@@ -13,10 +13,16 @@ extends RefCounted
 ##   body a shot is stuck to, the bodies a zap is due on): walked as **who** they point at and never
 ##   entered (`identity`): an actor by its id (a reference is to a live body, so its id says which;
 ##   what a body keeps of one that may be gone is its key, `Actors.key_of`, N5), anything else by
-##   what it is;
+##   what it is; a list of them that holds only bodies (and empty entries) is one leaf of their
+##   actor ids (`_bodies_as_ids`, props W3b);
 ## - `SPARES` (free lists of spare records, each set whole when it is taken: Spells' spare launches),
 ##   walked as their size alone (N3c: their contents cannot change the game, and walking them was a
-##   fifth of the spells area's hash).
+##   fifth of the spells area's hash);
+## - `BY_ACTOR` (tables kept by actor id that grow with the actors: Spells' builds by caster): state,
+##   walked with the rest unless a walk asks for the area without them (`without_by_actor`, props
+##   W3). Who walks each actor's share of them, and how it is got, is `SimHash`'s (`ActorPart`): the
+##   walker only walks the value it is handed (`walk_value`, `values_of`). A snapshot walks the area
+##   whole.
 ## A list is a constant `Array[StringName]` named after its kind, or after its kind and `_` and a
 ## name of the script's own (`DERIVED_BEAM`): a script that extends one with a list cannot declare
 ## the same constant again, so it names its own. The lists are read from the script and the scripts
@@ -79,7 +85,7 @@ const VIEW_FOLDERS: Array[String] = [
 ]
 ## The kinds of list a simulation script may declare (see the class doc; RUN_KEEPS, the settings a
 ## new run keeps, is `SimFresh`'s).
-const LISTS: Array[String] = ["DERIVED", "VIEW", "REFS", "SPARES", "RUN_KEEPS"]
+const LISTS: Array[String] = ["DERIVED", "VIEW", "REFS", "SPARES", "BY_ACTOR", "RUN_KEEPS"]
 
 ## Each problem, as "path: what it holds; the fix".
 var problems: PackedStringArray = PackedStringArray()
@@ -129,33 +135,79 @@ static var _frozen_hashes: Dictionary[int, int] = {}
 const FROZEN_LEAF: StringName = &"frozen"
 ## Script to whether its objects say when they are idle (`func idle() -> bool`).
 static var _idles: Dictionary[Script, bool] = {}
+## Script to whether its bodies have `rest_leaf` (`_rests_of`).
+static var _rests: Dictionary[Script, bool] = {}
+## Script to its BY_ACTOR members, 1 each in `members` order (empty when it lists none).
+static var _by_actor_mask: Dictionary[Script, PackedByteArray] = {}
 ## The one leaf of an idle object.
 const IDLE: StringName = &"idle"
+## An empty entry, and a freed one, of a REFS array of bodies walked as ids (`_bodies_as_ids`): no
+## actor id is either.
+const NO_BODY: int = -1
+const FREED_BODY: int = -2
 ## Script to whether a node of it is walked when its holder owns it (`_walks_into`), for the scripts
 ## not in `also_simulation`.
 static var _enters: Dictionary[Script, bool] = {}
 
 
 ## Walks `object` (an area: a service, an actor table, a body) under the name `area`, handing every
-## leaf to `sink(path, value)` in a fixed order. Problems are added to `problems`.
-func walk(area: String, object: Object, sink: Callable) -> void:
+## leaf to `sink(path, value)` in a fixed order; `without_by_actor` leaves its BY_ACTOR members out.
+## Problems are added to `problems`.
+func walk(area: String, object: Object, sink: Callable, without_by_actor: bool = false) -> void:
 	_sink = sink
 	_seen.clear()
-	# The area itself is walked as its own holder (a body or a service is the root of its area).
-	_object(area, object, null, true)
+	_root(area, object, without_by_actor)
 	_sink = Callable()
 
 
 ## The hash's walk: as `walk`, with every leaf's value (as `SimHash.add_leaf` gives it: a packed or typed
 ## array as its type, size and engine hash) appended to `into`, in the same order. Paths are built
 ## only for the problems' sake (`with_paths`), and are best off.
-func values(area: String, object: Object, into: Array) -> void:
+func values(area: String, object: Object, into: Array, without_by_actor: bool = false) -> void:
 	_collecting = true
 	_values = into
 	_seen.clear()
-	_object(area, object, null, true)
+	_root(area, object, without_by_actor)
 	_values = []
 	_collecting = false
+
+
+## Walks `value` (what an area hands over of itself: an actor's share of its BY_ACTOR members) under
+## the name `area`, as a member of `owner` would be walked.
+func walk_value(area: String, value: Variant, owner: Object, sink: Callable) -> void:
+	_sink = sink
+	_seen.clear()
+	_value(area, value, owner)
+	_sink = Callable()
+
+
+## As `walk_value`, the hash's way (`values`).
+func values_of(area: String, value: Variant, owner: Object, into: Array) -> void:
+	_collecting = true
+	_values = into
+	_seen.clear()
+	_value(area, value, owner)
+	_values = []
+	_collecting = false
+
+
+## Whether `script` lists BY_ACTOR.
+static func has_by_actor(script: Script) -> bool:
+	if script == null:
+		return false
+	if not _members.has(script):
+		_plan(script)
+	return not _by_actor_mask[script].is_empty()
+
+
+## The area itself, walked as its own holder (a body or a service is the root of its area), whole or
+## without its BY_ACTOR members. A null or freed area is a leaf, as any object is.
+func _root(area: String, object: Object, without_by_actor: bool) -> void:
+	var script: Script = object.get_script() as Script if without_by_actor and is_instance_valid(object) else null
+	if script != null and has_by_actor(script):
+		_object(area, object, null, true, _by_actor_mask[script])
+	else:
+		_object(area, object, null, true)
 
 
 ## Whether `script` is a simulation script (in FOLDERS, not in VIEW_FOLDERS). An inner class has no path of its own and is
@@ -253,10 +305,16 @@ static func enters(script: Script) -> bool:
 
 ## True for a body: a node with an actor id (an `Actor`; `Tick.state_areas`' "actor 7").
 static func is_body(object: Object) -> bool:
-	if not object is Node:
-		return false
-	var id: Variant = object.get(&"id")
-	return typeof(id) == TYPE_INT and int(id) >= 0
+	return actor_id_of(object) >= 0
+
+
+## The actor id of `value` if it is a body (a live node with an int `id` of 0 or more: an actor's id
+## in the actor table, which says which body it is), else -1. The one place that says what a body is.
+static func actor_id_of(value: Variant) -> int:
+	if typeof(value) != TYPE_OBJECT or not is_instance_valid(value) or not value is Node:
+		return -1
+	var id: Variant = (value as Node).get(&"id")
+	return int(id) if typeof(id) == TYPE_INT and int(id) >= 0 else -1
 
 
 ## The simulation nodes (`enters`) added to `body` in play, which its scene does not make: the
@@ -318,14 +376,17 @@ static func _plan(script: Script) -> void:
 	var skip: PackedStringArray = listed(script, "DERIVED") + listed(script, "VIEW")
 	var refs: PackedStringArray = listed(script, "REFS")
 	var spares: PackedStringArray = listed(script, "SPARES")
+	var parted: PackedStringArray = listed(script, "BY_ACTOR")
 	var names := PackedStringArray()
 	var how := PackedByteArray()
+	var skips := PackedByteArray()
 	var types: Dictionary[String, int] = {}
 	for info: Dictionary in script.get_script_property_list():
 		types[String(info["name"])] = int(info["type"])
 	for name in declared(script):
 		if not skip.has(name):
 			names.append(name)
+			skips.append(1 if parted.has(name) else 0)
 			# A bool, a number, a string, a vector, a colour ... (TYPE_BOOL to TYPE_NODE_PATH): it can
 			# hold nothing else.
 			var type: int = int(types.get(name, TYPE_NIL))
@@ -337,6 +398,7 @@ static func _plan(script: Script) -> void:
 				how.append(REF if refs.has(name) else (PLAIN if type >= TYPE_BOOL and type <= TYPE_NODE_PATH else 0))
 	_members[script] = names
 	_how[script] = how
+	_by_actor_mask[script] = skips if parted.size() > 0 else PackedByteArray()
 	var named: Array[StringName] = []
 	for name in names:
 		named.append(StringName(name))
@@ -367,15 +429,12 @@ func _value(path: String, value: Variant, holder: Object) -> void:
 				# packed array.
 				_leaf(path, items)
 				return
-			if _collecting:
-				_values.append(items.size())
-			else:
-				_sink.call(path + "#" if with_paths else path, items.size())
+			_leaf(path, items.size(), "#")
 			# A slot-sized array (a pool's or a carrier's per-shot objects) is mostly empty: with
 			# empty slots, only the filled ones are walked, each after its index, as `_ref` does (the
 			# empty slots were most of a hash's leaves: 15,000 of the spells area's 20,000).
 			var empty: int = 0 if items.is_typed() and element != TYPE_OBJECT else items.count(null)
-			_leaf(_join(path, "~"), empty)
+			_leaf(path, empty, "~")
 			if empty == items.size():
 				return
 			var rows: Script = items.get_typed_script() as Script
@@ -387,7 +446,7 @@ func _value(path: String, value: Variant, holder: Object) -> void:
 				if empty > 0:
 					if item == null:
 						continue
-					_leaf(_join(_index(path, i), "@"), i)
+					_leaf_at(path, i, i, "@")
 				var at: String = _index(path, i) if with_paths else path
 				if typeof(item) == TYPE_OBJECT:
 					_object(at, item, holder)
@@ -396,7 +455,7 @@ func _value(path: String, value: Variant, holder: Object) -> void:
 		TYPE_DICTIONARY:
 			var table: Dictionary = value
 			var keys: Array = sorted_keys(table)
-			_leaf(_join(path, "#"), keys.size())
+			_leaf(path, keys.size(), "#")
 			for key: Variant in keys:
 				var at: String = _index(path, key)
 				_key(at, key)
@@ -420,12 +479,9 @@ func _idle_rows(path: String, items: Array, has_empty: bool, holder: Object) -> 
 		if item == null:
 			continue
 		if has_empty:
-			_leaf(_join(_index(path, i), "@"), i)
+			_leaf_at(path, i, i, "@")
 		if item.call(&"idle"):
-			if _collecting:
-				_values.append(IDLE)
-			else:
-				_sink.call(_index(path, i) + ".idle" if with_paths else path, IDLE)
+			_leaf_at(path, i, IDLE, ".idle")
 		else:
 			_object(_index(path, i) if with_paths else path, item, holder)
 
@@ -449,12 +505,15 @@ func _frozen_leaf(path: String, object: Object, script: Script) -> void:
 		if known and worked != _frozen_hashes[id]:
 			_problem(path, "changed after it was made (%s is FROZEN)" % script.resource_path.get_file(), "take FROZEN off its script, or stop the change")
 		_frozen_hashes[id] = worked
-	if _collecting:
-		_values.append(FROZEN_LEAF)
-		_values.append(_frozen_hashes[id])
-	else:
-		_sink.call(path + ".frozen" if with_paths else path, FROZEN_LEAF)
-		_sink.call(path + ".frozen" if with_paths else path, _frozen_hashes[id])
+	_leaf(path, FROZEN_LEAF, ".frozen")
+	_leaf(path, _frozen_hashes[id], ".frozen")
+
+
+## Whether a body of `script` sums itself up at rest (`rest_leaf`), asked once a script.
+static func _rests_of(node: Node, script: Script) -> bool:
+	if not _rests.has(script):
+		_rests[script] = node.has_method(&"rest_leaf")
+	return _rests[script]
 
 
 ## Whether objects of `script` are FROZEN.
@@ -481,27 +540,53 @@ func _ref(path: String, value: Variant) -> void:
 			# body, 100,000 slots) is nearly all empty, and walking every slot in GDScript cost
 			# 136 ms a hash at the 100,000 cap; an empty one costs one engine call.
 			var items: Array = value
-			_leaf(_join(path, "#"), items.size())
+			_leaf(path, items.size(), "#")
 			# (A typed array of arrays, as a carrier's struck lists, holds no null to count.)
 			var may_hold_null: bool = not items.is_typed() or items.get_typed_builtin() == TYPE_OBJECT
 			if may_hold_null and items.count(null) == items.size():
+				return
+			if may_hold_null and _bodies_as_ids(path, items):
 				return
 			for i in items.size():
 				var item: Variant = items[i]
 				if item == null:
 					continue
-				_leaf(_join(_index(path, i), "@"), i)
+				_leaf_at(path, i, i, "@")
 				_ref(_index(path, i), item)
 		TYPE_DICTIONARY:
 			var table: Dictionary = value
 			var keys: Array = sorted_keys(table)
-			_leaf(_join(path, "#"), keys.size())
+			_leaf(path, keys.size(), "#")
 			for key: Variant in keys:
 				var at: String = _index(path, key)
 				_key(at, key)
 				_ref(at, table[key])
 		_:
 			_value(path, value, null)
+
+
+## A REFS array whose filled entries are all bodies (`actor_id_of`: Combat's bodies by row, the
+## bodies a zap is due on), or bodies freed since: one leaf, the actor id of each entry (NO_BODY for
+## an empty one, FREED_BODY for a freed one), which a report names by its index (props W3b: a leaf
+## and a name an entry cost 2.8 us). An actor id says which body; the kind of body is not hashed (a
+## body's id is unique in the actor table). False, with nothing walked, when an entry is anything
+## else (a node with no actor id, another object): then each entry is walked as before.
+func _bodies_as_ids(path: String, items: Array) -> bool:
+	var ids := PackedInt64Array()
+	ids.resize(items.size())
+	for i in items.size():
+		var item: Variant = items[i]
+		if item == null:
+			ids[i] = NO_BODY
+		elif not is_instance_valid(item):
+			ids[i] = FREED_BODY
+		else:
+			var id: int = actor_id_of(item)
+			if id < 0:
+				return false
+			ids[i] = id
+	_leaf(path, ids, ".ids")
+	return true
 
 
 ## `table`'s keys in an order that is the same on every machine. The engine's `sort` orders
@@ -540,10 +625,12 @@ func _key(at: String, key: Variant) -> void:
 	if typeof(key) == TYPE_OBJECT:
 		_problem(at, "is keyed by an object", "key it by an id (an actor id, a slot), or add it to DERIVED")
 		return
-	_leaf(_join(at, "{}"), key)
+	_leaf(at, key, "{}")
 
 
-func _object(path: String, value: Variant, holder: Object, root: bool = false) -> void:
+## `skip` marks the root's members left out (`_members_of`): its BY_ACTOR ones when the area less them
+## is walked.
+func _object(path: String, value: Variant, holder: Object, root: bool = false, skip: PackedByteArray = PackedByteArray()) -> void:
 	if value == null:
 		_leaf(path, null)
 		return
@@ -564,9 +651,9 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 		# the checks below apply.
 		_seen[id] = _seen.size()
 		if _idles[script] and bool(object.call(&"idle")):
-			_leaf(_join(path, ".idle"), IDLE)
+			_leaf(path, IDLE, ".idle")
 			return
-		_members_of(path, object, script)
+		_members_of(path, object, script, skip)
 		return
 	var node: Node = object as Node
 	if node != null:
@@ -605,9 +692,9 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 		return
 	_seen[id] = _seen.size()
 	if _idles_of(script) and bool(object.call(&"idle")):
-		_leaf(_join(path, ".idle"), IDLE)
+		_leaf(path, IDLE, ".idle")
 		return
-	if root and node != null and node.has_method(&"rest_leaf"):
+	if root and node != null and _rests_of(node, script):
 		# A body at rest, as it was made and with nothing to do (props W2: a standing prop): one
 		# leaf of what may differ between two bodies made alike (`Actor.rest_leaf`).
 		var rest: Variant = node.call(&"rest_leaf")
@@ -615,13 +702,13 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 			# Each value a leaf of its own, hashed by its bytes as a member is (an array's `hash()`
 			# would take -0.0 for 0.0).
 			var values: Array = rest
-			_leaf(_join(path, ".rest"), values.size())
+			_leaf(path, values.size(), ".rest")
 			for i in values.size():
-				_leaf(_index(path + ".rest", i) if with_paths else path, values[i])
+				_leaf_at(path + ".rest" if with_paths else path, i, values[i])
 			return
 	if node is Node2D:
-		_leaf(_join(path, ".position"), (node as Node2D).position)
-	_members_of(path, object, script)
+		_leaf(path, (node as Node2D).position, ".position")
+	_members_of(path, object, script, skip)
 	if root and is_body(node):
 		# The simulation nodes added to it in play that no member holds (a possession's puppet).
 		for added: Node in added_in_play(node):
@@ -629,11 +716,15 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 				_object(_join(path, "/" + str(node.get_path_to(added))), added, node)
 
 
-## Every state member of `object` (of `script`), in order, by how its plan says.
-func _members_of(path: String, object: Object, script: Script) -> void:
+## Every state member of `object` (of `script`), in order, by how its plan says; with `skip`, but
+## those it marks (the area less its BY_ACTOR members).
+func _members_of(path: String, object: Object, script: Script, skip: PackedByteArray = PackedByteArray()) -> void:
 	var names: Array = _member_names[script]
 	var how: PackedByteArray = _how[script]
+	var skipping: bool = not skip.is_empty()
 	for i in names.size():
+		if skipping and skip[i] != 0:
+			continue
 		var name: StringName = names[i]
 		if _collecting and how[i] == PLAIN:
 			_values.append(object.get(name))
@@ -648,7 +739,7 @@ func _members_of(path: String, object: Object, script: Script) -> void:
 		if how[i] == REF:
 			_ref(at, object.get(name))
 		elif how[i] == SPARE:
-			_leaf(_join(at, "#"), (object.get(name) as Array).size())
+			_leaf(at, (object.get(name) as Array).size(), "#")
 		elif how[i] == PLAIN or how[i] == PACKED:
 			_leaf(at, object.get(name))
 		else:
@@ -665,12 +756,34 @@ func _walks_into(script: Script) -> bool:
 	return enters(script)
 
 
-## Hands one leaf to the sink, or, in the hash's walk (`values`), appends its value.
-func _leaf(path: String, value: Variant) -> void:
+## Hands one leaf to the sink at `path` and `suffix` (".position"), or, in the hash's walk
+## (`values`), appends its value as `SimHash.add_leaf` gives it (a plain one as it is): the path is
+## built only for a sink that wants paths (props W3b: the calls a leaf made were most of the
+## walker's cost per leaf).
+func _leaf(path: String, value: Variant, suffix: String = "") -> void:
 	if _collecting:
-		SimHash.add_leaf(_values, value)
+		_append(value)
+	elif with_paths:
+		_sink.call(path + suffix, value)
 	else:
 		_sink.call(path, value)
+
+
+## As `_leaf`, at `path[key]` and `suffix`.
+func _leaf_at(path: String, key: Variant, value: Variant, suffix: String = "") -> void:
+	if _collecting:
+		_append(value)
+	else:
+		_sink.call(_index(path, key) + suffix if with_paths else path, value)
+
+
+## A leaf's value in the hash's walk, as `SimHash.add_leaf` gives it (a plain one as it is, without
+## the call).
+func _append(value: Variant) -> void:
+	if typeof(value) < TYPE_DICTIONARY:
+		_values.append(value)
+	else:
+		SimHash.add_leaf(_values, value)
 
 
 ## A problem: where, what it holds, and the fix, with where the lists are explained.

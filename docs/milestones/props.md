@@ -1,8 +1,8 @@
 # Props: things in the world that stand, block, take hits, react and give off motes
 
-**Status (2026-11-11): approved by the owner** ("approved, merge and start it"), written with the owner in an owner session on 2026-11-10; **W1 and W2 done (2026-11-11), W3 next** (the owner: Spells' hash by caster is the next step). It runs beside the online lobby (the owner, 2026-11-10: "Run beside it"). Asked by the owner after the hub (online lobby L1), on the hub's art: "we need to be able to make a ton of new 'assets' like the stone, with motes coming off almost everything. How could a system like that be made?" Then: "Props can block movement and be hit and props like a barrel will explode if hit by the right element - configurable." On a separate table of props: "This sound like coding 90% of an actor. Why not just use an actor, but maybe make it cheaper by not having a controller attached, which means no movement logic?" On possessing a prop: "Possess would actually be cool. So keep it." On several reactions to one hit: "it should be able to fire several I think. Not really sure though."
+**Status (2026-11-11): approved by the owner** ("approved, merge and start it"), written with the owner in an owner session on 2026-11-10; **W1, W2, W3 and W3b done (2026-11-11), W4 next**. It runs beside the online lobby (the owner, 2026-11-10: "Run beside it"). Asked by the owner after the hub (online lobby L1), on the hub's art: "we need to be able to make a ton of new 'assets' like the stone, with motes coming off almost everything. How could a system like that be made?" Then: "Props can block movement and be hit and props like a barrel will explode if hit by the right element - configurable." On a separate table of props: "This sound like coding 90% of an actor. Why not just use an actor, but maybe make it cheaper by not having a controller attached, which means no movement logic?" On possessing a prop: "Possess would actually be cool. So keep it." On several reactions to one hit: "it should be able to fire several I think. Not really sure though."
 
-The steps are **W1 to W9** (W for the world's things). Each is one PR, in order.
+The steps are **W1 to W9** (W for the world's things), with W3b added after W3 by the owner. Each is one PR, in order.
 
 ## What the players see
 
@@ -128,6 +128,42 @@ Added by the owner after W2 (2026-11-11): "the fix for this should be added to t
 - The walker, the hash and snapshots stay generic: Spells says what its parts are (one method the hash asks, as `rest_leaf` is for a body), and a snapshot still saves Spells whole.
 
 **Done when:** `prop_cost.gd` shows Spells' hash flat in the props (within a millisecond from 0 to 1,000) and the worst tick of a spread hash at 1,000 props under 5 ms; `test_state_walked`, `test_determinism`, `test_content_determinism`, the replays across platforms (`tools/platform_hashes.py`) and the desync report's tests pass; the stress run's hash numbers before and after are in docs/DECISIONS.md.
+
+**Done (2026-11-11).** Built as above, with these differences:
+
+- **Parts are a kind of member, not Spells' own code** (`BY_ACTOR`, core/sim/README.md, "The hash"): any area may list the tables it keeps by actor id, and hand each id's over (`actor_parts()`, `actor_part(id)`, empty for an id with none). Only `SimHash` makes parts and calls `actor_parts`/`actor_part` (`split_by_actor`, `slice`, `areas`; the desync report goes through `areas` with a sink): the area without those members under its own name, and "Spells 7" for caster 7, which `slice` puts with the body "actor 7"; an empty share is no area. The walker walks an area with or without its BY_ACTOR members, or a value it is handed, and knows nothing of parts. `SimHash.of`, a walk of the area itself and a snapshot take Spells whole, so nothing that hands Spells over alone loses a table.
+- **What is parted:** the tables that grew with the casters (`_installed`, `_profiles`, `_node_counts`, `_live`, `_generation_live`, `_last_infused`). The packed arrays kept by actor (wind-ups, cooldowns, cursors, generations) stay in Spells' area: each is one engine `hash()` call whatever the number of casters (flat), and the desync report already names the first index that differs, which is the caster's row. `_penta_rings` (by a Penta card's tag) stays too: only casters of Penta have a row.
+- **A resting caster** is its builds as installed and its last infusion (each FROZEN, one leaf). What says it rests is a new count, `_caster_live` (by caster, the sum of `_generation_live`, written only by the two functions that write that table; state, not DERIVED: exact in a snapshot with nothing to rebuild): at 0 its only generations are its staffs' current ones, whose spells are its builds' nodes (set and freed together), so the tables are not looked at. While something of its builds is alive, its part has one entry a generation it holds, staff by staff in order (looked up by key, never sorted): the generation, its node count, what is alive of it, its live shots by node and an older build's spells, so a report names a generation. **What the resting part stands on is checked** (`Spells.actor_part_problems()`): at every walk of every card (`test_state_walked.gd`), through a fight and a wrap of the generations, and a test changes each BY_ACTOR table in turn and fails unless its caster's part changes or `actor_part_problems` names it (a table with no case fails too).
+- **The net check holds a body and a part an actor** (`NetMessage.MAX_AREAS` is twice the actor table and the services; it was 2,048, under 1,024 bodies and 1,024 parts).
+- **The Tick keeps its bodies' names** ("actor 7", made once by id, not at every call): the spread hash asks for the areas every tick (`state_areas` took 0.66 ms at 1,000 bodies, most of it the names).
+
+Numbers (`prop_cost.gd`, headless, the owner's machine, main and W3 back to back):
+
+| | 0 | 300 | 1,000 |
+|---|---|---|---|
+| Spells' area | 2.03 ms (main) / 1.42 | 5.95 / 1.55 | 16.39 / 1.73 |
+| the casters' parts (W3) | 0.32 | 3.00 | 11.01 |
+| State hash, whole | 4.77 / 4.24 | 12.54 / 11.57 | 33.69 / 34.92 |
+| State hash, worst tick of 60 | 1.78 / 1.42 | 6.16 / 2.04 | 16.26 / 4.09 |
+
+Spells' area is flat (within 0.3 ms from 0 to 1,000) and the worst spread tick at 1,000 is 4.0 to 4.9 ms over five runs; it is Combat's tick now (2.8 ms at 1,000, its own tables by actor, which `BY_ACTOR` could take the same way) with the fixed cost of naming and slicing the areas (about 1 ms at 1,000). The whole hash is no cheaper: a caster's part costs about 10 us, nearly all of it the walker's own cost per area and per element (about 1 us an array element), as a resting body's `rest_leaf` does (11 us).
+
+**Reviewed** (an independent review, 2026-11-11): the walker's part was a hidden mode that a second walk of an area that is no node skipped, the net check's area cap was under a full table of bodies and parts, a BY_ACTOR table could leave the hash with no test failing, and a report on a part named a running index; all fixed as above.
+
+**Left:** the walker's cost per area and per element (the next lever for the whole hash: bodies 11 ms and parts 10 ms at 1,000); Combat's references to its bodies (2.8 ms of its 3 ms at 1,000, walked one by one); the net check sends a name and a hash a caster with a build (about 17 bytes a caster a second).
+
+## W3b: the walker's cost per entry (engine, every area)
+
+Added by the owner after W3 (2026-11-11): "If it makes the code more general, then sure, go for it. It should be easy to maintain new features in the future as well." W3 left Combat as the worst tick of the spread hash (2.8 ms at 1,000 props), and the walker's own cost per area and per entry as most of what a resting body and a caster's part cost.
+
+- **A list of references to bodies is one leaf of their actor ids** (`StateWalk._bodies_as_ids`): every REFS list, not Combat's alone (its bodies by row, a zap's due bodies, a carrier's struck lists). An actor id says which body, as `identity` does; a report names the row (`Combat._nodes.ids: [37] 5 vs 6`). A list with anything else in it (a node with no actor id, a freed one) is walked entry by entry, as before.
+- **One leaf call, its path built only when wanted:** `_leaf(path, value, suffix)` and `_leaf_at(path, key, value, suffix)` in place of `_leaf(_join(_index(...)))`, a plain value appended as it is; whether a body's script sums itself up at rest (`rest_leaf`) is asked once a script.
+
+**Done when:** Combat's hash flat in the props (within a millisecond from 0 to 1,000); `test_state_walk`, `test_state_walked`, the determinism tests, `tools/online_pair.sh` and the Linux replays pass.
+
+**Done (2026-11-11).** `prop_cost.gd` at 1,000 props, W3 against W3b back to back: Combat's area 2.90 ms against 0.80 (0.14 at none), the worst tick of a spread hash 4.15 ms against 3.08, the whole hash 35.4 against 30.1 ms (a resting body 11.8 against 10.8 us, a caster's part 12.5 against 10.7 us). The stress run (desktop) is unchanged (whole 40.2 ms, worst spread tick 4.34 ms): its bodies fight, so each is walked member by member (150 us a body).
+
+**Left:** a resting body or a caster's part still costs about 10 us, 5 to 6 of it the walker's handling of a root and of nested arrays (a few calls an entry); what remains is reordering its hottest branches for fractions of a microsecond each, which the owner's rule on maintainable code weighs against. A fighting body's member-by-member walk is the stress run's cost, for the netcode's later steps.
 
 ## W4: a prop in the game (engine)
 

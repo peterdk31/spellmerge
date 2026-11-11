@@ -20,6 +20,7 @@ extends Node
 ## Started by `prop_cost.gd`. Prints `PROP COST OK` and quits 0, or `PROP COST FAILED` and 1 (the
 ## hub did not start, a snapshot named problems, or the log has an error).
 
+const HashLabel := preload("res://tests/benchmark/hash_label.gd")
 const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const TickScript := preload("res://core/sim/tick.gd")
@@ -227,7 +228,8 @@ func _time_hash(count: int) -> void:
 	var by_area: Dictionary[String, int] = {}
 	for i in HASH_PASSES:
 		var start: int = Time.get_ticks_usec()
-		var named: Dictionary = _tick.state_areas()
+		# An area with parts as its parts (Spells' casters, props W3), as `SimHash.areas` takes it.
+		var named: Dictionary = SimHash.split_by_actor(_tick.state_areas())
 		areas = named.size()
 		var walk := StateWalk.new()
 		walk.with_paths = false
@@ -238,7 +240,8 @@ func _time_hash(count: int) -> void:
 			if name.begins_with(SimHash.BODY_PREFIX):
 				body_total += Time.get_ticks_usec() - area_start
 			else:
-				by_area[name] = by_area.get(name, 0) + Time.get_ticks_usec() - area_start
+				var key: String = HashLabel.of(name, named[name] as Object)
+				by_area[key] = by_area.get(key, 0) + Time.get_ticks_usec() - area_start
 		SimHash.whole(hashes)
 		problems = walk.problems
 		total += Time.get_ticks_usec() - start
@@ -256,7 +259,7 @@ func _time_hash(count: int) -> void:
 	var keys: Array = by_area.keys()
 	keys.sort_custom(func(a: String, b: String) -> bool: return by_area[a] > by_area[b])
 	var shown: Array[String] = []
-	for key: String in keys.slice(0, 4):
+	for key: String in keys.slice(0, 5):
 		shown.append("%s %.2f" % [key, float(by_area[key]) / HASH_PASSES / 1000.0])
 	print("BENCH: props %d: state hash, the costliest areas but the bodies (ms): %s" % [count, ", ".join(shown)])
 	for problem in problems.slice(0, 5):

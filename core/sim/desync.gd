@@ -44,13 +44,11 @@ func capture(areas: Dictionary) -> void:
 	if not keep:
 		hashes.append(SimHash.areas(areas, walk))
 	else:
-		var tick_hashes: Dictionary[String, int] = {}
 		leaves = {}
-		for name: Variant in areas:
-			var kept: Dictionary = {}
-			tick_hashes[String(name)] = SimHash.area(walk, String(name), areas[name] as Object, func(path: String, value: Variant) -> void: kept[path] = _copy(value))
-			leaves[String(name)] = kept
-		hashes.append(tick_hashes)
+		hashes.append(SimHash.areas(areas, walk, func(area: String, path: String, value: Variant) -> void:
+			if not leaves.has(area):
+				leaves[area] = {}
+			(leaves[area] as Dictionary)[path] = _copy(value)))
 	for problem in walk.problems:
 		if not problems.has(problem):
 			problems.append(problem)

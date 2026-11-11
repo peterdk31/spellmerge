@@ -10,6 +10,8 @@ extends "res://tests/support/suite.gd"
 ## - Every card of content/spells, cast in the card rules' world (tests/support/card_rules_world.gd)
 ##   and walked as it casts, flies and lands. New cards and carriers are walked the day they land,
 ##   with no edit here.
+## - An area hashed by parts (BY_ACTOR) is asked whether its parts still stand (`actor_part_problems`) at
+##   every walk.
 
 const SimScenes := preload("res://tests/core/sim_scenes.gd")
 const CardWorld := preload("res://tests/support/card_rules_world.gd")
@@ -102,7 +104,9 @@ func _check_scene(name: StringName) -> void:
 ## The hash's two walks agree on every area (core/sim/sim_hash.gd): the quick one (no paths, the
 ## values appended by the walk itself, its short ways: plain members, packed arrays, idle rows, spare
 ## pools) and the desync report's (paths, every leaf handed over).
-func _check_hash_modes(scene: StringName, areas: Dictionary) -> void:
+func _check_hash_modes(scene: StringName, named: Dictionary) -> void:
+	# An area with parts as its parts (Spells' casters, props W3), as the hash takes them.
+	var areas: Dictionary = SimHash.split_by_actor(named)
 	for name: Variant in areas:
 		var quick := StateWalk.new()
 		quick.with_paths = false
@@ -126,6 +130,13 @@ func _walk(areas: Dictionary) -> PackedStringArray:
 		walk.walk(String(name), areas[name] as Object, func(_path: String, _value: Variant) -> void: leaves[0] += 1)
 	if leaves[0] == 0:
 		walk.problems.append("the walk reached no state")
+	# An area hashed by parts checks what its parts stand on (BY_ACTOR, props W3: Spells' resting
+	# casters skip their tables), so a writer that breaks it is named here, card by card.
+	for name: Variant in areas:
+		var area: Object = areas[name]
+		if is_instance_valid(area) and StateWalk.has_by_actor(area.get_script() as Script):
+			for problem: String in area.call(&"actor_part_problems"):
+				walk.problems.append("%s parts: %s" % [name, problem])
 	return walk.problems
 
 

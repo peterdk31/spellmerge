@@ -15,6 +15,8 @@ extends "res://tests/support/suite.gd"
 ##   not call (a clock, the dice, the engine's maths, input, the camera) is
 ##   tests/core/test_sim_rules.gd's (N9).
 ## - A name in VIEW is a member, or a function that only draws (N9).
+## - A script that lists BY_ACTOR hands its parts over and checks them (`actor_parts`, `actor_part`,
+##   `actor_part_problems`; props W3).
 ## - The simulation folders in core/sim/README.md's table are StateWalk.FOLDERS.
 ##
 ## Each failure names the file, the member and the fix ("add it to DERIVED, it is set up again, not
@@ -31,6 +33,29 @@ func test_every_listed_name_is_a_member() -> void:
 			for name in StateWalk.listed(script, list):
 				var known: bool = members.has(name) or (list == "VIEW" and view_functions.has(name))
 				check(known, "%s: %s lists %s, which is no member%s (renamed?); take it out" % [entry["name"], list, name, " or function" if list == "VIEW" else ""])
+
+
+## A script that lists BY_ACTOR (state the hash walks id by id, props W3) hands each id's part over:
+## `actor_parts() -> int` and `actor_part(id) -> Array` (core/sim/sim_hash.gd, `Part`).
+func test_a_parted_script_hands_its_parts_over() -> void:
+	for entry in SimSource.scripts():
+		var script: Script = entry["script"]
+		if StateWalk.listed(script, "BY_ACTOR").is_empty():
+			continue
+		var methods: Dictionary[String, String] = {}
+		for method: Dictionary in script.get_script_method_list():
+			var returned: Dictionary = method["return"]
+			methods[String(method["name"])] = type_string(int(returned["type"]))
+		check_equal(methods.get("actor_parts", ""), "int", "%s lists BY_ACTOR: it has actor_parts() -> int" % entry["name"])
+		check_equal(methods.get("actor_part", ""), "Array", "%s lists BY_ACTOR: it has actor_part(id) -> Array" % entry["name"])
+		# What its parts leave out it checks itself (empty when they leave nothing out), asked at every
+		# walk of every card (test_state_walked.gd).
+		check_equal(methods.get("actor_part_problems", ""), "PackedStringArray", "%s lists BY_ACTOR: it has actor_part_problems() -> PackedStringArray" % entry["name"])
+		# A BY_ACTOR member is state walked by id: in no other list (a REFS one would be entered in its
+		# part, a DERIVED one never hashed).
+		for list: String in ["DERIVED", "VIEW", "REFS", "SPARES"]:
+			for name in StateWalk.listed(script, "BY_ACTOR"):
+				check(not StateWalk.listed(script, list).has(name), "%s: %s is BY_ACTOR and %s; take it out of one" % [entry["name"], name, list])
 
 
 ## A setting a new run keeps (RUN_KEEPS, core/sim/sim_fresh.gd) is a state member: one in DERIVED or

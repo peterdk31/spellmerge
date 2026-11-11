@@ -209,3 +209,17 @@ func test_random_bytes_are_refused_or_read_whole() -> void:
 			check(name.length() >= 1 and name.length() <= NetMessage.MAX_NAME, "a name")
 	check(refused > 2000, "most are refused (%d)" % refused)
 	check(taken > 100, "and a change that keeps a message whole is read (%d)" % taken)
+
+
+## A check holds every area of a full actor table: a body an actor, an actor's part of each area
+## kept by actor id (BY_ACTOR, props W3: "Spells 7"), and the services. A second area that lists
+## BY_ACTOR adds a part an actor: this fails until MAX_AREAS grows with it (an area past it is left
+## out of the check, and the other machine reports it as differing).
+func test_a_check_holds_a_full_table_of_bodies_and_parts() -> void:
+	var by_actor: int = 0
+	for entry in preload("res://tests/support/sim_source.gd").scripts():
+		if StateWalk.has_by_actor(entry["script"] as Script):
+			by_actor += 1
+	check(by_actor >= 1, "Spells keeps state by actor id")
+	var actors: int = preload("res://core/actors/actors.gd").ACTORS
+	check(NetMessage.MAX_AREAS >= (1 + by_actor) * actors + 64, "%d areas hold %d bodies, %d parts each and the services" % [NetMessage.MAX_AREAS, actors, by_actor])

@@ -132,9 +132,10 @@ constexpr double SPECK_RADIUS = 2.0;
 constexpr int64_t LOOK_ENEMY_RAMP = 1 << 22;
 constexpr int64_t EMITTING_MASK = ((1 << 21) - 1) & ~(1 << 10);
 constexpr int PARTICLES_PER_SHOT_MAX = 12;
-// core/actors: the first ramp that is not a hat's, and "no team".
+// core/actors: the first ramp that is not a hat's, "no team", and the world's (nobody's foe).
 constexpr int RAMP_ENEMY = 4;
 constexpr int TEAM_NONE = -1;
+constexpr int TEAM_WORLD = 2;
 // The threat grid.
 constexpr int THREAT_SPAN_MAX = 16;
 // The slots one task of a loop over every shot takes (jobs.h: fixed, whatever the threads).
@@ -408,7 +409,8 @@ struct HitPass {
 					work_left -= 1;
 					// `is_instance_valid(_targets[t])`: the node of the id kept beside it still exists.
 					if ((target_layer[t] & lay) != 0 && (caster < 0 || target_owner[t] != caster) &&
-							(tm == TEAM_NONE || target_team[t] != tm) &&
+							// `Actors.is_foe(tm, target_team[t])`.
+							target_team[t] != TEAM_WORLD && (tm == TEAM_NONE || target_team[t] != tm) &&
 							::godot::gdextension_interface::object_get_instance_from_id((GDObjectInstanceID)target_id[t]) != nullptr &&
 							target_mark[t] != stamp) {
 						const Vector2 to_target = target_pos[t] - origin;
@@ -883,7 +885,7 @@ void ShotKernel::free_names() {
 }
 
 // Every constant above that the GDScript also holds, by its GDScript name (PI and TAU are
-// GDScript's; HOMING_DRIFT, RAMP_ENEMY and TEAM_NONE come from other scripts, see `set_native`).
+// GDScript's; HOMING_DRIFT, RAMP_ENEMY, TEAM_NONE and TEAM_WORLD come from other scripts, see `set_native`).
 struct Constant {
 	const char *name;
 	double value;
@@ -978,6 +980,7 @@ const Constant CONSTANTS[] = {
 	{ "PARTICLES_PER_SHOT_MAX", (double)PARTICLES_PER_SHOT_MAX },
 	{ "RAMP_ENEMY", (double)RAMP_ENEMY },
 	{ "TEAM_NONE", (double)TEAM_NONE },
+	{ "TEAM_WORLD", (double)TEAM_WORLD },
 	{ "THREAT_SPAN_MAX", (double)THREAT_SPAN_MAX }
 };
 

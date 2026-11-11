@@ -50,7 +50,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `discharge_arc` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `ai` (`DummyLook` only; an actor's own components hear its `Actor.damaged`, which Combat sends with it) |
 | `status_applied` | `combat` | `feel` |
-| `enemy_died` | `combat` (every actor not on the players' team) | `feel`, `flow` |
+| `enemy_died` | `combat` (every foe of the players, never a prop: `Actors.is_foe`) | `feel`, `flow` |
 | `player_downed` | `player` (Downed) | `combat`, `feel`, `flow`, `run` |
 | `player_revived` | `player` (Downed) | `combat`, `flow` |
 | `revive_progress` | `coop` | `player` (Downed) |

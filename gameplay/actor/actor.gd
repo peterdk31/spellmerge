@@ -12,8 +12,9 @@ extends Node2D
 ##
 ## Components: found once in `_ready` among the children, at most one of each kind, none required:
 ## `health` (Health), `hurtbox` (Hurtbox), `contact` (Contact), `mover` (Mover), `caster`
-## (Caster), plus any number of looks (ActorLook) and the first ActorController, its
-## `home_controller`. Components reach each other only through the actor, never by node path.
+## (Caster), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
+## circle when its scene has none, so every actor has one), plus any number of looks (ActorLook)
+## and the first ActorController, its `home_controller`. Components reach each other only through the actor, never by node path.
 ##
 ## Controllers: `controller` is the one driving it now: its home controller, a guest handed over
 ## by `drive` (possess, G9), or none. `release` gives the guest back. A controller drives one actor
@@ -55,9 +56,9 @@ extends Node2D
 ## (`ActorComponent.at_rest`, false unless a component says). Only the hash does; a snapshot saves
 ## every body whole.
 ##
-## The move (online-ready N6): `move(delta)` slides the body, a circle of its Mover's `body_radius`,
-## along the walls (the room's and the solid shots', the projectile manager's wall grid,
-## `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
+## The move (online-ready N6): `move(delta)` slides the body, its footprint's circle (`wall_radius`),
+## along the walls (the room's, the solid shots' and the footprints', the projectile manager's
+## wall grid, `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
 ## moved by over the step, so a body against a wall keeps only its slide. Actors walk through each
 ## other (Combat's push parts them); spells find them by their hurt circles. No physics engine.
 ##
@@ -103,7 +104,8 @@ const REFS: Array[StringName] = [&"controller"]
 
 ## The colour ramp of its spells: 0-3 the hat colours, 4 the enemy ramp.
 @export var ramp: int = ActorsScript.RAMP_ENEMY
-## The team it keeps while no controller drives it and it has no home controller.
+## The team it keeps while no controller drives it and it has no home controller: a prop's is
+## `Actors.TEAM_WORLD` (props W4).
 @export var idle_team: int = ActorsScript.NONE
 ## The body: the hurt circle's centre and the orbit anchor, from the feet.
 @export var body_offset: Vector2 = Vector2(0.0, -12.0)
@@ -143,6 +145,7 @@ var hurtbox: Hurtbox = null
 var contact: Contact = null
 var mover: Mover = null
 var caster: Caster = null
+var footprint: Footprint = null
 ## True when something downs the actor at 0 health instead of letting it die (a Downed
 ## component, G7, sets it).
 var downable: bool = false
@@ -252,9 +255,11 @@ func rest_leaf() -> Variant:
 
 ## Move the body by `velocity` for `delta` seconds, sliding along the walls (see the class doc); when
 ## a wall changed the move, `velocity` is left as what it moved by. A body standing still is moved
-## too: a wall laid over it (a Wall card's) pushes it out.
+## too: a wall laid over it (a Wall card's) pushes it out. A body with no Mover never moves (props
+## W4: a prop stands in its own footprint, which would push it out; a possession drives it, and it
+## still stands).
 func move(delta: float) -> void:
-	if delta <= 0.0:
+	if delta <= 0.0 or mover == null:
 		return
 	var from: Vector2 = global_position
 	var unhindered: Vector2 = from + velocity * delta
@@ -264,9 +269,9 @@ func move(delta: float) -> void:
 		velocity = (to - from) / delta
 
 
-## The radius of the body against the walls: its Mover's `body_radius` (0 without a Mover).
+## The radius of the body against the walls: its footprint's circle (`Footprint.radius`).
 func wall_radius() -> float:
-	return mover.body_radius if mover != null else 0.0
+	return footprint.radius if footprint != null else 0.0
 
 
 ## Advance the actor by `delta` seconds and set `velocity` (see the class doc for the order). The
@@ -324,8 +329,13 @@ func step(delta: float) -> void:
 
 ## Whom it aims at: its driver's team (its home controller's while none drives it).
 func team() -> int:
-	var by: ActorController = controller if controller != null else home_controller
-	return by.team if by != null else idle_team
+	return controller.team if controller != null else own_team()
+
+
+## The team it is on by itself, whoever drives it now: its home controller's, else `idle_team` (a
+## prop's is the world's). A possessed enemy's death is still an enemy's (Combat).
+func own_team() -> int:
+	return home_controller.team if home_controller != null else idle_team
 
 
 ## The human seat (0-3) driving it now, or -1.
@@ -546,11 +556,19 @@ func _find_components() -> void:
 			mover = _first(mover, child) as Mover
 		elif child is Caster:
 			caster = _first(caster, child) as Caster
+		elif child is Footprint:
+			footprint = _first(footprint, child) as Footprint
 		elif child is ActorComponent:
 			# A kind the kit does not name (the wizard's Downed): stepped by nobody, attached too.
 			_components.append(child as ActorComponent)
+	if footprint == null:
+		# Every actor stands on some ground (props W4): one with the default circle when its scene
+		# has none, added as a boss's Phases is (a snapshot makes it again before `_ready`).
+		footprint = Footprint.new()
+		footprint.name = "Footprint"
+		add_child(footprint)
 	# Set up and attached in this order: health first, the caster last (it names the hurtbox).
-	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, caster]
+	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster]
 	var at: int = 0
 	for component in ordered:
 		if component != null:
@@ -604,7 +622,7 @@ func _apply_data() -> void:
 
 
 ## Make the body `factor` times its drawn size (a boss, a boss's phase): the node scales, and the
-## points and circles kept in pixels (hurt circle, body, hand and the Mover's `body_radius`) with
+## points and circles kept in pixels (hurt circle, body, hand and its footprint) with
 ## it. A hurt circle already registered is registered again at its new size.
 func set_size(factor: float) -> void:
 	if factor <= 0.0 or is_equal_approx(factor, size):
@@ -614,8 +632,8 @@ func set_size(factor: float) -> void:
 	scale = Vector2(factor, factor)
 	body_offset *= by
 	hand_offset *= by
-	if mover != null:
-		mover.body_radius *= by
+	if footprint != null:
+		footprint.scale_by(by)
 	if hurtbox != null:
 		hurtbox.radius *= by
 		hurtbox.offset *= by

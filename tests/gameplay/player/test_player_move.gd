@@ -118,7 +118,7 @@ func _test_wizard_scene() -> void:
 	_check(wizard.get_node_or_null("StaffLook") is StaffLook, "the wizard scene has a StaffLook")
 	_check(wizard.get_node_or_null("Face") is Face, "the wizard scene wears a Face")
 	_check(wizard.get_class() == "Node2D" and wizard.get_node_or_null("CollisionShape2D") == null, "wizards are no physics bodies (online-ready N6)")
-	_check((wizard.get_node("Mover") as Mover).body_radius == 6.0, "they walk against the walls as circles of their Mover's radius")
+	_check((wizard.get_node("Footprint") as Footprint).radius == 6.0, "they walk against the walls as circles of their footprint's radius (props W4)")
 	_check(wizard.get_node("Sprite").texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "the sprite is drawn with filtering off")
 	var caster := wizard.get_node("Caster") as Caster
 	_check(caster.staff_count == 4, "the wizard has four staffs")

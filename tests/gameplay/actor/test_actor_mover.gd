@@ -108,11 +108,11 @@ func test_teleport_keeps_the_body_out_of_walls_and_in_the_room() -> void:
 	var body: Actor = _mover()
 	_world.projectiles.set_walls([Rect2(60.0, 112.0, 200.0, 20.0)] as Array[Rect2])
 	_ask(body, &"teleport", Vector2(100.0, 0.0), 0.0)
-	check(not _world.projectiles.circle_blocked(body.global_position, body.mover.body_radius), "no part of the body is in the wall, got %s" % body.global_position)
+	check(not _world.projectiles.circle_blocked(body.global_position, body.wall_radius()), "no part of the body is in the wall, got %s" % body.global_position)
 	check(body.global_position.x > START.x + 50.0, "and it still jumped along the wall, got %s" % body.global_position)
 	var far: Actor = _mover(1)
 	_ask(far, &"teleport", Vector2(900.0, 0.0), 0.0)
-	check(not _world.projectiles.circle_blocked(far.global_position, far.mover.body_radius), "the body stays in the room, got %s" % far.global_position)
+	check(not _world.projectiles.circle_blocked(far.global_position, far.wall_radius()), "the body stays in the room, got %s" % far.global_position)
 
 
 func test_a_pull_moves_to_the_hit_over_the_time_asked() -> void:

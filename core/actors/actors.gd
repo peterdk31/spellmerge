@@ -43,9 +43,12 @@ const SEATS: int = 4
 const SHARED: int = SEATS
 ## No actor, no seat, no team: the world.
 const NONE: int = -1
-## The two teams so far; more are possible later.
+## The teams. The world's (props W4, docs/milestones/props.md) is the props': nobody's foe, so
+## nothing aims at it (`is_foe`), and every team is its foe, so its spells (a barrel's blast) go for
+## everyone. Hits land on every team alike, the world's too.
 const TEAM_WIZARDS: int = 0
 const TEAM_ENEMIES: int = 1
+const TEAM_WORLD: int = 2
 ## The enemy ramp (Blight); 0-3 are the four hat colours.
 const RAMP_ENEMY: int = 4
 
@@ -179,6 +182,15 @@ func open_ids(out: PackedInt32Array) -> int:
 ## Whom it aims at: TEAM_WIZARDS, TEAM_ENEMIES, ...; NONE for no actor.
 func team_of(id: int) -> int:
 	return _team[id] if is_open(id) else NONE
+
+
+## Aim's one rule: whether a body of team `them` is a foe of team `us`, to aim at (homing, a chain's
+## jump, a zap, the AI's target, a touch's damage, a discharge). Another team than ours, and never
+## the world's (props W4: nobody's foe, hit only by accident); a body of no team is everyone's foe,
+## and with no team of our own (NONE) every team but the world's is ours to aim at. Never asked for
+## whether a hit lands: every hit does.
+static func is_foe(us: int, them: int) -> bool:
+	return them != TEAM_WORLD and (us == NONE or them != us)
 
 
 ## Every actor's team by id (ACTORS of them), NONE for an id not open: `team_of` of every id at

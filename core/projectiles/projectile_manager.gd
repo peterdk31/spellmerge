@@ -63,8 +63,8 @@ extends Node2D
 ## ACTORS - 1, `core/actors`) or NO_PLAYER (`Actors.NONE`, a shot of no actor). Nothing here
 ## asks whether a caster is a wizard or an enemy; the actor table answers four questions, read
 ## once when a shot is spawned and kept with it (a shot keeps the caster it was cast by):
-## - **team** (`team_of`), only for aim: homing and `nearest_target`'s team skip pick other
-##   teams, and a shield stops other teams' shots. Never for whether a hit lands: every shot and
+## - **team** (`team_of`), only for aim: homing and `nearest_target`'s team skip pick foes
+##   (`Actors.is_foe`: another team, never the world's props), and a shield stops other teams' shots. Never for whether a hit lands: every shot and
 ##   beam hits both actor layers (ACTOR_LAYERS, actors G3c, owner 2026-10-28: "Everything should
 ##   be able to damage everything."), its own caster's body too: a shot spares only the body it
 ##   started on, until it has left it (`exclude`; owner, 2026-11-06: "a players own spells should
@@ -86,7 +86,13 @@ extends Node2D
 ## point, not a circle. The step is cut at the wall first, so a target in front of the wall is still hit by a fast
 ## shot, and one behind it is not. The wall walk is not charged to the work
 ## budget above (its length is capped instead). `wall_hits` counts these ends.
-## `clip_to_walls(from, to)` shortens a segment to the first wall. `spawn` refuses
+## `clip_to_walls(from, to)` shortens a segment to the first wall.
+##
+## Ground (props W4, docs/milestones/props.md): `set_footprint(actor, centre, size, radius)` lays the
+## ground a body that cannot move stands on (a prop's, a training dummy's: `Footprint`) into a grid
+## of its own over the same cells, which only bodies walking see (`slide_body`, `circle_blocked`):
+## shots, rays and lines of sight pass it, and hit the body as any other, by its hurt circle.
+## `spawn` refuses
 ## (-1, counted in `wall_hits`) a shot that starts inside a wall, so it takes no
 ## pool slot and evicts nobody at the cap. Each wall end, and each hit on a
 ## target, also sends `Events.projectile_impact(caster, target, position,
@@ -140,8 +146,8 @@ extends Node2D
 ## is no default here, so a new caller cannot quietly get another form's reach.
 ## The search runs on the grid and only every HOMING_PERIOD-th step of a shot (slots take
 ## turns, so the cost is spread); in between the shot keeps turning toward the point it
-## found. It never homes on its shooter's own body, on a body of its shooter's team or on
-## targets it just hit. The search
+## found. It homes only on a foe (`Actors.is_foe`: never on its shooter's own body, a body of its
+## shooter's team or a prop of the world's) and never on targets it just hit. The search
 ## is charged to the step's hit-work budget (1 per target examined); when the budget is
 ## spent the search waits for the shot's next turn. `homing_aim` does the same for a ray.
 ##
@@ -931,6 +937,17 @@ var _has_walls: bool = false
 ## it for every shot).
 var _solids: Dictionary = {}
 var _any_solid: bool = false
+## The ground (`set_footprint`): per wall cell, how many footprints lie on it; per actor, its
+## footprint's centre and half its size (a circle: its radius twice, and `_footprint_round` 1;
+## nothing laid: no size); how many are laid (the walk asks it first); and the cells a footprint
+## could not count when it was laid (255 already on them), by actor, so it never takes them out
+## either and the counts stay exact (empty but on a crowded cell).
+var _ground_cells: PackedByteArray = PackedByteArray()
+var _footprint_at: PackedVector2Array = PackedVector2Array()
+var _footprint_half: PackedVector2Array = PackedVector2Array()
+var _footprint_round: PackedByteArray = PackedByteArray()
+var _footprints_laid: int = 0
+var _footprint_missed: Dictionary = {}
 ## The shot that cast the next ray (`ray_cast_by`), and its number then; -1 for none.
 var _ray_caster: int = -1
 var _ray_caster_seq: int = -1
@@ -1209,6 +1226,9 @@ func _init() -> void:
 	sweep_heads.resize(SWEEP_START)
 	_anchors.resize(ACTORS)
 	_anchors.fill(Vector2.INF)
+	_footprint_at.resize(ACTORS)
+	_footprint_half.resize(ACTORS)
+	_footprint_round.resize(ACTORS)
 	_group_count.resize(GROUPS)
 	_groups.resize(GROUPS)
 	_group_at.resize(GROUPS)
@@ -1270,7 +1290,7 @@ func native_constants() -> Dictionary:
 		constants.merge(script.get_script_constant_map())
 		script = script.get_base_script()
 	constants.merge({"PI": PI, "TAU": TAU, "HOMING_DRIFT": SpellLimits.HOMING_DRIFT,
-			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE})
+			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE, "TEAM_WORLD": ActorsScript.TEAM_WORLD})
 	return constants
 
 
@@ -1747,6 +1767,14 @@ func set_bounds(rect: Rect2) -> void:
 	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
 	_wall_cells.resize(_wall_w * _wall_h)
 	clear_walls()
+	# The ground is laid again in the new grid (footprints keep their place in the world).
+	_ground_cells.resize(_wall_w * _wall_h)
+	_ground_cells.fill(0)
+	_footprint_missed.clear()
+	if _footprints_laid > 0:
+		for actor in ACTORS:
+			if _footprint_laid(actor):
+				_lay_footprint(actor)
 
 
 ## The longer side of the room (`set_bounds`): what a growing shot or beam grows to at most.
@@ -1955,8 +1983,9 @@ func line_clear(from: Vector2, to: Vector2) -> bool:
 	return _wall_hit(from, to) < 0.0
 
 
-## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell
-## (checked at the centre and eight points on its rim, each in its 8-pixel cell).
+## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell or
+## the ground of a body that cannot move (checked at the centre and eight points on its rim, each
+## in its 8-pixel cell): where a body could not stand (a teleport checks the body with it).
 func circle_blocked(center: Vector2, radius: float) -> bool:
 	for n in 9:
 		var point: Vector2 = center
@@ -1964,22 +1993,101 @@ func circle_blocked(center: Vector2, radius: float) -> bool:
 			point += DMath.from_angle(float(n - 1) * TAU / 8.0) * radius
 		if not _bounds.has_point(point):
 			return true
-		if not _has_walls:
+		if not _has_walls and _footprints_laid == 0:
 			continue
 		var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
 		var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
-		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
+		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and (_wall_cells[cy * _wall_w + cx] != 0 or _ground_cells[cy * _wall_w + cx] != 0):
 			return true
 	return false
 
 
 ## Where a body (a circle of `radius` at `from`) ends when it moves by `motion`, sliding along the
-## walls it meets: the room's and the solid shots' (online-ready N6: the actors' move, in place of
-## the engine's physics; `WallSlide`).
+## walls it meets, the room's and the solid shots', and the ground of the bodies that cannot move
+## (online-ready N6: the actors' move, in place of the engine's physics; `WallSlide`).
 func slide_body(from: Vector2, motion: Vector2, radius: float) -> Vector2:
-	if not _has_walls:
+	if not _has_walls and _footprints_laid == 0:
 		return from + motion
-	return WallSlide.slide(_wall_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
+	return WallSlide.slide(_wall_cells, _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
+
+
+## The body of the actor `actor` cannot move, and stands on this ground from now on (props W4: its
+## `Footprint`), in place of any before: a box `size` across round `centre`, or with no size a
+## circle of `radius`; neither: none. The cells laid are those whose centres lie in it. Bodies that
+## walk slide along it (`slide_body`) and cannot stand on it (`circle_blocked`); nothing else sees
+## it. Laying the same again changes nothing (a body made again from a snapshot). Ids outside the
+## table are ignored.
+func set_footprint(actor: int, centre: Vector2, size: Vector2, radius: float) -> void:
+	if actor < 0 or actor >= ACTORS:
+		return
+	if _footprint_laid(actor):
+		_mark_footprint(actor, -1)
+		_footprint_missed.erase(actor)
+		_footprints_laid -= 1
+	var is_round: bool = size == Vector2.ZERO
+	var half: Vector2 = Vector2(radius, radius) if is_round else size.abs() * 0.5
+	if not centre.is_finite() or not half.is_finite() or half.x <= 0.0 or half.y <= 0.0:
+		half = Vector2.ZERO
+	_footprint_at[actor] = centre if half != Vector2.ZERO else Vector2.ZERO
+	_footprint_half[actor] = half
+	_footprint_round[actor] = 1 if is_round and half != Vector2.ZERO else 0
+	if half != Vector2.ZERO:
+		_footprints_laid += 1
+		_lay_footprint(actor)
+
+
+## The ground the body of `actor` stands on (`set_footprint`) as the box round it, empty for none.
+func footprint_of(actor: int) -> Rect2:
+	if not _footprint_laid(actor):
+		return Rect2()
+	return Rect2(_footprint_at[actor] - _footprint_half[actor], _footprint_half[actor] * 2.0)
+
+
+## True while the body of `actor` has ground laid.
+func _footprint_laid(actor: int) -> bool:
+	return actor >= 0 and actor < ACTORS and _footprint_half[actor].x > 0.0
+
+
+## Lay the footprint of `actor` (newly set, or in a new grid): one more on each of its cells, those
+## it could not count kept apart (`_footprint_missed`).
+func _lay_footprint(actor: int) -> void:
+	var missed := PackedInt32Array()
+	for cell in _footprint_cells(actor):
+		if _ground_cells[cell] < 255:
+			_ground_cells[cell] += 1
+		else:
+			missed.append(cell)
+	if not missed.is_empty():
+		_footprint_missed[actor] = missed
+
+
+## Take the footprint of `actor` out (`by` -1) or put it back (1) on the cells it counted.
+func _mark_footprint(actor: int, by: int) -> void:
+	var missed: PackedInt32Array = _footprint_missed.get(actor, PackedInt32Array())
+	for cell in _footprint_cells(actor):
+		if missed.is_empty() or not missed.has(cell):
+			_ground_cells[cell] += by
+
+
+## The cells of the footprint of `actor` in the grid as it is now: those whose centres lie in its
+## box, or in its circle. Made each call (a footprint is laid when a body enters or changes, never
+## each step).
+func _footprint_cells(actor: int) -> PackedInt32Array:
+	var cells := PackedInt32Array()
+	var centre: Vector2 = _footprint_at[actor]
+	var half: Vector2 = _footprint_half[actor]
+	var low: Vector2 = (centre - half - _bounds.position) / WALL_CELL
+	var high: Vector2 = (centre + half - _bounds.position) / WALL_CELL
+	# A cell's centre is at its index and a half: in the box from ceil(low - 0.5) on, up to (not
+	# with) ceil(high - 0.5).
+	var is_round: bool = _footprint_round[actor] != 0
+	var radius_sq: float = half.x * half.x
+	for y in range(maxi(ceili(low.y - 0.5), 0), mini(ceili(high.y - 0.5), _wall_h)):
+		for x in range(maxi(ceili(low.x - 0.5), 0), mini(ceili(high.x - 0.5), _wall_w)):
+			if is_round and (_bounds.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * WALL_CELL).distance_squared_to(centre) >= radius_sq:
+				continue
+			cells.append(y * _wall_w + x)
+	return cells
 
 
 ## How far along `from`->`to` (0 to 1) the path first enters a solid cell, or -1.0
@@ -4309,8 +4417,9 @@ func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: f
 ## of `team` (NONE: no team, every target but its own body). For a shot (`slot` 0 or more) it
 ## also skips the targets the shot just hit and charges the work budget.
 func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int) -> int:
-	# Homing never picks its own team (a teammate, for a wizard), though every spell hits it, nor
-	# a target the shot is still on (`_mark_memory`).
+	# Homing picks only a foe (`Actors.is_foe`, written out here and in the queries below: a call
+	# per target costs more than the test; never its own team, a teammate for a wizard, nor a prop of
+	# the world's), though every spell hits them, nor a target the shot is still on (`_mark_memory`).
 	var stamp: int = _mark_memory(slot) if slot >= 0 else -1
 	var any_way: bool = max_angle >= PI
 	var pick: int = -1
@@ -4322,7 +4431,7 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 			while t >= 0:
 				if slot >= 0:
 					_work_left -= 1
-				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and (team == ActorsScript.NONE or _target_team[t] != team) and is_instance_valid(_targets[t]) and (slot < 0 or _target_mark[t] != stamp):
+				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and _target_team[t] != ActorsScript.TEAM_WORLD and (team == ActorsScript.NONE or _target_team[t] != team) and is_instance_valid(_targets[t]) and (slot < 0 or _target_mark[t] != stamp):
 					var to_target: Vector2 = _target_pos[t] - origin
 					var reach: float = within + _target_radius[t]
 					if to_target.length_squared() <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(DMath.angle_to(direction, to_target)) <= max_angle)):
@@ -6128,7 +6237,8 @@ func _refresh_targets() -> void:
 ## The nearest target on `layers` whose hit circle overlaps the circle (`point`,
 ## `radius`), by distance to its centre, or null. `exclude` is skipped (the target
 ## just hit, for a chain) and so is `exclude_also`. With a `team` (not NONE), targets of that
-## team are skipped too: aim at other teams (a chain's jump, an arc's zap, a familiar's cast).
+## team are skipped too, and the world's always: aim at foes only (`Actors.is_foe`: a chain's jump,
+## an arc's zap, a familiar's cast).
 ## The hit circle's centre of the target returned is left in `nearest_point`. Allocation-free.
 func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D = null, exclude_also: Node2D = null, team: int = ActorsScript.NONE) -> Node2D:
 	nearest_point = Vector2.INF
@@ -6144,7 +6254,7 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if _query_match(t, point, radius, layers, skip) and t != skip_also and (team == ActorsScript.NONE or _target_team[t] != team):
+				if _query_match(t, point, radius, layers, skip) and t != skip_also and _target_team[t] != ActorsScript.TEAM_WORLD and (team == ActorsScript.NONE or _target_team[t] != team):
 					var d: float = _target_pos[t].distance_squared_to(point)
 					if d < best_sq:
 						best_sq = d
@@ -6156,7 +6266,8 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 	return _targets[best]
 
 
-## Fill `out` with the targets on `layers` not of `team` (Actors.NONE: of any) whose hit circle
+## Fill `out` with the targets on `layers` that are foes of `team` (`Actors.is_foe`: not of `team`,
+## Actors.NONE for none, and never the world's) whose hit circle
 ## overlaps the circle (`point`, `radius`), `centres` with where each one's hit circle is and
 ## `radii` with how big, in the same order; return how many (a zap's bodies in reach). Order is the grid's: the same every
 ## run. With a finite `to`, the circles round every point of the line from `point` to `to` (a
@@ -6175,7 +6286,7 @@ func targets_near(point: Vector2, radius: float, layers: int, team: int, out: Ar
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
 				var at: Vector2 = point if end == point else Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end)
-				if _query_match(t, at, radius, layers, -1) and (team == ActorsScript.NONE or _target_team[t] != team) and not (keep and out.has(_targets[t])):
+				if _query_match(t, at, radius, layers, -1) and _target_team[t] != ActorsScript.TEAM_WORLD and (team == ActorsScript.NONE or _target_team[t] != team) and not (keep and out.has(_targets[t])):
 					if centres.size() <= out.size():
 						centres.resize(maxi(out.size() * 2, 8))
 						radii.resize(centres.size())

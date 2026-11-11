@@ -204,7 +204,7 @@ func test_a_teleport_jumps_at_once_and_stops_short_of_a_wall() -> void:
 	_wizard.position = Vector2(80.0, 100.0)
 	_projectiles.set_walls([Rect2(40.0, 80.0, 16.0, 60.0)] as Array[Rect2])
 	_run(_ai(walled).windup_time + 4.0 * STEP)
-	check(walled.position.x < 40.0 - walled.mover.body_radius + 0.01, "it stops short of the wall, its body clear (%.2f)" % walled.position.x)
+	check(walled.position.x < 40.0 - walled.wall_radius() + 0.01, "it stops short of the wall, its body clear (%.2f)" % walled.position.x)
 
 
 func test_a_recoil_pushes_the_enemy_back_from_its_shot() -> void:

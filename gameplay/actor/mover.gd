@@ -9,7 +9,8 @@ extends ActorComponent
 ## carries its own `move` (the way and the distance) and its time, and runs on its own, so two
 ## dashes cast close together stack, two pulls add and a dash and its recoil add. A `teleport` is
 ## over at once: the actor jumps by its `move`, stopping TELEPORT_CLEARANCE short of the first
-## wall, then backing off until the body (`body_radius`) is clear of walls and inside the room.
+## wall, then backing off until the body (its footprint's circle, `Footprint.radius`) is clear of
+## walls and of the ground of bodies that cannot move, and inside the room.
 ## Every other move (`dash`, `pull`, `swap`, `recoil`) is a velocity for its time; a `dash` turns
 ## toward a target as it goes when its card homes (`CarrierDash.move_homing`). Each move answers
 ## `caster_move_finished` where it ended: a teleport at once, the others the step after their
@@ -43,9 +44,6 @@ const MIN_SECONDS: float = 0.01
 
 ## Walking speed in pixels per second at full tilt (an enemy's from `EnemyBase.move_speed`).
 @export var speed: float = 90.0
-## The body's radius: the circle it walks against the walls with (`Actor.move`) and a teleport's
-## landing checks (about the hurt circle's).
-@export var body_radius: float = 6.0
 
 ## The moves running (the first `_count`): each one's mode, velocity, seconds left (0 or less:
 ## done, answered next step), its card's tag and its homing (a dash's, or null).
@@ -203,7 +201,7 @@ func _teleport(move: Vector2, tag: int) -> void:
 		if reached != goal:
 			reached = reached.move_toward(start, TELEPORT_CLEARANCE)
 		goal = reached
-		while goal != start and actor.projectiles.circle_blocked(goal, body_radius):
+		while goal != start and actor.projectiles.circle_blocked(goal, actor.wall_radius()):
 			goal = goal.move_toward(start, TELEPORT_BACKOFF)
 	actor.global_position = goal
 	if actor.events != null:

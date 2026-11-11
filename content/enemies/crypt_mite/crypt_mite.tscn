@@ -1,10 +1,11 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
 [ext_resource type="Script" path="res://gameplay/actor/health.gd" id="2_health"]
 [ext_resource type="Script" path="res://gameplay/actor/hurtbox.gd" id="3_hurtbox"]
 [ext_resource type="Script" path="res://gameplay/actor/contact.gd" id="4_contact"]
 [ext_resource type="Script" path="res://gameplay/actor/mover.gd" id="5_mover"]
+[ext_resource type="Script" path="res://gameplay/actor/footprint.gd" id="20_footprint"]
 [ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="7_ai"]
 [ext_resource type="Script" path="res://gameplay/ai/creature_look.gd" id="8_look"]
 [ext_resource type="Script" path="res://gameplay/actor/face.gd" id="9_face"]
@@ -26,7 +27,10 @@ script = ExtResource("4_contact")
 
 [node name="Mover" type="Node" parent="."]
 script = ExtResource("5_mover")
-body_radius = 5.0
+
+[node name="Footprint" type="Node" parent="."]
+script = ExtResource("20_footprint")
+radius = 5.0
 
 [node name="AIController" type="Node" parent="."]
 script = ExtResource("7_ai")

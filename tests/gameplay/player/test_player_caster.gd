@@ -183,7 +183,7 @@ func test_teleport_along_a_wall_keeps_the_body_out_of_it() -> void:
 	var player: Actor = _wizard(0)
 	_world.projectiles.set_walls([Rect2(60.0, 112.0, 200.0, 20.0)])
 	_ask(player, &"teleport", Vector2(100.0, 0.0), 0.0)
-	check(not _world.projectiles.circle_blocked(player.global_position, player.mover.body_radius), "no part of the body is in the wall, got %s" % player.global_position)
+	check(not _world.projectiles.circle_blocked(player.global_position, player.wall_radius()), "no part of the body is in the wall, got %s" % player.global_position)
 	check(player.global_position.x > START.x + 50.0, "and it still jumped along the wall, got %s" % player.global_position)
 
 
@@ -191,13 +191,13 @@ func test_teleport_into_a_corner_keeps_the_body_out_of_the_walls() -> void:
 	var player: Actor = _wizard(0)
 	_world.projectiles.set_walls([Rect2(140.0, 60.0, 40.0, 40.0), Rect2(140.0, 100.0, 8.0, 80.0)])
 	_ask(player, &"teleport", Vector2(45.0, 0.0), 0.0)
-	check(not _world.projectiles.circle_blocked(player.global_position, player.mover.body_radius), "clear of the corner, got %s" % player.global_position)
+	check(not _world.projectiles.circle_blocked(player.global_position, player.wall_radius()), "clear of the corner, got %s" % player.global_position)
 
 
 func test_teleport_does_not_leave_the_room() -> void:
 	var player: Actor = _wizard(0)
 	_ask(player, &"teleport", Vector2(900.0, 0.0), 0.0)
-	check(not _world.projectiles.circle_blocked(player.global_position, player.mover.body_radius), "the body stays in the room, got %s" % player.global_position)
+	check(not _world.projectiles.circle_blocked(player.global_position, player.wall_radius()), "the body stays in the room, got %s" % player.global_position)
 	check(player.global_position.x > START.x, "but it still moves, got %s" % player.global_position)
 
 

@@ -15,6 +15,11 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 
 ## Time moves by this fixed binary fraction.
 const STEP: float = 0.0625
+## The stand-in prop's ground (a box at its feet), its body's centre from the feet (its hurt
+## circle's and its hand's) and the hurt circle's radius.
+const PROP_SIZE: Vector2 = Vector2(16.0, 16.0)
+const PROP_CENTRE: Vector2 = Vector2(0.0, -8.0)
+const PROP_RADIUS: float = 12.0
 
 
 ## A controller that wants what a test sets: a walk, an aim, staffs pressed once or held.
@@ -117,6 +122,48 @@ func actor(at: Vector2, kinds: Array[StringName], controller: ActorController = 
 	if controller != null:
 		body.add_child(controller)
 	return add(body, at)
+
+
+## A stand-in prop (props W4, docs/milestones/props.md), not yet added: an actor of the world's
+## team with no controller and no Mover, Health 50, a 16 px box of ground at its feet, a hurt circle
+## on its body above, and a Caster with `cards` (one row per staff) on `staff` when it has any.
+static func prop_body(cards: Array = [], staff: StaffBase = null) -> Actor:
+	var body := Actor.new()
+	body.name = "Prop"
+	body.idle_team = ActorsScript.TEAM_WORLD
+	body.body_offset = PROP_CENTRE
+	body.hand_offset = PROP_CENTRE
+	var health := Health.new()
+	health.max_health = 50
+	body.add_child(health)
+	var hurtbox := Hurtbox.new()
+	hurtbox.radius = PROP_RADIUS
+	hurtbox.offset = PROP_CENTRE
+	body.add_child(hurtbox)
+	var footprint := Footprint.new()
+	footprint.name = "Footprint"
+	footprint.size = PROP_SIZE
+	body.add_child(footprint)
+	if not cards.is_empty():
+		var caster := Caster.new()
+		caster.staff_count = cards.size()
+		caster.start_cards = cards
+		caster.staff = staff
+		body.add_child(caster)
+	return body
+
+
+## `prop_body(cards, staff)` added at `at`.
+func prop(at: Vector2, cards: Array = [], staff: StaffBase = null) -> Actor:
+	return add(prop_body(cards, staff), at)
+
+
+## The footprint of `body` (null for none).
+static func footprint_of(body: Actor) -> Footprint:
+	for child in body.get_children():
+		if child is Footprint:
+			return child as Footprint
+	return null
 
 
 ## Services set on `body`, so the autoloads are not used.

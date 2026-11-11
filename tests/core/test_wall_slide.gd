@@ -2,7 +2,8 @@ extends "res://tests/support/suite.gd"
 ## A body's move against the wall grid (online-ready N6, core/projectiles/wall_slide.gd and the
 ## native module's BodyKernel): a circle stops at a wall, slides along it, settles in a corner,
 ## rounds an outer corner, fits a gap only as wide as it is, never crosses a wall however fast, and
-## leaves a wall it stands in by the open side. The native kernel gives the GDScript's bits on every
+## leaves a wall it stands in by the open side. The ground of a body that cannot move (props W4, a
+## grid of its own) is a wall to it as the walls are. The native kernel gives the GDScript's bits on every
 ## case and on a seeded spread of rooms. The actor moves by it (`Actor.move`), and its velocity is
 ## then what it moved by.
 ##
@@ -18,12 +19,16 @@ const W: int = 40
 const H: int = 30
 
 var _cells: PackedByteArray = PackedByteArray()
+## The ground grid (bodies that cannot move), open unless a test lays some.
+var _ground: PackedByteArray = PackedByteArray()
 
 
 func before_each() -> void:
 	super.before_each()
 	_cells.resize(W * H)
 	_cells.fill(0)
+	_ground.resize(W * H)
+	_ground.fill(0)
 
 
 func after_each() -> void:
@@ -40,7 +45,7 @@ func _wall(x0: int, y0: int, x1: int, y1: int) -> void:
 
 ## The behaviour is the GDScript's (the reference); the native kernel is held to it below.
 func _slide(from: Vector2, motion: Vector2, radius: float = 6.0) -> Vector2:
-	return WallSlide.gd_slide(_cells, W, H, CELL, Vector2.ZERO, from, motion, radius)
+	return WallSlide.gd_slide(_cells, _ground, W, H, CELL, Vector2.ZERO, from, motion, radius)
 
 
 ## Whether WallSlide runs the native kernel (a failure when the module is required but not loaded).
@@ -48,6 +53,16 @@ func _native() -> bool:
 	if not WallSlide.native_on() and OS.get_environment("SPELLMERGE_NATIVE") == "required":
 		check(false, "SPELLMERGE_NATIVE=required, but the native module is not loaded (ci/build/native.sh)")
 	return WallSlide.native_on()
+
+
+func test_ground_stops_the_body_as_a_wall_does() -> void:
+	_wall(10, 0, 12, H - 1)
+	var walled: Vector2 = _slide(Vector2(50.0, 100.0), Vector2(60.0, 0.0))
+	_cells.fill(0)
+	for y in H:
+		for x in range(10, 13):
+			_ground[y * W + x] = 1
+	check_equal(_slide(Vector2(50.0, 100.0), Vector2(60.0, 0.0)), walled, "ground in the same cells stops it the same")
 
 
 func test_open_floor_moves_the_whole_way() -> void:
@@ -134,6 +149,7 @@ func test_the_native_kernel_gives_the_same_bits() -> void:
 	var pushed: int = 0
 	for room in 60:
 		_cells.fill(0)
+		_ground.fill(0)
 		if room % 2 == 0:
 			# Blocks: faces, inner and outer corners, gaps.
 			for block in rng.randi_range(0, 12):
@@ -144,7 +160,11 @@ func test_the_native_kernel_gives_the_same_bits() -> void:
 			# Scattered cells: corners everywhere (a Wall card's stones are laid as such).
 			for i in W * H:
 				if rng.randf() < 0.18:
-					_cells[i] = 1
+					# Some of them ground (props W4): the two grids are one to a body.
+					if i % 3 == 0:
+						_ground[i] = 1
+					else:
+						_cells[i] = 1
 		var origin: Vector2 = Vector2(rng.randf_range(-40.0, 40.0), rng.randf_range(-40.0, 40.0))
 		for n in 300:
 			var from: Vector2 = origin + Vector2(rng.randf_range(-20.0, W * CELL + 20.0), rng.randf_range(-20.0, H * CELL + 20.0))
@@ -152,8 +172,8 @@ func test_the_native_kernel_gives_the_same_bits() -> void:
 			if n % 7 == 0:
 				motion *= 20.0
 			var radius: float = [0.0, 0.7, 3.0, 5.0, 6.0, 7.0, 12.0, 20.0][n % 8]
-			var gd: Vector2 = WallSlide.gd_slide(_cells, W, H, CELL, origin, from, motion, radius)
-			var native: Vector2 = WallSlide.slide(_cells, W, H, CELL, origin, from, motion, radius)
+			var gd: Vector2 = WallSlide.gd_slide(_cells, _ground, W, H, CELL, origin, from, motion, radius)
+			var native: Vector2 = WallSlide.slide(_cells, _ground, W, H, CELL, origin, from, motion, radius)
 			cases += 1
 			if gd != from + motion:
 				pushed += 1
@@ -182,11 +202,14 @@ func test_an_actor_moves_by_it_and_keeps_its_slide() -> void:
 	var body := own(Actor.new()) as Actor
 	body.projectiles = mgr
 	var mover := Mover.new()
-	mover.body_radius = 6.0
 	body.mover = mover
+	var footprint := Footprint.new()
+	footprint.radius = 6.0
+	body.footprint = footprint
 	body.position = Vector2(50.0, 150.0)
 	body.velocity = Vector2(600.0, 600.0)
 	body.move(1.0 / 60.0)
 	check(is_equal_approx(body.position.x, 60.0) and is_equal_approx(body.position.y, 154.0), "it slides along the floor's wall: %s" % body.position)
 	check(is_equal_approx(body.velocity.x, 600.0) and is_equal_approx(body.velocity.y, 240.0), "its velocity is what it moved by: %s" % body.velocity)
 	mover.free()
+	footprint.free()

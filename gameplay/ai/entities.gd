@@ -466,8 +466,11 @@ func _make_decoy(row: int) -> Actor:
 	var mover := Mover.new()
 	mover.name = "Mover"
 	mover.speed = SpellLimits.HOMING_DRIFT
-	mover.body_radius = DECOY_RADIUS
 	decoy.add_child(mover)
+	var footprint := Footprint.new()
+	footprint.name = "Footprint"
+	footprint.radius = DECOY_RADIUS
+	decoy.add_child(footprint)
 	var caster := Caster.new()
 	caster.name = "Caster"
 	decoy.add_child(caster)

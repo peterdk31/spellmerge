@@ -2,14 +2,14 @@ extends RefCounted
 ## Still motes: the motes a still carrier's shots give off all the time while they stand (the owner,
 ## 2026-11-09: "use motes for everything you can"; a wall's stream rising off its seam, a pool's
 ## motes rising off its mire, a rune's drips and the motes rising off its ring once armed). A carrier
-## card lists them, one `StillMoteSource` a stream (`FormBase.look_motes`: kind, rate, where from in
+## card lists them, one `CardMoteStream` a stream (`FormBase.look_motes`: kind, rate, where from in
 ## its `look_shape`, how high, from when, how far apart), coming and going by `look_open` and
 ## `look_fade`; Spells hands them out as its `CardLook` (`SpellRuntime.still_mote_cards`). They are
 ## given off from where its shots are drawn: the projectile manager hands out a view of the card
 ## body's still shots each frame it draws them (`watch_body`, `still_shots_drawn`, `StillShotView`:
 ## place, the way its row runs, hit size as drawn, colours, still clock), so nothing is asked of a
 ## shot, no area calls another to find one, and no row of the manager's is read here. Each mote is a
-## one-mote cue part (`Motes.throw_part`) of the source's kind, or now and then of its infusions' own
+## one-mote cue part (`Motes.throw_part`) of the stream's kind, or now and then of its infusions' own
 ## kinds (fire's embers, frost's flecks), in the shot's ramp, its infusions in turn
 ## (`Motes.set_infusions`). Where a shot or a beam strikes one of its shots (`struck`), its streams
 ## part there for a moment and a few motes are knocked out (the owner's pick for the wall: "a hit
@@ -110,20 +110,20 @@ func give_off(view: StillShotView, pool: MotesScript) -> void:
 		_meet_strikes(view, look, pool)
 	if pool == null or _frame <= 0.0 or view.count == 0:
 		return
-	for source: StillMoteSource in look.motes:
-		var picks: int = floori(source.rate * _frame * view.count + _rng.randf())
+	for stream: CardMoteStream in look.motes:
+		var picks: int = floori(stream.rate * _frame * view.count + _rng.randf())
 		for p in picks:
 			var n: int = _rng.randi() % view.count
 			var clock: Vector2 = view.clock(n)
-			if source.stop > 0.0 and clock.x >= source.stop:
+			if stream.stop > 0.0 and clock.x >= stream.stop:
 				continue
-			if _rng.randf() < strength(clock.x - source.start, clock.y, look.open, look.fade):
-				_give_off_shot(view, n, look, source, 1, pool)
+			if _rng.randf() < strength(clock.x - stream.start, clock.y, look.open, look.fade):
+				_give_off_shot(view, n, look, stream, 1, pool)
 
 
-## `many` motes of the stream `source` off shot `n` of `view`.
-func _give_off_shot(view: StillShotView, n: int, look: CardLook, source: StillMoteSource, many: int, pool: MotesScript) -> void:
-	var kind: int = pool.kind_index(source.kind)
+## `many` motes of `stream` off shot `n` of `view`.
+func _give_off_shot(view: StillShotView, n: int, look: CardLook, stream: CardMoteStream, many: int, pool: MotesScript) -> void:
+	var kind: int = pool.kind_index(stream.kind)
 	if kind < 0:
 		return
 	var bits: int = view.look(n)
@@ -133,9 +133,9 @@ func _give_off_shot(view: StillShotView, n: int, look: CardLook, source: StillMo
 	var middle: Vector2 = view.at(n)
 	var across: Vector2 = view.across(n)
 	var reach: float = view.reach(n)
-	var height: float = source.height * reach
+	var height: float = stream.height * reach
 	for m in many:
-		var ground: Vector2 = middle + _point(source, look.shape, reach, middle, across)
+		var ground: Vector2 = middle + _point(stream, look.shape, reach, middle, across)
 		if _parted(ground, view.time):
 			parted += 1
 			continue
@@ -227,18 +227,18 @@ static func strength(since: float, left: float, open: float, fade: float) -> flo
 	return coming * (1.0 - going)
 
 
-## A point a mote of `source` leaves from, from the middle of a shot at `middle` of hit size `reach`
+## A point a mote of `stream` leaves from, from the middle of a shot at `middle` of hit size `reach`
 ## (as drawn) whose row runs along `across`, in the card's look `shape` (the places in an oval are
 ## `mote_places.gd`'s, shared with the world's mote sources).
-func _point(source: StillMoteSource, shape: Vector2, reach: float, middle: Vector2, across: Vector2) -> Vector2:
-	match source.from:
-		StillMoteSource.FROM_ROW:
+func _point(stream: CardMoteStream, shape: Vector2, reach: float, middle: Vector2, across: Vector2) -> Vector2:
+	match stream.from:
+		CardMoteStream.From.ROW:
 			# On the world's grid along the row, so every piece's places line up.
-			var along: float = MotePlaces.on_grid(_rng.randf_range(-1.0, 1.0) * reach * shape.x, middle.dot(across), source.spacing)
+			var along: float = MotePlaces.on_grid(_rng.randf_range(-1.0, 1.0) * reach * shape.x, middle.dot(across), stream.spacing)
 			return Vector2(0.0, floorf(reach * shape.y + 0.5)) + across * along
-		StillMoteSource.FROM_RIM:
-			return MotePlaces.on_oval(_rng, shape * reach, source.spacing)
-		StillMoteSource.FROM_MIDDLE:
+		CardMoteStream.From.RIM:
+			return MotePlaces.on_oval(_rng, shape * reach, stream.spacing)
+		CardMoteStream.From.POINT:
 			return Vector2.ZERO
 	return MotePlaces.in_oval(_rng, shape * reach, AREA_INSIDE)
 

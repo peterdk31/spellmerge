@@ -103,8 +103,8 @@ func test_its_drips_show_at_the_crystal_s_foot() -> void:
 	var card := load("res://content/spells/forms/rune/rune.tres") as FormBase
 	var code: String = card.look_shader.code
 	var foot: float = (_shader_const(code, "HOVER") - _shader_const(code, "DRIP_FROM")) * _shader_const(code, "SCALE_PER_ZOOM") / (_shader_const(code, "GRID") * ManagerScript.STILL_HIT)
-	var drips: Array = card.look_motes.filter(func(s: StillMoteSource) -> bool: return s.kind == &"drip")
+	var drips: Array = card.look_motes.filter(func(s: CardMoteStream) -> bool: return s.kind == &"drip")
 	check_equal(drips.size(), 1, "one stream of drips")
 	if drips.size() == 1:
-		check(absf((drips[0] as StillMoteSource).height - foot) < 0.01, "its height is the crystal's foot (%f, the shader's %f)" % [(drips[0] as StillMoteSource).height, foot])
-		check(is_equal_approx((drips[0] as StillMoteSource).start, SpellLimits.RUNE_ARM), "from its arming")
+		check(absf((drips[0] as CardMoteStream).height - foot) < 0.01, "its height is the crystal's foot (%f, the shader's %f)" % [(drips[0] as CardMoteStream).height, foot])
+		check(is_equal_approx((drips[0] as CardMoteStream).start, SpellLimits.RUNE_ARM), "from its arming")

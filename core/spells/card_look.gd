@@ -15,8 +15,8 @@ var shader: Shader = null
 var light_intensity: float = 1.0
 var light_reach: float = 1.0
 ## The streams of motes its still shots give off while they stand (`FormBase.look_motes`, one
-## `StillMoteSource` each; empty for none), in its `shape`. Shared with the card: never change them.
-var motes: Array[StillMoteSource] = []
+## `CardMoteStream` each; empty for none), in its `shape`. Shared with the card: never change them.
+var motes: Array[CardMoteStream] = []
 ## The shape of its still look, in its hit size as drawn (`FormBase.look_shape`), and the seconds
 ## it takes to open and the seconds of its end it fades over (`look_open`, `look_fade`): what its
 ## shader draws by (`ProjectileManager.set_body_shape`) and its motes leave by. Its card's, from

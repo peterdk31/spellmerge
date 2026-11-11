@@ -1,4 +1,4 @@
-class_name StillMoteSource
+class_name CardMoteStream
 extends Resource
 ## One stream of motes a still carrier card's shots give off while they stand (the owner,
 ## 2026-11-09: "use motes for everything you can"; docs/milestones/carrier-looks-fixes.md, phase 3):
@@ -8,14 +8,20 @@ extends Resource
 ## gives each off (`gameplay/feel/still_motes.gd`) by these numbers alone: no case per carrier.
 ## Where they leave from is in the card's `look_shape` (its hit size as drawn), so its shader and its
 ## motes are shaped alike.
+##
+## A spell's own motes, not the world's: a thing that stands in the world gives off a `MoteSource`
+## (core/base/mote_source.gd). The two are apart because their numbers mean different things: here
+## a place is in the card's look shape scaled by each shot's size, `rate` is a shot's, `height` a
+## share of its hit size, `start` and `stop` on its still clock, and its colours are its spell's
+## (none named here); a world's source is in pixels from its node, its rate the whole source's and
+## its colours named. Where a place means the same, it has the same name (`AREA`, `RIM`, `POINT`),
+## and both pick from the same shapes (`gameplay/feel/mote_places.gd`). How to choose:
+## content/motes/README.md, "How to make something in the world give off motes".
 
-## Where its motes leave from: anywhere on the oval of the card's look shape (a pool's surface), on
-## the oval's rim (a rune's ring), along its piece of the row below its middle (a wall's seam), or
-## its middle.
-const FROM_AREA: int = 0
-const FROM_ROW: int = 1
-const FROM_RIM: int = 2
-const FROM_MIDDLE: int = 3
+## Where its motes leave from: anywhere on the oval of the card's look shape (a pool's surface), along
+## its piece of the row below its middle (a wall's seam), on the oval's rim (a rune's ring), or its
+## middle point. (The values are saved in the cards' files: add a new one at the end.)
+enum From { AREA, ROW, RIM, POINT }
 
 ## The most a second a shot gives off of one stream.
 const MOST_RATE: float = 120.0
@@ -24,7 +30,7 @@ const MOST_RATE: float = 120.0
 @export var kind: StringName = &""
 ## How many a second each shot gives off (each piece of a solid one, a wall's), in full.
 @export var rate: float = 0.0
-@export_enum("area", "row", "rim", "middle") var from: int = FROM_AREA
+@export var from: From = From.AREA
 ## How high over where it leaves from a mote shows, in the card's hit size as drawn (0 on the
 ## floor): a drip shows at the crystal's foot and falls by its kind's own gravity.
 @export var height: float = 0.0
@@ -42,7 +48,7 @@ const MOST_RATE: float = 120.0
 func problems(card: StringName) -> PackedStringArray:
 	var found := PackedStringArray()
 	if kind == &"":
-		found.append("%s: a look mote source names no mote kind" % card)
+		found.append("%s: a look mote stream names no mote kind" % card)
 	if rate <= 0.0:
 		found.append("%s: look motes '%s' at a rate of %s a second are never given off" % [card, kind, rate])
 	elif rate > MOST_RATE:

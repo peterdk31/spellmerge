@@ -18,6 +18,7 @@ extends RefCounted
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
+const MotePlaces := preload("res://gameplay/feel/mote_places.gd")
 
 ## The share of its motes that are its infusions' own kinds, when it has infusions with kinds.
 const OWN_SHARE: float = 0.3
@@ -227,26 +228,19 @@ static func strength(since: float, left: float, open: float, fade: float) -> flo
 
 
 ## A point a mote of `source` leaves from, from the middle of a shot at `middle` of hit size `reach`
-## (as drawn) whose row runs along `across`, in the card's look `shape`.
+## (as drawn) whose row runs along `across`, in the card's look `shape` (the places in an oval are
+## `mote_places.gd`'s, shared with the world's mote sources).
 func _point(source: StillMoteSource, shape: Vector2, reach: float, middle: Vector2, across: Vector2) -> Vector2:
 	match source.from:
 		StillMoteSource.FROM_ROW:
-			var along: float = _rng.randf_range(-1.0, 1.0) * reach * shape.x
-			if source.spacing > 0.0:
-				# On the world's grid along the row, so every piece's places line up.
-				var w: float = middle.dot(across)
-				along = roundf((w + along) / source.spacing) * source.spacing - w
+			# On the world's grid along the row, so every piece's places line up.
+			var along: float = MotePlaces.on_grid(_rng.randf_range(-1.0, 1.0) * reach * shape.x, middle.dot(across), source.spacing)
 			return Vector2(0.0, floorf(reach * shape.y + 0.5)) + across * along
 		StillMoteSource.FROM_RIM:
-			var a: float = _rng.randf() * TAU
-			if source.spacing > 0.0:
-				var steps: float = maxf(roundf(TAU * maxf(shape.x, shape.y) * reach / source.spacing), 1.0)
-				a = roundf(a / TAU * steps) / steps * TAU
-			return (Vector2(cos(a), sin(a)) * shape * reach).round()
+			return MotePlaces.on_oval(_rng, shape * reach, source.spacing)
 		StillMoteSource.FROM_MIDDLE:
 			return Vector2.ZERO
-	var b: float = _rng.randf() * TAU
-	return Vector2(cos(b), sin(b)) * shape * reach * sqrt(_rng.randf()) * AREA_INSIDE
+	return MotePlaces.in_oval(_rng, shape * reach, AREA_INSIDE)
 
 
 ## The kinds of the infusions on a look `bits` (those that name their infusion's layer), kept.

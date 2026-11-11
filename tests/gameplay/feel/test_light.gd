@@ -394,7 +394,7 @@ func test_a_torch_lights_in_its_flames_colour() -> void:
 	var spot: Node = torch.get_tree().get_nodes_in_group(LightSpot.GROUP)[0]
 	check_equal(LightSpot.problems(spot), PackedStringArray(), "the torch's spot is whole")
 	var flame: AnimatedSprite2D = torch.get_node("Flame") as AnimatedSprite2D
-	var colours: PackedColorArray = RoomBase.colours_of_art(flame.sprite_frames.get_frame_texture(flame.animation, 0))
+	var colours: PackedColorArray = ArtPixels.colours_of(flame.sprite_frames.get_frame_texture(flame.animation, 0))
 	check(not colours.is_empty() and LightSpot.colour_of(spot).is_equal_approx(colours[0]), "its colour is the flame art's lightest")
 	var row: PackedFloat32Array = light.spots.multimesh.buffer
 	check(Vector2(row[3], row[7]).is_equal_approx((spot as Node2D).global_position), "where its spot is")

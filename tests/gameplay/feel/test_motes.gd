@@ -423,7 +423,7 @@ func test_a_room_sheds_the_colours_of_its_wall_art() -> void:
 	var layout: Node = room.scene.instantiate()
 	var floor_texture: Texture2D = (layout.get_node("Floor") as Sprite2D).texture
 	layout.free()
-	var floor_main := Color.hex(RoomBase._most_common(RoomBase._count_colours(floor_texture, {})))
+	var floor_main := Color.hex(ArtPixels.most_common(ArtPixels.count_colours(floor_texture, {})))
 	for colour in colours:
 		check(not colour.is_equal_approx(floor_main), "never the floor's own colour %s (%s)" % [floor_main.to_html(false), colour.to_html(false)])
 	var override := RoomBase.new()
@@ -1162,7 +1162,7 @@ func test_a_dead_body_breaks_into_motes_of_its_art() -> void:
 	var motes: MotesScript = feel.motes()
 	var husk: Texture2D = load("res://content/enemies/bone_husk/idle.svg") as Texture2D
 	var body := _body_of(husk, Vector2(200.0, 150.0), 1.0)
-	var pixels: int = RoomBase.pixels_of_art(husk).size()
+	var pixels: int = ArtPixels.pixels_of(husk).size()
 	check(pixels > 50, "the husk's art has pixels: %d" % pixels)
 	var before: int = motes.next_row()
 	feel.spectacle().break_body(body, body.get_global_transform(), feel.preset.death_mote_kind, feel.preset.death_mote_share, feel.preset.death_mote_most, feel.preset.death_mote_speed, feel.preset.death_mote_up)

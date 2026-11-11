@@ -33,7 +33,8 @@ const HitSharesScript := preload("res://gameplay/feel/hit_shares.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const BarriersScript := preload("res://gameplay/feel/barriers.gd")
 const StillMotesScript := preload("res://gameplay/feel/still_motes.gd")
-const RimMotesScript := preload("res://gameplay/feel/rim_motes.gd")
+const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")
+const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's FORM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -96,8 +97,6 @@ var streams: StreamsScript = StreamsScript.new()
 ## The motes still carriers' shots give off while they stand (`still_motes.gd`: a wall's stream, a
 ## pool's rising motes), from the rows the projectile manager draws them by.
 var still_motes: StillMotesScript = StillMotesScript.new()
-## The motes a room's floor edge gives off, as its art (`MoteRim`; the hub's island).
-var rim_motes: RimMotesScript = RimMotesScript.new()
 
 ## The motes, and how many they hold (`MoteCap.default_cap()` until the setting changes it). They
 ## always exist (S3: every particle is a mote; the smallest "Particles" stop is a Minimal ring).
@@ -124,6 +123,10 @@ var ambient: float = 1.0
 ## The ramp table the motes and the floor marks share: a surface's colours and a body's art, one
 ## row each, so a mote and the mark it leaves read the same colours.
 var _ramp_table: RampTableScript = RampTableScript.new()
+## What the world's things give off as their art (`source_motes.gd`, `MoteSource`: the hub's island
+## edge, a prop's embers and glimmers; props W7), and the standing motes of its masks.
+var source_motes: SourceMotesScript = SourceMotesScript.new(_ramp_table)
+var _standing: PlacedMotesScript = null
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
 ## and their source in the ramp table (-1 for none).
 var _surface_colors: PackedColorArray = PackedColorArray()
@@ -159,6 +162,9 @@ func _ready() -> void:
 	barriers = BarriersScript.new(MOTE_Z)
 	barriers.name = "Barriers"
 	add_child(barriers)
+	_standing = PlacedMotesScript.new(MOTE_Z, "StandingMotes")
+	add_child(_standing)
+	source_motes.watch(get_tree())
 	ShaderWarmupScript.want(MarksScript.SHADER, ShaderWarmupScript.BATCH)
 	set_floor_marks(floor_marks)
 	if events == null:
@@ -205,7 +211,7 @@ func _on_batches_grown(_count: int) -> void:
 	still_motes.attach(projectiles, spells as SpellRuntime)
 
 
-## Once a frame, at Feel's clock `now`: the trails' particles thrown, the streams', the room's rims' and Feel's own
+## Once a frame, at Feel's clock `now`: the trails' particles thrown, the streams', the world's mote sources' and Feel's own
 ## drawings' given off, the barriers' shells drawn where their actors are (`table`, the actor
 ## table), then the motes and the marks stepped.
 func step(now: float, table: ActorsScript = null) -> void:
@@ -214,7 +220,7 @@ func step(now: float, table: ActorsScript = null) -> void:
 	_trail_motes()
 	streams.step(now, projectiles, births, motes_on())
 	_drawn_motes()
-	rim_motes.give_off(now, pool if motes_on() else null, _ramp_table)
+	source_motes.give_off(now, pool if motes_on() else null, view_rect(), _standing)
 	if barriers != null:
 		barriers.step(now, pool if motes_on() else null, table, projectiles)
 	if pool != null:
@@ -376,11 +382,11 @@ func break_body(sprite: Sprite2D, to_world: Transform2D, kind: StringName, share
 	var k: int = pool.kind_index(kind)
 	if source < 0 or k < 0:
 		return
-	var rect: Rect2i = _frame_rect(sprite)
+	var rect: Rect2i = ArtPixels.frame_of(sprite)
 	var key: Array = [sprite.texture, rect]
 	var pixels: Variant = _art_pixels.get(key)
 	if pixels == null:
-		pixels = RoomBase.pixels_of_art(sprite.texture, rect)
+		pixels = ArtPixels.pixels_of(sprite.texture, rect)
 		_art_pixels[key] = pixels
 	var art: PackedVector2Array = pixels as PackedVector2Array
 	if art.is_empty():
@@ -413,7 +419,7 @@ func broken_at() -> Vector2:
 
 
 ## The ramp table's source for the colours of a body's art (the `sprite` it shows, read once per
-## texture; `RoomBase.colours_of_art`), -1 when it has none (the room's walls' then), or with
+## texture; `ArtPixels.colours_of`), -1 when it has none (the room's walls' then), or with
 ## neither motes nor floor marks to show it.
 func body_source(sprite: Sprite2D) -> int:
 	if pool == null and marks == null:
@@ -422,17 +428,9 @@ func body_source(sprite: Sprite2D) -> int:
 		return -1
 	var colours: Variant = _art_colors.get(sprite.texture)
 	if colours == null:
-		colours = RoomBase.colours_of_art(sprite.texture, _frame_rect(sprite))
+		colours = ArtPixels.colours_of(sprite.texture, ArtPixels.frame_of(sprite))
 		_art_colors[sprite.texture] = colours
 	return _ramp_table.source(colours as PackedColorArray)
-
-
-## The part of its texture `sprite` shows: its region, or its frame of a sheet.
-static func _frame_rect(sprite: Sprite2D) -> Rect2i:
-	if sprite.region_enabled:
-		return Rect2i(sprite.region_rect)
-	var size: Vector2i = Vector2i(sprite.texture.get_size()) / Vector2i(maxi(sprite.hframes, 1), maxi(sprite.vframes, 1))
-	return Rect2i(Vector2i(sprite.frame % maxi(sprite.hframes, 1), sprite.frame / maxi(sprite.hframes, 1)) * size, size)
 
 
 ## The shots' trail particles as motes (spell spectacle P1d): the projectile manager hands them out
@@ -839,14 +837,23 @@ func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look
 		light.light_beam(i, path, points, player, look, core, fade, intensity, reach)
 
 
+## The part of the world on screen now (empty outside a tree): what the mote sources give off
+## near.
+func view_rect() -> Rect2:
+	var view: Viewport = get_viewport() if is_inside_tree() else null
+	if view == null:
+		return Rect2()
+	return view.get_canvas_transform().affine_inverse() * view.get_visible_rect()
+
+
 # --- The room ------------------------------------------------------------------------------------
 
 ## A new room: its colours for its walls' motes (`RoomBase.surface_colors`) and its ambient light
 ## (`RoomBase.ambient`, P3b).
 func _on_room_entered(room_id: StringName) -> void:
 	use_room(registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null)
-	# The room's world is in the tree by now: its rims are read (none in most rooms).
-	rim_motes.take(get_tree() if is_inside_tree() else null)
+	# The room's world is in the tree by now: its mote sources are read again (each from now).
+	source_motes.take(get_tree() if is_inside_tree() else null)
 
 
 ## The room `room` (null for none) is the one played in now: its walls' colours and motes, and its

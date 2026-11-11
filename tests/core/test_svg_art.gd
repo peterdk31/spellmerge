@@ -23,6 +23,8 @@ const KNOWN: Array[String] = [
 	"res://art/samples/o_teal/body.svg",
 	"res://art/samples/i_warm/floor.svg",
 ]
+## The palette, as docs/STYLE.md lists it. A literal list on purpose: ci/tests/test_styleguide.py
+## holds it to the guide; core/base/palette.gd is the same table by name (tests/core/test_palette.gd).
 const PALETTE: Array[String] = [
 	"#14121f",
 	"#2b2840", "#4a4663", "#7a7694",

@@ -44,19 +44,23 @@ class Area:
 		calls.append(["%s.take_rules" % name, float(rules.shot_cap)])
 
 
-## An area that keeps state by actor id, hashed id by id (`SimHash.Part`, props W3), as Spells does
+## An area that keeps state by actor id, hashed id by id (`SimHash.ActorPart`, props W3), as Spells does
 ## by caster.
-class PartedArea:
+class ByActorArea:
 	extends Area
-	const PARTED: Array[StringName] = [&"by_id"]
+	const BY_ACTOR: Array[StringName] = [&"by_id"]
 	var by_id: Array[int] = []
 	var shared: int = 0
 
-	func state_parts() -> int:
+	func actor_parts() -> int:
 		return by_id.size()
 
-	func state_part(id: int) -> Array:
-		return [by_id[id]]
+	## An id with 0 has no share: no area.
+	func actor_part(id: int) -> Array:
+		return [by_id[id]] if by_id[id] != 0 else []
+
+	func actor_part_problems() -> PackedStringArray:
+		return PackedStringArray()
 
 
 ## The frames service: records its tick and its stood ticks, and says how many ticks a physics step
@@ -192,13 +196,13 @@ func test_ticked_is_sent_after_every_tick_has_stepped() -> void:
 func test_the_state_splits_into_parts_that_cover_it_once() -> void:
 	for i in 5:
 		_body("b%d" % i)
-	var kept: PartedArea = own(PartedArea.new("Kept", calls)) as PartedArea
-	kept.by_id = [10, 11, 12, 13, 14]
+	var kept: ByActorArea = own(ByActorArea.new("Kept", calls)) as ByActorArea
+	kept.by_id = [10, 11, 12, 13, 14, 0]
 	var whole: Dictionary = _tick.state_areas()
 	check(whole.has("Sim") and whole.has("Spells") and whole.has("Actors") and whole.has("actor 4"), "the whole names the sim, the areas, the actor table and the bodies: %s" % [whole.keys()])
 	whole["Kept"] = kept
-	var all: Dictionary = SimHash.parted(whole)
-	check(all.has("Kept 4") and not all.has("Kept 5") and all["Kept"] is SimHash.Part, "each part is an area of its own, and the area less them another: %s" % [all.keys()])
+	var all: Dictionary = SimHash.split_by_actor(whole)
+	check(all.has("Kept 4") and not all.has("Kept 5") and all["Kept"] is SimHash.ActorPart, "each actor's part is an area of its own (none for an empty share), and the area without them another: %s" % [all.keys()])
 	var services: int = whole.size() - 5
 	for slices: int in [1, 2, 7, 60]:
 		var met: Dictionary = {}
@@ -228,7 +232,7 @@ func test_the_state_splits_into_parts_that_cover_it_once() -> void:
 	# The area less its parts still hashes its other members.
 	kept.shared = 5
 	var shared: Dictionary[String, int] = SimHash.areas(whole)
-	check(shared["Kept"] != after["Kept"] and shared["Kept 3"] == after["Kept 3"], "a member not PARTED changes the area's own hash only")
+	check(shared["Kept"] != after["Kept"] and shared["Kept 3"] == after["Kept 3"], "a member not BY_ACTOR changes the area's own hash only")
 
 
 func test_the_bodies_go_by_actor_id_not_by_tree_order() -> void:

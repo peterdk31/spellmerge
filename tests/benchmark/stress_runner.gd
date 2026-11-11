@@ -41,6 +41,7 @@ extends Node
 ## Reproducibility: the filler shots and the enemy places use a fixed seed. The rest of
 ## the run varies only with frame timing, like the 4-bot test.
 
+const HashLabel := preload("res://tests/benchmark/hash_label.gd")
 const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
@@ -537,14 +538,14 @@ func _report_state_hash(label: String) -> void:
 	for i in HASH_PASSES:
 		var start: int = Time.get_ticks_usec()
 		# An area with parts as its parts (Spells' casters, props W3), as `SimHash.areas` takes it.
-		named = SimHash.parted(tick.state_areas())
+		named = SimHash.split_by_actor(tick.state_areas())
 		var walk := StateWalk.new()
 		walk.with_paths = false
 		var hashes: Dictionary[String, int] = {}
 		for name: String in named:
 			var area_start: int = Time.get_ticks_usec()
 			hashes[name] = SimHash.area(walk, name, named[name] as Object)
-			var key: String = "bodies" if name.begins_with(SimHash.BODY_PREFIX) else SimHash.label(name, named[name] as Object)
+			var key: String = "bodies" if name.begins_with(SimHash.BODY_PREFIX) else HashLabel.of(name, named[name] as Object)
 			by_area[key] = by_area.get(key, 0) + Time.get_ticks_usec() - area_start
 		SimHash.whole(hashes)
 		problems = walk.problems

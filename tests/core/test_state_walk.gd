@@ -236,6 +236,42 @@ func test_a_list_of_bodies_is_one_leaf_of_ids() -> void:
 	leaves.clear()
 	walk.walk("a", closed, func(path: String, value: Variant) -> void: leaves[path] = value)
 	check(leaves.has("a.due[1]") and not leaves.has("a.due.ids"), "a closed body: entry by entry: %s" % [leaves.keys()])
+	# A body freed since it was pointed at stays in the leaf (no walk entry by entry of a slot table).
+	var gone := Body.new()
+	var freed := Pointer.new()
+	freed.due = [three, gone]
+	gone.free()
+	leaves.clear()
+	walk.walk("a", freed, func(path: String, value: Variant) -> void: leaves[path] = value)
+	var ids: Variant = leaves.get("a.due.ids")
+	check(ids is PackedInt64Array and (ids as PackedInt64Array)[1] < 0, "a freed body is an entry of the leaf, no id: %s" % [leaves])
+	# An object that is no node, even with an id: entry by entry.
+	var other := Pointer.new()
+	other.due = [three]
+	other.due.append(own(Node.new()) as Node)
+	leaves.clear()
+	walk.walk("a", other, func(path: String, value: Variant) -> void: leaves[path] = value)
+	check(not leaves.has("a.due.ids"), "a node with no actor id: entry by entry: %s" % [leaves.keys()])
+
+
+## An area handed over as nothing (a service gone) is a leaf, not an error; a value an area hands
+## over of itself (an actor's part, `SimHash.ActorPart`) is walked as its member would be.
+func test_a_missing_area_and_a_handed_value() -> void:
+	var hashes: Dictionary[String, int] = SimHash.areas({"gone": null})
+	check(hashes.has("gone"), "a null area hashes: %s" % [hashes])
+	var plain := Plain.new()
+	var walk := StateWalk.new()
+	var leaves: Dictionary = {}
+	walk.walk_value("p", [plain, 3], plain, func(path: String, value: Variant) -> void: leaves[path] = value)
+	check(walk.problems.is_empty() and leaves.has("p[1]"), "a value is walked as a member: %s" % [leaves])
+	# Both ways give the same leaves, in order (as `SimHash.area` hashes them).
+	var handed: Array = []
+	walk.walk_value("p", [plain, 3], plain, func(_path: String, value: Variant) -> void: SimHash.add_leaf(handed, value))
+	var quick: Array = []
+	var by_values := StateWalk.new()
+	by_values.with_paths = false
+	by_values.values_of("p", [plain, 3], plain, quick)
+	check(not quick.is_empty() and SimHash.of_leaves(quick) == SimHash.of_leaves(handed), "both ways, the same leaves")
 
 
 ## An array with empty slots walks only its filled ones, each after its index (the hash's walk was

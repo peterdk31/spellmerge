@@ -20,6 +20,7 @@ extends Node
 ## Started by `prop_cost.gd`. Prints `PROP COST OK` and quits 0, or `PROP COST FAILED` and 1 (the
 ## hub did not start, a snapshot named problems, or the log has an error).
 
+const HashLabel := preload("res://tests/benchmark/hash_label.gd")
 const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const TickScript := preload("res://core/sim/tick.gd")
@@ -228,7 +229,7 @@ func _time_hash(count: int) -> void:
 	for i in HASH_PASSES:
 		var start: int = Time.get_ticks_usec()
 		# An area with parts as its parts (Spells' casters, props W3), as `SimHash.areas` takes it.
-		var named: Dictionary = SimHash.parted(_tick.state_areas())
+		var named: Dictionary = SimHash.split_by_actor(_tick.state_areas())
 		areas = named.size()
 		var walk := StateWalk.new()
 		walk.with_paths = false
@@ -239,7 +240,7 @@ func _time_hash(count: int) -> void:
 			if name.begins_with(SimHash.BODY_PREFIX):
 				body_total += Time.get_ticks_usec() - area_start
 			else:
-				var key: String = SimHash.label(name, named[name] as Object)
+				var key: String = HashLabel.of(name, named[name] as Object)
 				by_area[key] = by_area.get(key, 0) + Time.get_ticks_usec() - area_start
 		SimHash.whole(hashes)
 		problems = walk.problems

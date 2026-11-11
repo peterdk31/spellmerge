@@ -204,10 +204,10 @@ const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
 ## (core/sim/README.md).
 const SPARES: Array[StringName] = [&"_pending_free"]
-## State kept by caster, hashed caster by caster (`state_part`, "Spells 7" beside the body "actor 7")
+## State kept by caster, hashed caster by caster (`actor_part`, "Spells 7" beside the body "actor 7")
 ## and not with the rest of Spells (props W3, core/sim/README.md, "The hash"): the tables that grow
 ## with the casters. A snapshot saves them whole.
-const PARTED: Array[StringName] = [&"_installed", &"_profiles", &"_node_counts", &"_live", &"_generation_live", &"_last_infused"]
+const BY_ACTOR: Array[StringName] = [&"_installed", &"_profiles", &"_node_counts", &"_live", &"_generation_live", &"_last_infused"]
 ## The session's settings a new run keeps (`begin_run`): a benchmark's fire budget.
 const RUN_KEEPS: Array[StringName] = [&"fire_shots_per_step"]
 
@@ -265,10 +265,11 @@ var _live: Dictionary = {}
 var _generation_live: Dictionary = {}
 ## actor -> its sum of `_generation_live`: 0 when nothing of its builds is alive (no shot, no
 ## launch that keeps a build), so its only generations are its staffs' current ones (an older one
-## is freed with its last shot). Written with `_generation_live` only (`_add_live`, `_take_live`).
+## is freed with its last shot). Written with `_generation_live` only (`_add_live`, `_take_live`,
+## `_drop_live`).
 var _caster_live: PackedInt32Array = PackedInt32Array()
-## Every actor id from this one on has nothing in the PARTED tables: one past the highest that ever
-## had a build (`begin_generation`), so the parts are `state_parts()` of them.
+## Every actor id from this one on has nothing in the BY_ACTOR tables: one past the highest that ever
+## had a build (`begin_generation`), so the parts are `actor_parts()` of them.
 var _caster_rows: int = 0
 
 ## actor * STAFFS + staff -> seconds before that staff may cast again
@@ -1000,7 +1001,7 @@ func begin_generation(actor: int, staff: int, compiled: CompiledStaff) -> int:
 		_live.erase(stale)
 	# The revoked build's waiting payloads go with its shots (its numbers are the new build's now).
 	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.staff == staff and launch.generation == generation)
-	_take_live(key, _generation_live.get(key, 0))
+	_drop_live(key)
 	for spell in compiled.nodes:
 		_profiles[SpellTag.make(actor, staff, spell.node, generation)] = spell
 	_node_counts[key] = compiled.nodes.size()
@@ -1047,7 +1048,7 @@ func shot_ended(tag: int) -> void:
 ## generation with none left is freed.
 func _generation_gone(tag: int) -> void:
 	var key: int = SpellTag.generation_key(tag)
-	_take_live(key, 1)
+	_take_live(key)
 	if not _generation_live.has(key) and not _is_current(tag):
 		_erase_generation(tag)
 
@@ -1059,18 +1060,21 @@ func _add_live(key: int) -> void:
 	_caster_live[SpellTag.caster_of(key)] += 1
 
 
-## `count` fewer of the generation `key` are alive (none left: its entry goes).
-func _take_live(key: int, count: int) -> void:
+## One fewer of the generation `key` is alive (none left: its entry goes).
+func _take_live(key: int) -> void:
 	var had: int = _generation_live.get(key, 0)
-	var taken: int = mini(count, had)
-	if taken <= 0:
-		_generation_live.erase(key)
+	if had <= 1:
+		_drop_live(key)
 		return
-	_caster_live[SpellTag.caster_of(key)] -= taken
-	if had > taken:
-		_generation_live[key] = had - taken
-	else:
-		_generation_live.erase(key)
+	_generation_live[key] = had - 1
+	_caster_live[SpellTag.caster_of(key)] -= 1
+
+
+## Nothing of the generation `key` is alive any more (its last one gone, or the generation revoked):
+## its entry goes, and its count leaves its caster's.
+func _drop_live(key: int) -> void:
+	_caster_live[SpellTag.caster_of(key)] -= _generation_live.get(key, 0)
+	_generation_live.erase(key)
 
 
 ## Live shots counted for `tag`.
@@ -3397,33 +3401,33 @@ func clear() -> void:
 
 
 ## How many casters' parts the state hash takes (props W3; core/sim/README.md, "The hash"): actor
-## ids 0 to this less one, each `state_part(id)`. Every other id has nothing in the PARTED tables.
-func state_parts() -> int:
+## ids 0 to this less one, each `actor_part(id)`. Every other id has nothing in the BY_ACTOR tables.
+func actor_parts() -> int:
 	return _caster_rows
 
 
-## Caster `actor`'s part of the PARTED tables, for the state hash (walked as "Spells 7", in the
-## spread hash's part with the body "actor 7"; core/sim/README.md, "The hash"):
-## - its builds as installed, staff by staff (FROZEN: one leaf each), and the carrier of its last
-##   infused cast;
-## - only while something of its builds is alive (`_caster_live`), one entry a generation it holds,
-##   staff by staff in order: `[staff * GENERATIONS + generation, node count, alive of it, live shots
-##   by node, the spells of a build no longer current]`, so a report that parts names a generation.
+## Caster `actor`'s share of the BY_ACTOR tables, for the state hash (walked as "Spells 7", in the
+## spread hash's part with the body "actor 7"; core/sim/README.md, "The hash"), empty for an id with
+## none (a caster gone, its shots ended):
+## - `[builds, infused]`: its builds as installed, staff by staff (FROZEN: one leaf each), and the
+##   carrier of its last infused cast;
+## - only while something of its builds is alive (`_caster_live`), a third entry: each generation it
+##   holds by name ("s0g3": staff 0, generation 3), with its node count, what is alive of it, its
+##   live shots by node and, for a build no longer current, its spells; a report names the field.
 ## A resting caster needs no more: its only generations are its staffs' current ones, whose spells
-## are its builds' nodes, set and freed together (`parts_problems` checks both). Looked up by key,
-## never by sorting a table. Empty for an id with none of it (a caster gone, its shots ended).
-func state_part(actor: int) -> Array:
+## are its builds' nodes, set and freed together (`actor_part_problems` checks both). Looked up by
+## key, never by sorting a table.
+func actor_part(actor: int) -> Array:
 	var base: int = actor * SpellLimits.STAFFS
-	var builds: Array = []
 	var any: bool = _caster_live[actor] > 0 or _last_infused[actor] != null
 	for staff in SpellLimits.STAFFS:
-		builds.append(_installed[base + staff])
 		any = any or _installed[base + staff] != null
 	if not any:
 		return []
-	var part: Array = [builds, _last_infused[actor]]
+	var builds: Array = _installed.slice(base, base + SpellLimits.STAFFS)
 	if _caster_live[actor] == 0:
-		return part
+		return [builds, _last_infused[actor]]
+	var generations: Dictionary = {}
 	for staff in SpellLimits.STAFFS:
 		var current: int = _current[base + staff]
 		for generation in SpellLimits.GENERATIONS:
@@ -3438,17 +3442,17 @@ func state_part(actor: int) -> Array:
 				live.append(_live.get(tag, 0))
 				if generation != current:
 					spells.append(_profiles.get(tag))
-			part.append([staff * SpellLimits.GENERATIONS + generation, nodes, _generation_live.get(key, 0), live, spells])
-	return part
+			generations["s%dg%d" % [staff, generation]] = {"nodes": nodes, "alive": _generation_live.get(key, 0), "live": live, "spells": spells}
+	return [builds, _last_infused[actor], generations]
 
 
-## What `state_part` stands on, checked (an empty list when it holds): each caster's live count is
+## What `actor_part` stands on, checked (an empty list when it holds): each caster's live count is
 ## the sum of its generations' (`_caster_live`); every spell, node count and live count belongs to a
 ## generation that is held; a caster with nothing alive holds only its staffs' current generations;
 ## and a current generation's spells are its installed build's nodes. A test asks after play (every
-## card's walk, tests/core/test_state_walked.gd), so a new writer of the PARTED tables that breaks
+## card's walk, tests/core/test_state_walked.gd), so a new writer of the BY_ACTOR tables that breaks
 ## one is named, not hashed past. Not for the game: it walks every table.
-func parts_problems() -> PackedStringArray:
+func actor_part_problems() -> PackedStringArray:
 	var out := PackedStringArray()
 	var sums := PackedInt32Array()
 	sums.resize(ACTORS)
@@ -3458,13 +3462,13 @@ func parts_problems() -> PackedStringArray:
 		if sums[actor] != _caster_live[actor]:
 			out.append("caster %d: live count %d, its generations' %d" % [actor, _caster_live[actor], sums[actor]])
 		if actor >= _caster_rows and (sums[actor] > 0 or _last_infused[actor] != null):
-			out.append("caster %d: has state at or past state_parts() (%d)" % [actor, _caster_rows])
+			out.append("caster %d: has state at or past actor_parts() (%d)" % [actor, _caster_rows])
 	for key: int in _node_counts:
 		var actor: int = SpellTag.caster_of(key)
 		var index: int = actor * SpellLimits.STAFFS + SpellTag.staff_of(key)
 		var current: bool = _current[index] == SpellTag.generation_of(key)
 		if actor >= _caster_rows:
-			out.append("caster %d: a generation at or past state_parts() (%d)" % [actor, _caster_rows])
+			out.append("caster %d: a generation at or past actor_parts() (%d)" % [actor, _caster_rows])
 		if not current and _caster_live[actor] == 0:
 			out.append("caster %d staff %d: an older generation %d held with nothing alive" % [actor, SpellTag.staff_of(key), SpellTag.generation_of(key)])
 		if current:

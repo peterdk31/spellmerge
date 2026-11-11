@@ -65,10 +65,12 @@ var current: int = 0
 var number: int = -1
 
 ## Not state: the compiled staffs' cache (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"_cache"]
+const DERIVED: Array[StringName] = [&"_cache", &"_held_scratch"]
 
 ## Every compiled staff, by "spells id|staff id|cards".
 static var _cache: Dictionary = {}
+## One float32, to round a value as a pool holds it (`_as_held`).
+static var _held_scratch: PackedFloat32Array = PackedFloat32Array([0.0])
 
 ## The card ids of each staff, `slots` long (`&""` is an empty slot), and whether it can cast.
 var _cards: Array = []
@@ -200,7 +202,9 @@ func rests() -> bool:
 	for at in staff_count:
 		var base: StaffBase = staff_of(at)
 		var mana: float = _mana[at]
-		if mana > base.max_mana or (mana < base.max_mana and base.mana_regen > 0.0):
+		# A pool holds float32s: full is the most as one holds it.
+		var most: float = _as_held(base.max_mana)
+		if mana > most or (mana < most and base.mana_regen > 0.0):
 			return false
 		if actor.spells != null and actor.spells.is_winding(number, at):
 			return false
@@ -213,9 +217,16 @@ func at_rest() -> bool:
 	if _edited:
 		return false
 	for at in staff_count:
-		if _mana[at] != max_mana_of(at):
+		if _mana[at] != _as_held(max_mana_of(at)):
 			return false
 	return true
+
+
+## `value` as a pool holds it (a float32: `_mana`), so a pool filled to a most it cannot hold
+## exactly still counts as full.
+static func _as_held(value: float) -> float:
+	_held_scratch[0] = value
+	return _held_scratch[0]
 
 
 ## The projectile manager's anchor at the body and Spells' aim from the staff tip.

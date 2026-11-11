@@ -129,11 +129,13 @@ func test_a_body_without_a_mover_never_moves() -> void:
 	check_equal(body.position, Vector2.ZERO, "no Mover, no move")
 
 
-func test_a_resting_body_hashes_as_one_leaf() -> void:
+func test_a_resting_body_hashes_as_its_rest_values_alone() -> void:
 	var body: Actor = _prop()
 	var leaves: Array[String] = []
 	StateWalk.new().walk("body", body, func(path: String, _value: Variant) -> void: leaves.append(path))
-	check_equal(leaves, ["body.rest"] as Array[String], "one leaf while at rest")
+	var rest: Array = body.rest_leaf()
+	check_equal(leaves.size(), rest.size() + 1, "its rest values and their count, while at rest")
+	check(leaves.all(func(path: String) -> bool: return path.begins_with("body.rest")), "nothing of its members")
 	var other: Actor = _prop(Vector2(16.0, 0.0))
 	check(SimHash.of(body) != SimHash.of(other), "two at rest apart hash apart")
 
@@ -205,3 +207,15 @@ func test_a_restored_snapshot_wakes_every_body() -> void:
 	check(_world.table.asleep[body.id] != 0, "asleep after a dormant tick")
 	_world.table.rebuild_derived()
 	check_equal(_world.table.asleep[body.id], 0, "awake after a restore (the body under the id may be another)")
+
+
+func test_a_pool_whose_most_a_float32_cannot_hold_still_counts_as_full() -> void:
+	var staff := StaffBase.new()
+	staff.max_mana = 12.3
+	staff.mana_regen = 4.0
+	var body: Actor = _world.actor(Vector2.ZERO, [&"health", &"hurtbox", &"caster"], null, [[&"bolt"]], staff)
+	check(body.dormant(), "full at 12.3 (held as a float32 a little below it): nothing to fill")
+	check(body.rest_leaf() != null, "and as made")
+	var before: Dictionary = _state(body)
+	_force_step(body)
+	check_equal(_state(body), before, "a step changes nothing")

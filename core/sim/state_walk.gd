@@ -48,8 +48,8 @@ extends RefCounted
 ## An object whose script has `func idle() -> bool` and is idle (its state is a fresh one's, waiting
 ## to be started: a dash's homing while no dash homes) is one leaf, `&"idle"`, not its members (N3c:
 ## a carrier keeps one per row, nearly all idle, and they were most of a hash).
-## A body walked as an area that is at rest (`rest_leaf()` gives a value, not null: an actor that
-## is dormant and still as it was made, a standing prop; props W2) is one leaf, that value, not its
+## A body walked as an area that is at rest (`rest_leaf()` gives an array, not null: an actor that
+## is dormant and still as it was made, a standing prop; props W2) is that array's values, not its
 ## members. A snapshot does not use it: it saves every body whole.
 ## Anything else is a **problem**, named by its path and what it holds: a node that is not the
 ## holder's own (a service: DERIVED; another area's body: REFS), a node of a script outside the
@@ -612,7 +612,12 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 		# leaf of what may differ between two bodies made alike (`Actor.rest_leaf`).
 		var rest: Variant = node.call(&"rest_leaf")
 		if rest != null:
-			_leaf(_join(path, ".rest"), rest)
+			# Each value a leaf of its own, hashed by its bytes as a member is (an array's `hash()`
+			# would take -0.0 for 0.0).
+			var values: Array = rest
+			_leaf(_join(path, ".rest"), values.size())
+			for i in values.size():
+				_leaf(_index(path + ".rest", i) if with_paths else path, values[i])
 			return
 	if node is Node2D:
 		_leaf(_join(path, ".position"), (node as Node2D).position)

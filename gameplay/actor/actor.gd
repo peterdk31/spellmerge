@@ -241,7 +241,8 @@ func tick_step(delta: float) -> void:
 ## The body may have something to do again: the Tick steps it from the next tick on (props W2).
 ## Whatever changes what `dormant` reads calls it: its driver (`drive`), its down state, a look
 ## added, a possession, its Health's protection, its Caster's mana or cast, a hold (the actor
-## table's own), a move of the body (`_notification`).
+## table's own), a move of the body (`_notification`). A move of the node it is under is not
+## noticed: no body stands under a node that moves (`Tick.verify_sleep` would name one that did).
 func wake() -> void:
 	if actors != null and id != ActorsScript.NONE:
 		actors.wake(id)

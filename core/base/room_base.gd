@@ -56,12 +56,9 @@ extends Resource
 ## The group of a room scene's nodes that show only while its `start_stone` is lit (Feel shows
 ## and hides them, hearing `start_stone_changed`).
 const STONE_LIT: StringName = &"start_stone_lit"
-## The wall art's colours that count, at most; a colour on fewer pixels than this share of the
-## most common one is left out (a speck of trim).
-const SURFACE_SHADES: int = 3
-const SURFACE_MIN_SHARE: float = 0.1
-## The same for the floor's colours: a floor is mostly one colour, its seams and highlights a few
-## pixels in a hundred (the crypt's shadow is 7 %, its light 1.4 %).
+## The share of the most common colour a floor's colour needs to count (a wall's is the art rule's,
+## `ArtPixels.MIN_SHARE`): a floor is mostly one colour, its seams and highlights a few pixels in a
+## hundred (the crypt's shadow is 7 %, its light 1.4 %).
 const FLOOR_MIN_SHARE: float = 0.01
 ## The layer of the walls' bodies (as Flow tells the projectile manager).
 const WALL_LAYER: int = 1
@@ -81,9 +78,9 @@ var _floor: PackedColorArray = PackedColorArray()
 ## common one), so debris lying on the floor always shows. Empty when there is no art to read.
 func surface_colors() -> PackedColorArray:
 	if not debris_colors.is_empty():
-		return _three(debris_colors)
+		return ArtPixels.three(debris_colors)
 	if _surface.is_empty() and scene != null:
-		_surface = _three(sample_surface(scene.instantiate()))
+		_surface = ArtPixels.three(sample_surface(scene.instantiate()))
 	return _surface
 
 
@@ -93,28 +90,28 @@ func surface_colors() -> PackedColorArray:
 ## when there is no art to read.
 func floor_colors() -> PackedColorArray:
 	if not floor_mark_colors.is_empty():
-		return _three(floor_mark_colors)
+		return ArtPixels.three(floor_mark_colors)
 	if _floor.is_empty() and scene != null:
-		_floor = _three(sample_floor(scene.instantiate()))
+		_floor = ArtPixels.three(sample_floor(scene.instantiate()))
 	return _floor
 
 
-## The floor colours of the layout `layout` (its `Floor` sprite's, most common first, SURFACE_SHADES
+## The floor colours of the layout `layout` (its `Floor` sprite's, most common first, ArtPixels.SHADES
 ## at most, none on fewer than FLOOR_MIN_SHARE of the most common's pixels); frees it.
 static func sample_floor(layout: Node) -> PackedColorArray:
 	var found := PackedColorArray()
 	if layout == null:
 		return found
 	var floor_sprite := layout.get_node_or_null("Floor") as Sprite2D
-	var counts: Dictionary = _count_colours(floor_sprite.texture, {}) if floor_sprite != null else {}
+	var counts: Dictionary = ArtPixels.count_colours(floor_sprite.texture, {}) if floor_sprite != null else {}
 	# As it is shown: a tinted floor's marks are tinted the same.
 	var tint: Color = floor_sprite.modulate * floor_sprite.self_modulate if floor_sprite != null else Color.WHITE
 	layout.free()
 	var most: int = 0
 	for rgba: int in counts:
 		most = maxi(most, int(counts[rgba]))
-	while found.size() < SURFACE_SHADES and not counts.is_empty():
-		var top: int = _most_common(counts)
+	while found.size() < ArtPixels.SHADES and not counts.is_empty():
+		var top: int = ArtPixels.most_common(counts)
 		if float(counts[top]) < float(most) * FLOOR_MIN_SHARE:
 			break
 		var colour: Color = Color.hex(top) * tint
@@ -132,127 +129,18 @@ static func sample_surface(layout: Node) -> PackedColorArray:
 	var floor_main: int = -1
 	var floor_sprite := layout.get_node_or_null("Floor") as Sprite2D
 	if floor_sprite != null:
-		var floor_counts: Dictionary = _count_colours(floor_sprite.texture, {})
-		floor_main = _most_common(floor_counts)
+		var floor_counts: Dictionary = ArtPixels.count_colours(floor_sprite.texture, {})
+		floor_main = ArtPixels.most_common(floor_counts)
 	var counts: Dictionary = {}
 	for node: Node in layout.find_children("*", "StaticBody2D", true, false):
 		if ((node as StaticBody2D).collision_layer & WALL_LAYER) == 0:
 			continue
 		for child: Node in node.get_children():
 			if child is Sprite2D:
-				_count_colours((child as Sprite2D).texture, counts)
+				ArtPixels.count_colours((child as Sprite2D).texture, counts)
 	layout.free()
 	counts.erase(floor_main)
-	return _top_colours(counts)
-
-
-## The colours of the art `texture` (only its `region` when one is given: a frame of a sheet),
-## by the same rule as a room's walls: its most common ones, lightest first (light, base, shadow;
-## always three, a colour repeated when it has fewer). What a body that breaks sheds (Feel's
-## motes). Empty when there is no art to read.
-static func colours_of_art(texture: Texture2D, region: Rect2i = Rect2i()) -> PackedColorArray:
-	return _three(_top_colours(_count_colours(texture, {}, region)))
-
-
-## The most common colours of `counts` (RGBA32 -> pixels), most common first: at most
-## SURFACE_SHADES, none on fewer than SURFACE_MIN_SHARE of the most common one's pixels. Empties
-## `counts`' top colours.
-static func _top_colours(counts: Dictionary) -> PackedColorArray:
-	var found := PackedColorArray()
-	var most: int = 0
-	for rgba: int in counts:
-		most = maxi(most, int(counts[rgba]))
-	while found.size() < SURFACE_SHADES and not counts.is_empty():
-		var top: int = _most_common(counts)
-		if float(counts[top]) < float(most) * SURFACE_MIN_SHARE:
-			break
-		found.append(Color.hex(top))
-		counts.erase(top)
-	return found
-
-
-## `colours` as three shades, lightest first: light, base, shadow.
-static func _three(colours: PackedColorArray) -> PackedColorArray:
-	var sorted: Array[Color] = []
-	for colour in colours:
-		sorted.append(colour)
-	sorted.sort_custom(func(a: Color, b: Color) -> bool: return a.get_luminance() > b.get_luminance())
-	match sorted.size():
-		0:
-			return PackedColorArray()
-		1:
-			return PackedColorArray([sorted[0], sorted[0], sorted[0]])
-		2:
-			return PackedColorArray([sorted[0], sorted[0], sorted[1]])
-	return PackedColorArray([sorted[0], sorted[1], sorted[2]])
-
-
-## Adds the opaque pixels of `texture` (of its `region` only, when one is given) to `counts`
-## (RGBA32 -> pixels) and returns it.
-static func _count_colours(texture: Texture2D, counts: Dictionary, region: Rect2i = Rect2i()) -> Dictionary:
-	if texture == null:
-		return counts
-	var image: Image = texture.get_image()
-	if image == null or image.is_empty():
-		return counts
-	if image.is_compressed():
-		image.decompress()
-	var area := Rect2i(Vector2i.ZERO, image.get_size())
-	if region.has_area():
-		area = area.intersection(region)
-	for y in range(area.position.y, area.end.y):
-		for x in range(area.position.x, area.end.x):
-			var pixel: Color = image.get_pixel(x, y)
-			if pixel.a >= 0.5:
-				var rgba: int = Color(pixel.r, pixel.g, pixel.b, 1.0).to_rgba32()
-				counts[rgba] = int(counts.get(rgba, 0)) + 1
-	return counts
-
-
-## The pixels of `texture` (within `region` when it has one) that show (alpha at least a half),
-## as positions in the region, every `step`-th of them in reading order: what a body's art is made
-## of, for it to break into (S3, a death's motes). Empty for no texture.
-static func pixels_of_art(texture: Texture2D, region: Rect2i = Rect2i(), step: int = 1) -> PackedVector2Array:
-	var found := PackedVector2Array()
-	if texture == null:
-		return found
-	var image: Image = texture.get_image()
-	if image == null or image.is_empty():
-		return found
-	if image.is_compressed():
-		image.decompress()
-	var area := Rect2i(Vector2i.ZERO, image.get_size())
-	if region.has_area():
-		area = area.intersection(region)
-	var n: int = 0
-	for y in range(area.position.y, area.end.y):
-		for x in range(area.position.x, area.end.x):
-			if image.get_pixel(x, y).a >= 0.5:
-				if n % maxi(step, 1) == 0:
-					found.append(Vector2(x - area.position.x, y - area.position.y))
-				n += 1
-	return found
-
-
-## The part of its texture `sprite` shows: its region, or its frame of a sheet (empty with no
-## texture). What a body breaks into and a mote source's mask read.
-static func frame_of(sprite: Sprite2D) -> Rect2i:
-	if sprite == null or sprite.texture == null:
-		return Rect2i()
-	if sprite.region_enabled:
-		return Rect2i(sprite.region_rect)
-	var size: Vector2i = Vector2i(sprite.texture.get_size()) / Vector2i(maxi(sprite.hframes, 1), maxi(sprite.vframes, 1))
-	return Rect2i(Vector2i(sprite.frame % maxi(sprite.hframes, 1), sprite.frame / maxi(sprite.hframes, 1)) * size, size)
-
-
-static func _most_common(counts: Dictionary) -> int:
-	var best: int = -1
-	var most: int = 0
-	for rgba: int in counts:
-		if int(counts[rgba]) > most:
-			most = int(counts[rgba])
-			best = rgba
-	return best
+	return ArtPixels.top_colours(counts)
 
 
 ## The dummy that stands at the `spawn`-th of `dummy_spawns`: `dummy_ids` in order, then its last

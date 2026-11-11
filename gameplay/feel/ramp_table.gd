@@ -2,7 +2,7 @@ extends RefCounted
 ## The ramp table (docs/milestones/spell-spectacle.md, P1 and P2): colours other than a spell's,
 ## as rows of four shades (white-hot, light, base, shadow) in a small texture that the motes'
 ## and the floor marks' shaders both read. A row is a set of colours from the room's or a body's
-## own art (a wall's, `RoomBase.surface_colors`; a dying body's, `RoomBase.colours_of_art`), named
+## own art (a wall's, `RoomBase.surface_colors`; a dying body's, `ArtPixels.colours_of`), named
 ## by its source, TABLE_SOURCE plus its row. Feel holds one table and hands it to both, so a mote
 ## that lands and the mark it leaves name the same row.
 ##

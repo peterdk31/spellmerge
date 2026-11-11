@@ -301,6 +301,12 @@ func cancel_winds() -> void:
 		actor.spells.cancel_winds(number)
 
 
+## The cast staff `at` winds up leaves no more, for free (a prop left the state that cast it).
+func cancel_wind(at: int) -> void:
+	if actor.spells != null and number >= 0:
+		actor.spells.cancel_wind(number, at)
+
+
 ## True while staff `at` holds a sustained card on.
 func is_holding(at: int) -> bool:
 	return has_staff(at) and actor.spells.is_holding(number, at)
@@ -355,6 +361,22 @@ func plan_of(at: int) -> Dictionary:
 ## The form of the carrier staff `at` cast last (`Spells.last_form`), or &"".
 func last_form(at: int) -> StringName:
 	return actor.spells.last_form(number, at) if has_staff(at) else &""
+
+
+## Hold the staffs of `entries` (an enemy's or a prop's data: `StaffCards`, at most 4) from the start,
+## one per button, their cards built when the actor enters play. Before the actor is ready.
+func hold_staffs(entries: Array[StaffCards]) -> void:
+	var held: Array[StaffBase] = []
+	var cards: Array = []
+	for entry: StaffCards in entries.slice(0, MAX_STAFFS):
+		held.append(entry.staff if entry != null else null)
+		cards.append(entry.cards.duplicate() if entry != null else [])
+	if held.is_empty():
+		return
+	staff_count = held.size()
+	staffs = held
+	staff = held[0]
+	start_cards = cards
 
 
 ## Build `cards` (card ids by slot) into staff `at`: cut or padded to the staff's slots, compiled

@@ -596,12 +596,20 @@ func _apply_status_row(caster: int, row: int, status_id: StringName, duration: f
 			_chill_stacks[row] = 0
 			_status_left[at + ST_FREEZE] = FREEZE_TIME
 			froze = true
-	if events != null:
-		var node: Node2D = _nodes[row]
-		events.status_applied.emit(caster, node, status_id)
-		if froze:
-			events.status_applied.emit(caster, node, FREEZE)
+	var node: Node2D = _nodes[row]
+	_tell_status(caster, node, status_id)
+	if froze:
+		_tell_status(caster, node, FREEZE)
 	return true
+
+
+## `status_id` from `by` was put on `node`: the bus's `status_applied`, and the actor's own
+## `Actor.status_gained` for its own listeners (a prop's reactions, props W6), as `damaged` is.
+func _tell_status(by: int, node: Node2D, status_id: StringName) -> void:
+	if events != null:
+		events.status_applied.emit(by, node, status_id)
+	if node is Actor and is_instance_valid(node):
+		(node as Actor).status_gained.emit(by, status_id)
 
 
 ## Seconds left of `status_id` (burn, chill, freeze, gust, hex or static) on `actor`; 0 when
@@ -1067,8 +1075,11 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 		hit_stop.reaction(by, reaction.reaction_id, _slot)
 		if _tag != 0:
 			events.reaction_landed.emit(by, reaction.reaction_id, node, centre, _tag, _slot)
-		if not _same(row, node):
-			return
+	if node is Actor and is_instance_valid(node):
+		# The actor's own listeners (a prop's reactions, props W6) hear it directly, as `damaged`.
+		(node as Actor).reacted.emit(by, reaction.reaction_id)
+	if not _same(row, node):
+		return
 	var spell_tag: int = _tag
 	_tag = 0
 	match reaction.effect:
@@ -1124,8 +1135,8 @@ func _extend(by: int, row: int, reaction: ReactionRow) -> void:
 		_status_power[at + ST_CHILL] = 0.0
 		_chill_stacks[row] = 0
 		_status_left[at + ST_FREEZE] += reaction.duration
-		if newly and events != null:
-			events.status_applied.emit(by, _nodes[row], FREEZE)
+		if newly:
+			_tell_status(by, _nodes[row], FREEZE)
 		return
 	_status_left[at + st] += reaction.duration
 	_status_power[at + st] += reaction.strength

@@ -13,7 +13,8 @@ extends Node2D
 ## Components: found once in `_ready` among the children, at most one of each kind, none required:
 ## `health` (Health), `hurtbox` (Hurtbox), `contact` (Contact), `mover` (Mover), `caster`
 ## (Caster), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
-## circle when its scene has none, so every actor has one), plus any number of looks (ActorLook)
+## circle when its scene has none, so every actor has one), `reactions` (Reactions: a prop's states,
+## props W6; never stepped, it hears its body), plus any number of looks (ActorLook)
 ## and the first ActorController, its `home_controller`. Its `damage_numbers` (DamageNumbers,
 ## props W5) are a look too, added the same way when its scene has none, so every actor shows its
 ## hits; they hear its hits and are never stepped. Components reach each other only through the actor, never by node path.
@@ -97,6 +98,12 @@ signal damaged(by: int, amount: float, element: StringName)
 ## Combat healed this actor by `amount` (what it gained) from the actor `by`: for its own listeners,
 ## as `damaged`.
 signal healed(by: int, amount: float)
+## Combat put the status `status` on this actor from the actor `by` (with every `status_applied` that
+## names it): for its own listeners, as `damaged` (a prop's reactions, props W6).
+signal status_gained(by: int, status: StringName)
+## One of Combat's reactions between statuses, `reaction` (&"shatter"), happened on this actor, set
+## off by the actor `by` (with its `reaction_triggered`): for its own listeners, as `damaged`.
+signal reacted(by: int, reaction: StringName)
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); its components' list,
 ## found again from its children (`_find_components`; each component is walked as its member).
@@ -152,10 +159,13 @@ var contact: Contact = null
 var mover: Mover = null
 var caster: Caster = null
 var footprint: Footprint = null
+## A prop's reactions and states (props W6), null for a body that has none.
+var reactions: Reactions = null
 ## Its damage numbers (a look its scene holds, else one it added; see the class doc).
 var damage_numbers: DamageNumbers = null
-## True when something downs the actor at 0 health instead of letting it die (a Downed
-## component, G7, sets it).
+## True when something else takes the actor's 0 health instead of letting it die: a Downed
+## component downs it (G7), Entities ends a decoy, a prop's `Reactions` runs its death reactions
+## (props W6). Combat then neither frees it nor tells its death.
 var downable: bool = false
 ## The possession holding this actor now (another controller possesses it), or null.
 var possessed_by: Possession = null
@@ -326,7 +336,7 @@ func step(delta: float) -> void:
 			velocity *= delta / full
 	else:
 		velocity = Vector2.ZERO
-	if hurtbox != null and hurtbox.registered == _down:
+	if hurtbox != null and hurtbox.registered == (_down or not hurtbox.enabled):
 		hurtbox.step()
 	for look in _looks:
 		look.step(delta)
@@ -571,6 +581,8 @@ func _find_components() -> void:
 			caster = _first(caster, child) as Caster
 		elif child is Footprint:
 			footprint = _first(footprint, child) as Footprint
+		elif child is Reactions:
+			reactions = _first(reactions, child) as Reactions
 		elif child is ActorComponent:
 			# A kind the kit does not name (the wizard's Downed): stepped by nobody, attached too.
 			_components.append(child as ActorComponent)
@@ -589,8 +601,9 @@ func _find_components() -> void:
 		damage_numbers = DamageNumbers.new()
 		damage_numbers.name = "DamageNumbers"
 		add_child(damage_numbers)
-	# Set up and attached in this order: health first, the caster last (it names the hurtbox).
-	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster]
+	# Set up and attached in this order: health first, the caster after the hurtbox (it names it),
+	# a prop's reactions last (they shape the hurt shape and footprint, and cast).
+	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster, reactions]
 	var at: int = 0
 	for component in ordered:
 		if component != null:
@@ -632,15 +645,7 @@ func _apply_data() -> void:
 		_components.erase(caster)
 		caster = null
 		return
-	var staffs: Array[StaffBase] = []
-	var cards: Array = []
-	for entry: StaffCards in data.staffs.slice(0, EnemyBase.MAX_STAFFS):
-		staffs.append(entry.staff if entry != null else null)
-		cards.append(entry.cards.duplicate() if entry != null else [])
-	caster.staff_count = staffs.size()
-	caster.staffs = staffs
-	caster.staff = staffs[0]
-	caster.start_cards = cards
+	caster.hold_staffs(data.staffs)
 
 
 ## Make the body `factor` times its drawn size (a boss, a boss's phase): the node scales, and the

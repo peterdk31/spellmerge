@@ -1240,7 +1240,9 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 		if events != null:
 			# Its look (an enemy's telegraph) is the first carrier card's `wind_cue` (T6b).
 			var first_spell: CompiledSpell = cast.group.spells[0]
-			events.cast_winding.emit(actor, staff, first_spell.form_id, origin, aim, cast.wind_up, first_spell.tint, first_spell.look, SpellTag.make(actor, staff, first_spell.node, _current[index]))
+			# A staff may name its own (a barrel's fuse; props W6): it plays in place of the card's.
+			var staff_cue: StringName = compiled.staff.wind_cue if compiled.staff != null else &""
+			events.cast_winding.emit(actor, staff, first_spell.form_id, origin, aim, cast.wind_up, first_spell.tint, first_spell.look, SpellTag.make(actor, staff, first_spell.node, _current[index]), staff_cue)
 		return 0.0
 	_walk_turn[actor] = turn
 	if not _leave(index, compiled, cast, origin, aim):
@@ -1249,11 +1251,16 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 
 
 ## The cast `cast` of staff `index`'s cycle leaves from `origin` along `aim`: its group launched,
-## the cycle moved on. False when no shot could start (every one inside a wall): then nothing
-## changed.
+## the cycle moved on, `cast_left` sent first. False when no shot could start (every one inside a
+## wall): then nothing changed but that it was told.
 func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vector2, aim: Vector2) -> bool:
 	var actor: int = floori(float(index) / SpellLimits.STAFFS)
 	var staff: int = index % SpellLimits.STAFFS
+	if events != null:
+		# Before its shots start (props W6): a caster that becomes something else as its cast leaves
+		# (a barrel's fuse burns out into rubble) is that when they meet it. Before the scatter is
+		# seeded, so a cast a listener makes now does not take this one's.
+		events.cast_left.emit(actor, staff)
 	_scatter_from(hash(Vector3i(actor, staff, _cast_count[index])))
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:
 		return false
@@ -1312,6 +1319,13 @@ func cancel_winds(actor: int) -> void:
 	if _winding <= 0 or actor < 0 or actor >= ACTORS:
 		return
 	for staff in SpellLimits.STAFFS:
+		_cancel_wind(actor * SpellLimits.STAFFS + staff)
+
+
+## The winding cast of `actor`'s staff `staff` leaves no more and the staff is free (a prop left the
+## state that wound it up, props W6); nothing was paid.
+func cancel_wind(actor: int, staff: int) -> void:
+	if _winding > 0 and _in_range(actor, staff):
 		_cancel_wind(actor * SpellLimits.STAFFS + staff)
 
 

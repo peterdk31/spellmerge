@@ -107,6 +107,21 @@ func test_line_is_hidden_outside_the_windup() -> void:
 	check(imp.get_node("Sprite").modulate == Color.WHITE, "the sprite is white again after the shot")
 
 
+func test_a_staff_that_names_its_own_wind_cue_plays_it_in_place_of_the_cards() -> void:
+	# props W6 (`StaffBase.wind_cue`: a barrel's fuse): the staff's cue, here one with no lane.
+	var imp: Actor = fx.imp_facing_player()
+	fx.with_feel()
+	var staff: StaffBase = imp.caster.staff_of(0)
+	staff.wind_cue = &"hit"
+	fx.run(imp, 1)
+	var winding: bool = imp.caster.is_winding(0)
+	var lane: Sprite2D = _lane(imp)
+	# The imp's staff is shared content: put it back before anything is checked.
+	staff.wind_cue = &""
+	check(winding, "it winds up")
+	check(lane == null, "with its staff's own cue, not the card's lane")
+
+
 func test_line_is_as_long_as_the_shot_flies() -> void:
 	var imp: Actor = fx.imp_facing_player()
 	fx.with_feel()

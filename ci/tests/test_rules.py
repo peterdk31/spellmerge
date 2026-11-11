@@ -124,6 +124,35 @@ class BannedApiTest(unittest.TestCase):
                 self.assertTrue(signal(good + bad + "\n"), f"not flagged: {bad}")
                 self.assertTrue(signal(bad + "\n", "server/signal/test/rooms.test.js") or "fetch" in bad, f"not flagged in a test: {bad}")
 
+    def test_the_room_server_calls_cloudflares_turn_service_once_and_only_so(self) -> None:
+        def signal(text: str, path: str = "server/signal/worker.js") -> list[str]:
+            return [f.message for f in rules.check_signal_source(path, text)]
+
+        relay = "const r = await " + rules.SIGNAL_RELAY_FETCH + ' method: "POST" });\n'
+        self.assertEqual(signal(relay), [], "the relay call in worker.js")
+        self.assertTrue(signal(relay, "server/signal/rooms.js"), "only in worker.js")
+        self.assertTrue(signal(relay, "server/signal/local.js"), "not in the local server")
+        self.assertEqual(len(signal(relay + relay)), 1, "once: a second is flagged")
+        self.assertTrue(signal(relay + 'await fetch("https://example.com");\n'), "and no other beside it")
+        # The global fetch is not called, named, kept or handed on in any other way, and there is
+        # no other way out.
+        for bad in ('const f = fetch;\nf("https://example.com");', 'fetch.call(null, "https://example.com");',
+                    '(fetch)("https://example.com");', '(0, fetch)("https://example.com");', '[fetch][0]("https://example.com");',
+                    'fetch/**/("https://example.com");', 'fetch ("https://example.com");', 'const o = { fetch };',
+                    'new WebSocket("wss://example.com/" + env.TURN_KEY_API_TOKEN);', 'new Request("https://example.com");',
+                    'new EventSource("https://example.com");', 'navigator.sendBeacon("https://example.com");'):
+            for path in ("server/signal/worker.js", "server/signal/rooms.js", "server/signal/turn.js"):
+                with self.subTest(code=bad, path=path):
+                    self.assertTrue(signal(relay + bad + "\n", path), f"not flagged: {bad}")
+        own = "export default {\n  async fetch(request, env) {\n    return env.ROOMS.get(id).fetch(request);\n  },\n};\n"
+        self.assertEqual(signal(relay + own), [], "a Worker's own fetch method, defined and called on an object")
+        for changed in (rules.SIGNAL_RELAY_FETCH.replace("rtc.live.cloudflare.com", "rtc.live.cloudflare.com.evil.example"),
+                        rules.SIGNAL_RELAY_FETCH.replace("env.TURN_KEY_ID", "url"),
+                        rules.SIGNAL_RELAY_FETCH.replace("generate-ice-servers", "generate-ice-servers?x=${y}"),
+                        rules.SIGNAL_RELAY_FETCH.replace("encodeURIComponent(env.TURN_KEY_ID)", "env.TURN_KEY_ID")):
+            with self.subTest(code=changed):
+                self.assertTrue(signal("await " + changed + " });\n"), f"not flagged: {changed}")
+
     def test_native_sources_compute_only(self) -> None:
         def native(text: str) -> list[str]:
             return [f.message for f in rules.check_native_source("native/src/k.cpp", text)]

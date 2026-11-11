@@ -46,10 +46,25 @@ var names: PackedStringArray = PackedStringArray()
 
 
 ## Add a candidate of this machine's. False (and it is left out) when it would not pass `read`
-## on the other machine, or there are MAX_CANDIDATES already.
+## on the other machine, or there are MAX_CANDIDATES already. A relay's address comes last and
+## is the one that always gets through, so with the code full it takes the place of the last
+## address on the machine's own network (a machine of many networks has plenty).
 func add_candidate(mid: String, index: int, name: String) -> bool:
-	if mids.size() >= MAX_CANDIDATES or _candidate_problem(mid, index, name) != "":
+	if _candidate_problem(mid, index, name) != "":
 		return false
+	if mids.size() >= MAX_CANDIDATES:
+		var given_up: int = -1
+		if _type_of(name) == "relay":
+			for at in range(names.size() - 1, -1, -1):
+				if _type_of(names[at]) == "host":
+					given_up = at
+					break
+		if given_up < 0:
+			return false
+		mids[given_up] = mid
+		indexes[given_up] = index
+		names[given_up] = name
+		return true
 	mids.append(mid)
 	indexes.append(index)
 	names.append(name)
@@ -58,24 +73,33 @@ func add_candidate(mid: String, index: int, name: String) -> bool:
 
 ## How many of the candidates are addresses on the machine's own network (`host`).
 func own_count() -> int:
-	return _addresses(true).size()
+	return _addresses(["host"]).size()
 
 
 ## The addresses the machine is seen at from outside its network (what a STUN server told it, or
-## a relay's): the candidates that are not `host`. Two machines that share one are behind the
-## same router.
+## the other machine saw): the `srflx` and `prflx` candidates. Two machines that share one are
+## behind the same router. (A relay's are not: one relay's address may be every machine's.)
 func seen_at() -> PackedStringArray:
-	return _addresses(false)
+	return _addresses(["srflx", "prflx"])
 
 
-## The candidates' addresses: the `host` ones (`own`), or the others.
-func _addresses(own: bool) -> PackedStringArray:
+## How many of the candidates are addresses on a relay (`relay`).
+func relay_count() -> int:
+	return _addresses(["relay"]).size()
+
+
+## The addresses of the candidates of these types.
+func _addresses(types: PackedStringArray) -> PackedStringArray:
 	var found: PackedStringArray = PackedStringArray()
 	for name: String in names:
-		var fields: PackedStringArray = name.substr(name.find("candidate:") + 10).split(" ", false)
-		if (fields[7] == "host") == own:
-			found.append(fields[4])
+		if types.has(_type_of(name)):
+			found.append(name.substr(name.find("candidate:") + 10).split(" ", false)[4])
 	return found
+
+
+## The type of a candidate that passed `_candidate_problem`: host, srflx, prflx or relay.
+static func _type_of(name: String) -> String:
+	return name.substr(name.find("candidate:") + 10).split(" ", false)[7]
 
 
 ## The code as text, or "" when it is not one `read` would take (no description yet, or too long).

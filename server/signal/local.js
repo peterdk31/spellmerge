@@ -8,6 +8,10 @@
 //
 // It speaks as much WebSocket as the game and the tests need: whole text messages, ping and
 // close. Anything else closes the socket.
+//
+// `node local.js [port] --fake-relay` hands every join a relay that is no relay (FAKE_RELAY, a
+// TURN address on this machine where nothing listens): a game that asked for relays
+// (`/room?relay=1`) takes it, gives it to WebRTC, and must still link directly.
 
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
@@ -17,6 +21,8 @@ const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 /** A frame's most bytes: a message at its longest in UTF-8, with room. */
 const MAX_FRAME = LIMITS.bytes * 4;
 const SWEEP_MS = 1000;
+/** A relay nobody runs. */
+export const FAKE_RELAY = { urls: ["turn:127.0.0.1:9?transport=udp"], username: "local", credential: "nobody" };
 
 /** Start it. `options` are `Rooms`' (the tests' clock and codes). Resolves to { port, rooms, close() }. */
 export function listen(port = 0, options = {}) {
@@ -27,14 +33,15 @@ export function listen(port = 0, options = {}) {
   });
   server.on("upgrade", (request, socket) => {
     const key = request.headers["sec-websocket-key"];
-    if (new URL(request.url, "http://local").pathname !== "/room" || typeof key !== "string") {
+    const url = new URL(request.url, "http://local");
+    if (url.pathname !== "/room" || typeof key !== "string") {
       socket.end("HTTP/1.1 404 Not Found\r\n\r\n");
       return;
     }
     const accept = createHash("sha1").update(key + GUID).digest("base64");
     socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
     open.add(socket);
-    serve(socket, rooms, () => open.delete(socket));
+    serve(socket, rooms, { relay: url.searchParams.get("relay") === "1" }, () => open.delete(socket));
   });
   const sweeper = setInterval(() => rooms.sweep(), SWEEP_MS);
   return new Promise((resolve) => {
@@ -53,7 +60,7 @@ export function listen(port = 0, options = {}) {
 }
 
 /** One socket's frames read and written. */
-function serve(socket, rooms, closed) {
+function serve(socket, rooms, asks, closed) {
   let unread = Buffer.alloc(0);
   let gone = false;
   const sock = {
@@ -89,7 +96,10 @@ function serve(socket, rooms, closed) {
         return;
       }
       unread = unread.subarray(read.size);
-      if (read.op === 0x1) rooms.message(sock, read.body.toString("utf8"));
+      if (read.op === 0x1) {
+        const pending = rooms.message(sock, read.body.toString("utf8"));
+        if (pending) pending.catch(() => {});
+      }
       else if (read.op === 0x9) socket.write(frame(0xa, read.body));
       else if (read.op === 0x8) {
         rooms.remove(sock);
@@ -97,7 +107,7 @@ function serve(socket, rooms, closed) {
       } else if (read.op !== 0xa) rooms.message(sock, read.body);
     }
   });
-  rooms.add(sock);
+  rooms.add(sock, asks);
 }
 
 /** A server's frame: whole, unmasked. */
@@ -148,6 +158,8 @@ function unframe(bytes) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const port = Number(process.argv[2] ?? 8787);
-  listen(port).then((server) => console.log(`signal: ws://127.0.0.1:${server.port}/room`));
+  const args = process.argv.slice(2);
+  const port = Number(args.find((arg) => !arg.startsWith("--")) ?? 8787);
+  const options = args.includes("--fake-relay") ? { relay: async () => FAKE_RELAY } : {};
+  listen(port, options).then((server) => console.log(`signal: ws://127.0.0.1:${server.port}/room`));
 }

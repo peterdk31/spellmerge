@@ -16,6 +16,11 @@ extends NetHandshake
 ##   then: the server's part is done. `code()` stays "": it has nothing to hand over by hand.
 ## - **Nothing connects anywhere before `offer` or `take`,** and then only to the room server
 ##   (the address given, `NetSignal.URL` in the game) and what the inner handshake talks to.
+## - **A relay the server hands over** (`NetSignal.RELAY`, sent before each join is told) goes to
+##   the inner handshakes made after it, as a TURN server beside STUN: WebRTC uses it only where
+##   the two machines find no direct way. The host keeps the last one for every guest after it
+##   (a join past the server's limit comes with none, and the host's own still helps). With none,
+##   the machines link directly or not at all, as by hand; so too with one that is out of form.
 ## - **What the server says is untrusted:** only `NetSignal`'s forms are taken, only the kinds
 ##   this side is sent, only in an order that makes sense; anything else ends the handshake
 ##   (`problem`). A code it hands over is checked by the inner handshake exactly as a pasted one
@@ -35,7 +40,8 @@ const MAX_READ: int = 16
 
 ## The time in milliseconds (a test's own; the engine's clock otherwise).
 var clock: Callable = Callable()
-## Makes an inner handshake (a `NetHandshake`); invalid: WebRTC's (`NetRtc`). Tests give their own.
+## Makes an inner handshake (a `NetHandshake`) from the relay given (a `NetRelay`, or null);
+## invalid: WebRTC's (`NetRtc`). Tests give their own.
 var rtc_maker: Callable = Callable()
 
 var _url: String
@@ -49,6 +55,8 @@ var _said_at: int = -1
 ## The host: its room's code; a joining machine: the room it asked for.
 var _room: String = ""
 var _room_given: bool = false
+## The relay the server handed over last (`NetSignal.relay`), for the inner handshakes made after it.
+var _relay: NetRelay = null
 ## The host's guests on their way to a link, by the server's id: the inner handshake, whether its
 ## offer was sent, and when the server named the guest.
 var _guests: Dictionary[int, NetHandshake] = {}
@@ -140,7 +148,7 @@ func close() -> void:
 
 
 func _open() -> String:
-	var why: String = _socket.open(_url)
+	var why: String = _socket.open(NetSignal.asking_relays(_url))
 	if why != "":
 		return _fail(why)
 	_opened_at = _now()
@@ -163,6 +171,9 @@ func _poll_server() -> void:
 		if text == "":
 			break
 		var mine: Array[StringName] = NetSignal.FOR_HOST if _hosting else NetSignal.FOR_GUEST
+		if text.begins_with(NetSignal.RELAY_HEAD) and not _message.read(text):
+			# A relay this game cannot read is no relay: the machines may still link directly.
+			continue
 		if not _message.read(text) or not mine.has(_message.kind) or not _hear():
 			_fail("the room server said something that is no message of its")
 		if _problem != "":
@@ -230,6 +241,11 @@ func _hear() -> bool:
 			_fail("the room %s is full" % _room)
 		NetSignal.CLOSED:
 			_fail("the host closed the room" if not _hosting else "the room is closed")
+		NetSignal.RELAY:
+			# The host's comes before each guest it names; a joining machine's before `joined`.
+			if (_hosting and not _room_given) or (not _hosting and _joined_at >= 0):
+				return false
+			_relay = _message.relay
 	return true
 
 
@@ -283,9 +299,9 @@ func _poll_host() -> void:
 
 
 func _make_rtc() -> NetHandshake:
-	var inner: NetHandshake = rtc_maker.call() as NetHandshake if rtc_maker.is_valid() else null
+	var inner: NetHandshake = rtc_maker.call(_relay) as NetHandshake if rtc_maker.is_valid() else null
 	if inner == null:
-		var rtc := NetRtc.new()
+		var rtc := NetRtc.new(NetRtc.STUN, _relay)
 		rtc.clock = clock
 		inner = rtc
 	return inner

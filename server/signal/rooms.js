@@ -14,6 +14,14 @@
 // changed (on Cloudflare it is the socket's attachment, which outlives the server's sleep, so the
 // rooms are found again by `add` when it wakes). Nothing else is kept: no code is stored, and
 // nothing is logged.
+//
+// A relay (a TURN server, for two machines with no direct way between them) is optional: given a
+// `relay()` that resolves to `{ urls, username, credential }` (whoever holds the sockets knows
+// where it comes from), each join draws one short-lived credential, and the host and the guest
+// are sent it, checked and written in one fixed form (`relayMessage`), before they are told of
+// each other. Only a socket that asked for relays when it came is sent one (`add`'s `asks`): a
+// game built before relays takes no such message. A relay that fails or is slow costs nothing
+// but the relay: the join goes on without it.
 
 /** The letters and digits of a room code: none that is misread for another (0 O 1 I L 5 S U V). */
 export const ALPHABET = "2346789ABCDEFGHJKMNPQRTWXYZ";
@@ -36,6 +44,15 @@ export const LIMITS = {
   idleMs: 60 * 1000,
   /** Sockets held at once. */
   sockets: 4096,
+  /**
+   * Relay credentials drawn in a minute, by every room together; joins past it get none. Counted
+   * in memory, so a server that slept counts anew: `roomRelays` is the limit that always holds.
+   */
+  relays: 30,
+  /** Relay credentials one room may draw while it is open. */
+  roomRelays: 12,
+  /** A relay message's most addresses. */
+  relayUrls: 8,
 };
 
 const MINUTE = 60 * 1000;
@@ -47,6 +64,10 @@ const TRY_LATER = 1013;
 const CODE_FORM = new RegExp(`^[${ALPHABET}]{${CODE_LENGTH}}$`);
 /** What a `NetCode` text is made of: its prefix and base64. The game checks the rest. */
 const NET_CODE_FORM = /^SM1\.[A-Za-z0-9+/]+={0,2}$/;
+/** A relay's address as the game takes it: TURN by name (or IPv4 address) and port, over UDP or TCP. */
+const RELAY_URL_FORM = /^turns?:[a-z0-9-]+(\.[a-z0-9-]+)+:([0-9]{1,5})\?transport=(udp|tcp)$/;
+/** A relay credential's user name or password. */
+const RELAY_WORD_FORM = /^[A-Za-z0-9+/=_.:-]{1,256}$/;
 
 /** A room code at random, evenly over the alphabet. */
 export function randomCode() {
@@ -61,10 +82,18 @@ export function randomCode() {
 }
 
 export class Rooms {
-  /** `now`: the time in milliseconds; `code`: makes a room code (the tests give their own). */
-  constructor({ now = Date.now, code = randomCode } = {}) {
+  /**
+   * `now`: the time in milliseconds; `code`: makes a room code (the tests give their own);
+   * `relay`: draws one relay credential, resolving to `{ urls, username, credential }` or null
+   * (null here: no relay).
+   */
+  constructor({ now = Date.now, code = randomCode, relay = null } = {}) {
     this.now = now;
     this.makeCode = code;
+    this.relay = relay;
+    /** Relay credentials drawn in the minute since `relaysAt`. */
+    this.relaysAt = undefined;
+    this.relays = 0;
     /** Every socket held. */
     this.sockets = new Set();
     /** A room's host by its code, and its guests by their id. */
@@ -72,13 +101,21 @@ export class Rooms {
     this.guests = new Map();
   }
 
-  /** A socket is here: a new one (its state empty), or one found again after a sleep. */
-  add(sock) {
+  /**
+   * A socket is here: a new one (its state empty; `asks.relay`: it takes relay messages), or one
+   * found again after a sleep.
+   */
+  add(sock, asks = {}) {
     if (this.sockets.size >= LIMITS.sockets) {
       sock.close(TRY_LATER, "full");
       return;
     }
     const s = sock.state;
+    if (s.waiting) {
+      // Its join was waiting on a relay when the server slept: nobody was told of it, so it asks again.
+      sock.close(TRY_LATER, "try again");
+      return;
+    }
     this.sockets.add(sock);
     if (s.role === "host") {
       this.hosts.set(s.code, sock);
@@ -89,6 +126,7 @@ export class Rooms {
     } else if (s.born === undefined) {
       s.role = "";
       s.born = this.now();
+      s.relay = asks.relay === true;
       sock.save();
     }
   }
@@ -103,15 +141,20 @@ export class Rooms {
       const guests = this.guests.get(s.code);
       if (guests && guests.get(s.id) === sock) {
         guests.delete(s.id);
+        // A guest still waiting on its relay was never named to the host.
         const host = this.hosts.get(s.code);
-        if (host) host.send(`{"t":"gone","id":${s.id}}`);
+        if (host && !s.waiting) host.send(`{"t":"gone","id":${s.id}}`);
       }
     }
   }
 
-  /** A message arrived: `data` as the socket gave it (anything but text is refused). */
+  /**
+   * A message arrived: `data` as the socket gave it (anything but text is refused). Returns a
+   * promise when the message left something to finish (a join waiting on its relay; whoever holds
+   * the sockets keeps itself awake until it settles), else null.
+   */
   message(sock, data) {
-    if (!this.sockets.has(sock)) return;
+    if (!this.sockets.has(sock)) return null;
     if (typeof data !== "string" || data.length > LIMITS.bytes) return this.#refuse(sock, "malformed");
     const s = sock.state;
     const now = this.now();
@@ -123,9 +166,10 @@ export class Rooms {
     if (s.n > LIMITS.messages) return this.#refuse(sock, "too many messages");
     const m = parse(data);
     if (m === null) return this.#refuse(sock, "malformed");
-    const refused = this.#take(sock, s, m, now);
-    if (refused) return this.#refuse(sock, refused);
+    const took = this.#take(sock, s, m, now);
+    if (typeof took === "string" && took !== "") return this.#refuse(sock, took);
     if (this.sockets.has(sock)) sock.save();
+    return typeof took === "string" ? null : took;
   }
 
   /**
@@ -152,7 +196,10 @@ export class Rooms {
     return next;
   }
 
-  /** One message taken. Returns why the socket is refused for it, or "" when it is not. */
+  /**
+   * One message taken. Returns why the socket is refused for it, "" when it is not, or a promise
+   * for what it left to finish (a join waiting on its relay).
+   */
   #take(sock, s, m, now) {
     switch (m.t) {
       case "open": {
@@ -199,8 +246,11 @@ export class Rooms {
         guests.set(id, sock);
         host.state.since = now;
         host.save();
-        host.send(`{"t":"guest","id":${id}}`);
-        sock.send('{"t":"joined"}');
+        if ((host.state.relay || s.relay) && this.#mayRelay(host.state, now)) {
+          s.waiting = true;
+          return this.#meetWithRelay(m.code, id, host, sock);
+        }
+        this.#meet(id, host, sock, "");
         return "";
       }
       case "offer": {
@@ -223,6 +273,45 @@ export class Rooms {
     return "malformed";
   }
 
+  /** True when a join to the room of the host with state `room` may draw a relay credential now (one is counted). */
+  #mayRelay(room, now) {
+    if (this.relay === null) return false;
+    if (this.relaysAt === undefined || now - this.relaysAt >= MINUTE) {
+      this.relaysAt = now;
+      this.relays = 0;
+    }
+    if (this.relays >= LIMITS.relays || (room.relays ?? 0) >= LIMITS.roomRelays) return false;
+    this.relays += 1;
+    room.relays = (room.relays ?? 0) + 1;
+    return true;
+  }
+
+  /** A guest's relay drawn, then the guest and its host told of each other, if both are still there. */
+  async #meetWithRelay(code, id, host, guest) {
+    let text = "";
+    try {
+      text = relayMessage(await this.relay());
+    } catch {
+      // No relay this time: the two may still find each other directly.
+    }
+    const guests = this.guests.get(code);
+    if (this.hosts.get(code) !== host || !guests || guests.get(id) !== guest) return;
+    guest.state.waiting = false;
+    guest.save();
+    this.#meet(id, host, guest, text);
+  }
+
+  /**
+   * The host is told of its guest and the guest that it is in, each sent the relay first when
+   * there is one and it takes them.
+   */
+  #meet(id, host, guest, relay) {
+    if (relay && host.state.relay) host.send(relay);
+    host.send(`{"t":"guest","id":${id}}`);
+    if (relay && guest.state.relay) guest.send(relay);
+    guest.send('{"t":"joined"}');
+  }
+
   /** A room ends: its guests are told and closed, and its host too when it is `host` (else it went itself). */
   #closeRoom(code, host) {
     const guests = this.guests.get(code);
@@ -241,6 +330,7 @@ export class Rooms {
 
   #refuse(sock, why) {
     this.#drop(sock, REFUSED, why);
+    return null;
   }
 
   /** Let a socket go: whoever it shared a room with is told (`remove`), then it is closed. */
@@ -253,6 +343,36 @@ export class Rooms {
       // It was gone already.
     }
   }
+}
+
+/**
+ * The relay message the machines of a join are sent, from a relay `{ urls, username, credential }`:
+ * only its TURN addresses of RELAY_URL_FORM (never port 53, which browsers block), at most
+ * `relayUrls` of them. Written in one fixed form, which the game reads exactly (`NetSignal`):
+ *
+ *     {"t":"relay","urls":["turn:host:3478?transport=udp",...],"username":"...","credential":"..."}
+ *
+ * "" when it is no relay: no such address, or a user name or password out of form.
+ */
+export function relayMessage(relay) {
+  if (relay === null || typeof relay !== "object") return "";
+  const { urls, username, credential } = relay;
+  if (!Array.isArray(urls) || !isRelayWord(username) || !isRelayWord(credential)) return "";
+  const list = urls.filter(isRelayUrl).slice(0, LIMITS.relayUrls);
+  if (list.length === 0) return "";
+  return `{"t":"relay","urls":[${list.map((url) => `"${url}"`).join(",")}],"username":"${username}","credential":"${credential}"}`;
+}
+
+function isRelayUrl(value) {
+  if (typeof value !== "string") return false;
+  const m = RELAY_URL_FORM.exec(value);
+  if (m === null) return false;
+  const port = Number(m[2]);
+  return port >= 1 && port <= 65535 && port !== 53;
+}
+
+function isRelayWord(value) {
+  return typeof value === "string" && RELAY_WORD_FORM.test(value);
 }
 
 /**

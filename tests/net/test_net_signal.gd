@@ -6,6 +6,10 @@ extends "res://tests/support/suite.gd"
 ## or no machine's, and thousands of changed and random texts.
 
 const NET_CODE: String = "SM1.aG9zdA=="
+const RELAY_TEXT: String = '{"t":"relay","urls":["turn:turn.example.net:3478?transport=udp","turns:turn.example.net:443?transport=tcp"],"username":"a1b2:c3","credential":"pa+ss/w=rd"}'
+const RELAY_URLS: PackedStringArray = ["turn:turn.example.net:3478?transport=udp", "turns:turn.example.net:443?transport=tcp"]
+const RELAY_USER: String = "a1b2:c3"
+const RELAY_PASS: String = "pa+ss/w=rd"
 
 
 func test_each_message_of_the_servers_is_read() -> void:
@@ -21,6 +25,7 @@ func test_each_message_of_the_servers_is_read() -> void:
 		'{"t":"no_room"}': [NetSignal.NO_ROOM, "", 0],
 		'{"t":"full"}': [NetSignal.FULL, "", 0],
 		'{"t":"closed"}': [NetSignal.CLOSED, "", 0],
+		RELAY_TEXT: [NetSignal.RELAY, "", 0],
 	}
 	for text: String in forms:
 		check(m.read(text), "%s is read" % text)
@@ -102,7 +107,70 @@ func test_text_that_is_no_message_is_refused_and_nothing_is_held() -> void:
 	for text: String in refused:
 		check(m.read('{"t":"room","code":"KQ7RM"}'), "a good one first")
 		check(not m.read(text), "refused: %s" % text.substr(0, 60))
-		check_equal([m.kind, m.code, m.id], [&"", "", 0], "nothing is held of %s" % text.substr(0, 60))
+		check_equal([m.kind, m.code, m.id, m.relay], [&"", "", 0, null], "nothing is held of %s" % text.substr(0, 60))
+
+
+func test_a_relay_is_read() -> void:
+	var m := NetSignal.new()
+	check(m.read(RELAY_TEXT), "read")
+	check_equal([m.relay.urls, m.relay.username, m.relay.credential], [RELAY_URLS, RELAY_USER, RELAY_PASS], "its addresses, user name and password")
+	check(m.read('{"t":"room","code":"KQ7RM"}') and m.relay == null, "the next message holds no relay")
+	check(RELAY_TEXT.begins_with(NetSignal.RELAY_HEAD), "and it starts as every relay message does")
+	check_equal(NetSignal.asking_relays("wss://rooms.test/room"), "wss://rooms.test/room?relay=1", "a game that takes relays says so in the server's address")
+	check_equal(NetSignal.asking_relays("ws://127.0.0.1:1/room?x=1"), "ws://127.0.0.1:1/room?x=1&relay=1", "beside what the address asks already")
+	var eight: PackedStringArray = []
+	for at in NetSignal.MAX_RELAY_URLS:
+		eight.append('"turn:a.b:%d?transport=udp"' % (1000 + at))
+	check(m.read('{"t":"relay","urls":[%s],"username":"u","credential":"p"}' % ",".join(eight)), "%d addresses" % NetSignal.MAX_RELAY_URLS)
+	check(m.read('{"t":"relay","urls":["turn:a.b:1?transport=tcp"],"username":"%s","credential":"p"}' % "u".repeat(NetSignal.MAX_RELAY_WORD)), "a user name of the most characters")
+
+
+func test_a_relay_out_of_form_is_refused_whole() -> void:
+	var m := NetSignal.new()
+	var relay: String = '{"t":"relay","urls":["%s"],"username":"%s","credential":"%s"}'
+	var nine: PackedStringArray = []
+	for at in NetSignal.MAX_RELAY_URLS + 1:
+		nine.append('"turn:a.b:%d?transport=udp"' % (1000 + at))
+	var refused: PackedStringArray = [
+		'{"t":"relay","urls":[],"username":"u","credential":"p"}',
+		'{"t":"relay","urls":[%s],"username":"u","credential":"p"}' % ",".join(nine),
+		'{"t":"relay","urls":["turn:a.b:1?transport=udp"],"credential":"p","username":"u"}',
+		'{"t":"relay","urls":["turn:a.b:1?transport=udp"],"username":"u"}',
+		'{"t":"relay","urls":["turn:a.b:1?transport=udp"],"username":"u","credential":"p","x":"y"}',
+		'{"t":"relay","urls":["turn:a.b:1?transport=udp"],"username":"u","credential":"p"} ',
+		'{"t":"relay","urls":["turn:a.b:1?transport=udp"], "username":"u","credential":"p"}',
+		'{"t":"relay","urls":["turn:a.b:1?transport=udp",],"username":"u","credential":"p"}',
+		'{"t":"relay","urls":["turn:a.b:1?transport=udp"],"username":"u","credential":"p"],"username":"u","credential":"p"}',
+		'{"t":"relay","urls":["turn:a.b:1?transport=udp"],"username":"u","credential":"p","credential":"q"}',
+		relay % ["turn:a.b:1?transport=udp", "", "p"],
+		relay % ["turn:a.b:1?transport=udp", "u", ""],
+		relay % ["turn:a.b:1?transport=udp", "u v", "p"],
+		relay % ["turn:a.b:1?transport=udp", "u", 'p\\"'],
+		relay % ["turn:a.b:1?transport=udp", "u".repeat(NetSignal.MAX_RELAY_WORD + 1), "p"],
+		relay % ["stun:a.b:3478", "u", "p"],
+		relay % ["turn:a.b:53?transport=udp", "u", "p"],
+		relay % ["turn:a.b:0?transport=udp", "u", "p"],
+		relay % ["turn:a.b:65536?transport=udp", "u", "p"],
+		relay % ["turn:a.b:+1?transport=udp", "u", "p"],
+		relay % ["turn:a.b:?transport=udp", "u", "p"],
+		relay % ["turn:a.b:123456?transport=udp", "u", "p"],
+		relay % ["turn:a.b:3478", "u", "p"],
+		relay % ["turn:a.b:3478?transport=sctp", "u", "p"],
+		relay % ["turn:a.b:3478?transport=udp&x=1", "u", "p"],
+		relay % ["turn:localhost:3478?transport=udp", "u", "p"],
+		relay % ["turn:A.b:3478?transport=udp", "u", "p"],
+		relay % ["turn:a..b:3478?transport=udp", "u", "p"],
+		relay % ["turn:.a.b:3478?transport=udp", "u", "p"],
+		relay % ["turn:a.b/c:3478?transport=udp", "u", "p"],
+		relay % ["turn:a:b.c:3478?transport=udp", "u", "p"],
+		relay % ["turn:u@a.b:3478?transport=udp", "u", "p"],
+		relay % ["TURN:a.b:3478?transport=udp", "u", "p"],
+		relay % ["turn:a.b:3478?transport=udp\",\"res://x", "u", "p"],
+	]
+	for text: String in refused:
+		check(m.read(RELAY_TEXT), "a good one first")
+		check(not m.read(text), "refused: %s" % text.substr(0, 90))
+		check(m.relay == null and m.kind == &"", "nothing is held of %s" % text.substr(0, 60))
 
 
 func test_the_games_messages_are_written_as_the_server_takes_them() -> void:
@@ -151,6 +219,7 @@ func test_a_fuzz_of_changed_and_random_texts() -> void:
 		'{"t":"joined"}',
 		'{"t":"offer","code":"%s"}' % NET_CODE,
 		'{"t":"closed"}',
+		RELAY_TEXT,
 	]
 	var m := NetSignal.new()
 	var taken: int = 0
@@ -170,7 +239,7 @@ func test_a_fuzz_of_changed_and_random_texts() -> void:
 				for at in rng.randi_range(0, 60):
 					text += char(rng.randi_range(1, 300))
 		if not m.read(text):
-			check_equal([m.kind, m.code, m.id], [&"", "", 0], "a refused text leaves nothing")
+			check_equal([m.kind, m.code, m.id, m.relay], [&"", "", 0, null], "a refused text leaves nothing")
 			continue
 		# What is taken all the same (a changed character that is still of the form) holds only
 		# what the forms allow.
@@ -179,4 +248,11 @@ func test_a_fuzz_of_changed_and_random_texts() -> void:
 		check(m.id >= 0 and m.id <= NetSignal.MAX_GUESTS, "an id within the room")
 		check(m.code == "" or NetSignal.is_room_code(m.code) or NetSignal.is_net_code(m.code), "a code of one of the two forms")
 		check(not m.code.contains('"') and not m.code.contains("\\"), "nothing escaped")
+		if m.kind == NetSignal.RELAY:
+			check(m.relay.urls.size() >= 1 and m.relay.urls.size() <= NetSignal.MAX_RELAY_URLS, "a relay of one to eight addresses")
+			for url: String in m.relay.urls:
+				check(NetSignal.is_relay_url(url), "an address of the form: %s" % url)
+			check(NetSignal.is_relay_word(m.relay.username) and NetSignal.is_relay_word(m.relay.credential), "words of the form")
+		else:
+			check(m.relay == null, "no relay held by another kind")
 	check(taken < 600, "hardly any changed text is still a message (%d of 6000)" % taken)

@@ -248,6 +248,17 @@ func test_a_prop_that_breaks_on_a_reaction_still_takes_it() -> void:
 	check(taken.size() >= 2, "the bolt's hit and then the reaction's own damage: %s" % [taken])
 
 
+func test_two_props_on_one_set_of_states_react_apart() -> void:
+	# The states are a file of their own (`barrel_states.tres`), which a big barrel may share.
+	var big := BARREL.duplicate() as PropBase
+	big.max_health = 40.0
+	check(big.states == BARREL.states, "one set of states")
+	var small: Actor = _prop(BARREL)
+	var other: Actor = _prop(big, Vector2(200.0, 0.0))
+	_world.combat.hit(ActorsScript.NONE, small, 100.0)
+	check_equal([_state(small), _state(other)], [&"broken", &"idle"], "each body keeps its own state")
+
+
 func test_three_barrels_set_each_other_off() -> void:
 	var first: Actor = _prop(BARREL)
 	var second: Actor = _prop(BARREL, Vector2(20.0, 0.0))
@@ -269,7 +280,7 @@ func _made(states: Array[PropState], health: float = 10.0, invincible: bool = fa
 	data.max_health = health
 	data.invincible = invincible
 	data.staffs = BARREL.staffs.duplicate()
-	data.states = states
+	data.states = PropStates.make(states)
 	return data
 
 
@@ -377,13 +388,13 @@ func test_problems_name_what_is_wrong() -> void:
 	var data := PropBase.new()
 	data.id = &"bad"
 	var empty: String = "\n".join(data.problems())
-	check(empty.contains("no scene") and empty.contains("no state"), "no scene, no state: %s" % empty)
+	check(empty.contains("no scene") and empty.contains("no states"), "no scene, no states: %s" % empty)
 	var stray: PropReaction = _on_fire(0.0, 3, &"nowhere")
 	stray.element = &"custard"
 	var loop_a: Array[PropReaction] = [PropReaction.make(PropReaction.When.ENTERED, 0, &"b")]
 	var loop_b: Array[PropReaction] = [PropReaction.make(PropReaction.When.ENTERED, 0, &"a")]
 	data.staffs = BARREL.staffs.duplicate()
-	data.states = [PropState.make(&"idle", [stray] as Array[PropReaction]), PropState.make(&"a", loop_a), PropState.make(&"b", loop_b), PropState.make(&"idle")]
+	data.states = PropStates.make([PropState.make(&"idle", [stray] as Array[PropReaction]), PropState.make(&"a", loop_a), PropState.make(&"b", loop_b), PropState.make(&"idle")])
 	var found: String = "\n".join(data.problems(_known()))
 	check(found.contains("staff 3"), "a staff it does not hold: %s" % found)
 	check(found.contains("'nowhere'"), "a state it does not have")

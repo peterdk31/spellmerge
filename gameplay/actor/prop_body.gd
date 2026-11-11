@@ -45,7 +45,7 @@ static func fill(body: Actor, data: PropBase) -> void:
 			hurtbox.offset = data.offset
 			hurt_box = data.size if hurtbox.is_box() else Vector2.ZERO
 		elif child is Reactions:
-			(child as Reactions).prop = data
+			(child as Reactions).states = data.states
 	for child in body.get_children():
 		if child is Footprint:
 			_fill_ground(child as Footprint, data, hurt_box)

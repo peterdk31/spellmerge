@@ -1,7 +1,7 @@
 class_name PropState
 extends Resource
 ## One state of a prop (props W6, docs/milestones/props.md, "What a prop is made of"): its
-## reactions, and what the body is while in it. A row of `PropBase.states`; it has no `id` field the
+## reactions, and what the body is while in it. A row of `PropStates.list`; it has no `id` field the
 ## registry would read (its name is `state_id`), so it is never taken for content.
 ##
 ## Reactions belong to states, so "only once" is a state change, never a flag: a fusing barrel has no

@@ -8,9 +8,10 @@ Built in W6 (reactions and states). The look (art layers, mote sources, a light 
 
 ## Contract
 
-- **One folder each:** `content/props/<id>/` with `<id>.tres` (a `PropBase`, core/base/prop_base.gd), its art, `assets.json` and its own test `test_<id>.gd`. Deleting a prop is deleting its folder. The registry finds it under `props` by `id`.
+- **One folder each:** `content/props/<id>/` with `<id>.tres` (a `PropBase`, core/base/prop_base.gd), `<id>_states.tres` (its `PropStates`, below; a prop may name another's instead, a big barrel the barrel's), its art, `assets.json` and its own test `test_<id>.gd`. Deleting a prop is deleting its folder. The registry finds it under `props` by `id`.
 - **One shared body:** `base/prop.tscn`, an actor of the world's team (`Actors.TEAM_WORLD`: every team's shots hit it, its shots hit every team) with `Health`, `Hurtbox`, `Footprint`, `Caster` and `Reactions`, and no controller and no Mover, so it is still (never stepped) and never moves. Every prop's `scene` is it; `PropBody.make(data)` (gameplay/actor) fills it from the data. **No `.gd` and no scene per prop:** a new prop is data and art.
-- **`PropBase`:** `id`, `display_name`, `scene`, `max_health`, `invincible` (the hub's: hits land and show, health stays), the hurt shape (`radius`, or a box `size`, round `offset` from the feet), the ground (`footprint_radius` or `footprint_size`, `footprint_offset`; none: its hurt box's base, else the kit's circle), `staffs` (1–4 `StaffCards`, as an enemy's: what its reactions and a possessor cast; a staff's `wind_up` is a fuse, its `wind_cue` the fuse's look) and `states` (`PropState`, the first the one it starts in).
+- **`PropBase`:** `id`, `display_name`, `scene`, `max_health`, `invincible` (the hub's: hits land and show, health stays), the hurt shape (`radius`, or a box `size`, round `offset` from the feet), the ground (`footprint_radius` or `footprint_size`, `footprint_offset`; none: its hurt box's base, else the kit's circle), `staffs` (1–4 `StaffCards`, as an enemy's: what its reactions and a possessor cast; a staff's `wind_up` is a fuse, its `wind_cue` the fuse's look) and `states` (a `PropStates` file).
+- **`PropStates`:** `list`, its `PropState`s, the first the one it starts in. A file of its own, so props can share one, and the one thing the `Reactions` component reads: any actor's data could name one.
 - **`PropState`:** `state_id`, `reactions` (in order), `blocks` (its footprint blocks the bodies that walk), `hittable` (its hurt shape can be hit), `gone` (entering it frees the prop).
 - **`PropReaction`:** `when` and its numbers, then what it does: `cast` (a staff by number, 1–4; 0 none) and `then` (a state id; empty stays).
 
@@ -43,7 +44,7 @@ fusing   entered              → cast 1                       (the fuse burns, 
 broken   blocks off, hittable off (rubble)
 ```
 
-As data: `tests/gameplay/actor/fixtures/barrel.tres` (its paths: `tests/gameplay/actor/test_reactions.gd`).
+As data: `tests/gameplay/actor/fixtures/barrel.tres` and its `barrel_states.tres` (its paths: `tests/gameplay/actor/test_reactions.gd`).
 
 ## Allowed files
 
@@ -51,7 +52,7 @@ As data: `tests/gameplay/actor/fixtures/barrel.tres` (its paths: `tests/gameplay
 
 ## Steps
 
-1. Make `content/props/<id>/` and its `<id>.tres` (a `PropBase` with `scene` the shared `base/prop.tscn`); write its states and reactions (start from the barrel above).
+1. Make `content/props/<id>/` and its `<id>.tres` (a `PropBase` with `scene` the shared `base/prop.tscn`); write its states and reactions in `<id>_states.tres` (start from the barrel above) and name it as its `states`.
 2. Give it staffs of player cards for what it casts.
 3. Add its art to an `assets.json` in its folder (W7 brings the look); commit the `.uid` files Godot creates.
 4. Write `test_<id>.gd` for its paths (as `tests/gameplay/actor/test_reactions.gd` does the barrel's), run the checks below and open a PR.

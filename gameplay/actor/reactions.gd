@@ -1,8 +1,9 @@
 class_name Reactions
 extends ActorComponent
 ## A prop's reactions and states (props W6, docs/milestones/props.md, "Triggers"): the component
-## that makes a body of `PropBase` data react. It holds which of the prop's states the body is in
-## (`state`, an index into `prop.states`, the first to start), and fires that state's reactions
+## that makes a body react by data, a `PropStates` (a prop's, `PropBase.states`; it reads nothing
+## else of the prop, so any actor could hold one). It holds which state the body is in (`state`, an
+## index into `states.list`, the first to start), and fires that state's reactions
 ## (`PropReaction`) on the moments it hears, all of them its own body's:
 ##
 ## - a hit (`Actor.damaged`: `element_hit`), a status put on it (`Actor.status_gained`: `status`), a
@@ -38,7 +39,7 @@ extends ActorComponent
 ## The state the body is in now, entered by a reaction (not the one it starts in).
 signal entered(state_id: StringName)
 
-## Moments within moments this deep are not fired (a loop in the data, which `PropBase.problems`
+## Moments within moments this deep are not fired (a loop in the data, which `PropStates.problems`
 ## names).
 const MAX_DEPTH: int = 16
 
@@ -46,9 +47,9 @@ const MAX_DEPTH: int = 16
 ## one moment (scratch).
 const DERIVED: Array[StringName] = [&"_depth", &"_entries", &"_leaving"]
 
-## The prop's data (set before the body is ready: `PropBody.make`).
-@export var prop: PropBase = null
-## The index of the state it is in, in `prop.states` (0: the one it starts in).
+## Its states (set before the body is ready: `PropBody.make`).
+@export var states: PropStates = null
+## The index of the state it is in, in `states.list` (0: the one it starts in).
 var state: int = 0
 ## Its health as last told (`Health.changed`), for `health_below`'s crossing; -1 before it is set up.
 var _health_seen: float = -1.0
@@ -60,7 +61,7 @@ var _leaving: int = 0
 
 func setup(owner_actor: Actor) -> void:
 	super.setup(owner_actor)
-	if prop == null:
+	if states == null:
 		# No data, no reactions: the body lives and dies as any.
 		return
 	# Its 0 health is its death reactions', not Combat's (see the class doc).
@@ -94,9 +95,9 @@ func at_rest() -> bool:
 
 ## The state it is in now (null with no data).
 func current() -> PropState:
-	if prop == null or state < 0 or state >= prop.states.size():
+	if states == null or state < 0 or state >= states.list.size():
 		return null
-	return prop.states[state]
+	return states.list[state]
 
 
 ## The id of the state it is in now (&"" with no data).
@@ -106,7 +107,7 @@ func state_id() -> StringName:
 
 
 func _hears_casts() -> bool:
-	return actor.events != null and prop != null and prop.listens(PropReaction.When.CAST)
+	return actor.events != null and states != null and states.listens(PropReaction.When.CAST)
 
 
 func _on_damaged(_by: int, amount: float, element: StringName) -> void:
@@ -162,7 +163,7 @@ func _moment(kind: PropReaction.When, name: StringName, amount: float, before: f
 	if now == null or actor.is_dying() or actor.is_leaving():
 		return
 	if _depth >= MAX_DEPTH:
-		push_warning("Reactions: %s goes on through moments %d deep; the rest is dropped (a loop in its data?)." % [prop.id, MAX_DEPTH])
+		push_warning("Reactions: %s goes on through moments %d deep; the rest is dropped (a loop in its data?)." % [actor.name, MAX_DEPTH])
 		return
 	_depth += 1
 	var entries: int = _entries
@@ -177,7 +178,7 @@ func _moment(kind: PropReaction.When, name: StringName, amount: float, before: f
 		if row.cast > 0 and _cast(row.cast - 1):
 			cast_bits |= 1 << (row.cast - 1)
 		if next < 0 and row.then != &"":
-			next = prop.state_at(row.then)
+			next = states.state_at(row.then)
 	if next >= 0 and _entries == entries:
 		_enter(next, cast_bits)
 	_depth -= 1

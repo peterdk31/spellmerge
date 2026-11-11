@@ -59,7 +59,7 @@ func test_every_cast_a_prop_reacts_with_is_paid_from_a_full_pool() -> void:
 	all.append(BARREL)
 	for data in all:
 		var body: Actor = _world.add(PropBody.make(data), Vector2.ZERO)
-		for state in data.states:
+		for state in data.states.list:
 			for row in state.reactions:
 				if row.cast <= 0:
 					continue

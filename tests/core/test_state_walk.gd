@@ -201,6 +201,79 @@ func test_a_reference_is_hashed_as_who_it_points_at() -> void:
 	check(SimHash.of(a) != empty, "an empty array's size counts")
 
 
+## A REFS list whose entries are all bodies (Combat's rows) is one leaf of their actor ids, -1 for an
+## empty entry (props W3b), and a report names the entry by its index; a list with anything else in
+## it is walked entry by entry, as above.
+func test_a_list_of_bodies_is_one_leaf_of_ids() -> void:
+	var three := own(Body.new()) as Body
+	var five := own(Body.new()) as Body
+	five.id = 5
+	var a := Pointer.new()
+	a.due = [three, null, five]
+	var walk := StateWalk.new()
+	var leaves: Dictionary = {}
+	walk.walk("a", a, func(path: String, value: Variant) -> void: leaves[path] = value)
+	check(walk.problems.is_empty(), "no problem: %s" % ", ".join(walk.problems))
+	check_equal(leaves.get("a.due.ids"), PackedInt64Array([3, StateWalk.NO_BODY, 5]), "one leaf of ids")
+	check(not leaves.has("a.due[0]"), "and no leaf an entry")
+	var before: int = SimHash.of(a)
+	a.due = [five, null, three]
+	check(SimHash.of(a) != before, "the same bodies in other rows change the hash")
+	a.due = [three, five, null]
+	var moved: int = SimHash.of(a)
+	check(moved != before, "an empty row moved changes it")
+	var b := Pointer.new()
+	b.due = [three, null, five]
+	var first := Desync.new(0)
+	var second := Desync.new(0)
+	first.capture({"a": a})
+	second.capture({"a": b})
+	check(Desync.compare(first, second).contains("a.due.ids: [1]"), "a report names the row: %s" % Desync.compare(first, second))
+	# A closed body (no actor id) in the list: walked entry by entry, as before.
+	five.id = -1
+	var closed := Pointer.new()
+	closed.due = [three, five]
+	leaves.clear()
+	walk.walk("a", closed, func(path: String, value: Variant) -> void: leaves[path] = value)
+	check(leaves.has("a.due[1]") and not leaves.has("a.due.ids"), "a closed body: entry by entry: %s" % [leaves.keys()])
+	# A body freed since it was pointed at stays in the leaf (no walk entry by entry of a slot table).
+	var gone := Body.new()
+	var freed := Pointer.new()
+	freed.due = [three, gone]
+	gone.free()
+	leaves.clear()
+	walk.walk("a", freed, func(path: String, value: Variant) -> void: leaves[path] = value)
+	var ids: Variant = leaves.get("a.due.ids")
+	check(ids is PackedInt64Array and (ids as PackedInt64Array)[1] < 0, "a freed body is an entry of the leaf, no id: %s" % [leaves])
+	# An object that is no node, even with an id: entry by entry.
+	var other := Pointer.new()
+	other.due = [three]
+	other.due.append(own(Node.new()) as Node)
+	leaves.clear()
+	walk.walk("a", other, func(path: String, value: Variant) -> void: leaves[path] = value)
+	check(not leaves.has("a.due.ids"), "a node with no actor id: entry by entry: %s" % [leaves.keys()])
+
+
+## An area handed over as nothing (a service gone) is a leaf, not an error; a value an area hands
+## over of itself (an actor's part, `SimHash.ActorPart`) is walked as its member would be.
+func test_a_missing_area_and_a_handed_value() -> void:
+	var hashes: Dictionary[String, int] = SimHash.areas({"gone": null})
+	check(hashes.has("gone"), "a null area hashes: %s" % [hashes])
+	var plain := Plain.new()
+	var walk := StateWalk.new()
+	var leaves: Dictionary = {}
+	walk.walk_value("p", [plain, 3], plain, func(path: String, value: Variant) -> void: leaves[path] = value)
+	check(walk.problems.is_empty() and leaves.has("p[1]"), "a value is walked as a member: %s" % [leaves])
+	# Both ways give the same leaves, in order (as `SimHash.area` hashes them).
+	var handed: Array = []
+	walk.walk_value("p", [plain, 3], plain, func(_path: String, value: Variant) -> void: SimHash.add_leaf(handed, value))
+	var quick: Array = []
+	var by_values := StateWalk.new()
+	by_values.with_paths = false
+	by_values.values_of("p", [plain, 3], plain, quick)
+	check(not quick.is_empty() and SimHash.of_leaves(quick) == SimHash.of_leaves(handed), "both ways, the same leaves")
+
+
 ## An array with empty slots walks only its filled ones, each after its index (the hash's walk was
 ## mostly the empty slots of the carriers' per-actor tables): where an object is still counts.
 func test_an_array_with_empty_slots_hashes_where_its_objects_are() -> void:
@@ -360,7 +433,7 @@ class Striker:
 
 
 ## A REFS member that is a typed array of arrays (a carrier's struck lists) is walked, entry by
-## entry, without an engine error.
+## entry, without an engine error; each inner list of bodies is one leaf of their ids.
 func test_refs_of_arrays_of_arrays() -> void:
 	var striker := Striker.new()
 	var body := own(Body.new()) as Body
@@ -369,7 +442,7 @@ func test_refs_of_arrays_of_arrays() -> void:
 	var leaves: Dictionary = {}
 	walk.walk("s", striker, func(path: String, value: Variant) -> void: leaves[path] = value)
 	check(walk.problems.is_empty(), "no problem: %s" % walk.problems)
-	check(leaves.values().has("Body#3") or str(leaves).contains("#3"), "the struck body by who it is: %s" % leaves)
+	check_equal(leaves.get("s.struck[1].ids"), PackedInt64Array([3]), "the struck body by its actor id (a list of bodies, props W3b): %s" % leaves)
 
 
 func test_a_frozen_object_is_hashed_by_its_contents_once() -> void:

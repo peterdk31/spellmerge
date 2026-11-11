@@ -295,7 +295,7 @@ func _hand_rules() -> void:
 ## The game's state by area (online-ready N1's `SimHash.areas`, `Desync.capture`): "Sim" (the tick
 ## and the run's seed), each area joined, the actor table, then every actor's body by actor id
 ## ("actor 3"). `SimHash.slice` spreads it over ticks; the hash takes an area that keeps state by
-## actor id (Spells, by caster) as its parts ("Spells 3", `SimHash.Part`, props W3).
+## actor id (Spells, by caster) as its parts ("Spells 3", `SimHash.ActorPart`, props W3).
 func state_areas() -> Dictionary:
 	var out: Dictionary = {"Sim": sim}
 	for name: StringName in _areas:

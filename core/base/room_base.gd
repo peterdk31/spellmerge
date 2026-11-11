@@ -234,6 +234,17 @@ static func pixels_of_art(texture: Texture2D, region: Rect2i = Rect2i(), step: i
 	return found
 
 
+## The part of its texture `sprite` shows: its region, or its frame of a sheet (empty with no
+## texture). What a body breaks into and a mote source's mask read.
+static func frame_of(sprite: Sprite2D) -> Rect2i:
+	if sprite == null or sprite.texture == null:
+		return Rect2i()
+	if sprite.region_enabled:
+		return Rect2i(sprite.region_rect)
+	var size: Vector2i = Vector2i(sprite.texture.get_size()) / Vector2i(maxi(sprite.hframes, 1), maxi(sprite.vframes, 1))
+	return Rect2i(Vector2i(sprite.frame % maxi(sprite.hframes, 1), sprite.frame / maxi(sprite.hframes, 1)) * size, size)
+
+
 static func _most_common(counts: Dictionary) -> int:
 	var best: int = -1
 	var most: int = 0

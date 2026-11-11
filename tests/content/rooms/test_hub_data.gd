@@ -131,21 +131,22 @@ func test_nothing_starts_in_a_wall_or_on_the_stone() -> void:
 		check(not wall.intersects(stone.grow(BODY_RADIUS)), "the stone has room round it (wall %s)" % wall)
 
 
-## The island's edge gives off motes (`MoteRim`; the owner's pick, "A, mixed elements"): one hidden
+## The island's edge gives off motes (a `MoteSource` line, props W7; the owner's pick, "A, mixed elements"): one hidden
 ## rim node, a sound look whose kind exists, in the elements' palette ramps, its points clockwise
 ## round the floor so every stretch has floor on its right and void (wall) on its left.
 func test_the_rim_of_motes_runs_round_the_island() -> void:
 	var rims: Array[Node] = []
 	for node: Node in room_root.find_children("*", "", true, false):
-		if node.is_in_group(MoteRim.GROUP):
+		if node.is_in_group(MoteSource.GROUP):
 			rims.append(node)
 	check_equal(rims.size(), 1, "one rim")
 	if rims.is_empty():
 		return
 	var line := rims[0] as Line2D
 	check(line != null and not line.visible and line.closed, "a hidden, closed Line2D")
-	var look: MoteRim = MoteRim.of(line)
-	check(look != null and look.problems().is_empty(), "a sound MoteRim")
+	var look: MoteSource = MoteSource.of(line)
+	check(look != null and look.problems(false).is_empty(), "a sound MoteSource")
+	check(look != null and look.from == MoteSource.From.LINE and look.points.is_empty(), "a line along the node's own points")
 	if look == null:
 		return
 	check(ResourceLoader.exists("res://content/motes/%s.tres" % look.kind), "its kind %s is a mote kind" % look.kind)

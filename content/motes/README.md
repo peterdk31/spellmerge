@@ -51,7 +51,7 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 | `seam` | none (named by the wall's `look_motes`) | a wall's stream: rising straight off its seam a shield's spacing apart, distinct and dim (the ward's twinkle, less glow), climbing about a wall's height before it fades | a pixel, now and then a hotter one |
 | `drip` | none (named by the rune's `look_motes`) | light dripping off a rune's crystal once armed: shown at the crystal's foot, it falls straight to the floor and goes | a pixel, now and then a hotter one |
 | `ward` | none (the barriers' shells, gameplay/feel/barriers.gd) | a barrier's bubble: standing still on its shell, twinkling white-hot to light; knocked off by a block, it flies out and slows, cooling | a pixel, now and then a hotter one |
-| `rim_ember` | none (named by a room's rim, `MoteRim`: the hub's island edge, gameplay/feel/rim_motes.gd) | given off all along a room's floor edge: rises slowly off it and drifts a little outward, swaying, white-hot at first and cooling through the rim's ramps (the hub's: the elements' colours, one a mote) | a pixel with a pixel of tail below it as it rises, flickering hotter now and then (it starts at its ramp's light shade) |
+| `rim_ember` | none (named by a `MoteSource`: the hub's island edge, gameplay/feel/source_motes.gd) | given off all along a room's floor edge: rises slowly off it and drifts a little outward, swaying, white-hot at first and cooling through the source's ramps (the hub's: the elements' colours, one a mote) | a pixel with a pixel of tail below it as it rises, flickering hotter now and then (it starts at its ramp's light shade) |
 
 ## Allowed files
 

@@ -5,12 +5,13 @@
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/stone.svg" id="3_stone"]
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/stone_lit.svg" id="4_stone_lit"]
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/altar.svg" id="5_altar"]
-[ext_resource type="Script" path="res://core/base/mote_rim.gd" id="9_rim"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="9_motes"]
 
-[sub_resource type="Resource" id="MoteRim_hub"]
-script = ExtResource("9_rim")
+[sub_resource type="Resource" id="MoteSource_rim"]
+script = ExtResource("9_motes")
 kind = &"rim_ember"
-rate = 5.0
+rate = 172.8
+from = 1
 reach = 6.0
 spread = 120.0
 ramps = Array[PackedColorArray]([PackedColorArray(0.9569, 0.9451, 0.9176, 1, 1, 0.6353, 0.2353, 1, 0.8784, 0.349, 0.1843, 1, 0.5608, 0.1765, 0.1647, 1), PackedColorArray(0.9569, 0.9451, 0.9176, 1, 1, 0.9529, 0.651, 1, 0.949, 0.7608, 0.1882, 1, 0.7216, 0.502, 0.1216, 1), PackedColorArray(0.9569, 0.9451, 0.9176, 1, 0.9333, 1, 0.651, 1, 0.7059, 0.9098, 0.1647, 1, 0.2471, 0.4196, 0.06275, 1), PackedColorArray(0.9569, 0.9451, 0.9176, 1, 0.7686, 0.9647, 0.949, 1, 0.3098, 0.8392, 0.8627, 1, 0.1216, 0.4392, 0.502, 1), PackedColorArray(0.9569, 0.9451, 0.9176, 1, 0.8784, 0.5412, 0.8471, 1, 0.6275, 0.1882, 0.6039, 1, 0.2902, 0.07843, 0.3137, 1)])
@@ -264,11 +265,11 @@ shape = SubResource("RectangleShape2D_352x32")
 position = Vector2(640, 768)
 shape = SubResource("RectangleShape2D_1280x128")
 
-[node name="Rim" type="Line2D" parent="." groups=["mote_rim"]]
+[node name="Rim" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
 closed = true
 points = PackedVector2Array(384, 64, 896, 64, 896, 96, 1024, 96, 1024, 128, 1088, 128, 1088, 160, 1120, 160, 1120, 192, 1152, 192, 1152, 256, 1184, 256, 1184, 512, 1152, 512, 1152, 576, 1120, 576, 1120, 608, 1088, 608, 1088, 640, 1024, 640, 1024, 672, 928, 672, 928, 704, 352, 704, 352, 672, 256, 672, 256, 640, 192, 640, 192, 608, 160, 608, 160, 576, 128, 576, 128, 512, 96, 512, 96, 256, 128, 256, 128, 192, 160, 192, 160, 160, 192, 160, 192, 128, 256, 128, 256, 96, 384, 96)
-metadata/mote_rim = SubResource("MoteRim_hub")
+metadata/mote_source = SubResource("MoteSource_rim")
 
 [node name="Stone" type="Sprite2D" parent="."]
 z_index = -2

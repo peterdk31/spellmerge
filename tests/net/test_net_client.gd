@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## for the host's tick `tick + delay`, works its delay out from its ping and again in the run
 ## (`NetDelay`, tests/net/test_net_delay.gd: here what goes on the wire, its frames never for an
 ## earlier tick), times its presses,
-## sends its checks, keeps a parting it is told of, ends when the host is gone, and
+## sends its checks, keeps a parting it is told of, ends when the host is gone or went silent, and
 ## closes the link on whatever a host must not send.
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -482,6 +482,46 @@ func test_the_host_gone_the_run_ends_once_played_out() -> void:
 	_step()
 	check(not _client.is_playing() and not _frames.is_playing(), "then the run ends")
 	check_equal(_client.problem, "", "the host closed it, not this side")
+
+
+## A host that is closed, crashes or loses its network says no goodbye: the link stays open and
+## nothing comes. (The owner's try of 2026-11-11: the host closed, the phone stood still for good.)
+func test_a_host_that_went_silent_is_taken_for_gone() -> void:
+	_link_up()
+	_host_ticks(3)
+	var steps: int = NetSession.SILENT_MS * 60 / 1000
+	for i in steps - 2:
+		_step()
+	check(_client.problem == "" and not _client.feed.closed and _client.is_playing(), "just under the limit it still waits for the host")
+	for i in 6:
+		_step()
+	check(_client.problem.begins_with("nothing was heard"), "past it the link is closed, and it says why (%s)" % _client.problem)
+	check(_client.feed.closed and not _client.link.is_open(), "no more will come")
+	check(not _client.is_playing() and not _frames.is_playing(), "and the run ends, played out")
+
+
+func test_a_word_from_the_host_starts_the_silence_anew() -> void:
+	_link_up()
+	var steps: int = NetSession.SILENT_MS * 60 / 1000
+	for i in steps - 30:
+		_step()
+	_far.send(NetMessage.of_pong(0))
+	for i in steps - 30:
+		_step()
+	check_equal(_client.problem, "", "a pong is word enough: the host is there")
+	check(_client.is_playing(), "and it waits on")
+
+
+func test_silence_is_not_counted_before_the_first_word_or_while_this_machine_stands() -> void:
+	for i in NetSession.SILENT_MS * 60 / 1000 + 60:
+		_step()
+	check(_client.problem == "" and _client.link.is_open(), "a host that has said nothing yet may still load")
+	_link_up()
+	# This machine stood for a minute (a load, a tab in the background): that is not the host's silence.
+	_now += 60000.0
+	_step()
+	_step()
+	check(_client.problem == "" and _client.is_playing(), "its own stall is not the host's silence")
 
 
 func test_it_sends_a_check_of_every_window() -> void:

@@ -56,6 +56,28 @@ func add_candidate(mid: String, index: int, name: String) -> bool:
 	return true
 
 
+## How many of the candidates are addresses on the machine's own network (`host`).
+func own_count() -> int:
+	return _addresses(true).size()
+
+
+## The addresses the machine is seen at from outside its network (what a STUN server told it, or
+## a relay's): the candidates that are not `host`. Two machines that share one are behind the
+## same router.
+func seen_at() -> PackedStringArray:
+	return _addresses(false)
+
+
+## The candidates' addresses: the `host` ones (`own`), or the others.
+func _addresses(own: bool) -> PackedStringArray:
+	var found: PackedStringArray = PackedStringArray()
+	for name: String in names:
+		var fields: PackedStringArray = name.substr(name.find("candidate:") + 10).split(" ", false)
+		if (fields[7] == "host") == own:
+			found.append(fields[4])
+	return found
+
+
 ## The code as text, or "" when it is not one `read` would take (no description yet, or too long).
 func to_text() -> String:
 	if type != OFFER and type != ANSWER:

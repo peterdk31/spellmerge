@@ -214,6 +214,33 @@ func test_a_code_of_the_wrong_side_or_no_code_is_refused_and_another_may_be_give
 			side.link().close()
 
 
+func _code_with(candidates: PackedStringArray) -> NetCode:
+	var code := NetCode.new()
+	for candidate: String in candidates:
+		check(code.add_candidate("0", 0, candidate), "a candidate is added")
+	return code
+
+
+## What a failure to link says, from the two codes alone (no WebRTC needed).
+func test_no_link_says_why_as_far_as_the_codes_tell() -> void:
+	var own: String = "candidate:1 1 UDP 2114977791 192.168.1.20 59921 typ host"
+	var named: String = "candidate:1 1 UDP 2114977791 0123abcd-4567-89ab-cdef-0123456789ab.local 59921 typ host"
+	var home: String = "candidate:2 1 UDP 1677729535 203.0.113.7 %d typ srflx raddr 0.0.0.0 rport 0"
+	var phone: String = "candidate:2 1 UDP 1677729535 198.51.100.9 40000 typ srflx raddr 0.0.0.0 rport 0"
+	var one_router: String = NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named, home % 61000]))
+	check(one_router.begins_with("both seem to be on one network"), "the same address from outside, by another port: one network (%s)" % one_router)
+	check(one_router.ends_with("(addresses: this machine 1 own, 1 outside; the other 1 own, 1 outside)"), "with the count of each machine's addresses")
+	var two: String = NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named, named, phone]))
+	check(two.begins_with("they are on two networks") and two.contains("only a relay"), "different addresses from outside: two networks, a relay's case (%s)" % two)
+	check(two.ends_with("this machine 1 own, 1 outside; the other 2 own, 1 outside)"), "counted")
+	var blind: String = NetRtc.why_no_link(_code_with([own]), _code_with([named, phone]))
+	check(blind.begins_with("this machine never learnt its address"), "no address from outside here: said of this machine (%s)" % blind)
+	var other_blind: String = NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named]))
+	check(other_blind.begins_with("the other machine never learnt its address"), "none in the other's code: said of the other (%s)" % other_blind)
+	for said: String in [one_router, two, blind, other_blind]:
+		check(not said.contains("203.0.113.7") and not said.contains("198.51.100.9") and not said.contains("192.168.1.20") and not said.contains(".local"), "no address is named")
+
+
 ## The joining machine waits as long as its player does (its code travels to the host by hand);
 ## the host, once given that code, gives up when the other machine is not found in time.
 func test_only_the_host_given_the_answer_runs_out_of_time() -> void:
@@ -244,6 +271,7 @@ func test_only_the_host_given_the_answer_runs_out_of_time() -> void:
 	now[0] += 2
 	host.poll()
 	check(host.problem() != "", "past its time the host gives up, in words (%s)" % host.problem())
+	check(host.problem().contains("this machine never learnt its address as seen from outside") and host.problem().contains("outside; the other"), "and says why as far as the codes tell: no STUN server here, so no address from outside")
 	check(early == "" or early == host.problem(), "and not before, unless WebRTC itself said so")
 	host.close()
 

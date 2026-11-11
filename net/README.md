@@ -26,7 +26,7 @@ This is the one folder whose scripts may name networking classes (the owner's ex
 | `net_webrtc.gd` (`NetWebRTC`) | Whether this build has WebRTC: a browser's own, or the WebRTC extension that `ci/build/webrtc.sh` puts in the desktop builds and the test runs (S3; `addons/webrtc_native/`, never committed). A peer made without it logs an engine error, so ask first |
 | `net_code.gd` (`NetCode`) | The code two players swap by copy and paste: a session description and its candidates as text, and the strict check of a pasted one |
 | `net_handshake.gd` (`NetHandshake`) | How two machines come to hold a link: the host offers, each takes the other's code, and a `NetLink` is there. What `NetPlay` knows of connecting |
-| `net_rtc.gd` (`NetRtc`) | The handshake over WebRTC: the peer, its channel, the one STUN server, the code once the candidates are gathered |
+| `net_rtc.gd` (`NetRtc`) | The handshake over WebRTC: the peer, its channel, the one STUN server, the code once the candidates are gathered; a link never made says why as far as the two codes tell (`why_no_link`: one network, a machine with no address from outside, or two networks only a relay gets through), with no address named |
 | `net_rtc_link.gd` (`NetRtcLink`) | The link over the WebRTC data channel: polled when read, large messages split and joined |
 | `net_signal.gd` (`NetSignal`) | What the game and the room server (`server/signal/`) say to each other: the server's messages read strictly, the game's written, a room code's form, and the server's one address (`URL`) |
 | `net_signal_socket.gd` (`NetSignalSocket`) | The WebSocket to the room server: whole text messages, polled when read |

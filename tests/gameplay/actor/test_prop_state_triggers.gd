@@ -420,6 +420,29 @@ func test_a_trigger_cast_its_staff_is_too_busy_for_is_refused() -> void:
 	check_equal(_state(body), &"busy", "refused, not dry: the row that waits for the mana fires not")
 
 
+## A `refused` row that casts the refused staff again, or enters a state whose `entered` row does,
+## would be refused again at once, round and round to MAX_DEPTH: while a staff's refused moment
+## runs, its rows' casts of that staff do nothing.
+func test_a_refused_row_never_goes_round_and_round() -> void:
+	var again: PropTrigger = PropTrigger.make(PropTrigger.When.REFUSED, 2, &"retry")
+	again.staff = 2
+	var cast: PropTrigger = PropTrigger.make(PropTrigger.When.ENTERED, 2)
+	var retry_again: PropTrigger = PropTrigger.make(PropTrigger.When.REFUSED, 0, &"retry")
+	retry_again.staff = 2
+	var hit: PropTrigger = PropTrigger.make(PropTrigger.When.ELEMENT_HIT, 2)
+	var idle: Array[PropTrigger] = [hit, again]
+	var retry: Array[PropTrigger] = [cast, retry_again]
+	var body: Actor = _prop(_made([PropState.make(&"idle", idle), PropState.make(&"retry", retry)], 10.0, true))
+	body.caster.set_mana(BLAST, 0.0)
+	var tries: Array[int] = [0]
+	_world.bus.cast_fizzled.connect(func(_caster: int, _staff: int) -> void: tries[0] += 1)
+	_world.combat.hit(ActorsScript.NONE, body, 1.0)
+	check_equal(tries[0], 1, "its staff was tried once (round and round, it was tried to MAX_DEPTH)")
+	check_equal(_state(body), &"retry", "refused once, it went on")
+	check_equal(_changes, [[body.id, &"retry"]], "once: its casts of the staff did nothing while its refusal ran")
+	check_equal(_blasts(body, BLAST), 0, "nothing left")
+
+
 func test_a_trigger_cast_its_mana_pays_not_is_refused_dry() -> void:
 	var body: Actor = _refusing()
 	body.caster.set_mana(BLAST, 0.0)

@@ -13,7 +13,9 @@ extends ActorComponent
 ##   by a prop with a `cast` trigger;
 ## - a trigger's cast that did not go (`refused`, props W9c): its staff busy, or its mana paying none
 ##   of its casts (`dry`: the staff's press fizzled, `Events.cast_fizzled`), a moment inside the one
-##   whose trigger cast it, right after that trigger;
+##   whose trigger cast it, right after that trigger; while it runs, its triggers' casts of that
+##   staff do nothing (a `refused` row that casts it again, or enters a state that does, would be
+##   refused again at once, round and round);
 ## - a state entered (`entered`).
 ##
 ## One hit is up to three moments, in the order its health tells them: `health_below`, `death`, then
@@ -22,7 +24,8 @@ extends ActorComponent
 ## **The rule:** on a moment every trigger of the current state that matches fires, in the order
 ## listed (`cast`: the prop casts that staff, as itself, along its aim: the body's own cast, which
 ## outlasts a possession, and never one of a staff whose cast is leaving now); the first of them that names
-## a `then` sets the next state, once, after they all fired. A moment inside another (a trigger's## cast whose blast sets off this prop again) is read against the state then; once it moved the state
+## a `then` sets the next state, once, after they all fired. A moment inside another (a trigger's
+## cast whose blast sets off this prop again) is read against the state then; once it moved the state
 ## on, the outer moment's triggers stop and its `then` is dropped: that state was left.
 ##
 ## **Entering a state:** the casts that state's predecessor wound up and this moment did not cast
@@ -47,7 +50,7 @@ const MAX_DEPTH: int = 16
 
 ## Not state: how deep in moments the component is and how many states it entered, only read within
 ## one moment (scratch).
-const DERIVED: Array[StringName] = [&"_depth", &"_entries", &"_leaving", &"_fizzled"]
+const DERIVED: Array[StringName] = [&"_depth", &"_entries", &"_leaving", &"_fizzled", &"_refusing"]
 
 ## Its states (set before the body is ready: `PropBody.make`).
 @export var states: PropStates = null
@@ -62,6 +65,8 @@ var _leaving: int = 0
 ## The staffs whose press fizzled (no cast its mana pays) during a trigger's cast, by bit
 ## (`_on_cast_fizzled`, read by `_cast`).
 var _fizzled: int = 0
+## The staffs whose `refused` moment runs now, by bit (`_cast`).
+var _refusing: int = 0
 
 
 func setup(owner_actor: Actor) -> void:
@@ -201,16 +206,16 @@ func _on_cast_fizzled(caster: int, staff: int) -> void:
 ## none of a staff whose cast is leaving now. True if it cast; when its caster refused it, the
 ## `refused` moment comes first (`DRY` when its mana paid none of its casts).
 func _cast(at: int) -> bool:
-	if actor.caster == null or _leaving & (1 << at) != 0:
+	var bit: int = 1 << at
+	if actor.caster == null or (_leaving | _refusing) & bit != 0:
 		return false
-	var was: int = _fizzled
-	_fizzled &= ~(1 << at)
+	_fizzled &= ~bit
 	if actor.caster.cast(at, false, true):
-		_fizzled = was
 		return true
-	var dry: bool = _fizzled & (1 << at) != 0
-	_fizzled = was
-	_moment(PropTrigger.When.REFUSED, PropTrigger.DRY if dry else &"", float(at + 1))
+	var was: int = _refusing
+	_refusing |= bit
+	_moment(PropTrigger.When.REFUSED, PropTrigger.DRY if _fizzled & bit != 0 else &"", float(at + 1))
+	_refusing = was
 	return false
 
 

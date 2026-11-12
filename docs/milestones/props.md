@@ -404,7 +404,8 @@ The owner, 2026-11-12: a carrier he had planned (as "Self") "should replace the 
 - **The crate:** 30 health, `idle` → below half → `cracked` (grit) → death → `broken` (rubble, dust for 2.5 s), no staff. **The burial jar:** 80 health, a thaw on it or its death → `shattered`: Void · Pulse, shards walked over.
 - **Snapshots:** the hub's resumed run (`tests/core/test_snapshot_game.gd`) now stands the yard's five; the lodestone rolls back to charged and zaps again (its own test); the barrel's lit roll-back is the triggers test's.
 - **Tests:** each prop's own; `ActorFixture.shoot` (a bolt of an element at a body, its muzzle level with the body's middle, so a low prop is hit too); the `refused` rows in `test_prop_state_triggers.gd`.
-- **Left:** motes a second of the yard on the owner's GPU (`webstorm.sh`); the fire pit's `near` event (W9b2, put off); a yard mark on the floor.
+- **Reviewed** (an independent review, 2026-11-12; no blocker), changed: a `refused` moment's rows can't cast its staff again while it runs (a row casting it, or entering a state that does, went round to `MAX_DEPTH`; `_refusing`, as `_leaving`); the yard replaces a prop only after 10 s on end out of its first state (its count stops as it is back: a lodestone zapping again and again was made anew before it could go dark); the burial jar's hurt box covers its art (16×20 from 3 px up); `refused` is documented as any refusal (busy, nothing to cast) and `dry` as told only of a free staff.
+- **Left:** motes a second of the yard on the owner's GPU (`webstorm.sh`); the fire pit's `near` event (W9b2, put off); a yard mark on the floor; a chill stretching a wind-up does not stretch its ring (as before).
 
 ## Not in this plan
 

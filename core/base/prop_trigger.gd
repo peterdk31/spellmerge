@@ -29,9 +29,10 @@ enum When {
 	## after any wind-up.
 	CAST,
 	## A trigger's cast of its staff `staff` (1-4) did not go (props W9c): the staff was busy (winding
-	## up, or in the delay after its last cast) or, `dry`, its mana pays none of its casts (a prop's
-	## pool never refills: an arc lodestone that has zapped its pool's worth goes dark). Only with
-	## `dry` on does it wait for the mana; off, it fires for either.
+	## up, or in the delay after its last cast), it had nothing to cast (every card wasted, no aim) or,
+	## `dry`, its mana pays none of its casts (a prop's pool never refills: an arc lodestone that has
+	## zapped its pool's worth goes dark). With `dry` on it fires only for the mana, which is told
+	## only of a staff that is free (a busy staff is refused as busy first); off, for any of them.
 	REFUSED,
 }
 

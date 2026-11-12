@@ -65,6 +65,7 @@ func _ids(bodies: Array[Node]) -> Array[StringName]:
 
 ## The yard's body of prop `id` now (null while it is gone).
 func _yard_prop(id: StringName) -> Actor:
+	assert(YARD.has(id), "a yard prop")
 	return flow.yard_props()[YARD.find(id)] as Actor
 
 
@@ -111,6 +112,22 @@ func test_a_yard_prop_that_leaves_its_first_state_stands_again_fresh() -> void:
 	check(_yard_prop(&"burial_jar") != null and _yard_prop(&"burial_jar").state_triggers.state == 0, "the others untouched")
 	_run(PropYard.RETURN_SECONDS + 1.0)
 	check(_yard_prop(&"crate") == fresh, "a fresh one stays")
+
+
+## One back in its first state before its count runs out stays (props W9c): an arc lodestone that
+## zaps again and again is not made anew every 10 s, so it is seen to go dark at last.
+func test_a_yard_prop_back_in_its_first_state_stays() -> void:
+	_start()
+	var stone: Actor = _yard_prop(&"arc_lodestone")
+	check(stone.state_triggers.enter(&"charged"), "charged")
+	_run(PropYard.RETURN_SECONDS - 1.0)
+	check(stone.state_triggers.enter(&"idle"), "idle again (as after its zap; the spells are not stepped here)")
+	_run(2.0)
+	check(stone.state_triggers.enter(&"charged"), "charged again")
+	_run(PropYard.RETURN_SECONDS - 1.0)
+	check(_yard_prop(&"arc_lodestone") == stone, "not replaced: its count stopped while it was idle, and started anew")
+	_run(2.0)
+	check(_yard_prop(&"arc_lodestone") != stone, "out of its first state 10 s on end, it is made anew")
 
 
 func test_a_yard_prop_that_goes_stands_again() -> void:

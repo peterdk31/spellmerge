@@ -339,6 +339,11 @@ func guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Ve
 	return _rt._guard(found, actor, tag, deflects, charges, a, b, carrier)
 
 
+## `guard` of the shots a carrier picked itself (`slots`: a Pulse's ring, those its segments reach).
+func guard_shots(slots: PackedInt32Array, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier: StringName) -> int:
+	return _rt._guard_shots(slots, actor, tag, deflects, charges, a, b, carrier)
+
+
 ## Turns the shots of other teams than `actor`'s within `reach` of `at` (MOVE_GUARD_REACH at
 ## least) outward from it, once, for the carrier with `tag` (`guard` with a deflect, as the carrier
 ## `carrier`, its `id()`): a deflect on the caster as it is cast, a teleport's landing, a decoy as it

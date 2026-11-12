@@ -31,7 +31,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `GATES` | Does it open a way through that shots and bodies take (a portal)? Read only by `CastSense` (`opens`: the AI casts it to open a fight). |
 | `CASTS_FROM_SHOT` | Is it shots of the projectile manager, each casting what it fires while it lives (a bolt, a rune, a pool, a wall)? |
 | `CASTS_FROM_BODY` | Is it a body of its own, an actor, that casts what it fires (a decoy)? |
-| `AOE` | Does it go out all round the point it is cast at, not along an aim (a pulse's ring)? A scatter turns nothing there; the AI reads it as an area round its caster; Return and Ghost work on it. |
+| `AOE` | Does it go out all round the point it is cast at, not along an aim (a pulse's ring)? Not aimed: scatter, mirror and nova turn nothing there and the AI reads it as an area round its caster; it goes out as a shot does: Return and Ghost work on it. |
 | `MELEE` | Is it held by or carried with the body that casts it, never leaving it (swing, slam, dash, teleport)? Then it never hits that body (`CarrierKit.spared`); a ranged carrier spares it only until it has left it: a shot over time, a beam along its path (it hits its caster when it bounces or bends back into them). |
 
 (and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
@@ -100,10 +100,14 @@ runs it, and the looks read the `pulse_*` getters.
   `lifetime` (owner: "using easing as bolt/atom"; `ProjectileManager.speed_factor`,
   SpellLimits.SHOT_SPEED_* times its cards' `speed_start`, `speed_end`, `speed_ease`), so a plain
   Pulse reaches 48 px (120 px/s for 0.4 s; the curve keeps its mean). Its edge, `radius` wide,
-  strikes each body it reaches once (owner: "It should not hit instantly"), where its edge meets
-  the body, outward from its centre, sparing the body that cast it (owner: "Yes it spares its
-  caster"); what the hit sets off (`on hit`) leaves from there (owner: "It should fire from the
-  edge"; `Spells._strike`'s `edge`). A bare Pulse strikes for its card's small damage.
+  strikes each body it crosses once (owner: "It should not hit instantly"): only what the edge
+  sweeps in a step counts, never a body that comes in behind it ("only the swept band should
+  count"). It strikes where its edge meets the body, outward from its centre
+  (`CarrierKit.strike_bodies`), so what the hit sets off (`on hit`) leaves from there ("It should
+  fire from the edge"), and it spares the body it starts on, as every carrier does (`Spells._launch`:
+  the caster, "Yes it spares its caster"; for a payload, the body it starts touching). A body is
+  judged by its own shape, a box's sides or a circle (`HitShape.sides`). A bare Pulse strikes for
+  its card's small damage.
 - **Segments:** the ring is SpellLimits.PULSE_SEGMENTS segments, each a line out from its centre
   stopped on its own (owner: "the ring should be 'individual' motes, that can be blocked
   individually"): at the first wall on its line (set when it is cast; Ghost takes it through) and
@@ -114,11 +118,15 @@ runs it, and the looks read the `pulse_*` getters.
   reaches (`pulse_stop_toward`, `gameplay/feel/pulse_rings.gd`). Its guard of shots (below)
   follows them too ("They should follow the segments too"): a shot behind a wall or a struck body
   is not turned or stopped.
-- **Shots:** while it is out, a deflect on it turns the shots of other teams inside it that its
-  segments reach outward, a shield stops them while its charges last (as a slam's ring). A shot that comes in faster than
+- **Shots:** while it is out, a deflect on it turns the shots of other teams its edge sweeps that
+  its segments reach outward, a shield stops them while its charges last (as a slam's ring;
+  `CarrierKit.guard_shots`). A shot that comes in faster than
   the ring grows reaches its caster first: a guarding Pulse is cast ahead.
 - **Return** grows it for half its life, then shrinks it back to its centre at the speed it had
-  then, striking again on the way in, as a returning shot flies home.
+  then, striking again what its edge crosses on the way in, its segments as when it was cast (a
+  body it struck may have moved), as a returning shot flies home.
+- **Not aimed:** Scatter, Mirror and Nova turn nothing on it (`AOE`; `CompiledSpell.nova_ways`,
+  `mirrors`): one ring already goes every way.
 - **Its end:** when its life is out (or it is home), its `blast` goes off at its centre, hitting
   whoever is there, its caster too, as every blast does (owner: "Why did you add an exception for
   blast to spare its caster?"), and its `on expire` fires from there.

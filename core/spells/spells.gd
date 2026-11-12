@@ -1703,7 +1703,7 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
 	_echo_spell = spell if echoed else null
 	var launched: int = _cast_nova(spell, tag, actor, origin, heading, source)
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
+	if launched > 0 and spell.mirrors():
 		# The same cast again, its aim reversed: every card it has does what it did the first time.
 		launched += _cast_nova(spell, tag, actor, origin, -heading, source)
 	_echo_spell = null
@@ -2289,7 +2289,12 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier: StringName) -> int:
 	if found == 0:
 		return charges
-	var slots: PackedInt32Array = projectiles.guard_slots.slice(0, found)
+	return _guard_shots(projectiles.guard_slots.slice(0, found), actor, tag, deflects, charges, a, b, carrier)
+
+
+## `_guard` of the shots a carrier picked itself (`slots`, a list it keeps: a Pulse's ring, those its
+## segments reach).
+func _guard_shots(slots: PackedInt32Array, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier: StringName) -> int:
 	for slot in slots:
 		if not projectiles.is_alive(slot):
 			continue
@@ -2474,7 +2479,7 @@ func _shots_of(group: CompiledGroup) -> int:
 ## times its Penta ring's copies where Penta works.
 func copies_of(spell: CompiledSpell) -> int:
 	var copies: int = spell.nova_ways() * maxi(_penta_copies(spell), 1)
-	if spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
+	if spell.mirrors():
 		copies *= 2
 	return copies
 

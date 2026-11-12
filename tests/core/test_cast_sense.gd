@@ -130,3 +130,11 @@ func test_spells_reads_the_next_cast() -> void:
 	check(arena.spells.next_cast_sense(0, 3) == null, "an empty staff has none")
 	check(arena.spells.next_cast_sense(-1, 0) == null, "nor a caster out of range")
 	arena.free_all()
+
+
+func test_a_rings_blast_goes_off_on_its_caster() -> void:
+	# A Pulse's blast is at its centre, where it was cast: the AI's fight never casts it at a target.
+	check(_sense(["blast", "pulse"]).blast_on_caster, "a blast Pulse blasts on its caster")
+	check(not _sense(["blast", "bolt"]).blast_on_caster, "a blast bolt where it ends")
+	check(not _sense(["fire", "pulse"]).blast_on_caster, "a Pulse with no blast")
+

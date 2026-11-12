@@ -4356,7 +4356,8 @@ func _turned(slot: int) -> float:
 ## The factor of its speed a shot of the curve `start`, `end`, `ease_power` (`set_speed_curve`) goes
 ## at with `left` of its life left (0 to 1): the curve itself, for what grows as a shot flies (a
 ## Pulse's ring, `CarrierPulse`). `_curve_factor` is the same sum inline (the hot loop, mirrored by
-## the native kernel); tests/core/test_pulse_ring.gd holds the two to the same distance.
+## the native kernel); content/spells/carriers/pulse/test_pulse.gd
+## (`test_its_ring_goes_as_far_as_a_shot_of_its_numbers_flies`) holds the two to the same distance.
 static func speed_factor(start: float, end: float, ease_power: float, left: float) -> float:
 	return start + (end - start) * (1.0 - DMath.pow(left, ease_power))
 
@@ -6169,13 +6170,20 @@ func target_centre(node: Node) -> Vector2:
 	return (node as Node2D).global_position + _target_offset[at] if at >= 0 else Vector2.INF
 
 
-## How far the hit shape of the registered target `node` reaches from its centre at most
-## (`HitShape.outer_radius`), 0 for a node that is not registered.
-func target_outer_radius(node: Node) -> float:
+## The hit shape of the registered target `node` (`HitShape`): its box's half size (zero for a
+## circle) and the radius it is rounded by; zero and 0 for a node that is not registered.
+func target_half(node: Node) -> Vector2:
+	if node == null or not is_instance_valid(node):
+		return Vector2.ZERO
+	var at: int = _target_row(node)
+	return _target_half[at] if at >= 0 else Vector2.ZERO
+
+
+func target_round(node: Node) -> float:
 	if node == null or not is_instance_valid(node):
 		return 0.0
 	var at: int = _target_row(node)
-	return HitShape.outer_radius(_target_half[at], _target_radius[at]) if at >= 0 else 0.0
+	return _target_radius[at] if at >= 0 else 0.0
 
 
 ## The identity of the registered target `node` (`_target_key`, online-ready N5: its actor's key),

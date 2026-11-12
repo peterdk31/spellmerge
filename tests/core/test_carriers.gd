@@ -66,7 +66,8 @@ func test_what_works_follows_the_traits() -> void:
 		check_equal(carrier.works(BEHAVIOURS.RETURN), carrier.flies() or carrier.has(CarrierTraits.AOE), "return works on a %s exactly when it flies or goes out all round (a ring)" % name)
 		for behaviour: int in [BEHAVIOURS.CHAIN, BEHAVIOURS.SIPHON, BEHAVIOURS.POSSESS, BEHAVIOURS.RELAY, BEHAVIOURS.HEAVY, BEHAVIOURS.PULL]:
 			check_equal(carrier.works(behaviour), carrier.hits(), "%s works on a %s exactly when it hits" % [BEHAVIOURS.keys()[behaviour], name])
-		for behaviour: int in [BEHAVIOURS.NONE, BEHAVIOURS.BLAST, BEHAVIOURS.ECHO, BEHAVIOURS.RECOIL, BEHAVIOURS.MIRROR]:
+		check_equal(carrier.works(BEHAVIOURS.MIRROR), not carrier.has(CarrierTraits.AOE), "mirror works on a %s exactly when it is aimed" % name)
+		for behaviour: int in [BEHAVIOURS.NONE, BEHAVIOURS.BLAST, BEHAVIOURS.ECHO, BEHAVIOURS.RECOIL]:
 			check(carrier.works(behaviour), "%s works on every carrier, a %s too" % [BEHAVIOURS.keys()[behaviour], name])
 
 

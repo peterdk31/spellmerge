@@ -7,7 +7,7 @@
 script = ExtResource("1_base")
 id = &"pulse"
 display_name = "Pulse"
-description = "A ring out from where it is cast, never hurting its caster."
+description = "A ring out from where it is cast, sparing its caster."
 complexity = 1
 icon = ExtResource("2_icon")
 base_damage = 4

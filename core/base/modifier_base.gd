@@ -140,7 +140,8 @@ const RULES: Dictionary = {
 	Behaviour.MAGNET: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}},
 	Behaviour.GHOST: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE | CarrierTraits.AOE}},
 	Behaviour.SPIRAL: {"needs": {"any": CarrierTraits.MOVES | CarrierTraits.LINE}},
-	Behaviour.MIRROR: {},
+	# Another firing aimed the other way: nothing to turn on a carrier that is not aimed (`AOE`).
+	Behaviour.MIRROR: {"needs": {"not": CarrierTraits.AOE}},
 	Behaviour.GROWTH: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "stacks": Stack.MULTIPLY},
 	Behaviour.RELAY: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
 	# A shot flies home; a ring that grows from its cast point (a Pulse) shrinks back to it.
@@ -154,7 +155,8 @@ const RULES: Dictionary = {
 	# leaves from a point of a ring. More cards add copies.
 	Behaviour.PENTA: {"needs": {"not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE}},
 	# Mirror's rule with N ways (owner, 2026-11-09: a dash's moves cancel, each still strikes).
-	Behaviour.NOVA: {},
+	# Firings every way round: one ring already goes every way (`AOE`).
+	Behaviour.NOVA: {"needs": {"not": CarrierTraits.AOE}},
 	# Nothing of a swing, slam, dash or teleport leaves the body to fall.
 	Behaviour.SKYFALL: {"needs": {"not": CarrierTraits.MELEE}},
 	# A row that flies or stays (a rune, a pool, a wall) or a beam goes round; nothing of a dash,

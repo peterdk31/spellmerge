@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The Pulses' rings as Feel draws them (gameplay/feel/pulse_rings.gd, props W9a): motes along each
 ## live ring's edge, none past a wall on its line from the centre (owner, 2026-11-12: "the ring
-## should be 'individual' motes, that can be blocked individually"), all round with ghost.
+## should be 'individual' motes, that can be blocked individually") where its segment stopped.
 ##
 ## godot --headless --path . --script res://tests/gameplay/feel/test_pulse_rings.gd
 

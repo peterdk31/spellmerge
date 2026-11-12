@@ -31,7 +31,7 @@ func want(brain: AIBrain) -> float:
 			continue
 		if not brain.reaches(sense):
 			continue
-		if sense.blast > 0.0 and not sense.moves_caster and brain.distance < sense.blast + BLAST_MARGIN:
+		if sense.blast_on_caster or (sense.blast > 0.0 and not sense.moves_caster and brain.distance < sense.blast + BLAST_MARGIN):
 			continue
 		if sense.reach > 0.0 and not brain.line_clear:
 			continue

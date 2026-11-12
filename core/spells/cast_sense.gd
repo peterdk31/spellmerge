@@ -27,6 +27,9 @@ var radius: float = 0.0
 var damage: float = 0.0
 ## The widest explosion at a carrier's end (`blast`): closer than this its caster is hurt too.
 var blast: float = 0.0
+## True when a blast of it goes off where it was cast, on its caster, wherever its target is: a
+## carrier that goes out all round its cast point (`AOE`, a Pulse's ring) blasts at its centre.
+var blast_on_caster: bool = false
 ## True when it hits round a point or round its caster rather than along a line (a nova, a ring,
 ## an orbit, a fall from the sky, a rune).
 var area: bool = false
@@ -118,6 +121,8 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	reach = maxf(reach, spell_reach)
 	lasts = maxf(lasts, spell.lifetime)
 	blast = maxf(blast, spell.behaviour(ModifierBase.Behaviour.BLAST))
+	if spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0 and spell.has_trait(CarrierTraits.AOE):
+		blast_on_caster = true
 	if spell.homing_range > 0.0:
 		homing = true
 	if spell.has_trait(CarrierTraits.MOVES_CASTER):

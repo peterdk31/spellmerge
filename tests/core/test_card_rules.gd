@@ -770,6 +770,10 @@ func _run(cards: Array[StringName], carrier_card: CarrierCard, scene: Dictionary
 			world.add_wall(Rect2(-480.0, -160.0, 960.0, 8.0))
 		# A weak target has 0.01 health: any hit kills it, a speck's too (an atom's 0.3).
 		var target: Node2D = world.add_enemy(&"A", Vector2(r, 0.0), WEAK_HEALTH if scene.get("weak", false) else World.HEALTH, donor, Vector2.UP)
+		if _cast_by_a_hit(carrier_card):
+			# On it: the ring where the shot hit spares the target it starts on (as every payload
+			# spares the body it starts touching), so one more stands beside it, in its reach.
+			world.add_enemy(&"N", Vector2(r, 24.0), WEAK_HEALTH if scene.get("weak", false) else World.HEALTH, donor, Vector2.UP)
 		if scene.get("status", false):
 			var row: ReactionRow = _reaction()
 			if row != null:

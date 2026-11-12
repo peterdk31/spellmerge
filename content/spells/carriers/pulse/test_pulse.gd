@@ -441,3 +441,88 @@ func test_its_guard_follows_its_segments() -> void:
 		else:
 			check(not arena.blocks.is_empty(), "in the open its ring stops it: %s" % [arena.blocks])
 		arena.free_all()
+
+
+func test_only_what_its_edge_sweeps_is_struck() -> void:
+	# Owner, 2026-11-12: "only the swept band should count": a body that comes inside the ring
+	# behind its edge, after the edge has passed, is not struck.
+	var arena := ArenaScript.new(root)
+	arena.add_guard(0, Vector2.ZERO)
+	var late: Node2D = arena.add_imp(Vector2(200.0, 0.0))
+	arena.install_cards(0, 0, ["fire", "pulse"])
+	arena.cast(0, 0)
+	arena.run(0.25)
+	var rings: CarrierPulse = CarrierPulse.of(arena.spells)
+	check_equal(rings.pulse_count(), 1, "the ring is still out")
+	# Into the ring, well inside its edge.
+	late.global_position = Vector2(8.0, 0.0)
+	arena.run(1.0)
+	check_equal(arena.lost(late), 0, "the body that came in behind its edge is not struck")
+	arena.free_all()
+
+
+func test_return_strikes_a_body_that_moved_on_the_way_in() -> void:
+	# Review, 2026-11-12: at the turn its segments are as when it was cast, so a body it struck that
+	# has moved further out still meets it on the way in.
+	var arena := ArenaScript.new(root)
+	arena.add_guard(0, Vector2.ZERO)
+	var imp: Node2D = arena.add_imp(Vector2(12.0, 0.0))
+	var struck: Array[float] = []
+	arena.bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void:
+		if target == imp:
+			struck.append(CarrierPulse.of(arena.spells).pulse_radius(0)))
+	arena.install_cards(0, 0, ["return", "fire", "pulse"])
+	arena.cast(0, 0)
+	arena.run(0.08)
+	check_equal(struck.size(), 1, "struck once on the way out")
+	# Pushed further out, as a hit's knockback would.
+	imp.global_position = Vector2(22.0, 0.0)
+	arena.run(1.0)
+	check_equal(struck.size(), 2, "and again on the way in: %s" % [struck])
+	arena.free_all()
+
+
+func test_a_payloads_ring_spares_the_body_it_starts_on() -> void:
+	# Review, 2026-11-12: as every payload spares the body it starts touching (`Spells._launch`),
+	# a ring where a bolt hit an imp does not strike that imp again; the one beside it, it does.
+	var arena := ArenaScript.new(root)
+	arena.add_guard(0, Vector2.ZERO)
+	var hit: Node2D = arena.add_imp(Vector2(60.0, 0.0))
+	var beside: Node2D = arena.add_imp(Vector2(60.0, 24.0))
+	var on_hit: Array[int] = [0]
+	arena.bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void:
+		if target == hit:
+			on_hit[0] += 1)
+	arena.install_cards(0, 0, ["on_hit", "bolt", "fire", "pulse"])
+	arena.cast(0, 0)
+	arena.run(1.5)
+	check_equal(on_hit[0], 1, "the imp the bolt hit is struck once, by the bolt")
+	check(arena.lost(beside) > 0, "the one beside it is struck by the ring")
+	arena.free_all()
+
+
+func test_a_box_shadows_by_its_shape() -> void:
+	# Review, 2026-11-12: a box (a prop) is judged by its own sides, not by the circle round it: a
+	# long thin box end-on shadows only the lines it covers.
+	var arena := ArenaScript.new(root)
+	arena.add_guard(0, Vector2.ZERO)
+	var box := Node2D.new()
+	root.add_child(box)
+	box.global_position = Vector2(30.0, 0.0)
+	arena.combat.register_actor(box, 100.0, 1.0, 0, Vector2.ZERO, Vector2(12.0, 2.0))
+	# A small body 18 degrees off the box's line: inside the shadow of the circle round the box
+	# (26 degrees), outside the box's own (about 13).
+	var aside := Node2D.new()
+	root.add_child(aside)
+	aside.global_position = Vector2(38.0, 12.4)
+	arena.combat.register_actor(aside, 100.0, 1.0, 0, Vector2.ZERO, Vector2(1.0, 1.0))
+	var struck: Array[Node] = []
+	arena.bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void: struck.append(target))
+	arena.install_cards(0, 0, ["fire", "pulse"])
+	arena.cast(0, 0)
+	arena.run(1.0)
+	check(struck.has(box), "the box is struck")
+	check(struck.has(aside), "and the body beside its line, not shadowed by the circle round the box")
+	box.queue_free()
+	aside.queue_free()
+	arena.free_all()

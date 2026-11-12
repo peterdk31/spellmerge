@@ -179,10 +179,20 @@ func cue_of(kind: int) -> StringName:
 
 
 ## How many ways it is cast at once (`ModifierBase.Behaviour.NOVA`): its Nova cards' count (8 a
-## card, more add, with no cap: owner, 2026-10-29, cards are not limited), or 1 without one.
+## card, more add, with no cap: owner, 2026-10-29, cards are not limited), or 1 without one or on a
+## carrier that is not aimed.
 func nova_ways() -> int:
+	# A carrier that is not aimed (`AOE`, a Pulse's ring) already goes every way.
+	if has_trait(CarrierTraits.AOE):
+		return 1
 	var ways: float = behaviour(ModifierBase.Behaviour.NOVA)
 	return maxi(roundi(ways), 1)
+
+
+## True when it is cast again with its aim reversed (`mirror`): not for a carrier that is not aimed
+## (`AOE`), which has no aim to reverse.
+func mirrors() -> bool:
+	return behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and not has_trait(CarrierTraits.AOE)
 
 
 ## How many spells there are in this chain of payloads, this one included (following the first

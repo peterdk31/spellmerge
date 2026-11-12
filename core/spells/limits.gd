@@ -12,13 +12,9 @@ extends RefCounted
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 
-## Staffs (A4): the numbers of a fallback carrier (`CarrierFallback`), the strike made when cards
-## land on the caster or on a payload's origin with no carrier (docs/milestones/M2-staffs.md, "Reading a staff").
-const FALLBACK_DAMAGE: float = 4.0
 ## The least damage a compiled hit does (a card may go below 1, an atom's speck; health is
 ## decimal), so every hit still counts.
 const MIN_DAMAGE: float = 0.01
-const FALLBACK_RADIUS: float = 8.0
 
 ## Engine pacing, never a limit (owner, 2026-10-29: interactions are not limited, they follow
 ## the rules): the shots the payloads of one budget's triggers (a seat's, or the shared one) may
@@ -171,8 +167,6 @@ const CHAIN_MIN_SPEED: float = 300.0
 ## Pixels a payload fired when a shot expires starts back along its path, so a shot that
 ## ended on a wall fires in front of it.
 const EXPIRE_BACKOFF: float = 2.0
-## Seconds the hit of a fallback lasts (it is an instant strike; the shot fields need a value).
-const MIN_LIFETIME: float = 0.05
 
 ## Skyfall (`core/spells/skyfall.gd`): how far up the screen from its spot the hole opens (fixed:
 ## owner, 2026-11-09, no card changes it), and how long it is open before the carrier falls.

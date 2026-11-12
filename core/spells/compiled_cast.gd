@@ -28,7 +28,7 @@ var ends_cycle: bool = false
 ## True when the reading went past the last slot and on from the first.
 var wrapped: bool = false
 ## What each modifier, infusion and trigger read in this cast attached to: card slot -> the
-## slot of its carrier, or `StaffCompiler.TARGET_CASTER` / `TARGET_BEARER` / `TARGET_POINT` for a fallback.
+## slot of its carrier.
 var targets: Dictionary = {}
 ## Slots whose card did nothing in this cast -> true.
 var wasted: Dictionary = {}

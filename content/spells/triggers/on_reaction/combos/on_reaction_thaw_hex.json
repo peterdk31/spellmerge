@@ -4,7 +4,7 @@
 	"does": "A fire bolt burns the imp, then a frost bolt on it sets off Thaw and a void blast goes off there, hexing the imp beside it.",
 	"casts": [
 		{"staff": 1, "cards": ["fire", "bolt"]},
-		{"staff": 0, "cards": ["on_reaction", "frost", "bolt", "void", "blast"], "at": 0.3}
+		{"staff": 0, "cards": ["on_reaction", "frost", "bolt", "void", "blast", "pulse"], "at": 0.3}
 	],
 	"imps": [[100, 0], [100, 45]],
 	"seconds": 2.0,

@@ -86,9 +86,8 @@ func required_fields() -> Dictionary:
 
 
 ## True when a cast of it adds a wind-down of its own to its staff's (its form card's
-## `wind_down`), so a card's wind-down factor changes something: every carrier a form card fires,
-## not a fallback carrier (`CarrierFallback`), which has no form card. A payload's carrier adds
-## none either; the compiler knows that one (`StaffCompiler._numbers_count`).
+## `wind_down`), so a card's wind-down factor changes something: every carrier a form card fires.
+## A payload's carrier adds none; the compiler knows that one (`StaffCompiler._numbers_count`).
 func has_wind_down() -> bool:
 	return true
 
@@ -104,15 +103,18 @@ func hit_kind() -> StringName:
 	return &""
 
 
-## A carrier no form card fires (a fallback) has its own look here, where a form card would carry
-## it: its staff animation (`FormBase.staff_pose`, packed) and the cue a seat's cast of it plays
-## (`FormBase.cast_cue`; &"" for Feel's default). A form card's carrier answers none: its card says.
-func staff_pose() -> PackedFloat32Array:
-	return PackedFloat32Array()
+## True when a cast of it with these cards on it strikes what it meets (`CompiledSpell.strikes`):
+## every carrier by default; a Pulse only when a card on it acts on hits (`CarrierPulse`).
+func strikes(_modifiers: Array[ModifierBase], _elements: Array[ElementBase], _triggers: Array[TriggerBase]) -> bool:
+	return true
 
 
-func cast_cue() -> StringName:
-	return &""
+## The modifiers of `modifiers` (each one that works here by its behaviour, `works`) that still do
+## nothing on it once the other cards on it are known (its infusions and its triggers): none by
+## default. The compiler lists them as wasted (a Pulse that strikes nothing and has no trigger that
+## fires while it lasts has nothing for a hold to keep: `CarrierPulse`).
+func idle_modifiers(_modifiers: Array[ModifierBase], _elements: Array[ElementBase], _triggers: Array[TriggerBase]) -> Array[ModifierBase]:
+	return []
 
 
 ## What draws its look (LOOK_*): by default its shots, which fly (`spawn_row`).
@@ -190,10 +192,10 @@ func fires_with(event: int, has: Dictionary, infused: bool) -> bool:
 
 ## Who may cast the payload a trigger of `event` fires on this carrier, as `BY_*` bits, when the
 ## carrier (compiled as `spell`) is itself cast by `by` (`BY_*` bits; a cast's own group is cast by
-## the caster's body): the compiler lands a payload's left-over cards on it (`Carriers.fallback`;
-## docs/CARRIERS.md, "The fallback carriers"), so a card there is wasted only when none of them
-## could use it. Worked out from its yes/no answers, the same for every carrier, as the runtime
-## fires each event:
+## the caster's body): the compiler takes a payload's Pulse round it (`Carriers.placed`;
+## docs/CARRIERS.md, "Pulse: a strike round what casts it"), so a card on that Pulse is wasted only when
+## none of them could use it. Worked out from its yes/no answers, the same for every carrier, as the
+## runtime fires each event:
 ## - `on cast` leaves at once, cast by whoever cast the carrier (`by`).
 ## - `timer`, `on hurt` and `on recast` fire from where the carrier is while it lasts: its own shot
 ##   (`CASTS_FROM_SHOT`), its own body (`CASTS_FROM_BODY`) or what it moves (`MOVES_CASTER`: the

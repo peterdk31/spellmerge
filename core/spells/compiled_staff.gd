@@ -13,7 +13,7 @@ var staff: StaffBase = null
 var cards: Array[StringName] = []
 ## The casts of one cycle, in order; empty when the staff holds no card.
 var casts: Array[CompiledCast] = []
-## Every compiled spell of the cycle, payloads and fallbacks included; a spell's `node` is
+## Every compiled spell of the cycle, payloads included; a spell's `node` is
 ## its index here (the tag of its shots carries it, staffs A5).
 var nodes: Array[CompiledSpell] = []
 ## Slots whose card did nothing in any cast that read it -> true, for the builder to

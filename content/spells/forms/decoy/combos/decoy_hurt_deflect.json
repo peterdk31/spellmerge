@@ -4,7 +4,7 @@
 	"does": "The deflect after the decoy's on hurt lands on the decoy itself: when the first enemy bolt hurts it, the bolt right behind is turned away from it.",
 	"needs": "deflect",
 	"entities": true,
-	"casts": [{"staff": 0, "cards": ["on_hurt", "decoy", "deflect"]}],
+	"casts": [{"staff": 0, "cards": ["on_hurt", "decoy", "deflect", "pulse"]}],
 	"imps": [],
 	"foes": [[100, -12], [118, -12]],
 	"seconds": 1.0,

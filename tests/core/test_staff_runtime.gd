@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the staff runtime in core/spells (staffs A5): a staff casts its cycle in order with
-## its delays, mana and recharge; multicast groups; payload groups; fallbacks asking for an area
-## hit; sustained (`hold`) carriers that reserve mana until switched off; and four players with
-## four staffs each, rebuilt mid-flight. A real projectile manager and event bus, stepped by
+## its delays, mana and recharge; multicast groups; payload groups; Pulses asking for an area hit;
+## sustained (`hold`) carriers that reserve mana until switched off; and four players with four
+## staffs each, rebuilt mid-flight. A real projectile manager and event bus, stepped by
 ## hand; cards built in code behind a stand-in registry.
 ##
 ## godot --headless --path . --script res://tests/core/test_staff_runtime.gd
@@ -55,6 +55,9 @@ func before_each() -> void:
 	_staff.slots = 20
 	_staff.cooldown = 0.5
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
+	var pulse: FormBase = _form(&"pulse", 0.0, 0.5)
+	pulse.carrier = Carriers.PULSE
+	pulse.radius = 24.0
 	bolt.wind_down = 0.2
 	var halo: FormBase = _form(&"halo", 300.0, 1.0)
 	halo.shots = 8
@@ -167,8 +170,8 @@ func test_a_payload_fires_on_hit_under_its_own_node() -> void:
 	check(_spells.profile(nova_tag) != null and _spells.profile(nova_tag).form_id == &"halo", "that tag is the halo's")
 
 
-func test_a_lone_blast_asks_for_an_area_hit_on_the_caster() -> void:
-	_install(3, 0, "blast")
+func test_a_blast_pulse_asks_for_an_area_hit_on_the_caster() -> void:
+	_install(3, 0, "blast pulse")
 	var origin := Vector2(20, 30)
 	check(_spells.cast_staff(3, 0, origin, AIM, 100.0) >= 0.0, "it casts")
 	check_equal(_areas.size(), 1, "one area hit")
@@ -180,7 +183,7 @@ func test_a_lone_blast_asks_for_an_area_hit_on_the_caster() -> void:
 
 func test_a_blast_in_a_payload_lands_where_the_bolt_hits() -> void:
 	_target(Vector2(60, 0))
-	_install(0, 0, "on_hit bolt blast")
+	_install(0, 0, "on_hit bolt blast pulse")
 	_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0)
 	_tick(20)
 	check_equal(_areas.size(), 1, "one area hit")

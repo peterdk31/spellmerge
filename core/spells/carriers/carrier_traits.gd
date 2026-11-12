@@ -65,7 +65,7 @@ const SPAWNS: int = 1 << 24
 const GATES: int = 1 << 25
 ## Is it shots of the projectile manager, each of which casts what it fires while it lives (a bolt,
 ## a rune, an orbit, a wall's stones)? A payload such a shot fires lands its left-over cards on that
-## shot (`Carrier.payload_cast_by`, docs/CARRIERS.md "The fallback carriers").
+## shot (`Carrier.payload_cast_by`, docs/CARRIERS.md "Pulse: a strike round what casts it").
 const CASTS_FROM_SHOT: int = 1 << 26
 ## Is it a body of its own, an actor (a decoy)? What it fires while it lives is cast from that body,
 ## and a payload's left-over cards land on it (`Carrier.payload_cast_by`).

@@ -187,7 +187,7 @@ func test_a_shell_without_a_body_or_anchor_goes() -> void:
 
 
 func test_a_cast_on_yourself_plays_its_own_cue() -> void:
-	check_equal(_feel._form_cues_of(&"caster")[FeelScript.CUE_CAST], &"cast_self", "the caster carrier's cast cue")
+	check_equal(_feel._form_cues_of(&"pulse")[FeelScript.CUE_CAST], &"cast_self", "a Pulse card's cast cue")
 	check_equal(_feel._form_cues_of(&"bolt")[FeelScript.CUE_CAST], (_feel.registry.get_resource(&"spells", &"bolt") as FormBase).cast_cue, "a carrier card's own stays")
 
 

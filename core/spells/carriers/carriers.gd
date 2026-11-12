@@ -8,16 +8,16 @@ extends RefCounted
 ## `id`), and no other file changes.
 
 ## The folder of the carrier scripts. Each script here whose class extends `Carrier` and has an id
-## is a carrier (the bases, `Carrier`, `CarrierMove`, `CarrierEntity` and `CarrierFallback`, have none).
+## is a carrier (the bases, `Carrier`, `CarrierMove`, `CarrierEntity` and `CarrierPulse`, have none).
 const FOLDER: String = "res://core/spells/carriers/"
 
-## The three fallback carriers (docs/CARRIERS.md, "The fallback carriers"): what the cards a group
-## read with no carrier after them land on: the caster for a cast's own group; for a payload, what
-## fired it (a body or a shot) when one may have, else the point it began at. No form card fires
-## them, so they are not in `ids` and a form card may not name them.
-const ON_CASTER: StringName = &"caster"
-const ON_BEARER: StringName = &"bearer"
-const AT_POINT: StringName = &"point"
+## The Pulse card's carrier (docs/CARRIERS.md, "Pulse: a strike round what casts it"): `PULSE`, the id
+## the card names, round the caster in a cast's own group; in a payload the compiler takes
+## `PULSE_BEARER` (round what fired it, a body or a shot) or `PULSE_POINT` (round the point it began
+## at) in its place (`placed`). No card names those two, so they are not in `ids`.
+const PULSE: StringName = &"pulse"
+const PULSE_BEARER: StringName = &"pulse_bearer"
+const PULSE_POINT: StringName = &"pulse_point"
 
 ## Not state: the carriers made once per script, shared by every runtime (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"_shared", &"_none"]
@@ -33,36 +33,37 @@ static func of(id: StringName) -> Carrier:
 	return _shared.get(id, _none) as Carrier
 
 
-## The fallback carrier the cards with no carrier after them land on: `ON_CASTER` in a cast's own
-## group; in a payload (`payload`), `ON_BEARER` when a body or a live shot may cast it (`by`, the
-## `Carrier.BY_*` bits of `Carrier.payload_cast_by`), else `AT_POINT`.
-static func fallback(payload: bool, by: int = Carrier.BY_POINT) -> Carrier:
-	if not payload:
-		return of(ON_CASTER)
-	return of(ON_BEARER if by & (Carrier.BY_BODY | Carrier.BY_SHOT) != 0 else AT_POINT)
+## The carrier a form card naming `id` fires in a group it is read in (`payload`: a trigger's), cast
+## by `by` (the `Carrier.BY_*` bits of `Carrier.payload_cast_by`): the carrier of that id, except
+## that the Pulse card's is round what casts it: `PULSE` in a cast's own group; in a payload
+## `PULSE_BEARER` when a body or a live shot may cast it, else `PULSE_POINT`.
+static func placed(id: StringName, payload: bool, by: int = Carrier.BY_POINT) -> Carrier:
+	if id != PULSE or not payload:
+		return of(id)
+	return of(PULSE_BEARER if by & (Carrier.BY_BODY | Carrier.BY_SHOT) != 0 else PULSE_POINT)
 
 
-## True when `id` is one of the fallback carriers.
-static func is_fallback(id: StringName) -> bool:
-	return id == ON_CASTER or id == ON_BEARER or id == AT_POINT
+## True when `id` is one of the Pulse card's carriers.
+static func is_pulse(id: StringName) -> bool:
+	return id == PULSE or id == PULSE_BEARER or id == PULSE_POINT
 
 
 ## True when `id` names a carrier a form card may fire (&"" names none: it is the id of the one that
-## runs nothing; the fallback carriers are fired by no card).
+## runs nothing; the Pulse card's payload carriers are named by no card).
 static func exists(id: StringName) -> bool:
 	if _shared.is_empty():
 		_shared = make_all()
-	return _shared.has(id) and not is_fallback(id)
+	return _shared.has(id) and id != PULSE_BEARER and id != PULSE_POINT
 
 
-## The id of every carrier a form card may fire, in the order `make_all` lists them (the fallback
-## carriers left out).
+## The id of every carrier a form card may fire, in the order `make_all` lists them (the Pulse card's
+## payload carriers left out).
 static func ids() -> Array[StringName]:
 	if _shared.is_empty():
 		_shared = make_all()
 	var out: Array[StringName] = []
 	for id: StringName in _shared:
-		if not is_fallback(id):
+		if exists(id):
 			out.append(id)
 	return out
 

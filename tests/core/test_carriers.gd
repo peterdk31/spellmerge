@@ -25,7 +25,7 @@ func test_every_carrier_is_found_by_its_name() -> void:
 	check(not Carriers.of(&"fissure").works(BEHAVIOURS.NONE), "and no card works on it")
 	check(not Carriers.exists(&"fissure") and not Carriers.exists(&""), "and neither is a carrier")
 	check(Carriers.exists(&"atom"), "an atom is")
-	check_equal(Carriers.ids().size(), 13, "every carrier script in the folder is found, and none of the bases: %s" % [Carriers.ids()])
+	check_equal(Carriers.ids().size(), 14, "every carrier script in the folder is found, and none of the bases: %s" % [Carriers.ids()])
 	var ids: Array[StringName] = Carriers.ids()
 	check(ids.find(&"dash") < ids.find(&"beam") and ids.find(&"beam") < ids.find(&"decoy") and ids.find(&"decoy") < ids.find(&"swing") and ids.find(&"swing") < ids.find(&"slam"), "the runtime steps a dash's strikes, then beams, entities, swings and slams: %s" % [ids])
 
@@ -137,7 +137,7 @@ func test_carriers_ask_the_runtime_only_through_the_kit_and_the_runtime_names_no
 			check(not line.contains("._rt") and not line.contains("SpellRuntime._"), "%s:%d asks the runtime only through the kit: %s" % [path, number, line.strip_edges()])
 	var names: PackedStringArray = []
 	var every: Array[StringName] = Carriers.ids()
-	every.append_array([Carriers.ON_CASTER, Carriers.ON_BEARER, Carriers.AT_POINT])
+	every.append_array([Carriers.PULSE_BEARER, Carriers.PULSE_POINT])
 	for id: StringName in every:
 		names.append('&"%s"' % id)
 		names.append(String(Carriers.of(id).get_script().get_global_name()))

@@ -2339,8 +2339,7 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 
 ## The cues the carrier card `form` names and its radius (`FormBase.look_cues`: [cast_cue,
 ## shown_cue, impact_cue, end_cue, radius], CUE_CAST to CUE_RADIUS), the defaults (`cast` and `impact`, radius
-## 0) for an id that is no carrier card; a fallback carrier (`caster`) casts with its own
-## `Carrier.cast_cue`; a modifier that shows itself (`form_shown` `zap`) brings its
+## 0) for an id that is no carrier card; a modifier that shows itself (`form_shown` `zap`) brings its
 ## own `cue` as its shown cue. Read once per card id, then kept: a cast or a hit allocates nothing.
 ## With no registry yet, or no form id, the defaults are answered but not kept.
 func _form_cues_of(form: StringName) -> Array:
@@ -2353,10 +2352,6 @@ func _form_cues_of(form: StringName) -> Array:
 	var cues: Array = NO_FORM_CUES
 	if card is FormBase:
 		cues = (card as FormBase).look_cues()
-	elif card == null and Carriers.is_fallback(form) and Carriers.of(form).cast_cue() != &"":
-		# A cast with no carrier card (its cards landed on the caster): its fallback carrier's own cue.
-		cues = NO_FORM_CUES.duplicate()
-		cues[CUE_CAST] = Carriers.of(form).cast_cue()
 	elif card is ModifierBase and (card as ModifierBase).cue != &"":
 		# A modifier that shows itself (a zap: `form_shown` names its card) plays its own cue there.
 		cues = [NO_FORM_CUES[CUE_CAST], (card as ModifierBase).cue, NO_FORM_CUES[CUE_IMPACT], &"", 0.0, NO_FORM_CUES[CUE_WIND]]

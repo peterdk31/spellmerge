@@ -9,7 +9,7 @@
 script = ExtResource("3_staff")
 id = &"prop_stand_in_fuse"
 display_name = "A barrel's fuse"
-slots = 2
+slots = 3
 draw = 1
 wind_up = 1.0
 cooldown = 0.0
@@ -21,7 +21,7 @@ mana_regen = 0.0
 script = ExtResource("3_staff")
 id = &"prop_stand_in_now"
 display_name = "A barrel's blast"
-slots = 2
+slots = 3
 draw = 1
 wind_up = 0.0
 cooldown = 0.0
@@ -32,12 +32,12 @@ mana_regen = 0.0
 [sub_resource type="Resource" id="Resource_entry_fuse"]
 script = ExtResource("4_entry")
 staff = SubResource("Resource_fuse")
-cards = Array[StringName]([&"fire", &"blast"])
+cards = Array[StringName]([&"fire", &"blast", &"pulse"])
 
 [sub_resource type="Resource" id="Resource_entry_now"]
 script = ExtResource("4_entry")
 staff = SubResource("Resource_now")
-cards = Array[StringName]([&"fire", &"blast"])
+cards = Array[StringName]([&"fire", &"blast", &"pulse"])
 
 [resource]
 script = ExtResource("1_base")

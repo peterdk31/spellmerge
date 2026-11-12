@@ -36,9 +36,9 @@ extends Node
 ## shot that fired it while that shot flies, by the body that fired it (a decoy's, a dashing wizard's
 ## timer, `on hurt` or end, a barrier's block: `body_caster`; owner, 2026-11-06), else by the point
 ## (`_caster`): dash, teleport, pull, swap and recoil move that shot or body, orbit, familiar and
-## return circle it, a beam, swing or slam is held by it. The cards a payload leaves with no carrier
-## land on it too (`CarrierBearer`), or on the point (`CarrierPoint`; docs/CARRIERS.md, "The
-## fallback carriers"); its actor stays the wizard. A trigger fires every
+## return circle it, a beam, swing or slam is held by it. A payload's Pulse is round it too
+## (`CarrierPulseBearer`), or round the point (`CarrierPulsePoint`; docs/CARRIERS.md, "Pulse: a strike
+## round what casts it"); its actor stays the wizard. A trigger fires every
 ## time its event happens, as long as its carrier lives (owner, 2026-10-29: no per-shot count).
 ## One budget's trigger fires make at most `fire_shots_per_step` shots per `step` (pacing, not a
 ## limit): a fire past it waits for the next step, oldest first, and none is dropped
@@ -293,7 +293,8 @@ var _rec_seq: PackedInt64Array = PackedInt64Array()
 var _rec_chain: PackedInt32Array = PackedInt32Array()
 ## The key (`ProjectileManager.key_of`, N5) of the target a chain came from, 0 for none.
 var _rec_prev: PackedInt64Array = PackedInt64Array()
-## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
+## The live carriers with a `timer`, `on hurt` or `on recast` trigger, `_lc_count` of them (rules
+## R4d), and the ends of the Pulses with an `on expire` (`_lc_join_ends`, props W9a): every
 ## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
 ## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a row of its carrier
 ## (`LC_ROW`: a beam's or a swing's tip, `Carrier.tip_of`), an actor's body (a wizard's dash, a decoy) or a point (a familiar's orb,
@@ -762,7 +763,7 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 ## What the builder shows of a staff, as plain values so that nothing outside `core/spells`
 ## reads a compiled staff: `empty`; `cards` (the card ids by slot, `&""` for an empty slot); `casts`, one Dictionary per cast of the cycle with `slots`
 ## (read order), `text`, `mana`, `wind_up` (the seconds it winds up before it leaves), `wind_down` (the seconds its staff is busy after it), `delay` (the wait in all: the wind-down, and the staff's cooldown when the cycle ends with it), `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `ends_cycle`, `wrapped`, `targets` (card slot -> the
-## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
+## carrier's slot) and `wasted` (slot ->
 ## true), and `tree` (the cast as the builder's tree draws it, `cast_tree`); `wasted` for the
 ## staff (cards that did nothing in any cast that read them); and `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
 ## (the radial builder shows what a card would change before it is put in).
@@ -782,11 +783,6 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate(), "staff": staff}
 
 
-## Shown as a tree's row for a fallback: the cards that landed on the caster, on the body or shot
-## that fired a payload, or where a payload began.
-const TREE_ON_CASTER: String = "On you"
-const TREE_ON_BEARER: String = "On what fired it"
-const TREE_AT_POINT: String = "Where it ends"
 
 
 ## The rows of one cast as the builder's tree draws them (docs/milestones/M2-builder-tree.md,
@@ -828,12 +824,6 @@ func _tree_group(group: CompiledGroup, depth: int, trigger: int, trigger_id: Str
 
 
 func _tree_carrier_name(spell: CompiledSpell) -> String:
-	if spell.fallback == CompiledSpell.FALLBACK_CASTER:
-		return TREE_ON_CASTER
-	if spell.fallback == CompiledSpell.FALLBACK_BEARER:
-		return TREE_ON_BEARER
-	if spell.fallback == CompiledSpell.FALLBACK_POINT:
-		return TREE_AT_POINT
 	return spell.form_name if spell.form_name != "" else String(spell.form_id)
 
 
@@ -1166,9 +1156,8 @@ func cast_index(actor: int, staff: int) -> int:
 	return _cursor[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else 0
 
 
-## The carrier (form id) of the last cast this actor's staff made, `&""` before any; for a cast with
-## no carrier card, its fallback carrier's id (`caster`: the cards landed on the caster). The
-## wizard's player sends it with `spell_cast`.
+## The carrier (form id) of the last cast this actor's staff made, `&""` before any. The wizard's
+## player sends it with `spell_cast`.
 func last_form(actor: int, staff: int) -> StringName:
 	return _last_form[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else &""
 
@@ -1272,8 +1261,7 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 			_last_infused[actor] = carrier
 			break
 	var first: CompiledSpell = cast.group.spells[0]
-	# A cast with no carrier card names its fallback carrier (`caster`), so it is still a cast to show.
-	_last_form[index] = first.form_id if first.form_id != &"" else first.carrier
+	_last_form[index] = first.form_id
 	return true
 
 
@@ -1411,8 +1399,8 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	return carrier.launch(spell, tag, actor, origin, direction, source, lifetime, carried, prev)
 
 
-## The carrier that runs `spell` (`Carrier`, by its id, a fallback carrier's too; one that runs
-## nothing for an id no carrier has).
+## The carrier that runs `spell` (`Carrier`, by its id; one that runs nothing for an id no carrier
+## has).
 func _carrier_of(spell: CompiledSpell) -> Carrier:
 	var carrier: Carrier = _carriers.get(spell.carrier)
 	return carrier if carrier != null else _no_carrier
@@ -1657,11 +1645,10 @@ func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) ->
 
 ## The shots of every spell of `group`, fired together from `origin` along `direction` by this
 ## actor's staff in its `generation` (each spell's tag names its node); returns how many were
-## made (a fallback counts as one). The carriers of one group leave along the same aim (only the
+## made (a Pulse counts as one). The carriers of one group leave along the same aim (only the
 ## staff's `spread` sets them apart, shot by shot); a scatter group sends each in a random
 ## direction instead. A burst group fires again `repeats - 1` times, `repeat_interval` seconds
-## apart (at once when that is 0), reading nothing again. A fallback carrier (the cards that landed
-## on the caster, or on a payload's origin) is launched like any other. `source` is the target that
+## apart (at once when that is 0), reading nothing again. `source` is the target that
 ## fired the payload, or null. `from_caster` is true for a launch a body casts (the cast's own group, a body's payload), whose later
 ## firings (burst, echo) start from where the caster has moved to.
 func _launch_group(group: CompiledGroup, actor: int, staff: int, generation: int, origin: Vector2, direction: Vector2, source: Node, from_caster: bool = false) -> int:
@@ -1680,7 +1667,8 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 	var made: int = 0
 	for spell in group.spells:
 		var heading: Vector2 = direction
-		if spell.fallback == CompiledSpell.FALLBACK_NONE and group.scatter:
+		# A Pulse is not aimed: a scatter turns the others.
+		if group.scatter and not Carriers.is_pulse(spell.carrier):
 			heading = DMath.rotated(direction, _scatter_roll() * TAU)
 		made += _fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, false)
 	return made
@@ -2563,6 +2551,16 @@ func _lc_join(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, tie
 			_lc_join_one(t, trigger.interval, tag, kind, ref, seq, tied, life, at, way)
 
 
+## Lists the end of a carrier of `tag` that lasts `life` seconds round `kind` and `ref` (as
+## `_lc_join`), once for each `on expire` trigger it has: when its life is over, the payload fires
+## from where it is then, cast by what it is round, as its live triggers' (a Pulse, props W9a: its
+## own end is its life's). Never tied: a carrier round a shot that ends first ends where the shot was.
+func _lc_join_ends(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, life: float, at: Vector2, way: Vector2) -> void:
+	for t in spell.triggers.size():
+		if spell.triggers[t].event == TriggerBase.Event.EXPIRE:
+			_lc_join_one(t, 0.0, tag, kind, ref, seq, false, life, at, way)
+
+
 ## How many entries `_lc_join` lists for one carrier of `spell`: its triggers of
 ## `TriggerBase.LIVE`.
 static func _lc_rows(spell: CompiledSpell) -> int:
@@ -2668,12 +2666,15 @@ func _step_live(delta: float) -> void:
 		var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 		var at: Vector2 = _lc_where(i)
 		_lc_left[i] -= delta
-		if spell == null or _lc_left[i] <= 0.0 or (_lc_tied[i] == 1 and not at.is_finite()):
-			_lc_remove(i)
-			continue
 		if at.is_finite():
 			_lc_at[i] = at
 		var trigger: CompiledSpell.Trigger = _lc_trigger_of(i, spell)
+		if spell == null or _lc_left[i] <= 0.0 or (_lc_tied[i] == 1 and not at.is_finite()):
+			if spell != null and trigger != null and trigger.event == TriggerBase.Event.EXPIRE:
+				# Its life is over: its `on expire` fires where it is, cast by what it is round.
+				_lc_fire(i, trigger.payload, _lc_at[i])
+			_lc_remove(i)
+			continue
 		if trigger != null and trigger.event == TriggerBase.Event.TIMER:
 			_lc_clock[i] -= delta
 			if _lc_clock[i] <= 0.0:

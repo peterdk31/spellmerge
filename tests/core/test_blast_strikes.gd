@@ -66,6 +66,9 @@ func before_each() -> void:
 	var decoy: FormBase = _form(&"decoy", 0.0, 2.0)
 	decoy.carrier = &"decoy"
 	_form(&"barb", 300.0, 1.0)
+	var pulse: FormBase = _form(&"pulse", 0.0, 0.5)
+	pulse.carrier = Carriers.PULSE
+	pulse.radius = 24.0
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
 	var slam: FormBase = _form(&"slam", 0.0, 0.12)
 	slam.carrier = &"slam"
@@ -167,10 +170,10 @@ func test_a_blast_strikes_as_an_explosion() -> void:
 
 func test_the_cards_that_land_on_a_point_strike_as_an_explosion() -> void:
 	var kinds: Dictionary = _record_kinds()
-	_build([&"blast"])
+	_build([&"blast", &"pulse"])
 	var enemy: Node2D = _target(Vector2(15.0, 0.0))
 	_cast()
-	check_equal(kinds.get(enemy, []), [&"burst"], "a blast on the caster strikes as a burst")
+	check_equal(kinds.get(enemy, []), [&"burst"], "a blast Pulse round the caster strikes as a burst")
 
 
 ## target -> the kinds of the hits it took (`HitProfile.kind`), as they are sent.
@@ -182,13 +185,15 @@ func _record_kinds() -> Dictionary:
 	return kinds
 
 
-func test_a_lone_blast_strikes_its_own_caster() -> void:
-	var tag: int = _build([&"blast"])
+func test_a_blast_pulse_spares_its_own_caster() -> void:
+	# Props W9a (owner, 2026-11-12: "Yes it spares its caster"); the lone blast it replaced hit them.
+	var tag: int = _build([&"blast", &"pulse"])
 	var body: Node2D = _target(Vector2.ZERO, 0)
+	_mgr.actors.set_node(0, body)
 	var enemy: Node2D = _target(Vector2(15.0, 0.0))
 	_cast()
-	check_equal(_hits_on(body, tag), 1, "the caster is inside their own blast (self-harm)")
-	check_equal(_hits_on(enemy, tag), 1, "and so is the enemy next to them")
+	check_equal(_hits_on(body, tag), 0, "the caster is inside their own blast, and spared")
+	check_equal(_hits_on(enemy, tag), 1, "the enemy next to them is struck")
 
 
 func test_on_hit_and_siphon_work_on_a_decoy_through_its_blast() -> void:

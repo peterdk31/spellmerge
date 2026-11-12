@@ -9,20 +9,13 @@ extends RefCounted
 ## for the next carrier, whose payload is the group read right after it (with more triggers, each
 ## takes the next group in turn). Reading wraps past the
 ## last slot, and a card already read in this cast ends the group. Cards left with no carrier
-## land on a fallback carrier (`Carriers.fallback`): the caster (the cast's own group), or for a
-## payload what fired it (a body or a shot, as its carrier and trigger say: `Carrier.payload_cast_by`)
-## or else the point it began at, by the same rules as any carrier. Nothing is refused: a card that
+## after them are wasted: the Pulse card is the carrier round whatever casts it (props W9a; it
+## replaced the fallback carriers this compiler once picked for them), its carrier taken by who may
+## cast the group (`Carriers.placed`, `Carrier.payload_cast_by`). Nothing is refused: a card that
 ## does nothing is listed as wasted (`wasted`); the builder shows it.
 
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
-## `CompiledCast.targets` value for a card that landed on the caster, on a payload's origin, and on
-## the body or shot that fired a payload.
-const TARGET_CASTER: int = -1
-const TARGET_POINT: int = -2
-const TARGET_BEARER: int = -3
-
-
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
 const WHEN: Array[String] = ["on hit", "when it ends", "every %s s", "when its shield blocks", "on a kill", "at once", "on a wall", "when you are hurt", "on a reaction", "when its staff is pressed again"]
 
@@ -108,9 +101,9 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 
 
 ## Reads one group that wants `want` carriers. `payload` is true for a trigger's (or a payload
-## carrier's) group, whose fallback is what fired it or its origin instead of the caster; `by` says
-## who may cast the group (`Carrier.BY_*` bits: the caster's body for the cast's own), for the
-## fallback and for what its carriers' payloads are cast by in turn (`Carrier.payload_cast_by`).
+## carrier's) group, whose Pulse is round what fired it or its origin instead of the caster; `by` says
+## who may cast the group (`Carrier.BY_*` bits: the caster's body for the cast's own), for its Pulse
+## (`Carriers.placed`) and for what its carriers' payloads are cast by in turn (`Carrier.payload_cast_by`).
 func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> CompiledGroup:
 	var outer_payload: bool = _in_payload
 	_in_payload = payload
@@ -148,10 +141,16 @@ func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> Com
 			trigger_slots.append(slot)
 		elif card is FormBase:
 			var form := card as FormBase
-			var on: Carrier = Carriers.of(form.carrier)
+			var on: Carrier = Carriers.placed(form.carrier, payload, by)
 			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, form.wind_up)
 			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
-			var spell: CompiledSpell = _build(form, on, kept_elements, kept_modifiers, CompiledSpell.FALLBACK_NONE)
+			if not keep_wasted:
+				# What works here by its behaviour may still do nothing beside these infusions and
+				# triggers (a hold on a Pulse that strikes nothing: `Carrier.idle_modifiers`).
+				for idle: ModifierBase in on.idle_modifiers(kept_modifiers, kept_elements, triggers):
+					kept_modifiers.erase(idle)
+			var spell: CompiledSpell = _build(form, on, kept_elements, kept_modifiers)
+			spell.strikes = on.strikes(kept_modifiers, kept_elements, triggers)
 			spell.slot = slot
 			_useful[slot] = true
 			_land(spell, kept, kept_modifiers, kept_elements, slot)
@@ -167,30 +166,40 @@ func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> Com
 			trigger_slots = PackedInt32Array()
 			want -= 1
 			found += 1
-	# Triggers with no carrier after them are wasted.
+	# Cards with no carrier after them are wasted: triggers, modifiers and infusions alike (the Pulse
+	# card is the carrier round whatever casts it).
 	for at: int in trigger_slots:
 		_waste(at)
-	# The fallback carrier is one the group drew too: a multicast that kept it reading pulled the
-	# cards that landed there into this cast (`triple · bolt · fire`: the fire lands on you now).
-	var landed: int = 0
-	if not elements.is_empty() or not modifiers.is_empty():
-		var fallback: CompiledSpell = _fallback(elements, modifiers, kept, payload, by)
-		if fallback != null:
-			group.spells.append(fallback)
-			group.wind_up += fallback.wind_up
-			landed = 1
-	_take_multicasts(group, multicasts, maxi(found + landed - asked, 0), found)
+	for at: int in kept:
+		_waste(at)
+	_take_multicasts(group, multicasts, maxi(found - asked, 0))
 	_in_payload = outer_payload
 	return group
 
 
+## True when a firing of `group` does anything: a carrier that strikes, carries a trigger or a card
+## (a bare Pulse does nothing).
+static func _does_anything(group: CompiledGroup) -> bool:
+	for spell in group.spells:
+		if spell.strikes or not spell.triggers.is_empty() or not spell.modifier_ids.is_empty():
+			return true
+	return false
+
+
+## True when `group` has a carrier a scatter turns: one that is aimed (a Pulse is not).
+static func _aims(group: CompiledGroup) -> bool:
+	for spell in group.spells:
+		if not Carriers.is_pulse(spell.carrier):
+			return true
+	return false
+
+
 ## The multicast cards of `group` (`slots`, in slot order) after it was read: `extra` carriers came
-## beyond what the group asked for (its fallback carrier counts), `found` of a form card's. Those
-## carriers go to the cards in slot order, each up to its `extra_draws`. A card works when it got one of them, or for what else it does: a
-## burst repeats a group that fires anything, a scatter turns the carriers it has. Any other is
+## beyond what the group asked for. Those carriers go to the cards in slot order, each up to its `extra_draws`. A card works when it got one of them, or for what else it does: a
+## burst repeats a group that fires anything, a scatter turns the aimed carriers it has. Any other is
 ## wasted (owner, 2026-11-06: one that adds no carrier at all; one that adds fewer than it asks for
 ## still works) and costs nothing. A card that works joins the group: its cost, its mode.
-func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int, found: int) -> void:
+func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int) -> void:
 	for slot: int in slots:
 		var multicast := _cards[slot] as MulticastBase
 		var got: int = mini(multicast.extra_draws, extra)
@@ -198,9 +207,11 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int,
 		var works: bool = got > 0
 		match multicast.mode:
 			MulticastBase.Mode.BURST:
-				works = works or (multicast.repeats > 1 and not group.is_empty())
+				works = works or (multicast.repeats > 1 and _does_anything(group))
 			MulticastBase.Mode.SCATTER:
-				works = works or found > 0
+				works = works or _aims(group)
+		# More of a group that does nothing (bare Pulses) is nothing either.
+		works = works and _does_anything(group)
 		if not works and not keep_wasted:
 			_waste(slot)
 			continue
@@ -225,7 +236,7 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int,
 ## the same way, in slot order, so each takes the next group (owner, 2026-10-31). `by` is who may
 ## cast the payload (`Carrier.payload_cast_by`).
 func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase], by: int) -> void:
-	var never: bool = not keep_wasted and not _trigger_fires(trigger, form, elements, modifiers)
+	var never: bool = not keep_wasted and not _trigger_fires(trigger, Carriers.of(spell.carrier), elements, modifiers)
 	var first: int = _cast.slots.size()
 	var mana: float = _cast.mana
 	var wind_down: float = _cast.wind_down
@@ -255,37 +266,11 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 		spell.triggers.append(fires)
 
 
-## The cards left without a carrier land on a fallback carrier (`Carriers.fallback`): the caster's
-## for the cast's own group; for a payload, what fired it when a body or a shot may have (`by`),
-## else its origin. Which of them do something there is the same rule as on any carrier (its yes/no
-## answers and what each card needs); when none does, nothing lands and every one is wasted.
-func _fallback(elements: Array[ElementBase], modifiers: Array[ModifierBase], kept: PackedInt32Array, payload: bool, by: int) -> CompiledSpell:
-	var on: Carrier = Carriers.fallback(payload, by)
-	var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload)
-	var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
-	if kept_modifiers.is_empty() and kept_elements.is_empty():
-		for at: int in kept:
-			_waste(at)
-		return null
-	var kind: int = CompiledSpell.FALLBACK_CASTER
-	var target: int = TARGET_CASTER
-	if on.id() == Carriers.ON_BEARER:
-		kind = CompiledSpell.FALLBACK_BEARER
-		target = TARGET_BEARER
-	elif on.id() == Carriers.AT_POINT:
-		kind = CompiledSpell.FALLBACK_POINT
-		target = TARGET_POINT
-	var spell: CompiledSpell = _build(null, on, kept_elements, kept_modifiers, kind)
-	spell.strikes = CarrierFallback.uses_strike(kept_modifiers, kept_elements)
-	_land(spell, kept, kept_modifiers, kept_elements, target)
-	return spell
-
-
 ## The modifiers of `modifiers` that do something on the carrier `on`, in order (every one with
 ## `keep_wasted`): a behaviour it runs (`Carrier.works`; homing on a rune, return on a beam do
 ## nothing, and change nothing else either) and numbers it uses (`_numbers_count`). The one rule for
-## a form's carrier and a fallback alike. `payload`: the carrier is a payload's, which adds no
-## wind-down to a staff. `wind_up`: its form card's wind-up (0 for a fallback carrier); with a
+## every carrier. `payload`: the carrier is a payload's, which adds no
+## wind-down to a staff. `wind_up`: its form card's wind-up; with a
 ## charge kept on it the carrier winds up too, so a shorter wind-up counts there.
 static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool, wind_up: float = 0.0) -> Array[ModifierBase]:
 	var deflects: bool = false
@@ -320,10 +305,8 @@ static func _elements_on(on: Carrier, elements: Array[ElementBase], modifiers: A
 	return out
 
 
-## Each card of `kept` (slots, in order) on `spell`: attached to `target` (its carrier's slot, or
-## TARGET_CASTER / TARGET_BEARER / TARGET_POINT) when it is in `modifiers` or `elements`, the cards
-## that work there,
-## else wasted.
+## Each card of `kept` (slots, in order) on `spell`: attached to `target` (its carrier's slot) when
+## it is in `modifiers` or `elements`, the cards that work there, else wasted.
 func _land(spell: CompiledSpell, kept: PackedInt32Array, modifiers: Array[ModifierBase], elements: Array[ElementBase], target: int) -> void:
 	for at: int in kept:
 		var card: SpellComponent = _cards[at]
@@ -334,13 +317,13 @@ func _land(spell: CompiledSpell, kept: PackedInt32Array, modifiers: Array[Modifi
 			spell.card_slots.append(at)
 
 
-## True when `trigger` can fire on `form` with these infusions and kept modifiers: all the trigger
-## needs (`TriggerBase.NEEDS`, `Carrier.fires_with`), the one rule for the compiler and `card_works`.
-func _trigger_fires(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> bool:
+## True when `trigger` can fire on the carrier `on` with these infusions and kept modifiers: all the
+## trigger needs (`TriggerBase.NEEDS`, `Carrier.fires_with`), the one rule for the compiler and `card_works`.
+func _trigger_fires(trigger: TriggerBase, on: Carrier, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> bool:
 	var has: Dictionary = {}
 	for modifier in modifiers:
 		has[modifier.behaviour] = true
-	return Carriers.of(form.carrier).fires_with(trigger.event, has, not elements.is_empty())
+	return on.fires_with(trigger.event, has, not elements.is_empty())
 
 
 ## True when `card` does something on the carrier `carrier` when it is the only other card there:
@@ -350,7 +333,8 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 	var on: Carrier = Carriers.of(carrier)
 	if card is ModifierBase:
 		var modifier := card as ModifierBase
-		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false, false, false)
+		var alone: Array[ModifierBase] = [modifier]
+		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false, false, false) and on.idle_modifiers(alone, [], []).is_empty()
 	if card is ElementBase:
 		return on.takes_element(card as ElementBase, false)
 	if card is TriggerBase:
@@ -361,7 +345,7 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 ## True when one of a modifier's numbers counts on the carrier `on` (or it has a behaviour). Its
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
 ## uses that number: a shorter wind-down where it adds one to its staff (`Carrier.has_wind_down`:
-## not a fallback carrier, and not a payload's carrier, `payload`), a shorter wind-up where the
+## not a payload's carrier, `payload`), a shorter wind-up where the
 ## carrier winds up (`winds_up`), damage where it hits (or blasts), speed where it travels and lifetime where it moves or lasts,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
 ## behaviour (`Carrier.works`), its numbers ride with it.
@@ -420,21 +404,19 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 	return not any
 
 
-## A compiled spell of the carrier `on` from its form card (none for a fallback carrier, whose
-## numbers are SpellLimits.FALLBACK_*) and the cards that attach to it.
-func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers: Array[ModifierBase], fallback: int) -> CompiledSpell:
+## A compiled spell of the carrier `on` from its form card and the cards that attach to it.
+func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> CompiledSpell:
 	var spell := CompiledSpell.new()
 	spell.node = _out.nodes.size()
 	_out.nodes.append(spell)
-	spell.fallback = fallback
 	spell.behaviours.resize(ModifierBase.Behaviour.size())
-	var damage: float = SpellLimits.FALLBACK_DAMAGE
-	var mana: float = 0.0
-	var wind_down: float = 0.0
-	var speed: float = 0.0
-	var radius: float = SpellLimits.FALLBACK_RADIUS
-	var shots: int = 1
-	var pierce: int = 0
+	var damage: float = form.base_damage
+	var mana: float = form.mana_cost
+	var wind_down: float = form.wind_down
+	var speed: float = form.speed
+	var radius: float = form.radius
+	var shots: int = form.shots
+	var pierce: int = form.pierce
 	var homing_reach: float = 0.0
 	var heals: bool = false
 	var later_ids: Array[StringName] = []
@@ -442,31 +424,20 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	var wind_up_mult: float = 1.0
 	var later_durations: PackedFloat32Array = PackedFloat32Array()
 	var later_strengths: PackedFloat32Array = PackedFloat32Array()
-	spell.lifetime = SpellLimits.MIN_LIFETIME
 	var carrier: Carrier = on
 	spell.carrier = on.id()
-	# A fallback carrier's own animation; a form card's carrier takes its card's below.
-	spell.staff_pose = on.staff_pose()
-	if form != null:
-		spell.form_id = form.id
-		spell.form_name = _name(form)
-		spell.lifetime = form.lifetime
-		spell.ray_length = form.ray_length
-		spell.arc = form.arc
-		spell.wind_up = maxf(form.wind_up, 0.0)
-		spell.pose_wind_up = spell.wind_up
-		spell.staff_pose = form.packed_pose()
-		spell.spread = form.spread
-		spell.look_shader = form.look_shader
-		spell.look_light_intensity = form.look_light_intensity
-		spell.look_light_reach = form.look_light_reach
-		damage = form.base_damage
-		mana = form.mana_cost
-		wind_down = form.wind_down
-		speed = form.speed
-		radius = form.radius
-		shots = form.shots
-		pierce = form.pierce
+	spell.form_id = form.id
+	spell.form_name = _name(form)
+	spell.lifetime = form.lifetime
+	spell.ray_length = form.ray_length
+	spell.arc = form.arc
+	spell.wind_up = maxf(form.wind_up, 0.0)
+	spell.pose_wind_up = spell.wind_up
+	spell.staff_pose = form.packed_pose()
+	spell.spread = form.spread
+	spell.look_shader = form.look_shader
+	spell.look_light_intensity = form.look_light_intensity
+	spell.look_light_reach = form.look_light_reach
 	for element in elements:
 		if spell.element_ids.is_empty():
 			spell.element_id = element.id
@@ -545,7 +516,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		spell.spread = SpellLimits.SPLIT_SPREAD
 	spell.hit = HitProfile.new()
 	spell.hit.damage = spell.damage
-	spell.hit.knockback = form.knockback if form != null and form.knockback > 0.0 else SpellLimits.KNOCKBACK
+	spell.hit.knockback = form.knockback if form.knockback > 0.0 else SpellLimits.KNOCKBACK
 	spell.hit.element_id = spell.element_id
 	spell.hit.element_ids = spell.element_ids
 	spell.hit.status_id = spell.status_id
@@ -698,20 +669,11 @@ func _spell_text(spell: CompiledSpell) -> String:
 	var names: PackedStringArray = PackedStringArray()
 	for id in spell.element_ids:
 		names.append(_name(_lookup.call(id) as SpellComponent))
-	var text: String
-	match spell.fallback:
-		CompiledSpell.FALLBACK_CASTER:
-			text = "on you: %s" % ", ".join(names + _modifier_names(spell))
-		CompiledSpell.FALLBACK_POINT:
-			text = "right there: %s" % ", ".join(names + _modifier_names(spell))
-		CompiledSpell.FALLBACK_BEARER:
-			text = "on what fired it: %s" % ", ".join(names + _modifier_names(spell))
-		_:
-			names.append(spell.form_name)
-			text = " ".join(names)
-			var modifiers: PackedStringArray = _modifier_names(spell)
-			if not modifiers.is_empty():
-				text += " (%s)" % ", ".join(modifiers)
+	names.append(spell.form_name)
+	var text: String = " ".join(names)
+	var modifiers: PackedStringArray = _modifier_names(spell)
+	if not modifiers.is_empty():
+		text += " (%s)" % ", ".join(modifiers)
 	for trigger in spell.triggers:
 		var when: String = WHEN[trigger.event] if trigger.event < WHEN.size() else "then"
 		if trigger.event == TriggerBase.Event.TIMER:

@@ -179,10 +179,10 @@ func test_a_decoy_placed_again_starts_with_its_own_barrier_only() -> void:
 
 func test_a_timer_on_a_decoy_shields_the_decoy() -> void:
 	# The wider rule (owner, 2026-11-06): a payload's left-over cards land on the body that fired it.
-	var made: Array = _world([&"timer", &"decoy", &"shield"], Vector2(400.0, 300.0))
+	var made: Array = _world([&"timer", &"decoy", &"shield", &"pulse"], Vector2(400.0, 300.0))
 	var world: World = made[0]
 	var wizard: Actor = made[1]
-	var compiled: CompiledStaff = world.spells.compile_staff([&"timer", &"decoy", &"shield"] as Array[StringName], _plain(3))
+	var compiled: CompiledStaff = world.spells.compile_staff([&"timer", &"decoy", &"shield", &"pulse"] as Array[StringName], _plain(4))
 	check(not compiled.wasted.has(2), "the shield is not wasted: it lands on the decoy")
 	world.run(0.125, 0.125)
 	check_equal(_decoy_barrier(world, wizard), 0, "no barrier before the first tick")
@@ -195,7 +195,7 @@ func test_a_timer_on_a_decoy_shields_the_decoy() -> void:
 func test_a_decoys_payload_waiting_for_its_turn_still_lands_on_the_decoy() -> void:
 	# The body is carried through a delayed fire (`PendingLaunch.caster`), as a shot caster is:
 	# an echo of the landing, and a fire past the step's budget, which waits for the next step.
-	var made: Array = _world([&"timer", &"mirror", &"decoy", &"echo", &"shield"], Vector2(400.0, 300.0))
+	var made: Array = _world([&"timer", &"mirror", &"decoy", &"echo", &"shield", &"pulse"], Vector2(400.0, 300.0))
 	var world: World = made[0]
 	var wizard: Actor = made[1]
 	world.spells.fire_shots_per_step = 0
@@ -215,7 +215,7 @@ func test_a_decoys_payload_waiting_for_its_turn_still_lands_on_the_decoy() -> vo
 func test_an_on_hurt_payload_that_hurts_its_decoy_does_not_fire_itself_again() -> void:
 	# Regression: the strike of what lands on a decoy hurt it, which fired its `on hurt` again inside
 	# itself, for ever (a stack overflow).
-	var made: Array = _world([&"on_hurt", &"decoy", &"fire"], Vector2(400.0, 300.0))
+	var made: Array = _world([&"on_hurt", &"decoy", &"fire", &"pulse"], Vector2(400.0, 300.0))
 	var world: World = made[0]
 	var wizard: Actor = made[1]
 	world.run(0.25, 0.25)
@@ -480,7 +480,7 @@ func _plain(slots: int) -> StaffBase:
 
 func test_on_hurt_on_a_decoy_turns_the_shots_round_it() -> void:
 	# The wider rule (owner, 2026-11-06): the deflect left in the payload lands on the decoy's body.
-	var made: Array = _world([&"on_hurt", &"decoy", &"deflect"], Vector2(400.0, 300.0))
+	var made: Array = _world([&"on_hurt", &"decoy", &"deflect", &"pulse"], Vector2(400.0, 300.0))
 	var world: World = made[0]
 	var wizard: Actor = made[1]
 	world.add_enemy(&"S", Vector2(140.0, 0.0), World.HEALTH, [&"bolt"], Vector2.LEFT, true)
@@ -713,9 +713,9 @@ func test_its_moments_have_their_cues() -> void:
 
 ## Cards that only guard strike nothing (owner, 2026-11-06): a decoy whose timer gives it a barrier
 ## every tick keeps its health for its whole life, and a wizard's lone Shield or Deflect costs it
-## none; a lone infusion still strikes its caster (self-harm is on).
+## none, nor does a Fire Pulse (a Pulse spares what casts it, props W9a).
 func test_guard_cards_landing_on_a_body_cost_it_no_health() -> void:
-	var made: Array = _world([&"timer", &"decoy", &"shield"], Vector2(4000.0, 3000.0))
+	var made: Array = _world([&"timer", &"decoy", &"shield", &"pulse"], Vector2(4000.0, 3000.0))
 	var world: World = made[0]
 	var wizard: Actor = made[1]
 	world.run(2.5, 2.5)
@@ -724,13 +724,10 @@ func test_guard_cards_landing_on_a_body_cost_it_no_health() -> void:
 	if decoy != null and decoy.is_inside_tree():
 		check_equal(decoy.health.health, decoy.health.max_health, "at full health")
 	world.free_all()
-	for cards: Array[StringName] in [[&"shield"] as Array[StringName], [&"deflect"] as Array[StringName], [&"fire"] as Array[StringName]]:
+	for cards: Array[StringName] in [[&"shield", &"pulse"] as Array[StringName], [&"deflect", &"pulse"] as Array[StringName], [&"fire", &"pulse"] as Array[StringName]]:
 		var alone: Array = _world(cards, Vector2(4000.0, 3000.0))
 		var w: World = alone[0]
 		var caster: Actor = alone[1]
 		w.run(0.5, 0.5)
-		if cards[0] == &"fire":
-			check(caster.health.health < caster.health.max_health, "a lone infusion still strikes its caster")
-		else:
-			check_equal(caster.health.health, caster.health.max_health, "a lone %s costs its caster no health" % cards[0])
+		check_equal(caster.health.health, caster.health.max_health, "a %s Pulse costs its caster no health" % cards[0])
 		w.free_all()

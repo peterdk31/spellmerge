@@ -33,7 +33,7 @@ const SECONDS: float = 2.0
 const MEAN_LIMIT_MS: float = 5.0
 const STEP_LIMIT_MS: float = 100.0
 ## Staffs the run must include per feature, so the rare shapes are really reached.
-const MIN_COVERAGE: Dictionary = {"payload": 20, "multicast": 10, "fallback": 10, "wrapped": 20, "wasted": 20}
+const MIN_COVERAGE: Dictionary = {"payload": 20, "multicast": 10, "pulse": 10, "wrapped": 20, "wasted": 20}
 ## The costliest staffs named on the FUZZ line.
 const COSTLIEST: int = 3
 ## Staffs named on each REPORT line of the emergent combo report.
@@ -72,7 +72,7 @@ func _populate(arena: ArenaScript) -> void:
 
 ## Which features a compiled staff has (0 or 1 each), under the keys of MIN_COVERAGE.
 func _coverage(staff: CompiledStaff) -> Dictionary:
-	var out: Dictionary = {"payload": 0, "multicast": 0, "fallback": 0, "wrapped": 0, "wasted": 0 if staff.wasted.is_empty() else 1}
+	var out: Dictionary = {"payload": 0, "multicast": 0, "pulse": 0, "wrapped": 0, "wasted": 0 if staff.wasted.is_empty() else 1}
 	for cast in staff.casts:
 		out["wrapped"] = maxi(int(out["wrapped"]), 1 if cast.wrapped else 0)
 		if cast.group.spells.size() > 1:
@@ -80,8 +80,8 @@ func _coverage(staff: CompiledStaff) -> Dictionary:
 	for spell in staff.nodes:
 		if spell.payload != null:
 			out["payload"] = 1
-		if spell.fallback != CompiledSpell.FALLBACK_NONE:
-			out["fallback"] = 1
+		if Carriers.is_pulse(spell.carrier):
+			out["pulse"] = 1
 	return out
 
 

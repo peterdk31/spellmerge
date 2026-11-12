@@ -421,3 +421,23 @@ func test_a_body_it_hits_shadows_the_ones_behind_it_unless_it_pierces() -> void:
 		else:
 			check_equal(arena.lost(behind), 0, "%s: the one behind is in its shadow" % [cards])
 		arena.free_all()
+
+
+func test_its_guard_follows_its_segments() -> void:
+	# Owner, 2026-11-12: "They should follow the segments too": a shot behind a wall is not stopped.
+	for walled: bool in [false, true]:
+		var arena := ArenaScript.new(root)
+		arena.add_guard(0, Vector2.ZERO)
+		if walled:
+			# Between the wizard and the shot's path, all along it.
+			arena.add_wall(Rect2(-60.0, 12.0, 120.0, 4.0))
+		arena.install_cards(0, 0, ["shield", "pulse"])
+		arena.cast(0, 0)
+		# A shot crossing below the wizard, through the ring, never coming at them.
+		arena.shoot_at(Vector2(-60.0, 25.0), Vector2(60.0, 25.0))
+		arena.run(0.5)
+		if walled:
+			check(arena.blocks.is_empty(), "behind a wall its ring does not stop it: %s" % [arena.blocks])
+		else:
+			check(not arena.blocks.is_empty(), "in the open its ring stops it: %s" % [arena.blocks])
+		arena.free_all()

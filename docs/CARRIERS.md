@@ -111,10 +111,11 @@ runs it, and the looks read the `pulse_*` getters.
   (unless pierce is on, obviously)": with Pierce it passes that many bodies, `PIERCE`). Bodies are
   judged nearest first, so a wall or a body shadows what is behind it and the rest of the ring
   goes on. Feel draws it as motes along its edge where it is now, only where its segment still
-  reaches (`pulse_stop_toward`, `gameplay/feel/pulse_rings.gd`). Its guard of shots (below) is
-  the whole ring's.
-- **Shots:** while it is out, a deflect on it turns the shots of other teams inside it outward, a
-  shield stops them while its charges last (as a slam's ring). A shot that comes in faster than
+  reaches (`pulse_stop_toward`, `gameplay/feel/pulse_rings.gd`). Its guard of shots (below)
+  follows them too ("They should follow the segments too"): a shot behind a wall or a struck body
+  is not turned or stopped.
+- **Shots:** while it is out, a deflect on it turns the shots of other teams inside it that its
+  segments reach outward, a shield stops them while its charges last (as a slam's ring). A shot that comes in faster than
   the ring grows reaches its caster first: a guarding Pulse is cast ahead.
 - **Return** grows it for half its life, then shrinks it back to its centre at the speed it had
   then, striking again on the way in, as a returning shot flies home.

@@ -183,8 +183,9 @@ func _pulse_step(at: int, delta: float) -> void:
 		_end_pulse(at, true)
 
 
-## The shots of other teams inside ring `at`: deflected outward from its centre (`deflect`), else
-## stopped while its shield has charges.
+## The shots of other teams inside ring `at` that its segments reach (owner, 2026-11-12: "They
+## should follow the segments too"): deflected outward from its centre (`deflect`), else stopped
+## while its shield has charges.
 func _pulse_guard(at: int) -> void:
 	var spell: CompiledSpell = _pu_spell[at]
 	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
@@ -192,7 +193,18 @@ func _pulse_guard(at: int) -> void:
 		return
 	var centre: Vector2 = _pu_centre[at]
 	var found: int = kit.projectiles.shots_in_wedge(_pu_actor[at], centre, _pu_dir[at], 1, -PI, PI, _pu_radius[at])
-	_pu_shield[at] = kit.guard(found, _pu_actor[at], _pu_tag[at], deflects, _pu_shield[at], centre, Vector2.INF, id())
+	# Only the shots its segments reach (not behind a wall or a body it struck): kept at the front
+	# of the query's own result list (`guard_slots`), which the guard reads that many of.
+	var kept: int = 0
+	var base: int = at * SpellLimits.PULSE_SEGMENTS
+	for i in found:
+		var slot: int = kit.projectiles.guard_slots[i]
+		var to: Vector2 = kit.projectiles.get_position_of(slot) - centre
+		var near: float = maxf(to.length() - kit.projectiles.get_radius_of(slot), 0.0)
+		if _pu_stop[base + _segment_of(to)] >= near:
+			kit.projectiles.guard_slots[kept] = slot
+			kept += 1
+	_pu_shield[at] = kit.guard(kept, _pu_actor[at], _pu_tag[at], deflects, _pu_shield[at], centre, Vector2.INF, id())
 
 
 ## Ring `at`'s edge (its radius and half its width): it strikes each body it reaches that it has

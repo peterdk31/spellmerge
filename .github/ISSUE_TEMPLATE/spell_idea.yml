@@ -1,5 +1,5 @@
 name: Spell idea
-description: Suggest a spell component (form, element, modifier or trigger) or a combo.
+description: Suggest a spell card (carrier, infusion, modifier, trigger or multicast) or a combo.
 labels: ["idea"]
 body:
   - type: dropdown
@@ -7,11 +7,12 @@ body:
     attributes:
       label: Kind
       options:
-        - Form (bolt, beam, nova, rune, orbit, ...)
-        - Element (fire, frost, storm, void, ...)
-        - Modifier (split, pierce, homing, chain, bigger, faster, ...)
+        - Carrier (bolt, beam, rune, dash, ...)
+        - Infusion (fire, frost, storm, void, ...)
+        - Modifier (split, pierce, homing, chain, nova, orbit, ...)
         - Trigger (on hit, on expire, timer, ...)
-        - A combo of existing components
+        - Multicast (double, scatter, burst, ...)
+        - A combo of existing cards
     validations:
       required: true
   - type: input
@@ -31,6 +32,6 @@ body:
     id: interactions
     attributes:
       label: Interesting interactions
-      description: Every new component needs at least 2 interesting interactions with others, e.g. "frost + storm = shatter".
+      description: Every new card needs at least 2 interesting interactions with others, e.g. "frost + storm = shatter".
     validations:
       required: true

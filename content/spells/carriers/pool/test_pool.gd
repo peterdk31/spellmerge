@@ -8,13 +8,13 @@ extends "res://tests/support/suite.gd"
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 
-func _card() -> FormBase:
-	return load("res://content/spells/carriers/pool/pool.tres") as FormBase
+func _card() -> CarrierCard:
+	return load("res://content/spells/carriers/pool/pool.tres") as CarrierCard
 
 
 func test_the_card_is_a_valid_carrier() -> void:
-	var card: FormBase = _card()
-	check(card != null, "pool.tres loads as a FormBase")
+	var card: CarrierCard = _card()
+	check(card != null, "pool.tres loads as a CarrierCard")
 	if card == null:
 		return
 	check_equal(card.id, &"pool", "its id is its folder")
@@ -49,7 +49,7 @@ func test_it_strikes_what_stands_in_it_every_tick() -> void:
 
 
 func test_it_ends_with_its_life() -> void:
-	var card: FormBase = _card()
+	var card: CarrierCard = _card()
 	var whole: Array[int] = _losses(card.lifetime + 1.0)
 	var longer: Array[int] = _losses(card.lifetime + 3.0)
 	check_equal(longer[0], whole[0], "nothing more once its %s s are over" % card.lifetime)

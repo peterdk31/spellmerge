@@ -1,6 +1,6 @@
 class_name Carrier
 extends RefCounted
-## A carrier: what a form card fires (`FormBase.carrier`), and the one place that says what it does
+## A carrier: what a form card fires (`CarrierCard.carrier`), and the one place that says what it does
 ## with every other card (docs/CARRIERS.md). Each carrier is one subclass in this folder, found by
 ## its id (`Carriers.of(&"beam")`); the compiler asks it, the spell runtime runs it.
 ##

@@ -59,14 +59,14 @@ func before_each() -> void:
 	_combat.actors = _actors
 	_combat._ready()
 	_enemies.clear()
-	var bolt := FormBase.new()
+	var bolt := CarrierCard.new()
 	bolt.base_damage = 5
 	bolt.speed = 200.0
 	bolt.lifetime = 1.0
 	bolt.radius = 4.0
 	bolt.mana_cost = 2.0
 	_put(bolt, &"bolt")
-	var halo := FormBase.new()
+	var halo := CarrierCard.new()
 	halo.base_damage = 3
 	halo.speed = 150.0
 	halo.lifetime = 0.5

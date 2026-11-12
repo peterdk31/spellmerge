@@ -71,19 +71,19 @@ func before_each() -> void:
 	_bus.mana_reserved.connect(func(player: int, at: int, amount: float) -> void: _reserved.append([player, amount, at]))
 	_form(&"bolt", 300.0, 1.0)
 	_form(&"slow", 30.0, 5.0)
-	var rune: FormBase = _form(&"rune", 0.0, 3.0)
+	var rune: CarrierCard = _form(&"rune", 0.0, 3.0)
 	rune.carrier = &"rune"
 	# Many shots at once, each with its own timer: one cast fills a budget's room for a step.
-	var spray: FormBase = _form(&"spray", 30.0, 5.0)
+	var spray: CarrierCard = _form(&"spray", 30.0, 5.0)
 	spray.shots = SpellLimits.FIRE_SHOTS_PER_STEP
 	spray.spread = 360.0
-	var beam: FormBase = _form(&"beam", 0.0, 5.0)
+	var beam: CarrierCard = _form(&"beam", 0.0, 5.0)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
-	var dash: FormBase = _form(&"dash", 400.0, 0.2)
+	var dash: CarrierCard = _form(&"dash", 400.0, 0.2)
 	dash.carrier = &"dash"
 	dash.ray_length = 80.0
-	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
+	var decoy: CarrierCard = _form(&"decoy", 0.0, 4.0)
 	decoy.carrier = &"decoy"
 	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
 	_modifier(&"echo", ModifierBase.Behaviour.ECHO, 1.0)
@@ -107,8 +107,8 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = 5
 	form.speed = speed
 	form.lifetime = lifetime

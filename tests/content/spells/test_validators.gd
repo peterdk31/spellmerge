@@ -182,7 +182,7 @@ func test_the_broken_reaction_table_fails() -> void:
 
 
 func test_a_form_needs_what_its_carrier_uses() -> void:
-	var form := _fine(FormBase.new()) as FormBase
+	var form := _fine(CarrierCard.new()) as CarrierCard
 	form.carrier = &"atom"
 	form.speed = 100.0
 	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a straight form with speed is fine")
@@ -195,7 +195,7 @@ func test_a_form_needs_what_its_carrier_uses() -> void:
 
 
 func test_a_form_that_names_no_carrier_is_refused() -> void:
-	var form := _fine(FormBase.new()) as FormBase
+	var form := _fine(CarrierCard.new()) as CarrierCard
 	form.carrier = &"fissure"
 	check(_has_rule(SpellValidator.check_component(form, _listed()), "unknown-carrier"), "a name no carrier has")
 	# The carrier that runs nothing has the id &"", so an empty name once passed as its own.
@@ -205,7 +205,7 @@ func test_a_form_that_names_no_carrier_is_refused() -> void:
 
 
 func test_a_staff_pose_must_be_known_keys_in_order_and_in_range() -> void:
-	var form := _fine(FormBase.new()) as FormBase
+	var form := _fine(CarrierCard.new()) as CarrierCard
 	form.carrier = &"rune"
 	form.staff_pose = [{"phase": "wind", "at": 1.0, "lift": 10, "push": -5, "ease": "out", "mood": "angry"}, {"phase": "after", "at": 0.1}] as Array[Dictionary]
 	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "two keys in order are fine")

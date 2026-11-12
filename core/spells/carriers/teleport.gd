@@ -39,7 +39,7 @@ func _aim_move(spell: CompiledSpell, _tag: int, actor: int, origin: Vector2, fro
 	# Where it leaves shows now, as it is aimed (a teleport is over at once); where it lands shows at
 	# its end point (`carrier_ended`, `CasterMoves.end`).
 	if kit.events != null:
-		kit.events.form_shown.emit(actor, spell.form_id, origin, way, distance, spell.tint, spell.look)
+		kit.events.form_shown.emit(actor, spell.carrier_card_id, origin, way, distance, spell.tint, spell.look)
 	return Vector3(way.x, way.y, distance)
 
 

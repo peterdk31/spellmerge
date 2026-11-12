@@ -14,10 +14,10 @@ const FROZEN: bool = true
 ## from one run into the next (online-ready N3b).
 const DERIVED: Array[StringName] = [&"_plain_hit"]
 
-var form_id: StringName = &""
+var carrier_card_id: StringName = &""
 var element_id: StringName = &""
 ## Display names taken while compiling, so a description needs no second look-up.
-var form_name: String = ""
+var carrier_card_name: String = ""
 var element_name: String = ""
 var modifier_ids: Array[StringName] = []
 ## The id of its first trigger, `&""` for none (for its name; the runtime reads `triggers`).
@@ -28,7 +28,7 @@ var trigger_id: StringName:
 ## Damage of one hit; may be below 1 (health is decimal: an atom's speck takes 0.3).
 var damage: float = 1.0
 var mana_cost: float = 0.0
-## Seconds its staff is busy after it leaves (`FormBase.wind_down` times the modifiers').
+## Seconds its staff is busy after it leaves (`CarrierCard.wind_down` times the modifiers').
 var wind_down: float = 0.5
 var speed: float = 0.0
 var lifetime: float = 1.0
@@ -40,7 +40,7 @@ var radius_scale: float = 1.0
 var shots: int = 1
 ## Degrees the shots fan over.
 var spread: float = 0.0
-## The id of its carrier (`FormBase.carrier`, as `Carriers.placed` takes it: a Pulse in a payload is
+## The id of its carrier (`CarrierCard.carrier`, as `Carriers.placed` takes it: a Pulse in a payload is
 ## `Carriers.PULSE_BEARER` or `PULSE_POINT`, which no card names).
 ## Setting it reads the carrier's `traits` and `look_drawer` once.
 var carrier: StringName = &"":
@@ -58,7 +58,7 @@ var pierce: int = 0
 ## Orbit cards' `behaviour_reach`; 0 without one.
 var orbit_radius: float = 0.0
 var ray_length: float = 0.0
-## SWING: degrees its sweep hits over (`FormBase.arc`). `wind_up`: the seconds its cast winds up
+## SWING: degrees its sweep hits over (`CarrierCard.arc`). `wind_up`: the seconds its cast winds up
 ## before it leaves, its form card's plus its modifiers' `wind_up_add`, times their `wind_up_mult`
 ## (docs/milestones/cast-timing.md).
 var arc: float = 0.0
@@ -67,7 +67,7 @@ var wind_up: float = 0.0
 ## `wind_up_mult`, with no `wind_up_add` (a charge's 2 s). A longer wind-up is spent before the
 ## animation's blow, which keeps this pace (`StaffPoses.start`).
 var pose_wind_up: float = 0.0
-## The carrier's staff animation (`FormBase.packed_pose`, shared, never written).
+## The carrier's staff animation (`CarrierCard.packed_pose`, shared, never written).
 var staff_pose: PackedFloat32Array = PackedFloat32Array()
 ## The shots the cards asked for (the same as `shots`; kept for the description).
 var shots_requested: int = 1
@@ -80,12 +80,12 @@ var tint: Color = Color.WHITE
 ## The shot's look, packed by `core/projectiles`' `pack_look`: the `look_layer` of every
 ## infusion and modifier on it, combined (0 none).
 var look: int = 0
-## The shader its carrier's look is drawn by (`FormBase.look_shader`; null for the plain one of
+## The shader its carrier's look is drawn by (`CarrierCard.look_shader`; null for the plain one of
 ## whatever draws it): for shots, a body the projectile manager numbers (`register_body`, by
 ## `look_drawer`'s mesh); its card's id goes with every shot (`Projectiles.set_looks`), for its looks.
 var look_shader: Shader = null
 ## How bright and how far its carrier lights the room, times the light's own
-## (`FormBase.look_light_intensity`, `look_light_reach`; 1 for a plain one).
+## (`CarrierCard.look_light_intensity`, `look_light_reach`; 1 for a plain one).
 var look_light_intensity: float = 1.0
 var look_light_reach: float = 1.0
 

@@ -42,7 +42,7 @@ These fill in what the plan leaves open (also recorded in `docs/DECISIONS.md`).
 
 ### Components are data on four small base classes
 
-- `core/base/` gets `SpellComponent` (`id`, `demo`, `display_name`, `complexity`, `icon`) and four subclasses: `FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase`. A component is a `.tres` on one of them, in its own folder under `content/spells/carriers/`, `elements/`, `modifiers/` or `triggers/`. It needs a `.gd` only for behaviour the base class can't express with its fields. Of the starting 18, at most the five forms and three of the modifiers should need one.
+- `core/base/` gets `SpellComponent` (`id`, `demo`, `display_name`, `complexity`, `icon`) and four subclasses: `CarrierCard`, `ElementBase`, `ModifierBase`, `TriggerBase`. A component is a `.tres` on one of them, in its own folder under `content/spells/carriers/`, `elements/`, `modifiers/` or `triggers/`. It needs a `.gd` only for behaviour the base class can't express with its fields. Of the starting 18, at most the five forms and three of the modifiers should need one.
 - **Ids are unique across all four kinds,** because the registry keys everything under `spells` by id. The validator checks it.
 - **Form** (bolt, beam, nova, rune, orbit): how shots leave the caster. Fields: `base_damage`, `mana_cost`, `cooldown`, `speed`, `lifetime`, `radius`, `shots`, `spread`, `motion` (straight, still, orbit), `pierce`. Beam is a ray, not a moving shot (see `core/projectiles` below).
 - **Element** (fire, frost, storm, void): what a hit does besides damage. Fields: `status_id`, `status_duration`, `status_strength`, `damage_scale`, `tint` (a palette colour from docs/STYLE.md). The reactions an element takes part in live in the reaction table, not on the element.
@@ -161,7 +161,7 @@ Every combo in the catalogue below fits under 12 with these numbers. Its largest
 
 ### The fire bolt migrates
 
-- `content/spells/carriers/bolt/` becomes a `FormBase` `.tres`, and `content/spells/elements/fire/` holds fire. A player's starting spell A is bolt + fire, which plays like M1's Fire Bolt plus burn. Spell B starts as a bolt with no element.
+- `content/spells/carriers/bolt/` becomes a `CarrierCard` `.tres`, and `content/spells/elements/fire/` holds fire. A player's starting spell A is bolt + fire, which plays like M1's Fire Bolt plus burn. Spell B starts as a bolt with no element.
 - `gameplay/flow` stops holding a `SpellBase`. `spell_id_to_play` becomes `start_recipe_a` and `start_recipe_b` (component ids). `_spawn_players` and `_add_wizard` hand the recipes to `player`, which compiles them through `Spells`. `docs/ARCHITECTURE.md`'s "where each change goes" table is updated to match.
 - `SpellBase` and its tests are removed in part 11, once nothing uses them. The spells README's example moves to the new bolt.
 
@@ -215,7 +215,7 @@ Each part ends with tests and a green `tools/check.sh` and `ci/build/build.sh --
 
 | # | Part | Delivers |
 | --- | --- | --- |
-| 1 | **Component base classes:** `core/base` | `SpellComponent`, `FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase`, `ReactionTable`, with documented fields and ranges; tests. `SpellBase` stays until part 11 |
+| 1 | **Component base classes:** `core/base` | `SpellComponent`, `CarrierCard`, `ElementBase`, `ModifierBase`, `TriggerBase`, `ReactionTable`, with documented fields and ranges; tests. `SpellBase` stays until part 11 |
 | 2 | **Events for M2:** `core/events` | `projectile_expired`, `reaction_triggered`, `spell_changed`, `build_refused`, `spell_swap_requested`; `build_change_requested` gets the `spell` path; the events table and area READMEs fixed to match; the `swap` input action |
 | 3 | **Projectile manager, part 1:** `core/projectiles` | `projectile_expired` (end of life and walls), the target queries `nearest_target` and `targets_in`, the `still` motion; tests; the timing test still within budget |
 | 4 | **Projectile manager, part 2:** `core/projectiles` | `orbit` with per-player anchors, homing on the grid every 4th step, `ray()` for the beam; the timing test extended with homing, orbit and rays; the hit-work budget still bounds a step |

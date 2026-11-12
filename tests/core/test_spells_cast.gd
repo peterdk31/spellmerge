@@ -52,18 +52,18 @@ func before_each() -> void:
 	_form(&"bolt", 5, 300.0, 1.0)
 	_form(&"slow", 5, 60.0, 5.0)
 	_form(&"short", 5, 300.0, 0.1)
-	var heavy: FormBase = _form(&"heavy", 5, 300.0, 1.0)
+	var heavy: CarrierCard = _form(&"heavy", 5, 300.0, 1.0)
 	heavy.wind_down = 2.0
-	var ring: FormBase = _form(&"ring", 5, 300.0, 1.0)
+	var ring: CarrierCard = _form(&"ring", 5, 300.0, 1.0)
 	ring.shots = 24
 	ring.spread = 360.0
-	var halo: FormBase = _form(&"halo", 5, 300.0, 1.0)
+	var halo: CarrierCard = _form(&"halo", 5, 300.0, 1.0)
 	halo.shots = 8
 	halo.spread = 360.0
-	var rune: FormBase = _form(&"rune", 5, 0.0, 10.0)
+	var rune: CarrierCard = _form(&"rune", 5, 0.0, 10.0)
 	rune.carrier = &"rune"
 	rune.radius = 6.0
-	var beam: FormBase = _form(&"beam", 5, 0.0, 0.1)
+	var beam: CarrierCard = _form(&"beam", 5, 0.0, 0.1)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var fire: ElementBase = ElementBase.new()
@@ -112,8 +112,8 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, damage: int, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, damage: int, speed: float, lifetime: float) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = damage
 	form.speed = speed
 	form.lifetime = lifetime

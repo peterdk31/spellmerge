@@ -34,14 +34,14 @@ func test_the_bolt_ends_after_its_lifetime() -> void:
 ## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
 ## tests/content/spells/test_carrier_looks.gd).
 func test_its_moments_have_their_cues() -> void:
-	var card: FormBase = load("res://content/spells/carriers/bolt/bolt.tres") as FormBase
+	var card: CarrierCard = load("res://content/spells/carriers/bolt/bolt.tres") as CarrierCard
 	check_equal(card.impact_cue, &"impact", "its impact plays impact")
 
 
 ## Its own look (docs/milestones/card-looks.md, phase 1): a bolt's head is drawn by its folder's
 ## shader, in a pair of head batches of its own, so the atom and nova keep the plain head.
 func test_it_is_drawn_by_its_own_head_shader() -> void:
-	var card: FormBase = load("res://content/spells/carriers/bolt/bolt.tres") as FormBase
+	var card: CarrierCard = load("res://content/spells/carriers/bolt/bolt.tres") as CarrierCard
 	check(card.look_shader == preload("res://content/spells/carriers/bolt/bolt.gdshader"), "drawn by its folder's shader")
 	check(card.look_problems().is_empty(), "a canvas-item shader")
 	var tag: int = _cast_form(&"bolt", 0, Vector2.ZERO)
@@ -57,5 +57,5 @@ func test_it_is_drawn_by_its_own_head_shader() -> void:
 	check(body > 0 and _mgr.body_shader(body) == card.look_shader, "its shot carries its card's body")
 	check_equal(_mgr.body_mesh(body), _mgr.MESH_HEAD, "a head body: its shots fly")
 	check_equal(_mgr._batch_of(slot), _mgr.body_batch(body, not _mgr.is_hat_ramp(_mgr._ramp[slot])), "drawn in its body's batch")
-	var atom: FormBase = load("res://content/spells/carriers/atom/atom.tres") as FormBase
+	var atom: CarrierCard = load("res://content/spells/carriers/atom/atom.tres") as CarrierCard
 	check(atom.look_shader == null, "the atom keeps the plain head")

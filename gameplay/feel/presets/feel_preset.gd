@@ -102,4 +102,4 @@ extends Resource
 ## room round it, so beams that cross (a split, a multicast) all still show.
 @export_range(0.2, 1.0, 0.05) var beam_alpha: float = 0.7
 ## The cast flash on the wizard and the flare where a shot ends are cues the carrier cards name
-## (`FormBase.cast_cue` and `impact_cue`, S6 2; `cast` and `impact` by default), not in this preset.
+## (`CarrierCard.cast_cue` and `impact_cue`, S6 2; `cast` and `impact` by default), not in this preset.

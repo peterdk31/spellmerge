@@ -82,8 +82,8 @@ func _run(imp: Actor, count: int) -> void:
 
 
 ## The imp's bolt card (its hit circle is the shot's).
-func _bolt() -> FormBase:
-	return _fx.registry.call("get_resource", &"spells", &"bolt") as FormBase
+func _bolt() -> CarrierCard:
+	return _fx.registry.call("get_resource", &"spells", &"bolt") as CarrierCard
 
 
 # --- Tests ------------------------------------------------------------------

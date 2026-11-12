@@ -3,7 +3,7 @@ shader_type canvas_item;
 render_mode blend_premul_alpha;
 
 // A rune, the hovering seal (content/spells/carriers/rune/: its card's own shot shader,
-// `FormBase.look_shader`; core/README.md, "The shot shaders"; the owner's pick, 2026-11-09): a small
+// `CarrierCard.look_shader`; core/README.md, "The shot shaders"; the owner's pick, 2026-11-09): a small
 // crystal drops in and hovers over a ring on the floor at its hit size, bobbing, its shadow under it.
 // While it arms (`SpellLimits.RUNE_ARM`, ARM here) the ring closes from an open arc, its tip lit, and
 // the crystal fills with light from the bottom; armed, the ring is whole, a white-hot speck chases

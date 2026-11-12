@@ -60,7 +60,7 @@ func before_each() -> void:
 	_damage.clear()
 	_bus.status_applied.connect(func(player: int, target: Node, id: StringName) -> void: _applied.append([player, target, id]))
 	_bus.damage_dealt.connect(func(player: int, target: Node, amount: int, _at: Vector2) -> void: _damage.append([player, target, amount]))
-	var bolt := FormBase.new()
+	var bolt := CarrierCard.new()
 	bolt.id = &"bolt"
 	bolt.base_damage = 4
 	bolt.speed = 200.0

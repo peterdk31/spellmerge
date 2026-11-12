@@ -47,7 +47,7 @@ func before_each() -> void:
 	_bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int, shot: int) -> void: _hits.append([caster, target, at, tag, _spells.hit_profile(tag, shot)]))
 	_form(&"bolt", 300.0, 1.0)
 	_form(&"short", 300.0, 0.1)
-	var rune: FormBase = _form(&"rune", 0.0, 10.0)
+	var rune: CarrierCard = _form(&"rune", 0.0, 10.0)
 	# The probe: a shot that does not move marks where a payload fires (a placed rune would
 	# appear a step ahead of it, rules R4 F3).
 	rune.carrier = &"atom"
@@ -64,7 +64,7 @@ func before_each() -> void:
 	_modifier(&"shield", ModifierBase.Behaviour.SHIELD, 1.0)
 	_modifier(&"relay", ModifierBase.Behaviour.RELAY, 1.0)
 	_modifier(&"bounce", ModifierBase.Behaviour.BOUNCE, 1.0)
-	var beam: FormBase = _form(&"beam", 0.0, 0.1)
+	var beam: CarrierCard = _form(&"beam", 0.0, 0.1)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var pierce := ModifierBase.new()
@@ -86,8 +86,8 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = 5
 	form.speed = speed
 	form.lifetime = lifetime
@@ -252,7 +252,7 @@ func test_on_block_fires_at_every_block_of_a_bigger_shield() -> void:
 
 
 func test_a_beam_on_kill_fires_at_every_kill() -> void:
-	var beam: FormBase = _form(&"beam", 0.0, 0.1)
+	var beam: CarrierCard = _form(&"beam", 0.0, 0.1)
 	beam.carrier = &"beam"
 	beam.ray_length = 300.0
 	beam.pierce = 3
@@ -449,7 +449,7 @@ func test_a_plain_shot_takes_nothing() -> void:
 func test_a_carrier_that_hits_nothing_fires_on_kill_from_its_blast() -> void:
 	# A decoy hits nothing itself, but its blast's area hit carries its tag, so a kill by it is the
 	# decoy's: `on kill` on a decoy is kept when it has a blast (rules R2b).
-	var decoy: FormBase = _form(&"decoy", 0.0, 0.1)
+	var decoy: CarrierCard = _form(&"decoy", 0.0, 0.1)
 	decoy.carrier = &"decoy"
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 24.0)
 	StaffKit.build(_spells, 0, 0, [&"on_kill", &"blast", &"decoy", &"rune"])
@@ -463,7 +463,7 @@ func test_a_carrier_that_hits_nothing_fires_on_kill_from_its_blast() -> void:
 
 func test_a_swing_fires_on_hit() -> void:
 	# A cell of the trigger table (rules R2b) observed: a swing's sweep hits under its own tag.
-	var swing: FormBase = _form(&"swing", 0.0, 0.1)
+	var swing: CarrierCard = _form(&"swing", 0.0, 0.1)
 	swing.carrier = &"swing"
 	swing.ray_length = 40.0
 	swing.arc = 120.0

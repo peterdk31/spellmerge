@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Every carrier card names its looks as cues (content/spells/carriers/, `FormBase.cast_cue`,
+## Every carrier card names its looks as cues (content/spells/carriers/, `CarrierCard.cast_cue`,
 ## `shown_cue`, `impact_cue` and `end_cue`; S6 2): every cue it names is a cue file (content/cues/),
 ## and its looks have no problems. Which cue each card's moments play, and a wall's stones, are in
 ## each card's own test (content/spells/carriers/<id>/test_<id>.gd).
@@ -16,30 +16,30 @@ func before_each() -> void:
 	registry.scan()
 
 
-func _forms() -> Array[FormBase]:
-	var found: Array[FormBase] = []
+func _forms() -> Array[CarrierCard]:
+	var found: Array[CarrierCard] = []
 	for card: Resource in registry.get_all(&"spells"):
-		if card is FormBase:
-			found.append(card as FormBase)
+		if card is CarrierCard:
+			found.append(card as CarrierCard)
 	return found
 
 
 ## The cues `form` names, by moment.
-func _cues_of(form: FormBase) -> Dictionary:
+func _cues_of(form: CarrierCard) -> Dictionary:
 	return {&"cast": form.cast_cue, &"shown": form.shown_cue, &"impact": form.impact_cue, &"end": form.end_cue}
 
 
 func test_every_carrier_card_casts_and_lands_in_a_cue() -> void:
-	var forms: Array[FormBase] = _forms()
+	var forms: Array[CarrierCard] = _forms()
 	check(forms.size() >= 14, "the carrier cards are found: %d" % forms.size())
-	for form: FormBase in forms:
+	for form: CarrierCard in forms:
 		check(form.cast_cue != &"", "%s has a cast cue" % form.id)
 		check(form.impact_cue != &"", "%s has an impact cue" % form.id)
 		check_equal(form.look_problems(), PackedStringArray(), "%s's looks have no problems" % form.id)
 
 
 func test_every_cue_a_card_names_is_a_cue() -> void:
-	for form: FormBase in _forms():
+	for form: CarrierCard in _forms():
 		var cues: Dictionary = _cues_of(form)
 		for moment: StringName in cues:
 			var id: StringName = cues[moment]
@@ -48,7 +48,7 @@ func test_every_cue_a_card_names_is_a_cue() -> void:
 
 
 func test_a_look_shader_that_is_not_canvas_item_is_reported() -> void:
-	var form := FormBase.new()
+	var form := CarrierCard.new()
 	form.id = &"test_form"
 	var spatial := Shader.new()
 	spatial.code = "shader_type spatial;\nvoid fragment() {}\n"
@@ -70,7 +70,7 @@ func test_a_card_with_the_old_shot_shader_name_keeps_its_look_and_is_reported() 
 	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
 	file.store_string(text)
 	file.close()
-	var form: FormBase = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as FormBase
+	var form: CarrierCard = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as CarrierCard
 	DirAccess.remove_absolute(path)
 	check(form != null, "it loads")
 	if form == null:
@@ -84,8 +84,8 @@ func test_a_card_with_the_old_shot_shader_name_keeps_its_look_and_is_reported() 
 ## A card's light (card-looks phase 1b): the atom lights less, and less far, than the bolt, and its
 ## compiled spell carries that to its shots (`Projectiles.set_looks`).
 func test_the_atom_lights_less_than_the_bolt() -> void:
-	var atom: FormBase = load("res://content/spells/carriers/atom/atom.tres") as FormBase
-	var bolt: FormBase = load("res://content/spells/carriers/bolt/bolt.tres") as FormBase
+	var atom: CarrierCard = load("res://content/spells/carriers/atom/atom.tres") as CarrierCard
+	var bolt: CarrierCard = load("res://content/spells/carriers/bolt/bolt.tres") as CarrierCard
 	check(atom.look_light_intensity < bolt.look_light_intensity, "dimmer: %s against %s" % [atom.look_light_intensity, bolt.look_light_intensity])
 	check(atom.look_light_reach < bolt.look_light_reach, "and nearer: %s against %s" % [atom.look_light_reach, bolt.look_light_reach])
 	var registry := own(preload("res://core/registry/registry.gd").new()) as Node
@@ -101,7 +101,7 @@ func test_the_atom_lights_less_than_the_bolt() -> void:
 
 ## Out of range, the light is a range problem the validator names.
 func test_a_light_out_of_range_is_reported() -> void:
-	var form := FormBase.new()
+	var form := CarrierCard.new()
 	form.id = &"test_form"
 	form.look_light_intensity = 3.0
 	form.look_light_reach = 0.1

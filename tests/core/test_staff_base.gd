@@ -66,14 +66,14 @@ func test_every_new_enum_value_is_inside_the_validator_range() -> void:
 	var trigger := TriggerBase.new()
 	trigger.event = TriggerBase.Event.REACTION
 	check(trigger.range_problems().is_empty(), "the last trigger event is in range")
-	var form := FormBase.new()
+	var form := CarrierCard.new()
 	form.carrier = &"familiar"
 	check(form.range_problems().is_empty(), "a named carrier is in range")
 
 
 func test_a_carrier_no_carrier_has_is_refused() -> void:
 	# Carriers are named (owner, 2026-10-30): a removed one, as the fissure, is a name no carrier has.
-	var form := FormBase.new()
+	var form := CarrierCard.new()
 	form.carrier = &"fissure"
 	check(not form.range_problems().is_empty(), "no card may name a carrier that is gone")
 	check_equal(Carriers.of(&"fissure").id(), &"", "and it runs as nothing")

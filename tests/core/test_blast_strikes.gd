@@ -63,14 +63,14 @@ func before_each() -> void:
 	_bus.mana_refund_requested.connect(func(_caster: int, _at: int, amount: float) -> void:
 		_refunds.append(amount))
 	_form(&"bolt", 300.0, 1.0)
-	var decoy: FormBase = _form(&"decoy", 0.0, 2.0)
+	var decoy: CarrierCard = _form(&"decoy", 0.0, 2.0)
 	decoy.carrier = &"decoy"
 	_form(&"barb", 300.0, 1.0)
-	var pulse: FormBase = _form(&"pulse", 0.0, 0.5)
+	var pulse: CarrierCard = _form(&"pulse", 0.0, 0.5)
 	pulse.carrier = Carriers.PULSE
 	pulse.radius = 24.0
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
-	var slam: FormBase = _form(&"slam", 0.0, 0.12)
+	var slam: CarrierCard = _form(&"slam", 0.0, 0.12)
 	slam.carrier = &"slam"
 	slam.ray_length = 20.0
 	slam.radius = 16.0
@@ -90,8 +90,8 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = 6
 	form.speed = speed
 	form.lifetime = lifetime

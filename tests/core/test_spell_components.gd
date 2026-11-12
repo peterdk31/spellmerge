@@ -10,7 +10,7 @@ const FIXTURE: String = "res://tests/core/fixtures/spell_components"
 
 
 func _components() -> Array[SpellComponent]:
-	var all: Array[SpellComponent] = [FormBase.new(), ElementBase.new(), ModifierBase.new(), TriggerBase.new()]
+	var all: Array[SpellComponent] = [CarrierCard.new(), ElementBase.new(), ModifierBase.new(), TriggerBase.new()]
 	return all
 
 
@@ -41,7 +41,7 @@ func test_every_kind_checks_complexity() -> void:
 
 
 func test_an_out_of_range_field_is_named() -> void:
-	var form := FormBase.new()
+	var form := CarrierCard.new()
 	form.shots = 0
 	form.wind_down = 99.0
 	var problems: PackedStringArray = form.range_problems()

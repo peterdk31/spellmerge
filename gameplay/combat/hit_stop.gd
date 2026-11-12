@@ -181,9 +181,9 @@ func _form_cue(form: StringName, which: int) -> StringName:
 		var made: Array[StringName] = [&"", &""]
 		if registry != null and form != &"":
 			var card: Resource = registry.get_resource(&"spells", form)
-			if card is FormBase:
-				made[0] = (card as FormBase).impact_cue
-				made[1] = (card as FormBase).end_cue
+			if card is CarrierCard:
+				made[0] = (card as CarrierCard).impact_cue
+				made[1] = (card as CarrierCard).end_cue
 		_form_cues[form] = made
 		cues = made
 	return (cues as Array[StringName])[which]

@@ -160,7 +160,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 		for k in used:
 			var gate: int = _pt_gates[at * _pt_stride + k]
 			kit.set_cue_tag(tag)
-			kit.events.form_shown.emit(actor, spell.form_id, kit.projectiles.gate_position(gate), kit.projectiles.gate_face(gate), spell.radius, spell.tint, spell.look)
+			kit.events.form_shown.emit(actor, spell.carrier_card_id, kit.projectiles.gate_position(gate), kit.projectiles.gate_face(gate), spell.radius, spell.tint, spell.look)
 			kit.set_cue_tag(0)
 	return 1
 
@@ -406,7 +406,7 @@ func _close(at: int, finished: bool) -> void:
 			continue
 		if kit.events != null:
 			kit.set_cue_tag(tag)
-			kit.events.carrier_ended.emit(actor, spell.form_id, where, face, size, spell.tint, spell.look)
+			kit.events.carrier_ended.emit(actor, spell.carrier_card_id, where, face, size, spell.tint, spell.look)
 			kit.set_cue_tag(0)
 		kit.blast(spell, tag, actor, where)
 		if spell.fires_on(TriggerBase.Event.EXPIRE):

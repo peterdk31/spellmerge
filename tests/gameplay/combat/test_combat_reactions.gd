@@ -61,7 +61,7 @@ func before_each() -> void:
 	_applied.clear()
 	_bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2, _shot: int) -> void: _reacted.append([player, id, at]))
 	_bus.status_applied.connect(func(player: int, target: Node, id: StringName) -> void: _applied.append([player, target, id]))
-	var bolt := FormBase.new()
+	var bolt := CarrierCard.new()
 	bolt.id = &"bolt"
 	bolt.base_damage = BOLT
 	bolt.speed = 200.0

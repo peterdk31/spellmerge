@@ -14,10 +14,10 @@ var shader: Shader = null
 ## How bright and how far it lights the room (spell light), times the light's own: 1 as any shot.
 var light_intensity: float = 1.0
 var light_reach: float = 1.0
-## The streams of motes its still shots give off while they stand (`FormBase.look_motes`, one
+## The streams of motes its still shots give off while they stand (`CarrierCard.look_motes`, one
 ## `CardMoteStream` each; empty for none), in its `shape`. Shared with the card: never change them.
 var motes: Array[CardMoteStream] = []
-## The shape of its still look, in its hit size as drawn (`FormBase.look_shape`), and the seconds
+## The shape of its still look, in its hit size as drawn (`CarrierCard.look_shape`), and the seconds
 ## it takes to open and the seconds of its end it fades over (`look_open`, `look_fade`): what its
 ## shader draws by (`ProjectileManager.set_body_shape`) and its motes leave by. Its card's, from
 ## `from_card` (the card holds the defaults); nothing for a look of no card, which has no motes.
@@ -32,7 +32,7 @@ static var PLAIN: CardLook = CardLook.new()
 
 ## The whole look of the carrier card `card`, made in one piece (Spells makes one per card and
 ## shares it): nothing is set on it after.
-static func from_card(card: FormBase) -> CardLook:
+static func from_card(card: CarrierCard) -> CardLook:
 	var look := of(card.look_shader, card.look_light_intensity, card.look_light_reach)
 	look.motes = card.look_motes
 	look.shape = card.look_shape

@@ -2,7 +2,7 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha, world_vertex_coords;
 
-// A beam card's own look (content/spells/carriers/beam/: `FormBase.look_shader`; docs/milestones/card-looks.md;
+// A beam card's own look (content/spells/carriers/beam/: `CarrierCard.look_shader`; docs/milestones/card-looks.md;
 // the owner, 2026-11-08: "it should glow hot white in the center and then apply the spell colors
 // out on each side", "maybe void should have a dark center"). A copy of the plain beam
 // (`core/projectiles/shot_beam.gdshaderinc`, which still draws a ray with no beam card: a chain's

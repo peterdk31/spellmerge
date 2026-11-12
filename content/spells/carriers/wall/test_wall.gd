@@ -20,8 +20,8 @@ func _lost(cards: Array, at: Vector2, seconds: float = 1.5) -> int:
 
 
 func test_the_card_is_a_valid_carrier() -> void:
-	var card: FormBase = load("res://content/spells/carriers/wall/wall.tres") as FormBase
-	check(card != null, "wall.tres loads as a FormBase")
+	var card: CarrierCard = load("res://content/spells/carriers/wall/wall.tres") as CarrierCard
+	check(card != null, "wall.tres loads as a CarrierCard")
 	if card == null:
 		return
 	check_equal(card.id, &"wall", "its id is its folder")

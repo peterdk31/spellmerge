@@ -2,7 +2,7 @@ class_name CardMoteStream
 extends Resource
 ## One stream of motes a still carrier card's shots give off while they stand (the owner,
 ## 2026-11-09: "use motes for everything you can"; docs/milestones/carrier-looks-fixes.md, phase 3):
-## a card lists as many as its look needs (`FormBase.look_motes`: a wall's stream off its seam, a
+## a card lists as many as its look needs (`CarrierCard.look_motes`: a wall's stream off its seam, a
 ## pool's motes off its mire and the drops of its splash, a rune's drips and the motes rising off its
 ## ring once armed), and Feel
 ## gives each off (`gameplay/feel/still_motes.gd`) by these numbers alone: no case per carrier.

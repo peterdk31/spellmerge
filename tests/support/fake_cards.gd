@@ -59,7 +59,7 @@ static func registry(count: int, kind: StringName = &"") -> FakeRegistry:
 static func _card(kind: StringName, at: int) -> SpellComponent:
 	match kind:
 		&"form":
-			var form := FormBase.new()
+			var form := CarrierCard.new()
 			form.base_damage = 1 + at % 9
 			form.mana_cost = 2.0 + float(at % 7)
 			form.wind_down = 0.25

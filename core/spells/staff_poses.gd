@@ -1,6 +1,6 @@
 class_name StaffPoses
 extends RefCounted
-## The staff animation of each actor's body (`FormBase.staff_pose`), kept by the spell runtime
+## The staff animation of each actor's body (`CarrierCard.staff_pose`), kept by the spell runtime
 ## (`Spells`, which owns it): `start` plays a carrier's keys from its cast, `end_strike` cuts its
 ## strike short when the carrier's last shot ends, and `staff_pose` and the other getters (read
 ## through `Spells.poses`) give the body's look where the staff is now.
@@ -8,7 +8,7 @@ extends RefCounted
 ## actor -> its body's last staff animation (`staff_pose`): when it began (INF for none), the
 ## carrier's wind-up and strike in seconds (its strike ends early when its last shot does: the tag
 ## it plays for), the aim locked at the cast, which way it turns (a swing's side), its keys
-## (`FormBase.packed_pose`), the carrier's tint (its glow's colour), and where the staff was when it
+## (`CarrierCard.packed_pose`), the carrier's tint (its glow's colour), and where the staff was when it
 ## began (POSE_CHANNELS numbers a body, in its own frame: what the first key starts from).
 var _pose_start: PackedFloat64Array = PackedFloat64Array()
 var _pose_wind: PackedFloat32Array = PackedFloat32Array()
@@ -42,7 +42,7 @@ var _pose_out: PackedFloat32Array = PackedFloat32Array()
 var _pose_out_mood: int = 0
 var _pose_out_actor: int = -1
 var _pose_out_clock: float = -1.0
-## Numbers a pose has: FormBase.POSE_CHANNELS (turn, lift, push, glow, stretch, shake, land, hammer).
+## Numbers a pose has: CarrierCard.POSE_CHANNELS (turn, lift, push, glow, stretch, shake, land, hammer).
 const POSE_CHANNELS: int = 8
 ## What `staff_infusions` answers with no spell (never written).
 const NO_INFUSIONS: PackedColorArray = []
@@ -93,7 +93,7 @@ func started_at(actor: int) -> float:
 	return _pose_start[actor]
 
 
-## How long `spell`'s strike lasts for its staff animation (`FormBase.staff_pose`): the working time
+## How long `spell`'s strike lasts for its staff animation (`CarrierCard.staff_pose`): the working time
 ## of a carrier the staff keeps working (a beam's or dash's `lifetime`, a held one's until its
 ## last shot ends); none for one that leaves the staff (a bolt, a rune, an orbit).
 static func strike_of(spell: CompiledSpell, lifetime: float) -> float:
@@ -141,19 +141,19 @@ func start(actor: int, spell: CompiledSpell, tag: int, wind: float, strike: floa
 ## charged for 2 s more raises its hammer slowly and still smashes it down in a blink.
 func _time_wind(actor: int, spell: CompiledSpell, wind: float) -> void:
 	var keys: PackedFloat32Array = spell.staff_pose
-	var stride: int = FormBase.POSE_STRIDE
+	var stride: int = CarrierCard.POSE_STRIDE
 	var last: int = -1
 	var before: int = -1
 	for k in keys.size() / stride:
-		if roundi(keys[k * stride + FormBase.PK_PHASE]) == FormBase.POSE_PHASES["wind"]:
+		if roundi(keys[k * stride + CarrierCard.PK_PHASE]) == CarrierCard.POSE_PHASES["wind"]:
 			before = last
 			last = k
 	_pose_blow[actor] = -1
 	_pose_lead[actor] = wind
 	if before < 0 or spell.pose_wind_up <= 0.0 or wind <= spell.pose_wind_up:
 		return
-	var at_last: float = keys[last * stride + FormBase.PK_AT]
-	var at_before: float = keys[before * stride + FormBase.PK_AT]
+	var at_last: float = keys[last * stride + CarrierCard.PK_AT]
+	var at_before: float = keys[before * stride + CarrierCard.PK_AT]
 	if at_before <= 0.0:
 		return
 	var blow: float = maxf(at_last - at_before, 0.0) * spell.pose_wind_up
@@ -167,8 +167,8 @@ func _time_wind(actor: int, spell: CompiledSpell, wind: float) -> void:
 func _land_point(actor: int, spell: CompiledSpell, dir: Vector2) -> Vector2:
 	var keys: PackedFloat32Array = spell.staff_pose
 	var lands: bool = false
-	for k in keys.size() / FormBase.POSE_STRIDE:
-		lands = lands or keys[k * FormBase.POSE_STRIDE + FormBase.PK_CHANNELS + LAND] > 0.0
+	for k in keys.size() / CarrierCard.POSE_STRIDE:
+		lands = lands or keys[k * CarrierCard.POSE_STRIDE + CarrierCard.PK_CHANNELS + LAND] > 0.0
 	if not lands:
 		return Vector2.INF
 	var offset: Vector2 = kit.carrier_of(spell).strike_point(spell, dir)
@@ -280,11 +280,11 @@ func staff_land_point(actor: int) -> Vector2:
 	return _pose_land[actor]
 
 
-## The mood `actor`'s staff animation shows on its face now (`FormBase.POSE_MOODS`), or empty.
+## The mood `actor`'s staff animation shows on its face now (`CarrierCard.POSE_MOODS`), or empty.
 func staff_mood(actor: int) -> StringName:
 	if not _pose_now(actor) or _pose_out_mood <= 0:
 		return &""
-	return FormBase.POSE_MOODS[_pose_out_mood - 1]
+	return CarrierCard.POSE_MOODS[_pose_out_mood - 1]
 
 
 ## The aim `actor`'s staff animation turns from, or zero when it plays none: the aim of the cast
@@ -312,7 +312,7 @@ func _pose_now(actor: int) -> bool:
 	var s: float = kit.clock() - _pose_start[actor]
 	var wind: float = _pose_wind[actor]
 	var strike: float = _pose_strike[actor]
-	var stride: int = FormBase.POSE_STRIDE
+	var stride: int = CarrierCard.POSE_STRIDE
 	var count: int = keys.size() / stride
 	# Where the last key passed left the staff (the start: where it was at the cast), and when.
 	var base: int = actor * POSE_CHANNELS
@@ -321,14 +321,14 @@ func _pose_now(actor: int) -> bool:
 	var mood: int = 0
 	var k: int = 0
 	while k < count:
-		var phase: int = roundi(keys[k * stride + FormBase.PK_PHASE])
-		if phase == FormBase.POSE_PHASES["hold"]:
+		var phase: int = roundi(keys[k * stride + CarrierCard.PK_PHASE])
+		if phase == CarrierCard.POSE_PHASES["hold"]:
 			# The run of hold keys, played round and round through the strike.
 			var first: int = k
-			while k < count and roundi(keys[k * stride + FormBase.PK_PHASE]) == phase:
+			while k < count and roundi(keys[k * stride + CarrierCard.PK_PHASE]) == phase:
 				k += 1
 			var last: int = k - 1
-			var period: float = keys[last * stride + FormBase.PK_AT]
+			var period: float = keys[last * stride + CarrierCard.PK_AT]
 			if s < wind and strike > 0.0:
 				# Still winding up past its last wind key: it stays there until the strike.
 				return _pose_between(keys, actor, from_key, first, 0.0, mood)
@@ -339,7 +339,7 @@ func _pose_now(actor: int) -> bool:
 				var h_from: int = from_key if round_n == 0 else last
 				var h_t: float = 0.0
 				for h in range(first, last + 1):
-					var t: float = keys[h * stride + FormBase.PK_AT]
+					var t: float = keys[h * stride + CarrierCard.PK_AT]
 					if u < t:
 						return _pose_between(keys, actor, h_from, h, clampf((u - h_t) / (t - h_t), 0.0, 1.0) if t > h_t else 1.0, mood)
 					h_from = h
@@ -350,7 +350,7 @@ func _pose_now(actor: int) -> bool:
 				from_key = last if strike > 0.0 else from_key
 				from_t = wind + strike
 			continue
-		var at: float = keys[k * stride + FormBase.PK_AT]
+		var at: float = keys[k * stride + CarrierCard.PK_AT]
 		# A wind key before the blow is timed by the lead (`_time_wind`), the blow and the rest by the wind-up.
 		var t: float = at * (_pose_lead[actor] if k < _pose_blow[actor] else wind) if phase == 0 else (wind + at * strike if phase == 1 else wind + strike + at)
 		if s < t:
@@ -365,18 +365,18 @@ func _pose_now(actor: int) -> bool:
 
 ## The mood shown once key `k` is passed: its own, else the one before.
 static func _mood_of(keys: PackedFloat32Array, k: int, mood: int) -> int:
-	var own: int = roundi(keys[k * FormBase.POSE_STRIDE + FormBase.PK_MOOD])
+	var own: int = roundi(keys[k * CarrierCard.POSE_STRIDE + CarrierCard.PK_MOOD])
 	return own if own > 0 else mood
 
 
 ## Puts into `_pose_out` the pose `x` of the way from key `from` (-1: where the staff was at the
 ## cast) to key `to`, eased by `to`'s ease, with `mood`; true.
 func _pose_between(keys: PackedFloat32Array, actor: int, from: int, to: int, x: float, mood: int) -> bool:
-	var stride: int = FormBase.POSE_STRIDE
-	var eased: float = pose_ease(x, roundi(keys[to * stride + FormBase.PK_EASE]))
+	var stride: int = CarrierCard.POSE_STRIDE
+	var eased: float = pose_ease(x, roundi(keys[to * stride + CarrierCard.PK_EASE]))
 	for c in POSE_CHANNELS:
-		var a: float = _pose_from[actor * POSE_CHANNELS + c] if from < 0 else keys[from * stride + FormBase.PK_CHANNELS + c]
-		_pose_out[c] = lerpf(a, keys[to * stride + FormBase.PK_CHANNELS + c], eased)
+		var a: float = _pose_from[actor * POSE_CHANNELS + c] if from < 0 else keys[from * stride + CarrierCard.PK_CHANNELS + c]
+		_pose_out[c] = lerpf(a, keys[to * stride + CarrierCard.PK_CHANNELS + c], eased)
 	_pose_out_mood = mood
 	return true
 
@@ -387,7 +387,7 @@ static func up_side(aim: Vector2) -> int:
 	return 1 if aim.x >= 0.0 else -1
 
 
-## `x` (0 to 1) of the way into a key, eased by `ease` (`FormBase.POSE_EASES`: 0 slow, fast, slow;
+## `x` (0 to 1) of the way into a key, eased by `ease` (`CarrierCard.POSE_EASES`: 0 slow, fast, slow;
 ## 1 slowing into the key; 2 speeding up into it; 3 barely moving and then whipping into it).
 static func pose_ease(x: float, ease: int) -> float:
 	match ease:

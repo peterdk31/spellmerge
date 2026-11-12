@@ -23,7 +23,7 @@ enum Mode {
 @export var repeat_interval: float = 0.0
 ## Mana this card adds to the cast.
 @export var mana_cost: float = 0.0
-## Seconds this card adds to the cast's wind-down (`FormBase.wind_down`).
+## Seconds this card adds to the cast's wind-down (`CarrierCard.wind_down`).
 @export var wind_down: float = 0.0
 
 

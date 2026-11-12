@@ -30,7 +30,7 @@ func before_each() -> void:
 
 
 func test_its_card_names_its_impact_cue_and_its_wind_up_draws_no_ring() -> void:
-	var card: FormBase = feel.registry.get_resource(&"spells", &"slam") as FormBase
+	var card: CarrierCard = feel.registry.get_resource(&"spells", &"slam") as CarrierCard
 	check_equal(card.end_cue, &"slam", "slam.tres names the cue `slam`")
 	check_equal(card.shown_cue, &"", "no cue for its wind-up")
 

@@ -355,7 +355,7 @@ const MIN_BATCH: int = 64
 ## BATCH_ORDER, so at one z the bolts draw before the runes.
 ##
 ## After them come the card bodies' batches, as many as the cards ask for (`register_body`): a
-## shot whose card names a shader of its own (`FormBase.look_shader`, in the card's folder: a
+## shot whose card names a shader of its own (`CarrierCard.look_shader`, in the card's folder: a
 ## wall's stones, a pool's puddle, a bolt's head) is drawn by it, in a pair of batches made with that
 ## shader and the mesh its shots are written as (MESH_QUAD, one quad a shot as a rune is, for a still
 ## carrier; MESH_HEAD, the shots' `head_mesh`, for one that flies or orbits): the hat ramps', then
@@ -426,7 +426,7 @@ const STILL_END: float = 1.0
 const TRACE_FROM: float = 0.02
 const TRACE_SPAN: float = 0.42
 ## A still shot's hit size as drawn, as a share of its quad (LOOK_GRID x zoom): the unit a still
-## card's shader shapes its look in (`FormBase.look_shape`) and its motes leave by
+## card's shader shapes its look in (`CarrierCard.look_shape`) and its motes leave by
 ## (`StillShotView.reach`). The shaders hold the same number (`STILL_HIT` in shot_palette.gdshaderinc;
 ## test_projectile_looks compares them).
 const STILL_HIT: float = 0.15
@@ -1370,7 +1370,7 @@ func body_of(shader: Shader, mesh: int = MESH_QUAD) -> int:
 	return 0
 
 
-## Card body `body`'s look shape (`FormBase.look_shape`, in its drawn hit size's units, STILL_HIT)
+## Card body `body`'s look shape (`CarrierCard.look_shape`, in its drawn hit size's units, STILL_HIT)
 ## and its clock (`Vector2(look_open, look_fade)`, seconds), handed to its batches' shader as the
 ## uniforms `look_shape` and `look_clock`, so the shader draws its look by the card's numbers and
 ## whoever gives off its motes (`still_motes.gd`, from the card's `CardLook`) reads the same ones.

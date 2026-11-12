@@ -54,15 +54,15 @@ func before_each() -> void:
 	_staff.id = &"test"
 	_staff.slots = 20
 	_staff.cooldown = 0.5
-	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
-	var pulse: FormBase = _form(&"pulse", 0.0, 0.5)
+	var bolt: CarrierCard = _form(&"bolt", 300.0, 1.0)
+	var pulse: CarrierCard = _form(&"pulse", 0.0, 0.5)
 	pulse.carrier = Carriers.PULSE
 	pulse.radius = 24.0
 	bolt.wind_down = 0.2
-	var halo: FormBase = _form(&"halo", 300.0, 1.0)
+	var halo: CarrierCard = _form(&"halo", 300.0, 1.0)
 	halo.shots = 8
 	halo.spread = 360.0
-	var rune: FormBase = _form(&"rune", 0.0, 2.0)
+	var rune: CarrierCard = _form(&"rune", 0.0, 2.0)
 	rune.carrier = &"rune"
 	var fire := ElementBase.new()
 	fire.status_id = &"burn"
@@ -90,8 +90,8 @@ func _put(card: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = card
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = 5
 	form.speed = speed
 	form.lifetime = lifetime
@@ -167,7 +167,7 @@ func test_a_payload_fires_on_hit_under_its_own_node() -> void:
 	_tick(20)
 	var nova_tag: int = _spells.current_tag(1, 2, 1)
 	check(_spells.live_shots(nova_tag) > 0, "the halo flies under node 1's tag")
-	check(_spells.profile(nova_tag) != null and _spells.profile(nova_tag).form_id == &"halo", "that tag is the halo's")
+	check(_spells.profile(nova_tag) != null and _spells.profile(nova_tag).carrier_card_id == &"halo", "that tag is the halo's")
 
 
 func test_a_blast_pulse_asks_for_an_area_hit_on_the_caster() -> void:
@@ -249,7 +249,7 @@ func test_four_players_with_four_staffs_rebuild_mid_flight_without_mixing() -> v
 
 ## A bolt that winds up `seconds` (its form card's `wind_up`), installed as `player`'s staff 0.
 func _wound_bolt(player: int, seconds: float) -> void:
-	var slow: FormBase = _form(&"slow_bolt", 300.0, 1.0)
+	var slow: CarrierCard = _form(&"slow_bolt", 300.0, 1.0)
 	slow.wind_up = seconds
 	slow.wind_down = 0.1
 	_install(player, 0, "slow_bolt")
@@ -320,7 +320,7 @@ func test_the_staff_s_wind_up_comes_before_every_cast() -> void:
 func test_a_payload_winds_up_where_its_trigger_fired() -> void:
 	_target(Vector2(30.0, 0.0))
 	_form(&"bolt", 300.0, 1.0).wind_down = 0.1
-	var halo: FormBase = _form(&"slow_halo", 0.0, 0.2)
+	var halo: CarrierCard = _form(&"slow_halo", 0.0, 0.2)
 	halo.carrier = &"atom"
 	halo.shots = 8
 	halo.spread = 360.0
@@ -345,7 +345,7 @@ func test_a_payload_winds_up_where_its_trigger_fired() -> void:
 
 ## A staff whose first cast is a dear halo (`dear`, 10 mana) and then two bolts (2 each).
 func _dear_then_bolts(player: int) -> void:
-	var dear: FormBase = _form(&"dear", 0.0, 0.3)
+	var dear: CarrierCard = _form(&"dear", 0.0, 0.3)
 	dear.mana_cost = 10.0
 	dear.wind_down = 0.0
 	_form(&"bolt", 300.0, 1.0).wind_down = 0.0

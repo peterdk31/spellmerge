@@ -54,7 +54,7 @@ func before_each() -> void:
 	_bus.damage_dealt.connect(func(_player: int, target: Node, amount: float, _at: Vector2) -> void: _damage.append([target, amount]))
 	_bus.hit_landed.connect(func(_player: int, target: Node, _amount: float, _at: Vector2, _kind: StringName, _shot: int) -> void: _landed.append(target))
 	_bus.status_applied.connect(func(_player: int, _target: Node, id: StringName) -> void: _applied.append(id))
-	var speck := FormBase.new()
+	var speck := CarrierCard.new()
 	speck.id = &"speck"
 	speck.base_damage = 0.25
 	speck.speed = 600.0

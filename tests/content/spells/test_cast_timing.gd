@@ -22,17 +22,17 @@ func after_each() -> void:
 	arena.free_all()
 
 
-func _forms() -> Array[FormBase]:
-	var out: Array[FormBase] = []
+func _forms() -> Array[CarrierCard]:
+	var out: Array[CarrierCard] = []
 	for id: StringName in arena.registry.call("get_ids", &"spells"):
 		var card: Resource = arena.registry.call("get_resource", &"spells", id)
-		if card is FormBase:
-			out.append(card as FormBase)
+		if card is CarrierCard:
+			out.append(card as CarrierCard)
 	return out
 
 
-func _form(id: StringName) -> FormBase:
-	return arena.registry.call("get_resource", &"spells", id) as FormBase
+func _form(id: StringName) -> CarrierCard:
+	return arena.registry.call("get_resource", &"spells", id) as CarrierCard
 
 
 func test_no_card_locks_its_staff_for_long() -> void:
@@ -54,5 +54,5 @@ func test_the_starter_staffs_share_one_cooldown() -> void:
 
 
 func test_a_held_beam_outlives_its_wind_down_and_the_starter_cooldown() -> void:
-	var beam: FormBase = _form(&"beam")
+	var beam: CarrierCard = _form(&"beam")
 	check(beam.lifetime > beam.wind_down + STARTER_COOLDOWN, "a beam lives %s s, past its %s s wind-down and the %s s cooldown, so held fire has no gap" % [beam.lifetime, beam.wind_down, STARTER_COOLDOWN])

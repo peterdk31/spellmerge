@@ -3517,7 +3517,7 @@ What it means:
 ## 2026-11-12: the carrier cards' folder is `content/spells/carriers` (owner decision)
 
 - **The owner,** on the new Pulse card: "why is it in a folder called "forms"? Is it not a carrier?", then "I think the rename should just happen right now".
-- **Now:** the carrier cards live in `content/spells/carriers/<id>/` (was `content/spells/forms/`), named for what they are since the carrier refactor (#494); the code that runs them stays in `core/spells/carriers/`. `FormBase`, a spell's `form_id` and the atlas's `form` kind keep their names. Earlier entries of this file, docs/NEXT.md and docs/LOG.md name the old folder as it was then.
+- **Now:** the carrier cards live in `content/spells/carriers/<id>/` (was `content/spells/forms/`), named for what they are since the carrier refactor (#494); the code that runs them stays in `core/spells/carriers/`. Then (owner: "Yes I want tht aswell") the card's class `FormBase` is `CarrierCard` (`core/base/carrier_card.gd`), and a compiled spell's `form_id` and `form_name` are `carrier_card_id` and `carrier_card_name` (its carrier card's, apart from `carrier`, the carrier that runs it: a payload's `pulse` card runs on `pulse_point`). Still named "form": the card kind `&"form"` (the builder, the atlas), the event `form_shown`, `Spells.last_form`, the recipes' `"form"` key in tests, and local variables. Earlier entries of this file, docs/NEXT.md and docs/LOG.md name the old folder as it was then.
 
 ## 2026-11-12: the Pulse card replaces the fallback carriers; cards with no carrier are wasted (props W9a, owner decision)
 

@@ -47,17 +47,17 @@ func before_each() -> void:
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
 		_hits.append([player, target, at, tag, _spells.hit_profile(tag, shot)]))
 	_bus.projectile_expired.connect(func(player: int, at: Vector2, tag: int, _shot: int) -> void: _ended.append([player, at, tag]))
-	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
+	var bolt: CarrierCard = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
-	var orb: FormBase = _form(&"orb", 30.0, 3.0)
+	var orb: CarrierCard = _form(&"orb", 30.0, 3.0)
 	orb.base_damage = 10
-	var rune: FormBase = _form(&"rune", 0.0, 4.0)
+	var rune: CarrierCard = _form(&"rune", 0.0, 4.0)
 	rune.carrier = &"rune"
 	rune.base_damage = 10
-	var beam: FormBase = _form(&"beam", 0.0, 0.3)
+	var beam: CarrierCard = _form(&"beam", 0.0, 0.3)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
-	var halo: FormBase = _form(&"halo", 300.0, 0.2)
+	var halo: CarrierCard = _form(&"halo", 300.0, 0.2)
 	halo.shots = 8
 	halo.spread = 360.0
 	var slow: ModifierBase = _modifier(&"slow", ModifierBase.Behaviour.NONE, 0.0)
@@ -88,8 +88,8 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = 5
 	form.speed = speed
 	form.lifetime = lifetime
@@ -299,7 +299,7 @@ func test_a_zap_sets_off_on_hit() -> void:
 	var halos: int = 0
 	for row: Array in _ended:
 		var spell: CompiledSpell = _spells._profiles.get(row[2])
-		if spell != null and spell.form_id == &"halo":
+		if spell != null and spell.carrier_card_id == &"halo":
 			halos += 1
 	check_equal(halos, 8, "the zap fired the halo payload once: eight halo shots")
 	check(not _hits_on(imp).is_empty(), "the imp was zapped")
@@ -406,7 +406,7 @@ func test_a_beam_zap_sets_off_on_hit() -> void:
 	var halos: int = 0
 	for row: Array in _ended:
 		var spell: CompiledSpell = _spells._profiles.get(row[2])
-		if spell != null and spell.form_id == &"halo":
+		if spell != null and spell.carrier_card_id == &"halo":
 			halos += 1
 	check(not _hits_on(imp).is_empty(), "the imp was zapped")
 	check_equal(halos, 8, "the zap fired the halo payload once: eight halo shots")

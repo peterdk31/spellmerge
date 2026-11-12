@@ -2,7 +2,7 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha, world_vertex_coords;
 
-// A bolt in flight (content/spells/carriers/bolt/: its card's own look, `FormBase.look_shader`;
+// A bolt in flight (content/spells/carriers/bolt/: its card's own look, `CarrierCard.look_shader`;
 // docs/milestones/card-looks.md): the plain shot head (`core/projectiles/shot_head.gdshader`: read it
 // for the instance, the quad kinds and why the fragment stage stays small), drawn by its include, so
 // every fix to the head reaches the bolt, with the bolt's own core: a `x` of arms round its white-hot

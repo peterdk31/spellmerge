@@ -71,14 +71,14 @@ func before_each() -> void:
 	_entities.actors = _actors
 	root.add_child(_entities)
 	_enemies.clear()
-	var bolt := FormBase.new()
+	var bolt := CarrierCard.new()
 	bolt.base_damage = 5
 	bolt.speed = 200.0
 	bolt.lifetime = 1.0
 	bolt.radius = 4.0
 	bolt.mana_cost = 2.0
 	_put(bolt, &"bolt")
-	var familiar := FormBase.new()
+	var familiar := CarrierCard.new()
 	familiar.carrier = &"familiar"
 	familiar.lifetime = 6.0
 	familiar.mana_cost = 2.0
@@ -87,7 +87,7 @@ func before_each() -> void:
 	timer.event = TriggerBase.Event.TIMER
 	timer.wind_up = 0.25
 	_put(timer, &"timer")
-	var decoy := FormBase.new()
+	var decoy := CarrierCard.new()
 	decoy.carrier = &"decoy"
 	decoy.lifetime = 4.0
 	decoy.mana_cost = 2.0

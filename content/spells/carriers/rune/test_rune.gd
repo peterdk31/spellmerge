@@ -44,7 +44,7 @@ func test_the_rune_stays_when_the_caster_and_a_target_move_away() -> void:
 ## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
 ## tests/content/spells/test_carrier_looks.gd).
 func test_its_moments_have_their_cues() -> void:
-	var card: FormBase = load("res://content/spells/carriers/rune/rune.tres") as FormBase
+	var card: CarrierCard = load("res://content/spells/carriers/rune/rune.tres") as CarrierCard
 	check_equal(card.impact_cue, &"rune_burst", "its impact plays rune_burst")
 	check_equal(card.cast_cue, &"cast_rune", "its cast plays cast_rune")
 
@@ -83,7 +83,7 @@ func test_a_rune_cast_on_a_hit_goes_off_on_that_body_once_armed() -> void:
 ## its still clock (`ProjectileManager.still_code`), which covers its arming, and arms when the rune
 ## does.
 func test_its_look_arms_when_it_does() -> void:
-	var card: FormBase = _form(&"rune")
+	var card: CarrierCard = _form(&"rune")
 	check(card.look_shader == preload("res://content/spells/carriers/rune/rune.gdshader"), "drawn by its folder's shader")
 	var code: String = card.look_shader.code
 	check(code.contains("const float ARM = %s;" % String.num(SpellLimits.RUNE_ARM, 1)), "the shader arms at SpellLimits.RUNE_ARM")
@@ -100,7 +100,7 @@ func _shader_const(code: String, name: String) -> float:
 func test_its_drips_show_at_the_crystal_s_foot() -> void:
 	# The `drip` source's height is the shader's crystal foot in hit size as drawn, worked out from
 	# the shader's own numbers: change the crystal and this says so.
-	var card := load("res://content/spells/carriers/rune/rune.tres") as FormBase
+	var card := load("res://content/spells/carriers/rune/rune.tres") as CarrierCard
 	var code: String = card.look_shader.code
 	var foot: float = (_shader_const(code, "HOVER") - _shader_const(code, "DRIP_FROM")) * _shader_const(code, "SCALE_PER_ZOOM") / (_shader_const(code, "GRID") * ManagerScript.STILL_HIT)
 	var drips: Array = card.look_motes.filter(func(s: CardMoteStream) -> bool: return s.kind == &"drip")

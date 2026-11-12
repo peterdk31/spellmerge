@@ -77,7 +77,7 @@ func test_three_carriers_leave_in_one_cast() -> void:
 		var group: CompiledGroup = staff.casts[0].group
 		var forms: Array[StringName] = []
 		for spell in group.spells:
-			forms.append(spell.form_id)
+			forms.append(spell.carrier_card_id)
 		check_equal(forms, [&"bolt", &"beam", &"rune"] as Array[StringName], "three carriers in the group")
 		if group.spells.size() == 3:
 			check_equal(group.spells[0].element_id, &"fire", "a fire bolt first")

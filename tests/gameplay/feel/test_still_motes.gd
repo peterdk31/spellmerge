@@ -52,7 +52,7 @@ func before_each() -> void:
 
 
 ## A still shot of `form`'s body at `at` living `life` seconds; a wall's a row of five across x.
-func _place(form: FormBase, at: Vector2, life: float = 5.0) -> int:
+func _place(form: CarrierCard, at: Vector2, life: float = 5.0) -> int:
 	var slot: int = mgr.spawn(0, at, Vector2.ZERO, life, form.radius, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	mgr.set_form(slot, form.id, mgr.register_body(form.look_shader, ManagerScript.MESH_QUAD))
 	if form.carrier == &"wall":
@@ -84,7 +84,7 @@ func _born_at(from: int, at: Vector2) -> int:
 
 
 func test_the_still_cards_name_their_streams() -> void:
-	for form: FormBase in [WALL, POOL, RUNE]:
+	for form: CarrierCard in [WALL, POOL, RUNE]:
 		check(not form.look_motes.is_empty(), "%s gives off motes" % form.id)
 		check(form.look_problems().is_empty(), "%s: %s" % [form.id, form.look_problems()])
 		for stream: CardMoteStream in form.look_motes:
@@ -124,7 +124,7 @@ func test_a_body_first_numbered_at_a_launch_is_shaped_too() -> void:
 
 
 func test_motes_on_a_card_that_cannot_give_them_off_are_reported() -> void:
-	var form := FormBase.new()
+	var form := CarrierCard.new()
 	form.id = &"test_form"
 	form.carrier = &"atom"
 	var stream := CardMoteStream.new()
@@ -205,7 +205,7 @@ func test_none_while_it_comes_in_and_fewer_as_it_goes() -> void:
 
 
 func test_the_card_shapes_its_shader_and_its_motes_alike() -> void:
-	for form: FormBase in [WALL, POOL]:
+	for form: CarrierCard in [WALL, POOL]:
 		var body: int = mgr.body_of(form.look_shader, ManagerScript.MESH_QUAD)
 		check(body > 0 and still.watches(body), "%s's body is watched" % form.id)
 		var material := mgr._nodes[ManagerScript.body_batch(body, false)].material as ShaderMaterial

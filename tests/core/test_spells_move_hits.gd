@@ -60,15 +60,15 @@ func before_each() -> void:
 	_bus.wizard_shield_requested.connect(func(caster: int, charges: int, seconds: float, tag: int) -> void:
 		_barriers.append([caster, charges, seconds, tag]))
 	# A dash of 48 px over 0.2 s, a teleport of 100 px, a bolt of 300 px over 1 s, pull and a swap.
-	var dash: FormBase = _form(&"dash", 240.0, 0.2)
+	var dash: CarrierCard = _form(&"dash", 240.0, 0.2)
 	dash.carrier = &"dash"
 	dash.ray_length = 48.0
-	var teleport: FormBase = _form(&"teleport", 400.0, 0.25)
+	var teleport: CarrierCard = _form(&"teleport", 400.0, 0.25)
 	teleport.carrier = &"teleport"
 	teleport.ray_length = 100.0
 	_form(&"bolt", 300.0, 1.0)
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
-	var swap: FormBase = _form(&"swap", 300.0, 1.0)
+	var swap: CarrierCard = _form(&"swap", 300.0, 1.0)
 	swap.carrier = &"swap"
 	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
 	_modifier(&"recoil", ModifierBase.Behaviour.RECOIL, 20.0)
@@ -89,8 +89,8 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = 5
 	form.speed = speed
 	form.lifetime = lifetime
@@ -273,7 +273,7 @@ func test_every_carrier_that_moves_its_caster_goes_the_way_it_walks() -> void:
 		if (Carriers.of(id).traits() & CarrierTraits.MOVES_CASTER) == 0:
 			continue
 		seen += 1
-		var form: FormBase = _form(StringName("walker_%s" % id), 240.0, 0.2)
+		var form: CarrierCard = _form(StringName("walker_%s" % id), 240.0, 0.2)
 		form.carrier = id
 		form.ray_length = 50.0
 		_moves.clear()

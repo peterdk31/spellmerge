@@ -36,7 +36,7 @@ var _bus: EventsScript
 var _hits: Array = []
 ## Every blast (its `cue_shown`) as [player, position, radius].
 var _areas: Array = []
-var _swing: FormBase
+var _swing: CarrierCard
 
 
 func before_each() -> void:
@@ -54,7 +54,7 @@ func before_each() -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	# The playground's numbers (owner, 2026-10-29).
-	_swing = FormBase.new()
+	_swing = CarrierCard.new()
 	_swing.carrier = &"swing"
 	_swing.base_damage = 2
 	_swing.arc = 90.0

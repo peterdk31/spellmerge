@@ -5,7 +5,7 @@ shader_type canvas_item;
 render_mode blend_premul_alpha, world_vertex_coords;
 
 // A swap's charm in flight, the chasing pair (content/spells/carriers/swap/: its card's own look,
-// `FormBase.look_shader`; docs/milestones/card-looks.md; the owner's pick, 2026-11-09): two sparks
+// `CarrierCard.look_shader`; docs/milestones/card-looks.md; the owner's pick, 2026-11-09): two sparks
 // chasing each other round a tight circle as it flies, one white-hot and one in its light shade, each
 // with a short trail behind it cooling to its shadow: two things trading places, shown in the shot.
 // The sparks and their trails are twinkling motes, as the ward's (`twinkle_px`). Every infusion shows

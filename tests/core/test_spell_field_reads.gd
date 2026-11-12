@@ -11,13 +11,13 @@ extends "res://tests/support/suite.gd"
 
 ## Fields that only a spell has: any receiver counts. (`burst.lifetime` is a CPUParticles2D
 ## property in gameplay/feel, and is dropped before the scan.)
-const UNIQUE_FIELDS: String = "(mana_cost|wind_down|lifetime|display_name|base_damage|damage_scale|orbit_radius|ray_length|shot_mult|damage_mult|speed_mult|radius_mult|wind_down_mult|mana_mult|extra_pierce|behaviour_strength|chain_jumps|homing_curve|trigger_interval|trigger_event|shots_requested|shots_clamped|element_name|form_name)"
+const UNIQUE_FIELDS: String = "(mana_cost|wind_down|lifetime|display_name|base_damage|damage_scale|orbit_radius|ray_length|shot_mult|damage_mult|speed_mult|radius_mult|wind_down_mult|mana_mult|extra_pierce|behaviour_strength|chain_jumps|homing_curve|trigger_interval|trigger_event|shots_requested|shots_clamped|element_name|carrier_card_name)"
 ## Fields with common names (`HitProfile` has some of them, and `gameplay/combat` may read that):
 ## only a variable named like a spell, or declared as a spell class.
-const COMMON_FIELDS: String = "(id|damage|speed|complexity|shots|radius|pierce|tint|carrier|spread|icon|event|interval|wind_up|status_id|status_duration|status_strength|element_id|form_id|trigger_id|behaviour)"
+const COMMON_FIELDS: String = "(id|damage|speed|complexity|shots|radius|pierce|tint|carrier|spread|icon|event|interval|wind_up|status_id|status_duration|status_strength|element_id|carrier_card_id|trigger_id|behaviour)"
 ## The classes a variable may be declared as. `HitProfile` is left out on purpose: `gameplay/combat`
 ## reads it, which is what it is for.
-const SPELL_CLASSES: String = "(SpellComponent|FormBase|ElementBase|ModifierBase|TriggerBase|CompiledSpell)"
+const SPELL_CLASSES: String = "(SpellComponent|CarrierCard|ElementBase|ModifierBase|TriggerBase|CompiledSpell)"
 ## Folders that are not game scripts, and the three that may read spell fields.
 const SKIPPED_DIRS: PackedStringArray = [".git", ".github", ".godot", "addons", "build", "ci", "docs", "content/spells", "core/base", "core/spells"]
 ## Fixtures that build or check cards, so they read and set card fields as the test_*.gd files may
@@ -43,7 +43,7 @@ func test_the_scanner_catches_field_reads() -> void:
 		check(_reads_field(line), "caught: " + line)
 	var good: PackedStringArray = [
 		"spells.cast(index, slot, global_position, aim, mana)",
-		"events.spell_cast.emit(index, form_id, pos, aim)",
+		"events.spell_cast.emit(index, carrier_card_id, pos, aim)",
 		"var speed: float = 3.0",
 		"data.id",
 		"spells.cast(0, 0, a, b, 1.0)  # reads spell.damage later",
@@ -58,7 +58,7 @@ func test_the_scanner_catches_field_reads() -> void:
 
 
 func test_the_scanner_catches_fields_of_declared_variables() -> void:
-	var names: PackedStringArray = _typed_names("var pick: FormBase = null\nfunc f(other: CompiledSpell, e: ElementBase) -> void:\nvar p: HitProfile")
+	var names: PackedStringArray = _typed_names("var pick: CarrierCard = null\nfunc f(other: CompiledSpell, e: ElementBase) -> void:\nvar p: HitProfile")
 	check_equal(names, PackedStringArray(["pick", "other", "e"]), "typed names are found")
 	check(_reads_field("var d: int = pick.base_damage", names), "caught: a unique field on a declared variable")
 	check(_reads_field("var d: int = other.shots", names), "caught: a common field on a variable declared CompiledSpell")

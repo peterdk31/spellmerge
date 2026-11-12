@@ -14,8 +14,8 @@ const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 
 func test_the_card_is_a_valid_carrier() -> void:
-	var card: FormBase = load("res://content/spells/carriers/pulse/pulse.tres") as FormBase
-	check(card != null, "pulse.tres loads as a FormBase")
+	var card: CarrierCard = load("res://content/spells/carriers/pulse/pulse.tres") as CarrierCard
+	check(card != null, "pulse.tres loads as a CarrierCard")
 	if card == null:
 		return
 	check_equal(card.id, &"pulse", "its id is its folder")
@@ -120,7 +120,7 @@ func test_a_bare_pulse_strikes_nothing() -> void:
 
 func test_a_pulse_that_strikes_shows_itself_out_to_its_reach() -> void:
 	# Owner, 2026-11-12: "It sends a mote pulse out from the caster/point" (its card's `shown_cue`).
-	var card: FormBase = load("res://content/spells/carriers/pulse/pulse.tres") as FormBase
+	var card: CarrierCard = load("res://content/spells/carriers/pulse/pulse.tres") as CarrierCard
 	check_equal(card.shown_cue, &"pulse", "its card shows the pulse cue")
 	check(load("res://content/cues/pulse.tres") is CueBase, "and that cue exists")
 	var shown: Array = _shown(["fire", "pulse"])

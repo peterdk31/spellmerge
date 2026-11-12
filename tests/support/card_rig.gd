@@ -58,8 +58,8 @@ func _card(id: StringName) -> SpellComponent:
 	return _registry.call("get_resource", &"spells", id) as SpellComponent
 
 
-func _form(id: StringName) -> FormBase:
-	return _card(id) as FormBase
+func _form(id: StringName) -> CarrierCard:
+	return _card(id) as CarrierCard
 
 
 func _modifier(id: StringName) -> ModifierBase:

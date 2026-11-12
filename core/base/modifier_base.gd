@@ -201,9 +201,9 @@ static func stacks(behaviour: int) -> Stack:
 @export var damage_mult: float = 1.0
 @export var speed_mult: float = 1.0
 @export var radius_mult: float = 1.0
-## Factor on the carrier's wind-down (`FormBase.wind_down`).
+## Factor on the carrier's wind-down (`CarrierCard.wind_down`).
 @export var wind_down_mult: float = 1.0
-## Seconds added to the carrier's wind-up (`FormBase.wind_up`): a charge; a cost, never an effect
+## Seconds added to the carrier's wind-up (`CarrierCard.wind_up`): a charge; a cost, never an effect
 ## of its own (docs/milestones/cast-timing.md).
 @export var wind_up_add: float = 0.0
 ## Factor on the carrier's whole wind-up, its form card's plus every `wind_up_add` on it, whatever

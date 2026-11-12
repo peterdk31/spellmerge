@@ -141,7 +141,7 @@ func end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 		return
 	if kit.events != null:
 		kit.set_cue_tag(tag)
-		kit.events.carrier_ended.emit(actor, spell.form_id, at, heading, spell.radius, spell.tint, spell.look)
+		kit.events.carrier_ended.emit(actor, spell.carrier_card_id, at, heading, spell.radius, spell.tint, spell.look)
 		kit.set_cue_tag(0)
 	# What it does where it lands hits as the move's caster (a teleport's strike, its pulls).
 	kit.cast_as(caster, kit.projectiles.get_seq_of(caster) if caster >= 0 else 0)

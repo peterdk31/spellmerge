@@ -46,12 +46,12 @@ func test_every_card_walks_without_problems() -> void:
 	staff.id = &"state_walk"
 	staff.slots = 16
 	staff.cooldown = 0.0
-	var forms: Array[FormBase] = []
+	var forms: Array[CarrierCard] = []
 	var others: Array[SpellComponent] = []
-	var payload: FormBase = null
+	var payload: CarrierCard = null
 	for card: Resource in registry.call("get_all", &"spells"):
-		if card is FormBase:
-			var form: FormBase = card
+		if card is CarrierCard:
+			var form: CarrierCard = card
 			forms.append(form)
 			if form.carrier == &"atom" and (payload == null or form.shots > payload.shots):
 				payload = form

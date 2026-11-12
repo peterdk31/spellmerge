@@ -53,7 +53,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 		# The pulse itself: a ring of its cards' motes out to its reach (the card's `shown_cue`).
 		# A bare Pulse strikes nothing and shows nothing (a held watch round a fire pit).
 		kit.set_cue_tag(tag)
-		kit.events.form_shown.emit(actor, spell.form_id, origin, way, reach, spell.tint, spell.look)
+		kit.events.form_shown.emit(actor, spell.carrier_card_id, origin, way, reach, spell.tint, spell.look)
 		kit.set_cue_tag(0)
 	_before_strike(spell, tag, actor, origin, reach)
 	if spell.strikes:

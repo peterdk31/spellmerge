@@ -16,8 +16,8 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const COMBOS: Array[String] = ["decoy_and_fire", "decoy_frost_cover"]
 
 
-func _card() -> FormBase:
-	return load("res://content/spells/carriers/decoy/decoy.tres") as FormBase
+func _card() -> CarrierCard:
+	return load("res://content/spells/carriers/decoy/decoy.tres") as CarrierCard
 
 
 func _combo(id: String) -> Dictionary:
@@ -42,8 +42,8 @@ func _spawns(cards: Array, seat: int = 0) -> Array:
 
 
 func test_the_card_is_a_valid_carrier() -> void:
-	var card: FormBase = _card()
-	check(card != null, "decoy.tres loads as a FormBase")
+	var card: CarrierCard = _card()
+	check(card != null, "decoy.tres loads as a CarrierCard")
 	if card == null:
 		return
 	check_equal(card.id, &"decoy", "its id is its folder")
@@ -160,7 +160,7 @@ func _decoy_barrier(world: World, wizard: Actor) -> int:
 
 func test_a_decoy_placed_again_starts_with_its_own_barrier_only() -> void:
 	# A decoy's actor is kept by its row and placed again: the barrier goes with the decoy, not the row.
-	var quick: FormBase = _card().duplicate() as FormBase
+	var quick: CarrierCard = _card().duplicate() as CarrierCard
 	quick.wind_down = 0.0
 	quick.lifetime = 0.25
 	var made: Array = _world([&"shield", &"decoy", &"decoy"], Vector2(400.0, 300.0), {&"decoy": quick})
@@ -295,7 +295,7 @@ func test_a_decoys_timer_recoil_pushes_the_decoy() -> void:
 
 func test_a_decoy_that_ends_mid_dash_is_placed_again_standing() -> void:
 	# A decoy's actor is kept by its row: the dash its payload asked of it ends with it.
-	var quick: FormBase = _card().duplicate() as FormBase
+	var quick: CarrierCard = _card().duplicate() as CarrierCard
 	quick.wind_down = 0.0
 	quick.lifetime = 0.3
 	var made: Array = _world([&"timer", &"decoy", &"dash", &"decoy"], Vector2(240.0, 0.0), {&"decoy": quick})
@@ -391,7 +391,7 @@ func test_a_decoys_chain_jumps_return_to_the_decoy() -> void:
 				if not world.projectiles.is_alive(slot):
 					continue
 				var spell: CompiledSpell = world.spells.profile(world.projectiles.get_tag_of(slot))
-				if spell == null or spell.form_id != &"bolt":
+				if spell == null or spell.carrier_card_id != &"bolt":
 					continue
 				bolts[world.projectiles.get_seq_of(slot)] = true
 				if world.projectiles.get_caster_of(slot).distance_to(world.projectiles.get_anchor(decoy.id)) > 1.0:
@@ -589,7 +589,7 @@ func test_a_homing_decoy_creeps_toward_its_target_and_a_plain_one_stands() -> vo
 ## ticking from its own body. Regression: the tag's last entry left (the younger's).
 func test_a_broken_decoy_takes_only_its_own_timer() -> void:
 	# A decoy card with no cooldown, so the staff casts a second while the first stands.
-	var quick: FormBase = _card().duplicate() as FormBase
+	var quick: CarrierCard = _card().duplicate() as CarrierCard
 	quick.wind_down = 0.0
 	var made: Array = _world([&"timer", &"decoy", &"bolt"], Vector2(400.0, 300.0), {&"decoy": quick})
 	var world: World = made[0]
@@ -637,7 +637,7 @@ func _bolts_near(world: World, at: Vector2) -> int:
 	for slot in world.projectiles.get_cap():
 		if world.projectiles.is_alive(slot) and world.projectiles.get_position_of(slot).distance_to(at) < 8.0:
 			var spell: CompiledSpell = world.spells.profile(world.projectiles.get_tag_of(slot))
-			if spell != null and spell.form_id == &"bolt":
+			if spell != null and spell.carrier_card_id == &"bolt":
 				found += 1
 	return found
 
@@ -669,7 +669,7 @@ func _bolts(world: World) -> int:
 	for slot in world.projectiles.get_cap():
 		if world.projectiles.is_alive(slot):
 			var spell: CompiledSpell = world.spells.profile(world.projectiles.get_tag_of(slot))
-			if spell != null and spell.form_id == &"bolt":
+			if spell != null and spell.carrier_card_id == &"bolt":
 				found += 1
 	return found
 
@@ -705,7 +705,7 @@ func test_a_decoy_aims_at_a_foe_it_can_see_and_turns_to_it() -> void:
 ## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
 ## tests/content/spells/test_carrier_looks.gd).
 func test_its_moments_have_their_cues() -> void:
-	var card: FormBase = load("res://content/spells/carriers/decoy/decoy.tres") as FormBase
+	var card: CarrierCard = load("res://content/spells/carriers/decoy/decoy.tres") as CarrierCard
 	check_equal(card.shown_cue, &"conjure", "its shown plays conjure")
 	check_equal(card.end_cue, &"dismiss", "its end plays dismiss")
 	check_equal(card.cast_cue, &"cast", "its cast plays cast")

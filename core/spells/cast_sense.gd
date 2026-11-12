@@ -158,8 +158,10 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	var shots: float = float(maxi(spell.shots, 1) * ways)
 	if hit != null:
 		if hit.heal > 0:
+			# A heal does nothing else (owner 2026-11-12): no damage, and its infusions' statuses never land.
 			heals = true
-		elif spell.has_trait(CarrierTraits.HITS):
-			damage += hit.damage * shots * repeats
-		if hit.status_id != &"":
-			status = true
+		else:
+			if spell.has_trait(CarrierTraits.HITS):
+				damage += hit.damage * shots * repeats
+			if hit.status_id != &"":
+				status = true

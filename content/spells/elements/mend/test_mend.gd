@@ -50,6 +50,8 @@ func test_a_mend_bolt_carries_a_heal_and_no_damage() -> void:
 	var spell: CompiledSpell = staff.casts[0].group.spells[0]
 	check(spell.hit.heal > 0, "the hit heals")
 	check_equal(spell.hit.damage, 0.0, "and does no damage, to friend or foe")
+	var view: Dictionary = arena.spells.staff_view([&"mend", &"bolt"] as Array[StringName], StaffBase.new())
+	check_equal(float((view["casts"] as Array)[0]["damage"]), 0.0, "and the builder shows no damage for it")
 	arena.free_all()
 	arena = ArenaScript.new(root)
 	staff = arena.install_cards(0, 0, ["bolt"])

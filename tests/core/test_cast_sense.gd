@@ -88,6 +88,8 @@ func test_moves_blocks_spawns_heals() -> void:
 	var mend: CastSense = _sense(["mend", "bolt"])
 	check(mend.heals, "a mend bolt heals")
 	check_equal(mend.damage, 0.0, "and hurts nobody")
+	check(not _sense(["frost", "mend", "bolt"]).status, "nor puts its frost on: a heal does nothing else (owner 2026-11-12)")
+	check(_sense(["frost", "bolt"]).status, "a frost bolt does")
 	var alone: CastSense = _sense(["mend"])
 	check(not alone.heals and alone.empty, "a mend with no carrier casts nothing (props W9a)")
 	check(_sense(["mend", "pulse"]).heals, "a mend Pulse heals those near its caster")

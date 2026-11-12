@@ -93,6 +93,7 @@ const BirthsScript := preload("res://gameplay/feel/births.gd")
 const BLAST_SHADER: Shader = preload("res://core/projectiles/shot_blast.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
+const PulseRingsScript := preload("res://gameplay/feel/pulse_rings.gd")
 const PortalLookScript := preload("res://gameplay/feel/portal_look.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
@@ -392,6 +393,10 @@ var _live_beams: Array[MeshInstance2D] = []
 var _carrier_card_looks: Dictionary = {}
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
 var _swing_trails: SwingTrailsScript = null
+## The Pulses' rings (`pulse_rings.gd`, props W9a): motes along each live ring's edge, every frame,
+## from one typed read of them (`CarrierPulse.read_view` into `_pulse_view`, refilled each frame).
+var _pulse_rings: PulseRingsScript = PulseRingsScript.new()
+var _pulse_view: PulseView = PulseView.new()
 ## The open portals' gates (`PortalLookScript`), drawn every frame from one typed read of them
 ## (`CarrierPortal.read_view` into `_portal_view`, refilled each frame).
 var _portal_look: PortalLookScript = null
@@ -748,6 +753,13 @@ func step(real_delta: float) -> void:
 	_draw_live_beams(real_delta)
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null, _swing_shader_of)
+	if _spectacle.motes_on():
+		var rings: CarrierPulse = CarrierPulse.of(spells as SpellRuntime) if spells is SpellRuntime else null
+		if rings != null:
+			rings.read_view(_pulse_view)
+		else:
+			_pulse_view.rings = 0
+		_pulse_rings.step(_pulse_view, real_delta, _swing_ramp, _spectacle.births)
 	if _portal_look != null:
 		_step_portals()
 	_status_motes(real_delta)
@@ -2339,8 +2351,7 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 
 ## The cues the carrier card `carrier_card` names and its radius (`CarrierCard.look_cues`: [cast_cue,
 ## shown_cue, impact_cue, end_cue, radius], CUE_CAST to CUE_RADIUS), the defaults (`cast` and `impact`, radius
-## 0) for an id that is no carrier card; a fallback carrier (`caster`) casts with its own
-## `Carrier.cast_cue`; a modifier that shows itself (`carrier_shown` `zap`) brings its
+## 0) for an id that is no carrier card; a modifier that shows itself (`carrier_shown` `zap`) brings its
 ## own `cue` as its shown cue. Read once per card id, then kept: a cast or a hit allocates nothing.
 ## With no registry yet, or no carrier card id, the defaults are answered but not kept.
 func _carrier_card_cues_of(carrier_card: StringName) -> Array:
@@ -2353,10 +2364,6 @@ func _carrier_card_cues_of(carrier_card: StringName) -> Array:
 	var cues: Array = NO_CARRIER_CARD_CUES
 	if card is CarrierCard:
 		cues = (card as CarrierCard).look_cues()
-	elif card == null and Carriers.is_fallback(carrier_card) and Carriers.of(carrier_card).cast_cue() != &"":
-		# A cast with no carrier card (its cards landed on the caster): its fallback carrier's own cue.
-		cues = NO_CARRIER_CARD_CUES.duplicate()
-		cues[CUE_CAST] = Carriers.of(carrier_card).cast_cue()
 	elif card is ModifierBase and (card as ModifierBase).cue != &"":
 		# A modifier that shows itself (a zap: `carrier_shown` names its card) plays its own cue there.
 		cues = [NO_CARRIER_CARD_CUES[CUE_CAST], (card as ModifierBase).cue, NO_CARRIER_CARD_CUES[CUE_IMPACT], &"", 0.0, NO_CARRIER_CARD_CUES[CUE_WIND]]

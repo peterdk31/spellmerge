@@ -1,10 +1,10 @@
 {
 	"id": "shield_decoy_timer",
 	"name": "Ever-shielded decoy",
-	"does": "The shield after the decoy's timer lands on the decoy: every tick gives the decoy a barrier, which stops the enemy bolt that reaches it.",
+	"does": "Every tick of the decoy's timer sends a shield ring out from the decoy, which stops the enemy bolt that reaches it.",
 	"needs": "shield",
 	"entities": true,
-	"casts": [{"staff": 0, "cards": ["timer", "decoy", "shield"]}],
+	"casts": [{"staff": 0, "cards": ["timer", "decoy", "shield", "pulse"]}],
 	"imps": [],
 	"foes": [[260, -12]],
 	"seconds": 1.5,

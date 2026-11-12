@@ -39,14 +39,9 @@ const SPAWNS: int = CarrierTraits.SPAWNS
 const GATES: int = CarrierTraits.GATES
 const CASTS_FROM_SHOT: int = CarrierTraits.CASTS_FROM_SHOT
 const CASTS_FROM_BODY: int = CarrierTraits.CASTS_FROM_BODY
-const CASTERLESS: int = CarrierTraits.CASTERLESS
+const AOE: int = CarrierTraits.AOE
 const MELEE: int = CarrierTraits.MELEE
 
-## Who may cast a group (`payload_cast_by`, `StaffCompiler`), as bits: an actor's body (the
-## caster's own, or a body of its own carrier's: a decoy), a live shot, a point.
-const BY_BODY: int = 1
-const BY_SHOT: int = 2
-const BY_POINT: int = 4
 ## What draws its look (`look_drawer`), and so which area a card's `look_shader` (and light) is
 ## for (docs/milestones/card-looks.md): the projectile manager's head batches (LOOK_SHOT: a shot
 ## that flies or orbits), its quad batches (LOOK_STILL: a still shot), Feel's beams (LOOK_BEAM),
@@ -85,14 +80,6 @@ func required_fields() -> Dictionary:
 	return {}
 
 
-## True when a cast of it adds a wind-down of its own to its staff's (its carrier card's
-## `wind_down`), so a card's wind-down factor changes something: every carrier a carrier card fires,
-## not a fallback carrier (`CarrierFallback`), which has no carrier card. A payload's carrier adds
-## none either; the compiler knows that one (`StaffCompiler._numbers_count`).
-func has_wind_down() -> bool:
-	return true
-
-
 ## Which way the staff turns for a cast of it by `actor` along `dir` (`StaffPoses.start`'s
 ## `side`), asked when the cast starts winding up, before it leaves (`Spells._wind_pose`).
 func pose_side(_actor: int, dir: Vector2) -> int:
@@ -101,17 +88,6 @@ func pose_side(_actor: int, dir: Vector2) -> int:
 
 ## The kind of its hits (`HitProfile.kind`), &"" for a shot's own.
 func hit_kind() -> StringName:
-	return &""
-
-
-## A carrier no carrier card fires (a fallback) has its own look here, where a carrier card would carry
-## it: its staff animation (`CarrierCard.staff_pose`, packed) and the cue a seat's cast of it plays
-## (`CarrierCard.cast_cue`; &"" for Feel's default). A carrier card's carrier answers none: its card says.
-func staff_pose() -> PackedFloat32Array:
-	return PackedFloat32Array()
-
-
-func cast_cue() -> StringName:
 	return &""
 
 
@@ -188,93 +164,12 @@ func fires_with(event: int, has: Dictionary, infused: bool) -> bool:
 	return true
 
 
-## Who may cast the payload a trigger of `event` fires on this carrier, as `BY_*` bits, when the
-## carrier (compiled as `spell`) is itself cast by `by` (`BY_*` bits; a cast's own group is cast by
-## the caster's body): the compiler lands a payload's left-over cards on it (`Carriers.fallback`;
-## docs/CARRIERS.md, "The fallback carriers"), so a card there is wasted only when none of them
-## could use it. Worked out from its yes/no answers, the same for every carrier, as the runtime
-## fires each event:
-## - `on cast` leaves at once, cast by whoever cast the carrier (`by`).
-## - `timer`, `on hurt` and `on recast` fire from where the carrier is while it lasts: its own shot
-##   (`CASTS_FROM_SHOT`), its own body (`CASTS_FROM_BODY`) or what it moves (`MOVES_CASTER`: the
-##   shot that cast it, else the wizard's body); a line, a strike or a spot is a point.
-## - `on expire` fires where it ended: a move's end is what it moved; a shot that pulls ends where
-##   what it pulled arrives (that caster); anything else is gone, a point.
-## - `on hit`, `on kill` and `on reaction` fire from a shot that may fly on after its hit (it
-##   pierces, sticks, or its hits never spend it: a wall), from what a move moves (its strikes are
-##   that body's: a dash's pass, a teleport's landing; `hit_caster`), else from the point.
-## - `on wall` fires from a shot that bounces on, else from the point.
-## - `on block` fires from what its shield stopped the shot with: the shot, or the body its barrier
-##   is on; a deflect's block is the turned shot's, from the point.
-func payload_cast_by(event: int, spell: CompiledSpell, by: int) -> int:
-	match event:
-		TriggerBase.Event.CAST:
-			return by
-		TriggerBase.Event.TIMER, TriggerBase.Event.HURT, TriggerBase.Event.RECAST:
-			var bearer: int = _bearer(by)
-			return bearer if bearer != 0 else BY_POINT
-		TriggerBase.Event.EXPIRE:
-			if has(MOVES_CASTER):
-				return _bearer(by)
-			if has(CASTS_FROM_SHOT) and _with(spell, ModifierBase.Behaviour.PULL):
-				# A pull whose hit spent the shot ends where its caster arrives (`CasterMoves.pull`).
-				return _moved(by) | BY_POINT
-			return BY_POINT
-		TriggerBase.Event.HIT, TriggerBase.Event.KILL, TriggerBase.Event.REACTION:
-			if has(MOVES_CASTER):
-				return _moved(by) | BY_POINT
-			var flies_on: bool = not has(PIERCE) or (spell != null and spell.pierce > 0) or _with(spell, ModifierBase.Behaviour.STICKY)
-			return BY_SHOT | BY_POINT if has(CASTS_FROM_SHOT) and flies_on else BY_POINT
-		TriggerBase.Event.WALL:
-			return BY_SHOT | BY_POINT if has(CASTS_FROM_SHOT) and _with(spell, ModifierBase.Behaviour.BOUNCE) else BY_POINT
-		TriggerBase.Event.BLOCK:
-			if not _with(spell, ModifierBase.Behaviour.SHIELD):
-				return BY_POINT
-			if has(CASTS_FROM_SHOT):
-				return BY_SHOT
-			if has(CASTS_FROM_BODY):
-				return BY_BODY
-			if has(MOVES_CASTER) and by & (BY_BODY | BY_POINT) != 0:
-				# Its shield is a barrier on the wizard's body it moves (`CasterMoves.shield`).
-				return BY_BODY
-	return BY_POINT
-
-
 ## Who casts the payload a hit of this carrier with no shot fires (a strike, a ray: `on hit`,
 ## `on kill`, `on reaction`), while `caster` (a value as `CarrierKit.caster`) casts the hit for a card
 ## of `actor`: the point it hit, by default; a carrier whose strikes are the body or shot it moves
-## (a dash, a teleport: `CarrierMove`) says that one. The runtime's side of `payload_cast_by`.
+## (a dash, a teleport: `CarrierMove`) says that one.
 func hit_caster(_caster: int, _actor: int) -> int:
 	return SpellRuntime.CASTER_POINT
-
-
-## True when `spell` has a card of `behaviour` on it.
-static func _with(spell: CompiledSpell, behaviour: int) -> bool:
-	return spell != null and spell.behaviour(behaviour) > 0.0
-
-
-## What casts the payloads this carrier fires from where it is while it lasts, when it is cast by
-## `by`: its own shot, its own body, or what it moves (`_moved`); 0 for none of them (a point).
-func _bearer(by: int) -> int:
-	if has(CASTS_FROM_BODY):
-		return BY_BODY
-	if has(CASTS_FROM_SHOT):
-		return BY_SHOT
-	if has(MOVES_CASTER):
-		return _moved(by)
-	return 0
-
-
-## What a move of a caster cast by `by` moves: the shot that cast it (which may end before the move
-## does: then the point), else the wizard's body (a point cannot move, so a move cast by one moves
-## the wizard, rules R4c).
-static func _moved(by: int) -> int:
-	var moved: int = 0
-	if by & BY_SHOT != 0:
-		moved |= BY_SHOT | BY_POINT
-	if by & (BY_BODY | BY_POINT) != 0:
-		moved |= BY_BODY
-	return moved
 
 
 ## True when its traits meet `need` (a needs row; empty: always).

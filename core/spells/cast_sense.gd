@@ -7,7 +7,7 @@ extends RefCounted
 ## `Caster.next_cast_sense`. It names no card: an AI knows a card only by what it does (owner,
 ## 2026-11-01; a test fails on any card or carrier id in the AI's code). Read-only.
 ##
-## It reads the cast's own group: its carriers and its fallback on the caster. What its triggers
+## It reads the cast's own group: its carriers (a Pulse's ring among them). What its triggers
 ## fire later is not part of the cast's summary.
 
 ## Made whole by the staff compiler (`CastSense.of`) and never changed after: the state walk
@@ -27,6 +27,9 @@ var radius: float = 0.0
 var damage: float = 0.0
 ## The widest explosion at a carrier's end (`blast`): closer than this its caster is hurt too.
 var blast: float = 0.0
+## True when a blast of it goes off where it was cast, on its caster, wherever its target is: a
+## carrier that goes out all round its cast point (`AOE`, a Pulse's ring) blasts at its centre.
+var blast_on_caster: bool = false
 ## True when it hits round a point or round its caster rather than along a line (a nova, a ring,
 ## an orbit, a fall from the sky, a rune).
 var area: bool = false
@@ -45,10 +48,8 @@ var blocks: bool = false
 var spawns: bool = false
 ## True when it opens a way through the world that shots and bodies take (a portal).
 var opens: bool = false
-## True when its hits heal, and when a heal lands on its caster itself (a mend that fell back on
-## the caster, with no carrier to fly on): a cast to heal itself with.
+## True when its hits heal.
 var heals: bool = false
-var heals_self: bool = false
 ## True when its hits apply a status.
 var status: bool = false
 ## True when it stays on until the button is pressed again (`hold`).
@@ -83,10 +84,12 @@ static func of(cast: CompiledCast) -> CastSense:
 		return sense
 	sense.empty = false
 	var repeats: float = float(maxi(cast.group.repeats, 1))
+	# The aimed numbers (`radius`, `speed`) are the first aimed carrier's: one that acts all round
+	# its caster (`AOE`) is not aimed.
 	var first_carrier: bool = true
 	for spell: CompiledSpell in cast.group.spells:
 		sense._read_spell(spell, repeats, first_carrier)
-		if spell.fallback == CompiledSpell.FALLBACK_NONE:
+		if not spell.has_trait(CarrierTraits.AOE):
 			first_carrier = false
 	if sense.close_reach <= 0.0:
 		sense.close_reach = sense.reach
@@ -95,14 +98,6 @@ static func of(cast: CompiledCast) -> CastSense:
 
 func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	var shield: bool = spell.behaviour(ModifierBase.Behaviour.SHIELD) > 0.0 or spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
-	if spell.fallback != CompiledSpell.FALLBACK_NONE:
-		# Cards that landed on the caster: a barrier or a deflect round the body, a heal on it.
-		if shield and spell.fallback == CompiledSpell.FALLBACK_CASTER:
-			blocks = true
-		if spell.hit != null and spell.hit.heal > 0:
-			heals = true
-			heals_self = heals_self or spell.fallback == CompiledSpell.FALLBACK_CASTER
-		return
 	var carrier: Carrier = Carriers.of(spell.carrier)
 	var spell_reach: float = carrier.reach_of(spell)
 	# A nova casts it every way at once: not aimed, an area as far out as each copy goes.
@@ -117,7 +112,8 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	if circles:
 		spell_reach = 0.0
 		carried = spell.orbit_radius + spell.radius
-	if ways > 1:
+	# A ring that goes out all round its cast point (a Pulse): an area as far as it grows, not aimed.
+	if ways > 1 or spell.has_trait(CarrierTraits.AOE):
 		spell_reach = 0.0
 	if first:
 		radius = spell.radius
@@ -125,6 +121,8 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	reach = maxf(reach, spell_reach)
 	lasts = maxf(lasts, spell.lifetime)
 	blast = maxf(blast, spell.behaviour(ModifierBase.Behaviour.BLAST))
+	if spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0 and spell.has_trait(CarrierTraits.AOE):
+		blast_on_caster = true
 	if spell.homing_range > 0.0:
 		homing = true
 	if spell.has_trait(CarrierTraits.MOVES_CASTER):
@@ -141,7 +139,7 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		sustained = true
 	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.LINE):
 		repeats_held = true
-	var ring: bool = falls or circles or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.OUTWARD)
+	var ring: bool = spell.has_trait(CarrierTraits.AOE) or falls or circles or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.OUTWARD)
 	if ring:
 		area = true
 	# How near a cast that is not aimed must be: a ring's flight, an orbit's circle, a melee arc.

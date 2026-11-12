@@ -95,15 +95,15 @@ func test_it_leaves_a_teammate_that_is_well() -> void:
 	check(healed.is_empty(), "no heal cast: %s" % healed)
 
 
-func test_it_heals_itself_with_a_heal_that_lands_on_it() -> void:
+func test_it_heals_a_teammate_beside_it_with_a_heal_round_itself() -> void:
+	# Review, 2026-11-12: a Pulse has no aimed reach, so a mend Pulse was never cast; it heals a
+	# teammate within it (and spares its caster).
 	fx.players[0].position = Vector2(300.0, 0.0)
-	var data: EnemyBase = Fixture.staffed([["mend"]])
-	data.max_health = 100.0
-	var healer: Actor = fx.imp(Vector2.ZERO, data)
-	healer.health.reset(30.0)
+	var healer: Actor = fx.staffed_enemy([["mend", "pulse"]])
+	var mate: Actor = _hurt_mate(healer.position + Vector2(0.0, 14.0), 0.3)
 	fx.run_all(48)
-	check(int(healed.get(healer.get_instance_id(), 0)) > 0, "hurt, it casts the heal that lands on it: %s" % healed)
-	check(healer.health.health > 30.0, "and its health goes up: %.1f" % healer.health.health)
+	check(int(healed.get(mate.get_instance_id(), 0)) > 0, "the teammate beside it is healed: %s" % healed)
+	check_equal(int(healed.get(healer.get_instance_id(), 0)), 0, "and never the healer itself")
 
 
 ## An imp holding a fire bolt it cannot pay for (so the test is about where it walks, and no shot

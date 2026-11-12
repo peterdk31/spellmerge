@@ -4353,6 +4353,15 @@ func _turned(slot: int) -> float:
 	return _orbit_angle[slot] - _orbit_from[slot] if _motion[slot] == MOTION_ORBIT else 0.0
 
 
+## The factor of its speed a shot of the curve `start`, `end`, `ease_power` (`set_speed_curve`) goes
+## at with `left` of its life left (0 to 1): the curve itself, for what grows as a shot flies (a
+## Pulse's ring, `CarrierPulse`). `_curve_factor` is the same sum inline (the hot loop, mirrored by
+## the native kernel); content/spells/carriers/pulse/test_pulse.gd
+## (`test_its_ring_goes_as_far_as_a_shot_of_its_numbers_flies`) holds the two to the same distance.
+static func speed_factor(start: float, end: float, ease_power: float, left: float) -> float:
+	return start + (end - start) * (1.0 - DMath.pow(left, ease_power))
+
+
 ## The factor of its speed the shot in `slot` goes at in a step of `delta` (`set_speed_curve`): read
 ## at the middle of the step (its life was already counted down for the whole step). 1 for a shot
 ## with no curve.
@@ -6150,6 +6159,31 @@ func target_owner_of(node: Node) -> int:
 		return EventsScript.NO_PLAYER
 	var at: int = _target_row(node)
 	return EventsScript.NO_PLAYER if at < 0 else _target_owner[at]
+
+
+## Where the hit shape of the registered target `node` is centred now (its node's place and offset),
+## and INF for a node that is not registered: what a ring judges a body by (`CarrierPulse`).
+func target_centre(node: Node) -> Vector2:
+	if node == null or not is_instance_valid(node) or not node is Node2D:
+		return Vector2.INF
+	var at: int = _target_row(node)
+	return (node as Node2D).global_position + _target_offset[at] if at >= 0 else Vector2.INF
+
+
+## The hit shape of the registered target `node` (`HitShape`): its box's half size (zero for a
+## circle) and the radius it is rounded by; zero and 0 for a node that is not registered.
+func target_half(node: Node) -> Vector2:
+	if node == null or not is_instance_valid(node):
+		return Vector2.ZERO
+	var at: int = _target_row(node)
+	return _target_half[at] if at >= 0 else Vector2.ZERO
+
+
+func target_round(node: Node) -> float:
+	if node == null or not is_instance_valid(node):
+		return 0.0
+	var at: int = _target_row(node)
+	return _target_radius[at] if at >= 0 else 0.0
 
 
 ## The identity of the registered target `node` (`_target_key`, online-ready N5: its actor's key),

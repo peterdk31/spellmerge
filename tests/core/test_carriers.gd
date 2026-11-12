@@ -25,7 +25,7 @@ func test_every_carrier_is_found_by_its_name() -> void:
 	check(not Carriers.of(&"fissure").works(BEHAVIOURS.NONE), "and no card works on it")
 	check(not Carriers.exists(&"fissure") and not Carriers.exists(&""), "and neither is a carrier")
 	check(Carriers.exists(&"atom"), "an atom is")
-	check_equal(Carriers.ids().size(), 13, "every carrier script in the folder is found, and none of the bases: %s" % [Carriers.ids()])
+	check_equal(Carriers.ids().size(), 14, "every carrier script in the folder is found, and none of the bases: %s" % [Carriers.ids()])
 	var ids: Array[StringName] = Carriers.ids()
 	check(ids.find(&"dash") < ids.find(&"beam") and ids.find(&"beam") < ids.find(&"decoy") and ids.find(&"decoy") < ids.find(&"swing") and ids.find(&"swing") < ids.find(&"slam"), "the runtime steps a dash's strikes, then beams, entities, swings and slams: %s" % [ids])
 
@@ -63,10 +63,11 @@ func test_what_works_follows_the_traits() -> void:
 		check(carrier.fires_with(EVENTS.HIT, {BEHAVIOURS.BLAST: true}, false), "and with a blast on a %s too: its strikes are its hits" % name)
 		check_equal(carrier.fires(EVENTS.TIMER), carrier.lasts(), "a timer ticks on a %s exactly when it lasts" % name)
 		check_equal(carrier.works(BEHAVIOURS.HOMING), carrier.steers(), "homing works on a %s exactly when it steers" % name)
-		check_equal(carrier.works(BEHAVIOURS.RETURN), carrier.flies(), "return works on a %s exactly when it flies" % name)
+		check_equal(carrier.works(BEHAVIOURS.RETURN), carrier.flies() or carrier.has(CarrierTraits.AOE), "return works on a %s exactly when it flies or goes out all round (a ring)" % name)
 		for behaviour: int in [BEHAVIOURS.CHAIN, BEHAVIOURS.SIPHON, BEHAVIOURS.POSSESS, BEHAVIOURS.RELAY, BEHAVIOURS.HEAVY, BEHAVIOURS.PULL]:
 			check_equal(carrier.works(behaviour), carrier.hits(), "%s works on a %s exactly when it hits" % [BEHAVIOURS.keys()[behaviour], name])
-		for behaviour: int in [BEHAVIOURS.NONE, BEHAVIOURS.BLAST, BEHAVIOURS.ECHO, BEHAVIOURS.RECOIL, BEHAVIOURS.MIRROR]:
+		check_equal(carrier.works(BEHAVIOURS.MIRROR), not carrier.has(CarrierTraits.AOE), "mirror works on a %s exactly when it is aimed" % name)
+		for behaviour: int in [BEHAVIOURS.NONE, BEHAVIOURS.BLAST, BEHAVIOURS.ECHO, BEHAVIOURS.RECOIL]:
 			check(carrier.works(behaviour), "%s works on every carrier, a %s too" % [BEHAVIOURS.keys()[behaviour], name])
 
 
@@ -120,6 +121,10 @@ func test_asking_about_one_card_says_what_a_compile_says() -> void:
 	check(asked > 100, "every card on every carrier was asked: %d" % asked)
 
 
+## `Carriers.<CONSTANT>` or `Carriers.is_<something>`: a carrier picked out by name.
+static var _PICKS: RegEx = RegEx.create_from_string("Carriers\\.([A-Z_]+\\b|is_)")
+
+
 func test_carriers_ask_the_runtime_only_through_the_kit_and_the_runtime_names_none() -> void:
 	# A carrier knows the runtime only as `CarrierKit` (docs/CARRIERS.md), so the kit is all a new
 	# carrier has to learn; the runtime hands launches, rows and looks to carriers by id, so a new
@@ -136,19 +141,23 @@ func test_carriers_ask_the_runtime_only_through_the_kit_and_the_runtime_names_no
 			number += 1
 			check(not line.contains("._rt") and not line.contains("SpellRuntime._"), "%s:%d asks the runtime only through the kit: %s" % [path, number, line.strip_edges()])
 	var names: PackedStringArray = []
-	var every: Array[StringName] = Carriers.ids()
-	every.append_array([Carriers.ON_CASTER, Carriers.ON_BEARER, Carriers.AT_POINT])
-	for id: StringName in every:
+	for id: StringName in Carriers.ids():
 		names.append('&"%s"' % id)
 		names.append(String(Carriers.of(id).get_script().get_global_name()))
-	var number: int = 0
-	for line in FileAccess.get_file_as_string("res://core/spells/spells.gd").split("\n"):
-		number += 1
-		var code: String = line.get_slice("#", 0)
-		if code.contains("const RAY_CARD"):
-			continue
-		for name in names:
-			check(not code.contains(name) if name.begins_with("&") else not _names_class(code, name), "spells.gd:%d names the carrier %s: %s" % [number, name, line.strip_edges()])
+	# The runtime, the compiler and the AI's summary ask a carrier its yes/no answers, never which
+	# one it is: no id, no class, and no carrier picked out through `Carriers` (a constant or an
+	# `is_` question about one; props W9a: a Pulse is `AOE`, not `Carriers.is_pulse`).
+	for path: String in ["res://core/spells/spells.gd", "res://core/spells/staff_compiler.gd", "res://core/spells/cast_sense.gd"]:
+		var number: int = 0
+		for line in FileAccess.get_file_as_string(path).split("\n"):
+			number += 1
+			var code: String = line.get_slice("#", 0)
+			if code.contains("const RAY_CARD"):
+				continue
+			for name in names:
+				check(not code.contains(name) if name.begins_with("&") else not _names_class(code, name), "%s:%d names the carrier %s: %s" % [path.get_file(), number, name, line.strip_edges()])
+			var picks: RegExMatch = _PICKS.search(code)
+			check(picks == null, "%s:%d picks out a carrier through Carriers: %s" % [path.get_file(), number, line.strip_edges()])
 
 
 ## True when `code` names the class `name` as a whole word.

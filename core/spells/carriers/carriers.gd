@@ -8,16 +8,8 @@ extends RefCounted
 ## `id`), and no other file changes.
 
 ## The folder of the carrier scripts. Each script here whose class extends `Carrier` and has an id
-## is a carrier (the bases, `Carrier`, `CarrierMove`, `CarrierEntity` and `CarrierFallback`, have none).
+## is a carrier (the bases, `Carrier`, `CarrierMove` and `CarrierEntity`, have none).
 const FOLDER: String = "res://core/spells/carriers/"
-
-## The three fallback carriers (docs/CARRIERS.md, "The fallback carriers"): what the cards a group
-## read with no carrier after them land on: the caster for a cast's own group; for a payload, what
-## fired it (a body or a shot) when one may have, else the point it began at. No carrier card fires
-## them, so they are not in `ids` and a carrier card may not name them.
-const ON_CASTER: StringName = &"caster"
-const ON_BEARER: StringName = &"bearer"
-const AT_POINT: StringName = &"point"
 
 ## Not state: the carriers made once per script, shared by every runtime (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"_shared", &"_none"]
@@ -33,37 +25,20 @@ static func of(id: StringName) -> Carrier:
 	return _shared.get(id, _none) as Carrier
 
 
-## The fallback carrier the cards with no carrier after them land on: `ON_CASTER` in a cast's own
-## group; in a payload (`payload`), `ON_BEARER` when a body or a live shot may cast it (`by`, the
-## `Carrier.BY_*` bits of `Carrier.payload_cast_by`), else `AT_POINT`.
-static func fallback(payload: bool, by: int = Carrier.BY_POINT) -> Carrier:
-	if not payload:
-		return of(ON_CASTER)
-	return of(ON_BEARER if by & (Carrier.BY_BODY | Carrier.BY_SHOT) != 0 else AT_POINT)
-
-
-## True when `id` is one of the fallback carriers.
-static func is_fallback(id: StringName) -> bool:
-	return id == ON_CASTER or id == ON_BEARER or id == AT_POINT
-
-
 ## True when `id` names a carrier a carrier card may fire (&"" names none: it is the id of the one that
-## runs nothing; the fallback carriers are fired by no card).
+## runs nothing).
 static func exists(id: StringName) -> bool:
 	if _shared.is_empty():
 		_shared = make_all()
-	return _shared.has(id) and not is_fallback(id)
+	return _shared.has(id)
 
 
-## The id of every carrier a carrier card may fire, in the order `make_all` lists them (the fallback
-## carriers left out).
+## The id of every carrier a carrier card may fire, in the order `make_all` lists them.
 static func ids() -> Array[StringName]:
 	if _shared.is_empty():
 		_shared = make_all()
 	var out: Array[StringName] = []
-	for id: StringName in _shared:
-		if not is_fallback(id):
-			out.append(id)
+	out.assign(_shared.keys())
 	return out
 
 

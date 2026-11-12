@@ -82,15 +82,15 @@ func test_moves_blocks_spawns_heals() -> void:
 	check(_sense(["teleport"]).move_reach > 30.0, "and a teleport's: %s" % _sense(["teleport"]).move_reach)
 	check(_sense(["teleport"]).moves_caster, "a teleport too")
 	check(_sense(["wall"]).blocks, "a wall blocks shots")
-	check(_sense(["shield"]).blocks, "a shield on the caster blocks")
+	check(_sense(["shield", "pulse"]).blocks, "a shield Pulse on the caster blocks")
 	check(_sense(["decoy"]).spawns, "a decoy is a body of its own")
 	check(_sense(["familiar"]).spawns, "a familiar too")
 	var mend: CastSense = _sense(["mend", "bolt"])
 	check(mend.heals, "a mend bolt heals")
 	check_equal(mend.damage, 0.0, "and hurts nobody")
-	check(not mend.heals_self, "it flies off, so it does not heal its caster")
 	var alone: CastSense = _sense(["mend"])
-	check(alone.heals and alone.heals_self, "a mend with no carrier lands on its caster and heals it")
+	check(not alone.heals and alone.empty, "a mend with no carrier casts nothing (props W9a)")
+	check(_sense(["mend", "pulse"]).heals, "a mend Pulse heals those near its caster")
 
 
 func test_held_and_sustained() -> void:
@@ -130,3 +130,11 @@ func test_spells_reads_the_next_cast() -> void:
 	check(arena.spells.next_cast_sense(0, 3) == null, "an empty staff has none")
 	check(arena.spells.next_cast_sense(-1, 0) == null, "nor a caster out of range")
 	arena.free_all()
+
+
+func test_a_rings_blast_goes_off_on_its_caster() -> void:
+	# A Pulse's blast is at its centre, where it was cast: the AI's fight never casts it at a target.
+	check(_sense(["blast", "pulse"]).blast_on_caster, "a blast Pulse blasts on its caster")
+	check(not _sense(["blast", "bolt"]).blast_on_caster, "a blast bolt where it ends")
+	check(not _sense(["fire", "pulse"]).blast_on_caster, "a Pulse with no blast")
+

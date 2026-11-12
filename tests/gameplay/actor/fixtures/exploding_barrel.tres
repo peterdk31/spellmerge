@@ -17,7 +17,7 @@
 [sub_resource type="Resource" id="fuse_staff"]
 script = ExtResource("2_staff")
 display_name = "Exploding barrel's fuse"
-slots = 2
+slots = 3
 wind_up = 1.0
 cooldown = 0.0
 max_mana = 100.0
@@ -26,7 +26,7 @@ mana_regen = 0.0
 [sub_resource type="Resource" id="blast_staff"]
 script = ExtResource("2_staff")
 display_name = "Exploding barrel's blast"
-slots = 2
+slots = 3
 cooldown = 0.0
 max_mana = 100.0
 mana_regen = 0.0
@@ -34,12 +34,12 @@ mana_regen = 0.0
 [sub_resource type="Resource" id="fuse"]
 script = ExtResource("3_entry")
 staff = SubResource("fuse_staff")
-cards = Array[StringName]([&"fire", &"blast"])
+cards = Array[StringName]([&"fire", &"blast", &"pulse"])
 
 [sub_resource type="Resource" id="blast"]
 script = ExtResource("3_entry")
 staff = SubResource("blast_staff")
-cards = Array[StringName]([&"fire", &"blast"])
+cards = Array[StringName]([&"fire", &"blast", &"pulse"])
 
 [sub_resource type="Resource" id="idle_mark"]
 script = ExtResource("10_motes")

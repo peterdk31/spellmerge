@@ -12,13 +12,9 @@ extends RefCounted
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 
-## Staffs (A4): the numbers of a fallback carrier (`CarrierFallback`), the strike made when cards
-## land on the caster or on a payload's origin with no carrier (docs/milestones/M2-staffs.md, "Reading a staff").
-const FALLBACK_DAMAGE: float = 4.0
 ## The least damage a compiled hit does (a card may go below 1, an atom's speck; health is
 ## decimal), so every hit still counts.
 const MIN_DAMAGE: float = 0.01
-const FALLBACK_RADIUS: float = 8.0
 
 ## Engine pacing, never a limit (owner, 2026-10-29: interactions are not limited, they follow
 ## the rules): the shots the payloads of one budget's triggers (a seat's, or the shared one) may
@@ -110,6 +106,12 @@ const SHOT_SPEED_EASE: float = 1.5
 ## Slam rows made at once (more when every one is on), and the share of a slam's `lifetime` its
 ## ring takes to grow to its radius; it holds for the rest (the playground's 0.08 s of 0.12 s).
 const SLAM_ROWS_START: int = 16
+## Pulse rings (`CarrierPulse`): the rows made at first; more when every one is on.
+const PULSE_ROWS_START: int = 16
+## A Pulse's ring is this many segments, each going out on its own line from its centre and
+## stopped on its own by a wall or a body it hits (owner, 2026-11-12: "the ring should be
+## 'individual' motes, that can be blocked individually").
+const PULSE_SEGMENTS: int = 64
 const SLAM_GROW: float = 0.67
 ## A homing carrier that is over at once (a beam, a teleport) has no time to turn, so it bends
 ## toward a target as far as a homing shot turns over this many pixels of its flight (the Homing
@@ -171,8 +173,6 @@ const CHAIN_MIN_SPEED: float = 300.0
 ## Pixels a payload fired when a shot expires starts back along its path, so a shot that
 ## ended on a wall fires in front of it.
 const EXPIRE_BACKOFF: float = 2.0
-## Seconds the hit of a fallback lasts (it is an instant strike; the shot fields need a value).
-const MIN_LIFETIME: float = 0.05
 
 ## Skyfall (`core/spells/skyfall.gd`): how far up the screen from its spot the hole opens (fixed:
 ## owner, 2026-11-09, no card changes it), and how long it is open before the carrier falls.

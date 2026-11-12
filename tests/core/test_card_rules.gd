@@ -43,17 +43,18 @@ extends "res://tests/support/suite.gd"
 ## with a copy of it that keeps only its costs (`_costs_of`: mana, a slower cast, less damage), a
 ## behaviour modifier with its plain copy as above.
 ##
-## The three fallback carriers (docs/CARRIERS.md, "The fallback carriers") are columns too, `on
-## you`, `on it`, `on its body` and `right there`: no carrier card fires them, so each is played the way a staff
-## reaches it. On you: the card alone, with a card that changes nothing (`LAND`) in both casts so a
-## strike happens with or without it. On it: the same as the payload of `on hit` on a piercing shot
-## that hits the target (`_bearer_prefix`): it pierces, so the shot that fired the payload flies on
-## and the cards land on it. On its body: the payload of `on cast` on a shot (`_body_prefix`), which
-## the wizard's body casts, so the cards land on that body (as a decoy's or a dashing wizard's
-## payload's do; owner, 2026-11-06). Right there: the same as on it with a shot that does not pierce
-## (`_point_prefix`), spent by its hit, so the payload is a point's. Both are cast at once in the
-## enemy shooter's scene: its shots end on the target, so none comes near the wizard. Only modifiers and infusions
-## land on them, so the triggers' and multicasts' cells there are `–`.
+## The Pulse card (docs/CARRIERS.md, "Pulse: a ring from the cast point"; props W9a) is a column of
+## its own, as every carrier card, and played in a payload in two more, `on it` and `on its body`,
+## each the way a staff reaches it: a modifier or an infusion followed by the Pulse card. On it: the
+## Pulse in the payload of `on hit` on a piercing shot that hits the target (`_bearer_prefix`): it
+## pierces, so the shot that fired the payload flies on and the Pulse is round it (cast at once in
+## the enemy shooter's scene: its shots end on the target, so none comes near the wizard). On its
+## body: the payload of `on cast` on a shot (`_body_prefix`), which the wizard's body casts, so the
+## Pulse is round that body (as a decoy's or a dashing wizard's payload's is; owner, 2026-11-06).
+## Only modifiers and infusions are played on the two payload columns, so the triggers' and
+## multicasts' cells there are `–`. A Pulse round a bare point (a payload whose shot is gone) has no
+## column: a shield or a recoil there has no one to guard or push, which the waste table does not
+## know (as for every carrier a point casts), still open with the owner (2026-11-12).
 ##
 ## It prints the matrix of every kind (✓ works, W wasted, ✗ silent no-op) so a PR shows coverage.
 ## Rule 2 (a card's effect survives a bounce, a jump, an echo, a payload) is not checked here yet.
@@ -73,11 +74,8 @@ const WORKS: String = "✓"
 const WASTED: String = "W"
 const SILENT: String = "✗"
 const NO_PROBE: String = "?"
-## A card that never lands on a fallback carrier (a trigger, a multicast).
+## A card that is not played on a payload's Pulse column (a trigger, a multicast).
 const NOT_THERE: String = "–"
-## The card both casts on a fallback carrier have: a modifier with no behaviour and no numbers, so
-## it lands and changes nothing (put on the shelf).
-const LAND: StringName = &"~land"
 
 ## The longest a cast runs (a familiar lives 8 s).
 const LONGEST: float = 9.5
@@ -134,19 +132,21 @@ var _shot: CarrierCard = null
 ## carrier of one shot that lives longest, so it flies on through the shooter's stream long enough
 ## to meet its shots (`_shot`, small and fast, passes them between two steps).
 var _lasting: CarrierCard = null
-## The matrix's columns: every carrier card, then a stand-in carrier card for each fallback carrier (its
-## `carrier` names it; not a card, never in a staff).
+## The Pulse card (the carrier card whose carrier is `pulse`), played after a card on a Pulse column.
+var _pulse: CarrierCard = null
+## The matrix's columns: every carrier card, then a stand-in carrier card for each way a Pulse is
+## played in a payload (`ON_IT_COLUMN`, `BODY_COLUMN`; not a card, never in a staff: the Pulse card
+## is played there).
 var _columns: Array[CarrierCard] = []
 ## What comes before the cards of the `on it` column (`on hit`, a pierce card, `_shot`; `_lasting`
-## in the shooter's scene: `_bearer_shooter_prefix`) and of the `right there` column (`on hit`,
-## `_shot`).
+## in the shooter's scene: `_bearer_shooter_prefix`).
 var _bearer_prefix: Array[StringName] = []
 var _bearer_shooter_prefix: Array[StringName] = []
-var _point_prefix: Array[StringName] = []
 ## What comes before the cards of the `on its body` column: `on cast`, `_shot`.
 var _body_prefix: Array[StringName] = []
-## The id of that column's stand-in carrier card.
+## The ids of the payload columns' stand-in carrier cards.
 const BODY_COLUMN: StringName = &"on its body"
+const ON_IT_COLUMN: StringName = &"on it"
 ## True while a multicast is given one carrier only, not the ones it asks for: one that adds no
 ## carrier at all must change the cast or be wasted (owner, 2026-11-06).
 var _one_carrier: bool = false
@@ -190,7 +190,10 @@ func _discover() -> void:
 	_payload = null
 	_shot = null
 	_lasting = null
+	_pulse = null
 	for carrier_card in _carrier_cards:
+		if carrier_card.carrier == &"pulse":
+			_pulse = carrier_card
 		if carrier_card.carrier != &"atom":
 			continue
 		if _payload == null or carrier_card.shots > _payload.shots:
@@ -203,21 +206,11 @@ func _discover() -> void:
 	_bearer_prefix.clear()
 	_body_prefix.clear()
 	_bearer_shooter_prefix.clear()
-	_point_prefix.clear()
-	if _shot == null:
+	if _shot == null or _pulse == null:
 		return
-	var land := ModifierBase.new()
-	land.id = LAND
-	_shelf.extra[LAND] = land
-	var on_you := CarrierCard.new()
-	on_you.id = &"on you"
-	on_you.carrier = Carriers.ON_CASTER
-	on_you.lifetime = SpellLimits.MIN_LIFETIME
-	_columns.append(on_you)
 	for trigger in _triggers:
 		if trigger.event == TriggerBase.Event.HIT:
 			_bearer_prefix.append(trigger.id)
-			_point_prefix.append(trigger.id)
 		elif trigger.event == TriggerBase.Event.CAST:
 			_body_prefix.append(trigger.id)
 	_body_prefix.append(_shot.id)
@@ -228,24 +221,19 @@ func _discover() -> void:
 	_bearer_shooter_prefix.assign(_bearer_prefix)
 	_bearer_prefix.append(_shot.id)
 	_bearer_shooter_prefix.append(_lasting.id)
-	_point_prefix.append(_shot.id)
 	var on_it := CarrierCard.new()
-	on_it.id = &"on it"
-	on_it.carrier = Carriers.ON_BEARER
+	on_it.id = ON_IT_COLUMN
+	on_it.carrier = _pulse.carrier
 	on_it.speed = _shot.speed
 	on_it.lifetime = _shot.lifetime
 	_columns.append(on_it)
 	var on_body := CarrierCard.new()
 	on_body.id = BODY_COLUMN
-	on_body.carrier = Carriers.ON_BEARER
-	on_body.lifetime = SpellLimits.MIN_LIFETIME
+	on_body.carrier = _pulse.carrier
+	on_body.speed = _pulse.speed
+	on_body.lifetime = _pulse.lifetime
+	on_body.radius = _pulse.radius
 	_columns.append(on_body)
-	var there := CarrierCard.new()
-	there.id = &"right there"
-	there.carrier = Carriers.AT_POINT
-	there.speed = _shot.speed
-	there.lifetime = _shot.lifetime
-	_columns.append(there)
 
 
 # --- The probes --------------------------------------------------------------------------------
@@ -277,6 +265,10 @@ const SHOOTER: Dictionary = {"name": "enemy shooter", "shooter": true}
 const WALL: Dictionary = {"name": "wall, target behind", "wall": 0.6, "back": true}
 const BACK: Dictionary = {"name": "target behind", "back": true}
 const WALL_TARGET: Dictionary = {"name": "target behind a wall", "wall": 0.4, "behind": true}
+## A wall just past the target on the line and one more behind it, off the line (`behind_y`): what
+## goes on from the target (a payload's ring where its shot hit it, which the target itself shadows
+## straight behind) meets the wall.
+const WALL_PAST: Dictionary = {"name": "wall past the target, one behind it off the line", "wall": 1.05, "behind": true, "behind_y": 30.0, "line": true}
 const DONOR: Dictionary = {"name": "infused target", "line": true, "donor": true}
 const SHIELDED: Dictionary = {"name": "enemy shooter, shield", "shooter": true, "with": ModifierBase.Behaviour.SHIELD}
 const WEAK: Dictionary = {"name": "target dies", "line": true, "weak": true}
@@ -308,15 +300,21 @@ static func behaviour_scenes(behaviour: int) -> Array[Dictionary]:
 			return [SHOOTER]
 		ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.ECHO, ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.PENTA, ModifierBase.Behaviour.SKYFALL:
 			return [LINE]
-		ModifierBase.Behaviour.HOLD, ModifierBase.Behaviour.RECOIL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.GROWTH, ModifierBase.Behaviour.RETURN:
+		ModifierBase.Behaviour.HOLD:
+			# A held carrier lives on, and a held Pulse strikes again: what stands on the line is struck.
+			return [OPEN, LINE]
+		ModifierBase.Behaviour.RECOIL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.GROWTH:
 			return [OPEN]
+		ModifierBase.Behaviour.RETURN:
+			# A shot comes back the way it went; a ring that shrinks home strikes what it passes again.
+			return [OPEN, LINE]
 		ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.NOVA:
 			# A nova is a mirror with eight ways: one of them goes behind.
 			return [BACK]
 		ModifierBase.Behaviour.BOUNCE:
 			return [WALL]
 		ModifierBase.Behaviour.GHOST:
-			return [WALL_TARGET]
+			return [WALL_TARGET, WALL_PAST]
 		ModifierBase.Behaviour.RELAY:
 			return [DONOR]
 		ModifierBase.Behaviour.ORBIT:
@@ -351,16 +349,17 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 ## when there is no rule for its carrier yet.
 static func reach(carrier_card: CarrierCard) -> float:
 	if carrier_card.id == BODY_COLUMN:
-		# On its body: within its strike round the wizard's hand, as on you.
-		return SpellLimits.FALLBACK_RADIUS
+		# On its body: inside its ring round the wizard, as on you.
+		return carrier_card.speed * carrier_card.lifetime * 0.75
+	if carrier_card.id == ON_IT_COLUMN:
+		# On it: where the shot that fires it hits (its stand-in has that shot's numbers).
+		return minf(carrier_card.speed * carrier_card.lifetime * 0.5, 90.0)
 	match carrier_card.carrier:
-		&"atom", &"swap", Carriers.ON_BEARER, Carriers.AT_POINT:
-			# On it and right there: where the shot that fires it hits (its stand-in has that shot's
-			# numbers).
+		&"atom", &"swap":
 			return minf(carrier_card.speed * carrier_card.lifetime * 0.5, 90.0)
-		Carriers.ON_CASTER:
-			# On you: within its strike round the wizard's hand.
-			return SpellLimits.FALLBACK_RADIUS
+		&"pulse":
+			# On you: inside the ring it grows round the wizard (as far as `speed` x `lifetime`).
+			return carrier_card.speed * carrier_card.lifetime * 0.75
 		&"beam":
 			return minf(carrier_card.ray_length * 0.5, 90.0)
 		&"swing":
@@ -533,7 +532,7 @@ func _matrix(title: String, cards: Array[SpellComponent]) -> void:
 	for card in cards:
 		var row: PackedStringArray = PackedStringArray([String(card.id)])
 		for carrier_card in _columns:
-			var cell: String = NOT_THERE if Carriers.is_fallback(carrier_card.carrier) and not _lands(card) else _cell(card, carrier_card)
+			var cell: String = NOT_THERE if _payload_pulse(carrier_card) and not _lands(card) else _cell(card, carrier_card)
 			if cell == SILENT:
 				silent += 1
 			row.append(cell)
@@ -603,27 +602,25 @@ func _casts(card: SpellComponent, carrier_card: CarrierCard, scene: Dictionary, 
 	var with: Array[StringName] = []
 	var without: Array[StringName] = []
 	var extra: Array[StringName] = _extra_cards(scene)
-	if Carriers.is_fallback(carrier_card.carrier):
-		# The card lands with LAND and the scene's cards, and nothing after them: on the caster, on the
-		# shot that hit and flies on, or on the point where `on hit`'s shot was spent.
+	if carrier_card.carrier == &"pulse" and _lands(card):
+		# The card lands with the scene's cards, and the Pulse card after them: round the caster,
+		# round the wizard's body that cast a payload, or round the shot that hit and flies on.
 		if carrier_card.id == BODY_COLUMN:
 			with.append_array(_body_prefix)
 			without.append_array(_body_prefix)
-		elif carrier_card.carrier == Carriers.ON_BEARER:
+		elif carrier_card.id == ON_IT_COLUMN:
 			var prefix: Array[StringName] = _bearer_shooter_prefix if scene.get("shooter", false) else _bearer_prefix
 			with.append_array(prefix)
 			without.append_array(prefix)
-		elif carrier_card.carrier == Carriers.AT_POINT:
-			with.append_array(_point_prefix)
-			without.append_array(_point_prefix)
 		for cards: Array[StringName] in [with, without]:
 			cards.append_array(extra)
-			cards.append(LAND)
 		var slot: int = with.size()
 		with.append(card.id)
 		var plain: StringName = _costs_of(card) if forced else _plain_of(card)
 		if plain != &"":
 			without.append(plain)
+		with.append(_pulse.id)
+		without.append(_pulse.id)
 		return [with, without, slot]
 	var tail: Array[StringName] = [carrier_card.id]
 	if card is TriggerBase:
@@ -656,10 +653,15 @@ func _casts(card: SpellComponent, carrier_card: CarrierCard, scene: Dictionary, 
 	return [with, without, 0]
 
 
-## True when `card` can land on a fallback carrier: a modifier or an infusion (a trigger with no
-## carrier after it is wasted, and a multicast asks for carriers).
+## True when `card` is played on a Pulse with the Pulse card after it: a modifier or an infusion (a trigger or a multicast
+## is played on the Pulse card's own column as on any carrier card's).
 static func _lands(card: SpellComponent) -> bool:
 	return card is ModifierBase or card is ElementBase
+
+
+## True when `carrier_card` is the stand-in of a Pulse in a payload (`on it`, `on its body`).
+static func _payload_pulse(carrier_card: CarrierCard) -> bool:
+	return carrier_card.id == ON_IT_COLUMN or carrier_card.id == BODY_COLUMN
 
 
 func _scenes_of(card: SpellComponent) -> Array[Dictionary]:
@@ -756,7 +758,7 @@ func _run(cards: Array[StringName], carrier_card: CarrierCard, scene: Dictionary
 	var r: float = reach(carrier_card)
 	world.add_wizard(cards)
 	world.add_ally(ALLY_AT)
-	# On it and right there are cast where `on hit`'s shot hits: always a target on the line for it.
+	# On it is cast where `on hit`'s shot hits: always a target on the line for it.
 	if scene.get("line", false) or _cast_by_a_hit(carrier_card):
 		var donor: Array[StringName] = []
 		if scene.get("donor", false):
@@ -768,6 +770,10 @@ func _run(cards: Array[StringName], carrier_card: CarrierCard, scene: Dictionary
 			world.add_wall(Rect2(-480.0, -160.0, 960.0, 8.0))
 		# A weak target has 0.01 health: any hit kills it, a speck's too (an atom's 0.3).
 		var target: Node2D = world.add_enemy(&"A", Vector2(r, 0.0), WEAK_HEALTH if scene.get("weak", false) else World.HEALTH, donor, Vector2.UP)
+		if _cast_by_a_hit(carrier_card):
+			# On it: the ring where the shot hit spares the target it starts on (as every payload
+			# spares the body it starts touching), so one more stands beside it, in its reach.
+			world.add_enemy(&"N", Vector2(r, 24.0), WEAK_HEALTH if scene.get("weak", false) else World.HEALTH, donor, Vector2.UP)
 		if scene.get("status", false):
 			var row: ReactionRow = _reaction()
 			if row != null:
@@ -786,7 +792,7 @@ func _run(cards: Array[StringName], carrier_card: CarrierCard, scene: Dictionary
 		var x: float = r * float(scene["wall"])
 		world.add_wall(Rect2(x, -80.0, 8.0, 160.0))
 		if scene.get("behind", false):
-			world.add_enemy(&"G", Vector2(r + 8.0, 0.0))
+			world.add_enemy(&"G", Vector2(r + 8.0, float(scene.get("behind_y", 0.0))))
 	if scene.get("shooter", false):
 		var shot: Array[StringName] = [_shot.id]
 		world.add_enemy(&"E", Vector2(r + SHOOTER_BEHIND, 0.0), World.HEALTH, shot, Vector2.LEFT, true)
@@ -799,7 +805,7 @@ func _run(cards: Array[StringName], carrier_card: CarrierCard, scene: Dictionary
 		for step in HURT_STEPS:
 			world.hurt_wizard_at(step, 1)
 	if scene.get("shooter", false) and _cast_by_a_hit(carrier_card):
-		# On it and right there: the shooter's shots end on the target their shot hits, so none comes
+		# On it: the shooter's shots end on the target their shot hits, so none comes
 		# near the wizard; cast at once, the shot that hit flies on through them.
 		world.press()
 	elif scene.get("shooter", false):
@@ -838,10 +844,10 @@ func _watch_circling(world: World) -> void:
 			world._put("beam %s points %d" % [world._who(beams.beam_caster(at)), roundi(rad_to_deg(DMath.angle(way)))])
 
 
-## True for the columns whose payload a shot's hit fires (on it, right there): a target always
+## True for the columns whose payload a shot's hit fires (on it): a target always
 ## stands on the line for that shot.
 static func _cast_by_a_hit(carrier_card: CarrierCard) -> bool:
-	return carrier_card.id != BODY_COLUMN and (carrier_card.carrier == Carriers.AT_POINT or carrier_card.carrier == Carriers.ON_BEARER)
+	return carrier_card.id != BODY_COLUMN and _payload_pulse(carrier_card)
 
 
 ## The world a cast runs in.

@@ -67,6 +67,9 @@ func before_each() -> void:
 	_bus.carrier_shown.connect(func(player: int, carrier_card: StringName, at: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_shown.append([player, carrier_card, at, direction, length]))
 	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
+	# The real Pulse card, not a stand-in that could drift from it (owner, 2026-11-12: "Is it not
+	# better to test the real cards?").
+	_fake.items[&"pulse"] = load("res://content/spells/carriers/pulse/pulse.tres")
 	bolt.base_damage = 10
 	var familiar: CarrierCard = _carrier_card(&"familiar", 0.0, 6.0)
 	familiar.carrier = &"familiar"
@@ -351,9 +354,10 @@ func test_a_blast_plays_the_cue_its_card_names_the_first_in_slot_order() -> void
 	_bus.entity_ended.emit(1, &"decoy", Vector2(50, 20), tag)
 	check(_explosions.size() == 1 and _explosions[0][3] == &"fireball", "two blast cards: the first's cue: %s" % [_explosions])
 	_explosions.clear()
-	_build(2, [&"blast", &"barrel"])
+	_build(2, [&"blast", &"barrel", &"pulse"])
 	_cast(2)
-	check(_explosions.size() == 1 and _explosions[0][3] == &"blast", "fallen back on the caster, the first's too: %s" % [_explosions])
+	_tick(30)
+	check(_explosions.size() == 1 and _explosions[0][3] == &"blast", "on a Pulse round the caster, the first's too: %s" % [_explosions])
 
 
 ## The rising fireball since the owner's pick of 2026-11-09 (on trial; the ragged shell before).
@@ -362,10 +366,12 @@ func test_the_shipped_blast_card_names_the_fireball_cue() -> void:
 	check_equal(card.cue, &"fireball", "blast.tres says which cue it plays")
 
 
-func test_a_lone_blast_explodes_on_its_caster_and_a_decoy_without_one_does_not() -> void:
-	_build(0, [&"blast"])
+func test_a_blast_pulse_explodes_round_its_caster_and_a_decoy_without_one_does_not() -> void:
+	_build(0, [&"blast", &"pulse"])
 	_cast()
-	check_equal(_explosions.size(), 1, "blast alone falls back on the caster and explodes there")
+	# As its ring ends, at its centre.
+	_tick(30)
+	check_equal(_explosions.size(), 1, "a blast Pulse explodes round the caster")
 	check(_areas.size() == 1 and _explosions.size() == 1 and _explosions[0][1].is_equal_approx(_areas[0][1]), "where its area hit is")
 	_explosions.clear()
 	var tag: int = _build(0, [&"decoy"])

@@ -75,13 +75,19 @@ func test_the_combos_hold_with_the_card_and_fail_without_it() -> void:
 		check(without.size() > 0 and without.min() == 0, "%s: an imp is spared without Blast (%s)" % [id, without])
 
 
-func test_a_blast_alone_hurts_the_caster() -> void:
+func test_a_blast_pulse_goes_off_at_its_centre_as_its_ring_ends() -> void:
+	# Props W9a (owner, 2026-11-12): the blast where the ring ends, at its centre; it hits whoever is
+	# there, its caster too, as every blast does.
 	var arena := ArenaScript.new(root)
 	var guard: Node2D = arena.add_guard(0, Vector2.ZERO)
-	arena.install_cards(0, 0, ["blast"])
+	arena.add_imp(Vector2(20.0, 0.0))
+	arena.install_cards(0, 0, ["blast", "pulse"])
 	arena.cast(0, 0)
+	arena.run(0.2)
+	check_equal(arena.lost(guard), 0, "nothing on the caster while the ring is out")
 	arena.run(0.5)
-	check(arena.lost(guard) > 0, "the burst on the caster hurts them (%d)" % arena.lost(guard))
+	check(arena.lost(guard) > 0, "its blast hits the caster still standing at its centre")
+	check(arena.lost(arena.imps[0]) > 0, "and the imp beside them")
 	arena.free_all()
 
 

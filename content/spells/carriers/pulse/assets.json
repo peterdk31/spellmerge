@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/pulse/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written from a character grid)",
+			"prompt": "A 16x16 icon for the AoE carrier: a round disc with a 1 px outline, dark Stone inside, a white-hot heart in Bone shades and a ring of Spark gold round it, lit at the top-left and shaded at the bottom-right. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

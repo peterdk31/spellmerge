@@ -87,13 +87,13 @@ func test_a_payload_with_a_multicast_has_a_row_per_carrier() -> void:
 		check_equal(rows[2]["name"], _spells.component_name(&"bolt"), "the further carrier is named by its carrier")
 
 
-func test_a_fallback_has_a_row() -> void:
-	var rows: Array = _tree("fire")
-	check_equal(_shape(rows), [[0, -1, [0]]], "fire on the caster")
+func test_a_pulse_has_a_row() -> void:
+	var rows: Array = _tree("fire pulse")
+	check_equal(_shape(rows), [[0, -1, [0, 1]]], "a fire Pulse round the caster")
 	if rows.size() == 1:
-		check_equal(rows[0]["name"], SpellsScript.TREE_ON_CASTER, "named for where it lands")
-	var payload: Array = _tree("on_hit bolt frost")
-	check_equal(_shape(payload), [[0, -1, [1]], [1, 0, [2]]], "frost where the bolt hits")
+		check_equal(rows[0]["name"], _spells.component_name(&"pulse"), "named by its card")
+	var payload: Array = _tree("on_hit bolt frost pulse")
+	check_equal(_shape(payload), [[0, -1, [1]], [1, 0, [2, 3]]], "a frost Pulse where the bolt hits")
 	if payload.size() == 2:
 		check_equal(payload[1]["name"], _spells.component_name(&"on_hit"), "the trigger row keeps the trigger's name")
 

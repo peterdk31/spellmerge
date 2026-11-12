@@ -9,8 +9,7 @@ extends RefCounted
 ## (core/sim/README.md).
 const FROZEN: bool = true
 
-## The carriers of the group, in slot order; a fallback (the caster or the payload's origin)
-## comes last.
+## The carriers of the group, in slot order.
 var spells: Array[CompiledSpell] = []
 ## True when a scatter card sends the carriers in random directions (seeded per cast).
 var scatter: bool = false

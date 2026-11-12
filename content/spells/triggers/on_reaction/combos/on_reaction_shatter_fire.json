@@ -4,7 +4,7 @@
 	"does": "A frost bolt chills the imp, then a storm bolt on it sets off Shatter and a fire blast goes off there, burning the imp beside it.",
 	"casts": [
 		{"staff": 1, "cards": ["frost", "bolt"]},
-		{"staff": 0, "cards": ["on_reaction", "storm", "bolt", "fire", "blast"], "at": 0.3}
+		{"staff": 0, "cards": ["on_reaction", "storm", "bolt", "fire", "blast", "pulse"], "at": 0.3}
 	],
 	"imps": [[100, 0], [100, 45]],
 	"seconds": 2.0,

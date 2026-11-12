@@ -1,9 +1,9 @@
 extends AIBehaviour
 ## A teammate on the board is hurt (under `TeamBoard.HURT`) and a staff whose next cast heals and
 ## hurts nobody is ready, with the teammate in its reach along a clear line: cast it at the
-## teammate (`plan_target`). Hurt itself, a cast whose heal lands on its caster (`heals_self`)
-## will do. The more hurt the one healed, the keener; the most hurt in reach is chosen
-## (`AIBrain.hurt_mate`). It never heals another team: a teammate is one the board names and the
+## teammate (`plan_target`); a cast round the caster (a Pulse) counts when the teammate is within
+## it (`AIBrain.reaches`), and it never heals its caster, which it spares. The more hurt the one
+## healed, the keener; the most hurt in reach is chosen (`AIBrain.hurt_mate`). It never heals another team: a teammate is one the board names and the
 ## actor table puts on its own team.
 
 ## Its want for a heal: BASE, plus HURT_BONUS times the share of health the one healed has lost.
@@ -23,13 +23,7 @@ func want(brain: AIBrain) -> float:
 		var sense: CastSense = brain.senses[at]
 		if sense == null or sense.empty or not sense.heals or brain.ready[at] == 0 or brain.holding[at] != 0:
 			continue
-		if sense.heals_self and brain.health_fraction < TeamBoard.HURT:
-			var own: float = BASE + HURT_BONUS * (1.0 - brain.health_fraction)
-			if own > best:
-				best = own
-				brain.picks[index] = at
-				brain.memo[index] = -1.0
-		if sense.reach <= 0.0 or sense.harms():
+		if sense.harms():
 			continue
 		var mate: Actor = brain.hurt_mate(sense)
 		if mate == null:

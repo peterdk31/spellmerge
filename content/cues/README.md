@@ -31,7 +31,7 @@ Cards name the cues they play (S6 2): a carrier's `cast_cue` (`CarrierCard`; on 
 | `cast_rune`, `cast_gather` | the rune's, and the swap's and teleport's `cast_cue` | the cast flash and a ring gathering in (`ring_in`), the build-up; a rune's flash twice as big |
 | `orbit` | the Orbit card's `cue`, once round the caster when what it carries starts to circle (`size` the circle's radius) | a ring gathering in and a ring of the spell's motes out to the circle |
 | `cast_ring` | the dash's `cast_cue` | the cast flash and a ring flashing out (`ring_out`) |
-| `cast_self` | a cast with no carrier card, whose cards land on the caster (`CarrierCaster.cast_cue`) | the cast flash small, a ring drawing in (`ring_in`) and a few `glimmer` motes round the staff head; no kick |
+| `cast_self` | the Pulse card's `cast_cue` (a cast round the caster) | the cast flash small, a ring drawing in (`ring_in`) and a few `glimmer` motes round the staff head; no kick |
 | `impact` | a carrier card's `impact_cue` when it names none, and a shot of no card | a small burst where the shot strikes, in its colour and cards |
 | `impact_ring` | the wall's, swap's, dash's and teleport's `impact_cue` | the burst and a ring in the shot's colour without its cards (`no_cards`) |
 | `hit` | Feel, for a hit on a body with the way its shot flew (`damage_dealt` after `projectile_impact`), `size` its zoom steps (12 px each, bigger for more damage) | a spray along the way in the hit body's colours (ember for an enemy, its own ramp for a wizard) and its `spark` motes (`often`: a hit is one of many a frame) |

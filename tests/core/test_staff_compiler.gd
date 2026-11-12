@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the staff compiler (staffs A4): every example of docs/milestones/M2-staffs.md,
-## "Reading a staff", as slots in and casts out, plus the numbers of a cast, fallbacks, wasted
+## "Reading a staff", as slots in and casts out, plus the numbers of a cast, Pulses, wasted
 ## cards and the builder view. Cards are built in code behind a stand-in registry.
 ##
 ## godot --headless --path . --script res://tests/core/test_staff_compiler.gd
@@ -35,6 +35,9 @@ func before_each() -> void:
 	var halo: CarrierCard = _carrier_card(&"halo", 4, 8)
 	halo.spread = 360.0
 	halo.wind_down = 0.4
+	# The real Pulse card, not a stand-in that could drift from it (owner, 2026-11-12: "Is it not
+	# better to test the real cards?").
+	_fake.items[&"pulse"] = load("res://content/spells/carriers/pulse/pulse.tres")
 	_element(&"fire", &"burn", 1.5)
 	_element(&"frost", &"chill", 1.0)
 	_modifier(&"split").shot_mult = 3
@@ -147,14 +150,21 @@ func test_a_trailing_modifier_wraps_onto_the_first_carrier() -> void:
 	check(staff.casts[1].ends_cycle, "a wrapped cast ends the cycle")
 
 
-func test_a_lone_blast_explodes_on_the_caster() -> void:
-	var staff: CompiledStaff = _compile("blast")
+func test_a_blast_pulse_explodes_round_the_caster() -> void:
+	var staff: CompiledStaff = _compile("blast pulse")
 	check_equal(staff.casts.size(), 1, "one cast")
 	var spell: CompiledSpell = staff.casts[0].group.spells[0]
-	check_equal(spell.fallback, CompiledSpell.FALLBACK_CASTER, "it lands on the caster")
+	check_equal(spell.carrier, &"pulse", "its Pulse is round the caster")
 	check(spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0, "it blasts")
-	check_equal(staff.casts[0].targets[0], StaffCompiler.TARGET_CASTER, "the plan links it to the caster")
+	check_equal(staff.casts[0].targets[0], 1, "the plan links the blast to the Pulse")
 	check(staff.casts[0].ends_cycle, "and the cycle ends")
+
+
+func test_a_lone_blast_is_wasted() -> void:
+	# Props W9a (owner, 2026-11-12): cards with no carrier after them no longer fall back on the caster.
+	var staff: CompiledStaff = _compile("blast")
+	check(staff.wasted.has(0), "a blast with no carrier is wasted")
+	check(staff.casts.is_empty() or staff.casts[0].group.is_empty(), "and casts nothing")
 
 
 func test_double_with_a_payload_on_the_second_bolt() -> void:
@@ -181,13 +191,14 @@ func test_a_group_resumes_after_its_payload() -> void:
 	check(staff.casts[0].ends_cycle, "then recharge")
 
 
-func test_a_lone_modifier_in_a_payload_lands_on_its_origin() -> void:
-	var staff: CompiledStaff = _compile("on_hit bolt blast")
+func test_a_payloads_pulse_is_round_its_origin() -> void:
+	var staff: CompiledStaff = _compile("on_hit bolt blast pulse")
 	var bolt: CompiledSpell = staff.casts[0].group.spells[0]
 	check(bolt.payload != null, "the bolt has a payload")
 	if bolt.payload != null:
-		check_equal(bolt.payload.spells[0].fallback, CompiledSpell.FALLBACK_POINT, "the blast lands where the bolt hits, not on the caster")
-	check_equal(staff.casts[0].targets[2], StaffCompiler.TARGET_POINT, "the plan links it to the payload's origin")
+		check_equal(bolt.payload.spells[0].carrier, &"pulse", "the blast goes off round what the bolt hit (the runtime knows where), not round the caster")
+	check_equal(staff.casts[0].targets[2], 3, "the plan links it to the payload's Pulse")
+	check(_compile("on_hit bolt blast").wasted.has(2), "with no Pulse the payload's blast is wasted")
 
 
 func test_a_trigger_with_nothing_after_it_is_wasted() -> void:
@@ -229,10 +240,10 @@ func test_a_counter_dash_reads_in_slot_order() -> void:
 
 # --- More rules ---------------------------------------------------------------
 
-func test_a_steering_modifier_on_the_caster_is_wasted() -> void:
-	var staff: CompiledStaff = _compile("homing fire")
+func test_a_steering_modifier_on_a_pulse_is_wasted() -> void:
+	var staff: CompiledStaff = _compile("homing fire pulse")
 	var spell: CompiledSpell = staff.casts[0].group.spells[0]
-	check_equal(spell.fallback, CompiledSpell.FALLBACK_CASTER, "fire lands on the caster")
+	check_equal(spell.carrier, &"pulse", "fire strikes round the caster")
 	check(not spell.modifier_ids.has(&"homing"), "homing does not")
 	check(staff.wasted.has(0), "homing is wasted with a reason")
 
@@ -384,11 +395,11 @@ func test_a_multicast_that_adds_no_carrier_is_wasted() -> void:
 	# Owner, 2026-11-06: a multicast whose extra draws find no carrier adds none, so it is wasted and
 	# costs nothing; one that finds fewer than it asks for still works.
 	(_fake.items[&"double"] as MulticastBase).mana_cost = 3.0
-	var staff: CompiledStaff = _compile("double fire")
-	check(staff.wasted.has(0), "a double with nothing to draw is wasted: %s" % staff.wasted)
-	check(not staff.wasted.has(1), "the fire still lands on the caster")
+	var staff: CompiledStaff = _compile("double fire pulse")
+	check(staff.wasted.has(0), "a double with nothing more to draw is wasted: %s" % staff.wasted)
+	check(not staff.wasted.has(1), "the fire still strikes round the caster")
 	check(staff.casts[0].group.multicast_ids.is_empty(), "the group has no multicast")
-	check_equal(staff.casts[0].mana, 0.0, "and pays nothing for it")
+	check_equal(staff.casts[0].mana, (_fake.items[&"pulse"] as CarrierCard).mana_cost, "and pays nothing for it, only the Pulse")
 	staff = _compile("double bolt")
 	check(staff.wasted.has(0), "a double with one bolt is wasted too: %s" % staff.wasted)
 	_multicast(&"triple", 2, MulticastBase.Mode.TOGETHER)
@@ -398,21 +409,23 @@ func test_a_multicast_that_adds_no_carrier_is_wasted() -> void:
 	check(not staff.wasted.has(0), "the first multicast takes the extra bolt")
 	check(staff.wasted.has(1), "the second finds none: %s" % staff.wasted)
 	staff = _compile("triple bolt fire")
-	check(not staff.wasted.has(0), "a triple that reads on to cards with no carrier draws the caster's fallback: %s" % staff.wasted)
-	check_equal(staff.casts.size(), 1, "the fire lands on the caster in the same cast")
+	check(staff.wasted.has(0) and staff.wasted.has(2), "a triple that reads on to cards with no carrier after them adds none, and the fire is wasted: %s" % staff.wasted)
+	staff = _compile("triple bolt fire pulse")
+	check(not staff.wasted.has(0), "with a Pulse after them the triple draws it: %s" % staff.wasted)
+	check_equal(staff.casts.size(), 1, "the fire Pulse goes in the same cast")
 
 
 func test_a_burst_or_scatter_works_without_adding_a_carrier() -> void:
-	var staff: CompiledStaff = _compile("burst fire")
-	check(not staff.wasted.has(0), "a burst repeats the strike on the caster")
+	var staff: CompiledStaff = _compile("burst fire pulse")
+	check(not staff.wasted.has(0), "a burst repeats the strike round the caster")
 	check_equal(staff.casts[0].group.repeats, (_fake.items[&"burst"] as MulticastBase).repeats, "the group repeats")
 	staff = _compile("burst on_hit")
 	check(staff.wasted.has(0), "a burst of a group with nothing in it is wasted: %s" % staff.wasted)
 	staff = _compile("scatter bolt")
 	check(not staff.wasted.has(0), "a scatter turns the one bolt it has")
 	check(staff.casts[0].group.scatter, "the group scatters")
-	staff = _compile("scatter fire")
-	check(staff.wasted.has(0), "a scatter with no carrier to turn is wasted: %s" % staff.wasted)
+	staff = _compile("scatter fire pulse")
+	check(staff.wasted.has(0), "a scatter with only a Pulse, which is not aimed, has nothing to turn: %s" % staff.wasted)
 
 
 func test_a_multicast_in_one_payload_counts_for_that_payload_only() -> void:
@@ -548,14 +561,14 @@ func test_every_compiled_spell_has_its_own_node() -> void:
 
 
 func test_the_builder_view_is_plain_values() -> void:
-	var ids: Array[StringName] = [&"homing", &"fire"]
+	var ids: Array[StringName] = [&"homing", &"fire", &"pulse"]
 	var view: Dictionary = _spells.call("staff_view", ids, _staff)
 	check(not bool(view["empty"]), "not empty")
 	var casts: Array = view["casts"]
 	check_equal(casts.size(), 1, "one cast")
 	var cast: Dictionary = casts[0]
-	check(String(cast["text"]).contains("on you: Fire"), "it reads as fire on the caster: %s" % cast["text"])
-	check_equal((cast["targets"] as Dictionary)[1], StaffCompiler.TARGET_CASTER, "fire links to the caster")
+	check(String(cast["text"]).contains("Fire Pulse"), "it reads as a fire Pulse: %s" % cast["text"])
+	check_equal((cast["targets"] as Dictionary)[1], 2, "fire links to the Pulse")
 	check((view["wasted"] as Dictionary).has(0), "homing on the caster is wasted")
 	check_equal(view["staff"], _staff, "the staff comes back, to preview other cards with")
 

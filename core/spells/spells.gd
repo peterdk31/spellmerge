@@ -36,9 +36,8 @@ extends Node
 ## shot that fired it while that shot flies, by the body that fired it (a decoy's, a dashing wizard's
 ## timer, `on hurt` or end, a barrier's block: `body_caster`; owner, 2026-11-06), else by the point
 ## (`_caster`): dash, teleport, pull, swap and recoil move that shot or body, orbit, familiar and
-## return circle it, a beam, swing or slam is held by it. The cards a payload leaves with no carrier
-## land on it too (`CarrierBearer`), or on the point (`CarrierPoint`; docs/CARRIERS.md, "The
-## fallback carriers"); its actor stays the wizard. A trigger fires every
+## return circle it, a beam, swing or slam is held by it. A payload's Pulse is round it too
+## (docs/CARRIERS.md, "Pulse: a ring from the cast point"); its actor stays the wizard. A trigger fires every
 ## time its event happens, as long as its carrier lives (owner, 2026-10-29: no per-shot count).
 ## One budget's trigger fires make at most `fire_shots_per_step` shots per `step` (pacing, not a
 ## limit): a fire past it waits for the next step, oldest first, and none is dropped
@@ -762,7 +761,7 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 ## What the builder shows of a staff, as plain values so that nothing outside `core/spells`
 ## reads a compiled staff: `empty`; `cards` (the card ids by slot, `&""` for an empty slot); `casts`, one Dictionary per cast of the cycle with `slots`
 ## (read order), `text`, `mana`, `wind_up` (the seconds it winds up before it leaves), `wind_down` (the seconds its staff is busy after it), `delay` (the wait in all: the wind-down, and the staff's cooldown when the cycle ends with it), `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `ends_cycle`, `wrapped`, `targets` (card slot -> the
-## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
+## carrier's slot) and `wasted` (slot ->
 ## true), and `tree` (the cast as the builder's tree draws it, `cast_tree`); `wasted` for the
 ## staff (cards that did nothing in any cast that read them); and `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
 ## (the radial builder shows what a card would change before it is put in).
@@ -782,11 +781,6 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate(), "staff": staff}
 
 
-## Shown as a tree's row for a fallback: the cards that landed on the caster, on the body or shot
-## that fired a payload, or where a payload began.
-const TREE_ON_CASTER: String = "On you"
-const TREE_ON_BEARER: String = "On what fired it"
-const TREE_AT_POINT: String = "Where it ends"
 
 
 ## The rows of one cast as the builder's tree draws them (docs/milestones/M2-builder-tree.md,
@@ -828,12 +822,6 @@ func _tree_group(group: CompiledGroup, depth: int, trigger: int, trigger_id: Str
 
 
 func _tree_carrier_name(spell: CompiledSpell) -> String:
-	if spell.fallback == CompiledSpell.FALLBACK_CASTER:
-		return TREE_ON_CASTER
-	if spell.fallback == CompiledSpell.FALLBACK_BEARER:
-		return TREE_ON_BEARER
-	if spell.fallback == CompiledSpell.FALLBACK_POINT:
-		return TREE_AT_POINT
 	return spell.carrier_card_name if spell.carrier_card_name != "" else String(spell.carrier_card_id)
 
 
@@ -1166,8 +1154,7 @@ func cast_index(actor: int, staff: int) -> int:
 	return _cursor[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else 0
 
 
-## The carrier card (its id) of the last cast this actor's staff made, `&""` before any; for a cast with
-## no carrier card, its fallback carrier's id instead (`caster`: the cards landed on the caster). The
+## The carrier card (its id) of the last cast this actor's staff made, `&""` before any. The
 ## wizard's player sends it with `spell_cast`.
 func last_carrier_card(actor: int, staff: int) -> StringName:
 	return _last_carrier_card[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else &""
@@ -1272,8 +1259,7 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 			_last_infused[actor] = carrier
 			break
 	var first: CompiledSpell = cast.group.spells[0]
-	# A cast with no carrier card names its fallback carrier (`caster`), so it is still a cast to show.
-	_last_carrier_card[index] = first.carrier_card_id if first.carrier_card_id != &"" else first.carrier
+	_last_carrier_card[index] = first.carrier_card_id
 	return true
 
 
@@ -1411,8 +1397,8 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	return carrier.launch(spell, tag, actor, origin, direction, source, lifetime, carried, prev)
 
 
-## The carrier that runs `spell` (`Carrier`, by its id, a fallback carrier's too; one that runs
-## nothing for an id no carrier has).
+## The carrier that runs `spell` (`Carrier`, by its id; one that runs nothing for an id no carrier
+## has).
 func _carrier_of(spell: CompiledSpell) -> Carrier:
 	var carrier: Carrier = _carriers.get(spell.carrier)
 	return carrier if carrier != null else _no_carrier
@@ -1485,6 +1471,27 @@ func _strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arr
 			_strike_bodies.append(node)
 			_strike_marks.append(projectiles.sweep_points[i])
 			_strike_marks.append(projectiles.sweep_heads[i])
+	return _strike_listed(spell, tag, actor, first, centre, chain, prev, hit)
+
+
+## `_strike` of bodies a carrier picked itself (a Pulse's ring: those its segments reach): the
+## first `count` of `nodes`, each struck at its `points` entry going along its `heads` entry, those
+## not in `struck` yet (and adds them).
+func _strike_bodies_at(spell: CompiledSpell, tag: int, actor: int, nodes: Array[Node], points: PackedVector2Array, heads: PackedVector2Array, count: int, struck: Array, centre: Vector2, chain: int, prev: int, hit: HitProfile) -> HitProfile:
+	var first: int = _strike_bodies.size()
+	for i in count:
+		var node: Node = nodes[i]
+		if not struck.has(node):
+			struck.append(node)
+			_strike_bodies.append(node)
+			_strike_marks.append(points[i])
+			_strike_marks.append(heads[i])
+	return _strike_listed(spell, tag, actor, first, centre, chain, prev, hit)
+
+
+## Strikes the bodies `_strike_bodies[first..]` (and their marks), then drops them: the ray every
+## strike hits through.
+func _strike_listed(spell: CompiledSpell, tag: int, actor: int, first: int, centre: Vector2, chain: int, prev: int, hit: HitProfile) -> HitProfile:
 	var last: int = _strike_bodies.size()
 	if last == first:
 		return hit
@@ -1657,11 +1664,10 @@ func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) ->
 
 ## The shots of every spell of `group`, fired together from `origin` along `direction` by this
 ## actor's staff in its `generation` (each spell's tag names its node); returns how many were
-## made (a fallback counts as one). The carriers of one group leave along the same aim (only the
+## made (a Pulse counts as one). The carriers of one group leave along the same aim (only the
 ## staff's `spread` sets them apart, shot by shot); a scatter group sends each in a random
 ## direction instead. A burst group fires again `repeats - 1` times, `repeat_interval` seconds
-## apart (at once when that is 0), reading nothing again. A fallback carrier (the cards that landed
-## on the caster, or on a payload's origin) is launched like any other. `source` is the target that
+## apart (at once when that is 0), reading nothing again. `source` is the target that
 ## fired the payload, or null. `from_caster` is true for a launch a body casts (the cast's own group, a body's payload), whose later
 ## firings (burst, echo) start from where the caster has moved to.
 func _launch_group(group: CompiledGroup, actor: int, staff: int, generation: int, origin: Vector2, direction: Vector2, source: Node, from_caster: bool = false) -> int:
@@ -1680,7 +1686,8 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 	var made: int = 0
 	for spell in group.spells:
 		var heading: Vector2 = direction
-		if spell.fallback == CompiledSpell.FALLBACK_NONE and group.scatter:
+		# A carrier that acts all round what casts it (a Pulse) is not aimed: a scatter turns the others.
+		if group.scatter and not spell.has_trait(CarrierTraits.AOE):
 			heading = DMath.rotated(direction, _scatter_roll() * TAU)
 		made += _fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, false)
 	return made
@@ -1696,7 +1703,7 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
 	_echo_spell = spell if echoed else null
 	var launched: int = _cast_nova(spell, tag, actor, origin, heading, source)
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
+	if launched > 0 and spell.mirrors():
 		# The same cast again, its aim reversed: every card it has does what it did the first time.
 		launched += _cast_nova(spell, tag, actor, origin, -heading, source)
 	_echo_spell = null
@@ -2282,7 +2289,12 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier: StringName) -> int:
 	if found == 0:
 		return charges
-	var slots: PackedInt32Array = projectiles.guard_slots.slice(0, found)
+	return _guard_shots(projectiles.guard_slots.slice(0, found), actor, tag, deflects, charges, a, b, carrier)
+
+
+## `_guard` of the shots a carrier picked itself (`slots`, a list it keeps: a Pulse's ring, those its
+## segments reach).
+func _guard_shots(slots: PackedInt32Array, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier: StringName) -> int:
 	for slot in slots:
 		if not projectiles.is_alive(slot):
 			continue
@@ -2467,7 +2479,7 @@ func _shots_of(group: CompiledGroup) -> int:
 ## times its Penta ring's copies where Penta works.
 func copies_of(spell: CompiledSpell) -> int:
 	var copies: int = spell.nova_ways() * maxi(_penta_copies(spell), 1)
-	if spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
+	if spell.mirrors():
 		copies *= 2
 	return copies
 

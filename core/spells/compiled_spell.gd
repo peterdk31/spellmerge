@@ -2,8 +2,7 @@ class_name CompiledSpell
 extends RefCounted
 ## One carrier of a staff turned into final numbers (`StaffCompiler`, docs/milestones/
 ## M2-staffs.md): what it fires, with the infusions, modifiers and triggers that attached to it,
-## and the payload each trigger fires (`triggers`). A fallback (cards that landed on the caster or on a
-## payload's origin) is one too, with `fallback` set and a fallback carrier (docs/CARRIERS.md). It is read-only data for the spell runtime;
+## and the payload each trigger fires (`triggers`). It is read-only data for the spell runtime;
 ## nothing but `core/spells/` reads it (the builder gets plain values from `Spells.staff_view`).
 
 ## Made whole by the staff compiler and never changed after: the state walk hashes it once
@@ -41,8 +40,7 @@ var radius_scale: float = 1.0
 var shots: int = 1
 ## Degrees the shots fan over.
 var spread: float = 0.0
-## The id of its carrier (`CarrierCard.carrier`, `Carriers.of`); a fallback's is a fallback carrier's
-## (`Carriers.ON_CASTER`, `ON_BEARER`, `AT_POINT`), which no carrier card fires.
+## The id of its carrier (`CarrierCard.carrier`: the bolt card's is `atom`).
 ## Setting it reads the carrier's `traits` and `look_drawer` once.
 var carrier: StringName = &"":
 	set(value):
@@ -134,16 +132,6 @@ var zap_hit: HitProfile = null
 ## An echoed shot's zap: `zap_hit` at ECHO_DAMAGE. Null without both `zap` and `echo`.
 var echo_zap_hit: HitProfile = null
 
-## `fallback` values: a carrier's spell, the cards that landed on the caster, on a payload's
-## origin, or on the body or shot that fired a payload (docs/CARRIERS.md, "The fallback carriers").
-const FALLBACK_NONE: int = 0
-const FALLBACK_CASTER: int = 1
-const FALLBACK_POINT: int = 2
-const FALLBACK_BEARER: int = 3
-var fallback: int = FALLBACK_NONE
-## A fallback carrier's: whether a card that landed on it uses its strike (`CarrierFallback.uses_strike`:
-## cards that only guard, a shield or a deflect, strike nothing). True for any other carrier.
-var strikes: bool = true
 ## Every infusion on the shot, in slot order; `element_id` is the first.
 var element_ids: Array[StringName] = []
 ## How each different infusion on it looks, in slot order (a card twice is once): rgb its `tint`,
@@ -168,10 +156,10 @@ var payload: CompiledGroup:
 		return triggers[0].payload if not triggers.is_empty() else null
 ## Index in `CompiledStaff.nodes`; the tag of this spell's shots carries it.
 var node: int = -1
-## The carrier's slot in the staff, -1 for a fallback.
+## The carrier's slot in the staff.
 var slot: int = -1
 ## The slots of its own cards, in the order they were read: the infusions and modifiers attached
-## to it, then its carrier (a fallback: the cards that landed there). Set where the compiler
+## to it, then its carrier. Set where the compiler
 ## attaches them; its triggers are in `triggers` and a group's multicasts in the group. For the
 ## builder's tree (docs/milestones/M2-builder-tree.md, part T3).
 var card_slots: PackedInt32Array = PackedInt32Array()
@@ -191,10 +179,20 @@ func cue_of(kind: int) -> StringName:
 
 
 ## How many ways it is cast at once (`ModifierBase.Behaviour.NOVA`): its Nova cards' count (8 a
-## card, more add, with no cap: owner, 2026-10-29, cards are not limited), or 1 without one.
+## card, more add, with no cap: owner, 2026-10-29, cards are not limited), or 1 without one or on a
+## carrier that is not aimed.
 func nova_ways() -> int:
+	# A carrier that is not aimed (`AOE`, a Pulse's ring) already goes every way.
+	if has_trait(CarrierTraits.AOE):
+		return 1
 	var ways: float = behaviour(ModifierBase.Behaviour.NOVA)
 	return maxi(roundi(ways), 1)
+
+
+## True when it is cast again with its aim reversed (`mirror`): not for a carrier that is not aimed
+## (`AOE`), which has no aim to reverse.
+func mirrors() -> bool:
+	return behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and not has_trait(CarrierTraits.AOE)
 
 
 ## How many spells there are in this chain of payloads, this one included (following the first

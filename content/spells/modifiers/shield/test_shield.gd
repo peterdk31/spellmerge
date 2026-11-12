@@ -107,14 +107,18 @@ func test_a_shield_on_a_dash_is_a_barrier_on_the_caster() -> void:
 		check_equal(plain[0], [], "seat %d: a plain dash blocks nothing" % seat)
 
 
-func test_a_shield_on_the_caster_is_a_barrier() -> void:
-	# Cards with no carrier land on the caster (a fallback).
-	var spell: CompiledSpell = _first(["shield"])
-	check(spell != null and spell.fallback == CompiledSpell.FALLBACK_CASTER, "a lone shield lands on the caster")
-	var shielded: Array = _guarded(["shield"], 0)
-	check_equal(shielded[0], [0], "the barrier stops the shot")
-	# The cards' own area hit lands on the caster before the barrier is up; the shot costs nothing more.
-	check_equal(shielded[1], _guarded(["shield"], 0, false)[1], "the caster loses only what the landing itself does")
+func test_a_shield_pulse_stops_the_shots_inside_its_ring() -> void:
+	# Props W9a: a Pulse's ring meets the shots inside it, as a slam's (`GUARDS`): it has to grow out
+	# to a shot before the shot reaches the caster.
+	var arena := ArenaScript.new(root)
+	var guard: Node2D = arena.add_guard(0, Vector2.ZERO)
+	arena.install_cards(0, 0, ["shield", "pulse"])
+	arena.shoot_at(Vector2(80.0, 0.0), Vector2.ZERO)
+	arena.cast(0, 0)
+	arena.run(1.0)
+	check_equal(arena.blocks, [0], "its ring stops the shot")
+	check_equal(arena.lost(guard), 0, "and the caster loses nothing")
+	arena.free_all()
 
 
 func test_two_shields_on_a_dash_stop_two_shots() -> void:
@@ -135,13 +139,18 @@ func test_a_barrier_says_when_it_is_given_blocks_and_runs_out() -> void:
 	var arena := ArenaScript.new(root)
 	var changes: Array = []
 	arena.bus.barrier_changed.connect(func(actor: int, charges: int, seconds: float, _tag: int, way: Vector2, radius: float) -> void: changes.append([actor, charges, seconds, way, radius]))
-	arena.add_guard(0, Vector2.ZERO)
-	arena.install_cards(0, 0, ["shield", "shield"])
+	arena.answer_moves()
+	var guard: Node2D = arena.add_guard(0, Vector2.ZERO)
+	# A dash's shield is a barrier on the body it moves.
+	arena.install_cards(0, 0, ["shield", "shield", "dash"])
 	arena.cast(0, 0)
 	check(changes.size() == 1 and changes[0][0] == 0 and changes[0][1] == 2 and changes[0][3] == Vector2.ZERO, "given: two charges, no block: %s" % [changes])
 	check(changes.size() == 1 and changes[0][2] > 0.0 and changes[0][4] == ArenaScript.IMP_RADIUS, "for its time, round the hurt circle: %s" % [changes])
-	arena.shoot_at(Vector2(30.0, 0.0), Vector2.ZERO)
-	arena.run(0.4)
+	# The dash over (the barrier stays for its time), a shot at where it took the wizard.
+	arena.run(0.15)
+	var at: Vector2 = guard.global_position
+	arena.shoot_at(at + Vector2(30.0, 0.0), at)
+	arena.run(0.25)
 	check(changes.size() == 2 and changes[1][1] == 1 and (changes[1][3] as Vector2).x < 0.0, "a block from the right: one charge left, the hit flying left: %s" % [changes])
 	arena.run(1.0)
 	check(changes.size() == 3 and changes[2][1] == 0 and changes[2][2] == 0.0 and changes[2][3] == Vector2.ZERO, "run out: none left, no block: %s" % [changes])
@@ -152,14 +161,14 @@ func test_a_barrier_says_when_it_is_given_blocks_and_runs_out() -> void:
 ## (its cue, `cast_self`), and moves the staff (the owner, 2026-11-06: a lone Shield showed nothing
 ## after the staff was first put on show).
 func test_a_cast_on_the_caster_names_its_carrier_and_moves_the_staff() -> void:
-	var spell: CompiledSpell = _first(["shield"])
-	check(spell != null and not spell.staff_pose.is_empty(), "the caster carrier has a staff animation")
+	var spell: CompiledSpell = _first(["shield", "pulse"])
+	check(spell != null and not spell.staff_pose.is_empty(), "a Pulse card has a staff animation")
 	check(_first(["bolt"]).staff_pose == load("res://content/spells/carriers/bolt/bolt.tres").packed_pose(), "a carrier card's own stays")
 	var arena := ArenaScript.new(root)
 	arena.add_guard(0, Vector2.ZERO)
-	arena.install_cards(0, 0, ["shield"])
+	arena.install_cards(0, 0, ["shield", "pulse"])
 	for n in 3:
 		check(arena.cast(0, 0), "cast %d" % n)
-		check_equal(arena.spells.last_carrier_card(0, 0), &"caster", "cast %d names its carrier" % n)
+		check_equal(arena.spells.last_carrier_card(0, 0), &"pulse", "cast %d names its card" % n)
 		arena.run(0.6)
 	arena.free_all()

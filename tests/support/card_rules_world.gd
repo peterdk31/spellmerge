@@ -300,12 +300,17 @@ func _shot_within(distance: float) -> bool:
 
 
 func _is_quiet() -> bool:
-	if projectiles.get_count() > 0 or CarrierBeam.of(spells).beam_count() > 0 or CarrierSwing.of(spells).swing_count() > 0 or CarrierSlam.of(spells).slam_count() > 0 or CarrierPortal.of(spells).portal_count() > 0:
+	if projectiles.get_count() > 0 or CarrierBeam.of(spells).beam_count() > 0 or CarrierSwing.of(spells).swing_count() > 0 or CarrierSlam.of(spells).slam_count() > 0 or CarrierPortal.of(spells).portal_count() > 0 or CarrierPulse.of(spells).pulse_count() > 0:
 		return false
 	if not spells._pending.is_empty() or spells._moves.under_way() > 0 or spells._jq_count > 0:
 		return false
 	if entities.count() > 0:
 		return false
+	# A carrier that lasts a while and then ends (a Pulse's life, for its `on expire`) is busy until
+	# it does; one held until cast again is not (it would keep every run to its end).
+	for i in spells._lc_count:
+		if is_finite(spells._lc_left[i]):
+			return false
 	for body in _bodies:
 		if is_instance_valid(body) and body.mover != null and body.mover.is_moving():
 			return false

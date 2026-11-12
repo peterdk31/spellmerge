@@ -31,8 +31,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `GATES` | Does it open a way through that shots and bodies take (a portal)? Read only by `CastSense` (`opens`: the AI casts it to open a fight). |
 | `CASTS_FROM_SHOT` | Is it shots of the projectile manager, each casting what it fires while it lives (a bolt, a rune, a pool, a wall)? |
 | `CASTS_FROM_BODY` | Is it a body of its own, an actor, that casts what it fires (a decoy)? |
-| `LIFE_WAITS` | Is its life only a wait (a pulse): it does nothing more while it lasts, so a card that only changes its life counts only with a trigger that waits on it or a hold? |
-| `AOE` | Does it act all round what casts it, not along an aim (a pulse)? A scatter turns nothing there; the AI reads it as an area round its caster. |
+| `AOE` | Does it go out all round the point it is cast at, not along an aim (a pulse's ring)? A scatter turns nothing there; the AI reads it as an area round its caster; Return and Ghost work on it. |
 | `MELEE` | Is it held by or carried with the body that casts it, never leaving it (swing, slam, dash, teleport)? Then it never hits that body (`CarrierKit.spared`); a ranged carrier spares it only until it has left it: a shot over time, a beam along its path (it hits its caster when it bounces or bends back into them). |
 
 (and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
@@ -77,22 +76,49 @@ placed, with the same rules as a compile; for the builder, a reward screen or a 
 **Required fields**, in `required_fields()`: what a carrier card of this carrier must set above 0 (a
 beam's `ray_length`); the spell validator checks them.
 
-## Pulse: a strike round what casts it
+## Pulse: a ring from the cast point
 
-The **Pulse** card (`content/spells/carriers/pulse/`, a carrier card like Bolt) is one area strike round
-whatever casts it, then a short life (props W9a, owner 2026-11-12). It replaced the compiler's
+The **Pulse** card (`content/spells/carriers/pulse/`, a carrier card like Bolt) is a ring that
+grows from the point it is cast at (props W9a, owner 2026-11-12). It replaced the compiler's
 fallback carriers, a rule of the compiler no card played ("the 'ugly' fallback in the
 SpellCompiler ... since that one is a custom rule"): **cards with no carrier after them are now
 wasted**, as a trigger with no carrier is, and a staff of only an infusion does not cast
-(`fire · blast` alone does nothing; `fire · blast · pulse` explodes round you).
+(`fire · blast` alone does nothing; `fire · blast · pulse` sends a fire ring out round you and
+explodes where it ends).
 
-It is **one carrier**, `pulse` (`pulse.gd`, `CarrierPulse`; owner, 2026-11-12: "One carrier!"),
-with fixed yes/no answers like every other: it `HITS`, `LASTS` (its life only a wait, `LIFE_WAITS`), `REPEATS_HELD`, `MEETS_SHOTS`, is
-`MELEE` (it never leaves what casts it) and acts `AOE` (all round, not along an aim: a scatter
-turns nothing there, and the AI reads it as an area round its caster). **What it is round is the
-runtime's to know**, as for every carrier (the caster, below): the caster's body in the cast's own
-group; in a payload, whatever fired it, a body or a shot that flies on (owner, 2026-11-06), else the
-point the payload began at (`on hit · bolt · blast · pulse` explodes where the bolt hits).
+It is **one carrier**, `pulse` (`pulse.gd`, `CarrierPulse`; owner: "One carrier!"), with fixed
+yes/no answers like every other: it `HITS`, `LASTS`, has a `SPEED`, `GUARDS` and `MEETS_SHOTS` (as
+a slam's ring), `REPEATS_HELD`, and goes out `AOE`: all round the point it is cast at, not along an
+aim (a scatter turns nothing there; the AI reads it as an area round its caster; Return and Ghost
+work on it as on a shot). Its rows are its own (as the slam's): `launch` starts a ring, `step`
+runs it, and the looks read the `pulse_*` getters.
+
+- **Where:** the point it is cast at: where what casts it stands then (the caster's body; in a
+  payload the body or shot that fired it, else the payload's point). It stays there (owner: "from
+  the cast point").
+- **Its ring:** its radius grows as a shot flies, `speed` on the shots' speed curve over its
+  `lifetime` (owner: "using easing as bolt/atom"; `ProjectileManager.speed_factor`,
+  SpellLimits.SHOT_SPEED_* times its cards' `speed_start`, `speed_end`, `speed_ease`), so a plain
+  Pulse reaches 48 px (120 px/s for 0.4 s; the curve keeps its mean). Its edge, `radius` wide,
+  strikes each body it reaches once (owner: "It should not hit instantly"), outward from its centre
+  (`Projectiles.sweep` all round, so a wall hides a body unless it has Ghost), sparing the body
+  that cast it (owner: "Yes it spares its caster"). A bare Pulse strikes for its card's small
+  damage. Feel draws it as motes along its edge where it is now (`gameplay/feel/pulse_rings.gd`).
+- **Shots:** while it is out, a deflect on it turns the shots of other teams inside it outward, a
+  shield stops them while its charges last (as a slam's ring). A shot that comes in faster than
+  the ring grows reaches its caster first: a guarding Pulse is cast ahead.
+- **Return** grows it for half its life, then shrinks it back to its centre at the speed it had
+  then, striking again on the way in, as a returning shot flies home.
+- **Its end:** when its life is out (or it is home), its `blast` goes off at its centre, hitting
+  whoever is there, its caster too, as every blast does (owner: "Why did you add an exception for
+  blast to spare its caster?"), and its `on expire` fires from there.
+- **Its triggers that fire while it lasts** (Timer, On Hurt, On Recast) fire from its centre
+  (`LC_ROW`, `tip_of`). What its end and those triggers fire is cast by that point, as a slam's end
+  or a beam's tip: a bolt they send hits a wizard still standing there (owner: "the bolt should hit
+  the wizard if he is still standing at the cast point"). Its own strikes are cast by what cast it,
+  as a slam's (a pull on its hit moves that).
+- **Hold** casts it again every wind-up and life (`REPEATS_HELD`): `hold · fire · pulse` rings out
+  round its wizard again and again.
 
 **What fires a payload** is decided by the runtime each time it fires:
 
@@ -127,37 +153,6 @@ seq it was launched with; each later step of the row, its zaps and a move's land
 that caster, not whoever is casting when the step comes (owner, 2026-11-06). A shot's hit is
 handled as that shot's caster too, so a chain jump belongs to the shot it jumped from (a ray's
 waiting jump keeps the caster of the hit it came from).
-
-What the Pulse does:
-
-- **Its strike:** everything within its `radius` (24 px, Bigger widens it) or the blast's
-  strength, round what casts it, **sparing that** (the owner's rule of 2026-11-06: a carrier that
-  never leaves its caster spares it; the fallback's strike hurt the caster). A bare Pulse strikes
-  too, for its card's small damage (owner, 2026-11-12: "it hits everything around it"), and shows
-  itself as a ring of its cards' motes out to its reach (its card's `shown_cue`, `pulse`).
-- **Its life:** its `lifetime` (0.5 s), round what casts it (`LC_ACTOR` a body, `LC_SLOT` a shot,
-  `LC_POINT` the point), so the triggers that need a carrier that lasts (Timer, On Hurt, On
-  Recast) fire from it while it lasts and `on expire` as it ends, cast by what it is round.
-  **Hold** keeps it until its staff is cast again, striking again every wind-up and life
-  (`REPEATS_HELD`, as a held swing): `hold · fire · pulse` is a burning aura that spares its
-  wizard. A card that only lengthens its life does nothing without a trigger or a hold that waits
-  on it: its life is only a wait (`LIFE_WAITS`), which the compiler's one numbers rule reads
-  (`StaffCompiler._numbers_count`).
-- **Round a body** (the caster, or a body that fired the payload): a shield is a barrier on that
-  body's actor (`CasterMoves.shield_caster`), a deflect turns the shots round it once, as it lands
-  (`CarrierKit.turn_shots_round`), a recoil pushes it.
-- **Round a shot** that fired the payload: a shield adds that many shield charges to the shot, a
-  deflect makes it deflect for the rest of its life (`set_deflect`), a recoil pushes it.
-- **Round a point** (that shot has ended, that body has gone): a deflect turns the shots round the
-  point; a shield or a recoil has no one to guard or push. The waste table does not know this
-  beforehand, as for every carrier a point casts. What Shield does on a Pulse is still to be talked
-  through with the owner (2026-11-12).
-
-It does not fly, move, stay or steer, so homing, bounce or split are wasted on it, and a shorter
-wind-down on a payload's Pulse (no staff waits on a payload, docs/milestones/cast-timing.md);
-chain, pull, possess, relay, penta and mirror work. The runtime launches it like any other
-carrier, so echo strikes again, recoil pushes, mirror strikes twice and penta strikes from a ring
-(whose copies are cast by points).
 
 `tests/core/test_card_rules.gd` plays every modifier and infusion on it with the Pulse card after
 them (the columns `pulse`, round you; `on it`, a piercing shot's hit, and `on its body`, an

@@ -210,11 +210,11 @@ func test_homing_picks_spread_over_the_enemies_across_casts() -> void:
 
 func test_a_payload_of_its_landing_hit_is_cast_by_the_wizards_body() -> void:
 	# What a move moves casts its hits' payloads (`Carrier.hit_caster`): a shield left over in the
-	# payload is a barrier on the wizard, not a card wasted on a point.
-	var made: Array = _flicker_world([&"on_hit", &"homing", &"teleport", &"shield", &"pulse"], [Vector2(70.0, 30.0)])
+	# payload's dash moves the wizard and is a barrier on it, not a card wasted on a point.
+	var made: Array = _flicker_world([&"on_hit", &"homing", &"teleport", &"shield", &"dash"], [Vector2(70.0, 30.0)])
 	var world: World = made[0]
 	var wizard: Actor = made[1]
-	var compiled: CompiledStaff = world.spells.compile_staff([&"on_hit", &"homing", &"teleport", &"shield", &"pulse"] as Array[StringName], _staff_of(5))
+	var compiled: CompiledStaff = world.spells.compile_staff([&"on_hit", &"homing", &"teleport", &"shield", &"dash"] as Array[StringName], _staff_of(5))
 	check(not compiled.wasted.has(3), "the shield is not wasted")
 	world.run(0.1, 0.1)
 	check(world.combat.shield(wizard.id) > 0, "the wizard has a barrier from its landing hit")

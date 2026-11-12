@@ -1,12 +1,12 @@
 extends "res://tests/support/suite.gd"
-## The Pulse card (content/spells/carriers/pulse/; props W9a, docs/CARRIERS.md "Pulse: a strike
-## round what casts it"): one strike round whatever casts it, sparing that, then a short life for
-## the triggers that need a carrier that lasts. One carrier (owner, 2026-11-12: "One carrier!"):
-## round the caster in a cast's own group; in a payload round the body or shot that fired it, else
-## round the point it began at, which the runtime knows when it fires. It replaced the compiler's
-## fallback carriers (owner, 2026-11-12), so cards with no carrier after them are wasted. Which
-## cards do something on it follows from its yes/no answers and what each card needs, as on any
-## carrier; tests/core/test_card_rules.gd plays every card on it, on you and in a payload.
+## The Pulse card (content/spells/carriers/pulse/; props W9a, docs/CARRIERS.md "Pulse: a ring from
+## the cast point"): a ring that grows from the point it is cast at as a shot flies (the shots' speed
+## curve), striking each body its edge reaches once, sparing the body that cast it; its blast and
+## `on expire` where it ends, at its centre. One carrier (owner, 2026-11-12: "One carrier!"). It
+## replaced the compiler's fallback carriers (owner, 2026-11-12), so cards with no carrier after them
+## are wasted. Which cards do something on it follows from its yes/no answers and what each card
+## needs, as on any carrier; tests/core/test_card_rules.gd plays every card on it, on you and in a
+## payload.
 ##
 ## godot --headless --path . --script res://content/spells/carriers/pulse/test_pulse.gd
 
@@ -30,8 +30,8 @@ func test_it_is_one_carrier_that_acts_round_what_casts_it() -> void:
 	check(Carriers.ids().has(&"pulse"), "and it is among the carriers")
 	check(pulse.hits() and pulse.lasts(), "it strikes what is there and lasts a moment, for its triggers")
 	check(pulse.has(CarrierTraits.MEETS_SHOTS), "it meets the shots that reach what casts it")
-	check(pulse.has(CarrierTraits.MELEE), "it never leaves what casts it, so it never hits that")
-	check(pulse.has(CarrierTraits.AOE), "it acts all round, not along an aim")
+	check(pulse.has(CarrierTraits.GUARDS), "a shield or deflect on it guards the shots inside it")
+	check(pulse.has(CarrierTraits.AOE), "it goes out all round its cast point, not along an aim")
 	for gone: StringName in [&"pulse_bearer", &"pulse_point"]:
 		check(not Carriers.exists(gone), "no %s: the runtime knows what casts it" % gone)
 
@@ -85,14 +85,15 @@ func test_the_rule_decides_not_a_list() -> void:
 
 
 func test_it_spares_what_casts_it() -> void:
-	# Owner, 2026-11-12: "Yes it spares its caster" (the fallback's strike hurt it).
+	# Owner, 2026-11-12: "Yes it spares its caster" (its ring; a blast where it ends is a blast, which
+	# hits its caster as every blast does: test_its_blast_goes_off_at_its_centre_as_it_ends).
 	var arena := ArenaScript.new(root)
 	var body: Node2D = arena.add_guard(0, Vector2.ZERO)
 	arena.add_imp(Vector2(20.0, 0.0))
-	arena.install_cards(0, 0, ["fire", "blast", "pulse"])
+	arena.install_cards(0, 0, ["fire", "pulse"])
 	arena.cast(0, 0)
 	arena.run(1.0)
-	check(arena.lost(arena.imps[0]) > 0, "the imp beside it is hit")
+	check(arena.lost(arena.imps[0]) > 0, "the imp its ring reaches is hit")
 	check_equal(arena.lost(body), 0, "its caster is not")
 	arena.free_all()
 
@@ -106,32 +107,83 @@ func test_a_bare_pulse_strikes_for_a_little() -> void:
 	check(_imp_lost(["fire", "pulse"], 1.0) >= bare, "an infusion strikes as hard or harder")
 
 
-func test_a_pulse_shows_itself_out_to_its_reach() -> void:
-	# Owner, 2026-11-12: "It sends a mote pulse out from the caster/point" (its card's `shown_cue`).
-	var card: CarrierCard = load("res://content/spells/carriers/pulse/pulse.tres") as CarrierCard
-	check_equal(card.shown_cue, &"pulse", "its card shows the pulse cue")
-	check(load("res://content/cues/pulse.tres") is CueBase, "and that cue exists")
-	var shown: Array = _shown(["fire", "pulse"])
-	check_equal(shown.size(), 1, "a fire Pulse shows itself once")
-	if shown.size() == 1:
-		check_equal(shown[0][0], &"pulse", "as the Pulse card")
-		check(is_equal_approx(float(shown[0][1]), card.radius), "out to its reach: %s" % shown[0][1])
-	check_equal(_shown(["pulse"]).size(), 1, "a bare Pulse strikes, so it shows itself too")
-
-
-## The `carrier_shown` of a Pulse's card ([carrier card, length] each) after `cards` were cast once.
-func _shown(cards: Array) -> Array:
+func test_its_ring_grows_and_strikes_as_it_reaches() -> void:
+	# Owner, 2026-11-12: "It should emit a pulse going outwards from the cast point (using easing as
+	# bolt/atom). It should not hit instantly".
 	var arena := ArenaScript.new(root)
 	arena.add_guard(0, Vector2.ZERO)
-	var seen: Array = []
-	arena.bus.carrier_shown.connect(func(_caster: int, carrier_card: StringName, _origin: Vector2, _direction: Vector2, length: float, _tint: Color, _look: int) -> void:
-		if carrier_card == &"pulse":
-			seen.append([carrier_card, length]))
-	arena.install_cards(0, 0, cards)
+	arena.add_imp(Vector2(40.0, 0.0))
+	arena.install_cards(0, 0, ["pulse"])
 	arena.cast(0, 0)
-	arena.run(0.3)
+	arena.run(1.0 / 60.0)
+	var rings: CarrierPulse = CarrierPulse.of(arena.spells)
+	check_equal(rings.pulse_count(), 1, "one ring")
+	check_equal(arena.lost(arena.imps[0]), 0, "nothing is hit at once")
+	var radius: float = 0.0
+	var grew: bool = true
+	for step in 30:
+		arena.run(1.0 / 60.0)
+		for at in rings.pulse_slots():
+			if rings.pulse_on(at):
+				grew = grew and rings.pulse_radius(at) >= radius
+				radius = rings.pulse_radius(at)
+	check(grew, "its ring only grows")
+	check(arena.lost(arena.imps[0]) > 0, "the imp is hit once the ring reaches it")
 	arena.free_all()
-	return seen
+
+
+func test_its_ring_goes_as_far_as_a_shot_of_its_numbers_flies() -> void:
+	# The same speed curve as a shot (`ProjectilesScript.speed_factor`, the manager's own sum inline):
+	# a ring reaches where a shot of its speed and life gets to (the curve keeps its mean, 1).
+	var arena := ArenaScript.new(root)
+	arena.add_guard(0, Vector2.ZERO)
+	var card: CarrierCard = load("res://content/spells/carriers/pulse/pulse.tres") as CarrierCard
+	arena.install_cards(0, 0, ["pulse"])
+	arena.cast(0, 0)
+	var rings: CarrierPulse = CarrierPulse.of(arena.spells)
+	var furthest: float = 0.0
+	for step in 40:
+		arena.run(1.0 / 60.0)
+		for at in rings.pulse_slots():
+			if rings.pulse_on(at):
+				furthest = maxf(furthest, rings.pulse_radius(at))
+	# In open space, clear of every body.
+	var slot: int = arena.projectiles.spawn(0, Vector2(0.0, 300.0), Vector2.RIGHT * card.speed, card.lifetime, 1.0, 0)
+	arena.projectiles.set_speed_curve(slot, SpellLimits.SHOT_SPEED_START, SpellLimits.SHOT_SPEED_END, SpellLimits.SHOT_SPEED_EASE)
+	var flown: float = 0.0
+	for step in 40:
+		if arena.projectiles.is_alive(slot):
+			flown = arena.projectiles.get_position_of(slot).x
+		arena.run(1.0 / 60.0)
+	check(absf(furthest - flown) < 2.0, "a ring and a shot of the same numbers go as far: %.1f and %.1f" % [furthest, flown])
+	check(absf(furthest - card.speed * card.lifetime) < 3.0, "about speed x life: %.1f" % furthest)
+	arena.free_all()
+
+
+func test_its_blast_goes_off_at_its_centre_as_it_ends() -> void:
+	# Owner, 2026-11-12: the blast where the ring ends, at its centre; a blast hits everyone in it,
+	# its caster too ("Why did you add an exception for blast to spare its caster?").
+	var arena := ArenaScript.new(root)
+	var body: Node2D = arena.add_guard(0, Vector2.ZERO)
+	arena.install_cards(0, 0, ["blast", "pulse"])
+	arena.cast(0, 0)
+	arena.run(0.2)
+	check_equal(arena.lost(body), 0, "nothing while the ring is out")
+	arena.run(0.6)
+	check(arena.lost(body) > 0, "its blast at the centre as it ends hits the caster standing there")
+	arena.free_all()
+
+
+func test_return_brings_its_ring_back_striking_again() -> void:
+	var once: int = _imp_lost(["fire", "pulse"], 2.0, Vector2(20.0, 0.0))
+	var back: int = _imp_lost(["return", "fire", "pulse"], 2.0, Vector2(20.0, 0.0))
+	check(back > once, "out and back, it strikes the imp twice: %d against %d" % [back, once])
+
+
+func test_walls_stop_its_ring_and_ghost_takes_it_through() -> void:
+	var wall: Rect2 = Rect2(14.0, -40.0, 4.0, 80.0)
+	check_equal(_imp_lost(["fire", "pulse"], 1.0, Vector2(24.0, 0.0), wall), 0, "an imp behind a wall is not struck")
+	check(_imp_lost(["ghost", "fire", "pulse"], 1.0, Vector2(24.0, 0.0), wall) > 0, "with ghost it is")
 
 
 func test_held_it_strikes_again_until_cast_again() -> void:
@@ -140,40 +192,52 @@ func test_held_it_strikes_again_until_cast_again() -> void:
 	check(held > once, "held, it strikes again and again: %d against %d" % [held, once])
 
 
-func test_a_trigger_that_needs_a_carrier_that_lasts_fires_from_it() -> void:
-	# Its short life carries a timer: the payload bolt leaves from the caster.
+func test_a_trigger_that_needs_a_carrier_that_lasts_fires_from_its_centre() -> void:
+	# Its life carries a timer: the payload bolt leaves from its centre, cast by that point.
 	var arena := ArenaScript.new(root)
-	arena.add_guard(0, Vector2.ZERO)
+	var body: Node2D = arena.add_guard(0, Vector2.ZERO)
 	arena.add_imp(Vector2(70.0, 0.0))
 	arena.install_cards(0, 0, ["timer", "pulse", "bolt"])
 	var compiled: CompiledStaff = arena.spells.compile_staff([&"timer", &"pulse", &"bolt"] as Array[StringName], ArenaScript.plain_staff(3))
 	check(not compiled.wasted.has(0), "a timer works on a Pulse")
 	arena.cast(0, 0)
+	# The wizard steps off the centre (one standing there is hit: the next test).
+	body.position = Vector2(0.0, 60.0)
 	arena.run(1.5)
-	check(arena.lost(arena.imps[0]) > 0, "its payload bolt flew from the caster and hit")
+	check(arena.lost(arena.imps[0]) > 0, "its payload bolt flew from the centre and hit")
 	arena.free_all()
 
 
-func test_on_expire_fires_from_what_it_is_round_as_it_ends() -> void:
-	# Its own end is its life's: the payload leaves from the caster it was round, so it spares them.
-	var arena := ArenaScript.new(root)
-	var body: Node2D = arena.add_guard(0, Vector2.ZERO)
-	arena.add_imp(Vector2(60.0, 0.0))
-	arena.install_cards(0, 0, ["on_expire", "pulse", "bolt"])
-	arena.cast(0, 0)
-	arena.run(0.3)
-	check_equal(arena.lost(arena.imps[0]), 0, "nothing yet: it lasts half a second")
-	arena.run(1.0)
-	check(arena.lost(arena.imps[0]) > 0, "as it ends, its bolt flew from the caster and hit")
-	check_equal(arena.lost(body), 0, "and spared the caster it left")
-	arena.free_all()
+func test_on_expire_fires_from_its_centre_cast_by_that_point() -> void:
+	# Owner, 2026-11-12: "the bolt should hit the wizard if he is still standing at the cast point":
+	# its end is a point's, as every carrier's that ends at a spot, with no exception for its caster.
+	for stays: bool in [true, false]:
+		var arena := ArenaScript.new(root)
+		var body: Node2D = arena.add_guard(0, Vector2.ZERO)
+		arena.add_imp(Vector2(60.0, 0.0))
+		arena.install_cards(0, 0, ["on_expire", "pulse", "bolt"])
+		arena.cast(0, 0)
+		if not stays:
+			body.position = Vector2(0.0, 60.0)
+		arena.run(0.3)
+		check_equal(arena.lost(arena.imps[0]), 0, "nothing yet: its ring is still out")
+		arena.run(1.0)
+		if stays:
+			check(arena.lost(body) > 0, "a wizard still at the centre is hit by the bolt")
+		else:
+			check_equal(arena.lost(body), 0, "one who stepped away is not")
+			check(arena.lost(arena.imps[0]) > 0, "and the bolt flies on to the imp")
+		arena.free_all()
 
 
-## Health the imp beside the caster lost after `cards` were cast once and `seconds` ran.
-func _imp_lost(cards: Array, seconds: float) -> int:
+## Health the imp at `at` lost after `cards` were cast once and `seconds` ran (with a wall over
+## `wall`, when it has an area).
+func _imp_lost(cards: Array, seconds: float, at: Vector2 = Vector2(20.0, 0.0), wall: Rect2 = Rect2()) -> int:
 	var arena := ArenaScript.new(root)
 	arena.add_guard(0, Vector2.ZERO)
-	arena.add_imp(Vector2(20.0, 0.0))
+	arena.add_imp(at)
+	if wall.has_area():
+		arena.add_wall(wall)
 	arena.install_cards(0, 0, cards)
 	arena.cast(0, 0)
 	arena.run(seconds)
@@ -198,18 +262,20 @@ func test_a_recoil_on_it_pushes_its_caster() -> void:
 	arena.free_all()
 
 
-func test_a_deflect_on_it_turns_a_shot_that_reaches_the_caster() -> void:
+func test_a_deflect_on_it_turns_the_shots_inside_its_ring() -> void:
+	# As a slam's ring (`MEETS_SHOTS`, `GUARDS`): while it is out, the shots of other teams inside it.
 	var arena := ArenaScript.new(root)
 	arena.add_guard(0, Vector2.ZERO)
-	arena.install_cards(0, 0, ["deflect", "fire", "pulse"])
-	arena.shoot_at(Vector2(60.0, 0.0), Vector2.ZERO)
+	arena.install_cards(0, 0, ["deflect", "pulse"])
+	arena.shoot_at(Vector2(110.0, 0.0), Vector2.ZERO)
 	var cast: bool = false
 	for step in 120:
 		arena.run(1.0 / 60.0)
-		if not cast and arena.projectiles.shots_on_segment(0, Vector2.ZERO, Vector2.ZERO, SpellLimits.MOVE_GUARD_REACH) > 0:
+		# Cast ahead of it: the ring has to grow out to meet it before it reaches the wizard.
+		if not cast and arena.projectiles.shots_on_segment(0, Vector2.ZERO, Vector2.ZERO, 70.0) > 0:
 			cast = arena.cast(0, 0)
 	check(cast, "the wizard cast as the shot came near")
-	check(not arena.deflects.is_empty(), "and turned it: %s" % [arena.deflects])
+	check(not arena.deflects.is_empty(), "and its ring turned it: %s" % [arena.deflects])
 	arena.free_all()
 
 
@@ -225,56 +291,6 @@ func test_a_payloads_pulse_strikes_round_where_its_spent_bolt_hit() -> void:
 	arena.run(1.0)
 	check(arena.lost(arena.imps[0]) > 0, "the bolt hit the first imp")
 	check(arena.lost(arena.imps[1]) > 0, "and the Pulse struck the one beside it")
-	arena.free_all()
-
-
-func test_a_shield_pulse_on_a_shot_gives_it_charges_and_a_deflect_makes_it_deflect() -> void:
-	for card: String in ["shield", "deflect"]:
-		var arena := ArenaScript.new(root)
-		arena.install_cards(0, 0, ["timer", "bolt", card, "pulse"])
-		arena.cast(0, 0)
-		var bolt: int = -1
-		for slot in arena.projectiles.get_cap():
-			if arena.projectiles.is_alive(slot) and arena.projectiles.get_actor_of(slot) == 0:
-				bolt = slot
-		check(bolt >= 0, "%s: the bolt flies" % card)
-		arena.run(0.25)
-		var before: bool = arena.projectiles.get_shield_of(bolt) > 0 or arena.projectiles.is_deflecting(bolt)
-		check(not before, "%s: nothing on it before its first tick" % card)
-		arena.run(0.4)
-		if card == "shield":
-			check_equal(arena.projectiles.get_shield_of(bolt), 1, "a tick puts a shield charge on the bolt")
-		else:
-			check(arena.projectiles.is_deflecting(bolt), "a tick makes the bolt deflect")
-		arena.free_all()
-
-
-func test_a_shield_pulse_on_the_caster_by_on_cast_or_a_dash_is_its_barrier() -> void:
-	for cards: Array in [["on_cast", "bolt", "shield", "pulse"], ["timer", "dash", "shield", "pulse"]]:
-		var arena := ArenaScript.new(root)
-		arena.add_guard(0, Vector2.ZERO)
-		var barriers: Array = []
-		arena.bus.wizard_shield_requested.connect(func(actor: int, charges: int, _seconds: float, _tag: int) -> void: barriers.append([actor, charges]))
-		arena.install_cards(0, 0, cards)
-		arena.cast(0, 0)
-		arena.run(0.4)
-		check_equal(barriers, [[0, 1]], "%s: a barrier on the wizard" % [cards])
-		arena.free_all()
-
-
-func test_a_shield_pulse_on_a_point_guards_no_one() -> void:
-	# The point has no one to shield (what Shield does on a Pulse is still to be talked through with
-	# the owner, 2026-11-12).
-	var arena := ArenaScript.new(root)
-	arena.add_imp(Vector2(60.0, 0.0))
-	arena.add_guard(0, Vector2.ZERO)
-	var barriers: Array = []
-	arena.bus.wizard_shield_requested.connect(func(actor: int, _charges: int, _seconds: float, _tag: int) -> void: barriers.append(actor))
-	arena.install_cards(0, 0, ["on_hit", "bolt", "shield", "pulse"])
-	arena.cast(0, 0)
-	arena.run(1.0)
-	check(arena.lost(arena.imps[0]) > 0, "the bolt hit")
-	check(barriers.is_empty(), "and nobody got a barrier: %s" % [barriers])
 	arena.free_all()
 
 
@@ -332,4 +348,21 @@ func test_on_expire_on_a_payloads_pulse_round_a_flying_bolt_fires_from_the_bolt(
 			break
 	check(second, "a second bolt left")
 	check(furthest > 40.0, "from far along the first bolt's flight, not from the wizard: %.1f" % furthest)
+	arena.free_all()
+
+
+func test_a_shield_on_it_stops_the_shots_inside_its_ring() -> void:
+	var arena := ArenaScript.new(root)
+	var body: Node2D = arena.add_guard(0, Vector2.ZERO)
+	arena.install_cards(0, 0, ["shield", "pulse"])
+	arena.shoot_at(Vector2(110.0, 0.0), Vector2.ZERO)
+	var cast: bool = false
+	for step in 120:
+		arena.run(1.0 / 60.0)
+		# Cast ahead of it: the ring has to grow out to meet it before it reaches the wizard.
+		if not cast and arena.projectiles.shots_on_segment(0, Vector2.ZERO, Vector2.ZERO, 70.0) > 0:
+			cast = arena.cast(0, 0)
+	check(cast, "the wizard cast as the shot came near")
+	check(not arena.blocks.is_empty(), "its ring stopped it: %s" % [arena.blocks])
+	check_equal(arena.lost(body), 0, "and the wizard was not hit")
 	arena.free_all()

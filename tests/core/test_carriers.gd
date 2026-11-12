@@ -63,7 +63,7 @@ func test_what_works_follows_the_traits() -> void:
 		check(carrier.fires_with(EVENTS.HIT, {BEHAVIOURS.BLAST: true}, false), "and with a blast on a %s too: its strikes are its hits" % name)
 		check_equal(carrier.fires(EVENTS.TIMER), carrier.lasts(), "a timer ticks on a %s exactly when it lasts" % name)
 		check_equal(carrier.works(BEHAVIOURS.HOMING), carrier.steers(), "homing works on a %s exactly when it steers" % name)
-		check_equal(carrier.works(BEHAVIOURS.RETURN), carrier.flies(), "return works on a %s exactly when it flies" % name)
+		check_equal(carrier.works(BEHAVIOURS.RETURN), carrier.flies() or carrier.has(CarrierTraits.AOE), "return works on a %s exactly when it flies or goes out all round (a ring)" % name)
 		for behaviour: int in [BEHAVIOURS.CHAIN, BEHAVIOURS.SIPHON, BEHAVIOURS.POSSESS, BEHAVIOURS.RELAY, BEHAVIOURS.HEAVY, BEHAVIOURS.PULL]:
 			check_equal(carrier.works(behaviour), carrier.hits(), "%s works on a %s exactly when it hits" % [BEHAVIOURS.keys()[behaviour], name])
 		for behaviour: int in [BEHAVIOURS.NONE, BEHAVIOURS.BLAST, BEHAVIOURS.ECHO, BEHAVIOURS.RECOIL, BEHAVIOURS.MIRROR]:

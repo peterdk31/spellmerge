@@ -93,6 +93,7 @@ const BirthsScript := preload("res://gameplay/feel/births.gd")
 const BLAST_SHADER: Shader = preload("res://core/projectiles/shot_blast.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
+const PulseRingsScript := preload("res://gameplay/feel/pulse_rings.gd")
 const PortalLookScript := preload("res://gameplay/feel/portal_look.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
@@ -392,6 +393,8 @@ var _live_beams: Array[MeshInstance2D] = []
 var _carrier_card_looks: Dictionary = {}
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
 var _swing_trails: SwingTrailsScript = null
+## The Pulses' rings (`pulse_rings.gd`, props W9a): motes along each live ring's edge, every frame.
+var _pulse_rings: PulseRingsScript = PulseRingsScript.new()
 ## The open portals' gates (`PortalLookScript`), drawn every frame from one typed read of them
 ## (`CarrierPortal.read_view` into `_portal_view`, refilled each frame).
 var _portal_look: PortalLookScript = null
@@ -748,6 +751,8 @@ func step(real_delta: float) -> void:
 	_draw_live_beams(real_delta)
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null, _swing_shader_of)
+	if _spectacle.motes_on():
+		_pulse_rings.step(spells.call("carrier", &"pulse") if spells != null and spells.has_method("carrier") else null, real_delta, _swing_ramp, _spectacle.births)
 	if _portal_look != null:
 		_step_portals()
 	_status_motes(real_delta)

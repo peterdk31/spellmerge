@@ -35,10 +35,9 @@ func before_each() -> void:
 	var halo: CarrierCard = _carrier_card(&"halo", 4, 8)
 	halo.spread = 360.0
 	halo.wind_down = 0.4
-	var pulse: CarrierCard = _carrier_card(&"pulse", 4, 1)
-	pulse.carrier = &"pulse"
-	pulse.radius = 24.0
-	pulse.lifetime = 0.5
+	# The real Pulse card, not a stand-in that could drift from it (owner, 2026-11-12: "Is it not
+	# better to test the real cards?").
+	_fake.items[&"pulse"] = load("res://content/spells/carriers/pulse/pulse.tres")
 	_element(&"fire", &"burn", 1.5)
 	_element(&"frost", &"chill", 1.0)
 	_modifier(&"split").shot_mult = 3

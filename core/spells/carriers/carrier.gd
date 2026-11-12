@@ -41,7 +41,6 @@ const CASTS_FROM_SHOT: int = CarrierTraits.CASTS_FROM_SHOT
 const CASTS_FROM_BODY: int = CarrierTraits.CASTS_FROM_BODY
 const AOE: int = CarrierTraits.AOE
 const MELEE: int = CarrierTraits.MELEE
-const LIFE_WAITS: int = CarrierTraits.LIFE_WAITS
 
 ## What draws its look (`look_drawer`), and so which area a card's `look_shader` (and light) is
 ## for (docs/milestones/card-looks.md): the projectile manager's head batches (LOOK_SHOT: a shot

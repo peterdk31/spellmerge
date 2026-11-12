@@ -604,8 +604,7 @@ func _read_staffs() -> void:
 			continue
 		var reach: float = sense.reach if sense.reach > 0.0 else sense.close_reach
 		best = maxf(best, reach)
-		if sense.self_blast:
-			blast = maxf(blast, sense.blast)
+		blast = maxf(blast, sense.blast)
 	if best > 0.0:
 		# The bolder, the nearer it fights: a slow shot from afar is easy to dodge.
 		band_max = best * (0.95 - 0.35 * profile.aggression)

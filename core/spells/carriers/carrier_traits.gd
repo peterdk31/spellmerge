@@ -70,15 +70,12 @@ const CASTS_FROM_SHOT: int = 1 << 26
 ## Is it a body of its own, an actor (a decoy)? What it fires while it lives is cast from that body,
 ## and a Pulse in a payload it fires is round it.
 const CASTS_FROM_BODY: int = 1 << 27
-## Does it act all round what casts it, not along an aim (a pulse)? A scatter turns nothing there
-## (`Spells`), and the AI reads it as an area round its caster (`CastSense`).
+## Does it go out all round the point it is cast at, not along an aim (a pulse's ring)? A scatter
+## turns nothing there (`Spells`), the AI reads it as an area round its caster (`CastSense`), and
+## it goes out as a shot does, so return brings it back and ghost takes it through walls.
 const AOE: int = 1 << 28
 ## Is it melee: held by or carried with the body that casts it, never leaving it (a swing, a slam, a
 ## dash's pass, a teleport's landing)? Then it never hits that body (`CarrierKit.spared`); anything
 ## else (ranged) spares it only until it has left it: a shot over time, a beam along its path
 ## (owner, 2026-11-06).
 const MELEE: int = 1 << 29
-## Is its life only a wait (a pulse): it does nothing more while it lasts, so its life matters only
-## to what waits on it, a trigger that fires while it lasts or as it ends, or a hold? Then a card
-## that only changes its life does nothing without one (`StaffCompiler._numbers_count`).
-const LIFE_WAITS: int = 1 << 30

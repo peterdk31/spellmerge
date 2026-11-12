@@ -1,9 +1,9 @@
 {
 	"id": "linger_blast_mine",
 	"name": "Linger blast mine",
-	"does": "A timed bolt that stops in mid-air goes off in blasts from one spot: they hit an imp just past it that the moving bolt's blasts never come near.",
+	"does": "A timed bolt that stops in mid-air rings out again and again from one spot: its rings reach an imp off to the side that the moving bolt's rings fall just short of.",
 	"casts": [{"staff": 0, "cards": ["timer", "linger", "bolt", "blast", "pulse"]}],
-	"imps": [[212, 40]],
+	"imps": [[200, 57.5]],
 	"seconds": 2.5,
 	"checks": [{"kind": "damaged", "imps": [0]}]
 }

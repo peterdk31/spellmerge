@@ -1,7 +1,7 @@
 {
 	"id": "pulse_frost_ring",
 	"name": "Frost ring",
-	"does": "A frost burst round the wizard chills the two imps pressing in on either side at once, and its caster takes nothing.",
+	"does": "A frost ring out from the wizard chills the two imps pressing in on either side, and its caster takes nothing.",
 	"needs": "pulse",
 	"guard": true,
 	"casts": [{"staff": 0, "cards": ["frost", "pulse"]}],

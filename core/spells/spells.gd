@@ -37,7 +37,7 @@ extends Node
 ## timer, `on hurt` or end, a barrier's block: `body_caster`; owner, 2026-11-06), else by the point
 ## (`_caster`): dash, teleport, pull, swap and recoil move that shot or body, orbit, familiar and
 ## return circle it, a beam, swing or slam is held by it. A payload's Pulse is round it too
-## (docs/CARRIERS.md, "Pulse: a strike round what casts it"); its actor stays the wizard. A trigger fires every
+## (docs/CARRIERS.md, "Pulse: a ring from the cast point"); its actor stays the wizard. A trigger fires every
 ## time its event happens, as long as its carrier lives (owner, 2026-10-29: no per-shot count).
 ## One budget's trigger fires make at most `fire_shots_per_step` shots per `step` (pacing, not a
 ## limit): a fire past it waits for the next step, oldest first, and none is dropped
@@ -197,7 +197,7 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit", &"_lc_aim_tag", &"_lc_aim_way", &"_lc_aim_caster"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
@@ -292,8 +292,7 @@ var _rec_seq: PackedInt64Array = PackedInt64Array()
 var _rec_chain: PackedInt32Array = PackedInt32Array()
 ## The key (`ProjectileManager.key_of`, N5) of the target a chain came from, 0 for none.
 var _rec_prev: PackedInt64Array = PackedInt64Array()
-## The live carriers with a `timer`, `on hurt` or `on recast` trigger, `_lc_count` of them (rules
-## R4d), and the ends of the Pulses with an `on expire` (`_lc_join_ends`, props W9a): every
+## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
 ## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
 ## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a row of its carrier
 ## (`LC_ROW`: a beam's or a swing's tip, `Carrier.tip_of`), an actor's body (a wizard's dash, a decoy) or a point (a familiar's orb,
@@ -313,10 +312,6 @@ var _lc_kind: PackedInt32Array = PackedInt32Array()
 var _lc_ref: PackedInt32Array = PackedInt32Array()
 var _lc_seq: PackedInt64Array = PackedInt64Array()
 var _lc_tied: PackedByteArray = PackedByteArray()
-## Scratch of `_lc_aim` for `_lc_send` (not state: set and read within one firing).
-var _lc_aim_tag: int = 0
-var _lc_aim_way: Vector2 = Vector2.RIGHT
-var _lc_aim_caster: int = 0
 var _lc_left: PackedFloat32Array = PackedFloat32Array()
 var _lc_clock: PackedFloat32Array = PackedFloat32Array()
 var _lc_at: PackedVector2Array = PackedVector2Array()
@@ -2554,16 +2549,6 @@ func _lc_join(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, tie
 			_lc_join_one(t, trigger.interval, tag, kind, ref, seq, tied, life, at, way)
 
 
-## Lists the end of a carrier of `tag` that lasts `life` seconds round `kind` and `ref` (as
-## `_lc_join`), once for each `on expire` trigger it has: when its life is over, the payload fires
-## from where it is then, cast by what it is round, as its live triggers' (a Pulse, props W9a: its
-## own end is its life's). Never tied: a carrier round a shot that ends first ends where the shot was.
-func _lc_join_ends(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, life: float, at: Vector2, way: Vector2) -> void:
-	for t in spell.triggers.size():
-		if spell.triggers[t].event == TriggerBase.Event.EXPIRE:
-			_lc_join_one(t, 0.0, tag, kind, ref, seq, false, life, at, way)
-
-
 ## How many entries `_lc_join` lists for one carrier of `spell`: its triggers of
 ## `TriggerBase.LIVE`.
 static func _lc_rows(spell: CompiledSpell) -> int:
@@ -2620,9 +2605,7 @@ func _lc_remove(i: int) -> void:
 
 
 ## A carrier of `tag` that is not tied to a row ended (an entity): one of its entries leaves, or
-## with `every` all of them (its build was revoked). An entity's entries are its lasting
-## triggers' (`_lc_rows`); the end of a Pulse (`_lc_join_ends`) is no entity's, and leaves only as
-## its life runs out (`_step_live`) or with `every`.
+## with `every` all of them (its build was revoked).
 func _lc_leave(tag: int, every: bool) -> void:
 	# One carrier is listed once per timer or on hurt trigger (`_lc_join`).
 	var spell: CompiledSpell = _profiles.get(tag)
@@ -2671,19 +2654,12 @@ func _step_live(delta: float) -> void:
 		var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 		var at: Vector2 = _lc_where(i)
 		_lc_left[i] -= delta
+		if spell == null or _lc_left[i] <= 0.0 or (_lc_tied[i] == 1 and not at.is_finite()):
+			_lc_remove(i)
+			continue
 		if at.is_finite():
 			_lc_at[i] = at
 		var trigger: CompiledSpell.Trigger = _lc_trigger_of(i, spell)
-		if spell == null or _lc_left[i] <= 0.0 or (_lc_tied[i] == 1 and not at.is_finite()):
-			var expires: bool = spell != null and trigger != null and trigger.event == TriggerBase.Event.EXPIRE and _lc_aim(i)
-			var from: Vector2 = _lc_at[i]
-			# It leaves before its `on expire` fires: what that payload does may end other entries of
-			# the list (a decoy's pool making room), which moves them about (`_lc_remove`).
-			_lc_remove(i)
-			if expires:
-				# Its life is over: its `on expire` fires where it was, cast by what it was round.
-				_lc_send(trigger.payload, from)
-			continue
 		if trigger != null and trigger.event == TriggerBase.Event.TIMER:
 			_lc_clock[i] -= delta
 			if _lc_clock[i] <= 0.0:
@@ -2698,16 +2674,9 @@ func _step_live(delta: float) -> void:
 ## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies, an
 ## actor's body while it is there (owner, 2026-11-06), else the point does.
 func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false, source: Node = null) -> void:
-	if _lc_aim(i):
-		_lc_send(payload, from, wound, source)
-
-
-## Reads who live carrier `i` casts as and which way (`_lc_aim_tag`, `_lc_aim_caster`,
-## `_lc_aim_way`, scratch for `_lc_send`); false when its spell is gone.
-func _lc_aim(i: int) -> bool:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
-		return false
+		return
 	var tag: int = _lc_tag[i]
 	var actor: int = SpellTag.caster_of(tag)
 	var at: Vector2 = _lc_at[i]
@@ -2729,15 +2698,7 @@ func _lc_aim(i: int) -> bool:
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
 			way = (at - body).normalized()
-	_lc_aim_tag = tag
-	_lc_aim_way = way
-	_lc_aim_caster = caster
-	return true
-
-
-## Fires `payload` from `from` as the live carrier `_lc_aim` read last.
-func _lc_send(payload: CompiledGroup, from: Vector2, wound: bool = false, source: Node = null) -> void:
-	_fire_payload(payload, _lc_aim_tag, SpellTag.caster_of(_lc_aim_tag), from, _lc_aim_way, source, _lc_aim_caster, wound)
+	_fire_payload(payload, tag, actor, from, way, source, caster, wound)
 
 
 ## The trigger live carrier `i` fires, or null.

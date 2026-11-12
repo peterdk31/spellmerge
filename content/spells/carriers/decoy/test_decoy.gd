@@ -178,12 +178,13 @@ func test_a_decoy_placed_again_starts_with_its_own_barrier_only() -> void:
 
 
 func test_a_timer_on_a_decoy_shields_the_decoy() -> void:
-	# The wider rule (owner, 2026-11-06): a payload's left-over cards land on the body that fired it.
-	var made: Array = _world([&"timer", &"decoy", &"shield", &"pulse"], Vector2(400.0, 300.0))
+	# The wider rule (owner, 2026-11-06): a payload is cast by the body that fired it.
+	# A shielded dash in its payload is the decoy's own move, and its shield guards what it moves.
+	var made: Array = _world([&"timer", &"decoy", &"shield", &"dash"], Vector2(400.0, 300.0))
 	var world: World = made[0]
 	var wizard: Actor = made[1]
-	var compiled: CompiledStaff = world.spells.compile_staff([&"timer", &"decoy", &"shield", &"pulse"] as Array[StringName], _plain(4))
-	check(not compiled.wasted.has(2), "the shield is not wasted: it lands on the decoy")
+	var compiled: CompiledStaff = world.spells.compile_staff([&"timer", &"decoy", &"shield", &"dash"] as Array[StringName], _plain(4))
+	check(not compiled.wasted.has(2), "the shield is not wasted: it guards the decoy its dash moves")
 	world.run(0.125, 0.125)
 	check_equal(_decoy_barrier(world, wizard), 0, "no barrier before the first tick")
 	world.run(0.5, 0.5)
@@ -195,7 +196,7 @@ func test_a_timer_on_a_decoy_shields_the_decoy() -> void:
 func test_a_decoys_payload_waiting_for_its_turn_still_lands_on_the_decoy() -> void:
 	# The body is carried through a delayed fire (`PendingLaunch.caster`), as a shot caster is:
 	# an echo of the landing, and a fire past the step's budget, which waits for the next step.
-	var made: Array = _world([&"timer", &"mirror", &"decoy", &"echo", &"shield", &"pulse"], Vector2(400.0, 300.0))
+	var made: Array = _world([&"timer", &"mirror", &"decoy", &"echo", &"shield", &"dash"], Vector2(400.0, 300.0))
 	var world: World = made[0]
 	var wizard: Actor = made[1]
 	world.spells.fire_shots_per_step = 0

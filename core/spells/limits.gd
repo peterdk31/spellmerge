@@ -106,6 +106,8 @@ const SHOT_SPEED_EASE: float = 1.5
 ## Slam rows made at once (more when every one is on), and the share of a slam's `lifetime` its
 ## ring takes to grow to its radius; it holds for the rest (the playground's 0.08 s of 0.12 s).
 const SLAM_ROWS_START: int = 16
+## Pulse rings (`CarrierPulse`): the rows made at first; more when every one is on.
+const PULSE_ROWS_START: int = 16
 const SLAM_GROW: float = 0.67
 ## A homing carrier that is over at once (a beam, a teleport) has no time to turn, so it bends
 ## toward a target as far as a homing shot turns over this many pixels of its flight (the Homing

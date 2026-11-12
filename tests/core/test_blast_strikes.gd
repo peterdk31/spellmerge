@@ -66,9 +66,9 @@ func before_each() -> void:
 	var decoy: CarrierCard = _carrier_card(&"decoy", 0.0, 2.0)
 	decoy.carrier = &"decoy"
 	_carrier_card(&"barb", 300.0, 1.0)
-	var pulse: CarrierCard = _carrier_card(&"pulse", 0.0, 0.5)
-	pulse.carrier = &"pulse"
-	pulse.radius = 24.0
+	# The real Pulse card, not a stand-in that could drift from it (owner, 2026-11-12: "Is it not
+	# better to test the real cards?").
+	_fake.items[&"pulse"] = load("res://content/spells/carriers/pulse/pulse.tres")
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
 	var slam: CarrierCard = _carrier_card(&"slam", 0.0, 0.12)
 	slam.carrier = &"slam"
@@ -173,7 +173,9 @@ func test_the_cards_that_land_on_a_point_strike_as_an_explosion() -> void:
 	_build([&"blast", &"pulse"])
 	var enemy: Node2D = _target(Vector2(15.0, 0.0))
 	_cast()
-	check_equal(kinds.get(enemy, []), [&"burst"], "a blast Pulse round the caster strikes as a burst")
+	_tick(40)
+	var struck: Array = kinds.get(enemy, [])
+	check(not struck.is_empty() and struck.all(func(kind: Variant) -> bool: return kind == &"burst"), "a blast Pulse's ring and blast strike as bursts: %s" % [struck])
 
 
 ## target -> the kinds of the hits it took (`HitProfile.kind`), as they are sent.
@@ -185,15 +187,19 @@ func _record_kinds() -> Dictionary:
 	return kinds
 
 
-func test_a_blast_pulse_spares_its_own_caster() -> void:
-	# Props W9a (owner, 2026-11-12: "Yes it spares its caster"); the lone blast it replaced hit them.
+func test_a_blast_pulse_goes_off_where_its_ring_ends_and_hits_its_caster_too() -> void:
+	# Props W9a (owner, 2026-11-12): a Pulse's blast goes off at its centre as its ring ends, and a
+	# blast hits everyone in it, its caster too ("Why did you add an exception for blast to spare its
+	# caster?").
 	var tag: int = _build([&"blast", &"pulse"])
 	var body: Node2D = _target(Vector2.ZERO, 0)
 	_mgr.actors.set_node(0, body)
 	var enemy: Node2D = _target(Vector2(15.0, 0.0))
 	_cast()
-	check_equal(_hits_on(body, tag), 0, "the caster is inside their own blast, and spared")
-	check_equal(_hits_on(enemy, tag), 1, "the enemy next to them is struck")
+	check_equal(_hits_on(body, tag), 0, "nothing on the caster while the ring is out")
+	_tick(40)
+	check_equal(_hits_on(body, tag), 1, "its blast hits the caster still at its centre")
+	check(_hits_on(enemy, tag) >= 1, "and the enemy next to them")
 
 
 func test_on_hit_and_siphon_work_on_a_decoy_through_its_blast() -> void:

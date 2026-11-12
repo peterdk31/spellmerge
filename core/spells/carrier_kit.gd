@@ -394,13 +394,6 @@ func live_join(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, ti
 	_rt._lc_join(spell, tag, kind, ref, seq, tied, life, at, way)
 
 
-## Lists the end of a carrier of `tag` that lasts `life` seconds round `kind` and `ref`, for its
-## `on expire` triggers: when its life is over the payload fires from where it is, cast by what it
-## is round (a Pulse's own end).
-func live_join_ends(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, life: float, at: Vector2, way: Vector2) -> void:
-	_rt._lc_join_ends(spell, tag, kind, ref, seq, life, at, way)
-
-
 ## A live carrier of `tag` that is not tied to a row ended: one of its entries leaves, or with
 ## `every` all of them.
 func live_leave(tag: int, every: bool) -> void:

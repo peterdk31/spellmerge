@@ -1,9 +1,9 @@
 {
 	"id": "linger_frost_mines",
 	"name": "Linger frost mines",
-	"does": "A timed frost bolt hangs in mid-air and drops frost blasts on one spot, chilling an imp off to its side.",
+	"does": "A timed frost bolt hangs in mid-air and rings out frost from one spot, chilling an imp off to its side that the moving bolt's rings fall just short of.",
 	"casts": [{"staff": 0, "cards": ["timer", "linger", "frost", "bolt", "frost", "blast", "pulse"]}],
-	"imps": [[212, -40]],
+	"imps": [[200, -57.5]],
 	"seconds": 2.5,
 	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
 }

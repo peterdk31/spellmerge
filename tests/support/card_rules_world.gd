@@ -300,7 +300,7 @@ func _shot_within(distance: float) -> bool:
 
 
 func _is_quiet() -> bool:
-	if projectiles.get_count() > 0 or CarrierBeam.of(spells).beam_count() > 0 or CarrierSwing.of(spells).swing_count() > 0 or CarrierSlam.of(spells).slam_count() > 0 or CarrierPortal.of(spells).portal_count() > 0:
+	if projectiles.get_count() > 0 or CarrierBeam.of(spells).beam_count() > 0 or CarrierSwing.of(spells).swing_count() > 0 or CarrierSlam.of(spells).slam_count() > 0 or CarrierPortal.of(spells).portal_count() > 0 or CarrierPulse.of(spells).pulse_count() > 0:
 		return false
 	if not spells._pending.is_empty() or spells._moves.under_way() > 0 or spells._jq_count > 0:
 		return false

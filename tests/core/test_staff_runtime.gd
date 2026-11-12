@@ -55,9 +55,9 @@ func before_each() -> void:
 	_staff.slots = 20
 	_staff.cooldown = 0.5
 	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
-	var pulse: CarrierCard = _carrier_card(&"pulse", 0.0, 0.5)
-	pulse.carrier = &"pulse"
-	pulse.radius = 24.0
+	# The real Pulse card, not a stand-in that could drift from it (owner, 2026-11-12: "Is it not
+	# better to test the real cards?").
+	_fake.items[&"pulse"] = load("res://content/spells/carriers/pulse/pulse.tres")
 	bolt.wind_down = 0.2
 	var halo: CarrierCard = _carrier_card(&"halo", 300.0, 1.0)
 	halo.shots = 8
@@ -174,6 +174,8 @@ func test_a_blast_pulse_asks_for_an_area_hit_on_the_caster() -> void:
 	_install(3, 0, "blast pulse")
 	var origin := Vector2(20, 30)
 	check(_spells.cast_staff(3, 0, origin, AIM, 100.0) >= 0.0, "it casts")
+	check(_areas.is_empty(), "nothing at once: its blast goes off as its ring ends")
+	_tick(30)
 	check_equal(_areas.size(), 1, "one area hit")
 	if _areas.size() == 1:
 		check_equal(_areas[0][0], 3, "for player 4")
@@ -185,7 +187,8 @@ func test_a_blast_in_a_payload_lands_where_the_bolt_hits() -> void:
 	_target(Vector2(60, 0))
 	_install(0, 0, "on_hit bolt blast pulse")
 	_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0)
-	_tick(20)
+	# The bolt's flight, then the Pulse's ring, whose blast goes off as it ends.
+	_tick(60)
 	check_equal(_areas.size(), 1, "one area hit")
 	if _areas.size() == 1:
 		check((_areas[0][1] as Vector2).distance_to(Vector2(60, 0)) < 16.0, "at the hit, got %s" % _areas[0][1])

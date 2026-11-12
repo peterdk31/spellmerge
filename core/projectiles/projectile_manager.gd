@@ -4353,6 +4353,14 @@ func _turned(slot: int) -> float:
 	return _orbit_angle[slot] - _orbit_from[slot] if _motion[slot] == MOTION_ORBIT else 0.0
 
 
+## The factor of its speed a shot of the curve `start`, `end`, `ease_power` (`set_speed_curve`) goes
+## at with `left` of its life left (0 to 1): the curve itself, for what grows as a shot flies (a
+## Pulse's ring, `CarrierPulse`). `_curve_factor` is the same sum inline (the hot loop, mirrored by
+## the native kernel); tests/core/test_pulse_ring.gd holds the two to the same distance.
+static func speed_factor(start: float, end: float, ease_power: float, left: float) -> float:
+	return start + (end - start) * (1.0 - DMath.pow(left, ease_power))
+
+
 ## The factor of its speed the shot in `slot` goes at in a step of `delta` (`set_speed_curve`): read
 ## at the middle of the step (its life was already counted down for the whole step). 1 for a shot
 ## with no curve.

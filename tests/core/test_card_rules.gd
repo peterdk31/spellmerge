@@ -43,7 +43,7 @@ extends "res://tests/support/suite.gd"
 ## with a copy of it that keeps only its costs (`_costs_of`: mana, a slower cast, less damage), a
 ## behaviour modifier with its plain copy as above.
 ##
-## The Pulse card (docs/CARRIERS.md, "Pulse: a strike round what casts it"; props W9a) is a column of
+## The Pulse card (docs/CARRIERS.md, "Pulse: a ring from the cast point"; props W9a) is a column of
 ## its own, as every carrier card, and played in a payload in two more, `on it` and `on its body`,
 ## each the way a staff reaches it: a modifier or an infusion followed by the Pulse card. On it: the
 ## Pulse in the payload of `on hit` on a piercing shot that hits the target (`_bearer_prefix`): it
@@ -230,6 +230,7 @@ func _discover() -> void:
 	var on_body := CarrierCard.new()
 	on_body.id = BODY_COLUMN
 	on_body.carrier = _pulse.carrier
+	on_body.speed = _pulse.speed
 	on_body.lifetime = _pulse.lifetime
 	on_body.radius = _pulse.radius
 	_columns.append(on_body)
@@ -264,6 +265,9 @@ const SHOOTER: Dictionary = {"name": "enemy shooter", "shooter": true}
 const WALL: Dictionary = {"name": "wall, target behind", "wall": 0.6, "back": true}
 const BACK: Dictionary = {"name": "target behind", "back": true}
 const WALL_TARGET: Dictionary = {"name": "target behind a wall", "wall": 0.4, "behind": true}
+## A wall just past the target on the line and one more behind it: what goes on from the target (a
+## payload's ring round the shot that hit it) meets the wall.
+const WALL_PAST: Dictionary = {"name": "wall past the target, one behind it", "wall": 1.05, "behind": true, "line": true}
 const DONOR: Dictionary = {"name": "infused target", "line": true, "donor": true}
 const SHIELDED: Dictionary = {"name": "enemy shooter, shield", "shooter": true, "with": ModifierBase.Behaviour.SHIELD}
 const WEAK: Dictionary = {"name": "target dies", "line": true, "weak": true}
@@ -298,15 +302,18 @@ static func behaviour_scenes(behaviour: int) -> Array[Dictionary]:
 		ModifierBase.Behaviour.HOLD:
 			# A held carrier lives on, and a held Pulse strikes again: what stands on the line is struck.
 			return [OPEN, LINE]
-		ModifierBase.Behaviour.RECOIL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.GROWTH, ModifierBase.Behaviour.RETURN:
+		ModifierBase.Behaviour.RECOIL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.GROWTH:
 			return [OPEN]
+		ModifierBase.Behaviour.RETURN:
+			# A shot comes back the way it went; a ring that shrinks home strikes what it passes again.
+			return [OPEN, LINE]
 		ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.NOVA:
 			# A nova is a mirror with eight ways: one of them goes behind.
 			return [BACK]
 		ModifierBase.Behaviour.BOUNCE:
 			return [WALL]
 		ModifierBase.Behaviour.GHOST:
-			return [WALL_TARGET]
+			return [WALL_TARGET, WALL_PAST]
 		ModifierBase.Behaviour.RELAY:
 			return [DONOR]
 		ModifierBase.Behaviour.ORBIT:
@@ -341,8 +348,8 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 ## when there is no rule for its carrier yet.
 static func reach(carrier_card: CarrierCard) -> float:
 	if carrier_card.id == BODY_COLUMN:
-		# On its body: within its strike round the wizard's hand, as on you.
-		return carrier_card.radius
+		# On its body: inside its ring round the wizard, as on you.
+		return carrier_card.speed * carrier_card.lifetime * 0.75
 	if carrier_card.id == ON_IT_COLUMN:
 		# On it: where the shot that fires it hits (its stand-in has that shot's numbers).
 		return minf(carrier_card.speed * carrier_card.lifetime * 0.5, 90.0)
@@ -350,8 +357,8 @@ static func reach(carrier_card: CarrierCard) -> float:
 		&"atom", &"swap":
 			return minf(carrier_card.speed * carrier_card.lifetime * 0.5, 90.0)
 		&"pulse":
-			# On you: within its strike round the wizard's hand.
-			return carrier_card.radius
+			# On you: inside the ring it grows round the wizard (as far as `speed` x `lifetime`).
+			return carrier_card.speed * carrier_card.lifetime * 0.75
 		&"beam":
 			return minf(carrier_card.ray_length * 0.5, 90.0)
 		&"swing":

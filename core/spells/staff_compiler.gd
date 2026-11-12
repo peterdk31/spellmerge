@@ -9,7 +9,7 @@ extends RefCounted
 ## for the next carrier, whose payload is the group read right after it (with more triggers, each
 ## takes the next group in turn). Reading wraps past the
 ## last slot, and a card already read in this cast ends the group. Cards left with no carrier
-## after them are wasted: the Pulse card is the carrier round whatever casts it (props W9a; it
+## after them are wasted: the Pulse card is a ring out from where it is cast (props W9a; it
 ## replaced the fallback carriers this compiler once picked for them). Nothing is refused: a card that
 ## does nothing is listed as wasted (`wasted`); the builder shows it.
 
@@ -139,7 +139,7 @@ func _read_group(want: int, payload: bool, wind_up: float = 0.0) -> CompiledGrou
 		elif card is CarrierCard:
 			var carrier_card := card as CarrierCard
 			var on: Carrier = Carriers.of(carrier_card.carrier)
-			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, carrier_card.wind_up, _waits(triggers))
+			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, carrier_card.wind_up)
 			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
 			var spell: CompiledSpell = _build(carrier_card, on, kept_elements, kept_modifiers)
 			spell.slot = slot
@@ -158,7 +158,7 @@ func _read_group(want: int, payload: bool, wind_up: float = 0.0) -> CompiledGrou
 			want -= 1
 			found += 1
 	# Cards with no carrier after them are wasted: triggers, modifiers and infusions alike (the Pulse
-	# card is the carrier round whatever casts it).
+	# card is a ring out from where it is cast).
 	for at: int in trigger_slots:
 		_waste(at)
 	for at: int in kept:
@@ -246,37 +246,26 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 		spell.triggers.append(fires)
 
 
-## True when one of `triggers` waits on its carrier's life: one that fires while it lasts, or as it
-## ends.
-static func _waits(triggers: Array[TriggerBase]) -> bool:
-	for trigger in triggers:
-		if TriggerBase.LIVE.has(trigger.event) or trigger.event == TriggerBase.Event.EXPIRE:
-			return true
-	return false
-
-
 ## The modifiers of `modifiers` that do something on the carrier `on`, in order (every one with
 ## `keep_wasted`): a behaviour it runs (`Carrier.works`; homing on a rune, return on a beam do
 ## nothing, and change nothing else either) and numbers it uses (`_numbers_count`). The one rule for
 ## every carrier. `payload`: the carrier is a payload's, which adds no
 ## wind-down to a staff. `wind_up`: its carrier card's wind-up; with a
-## charge kept on it the carrier winds up too, so a shorter wind-up counts there. `waited`: a
-## trigger on it waits on its life (`_waits`); a hold kept on it does too.
-static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool, wind_up: float = 0.0, waited: bool = false) -> Array[ModifierBase]:
+## charge kept on it the carrier winds up too, so a shorter wind-up counts there.
+static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool, wind_up: float = 0.0) -> Array[ModifierBase]:
 	var deflects: bool = false
 	var blasts: bool = false
 	for modifier in modifiers:
 		deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and on.works(modifier.behaviour))
 		blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and on.works(modifier.behaviour))
-		waited = waited or (modifier.behaviour == ModifierBase.Behaviour.HOLD and on.works(modifier.behaviour))
 	var winds_up: bool = wind_up > 0.0
 	for modifier in modifiers:
 		# A charge's wind-up is a cost: it is there when the charge is kept for what else it does.
-		winds_up = winds_up or (modifier.wind_up_add > 0.0 and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, false, waited))
+		winds_up = winds_up or (modifier.wind_up_add > 0.0 and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, false))
 	var out: Array[ModifierBase] = []
 	for modifier in modifiers:
 		# A deflect turns every shot that touches it first, so a shield with it never blocks.
-		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, winds_up, waited)
+		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, winds_up)
 		if works or keep_wasted:
 			out.append(modifier)
 	return out
@@ -324,7 +313,7 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 	var on: Carrier = Carriers.of(carrier)
 	if card is ModifierBase:
 		var modifier := card as ModifierBase
-		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false, false, false, modifier.behaviour == ModifierBase.Behaviour.HOLD)
+		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false, false, false)
 	if card is ElementBase:
 		return on.takes_element(card as ElementBase, false)
 	if card is TriggerBase:
@@ -336,11 +325,10 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
 ## uses that number: a shorter wind-down where it adds one to its staff (not a payload's carrier,
 ## `payload`), a shorter wind-up where the
-## carrier winds up (`winds_up`), damage where it hits (or blasts), speed where it travels and lifetime where it moves or lasts
-## (where its life is only a wait, `LIFE_WAITS`, only when something waits on it: `waited`),
+## carrier winds up (`winds_up`), damage where it hits (or blasts), speed where it travels and lifetime where it moves or lasts,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
 ## behaviour (`Carrier.works`), its numbers ride with it.
-static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool, winds_up: bool, waited: bool = false) -> bool:
+static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool, winds_up: bool) -> bool:
 	if modifier.behaviour != ModifierBase.Behaviour.NONE:
 		return true
 	var any: bool = false
@@ -364,11 +352,11 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 			return true
 	if not is_equal_approx(modifier.lifetime_mult, 1.0):
 		any = true
-		if on.has(Carrier.SPEED) or (on.has(Carrier.LASTS) and (waited or not on.has(Carrier.LIFE_WAITS))):
+		if on.has(Carrier.SPEED) or on.has(Carrier.LASTS):
 			return true
 	if modifier.lifetime_base > 0.0:
 		any = true
-		if on.has(Carrier.SPEED) or (on.has(Carrier.LASTS) and (waited or not on.has(Carrier.LIFE_WAITS))):
+		if on.has(Carrier.SPEED) or on.has(Carrier.LASTS):
 			return true
 	if modifier.shot_mult != 1:
 		any = true

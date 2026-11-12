@@ -67,9 +67,9 @@ func before_each() -> void:
 	_bus.carrier_shown.connect(func(player: int, carrier_card: StringName, at: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_shown.append([player, carrier_card, at, direction, length]))
 	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
-	var pulse: CarrierCard = _carrier_card(&"pulse", 0.0, 0.5)
-	pulse.carrier = &"pulse"
-	pulse.radius = 24.0
+	# The real Pulse card, not a stand-in that could drift from it (owner, 2026-11-12: "Is it not
+	# better to test the real cards?").
+	_fake.items[&"pulse"] = load("res://content/spells/carriers/pulse/pulse.tres")
 	bolt.base_damage = 10
 	var familiar: CarrierCard = _carrier_card(&"familiar", 0.0, 6.0)
 	familiar.carrier = &"familiar"
@@ -356,6 +356,7 @@ func test_a_blast_plays_the_cue_its_card_names_the_first_in_slot_order() -> void
 	_explosions.clear()
 	_build(2, [&"blast", &"barrel", &"pulse"])
 	_cast(2)
+	_tick(30)
 	check(_explosions.size() == 1 and _explosions[0][3] == &"blast", "on a Pulse round the caster, the first's too: %s" % [_explosions])
 
 
@@ -368,6 +369,8 @@ func test_the_shipped_blast_card_names_the_fireball_cue() -> void:
 func test_a_blast_pulse_explodes_round_its_caster_and_a_decoy_without_one_does_not() -> void:
 	_build(0, [&"blast", &"pulse"])
 	_cast()
+	# As its ring ends, at its centre.
+	_tick(30)
 	check_equal(_explosions.size(), 1, "a blast Pulse explodes round the caster")
 	check(_areas.size() == 1 and _explosions.size() == 1 and _explosions[0][1].is_equal_approx(_areas[0][1]), "where its area hit is")
 	_explosions.clear()

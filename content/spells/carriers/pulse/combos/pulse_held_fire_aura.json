@@ -1,7 +1,7 @@
 {
 	"id": "pulse_held_fire_aura",
 	"name": "Fire aura",
-	"does": "Held, a fire Pulse bursts round the wizard again and again until cast again, so an imp standing close keeps burning.",
+	"does": "Held, a fire Pulse rings out from the wizard again and again until cast again, so an imp standing close keeps burning.",
 	"needs": "pulse",
 	"casts": [{"staff": 0, "cards": ["hold", "fire", "pulse"]}],
 	"imps": [[20, 0]],

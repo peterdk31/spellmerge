@@ -1,7 +1,7 @@
 {
 	"id": "timer_bolt_shield",
 	"name": "Bolt that grows a shield",
-	"does": "The shield after the bolt's timer lands on the bolt that ticked: from its first tick it carries a shield charge, which stops the enemy bolt flying at it head on.",
+	"does": "Every tick of the bolt's timer sends a shield ring out from where the bolt is, which stops the enemy bolt flying at it head on.",
 	"needs": "shield",
 	"casts": [{"staff": 0, "cards": ["timer", "bolt", "shield", "pulse"]}],
 	"imps": [],

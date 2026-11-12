@@ -483,6 +483,10 @@ func start_run(requester: int, kept: Array = []) -> bool:
 		projectiles.set_bounds(bounds)
 	var new_world := Node2D.new()
 	new_world.name = WORLD_NAME
+	# The bodies are drawn by their feet (view only): one standing in front of a prop is drawn over
+	# it, one behind it under it. The room's layout, at the top left, is one piece drawn first, its
+	# floor, walls and tops in their own order and z.
+	new_world.y_sort_enabled = true
 	new_world.add_child(layout)
 	_add_camera(new_world, size)
 	_spawn_players(new_world, room, players, kept)

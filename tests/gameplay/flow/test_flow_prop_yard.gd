@@ -94,6 +94,24 @@ func test_the_yard_stands_every_yard_prop_in_rows_by_id() -> void:
 	check(flow.yard_props().is_empty(), "the yard goes with the hub")
 
 
+## Regression (the owner's playtest of 2026-11-12, "I can kinda walk in behind their bottom"): the
+## props were added after the wizards and drawn over them wherever they stood, so a wizard in front of
+## a crate went under its art. The world draws its bodies by their feet, the room's layout first.
+func test_the_world_draws_its_bodies_by_their_feet() -> void:
+	_start()
+	var world: Node2D = flow.world
+	check(world.y_sort_enabled, "the world sorts its bodies by their feet")
+	var crate: Actor = _yard_prop(&"crate")
+	var wizard: Node2D = flow.get_wizard(0)
+	check_equal(crate.get_parent(), world, "a prop is sorted among the bodies")
+	check_equal(wizard.get_parent(), world, "and so is a wizard")
+	var layout: Node2D = world.get_child(0) as Node2D
+	check(layout is not Actor and layout.position == Vector2.ZERO, "the layout at the top left, drawn before every body")
+	for body: Node in world.get_children():
+		if body is Actor:
+			check((body as Actor).global_position.y >= layout.position.y, "%s below the layout's place" % body.name)
+
+
 func test_a_yard_prop_that_leaves_its_first_state_stands_again_fresh() -> void:
 	_start()
 	var first: Actor = _yard_prop(&"crate")

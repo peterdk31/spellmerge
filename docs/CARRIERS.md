@@ -1,12 +1,12 @@
 # Carriers
 
-A carrier is what a form card fires: an atom (the Atom and Bolt cards), a rune, a beam, a dash, a decoy and so on. The carrier
+A carrier is what a carrier card fires: an atom (the Atom and Bolt cards), a rune, a beam, a dash, a decoy and so on. The carrier
 is the important part of a cast. **Each carrier decides for itself what it does with every other
 card on it, both in what the card does and in how it looks**, and it has to decide every one:
 there is no default.
 
 The code is in `core/spells/carriers/`: one script per carrier (`atom.gd`, `beam.gd`,
-`decoy.gd`...) on the base `Carrier` (`carrier.gd`). A carrier is known by its name: a form card
+`decoy.gd`...) on the base `Carrier` (`carrier.gd`). A carrier is known by its name: a carrier card
 says `carrier = &"beam"`, and `Carriers.of(&"beam")` (`carriers.gd`) finds it. Carriers are never
 numbered, so adding or removing one never touches another card's file.
 
@@ -73,12 +73,12 @@ answers yes or no to "does this card do anything on this carrier on its own?" be
 placed, with the same rules as a compile; for the builder, a reward screen or a bot.
 `tests/core/test_carriers.gd` checks it against a real compile for every card on every carrier.
 
-**Required fields**, in `required_fields()`: what a form card of this carrier must set above 0 (a
+**Required fields**, in `required_fields()`: what a carrier card of this carrier must set above 0 (a
 beam's `ray_length`); the spell validator checks them.
 
 ## Pulse: a strike round what casts it
 
-The **Pulse** card (`content/spells/carriers/pulse/`, a form card like Bolt) is one area strike round
+The **Pulse** card (`content/spells/carriers/pulse/`, a carrier card like Bolt) is one area strike round
 whatever casts it, then a short life (props W9a, owner 2026-11-12). It replaced the compiler's
 fallback carriers, a rule of the compiler no card played ("the 'ugly' fallback in the
 SpellCompiler ... since that one is a custom rule"): **cards with no carrier after them are now
@@ -261,7 +261,7 @@ To give a carrier a fade, override `fade()`, and draw its look from `fade_left`.
    another carrier's.
 2. Override the hooks it needs (at least `launch` or `shoot`), asking the runtime only through
    `kit` (`CarrierKit`, above). Nothing in `spells.gd` changes.
-3. Add its form card under `content/spells/carriers/` with `carrier = &"<name>"`, and its looks, all
+3. Add its carrier card under `content/spells/carriers/` with `carrier = &"<name>"`, and its looks, all
    data on the card (`CarrierCard`): a `staff_pose` (`tests/core/test_staff_poses.gd` fails without
    one), its cues (`cast_cue`, the flash on the staff, `cast` by default; `shown_cue`, where it
    shows itself; `impact_cue`, where its shots strike, `impact` by default; `end_cue`, where a
@@ -269,7 +269,7 @@ To give a carrier a fade, override `fade()`, and draw its look from `fade_left`.
    not in `content/cues/`: one file per moment, flashes from `content/flashes/`), and a `look_shader`
    (a shader in its folder, `CarrierCard.look_shader`) if its shots are not drawn plain (a carrier says what draws its
    look, `Carrier.look_drawer`). A carrier with no shot to draw tells its moments for them:
-   `form_shown` with its card's id (`spell.carrier_card_id`) where it shows itself, which plays its
+   `carrier_shown` with its card's id (`spell.carrier_card_id`) where it shows itself, which plays its
    `shown_cue`, and `carrier_ended` where it ends, which plays its `end_cue` (a carrier that moves its caster gets this from
    `CasterMoves.end`). Feel names no carrier: nothing there changes.
 4. If its look strikes one point near the caster (a slam's impact), give it `STRIKES_POINT` and
@@ -283,7 +283,7 @@ A key's `land` (0 to 1) moves the drawn staff so its tip lies on the point the c
 whichever of the 16 head columns shows and whichever way it aims; `turn`, `lift` and `push` then
 only shape the way there. Two checks keep it lined up: `tests/gameplay/player/test_staff_alignment.gd`
 casts every card that lands, in 32 aims and by a wall, and fails when the drawn tip
-(`StaffLook.tip_position`) or the strike's look (`form_shown`) is more than a pixel off the point
+(`StaffLook.tip_position`) or the strike's look (`carrier_shown`) is more than a pixel off the point
 struck; the screenshot `shot_staff_alignment` (`ci/build/build.sh --quick --screenshots`) draws
 them, a white cross on each tip and a red ring on each point struck. A card asks for nothing: it is
 found because it lands. While a hit holds the caster (a local stop), the body shows the moment of
@@ -298,7 +298,7 @@ its own (`CarrierBeam._start_leg`); a flying shot that went in is moved by the p
 step (`shots_into_gates`, `pass_shot`); a body by `target_move_requested`. A new carrier whose
 rays should go through portals sets `ray_gates` before its ray and reads `ray_gate` after it.
 
-Removing a carrier is deleting its script. A form card that still names
+Removing a carrier is deleting its script. A carrier card that still names
 it is refused by the validator.
 
 ## Adding a modifier behaviour or a trigger

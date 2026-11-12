@@ -89,8 +89,8 @@ func step(swings: Object, now: float, ramp_of: Callable, glow: float, births: Bi
 			# Drawn by its card's own shader (docs/milestones/card-looks.md, phase 2): set on the
 			# trail's own material (each trail sets its own uniforms), only when it differs.
 			var shader: Shader = SHADER
-			if shader_of.is_valid() and swings.has_method("swing_form"):
-				shader = shader_of.call(swings.call("swing_form", at) as StringName) as Shader
+			if shader_of.is_valid() and swings.has_method("swing_carrier_card"):
+				shader = shader_of.call(swings.call("swing_carrier_card", at) as StringName) as Shader
 			var material: ShaderMaterial = _nodes[slot].material as ShaderMaterial
 			if material.shader != shader:
 				material.shader = shader

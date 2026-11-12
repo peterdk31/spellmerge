@@ -81,9 +81,9 @@ func take() -> void:
 	save(zooms, "tail_motes_4x")
 
 
-func _shoot(form: Resource, at: Vector2, tint: Color, look: int) -> void:
-	var speed: float = float(form.get("speed"))
-	var slot: int = _shots.call("spawn", 0, at, Vector2(speed, 0.0), float(form.get("lifetime")), float(form.get("radius"))) as int
+func _shoot(carrier_card: Resource, at: Vector2, tint: Color, look: int) -> void:
+	var speed: float = float(carrier_card.get("speed"))
+	var slot: int = _shots.call("spawn", 0, at, Vector2(speed, 0.0), float(carrier_card.get("lifetime")), float(carrier_card.get("radius"))) as int
 	if slot < 0:
 		return
 	_shots.call("set_core", slot, tint)

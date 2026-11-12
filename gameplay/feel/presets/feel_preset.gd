@@ -85,7 +85,7 @@ extends Resource
 ## (a rune and an orbit orb included), so only Feel's lone sprites use this art.
 @export var bolt_texture: Texture2D = preload("res://art/vfx/bolt.svg")
 ## The beam (a 32 px segment that repeats along its length) and the nova ring, drawn from
-## `form_shown`, tinted like the bolt.
+## `carrier_shown`, tinted like the bolt.
 @export var beam_texture: Texture2D = preload("res://art/vfx/beam.svg")
 @export var nova_texture: Texture2D = preload("res://art/vfx/nova_ring.svg")
 ## How long a beam stays on screen (a nova's ring is the cue `nova`, `content/cues`).

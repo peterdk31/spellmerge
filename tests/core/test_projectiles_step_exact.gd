@@ -386,7 +386,7 @@ func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int =
 
 
 func _on_impact(caster: int, target: Node, position: Vector2, direction: Vector2) -> void:
-	_events.append("impact c%d %s %s %s %s" % [caster, _name_of(target), _v(position), _v(direction), _mgr.impact_form])
+	_events.append("impact c%d %s %s %s %s" % [caster, _name_of(target), _v(position), _v(direction), _mgr.impact_carrier_card])
 
 
 func _on_expired(caster: int, position: Vector2, tag: int, shot: int = -1) -> void:

@@ -143,8 +143,8 @@ func test_bolts_past_a_row_zap_different_imps() -> void:
 func test_with_nothing_near_it_sparks_into_the_air() -> void:
 	var arena := ArenaScript.new(root)
 	var sparks: Array[int] = [0]
-	arena.bus.form_shown.connect(func(_caster: int, form: StringName, _origin: Vector2, _direction: Vector2, length: float, _tint: Color, _look: int) -> void:
-		if form == &"zap" and length <= 22.0:
+	arena.bus.carrier_shown.connect(func(_caster: int, carrier_card: StringName, _origin: Vector2, _direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if carrier_card == &"zap" and length <= 22.0:
 			sparks[0] += 1)
 	arena.install_cards(0, 0, ["zap", "rune"])
 	arena.cast(0, 0)

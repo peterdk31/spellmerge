@@ -25,7 +25,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `staff_shown` | `actor` (the Caster, another staff put on show; living staffs H4) | `feel` (the poof) |
 | `projectile_hit` | `core/projectiles` | `combat` |
 | `projectile_impact` | `core/projectiles` | `feel` |
-| `form_shown` | `core/spells` | `feel` |
+| `carrier_shown` | `core/spells` | `feel` |
 | `projectile_expired` | `core/projectiles` | `core/spells` (on expire), `feel` |
 | `build_refused` | `player` | `hud` (the builders) |
 | `bag_changed` | `player` | `hud` (the builders) |

@@ -31,7 +31,7 @@ extends ActorController
 ##   step later), `staff_changed` with the plain view of every built staff (`Caster.plan_of`),
 ##   `bag_changed` and `build_refused`.
 ## - **The cast events** (from the actor it drives now, whose staffs its buttons cast): `spell_cast`
-##   (the carrier, `Caster.last_form`) and `staff_cast` on every cast (with the cast sound `cast`
+##   (the carrier, `Caster.last_carrier_card`) and `staff_cast` on every cast (with the cast sound `cast`
 ##   from `core/registry`, nothing on null).
 ## - **The builder** (`staff_change_requested` and `staff_cards_requested`,
 ##   each for this seat only; commands, heard at the tick's start: core/events `listen`) builds the home body's staffs with `Caster.set_staff`, also during a
@@ -343,9 +343,9 @@ func _on_cast_done(at: int, origin: Vector2, direction: Vector2) -> void:
 	announce_stats()
 	var bus: EventsScript = _actor.events
 	if bus != null:
-		var form: StringName = _actor.caster.last_form(at)
-		if form != &"":
-			bus.spell_cast.emit(seat, form, origin, direction)
+		var carrier_card: StringName = _actor.caster.last_carrier_card(at)
+		if carrier_card != &"":
+			bus.spell_cast.emit(seat, carrier_card, origin, direction)
 		bus.staff_cast.emit(seat, at, origin, direction)
 	_play_cast_sound()
 

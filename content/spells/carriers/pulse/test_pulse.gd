@@ -131,14 +131,14 @@ func test_a_pulse_that_strikes_shows_itself_out_to_its_reach() -> void:
 	check(_shown(["pulse"]).is_empty(), "a bare Pulse strikes nothing and shows nothing (a fire pit's watch)")
 
 
-## The `form_shown` of a Pulse's card ([form, length] each) after `cards` were cast once.
+## The `carrier_shown` of a Pulse's card ([carrier card, length] each) after `cards` were cast once.
 func _shown(cards: Array) -> Array:
 	var arena := ArenaScript.new(root)
 	arena.add_guard(0, Vector2.ZERO)
 	var seen: Array = []
-	arena.bus.form_shown.connect(func(_caster: int, form: StringName, _origin: Vector2, _direction: Vector2, length: float, _tint: Color, _look: int) -> void:
-		if form == &"pulse":
-			seen.append([form, length]))
+	arena.bus.carrier_shown.connect(func(_caster: int, carrier_card: StringName, _origin: Vector2, _direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if carrier_card == &"pulse":
+			seen.append([carrier_card, length]))
 	arena.install_cards(0, 0, cards)
 	arena.cast(0, 0)
 	arena.run(0.3)

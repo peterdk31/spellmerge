@@ -14,8 +14,8 @@ var mgr: ManagerScript
 ## Every impact as [caster, target, position, direction], and every hit as the same order of events.
 var impacts: Array = []
 var order: Array[String] = []
-## The manager's `impact_form` as each impact was sent.
-var forms: Array[StringName] = []
+## The manager's `impact_carrier_card` as each impact was sent.
+var carrier_cards: Array[StringName] = []
 
 
 func before_each() -> void:
@@ -25,9 +25,9 @@ func before_each() -> void:
 	mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	impacts.clear()
 	order.clear()
-	forms.clear()
+	carrier_cards.clear()
 	bus.projectile_impact.connect(func(caster: int, target: Node, position: Vector2, direction: Vector2) -> void:
-		forms.append(mgr.impact_form)
+		carrier_cards.append(mgr.impact_carrier_card)
 		impacts.append([caster, target, position, direction])
 		order.append("impact"))
 	bus.projectile_hit.connect(func(_caster: int, _target: Node, _position: Vector2, _tag: int, _shot: int) -> void: order.append("hit"))
@@ -102,7 +102,7 @@ func test_a_hit_on_a_target_says_which_way_the_shot_flew_before_the_hit() -> voi
 	check_equal(order, ["impact", "hit"] as Array[String], "the impact comes first, so the damage that follows `projectile_hit` can use it")
 
 
-func test_each_impact_names_the_form_of_its_own_shot() -> void:
+func test_each_impact_names_the_carrier_card_of_its_own_shot() -> void:
 	mgr.set_walls([Rect2(96.0, 0.0, 32.0, 200.0)] as Array[Rect2])
 	var target := own(Node2D.new()) as Node2D
 	root.add_child(target)
@@ -115,11 +115,11 @@ func test_each_impact_names_the_form_of_its_own_shot() -> void:
 	for _i in 60:
 		mgr.step(DT)
 	var names: Array[String] = []
-	for form in forms:
-		names.append(String(form))
+	for carrier_card in carrier_cards:
+		names.append(String(carrier_card))
 	names.sort()
 	check_equal(names, ["beam", "bolt", "bolt", "rune"] as Array[String], "a beam, a rune and two bolts (an enemy's shot is drawn as a bolt too since staffs F9b), each its own")
-	check_equal(mgr.impact_form, &"", "no form once the impacts are sent")
+	check_equal(mgr.impact_carrier_card, &"", "no carrier card once the impacts are sent")
 
 
 func test_a_miss_reports_nothing() -> void:

@@ -2,7 +2,7 @@ extends "res://core/spells/spells.gd"
 ## Test stand-in for the spell runtime (not content): every staff with a card in it builds,
 ## `cast_staff` records who fired which staff from where and keeps a delay per caster and staff,
 ## and nothing is spawned. It lets the player tests run the wizard on its own, with `cost` and
-## `cooldown_time` set per test. The carrier it reports for a cast (`last_form`) is the first
+## `cooldown_time` set per test. The carrier it reports for a cast (`last_carrier_card`) is the first
 ## card of the staff.
 
 ## Mana a cast takes, and seconds before the same player and staff may cast again.
@@ -76,7 +76,7 @@ func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, ma
 	return cost
 
 
-func last_form(player: int, staff: int) -> StringName:
+func last_carrier_card(player: int, staff: int) -> StringName:
 	return _first[player * 4 + staff]
 
 

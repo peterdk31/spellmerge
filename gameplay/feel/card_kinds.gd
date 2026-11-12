@@ -4,7 +4,7 @@ extends RefCounted
 ## end, wall, trail birth and cue.
 ##
 ## A shot's tag (every shot carries one; `core/spells/spell_tag.gd`) gives its spell's cards as plain
-## ids (`Spells.cards_of`: its form, its infusions and its modifiers; nothing here reads a spell's
+## ids (`Spells.cards_of`: its carrier card, its infusions and its modifiers; nothing here reads a spell's
 ## fields), and `Spells.profile` which spell it is now. Each
 ## card's kinds are those that name it by id (`MoteKind.cards`, `MarkKind.cards`), else those that
 ## name its look layer (`look_layers`, today's rule); a spell's are its cards' together, and with
@@ -69,7 +69,7 @@ var _seen: Dictionary = {}
 ## Frames so far (`new_frame`).
 var _frame: int = 0
 var _entries: Dictionary[int, Entry] = {}
-## A card's look layer (0 for none: a form), read once.
+## A card's look layer (0 for none: a carrier card), read once.
 var _layers: Dictionary[StringName, int] = {}
 
 
@@ -234,7 +234,7 @@ static func _look_kinds(side: SideKinds, bits: int, kinds: Object, zero: bool) -
 	return found
 
 
-## The look layer of the card `id` (an element's or a modifier's `look_layer`; 0 for a form, or a
+## The look layer of the card `id` (an element's or a modifier's `look_layer`; 0 for a carrier card, or a
 ## card the registry does not know).
 func _layer_of(id: StringName) -> int:
 	var known: Variant = _layers.get(id)

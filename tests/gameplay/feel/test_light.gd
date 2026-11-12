@@ -167,7 +167,7 @@ func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
 		if item != manager:
 			check(_drawn_z(item) > at, "the shots' %s (z %d) are over the light" % [manager.get_path_to(item), _drawn_z(item)])
 	check(EntitiesScript.DRAW_Z > at, "the entities are over the light")
-	check(FeelScript.MOTE_Z > at and FeelScript.FORM_Z > at and FeelScript.FLASH_Z > at, "motes, beams and flashes are over the light")
+	check(FeelScript.MOTE_Z > at and FeelScript.SHOWN_BEAM_Z > at and FeelScript.FLASH_Z > at, "motes, beams and flashes are over the light")
 	# The floor flashes lie on the floor under the bodies (owner, 2026-11-08), so under the light
 	# with the floor marks: lit by it, as the slam's cue lights its own strike (its `light` part).
 	check(FeelScript.FLOOR_Z < at and FeelScript.FLOOR_Z == FeelScript.MARK_Z, "floor flashes lie with the floor marks, lit by the light")
@@ -510,7 +510,7 @@ func test_a_shots_row_carries_its_cards_light() -> void:
 	var dim: int = manager.spawn(0, Vector2(120.0, 160.0), Vector2(60.0, 0.0), 2.0, 4.0)
 	var rune: int = manager.spawn(0, Vector2(300.0, 160.0), Vector2.ZERO, 2.0, 6.0, ProjectilesScript.LAYER_ENEMY, 0, 0, ProjectilesScript.MOTION_STILL)
 	var launch := LaunchLook.new()
-	launch.form = &"atom"
+	launch.carrier_card = &"atom"
 	launch.light_intensity = 0.5
 	launch.light_reach = 0.75
 	manager.set_looks(PackedInt32Array([dim]), 1, launch)

@@ -36,7 +36,7 @@ var radius: float = 4.0
 ## How many times its cards grew its `radius` (the modifiers' `radius_mult`, multiplied: 1 for
 ## none, 1.6 with a bigger card), for a look that draws its carrier bigger as it grows.
 var radius_scale: float = 1.0
-## Shots one cast of this carrier makes, after split and the form's own count.
+## Shots one cast of this carrier makes, after split and the carrier card's own count.
 var shots: int = 1
 ## Degrees the shots fan over.
 var spread: float = 0.0
@@ -59,11 +59,11 @@ var pierce: int = 0
 var orbit_radius: float = 0.0
 var ray_length: float = 0.0
 ## SWING: degrees its sweep hits over (`CarrierCard.arc`). `wind_up`: the seconds its cast winds up
-## before it leaves, its form card's plus its modifiers' `wind_up_add`, times their `wind_up_mult`
+## before it leaves, its carrier card's plus its modifiers' `wind_up_add`, times their `wind_up_mult`
 ## (docs/milestones/cast-timing.md).
 var arc: float = 0.0
 var wind_up: float = 0.0
-## The wind-up its staff animation's keys are timed for: its form card's own, times the cards'
+## The wind-up its staff animation's keys are timed for: its carrier card's own, times the cards'
 ## `wind_up_mult`, with no `wind_up_add` (a charge's 2 s). A longer wind-up is spent before the
 ## animation's blow, which keeps this pace (`StaffPoses.start`).
 var pose_wind_up: float = 0.0
@@ -106,7 +106,7 @@ var homing_curve: float = 0.0
 ## over SpellLimits.INSTANT_HOMING_REACH pixels, up to all the way round (0 without homing).
 var homing_angle: float = 0.0
 ## Pixels away a homing spell looks for its target (`Carrier.homing_range`); 0 when it does
-## not home, or its form cannot be steered (its homing cards are then listed as wasted).
+## not home, or its carrier card cannot be steered (its homing cards are then listed as wasted).
 var homing_range: float = 0.0
 ## Times a hit jumps on to another target; 0 means no chain.
 var chain_jumps: int = 0

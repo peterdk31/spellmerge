@@ -52,8 +52,8 @@ func test_a_spell_three_levels_deep_fires_all_the_way_down() -> void:
 	for n in 8:
 		_target(center + Vector2.from_angle(TAU * n / 8.0 + 0.2) * 40.0, 4.0)
 	var recipe: Dictionary = {
-		"form": &"bolt", "trigger": &"on_hit",
-		"held": {"form": &"bolt", "modifiers": [&"nova"], "trigger": &"on_hit", "held": {"form": &"bolt"}},
+		"carrier": &"bolt", "trigger": &"on_hit",
+		"held": {"carrier": &"bolt", "modifiers": [&"nova"], "trigger": &"on_hit", "held": {"carrier": &"bolt"}},
 	}
 	var spell: CompiledSpell = _compile_recipe(recipe)
 	check_equal(spell.chain_length(), 3, "bolt, on hit, nova, on hit, bolt: three spells deep")
@@ -69,8 +69,8 @@ func test_a_spell_three_levels_deep_fires_all_the_way_down() -> void:
 
 func test_payloads_nest_as_deep_as_the_cards_go() -> void:
 	var deep: Dictionary = {
-		"form": &"bolt", "trigger": &"on_hit",
-		"held": {"form": &"bolt", "trigger": &"on_expire", "held": {"form": &"bolt", "trigger": &"timer", "held": {"form": &"bolt"}}},
+		"carrier": &"bolt", "trigger": &"on_hit",
+		"held": {"carrier": &"bolt", "trigger": &"on_expire", "held": {"carrier": &"bolt", "trigger": &"timer", "held": {"carrier": &"bolt"}}},
 	}
 	var spell: CompiledSpell = _compile_recipe(deep)
 	check(spell != null and spell.chain_length() == 4, "four levels compile: there is no depth limit any more")
@@ -80,8 +80,8 @@ func test_the_three_triggers_mix_at_three_levels() -> void:
 	# bolt -(on hit)-> rune -(timer)-> bolt: the rune is dropped where the bolt landed and then throws bolts.
 	var victim: Node2D = _target(Vector2(60.0, 0.0))
 	_build_and_cast(0, 0, {
-		"form": &"bolt", "trigger": &"on_hit",
-		"held": {"form": &"rune", "trigger": &"timer", "held": {"form": &"bolt"}},
+		"carrier": &"bolt", "trigger": &"on_hit",
+		"held": {"carrier": &"rune", "trigger": &"timer", "held": {"carrier": &"bolt"}},
 	})
 	for step in 60:
 		_tick(1)
@@ -97,7 +97,7 @@ func test_the_three_triggers_mix_at_three_levels() -> void:
 func test_fires_past_a_steps_room_wait_for_the_next_step_with_the_real_triggers() -> void:
 	for n in 24:
 		_target(Vector2.from_angle(TAU * n / 24.0) * 40.0, 3.0)
-	var hold: Dictionary = {"form": &"bolt", "modifiers": [&"nova", &"split"], "trigger": &"on_hit", "held": {"form": &"bolt"}}
+	var hold: Dictionary = {"carrier": &"bolt", "modifiers": [&"nova", &"split"], "trigger": &"on_hit", "held": {"carrier": &"bolt"}}
 	check_equal(_compile_recipe(hold).shots * _compile_recipe(hold).nova_ways(), 24, "the nova is 8 fans of 3 shots")
 	_spells.fire_shots_per_step = 32
 	_build_and_cast(0, 0, hold)

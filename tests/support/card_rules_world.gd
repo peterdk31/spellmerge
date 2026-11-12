@@ -409,8 +409,8 @@ func _listen() -> void:
 	bus.discharge_arc.connect(func(caster: int, from: Vector2, to: Vector2) -> void:
 		_put("arc %s %s -> %s" % [_who(caster), _at(from), _at(to)]))
 	# A carrier's shape as a player sees it (so a longer reach shows; its tint and look are left out).
-	bus.form_shown.connect(func(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
-		_put("shown %s %s at %s to %s %d" % [_who(caster), form, _at(origin), _at(direction * 100.0), roundi(length)]))
+	bus.carrier_shown.connect(func(caster: int, carrier_card: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		_put("shown %s %s at %s to %s %d" % [_who(caster), carrier_card, _at(origin), _at(direction * 100.0), roundi(length)]))
 	bus.enemy_died.connect(func(killer: int, enemy: Node, at: Vector2, _shot: int) -> void:
 		_put("died %s by %s at %s" % [_name_of(enemy), _who(killer), _at(at)]))
 

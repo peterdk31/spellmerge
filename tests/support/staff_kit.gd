@@ -1,12 +1,12 @@
 extends RefCounted
 ## Helpers for tests that build staffs (staffs A6c). The spell runtime only knows staffs of cards
-## now; tests written before staffs describe a spell in the old recipe shape (`{"form": &"bolt",
+## now; tests written before staffs describe a spell in the old recipe shape (`{"carrier": &"bolt",
 ## "element": &"fire", "modifiers": [...], "trigger": &"on_hit", "held": {...}}`), which `cards`
 ## turns into the card row a staff reads the same way: infusion and modifiers, the trigger, the
 ## carrier, then the payload. New tests write card rows directly.
 ##
 ##     const StaffKit := preload("res://tests/support/staff_kit.gd")
-##     var tag: int = StaffKit.build(spells, 0, 1, StaffKit.cards({"form": &"bolt"}))
+##     var tag: int = StaffKit.build(spells, 0, 1, StaffKit.cards({"carrier": &"bolt"}))
 ##     var first: CompiledSpell = StaffKit.first(spells, [&"fire", &"bolt"])
 
 
@@ -20,7 +20,7 @@ static func cards(recipe: Dictionary) -> Array[StringName]:
 	var trigger: Variant = recipe.get("trigger")
 	if trigger != null:
 		out.append(StringName(str(trigger)))
-	out.append(StringName(str(recipe.get("form", ""))))
+	out.append(StringName(str(recipe.get("carrier", ""))))
 	var held: Variant = recipe.get("held")
 	if trigger != null and held is Dictionary and not (held as Dictionary).is_empty():
 		out.append_array(cards(held as Dictionary))

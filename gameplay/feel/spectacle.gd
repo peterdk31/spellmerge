@@ -36,7 +36,7 @@ const StillMotesScript := preload("res://gameplay/feel/still_motes.gd")
 const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")
 const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 
-## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's FORM_Z 18
+## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's SHOWN_BEAM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
 const MOTE_Z: int = 16
 ## The floor marks lie on the room's floor (RoomBase.FLOOR_Z) and under every body (0).

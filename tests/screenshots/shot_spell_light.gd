@@ -57,7 +57,7 @@ func take() -> void:
 		var slot: int = _shots.call("spawn", 1, Vector2(285.0 if card == BOLT else 355.0, 150.0), Vector2(0.01, 0.0), 600.0, float(card.get("radius"))) as int
 		_shots.call("set_light", slot, float(card.get("look_light_intensity")), float(card.get("look_light_reach")))
 	var rune: int = _shots.call("spawn", 0, Vector2(80.0, 300.0), Vector2.ZERO, 600.0, 14.0, 1, 0, 0, ManagerScript.MOTION_STILL) as int
-	_shots.call("set_form", rune, &"rune", _shots.call("register_body", RUNE))
+	_shots.call("set_carrier_card", rune, &"rune", _shots.call("register_body", RUNE))
 	_dress(rune, FIRE.get("tint") as Color, PackedInt32Array([int(FIRE.get("look_layer"))]))
 	if int(_shots.get("drawn")) < 0:
 		fail("no shots")

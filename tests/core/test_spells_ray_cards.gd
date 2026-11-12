@@ -53,11 +53,11 @@ func before_each() -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.pull_requested.connect(func(_player: int, at: Vector2, radius: float, _strength: float, _tag: int, to: Vector2) -> void:
 		_pulls.append([at, to, radius]))
-	var beam: CarrierCard = _form(&"beam", 0.0, 0.3)
+	var beam: CarrierCard = _carrier_card(&"beam", 0.0, 0.3)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	beam.radius = 6.0
-	var long: CarrierCard = _form(&"long_beam", 0.0, 0.3)
+	var long: CarrierCard = _carrier_card(&"long_beam", 0.0, 0.3)
 	long.carrier = &"beam"
 	long.ray_length = 300.0
 	long.radius = 6.0
@@ -80,14 +80,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
-	var form := CarrierCard.new()
-	form.base_damage = 2
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 2
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> void:

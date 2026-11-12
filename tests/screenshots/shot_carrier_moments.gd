@@ -29,13 +29,13 @@ func take() -> void:
 	lay_floor()
 	await settle()
 	var first: Array[Array] = [
-		["form_shown", &"teleport", 0.0],
+		["carrier_shown", &"teleport", 0.0],
 		["carrier_ended", &"teleport", 6.0],
-		["form_shown", &"swap", 80.0],
+		["carrier_shown", &"swap", 80.0],
 	]
 	await _sheet(wizard, first, false, "carrier_moments_1")
 	var second: Array[Array] = [
-		["form_shown", &"decoy", 0.0],
+		["carrier_shown", &"decoy", 0.0],
 		["carrier_ended", &"decoy", 8.0],
 		["wall", &"wall", 0.0],
 	]
@@ -59,7 +59,7 @@ func _sheet(wizard: int, rows: Array[Array], walls: bool, shot_name: String) -> 
 			if row[0] == "wall":
 				var slot: int = projectiles.call("spawn", wizard, at, Vector2.ZERO, 5.0, 5.0, ProjectilesScript.LAYER_ENEMY, 0, tag, ProjectilesScript.MOTION_STILL)
 				projectiles.call("set_core", slot, FIRE)
-				projectiles.call("set_form", slot, &"wall", projectiles.call("register_body", STONE))
+				projectiles.call("set_carrier_card", slot, &"wall", projectiles.call("register_body", STONE))
 				projectiles.call("set_solid", slot, Vector2.RIGHT, 5, 9.0)
 			else:
 				events.call("emit_signal", row[0], wizard, row[1], at, Vector2.RIGHT, row[2], FIRE, 0)

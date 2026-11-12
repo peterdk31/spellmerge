@@ -4,6 +4,6 @@
 
 [resource]
 script = ExtResource("1_form")
-id = &"broken_form"
+id = &"broken_carrier"
 shots = 99
 speed = 0.0

@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Beams and nova rings in gameplay/feel: `form_shown` shows a beam along the aim or a ring
+## Beams and nova rings in gameplay/feel: `carrier_shown` shows a beam along the aim or a ring
 ## at the caster, in the owner's tint with the element's colour in the core. They fade out,
 ## stay inside the pool with four players, and ignore what is not a beam or a nova.
 
@@ -47,7 +47,7 @@ func before_each() -> void:
 
 func _shown() -> Array[MeshInstance2D]:
 	var found: Array[MeshInstance2D] = []
-	for node in feel._forms:
+	for node in feel._shown_beams:
 		if node.visible:
 			found.append(node)
 	return found
@@ -62,7 +62,7 @@ func _path(node: MeshInstance2D) -> PackedVector3Array:
 
 
 func test_a_beam_is_drawn_along_the_aim_as_long_as_it_got() -> void:
-	bus.form_shown.emit(1, &"beam", Vector2(10, 20), Vector2.DOWN, 150.0, FROST, 0)
+	bus.carrier_shown.emit(1, &"beam", Vector2(10, 20), Vector2.DOWN, 150.0, FROST, 0)
 	var shown: Array[MeshInstance2D] = _shown()
 	check_equal(shown.size(), 1, "one beam on screen")
 	var beam: MeshInstance2D = shown[0]
@@ -76,7 +76,7 @@ func test_a_beam_is_drawn_along_the_aim_as_long_as_it_got() -> void:
 
 
 func test_the_core_has_the_element_colour_and_the_body_the_owners() -> void:
-	bus.form_shown.emit(2, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
+	bus.carrier_shown.emit(2, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
 	var beam: MeshInstance2D = _shown()[0]
 	var core: Color = _param(beam, &"core_override")
 	check(core.is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is frost")
@@ -113,61 +113,61 @@ func test_a_shot_whose_life_runs_out_pops() -> void:
 	check_equal(feel.flashes_of(&"burst", 1), 1, "a rune's end is its own burst, not a pop")
 
 
-func test_forms_end() -> void:
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
+func test_carrier_cards_end() -> void:
+	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
 	bus.cue_shown.emit(0, &"nova", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
 	feel.step(1.0)
 	check_equal(_shown().size(), 0, "after its seconds the beam is gone")
 	check_equal(feel.live_flashes(), 0, "and the ring")
 
 
-func test_other_forms_and_empty_beams_show_nothing() -> void:
-	bus.form_shown.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.ZERO, 100.0, FROST, 0)
+func test_other_carrier_cards_and_empty_beams_show_nothing() -> void:
+	bus.carrier_shown.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
+	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
+	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.ZERO, 100.0, FROST, 0)
 	check_equal(_shown().size(), 0, "none of them is drawn")
 
 
 func test_four_players_firing_at_once_stay_inside_the_pool() -> void:
 	for round in 4:
 		for player in 4:
-			bus.form_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST, 0)
-	check(_shown().size() <= FeelScript.FORM_SLOTS, "never more sprites than the pool holds")
-	check_equal(feel._forms.size(), FeelScript.FORM_SLOTS, "and no sprite is made on the way")
+			bus.carrier_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST, 0)
+	check(_shown().size() <= FeelScript.SHOWN_BEAM_SLOTS, "never more sprites than the pool holds")
+	check_equal(feel._shown_beams.size(), FeelScript.SHOWN_BEAM_SLOTS, "and no sprite is made on the way")
 
 
 func test_one_players_many_beams_never_push_out_another_players_beam() -> void:
 	for player in 4:
-		bus.form_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST, 0)
+		bus.carrier_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST, 0)
 	for ray in 20:
-		bus.form_shown.emit(0, &"beam", Vector2(0, ray), Vector2.UP, 100.0, FROST, 0)
+		bus.carrier_shown.emit(0, &"beam", Vector2(0, ray), Vector2.UP, 100.0, FROST, 0)
 	for player in 4:
 		var seen: int = 0
-		for slot in range(player * FeelScript.FORMS_PER_PLAYER, (player + 1) * FeelScript.FORMS_PER_PLAYER):
-			if feel._forms[slot].visible:
+		for slot in range(player * FeelScript.SHOWN_BEAMS_PER_PLAYER, (player + 1) * FeelScript.SHOWN_BEAMS_PER_PLAYER):
+			if feel._shown_beams[slot].visible:
 				seen += 1
 		check(seen >= 1, "player %d still has a visible beam" % player)
-	check(_path(feel._forms[FeelScript.FORMS_PER_PLAYER])[0].is_equal_approx(Vector3(10, 0, 0)), "player 1's beam is untouched")
+	check(_path(feel._shown_beams[FeelScript.SHOWN_BEAMS_PER_PLAYER])[0].is_equal_approx(Vector3(10, 0, 0)), "player 1's beam is untouched")
 
 
 func test_one_cast_with_many_rays_shows_every_ray() -> void:
 	for ray in 24:
-		bus.form_shown.emit(1, &"beam", Vector2.ZERO, Vector2.RIGHT.rotated(ray * 0.1), 100.0, FROST, 0)
+		bus.carrier_shown.emit(1, &"beam", Vector2.ZERO, Vector2.RIGHT.rotated(ray * 0.1), 100.0, FROST, 0)
 	check_equal(_shown().size(), 24, "a fan of 24 rays is drawn whole")
 
 
 func test_an_enemys_beams_take_only_the_enemies_share() -> void:
 	var enemy: int = ActorSeats.enemy(actors)
-	for i in FeelScript.FORMS_PER_PLAYER + 6:
-		bus.form_shown.emit(enemy, &"beam", Vector2(0.0, i), Vector2.RIGHT, 100.0, FROST, 0)
-	check_equal(_shown().size(), FeelScript.FORMS_PER_PLAYER, "enemies' beams show, in their one share")
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
-	check_equal(_shown().size(), FeelScript.FORMS_PER_PLAYER + 1, "and never take a player's slot")
-	var enemy_beam: MeshInstance2D = feel._forms[FeelScript.ENEMY_FORMS * FeelScript.FORMS_PER_PLAYER]
+	for i in FeelScript.SHOWN_BEAMS_PER_PLAYER + 6:
+		bus.carrier_shown.emit(enemy, &"beam", Vector2(0.0, i), Vector2.RIGHT, 100.0, FROST, 0)
+	check_equal(_shown().size(), FeelScript.SHOWN_BEAMS_PER_PLAYER, "enemies' beams show, in their one share")
+	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
+	check_equal(_shown().size(), FeelScript.SHOWN_BEAMS_PER_PLAYER + 1, "and never take a player's slot")
+	var enemy_beam: MeshInstance2D = feel._shown_beams[FeelScript.ENEMY_SHOWN_BEAMS * FeelScript.SHOWN_BEAMS_PER_PLAYER]
 	check_equal(_param(enemy_beam, &"beam_player"), -1, "drawn in the enemy ramp")
 
 
-func test_the_shipped_preset_has_the_form_art() -> void:
+func test_the_shipped_preset_has_the_carrier_card_art() -> void:
 	var shipped := load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
 	check(shipped.beam_texture != null and shipped.nova_texture != null, "beam and ring art")
 
@@ -376,10 +376,10 @@ func test_a_beam_is_one_mesh_of_small_quads_never_culled() -> void:
 	var shader: Shader = FeelScript.BEAM_SHADER
 	check(ShaderSource.of(shader).contains("uniform vec3 beam_path[%d];" % FeelScript.LIVE_BEAM_POINTS), "the shader takes as many points as a path has")
 	var drawn: int = 0
-	for node: MeshInstance2D in feel._forms + feel._live_beams:
+	for node: MeshInstance2D in feel._shown_beams + feel._live_beams:
 		if node.mesh == mesh:
 			drawn += 1
-	check_equal(drawn, FeelScript.FORM_SLOTS + FeelScript.LIVE_BEAMS, "every beam draws it")
+	check_equal(drawn, FeelScript.SHOWN_BEAM_SLOTS + FeelScript.LIVE_BEAMS, "every beam draws it")
 
 
 ## The births in the spectacle's collector now (Feel's own motes this frame, before they are given off).
@@ -427,7 +427,7 @@ func test_live_and_shown_beams_give_their_motes_to_the_pool() -> void:
 		feel.step(0.016)
 	check(feel.motes().births - before > 10, "a live beam's births are thrown as motes: %d" % (feel.motes().births - before))
 	feel.spells = null
-	bus.form_shown.emit(1, &"beam", Vector2(10, 20), Vector2.DOWN, 150.0, FROST, 0)
+	bus.carrier_shown.emit(1, &"beam", Vector2(10, 20), Vector2.DOWN, 150.0, FROST, 0)
 	before = feel.motes().births
 	for i in 10:
 		feel.step(0.016)

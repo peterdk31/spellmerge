@@ -3,7 +3,7 @@ extends "res://tests/support/screenshot.gd"
 ## row per infusion (plain, fire, frost, storm, void, lightning; the real cards' colours and
 ## looks), each caster dashing 80 px (Dash) to the right and bending down on the way, as
 ## a wizard does that walks while it dashes. The dash card's cues draw it: `dash_start` (at
-## `form_shown`) the dust where it left and its streams, which follow the caster's anchor and give
+## `carrier_shown`) the dust where it left and its streams, which follow the caster's anchor and give
 ## off its speed streaks (in the player's colours) and its cards' particles as motes where it went
 ## until it lands (gameplay/feel/streams.gd; spell-spectacle-2.md, S5), and `dash_land` (at
 ## `carrier_ended`) the ring where it landed.
@@ -56,7 +56,7 @@ func take() -> void:
 		casters.append(caster)
 		shots.call("set_anchor", caster, _at(e, 0.0, length))
 		# Its way, as the dash carrier sends it (the move's direction, not the aim).
-		events.emit_signal("form_shown", caster, &"dash", _at(e, 0.0, length), Vector2.RIGHT, length, tint, look)
+		events.emit_signal("carrier_shown", caster, &"dash", _at(e, 0.0, length), Vector2.RIGHT, length, tint, look)
 	for n in STEPS + 4:
 		await physics_frame
 		for e in 6:

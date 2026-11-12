@@ -1,6 +1,6 @@
 class_name Carriers
 extends RefCounted
-## Finds each carrier by its id (`Carrier.id`, the `carrier` a form card names: &"atom", &"beam"...).
+## Finds each carrier by its id (`Carrier.id`, the `carrier` a carrier card names: &"atom", &"beam"...).
 ## `of` answers the compiler and anything that reads a carrier's tables; the spell runtime makes its
 ## own set with `make_all` and binds them, since a carrier with rows of its own (a beam, a swing, a
 ## slam) keeps them per runtime. A carrier is named, never numbered, and found by its script, so
@@ -33,7 +33,7 @@ static func of(id: StringName) -> Carrier:
 	return _shared.get(id, _none) as Carrier
 
 
-## The carrier a form card naming `id` fires in a group it is read in (`payload`: a trigger's), cast
+## The carrier a carrier card naming `id` fires in a group it is read in (`payload`: a trigger's), cast
 ## by `by` (the `Carrier.BY_*` bits of `Carrier.payload_cast_by`): the carrier of that id, except
 ## that the Pulse card's is round what casts it: `PULSE` in a cast's own group; in a payload
 ## `PULSE_BEARER` when a body or a live shot may cast it, else `PULSE_POINT`.
@@ -48,7 +48,7 @@ static func is_pulse(id: StringName) -> bool:
 	return id == PULSE or id == PULSE_BEARER or id == PULSE_POINT
 
 
-## True when `id` names a carrier a form card may fire (&"" names none: it is the id of the one that
+## True when `id` names a carrier a carrier card may fire (&"" names none: it is the id of the one that
 ## runs nothing; the Pulse card's payload carriers are named by no card).
 static func exists(id: StringName) -> bool:
 	if _shared.is_empty():
@@ -56,7 +56,7 @@ static func exists(id: StringName) -> bool:
 	return _shared.has(id) and id != PULSE_BEARER and id != PULSE_POINT
 
 
-## The id of every carrier a form card may fire, in the order `make_all` lists them (the Pulse card's
+## The id of every carrier a carrier card may fire, in the order `make_all` lists them (the Pulse card's
 ## payload carriers left out).
 static func ids() -> Array[StringName]:
 	if _shared.is_empty():

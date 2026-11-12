@@ -60,15 +60,15 @@ func before_each() -> void:
 	_bus.wizard_shield_requested.connect(func(caster: int, charges: int, seconds: float, tag: int) -> void:
 		_barriers.append([caster, charges, seconds, tag]))
 	# A dash of 48 px over 0.2 s, a teleport of 100 px, a bolt of 300 px over 1 s, pull and a swap.
-	var dash: CarrierCard = _form(&"dash", 240.0, 0.2)
+	var dash: CarrierCard = _carrier_card(&"dash", 240.0, 0.2)
 	dash.carrier = &"dash"
 	dash.ray_length = 48.0
-	var teleport: CarrierCard = _form(&"teleport", 400.0, 0.25)
+	var teleport: CarrierCard = _carrier_card(&"teleport", 400.0, 0.25)
 	teleport.carrier = &"teleport"
 	teleport.ray_length = 100.0
-	_form(&"bolt", 300.0, 1.0)
+	_carrier_card(&"bolt", 300.0, 1.0)
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
-	var swap: CarrierCard = _form(&"swap", 300.0, 1.0)
+	var swap: CarrierCard = _carrier_card(&"swap", 300.0, 1.0)
 	swap.carrier = &"swap"
 	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
 	_modifier(&"recoil", ModifierBase.Behaviour.RECOIL, 20.0)
@@ -89,14 +89,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
-	var form := CarrierCard.new()
-	form.base_damage = 5
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 1.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 5
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 1.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> void:
@@ -273,9 +273,9 @@ func test_every_carrier_that_moves_its_caster_goes_the_way_it_walks() -> void:
 		if (Carriers.of(id).traits() & CarrierTraits.MOVES_CASTER) == 0:
 			continue
 		seen += 1
-		var form: CarrierCard = _form(StringName("walker_%s" % id), 240.0, 0.2)
-		form.carrier = id
-		form.ray_length = 50.0
+		var carrier_card: CarrierCard = _carrier_card(StringName("walker_%s" % id), 240.0, 0.2)
+		carrier_card.carrier = id
+		carrier_card.ray_length = 50.0
 		_moves.clear()
 		_spells.clear()
 		_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)

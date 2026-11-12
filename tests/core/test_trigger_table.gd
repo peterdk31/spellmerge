@@ -29,11 +29,11 @@ func before_each() -> void:
 	_staff.slots = 12
 	_staff.cooldown = 0.0
 	for carrier: StringName in Carriers.ids():
-		var form := CarrierCard.new()
-		form.carrier = carrier
-		form.mana_cost = 2.0
-		form.wind_down = 0.25
-		_put(form, carrier)
+		var carrier_card := CarrierCard.new()
+		carrier_card.carrier = carrier
+		carrier_card.mana_cost = 2.0
+		carrier_card.wind_down = 0.25
+		_put(carrier_card, carrier)
 	for event: int in E.size():
 		var trigger := TriggerBase.new()
 		trigger.event = event as TriggerBase.Event

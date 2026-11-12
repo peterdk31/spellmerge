@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## The look of each form in gameplay/feel (#244, part 2; the glow look, 2026-10-27): a cast
+## The look of each carrier card in gameplay/feel (#244, part 2; the glow look, 2026-10-27): a cast
 ## flash at the staff and, for a ring carrier, a ring (a dash's flashes out, a rune's gathers
 ## in), a flash where its shot lands in the shot's own colours and cards (a
 ## rune goes off in a burst of its own), a beam that opens wide and thins, and an enemy's shot
@@ -25,7 +25,7 @@ class CardsRegistry:
 		return super(folder, id)
 
 
-const FORMS: Array[StringName] = [&"bolt", &"beam", &"dash", &"rune"]
+const CARRIER_CARDS: Array[StringName] = [&"bolt", &"beam", &"dash", &"rune"]
 ## The beam card's own look (`CarrierCard.look_shader`; docs/milestones/card-looks.md, phase 2).
 const BEAM_CARD_SHADER: Shader = preload("res://content/spells/carriers/beam/beam.gdshader")
 
@@ -57,25 +57,25 @@ func before_each() -> void:
 	root.add_child(feel)
 
 
-## The cue the carrier card `form` names for its cast or its impact (`CarrierCard.cast_cue`,
+## The cue the carrier card `carrier_card` names for its cast or its impact (`CarrierCard.cast_cue`,
 ## `impact_cue`).
-func _card_cue(form: StringName, cast: bool) -> CueBase:
-	var card: CarrierCard = registry.get_resource(&"spells", form) as CarrierCard
+func _card_cue(carrier_card: StringName, cast: bool) -> CueBase:
+	var card: CarrierCard = registry.get_resource(&"spells", carrier_card) as CarrierCard
 	return feel.cue_of(card.cast_cue if cast else card.impact_cue)
 
 
-func _cast(player: int, form: StringName) -> void:
-	bus.spell_cast.emit(player, form, Vector2(10, 10), Vector2.DOWN)
+func _cast(player: int, carrier_card: StringName) -> void:
+	bus.spell_cast.emit(player, carrier_card, Vector2(10, 10), Vector2.DOWN)
 
 
-## A shot of `form` ends on a wall at (50, 50) (the manager names the form, the core colour and
-## the look while it sends the impact, as it does for a real shot; the form last cast has no say).
-func _impact(player: int, form: StringName = &"", core: Color = Color.WHITE, look: int = 0, target: Node = null) -> void:
-	projectiles.impact_form = form
+## A shot of `carrier_card` ends on a wall at (50, 50) (the manager names the carrier card, the core colour and
+## the look while it sends the impact, as it does for a real shot; the carrier card last cast has no say).
+func _impact(player: int, carrier_card: StringName = &"", core: Color = Color.WHITE, look: int = 0, target: Node = null) -> void:
+	projectiles.impact_carrier_card = carrier_card
 	projectiles.impact_core = core
 	projectiles.impact_look = look
 	bus.projectile_impact.emit(player, target, Vector2(50, 50), Vector2.RIGHT)
-	projectiles.impact_form = &""
+	projectiles.impact_carrier_card = &""
 	projectiles.impact_core = Color.WHITE
 	projectiles.impact_look = 0
 
@@ -87,12 +87,12 @@ func _kinds() -> Array[int]:
 
 
 func test_the_looks_are_cues_the_cards_name_not_in_the_preset() -> void:
-	check(not ("cast_looks" in preset) and not ("impact_looks" in preset), "the preset has no per-form looks")
+	check(not ("cast_looks" in preset) and not ("impact_looks" in preset), "the preset has no per-carrier-card looks")
 	check(not ("wall_spark_size" in preset) and not ("cast_kick_pixels" in preset), "nor a flare's size or a cast's kick")
-	for form in FORMS:
-		check(registry.get_resource(&"spells", form) is CarrierCard, "%s is a carrier card" % form)
-		check(_card_cue(form, true) != null, "%s has a cast cue" % form)
-		check(_card_cue(form, false) != null, "%s has an impact cue" % form)
+	for carrier_card in CARRIER_CARDS:
+		check(registry.get_resource(&"spells", carrier_card) is CarrierCard, "%s is a carrier card" % carrier_card)
+		check(_card_cue(carrier_card, true) != null, "%s has a cast cue" % carrier_card)
+		check(_card_cue(carrier_card, false) != null, "%s has an impact cue" % carrier_card)
 	check_equal(_card_cue(&"dash", true).id, &"cast_ring", "a dash has a cast flash of its own")
 	var flashes: int = 0
 	for part: Dictionary in _card_cue(&"bolt", true).parts:
@@ -115,9 +115,9 @@ func test_the_ring_carriers_add_a_ring_to_their_cast() -> void:
 		&"bolt": [1, 0, 0, 0, 0], &"beam": [1, 0, 0, 0, 0], &"dash": [1, 0, 1, 0, 0],
 		&"rune": [1, 0, 0, 1, 0],
 	}
-	for form: StringName in want:
-		_cast(0, form)
-		check_equal(_kinds(), want[form] as Array[int], "%s: a dash flashes a ring out, a rune gathers one in" % form)
+	for carrier_card: StringName in want:
+		_cast(0, carrier_card)
+		check_equal(_kinds(), want[carrier_card] as Array[int], "%s: a dash flashes a ring out, a rune gathers one in" % carrier_card)
 		feel.step(1.0)
 
 
@@ -154,23 +154,23 @@ func test_a_cue_missed_for_want_of_a_registry_is_not_kept() -> void:
 	feel.registry = null
 	_cast(0, &"dash")
 	check_equal(feel.flashes_of(&"ring_out"), 0, "no registry: no cue to play")
-	check_equal(feel._form_cues_of(&"dash"), FeelScript.NO_FORM_CUES, "the defaults")
-	check_equal(feel._form_cues_of(&""), FeelScript.NO_FORM_CUES, "no form id, the defaults")
+	check_equal(feel._carrier_cues_of(&"dash"), FeelScript.NO_CARRIER_CUES, "the defaults")
+	check_equal(feel._carrier_cues_of(&""), FeelScript.NO_CARRIER_CUES, "no carrier card id, the defaults")
 	feel.registry = registry
 	_cast(0, &"dash")
 	check_equal(feel.flashes_of(&"ring_out"), 1, "once the registry is there the dash has its ring")
-	check_equal(feel._form_cues_of(&"dash")[FeelScript.CUE_IMPACT], &"impact_ring", "and its flare")
-	check_equal(feel._form_cues_of(&"fire_bolt"), FeelScript.NO_FORM_CUES, "an id that is no carrier card: the defaults")
+	check_equal(feel._carrier_cues_of(&"dash")[FeelScript.CUE_IMPACT], &"impact_ring", "and its flare")
+	check_equal(feel._carrier_cues_of(&"fire_bolt"), FeelScript.NO_CARRIER_CUES, "an id that is no carrier card: the defaults")
 
 
-func test_each_form_ends_its_own_way() -> void:
+func test_each_carrier_card_ends_its_own_way() -> void:
 	var want: Dictionary = {
 		&"bolt": [0, 1, 0, 0, 0], &"beam": [0, 1, 0, 0, 0], &"dash": [0, 1, 1, 0, 0],
 		&"rune": [0, 0, 0, 0, 1], &"": [0, 1, 0, 0, 0],
 	}
-	for form: StringName in want:
-		_impact(0, form)
-		check_equal(_kinds(), want[form] as Array[int], "%s: a burst, a dash's with a ring, a rune goes off" % form)
+	for carrier_card: StringName in want:
+		_impact(0, carrier_card)
+		check_equal(_kinds(), want[carrier_card] as Array[int], "%s: a burst, a dash's with a ring, a rune goes off" % carrier_card)
 		feel.step(1.0)
 
 
@@ -242,12 +242,12 @@ func test_flashes_past_the_slots_take_the_oldest() -> void:
 func test_an_enemy_shot_lands_like_a_spell_in_the_enemy_ramp() -> void:
 	# Staffs F7: no ember burst of its own any more; an enemy actor's shot is in the enemy ramp.
 	var enemy: int = ActorSeats.enemy(actors)
-	for form in FORMS:
-		_cast(0, form)
+	for carrier_card in CARRIER_CARDS:
+		_cast(0, carrier_card)
 		bus.projectile_impact.emit(enemy, null, Vector2(50, 50), Vector2.RIGHT)
 		var shown: Dictionary = feel.flash_info(&"burst")
-		check(not shown.is_empty() and shown["ramp"] == ActorSeats.ActorsScript.RAMP_ENEMY and shown["core"] == Color.WHITE, "%s: an enemy's plain shot lands in a burst in the enemy ramp" % form)
-		check(shown["core"] != EnemyBase.DEFAULT_HIT_COLOR, "%s: not in ember" % form)
+		check(not shown.is_empty() and shown["ramp"] == ActorSeats.ActorsScript.RAMP_ENEMY and shown["core"] == Color.WHITE, "%s: an enemy's plain shot lands in a burst in the enemy ramp" % carrier_card)
+		check(shown["core"] != EnemyBase.DEFAULT_HIT_COLOR, "%s: not in ember" % carrier_card)
 		feel.step(1.0)
 
 
@@ -259,7 +259,7 @@ func test_four_players_casting_and_hitting_stay_in_the_pools() -> void:
 	var enemy: int = ActorSeats.enemy(actors)
 	for round in 6:
 		for player in 4:
-			_cast(player, FORMS[(player + round) % FORMS.size()])
+			_cast(player, CARRIER_CARDS[(player + round) % CARRIER_CARDS.size()])
 			bus.projectile_impact.emit(player, null, Vector2(player * 10, 0), Vector2.RIGHT)
 			bus.projectile_impact.emit(enemy, null, Vector2(player * 10, 5), Vector2.LEFT)
 	check(feel.live_flashes() <= feel.effect_slots, "inside the effect slots")
@@ -268,7 +268,7 @@ func test_four_players_casting_and_hitting_stay_in_the_pools() -> void:
 
 func _the_shown_beam() -> MeshInstance2D:
 	var beam: MeshInstance2D = null
-	for node in feel._forms:
+	for node in feel._shown_beams:
 		if node.visible:
 			beam = node
 	return beam
@@ -279,7 +279,7 @@ func _swell() -> float:
 
 
 func test_a_beam_opens_wide_then_thins() -> void:
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
+	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
 	var first: float = _swell()
 	check(first > 1.5, "its rim and glow swell at first")
 	feel.step(preset.beam_seconds * 0.5)
@@ -293,7 +293,7 @@ func test_a_beam_flickers_by_the_preset_depth_on_every_other_step() -> void:
 	preset.beam_flare = 0.0
 	preset.beam_flicker_rate = 10.0
 	preset.beam_flicker_depth = 0.1
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
+	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
 	check_equal(_swell(), 1.0, "step 0 is full width")
 	feel.step(0.11)
 	var t: float = (preset.beam_seconds - 0.11) / preset.beam_seconds
@@ -306,7 +306,7 @@ func test_a_beam_flickers_by_the_preset_depth_on_every_other_step() -> void:
 func test_a_beam_with_no_flicker_depth_is_steady() -> void:
 	preset.beam_flare = 0.0
 	preset.beam_flicker_depth = 0.0
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
+	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
 	feel.step(0.07)
 	var t: float = (preset.beam_seconds - 0.07) / preset.beam_seconds
 	check(is_equal_approx(_swell(), t), "only the fade thins it")
@@ -315,7 +315,7 @@ func test_a_beam_with_no_flicker_depth_is_steady() -> void:
 
 
 func test_a_beam_is_drawn_by_the_beam_shader_with_its_cards() -> void:
-	bus.form_shown.emit(3, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 9)
+	bus.carrier_shown.emit(3, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 9)
 	var material: ShaderMaterial = _the_shown_beam().material as ShaderMaterial
 	check(material.shader == BEAM_CARD_SHADER, "a beam, by its card's own shader (card-looks phase 2)")
 	check_equal(material.get_shader_parameter(&"beam_points"), 2, "along a path of two points")
@@ -328,7 +328,7 @@ func test_a_beam_is_drawn_by_the_beam_shader_with_its_cards() -> void:
 
 func test_a_flare_of_zero_leaves_the_beam_as_before() -> void:
 	preset.beam_flare = 0.0
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
+	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
 	check_equal(_swell(), 1.0, "at rest at the start")
 
 
@@ -388,10 +388,10 @@ func test_an_impact_cue_is_of_the_shots_spell() -> void:
 ## Two beams on screen at once keep their own materials: each sets its own path and length, so a
 ## card's shader is set on each beam's own material, never shared (card-looks phase 2).
 func test_two_beams_keep_their_own_materials() -> void:
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
-	bus.form_shown.emit(1, &"beam", Vector2(0, 50), Vector2.RIGHT, 60.0, Color.BLUE, 0)
+	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
+	bus.carrier_shown.emit(1, &"beam", Vector2(0, 50), Vector2.RIGHT, 60.0, Color.BLUE, 0)
 	var shown: Array[MeshInstance2D] = []
-	for node in feel._forms:
+	for node in feel._shown_beams:
 		if node.visible:
 			shown.append(node)
 	check_equal(shown.size(), 2, "two beams")
@@ -408,6 +408,6 @@ func test_two_beams_keep_their_own_materials() -> void:
 ## Only a card its own area draws lends a beam its shader: a ray of another card (a zap of a bolt
 ## is drawn as a beam, but the bolt's shader draws heads) and an id that is no card draw plain.
 func test_a_beam_of_another_card_is_drawn_plain() -> void:
-	check(feel._form_shader_of(&"beam", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == BEAM_CARD_SHADER, "the beam card's own")
-	check(feel._form_shader_of(&"bolt", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == FeelScript.BEAM_SHADER, "a bolt's ray: plain")
-	check(feel._form_shader_of(&"no_such_card", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == FeelScript.BEAM_SHADER, "no card: plain")
+	check(feel._carrier_shader_of(&"beam", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == BEAM_CARD_SHADER, "the beam card's own")
+	check(feel._carrier_shader_of(&"bolt", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == FeelScript.BEAM_SHADER, "a bolt's ray: plain")
+	check(feel._carrier_shader_of(&"no_such_card", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == FeelScript.BEAM_SHADER, "no card: plain")

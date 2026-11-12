@@ -387,7 +387,7 @@ func _drive(side: int, step: int) -> void:
 			slot = m.spawn(caster, from + Vector2(rng.randf_range(-60, 60), rng.randf_range(-200, 0)), Vector2.ZERO, rng.randf_range(0.5, 2.0), rng.randf_range(4.0, 14.0), ManagerScript.ACTOR_LAYERS, 2, 1, ManagerScript.MOTION_STILL)
 			if slot >= 0:
 				# A rune, or one of the card bodies (their batches, the enemy ramp's too).
-				m.set_form(slot, &"", slot % (SCENE_BODIES + 1))
+				m.set_carrier_card(slot, &"", slot % (SCENE_BODIES + 1))
 		elif kind == 1:
 			# A shot set circling its caster's body (orbit as a modifier, 5A): most are bolts cast with
 			# a speed, turned by it over their radius plus a drift; some have no speed and only drift.
@@ -408,12 +408,12 @@ func _drive(side: int, step: int) -> void:
 				m.set_bounce(slot, 3)
 			if slot >= 0 and slot % 3 == 0:
 				# An orbit shot of a card body: a head body's pair, or plain for a quad body.
-				m.set_form(slot, &"", slot % (SCENE_BODIES + 1))
+				m.set_carrier_card(slot, &"", slot % (SCENE_BODIES + 1))
 		else:
 			slot = m.spawn(caster, from, velocity, rng.randf_range(0.3, 2.5), rng.randf_range(1.0, 9.0), ManagerScript.ACTOR_LAYERS, rng.randi() % 4, 1 if kind != 9 else 2)
 			if slot >= 0 and kind == 8:
 				# A flying shot of a card body (a bolt's own head): a head body's pair, or plain.
-				m.set_form(slot, &"", slot % (SCENE_BODIES + 1))
+				m.set_carrier_card(slot, &"", slot % (SCENE_BODIES + 1))
 		if slot < 0:
 			continue
 		if prop >= 0:

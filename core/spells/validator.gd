@@ -16,7 +16,7 @@ extends RefCounted
 ##
 ## What it checks, per component: `id` set and equal to the folder name; a name; an icon that
 ## is listed in the art manifest; every number inside `ranges()` (which keeps a component's
-## `complexity` to 1-4, well inside the whole-spell budget); and the fields its kind needs (a form's speed, orbit radius or ray
+## `complexity` to 1-4, well inside the whole-spell budget); and the fields its kind needs (a carrier card's speed, orbit radius or ray
 ## length for its carrier (`Carrier.required_fields`); an element's known status and duration; a modifier's strength
 ## for its behaviour; a timer trigger's wind-up). Across the list: no id twice. For the
 ## reaction table: each row names a known status, an existing element and a real effect,
@@ -91,7 +91,7 @@ static func check_all(resources: Array[Resource], reactions: ReactionTable, mani
 			components.append(resource as SpellComponent)
 	var problems: Array[Dictionary] = check_components(components, manifest)
 	for duplicate in duplicates:
-		problems.append(_problem("unique-id", "content/spells", "id", "Duplicate id (%s). Ids are unique across forms, elements, modifiers and triggers; rename one." % duplicate))
+		problems.append(_problem("unique-id", "content/spells", "id", "Duplicate id (%s). Ids are unique across carrier cards, elements, modifiers and triggers; rename one." % duplicate))
 	if reactions != null:
 		var element_ids: Array[StringName] = []
 		for component in components:
@@ -139,7 +139,7 @@ static func check_component(component: SpellComponent, manifest: Dictionary) -> 
 		var field: String = line.get_slice(":", 0)
 		problems.append(_problem("range", file, field, "%s. Change it to a value inside the range (documented next to the field)." % line))
 	if component is CarrierCard:
-		problems.append_array(_check_form(component as CarrierCard))
+		problems.append_array(_check_carrier(component as CarrierCard))
 	elif component is ElementBase:
 		problems.append_array(_check_element(component as ElementBase))
 	elif component is ModifierBase:
@@ -208,18 +208,18 @@ static func format(problem: Dictionary) -> String:
 	return "%s: %s: %s: %s" % [problem["rule"], problem["file"], problem["field"], problem["fix"]]
 
 
-static func _check_form(form: CarrierCard) -> Array[Dictionary]:
+static func _check_carrier(carrier_card: CarrierCard) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
-	var file: String = form.resource_path
-	problems.append_array(_check_pose(form, file))
-	for line: String in form.look_problems():
+	var file: String = carrier_card.resource_path
+	problems.append_array(_check_pose(carrier_card, file))
+	for line: String in carrier_card.look_problems():
 		problems.append(_problem("look", file, "look_shader", line))
-	var carrier: Carrier = Carriers.of(form.carrier)
-	if not Carriers.exists(form.carrier):
-		problems.append(_problem("unknown-carrier", file, "carrier", "`%s` is no carrier: use one of %s (core/spells/carriers/)." % [form.carrier, ", ".join(Carriers.ids())]))
+	var carrier: Carrier = Carriers.of(carrier_card.carrier)
+	if not Carriers.exists(carrier_card.carrier):
+		problems.append(_problem("unknown-carrier", file, "carrier", "`%s` is no carrier: use one of %s (core/spells/carriers/)." % [carrier_card.carrier, ", ".join(Carriers.ids())]))
 	var required: Dictionary = carrier.required_fields()
 	for field: String in required:
-		if float(form.get(field)) <= 0.0:
+		if float(carrier_card.get(field)) <= 0.0:
 			problems.append(_problem("required-field", file, field, str(required[field])))
 	return problems
 
@@ -227,13 +227,13 @@ static func _check_form(form: CarrierCard) -> Array[Dictionary]:
 ## A carrier's `staff_pose` (CarrierCard): every key a dictionary of known names, a known phase, ease
 ## and mood, its time inside its phase and not before the key before it, every channel in range,
 ## and `land` only on a carrier that strikes a point to land on (`STRIKES_POINT`).
-static func _check_pose(form: CarrierCard, file: String) -> Array[Dictionary]:
+static func _check_pose(carrier_card: CarrierCard, file: String) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
 	var allowed: Array[String] = ["phase", "at", "ease", "mood"]
 	allowed.append_array(CarrierCard.POSE_CHANNELS)
 	var last: Vector2 = Vector2.ZERO
-	for n in form.staff_pose.size():
-		var key: Dictionary = form.staff_pose[n]
+	for n in carrier_card.staff_pose.size():
+		var key: Dictionary = carrier_card.staff_pose[n]
 		for name: Variant in key.keys():
 			if not allowed.has(str(name)):
 				problems.append(_problem("pose", file, "staff_pose", "Key %d: `%s` is not a pose name (%s)." % [n, name, ", ".join(PackedStringArray(allowed))]))
@@ -256,8 +256,8 @@ static func _check_pose(form: CarrierCard, file: String) -> Array[Dictionary]:
 			var value: float = float(key.get(channel, 0.0))
 			if value < range_of.x or value > range_of.y:
 				problems.append(_problem("pose", file, "staff_pose", "Key %d: `%s` %s is outside %s to %s." % [n, channel, value, range_of.x, range_of.y]))
-		if float(key.get("land", 0.0)) > 0.0 and not Carriers.of(form.carrier).has(Carrier.STRIKES_POINT):
-			problems.append(_problem("pose", file, "staff_pose", "Key %d: `land` puts the tip on the point the carrier strikes, and `%s` strikes none (`STRIKES_POINT`, core/spells/carriers/)." % [n, form.carrier]))
+		if float(key.get("land", 0.0)) > 0.0 and not Carriers.of(carrier_card.carrier).has(Carrier.STRIKES_POINT):
+			problems.append(_problem("pose", file, "staff_pose", "Key %d: `land` puts the tip on the point the carrier strikes, and `%s` strikes none (`STRIKES_POINT`, core/spells/carriers/)." % [n, carrier_card.carrier]))
 	return problems
 
 

@@ -76,8 +76,8 @@ func attach(projectiles: ProjectilesScript, spells: SpellRuntime) -> void:
 	_looks.clear()
 	if projectiles == null or spells == null:
 		return
-	for form: StringName in spells.still_mote_cards():
-		var look: CardLook = spells.look_of(form, Carrier.LOOK_STILL)
+	for carrier_card: StringName in spells.still_mote_cards():
+		var look: CardLook = spells.look_of(carrier_card, Carrier.LOOK_STILL)
 		if look.shader == null or look.motes.is_empty():
 			continue
 		var body: int = projectiles.body_of(look.shader, ProjectilesScript.MESH_QUAD)

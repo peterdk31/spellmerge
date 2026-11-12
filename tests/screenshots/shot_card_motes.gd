@@ -97,12 +97,12 @@ func _make(row: int, actor: int, at: Vector2) -> void:
 			var target: Sprite2D = _body(DUMMY, at)
 			shots.impact_look = heavy | (fire if row == 2 else 0)
 			shots.impact_core = FIRE.tint if row == 2 else Color.WHITE
-			shots.impact_form = &"bolt"
+			shots.impact_carrier_card = &"bolt"
 			shots.impact_tag = [0, _heavy_tag, _fire_heavy_tag][row]
 			events.emit_signal(&"projectile_impact", actor, target, at, Vector2.RIGHT)
 			shots.impact_look = 0
 			shots.impact_core = Color.WHITE
-			shots.impact_form = &""
+			shots.impact_carrier_card = &""
 			shots.impact_tag = 0
 		_:
 			var cue: CueBase = root.get_node("Feel").call(&"cue_of", &"fireball") as CueBase

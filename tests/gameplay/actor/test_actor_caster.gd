@@ -69,7 +69,7 @@ func test_a_press_casts_from_the_staff_tip_along_the_aim_and_pays() -> void:
 	check_equal(casts, [[0, Vector2(114.0, 90.0), Vector2.RIGHT]], "cast from the tip along the aim")
 	check(_world.projectiles.get_count() > 0, "a shot flies")
 	check(wizard.caster.mana_of(0) < mana, "mana was paid")
-	check_equal(wizard.caster.last_form(0), &"bolt", "the carrier is named")
+	check_equal(wizard.caster.last_carrier_card(0), &"bolt", "the carrier is named")
 
 
 func test_a_held_staff_casts_whenever_it_is_ready_and_a_free_one_does_not() -> void:

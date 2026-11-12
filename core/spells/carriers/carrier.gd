@@ -1,6 +1,6 @@
 class_name Carrier
 extends RefCounted
-## A carrier: what a form card fires (`CarrierCard.carrier`), and the one place that says what it does
+## A carrier: what a carrier card fires (`CarrierCard.carrier`), and the one place that says what it does
 ## with every other card (docs/CARRIERS.md). Each carrier is one subclass in this folder, found by
 ## its id (`Carriers.of(&"beam")`); the compiler asks it, the spell runtime runs it.
 ##
@@ -61,7 +61,7 @@ const LOOK_ORB: int = 5
 const LOOK_PORTAL: int = 6
 
 
-## Its id, the `carrier` a form card names (&"atom"); &"" for the carrier that runs nothing, which
+## Its id, the `carrier` a carrier card names (&"atom"); &"" for the carrier that runs nothing, which
 ## `Carriers.of` answers for a name no carrier has.
 func id() -> StringName:
 	return &""
@@ -79,14 +79,14 @@ func step_order() -> int:
 
 
 
-## The fields a form card of this carrier must set above 0, with the fix the validator gives
+## The fields a carrier card of this carrier must set above 0, with the fix the validator gives
 ## (`SpellValidator`): {"speed": "A bolt needs a `speed` above 0."}.
 func required_fields() -> Dictionary:
 	return {}
 
 
-## True when a cast of it adds a wind-down of its own to its staff's (its form card's
-## `wind_down`), so a card's wind-down factor changes something: every carrier a form card fires.
+## True when a cast of it adds a wind-down of its own to its staff's (its carrier card's
+## `wind_down`), so a card's wind-down factor changes something: every carrier a carrier card fires.
 ## A payload's carrier adds none; the compiler knows that one (`StaffCompiler._numbers_count`).
 func has_wind_down() -> bool:
 	return true

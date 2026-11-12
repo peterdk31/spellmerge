@@ -38,5 +38,5 @@ func on_hit(spell: CompiledSpell, tag: int, actor: int, target: Node, _position:
 		kit.moves().shield(spell, tag, -1, moved, 0.0)
 	# The trade shows at both of its ends, each facing the other.
 	var apart: float = from.distance_to(there)
-	kit.events.form_shown.emit(actor, spell.carrier_card_id, from, from.direction_to(there), apart, spell.tint, spell.look)
-	kit.events.form_shown.emit(actor, spell.carrier_card_id, there, there.direction_to(from), apart, spell.tint, spell.look)
+	kit.events.carrier_shown.emit(actor, spell.carrier_card_id, from, from.direction_to(there), apart, spell.tint, spell.look)
+	kit.events.carrier_shown.emit(actor, spell.carrier_card_id, there, there.direction_to(from), apart, spell.tint, spell.look)

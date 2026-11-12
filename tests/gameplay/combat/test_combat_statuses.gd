@@ -91,7 +91,7 @@ func _foe(at: Vector2, health: float = 100.0) -> Node2D:
 
 ## The tag of a bolt of `element` (&"" for none) built into slot A of `player`.
 func _tag(player: int, element: StringName) -> int:
-	var recipe: Dictionary = {"form": &"bolt"}
+	var recipe: Dictionary = {"carrier": &"bolt"}
 	if element != &"":
 		recipe["element"] = element
 	return StaffKit.build(_spells, player, 0, StaffKit.cards(recipe))

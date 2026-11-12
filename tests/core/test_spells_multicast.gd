@@ -46,9 +46,9 @@ func before_each() -> void:
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
 		var profile: HitProfile = _spells.hit_profile(tag, shot)
 		_hits.append([player, target, at, tag, profile.damage if profile != null else -1]))
-	var bolt: CarrierCard = _form(&"bolt", 300.0, 1.0)
+	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
-	var beam: CarrierCard = _form(&"beam", 0.0, 0.1)
+	var beam: CarrierCard = _carrier_card(&"beam", 0.0, 0.1)
 	beam.carrier = &"beam"
 	beam.ray_length = 300.0
 	beam.base_damage = 10
@@ -71,14 +71,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
-	var form := CarrierCard.new()
-	form.base_damage = 5
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 5
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> void:
@@ -349,7 +349,7 @@ func test_a_mirrored_orbit_starts_on_the_other_side() -> void:
 
 
 func test_a_mirrored_swap_flies_both_ways() -> void:
-	var swap: CarrierCard = _form(&"swap", 300.0, 0.5)
+	var swap: CarrierCard = _carrier_card(&"swap", 300.0, 0.5)
 	swap.carrier = &"swap"
 	_build(0, [&"mirror", &"swap"])
 	_cast()

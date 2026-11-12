@@ -113,8 +113,8 @@ func test_a_payload_slam_ends_a_sweep() -> void:
 	# `on expire · swing · slam`: one press, a sweep, then a slam from the end of its arc.
 	var arena := ArenaScript.new(root)
 	var slams: Array[Vector2] = []
-	arena.bus.form_shown.connect(func(_caster: int, form: StringName, at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void:
-		if form == &"slam":
+	arena.bus.carrier_shown.connect(func(_caster: int, carrier_card: StringName, at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void:
+		if carrier_card == &"slam":
 			slams.append(at))
 	arena.install_cards(0, 0, ["on_expire", "swing", "slam"])
 	arena.cast(0, 0)

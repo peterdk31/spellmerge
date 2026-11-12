@@ -13,21 +13,21 @@ extends RefCounted
 const EMPTY_CHANCE: int = 15
 
 var _bag: Array[StringName] = []
-var _forms: Array[StringName] = []
+var _shown_beams: Array[StringName] = []
 
 
 ## `bag` is the card ids to draw from; `kind_of` (Callable(id) -> StringName) tells the carriers
-## (`&"form"`) apart.
+## (`&"carrier"`) apart.
 func _init(bag: Array[StringName], kind_of: Callable) -> void:
 	_bag = bag.duplicate()
 	for id in _bag:
-		if StringName(kind_of.call(id)) == &"form":
-			_forms.append(id)
+		if StringName(kind_of.call(id)) == &"carrier":
+			_shown_beams.append(id)
 
 
 ## True when the bag has a carrier to build with.
 func can_build() -> bool:
-	return not _forms.is_empty()
+	return not _shown_beams.is_empty()
 
 
 ## A random row of at most `slots` cards (1 to `slots` long), with at least one carrier when the
@@ -42,9 +42,9 @@ func random_cards(rng: RandomNumberGenerator, slots: int) -> Array[StringName]:
 			cards.append(&"")
 		else:
 			cards.append(_bag[rng.randi_range(0, _bag.size() - 1)])
-	var has_form: bool = false
+	var has_carrier: bool = false
 	for id in cards:
-		has_form = has_form or _forms.has(id)
-	if not has_form and not _forms.is_empty():
-		cards[rng.randi_range(0, cards.size() - 1)] = _forms[rng.randi_range(0, _forms.size() - 1)]
+		has_carrier = has_carrier or _shown_beams.has(id)
+	if not has_carrier and not _shown_beams.is_empty():
+		cards[rng.randi_range(0, cards.size() - 1)] = _shown_beams[rng.randi_range(0, _shown_beams.size() - 1)]
 	return cards

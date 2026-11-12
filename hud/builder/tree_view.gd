@@ -317,7 +317,7 @@ func _draw() -> void:
 			end_x = x + TILE_SIZE
 			if trigger and tile == 0:
 				_draw_arrow(Vector2(x + TILE_SIZE + 1.0, top + 1.0 + TILE_SIZE * 0.5))
-		var color: Color = kind_colors.get(&"trigger" if trigger else &"form", TEXT)
+		var color: Color = kind_colors.get(&"trigger" if trigger else &"carrier", TEXT)
 		_text(_fit(String(row["name"]), right - end_x - 4.0), Vector2(end_x + 4.0, top + 5.0), color)
 		if at == replay:
 			draw_rect(Rect2(0.0, top, width, ROW_HEIGHT), GOLD, false, 1.0)

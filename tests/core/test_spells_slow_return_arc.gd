@@ -47,17 +47,17 @@ func before_each() -> void:
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
 		_hits.append([player, target, at, tag, _spells.hit_profile(tag, shot)]))
 	_bus.projectile_expired.connect(func(player: int, at: Vector2, tag: int, _shot: int) -> void: _ended.append([player, at, tag]))
-	var bolt: CarrierCard = _form(&"bolt", 300.0, 1.0)
+	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
-	var orb: CarrierCard = _form(&"orb", 30.0, 3.0)
+	var orb: CarrierCard = _carrier_card(&"orb", 30.0, 3.0)
 	orb.base_damage = 10
-	var rune: CarrierCard = _form(&"rune", 0.0, 4.0)
+	var rune: CarrierCard = _carrier_card(&"rune", 0.0, 4.0)
 	rune.carrier = &"rune"
 	rune.base_damage = 10
-	var beam: CarrierCard = _form(&"beam", 0.0, 0.3)
+	var beam: CarrierCard = _carrier_card(&"beam", 0.0, 0.3)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
-	var halo: CarrierCard = _form(&"halo", 300.0, 0.2)
+	var halo: CarrierCard = _carrier_card(&"halo", 300.0, 0.2)
 	halo.shots = 8
 	halo.spread = 360.0
 	var slow: ModifierBase = _modifier(&"slow", ModifierBase.Behaviour.NONE, 0.0)
@@ -88,15 +88,15 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
-	var form := CarrierCard.new()
-	form.base_damage = 5
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	form.radius = 4.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 5
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	carrier_card.radius = 4.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> ModifierBase:
@@ -174,9 +174,9 @@ func test_a_returning_bolt_comes_back_to_its_caster() -> void:
 
 
 func test_return_is_wasted_on_a_carrier_that_does_not_fly_out() -> void:
-	for form: StringName in [&"beam", &"rune"]:
-		var staff: CompiledStaff = _compile([&"return", form])
-		check(staff.wasted.has(0), "return on a %s is wasted" % form)
+	for carrier_card: StringName in [&"beam", &"rune"]:
+		var staff: CompiledStaff = _compile([&"return", carrier_card])
+		check(staff.wasted.has(0), "return on a %s is wasted" % carrier_card)
 		check(staff.wasted.has(0), "return on it is wasted: %s" % staff.wasted)
 
 
@@ -253,8 +253,8 @@ func test_a_held_beam_zaps_again_after_a_second() -> void:
 func test_bolts_past_an_imp_zap_it_from_different_places() -> void:
 	var imp: Node2D = _target(Vector2(120.0, 40.0))
 	var from: Array[float] = []
-	_bus.form_shown.connect(func(_caster: int, form: StringName, origin: Vector2, _way: Vector2, length: float, _tint: Color, _look: int) -> void:
-		if form == &"zap" and length > 22.0:
+	_bus.carrier_shown.connect(func(_caster: int, carrier_card: StringName, origin: Vector2, _way: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if carrier_card == &"zap" and length > 22.0:
 			from.append(origin.x))
 	_build(0, [&"zap", &"bolt"])
 	for n in 10:
@@ -333,8 +333,8 @@ func test_zap_works_on_a_beam() -> void:
 func test_a_beam_zaps_the_enemy_beside_its_line() -> void:
 	var imp: Node2D = _target(Vector2(100.0, 40.0))
 	var from: Array[Vector2] = []
-	_bus.form_shown.connect(func(_caster: int, form: StringName, origin: Vector2, _way: Vector2, length: float, _tint: Color, _look: int) -> void:
-		if form == &"zap" and length > 22.0:
+	_bus.carrier_shown.connect(func(_caster: int, carrier_card: StringName, origin: Vector2, _way: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if carrier_card == &"zap" and length > 22.0:
 			from.append(origin))
 	_build(0, [&"zap", &"lightning", &"beam"])
 	_cast()
@@ -356,8 +356,8 @@ func test_a_beam_zaps_the_enemy_beside_its_line() -> void:
 func test_a_beam_zaps_only_before_it_dissolves() -> void:
 	_target(Vector2(100.0, 40.0))
 	var lefts: Array[float] = []
-	_bus.form_shown.connect(func(_caster: int, form: StringName, _origin: Vector2, _way: Vector2, length: float, _tint: Color, _look: int) -> void:
-		if form == &"zap" and length > 22.0:
+	_bus.carrier_shown.connect(func(_caster: int, carrier_card: StringName, _origin: Vector2, _way: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if carrier_card == &"zap" and length > 22.0:
 			var beams: CarrierBeam = CarrierBeam.of(_spells)
 			for at in beams.beam_slots():
 				if beams.beam_on(at):

@@ -140,23 +140,23 @@ func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> Com
 			triggers.append(card as TriggerBase)
 			trigger_slots.append(slot)
 		elif card is CarrierCard:
-			var form := card as CarrierCard
-			var on: Carrier = Carriers.placed(form.carrier, payload, by)
-			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, form.wind_up)
+			var carrier_card := card as CarrierCard
+			var on: Carrier = Carriers.placed(carrier_card.carrier, payload, by)
+			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, carrier_card.wind_up)
 			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
 			if not keep_wasted:
 				# What works here by its behaviour may still do nothing beside these infusions and
 				# triggers (a hold on a Pulse that strikes nothing: `Carrier.idle_modifiers`).
 				for idle: ModifierBase in on.idle_modifiers(kept_modifiers, kept_elements, triggers):
 					kept_modifiers.erase(idle)
-			var spell: CompiledSpell = _build(form, on, kept_elements, kept_modifiers)
+			var spell: CompiledSpell = _build(carrier_card, on, kept_elements, kept_modifiers)
 			spell.strikes = on.strikes(kept_modifiers, kept_elements, triggers)
 			spell.slot = slot
 			_useful[slot] = true
 			_land(spell, kept, kept_modifiers, kept_elements, slot)
 			spell.card_slots.append(slot)
 			for t in triggers.size():
-				_read_trigger(spell, triggers[t], trigger_slots[t], form, kept_elements, kept_modifiers, on.payload_cast_by(triggers[t].event, spell, by))
+				_read_trigger(spell, triggers[t], trigger_slots[t], carrier_card, kept_elements, kept_modifiers, on.payload_cast_by(triggers[t].event, spell, by))
 			group.spells.append(spell)
 			group.wind_up += spell.wind_up
 			elements = []
@@ -229,13 +229,13 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int)
 				group.repeat_interval = maxf(group.repeat_interval, multicast.repeat_interval)
 
 
-## Reads the payload of `trigger` (in `trigger_slot`) on the carrier `spell` (in `form`): the group
+## Reads the payload of `trigger` (in `trigger_slot`) on the carrier `spell` (in `carrier_card`): the group
 ## read next. A trigger whose event never happens on this carrier still reads its payload, so the
 ## cards after it are read in the same order whether it fires or not; the payload is then wasted
 ## with it (rules R2b). One with nothing to fire is wasted too. Every trigger of a carrier is read
 ## the same way, in slot order, so each takes the next group (owner, 2026-10-31). `by` is who may
 ## cast the payload (`Carrier.payload_cast_by`).
-func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int, form: CarrierCard, elements: Array[ElementBase], modifiers: Array[ModifierBase], by: int) -> void:
+func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int, carrier_card: CarrierCard, elements: Array[ElementBase], modifiers: Array[ModifierBase], by: int) -> void:
 	var never: bool = not keep_wasted and not _trigger_fires(trigger, Carriers.of(spell.carrier), elements, modifiers)
 	var first: int = _cast.slots.size()
 	var mana: float = _cast.mana
@@ -270,7 +270,7 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 ## `keep_wasted`): a behaviour it runs (`Carrier.works`; homing on a rune, return on a beam do
 ## nothing, and change nothing else either) and numbers it uses (`_numbers_count`). The one rule for
 ## every carrier. `payload`: the carrier is a payload's, which adds no
-## wind-down to a staff. `wind_up`: its form card's wind-up; with a
+## wind-down to a staff. `wind_up`: its carrier card's wind-up; with a
 ## charge kept on it the carrier winds up too, so a shorter wind-up counts there.
 static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool, wind_up: float = 0.0) -> Array[ModifierBase]:
 	var deflects: bool = false
@@ -328,7 +328,7 @@ func _trigger_fires(trigger: TriggerBase, on: Carrier, elements: Array[ElementBa
 
 ## True when `card` does something on the carrier `carrier` when it is the only other card there:
 ## what the builder, a reward screen or a bot asks before a card is placed. The same rules as a
-## compile of `[card, carrier]` (a trigger with a payload after it); a form or a multicast always.
+## compile of `[card, carrier]` (a trigger with a payload after it); a carrier card or a multicast always.
 static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 	var on: Carrier = Carriers.of(carrier)
 	if card is ModifierBase:
@@ -404,19 +404,19 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 	return not any
 
 
-## A compiled spell of the carrier `on` from its form card and the cards that attach to it.
-func _build(form: CarrierCard, on: Carrier, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> CompiledSpell:
+## A compiled spell of the carrier `on` from its carrier card and the cards that attach to it.
+func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> CompiledSpell:
 	var spell := CompiledSpell.new()
 	spell.node = _out.nodes.size()
 	_out.nodes.append(spell)
 	spell.behaviours.resize(ModifierBase.Behaviour.size())
-	var damage: float = form.base_damage
-	var mana: float = form.mana_cost
-	var wind_down: float = form.wind_down
-	var speed: float = form.speed
-	var radius: float = form.radius
-	var shots: int = form.shots
-	var pierce: int = form.pierce
+	var damage: float = carrier_card.base_damage
+	var mana: float = carrier_card.mana_cost
+	var wind_down: float = carrier_card.wind_down
+	var speed: float = carrier_card.speed
+	var radius: float = carrier_card.radius
+	var shots: int = carrier_card.shots
+	var pierce: int = carrier_card.pierce
 	var homing_reach: float = 0.0
 	var heals: bool = false
 	var later_ids: Array[StringName] = []
@@ -426,18 +426,18 @@ func _build(form: CarrierCard, on: Carrier, elements: Array[ElementBase], modifi
 	var later_strengths: PackedFloat32Array = PackedFloat32Array()
 	var carrier: Carrier = on
 	spell.carrier = on.id()
-	spell.carrier_card_id = form.id
-	spell.carrier_card_name = _name(form)
-	spell.lifetime = form.lifetime
-	spell.ray_length = form.ray_length
-	spell.arc = form.arc
-	spell.wind_up = maxf(form.wind_up, 0.0)
+	spell.carrier_card_id = carrier_card.id
+	spell.carrier_card_name = _name(carrier_card)
+	spell.lifetime = carrier_card.lifetime
+	spell.ray_length = carrier_card.ray_length
+	spell.arc = carrier_card.arc
+	spell.wind_up = maxf(carrier_card.wind_up, 0.0)
 	spell.pose_wind_up = spell.wind_up
-	spell.staff_pose = form.packed_pose()
-	spell.spread = form.spread
-	spell.look_shader = form.look_shader
-	spell.look_light_intensity = form.look_light_intensity
-	spell.look_light_reach = form.look_light_reach
+	spell.staff_pose = carrier_card.packed_pose()
+	spell.spread = carrier_card.spread
+	spell.look_shader = carrier_card.look_shader
+	spell.look_light_intensity = carrier_card.look_light_intensity
+	spell.look_light_reach = carrier_card.look_light_reach
 	for element in elements:
 		if spell.element_ids.is_empty():
 			spell.element_id = element.id
@@ -455,7 +455,7 @@ func _build(form: CarrierCard, on: Carrier, elements: Array[ElementBase], modifi
 		spell.element_ids.append(element.id)
 		damage *= element.damage_scale
 		heals = heals or element.heals
-	# A card's `lifetime_base` replaces the form's life before any factor (the longest counts), so
+	# A card's `lifetime_base` replaces the carrier card's life before any factor (the longest counts), so
 	# the factors below act on it whatever the slot order.
 	var life_base: float = 0.0
 	for modifier in modifiers:
@@ -516,7 +516,7 @@ func _build(form: CarrierCard, on: Carrier, elements: Array[ElementBase], modifi
 		spell.spread = SpellLimits.SPLIT_SPREAD
 	spell.hit = HitProfile.new()
 	spell.hit.damage = spell.damage
-	spell.hit.knockback = form.knockback if form.knockback > 0.0 else SpellLimits.KNOCKBACK
+	spell.hit.knockback = carrier_card.knockback if carrier_card.knockback > 0.0 else SpellLimits.KNOCKBACK
 	spell.hit.element_id = spell.element_id
 	spell.hit.element_ids = spell.element_ids
 	spell.hit.status_id = spell.status_id

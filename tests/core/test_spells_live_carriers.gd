@@ -45,18 +45,18 @@ func before_each() -> void:
 	_hits.clear()
 	_bus.projectile_hit.connect(func(_caster: int, _target: Node, at: Vector2, tag: int, _shot: int) -> void: _hits.append([tag, at]))
 	# A shot of 0.4 s, as short as a nova's.
-	_form(&"short", 300.0, 0.4)
-	var rune: CarrierCard = _form(&"rune", 0.0, 10.0)
+	_carrier_card(&"short", 300.0, 0.4)
+	var rune: CarrierCard = _carrier_card(&"rune", 0.0, 10.0)
 	# The probe: a shot that does not move marks where a payload fires (a placed rune would
 	# appear a step ahead of it, rules R4 F3).
 	rune.carrier = &"atom"
 	rune.radius = 6.0
-	var beam: CarrierCard = _form(&"beam", 0.0, 0.4)
+	var beam: CarrierCard = _carrier_card(&"beam", 0.0, 0.4)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
-	var decoy: CarrierCard = _form(&"decoy", 0.0, 4.0)
+	var decoy: CarrierCard = _carrier_card(&"decoy", 0.0, 4.0)
 	decoy.carrier = &"decoy"
-	var dash: CarrierCard = _form(&"dash", 100.0, 0.4)
+	var dash: CarrierCard = _carrier_card(&"dash", 100.0, 0.4)
 	dash.carrier = &"dash"
 	dash.ray_length = 40.0
 	var arc := ModifierBase.new()
@@ -84,14 +84,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
-	var form := CarrierCard.new()
-	form.base_damage = 5
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 5
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 ## Builds `cards` as wizard 0's staff 0 and checks none is wasted.

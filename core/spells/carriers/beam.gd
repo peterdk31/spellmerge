@@ -1128,7 +1128,7 @@ func beam_infusions(at: int) -> PackedColorArray:
 
 ## The id of the card live beam `at` is (`CompiledSpell.carrier_card_id`; &"" for none), so Feel draws it
 ## by its card's look (`Spells.look_of`).
-func beam_form(at: int) -> StringName:
+func beam_carrier_card(at: int) -> StringName:
 	return _bm_spell[at].carrier_card_id if _bm_spell[at] != null else &""
 
 

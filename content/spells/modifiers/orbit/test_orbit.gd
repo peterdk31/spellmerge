@@ -26,9 +26,9 @@ func _all() -> Dictionary:
 	return {0: _at(0), 1: _at(1), 2: _at(2), 3: _at(3)}
 
 
-func _cast(modifiers: Array, form: StringName = &"bolt", direction: Vector2 = Vector2.RIGHT, player: int = 0) -> int:
+func _cast(modifiers: Array, carrier_card: StringName = &"bolt", direction: Vector2 = Vector2.RIGHT, player: int = 0) -> int:
 	_mgr.set_anchor(player, _at(player))
-	return _cast_with(form, modifiers, player, _at(player), direction)
+	return _cast_with(carrier_card, modifiers, player, _at(player), direction)
 
 
 ## The way round its caster's place `centre` the shot in `slot` is (radians).
@@ -234,10 +234,10 @@ func test_a_held_beam_turns_the_whole_staff_round_the_hand() -> void:
 
 
 func test_wasted_on_what_never_leaves_the_body() -> void:
-	for form: StringName in [&"dash", &"teleport", &"swing", &"slam", &"decoy", &"familiar", &"portal"]:
-		check(not Carriers.of(form).works(ModifierBase.Behaviour.ORBIT), "nothing of a %s circles" % form)
-	for form: StringName in [&"bolt", &"atom", &"swap", &"beam", &"rune", &"pool", &"wall"]:
-		check(Carriers.of(_form(form).carrier).works(ModifierBase.Behaviour.ORBIT), "a %s circles" % form)
+	for carrier_card: StringName in [&"dash", &"teleport", &"swing", &"slam", &"decoy", &"familiar", &"portal"]:
+		check(not Carriers.of(carrier_card).works(ModifierBase.Behaviour.ORBIT), "nothing of a %s circles" % carrier_card)
+	for carrier_card: StringName in [&"bolt", &"atom", &"swap", &"beam", &"rune", &"pool", &"wall"]:
+		check(Carriers.of(_carrier_card(carrier_card).carrier).works(ModifierBase.Behaviour.ORBIT), "a %s circles" % carrier_card)
 
 
 ## The live slot of the first shot of `tag`, or -1.

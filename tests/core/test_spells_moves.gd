@@ -61,16 +61,16 @@ func before_each() -> void:
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	_bus.mana_refund_requested.connect(func(player: int, _at: int, amount: float) -> void:
 		_refunds.append([player, amount]))
-	var bolt: CarrierCard = _form(&"bolt", 300.0, 1.0)
+	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
-	var teleport: CarrierCard = _form(&"teleport", 400.0, 0.25)
+	var teleport: CarrierCard = _carrier_card(&"teleport", 400.0, 0.25)
 	teleport.carrier = &"teleport"
-	var dash: CarrierCard = _form(&"dash", 400.0, 0.2)
+	var dash: CarrierCard = _carrier_card(&"dash", 400.0, 0.2)
 	dash.carrier = &"dash"
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
-	var swap: CarrierCard = _form(&"swap", 300.0, 1.0)
+	var swap: CarrierCard = _carrier_card(&"swap", 300.0, 1.0)
 	swap.carrier = &"swap"
-	var beam: CarrierCard = _form(&"beam", 0.0, 0.2)
+	var beam: CarrierCard = _carrier_card(&"beam", 0.0, 0.2)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	beam.radius = 6.0
@@ -82,13 +82,13 @@ func before_each() -> void:
 	var piercing := ModifierBase.new()
 	piercing.extra_pierce = 2
 	_put(piercing, &"pierce")
-	var wall: CarrierCard = _form(&"wall", 0.0, 0.5)
+	var wall: CarrierCard = _carrier_card(&"wall", 0.0, 0.5)
 	wall.carrier = &"wall"
 	wall.shots = 3
 	wall.spread = 10.0
 	wall.radius = 4.0
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
-	var spark: CarrierCard = _form(&"spark", 100.0, 1.0)
+	var spark: CarrierCard = _carrier_card(&"spark", 100.0, 1.0)
 	spark.base_damage = 3
 
 
@@ -99,14 +99,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
-	var form := CarrierCard.new()
-	form.base_damage = 5
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 5
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> void:
@@ -262,8 +262,8 @@ func test_a_swap_shows_at_both_ends_of_its_trade() -> void:
 	_build(0, [&"swap"])
 	_target(Vector2(60, 0))
 	var shown: Array = []
-	_bus.form_shown.connect(func(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
-		shown.append([caster, form, origin, direction, length]))
+	_bus.carrier_shown.connect(func(caster: int, carrier_card: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		shown.append([caster, carrier_card, origin, direction, length]))
 	_spells.cast_staff(0, 0, Vector2(-10, 4), Vector2.RIGHT, 100.0)
 	_tick(30)
 	check_equal(shown.size(), 2, "once for each end")
@@ -279,10 +279,10 @@ func test_a_teleport_shows_where_it_leaves_and_ends_where_it_lands() -> void:
 	var tag: int = _build(0, [&"teleport"])
 	var shown: Array = []
 	var ended: Array = []
-	_bus.form_shown.connect(func(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
-		shown.append([caster, form, origin, direction, length]))
-	_bus.carrier_ended.connect(func(caster: int, form: StringName, at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
-		ended.append([caster, form, at]))
+	_bus.carrier_shown.connect(func(caster: int, carrier_card: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		shown.append([caster, carrier_card, origin, direction, length]))
+	_bus.carrier_ended.connect(func(caster: int, carrier_card: StringName, at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
+		ended.append([caster, carrier_card, at]))
 	_cast()
 	check(shown.size() == 1 and shown[0][1] == &"teleport" and shown[0][2].is_equal_approx(Vector2.ZERO) and shown[0][3].is_equal_approx(Vector2.RIGHT) and is_equal_approx(shown[0][4], 100.0), "it shows where it leaves, its way and distance: %s" % [shown])
 	check_equal(ended.size(), 0, "nothing lands before the body has moved")
@@ -482,15 +482,15 @@ func test_a_teleport_of_player_three_ignores_other_players_arrivals() -> void:
 ## trigger that fires once after 0.25 s, a slow speck (`orb`) and Orbit to circle it 20 px out
 ## (docs/milestones/carrier-modifiers.md Part 5), and faster (speed x1.5).
 func _distance_cards() -> void:
-	var short: CarrierCard = _form(&"short", 240.0, 0.25)
+	var short: CarrierCard = _carrier_card(&"short", 240.0, 0.25)
 	short.carrier = &"dash"
 	short.ray_length = 48.0
-	var blink: CarrierCard = _form(&"blink", 400.0, 0.25)
+	var blink: CarrierCard = _carrier_card(&"blink", 400.0, 0.25)
 	blink.carrier = &"teleport"
 	blink.ray_length = 64.0
 	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
 	timer.wind_up = 0.25
-	_form(&"orb", 3.0, 1.0)
+	_carrier_card(&"orb", 3.0, 1.0)
 	var orbit := ModifierBase.new()
 	orbit.behaviour = ModifierBase.Behaviour.ORBIT
 	orbit.behaviour_strength = 1.0 / 3.0
@@ -533,16 +533,16 @@ func test_a_dash_moves_its_card_distance_and_faster_only_makes_it_sooner() -> vo
 
 func test_a_dash_shows_from_its_start_to_its_landing_with_its_tag() -> void:
 	# The owner (2026-10-28): the dash look went another way than the wizard. Its streaks and cards
-	# are Feel's: the `dash_start` cue's streams follow the caster's anchor from its `form_shown`
+	# are Feel's: the `dash_start` cue's streams follow the caster's anchor from its `carrier_shown`
 	# until its `carrier_ended` (gameplay/feel/streams.gd), which the runtime sends with the dash's
 	# tag (`cue_tag`), so the landing ends that dash's streams and no other's.
 	var shown: Array = []
 	var ended: Array = []
-	_bus.form_shown.connect(func(caster: int, form: StringName, _origin: Vector2, _direction: Vector2, _length: float, _tint: Color, _look: int) -> void:
-		if form == &"dash":
+	_bus.carrier_shown.connect(func(caster: int, carrier_card: StringName, _origin: Vector2, _direction: Vector2, _length: float, _tint: Color, _look: int) -> void:
+		if carrier_card == &"dash":
 			shown.append([caster, _spells.cue_tag]))
-	# Its end names its card's form (here the test's `short`, a dash carrier).
-	_bus.carrier_ended.connect(func(caster: int, _form: StringName, _at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
+	# Its end names its carrier card (here the test's `short`, a dash carrier).
+	_bus.carrier_ended.connect(func(caster: int, _carrier_card: StringName, _at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
 		ended.append([caster, _spells.cue_tag]))
 	_distance_cards()
 	var tag: int = _build(0, [&"short"])
@@ -570,8 +570,8 @@ func test_a_dash_keeps_its_own_way_when_its_move_ends_another_dash() -> void:
 	_build(0, [&"short"])
 	var shown: Array[Vector2] = []
 	var ended: Array[bool] = [false]
-	_bus.form_shown.connect(func(caster: int, form: StringName, _origin: Vector2, direction: Vector2, _length: float, _tint: Color, _look: int) -> void:
-		if form == &"dash" and caster == 0:
+	_bus.carrier_shown.connect(func(caster: int, carrier_card: StringName, _origin: Vector2, direction: Vector2, _length: float, _tint: Color, _look: int) -> void:
+		if carrier_card == &"dash" and caster == 0:
 			shown.append(direction))
 	_bus.caster_move_requested.connect(func(player: int, _mode: StringName, _to: Vector2, _seconds: float, _tag: int) -> void:
 		if player == 0 and not ended[0]:
@@ -769,7 +769,7 @@ func test_a_pull_after_a_recoil_on_a_shot_gets_both_moves() -> void:
 	# Rules R1e: the hook ran in place of the recoil before, so the shot lost what was left of its
 	# push back. Player 0's payload has recoil, player 1's the same without it.
 	_distance_cards()
-	_form(&"quick_bolt", 900.0, 1.0)
+	_carrier_card(&"quick_bolt", 900.0, 1.0)
 	_mgr.set_anchor(1, Vector2(0.0, 100.0))
 	_target(Vector2(130.0, 0.0))
 	_target(Vector2(130.0, 100.0))

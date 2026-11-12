@@ -8,7 +8,7 @@ const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 func test_the_card_is_a_rune() -> void:
 	_check_card(&"rune", 2)
-	check_equal(_form(&"rune").carrier, &"rune", "rune waits")
+	check_equal(_carrier_card(&"rune").carrier, &"rune", "rune waits")
 
 
 func test_it_works_for_all_four_players_at_once() -> void:
@@ -18,11 +18,11 @@ func test_it_works_for_all_four_players_at_once() -> void:
 
 
 func test_the_rune_stays_where_it_was_cast_and_hits_what_walks_in() -> void:
-	var tag: int = _cast_form(&"rune", 0, Vector2(50.0, 50.0))
+	var tag: int = _cast_carrier(&"rune", 0, Vector2(50.0, 50.0))
 	check_equal(_slots(tag).size(), 1, "one rune")
 	_tick(90)
 	# Placed a step ahead along the aim, twice its size (rules R4 F3).
-	var placed: Vector2 = Vector2(50.0 + _form(&"rune").radius * 2.0, 50.0)
+	var placed: Vector2 = Vector2(50.0 + _carrier_card(&"rune").radius * 2.0, 50.0)
 	check_equal(_mgr.get_position_of(_slots(tag)[0]), placed, "it did not move")
 	check_equal(_hits.size(), 0, "nobody was near")
 	var imp := _target(Vector2(300.0, 300.0))
@@ -32,12 +32,12 @@ func test_the_rune_stays_where_it_was_cast_and_hits_what_walks_in() -> void:
 
 
 func test_the_rune_stays_when_the_caster_and_a_target_move_away() -> void:
-	var tag: int = _cast_form(&"rune", 0, Vector2.ZERO)
+	var tag: int = _cast_carrier(&"rune", 0, Vector2.ZERO)
 	var imp := _target(Vector2(300.0, 0.0))
 	_tick(30, {0: Vector2(200.0, 0.0)})
 	imp.global_position = Vector2(400.0, 0.0)
 	_tick(30, {0: Vector2(200.0, 0.0)})
-	check_equal(_mgr.get_position_of(_slots(tag)[0]), Vector2(_form(&"rune").radius * 2.0, 0.0), "the rune stays where it was placed, a step ahead of the cast point")
+	check_equal(_mgr.get_position_of(_slots(tag)[0]), Vector2(_carrier_card(&"rune").radius * 2.0, 0.0), "the rune stays where it was placed, a step ahead of the cast point")
 	check_equal(_hits.size(), 0, "nobody was near it")
 
 
@@ -54,7 +54,7 @@ func test_its_moments_have_their_cues() -> void:
 func test_a_rune_hits_nothing_until_it_is_armed() -> void:
 	var arena := ArenaScript.new(root)
 	arena.install_cards(0, 0, ["rune"])
-	var placed: Vector2 = Vector2(_form(&"rune").radius * 2.0, 0.0)
+	var placed: Vector2 = Vector2(_carrier_card(&"rune").radius * 2.0, 0.0)
 	var imp: Node2D = arena.add_imp(placed)
 	check(arena.cast(0, 0), "cast")
 	arena.run(SpellLimits.RUNE_ARM - 0.2)
@@ -83,7 +83,7 @@ func test_a_rune_cast_on_a_hit_goes_off_on_that_body_once_armed() -> void:
 ## its still clock (`ProjectileManager.still_code`), which covers its arming, and arms when the rune
 ## does.
 func test_its_look_arms_when_it_does() -> void:
-	var card: CarrierCard = _form(&"rune")
+	var card: CarrierCard = _carrier_card(&"rune")
 	check(card.look_shader == preload("res://content/spells/carriers/rune/rune.gdshader"), "drawn by its folder's shader")
 	var code: String = card.look_shader.code
 	check(code.contains("const float ARM = %s;" % String.num(SpellLimits.RUNE_ARM, 1)), "the shader arms at SpellLimits.RUNE_ARM")

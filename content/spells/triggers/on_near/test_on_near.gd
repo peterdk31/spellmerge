@@ -76,17 +76,67 @@ func test_it_stays_quiet_with_no_foe_near() -> void:
 	arena.free_all()
 
 
-## A rune lasts: with a foe beside it, it fires again and again, paced by the payload's wind-up.
-func test_a_lasting_carrier_fires_again_paced() -> void:
+## Where a rune cast along +x from the origin lies (it stays there).
+const RUNE_AT: Vector2 = Vector2(28.0, 0.0)
+## Health of a body no test here kills, so what it lost is all counted.
+const BIG: float = 500.0
+
+
+## A rune lasts: with a foe beside it (inside its payload ring's reach, outside the rune's own
+## strike), it fires again and again, one ring each interval.
+func test_a_lasting_carrier_fires_again_once_each_interval() -> void:
 	var arena := ArenaScript.new(root)
-	var imp: Node2D = arena.add_imp(Vector2(30.0, 20.0), 500.0)
+	var imp: Node2D = arena.add_imp(RUNE_AT + Vector2(0.0, 40.0), BIG)
 	var staff: CompiledStaff = arena.install_cards(0, 0, ["on_near", "rune", "pulse"])
-	var interval: float = staff.casts[0].group.spells[0].triggers[0].interval
+	var trigger: CompiledSpell.Trigger = staff.casts[0].group.spells[0].triggers[0]
+	var ring: float = trigger.payload.spells[0].damage
 	arena.cast(0, 0)
-	arena.run(2.0)
-	var lost: int = roundi(500.0 - arena.combat.health_of(imp))
-	var ring: float = staff.casts[0].group.spells[0].triggers[0].payload.spells[0].damage
-	var fires: int = roundi(float(lost) / ring)
-	check(fires >= 2, "it fired again while the imp stayed near (%d rings)" % fires)
-	check(fires <= ceili(2.0 / interval) + 1, "but no more often than its interval allows (%d rings, %ss apart)" % [fires, interval])
+	var seconds: float = 3.0
+	arena.run(seconds)
+	var fires: float = (BIG - arena.combat.health_of(imp)) / ring
+	var expected: float = seconds / trigger.interval
+	check(is_equal_approx(fires, roundf(fires)), "only rings hurt it, the rune never struck it (%s rings)" % fires)
+	check(fires >= expected - 2.0 and fires <= expected + 1.0, "about one ring every %ss: %s in %ss (%s expected)" % [trigger.interval, fires, seconds, expected])
+	arena.free_all()
+
+
+## Only foes count: a teammate beside the rune sets nothing off.
+func test_a_teammate_near_sets_nothing_off() -> void:
+	var arena := ArenaScript.new(root)
+	var mate: Node2D = arena.add_guard(1, RUNE_AT + Vector2(0.0, 30.0))
+	var health: float = arena.combat.health_of(mate)
+	arena.install_cards(0, 0, ["on_near", "rune", "pulse"])
+	arena.cast(0, 0)
+	arena.run(1.5)
+	check_equal(arena.combat.health_of(mate), health, "no ring went off at the teammate")
+	arena.free_all()
+
+
+## Its foes are its caster's team's, and stay so after that caster is gone (review, 2026-11-12: a
+## dead imp's mine turned on its pack).
+func test_a_gone_casters_carrier_keeps_its_foes() -> void:
+	var arena := ArenaScript.new(root)
+	var mate: Node2D = arena.add_guard(1, RUNE_AT + Vector2(0.0, 30.0))
+	var health: float = arena.combat.health_of(mate)
+	arena.install_cards(0, 0, ["on_near", "rune", "pulse"])
+	arena.cast(0, 0)
+	arena.run(0.1)
+	arena.projectiles.actors.close(0)
+	arena.run(1.5)
+	check_equal(arena.combat.health_of(mate), health, "its caster closed, the rune still spares the teammate")
+	arena.free_all()
+
+
+## The rune sentry with its caster standing beside it: the bolt goes down at the imp, not through
+## the caster (the combo on_near_rune_sentry, with the caster's own health read).
+func test_a_rune_sentry_shoots_the_foe_and_spares_its_caster() -> void:
+	var arena := ArenaScript.new(root)
+	var wizard: Node2D = arena.add_guard(0, Vector2.ZERO)
+	var health: float = arena.combat.health_of(wizard)
+	var imp: Node2D = arena.add_imp(RUNE_AT + Vector2(0.0, 100.0))
+	arena.install_cards(0, 0, ["on_near", "rune", "bolt"])
+	arena.cast(0, 0)
+	arena.run(1.5)
+	check(arena.lost(imp) > 0, "the bolt hit the imp below the rune")
+	check_equal(arena.combat.health_of(wizard), health, "and not its caster")
 	arena.free_all()

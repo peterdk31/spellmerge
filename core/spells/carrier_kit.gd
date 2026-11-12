@@ -397,9 +397,9 @@ func delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int, 
 	return _rt._delay(wait, group, spell, actor, staff, generation, origin, heading, source, from_caster)
 
 
-# --- Live carriers (a `timer` or `on hurt` trigger on a carrier that lasts) -------------
+# --- Live carriers (a trigger of `TriggerBase.LIVE` on a carrier that lasts) ------------
 
-## Lists a carrier of `tag` that lasts, when it has a `timer` or `on hurt` trigger: `kind`
+## Lists a carrier of `tag` that lasts, when it has a trigger of `TriggerBase.LIVE`: `kind`
 ## (`SpellRuntime.LC_SLOT` a shot, `LC_ROW` a row of this carrier, which `Carrier.tip_of` places,
 ## `LC_ACTOR` an actor's body, `LC_POINT` a point) and `ref` (with `seq`, the row's birth) say where
 ## it is; `tied` that it ends with that row, else it lives `life` seconds; `at` is where it starts

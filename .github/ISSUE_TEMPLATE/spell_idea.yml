@@ -7,7 +7,7 @@ body:
     attributes:
       label: Kind
       options:
-        - Carrier (bolt, beam, rune, dash, ...)
+        - Carrier (bolt, beam, rune, dash, pulse, ...)
         - Infusion (fire, frost, storm, void, ...)
         - Modifier (split, pierce, homing, chain, nova, orbit, ...)
         - Trigger (on hit, on expire, timer, ...)

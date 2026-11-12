@@ -516,6 +516,10 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 		spell.hit.heal = maxi(roundi(spell.damage), 1)
 		# Heal only, whatever it hits (owner 2026-11-12): no damage, for friend or foe.
 		spell.hit.damage = 0.0
+	var barrier: float = spell.behaviour(ModifierBase.Behaviour.BARRIER)
+	if barrier > 0.0:
+		spell.hit.barrier = roundi(barrier)
+		spell.hit.barrier_seconds = SpellLimits.BARRIER_SECONDS
 	var heavy: float = spell.behaviour(ModifierBase.Behaviour.HEAVY)
 	if heavy > 0.0:
 		spell.hit.knockback *= heavy

@@ -402,6 +402,9 @@ func _listen() -> void:
 		_put("deflected %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
 	bus.wizard_shield_requested.connect(func(caster: int, charges: int, seconds: float, tag: int) -> void:
 		_put("barrier %s %s %d for %d ms" % [_who(caster), _node(tag), charges, roundi(seconds * 1000.0)]))
+	# The barriers Combat keeps (a Barrier card's on what it hits too), as their charges change.
+	bus.barrier_changed.connect(func(actor: int, charges: int, _seconds: float, _tag: int, _way: Vector2, _radius: float) -> void:
+		_put("barrier now %s %d" % [_who(actor), charges]))
 	bus.pull_requested.connect(func(caster: int, at: Vector2, radius: float, strength: float, tag: int, to: Vector2) -> void:
 		_put("pull %s %s at %s to %s r%d %d" % [_who(caster), _node(tag), _at(at), _at(to), roundi(radius), roundi(strength)]))
 	bus.possess_requested.connect(func(caster: int, target: int, seconds: float, tag: int) -> void:

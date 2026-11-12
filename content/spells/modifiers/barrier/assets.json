@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/modifiers/barrier/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG written by hand)",
+			"prompt": "A 16x16 icon for the Barrier card: a round bubble, dark inside, with a light-blue rim, a 1 px dark outline and a light glint along its upper left, round a small light body with a dark outline in its middle. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

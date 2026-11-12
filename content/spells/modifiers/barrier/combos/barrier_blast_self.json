@@ -1,0 +1,13 @@
+{
+	"id": "barrier_blast_self",
+	"name": "Barrier burst",
+	"does": "A barrier blast bolt bursts on a near wall; the caster standing in the circle gets a barrier, which stops the enemy shot flying at them.",
+	"needs": "barrier",
+	"casts": [{"staff": 0, "cards": ["barrier", "blast", "bolt"]}],
+	"imps": [],
+	"walls": [[30, -100, 8, 200]],
+	"guard": true,
+	"foes": [[0, 240]],
+	"seconds": 1.5,
+	"checks": [{"kind": "blocked", "min": 1}]
+}

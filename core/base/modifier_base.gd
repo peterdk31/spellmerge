@@ -104,6 +104,12 @@ enum Behaviour {
 	## that flies, stays (a rune, a pool, a wall: they circle as they are) or is a line, and not one
 	## that moves its caster, strikes from the hand, or makes a body or a gate.
 	ORBIT,
+	## Whatever the carrier hits, friend or foe, gets a barrier of `behaviour_strength` blocked hits
+	## for `SpellLimits.BARRIER_SECONDS` (owner, 2026-11-12: the card for shielding a teammate;
+	## Shield guards the carrier itself). It is part of the hit (`HitProfile.barrier`): Combat gives
+	## it after the hit's heal or damage, and it never stops the spell that gave it
+	## (`Combat.give_barrier`).
+	BARRIER,
 }
 
 ## How more cards of one behaviour on a carrier combine (`StaffCompiler.stacked`): counts add
@@ -163,6 +169,8 @@ const RULES: Dictionary = {
 	# teleport, swing or slam leaves the body to circle, and a decoy, familiar or portal makes a
 	# body or a gate, not a row (carrier-modifiers 5B).
 	Behaviour.ORBIT: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.STAYS | CarrierTraits.LINE, "not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE | CarrierTraits.SPAWNS | CarrierTraits.GATES}},
+	# Part of the hit, as a heal is: a blast strikes with it too.
+	Behaviour.BARRIER: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.

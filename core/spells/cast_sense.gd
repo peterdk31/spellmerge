@@ -80,20 +80,32 @@ static func of(cast: CompiledCast) -> CastSense:
 	sense.mana = cast.mana
 	sense.delay = cast.delay
 	sense.wind_up = cast.wind_up
-	if cast.group == null or cast.group.is_empty():
-		return sense
-	sense.empty = false
-	var repeats: float = float(maxi(cast.group.repeats, 1))
+	sense._read_group(cast.group)
+	return sense
+
+
+## How far what `group` casts reaches from where it is cast, along its aim or all round (the larger;
+## 0 for nothing): how near a foe must be for `on near` to fire it (props W9b).
+static func reach_of(group: CompiledGroup) -> float:
+	var sense := CastSense.new()
+	sense._read_group(group)
+	return maxf(sense.reach, sense.close_reach)
+
+
+func _read_group(group: CompiledGroup) -> void:
+	if group == null or group.is_empty():
+		return
+	empty = false
+	var repeats: float = float(maxi(group.repeats, 1))
 	# The aimed numbers (`radius`, `speed`) are the first aimed carrier's: one that acts all round
 	# its caster (`AOE`) is not aimed.
 	var first_carrier: bool = true
-	for spell: CompiledSpell in cast.group.spells:
-		sense._read_spell(spell, repeats, first_carrier)
+	for spell: CompiledSpell in group.spells:
+		_read_spell(spell, repeats, first_carrier)
 		if not spell.has_trait(CarrierTraits.AOE):
 			first_carrier = false
-	if sense.close_reach <= 0.0:
-		sense.close_reach = sense.reach
-	return sense
+	if close_reach <= 0.0:
+		close_reach = reach
 
 
 func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:

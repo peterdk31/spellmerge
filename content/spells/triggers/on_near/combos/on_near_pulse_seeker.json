@@ -1,0 +1,10 @@
+{
+	"id": "on_near_pulse_seeker",
+	"name": "Seeker ring",
+	"does": "A ring goes out round the caster; an imp below them is within reach of its bolt, so the bolt flies at the imp, not along the aim.",
+	"needs": "on_near",
+	"casts": [{"staff": 0, "cards": ["on_near", "pulse", "bolt"]}],
+	"imps": [[0, 100]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

@@ -342,6 +342,9 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 			return [REACTING]
 		TriggerBase.Event.RECAST:
 			return [OPEN_AGAIN]
+		TriggerBase.Event.NEAR:
+			# A foe beside the carrier's way, or on it: the payload goes off as it comes near.
+			return [SIDE_TARGET, LINE]
 	return []
 
 

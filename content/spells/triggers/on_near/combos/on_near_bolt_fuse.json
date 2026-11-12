@@ -1,0 +1,10 @@
+{
+	"id": "on_near_bolt_fuse",
+	"name": "Proximity fuse",
+	"does": "A bolt flies past an imp beside its path without touching it; as it comes near, it bursts into a ring of fire round itself that burns the imp.",
+	"needs": "on_near",
+	"casts": [{"staff": 0, "cards": ["on_near", "bolt", "fire", "pulse"]}],
+	"imps": [[110, 34]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

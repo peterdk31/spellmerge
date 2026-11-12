@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="TriggerBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/trigger_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/triggers/on_near/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"on_near"
+display_name = "On Near"
+description = "Casts its spell at a foe that comes near its shot."
+complexity = 2
+icon = ExtResource("2_icon")
+event = 10
+wind_up = 0.25

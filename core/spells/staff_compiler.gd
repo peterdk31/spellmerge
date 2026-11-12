@@ -239,8 +239,12 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 		var fires := CompiledSpell.Trigger.new()
 		fires.id = trigger.id
 		fires.event = trigger.event
-		# A timer's tick is its payload's whole wind-up (cast timing T8).
-		fires.interval = held.wind_up if trigger.event == TriggerBase.Event.TIMER else 0.0
+		# A timer's tick is its payload's whole wind-up (cast timing T8); `on near` waits as long
+		# before it fires again, and fires when a foe is within its payload's reach.
+		var paced: bool = trigger.event == TriggerBase.Event.TIMER or trigger.event == TriggerBase.Event.NEAR
+		fires.interval = held.wind_up if paced else 0.0
+		if trigger.event == TriggerBase.Event.NEAR:
+			fires.reach = CastSense.reach_of(held)
 		fires.payload = held
 		fires.slot = trigger_slot
 		spell.triggers.append(fires)

@@ -2578,6 +2578,9 @@ func _lc_join(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, tie
 		var trigger: CompiledSpell.Trigger = spell.triggers[t]
 		if TriggerBase.LIVE.has(trigger.event):
 			_lc_join_one(t, trigger.interval, tag, kind, ref, seq, tied, life, at, way)
+			if trigger.event == TriggerBase.Event.NEAR:
+				# On near is ready at once: a foe already near sets it off.
+				_lc_clock[_lc_count - 1] = 0.0
 
 
 ## How many entries `_lc_join` lists for one carrier of `spell`: its triggers of
@@ -2697,14 +2700,33 @@ func _step_live(delta: float) -> void:
 				_lc_clock[i] += trigger.interval
 				# The tick was its payload's wind-up: it leaves now.
 				_lc_fire(i, trigger.payload, _lc_at[i], true)
+		elif trigger != null and trigger.event == TriggerBase.Event.NEAR:
+			_lc_clock[i] = maxf(_lc_clock[i] - delta, 0.0)
+			if _lc_clock[i] <= 0.0:
+				_lc_near(i, trigger)
 		i += 1
 
 
-## Fires the payload of live carrier `i` from `from`, along its way where it is: a shot's own
-## (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
+## `on near` of live carrier `i`, ready: the nearest foe of its caster within its payload's reach
+## sets it off, and its payload winds up and fires from the carrier toward that foe; it waits its
+## interval (the payload's wind-up) before it can fire again. With no foe near it stays ready.
+func _lc_near(i: int, trigger: CompiledSpell.Trigger) -> void:
+	var actor: int = SpellTag.caster_of(_lc_tag[i])
+	var team: int = _team(actor)
+	var at: Vector2 = _lc_at[i]
+	var foe: Node2D = projectiles.nearest_target(at, trigger.reach, HITS, null, null, team)
+	if foe == null:
+		return
+	_lc_clock[i] = trigger.interval
+	var toward: Vector2 = projectiles.nearest_point - at
+	_lc_fire(i, trigger.payload, at, false, null, toward if not toward.is_zero_approx() else Vector2.ZERO)
+
+
+## Fires the payload of live carrier `i` from `from`, along `aim` when given (`on near`: toward the
+## foe), else its way where it is: a shot's own (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
 ## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies, an
 ## actor's body while it is there (owner, 2026-11-06), else the point does.
-func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false, source: Node = null) -> void:
+func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false, source: Node = null, aim: Vector2 = Vector2.ZERO) -> void:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
 		return
@@ -2729,6 +2751,8 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
 			way = (at - body).normalized()
+	if not aim.is_zero_approx():
+		way = aim.normalized()
 	_fire_payload(payload, tag, actor, from, way, source, caster, wound)
 
 

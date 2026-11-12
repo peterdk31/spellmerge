@@ -343,9 +343,10 @@ func turn_shots_round(actor: int, tag: int, at: Vector2, reach: float, carrier: 
 
 
 ## `guard` along the path `points[first]` to `points[first + count - 1]` (cut `reach` pixels along),
-## `width` pixels either side: a beam's line. Returns the charges left.
-func guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, width: float, charges: int) -> int:
-	return _rt._guard_path(spell, tag, actor, points, first, count, reach, width, charges)
+## `width` pixels either side: a beam's line. A block is sent as the carrier `carrier`'s (its
+## `id()`, as `guard`). Returns the charges left.
+func guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, width: float, charges: int, carrier: StringName) -> int:
+	return _rt._guard_path(spell, tag, actor, points, first, count, reach, width, charges, carrier)
 
 
 ## How many times `spell`'s line turns at a wall: its bounce cards' count.

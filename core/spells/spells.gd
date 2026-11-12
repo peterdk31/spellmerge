@@ -2226,7 +2226,9 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 			count = mini(projectiles.ray_path_count, _ray_guard_points.size())
 			for n in count:
 				_ray_guard_points[n] = projectiles.ray_path[n]
-		_guard_path(spell, tag, actor, _ray_guard_points, 0, count, got, spell.radius * 0.5, roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD)))
+		# A chain jump of any ray (a swing's or a slam's too) blocks as a ray, never as its carrier: a
+		# swing's jump is no parry.
+		_guard_path(spell, tag, actor, _ray_guard_points, 0, count, got, spell.radius * 0.5, roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD)), RAY_CARD)
 	if got > 0.0 and projectiles.ray_path_count > 2:
 		# It turned at walls: a cue for every straight leg, and it ends where the last one does.
 		end = projectiles.ray_end
@@ -2252,8 +2254,8 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 ## The shots of other teams touching the path `points[first]` to `points[first + count - 1]`
 ## (cut `reach` pixels along) of a beam with `tag`, `width` pixels either side as its
 ## hits: each is deflected off the line (`deflect`), else stopped while `charges` last (melee
-## I3). Returns the charges left.
-func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, width: float, charges: int) -> int:
+## I3); a block is sent as the carrier `carrier`'s (`_guard`). Returns the charges left.
+func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, width: float, charges: int, carrier: StringName) -> int:
 	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
 	if (not deflects and charges <= 0) or count < 2 or reach <= 0.0:
 		return charges
@@ -2265,7 +2267,7 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 		if walked + piece > reach:
 			b = a.move_toward(b, reach - walked)
 		var found: int = projectiles.shots_on_segment(actor, a, b, width)
-		charges = _guard(found, actor, tag, deflects, charges, a, b, spell.carrier)
+		charges = _guard(found, actor, tag, deflects, charges, a, b, carrier)
 		walked += piece
 		if walked >= reach or (not deflects and charges <= 0):
 			break

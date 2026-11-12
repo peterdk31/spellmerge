@@ -171,3 +171,34 @@ func test_four_players_swing_at_once() -> void:
 	for imp in imps:
 		check_equal(arena.lost(imp), plain, "every imp in front of its player took the same hit")
 	arena.free_all()
+
+
+func test_its_block_is_a_swings_and_a_chain_jumps_is_a_rays() -> void:
+	# Review, 2026-11-12: a block tells the carrier that made it (`Projectiles.impact_carrier`),
+	# never in the card's place (`impact_carrier_card` stays empty); a chain jump of a swing blocks
+	# as a ray (`Spells.RAY_CARD`), so it is no parry.
+	var arena := ArenaScript.new(root)
+	arena.add_guard(0, Vector2.ZERO)
+	var told: Array = []
+	arena.bus.shot_blocked.connect(func(_actor: int, _at: Vector2, _tag: int, _shot: int) -> void:
+		told.append([arena.projectiles.impact_carrier, arena.projectiles.impact_carrier_card]))
+	var compiled: CompiledStaff = arena.install_cards(0, 0, ["shield", "swing"])
+	var spell: CompiledSpell = compiled.casts[0].group.spells[0]
+	var tag: int = SpellTag.make(0, 0, spell.node, 0)
+	# An enemy shot; once it flies, a jump fired straight through where it is.
+	arena.shoot_at(Vector2(60.0, -60.0), Vector2(60.0, 60.0))
+	var at: Vector2 = Vector2.INF
+	for step in 60:
+		arena.run(1.0 / 60.0)
+		for slot in arena.projectiles.get_cap():
+			if arena.projectiles.is_alive(slot) and arena.projectiles.get_actor_of(slot) != 0:
+				at = arena.projectiles.get_position_of(slot)
+		if at.is_finite():
+			break
+	check(at.is_finite(), "the enemy shot flies")
+	arena.spells._shoot_ray(spell, tag, 0, at - Vector2(30.0, 0.0), Vector2.RIGHT, 0, 0, null, 60.0)
+	check(not told.is_empty(), "the jump stopped the shot")
+	if not told.is_empty():
+		check_equal(told[0][0], arena.spells.RAY_CARD, "as a ray's block, not the swing's (no parry)")
+		check_equal(told[0][1], &"", "and the card's place is left alone")
+	arena.free_all()

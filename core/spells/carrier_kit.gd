@@ -325,21 +325,21 @@ func spared(spell: CompiledSpell, body: Node) -> Node:
 
 ## Deflects (with `deflects`) or stops (while `charges` last) the `found` shots of
 ## `Projectiles.guard_slots` that touched a carrier of `actor` with `tag`: outward from `a` when `b`
-## is INF, else off the segment from `a` to `b`. A block is sent as `carrier_card`'s (`block_shot`: a
-## swing's is a parry). Returns the charges left.
-func guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier_card: StringName) -> int:
-	return _rt._guard(found, actor, tag, deflects, charges, a, b, carrier_card)
+## is INF, else off the segment from `a` to `b`. A block is sent as the carrier `carrier`'s (its
+## `id()`; `block_shot`: a swing's is a parry). Returns the charges left.
+func guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier: StringName) -> int:
+	return _rt._guard(found, actor, tag, deflects, charges, a, b, carrier)
 
 
 ## Turns the shots of other teams than `actor`'s within `reach` of `at` (MOVE_GUARD_REACH at
-## least) outward from it, once, for the carrier with `tag` (`guard` with a deflect; the block is
-## sent as `carrier_card`'s): a deflect on the caster as it is cast, a teleport's landing, a decoy as it
+## least) outward from it, once, for the carrier with `tag` (`guard` with a deflect, as the carrier
+## `carrier`, its `id()`): a deflect on the caster as it is cast, a teleport's landing, a decoy as it
 ## appears, a payload's deflect landing on the body that fired it.
-func turn_shots_round(actor: int, tag: int, at: Vector2, reach: float, carrier_card: StringName) -> void:
+func turn_shots_round(actor: int, tag: int, at: Vector2, reach: float, carrier: StringName) -> void:
 	if _rt.projectiles == null or not at.is_finite():
 		return
 	var around: float = maxf(reach, SpellLimits.MOVE_GUARD_REACH)
-	_rt._guard(_rt.projectiles.shots_on_segment(actor, at, at, around), actor, tag, true, 0, at, at, carrier_card)
+	_rt._guard(_rt.projectiles.shots_on_segment(actor, at, at, around), actor, tag, true, 0, at, at, carrier)
 
 
 ## `guard` along the path `points[first]` to `points[first + count - 1]` (cut `reach` pixels along),

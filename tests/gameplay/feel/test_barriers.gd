@@ -187,8 +187,8 @@ func test_a_shell_without_a_body_or_anchor_goes() -> void:
 
 
 func test_a_cast_on_yourself_plays_its_own_cue() -> void:
-	check_equal(_feel._carrier_cues_of(&"caster")[FeelScript.CUE_CAST], &"cast_self", "the caster carrier's cast cue")
-	check_equal(_feel._carrier_cues_of(&"bolt")[FeelScript.CUE_CAST], (_feel.registry.get_resource(&"spells", &"bolt") as CarrierCard).cast_cue, "a carrier card's own stays")
+	check_equal(_feel._carrier_card_cues_of(&"caster")[FeelScript.CUE_CAST], &"cast_self", "the caster carrier's cast cue")
+	check_equal(_feel._carrier_card_cues_of(&"bolt")[FeelScript.CUE_CAST], (_feel.registry.get_resource(&"spells", &"bolt") as CarrierCard).cast_cue, "a carrier card's own stays")
 
 
 ## The shell's size and its motes follow the body's: a boss's is wider and has more motes a

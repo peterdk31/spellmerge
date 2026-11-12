@@ -391,10 +391,10 @@ func setup() -> void:
 		events.projectile_impact.connect(_on_projectile_impact)
 
 
-## A swing's block (the projectile manager's `impact_carrier_card` while it is sent, no shot of its own)
+## A swing's block (the projectile manager's `impact_carrier` while it is sent, no shot of its own)
 ## is a parry: its stop.
 func _on_shot_blocked(caster: int, _position: Vector2, _tag: int, shot: int) -> void:
-	if shot < 0 and projectiles != null and projectiles.impact_carrier_card == &"swing":
+	if shot < 0 and projectiles != null and projectiles.impact_carrier == &"swing":
 		hit_stop.parried(caster)
 
 

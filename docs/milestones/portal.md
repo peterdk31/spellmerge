@@ -12,7 +12,7 @@
 
 ## The card
 
-A form card, `content/spells/carriers/portal/`, `carrier = &"portal"`, a new `core/spells/carriers/portal.gd` (`CarrierPortal`). Starting numbers, for tuning in the playtest:
+A form card, `content/spells/forms/portal/`, `carrier = &"portal"`, a new `core/spells/carriers/portal.gd` (`CarrierPortal`). Starting numbers, for tuning in the playtest:
 
 | Field | Value | What it means on a portal |
 | --- | --- | --- |
@@ -98,7 +98,7 @@ The first build's ring round a target (homing exits, each facing it) was a rule 
 
 ## How it was built
 
-All in one branch, in GDScript: no C++ changed. The gates are rows of the projectile manager, as the walls are (`open_gate`, `close_gate`, `gate_outs`, `gate_turn`, `gate_cut`); a ray stops where it goes into one when its caller asks (`ray_gates`, a beam only: a zap or a jump passes gates by) and says which (`ray_gate`, `ray_gate_left`); `shots_into_gates` lists the flying shots that went into one on their last step, and `pass_shot` moves one. The portal carrier (`core/spells/carriers/portal.gd`) runs every step after the manager's: it moves those shots (and makes their copies through `land_shot`, so a copy is a full shot of its spell), moves the bodies, pulls, zaps and closes. A beam that stops at a gate opens a leg at every gate it leads to: a beam row of its own (`CarrierBeam._start_leg`), which follows its beam and ends when its beam no longer reaches that gate. Since the shots are moved after the step, outside the kernel's loop, the native shot kernel needed no change and its check (`test_native_kernel`) is unchanged; the swarm's bodies are moved by `target_move_requested`, which the swarm already hears. `content/spells/carriers/portal/test_portal.gd` checks the rules; `test_card_rules` plays every card on it, with a teammate's plain shot sent through every carrier that opens a way through (`GATES`), so what its cards do to what comes out shows.
+All in one branch, in GDScript: no C++ changed. The gates are rows of the projectile manager, as the walls are (`open_gate`, `close_gate`, `gate_outs`, `gate_turn`, `gate_cut`); a ray stops where it goes into one when its caller asks (`ray_gates`, a beam only: a zap or a jump passes gates by) and says which (`ray_gate`, `ray_gate_left`); `shots_into_gates` lists the flying shots that went into one on their last step, and `pass_shot` moves one. The portal carrier (`core/spells/carriers/portal.gd`) runs every step after the manager's: it moves those shots (and makes their copies through `land_shot`, so a copy is a full shot of its spell), moves the bodies, pulls, zaps and closes. A beam that stops at a gate opens a leg at every gate it leads to: a beam row of its own (`CarrierBeam._start_leg`), which follows its beam and ends when its beam no longer reaches that gate. Since the shots are moved after the step, outside the kernel's loop, the native shot kernel needed no change and its check (`test_native_kernel`) is unchanged; the swarm's bodies are moved by `target_move_requested`, which the swarm already hears. `content/spells/forms/portal/test_portal.gd` checks the rules; `test_card_rules` plays every card on it, with a teammate's plain shot sent through every carrier that opens a way through (`GATES`), so what its cards do to what comes out shows.
 
 Not built yet: the enemy AI does not aim through portals (step 4 below; an enemy that holds a portal opens it and fights on as it does), spell light, and sounds.
 

@@ -82,7 +82,7 @@ func test_a_swing_block_is_a_parry_a_gold_star_and_a_local_stop() -> void:
 	check(is_equal_approx(_feel.cue_of(&"parry").hold, 0.06), "the playground's 0.06 s")
 	check_equal(_world.table.held_left(other.id), 0.0, "another actor is not")
 	check_equal(_world.table.held_left(shooter.id), 0.0, "nor the shooter")
-	check_equal(_world.projectiles.impact_carrier_card, &"", "the carrier card is only told while the block is sent")
+	check_equal(_world.projectiles.impact_carrier, &"", "the blocking carrier is only told while the block is sent")
 
 
 func test_other_blocks_show_no_parry() -> void:

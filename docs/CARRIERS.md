@@ -201,7 +201,7 @@ runtime's one rule for it, shared by every carrier:
 | The cast under way | `spell_of(tag)`, `carrier_of(spell)`, `caster()` (the one caster value), `caster_seq()`, `caster_shot()`, `caster_body(actor)`, `caster_place(actor, origin)`, `shot_caster(slot)`, `pick_target(actor, at, within)` (a one-off homing pick: any enemy in reach, at random, afresh each time), `cast_as(caster, seq)`/`cast_done()` (a row steps as its caster), `is_echo(spell)`, `shot_started`, `shot_ended` |
 | The aim | `aim_origin`, `aim_dir`, `aim_pivot`, `aim_seen`, `walk_turn` (by actor) |
 | Shots | `fan_angle`, `staff_spread`, `placed_at`, `land_shot` (every carrier that spawns a shot: a wall makes its row solid first) |
-| Hits with no shot slot | `ray_begin`/`ray_end`, `cast_jumps`, `strike`, `strike_round`, `guard` (with the carrier's `id()` as its block form), `guard_path`, `turn_shots_round` (a deflect round one point, once), `bounces`, `ghost` |
+| Hits with no shot slot | `ray_begin`/`ray_end`, `cast_jumps`, `strike`, `strike_round`, `guard` (with the carrier's `id()` as the blocking carrier, `Projectiles.impact_carrier`), `guard_path`, `turn_shots_round` (a deflect round one point, once), `bounces`, `ghost` |
 | What it leaves behind | `blast`, `fire_payloads`, `fire`, `delay` |
 | Live carriers | `live_join` (`SpellRuntime.LC_SLOT`, `LC_ROW`, `LC_ACTOR`, `LC_POINT`), `live_leave` |
 | Moves and entities | `moves()` (`CasterMoves`), `request_entity` |

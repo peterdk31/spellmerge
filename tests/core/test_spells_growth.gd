@@ -41,7 +41,7 @@ func before_each() -> void:
 	_bus.projectile_hit.connect(func(_player: int, _target: Node, _at: Vector2, tag: int, _shot: int) -> void:
 		var profile: HitProfile = _spells.hit_profile(tag)
 		_damage.append(profile.damage if profile != null else -1))
-	var bolt := FormBase.new()
+	var bolt := CarrierCard.new()
 	bolt.base_damage = 10
 	bolt.speed = 100.0
 	bolt.lifetime = 3.0

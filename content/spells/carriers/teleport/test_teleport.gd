@@ -11,8 +11,8 @@ const ComboFiles := preload("res://tests/support/combo_files.gd")
 const COMBOS: Array[String] = ["teleport_away", "teleport_and_fire", "shield_teleport"]
 
 
-func _card() -> FormBase:
-	return load("res://content/spells/carriers/teleport/teleport.tres") as FormBase
+func _card() -> CarrierCard:
+	return load("res://content/spells/carriers/teleport/teleport.tres") as CarrierCard
 
 
 func _combo(id: String) -> Dictionary:
@@ -37,8 +37,8 @@ func _moves(cards: Array, seat: int = 0) -> Array:
 
 
 func test_the_card_is_a_valid_carrier() -> void:
-	var card: FormBase = _card()
-	check(card != null, "teleport.tres loads as a FormBase")
+	var card: CarrierCard = _card()
+	check(card != null, "teleport.tres loads as a CarrierCard")
 	if card == null:
 		return
 	check_equal(card.id, &"teleport", "its id is its folder")
@@ -56,7 +56,7 @@ func test_the_combos_exist() -> void:
 
 
 func test_a_cast_blinks_the_caster_the_card_s_distance() -> void:
-	var card: FormBase = _card()
+	var card: CarrierCard = _card()
 	var moves: Array = _moves(["teleport"])
 	check_equal(moves.size(), 1, "one move is asked")
 	if moves.is_empty() or card == null:
@@ -82,7 +82,7 @@ func test_four_players_blink_each() -> void:
 ## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
 ## tests/content/spells/test_carrier_looks.gd).
 func test_its_moments_have_their_cues() -> void:
-	var card: FormBase = load("res://content/spells/carriers/teleport/teleport.tres") as FormBase
+	var card: CarrierCard = load("res://content/spells/carriers/teleport/teleport.tres") as CarrierCard
 	check_equal(card.shown_cue, &"vanish", "its shown plays vanish")
 	check_equal(card.end_cue, &"appear", "its end plays appear")
 

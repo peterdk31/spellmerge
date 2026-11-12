@@ -34,7 +34,7 @@ class FakeSpells:
 		var cards: Array[StringName] = []
 		var spell: CompiledSpell = spells.get(tag)
 		if spell != null:
-			cards.append(spell.form_id)
+			cards.append(spell.carrier_card_id)
 			for id in spell.element_ids + spell.modifier_ids:
 				if not cards.has(id):
 					cards.append(id)
@@ -66,7 +66,7 @@ func _pool(kinds: Array[MoteKind] = []) -> MotesScript:
 ## A spell of the form `form`, the infusions `elements` and the modifiers `modifiers`.
 static func _spell(form: StringName, elements: Array[StringName], modifiers: Array[StringName]) -> CompiledSpell:
 	var spell := CompiledSpell.new()
-	spell.form_id = form
+	spell.carrier_card_id = form
 	spell.element_ids = elements
 	spell.modifier_ids = modifiers
 	return spell

@@ -10,8 +10,8 @@ const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 
 
-func _card() -> FormBase:
-	return load("res://content/spells/carriers/swing/swing.tres") as FormBase
+func _card() -> CarrierCard:
+	return load("res://content/spells/carriers/swing/swing.tres") as CarrierCard
 
 
 func _lost(cards: Array, at: Vector2, seconds: float = 1.0) -> int:
@@ -26,8 +26,8 @@ func _lost(cards: Array, at: Vector2, seconds: float = 1.0) -> int:
 
 
 func test_the_card_is_a_valid_carrier() -> void:
-	var card: FormBase = _card()
-	check(card != null, "swing.tres loads as a FormBase")
+	var card: CarrierCard = _card()
+	check(card != null, "swing.tres loads as a CarrierCard")
 	if card == null:
 		return
 	check_equal(card.id, &"swing", "its id is its folder")
@@ -37,7 +37,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 
 func test_it_has_the_playgrounds_numbers() -> void:
 	# The owner's tuning in the melee playground (2026-10-29), as the plan's "Tuning" lists them.
-	var card: FormBase = _card()
+	var card: CarrierCard = _card()
 	check_equal(card.mana_cost, 0.0, "it costs no mana")
 	check_equal(card.arc, 90.0, "a 90° arc")
 	check_equal(card.ray_length, 32.0, "32 px of reach (24 in the playground; one tile after the first playtest)")

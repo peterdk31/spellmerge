@@ -42,7 +42,7 @@ func before_each() -> void:
 func _looked_cards() -> Array:
 	var found: Array = []
 	for card: Resource in registry.call("get_all", &"spells"):
-		var form := card as FormBase
+		var form := card as CarrierCard
 		if form != null and form.look_shader != null:
 			found.append([form, Carriers.of(form.carrier).look_drawer()])
 	return found
@@ -51,14 +51,14 @@ func _looked_cards() -> Array:
 func test_some_cards_have_a_look_of_their_own() -> void:
 	var ids: Array[StringName] = []
 	for each: Array in _looked_cards():
-		ids.append((each[0] as FormBase).id)
+		ids.append((each[0] as CarrierCard).id)
 	for id: StringName in [&"rune", &"wall", &"pool", &"bolt", &"swap", &"beam", &"swing", &"familiar", &"portal"]:
 		check(ids.has(id), "%s draws with its folder's shader" % id)
 
 
 func test_every_card_shader_is_one_its_carrier_draws() -> void:
 	for each: Array in _looked_cards():
-		var form: FormBase = each[0]
+		var form: CarrierCard = each[0]
 		check(form.look_problems().is_empty(), "%s: %s" % [form.id, form.look_problems()])
 		check(PLAIN.has(each[1]), "%s's carrier %s draws a look (got %d)" % [form.id, form.carrier, each[1]])
 		check(form.look_shader.resource_path.begins_with("res://content/spells/carriers/%s/" % form.id), "%s's shader is in its own folder" % form.id)
@@ -66,7 +66,7 @@ func test_every_card_shader_is_one_its_carrier_draws() -> void:
 
 func test_every_card_shader_keeps_its_areas_instance_and_mesh() -> void:
 	for each: Array in _looked_cards():
-		var form: FormBase = each[0]
+		var form: CarrierCard = each[0]
 		if not PLAIN.has(each[1]):
 			continue
 		var plain: String = ShaderSource.of(load(PLAIN[each[1]]) as Shader)
@@ -79,7 +79,7 @@ func test_every_card_shader_keeps_its_areas_instance_and_mesh() -> void:
 
 func test_every_card_shader_keeps_its_areas_particle_rule() -> void:
 	for each: Array in _looked_cards():
-		var form: FormBase = each[0]
+		var form: CarrierCard = each[0]
 		var code: String = ShaderSource.of(form.look_shader)
 		if DRAWS_PARTICLES.has(each[1]):
 			check(code.contains(PARTICLE_RULE), "%s asks 4 + 2 particles a kind" % form.id)
@@ -89,7 +89,7 @@ func test_every_card_shader_keeps_its_areas_particle_rule() -> void:
 
 func test_no_card_shader_reads_the_light_floats() -> void:
 	for each: Array in _looked_cards():
-		var form: FormBase = each[0]
+		var form: CarrierCard = each[0]
 		check(not ShaderSource.of(form.look_shader).contains("MODEL_MATRIX[2]"), "%s leaves the row floats the spell light reads alone (LIGHT_*_FLOAT)" % form.id)
 
 
@@ -109,12 +109,12 @@ func test_every_card_shader_is_warmed_before_the_first_room() -> void:
 	entities.use_familiar_look()
 	var warmed: Array[Shader] = WarmupScript.shaders()
 	for each: Array in _looked_cards():
-		var form: FormBase = each[0]
+		var form: CarrierCard = each[0]
 		check(warmed.has(form.look_shader), "%s's shader is warmed before the first room" % form.id)
 	# A shot carrier's body was numbered then, with its mesh: asked again, it is one of those.
 	var numbered: int = manager.batch_count()
 	for each: Array in _looked_cards():
-		var form: FormBase = each[0]
+		var form: CarrierCard = each[0]
 		if each[1] == Carrier.LOOK_SHOT or each[1] == Carrier.LOOK_STILL:
 			var mesh: int = ProjectilesScript.MESH_HEAD if each[1] == Carrier.LOOK_SHOT else ProjectilesScript.MESH_QUAD
 			check(manager.register_body(form.look_shader, mesh) > 0, "%s has a body" % form.id)
@@ -122,7 +122,7 @@ func test_every_card_shader_is_warmed_before_the_first_room() -> void:
 
 
 func test_a_look_shader_on_a_carrier_with_no_look_is_reported() -> void:
-	var form := FormBase.new()
+	var form := CarrierCard.new()
 	form.id = &"test_form"
 	form.carrier = &"dash"
 	form.look_shader = preload("res://content/spells/carriers/pool/pool.gdshader")
@@ -136,7 +136,7 @@ func test_every_card_shader_takes_every_uniform_its_area_sets() -> void:
 	# trails, Entities' orbs, the manager's batches), so it declares every one, or a setting falls
 	# on nothing and the look draws stale.
 	for each: Array in _looked_cards():
-		var form: FormBase = each[0]
+		var form: CarrierCard = each[0]
 		if not PLAIN.has(each[1]):
 			continue
 		var plain: String = ShaderSource.of(load(PLAIN[each[1]]) as Shader)
@@ -152,7 +152,7 @@ func test_every_still_cards_look_is_one_its_shader_and_clock_can_draw() -> void:
 	# Its coming and going fit what the still clock tells (`STILL_START`, `STILL_END`).
 	var by_shader: Dictionary = {}
 	for each: Array in _looked_cards():
-		var form: FormBase = each[0]
+		var form: CarrierCard = each[0]
 		if each[1] != Carrier.LOOK_STILL:
 			continue
 		check(form.look_open <= ProjectilesScript.STILL_START and form.look_fade <= ProjectilesScript.STILL_END, "%s comes and goes within what its still clock tells" % form.id)

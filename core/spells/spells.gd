@@ -576,7 +576,7 @@ func register_bodies() -> void:
 	# Every infusion's colour by its look layer, for the shaders that weave a look of several.
 	InfusionTable.publish(InfusionTable.of_registry(source))
 	for card: Resource in source.call(&"get_all", &"spells"):
-		var form := card as FormBase
+		var form := card as CarrierCard
 		if form == null:
 			continue
 		var mesh: int = _shot_mesh(_remember_look(form))
@@ -592,7 +592,7 @@ var _look_drawers: Dictionary = {}
 
 
 ## The carrier card `form`'s look as the area `drawer` (Carrier.LOOK_*: Feel's beams or swing
-## trails, Entities' orbs) draws it: its own shader and light (`FormBase.look_shader`,
+## trails, Entities' orbs) draws it: its own shader and light (`CarrierCard.look_shader`,
 ## `look_light_intensity`, `look_light_reach`), or `CardLook.PLAIN` when its carrier is drawn by
 ## another area (a bolt's zap is a beam, but a bolt's shader draws heads) and for an id that is no
 ## carrier card (a chain's jump). So no area reads the card (docs/milestones/card-looks.md). Shared
@@ -612,13 +612,13 @@ func look_shaders(drawer: int) -> Array[Shader]:
 	if source == null or not source.has_method(&"get_all"):
 		return found
 	for card: Resource in source.call(&"get_all", &"spells"):
-		var form := card as FormBase
+		var form := card as CarrierCard
 		if form != null and form.look_shader != null and _remember_look(form) == drawer and not found.has(form.look_shader):
 			found.append(form.look_shader)
 	return found
 
 
-## Every still carrier card whose shots give off motes while they stand (`FormBase.look_motes`,
+## Every still carrier card whose shots give off motes while they stand (`CarrierCard.look_motes`,
 ## drawn by a shader of its own), by id, for Feel to give them off (`gameplay/feel/still_motes.gd`,
 ## which asks `look_of(form, Carrier.LOOK_STILL)` for them). A new array each call: once, at start.
 func still_mote_cards() -> Array[StringName]:
@@ -627,7 +627,7 @@ func still_mote_cards() -> Array[StringName]:
 	if source == null or not source.has_method(&"get_all"):
 		return found
 	for card: Resource in source.call(&"get_all", &"spells"):
-		var form := card as FormBase
+		var form := card as CarrierCard
 		if form != null and form.look_shader != null and not form.look_motes.is_empty() and _remember_look(form) == Carrier.LOOK_STILL:
 			found.append(form.id)
 	return found
@@ -639,7 +639,7 @@ func _read_look(form: StringName) -> bool:
 	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
 	if form == &"" or source == null or not source.has_method(&"get_resource"):
 		return false
-	var card := source.call(&"get_resource", &"spells", form) as FormBase
+	var card := source.call(&"get_resource", &"spells", form) as CarrierCard
 	if card == null:
 		return false
 	_remember_look(card)
@@ -647,7 +647,7 @@ func _read_look(form: StringName) -> bool:
 
 
 ## Keeps `card`'s look in `_looks` (once) and returns the area that draws its carrier.
-func _remember_look(card: FormBase) -> int:
+func _remember_look(card: CarrierCard) -> int:
 	if not _looks.has(card.id):
 		_looks[card.id] = CardLook.from_card(card)
 		_look_drawers[card.id] = Carriers.of(card.carrier).look_drawer()
@@ -665,8 +665,8 @@ func _launch_look_of(spell: CompiledSpell) -> LaunchLook:
 	var mesh: int = _shot_mesh(spell.look_drawer)
 	_launch_look.core = spell.tint
 	_launch_look.look = spell.look
-	_launch_look.form = spell.form_id
-	_launch_look.body = _body_of(spell.form_id, spell.look_shader, mesh) if mesh != NO_SHOT_MESH else 0
+	_launch_look.form = spell.carrier_card_id
+	_launch_look.body = _body_of(spell.carrier_card_id, spell.look_shader, mesh) if mesh != NO_SHOT_MESH else 0
 	_launch_look.light_intensity = spell.look_light_intensity
 	_launch_look.light_reach = spell.look_light_reach
 	return _launch_look
@@ -743,7 +743,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.caster_move_finished.connect(_moves.finished)
 
 
-## True when the card `card_id` does something on the carrier `carrier` (`FormBase.carrier`) on its
+## True when the card `card_id` does something on the carrier `carrier` (`CarrierCard.carrier`) on its
 ## own: for the builder, a reward screen or a bot, before the card is placed
 ## (`StaffCompiler.card_works`). False for an unknown card.
 func card_works(card_id: StringName, carrier: StringName) -> bool:
@@ -834,7 +834,7 @@ func _tree_carrier_name(spell: CompiledSpell) -> String:
 		return TREE_ON_BEARER
 	if spell.fallback == CompiledSpell.FALLBACK_POINT:
 		return TREE_AT_POINT
-	return spell.form_name if spell.form_name != "" else String(spell.form_id)
+	return spell.carrier_card_name if spell.carrier_card_name != "" else String(spell.carrier_card_id)
 
 
 ## The damage one cast deals if every shot of it lands once (a beam: every hit of its life):
@@ -870,8 +870,8 @@ func component_icon(id: StringName) -> Texture2D:
 func component_stats(id: StringName) -> PackedStringArray:
 	var out := PackedStringArray()
 	var component: SpellComponent = _component(id)
-	if component is FormBase:
-		var form: FormBase = component
+	if component is CarrierCard:
+		var form: CarrierCard = component
 		var hits: int = maxi(form.shots, 1) * Carriers.of(form.carrier).hits_per_target(form.lifetime)
 		out.append("Dmg " + _short(form.base_damage) if hits <= 1 else "Dmg %sx%d" % [_short(form.base_damage), hits])
 		out.append("Mana " + _short(form.mana_cost))
@@ -959,8 +959,8 @@ func cards_of(tag: int) -> Array[StringName]:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null:
 		return cards
-	if spell.form_id != &"":
-		cards.append(spell.form_id)
+	if spell.carrier_card_id != &"":
+		cards.append(spell.carrier_card_id)
 	for id in spell.element_ids + spell.modifier_ids:
 		if id != &"" and not cards.has(id):
 			cards.append(id)
@@ -1242,7 +1242,7 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 			var first_spell: CompiledSpell = cast.group.spells[0]
 			# A staff may name its own (a barrel's fuse; props W6): it plays in place of the card's.
 			var staff_cue: StringName = compiled.staff.wind_cue if compiled.staff != null else &""
-			events.cast_winding.emit(actor, staff, first_spell.form_id, origin, aim, cast.wind_up, first_spell.tint, first_spell.look, SpellTag.make(actor, staff, first_spell.node, _current[index]), staff_cue)
+			events.cast_winding.emit(actor, staff, first_spell.carrier_card_id, origin, aim, cast.wind_up, first_spell.tint, first_spell.look, SpellTag.make(actor, staff, first_spell.node, _current[index]), staff_cue)
 		return 0.0
 	_walk_turn[actor] = turn
 	if not _leave(index, compiled, cast, origin, aim):
@@ -1273,7 +1273,7 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 			break
 	var first: CompiledSpell = cast.group.spells[0]
 	# A cast with no carrier card names its fallback carrier (`caster`), so it is still a cast to show.
-	_last_form[index] = first.form_id if first.form_id != &"" else first.carrier
+	_last_form[index] = first.carrier_card_id if first.carrier_card_id != &"" else first.carrier
 	return true
 
 
@@ -1493,7 +1493,7 @@ func _strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arr
 		var point: Vector2 = _strike_marks[n * 2]
 		var head: Vector2 = _strike_marks[n * 2 + 1]
 		ray.dir = centre.direction_to(point) if not centre.is_equal_approx(point) else head
-		projectiles.strike(actor, _strike_bodies[n], point, head, tag, spell.form_id)
+		projectiles.strike(actor, _strike_bodies[n], point, head, tag, spell.carrier_card_id)
 	var took: HitProfile = ray.hit
 	_ray_end()
 	_strike_bodies.resize(first)

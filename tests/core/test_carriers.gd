@@ -48,8 +48,8 @@ func test_every_form_card_names_a_carrier_and_every_carrier_has_one() -> void:
 	arena.free_all()
 	var named: Dictionary = {}
 	for card: Variant in cards:
-		if card is FormBase:
-			var form := card as FormBase
+		if card is CarrierCard:
+			var form := card as CarrierCard
 			check(Carriers.ids().has(form.carrier), "%s names a carrier: %s" % [form.id, form.carrier])
 			named[form.carrier] = true
 	for id: StringName in Carriers.ids():

@@ -2,7 +2,7 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// A familiar card's own look (content/spells/carriers/familiar/: `FormBase.look_shader`;
+// A familiar card's own look (content/spells/carriers/familiar/: `CarrierCard.look_shader`;
 // docs/milestones/card-looks.md; the owner, 2026-11-08: rework the carriers' looks). A copy of the
 // plain orbit shot (`core/projectiles/shot_orbit.gdshaderinc`, the fallback) that draws a little
 // spirit instead of a shot: a round orb in its owner's ramp, shadowed at its rim, lit from the

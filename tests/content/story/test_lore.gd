@@ -24,7 +24,7 @@ func _rules(problems: Array[Dictionary]) -> Array[String]:
 
 
 func _card(text: String) -> SpellComponent:
-	var card := FormBase.new()
+	var card := CarrierCard.new()
 	card.id = &"bolt"
 	card.description = text
 	return card

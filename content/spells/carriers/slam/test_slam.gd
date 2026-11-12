@@ -13,13 +13,13 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 
-func _card() -> FormBase:
-	return load("res://content/spells/carriers/slam/slam.tres") as FormBase
+func _card() -> CarrierCard:
+	return load("res://content/spells/carriers/slam/slam.tres") as CarrierCard
 
 
 func test_the_card_is_a_valid_carrier() -> void:
-	var card: FormBase = _card()
-	check(card != null, "slam.tres loads as a FormBase")
+	var card: CarrierCard = _card()
+	check(card != null, "slam.tres loads as a CarrierCard")
 	if card == null:
 		return
 	check_equal(card.id, &"slam", "its id is its folder")
@@ -165,8 +165,8 @@ func test_its_blow_hangs_at_the_top_then_whips_down() -> void:
 	# A hard hit (the owner, 2026-11-08: "start a bit slower and then accelerate"): the drop's key
 	# eases "slam", so halfway through the drop the staff has come only a little of the way down,
 	# and it covers the rest in the drop's last moments.
-	check(is_equal_approx(StaffPoses.pose_ease(0.5, FormBase.POSE_EASES["slam"]), 0.0625), "slam eases as x to the fourth")
-	check(StaffPoses.pose_ease(0.5, FormBase.POSE_EASES["slam"]) < StaffPoses.pose_ease(0.5, FormBase.POSE_EASES["in"]), "slower to start than \"in\"")
+	check(is_equal_approx(StaffPoses.pose_ease(0.5, CarrierCard.POSE_EASES["slam"]), 0.0625), "slam eases as x to the fourth")
+	check(StaffPoses.pose_ease(0.5, CarrierCard.POSE_EASES["slam"]) < StaffPoses.pose_ease(0.5, CarrierCard.POSE_EASES["in"]), "slower to start than \"in\"")
 	var arena := ArenaScript.new(root)
 	arena.install_cards(0, 0, ["slam"])
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
@@ -363,5 +363,5 @@ func test_closing_its_caster_ends_a_slam_in_its_wind_up() -> void:
 ## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
 ## tests/content/spells/test_carrier_looks.gd).
 func test_its_moments_have_their_cues() -> void:
-	var card: FormBase = load("res://content/spells/carriers/slam/slam.tres") as FormBase
+	var card: CarrierCard = load("res://content/spells/carriers/slam/slam.tres") as CarrierCard
 	check_equal(card.end_cue, &"slam", "its end plays slam")

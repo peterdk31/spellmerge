@@ -146,8 +146,8 @@ func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> Com
 		elif card is TriggerBase:
 			triggers.append(card as TriggerBase)
 			trigger_slots.append(slot)
-		elif card is FormBase:
-			var form := card as FormBase
+		elif card is CarrierCard:
+			var form := card as CarrierCard
 			var on: Carrier = Carriers.of(form.carrier)
 			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, form.wind_up)
 			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
@@ -224,7 +224,7 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int,
 ## with it (rules R2b). One with nothing to fire is wasted too. Every trigger of a carrier is read
 ## the same way, in slot order, so each takes the next group (owner, 2026-10-31). `by` is who may
 ## cast the payload (`Carrier.payload_cast_by`).
-func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase], by: int) -> void:
+func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int, form: CarrierCard, elements: Array[ElementBase], modifiers: Array[ModifierBase], by: int) -> void:
 	var never: bool = not keep_wasted and not _trigger_fires(trigger, form, elements, modifiers)
 	var first: int = _cast.slots.size()
 	var mana: float = _cast.mana
@@ -336,7 +336,7 @@ func _land(spell: CompiledSpell, kept: PackedInt32Array, modifiers: Array[Modifi
 
 ## True when `trigger` can fire on `form` with these infusions and kept modifiers: all the trigger
 ## needs (`TriggerBase.NEEDS`, `Carrier.fires_with`), the one rule for the compiler and `card_works`.
-func _trigger_fires(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> bool:
+func _trigger_fires(trigger: TriggerBase, form: CarrierCard, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> bool:
 	var has: Dictionary = {}
 	for modifier in modifiers:
 		has[modifier.behaviour] = true
@@ -422,7 +422,7 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 
 ## A compiled spell of the carrier `on` from its form card (none for a fallback carrier, whose
 ## numbers are SpellLimits.FALLBACK_*) and the cards that attach to it.
-func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers: Array[ModifierBase], fallback: int) -> CompiledSpell:
+func _build(form: CarrierCard, on: Carrier, elements: Array[ElementBase], modifiers: Array[ModifierBase], fallback: int) -> CompiledSpell:
 	var spell := CompiledSpell.new()
 	spell.node = _out.nodes.size()
 	_out.nodes.append(spell)
@@ -448,8 +448,8 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	# A fallback carrier's own animation; a form card's carrier takes its card's below.
 	spell.staff_pose = on.staff_pose()
 	if form != null:
-		spell.form_id = form.id
-		spell.form_name = _name(form)
+		spell.carrier_card_id = form.id
+		spell.carrier_card_name = _name(form)
 		spell.lifetime = form.lifetime
 		spell.ray_length = form.ray_length
 		spell.arc = form.arc
@@ -707,7 +707,7 @@ func _spell_text(spell: CompiledSpell) -> String:
 		CompiledSpell.FALLBACK_BEARER:
 			text = "on what fired it: %s" % ", ".join(names + _modifier_names(spell))
 		_:
-			names.append(spell.form_name)
+			names.append(spell.carrier_card_name)
 			text = " ".join(names)
 			var modifiers: PackedStringArray = _modifier_names(spell)
 			if not modifiers.is_empty():

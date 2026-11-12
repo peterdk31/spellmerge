@@ -1126,10 +1126,10 @@ func beam_infusions(at: int) -> PackedColorArray:
 	return _bm_spell[at].infusion_looks if _bm_spell[at] != null else PackedColorArray()
 
 
-## The id of the card live beam `at` is (`CompiledSpell.form_id`; &"" for none), so Feel draws it
+## The id of the card live beam `at` is (`CompiledSpell.carrier_card_id`; &"" for none), so Feel draws it
 ## by its card's look (`Spells.look_of`).
 func beam_form(at: int) -> StringName:
-	return _bm_spell[at].form_id if _bm_spell[at] != null else &""
+	return _bm_spell[at].carrier_card_id if _bm_spell[at] != null else &""
 
 
 ## The packed look kinds of live beam `at` (`CompiledSpell.look`), so it shows its cards.

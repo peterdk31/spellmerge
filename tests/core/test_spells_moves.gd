@@ -61,16 +61,16 @@ func before_each() -> void:
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	_bus.mana_refund_requested.connect(func(player: int, _at: int, amount: float) -> void:
 		_refunds.append([player, amount]))
-	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
+	var bolt: CarrierCard = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
-	var teleport: FormBase = _form(&"teleport", 400.0, 0.25)
+	var teleport: CarrierCard = _form(&"teleport", 400.0, 0.25)
 	teleport.carrier = &"teleport"
-	var dash: FormBase = _form(&"dash", 400.0, 0.2)
+	var dash: CarrierCard = _form(&"dash", 400.0, 0.2)
 	dash.carrier = &"dash"
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
-	var swap: FormBase = _form(&"swap", 300.0, 1.0)
+	var swap: CarrierCard = _form(&"swap", 300.0, 1.0)
 	swap.carrier = &"swap"
-	var beam: FormBase = _form(&"beam", 0.0, 0.2)
+	var beam: CarrierCard = _form(&"beam", 0.0, 0.2)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	beam.radius = 6.0
@@ -82,13 +82,13 @@ func before_each() -> void:
 	var piercing := ModifierBase.new()
 	piercing.extra_pierce = 2
 	_put(piercing, &"pierce")
-	var wall: FormBase = _form(&"wall", 0.0, 0.5)
+	var wall: CarrierCard = _form(&"wall", 0.0, 0.5)
 	wall.carrier = &"wall"
 	wall.shots = 3
 	wall.spread = 10.0
 	wall.radius = 4.0
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
-	var spark: FormBase = _form(&"spark", 100.0, 1.0)
+	var spark: CarrierCard = _form(&"spark", 100.0, 1.0)
 	spark.base_damage = 3
 
 
@@ -99,8 +99,8 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = 5
 	form.speed = speed
 	form.lifetime = lifetime
@@ -482,10 +482,10 @@ func test_a_teleport_of_player_three_ignores_other_players_arrivals() -> void:
 ## trigger that fires once after 0.25 s, a slow speck (`orb`) and Orbit to circle it 20 px out
 ## (docs/milestones/carrier-modifiers.md Part 5), and faster (speed x1.5).
 func _distance_cards() -> void:
-	var short: FormBase = _form(&"short", 240.0, 0.25)
+	var short: CarrierCard = _form(&"short", 240.0, 0.25)
 	short.carrier = &"dash"
 	short.ray_length = 48.0
-	var blink: FormBase = _form(&"blink", 400.0, 0.25)
+	var blink: CarrierCard = _form(&"blink", 400.0, 0.25)
 	blink.carrier = &"teleport"
 	blink.ray_length = 64.0
 	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)

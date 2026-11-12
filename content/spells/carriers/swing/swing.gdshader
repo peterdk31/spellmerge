@@ -2,7 +2,7 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha, world_vertex_coords;
 
-// A swing card's own look (content/spells/carriers/swing/: `FormBase.look_shader`; docs/milestones/card-looks.md;
+// A swing card's own look (content/spells/carriers/swing/: `CarrierCard.look_shader`; docs/milestones/card-looks.md;
 // the owner, 2026-11-08: rework the carriers' looks). A copy of the plain trail
 // (`core/projectiles/shot_swing.gdshaderinc`, the fallback) drawing a crescent slash instead of a
 // line: white-hot along its line at the reach where the tip just passed, cooling inward through

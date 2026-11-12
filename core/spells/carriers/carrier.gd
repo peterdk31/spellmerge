@@ -1,6 +1,6 @@
 class_name Carrier
 extends RefCounted
-## A carrier: what a form card fires (`FormBase.carrier`), and the one place that says what it does
+## A carrier: what a form card fires (`CarrierCard.carrier`), and the one place that says what it does
 ## with every other card (docs/CARRIERS.md). Each carrier is one subclass in this folder, found by
 ## its id (`Carriers.of(&"beam")`); the compiler asks it, the spell runtime runs it.
 ##
@@ -105,8 +105,8 @@ func hit_kind() -> StringName:
 
 
 ## A carrier no form card fires (a fallback) has its own look here, where a form card would carry
-## it: its staff animation (`FormBase.staff_pose`, packed) and the cue a seat's cast of it plays
-## (`FormBase.cast_cue`; &"" for Feel's default). A form card's carrier answers none: its card says.
+## it: its staff animation (`CarrierCard.staff_pose`, packed) and the cue a seat's cast of it plays
+## (`CarrierCard.cast_cue`; &"" for Feel's default). A form card's carrier answers none: its card says.
 func staff_pose() -> PackedFloat32Array:
 	return PackedFloat32Array()
 

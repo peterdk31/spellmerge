@@ -66,23 +66,23 @@ func before_each() -> void:
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	_bus.form_shown.connect(func(player: int, form: StringName, at: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_shown.append([player, form, at, direction, length]))
-	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
+	var bolt: CarrierCard = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
-	var familiar: FormBase = _form(&"familiar", 0.0, 6.0)
+	var familiar: CarrierCard = _form(&"familiar", 0.0, 6.0)
 	familiar.carrier = &"familiar"
 	familiar.radius = 5.0
-	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
+	var decoy: CarrierCard = _form(&"decoy", 0.0, 4.0)
 	decoy.carrier = &"decoy"
 	decoy.radius = 8.0
-	var rune: FormBase = _form(&"rune", 0.0, 3.0)
+	var rune: CarrierCard = _form(&"rune", 0.0, 3.0)
 	rune.carrier = &"rune"
 	rune.radius = 7.0
-	var wall: FormBase = _form(&"wall", 0.0, 3.0)
+	var wall: CarrierCard = _form(&"wall", 0.0, 3.0)
 	wall.carrier = &"wall"
 	wall.shots = 3
 	wall.spread = 10.0
 	wall.radius = 4.0
-	var beam: FormBase = _form(&"beam", 0.0, 0.2)
+	var beam: CarrierCard = _form(&"beam", 0.0, 0.2)
 	beam.carrier = &"beam"
 	beam.ray_length = 300.0
 	beam.radius = 6.0
@@ -96,7 +96,7 @@ func before_each() -> void:
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	_trigger(&"on_hit", TriggerBase.Event.HIT)
 	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
-	var spark: FormBase = _form(&"spark", 100.0, 1.0)
+	var spark: CarrierCard = _form(&"spark", 100.0, 1.0)
 	spark.base_damage = 3
 
 
@@ -107,8 +107,8 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = 5
 	form.speed = speed
 	form.lifetime = lifetime
@@ -192,7 +192,7 @@ func test_a_decoy_and_a_familiar_appear_a_step_ahead_and_a_mirror_puts_its_copy_
 		_spells.clear()
 		_build(0, [&"mirror", card])
 		_cast()
-		var step: float = (_fake.items[card] as FormBase).radius * 2.0
+		var step: float = (_fake.items[card] as CarrierCard).radius * 2.0
 		check(_spawns.size() == 2 and (_spawns[0][2] as Vector2).is_equal_approx(Vector2(step, 0.0)), "the %s ahead: %s" % [card, _spawns])
 		check(_spawns.size() == 2 and (_spawns[1][2] as Vector2).is_equal_approx(Vector2(-step, 0.0)), "its mirror's behind: %s" % [_spawns])
 

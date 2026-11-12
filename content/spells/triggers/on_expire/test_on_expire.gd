@@ -21,7 +21,7 @@ func test_it_compiles_into_the_spell_numbers() -> void:
 		return
 	check_equal(spell.triggers[0].event, trigger.event, "the event is compiled")
 	check_equal(spell.triggers[0].interval, 0.0, "no timer: no tick (docs/milestones/cast-timing.md, T8)")
-	check(spell.payload != null and spell.payload.spells[0].form_id == &"bolt" and spell.payload.spells[0].nova_ways() == 8, "the payload is a nova of bolts")
+	check(spell.payload != null and spell.payload.spells[0].carrier_card_id == &"bolt" and spell.payload.spells[0].nova_ways() == 8, "the payload is a nova of bolts")
 
 
 func test_it_works_for_all_four_players_at_once() -> void:

@@ -161,7 +161,7 @@ Gone as a phase: with the owner's hole, a falling beam is cast down from the hol
 - **The payload-carrier code, which only rain used:**
   - `CARRIES_PAYLOAD` (carrier_traits.gd:41-42, carrier.gd:32);
   - `Carrier.land` (carrier.gd:485-488);
-  - `FormBase.carries_payload` (form_base.gd:214-217);
+  - `CarrierCard.carries_payload` (carrier_card.gd:214-217);
   - `CompiledSpell.own_payload` (compiled_spell.gd:167-168);
   - the compiler (staff_compiler.gd:159-161, 705-706), the tree (spells.gd:774-775), CastSense (cast_sense.gd:132, 151-158) and `_group_has` (spells.gd:3519);
   - `PendingLaunch.landing` (spells.gd:191-193, 1766, 1818-1826, 1858, 1872-1873, 1887). Skyfall's own field replaces it.
@@ -176,7 +176,7 @@ Gone as a phase: with the owner's hole, a falling beam is cast down from the hol
 - **Comments that name rain:**
   - spells.gd: 88-89, 174, 191, 289, 292-293, 372, 413, 749, 1062, 1386, 1417, 1477, 1600, 1655, 1864-1865, 1883, 3349, 3479-3480;
   - ray_hit.gd:4, carrier_traits.gd:35 and 43, events.gd:106 and 108, homing.gd:8, carrier_kit.gd:106, point.gd:5, compiled_group.gd:5;
-  - form_base.gd:53, 60, 74, 104, 108, staff_poses.gd:91, modifier_base.gd:223, feel.gd:1665 and 2382.
+  - carrier_card.gd:53, 60, 74, 104, 108, staff_poses.gd:91, modifier_base.gd:223, feel.gd:1665 and 2382.
 - **Docs:** CARRIERS.md (lines 26, 88, 107, 174, 183), content/spells/README.md:33 and 45, core/README.md, DESIGN.md:27, BACKLOG.md:40 (the rain cue item goes), and a DECISIONS.md entry.
 
 ## Part 5: Orbit as a modifier (decided 2026-11-09)
@@ -226,7 +226,7 @@ It does nothing on dash and teleport (they move the caster), swing and slam (the
 4. Orbit's special cases go: the room-wall skips (projectile_manager.gd:3099 and 3459), and the AI threat skips (2897, 2958, 3023). `move_shot` refusing an orbit shot (2325) is audited: what pushes a shot (pull, recoil, swap, move) moves a circling shot's centre, unless a real rule turns up. That would be brought to the owner, not decided alone.
 5. The beam's sweep.
 6. The card: `content/spells/modifiers/orbit/` with `orbit.tres` (`behaviour_id = &"orbit"`, `behaviour_strength = 1/3`, `behaviour_reach = 36`, `lifetime_base = 3.0`, no pierce, damage x1, `mana_mult` about 1.5, `cue = &"orbit"`, a `look_layer`), an icon, `assets.json`, `combos/` and `test_orbit.gd`. Description: "The next spell circles you instead of leaving."
-7. **What goes:** `core/spells/carriers/orbit.gd`, `content/spells/forms/orbit/` (the modifier takes the id, as Nova did), `FormBase.orbit_radius` and its range row, `CompiledSpell.orbit_radius`, `SpellLimits.ORBIT_TURN`, `CarrierTraits.RING` (only the orbit carrier has it: cast_sense.gd:139, staff_compiler.gd:532, spells.gd:1971 read it), `spawn_orbit`, and the `cast_orbit` cue (renamed). The carrier count test goes from 14 to 13.
+7. **What goes:** `core/spells/carriers/orbit.gd`, `content/spells/forms/orbit/` (the modifier takes the id, as Nova did), `CarrierCard.orbit_radius` and its range row, `CompiledSpell.orbit_radius`, `SpellLimits.ORBIT_TURN`, `CarrierTraits.RING` (only the orbit carrier has it: cast_sense.gd:139, staff_compiler.gd:532, spells.gd:1971 read it), `spawn_orbit`, and the `cast_orbit` cue (renamed). The carrier count test goes from 14 to 13.
 8. **Content:** no staff names `orbit`. The ten combos are rewritten to keep what they show. Today's three orbs become `orbit · split · bolt` (a cluster) or `orbit · nova · bolt` (a ring), whichever the combo means: `fire_fan_orbit`, `void_ring`, `decoy_timer_orbit_deflect`, `frost_carousel` (it adds pierce itself now), `hold_fire_orbit`, `hold_shield_orbit`, `shield_orbit_ring`, `double_beam_and_ring`, `triple_three_ways`, `on_hurt_orbit_nova`.
 9. **Tests that name orbit** move to the modifier: test_hold, test_return, test_zap, test_penta, test_decoy, test_on_hurt, test_shield, test_card_rules, test_behaviour_table, test_spells_cast, test_spells_multicast, test_spells_land_shots, test_spells_moves, test_spells_actors, test_spells_deflect, test_projectile_bodies, test_staff_compiler, test_staff_runtime, test_cast_sense, test_trigger_table, test_validators, test_cast_timing, the player bag and build tests, test_radial_builder, test_feel_form_looks, the benchmarks and the screenshot scripts. New tests: start angle from the start point; turn from speed (an atom outturns a bolt, Slow slows it, speed 0 drifts one turn in 3 s); a circling shot ends on a room wall and Ghost passes it; the AI sees a circling shot; `lifetime_base` with factors in any order; a sweeping beam; the native kernel's orbit step.
 10. **Docs:** CARRIERS.md, content/spells/README.md, core/README.md, DESIGN.md (the card list), card-looks.md (the orbit look note), BACKLOG.md, and a DECISIONS.md entry: "Orbit is a modifier: motion only, no special cases".

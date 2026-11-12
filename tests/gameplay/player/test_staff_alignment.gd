@@ -37,7 +37,7 @@ func after_each() -> void:
 func _landing_cards() -> Array[StringName]:
 	var found: Array[StringName] = []
 	for id: StringName in _world.registry.get_ids(&"spells"):
-		var form: FormBase = _world.registry.get_resource(&"spells", id) as FormBase
+		var form: CarrierCard = _world.registry.get_resource(&"spells", id) as CarrierCard
 		if form != null and form.lands():
 			found.append(id)
 	return found

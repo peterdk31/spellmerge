@@ -54,7 +54,7 @@ func across(n: int) -> Vector2:
 
 
 ## Shot `n`'s hit size as drawn, in pixels (`ProjectileManager.STILL_HIT` of its quad): the unit a
-## still card's look is shaped in (`FormBase.look_shape`).
+## still card's look is shaped in (`CarrierCard.look_shape`).
 func reach(n: int) -> float:
 	return ManagerScript.row_reach(_rows, n)
 

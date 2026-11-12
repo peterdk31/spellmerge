@@ -50,7 +50,7 @@ func take() -> void:
 	var registry: Node = root.get_node("Registry")
 	var cards: Array[StringName] = []
 	for id: StringName in registry.call("get_ids", &"spells"):
-		var form: FormBase = registry.call("get_resource", &"spells", id) as FormBase
+		var form: CarrierCard = registry.call("get_resource", &"spells", id) as CarrierCard
 		if form != null and form.lands():
 			cards.append(id)
 	var start: Vector2 = row[0].global_position + Vector2(-APART * 1.5, 0.0)

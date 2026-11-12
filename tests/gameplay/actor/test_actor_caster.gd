@@ -296,21 +296,21 @@ func test_a_teleport_card_jumps_and_a_recoil_card_pushes_back() -> void:
 ## Cards for the moves (as tests/gameplay/ai/test_ai_moves.gd makes them).
 func _move_cards() -> Fixture.FakeRegistry:
 	var fake := Fixture.FakeRegistry.new()
-	var bolt := FormBase.new()
+	var bolt := CarrierCard.new()
 	bolt.base_damage = 5
 	bolt.speed = 200.0
 	bolt.lifetime = 1.0
 	bolt.radius = 4.0
 	bolt.mana_cost = 2.0
 	_put(fake, bolt, &"bolt")
-	var dash := FormBase.new()
+	var dash := CarrierCard.new()
 	dash.carrier = &"dash"
 	dash.ray_length = 60.0
 	dash.speed = 300.0
 	dash.lifetime = 0.2
 	dash.mana_cost = 2.0
 	_put(fake, dash, &"dash")
-	var teleport := FormBase.new()
+	var teleport := CarrierCard.new()
 	teleport.carrier = &"teleport"
 	teleport.ray_length = 70.0
 	teleport.mana_cost = 2.0

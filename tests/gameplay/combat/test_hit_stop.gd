@@ -293,9 +293,9 @@ func test_no_cast_shown_or_wind_cue_holds() -> void:
 	var cards: Array = _world.registry.call(&"get_all", &"spells") as Array
 	check(not cards.is_empty(), "the cards are found")
 	for card: Variant in cards:
-		if not card is FormBase:
+		if not card is CarrierCard:
 			continue
-		var form: FormBase = card as FormBase
+		var form: CarrierCard = card as CarrierCard
 		for id: StringName in [form.cast_cue, form.shown_cue, form.wind_cue]:
 			var cue: CueBase = _cue(id)
 			if cue == null:

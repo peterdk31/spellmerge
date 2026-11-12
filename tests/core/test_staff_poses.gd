@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Staff animations (`FormBase.staff_pose`, played by `Spells.poses().staff_pose` and the rest): keys in
+## Staff animations (`CarrierCard.staff_pose`, played by `Spells.poses().staff_pose` and the rest): keys in
 ## the carrier's own time (wind-up, strike, a hold that repeats while the strike lasts, after),
 ## every channel, the strike ending with the carrier's last shot, a new cast starting from where
 ## the staff is, and the aim it turns from. Every real carrier has one. Cards are made in code and
@@ -22,8 +22,8 @@ func after_each() -> void:
 
 
 ## A form card of the carrier `carrier` with `keys` as its staff animation, in the registry as `id`.
-func _card(id: StringName, carrier: StringName, keys: Array[Dictionary], lifetime: float = 0.3) -> FormBase:
-	var form := FormBase.new()
+func _card(id: StringName, carrier: StringName, keys: Array[Dictionary], lifetime: float = 0.3) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.id = id
 	form.display_name = String(id)
 	form.complexity = 1
@@ -110,5 +110,5 @@ func test_it_turns_with_the_live_aim_unless_its_carrier_locks_the_aim_as_it_leav
 func test_every_carrier_moves_the_staff() -> void:
 	for id: StringName in arena.registry.call("get_ids", &"spells"):
 		var card: Resource = arena.registry.call("get_resource", &"spells", id)
-		if card is FormBase:
-			check(not (card as FormBase).staff_pose.is_empty(), "%s has a staff animation" % id)
+		if card is CarrierCard:
+			check(not (card as CarrierCard).staff_pose.is_empty(), "%s has a staff animation" % id)

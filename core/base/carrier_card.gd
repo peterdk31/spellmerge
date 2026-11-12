@@ -1,9 +1,9 @@
-class_name FormBase
+class_name CarrierCard
 extends SpellComponent
 ## A carrier (bolt, beam, rune, dash, teleport, ...): what leaves the caster
 ## and ends a group when a staff is read (docs/milestones/M2-staffs.md). It sets the base
 ## numbers the infusions and modifiers before it then change. The class keeps its old name,
-## `FormBase`, and its kind `&"form"`.
+## `CarrierCard`, and its kind `&"form"`.
 
 ## Staff animations (`staff_pose`): the phases a key can be in, the eases into a key, the moods
 ## a key can show on the staff's face (its brows), the channels a key moves and the numbers each

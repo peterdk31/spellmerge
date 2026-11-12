@@ -2337,7 +2337,7 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 	play_cue(CueBase.BOSS_DEATH_CUE if _is_boss(enemy) else CueBase.ENEMY_DEATH_CUE, killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(body), 0, true, _hit_color_of(enemy))
 
 
-## The cues the carrier card `form` names and its radius (`FormBase.look_cues`: [cast_cue,
+## The cues the carrier card `form` names and its radius (`CarrierCard.look_cues`: [cast_cue,
 ## shown_cue, impact_cue, end_cue, radius], CUE_CAST to CUE_RADIUS), the defaults (`cast` and `impact`, radius
 ## 0) for an id that is no carrier card; a fallback carrier (`caster`) casts with its own
 ## `Carrier.cast_cue`; a modifier that shows itself (`form_shown` `zap`) brings its
@@ -2351,8 +2351,8 @@ func _form_cues_of(form: StringName) -> Array:
 		return NO_FORM_CUES
 	var card: Resource = registry.get_resource(&"spells", form)
 	var cues: Array = NO_FORM_CUES
-	if card is FormBase:
-		cues = (card as FormBase).look_cues()
+	if card is CarrierCard:
+		cues = (card as CarrierCard).look_cues()
 	elif card == null and Carriers.is_fallback(form) and Carriers.of(form).cast_cue() != &"":
 		# A cast with no carrier card (its cards landed on the caster): its fallback carrier's own cue.
 		cues = NO_FORM_CUES.duplicate()
@@ -2444,7 +2444,7 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	var path: PackedVector3Array = _form_paths[slot]
 	path[0] = Vector3(origin.x, origin.y, 0.0)
 	path[1] = Vector3(end.x, end.y, length)
-	# Drawn by its card's own shader (`FormBase.look_shader`), or the plain beam's.
+	# Drawn by its card's own shader (`CarrierCard.look_shader`), or the plain beam's.
 	_use_shader(node, _form_shader_of(form, Carrier.LOOK_BEAM, BEAM_SHADER))
 	var material: ShaderMaterial = node.material as ShaderMaterial
 	material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
@@ -2607,7 +2607,7 @@ func _draw_live_beams(real_delta: float) -> void:
 		if projectiles != null:
 			body = projectiles.tint_of(caster)
 		var tint: Color = beams.call("beam_tint", i)
-		# Drawn by its card's own shader (`FormBase.look_shader`), or the plain beam's, and lit as
+		# Drawn by its card's own shader (`CarrierCard.look_shader`), or the plain beam's, and lit as
 		# its card says (`look_light_intensity`, `look_light_reach`).
 		var look: CardLook = _form_look_of(beams.call("beam_form", i) as StringName if beams.has_method("beam_form") else &"", Carrier.LOOK_BEAM)
 		_use_shader(node, look.shader if look.shader != null else BEAM_SHADER)

@@ -153,7 +153,7 @@ func _slam_step(at: int, delta: float) -> void:
 		if kit.events != null:
 			kit.events.form_shown.emit(_sl_actor[at], &"slam", impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
 			# Its strike is where it ends for the looks: its card's impact cue, as big as its ring.
-			kit.events.carrier_ended.emit(_sl_actor[at], spell.form_id, impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
+			kit.events.carrier_ended.emit(_sl_actor[at], spell.carrier_card_id, impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
 	var into: float = _sl_age[at] - _sl_wind[at]
 	var life: float = maxf(spell.lifetime, 0.001)
 	var reach: float = spell.radius * clampf(into / (life * SpellLimits.SLAM_GROW), 0.0, 1.0)

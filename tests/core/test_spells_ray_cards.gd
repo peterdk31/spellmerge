@@ -53,11 +53,11 @@ func before_each() -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.pull_requested.connect(func(_player: int, at: Vector2, radius: float, _strength: float, _tag: int, to: Vector2) -> void:
 		_pulls.append([at, to, radius]))
-	var beam: FormBase = _form(&"beam", 0.0, 0.3)
+	var beam: CarrierCard = _form(&"beam", 0.0, 0.3)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	beam.radius = 6.0
-	var long: FormBase = _form(&"long_beam", 0.0, 0.3)
+	var long: CarrierCard = _form(&"long_beam", 0.0, 0.3)
 	long.carrier = &"beam"
 	long.ray_length = 300.0
 	long.radius = 6.0
@@ -80,8 +80,8 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = 2
 	form.speed = speed
 	form.lifetime = lifetime

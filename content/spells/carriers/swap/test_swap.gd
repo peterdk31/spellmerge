@@ -11,8 +11,8 @@ const ComboFiles := preload("res://tests/support/combo_files.gd")
 const COMBOS: Array[String] = ["swap_trade", "swap_miss", "swap_frost"]
 
 
-func _card() -> FormBase:
-	return load("res://content/spells/carriers/swap/swap.tres") as FormBase
+func _card() -> CarrierCard:
+	return load("res://content/spells/carriers/swap/swap.tres") as CarrierCard
 
 
 func _combo(id: String) -> Dictionary:
@@ -44,8 +44,8 @@ func _moves(cards: Array, imp_at: Vector2, seat: int = 0, target_moves: Array = 
 
 
 func test_the_card_is_a_valid_carrier() -> void:
-	var card: FormBase = _card()
-	check(card != null, "swap.tres loads as a FormBase")
+	var card: CarrierCard = _card()
+	check(card != null, "swap.tres loads as a CarrierCard")
 	if card == null:
 		return
 	check_equal(card.id, &"swap", "its id is its folder")
@@ -113,14 +113,14 @@ func test_four_players_trade_each() -> void:
 ## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
 ## tests/content/spells/test_carrier_looks.gd).
 func test_its_moments_have_their_cues() -> void:
-	var card: FormBase = load("res://content/spells/carriers/swap/swap.tres") as FormBase
+	var card: CarrierCard = load("res://content/spells/carriers/swap/swap.tres") as CarrierCard
 	check_equal(card.shown_cue, &"trade", "its shown plays trade")
 
 
 ## Its look (the owner's pick, 2026-11-09: the chasing pair): its charm is drawn by its folder's own
 ## head shader, a copy of the plain head's with the pair for its core, in a head body of its own.
 func test_its_charm_is_drawn_by_its_own_head_shader() -> void:
-	var card: FormBase = _card()
+	var card: CarrierCard = _card()
 	check(card.look_shader == preload("res://content/spells/carriers/swap/swap.gdshader"), "drawn by its folder's shader")
 	check(card.look_problems().is_empty(), "a canvas-item shader its carrier draws: %s" % [card.look_problems()])
 	check_equal(Carriers.of(card.carrier).look_drawer(), Carrier.LOOK_SHOT, "a shot in flight: a head")

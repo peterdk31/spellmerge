@@ -60,7 +60,7 @@ func test_the_first_copy_goes_along_the_aim() -> void:
 
 
 func test_each_copy_keeps_its_carriers_reach() -> void:
-	var bolt: FormBase = _form(&"bolt")
+	var bolt: CarrierCard = _form(&"bolt")
 	var far: float = bolt.speed * bolt.lifetime * 0.7
 	var target: Node2D = _target(Vector2.from_angle(TAU * 3.0 / 8.0) * far)
 	_cast_with(&"bolt", [&"nova"], 0, Vector2.ZERO)

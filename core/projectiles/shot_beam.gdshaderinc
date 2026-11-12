@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The drawing of `shot_beam.gdshader` (read it for what this draws and how its instance or mesh
-// is encoded), in an include so a card's own look that starts from it (`FormBase.look_shader`;
+// is encoded), in an include so a card's own look that starts from it (`CarrierCard.look_shader`;
 // docs/milestones/card-looks.md) includes it and keeps every fix to it, until the card replaces
 // the include with code of its own. The including file has `shader_type` and `render_mode`.
 

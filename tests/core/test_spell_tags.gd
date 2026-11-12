@@ -33,7 +33,7 @@ func before_each() -> void:
 	_form(&"bolt", 1, 5, 1)
 	_form(&"halo", 2, 4, 8).spread = 360.0
 	_form(&"heavy", 4, 4, 1)
-	var beam: FormBase = _form(&"beam", 2, 3, 1)
+	var beam: CarrierCard = _form(&"beam", 2, 3, 1)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var fire: ElementBase = _element(&"fire", 1)
@@ -67,8 +67,8 @@ func _put(component: SpellComponent, id: StringName, complexity: int) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, complexity: int, damage: int, shots: int) -> FormBase:
-	var form := FormBase.new()
+func _form(id: StringName, complexity: int, damage: int, shots: int) -> CarrierCard:
+	var form := CarrierCard.new()
 	form.base_damage = damage
 	form.shots = shots
 	form.speed = 300.0

@@ -28,7 +28,7 @@ extends "res://tests/support/suite.gd"
 ## bounce a wall, ghost a wall with a target behind it, shield and deflect an enemy that shoots at
 ## the wizard, on kill a target that dies, on hurt the wizard hurt or an enemy that shoots (a body of the carrier's own is hurt when it is: a decoy), orbit the open with what circles written down, on reaction a target with a
 ## status the carrier's infusion reacts with (see `behaviour_scenes` and `event_scenes`). How far
-## along the line things stand is the carrier's reach, chosen by its `FormBase.carrier` (`reach`). A
+## along the line things stand is the carrier's reach, chosen by its `CarrierCard.carrier` (`reach`). A
 ## card whose behaviour or event has no scene yet fails with "no probe for ...", and a carrier
 ## that has none with "no reach for ...", so a new kind of card or carrier brings its
 ## probe in the same PR.
@@ -119,24 +119,24 @@ var _registry: Node
 var _shelf: World.Shelf
 var _compiler: SpellsScript
 var _staff: StaffBase
-var _forms: Array[FormBase] = []
+var _forms: Array[CarrierCard] = []
 var _modifiers: Array[ModifierBase] = []
 var _triggers: Array[TriggerBase] = []
 var _elements: Array[ElementBase] = []
 var _multicasts: Array[MulticastBase] = []
 ## The plain payload a trigger fires: the straight carrier with the most
 ## shots, so a fire shows wherever it happens.
-var _payload: FormBase = null
+var _payload: CarrierCard = null
 ## What the enemy shooter and the relay donor cast: the straight carrier of one shot that reaches
 ## furthest.
-var _shot: FormBase = null
+var _shot: CarrierCard = null
 ## What the `on it` column's payload is fired from in the enemy shooter's scene: the straight
 ## carrier of one shot that lives longest, so it flies on through the shooter's stream long enough
 ## to meet its shots (`_shot`, small and fast, passes them between two steps).
-var _lasting: FormBase = null
+var _lasting: CarrierCard = null
 ## The matrix's columns: every form card, then a stand-in form for each fallback carrier (its
 ## `carrier` names it; not a card, never in a staff).
-var _columns: Array[FormBase] = []
+var _columns: Array[CarrierCard] = []
 ## What comes before the cards of the `on it` column (`on hit`, a pierce card, `_shot`; `_lasting`
 ## in the shooter's scene: `_bearer_shooter_prefix`) and of the `right there` column (`on hit`,
 ## `_shot`).
@@ -177,8 +177,8 @@ func _discover() -> void:
 	_elements.clear()
 	_multicasts.clear()
 	for card: Resource in _registry.call("get_all", &"spells"):
-		if card is FormBase:
-			_forms.append(card as FormBase)
+		if card is CarrierCard:
+			_forms.append(card as CarrierCard)
 		elif card is ModifierBase:
 			_modifiers.append(card as ModifierBase)
 		elif card is TriggerBase:
@@ -209,7 +209,7 @@ func _discover() -> void:
 	var land := ModifierBase.new()
 	land.id = LAND
 	_shelf.extra[LAND] = land
-	var on_you := FormBase.new()
+	var on_you := CarrierCard.new()
 	on_you.id = &"on you"
 	on_you.carrier = Carriers.ON_CASTER
 	on_you.lifetime = SpellLimits.MIN_LIFETIME
@@ -229,18 +229,18 @@ func _discover() -> void:
 	_bearer_prefix.append(_shot.id)
 	_bearer_shooter_prefix.append(_lasting.id)
 	_point_prefix.append(_shot.id)
-	var on_it := FormBase.new()
+	var on_it := CarrierCard.new()
 	on_it.id = &"on it"
 	on_it.carrier = Carriers.ON_BEARER
 	on_it.speed = _shot.speed
 	on_it.lifetime = _shot.lifetime
 	_columns.append(on_it)
-	var on_body := FormBase.new()
+	var on_body := CarrierCard.new()
 	on_body.id = BODY_COLUMN
 	on_body.carrier = Carriers.ON_BEARER
 	on_body.lifetime = SpellLimits.MIN_LIFETIME
 	_columns.append(on_body)
-	var there := FormBase.new()
+	var there := CarrierCard.new()
 	there.id = &"right there"
 	there.carrier = Carriers.AT_POINT
 	there.speed = _shot.speed
@@ -349,7 +349,7 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 
 ## How far along the aim a carrier of `form` acts (where its target stands), by its carrier; -1
 ## when there is no rule for its carrier yet.
-static func reach(form: FormBase) -> float:
+static func reach(form: CarrierCard) -> float:
 	if form.id == BODY_COLUMN:
 		# On its body: within its strike round the wizard's hand, as on you.
 		return SpellLimits.FALLBACK_RADIUS
@@ -543,7 +543,7 @@ func _matrix(title: String, cards: Array[SpellComponent]) -> void:
 
 ## The cell of `card` on `form`: W, ✓ (some scene of its probe shows a change), ✗ (and a
 ## failure), or ? (no probe, a failure).
-func _cell(card: SpellComponent, form: FormBase) -> String:
+func _cell(card: SpellComponent, form: CarrierCard) -> String:
 	var scenes: Array[Dictionary] = _scenes_of(card)
 	if scenes.is_empty():
 		check(false, "no probe for %s (the card `%s`): add a scene for it" % [_what(card), card.id])
@@ -571,7 +571,7 @@ func _cell(card: SpellComponent, form: FormBase) -> String:
 ## True when the cast with `card` on `form` writes another trace in `scene` than the cast without
 ## it. `forced` compiles both with `StaffCompiler.keep_wasted`, so what the waste table would drop
 ## is kept and the runtime alone decides what it does.
-func _changes(card: SpellComponent, form: FormBase, scene: Dictionary, forced: bool) -> bool:
+func _changes(card: SpellComponent, form: CarrierCard, scene: Dictionary, forced: bool) -> bool:
 	StaffCompiler.keep_wasted = forced
 	var casts: Array = _casts(card, form, scene, forced)
 	var with: Array[StringName] = casts[0]
@@ -599,7 +599,7 @@ func _changes(card: SpellComponent, form: FormBase, scene: Dictionary, forced: b
 ## The cards of the cast with `card` and of the same cast without it, and the slot of `card` in the
 ## first, as [with, without, slot]. `forced` (a wasted card forced on): a modifier of numbers only
 ## is swapped for a copy of its costs, so both casts pay them (a slower cast is no effect).
-func _casts(card: SpellComponent, form: FormBase, scene: Dictionary, forced: bool) -> Array:
+func _casts(card: SpellComponent, form: CarrierCard, scene: Dictionary, forced: bool) -> Array:
 	var with: Array[StringName] = []
 	var without: Array[StringName] = []
 	var extra: Array[StringName] = _extra_cards(scene)
@@ -749,7 +749,7 @@ func _costs_of(card: SpellComponent) -> StringName:
 
 ## Casts `cards` once (or for the whole run, `repeat`) in the scene for `form` and returns the trace,
 ## up to its first difference from `expect` (the whole trace when there is none).
-func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: float, expect: PackedStringArray = PackedStringArray()) -> PackedStringArray:
+func _run(cards: Array[StringName], form: CarrierCard, scene: Dictionary, seconds: float, expect: PackedStringArray = PackedStringArray()) -> PackedStringArray:
 	var world: World = _make_world()
 	# Stop at the first difference: the cell is ✓ then.
 	world.expect = expect
@@ -840,7 +840,7 @@ func _watch_circling(world: World) -> void:
 
 ## True for the columns whose payload a shot's hit fires (on it, right there): a target always
 ## stands on the line for that shot.
-static func _cast_by_a_hit(form: FormBase) -> bool:
+static func _cast_by_a_hit(form: CarrierCard) -> bool:
 	return form.id != BODY_COLUMN and (form.carrier == Carriers.AT_POINT or form.carrier == Carriers.ON_BEARER)
 
 

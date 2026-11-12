@@ -31,7 +31,7 @@ A card is a `.tres` on one of five classes in `core/base/`, in its own folder un
 
 | Kind | Class | Role | Cards (new in bold) |
 | --- | --- | --- | --- |
-| Carrier (12) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, swap, wall, rain, decoy, familiar** (the boomerang carrier became the `return` modifier, owner 2026-10-27; fissure removed, owner 2026-10-30; the hook carrier became the `pull` modifier, owner 2026-10-30) |
+| Carrier (12) | `CarrierCard` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, swap, wall, rain, decoy, familiar** (the boomerang carrier became the `return` modifier, owner 2026-10-27; fissure removed, owner 2026-10-30; the hook carrier became the `pull` modifier, owner 2026-10-30) |
 | Modifier (27) | `ModifierBase` | Attaches to the next carrier | split, pierce, homing, chain, bigger, faster, **shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper, return, slow, arc** |
 | Infusion (6) | `ElementBase` | Attaches to the next carrier; several may | fire, frost, storm, void, lightning, **mend** |
 | Trigger (9) | `TriggerBase` | Attaches to the next carrier; the group read after that carrier is its payload | on hit, on expire, timer, **on block, on kill, on cast, on wall, on hurt, on reaction** |

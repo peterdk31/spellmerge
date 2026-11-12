@@ -45,11 +45,11 @@ func before_each() -> void:
 	_bus.caster_move_requested.connect(func(player: int, mode: StringName, to: Vector2, _seconds: float, _tag: int) -> void: _moves.append([player, mode, to]))
 
 
-func _forms() -> Array[FormBase]:
-	var forms: Array[FormBase] = []
+func _forms() -> Array[CarrierCard]:
+	var forms: Array[CarrierCard] = []
 	for card: Resource in _registry.call("get_all", &"spells"):
-		if card is FormBase:
-			forms.append(card as FormBase)
+		if card is CarrierCard:
+			forms.append(card as CarrierCard)
 	return forms
 
 
@@ -57,7 +57,7 @@ func _forms() -> Array[FormBase]:
 ## speed for its life, a rune as far as it creeps in its life, a wall a little past where it
 ## rises (it creeps as a rune does, rules R4 F6), a pool where it spreads and half as far again
 ## as it creeps in its life.
-static func _reach(form: FormBase) -> float:
+static func _reach(form: CarrierCard) -> float:
 	if form.carrier == &"pool":
 		return form.ray_length + SpellLimits.HOMING_DRIFT * form.lifetime * 0.5
 	if form.carrier == &"rune":
@@ -68,7 +68,7 @@ static func _reach(form: FormBase) -> float:
 
 
 ## Forms that move their caster instead of hitting: their homing shows in the move asked for.
-static func _moves_caster(form: FormBase) -> bool:
+static func _moves_caster(form: CarrierCard) -> bool:
 	return form.carrier == &"dash" or form.carrier == &"teleport"
 
 
@@ -121,7 +121,7 @@ func test_a_homing_form_reaches_a_target_off_its_line_near_the_end_of_its_reach(
 
 ## A homing teleport is sent at the target; a homing dash hands the wizard the turn rate and
 ## reach it turns with as it goes (the wizard's turning is tested in test_player_caster.gd).
-func _check_move(form: FormBase, at: Vector2) -> void:
+func _check_move(form: CarrierCard, at: Vector2) -> void:
 	_moves.clear()
 	_spells.set_aim(1, Vector2.ZERO, Vector2.RIGHT)
 	StaffKit.build(_spells, 1, 0, [&"homing", form.id] as Array[StringName])

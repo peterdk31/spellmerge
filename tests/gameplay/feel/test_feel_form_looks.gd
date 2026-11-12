@@ -4,7 +4,7 @@ extends "res://tests/support/suite.gd"
 ## in), a flash where its shot lands in the shot's own colours and cards (a
 ## rune goes off in a burst of its own), a beam that opens wide and thins, and an enemy's shot
 ## that always shows the same ember mark no player's flare resembles. The cast and the impact are
-## the cues the carrier card names (`FormBase.cast_cue`, `impact_cue`; S6 2).
+## the cues the carrier card names (`CarrierCard.cast_cue`, `impact_cue`; S6 2).
 
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
@@ -26,7 +26,7 @@ class CardsRegistry:
 
 
 const FORMS: Array[StringName] = [&"bolt", &"beam", &"dash", &"rune"]
-## The beam card's own look (`FormBase.look_shader`; docs/milestones/card-looks.md, phase 2).
+## The beam card's own look (`CarrierCard.look_shader`; docs/milestones/card-looks.md, phase 2).
 const BEAM_CARD_SHADER: Shader = preload("res://content/spells/carriers/beam/beam.gdshader")
 
 var bus: EventsScript
@@ -57,10 +57,10 @@ func before_each() -> void:
 	root.add_child(feel)
 
 
-## The cue the carrier card `form` names for its cast or its impact (`FormBase.cast_cue`,
+## The cue the carrier card `form` names for its cast or its impact (`CarrierCard.cast_cue`,
 ## `impact_cue`).
 func _card_cue(form: StringName, cast: bool) -> CueBase:
-	var card: FormBase = registry.get_resource(&"spells", form) as FormBase
+	var card: CarrierCard = registry.get_resource(&"spells", form) as CarrierCard
 	return feel.cue_of(card.cast_cue if cast else card.impact_cue)
 
 
@@ -90,7 +90,7 @@ func test_the_looks_are_cues_the_cards_name_not_in_the_preset() -> void:
 	check(not ("cast_looks" in preset) and not ("impact_looks" in preset), "the preset has no per-form looks")
 	check(not ("wall_spark_size" in preset) and not ("cast_kick_pixels" in preset), "nor a flare's size or a cast's kick")
 	for form in FORMS:
-		check(registry.get_resource(&"spells", form) is FormBase, "%s is a carrier card" % form)
+		check(registry.get_resource(&"spells", form) is CarrierCard, "%s is a carrier card" % form)
 		check(_card_cue(form, true) != null, "%s has a cast cue" % form)
 		check(_card_cue(form, false) != null, "%s has an impact cue" % form)
 	check_equal(_card_cue(&"dash", true).id, &"cast_ring", "a dash has a cast flash of its own")
@@ -99,8 +99,8 @@ func test_the_looks_are_cues_the_cards_name_not_in_the_preset() -> void:
 		if StringName(part.get("part", "flash")) == &"flash":
 			flashes += 1
 	check_equal(flashes, 1, "a bolt's is the plain spark, with no ring (its sparks are motes, S6 item 3)")
-	check_equal(FormBase.new().cast_cue, &"cast", "a card naming none casts `cast`")
-	check_equal(FormBase.new().impact_cue, &"impact", "and lands in `impact`")
+	check_equal(CarrierCard.new().cast_cue, &"cast", "a card naming none casts `cast`")
+	check_equal(CarrierCard.new().impact_cue, &"impact", "and lands in `impact`")
 
 
 func test_a_cast_flashes_at_the_staff_in_its_players_colours() -> void:
@@ -122,7 +122,7 @@ func test_the_ring_carriers_add_a_ring_to_their_cast() -> void:
 
 
 func test_a_new_carrier_card_brings_its_own_look() -> void:
-	var card := FormBase.new()
+	var card := CarrierCard.new()
 	card.id = &"test_wave"
 	card.cast_cue = &"cast_gather"
 	card.impact_cue = &"impact_ring"
@@ -135,7 +135,7 @@ func test_a_new_carrier_card_brings_its_own_look() -> void:
 
 
 func test_a_carrier_whose_impact_cue_is_a_quake_cracks_the_floor_where_it_strikes() -> void:
-	var card := FormBase.new()
+	var card := CarrierCard.new()
 	card.id = &"test_meteor"
 	card.radius = 12.0
 	card.impact_cue = &"quake"

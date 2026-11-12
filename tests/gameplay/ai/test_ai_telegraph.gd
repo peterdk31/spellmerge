@@ -126,7 +126,7 @@ func test_line_is_as_long_as_the_shot_flies() -> void:
 	var imp: Actor = fx.imp_facing_player()
 	fx.with_feel()
 	fx.run(imp, 1)
-	var bolt: FormBase = fx.registry.call("get_resource", &"spells", &"bolt") as FormBase
+	var bolt: CarrierCard = fx.registry.call("get_resource", &"spells", &"bolt") as CarrierCard
 	var reach: float = bolt.speed * bolt.lifetime
 	check(is_equal_approx(float(fx.lanes().call("reach_of", imp.id)), reach), "the far end is the real reach of its bolt (%.1f)" % float(fx.lanes().call("reach_of", imp.id)))
 	var line: Sprite2D = _lane(imp)

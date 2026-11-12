@@ -86,12 +86,12 @@ func before_each() -> void:
 	bus.staff_cast.connect(func(player: int, staff: int, _o: Vector2, _d: Vector2) -> void: _staff_casts.append([player, staff]))
 	bus.spell_cast.connect(func(_p: int, form: StringName, _o: Vector2, _d: Vector2) -> void: _cast_forms.append(form))
 	bus.player_stats_changed.connect(func(p: int, h: int, mh: int, m: float, mm: float) -> void: _stats.append([p, h, mh, m, mm]))
-	var bolt := _card(FormBase.new(), &"bolt") as FormBase
+	var bolt := _card(CarrierCard.new(), &"bolt") as CarrierCard
 	bolt.wind_down = 0.25
-	var rune := _card(FormBase.new(), &"rune") as FormBase
+	var rune := _card(CarrierCard.new(), &"rune") as CarrierCard
 	rune.carrier = &"rune"
 	rune.lifetime = 5.0
-	var dash := _card(FormBase.new(), &"dash") as FormBase
+	var dash := _card(CarrierCard.new(), &"dash") as CarrierCard
 	dash.carrier = &"dash"
 	dash.speed = 220.0
 	dash.lifetime = 0.25
@@ -117,9 +117,9 @@ func after_each() -> void:
 func _card(card: SpellComponent, id: StringName) -> SpellComponent:
 	card.id = id
 	card.display_name = String(id).capitalize()
-	if card is FormBase:
-		(card as FormBase).mana_cost = 5.0
-		(card as FormBase).speed = 200.0
+	if card is CarrierCard:
+		(card as CarrierCard).mana_cost = 5.0
+		(card as CarrierCard).speed = 200.0
 	_registry.items[id] = card
 	return card
 

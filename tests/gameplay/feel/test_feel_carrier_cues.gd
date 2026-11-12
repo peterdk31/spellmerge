@@ -34,8 +34,8 @@ func before_each() -> void:
 	root.add_child(feel)
 
 
-func _card(id: StringName) -> FormBase:
-	return registry.get_resource(&"spells", id) as FormBase
+func _card(id: StringName) -> CarrierCard:
+	return registry.get_resource(&"spells", id) as CarrierCard
 
 
 func test_a_teleport_rises_off_where_it_leaves() -> void:

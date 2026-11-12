@@ -13,8 +13,8 @@ const ComboFiles := preload("res://tests/support/combo_files.gd")
 const COMBOS: Array[String] = ["familiar_bolt", "familiar_and_frost"]
 
 
-func _card() -> FormBase:
-	return load("res://content/spells/carriers/familiar/familiar.tres") as FormBase
+func _card() -> CarrierCard:
+	return load("res://content/spells/carriers/familiar/familiar.tres") as CarrierCard
 
 
 func _combo(id: String) -> Dictionary:
@@ -39,8 +39,8 @@ func _spawns(cards: Array, seat: int = 0) -> Array:
 
 
 func test_the_card_is_a_valid_carrier() -> void:
-	var card: FormBase = _card()
-	check(card != null, "familiar.tres loads as a FormBase")
+	var card: CarrierCard = _card()
+	check(card != null, "familiar.tres loads as a CarrierCard")
 	if card == null:
 		return
 	check_equal(card.id, &"familiar", "its id is its folder")
@@ -82,6 +82,6 @@ func test_four_players_send_their_own() -> void:
 ## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
 ## tests/content/spells/test_carrier_looks.gd).
 func test_its_moments_have_their_cues() -> void:
-	var card: FormBase = load("res://content/spells/carriers/familiar/familiar.tres") as FormBase
+	var card: CarrierCard = load("res://content/spells/carriers/familiar/familiar.tres") as CarrierCard
 	check_equal(card.shown_cue, &"conjure", "its shown plays conjure")
 	check_equal(card.end_cue, &"dismiss", "its end plays dismiss")

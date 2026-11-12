@@ -156,6 +156,8 @@ func test_a_zaps_spark_into_the_air_burns_out_sooner() -> void:
 ## `actor` still winds up (props W9c: Feel reads only these of a wind-up).
 class Winding extends Node:
 	var winding: bool = true
+	## Seconds the wind-up has left.
+	var left: float = 1.0
 
 	func is_winding(_actor: int, _staff: int) -> bool:
 		return winding
@@ -168,6 +170,28 @@ class Winding extends Node:
 
 	func carrier_reach(_tag: int) -> float:
 		return 0.0
+
+	func cooldown_left(_actor: int, _staff: int) -> float:
+		return left
+
+
+## A wind-up's ring lasts its wind-up, not the seconds it was first told: a chill that stretches the
+## wind-up, or a freeze that holds it (`Spells.hold_winds`), stretches or holds the ring, as the lane.
+func test_a_wind_ups_ring_lasts_as_its_wind_up_is_held() -> void:
+	var spells := own(Winding.new()) as Winding
+	feel.spells = spells
+	var foe: int = ActorSeats.enemy(feel.actors)
+	bus.cast_winding.emit(foe, 1, &"bolt", Vector2(40, 40), Vector2.RIGHT, 1.0, FROST, 0, 0, &"wind_area")
+	for i in 12:
+		# Frozen: 1.2 s on, the wind-up has its whole second left.
+		feel.step(0.1)
+	check_equal(feel.flashes_of(&"ring_in"), 1, "held, the ring is still closing in past its second")
+	spells.left = 0.05
+	feel.step(0.1)
+	check_equal(feel.flashes_of(&"ring_in"), 1, "as long as the wind-up winds")
+	spells.winding = false
+	feel.step(0.05)
+	check_equal(feel.flashes_of(&"ring_in"), 0, "and gone as it is over")
 
 
 ## Props W9c's regression (W7's leftover): a wind-up's cue ends with its wind-up. A lit barrel

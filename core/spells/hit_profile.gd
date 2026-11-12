@@ -37,7 +37,8 @@ var later_status_strengths: PackedFloat32Array = PackedFloat32Array()
 ## shockwave, a blast's strikes, the cards that land on a point; `StaffCompiler.blast_hit`). Combat
 ## sets `reaction` and `status` for the hits it makes itself.
 var kind: StringName = &"shot"
-## Health a hit gives a wizard instead of damage (mend); 0 for none. An enemy still takes `damage`.
+## Health a hit gives whatever it hits, friend or foe, instead of damage (mend); 0 for none. A
+## heal does nothing else: no damage, push or status.
 var heal: int = 0
 ## Damage an enemy takes when this hit knocks it into a wall (heavy); 0 for none.
 var slam: int = 0

@@ -5,6 +5,7 @@
 	"needs": "mend",
 	"casts": [{"staff": 0, "cards": ["mend", "blast", "bolt"]}],
 	"imps": [],
+	"allies": [[0, -40, 1]],
 	"walls": [[30, -100, 8, 200]],
 	"guard": true,
 	"hurt": 60,

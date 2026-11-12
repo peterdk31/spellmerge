@@ -64,7 +64,7 @@ func test_a_crowd_keeps_its_hurt_on_the_board() -> void:
 
 
 func test_it_heals_a_hurt_teammate_never_a_wizard() -> void:
-	# The wizard is hurt too, and as near: a heal is only ever for its own team.
+	# The wizard is hurt too, and as near: a heal is only ever aimed at its own team.
 	fx.players[0].position = Vector2(-90.0, 0.0)
 	fx.players[0].health.reset(fx.players[0].health.max_health * 0.5)
 	var wizard_health: float = fx.players[0].health.health

@@ -26,10 +26,10 @@ extends Node
 ## kit Actor is not hurt while down, dying or protected.
 ##
 ## A spell's hit (`projectile_hit`; a blast's too, rules R4 F2) is looked up in Spells' hit profiles
-## (`Spells.hit_profile(tag, shot)`) and runs `_apply_spell`: a heal for the caster's team (a mend),
-## else damage and a push (a pull while hexed; harder while gusted), the static discharge, then
-## each element's reaction or status. Plain hits (`hit`, contact, reactions, burn) run `_hit`:
-## a barrier takes the hit whole, then hex adds its share, static goes off, health goes down,
+## (`Spells.hit_profile(tag, shot)`) and runs `_apply_spell`: a heal for whatever it hits (a mend:
+## heal only, friend or foe, owner 2026-11-12), else damage and a push (a pull while hexed;
+## harder while gusted), the static discharge, then each element's reaction or status. Plain hits
+## (`hit`, contact, reactions, burn) run `_hit`: a barrier takes the hit whole, then hex adds its share, static goes off, health goes down,
 ## `hit_landed`, `damage_dealt` (and the actor's own `Actor.damaged`) and `actor_hurt` are sent,
 ## and a body at 0 dies: `kill_landed` (a spell's own hit only), `enemy_died` (for every foe of
 ## the wizards, a kit actor by its own team so a possessed enemy still counts and a prop of the
@@ -889,13 +889,13 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 	_slot = saved_slot
 
 
-## A spell's hit on the row `row`, struck at `position`: a mend heals an actor of the caster's
-## team (teams aim: a mend is for friends); otherwise damage and a push away from the hit (a pull
-## toward it while hexed; harder while gusted, `_gust_power`), the static discharge (in `_hit`), then every element in
-## order: each reacts with what the ones before it left, or puts its own status on, later
-## statuses too (`fire · frost · bolt` thaws on its own hit).
+## A spell's hit on the row `row`, struck at `position`: a mend heals whatever it hits, of any
+## team, and does nothing else (owner 2026-11-12: heal only, friend or foe); otherwise damage and
+## a push away from the hit (a pull toward it while hexed; harder while gusted, `_gust_power`),
+## the static discharge (in `_hit`), then every element in order: each reacts with what the ones
+## before it left, or puts its own status on, later statuses too (`fire · frost · bolt` thaws on its own hit).
 func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kind: StringName) -> void:
-	if profile.heal > 0 and _heals(by, row):
+	if profile.heal > 0:
 		_heal(by, row, profile.heal)
 		return
 	var node: Node2D = _nodes[row]
@@ -956,15 +956,6 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 		elif status_id != &"" and not (i == 0 and discharged):
 			# (A discharge replaces the first status, so a lightning hit does not charge again at once.)
 			_apply_status_row(by, row, status_id, duration, power)
-
-
-## True when `by`'s heal is for the row `row`: the same team (an actor of no team heals nobody).
-func _heals(by: int, row: int) -> bool:
-	var table: ActorsScript = _table()
-	if table == null:
-		return false
-	var team: int = table.team_of(by)
-	return team != ActorsScript.NONE and team == _team(row)
 
 
 ## The slam a spell hit of `profile` dealing `damage` arms on a body it shoves, `gust` per cent

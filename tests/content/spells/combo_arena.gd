@@ -134,11 +134,12 @@ func hurt(body: Node2D, amount: int) -> void:
 	combat.hit(ActorSeats.enemy(projectiles.actors), body, amount)
 
 
-## Health given to wizard bodies by heals, all together.
+## Health given to wizard bodies by heals, all together (not the imps': a mend heals them too).
 func healed() -> int:
 	var total: int = 0
 	for row: Array in heals:
-		total += int(row[2])
+		if not imps.has(row[1]):
+			total += int(row[2])
 	return total
 
 

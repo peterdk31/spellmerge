@@ -828,12 +828,14 @@ func _tree_carrier_name(spell: CompiledSpell) -> String:
 ## The damage one cast deals if every shot of it lands once (a beam: every hit of its life):
 ## each carrier's hit times its shots, times the group's repeats. Payloads are left out (they
 ## depend on what is hit), so it is the builder's "at least" number; to a tenth (an atom's 0.3).
+## A mend's hit deals none (it heals only).
 static func _cast_damage(cast: CompiledCast) -> float:
 	if cast.group == null:
 		return 0.0
 	var total: float = 0.0
 	for spell in cast.group.spells:
-		total += spell.damage * float(maxi(spell.shots, 1) * Carriers.of(spell.carrier).hits_per_target(spell.lifetime))
+		var damage: float = spell.hit.damage if spell.hit != null else spell.damage
+		total += damage * float(maxi(spell.shots, 1) * Carriers.of(spell.carrier).hits_per_target(spell.lifetime))
 	return snappedf(total * float(maxi(cast.group.repeats, 1)), 0.1)
 
 
@@ -892,7 +894,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 		if element.status_id != &"":
 			out.append("%s %ss" % [String(element.status_id).capitalize(), _short(element.status_duration)])
 		if element.heals:
-			out.append("Heals wizards")
+			out.append("Heals all it hits")
 		if not is_equal_approx(element.damage_scale, 1.0):
 			out.append("Dmg x" + _short(element.damage_scale))
 	elif component is TriggerBase:

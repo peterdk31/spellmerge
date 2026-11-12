@@ -7,7 +7,7 @@
 script = ExtResource("1_base")
 id = &"mend"
 display_name = "Mend"
-description = "Heals wizards it hits. Barely scratches enemies."
+description = "Heals whatever it hits, friend or foe. Does no damage."
 complexity = 2
 icon = ExtResource("2_icon")
 damage_scale = 1.0

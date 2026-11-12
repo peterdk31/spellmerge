@@ -1,9 +1,9 @@
 [gd_resource type="Resource" script_class="CarrierCard" load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://core/base/carrier_card.gd" id="1_form"]
+[ext_resource type="Script" path="res://core/base/carrier_card.gd" id="1_carrier"]
 
 [resource]
-script = ExtResource("1_form")
+script = ExtResource("1_carrier")
 id = &"broken_carrier"
 shots = 99
 speed = 0.0

@@ -524,12 +524,18 @@ func test_a_barrier_hit_shields_what_it_hits_after_the_hit() -> void:
 	var profile := _profile(5)
 	profile.barrier = 2
 	profile.barrier_seconds = 3.0
-	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, _tag(profile), -1)
+	var tag: int = _tag(profile)
+	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, tag, -1)
 	check_equal(_combat.health_of(enemy), 95.0, "the hit lands")
 	check_equal(_combat.shield(enemy), 2, "then the barrier goes on")
-	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, _tag(profile), -1)
-	check_equal(_combat.health_of(enemy), 95.0, "the old barrier takes the next hit whole")
-	check_equal(_combat.shield(enemy), 3, "one charge spent, two more given")
+	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, tag, -1)
+	check_equal(_combat.health_of(enemy), 90.0, "it never stops the spell that gave it (a beam's next tick, a blast, a jump)")
+	check_equal(_combat.shield(enemy), 4, "which adds its charges again")
+	check(_blocked.is_empty(), "nothing was blocked")
+	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, _tag(_profile(5)), -1)
+	check_equal(_combat.health_of(enemy), 90.0, "another spell's hit is taken whole")
+	check_equal(_combat.shield(enemy), 3, "one charge spent")
+	check_equal(_blocked, [[_combat.actor_of(enemy), 0]], "its block names no card: no `on block` (it is no carrier's shield)")
 	_run(3.5)
 	check_equal(_combat.shield(enemy), 0, "it runs out after its time")
 	var mate := _wizard(1, Vector2(40.0, 0.0))
@@ -541,6 +547,43 @@ func test_a_barrier_hit_shields_what_it_hits_after_the_hit() -> void:
 	_bus.projectile_hit.emit(0, mate, Vector2.ZERO, _tag(mend), -1)
 	check_equal(mate.health.health, mate.health.max_health - 15, "a heal heals")
 	check_equal(_combat.shield(mate), 1, "and its barrier comes with it")
+
+
+## A Barrier card's barrier never stops the slam its own heavy hit armed (the slam comes a step
+## later, after the barrier is on: owner review, 2026-11-12).
+func test_a_barrier_lets_its_own_spells_slam_through() -> void:
+	_projectiles.set_bounds(Rect2(-200.0, -200.0, 400.0, 400.0))
+	_projectiles.set_walls([Rect2(20.0, -20.0, 20.0, 40.0)] as Array[Rect2])
+	var enemy := _enemy(Vector2(10.0, 0.0))
+	var heavy := _profile(3)
+	heavy.knockback = 300.0
+	heavy.slam = 7
+	heavy.barrier = 1
+	heavy.barrier_seconds = 3.0
+	_bus.projectile_hit.emit(0, enemy, Vector2(0.0, 0.0), _tag(heavy), -1)
+	check_equal(_combat.health_of(enemy), 97, "the hit itself")
+	check_equal(_combat.shield(enemy), 1, "then the barrier is on")
+	_run(STEP)
+	check_equal(_combat.health_of(enemy), 90, "the slam into the wall lands through it")
+	check_equal(_combat.shield(enemy), 1, "the barrier spent nothing on it")
+
+
+## An own shield (a move's) takes a barrier over: its blocks set off its card's `on block`; a Barrier
+## card's barrier on a body that already has one only adds to it.
+func test_an_own_shield_and_a_barrier_card_share_one_barrier() -> void:
+	_wizard(0, Vector2(-200.0, 0.0))
+	var enemy := _enemy(Vector2(10.0, 0.0))
+	_combat.give_barrier(enemy, 1, 3.0, 77)
+	_combat.give_shield(enemy, 1, 3.0, 88)
+	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, _tag(_profile(5)), -1)
+	check_equal(_blocked, [[_combat.actor_of(enemy), 88]], "the own shield's card blocks, and names itself")
+	var other := _enemy(Vector2(10.0, 30.0))
+	_combat.give_shield(other, 1, 3.0, 88)
+	_combat.give_barrier(other, 1, 3.0, 77)
+	check_equal(_combat.shield(other), 2, "a Barrier card adds its charge")
+	_blocked.clear()
+	_bus.projectile_hit.emit(0, other, Vector2.ZERO, _tag(_profile(5)), -1)
+	check_equal(_blocked, [[_combat.actor_of(other), 88]], "and the barrier stays the own shield's")
 
 
 func test_a_heal_hit_heals_a_teammate() -> void:

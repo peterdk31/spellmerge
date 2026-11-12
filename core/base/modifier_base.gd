@@ -106,8 +106,9 @@ enum Behaviour {
 	ORBIT,
 	## Whatever the carrier hits, friend or foe, gets a barrier of `behaviour_strength` blocked hits
 	## for `SpellLimits.BARRIER_SECONDS` (owner, 2026-11-12: the card for shielding a teammate;
-	## Shield guards the carrier itself). It is part of the hit (`HitProfile.barrier`), so Combat
-	## gives it after the hit's heal or damage, never before: it never blocks the hit that brings it.
+	## Shield guards the carrier itself). It is part of the hit (`HitProfile.barrier`): Combat gives
+	## it after the hit's heal or damage, and it never stops the spell that gave it
+	## (`Combat.give_barrier`).
 	BARRIER,
 }
 

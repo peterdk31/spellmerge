@@ -242,13 +242,17 @@ var _chill_stacks: PackedInt32Array = PackedInt32Array()
 var _reacting_at: PackedInt32Array = _reacting_indices()
 # Seconds until the actor may react again.
 var _react_wait: PackedFloat32Array = PackedFloat32Array()
-# The barrier: blocked hits left, seconds left and the card's tag.
+# The barrier: blocked hits left, seconds left and the card's tag; and, for a barrier a Barrier
+# card's hit gave (`give_barrier`), that spell's tag, whose hits it lets through (0 for an own
+# shield's, which blocks every hit and sets off `on block`).
 var _shield: PackedInt32Array = PackedInt32Array()
 var _shield_left: PackedFloat32Array = PackedFloat32Array()
 var _shield_tag: PackedInt32Array = PackedInt32Array()
-# Heavy hits armed: the slam damage waiting for a wall, and who dealt it.
+var _shield_spares: PackedInt32Array = PackedInt32Array()
+# Heavy hits armed: the slam damage waiting for a wall, who dealt it and the spell's tag.
 var _slam: PackedInt32Array = PackedInt32Array()
 var _slam_by: PackedInt32Array = PackedInt32Array()
+var _slam_tag: PackedInt32Array = PackedInt32Array()
 # Who hurt the actor last, for "downed by ...": the actor (or NO_PLAYER), the hit kind and the
 # spell's name.
 var _last_by: PackedInt32Array = PackedInt32Array()
@@ -262,6 +266,9 @@ var _discharged: bool = false
 ## The tag of the spell hit being dealt now (0 for none): `kill_landed`, `reaction_landed` and
 ## `actor_hurt` carry it. Set around a spell's hit, restored after, so hits inside hits are right.
 var _tag: int = 0
+## The spell whose hit is being dealt now, its slam's too (0 for none): a barrier its Barrier card
+## gave lets it through (`_blocks`). Unlike `_tag` it stays set for the slam a spell's hit armed.
+var _hit_spell: int = 0
 ## The shot that hit (the projectile manager's slot from `projectile_hit`), -1 for none: what the
 ## hit sets off names it as its `shot`, as `_tag` its tag.
 var _slot: int = -1
@@ -274,6 +281,7 @@ var _due_amount: PackedInt32Array = PackedInt32Array()
 var _slam_due_node: Array[Node2D] = []
 var _slam_due_by: PackedInt32Array = PackedInt32Array()
 var _slam_due_amount: PackedInt32Array = PackedInt32Array()
+var _slam_due_tag: PackedInt32Array = PackedInt32Array()
 # Contact hits due this step: the body touched, who touched it, damage.
 var _touch_node: Array[Node2D] = []
 var _touch_by: PackedInt32Array = PackedInt32Array()
@@ -313,8 +321,10 @@ func _init() -> void:
 	_chill_stacks.resize(ACTORS)
 	_shield.resize(ACTORS)
 	_shield_tag.resize(ACTORS)
+	_shield_spares.resize(ACTORS)
 	_slam.resize(ACTORS)
 	_slam_by.resize(ACTORS)
+	_slam_tag.resize(ACTORS)
 	_last_by.resize(ACTORS)
 	_last_by.fill(EventsScript.NO_PLAYER)
 	_hurt_radius.resize(ACTORS)
@@ -635,16 +645,50 @@ func chill_stacks(actor: Variant) -> int:
 
 # --- Barriers, pulls, notes --------------------------------------------------
 
-## A barrier on `actor` (an id or its node): `charges` more blocked hits for `seconds` (at
-## least SHIELD_MIN_TIME). Charges add up; the longer time is kept. A down actor gets none.
+## A barrier on `actor` (an id or its node) from its own shield (a move's, a decoy's): `charges`
+## more blocked hits for `seconds` (at least SHIELD_MIN_TIME). Charges add up; the longer time is
+## kept. It is the card `tag`'s now (its blocks set off that card's `on block`), and it blocks
+## every hit. A down actor gets none.
 func give_shield(actor: Variant, charges: int, seconds: float, tag: int = 0) -> void:
 	var row: int = _row_of(actor)
-	if row == ActorsScript.NONE or charges <= 0 or _is_down(row):
+	if not _add_barrier(row, charges, seconds):
 		return
+	_shield_tag[row] = tag
+	_shield_spares[row] = 0
+	_send_barrier(row, Vector2.ZERO)
+
+
+## A barrier a Barrier card's hit gives `actor` (owner, 2026-11-12): as `give_shield`, but it lets
+## the hits of the spell `tag` through (its blast, its slam, its beam's next ticks, its jumps: it
+## never stops the spell that gave it) and its blocks set off no `on block`. On a body with a
+## barrier already, it adds its charges and time to that one, which stays as it was.
+func give_barrier(actor: Variant, charges: int, seconds: float, tag: int) -> void:
+	var row: int = _row_of(actor)
+	var live: bool = row != ActorsScript.NONE and _shield_left[row] > 0.0 and _shield[row] > 0
+	if not _add_barrier(row, charges, seconds):
+		return
+	if not live:
+		_shield_tag[row] = tag
+		_shield_spares[row] = tag
+	_send_barrier(row, Vector2.ZERO)
+
+
+## `charges` more blocked hits for at least `seconds` on the row `row`; false when it gets none
+## (no row, no charges, down).
+func _add_barrier(row: int, charges: int, seconds: float) -> bool:
+	if row == ActorsScript.NONE or charges <= 0 or _is_down(row):
+		return false
 	_shield[row] = (_shield[row] if _shield_left[row] > 0.0 else 0) + charges
 	_shield_left[row] = maxf(_shield_left[row], maxf(seconds, SHIELD_MIN_TIME))
-	_shield_tag[row] = tag
-	_send_barrier(row, Vector2.ZERO)
+	return true
+
+
+## True when the barrier on `row` stops the hit being dealt now: it is up, and it is not a Barrier
+## card's barrier meeting the spell that gave it (`_hit_spell`).
+func _blocks(row: int) -> bool:
+	if _shield[row] <= 0 or _shield_left[row] <= 0.0:
+		return false
+	return _shield_spares[row] == 0 or _shield_spares[row] != _hit_spell
 
 
 ## `barrier_changed` for the barrier on `row` as it is now; `way` the way a hit it blocked flew
@@ -754,12 +798,13 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 	var actor: int = _cast_id(row)
 	var tick: bool = kind == KIND_STATUS
 	# A barrier takes the hit whole: no damage, no status, no push.
-	if not tick and _shield[row] > 0 and _shield_left[row] > 0.0:
+	if not tick and _blocks(row):
 		_shield[row] -= 1
 		if _shield[row] == 0:
 			_shield_left[row] = 0.0
 		if events != null:
-			events.shield_blocked.emit(actor, where, _shield_tag[row])
+			# A Barrier card's block is no block of a carrier's: it names no card, so no `on block`.
+			events.shield_blocked.emit(actor, where, _shield_tag[row] if _shield_spares[row] == 0 else 0)
 			# Its look is content's (S6, item 13): turned back the way the hit came.
 			events.cue_shown.emit(actor, SHIELD_BLOCK_CUE, where + _hurt_offset[row], -direction, 0.0, Color.WHITE, 0)
 			# A hit with no way of its own (contact) is drawn as one from straight above.
@@ -883,11 +928,14 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 		return
 	var saved_tag: int = _tag
 	var saved_slot: int = _slot
+	var saved_spell: int = _hit_spell
 	_tag = tag
 	_slot = shot
+	_hit_spell = tag
 	_apply_spell(caster, row, position, profile, profile.kind)
 	_tag = saved_tag
 	_slot = saved_slot
+	_hit_spell = saved_spell
 
 
 ## A spell's hit on the row `row`, struck at `position`: a mend heals whatever it hits, of any
@@ -901,7 +949,7 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	else:
 		_strike(by, row, position, profile, kind)
 	if profile.barrier > 0 and _same(row, node):
-		give_shield(node, profile.barrier, profile.barrier_seconds, _tag)
+		give_barrier(node, profile.barrier, profile.barrier_seconds, _tag)
 
 
 ## A spell's hit that is not a heal, on the row `row` struck at `position`: damage and a push away
@@ -940,6 +988,7 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 			# A push replaces the knockback, so it replaces the slam too.
 			_slam[row] = _slam_of(profile, damage, gust)
 			_slam_by[row] = by
+			_slam_tag[row] = _hit_spell
 	# What the reactions kill is not the spell's own kill: no `kill_landed`.
 	# (One reaction per hit on a target, but within a hit the chain goes on: `reacted` lets the
 	# next element read what is left.)
@@ -1357,23 +1406,29 @@ func _check_slam(row: int) -> void:
 		_slam_due_node.append(_nodes[row])
 		_slam_due_by.append(_slam_by[row])
 		_slam_due_amount.append(_slam[row])
+		_slam_due_tag.append(_slam_tag[row])
 		_slam[row] = 0
 
 
-## A slam is not the spell's own hit: no tag, so it sends no `kill_landed`.
+## A slam is not the spell's own hit: no tag, so it sends no `kill_landed`. It is still the spell's
+## for a barrier its Barrier card gave (`_hit_spell`), which lets it through.
 func _send_slams() -> void:
 	var saved_tag: int = _tag
+	var saved_spell: int = _hit_spell
 	_tag = 0
 	var sent: int = 0
 	while sent < _slam_due_node.size():
 		var row: int = _row_of_node(_slam_due_node[sent])
 		if row != ActorsScript.NONE:
+			_hit_spell = _slam_due_tag[sent]
 			_hit(_slam_due_by[sent], row, maxi(_slam_due_amount[sent], 1), Vector2.ZERO, 0.0, KIND_REACTION, null, false)
 		sent += 1
 	_tag = saved_tag
+	_hit_spell = saved_spell
 	_slam_due_node.clear()
 	_slam_due_by.clear()
 	_slam_due_amount.clear()
+	_slam_due_tag.clear()
 
 
 ## Contact: every actor that touches (`_contact_damage`) hurts each actor of another team whose
@@ -1608,8 +1663,10 @@ func _clear_state(row: int) -> void:
 	if shielded:
 		_send_barrier(row, Vector2.ZERO)
 	_shield_tag[row] = 0
+	_shield_spares[row] = 0
 	_slam[row] = 0
 	_slam_by[row] = EventsScript.NO_PLAYER
+	_slam_tag[row] = 0
 
 
 ## The row of `actor`: an actor id (the row itself, or the row of the body that casts under that

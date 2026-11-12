@@ -22,7 +22,7 @@ func after_each() -> void:
 	arena.free_all()
 
 
-func _shown_beams() -> Array[CarrierCard]:
+func _carrier_cards() -> Array[CarrierCard]:
 	var out: Array[CarrierCard] = []
 	for id: StringName in arena.registry.call("get_ids", &"spells"):
 		var card: Resource = arena.registry.call("get_resource", &"spells", id)
@@ -36,7 +36,7 @@ func _carrier_card(id: StringName) -> CarrierCard:
 
 
 func test_no_card_locks_its_staff_for_long() -> void:
-	for carrier_card in _shown_beams():
+	for carrier_card in _carrier_cards():
 		check(carrier_card.wind_down <= LONGEST_WIND_DOWN, "%s winds down %s s, at most %s: a longer lockout is a mana cost" % [carrier_card.id, carrier_card.wind_down, LONGEST_WIND_DOWN])
 
 

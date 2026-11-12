@@ -395,7 +395,7 @@ func test_an_enemys_hit_names_its_actor_id() -> void:
 	check(_hits.size() == 1 and _hits[0][0] == imp, "the hit names the enemy's id: %s" % [_hits])
 
 
-func test_carrier_card_shown_names_the_actor_id() -> void:
+func test_carrier_shown_names_the_actor_id() -> void:
 	var imp: int = ActorSeats.enemy(_table)
 	_build(imp, [&"decoy"])
 	_cast(imp)

@@ -116,7 +116,7 @@ func _compile(cards: String) -> CompiledStaff:
 	return _spells.call("compile_staff", ids, _staff) as CompiledStaff
 
 
-func _shown_beams(group: CompiledGroup) -> Array[StringName]:
+func _carrier_cards(group: CompiledGroup) -> Array[StringName]:
 	var out: Array[StringName] = []
 	for spell in group.spells:
 		out.append(spell.carrier_card_id)
@@ -161,7 +161,7 @@ func test_double_with_a_payload_on_the_second_bolt() -> void:
 	var staff: CompiledStaff = _compile("double fire bolt on_hit bolt frost halo")
 	check_equal(staff.casts.size(), 1, "one cast")
 	var group: CompiledGroup = staff.casts[0].group
-	check_equal(_shown_beams(group), [&"bolt", &"bolt"] as Array[StringName], "two bolts together")
+	check_equal(_carrier_cards(group), [&"bolt", &"bolt"] as Array[StringName], "two bolts together")
 	check_equal(group.spells[0].element_id, &"fire", "the first is a fire bolt")
 	check(group.spells[0].payload == null, "the first holds nothing")
 	check_equal(group.spells[1].element_id, &"", "the second is plain")
@@ -175,8 +175,8 @@ func test_a_group_resumes_after_its_payload() -> void:
 	var staff: CompiledStaff = _compile("double on_hit bolt halo bolt")
 	check_equal(staff.casts.size(), 1, "one cast")
 	var group: CompiledGroup = staff.casts[0].group
-	check_equal(_shown_beams(group), [&"bolt", &"bolt"] as Array[StringName], "the last bolt joins the cast")
-	check_equal(_shown_beams(group.spells[0].payload), [&"halo"] as Array[StringName], "the first fires a halo on hit")
+	check_equal(_carrier_cards(group), [&"bolt", &"bolt"] as Array[StringName], "the last bolt joins the cast")
+	check_equal(_carrier_cards(group.spells[0].payload), [&"halo"] as Array[StringName], "the first fires a halo on hit")
 	check(group.spells[1].payload == null, "the last bolt holds nothing")
 	check(staff.casts[0].ends_cycle, "then recharge")
 
@@ -211,7 +211,7 @@ func test_magnet_on_a_payload_fired_from_a_point_is_wasted() -> void:
 func test_a_trigger_in_the_last_slot_wraps_and_is_wasted() -> void:
 	var staff: CompiledStaff = _compile("bolt on_hit")
 	check_equal(staff.casts.size(), 2, "two casts")
-	check_equal(_shown_beams(staff.casts[1].group), [&"bolt"] as Array[StringName], "cast 2 wraps to the bolt")
+	check_equal(_carrier_cards(staff.casts[1].group), [&"bolt"] as Array[StringName], "cast 2 wraps to the bolt")
 	check(staff.casts[1].wrapped, "cast 2 wrapped")
 	check(staff.wasted.has(1), "the trigger is wasted")
 
@@ -224,7 +224,7 @@ func test_a_counter_dash_reads_in_slot_order() -> void:
 	check_equal(dash.carrier_card_id, &"dash", "a dash")
 	check_equal(dash.behaviour(ModifierBase.Behaviour.SHIELD), 1.0, "with one shield")
 	check(dash.fires_on(TriggerBase.Event.BLOCK), "that fires on a block")
-	check_equal(_shown_beams(dash.payload), [&"halo"] as Array[StringName], "a halo")
+	check_equal(_carrier_cards(dash.payload), [&"halo"] as Array[StringName], "a halo")
 
 
 # --- More rules ---------------------------------------------------------------
@@ -343,9 +343,9 @@ func test_each_trigger_takes_its_own_payload_in_order() -> void:
 	check_equal(bolt.triggers.size(), 2, "two triggers")
 	if bolt.triggers.size() == 2:
 		check_equal(bolt.triggers[0].event, TriggerBase.Event.HIT, "the first is on hit")
-		check_equal(_shown_beams(bolt.triggers[0].payload), [&"halo"] as Array[StringName], "and fires the halo")
+		check_equal(_carrier_cards(bolt.triggers[0].payload), [&"halo"] as Array[StringName], "and fires the halo")
 		check_equal(bolt.triggers[1].event, TriggerBase.Event.EXPIRE, "the second is on expire")
-		check_equal(_shown_beams(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and fires the next group, the fire bolt")
+		check_equal(_carrier_cards(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and fires the next group, the fire bolt")
 		check_equal(bolt.triggers[1].payload.spells[0].element_id, &"fire", "with its fire")
 	check_equal(staff.casts[0].targets.get(0, -1), 2, "on hit goes on the bolt")
 	check_equal(staff.casts[0].targets.get(1, -1), 2, "on expire goes on the bolt")
@@ -356,8 +356,8 @@ func test_the_same_trigger_twice_fires_two_payloads() -> void:
 	var bolt: CompiledSpell = _compile("on_hit on_hit bolt halo bolt").casts[0].group.spells[0]
 	check_equal(bolt.triggers.size(), 2, "both count")
 	if bolt.triggers.size() == 2:
-		check_equal(_shown_beams(bolt.triggers[0].payload), [&"halo"] as Array[StringName], "a halo on hit")
-		check_equal(_shown_beams(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and a bolt on hit")
+		check_equal(_carrier_cards(bolt.triggers[0].payload), [&"halo"] as Array[StringName], "a halo on hit")
+		check_equal(_carrier_cards(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and a bolt on hit")
 
 
 func test_a_trigger_with_no_cards_left_is_wasted_and_the_others_keep_theirs() -> void:
@@ -376,7 +376,7 @@ func test_payloads_nest_before_the_next_trigger_reads() -> void:
 	if bolt.triggers.size() == 2:
 		var inner: CompiledSpell = bolt.triggers[0].payload.spells[0]
 		check_equal(inner.carrier_card_id, &"bolt", "on hit fires a bolt")
-		check_equal(_shown_beams(inner.payload), [&"halo"] as Array[StringName], "whose own payload is read first")
+		check_equal(_carrier_cards(inner.payload), [&"halo"] as Array[StringName], "whose own payload is read first")
 		check_equal(bolt.triggers[1].payload.spells[0].element_id, &"fire", "then on expire takes the fire bolt")
 
 
@@ -419,8 +419,8 @@ func test_a_multicast_in_one_payload_counts_for_that_payload_only() -> void:
 	var bolt: CompiledSpell = _compile("on_hit on_expire bolt double halo halo bolt").casts[0].group.spells[0]
 	check_equal(bolt.triggers.size(), 2, "two triggers")
 	if bolt.triggers.size() == 2:
-		check_equal(_shown_beams(bolt.triggers[0].payload), [&"halo", &"halo"] as Array[StringName], "the double takes two halos")
-		check_equal(_shown_beams(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "the next payload starts after them")
+		check_equal(_carrier_cards(bolt.triggers[0].payload), [&"halo", &"halo"] as Array[StringName], "the double takes two halos")
+		check_equal(_carrier_cards(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "the next payload starts after them")
 
 
 func test_a_trigger_that_never_fires_keeps_its_place_and_the_next_still_reads() -> void:
@@ -432,7 +432,7 @@ func test_a_trigger_that_never_fires_keeps_its_place_and_the_next_still_reads() 
 	check(staff.wasted.has(0) and staff.wasted.has(3), "the timer and its halo are wasted: %s" % staff.wasted)
 	check_equal(slam.triggers.size(), 1, "only on hit is left")
 	if slam.triggers.size() == 1:
-		check_equal(_shown_beams(slam.triggers[0].payload), [&"bolt"] as Array[StringName], "and it fires the bolt")
+		check_equal(_carrier_cards(slam.triggers[0].payload), [&"bolt"] as Array[StringName], "and it fires the bolt")
 
 
 func test_triggers_with_no_carrier_are_all_wasted() -> void:
@@ -527,14 +527,14 @@ func test_an_empty_staff_has_no_cast_and_unknown_cards_are_wasted() -> void:
 	check(_compile("- - -").is_empty(), "no cards, no cast")
 	var staff: CompiledStaff = _compile("nope bolt")
 	check(staff.wasted.has(0), "an unknown id is wasted")
-	check_equal(_shown_beams(staff.casts[0].group), [&"bolt"] as Array[StringName], "the rest still casts")
+	check_equal(_carrier_cards(staff.casts[0].group), [&"bolt"] as Array[StringName], "the rest still casts")
 
 
 func test_cards_past_the_staff_slots_are_ignored() -> void:
 	_staff.slots = 1
 	var staff: CompiledStaff = _compile("bolt halo")
 	check_equal(staff.casts.size(), 1, "one slot, one cast")
-	check_equal(_shown_beams(staff.casts[0].group), [&"bolt"] as Array[StringName], "only the bolt")
+	check_equal(_carrier_cards(staff.casts[0].group), [&"bolt"] as Array[StringName], "only the bolt")
 
 
 func test_every_compiled_spell_has_its_own_node() -> void:

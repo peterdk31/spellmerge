@@ -119,7 +119,7 @@ var _registry: Node
 var _shelf: World.Shelf
 var _compiler: SpellsScript
 var _staff: StaffBase
-var _shown_beams: Array[CarrierCard] = []
+var _carrier_cards: Array[CarrierCard] = []
 var _modifiers: Array[ModifierBase] = []
 var _triggers: Array[TriggerBase] = []
 var _elements: Array[ElementBase] = []
@@ -171,14 +171,14 @@ func before_each() -> void:
 
 
 func _discover() -> void:
-	_shown_beams.clear()
+	_carrier_cards.clear()
 	_modifiers.clear()
 	_triggers.clear()
 	_elements.clear()
 	_multicasts.clear()
 	for card: Resource in _registry.call("get_all", &"spells"):
 		if card is CarrierCard:
-			_shown_beams.append(card as CarrierCard)
+			_carrier_cards.append(card as CarrierCard)
 		elif card is ModifierBase:
 			_modifiers.append(card as ModifierBase)
 		elif card is TriggerBase:
@@ -190,7 +190,7 @@ func _discover() -> void:
 	_payload = null
 	_shot = null
 	_lasting = null
-	for carrier_card in _shown_beams:
+	for carrier_card in _carrier_cards:
 		if carrier_card.carrier != &"atom":
 			continue
 		if _payload == null or carrier_card.shots > _payload.shots:
@@ -199,7 +199,7 @@ func _discover() -> void:
 			_shot = carrier_card
 		if carrier_card.shots == 1 and (_lasting == null or carrier_card.lifetime > _lasting.lifetime):
 			_lasting = carrier_card
-	_columns.assign(_shown_beams)
+	_columns.assign(_carrier_cards)
 	_bearer_prefix.clear()
 	_body_prefix.clear()
 	_bearer_shooter_prefix.clear()
@@ -396,17 +396,17 @@ static func reach(carrier_card: CarrierCard) -> float:
 # --- The tests ---------------------------------------------------------------------------------
 
 func test_it_finds_the_cards_and_carriers_itself() -> void:
-	check(_shown_beams.size() >= 2, "the registry has carriers (%d)" % _shown_beams.size())
+	check(_carrier_cards.size() >= 2, "the registry has carriers (%d)" % _carrier_cards.size())
 	check(not _modifiers.is_empty() and not _triggers.is_empty(), "and modifiers and triggers")
 	check(_payload != null, "a straight carrier to fire as a payload")
 	check(_shot != null, "a straight carrier of one shot for the enemy shooter")
-	for carrier_card in _shown_beams:
+	for carrier_card in _carrier_cards:
 		check(reach(carrier_card) >= 0.0, "no reach for the carrier %s of `%s`: add it to `reach`" % [carrier_card.carrier, carrier_card.id])
 
 
 func test_the_same_cast_writes_the_same_trace() -> void:
 	# Without this a ✓ could be noise: every carrier, cast alike twice, in the busiest scenes.
-	for carrier_card in _shown_beams:
+	for carrier_card in _carrier_cards:
 		var cards: Array[StringName] = [carrier_card.id]
 		for scene: Dictionary in [CROWD_AGAIN, SHOOTER]:
 			var seconds: float = minf(carrier_card.wind_up + carrier_card.lifetime + AFTER_LIFE, LONGEST)
@@ -419,7 +419,7 @@ func test_the_same_cast_writes_the_same_trace() -> void:
 func test_forcing_keeps_every_wasted_card() -> void:
 	# The seam of the W check: with `keep_wasted` nothing on a carrier is listed as wasted.
 	var forced: int = 0
-	for carrier_card in _shown_beams:
+	for carrier_card in _carrier_cards:
 		for modifier in _modifiers:
 			var cards: Array[StringName] = [modifier.id, carrier_card.id]
 			if not _compiler.compile_staff(cards, _staff).wasted.has(0):

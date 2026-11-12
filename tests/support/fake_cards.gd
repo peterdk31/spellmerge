@@ -12,7 +12,7 @@ extends RefCounted
 ## The kinds in the order the cards take them: card 0 a carrier, card 1 a modifier, and so on.
 const KINDS: Array[StringName] = [&"form", &"modifier", &"element", &"trigger", &"multicast"]
 const ICONS: Array[Texture2D] = [
-	preload("res://content/spells/forms/bolt/icon.svg"),
+	preload("res://content/spells/carriers/bolt/icon.svg"),
 	preload("res://content/spells/modifiers/split/icon.svg"),
 	preload("res://content/spells/elements/fire/icon.svg"),
 	preload("res://content/spells/triggers/on_hit/icon.svg"),

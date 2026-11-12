@@ -5,7 +5,7 @@ extends "res://tests/support/screenshot.gd"
 ## are drawn.
 ##
 ## `atom_looks` (1x): three lanes per infusion (plain, fire, frost, storm, void, lightning), all
-## flying right: a bolt drawn by its card's own shader (`forms/bolt/bolt.gdshader`, its core a `x`;
+## flying right: a bolt drawn by its card's own shader (`carriers/bolt/bolt.gdshader`, its core a `x`;
 ## docs/milestones/card-looks.md), an atom, and a bolt drawn by the plain head (`+`) for the owner
 ## to judge them side by side. `atom_looks_4x`: the plain infusion's three heads at 4x.
 
@@ -18,8 +18,8 @@ const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/void/void.tres"),
 	preload("res://content/spells/elements/lightning/lightning.tres"),
 ]
-const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
-const ATOM := preload("res://content/spells/forms/atom/atom.tres")
+const BOLT := preload("res://content/spells/carriers/bolt/bolt.tres")
+const ATOM := preload("res://content/spells/carriers/atom/atom.tres")
 ## Frames the shots fly before the picture (a quarter of a second).
 const FLIGHT: int = 15
 

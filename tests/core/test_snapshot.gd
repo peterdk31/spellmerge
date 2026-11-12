@@ -10,9 +10,9 @@ extends "res://tests/support/suite.gd"
 const SimScenes := preload("res://tests/core/sim_scenes.gd")
 const ContentFight := preload("res://tests/core/content_fight.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
-const DecoyCard := preload("res://content/spells/forms/decoy/decoy.tres")
-const PoolCard := preload("res://content/spells/forms/pool/pool.tres")
-const BoltCard := preload("res://content/spells/forms/bolt/bolt.tres")
+const DecoyCard := preload("res://content/spells/carriers/decoy/decoy.tres")
+const PoolCard := preload("res://content/spells/carriers/pool/pool.tres")
+const BoltCard := preload("res://content/spells/carriers/bolt/bolt.tres")
 
 ## Ticks played before the snapshot, and after it.
 const BEFORE: int = 70

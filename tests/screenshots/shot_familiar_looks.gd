@@ -1,5 +1,5 @@
 extends "res://tests/support/screenshot.gd"
-## The familiar's own look (content/spells/forms/familiar/familiar.gdshader; the owner, 2026-11-08:
+## The familiar's own look (content/spells/carriers/familiar/familiar.gdshader; the owner, 2026-11-08:
 ## rework the carriers' looks): each of four wizards with two familiars circling it, in their
 ## owners' ramps (`familiar_looks`, the four at 3x), and one wizard's at 6x
 ## (`familiar_looks_6x`), so the orb's eyes, glint and wisp can be judged. Asked for with

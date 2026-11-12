@@ -144,7 +144,7 @@ Build R3 right after R2 (it needs the honest compiler); R1 parts can land before
 The test keeps no list of cards or carriers. It finds them itself, so a new card or carrier is checked the day it lands, with nobody updating the test:
 
 - **Cards:** every modifier, trigger, infusion and multicast card the registry finds in `content/spells/` (the folders it already scans for the game).
-- **Carriers:** every form card the registry finds (`content/spells/forms/`), the melee carriers included; the carrier's `motion` picks the scene it runs in.
+- **Carriers:** every form card the registry finds (`content/spells/carriers/`), the melee carriers included; the carrier's `motion` picks the scene it runs in.
 - **What they do:** every value of `ModifierBase.Behaviour` and `TriggerBase.Event`, read from the enums. A card whose behaviour or event has no probe yet fails with "no probe for `<behaviour>`", so adding a new kind of card asks for its probe in the same PR.
 - It is a `tests/**/test_*.gd`, so it runs with the rest of the suite (`tools/ptest.sh`, and the daily build, which a merge that breaks it keeps from releasing).
 

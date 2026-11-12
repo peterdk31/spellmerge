@@ -13,7 +13,7 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 const AGES: Array[int] = [1, 4, 8, 14, 22]
 const COLUMN := 128
 const FIRE := Color("e0592f")
-const STONE: Shader = preload("res://content/spells/forms/wall/stone.gdshader")
+const STONE: Shader = preload("res://content/spells/carriers/wall/stone.gdshader")
 
 
 func take() -> void:

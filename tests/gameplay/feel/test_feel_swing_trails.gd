@@ -264,7 +264,7 @@ func test_the_shader_draws_only_the_line_and_its_light() -> void:
 ## Spells answers for its card (`look_of`, as a swing trail), on the trail's own material;
 ## a card that names none, or that another area draws, trails with the plain shader.
 func test_a_swing_trails_with_its_cards_own_shader() -> void:
-	var own_look: Shader = preload("res://content/spells/forms/swing/swing.gdshader")
+	var own_look: Shader = preload("res://content/spells/carriers/swing/swing.gdshader")
 	swings.trail_shaders[&"swing"] = own_look
 	feel.step(0.016)
 	var trail: MeshInstance2D = null

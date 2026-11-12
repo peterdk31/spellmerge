@@ -16,12 +16,12 @@
 
 | Carrier (cards) | Drawn by | Shader today | In its folder after |
 | --- | --- | --- | --- |
-| rune, wall, pool | the projectile manager, still batches | `forms/<card>/*.gdshader` | done (#632) |
-| atom (atom, bolt), swap, and any of them circling (Orbit) | the projectile manager, head batches (`head_mesh`) | `core/projectiles/shot_head.gdshader`, one for all; the bolt's `forms/bolt/bolt.gdshader` and the swap's `forms/swap/swap.gdshader` (the chasing pair, 2026-11-09) their own | phase 1 |
+| rune, wall, pool | the projectile manager, still batches | `carriers/<card>/*.gdshader` | done (#632) |
+| atom (atom, bolt), swap, and any of them circling (Orbit) | the projectile manager, head batches (`head_mesh`) | `core/projectiles/shot_head.gdshader`, one for all; the bolt's `carriers/bolt/bolt.gdshader` and the swap's `carriers/swap/swap.gdshader` (the chasing pair, 2026-11-09) their own | phase 1 |
 | beam | Feel, one beam mesh per live beam (`Feel._make_beam`) | `core/projectiles/shot_beam.gdshader` | phase 2 |
 | swing | Feel's swing trails (`swing_trails.gd`) | `core/projectiles/shot_swing.gdshader` | phase 2 |
 | familiar (its orb) | Entities (`entities.gd`), one MultiMesh for every familiar | `core/projectiles/shot_orbit.gdshader` | phase 3 |
-| portal | Feel's portal look (`portal_look.gd`, `Carrier.LOOK_PORTAL`): a lens quad a gate, its lips real motes | `forms/portal/portal.gdshader` (`core/projectiles/shot_portal.gdshader` the fallback) | done (carrier-looks-fixes.md, phase 2) |
+| portal | Feel's portal look (`portal_look.gd`, `Carrier.LOOK_PORTAL`): a lens quad a gate, its lips real motes | `carriers/portal/portal.gdshader` (`core/projectiles/shot_portal.gdshader` the fallback) | done (carrier-looks-fixes.md, phase 2) |
 | dash, teleport, slam | cues only (`content/cues/`, flashes in `content/flashes/`) | none of their own | already data in content: nothing to move |
 | decoy | the actor look (a copy of its caster) | `shot_sprite.gdshader`, shared by every sprite | stays: it is not a look of the card |
 
@@ -39,7 +39,7 @@ What every card shader keeps, as today's shot shaders do (core/README.md, "The s
 
 ## Phase 1: flying shots (the bolt's look)
 
-**Yes, this is what makes the bolt's look easy to change.** Today the bolt, the atom, the nova, the swap and the orbit's shots all draw with one shared shader in core. After this phase, giving the bolt a look of its own is a `forms/bolt/bolt.gdshader` and one line in `bolt.tres`, with no engine change.
+**Yes, this is what makes the bolt's look easy to change.** Today the bolt, the atom, the nova, the swap and the orbit's shots all draw with one shared shader in core. After this phase, giving the bolt a look of its own is a `carriers/bolt/bolt.gdshader` and one line in `bolt.tres`, with no engine change.
 
 - **A body is a shader and a mesh.** The writing picks a shot's mesh by its motion (a quad for a still shot, `_write_stones`; a head for any other, `_write_head`; the same in the kernel's `draw_shots`), and a batch draws one mesh, so a body's batches must be the mesh its shots are written as. The manager therefore numbers a body by the pair (shader, mesh), not by the shader alone: `register_body(shader, mesh)` with `mesh` `MESH_QUAD` or `MESH_HEAD`, the same shader under two meshes being two bodies. Spells numbers a carrier card's shader for the mesh of its shots' motion, which it knows from the carrier (still carriers spawn `MOTION_STILL`); the carrier's traits are not asked.
 - **A shot whose motion draws another mesh falls back.** `_batch_of` sends a shot to its body's pair only when the mesh of its motion (`mesh_of_motion`, the rule the writing uses) is the body's mesh; otherwise to its motion's own batch (`BATCH_BOLT`, `BATCH_STILL`, `BATCH_ORBIT`, the enemy ones), drawn plain. So the routing and the writing can never disagree, whether two cards name one shader for different carriers or a shot changes motion after it is spawned (`deflect_shot` already turns an orbit shot straight). A test spawns shots of one card in both motions and checks each lands in a batch of its own mesh.
@@ -49,7 +49,7 @@ What every card shader keeps, as today's shot shaders do (core/README.md, "The s
 - **Draw order stays.** At one z, the first batches draw in `BATCH_ORDER` (bolts, then runes, then orbits), and a node made later draws above them. `_make_body_batches` adds a body's pair at the end, so a bolt with its own look would start drawing over runes, walls and orbit shots. A head body's pair is moved to sit right after `BATCH_BOLT`'s node (and its enemy half after `BATCH_ENEMY`'s), a quad body's after `BATCH_STILL`'s (`BATCH_ENEMY_STILL`'s), each new body after the bodies of its mesh already there; a test checks a bolt of its own look still draws under a rune at the same z, as a plain bolt does.
 - **Spell light:** a body batch of heads is lit as shots (`ROWS_SHOT`), one of quads as runes (`ROWS_RUNE`). `batch_mesh(batch)` answers from the body's mesh, so it stops being `static`: `spell_light.gd` asks the manager it lights (not `ProjectileManagerScript`), and a light test covers a head body's batch.
 - **Contract for a flying card shader:** copy `shot_head.gdshader` (its vertex stage places the head's quads from the instance; tails stay Feel's motes and are not the shader's). Warmed as a batch (`ShaderWarmup.want(shader, BATCH)`), as the head shader is.
-- **Cards:** the bolt gets a look of its own (owner, 2026-11-08: "let's try yes"): `forms/bolt/bolt.gdshader`, a copy of the head shader made distinct, shown beside the plain head in `shot_looks.gd` for the owner to judge. The atom keeps the shared head (no `look_shader`; the swap got its own with the carrier looks of 2026-11-09, and the nova became a modifier) until someone wants it to look different: a shader per card costs a compile and **four draw calls** with Spell light on (its pair of batches, and the light batch `spell_light._add_batches` mirrors for each), so sharing stays the default.
+- **Cards:** the bolt gets a look of its own (owner, 2026-11-08: "let's try yes"): `carriers/bolt/bolt.gdshader`, a copy of the head shader made distinct, shown beside the plain head in `shot_looks.gd` for the owner to judge. The atom keeps the shared head (no `look_shader`; the swap got its own with the carrier looks of 2026-11-09, and the nova became a modifier) until someone wants it to look different: a shader per card costs a compile and **four draw calls** with Spell light on (its pair of batches, and the light batch `spell_light._add_batches` mirrors for each), so sharing stays the default.
 
 ## Phase 1b: a card's light and its reach (the atom lit less than the bolt)
 
@@ -69,14 +69,14 @@ It does not need phase 1's bodies, so it can go before or after it; it comes rig
 
 - Feel asks for a carrier's shader by its form id, `spells.look_shader_of(form)`, once per form id and kept (as `_form_cues_of` keeps cues); it reads no card field.
 - **One material per node, not per shader.** Each live beam sets its own uniforms on its own material (`beam_path`, `beam_start`, `beam_end`, `beam_length`, ...: `Feel._on_form_shown`), and each swing trail its own (`swing_origin`, `sim_time`), so a material is never shared between nodes. A beam's node keeps its `ShaderMaterial`; when it is shown for a beam, its `material.shader` is set to the card's (or core's) only when it differs from the one it has, so nothing is allocated or recompiled per cast. A test shows two beams of different cards at once and checks each node keeps its own path and shader.
-- **Beam:** `shot_beam.gdshader` stays in core as the fallback for rays with no beam card (chain jumps, zaps, arcs: `RAY_FORM`), and the beam card names a copy of it: `forms/beam/beam.gdshader`.
-- **Swing:** the same in `swing_trails.gd`: `forms/swing/swing.gdshader`, with core's as the fallback; a trail's shader is set when it is shown for a swing.
+- **Beam:** `shot_beam.gdshader` stays in core as the fallback for rays with no beam card (chain jumps, zaps, arcs: `RAY_FORM`), and the beam card names a copy of it: `carriers/beam/beam.gdshader`.
+- **Swing:** the same in `swing_trails.gd`: `carriers/swing/swing.gdshader`, with core's as the fallback; a trail's shader is set when it is shown for a swing.
 - **Light:** the beam light (`light_beam.gdshader`) reads the beam mesh, not its shader, so a beam shader needs nothing for it; how bright and how far it lights come from the card's `look_light_intensity` and `look_light_reach` (phase 1b).
 - **Warm-up:** drawn as MESH (`ShaderWarmup.want(shader, MESH)`), handed over when Spells fills `look_shader_of`.
 
 ## Phase 3: the familiar's orb (Entities)
 
-Entities draws every familiar in one MultiMesh with one material (`_familiar_node`, `shot_orbit.gdshader`). The familiar card names its own (`forms/familiar/familiar.gdshader`). With one familiar card, Entities asks once, when it makes that node, `Spells.look_shader_of(&"familiar")`, and sets the node's shader (core's when it is null); nothing is asked per spawn. The shader Entities keeps is listed in its `VIEW` (Entities is in a simulation folder, `gameplay/ai`). If a second card ever makes familiars with a look of its own, that is one MultiMesh per shader (made with `Batches.multimesh()`), chosen by the spawn's form: work for that card's PR, not this one. Core's stays the fallback.
+Entities draws every familiar in one MultiMesh with one material (`_familiar_node`, `shot_orbit.gdshader`). The familiar card names its own (`carriers/familiar/familiar.gdshader`). With one familiar card, Entities asks once, when it makes that node, `Spells.look_shader_of(&"familiar")`, and sets the node's shader (core's when it is null); nothing is asked per spawn. The shader Entities keeps is listed in its `VIEW` (Entities is in a simulation folder, `gameplay/ai`). If a second card ever makes familiars with a look of its own, that is one MultiMesh per shader (made with `Batches.multimesh()`), chosen by the spawn's form: work for that card's PR, not this one. Core's stays the fallback.
 
 ## Phase 4: docs and checks
 
@@ -99,4 +99,4 @@ One PR each, phase 1 first: it is the one the bolt question needs, and phases 2 
 ## The owner's answers (2026-11-08)
 
 1. **One field:** `shot_shader` is renamed `look_shader` in phase 1, "the shader that draws this carrier", whoever draws it.
-2. **The bolt gets its own look** in phase 1 (`forms/bolt/bolt.gdshader`), to try it.
+2. **The bolt gets its own look** in phase 1 (`carriers/bolt/bolt.gdshader`), to try it.

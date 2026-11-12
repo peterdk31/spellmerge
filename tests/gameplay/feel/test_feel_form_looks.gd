@@ -27,7 +27,7 @@ class CardsRegistry:
 
 const FORMS: Array[StringName] = [&"bolt", &"beam", &"dash", &"rune"]
 ## The beam card's own look (`FormBase.look_shader`; docs/milestones/card-looks.md, phase 2).
-const BEAM_CARD_SHADER: Shader = preload("res://content/spells/forms/beam/beam.gdshader")
+const BEAM_CARD_SHADER: Shader = preload("res://content/spells/carriers/beam/beam.gdshader")
 
 var bus: EventsScript
 var feel: FeelScript

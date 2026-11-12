@@ -12,7 +12,7 @@ extends "res://tests/support/screenshot.gd"
 ## light's steps are drawn by shot_spell_light_rooms.gd.
 
 ## The rune card's own shot shader, which draws its still shots.
-const RUNE: Shader = preload("res://content/spells/forms/rune/rune.gdshader")
+const RUNE: Shader = preload("res://content/spells/carriers/rune/rune.gdshader")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ROOM := preload("res://content/rooms/crypt/arena_01.tscn")
@@ -21,8 +21,8 @@ const FROST := preload("res://content/spells/elements/frost/frost.tres")
 const STORM := preload("res://content/spells/elements/storm/storm.tres")
 const LIGHTNING := preload("res://content/spells/elements/lightning/lightning.tres")
 const BIGGER := preload("res://content/spells/modifiers/bigger/bigger.tres")
-const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
-const ATOM := preload("res://content/spells/forms/atom/atom.tres")
+const BOLT := preload("res://content/spells/carriers/bolt/bolt.tres")
+const ATOM := preload("res://content/spells/carriers/atom/atom.tres")
 const BOLT_RADIUS: float = 5.0
 const MIDDLE := Vector2(320.0, 180.0)
 

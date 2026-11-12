@@ -2,7 +2,7 @@ class_name CarrierPulse
 extends Carrier
 ## The base of the Pulse card's three carriers (docs/CARRIERS.md, "Pulse: a strike round what casts
 ## it"; props W9a, owner 2026-11-12: it replaced the compiler's fallback carriers, "a custom rule").
-## The Pulse card (`content/spells/forms/pulse/`) is one strike round whatever casts it: the caster's
+## The Pulse card (`content/spells/carriers/pulse/`) is one strike round whatever casts it: the caster's
 ## body in a cast's own group (`CarrierPulseCaster`, `&"pulse"`, the id the card names); in a payload,
 ## what fired it, a body or a shot (`CarrierPulseBearer`), or the point it began at when nothing else
 ## can have (`CarrierPulsePoint`). The compiler picks which from who may cast the group

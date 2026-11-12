@@ -78,7 +78,7 @@ beam's `ray_length`); the spell validator checks them.
 
 ## Pulse: a strike round what casts it
 
-The **Pulse** card (`content/spells/forms/pulse/`, a form card like Bolt) is one area strike round
+The **Pulse** card (`content/spells/carriers/pulse/`, a form card like Bolt) is one area strike round
 whatever casts it, then a short life (props W9a, owner 2026-11-12). It replaced the compiler's
 fallback carriers, a rule of the compiler no card played ("the 'ugly' fallback in the
 SpellCompiler ... since that one is a custom rule"): **cards with no carrier after them are now
@@ -179,7 +179,7 @@ cast by points).
 `tests/core/test_card_rules.gd` plays every modifier and infusion on all three with the Pulse card
 after them (the columns `pulse`, round you; `on it`, a piercing shot's hit, and `on its body`, an
 `on cast` the wizard's body casts; and `right there`), and the card's own test
-(`content/spells/forms/pulse/test_pulse.gd`) checks the rest.
+(`content/spells/carriers/pulse/test_pulse.gd`) checks the rest.
 
 ## What a carrier runs
 
@@ -261,7 +261,7 @@ To give a carrier a fade, override `fade()`, and draw its look from `fade_left`.
    another carrier's.
 2. Override the hooks it needs (at least `launch` or `shoot`), asking the runtime only through
    `kit` (`CarrierKit`, above). Nothing in `spells.gd` changes.
-3. Add its form card under `content/spells/forms/` with `carrier = &"<name>"`, and its looks, all
+3. Add its form card under `content/spells/carriers/` with `carrier = &"<name>"`, and its looks, all
    data on the card (`FormBase`): a `staff_pose` (`tests/core/test_staff_poses.gd` fails without
    one), its cues (`cast_cue`, the flash on the staff, `cast` by default; `shown_cue`, where it
    shows itself; `impact_cue`, where its shots strike, `impact` by default; `end_cue`, where a

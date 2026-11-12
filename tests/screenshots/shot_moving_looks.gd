@@ -22,7 +22,7 @@ const ELEMENTS: Array[Resource] = [
 ]
 const ORBIT := preload("res://content/spells/modifiers/orbit/orbit.tres")
 const NOVA := preload("res://content/spells/modifiers/nova/nova.tres")
-const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
+const BOLT := preload("res://content/spells/carriers/bolt/bolt.tres")
 
 var _shots: Node = null
 

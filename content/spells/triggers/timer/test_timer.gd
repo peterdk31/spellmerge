@@ -65,7 +65,7 @@ func test_a_timer_fires_from_where_its_shot_is() -> void:
 	if not shots.is_empty():
 		var at: Vector2 = _mgr.get_position_of(shots[0])
 		# The rune stands twice its size ahead of where it was cast (rules R4 F3).
-		var rune: Vector2 = Vector2(100.0 + (load("res://content/spells/forms/rune/rune.tres") as FormBase).radius * 2.0, 50.0)
+		var rune: Vector2 = Vector2(100.0 + (load("res://content/spells/carriers/rune/rune.tres") as FormBase).radius * 2.0, 50.0)
 		check(at.distance_to(rune) < 20.0, "close to the rune that fired it")
 
 

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="FormBase" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/base/form_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/carriers/familiar/icon.svg" id="2_icon"]
+[ext_resource type="Shader" path="res://content/spells/carriers/familiar/familiar.gdshader" id="9_look"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"familiar"
+display_name = "Familiar"
+description = "A small spirit circles you, casting its triggers outward."
+complexity = 2
+icon = ExtResource("2_icon")
+base_damage = 1
+mana_cost = 40.0
+wind_down = 0.5
+speed = 0.0
+lifetime = 8.0
+radius = 3.0
+shots = 1
+spread = 0.0
+carrier = &"familiar"
+pierce = 0
+staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.08, "turn": -40, "lift": 4, "glow": 0.6, "ease": "out", "mood": "raised"}, {"phase": "after", "at": 0.36}])
+shown_cue = &"conjure"
+end_cue = &"dismiss"
+look_shader = ExtResource("9_look")

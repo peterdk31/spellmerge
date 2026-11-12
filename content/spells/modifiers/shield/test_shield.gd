@@ -152,7 +152,7 @@ func test_a_barrier_says_when_it_is_given_blocks_and_runs_out() -> void:
 func test_a_cast_on_the_caster_names_its_carrier_and_moves_the_staff() -> void:
 	var spell: CompiledSpell = _first(["shield", "pulse"])
 	check(spell != null and not spell.staff_pose.is_empty(), "a Pulse card has a staff animation")
-	check(_first(["bolt"]).staff_pose == load("res://content/spells/forms/bolt/bolt.tres").packed_pose(), "a carrier card's own stays")
+	check(_first(["bolt"]).staff_pose == load("res://content/spells/carriers/bolt/bolt.tres").packed_pose(), "a carrier card's own stays")
 	var arena := ArenaScript.new(root)
 	arena.add_guard(0, Vector2.ZERO)
 	arena.install_cards(0, 0, ["shield", "pulse"])

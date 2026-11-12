@@ -61,7 +61,7 @@ func test_every_card_shader_is_one_its_carrier_draws() -> void:
 		var form: FormBase = each[0]
 		check(form.look_problems().is_empty(), "%s: %s" % [form.id, form.look_problems()])
 		check(PLAIN.has(each[1]), "%s's carrier %s draws a look (got %d)" % [form.id, form.carrier, each[1]])
-		check(form.look_shader.resource_path.begins_with("res://content/spells/forms/%s/" % form.id), "%s's shader is in its own folder" % form.id)
+		check(form.look_shader.resource_path.begins_with("res://content/spells/carriers/%s/" % form.id), "%s's shader is in its own folder" % form.id)
 
 
 func test_every_card_shader_keeps_its_areas_instance_and_mesh() -> void:
@@ -125,7 +125,7 @@ func test_a_look_shader_on_a_carrier_with_no_look_is_reported() -> void:
 	var form := FormBase.new()
 	form.id = &"test_form"
 	form.carrier = &"dash"
-	form.look_shader = preload("res://content/spells/forms/pool/pool.gdshader")
+	form.look_shader = preload("res://content/spells/carriers/pool/pool.gdshader")
 	var found: String = " ".join(form.look_problems())
 	check(found.contains("never drawn"), "a dash draws no look: %s" % found)
 

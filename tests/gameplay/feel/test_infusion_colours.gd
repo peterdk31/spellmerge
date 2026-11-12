@@ -106,7 +106,7 @@ func test_the_shaders_read_it_as_a_global_marked_texture() -> void:
 	check(look.contains("const int PALETTE_MOST = 4;"), "four in a palette, each with its slot")
 	# These show each infusion their own way (the beam's strands) or are in one infusion's colours
 	# already (a mote, the mark it leaves): their looks are not woven.
-	for path: String in ["res://content/spells/forms/beam/beam.gdshader", "res://gameplay/feel/light_beam.gdshader", "res://gameplay/feel/mote.gdshader", "res://gameplay/feel/mark.gdshader"]:
+	for path: String in ["res://content/spells/carriers/beam/beam.gdshader", "res://gameplay/feel/light_beam.gdshader", "res://gameplay/feel/mote.gdshader", "res://gameplay/feel/mark.gdshader"]:
 		var code: String = FileAccess.get_file_as_string(path)
 		var own_at: int = code.find("#define LOOK_OWN_INFUSIONS")
 		check(own_at >= 0 and own_at < code.find("shot_look.gdshaderinc\""), "%s opts out before it includes the look" % path)

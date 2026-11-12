@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
-## The Mend card (content/spells/elements/mend/, staffs C): an infusion whose hits heal wizards
-## and do almost nothing to enemies. Each of its combos does what it promises with the card and
+## The Mend card (content/spells/elements/mend/, staffs C): an infusion whose hits heal whatever
+## they hit, friend or foe, and do no damage (owner 2026-11-12: heal only). Each of its combos does what it promises with the card and
 ## fails without it.
 ##
 ## godot --headless --path . --script res://content/spells/elements/mend/test_mend.gd
@@ -14,13 +14,16 @@ func _card() -> ElementBase:
 	return load("res://content/spells/elements/mend/mend.tres") as ElementBase
 
 
-## Casts `cards` from seat 0 at a hurt teammate (seat 1) at 60 px with an imp at 110 px; returns
-## [health the teammate got back, health the imp lost, health the teammate still lacks].
-func _party(cards: Array) -> Array[int]:
+## Casts `cards` from seat 0 at a hurt teammate (seat 1) at 60 px with an imp at 110 px (hurt by
+## `imp_hurt` first); returns [health given back to the wizards, health the imp lacks at the end,
+## health the teammate still lacks].
+func _party(cards: Array, imp_hurt: int = 0) -> Array[int]:
 	var arena := ArenaScript.new(root)
 	var imp: Node2D = arena.add_imp(Vector2(110.0, 0.0))
 	var ally: Node2D = arena.add_guard(1, Vector2(60.0, 0.0))
 	arena.hurt(ally, ALLY_HURT)
+	if imp_hurt > 0:
+		arena.hurt(imp, imp_hurt)
 	arena.install_cards(0, 0, cards)
 	arena.cast(0, 0)
 	arena.run(1.5)
@@ -41,12 +44,12 @@ func test_the_card_is_a_valid_infusion() -> void:
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 
 
-func test_a_mend_bolt_carries_a_heal_and_a_small_enemy_hit() -> void:
+func test_a_mend_bolt_carries_a_heal_and_no_damage() -> void:
 	var arena := ArenaScript.new(root)
 	var staff: CompiledStaff = arena.install_cards(0, 0, ["mend", "bolt"])
 	var spell: CompiledSpell = staff.casts[0].group.spells[0]
 	check(spell.hit.heal > 0, "the hit heals")
-	check(spell.hit.damage >= 1 and spell.hit.damage < spell.hit.heal, "an enemy takes a small share of it")
+	check_equal(spell.hit.damage, 0.0, "and does no damage, to friend or foe")
 	arena.free_all()
 	arena = ArenaScript.new(root)
 	staff = arena.install_cards(0, 0, ["bolt"])
@@ -63,17 +66,27 @@ func test_a_mend_bolt_heals_a_hurt_teammate_and_a_plain_one_does_not() -> void:
 	check(plain[2] >= ALLY_HURT, "and the teammate is no better off (%d)" % plain[2])
 
 
-func test_the_builder_says_it_heals_wizards() -> void:
+func test_the_builder_says_it_heals_all_it_hits() -> void:
 	var arena := ArenaScript.new(root)
-	check(arena.spells.component_stats(&"mend").has("Heals wizards"), "the hub line: %s" % [arena.spells.component_stats(&"mend")])
+	check(arena.spells.component_stats(&"mend").has("Heals all it hits"), "the hub line: %s" % [arena.spells.component_stats(&"mend")])
 	arena.free_all()
 
 
-func test_a_mend_bolt_barely_hurts_an_imp() -> void:
+## Owner 2026-11-12: heal only, whatever it hits, friend or foe. (It was a tenth of its strength
+## as damage on enemies.)
+func test_a_mend_bolt_never_hurts_an_imp() -> void:
 	var mended: Array[int] = _party(["mend", "pierce", "bolt"])
 	var plain: Array[int] = _party(["pierce", "bolt"])
-	check(mended[1] > 0, "the imp still takes something")
-	check(mended[1] * 4 <= plain[1], "far less than a plain bolt does (%d against %d)" % [mended[1], plain[1]])
+	check(plain[1] > 0, "a plain bolt hurts the imp (%d)" % plain[1])
+	check_equal(mended[1], 0, "a mend bolt does not")
+
+
+func test_a_mend_bolt_heals_a_hurt_imp_too() -> void:
+	var imp_hurt: int = 20
+	var mended: Array[int] = _party(["mend", "pierce", "bolt"], imp_hurt)
+	check(mended[1] < imp_hurt, "the imp lacks less health than before (%d of %d)" % [mended[1], imp_hurt])
+	var plain: Array[int] = _party(["pierce", "bolt"], imp_hurt)
+	check(plain[1] > imp_hurt, "a plain bolt hurts it more (%d)" % plain[1])
 
 
 func test_a_heal_never_goes_past_full_health() -> void:

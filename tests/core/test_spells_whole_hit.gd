@@ -72,7 +72,7 @@ func test_an_echoed_mend_bolt_heals_the_teammate_and_never_hurts_it() -> void:
 	check(plain[0] > 0, "a mend bolt heals (%d)" % plain[0])
 	check_equal(echoed[0], plain[0] + roundi(plain[0] * SpellLimits.ECHO_DAMAGE), "the echo heals half again")
 	check_equal(echoed[2], ALLY_HURT - echoed[0], "the teammate was never hurt")
-	check_equal(echoed[1], plain[1] + floori(plain[1] * SpellLimits.ECHO_DAMAGE), "the imp takes half the enemy share again (1.5: 1 whole point)")
+	check_equal(echoed[1], 0, "nor the imp: a mend is a heal only, friend or foe (owner 2026-11-12)")
 
 
 func test_a_relay_mend_bolt_still_heals_after_it_takes_on_frost() -> void:
@@ -88,7 +88,8 @@ func test_a_relay_mend_bolt_still_heals_after_it_takes_on_frost() -> void:
 	arena.run(1.5)
 	check(arena.healed() > 0, "the teammate is healed")
 	check_equal(arena.lost(ally), ALLY_HURT - arena.healed(), "and never hurt")
-	check(arena.was_given(imp, &"chill"), "the bolt took on the frost")
+	# (That relay takes on a teammate's statuses is test_relay_keeps_each_new_elements_status's.)
+	check(not arena.was_given(imp, &"chill"), "the imp it heals is not chilled: a heal does nothing else")
 	arena.free_all()
 
 

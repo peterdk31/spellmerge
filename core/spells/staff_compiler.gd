@@ -514,7 +514,8 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 		spell.homing_angle = minf(rad_to_deg(SpellLimits.INSTANT_HOMING_REACH / spell.homing_curve), 180.0)
 	if heals:
 		spell.hit.heal = maxi(roundi(spell.damage), 1)
-		spell.hit.damage = maxf(spell.damage * SpellLimits.HEAL_ENEMY_SHARE, 1.0)
+		# Heal only, whatever it hits (owner 2026-11-12): no damage, for friend or foe.
+		spell.hit.damage = 0.0
 	var heavy: float = spell.behaviour(ModifierBase.Behaviour.HEAVY)
 	if heavy > 0.0:
 		spell.hit.knockback *= heavy

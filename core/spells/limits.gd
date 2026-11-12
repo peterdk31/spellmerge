@@ -166,8 +166,6 @@ const SOURCE_TOUCH: float = 8.0
 const KNOCKBACK: float = 120.0
 ## A heavy hit's knock into a wall hurts for this share of the hit's damage (at least 1).
 const SLAM_SHARE: float = 1.0
-## Share of a mend hit's strength that an enemy takes as damage.
-const HEAL_ENEMY_SHARE: float = 0.1
 ## Speed of a chain jump when the spell's own speed is lower (a rune or a beam has none).
 const CHAIN_MIN_SPEED: float = 300.0
 ## Pixels a payload fired when a shot expires starts back along its path, so a shot that

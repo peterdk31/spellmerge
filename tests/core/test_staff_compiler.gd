@@ -612,12 +612,11 @@ func test_a_heavy_hit_pushes_harder_and_slams() -> void:
 	check(hit.slam >= 1, "a knock into a wall hurts")
 
 
-func test_a_mend_hit_heals_and_barely_hurts_enemies() -> void:
+func test_a_mend_hit_heals_and_does_no_damage() -> void:
 	(_fake.items[&"frost"] as ElementBase).heals = true
 	var hit: HitProfile = _compile("frost bolt").casts[0].group.spells[0].hit
-	check(hit.heal > 0, "it heals wizards")
-	check(hit.damage < hit.heal, "and an enemy takes a tenth of it")
-	check(hit.damage >= 1, "at least a point")
+	check(hit.heal > 0, "it heals")
+	check_equal(hit.damage, 0.0, "and hurts nobody, friend or foe (owner 2026-11-12)")
 
 
 func test_a_beam_is_a_ray_hit_and_a_bolt_a_shot() -> void:

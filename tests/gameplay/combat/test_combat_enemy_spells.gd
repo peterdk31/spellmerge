@@ -187,7 +187,9 @@ func test_a_wizard_waits_before_reacting_again() -> void:
 	check_equal(_triggered.size(), 2, "after the wait it reacts again")
 
 
-func test_an_enemys_mend_heals_its_team_and_hurts_the_wizards() -> void:
+## Owner 2026-11-12: a mend heals whatever it hits, friend or foe, and does nothing else (it
+## was a heal for the caster's team and a plain hit on the others).
+func test_an_enemys_mend_heals_whatever_it_hits() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
 	wizard.health.health = 50
 	var imp := _enemy(Vector2(10.0, 0.0))
@@ -198,5 +200,5 @@ func test_an_enemys_mend_heals_its_team_and_hurts_the_wizards() -> void:
 	var tag: int = _enemy_tag(profile)
 	_bus.projectile_hit.emit(_caster, wizard, Vector2.ZERO, tag, -1)
 	_bus.projectile_hit.emit(_caster, imp, Vector2.ZERO, tag, -1)
-	check_equal(wizard.health.health, 48, "an enemy's mend is not the wizards': they take its damage")
-	check_equal(_combat.health_of(imp), 80, "it heals its caster's team (actors G5: a mend is for friends)")
+	check_equal(wizard.health.health, 60, "an enemy's mend heals a wizard too, and does not hurt it")
+	check_equal(_combat.health_of(imp), 80, "it heals its caster's team")

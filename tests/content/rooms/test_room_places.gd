@@ -46,7 +46,10 @@ func test_a_props_stand_in_draws_what_the_game_draws() -> void:
 		for data: PropBase in room.places().placed_of(PropBase):
 			if not props.has(data):
 				props.append(data)
-	props.append(preload("res://tests/gameplay/actor/fixtures/exploding_barrel.tres"))
+	# And every prop of the game's, placed in a room or not (the yard's stand where Flow puts them).
+	for data: Resource in _registry.get_all(&"props"):
+		if not props.has(data):
+			props.append(data as PropBase)
 	for data in props:
 		for state in data.states.list:
 			var stand_in := own(PropStandIn.new()) as PropStandIn

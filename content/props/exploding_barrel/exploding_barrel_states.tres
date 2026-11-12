@@ -1,0 +1,71 @@
+[gd_resource type="Resource" script_class="PropStates" load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_trigger.gd" id="1"]
+[ext_resource type="Script" path="res://core/base/prop_state.gd" id="2"]
+[ext_resource type="Script" path="res://core/base/prop_states.gd" id="3"]
+
+[sub_resource type="Resource" id="idle_element_hit_0"]
+script = ExtResource("1")
+element = &"fire"
+then = &"fusing"
+
+[sub_resource type="Resource" id="idle_death_1"]
+script = ExtResource("1")
+when = 4
+cast = 2
+then = &"broken"
+
+[sub_resource type="Resource" id="idle_cast_2"]
+script = ExtResource("1")
+when = 6
+staff = 1
+then = &"broken"
+
+[sub_resource type="Resource" id="idle_cast_3"]
+script = ExtResource("1")
+when = 6
+staff = 2
+then = &"broken"
+
+[sub_resource type="Resource" id="idle"]
+script = ExtResource("2")
+state_id = &"idle"
+triggers = Array[ExtResource("1")]([SubResource("idle_element_hit_0"), SubResource("idle_death_1"), SubResource("idle_cast_2"), SubResource("idle_cast_3")])
+
+[sub_resource type="Resource" id="fusing_entered_0"]
+script = ExtResource("1")
+when = 5
+cast = 1
+
+[sub_resource type="Resource" id="fusing_death_1"]
+script = ExtResource("1")
+when = 4
+cast = 2
+then = &"broken"
+
+[sub_resource type="Resource" id="fusing_cast_2"]
+script = ExtResource("1")
+when = 6
+staff = 1
+then = &"broken"
+
+[sub_resource type="Resource" id="fusing_cast_3"]
+script = ExtResource("1")
+when = 6
+staff = 2
+then = &"broken"
+
+[sub_resource type="Resource" id="fusing"]
+script = ExtResource("2")
+state_id = &"fusing"
+triggers = Array[ExtResource("1")]([SubResource("fusing_entered_0"), SubResource("fusing_death_1"), SubResource("fusing_cast_2"), SubResource("fusing_cast_3")])
+
+[sub_resource type="Resource" id="broken"]
+script = ExtResource("2")
+state_id = &"broken"
+blocks = false
+hittable = false
+
+[resource]
+script = ExtResource("3")
+list = Array[ExtResource("2")]([SubResource("idle"), SubResource("fusing"), SubResource("broken")])

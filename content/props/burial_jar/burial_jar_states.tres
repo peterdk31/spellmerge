@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="PropStates" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_trigger.gd" id="1"]
+[ext_resource type="Script" path="res://core/base/prop_state.gd" id="2"]
+[ext_resource type="Script" path="res://core/base/prop_states.gd" id="3"]
+
+[sub_resource type="Resource" id="idle_reaction_0"]
+script = ExtResource("1")
+when = 2
+reaction = &"thaw"
+then = &"shattered"
+
+[sub_resource type="Resource" id="idle_death_1"]
+script = ExtResource("1")
+when = 4
+then = &"shattered"
+
+[sub_resource type="Resource" id="idle"]
+script = ExtResource("2")
+state_id = &"idle"
+triggers = Array[ExtResource("1")]([SubResource("idle_reaction_0"), SubResource("idle_death_1")])
+
+[sub_resource type="Resource" id="shattered_entered_0"]
+script = ExtResource("1")
+when = 5
+cast = 1
+
+[sub_resource type="Resource" id="shattered"]
+script = ExtResource("2")
+state_id = &"shattered"
+triggers = Array[ExtResource("1")]([SubResource("shattered_entered_0")])
+blocks = false
+hittable = false
+
+[resource]
+script = ExtResource("3")
+list = Array[ExtResource("2")]([SubResource("idle"), SubResource("shattered")])

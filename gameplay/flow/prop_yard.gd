@@ -3,7 +3,8 @@ extends RefCounted
 ## The hub's prop yard (props W8, docs/milestones/props.md): a room's zone named `prop_yard`
 ## (`Flow.ZONE_PROP_YARD`) where every prop of the registry the game's rules know nothing of (no
 ## `PropBase.role`) stands, in rows by id (`places`), each in its first state; one that leaves its
-## first state (lit, broken) or goes is replaced by a fresh one RETURN_SECONDS later, where it stood.
+## first state (lit, broken) or goes is replaced by a fresh one RETURN_SECONDS later, where it stood;
+## one back in its first state by then (a fire pit put out, an arc lodestone idle after its zap) stays.
 ## The game's rule, not the room's: a room only marks the zone. Flow's state (it holds one), stepped
 ## by Flow (`tend`).
 
@@ -47,8 +48,10 @@ func fill(world: Node2D, yard: Rect2, registry: RegistryScript) -> void:
 		_bodies.append(_stand(world, kinds[i], at[i]))
 
 
-## One tick of `delta` seconds: a prop that left its first state or went starts its slot's count;
-## when it runs out, the slot's body (if any) goes and a fresh one stands. A body that goes is
+## One tick of `delta` seconds: a prop that left its first state or went starts its slot's count,
+## which stops if it is back in its first state; when it runs out, the slot's body (if any) goes and
+## a fresh one stands (props W9c: an arc lodestone zapping again and again is not replaced every
+## 10 s, so it is seen to go dark). A body that goes is
 ## forgotten in the tick it goes (the yard's state never points at a freed one).
 func tend(delta: float, world: Node2D, registry: RegistryScript) -> void:
 	for i in _bodies.size():
@@ -57,7 +60,9 @@ func tend(delta: float, world: Node2D, registry: RegistryScript) -> void:
 			_bodies[i] = null
 		var prop := _bodies[i] as Actor
 		var fresh: bool = prop != null and (prop.state_triggers == null or prop.state_triggers.in_first_state())
-		if not fresh and _left[i] < 0.0:
+		if fresh:
+			_left[i] = -1.0
+		elif _left[i] < 0.0:
 			_left[i] = RETURN_SECONDS
 		if _left[i] < 0.0:
 			continue

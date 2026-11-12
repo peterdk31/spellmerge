@@ -1,0 +1,28 @@
+{
+	"assets": [
+		{
+			"path": "content/props/crate/idle.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from idle.grid.json, 2026-11-12)",
+			"prompt": "A plank crate prop, 24x24, seen from a little above: a lit Wood top face of boards and a front face of three planks inside a frame, no cross brace. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/crate/cracked.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from cracked.grid.json, 2026-11-12)",
+			"prompt": "The plank crate cracked: idle.svg with a split plank across its front and a corner broken off its top. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/crate/broken.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from broken.grid.json, 2026-11-12)",
+			"prompt": "The plank crate broken: a low pile of loose, crossed Wood planks. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		}
+	]
+}

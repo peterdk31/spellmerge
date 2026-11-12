@@ -28,10 +28,18 @@ enum When {
 	## Its staff `staff` (1-4) cast, by a trigger or by whoever possesses it: as the cast leaves,
 	## after any wind-up.
 	CAST,
+	## A trigger's cast of its staff `staff` (1-4) did not go (props W9c): the staff was busy (winding
+	## up, or in the delay after its last cast), it had nothing to cast (every card wasted, no aim) or,
+	## `dry`, its mana pays none of its casts (a prop's pool never refills: an arc lodestone that has
+	## zapped its pool's worth goes dark). With `dry` on it fires only for the mana, which is told
+	## only of a staff that is free (a busy staff is refused as busy first); off, for any of them.
+	REFUSED,
 }
 
 ## The names of `When`, as the problems and the moments name them.
-const WHEN_NAMES: PackedStringArray = ["element_hit", "status", "reaction", "health_below", "death", "entered", "cast"]
+const WHEN_NAMES: PackedStringArray = ["element_hit", "status", "reaction", "health_below", "death", "entered", "cast", "refused"]
+## The name a REFUSED moment comes with when the staff's mana paid none of its casts (`dry`).
+const DRY: StringName = &"dry"
 
 @export var when: When = When.ELEMENT_HIT
 ## ELEMENT_HIT: the hit's element (a card id: &"fire"; empty: a plain hit).
@@ -44,8 +52,10 @@ const WHEN_NAMES: PackedStringArray = ["element_hit", "status", "reaction", "hea
 @export var reaction: StringName = &""
 ## HEALTH_BELOW: the share of its most health (0-1).
 @export_range(0.0, 1.0) var share: float = 0.0
-## CAST: the staff (1-4) whose cast it hears.
+## CAST, REFUSED: the staff (1-4) whose cast it hears.
 @export_range(0, 4) var staff: int = 0
+## REFUSED: only when the staff's mana pays none of its casts (off: whatever stopped it).
+@export var dry: bool = false
 
 ## What it does: cast this staff of the prop's (1-4; 0: none), as the prop, along its aim.
 @export_range(0, 4) var cast: int = 0
@@ -63,8 +73,8 @@ static func make(when_kind: When, cast_staff: int = 0, then_state: StringName = 
 
 
 ## True when this row fires on a moment of `kind` with `name` (the element, status or reaction it
-## is about; empty for the others) and `amount` (a hit's damage, the health share it fell to, the
-## staff number that cast). HEALTH_BELOW is handed the share it fell from too (`before`): it fires
+## is about, or REFUSED's `DRY`; empty for the others) and `amount` (a hit's damage, the health
+## share it fell to, the staff number that cast or was refused). HEALTH_BELOW is handed the share it fell from too (`before`): it fires
 ## on the hit that crosses its share.
 func heard(kind: When, name: StringName, amount: float, before: float = 1.0) -> bool:
 	if kind != when:
@@ -80,6 +90,8 @@ func heard(kind: When, name: StringName, amount: float, before: float = 1.0) -> 
 			return before >= share and amount < share
 		When.CAST:
 			return int(amount) == staff
+		When.REFUSED:
+			return int(amount) == staff and (not dry or name == DRY)
 	return true
 
 
@@ -120,9 +132,9 @@ func problems(staffs: int, state_ids: PackedStringArray, known: Dictionary = {})
 		When.HEALTH_BELOW:
 			if share <= 0.0 or share > 1.0:
 				found.append("health_below: share is %s; above 0, at most 1." % share)
-		When.CAST:
+		When.CAST, When.REFUSED:
 			if staff < 1 or staff > staffs:
-				found.append("cast hears staff %d; the prop holds %d." % [staff, staffs])
+				found.append("%s hears staff %d; the prop holds %d." % [when_name(), staff, staffs])
 	return found
 
 

@@ -1,0 +1,20 @@
+{
+	"assets": [
+		{
+			"path": "content/props/burial_jar/idle.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from idle.grid.json, 2026-11-12)",
+			"prompt": "A burial jar prop, 24x24: a squat lidded Bone jar with a knob on its lid and a Void band of small rune marks round its belly. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/burial_jar/shattered.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from shattered.grid.json, 2026-11-12)",
+			"prompt": "The burial jar shattered: the jagged bottom of the Bone jar still standing, shards on the floor round it. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		}
+	]
+}

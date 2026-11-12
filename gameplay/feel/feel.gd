@@ -525,8 +525,18 @@ var _flash_tip: PackedInt32Array = PackedInt32Array()
 ## 1 for a flash drawn on the floor under the bodies by its cue part (`floor`; a slam's), as its
 ## kind's `on_floor` draws the cracks.
 var _flash_floor: PackedByteArray = PackedByteArray()
-## The actor whose staff tip the flashes of the cue playing now sit on (`_on_cast_winding`), or NONE.
+## The staff whose wind-up each flash shows (a wind-up cue's, `_on_cast_winding`), or -1: it ends
+## the frame that wind-up is over, left or cancelled (a lit barrel shot apart blows at once, and its
+## fuse's look ends with its fuse; props W9c), as a lane does (`lanes.gd`).
+var _flash_wind: PackedInt32Array = PackedInt32Array()
+## 1 for a wind-up's flash that lasts its wind-up (a `lasts_size` part, as the closing ring): its
+## seconds follow what the wind-up has left (`Spells.cooldown_left`), so a chill that stretches the
+## wind-up, or a freeze that holds it, stretches or holds the ring too, as it does the lane.
+var _flash_lasts_wind: PackedByteArray = PackedByteArray()
+## The actor whose staff tip the flashes of the cue playing now sit on (`_on_cast_winding`), or NONE,
+## and the staff winding up.
 var _cue_tip: int = ActorsScript.NONE
+var _cue_wind: int = -1
 var _next_flash: int = 0
 ## The flashes shown since the last step drew them (`_show_flash`), and whether the flash being
 ## shown is a hit's own (its spray or impact, `_hit_flash`). A frame's hit flashes stop at
@@ -1643,6 +1653,9 @@ func _play_flash(flash: CuePlanScript.Flash, cue: CueContextScript) -> void:
 		_cue_flash = _show_flash(flash.kind, at, way, cue.color, 0, EXACT, zoom, seconds, length, follow)
 	else:
 		_cue_flash = _show_flash(flash.kind, at, way, cue.tint, cue.ramp, 0 if paint == CuePlanScript.PAINT_NO_CARDS else cue.look, zoom, seconds, length, follow)
+	# A wind-up's flash as long as the wind-up follows it, held or stretched.
+	if flash.lasts_size and _cue_flash >= 0 and _flash_wind[_cue_flash] >= 0:
+		_flash_lasts_wind[_cue_flash] = 1
 	# A ground strike's flash on the floor, under the bodies (its part's `floor`).
 	if flash.floor and _cue_flash >= 0:
 		_flash_floor[_cue_flash] = 1
@@ -1961,6 +1974,10 @@ func _size_flashes(slots: int) -> void:
 	_flash_floor.resize(slots)
 	_flash_floor.fill(0)
 	_flash_tip.fill(ActorsScript.NONE)
+	_flash_wind.resize(slots)
+	_flash_wind.fill(-1)
+	_flash_lasts_wind.resize(slots)
+	_flash_lasts_wind.fill(0)
 	_next_flash = 0
 	# The statuses shown lost their flashes; the next step shows them again.
 	_status_effect.fill(-1)
@@ -2084,6 +2101,8 @@ func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_flash_follow[slot] = follow
 	_flash_offset[slot] = Vector2(0.0, -STATUS_RISE) if follow != null else Vector2.ZERO
 	_flash_tip[slot] = _cue_tip
+	_flash_wind[slot] = _cue_wind
+	_flash_lasts_wind[slot] = 0
 	_flash_floor[slot] = 0
 	_flash_light[slot] = 0.0 if _cue_unlit else float(_code_light.get(kind, 0.0))
 	if kind == KIND_ARC:
@@ -2137,6 +2156,15 @@ func _step_flashes(real_delta: float) -> void:
 				follow = followed as Node2D
 			else:
 				through = 1.0
+		if _flash_wind[slot] >= 0 and spells != null and through < 1.0:
+			if not bool(spells.call("is_winding", _flash_tip[slot], _flash_wind[slot])):
+				# Its wind-up is over: the cast left, or was cancelled.
+				through = 1.0
+			elif _flash_lasts_wind[slot] == 1:
+				# As long as its wind-up: what has run plus what the wind-up has left.
+				var left: float = float(spells.call("cooldown_left", _flash_tip[slot], _flash_wind[slot]))
+				_flash_seconds[slot] = maxf(_flash_age[slot] + left, 0.01)
+				through = _flash_age[slot] / _flash_seconds[slot]
 		if through >= 1.0:
 			_flash_seconds[slot] = 0.0
 			_flash_follow[slot] = null
@@ -2387,7 +2415,7 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 ## its carrier card's `wind_cue` (an enemy's telegraph: a lane along the aim, a ring for a cast that
 ## is not aimed), from the staff tip, its size the wind-up's seconds, on the staff tip as it turns.
 ## Only for a caster not on the players' team: a telegraph warns the players (owner, 2026-11-01).
-func _on_cast_winding(caster: int, _staff: int, carrier_card: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int, staff_cue: StringName) -> void:
+func _on_cast_winding(caster: int, staff: int, carrier_card: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int, staff_cue: StringName) -> void:
 	if caster < 0 or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
 	var table: ActorsScript = _actor_table()
@@ -2398,8 +2426,10 @@ func _on_cast_winding(caster: int, _staff: int, carrier_card: StringName, origin
 		return
 	# Its flashes sit on the staff tip as it turns (the aim follows the caster through the wind-up).
 	_cue_tip = caster
+	_cue_wind = staff
 	play_cue(cue, caster, origin, direction, seconds, tint, look, ActorsScript.NONE, -1, -1, tag, true, NO_BODY, _ramp_of(caster), table.node_of(caster) as Node2D)
 	_cue_tip = ActorsScript.NONE
+	_cue_wind = -1
 
 
 ## A cue's `lane` part (`CueBase`; T6b): a telegraph lane for the cast of the cue's tag, as long as

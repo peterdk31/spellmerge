@@ -1,0 +1,44 @@
+{
+	"assets": [
+		{
+			"path": "content/props/arc_lodestone/idle.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from idle.grid.json, 2026-11-12)",
+			"prompt": "An arc lodestone prop, 24x32: a dark Stone standing stone with Arc lime veins down its face and two small Arc crystal tips growing from its sides. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/arc_lodestone/idle_motes.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from idle.grid.json, 2026-11-12)",
+			"prompt": "The mote points of idle.svg: its crystal tips' lit faces and four points of its veins in Bone light, nothing else."
+		},
+		{
+			"path": "content/props/arc_lodestone/charged.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from charged.grid.json, 2026-11-12)",
+			"prompt": "The arc lodestone charged: idle.svg with every Arc shade a step brighter, its veins Arc light and its crystal tips white-hot Bone light. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/arc_lodestone/charged_motes.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from charged.grid.json, 2026-11-12)",
+			"prompt": "The mote points of charged.svg, the same as idle_motes.svg: in Bone light, nothing else."
+		},
+		{
+			"path": "content/props/arc_lodestone/spent.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from spent.grid.json, 2026-11-12)",
+			"prompt": "The arc lodestone spent: idle.svg with its veins and crystal tips burnt out to dark Stone shades. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		}
+	]
+}

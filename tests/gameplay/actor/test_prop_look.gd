@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## prop body shows the look of the state it is in (`PropBase.looks`, `PropStateLook`, `PropLayer`):
 ## the body's own `Sprite` as its first layer, its other layers, a node giving off each of their
 ## `MoteSource`s (a mask reading its layer), a light spot, and its cue as a state is entered. The
-## test exploding barrel (`fixtures/exploding_barrel.tres`, its art from `fixtures/exploding_barrel/`
-## by tools/pixel_grid.py) idle, lit and broken; a snapshot giving a state back; an animated layer;
+## exploding barrel (content/props/exploding_barrel, its art by tools/pixel_grid.py) idle, lit and broken; a snapshot giving a state back; an animated layer;
 ## Feel's source motes reading a prop's sources; the looks' problems.
 ##
 ## godot --headless --path . --script res://tests/gameplay/actor/test_prop_look.gd
@@ -13,8 +12,8 @@ const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
-const EXPLODING_BARREL: PropBase = preload("res://tests/gameplay/actor/fixtures/exploding_barrel.tres")
-const ART: String = "res://tests/gameplay/actor/fixtures/exploding_barrel/%s.svg"
+const EXPLODING_BARREL: PropBase = preload("res://content/props/exploding_barrel/exploding_barrel.tres")
+const ART: String = "res://content/props/exploding_barrel/%s.svg"
 
 var _world: Fixture
 ## [caster, cue] of every `cue_shown`.
@@ -68,7 +67,7 @@ func test_it_shows_the_state_it_starts_in_with_its_body_sprite_first() -> void:
 	var body: Actor = _barrel()
 	check_equal(_body_art(body), ART % "idle", "the body's own Sprite shows the idle art")
 	var sprite := body.get_node("Sprite") as Sprite2D
-	check_equal(sprite.position, Vector2(0, -12), "a 16x24 picture stands on the feet")
+	check_equal(sprite.position, Vector2(0, -16), "a 24x32 picture stands on the feet")
 	var mask := _look(body).get_node("Layer1") as Sprite2D
 	check(mask != null and not mask.visible, "its mask layer is there, hidden")
 	var sources: Array[Node] = _in_group(body, MoteSource.GROUP)
@@ -89,14 +88,14 @@ func test_entering_a_state_shows_its_look_light_and_motes() -> void:
 	check_equal(lights.size(), 1, "a light")
 	if lights.size() == 1:
 		check(LightSpot.problems(lights[0]).is_empty(), "a sound light spot: %s" % [LightSpot.problems(lights[0])])
-		check_equal((lights[0] as Node2D).position, Vector2(0, -22), "at its fuse")
+		check_equal((lights[0] as Node2D).position, Vector2(1.5, -27.5), "at its fuse")
 		check_equal(LightSpot.reach_of(lights[0]), 40.0, "its reach")
 	for source in sources:
 		var art: Sprite2D = MoteSource.art_of(source)
 		check(art != null and art.texture != null, "each source has art to read: %s" % source.name)
 	_enter(body, &"broken")
 	check_equal(_body_art(body), ART % "broken", "broken: the rubble")
-	check_equal(_in_group(body, MoteSource.GROUP).size(), 1, "its dust")
+	check_equal(_in_group(body, MoteSource.GROUP).size(), 2, "its ash and last embers")
 	check_equal(_in_group(body, LightSpot.GROUP).size(), 0, "its light gone")
 	check(_look(body).get_node_or_null("Layer1") == null, "the fusing look's mask gone")
 
@@ -230,7 +229,7 @@ func test_feels_source_motes_read_a_props_sources() -> void:
 	check_equal(sources.source_count(), 2, "the lit barrel's two")
 	_enter(body, &"broken")
 	sources.give_off(0.0, null)
-	check_equal(sources.source_count(), 1, "left as the state is left; the rubble's read at the next frame")
+	check_equal(sources.source_count(), 2, "left as the state is left; the rubble's two read at the next frame")
 
 
 func test_the_problems_of_looks() -> void:
@@ -265,12 +264,12 @@ func test_the_problems_of_looks() -> void:
 	check(masked_lines.contains("never the body's"), "a mask on the body's layer: %s" % masked_lines)
 	check(masked_lines.contains("0 to 1"), "a light out of range: %s" % masked_lines)
 	var bad := PropLayer.new()
-	bad.frames = 3
+	bad.frames = 5
 	bad.texture = load(ART % "idle") as Texture2D
 	bad.offset = Vector2(0.5, 0)
 	bad.motes = [MoteSource.new()]
 	var lines := "\n".join(bad.problems("bad"))
-	for words: String in ["not 3 frames", "whole pixels", "mote source 0"]:
+	for words: String in ["not 5 frames", "whole pixels", "mote source 0"]:
 		check(lines.contains(words), "names %s: %s" % [words, lines])
 
 

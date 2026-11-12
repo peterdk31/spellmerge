@@ -11,7 +11,6 @@ const MoteKinds := preload("res://tests/content/mote_kinds.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")
-const EXPLODING_BARREL: PropBase = preload("res://tests/gameplay/actor/fixtures/exploding_barrel.tres")
 const SCENE: PackedScene = preload("res://content/props/base/prop.tscn")
 
 var _world: Fixture
@@ -43,11 +42,9 @@ func test_every_prop_is_sound() -> void:
 
 ## Every prop's look loads (props W7): each state has one (`PropBase.problems` names one missing),
 ## every layer's picture is there, its motes are a kind content/motes has (as every source in a
-## scene, tests/content/test_mote_sources.gd), and a mask has lit pixels to give off from; the test
-## exploding barrel too.
+## scene, tests/content/test_mote_sources.gd), and a mask has lit pixels to give off from.
 func test_every_props_look_loads_and_its_masks_are_not_empty() -> void:
 	var all: Array[PropBase] = _props()
-	all.append(EXPLODING_BARREL)
 	for data in all:
 		check_equal(data.look_problems(), PackedStringArray(), "%s: its looks are sound" % data.id)
 		for look in data.looks:
@@ -77,7 +74,6 @@ func test_the_shared_body_has_every_part_a_prop_needs() -> void:
 
 func test_every_cast_a_prop_reacts_with_is_paid_from_a_full_pool() -> void:
 	var all: Array[PropBase] = _props()
-	all.append(EXPLODING_BARREL)
 	for data in all:
 		var body: Actor = _world.add(PropBody.make(data), Vector2.ZERO)
 		for state in data.states.list:

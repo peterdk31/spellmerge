@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## A prop's states and their triggers (props W6, docs/milestones/props.md, "Triggers" and "The exploding barrel,
 ## written out"): the `PropStateTriggers` component on a body made by `PropBody.make`, with real Spells,
-## Combat and cards. The exploding barrel (`fixtures/exploding_barrel.tres`, the plan's exploding barrel as data: a fuse staff of
-## `fire · blast` that winds up 1 s and a blast staff with none) in all its paths: lit and blown, shot
+## Combat and cards. The exploding barrel (content/props/exploding_barrel: a fuse staff of
+## `fire · blast · pulse` that winds up 1 s and a blast staff with none) in all its paths: lit and blown, shot
 ## while lit, shot apart, possessed and pressed; a chain of three; several triggers on one hit; a
 ## `gone` state; an invincible prop; the triggers one by one; its state in the hash and a snapshot.
 ##
@@ -12,7 +12,7 @@ const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")
-const EXPLODING_BARREL: PropBase = preload("res://tests/gameplay/actor/fixtures/exploding_barrel.tres")
+const EXPLODING_BARREL: PropBase = preload("res://content/props/exploding_barrel/exploding_barrel.tres")
 
 ## The fuse (staff 1, by number 0) and the blast (staff 2, by number 1).
 const FUSE: int = 0
@@ -116,8 +116,8 @@ func test_a_body_is_made_from_its_data() -> void:
 	check_equal(exploding_barrel.team(), ActorsScript.TEAM_WORLD, "the world's")
 	check(exploding_barrel.is_still(), "still: no controller, no Mover")
 	check_equal(exploding_barrel.health.max_health, 10.0, "its health")
-	check_equal(exploding_barrel.hurtbox.radius, 7.0, "its hurt circle")
-	check_equal(exploding_barrel.footprint.size, Vector2(14.0, 8.0), "its ground")
+	check_equal(exploding_barrel.hurtbox.size, Vector2(14.0, 20.0), "its hurt box")
+	check_equal(exploding_barrel.footprint.size, Vector2(14.0, 10.0), "its ground: the box's base")
 	check_equal(exploding_barrel.caster.staff_count, 2, "its two staffs")
 	check_equal(_state(exploding_barrel), &"idle", "in its first state")
 	check(exploding_barrel.downable, "its 0 health is its own")
@@ -396,6 +396,61 @@ func test_a_reaction_between_statuses_on_it_is_a_moment() -> void:
 	check_equal(_state(body), &"reacted", "Combat's %s on it" % row.reaction_id)
 
 
+## Props W9c: a trigger's cast that does not go is a moment, `refused`: `dry` when the staff's mana
+## pays none of its casts (a prop's pool never refills), else whatever stopped it (here the delay
+## after its last cast). An invincible prop whose plain hits cast its blast staff.
+func _refusing() -> Actor:
+	var dry: PropTrigger = PropTrigger.make(PropTrigger.When.REFUSED, 0, &"dry")
+	dry.staff = 2
+	dry.dry = true
+	var busy: PropTrigger = PropTrigger.make(PropTrigger.When.REFUSED, 0, &"busy")
+	busy.staff = 2
+	var hit: PropTrigger = PropTrigger.make(PropTrigger.When.ELEMENT_HIT, 2)
+	var rows: Array[PropTrigger] = [hit, dry, busy]
+	return _prop(_made([PropState.make(&"idle", rows), PropState.make(&"dry"), PropState.make(&"busy")], 10.0, true))
+
+
+func test_a_trigger_cast_its_staff_is_too_busy_for_is_refused() -> void:
+	var body: Actor = _refusing()
+	_world.combat.hit(ActorsScript.NONE, body, 1.0)
+	check_equal(_blasts(body, BLAST), 1, "the first hit casts")
+	check_equal(_state(body), &"idle", "and stays")
+	_world.combat.hit(ActorsScript.NONE, body, 1.0)
+	check_equal(_blasts(body, BLAST), 1, "the second comes in the delay after it: nothing leaves")
+	check_equal(_state(body), &"busy", "refused, not dry: the row that waits for the mana fires not")
+
+
+## A `refused` row that casts the refused staff again, or enters a state whose `entered` row does,
+## would be refused again at once, round and round to MAX_DEPTH: while a staff's refused moment
+## runs, its rows' casts of that staff do nothing.
+func test_a_refused_row_never_goes_round_and_round() -> void:
+	var again: PropTrigger = PropTrigger.make(PropTrigger.When.REFUSED, 2, &"retry")
+	again.staff = 2
+	var cast: PropTrigger = PropTrigger.make(PropTrigger.When.ENTERED, 2)
+	var retry_again: PropTrigger = PropTrigger.make(PropTrigger.When.REFUSED, 0, &"retry")
+	retry_again.staff = 2
+	var hit: PropTrigger = PropTrigger.make(PropTrigger.When.ELEMENT_HIT, 2)
+	var idle: Array[PropTrigger] = [hit, again]
+	var retry: Array[PropTrigger] = [cast, retry_again]
+	var body: Actor = _prop(_made([PropState.make(&"idle", idle), PropState.make(&"retry", retry)], 10.0, true))
+	body.caster.set_mana(BLAST, 0.0)
+	var tries: Array[int] = [0]
+	_world.bus.cast_fizzled.connect(func(_caster: int, _staff: int) -> void: tries[0] += 1)
+	_world.combat.hit(ActorsScript.NONE, body, 1.0)
+	check_equal(tries[0], 1, "its staff was tried once (round and round, it was tried to MAX_DEPTH)")
+	check_equal(_state(body), &"retry", "refused once, it went on")
+	check_equal(_changes, [[body.id, &"retry"]], "once: its casts of the staff did nothing while its refusal ran")
+	check_equal(_blasts(body, BLAST), 0, "nothing left")
+
+
+func test_a_trigger_cast_its_mana_pays_not_is_refused_dry() -> void:
+	var body: Actor = _refusing()
+	body.caster.set_mana(BLAST, 0.0)
+	_world.combat.hit(ActorsScript.NONE, body, 1.0)
+	check_equal(_blasts(body, BLAST), 0, "nothing leaves")
+	check_equal(_state(body), &"dry", "refused dry: the first then among both refused rows")
+
+
 # --- Problems ---------------------------------------------------------------------
 
 func test_problems_name_what_is_wrong() -> void:
@@ -405,7 +460,8 @@ func test_problems_name_what_is_wrong() -> void:
 	check(empty.contains("no scene") and empty.contains("no states"), "no scene, no states: %s" % empty)
 	var stray: PropTrigger = _on_fire(0.0, 3, &"nowhere")
 	stray.element = &"custard"
-	var loop_a: Array[PropTrigger] = [PropTrigger.make(PropTrigger.When.ENTERED, 0, &"b")]
+	var deaf: PropTrigger = PropTrigger.make(PropTrigger.When.REFUSED, 0, &"a")
+	var loop_a: Array[PropTrigger] = [PropTrigger.make(PropTrigger.When.ENTERED, 0, &"b"), deaf]
 	var loop_b: Array[PropTrigger] = [PropTrigger.make(PropTrigger.When.ENTERED, 0, &"a")]
 	data.staffs = EXPLODING_BARREL.staffs.duplicate()
 	data.states = PropStates.make([PropState.make(&"idle", [stray] as Array[PropTrigger]), PropState.make(&"a", loop_a), PropState.make(&"b", loop_b), PropState.make(&"idle")])
@@ -414,6 +470,7 @@ func test_problems_name_what_is_wrong() -> void:
 	check(found.contains("'nowhere'"), "a state it does not have")
 	check(found.contains("custard"), "an element nobody knows")
 	check(found.contains("for ever"), "entered triggers that go round")
+	check(found.contains("refused hears staff 0"), "a refused row that names no staff")
 	check(found.contains("two states are named 'idle'"), "a name twice")
 
 

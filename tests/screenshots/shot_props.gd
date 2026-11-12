@@ -1,12 +1,10 @@
 extends "res://tests/support/empty_stage.gd"
 ## Every prop in every state (props W7, docs/milestones/props.md, "W7: the look"): on the empty
-## stage (tests/support/empty_stage.gd), a row a prop (the registry's `props`, by id, then the test exploding barrel,
-## tests/gameplay/actor/fixtures/exploding_barrel.tres), a column a state, each body made by
+## stage (tests/support/empty_stage.gd), a row a prop (the registry's `props`, by id), a column a state, each body made by
 ## `PropBody.make` and put into its state as a trigger would, its look's art, motes and light
 ## showing; each prop's cells as big as its art (a barrel to the hub's 96 px stone). `props` is the
 ## whole sheet a moment later (the motes given off), `props_4x` the first prop close up.
 
-const TEST_BARREL: PropBase = preload("res://tests/gameplay/actor/fixtures/exploding_barrel.tres")
 ## Pixels round each prop's art, and the widest a row of the sheet runs.
 const PAD: float = 12.0
 const ROW_WIDTH: float = 600.0
@@ -21,7 +19,6 @@ func take() -> void:
 	for resource: Resource in root.get_node("Registry").call("get_all", &"props"):
 		if resource is PropBase:
 			props.append(resource as PropBase)
-	props.append(TEST_BARREL)
 	# Each prop a block of its states side by side, a cell as big as its biggest art (props differ
 	# from a barrel to the hub's 96 px stone); blocks run in rows across the screen.
 	var cells: Array[Rect2] = []
@@ -53,7 +50,7 @@ func take() -> void:
 			stand(body, bottom - _first_offset(data))
 			if column > 0:
 				_put_in(body, data.states.list[column].state_id)
-	# The motes given off for a while (under the test barrel's 1 s fuse).
+	# The motes given off for a while (under the exploding barrel's 1 s fuse).
 	for i in 40:
 		await physics_frame
 		await process_frame

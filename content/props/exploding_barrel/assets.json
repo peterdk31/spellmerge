@@ -1,0 +1,36 @@
+{
+	"assets": [
+		{
+			"path": "content/props/exploding_barrel/idle.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from idle.grid.json, 2026-11-12)",
+			"prompt": "A powder keg prop, 24x32: bulging Wood staves, two Stone iron hoops at each end, a lid and a short dark fuse, a painted Fire flame mark on its front. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/exploding_barrel/idle_motes.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from idle.grid.json, 2026-11-12)",
+			"prompt": "The mote points of idle.svg: its painted flame mark's pixels in Bone light, nothing else."
+		},
+		{
+			"path": "content/props/exploding_barrel/fusing.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from fusing.grid.json, 2026-11-12)",
+			"prompt": "The powder keg lit: idle.svg with a Spark light tip on its fuse. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/exploding_barrel/broken.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from broken.grid.json, 2026-11-12)",
+			"prompt": "The powder keg blown apart: a scorched ring of broken Wood stave stubs, coals and a loose Stone hoop on the floor beside it. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		}
+	]
+}

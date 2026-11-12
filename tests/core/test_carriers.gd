@@ -145,7 +145,7 @@ func test_carriers_ask_the_runtime_only_through_the_kit_and_the_runtime_names_no
 		names.append(String(Carriers.of(id).get_script().get_global_name()))
 	# The runtime, the compiler and the AI's summary ask a carrier its yes/no answers, never which
 	# one it is: no id, no class, and no carrier picked out through `Carriers` (a constant or an
-	# `is_` question about one; props W9a: a Pulse is `AROUND`, not `Carriers.is_pulse`).
+	# `is_` question about one; props W9a: a Pulse is `AOE`, not `Carriers.is_pulse`).
 	for path: String in ["res://core/spells/spells.gd", "res://core/spells/staff_compiler.gd", "res://core/spells/cast_sense.gd"]:
 		var number: int = 0
 		for line in FileAccess.get_file_as_string(path).split("\n"):

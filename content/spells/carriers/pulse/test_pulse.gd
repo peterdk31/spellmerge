@@ -31,7 +31,7 @@ func test_it_is_one_carrier_that_acts_round_what_casts_it() -> void:
 	check(pulse.hits() and pulse.lasts(), "it strikes what is there and lasts a moment, for its triggers")
 	check(pulse.has(CarrierTraits.MEETS_SHOTS), "it meets the shots that reach what casts it")
 	check(pulse.has(CarrierTraits.MELEE), "it never leaves what casts it, so it never hits that")
-	check(pulse.has(CarrierTraits.AROUND), "it acts all round, not along an aim")
+	check(pulse.has(CarrierTraits.AOE), "it acts all round, not along an aim")
 	for gone: StringName in [&"pulse_bearer", &"pulse_point"]:
 		check(not Carriers.exists(gone), "no %s: the runtime knows what casts it" % gone)
 
@@ -275,4 +275,61 @@ func test_a_shield_pulse_on_a_point_guards_no_one() -> void:
 	arena.run(1.0)
 	check(arena.lost(arena.imps[0]) > 0, "the bolt hit")
 	check(barriers.is_empty(), "and nobody got a barrier: %s" % [barriers])
+	arena.free_all()
+
+
+func test_an_on_expire_that_makes_room_in_a_full_decoy_pool_ends_only_the_oldest_decoys_entry() -> void:
+	# Regression (review, 2026-11-12): a Pulse's entry left the live carriers after its `on expire`
+	# fired; when that payload's decoy ended the oldest of a full pool, the oldest's entry left the
+	# list first and moved it about, so the wrong entry was removed.
+	var arena := ArenaScript.new(root)
+	arena.add_entities()
+	arena.add_guard(0, Vector2.ZERO)
+	# `on hurt`: listed while each decoy lives, and quiet (no bolts for the stacked decoys to trade).
+	arena.install_cards(0, 0, ["on_hurt", "decoy", "bolt"])
+	var pool: int = (preload("res://gameplay/ai/entities.gd")).PER_PLAYER
+	var cast: int = 0
+	for step in 600:
+		if cast == pool:
+			break
+		if arena.cast(0, 0):
+			cast += 1
+		arena.run(1.0 / 60.0)
+	check_equal(cast, pool, "the decoy staff was cast %d times" % pool)
+	check_equal(arena.spells._lc_count, pool, "each decoy's `on hurt` is listed")
+	arena.install_cards(0, 1, ["on_expire", "pulse", "decoy"])
+	# Cast away from the decoys, so the Pulse's strike does not end one of them first.
+	arena.place_caster(0, Vector2(-300.0, 0.0))
+	arena.cast(0, 1)
+	arena.run(1.0)
+	var staffs: Array[int] = []
+	for i in arena.spells._lc_count:
+		staffs.append(SpellTag.staff_of(arena.spells._lc_tag[i]))
+	check_equal(staffs, [0, 0, 0] as Array[int], "the Pulse's end and the oldest decoy's `on hurt` left; the other decoys' stay")
+	arena.free_all()
+
+
+func test_on_expire_on_a_payloads_pulse_round_a_flying_bolt_fires_from_the_bolt() -> void:
+	# A bolt's timer fires a Pulse round the bolt (what fired it); as the Pulse's life ends, its own
+	# `on expire` fires a second bolt from where the first one is by then.
+	var arena := ArenaScript.new(root)
+	arena.add_guard(0, Vector2.ZERO)
+	var compiled: CompiledStaff = arena.install_cards(0, 0, ["timer", "bolt", "on_expire", "pulse", "bolt"])
+	check(compiled.wasted.is_empty(), "every card works: %s" % [compiled.wasted])
+	arena.cast(0, 0)
+	var furthest: float = 0.0
+	var second: bool = false
+	for step in 90:
+		arena.run(1.0 / 60.0)
+		var xs: Array[float] = []
+		for slot in arena.projectiles.get_cap():
+			if arena.projectiles.is_alive(slot) and arena.projectiles.get_actor_of(slot) == 0:
+				xs.append(arena.projectiles.get_position_of(slot).x)
+		if xs.size() >= 2:
+			second = true
+			xs.sort()
+			furthest = xs[xs.size() - 2]
+			break
+	check(second, "a second bolt left")
+	check(furthest > 40.0, "from far along the first bolt's flight, not from the wizard: %.1f" % furthest)
 	arena.free_all()

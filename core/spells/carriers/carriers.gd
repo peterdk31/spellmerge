@@ -38,9 +38,7 @@ static func ids() -> Array[StringName]:
 	if _shared.is_empty():
 		_shared = make_all()
 	var out: Array[StringName] = []
-	for id: StringName in _shared:
-		if exists(id):
-			out.append(id)
+	out.assign(_shared.keys())
 	return out
 
 

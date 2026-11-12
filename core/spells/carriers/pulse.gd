@@ -15,7 +15,7 @@ extends Carrier
 ## blast on it is that strike, so it explodes there. Then it **lasts** its `lifetime` round what
 ## casts it, for the triggers that need a carrier that lasts (a timer, on hurt, on recast) and its
 ## end (on expire); a hold keeps it until its staff is cast again, striking again every wind-up and
-## life (`REPEATS_HELD`, as a held swing). It acts all round, not along an aim (`AROUND`).
+## life (`REPEATS_HELD`, as a held swing). It acts all round, not along an aim (`AOE`).
 ##
 ## Where what casts it is a body or a shot, it meets the shots that reach it there (`MEETS_SHOTS`): a
 ## deflect turns the shots round it (or makes the shot deflect), a shield is a barrier on that body
@@ -28,7 +28,7 @@ func id() -> StringName:
 
 
 func traits() -> int:
-	return HITS | LASTS | REPEATS_HELD | MEETS_SHOTS | MELEE | AROUND
+	return HITS | LASTS | LIFE_WAITS | REPEATS_HELD | MEETS_SHOTS | MELEE | AOE
 
 
 ## Its hits feel like an explosion (`HitProfile.kind`).
@@ -67,21 +67,19 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 		kit.moves().shield_caster(spell, tag, body, 0.0)
 	elif shot >= 0:
 		kit.moves().shield(spell, tag, actor, shot, 0.0)
-	_join_live(spell, tag, actor, origin, way, lifetime)
+	_join_live(spell, tag, body, shot, origin, way, lifetime)
 	return 1
 
 
 ## Lists it for its triggers that fire while it lasts, and its end for its `on expire`, round
-## what casts it for its life: a body (`LC_ACTOR`), a shot (`LC_SLOT`: round it while it flies, then
-## where it was) or the point (`LC_POINT`).
-func _join_live(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way: Vector2, lifetime: float) -> void:
+## what casts it for its life: the body `body` (`LC_ACTOR`), else the shot `shot` (`LC_SLOT`: round
+## it while it flies, then where it was), else the point (`LC_POINT`).
+func _join_live(spell: CompiledSpell, tag: int, body: int, shot: int, origin: Vector2, way: Vector2, lifetime: float) -> void:
 	if lifetime <= 0.0 or spell.triggers.is_empty():
 		return
 	var kind: int = SpellRuntime.LC_POINT
 	var ref: int = -1
 	var seq: int = 0
-	var body: int = kit.caster_body(actor)
-	var shot: int = kit.caster_shot()
 	if body >= 0:
 		kind = SpellRuntime.LC_ACTOR
 		ref = body
@@ -91,35 +89,6 @@ func _join_live(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way
 		seq = kit.caster_seq()
 	kit.live_join(spell, tag, kind, ref, seq, false, lifetime, origin, way)
 	kit.live_join_ends(spell, tag, kind, ref, seq, lifetime, origin, way)
-
-
-## The modifiers of `modifiers` that do nothing on it once its other cards are known: its life
-## matters only to a trigger that waits on it (one that fires while it lasts, or when it ends) or to
-## a hold (a held Pulse strikes again every wind-up and life), so a card that only lengthens its
-## life does nothing without one.
-func idle_modifiers(modifiers: Array[ModifierBase], _elements: Array[ElementBase], triggers: Array[TriggerBase]) -> Array[ModifierBase]:
-	var out: Array[ModifierBase] = []
-	var waits: bool = false
-	for trigger in triggers:
-		waits = waits or TriggerBase.LIVE.has(trigger.event) or trigger.event == TriggerBase.Event.EXPIRE
-	for modifier in modifiers:
-		waits = waits or modifier.behaviour == ModifierBase.Behaviour.HOLD
-	if waits:
-		return out
-	for modifier in modifiers:
-		if _only_life(modifier):
-			out.append(modifier)
-	return out
-
-
-## True when the only number of `modifier` a Pulse uses is its life (`lifetime_mult`,
-## `lifetime_base`): no behaviour, and nothing of its reach, damage or cast time.
-static func _only_life(modifier: ModifierBase) -> bool:
-	if modifier.behaviour != ModifierBase.Behaviour.NONE:
-		return false
-	if not is_equal_approx(modifier.lifetime_mult, 1.0) or modifier.lifetime_base > 0.0:
-		return is_equal_approx(modifier.radius_mult, 1.0) and modifier.damage_mult <= 1.0 and modifier.wind_up_mult >= 1.0 and modifier.wind_down_mult >= 1.0
-	return false
 
 
 ## What draws its look: no look of its own (its cues, and the body it is on).

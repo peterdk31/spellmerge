@@ -25,8 +25,12 @@ var radius: float = 0.0
 ## What the whole cast may deal: every carrier's hit times its shots, times the group's repeats;
 ## 0 when it hurts nobody.
 var damage: float = 0.0
-## The widest explosion at a carrier's end (`blast`): closer than this its caster is hurt too.
+## The widest explosion at a carrier's end (`blast`).
 var blast: float = 0.0
+## True when one of its blasts can hurt its caster, who should stand further off than `blast`. A
+## blast that is the strike of a carrier round its caster that spares it (a Pulse: `AOE` and
+## `MELEE`) cannot.
+var self_blast: bool = false
 ## True when it hits round a point or round its caster rather than along a line (a nova, a ring,
 ## an orbit, a fall from the sky, a rune).
 var area: bool = false
@@ -81,10 +85,12 @@ static func of(cast: CompiledCast) -> CastSense:
 		return sense
 	sense.empty = false
 	var repeats: float = float(maxi(cast.group.repeats, 1))
+	# The aimed numbers (`radius`, `speed`) are the first aimed carrier's: one that acts all round
+	# its caster (`AOE`) is not aimed.
 	var first_carrier: bool = true
 	for spell: CompiledSpell in cast.group.spells:
 		sense._read_spell(spell, repeats, first_carrier)
-		if not spell.has_trait(CarrierTraits.AROUND):
+		if not spell.has_trait(CarrierTraits.AOE):
 			first_carrier = false
 	if sense.close_reach <= 0.0:
 		sense.close_reach = sense.reach
@@ -93,14 +99,6 @@ static func of(cast: CompiledCast) -> CastSense:
 
 func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	var shield: bool = spell.behaviour(ModifierBase.Behaviour.SHIELD) > 0.0 or spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
-	if spell.has_trait(CarrierTraits.AROUND):
-		# Round the caster (the cast's own group): a barrier or a deflect round the caster's body, a
-		# heal on those near it (never the caster: it spares what casts it); its strike is an area
-		# round the caster, read below.
-		if shield:
-			blocks = true
-		if spell.hit != null and spell.hit.heal > 0:
-			heals = true
 	var carrier: Carrier = Carriers.of(spell.carrier)
 	var spell_reach: float = carrier.reach_of(spell)
 	# A nova casts it every way at once: not aimed, an area as far out as each copy goes.
@@ -122,14 +120,19 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		speed = spell.speed if spell_reach > 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES) else 0.0
 	reach = maxf(reach, spell_reach)
 	lasts = maxf(lasts, spell.lifetime)
-	blast = maxf(blast, spell.behaviour(ModifierBase.Behaviour.BLAST))
+	var spell_blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
+	blast = maxf(blast, spell_blast)
+	if spell_blast > 0.0 and not (spell.has_trait(CarrierTraits.AOE) and spell.has_trait(CarrierTraits.MELEE)):
+		self_blast = true
 	if spell.homing_range > 0.0:
 		homing = true
 	if spell.has_trait(CarrierTraits.MOVES_CASTER):
 		moves_caster = true
 		# A dash runs its `ray_length` (or its flight), a teleport jumps it.
 		move_reach = maxf(move_reach, maxf(spell_reach, maxf(spell.ray_length, spell.speed * spell.lifetime)))
-	if spell.has_trait(CarrierTraits.BLOCKS) or (shield and spell.has_trait(CarrierTraits.GUARDS)):
+	# A shield or deflect on a carrier that guards with it, or on one round its caster (a barrier or
+	# a deflect round the caster's body).
+	if spell.has_trait(CarrierTraits.BLOCKS) or (shield and (spell.has_trait(CarrierTraits.GUARDS) or spell.has_trait(CarrierTraits.AOE))):
 		blocks = true
 	if spell.has_trait(CarrierTraits.SPAWNS):
 		spawns = true
@@ -139,7 +142,7 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		sustained = true
 	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.LINE):
 		repeats_held = true
-	var ring: bool = spell.has_trait(CarrierTraits.AROUND) or falls or circles or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.OUTWARD)
+	var ring: bool = spell.has_trait(CarrierTraits.AOE) or falls or circles or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.OUTWARD)
 	if ring:
 		area = true
 	# How near a cast that is not aimed must be: a ring's flight, an orbit's circle, a melee arc.

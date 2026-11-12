@@ -139,13 +139,8 @@ func _read_group(want: int, payload: bool, wind_up: float = 0.0) -> CompiledGrou
 		elif card is CarrierCard:
 			var carrier_card := card as CarrierCard
 			var on: Carrier = Carriers.of(carrier_card.carrier)
-			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, carrier_card.wind_up)
+			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, carrier_card.wind_up, _waits(triggers))
 			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
-			if not keep_wasted:
-				# What works here by its behaviour may still do nothing beside these infusions and
-				# triggers (a longer life on a Pulse nothing waits on: `Carrier.idle_modifiers`).
-				for idle: ModifierBase in on.idle_modifiers(kept_modifiers, kept_elements, triggers):
-					kept_modifiers.erase(idle)
 			var spell: CompiledSpell = _build(carrier_card, on, kept_elements, kept_modifiers)
 			spell.slot = slot
 			_useful[slot] = true
@@ -174,10 +169,10 @@ func _read_group(want: int, payload: bool, wind_up: float = 0.0) -> CompiledGrou
 
 
 ## True when `group` has a carrier a scatter turns: one that is aimed (not one that acts all round
-## what casts it, `AROUND`: a Pulse).
+## what casts it, `AOE`: a Pulse).
 static func _aims(group: CompiledGroup) -> bool:
 	for spell in group.spells:
-		if not spell.has_trait(CarrierTraits.AROUND):
+		if not spell.has_trait(CarrierTraits.AOE):
 			return true
 	return false
 
@@ -251,26 +246,37 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 		spell.triggers.append(fires)
 
 
+## True when one of `triggers` waits on its carrier's life: one that fires while it lasts, or as it
+## ends.
+static func _waits(triggers: Array[TriggerBase]) -> bool:
+	for trigger in triggers:
+		if TriggerBase.LIVE.has(trigger.event) or trigger.event == TriggerBase.Event.EXPIRE:
+			return true
+	return false
+
+
 ## The modifiers of `modifiers` that do something on the carrier `on`, in order (every one with
 ## `keep_wasted`): a behaviour it runs (`Carrier.works`; homing on a rune, return on a beam do
 ## nothing, and change nothing else either) and numbers it uses (`_numbers_count`). The one rule for
 ## every carrier. `payload`: the carrier is a payload's, which adds no
 ## wind-down to a staff. `wind_up`: its carrier card's wind-up; with a
-## charge kept on it the carrier winds up too, so a shorter wind-up counts there.
-static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool, wind_up: float = 0.0) -> Array[ModifierBase]:
+## charge kept on it the carrier winds up too, so a shorter wind-up counts there. `waited`: a
+## trigger on it waits on its life (`_waits`); a hold kept on it does too.
+static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool, wind_up: float = 0.0, waited: bool = false) -> Array[ModifierBase]:
 	var deflects: bool = false
 	var blasts: bool = false
 	for modifier in modifiers:
 		deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and on.works(modifier.behaviour))
 		blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and on.works(modifier.behaviour))
+		waited = waited or (modifier.behaviour == ModifierBase.Behaviour.HOLD and on.works(modifier.behaviour))
 	var winds_up: bool = wind_up > 0.0
 	for modifier in modifiers:
 		# A charge's wind-up is a cost: it is there when the charge is kept for what else it does.
-		winds_up = winds_up or (modifier.wind_up_add > 0.0 and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, false))
+		winds_up = winds_up or (modifier.wind_up_add > 0.0 and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, false, waited))
 	var out: Array[ModifierBase] = []
 	for modifier in modifiers:
 		# A deflect turns every shot that touches it first, so a shield with it never blocks.
-		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, winds_up)
+		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, winds_up, waited)
 		if works or keep_wasted:
 			out.append(modifier)
 	return out
@@ -318,8 +324,7 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 	var on: Carrier = Carriers.of(carrier)
 	if card is ModifierBase:
 		var modifier := card as ModifierBase
-		var alone: Array[ModifierBase] = [modifier]
-		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false, false, false) and on.idle_modifiers(alone, [], []).is_empty()
+		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false, false, false, modifier.behaviour == ModifierBase.Behaviour.HOLD)
 	if card is ElementBase:
 		return on.takes_element(card as ElementBase, false)
 	if card is TriggerBase:
@@ -329,12 +334,13 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 
 ## True when one of a modifier's numbers counts on the carrier `on` (or it has a behaviour). Its
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
-## uses that number: a shorter wind-down where it adds one to its staff (`Carrier.has_wind_down`:
-## not a payload's carrier, `payload`), a shorter wind-up where the
-## carrier winds up (`winds_up`), damage where it hits (or blasts), speed where it travels and lifetime where it moves or lasts,
+## uses that number: a shorter wind-down where it adds one to its staff (not a payload's carrier,
+## `payload`), a shorter wind-up where the
+## carrier winds up (`winds_up`), damage where it hits (or blasts), speed where it travels and lifetime where it moves or lasts
+## (where its life is only a wait, `LIFE_WAITS`, only when something waits on it: `waited`),
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
 ## behaviour (`Carrier.works`), its numbers ride with it.
-static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool, winds_up: bool) -> bool:
+static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool, winds_up: bool, waited: bool = false) -> bool:
 	if modifier.behaviour != ModifierBase.Behaviour.NONE:
 		return true
 	var any: bool = false
@@ -346,7 +352,7 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 			return true
 	if modifier.wind_down_mult < 1.0:
 		any = true
-		if on.has_wind_down() and not payload:
+		if not payload:
 			return true
 	if modifier.damage_mult > 1.0:
 		any = true
@@ -358,11 +364,11 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 			return true
 	if not is_equal_approx(modifier.lifetime_mult, 1.0):
 		any = true
-		if on.has(Carrier.SPEED) or on.has(Carrier.LASTS):
+		if on.has(Carrier.SPEED) or (on.has(Carrier.LASTS) and (waited or not on.has(Carrier.LIFE_WAITS))):
 			return true
 	if modifier.lifetime_base > 0.0:
 		any = true
-		if on.has(Carrier.SPEED) or on.has(Carrier.LASTS):
+		if on.has(Carrier.SPEED) or (on.has(Carrier.LASTS) and (waited or not on.has(Carrier.LIFE_WAITS))):
 			return true
 	if modifier.shot_mult != 1:
 		any = true

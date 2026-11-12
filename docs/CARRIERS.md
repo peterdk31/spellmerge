@@ -31,7 +31,8 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `GATES` | Does it open a way through that shots and bodies take (a portal)? Read only by `CastSense` (`opens`: the AI casts it to open a fight). |
 | `CASTS_FROM_SHOT` | Is it shots of the projectile manager, each casting what it fires while it lives (a bolt, a rune, a pool, a wall)? |
 | `CASTS_FROM_BODY` | Is it a body of its own, an actor, that casts what it fires (a decoy)? |
-| `AROUND` | Does it act all round what casts it, not along an aim (a pulse)? A scatter turns nothing there; the AI reads it as an area round its caster. |
+| `LIFE_WAITS` | Is its life only a wait (a pulse): it does nothing more while it lasts, so a card that only changes its life counts only with a trigger that waits on it or a hold? |
+| `AOE` | Does it act all round what casts it, not along an aim (a pulse)? A scatter turns nothing there; the AI reads it as an area round its caster. |
 | `MELEE` | Is it held by or carried with the body that casts it, never leaving it (swing, slam, dash, teleport)? Then it never hits that body (`CarrierKit.spared`); a ranged carrier spares it only until it has left it: a shot over time, a beam along its path (it hits its caster when it bounces or bends back into them). |
 
 (and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
@@ -86,8 +87,8 @@ wasted**, as a trigger with no carrier is, and a staff of only an infusion does 
 (`fire · blast` alone does nothing; `fire · blast · pulse` explodes round you).
 
 It is **one carrier**, `pulse` (`pulse.gd`, `CarrierPulse`; owner, 2026-11-12: "One carrier!"),
-with fixed yes/no answers like every other: it `HITS`, `LASTS`, `REPEATS_HELD`, `MEETS_SHOTS`, is
-`MELEE` (it never leaves what casts it) and acts `AROUND` (all round, not along an aim: a scatter
+with fixed yes/no answers like every other: it `HITS`, `LASTS` (its life only a wait, `LIFE_WAITS`), `REPEATS_HELD`, `MEETS_SHOTS`, is
+`MELEE` (it never leaves what casts it) and acts `AOE` (all round, not along an aim: a scatter
 turns nothing there, and the AI reads it as an area round its caster). **What it is round is the
 runtime's to know**, as for every carrier (the caster, below): the caster's body in the cast's own
 group; in a payload, whatever fired it, a body or a shot that flies on (owner, 2026-11-06), else the
@@ -104,7 +105,7 @@ point the payload began at (`on hit · bolt · blast · pulse` explodes where th
 | `on wall` | a shot that bounces on, else a point |
 | `on block` | the shot whose shield stopped one, or the body its barrier is on (a decoy, a dashing or teleporting wizard); a deflect's block is a point's |
 
-**What fires a payload casts all of it**, its carriers too, not only its left-over cards (owner, 2026-11-06): a
+**What fires a payload casts all of it**, every carrier in it (owner, 2026-11-06): a
 payload fired from an actor's body (a decoy's own, or the wizard's for a dash's timer, `on hurt`
 or end, a barrier's block) is cast by that body, the way a staff's own cast is cast by the
 wizard's: a dash, teleport, pull or swap in it moves that body, a circling carrier (Orbit) or a
@@ -140,7 +141,8 @@ What the Pulse does:
   **Hold** keeps it until its staff is cast again, striking again every wind-up and life
   (`REPEATS_HELD`, as a held swing): `hold · fire · pulse` is a burning aura that spares its
   wizard. A card that only lengthens its life does nothing without a trigger or a hold that waits
-  on it (`CarrierPulse.idle_modifiers`).
+  on it: its life is only a wait (`LIFE_WAITS`), which the compiler's one numbers rule reads
+  (`StaffCompiler._numbers_count`).
 - **Round a body** (the caster, or a body that fired the payload): a shield is a barrier on that
   body's actor (`CasterMoves.shield_caster`), a deflect turns the shots round it once, as it lands
   (`CarrierKit.turn_shots_round`), a recoil pushes it.

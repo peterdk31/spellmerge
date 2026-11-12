@@ -197,7 +197,7 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit", &"_lc_aim_tag", &"_lc_aim_way", &"_lc_aim_caster"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
@@ -313,6 +313,10 @@ var _lc_kind: PackedInt32Array = PackedInt32Array()
 var _lc_ref: PackedInt32Array = PackedInt32Array()
 var _lc_seq: PackedInt64Array = PackedInt64Array()
 var _lc_tied: PackedByteArray = PackedByteArray()
+## Scratch of `_lc_aim` for `_lc_send` (not state: set and read within one firing).
+var _lc_aim_tag: int = 0
+var _lc_aim_way: Vector2 = Vector2.RIGHT
+var _lc_aim_caster: int = 0
 var _lc_left: PackedFloat32Array = PackedFloat32Array()
 var _lc_clock: PackedFloat32Array = PackedFloat32Array()
 var _lc_at: PackedVector2Array = PackedVector2Array()
@@ -1667,7 +1671,7 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 	for spell in group.spells:
 		var heading: Vector2 = direction
 		# A carrier that acts all round what casts it (a Pulse) is not aimed: a scatter turns the others.
-		if group.scatter and not spell.has_trait(CarrierTraits.AROUND):
+		if group.scatter and not spell.has_trait(CarrierTraits.AOE):
 			heading = DMath.rotated(direction, _scatter_roll() * TAU)
 		made += _fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, false)
 	return made
@@ -2616,7 +2620,9 @@ func _lc_remove(i: int) -> void:
 
 
 ## A carrier of `tag` that is not tied to a row ended (an entity): one of its entries leaves, or
-## with `every` all of them (its build was revoked).
+## with `every` all of them (its build was revoked). An entity's entries are its lasting
+## triggers' (`_lc_rows`); the end of a Pulse (`_lc_join_ends`) is no entity's, and leaves only as
+## its life runs out (`_step_live`) or with `every`.
 func _lc_leave(tag: int, every: bool) -> void:
 	# One carrier is listed once per timer or on hurt trigger (`_lc_join`).
 	var spell: CompiledSpell = _profiles.get(tag)
@@ -2669,10 +2675,14 @@ func _step_live(delta: float) -> void:
 			_lc_at[i] = at
 		var trigger: CompiledSpell.Trigger = _lc_trigger_of(i, spell)
 		if spell == null or _lc_left[i] <= 0.0 or (_lc_tied[i] == 1 and not at.is_finite()):
-			if spell != null and trigger != null and trigger.event == TriggerBase.Event.EXPIRE:
-				# Its life is over: its `on expire` fires where it is, cast by what it is round.
-				_lc_fire(i, trigger.payload, _lc_at[i])
+			var expires: bool = spell != null and trigger != null and trigger.event == TriggerBase.Event.EXPIRE and _lc_aim(i)
+			var from: Vector2 = _lc_at[i]
+			# It leaves before its `on expire` fires: what that payload does may end other entries of
+			# the list (a decoy's pool making room), which moves them about (`_lc_remove`).
 			_lc_remove(i)
+			if expires:
+				# Its life is over: its `on expire` fires where it was, cast by what it was round.
+				_lc_send(trigger.payload, from)
 			continue
 		if trigger != null and trigger.event == TriggerBase.Event.TIMER:
 			_lc_clock[i] -= delta
@@ -2688,9 +2698,16 @@ func _step_live(delta: float) -> void:
 ## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies, an
 ## actor's body while it is there (owner, 2026-11-06), else the point does.
 func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false, source: Node = null) -> void:
+	if _lc_aim(i):
+		_lc_send(payload, from, wound, source)
+
+
+## Reads who live carrier `i` casts as and which way (`_lc_aim_tag`, `_lc_aim_caster`,
+## `_lc_aim_way`, scratch for `_lc_send`); false when its spell is gone.
+func _lc_aim(i: int) -> bool:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
-		return
+		return false
 	var tag: int = _lc_tag[i]
 	var actor: int = SpellTag.caster_of(tag)
 	var at: Vector2 = _lc_at[i]
@@ -2712,7 +2729,15 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
 			way = (at - body).normalized()
-	_fire_payload(payload, tag, actor, from, way, source, caster, wound)
+	_lc_aim_tag = tag
+	_lc_aim_way = way
+	_lc_aim_caster = caster
+	return true
+
+
+## Fires `payload` from `from` as the live carrier `_lc_aim` read last.
+func _lc_send(payload: CompiledGroup, from: Vector2, wound: bool = false, source: Node = null) -> void:
+	_fire_payload(payload, _lc_aim_tag, SpellTag.caster_of(_lc_aim_tag), from, _lc_aim_way, source, _lc_aim_caster, wound)
 
 
 ## The trigger live carrier `i` fires, or null.

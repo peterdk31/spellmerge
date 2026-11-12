@@ -129,7 +129,7 @@ const RULES: Dictionary = {
 	Behaviour.SHIELD: {"needs": {"any": CarrierTraits.MEETS_SHOTS}},
 	Behaviour.BLAST: {},
 	Behaviour.HOLD: {"needs": {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER}},
-	# It pushes the carrier's caster back: a body or a shot (a point has nothing to push).
+	# It pushes what casts the carrier back: a body or a shot (at runtime; a point has nothing to push).
 	Behaviour.RECOIL: {},
 	Behaviour.BOUNCE: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}},
 	Behaviour.ECHO: {},

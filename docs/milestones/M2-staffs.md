@@ -138,7 +138,7 @@ A modifier or infusion affects **only the next carrier**, not every carrier of a
 - `blast`: an explosion on the caster, every cast.
 - `double · fire · bolt · on hit · bolt · frost · nova`: a fire bolt and a bolt, cast together; the second one, on hit, fires a frost nova.
 - `double · on hit · bolt · nova · bolt`: the first bolt fires a nova on hit; the payload ends after the nova; the outer group still wants one carrier, so the last bolt joins the cast. One cast, then recharge.
-- `on hit · bolt · blast`: the payload is a lone `blast`, which lands on the payload's origin: the bolt explodes where it hits, not on the caster.
+- `on hit · bolt · blast · pulse`: the payload is a blast on a Pulse, round the payload's origin: the bolt explodes where it hits, not on the caster. (`on hit · bolt · blast`: the blast has no carrier after it and is wasted, rule 5.)
 - `on hit · bolt`: the payload wraps to slot 1 (`on hit`, already used), so it is empty and the trigger is wasted. It wrapped: recharge.
 - `bolt · on hit`: cast 1 is a bolt. Cast 2 reads `on hit`, wraps to the `bolt` (unused in this cast) which takes it; the payload wraps to `on hit` again, used, so it is empty and the trigger is wasted. Recharge.
 - `shield · on block · dash · nova`: a dash with one shield; when the shield blocks a hit, a nova fires from there.

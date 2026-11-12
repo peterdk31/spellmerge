@@ -130,3 +130,13 @@ func test_spells_reads_the_next_cast() -> void:
 	check(arena.spells.next_cast_sense(0, 3) == null, "an empty staff has none")
 	check(arena.spells.next_cast_sense(-1, 0) == null, "nor a caster out of range")
 	arena.free_all()
+
+
+func test_a_blast_that_spares_its_caster_is_no_reason_to_stand_off() -> void:
+	# Review, 2026-11-12: a Pulse's blast is its strike round its caster, which it spares, so the AI
+	# must not keep a blast's distance from its target for it (or it never casts it).
+	var pulse: CastSense = _sense(["fire", "blast", "pulse"])
+	check(pulse.blast > 0.0 and pulse.harms(), "a blast Pulse explodes and harms")
+	check(not pulse.self_blast, "but never its caster")
+	check(_sense(["blast", "bolt"]).self_blast, "a bolt's blast where it ends can reach its caster")
+

@@ -39,8 +39,9 @@ const SPAWNS: int = CarrierTraits.SPAWNS
 const GATES: int = CarrierTraits.GATES
 const CASTS_FROM_SHOT: int = CarrierTraits.CASTS_FROM_SHOT
 const CASTS_FROM_BODY: int = CarrierTraits.CASTS_FROM_BODY
-const AROUND: int = CarrierTraits.AROUND
+const AOE: int = CarrierTraits.AOE
 const MELEE: int = CarrierTraits.MELEE
+const LIFE_WAITS: int = CarrierTraits.LIFE_WAITS
 
 ## What draws its look (`look_drawer`), and so which area a card's `look_shader` (and light) is
 ## for (docs/milestones/card-looks.md): the projectile manager's head batches (LOOK_SHOT: a shot
@@ -80,13 +81,6 @@ func required_fields() -> Dictionary:
 	return {}
 
 
-## True when a cast of it adds a wind-down of its own to its staff's (its carrier card's
-## `wind_down`), so a card's wind-down factor changes something: every carrier a carrier card fires.
-## A payload's carrier adds none; the compiler knows that one (`StaffCompiler._numbers_count`).
-func has_wind_down() -> bool:
-	return true
-
-
 ## Which way the staff turns for a cast of it by `actor` along `dir` (`StaffPoses.start`'s
 ## `side`), asked when the cast starts winding up, before it leaves (`Spells._wind_pose`).
 func pose_side(_actor: int, dir: Vector2) -> int:
@@ -96,14 +90,6 @@ func pose_side(_actor: int, dir: Vector2) -> int:
 ## The kind of its hits (`HitProfile.kind`), &"" for a shot's own.
 func hit_kind() -> StringName:
 	return &""
-
-
-## The modifiers of `modifiers` (each one that works here by its behaviour, `works`) that still do
-## nothing on it once the other cards on it are known (its infusions and its triggers): none by
-## default. The compiler lists them as wasted (a longer life on a Pulse that nothing waits on:
-## `CarrierPulse`).
-func idle_modifiers(_modifiers: Array[ModifierBase], _elements: Array[ElementBase], _triggers: Array[TriggerBase]) -> Array[ModifierBase]:
-	return []
 
 
 ## What draws its look (LOOK_*): by default its shots, which fly (`spawn_row`).

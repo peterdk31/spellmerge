@@ -2,7 +2,7 @@
 
 *Merge spells. Cause chaos. Together.* · *Every spell is a merge request.*
 
-A 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. Assemble spells from a form, an element, modifiers and triggers (a trigger holds another spell), find relics that bend the rules, and fight through rooms with up to three friends on one screen, with nobody ever waiting for anybody.
+A 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. Build spells on your staffs from cards read left to right: a carrier (what leaves the staff: a bolt, a beam, a dash), infusions (what it is made of: fire, frost, void...), modifiers (how it behaves), triggers (what happens next, holding another spell) and multicasts, find relics that bend the rules, and fight through rooms with up to three friends on one screen, with nobody ever waiting for anybody.
 
 **Play:** [in the browser](https://peterdk31.github.io/spellmerge/play/) · [today's nightly](https://peterdk31.github.io/spellmerge/nightly/) · [latest preview](https://peterdk31.github.io/spellmerge/preview/) (rebuilt after each merge) · [Windows and Linux downloads](https://github.com/peterdk31/spellmerge/releases)
 

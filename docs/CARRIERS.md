@@ -87,7 +87,7 @@ wasted**, as a trigger with no carrier is, and a staff of only an infusion does 
 explodes where it ends).
 
 It is **one carrier**, `pulse` (`pulse.gd`, `CarrierPulse`; owner: "One carrier!"), with fixed
-yes/no answers like every other: it `HITS`, `LASTS`, has a `SPEED`, `GUARDS` and `MEETS_SHOTS` (as
+yes/no answers like every other: it `HITS`, `LASTS`, has a `SPEED` and `PIERCE`, `GUARDS` and `MEETS_SHOTS` (as
 a slam's ring), `REPEATS_HELD`, and goes out `AOE`: all round the point it is cast at, not along an
 aim (a scatter turns nothing there; the AI reads it as an area round its caster; Return and Ghost
 work on it as on a shot). Its rows are its own (as the slam's): `launch` starts a ring, `step`
@@ -100,10 +100,19 @@ runs it, and the looks read the `pulse_*` getters.
   `lifetime` (owner: "using easing as bolt/atom"; `ProjectileManager.speed_factor`,
   SpellLimits.SHOT_SPEED_* times its cards' `speed_start`, `speed_end`, `speed_ease`), so a plain
   Pulse reaches 48 px (120 px/s for 0.4 s; the curve keeps its mean). Its edge, `radius` wide,
-  strikes each body it reaches once (owner: "It should not hit instantly"), outward from its centre
-  (`Projectiles.sweep` all round, so a wall hides a body unless it has Ghost), sparing the body
-  that cast it (owner: "Yes it spares its caster"). A bare Pulse strikes for its card's small
-  damage. Feel draws it as motes along its edge where it is now (`gameplay/feel/pulse_rings.gd`).
+  strikes each body it reaches once (owner: "It should not hit instantly"), where its edge meets
+  the body, outward from its centre, sparing the body that cast it (owner: "Yes it spares its
+  caster"); what the hit sets off (`on hit`) leaves from there (owner: "It should fire from the
+  edge"; `Spells._strike`'s `edge`). A bare Pulse strikes for its card's small damage.
+- **Segments:** the ring is SpellLimits.PULSE_SEGMENTS segments, each a line out from its centre
+  stopped on its own (owner: "the ring should be 'individual' motes, that can be blocked
+  individually"): at the first wall on its line (set when it is cast; Ghost takes it through) and
+  at the first body it strikes ("if an enemy is hit, that segment should stop propagating out
+  (unless pierce is on, obviously)": with Pierce it passes that many bodies, `PIERCE`). Bodies are
+  judged nearest first, so a wall or a body shadows what is behind it and the rest of the ring
+  goes on. Feel draws it as motes along its edge where it is now, only where its segment still
+  reaches (`pulse_stop_toward`, `gameplay/feel/pulse_rings.gd`). Its guard of shots (below) is
+  the whole ring's.
 - **Shots:** while it is out, a deflect on it turns the shots of other teams inside it outward, a
   shield stops them while its charges last (as a slam's ring). A shot that comes in faster than
   the ring grows reaches its caster first: a guarding Pulse is cast ahead.

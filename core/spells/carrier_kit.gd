@@ -300,9 +300,17 @@ func cast_jumps() -> void:
 
 ## The one strike (rules R4 F2): `spell` with `tag` hits each of the first `found` bodies of the
 ## last `Projectiles.sweep` round `centre` not in `struck` yet (and adds it), pushing it outward
-## from `centre`. Returns what it hit with at the end (relay may have changed it). See `Spells._strike`.
+## from `centre`. Returns what it hit with at the end (relay may have changed it). See
+## `Spells._strike`.
 func strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Array, centre: Vector2, chain: int, prev: int, hit: HitProfile) -> HitProfile:
 	return _rt._strike(spell, tag, actor, found, struck, centre, chain, prev, hit)
+
+
+## `strike` of the bodies a carrier picked itself: the first `count` of `nodes`, each struck at its
+## `points` entry going along its `heads` entry (a Pulse's ring, where its edge met each). See
+## `Spells._strike_bodies_at`.
+func strike_bodies(spell: CompiledSpell, tag: int, actor: int, nodes: Array[Node], points: PackedVector2Array, heads: PackedVector2Array, count: int, struck: Array, centre: Vector2, chain: int, prev: int, hit: HitProfile) -> HitProfile:
+	return _rt._strike_bodies_at(spell, tag, actor, nodes, points, heads, count, struck, centre, chain, prev, hit)
 
 
 ## `spell` with `tag` strikes every body within `reach` of `at` at once, with `hit` (null: its own),

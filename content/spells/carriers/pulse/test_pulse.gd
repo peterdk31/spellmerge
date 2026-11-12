@@ -366,3 +366,58 @@ func test_a_shield_on_it_stops_the_shots_inside_its_ring() -> void:
 	check(not arena.blocks.is_empty(), "its ring stopped it: %s" % [arena.blocks])
 	check_equal(arena.lost(body), 0, "and the wizard was not hit")
 	arena.free_all()
+
+
+func test_its_hit_is_where_its_edge_meets_the_body() -> void:
+	# Owner, 2026-11-12: "It should fire from the edge": what its hit sets off (`on hit`) leaves from
+	# where the ring met the body, not from its centre, where its caster may stand.
+	var arena := ArenaScript.new(root)
+	var body: Node2D = arena.add_guard(0, Vector2.ZERO)
+	var imp: Node2D = arena.add_imp(Vector2(36.0, 0.0))
+	var at: Array[Vector2] = []
+	arena.bus.projectile_hit.connect(func(_caster: int, target: Node, point: Vector2, _tag: int, _shot: int) -> void:
+		if target == imp:
+			at.append(point))
+	arena.install_cards(0, 0, ["on_hit", "pulse", "bolt"])
+	arena.cast(0, 0)
+	arena.run(1.0)
+	check(not at.is_empty() and at[0].x > 20.0 and at[0].x <= 36.0, "struck where the edge met it: %s" % [at])
+	check_equal(arena.lost(body), 0, "so its payload bolt does not leave through the caster")
+	arena.free_all()
+
+
+func test_a_wall_shadows_only_what_is_behind_it() -> void:
+	# Owner, 2026-11-12: "Will the whole pulse stop, if the ring hits a wall anywhere?": no, each line
+	# from its centre is stopped on its own.
+	var arena := ArenaScript.new(root)
+	arena.add_guard(0, Vector2.ZERO)
+	arena.add_wall(Rect2(14.0, -12.0, 4.0, 24.0))
+	var behind: Node2D = arena.add_imp(Vector2(26.0, 0.0))
+	var open: Node2D = arena.add_imp(Vector2(-26.0, 0.0))
+	arena.install_cards(0, 0, ["fire", "pulse"])
+	arena.cast(0, 0)
+	arena.run(1.0)
+	check_equal(arena.lost(behind), 0, "the imp behind the wall is not struck")
+	check(arena.lost(open) > 0, "the one on the open side is")
+	arena.free_all()
+
+
+func test_a_body_it_hits_shadows_the_ones_behind_it_unless_it_pierces() -> void:
+	# Owner, 2026-11-12: "if an enemy is hit, that segment should stop propagating out (unless pierce
+	# is on, obviously)".
+	for cards: Array in [["fire", "pulse"], ["pierce", "fire", "pulse"]]:
+		var arena := ArenaScript.new(root)
+		arena.add_guard(0, Vector2.ZERO)
+		var front: Node2D = arena.add_imp(Vector2(20.0, 0.0))
+		var behind: Node2D = arena.add_imp(Vector2(40.0, 0.0))
+		var aside: Node2D = arena.add_imp(Vector2(0.0, 40.0))
+		arena.install_cards(0, 0, cards)
+		arena.cast(0, 0)
+		arena.run(1.0)
+		check(arena.lost(front) > 0, "%s: the imp in front is struck" % [cards])
+		check(arena.lost(aside) > 0, "%s: the rest of the ring goes on: the imp aside is struck" % [cards])
+		if cards.has("pierce"):
+			check(arena.lost(behind) > 0, "%s: with pierce it passes the first and strikes the one behind" % [cards])
+		else:
+			check_equal(arena.lost(behind), 0, "%s: the one behind is in its shadow" % [cards])
+		arena.free_all()

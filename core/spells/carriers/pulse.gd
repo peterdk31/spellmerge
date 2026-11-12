@@ -9,10 +9,13 @@ extends Carrier
 ## body, or in a payload the body or shot that fired it, else the payload's point) and stays there.
 ## Its radius grows as a shot flies, `speed` on the shots' speed curve over its `lifetime`
 ## (`ProjectilesScript.speed_factor`; SpellLimits.SHOT_SPEED_*, times its cards' `speed_start`,
-## `speed_end`, `speed_ease`), and its edge strikes each body it reaches once (`Projectiles.sweep`
-## all round the centre, so a wall between hides a body unless it has `ghost`), outward from the
-## centre, `radius` the width of its edge. It spares the body that casts it (owner, 2026-11-12:
-## "Yes it spares its caster"). While it is out it meets the shots of other teams inside it
+## `speed_end`, `speed_ease`). It is SpellLimits.PULSE_SEGMENTS segments, each a line out from its
+## centre stopped on its own: at the first wall on it (unless it has `ghost`) and at the first body
+## it strikes (unless its `pierce` lets it pass), so a wall or a body shadows what is behind it and
+## the rest of the ring goes on (`_pulse_strike`). Its edge, `radius` wide, strikes each body a
+## segment still reaches once, where it meets the body, outward from the centre, so what the hit
+## sets off leaves from there. It spares the body that casts it (owner, 2026-11-12: "Yes it spares
+## its caster"). While it is out it meets the shots of other teams inside it
 ## (`MEETS_SHOTS`, as a slam's ring): a deflect turns them outward, a shield stops them while its
 ## charges last. With `return` it grows for half its life, then shrinks back to its centre at the
 ## speed it had then, striking again on the way in, as a returning shot flies home. When it is
@@ -30,6 +33,8 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_pu_source", &"_pu_struck"]
+## Not state: scratch of one strike (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"_hit_nodes", &"_hit_points", &"_hit_heads", &"_hit_far"]
 
 ## The live rings: PULSE_ROWS_START rows at first, more when every one is on. Each keeps its
 ## spell and tag, the actor whose card it is, who casts it (`Spells._caster`, and its seq: the
@@ -56,6 +61,19 @@ var _pu_prev: PackedInt64Array = PackedInt64Array()
 var _pu_hit: Array[HitProfile] = []
 var _pu_shield: PackedInt32Array = PackedInt32Array()
 var _pu_struck: Array[Array] = []
+## Each ring's segments (SpellLimits.PULSE_SEGMENTS a row, row `at`'s from `at` times that), each
+## a line out from its centre at its angle (`_segment_of`): how far it goes before it stops (at
+## the first wall on its line, set when it is cast, or at a body it hit; INF with nothing in its
+## way, or with `ghost` past every wall), and how many bodies it may yet pass (its `pierce`).
+var _pu_stop: PackedFloat32Array = PackedFloat32Array()
+var _pu_pierce: PackedInt32Array = PackedInt32Array()
+
+## Scratch of one strike: the bodies its edge reached that its segments reach, nearest first, where
+## each is struck and which way, and how far its centre is.
+var _hit_nodes: Array[Node] = []
+var _hit_points: PackedVector2Array = PackedVector2Array()
+var _hit_heads: PackedVector2Array = PackedVector2Array()
+var _hit_far: PackedFloat32Array = PackedFloat32Array()
 
 
 func id() -> StringName:
@@ -74,7 +92,7 @@ static func of(spells: SpellRuntime) -> CarrierPulse:
 
 
 func traits() -> int:
-	return HITS | LASTS | SPEED | GUARDS | REPEATS_HELD | MEETS_SHOTS | AOE
+	return HITS | LASTS | SPEED | PIERCE | GUARDS | REPEATS_HELD | MEETS_SHOTS | AOE
 
 
 ## After the slams (5).
@@ -123,6 +141,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	_pu_hit[at] = spell.echo_hit if kit.is_echo(spell) else null
 	_pu_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_pu_struck[at].clear()
+	_set_segments(at, spell, origin)
 	kit.shot_started(tag)
 	if kit.events != null:
 		kit.set_cue_tag(tag)
@@ -177,21 +196,118 @@ func _pulse_guard(at: int) -> void:
 
 
 ## Ring `at`'s edge (its radius and half its width): it strikes each body it reaches that it has
-## not struck yet, outward from its centre (`Spells._strike`), and keeps what it hit with.
+## not struck yet and that a segment of it still reaches (`_pu_stop`: walls, and the bodies it
+## struck before, stop its segments; owner, 2026-11-12: "if an enemy is hit, that segment should
+## stop propagating out (unless pierce is on, obviously)"), nearest first, so a body shadows those
+## behind it: the segments over a body it strikes stop there, or pass it while their pierce lasts.
+## Each is struck where the edge meets it, outward from the centre (`CarrierKit.strike_bodies`), so
+## what its hit sets off (`on hit`) leaves from there (owner: "It should fire from the edge"). It
+## keeps what it hit with.
 func _pulse_strike(at: int) -> void:
 	var spell: CompiledSpell = _pu_spell[at]
 	var reach: float = _pu_radius[at] + spell.radius * 0.5
 	if reach <= 0.0:
 		return
 	var tag: int = _pu_tag[at]
+	var centre: Vector2 = _pu_centre[at]
 	var source: Node = _pu_source[at] if is_instance_valid(_pu_source[at]) else null
-	var walls: bool = spell.behaviour(ModifierBase.Behaviour.GHOST) <= 0.0
-	var found: int = kit.projectiles.sweep(_pu_actor[at], _pu_centre[at], _pu_dir[at], 1, -PI, PI, reach, SpellRuntime.HITS, source, walls)
-	if found == 0:
+	# Every body its edge reaches, walls or not: its segments judge the walls.
+	var found: int = kit.projectiles.sweep(_pu_actor[at], centre, _pu_dir[at], 1, -PI, PI, reach, SpellRuntime.HITS, source, false)
+	_hit_nodes.clear()
+	_hit_points.clear()
+	_hit_heads.clear()
+	_hit_far.clear()
+	for i in found:
+		var node: Node = kit.projectiles.sweep_nodes[i]
+		if _pu_struck[at].has(node):
+			continue
+		var far: float = centre.distance_to(kit.projectiles.target_centre(node))
+		# Nearest first (a strike finds a few bodies: an insertion is enough).
+		var n: int = _hit_far.size()
+		while n > 0 and _hit_far[n - 1] > far:
+			n -= 1
+		_hit_far.insert(n, far)
+		_hit_nodes.insert(n, node)
+	var count: int = 0
+	for n in _hit_nodes.size():
+		var node: Node = _hit_nodes[n]
+		var to: Vector2 = kit.projectiles.target_centre(node) - centre
+		var far: float = _hit_far[n]
+		var size: float = kit.projectiles.target_outer_radius(node)
+		if not _segments_take(at, to, far, size):
+			continue
+		var way: Vector2 = to / far if far > 0.0 else _pu_dir[at]
+		_hit_nodes[count] = node
+		_hit_points.append(centre + way * minf(reach, far))
+		_hit_heads.append(way)
+		count += 1
+	if count == 0:
 		return
-	var took: HitProfile = kit.strike(spell, tag, _pu_actor[at], found, _pu_struck[at], _pu_centre[at], _pu_chain[at], _pu_prev[at], _pu_hit[at])
+	var took: HitProfile = kit.strike_bodies(spell, tag, _pu_actor[at], _hit_nodes, _hit_points, _hit_heads, count, _pu_struck[at], centre, _pu_chain[at], _pu_prev[at], _pu_hit[at])
 	if _pu_on[at] != 0 and _pu_spell[at] == spell and _pu_tag[at] == tag:
 		_pu_hit[at] = took
+
+
+## True when a segment of ring `at` still reaches a body `size` pixels round a point `far` pixels
+## out along `to` from its centre (one over it whose stop is not short of the body's near side);
+## then each such segment passes the body (a pierce spent) or stops at it.
+func _segments_take(at: int, to: Vector2, far: float, size: float) -> bool:
+	var segments: int = SpellLimits.PULSE_SEGMENTS
+	var base: int = at * segments
+	var near: float = maxf(far - size, 0.0)
+	# A body its centre is on (a payload's ring where its shot hit) covers the half facing it.
+	var half: float = PI * 0.5 if far <= size else DMath.asin(size / far)
+	var middle: float = DMath.angle(to) if far > 0.0 else 0.0
+	var step: float = TAU / float(segments)
+	var low: int = floori((middle - half) / step + 0.5)
+	var high: int = floori((middle + half) / step + 0.5)
+	if high - low >= segments:
+		high = low + segments - 1
+	var reached: bool = false
+	for k in range(low, high + 1):
+		if _pu_stop[base + posmod(k, segments)] >= near:
+			reached = true
+	if not reached:
+		return false
+	for k in range(low, high + 1):
+		var s: int = base + posmod(k, segments)
+		if _pu_stop[s] < near:
+			continue
+		if _pu_pierce[s] > 0:
+			_pu_pierce[s] -= 1
+		else:
+			_pu_stop[s] = near
+	return true
+
+
+## Sets ring `at`'s segments, cast at `origin`: each stops at the first wall on its line (none with
+## `ghost`), and may pass `pierce` bodies.
+func _set_segments(at: int, spell: CompiledSpell, origin: Vector2) -> void:
+	var segments: int = SpellLimits.PULSE_SEGMENTS
+	var base: int = at * segments
+	var ghost: bool = spell.behaviour(ModifierBase.Behaviour.GHOST) > 0.0
+	# As far as it can grow: its fastest speed for its whole life, and its edge.
+	var far: float = spell.speed * maxf(spell.speed_start, 1.0) * maxf(spell.lifetime, 0.0) + spell.radius + 1.0
+	for k in segments:
+		var stop: float = INF
+		if not ghost:
+			var to: Vector2 = origin + _segment_way(k) * far
+			var wall: Vector2 = kit.projectiles.clip_to_walls(origin, to)
+			if not wall.is_equal_approx(to):
+				stop = origin.distance_to(wall)
+		_pu_stop[base + k] = stop
+		_pu_pierce[base + k] = spell.pierce
+
+
+## The way segment `k` of a ring goes out from its centre (the segments evenly round, the first
+## along +x; `DMath`, the same on every machine).
+static func _segment_way(k: int) -> Vector2:
+	return DMath.from_angle(TAU * float(k) / float(SpellLimits.PULSE_SEGMENTS))
+
+
+## The segment of a ring that goes out along `way` from its centre.
+static func _segment_of(way: Vector2) -> int:
+	return posmod(floori(DMath.angle(way) / (TAU / float(SpellLimits.PULSE_SEGMENTS)) + 0.5), SpellLimits.PULSE_SEGMENTS)
 
 
 ## Ring `at` is over. With `finished` (its life is out, or it is home), its `blast` and `on expire`
@@ -237,6 +353,8 @@ func _grow_pulses(size: int) -> void:
 	_pu_prev.resize(size)
 	_pu_hit.resize(size)
 	_pu_shield.resize(size)
+	_pu_stop.resize(size * SpellLimits.PULSE_SEGMENTS)
+	_pu_pierce.resize(size * SpellLimits.PULSE_SEGMENTS)
 	for i in range(old, size):
 		_pu_struck.append([])
 
@@ -324,6 +442,12 @@ func pulse_actor(at: int) -> int:
 
 func pulse_tag(at: int) -> int:
 	return _pu_tag[at]
+
+
+## How far ring `at` goes out along `way` from its centre before its segment there stopped (at a
+## wall, or a body it hit), INF when nothing stopped it: where its look ends on that line.
+func pulse_stop_toward(at: int, way: Vector2) -> float:
+	return _pu_stop[at * SpellLimits.PULSE_SEGMENTS + _segment_of(way)]
 
 
 ## The colour of ring `at`'s element and its packed look kinds (`CompiledSpell.tint`, `look`).

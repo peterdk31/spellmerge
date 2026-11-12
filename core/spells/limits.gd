@@ -108,6 +108,10 @@ const SHOT_SPEED_EASE: float = 1.5
 const SLAM_ROWS_START: int = 16
 ## Pulse rings (`CarrierPulse`): the rows made at first; more when every one is on.
 const PULSE_ROWS_START: int = 16
+## A Pulse's ring is this many segments, each going out on its own line from its centre and
+## stopped on its own by a wall or a body it hits (owner, 2026-11-12: "the ring should be
+## 'individual' motes, that can be blocked individually").
+const PULSE_SEGMENTS: int = 64
 const SLAM_GROW: float = 0.67
 ## A homing carrier that is over at once (a beam, a teleport) has no time to turn, so it bends
 ## toward a target as far as a homing shot turns over this many pixels of its flight (the Homing

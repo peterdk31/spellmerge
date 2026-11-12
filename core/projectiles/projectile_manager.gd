@@ -6160,6 +6160,24 @@ func target_owner_of(node: Node) -> int:
 	return EventsScript.NO_PLAYER if at < 0 else _target_owner[at]
 
 
+## Where the hit shape of the registered target `node` is centred now (its node's place and offset),
+## and INF for a node that is not registered: what a ring judges a body by (`CarrierPulse`).
+func target_centre(node: Node) -> Vector2:
+	if node == null or not is_instance_valid(node) or not node is Node2D:
+		return Vector2.INF
+	var at: int = _target_row(node)
+	return (node as Node2D).global_position + _target_offset[at] if at >= 0 else Vector2.INF
+
+
+## How far the hit shape of the registered target `node` reaches from its centre at most
+## (`HitShape.outer_radius`), 0 for a node that is not registered.
+func target_outer_radius(node: Node) -> float:
+	if node == null or not is_instance_valid(node):
+		return 0.0
+	var at: int = _target_row(node)
+	return HitShape.outer_radius(_target_half[at], _target_radius[at]) if at >= 0 else 0.0
+
+
 ## The identity of the registered target `node` (`_target_key`, online-ready N5: its actor's key),
 ## or 0 for a node that is not registered. What the simulation keeps for "that body" (a chain's last
 ## body, a zap's roll for it) is this, never an instance id.

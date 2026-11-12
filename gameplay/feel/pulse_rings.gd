@@ -7,7 +7,11 @@ extends RefCounted
 ## shots' speed curve: `CarrierPulse`), so the motes are where it strikes. The rate is per second and
 ## per 100 pixels of edge, so a wide ring is as dense as a small one. Feel calls `step` every frame;
 ## it reads `Spells`' live rings from their plain queries (`pulse_slots`, `pulse_on`,
-## `pulse_centre`, `pulse_radius`, ...). Nothing is kept and nothing is allocated.
+## `pulse_centre`, `pulse_radius`, ...). A ring is segments, each stopped on its own by a wall or
+## a body it hit (`CarrierPulse`, owner 2026-11-12: "the ring should be 'individual' motes, that
+## can be blocked individually"): a mote is given off only where its segment still reaches the
+## edge (`pulse_stop_toward`), so the look stops where the strikes stop. Nothing is kept and
+## nothing is allocated.
 
 const BirthsScript := preload("res://gameplay/feel/births.gd")
 
@@ -40,11 +44,15 @@ func step(rings: Object, delta: float, ramp_of: Callable, births: BirthsScript) 
 		for n in births.roll(SPARKS_PER_100 * edge):
 			var out: Vector2 = Vector2.RIGHT.rotated(births.dice() * TAU)
 			var colour: Color = core if births.dice() < INFUSED_SHARE else Color.WHITE
+			if float(rings.call("pulse_stop_toward", at, out)) < radius:
+				continue
 			if not births.add(centre + out * radius, out, 0, ramp, look, colour, tag):
 				return
 		if BirthsScript.emitting_count(look) == 0:
 			continue
 		for n in births.roll(PARTICLES_PER_100 * edge):
 			var out: Vector2 = Vector2.RIGHT.rotated(births.dice() * TAU)
+			if float(rings.call("pulse_stop_toward", at, out)) < radius:
+				continue
 			if not births.add(centre + out * radius, out, births.emitting_layer(look), ramp, look, core, tag):
 				return

@@ -265,9 +265,10 @@ const SHOOTER: Dictionary = {"name": "enemy shooter", "shooter": true}
 const WALL: Dictionary = {"name": "wall, target behind", "wall": 0.6, "back": true}
 const BACK: Dictionary = {"name": "target behind", "back": true}
 const WALL_TARGET: Dictionary = {"name": "target behind a wall", "wall": 0.4, "behind": true}
-## A wall just past the target on the line and one more behind it: what goes on from the target (a
-## payload's ring round the shot that hit it) meets the wall.
-const WALL_PAST: Dictionary = {"name": "wall past the target, one behind it", "wall": 1.05, "behind": true, "line": true}
+## A wall just past the target on the line and one more behind it, off the line (`behind_y`): what
+## goes on from the target (a payload's ring where its shot hit it, which the target itself shadows
+## straight behind) meets the wall.
+const WALL_PAST: Dictionary = {"name": "wall past the target, one behind it off the line", "wall": 1.05, "behind": true, "behind_y": 30.0, "line": true}
 const DONOR: Dictionary = {"name": "infused target", "line": true, "donor": true}
 const SHIELDED: Dictionary = {"name": "enemy shooter, shield", "shooter": true, "with": ModifierBase.Behaviour.SHIELD}
 const WEAK: Dictionary = {"name": "target dies", "line": true, "weak": true}
@@ -787,7 +788,7 @@ func _run(cards: Array[StringName], carrier_card: CarrierCard, scene: Dictionary
 		var x: float = r * float(scene["wall"])
 		world.add_wall(Rect2(x, -80.0, 8.0, 160.0))
 		if scene.get("behind", false):
-			world.add_enemy(&"G", Vector2(r + 8.0, 0.0))
+			world.add_enemy(&"G", Vector2(r + 8.0, float(scene.get("behind_y", 0.0))))
 	if scene.get("shooter", false):
 		var shot: Array[StringName] = [_shot.id]
 		world.add_enemy(&"E", Vector2(r + SHOOTER_BEHIND, 0.0), World.HEALTH, shot, Vector2.LEFT, true)

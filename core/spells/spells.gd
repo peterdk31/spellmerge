@@ -1471,6 +1471,27 @@ func _strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arr
 			_strike_bodies.append(node)
 			_strike_marks.append(projectiles.sweep_points[i])
 			_strike_marks.append(projectiles.sweep_heads[i])
+	return _strike_listed(spell, tag, actor, first, centre, chain, prev, hit)
+
+
+## `_strike` of bodies a carrier picked itself (a Pulse's ring: those its segments reach): the
+## first `count` of `nodes`, each struck at its `points` entry going along its `heads` entry, those
+## not in `struck` yet (and adds them).
+func _strike_bodies_at(spell: CompiledSpell, tag: int, actor: int, nodes: Array[Node], points: PackedVector2Array, heads: PackedVector2Array, count: int, struck: Array, centre: Vector2, chain: int, prev: int, hit: HitProfile) -> HitProfile:
+	var first: int = _strike_bodies.size()
+	for i in count:
+		var node: Node = nodes[i]
+		if not struck.has(node):
+			struck.append(node)
+			_strike_bodies.append(node)
+			_strike_marks.append(points[i])
+			_strike_marks.append(heads[i])
+	return _strike_listed(spell, tag, actor, first, centre, chain, prev, hit)
+
+
+## Strikes the bodies `_strike_bodies[first..]` (and their marks), then drops them: the ray every
+## strike hits through.
+func _strike_listed(spell: CompiledSpell, tag: int, actor: int, first: int, centre: Vector2, chain: int, prev: int, hit: HitProfile) -> HitProfile:
 	var last: int = _strike_bodies.size()
 	if last == first:
 		return hit

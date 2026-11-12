@@ -1,0 +1,11 @@
+{
+	"id": "on_near_rune_sentry",
+	"name": "Rune sentry",
+	"does": "A rune lies in front of the caster; an imp below it is within reach of its bolt, so the rune fires the bolt down at the imp, not along the aim, and the caster beside it is never hit.",
+	"needs": "on_near",
+	"casts": [{"staff": 0, "cards": ["on_near", "rune", "bolt"]}],
+	"imps": [[28, 100]],
+	"guard": true,
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

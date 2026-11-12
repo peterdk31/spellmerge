@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/triggers/on_near/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG written by hand)",
+			"prompt": "A 16x16 icon for the On Near trigger card, in the trigger cards' style: a light round disc with a 1 px dark outline and a grey lower part, a small dark dot left of its middle and two dark arcs to its right, like a sense reaching out. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

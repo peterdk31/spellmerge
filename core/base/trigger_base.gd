@@ -30,6 +30,11 @@ enum Event {
 	## cast or not: `Spells.press_staff`); the payload fires from where the carrier is then. The
 	## one trigger the player sets off by hand: a detonation, when they choose.
 	RECAST,
+	## While the carrier lives, a foe of its caster (`Actors.is_foe`) comes within its payload's
+	## reach of it (`CompiledSpell.Trigger.reach`): the payload winds up and fires from the carrier
+	## toward that foe, and again after its wind-up while one is near (props W9b, owner 2026-11-12):
+	## a proximity fuse on a bolt, a mine on a rune.
+	NEAR,
 }
 
 ## What each trigger needs to go off (`Carrier.fires`, `Carrier.fires_with`), in the rows of
@@ -43,6 +48,7 @@ const NEEDS: Dictionary = {
 	Event.TIMER: {"any": CarrierTraits.LASTS},
 	Event.HURT: {"any": CarrierTraits.LASTS},
 	Event.RECAST: {"any": CarrierTraits.LASTS},
+	Event.NEAR: {"any": CarrierTraits.LASTS},
 	Event.BLOCK: {"any": CarrierTraits.MEETS_SHOTS, "cards": [ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT]},
 	Event.KILL: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST]},
 	Event.REACTION: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST], "cards": [ModifierBase.Behaviour.RELAY], "or_infused": true},
@@ -50,8 +56,8 @@ const NEEDS: Dictionary = {
 }
 
 ## The events a carrier that lasts is listed for while it lives, and fires from where it is then
-## (`Spells._lc_join`): a timer's tick, a hurt, a recast. The one list of them.
-const LIVE: Array[Event] = [Event.TIMER, Event.HURT, Event.RECAST]
+## (`Spells._lc_join`): a timer's tick, a hurt, a recast, a foe near. The one list of them.
+const LIVE: Array[Event] = [Event.TIMER, Event.HURT, Event.RECAST, Event.NEAR]
 
 @export var event: Event = Event.HIT
 ## Seconds its payload winds up where it fired, before the payload's own cards' wind-up (every

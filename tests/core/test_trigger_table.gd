@@ -61,7 +61,7 @@ func _compile(cards: Array[StringName]) -> CompiledStaff:
 
 func _expected(event: int, carrier: StringName) -> bool:
 	match event:
-		E.TIMER, E.HURT, E.RECAST:
+		E.TIMER, E.HURT, E.RECAST, E.NEAR:
 			return not AT_ONCE.has(carrier)
 		E.BLOCK:
 			# Wherever a shield or deflect runs: not on a familiar (a decoy has a barrier), nor a

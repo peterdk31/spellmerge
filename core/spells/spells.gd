@@ -292,15 +292,16 @@ var _rec_seq: PackedInt64Array = PackedInt64Array()
 var _rec_chain: PackedInt32Array = PackedInt32Array()
 ## The key (`ProjectileManager.key_of`, N5) of the target a chain came from, 0 for none.
 var _rec_prev: PackedInt64Array = PackedInt64Array()
-## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
+## The live carriers with a trigger of `TriggerBase.LIVE` (timer, on hurt, on recast, on near), `_lc_count` of them (rules R4d): every
 ## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
 ## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a row of its carrier
 ## (`LC_ROW`: a beam's or a swing's tip, `Carrier.tip_of`), an actor's body (a wizard's dash, a decoy) or a point (a familiar's orb,
 ## which Entities moves: `familiar_at`, keyed by `_lc_seq`). One `_lc_tied` to its row ends with
 ## it (a shot, a beam, a swing); the others
 ## live `_lc_left` seconds (a dash, an entity) or until they leave (`_lc_leave`: an
-## entity that ended). `_lc_clock` is the seconds to the next tick, `_lc_at` where it was last,
-## `_lc_way` its way where nothing else gives one.
+## entity that ended). `_lc_clock` is the seconds to the next tick (`on near`: to its next look),
+## `_lc_at` where it was last, `_lc_way` its way where nothing else gives one, and `_lc_team` its
+## caster's team when it joined (`on near`'s foes once that caster is gone).
 const LC_SLOT: int = 0
 const LC_ROW: int = 1
 const LC_ACTOR: int = 2
@@ -316,6 +317,7 @@ var _lc_left: PackedFloat32Array = PackedFloat32Array()
 var _lc_clock: PackedFloat32Array = PackedFloat32Array()
 var _lc_at: PackedVector2Array = PackedVector2Array()
 var _lc_way: PackedVector2Array = PackedVector2Array()
+var _lc_team: PackedInt32Array = PackedInt32Array()
 var _lc_count: int = 0
 ## Slots of live shots with `zap`, `_zapper_count` of them, flagged in `_rec_zapper`;
 ## `_rec_zap_rolls` is how many random numbers each has drawn (its rolls are a hash of its sequence
@@ -2578,6 +2580,9 @@ func _lc_join(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, tie
 		var trigger: CompiledSpell.Trigger = spell.triggers[t]
 		if TriggerBase.LIVE.has(trigger.event):
 			_lc_join_one(t, trigger.interval, tag, kind, ref, seq, tied, life, at, way)
+			if trigger.event == TriggerBase.Event.NEAR:
+				# On near is ready at once: a foe already near sets it off.
+				_lc_clock[_lc_count - 1] = 0.0
 
 
 ## How many entries `_lc_join` lists for one carrier of `spell`: its triggers of
@@ -2605,6 +2610,7 @@ func _lc_join_one(trigger: int, interval: float, tag: int, kind: int, ref: int, 
 	_lc_clock[i] = first_tick(interval, life)
 	_lc_at[i] = at
 	_lc_way[i] = way.normalized() if way.is_finite() and not way.is_zero_approx() else Vector2.RIGHT
+	_lc_team[i] = _team(SpellTag.caster_of(tag))
 
 
 func _lc_grow(size: int) -> void:
@@ -2618,6 +2624,7 @@ func _lc_grow(size: int) -> void:
 	_lc_clock.resize(size)
 	_lc_at.resize(size)
 	_lc_way.resize(size)
+	_lc_team.resize(size)
 
 
 ## Takes live carrier `i` off the list (the last one takes its place).
@@ -2633,12 +2640,13 @@ func _lc_remove(i: int) -> void:
 	_lc_clock[i] = _lc_clock[_lc_count]
 	_lc_at[i] = _lc_at[_lc_count]
 	_lc_way[i] = _lc_way[_lc_count]
+	_lc_team[i] = _lc_team[_lc_count]
 
 
 ## A carrier of `tag` that is not tied to a row ended (an entity): one of its entries leaves, or
 ## with `every` all of them (its build was revoked).
 func _lc_leave(tag: int, every: bool) -> void:
-	# One carrier is listed once per timer or on hurt trigger (`_lc_join`).
+	# One carrier is listed once per trigger of `TriggerBase.LIVE` (`_lc_join`).
 	var spell: CompiledSpell = _profiles.get(tag)
 	var left: int = maxi(_lc_rows(spell), 1) if spell != null else 1
 	var i: int = _lc_count - 1
@@ -2697,14 +2705,39 @@ func _step_live(delta: float) -> void:
 				_lc_clock[i] += trigger.interval
 				# The tick was its payload's wind-up: it leaves now.
 				_lc_fire(i, trigger.payload, _lc_at[i], true)
+		elif trigger != null and trigger.event == TriggerBase.Event.NEAR:
+			_lc_clock[i] -= delta
+			if _lc_clock[i] <= 0.0:
+				_lc_near(i, trigger)
 		i += 1
 
 
-## Fires the payload of live carrier `i` from `from`, along its way where it is: a shot's own
-## (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
+## `on near` of live carrier `i`, due to look: the nearest foe of its caster within its payload's
+## reach sets it off, and its payload winds up and fires from the carrier toward that foe; it
+## waits its interval (the payload's wind-up, the time over carried as a timer's) before it can
+## fire again. With no foe near it looks again SpellLimits.NEAR_LOOK_AGAIN later (paced, never
+## dropped: rule 5), so many waiting mines cost a look each every few steps, not every step. Its
+## foes are its caster's (`Actors.is_foe`), by the team it had when it joined once that caster is
+## gone: a dead imp's mine still spares its pack.
+func _lc_near(i: int, trigger: CompiledSpell.Trigger) -> void:
+	var team: int = _team(SpellTag.caster_of(_lc_tag[i]))
+	if team == ActorsScript.NONE:
+		team = _lc_team[i]
+	var at: Vector2 = _lc_at[i]
+	var foe: Node2D = projectiles.nearest_target(at, trigger.reach, HITS, null, null, team)
+	if foe == null:
+		_lc_clock[i] = SpellLimits.NEAR_LOOK_AGAIN
+		return
+	_lc_clock[i] += trigger.interval
+	var toward: Vector2 = projectiles.nearest_point - at
+	_lc_fire(i, trigger.payload, at, false, null, toward if not toward.is_zero_approx() else Vector2.ZERO)
+
+
+## Fires the payload of live carrier `i` from `from`, along `aim` when given (`on near`: toward
+## the foe), else its way where it is: a shot's own (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
 ## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies, an
 ## actor's body while it is there (owner, 2026-11-06), else the point does.
-func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false, source: Node = null) -> void:
+func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false, source: Node = null, aim: Vector2 = Vector2.ZERO) -> void:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
 		return
@@ -2729,6 +2762,8 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
 			way = (at - body).normalized()
+	if not aim.is_zero_approx():
+		way = aim.normalized()
 	_fire_payload(payload, tag, actor, from, way, source, caster, wound)
 
 

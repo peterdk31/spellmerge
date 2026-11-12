@@ -39,6 +39,9 @@ const MAX_ZAPS_PER_STEP: int = 32
 ## while it is in reach (ZAP_WAIT_MOST), the body its shot is about to hit too. Shots look for bodies every ZAP_EVERY steps (half of them each
 ## step), which is soon enough at any speed and halves the cost.
 const ZAP_EVERY: int = 2
+## Seconds a waiting `on near` lets pass before it looks for a foe again after it found none (four
+## steps at 60 a second): many mines and fuses cost a look each every few steps, not every step.
+const NEAR_LOOK_AGAIN: float = 4.0 / 60.0
 ## A won zap waits a random moment of the time its body stays in reach (owner, 2026-10-30: "make
 ## this random as well"): of the shot's way through its reach circle, or until it hits that body,
 ## at most ZAP_WAIT_MOST seconds (a shot that stands still, a rune); a body that leaves first is

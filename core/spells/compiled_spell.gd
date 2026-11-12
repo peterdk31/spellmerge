@@ -246,6 +246,9 @@ class Trigger:
 	## Seconds between fires, for a timer: its payload's whole wind-up (the timer card's and the
 	## payload's cards'; docs/milestones/cast-timing.md, T8), which the tick then fires without.
 	var interval: float = 0.0
+	## How near a foe must come for `on near` to fire (its payload's reach, `CastSense.reach_of`);
+	## 0 for the other triggers.
+	var reach: float = 0.0
 	var payload: CompiledGroup = null
 	## The trigger card's slot in the staff.
 	var slot: int = -1

@@ -131,7 +131,7 @@ runs it, and the looks read the `pulse_*` getters.
 - **Its end:** when its life is out (or it is home), its `blast` goes off at its centre, hitting
   whoever is there, its caster too, as every blast does (owner: "Why did you add an exception for
   blast to spare its caster?"), and its `on expire` fires from there.
-- **Its triggers that fire while it lasts** (Timer, On Hurt, On Recast) fire from its centre
+- **Its triggers that fire while it lasts** (Timer, On Hurt, On Recast, On Near) fire from its centre
   (`LC_ROW`, `tip_of`). What its end and those triggers fire is cast by that point, as a slam's end
   or a beam's tip: a bolt they send hits a wizard still standing there (owner: "the bolt should hit
   the wizard if he is still standing at the cast point"). Its own strikes are cast by what cast it,
@@ -144,7 +144,7 @@ runs it, and the looks read the `pulse_*` getters.
 | Trigger | The payload is cast by |
 | --- | --- |
 | `on cast` | whoever cast the carrier |
-| `timer`, `on hurt`, `on recast` | its own shot, its own body (a decoy), or what it moves (the shot that cast it, else the wizard's body); a beam's or swing's tip, a familiar, a portal: a point; a Pulse: what it is round |
+| `timer`, `on hurt`, `on recast`, `on near` (toward the foe that set it off) | its own shot, its own body (a decoy), or what it moves (the shot that cast it, else the wizard's body); a beam's or swing's tip, a familiar, a portal: a point; a Pulse: what it is round |
 | `on expire` | a move's end: what it moved (the wizard's body, or the shot); a shot with `pull`: what it pulled there; a Pulse: what it is round; anything else: a point |
 | `on hit`, `on kill`, `on reaction` | a shot that flies on after its hit (it pierces, sticks, or its hits never spend it: a wall), what a move moves (a dash's pass and a teleport's landing are that body's or shot's strikes: `Carrier.hit_caster`), else a point |
 | `on wall` | a shot that bounces on, else a point |

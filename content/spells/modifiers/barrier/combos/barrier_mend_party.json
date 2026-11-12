@@ -1,0 +1,13 @@
+{
+	"id": "barrier_mend_party",
+	"name": "Mend and ward a friend",
+	"does": "A piercing mend barrier bolt heals the hurt teammate in its way and leaves a barrier on them, which stops the enemy shot flying at them.",
+	"needs": "barrier",
+	"casts": [{"staff": 0, "cards": ["mend", "barrier", "pierce", "bolt"]}],
+	"imps": [],
+	"allies": [[60, 0, 1]],
+	"hurt": 40,
+	"foes": [[260, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "healed", "min": 1}, {"kind": "blocked", "min": 1}]
+}

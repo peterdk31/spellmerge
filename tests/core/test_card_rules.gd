@@ -298,7 +298,7 @@ static func behaviour_scenes(behaviour: int) -> Array[Dictionary]:
 			return [TWO_TARGETS]
 		ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT:
 			return [SHOOTER]
-		ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.ECHO, ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.PENTA, ModifierBase.Behaviour.SKYFALL:
+		ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.ECHO, ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.PENTA, ModifierBase.Behaviour.SKYFALL, ModifierBase.Behaviour.BARRIER:
 			return [LINE]
 		ModifierBase.Behaviour.HOLD:
 			# A held carrier lives on, and a held Pulse strikes again: what stands on the line is struck.

@@ -871,6 +871,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 		var words: Dictionary = {
 			ModifierBase.Behaviour.HOMING: "Homes in", ModifierBase.Behaviour.CHAIN: "Chains %s",
 			ModifierBase.Behaviour.SHIELD: "Blocks %s", ModifierBase.Behaviour.BOUNCE: "Bounces %s",
+			ModifierBase.Behaviour.BARRIER: "Barrier %s",
 		}
 		if words.has(modifier.behaviour):
 			var word: String = words[modifier.behaviour]

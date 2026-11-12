@@ -42,7 +42,8 @@ extends Node
 ##    within STATIC_RANGE take its share, and the charge is always spent;
 ##  - **hex:** extra damage, and a spell hit pulls the victim toward it instead of pushing;
 ##  - **pull:** moves every actor in the circle;
-##  - **barriers:** on any actor (`wizard_shield_requested` gives the caster's actor one);
+##  - **barriers:** on any actor (`wizard_shield_requested` gives the caster's actor one; a Barrier
+##    card's hit gives the body it hits one after the hit, `HitProfile.barrier`);
 ##  - **several elements:** every element of a hit acts in turn, later statuses too;
 ##  - **burn ticks** are quiet for everyone: no event unless the tick kills;
 ##  - **contact:** an actor with contact damage hurts every actor of another team it touches,
@@ -890,14 +891,25 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 
 
 ## A spell's hit on the row `row`, struck at `position`: a mend heals whatever it hits, of any
-## team, and does nothing else (owner 2026-11-12: heal only, friend or foe); otherwise damage and
-## a push away from the hit (a pull toward it while hexed; harder while gusted, `_gust_power`),
-## the static discharge (in `_hit`), then every element in order: each reacts with what the ones
-## before it left, or puts its own status on, later statuses too (`fire · frost · bolt` thaws on its own hit).
+## team, with no damage, push or status (owner 2026-11-12: heal only, friend or foe); otherwise it
+## strikes (`_strike`). Then a Barrier card's barrier (`HitProfile.barrier`) goes on the body, if
+## it is still there: after the hit, so it never blocks the hit that brings it.
 func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kind: StringName) -> void:
+	var node: Node2D = _nodes[row]
 	if profile.heal > 0:
 		_heal(by, row, profile.heal)
-		return
+	else:
+		_strike(by, row, position, profile, kind)
+	if profile.barrier > 0 and _same(row, node):
+		give_shield(node, profile.barrier, profile.barrier_seconds, _tag)
+
+
+## A spell's hit that is not a heal, on the row `row` struck at `position`: damage and a push away
+## from the hit (a pull toward it while hexed; harder while gusted, `_gust_power`),
+## the static discharge (in `_hit`), then every element in order: each reacts with what the ones
+## before it left, or puts its own status on, later statuses too (`fire · frost · bolt` thaws on
+## its own hit).
+func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: StringName) -> void:
 	var node: Node2D = _nodes[row]
 	var damage: float = profile.damage
 	var strength: float = profile.knockback

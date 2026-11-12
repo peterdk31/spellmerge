@@ -354,7 +354,7 @@ func _profile(tag: int, shot: int) -> String:
 	if hit == null:
 		return "none"
 	var statuses: Array = [hit.status_id] + Array(hit.later_status_ids)
-	return "d%d h%d s%d k%d %s %s %s" % [hit.damage, hit.heal, hit.slam, roundi(hit.knockback), hit.kind, ",".join(PackedStringArray(hit.element_ids)), ",".join(PackedStringArray(statuses))]
+	return "d%d h%d s%d b%d k%d %s %s %s" % [hit.damage, hit.heal, hit.slam, hit.barrier, roundi(hit.knockback), hit.kind, ",".join(PackedStringArray(hit.element_ids)), ",".join(PackedStringArray(statuses))]
 
 
 func _listen() -> void:

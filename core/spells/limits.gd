@@ -162,6 +162,8 @@ const POOL_REACH: float = 64.0
 ## the shot that hit was, whose centre may stand its own radius off the body, more than the
 ## payload's when that shot was bigger (a `bigger` bolt's 8 px against an atom's 1.5).
 const SOURCE_TOUCH: float = 8.0
+## How long the barrier a Barrier card's hit gives lasts, in seconds.
+const BARRIER_SECONDS: float = 4.0
 ## Knockback of one hit in pixels per second (M1's fire bolt had 120).
 const KNOCKBACK: float = 120.0
 ## A heavy hit's knock into a wall hurts for this share of the hit's damage (at least 1).

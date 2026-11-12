@@ -515,6 +515,34 @@ func test_a_heal_hit_heals_a_foe_and_does_nothing_else() -> void:
 	check_equal(_combat.health_of(enemy), 80.0, "no slam and no burn after")
 
 
+## A Barrier card's hit (owner 2026-11-12) gives the body it hits a barrier after the hit's damage
+## or heal, so it never blocks the hit that brings it; on a body that has a barrier already, that
+## one takes the hit and the new one goes on after.
+func test_a_barrier_hit_shields_what_it_hits_after_the_hit() -> void:
+	_wizard(0, Vector2(-200.0, 0.0))
+	var enemy := _enemy(Vector2(10.0, 0.0))
+	var profile := _profile(5)
+	profile.barrier = 2
+	profile.barrier_seconds = 3.0
+	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, _tag(profile), -1)
+	check_equal(_combat.health_of(enemy), 95.0, "the hit lands")
+	check_equal(_combat.shield(enemy), 2, "then the barrier goes on")
+	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, _tag(profile), -1)
+	check_equal(_combat.health_of(enemy), 95.0, "the old barrier takes the next hit whole")
+	check_equal(_combat.shield(enemy), 3, "one charge spent, two more given")
+	_run(3.5)
+	check_equal(_combat.shield(enemy), 0, "it runs out after its time")
+	var mate := _wizard(1, Vector2(40.0, 0.0))
+	mate.health.take(20)
+	var mend := _profile(0)
+	mend.heal = 5
+	mend.barrier = 1
+	mend.barrier_seconds = 3.0
+	_bus.projectile_hit.emit(0, mate, Vector2.ZERO, _tag(mend), -1)
+	check_equal(mate.health.health, mate.health.max_health - 15, "a heal heals")
+	check_equal(_combat.shield(mate), 1, "and its barrier comes with it")
+
+
 func test_a_heal_hit_heals_a_teammate() -> void:
 	_wizard(0, Vector2.ZERO)
 	var mate := _wizard(1, Vector2(10.0, 0.0))

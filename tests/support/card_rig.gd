@@ -8,7 +8,7 @@ extends "res://tests/support/suite.gd"
 ##
 ##     func test_the_bolt_hits() -> void:
 ##         var imp := _target(Vector2(100.0, 0.0))
-##         _cast_form(&"bolt", 0, Vector2.ZERO)
+##         _cast_carrier(&"bolt", 0, Vector2.ZERO)
 ##         _tick(30)
 ##         check_equal(_hit_targets(), [imp] as Array, "it hit the imp")
 
@@ -58,7 +58,7 @@ func _card(id: StringName) -> SpellComponent:
 	return _registry.call("get_resource", &"spells", id) as SpellComponent
 
 
-func _form(id: StringName) -> CarrierCard:
+func _carrier_card(id: StringName) -> CarrierCard:
 	return _card(id) as CarrierCard
 
 
@@ -106,36 +106,36 @@ func _tick(steps: int, anchors: Dictionary = {}) -> void:
 		_spells.step(DT)
 
 
-## Builds a bare `form` into staff A of `player` and casts it from `origin` toward `direction`.
-func _cast_form(form: StringName, player: int, origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> int:
-	var tag: int = StaffKit.build(_spells, player, 0, [form] as Array[StringName])
-	check(tag != 0, "%s builds" % form)
+## Builds a bare `carrier_card` into staff A of `player` and casts it from `origin` toward `direction`.
+func _cast_carrier(carrier_card: StringName, player: int, origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> int:
+	var tag: int = StaffKit.build(_spells, player, 0, [carrier_card] as Array[StringName])
+	check(tag != 0, "%s builds" % carrier_card)
 	# An orbit needs its caster's anchor; the player pushes it every step.
 	_mgr.set_anchor(player, origin)
-	check(_spells.cast_staff(player, 0, origin, direction, 100.0) != SpellsScript.REFUSED, "%s is cast" % form)
+	check(_spells.cast_staff(player, 0, origin, direction, 100.0) != SpellsScript.REFUSED, "%s is cast" % carrier_card)
 	return tag
 
 
-## The modifiers before the form: one carrier with all of them (staffs A6c).
-func _row(form: StringName, modifiers: Array) -> Array[StringName]:
+## The modifiers before the carrier card: one carrier with all of them (staffs A6c).
+func _row(carrier_card: StringName, modifiers: Array) -> Array[StringName]:
 	var row: Array[StringName] = []
 	for id: StringName in modifiers:
 		row.append(id)
-	row.append(form)
+	row.append(carrier_card)
 	return row
 
 
-## The compiled spell of `form` with `modifiers`.
-func _compile_with(form: StringName, modifiers: Array) -> CompiledSpell:
-	var spell: CompiledSpell = StaffKit.first(_spells, _row(form, modifiers))
-	check(spell != null, "%s + %s compiles" % [form, modifiers])
+## The compiled spell of `carrier_card` with `modifiers`.
+func _compile_with(carrier_card: StringName, modifiers: Array) -> CompiledSpell:
+	var spell: CompiledSpell = StaffKit.first(_spells, _row(carrier_card, modifiers))
+	check(spell != null, "%s + %s compiles" % [carrier_card, modifiers])
 	return spell
 
 
-## Builds `form` with `modifiers` into staff A of `player` and casts it from `origin`.
-func _cast_with(form: StringName, modifiers: Array, player: int, origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> int:
-	var tag: int = StaffKit.build(_spells, player, 0, _row(form, modifiers))
-	check(_spells.cast_staff(player, 0, origin, direction, 100.0) != SpellsScript.REFUSED, "%s + %s is cast" % [form, modifiers])
+## Builds `carrier_card` with `modifiers` into staff A of `player` and casts it from `origin`.
+func _cast_with(carrier_card: StringName, modifiers: Array, player: int, origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> int:
+	var tag: int = StaffKit.build(_spells, player, 0, _row(carrier_card, modifiers))
+	check(_spells.cast_staff(player, 0, origin, direction, 100.0) != SpellsScript.REFUSED, "%s + %s is cast" % [carrier_card, modifiers])
 	return tag
 
 

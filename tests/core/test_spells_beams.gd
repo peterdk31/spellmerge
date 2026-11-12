@@ -48,11 +48,11 @@ func before_each() -> void:
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
-	var beam: CarrierCard = _form(&"beam", 0.0, 0.3)
+	var beam: CarrierCard = _carrier_card(&"beam", 0.0, 0.3)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	beam.radius = 6.0
-	var bolt: CarrierCard = _form(&"bolt", 300.0, 1.0)
+	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
 	bolt.radius = 2.0
 	_modifier(&"bounce", ModifierBase.Behaviour.BOUNCE, 3.0)
 	_modifier(&"homing", ModifierBase.Behaviour.HOMING, 73.0)
@@ -77,14 +77,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
-	var form := CarrierCard.new()
-	form.base_damage = 2
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 2
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> void:
@@ -323,7 +323,7 @@ func test_a_bouncing_beam_ends_its_blast_past_the_turn() -> void:
 ## turn, off the straight line back.
 func test_a_homing_beam_homes_again_after_it_turns_at_a_wall() -> void:
 	_turning_room()
-	var long: CarrierCard = _form(&"long_beam", 0.0, 0.3)
+	var long: CarrierCard = _carrier_card(&"long_beam", 0.0, 0.3)
 	long.carrier = &"beam"
 	long.ray_length = 300.0
 	long.radius = 6.0

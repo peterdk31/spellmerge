@@ -20,7 +20,7 @@ func test_it_works_for_all_four_players_at_once() -> void:
 
 
 func test_two_faster_cards_multiply_the_speed() -> void:
-	check_equal(_compile_with(&"bolt", [&"faster", &"faster"]).speed, _form(&"bolt").speed * 1.5 * 1.5, "two faster modifiers multiply the speed")
+	check_equal(_compile_with(&"bolt", [&"faster", &"faster"]).speed, _carrier_card(&"bolt").speed * 1.5 * 1.5, "two faster modifiers multiply the speed")
 
 
 func test_faster_compiles_to_a_quicker_shot_with_the_same_cast_time() -> void:

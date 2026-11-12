@@ -3,7 +3,7 @@ extends SpellComponent
 ## A carrier (bolt, beam, rune, dash, teleport, ...): what leaves the caster
 ## and ends a group when a staff is read (docs/milestones/M2-staffs.md). It sets the base
 ## numbers the infusions and modifiers before it then change. The class keeps its old name,
-## `CarrierCard`, and its kind `&"form"`.
+## `CarrierCard`, and its kind `&"carrier"`.
 
 ## Staff animations (`staff_pose`): the phases a key can be in, the eases into a key, the moods
 ## a key can show on the staff's face (its brows), the channels a key moves and the numbers each
@@ -99,7 +99,7 @@ var _pose_packed: bool = false
 ## docs/milestones/spell-spectacle-2.md, S6 2), so how a carrier looks is cue files, not keys of its
 ## own: `cast_cue` on its caster's staff when a seat casts it (`spell_cast`: the flash, a ring with
 ## it, the camera kicked back; `cast` when not given); `shown_cue` where the carrier shows itself
-## (`form_shown`, whoever casts it: where a teleport leaves, each
+## (`carrier_shown`, whoever casts it: where a teleport leaves, each
 ## end of a swap's trade, a decoy or familiar appearing), as big as the event's `length`; `impact_cue`
 ## where its shots strike, on a body or a wall (`projectile_impact`: the flare in the shot's colours
 ## and cards; `impact` when not given), as big as its `radius`; and `end_cue` where a carrier with no
@@ -158,7 +158,7 @@ var _renamed: PackedStringArray = PackedStringArray()
 
 
 func kind() -> StringName:
-	return &"form"
+	return &"carrier"
 
 
 ## A field this card's `.tres` sets that no longer exists: `shot_shader`, renamed `look_shader`

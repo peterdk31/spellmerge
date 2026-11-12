@@ -1,6 +1,6 @@
 extends RefCounted
 ## The clip scenarios (#245), read from the content so a new row or component is a new clip
-## with no code change: one per combo file (each in its card's `combos/` folder), one per component (a form,
+## with no code change: one per combo file (each in its card's `combos/` folder), one per component (a carrier card,
 ## an element, a modifier or a trigger alone), one per element reaction in `reactions.tres`,
 ## and a co-op version of each reaction with two players.
 ##
@@ -39,6 +39,10 @@ const OWN_ROWS: Dictionary = {}
 ## The card a trigger's clip puts on its bolt, for a trigger whose event needs one (otherwise the
 ## compiler lists it as wasted, rules R2b).
 const TRIGGER_NEEDS: Dictionary = {&"on_block": &"shield", &"on_reaction": &"fire"}
+## The clip pipeline's name of a card kind, where it is not the kind itself: a carrier card is a
+## `form` to ci/smbot/clips.py and tools/atlas.py (its clip `form_<id>`, its gallery section), which
+## kept the name when the game's kind became `carrier` (2026-11-12).
+const PIPELINE_KINDS: Dictionary = {&"carrier": "form"}
 const FOUR_PLAYER_ROUNDS: int = 3
 const FOUR_PLAYER_GAP: float = 0.6
 const FOUR_PLAYER_SECONDS: float = 3.0
@@ -128,7 +132,7 @@ static func _component(id: StringName, kind: StringName, title: String) -> Dicti
 	# a multicast pulls three bolts.
 	var cards: Array = [id, &"bolt"]
 	match kind:
-		&"form":
+		&"carrier":
 			cards = [id]
 		&"trigger":
 			cards = [id, &"bolt", &"nova", &"bolt"]
@@ -139,7 +143,13 @@ static func _component(id: StringName, kind: StringName, title: String) -> Dicti
 	if OWN_ROWS.has(id):
 		cards = (OWN_ROWS[id] as Array).duplicate()
 	var casts: Array[Dictionary] = [_cast(0, 0, cards, 0.0)]
-	return _scenario("%s_%s" % [kind, id], str(kind), title if title != "" else String(id), SPREAD_IMPS, casts, COMPONENT_SECONDS)
+	var named: String = pipeline_kind(kind)
+	return _scenario("%s_%s" % [named, id], named, title if title != "" else String(id), SPREAD_IMPS, casts, COMPONENT_SECONDS)
+
+
+## The clip pipeline's name of the card kind `kind` (`PIPELINE_KINDS`).
+static func pipeline_kind(kind: StringName) -> String:
+	return String(PIPELINE_KINDS.get(kind, String(kind)))
 
 
 ## A reaction made by two real bolts: the first (of element `first`) puts the status on, the

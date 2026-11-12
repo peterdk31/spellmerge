@@ -45,14 +45,14 @@ func take() -> void:
 		var player: int = wizards[e % 4]
 		var y: float = 30.0 + e * 56.0
 		for lane in 3:
-			var form: Resource = ATOM if lane == 1 else BOLT
-			var speed: float = float(form.get("speed"))
+			var carrier_card: Resource = ATOM if lane == 1 else BOLT
+			var speed: float = float(carrier_card.get("speed"))
 			# Both end their flight at the same x, so the tails line up behind them.
 			var start: Vector2 = Vector2(420.0 - speed * float(FLIGHT) / 60.0, y + lane * 17.0)
-			var slot: int = _shots.call("spawn", player, start, Vector2(speed, 0.0), 600.0, float(form.get("radius"))) as int
+			var slot: int = _shots.call("spawn", player, start, Vector2(speed, 0.0), 600.0, float(carrier_card.get("radius"))) as int
 			if lane == 0:
 				# The bolt's own look: its card's shader, a pair of head batches of its own.
-				_shots.call("set_form", slot, &"bolt", _shots.call("register_body", form.get("look_shader"), ManagerScript.MESH_HEAD))
+				_shots.call("set_carrier_card", slot, &"bolt", _shots.call("register_body", carrier_card.get("look_shader"), ManagerScript.MESH_HEAD))
 			_shots.call("set_core", slot, tint)
 			_shots.call("set_look", slot, ManagerScript.pack_look(look))
 		if e == 0:

@@ -160,7 +160,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 		for k in used:
 			var gate: int = _pt_gates[at * _pt_stride + k]
 			kit.set_cue_tag(tag)
-			kit.events.form_shown.emit(actor, spell.carrier_card_id, kit.projectiles.gate_position(gate), kit.projectiles.gate_face(gate), spell.radius, spell.tint, spell.look)
+			kit.events.carrier_shown.emit(actor, spell.carrier_card_id, kit.projectiles.gate_position(gate), kit.projectiles.gate_face(gate), spell.radius, spell.tint, spell.look)
 			kit.set_cue_tag(0)
 	return 1
 

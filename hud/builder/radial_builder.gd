@@ -80,12 +80,12 @@ const NO_CARD: StringName = &""
 const NONE: int = -1
 
 ## The kinds in ring order, their words and colours (docs/STYLE.md: none near a player colour).
-const KINDS: Array[StringName] = [&"form", &"modifier", &"element", &"trigger", &"multicast"]
+const KINDS: Array[StringName] = [&"carrier", &"modifier", &"element", &"trigger", &"multicast"]
 const KIND_WORDS: Dictionary = {
-	&"form": "Carrier", &"modifier": "Modifier", &"element": "Infusion", &"trigger": "Trigger", &"multicast": "Multicast",
+	&"carrier": "Carrier", &"modifier": "Modifier", &"element": "Infusion", &"trigger": "Trigger", &"multicast": "Multicast",
 }
 const KIND_COLORS: Dictionary = {
-	&"form": Color("#ffa23c"), &"modifier": Color("#4fd6dc"), &"element": Color("#b4e82a"),
+	&"carrier": Color("#ffa23c"), &"modifier": Color("#4fd6dc"), &"element": Color("#b4e82a"),
 	&"trigger": Color("#e08ad8"), &"multicast": Color("#d4d0e0"),
 }
 const OUTLINE: Color = Color("#14121f")

@@ -2,7 +2,7 @@ class_name Homing
 extends RefCounted
 ## The homing of one thing that is not one of the projectile manager's own shots and keeps its
 ## target while it lasts: a leg of a beam, a wizard's dash (owner, 2026-10-27: one rule, easy to add
-## a new form to). It holds what its spell's homing cards give (`start`), the target it keeps and
+## a new carrier card to). It holds what its spell's homing cards give (`start`), the target it keeps and
 ## the seed of its random pick; `steer` turns what moves over time, `point` bends what is over at
 ## once (a beam ends on its target when that is within its length). A one-off pick that keeps
 ## nothing (a teleport's target) is `CarrierKit.pick_target`.

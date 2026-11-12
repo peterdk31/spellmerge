@@ -8,8 +8,8 @@ const ShaderSource := preload("res://tests/support/shader_source.gd")
 
 func test_the_card_is_a_beam() -> void:
 	_check_card(&"beam", 2)
-	check_equal(_form(&"beam").carrier, &"beam", "beam is a ray")
-	check(_form(&"beam").ray_length > 0.0, "a beam has a reach")
+	check_equal(_carrier_card(&"beam").carrier, &"beam", "beam is a ray")
+	check(_carrier_card(&"beam").ray_length > 0.0, "a beam has a reach")
 
 
 func test_it_works_for_all_four_players_at_once() -> void:
@@ -23,8 +23,8 @@ func test_the_beam_hits_along_a_line_up_to_its_reach_at_once() -> void:
 	var second := _target(Vector2(120.0, 0.0))
 	var third := _target(Vector2(180.0, 0.0))
 	var beside := _target(Vector2(120.0, 50.0))
-	_cast_form(&"beam", 0, Vector2.ZERO)
-	check_equal(_form(&"beam").pierce, 0, "a beam pierces only with pierce cards")
+	_cast_carrier(&"beam", 0, Vector2.ZERO)
+	check_equal(_carrier_card(&"beam").pierce, 0, "a beam pierces only with pierce cards")
 	check_equal(_hit_targets(), [near] as Array, "a bare beam hits the nearest on the line and stops there")
 	check(not _hit_targets().has(second) and not _hit_targets().has(third) and not _hit_targets().has(beside), "not the ones behind it nor the one beside it")
 	check_equal(_mgr.get_count(), 0, "a beam holds no shot")
@@ -33,7 +33,7 @@ func test_the_beam_hits_along_a_line_up_to_its_reach_at_once() -> void:
 func test_one_beam_hits_at_once_and_every_tick_of_its_life() -> void:
 	_target(Vector2(60.0, 0.0))
 	var spell: CompiledSpell = StaffKit.first(_spells, [&"beam"] as Array[StringName])
-	_cast_form(&"beam", 0, Vector2.ZERO)
+	_cast_carrier(&"beam", 0, Vector2.ZERO)
 	check_equal(_hits.size(), 1, "a hit at once")
 	check_equal(CarrierBeam.of(_spells).beam_count(), 1, "and the beam stays on")
 	_tick(60)
@@ -68,19 +68,19 @@ func test_a_held_beam_stays_on_and_drains_mana_steadily() -> void:
 
 
 func test_the_beam_does_not_reach_past_its_length() -> void:
-	_target(Vector2(_form(&"beam").ray_length + 40.0, 0.0))
-	_cast_form(&"beam", 0, Vector2.ZERO)
+	_target(Vector2(_carrier_card(&"beam").ray_length + 40.0, 0.0))
+	_cast_carrier(&"beam", 0, Vector2.ZERO)
 	check_equal(_hits.size(), 0, "a target beyond the reach is safe")
 
 
 func test_its_own_look_takes_every_uniform_feel_gives_a_beam() -> void:
 	# The beam's look is its own (a white-hot core banded out through its ramp; void a dark rift;
 	# the owner, 2026-11-08), no longer the plain beam's include: Feel sets the plain beam's
-	# uniforms on it (`Feel._on_form_shown`), so it keeps declaring every one, or a setting falls
+	# uniforms on it (`Feel._on_carrier_shown`), so it keeps declaring every one, or a setting falls
 	# on nothing and the beam draws stale.
 	var plain: String = ShaderSource.of(load("res://core/projectiles/shot_beam.gdshader") as Shader)
-	var own_look: String = ShaderSource.of(_form(&"beam").look_shader)
-	check(not _form(&"beam").look_shader.code.contains("#include \"res://core/projectiles/shot_beam.gdshaderinc\""), "the beam draws a look of its own")
+	var own_look: String = ShaderSource.of(_carrier_card(&"beam").look_shader)
+	check(not _carrier_card(&"beam").look_shader.code.contains("#include \"res://core/projectiles/shot_beam.gdshaderinc\""), "the beam draws a look of its own")
 	var count: int = 0
 	for line: String in plain.split("\n"):
 		if line.begins_with("uniform "):

@@ -42,9 +42,9 @@ func before_each() -> void:
 func _looked_cards() -> Array:
 	var found: Array = []
 	for card: Resource in registry.call("get_all", &"spells"):
-		var form := card as CarrierCard
-		if form != null and form.look_shader != null:
-			found.append([form, Carriers.of(form.carrier).look_drawer()])
+		var carrier_card := card as CarrierCard
+		if carrier_card != null and carrier_card.look_shader != null:
+			found.append([carrier_card, Carriers.of(carrier_card.carrier).look_drawer()])
 	return found
 
 
@@ -58,39 +58,39 @@ func test_some_cards_have_a_look_of_their_own() -> void:
 
 func test_every_card_shader_is_one_its_carrier_draws() -> void:
 	for each: Array in _looked_cards():
-		var form: CarrierCard = each[0]
-		check(form.look_problems().is_empty(), "%s: %s" % [form.id, form.look_problems()])
-		check(PLAIN.has(each[1]), "%s's carrier %s draws a look (got %d)" % [form.id, form.carrier, each[1]])
-		check(form.look_shader.resource_path.begins_with("res://content/spells/carriers/%s/" % form.id), "%s's shader is in its own folder" % form.id)
+		var carrier_card: CarrierCard = each[0]
+		check(carrier_card.look_problems().is_empty(), "%s: %s" % [carrier_card.id, carrier_card.look_problems()])
+		check(PLAIN.has(each[1]), "%s's carrier %s draws a look (got %d)" % [carrier_card.id, carrier_card.carrier, each[1]])
+		check(carrier_card.look_shader.resource_path.begins_with("res://content/spells/carriers/%s/" % carrier_card.id), "%s's shader is in its own folder" % carrier_card.id)
 
 
 func test_every_card_shader_keeps_its_areas_instance_and_mesh() -> void:
 	for each: Array in _looked_cards():
-		var form: CarrierCard = each[0]
+		var carrier_card: CarrierCard = each[0]
 		if not PLAIN.has(each[1]):
 			continue
 		var plain: String = ShaderSource.of(load(PLAIN[each[1]]) as Shader)
-		var code: String = ShaderSource.of(form.look_shader)
+		var code: String = ShaderSource.of(carrier_card.look_shader)
 		for line: String in plain.split("\n"):
 			if line.begins_with("const float Q_") or line.begins_with("const float HF_"):
-				check(code.contains(line), "%s keeps its area's `%s`" % [form.id, line])
-		check(code.contains("render_mode blend_premul_alpha"), "%s blends as the shot shaders do" % form.id)
+				check(code.contains(line), "%s keeps its area's `%s`" % [carrier_card.id, line])
+		check(code.contains("render_mode blend_premul_alpha"), "%s blends as the shot shaders do" % carrier_card.id)
 
 
 func test_every_card_shader_keeps_its_areas_particle_rule() -> void:
 	for each: Array in _looked_cards():
-		var form: CarrierCard = each[0]
-		var code: String = ShaderSource.of(form.look_shader)
+		var carrier_card: CarrierCard = each[0]
+		var code: String = ShaderSource.of(carrier_card.look_shader)
 		if DRAWS_PARTICLES.has(each[1]):
-			check(code.contains(PARTICLE_RULE), "%s asks 4 + 2 particles a kind" % form.id)
+			check(code.contains(PARTICLE_RULE), "%s asks 4 + 2 particles a kind" % carrier_card.id)
 		else:
-			check(not code.contains(PARTICLE_RULE), "%s draws no card particles: its area's are motes" % form.id)
+			check(not code.contains(PARTICLE_RULE), "%s draws no card particles: its area's are motes" % carrier_card.id)
 
 
 func test_no_card_shader_reads_the_light_floats() -> void:
 	for each: Array in _looked_cards():
-		var form: CarrierCard = each[0]
-		check(not ShaderSource.of(form.look_shader).contains("MODEL_MATRIX[2]"), "%s leaves the row floats the spell light reads alone (LIGHT_*_FLOAT)" % form.id)
+		var carrier_card: CarrierCard = each[0]
+		check(not ShaderSource.of(carrier_card.look_shader).contains("MODEL_MATRIX[2]"), "%s leaves the row floats the spell light reads alone (LIGHT_*_FLOAT)" % carrier_card.id)
 
 
 func test_every_card_shader_is_warmed_before_the_first_room() -> void:
@@ -109,24 +109,24 @@ func test_every_card_shader_is_warmed_before_the_first_room() -> void:
 	entities.use_familiar_look()
 	var warmed: Array[Shader] = WarmupScript.shaders()
 	for each: Array in _looked_cards():
-		var form: CarrierCard = each[0]
-		check(warmed.has(form.look_shader), "%s's shader is warmed before the first room" % form.id)
+		var carrier_card: CarrierCard = each[0]
+		check(warmed.has(carrier_card.look_shader), "%s's shader is warmed before the first room" % carrier_card.id)
 	# A shot carrier's body was numbered then, with its mesh: asked again, it is one of those.
 	var numbered: int = manager.batch_count()
 	for each: Array in _looked_cards():
-		var form: CarrierCard = each[0]
+		var carrier_card: CarrierCard = each[0]
 		if each[1] == Carrier.LOOK_SHOT or each[1] == Carrier.LOOK_STILL:
 			var mesh: int = ProjectilesScript.MESH_HEAD if each[1] == Carrier.LOOK_SHOT else ProjectilesScript.MESH_QUAD
-			check(manager.register_body(form.look_shader, mesh) > 0, "%s has a body" % form.id)
+			check(manager.register_body(carrier_card.look_shader, mesh) > 0, "%s has a body" % carrier_card.id)
 	check_equal(manager.batch_count(), numbered, "every shot carrier card's body was numbered when Spells started")
 
 
 func test_a_look_shader_on_a_carrier_with_no_look_is_reported() -> void:
-	var form := CarrierCard.new()
-	form.id = &"test_form"
-	form.carrier = &"dash"
-	form.look_shader = preload("res://content/spells/carriers/pool/pool.gdshader")
-	var found: String = " ".join(form.look_problems())
+	var carrier_card := CarrierCard.new()
+	carrier_card.id = &"test_form"
+	carrier_card.carrier = &"dash"
+	carrier_card.look_shader = preload("res://content/spells/carriers/pool/pool.gdshader")
+	var found: String = " ".join(carrier_card.look_problems())
 	check(found.contains("never drawn"), "a dash draws no look: %s" % found)
 
 
@@ -136,14 +136,14 @@ func test_every_card_shader_takes_every_uniform_its_area_sets() -> void:
 	# trails, Entities' orbs, the manager's batches), so it declares every one, or a setting falls
 	# on nothing and the look draws stale.
 	for each: Array in _looked_cards():
-		var form: CarrierCard = each[0]
+		var carrier_card: CarrierCard = each[0]
 		if not PLAIN.has(each[1]):
 			continue
 		var plain: String = ShaderSource.of(load(PLAIN[each[1]]) as Shader)
-		var code: String = ShaderSource.of(form.look_shader)
+		var code: String = ShaderSource.of(carrier_card.look_shader)
 		for line: String in plain.split("\n"):
 			if line.begins_with("uniform "):
-				check(code.contains(line), "%s keeps its area's `%s`" % [form.id, line])
+				check(code.contains(line), "%s keeps its area's `%s`" % [carrier_card.id, line])
 
 
 func test_every_still_cards_look_is_one_its_shader_and_clock_can_draw() -> void:
@@ -152,13 +152,13 @@ func test_every_still_cards_look_is_one_its_shader_and_clock_can_draw() -> void:
 	# Its coming and going fit what the still clock tells (`STILL_START`, `STILL_END`).
 	var by_shader: Dictionary = {}
 	for each: Array in _looked_cards():
-		var form: CarrierCard = each[0]
+		var carrier_card: CarrierCard = each[0]
 		if each[1] != Carrier.LOOK_STILL:
 			continue
-		check(form.look_open <= ProjectilesScript.STILL_START and form.look_fade <= ProjectilesScript.STILL_END, "%s comes and goes within what its still clock tells" % form.id)
-		var numbers: Array = [form.look_shape, form.look_open, form.look_fade]
-		if by_shader.has(form.look_shader):
-			var first: Array = by_shader[form.look_shader]
-			check(first[1] == numbers, "%s shares %s's shader, so its look shape and clock too" % [form.id, first[0]])
+		check(carrier_card.look_open <= ProjectilesScript.STILL_START and carrier_card.look_fade <= ProjectilesScript.STILL_END, "%s comes and goes within what its still clock tells" % carrier_card.id)
+		var numbers: Array = [carrier_card.look_shape, carrier_card.look_open, carrier_card.look_fade]
+		if by_shader.has(carrier_card.look_shader):
+			var first: Array = by_shader[carrier_card.look_shader]
+			check(first[1] == numbers, "%s shares %s's shader, so its look shape and clock too" % [carrier_card.id, first[0]])
 		else:
-			by_shader[form.look_shader] = [form.id, numbers]
+			by_shader[carrier_card.look_shader] = [carrier_card.id, numbers]

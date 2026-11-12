@@ -223,10 +223,10 @@ func test_a_random_staff_has_a_carrier() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
 	for i in 50:
-		var has_form: bool = false
+		var has_carrier: bool = false
 		for id in fuzzer.random_cards(rng, SLOTS):
-			has_form = has_form or arena.spells.component_kind(id) == &"form"
-		check(has_form, "staff %d has a carrier" % i)
+			has_carrier = has_carrier or arena.spells.component_kind(id) == &"carrier"
+		check(has_carrier, "staff %d has a carrier" % i)
 	check(not FuzzerScript.new([&"fire"] as Array[StringName], func(_id: StringName) -> StringName: return &"element").can_build(), "no carrier in the bag, no build")
 	arena.free_all()
 

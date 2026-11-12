@@ -49,7 +49,7 @@ func before_each() -> void:
 	_mgr.actors = own(ActorSeats.table(4, FIRST_WIZARD)) as ActorSeats.ActorsScript
 	_spells = own(SpellsScript.new()) as SpellsScript
 	# Every made-up card a carrier, so each card is a cast of its own.
-	_spells.registry = own(FakeCards.registry(CARDS, &"form"))
+	_spells.registry = own(FakeCards.registry(CARDS, &"carrier"))
 	_spells.bind(_mgr, _bus)
 	_staff = StaffBase.new()
 	_staff.slots = CARDS

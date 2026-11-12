@@ -19,7 +19,7 @@ func traits() -> int:
 
 ## Wall (rules R4 F6): one solid still shot centred its `ray_length` (or `SpellLimits.WALL_REACH`)
 ## ahead of `origin`, a row of `shots` stones across `direction`, `spread` pixels apart (the shot's
-## diameter when the form has none): a wall while it lives (`set_solid`) that hurts what touches it
+## diameter when the carrier card has none): a wall while it lives (`set_solid`) that hurts what touches it
 ## and that its hits never spend. Homing makes it creep toward a target as one piece, as a rune does.
 func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, carried: int, prev: int) -> int:
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.WALL_REACH

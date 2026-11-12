@@ -67,13 +67,13 @@ func take() -> void:
 	save_crop(image, on_screen(Vector2(COLUMNS[4] - 6.0, 176.0)), "carrier_palettes_swap", Vector2i(24, 130), 4)
 
 
-## A still or flying shot of `form`'s body at `at` (moving at `velocity`), in the palette `infusions`
+## A still or flying shot of `carrier_card`'s body at `at` (moving at `velocity`), in the palette `infusions`
 ## (the first's tint, every one's look layer).
-func _spawn(form: Resource, at: Vector2, infusions: Array, velocity: Vector2 = Vector2.ZERO) -> int:
+func _spawn(carrier_card: Resource, at: Vector2, infusions: Array, velocity: Vector2 = Vector2.ZERO) -> int:
 	var motion: int = ManagerScript.MOTION_STILL if velocity == Vector2.ZERO else ManagerScript.MOTION_STRAIGHT
-	var slot: int = _shots.call("spawn", _wizard, at, velocity, 600.0, float(form.get("radius")), ManagerScript.LAYER_ENEMY, 0, 0, motion)
+	var slot: int = _shots.call("spawn", _wizard, at, velocity, 600.0, float(carrier_card.get("radius")), ManagerScript.LAYER_ENEMY, 0, 0, motion)
 	var mesh: int = ManagerScript.MESH_QUAD if velocity == Vector2.ZERO else ManagerScript.MESH_HEAD
-	_shots.call("set_form", slot, StringName(form.get("id")), _shots.call("register_body", form.get("look_shader"), mesh))
+	_shots.call("set_carrier_card", slot, StringName(carrier_card.get("id")), _shots.call("register_body", carrier_card.get("look_shader"), mesh))
 	var layers := PackedInt32Array()
 	for element: Resource in infusions:
 		layers.append(int(element.get("look_layer")))

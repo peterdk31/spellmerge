@@ -160,6 +160,6 @@ func test_a_cast_on_the_caster_names_its_carrier_and_moves_the_staff() -> void:
 	arena.install_cards(0, 0, ["shield"])
 	for n in 3:
 		check(arena.cast(0, 0), "cast %d" % n)
-		check_equal(arena.spells.last_form(0, 0), &"caster", "cast %d names its carrier" % n)
+		check_equal(arena.spells.last_carrier_card(0, 0), &"caster", "cast %d names its carrier" % n)
 		arena.run(0.6)
 	arena.free_all()

@@ -6,7 +6,7 @@ extends "res://tests/support/card_rig.gd"
 
 func test_the_card_is_a_bolt() -> void:
 	_check_card(&"bolt", 1)
-	check_equal(_form(&"bolt").carrier, &"atom", "bolt flies (a bigger atom)")
+	check_equal(_carrier_card(&"bolt").carrier, &"atom", "bolt flies (a bigger atom)")
 
 
 func test_it_works_for_all_four_players_at_once() -> void:
@@ -18,16 +18,16 @@ func test_it_works_for_all_four_players_at_once() -> void:
 func test_the_bolt_is_one_shot_that_flies_straight_and_hits() -> void:
 	var imp := _target(Vector2(100.0, 0.0))
 	_target(Vector2(100.0, 60.0))
-	var tag: int = _cast_form(&"bolt", 0, Vector2.ZERO)
+	var tag: int = _cast_carrier(&"bolt", 0, Vector2.ZERO)
 	check_equal(_mgr.get_count(), 1, "one shot")
 	_tick(30)
 	check_equal(_hit_targets(), [imp] as Array, "it hit the imp in its way and not the one beside it")
-	check_equal(_spells.hit_profile(tag).damage, _form(&"bolt").base_damage, "a bare bolt hits for its base damage")
+	check_equal(_spells.hit_profile(tag).damage, _carrier_card(&"bolt").base_damage, "a bare bolt hits for its base damage")
 
 
 func test_the_bolt_ends_after_its_lifetime() -> void:
-	_cast_form(&"bolt", 0, Vector2.ZERO)
-	_tick(ceili(_form(&"bolt").lifetime / DT) + 4)
+	_cast_carrier(&"bolt", 0, Vector2.ZERO)
+	_tick(ceili(_carrier_card(&"bolt").lifetime / DT) + 4)
 	check_equal(_mgr.get_count(), 0, "the shot expired")
 
 
@@ -44,7 +44,7 @@ func test_it_is_drawn_by_its_own_head_shader() -> void:
 	var card: CarrierCard = load("res://content/spells/carriers/bolt/bolt.tres") as CarrierCard
 	check(card.look_shader == preload("res://content/spells/carriers/bolt/bolt.gdshader"), "drawn by its folder's shader")
 	check(card.look_problems().is_empty(), "a canvas-item shader")
-	var tag: int = _cast_form(&"bolt", 0, Vector2.ZERO)
+	var tag: int = _cast_carrier(&"bolt", 0, Vector2.ZERO)
 	check(tag > 0, "cast")
 	var slot: int = -1
 	for s in _mgr.get_cap():

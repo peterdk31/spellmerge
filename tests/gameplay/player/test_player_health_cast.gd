@@ -219,7 +219,7 @@ func _test_cast_spends_mana_and_sends_event() -> void:
 	_world.step_one(_players[1])
 	_check(_fake.fired_players == [_players[1].id], "holding cast calls the runtime for this wizard's caster number")
 	_check(_fake.fired_slots == [0], "and for the active slot")
-	_check(_casts == [1] and _cast_ids == [&"bolt"], "spell_cast is sent with the player and the form id")
+	_check(_casts == [1] and _cast_ids == [&"bolt"], "spell_cast is sent with the player and the carrier card id")
 	_check(_players[1].caster.mana_of(0) < _players[1].caster.max_mana_of(0), "the cast took mana")
 	_check(_players[0].caster.mana_of(0) == _players[0].caster.max_mana_of(0), "the other wizard's mana is untouched")
 

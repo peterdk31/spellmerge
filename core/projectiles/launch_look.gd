@@ -12,7 +12,7 @@ var core: Color = Color.WHITE
 ## The packed look kinds (`ProjectileManager.pack_look`; 0 for none).
 var look: int = 0
 ## The id of the card it is (`&""` for none).
-var form: StringName = &""
+var carrier_card: StringName = &""
 ## The card body it is drawn by (`ProjectileManager.register_body`; 0 for its motion's own).
 var body: int = 0
 ## How bright and how far it lights the room, times the shot light's own (1 as a plain shot).

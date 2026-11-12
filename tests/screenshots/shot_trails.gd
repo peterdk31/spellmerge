@@ -72,7 +72,7 @@ func take() -> void:
 		var caster: int = e if e < 4 else enemies[e - 4]
 		_shots.call("set_anchor", caster, _dash_point(e, 0.0))
 		# The dash card's start (its cue's streams follow the caster until it lands).
-		events.emit_signal("form_shown", caster, &"dash", _dash_point(e, 0.0), Vector2.UP, 80.0, tint, look)
+		events.emit_signal("carrier_shown", caster, &"dash", _dash_point(e, 0.0), Vector2.UP, 80.0, tint, look)
 		dashers.append(caster)
 	for n in STEPS:
 		await physics_frame

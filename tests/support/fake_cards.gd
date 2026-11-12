@@ -10,7 +10,7 @@ extends RefCounted
 ##     events.bag_changed.emit(0, FakeCards.ids(300))
 
 ## The kinds in the order the cards take them: card 0 a carrier, card 1 a modifier, and so on.
-const KINDS: Array[StringName] = [&"form", &"modifier", &"element", &"trigger", &"multicast"]
+const KINDS: Array[StringName] = [&"carrier", &"modifier", &"element", &"trigger", &"multicast"]
 const ICONS: Array[Texture2D] = [
 	preload("res://content/spells/carriers/bolt/icon.svg"),
 	preload("res://content/spells/modifiers/split/icon.svg"),
@@ -58,13 +58,13 @@ static func registry(count: int, kind: StringName = &"") -> FakeRegistry:
 
 static func _card(kind: StringName, at: int) -> SpellComponent:
 	match kind:
-		&"form":
-			var form := CarrierCard.new()
-			form.base_damage = 1 + at % 9
-			form.mana_cost = 2.0 + float(at % 7)
-			form.wind_down = 0.25
-			form.speed = 200.0
-			return form
+		&"carrier":
+			var carrier_card := CarrierCard.new()
+			carrier_card.base_damage = 1 + at % 9
+			carrier_card.mana_cost = 2.0 + float(at % 7)
+			carrier_card.wind_down = 0.25
+			carrier_card.speed = 200.0
+			return carrier_card
 		&"modifier":
 			var modifier := ModifierBase.new()
 			modifier.damage_mult = 1.25

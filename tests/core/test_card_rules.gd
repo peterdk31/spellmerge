@@ -4,7 +4,7 @@ extends "res://tests/support/suite.gd"
 ## by the compiler as wasted. Nothing does nothing silently.
 ##
 ## It keeps no list of cards or carriers (owner, 2026-10-29: "It should just auto discover new
-## cards and carriers"). It asks the registry for every card: the forms are the carriers, and every
+## cards and carriers"). It asks the registry for every card: the carrier cards are the carriers, and every
 ## modifier, trigger, infusion and multicast card is tried on each of them. A new card or carrier
 ## is checked the day it lands.
 ##
@@ -44,7 +44,7 @@ extends "res://tests/support/suite.gd"
 ## behaviour modifier with its plain copy as above.
 ##
 ## The three fallback carriers (docs/CARRIERS.md, "The fallback carriers") are columns too, `on
-## you`, `on it`, `on its body` and `right there`: no form card fires them, so each is played the way a staff
+## you`, `on it`, `on its body` and `right there`: no carrier card fires them, so each is played the way a staff
 ## reaches it. On you: the card alone, with a card that changes nothing (`LAND`) in both casts so a
 ## strike happens with or without it. On it: the same as the payload of `on hit` on a piercing shot
 ## that hits the target (`_bearer_prefix`): it pierces, so the shot that fired the payload flies on
@@ -111,7 +111,7 @@ const SPREAD: float = 4.0
 ## Print the first differing line of every ✓ cell (for checking a probe by hand).
 const EXPLAIN: bool = false
 ## Only this carrier (for checking a probe by hand); empty for all.
-const ONLY_FORM: String = ""
+const ONLY_CARRIER: String = ""
 ## How many tests the modifiers' matrix is split into (see `_modifier_part`).
 const MODIFIER_PARTS: int = 6
 
@@ -119,7 +119,7 @@ var _registry: Node
 var _shelf: World.Shelf
 var _compiler: SpellsScript
 var _staff: StaffBase
-var _forms: Array[CarrierCard] = []
+var _shown_beams: Array[CarrierCard] = []
 var _modifiers: Array[ModifierBase] = []
 var _triggers: Array[TriggerBase] = []
 var _elements: Array[ElementBase] = []
@@ -134,7 +134,7 @@ var _shot: CarrierCard = null
 ## carrier of one shot that lives longest, so it flies on through the shooter's stream long enough
 ## to meet its shots (`_shot`, small and fast, passes them between two steps).
 var _lasting: CarrierCard = null
-## The matrix's columns: every form card, then a stand-in form for each fallback carrier (its
+## The matrix's columns: every carrier card, then a stand-in carrier card for each fallback carrier (its
 ## `carrier` names it; not a card, never in a staff).
 var _columns: Array[CarrierCard] = []
 ## What comes before the cards of the `on it` column (`on hit`, a pierce card, `_shot`; `_lasting`
@@ -145,7 +145,7 @@ var _bearer_shooter_prefix: Array[StringName] = []
 var _point_prefix: Array[StringName] = []
 ## What comes before the cards of the `on its body` column: `on cast`, `_shot`.
 var _body_prefix: Array[StringName] = []
-## The id of that column's stand-in form.
+## The id of that column's stand-in carrier card.
 const BODY_COLUMN: StringName = &"on its body"
 ## True while a multicast is given one carrier only, not the ones it asks for: one that adds no
 ## carrier at all must change the cast or be wasted (owner, 2026-11-06).
@@ -171,14 +171,14 @@ func before_each() -> void:
 
 
 func _discover() -> void:
-	_forms.clear()
+	_shown_beams.clear()
 	_modifiers.clear()
 	_triggers.clear()
 	_elements.clear()
 	_multicasts.clear()
 	for card: Resource in _registry.call("get_all", &"spells"):
 		if card is CarrierCard:
-			_forms.append(card as CarrierCard)
+			_shown_beams.append(card as CarrierCard)
 		elif card is ModifierBase:
 			_modifiers.append(card as ModifierBase)
 		elif card is TriggerBase:
@@ -190,16 +190,16 @@ func _discover() -> void:
 	_payload = null
 	_shot = null
 	_lasting = null
-	for form in _forms:
-		if form.carrier != &"atom":
+	for carrier_card in _shown_beams:
+		if carrier_card.carrier != &"atom":
 			continue
-		if _payload == null or form.shots > _payload.shots:
-			_payload = form
-		if form.shots == 1 and (_shot == null or form.speed * form.lifetime > _shot.speed * _shot.lifetime):
-			_shot = form
-		if form.shots == 1 and (_lasting == null or form.lifetime > _lasting.lifetime):
-			_lasting = form
-	_columns.assign(_forms)
+		if _payload == null or carrier_card.shots > _payload.shots:
+			_payload = carrier_card
+		if carrier_card.shots == 1 and (_shot == null or carrier_card.speed * carrier_card.lifetime > _shot.speed * _shot.lifetime):
+			_shot = carrier_card
+		if carrier_card.shots == 1 and (_lasting == null or carrier_card.lifetime > _lasting.lifetime):
+			_lasting = carrier_card
+	_columns.assign(_shown_beams)
 	_bearer_prefix.clear()
 	_body_prefix.clear()
 	_bearer_shooter_prefix.clear()
@@ -347,40 +347,40 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 	return []
 
 
-## How far along the aim a carrier of `form` acts (where its target stands), by its carrier; -1
+## How far along the aim a carrier of `carrier_card` acts (where its target stands), by its carrier; -1
 ## when there is no rule for its carrier yet.
-static func reach(form: CarrierCard) -> float:
-	if form.id == BODY_COLUMN:
+static func reach(carrier_card: CarrierCard) -> float:
+	if carrier_card.id == BODY_COLUMN:
 		# On its body: within its strike round the wizard's hand, as on you.
 		return SpellLimits.FALLBACK_RADIUS
-	match form.carrier:
+	match carrier_card.carrier:
 		&"atom", &"swap", Carriers.ON_BEARER, Carriers.AT_POINT:
 			# On it and right there: where the shot that fires it hits (its stand-in has that shot's
 			# numbers).
-			return minf(form.speed * form.lifetime * 0.5, 90.0)
+			return minf(carrier_card.speed * carrier_card.lifetime * 0.5, 90.0)
 		Carriers.ON_CASTER:
 			# On you: within its strike round the wizard's hand.
 			return SpellLimits.FALLBACK_RADIUS
 		&"beam":
-			return minf(form.ray_length * 0.5, 90.0)
+			return minf(carrier_card.ray_length * 0.5, 90.0)
 		&"swing":
-			return form.ray_length * 0.75
+			return carrier_card.ray_length * 0.75
 		&"slam":
 			# The ring's middle: it strikes `ray_length` ahead and grows to `radius`.
-			return form.ray_length
+			return carrier_card.ray_length
 		&"rune":
-			return form.radius
+			return carrier_card.radius
 		&"pool":
 			# In the puddle: it spreads `ray_length` ahead.
-			return form.ray_length
+			return carrier_card.ray_length
 		&"wall":
 			return SpellLimits.WALL_REACH
 		&"dash":
 			# On its way: a dash strikes what its body passes (rules R4c).
-			return form.ray_length * 0.5
+			return carrier_card.ray_length * 0.5
 		&"teleport":
 			# Where it lands: a teleport strikes what is there (rules R4c).
-			return form.ray_length
+			return carrier_card.ray_length
 		&"decoy":
 			# Its body stands a step ahead (twice its size) and turns the shots near it as it appears:
 			# a shot this near the wizard's hand when it is cast is near its body.
@@ -389,55 +389,55 @@ static func reach(form: CarrierCard) -> float:
 			return 60.0
 		&"portal":
 			# Its exit: what stands there goes through to the mouth.
-			return form.ray_length
+			return carrier_card.ray_length
 	return -1.0
 
 
 # --- The tests ---------------------------------------------------------------------------------
 
 func test_it_finds_the_cards_and_carriers_itself() -> void:
-	check(_forms.size() >= 2, "the registry has carriers (%d)" % _forms.size())
+	check(_shown_beams.size() >= 2, "the registry has carriers (%d)" % _shown_beams.size())
 	check(not _modifiers.is_empty() and not _triggers.is_empty(), "and modifiers and triggers")
 	check(_payload != null, "a straight carrier to fire as a payload")
 	check(_shot != null, "a straight carrier of one shot for the enemy shooter")
-	for form in _forms:
-		check(reach(form) >= 0.0, "no reach for the carrier %s of `%s`: add it to `reach`" % [form.carrier, form.id])
+	for carrier_card in _shown_beams:
+		check(reach(carrier_card) >= 0.0, "no reach for the carrier %s of `%s`: add it to `reach`" % [carrier_card.carrier, carrier_card.id])
 
 
 func test_the_same_cast_writes_the_same_trace() -> void:
 	# Without this a ✓ could be noise: every carrier, cast alike twice, in the busiest scenes.
-	for form in _forms:
-		var cards: Array[StringName] = [form.id]
+	for carrier_card in _shown_beams:
+		var cards: Array[StringName] = [carrier_card.id]
 		for scene: Dictionary in [CROWD_AGAIN, SHOOTER]:
-			var seconds: float = minf(form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
-			var first: PackedStringArray = _run(cards, form, scene, seconds)
-			var second: PackedStringArray = _run(cards, form, scene, seconds)
-			check(first == second, "`%s` in the scene %s writes another trace the second time: %s" % [form.id, scene["name"], _first_difference(first, second)])
-			check(not first.is_empty(), "`%s` in the scene %s writes something" % [form.id, scene["name"]])
+			var seconds: float = minf(carrier_card.wind_up + carrier_card.lifetime + AFTER_LIFE, LONGEST)
+			var first: PackedStringArray = _run(cards, carrier_card, scene, seconds)
+			var second: PackedStringArray = _run(cards, carrier_card, scene, seconds)
+			check(first == second, "`%s` in the scene %s writes another trace the second time: %s" % [carrier_card.id, scene["name"], _first_difference(first, second)])
+			check(not first.is_empty(), "`%s` in the scene %s writes something" % [carrier_card.id, scene["name"]])
 
 
 func test_forcing_keeps_every_wasted_card() -> void:
 	# The seam of the W check: with `keep_wasted` nothing on a carrier is listed as wasted.
 	var forced: int = 0
-	for form in _forms:
+	for carrier_card in _shown_beams:
 		for modifier in _modifiers:
-			var cards: Array[StringName] = [modifier.id, form.id]
+			var cards: Array[StringName] = [modifier.id, carrier_card.id]
 			if not _compiler.compile_staff(cards, _staff).wasted.has(0):
 				continue
 			StaffCompiler.keep_wasted = true
 			var kept: CompiledStaff = _compiler.compile_staff(cards, _staff)
 			StaffCompiler.keep_wasted = false
-			check(not kept.wasted.has(0), "`%s` on `%s` is kept when forced" % [modifier.id, form.id])
+			check(not kept.wasted.has(0), "`%s` on `%s` is kept when forced" % [modifier.id, carrier_card.id])
 			check(kept.casts[0].group.spells[0].modifier_ids.has(modifier.id), "and rides on it")
 			forced += 1
 		for trigger in _triggers:
-			var cards: Array[StringName] = [trigger.id, form.id, _payload.id]
+			var cards: Array[StringName] = [trigger.id, carrier_card.id, _payload.id]
 			if not _compiler.compile_staff(cards, _staff).wasted.has(0):
 				continue
 			StaffCompiler.keep_wasted = true
 			var kept: CompiledStaff = _compiler.compile_staff(cards, _staff)
 			StaffCompiler.keep_wasted = false
-			check(not kept.wasted.has(0), "`%s` on `%s` is kept when forced" % [trigger.id, form.id])
+			check(not kept.wasted.has(0), "`%s` on `%s` is kept when forced" % [trigger.id, carrier_card.id])
 			forced += 1
 	check(forced > 0, "some card is wasted somewhere (%d)" % forced)
 
@@ -521,8 +521,8 @@ func _matrix(title: String, cards: Array[SpellComponent]) -> void:
 		return
 	var started: int = Time.get_ticks_msec()
 	var header: PackedStringArray = PackedStringArray(["", ""])
-	for form in _columns:
-		header.append(String(form.id))
+	for carrier_card in _columns:
+		header.append(String(carrier_card.id))
 	var lines: PackedStringArray = PackedStringArray()
 	lines.append("| %s |" % " | ".join(header.slice(1)))
 	var rule: PackedStringArray = PackedStringArray()
@@ -532,8 +532,8 @@ func _matrix(title: String, cards: Array[SpellComponent]) -> void:
 	var silent: int = 0
 	for card in cards:
 		var row: PackedStringArray = PackedStringArray([String(card.id)])
-		for form in _columns:
-			var cell: String = NOT_THERE if Carriers.is_fallback(form.carrier) and not _lands(card) else _cell(card, form)
+		for carrier_card in _columns:
+			var cell: String = NOT_THERE if Carriers.is_fallback(carrier_card.carrier) and not _lands(card) else _cell(card, carrier_card)
 			if cell == SILENT:
 				silent += 1
 			row.append(cell)
@@ -541,79 +541,79 @@ func _matrix(title: String, cards: Array[SpellComponent]) -> void:
 	print("\n%s × carriers (%s works, %s wasted, %s silent no-op), %d ✗, %d ms:\n%s\n" % [title, WORKS, WASTED, SILENT, silent, Time.get_ticks_msec() - started, "\n".join(lines)])
 
 
-## The cell of `card` on `form`: W, ✓ (some scene of its probe shows a change), ✗ (and a
+## The cell of `card` on `carrier_card`: W, ✓ (some scene of its probe shows a change), ✗ (and a
 ## failure), or ? (no probe, a failure).
-func _cell(card: SpellComponent, form: CarrierCard) -> String:
+func _cell(card: SpellComponent, carrier_card: CarrierCard) -> String:
 	var scenes: Array[Dictionary] = _scenes_of(card)
 	if scenes.is_empty():
 		check(false, "no probe for %s (the card `%s`): add a scene for it" % [_what(card), card.id])
 		return NO_PROBE
-	if reach(form) < 0.0 or (not ONLY_FORM.is_empty() and String(form.id) != ONLY_FORM):
+	if reach(carrier_card) < 0.0 or (not ONLY_CARRIER.is_empty() and String(carrier_card.id) != ONLY_CARRIER):
 		return NO_PROBE
 	var names: PackedStringArray = PackedStringArray()
 	for scene in scenes:
 		names.append(scene["name"])
-		var casts: Array = _casts(card, form, scene, false)
+		var casts: Array = _casts(card, carrier_card, scene, false)
 		var compiled: CompiledStaff = _compiler.compile_staff(casts[0], _staff)
 		if compiled.wasted.has(int(casts[2])):
 			# The other way round: forced on, a wasted card must still change nothing.
 			for forced in scenes:
-				if _changes(card, form, forced, true):
-					check(false, "`%s` on `%s` is listed as wasted but changes the cast (scene: %s)" % [card.id, form.id, forced["name"]])
+				if _changes(card, carrier_card, forced, true):
+					check(false, "`%s` on `%s` is listed as wasted but changes the cast (scene: %s)" % [card.id, carrier_card.id, forced["name"]])
 					break
 			return WASTED
-		if _changes(card, form, scene, false):
+		if _changes(card, carrier_card, scene, false):
 			return WORKS
-	check(false, "`%s` on `%s` does nothing and is not listed as wasted (scene: %s)" % [card.id, form.id, "; ".join(names)])
+	check(false, "`%s` on `%s` does nothing and is not listed as wasted (scene: %s)" % [card.id, carrier_card.id, "; ".join(names)])
 	return SILENT
 
 
-## True when the cast with `card` on `form` writes another trace in `scene` than the cast without
+## True when the cast with `card` on `carrier_card` writes another trace in `scene` than the cast without
 ## it. `forced` compiles both with `StaffCompiler.keep_wasted`, so what the waste table would drop
 ## is kept and the runtime alone decides what it does.
-func _changes(card: SpellComponent, form: CarrierCard, scene: Dictionary, forced: bool) -> bool:
+func _changes(card: SpellComponent, carrier_card: CarrierCard, scene: Dictionary, forced: bool) -> bool:
 	StaffCompiler.keep_wasted = forced
-	var casts: Array = _casts(card, form, scene, forced)
+	var casts: Array = _casts(card, carrier_card, scene, forced)
 	var with: Array[StringName] = casts[0]
 	var without: Array[StringName] = casts[1]
-	var seconds: float = minf(form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
+	var seconds: float = minf(carrier_card.wind_up + carrier_card.lifetime + AFTER_LIFE, LONGEST)
 	if scene.get("repeat", false):
 		# Long enough for the second cast to land (its delay is every carrier's cooldown).
 		var plain: CompiledStaff = _compiler.compile_staff(without, _staff)
 		var delay: float = plain.casts[0].delay if not plain.is_empty() else 0.0
-		seconds = minf(delay + form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
-	var key: String = "%s|%s|%s|%s|%s" % [form.id, scene["name"], ",".join(PackedStringArray(without)), seconds, forced]
+		seconds = minf(delay + carrier_card.wind_up + carrier_card.lifetime + AFTER_LIFE, LONGEST)
+	var key: String = "%s|%s|%s|%s|%s" % [carrier_card.id, scene["name"], ",".join(PackedStringArray(without)), seconds, forced]
 	var before: PackedStringArray
 	if _baselines.has(key):
 		before = _baselines[key]
 	else:
-		before = _run(without, form, scene, seconds)
+		before = _run(without, carrier_card, scene, seconds)
 		_baselines[key] = before
-	var after: PackedStringArray = _run(with, form, scene, seconds, before)
+	var after: PackedStringArray = _run(with, carrier_card, scene, seconds, before)
 	StaffCompiler.keep_wasted = false
 	if after != before and EXPLAIN:
-		print("%s on %s (%s%s): %s" % [card.id, form.id, scene["name"], ", forced" if forced else "", _first_difference(before, after)])
+		print("%s on %s (%s%s): %s" % [card.id, carrier_card.id, scene["name"], ", forced" if forced else "", _first_difference(before, after)])
 	return after != before
 
 
 ## The cards of the cast with `card` and of the same cast without it, and the slot of `card` in the
 ## first, as [with, without, slot]. `forced` (a wasted card forced on): a modifier of numbers only
 ## is swapped for a copy of its costs, so both casts pay them (a slower cast is no effect).
-func _casts(card: SpellComponent, form: CarrierCard, scene: Dictionary, forced: bool) -> Array:
+func _casts(card: SpellComponent, carrier_card: CarrierCard, scene: Dictionary, forced: bool) -> Array:
 	var with: Array[StringName] = []
 	var without: Array[StringName] = []
 	var extra: Array[StringName] = _extra_cards(scene)
-	if Carriers.is_fallback(form.carrier):
+	if Carriers.is_fallback(carrier_card.carrier):
 		# The card lands with LAND and the scene's cards, and nothing after them: on the caster, on the
 		# shot that hit and flies on, or on the point where `on hit`'s shot was spent.
-		if form.id == BODY_COLUMN:
+		if carrier_card.id == BODY_COLUMN:
 			with.append_array(_body_prefix)
 			without.append_array(_body_prefix)
-		elif form.carrier == Carriers.ON_BEARER:
+		elif carrier_card.carrier == Carriers.ON_BEARER:
 			var prefix: Array[StringName] = _bearer_shooter_prefix if scene.get("shooter", false) else _bearer_prefix
 			with.append_array(prefix)
 			without.append_array(prefix)
-		elif form.carrier == Carriers.AT_POINT:
+		elif carrier_card.carrier == Carriers.AT_POINT:
 			with.append_array(_point_prefix)
 			without.append_array(_point_prefix)
 		for cards: Array[StringName] in [with, without]:
@@ -625,7 +625,7 @@ func _casts(card: SpellComponent, form: CarrierCard, scene: Dictionary, forced: 
 		if plain != &"":
 			without.append(plain)
 		return [with, without, slot]
-	var tail: Array[StringName] = [form.id]
+	var tail: Array[StringName] = [carrier_card.id]
 	if card is TriggerBase:
 		with.append(card.id)
 		with.append_array(extra)
@@ -747,17 +747,17 @@ func _costs_of(card: SpellComponent) -> StringName:
 	return id
 
 
-## Casts `cards` once (or for the whole run, `repeat`) in the scene for `form` and returns the trace,
+## Casts `cards` once (or for the whole run, `repeat`) in the scene for `carrier_card` and returns the trace,
 ## up to its first difference from `expect` (the whole trace when there is none).
-func _run(cards: Array[StringName], form: CarrierCard, scene: Dictionary, seconds: float, expect: PackedStringArray = PackedStringArray()) -> PackedStringArray:
+func _run(cards: Array[StringName], carrier_card: CarrierCard, scene: Dictionary, seconds: float, expect: PackedStringArray = PackedStringArray()) -> PackedStringArray:
 	var world: World = _make_world()
 	# Stop at the first difference: the cell is ✓ then.
 	world.expect = expect
-	var r: float = reach(form)
+	var r: float = reach(carrier_card)
 	world.add_wizard(cards)
 	world.add_ally(ALLY_AT)
 	# On it and right there are cast where `on hit`'s shot hits: always a target on the line for it.
-	if scene.get("line", false) or _cast_by_a_hit(form):
+	if scene.get("line", false) or _cast_by_a_hit(carrier_card):
 		var donor: Array[StringName] = []
 		if scene.get("donor", false):
 			for element in _elements:
@@ -790,7 +790,7 @@ func _run(cards: Array[StringName], form: CarrierCard, scene: Dictionary, second
 	if scene.get("shooter", false):
 		var shot: Array[StringName] = [_shot.id]
 		world.add_enemy(&"E", Vector2(r + SHOOTER_BEHIND, 0.0), World.HEALTH, shot, Vector2.LEFT, true)
-	if Carriers.of(form.carrier).has(CarrierTraits.GATES):
+	if Carriers.of(carrier_card.carrier).has(CarrierTraits.GATES):
 		# A carrier that opens a way through (a portal) acts on what goes through it: a teammate
 		# sends a plain shot into it a moment after the cast.
 		var shot: Array[StringName] = [_shot.id]
@@ -798,13 +798,13 @@ func _run(cards: Array[StringName], form: CarrierCard, scene: Dictionary, second
 	if scene.get("hurt", false):
 		for step in HURT_STEPS:
 			world.hurt_wizard_at(step, 1)
-	if scene.get("shooter", false) and _cast_by_a_hit(form):
+	if scene.get("shooter", false) and _cast_by_a_hit(carrier_card):
 		# On it and right there: the shooter's shots end on the target their shot hits, so none comes
 		# near the wizard; cast at once, the shot that hit flies on through them.
 		world.press()
 	elif scene.get("shooter", false):
 		# A carrier that leans back first (a swing) is cast that much sooner.
-		world.press_when_shot_within(r + SHOT_NEAR + form.wind_up * _shot.speed)
+		world.press_when_shot_within(r + SHOT_NEAR + carrier_card.wind_up * _shot.speed)
 	elif scene.get("donor", false):
 		# The donor casts first, so a carrier that hits at once finds what it cast.
 		world.at_step[2] = [world.press]
@@ -840,8 +840,8 @@ func _watch_circling(world: World) -> void:
 
 ## True for the columns whose payload a shot's hit fires (on it, right there): a target always
 ## stands on the line for that shot.
-static func _cast_by_a_hit(form: CarrierCard) -> bool:
-	return form.id != BODY_COLUMN and (form.carrier == Carriers.AT_POINT or form.carrier == Carriers.ON_BEARER)
+static func _cast_by_a_hit(carrier_card: CarrierCard) -> bool:
+	return carrier_card.id != BODY_COLUMN and (carrier_card.carrier == Carriers.AT_POINT or carrier_card.carrier == Carriers.ON_BEARER)
 
 
 ## The world a cast runs in.

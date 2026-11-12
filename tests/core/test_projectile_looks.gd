@@ -130,7 +130,7 @@ func test_wizard_shots_carry_their_body_ramp_look_and_core() -> void:
 	check_equal(seen, [0, 1, 2, 3] as Array[int], "each shot names its wizard's ramp")
 
 
-func test_runes_are_drawn_as_their_form() -> void:
+func test_runes_are_drawn_as_their_carrier_card() -> void:
 	var rune: int = mgr.spawn(1, Vector2(50.0, 50.0), Vector2.ZERO, 1.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	mgr.set_look(rune, ManagerScript.pack_look(PackedInt32Array([2])))
 	mgr.update_draw(1.0)
@@ -345,7 +345,7 @@ var _seen_impacts: Array = []
 
 
 func _on_impact(_caster: int, _target: Node, _position: Vector2, _direction: Vector2) -> void:
-	_seen_impacts.append([mgr.impact_form, mgr.impact_core, mgr.impact_look])
+	_seen_impacts.append([mgr.impact_carrier_card, mgr.impact_core, mgr.impact_look])
 
 
 func test_an_impact_names_the_shots_colour_and_look() -> void:

@@ -1,6 +1,6 @@
 extends "res://tests/support/screenshot.gd"
-## What Feel draws when five of the forms are cast and when their shots end (`form_looks`). One
-## column per form (bolt, beam, dash, rune, orbit). Row 1: the cast flash on the wizard's staff
+## What Feel draws when five of the carrier cards are cast and when their shots end (`carrier_looks`). One
+## column per carrier card (bolt, beam, dash, rune, orbit). Row 1: the cast flash on the wizard's staff
 ## (the body of a beam is drawn with it). Row 2: where a player's shot ends. Row 3:
 ## where an enemy's shot ends, which is the same ember mark in every column. Each column is its
 ## own take (a flash lasts a tenth of a second), put together into one sheet.
@@ -8,7 +8,7 @@ extends "res://tests/support/screenshot.gd"
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const COLUMN := 128
-const FORMS: Array[StringName] = [&"bolt", &"beam", &"dash", &"rune", &"orbit"]
+const CARRIER_CARDS: Array[StringName] = [&"bolt", &"beam", &"dash", &"rune", &"orbit"]
 const ROWS_Y: Array[float] = [70.0, 170.0, 270.0]
 
 
@@ -32,16 +32,16 @@ func take() -> void:
 	lay_floor()
 	await settle()
 	var sheet: Image = null
-	for i in FORMS.size():
-		var form: StringName = FORMS[i]
+	for i in CARRIER_CARDS.size():
+		var carrier_card: StringName = CARRIER_CARDS[i]
 		var x: float = COLUMN * i + COLUMN * 0.5
-		events.call("emit_signal", "spell_cast", 0, form, Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT)
-		if form == &"beam":
-			events.call("emit_signal", "form_shown", wizard, &"beam", Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT, 56.0, Color("e0592f"), 0)
-		# The manager names the form of the shot while it sends the impact.
-		projectiles.set("impact_form", form)
+		events.call("emit_signal", "spell_cast", 0, carrier_card, Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT)
+		if carrier_card == &"beam":
+			events.call("emit_signal", "carrier_shown", wizard, &"beam", Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT, 56.0, Color("e0592f"), 0)
+		# The manager names the carrier card of the shot while it sends the impact.
+		projectiles.set("impact_carrier_card", carrier_card)
 		events.call("emit_signal", "projectile_impact", wizard, null, Vector2(x, ROWS_Y[1]), Vector2.RIGHT)
-		projectiles.set("impact_form", &"")
+		projectiles.set("impact_carrier_card", &"")
 		events.call("emit_signal", "projectile_impact", enemy, null, Vector2(x, ROWS_Y[2]), Vector2.RIGHT)
 		await process_frame
 		var image: Image = await grab()
@@ -50,4 +50,4 @@ func take() -> void:
 		else:
 			sheet.blit_rect(image, Rect2i(COLUMN * i, 0, COLUMN, int(SCREEN.y)), Vector2i(COLUMN * i, 0))
 		await settle()
-	save(sheet, "form_looks")
+	save(sheet, "carrier_looks")

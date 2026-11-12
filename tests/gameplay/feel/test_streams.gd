@@ -154,7 +154,7 @@ func test_a_stream_part_is_checked() -> void:
 		check(not cue.problems().is_empty(), "caught: %s" % [bad])
 
 
-## Feel plays it: a dash's `form_shown` plays `dash_start`, whose stream parts follow the dasher
+## Feel plays it: a dash's `carrier_shown` plays `dash_start`, whose stream parts follow the dasher
 ## until its `carrier_ended`, and give off its streaks into the motes meanwhile.
 func test_a_dash_streams_from_its_start_to_its_landing() -> void:
 	var bus := own(EventsScript.new()) as EventsScript
@@ -173,7 +173,7 @@ func test_a_dash_streams_from_its_start_to_its_landing() -> void:
 	var cue: CueBase = registry.get_resource(&"cues", &"dash_start") as CueBase
 	var streams_in: int = cue.parts.filter(func(p: Dictionary) -> bool: return p.get("part") == &"stream").size()
 	check_equal(streams_in, 2, "dash_start has its streaks and its cards")
-	bus.form_shown.emit(2, &"dash", Vector2(40.0, 40.0), Vector2.RIGHT, 80.0, Color.WHITE, 0)
+	bus.carrier_shown.emit(2, &"dash", Vector2(40.0, 40.0), Vector2.RIGHT, 80.0, Color.WHITE, 0)
 	check(feel.spectacle().streams.is_streaming(2), "its start starts its streams")
 	var before: int = feel.motes().births
 	for n in 20:

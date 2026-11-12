@@ -36,7 +36,7 @@ func take() -> void:
 			var slot: int = projectiles.call("spawn", wizard, at, Vector2.ZERO, 5.0, 16.0, ProjectilesScript.LAYER_ENEMY, 0, tag, ProjectilesScript.MOTION_STILL)
 			if TINTS[r].a > 0.0:
 				projectiles.call("set_core", slot, TINTS[r])
-			projectiles.call("set_form", slot, &"pool", projectiles.call("register_body", POOL))
+			projectiles.call("set_carrier_card", slot, &"pool", projectiles.call("register_body", POOL))
 		for i in AGES[column]:
 			await process_frame
 		var image: Image = await grab()

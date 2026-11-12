@@ -46,9 +46,9 @@ func test_its_on_expire_goes_off_at_home() -> void:
 
 func test_it_is_wasted_on_a_carrier_that_does_not_fly_out() -> void:
 	var arena := ArenaScript.new(root)
-	for form: String in ["beam", "rune"]:
-		var staff: CompiledStaff = arena.install_cards(0, 0, ["return", form])
-		check(staff.wasted.has(0), "return on a %s is wasted" % form)
+	for carrier_card: String in ["beam", "rune"]:
+		var staff: CompiledStaff = arena.install_cards(0, 0, ["return", carrier_card])
+		check(staff.wasted.has(0), "return on a %s is wasted" % carrier_card)
 	arena.free_all()
 
 

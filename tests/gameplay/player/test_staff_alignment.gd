@@ -5,7 +5,7 @@ extends "res://tests/support/suite.gd"
 ## and short of a wall. While it lands fully, the drawn point that strikes (`StaffLook.contact_position`:
 ## the tip, or the hammer head's lowest corner while the staff is a hammer) is on the
 ## point its carrier strikes (`Carrier.strike_point`, from the hand), and the carrier's look of its
-## strike (`form_shown`) is drawn there too. A new card that lands is checked here without a line
+## strike (`carrier_shown`) is drawn there too. A new card that lands is checked here without a line
 ## added; a new carrier that strikes a point says so in `traits()` (`STRIKES_POINT`).
 ##
 ## godot --headless --path . --script res://tests/gameplay/player/test_staff_alignment.gd
@@ -17,14 +17,14 @@ const SLACK: float = 1.0
 const STEPS: int = 40
 
 var _world: WizardFixture
-## The looks `form_shown` drew for the wizard's casts: their points.
+## The looks `carrier_shown` drew for the wizard's casts: their points.
 var _shown: Array[Vector2] = []
 
 
 func before_each() -> void:
 	_world = WizardFixture.new(root)
 	_shown.clear()
-	_world.bus.form_shown.connect(func(caster: int, _form: StringName, at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void:
+	_world.bus.carrier_shown.connect(func(caster: int, _carrier_card: StringName, at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void:
 		if caster == 0:
 			_shown.append(at))
 
@@ -37,8 +37,8 @@ func after_each() -> void:
 func _landing_cards() -> Array[StringName]:
 	var found: Array[StringName] = []
 	for id: StringName in _world.registry.get_ids(&"spells"):
-		var form: CarrierCard = _world.registry.get_resource(&"spells", id) as CarrierCard
-		if form != null and form.lands():
+		var carrier_card: CarrierCard = _world.registry.get_resource(&"spells", id) as CarrierCard
+		if carrier_card != null and carrier_card.lands():
 			found.append(id)
 	return found
 

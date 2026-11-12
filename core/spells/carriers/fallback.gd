@@ -2,7 +2,7 @@ class_name CarrierFallback
 extends Carrier
 ## The base of the three fallback carriers (docs/CARRIERS.md, "The fallback carriers"): what the
 ## modifiers and infusions a group read land on when no carrier came after them (reading rule 5,
-## docs/milestones/M2-staffs.md). No form card fires one; the compiler picks it for those cards
+## docs/milestones/M2-staffs.md). No carrier card fires one; the compiler picks it for those cards
 ## (`Carriers.fallback`): the caster for the cast's own group (`CarrierCaster`), for a payload what
 ## fired it, a body or a shot (`CarrierBearer`), or the point it began at when nothing else can have
 ## (`CarrierPoint`). Otherwise it is a carrier like any other: its yes/no answers decide
@@ -19,7 +19,7 @@ func traits() -> int:
 	return HITS
 
 
-## No form card gives it a wind-down, so a card's wind-down factor has nothing to shorten.
+## No carrier card gives it a wind-down, so a card's wind-down factor has nothing to shorten.
 func has_wind_down() -> bool:
 	return false
 

@@ -6,7 +6,7 @@ extends "res://tests/support/screenshot.gd"
 ##   5    a zap 30 px long, up and to the right, 2 frames old
 ##   6    a spark into the air (16 px), 2 frames old
 ## `arc_looks` at 1x and `arc_looks_4x` (the plain and fire rows, columns 1-3). Each zap is the zap
-## card's cue (`zap`, content/cues; S6), as `form_shown` plays it, by the actor id of the row's seat (no actor is open here, so the plain row
+## card's cue (`zap`, content/cues; S6), as `carrier_shown` plays it, by the actor id of the row's seat (no actor is open here, so the plain row
 ## is in the ramp Feel gives an unknown actor, not seat 0's blue as before the cue).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

@@ -54,12 +54,12 @@ func before_each() -> void:
 	_staff.id = &"test"
 	_staff.slots = 20
 	_staff.cooldown = 0.5
-	var bolt: CarrierCard = _form(&"bolt", 300.0, 1.0)
+	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
 	bolt.wind_down = 0.2
-	var halo: CarrierCard = _form(&"halo", 300.0, 1.0)
+	var halo: CarrierCard = _carrier_card(&"halo", 300.0, 1.0)
 	halo.shots = 8
 	halo.spread = 360.0
-	var rune: CarrierCard = _form(&"rune", 0.0, 2.0)
+	var rune: CarrierCard = _carrier_card(&"rune", 0.0, 2.0)
 	rune.carrier = &"rune"
 	var fire := ElementBase.new()
 	fire.status_id = &"burn"
@@ -87,14 +87,14 @@ func _put(card: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = card
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
-	var form := CarrierCard.new()
-	form.base_damage = 5
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 5
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 ## Compiles and installs a staff for `player`'s `staff` from card ids written with spaces.
@@ -244,9 +244,9 @@ func test_four_players_with_four_staffs_rebuild_mid_flight_without_mixing() -> v
 
 # --- Wind-up (docs/milestones/cast-timing.md, part T2) -----------------------------------------
 
-## A bolt that winds up `seconds` (its form card's `wind_up`), installed as `player`'s staff 0.
+## A bolt that winds up `seconds` (its carrier card's `wind_up`), installed as `player`'s staff 0.
 func _wound_bolt(player: int, seconds: float) -> void:
-	var slow: CarrierCard = _form(&"slow_bolt", 300.0, 1.0)
+	var slow: CarrierCard = _carrier_card(&"slow_bolt", 300.0, 1.0)
 	slow.wind_up = seconds
 	slow.wind_down = 0.1
 	_install(player, 0, "slow_bolt")
@@ -304,7 +304,7 @@ func test_being_downed_or_a_rebuild_cancels_a_wind_up_for_free() -> void:
 
 func test_the_staff_s_wind_up_comes_before_every_cast() -> void:
 	_staff.wind_up = 0.1
-	_form(&"bolt", 300.0, 1.0).wind_down = 0.0
+	_carrier_card(&"bolt", 300.0, 1.0).wind_down = 0.0
 	_install(3, 0, "bolt bolt")
 	_spells.cast_staff(3, 0, Vector2.ZERO, AIM, 100.0)
 	check(_spells.is_winding(3, 0), "a plain bolt winds up on a staff that does (an enemy's telegraph)")
@@ -316,8 +316,8 @@ func test_the_staff_s_wind_up_comes_before_every_cast() -> void:
 
 func test_a_payload_winds_up_where_its_trigger_fired() -> void:
 	_target(Vector2(30.0, 0.0))
-	_form(&"bolt", 300.0, 1.0).wind_down = 0.1
-	var halo: CarrierCard = _form(&"slow_halo", 0.0, 0.2)
+	_carrier_card(&"bolt", 300.0, 1.0).wind_down = 0.1
+	var halo: CarrierCard = _carrier_card(&"slow_halo", 0.0, 0.2)
 	halo.carrier = &"atom"
 	halo.shots = 8
 	halo.spread = 360.0
@@ -342,10 +342,10 @@ func test_a_payload_winds_up_where_its_trigger_fired() -> void:
 
 ## A staff whose first cast is a dear halo (`dear`, 10 mana) and then two bolts (2 each).
 func _dear_then_bolts(player: int) -> void:
-	var dear: CarrierCard = _form(&"dear", 0.0, 0.3)
+	var dear: CarrierCard = _carrier_card(&"dear", 0.0, 0.3)
 	dear.mana_cost = 10.0
 	dear.wind_down = 0.0
-	_form(&"bolt", 300.0, 1.0).wind_down = 0.0
+	_carrier_card(&"bolt", 300.0, 1.0).wind_down = 0.0
 	_install(player, 0, "dear bolt bolt")
 
 

@@ -62,12 +62,12 @@ func before_each() -> void:
 		_moves.append(to))
 	_bus.mana_refund_requested.connect(func(_caster: int, _at: int, amount: float) -> void:
 		_refunds.append(amount))
-	_form(&"bolt", 300.0, 1.0)
-	var decoy: CarrierCard = _form(&"decoy", 0.0, 2.0)
+	_carrier_card(&"bolt", 300.0, 1.0)
+	var decoy: CarrierCard = _carrier_card(&"decoy", 0.0, 2.0)
 	decoy.carrier = &"decoy"
-	_form(&"barb", 300.0, 1.0)
+	_carrier_card(&"barb", 300.0, 1.0)
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
-	var slam: CarrierCard = _form(&"slam", 0.0, 0.12)
+	var slam: CarrierCard = _carrier_card(&"slam", 0.0, 0.12)
 	slam.carrier = &"slam"
 	slam.ray_length = 20.0
 	slam.radius = 16.0
@@ -87,14 +87,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
-	var form := CarrierCard.new()
-	form.base_damage = 6
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 1.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 6
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 1.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> void:

@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The carriers (docs/CARRIERS.md, core/spells/carriers/): every one is found by its name and fired
-## by a form card, and which cards work on it follows from its yes/no answers (`CarrierTraits`) and
+## by a carrier card, and which cards work on it follows from its yes/no answers (`CarrierTraits`) and
 ## what each card needs (`ModifierBase.RULES` "needs", `TriggerBase.NEEDS`). Whether that is right in play is
 ## tested by tests/core/test_card_rules.gd.
 ##
@@ -42,18 +42,18 @@ func test_a_card_whose_carrier_is_unknown_casts_nothing() -> void:
 	arena.free_all()
 
 
-func test_every_form_card_names_a_carrier_and_every_carrier_has_one() -> void:
+func test_every_carrier_card_names_a_carrier_and_every_carrier_has_one() -> void:
 	var arena := ArenaScript.new(root)
 	var cards: Array = arena.registry.call("get_all", "spells")
 	arena.free_all()
 	var named: Dictionary = {}
 	for card: Variant in cards:
 		if card is CarrierCard:
-			var form := card as CarrierCard
-			check(Carriers.ids().has(form.carrier), "%s names a carrier: %s" % [form.id, form.carrier])
-			named[form.carrier] = true
+			var carrier_card := card as CarrierCard
+			check(Carriers.ids().has(carrier_card.carrier), "%s names a carrier: %s" % [carrier_card.id, carrier_card.carrier])
+			named[carrier_card.carrier] = true
 	for id: StringName in Carriers.ids():
-		check(named.has(id), "a form card fires the %s" % id)
+		check(named.has(id), "a carrier card fires the %s" % id)
 
 
 func test_what_works_follows_the_traits() -> void:
@@ -145,7 +145,7 @@ func test_carriers_ask_the_runtime_only_through_the_kit_and_the_runtime_names_no
 	for line in FileAccess.get_file_as_string("res://core/spells/spells.gd").split("\n"):
 		number += 1
 		var code: String = line.get_slice("#", 0)
-		if code.contains("const RAY_FORM"):
+		if code.contains("const RAY_CARD"):
 			continue
 		for name in names:
 			check(not code.contains(name) if name.begins_with("&") else not _names_class(code, name), "spells.gd:%d names the carrier %s: %s" % [number, name, line.strip_edges()])

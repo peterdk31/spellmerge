@@ -1,6 +1,6 @@
 class_name SpellComponent
 extends Resource
-## One spell card (M2): a form (carrier), an element (infusion), a modifier, a trigger or a
+## One spell card (M2): a carrier card (carrier), an element (infusion), a modifier, a trigger or a
 ## multicast. Since the staffs rework (docs/milestones/M2-staffs.md) cards are placed in a
 ## staff in any order and read left to right. A card is a `.tres` on one of the five
 ## subclasses, in its own folder under `content/spells/<kind>s/`.
@@ -33,7 +33,7 @@ const COMPLEXITY_MIN: int = 1
 const COMPLEXITY_MAX: int = 4
 
 
-## The kind of card: &"form", &"element", &"modifier", &"trigger" or &"multicast". The
+## The kind of card: &"carrier", &"element", &"modifier", &"trigger" or &"multicast". The
 ## builder uses it to filter the bag by slot.
 func kind() -> StringName:
 	return &""

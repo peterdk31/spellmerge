@@ -63,10 +63,10 @@ func _pool(kinds: Array[MoteKind] = []) -> MotesScript:
 	return motes
 
 
-## A spell of the form `form`, the infusions `elements` and the modifiers `modifiers`.
-static func _spell(form: StringName, elements: Array[StringName], modifiers: Array[StringName]) -> CompiledSpell:
+## A spell of the carrier card `carrier_card`, the infusions `elements` and the modifiers `modifiers`.
+static func _spell(carrier_card: StringName, elements: Array[StringName], modifiers: Array[StringName]) -> CompiledSpell:
 	var spell := CompiledSpell.new()
-	spell.carrier_card_id = form
+	spell.carrier_card_id = carrier_card
 	spell.element_ids = elements
 	spell.modifier_ids = modifiers
 	return spell
@@ -130,7 +130,7 @@ func test_every_card_no_kind_names_keeps_its_looks_motes() -> void:
 	var checked: int = 0
 	for found: Resource in registry.get_all(&"spells"):
 		var kind: StringName = found.call(&"kind") if found.has_method(&"kind") else &""
-		if not [&"form", &"element", &"modifier"].has(kind):
+		if not [&"carrier", &"element", &"modifier"].has(kind):
 			continue
 		var id: StringName = found.get(&"id")
 		if not motes.kinds_of_card(id).is_empty():
@@ -138,7 +138,7 @@ func test_every_card_no_kind_names_keeps_its_looks_motes() -> void:
 		for elements: Array[StringName] in [[] as Array[StringName], [&"fire"] as Array[StringName]]:
 			var cards: Array[StringName] = elements.duplicate()
 			var spell: CompiledSpell
-			if kind == &"form":
+			if kind == &"carrier":
 				spell = _spell(id, elements, [])
 			elif kind == &"element":
 				cards.append(id)

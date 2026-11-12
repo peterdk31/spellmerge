@@ -1,6 +1,6 @@
 extends "res://tests/support/card_rig.gd"
 ## The Nova card (content/spells/modifiers/nova/; owner, 2026-11-09: a modifier that makes a nova of
-## any carrier, in place of the old nova form): the next carrier is cast eight ways at once, from
+## any carrier, in place of the old nova carrier card): the next carrier is cast eight ways at once, from
 ## the same place, each copy aimed out round a circle and keeping its own shots and reach.
 ##
 ## godot --headless --path . --script res://content/spells/modifiers/nova/test_nova.gd
@@ -30,7 +30,7 @@ func test_the_card_is_a_nova_modifier() -> void:
 	check_equal(card.behaviour, ModifierBase.Behaviour.NOVA, "it casts a nova")
 	check_equal(card.behaviour_strength, 8.0, "eight ways")
 	check_equal(card.cue, &"nova", "its ring is the nova cue")
-	check(_card(&"nova") is ModifierBase, "no form card is called nova any more")
+	check(_card(&"nova") is ModifierBase, "no carrier card is called nova any more")
 
 
 func test_it_works_for_all_four_players_at_once() -> void:
@@ -60,7 +60,7 @@ func test_the_first_copy_goes_along_the_aim() -> void:
 
 
 func test_each_copy_keeps_its_carriers_reach() -> void:
-	var bolt: CarrierCard = _form(&"bolt")
+	var bolt: CarrierCard = _carrier_card(&"bolt")
 	var far: float = bolt.speed * bolt.lifetime * 0.7
 	var target: Node2D = _target(Vector2.from_angle(TAU * 3.0 / 8.0) * far)
 	_cast_with(&"bolt", [&"nova"], 0, Vector2.ZERO)

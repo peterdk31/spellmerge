@@ -26,9 +26,9 @@ func before_each() -> void:
 			_holes.append(at))
 
 
-func _cast(modifiers: Array, form: StringName = &"bolt", player: int = 0) -> int:
+func _cast(modifiers: Array, carrier_card: StringName = &"bolt", player: int = 0) -> int:
 	_mgr.set_anchor(player, SPOT)
-	return _cast_with(form, modifiers, player, SPOT)
+	return _cast_with(carrier_card, modifiers, player, SPOT)
 
 
 func test_the_card_is_a_skyfall_modifier() -> void:

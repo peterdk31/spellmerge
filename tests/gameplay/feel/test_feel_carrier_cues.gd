@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## The carriers' moments in gameplay/feel are cues their cards name: `form_shown` plays a card's
+## The carriers' moments in gameplay/feel are cues their cards name: `carrier_shown` plays a card's
 ## `shown_cue` where the carrier shows itself (where a teleport leaves, each end of a swap,
 ## a decoy or familiar appearing), `carrier_ended` its `end_cue` where a carrier with no
 ## shot ends (a teleport landing, a slam's strike, a decoy going). The cues use the
@@ -40,7 +40,7 @@ func _card(id: StringName) -> CarrierCard:
 
 func test_a_teleport_rises_off_where_it_leaves() -> void:
 	check_equal(_card(&"teleport").shown_cue, &"vanish", "teleport.tres names the cue `vanish`")
-	bus.form_shown.emit(0, &"teleport", Vector2(10, 10), Vector2.RIGHT, 96.0, FROST, 0)
+	bus.carrier_shown.emit(0, &"teleport", Vector2(10, 10), Vector2.RIGHT, 96.0, FROST, 0)
 	check_equal(feel.flashes_of(&"rise"), 1, "a column of light pulled up off the spot")
 	check_equal(feel.flashes_of(&"ring_in"), 0, "its ring is the column's own, flat on the floor")
 	check_equal(feel.flashes_of(&"fall"), 0, "nothing lands yet")
@@ -58,8 +58,8 @@ func test_a_teleport_strikes_down_where_it_lands() -> void:
 
 
 func test_each_end_of_a_swap_shows() -> void:
-	bus.form_shown.emit(0, &"swap", Vector2(0, 0), Vector2.RIGHT, 80.0, FROST, 0)
-	bus.form_shown.emit(0, &"swap", Vector2(80, 0), Vector2.LEFT, 80.0, FROST, 0)
+	bus.carrier_shown.emit(0, &"swap", Vector2(0, 0), Vector2.RIGHT, 80.0, FROST, 0)
+	bus.carrier_shown.emit(0, &"swap", Vector2(80, 0), Vector2.LEFT, 80.0, FROST, 0)
 	check_equal(feel.flashes_of(&"fall"), 2, "a column struck down at both ends of the trade")
 	check_equal(feel.flashes_of(&"rise"), 2, "and one pulled up, their rings crossing")
 
@@ -77,12 +77,12 @@ func test_a_dash_kicks_up_dust_and_lands_in_a_ring() -> void:
 	bus.room_entered.emit(&"arena_01")
 	var motes: Node = feel.motes()
 	var written: int = int(motes.get(&"written"))
-	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, sparks)
+	bus.carrier_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, sparks)
 	check(int(motes.get(&"written")) > written, "dust where player 3 left (motes)")
 	check_equal(feel.flashes_of(&"arc", 2), 1, "lightning (its sparks) arcs along its way")
 	check(feel.flash_info(&"arc")["at"].is_equal_approx(Vector2(10, 20)), "from where it left")
 	feel.step(1.0)
-	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 0)
+	bus.carrier_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 0)
 	check_equal(feel.flashes_of(&"arc"), 0, "a dash with no lightning arcs nowhere")
 	written = int(motes.get(&"written"))
 	bus.carrier_ended.emit(2, &"dash", Vector2(60, 30), Vector2.DOWN, 1.0, FROST, sparks)
@@ -101,7 +101,7 @@ func test_a_dash_kicks_up_dust_and_lands_in_a_ring() -> void:
 func test_a_decoy_and_a_familiar_come_and_go() -> void:
 	for id: StringName in [&"decoy", &"familiar"]:
 		feel.step(1.0)
-		bus.form_shown.emit(0, id, Vector2(30, 30), Vector2.RIGHT, 0.0, FROST, 0)
+		bus.carrier_shown.emit(0, id, Vector2(30, 30), Vector2.RIGHT, 0.0, FROST, 0)
 		check_equal(feel.flashes_of(&"fall"), 1, "%s: conjured in a column" % id)
 		check_equal(feel.flashes_of(&"puff"), 1, "%s: in a puff" % id)
 		bus.carrier_ended.emit(0, id, Vector2(30, 30), Vector2.RIGHT, 8.0, FROST, 0)
@@ -110,14 +110,14 @@ func test_a_decoy_and_a_familiar_come_and_go() -> void:
 
 func test_an_enemys_moments_show_in_the_enemy_ramp() -> void:
 	var enemy: int = ActorSeats.enemy(feel.actors)
-	bus.form_shown.emit(enemy, &"teleport", Vector2(10, 10), Vector2.RIGHT, 96.0, FROST, 0)
+	bus.carrier_shown.emit(enemy, &"teleport", Vector2(10, 10), Vector2.RIGHT, 96.0, FROST, 0)
 	bus.carrier_ended.emit(enemy, &"teleport", Vector2(106, 10), Vector2.RIGHT, 1.0, FROST, 0)
 	check_equal(feel.flashes_of(&"rise"), 1, "an enemy's teleport leaves")
 	check_equal(feel.flashes_of(&"fall"), 1, "and lands, as a wizard's does")
 
 
 func test_a_card_without_a_cue_plays_none() -> void:
-	bus.form_shown.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
+	bus.carrier_shown.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
 	bus.carrier_ended.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT, 5.0, FROST, 0)
 	bus.carrier_ended.emit(0, &"no_such_card", Vector2.ZERO, Vector2.RIGHT, 5.0, FROST, 0)
 	for kind: StringName in [&"rise", &"fall", &"ring_out", &"ring_in", &"burst"]:
@@ -131,11 +131,11 @@ func test_a_bad_moment_is_ignored() -> void:
 
 
 func test_a_zap_plays_its_cards_cue_as_long_as_the_zap() -> void:
-	# A modifier that shows itself names its own cue (S6 item 8): `form_shown` `zap` names the zap
+	# A modifier that shows itself names its own cue (S6 item 8): `carrier_shown` `zap` names the zap
 	# card, and its cue draws the arc in the shot's colours, for 0.25 s.
 	var card: ModifierBase = registry.get_resource(&"spells", &"zap") as ModifierBase
 	check_equal(card.cue, &"zap", "zap.tres names the cue `zap`")
-	bus.form_shown.emit(1, &"zap", Vector2(10, 20), Vector2.RIGHT, 60.0, FROST, 0)
+	bus.carrier_shown.emit(1, &"zap", Vector2(10, 20), Vector2.RIGHT, 60.0, FROST, 0)
 	check_equal(feel.flashes_of(&"arc", 1), 1, "one arc in the caster's ramp")
 	var arc: Dictionary = feel.flash_info(&"arc")
 	check(arc["at"].is_equal_approx(Vector2(10, 20)), "from where it zapped")
@@ -145,8 +145,8 @@ func test_a_zap_plays_its_cards_cue_as_long_as_the_zap() -> void:
 
 
 func test_a_zaps_spark_into_the_air_burns_out_sooner() -> void:
-	bus.form_shown.emit(0, &"zap", Vector2.ZERO, Vector2.UP, 16.0, FROST, 0)
+	bus.carrier_shown.emit(0, &"zap", Vector2.ZERO, Vector2.UP, 16.0, FROST, 0)
 	check_equal(feel.flashes_of(&"arc"), 1, "one spark (`if_size_upto` 22), not both parts")
 	check(is_equal_approx(feel.flash_info(&"arc")["seconds"] as float, 0.15), "0.6 of a zap's seconds, as before the cue")
-	bus.form_shown.emit(0, &"zap", Vector2.ZERO, Vector2.UP, 0.0, FROST, 0)
+	bus.carrier_shown.emit(0, &"zap", Vector2.ZERO, Vector2.UP, 0.0, FROST, 0)
 	check_equal(feel.flashes_of(&"arc"), 1, "a zap of no length shows nothing")

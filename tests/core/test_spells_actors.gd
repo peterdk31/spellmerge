@@ -39,7 +39,7 @@ var _table: ActorSeats.ActorsScript
 ## Every projectile_hit as [caster, target, tag].
 var _hits: Array = []
 ## The first argument (the actor id) and the tag of every caster_move_requested and
-## blast cue; the caster of every form_shown and entity_spawn_requested.
+## blast cue; the caster of every carrier_shown and entity_spawn_requested.
 var _moves: Array = []
 var _areas: Array = []
 var _shown: Array[int] = []
@@ -65,25 +65,25 @@ func before_each() -> void:
 	_bus.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int, _shot: int) -> void: _hits.append([caster, target, tag]))
 	_bus.caster_move_requested.connect(func(caster: int, _mode: StringName, _to: Vector2, _seconds: float, tag: int) -> void: _moves.append([caster, tag]))
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
-	_bus.form_shown.connect(func(caster: int, _form: StringName, _at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void: _shown.append(caster))
+	_bus.carrier_shown.connect(func(caster: int, _carrier_card: StringName, _at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void: _shown.append(caster))
 	_bus.entity_spawn_requested.connect(func(caster: int, _kind: StringName, _at: Vector2, _seconds: float, _tag: int, _anchor: int) -> void: _spawns.append(caster))
 	_bus.mana_refund_requested.connect(func(caster: int, at: int, amount: float) -> void: _refunds.append([caster, amount, at]))
 	_bus.mana_reserved.connect(func(player: int, at: int, amount: float) -> void: _reserved.append([player, amount, at]))
-	_form(&"bolt", 300.0, 1.0)
-	_form(&"slow", 30.0, 5.0)
-	var rune: CarrierCard = _form(&"rune", 0.0, 3.0)
+	_carrier_card(&"bolt", 300.0, 1.0)
+	_carrier_card(&"slow", 30.0, 5.0)
+	var rune: CarrierCard = _carrier_card(&"rune", 0.0, 3.0)
 	rune.carrier = &"rune"
 	# Many shots at once, each with its own timer: one cast fills a budget's room for a step.
-	var spray: CarrierCard = _form(&"spray", 30.0, 5.0)
+	var spray: CarrierCard = _carrier_card(&"spray", 30.0, 5.0)
 	spray.shots = SpellLimits.FIRE_SHOTS_PER_STEP
 	spray.spread = 360.0
-	var beam: CarrierCard = _form(&"beam", 0.0, 5.0)
+	var beam: CarrierCard = _carrier_card(&"beam", 0.0, 5.0)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
-	var dash: CarrierCard = _form(&"dash", 400.0, 0.2)
+	var dash: CarrierCard = _carrier_card(&"dash", 400.0, 0.2)
 	dash.carrier = &"dash"
 	dash.ray_length = 80.0
-	var decoy: CarrierCard = _form(&"decoy", 0.0, 4.0)
+	var decoy: CarrierCard = _carrier_card(&"decoy", 0.0, 4.0)
 	decoy.carrier = &"decoy"
 	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
 	_modifier(&"echo", ModifierBase.Behaviour.ECHO, 1.0)
@@ -107,14 +107,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> CarrierCard:
-	var form := CarrierCard.new()
-	form.base_damage = 5
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 5
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> ModifierBase:
@@ -395,7 +395,7 @@ func test_an_enemys_hit_names_its_actor_id() -> void:
 	check(_hits.size() == 1 and _hits[0][0] == imp, "the hit names the enemy's id: %s" % [_hits])
 
 
-func test_form_shown_names_the_actor_id() -> void:
+func test_carrier_card_shown_names_the_actor_id() -> void:
 	var imp: int = ActorSeats.enemy(_table)
 	_build(imp, [&"decoy"])
 	_cast(imp)

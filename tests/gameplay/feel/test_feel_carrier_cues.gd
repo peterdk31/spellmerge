@@ -150,3 +150,37 @@ func test_a_zaps_spark_into_the_air_burns_out_sooner() -> void:
 	check(is_equal_approx(feel.flash_info(&"arc")["seconds"] as float, 0.15), "0.6 of a zap's seconds, as before the cue")
 	bus.carrier_shown.emit(0, &"zap", Vector2.ZERO, Vector2.UP, 0.0, FROST, 0)
 	check_equal(feel.flashes_of(&"arc"), 1, "a zap of no length shows nothing")
+
+
+## A stand-in spell runtime for a wind-up: the staff tip, the aim, and whether staff `staff` of
+## `actor` still winds up (props W9c: Feel reads only these of a wind-up).
+class Winding extends Node:
+	var winding: bool = true
+
+	func is_winding(_actor: int, _staff: int) -> bool:
+		return winding
+
+	func aim_origin_of(_actor: int) -> Vector2:
+		return Vector2(40, 40)
+
+	func aim_of(_actor: int) -> Vector2:
+		return Vector2.RIGHT
+
+	func carrier_reach(_tag: int) -> float:
+		return 0.0
+
+
+## Props W9c's regression (W7's leftover): a wind-up's cue ends with its wind-up. A lit barrel
+## shot apart blows at once and its fuse's wind-up is cancelled (`Spells.cancel_wind`); its ring
+## played on for the fuse's seconds.
+func test_a_wind_ups_cue_ends_when_it_is_cancelled() -> void:
+	var spells := own(Winding.new()) as Winding
+	feel.spells = spells
+	var foe: int = ActorSeats.enemy(feel.actors)
+	bus.cast_winding.emit(foe, 1, &"bolt", Vector2(40, 40), Vector2.RIGHT, 1.0, FROST, 0, 0, &"wind_area")
+	check_equal(feel.flashes_of(&"ring_in"), 1, "the wind-up's ring closes in")
+	feel.step(0.1)
+	check_equal(feel.flashes_of(&"ring_in"), 1, "while it winds up")
+	spells.winding = false
+	feel.step(0.05)
+	check_equal(feel.flashes_of(&"ring_in"), 0, "gone the frame its wind-up is over, not after its second")

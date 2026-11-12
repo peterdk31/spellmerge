@@ -396,6 +396,38 @@ func test_a_reaction_between_statuses_on_it_is_a_moment() -> void:
 	check_equal(_state(body), &"reacted", "Combat's %s on it" % row.reaction_id)
 
 
+## Props W9c: a trigger's cast that does not go is a moment, `refused`: `dry` when the staff's mana
+## pays none of its casts (a prop's pool never refills), else whatever stopped it (here the delay
+## after its last cast). An invincible prop whose plain hits cast its blast staff.
+func _refusing() -> Actor:
+	var dry: PropTrigger = PropTrigger.make(PropTrigger.When.REFUSED, 0, &"dry")
+	dry.staff = 2
+	dry.dry = true
+	var busy: PropTrigger = PropTrigger.make(PropTrigger.When.REFUSED, 0, &"busy")
+	busy.staff = 2
+	var hit: PropTrigger = PropTrigger.make(PropTrigger.When.ELEMENT_HIT, 2)
+	var rows: Array[PropTrigger] = [hit, dry, busy]
+	return _prop(_made([PropState.make(&"idle", rows), PropState.make(&"dry"), PropState.make(&"busy")], 10.0, true))
+
+
+func test_a_trigger_cast_its_staff_is_too_busy_for_is_refused() -> void:
+	var body: Actor = _refusing()
+	_world.combat.hit(ActorsScript.NONE, body, 1.0)
+	check_equal(_blasts(body, BLAST), 1, "the first hit casts")
+	check_equal(_state(body), &"idle", "and stays")
+	_world.combat.hit(ActorsScript.NONE, body, 1.0)
+	check_equal(_blasts(body, BLAST), 1, "the second comes in the delay after it: nothing leaves")
+	check_equal(_state(body), &"busy", "refused, not dry: the row that waits for the mana fires not")
+
+
+func test_a_trigger_cast_its_mana_pays_not_is_refused_dry() -> void:
+	var body: Actor = _refusing()
+	body.caster.set_mana(BLAST, 0.0)
+	_world.combat.hit(ActorsScript.NONE, body, 1.0)
+	check_equal(_blasts(body, BLAST), 0, "nothing leaves")
+	check_equal(_state(body), &"dry", "refused dry: the first then among both refused rows")
+
+
 # --- Problems ---------------------------------------------------------------------
 
 func test_problems_name_what_is_wrong() -> void:
@@ -405,7 +437,8 @@ func test_problems_name_what_is_wrong() -> void:
 	check(empty.contains("no scene") and empty.contains("no states"), "no scene, no states: %s" % empty)
 	var stray: PropTrigger = _on_fire(0.0, 3, &"nowhere")
 	stray.element = &"custard"
-	var loop_a: Array[PropTrigger] = [PropTrigger.make(PropTrigger.When.ENTERED, 0, &"b")]
+	var deaf: PropTrigger = PropTrigger.make(PropTrigger.When.REFUSED, 0, &"a")
+	var loop_a: Array[PropTrigger] = [PropTrigger.make(PropTrigger.When.ENTERED, 0, &"b"), deaf]
 	var loop_b: Array[PropTrigger] = [PropTrigger.make(PropTrigger.When.ENTERED, 0, &"a")]
 	data.staffs = EXPLODING_BARREL.staffs.duplicate()
 	data.states = PropStates.make([PropState.make(&"idle", [stray] as Array[PropTrigger]), PropState.make(&"a", loop_a), PropState.make(&"b", loop_b), PropState.make(&"idle")])
@@ -414,6 +447,7 @@ func test_problems_name_what_is_wrong() -> void:
 	check(found.contains("'nowhere'"), "a state it does not have")
 	check(found.contains("custard"), "an element nobody knows")
 	check(found.contains("for ever"), "entered triggers that go round")
+	check(found.contains("refused hears staff 0"), "a refused row that names no staff")
 	check(found.contains("two states are named 'idle'"), "a name twice")
 
 

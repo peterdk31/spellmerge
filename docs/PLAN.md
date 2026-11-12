@@ -269,7 +269,7 @@ spellmerge/
 ├─ gameplay/         code systems, one sub-area each (see below)
 │  └─ run/ flow/ player/ combat/ rewards/ difficulty/ coop/ ai/ feel/ progression/
 ├─ content/          one folder per item; its own art and sound live inside it
-│  ├─ spells/        forms/ elements/ modifiers/ triggers/ + reactions.tres
+│  ├─ spells/        carriers/ elements/ modifiers/ triggers/ + reactions.tres
 │  ├─ relics/  enemies/  bosses/
 │  ├─ wizard/        cosmetics/ staffs/
 │  ├─ rooms/         one folder per biome
@@ -287,7 +287,7 @@ spellmerge/
 
 | Area | Holds | Allowed files | Extra review questions |
 | --- | --- | --- | --- |
-| Spells | Forms, elements, modifiers, triggers | `.tres`, `.gd`, icon, SFX | Creative interactions, power budget |
+| Spells | Carriers, elements, modifiers, triggers | `.tres`, `.gd`, icon, SFX | Creative interactions, power budget |
 | Relics | Passive items | `.tres`, `.gd`, icon | Build diversity, balance |
 | Wizard | Cosmetics, staffs | `.tres`, `.gd`, sprites | Distinct look/playstyle, style guide |
 | Enemies | Enemies, attack patterns | `.tres`, `.gd`, `.tscn`, sprites | Readable telegraphs, co-op scaling |

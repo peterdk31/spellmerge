@@ -49,7 +49,7 @@ func test_every_cue_a_card_names_is_a_cue() -> void:
 
 func test_a_look_shader_that_is_not_canvas_item_is_reported() -> void:
 	var carrier_card := CarrierCard.new()
-	carrier_card.id = &"test_form"
+	carrier_card.id = &"test_carrier"
 	var spatial := Shader.new()
 	spatial.code = "shader_type spatial;\nvoid fragment() {}\n"
 	carrier_card.look_shader = spatial
@@ -102,7 +102,7 @@ func test_the_atom_lights_less_than_the_bolt() -> void:
 ## Out of range, the light is a range problem the validator names.
 func test_a_light_out_of_range_is_reported() -> void:
 	var carrier_card := CarrierCard.new()
-	carrier_card.id = &"test_form"
+	carrier_card.id = &"test_carrier"
 	carrier_card.look_light_intensity = 3.0
 	carrier_card.look_light_reach = 0.1
 	var found: String = " ".join(carrier_card.range_problems())

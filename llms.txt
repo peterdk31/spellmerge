@@ -54,7 +54,7 @@ Each area README states the area's job, the milestone that builds and opens it, 
 - [gameplay/progression/README.md](gameplay/progression/README.md): hub, unlocks, currency, codex.
 - [gameplay/rewards/README.md](gameplay/rewards/README.md): per-player loot rolls, unspent rewards, shops.
 - [gameplay/run/README.md](gameplay/run/README.md): run lifecycle: start, seed, end, summary screen.
-- [content/spells/README.md](content/spells/README.md): spell components: forms, elements, modifiers, triggers.
+- [content/spells/README.md](content/spells/README.md): spell components: carriers, elements, modifiers, triggers.
 - [content/relics/README.md](content/relics/README.md): passive items that change how spells behave.
 - [content/wizard/README.md](content/wizard/README.md): the player character: the base scene and the staffs (each a head and a personality).
 - [content/enemies/README.md](content/enemies/README.md): regular enemies and their attack patterns.

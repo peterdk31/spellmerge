@@ -671,10 +671,13 @@ var dropped: int = 0
 ## just ended still answers its own event's handlers). Listeners get it as the event's `shot`.
 var _event_slot: int = -1
 ## The carrier card of the shot whose `projectile_impact` is being sent: its card's id (`set_carrier_card`; `&"bolt"`,
-## `&"rune"` or `&"orbit"` by its body for a shot no card set), `&"beam"` or a strike's card, and
-## the carrier's while `block_shot` sends `shot_blocked` (a swing's: a parry) (any time outside
-## these: `&""`). For looks only.
+## `&"rune"` or `&"orbit"` by its body for a shot no card set), a strike's card, or `&"beam"` for a
+## ray's hits (the manager knows no card for a ray: they are told as the beam card's) (any time
+## outside these: `&""`). For looks only.
 var impact_carrier_card: StringName = &""
+## The carrier (its id, not its card's) that blocked, while `block_shot` sends `shot_blocked`: a
+## swing's block is a parry (any time outside it: `&""`). For looks only.
+var impact_carrier: StringName = &""
 ## The body (KIND_*) of the shot whose `projectile_impact` or `projectile_expired` is being sent, 0
 ## for none (a ray, a strike) and outside them: a still body goes off in its own way. For looks only.
 var impact_body: int = 0
@@ -3023,24 +3026,24 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 
 
 ## Stops the shot in `slot` as a shield charge does (`shot_blocked(by, where, by_tag)`), for a
-## carrier that is no shot (a swing, a beam, a slam, a decoy). `carrier_card` is that carrier's id,
-## told to looks as `impact_carrier_card` while the event is sent: a swing's block is a parry (melee I5).
-## The blocker is no shot, so the event's `shot` is -1, whatever event it is sent inside of.
-## False when there is no such shot.
-func block_shot(slot: int, by: int, by_tag: int, carrier_card: StringName = &"") -> bool:
+## carrier that is no shot (a swing, a beam, a slam, a decoy). `carrier` is that carrier's id (not
+## its card's), told to looks as `impact_carrier` while the event is sent: a swing's block is a
+## parry (melee I5). The blocker is no shot, so the event's `shot` is -1, whatever event it is sent
+## inside of. False when there is no such shot.
+func block_shot(slot: int, by: int, by_tag: int, carrier: StringName = &"") -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
 		return false
 	var at: Vector2 = _pos[slot]
 	_end_tail(slot, at)
 	_kill(slot)
 	if events != null:
-		var outer_carrier_card: StringName = impact_carrier_card
+		var outer_carrier: StringName = impact_carrier
 		var outer_slot: int = _event_slot
-		impact_carrier_card = carrier_card
+		impact_carrier = carrier
 		_event_slot = -1
 		events.shot_blocked.emit(by, at, by_tag, -1)
 		_event_slot = outer_slot
-		impact_carrier_card = outer_carrier_card
+		impact_carrier = outer_carrier
 	return true
 
 

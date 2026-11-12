@@ -1159,8 +1159,8 @@ func cast_index(actor: int, staff: int) -> int:
 	return _cursor[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else 0
 
 
-## The carrier (carrier card id) of the last cast this actor's staff made, `&""` before any. The wizard's
-## player sends it with `spell_cast`.
+## The carrier card (its id) of the last cast this actor's staff made, `&""` before any. The
+## wizard's player sends it with `spell_cast`.
 func last_carrier_card(actor: int, staff: int) -> StringName:
 	return _last_carrier_card[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else &""
 
@@ -2256,7 +2256,7 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 		if walked + piece > reach:
 			b = a.move_toward(b, reach - walked)
 		var found: int = projectiles.shots_on_segment(actor, a, b, width)
-		charges = _guard(found, actor, tag, deflects, charges, a, b, RAY_CARD)
+		charges = _guard(found, actor, tag, deflects, charges, a, b, spell.carrier)
 		walked += piece
 		if walked >= reach or (not deflects and charges <= 0):
 			break
@@ -2266,9 +2266,9 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 ## Deflects (with `deflects`) or stops (while `charges` last) the `found` shots of
 ## `Projectiles.guard_slots` that touched a carrier of `actor` with `tag`: outward from `a` when
 ## `b` is INF (a swing's hand), else off the segment from `a` to `b` (a beam's line);
-## a block is sent as `carrier_card`'s, the carrier's id (`block_shot`: Feel tells a swing's parry by it).
+## a block is sent as `carrier`'s, the carrier's id (`block_shot`: Feel tells a swing's parry by it).
 ## Returns the charges left. The list is copied first: what a deflect sets off can run another guard.
-func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier_card: StringName) -> int:
+func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier: StringName) -> int:
 	if found == 0:
 		return charges
 	var slots: PackedInt32Array = projectiles.guard_slots.slice(0, found)
@@ -2284,7 +2284,7 @@ func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: V
 			projectiles.deflect_shot(slot, actor, normal, tag)
 		elif charges > 0:
 			charges -= 1
-			projectiles.block_shot(slot, actor, tag, carrier_card)
+			projectiles.block_shot(slot, actor, tag, carrier)
 	return charges
 
 

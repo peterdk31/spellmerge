@@ -123,7 +123,7 @@ func test_every_card_shader_is_warmed_before_the_first_room() -> void:
 
 func test_a_look_shader_on_a_carrier_with_no_look_is_reported() -> void:
 	var carrier_card := CarrierCard.new()
-	carrier_card.id = &"test_form"
+	carrier_card.id = &"test_carrier"
 	carrier_card.carrier = &"dash"
 	carrier_card.look_shader = preload("res://content/spells/carriers/pool/pool.gdshader")
 	var found: String = " ".join(carrier_card.look_problems())

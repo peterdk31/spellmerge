@@ -113,7 +113,7 @@ func test_a_shot_whose_life_runs_out_pops() -> void:
 	check_equal(feel.flashes_of(&"burst", 1), 1, "a rune's end is its own burst, not a pop")
 
 
-func test_carrier_cards_end() -> void:
+func test_shown_beams_and_rings_end() -> void:
 	bus.carrier_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
 	bus.cue_shown.emit(0, &"nova", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
 	feel.step(1.0)

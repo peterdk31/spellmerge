@@ -154,13 +154,13 @@ func test_a_cue_missed_for_want_of_a_registry_is_not_kept() -> void:
 	feel.registry = null
 	_cast(0, &"dash")
 	check_equal(feel.flashes_of(&"ring_out"), 0, "no registry: no cue to play")
-	check_equal(feel._carrier_cues_of(&"dash"), FeelScript.NO_CARRIER_CUES, "the defaults")
-	check_equal(feel._carrier_cues_of(&""), FeelScript.NO_CARRIER_CUES, "no carrier card id, the defaults")
+	check_equal(feel._carrier_card_cues_of(&"dash"), FeelScript.NO_CARRIER_CARD_CUES, "the defaults")
+	check_equal(feel._carrier_card_cues_of(&""), FeelScript.NO_CARRIER_CARD_CUES, "no carrier card id, the defaults")
 	feel.registry = registry
 	_cast(0, &"dash")
 	check_equal(feel.flashes_of(&"ring_out"), 1, "once the registry is there the dash has its ring")
-	check_equal(feel._carrier_cues_of(&"dash")[FeelScript.CUE_IMPACT], &"impact_ring", "and its flare")
-	check_equal(feel._carrier_cues_of(&"fire_bolt"), FeelScript.NO_CARRIER_CUES, "an id that is no carrier card: the defaults")
+	check_equal(feel._carrier_card_cues_of(&"dash")[FeelScript.CUE_IMPACT], &"impact_ring", "and its flare")
+	check_equal(feel._carrier_card_cues_of(&"fire_bolt"), FeelScript.NO_CARRIER_CARD_CUES, "an id that is no carrier card: the defaults")
 
 
 func test_each_carrier_card_ends_its_own_way() -> void:
@@ -408,6 +408,6 @@ func test_two_beams_keep_their_own_materials() -> void:
 ## Only a card its own area draws lends a beam its shader: a ray of another card (a zap of a bolt
 ## is drawn as a beam, but the bolt's shader draws heads) and an id that is no card draw plain.
 func test_a_beam_of_another_card_is_drawn_plain() -> void:
-	check(feel._carrier_shader_of(&"beam", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == BEAM_CARD_SHADER, "the beam card's own")
-	check(feel._carrier_shader_of(&"bolt", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == FeelScript.BEAM_SHADER, "a bolt's ray: plain")
-	check(feel._carrier_shader_of(&"no_such_card", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == FeelScript.BEAM_SHADER, "no card: plain")
+	check(feel._carrier_card_shader_of(&"beam", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == BEAM_CARD_SHADER, "the beam card's own")
+	check(feel._carrier_card_shader_of(&"bolt", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == FeelScript.BEAM_SHADER, "a bolt's ray: plain")
+	check(feel._carrier_card_shader_of(&"no_such_card", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == FeelScript.BEAM_SHADER, "no card: plain")

@@ -125,7 +125,7 @@ func test_a_body_first_numbered_at_a_launch_is_shaped_too() -> void:
 
 func test_motes_on_a_card_that_cannot_give_them_off_are_reported() -> void:
 	var carrier_card := CarrierCard.new()
-	carrier_card.id = &"test_form"
+	carrier_card.id = &"test_carrier"
 	carrier_card.carrier = &"atom"
 	var stream := CardMoteStream.new()
 	stream.kind = &"rising"

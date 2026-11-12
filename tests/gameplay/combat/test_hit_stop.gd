@@ -251,9 +251,9 @@ func test_a_down_stands_the_game_still() -> void:
 func test_a_parry_and_a_slams_strike_hold_their_caster() -> void:
 	var parrier: Actor = _body(Vector2.ZERO)
 	var slammer: Actor = _body(Vector2(100.0, 0.0))
-	_world.projectiles.impact_carrier_card = &"swing"
+	_world.projectiles.impact_carrier = &"swing"
 	_world.bus.shot_blocked.emit(parrier.id, Vector2.ZERO, 0, -1)
-	_world.projectiles.impact_carrier_card = &""
+	_world.projectiles.impact_carrier = &""
 	check(_world.table.held_left(parrier.id) >= _cue(&"parry").hold - 0.0001, "a swing's block holds the parrier")
 	_world.bus.carrier_ended.emit(slammer.id, &"slam", Vector2.ZERO, Vector2.RIGHT, 20.0, Color.WHITE, 0)
 	check(_world.table.held_left(slammer.id) >= _cue(&"slam").hold - 0.0001, "a slam's strike holds the slammer")

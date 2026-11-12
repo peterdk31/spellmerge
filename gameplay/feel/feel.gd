@@ -36,7 +36,7 @@ extends Node
 ## the camera against the aim); where a shot strikes, its card's `impact_cue` (S6 2).
 ##
 ## A deflected shot (`shot_deflected`) flashes big and white where it turned, in its new caster's
-## colours; a swing's block (`shot_blocked` while the projectile manager's `impact_carrier_card` is
+## colours; a swing's block (`shot_blocked` while the projectile manager's `impact_carrier` is
 ## `swing`) is a parry: a big four-point star in Spark gold and a local stop on the parrying actor
 ## (melee I5).
 ##
@@ -213,14 +213,14 @@ const STAFF_SWAP: StringName = &"staff_swap"
 ## cues' `motes` and `mark` parts). The square each is drawn in: BLAST_SPAN radii each way (the
 ## shader's; its seconds are the kinds' own, keep them equal).
 const BLAST_SPAN: float = 2.2
-## What `_carrier_cues_of` answers: the places of a carrier card's cues and radius, and the defaults.
+## What `_carrier_card_cues_of` answers: the places of a carrier card's cues and radius, and the defaults.
 const CUE_CAST: int = 0
 const CUE_SHOWN: int = 1
 const CUE_IMPACT: int = 2
 const CUE_END: int = 3
 const CUE_RADIUS: int = 4
 const CUE_WIND: int = 5
-const NO_CARRIER_CUES: Array = [&"cast", &"", &"impact", &"", 0.0, &"wind"]
+const NO_CARRIER_CARD_CUES: Array = [&"cast", &"", &"impact", &"", 0.0, &"wind"]
 ## The cue of a shield's block (combat plays it for a barrier's, Feel for a shot's own shield).
 const SHIELD_BLOCK_CUE: StringName = &"shield_block"
 ## The pixels a step of a hit's spray or puff is (its cue's size is its steps times this: the
@@ -386,10 +386,10 @@ var _hit_flash_material: ShaderMaterial = null
 ## path as the shader takes it (x, y and how far along the beam; `beam_path`).
 var _live_beams: Array[MeshInstance2D] = []
 ## Each carrier card's own look as an area of Feel draws it, asked of Spells once and kept
-## (`_carrier_look_of`; docs/milestones/card-looks.md): {Carrier.LOOK_BEAM or LOOK_SWING: {card id:
+## (`_carrier_card_look_of`; docs/milestones/card-looks.md): {Carrier.LOOK_BEAM or LOOK_SWING: {card id:
 ## CardLook}}. Beams' and swing trails' materials take its shader; a beam's light its light. Feel
 ## reads no card field.
-var _carrier_looks: Dictionary = {}
+var _carrier_card_looks: Dictionary = {}
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
 var _swing_trails: SwingTrailsScript = null
 ## The open portals' gates (`PortalLookScript`), drawn every frame from one typed read of them
@@ -577,8 +577,8 @@ var _impact_aim: Vector2 = Vector2.ZERO
 ## Camera kick of casts (pixels), added to the shake.
 var _kick: Vector2 = Vector2.ZERO
 var _last_usec: int = 0
-## The cues and radius read from the carrier cards, by card id (see `_carrier_cues_of`).
-var _carrier_cues: Dictionary = {}
+## The cues and radius read from the carrier cards, by card id (see `_carrier_card_cues_of`).
+var _carrier_card_cues: Dictionary = {}
 ## The cues read from `content/cues`, by id (see `cue_of`).
 var _cue_cache: Dictionary = {}
 ## The cues that play at most `every` seconds apart (`CueBase.every`): each one's first index in
@@ -1371,7 +1371,7 @@ func _on_shot_deflected(caster: int, position: Vector2, _tag: int, shot: int) ->
 ## A shot was blocked. A shot's own shield (`shot`, the shielded shot) blocks as a barrier does: its
 ## shell loses that charge's motes (`barriers.gd`) and the cue `shield_block` plays where the
 ## blocked shot was, turned back toward the shield. A swing's block is a parry (`shield · swing`; the
-## projectile manager's `impact_carrier_card` says which carrier blocked): the cue `parry`, a big
+## projectile manager's `impact_carrier` says which carrier blocked): the cue `parry`, a big
 ## four-point star in Spark gold and a local stop on the parrying actor alone. Other carriers'
 ## blocks show nothing of their own.
 func _on_shot_blocked(caster: int, position: Vector2, _tag: int, shot: int) -> void:
@@ -1382,7 +1382,7 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int, shot: int) -> v
 		play_cue(SHIELD_BLOCK_CUE, caster, position, (position - from).normalized() if from.is_finite() and from != position else Vector2.ZERO)
 		_spectacle.shot_blocked(shot, position)
 		return
-	if projectiles.impact_carrier_card != &"swing":
+	if projectiles.impact_carrier != &"swing":
 		return
 	play_cue(CueBase.PARRY_CUE, caster, position)
 
@@ -1402,7 +1402,7 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2)
 		core = projectiles.impact_core
 		bits = projectiles.impact_look
 		tag = projectiles.impact_tag
-	var cues: Array = _carrier_cues_of(carrier_card)
+	var cues: Array = _carrier_card_cues_of(carrier_card)
 	play_cue(cues[CUE_IMPACT] as StringName, caster, position, direction, cues[CUE_RADIUS] as float, core, bits, ActorsScript.NONE, -1, -1, tag, true, NO_BODY, ramp)
 
 
@@ -1695,7 +1695,7 @@ func _on_carrier_ended(caster: int, carrier_card: StringName, at: Vector2, direc
 	var tag: int = _cue_tag()
 	if _spectacle != null:
 		_spectacle.end_streams(caster, tag)
-	var cue: StringName = _carrier_cues_of(carrier_card)[CUE_END] as StringName
+	var cue: StringName = _carrier_card_cues_of(carrier_card)[CUE_END] as StringName
 	if cue != &"":
 		play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, tag)
 
@@ -1703,8 +1703,8 @@ func _on_carrier_ended(caster: int, carrier_card: StringName, at: Vector2, direc
 ## The carrier card `carrier_card`'s look as the area `drawer` (Carrier.LOOK_BEAM, LOOK_SWING) draws it
 ## (`Spells.look_of`; `CardLook.PLAIN` with no Spells, no card, or a card another area draws), asked
 ## once per id and kept: a cast allocates nothing.
-func _carrier_look_of(carrier_card: StringName, drawer: int) -> CardLook:
-	var cache: Dictionary = _carrier_looks.get(drawer, {})
+func _carrier_card_look_of(carrier_card: StringName, drawer: int) -> CardLook:
+	var cache: Dictionary = _carrier_card_looks.get(drawer, {})
 	var known: CardLook = cache.get(carrier_card) as CardLook
 	if known != null:
 		return known
@@ -1712,14 +1712,14 @@ func _carrier_look_of(carrier_card: StringName, drawer: int) -> CardLook:
 		return CardLook.PLAIN
 	var look: CardLook = spells.call(&"look_of", carrier_card, drawer) as CardLook
 	cache[carrier_card] = look
-	_carrier_looks[drawer] = cache
+	_carrier_card_looks[drawer] = cache
 	return look
 
 
 ## The shader that draws the carrier card `carrier_card`'s look in the area `drawer`, or `plain` when its
 ## card names none (or is drawn by another area).
-func _carrier_shader_of(carrier_card: StringName, drawer: int, plain: Shader) -> Shader:
-	var shader: Shader = _carrier_look_of(carrier_card, drawer).shader
+func _carrier_card_shader_of(carrier_card: StringName, drawer: int, plain: Shader) -> Shader:
+	var shader: Shader = _carrier_card_look_of(carrier_card, drawer).shader
 	return shader if shader != null else plain
 
 
@@ -1787,7 +1787,7 @@ static func swing_mesh() -> ArrayMesh:
 ## The swing trails (for tests).
 ## The shader a swing of the carrier card `carrier_card` trails with (its `look_shader`, or the plain trail's).
 func _swing_shader_of(carrier_card: StringName) -> Shader:
-	return _carrier_shader_of(carrier_card, Carrier.LOOK_SWING, SwingTrailsScript.SHADER)
+	return _carrier_card_shader_of(carrier_card, Carrier.LOOK_SWING, SwingTrailsScript.SHADER)
 
 
 func swing_trails() -> SwingTrailsScript:
@@ -2342,20 +2342,20 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 ## 0) for an id that is no carrier card; a modifier that shows itself (`carrier_shown` `zap`) brings its
 ## own `cue` as its shown cue. Read once per card id, then kept: a cast or a hit allocates nothing.
 ## With no registry yet, or no carrier card id, the defaults are answered but not kept.
-func _carrier_cues_of(carrier_card: StringName) -> Array:
-	var cached: Variant = _carrier_cues.get(carrier_card)
+func _carrier_card_cues_of(carrier_card: StringName) -> Array:
+	var cached: Variant = _carrier_card_cues.get(carrier_card)
 	if cached != null:
 		return cached as Array
 	if registry == null or carrier_card == &"":
-		return NO_CARRIER_CUES
+		return NO_CARRIER_CARD_CUES
 	var card: Resource = registry.get_resource(&"spells", carrier_card)
-	var cues: Array = NO_CARRIER_CUES
+	var cues: Array = NO_CARRIER_CARD_CUES
 	if card is CarrierCard:
 		cues = (card as CarrierCard).look_cues()
 	elif card is ModifierBase and (card as ModifierBase).cue != &"":
 		# A modifier that shows itself (a zap: `carrier_shown` names its card) plays its own cue there.
-		cues = [NO_CARRIER_CUES[CUE_CAST], (card as ModifierBase).cue, NO_CARRIER_CUES[CUE_IMPACT], &"", 0.0, NO_CARRIER_CUES[CUE_WIND]]
-	_carrier_cues[carrier_card] = cues
+		cues = [NO_CARRIER_CARD_CUES[CUE_CAST], (card as ModifierBase).cue, NO_CARRIER_CARD_CUES[CUE_IMPACT], &"", 0.0, NO_CARRIER_CARD_CUES[CUE_WIND]]
+	_carrier_card_cues[carrier_card] = cues
 	return cues
 
 
@@ -2367,7 +2367,7 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 		return
 	var table: ActorsScript = _actor_table()
 	var actor: int = table.actor_of_seat(player) if table != null else ActorsScript.NONE
-	play_cue(_carrier_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, player)
+	play_cue(_carrier_card_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, player)
 
 
 ## A cast started winding up (`cast_winding`; docs/milestones/cast-timing.md, T6b): the staff's own
@@ -2381,7 +2381,7 @@ func _on_cast_winding(caster: int, _staff: int, carrier_card: StringName, origin
 	var table: ActorsScript = _actor_table()
 	if table == null or table.team_of(caster) == ActorsScript.TEAM_WIZARDS:
 		return
-	var cue: StringName = staff_cue if staff_cue != &"" else _carrier_cues_of(carrier_card)[CUE_WIND] as StringName
+	var cue: StringName = staff_cue if staff_cue != &"" else _carrier_card_cues_of(carrier_card)[CUE_WIND] as StringName
 	if cue == &"":
 		return
 	# Its flashes sit on the staff tip as it turns (the aim follows the caster through the wind-up).
@@ -2420,7 +2420,7 @@ func _on_barrier_changed(actor: int, charges: int, seconds: float, tag: int, way
 func _on_carrier_shown(caster: int, carrier_card: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
 	if caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
-	var cue: StringName = _carrier_cues_of(carrier_card)[CUE_SHOWN] as StringName
+	var cue: StringName = _carrier_card_cues_of(carrier_card)[CUE_SHOWN] as StringName
 	if cue != &"":
 		play_cue(cue, caster, origin, direction, length, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
 	var ramp: int = _ramp_of(caster)
@@ -2440,7 +2440,7 @@ func _on_carrier_shown(caster: int, carrier_card: StringName, origin: Vector2, d
 	path[0] = Vector3(origin.x, origin.y, 0.0)
 	path[1] = Vector3(end.x, end.y, length)
 	# Drawn by its card's own shader (`CarrierCard.look_shader`), or the plain beam's.
-	_use_shader(node, _carrier_shader_of(carrier_card, Carrier.LOOK_BEAM, BEAM_SHADER))
+	_use_shader(node, _carrier_card_shader_of(carrier_card, Carrier.LOOK_BEAM, BEAM_SHADER))
 	var material: ShaderMaterial = node.material as ShaderMaterial
 	material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
 	# A path of two points, BEAM_LEAD past each end, so the flares are whole.
@@ -2604,7 +2604,7 @@ func _draw_live_beams(real_delta: float) -> void:
 		var tint: Color = beams.call("beam_tint", i)
 		# Drawn by its card's own shader (`CarrierCard.look_shader`), or the plain beam's, and lit as
 		# its card says (`look_light_intensity`, `look_light_reach`).
-		var look: CardLook = _carrier_look_of(beams.call("beam_carrier_card", i) as StringName if beams.has_method("beam_carrier_card") else &"", Carrier.LOOK_BEAM)
+		var look: CardLook = _carrier_card_look_of(beams.call("beam_carrier_card", i) as StringName if beams.has_method("beam_carrier_card") else &"", Carrier.LOOK_BEAM)
 		_use_shader(node, look.shader if look.shader != null else BEAM_SHADER)
 		var material: ShaderMaterial = node.material as ShaderMaterial
 		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))

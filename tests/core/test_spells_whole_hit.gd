@@ -8,6 +8,9 @@ extends "res://tests/support/suite.gd"
 
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
+## What the imp lacks before a mend bolt reaches it.
+const IMP_HURT: int = 20
+
 const ALLY_HURT: int = 40
 const BIG: int = 100000
 
@@ -48,7 +51,10 @@ func test_an_echo_hit_is_the_whole_hit_at_half() -> void:
 	if echo == null:
 		return
 	check(hit.heal > 0 and hit.slam > 0, "the carrier heals and slams")
-	check_equal(echo.damage, hit.damage * SpellLimits.ECHO_DAMAGE, "half the damage, not rounded")
+	# (A mend hit deals no damage, owner 2026-11-12: the damage is a hit without it.)
+	var harmful: CompiledSpell = _spell(["fire", "frost", "heavy", "echo", "bolt"])
+	check(harmful.hit.damage > 0.0, "without mend the hit hurts")
+	check_equal(harmful.echo_hit.damage, harmful.hit.damage * SpellLimits.ECHO_DAMAGE, "half the damage, not rounded")
 	check_equal(echo.heal, roundi(hit.heal * SpellLimits.ECHO_DAMAGE), "half the heal")
 	check_equal(echo.slam, roundi(hit.slam * SpellLimits.ECHO_DAMAGE), "half the slam")
 	check(echo.heal > 0 and echo.slam > 0, "an echo still heals and slams")
@@ -80,6 +86,8 @@ func test_a_relay_mend_bolt_still_heals_after_it_takes_on_frost() -> void:
 	var imp: Node2D = arena.add_imp(Vector2(110.0, 0.0))
 	var ally: Node2D = arena.add_guard(1, Vector2(60.0, 0.0))
 	arena.hurt(ally, ALLY_HURT)
+	# The imp is hurt too, so the bolt is seen to reach it: a mend heals foes as well.
+	arena.hurt(imp, IMP_HURT)
 	arena.install_cards(1, 0, ["frost", "bolt"])
 	arena.install_cards(0, 0, ["relay", "mend", "pierce", "bolt"])
 	check(arena.cast(1, 0, Vector2.DOWN), "the teammate casts frost")
@@ -89,7 +97,8 @@ func test_a_relay_mend_bolt_still_heals_after_it_takes_on_frost() -> void:
 	check(arena.healed() > 0, "the teammate is healed")
 	check_equal(arena.lost(ally), ALLY_HURT - arena.healed(), "and never hurt")
 	# (That relay takes on a teammate's statuses is test_relay_keeps_each_new_elements_status's.)
-	check(not arena.was_given(imp, &"chill"), "the imp it heals is not chilled: a heal does nothing else")
+	check(arena.lost(imp) < IMP_HURT, "the bolt reached the imp and healed it (%d of %d)" % [arena.lost(imp), IMP_HURT])
+	check(not arena.was_given(imp, &"chill"), "but did not chill it: a heal does nothing else (owner 2026-11-12)")
 	arena.free_all()
 
 

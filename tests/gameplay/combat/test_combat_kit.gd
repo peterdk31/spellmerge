@@ -489,6 +489,32 @@ func test_a_heal_stops_at_full_health_and_skips_the_downed() -> void:
 	check(_healed.is_empty(), "a downed wizard is not healed")
 
 
+## Owner 2026-11-12: a heal heals whatever it hits, friend or foe, and does nothing else: a foe
+## it strikes takes no damage, no push, no slam and no status from the hit's other cards.
+func test_a_heal_hit_heals_a_foe_and_does_nothing_else() -> void:
+	_wizard(0, Vector2(-200.0, 0.0))
+	var enemy := _enemy(Vector2(10.0, 0.0))
+	_combat.hit(_enemy_caster, enemy, 30)
+	_hurt.clear()
+	_applied.clear()
+	var profile := _profile(3)
+	profile.heal = 10
+	profile.knockback = 200.0
+	profile.slam = 5
+	profile.element_id = &"fire"
+	profile.element_ids = [&"fire"]
+	profile.status_id = &"burn"
+	profile.status_duration = 3.0
+	profile.status_strength = 1.0
+	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, _tag(profile), -1)
+	check_equal(_combat.health_of(enemy), 80.0, "the foe is healed 10, not hurt 3")
+	check_equal(_combat.knockback_of(enemy), Vector2.ZERO, "not pushed")
+	check(_applied.is_empty(), "no status: %s" % [_applied])
+	check(_hurt.is_empty(), "no hurt")
+	_run(1.0)
+	check_equal(_combat.health_of(enemy), 80.0, "no slam and no burn after")
+
+
 func test_a_heal_hit_heals_a_teammate() -> void:
 	_wizard(0, Vector2.ZERO)
 	var mate := _wizard(1, Vector2(10.0, 0.0))

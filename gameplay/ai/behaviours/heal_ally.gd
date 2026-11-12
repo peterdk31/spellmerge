@@ -3,8 +3,9 @@ extends AIBehaviour
 ## hurts nobody is ready, with the teammate in its reach along a clear line: cast it at the
 ## teammate (`plan_target`); a cast round the caster (a Pulse) counts when the teammate is within
 ## it (`AIBrain.reaches`), and it never heals its caster, which it spares. The more hurt the one
-## healed, the keener; the most hurt in reach is chosen (`AIBrain.hurt_mate`). It never heals another team: a teammate is one the board names and the
-## actor table puts on its own team.
+## healed, the keener; the most hurt in reach is chosen (`AIBrain.hurt_mate`). It never aims a heal
+## at another team: a teammate is one the board names and the actor table puts on its own team. (A
+## heal heals whatever it hits, owner 2026-11-12, so who it lands on is the aim's business.)
 
 ## Its want for a heal: BASE, plus HURT_BONUS times the share of health the one healed has lost.
 const BASE: float = 0.9

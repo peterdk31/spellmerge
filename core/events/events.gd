@@ -234,7 +234,7 @@ signal possess_started(caster: int, actor: int)
 signal possess_ended(caster: int, actor: int)
 ## Sender: combat. Just before `damage_dealt`: the hit of the actor `caster` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `caster` equal to their own actor id. Heard by feel. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal hit_landed(caster: int, target: Node, amount: float, position: Vector2, kind: StringName, shot: int)
-## Sender: combat. A heal hit of the actor `caster` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
+## Sender: combat. A heal hit of the actor `caster` gave `target` (any actor, friend or foe) `amount` health at `position`. Heard by player and feel.
 signal heal_dealt(caster: int, target: Node, amount: float, position: Vector2)
 ## Sender: actor (its `DamageNumbers` look, props W5). A hit on the actor `actor` shows its number: `amount` rising `rise` pixels from `position` (world pixels, above its hurt shape) for `seconds`, at `size` times the plain text. `kind` is `NUMBER_HIT` (in the colour of the element `element`, white for `&""`), `NUMBER_HEAL`, or `NUMBER_SPARED` (a hit that took nothing: an invincible actor, the hub). View only; heard by feel, which draws every actor's numbers in one place.
 signal damage_number_shown(actor: int, position: Vector2, amount: float, element: StringName, kind: StringName, rise: float, seconds: float, size: float)

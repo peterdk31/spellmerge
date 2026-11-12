@@ -120,9 +120,12 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		speed = spell.speed if spell_reach > 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES) else 0.0
 	reach = maxf(reach, spell_reach)
 	lasts = maxf(lasts, spell.lifetime)
-	blast = maxf(blast, spell.behaviour(ModifierBase.Behaviour.BLAST))
-	if spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0 and spell.has_trait(CarrierTraits.AOE):
-		blast_on_caster = true
+	# A blast strikes with the carrier's hit (`StaffCompiler.blast_hit`): a mend's blast only heals,
+	# so it is no harm (owner 2026-11-12: a heal does nothing else).
+	if spell.hit == null or spell.hit.heal <= 0:
+		blast = maxf(blast, spell.behaviour(ModifierBase.Behaviour.BLAST))
+		if spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0 and spell.has_trait(CarrierTraits.AOE):
+			blast_on_caster = true
 	if spell.homing_range > 0.0:
 		homing = true
 	if spell.has_trait(CarrierTraits.MOVES_CASTER):

@@ -74,8 +74,7 @@ func test_combat_takes_and_heals_through_health_and_the_bus_does_not() -> void:
 	_world.bus.damage_dealt.emit(0, body, 15, Vector2.ZERO)
 	_world.bus.heal_dealt.emit(0, body, 15, Vector2.ZERO)
 	check_equal(body.health.health, 35, "the bus is for the rest of the game: Health does not hear it")
-	# A mend heals its caster's team: the actor's own, cast on itself.
-	_world.table.set_driver(body.id, Actor.ActorsScript.TEAM_WIZARDS, -1)
+	# A mend heals whatever it hits (owner 2026-11-12): here the actor's own, cast on itself.
 	var mend := HitProfile.new()
 	mend.heal = 5
 	var spell := CompiledSpell.new()

@@ -40,8 +40,7 @@ var radius_scale: float = 1.0
 var shots: int = 1
 ## Degrees the shots fan over.
 var spread: float = 0.0
-## The id of its carrier (`CarrierCard.carrier`, as `Carriers.placed` takes it: a Pulse in a payload is
-## `Carriers.PULSE_BEARER` or `PULSE_POINT`, which no card names).
+## The id of its carrier (`CarrierCard.carrier`: the bolt card's is `atom`).
 ## Setting it reads the carrier's `traits` and `look_drawer` once.
 var carrier: StringName = &"":
 	set(value):
@@ -133,10 +132,6 @@ var zap_hit: HitProfile = null
 ## An echoed shot's zap: `zap_hit` at ECHO_DAMAGE. Null without both `zap` and `echo`.
 var echo_zap_hit: HitProfile = null
 
-## Whether it strikes what it meets (`Carrier.strikes`): a Pulse only when a card on it acts on hits
-## (a bare Pulse, or one with only a shield, a deflect or a hold, strikes nothing). True for any other
-## carrier.
-var strikes: bool = true
 ## Every infusion on the shot, in slot order; `element_id` is the first.
 var element_ids: Array[StringName] = []
 ## How each different infusion on it looks, in slot order (a card twice is once): rgb its `tint`,

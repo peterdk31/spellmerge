@@ -16,7 +16,7 @@ func before_each() -> void:
 	registry.scan()
 
 
-func _shown_beams() -> Array[CarrierCard]:
+func _carrier_cards() -> Array[CarrierCard]:
 	var found: Array[CarrierCard] = []
 	for card: Resource in registry.get_all(&"spells"):
 		if card is CarrierCard:
@@ -30,7 +30,7 @@ func _cues_of(carrier_card: CarrierCard) -> Dictionary:
 
 
 func test_every_carrier_card_casts_and_lands_in_a_cue() -> void:
-	var carrier_cards: Array[CarrierCard] = _shown_beams()
+	var carrier_cards: Array[CarrierCard] = _carrier_cards()
 	check(carrier_cards.size() >= 14, "the carrier cards are found: %d" % carrier_cards.size())
 	for carrier_card: CarrierCard in carrier_cards:
 		check(carrier_card.cast_cue != &"", "%s has a cast cue" % carrier_card.id)
@@ -39,7 +39,7 @@ func test_every_carrier_card_casts_and_lands_in_a_cue() -> void:
 
 
 func test_every_cue_a_card_names_is_a_cue() -> void:
-	for carrier_card: CarrierCard in _shown_beams():
+	for carrier_card: CarrierCard in _carrier_cards():
 		var cues: Dictionary = _cues_of(carrier_card)
 		for moment: StringName in cues:
 			var id: StringName = cues[moment]

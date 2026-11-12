@@ -87,7 +87,7 @@ func test_a_payload_with_a_multicast_has_a_row_per_carrier() -> void:
 		check_equal(rows[2]["name"], _spells.component_name(&"bolt"), "the further carrier is named by its carrier")
 
 
-func test_an_pulse_has_a_row() -> void:
+func test_a_pulse_has_a_row() -> void:
 	var rows: Array = _tree("fire pulse")
 	check_equal(_shape(rows), [[0, -1, [0, 1]]], "a fire Pulse round the caster")
 	if rows.size() == 1:

@@ -237,7 +237,7 @@ func shield(spell: CompiledSpell, tag: int, body: int, shot: int, seconds: float
 
 ## `shield` on a body: a barrier on the actor `actor` with the card's charges, for as long as the
 ## carrier lasts (a move's own time at least). It comes with every move of the wizard (`shield`),
-## a Pulse round the caster or round the body that fired a payload (`CarrierPulseBearer`), and a
+## a Pulse round the caster or round the body that fired a payload (`CarrierPulse`), and a
 ## decoy's body (`CarrierDecoy`). Combat gives it a minimum time; its block is the card `tag`'s.
 func shield_caster(spell: CompiledSpell, tag: int, actor: int, move_seconds: float) -> void:
 	var charges: int = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))

@@ -120,6 +120,10 @@ func test_asking_about_one_card_says_what_a_compile_says() -> void:
 	check(asked > 100, "every card on every carrier was asked: %d" % asked)
 
 
+## `Carriers.<CONSTANT>` or `Carriers.is_<something>`: a carrier picked out by name.
+static var _PICKS: RegEx = RegEx.create_from_string("Carriers\\.([A-Z_]+\\b|is_)")
+
+
 func test_carriers_ask_the_runtime_only_through_the_kit_and_the_runtime_names_none() -> void:
 	# A carrier knows the runtime only as `CarrierKit` (docs/CARRIERS.md), so the kit is all a new
 	# carrier has to learn; the runtime hands launches, rows and looks to carriers by id, so a new
@@ -136,19 +140,23 @@ func test_carriers_ask_the_runtime_only_through_the_kit_and_the_runtime_names_no
 			number += 1
 			check(not line.contains("._rt") and not line.contains("SpellRuntime._"), "%s:%d asks the runtime only through the kit: %s" % [path, number, line.strip_edges()])
 	var names: PackedStringArray = []
-	var every: Array[StringName] = Carriers.ids()
-	every.append_array([Carriers.PULSE_BEARER, Carriers.PULSE_POINT])
-	for id: StringName in every:
+	for id: StringName in Carriers.ids():
 		names.append('&"%s"' % id)
 		names.append(String(Carriers.of(id).get_script().get_global_name()))
-	var number: int = 0
-	for line in FileAccess.get_file_as_string("res://core/spells/spells.gd").split("\n"):
-		number += 1
-		var code: String = line.get_slice("#", 0)
-		if code.contains("const RAY_CARD"):
-			continue
-		for name in names:
-			check(not code.contains(name) if name.begins_with("&") else not _names_class(code, name), "spells.gd:%d names the carrier %s: %s" % [number, name, line.strip_edges()])
+	# The runtime, the compiler and the AI's summary ask a carrier its yes/no answers, never which
+	# one it is: no id, no class, and no carrier picked out through `Carriers` (a constant or an
+	# `is_` question about one; props W9a: a Pulse is `AROUND`, not `Carriers.is_pulse`).
+	for path: String in ["res://core/spells/spells.gd", "res://core/spells/staff_compiler.gd", "res://core/spells/cast_sense.gd"]:
+		var number: int = 0
+		for line in FileAccess.get_file_as_string(path).split("\n"):
+			number += 1
+			var code: String = line.get_slice("#", 0)
+			if code.contains("const RAY_CARD"):
+				continue
+			for name in names:
+				check(not code.contains(name) if name.begins_with("&") else not _names_class(code, name), "%s:%d names the carrier %s: %s" % [path.get_file(), number, name, line.strip_edges()])
+			var picks: RegExMatch = _PICKS.search(code)
+			check(picks == null, "%s:%d picks out a carrier through Carriers: %s" % [path.get_file(), number, line.strip_edges()])
 
 
 ## True when `code` names the class `name` as a whole word.

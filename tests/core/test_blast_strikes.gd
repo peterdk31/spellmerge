@@ -67,7 +67,7 @@ func before_each() -> void:
 	decoy.carrier = &"decoy"
 	_carrier_card(&"barb", 300.0, 1.0)
 	var pulse: CarrierCard = _carrier_card(&"pulse", 0.0, 0.5)
-	pulse.carrier = Carriers.PULSE
+	pulse.carrier = &"pulse"
 	pulse.radius = 24.0
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
 	var slam: CarrierCard = _carrier_card(&"slam", 0.0, 0.12)

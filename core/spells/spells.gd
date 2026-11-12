@@ -37,8 +37,7 @@ extends Node
 ## timer, `on hurt` or end, a barrier's block: `body_caster`; owner, 2026-11-06), else by the point
 ## (`_caster`): dash, teleport, pull, swap and recoil move that shot or body, orbit, familiar and
 ## return circle it, a beam, swing or slam is held by it. A payload's Pulse is round it too
-## (`CarrierPulseBearer`), or round the point (`CarrierPulsePoint`; docs/CARRIERS.md, "Pulse: a strike
-## round what casts it"); its actor stays the wizard. A trigger fires every
+## (docs/CARRIERS.md, "Pulse: a strike round what casts it"); its actor stays the wizard. A trigger fires every
 ## time its event happens, as long as its carrier lives (owner, 2026-10-29: no per-shot count).
 ## One budget's trigger fires make at most `fire_shots_per_step` shots per `step` (pacing, not a
 ## limit): a fire past it waits for the next step, oldest first, and none is dropped
@@ -1667,8 +1666,8 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 	var made: int = 0
 	for spell in group.spells:
 		var heading: Vector2 = direction
-		# A Pulse is not aimed: a scatter turns the others.
-		if group.scatter and not Carriers.is_pulse(spell.carrier):
+		# A carrier that acts all round what casts it (a Pulse) is not aimed: a scatter turns the others.
+		if group.scatter and not spell.has_trait(CarrierTraits.AROUND):
 			heading = DMath.rotated(direction, _scatter_roll() * TAU)
 		made += _fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, false)
 	return made

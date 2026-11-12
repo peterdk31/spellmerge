@@ -68,7 +68,7 @@ func before_each() -> void:
 		_shown.append([player, carrier_card, at, direction, length]))
 	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
 	var pulse: CarrierCard = _carrier_card(&"pulse", 0.0, 0.5)
-	pulse.carrier = Carriers.PULSE
+	pulse.carrier = &"pulse"
 	pulse.radius = 24.0
 	bolt.base_damage = 10
 	var familiar: CarrierCard = _carrier_card(&"familiar", 0.0, 6.0)

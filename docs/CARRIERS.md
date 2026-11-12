@@ -31,7 +31,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `GATES` | Does it open a way through that shots and bodies take (a portal)? Read only by `CastSense` (`opens`: the AI casts it to open a fight). |
 | `CASTS_FROM_SHOT` | Is it shots of the projectile manager, each casting what it fires while it lives (a bolt, a rune, a pool, a wall)? |
 | `CASTS_FROM_BODY` | Is it a body of its own, an actor, that casts what it fires (a decoy)? |
-| `CASTERLESS` | Is it cast by nothing a push could move (a Pulse round a payload's point, `pulse_point`)? Recoil needs a caster to push. |
+| `AROUND` | Does it act all round what casts it, not along an aim (a pulse)? A scatter turns nothing there; the AI reads it as an area round its caster. |
 | `MELEE` | Is it held by or carried with the body that casts it, never leaving it (swing, slam, dash, teleport)? Then it never hits that body (`CarrierKit.spared`); a ranged carrier spares it only until it has left it: a shot over time, a beam along its path (it hits its caster when it bounces or bends back into them). |
 
 (and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
@@ -85,39 +85,26 @@ SpellCompiler ... since that one is a custom rule"): **cards with no carrier aft
 wasted**, as a trigger with no carrier is, and a staff of only an infusion does not cast
 (`fire · blast` alone does nothing; `fire · blast · pulse` explodes round you).
 
-It is one card with three carriers, on the shared base `pulse.gd` (`CarrierPulse`), because where it
-is depends on what casts its group:
+It is **one carrier**, `pulse` (`pulse.gd`, `CarrierPulse`; owner, 2026-11-12: "One carrier!"),
+with fixed yes/no answers like every other: it `HITS`, `LASTS`, `REPEATS_HELD`, `MEETS_SHOTS`, is
+`MELEE` (it never leaves what casts it) and acts `AROUND` (all round, not along an aim: a scatter
+turns nothing there, and the AI reads it as an area round its caster). **What it is round is the
+runtime's to know**, as for every carrier (the caster, below): the caster's body in the cast's own
+group; in a payload, whatever fired it, a body or a shot that flies on (owner, 2026-11-06), else the
+point the payload began at (`on hit · bolt · blast · pulse` explodes where the bolt hits).
 
-- `pulse` (`pulse_caster.gd`), the id the card names, in the cast's own group: round the caster.
-- `pulse_bearer`, in a payload that a body or a live shot may cast: round **whatever fired the
-  payload** (owner, 2026-11-06).
-- `pulse_point`, in a payload that only a point can cast (a shot that is gone, a beam's tip, a
-  familiar's orb, `on expire` of a shot): round the point it began at (`on hit · bolt · blast ·
-  pulse` explodes where the bolt hits).
-
-No card names the two payload ids, so `Carriers.ids()` leaves them out (`Carriers.exists`); the
-compiler takes one in the Pulse card's place in a payload (`Carriers.placed(id, payload, by)`), from
-who may cast that payload.
-
-**What fires a payload** is worked out from the carriers' yes/no answers, never from a list
-(`Carrier.payload_cast_by(event, spell, by)`, the same for every carrier): given the trigger's
-event, the carrier it rides on (its compiled spell: its pierce, its cards) and who casts that
-carrier's own group (`by`: the caster's body for the cast's own group, and so on down), it answers
-who may cast the payload, as bits: a body, a live shot, a point. Where a body or a shot may, an
-Pulse in it is `pulse_bearer`; where only a point can, `pulse_point`. A card is wasted only when nothing
-that may cast the payload could use it:
+**What fires a payload** is decided by the runtime each time it fires:
 
 | Trigger | The payload is cast by |
 | --- | --- |
-| `on cast` | whoever cast the carrier (its group's `by`) |
-| `timer`, `on hurt`, `on recast` | its own shot (`CASTS_FROM_SHOT`), its own body (`CASTS_FROM_BODY`: a decoy), or what it moves (`MOVES_CASTER`: the shot that cast it, else the wizard's body); a beam's or swing's tip, a familiar, a portal: a point |
-| `on expire` | a move's end: what it moved (the wizard's body, or the shot); a shot with `pull`: what it pulled there; anything else: a point |
+| `on cast` | whoever cast the carrier |
+| `timer`, `on hurt`, `on recast` | its own shot, its own body (a decoy), or what it moves (the shot that cast it, else the wizard's body); a beam's or swing's tip, a familiar, a portal: a point; a Pulse: what it is round |
+| `on expire` | a move's end: what it moved (the wizard's body, or the shot); a shot with `pull`: what it pulled there; a Pulse: what it is round; anything else: a point |
 | `on hit`, `on kill`, `on reaction` | a shot that flies on after its hit (it pierces, sticks, or its hits never spend it: a wall), what a move moves (a dash's pass and a teleport's landing are that body's or shot's strikes: `Carrier.hit_caster`), else a point |
 | `on wall` | a shot that bounces on, else a point |
 | `on block` | the shot whose shield stopped one, or the body its barrier is on (a decoy, a dashing or teleporting wizard); a deflect's block is a point's |
 
-The runtime does what the compiled rule promises, and decides each time which it is. **What fires
-a payload casts all of it**, its carriers too, not only its left-over cards (owner, 2026-11-06): a
+**What fires a payload casts all of it**, its carriers too, not only its left-over cards (owner, 2026-11-06): a
 payload fired from an actor's body (a decoy's own, or the wizard's for a dash's timer, `on hurt`
 or end, a barrier's block) is cast by that body, the way a staff's own cast is cast by the
 wizard's: a dash, teleport, pull or swap in it moves that body, a circling carrier (Orbit) or a
@@ -140,45 +127,39 @@ that caster, not whoever is casting when the step comes (owner, 2026-11-06). A s
 handled as that shot's caster too, so a chain jump belongs to the shot it jumped from (a ray's
 waiting jump keeps the caster of the hit it came from).
 
-Everything else is the one rule. Their yes/no answers decide which cards do something there,
-through the same needs as on every carrier. All three `HITS` and `LASTS`:
+What the Pulse does:
 
 - **Its strike:** everything within its `radius` (24 px, Bigger widens it) or the blast's
   strength, round what casts it, **sparing that** (the owner's rule of 2026-11-06: a carrier that
-  never leaves its caster spares it; `pulse` and `pulse_bearer` are `MELEE`; the fallback's strike hurt
-  the caster). It strikes only when a card on it acts on hits (`CarrierPulse.strikes`): an infusion,
-  a hit trigger, or a modifier that does more than guard (Shield, Deflect: `MEETS_SHOTS` only) or
-  keep it (Hold: `LASTS` only), so a bare Pulse, or a lone Shield or Deflect on you, strikes nothing
-  and costs no health (owner, 2026-11-06).
+  never leaves its caster spares it; the fallback's strike hurt the caster). A bare Pulse strikes
+  too, for its card's small damage (owner, 2026-11-12: "it hits everything around it"), and shows
+  itself as a ring of its cards' motes out to its reach (its card's `shown_cue`, `pulse`).
 - **Its life:** its `lifetime` (0.5 s), round what casts it (`LC_ACTOR` a body, `LC_SLOT` a shot,
   `LC_POINT` the point), so the triggers that need a carrier that lasts (Timer, On Hurt, On
-  Recast) fire from it while it lasts and `on expire` as it ends, cast by what it is round
-  (`CarrierPulse.payload_cast_by`). **Hold** keeps it until its staff is cast again; a held Pulse that
-  strikes strikes again every wind-up and life (`REPEATS_HELD`, as a held swing): `hold · fire ·
-  pulse` is a burning aura that spares its wizard. A card that only lengthens its life does nothing
-  without a trigger or a hold that waits on it (`CarrierPulse.idle_modifiers`).
+  Recast) fire from it while it lasts and `on expire` as it ends, cast by what it is round.
+  **Hold** keeps it until its staff is cast again, striking again every wind-up and life
+  (`REPEATS_HELD`, as a held swing): `hold · fire · pulse` is a burning aura that spares its
+  wizard. A card that only lengthens its life does nothing without a trigger or a hold that waits
+  on it (`CarrierPulse.idle_modifiers`).
+- **Round a body** (the caster, or a body that fired the payload): a shield is a barrier on that
+  body's actor (`CasterMoves.shield_caster`), a deflect turns the shots round it once, as it lands
+  (`CarrierKit.turn_shots_round`), a recoil pushes it.
+- **Round a shot** that fired the payload: a shield adds that many shield charges to the shot, a
+  deflect makes it deflect for the rest of its life (`set_deflect`), a recoil pushes it.
+- **Round a point** (that shot has ended, that body has gone): a deflect turns the shots round the
+  point; a shield or a recoil has no one to guard or push. The waste table does not know this
+  beforehand, as for every carrier a point casts. What Shield does on a Pulse is still to be talked
+  through with the owner (2026-11-12).
 
-`pulse` and `pulse_bearer` also `MEETS_SHOTS`:
+It does not fly, move, stay or steer, so homing, bounce or split are wasted on it, and a shorter
+wind-down on a payload's Pulse (no staff waits on a payload, docs/milestones/cast-timing.md);
+chain, pull, possess, relay, penta and mirror work. The runtime launches it like any other
+carrier, so echo strikes again, recoil pushes, mirror strikes twice and penta strikes from a ring
+(whose copies are cast by points).
 
-- On the caster, or a body that fired the payload: a shield is a barrier on that body's actor
-  (`CasterMoves.shield_caster`), a deflect turns the shots round it once, as it lands
-  (`CarrierKit.turn_shots_round`).
-- On a shot that fired the payload: a shield adds that many shield charges to the shot, a deflect
-  makes it deflect for the rest of its life (`set_deflect`), as a move's shield does to the shot it
-  moves. Infusions and the strike are the same as anywhere: a strike round the shot, with them.
-- On a point, or when that shot has ended or that body has gone: a shield or deflect guards no one,
-  and a recoil has nothing to push (`CASTERLESS`; it is wasted on `pulse_point`).
-
-None of them flies, moves, stays or steers, and only the cast's own `pulse` has a wind-down of its
-own (`has_wind_down`; no staff waits on a payload, docs/milestones/cast-timing.md), so homing,
-bounce, split, or a shorter wind-down on a payload's Pulse are wasted there, and chain, pull,
-possess, relay, penta and mirror work. The runtime launches them like any other carrier, so echo
-strikes again, recoil pushes, mirror strikes twice and penta strikes from a ring (whose copies are
-cast by points).
-
-`tests/core/test_card_rules.gd` plays every modifier and infusion on all three with the Pulse card
-after them (the columns `pulse`, round you; `on it`, a piercing shot's hit, and `on its body`, an
-`on cast` the wizard's body casts; and `right there`), and the card's own test
+`tests/core/test_card_rules.gd` plays every modifier and infusion on it with the Pulse card after
+them (the columns `pulse`, round you; `on it`, a piercing shot's hit, and `on its body`, an
+`on cast` the wizard's body casts), and the card's own test
 (`content/spells/carriers/pulse/test_pulse.gd`) checks the rest.
 
 ## What a carrier runs
@@ -195,7 +176,6 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | `on_move_end` | nothing | teleport (strikes where it lands) |
 | `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows), pool (forgets what it touches every `POOL_TICK`, so it strikes it again), portal (moves what went into its gates) |
 | `end_of`, `end_actor`, `clear`, `reset_actor` | nothing | dash, teleport, beam, swing, slam, decoy, familiar (what they keep) |
-| `payload_cast_by` | from its traits (the table above) | Pulse (its timer, on hurt, on recast and on expire are cast by what it is round); otherwise every carrier answers by its yes/no flags |
 | `hit_caster` | the point | dash and teleport (`CarrierMove`): what they move casts their hits' payloads |
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
 | `reach_of` | 0 | atom, beam, swing, slam (for an enemy's telegraph) |

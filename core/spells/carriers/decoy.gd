@@ -6,7 +6,7 @@ extends CarrierEntity
 ## itself: only a blast carries hit cards and infusions. It is a regular actor (owner, 2026-11-06):
 ## its shield is a barrier on its body for its life, and its deflect turns the shots round it once,
 ## as it appears, as on a caster (`_body_made`). What its triggers fire is cast from its body, and a
-## payload's Pulse is round it (`CASTS_FROM_BODY`, `CarrierPulseBearer`).
+## payload's Pulse is round it (`CASTS_FROM_BODY`, `CarrierPulse`).
 
 
 func id() -> StringName:

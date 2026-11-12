@@ -80,7 +80,7 @@ func _coverage(staff: CompiledStaff) -> Dictionary:
 	for spell in staff.nodes:
 		if spell.payload != null:
 			out["payload"] = 1
-		if Carriers.is_pulse(spell.carrier):
+		if spell.carrier == &"pulse":
 			out["pulse"] = 1
 	return out
 

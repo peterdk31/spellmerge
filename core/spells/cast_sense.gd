@@ -84,7 +84,7 @@ static func of(cast: CompiledCast) -> CastSense:
 	var first_carrier: bool = true
 	for spell: CompiledSpell in cast.group.spells:
 		sense._read_spell(spell, repeats, first_carrier)
-		if not Carriers.is_pulse(spell.carrier):
+		if not spell.has_trait(CarrierTraits.AROUND):
 			first_carrier = false
 	if sense.close_reach <= 0.0:
 		sense.close_reach = sense.reach
@@ -93,17 +93,14 @@ static func of(cast: CompiledCast) -> CastSense:
 
 func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	var shield: bool = spell.behaviour(ModifierBase.Behaviour.SHIELD) > 0.0 or spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
-	var pulse: bool = Carriers.is_pulse(spell.carrier)
-	if pulse:
-		# A Pulse: a barrier or a deflect round the caster's body, a heal on those near what casts it
-		# (never that: a Pulse spares what casts it). One round the caster that strikes is an area
-		# round it, read below; a payload's is where its payload goes.
-		if shield and spell.carrier == Carriers.PULSE:
+	if spell.has_trait(CarrierTraits.AROUND):
+		# Round the caster (the cast's own group): a barrier or a deflect round the caster's body, a
+		# heal on those near it (never the caster: it spares what casts it); its strike is an area
+		# round the caster, read below.
+		if shield:
 			blocks = true
 		if spell.hit != null and spell.hit.heal > 0:
 			heals = true
-		if not spell.strikes or spell.carrier != Carriers.PULSE:
-			return
 	var carrier: Carrier = Carriers.of(spell.carrier)
 	var spell_reach: float = carrier.reach_of(spell)
 	# A nova casts it every way at once: not aimed, an area as far out as each copy goes.
@@ -142,7 +139,7 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		sustained = true
 	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.LINE):
 		repeats_held = true
-	var ring: bool = pulse or falls or circles or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.OUTWARD)
+	var ring: bool = spell.has_trait(CarrierTraits.AROUND) or falls or circles or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.OUTWARD)
 	if ring:
 		area = true
 	# How near a cast that is not aimed must be: a ring's flight, an orbit's circle, a melee arc.

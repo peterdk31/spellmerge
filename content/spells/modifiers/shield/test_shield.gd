@@ -109,7 +109,7 @@ func test_a_shield_on_a_dash_is_a_barrier_on_the_caster() -> void:
 
 func test_a_shield_pulse_on_the_caster_is_a_barrier() -> void:
 	var spell: CompiledSpell = _first(["shield", "pulse"])
-	check(spell != null and spell.carrier == Carriers.PULSE, "a shield Pulse is round the caster")
+	check(spell != null and spell.carrier == &"pulse", "a shield Pulse is round the caster")
 	var shielded: Array = _guarded(["shield", "pulse"], 0)
 	check_equal(shielded[0], [0], "the barrier stops the shot")
 	check_equal(shielded[1], 0, "and the caster loses nothing: a shield strikes nothing, and a Pulse spares its caster")

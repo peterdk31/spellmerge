@@ -56,7 +56,7 @@ func before_each() -> void:
 	_staff.cooldown = 0.5
 	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
 	var pulse: CarrierCard = _carrier_card(&"pulse", 0.0, 0.5)
-	pulse.carrier = Carriers.PULSE
+	pulse.carrier = &"pulse"
 	pulse.radius = 24.0
 	bolt.wind_down = 0.2
 	var halo: CarrierCard = _carrier_card(&"halo", 300.0, 1.0)

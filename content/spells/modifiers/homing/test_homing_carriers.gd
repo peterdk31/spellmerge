@@ -45,7 +45,7 @@ func before_each() -> void:
 	_bus.caster_move_requested.connect(func(player: int, mode: StringName, to: Vector2, _seconds: float, _tag: int) -> void: _moves.append([player, mode, to]))
 
 
-func _shown_beams() -> Array[CarrierCard]:
+func _carrier_cards() -> Array[CarrierCard]:
 	var carrier_cards: Array[CarrierCard] = []
 	for card: Resource in _registry.call("get_all", &"spells"):
 		if card is CarrierCard:
@@ -87,7 +87,7 @@ func _hits(player: int, cards: Array[StringName], target: Node2D, seconds: float
 func test_there_are_carrier_cards_of_both_kinds() -> void:
 	var steered: int = 0
 	var not_steered: int = 0
-	for carrier_card in _shown_beams():
+	for carrier_card in _carrier_cards():
 		if Carriers.of(carrier_card.carrier).steers():
 			steered += 1
 		else:
@@ -96,7 +96,7 @@ func test_there_are_carrier_cards_of_both_kinds() -> void:
 
 
 func test_a_homing_carrier_card_reaches_a_target_off_its_line_near_the_end_of_its_reach() -> void:
-	for carrier_card in _shown_beams():
+	for carrier_card in _carrier_cards():
 		if not Carriers.of(carrier_card.carrier).steers():
 			continue
 		before_each()
@@ -164,7 +164,7 @@ func test_a_homing_wall_creeps_toward_its_target_as_one_piece() -> void:
 
 
 func test_homing_on_a_carrier_card_it_cannot_steer_is_wasted_and_changes_nothing() -> void:
-	for carrier_card in _shown_beams():
+	for carrier_card in _carrier_cards():
 		if Carriers.of(carrier_card.carrier).steers():
 			continue
 		var staff: CompiledStaff = StaffKit.compile(_spells, [&"homing", carrier_card.id] as Array[StringName])
@@ -178,6 +178,6 @@ func test_homing_on_a_carrier_card_it_cannot_steer_is_wasted_and_changes_nothing
 
 func test_the_compiled_range_is_the_rule_for_each_carrier_card() -> void:
 	var reach: float = (_registry.call("get_resource", &"spells", &"homing") as ModifierBase).behaviour_reach
-	for carrier_card in _shown_beams():
+	for carrier_card in _carrier_cards():
 		var spell: CompiledSpell = StaffKit.first(_spells, [&"homing", carrier_card.id] as Array[StringName])
 		check_equal(spell.homing_range, Carriers.of(carrier_card.carrier).homing_range(carrier_card.ray_length, reach), "a homing %s looks as far as the rule says" % carrier_card.id)

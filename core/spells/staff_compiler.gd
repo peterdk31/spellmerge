@@ -10,8 +10,7 @@ extends RefCounted
 ## takes the next group in turn). Reading wraps past the
 ## last slot, and a card already read in this cast ends the group. Cards left with no carrier
 ## after them are wasted: the Pulse card is the carrier round whatever casts it (props W9a; it
-## replaced the fallback carriers this compiler once picked for them), its carrier taken by who may
-## cast the group (`Carriers.placed`, `Carrier.payload_cast_by`). Nothing is refused: a card that
+## replaced the fallback carriers this compiler once picked for them). Nothing is refused: a card that
 ## does nothing is listed as wasted (`wasted`); the builder shows it.
 
 
@@ -89,7 +88,7 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 	_pos = start
 	_reached_end = false
 	_in_payload = false
-	_cast.group = _read_group(staff.draw if staff != null else 1, false, Carrier.BY_BODY)
+	_cast.group = _read_group(staff.draw if staff != null else 1, false)
 	_cast.ends_cycle = _reached_end or not _has_card_from(_pos)
 	_cast.wind_up = _cast.group.wind_up + (staff.wind_up if staff != null else 0.0)
 	_cast.delay = _cast.wind_down
@@ -101,10 +100,8 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 
 
 ## Reads one group that wants `want` carriers. `payload` is true for a trigger's (or a payload
-## carrier's) group, whose Pulse is round what fired it or its origin instead of the caster; `by` says
-## who may cast the group (`Carrier.BY_*` bits: the caster's body for the cast's own), for its Pulse
-## (`Carriers.placed`) and for what its carriers' payloads are cast by in turn (`Carrier.payload_cast_by`).
-func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> CompiledGroup:
+## carrier's) group, which adds no wind-down to its staff.
+func _read_group(want: int, payload: bool, wind_up: float = 0.0) -> CompiledGroup:
 	var outer_payload: bool = _in_payload
 	_in_payload = payload
 	var group := CompiledGroup.new()
@@ -141,22 +138,21 @@ func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> Com
 			trigger_slots.append(slot)
 		elif card is CarrierCard:
 			var carrier_card := card as CarrierCard
-			var on: Carrier = Carriers.placed(carrier_card.carrier, payload, by)
+			var on: Carrier = Carriers.of(carrier_card.carrier)
 			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, carrier_card.wind_up)
 			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
 			if not keep_wasted:
 				# What works here by its behaviour may still do nothing beside these infusions and
-				# triggers (a hold on a Pulse that strikes nothing: `Carrier.idle_modifiers`).
+				# triggers (a longer life on a Pulse nothing waits on: `Carrier.idle_modifiers`).
 				for idle: ModifierBase in on.idle_modifiers(kept_modifiers, kept_elements, triggers):
 					kept_modifiers.erase(idle)
 			var spell: CompiledSpell = _build(carrier_card, on, kept_elements, kept_modifiers)
-			spell.strikes = on.strikes(kept_modifiers, kept_elements, triggers)
 			spell.slot = slot
 			_useful[slot] = true
 			_land(spell, kept, kept_modifiers, kept_elements, slot)
 			spell.card_slots.append(slot)
 			for t in triggers.size():
-				_read_trigger(spell, triggers[t], trigger_slots[t], carrier_card, kept_elements, kept_modifiers, on.payload_cast_by(triggers[t].event, spell, by))
+				_read_trigger(spell, triggers[t], trigger_slots[t], carrier_card, kept_elements, kept_modifiers)
 			group.spells.append(spell)
 			group.wind_up += spell.wind_up
 			elements = []
@@ -177,19 +173,11 @@ func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> Com
 	return group
 
 
-## True when a firing of `group` does anything: a carrier that strikes, carries a trigger or a card
-## (a bare Pulse does nothing).
-static func _does_anything(group: CompiledGroup) -> bool:
-	for spell in group.spells:
-		if spell.strikes or not spell.triggers.is_empty() or not spell.modifier_ids.is_empty():
-			return true
-	return false
-
-
-## True when `group` has a carrier a scatter turns: one that is aimed (a Pulse is not).
+## True when `group` has a carrier a scatter turns: one that is aimed (not one that acts all round
+## what casts it, `AROUND`: a Pulse).
 static func _aims(group: CompiledGroup) -> bool:
 	for spell in group.spells:
-		if not Carriers.is_pulse(spell.carrier):
+		if not spell.has_trait(CarrierTraits.AROUND):
 			return true
 	return false
 
@@ -207,11 +195,9 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int)
 		var works: bool = got > 0
 		match multicast.mode:
 			MulticastBase.Mode.BURST:
-				works = works or (multicast.repeats > 1 and _does_anything(group))
+				works = works or (multicast.repeats > 1 and not group.is_empty())
 			MulticastBase.Mode.SCATTER:
 				works = works or _aims(group)
-		# More of a group that does nothing (bare Pulses) is nothing either.
-		works = works and _does_anything(group)
 		if not works and not keep_wasted:
 			_waste(slot)
 			continue
@@ -233,15 +219,14 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int)
 ## read next. A trigger whose event never happens on this carrier still reads its payload, so the
 ## cards after it are read in the same order whether it fires or not; the payload is then wasted
 ## with it (rules R2b). One with nothing to fire is wasted too. Every trigger of a carrier is read
-## the same way, in slot order, so each takes the next group (owner, 2026-10-31). `by` is who may
-## cast the payload (`Carrier.payload_cast_by`).
-func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int, carrier_card: CarrierCard, elements: Array[ElementBase], modifiers: Array[ModifierBase], by: int) -> void:
+## the same way, in slot order, so each takes the next group (owner, 2026-10-31).
+func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int, carrier_card: CarrierCard, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> void:
 	var never: bool = not keep_wasted and not _trigger_fires(trigger, Carriers.of(spell.carrier), elements, modifiers)
 	var first: int = _cast.slots.size()
 	var mana: float = _cast.mana
 	var wind_down: float = _cast.wind_down
 	var useful: Dictionary = _useful.duplicate() if never else {}
-	var held: CompiledGroup = _read_group(1, true, by, trigger.wind_up)
+	var held: CompiledGroup = _read_group(1, true, trigger.wind_up)
 	if held.is_empty():
 		_waste(trigger_slot)
 	elif never:

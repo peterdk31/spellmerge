@@ -8,16 +8,8 @@ extends RefCounted
 ## `id`), and no other file changes.
 
 ## The folder of the carrier scripts. Each script here whose class extends `Carrier` and has an id
-## is a carrier (the bases, `Carrier`, `CarrierMove`, `CarrierEntity` and `CarrierPulse`, have none).
+## is a carrier (the bases, `Carrier`, `CarrierMove` and `CarrierEntity`, have none).
 const FOLDER: String = "res://core/spells/carriers/"
-
-## The Pulse card's carrier (docs/CARRIERS.md, "Pulse: a strike round what casts it"): `PULSE`, the id
-## the card names, round the caster in a cast's own group; in a payload the compiler takes
-## `PULSE_BEARER` (round what fired it, a body or a shot) or `PULSE_POINT` (round the point it began
-## at) in its place (`placed`). No card names those two, so they are not in `ids`.
-const PULSE: StringName = &"pulse"
-const PULSE_BEARER: StringName = &"pulse_bearer"
-const PULSE_POINT: StringName = &"pulse_point"
 
 ## Not state: the carriers made once per script, shared by every runtime (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"_shared", &"_none"]
@@ -33,31 +25,15 @@ static func of(id: StringName) -> Carrier:
 	return _shared.get(id, _none) as Carrier
 
 
-## The carrier a carrier card naming `id` fires in a group it is read in (`payload`: a trigger's), cast
-## by `by` (the `Carrier.BY_*` bits of `Carrier.payload_cast_by`): the carrier of that id, except
-## that the Pulse card's is round what casts it: `PULSE` in a cast's own group; in a payload
-## `PULSE_BEARER` when a body or a live shot may cast it, else `PULSE_POINT`.
-static func placed(id: StringName, payload: bool, by: int = Carrier.BY_POINT) -> Carrier:
-	if id != PULSE or not payload:
-		return of(id)
-	return of(PULSE_BEARER if by & (Carrier.BY_BODY | Carrier.BY_SHOT) != 0 else PULSE_POINT)
-
-
-## True when `id` is one of the Pulse card's carriers.
-static func is_pulse(id: StringName) -> bool:
-	return id == PULSE or id == PULSE_BEARER or id == PULSE_POINT
-
-
 ## True when `id` names a carrier a carrier card may fire (&"" names none: it is the id of the one that
-## runs nothing; the Pulse card's payload carriers are named by no card).
+## runs nothing).
 static func exists(id: StringName) -> bool:
 	if _shared.is_empty():
 		_shared = make_all()
-	return _shared.has(id) and id != PULSE_BEARER and id != PULSE_POINT
+	return _shared.has(id)
 
 
-## The id of every carrier a carrier card may fire, in the order `make_all` lists them (the Pulse card's
-## payload carriers left out).
+## The id of every carrier a carrier card may fire, in the order `make_all` lists them.
 static func ids() -> Array[StringName]:
 	if _shared.is_empty():
 		_shared = make_all()

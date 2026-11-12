@@ -17,7 +17,7 @@ extends "res://tests/support/screenshot.gd"
 ## `looks_sheet_4x`: the top rows at 4x. `looks_combined_4x`: the combined shots at 4x.
 
 ## The rune card's own shot shader, which draws its still shots.
-const RUNE: Shader = preload("res://content/spells/forms/rune/rune.gdshader")
+const RUNE: Shader = preload("res://content/spells/carriers/rune/rune.gdshader")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ELEMENTS: Array[Resource] = [

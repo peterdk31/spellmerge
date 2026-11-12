@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
-## Every carrier card names its looks as cues (content/spells/forms/, `FormBase.cast_cue`,
+## Every carrier card names its looks as cues (content/spells/carriers/, `FormBase.cast_cue`,
 ## `shown_cue`, `impact_cue` and `end_cue`; S6 2): every cue it names is a cue file (content/cues/),
 ## and its looks have no problems. Which cue each card's moments play, and a wall's stones, are in
-## each card's own test (content/spells/forms/<id>/test_<id>.gd).
+## each card's own test (content/spells/carriers/<id>/test_<id>.gd).
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_carrier_looks.gd
 
@@ -56,7 +56,7 @@ func test_a_look_shader_that_is_not_canvas_item_is_reported() -> void:
 	var found: PackedStringArray = form.look_problems()
 	check_equal(found.size(), 1, "one problem: %s" % [found])
 	check(" ".join(found).contains("canvas_item"), "a shot shader that is no canvas-item shader")
-	form.look_shader = preload("res://content/spells/forms/pool/pool.gdshader")
+	form.look_shader = preload("res://content/spells/carriers/pool/pool.gdshader")
 	check(form.look_problems().is_empty(), "a card's own canvas-item shader is fine")
 
 
@@ -64,7 +64,7 @@ func test_a_look_shader_that_is_not_canvas_item_is_reported() -> void:
 ## old name keeps its look (it is taken as `look_shader`) and the validator names it, so it never
 ## loads clean and draws plain in silence.
 func test_a_card_with_the_old_shot_shader_name_keeps_its_look_and_is_reported() -> void:
-	var text: String = FileAccess.get_file_as_string("res://content/spells/forms/pool/pool.tres").replace("look_shader = ", "shot_shader = ")
+	var text: String = FileAccess.get_file_as_string("res://content/spells/carriers/pool/pool.tres").replace("look_shader = ", "shot_shader = ")
 	check(text.contains("shot_shader = "), "the pool card, written with the old name")
 	var path: String = "user://test_old_shot_shader.tres"
 	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
@@ -75,7 +75,7 @@ func test_a_card_with_the_old_shot_shader_name_keeps_its_look_and_is_reported() 
 	check(form != null, "it loads")
 	if form == null:
 		return
-	check(form.look_shader == preload("res://content/spells/forms/pool/pool.gdshader"), "its shader is kept, as its look_shader")
+	check(form.look_shader == preload("res://content/spells/carriers/pool/pool.gdshader"), "its shader is kept, as its look_shader")
 	var found: PackedStringArray = form.look_problems()
 	check_equal(found.size(), 1, "one problem: %s" % [found])
 	check(" ".join(found).contains("renamed `look_shader`"), "it names the rename")
@@ -84,8 +84,8 @@ func test_a_card_with_the_old_shot_shader_name_keeps_its_look_and_is_reported() 
 ## A card's light (card-looks phase 1b): the atom lights less, and less far, than the bolt, and its
 ## compiled spell carries that to its shots (`Projectiles.set_looks`).
 func test_the_atom_lights_less_than_the_bolt() -> void:
-	var atom: FormBase = load("res://content/spells/forms/atom/atom.tres") as FormBase
-	var bolt: FormBase = load("res://content/spells/forms/bolt/bolt.tres") as FormBase
+	var atom: FormBase = load("res://content/spells/carriers/atom/atom.tres") as FormBase
+	var bolt: FormBase = load("res://content/spells/carriers/bolt/bolt.tres") as FormBase
 	check(atom.look_light_intensity < bolt.look_light_intensity, "dimmer: %s against %s" % [atom.look_light_intensity, bolt.look_light_intensity])
 	check(atom.look_light_reach < bolt.look_light_reach, "and nearer: %s against %s" % [atom.look_light_reach, bolt.look_light_reach])
 	var registry := own(preload("res://core/registry/registry.gd").new()) as Node
@@ -117,13 +117,13 @@ func test_spells_answers_a_cards_look_for_its_own_area() -> void:
 	registry.call("scan")
 	var spells := own(preload("res://core/spells/spells.gd").new()) as Node
 	spells.set(&"registry", registry)
-	var beam: Shader = preload("res://content/spells/forms/beam/beam.gdshader")
+	var beam: Shader = preload("res://content/spells/carriers/beam/beam.gdshader")
 	var look: Callable = func(id: StringName, drawer: int) -> CardLook: return spells.call(&"look_of", id, drawer) as CardLook
 	check(look.call(&"beam", Carrier.LOOK_BEAM).shader == beam, "the beam card's shader, to the beams")
 	check(look.call(&"beam", Carrier.LOOK_SWING) == CardLook.PLAIN, "not to the swing trails")
 	check(look.call(&"bolt", Carrier.LOOK_BEAM) == CardLook.PLAIN, "a bolt's ray is no beam card's: plain")
 	check(look.call(&"no_such_card", Carrier.LOOK_BEAM) == CardLook.PLAIN, "no card: plain")
-	check(look.call(&"swing", Carrier.LOOK_SWING).shader == preload("res://content/spells/forms/swing/swing.gdshader"), "the swing card's, to the trails")
+	check(look.call(&"swing", Carrier.LOOK_SWING).shader == preload("res://content/spells/carriers/swing/swing.gdshader"), "the swing card's, to the trails")
 	check(is_equal_approx(look.call(&"atom", Carrier.LOOK_SHOT).light_intensity, 0.5) and is_equal_approx(look.call(&"atom", Carrier.LOOK_SHOT).light_reach, 0.75), "the atom's light, for shots")
 	check(look.call(&"atom", Carrier.LOOK_SHOT) == look.call(&"atom", Carrier.LOOK_SHOT), "one look a card, shared: nothing made per ask")
 	var beams: Array[Shader] = spells.call(&"look_shaders", Carrier.LOOK_BEAM)

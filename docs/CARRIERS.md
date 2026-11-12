@@ -243,7 +243,7 @@ To give a carrier a fade, override `fade()`, and draw its look from `fade_left`.
    another carrier's.
 2. Override the hooks it needs (at least `launch` or `shoot`), asking the runtime only through
    `kit` (`CarrierKit`, above). Nothing in `spells.gd` changes.
-3. Add its form card under `content/spells/forms/` with `carrier = &"<name>"`, and its looks, all
+3. Add its form card under `content/spells/carriers/` with `carrier = &"<name>"`, and its looks, all
    data on the card (`FormBase`): a `staff_pose` (`tests/core/test_staff_poses.gd` fails without
    one), its cues (`cast_cue`, the flash on the staff, `cast` by default; `shown_cue`, where it
    shows itself; `impact_cue`, where its shots strike, `impact` by default; `end_cue`, where a

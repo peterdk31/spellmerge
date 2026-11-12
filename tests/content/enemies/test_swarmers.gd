@@ -11,7 +11,7 @@ const AiFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const MiteData: EnemyBase = preload("res://content/enemies/crypt_mite/crypt_mite.tres")
 const HuskData: EnemyBase = preload("res://content/enemies/bone_husk/bone_husk.tres")
 const ImpData: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
-const BoltData: Resource = preload("res://content/spells/forms/bolt/bolt.tres")
+const BoltData: Resource = preload("res://content/spells/carriers/bolt/bolt.tres")
 const FRAME: int = 32
 
 var _world: AiFixture

@@ -5,7 +5,7 @@ extends Node2D
 ##
 ## Each gate is a mote rift (the owner's pick, 2026-11-09: "use motes for everything you can"):
 ##  - its lens is its card's look: one quad a gate in a batch drawn by the portal card's shader
-##    (`FormBase.look_shader`, `content/spells/forms/portal/portal.gdshader`: a dark lens, its stars
+##    (`FormBase.look_shader`, `content/spells/carriers/portal/portal.gdshader`: a dark lens, its stars
 ##    drifting through it), or the plain one (`core/projectiles/shot_portal.gdshader`), the quad
 ##    sized by how open it is (`shot_portal.gdshaderinc` says what a quad carries);
 ##  - its lips are two streams of real `ward` motes (placed each frame, `placed_motes.gd`, as a

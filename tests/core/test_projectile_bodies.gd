@@ -13,9 +13,9 @@ extends "res://tests/support/suite.gd"
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")
-const STONE: Shader = preload("res://content/spells/forms/wall/stone.gdshader")
-const POOL: Shader = preload("res://content/spells/forms/pool/pool.gdshader")
-const BOLT: Shader = preload("res://content/spells/forms/bolt/bolt.gdshader")
+const STONE: Shader = preload("res://content/spells/carriers/wall/stone.gdshader")
+const POOL: Shader = preload("res://content/spells/carriers/pool/pool.gdshader")
+const BOLT: Shader = preload("res://content/spells/carriers/bolt/bolt.gdshader")
 
 const DT: float = 1.0 / 60.0
 

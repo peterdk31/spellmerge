@@ -19,7 +19,7 @@ const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/void/void.tres"),
 	preload("res://content/spells/elements/lightning/lightning.tres"),
 ]
-const DASH := preload("res://content/spells/forms/dash/dash.tres")
+const DASH := preload("res://content/spells/carriers/dash/dash.tres")
 const ROW: float = 58.0
 ## Physics steps the dash takes (0.27 s, as the mockup's).
 const STEPS: int = 16

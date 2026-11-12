@@ -44,13 +44,13 @@ class AtlasTest(unittest.TestCase):
                 self.assertTrue(e["description"], f"no builder description: add a description to {e['source']}: {e}")
 
     def test_a_fake_combo_file_appears(self) -> None:
-        path = self.tmp / atlas.SPELLS / "forms/bolt/combos/fake_combo.json"
+        path = self.tmp / atlas.SPELLS / "carriers/bolt/combos/fake_combo.json"
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps({"id": "fake_combo", "name": "Fake combo", "does": "Does a fake thing."}))
         row = next(e for e in self.entries() if e["id"] == "fake_combo")
         self.assertEqual((row["kind"], row["name"], row["does"]), ("combo", "Fake combo", "Does a fake thing."))
         self.assertEqual(row["clips"], ["combo_fake_combo"])
-        self.assertEqual(row["source"], f"{atlas.SPELLS}/forms/bolt/combos/fake_combo.json")
+        self.assertEqual(row["source"], f"{atlas.SPELLS}/carriers/bolt/combos/fake_combo.json")
 
     def test_a_new_component_folder_appears_with_its_description(self) -> None:
         folder = self.tmp / "content/spells/elements/acid"
@@ -117,7 +117,7 @@ class AtlasTest(unittest.TestCase):
                 self.assertGreaterEqual(e["does"].count(": "), 1, e)
 
     def test_an_unreadable_component_file_is_skipped(self) -> None:
-        folder = self.tmp / "content/spells/forms/bad"
+        folder = self.tmp / "content/spells/carriers/bad"
         folder.mkdir(parents=True)
         (folder / "bad.tres").write_bytes(b"\xff\xfe\x00 id = broken")
         self.assertNotIn("bad", [e["id"] for e in self.entries()])
@@ -130,7 +130,7 @@ class AtlasTest(unittest.TestCase):
         self.assertEqual(next(e for e in self.entries() if e["id"] == "solo")["clips"], [])
 
     def test_a_deeper_component_is_found(self) -> None:
-        folder = self.tmp / "content/spells/forms/deep/inner"
+        folder = self.tmp / "content/spells/carriers/deep/inner"
         folder.mkdir(parents=True)
         (folder / "deep.tres").write_text('[resource]\nid = &"deep"\ndisplay_name = "Deep"\n')
         row = next(e for e in self.entries() if e["id"] == "deep")

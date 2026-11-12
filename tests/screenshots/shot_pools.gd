@@ -9,7 +9,7 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 ## The ages shown, in frames of 1/60 s.
 const AGES: Array[int] = [1, 6, 14, 30, 60]
 const COLUMN := 128
-const POOL: Shader = preload("res://content/spells/forms/pool/pool.gdshader")
+const POOL: Shader = preload("res://content/spells/carriers/pool/pool.gdshader")
 const TINTS: Array[Color] = [Color("e0592f"), Color("4fd6dc"), Color("8fd46a"), Color("e08ad8"), Color(0, 0, 0, 0)]
 
 

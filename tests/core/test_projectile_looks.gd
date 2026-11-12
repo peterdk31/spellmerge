@@ -437,7 +437,7 @@ func test_a_shot_asks_the_pool_for_four_plus_two_per_emitting_kind() -> void:
 
 
 func test_the_shader_holds_the_same_particle_rule_as_the_manager() -> void:
-	for path: String in ["res://core/projectiles/shot_still.gdshader", "res://core/projectiles/shot_orbit.gdshader", "res://content/spells/forms/rune/rune.gdshader", "res://content/spells/forms/wall/stone.gdshader", "res://content/spells/forms/pool/pool.gdshader"]:
+	for path: String in ["res://core/projectiles/shot_still.gdshader", "res://core/projectiles/shot_orbit.gdshader", "res://content/spells/carriers/rune/rune.gdshader", "res://content/spells/carriers/wall/stone.gdshader", "res://content/spells/carriers/pool/pool.gdshader"]:
 		var shader: Shader = load(path)
 		check(ShaderSource.of(shader).contains("min(4.0 + 2.0 * emit_count(), float(MAX_PARTICLES))"), "%s asks 4 + 2 per kind" % path.get_file())
 	var palette: ShaderInclude = load("res://core/projectiles/shot_palette.gdshaderinc")

@@ -42,7 +42,7 @@ These fill in what the plan leaves open (also recorded in `docs/DECISIONS.md`).
 
 ### Components are data on four small base classes
 
-- `core/base/` gets `SpellComponent` (`id`, `demo`, `display_name`, `complexity`, `icon`) and four subclasses: `FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase`. A component is a `.tres` on one of them, in its own folder under `content/spells/forms/`, `elements/`, `modifiers/` or `triggers/`. It needs a `.gd` only for behaviour the base class can't express with its fields. Of the starting 18, at most the five forms and three of the modifiers should need one.
+- `core/base/` gets `SpellComponent` (`id`, `demo`, `display_name`, `complexity`, `icon`) and four subclasses: `FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase`. A component is a `.tres` on one of them, in its own folder under `content/spells/carriers/`, `elements/`, `modifiers/` or `triggers/`. It needs a `.gd` only for behaviour the base class can't express with its fields. Of the starting 18, at most the five forms and three of the modifiers should need one.
 - **Ids are unique across all four kinds,** because the registry keys everything under `spells` by id. The validator checks it.
 - **Form** (bolt, beam, nova, rune, orbit): how shots leave the caster. Fields: `base_damage`, `mana_cost`, `cooldown`, `speed`, `lifetime`, `radius`, `shots`, `spread`, `motion` (straight, still, orbit), `pierce`. Beam is a ray, not a moving shot (see `core/projectiles` below).
 - **Element** (fire, frost, storm, void): what a hit does besides damage. Fields: `status_id`, `status_duration`, `status_strength`, `damage_scale`, `tint` (a palette colour from docs/STYLE.md). The reactions an element takes part in live in the reaction table, not on the element.
@@ -161,7 +161,7 @@ Every combo in the catalogue below fits under 12 with these numbers. Its largest
 
 ### The fire bolt migrates
 
-- `content/spells/forms/bolt/` becomes a `FormBase` `.tres`, and `content/spells/elements/fire/` holds fire. A player's starting spell A is bolt + fire, which plays like M1's Fire Bolt plus burn. Spell B starts as a bolt with no element.
+- `content/spells/carriers/bolt/` becomes a `FormBase` `.tres`, and `content/spells/elements/fire/` holds fire. A player's starting spell A is bolt + fire, which plays like M1's Fire Bolt plus burn. Spell B starts as a bolt with no element.
 - `gameplay/flow` stops holding a `SpellBase`. `spell_id_to_play` becomes `start_recipe_a` and `start_recipe_b` (component ids). `_spawn_players` and `_add_wizard` hand the recipes to `player`, which compiles them through `Spells`. `docs/ARCHITECTURE.md`'s "where each change goes" table is updated to match.
 - `SpellBase` and its tests are removed in part 11, once nothing uses them. The spells README's example moves to the new bolt.
 
@@ -224,7 +224,7 @@ Each part ends with tests and a green `tools/check.sh` and `ci/build/build.sh --
 | 7 | **The four elements and statuses:** `content/spells/elements/`, `gameplay/combat` | Fire, frost, storm and void as `.tres` with tints and icons; burn, chill and freeze, shock and hex as packed arrays per enemy in `combat`; `status_applied`; `combat` reads `Spells.hit_profile`; the AI respects slow and freeze; tests |
 | 8 | **Reactions:** `content/spells/reactions.tres`, `gameplay/combat` | The four effect kinds, the six reactions, `reaction_triggered`; feel reacts (flash, number, sound by id); tests per reaction |
 | 9 | **The validator:** `core/spells/validator.gd` | Checks for all component kinds and the reaction table, a broken fixture of each, `test_validators.gd`, warnings from the registry in debug; the owner question about `tools/check.sh` |
-| 10 | **The five forms:** `content/spells/forms/` | Bolt (migrated), beam, nova, rune and orbit as `.tres` (plus a `.gd` where needed), placeholder vfx, manifest lines; a test per form |
+| 10 | **The five forms:** `content/spells/carriers/` | Bolt (migrated), beam, nova, rune and orbit as `.tres` (plus a `.gd` where needed), placeholder vfx, manifest lines; a test per form |
 | 11 | **Player and flow on the new runtime:** `gameplay/player`, `gameplay/flow` | Two prepared spells, `swap`, the per-player bag from the registry, `build_change_requested` checked and applied, `spell_changed` and `build_refused`; flow's start recipes instead of a spell id; `SpellBase` removed; the field-read test widened; ARCHITECTURE.md updated; the 4-bot test still green |
 | 12 | **The six modifiers:** `content/spells/modifiers/` | Split, pierce, homing, chain, bigger and faster, with icons; tests per modifier |
 | 13 | **The three triggers:** `content/spells/triggers/` | On hit, on expire and timer, with icons; tests including depth 3 and the fire cap |

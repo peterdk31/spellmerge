@@ -26,7 +26,7 @@ Words in the game: **lore** (`lore/`) for world descriptions, **dialogue** (`dia
 
 ## Example to copy
 
-`content/spells/forms/bolt/bolt.tres`:
+`content/spells/carriers/bolt/bolt.tres`:
 
 ```
 description = "One shot, straight. Reliable, which the guild suspects."

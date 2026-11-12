@@ -244,7 +244,7 @@ func test_complexity_above_the_whole_spell_budget_is_reported_once_as_a_range() 
 
 func test_an_assets_file_in_a_content_folder_is_read() -> void:
 	var listed: Dictionary = SpellValidator.load_manifest("res://tests/content/spells/no_such_manifest.json", ["res://tests/content/spells/fixtures_assets"] as Array[String])
-	check(listed.has("content/spells/forms/fixture_only/icon.svg"), "an assets.json two folders down is read")
+	check(listed.has("content/spells/carriers/fixture_only/icon.svg"), "an assets.json two folders down is read")
 	check(SpellValidator.load_manifest().has("art/vfx/hit_spark.svg"), "the art manifest is still read")
 
 

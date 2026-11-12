@@ -10,8 +10,8 @@ extends "res://tests/support/screenshot.gd"
 ## filmstrip: the stream held, then let go and cooling). `tail_motes` is the strip at 1x;
 ## `tail_motes_4x` the same moments near the streams' start, four times bigger.
 
-const ATOM := preload("res://content/spells/forms/atom/atom.tres")
-const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
+const ATOM := preload("res://content/spells/carriers/atom/atom.tres")
+const BOLT := preload("res://content/spells/carriers/bolt/bolt.tres")
 const FIRE := preload("res://content/spells/elements/fire/fire.tres")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

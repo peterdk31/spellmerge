@@ -21,7 +21,7 @@ const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/void/void.tres"),
 	preload("res://content/spells/elements/lightning/lightning.tres"),
 ]
-const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
+const BOLT := preload("res://content/spells/carriers/bolt/bolt.tres")
 const COLUMN: float = 106.0
 ## Steps before the picture: the homing bolts are round their turn, the bounced ones on their way
 ## down, the dashes half done.

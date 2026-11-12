@@ -16,9 +16,9 @@ const MotesScript := preload("res://gameplay/feel/mote.gd")
 const StillMotesScript := preload("res://gameplay/feel/still_motes.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
-const WALL := preload("res://content/spells/forms/wall/wall.tres")
-const POOL := preload("res://content/spells/forms/pool/pool.tres")
-const RUNE := preload("res://content/spells/forms/rune/rune.tres")
+const WALL := preload("res://content/spells/carriers/wall/wall.tres")
+const POOL := preload("res://content/spells/carriers/pool/pool.tres")
+const RUNE := preload("res://content/spells/carriers/rune/rune.tres")
 const FIRE_LOOK: int = 1 << 0
 
 var mgr: ManagerScript

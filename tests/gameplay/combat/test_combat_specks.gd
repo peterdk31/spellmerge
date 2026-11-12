@@ -54,7 +54,7 @@ func before_each() -> void:
 	_bus.damage_dealt.connect(func(_player: int, target: Node, amount: float, _at: Vector2) -> void: _damage.append([target, amount]))
 	_bus.hit_landed.connect(func(_player: int, target: Node, _amount: float, _at: Vector2, _kind: StringName, _shot: int) -> void: _landed.append(target))
 	_bus.status_applied.connect(func(_player: int, _target: Node, id: StringName) -> void: _applied.append(id))
-	var speck := FormBase.new()
+	var speck := CarrierCard.new()
 	speck.id = &"speck"
 	speck.base_damage = 0.25
 	speck.speed = 600.0
@@ -81,14 +81,14 @@ func _hit(enemy: Node2D, tag: int) -> void:
 
 
 func test_a_card_below_a_point_keeps_its_damage() -> void:
-	var spell: CompiledSpell = StaffKit.first(_spells, StaffKit.cards({"form": &"speck"}))
+	var spell: CompiledSpell = StaffKit.first(_spells, StaffKit.cards({"carrier": &"speck"}))
 	check_equal(spell.damage, 0.25, "not rounded up to a point")
 	check_equal(spell.hit.damage, 0.25, "its hit too")
 
 
 func test_a_speck_takes_its_share_of_health() -> void:
 	var enemy: Node2D = _enemy(Vector2(100.0, 0.0))
-	var tag: int = _tag({"form": &"speck"})
+	var tag: int = _tag({"carrier": &"speck"})
 	_hit(enemy, tag)
 	check(is_equal_approx(_combat.health_of(enemy), 9.75), "a quarter of a point gone (%s)" % _combat.health_of(enemy))
 	check_equal(_landed.size(), 1, "it landed")
@@ -101,7 +101,7 @@ func test_a_speck_takes_its_share_of_health() -> void:
 
 func test_specks_kill_at_last() -> void:
 	var enemy: Node2D = _enemy(Vector2(100.0, 0.0), 1)
-	var tag: int = _tag({"form": &"speck"})
+	var tag: int = _tag({"carrier": &"speck"})
 	for i in 3:
 		_hit(enemy, tag)
 	check(_combat.is_registered(enemy), "three quarters: it stands")
@@ -113,11 +113,11 @@ func test_a_target_of_a_hundredth_of_a_point_dies_of_any_hit() -> void:
 	var enemy: Node2D = _enemy(Vector2(100.0, 0.0))
 	_combat.unregister_actor(enemy)
 	_combat.register_actor(enemy, 0.01, 10.0)
-	_hit(enemy, _tag({"form": &"speck"}))
+	_hit(enemy, _tag({"carrier": &"speck"}))
 	check(not _combat.is_registered(enemy), "a speck kills it")
 
 
 func test_a_speck_puts_its_status_on() -> void:
 	var enemy: Node2D = _enemy(Vector2(100.0, 0.0), 100)
-	_hit(enemy, _tag({"form": &"speck", "element": &"fire"}))
+	_hit(enemy, _tag({"carrier": &"speck", "element": &"fire"}))
 	check(_applied.has(&"burn"), "it burns")

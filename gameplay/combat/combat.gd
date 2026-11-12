@@ -391,21 +391,21 @@ func setup() -> void:
 		events.projectile_impact.connect(_on_projectile_impact)
 
 
-## A swing's block (the projectile manager's `impact_form` while it is sent, no shot of its own)
+## A swing's block (the projectile manager's `impact_carrier` while it is sent, no shot of its own)
 ## is a parry: its stop.
 func _on_shot_blocked(caster: int, _position: Vector2, _tag: int, shot: int) -> void:
-	if shot < 0 and projectiles != null and projectiles.impact_form == &"swing":
+	if shot < 0 and projectiles != null and projectiles.impact_carrier == &"swing":
 		hit_stop.parried(caster)
 
 
-## A shot struck (the projectile manager's `impact_form` while it is sent names its card).
+## A shot struck (the projectile manager's `impact_carrier_card` while it is sent names its card).
 func _on_projectile_impact(caster: int, _target: Node, _position: Vector2, _direction: Vector2) -> void:
 	if projectiles != null:
-		hit_stop.impact(caster, projectiles.impact_form)
+		hit_stop.impact(caster, projectiles.impact_carrier_card)
 
 
-func _on_carrier_ended(caster: int, form: StringName, _at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
-	hit_stop.carrier_ended(caster, form)
+func _on_carrier_ended(caster: int, carrier_card: StringName, _at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
+	hit_stop.carrier_ended(caster, carrier_card)
 
 
 func _on_cue_shown(caster: int, cue: StringName, _at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:

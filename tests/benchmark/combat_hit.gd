@@ -67,7 +67,7 @@ func _scenario(label: String, element: StringName, status: StringName, hits: int
 	spells.bind(projectiles, bus)
 	combat.spells = spells
 	combat._ready()
-	fake.items[&"bolt"] = load("res://content/spells/forms/bolt/bolt.tres")
+	fake.items[&"bolt"] = load("res://content/spells/carriers/bolt/bolt.tres")
 	var cards: Array[StringName] = [&"bolt"]
 	if element != &"":
 		fake.items[element] = load("res://content/spells/elements/%s/%s.tres" % [element, element])

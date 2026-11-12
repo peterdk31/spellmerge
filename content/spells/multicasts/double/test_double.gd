@@ -69,8 +69,8 @@ func test_two_carriers_leave_in_one_cast() -> void:
 		var group: CompiledGroup = staff.casts[0].group
 		check_equal(group.spells.size(), 2, "two carriers in the group")
 		if group.spells.size() == 2:
-			check_equal([group.spells[0].form_id, group.spells[0].element_id], [&"bolt", &"fire"], "a fire bolt first")
-			check_equal([group.spells[1].form_id, group.spells[1].element_id], [&"bolt", &""], "the fire stays on the bolt")
+			check_equal([group.spells[0].carrier_card_id, group.spells[0].element_id], [&"bolt", &"fire"], "a fire bolt first")
+			check_equal([group.spells[1].carrier_card_id, group.spells[1].element_id], [&"bolt", &""], "the fire stays on the bolt")
 	check(staff.wasted.is_empty(), "no card is wasted")
 	arena.free_all()
 

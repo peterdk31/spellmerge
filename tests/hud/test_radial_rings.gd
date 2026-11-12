@@ -251,9 +251,9 @@ func test_kinds_depth_points_with_half_a_push_and_opens_further_out() -> void:
 	_frame()
 	check_equal(kinds.open_kind(radial), &"", "easing back goes back to the kinds")
 	check_equal(radial.pointed_id(), &"", "and drops the card")
-	_push(kinds.kind_direction(radial, &"form"), 1.0)
+	_push(kinds.kind_direction(radial, &"carrier"), 1.0)
 	_frame()
-	check_equal(kinds.open_kind(radial), &"form", "a flick out opens a kind at once")
+	check_equal(kinds.open_kind(radial), &"carrier", "a flick out opens a kind at once")
 
 
 func test_kinds_depth_picks_every_real_card() -> void:
@@ -271,12 +271,12 @@ func test_kinds_depth_picks_every_real_card() -> void:
 func test_past_the_ends_of_a_kind_the_nearer_end_card_is_picked() -> void:
 	var radial: RadialScript = _open(PauseMenuScript.Ring.KINDS_DEPTH)
 	var kinds: RingKindsScript = radial.ring_picker as RingKindsScript
-	var way: Vector2 = kinds.kind_direction(radial, &"form")
+	var way: Vector2 = kinds.kind_direction(radial, &"carrier")
 	_push(way, 1.0)
 	_frame()
-	var forms: Array[Dictionary] = radial.ring_entries().filter(func(entry: Dictionary) -> bool: return entry["kind"] == &"form")
-	var first: StringName = forms[0]["id"]
-	var last: StringName = forms[forms.size() - 1]["id"]
+	var carrier_cards: Array[Dictionary] = radial.ring_entries().filter(func(entry: Dictionary) -> bool: return entry["kind"] == &"carrier")
+	var first: StringName = carrier_cards[0]["id"]
+	var last: StringName = carrier_cards[carrier_cards.size() - 1]["id"]
 	var behind: float = RadialScript.angle_of(way) + PI
 	_push(RadialScript.direction_of(behind - 0.2), 1.0)
 	_frame()

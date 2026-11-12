@@ -82,20 +82,20 @@ func test_a_swing_block_is_a_parry_a_gold_star_and_a_local_stop() -> void:
 	check(is_equal_approx(_feel.cue_of(&"parry").hold, 0.06), "the playground's 0.06 s")
 	check_equal(_world.table.held_left(other.id), 0.0, "another actor is not")
 	check_equal(_world.table.held_left(shooter.id), 0.0, "nor the shooter")
-	check_equal(_world.projectiles.impact_form, &"", "the form is only told while the block is sent")
+	check_equal(_world.projectiles.impact_carrier, &"", "the blocking carrier is only told while the block is sent")
 
 
 func test_other_blocks_show_no_parry() -> void:
 	var guard: Actor = _body(Vector2.ZERO)
 	var shooter: Actor = _body(Vector2(200.0, 0.0))
 	check(_world.projectiles.block_shot(_shot(shooter.id, Vector2(20.0, 0.0)), guard.id, 7, &"beam"), "a beam's shield stops a shot")
-	check(_world.projectiles.block_shot(_shot(shooter.id, Vector2(20.0, 10.0)), guard.id, 7), "so does a block with no form")
+	check(_world.projectiles.block_shot(_shot(shooter.id, Vector2(20.0, 10.0)), guard.id, 7), "so does a block with no carrier card")
 	check_equal(_feel.flashes_of(&"burst"), 0, "no star")
 	check_equal(_world.table.held_left(guard.id), 0.0, "and no stop")
 
 
 func test_a_real_shielded_swing_parries() -> void:
-	# The whole flow with the real cards (the combo arena): the swing's guard blocks with its form,
+	# The whole flow with the real cards (the combo arena): the swing's guard blocks with its carrier card,
 	# and a Feel listening to that arena sees a parry.
 	var arena := ArenaScript.new(root)
 	var feel := own(FeelScript.new()) as FeelScript

@@ -26,7 +26,7 @@ func _init(runtime: SpellRuntime) -> void:
 # --- The world -----------------------------------------------------------------
 
 ## The looks the next events show are the spell `tag`'s (`SpellRuntime.cue_tag`; 0 for none): set
-## round a `form_shown` or `carrier_ended`, so the cue it plays throws its cards' motes and marks
+## round a `carrier_shown` or `carrier_ended`, so the cue it plays throws its cards' motes and marks
 ## (gameplay/feel; docs/milestones/spell-spectacle-2.md, S2 and S5). For looks only.
 func set_cue_tag(tag: int) -> void:
 	_rt.cue_tag = tag
@@ -285,7 +285,7 @@ func zap_room() -> bool:
 func spark(spell: CompiledSpell, tag: int, at: Vector2, way: Vector2, length: float) -> void:
 	_rt._zaps_used += 1
 	if _rt.events != null:
-		_rt.events.form_shown.emit(SpellTag.caster_of(tag), SpellRuntime.ZAP_FORM, at, way, length, spell.tint, spell.look)
+		_rt.events.carrier_shown.emit(SpellTag.caster_of(tag), SpellRuntime.ZAP_CARD, at, way, length, spell.tint, spell.look)
 
 
 ## The team of `actor` (`Actors.team_of`; NONE without an actor table): what a zap aims away from.
@@ -325,27 +325,28 @@ func spared(spell: CompiledSpell, body: Node) -> Node:
 
 ## Deflects (with `deflects`) or stops (while `charges` last) the `found` shots of
 ## `Projectiles.guard_slots` that touched a carrier of `actor` with `tag`: outward from `a` when `b`
-## is INF, else off the segment from `a` to `b`. A block is sent as `form`'s (`block_shot`: a
-## swing's is a parry). Returns the charges left.
-func guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, form: StringName) -> int:
-	return _rt._guard(found, actor, tag, deflects, charges, a, b, form)
+## is INF, else off the segment from `a` to `b`. A block is sent as the carrier `carrier`'s (its
+## `id()`; `block_shot`: a swing's is a parry). Returns the charges left.
+func guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier: StringName) -> int:
+	return _rt._guard(found, actor, tag, deflects, charges, a, b, carrier)
 
 
 ## Turns the shots of other teams than `actor`'s within `reach` of `at` (MOVE_GUARD_REACH at
-## least) outward from it, once, for the carrier with `tag` (`guard` with a deflect; the block is
-## sent as `form`'s): a deflect on the caster as it is cast, a teleport's landing, a decoy as it
+## least) outward from it, once, for the carrier with `tag` (`guard` with a deflect, as the carrier
+## `carrier`, its `id()`): a deflect on the caster as it is cast, a teleport's landing, a decoy as it
 ## appears, a payload's deflect landing on the body that fired it.
-func turn_shots_round(actor: int, tag: int, at: Vector2, reach: float, form: StringName) -> void:
+func turn_shots_round(actor: int, tag: int, at: Vector2, reach: float, carrier: StringName) -> void:
 	if _rt.projectiles == null or not at.is_finite():
 		return
 	var around: float = maxf(reach, SpellLimits.MOVE_GUARD_REACH)
-	_rt._guard(_rt.projectiles.shots_on_segment(actor, at, at, around), actor, tag, true, 0, at, at, form)
+	_rt._guard(_rt.projectiles.shots_on_segment(actor, at, at, around), actor, tag, true, 0, at, at, carrier)
 
 
 ## `guard` along the path `points[first]` to `points[first + count - 1]` (cut `reach` pixels along),
-## `width` pixels either side: a beam's line. Returns the charges left.
-func guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, width: float, charges: int) -> int:
-	return _rt._guard_path(spell, tag, actor, points, first, count, reach, width, charges)
+## `width` pixels either side: a beam's line. A block is sent as the carrier `carrier`'s (its
+## `id()`, as `guard`). Returns the charges left.
+func guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, width: float, charges: int, carrier: StringName) -> int:
+	return _rt._guard_path(spell, tag, actor, points, first, count, reach, width, charges, carrier)
 
 
 ## How many times `spell`'s line turns at a wall: its bounce cards' count.

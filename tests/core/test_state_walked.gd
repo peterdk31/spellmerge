@@ -46,29 +46,29 @@ func test_every_card_walks_without_problems() -> void:
 	staff.id = &"state_walk"
 	staff.slots = 16
 	staff.cooldown = 0.0
-	var forms: Array[FormBase] = []
+	var carrier_cards: Array[CarrierCard] = []
 	var others: Array[SpellComponent] = []
-	var payload: FormBase = null
+	var payload: CarrierCard = null
 	for card: Resource in registry.call("get_all", &"spells"):
-		if card is FormBase:
-			var form: FormBase = card
-			forms.append(form)
-			if form.carrier == &"atom" and (payload == null or form.shots > payload.shots):
-				payload = form
+		if card is CarrierCard:
+			var carrier_card: CarrierCard = card
+			carrier_cards.append(carrier_card)
+			if carrier_card.carrier == &"atom" and (payload == null or carrier_card.shots > payload.shots):
+				payload = carrier_card
 		elif card is SpellComponent:
 			others.append(card as SpellComponent)
 	if payload == null:
 		check(false, "a straight carrier to fire as a payload")
 		return
 	var casts: Array[Array] = []
-	for form in forms:
-		casts.append([form.id] as Array[StringName])
+	for carrier_card in carrier_cards:
+		casts.append([carrier_card.id] as Array[StringName])
 	for card in others:
 		var cards: Array[StringName] = [card.id, payload.id]
 		if card is TriggerBase:
 			cards.append(payload.id)
 		casts.append(cards)
-	check(casts.size() == forms.size() + others.size() and forms.size() > 5, "every card is cast (%d carriers, %d others)" % [forms.size(), others.size()])
+	check(casts.size() == carrier_cards.size() + others.size() and carrier_cards.size() > 5, "every card is cast (%d carriers, %d others)" % [carrier_cards.size(), others.size()])
 	for cast: Array in casts:
 		var cards: Array[StringName] = []
 		cards.assign(cast)

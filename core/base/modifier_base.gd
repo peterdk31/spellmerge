@@ -2,7 +2,7 @@ class_name ModifierBase
 extends SpellComponent
 ## A modifier (split, pierce, homing, chain, bigger, faster): changes the spell's numbers
 ## or adds a behaviour. A spell has up to three, and the same one may appear twice.
-## Multipliers multiply the form's numbers and adds are added, in slot order.
+## Multipliers multiply the carrier card's numbers and adds are added, in slot order.
 
 ## A behaviour beyond the numbers, run by the projectile manager or the spell runtime.
 enum Behaviour {
@@ -84,7 +84,7 @@ enum Behaviour {
 	## The carrier is cast `behaviour_strength` times (8 the card; more cards add, with no cap) instead of once, from the same place by the same caster, each copy
 	## aimed out along the aim turned by its share of a full turn (owner, 2026-11-09: "a Nova
 	## modifier card, which would allow us to make novas of other carriers"; it replaced the nova
-	## form). Each copy is a whole cast, so a carrier keeps its own shots and reach. Works on every
+	## carrier card). Each copy is a whole cast, so a carrier keeps its own shots and reach. Works on every
 	## carrier, as Mirror does: eight moves round a circle add up to none, and each still strikes.
 	NOVA,
 	## The carrier falls from the sky (owner, 2026-11-09; docs/milestones/carrier-modifiers.md Part
@@ -201,12 +201,12 @@ static func stacks(behaviour: int) -> Stack:
 @export var damage_mult: float = 1.0
 @export var speed_mult: float = 1.0
 @export var radius_mult: float = 1.0
-## Factor on the carrier's wind-down (`FormBase.wind_down`).
+## Factor on the carrier's wind-down (`CarrierCard.wind_down`).
 @export var wind_down_mult: float = 1.0
-## Seconds added to the carrier's wind-up (`FormBase.wind_up`): a charge; a cost, never an effect
+## Seconds added to the carrier's wind-up (`CarrierCard.wind_up`): a charge; a cost, never an effect
 ## of its own (docs/milestones/cast-timing.md).
 @export var wind_up_add: float = 0.0
-## Factor on the carrier's whole wind-up, its form card's plus every `wind_up_add` on it, whatever
+## Factor on the carrier's whole wind-up, its carrier card's plus every `wind_up_add` on it, whatever
 ## the slot order (faster casting; docs/milestones/cast-timing.md, T9).
 @export var wind_up_mult: float = 1.0
 @export var mana_mult: float = 1.0
@@ -219,7 +219,7 @@ static func stacks(behaviour: int) -> Stack:
 ## turns faster, on the same curve); number of jumps for CHAIN; unused for NONE.
 @export var behaviour_strength: float = 0.0
 ## Pixels the behaviour reaches. For HOMING, how far a shot looks for a target (one in flight
-## looks again as it flies; a beam looks at least as far as it is long), on every form homing
+## looks again as it flies; a beam looks at least as far as it is long), on every carrier card homing
 ## steers (`Carrier.homing_range`). Unused by the others.
 @export var behaviour_reach: float = 0.0
 
@@ -236,7 +236,7 @@ var look_layer: int:
 	set(value):
 		look_id = LookNames.name_of(value)
 ## The cue (`content/cues`) Feel plays when this card's behaviour goes off: `blast`'s explosion,
-## as big as its radius, or `zap`'s arc wherever a zap shows itself (`form_shown` names the card;
+## as big as its radius, or `zap`'s arc wherever a zap shows itself (`carrier_shown` names the card;
 ## as long as the zap). When several cards of one behaviour name a cue, the first in slot order
 ## is played (`CompiledSpell.cue_of`); none plays nothing.
 @export var cue: StringName = &""
@@ -252,7 +252,7 @@ var look_layer: int:
 ## Factor on the carrier's `lifetime`. With `speed_mult` it makes a slow shot that still goes as
 ## far (slow: speed x0.3, lifetime x3). Several multiply.
 @export var lifetime_mult: float = 1.0
-## Seconds the carrier lives before any factor (0: its form card's `lifetime`). The compiler sets
+## Seconds the carrier lives before any factor (0: its carrier card's `lifetime`). The compiler sets
 ## it first and then applies every `lifetime_mult` and `reach_mult`, so slot order does not matter;
 ## with several cards that set one, the longest counts (Orbit: 3 s, whatever it carries).
 @export var lifetime_base: float = 0.0

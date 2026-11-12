@@ -45,18 +45,18 @@ func before_each() -> void:
 	_hits.clear()
 	_bus.projectile_hit.connect(func(_caster: int, _target: Node, at: Vector2, tag: int, _shot: int) -> void: _hits.append([tag, at]))
 	# A shot of 0.4 s, as short as a nova's.
-	_form(&"short", 300.0, 0.4)
-	var rune: FormBase = _form(&"rune", 0.0, 10.0)
+	_carrier_card(&"short", 300.0, 0.4)
+	var rune: CarrierCard = _carrier_card(&"rune", 0.0, 10.0)
 	# The probe: a shot that does not move marks where a payload fires (a placed rune would
 	# appear a step ahead of it, rules R4 F3).
 	rune.carrier = &"atom"
 	rune.radius = 6.0
-	var beam: FormBase = _form(&"beam", 0.0, 0.4)
+	var beam: CarrierCard = _carrier_card(&"beam", 0.0, 0.4)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
-	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
+	var decoy: CarrierCard = _carrier_card(&"decoy", 0.0, 4.0)
 	decoy.carrier = &"decoy"
-	var dash: FormBase = _form(&"dash", 100.0, 0.4)
+	var dash: CarrierCard = _carrier_card(&"dash", 100.0, 0.4)
 	dash.carrier = &"dash"
 	dash.ray_length = 40.0
 	var arc := ModifierBase.new()
@@ -84,14 +84,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
-	form.base_damage = 5
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 5
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 ## Builds `cards` as wizard 0's staff 0 and checks none is wasted.
@@ -118,7 +118,7 @@ func _runes() -> Array[Vector2]:
 		if not _mgr.is_alive(slot):
 			continue
 		var spell: CompiledSpell = _spells.profile(_mgr.get_tag_of(slot))
-		if spell != null and spell.form_id == &"rune":
+		if spell != null and spell.carrier_card_id == &"rune":
 			found.append(_mgr.get_position_of(slot))
 	return found
 
@@ -181,7 +181,7 @@ func test_a_timer_on_a_decoy_fires_from_it_until_it_ends() -> void:
 	var runes: Array[Vector2] = _runes()
 	check_equal(runes.size(), 1, "a decoy ticks every 0.5 s")
 	# It stands a step ahead of where it was cast (rules R4 F3).
-	var stands: Vector2 = Vector2(30.0 + (_fake.items[&"decoy"] as FormBase).radius * 2.0, 40.0)
+	var stands: Vector2 = Vector2(30.0 + (_fake.items[&"decoy"] as CarrierCard).radius * 2.0, 40.0)
 	check(runes.size() == 1 and runes[0].is_equal_approx(stands), "where it stands (%s)" % [runes])
 	_bus.entity_ended.emit(0, &"decoy", Vector2(30, 40), tag)
 	_tick(60)
@@ -253,7 +253,7 @@ func test_a_timer_on_a_dash_fires_along_the_casters_aim_now() -> void:
 	for slot in _mgr.get_cap():
 		if _mgr.is_alive(slot):
 			var spell: CompiledSpell = _spells.profile(_mgr.get_tag_of(slot))
-			if spell != null and spell.form_id == &"short":
+			if spell != null and spell.carrier_card_id == &"short":
 				ways.append(_mgr.get_velocity_of(slot).normalized())
 	check_equal(ways.size(), 1, "a 0.4 s dash ticks at 0.2 s")
 	check(ways.size() == 1 and ways[0].dot(Vector2.DOWN) > 0.99, "its shot flies the way the caster aims now, not along the dash (%s)" % [ways])
@@ -273,7 +273,7 @@ func test_a_timer_on_a_dash_keeps_its_way_when_the_caster_goes_down() -> void:
 	for slot in _mgr.get_cap():
 		if _mgr.is_alive(slot):
 			var spell: CompiledSpell = _spells.profile(_mgr.get_tag_of(slot))
-			if spell != null and spell.form_id == &"short":
+			if spell != null and spell.carrier_card_id == &"short":
 				ways.append(_mgr.get_velocity_of(slot))
 	check_equal(ways.size(), 1, "the dash ticked")
 	check(ways.size() == 1 and ways[0].is_finite() and ways[0].normalized().dot(Vector2.RIGHT) > 0.99, "its shot flies along the dash's way (%s)" % [ways])

@@ -156,7 +156,7 @@ func _sets() -> Array:
 func _plain_staff(id: StringName) -> Array:
 	var card: SpellComponent = _registry.call("get_resource", &"spells", id) as SpellComponent
 	match card.kind() if card != null else &"":
-		&"form":
+		&"carrier":
 			return [&"split", id]
 		&"trigger":
 			return [id, &"split", &"bolt", &"split", &"nova", &"bolt"]

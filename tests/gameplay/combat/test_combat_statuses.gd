@@ -60,7 +60,7 @@ func before_each() -> void:
 	_damage.clear()
 	_bus.status_applied.connect(func(player: int, target: Node, id: StringName) -> void: _applied.append([player, target, id]))
 	_bus.damage_dealt.connect(func(player: int, target: Node, amount: int, _at: Vector2) -> void: _damage.append([player, target, amount]))
-	var bolt := FormBase.new()
+	var bolt := CarrierCard.new()
 	bolt.id = &"bolt"
 	bolt.base_damage = 4
 	bolt.speed = 200.0
@@ -91,7 +91,7 @@ func _foe(at: Vector2, health: float = 100.0) -> Node2D:
 
 ## The tag of a bolt of `element` (&"" for none) built into slot A of `player`.
 func _tag(player: int, element: StringName) -> int:
-	var recipe: Dictionary = {"form": &"bolt"}
+	var recipe: Dictionary = {"carrier": &"bolt"}
 	if element != &"":
 		recipe["element"] = element
 	return StaffKit.build(_spells, player, 0, StaffKit.cards(recipe))

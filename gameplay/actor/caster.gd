@@ -23,7 +23,7 @@ extends ActorComponent
 ## For an AI: `cast_ready(within)` says the next cast can leave within that many seconds with the
 ## mana there (so a telegraph always comes true), `next_cast_mana`, `next_cast_reach` and
 ## `next_cast_radius` size its telegraph. For a seat: `cast_done` and `staff_built` are what the
-## player's controller turns into the HUD's events; `cards_of`, `plan_of`, `last_form`.
+## player's controller turns into the HUD's events; `cards_of`, `plan_of`, `last_carrier_card`.
 ##
 ## Compiled staffs are shared by every caster: one cache keyed by the Spells, the staff and the
 ## cards, so a crowd of one enemy type compiles its staff once, and a wizard who builds a row
@@ -42,7 +42,7 @@ const MAX_STAFFS: int = SpellLimits.STAFFS
 ## Compiled staffs kept before the cache starts over (a builder makes a new row on every edit).
 const CACHE_SIZE: int = 256
 
-## A staff was cast (`cast`): from `origin` along `direction` (`last_form(at)` names the carrier).
+## A staff was cast (`cast`): from `origin` along `direction` (`last_carrier_card(at)` names the carrier).
 ## Sent before `actor_cast`.
 signal cast_done(at: int, origin: Vector2, direction: Vector2)
 ## Staff `at` was built (`set_staff`): `cards_of(at)` and `plan_of(at)` say what it is now.
@@ -373,9 +373,9 @@ func plan_of(at: int) -> Dictionary:
 	return actor.spells.staff_view(cards_of(at), staff_of(at))
 
 
-## The form of the carrier staff `at` cast last (`Spells.last_form`), or &"".
-func last_form(at: int) -> StringName:
-	return actor.spells.last_form(number, at) if has_staff(at) else &""
+## The carrier card of the carrier staff `at` cast last (`Spells.last_carrier_card`), or &"".
+func last_carrier_card(at: int) -> StringName:
+	return actor.spells.last_carrier_card(number, at) if has_staff(at) else &""
 
 
 ## Hold the staffs of `entries` (an enemy's or a prop's data: `StaffCards`, at most 4) from the start,

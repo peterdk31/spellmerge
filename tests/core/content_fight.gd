@@ -87,7 +87,7 @@ var _staffed: Actor = null
 ## with plain carriers to fire or pull, anything else on a plain carrier.
 static func staff_for(card: SpellComponent) -> Array[StringName]:
 	var out: Array[StringName] = [card.id]
-	if card is FormBase:
+	if card is CarrierCard:
 		return out
 	var carriers: int = 1
 	if card is TriggerBase:

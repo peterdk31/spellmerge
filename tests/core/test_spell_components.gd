@@ -10,7 +10,7 @@ const FIXTURE: String = "res://tests/core/fixtures/spell_components"
 
 
 func _components() -> Array[SpellComponent]:
-	var all: Array[SpellComponent] = [FormBase.new(), ElementBase.new(), ModifierBase.new(), TriggerBase.new()]
+	var all: Array[SpellComponent] = [CarrierCard.new(), ElementBase.new(), ModifierBase.new(), TriggerBase.new()]
 	return all
 
 
@@ -18,8 +18,8 @@ func test_each_class_names_its_own_kind() -> void:
 	var kinds: Array[StringName] = []
 	for component in _components():
 		kinds.append(component.kind())
-	var expected: Array[StringName] = [&"form", &"element", &"modifier", &"trigger"]
-	check_equal(kinds, expected, "the four classes report form, element, modifier and trigger")
+	var expected: Array[StringName] = [&"carrier", &"element", &"modifier", &"trigger"]
+	check_equal(kinds, expected, "the four classes report carrier card, element, modifier and trigger")
 
 
 func test_new_components_are_in_range() -> void:
@@ -41,10 +41,10 @@ func test_every_kind_checks_complexity() -> void:
 
 
 func test_an_out_of_range_field_is_named() -> void:
-	var form := FormBase.new()
-	form.shots = 0
-	form.wind_down = 99.0
-	var problems: PackedStringArray = form.range_problems()
+	var carrier_card := CarrierCard.new()
+	carrier_card.shots = 0
+	carrier_card.wind_down = 99.0
+	var problems: PackedStringArray = carrier_card.range_problems()
 	check_equal(problems.size(), 2, "two fields out of range give two problems")
 	var text: String = " ".join(problems)
 	check(text.contains("shots:") and text.contains("wind_down:"), "each problem names its field")

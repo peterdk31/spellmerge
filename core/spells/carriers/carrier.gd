@@ -1,6 +1,6 @@
 class_name Carrier
 extends RefCounted
-## A carrier: what a form card fires (`FormBase.carrier`), and the one place that says what it does
+## A carrier: what a carrier card fires (`CarrierCard.carrier`), and the one place that says what it does
 ## with every other card (docs/CARRIERS.md). Each carrier is one subclass in this folder, found by
 ## its id (`Carriers.of(&"beam")`); the compiler asks it, the spell runtime runs it.
 ##
@@ -61,7 +61,7 @@ const LOOK_ORB: int = 5
 const LOOK_PORTAL: int = 6
 
 
-## Its id, the `carrier` a form card names (&"atom"); &"" for the carrier that runs nothing, which
+## Its id, the `carrier` a carrier card names (&"atom"); &"" for the carrier that runs nothing, which
 ## `Carriers.of` answers for a name no carrier has.
 func id() -> StringName:
 	return &""
@@ -79,15 +79,15 @@ func step_order() -> int:
 
 
 
-## The fields a form card of this carrier must set above 0, with the fix the validator gives
+## The fields a carrier card of this carrier must set above 0, with the fix the validator gives
 ## (`SpellValidator`): {"speed": "A bolt needs a `speed` above 0."}.
 func required_fields() -> Dictionary:
 	return {}
 
 
-## True when a cast of it adds a wind-down of its own to its staff's (its form card's
-## `wind_down`), so a card's wind-down factor changes something: every carrier a form card fires,
-## not a fallback carrier (`CarrierFallback`), which has no form card. A payload's carrier adds
+## True when a cast of it adds a wind-down of its own to its staff's (its carrier card's
+## `wind_down`), so a card's wind-down factor changes something: every carrier a carrier card fires,
+## not a fallback carrier (`CarrierFallback`), which has no carrier card. A payload's carrier adds
 ## none either; the compiler knows that one (`StaffCompiler._numbers_count`).
 func has_wind_down() -> bool:
 	return true
@@ -104,9 +104,9 @@ func hit_kind() -> StringName:
 	return &""
 
 
-## A carrier no form card fires (a fallback) has its own look here, where a form card would carry
-## it: its staff animation (`FormBase.staff_pose`, packed) and the cue a seat's cast of it plays
-## (`FormBase.cast_cue`; &"" for Feel's default). A form card's carrier answers none: its card says.
+## A carrier no carrier card fires (a fallback) has its own look here, where a carrier card would carry
+## it: its staff animation (`CarrierCard.staff_pose`, packed) and the cue a seat's cast of it plays
+## (`CarrierCard.cast_cue`; &"" for Feel's default). A carrier card's carrier answers none: its card says.
 func staff_pose() -> PackedFloat32Array:
 	return PackedFloat32Array()
 

@@ -251,9 +251,9 @@ func test_a_down_stands_the_game_still() -> void:
 func test_a_parry_and_a_slams_strike_hold_their_caster() -> void:
 	var parrier: Actor = _body(Vector2.ZERO)
 	var slammer: Actor = _body(Vector2(100.0, 0.0))
-	_world.projectiles.impact_form = &"swing"
+	_world.projectiles.impact_carrier = &"swing"
 	_world.bus.shot_blocked.emit(parrier.id, Vector2.ZERO, 0, -1)
-	_world.projectiles.impact_form = &""
+	_world.projectiles.impact_carrier = &""
 	check(_world.table.held_left(parrier.id) >= _cue(&"parry").hold - 0.0001, "a swing's block holds the parrier")
 	_world.bus.carrier_ended.emit(slammer.id, &"slam", Vector2.ZERO, Vector2.RIGHT, 20.0, Color.WHITE, 0)
 	check(_world.table.held_left(slammer.id) >= _cue(&"slam").hold - 0.0001, "a slam's strike holds the slammer")
@@ -293,11 +293,11 @@ func test_no_cast_shown_or_wind_cue_holds() -> void:
 	var cards: Array = _world.registry.call(&"get_all", &"spells") as Array
 	check(not cards.is_empty(), "the cards are found")
 	for card: Variant in cards:
-		if not card is FormBase:
+		if not card is CarrierCard:
 			continue
-		var form: FormBase = card as FormBase
-		for id: StringName in [form.cast_cue, form.shown_cue, form.wind_cue]:
+		var carrier_card: CarrierCard = card as CarrierCard
+		for id: StringName in [carrier_card.cast_cue, carrier_card.shown_cue, carrier_card.wind_cue]:
 			var cue: CueBase = _cue(id)
 			if cue == null:
 				continue
-			check(cue.hold <= 0.0 and cue.hold_target <= 0.0 and cue.stop_game <= 0.0, "%s's cue %s holds, but nothing plays its hold (gameplay/combat/hit_stop.gd)" % [form.id, id])
+			check(cue.hold <= 0.0 and cue.hold_target <= 0.0 and cue.stop_game <= 0.0, "%s's cue %s holds, but nothing plays its hold (gameplay/combat/hit_stop.gd)" % [carrier_card.id, id])

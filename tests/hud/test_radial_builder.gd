@@ -393,8 +393,8 @@ func test_the_one_kind_ring_flips_with_the_dpad() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
 	radial.layout = RadialScript.Layout.KIND
-	check_equal(radial.shown_kind(), &"form", "carriers first")
-	check(radial.ring_entries().all(func(entry: Dictionary) -> bool: return entry["kind"] == &"form"), "the ring holds only carriers")
+	check_equal(radial.shown_kind(), &"carrier", "carriers first")
+	check(radial.ring_entries().all(func(entry: Dictionary) -> bool: return entry["kind"] == &"carrier"), "the ring holds only carriers")
 	_tap(0, &"kind_next")
 	_frame()
 	check_equal(radial.shown_kind(), &"modifier", "right shows the modifiers")
@@ -404,7 +404,7 @@ func test_the_one_kind_ring_flips_with_the_dpad() -> void:
 	_tap(0, &"kind_prev")
 	_frame()
 	check_equal(radial.shown_kind(), RadialScript.KINDS[RadialScript.KINDS.find(radial.shown_kind())], "left wraps round")
-	check(radial.shown_kind() != &"form", "to the last kind")
+	check(radial.shown_kind() != &"carrier", "to the last kind")
 
 
 func test_the_numbers_show_the_mana_share_and_what_rt_would_change() -> void:

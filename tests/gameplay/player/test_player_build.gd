@@ -47,9 +47,9 @@ var _players: Array[Actor] = []
 var _changed: Array = []
 ## Every build_refused as [player, reason].
 var _refused: Array = []
-## Every staff_cast as [player, staff], and every spell_cast's form.
+## Every staff_cast as [player, staff], and every spell_cast's carrier card.
 var _staff_casts: Array = []
-var _cast_forms: Array[StringName] = []
+var _cast_carriers: Array[StringName] = []
 ## Every player_stats_changed as [player, health, max_health, mana, max_mana].
 var _stats: Array = []
 
@@ -78,20 +78,20 @@ func before_each() -> void:
 	_changed.clear()
 	_refused.clear()
 	_staff_casts.clear()
-	_cast_forms.clear()
+	_cast_carriers.clear()
 	_stats.clear()
 	var bus := _world.bus
 	bus.staff_changed.connect(func(player: int, staff: int, plan: Dictionary) -> void: _changed.append([player, staff, plan]))
 	bus.build_refused.connect(func(player: int, reason: String) -> void: _refused.append([player, reason]))
 	bus.staff_cast.connect(func(player: int, staff: int, _o: Vector2, _d: Vector2) -> void: _staff_casts.append([player, staff]))
-	bus.spell_cast.connect(func(_p: int, form: StringName, _o: Vector2, _d: Vector2) -> void: _cast_forms.append(form))
+	bus.spell_cast.connect(func(_p: int, carrier_card: StringName, _o: Vector2, _d: Vector2) -> void: _cast_carriers.append(carrier_card))
 	bus.player_stats_changed.connect(func(p: int, h: int, mh: int, m: float, mm: float) -> void: _stats.append([p, h, mh, m, mm]))
-	var bolt := _card(FormBase.new(), &"bolt") as FormBase
+	var bolt := _card(CarrierCard.new(), &"bolt") as CarrierCard
 	bolt.wind_down = 0.25
-	var rune := _card(FormBase.new(), &"rune") as FormBase
+	var rune := _card(CarrierCard.new(), &"rune") as CarrierCard
 	rune.carrier = &"rune"
 	rune.lifetime = 5.0
-	var dash := _card(FormBase.new(), &"dash") as FormBase
+	var dash := _card(CarrierCard.new(), &"dash") as CarrierCard
 	dash.carrier = &"dash"
 	dash.speed = 220.0
 	dash.lifetime = 0.25
@@ -117,9 +117,9 @@ func after_each() -> void:
 func _card(card: SpellComponent, id: StringName) -> SpellComponent:
 	card.id = id
 	card.display_name = String(id).capitalize()
-	if card is FormBase:
-		(card as FormBase).mana_cost = 5.0
-		(card as FormBase).speed = 200.0
+	if card is CarrierCard:
+		(card as CarrierCard).mana_cost = 5.0
+		(card as CarrierCard).speed = 200.0
 	_registry.items[id] = card
 	return card
 
@@ -195,7 +195,7 @@ func test_each_button_casts_its_own_staff() -> void:
 	_world.hold(0, &"staff_2")
 	_run(1)
 	check_equal(_staff_casts, [[0, 1]], "staff_2 casts staff 2")
-	check_equal(_cast_forms, [&"bolt"] as Array[StringName], "spell_cast names the carrier")
+	check_equal(_cast_carriers, [&"bolt"] as Array[StringName], "spell_cast names the carrier")
 	_world.hold(0, &"staff_1")
 	_run(1)
 	check(_staff_casts.has([0, 0]), "staff_1 casts staff 1, with staff 2 still held")

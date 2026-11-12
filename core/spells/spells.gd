@@ -45,7 +45,7 @@ extends Node
 ## (`fires_waited` counts them). A beam fires an on-expire payload where it ends when its
 ## life is over, and a timer from its tip while it is on.
 ##
-## Carriers (docs/CARRIERS.md): each form names its `Carrier` (core/spells/carriers/) that this
+## Carriers (docs/CARRIERS.md): each carrier card names its `Carrier` (core/spells/carriers/) that this
 ## script makes and binds (`Carriers.make_all`) and hands each launch to (`_launch` ->
 ## `Carrier.launch`); nothing here asks which carrier a spell has. A carrier runs what is its own (a
 ## swap's trade, a beam's rows, a teleport's landing) and asks this script for the shared path: the
@@ -146,11 +146,11 @@ const ACTORS: int = ActorsScript.ACTORS
 const HITS: int = ProjectilesScript.ACTOR_LAYERS
 ## A wall's pierce (rules R4 F6): a pierce no hit spends, so it stands through every hit.
 const PIERCE_ALL: int = 1 << 30
-## How a ray this runtime sends itself looks and blocks (a chain jump, a zap: `form_shown`,
+## How a ray this runtime sends itself looks and blocks (a chain jump, a zap: `carrier_shown`,
 ## `block_shot`): as a beam's line. A look, not a carrier: it runs no carrier.
-const RAY_FORM: StringName = &"beam"
+const RAY_CARD: StringName = &"beam"
 ## The look of a zap and its sparks (Feel draws lightning for it).
-const ZAP_FORM: StringName = &"zap"
+const ZAP_CARD: StringName = &"zap"
 ## Bodies a zap shot remembers rolling for (`_rec_zapped`), and the won zaps it can keep waiting
 ## (`_rec_due_body`; past that it makes the zap at once).
 const ZAP_MEMORY: int = 32
@@ -231,7 +231,7 @@ var sim: Sim = null
 ## `begin_generation`, remove them, and only then call `begin_generation` (which clears it)
 ## or `shot_ended` again for them. Part 6 does exactly that.
 var revoked_tags: PackedInt64Array = PackedInt64Array()
-## The tag of the spell whose `cue_shown` is being sent (a blast's), or whose `form_shown` or
+## The tag of the spell whose `cue_shown` is being sent (a blast's), or whose `carrier_shown` or
 ## `carrier_ended` a carrier sends (`CarrierKit.set_cue_tag`: a dash's, a move's end), 0 outside
 ## them, so the cue's motes and marks can be its cards' (gameplay/feel; spell-spectacle-2.md, S2
 ## and S5). For looks only.
@@ -251,8 +251,8 @@ var _installed: Array[CompiledStaff] = []
 var _cursor: PackedInt32Array = PackedInt32Array()
 ## actor * STAFFS + staff -> the tags of its sustained (`hold`) carriers that are on
 var _hold_tags: Array[PackedInt64Array] = []
-## actor * STAFFS + staff -> the carrier (form id) of its last cast, for the cast's look
-var _last_form: Array[StringName] = []
+## actor * STAFFS + staff -> the carrier (carrier card id) of its last cast, for the cast's look
+var _last_carrier_card: Array[StringName] = []
 ## actor * STAFFS + staff -> the mana its sustained carriers reserve
 var _hold_mana: PackedFloat32Array = PackedFloat32Array()
 ## generation key (`SpellTag.generation_key`) -> how many nodes that generation registered
@@ -372,7 +372,7 @@ var _scatter_key: int = 0
 var _scatter_rolls: int = 0
 ## The carrier whose echo is being launched: its shots hit at the echo's half damage.
 var _echo_spell: CompiledSpell = null
-## One slot, for the one-shot forms of `_land_shots`, `_travel_shots` and `_register_shots`.
+## One slot, for the one-shot carrier cards of `_land_shots`, `_travel_shots` and `_register_shots`.
 var _one_slot: PackedInt32Array = PackedInt32Array([-1])
 
 ## Who casts the launch being fired, one value (`_caster`): the actor's own body for its own cast
@@ -514,7 +514,7 @@ func _init() -> void:
 	_cast_count.resize(ACTORS * SpellLimits.STAFFS)
 	for i in ACTORS * SpellLimits.STAFFS:
 		_hold_tags.append(PackedInt64Array())
-		_last_form.append(&"")
+		_last_carrier_card.append(&"")
 	for i in ACTORS:
 		_last_infused.append(null)
 	_aim_origin.resize(ACTORS)
@@ -576,12 +576,12 @@ func register_bodies() -> void:
 	# Every infusion's colour by its look layer, for the shaders that weave a look of several.
 	InfusionTable.publish(InfusionTable.of_registry(source))
 	for card: Resource in source.call(&"get_all", &"spells"):
-		var form := card as FormBase
-		if form == null:
+		var carrier_card := card as CarrierCard
+		if carrier_card == null:
 			continue
-		var mesh: int = _shot_mesh(_remember_look(form))
-		if form.look_shader != null and mesh != NO_SHOT_MESH and projectiles != null:
-			_shape_body(projectiles.register_body(form.look_shader, mesh), form.id, mesh)
+		var mesh: int = _shot_mesh(_remember_look(carrier_card))
+		if carrier_card.look_shader != null and mesh != NO_SHOT_MESH and projectiles != null:
+			_shape_body(projectiles.register_body(carrier_card.look_shader, mesh), carrier_card.id, mesh)
 
 
 ## Each carrier card's look by its id, read from the card once (at start, `register_bodies`, or the
@@ -591,16 +591,16 @@ var _looks: Dictionary = {}
 var _look_drawers: Dictionary = {}
 
 
-## The carrier card `form`'s look as the area `drawer` (Carrier.LOOK_*: Feel's beams or swing
-## trails, Entities' orbs) draws it: its own shader and light (`FormBase.look_shader`,
+## The carrier card `carrier_card`'s look as the area `drawer` (Carrier.LOOK_*: Feel's beams or swing
+## trails, Entities' orbs) draws it: its own shader and light (`CarrierCard.look_shader`,
 ## `look_light_intensity`, `look_light_reach`), or `CardLook.PLAIN` when its carrier is drawn by
 ## another area (a bolt's zap is a beam, but a bolt's shader draws heads) and for an id that is no
 ## carrier card (a chain's jump). So no area reads the card (docs/milestones/card-looks.md). Shared
 ## and read only; allocates nothing once the card was read.
-func look_of(form: StringName, drawer: int) -> CardLook:
-	if not _looks.has(form) and not _read_look(form):
+func look_of(carrier_card: StringName, drawer: int) -> CardLook:
+	if not _looks.has(carrier_card) and not _read_look(carrier_card):
 		return CardLook.PLAIN
-	return _looks[form] as CardLook if int(_look_drawers[form]) == drawer else CardLook.PLAIN
+	return _looks[carrier_card] as CardLook if int(_look_drawers[carrier_card]) == drawer else CardLook.PLAIN
 
 
 ## Every carrier card's own shader the area `drawer` draws (Carrier.LOOK_*), so that area warms them
@@ -612,34 +612,34 @@ func look_shaders(drawer: int) -> Array[Shader]:
 	if source == null or not source.has_method(&"get_all"):
 		return found
 	for card: Resource in source.call(&"get_all", &"spells"):
-		var form := card as FormBase
-		if form != null and form.look_shader != null and _remember_look(form) == drawer and not found.has(form.look_shader):
-			found.append(form.look_shader)
+		var carrier_card := card as CarrierCard
+		if carrier_card != null and carrier_card.look_shader != null and _remember_look(carrier_card) == drawer and not found.has(carrier_card.look_shader):
+			found.append(carrier_card.look_shader)
 	return found
 
 
-## Every still carrier card whose shots give off motes while they stand (`FormBase.look_motes`,
+## Every still carrier card whose shots give off motes while they stand (`CarrierCard.look_motes`,
 ## drawn by a shader of its own), by id, for Feel to give them off (`gameplay/feel/still_motes.gd`,
-## which asks `look_of(form, Carrier.LOOK_STILL)` for them). A new array each call: once, at start.
+## which asks `look_of(carrier card, Carrier.LOOK_STILL)` for them). A new array each call: once, at start.
 func still_mote_cards() -> Array[StringName]:
 	var found: Array[StringName] = []
 	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
 	if source == null or not source.has_method(&"get_all"):
 		return found
 	for card: Resource in source.call(&"get_all", &"spells"):
-		var form := card as FormBase
-		if form != null and form.look_shader != null and not form.look_motes.is_empty() and _remember_look(form) == Carrier.LOOK_STILL:
-			found.append(form.id)
+		var carrier_card := card as CarrierCard
+		if carrier_card != null and carrier_card.look_shader != null and not carrier_card.look_motes.is_empty() and _remember_look(carrier_card) == Carrier.LOOK_STILL:
+			found.append(carrier_card.id)
 	return found
 
 
-## Reads the card `form` into `_looks`: false when there is no such carrier card (not kept, so a
+## Reads the card `carrier_card` into `_looks`: false when there is no such carrier card (not kept, so a
 ## card the registry has not scanned yet is read once it has).
-func _read_look(form: StringName) -> bool:
+func _read_look(carrier_card: StringName) -> bool:
 	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
-	if form == &"" or source == null or not source.has_method(&"get_resource"):
+	if carrier_card == &"" or source == null or not source.has_method(&"get_resource"):
 		return false
-	var card := source.call(&"get_resource", &"spells", form) as FormBase
+	var card := source.call(&"get_resource", &"spells", carrier_card) as CarrierCard
 	if card == null:
 		return false
 	_remember_look(card)
@@ -647,7 +647,7 @@ func _read_look(form: StringName) -> bool:
 
 
 ## Keeps `card`'s look in `_looks` (once) and returns the area that draws its carrier.
-func _remember_look(card: FormBase) -> int:
+func _remember_look(card: CarrierCard) -> int:
 	if not _looks.has(card.id):
 		_looks[card.id] = CardLook.from_card(card)
 		_look_drawers[card.id] = Carriers.of(card.carrier).look_drawer()
@@ -665,21 +665,21 @@ func _launch_look_of(spell: CompiledSpell) -> LaunchLook:
 	var mesh: int = _shot_mesh(spell.look_drawer)
 	_launch_look.core = spell.tint
 	_launch_look.look = spell.look
-	_launch_look.form = spell.form_id
-	_launch_look.body = _body_of(spell.form_id, spell.look_shader, mesh) if mesh != NO_SHOT_MESH else 0
+	_launch_look.carrier_card = spell.carrier_card_id
+	_launch_look.body = _body_of(spell.carrier_card_id, spell.look_shader, mesh) if mesh != NO_SHOT_MESH else 0
 	_launch_look.light_intensity = spell.look_light_intensity
 	_launch_look.light_reach = spell.look_light_reach
 	return _launch_look
 
 
-## The card body the carrier card `form`'s shots are drawn by (its `shader` under `mesh`), numbered
+## The card body the carrier card `carrier_card`'s shots are drawn by (its `shader` under `mesh`), numbered
 ## the first time (`register_body`) and shaped as it is (`_shape_body`): a launch may be the first to
 ## ask for a card the start did not know. Only a look up once numbered, so a launch costs no more.
-func _body_of(form: StringName, shader: Shader, mesh: int) -> int:
+func _body_of(carrier_card: StringName, shader: Shader, mesh: int) -> int:
 	var body: int = projectiles.body_of(shader, mesh)
 	if body == 0 and shader != null:
 		body = projectiles.register_body(shader, mesh)
-		_shape_body(body, form, mesh)
+		_shape_body(body, carrier_card, mesh)
 	return body
 
 
@@ -687,10 +687,10 @@ func _body_of(form: StringName, shader: Shader, mesh: int) -> int:
 ## `look_fade`) to the manager for its body `body` (`set_body_shape`), so its shader draws by the
 ## numbers its motes leave by (`gameplay/feel/still_motes.gd` reads the same `CardLook`). Every place
 ## a body is numbered shapes it here. A head body (`mesh` MESH_HEAD) has no still look.
-func _shape_body(body: int, form: StringName, mesh: int) -> void:
-	if body <= 0 or mesh != ProjectilesScript.MESH_QUAD or not _looks.has(form):
+func _shape_body(body: int, carrier_card: StringName, mesh: int) -> void:
+	if body <= 0 or mesh != ProjectilesScript.MESH_QUAD or not _looks.has(carrier_card):
 		return
-	var look: CardLook = _looks[form]
+	var look: CardLook = _looks[carrier_card]
 	projectiles.set_body_shape(body, look.shape, Vector2(look.open, look.fade))
 
 
@@ -743,7 +743,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.caster_move_finished.connect(_moves.finished)
 
 
-## True when the card `card_id` does something on the carrier `carrier` (`FormBase.carrier`) on its
+## True when the card `card_id` does something on the carrier `carrier` (`CarrierCard.carrier`) on its
 ## own: for the builder, a reward screen or a bot, before the card is placed
 ## (`StaffCompiler.card_works`). False for an unknown card.
 func card_works(card_id: StringName, carrier: StringName) -> bool:
@@ -834,7 +834,7 @@ func _tree_carrier_name(spell: CompiledSpell) -> String:
 		return TREE_ON_BEARER
 	if spell.fallback == CompiledSpell.FALLBACK_POINT:
 		return TREE_AT_POINT
-	return spell.form_name if spell.form_name != "" else String(spell.form_id)
+	return spell.carrier_card_name if spell.carrier_card_name != "" else String(spell.carrier_card_id)
 
 
 ## The damage one cast deals if every shot of it lands once (a beam: every hit of its life):
@@ -850,7 +850,7 @@ static func _cast_damage(cast: CompiledCast) -> float:
 
 
 ## What the builder shows of the component `id`: its name (the id when it has none, "" for
-## an unknown id), its 16x16 icon (null when unknown) and its kind (`&"form"`, `&"element"`,
+## an unknown id), its 16x16 icon (null when unknown) and its kind (`&"carrier"`, `&"element"`,
 ## `&"modifier"` or `&"trigger"`, `&""` when unknown). Scripts outside `core/` and
 ## `content/spells/` learn these here and never read the component's fields.
 func component_name(id: StringName) -> String:
@@ -870,12 +870,12 @@ func component_icon(id: StringName) -> Texture2D:
 func component_stats(id: StringName) -> PackedStringArray:
 	var out := PackedStringArray()
 	var component: SpellComponent = _component(id)
-	if component is FormBase:
-		var form: FormBase = component
-		var hits: int = maxi(form.shots, 1) * Carriers.of(form.carrier).hits_per_target(form.lifetime)
-		out.append("Dmg " + _short(form.base_damage) if hits <= 1 else "Dmg %sx%d" % [_short(form.base_damage), hits])
-		out.append("Mana " + _short(form.mana_cost))
-		out.append("Delay %ss" % _short(form.wind_down))
+	if component is CarrierCard:
+		var carrier_card: CarrierCard = component
+		var hits: int = maxi(carrier_card.shots, 1) * Carriers.of(carrier_card.carrier).hits_per_target(carrier_card.lifetime)
+		out.append("Dmg " + _short(carrier_card.base_damage) if hits <= 1 else "Dmg %sx%d" % [_short(carrier_card.base_damage), hits])
+		out.append("Mana " + _short(carrier_card.mana_cost))
+		out.append("Delay %ss" % _short(carrier_card.wind_down))
 	elif component is ModifierBase:
 		var modifier: ModifierBase = component
 		var words: Dictionary = {
@@ -951,7 +951,7 @@ func profile(tag: int) -> CompiledSpell:
 	return _profiles.get(tag)
 
 
-## The cards of the spell registered under `tag`, as plain ids: its form, then its infusions and its
+## The cards of the spell registered under `tag`, as plain ids: its carrier card, then its infusions and its
 ## modifiers in slot order, each once (empty when its generation is gone). For looks only:
 ## gameplay/feel's motes and marks by card (docs/milestones/spell-spectacle-2.md, S2).
 func cards_of(tag: int) -> Array[StringName]:
@@ -959,8 +959,8 @@ func cards_of(tag: int) -> Array[StringName]:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null:
 		return cards
-	if spell.form_id != &"":
-		cards.append(spell.form_id)
+	if spell.carrier_card_id != &"":
+		cards.append(spell.carrier_card_id)
 	for id in spell.element_ids + spell.modifier_ids:
 		if id != &"" and not cards.has(id):
 			cards.append(id)
@@ -1166,11 +1166,11 @@ func cast_index(actor: int, staff: int) -> int:
 	return _cursor[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else 0
 
 
-## The carrier (form id) of the last cast this actor's staff made, `&""` before any; for a cast with
-## no carrier card, its fallback carrier's id (`caster`: the cards landed on the caster). The
+## The carrier card (its id) of the last cast this actor's staff made, `&""` before any; for a cast with
+## no carrier card, its fallback carrier's id instead (`caster`: the cards landed on the caster). The
 ## wizard's player sends it with `spell_cast`.
-func last_form(actor: int, staff: int) -> StringName:
-	return _last_form[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else &""
+func last_carrier_card(actor: int, staff: int) -> StringName:
+	return _last_carrier_card[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else &""
 
 
 ## True while this actor's staff has sustained (`hold`) carriers switched on.
@@ -1242,7 +1242,7 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 			var first_spell: CompiledSpell = cast.group.spells[0]
 			# A staff may name its own (a barrel's fuse; props W6): it plays in place of the card's.
 			var staff_cue: StringName = compiled.staff.wind_cue if compiled.staff != null else &""
-			events.cast_winding.emit(actor, staff, first_spell.form_id, origin, aim, cast.wind_up, first_spell.tint, first_spell.look, SpellTag.make(actor, staff, first_spell.node, _current[index]), staff_cue)
+			events.cast_winding.emit(actor, staff, first_spell.carrier_card_id, origin, aim, cast.wind_up, first_spell.tint, first_spell.look, SpellTag.make(actor, staff, first_spell.node, _current[index]), staff_cue)
 		return 0.0
 	_walk_turn[actor] = turn
 	if not _leave(index, compiled, cast, origin, aim):
@@ -1273,7 +1273,7 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 			break
 	var first: CompiledSpell = cast.group.spells[0]
 	# A cast with no carrier card names its fallback carrier (`caster`), so it is still a cast to show.
-	_last_form[index] = first.form_id if first.form_id != &"" else first.carrier
+	_last_carrier_card[index] = first.carrier_card_id if first.carrier_card_id != &"" else first.carrier
 	return true
 
 
@@ -1493,7 +1493,7 @@ func _strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arr
 		var point: Vector2 = _strike_marks[n * 2]
 		var head: Vector2 = _strike_marks[n * 2 + 1]
 		ray.dir = centre.direction_to(point) if not centre.is_equal_approx(point) else head
-		projectiles.strike(actor, _strike_bodies[n], point, head, tag, spell.form_id)
+		projectiles.strike(actor, _strike_bodies[n], point, head, tag, spell.carrier_card_id)
 	var took: HitProfile = ray.hit
 	_ray_end()
 	_strike_bodies.resize(first)
@@ -2226,7 +2226,9 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 			count = mini(projectiles.ray_path_count, _ray_guard_points.size())
 			for n in count:
 				_ray_guard_points[n] = projectiles.ray_path[n]
-		_guard_path(spell, tag, actor, _ray_guard_points, 0, count, got, spell.radius * 0.5, roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD)))
+		# A chain jump of any ray (a swing's or a slam's too) blocks as a ray, never as its carrier: a
+		# swing's jump is no parry.
+		_guard_path(spell, tag, actor, _ray_guard_points, 0, count, got, spell.radius * 0.5, roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD)), RAY_CARD)
 	if got > 0.0 and projectiles.ray_path_count > 2:
 		# It turned at walls: a cue for every straight leg, and it ends where the last one does.
 		end = projectiles.ray_end
@@ -2236,9 +2238,9 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 				var from: Vector2 = projectiles.ray_path[n]
 				var to: Vector2 = projectiles.ray_path[n + 1]
 				if not from.is_equal_approx(to):
-					events.form_shown.emit(actor, RAY_FORM, from, from.direction_to(to), from.distance_to(to), spell.tint, spell.look)
+					events.carrier_shown.emit(actor, RAY_CARD, from, from.direction_to(to), from.distance_to(to), spell.tint, spell.look)
 	elif got > 0.0 and events != null:
-		events.form_shown.emit(actor, RAY_FORM, origin, heading, got, spell.tint, spell.look)
+		events.carrier_shown.emit(actor, RAY_CARD, origin, heading, got, spell.tint, spell.look)
 	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the payload from.
 	if got > 0.0:
 		_blast(spell, tag, actor, end)
@@ -2252,8 +2254,8 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 ## The shots of other teams touching the path `points[first]` to `points[first + count - 1]`
 ## (cut `reach` pixels along) of a beam with `tag`, `width` pixels either side as its
 ## hits: each is deflected off the line (`deflect`), else stopped while `charges` last (melee
-## I3). Returns the charges left.
-func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, width: float, charges: int) -> int:
+## I3); a block is sent as the carrier `carrier`'s (`_guard`). Returns the charges left.
+func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, width: float, charges: int, carrier: StringName) -> int:
 	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
 	if (not deflects and charges <= 0) or count < 2 or reach <= 0.0:
 		return charges
@@ -2265,7 +2267,7 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 		if walked + piece > reach:
 			b = a.move_toward(b, reach - walked)
 		var found: int = projectiles.shots_on_segment(actor, a, b, width)
-		charges = _guard(found, actor, tag, deflects, charges, a, b, RAY_FORM)
+		charges = _guard(found, actor, tag, deflects, charges, a, b, carrier)
 		walked += piece
 		if walked >= reach or (not deflects and charges <= 0):
 			break
@@ -2275,9 +2277,9 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 ## Deflects (with `deflects`) or stops (while `charges` last) the `found` shots of
 ## `Projectiles.guard_slots` that touched a carrier of `actor` with `tag`: outward from `a` when
 ## `b` is INF (a swing's hand), else off the segment from `a` to `b` (a beam's line);
-## a block is sent as `form`'s, the carrier's id (`block_shot`: Feel tells a swing's parry by it).
+## a block is sent as `carrier`'s, the carrier's id (`block_shot`: Feel tells a swing's parry by it).
 ## Returns the charges left. The list is copied first: what a deflect sets off can run another guard.
-func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, form: StringName) -> int:
+func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, carrier: StringName) -> int:
 	if found == 0:
 		return charges
 	var slots: PackedInt32Array = projectiles.guard_slots.slice(0, found)
@@ -2293,7 +2295,7 @@ func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: V
 			projectiles.deflect_shot(slot, actor, normal, tag)
 		elif charges > 0:
 			charges -= 1
-			projectiles.block_shot(slot, actor, tag, form)
+			projectiles.block_shot(slot, actor, tag, carrier)
 	return charges
 
 
@@ -2886,7 +2888,7 @@ func _spark(slot: int, spell: CompiledSpell) -> void:
 	var way: Vector2 = DMath.from_angle(_zap_roll(slot) * TAU)
 	var length: float = lerpf(SpellLimits.ZAP_SPARK_SHORTEST, SpellLimits.ZAP_SPARK_LONGEST, _zap_roll(slot))
 	_zaps_used += 1
-	events.form_shown.emit(SpellTag.caster_of(projectiles.get_tag_of(slot)), ZAP_FORM, projectiles.get_position_of(slot), way, length, spell.tint, spell.look)
+	events.carrier_shown.emit(SpellTag.caster_of(projectiles.get_tag_of(slot)), ZAP_CARD, projectiles.get_position_of(slot), way, length, spell.tint, spell.look)
 
 
 ## Every `magnet` shot pulls the enemies within its card's reach toward where it is, each step
@@ -2942,7 +2944,7 @@ func _zap_ray(spell: CompiledSpell, tag: int, at: Vector2, aim: Vector2, chain: 
 	var got: float = projectiles.ray(actor, at, way, at.distance_to(aim) + 2.0, 0, HITS, tag, 0.0, null)
 	_ray_end()
 	if got > 0.0 and events != null:
-		events.form_shown.emit(actor, ZAP_FORM, at, way, got, spell.tint, spell.look)
+		events.carrier_shown.emit(actor, ZAP_CARD, at, way, got, spell.tint, spell.look)
 	_cast_jumps()
 
 
@@ -3382,7 +3384,7 @@ func clear() -> void:
 	_pending.clear()
 	_penta_rings.clear()
 	_ring.fill(-1)
-	_last_form.fill(&"")
+	_last_carrier_card.fill(&"")
 	_cast_count.fill(0)
 	_lc_count = 0
 	_zapper_count = 0
@@ -3700,7 +3702,7 @@ func _reset_caster(caster: int) -> void:
 		_cursor[index] = 0
 		_cast_count[index] = 0
 		_hold_mana[index] = 0.0
-		_last_form[index] = &""
+		_last_carrier_card[index] = &""
 	_moves.reset_actor(caster)
 	for carrier: Carrier in _carriers.values():
 		carrier.reset_actor(caster)

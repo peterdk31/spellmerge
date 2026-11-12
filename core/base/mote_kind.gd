@@ -5,7 +5,7 @@ extends Resource
 ## the registry finds it by its `id`, so a new kind is a new file and no list is edited.
 ##
 ## A kind belongs to cards (docs/milestones/spell-spectacle-2.md, S2): it is the motes of every
-## card it names by id (`cards`: a form, an element or a modifier), and of every card whose
+## card it names by id (`cards`: a carrier card, an element or a modifier), and of every card whose
 ## look it names (`look_ids`) that no kind names by id. So a card gets motes of its
 ## own with one new file naming it (the card's file is not touched), a card that no kind names
 ## sheds its look layer's, and a shot whose cards have none sheds the kinds of layer 0. A spell
@@ -26,7 +26,7 @@ const LOOK_LAYERS: int = preload("res://core/projectiles/projectile_manager.gd")
 
 ## Unique name, also its file name.
 @export var id: StringName = &""
-## The cards (forms, elements, modifiers: their ids) this kind is the motes of, whatever their look
+## The cards (carrier cards, elements, modifiers: their ids) this kind is the motes of, whatever their look
 ## layer.
 @export var cards: Array[StringName] = []
 ## The cards' looks (`look_id` of an element or modifier, `LookNames`) this kind is the motes of,

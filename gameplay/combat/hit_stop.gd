@@ -46,7 +46,7 @@ const KIND_STOP: Dictionary[StringName, float] = {
 }
 
 ## Not state: the services it holds and stops through, and caches of content (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"actors", &"projectiles", &"registry", &"sim", &"_cues", &"_reaction_cues", &"_form_cues"]
+const DERIVED: Array[StringName] = [&"actors", &"projectiles", &"registry", &"sim", &"_cues", &"_reaction_cues", &"_carrier_card_cues"]
 
 ## What it holds and stops through, handed over by its owner (Combat's `bind`): the bodies' holds
 ## (the actor table), the shots' (the projectile manager), the cues (the registry) and the
@@ -63,7 +63,7 @@ var _reaction_next: Dictionary[StringName, int] = {}
 ## Caches of content: cue by id (null for none), a reaction's cue id, a card's [impact, end] cues.
 var _cues: Dictionary = {}
 var _reaction_cues: Dictionary = {}
-var _form_cues: Dictionary = {}
+var _carrier_card_cues: Dictionary = {}
 
 
 ## Hand over the services (Combat's, each time they may have changed: its setup and its step).
@@ -134,16 +134,16 @@ func parried(caster: int) -> void:
 	cue(CueBase.PARRY_CUE, caster)
 
 
-## `caster`'s carrier of the card `form` ended with no shot (a slam's strike): its card's `end_cue`.
-func carrier_ended(caster: int, form: StringName) -> void:
-	var id: StringName = _form_cue(form, 1)
+## `caster`'s carrier of the card `carrier_card` ended with no shot (a slam's strike): its card's `end_cue`.
+func carrier_ended(caster: int, carrier_card: StringName) -> void:
+	var id: StringName = _carrier_card_cue(carrier_card, 1)
 	if id != &"":
 		cue(id, caster)
 
 
-## A shot of `caster`'s, of the card `form`, struck a body or a wall: its card's `impact_cue`.
-func impact(caster: int, form: StringName) -> void:
-	var id: StringName = _form_cue(form, 0)
+## A shot of `caster`'s, of the card `carrier_card`, struck a body or a wall: its card's `impact_cue`.
+func impact(caster: int, carrier_card: StringName) -> void:
+	var id: StringName = _carrier_card_cue(carrier_card, 0)
 	if id != &"":
 		cue(id, caster)
 
@@ -173,17 +173,17 @@ func _reaction_cue(reaction_id: StringName) -> StringName:
 	return id
 
 
-## The card `form`'s impact cue (`which` 0) or end cue (1), &"" for none.
-func _form_cue(form: StringName, which: int) -> StringName:
+## The card `carrier_card`'s impact cue (`which` 0) or end cue (1), &"" for none.
+func _carrier_card_cue(carrier_card: StringName, which: int) -> StringName:
 	# (Kept as names, read with one lookup: a shot's impact asks on every hit.)
-	var cues: Variant = _form_cues.get(form)
+	var cues: Variant = _carrier_card_cues.get(carrier_card)
 	if cues == null:
 		var made: Array[StringName] = [&"", &""]
-		if registry != null and form != &"":
-			var card: Resource = registry.get_resource(&"spells", form)
-			if card is FormBase:
-				made[0] = (card as FormBase).impact_cue
-				made[1] = (card as FormBase).end_cue
-		_form_cues[form] = made
+		if registry != null and carrier_card != &"":
+			var card: Resource = registry.get_resource(&"spells", carrier_card)
+			if card is CarrierCard:
+				made[0] = (card as CarrierCard).impact_cue
+				made[1] = (card as CarrierCard).end_cue
+		_carrier_card_cues[carrier_card] = made
 		cues = made
 	return (cues as Array[StringName])[which]

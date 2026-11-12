@@ -90,7 +90,7 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 ## all round the impact, so a wall between hides a body), outward from the impact, so the hit's
 ## knockback throws it outward; the body that slams is spared (it never leaves it), any other is hit. Its hits carry
 ## payloads and chains as a beam's do, and a shield or deflect works on the shots in its ring. Its
-## `blast` and `on expire` happen at the impact when the ring is done. `form_shown` tells looks of
+## `blast` and `on expire` happen at the impact when the ring is done. `carrier_shown` tells looks of
 ## the impact (`slam`), the point it strikes (`STRIKES_POINT`): its staff animation's `land` puts the
 ## staff's tip there, told again at the impact (`StaffPoses.land_at`) in case its hand moved.
 ## Returns false when it could not start (no direction). `caster` and `caster_seq` are who casts it (`Spells._caster`:
@@ -151,9 +151,9 @@ func _slam_step(at: int, delta: float) -> void:
 		if SpellRuntime.body_of(_sl_caster[at], _sl_actor[at]) == _sl_actor[at]:
 			poses.land_at(tag, impact - _sl_origin[at])
 		if kit.events != null:
-			kit.events.form_shown.emit(_sl_actor[at], &"slam", impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
+			kit.events.carrier_shown.emit(_sl_actor[at], &"slam", impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
 			# Its strike is where it ends for the looks: its card's impact cue, as big as its ring.
-			kit.events.carrier_ended.emit(_sl_actor[at], spell.form_id, impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
+			kit.events.carrier_ended.emit(_sl_actor[at], spell.carrier_card_id, impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
 	var into: float = _sl_age[at] - _sl_wind[at]
 	var life: float = maxf(spell.lifetime, 0.001)
 	var reach: float = spell.radius * clampf(into / (life * SpellLimits.SLAM_GROW), 0.0, 1.0)

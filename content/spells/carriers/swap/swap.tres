@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="CarrierCard" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/base/carrier_card.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/carriers/swap/icon.svg" id="2_icon"]
+[ext_resource type="Shader" path="res://content/spells/carriers/swap/swap.gdshader" id="3_shader"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"swap"
+display_name = "Swap"
+description = "Throw a charm. What it touches and you trade places."
+complexity = 2
+icon = ExtResource("2_icon")
+base_damage = 1
+mana_cost = 20.0
+wind_down = 0.3
+speed = 300.0
+lifetime = 0.5
+radius = 4.0
+shots = 1
+spread = 0.0
+carrier = &"swap"
+pierce = 0
+staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.08, "turn": -40, "glow": 0.4, "ease": "out"}, {"phase": "after", "at": 0.18, "turn": 25}, {"phase": "after", "at": 0.32}])
+cast_cue = &"cast_gather"
+shown_cue = &"trade"
+impact_cue = &"impact_ring"
+look_shader = ExtResource("3_shader")

@@ -84,13 +84,13 @@ class FakeSwings:
 	func swing_tag(_at: int) -> int:
 		return 77
 
-	## The card each swing is (`swing_form`), and the looks Spells would answer for a card id
+	## The card each swing is (`swing_carrier_card`), and the looks Spells would answer for a card id
 	## drawn as a swing trail (`look_of`): none by default, every trail plain.
-	var form: StringName = &"swing"
+	var carrier_card: StringName = &"swing"
 	var trail_shaders: Dictionary = {}
 
-	func swing_form(_at: int) -> StringName:
-		return form
+	func swing_carrier_card(_at: int) -> StringName:
+		return carrier_card
 
 	func look_of(id: StringName, drawer: int) -> CardLook:
 		if drawer != Carrier.LOOK_SWING or not trail_shaders.has(id):
@@ -264,7 +264,7 @@ func test_the_shader_draws_only_the_line_and_its_light() -> void:
 ## Spells answers for its card (`look_of`, as a swing trail), on the trail's own material;
 ## a card that names none, or that another area draws, trails with the plain shader.
 func test_a_swing_trails_with_its_cards_own_shader() -> void:
-	var own_look: Shader = preload("res://content/spells/forms/swing/swing.gdshader")
+	var own_look: Shader = preload("res://content/spells/carriers/swing/swing.gdshader")
 	swings.trail_shaders[&"swing"] = own_look
 	feel.step(0.016)
 	var trail: MeshInstance2D = null
@@ -274,7 +274,7 @@ func test_a_swing_trails_with_its_cards_own_shader() -> void:
 	check(trail != null and (trail.material as ShaderMaterial).shader == own_look, "drawn by its card's shader")
 	check_equal(_trails().parameter_of(1, &"swing_reach"), 24.0, "with its own uniforms, as before")
 	# A new swing of a card with no look of its own takes a trail drawn plain.
-	swings.form = &"bolt"
+	swings.carrier_card = &"bolt"
 	swings.generation = 1
 	feel.step(0.016)
 	var plain: int = 0

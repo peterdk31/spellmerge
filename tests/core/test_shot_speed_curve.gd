@@ -34,7 +34,7 @@ func test_every_compiled_spell_takes_it() -> void:
 ## A card's speed numbers multiply the default, and two such cards each other (`StaffCompiler`).
 ## No card in the box sets them today, so this one is made here.
 func test_a_cards_numbers_multiply_the_default() -> void:
-	var bolt: FormBase = load("res://content/spells/forms/bolt/bolt.tres") as FormBase
+	var bolt: CarrierCard = load("res://content/spells/carriers/bolt/bolt.tres") as CarrierCard
 	var card := ModifierBase.new()
 	card.id = &"test_curve"
 	card.speed_start = 1.5

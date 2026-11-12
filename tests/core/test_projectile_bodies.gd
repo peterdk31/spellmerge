@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
-## What a shot is drawn as and told as (`Projectiles.set_form`): every shot a card fired carries the
-## card's id, so its impacts and its end are told as that card (`impact_form`, its card's impact
+## What a shot is drawn as and told as (`Projectiles.set_carrier_card`): every shot a card fired carries the
+## card's id, so its impacts and its end are told as that card (`impact_carrier_card`, its card's impact
 ## look), and the body (`impact_body`) goes with them. A still shot may ask for a card's own body
 ## (a shader `register_body` numbered with the mesh it draws: a wall's stone, quads), drawn by that
 ## shader's pair of batches; it is still a rune to the world. A flying shot may ask for one too (a
@@ -13,15 +13,15 @@ extends "res://tests/support/suite.gd"
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")
-const STONE: Shader = preload("res://content/spells/forms/wall/stone.gdshader")
-const POOL: Shader = preload("res://content/spells/forms/pool/pool.gdshader")
-const BOLT: Shader = preload("res://content/spells/forms/bolt/bolt.gdshader")
+const STONE: Shader = preload("res://content/spells/carriers/wall/stone.gdshader")
+const POOL: Shader = preload("res://content/spells/carriers/pool/pool.gdshader")
+const BOLT: Shader = preload("res://content/spells/carriers/bolt/bolt.gdshader")
 
 const DT: float = 1.0 / 60.0
 
 var bus: EventsScript
 var mgr: ManagerScript
-## The manager's [impact_form, impact_body] as each impact or expiry was sent.
+## The manager's [impact_carrier_card, impact_body] as each impact or expiry was sent.
 var told: Array = []
 
 
@@ -32,9 +32,9 @@ func before_each() -> void:
 	mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	told.clear()
 	bus.projectile_impact.connect(func(_caster: int, _target: Node, _position: Vector2, _direction: Vector2) -> void:
-		told.append([mgr.impact_form, mgr.impact_body]))
+		told.append([mgr.impact_carrier_card, mgr.impact_body]))
 	bus.projectile_expired.connect(func(_caster: int, _position: Vector2, _tag: int, _shot: int) -> void:
-		told.append([mgr.impact_form, mgr.impact_body]))
+		told.append([mgr.impact_carrier_card, mgr.impact_body]))
 
 
 func test_a_card_shader_is_numbered_once_and_given_a_pair_of_batches() -> void:
@@ -66,7 +66,7 @@ func test_a_still_shot_of_a_card_body_draws_in_its_batch() -> void:
 	var stone: int = mgr.register_body(STONE)
 	var slot: int = mgr.spawn(0, Vector2(100, 100), Vector2.ZERO, 1.0, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	check_equal(mgr._batch_of(slot), ManagerScript.BATCH_ENEMY_STILL, "a still shot of no actor is a rune of the enemy ramp")
-	check(mgr.set_form(slot, &"wall", stone), "a card may name its body")
+	check(mgr.set_carrier_card(slot, &"wall", stone), "a card may name its body")
 	check_equal(mgr._batch_of(slot), ManagerScript.body_batch(stone, true), "and it draws in that body's batch")
 	check_equal(mgr._kind_of(slot), ManagerScript.KIND_RUNE, "still a rune to the world")
 
@@ -74,7 +74,7 @@ func test_a_still_shot_of_a_card_body_draws_in_its_batch() -> void:
 func test_a_flying_shot_of_a_quad_body_draws_plain() -> void:
 	var stone: int = mgr.register_body(STONE)
 	var slot: int = mgr.spawn(0, Vector2(100, 100), Vector2(50, 0), 1.0)
-	mgr.set_form(slot, &"swap", stone)
+	mgr.set_carrier_card(slot, &"swap", stone)
 	check_equal(mgr._batch_of(slot), ManagerScript.BATCH_ENEMY, "a quad body draws no head: the shot draws in its motion's batch")
 	check_equal(mgr._kind_of(slot), ManagerScript.KIND_BOLT, "a bolt's body")
 
@@ -92,11 +92,11 @@ func test_a_shader_under_each_mesh_is_two_bodies() -> void:
 func test_a_flying_shot_of_a_head_body_draws_in_its_batch() -> void:
 	var head: int = mgr.register_body(BOLT, ManagerScript.MESH_HEAD)
 	var slot: int = mgr.spawn(0, Vector2(100, 100), Vector2(50, 0), 1.0)
-	mgr.set_form(slot, &"bolt", head)
+	mgr.set_carrier_card(slot, &"bolt", head)
 	check_equal(mgr._batch_of(slot), ManagerScript.body_batch(head, true), "a flying shot of a head body draws in its pair")
 	check_equal(mgr._kind_of(slot), ManagerScript.KIND_BOLT, "still a bolt to the world")
 	var still: int = mgr.spawn(0, Vector2(140, 100), Vector2.ZERO, 1.0, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
-	mgr.set_form(still, &"bolt", head)
+	mgr.set_carrier_card(still, &"bolt", head)
 	check_equal(mgr._batch_of(still), ManagerScript.BATCH_ENEMY_STILL, "a still shot of a head body draws plain: routing never disagrees with writing")
 
 
@@ -107,7 +107,7 @@ func test_an_orbit_shot_deflected_keeps_its_head_body() -> void:
 	check(mgr.set_orbit(slot, 30.0, 0.0, 0.0, Vector2(100, 100)) and mgr._motion[slot] == ManagerScript.MOTION_ORBIT, "an orbit shot round a point")
 	if slot < 0:
 		return
-	mgr.set_form(slot, &"bolt", head)
+	mgr.set_carrier_card(slot, &"bolt", head)
 	check_equal(mgr._batch_of(slot), ManagerScript.body_batch(head, true), "a circling shot keeps its card's head body")
 	check_equal(mgr._kind_of(slot), ManagerScript.KIND_BOLT, "and is a bolt to the world: its motion is not its body")
 	mgr.step(DT)
@@ -142,26 +142,26 @@ func test_a_deflected_drift_only_orbit_flies_on() -> void:
 func test_a_reused_slot_forgets_its_card() -> void:
 	var stone: int = mgr.register_body(STONE)
 	var slot: int = mgr.spawn(0, Vector2(100, 100), Vector2.ZERO, 0.05, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
-	mgr.set_form(slot, &"wall", stone)
+	mgr.set_carrier_card(slot, &"wall", stone)
 	for _i in 10:
 		mgr.step(DT)
 	var again: int = mgr.spawn(0, Vector2(100, 100), Vector2.ZERO, 1.0, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	check_equal(again, slot, "the same slot is taken again")
 	check_equal(mgr._batch_of(again), ManagerScript.BATCH_ENEMY_STILL, "a rune again, not the stone before")
-	check_equal(mgr._form_of(again), &"rune", "told by its body again")
+	check_equal(mgr._carrier_card_of(again), &"rune", "told by its body again")
 
 
 func test_an_impact_is_told_as_the_card_with_its_body() -> void:
 	mgr.set_walls([Rect2(150.0, 0.0, 32.0, 200.0)] as Array[Rect2])
 	var slot: int = mgr.spawn(0, Vector2(100, 100), Vector2(240, 0), 5.0)
-	mgr.set_form(slot, &"atom")
+	mgr.set_carrier_card(slot, &"atom")
 	for _i in 30:
 		mgr.step(DT)
 	check_equal(told.size(), 2, "it ended on the wall: its impact, then its end")
 	for each: Array in told:
 		check_equal(each[0], &"atom", "told as the atom it is, not a bolt")
 		check_equal(each[1], ManagerScript.KIND_BOLT, "with its bolt's body")
-	check_equal(mgr.impact_form, &"", "nothing told outside the event")
+	check_equal(mgr.impact_carrier_card, &"", "nothing told outside the event")
 	check_equal(mgr.impact_body, 0, "no body outside the event")
 
 
@@ -176,9 +176,9 @@ func test_a_shot_no_card_named_is_told_by_its_body() -> void:
 		check_equal(told[0][1], ManagerScript.KIND_RUNE, "with a rune's body")
 
 
-func test_set_form_refuses_an_empty_slot() -> void:
-	check(not mgr.set_form(-1, &"bolt"), "no slot -1")
-	check(not mgr.set_form(3, &"bolt"), "nor a slot with no shot")
+func test_set_carrier_card_refuses_an_empty_slot() -> void:
+	check(not mgr.set_carrier_card(-1, &"bolt"), "no slot -1")
+	check(not mgr.set_carrier_card(3, &"bolt"), "nor a slot with no shot")
 
 
 func test_a_body_keeps_the_first_batches_draw_order() -> void:
@@ -214,7 +214,7 @@ func test_a_body_is_looked_up_without_being_numbered() -> void:
 ## A still shot of no actor at `at` drawn by `body` (the manager in the tree, its batches made).
 func _drawn_still(body: int, at: Vector2, life: float = 5.0) -> int:
 	var slot: int = mgr.spawn(0, at, Vector2.ZERO, life, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
-	mgr.set_form(slot, &"pool", body)
+	mgr.set_carrier_card(slot, &"pool", body)
 	return slot
 
 

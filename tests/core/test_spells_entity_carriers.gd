@@ -34,7 +34,7 @@ var _spawns: Array = []
 var _end_requests: Array = []
 ## Every blast (its `cue_shown`) as [player, position, radius].
 var _areas: Array = []
-## Every form_shown as [player, form, origin, direction, length].
+## Every carrier_shown as [player, carrier card, origin, direction, length].
 var _shown: Array = []
 ## Every cue_shown as [player, at, size, cue].
 var _explosions: Array = []
@@ -64,25 +64,25 @@ func before_each() -> void:
 	_bus.entity_end_requested.connect(func(player: int, tag: int) -> void:
 		_end_requests.append([player, tag]))
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
-	_bus.form_shown.connect(func(player: int, form: StringName, at: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
-		_shown.append([player, form, at, direction, length]))
-	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
+	_bus.carrier_shown.connect(func(player: int, carrier_card: StringName, at: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		_shown.append([player, carrier_card, at, direction, length]))
+	var bolt: CarrierCard = _carrier_card(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
-	var familiar: FormBase = _form(&"familiar", 0.0, 6.0)
+	var familiar: CarrierCard = _carrier_card(&"familiar", 0.0, 6.0)
 	familiar.carrier = &"familiar"
 	familiar.radius = 5.0
-	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
+	var decoy: CarrierCard = _carrier_card(&"decoy", 0.0, 4.0)
 	decoy.carrier = &"decoy"
 	decoy.radius = 8.0
-	var rune: FormBase = _form(&"rune", 0.0, 3.0)
+	var rune: CarrierCard = _carrier_card(&"rune", 0.0, 3.0)
 	rune.carrier = &"rune"
 	rune.radius = 7.0
-	var wall: FormBase = _form(&"wall", 0.0, 3.0)
+	var wall: CarrierCard = _carrier_card(&"wall", 0.0, 3.0)
 	wall.carrier = &"wall"
 	wall.shots = 3
 	wall.spread = 10.0
 	wall.radius = 4.0
-	var beam: FormBase = _form(&"beam", 0.0, 0.2)
+	var beam: CarrierCard = _carrier_card(&"beam", 0.0, 0.2)
 	beam.carrier = &"beam"
 	beam.ray_length = 300.0
 	beam.radius = 6.0
@@ -96,7 +96,7 @@ func before_each() -> void:
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	_trigger(&"on_hit", TriggerBase.Event.HIT)
 	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
-	var spark: FormBase = _form(&"spark", 100.0, 1.0)
+	var spark: CarrierCard = _carrier_card(&"spark", 100.0, 1.0)
 	spark.base_damage = 3
 
 
@@ -107,14 +107,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
-	form.base_damage = 5
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = 5
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> ModifierBase:
@@ -192,7 +192,7 @@ func test_a_decoy_and_a_familiar_appear_a_step_ahead_and_a_mirror_puts_its_copy_
 		_spells.clear()
 		_build(0, [&"mirror", card])
 		_cast()
-		var step: float = (_fake.items[card] as FormBase).radius * 2.0
+		var step: float = (_fake.items[card] as CarrierCard).radius * 2.0
 		check(_spawns.size() == 2 and (_spawns[0][2] as Vector2).is_equal_approx(Vector2(step, 0.0)), "the %s ahead: %s" % [card, _spawns])
 		check(_spawns.size() == 2 and (_spawns[1][2] as Vector2).is_equal_approx(Vector2(-step, 0.0)), "its mirror's behind: %s" % [_spawns])
 
@@ -245,8 +245,8 @@ func test_a_familiar_casts_what_its_timer_gives_it() -> void:
 func test_a_familiar_shows_where_it_appears_and_ends_where_it_goes() -> void:
 	var tag: int = _build(0, [&"familiar", &"bolt"])
 	var ended: Array = []
-	_bus.carrier_ended.connect(func(player: int, form: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
-		ended.append([player, form, at, size]))
+	_bus.carrier_ended.connect(func(player: int, carrier_card: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
+		ended.append([player, carrier_card, at, size]))
 	_cast()
 	check(_shown.size() == 1 and _shown[0][1] == &"familiar" and _shown[0][2].is_equal_approx(_spawns[0][2]), "it shows where it is made: %s" % [_shown])
 	_bus.entity_ended.emit(0, &"familiar", Vector2(30, 40), tag)

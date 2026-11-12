@@ -72,11 +72,11 @@ func _make(what: StringName, actor: int, at: Vector2) -> void:
 			var target: Sprite2D = _body(DUMMY, at)
 			shots.impact_look = 1 << (FROST.look_layer - 1)
 			shots.impact_core = FROST.tint
-			shots.impact_form = &"bolt"
+			shots.impact_carrier_card = &"bolt"
 			events.emit_signal(&"projectile_impact", actor, target, at, Vector2.RIGHT)
 			shots.impact_look = 0
 			shots.impact_core = Color.WHITE
-			shots.impact_form = &""
+			shots.impact_carrier_card = &""
 		&"expired":
 			shots.impact_body = ProjectilesScript.KIND_BOLT
 			shots.impact_look = 1 << (FIRE.look_layer - 1)

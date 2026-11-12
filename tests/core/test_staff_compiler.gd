@@ -30,9 +30,9 @@ func before_each() -> void:
 	_staff.id = &"test"
 	_staff.slots = 20
 	_staff.cooldown = 0.5
-	var bolt: FormBase = _form(&"bolt", 5, 1)
+	var bolt: CarrierCard = _carrier_card(&"bolt", 5, 1)
 	bolt.wind_down = 0.2
-	var halo: FormBase = _form(&"halo", 4, 8)
+	var halo: CarrierCard = _carrier_card(&"halo", 4, 8)
 	halo.spread = 360.0
 	halo.wind_down = 0.4
 	_element(&"fire", &"burn", 1.5)
@@ -67,14 +67,14 @@ func _put(card: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = card
 
 
-func _form(id: StringName, damage: int, shots: int) -> FormBase:
-	var form := FormBase.new()
-	form.base_damage = damage
-	form.shots = shots
-	form.speed = 300.0
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, damage: int, shots: int) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = damage
+	carrier_card.shots = shots
+	carrier_card.speed = 300.0
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _element(id: StringName, status: StringName, scale: float) -> ElementBase:
@@ -116,10 +116,10 @@ func _compile(cards: String) -> CompiledStaff:
 	return _spells.call("compile_staff", ids, _staff) as CompiledStaff
 
 
-func _forms(group: CompiledGroup) -> Array[StringName]:
+func _carrier_cards(group: CompiledGroup) -> Array[StringName]:
 	var out: Array[StringName] = []
 	for spell in group.spells:
-		out.append(spell.form_id)
+		out.append(spell.carrier_card_id)
 	return out
 
 
@@ -129,9 +129,9 @@ func test_two_casts_then_recharge() -> void:
 	var staff: CompiledStaff = _compile("fire bolt frost halo")
 	check_equal(staff.casts.size(), 2, "two casts")
 	var first: CompiledSpell = staff.casts[0].group.spells[0]
-	check_equal([first.form_id, first.element_id], [&"bolt", &"fire"], "cast 1 is a fire bolt")
+	check_equal([first.carrier_card_id, first.element_id], [&"bolt", &"fire"], "cast 1 is a fire bolt")
 	var second: CompiledSpell = staff.casts[1].group.spells[0]
-	check_equal([second.form_id, second.element_id], [&"halo", &"frost"], "cast 2 is a frost halo")
+	check_equal([second.carrier_card_id, second.element_id], [&"halo", &"frost"], "cast 2 is a frost halo")
 	check(not staff.casts[0].ends_cycle, "cast 1 does not end the cycle")
 	check(staff.casts[1].ends_cycle, "cast 2 ends it")
 
@@ -141,7 +141,7 @@ func test_a_trailing_modifier_wraps_onto_the_first_carrier() -> void:
 	check_equal(staff.casts.size(), 2, "two casts")
 	check_equal(staff.casts[0].group.spells[0].modifier_ids, [&"blast"] as Array[StringName], "cast 1: a bolt with one blast")
 	var second: CompiledSpell = staff.casts[1].group.spells[0]
-	check_equal(second.form_id, &"bolt", "cast 2 wraps to the bolt")
+	check_equal(second.carrier_card_id, &"bolt", "cast 2 wraps to the bolt")
 	check_equal(second.modifier_ids, [&"blast", &"blast"] as Array[StringName], "cast 2: a bolt with two blasts")
 	check(staff.casts[1].wrapped, "cast 2 wrapped")
 	check(staff.casts[1].ends_cycle, "a wrapped cast ends the cycle")
@@ -161,22 +161,22 @@ func test_double_with_a_payload_on_the_second_bolt() -> void:
 	var staff: CompiledStaff = _compile("double fire bolt on_hit bolt frost halo")
 	check_equal(staff.casts.size(), 1, "one cast")
 	var group: CompiledGroup = staff.casts[0].group
-	check_equal(_forms(group), [&"bolt", &"bolt"] as Array[StringName], "two bolts together")
+	check_equal(_carrier_cards(group), [&"bolt", &"bolt"] as Array[StringName], "two bolts together")
 	check_equal(group.spells[0].element_id, &"fire", "the first is a fire bolt")
 	check(group.spells[0].payload == null, "the first holds nothing")
 	check_equal(group.spells[1].element_id, &"", "the second is plain")
 	var payload: CompiledGroup = group.spells[1].payload
 	check(payload != null, "the second has a payload")
 	if payload != null:
-		check_equal([payload.spells[0].form_id, payload.spells[0].element_id], [&"halo", &"frost"], "a frost halo on hit")
+		check_equal([payload.spells[0].carrier_card_id, payload.spells[0].element_id], [&"halo", &"frost"], "a frost halo on hit")
 
 
 func test_a_group_resumes_after_its_payload() -> void:
 	var staff: CompiledStaff = _compile("double on_hit bolt halo bolt")
 	check_equal(staff.casts.size(), 1, "one cast")
 	var group: CompiledGroup = staff.casts[0].group
-	check_equal(_forms(group), [&"bolt", &"bolt"] as Array[StringName], "the last bolt joins the cast")
-	check_equal(_forms(group.spells[0].payload), [&"halo"] as Array[StringName], "the first fires a halo on hit")
+	check_equal(_carrier_cards(group), [&"bolt", &"bolt"] as Array[StringName], "the last bolt joins the cast")
+	check_equal(_carrier_cards(group.spells[0].payload), [&"halo"] as Array[StringName], "the first fires a halo on hit")
 	check(group.spells[1].payload == null, "the last bolt holds nothing")
 	check(staff.casts[0].ends_cycle, "then recharge")
 
@@ -211,20 +211,20 @@ func test_magnet_on_a_payload_fired_from_a_point_is_wasted() -> void:
 func test_a_trigger_in_the_last_slot_wraps_and_is_wasted() -> void:
 	var staff: CompiledStaff = _compile("bolt on_hit")
 	check_equal(staff.casts.size(), 2, "two casts")
-	check_equal(_forms(staff.casts[1].group), [&"bolt"] as Array[StringName], "cast 2 wraps to the bolt")
+	check_equal(_carrier_cards(staff.casts[1].group), [&"bolt"] as Array[StringName], "cast 2 wraps to the bolt")
 	check(staff.casts[1].wrapped, "cast 2 wrapped")
 	check(staff.wasted.has(1), "the trigger is wasted")
 
 
 func test_a_counter_dash_reads_in_slot_order() -> void:
-	_form(&"dash", 1, 1).carrier = &"dash"
+	_carrier_card(&"dash", 1, 1).carrier = &"dash"
 	_trigger(&"on_block", TriggerBase.Event.BLOCK)
 	var staff: CompiledStaff = _compile("shield on_block dash halo")
 	var dash: CompiledSpell = staff.casts[0].group.spells[0]
-	check_equal(dash.form_id, &"dash", "a dash")
+	check_equal(dash.carrier_card_id, &"dash", "a dash")
 	check_equal(dash.behaviour(ModifierBase.Behaviour.SHIELD), 1.0, "with one shield")
 	check(dash.fires_on(TriggerBase.Event.BLOCK), "that fires on a block")
-	check_equal(_forms(dash.payload), [&"halo"] as Array[StringName], "a halo")
+	check_equal(_carrier_cards(dash.payload), [&"halo"] as Array[StringName], "a halo")
 
 
 # --- More rules ---------------------------------------------------------------
@@ -242,10 +242,10 @@ func test_how_far_homing_looks_comes_from_the_card_and_a_beam_s_length() -> void
 	far.behaviour = ModifierBase.Behaviour.HOMING
 	far.behaviour_strength = 2.0
 	far.behaviour_reach = 240.0
-	var beam: FormBase = _form(&"beam", 3, 1)
+	var beam: CarrierCard = _carrier_card(&"beam", 3, 1)
 	beam.carrier = &"beam"
 	beam.ray_length = 300.0
-	var rune: FormBase = _form(&"rune", 3, 1)
+	var rune: CarrierCard = _carrier_card(&"rune", 3, 1)
 	rune.carrier = &"rune"
 	_orbit_cards()
 	check_equal((_compile("homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 160.0, "a bolt looks as far as its card reaches")
@@ -280,10 +280,10 @@ func _orbit_cards() -> void:
 	_modifier(&"long").lifetime_base = 5.0
 	var reach: ModifierBase = _modifier(&"reach")
 	reach.reach_mult = 1.6
-	var rune: FormBase = _form(&"rune", 3, 1)
+	var rune: CarrierCard = _carrier_card(&"rune", 3, 1)
 	rune.carrier = &"rune"
 	rune.lifetime = 8.0
-	var decoy: FormBase = _form(&"decoy", 0, 1)
+	var decoy: CarrierCard = _carrier_card(&"decoy", 0, 1)
 	decoy.carrier = &"decoy"
 	decoy.lifetime = 8.0
 
@@ -343,9 +343,9 @@ func test_each_trigger_takes_its_own_payload_in_order() -> void:
 	check_equal(bolt.triggers.size(), 2, "two triggers")
 	if bolt.triggers.size() == 2:
 		check_equal(bolt.triggers[0].event, TriggerBase.Event.HIT, "the first is on hit")
-		check_equal(_forms(bolt.triggers[0].payload), [&"halo"] as Array[StringName], "and fires the halo")
+		check_equal(_carrier_cards(bolt.triggers[0].payload), [&"halo"] as Array[StringName], "and fires the halo")
 		check_equal(bolt.triggers[1].event, TriggerBase.Event.EXPIRE, "the second is on expire")
-		check_equal(_forms(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and fires the next group, the fire bolt")
+		check_equal(_carrier_cards(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and fires the next group, the fire bolt")
 		check_equal(bolt.triggers[1].payload.spells[0].element_id, &"fire", "with its fire")
 	check_equal(staff.casts[0].targets.get(0, -1), 2, "on hit goes on the bolt")
 	check_equal(staff.casts[0].targets.get(1, -1), 2, "on expire goes on the bolt")
@@ -356,8 +356,8 @@ func test_the_same_trigger_twice_fires_two_payloads() -> void:
 	var bolt: CompiledSpell = _compile("on_hit on_hit bolt halo bolt").casts[0].group.spells[0]
 	check_equal(bolt.triggers.size(), 2, "both count")
 	if bolt.triggers.size() == 2:
-		check_equal(_forms(bolt.triggers[0].payload), [&"halo"] as Array[StringName], "a halo on hit")
-		check_equal(_forms(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and a bolt on hit")
+		check_equal(_carrier_cards(bolt.triggers[0].payload), [&"halo"] as Array[StringName], "a halo on hit")
+		check_equal(_carrier_cards(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and a bolt on hit")
 
 
 func test_a_trigger_with_no_cards_left_is_wasted_and_the_others_keep_theirs() -> void:
@@ -375,8 +375,8 @@ func test_payloads_nest_before_the_next_trigger_reads() -> void:
 	check_equal(bolt.triggers.size(), 2, "two triggers")
 	if bolt.triggers.size() == 2:
 		var inner: CompiledSpell = bolt.triggers[0].payload.spells[0]
-		check_equal(inner.form_id, &"bolt", "on hit fires a bolt")
-		check_equal(_forms(inner.payload), [&"halo"] as Array[StringName], "whose own payload is read first")
+		check_equal(inner.carrier_card_id, &"bolt", "on hit fires a bolt")
+		check_equal(_carrier_cards(inner.payload), [&"halo"] as Array[StringName], "whose own payload is read first")
 		check_equal(bolt.triggers[1].payload.spells[0].element_id, &"fire", "then on expire takes the fire bolt")
 
 
@@ -419,12 +419,12 @@ func test_a_multicast_in_one_payload_counts_for_that_payload_only() -> void:
 	var bolt: CompiledSpell = _compile("on_hit on_expire bolt double halo halo bolt").casts[0].group.spells[0]
 	check_equal(bolt.triggers.size(), 2, "two triggers")
 	if bolt.triggers.size() == 2:
-		check_equal(_forms(bolt.triggers[0].payload), [&"halo", &"halo"] as Array[StringName], "the double takes two halos")
-		check_equal(_forms(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "the next payload starts after them")
+		check_equal(_carrier_cards(bolt.triggers[0].payload), [&"halo", &"halo"] as Array[StringName], "the double takes two halos")
+		check_equal(_carrier_cards(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "the next payload starts after them")
 
 
 func test_a_trigger_that_never_fires_keeps_its_place_and_the_next_still_reads() -> void:
-	_form(&"slam", 1, 1).carrier = &"slam"
+	_carrier_card(&"slam", 1, 1).carrier = &"slam"
 	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
 	# A slam is over at once: its timer never fires, but it still reads the halo, so on hit gets the bolt.
 	var staff: CompiledStaff = _compile("timer on_hit slam halo bolt")
@@ -432,7 +432,7 @@ func test_a_trigger_that_never_fires_keeps_its_place_and_the_next_still_reads() 
 	check(staff.wasted.has(0) and staff.wasted.has(3), "the timer and its halo are wasted: %s" % staff.wasted)
 	check_equal(slam.triggers.size(), 1, "only on hit is left")
 	if slam.triggers.size() == 1:
-		check_equal(_forms(slam.triggers[0].payload), [&"bolt"] as Array[StringName], "and it fires the bolt")
+		check_equal(_carrier_cards(slam.triggers[0].payload), [&"bolt"] as Array[StringName], "and it fires the bolt")
 
 
 func test_triggers_with_no_carrier_are_all_wasted() -> void:
@@ -493,7 +493,7 @@ func test_a_shorter_wind_down_on_a_payload_is_wasted() -> void:
 func test_a_cast_winds_up_for_its_staff_its_carriers_and_their_charges() -> void:
 	# docs/milestones/cast-timing.md, T2: the staff's wind-up, every carrier's of the cast's own
 	# group and its modifiers' `wind_up_add`; a payload's winds up on its own.
-	(_fake.items[&"halo"] as FormBase).wind_up = 0.3
+	(_fake.items[&"halo"] as CarrierCard).wind_up = 0.3
 	var charge: ModifierBase = _modifier(&"charge")
 	charge.wind_up_add = 2.0
 	charge.damage_mult = 4.0
@@ -527,14 +527,14 @@ func test_an_empty_staff_has_no_cast_and_unknown_cards_are_wasted() -> void:
 	check(_compile("- - -").is_empty(), "no cards, no cast")
 	var staff: CompiledStaff = _compile("nope bolt")
 	check(staff.wasted.has(0), "an unknown id is wasted")
-	check_equal(_forms(staff.casts[0].group), [&"bolt"] as Array[StringName], "the rest still casts")
+	check_equal(_carrier_cards(staff.casts[0].group), [&"bolt"] as Array[StringName], "the rest still casts")
 
 
 func test_cards_past_the_staff_slots_are_ignored() -> void:
 	_staff.slots = 1
 	var staff: CompiledStaff = _compile("bolt halo")
 	check_equal(staff.casts.size(), 1, "one slot, one cast")
-	check_equal(_forms(staff.casts[0].group), [&"bolt"] as Array[StringName], "only the bolt")
+	check_equal(_carrier_cards(staff.casts[0].group), [&"bolt"] as Array[StringName], "only the bolt")
 
 
 func test_every_compiled_spell_has_its_own_node() -> void:
@@ -561,7 +561,7 @@ func test_the_builder_view_is_plain_values() -> void:
 
 
 func test_each_kind_of_card_has_short_lines_of_its_numbers() -> void:
-	var bolt: FormBase = _fake.items[&"bolt"]
+	var bolt: CarrierCard = _fake.items[&"bolt"]
 	bolt.mana_cost = 5.0
 	check_equal(_spells.call("component_stats", &"bolt"), PackedStringArray(["Dmg 5", "Mana 5", "Delay 0.2s"]), "a carrier: damage, mana, delay")
 	check_equal((_spells.call("component_stats", &"halo") as PackedStringArray)[0], "Dmg 4x8", "shots multiply the damage")
@@ -608,7 +608,7 @@ func test_a_mend_hit_heals_and_barely_hurts_enemies() -> void:
 
 
 func test_a_beam_is_a_ray_hit_and_a_bolt_a_shot() -> void:
-	var beam: FormBase = _form(&"beam", 3, 1)
+	var beam: CarrierCard = _carrier_card(&"beam", 3, 1)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	check_equal((_compile("beam").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"ray", "a beam")
@@ -616,7 +616,7 @@ func test_a_beam_is_a_ray_hit_and_a_bolt_a_shot() -> void:
 
 
 func test_a_swing_is_a_swing_hit_though_it_has_a_reach() -> void:
-	var swing: FormBase = _form(&"swing", 2, 1)
+	var swing: CarrierCard = _carrier_card(&"swing", 2, 1)
 	swing.carrier = &"swing"
 	swing.ray_length = 24.0
 	swing.arc = 90.0
@@ -624,7 +624,7 @@ func test_a_swing_is_a_swing_hit_though_it_has_a_reach() -> void:
 
 
 func test_a_slam_is_an_area_hit() -> void:
-	var slam: FormBase = _form(&"slam", 3, 1)
+	var slam: CarrierCard = _carrier_card(&"slam", 3, 1)
 	slam.carrier = &"slam"
 	slam.ray_length = 20.0
 	slam.radius = 16.0
@@ -642,7 +642,7 @@ func test_the_builder_view_counts_a_casts_damage() -> void:
 
 func test_the_builder_view_keeps_a_specks_damage() -> void:
 	# An atom hits for 0.3: the builder shows that, not 0.
-	var atom: FormBase = _form(&"speck", 1, 1)
+	var atom: CarrierCard = _carrier_card(&"speck", 1, 1)
 	atom.base_damage = 0.3
 	var view: Dictionary = _spells.call("staff_view", [&"speck"] as Array[StringName], _staff)
 	check(is_equal_approx(float((view["casts"] as Array)[0]["damage"]), 0.3), "a cast of one speck is 0.3")
@@ -652,12 +652,12 @@ func test_the_builder_view_keeps_a_specks_damage() -> void:
 func test_reach_stretches_a_carriers_range_and_two_multiply() -> void:
 	var reach: ModifierBase = _modifier(&"reach")
 	reach.reach_mult = 1.6
-	var bolt: FormBase = _form(&"far_bolt", 3, 1)
+	var bolt: CarrierCard = _carrier_card(&"far_bolt", 3, 1)
 	bolt.lifetime = 1.0
-	var dash: FormBase = _form(&"far_dash", 1, 1)
+	var dash: CarrierCard = _carrier_card(&"far_dash", 1, 1)
 	dash.carrier = &"dash"
 	dash.ray_length = 80.0
-	var rune: FormBase = _form(&"far_rune", 3, 1)
+	var rune: CarrierCard = _carrier_card(&"far_rune", 3, 1)
 	rune.carrier = &"rune"
 	var shot: CompiledSpell = _compile("reach far_bolt").casts[0].group.spells[0]
 	check(is_equal_approx(shot.lifetime, 1.6) and is_equal_approx(shot.speed, 300.0), "a flying shot lives longer at its speed: %s s" % shot.lifetime)

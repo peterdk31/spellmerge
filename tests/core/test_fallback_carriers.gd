@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The fallback carriers (docs/CARRIERS.md, "The fallback carriers"; reading rule 5,
 ## docs/milestones/M2-staffs.md): the modifiers and infusions a group read with no carrier after
 ## them land on the caster (`caster`), on the body or shot that fired a payload (`bearer`), or on a
-## payload's origin (`point`), three carriers no form card fires. Which cards do something there
+## payload's origin (`point`), three carriers no carrier card fires. Which cards do something there
 ## follows from their yes/no answers and what each card needs, the same rule as on any carrier, and
 ## the runtime launches them like any other, so echo, recoil, mirror and penta reach them too.
 ## tests/core/test_card_rules.gd plays every card on all three.
@@ -12,22 +12,22 @@ extends "res://tests/support/suite.gd"
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 
-func test_they_are_carriers_no_form_card_fires() -> void:
+func test_they_are_carriers_no_carrier_card_fires() -> void:
 	var on_you: Carrier = Carriers.fallback(false)
 	var there: Carrier = Carriers.fallback(true)
 	check_equal(on_you.id(), Carriers.ON_CASTER, "a cast's own group lands on the caster")
 	check_equal(there.id(), Carriers.AT_POINT, "a payload lands on its origin")
 	check(on_you.hits() and there.hits(), "both strike what is there")
 	check(on_you.has(CarrierTraits.MEETS_SHOTS) and not there.has(CarrierTraits.MEETS_SHOTS), "only the caster meets the shots that reach it")
-	check(not on_you.has_wind_down() and not there.has_wind_down(), "no form card gives them a cooldown")
+	check(not on_you.has_wind_down() and not there.has_wind_down(), "no carrier card gives them a cooldown")
 	var on_it: Carrier = Carriers.fallback(true, Carrier.BY_SHOT | Carrier.BY_POINT)
 	check_equal(on_it.id(), Carriers.ON_BEARER, "a payload a shot or body may cast lands on it")
 	check_equal(Carriers.fallback(true, Carrier.BY_POINT).id(), Carriers.AT_POINT, "one only a point casts lands there")
 	check(on_it.hits() and on_it.has(CarrierTraits.MEETS_SHOTS) and not on_it.has_wind_down(), "what fired it is struck round and meets shots")
 	check(there.has(CarrierTraits.CASTERLESS) and not on_it.has(CarrierTraits.CASTERLESS) and not on_you.has(CarrierTraits.CASTERLESS), "only a point has nothing to push")
 	for id: StringName in [Carriers.ON_CASTER, Carriers.ON_BEARER, Carriers.AT_POINT]:
-		check(not Carriers.ids().has(id), "%s is not among the carriers a form card may fire" % id)
-		check(not Carriers.exists(id), "and a form card naming %s is refused" % id)
+		check(not Carriers.ids().has(id), "%s is not among the carriers a carrier card may fire" % id)
+		check(not Carriers.exists(id), "and a carrier card naming %s is refused" % id)
 
 
 func test_a_card_lands_there_exactly_when_it_works_there() -> void:

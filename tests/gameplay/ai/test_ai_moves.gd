@@ -62,14 +62,14 @@ func before_each() -> void:
 	_combat.actors = _actors
 	_combat._ready()
 	_enemies.clear()
-	var bolt := FormBase.new()
+	var bolt := CarrierCard.new()
 	bolt.base_damage = 5
 	bolt.speed = 200.0
 	bolt.lifetime = 1.0
 	bolt.radius = 4.0
 	bolt.mana_cost = 2.0
 	_put(bolt, &"bolt")
-	var halo := FormBase.new()
+	var halo := CarrierCard.new()
 	halo.base_damage = 3
 	halo.speed = 150.0
 	halo.lifetime = 0.5
@@ -77,14 +77,14 @@ func before_each() -> void:
 	halo.spread = 360.0
 	halo.mana_cost = 2.0
 	_put(halo, &"halo")
-	var dash := FormBase.new()
+	var dash := CarrierCard.new()
 	dash.carrier = &"dash"
 	dash.ray_length = 60.0
 	dash.speed = 300.0
 	dash.lifetime = 0.2
 	dash.mana_cost = 2.0
 	_put(dash, &"dash")
-	var teleport := FormBase.new()
+	var teleport := CarrierCard.new()
 	teleport.carrier = &"teleport"
 	teleport.ray_length = 70.0
 	teleport.mana_cost = 2.0

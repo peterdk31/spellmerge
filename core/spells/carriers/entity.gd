@@ -45,7 +45,7 @@ func _spawn(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Ve
 	# point, where it was made, which Entities moves along with a familiar's orb
 	# (`Spells.familiar_at`, by its key), so the familiar casts from its orb (rules R4 F8).
 	var key: int = kit.request_entity(actor, kind, at, seconds, tag, anchor)
-	kit.events.form_shown.emit(actor, spell.form_id, at, heading, 0.0, spell.tint, spell.look)
+	kit.events.carrier_shown.emit(actor, spell.carrier_card_id, at, heading, 0.0, spell.tint, spell.look)
 	var body: int = kit.entity_body()
 	if body >= 0:
 		kit.live_join(spell, tag, SpellRuntime.LC_ACTOR, body, key, false, seconds, at, heading)
@@ -91,7 +91,7 @@ func entity_ended(actor: int, position: Vector2, tag: int, key: int = 0) -> void
 	var spell: CompiledSpell = kit.spell_of(tag)
 	if spell != null and position.is_finite():
 		if kit.events != null:
-			kit.events.carrier_ended.emit(actor, spell.form_id, position, Vector2.RIGHT, spell.radius, spell.tint, spell.look)
+			kit.events.carrier_ended.emit(actor, spell.carrier_card_id, position, Vector2.RIGHT, spell.radius, spell.tint, spell.look)
 		kit.blast(spell, tag, actor, position)
 		for trigger in spell.triggers:
 			if trigger.event == TriggerBase.Event.EXPIRE:

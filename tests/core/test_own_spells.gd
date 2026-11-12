@@ -66,18 +66,18 @@ func test_melee_is_the_carriers_that_never_leave_their_body() -> void:
 
 ## Every melee carrier never hits the body that casts it, a move's (dash, teleport) as it goes.
 func test_melee_spares_its_caster() -> void:
-	for form: String in ["swing", "slam", "dash", "teleport"]:
+	for carrier_card: String in ["swing", "slam", "dash", "teleport"]:
 		var arena := ArenaScript.new(root)
 		arena.answer_moves()
 		var body: Node2D = arena.add_guard(0, Vector2.ZERO)
-		arena.install_cards(0, 0, [form])
+		arena.install_cards(0, 0, [carrier_card])
 		var struck: Array[int] = [0]
 		arena.bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void:
 			if target == body:
 				struck[0] += 1)
-		check(arena.cast(0, 0), "%s is cast" % form)
+		check(arena.cast(0, 0), "%s is cast" % carrier_card)
 		arena.run(1.0)
-		check_equal(struck[0], 0, "a %s never hits the body that casts it" % form)
+		check_equal(struck[0], 0, "a %s never hits the body that casts it" % carrier_card)
 		arena.free_all()
 
 

@@ -10,8 +10,8 @@ extends "res://tests/support/screenshot.gd"
 ## filmstrip: the stream held, then let go and cooling). `tail_motes` is the strip at 1x;
 ## `tail_motes_4x` the same moments near the streams' start, four times bigger.
 
-const ATOM := preload("res://content/spells/forms/atom/atom.tres")
-const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
+const ATOM := preload("res://content/spells/carriers/atom/atom.tres")
+const BOLT := preload("res://content/spells/carriers/bolt/bolt.tres")
 const FIRE := preload("res://content/spells/elements/fire/fire.tres")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
@@ -81,9 +81,9 @@ func take() -> void:
 	save(zooms, "tail_motes_4x")
 
 
-func _shoot(form: Resource, at: Vector2, tint: Color, look: int) -> void:
-	var speed: float = float(form.get("speed"))
-	var slot: int = _shots.call("spawn", 0, at, Vector2(speed, 0.0), float(form.get("lifetime")), float(form.get("radius"))) as int
+func _shoot(carrier_card: Resource, at: Vector2, tint: Color, look: int) -> void:
+	var speed: float = float(carrier_card.get("speed"))
+	var slot: int = _shots.call("spawn", 0, at, Vector2(speed, 0.0), float(carrier_card.get("lifetime")), float(carrier_card.get("radius"))) as int
 	if slot < 0:
 		return
 	_shots.call("set_core", slot, tint)

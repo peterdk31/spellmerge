@@ -110,7 +110,7 @@ func test_a_jump_keeps_its_timer() -> void:
 func test_a_jump_flies_as_far_as_its_carrier() -> void:
 	var life: Callable = func(a: ArenaScript, s: int) -> float: return a.projectiles._life[s]
 	var left: Variant = _on_jump(["chain", "bolt"], life)
-	var bolt: FormBase = load("res://content/spells/forms/bolt/bolt.tres") as FormBase
+	var bolt: CarrierCard = load("res://content/spells/carriers/bolt/bolt.tres") as CarrierCard
 	# It flies at least CHAIN_MIN_SPEED, so it covers the bolt's range in less time.
 	var speed: float = maxf(bolt.speed, SpellLimits.CHAIN_MIN_SPEED)
 	check(left != null and float(left) * speed > bolt.lifetime * bolt.speed - 30.0, "a bolt's jump flies a bolt's range (%s s)" % [left])

@@ -72,7 +72,7 @@ func test_every_component_is_a_clip_of_its_kind_that_builds() -> void:
 	var count: int = 0
 	for id: StringName in _registry.call("get_ids", &"spells"):
 		count += 1
-		var kind: StringName = arena.spells.component_kind(id)
+		var kind: String = ScenariosScript.pipeline_kind(arena.spells.component_kind(id))
 		var scenario: Dictionary = _find(scenarios, "%s_%s" % [kind, id])
 		check(not scenario.is_empty(), "%s has a clip" % id)
 		if scenario.is_empty():

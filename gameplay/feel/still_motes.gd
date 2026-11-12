@@ -2,7 +2,7 @@ extends RefCounted
 ## Still motes: the motes a still carrier's shots give off all the time while they stand (the owner,
 ## 2026-11-09: "use motes for everything you can"; a wall's stream rising off its seam, a pool's
 ## motes rising off its mire, a rune's drips and the motes rising off its ring once armed). A carrier
-## card lists them, one `CardMoteStream` a stream (`FormBase.look_motes`: kind, rate, where from in
+## card lists them, one `CardMoteStream` a stream (`CarrierCard.look_motes`: kind, rate, where from in
 ## its `look_shape`, how high, from when, how far apart), coming and going by `look_open` and
 ## `look_fade`; Spells hands them out as its `CardLook` (`SpellRuntime.still_mote_cards`). They are
 ## given off from where its shots are drawn: the projectile manager hands out a view of the card
@@ -76,8 +76,8 @@ func attach(projectiles: ProjectilesScript, spells: SpellRuntime) -> void:
 	_looks.clear()
 	if projectiles == null or spells == null:
 		return
-	for form: StringName in spells.still_mote_cards():
-		var look: CardLook = spells.look_of(form, Carrier.LOOK_STILL)
+	for carrier_card: StringName in spells.still_mote_cards():
+		var look: CardLook = spells.look_of(carrier_card, Carrier.LOOK_STILL)
 		if look.shader == null or look.motes.is_empty():
 			continue
 		var body: int = projectiles.body_of(look.shader, ProjectilesScript.MESH_QUAD)

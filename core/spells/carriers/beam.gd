@@ -488,7 +488,7 @@ func _beam_step(at: int, delta: float) -> void:
 		_open_legs(at)
 	# Every step, not only on its hits: a shot must not slip through between two ticks.
 	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
-		_bm_shield[at] = kit.guard_path(spell, tag, _bm_actor[at], _bm_points, at * _bm_stride, _bm_count[at], _bm_reach[at], _beam_width(at), _bm_shield[at])
+		_bm_shield[at] = kit.guard_path(spell, tag, _bm_actor[at], _bm_points, at * _bm_stride, _bm_count[at], _bm_reach[at], _beam_width(at), _bm_shield[at], id())
 
 
 ## Puts live beam `at` where its caster holds it now: a body (the wizard's, or one that fired its
@@ -1126,10 +1126,10 @@ func beam_infusions(at: int) -> PackedColorArray:
 	return _bm_spell[at].infusion_looks if _bm_spell[at] != null else PackedColorArray()
 
 
-## The id of the card live beam `at` is (`CompiledSpell.form_id`; &"" for none), so Feel draws it
+## The id of the card live beam `at` is (`CompiledSpell.carrier_card_id`; &"" for none), so Feel draws it
 ## by its card's look (`Spells.look_of`).
-func beam_form(at: int) -> StringName:
-	return _bm_spell[at].form_id if _bm_spell[at] != null else &""
+func beam_carrier_card(at: int) -> StringName:
+	return _bm_spell[at].carrier_card_id if _bm_spell[at] != null else &""
 
 
 ## The packed look kinds of live beam `at` (`CompiledSpell.look`), so it shows its cards.

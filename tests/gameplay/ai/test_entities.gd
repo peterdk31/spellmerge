@@ -405,7 +405,7 @@ func _test_swap_moves_only_the_named_enemy() -> void:
 func _test_a_familiar_is_drawn_by_its_cards_look() -> void:
 	_setup()
 	var material: ShaderMaterial = _entities._familiar_node.material as ShaderMaterial
-	_check(material.shader == preload("res://content/spells/forms/familiar/familiar.gdshader"), "familiar look: drawn by the familiar card's shader, got %s" % material.shader.resource_path)
+	_check(material.shader == preload("res://content/spells/carriers/familiar/familiar.gdshader"), "familiar look: drawn by the familiar card's shader, got %s" % material.shader.resource_path)
 	_entities.spells = null
 	_entities.use_familiar_look()
 	_check(material.shader == EntitiesScript.ORBIT_SHADER, "familiar look: the plain orbit shot with no Spells")

@@ -5,7 +5,7 @@ extends "res://tests/support/screenshot.gd"
 ## are drawn.
 ##
 ## `atom_looks` (1x): three lanes per infusion (plain, fire, frost, storm, void, lightning), all
-## flying right: a bolt drawn by its card's own shader (`forms/bolt/bolt.gdshader`, its core a `x`;
+## flying right: a bolt drawn by its card's own shader (`carriers/bolt/bolt.gdshader`, its core a `x`;
 ## docs/milestones/card-looks.md), an atom, and a bolt drawn by the plain head (`+`) for the owner
 ## to judge them side by side. `atom_looks_4x`: the plain infusion's three heads at 4x.
 
@@ -18,8 +18,8 @@ const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/void/void.tres"),
 	preload("res://content/spells/elements/lightning/lightning.tres"),
 ]
-const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
-const ATOM := preload("res://content/spells/forms/atom/atom.tres")
+const BOLT := preload("res://content/spells/carriers/bolt/bolt.tres")
+const ATOM := preload("res://content/spells/carriers/atom/atom.tres")
 ## Frames the shots fly before the picture (a quarter of a second).
 const FLIGHT: int = 15
 
@@ -45,14 +45,14 @@ func take() -> void:
 		var player: int = wizards[e % 4]
 		var y: float = 30.0 + e * 56.0
 		for lane in 3:
-			var form: Resource = ATOM if lane == 1 else BOLT
-			var speed: float = float(form.get("speed"))
+			var carrier_card: Resource = ATOM if lane == 1 else BOLT
+			var speed: float = float(carrier_card.get("speed"))
 			# Both end their flight at the same x, so the tails line up behind them.
 			var start: Vector2 = Vector2(420.0 - speed * float(FLIGHT) / 60.0, y + lane * 17.0)
-			var slot: int = _shots.call("spawn", player, start, Vector2(speed, 0.0), 600.0, float(form.get("radius"))) as int
+			var slot: int = _shots.call("spawn", player, start, Vector2(speed, 0.0), 600.0, float(carrier_card.get("radius"))) as int
 			if lane == 0:
 				# The bolt's own look: its card's shader, a pair of head batches of its own.
-				_shots.call("set_form", slot, &"bolt", _shots.call("register_body", form.get("look_shader"), ManagerScript.MESH_HEAD))
+				_shots.call("set_carrier_card", slot, &"bolt", _shots.call("register_body", carrier_card.get("look_shader"), ManagerScript.MESH_HEAD))
 			_shots.call("set_core", slot, tint)
 			_shots.call("set_look", slot, ManagerScript.pack_look(look))
 		if e == 0:

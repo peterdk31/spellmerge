@@ -59,14 +59,14 @@ func before_each() -> void:
 	_combat.actors = _actors
 	_combat._ready()
 	_enemies.clear()
-	var bolt := FormBase.new()
+	var bolt := CarrierCard.new()
 	bolt.base_damage = 5
 	bolt.speed = 200.0
 	bolt.lifetime = 1.0
 	bolt.radius = 4.0
 	bolt.mana_cost = 2.0
 	_put(bolt, &"bolt")
-	var halo := FormBase.new()
+	var halo := CarrierCard.new()
 	halo.base_damage = 3
 	halo.speed = 150.0
 	halo.lifetime = 0.5
@@ -228,7 +228,7 @@ func test_the_telegraph_shows_the_next_casts_reach() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
 	# The lane is Feel's (the card's wind cue, docs/milestones/cast-timing.md T6b); what it is told:
 	var winding: Array = []
-	_bus.cast_winding.connect(func(caster: int, _staff: int, form: StringName, _origin: Vector2, _direction: Vector2, seconds: float, _tint: Color, _look: int, tag: int, _cue: StringName) -> void: winding.append([caster, form, seconds, tag]))
+	_bus.cast_winding.connect(func(caster: int, _staff: int, carrier_card: StringName, _origin: Vector2, _direction: Vector2, seconds: float, _tint: Color, _look: int, tag: int, _cue: StringName) -> void: winding.append([caster, carrier_card, seconds, tag]))
 	_until_windup(enemy, 1.0)
 	check(winding.size() == 1 and winding[0][0] == enemy.id and winding[0][1] == &"bolt", "a bolt winding up is told: %s" % [winding])
 	if winding.size() == 1:

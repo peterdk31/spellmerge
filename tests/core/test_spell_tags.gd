@@ -30,10 +30,10 @@ func before_each() -> void:
 	_fake = own(FakeRegistry.new()) as FakeRegistry
 	_spells = own(SpellsScript.new())
 	_spells.set("registry", _fake)
-	_form(&"bolt", 1, 5, 1)
-	_form(&"halo", 2, 4, 8).spread = 360.0
-	_form(&"heavy", 4, 4, 1)
-	var beam: FormBase = _form(&"beam", 2, 3, 1)
+	_carrier_card(&"bolt", 1, 5, 1)
+	_carrier_card(&"halo", 2, 4, 8).spread = 360.0
+	_carrier_card(&"heavy", 4, 4, 1)
+	var beam: CarrierCard = _carrier_card(&"beam", 2, 3, 1)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var fire: ElementBase = _element(&"fire", 1)
@@ -67,14 +67,14 @@ func _put(component: SpellComponent, id: StringName, complexity: int) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, complexity: int, damage: int, shots: int) -> FormBase:
-	var form := FormBase.new()
-	form.base_damage = damage
-	form.shots = shots
-	form.speed = 300.0
-	form.mana_cost = 2.0
-	_put(form, id, complexity)
-	return form
+func _carrier_card(id: StringName, complexity: int, damage: int, shots: int) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = damage
+	carrier_card.shots = shots
+	carrier_card.speed = 300.0
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id, complexity)
+	return carrier_card
 
 
 func _element(id: StringName, complexity: int) -> ElementBase:
@@ -101,9 +101,9 @@ func _staff(recipe: Dictionary) -> CompiledStaff:
 	return StaffKit.compile(_spells, StaffKit.cards(recipe))
 
 
-## A recipe of `form` that holds `held` through `trigger`.
-func _holding(form: StringName, trigger: StringName, held: Dictionary) -> Dictionary:
-	return {"form": form, "trigger": trigger, "held": held}
+## A recipe of `carrier_card` that holds `held` through `trigger`.
+func _holding(carrier_card: StringName, trigger: StringName, held: Dictionary) -> Dictionary:
+	return {"carrier": carrier_card, "trigger": trigger, "held": held}
 
 
 func _begin(actor: int, staff: int, compiled: CompiledStaff) -> int:
@@ -156,7 +156,7 @@ func test_tags_fit_an_int32_and_miss_the_ai_tags() -> void:
 
 
 func test_a_built_staff_registers_every_node() -> void:
-	var staff: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", _holding(&"halo", &"on_hit", {"form": &"bolt"})))
+	var staff: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", _holding(&"halo", &"on_hit", {"carrier": &"bolt"})))
 	var tag: int = _begin(2, 1, staff)
 	check(SpellTag.caster_of(tag) == 2 and SpellTag.staff_of(tag) == 1 and SpellTag.node_of(tag) == 0, "the first tag names caster, staff and node 0")
 	for node in staff.nodes.size():
@@ -166,7 +166,7 @@ func test_a_built_staff_registers_every_node() -> void:
 
 func test_empty_staffs_and_bad_arguments_give_tag_zero() -> void:
 	check_equal(_begin(0, 0, StaffKit.compile(_spells, [] as Array[StringName])), 0, "an empty staff is not registered")
-	var good: CompiledStaff = _staff({"form": &"bolt"})
+	var good: CompiledStaff = _staff({"carrier": &"bolt"})
 	check_equal(_begin(ActorsScript.ACTORS, 0, good), 0, "actor %d does not exist" % ActorsScript.ACTORS)
 	var high: int = _begin(1023, 3, good)
 	check(high != 0 and SpellTag.caster_of(high) == 1023 and SpellTag.staff_of(high) == 3, "actor 1023 builds and its tag names it")
@@ -182,13 +182,13 @@ func test_four_players_build_at_once_without_mixing() -> void:
 	var builds: Array[CompiledStaff] = []
 	for player in 4:
 		for staff in SpellLimits.STAFFS:
-			var built: CompiledStaff = _staff({"form": &"bolt", "modifiers": [&"pierce"]})
+			var built: CompiledStaff = _staff({"carrier": &"bolt", "modifiers": [&"pierce"]})
 			builds.append(built)
 			tags.append(_begin(player, staff, built))
 	for i in tags.size():
 		check(_spells.call("profile", tags[i]) == builds[i].nodes[0], "tag %d finds its own spell" % i)
 	# Rebuilding one staff leaves the others alone.
-	var rebuilt: int = _begin(1, 0, _staff({"form": &"halo"}))
+	var rebuilt: int = _begin(1, 0, _staff({"carrier": &"halo"}))
 	var at: int = SpellLimits.STAFFS
 	check(rebuilt != tags[at], "the new build has a new tag")
 	for i in tags.size():
@@ -197,11 +197,11 @@ func test_four_players_build_at_once_without_mixing() -> void:
 
 
 func test_a_rebuild_mid_flight_keeps_the_old_profile_until_the_last_shot_ends() -> void:
-	var old: CompiledStaff = _staff({"form": &"bolt"})
+	var old: CompiledStaff = _staff({"carrier": &"bolt"})
 	var old_tag: int = _begin(0, 0, old)
 	_spells.call("shot_started", old_tag)
 	_spells.call("shot_started", old_tag)
-	var new_tag: int = _begin(0, 0, _staff({"form": &"halo"}))
+	var new_tag: int = _begin(0, 0, _staff({"carrier": &"halo"}))
 	check(new_tag != old_tag, "a rebuild moves to a new generation")
 	check(_spells.call("profile", old_tag) == old.nodes[0], "shots in the air keep their old numbers")
 	check_equal(_spells.call("generations_held", 0, 0), 2, "old and new are both held")
@@ -213,12 +213,12 @@ func test_a_rebuild_mid_flight_keeps_the_old_profile_until_the_last_shot_ends() 
 
 
 func test_a_rebuild_mid_flight_keeps_every_node_until_the_last_shot_of_any_node() -> void:
-	var old: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", _holding(&"halo", &"on_hit", {"form": &"bolt"})))
+	var old: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", _holding(&"halo", &"on_hit", {"carrier": &"bolt"})))
 	var tag0: int = _begin(0, 0, old)
 	var tag1: int = _spells.call("current_tag", 0, 0, 1)
 	var tag2: int = _spells.call("current_tag", 0, 0, 2)
 	_spells.call("shot_started", tag0)
-	_begin(0, 0, _staff({"form": &"bolt"}))
+	_begin(0, 0, _staff({"carrier": &"bolt"}))
 	check(_spells.call("profile", tag1) == old.nodes[1], "the payload survives while its parent shot is in the air")
 	check(_spells.call("profile", tag2) == old.nodes[2], "and so does the one below it")
 	# The parent hits: the child is counted first, then the parent ends.
@@ -235,14 +235,14 @@ func test_a_rebuild_mid_flight_keeps_every_node_until_the_last_shot_of_any_node(
 
 
 func test_a_rebuild_with_no_shots_in_the_air_frees_the_old_build_at_once() -> void:
-	var old_tag: int = _begin(3, 1, _staff({"form": &"bolt"}))
-	_begin(3, 1, _staff({"form": &"halo"}))
+	var old_tag: int = _begin(3, 1, _staff({"carrier": &"bolt"}))
+	_begin(3, 1, _staff({"carrier": &"halo"}))
 	check(_spells.call("profile", old_tag) == null, "nothing needs the old build")
 	check_equal(_spells.call("generations_held", 3, 1), 1, "one generation held")
 
 
 func test_the_current_build_stays_when_its_shots_end() -> void:
-	var tag: int = _begin(0, 0, _staff({"form": &"bolt"}))
+	var tag: int = _begin(0, 0, _staff({"carrier": &"bolt"}))
 	_spells.call("shot_started", tag)
 	_spells.call("shot_ended", tag)
 	check(_spells.call("profile", tag) != null, "the build in use is never freed")
@@ -253,24 +253,24 @@ func test_the_current_build_stays_when_its_shots_end() -> void:
 
 
 func test_the_ring_wraps_after_eight_builds() -> void:
-	var first_tag: int = _begin(0, 0, _staff({"form": &"bolt"}))
+	var first_tag: int = _begin(0, 0, _staff({"carrier": &"bolt"}))
 	for build in range(1, SpellLimits.GENERATIONS):
-		var tag: int = _begin(0, 0, _staff({"form": &"bolt"}))
+		var tag: int = _begin(0, 0, _staff({"carrier": &"bolt"}))
 		check_equal(SpellTag.generation_of(tag), build, "build %d is generation %d" % [build, build])
-	var wrapped: int = _begin(0, 0, _staff({"form": &"halo"}))
+	var wrapped: int = _begin(0, 0, _staff({"carrier": &"halo"}))
 	check_equal(wrapped, first_tag, "the ninth build reuses generation 0")
 	check_equal((_spells.get("revoked_tags") as PackedInt64Array).size(), 0, "nothing was in the air, so nothing is revoked")
 
 
 func test_a_full_ring_revokes_the_oldest_generations_shots() -> void:
-	var first_tag: int = _begin(0, 0, _staff({"form": &"bolt"}))
+	var first_tag: int = _begin(0, 0, _staff({"carrier": &"bolt"}))
 	_spells.call("shot_started", first_tag)
 	# Seven more builds, each with a shot still in the air: all eight generations are live.
 	for build in range(1, SpellLimits.GENERATIONS):
-		var tag: int = _begin(0, 0, _staff({"form": &"bolt"}))
+		var tag: int = _begin(0, 0, _staff({"carrier": &"bolt"}))
 		_spells.call("shot_started", tag)
 	check_equal(_spells.call("generations_held", 0, 0), SpellLimits.GENERATIONS, "all eight generations are held")
-	var newest: CompiledStaff = _staff({"form": &"halo"})
+	var newest: CompiledStaff = _staff({"carrier": &"halo"})
 	var tag: int = _begin(0, 0, newest)
 	check_equal(tag, first_tag, "the ring is back at generation 0")
 	var revoked: PackedInt64Array = _spells.get("revoked_tags")
@@ -284,7 +284,7 @@ func test_a_full_ring_revokes_the_oldest_generations_shots() -> void:
 
 
 func test_revoking_covers_the_payload_nodes() -> void:
-	var staff: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", {"form": &"bolt"}))
+	var staff: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", {"carrier": &"bolt"}))
 	_begin(0, 1, staff)
 	var payload_tag: int = _spells.call("current_tag", 0, 1, 1)
 	_spells.call("shot_started", payload_tag)
@@ -295,18 +295,18 @@ func test_revoking_covers_the_payload_nodes() -> void:
 
 
 func test_clear_forgets_everything() -> void:
-	var tag: int = _begin(0, 0, _staff({"form": &"bolt"}))
+	var tag: int = _begin(0, 0, _staff({"carrier": &"bolt"}))
 	_spells.call("clear")
 	check(_spells.call("profile", tag) == null, "no profile")
 	check_equal(_spells.call("current_tag", 0, 0), 0, "no current build")
 
 
 ## A tag gives its spell's cards as plain ids (for gameplay/feel's motes by card,
-## docs/milestones/spell-spectacle-2.md, S2): its form, its infusion, its modifiers; none once its
+## docs/milestones/spell-spectacle-2.md, S2): its carrier card, its infusion, its modifiers; none once its
 ## generation is gone.
 func test_a_tag_gives_its_spells_cards() -> void:
-	var tag: int = _begin(0, 1, _staff({"form": &"bolt", "element": &"fire", "modifiers": [&"homing", &"pierce"]}))
-	check_equal(_spells.call("cards_of", tag), [&"bolt", &"fire", &"homing", &"pierce"] as Array[StringName], "form, infusion, modifiers")
+	var tag: int = _begin(0, 1, _staff({"carrier": &"bolt", "element": &"fire", "modifiers": [&"homing", &"pierce"]}))
+	check_equal(_spells.call("cards_of", tag), [&"bolt", &"fire", &"homing", &"pierce"] as Array[StringName], "carrier card, infusion, modifiers")
 	check_equal(_spells.call("cards_of", tag + 4096), [] as Array[StringName], "a tag with no spell: none")
-	_begin(0, 1, _staff({"form": &"halo"}))
+	_begin(0, 1, _staff({"carrier": &"halo"}))
 	check_equal(_spells.call("cards_of", tag), [] as Array[StringName], "a rebuilt staff's old tag (no shot in the air): none")

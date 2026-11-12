@@ -52,7 +52,7 @@ func _registry() -> Node:
 func _test_lookup() -> void:
 	var registry: Node = _registry()
 	var spark: Resource = registry.get_resource(&"spells", &"spark")
-	_check(spark is FormBase, "spark is a FormBase")
+	_check(spark is CarrierCard, "spark is a CarrierCard")
 	_check(registry.get_resource(&"enemies", &"blob") is EnemyBase, "blob is an EnemyBase")
 	_check(registry.get_resource(&"rooms", &"hall") is RoomBase, "hall is a RoomBase")
 	_check(registry.get_folders() == _names([&"enemies", &"rooms", &"spells"]), "folders are found, sorted: %s" % [registry.get_folders()])
@@ -86,7 +86,7 @@ func _test_nested_folders_and_skipped_files() -> void:
 
 func _test_duplicate_id_keeps_the_first() -> void:
 	var registry: Node = _registry()
-	var spark: FormBase = registry.get_resource(&"spells", &"spark") as FormBase
+	var spark: CarrierCard = registry.get_resource(&"spells", &"spark") as CarrierCard
 	_check(spark != null and spark.display_name == "Spark", "the first file in sorted order wins a duplicate id")
 	registry.free()
 

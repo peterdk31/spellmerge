@@ -1,6 +1,6 @@
 class_name Carriers
 extends RefCounted
-## Finds each carrier by its id (`Carrier.id`, the `carrier` a form card names: &"atom", &"beam"...).
+## Finds each carrier by its id (`Carrier.id`, the `carrier` a carrier card names: &"atom", &"beam"...).
 ## `of` answers the compiler and anything that reads a carrier's tables; the spell runtime makes its
 ## own set with `make_all` and binds them, since a carrier with rows of its own (a beam, a swing, a
 ## slam) keeps them per runtime. A carrier is named, never numbered, and found by its script, so
@@ -13,8 +13,8 @@ const FOLDER: String = "res://core/spells/carriers/"
 
 ## The three fallback carriers (docs/CARRIERS.md, "The fallback carriers"): what the cards a group
 ## read with no carrier after them land on: the caster for a cast's own group; for a payload, what
-## fired it (a body or a shot) when one may have, else the point it began at. No form card fires
-## them, so they are not in `ids` and a form card may not name them.
+## fired it (a body or a shot) when one may have, else the point it began at. No carrier card fires
+## them, so they are not in `ids` and a carrier card may not name them.
 const ON_CASTER: StringName = &"caster"
 const ON_BEARER: StringName = &"bearer"
 const AT_POINT: StringName = &"point"
@@ -47,7 +47,7 @@ static func is_fallback(id: StringName) -> bool:
 	return id == ON_CASTER or id == ON_BEARER or id == AT_POINT
 
 
-## True when `id` names a carrier a form card may fire (&"" names none: it is the id of the one that
+## True when `id` names a carrier a carrier card may fire (&"" names none: it is the id of the one that
 ## runs nothing; the fallback carriers are fired by no card).
 static func exists(id: StringName) -> bool:
 	if _shared.is_empty():
@@ -55,7 +55,7 @@ static func exists(id: StringName) -> bool:
 	return _shared.has(id) and not is_fallback(id)
 
 
-## The id of every carrier a form card may fire, in the order `make_all` lists them (the fallback
+## The id of every carrier a carrier card may fire, in the order `make_all` lists them (the fallback
 ## carriers left out).
 static func ids() -> Array[StringName]:
 	if _shared.is_empty():

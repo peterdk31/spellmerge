@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Tests for casting and triggers in core/spells (M2 part 6): `cast` with per-player
-## cooldowns, the shapes the forms make, triggers on hit, expire and timer with the per-step
+## cooldowns, the shapes the carrier cards make, triggers on hit, expire and timer with the per-step
 ## fire cap, the held spell's origin, direction and exclusion, chain, `hit_profile`, and
 ## four players with a rebuild mid-flight. It runs a real projectile manager and event bus,
 ## stepped by hand, with components built in code and a stand-in registry.
@@ -49,21 +49,21 @@ func before_each() -> void:
 	_ended.clear()
 	_mgr.shot_ended.connect(func(tag: int) -> void: _ended[tag] = _ended.get(tag, 0) + 1)
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void: _hits.append([player, target, at, tag]))
-	_form(&"bolt", 5, 300.0, 1.0)
-	_form(&"slow", 5, 60.0, 5.0)
-	_form(&"short", 5, 300.0, 0.1)
-	var heavy: FormBase = _form(&"heavy", 5, 300.0, 1.0)
+	_carrier_card(&"bolt", 5, 300.0, 1.0)
+	_carrier_card(&"slow", 5, 60.0, 5.0)
+	_carrier_card(&"short", 5, 300.0, 0.1)
+	var heavy: CarrierCard = _carrier_card(&"heavy", 5, 300.0, 1.0)
 	heavy.wind_down = 2.0
-	var ring: FormBase = _form(&"ring", 5, 300.0, 1.0)
+	var ring: CarrierCard = _carrier_card(&"ring", 5, 300.0, 1.0)
 	ring.shots = 24
 	ring.spread = 360.0
-	var halo: FormBase = _form(&"halo", 5, 300.0, 1.0)
+	var halo: CarrierCard = _carrier_card(&"halo", 5, 300.0, 1.0)
 	halo.shots = 8
 	halo.spread = 360.0
-	var rune: FormBase = _form(&"rune", 5, 0.0, 10.0)
+	var rune: CarrierCard = _carrier_card(&"rune", 5, 0.0, 10.0)
 	rune.carrier = &"rune"
 	rune.radius = 6.0
-	var beam: FormBase = _form(&"beam", 5, 0.0, 0.1)
+	var beam: CarrierCard = _carrier_card(&"beam", 5, 0.0, 0.1)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var fire: ElementBase = ElementBase.new()
@@ -112,14 +112,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-func _form(id: StringName, damage: int, speed: float, lifetime: float) -> FormBase:
-	var form := FormBase.new()
-	form.base_damage = damage
-	form.speed = speed
-	form.lifetime = lifetime
-	form.mana_cost = 2.0
-	_put(form, id)
-	return form
+func _carrier_card(id: StringName, damage: int, speed: float, lifetime: float) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.base_damage = damage
+	carrier_card.speed = speed
+	carrier_card.lifetime = lifetime
+	carrier_card.mana_cost = 2.0
+	_put(carrier_card, id)
+	return carrier_card
 
 
 func _trigger(id: StringName, event: TriggerBase.Event) -> TriggerBase:
@@ -142,8 +142,8 @@ func _build(player: int, staff: int, recipe: Dictionary) -> int:
 	return StaffKit.build(_spells, player, staff, StaffKit.cards(recipe))
 
 
-func _held(form: StringName, trigger: StringName, held: StringName) -> Dictionary:
-	return {"form": form, "trigger": trigger, "held": {"form": held}}
+func _held(carrier_card: StringName, trigger: StringName, held: StringName) -> Dictionary:
+	return {"carrier": carrier_card, "trigger": trigger, "held": {"carrier": held}}
 
 
 func _target(position: Vector2, radius: float = 10.0) -> Node2D:
@@ -180,7 +180,7 @@ func _cast(player: int, slot: int = 0, mana: float = 10.0, origin: Vector2 = Vec
 
 
 func test_a_cast_spends_mana_then_cools_down() -> void:
-	_build(0, 0, {"form": &"bolt"})
+	_build(0, 0, {"carrier": &"bolt"})
 	check_equal(_cast(0), 2.0, "the cast returns the mana it cost")
 	check_equal(_mgr.get_count(), 1, "one shot")
 	check_equal(_cast(0), SpellsScript.REFUSED, "cooling down")
@@ -192,7 +192,7 @@ func test_a_cast_spends_mana_then_cools_down() -> void:
 
 
 func test_a_refused_cast_changes_nothing() -> void:
-	_build(0, 0, {"form": &"bolt"})
+	_build(0, 0, {"carrier": &"bolt"})
 	check_equal(_cast(0, 0, 1.0), SpellsScript.REFUSED, "too little mana")
 	check_equal(_cast(0, 0, 10.0, Vector2.ZERO, Vector2.ZERO), SpellsScript.REFUSED, "no direction")
 	check_equal(_cast(0, 1), SpellsScript.REFUSED, "nothing built in slot B")
@@ -203,8 +203,8 @@ func test_a_refused_cast_changes_nothing() -> void:
 
 func test_players_and_slots_cool_down_on_their_own() -> void:
 	for player in 4:
-		_build(player, 0, {"form": &"heavy" if player == 2 else &"bolt"})
-	_build(0, 1, {"form": &"bolt"})
+		_build(player, 0, {"carrier": &"heavy" if player == 2 else &"bolt"})
+	_build(0, 1, {"carrier": &"bolt"})
 	for player in 4:
 		check_equal(_cast(player), 2.0, "player %d casts" % player)
 		check_equal(_mgr.get_count_for(player), 1, "player %d owns one shot" % player)
@@ -217,7 +217,7 @@ func test_players_and_slots_cool_down_on_their_own() -> void:
 
 
 func test_split_fans_the_shots_over_the_spread() -> void:
-	_build(0, 0, {"form": &"bolt", "modifiers": [&"split"]})
+	_build(0, 0, {"carrier": &"bolt", "modifiers": [&"split"]})
 	_cast(0)
 	var angles: Array[float] = []
 	for slot in _slots():
@@ -227,7 +227,7 @@ func test_split_fans_the_shots_over_the_spread() -> void:
 
 
 func test_a_nova_is_an_even_ring() -> void:
-	_build(0, 0, {"form": &"halo"})
+	_build(0, 0, {"carrier": &"halo"})
 	_cast(0)
 	var sum: Vector2 = Vector2.ZERO
 	for slot in _slots():
@@ -237,18 +237,18 @@ func test_a_nova_is_an_even_ring() -> void:
 
 
 func test_still_and_orbit_shots_and_a_missing_anchor() -> void:
-	_build(0, 0, {"form": &"rune"})
+	_build(0, 0, {"carrier": &"rune"})
 	_cast(0, 0, 10.0, Vector2(30, 30))
 	_tick(10)
 	check_equal(_mgr.get_position_of(_slots()[0]), Vector2(42, 30), "a rune stays where it was placed, twice its size ahead (rules R4 F3)")
 	# A circling bolt with no anchor to go round is cast all the same and flies on as it was made.
-	_build(1, 0, {"form": &"bolt", "modifiers": [&"orbit"]})
+	_build(1, 0, {"carrier": &"bolt", "modifiers": [&"orbit"]})
 	check_equal(_cast(1), 2.0, "with no anchor a circling bolt is still cast")
 	_tick(10)
 	var lost: Array[int] = _slots(_spells.current_tag(1, 0))
 	check(lost.size() == 1 and _mgr.get_position_of(lost[0]).x > 40.0, "and flies straight on: nothing to circle")
 	_mgr.set_anchor(2, Vector2(100, 100))
-	_build(2, 0, {"form": &"bolt", "modifiers": [&"orbit"]})
+	_build(2, 0, {"carrier": &"bolt", "modifiers": [&"orbit"]})
 	check_equal(_cast(2), 2.0, "with its anchor it is cast")
 	_tick(10)
 	var orbit_slot: int = _slots(_spells.current_tag(2, 0))[0]
@@ -256,25 +256,25 @@ func test_still_and_orbit_shots_and_a_missing_anchor() -> void:
 
 
 func test_every_shot_takes_the_colour_of_its_element_in_its_core() -> void:
-	_build(0, 0, {"form": &"halo", "element": &"fire"})
+	_build(0, 0, {"carrier": &"halo", "element": &"fire"})
 	_cast(0)
 	var shots: Array[int] = _slots()
 	check_equal(shots.size(), 8, "the halo made its ring")
 	for slot in shots:
 		check_equal(_mgr.get_core_of(slot), Color(0.88, 0.35, 0.18), "a shot of the ring has the element's core")
-	_build(1, 0, {"form": &"bolt"})
+	_build(1, 0, {"carrier": &"bolt"})
 	_cast(1)
 	var plain: int = _slots(_spells.current_tag(1, 0))[0]
 	check_equal(_mgr.get_core_of(plain), Color.WHITE, "a spell with no element has a plain core")
-	_build(2, 0, {"form": &"rune", "element": &"fire"})
+	_build(2, 0, {"carrier": &"rune", "element": &"fire"})
 	_cast(2, 0, 10.0, Vector2(30, 30))
 	check_equal(_mgr.get_core_of(_slots(_spells.current_tag(2, 0))[0]), Color(0.88, 0.35, 0.18), "a rune has it too")
 
 
 func test_a_beam_and_a_full_fan_announce_nothing_for_looks() -> void:
 	var seen: Array = []
-	_bus.form_shown.connect(func(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, _look: int) -> void: seen.append([player, form, origin, direction, length, tint]))
-	_build(2, 0, {"form": &"beam", "element": &"fire"})
+	_bus.carrier_shown.connect(func(player: int, carrier_card: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, _look: int) -> void: seen.append([player, carrier_card, origin, direction, length, tint]))
+	_build(2, 0, {"carrier": &"beam", "element": &"fire"})
 	_cast(2, 0, 10.0, Vector2(5, 6), Vector2.DOWN)
 	# A beam lives on for its lifetime, so it is shown from the live beams, not announced.
 	check_equal(seen.size(), 0, "a beam is no announcement")
@@ -288,10 +288,10 @@ func test_a_beam_and_a_full_fan_announce_nothing_for_looks() -> void:
 	check(CarrierBeam.of(_spells).beam_origin(at).direction_to(CarrierBeam.of(_spells).beam_end(at)).is_equal_approx(Vector2.DOWN), "along the aim")
 	check(is_equal_approx(CarrierBeam.of(_spells).beam_reach(at), 200.0), "as long as it got (%s)" % str(CarrierBeam.of(_spells).beam_reach(at)))
 	check_equal(CarrierBeam.of(_spells).beam_tint(at), Color(0.88, 0.35, 0.18), "in the element's colour")
-	_build(1, 0, {"form": &"halo"})
+	_build(1, 0, {"carrier": &"halo"})
 	_cast(1)
 	check_equal(seen.size(), 0, "a fan all the way round is drawn as its shots, no announcement")
-	_build(0, 0, {"form": &"bolt"})
+	_build(0, 0, {"carrier": &"bolt"})
 	_cast(0)
 	check_equal(seen.size(), 0, "a bolt has no announcement, it is drawn as a shot")
 
@@ -302,7 +302,7 @@ func test_a_nova_casts_eight_ways_and_shows_its_ring_once() -> void:
 	var cues: Array = []
 	_bus.cue_shown.connect(func(caster: int, cue: StringName, at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void: cues.append([caster, cue, at]))
 	_mgr.set_anchor(1, Vector2(30, 40))
-	var tag: int = _build(1, 0, {"form": &"bolt", "modifiers": [&"nova"]})
+	var tag: int = _build(1, 0, {"carrier": &"bolt", "modifiers": [&"nova"]})
 	_cast(1, 0, 10.0, Vector2(30, 40))
 	var slots: Array[int] = _slots(tag)
 	check_equal(slots.size(), 8, "eight bolts")
@@ -319,7 +319,7 @@ func test_a_nova_casts_eight_ways_and_shows_its_ring_once() -> void:
 
 func test_a_beam_hits_instantly_and_counts_as_a_shot() -> void:
 	_target(Vector2(100, 0))
-	var tag: int = _build(0, 0, {"form": &"beam"})
+	var tag: int = _build(0, 0, {"carrier": &"beam"})
 	check_equal(_cast(0), 2.0, "the beam fired")
 	check_equal(_hits.size(), 1, "it hit at once")
 	check_equal(_hits[0][3], tag, "with the spell's tag")
@@ -345,7 +345,7 @@ func test_on_hit_fires_the_held_spell_from_the_hit_point_along_the_shot() -> voi
 func test_the_held_spell_cannot_hit_the_target_that_fired_it() -> void:
 	var near: Node2D = _target(Vector2(60, 0))
 	var far: Node2D = _target(Vector2(160, 0))
-	_build(0, 0, {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"halo"}})
+	_build(0, 0, {"carrier": &"bolt", "trigger": &"on_hit", "held": {"carrier": &"halo"}})
 	_cast(0)
 	_tick(60)
 	var on_near: int = 0
@@ -407,7 +407,7 @@ func test_a_timer_fires_every_interval_for_as_long_as_its_shot_lives() -> void:
 func test_a_trigger_fires_every_time_its_event_happens() -> void:
 	for x in [40.0, 70.0, 100.0, 130.0]:
 		_target(Vector2(x, 0))
-	_build(0, 0, {"form": &"bolt", "modifiers": [&"pierce"], "trigger": &"on_hit", "held": {"form": &"bolt"}})
+	_build(0, 0, {"carrier": &"bolt", "modifiers": [&"pierce"], "trigger": &"on_hit", "held": {"carrier": &"bolt"}})
 	_cast(0)
 	_tick(30)
 	var first_hits: int = 0
@@ -420,7 +420,7 @@ func test_a_trigger_fires_every_time_its_event_happens() -> void:
 func test_fires_past_a_steps_room_wait_for_the_next_step() -> void:
 	for n in 24:
 		_target(Vector2.from_angle(TAU * n / 24.0) * 120.0)
-	var hold: Dictionary = {"form": &"ring", "trigger": &"on_hit", "held": {"form": &"bolt"}}
+	var hold: Dictionary = {"carrier": &"ring", "trigger": &"on_hit", "held": {"carrier": &"bolt"}}
 	_spells.fire_shots_per_step = 32
 	_build(0, 0, hold)
 	_build(0, 1, hold)
@@ -448,7 +448,7 @@ func test_an_edit_keeps_the_payloads_waiting_for_room() -> void:
 	for n in 24:
 		_target(Vector2.from_angle(TAU * n / 24.0) * 120.0)
 	_spells.fire_shots_per_step = 8
-	_build(0, 0, {"form": &"ring", "trigger": &"on_hit", "held": {"form": &"bolt"}})
+	_build(0, 0, {"carrier": &"ring", "trigger": &"on_hit", "held": {"carrier": &"bolt"}})
 	var held: int = _spells.current_tag(0, 0, 1)
 	_cast(0)
 	for _i in 30:
@@ -457,7 +457,7 @@ func test_an_edit_keeps_the_payloads_waiting_for_room() -> void:
 			break
 		_spells.step(DT)
 	check_equal(_born(held), 8, "the step's room fired, the rest wait")
-	_build(0, 0, {"form": &"bolt"})
+	_build(0, 0, {"carrier": &"bolt"})
 	_tick(5)
 	check_equal(_born(held), 24, "the edit leaves the waiting payloads: all 24 fired")
 	check(_spells.hit_profile(held) != null, "with their old build's numbers")
@@ -467,7 +467,7 @@ func test_chain_jumps_to_new_targets_only() -> void:
 	var a: Node2D = _target(Vector2(60, 0))
 	var b: Node2D = _target(Vector2(110, 0))
 	var c: Node2D = _target(Vector2(160, 0))
-	_build(0, 0, {"form": &"bolt", "modifiers": [&"chain"]})
+	_build(0, 0, {"carrier": &"bolt", "modifiers": [&"chain"]})
 	_cast(0)
 	_tick(120)
 	var order: Array = []
@@ -479,7 +479,7 @@ func test_chain_jumps_to_new_targets_only() -> void:
 func test_chain_does_not_bounce_between_two_targets() -> void:
 	var a: Node2D = _target(Vector2(60, 0))
 	var b: Node2D = _target(Vector2(110, 0))
-	_build(0, 0, {"form": &"bolt", "modifiers": [&"chain"]})
+	_build(0, 0, {"carrier": &"bolt", "modifiers": [&"chain"]})
 	_cast(0)
 	_tick(200)
 	var order: Array = []
@@ -491,7 +491,7 @@ func test_chain_does_not_bounce_between_two_targets() -> void:
 func test_a_beam_chains_with_another_beam() -> void:
 	var a: Node2D = _target(Vector2(100, 0))
 	var b: Node2D = _target(Vector2(110, 60))
-	_build(0, 0, {"form": &"beam", "modifiers": [&"chain"]})
+	_build(0, 0, {"carrier": &"beam", "modifiers": [&"chain"]})
 	_cast(0)
 	var order: Array = []
 	for hit in _hits:
@@ -505,7 +505,7 @@ func test_a_beam_makes_all_six_jumps() -> void:
 	var line: Array[Node2D] = []
 	for i in 8:
 		line.append(_target(Vector2(60 + 40 * i, 0)))
-	var recipe: Dictionary = {"form": &"beam", "modifiers": [&"chain", &"chain", &"chain"]}
+	var recipe: Dictionary = {"carrier": &"beam", "modifiers": [&"chain", &"chain", &"chain"]}
 	var spell: CompiledSpell = _compile(recipe)
 	check_equal(spell.chain_jumps, 6, "three chain runes give the most jumps")
 	_build(0, 0, recipe)
@@ -521,7 +521,7 @@ func test_split_beams_chain_past_the_ray_depth() -> void:
 	for x in range(40, 330, 30):
 		for y in range(-60, 61, 30):
 			_target(Vector2(x, y))
-	var recipe: Dictionary = {"form": &"beam", "modifiers": [&"split", &"chain", &"chain"]}
+	var recipe: Dictionary = {"carrier": &"beam", "modifiers": [&"split", &"chain", &"chain"]}
 	_build(0, 0, recipe)
 	_cast(0)
 	check(_hits.size() > 0, "the beams hit")
@@ -548,7 +548,7 @@ func test_a_held_spell_from_a_rune_goes_outward_from_the_caster() -> void:
 	_target(Vector2(190, 176))
 	# The rune pierces, so it is still there to say where its caster is; its bolt pierces, so it flies
 	# on through the target it starts in.
-	_build(0, 0, {"form": &"rune", "modifiers": [&"pierce"], "trigger": &"on_hit", "held": {"form": &"bolt", "modifiers": [&"pierce"]}})
+	_build(0, 0, {"carrier": &"rune", "modifiers": [&"pierce"], "trigger": &"on_hit", "held": {"carrier": &"bolt", "modifiers": [&"pierce"]}})
 	_cast(0, 0, 10.0, Vector2(190, 200), Vector2.UP)
 	# Past the rune's arming (SpellLimits.RUNE_ARM), and within its bolt's life.
 	_tick(80)
@@ -561,7 +561,7 @@ func test_a_held_spell_from_a_rune_goes_outward_from_the_caster() -> void:
 
 
 func test_hit_profile_gives_combat_the_numbers() -> void:
-	var tag: int = _build(0, 0, {"form": &"bolt", "element": &"fire"})
+	var tag: int = _build(0, 0, {"carrier": &"bolt", "element": &"fire"})
 	var profile: HitProfile = _spells.hit_profile(tag)
 	check(profile != null, "the tag has a profile")
 	check_equal(profile.damage, 10, "damage with the element's scale")
@@ -575,10 +575,10 @@ func test_hit_profile_gives_combat_the_numbers() -> void:
 
 func test_a_rebuild_mid_flight_leaves_the_old_shot_its_old_numbers() -> void:
 	_target(Vector2(120, 0))
-	var old: int = _build(0, 0, {"form": &"bolt"})
+	var old: int = _build(0, 0, {"carrier": &"bolt"})
 	_cast(0)
 	_tick(5)
-	var new: int = _build(0, 0, {"form": &"bolt", "element": &"fire"})
+	var new: int = _build(0, 0, {"carrier": &"bolt", "element": &"fire"})
 	check(old != new, "a new generation has a new tag")
 	_tick(40)
 	check_equal(_hits.size(), 1, "the old shot hit")
@@ -594,7 +594,7 @@ func test_an_old_shot_fires_its_old_held_spell_and_keeps_it_alive() -> void:
 	var old_held: int = _spells.current_tag(0, 0, 1)
 	_cast(0)
 	_tick(5)
-	_build(0, 0, {"form": &"bolt"})
+	_build(0, 0, {"carrier": &"bolt"})
 	_tick(10)
 	check_equal(_spells.live_shots(old_held), 1, "the old shot fired the held spell of the old build")
 	check(_spells.hit_profile(old_held) != null, "which is kept while that rune lives")
@@ -605,14 +605,14 @@ func test_an_old_shot_fires_its_old_held_spell_and_keeps_it_alive() -> void:
 
 
 func test_a_full_ring_of_rebuilds_removes_the_revoked_shots() -> void:
-	var first: int = _build(0, 0, {"form": &"slow"})
+	var first: int = _build(0, 0, {"carrier": &"slow"})
 	_cast(0)
-	_build(1, 0, {"form": &"slow"})
+	_build(1, 0, {"carrier": &"slow"})
 	_cast(1)
 	for n in SpellLimits.GENERATIONS - 1:
-		_build(0, 0, {"form": &"bolt"})
+		_build(0, 0, {"carrier": &"bolt"})
 	check_equal(_mgr.get_count_for(0), 1, "seven rebuilds keep the old shot")
-	var wrapped: int = _build(0, 0, {"form": &"bolt", "element": &"fire"})
+	var wrapped: int = _build(0, 0, {"carrier": &"bolt", "element": &"fire"})
 	check_equal(wrapped, first, "the ring came round to the first tag")
 	check_equal(_mgr.get_count_for(0), 0, "the old shot was removed, not mis-profiled")
 	check_equal(_mgr.get_count_for(1), 1, "another player's shot is not touched")
@@ -628,17 +628,17 @@ func test_counts_return_to_zero_after_a_busy_fight() -> void:
 	for n in 6:
 		_target(Vector2(60 + 40 * n, 20 * (n % 3)))
 	var recipes: Array[Dictionary] = [
-		{"form": &"halo", "modifiers": [&"chain"], "trigger": &"on_hit", "held": {"form": &"bolt", "trigger": &"on_expire", "held": {"form": &"short"}}},
-		{"form": &"bolt", "modifiers": [&"split", &"homing"], "trigger": &"timer", "held": {"form": &"short"}},
-		{"form": &"beam", "modifiers": [&"chain"], "trigger": &"on_expire", "held": {"form": &"bolt"}},
-		{"form": &"bolt", "modifiers": [&"pierce"], "trigger": &"on_hit_twice", "held": {"form": &"halo"}},
+		{"carrier": &"halo", "modifiers": [&"chain"], "trigger": &"on_hit", "held": {"carrier": &"bolt", "trigger": &"on_expire", "held": {"carrier": &"short"}}},
+		{"carrier": &"bolt", "modifiers": [&"split", &"homing"], "trigger": &"timer", "held": {"carrier": &"short"}},
+		{"carrier": &"beam", "modifiers": [&"chain"], "trigger": &"on_expire", "held": {"carrier": &"bolt"}},
+		{"carrier": &"bolt", "modifiers": [&"pierce"], "trigger": &"on_hit_twice", "held": {"carrier": &"halo"}},
 	]
 	for player in 4:
 		_build(player, 0, recipes[player])
 	for player in 4:
 		_cast(player)
 	_tick(600)
-	_build(0, 0, {"form": &"bolt"})
+	_build(0, 0, {"carrier": &"bolt"})
 	for player in 4:
 		for depth in 3:
 			check_equal(_spells.live_shots(_spells.current_tag(player, 0, depth)), 0, "player %d depth %d has no shots left" % [player, depth])
@@ -659,7 +659,7 @@ func _timer_entries(slot: int) -> int:
 func test_a_shot_replaced_in_its_slot_is_timed_once() -> void:
 	_target(Vector2(60, 0))
 	_target(Vector2(110, 0))
-	_build(0, 0, {"form": &"bolt", "modifiers": [&"chain"], "trigger": &"timer", "held": {"form": &"short"}})
+	_build(0, 0, {"carrier": &"bolt", "modifiers": [&"chain"], "trigger": &"timer", "held": {"carrier": &"short"}})
 	_cast(0)
 	var parent: int = _slots()[0]
 	var reused: bool = false
@@ -679,7 +679,7 @@ func test_every_chain_jump_happens_however_many_in_one_step() -> void:
 	for x in range(20, 190, 8):
 		for y in range(-60, 61, 8):
 			_target(Vector2(x, y))
-	var recipe: Dictionary = {"form": &"beam", "modifiers": [&"split", &"split", &"split", &"chain", &"chain", &"chain"]}
+	var recipe: Dictionary = {"carrier": &"beam", "modifiers": [&"split", &"split", &"split", &"chain", &"chain", &"chain"]}
 	var spell: CompiledSpell = _compile(recipe)
 	check(spell.shots * spell.chain_jumps > SpellsScript.JUMP_QUEUE, "more jumps in one step than the jump ring starts with (%d)" % (spell.shots * spell.chain_jumps))
 	_build(0, 0, recipe)

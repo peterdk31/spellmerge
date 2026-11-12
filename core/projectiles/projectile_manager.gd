@@ -143,7 +143,7 @@ extends Node2D
 ## target no further than `within` pixels from it (picked at random and kept while it can), at most `turn_rate` radians a
 ## second at its speed then (`set_homing_curve(slot, curve, within)`: on a curve of that radius),
 ## keeping its speed and its curve whatever its speed later; a still shot creeps toward it at SpellLimits.HOMING_DRIFT. The caller says how far (`CompiledSpell.homing_range`); there
-## is no default here, so a new caller cannot quietly get another form's reach.
+## is no default here, so a new caller cannot quietly get another carrier card's reach.
 ## The search runs on the grid and only every HOMING_PERIOD-th step of a shot (slots take
 ## turns, so the cost is spread); in between the shot keeps turning toward the point it
 ## found. It homes only on a foe (`Actors.is_foe`: never on its shooter's own body, a body of its
@@ -355,7 +355,7 @@ const MIN_BATCH: int = 64
 ## BATCH_ORDER, so at one z the bolts draw before the runes.
 ##
 ## After them come the card bodies' batches, as many as the cards ask for (`register_body`): a
-## shot whose card names a shader of its own (`FormBase.look_shader`, in the card's folder: a
+## shot whose card names a shader of its own (`CarrierCard.look_shader`, in the card's folder: a
 ## wall's stones, a pool's puddle, a bolt's head) is drawn by it, in a pair of batches made with that
 ## shader and the mesh its shots are written as (MESH_QUAD, one quad a shot as a rune is, for a still
 ## carrier; MESH_HEAD, the shots' `head_mesh`, for one that flies or orbits): the hat ramps', then
@@ -426,7 +426,7 @@ const STILL_END: float = 1.0
 const TRACE_FROM: float = 0.02
 const TRACE_SPAN: float = 0.42
 ## A still shot's hit size as drawn, as a share of its quad (LOOK_GRID x zoom): the unit a still
-## card's shader shapes its look in (`FormBase.look_shape`) and its motes leave by
+## card's shader shapes its look in (`CarrierCard.look_shape`) and its motes leave by
 ## (`StillShotView.reach`). The shaders hold the same number (`STILL_HIT` in shot_palette.gdshaderinc;
 ## test_projectile_looks compares them).
 const STILL_HIT: float = 0.15
@@ -670,11 +670,14 @@ var dropped: int = 0
 ## The slot of the shot whose event is being sent, else -1: inside the manager only (a shot that
 ## just ended still answers its own event's handlers). Listeners get it as the event's `shot`.
 var _event_slot: int = -1
-## The form of the shot whose `projectile_impact` is being sent: its card's id (`set_form`; `&"bolt"`,
-## `&"rune"` or `&"orbit"` by its body for a shot no card set), `&"beam"` or a strike's card, and
-## the carrier's while `block_shot` sends `shot_blocked` (a swing's: a parry) (any time outside
-## these: `&""`). For looks only.
-var impact_form: StringName = &""
+## The carrier card of the shot whose `projectile_impact` is being sent: its card's id (`set_carrier_card`; `&"bolt"`,
+## `&"rune"` or `&"orbit"` by its body for a shot no card set), a strike's card, or `&"beam"` for a
+## ray's hits (the manager knows no card for a ray: they are told as the beam card's) (any time
+## outside these: `&""`). For looks only.
+var impact_carrier_card: StringName = &""
+## The carrier (its id, not its card's) that blocked, while `block_shot` sends `shot_blocked`: a
+## swing's block is a parry (any time outside it: `&""`). For looks only.
+var impact_carrier: StringName = &""
 ## The body (KIND_*) of the shot whose `projectile_impact` or `projectile_expired` is being sent, 0
 ## for none (a ray, a strike) and outside them: a still body goes off in its own way. For looks only.
 var impact_body: int = 0
@@ -686,7 +689,7 @@ var impact_look: int = 0
 ## The tag of that shot (0 for a beam, a strike and outside an impact), so its motes and marks can
 ## be its spell's cards' (spell-spectacle-2.md, S2). For looks only.
 var impact_tag: int = 0
-## The way the shot was flying, while a `projectile_expired` is sent (with `impact_form`,
+## The way the shot was flying, while a `projectile_expired` is sent (with `impact_carrier_card`,
 ## `impact_core` and `impact_look`, so Feel can show where its life ran out).
 var impact_heading: Vector2 = Vector2.ZERO
 ## How many projectiles ended on a wall, since start.
@@ -732,7 +735,7 @@ var _pierce: PackedInt32Array = PackedInt32Array()
 var _tag: PackedInt64Array = PackedInt64Array()
 ## MOTION_STRAIGHT or MOTION_STILL per slot.
 var _motion: PackedByteArray = PackedByteArray()
-## The body a card asked for per slot (`set_form`: a shader `register_body`
+## The body a card asked for per slot (`set_carrier_card`: a shader `register_body`
 ## numbered, drawn when the shot is still; 0 for its motion's own), and the id of the card it is
 ## (`&""` for none), for its looks. VIEW: only the drawing reads it, and the numbers are this
 ## machine's (in the order it first met each card's shader, Feel's among them), so a world restored
@@ -744,7 +747,7 @@ var _body: PackedByteArray = PackedByteArray()
 ## LIGHT_REACH_FLOAT), which Feel's spell light reads (`light.gdshader`). Drawn only (VIEW).
 var _look_light_intensity: PackedFloat32Array = PackedFloat32Array()
 var _look_light_reach: PackedFloat32Array = PackedFloat32Array()
-var _form_id: Array[StringName] = []
+var _carrier_card_ids: Array[StringName] = []
 ## Orbit shots: radius from the anchor, current angle, and the drift (rad/s) it turns by on top of
 ## its speed over its radius (`_orbit_turn`).
 var _orbit_radius: PackedFloat32Array = PackedFloat32Array()
@@ -1370,7 +1373,7 @@ func body_of(shader: Shader, mesh: int = MESH_QUAD) -> int:
 	return 0
 
 
-## Card body `body`'s look shape (`FormBase.look_shape`, in its drawn hit size's units, STILL_HIT)
+## Card body `body`'s look shape (`CarrierCard.look_shape`, in its drawn hit size's units, STILL_HIT)
 ## and its clock (`Vector2(look_open, look_fade)`, seconds), handed to its batches' shader as the
 ## uniforms `look_shape` and `look_clock`, so the shader draws its look by the card's numbers and
 ## whoever gives off its motes (`still_motes.gd`, from the card's `CardLook`) reads the same ones.
@@ -1631,7 +1634,7 @@ func set_cap(value: int) -> void:
 	_body.resize(_cap)
 	_look_light_intensity.resize(_cap)
 	_look_light_reach.resize(_cap)
-	_form_id.resize(_cap)
+	_carrier_card_ids.resize(_cap)
 	_orbit_radius.resize(_cap)
 	_orbit_angle.resize(_cap)
 	_orbit_drift.resize(_cap)
@@ -2648,14 +2651,14 @@ func set_core(slot: int, color: Color) -> bool:
 	return true
 
 
-## `set_core`, `set_look`, `set_form` and `set_light` for each of the first `count` shots in
+## `set_core`, `set_look`, `set_carrier_card` and `set_light` for each of the first `count` shots in
 ## `slots` (-1 for none), from what one launch's shots share (`launch`, a `LaunchLook`), checked once.
 func set_looks(slots: PackedInt32Array, count: int, launch: LaunchLook) -> void:
 	var intensity: float = clean_light(launch.light_intensity, LIGHT_INTENSITY_MIN)
 	var reach: float = clean_light(launch.light_reach, LIGHT_REACH_MIN)
 	var color: Color = launch.core
 	var look: int = launch.look
-	var form: StringName = launch.form
+	var carrier_card: StringName = launch.carrier_card
 	var core_ok: bool = is_finite(color.r) and is_finite(color.g) and is_finite(color.b)
 	var core: Color = Color(color.r, color.g, color.b, 1.0)
 	var look_ok: bool = look >= 0 and look < 1 << (LOOK_COUNT - 1)
@@ -2668,7 +2671,7 @@ func set_looks(slots: PackedInt32Array, count: int, launch: LaunchLook) -> void:
 			_core[slot] = core
 		if look_ok:
 			_look[slot] = look
-		_form_id[slot] = form
+		_carrier_card_ids[slot] = carrier_card
 		_set_body(slot, kind)
 		_look_light_intensity[slot] = intensity
 		_look_light_reach[slot] = reach
@@ -2726,13 +2729,13 @@ func set_look(slot: int, look: int) -> bool:
 	return true
 
 
-## Name the card the shot in `slot` is (`form`: its impacts are told as it, `impact_form`) and the
+## Name the card the shot in `slot` is (`carrier_card`: its impacts are told as it, `impact_carrier_card`) and the
 ## body it asks for (`body`: a card body `register_body` numbered, 0 for its motion's own; a shot
 ## draws it only while its motion is written as the body's mesh). False for an empty slot.
-func set_form(slot: int, form: StringName, body: int = 0) -> bool:
+func set_carrier_card(slot: int, carrier_card: StringName, body: int = 0) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
 		return false
-	_form_id[slot] = form
+	_carrier_card_ids[slot] = carrier_card
 	_set_body(slot, clampi(body, 0, _body_shaders.size()))
 	return true
 
@@ -3023,24 +3026,24 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 
 
 ## Stops the shot in `slot` as a shield charge does (`shot_blocked(by, where, by_tag)`), for a
-## carrier that is no shot (a swing, a beam, a slam, a decoy). `form` is that carrier's id,
-## told to looks as `impact_form` while the event is sent: a swing's block is a parry (melee I5).
-## The blocker is no shot, so the event's `shot` is -1, whatever event it is sent inside of.
-## False when there is no such shot.
-func block_shot(slot: int, by: int, by_tag: int, form: StringName = &"") -> bool:
+## carrier that is no shot (a swing, a beam, a slam, a decoy). `carrier` is that carrier's id (not
+## its card's), told to looks as `impact_carrier` while the event is sent: a swing's block is a
+## parry (melee I5). The blocker is no shot, so the event's `shot` is -1, whatever event it is sent
+## inside of. False when there is no such shot.
+func block_shot(slot: int, by: int, by_tag: int, carrier: StringName = &"") -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
 		return false
 	var at: Vector2 = _pos[slot]
 	_end_tail(slot, at)
 	_kill(slot)
 	if events != null:
-		var outer_form: StringName = impact_form
+		var outer_carrier: StringName = impact_carrier
 		var outer_slot: int = _event_slot
-		impact_form = form
+		impact_carrier = carrier
 		_event_slot = -1
 		events.shot_blocked.emit(by, at, by_tag, -1)
 		_event_slot = outer_slot
-		impact_form = outer_form
+		impact_carrier = outer_carrier
 	return true
 
 
@@ -3411,7 +3414,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_body[slot] = 0
 	_look_light_intensity[slot] = 1.0
 	_look_light_reach[slot] = 1.0
-	_form_id[slot] = &""
+	_carrier_card_ids[slot] = &""
 	_turn[slot] = 0.0
 	_home_at[slot] = Vector2.INF
 	_home_range[slot] = 0.0
@@ -4833,22 +4836,22 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 	return found
 
 
-## One hit of an instant carrier on `target` (a swing's, `sweep`): `projectile_impact` with `form`
+## One hit of an instant carrier on `target` (a swing's, `sweep`): `projectile_impact` with `carrier_card`
 ## for its look, then `projectile_hit(caster, target, point, tag)`, as a beam's hit sends them.
 ## Returns false when it sent nothing (no events, or a gone target). It nests one ray level, as a
 ## ray's hits do, so a ray its handlers fire has scratch of its own.
-func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: int, form: StringName) -> bool:
+func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: int, carrier_card: StringName) -> bool:
 	if events == null or not is_instance_valid(target) or not is_caster(caster):
 		return false
 	_ray_depth += 1
 	var outer_slot: int = _event_slot
 	_event_slot = -1
-	impact_form = form
+	impact_carrier_card = carrier_card
 	impact_core = Color.WHITE
 	impact_look = 0
 	impact_tag = 0
 	events.projectile_impact.emit(caster, target, point, heading)
-	impact_form = &""
+	impact_carrier_card = &""
 	events.projectile_hit.emit(caster, target, point, tag, -1)
 	_ray_depth -= 1
 	_event_slot = outer_slot
@@ -5060,12 +5063,12 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	for i in found:
 		var node: Variant = nodes[i]
 		if events != null and is_instance_valid(node):
-			impact_form = &"beam"
+			impact_carrier_card = &"beam"
 			impact_core = Color.WHITE
 			impact_look = 0
 			impact_tag = 0
 			events.projectile_impact.emit(caster, node, points[i], heads[i])
-			impact_form = &""
+			impact_carrier_card = &""
 			impact_core = Color.WHITE
 			impact_look = 0
 			events.projectile_hit.emit(caster, node, points[i], tag, -1)
@@ -5078,21 +5081,21 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			break
 		var turn: Vector2 = walk[n]
 		if events != null:
-			impact_form = &"beam"
+			impact_carrier_card = &"beam"
 			impact_core = Color.WHITE
 			impact_look = 0
 			impact_tag = 0
 			events.projectile_impact.emit(caster, null, turn, (walk[n - 1] as Vector2).direction_to(turn))
-			impact_form = &""
+			impact_carrier_card = &""
 			impact_core = Color.WHITE
 			impact_look = 0
 	if walled and events != null:
-		impact_form = &"beam"
+		impact_carrier_card = &"beam"
 		impact_core = Color.WHITE
 		impact_look = 0
 		impact_tag = 0
 		events.projectile_impact.emit(caster, null, end, end_heading)
-		impact_form = &""
+		impact_carrier_card = &""
 		impact_core = Color.WHITE
 		impact_look = 0
 	for k in turned:
@@ -6016,14 +6019,14 @@ func _expire(slot: int) -> void:
 	_kill(slot, false)
 	if events != null:
 		_event_slot = slot
-		impact_form = _form_of(slot)
+		impact_carrier_card = _carrier_card_of(slot)
 		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
 		impact_tag = tag
 		impact_heading = _vel[slot].normalized()
 		events.projectile_expired.emit(caster, at, tag, slot)
-		impact_form = &""
+		impact_carrier_card = &""
 		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
@@ -6700,23 +6703,23 @@ func _grow_memory(size: int) -> void:
 ## Tell listeners the shot in `slot` ended on a wall where it stands, flying along `velocity`.
 func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 	if events != null and not velocity.is_zero_approx():
-		impact_form = _form_of(slot)
+		impact_carrier_card = _carrier_card_of(slot)
 		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
 		impact_tag = _tag[slot]
 		events.projectile_impact.emit(_actor[slot], null, _pos[slot], velocity.normalized())
-		impact_form = &""
+		impact_carrier_card = &""
 		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
 		impact_tag = 0
 
 
-## The form of the shot in `slot`: its card's (`set_form`), else by its body.
-func _form_of(slot: int) -> StringName:
-	if _form_id[slot] != &"":
-		return _form_id[slot]
+## The carrier card of the shot in `slot`: its card's (`set_carrier_card`), else by its body.
+func _carrier_card_of(slot: int) -> StringName:
+	if _carrier_card_ids[slot] != &"":
+		return _carrier_card_ids[slot]
 	var kind: int = _kind_of(slot)
 	return &"rune" if kind == KIND_RUNE else &"bolt"
 
@@ -6759,13 +6762,13 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		_end_tail(slot, at)
 		_kill(slot, false)
 	if events != null and is_instance_valid(node):
-		impact_form = _form_of(slot)
+		impact_carrier_card = _carrier_card_of(slot)
 		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
 		impact_tag = tag
 		events.projectile_impact.emit(caster, node, at, heading)
-		impact_form = &""
+		impact_carrier_card = &""
 		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0

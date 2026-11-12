@@ -36,7 +36,7 @@ For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 - **A map view, and other uses for A, X and Y (task, owner 2026-10-26).** The staffs moved to the shoulders, so A, X and Y do nothing in play (B opens the builder). The owner's first idea is a map view (the room sequence and where the players are, once M3 has rooms and doors); A, X and Y get their jobs then.
 - **Codex of discoveries (M5).** The first time a reaction, a combo or an unknown chain happens, the game notes it (with a short clip if the recorder can do it cheaply).
 - **Superseded by the pivot:** "Spell visuals round 2, part 2" (a burst per combo row) and the combo marks per combo class are replaced by the layered shot look (staffs B6); keep what still reads well.
-- **Beams longer than the beam shader holds (owner, 2026-10-29).** `shot_beam.gdshader` takes 80 path points; a live beam with more (a homing beam with 9 or more pierce, a beam bouncing about 78 times) keeps its ends and sharpest turns and drops gentle curve points (`Feel._thin_beam`), so it is only lossy past 78 real turns. The full fix, if a build ever gets there: draw a long beam as consecutive meshes of up to 80 points each, with a shader flag so only the beam's true ends get flares; the shader stays the same size (a bigger uniform array is not an option: WebGL's limits and the owner's GPU, #400). The same applies to fissures: each leg of a bouncing fissure takes one of the player's 24 beam cue slots (`FORMS_PER_PLAYER`), so a fissure with more legs, or several at once, ends its oldest legs' look early.
+- **Beams longer than the beam shader holds (owner, 2026-10-29).** `shot_beam.gdshader` takes 80 path points; a live beam with more (a homing beam with 9 or more pierce, a beam bouncing about 78 times) keeps its ends and sharpest turns and drops gentle curve points (`Feel._thin_beam`), so it is only lossy past 78 real turns. The full fix, if a build ever gets there: draw a long beam as consecutive meshes of up to 80 points each, with a shader flag so only the beam's true ends get flares; the shader stays the same size (a bigger uniform array is not an option: WebGL's limits and the owner's GPU, #400). The same applies to fissures: each leg of a bouncing fissure takes one of the player's 24 beam cue slots (`SHOWN_BEAMS_PER_PLAYER`), so a fissure with more legs, or several at once, ends its oldest legs' look early.
 
 ## From the actors rework (phase G, 2026-10-28)
 
@@ -69,7 +69,6 @@ Found by looking at all 51 clips and the four-player sheets at 1x (a clip frame 
 - **Glyph art is drawn in code (task).** `action_glyph.gd` draws key caps, round buttons and PlayStation symbols with 8 px text, so it is not pixel art in style N. Replace it with 10 px SVG sprites per family when the art direction has a glyph set (add them to `art/manifest.json`).
 - **Stick and d-pad glyphs are missing (task).** The face buttons, the shoulders and triggers, Start, Join and Leave have glyphs; move hints would need a stick and a WASD group.
 - **The pause menu has the plain focus look and no hint line (task).** Give it the `BuilderButtonFocus` look and a hint line (A to pick, B back).
-- **The refusal text says "(F)" (task).** "Pick a form (F) first" comes from `gameplay/player/player.gd`; the slot is now named "Form" in the builder, so drop the letter there.
 - **Long descriptions are cut at three lines (task).** The note under the info panel ends in "..." for several components. Shorten the texts, or give the note more room by dropping the stats line when a description is long.
 - **What " *" means (task).** The bag marks the current component with " *". Try "(in slot)" or a check mark glyph, if it fits the 80 px row.
 - **The quick view does not say the full builder returns (task).** Add "Full builder after the wave" under the quick view's chain, if the quarter has room.
@@ -88,10 +87,8 @@ Found by looking at all 51 clips and the four-player sheets at 1x (a clip frame 
 ## From M2 part 29 (the builder walkthrough)
 
 - **The mouse (task).** The builder, the overlay and the quick view ignore the mouse. Add a mouse for P1's panel only: hover mark (a "> " or an outline, not colour alone), click to activate, a click outside the builder closes nothing. Needs the hover to go through `UIFocus` so the owner's device still wins. M4 polish.
-- **Picking modifiers is still one slot at a time (task).** A form and an element are four presses; each modifier is about three (dodge, move to its slot, cast, move to the row, cast). Try advancing through the modifier slots too, or a "next free slot" shortcut, once a real playtest says what players do.
 - **No hint on a disabled slot or button (task).** A greyed modifier slot or "Held >" says nothing about why (needs the slot before it filled, needs a trigger). Show it in the note when focus rests on it (it skips disabled controls today, so this needs a way to read them: a `UIFocus` change, too big for the quick view walkthrough).
 - **The held-spell levels are two small buttons (task).** "Held >" and "< Up" at 10 px are easy to miss; the title says "held 1" but not which trigger holds it. Show the holding trigger's name in the title.
-- **Refusals name no slot for a held spell (task).** "Pick a form (F) first." is shown for the held spell too, where the title says "held 1"; the note could start with "Held spell:" when `level() > 0`.
 
 ## From M2 part 16 (the builder)
 
@@ -174,7 +171,7 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 ## From #243 part 1 (Lightning)
 
 - **The quick drop list and the overlay's list cap at 11 rows (task).** Each new element or modifier adds a row to the longest list; at 12 px rows and 8 px text 11 rows fit a player's quarter at 640×360, a 12th does not. Needs a list that scrolls or pages (UIFocus must follow it), or two columns in the quick view. Do it before the next element or modifier is added.
-- **Shader kinds are a number scheme (task).** Shapes, trail marks and form bodies share one 0–15 kind in the shot's custom data, and adding a shape moves the others. A table in the manager (kind per shape and form) would make the next shape one line.
+- **Shader kinds are a number scheme (task).** Shapes, trail marks and carrier cards' bodies share one 0–15 kind in the shot's custom data, and adding a shape moves the others. A table in the manager (kind per shape and form) would make the next shape one line.
 
 ## From #243 part 2 (extensibility proposals, not built)
 

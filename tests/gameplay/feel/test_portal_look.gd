@@ -11,7 +11,7 @@ const PortalLookScript := preload("res://gameplay/feel/portal_look.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
-const CARD_SHADER: Shader = preload("res://content/spells/forms/portal/portal.gdshader")
+const CARD_SHADER: Shader = preload("res://content/spells/carriers/portal/portal.gdshader")
 const FIRE := Color("e0592f")
 const FROST := Color("7fd4f0")
 

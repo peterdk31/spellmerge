@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Staff animations (`FormBase.staff_pose`, played by `Spells.poses().staff_pose` and the rest): keys in
+## Staff animations (`CarrierCard.staff_pose`, played by `Spells.poses().staff_pose` and the rest): keys in
 ## the carrier's own time (wind-up, strike, a hold that repeats while the strike lasts, after),
 ## every channel, the strike ending with the carrier's last shot, a new cast starting from where
 ## the staff is, and the aim it turns from. Every real carrier has one. Cards are made in code and
@@ -21,21 +21,21 @@ func after_each() -> void:
 	arena.free_all()
 
 
-## A form card of the carrier `carrier` with `keys` as its staff animation, in the registry as `id`.
-func _card(id: StringName, carrier: StringName, keys: Array[Dictionary], lifetime: float = 0.3) -> FormBase:
-	var form := FormBase.new()
-	form.id = id
-	form.display_name = String(id)
-	form.complexity = 1
-	form.carrier = carrier
-	form.base_damage = 1
-	form.speed = 100.0
-	form.ray_length = 100.0
-	form.lifetime = lifetime
-	form.wind_down = 0.05
-	form.staff_pose = keys
-	(arena.registry.get("_resources")[&"spells"] as Dictionary)[id] = form
-	return form
+## A carrier card of the carrier `carrier` with `keys` as its staff animation, in the registry as `id`.
+func _card(id: StringName, carrier: StringName, keys: Array[Dictionary], lifetime: float = 0.3) -> CarrierCard:
+	var carrier_card := CarrierCard.new()
+	carrier_card.id = id
+	carrier_card.display_name = String(id)
+	carrier_card.complexity = 1
+	carrier_card.carrier = carrier
+	carrier_card.base_damage = 1
+	carrier_card.speed = 100.0
+	carrier_card.ray_length = 100.0
+	carrier_card.lifetime = lifetime
+	carrier_card.wind_down = 0.05
+	carrier_card.staff_pose = keys
+	(arena.registry.get("_resources")[&"spells"] as Dictionary)[id] = carrier_card
+	return carrier_card
 
 
 func _cast(id: StringName) -> void:
@@ -110,5 +110,5 @@ func test_it_turns_with_the_live_aim_unless_its_carrier_locks_the_aim_as_it_leav
 func test_every_carrier_moves_the_staff() -> void:
 	for id: StringName in arena.registry.call("get_ids", &"spells"):
 		var card: Resource = arena.registry.call("get_resource", &"spells", id)
-		if card is FormBase:
-			check(not (card as FormBase).staff_pose.is_empty(), "%s has a staff animation" % id)
+		if card is CarrierCard:
+			check(not (card as CarrierCard).staff_pose.is_empty(), "%s has a staff animation" % id)

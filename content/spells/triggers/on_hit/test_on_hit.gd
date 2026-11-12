@@ -14,14 +14,14 @@ func test_the_card_is_on_hit() -> void:
 
 
 func test_it_compiles_into_the_spell_numbers() -> void:
-	var spell: CompiledSpell = _compile_recipe({"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"bolt", "modifiers": [&"nova"]}})
+	var spell: CompiledSpell = _compile_recipe({"carrier": &"bolt", "trigger": &"on_hit", "held": {"carrier": &"bolt", "modifiers": [&"nova"]}})
 	var trigger: TriggerBase = _trigger(&"on_hit")
 	check_equal(spell.triggers.size(), 1, "one trigger")
 	if spell.triggers.is_empty():
 		return
 	check_equal(spell.triggers[0].event, trigger.event, "the event is compiled")
 	check_equal(spell.triggers[0].interval, 0.0, "no timer: no tick (docs/milestones/cast-timing.md, T8)")
-	check(spell.payload != null and spell.payload.spells[0].form_id == &"bolt" and spell.payload.spells[0].nova_ways() == 8, "the payload is a nova of bolts")
+	check(spell.payload != null and spell.payload.spells[0].carrier_card_id == &"bolt" and spell.payload.spells[0].nova_ways() == 8, "the payload is a nova of bolts")
 
 
 func test_it_works_for_all_four_players_at_once() -> void:
@@ -29,7 +29,7 @@ func test_it_works_for_all_four_players_at_once() -> void:
 	for player in 4:
 		var origin := Vector2(-600.0, -600.0 + 400.0 * player)
 		_target(origin + Vector2(80.0, 0.0))
-		_build_and_cast(player, 0, {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"bolt"}}, origin)
+		_build_and_cast(player, 0, {"carrier": &"bolt", "trigger": &"on_hit", "held": {"carrier": &"bolt"}}, origin)
 	_tick(100)
 	for player in 4:
 		var held_tag: int = _spells.current_tag(player, 0, 1)
@@ -39,7 +39,7 @@ func test_it_works_for_all_four_players_at_once() -> void:
 
 func test_on_hit_fires_the_held_spell_from_the_hit_point() -> void:
 	_target(Vector2(80.0, 0.0))
-	_build_and_cast(0, 0, {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"bolt", "modifiers": [&"nova"]}})
+	_build_and_cast(0, 0, {"carrier": &"bolt", "trigger": &"on_hit", "held": {"carrier": &"bolt", "modifiers": [&"nova"]}})
 	_tick(60)
 	var held_tag: int = _spells.current_tag(0, 0, 1)
 	var bolt_hits: int = 0
@@ -54,7 +54,7 @@ func test_on_hit_fires_the_held_spell_from_the_hit_point() -> void:
 
 
 func test_on_hit_does_not_fire_without_a_hit() -> void:
-	_build_and_cast(0, 0, {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"bolt", "modifiers": [&"nova"]}})
+	_build_and_cast(0, 0, {"carrier": &"bolt", "trigger": &"on_hit", "held": {"carrier": &"bolt", "modifiers": [&"nova"]}})
 	_tick(120)
 	check_equal(_born(_spells.current_tag(0, 0, 1)), 0, "a bolt that hits nothing fires nothing")
 
@@ -63,7 +63,7 @@ func test_on_hit_fires_at_every_hit_of_a_pierce() -> void:
 	_target(Vector2(60.0, 0.0))
 	_target(Vector2(110.0, 0.0))
 	_target(Vector2(160.0, 0.0))
-	_build_and_cast(0, 0, {"form": &"bolt", "modifiers": [&"pierce"], "trigger": &"on_hit", "held": {"form": &"bolt"}})
+	_build_and_cast(0, 0, {"carrier": &"bolt", "modifiers": [&"pierce"], "trigger": &"on_hit", "held": {"carrier": &"bolt"}})
 	_tick(60)
 	var from_pierce: int = 0
 	for hit: Array in _hits:

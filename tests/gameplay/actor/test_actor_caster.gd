@@ -69,7 +69,7 @@ func test_a_press_casts_from_the_staff_tip_along_the_aim_and_pays() -> void:
 	check_equal(casts, [[0, Vector2(114.0, 90.0), Vector2.RIGHT]], "cast from the tip along the aim")
 	check(_world.projectiles.get_count() > 0, "a shot flies")
 	check(wizard.caster.mana_of(0) < mana, "mana was paid")
-	check_equal(wizard.caster.last_form(0), &"bolt", "the carrier is named")
+	check_equal(wizard.caster.last_carrier_card(0), &"bolt", "the carrier is named")
 
 
 func test_a_held_staff_casts_whenever_it_is_ready_and_a_free_one_does_not() -> void:
@@ -296,21 +296,21 @@ func test_a_teleport_card_jumps_and_a_recoil_card_pushes_back() -> void:
 ## Cards for the moves (as tests/gameplay/ai/test_ai_moves.gd makes them).
 func _move_cards() -> Fixture.FakeRegistry:
 	var fake := Fixture.FakeRegistry.new()
-	var bolt := FormBase.new()
+	var bolt := CarrierCard.new()
 	bolt.base_damage = 5
 	bolt.speed = 200.0
 	bolt.lifetime = 1.0
 	bolt.radius = 4.0
 	bolt.mana_cost = 2.0
 	_put(fake, bolt, &"bolt")
-	var dash := FormBase.new()
+	var dash := CarrierCard.new()
 	dash.carrier = &"dash"
 	dash.ray_length = 60.0
 	dash.speed = 300.0
 	dash.lifetime = 0.2
 	dash.mana_cost = 2.0
 	_put(fake, dash, &"dash")
-	var teleport := FormBase.new()
+	var teleport := CarrierCard.new()
 	teleport.carrier = &"teleport"
 	teleport.ray_length = 70.0
 	teleport.mana_cost = 2.0

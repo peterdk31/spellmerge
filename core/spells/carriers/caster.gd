@@ -21,7 +21,7 @@ const POSE: Array[Dictionary] = [
 ]
 
 func staff_pose() -> PackedFloat32Array:
-	return FormBase.pack_pose(POSE)
+	return CarrierCard.pack_pose(POSE)
 
 
 ## Its cast cue (content/cues/cast_self.tres): drawn in to the caster, not thrown out.

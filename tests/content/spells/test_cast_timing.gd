@@ -22,29 +22,29 @@ func after_each() -> void:
 	arena.free_all()
 
 
-func _forms() -> Array[FormBase]:
-	var out: Array[FormBase] = []
+func _carrier_cards() -> Array[CarrierCard]:
+	var out: Array[CarrierCard] = []
 	for id: StringName in arena.registry.call("get_ids", &"spells"):
 		var card: Resource = arena.registry.call("get_resource", &"spells", id)
-		if card is FormBase:
-			out.append(card as FormBase)
+		if card is CarrierCard:
+			out.append(card as CarrierCard)
 	return out
 
 
-func _form(id: StringName) -> FormBase:
-	return arena.registry.call("get_resource", &"spells", id) as FormBase
+func _carrier_card(id: StringName) -> CarrierCard:
+	return arena.registry.call("get_resource", &"spells", id) as CarrierCard
 
 
 func test_no_card_locks_its_staff_for_long() -> void:
-	for form in _forms():
-		check(form.wind_down <= LONGEST_WIND_DOWN, "%s winds down %s s, at most %s: a longer lockout is a mana cost" % [form.id, form.wind_down, LONGEST_WIND_DOWN])
+	for carrier_card in _carrier_cards():
+		check(carrier_card.wind_down <= LONGEST_WIND_DOWN, "%s winds down %s s, at most %s: a longer lockout is a mana cost" % [carrier_card.id, carrier_card.wind_down, LONGEST_WIND_DOWN])
 
 
 func test_the_big_cards_cost_mana_instead() -> void:
 	# Each was a lockout of 2 s or more before the retune.
 	for id: StringName in [&"dash", &"teleport", &"swap", &"decoy", &"familiar"]:
-		check(_form(id).mana_cost >= 20.0, "%s costs %s mana" % [id, _form(id).mana_cost])
-	check(_form(&"familiar").mana_cost > _form(&"bolt").mana_cost * 5.0, "a familiar costs many bolts")
+		check(_carrier_card(id).mana_cost >= 20.0, "%s costs %s mana" % [id, _carrier_card(id).mana_cost])
+	check(_carrier_card(&"familiar").mana_cost > _carrier_card(&"bolt").mana_cost * 5.0, "a familiar costs many bolts")
 
 
 func test_the_starter_staffs_share_one_cooldown() -> void:
@@ -54,5 +54,5 @@ func test_the_starter_staffs_share_one_cooldown() -> void:
 
 
 func test_a_held_beam_outlives_its_wind_down_and_the_starter_cooldown() -> void:
-	var beam: FormBase = _form(&"beam")
+	var beam: CarrierCard = _carrier_card(&"beam")
 	check(beam.lifetime > beam.wind_down + STARTER_COOLDOWN, "a beam lives %s s, past its %s s wind-down and the %s s cooldown, so held fire has no gap" % [beam.lifetime, beam.wind_down, STARTER_COOLDOWN])

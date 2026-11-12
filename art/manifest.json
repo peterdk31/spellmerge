@@ -343,7 +343,7 @@
       "prompt": "A 16x16 icon of a dark hole in a purple ring for the Void element: Void base and shadow ring, an outlined black centre and a Void light glint, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "content/spells/forms/bolt/icon.svg",
+      "path": "content/spells/carriers/bolt/icon.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
@@ -352,7 +352,7 @@
       "prompt": "A 16x16 icon of a comet flying right for the Bolt form: a round Bone head with a Spark core and a tapering Bone tail, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "content/spells/forms/beam/icon.svg",
+      "path": "content/spells/carriers/beam/icon.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
@@ -361,7 +361,7 @@
       "prompt": "A 16x16 icon of a horizontal ray for the Beam form: a Spark band with a Spark light core, small flares above and below its middle, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "content/spells/forms/rune/icon.svg",
+      "path": "content/spells/carriers/rune/icon.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",

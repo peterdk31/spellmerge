@@ -16,9 +16,9 @@ const MotesScript := preload("res://gameplay/feel/mote.gd")
 const StillMotesScript := preload("res://gameplay/feel/still_motes.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
-const WALL := preload("res://content/spells/forms/wall/wall.tres")
-const POOL := preload("res://content/spells/forms/pool/pool.tres")
-const RUNE := preload("res://content/spells/forms/rune/rune.tres")
+const WALL := preload("res://content/spells/carriers/wall/wall.tres")
+const POOL := preload("res://content/spells/carriers/pool/pool.tres")
+const RUNE := preload("res://content/spells/carriers/rune/rune.tres")
 const FIRE_LOOK: int = 1 << 0
 
 var mgr: ManagerScript
@@ -51,12 +51,12 @@ func before_each() -> void:
 	mgr.still_shots_drawn.connect(func(view: StillShotView) -> void: still.give_off(view, motes))
 
 
-## A still shot of `form`'s body at `at` living `life` seconds; a wall's a row of five across x.
-func _place(form: FormBase, at: Vector2, life: float = 5.0) -> int:
-	var slot: int = mgr.spawn(0, at, Vector2.ZERO, life, form.radius, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
-	mgr.set_form(slot, form.id, mgr.register_body(form.look_shader, ManagerScript.MESH_QUAD))
-	if form.carrier == &"wall":
-		mgr.set_solid(slot, Vector2.RIGHT, form.shots, form.spread)
+## A still shot of `carrier_card`'s body at `at` living `life` seconds; a wall's a row of five across x.
+func _place(carrier_card: CarrierCard, at: Vector2, life: float = 5.0) -> int:
+	var slot: int = mgr.spawn(0, at, Vector2.ZERO, life, carrier_card.radius, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	mgr.set_carrier_card(slot, carrier_card.id, mgr.register_body(carrier_card.look_shader, ManagerScript.MESH_QUAD))
+	if carrier_card.carrier == &"wall":
+		mgr.set_solid(slot, Vector2.RIGHT, carrier_card.shots, carrier_card.spread)
 	return slot
 
 
@@ -84,11 +84,11 @@ func _born_at(from: int, at: Vector2) -> int:
 
 
 func test_the_still_cards_name_their_streams() -> void:
-	for form: FormBase in [WALL, POOL, RUNE]:
-		check(not form.look_motes.is_empty(), "%s gives off motes" % form.id)
-		check(form.look_problems().is_empty(), "%s: %s" % [form.id, form.look_problems()])
-		for stream: CardMoteStream in form.look_motes:
-			check(stream.start <= ManagerScript.STILL_START and stream.stop <= ManagerScript.STILL_START, "%s's %s start and stop within what its still clock tells" % [form.id, stream.kind])
+	for carrier_card: CarrierCard in [WALL, POOL, RUNE]:
+		check(not carrier_card.look_motes.is_empty(), "%s gives off motes" % carrier_card.id)
+		check(carrier_card.look_problems().is_empty(), "%s: %s" % [carrier_card.id, carrier_card.look_problems()])
+		for stream: CardMoteStream in carrier_card.look_motes:
+			check(stream.start <= ManagerScript.STILL_START and stream.stop <= ManagerScript.STILL_START, "%s's %s start and stop within what its still clock tells" % [carrier_card.id, stream.kind])
 	check(WALL.look_motes[0].kind == &"seam" and WALL.look_motes[0].from == CardMoteStream.From.ROW, "a wall's stream rises off its seam")
 	check(POOL.look_motes[0].kind == &"rising" and POOL.look_motes[0].from == CardMoteStream.From.AREA, "a pool's motes rise off its mire")
 	check(RUNE.look_motes.all(func(s: CardMoteStream) -> bool: return s.start >= 1.0), "a rune's only once armed")
@@ -124,14 +124,14 @@ func test_a_body_first_numbered_at_a_launch_is_shaped_too() -> void:
 
 
 func test_motes_on_a_card_that_cannot_give_them_off_are_reported() -> void:
-	var form := FormBase.new()
-	form.id = &"test_form"
-	form.carrier = &"atom"
+	var carrier_card := CarrierCard.new()
+	carrier_card.id = &"test_carrier"
+	carrier_card.carrier = &"atom"
 	var stream := CardMoteStream.new()
 	stream.kind = &"rising"
 	stream.rate = 10.0
-	form.look_motes = [stream] as Array[CardMoteStream]
-	check(" ".join(form.look_problems()).contains("never given off"), "a flying card's still motes are reported")
+	carrier_card.look_motes = [stream] as Array[CardMoteStream]
+	check(" ".join(carrier_card.look_problems()).contains("never given off"), "a flying card's still motes are reported")
 
 
 func test_a_wall_streams_motes_along_its_row() -> void:
@@ -205,16 +205,16 @@ func test_none_while_it_comes_in_and_fewer_as_it_goes() -> void:
 
 
 func test_the_card_shapes_its_shader_and_its_motes_alike() -> void:
-	for form: FormBase in [WALL, POOL]:
-		var body: int = mgr.body_of(form.look_shader, ManagerScript.MESH_QUAD)
-		check(body > 0 and still.watches(body), "%s's body is watched" % form.id)
+	for carrier_card: CarrierCard in [WALL, POOL]:
+		var body: int = mgr.body_of(carrier_card.look_shader, ManagerScript.MESH_QUAD)
+		check(body > 0 and still.watches(body), "%s's body is watched" % carrier_card.id)
 		var material := mgr._nodes[ManagerScript.body_batch(body, false)].material as ShaderMaterial
-		check_equal(material.get_shader_parameter(&"look_shape"), form.look_shape, "%s's shader draws by its card's shape" % form.id)
-		check_equal(material.get_shader_parameter(&"look_clock"), Vector2(form.look_open, form.look_fade), "and comes and goes by its card's clock")
-		var look: CardLook = spells.look_of(form.id, Carrier.LOOK_STILL)
-		check(look.shape == form.look_shape and look.open == form.look_open and look.fade == form.look_fade, "%s's motes read the same numbers (its CardLook)" % form.id)
-		var own: String = form.look_shader.code
-		check(own.contains("STILL_HIT") and not own.contains("0.15"), "%s's shader takes its hit size from STILL_HIT, not a copy" % form.id)
+		check_equal(material.get_shader_parameter(&"look_shape"), carrier_card.look_shape, "%s's shader draws by its card's shape" % carrier_card.id)
+		check_equal(material.get_shader_parameter(&"look_clock"), Vector2(carrier_card.look_open, carrier_card.look_fade), "and comes and goes by its card's clock")
+		var look: CardLook = spells.look_of(carrier_card.id, Carrier.LOOK_STILL)
+		check(look.shape == carrier_card.look_shape and look.open == carrier_card.look_open and look.fade == carrier_card.look_fade, "%s's motes read the same numbers (its CardLook)" % carrier_card.id)
+		var own: String = carrier_card.look_shader.code
+		check(own.contains("STILL_HIT") and not own.contains("0.15"), "%s's shader takes its hit size from STILL_HIT, not a copy" % carrier_card.id)
 
 
 func test_a_fire_pool_gives_off_embers_too() -> void:

@@ -30,13 +30,13 @@ func before_each() -> void:
 
 
 func test_its_card_names_its_impact_cue_and_its_wind_up_draws_no_ring() -> void:
-	var card: FormBase = feel.registry.get_resource(&"spells", &"slam") as FormBase
+	var card: CarrierCard = feel.registry.get_resource(&"spells", &"slam") as CarrierCard
 	check_equal(card.end_cue, &"slam", "slam.tres names the cue `slam`")
 	check_equal(card.shown_cue, &"", "no cue for its wind-up")
 
 
 func test_its_strike_shown_is_no_cue_its_end_is() -> void:
-	bus.form_shown.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
+	bus.carrier_shown.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
 	check_equal(feel.flashes_of(&"quake"), 0, "showing the slam plays no cue (its card's cast look names none)")
 	check_equal(feel.trauma(), 0.0, "and no shake")
 

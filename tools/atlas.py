@@ -27,7 +27,7 @@ SPELLS = "content/spells"
 COMBO_GLOB = "**/combos/*.json"
 REACTIONS = f"{SPELLS}/reactions.tres"
 # The folder of each component kind under content/spells/.
-KIND_FOLDERS = {"form": "forms", "element": "elements", "modifier": "modifiers", "trigger": "triggers",
+KIND_FOLDERS = {"form": "carriers", "element": "elements", "modifier": "modifiers", "trigger": "triggers",
                 "multicast": "multicasts"}
 KIND_ORDER = ("form", "element", "modifier", "trigger", "multicast", "combo", "reaction")
 # ReactionRow.Effect, in the order of the enum in core/base/reaction_row.gd.

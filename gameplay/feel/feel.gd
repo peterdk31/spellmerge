@@ -36,7 +36,7 @@ extends Node
 ## the camera against the aim); where a shot strikes, its card's `impact_cue` (S6 2).
 ##
 ## A deflected shot (`shot_deflected`) flashes big and white where it turned, in its new caster's
-## colours; a swing's block (`shot_blocked` while the projectile manager's `impact_form` is
+## colours; a swing's block (`shot_blocked` while the projectile manager's `impact_carrier` is
 ## `swing`) is a parry: a big four-point star in Spark gold and a local stop on the parrying actor
 ## (melee I5).
 ##
@@ -109,13 +109,13 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
-const FORMS_PER_PLAYER: int = 24
+const SHOWN_BEAMS_PER_PLAYER: int = 24
 ## Four players' beam sprites and the enemies' (one share for every enemy caster, staffs F7).
-const FORM_SLOTS: int = FORMS_PER_PLAYER * 5
+const SHOWN_BEAM_SLOTS: int = SHOWN_BEAMS_PER_PLAYER * 5
 ## The share of the beam sprites every enemy's beam takes turns in.
-const ENEMY_FORMS: int = 4
+const ENEMY_SHOWN_BEAMS: int = 4
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
-const FORM_Z: int = 18
+const SHOWN_BEAM_Z: int = 18
 ## Where the spectacle draws (`spectacle.gd`): the motes under the beams and every flash and
 ## telegraph, the floor marks on the floor under every body, spell light just under the motes.
 const MOTE_Z: int = SpectacleScript.MOTE_Z
@@ -123,7 +123,7 @@ const MARK_Z: int = SpectacleScript.MARK_Z
 const LIGHT_Z: int = SpectacleScript.LIGHT_Z
 ## Flashes on the floor (a quake's cracks, a slam's burst and star: `FlashKind.on_floor`, a cue
 ## part's `floor`) draw with the floor marks: over the room's floor (`RoomBase.FLOOR_Z`), under
-## every body (the wizards and enemies at 0 and up; it was FORM_Z - 1 and drew over them).
+## every body (the wizards and enemies at 0 and up; it was SHOWN_BEAM_Z - 1 and drew over them).
 const FLOOR_Z: int = MARK_Z
 ## Live beams made at once (more are made when core/spells has more: no beam limit, owner
 ## 2026-10-29), and the most points of each one's drawn path (BEAM_POINTS in `shot_beam.gdshader`):
@@ -213,14 +213,14 @@ const STAFF_SWAP: StringName = &"staff_swap"
 ## cues' `motes` and `mark` parts). The square each is drawn in: BLAST_SPAN radii each way (the
 ## shader's; its seconds are the kinds' own, keep them equal).
 const BLAST_SPAN: float = 2.2
-## What `_form_cues_of` answers: the places of a carrier card's cues and radius, and the defaults.
+## What `_carrier_card_cues_of` answers: the places of a carrier card's cues and radius, and the defaults.
 const CUE_CAST: int = 0
 const CUE_SHOWN: int = 1
 const CUE_IMPACT: int = 2
 const CUE_END: int = 3
 const CUE_RADIUS: int = 4
 const CUE_WIND: int = 5
-const NO_FORM_CUES: Array = [&"cast", &"", &"impact", &"", 0.0, &"wind"]
+const NO_CARRIER_CARD_CUES: Array = [&"cast", &"", &"impact", &"", 0.0, &"wind"]
 ## The cue of a shield's block (combat plays it for a barrier's, Feel for a shot's own shield).
 const SHIELD_BLOCK_CUE: StringName = &"shield_block"
 ## The pixels a step of a hit's spray or puff is (its cue's size is its steps times this: the
@@ -386,10 +386,10 @@ var _hit_flash_material: ShaderMaterial = null
 ## path as the shader takes it (x, y and how far along the beam; `beam_path`).
 var _live_beams: Array[MeshInstance2D] = []
 ## Each carrier card's own look as an area of Feel draws it, asked of Spells once and kept
-## (`_form_look_of`; docs/milestones/card-looks.md): {Carrier.LOOK_BEAM or LOOK_SWING: {card id:
+## (`_carrier_card_look_of`; docs/milestones/card-looks.md): {Carrier.LOOK_BEAM or LOOK_SWING: {card id:
 ## CardLook}}. Beams' and swing trails' materials take its shader; a beam's light its light. Feel
 ## reads no card field.
-var _form_looks: Dictionary = {}
+var _carrier_card_looks: Dictionary = {}
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
 var _swing_trails: SwingTrailsScript = null
 ## The open portals' gates (`PortalLookScript`), drawn every frame from one typed read of them
@@ -439,18 +439,18 @@ var _thin_turn: PackedFloat32Array = PackedFloat32Array()
 var _thin_sorted: PackedFloat32Array = PackedFloat32Array()
 ## Beams shown whole (beam meshes made once) and their paths of two points: seconds left and in
 ## all, the owner's body tint and the beam's length in pixels.
-var _forms: Array[MeshInstance2D] = []
-var _form_paths: Array[PackedVector3Array] = []
-var _form_left: PackedFloat32Array = PackedFloat32Array()
-var _form_total: PackedFloat32Array = PackedFloat32Array()
-var _form_body: PackedColorArray = PackedColorArray()
-var _form_length: PackedFloat32Array = PackedFloat32Array()
+var _shown_beams: Array[MeshInstance2D] = []
+var _shown_beam_paths: Array[PackedVector3Array] = []
+var _shown_beam_left: PackedFloat32Array = PackedFloat32Array()
+var _shown_beam_total: PackedFloat32Array = PackedFloat32Array()
+var _shown_beam_body: PackedColorArray = PackedColorArray()
+var _shown_beam_length: PackedFloat32Array = PackedFloat32Array()
 ## Each one's motes: its caster's shader ramp (`_beam_ramp`), its look, its tint and its spell's tag.
-var _form_ramp: PackedInt32Array = PackedInt32Array()
-var _form_look: PackedInt32Array = PackedInt32Array()
-var _form_tint: PackedColorArray = PackedColorArray()
-var _form_tag: PackedInt64Array = PackedInt64Array()
-var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
+var _shown_beam_ramp: PackedInt32Array = PackedInt32Array()
+var _shown_beam_look: PackedInt32Array = PackedInt32Array()
+var _shown_beam_tint: PackedColorArray = PackedColorArray()
+var _shown_beam_tag: PackedInt64Array = PackedInt64Array()
+var _next_shown_beam: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## Reaction names: one label per reaction flash slot, with where it starts and seconds left.
 var _labels: Array[Label] = []
 var _label_left: PackedFloat32Array = PackedFloat32Array()
@@ -577,8 +577,8 @@ var _impact_aim: Vector2 = Vector2.ZERO
 ## Camera kick of casts (pixels), added to the shake.
 var _kick: Vector2 = Vector2.ZERO
 var _last_usec: int = 0
-## The cues and radius read from the carrier cards, by card id (see `_form_cues_of`).
-var _form_cues: Dictionary = {}
+## The cues and radius read from the carrier cards, by card id (see `_carrier_card_cues_of`).
+var _carrier_card_cues: Dictionary = {}
 ## The cues read from `content/cues`, by id (see `cue_of`).
 var _cue_cache: Dictionary = {}
 ## The cues that play at most `every` seconds apart (`CueBase.every`): each one's first index in
@@ -606,9 +606,9 @@ func _ready() -> void:
 	_hit_flash_material = ShaderMaterial.new()
 	_hit_flash_material.shader = HIT_FLASH_SHADER
 	ShaderWarmupScript.want(HIT_FLASH_SHADER, ShaderWarmupScript.RECT)
-	for i in FORM_SLOTS:
-		_forms.append(_make_beam())
-		_form_paths.append(_make_beam_path())
+	for i in SHOWN_BEAM_SLOTS:
+		_shown_beams.append(_make_beam())
+		_shown_beam_paths.append(_make_beam_path())
 	_make_flashes()
 	for i in LIVE_BEAMS:
 		_live_beams.append(_make_beam())
@@ -630,7 +630,7 @@ func _ready() -> void:
 	_lanes = LanesScript.new()
 	_lanes.name = "Lanes"
 	# Over the shots and every flash: a telegraph is the brightest thing on screen (docs/STYLE.md).
-	_lanes.z_index = FORM_Z + 2
+	_lanes.z_index = SHOWN_BEAM_Z + 2
 	add_child(_lanes)
 	_numbers = DamageNumberDrawerScript.new()
 	_numbers.name = "DamageNumbers"
@@ -643,14 +643,14 @@ func _ready() -> void:
 	for type: StringName in parts:
 		var row: Array = parts[type] as Array
 		add_cue_part(type, row[0] as Callable, row[1] as Callable if row.size() > 1 else Callable(), row[2] as Callable if row.size() > 2 else Callable())
-	_form_left.resize(FORM_SLOTS)
-	_form_total.resize(FORM_SLOTS)
-	_form_body.resize(FORM_SLOTS)
-	_form_length.resize(FORM_SLOTS)
-	_form_ramp.resize(FORM_SLOTS)
-	_form_look.resize(FORM_SLOTS)
-	_form_tint.resize(FORM_SLOTS)
-	_form_tag.resize(FORM_SLOTS)
+	_shown_beam_left.resize(SHOWN_BEAM_SLOTS)
+	_shown_beam_total.resize(SHOWN_BEAM_SLOTS)
+	_shown_beam_body.resize(SHOWN_BEAM_SLOTS)
+	_shown_beam_length.resize(SHOWN_BEAM_SLOTS)
+	_shown_beam_ramp.resize(SHOWN_BEAM_SLOTS)
+	_shown_beam_look.resize(SHOWN_BEAM_SLOTS)
+	_shown_beam_tint.resize(SHOWN_BEAM_SLOTS)
+	_shown_beam_tag.resize(SHOWN_BEAM_SLOTS)
 	for i in REACTION_SLOTS:
 		var label := Label.new()
 		label.top_level = true
@@ -684,7 +684,7 @@ func _ready() -> void:
 	events.possess_started.connect(_on_possess_started)
 	events.possess_ended.connect(_on_possess_ended)
 	events.projectile_impact.connect(_on_projectile_impact)
-	events.form_shown.connect(_on_form_shown)
+	events.carrier_shown.connect(_on_carrier_shown)
 	events.cast_winding.connect(_on_cast_winding)
 	events.carrier_ended.connect(_on_carrier_ended)
 	events.cue_shown.connect(_on_cue_shown)
@@ -741,7 +741,7 @@ func step(real_delta: float) -> void:
 	party_camera.follow(_live_camera())
 	party_camera.step(real_delta)
 	_step_reactions(real_delta)
-	_step_forms(real_delta)
+	_step_shown_beams(real_delta)
 	_step_flashes(real_delta)
 	_flashes_shown = 0
 	_hit_sounds = 0
@@ -1371,7 +1371,7 @@ func _on_shot_deflected(caster: int, position: Vector2, _tag: int, shot: int) ->
 ## A shot was blocked. A shot's own shield (`shot`, the shielded shot) blocks as a barrier does: its
 ## shell loses that charge's motes (`barriers.gd`) and the cue `shield_block` plays where the
 ## blocked shot was, turned back toward the shield. A swing's block is a parry (`shield · swing`; the
-## projectile manager's `impact_form` says which carrier blocked): the cue `parry`, a big
+## projectile manager's `impact_carrier` says which carrier blocked): the cue `parry`, a big
 ## four-point star in Spark gold and a local stop on the parrying actor alone. Other carriers'
 ## blocks show nothing of their own.
 func _on_shot_blocked(caster: int, position: Vector2, _tag: int, shot: int) -> void:
@@ -1382,27 +1382,27 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int, shot: int) -> v
 		play_cue(SHIELD_BLOCK_CUE, caster, position, (position - from).normalized() if from.is_finite() and from != position else Vector2.ZERO)
 		_spectacle.shot_blocked(shot, position)
 		return
-	if projectiles.impact_form != &"swing":
+	if projectiles.impact_carrier != &"swing":
 		return
 	play_cue(CueBase.PARRY_CUE, caster, position)
 
 
 ## The payoff of a shot, on a body or a wall: the `impact_cue` of the card the shot is (the
-## projectile manager's `impact_form` while the impact is sent; `impact`, a flare, for none), in the
+## projectile manager's `impact_carrier_card` while the impact is sent; `impact`, a flare, for none), in the
 ## shot's colour and cards (its `impact_core`, `impact_look` and `impact_tag`) and its caster's `ramp`:
 ## an enemy's lands the same way, in the enemy ramp (staffs F7: one look for every spell). As big as
 ## the card's radius: a rune goes off in `rune_burst`, a wall's adds a ring (`impact_ring`).
 func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2) -> void:
-	var form: StringName = &""
+	var carrier_card: StringName = &""
 	var core: Color = Color.WHITE
 	var bits: int = 0
 	var tag: int = 0
 	if projectiles != null:
-		form = projectiles.impact_form
+		carrier_card = projectiles.impact_carrier_card
 		core = projectiles.impact_core
 		bits = projectiles.impact_look
 		tag = projectiles.impact_tag
-	var cues: Array = _form_cues_of(form)
+	var cues: Array = _carrier_card_cues_of(carrier_card)
 	play_cue(cues[CUE_IMPACT] as StringName, caster, position, direction, cues[CUE_RADIUS] as float, core, bits, ActorsScript.NONE, -1, -1, tag, true, NO_BODY, ramp)
 
 
@@ -1681,7 +1681,7 @@ func _on_cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2
 	play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
 
 
-## The spell runtime's tag of the spell whose cue, form or carrier's end is being sent (its cards'
+## The spell runtime's tag of the spell whose cue, carrier card or carrier's end is being sent (its cards'
 ## motes and marks; `SpellRuntime.cue_tag`), 0 for none.
 func _cue_tag() -> int:
 	var tag: Variant = spells.get(&"cue_tag") if spells != null else null
@@ -1691,35 +1691,35 @@ func _cue_tag() -> int:
 ## A carrier with no shot ended (a teleport or dash landing, a slam striking, a
 ## decoy or familiar going): the streams its cues started end (a dash's streaks), and its card's
 ## `end_cue` plays, `size` big.
-func _on_carrier_ended(caster: int, form: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int) -> void:
+func _on_carrier_ended(caster: int, carrier_card: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int) -> void:
 	var tag: int = _cue_tag()
 	if _spectacle != null:
 		_spectacle.end_streams(caster, tag)
-	var cue: StringName = _form_cues_of(form)[CUE_END] as StringName
+	var cue: StringName = _carrier_card_cues_of(carrier_card)[CUE_END] as StringName
 	if cue != &"":
 		play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, tag)
 
 
-## The carrier card `form`'s look as the area `drawer` (Carrier.LOOK_BEAM, LOOK_SWING) draws it
+## The carrier card `carrier_card`'s look as the area `drawer` (Carrier.LOOK_BEAM, LOOK_SWING) draws it
 ## (`Spells.look_of`; `CardLook.PLAIN` with no Spells, no card, or a card another area draws), asked
 ## once per id and kept: a cast allocates nothing.
-func _form_look_of(form: StringName, drawer: int) -> CardLook:
-	var cache: Dictionary = _form_looks.get(drawer, {})
-	var known: CardLook = cache.get(form) as CardLook
+func _carrier_card_look_of(carrier_card: StringName, drawer: int) -> CardLook:
+	var cache: Dictionary = _carrier_card_looks.get(drawer, {})
+	var known: CardLook = cache.get(carrier_card) as CardLook
 	if known != null:
 		return known
-	if spells == null or form == &"" or not spells.has_method(&"look_of"):
+	if spells == null or carrier_card == &"" or not spells.has_method(&"look_of"):
 		return CardLook.PLAIN
-	var look: CardLook = spells.call(&"look_of", form, drawer) as CardLook
-	cache[form] = look
-	_form_looks[drawer] = cache
+	var look: CardLook = spells.call(&"look_of", carrier_card, drawer) as CardLook
+	cache[carrier_card] = look
+	_carrier_card_looks[drawer] = cache
 	return look
 
 
-## The shader that draws the carrier card `form`'s look in the area `drawer`, or `plain` when its
+## The shader that draws the carrier card `carrier_card`'s look in the area `drawer`, or `plain` when its
 ## card names none (or is drawn by another area).
-func _form_shader_of(form: StringName, drawer: int, plain: Shader) -> Shader:
-	var shader: Shader = _form_look_of(form, drawer).shader
+func _carrier_card_shader_of(carrier_card: StringName, drawer: int, plain: Shader) -> Shader:
+	var shader: Shader = _carrier_card_look_of(carrier_card, drawer).shader
 	return shader if shader != null else plain
 
 
@@ -1753,7 +1753,7 @@ func _make_beam() -> MeshInstance2D:
 	node.material = material
 	node.top_level = true
 	node.visible = false
-	node.z_index = FORM_Z
+	node.z_index = SHOWN_BEAM_Z
 	add_child(node)
 	return node
 
@@ -1785,9 +1785,9 @@ static func swing_mesh() -> ArrayMesh:
 
 
 ## The swing trails (for tests).
-## The shader a swing of the carrier card `form` trails with (its `look_shader`, or the plain trail's).
-func _swing_shader_of(form: StringName) -> Shader:
-	return _form_shader_of(form, Carrier.LOOK_SWING, SwingTrailsScript.SHADER)
+## The shader a swing of the carrier card `carrier_card` trails with (its `look_shader`, or the plain trail's).
+func _swing_shader_of(carrier_card: StringName) -> Shader:
+	return _carrier_card_shader_of(carrier_card, Carrier.LOOK_SWING, SwingTrailsScript.SHADER)
 
 
 func swing_trails() -> SwingTrailsScript:
@@ -2337,30 +2337,30 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 	play_cue(CueBase.BOSS_DEATH_CUE if _is_boss(enemy) else CueBase.ENEMY_DEATH_CUE, killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(body), 0, true, _hit_color_of(enemy))
 
 
-## The cues the carrier card `form` names and its radius (`FormBase.look_cues`: [cast_cue,
+## The cues the carrier card `carrier_card` names and its radius (`CarrierCard.look_cues`: [cast_cue,
 ## shown_cue, impact_cue, end_cue, radius], CUE_CAST to CUE_RADIUS), the defaults (`cast` and `impact`, radius
 ## 0) for an id that is no carrier card; a fallback carrier (`caster`) casts with its own
-## `Carrier.cast_cue`; a modifier that shows itself (`form_shown` `zap`) brings its
+## `Carrier.cast_cue`; a modifier that shows itself (`carrier_shown` `zap`) brings its
 ## own `cue` as its shown cue. Read once per card id, then kept: a cast or a hit allocates nothing.
-## With no registry yet, or no form id, the defaults are answered but not kept.
-func _form_cues_of(form: StringName) -> Array:
-	var cached: Variant = _form_cues.get(form)
+## With no registry yet, or no carrier card id, the defaults are answered but not kept.
+func _carrier_card_cues_of(carrier_card: StringName) -> Array:
+	var cached: Variant = _carrier_card_cues.get(carrier_card)
 	if cached != null:
 		return cached as Array
-	if registry == null or form == &"":
-		return NO_FORM_CUES
-	var card: Resource = registry.get_resource(&"spells", form)
-	var cues: Array = NO_FORM_CUES
-	if card is FormBase:
-		cues = (card as FormBase).look_cues()
-	elif card == null and Carriers.is_fallback(form) and Carriers.of(form).cast_cue() != &"":
+	if registry == null or carrier_card == &"":
+		return NO_CARRIER_CARD_CUES
+	var card: Resource = registry.get_resource(&"spells", carrier_card)
+	var cues: Array = NO_CARRIER_CARD_CUES
+	if card is CarrierCard:
+		cues = (card as CarrierCard).look_cues()
+	elif card == null and Carriers.is_fallback(carrier_card) and Carriers.of(carrier_card).cast_cue() != &"":
 		# A cast with no carrier card (its cards landed on the caster): its fallback carrier's own cue.
-		cues = NO_FORM_CUES.duplicate()
-		cues[CUE_CAST] = Carriers.of(form).cast_cue()
+		cues = NO_CARRIER_CARD_CUES.duplicate()
+		cues[CUE_CAST] = Carriers.of(carrier_card).cast_cue()
 	elif card is ModifierBase and (card as ModifierBase).cue != &"":
-		# A modifier that shows itself (a zap: `form_shown` names its card) plays its own cue there.
-		cues = [NO_FORM_CUES[CUE_CAST], (card as ModifierBase).cue, NO_FORM_CUES[CUE_IMPACT], &"", 0.0, NO_FORM_CUES[CUE_WIND]]
-	_form_cues[form] = cues
+		# A modifier that shows itself (a zap: `carrier_shown` names its card) plays its own cue there.
+		cues = [NO_CARRIER_CARD_CUES[CUE_CAST], (card as ModifierBase).cue, NO_CARRIER_CARD_CUES[CUE_IMPACT], &"", 0.0, NO_CARRIER_CARD_CUES[CUE_WIND]]
+	_carrier_card_cues[carrier_card] = cues
 	return cues
 
 
@@ -2372,7 +2372,7 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 		return
 	var table: ActorsScript = _actor_table()
 	var actor: int = table.actor_of_seat(player) if table != null else ActorsScript.NONE
-	play_cue(_form_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, player)
+	play_cue(_carrier_card_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, player)
 
 
 ## A cast started winding up (`cast_winding`; docs/milestones/cast-timing.md, T6b): the staff's own
@@ -2380,13 +2380,13 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 ## its carrier card's `wind_cue` (an enemy's telegraph: a lane along the aim, a ring for a cast that
 ## is not aimed), from the staff tip, its size the wind-up's seconds, on the staff tip as it turns.
 ## Only for a caster not on the players' team: a telegraph warns the players (owner, 2026-11-01).
-func _on_cast_winding(caster: int, _staff: int, form: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int, staff_cue: StringName) -> void:
+func _on_cast_winding(caster: int, _staff: int, carrier_card: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int, staff_cue: StringName) -> void:
 	if caster < 0 or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
 	var table: ActorsScript = _actor_table()
 	if table == null or table.team_of(caster) == ActorsScript.TEAM_WIZARDS:
 		return
-	var cue: StringName = staff_cue if staff_cue != &"" else _form_cues_of(form)[CUE_WIND] as StringName
+	var cue: StringName = staff_cue if staff_cue != &"" else _carrier_card_cues_of(carrier_card)[CUE_WIND] as StringName
 	if cue == &"":
 		return
 	# Its flashes sit on the staff tip as it turns (the aim follows the caster through the wind-up).
@@ -2422,14 +2422,14 @@ func _on_barrier_changed(actor: int, charges: int, seconds: float, tag: int, way
 ## enemy ramp (staffs F7). The beam keeps state of its own (its slot while it fades), so it stays
 ## in code. A slam's strike is its end (`carrier_ended`); its
 ## wind-up shows only on the staff (the rising, glowing staff: a ring there distracted from it).
-func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
+func _on_carrier_shown(caster: int, carrier_card: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
 	if caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
-	var cue: StringName = _form_cues_of(form)[CUE_SHOWN] as StringName
+	var cue: StringName = _carrier_card_cues_of(carrier_card)[CUE_SHOWN] as StringName
 	if cue != &"":
 		play_cue(cue, caster, origin, direction, length, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
 	var ramp: int = _ramp_of(caster)
-	if form != &"beam" or length <= 0.0 or direction == Vector2.ZERO:
+	if carrier_card != &"beam" or length <= 0.0 or direction == Vector2.ZERO:
 		return
 	var seconds: float = preset.beam_seconds
 	if seconds <= 0.0:
@@ -2437,15 +2437,15 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	# Each seat's caster reuses only its own oldest slots, so nobody's beams push out another's;
 	# the actors no seat drives share one seat's worth (by budget), so a crowd never takes a seat's.
 	var who: int = _budget_of(caster)
-	var slot: int = who * FORMS_PER_PLAYER + _next_form[who]
-	_next_form[who] = (_next_form[who] + 1) % FORMS_PER_PLAYER
-	var node: MeshInstance2D = _forms[slot]
+	var slot: int = who * SHOWN_BEAMS_PER_PLAYER + _next_shown_beam[who]
+	_next_shown_beam[who] = (_next_shown_beam[who] + 1) % SHOWN_BEAMS_PER_PLAYER
+	var node: MeshInstance2D = _shown_beams[slot]
 	var end: Vector2 = origin + direction.normalized() * length
-	var path: PackedVector3Array = _form_paths[slot]
+	var path: PackedVector3Array = _shown_beam_paths[slot]
 	path[0] = Vector3(origin.x, origin.y, 0.0)
 	path[1] = Vector3(end.x, end.y, length)
-	# Drawn by its card's own shader (`FormBase.look_shader`), or the plain beam's.
-	_use_shader(node, _form_shader_of(form, Carrier.LOOK_BEAM, BEAM_SHADER))
+	# Drawn by its card's own shader (`CarrierCard.look_shader`), or the plain beam's.
+	_use_shader(node, _carrier_card_shader_of(carrier_card, Carrier.LOOK_BEAM, BEAM_SHADER))
 	var material: ShaderMaterial = node.material as ShaderMaterial
 	material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
 	# A path of two points, BEAM_LEAD past each end, so the flares are whole.
@@ -2464,32 +2464,32 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	var body: Color = Color.WHITE
 	if projectiles != null:
 		body = projectiles.tint_of(caster)
-	_form_body[slot] = body
-	_form_ramp[slot] = _beam_ramp(ramp)
-	_form_look[slot] = look
-	_form_tint[slot] = tint
-	_form_tag[slot] = _cue_tag()
-	_form_left[slot] = seconds
-	_form_total[slot] = seconds
+	_shown_beam_body[slot] = body
+	_shown_beam_ramp[slot] = _beam_ramp(ramp)
+	_shown_beam_look[slot] = look
+	_shown_beam_tint[slot] = tint
+	_shown_beam_tag[slot] = _cue_tag()
+	_shown_beam_left[slot] = seconds
+	_shown_beam_total[slot] = seconds
 	node.visible = true
-	_pose_form(slot, 1.0)
+	_pose_shown_beam(slot, 1.0)
 
 
 ## Fade the beams, and give off their motes.
-func _step_forms(real_delta: float) -> void:
-	for i in FORM_SLOTS:
-		if _form_left[i] <= 0.0:
+func _step_shown_beams(real_delta: float) -> void:
+	for i in SHOWN_BEAM_SLOTS:
+		if _shown_beam_left[i] <= 0.0:
 			continue
-		_form_left[i] -= real_delta
-		if _form_left[i] <= 0.0:
-			_forms[i].visible = false
+		_shown_beam_left[i] -= real_delta
+		if _shown_beam_left[i] <= 0.0:
+			_shown_beams[i].visible = false
 			continue
-		var t: float = _form_left[i] / _form_total[i]
-		_pose_form(i, t)
-		var path: PackedVector3Array = _form_paths[i]
+		var t: float = _shown_beam_left[i] / _shown_beam_total[i]
+		_pose_shown_beam(i, t)
+		var path: PackedVector3Array = _shown_beam_paths[i]
 		var from: Vector2 = Vector2(path[0].x, path[0].y)
 		var end: Vector2 = Vector2(path[1].x, path[1].y)
-		_beam_motes(path, 2, path[1].z, end, from.direction_to(end), t, _form_ramp[i], _form_look[i], _form_tint[i], _form_tag[i], real_delta)
+		_beam_motes(path, 2, path[1].z, end, from.direction_to(end), t, _shown_beam_ramp[i], _shown_beam_look[i], _shown_beam_tint[i], _shown_beam_tag[i], real_delta)
 
 
 ## Draw every live beam where it is this frame: along its curve, as far as it got, in its owner's
@@ -2607,9 +2607,9 @@ func _draw_live_beams(real_delta: float) -> void:
 		if projectiles != null:
 			body = projectiles.tint_of(caster)
 		var tint: Color = beams.call("beam_tint", i)
-		# Drawn by its card's own shader (`FormBase.look_shader`), or the plain beam's, and lit as
+		# Drawn by its card's own shader (`CarrierCard.look_shader`), or the plain beam's, and lit as
 		# its card says (`look_light_intensity`, `look_light_reach`).
-		var look: CardLook = _form_look_of(beams.call("beam_form", i) as StringName if beams.has_method("beam_form") else &"", Carrier.LOOK_BEAM)
+		var look: CardLook = _carrier_card_look_of(beams.call("beam_carrier_card", i) as StringName if beams.has_method("beam_carrier_card") else &"", Carrier.LOOK_BEAM)
 		_use_shader(node, look.shader if look.shader != null else BEAM_SHADER)
 		var material: ShaderMaterial = node.material as ShaderMaterial
 		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
@@ -2673,14 +2673,14 @@ func _beam_motes(path: PackedVector3Array, points: int, length: float, end_at: V
 
 ## Show beam `slot` at `t` (1 just shown, 0 gone): its rim and glow swell for its first moments
 ## (the payoff), then thin and flicker, and it dissolves into pixels (`beam_swell`, `beam_fade`).
-func _pose_form(slot: int, t: float) -> void:
-	var body: Color = _form_body[slot]
+func _pose_shown_beam(slot: int, t: float) -> void:
+	var body: Color = _shown_beam_body[slot]
 	var age: float = 1.0 - t
-	var material: ShaderMaterial = _forms[slot].material as ShaderMaterial
+	var material: ShaderMaterial = _shown_beams[slot].material as ShaderMaterial
 	material.set_shader_parameter(&"sim_time", _clock)
 	material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, t * preset.beam_alpha))
 	var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - age / preset.beam_flare_share, 0.0)
-	var step: int = int(age * _form_total[slot] * preset.beam_flicker_rate)
+	var step: int = int(age * _shown_beam_total[slot] * preset.beam_flicker_rate)
 	var flicker: float = 1.0 - preset.beam_flicker_depth * float(step % 2)
 	material.set_shader_parameter(&"beam_swell", t * flare * flicker)
 	material.set_shader_parameter(&"beam_fade", t)

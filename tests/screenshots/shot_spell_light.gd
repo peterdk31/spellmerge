@@ -12,7 +12,7 @@ extends "res://tests/support/screenshot.gd"
 ## light's steps are drawn by shot_spell_light_rooms.gd.
 
 ## The rune card's own shot shader, which draws its still shots.
-const RUNE: Shader = preload("res://content/spells/forms/rune/rune.gdshader")
+const RUNE: Shader = preload("res://content/spells/carriers/rune/rune.gdshader")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ROOM := preload("res://content/rooms/crypt/arena_01.tscn")
@@ -21,8 +21,8 @@ const FROST := preload("res://content/spells/elements/frost/frost.tres")
 const STORM := preload("res://content/spells/elements/storm/storm.tres")
 const LIGHTNING := preload("res://content/spells/elements/lightning/lightning.tres")
 const BIGGER := preload("res://content/spells/modifiers/bigger/bigger.tres")
-const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
-const ATOM := preload("res://content/spells/forms/atom/atom.tres")
+const BOLT := preload("res://content/spells/carriers/bolt/bolt.tres")
+const ATOM := preload("res://content/spells/carriers/atom/atom.tres")
 const BOLT_RADIUS: float = 5.0
 const MIDDLE := Vector2(320.0, 180.0)
 
@@ -57,7 +57,7 @@ func take() -> void:
 		var slot: int = _shots.call("spawn", 1, Vector2(285.0 if card == BOLT else 355.0, 150.0), Vector2(0.01, 0.0), 600.0, float(card.get("radius"))) as int
 		_shots.call("set_light", slot, float(card.get("look_light_intensity")), float(card.get("look_light_reach")))
 	var rune: int = _shots.call("spawn", 0, Vector2(80.0, 300.0), Vector2.ZERO, 600.0, 14.0, 1, 0, 0, ManagerScript.MOTION_STILL) as int
-	_shots.call("set_form", rune, &"rune", _shots.call("register_body", RUNE))
+	_shots.call("set_carrier_card", rune, &"rune", _shots.call("register_body", RUNE))
 	_dress(rune, FIRE.get("tint") as Color, PackedInt32Array([int(FIRE.get("look_layer"))]))
 	if int(_shots.get("drawn")) < 0:
 		fail("no shots")

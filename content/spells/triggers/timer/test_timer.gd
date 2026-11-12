@@ -14,21 +14,21 @@ func test_the_card_is_timer() -> void:
 
 
 func test_it_compiles_into_the_spell_numbers() -> void:
-	var spell: CompiledSpell = _compile_recipe({"form": &"bolt", "trigger": &"timer", "held": {"form": &"bolt", "modifiers": [&"nova"]}})
+	var spell: CompiledSpell = _compile_recipe({"carrier": &"bolt", "trigger": &"timer", "held": {"carrier": &"bolt", "modifiers": [&"nova"]}})
 	var trigger: TriggerBase = _trigger(&"timer")
 	check_equal(spell.triggers.size(), 1, "one trigger")
 	if spell.triggers.is_empty():
 		return
 	check_equal(spell.triggers[0].event, trigger.event, "the event is compiled")
 	check_equal(spell.triggers[0].interval, trigger.wind_up, "its tick is its wind-up (its payload adds none here; docs/milestones/cast-timing.md, T8)")
-	check(spell.payload != null and spell.payload.spells[0].form_id == &"bolt" and spell.payload.spells[0].nova_ways() == 8, "the payload is a nova of bolts")
+	check(spell.payload != null and spell.payload.spells[0].carrier_card_id == &"bolt" and spell.payload.spells[0].nova_ways() == 8, "the payload is a nova of bolts")
 
 
 func test_it_works_for_all_four_players_at_once() -> void:
 	# Each player has a row of their own, 400 px apart.
 	for player in 4:
 		var origin := Vector2(-600.0, -600.0 + 400.0 * player)
-		_build_and_cast(player, 0, {"form": &"rune", "trigger": &"timer", "held": {"form": &"bolt"}}, origin)
+		_build_and_cast(player, 0, {"carrier": &"rune", "trigger": &"timer", "held": {"carrier": &"bolt"}}, origin)
 	_tick(100)
 	for player in 4:
 		var held_tag: int = _spells.current_tag(player, 0, 1)
@@ -43,7 +43,7 @@ func test_the_timer_waits_half_a_second() -> void:
 
 
 func test_a_timer_fires_every_half_second_as_long_as_its_shot_lives() -> void:
-	_build_and_cast(0, 0, {"form": &"rune", "trigger": &"timer", "held": {"form": &"bolt"}})
+	_build_and_cast(0, 0, {"carrier": &"rune", "trigger": &"timer", "held": {"carrier": &"bolt"}})
 	var held_tag: int = _spells.current_tag(0, 0, 1)
 	_tick(29)
 	check_equal(_born(held_tag), 0, "nothing before half a second")
@@ -58,19 +58,19 @@ func test_a_timer_fires_every_half_second_as_long_as_its_shot_lives() -> void:
 
 
 func test_a_timer_fires_from_where_its_shot_is() -> void:
-	_build_and_cast(0, 0, {"form": &"rune", "trigger": &"timer", "held": {"form": &"bolt"}}, Vector2(100.0, 50.0))
+	_build_and_cast(0, 0, {"carrier": &"rune", "trigger": &"timer", "held": {"carrier": &"bolt"}}, Vector2(100.0, 50.0))
 	_tick(32)
 	var shots: Array[int] = _slots(_spells.current_tag(0, 0, 1))
 	check_equal(shots.size(), 1, "one held shot")
 	if not shots.is_empty():
 		var at: Vector2 = _mgr.get_position_of(shots[0])
 		# The rune stands twice its size ahead of where it was cast (rules R4 F3).
-		var rune: Vector2 = Vector2(100.0 + (load("res://content/spells/forms/rune/rune.tres") as FormBase).radius * 2.0, 50.0)
+		var rune: Vector2 = Vector2(100.0 + (load("res://content/spells/carriers/rune/rune.tres") as CarrierCard).radius * 2.0, 50.0)
 		check(at.distance_to(rune) < 20.0, "close to the rune that fired it")
 
 
 func test_a_timer_stops_when_the_shot_ends() -> void:
 	# A bolt lives 1.2 s: its timer fires at 0.5 s and 1.0 s only.
-	_build_and_cast(0, 0, {"form": &"bolt", "trigger": &"timer", "held": {"form": &"bolt"}})
+	_build_and_cast(0, 0, {"carrier": &"bolt", "trigger": &"timer", "held": {"carrier": &"bolt"}})
 	_tick(200)
 	check_equal(_born(_spells.current_tag(0, 0, 1)), 2, "two fires in the bolt's 1.2 s")

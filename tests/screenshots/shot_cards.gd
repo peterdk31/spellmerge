@@ -1,12 +1,12 @@
 extends "res://tests/support/screenshot.gd"
 ## The art of every card and the spell sprites on the crypt floor (`cards_sheet`, then
 ## `cards_sheet_2` and on when the cards fill a screen: a new card never breaks the build), to look at
-## against docs/STYLE.md. One row per kind (form, element, modifier, trigger, multicast), each
+## against docs/STYLE.md. One row per kind (carrier card, element, modifier, trigger, multicast), each
 ## card's 16x16 icon at 3x with the same icon at 1x beside it, as the builder shows it. The
 ## cards are the ones the registry found, so a new card adds itself. The bottom row is every
 ## sprite in art/vfx/ at 2x, with each again at 1x under it.
 
-const KINDS: Array[StringName] = [&"form", &"element", &"modifier", &"trigger", &"multicast"]
+const KINDS: Array[StringName] = [&"carrier", &"element", &"modifier", &"trigger", &"multicast"]
 const CELL := Vector2(72.0, 58.0)
 ## Where the cards start, right of the kind names.
 const LEFT: float = 70.0

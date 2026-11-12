@@ -101,21 +101,21 @@ func test_the_effect_range_covers_every_reaction_effect() -> void:
 
 
 func test_a_problem_has_a_rule_a_file_a_field_and_a_fix() -> void:
-	var form := _component(FIXTURES + "/form/broken_form.tres")
-	var problems: Array[Dictionary] = SpellValidator.check_component(form, _manifest())
-	check(not problems.is_empty(), "the broken form has problems")
+	var carrier_card := _component(FIXTURES + "/carrier/broken_carrier.tres")
+	var problems: Array[Dictionary] = SpellValidator.check_component(carrier_card, _manifest())
+	check(not problems.is_empty(), "the broken carrier card has problems")
 	for problem in problems:
 		for part: String in ["rule", "file", "field", "fix"]:
 			check(String(problem.get(part, "")) != "", "%s is filled in" % part)
-		check_equal(problem["file"], form.resource_path, "the problem names the file")
-	check(SpellValidator.format(problems[0]).contains(form.resource_path), "the formatted line has the file")
+		check_equal(problem["file"], carrier_card.resource_path, "the problem names the file")
+	check(SpellValidator.format(problems[0]).contains(carrier_card.resource_path), "the formatted line has the file")
 
 
-func test_the_broken_form_fails() -> void:
-	var problems := SpellValidator.check_component(_component(FIXTURES + "/form/broken_form.tres"), _manifest())
+func test_the_broken_carrier_card_fails() -> void:
+	var problems := SpellValidator.check_component(_component(FIXTURES + "/carrier/broken_carrier.tres"), _manifest())
 	check_equal(_fields(problems, "id-folder"), ["id"] as Array[String], "id differs from the folder")
 	check(_fields(problems, "required-field").has("display_name"), "no name")
-	check(_fields(problems, "required-field").has("speed"), "a straight form without speed")
+	check(_fields(problems, "required-field").has("speed"), "a straight carrier card without speed")
 	check_equal(_fields(problems, "icon"), ["icon"] as Array[String], "no icon")
 	check_equal(_fields(problems, "range"), ["shots"] as Array[String], "too many shots")
 
@@ -181,49 +181,49 @@ func test_the_broken_reaction_table_fails() -> void:
 		check_equal(problem["file"], table.resource_path, "the problem names the table")
 
 
-func test_a_form_needs_what_its_carrier_uses() -> void:
-	var form := _fine(FormBase.new()) as FormBase
-	form.carrier = &"atom"
-	form.speed = 100.0
-	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a straight form with speed is fine")
-	form.speed = 0.0
-	check_equal(_fields(SpellValidator.check_component(form, _listed()), "required-field"), ["speed"] as Array[String], "straight needs speed")
-	form.carrier = &"beam"
-	check_equal(_fields(SpellValidator.check_component(form, _listed()), "required-field"), ["ray_length"] as Array[String], "a ray needs a length")
-	form.carrier = &"rune"
-	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a rune needs nothing more")
+func test_a_carrier_card_needs_what_its_carrier_uses() -> void:
+	var carrier_card := _fine(CarrierCard.new()) as CarrierCard
+	carrier_card.carrier = &"atom"
+	carrier_card.speed = 100.0
+	check_equal(SpellValidator.check_component(carrier_card, _listed()).size(), 0, "a straight carrier card with speed is fine")
+	carrier_card.speed = 0.0
+	check_equal(_fields(SpellValidator.check_component(carrier_card, _listed()), "required-field"), ["speed"] as Array[String], "straight needs speed")
+	carrier_card.carrier = &"beam"
+	check_equal(_fields(SpellValidator.check_component(carrier_card, _listed()), "required-field"), ["ray_length"] as Array[String], "a ray needs a length")
+	carrier_card.carrier = &"rune"
+	check_equal(SpellValidator.check_component(carrier_card, _listed()).size(), 0, "a rune needs nothing more")
 
 
-func test_a_form_that_names_no_carrier_is_refused() -> void:
-	var form := _fine(FormBase.new()) as FormBase
-	form.carrier = &"fissure"
-	check(_has_rule(SpellValidator.check_component(form, _listed()), "unknown-carrier"), "a name no carrier has")
+func test_a_carrier_card_that_names_no_carrier_is_refused() -> void:
+	var carrier_card := _fine(CarrierCard.new()) as CarrierCard
+	carrier_card.carrier = &"fissure"
+	check(_has_rule(SpellValidator.check_component(carrier_card, _listed()), "unknown-carrier"), "a name no carrier has")
 	# The carrier that runs nothing has the id &"", so an empty name once passed as its own.
-	form.carrier = &""
-	check(_has_rule(SpellValidator.check_component(form, _listed()), "unknown-carrier"), "an empty name")
-	check(not form.range_problems().is_empty(), "and its ranges say so too")
+	carrier_card.carrier = &""
+	check(_has_rule(SpellValidator.check_component(carrier_card, _listed()), "unknown-carrier"), "an empty name")
+	check(not carrier_card.range_problems().is_empty(), "and its ranges say so too")
 
 
 func test_a_staff_pose_must_be_known_keys_in_order_and_in_range() -> void:
-	var form := _fine(FormBase.new()) as FormBase
-	form.carrier = &"rune"
-	form.staff_pose = [{"phase": "wind", "at": 1.0, "lift": 10, "push": -5, "ease": "out", "mood": "angry"}, {"phase": "after", "at": 0.1}] as Array[Dictionary]
-	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "two keys in order are fine")
-	form.staff_pose = [{"phase": "later", "at": 0.1}] as Array[Dictionary]
-	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "an unknown phase is reported")
-	form.staff_pose = [{"phase": "after", "at": 0.1}, {"phase": "wind", "at": 1.0}] as Array[Dictionary]
-	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "a key before the one before it is reported")
-	form.staff_pose = [{"phase": "after", "at": 0.1, "glow": 2.0}] as Array[Dictionary]
-	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "a glow above 1 is reported")
-	form.staff_pose = [{"phase": "after", "at": 0.1, "wobble": 1.0}] as Array[Dictionary]
-	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "an unknown channel is reported")
-	form.staff_pose = [{"phase": "after", "at": 0.1, "mood": "sleepy"}] as Array[Dictionary]
-	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "an unknown mood is reported")
-	form.staff_pose = [{"phase": "wind", "at": 1.0, "land": 1.0}] as Array[Dictionary]
-	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "a rune strikes no point, so it has nowhere to land")
-	form.carrier = &"slam"
-	form.ray_length = 20.0
-	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a slam strikes one: land is fine")
+	var carrier_card := _fine(CarrierCard.new()) as CarrierCard
+	carrier_card.carrier = &"rune"
+	carrier_card.staff_pose = [{"phase": "wind", "at": 1.0, "lift": 10, "push": -5, "ease": "out", "mood": "angry"}, {"phase": "after", "at": 0.1}] as Array[Dictionary]
+	check_equal(SpellValidator.check_component(carrier_card, _listed()).size(), 0, "two keys in order are fine")
+	carrier_card.staff_pose = [{"phase": "later", "at": 0.1}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(carrier_card, _listed()), "pose"), "an unknown phase is reported")
+	carrier_card.staff_pose = [{"phase": "after", "at": 0.1}, {"phase": "wind", "at": 1.0}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(carrier_card, _listed()), "pose"), "a key before the one before it is reported")
+	carrier_card.staff_pose = [{"phase": "after", "at": 0.1, "glow": 2.0}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(carrier_card, _listed()), "pose"), "a glow above 1 is reported")
+	carrier_card.staff_pose = [{"phase": "after", "at": 0.1, "wobble": 1.0}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(carrier_card, _listed()), "pose"), "an unknown channel is reported")
+	carrier_card.staff_pose = [{"phase": "after", "at": 0.1, "mood": "sleepy"}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(carrier_card, _listed()), "pose"), "an unknown mood is reported")
+	carrier_card.staff_pose = [{"phase": "wind", "at": 1.0, "land": 1.0}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(carrier_card, _listed()), "pose"), "a rune strikes no point, so it has nowhere to land")
+	carrier_card.carrier = &"slam"
+	carrier_card.ray_length = 20.0
+	check_equal(SpellValidator.check_component(carrier_card, _listed()).size(), 0, "a slam strikes one: land is fine")
 
 
 func test_an_icon_missing_from_the_manifest_is_reported() -> void:
@@ -244,7 +244,7 @@ func test_complexity_above_the_whole_spell_budget_is_reported_once_as_a_range() 
 
 func test_an_assets_file_in_a_content_folder_is_read() -> void:
 	var listed: Dictionary = SpellValidator.load_manifest("res://tests/content/spells/no_such_manifest.json", ["res://tests/content/spells/fixtures_assets"] as Array[String])
-	check(listed.has("content/spells/forms/fixture_only/icon.svg"), "an assets.json two folders down is read")
+	check(listed.has("content/spells/carriers/fixture_only/icon.svg"), "an assets.json two folders down is read")
 	check(SpellValidator.load_manifest().has("art/vfx/hit_spark.svg"), "the art manifest is still read")
 
 
@@ -271,7 +271,7 @@ func test_the_registry_reports_a_duplicate_id_across_kinds() -> void:
 	var registry := _registry()
 	registry.scan(DUPLICATES, "res://tests/content/spells/no_audio")
 	var problems: Array[Dictionary] = registry.validate_spells()
-	check_equal(_fields(problems, "unique-id").size(), 1, "one id is used by a form and an element")
+	check_equal(_fields(problems, "unique-id").size(), 1, "one id is used by a carrier card and an element")
 	var fix: String = ""
 	for problem in problems:
 		if problem["rule"] == "unique-id":

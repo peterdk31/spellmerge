@@ -2,10 +2,10 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// A portal's gate whose card names no shader of its own (`FormBase.look_shader`; Feel's portal look,
+// A portal's gate whose card names no shader of its own (`CarrierCard.look_shader`; Feel's portal look,
 // `Carrier.LOOK_PORTAL`; core/README.md, "The shot shaders"): the plain dark lens, its edge in the
 // first infusion's shadow (`shot_portal.gdshaderinc`). The portal card draws its own (the mote rift's
-// lens, `content/spells/forms/portal/portal.gdshader`); this is only the fallback. Its lips, its
+// lens, `content/spells/carriers/portal/portal.gdshader`); this is only the fallback. Its lips, its
 // loose motes and the line to each exit are motes. Blending is premultiplied: its pixels are opaque.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"

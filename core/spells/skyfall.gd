@@ -115,5 +115,5 @@ func on_floor(spell: CompiledSpell, point: Vector2) -> Vector2:
 	var at := Vector2(point.x, floor_y)
 	var from: Vector2 = at + Vector2.UP * maxf(SpellLimits.SKYFALL_HEIGHT, floor_y - point.y)
 	if _kit.events != null:
-		_kit.events.form_shown.emit(actor, SpellRuntime.RAY_FORM, from, Vector2.DOWN, at.y - from.y, spell.tint, spell.look)
+		_kit.events.carrier_shown.emit(actor, SpellRuntime.RAY_CARD, from, Vector2.DOWN, at.y - from.y, spell.tint, spell.look)
 	return at

@@ -30,7 +30,7 @@ func _check(condition: bool, message: String) -> void:
 
 
 func _test_spell() -> void:
-	var spell := FormBase.new()
+	var spell := CarrierCard.new()
 	spell.id = &"fire_bolt"
 	spell.display_name = "Fire Bolt"
 	spell.mana_cost = 5.0
@@ -142,20 +142,20 @@ func _test_room_places() -> void:
 
 func _test_no_demo_flag() -> void:
 	# There is no demo subset (owner, 2026-11-05): no base class carries a `demo` flag.
-	_check(not ("demo" in FormBase.new()), "spell: no demo flag")
+	_check(not ("demo" in CarrierCard.new()), "spell: no demo flag")
 	_check(not ("demo" in EnemyBase.new()), "enemy: no demo flag")
 	_check(not ("demo" in RoomBase.new()), "room: no demo flag")
-	_check(FormBase.new().id == &"", "spell: id is empty by default")
+	_check(CarrierCard.new().id == &"", "spell: id is empty by default")
 
 
 func _test_round_trip() -> void:
-	var spell := FormBase.new()
+	var spell := CarrierCard.new()
 	spell.id = &"fire_bolt"
 	spell.base_damage = 4
 	var path := "user://test_base_spell.tres"
 	_check(ResourceSaver.save(spell, path) == OK, "spell saves as text")
-	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as FormBase
-	_check(loaded != null, "spell loads back as FormBase")
+	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as CarrierCard
+	_check(loaded != null, "spell loads back as CarrierCard")
 	if loaded != null:
 		_check(loaded.id == &"fire_bolt" and loaded.base_damage == 4, "spell keeps its values")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))

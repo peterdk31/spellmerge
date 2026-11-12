@@ -7,7 +7,7 @@ extends "res://tests/support/suite.gd"
 ## godot --headless --path . --script res://tests/content/story/test_lore.gd
 
 const RegistryScript := preload("res://core/registry/registry.gd")
-const FILE: String = "res://content/spells/forms/bolt/bolt.tres"
+const FILE: String = "res://content/spells/carriers/bolt/bolt.tres"
 
 
 func _registry() -> RegistryScript:
@@ -24,7 +24,7 @@ func _rules(problems: Array[Dictionary]) -> Array[String]:
 
 
 func _card(text: String) -> SpellComponent:
-	var card := FormBase.new()
+	var card := CarrierCard.new()
 	card.id = &"bolt"
 	card.description = text
 	return card

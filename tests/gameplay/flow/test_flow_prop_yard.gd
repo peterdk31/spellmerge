@@ -3,14 +3,16 @@ extends "res://tests/support/suite.gd"
 ## prop of the registry that the game's rules know nothing of (no `PropBase.role`) in the room's zone `prop_yard`, in rows
 ## by id, each in its first state; one that leaves its first state or goes is replaced by a fresh one
 ## `PropYard.RETURN_SECONDS` later, where it stood. The hub's own stone and altar stand
-## where the room puts them, never in the yard. The registry here is the real content plus two test
-## exploding barrels (W9 brings the first props of the game's own).
+## where the room puts them, never in the yard. The registry is the game's own (props W9c: the
+## exploding barrel, the crate, the fire pit, the arc lodestone and the burial jar).
 ##
 ## godot --headless --path . --script res://tests/gameplay/flow/test_flow_prop_yard.gd
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
-const EXPLODING_BARREL: PropBase = preload("res://tests/gameplay/actor/fixtures/exploding_barrel.tres")
+
+## The yard's props by id (every prop with no role).
+const YARD: Array[StringName] = [&"arc_lodestone", &"burial_jar", &"crate", &"exploding_barrel", &"fire_pit"]
 
 const DT: float = 1.0 / 60.0
 
@@ -29,11 +31,6 @@ func before_each() -> void:
 	_real_registry = flow.registry
 	_registry = own(RegistryScript.new()) as RegistryScript
 	_registry.scan()
-	# Out of id order on purpose: the yard stands them by id.
-	check(_registry.add(&"props", EXPLODING_BARREL), "the test barrel is a prop")
-	var second: PropBase = EXPLODING_BARREL.duplicate()
-	second.id = &"a_barrel"
-	check(_registry.add(&"props", second), "and a second one")
 	flow.registry = _registry
 
 
@@ -66,6 +63,11 @@ func _ids(bodies: Array[Node]) -> Array[StringName]:
 	return ids
 
 
+## The yard's body of prop `id` now (null while it is gone).
+func _yard_prop(id: StringName) -> Actor:
+	return flow.yard_props()[YARD.find(id)] as Actor
+
+
 ## `seconds` of Flow's ticks.
 func _run(seconds: float) -> void:
 	for i in roundi(seconds / DT):
@@ -76,9 +78,9 @@ func test_the_yard_stands_every_yard_prop_in_rows_by_id() -> void:
 	_start()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "the hub")
 	var yard: Array[Node] = flow.yard_props()
-	check_equal(_ids(yard), [&"a_barrel", EXPLODING_BARREL.id] as Array[StringName], "every yard prop by id; never the hub's stone and altar")
+	check_equal(_ids(yard), YARD, "every yard prop by id; never the hub's stone and altar")
 	var kinds: Array[PropBase] = []
-	for id: StringName in [&"a_barrel", EXPLODING_BARREL.id]:
+	for id: StringName in YARD:
 		kinds.append(_registry.get_resource(&"props", id) as PropBase)
 	var places: PackedVector2Array = PropYard.places(_yard(), kinds)
 	for i in yard.size():
@@ -93,33 +95,33 @@ func test_the_yard_stands_every_yard_prop_in_rows_by_id() -> void:
 
 func test_a_yard_prop_that_leaves_its_first_state_stands_again_fresh() -> void:
 	_start()
-	var first := flow.yard_props()[0] as Actor
+	var first: Actor = _yard_prop(&"crate")
 	var place: Vector2 = first.position
 	check(first.state_triggers.enter(&"broken"), "it breaks")
 	_run(PropYard.RETURN_SECONDS - 0.5)
-	check(flow.yard_props()[0] == first, "the rubble stands for a while")
+	check(_yard_prop(&"crate") == first, "the rubble stands for a while")
 	_run(1.0)
-	var fresh := flow.yard_props()[0] as Actor
+	var fresh: Actor = _yard_prop(&"crate")
 	check(fresh != null and fresh != first, "a fresh one in its place")
 	if fresh == null:
 		return
 	check_equal(fresh.position, place, "where it stood")
 	check_equal(fresh.state_triggers.state, 0, "in its first state")
 	check(not first.is_inside_tree(), "the rubble is gone")
-	check(flow.yard_props()[1] != null and (flow.yard_props()[1] as Actor).state_triggers.state == 0, "the other one untouched")
+	check(_yard_prop(&"burial_jar") != null and _yard_prop(&"burial_jar").state_triggers.state == 0, "the others untouched")
 	_run(PropYard.RETURN_SECONDS + 1.0)
-	check(flow.yard_props()[0] == fresh, "a fresh one stays")
+	check(_yard_prop(&"crate") == fresh, "a fresh one stays")
 
 
 func test_a_yard_prop_that_goes_stands_again() -> void:
 	_start()
-	var first := flow.yard_props()[1] as Actor
+	var first: Actor = _yard_prop(&"exploding_barrel")
 	first.die(-1)
 	flow.step(DT)
-	check(flow.yard_props()[1] == null, "forgotten in the tick it went, never left pointing at a freed body")
+	check(_yard_prop(&"exploding_barrel") == null, "forgotten in the tick it went, never left pointing at a freed body")
 	_run(PropYard.RETURN_SECONDS)
-	var fresh := flow.yard_props()[1] as Actor
-	check(fresh != null and fresh.prop.id == EXPLODING_BARREL.id, "a fresh one stands again")
+	var fresh: Actor = _yard_prop(&"exploding_barrel")
+	check(fresh != null and fresh.prop.id == &"exploding_barrel", "a fresh one stands again")
 
 
 func test_a_room_without_a_yard_stands_none() -> void:

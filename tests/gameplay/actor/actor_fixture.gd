@@ -209,6 +209,32 @@ func run(count: int) -> void:
 		combat.step(STEP)
 
 
+## Hit `body` with a bolt of `element` (&"fire": a fire bolt; empty: a plain bolt) from a shooter
+## whose muzzle is 40 px left of its body's middle, level with it (a low prop too), run until it
+## lands (30 steps at most), then free the shooter (its statuses on the body stay). The elements of
+## the hits that landed on `body`, in order (empty: none landed).
+func shoot(body: Actor, element: StringName) -> Array[StringName]:
+	var hits: Array[StringName] = []
+	var heard := func(_by: int, _amount: float, hit: StringName) -> void: hits.append(hit)
+	body.damaged.connect(heard)
+	var cards: Array[StringName] = [&"bolt"]
+	if element != &"":
+		cards.push_front(element)
+	var shooter: Actor = actor(body.global_position + body.body_offset + Vector2(-40.0, 0.0), [&"caster"], Scripted.new(), [cards])
+	shooter.aim = Vector2.RIGHT
+	shooter.position += body.global_position + body.body_offset + Vector2(-40.0, 0.0) - shooter.muzzle_position()
+	if shooter.caster.cast(0):
+		for i in 30:
+			run(1)
+			if not hits.is_empty():
+				break
+	if is_instance_valid(body):
+		body.damaged.disconnect(heard)
+	actors.erase(shooter)
+	shooter.free()
+	return hits
+
+
 ## The tag a card of `body`'s staff `staff` carries now (for moves asked by hand).
 func tag_of(body: Actor, staff: int = 0) -> int:
 	return SpellTag.make(body.caster_number(), staff, 0, 0)

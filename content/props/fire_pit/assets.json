@@ -1,0 +1,28 @@
+{
+	"assets": [
+		{
+			"path": "content/props/fire_pit/unlit.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from unlit.grid.json, 2026-11-12)",
+			"prompt": "A fire pit prop, 24x24, lying on the floor: a ring of eight Stone stones round crossed Wood logs, cold ash on the logs. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/fire_pit/lit.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from lit.grid.json, 2026-11-12)",
+			"prompt": "The fire pit lit: unlit.svg with glowing Fire coals on its logs, no flame (the flames are flames.svg). Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/fire_pit/flames.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from flames.grid.json, 2026-11-12)",
+			"prompt": "Three frames, side by side, of a small flame over the fire pit's logs: Fire shades with a white-hot Spark core, swaying left and right. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		}
+	]
+}

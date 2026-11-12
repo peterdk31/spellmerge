@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="PropStates" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_trigger.gd" id="1"]
+[ext_resource type="Script" path="res://core/base/prop_state.gd" id="2"]
+[ext_resource type="Script" path="res://core/base/prop_states.gd" id="3"]
+
+[sub_resource type="Resource" id="idle_health_below_0"]
+script = ExtResource("1")
+when = 3
+share = 0.5
+then = &"cracked"
+
+[sub_resource type="Resource" id="idle_death_1"]
+script = ExtResource("1")
+when = 4
+then = &"broken"
+
+[sub_resource type="Resource" id="idle"]
+script = ExtResource("2")
+state_id = &"idle"
+triggers = Array[ExtResource("1")]([SubResource("idle_health_below_0"), SubResource("idle_death_1")])
+
+[sub_resource type="Resource" id="cracked_death_0"]
+script = ExtResource("1")
+when = 4
+then = &"broken"
+
+[sub_resource type="Resource" id="cracked"]
+script = ExtResource("2")
+state_id = &"cracked"
+triggers = Array[ExtResource("1")]([SubResource("cracked_death_0")])
+
+[sub_resource type="Resource" id="broken"]
+script = ExtResource("2")
+state_id = &"broken"
+blocks = false
+hittable = false
+
+[resource]
+script = ExtResource("3")
+list = Array[ExtResource("2")]([SubResource("idle"), SubResource("cracked"), SubResource("broken")])

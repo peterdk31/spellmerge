@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="PropStates" load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_trigger.gd" id="1"]
+[ext_resource type="Script" path="res://core/base/prop_state.gd" id="2"]
+[ext_resource type="Script" path="res://core/base/prop_states.gd" id="3"]
+
+[sub_resource type="Resource" id="unlit_element_hit_0"]
+script = ExtResource("1")
+element = &"fire"
+then = &"lit"
+
+[sub_resource type="Resource" id="unlit"]
+script = ExtResource("2")
+state_id = &"unlit"
+triggers = Array[ExtResource("1")]([SubResource("unlit_element_hit_0")])
+blocks = false
+
+[sub_resource type="Resource" id="lit_element_hit_0"]
+script = ExtResource("1")
+element = &"frost"
+then = &"unlit"
+
+[sub_resource type="Resource" id="lit"]
+script = ExtResource("2")
+state_id = &"lit"
+triggers = Array[ExtResource("1")]([SubResource("lit_element_hit_0")])
+blocks = false
+
+[resource]
+script = ExtResource("3")
+list = Array[ExtResource("2")]([SubResource("unlit"), SubResource("lit")])

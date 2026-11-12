@@ -1,0 +1,89 @@
+[gd_resource type="Resource" script_class="PropBase" load_steps=20 format=3]
+
+[ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="1"]
+[ext_resource type="Resource" path="res://content/props/burial_jar/burial_jar_states.tres" id="2"]
+[ext_resource type="Script" path="res://core/base/staff_base.gd" id="3"]
+[ext_resource type="Script" path="res://core/base/staff_cards.gd" id="4"]
+[ext_resource type="Texture2D" path="res://content/props/burial_jar/idle.svg" id="5"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="6"]
+[ext_resource type="Script" path="res://core/base/prop_layer.gd" id="7"]
+[ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="8"]
+[ext_resource type="Texture2D" path="res://content/props/burial_jar/shattered.svg" id="9"]
+[ext_resource type="Script" path="res://core/base/prop_base.gd" id="10"]
+
+[sub_resource type="Resource" id="staff_1"]
+script = ExtResource("3")
+id = &"burial_jar"
+display_name = "Burial jar's seal"
+slots = 3
+cooldown = 0.0
+max_mana = 100.0
+mana_regen = 0.0
+
+[sub_resource type="Resource" id="staff_1_cards"]
+script = ExtResource("4")
+staff = SubResource("staff_1")
+cards = Array[StringName]([&"void", &"pulse"])
+
+[sub_resource type="Resource" id="idle_0_motes_0"]
+script = ExtResource("6")
+kind = &"wisp"
+rate = 0.8
+at = Vector2(0.5, -18.5)
+spread = 60.0
+reach = 4.0
+colours = Array[StringName]([&"void"])
+
+[sub_resource type="Resource" id="idle_layer_0"]
+script = ExtResource("7")
+texture = ExtResource("5")
+motes = Array[ExtResource("6")]([SubResource("idle_0_motes_0")])
+
+[sub_resource type="Resource" id="idle_look"]
+script = ExtResource("8")
+state_id = &"idle"
+layers = Array[ExtResource("7")]([SubResource("idle_layer_0")])
+
+[sub_resource type="Resource" id="shattered_0_motes_0"]
+script = ExtResource("6")
+kind = &"dust"
+rate = 12.0
+from = 2
+at = Vector2(0.5, -7)
+size = Vector2(18, 5)
+spread = 360.0
+reach = 5.0
+stop = 2.0
+colours = Array[StringName]([&"bone"])
+
+[sub_resource type="Resource" id="shattered_0_motes_1"]
+script = ExtResource("6")
+kind = &"wisp"
+rate = 6.0
+from = 2
+at = Vector2(0.5, -9)
+size = Vector2(10, 3)
+stop = 3.0
+colours = Array[StringName]([&"void"])
+
+[sub_resource type="Resource" id="shattered_layer_0"]
+script = ExtResource("7")
+texture = ExtResource("9")
+motes = Array[ExtResource("6")]([SubResource("shattered_0_motes_0"), SubResource("shattered_0_motes_1")])
+
+[sub_resource type="Resource" id="shattered_look"]
+script = ExtResource("8")
+state_id = &"shattered"
+layers = Array[ExtResource("7")]([SubResource("shattered_layer_0")])
+
+[resource]
+script = ExtResource("10")
+id = &"burial_jar"
+display_name = "Burial jar"
+scene = ExtResource("1")
+max_health = 80.0
+size = Vector2(16, 16)
+offset = Vector2(0, -8)
+staffs = Array[ExtResource("4")]([SubResource("staff_1_cards")])
+states = ExtResource("2")
+looks = Array[ExtResource("8")]([SubResource("idle_look"), SubResource("shattered_look")])

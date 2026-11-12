@@ -1,0 +1,120 @@
+[gd_resource type="Resource" script_class="PropBase" load_steps=27 format=3]
+
+[ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="1"]
+[ext_resource type="Resource" path="res://content/props/arc_lodestone/arc_lodestone_states.tres" id="2"]
+[ext_resource type="Script" path="res://core/base/staff_base.gd" id="3"]
+[ext_resource type="Script" path="res://core/base/staff_cards.gd" id="4"]
+[ext_resource type="Texture2D" path="res://content/props/arc_lodestone/idle.svg" id="5"]
+[ext_resource type="Script" path="res://core/base/prop_layer.gd" id="6"]
+[ext_resource type="Texture2D" path="res://content/props/arc_lodestone/idle_motes.svg" id="7"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="8"]
+[ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="9"]
+[ext_resource type="Texture2D" path="res://content/props/arc_lodestone/charged.svg" id="10"]
+[ext_resource type="Texture2D" path="res://content/props/arc_lodestone/charged_motes.svg" id="11"]
+[ext_resource type="Texture2D" path="res://content/props/arc_lodestone/spent.svg" id="12"]
+[ext_resource type="Script" path="res://core/base/prop_base.gd" id="13"]
+
+[sub_resource type="Resource" id="staff_1"]
+script = ExtResource("3")
+id = &"arc_lodestone"
+display_name = "Arc lodestone's charge"
+slots = 3
+wind_up = 0.5
+wind_cue = &"wind_area"
+cooldown = 0.0
+max_mana = 60.0
+mana_regen = 0.0
+
+[sub_resource type="Resource" id="staff_1_cards"]
+script = ExtResource("4")
+staff = SubResource("staff_1")
+cards = Array[StringName]([&"lightning", &"pulse"])
+
+[sub_resource type="Resource" id="idle_layer_0"]
+script = ExtResource("6")
+texture = ExtResource("5")
+
+[sub_resource type="Resource" id="idle_1_motes_0"]
+script = ExtResource("8")
+kind = &"glimmer"
+rate = 3.5
+from = 4
+spread = 60.0
+reach = 3.0
+colours = Array[StringName]([&"arc"])
+
+[sub_resource type="Resource" id="idle_layer_1"]
+script = ExtResource("6")
+texture = ExtResource("7")
+drawn = 3
+motes = Array[ExtResource("8")]([SubResource("idle_1_motes_0")])
+
+[sub_resource type="Resource" id="idle_look"]
+script = ExtResource("9")
+state_id = &"idle"
+layers = Array[ExtResource("6")]([SubResource("idle_layer_0"), SubResource("idle_layer_1")])
+light_reach = 22.0
+light_at = Vector2(-0.5, -14.5)
+light_strength = 0.35
+light_flicker = 0.0
+light_tint = Color(0.7059, 0.9098, 0.1647, 1)
+
+[sub_resource type="Resource" id="charged_0_motes_0"]
+script = ExtResource("8")
+kind = &"streak"
+rate = 14.0
+at = Vector2(-0.5, -14.5)
+spread = 360.0
+reach = 10.0
+colours = Array[StringName]([&"arc"])
+
+[sub_resource type="Resource" id="charged_layer_0"]
+script = ExtResource("6")
+texture = ExtResource("10")
+motes = Array[ExtResource("8")]([SubResource("charged_0_motes_0")])
+
+[sub_resource type="Resource" id="charged_1_motes_0"]
+script = ExtResource("8")
+kind = &"glimmer"
+rate = 30.0
+from = 4
+spread = 60.0
+reach = 3.0
+colours = Array[StringName]([&"arc"])
+
+[sub_resource type="Resource" id="charged_layer_1"]
+script = ExtResource("6")
+texture = ExtResource("11")
+drawn = 3
+motes = Array[ExtResource("8")]([SubResource("charged_1_motes_0")])
+
+[sub_resource type="Resource" id="charged_look"]
+script = ExtResource("9")
+state_id = &"charged"
+layers = Array[ExtResource("6")]([SubResource("charged_layer_0"), SubResource("charged_layer_1")])
+light_reach = 56.0
+light_at = Vector2(-0.5, -14.5)
+light_flicker = 0.5
+light_tint = Color(0.7059, 0.9098, 0.1647, 1)
+
+[sub_resource type="Resource" id="spent_layer_0"]
+script = ExtResource("6")
+texture = ExtResource("12")
+
+[sub_resource type="Resource" id="spent_look"]
+script = ExtResource("9")
+state_id = &"spent"
+layers = Array[ExtResource("6")]([SubResource("spent_layer_0")])
+
+[resource]
+script = ExtResource("13")
+id = &"arc_lodestone"
+display_name = "Arc lodestone"
+scene = ExtResource("1")
+max_health = 10.0
+invincible = true
+size = Vector2(12, 22)
+offset = Vector2(0, -11)
+staffs = Array[ExtResource("4")]([SubResource("staff_1_cards")])
+states = ExtResource("2")
+looks = Array[ExtResource("9")]([SubResource("idle_look"), SubResource("charged_look"), SubResource("spent_look")])

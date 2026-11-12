@@ -1,0 +1,42 @@
+{
+	"colours": {
+		"a": "#2b2840",
+		"b": "#4a4663",
+		"c": "#7a7694",
+		"o": "#14121f"
+	},
+	"rows": [
+		"........................",
+		"........................",
+		"........................",
+		"........................",
+		"........................",
+		"........................",
+		"........................",
+		".........oooooo.........",
+		"........ocbbbbao........",
+		".......occbbbbaao.......",
+		".......occbbbbaao.......",
+		".......occbbbbaaoo......",
+		".......occbabbaaoao.....",
+		"......occbbabbbaao......",
+		"......occbbbabbaao......",
+		".....oaccbbbabbaao......",
+		".....oaccbbabbbaao......",
+		".....oaccbbabbbaao......",
+		".....oaccbabbbbaao......",
+		".....oaccbabbbbaao......",
+		".....oaccbbabbbaao......",
+		"......oacabbabbaao......",
+		"......ocabbbbabaao......",
+		".....occbbbbbabbaao.....",
+		".....occbbbbabbbaao.....",
+		".....occbbbbbbbbaao.....",
+		".....occbbbbbbbbaao.....",
+		".....occbbbbbbbbaao.....",
+		".....occbbbbbbbbaao.....",
+		".....occbbbbbbbbaao.....",
+		"......ocbbbbbbbbao......",
+		".......oooooooooo......."
+	]
+}

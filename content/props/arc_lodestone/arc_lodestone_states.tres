@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="PropStates" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_trigger.gd" id="1"]
+[ext_resource type="Script" path="res://core/base/prop_state.gd" id="2"]
+[ext_resource type="Script" path="res://core/base/prop_states.gd" id="3"]
+
+[sub_resource type="Resource" id="idle_element_hit_0"]
+script = ExtResource("1")
+element = &"lightning"
+then = &"charged"
+
+[sub_resource type="Resource" id="idle"]
+script = ExtResource("2")
+state_id = &"idle"
+triggers = Array[ExtResource("1")]([SubResource("idle_element_hit_0")])
+
+[sub_resource type="Resource" id="charged_entered_0"]
+script = ExtResource("1")
+when = 5
+cast = 1
+
+[sub_resource type="Resource" id="charged_cast_1"]
+script = ExtResource("1")
+when = 6
+staff = 1
+then = &"idle"
+
+[sub_resource type="Resource" id="charged_refused_2"]
+script = ExtResource("1")
+when = 7
+staff = 1
+dry = true
+then = &"spent"
+
+[sub_resource type="Resource" id="charged_refused_3"]
+script = ExtResource("1")
+when = 7
+staff = 1
+then = &"idle"
+
+[sub_resource type="Resource" id="charged"]
+script = ExtResource("2")
+state_id = &"charged"
+triggers = Array[ExtResource("1")]([SubResource("charged_entered_0"), SubResource("charged_cast_1"), SubResource("charged_refused_2"), SubResource("charged_refused_3")])
+
+[sub_resource type="Resource" id="spent"]
+script = ExtResource("2")
+state_id = &"spent"
+
+[resource]
+script = ExtResource("3")
+list = Array[ExtResource("2")]([SubResource("idle"), SubResource("charged"), SubResource("spent")])

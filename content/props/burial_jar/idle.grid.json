@@ -1,0 +1,36 @@
+{
+	"colours": {
+		"B": "#a39fb8",
+		"C": "#d4d0e0",
+		"D": "#f4f1ea",
+		"o": "#14121f",
+		"q": "#4a1450",
+		"r": "#a0309a"
+	},
+	"rows": [
+		"...........oo...........",
+		"..........oCCo..........",
+		"......ooooDCCBoooo......",
+		".....oDCCCCCCCCCCBo.....",
+		".....oDCCCCCCCCCCBo.....",
+		".....oooooooooooooo.....",
+		"....oDDCCCCCCCCCCBBo....",
+		"....oDDCCCCCCCCCCBBo....",
+		"...oDDCCCCCCCCCCCCBBo...",
+		"...oDDCCCCrCCrCCrCBBo...",
+		"...oDDqqqqqqqqqqqqBBo...",
+		"...oDDCrqCrCCrCCqCBBo...",
+		"...oDDCCCCCCCCCCCCBBo...",
+		"...oDDCCCCCCCCCCCCBBo...",
+		"...oDDCCCCCCCCCCCCBBo...",
+		"....oDDCCCCCCCCCCBBo....",
+		"....oDDCCCCCCCCCCBBo....",
+		".....oDDCCCCCCCCBBo.....",
+		".....oDDCCCCCCCCBBo.....",
+		"......oDDCCCCCCBBo......",
+		".......oooooooooo.......",
+		"........................",
+		"........................",
+		"........................"
+	]
+}

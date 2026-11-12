@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Things in the world that stand, block, take hits, react by casting spell cards and give off motes: an exploding barrel's fuse and blast, a crate's rubble, a brazier's embers ([docs/milestones/props.md](../../docs/milestones/props.md), phase W). A prop is an **actor with no controller** (owner, 2026-11-10): health, the hurt shape, statuses, possession and casting are the actor kit's, so nothing in Combat, Spells or possession needs to know it is a prop. If it acts on its own it is an enemy with a statue's look; if it only stands and reacts, it is a prop.
+Things in the world that stand, block, take hits, react by casting spell cards and give off motes: an exploding barrel's fuse and blast, a crate's rubble, a fire pit's embers ([docs/milestones/props.md](../../docs/milestones/props.md), phase W). A prop is an **actor with no controller** (owner, 2026-11-10): health, the hurt shape, statuses, possession and casting are the actor kit's, so nothing in Combat, Spells or possession needs to know it is a prop. If it acts on its own it is an enemy with a statue's look; if it only stands and reacts, it is a prop.
 
 **Placing a prop in a room** (W8a/W8b/W8c): add a `PropStandIn` (tools/prop_stand_in.gd, a `RoomPlacement`) anywhere in the room's scene, pick the prop in the Inspector and move it; the editor draws the prop as the game will (any state, with its hurt shape, ground and area outlined), and the game stands the real prop there. Nothing to add to the prop's folder. **A prop is self-contained** (owner, 2026-11-11): what it means to the game comes with it, never with a room: its `role` (empty for most; `run_start`, `party_altar`: the hub's rules read them, `HubRules`) and where it is stood on (`area_size`, `area_offset`, apart from the ground that blocks). **The hub's prop yard** (W8, the hub scene's `RoomZone` `prop_yard`) stands every prop here with no `role` (most), in rows by id, each fresh again 10 s after it is lit, broken or gone: a new prop appears there with no edit anywhere else. The hub's own teleporter stone and altar (`hub_stone`, `hub_altar`) are props too, of the roles `run_start` and `party_altar`, each stood on where its 96×96 `area` is: the hub's rules count a wizard on them there and light the stone by asking it (`prop_state_requested`) to enter `lit` or `unlit`, the states a `run_start` has (`tests/content/props/test_prop_data.gd` holds every role to what its rules need).
 
-Built in W6 (states and their triggers; the component and rows were named `Reactions` and `PropReaction` until the owner renamed them, 2026-11-11: Combat has reactions of its own). The look (art layers, mote sources, a light, a cue) is W7's, the hub's prop yard W8's (with the hub's stone and altar) and the first props (exploding barrel, crate, brazier, crystal, urn) W9's; until then this folder holds the shared body and the hub's two, and the test exploding barrel (`tests/gameplay/actor/fixtures/exploding_barrel.tres`, its art in `fixtures/exploding_barrel/`) is the example.
+Built in W6 (states and their triggers; the component and rows were named `Reactions` and `PropReaction` until the owner renamed them, 2026-11-11: Combat has reactions of its own). The look (art layers, mote sources, a light, a cue) is W7's, the hub's prop yard W8's (with the hub's stone and altar) and the first five props W9c's: the **exploding barrel** (`exploding_barrel`, the example below), the **crate** (`crate`), the **fire pit** (`fire_pit`), the **arc lodestone** (`arc_lodestone`) and the **burial jar** (`burial_jar`).
 
 ## Contract
 
@@ -31,6 +31,7 @@ Built in W6 (states and their triggers; the component and rows were named `React
   | `death` | its health runs out | |
   | `entered` | its state was just entered (not the one it starts in) | |
   | `cast` | its staff N's cast leaves (a trigger's or a possessor's, after any wind-up) | `staff` |
+  | `refused` | a trigger's cast of its staff N did not go: the staff busy (winding up, or in the delay after its last cast) or, `dry`, its mana paying none of its casts | `staff`, `dry` (only when dry) |
 
 - **The rule:** on a moment every trigger of the current state that matches fires, in order; the first of them that names a `then` sets the next state, once, after they all fired. Triggers belong to states, so "only once" is a state change, never a flag. Leaving a state ends the wind-ups it cast (a lit barrel shot apart blows now, and its fuse no more). **Death doesn't free a prop:** its `death` triggers run and a possession of it ends; it is freed only by a `gone` state, and without a death row it stands with its health empty.
 - **A prop's casts pay from its staffs' pools, which never refill** (a still body is never stepped): the first cast of every staff a trigger casts must fit in a full pool (`tests/content/props/test_prop_data.gd`); a staff cast more than once over a prop's life needs a pool for each.
@@ -41,7 +42,7 @@ Built in W6 (states and their triggers; the component and rows were named `React
 ## The exploding barrel, written out
 
 ```
-staffs   1: fire · blast, wind-up 1.0 s (the fuse)    2: fire · blast, no wind-up
+staffs   1: fire · blast · pulse, wind-up 1.0 s (the fuse)    2: fire · blast · pulse, no wind-up
 idle     element_hit fire     → then fusing
          death                → cast 2, then broken          (shot apart: blows at once)
          cast 1, cast 2       → then broken                  (possessed: 1 lights the fuse the long way, 2 blows)
@@ -51,7 +52,20 @@ fusing   entered              → cast 1                       (the fuse burns, 
 broken   blocks off, hittable off (rubble)
 ```
 
-As data: `tests/gameplay/actor/fixtures/exploding_barrel.tres` and its `exploding_barrel_states.tres` (its paths: `tests/gameplay/actor/test_prop_state_triggers.gd`).
+As data: `exploding_barrel/exploding_barrel.tres` and its `exploding_barrel_states.tres` (its paths: `tests/gameplay/actor/test_prop_state_triggers.gd`; its own test `exploding_barrel/test_exploding_barrel.gd`). Its fuse's `wind_cue` is `wind_area` (a ring closing in for the fuse's second); its sparks are its `fusing` look's.
+
+## A prop that runs dry, written out
+
+A prop's pool never refills, so a prop that casts again and again runs dry; a `refused` row says what then. The arc lodestone (`arc_lodestone`, a staff of `lightning · pulse` that winds up 0.5 s, a pool of 60 at 3 a zap):
+
+```
+idle      element_hit lightning  → then charged
+charged   entered                → cast 1                (the charge, then the zap)
+          cast 1                 → then idle
+          refused 1, dry         → then spent            (its pool pays no more: dark for good)
+          refused 1              → then idle             (charged while still in the delay after a zap)
+spent     (no triggers)
+```
 
 ## Allowed files
 

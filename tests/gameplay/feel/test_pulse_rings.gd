@@ -10,41 +10,23 @@ const BirthsScript := preload("res://gameplay/feel/births.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 
 
-## One live ring round the origin, 40 px out, as `CarrierPulse` tells it: its segments to the
-## right (x above half) stopped 10 px out (a wall or a body), the rest open.
-class OneRing:
-	extends RefCounted
-
-	func pulse_slots() -> int:
-		return 1
-
-	func pulse_on(_at: int) -> bool:
-		return true
-
-	func pulse_radius(_at: int) -> float:
-		return 40.0
-
-	func pulse_centre(_at: int) -> Vector2:
-		return Vector2.ZERO
-
-	func pulse_tint(_at: int) -> Color:
-		return Color.ORANGE
-
-	func pulse_look(_at: int) -> int:
-		return 0
-
-	func pulse_tag(_at: int) -> int:
-		return 0
-
-	func pulse_actor(_at: int) -> int:
-		return 0
-
-	func pulse_stop_toward(_at: int, way: Vector2) -> float:
-		return 10.0 if way.x > 0.5 else INF
+## A view of one live ring round the origin, 40 px out, as `CarrierPulse.read_view` fills it: its
+## segments to the right (x above half) stopped 10 px out (a wall or a body), the rest open.
+func _one_ring() -> PulseView:
+	var view := PulseView.new()
+	view.hold(1)
+	view.rings = 1
+	view.centre[0] = Vector2.ZERO
+	view.radius[0] = 40.0
+	view.core[0] = Color.ORANGE
+	for k in PulseView.SEGMENTS:
+		var way: Vector2 = Vector2.RIGHT.rotated(TAU * float(k) / float(PulseView.SEGMENTS))
+		view.stop[k] = 10.0 if way.x > 0.5 else INF
+	return view
 
 
 ## The places of every birth the ring gave off in `frames` frames.
-func _given_off(ring: OneRing, frames: int) -> PackedVector2Array:
+func _given_off(ring: PulseView, frames: int) -> PackedVector2Array:
 	var rings := RingsScript.new()
 	var births := BirthsScript.new()
 	var at: PackedVector2Array = PackedVector2Array()
@@ -58,12 +40,13 @@ func _given_off(ring: OneRing, frames: int) -> PackedVector2Array:
 
 
 func test_no_mote_is_given_off_where_its_segment_stopped() -> void:
-	var at: PackedVector2Array = _given_off(OneRing.new(), 60)
+	var ring: PulseView = _one_ring()
+	var at: PackedVector2Array = _given_off(ring, 60)
 	check(at.size() > 20, "motes along its edge: %d" % at.size())
 	var stopped: int = 0
 	var left: int = 0
 	for point in at:
-		if point.normalized().x > 0.5:
+		if ring.stop_toward(0, point.normalized()) < 40.0 or point.normalized().x > 0.6:
 			stopped += 1
 		if point.x < 0.0:
 			left += 1

@@ -393,8 +393,10 @@ var _live_beams: Array[MeshInstance2D] = []
 var _carrier_card_looks: Dictionary = {}
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
 var _swing_trails: SwingTrailsScript = null
-## The Pulses' rings (`pulse_rings.gd`, props W9a): motes along each live ring's edge, every frame.
+## The Pulses' rings (`pulse_rings.gd`, props W9a): motes along each live ring's edge, every frame,
+## from one typed read of them (`CarrierPulse.read_view` into `_pulse_view`, refilled each frame).
 var _pulse_rings: PulseRingsScript = PulseRingsScript.new()
+var _pulse_view: PulseView = PulseView.new()
 ## The open portals' gates (`PortalLookScript`), drawn every frame from one typed read of them
 ## (`CarrierPortal.read_view` into `_portal_view`, refilled each frame).
 var _portal_look: PortalLookScript = null
@@ -752,7 +754,12 @@ func step(real_delta: float) -> void:
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null, _swing_shader_of)
 	if _spectacle.motes_on():
-		_pulse_rings.step(spells.call("carrier", &"pulse") if spells != null and spells.has_method("carrier") else null, real_delta, _swing_ramp, _spectacle.births)
+		var rings: CarrierPulse = CarrierPulse.of(spells as SpellRuntime) if spells is SpellRuntime else null
+		if rings != null:
+			rings.read_view(_pulse_view)
+		else:
+			_pulse_view.rings = 0
+		_pulse_rings.step(_pulse_view, real_delta, _swing_ramp, _spectacle.births)
 	if _portal_look != null:
 		_step_portals()
 	_status_motes(real_delta)

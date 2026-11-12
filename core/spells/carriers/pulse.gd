@@ -25,8 +25,8 @@ extends Carrier
 ## 2026-11-12). A hold casts it again every wind-up and life (`REPEATS_HELD`).
 ##
 ## Its rows: the live rings, which it keeps itself (`bind` makes them), starts (`launch`), runs
-## (`step`) and ends (`end_of`, `end_actor`, `clear`); the looks read the `pulse_*` getters
-## (`CarrierPulse.of(spells)`).
+## (`step`) and ends (`end_of`, `end_actor`, `clear`); the looks read them through one typed view a
+## frame (`read_view`, a `PulseView`).
 
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -85,7 +85,7 @@ func id() -> StringName:
 	return &"pulse"
 
 
-## What draws its look: Feel, from its rows (`pulse_*`).
+## What draws its look: Feel, from one typed read of its rings a frame (`read_view`).
 func look_drawer() -> int:
 	return LOOK_NONE
 
@@ -210,7 +210,7 @@ func _pulse_guard(at: int) -> void:
 		var to: Vector2 = kit.projectiles.get_position_of(slot) - centre
 		var size: float = kit.projectiles.get_radius_of(slot)
 		var near: float = maxf(to.length() - size, 0.0)
-		if to.length() + size >= band.x and _pu_stop[base + _segment_of(to)] >= near:
+		if to.length() + size >= band.x and _pu_stop[base + segment_of(to)] >= near:
 			_guarded.append(slot)
 	if _guarded.is_empty():
 		return
@@ -342,8 +342,9 @@ static func _segment_way(k: int) -> Vector2:
 	return DMath.from_angle(TAU * float(k) / float(SpellLimits.PULSE_SEGMENTS))
 
 
-## The segment of a ring that goes out along `way` from its centre.
-static func _segment_of(way: Vector2) -> int:
+## The segment of a ring that goes out along `way` from its centre (its looks read it too,
+## `PulseView.stop_toward`).
+static func segment_of(way: Vector2) -> int:
 	return posmod(floori(DMath.angle(way) / (TAU / float(SpellLimits.PULSE_SEGMENTS)) + 0.5), SpellLimits.PULSE_SEGMENTS)
 
 
@@ -447,7 +448,30 @@ func reach_of(spell: CompiledSpell) -> float:
 	return spell.speed * spell.lifetime + spell.radius * 0.5
 
 
-## Live rings over every caster, and the rows, for the looks and the tests.
+## What a viewer may know of the live rings now, into `view` (Feel's ring look: one typed read a
+## frame, no getter called by name): each ring's centre, radius, caster, tag, look, core colour
+## and its segments' stops. Allocates nothing once `view` has held as many.
+func read_view(view: PulseView) -> void:
+	view.rings = 0
+	var segments: int = SpellLimits.PULSE_SEGMENTS
+	for at in _pu_on.size():
+		if _pu_on[at] == 0 or _pu_spell[at] == null:
+			continue
+		var r: int = view.rings
+		view.hold(r + 1)
+		view.centre[r] = _pu_centre[at]
+		view.radius[r] = _pu_radius[at]
+		view.caster[r] = _pu_actor[at]
+		view.tag[r] = _pu_tag[at]
+		view.look[r] = _pu_spell[at].look
+		view.core[r] = _pu_spell[at].tint
+		for k in segments:
+			view.stop[r * segments + k] = _pu_stop[at * segments + k]
+		view.rings = r + 1
+
+
+## Live rings over every caster, and whether row `at` is one and how far it has grown, for the
+## tests.
 func pulse_count() -> int:
 	return _pu_on.count(1)
 
@@ -460,33 +484,5 @@ func pulse_on(at: int) -> bool:
 	return at >= 0 and at < _pu_on.size() and _pu_on[at] != 0
 
 
-func pulse_centre(at: int) -> Vector2:
-	return _pu_centre[at]
-
-
-## How far ring `at` has grown now (the middle of its edge).
 func pulse_radius(at: int) -> float:
 	return _pu_radius[at]
-
-
-func pulse_actor(at: int) -> int:
-	return _pu_actor[at]
-
-
-func pulse_tag(at: int) -> int:
-	return _pu_tag[at]
-
-
-## How far ring `at` goes out along `way` from its centre before its segment there stopped (at a
-## wall, or a body it hit), INF when nothing stopped it: where its look ends on that line.
-func pulse_stop_toward(at: int, way: Vector2) -> float:
-	return _pu_stop[at * SpellLimits.PULSE_SEGMENTS + _segment_of(way)]
-
-
-## The colour of ring `at`'s element and its packed look kinds (`CompiledSpell.tint`, `look`).
-func pulse_tint(at: int) -> Color:
-	return _pu_spell[at].tint if _pu_spell[at] != null else Color.WHITE
-
-
-func pulse_look(at: int) -> int:
-	return _pu_spell[at].look if _pu_spell[at] != null else 0

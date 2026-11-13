@@ -389,6 +389,21 @@ func hears_commands(seat: int) -> bool:
 	return _builds(seat)
 
 
+## A bit per seat played on this machine now, for the view only (whose wizards its camera holds,
+## gameplay/feel/party_camera.gd; the game never asks): the seats a real device holds here, or a
+## live replay's local seats (the online client's). Another machine's seat is a virtual device
+## here, as a bot's is, so those are not this machine's; 0 while a recording plays.
+func seats_here() -> int:
+	var mask: int = 0
+	for seat in SEATS:
+		if is_playing():
+			if _tape.is_local(seat):
+				mask |= 1 << seat
+		elif input != null and input.is_joined(seat) and not InputManagerScript.is_virtual(input.device_of(seat)):
+			mask |= 1 << seat
+	return mask
+
+
 func _play(tape: ReplayTape) -> bool:
 	var replay: Replay = tape.replay
 	var here: int = Replay.content_of(registry)

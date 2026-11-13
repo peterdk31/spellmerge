@@ -116,6 +116,20 @@ func test_a_bad_command_never_reaches_the_game() -> void:
 	check(_heard.is_empty(), "no seat 7, no path for an id")
 
 
+## The seats played on this machine (the view's question: whose wizards its camera holds) are the
+## ones a real device holds; another machine's seat and a bot's are virtual devices.
+func test_the_seats_here_are_the_real_devices_seats() -> void:
+	check_equal(_frames.seats_here(), 0, "nobody plays here yet")
+	_input.add_virtual_device(0)
+	_input.add_virtual_device(3)
+	check_equal(_frames.seats_here(), 0, "virtual devices are not this machine's players")
+	_input.join_as(InputManagerScript.KEYBOARD, 1)
+	_input.join_as(0, 2)
+	check_equal(_frames.seats_here(), 0b0110, "the keyboard's and the gamepad's seats are")
+	_input.leave(2)
+	check_equal(_frames.seats_here(), 0b0010, "a seat left is not")
+
+
 func test_a_device_becomes_its_seats_frame() -> void:
 	_input.add_virtual_device(1)
 	_frames.tick(DT)

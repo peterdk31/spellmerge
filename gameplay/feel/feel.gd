@@ -107,7 +107,9 @@ const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
 const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
+const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const SHOWN_BEAMS_PER_PLAYER: int = 24
@@ -318,6 +320,9 @@ var spells: Node = null
 ## The actor table, which says the ramp, seat and budget of a caster (actors G3b). Only tests set
 ## it; otherwise the "Actors" autoload.
 var actors: ActorsScript = null
+## The frames service (core/sim/frames.gd), asked only which seats are played on this machine
+## (the party camera); null looks for the "Frames" autoload.
+var frames: FramesScript = null
 ## The "Actors" autoload once found (`_actor_table`), while it is still there.
 var _auto_actors: ActorsScript = null
 ## Tests turn this off: Feel steps only when the test calls `step` (no real clock in `_process`).
@@ -403,12 +408,14 @@ var _portal_look: PortalLookScript = null
 var _portal_view: PortalView = PortalView.new()
 ## The spectacle (`spectacle.gd`): motes, floor marks, spell light and their settings.
 var _spectacle: SpectacleScript = null
-## The party's shared camera, eased towards Coop's view (`view_fitted`) as it is drawn.
+## The party's camera: it holds this machine's wizards (`Frames.seats_here`), eased as it is drawn.
 var party_camera: PartyCameraScript = PartyCameraScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
 var _lanes: LanesScript = null
 ## Every actor's damage numbers (`damage_number_drawer.gd`, props W5).
 var _numbers: DamageNumberDrawerScript = null
+## The markers at the picture's edge for teammates out of it (`teammate_markers.gd`).
+var _markers: TeammateMarkersScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
 var mote_cap: int:
 	get:
@@ -589,6 +596,9 @@ var _kind_own: bool = false
 var _kind_shot: int = -1
 var _impact_at: Vector2 = Vector2.ZERO
 var _impact_aim: Vector2 = Vector2.ZERO
+## How far past the picture's edge (world pixels) a hit or a cue still shakes and kicks the camera
+## (`_in_picture`): a blast just off the screen is still felt.
+const SHAKE_REACH: float = 64.0
 ## Camera kick of casts (pixels), added to the shake.
 var _kick: Vector2 = Vector2.ZERO
 var _last_usec: int = 0
@@ -652,6 +662,9 @@ func _ready() -> void:
 	_numbers.events = events
 	_numbers.registry = registry
 	add_child(_numbers)
+	_markers = TeammateMarkersScript.new()
+	_markers.name = "TeammateMarkers"
+	add_child(_markers)
 	add_cue_part(&"flash", _play_flash, _prepare_flash)
 	add_cue_part(&"lane", _play_lane)
 	var parts: Dictionary = _spectacle.cue_parts()
@@ -712,7 +725,6 @@ func _ready() -> void:
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
 	events.room_entered.connect(_on_room_entered)
-	events.view_fitted.connect(_on_view_fitted)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
@@ -739,6 +751,11 @@ func _process(delta: float) -> void:
 
 ## Advance by `real_delta` seconds of real time (not slowed by hit-stop).
 func step(real_delta: float) -> void:
+	# The world's camera now, for the party camera: looked for afresh every drawn frame (a new
+	# world's is there at once), before the step is counted, so the first hit after it still looks
+	# again (`_refresh_camera` looks once a step).
+	_camera_step = -1
+	_refresh_camera()
 	_steps += 1
 	_body_looks.new_frame()
 	_hit_slot = -1
@@ -754,7 +771,12 @@ func step(real_delta: float) -> void:
 		shake_offset += _kick
 		_apply_camera()
 	party_camera.follow(_live_camera())
+	var seats_here: int = _seats_here()
+	party_camera.look(_actor_table(), seats_here)
 	party_camera.step(real_delta)
+	if _markers != null:
+		var shown: Camera2D = party_camera.camera
+		_markers.step(_actor_table(), seats_here, party_camera.visible_rect(), shown.zoom.x if is_instance_valid(shown) else 0.0, _clock)
 	_step_reactions(real_delta)
 	_step_shown_beams(real_delta)
 	_step_flashes(real_delta)
@@ -921,13 +943,15 @@ func _on_room_entered(_room_id: StringName) -> void:
 	_juiced_kind.fill(&"")
 
 
-## The party's view (`view_fitted`, Coop's, on the tick): the party camera heads for it, on the
-## world's camera now (a new room's, at its first view).
-func _on_view_fitted(view: Rect2, party: Rect2) -> void:
-	_camera_step = -1
-	_refresh_camera()
-	party_camera.follow(_live_camera())
-	party_camera.fitted(view, party)
+## A bit per seat played on this machine (`Frames.seats_here`): whose wizards the party camera
+## holds. 0 (everyone's) without the frames service.
+func _seats_here() -> int:
+	if frames == null or not is_instance_valid(frames):
+		frames = null
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		if tree != null and tree.root != null:
+			frames = tree.root.get_node_or_null(^"Frames") as FramesScript
+	return frames.seats_here() if frames != null else 0
 
 
 ## The camera followed now, or null when it is gone (a freed world's).
@@ -1507,7 +1531,7 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	var power: float = plan.power
 	# Its holds and game-wide stop are the game's (`HitStop`, online-ready N4), not drawn here.
 	var table: ActorsScript = _actor_table() if cue.kick_way == &"away" else null
-	if shake_enabled and (cue.shake > 0.0 or cue.kick > 0.0):
+	if shake_enabled and (cue.shake > 0.0 or cue.kick > 0.0) and _in_picture(at):
 		_refresh_camera()
 		_shake(cue.shake * power)
 		var way: Vector2 = Vector2.DOWN
@@ -2008,6 +2032,11 @@ func spectacle() -> SpectacleScript:
 ## Every actor's damage numbers (tests).
 func damage_numbers() -> DamageNumberDrawerScript:
 	return _numbers
+
+
+## The markers for teammates out of the picture (for tests).
+func teammate_markers() -> TeammateMarkersScript:
+	return _markers
 
 
 ## The motes (null with the setting off; for tests and the benchmarks).
@@ -2787,6 +2816,17 @@ func _on_player_downed(player: int) -> void:
 	_show_note(note, wizard.global_position if wizard.is_inside_tree() else wizard.position, ProjectileManagerScript.ramp_light(table.ramp_of(actor)), preset.downed_note_seconds)
 
 
+## Whether `at` (world) is in this machine's picture, or within SHAKE_REACH pixels of its edge: only
+## what happens there shakes or kicks the camera (owner, 2026-11-13: each machine's camera holds its
+## own wizards, so a teammate's fight on another machine's picture must not shake this one). True
+## with no place (`Vector2.INF`) or before the party camera has a picture.
+func _in_picture(at: Vector2) -> bool:
+	if at == Vector2.INF:
+		return true
+	var picture: Rect2 = party_camera.visible_rect()
+	return not picture.has_area() or picture.grow(SHAKE_REACH).has_point(at)
+
+
 ## Shake the screen by `amount` (trauma, 0 to 1; its pixels are its square times `max_shake_pixels`):
 ## it raises the shake to `amount` and never adds to it (owner, 2026-11-07: a storm's hits each adding
 ## theirs kept the screen at its most), so a stream of small shakes holds at one's, and a bigger
@@ -2799,7 +2839,7 @@ func _shake(amount: float) -> void:
 ## A hit with an `aim` (the way the shot flew) sprays along it, `size` times as big, from `at`,
 ## in the ramp of `tint` (white: `player`'s colours); without one it is a puff at `position`.
 func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF, player: int = 0) -> void:
-	if shake_enabled:
+	if shake_enabled and _in_picture(position):
 		_refresh_camera()
 		_shake(shake)
 	if position != Vector2.INF:

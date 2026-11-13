@@ -7,25 +7,22 @@ extends Node2D
 ##
 ## Only the wizards of seats that are not this machine's get one (`Frames.seats_here`); with no
 ## seat here the camera holds everyone, so nobody does. It marks a seat's own body, where a revive
-## happens, not an actor the seat drives. A child of Feel, top level (world space), drawn over
-## everything Feel draws and the same size on screen whatever the camera's zoom. View only, on
+## happens, not an actor the seat drives. It sits right at the picture's edge, corners too, and is
+## drawn over the HUD's panels (owner, 2026-11-13: "should not take player huds into account"): Feel
+## puts it on its own canvas layer over the HUD's (`LAYER`) that follows the camera, so it is placed
+## in world space, and it is the same size on screen whatever the camera's zoom. View only, on
 ## Feel's real clock: nothing in the game reads it, and nothing is allocated after it is made.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
-## Over the damage numbers.
-const Z: int = 23
+## The canvas layer Feel puts it on: over the HUD's (`hud/panels/panels.tscn`, layer 10), so a
+## marker shows over a player's panel. Feel knows nothing of the HUD but this number.
+const LAYER: int = 11
 ## How far inside the picture's edge a marker sits, in screen pixels.
 const INSET: float = 18.0
 ## A wizard this far inside the picture's edge (screen pixels) needs no marker yet.
 const SHOWN_MARGIN: float = 4.0
-## The part of each corner of the screen a marker keeps out of, in screen pixels: the HUD's corner
-## panels are there (a player's bars and staff rows, and the word of a seat played on another
-## machine, hud/panels) and would hide it. A marker that
-## would sit in a corner sits at this part's inner corner instead, still pointing at its wizard.
-## Feel knows nothing of the HUD but this size.
-const CORNER: Vector2 = Vector2(124.0, 104.0)
 ## The arrowhead: from its tip back to its two barbs, half the width between them, and how far its
 ## back is cut in between them (so it reads as a way, not a triangle), in screen pixels.
 const LENGTH: float = 15.0
@@ -65,11 +62,6 @@ func _init() -> void:
 	_outline.resize(5)
 
 
-func _ready() -> void:
-	top_level = true
-	z_index = Z
-
-
 ## Find the teammates out of `picture` (the part of the world on screen, `PartyCamera.visible_rect`)
 ## at the camera's `zoom`: the wizards of the seats not in `seats_here` (a bit per seat played on
 ## this machine; 0: none get a marker). `clock` is Feel's, in real seconds.
@@ -96,27 +88,13 @@ func step(table: ActorsScript, seats_here: int, picture: Rect2, zoom: float, clo
 			if absf(to.y) > 0.0:
 				reach = minf(reach, half.y / absf(to.y))
 			_seat[count] = seat
-			_at[count] = _out_of_corners(middle + to * minf(reach, 1.0), picture)
+			_at[count] = middle + to * minf(reach, 1.0)
 			_way[count] = to.normalized()
 			_colour[count] = ProjectileManagerScript.ramp_color(table.ramp_of(id))
 			_down[count] = 1 if body is Actor and (body as Actor).is_down() else 0
 			count += 1
 	if count > 0 or before > 0:
 		queue_redraw()
-
-
-## `at` (world, on the edge of `picture`), moved out of the screen's corners (CORNER): one in a
-## corner goes to that corner part's inner corner.
-func _out_of_corners(at: Vector2, picture: Rect2) -> Vector2:
-	var corner: Vector2 = CORNER * _scale
-	# How far it is from the nearest side on each axis.
-	var from_side: Vector2 = (at - picture.position).min(picture.end - at)
-	if from_side.x >= corner.x or from_side.y >= corner.y:
-		return at
-	var middle: Vector2 = picture.get_center()
-	var x: float = picture.position.x + corner.x if at.x < middle.x else picture.end.x - corner.x
-	var y: float = picture.position.y + corner.y if at.y < middle.y else picture.end.y - corner.y
-	return Vector2(x, y)
 
 
 ## The seat of marker `at` (0 to `count` - 1), where it is (world), the way it points, and whether

@@ -52,15 +52,23 @@ func test_a_teammate_out_of_the_picture_gets_a_marker_on_the_edge_towards_it() -
 	check(PICTURE.has_point(_markers.position_of(0)), "inside the picture")
 
 
-## The HUD's panels are in the screen's corners: a marker there would be hidden under one.
-func test_a_marker_towards_a_corner_sits_clear_of_the_corner() -> void:
+## The HUD's panels take no part (owner, 2026-11-13): a marker towards a corner sits in the corner,
+## at the edge, and is drawn over the panels.
+func test_a_marker_towards_a_corner_sits_in_the_corner() -> void:
 	_wizard(Vector2(320.0, 180.0), 0)
-	_wizard(Vector2(5000.0, -3000.0), 2)
+	# Off the top right corner, on the line through the corner of the inset edge.
+	var half: Vector2 = PICTURE.size * 0.5 - Vector2.ONE * MarkersScript.INSET
+	_wizard(Vector2(320.0, 180.0) + Vector2(half.x, -half.y) * 10.0, 2)
 	_markers.step(_table, 0b0001, PICTURE, 1.0, 0.0)
 	check_equal(_markers.count, 1, "a marker")
 	if _markers.count == 1:
-		check_equal(_markers.position_of(0), Vector2(640.0 - MarkersScript.CORNER.x, MarkersScript.CORNER.y), "at the inner corner of the top right corner's part")
-		check(_markers.way_of(0).x > 0.0 and _markers.way_of(0).y < 0.0, "still pointing up and right, at its wizard")
+		var corner := Vector2(640.0 - MarkersScript.INSET, MarkersScript.INSET)
+		check(_markers.position_of(0).is_equal_approx(corner), "in the top right corner, not kept clear of it (%s)" % _markers.position_of(0))
+		check(_markers.way_of(0).x > 0.0 and _markers.way_of(0).y < 0.0, "pointing up and right, at its wizard")
+
+
+func test_feel_draws_the_markers_over_the_hud() -> void:
+	check(MarkersScript.LAYER > 10, "the markers' layer is over the HUD's (layer 10)")
 
 
 func test_nobody_in_the_picture_and_none_of_this_machines_gets_one() -> void:

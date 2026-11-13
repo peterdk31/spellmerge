@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-13: each machine's camera holds its own seats (owner)
+
+- **The zoom-out camera is for players who share a screen** (owner: "only 'local players' use the zoom-in out multiplayer camera ... 2-4 machines connected over the internet does not need to share a camera"): the party camera holds the wizards of the seats played on this machine, so two players on one couch share the picture as before and each machine online follows its own. Mixed play (two on a couch and one online) holds the two.
+- **The fit left the simulation.** Coop worked the view out on the tick and sent it (`view_fitted`), as state, because the horde spawned outside it; since the horde went nothing in the game read it. A view that differs by machine cannot be state, so Feel's party camera now finds the wizards itself as it draws (the actor table: each seat's own body and the actor it drives) and fits the view; `view_fitted`, `room_laid_out` (the camera's limits are the room) and `Coop.VIEW_SIZE` are gone. The simulation knows no camera and no machine.
+- **Which seats are this machine's is the frames service's to say** (`Frames.seats_here`, for the view only): the seats a real device holds, or a live replay's local seats (an online client's). Another machine's seat is a virtual device here, and so is a bot's, so a test's bots count as nobody's; with no seat here that has a wizard (a recording played, a machine waiting for its seat) the camera holds everyone, which is what every bot-driven test and screenshot sees.
+- **Only what is in this machine's picture shakes it** (owner, same day: "Implement 2 first"): a hit's shake and a cue's shake and kick come only from a place in the picture or within `Feel.SHAKE_REACH` (64 px) of its edge, so a teammate's fight on another machine's picture is not felt here. Hit-stop is the game's and stays shared; sounds are not cut.
+- **Agreed to follow** (owner, same day): a marker at the picture's edge for a teammate out of it, pulsing for a downed one, since a revive needs someone to walk there; the camera stays on this machine's wizards when all of them are down (following a teammate may come with the markers).
+
 ## 2026-11-13: hits hurt in the hub; a fall there costs nothing (owner)
 
 - **Wizards are no longer invincible in the hub** (owner: "The players should no longer be invincible in the hub. If they are downed they should come back to full life a moment after. But this will still allow multiplayer hubs to play against each other without consequences and test builds"): hits take health there as anywhere, and a downed wizard stands up by itself where it fell, at full health and protected for `Downed.JOIN_PROTECTION`, `RoomBase.stand_up_after` seconds later (2 in the hub; Flow's `_stand_up_left`, by seat, state). Everyone down there starts no restart. `RoomBase.invincible` is gone; props keep `PropBase.invincible`.

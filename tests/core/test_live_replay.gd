@@ -201,6 +201,13 @@ func test_it_plays_the_frames_it_is_fed() -> void:
 	check(_feed.problems.is_empty(), "every tick taken: %s" % ", ".join(_feed.problems))
 
 
+## The view's question (whose wizards this machine's camera holds): a live replay's local seats.
+func test_the_seats_here_are_the_live_replays_local_seats() -> void:
+	check(_play(), "it plays")
+	check_equal(_frames.seats_here(), _feed.local_seats, "the feed's local seats, whatever devices sit here")
+	check(_feed.local_seats != 0, "and there is one")
+
+
 func test_the_local_seats_frame_is_sent_every_step() -> void:
 	check(_play(), "it plays")
 	_input.send_virtual(LOCAL, &"move_left", 1.0)

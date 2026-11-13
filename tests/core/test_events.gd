@@ -109,9 +109,7 @@ const EVENTS: Dictionary = {
 	# Run and rooms.
 	&"run_started": [["player_count", TYPE_INT]],
 	&"run_ended": [["victory", TYPE_BOOL]],
-	&"room_laid_out": [["bounds", TYPE_RECT2]],
 	&"room_entered": [["room_id", TYPE_STRING_NAME]],
-	&"view_fitted": [["view", TYPE_RECT2], ["party", TYPE_RECT2]],
 	&"room_cleared": [["room_id", TYPE_STRING_NAME]],
 	&"loading_started": [],
 	&"loading_progressed": [["done", TYPE_INT], ["total", TYPE_INT]],
@@ -133,7 +131,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"room_laid_out", &"room_entered", &"view_fitted", &"room_cleared", &"wave_started", &"start_stone_changed", &"altar_changed", &"hub_changed",
+	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started", &"start_stone_changed", &"altar_changed", &"hub_changed",
 	&"loading_started", &"loading_progressed", &"loading_finished",
 	&"play_load_requested", &"online_changed", &"online_line_changed", &"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]

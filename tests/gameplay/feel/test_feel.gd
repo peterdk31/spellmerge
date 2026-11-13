@@ -61,6 +61,7 @@ func _initialize() -> void:
 	_test_bursts_survive_the_world_being_freed()
 	_test_a_kill_uses_one_slot_and_beats_a_full_pool()
 	_test_camera_change_is_followed()
+	_test_only_what_is_in_the_picture_shakes()
 	_test_hit_flash_and_squash()
 	_test_cast_flash_and_kick()
 	_test_death_puff_is_limited()
@@ -334,6 +335,26 @@ func _test_a_kill_uses_one_slot_and_beats_a_full_pool() -> void:
 	_check(_feel.flashes_of(&"puff") >= 1, "a kill gets its puff even when the slots are full (the oldest is taken)")
 	_check(_feel.live_flashes() == _feel.effect_slots, "taking one over keeps the limit")
 
+
+
+## Each machine's camera holds its own wizards (owner, 2026-11-13), so a hit or a cast far off this
+## machine's picture (a teammate's fight on another machine) does not shake or kick it; one in the
+## picture or just past its edge does.
+func _test_only_what_is_in_the_picture_shakes() -> void:
+	_setup()
+	_camera.make_current()
+	_feel.step(0.015625)
+	var picture: Rect2 = _feel.party_camera.visible_rect()
+	_check(picture.has_area(), "the party camera has a picture")
+	_hit(0, picture.end + Vector2(2000.0, 2000.0))
+	_check(_feel.trauma() == 0.0, "a hit far out of the picture does not shake it")
+	_feel.play_cue(&"cast", 0, picture.end + Vector2(2000.0, 2000.0), Vector2.RIGHT)
+	_check(_feel.trauma() == 0.0 and _feel.kick() == Vector2.ZERO, "a cast far out of the picture neither shakes nor kicks")
+	_hit(0, picture.end + Vector2(FeelScript.SHAKE_REACH * 0.5, 0.0))
+	_check(_feel.trauma() > 0.0, "a hit just past the edge is still felt")
+	_feel.step(5.0)
+	_hit(0, picture.get_center())
+	_check(_feel.trauma() > 0.0, "a hit in the picture shakes")
 
 
 func _test_camera_change_is_followed() -> void:

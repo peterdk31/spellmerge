@@ -519,7 +519,6 @@ func start_run(requester: int, kept: Array = [], heads: Array = []) -> bool:
 	_show_world(new_world)
 	_set_walls(new_world)
 	if events != null:
-		events.room_laid_out.emit(Rect2(Vector2.ZERO, size))
 		events.room_entered.emit(room.id)
 		events.sandbox_changed.emit(mode == MODE_SANDBOX)
 		if mode == MODE_WAVES:
@@ -1008,8 +1007,8 @@ func _set_walls(new_world: Node2D) -> void:
 func _add_camera(parent: Node2D, size: Vector2) -> void:
 	var camera := Camera2D.new()
 	camera.position = size * 0.5
-	# Feel's party camera moves and zooms it to the party's view (Coop's `view_fitted`); the
-	# limits keep it inside the room, as Coop keeps the view (`room_laid_out`).
+	# Feel's party camera moves and zooms it to hold this machine's wizards; the limits keep it
+	# inside the room.
 	camera.limit_left = 0
 	camera.limit_top = 0
 	camera.limit_right = ceili(size.x)

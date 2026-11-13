@@ -440,9 +440,11 @@ func set_staff(at: int, cards: Array[StringName]) -> bool:
 	return true
 
 
-## Hold `new_staffs` (1-4, one per button; a null one an empty hand) with `new_cards` (card ids by
-## slot, per staff) instead of the staffs it held: a boss's phase (`Phases`). Each pool starts full;
-## a button it no longer has is emptied (its sustained cards end). `staff_built` follows for each.
+## Hold `new_staffs` (1-4, one per button; a null one falls back to `staff`, as in `hold_staffs`)
+## with `new_cards` (card ids by slot, per staff) instead of the staffs it held: a boss's phase
+## (`Phases`). Every button it is given holds its staff (none is an empty hand). Each pool starts
+## full; a button it no longer has is emptied (its sustained cards end). `staff_built` follows for
+## each.
 func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 	if new_staffs.is_empty():
 		return
@@ -452,11 +454,6 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 	staff = staffs[0]
 	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)
 	empty_hands = 0
-	for at in staff_count:
-		if staffs[at] == null:
-			empty_hands |= 1 << at
-	if not holds(current):
-		_show(first_held())
 	for at in MAX_STAFFS:
 		_mana[at] = max_mana_of(at)
 	for at in maxi(before, staff_count):

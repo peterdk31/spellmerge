@@ -430,13 +430,20 @@ func _builder_caster() -> Caster:
 	return _home.caster if _home != null else null
 
 
+## True (and refused with EMPTY_HAND) when button `at` of `caster` exists but holds no staff.
+func _refused_empty_hand(caster: Caster, at: int) -> bool:
+	if caster == null or at < 0 or at >= caster.staff_count or caster.holds(at):
+		return false
+	_refuse(EMPTY_HAND)
+	return true
+
+
 ## A builder asked to put `card_id` into `slot` of staff `at` (`&""` empties it).
 func _on_staff_change_requested(player: int, at: int, slot: int, card_id: StringName) -> void:
 	if player != seat:
 		return
 	var caster: Caster = _builder_caster()
-	if caster != null and caster.staff_count > at and at >= 0 and not caster.holds(at):
-		_refuse(EMPTY_HAND)
+	if _refused_empty_hand(caster, at):
 		return
 	if caster == null or at < 0 or at >= caster.staff_count or slot < 0 or slot >= caster.slot_count(at):
 		_refuse("There is no such slot.")
@@ -456,8 +463,7 @@ func _on_staff_cards_requested(player: int, at: int, cards: Array[StringName]) -
 	if player != seat:
 		return
 	var caster: Caster = _builder_caster()
-	if caster != null and caster.staff_count > at and at >= 0 and not caster.holds(at):
-		_refuse(EMPTY_HAND)
+	if _refused_empty_hand(caster, at):
 		return
 	if caster == null or at < 0 or at >= caster.staff_count or cards.size() > caster.slot_count(at):
 		_refuse("There is no such slot.")

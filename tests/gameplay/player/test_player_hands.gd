@@ -176,13 +176,15 @@ func test_seat_wizard_marks_a_short_list_and_nulls_as_empty() -> void:
 	body.free()
 
 
-## `replace_staffs` says every hand anew: a null one is empty, one given a staff holds it, and the
-## staff on show moves off a hand that is emptied.
-func test_replace_staffs_says_every_hand() -> void:
+## `replace_staffs` fills every hand it is given (a boss's phase; the stress bench): an empty hand
+## given a staff holds it and is built, and a null staff falls back to `staff` as before, never an
+## empty hand.
+func test_replace_staffs_fills_every_hand_it_is_given() -> void:
 	var wizard: Actor = _gapped()
-	var cards: Array = [[&"bolt"], [], [&"bolt"]]
+	var cards: Array = [[&"bolt"], [&"bolt"], [&"bolt"]]
 	var hands: Array[StaffBase] = [_star, null, _curl]
 	wizard.caster.replace_staffs(hands, cards)
-	check_equal(wizard.caster.empty_hands, 0b010, "RT is empty now, RB and LB hold staffs")
-	check(wizard.caster.has_staff(0) and wizard.caster.has_staff(2), "and are built")
-	check_equal(wizard.caster.current, 0, "the staff on show left the emptied RT for RB")
+	check_equal(wizard.caster.empty_hands, 0, "no hand is empty now")
+	for at in 3:
+		check(wizard.caster.has_staff(at), "hand %d is built" % at)
+	check(wizard.caster.staff_of(1) == _star, "the null staff falls back to the first, as for a boss")

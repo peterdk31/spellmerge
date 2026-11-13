@@ -34,7 +34,7 @@ const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
 ## How a bot plays (the brain's numbers).
 const PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
 
-## The staff a bot builds into: staff 3, LB (empty at the start).
+## The staff a bot builds into: RB, over its start `dash` (RT keeps its `bolt`).
 const BUILD_STAFF: int = 0
 ## The staff buttons, by staff.
 const STAFF_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]

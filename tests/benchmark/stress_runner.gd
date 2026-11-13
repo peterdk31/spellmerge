@@ -93,8 +93,9 @@ const FRAME_BUDGET_MS: float = 1000.0 / 60.0
 const PROFILED_SIGNALS: Array[StringName] = [&"damage_dealt", &"projectile_hit", &"enemy_died", &"hit_landed", &"status_applied", &"reaction_triggered", &"spell_cast"]
 
 ## The build of each player: the cards of RT and LB (RB keeps its dash). A Play wizard holds two
-## staffs (items I2), so the runner hands each wizard three (`Caster.replace_staffs`): Play's RB and
-## RT and the moon staff on LB, as the wizards held before.
+## staffs (items I2), so the runner hands each wizard three (`Caster.replace_staffs`, every hand it
+## is given held): Play's RB and RT and the moon staff on LB, as the wizards held before. Until the
+## inventory (I3) puts a staff on a hand, that is the one call that does.
 ## Heavy on purpose: splits, rings, orbits, triggers with payloads, all four elements.
 const STAFFS: Array[Array] = [
 	[
@@ -304,7 +305,7 @@ func _start_measuring(scenario: Dictionary) -> void:
 		rows.append_array(STAFFS[index])
 		wizard.caster.replace_staffs(held, rows)
 		for at in 2:
-			if wizard.caster.cards_of(at + 1).is_empty():
+			if not wizard.caster.has_staff(at + 1):
 				_finish(["the stress staff %d of player %d was refused" % [at + 1, index + 1]])
 				return
 	print("BENCH: stress scenario %s: %d players, %d enemies, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], PLAYERS, _target_enemies, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])

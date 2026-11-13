@@ -517,6 +517,12 @@ func _test_feel_gives_the_camera_the_seats_played_here() -> void:
 	_wizard(1).global_position = Vector2(900.0, 500.0)
 	feel.call("step", 0.016)
 	_check(_party.target_position.is_equal_approx(_wizard(0).global_position) and is_equal_approx(_party.target_zoom, PartyCameraScript.MAX_ZOOM), "Feel's step heads the camera for the keyboard's wizard alone (%s, %f)" % [_party.target_position, _party.target_zoom])
+	# The wizard played elsewhere is out of the picture: Feel marks it at the picture's edge.
+	feel.call("step", 0.016)
+	var markers: Node = feel.call("teammate_markers") as Node
+	_check(markers != null and int(markers.get("count")) == 1 and int(markers.call("seat_of", 0)) == 1, "Feel marks the teammate out of the picture, and nobody else")
+	if markers != null and int(markers.get("count")) == 1:
+		_check(_party.visible_rect().has_point(markers.call("position_of", 0) as Vector2), "the marker is in the picture")
 	# The keyboard leaves: nobody plays here, so everyone is held again.
 	_input.leave(0)
 	feel.call("step", 0.016)

@@ -11,9 +11,10 @@ extends Resource
 @export var id: StringName = &""
 ## The layout scene: its art and walls, and what is where (`RoomPlaces`). No scripts.
 @export var scene: PackedScene
-## True for a room where wizards take nothing from hits (the hub): a hit still lands (its flash, its
-## push, its statuses) but takes no health (`Health.invincible`), so nobody is downed there.
-@export var invincible: bool = false
+## Seconds after which a downed wizard stands up by itself at full health (the hub: hits hurt there,
+## but a fall costs nothing; owner, 2026-11-13). Below 0 (the default): never by itself, only by a
+## teammate's revive, a new wave or the restart. In such a room everyone down starts no restart.
+@export var stand_up_after: float = -1.0
 ## The colours of what its walls shed when struck (Feel's surface motes: chips), lightest first:
 ## light, base, shadow. Empty (the default): sampled from the room's own art (`surface_colors`),
 ## so new tiles change the chips with no edit here; set it only when the sample looks wrong.

@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-13: hits hurt in the hub; a fall there costs nothing (owner)
+
+- **Wizards are no longer invincible in the hub** (owner: "The players should no longer be invincible in the hub. If they are downed they should come back to full life a moment after. But this will still allow multiplayer hubs to play against each other without consequences and test builds"): hits take health there as anywhere, and a downed wizard stands up by itself where it fell, at full health and protected for `Downed.JOIN_PROTECTION`, `RoomBase.stand_up_after` seconds later (2 in the hub; Flow's `_stand_up_left`, by seat, state). Everyone down there starts no restart. `RoomBase.invincible` is gone; props keep `PropBase.invincible`.
+
 ## 2026-11-13: the hub's RT holds the dev staff (owner)
 
 - **The hub's wizards hold the `dev` staff on RT** (`Flow.HUB_DEV_BUTTON`; owner: "In the hub, players should have a dev staff on RT. Just to allow for testing bigger spells for now"): 20 slots, no delay, practically endless mana, beside Play's three other basic staffs, so a big build can be tried on the hub's dummies without going to the sandbox. For now: it goes when the hub has a better way to try spells.

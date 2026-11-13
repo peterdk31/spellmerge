@@ -29,26 +29,26 @@ func _body(point: Vector2) -> Rect2:
 	return Rect2(point - Vector2.ONE * BODY_RADIUS, Vector2.ONE * BODY_RADIUS * 2.0)
 
 
-func test_resource_is_the_hub_where_hits_take_nothing() -> void:
+func test_resource_is_the_hub_where_a_fall_costs_nothing() -> void:
 	var room: RoomBase = _room()
 	check_equal(room.id, &"hub", "the id")
 	check(room.scene != null, "the room has a scene")
 	check_equal(room.places().player_spawns.size(), 4, "player spawns")
 	check_equal(room.places().placed_at_of(EnemyBase).size(), 3, "three dummies")
 	check(room.places().enemy_spawns.is_empty(), "no enemy spawns: no wave there")
-	check(room.invincible, "hits take nothing in the hub")
+	check(room.stand_up_after > 0.0, "a downed wizard stands up by itself in the hub")
 	check(HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).has_area(), "it has a teleporter stone")
 	for dummy: EnemyBase in room.places().placed_of(EnemyBase):
 		check_equal(dummy.id, &"training_dummy", "a training dummy")
 	check_equal(room.places().problems(), PackedStringArray(), "every stand-in and zone has its data")
 
 
-func test_the_other_rooms_have_no_stone_and_hurt() -> void:
+func test_the_other_rooms_have_no_stone_and_down_for_good() -> void:
 	for path: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/sandbox.tres"]:
 		var room: RoomBase = load(path) as RoomBase
 		check(not HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).has_area(), "%s has no stone" % room.id)
 		check(not HubRules.area_of(room.places(), HubRules.ROLE_PARTY_ALTAR).has_area(), "%s has no altar" % room.id)
-		check(not room.invincible, "%s hurts" % room.id)
+		check(room.stand_up_after < 0.0, "%s downs for good" % room.id)
 
 
 func test_scene_has_no_scripts() -> void:

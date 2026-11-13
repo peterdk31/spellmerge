@@ -10,7 +10,7 @@ extends ActorLook
 ## (`damage_number_shown` on the bus), with where the number starts and how it moves: its numbers
 ## are data here. An actor never hit costs only the node; the actor never steps it.
 ##
-## A hit that took nothing (the actor is invincible: a wizard in the hub) is told as spared, so
+## A hit that took nothing (the actor is invincible: one of the hub's props) is told as spared, so
 ## a test there still reads what it would have done. View only, as every look.
 
 const EventsScript := preload("res://core/events/events.gd")

@@ -72,15 +72,16 @@ func revive_progress() -> float:
 	return _revive_progress
 
 
-## Bring the downed actor back with REVIVE_HEALTH; `reviver` is the seat of the teammate who did
-## it. Returns false if it was not down.
-func revive(reviver: int) -> bool:
+## Bring the downed actor back with `health` (REVIVE_HEALTH unless given; the hub stands a wizard up
+## at full health); `reviver` is the seat of the teammate who did it (its own seat when it stood up by
+## itself). Returns false if it was not down.
+func revive(reviver: int, health: float = REVIVE_HEALTH) -> bool:
 	if not is_down():
 		return false
 	actor.set_down(false)
 	_revive_progress = 0.0
 	if actor.health != null:
-		actor.health.reset(REVIVE_HEALTH)
+		actor.health.reset(health)
 	if actor.events != null:
 		actor.events.player_revived.emit(seat(), reviver)
 		# The moment's look is content's (S6, item 13).

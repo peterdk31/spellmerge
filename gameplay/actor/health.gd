@@ -24,7 +24,7 @@ var health: float = 100.0
 ## True from a `protect` until its time has run out: the actor steps Health only then (read only).
 var protecting: bool = false
 
-## True while hits take nothing (a wizard in the hub, `RoomBase.invincible`; online-lobby L1). Unlike
+## True while hits take nothing (a prop no hit hurts, `PropBase.invincible`). Unlike
 ## `protect`, the hit still lands: Combat sends it, pushes and flashes the body; only the health
 ## stays as it was, so it is never depleted by a hit.
 var invincible: bool = false

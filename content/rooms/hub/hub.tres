@@ -7,5 +7,5 @@
 script = ExtResource("1_base")
 id = &"hub"
 scene = ExtResource("2_scene")
-invincible = true
+stand_up_after = 2.0
 ambient = 0.9

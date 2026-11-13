@@ -52,6 +52,9 @@ const JOIN_CODE: String = "online_runner_join.code"
 ## The host's run, in ticks, and the longest the whole thing may take, in seconds.
 const TICKS: int = 600
 const PATIENCE: float = 120.0
+## Told to lose its runs: how far apart the seats' spots are set, beside the spread of the room's
+## spawns, in pixels: far past a revive's reach (Coop's REVIVE_RANGE, 48).
+const LOSING_SPREAD: float = 96.0
 ## `--rejoin`: the joining machine's physics frames in the hub before it goes back to the menu, and
 ## the menu it must be shown.
 const REJOIN_AFTER: int = 120
@@ -80,11 +83,16 @@ class Walker:
 	var runner: Node = null
 	var seat: int = 0
 	var steps: int = 0
+	## Told to lose its runs: the spot it holds in the run (INF until the run's first frame), its
+	## seat's own, apart from the others' (`LOSING_SPREAD`).
+	var post: Vector2 = Vector2.INF
 
 	func fill_frame(frame: InputFrame, _delta: float) -> void:
 		steps += 1
 		frame.aim = posmod(steps * 300 + seat * 2000, InputFrame.AIM_STEPS)
 		var wizard: Node2D = runner.call(&"wizard_of", seat) as Node2D
+		if bool(runner.get(&"in_hub")):
+			post = Vector2.INF
 		if bool(runner.get(&"in_hub")) and wizard != null:
 			var to: Vector2 = (runner.get(&"stone") as Vector2) + Vector2(-24.0 + 16.0 * seat, 8.0) - wizard.position
 			if to.length() > 6.0:
@@ -92,9 +100,18 @@ class Walker:
 			if steps % 120 == 30 + seat * 11:
 				frame.press(1)
 			return
-		# Told to lose its runs (`--runs`): it stands and casts nothing, so the party is soon back
-		# in the hub.
+		# Told to lose its runs (`--runs`): it casts nothing and holds a spot of its own, far from
+		# the others', so the party is soon back in the hub. Standing still, the enemies' hits
+		# would herd the party together, and a teammate in reach revives each one that goes down
+		# (Coop's REVIVE_RANGE): the run would never end.
 		if bool(runner.get(&"loses_runs")):
+			if wizard == null:
+				return
+			if post == Vector2.INF:
+				post = wizard.position + Vector2((seat - 1.5) * LOSING_SPREAD, 0.0)
+			var back: Vector2 = post - wizard.position
+			if back.length() > 6.0:
+				frame.set_move(back.normalized())
 			return
 		frame.set_move([Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][(steps / 30) % 4] * 0.5)
 		if steps % 40 == 5:

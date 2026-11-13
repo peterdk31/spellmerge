@@ -706,3 +706,61 @@ func test_a_machine_still_waiting_to_be_joined_is_not_let_go_when_the_last_one_p
 	_steps(4)
 	check_equal([_host.play.phase, _host.play.session == null], [NetPlayScript.CODE, true], "with that one gone too, the room is open as before")
 
+
+
+# --- Back to the main menu (the pause menu's "Main menu", `main_menu_requested`) ---------------
+
+## A guest machine that goes back to the menu leaves the party at once: its link closes, so the
+## host lets its seats go in a step or two, not after a silence (NetSession.SILENT_MS).
+func test_a_guest_back_to_the_menu_leaves_the_party_at_once() -> void:
+	_open_room()
+	_join_room(_client)
+	_steps(60)
+	_client.fight.fight.bus.main_menu_requested.emit(0)
+	check_equal([_client.play.phase, _client.play.code], [NetPlayScript.OFF, ""], "the machine that left is off")
+	check(_client.play.session == null and not _client.fight.frames.is_playing(), "it holds no session and plays nothing")
+	check_equal(_client.lines[-1], "", "and the HUD's online line is cleared")
+	_steps(3)
+	check_equal([_host.play.phase, _host.play.code], [NetPlayScript.CODE, RoomHandshake.ROOM], "the host plays on with its room open")
+	check(not _host.fight.input.is_joined(1), "and the guest's seat left its game")
+
+
+## The owner's case (online lobby, L2 leftovers): a machine whose host left goes back to the menu
+## and joins another room, with no restart of the game.
+func test_a_machine_whose_host_left_goes_back_to_the_menu_and_joins_another_room() -> void:
+	_open_room()
+	_join_room(_client)
+	_steps(60)
+	_host.fight.fight.bus.main_menu_requested.emit(0)
+	check_equal([_host.play.phase, _host.play.code], [NetPlayScript.OFF, ""], "the host back in the menu is off")
+	check(_host.play.session == null and not _host.fight.frames.is_recording(), "it holds no session and records nothing")
+	check(not _table.get(&"open", true), "and its room is closed")
+	for i in 30:
+		_client.step()
+	check_equal(_client.play.phase, NetPlayScript.ENDED, "the guest sees its host gone at once")
+	_client.fight.fight.bus.main_menu_requested.emit(0)
+	check_equal(_client.play.phase, NetPlayScript.OFF, "back in the menu it is off")
+	check_equal(_client.fight.input.own_seat_count(), 4, "with every seat its machine's again")
+	# Another machine opens a room; the one that was left alone joins it.
+	_third = Machine.new(root, _card, _table)
+	_third.fight.input.add_virtual_device(0)
+	_third.fight.fight.bus.hub_changed.emit(true)
+	_third.fight.fight.bus.online_open_requested.emit(0)
+	_client.fight.fight.bus.online_join_requested.emit(0, RoomHandshake.ROOM)
+	for i in WARM_UP + 20:
+		_third.step()
+		_client.step()
+	check_equal([_third.play.phase, _client.play.phase], [NetPlayScript.PLAYING, NetPlayScript.PLAYING], "it plays in the new room")
+	check(_client.fight.frames.is_live() and (_third.play.session as NetHost).guest_seats() != 0, "the new host's recording, live, with a seat of its own")
+
+
+## Back to the menu before anything linked gives up, as Cancel does.
+func test_back_to_the_menu_while_the_room_is_being_made_gives_it_up() -> void:
+	_seat_scripted_players()
+	_host.fight.fight.bus.hub_changed.emit(true)
+	_host.fight.fight.bus.online_open_requested.emit(0)
+	_host.fight.fight.bus.main_menu_requested.emit(0)
+	check_equal([_host.play.phase, _host.play.code], [NetPlayScript.OFF, ""], "off")
+	check(not _table.get(&"open", true), "the room it was making is closed")
+	_steps(4)
+	check_equal(_host.play.phase, NetPlayScript.OFF, "and stays off")

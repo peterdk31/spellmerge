@@ -22,7 +22,7 @@ Players in the spell builder never block the others: the rest keep playing.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `room_entered`, `room_cleared`, `wave_started` (and with it `cue_shown` `wave_start`, `WAVE_START_CUE`, on every standing wizard, as its actor; S6, item 13), `build_break_started`, `sandbox_changed`, `start_stone_changed` (and `cue_shown` `stone_lit` at the stone as it lights, as no actor), `door_voted`.
-  - Listens to: `enemy_died`, `run_started`, `player_downed`, `player_joined`, `player_left`, and from the HUD `play_requested`, `hub_requested`, `run_requested` (a command), `sandbox_spawn_requested`, `sandbox_requested`, `sandbox_action_requested` and `door_vote_requested` (`door_voted` is flow's announced result of the vote; `room_entered` follows `play_requested`).
+  - Listens to: `enemy_died`, `run_started`, `player_downed`, `player_joined`, `player_left`, and from the HUD `play_requested`, `hub_requested`, `run_requested` (a command), `main_menu_requested` (this machine back to the main menu, not a command: `stop_run`), `sandbox_spawn_requested`, `sandbox_requested`, `sandbox_action_requested` and `door_vote_requested` (`door_voted` is flow's announced result of the vote; `room_entered` follows `play_requested`).
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
 ## Allowed files

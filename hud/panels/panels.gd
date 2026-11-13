@@ -10,7 +10,8 @@ extends CanvasLayer
 ## another panel wait.
 ##
 ## Menus open only while a room is active, and close when the run starts or ends, so none is
-## ever left open over the main menu.
+## ever left open over the main menu. The pause menu's "Main menu" (`main_menu_requested`) clears
+## them all and makes the main menu the current scene again (`main_menu`).
 ##
 ## Under each panel's mana bar, one row per staff with cards (owner, 2026-10-27): its cast
 ## sequence comes from `staff_changed` (the plain `Spells.staff_view`, icons asked of `Spells`
@@ -102,6 +103,9 @@ var input: InputManagerScript = null
 var spells: SpellsScript = null
 ## The save that keeps the menu's settings; the default one (`user://save.cfg`) when null.
 var save: SaveFile = null
+## The main menu shown on `main_menu_requested`; null: the game's own (its main scene,
+## `hud/menus/main_menu/`). Tests give their own.
+var main_menu: PackedScene = null
 
 var _panels: Array[PlayerPanelScript] = []
 var _radials: Array[RadialScript] = []
@@ -276,6 +280,7 @@ func _ready() -> void:
 		events.cast_fizzled.connect(_on_cast_fizzled)
 		events.run_started.connect(_on_run_started)
 		events.run_ended.connect(_on_run_ended)
+		events.main_menu_requested.connect(_on_main_menu_requested)
 	if ui_focus != null:
 		ui_focus.opened.connect(_on_menu_opened)
 		ui_focus.closed.connect(_on_menu_closed)
@@ -534,6 +539,25 @@ func _on_run_ended(_victory: bool) -> void:
 	_reset_all()
 	for panel in _panels:
 		panel.clear_staffs()
+
+
+## This machine goes back to the main menu (`main_menu_requested`): no panel or menu stays, and
+## the main menu becomes the current scene again (Flow takes the run's world away itself). Nothing
+## here asks Flow or net/: each does its own part of leaving.
+func _on_main_menu_requested(_player: int) -> void:
+	_on_run_ended(false)
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return
+	var scene: PackedScene = main_menu
+	if scene == null:
+		scene = load("res://hud/menus/main_menu/main_menu.tscn") as PackedScene
+	var menu: Node = scene.instantiate() if scene != null else null
+	if menu == null:
+		push_warning("Hud: the main menu could not be made.")
+		return
+	tree.root.add_child(menu)
+	tree.current_scene = menu
 
 
 func _reset_all() -> void:

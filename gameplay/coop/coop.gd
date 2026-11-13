@@ -72,9 +72,12 @@ const REFS: Array[StringName] = [&"_wizards", &"_downs"]
 
 ## Why Coop needs no renewing at a run's start (core/sim/sim_area.gd, `fresh_because`).
 const FRESH_BECAUSE: String = "the seats' joins are the session's; room_laid_out and room_entered set the run's room, view, wizards and revives"
-## The reason the pause menu stops the game (`Sim.stop`): offline, any seat's open menu stops it
-## for everyone (one menu is open at a time).
-const MENU: StringName = &"menu"
+## The reasons the pause menu stops the game (`Sim.stop`), one a seat: a seat's open menu stops it
+## for everyone, and only that seat's closing, or the seat leaving, lets it go. A seat that leaves
+## with its menu open (a machine gone back to the main menu, or lost, online: its closing never
+## comes) must not leave everyone else stopped; and online two machines' menus may be open at
+## once, each its own reason.
+const MENU_OF: Array[StringName] = [&"menu_0", &"menu_1", &"menu_2", &"menu_3"]
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -118,12 +121,22 @@ func _ready() -> void:
 ## `player` opened (`on` 1) or closed (`on` 0) the pause menu (a command, at a tick's start;
 ## online-ready N4): the game stops while it is open (`Sim.stop`), and the Tick pauses the tree for
 ## the picture.
-func _on_pause_requested(_player: int, on: int) -> void:
+func _on_pause_requested(player: int, on: int) -> void:
+	if player < 0 or player >= PLAYER_SLOTS:
+		return
 	var game: Sim = Sim.found(self)
 	if on != 0:
-		game.stop(MENU)
+		game.stop(MENU_OF[player])
 	else:
-		game.go(MENU)
+		game.go(MENU_OF[player])
+
+
+## True while some seat's pause menu stops `game`.
+static func menu_stops(game: Sim) -> bool:
+	for reason in MENU_OF:
+		if game.stopped_for(reason):
+			return true
+	return false
 
 
 ## Coop's rules, once a tick (core/sim/tick.gd): the party's view (`view_fitted`), then the
@@ -319,7 +332,14 @@ func _on_seat_joined(player: int) -> void:
 
 
 func _on_seat_left(player: int) -> void:
-	if player < 0 or player >= PLAYER_SLOTS or not _joined[player]:
+	if player < 0 or player >= PLAYER_SLOTS:
+		return
+	# A seat that leaves with its pause menu open lets the game go (heard where the frames say the
+	# seat left, so on every machine at the same tick).
+	var game: Sim = Sim.found(self)
+	if game != null:
+		game.go(MENU_OF[player])
+	if not _joined[player]:
 		return
 	_set_revive(player, 0.0)
 	_joined[player] = false

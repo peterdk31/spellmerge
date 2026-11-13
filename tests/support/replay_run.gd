@@ -33,6 +33,7 @@ const BotScript := preload("res://tests/bots/bot.gd")
 const FreshGame := preload("res://tests/support/fresh_game.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const TickScript := preload("res://core/sim/tick.gd")
+const CoopScript := preload("res://gameplay/coop/coop.gd")
 
 ## The tick the scripted run's "HUD" rebuilds staff 0 (a command).
 const REBUILD_AT: int = 100
@@ -326,7 +327,7 @@ func _check_stopped(run: String, i: int) -> void:
 		return
 	var game: Sim = (_root.get_node("Tick") as TickScript).sim
 	var inside: bool = i > PAUSE_AT and i <= RESUME_AT
-	if game.stopped_for(&"menu") != inside:
+	if CoopScript.menu_stops(game) != inside:
 		problems.append("%s: tick %d %s by the pause menu" % [run, i, "is not stopped" if inside else "is stopped"])
 
 

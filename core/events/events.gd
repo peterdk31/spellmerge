@@ -74,6 +74,14 @@ signal sandbox_requested(player: int)
 ## flow, which starts it, and core/input, which joins the keyboard first. A run's start, as
 ## `sandbox_requested` is (`Replay.STARTS`), not a command.
 signal hub_requested(player: int)
+## Sender: hud. `player` picked "Main menu" in the pause menu: this machine leaves what it plays and
+## shows the main menu again (online lobby, docs/milestones/online-lobby.md: a machine whose host
+## left joins another room from there). This machine's own, never a command: a recorded command
+## would take every machine of an online party out. Heard by flow (the run stops, its world goes),
+## core/sim (the frames service: what it records or plays ends), net (whatever it holds online
+## is let go: the other machines see this one leave) and hud (the main menu is shown). None of
+## them asks another.
+signal main_menu_requested(player: int)
 ## Sender: hud. `player` pressed A (`accept`) with no menu open while the hub's teleporter stone was
 ## lit (`start_stone_changed`): start the run (online-lobby L1). A command: heard by flow at the next
 ## tick's start, which starts the run of waves if the stone is still lit then.

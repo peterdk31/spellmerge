@@ -30,6 +30,11 @@ extends Node
 ## passes when every hash check agreed, the joining machine held two seats and a run was started
 ## from the stone.
 ##
+## **Back to the menu and in again** (`--rejoin`, both processes): the joining process goes back to
+## the main menu a while into the hub, as the pause menu's "Main menu" does (`main_menu_requested`),
+## and once the main menu shows joins the same room again; the host keeps its room open and starts
+## no run until the machine is back. The joining process passes only when it played twice.
+##
 ##     godot --headless --path . -- --online --online-role=host --signal=ws://127.0.0.1:8787/room --ticks=1500
 ##     godot --headless --path . -- --online --online-role=join --signal=ws://127.0.0.1:8787/room
 
@@ -47,6 +52,10 @@ const JOIN_CODE: String = "online_runner_join.code"
 ## The host's run, in ticks, and the longest the whole thing may take, in seconds.
 const TICKS: int = 600
 const PATIENCE: float = 120.0
+## `--rejoin`: the joining machine's physics frames in the hub before it goes back to the menu, and
+## the menu it must be shown.
+const REJOIN_AFTER: int = 120
+const MAIN_MENU: String = "res://hud/menus/main_menu/main_menu.tscn"
 
 
 ## A player that reads nothing of the game: it walks a square, sweeps its aim and casts.
@@ -121,6 +130,15 @@ var _played: int = 0
 var _players: int = OWN_PLAYERS
 var _party: int = 0
 var _ticks: int = TICKS
+## `--rejoin` (see the top): asked; the joining machine's way through it (0 not yet, 1 gone to the
+## menu, 2 joined again), its physics frames played and the times it played; the host's: the
+## machine left, and came back.
+var _rejoin: bool = false
+var _rejoin_state: int = 0
+var _playing_frames: int = 0
+var _plays: int = 0
+var _guest_left: bool = false
+var _guest_back: bool = false
 var _play: NetPlayScript
 var _events: EventsScript
 var _frames: FramesScript
@@ -147,6 +165,8 @@ func _ready() -> void:
 			_players = clampi(arg.trim_prefix("--players=").to_int(), 1, Replay.SEATS)
 		elif arg.begins_with("--party="):
 			_party = clampi(arg.trim_prefix("--party=").to_int(), 2, Replay.SEATS)
+		elif arg == "--rejoin":
+			_rejoin = true
 	if _party == 0:
 		_party = mini(_players * 2, Replay.SEATS)
 	_play = get_node_or_null(^"/root/NetPlay") as NetPlayScript
@@ -202,6 +222,9 @@ func _on_room_entered(_room_id: StringName) -> void:
 func _on_stone(_standing: int, wizards: int, lit: bool) -> void:
 	in_hub = wizards > 0
 	_hub_wizards = wizards
+	# With `--rejoin` no run starts until the joining machine has left and come back.
+	if _rejoin and not _guest_back:
+		return
 	if _hosting and lit and wizards == _party and _play.phase == NetPlayScript.PLAYING:
 		_runs += 1
 		_events.run_requested.emit(0)
@@ -258,7 +281,19 @@ func _process(delta: float) -> void:
 ## host leaving once its ticks are played.
 func _process_room() -> void:
 	_seat_walkers()
-	if not _hosting and not _joined:
+	if _play.phase == NetPlayScript.PLAYING:
+		_playing_frames += 1
+	if not _hosting and _rejoin and _rejoin_state == 0 and _play.phase == NetPlayScript.PLAYING and in_hub and _playing_frames >= REJOIN_AFTER:
+		# As the pause menu's "Main menu" sends it.
+		_rejoin_state = 1
+		_events.main_menu_requested.emit(0)
+	elif not _hosting and _rejoin_state == 1:
+		var shown: Node = get_tree().current_scene
+		if _play.phase == NetPlayScript.OFF and shown != null and shown.scene_file_path == MAIN_MENU:
+			# Back in the main menu: the same room's code, typed again.
+			_rejoin_state = 2
+			_events.online_join_requested.emit(0, _handed(ROOM_CODE))
+	elif not _hosting and not _joined:
 		var room_code: String = _handed(ROOM_CODE)
 		if room_code != "":
 			_joined = true
@@ -288,6 +323,12 @@ func _on_online_changed(phase: StringName, code: String, note: String) -> void:
 				if not _handed_room:
 					_handed_room = true
 					_hand(ROOM_CODE, code)
+				elif _hosting:
+					# The joining machine left; the room is open for it again.
+					_guest_left = true
+			NetPlayScript.PLAYING:
+				_plays += 1
+				_guest_back = _guest_back or _guest_left
 			NetPlayScript.FAILED:
 				_finish(note)
 			NetPlayScript.ENDED:
@@ -322,6 +363,8 @@ func _host_leaves() -> void:
 		why = "the client's frames never arrived"
 	elif _signal != "" and _most_seats != _party - _players:
 		why = "the joining machines hold %d seats, not %d" % [_most_seats, _party - _players]
+	elif _rejoin and not _guest_back:
+		why = "the joining machine never came back after it left for the main menu"
 	elif _signal != "" and _runs < _runs_wanted:
 		why = "%d run(s) started from the stone, not %d (%d wizards in the hub)" % [_runs, _runs_wanted, _hub_wizards]
 	if _signal != "":
@@ -341,6 +384,8 @@ func _finish(why: String) -> void:
 			why = "the client's game never ran"
 		elif _signal != "" and _most_seats != _players:
 			why = "this machine held %d seats, not %d" % [_most_seats, _players]
+		elif _rejoin and (_rejoin_state < 2 or _plays < 2):
+			why = "it did not play again after the main menu (step %d, played %d time(s))" % [_rejoin_state, _plays]
 	print("ONLINE %s LINE %s" % [_role(), _last_line])
 	print("ONLINE %s %s" % [_role(), "OK" if why == "" else "FAILED: " + why])
 	get_tree().quit(0 if why == "" else 1)

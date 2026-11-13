@@ -75,6 +75,7 @@ func _initialize() -> void:
 	_test_a_on_the_lit_stone_starts_the_run()
 	_test_a_on_the_altar_asks_to_open_the_room()
 	_test_the_run_ending_closes_it()
+	_test_main_menu_leaves_for_the_main_menu()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: hud/menus pause menu")
@@ -189,7 +190,7 @@ func _test_start_opens_it_and_pauses_everyone() -> void:
 	_check(_menu().is_open() and _menu().visible, "Start opens the pause menu")
 	_check(_menu().owner_player == 1, "for the player who pressed it")
 	_check(_stops, "the game stops for everyone (the command pause_requested)")
-	_check(_names() == ["Resume", "Settings"], "the main page out of the sandbox, got %s" % [_names()])
+	_check(_names() == ["Resume", "Settings", "MainMenu"], "the main page out of the sandbox, got %s" % [_names()])
 	_check(_menu().button("Resume").text.begins_with("> "), "the focus is marked with text")
 
 
@@ -223,7 +224,7 @@ func _test_sandbox_entry_and_actions() -> void:
 	_setup(2, true)
 	_tap(1, &"pause")
 	_frame()
-	_check(_names() == ["Resume", "Sandbox", "Settings"], "in the sandbox the main page has Sandbox, got %s" % [_names()])
+	_check(_names() == ["Resume", "Sandbox", "Settings", "MainMenu"], "in the sandbox the main page has Sandbox, got %s" % [_names()])
 	_press(1, "Sandbox")
 	_check(_names() == ["ResetDummies", "ArenaEnemy", "ArenaCount", "ArenaSpawn", "ArenaClear", "AIView", "RingStyle", "PutStyle", "ReloadStyle", "SandboxBack"], "the sandbox page, got %s" % [_names()])
 	_press(1, "ResetDummies")
@@ -234,7 +235,7 @@ func _test_sandbox_entry_and_actions() -> void:
 	_frame()
 	_check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
 	_bus.sandbox_changed.emit(false)
-	_check(_names() == ["Resume", "Settings"], "out of the sandbox the entry goes")
+	_check(_names() == ["Resume", "Settings", "MainMenu"], "out of the sandbox the entry goes")
 
 
 func _test_the_enemy_arena() -> void:
@@ -810,3 +811,36 @@ func _test_the_run_ending_closes_it() -> void:
 	_frame()
 	_bus.run_ended.emit(false)
 	_check(not _menu().is_open() and not _stops, "a run ending closes the menu and lets the game go")
+
+
+## "Main menu" (online lobby: a machine whose host left joins another room from the menu): the
+## menu closes and lets the game go first, then `main_menu_requested` asks this machine to leave,
+## and the HUD itself shows the main menu again with no panel or menu over it.
+func _test_main_menu_leaves_for_the_main_menu() -> void:
+	_setup(2)
+	var stand_in := PackedScene.new()
+	var made := Node.new()
+	made.name = "MenuStandIn"
+	stand_in.pack(made)
+	made.free()
+	_hud.main_menu = stand_in
+	var heard: Array[String] = []
+	_bus.pause_requested.connect(func(player: int, on: int) -> void: heard.append("pause %d %d" % [player, on]))
+	# Heard before the HUD's own handler (which closes every menu too), so the order is the menu's.
+	var hud_heard := Callable(_hud, &"_on_main_menu_requested")
+	_bus.main_menu_requested.disconnect(hud_heard)
+	_bus.main_menu_requested.connect(func(player: int) -> void: heard.append("menu %d" % player))
+	_bus.main_menu_requested.connect(hud_heard)
+	_tap(1, &"pause")
+	_frame()
+	heard.clear()
+	_press(1, "MainMenu")
+	_check(not _menu().is_open() and not _stops, "Main menu closes the menu and lets the game go")
+	# First: while a replay file plays the menu's closing unpauses the tree itself, which it no
+	# longer does once the replay has ended on the way out.
+	_check(heard == ["pause 1 0", "menu 1"], "first the game is let go, then this machine leaves, got %s" % [heard])
+	var shown: Node = current_scene
+	_check(shown != null and shown.name == "MenuStandIn" and shown.get_parent() == root, "the main menu is the current scene")
+	_check(not _hud.get_panel(0).visible and not _hud.get_panel(1).visible, "and no panel is left over it")
+	if shown != null and shown.name == "MenuStandIn":
+		shown.free()

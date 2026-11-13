@@ -341,3 +341,14 @@ func test_the_world_is_nobodys_foe_and_every_team_is_its() -> void:
 	check(not ActorsScript.is_foe(WORLD, WORLD), "not even the world")
 	check(ActorsScript.is_foe(WORLD, W) and ActorsScript.is_foe(WORLD, E), "the world aims at every other team")
 	check(ActorsScript.is_foe(NONE, W) and ActorsScript.is_foe(W, NONE), "no team: a foe of every team")
+
+
+## A closed body leaves nothing of its own in the table: `still` is state, hashed for every id, so a
+## still prop's flag left on a closed id made a hub played after another hub part from a hub played
+## in a fresh game at tick 0 (found while adding the way back to the main menu, online lobby).
+func test_a_closed_still_body_leaves_no_flag_behind() -> void:
+	var id: int = _open_enemies(1)[0]
+	_actors.set_still(id, true)
+	check(_actors.is_still(id), "a still body is still")
+	_actors.close(id)
+	check_equal(_actors.still[id], 0, "closed, its id is as a fresh table's")

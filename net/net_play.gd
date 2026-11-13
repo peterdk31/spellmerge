@@ -48,6 +48,8 @@ extends Node
 ##    next machine joins a hub begun anew); by hand it is ENDED. The joining machine's replay ends once played out and its game
 ##    goes on alone, its devices where they sat: ENDED. **Given up** before the run
 ##    (`online_leave_requested`) or failed: OFF or FAILED.
+## 5. **Back to the main menu** (`main_menu_requested`, from any phase): everything is let go, as if
+##    this machine had gone: OFF, ready to host or join again.
 ##
 ## **A party takes up to three guest machines** (`NetHost.GUESTS`; L3), each joined to the hub's
 ## recording when it is ready, the others playing on meanwhile; a link past that is closed. A
@@ -170,6 +172,7 @@ func _ready() -> void:
 	events.online_join_requested.connect(_on_join_requested)
 	events.online_answer_requested.connect(_on_answer_requested)
 	events.online_leave_requested.connect(_on_leave_requested)
+	events.main_menu_requested.connect(_on_main_menu_requested)
 	events.loading_started.connect(func() -> void: _loading = true)
 	events.loading_finished.connect(func() -> void: _loading = false)
 	events.hub_changed.connect(func(in_hub: bool) -> void: _in_lobby = in_hub)
@@ -291,7 +294,22 @@ func _on_leave_requested(_player: int) -> void:
 	if phase == PLAYING or phase == ENDED or phase == OFF:
 		return
 	_let_go()
-	code = ""
+	_show(OFF)
+
+
+## This machine goes back to the main menu (`main_menu_requested`), whatever it plays: everything
+## online is let go at once, so the other machines see it leave (its link closes: a guest's seats
+## leave the host's game; a host's guests' replays end, and its room closes), and the machine may
+## host or join again from the menu.
+func _on_main_menu_requested(_player: int) -> void:
+	if phase == OFF:
+		return
+	if phase == PLAYING and session != null:
+		_log.row(_stats().row())
+	_log.close()
+	_let_go()
+	_last_problem = ""
+	events.online_line_changed.emit("")
 	_show(OFF)
 
 
@@ -547,13 +565,14 @@ func _fail(why: String) -> void:
 		# The room's line goes with the room.
 		events.online_line_changed.emit("")
 	_let_go()
-	code = ""
 	_show(FAILED, why.substr(0, 1).to_upper() + why.substr(1) + ".")
 
 
-## The handshake and a session whose run never began are closed, and a joining machine's devices
-## seat themselves again.
+## The handshake and the session are closed, the code and the run recorded forgotten, and a
+## joining machine's devices seat themselves again.
 func _let_go() -> void:
+	code = ""
+	_replay = null
 	if _handshake != null:
 		_handshake.close()
 		_handshake = null

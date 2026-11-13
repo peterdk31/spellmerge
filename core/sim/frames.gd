@@ -65,6 +65,8 @@ extends Node
 ##   one. A replay played from a file ends there and the game goes on by itself; a live replay
 ##   waits for its feed to bring the next recording (`play_live` again, which `begin_step` takes
 ##   in its stride).
+## - **Back to the main menu** (`main_menu_requested`): this machine's own leaving, never a command.
+##   What is recorded or played ends there, and a run asked for by `restart` is forgotten.
 ##
 ## Nothing here allocates per tick, but a command (an array) and a recorded tick (its bytes).
 
@@ -143,6 +145,7 @@ func _ready() -> void:
 	events.device_joined.connect(_on_device_joined)
 	events.device_left.connect(_on_device_left)
 	events.projectile_cap_changed.connect(_on_machine_cap)
+	events.main_menu_requested.connect(_on_main_menu_requested)
 
 
 func _exit_tree() -> void:
@@ -256,6 +259,16 @@ func begin_step(delta: float) -> int:
 			if tape != _tape:
 				return 1
 	return tape.ticks_due()
+
+
+## This machine leaves what it plays for the main menu (`main_menu_requested`): what it records or
+## plays ends, and a run the game asked for and not yet begun (`restart`) never begins. The seats'
+## commands still waiting are kept: the pause menu's own closing is one, and the game must not stay
+## stopped under the menu.
+func _on_main_menu_requested(_player: int) -> void:
+	_restart = []
+	stop_recording()
+	stop_playing()
 
 
 ## The game asks for a run's start itself (one of `Replay.STARTS`, for seat `starter`): sent at

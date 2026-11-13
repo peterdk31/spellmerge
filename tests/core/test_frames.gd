@@ -380,3 +380,28 @@ func _frames_bytes() -> PackedByteArray:
 	for seat in 4:
 		_frames.frame_of(seat).encode_into(out)
 	return out
+
+
+## Back to the main menu (`main_menu_requested`, this machine's own leaving): what is recorded or
+## played ends, a run the game asked for (`restart`) never starts, and a command still waiting (the
+## pause menu's own closing) still applies, so the game is not left stopped under the menu.
+func test_back_to_the_menu_ends_the_recording_and_the_replay_and_forgets_a_restart() -> void:
+	var starts: Array = []
+	_bus.hub_requested.connect(func(seat: int) -> void: starts.append(seat))
+	_input.add_virtual_device(0)
+	var replay: Replay = _frames.record(&"hub_requested", 0)
+	for i in 4:
+		_frames.tick(DT)
+	_frames.restart(&"hub_requested", 0)
+	_bus.pause_requested.emit(0, 0)
+	var paused: Array = []
+	_bus.listen(&"pause_requested", func(seat: int, on: int) -> void: paused.append([seat, on]))
+	_bus.main_menu_requested.emit(0)
+	check(not _frames.is_recording() and replay.tick_count() == 4, "the recording ended where it was")
+	_frames.begin_step(DT)
+	_frames.tick(DT)
+	check_equal(starts, [0], "the run asked for again never starts")
+	check_equal(paused, [[0, 0]], "the waiting command still applies")
+	check(_frames.play(replay), "a replay plays")
+	_bus.main_menu_requested.emit(0)
+	check(not _frames.is_playing(), "and ends at once on the way back to the menu")

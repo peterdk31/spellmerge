@@ -665,9 +665,15 @@ func _ready() -> void:
 	_numbers.events = events
 	_numbers.registry = registry
 	add_child(_numbers)
+	# On a layer of its own over the HUD's, following the camera (world space).
+	var marker_layer := CanvasLayer.new()
+	marker_layer.name = "TeammateMarkerLayer"
+	marker_layer.layer = TeammateMarkersScript.LAYER
+	marker_layer.follow_viewport_enabled = true
+	add_child(marker_layer)
 	_markers = TeammateMarkersScript.new()
 	_markers.name = "TeammateMarkers"
-	add_child(_markers)
+	marker_layer.add_child(_markers)
 	_altar_code = AltarCodeScript.new()
 	_altar_code.name = "AltarCode"
 	add_child(_altar_code)

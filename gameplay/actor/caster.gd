@@ -1,8 +1,10 @@
 class_name Caster
 extends ActorComponent
 ## The caster (actors G4, docs/milestones/M2-actors.md, "The components"): an actor's staffs and
-## mana. It holds 1-4 staffs (`staff_count`), each a `StaffBase` (`staffs`, one per button; a
-## button without one is `staff`) and a row of card ids; `set_staff(at, cards)` builds one and
+## mana. It has 1-4 buttons (`staff_count`, a wizard's hands), each a `StaffBase` (`staffs`, one per
+## button; a button without one is `staff`) and a row of card ids, or none: an empty hand
+## (`empty_hands`, items I2) holds no staff, no cards and no mana, casts nothing and is never put
+## on show while another hand holds a staff (`holds`). `set_staff(at, cards)` builds one and
 ## installs it in `Spells` under the actor's caster number (`number`). `current` is the staff on
 ## show (living staffs H3): the one pressed or held last, set before it casts, so the cast leaves
 ## from that staff's tip (`tip`, `Actor.muzzle_position`); a change sends `staff_shown` (living
@@ -58,6 +60,10 @@ signal staff_built(at: int)
 @export var staffs: Array[StaffBase] = []
 ## The card ids built into each staff when the actor is ready (a list per staff).
 @export var start_cards: Array = []
+## The buttons that hold no staff (a bit each, 1 << button): an empty hand (items I2). Set before
+## the actor is ready (`PlayerController.seat_wizard`); a staff is put on a hand by the inventory
+## later (items I3).
+var empty_hands: int = 0
 ## The staff on show: the one pressed or held last (0 at the start).
 var current: int = 0
 ## The number the actor casts under in Spells (and is the anchor of in the projectile manager),
@@ -122,7 +128,13 @@ func attach() -> void:
 	own_hurtbox()
 	if not _built:
 		_built = true
+		if not holds(current):
+			current = first_held()
 		for at in staff_count:
+			if not holds(at):
+				# An empty hand is announced too: its plan is empty (`plan_of`).
+				staff_built.emit(at)
+				continue
 			var cards: Array[StringName] = []
 			if at < start_cards.size() and start_cards[at] is Array:
 				for id: Variant in start_cards[at]:
@@ -158,6 +170,8 @@ func step(delta: float) -> void:
 		_placed_feet = Vector2.INF
 		return
 	for at in staff_count:
+		if not holds(at):
+			continue
 		var base: StaffBase = staff_of(at)
 		_mana[at] = minf(_mana[at] + base.mana_regen * delta, base.max_mana)
 	if actor.global_position != _placed_feet or actor.aim != _placed_aim or current != _placed_current:
@@ -172,8 +186,9 @@ func step(delta: float) -> void:
 		return
 	for at in staff_count:
 		if _has_build[at] == 0:
-			# An empty staff casts nothing, but pressing it still puts it on show.
-			if intent.is_pressed(at):
+			# An empty staff casts nothing, but pressing it still puts it on show; an empty hand
+			# has nothing to show.
+			if intent.is_pressed(at) and holds(at):
 				_show(at)
 			continue
 		# A held button casts whenever the staff is ready, except while it holds a sustained card:
@@ -276,9 +291,9 @@ func mana_of(at: int) -> float:
 	return _mana[at] if at >= 0 and at < _mana.size() else 0.0
 
 
-## The most mana staff `at` holds: its staff's pool.
+## The most mana staff `at` holds: its staff's pool (0 for an empty hand).
 func max_mana_of(at: int) -> float:
-	return staff_of(at).max_mana
+	return staff_of(at).max_mana if holds(at) else 0.0
 
 
 ## Set the mana staff `at` holds, kept within 0 and its maximum (tests, a sandbox refill).
@@ -291,6 +306,19 @@ func set_mana(at: int, value: float) -> void:
 func free_mana(at: int) -> float:
 	var reserved: float = actor.spells.reserved_mana(number, at) if actor.spells != null and number >= 0 else 0.0
 	return maxf(mana_of(at) - reserved, 0.0)
+
+
+## True when button `at` exists and holds a staff (not an empty hand), whatever its cards.
+func holds(at: int) -> bool:
+	return at >= 0 and at < staff_count and empty_hands & (1 << at) == 0
+
+
+## The first button that holds a staff, or 0 when every hand is empty.
+func first_held() -> int:
+	for at in staff_count:
+		if holds(at):
+			return at
+	return 0
 
 
 ## True when staff `at` has a build that can cast.
@@ -330,14 +358,14 @@ func is_holding(at: int) -> bool:
 ## The card ids of staff `at` as a copy, one per slot (`&""` for an empty slot).
 func cards_of(at: int) -> Array[StringName]:
 	var out: Array[StringName] = []
-	if at >= 0 and at < staff_count:
+	if holds(at):
 		out.assign(_cards[at])
 	return out
 
 
-## How many slots staff `at` has.
+## How many slots staff `at` has (0 for an empty hand).
 func slot_count(at: int = 0) -> int:
-	return staff_of(at).slots
+	return staff_of(at).slots if holds(at) else 0
 
 
 ## The staff of button `at`: its own in `staffs`, else `staff`, else a plain one of 4 slots.
@@ -366,9 +394,10 @@ func _show(at: int) -> void:
 		actor.events.staff_shown.emit(actor.id, actor, at)
 
 
-## The plain view of staff `at` for a builder (`Spells.staff_view`); empty without Spells.
+## The plain view of staff `at` for a builder (`Spells.staff_view`); empty without Spells and for
+## an empty hand.
 func plan_of(at: int) -> Dictionary:
-	if actor.spells == null or at < 0 or at >= staff_count:
+	if actor.spells == null or not holds(at):
 		return {}
 	return actor.spells.staff_view(cards_of(at), staff_of(at))
 
@@ -397,9 +426,9 @@ func hold_staffs(entries: Array[StaffCards]) -> void:
 ## Build `cards` (card ids by slot) into staff `at`: cut or padded to the staff's slots, compiled
 ## (once per staff and cards, for every caster) and installed in Spells; `staff_built` follows.
 ## Nothing is refused for what the cards do; an empty staff casts nothing. Returns false only for
-## a staff that does not exist.
+## a staff that does not exist (no such button, or an empty hand).
 func set_staff(at: int, cards: Array[StringName]) -> bool:
-	if at < 0 or at >= staff_count:
+	if not holds(at):
 		return false
 	var row: Array[StringName] = []
 	for slot in slot_count(at):
@@ -411,9 +440,9 @@ func set_staff(at: int, cards: Array[StringName]) -> bool:
 	return true
 
 
-## Hold `new_staffs` (1-4, one per button) with `new_cards` (card ids by slot, per staff) instead
-## of the staffs it held: a boss's phase (`Phases`). Each pool starts full; a button it no longer
-## has is emptied (its sustained cards end). `staff_built` follows for each.
+## Hold `new_staffs` (1-4, one per button; a null one an empty hand) with `new_cards` (card ids by
+## slot, per staff) instead of the staffs it held: a boss's phase (`Phases`). Each pool starts full;
+## a button it no longer has is emptied (its sustained cards end). `staff_built` follows for each.
 func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 	if new_staffs.is_empty():
 		return
@@ -422,6 +451,12 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 	staffs = new_staffs.duplicate()
 	staff = staffs[0]
 	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)
+	empty_hands = 0
+	for at in staff_count:
+		if staffs[at] == null:
+			empty_hands |= 1 << at
+	if not holds(current):
+		_show(first_held())
 	for at in MAX_STAFFS:
 		_mana[at] = max_mana_of(at)
 	for at in maxi(before, staff_count):

@@ -33,10 +33,10 @@ extends Node
 ## new wizard builds its start staffs again).
 ##
 ## Staffs (staffs A6a, docs/milestones/M2-staffs.md; living staffs H3; owner 2026-11-01: one
-## staff file per setup, used as it is): every wizard gets the four staffs of its run's mode
+## staff file per setup, used as it is): every wizard gets the hands of its run's mode
 ## (`staffs_for_mode`), straight from the registry under `wizard`, never copied or changed: in
-## Play the four basic staffs STARTER_HEADS (`content/wizard/staffs/`, one per
-## button, each its own head), in the sandbox four times the `dev` staff (DEV_STAFF: 20 slots,
+## Play and the hub the first two basic staffs of STARTER_HEADS on RB and RT (`content/wizard/staffs/`,
+## each its own head; START_HANDS, items I2: the other two hands empty), in the sandbox four times the `dev` staff (DEV_STAFF: 20 slots,
 ## no delay, practically infinite mana). The build channel plays no part. With them the mode's
 ## cards (`start_cards_for_mode`; Play's `start_cards`: A `dash`, X `bolt`, Y and B empty),
 ## which the wizard builds itself; flow never touches a spell.
@@ -82,8 +82,8 @@ extends Node
 ## and are hurt by hits as anywhere, but a wizard downed there stands up by itself at full health
 ## `RoomBase.stand_up_after` seconds later (owner, 2026-11-13: duels between parties and test builds
 ## without consequences), and everyone down restarts nothing. Its wizards
-## have Play's staffs, but the `dev` staff on RT (HUB_DEV_BUTTON, owner 2026-11-13: to try bigger
-## spells for now), Play's start cards, and every card in the bag (above). Its teleporter stone (a
+## have Play's staffs (two, RB and RT: START_HANDS; items I2 took the `dev` staff off RT, the
+## rack of items I6 replaces it), Play's start cards, and every card in the bag (above). Its teleporter stone (a
 ## prop of the role `run_start`, stood on where its area is) is lit while every wizard stands on it:
 ## counted each tick and whenever a wizard joins or leaves (`hub`, `HubRules`), told by
 ## `start_stone_changed`, the stone asked to enter `lit` or `unlit` to match, so its look and cue
@@ -176,9 +176,10 @@ const ACTION_CLEAR_ENEMIES: StringName = &"clear_enemies"
 ## button (RB, RT, LB, LT), by id under `wizard`.
 const DEV_STAFF: StringName = &"dev"
 const STARTER_HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
-## The button the hub's wizards hold the `dev` staff on instead of its basic staff: RT (owner,
-## 2026-11-13: to try bigger spells for now). A run from the stone takes it along, as every staff.
-const HUB_DEV_BUTTON: int = 1
+## How many of STARTER_HEADS a wizard of Play and the hub holds, from RB on: two, RB and RT; the
+## other hands are empty (items I2, owner 2026-11-13: players start with two staffs). The sandbox
+## holds the `dev` staff on every hand.
+const START_HANDS: int = 2
 ## The wave, sized for four players: one enemy per entry, placed at the room's
 ## enemy spawn with that index (wrapped if the room has fewer). An index used
 ## again puts the enemy a step further along the diagonal.
@@ -1078,20 +1079,22 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 	return ok
 
 
-## The four staffs a wizard of this run's `mode` holds, by button, as the registry has them:
-## the sandbox's the `dev` staff on every button, Play's the four basic staffs
-## (STARTER_HEADS), the hub's Play's with the `dev` staff on RT (HUB_DEV_BUTTON). Empty when one is
-## missing.
+## The four hands of a wizard of this run's `mode`, by button, as the registry has their staffs:
+## the sandbox's the `dev` staff on every button, Play's and the hub's the first START_HANDS basic
+## staffs (STARTER_HEADS) and null for an empty hand after them. Empty when one is missing.
 func staffs_for_mode() -> Array[StaffBase]:
-	var ids: Array[StringName] = STARTER_HEADS.duplicate()
+	var ids: Array[StringName] = []
+	for at in STARTER_HEADS.size():
+		ids.append(STARTER_HEADS[at] if at < START_HANDS else &"")
 	if mode == MODE_SANDBOX:
 		ids = [DEV_STAFF, DEV_STAFF, DEV_STAFF, DEV_STAFF]
-	elif mode == MODE_HUB:
-		ids[HUB_DEV_BUTTON] = DEV_STAFF
 	var out: Array[StaffBase] = []
 	if registry == null:
 		return out
 	for id in ids:
+		if id == &"":
+			out.append(null)
+			continue
 		var staff: StaffBase = registry.get_resource(&"wizard", id) as StaffBase
 		if staff == null:
 			out.clear()
@@ -1100,10 +1103,10 @@ func staffs_for_mode() -> Array[StaffBase]:
 	return out
 
 
-## The four staffs a wizard holds that comes with the staffs of the ids `ids` (by button, as
+## The four hands of a wizard that comes with the staffs of the ids `ids` (by button, as
 ## `_heads_by_seat` makes them): each button the staff of its id under `wizard`, or, where there is
-## none, it is empty or no staff has it, the mode's (`staffs_for_mode`). Empty when the mode's is
-## missing.
+## none, it is empty or no staff has it, the mode's (`staffs_for_mode`; null: an empty hand, as an
+## empty hand carried from the hub stays). Empty when the mode's is missing.
 func staffs_for_seat(ids: Array) -> Array[StaffBase]:
 	var out: Array[StaffBase] = staffs_for_mode()
 	if registry == null:

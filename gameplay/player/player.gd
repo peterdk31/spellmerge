@@ -61,6 +61,8 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const INPUT_BUFFER: float = 0.15
 ## The four staff buttons (0 RB, 1 RT, 2 LB, 3 LT; owner, 2026-10-26).
 const STAFF_COUNT: int = 4
+## Why the builder's request for a hand with no staff on it is refused (`build_refused`).
+const EMPTY_HAND: String = "That hand holds no staff."
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"
 
@@ -120,9 +122,9 @@ func _ready() -> void:
 
 ## Get `body` (a wizard scene, not yet in the tree) ready for seat `seat_index`: its controller's
 ## seat, its ramp (the seat's colour), its four staffs (`staff` for every button, or `staffs`,
-## one per button: the four heads; and `cards`: four lists of card ids, built when it enters the
-## tree) and its `bag` (the run mode's, `set_bag`; empty: every card of the registry). Returns its
-## controller, or null when `body` has none.
+## one per button: the four heads, a null one an empty hand (items I2); and `cards`: four lists of
+## card ids, built when it enters the tree) and its `bag` (the run mode's, `set_bag`; empty: every
+## card of the registry). Returns its controller, or null when `body` has none.
 static func seat_wizard(body: Actor, seat_index: int, staff: StaffBase, cards: Array, staffs: Array[StaffBase] = [], bag: Array[StringName] = []) -> PlayerController:
 	var controller: PlayerController = of(body)
 	if controller == null:
@@ -133,10 +135,24 @@ static func seat_wizard(body: Actor, seat_index: int, staff: StaffBase, cards: A
 	body.ramp = seat_index
 	for child in body.get_children():
 		if child is Caster:
-			(child as Caster).staff = staff
-			(child as Caster).staffs = staffs
-			(child as Caster).start_cards = cards
+			var caster := child as Caster
+			caster.staff = staff
+			caster.staffs = staffs
+			caster.start_cards = cards
+			caster.empty_hands = _empty_hands(staffs)
 	return controller
+
+
+## The empty hands of `staffs` (one per button), a bit each: a null entry, or a button past its
+## end. None when `staffs` is empty (then `staff` is on every button).
+static func _empty_hands(staffs: Array[StaffBase]) -> int:
+	if staffs.is_empty():
+		return 0
+	var bits: int = 0
+	for at in STAFF_COUNT:
+		if at >= staffs.size() or staffs[at] == null:
+			bits |= 1 << at
+	return bits
 
 
 ## The cards `body`'s staffs hold now, by staff, each a list of card ids by slot (`&""` for an
@@ -152,7 +168,8 @@ static func staff_cards(body: Actor) -> Array:
 	return out
 
 
-## The id of each staff `body` holds now, by button (`&""` for one with no id): what Flow gives a
+## The id of each staff `body` holds now, by button (`&""` for one with no id, and for an empty
+## hand: the run's own, which a run from the hub has empty too): what Flow gives a
 ## wizard made again as its staffs (`Flow.staffs_for_seat`), so it keeps the staffs themselves
 ## beside their cards (`staff_cards`; owner, 2026-11-13). Empty for a body with no Caster.
 static func staff_ids(body: Actor) -> Array[StringName]:
@@ -161,7 +178,7 @@ static func staff_ids(body: Actor) -> Array[StringName]:
 	if caster == null:
 		return out
 	for at in caster.staff_count:
-		var held: StaffBase = caster.staff_of(at)
+		var held: StaffBase = caster.staff_of(at) if caster.holds(at) else null
 		out.append(held.id if held != null else &"")
 	return out
 
@@ -418,6 +435,9 @@ func _on_staff_change_requested(player: int, at: int, slot: int, card_id: String
 	if player != seat:
 		return
 	var caster: Caster = _builder_caster()
+	if caster != null and caster.staff_count > at and at >= 0 and not caster.holds(at):
+		_refuse(EMPTY_HAND)
+		return
 	if caster == null or at < 0 or at >= caster.staff_count or slot < 0 or slot >= caster.slot_count(at):
 		_refuse("There is no such slot.")
 		return
@@ -436,6 +456,9 @@ func _on_staff_cards_requested(player: int, at: int, cards: Array[StringName]) -
 	if player != seat:
 		return
 	var caster: Caster = _builder_caster()
+	if caster != null and caster.staff_count > at and at >= 0 and not caster.holds(at):
+		_refuse(EMPTY_HAND)
+		return
 	if caster == null or at < 0 or at >= caster.staff_count or cards.size() > caster.slot_count(at):
 		_refuse("There is no such slot.")
 		return

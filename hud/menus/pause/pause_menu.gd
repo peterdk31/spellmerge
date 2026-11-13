@@ -5,9 +5,11 @@ extends PanelContainer
 ## (node Root/PauseMenu); it sits in the middle of the view.
 ##
 ## Pages, one list of buttons each:
-## - **Main:** Resume, Sandbox (only while the run is a sandbox, `sandbox_changed`), Settings, Main
-##   menu (`main_menu_requested`: this machine leaves the run, online too, and the main menu shows
-##   again; the menu closes first).
+## - **Main:** Resume, Sandbox (only while the run is a sandbox, `sandbox_changed`), Settings, Leave
+##   game (`seat_leave_requested`: the seat that opened the menu lets its device go and its wizard
+##   leaves, at its tick on every machine; the others play on; items I2, in place of the `leave`
+##   action; the menu closes first), Main menu (`main_menu_requested`: this machine leaves the run,
+##   online too, and the main menu shows again; the menu closes first).
 ## - **Sandbox** (staffs B7): Reset dummies (`sandbox_action_requested(player, reset_dummies)`;
 ##   it stays on the page); the enemy arena (enemy AI AI8): "Enemy: <name>" (every enemy in the registry, by its
 ##   `shown_name()`; left and right or `accept` step through them), "Count: 1" (1-8, the same
@@ -199,6 +201,7 @@ var ai_view: bool = false
 @onready var _resume: Button = _add(Page.MAIN, "Resume", "Resume")
 @onready var _sandbox: Button = _add(Page.MAIN, "Sandbox", "Sandbox")
 @onready var _settings: Button = _add(Page.MAIN, "Settings", "Settings")
+@onready var _leave: Button = _add(Page.MAIN, "LeaveGame", "Leave game")
 @onready var _main_menu: Button = _add(Page.MAIN, "MainMenu", "Main menu")
 @onready var _reset: Button = _add(Page.SANDBOX, "ResetDummies", "Reset dummies")
 @onready var _arena_enemy: Button = _add(Page.SANDBOX, "ArenaEnemy", ENEMY_TEXT % "-")
@@ -512,6 +515,11 @@ func _on_activated(player: int, control: Control) -> void:
 		_go(Page.SANDBOX)
 	elif control == _settings:
 		_go(Page.SETTINGS)
+	elif control == _leave:
+		# Closed first, so the game is let go before the seat leaves it.
+		close_menu()
+		if _events != null:
+			_events.seat_leave_requested.emit(player)
 	elif control == _main_menu:
 		# Closed first, so the game is let go before this machine leaves it.
 		close_menu()

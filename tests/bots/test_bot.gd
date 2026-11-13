@@ -104,8 +104,8 @@ func _test_builder_walk() -> void:
 	bot.leave()
 
 
-## With a wizard, `build_random` sends one `staff_change_requested` per slot of staff 3, all for
-## its own player, and the wizard's staff 3 holds the cards the bot chose from the next tick on
+## With a wizard, `build_random` sends one `staff_change_requested` per slot of staff 1, all for
+## its own player, and the wizard's staff 1 holds the cards the bot chose from the next tick on
 ## (a command applies at the tick's start).
 func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	var builds: Array = []
@@ -122,8 +122,8 @@ func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	var own: bool = true
 	for entry: Array in builds:
 		own = own and entry[0] == 0 and entry[1] == BotScript.BUILD_STAFF
-	_check(own, "all build calls are for the bot's own player and staff 3")
-	_check(caster.cards_of(BotScript.BUILD_STAFF) == bot.built_cards, "staff 3 holds what the bot built")
+	_check(own, "all build calls are for the bot's own player and staff 1")
+	_check(caster.cards_of(BotScript.BUILD_STAFF) == bot.built_cards, "staff 1 holds what the bot built")
 	_check(caster.has_staff(BotScript.BUILD_STAFF), "and it can cast")
 
 

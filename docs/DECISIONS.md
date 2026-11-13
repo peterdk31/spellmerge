@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-13: hands that can be empty (items I2)
+
+- **An empty hand is a bit on the caster** (`Caster.empty_hands`), not a null staff in `Caster.staffs`: a null entry there already means "the `staff` of every button" for enemies and props, so a second meaning would change them. The inventory (I3) will hand the caster its staffs and set the bits.
+- **An empty hand is never on show** while a staff is held: pressing it does nothing, so the look always shows a staff the wizard holds. With every hand empty the look shows the plain staff.
+- **No change to the replay's header in I2:** an empty hand carries `&""`, the run's own staff, which in Play and the hub is empty on LB and LT too. A hand emptied by a player (I7) needs its own mark, which the player record (I4) gives.
+- **"Leave game" is a device-layer request,** not a command: the input layer lets the device go as an unplugged pad, and its `device_left` puts the seat's LEAVE in its next frame, the path every machine and a replay already follow.
+- **The hub's dev staff on RT goes** (2026-11-13 below): players start with two staffs; the rack (I6) replaces it.
+
 ## 2026-11-13: items, bags and pickups (owner decisions; docs/milestones/items.md)
 
 - **Now:** a plan, docs/milestones/items.md (I1 to I9), written with the owner over several rounds; nothing built yet.

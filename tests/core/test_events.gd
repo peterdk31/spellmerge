@@ -20,6 +20,7 @@ const EVENTS: Dictionary = {
 	&"sandbox_requested": [["player", TYPE_INT]],
 	&"hub_requested": [["player", TYPE_INT]],
 	&"main_menu_requested": [["player", TYPE_INT]],
+	&"seat_leave_requested": [["player", TYPE_INT]],
 	&"run_requested": [["player", TYPE_INT]],
 	&"effect_slots_changed": [["slots", TYPE_INT]],
 	&"screen_shake_changed": [["enabled", TYPE_BOOL]],

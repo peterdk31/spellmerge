@@ -133,6 +133,16 @@ func _test_room_places() -> void:
 	art.add_child(Sprite2D.new())
 	layout.add_child(art)
 	_check(RoomPlaces.read(layout).problems().size() == 2, "turned or mirrored art with no place under it is free: %s" % RoomPlaces.read(layout).problems())
+	# The room starts at (0, 0) (the world draws its bodies by their feet, the layout as one piece at
+	# its own place): a moved root is a problem, and so is a place above or left of the corner.
+	layout.position = Vector2(0, 40)
+	_check(RoomPlaces.read(layout).problems().size() == 3, "a moved root is named: %s" % RoomPlaces.read(layout).problems())
+	layout.position = Vector2.ZERO
+	piece.position = Vector2(200, -30)
+	_check(RoomPlaces.read(layout).problems().size() == 4, "a spawn and a placement above the corner, each named: %s" % RoomPlaces.read(layout).problems())
+	piece.position = Vector2(-220, 0)
+	_check(RoomPlaces.read(layout).problems().size() == 4, "and left of it: %s" % RoomPlaces.read(layout).problems())
+	piece.position = Vector2(200, 0)
 	RoomPlaces.strip(layout)
 	_check(layout.find_children("*", "RoomPlacement", true, false).is_empty() and not is_instance_valid(deep), "every placement taken out, at any depth")
 	_check(layout.find_children("*", "RoomZone", true, false).is_empty(), "every zone taken out")

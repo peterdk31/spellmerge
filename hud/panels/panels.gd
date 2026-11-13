@@ -53,6 +53,9 @@ extends CanvasLayer
 ## - The online line (`hud/widgets/online_line.gd`, node Root/OnlineLine, made here; netcode spike
 ##   S4): what playing with other machines has to say, at the top middle (`online_changed`'s
 ##   reason and the line of `online_line_changed`, worded by `hud/widgets/online_words.gd`).
+## - A seat played on another machine says so on its corner panel (online-lobby L5c): while this
+##   machine plays with others (`online_changed`), a joined seat with no real device of this
+##   machine on it (`core/input`) shows ONLINE (`PlayerPanel.set_online`, `poll`).
 ## - The stone line (`hud/widgets/stone_line.gd`, node Root/StoneLine, made here; online-lobby L1):
 ##   in the hub, how many wizards stand on the teleporter stone, or that A starts the run, at the
 ##   top middle under the online line (`start_stone_changed`). While the stone is lit, a player's
@@ -120,6 +123,8 @@ var _seen_start: Array[int] = [0, 0, 0, 0]
 var _stone_lit: bool = false
 ## The seats whose wizards stand on the hub's multiplayer altar (`altar_changed`), a bit each.
 var _altar_seats: int = 0
+## Whether this machine plays with others now (`online_changed`): only then is a seat marked.
+var _online: bool = false
 var _had_menu: Array[bool] = [false, false, false, false]
 ## A wave is in progress (the wave line shows).
 var _wave_active: bool = false
@@ -272,6 +277,7 @@ func _ready() -> void:
 		events.room_entered.connect(_on_room_entered)
 		events.start_stone_changed.connect(_on_start_stone_changed)
 		events.altar_changed.connect(func(seats: int) -> void: _altar_seats = seats)
+		events.online_changed.connect(_on_online_changed)
 		events.wave_started.connect(_on_wave_started)
 		events.room_cleared.connect(_on_room_cleared)
 		events.build_break_started.connect(_on_build_break_started)
@@ -338,6 +344,22 @@ func poll() -> void:
 					and not _pause_menu.is_open() and not _panels[player].is_downed():
 				_radials[player].open_builder()
 		_had_menu[player] = _has_menu(player)
+		# A seat in the game with no device of this machine on it is played on another one. Asked
+		# of the input layer each frame: a device handed over or mirrored sends no event.
+		_panels[player].set_online(_online and _joined[player] and not _plays_here(player))
+
+
+## Whether seat `player` is played on this machine: a real device sits on it (another machine's
+## seat is a virtual device here, as a bot's is; `core/input`).
+func _plays_here(player: int) -> bool:
+	return input.is_joined(player) and not InputManagerScript.is_virtual(input.device_of(player))
+
+
+## Playing with other machines began or ended (`online_changed`): the seats are marked only while
+## it lasts (a room open or a run played), so offline a bot's or a recording's seat is not called
+## online.
+func _on_online_changed(phase: StringName, _code: String, _reason: StringName, _facts: Dictionary) -> void:
+	_online = phase == EventsScript.ONLINE_CODE or phase == EventsScript.ONLINE_LINKED or phase == EventsScript.ONLINE_PLAYING
 
 
 ## Whether `player` has a menu open: their builder, or the pause menu they work.

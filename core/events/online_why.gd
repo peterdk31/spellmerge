@@ -134,3 +134,19 @@ const LINE_CATCHING_UP: StringName = &"catching_up"
 ## hashed them; a joining machine was told them over the wire, so its line has none).
 const LINE_PARTED_TICK: StringName = &"parted_tick"
 const LINE_PARTED_AREAS: StringName = &"parted_areas"
+
+
+## The most characters of a room's code shown (a room's code is short; nothing longer is one).
+const MAX_ROOM_CHARS: int = 16
+
+
+## A room's code as it may be shown on the screen: text, short, letters and digits only; "" for
+## anything else (a machine's own long code by hand, something that is no text).
+static func room_code(fact: Variant) -> String:
+	if not (fact is String) or (fact as String).length() > MAX_ROOM_CHARS:
+		return ""
+	for at in (fact as String).length():
+		var c: int = (fact as String).unicode_at(at)
+		if not ((c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122)):
+			return ""
+	return fact

@@ -11,6 +11,28 @@ script = ExtResource("1_panel")
 layout_mode = 2
 theme_override_constants/separation = 1
 
+[node name="SeatRow" type="Control" parent="Rows"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 7)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Seat" type="Label" parent="Rows/SeatRow"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 8
+text = "ONLINE"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="Health" type="HBoxContainer" parent="Rows"]
 layout_mode = 2
 

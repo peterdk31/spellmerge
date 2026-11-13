@@ -63,8 +63,6 @@ const CAUSES: Dictionary[StringName, String] = {
 }
 ## NO_LINK, when this machine's code was made before its address from outside had come.
 const LATE: String = "This machine's address as seen from outside came too late for its code, or never; trying again may do."
-## The most characters of a room's code shown (a room's code is short; nothing longer is one).
-const MAX_ROOM_CHARS: int = 16
 
 
 ## The sentence for `reason` with its `facts`; "" for no reason.
@@ -132,12 +130,6 @@ static func _number(fact: Variant) -> int:
 	return fact if fact is int else 0
 
 
-## A room's code as it may be shown: text, short, letters and digits only.
+## A room's code as it may be shown (`OnlineWhy.room_code`).
 static func _room(fact: Variant) -> String:
-	if not (fact is String) or (fact as String).length() > MAX_ROOM_CHARS:
-		return ""
-	for at in (fact as String).length():
-		var c: int = (fact as String).unicode_at(at)
-		if not ((c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122)):
-			return ""
-	return fact
+	return OnlineWhy.room_code(fact)

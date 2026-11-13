@@ -125,7 +125,7 @@ const ONLINE_ENDED: StringName = &"ended"
 const ONLINE_FAILED: StringName = &"failed"
 ## Sender: net. Where Host or Join stands: `phase` is `&"off"` (nothing asked, or given up), `&"making"` (this machine's code is being made), `&"code"` (`code` is this machine's code, for the other player), `&"linking"` (both codes given, the machines look for each other), `&"linked"` (they found each other; the run starts in a moment), `&"playing"` (the run plays), `&"ended"` (the other machine left a run that played) or `&"failed"`. `reason` says why, as one of `OnlineWhy`'s names (`core/events/online_why.gd`; `&""`: nothing to say), with its few `facts` (numbers, yes or no, names, a room's code): why it failed, why a code was refused, who left. Never a sentence: net names it and the HUD alone words it (online-lobby L5b), so another way to link machines says the same names. Heard by hud (the main menu, the online line).
 signal online_changed(phase: StringName, code: String, reason: StringName, facts: Dictionary)
-## Sender: net. The line about the run played online, about once a second while it plays: `facts` say what stands (`OnlineWhy`'s `LINE_` keys: an open room's code and the machines in it, catching up, the machines' games parted), worded by the HUD; `counters` is the run's counters in a developer's shorthand, shown as it is. Both empty clears the line. Heard by hud.
+## Sender: net. The line about the run played online, about once a second while it plays: `facts` say what stands (`OnlineWhy`'s `LINE_` keys: an open room's code and the machines in it, catching up, the machines' games parted), worded by the HUD; `counters` is the run's counters in a developer's shorthand, shown as it is. Both empty clears the line. Heard by hud, and by feel (the open room's code, drawn over the hub's altar).
 signal online_line_changed(facts: Dictionary, counters: String)
 
 # --- Devices (sender: core/input) -------------------------------------------
@@ -294,6 +294,8 @@ signal start_stone_changed(standing: int, wizards: int, lit: bool)
 signal hub_changed(in_hub: bool)
 ## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (a prop of the role `party_altar`, where its area is), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).
 signal altar_changed(seats: int)
+## Sender: flow. In the hub: whether a multiplayer altar stands (`standing`), and `at`, the top middle of the first one's area in room pixels (where something drawn over it sits). Sent as it changes; (false, zero) when the hub is left. For the view only. Heard by feel (the room's code drawn over the altar, online-lobby L5c).
+signal altar_placed(standing: bool, at: Vector2)
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
 signal wave_started(wave: int)
 ## Sender: flow. The build break between waves began and lasts `seconds`; the next wave starts when it ends, whoever is building. Follows `room_cleared`; `wave_started` ends it.

@@ -51,7 +51,8 @@ extends CanvasLayer
 ##   Root/PauseMenu), which stops the game for everyone and is worked by the player who opened
 ##   it. Another player's `pause` does nothing while it is open.
 ## - The online line (`hud/widgets/online_line.gd`, node Root/OnlineLine, made here; netcode spike
-##   S4): the text of `online_line_changed` at the top middle while a run is played online.
+##   S4): what playing with other machines has to say, at the top middle (`online_changed`'s
+##   reason and the line of `online_line_changed`, worded by `hud/widgets/online_words.gd`).
 ## - The stone line (`hud/widgets/stone_line.gd`, node Root/StoneLine, made here; online-lobby L1):
 ##   in the hub, how many wizards stand on the teleporter stone, or that A starts the run, at the
 ##   top middle under the online line (`start_stone_changed`). While the stone is lit, a player's

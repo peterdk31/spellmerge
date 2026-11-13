@@ -5,6 +5,7 @@ extends "res://tests/support/suite.gd"
 ## shows only what `online_changed` says: this machine's code with Copy, the box for the other
 ## player's code while one is wanted, and a line of words. It names nothing of a network.
 
+const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 const MenuScene: PackedScene = preload("res://hud/menus/main_menu/main_menu.tscn")
 const EventsScript := preload("res://core/events/events.gd")
 const MENU_SCRIPT: String = "res://hud/menus/main_menu/main_menu.gd"
@@ -47,7 +48,7 @@ func test_host_and_join_are_there_and_the_box_is_closed() -> void:
 	check(_button("Host").is_visible_in_tree() and _button("Join").is_visible_in_tree(), "Host and Join show")
 	check(not _shown("Online"), "the online box is closed")
 	check_equal(_sent, [], "nothing is asked of anyone before a press")
-	_bus.online_changed.emit(&"code", "a code", "")
+	_bus.online_changed.emit(&"code", "a code", &"", {})
 	check(not _shown("Online"), "and what net/ says to a closed box opens nothing")
 
 
@@ -55,9 +56,9 @@ func test_host_asks_for_a_code_shows_it_and_passes_the_answer_on() -> void:
 	_button("Host").pressed.emit()
 	check_equal(_sent, [[&"host", 0]], "Host asks, as seat 0")
 	check(_shown("Online") and not _shown("Host") and not _shown("Join") and not _shown("Play") and not _shown("Sandbox"), "the box opens in the buttons' place")
-	_bus.online_changed.emit(&"making", "", "")
+	_bus.online_changed.emit(&"making", "", &"", {})
 	check(not _shown("MineRow") and not _shown("TheirsRow"), "while the code is made there is nothing to copy or paste")
-	_bus.online_changed.emit(&"code", "SM1.host", "")
+	_bus.online_changed.emit(&"code", "SM1.host", &"", {})
 	check_equal((_menu.get_node("%Mine") as LineEdit).text, "SM1.host", "the code is shown")
 	check(not (_menu.get_node("%Mine") as LineEdit).editable, "to copy, not to change")
 	check(_shown("TheirsRow") and _status().contains("send it to the other player"), "with the box for the code that comes back, and what to do")
@@ -66,11 +67,11 @@ func test_host_asks_for_a_code_shows_it_and_passes_the_answer_on() -> void:
 	_box().text = "  SM1.answer\n"
 	_button("Connect").pressed.emit()
 	check_equal(_sent.back(), [&"answer", 0, "  SM1.answer\n"], "the pasted text is passed on as it is")
-	_bus.online_changed.emit(&"code", "SM1.host", "That code was not taken: it is not a code.")
-	check(_status().begins_with("That code was not taken") and _shown("TheirsRow"), "a refused code: why, and the box stays")
-	_bus.online_changed.emit(&"linking", "SM1.host", "")
+	_bus.online_changed.emit(&"code", "SM1.host", OnlineWhy.HOSTS_CODE, {})
+	check(_status().begins_with("That is a host's code") and _shown("TheirsRow"), "a refused code: why, in the HUD's words, and the box stays")
+	_bus.online_changed.emit(&"linking", "SM1.host", &"", {})
 	check(not _shown("TheirsRow") and _status().contains("Looking"), "linking: no box")
-	_bus.online_changed.emit(&"failed", "", "The two machines could not reach each other.")
+	_bus.online_changed.emit(&"failed", "", OnlineWhy.NO_LINK, {OnlineWhy.CAUSE: OnlineWhy.CAUSE_UNKNOWN})
 	check(_status().begins_with("The two machines could not reach each other.") and _status().contains("Cancel"), "failed: why, and what to do (%s)" % _status())
 	check(not _shown("MineRow") and not _shown("TheirsRow"), "the code and the box are gone")
 	_button("Cancel").pressed.emit()
@@ -84,20 +85,39 @@ func test_join_asks_nothing_until_connect_and_then_shows_its_own_code() -> void:
 	_box().text = "SM1.host"
 	_box().text_submitted.emit(_box().text)
 	check_equal(_sent, [[&"join", 0, "SM1.host"]], "Enter in the box is Connect: the host's code passed on")
-	_bus.online_changed.emit(&"making", "", "")
+	_bus.online_changed.emit(&"making", "", &"", {})
 	check(not _shown("TheirsRow"), "the box goes while this machine's code is made")
-	_bus.online_changed.emit(&"code", "SM1.mine", "")
+	_bus.online_changed.emit(&"code", "SM1.mine", &"", {})
 	check(_shown("MineRow") and not _shown("TheirsRow") and _status().contains("back to the host"), "its own code to send back, no box")
-	_bus.online_changed.emit(&"failed", "", "It is not a code of this game.")
-	check(_shown("TheirsRow") and _status().begins_with("It is not a code of this game."), "failed: why, and the box again for another try")
+	_bus.online_changed.emit(&"failed", "", OnlineWhy.NO_ROOM, {OnlineWhy.ROOM: "ABCDE"})
+	check(_shown("TheirsRow") and _status().begins_with("No room has the code ABCDE."), "failed: why, and the box again for another try (%s)" % _status())
+	_bus.online_changed.emit(&"failed", "", &"a name the menu has never heard", {})
+	check(_status().begins_with("It did not work.") and _status().contains("try again"), "a reason with no words still says it failed, never the name (%s)" % _status())
 	_box().text = "SM1.other"
 	_button("Connect").pressed.emit()
 	check_equal(_sent.back(), [&"join", 0, "SM1.other"], "another code may be given")
 
 
+func test_the_open_box_hushes_the_huds_online_line() -> void:
+	var line := OnlineLineScript.new()
+	root.add_child(own(line))
+	line.bind(_bus)
+	_button("Join").pressed.emit()
+	_bus.online_changed.emit(&"failed", "", OnlineWhy.NO_SERVER, {})
+	check(_status().begins_with("The room server could not be reached.") and not line.visible, "the box says why it failed; the line over the menu does not say it again")
+	_button("Cancel").pressed.emit()
+	_bus.online_changed.emit(&"failed", "", OnlineWhy.NO_SERVER, {})
+	check(line.visible, "the box closed: the line speaks again")
+	_button("Host").pressed.emit()
+	check(not line.visible, "open again: hushed")
+	root.remove_child(_menu)
+	check(line.visible, "the menu gone (a run starts): the line speaks")
+	root.add_child(_menu)
+
+
 func test_cancel_closes_the_box_and_says_so() -> void:
 	_button("Host").pressed.emit()
-	_bus.online_changed.emit(&"code", "SM1.host", "")
+	_bus.online_changed.emit(&"code", "SM1.host", &"", {})
 	_button("Cancel").pressed.emit()
 	check_equal(_sent.back(), [&"leave", 0], "Cancel says the player gave up")
 	check(not _shown("Online") and _shown("Host") and _shown("Join") and _shown("Play") and _shown("Sandbox"), "the box closes; the buttons are back")
@@ -107,12 +127,12 @@ func test_cancel_closes_the_box_and_says_so() -> void:
 
 func test_copy_puts_the_code_on_the_clipboard() -> void:
 	_button("Host").pressed.emit()
-	_bus.online_changed.emit(&"code", "SM1.copied", "")
+	_bus.online_changed.emit(&"code", "SM1.copied", &"", {})
 	_button("Copy").pressed.emit()
 	check_equal(_button("Copy").text, "Copied", "Copy says it did")
 	if DisplayServer.has_feature(DisplayServer.FEATURE_CLIPBOARD):
 		check_equal(DisplayServer.clipboard_get(), "SM1.copied", "the code is on the clipboard")
-	_bus.online_changed.emit(&"code", "SM1.another", "")
+	_bus.online_changed.emit(&"code", "SM1.another", &"", {})
 	check_equal(_button("Copy").text, "Copy", "a new code is not yet copied")
 
 

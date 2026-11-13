@@ -14,7 +14,7 @@ const BROKEN_CODE: String = "SM1.YnJva2Vu"
 ## Polls a code takes to make.
 var making: int = 2
 ## Set by a test: it fails with this.
-var fails_with: String = ""
+var fails_with: NetWhy = null
 
 var _table: Dictionary
 var _hosting: bool = false
@@ -28,30 +28,30 @@ func _init(table: Dictionary) -> void:
 	_table = table
 
 
-func offer() -> String:
+func offer() -> NetWhy:
 	_hosting = true
 	_asked = true
 	_table[&"ends"] = NetLoopback.pair()
-	return ""
+	return null
 
 
 func takes(typed: String) -> bool:
 	return typed.strip_edges().begins_with("SM1.")
 
 
-func take(code: String) -> String:
+func take(code: String) -> NetWhy:
 	if _hosting:
 		if code == BROKEN_CODE:
-			fails_with = "the handshake did not take the code"
+			fails_with = NetWhy.new(OnlineWhy.BAD_CODE, "the handshake did not take the code")
 			return fails_with
 		if code != JOIN_CODE:
-			return "it is not the joining player's code"
+			return NetWhy.new(OnlineWhy.HOSTS_CODE, "it is not the joining player's code")
 		_table[&"answered"] = true
-		return ""
+		return null
 	if code != HOST_CODE or not _table.has(&"ends"):
-		return "it is not the host's code"
+		return NetWhy.new(OnlineWhy.JOINERS_CODE, "it is not the host's code")
 	_asked = true
-	return ""
+	return null
 
 
 func code() -> String:
@@ -71,7 +71,7 @@ func link() -> NetLink:
 	return (_table[&"ends"] as Array[NetLoopback])[0 if _hosting else 1]
 
 
-func problem() -> String:
+func problem() -> NetWhy:
 	return fails_with
 
 

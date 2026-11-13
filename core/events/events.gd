@@ -123,10 +123,10 @@ const ONLINE_LINKED: StringName = &"linked"
 const ONLINE_PLAYING: StringName = &"playing"
 const ONLINE_ENDED: StringName = &"ended"
 const ONLINE_FAILED: StringName = &"failed"
-## Sender: net. Where Host or Join stands: `phase` is `&"off"` (nothing asked, or given up), `&"making"` (this machine's code is being made), `&"code"` (`code` is this machine's code, for the other player), `&"linking"` (both codes given, the machines look for each other), `&"linked"` (they found each other; the run starts in a moment), `&"playing"` (the run plays), `&"ended"` (the other machine left a run that played) or `&"failed"`. `note` says in plain words what the player should know (why it failed, a code refused). Heard by hud (the main menu, the online line).
-signal online_changed(phase: StringName, code: String, note: String)
-## Sender: net. One line of text about the run played online (its counters), about once a second while it plays; `""` clears it. Heard by hud, which shows it as it is.
-signal online_line_changed(line: String)
+## Sender: net. Where Host or Join stands: `phase` is `&"off"` (nothing asked, or given up), `&"making"` (this machine's code is being made), `&"code"` (`code` is this machine's code, for the other player), `&"linking"` (both codes given, the machines look for each other), `&"linked"` (they found each other; the run starts in a moment), `&"playing"` (the run plays), `&"ended"` (the other machine left a run that played) or `&"failed"`. `reason` says why, as one of `OnlineWhy`'s names (`core/events/online_why.gd`; `&""`: nothing to say), with its few `facts` (numbers, yes or no, names, a room's code): why it failed, why a code was refused, who left. Never a sentence: net names it and the HUD alone words it (online-lobby L5b), so another way to link machines says the same names. Heard by hud (the main menu, the online line).
+signal online_changed(phase: StringName, code: String, reason: StringName, facts: Dictionary)
+## Sender: net. The line about the run played online, about once a second while it plays: `facts` say what stands (`OnlineWhy`'s `LINE_` keys: an open room's code and the machines in it, catching up, the machines' games parted), worded by the HUD; `counters` is the run's counters in a developer's shorthand, shown as it is. Both empty clears the line. Heard by hud.
+signal online_line_changed(facts: Dictionary, counters: String)
 
 # --- Devices (sender: core/input) -------------------------------------------
 

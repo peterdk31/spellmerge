@@ -422,6 +422,7 @@ func test_a_header_of_another_game_is_refused() -> void:
 		_step()
 		check(not _client.started and not _frames.is_playing(), "%s: nothing plays" % what)
 		check(not _far.is_open() and _client.problem.contains(cases[what][0]), "%s: the link closes, for that (%s)" % [what, _client.problem])
+		check_equal(_client.reason, OnlineWhy.OTHER_BUILD, "%s: and by name, another build's game" % what)
 
 
 func test_what_a_host_must_not_send_closes_the_link() -> void:
@@ -496,6 +497,7 @@ func test_a_host_that_went_silent_is_taken_for_gone() -> void:
 	for i in 6:
 		_step()
 	check(_client.problem.begins_with("nothing was heard"), "past it the link is closed, and it says why (%s)" % _client.problem)
+	check_equal(_client.reason, OnlineWhy.SILENT, "by name too")
 	check(_client.feed.closed and not _client.link.is_open(), "no more will come")
 	check(not _client.is_playing() and not _frames.is_playing(), "and the run ends, played out")
 

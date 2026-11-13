@@ -16,7 +16,7 @@ extends Node
 ## it), which stand for the players' copy and paste. The host plays `--ticks` ticks and leaves; the
 ## joining process plays until the host is gone. The lines:
 ##
-##     ONLINE <role> <phase> <note>          (every `online_changed`)
+##     ONLINE <role> <phase> <reason>        (every `online_changed`; the reason by its name)
 ##     ONLINE <role> ROW <the counters, JSON>   (the host's, as it leaves)
 ##     ONLINE <role> LINE <the counters' last line on the screen>
 ##     ONLINE <role> OK | FAILED: <why>      (then the process quits)
@@ -195,7 +195,8 @@ func _ready() -> void:
 	# One machine: no STUN server is asked.
 	_play.handshake_maker = func() -> NetHandshake: return NetRtc.new(PackedStringArray())
 	_events.online_changed.connect(_on_online_changed)
-	_events.online_line_changed.connect(func(line: String) -> void: _last_line = line)
+	# The last counters there were: the line is cleared when the run is over.
+	_events.online_line_changed.connect(func(_facts: Dictionary, counters: String) -> void: _last_line = counters if counters != "" else _last_line)
 	DirAccess.make_dir_recursive_absolute(HANDOFF)
 	if _signal != "":
 		_ready_room()
@@ -332,8 +333,10 @@ func _room_done() -> bool:
 	return (_play.session as NetHost).stats.ticks >= _ticks
 
 
-func _on_online_changed(phase: StringName, code: String, note: String) -> void:
-	print("ONLINE %s %s %s" % [_role(), phase, note])
+func _on_online_changed(phase: StringName, code: String, reason: StringName, facts: Dictionary) -> void:
+	print("ONLINE %s %s %s%s" % [_role(), phase, reason, "" if facts.is_empty() else " %s" % facts])
+	# Why it failed, for this script's last line.
+	var note: String = String(reason) if reason != &"" else "it failed, with no reason given"
 	if _signal != "":
 		match phase:
 			NetPlayScript.CODE:
@@ -354,7 +357,7 @@ func _on_online_changed(phase: StringName, code: String, note: String) -> void:
 		return
 	match phase:
 		NetPlayScript.CODE:
-			if note == "":
+			if reason == &"":
 				_hand(HOST_CODE if _hosting else JOIN_CODE, code)
 		NetPlayScript.PLAYING:
 			# This machine's seat plays by script from here.

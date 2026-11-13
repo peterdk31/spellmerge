@@ -11,7 +11,7 @@ const ROOM: String = "KQ7RM"
 ## Polls the room's code takes to make.
 var making: int = 2
 ## Set by a test: it fails with this.
-var fails_with: String = ""
+var fails_with: NetWhy = null
 
 var _table: Dictionary
 var _hosting: bool = false
@@ -25,25 +25,25 @@ func _init(table: Dictionary) -> void:
 	_table = table
 
 
-func offer() -> String:
+func offer() -> NetWhy:
 	_hosting = true
 	_table[&"open"] = true
 	_table[&"waiting"] = [] as Array[NetLink]
-	return ""
+	return null
 
 
-func take(typed: String) -> String:
+func take(typed: String) -> NetWhy:
 	if _hosting:
-		return "the room's server brings the other machine's code"
+		return NetWhy.new(OnlineWhy.NOT_NOW, "the room's server brings the other machine's code")
 	if typed.strip_edges().to_upper() != ROOM:
-		return "a room's code is 5 letters and digits"
+		return NetWhy.new(OnlineWhy.BAD_ROOM_CODE, "a room's code is 5 letters and digits", {OnlineWhy.LENGTH: 5})
 	if not _table.get(&"open", false):
-		fails_with = "no room has the code %s" % ROOM
-		return ""
+		fails_with = NetWhy.new(OnlineWhy.NO_ROOM, "no room has the code %s" % ROOM, {OnlineWhy.ROOM: ROOM})
+		return null
 	var ends: Array[NetLoopback] = NetLoopback.pair()
 	(_table[&"waiting"] as Array[NetLink]).append(ends[0])
 	_mine = ends[1]
-	return ""
+	return null
 
 
 func code() -> String:
@@ -53,7 +53,7 @@ func code() -> String:
 func poll() -> void:
 	_polls += 1
 	if _hosting and not _closed and not _table.get(&"open", false):
-		fails_with = "the room is closed"
+		fails_with = NetWhy.new(OnlineWhy.ROOM_CLOSED, "the room is closed")
 
 
 func link() -> NetLink:
@@ -69,7 +69,7 @@ func next_link() -> NetLink:
 	return waiting.pop_front()
 
 
-func problem() -> String:
+func problem() -> NetWhy:
 	return fails_with
 
 

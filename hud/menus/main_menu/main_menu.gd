@@ -24,6 +24,8 @@ extends Control
 ## PASTE_CHECKS times, PASTE_WAIT apart.
 
 const EventsScript := preload("res://core/events/events.gd")
+const OnlineWords := preload("res://hud/widgets/online_words.gd")
+const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 
 ## The player index sent with `hub_requested`: the menu is used by P1 (the mouse
 ## and keyboard, or the gamepad that joined first).
@@ -66,7 +68,7 @@ const CODE_MAX_CHARS: int = 16384
 const PASTE_CHECKS: int = 4
 const PASTE_WAIT: float = 0.3
 ## What the online box says in each phase of `online_changed`, as the host and as the joining
-## player (a phase's `note`, when it has one, is shown instead or after).
+## player (a phase's reason, when it has one, is worded before it: `online_words.gd`).
 const ONLINE_TEXT: Dictionary[StringName, Array] = {
 	EventsScript.ONLINE_OFF: ["", "Type the room's code below (the host opens a room at the altar in their hub), or paste a host's code, then press Connect."],
 	EventsScript.ONLINE_MAKING: ["Making this machine's code...", "Connecting..."],
@@ -285,7 +287,7 @@ func _on_join_pressed() -> void:
 		return
 	_hosting = false
 	_open_online()
-	_show_online(EventsScript.ONLINE_OFF, "", "")
+	_show_online(EventsScript.ONLINE_OFF, "", &"", {})
 	_theirs.grab_focus()
 
 
@@ -298,10 +300,23 @@ func _open_online() -> void:
 
 func _set_online_open(open: bool) -> void:
 	_online.visible = open
+	_hush_online_line(open)
 	for button: Control in [_sandbox, _play, _fullscreen, _host.get_parent() as Control, _hint]:
 		button.visible = not open
 	if not open:
 		_fullscreen.visible = display != null
+
+
+## The online box says why hosting or joining failed; the HUD's online line, drawn over this menu,
+## does not say it again while the box is open.
+func _hush_online_line(on: bool) -> void:
+	if is_inside_tree():
+		get_tree().call_group(OnlineLineScript.GROUP, &"hush", on)
+
+
+func _exit_tree() -> void:
+	# The menu goes (a run starts): the line speaks again.
+	get_tree().call_group(OnlineLineScript.GROUP, &"hush", false)
 
 
 func _on_copy_pressed() -> void:
@@ -362,16 +377,17 @@ func _on_cancel_pressed() -> void:
 	_host.grab_focus()
 
 
-func _on_online_changed(phase: StringName, code: String, note: String) -> void:
+func _on_online_changed(phase: StringName, code: String, reason: StringName, facts: Dictionary) -> void:
 	if _online.visible:
-		_show_online(phase, code, note)
+		_show_online(phase, code, reason, facts)
 
 
 ## The online box for `phase`: its line of words, this machine's code once made, and the box for
 ## the other's code while one is wanted (the host: once its own is made; Join: before any).
-func _show_online(phase: StringName, code: String, note: String) -> void:
+func _show_online(phase: StringName, code: String, reason: StringName, facts: Dictionary) -> void:
 	var words: Array = ONLINE_TEXT.get(phase, ["", ""])
 	var text: String = words[0 if _hosting else 1]
+	var note: String = OnlineWords.said(reason, facts)
 	if note != "":
 		text = note if text == "" else "%s %s" % [note, text]
 	elif phase == EventsScript.ONLINE_FAILED:

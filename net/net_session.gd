@@ -1,5 +1,5 @@
 class_name NetSession
-extends RefCounted
+extends NetRun
 ## One side of one link of an online run (netcode spike S2, docs/milestones/netcode-spike.md): what
 ## the host's view of a guest machine and the client's session share (`NetGuest`, `NetClient`). A
 ## session sits between a link and the frames service and knows nothing else of the game.
@@ -20,8 +20,9 @@ extends RefCounted
 ## - **The link it is given is open.** Whoever holds the session makes it once the link is up, and
 ##   calls `pump` each physics step until the run starts and `after_tick` after every tick has
 ##   stepped.
-## - A session writes no file and logs nothing: its holder shows `problem`, the parting and the
-##   counters (`stats`), and saves `replay`.
+## - A session writes no file and logs nothing: its holder says why it closed (`reason`, a name
+##   the HUD words; `problem` is the same in words, for the log), shows the parting and the
+##   counters (`stats`), and saves `replay`. What a holder watches of any run is `NetRun`'s.
 
 const FramesScript := preload("res://core/sim/frames.gd")
 
@@ -38,8 +39,10 @@ var stats: NetStats = NetStats.new()
 var checks: NetChecks = NetChecks.new()
 ## The run: the host's recording, the client's copy of it as it arrives (null before the run).
 var replay: Replay = null
-## Why this side closed the link ("" while it has not).
+## Why this side closed the link ("" while it has not), in words for the log and the tests, and
+## as a name of `OnlineWhy` (with SILENT, the seconds are SILENT_MS's).
 var problem: String = ""
+var reason: StringName = &""
 ## The first check that failed: its tick (-1: none) and the areas that differed.
 var parted_tick: int = -1
 var parted_areas: PackedStringArray = PackedStringArray()
@@ -102,16 +105,23 @@ func _listen(heard: bool) -> void:
 		return
 	_silent_ms += passed
 	if _silent_ms >= float(SILENT_MS):
-		_refuse("nothing was heard from the other machine for %d seconds" % (SILENT_MS / 1000))
+		_refuse("nothing was heard from the other machine for %d seconds" % (SILENT_MS / 1000), OnlineWhy.SILENT)
 
 
 func _now_ms() -> float:
 	return float(clock.call()) if clock.is_valid() else float(Time.get_ticks_msec())
 
 
-## Call after every tick has stepped.
-func after_tick() -> void:
-	pass
+func counters() -> NetStats:
+	return stats
+
+
+func parted_at() -> int:
+	return parted_tick
+
+
+func parted_in() -> PackedStringArray:
+	return parted_areas
 
 
 ## A message of the other side's: "" when it was taken, else why the link closes.
@@ -140,7 +150,12 @@ func _send(bytes: PackedByteArray) -> void:
 	stats.count_sent(bytes.size())
 
 
-## Close the link for `why`: nothing more is read from it or sent.
-func _refuse(why: String) -> void:
+## Close the link for `why` (`named`: the same as a name of `OnlineWhy`; what the other machine
+## sent was not taken, unless said): nothing more is read from it or sent.
+func _refuse(why: String, named: StringName = OnlineWhy.LINK_REFUSED) -> void:
+	if problem != "":
+		# The first reason stands.
+		return
 	problem = why
+	reason = named
 	link.close()

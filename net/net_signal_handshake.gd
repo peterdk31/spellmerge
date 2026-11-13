@@ -48,7 +48,7 @@ var _url: String
 var _socket: NetSignalSocket
 var _message: NetSignal = NetSignal.new()
 var _hosting: bool = false
-var _problem: String = ""
+var _problem: NetWhy = null
 ## When the socket was opened, and when `open` or `join` was said on it (-1: not yet).
 var _opened_at: int = -1
 var _said_at: int = -1
@@ -80,9 +80,9 @@ func _init(url: String = NetSignal.URL, socket: NetSignalSocket = null) -> void:
 	_socket = socket if socket != null else NetSignalSocket.new()
 
 
-func offer() -> String:
+func offer() -> NetWhy:
 	if _opened_at >= 0:
-		return "it has begun already"
+		return NetWhy.new(OnlineWhy.NOT_NOW, "it has begun already")
 	_hosting = true
 	return _open()
 
@@ -94,16 +94,16 @@ func takes(typed: String) -> bool:
 
 ## A joining machine: `code` is the room code as a player typed it. (A host is given nothing by
 ## hand: the server brings the answers.)
-func take(code: String) -> String:
-	if _problem != "":
+func take(code: String) -> NetWhy:
+	if _problem != null:
 		return _problem
 	if _hosting:
-		return "the room's server brings the other machine's code"
+		return NetWhy.new(OnlineWhy.NOT_NOW, "the room's server brings the other machine's code")
 	if _opened_at >= 0:
-		return "a code was given already"
+		return NetWhy.new(OnlineWhy.NOT_NOW, "a code was given already")
 	var room: String = NetSignal.typed_room_code(code)
 	if room == "":
-		return "a room's code is %d letters and digits" % NetSignal.CODE_LENGTH
+		return NetWhy.new(OnlineWhy.BAD_ROOM_CODE, "a room's code is %d letters and digits" % NetSignal.CODE_LENGTH, {OnlineWhy.LENGTH: NetSignal.CODE_LENGTH})
 	_room = room
 	return _open()
 
@@ -114,12 +114,12 @@ func code() -> String:
 
 
 func poll() -> void:
-	if _opened_at < 0 or _problem != "":
+	if _opened_at < 0 or _problem != null:
 		return
 	# A joining machine that holds its link has closed its socket: the server's part is done.
 	if _hosting or _first == null:
 		_poll_server()
-	if _problem != "":
+	if _problem != null:
 		return
 	if _hosting:
 		_poll_guests()
@@ -137,22 +137,22 @@ func next_link() -> NetLink:
 	return _links.pop_front() if not _links.is_empty() else null
 
 
-func problem() -> String:
+func problem() -> NetWhy:
 	return _problem
 
 
 func close() -> void:
-	if _problem == "":
-		_problem = "given up"
+	if _problem == null:
+		_problem = NetWhy.new(OnlineWhy.NOT_NOW, "given up")
 	_let_go()
 
 
-func _open() -> String:
+func _open() -> NetWhy:
 	var why: String = _socket.open(NetSignal.asking_relays(_url))
 	if why != "":
-		return _fail(why)
+		return _fail(OnlineWhy.NO_SERVER, why)
 	_opened_at = _now()
-	return ""
+	return null
 
 
 ## The socket moved on and what the server said heard.
@@ -164,7 +164,7 @@ func _poll_server() -> void:
 			_socket.send(NetSignal.open() if _hosting else NetSignal.join(_room))
 			_said_at = _now()
 		elif state == NetSignalSocket.CLOSED or _now() - _opened_at >= CONNECT_MS:
-			_fail("the room server could not be reached")
+			_fail(OnlineWhy.NO_SERVER, "the room server could not be reached")
 		return
 	for at in MAX_READ:
 		var text: String = _socket.read()
@@ -175,14 +175,17 @@ func _poll_server() -> void:
 			# A relay this game cannot read is no relay: the machines may still link directly.
 			continue
 		if not _message.read(text) or not mine.has(_message.kind) or not _hear():
-			_fail("the room server said something that is no message of its")
-		if _problem != "":
+			_fail(OnlineWhy.SERVER_FAILED, "the room server said something that is no message of its")
+		if _problem != null:
 			return
 	var answered: bool = _room_given if _hosting else _joined_at >= 0
 	if state == NetSignalSocket.CLOSED:
-		_fail("the room is closed" if answered else "the room server closed the connection")
+		if answered:
+			_fail(OnlineWhy.ROOM_CLOSED, "the room is closed")
+		else:
+			_fail(OnlineWhy.SERVER_FAILED, "the room server closed the connection")
 	elif not answered and _now() - _said_at >= CONNECT_MS:
-		_fail("the room server did not answer")
+		_fail(OnlineWhy.NO_SERVER, "the room server did not answer")
 
 
 ## One message of the server's taken (`_message`). False when it makes no sense now.
@@ -202,10 +205,10 @@ func _hear() -> bool:
 			if _guests.has(_message.id):
 				return true
 			var inner: NetHandshake = _make_rtc()
-			var why: String = inner.offer()
-			if why != "":
+			var why: NetWhy = inner.offer()
+			if why != null:
 				# This machine cannot link at all: no guest will fare better.
-				_fail(why)
+				_keep(why)
 				return true
 			_guests[_message.id] = inner
 			_offered[_message.id] = false
@@ -214,7 +217,7 @@ func _hear() -> bool:
 			# An answer for nobody (a guest let go a moment ago) is nothing.
 			var inner: NetHandshake = _guests.get(_message.id)
 			if inner != null and _offered[_message.id]:
-				if inner.take(_message.code) != "":
+				if inner.take(_message.code) != null:
 					_drop(_message.id)
 				else:
 					_answered_by[_message.id] = true
@@ -232,15 +235,16 @@ func _hear() -> bool:
 			if _joined_at < 0 or _rtc != null:
 				return false
 			_rtc = _make_rtc()
-			var why: String = _rtc.take(_message.code)
-			if why != "":
-				_fail("the host's code was not taken: %s" % why)
+			var why: NetWhy = _rtc.take(_message.code)
+			if why != null:
+				# What it says of a pasted code is not for a player who typed a room's.
+				_fail(why.name if why.name == OnlineWhy.CANNOT_LINK or why.name == OnlineWhy.SETUP_FAILED else OnlineWhy.HOST_CODE_REFUSED, "the host's code was not taken: %s" % why.text)
 		NetSignal.NO_ROOM:
-			_fail("no room has the code %s" % _room)
+			_fail(OnlineWhy.NO_ROOM, "no room has the code %s" % _room, {OnlineWhy.ROOM: _room})
 		NetSignal.FULL:
-			_fail("the room %s is full" % _room)
+			_fail(OnlineWhy.ROOM_FULL, "the room %s is full" % _room, {OnlineWhy.ROOM: _room})
 		NetSignal.CLOSED:
-			_fail("the host closed the room" if not _hosting else "the room is closed")
+			_fail(OnlineWhy.ROOM_CLOSED, "the host closed the room" if not _hosting else "the room is closed")
 		NetSignal.RELAY:
 			# The host's comes before each guest it names; a joining machine's before `joined`.
 			if (_hosting and not _room_given) or (not _hosting and _joined_at >= 0):
@@ -255,7 +259,7 @@ func _poll_guests() -> void:
 	for id: int in _guests.keys():
 		var inner: NetHandshake = _guests[id]
 		inner.poll()
-		if inner.problem() != "" or _now() - _named_at[id] >= GUEST_MS:
+		if inner.problem() != null or _now() - _named_at[id] >= GUEST_MS:
 			_drop(id)
 		elif inner.link() != null:
 			_links.append(inner.link())
@@ -278,8 +282,8 @@ func _poll_host() -> void:
 		return
 	if _rtc != null:
 		_rtc.poll()
-		if _rtc.problem() != "":
-			_fail(_rtc.problem())
+		if _rtc.problem() != null:
+			_keep(_rtc.problem())
 			return
 		if _rtc.link() != null:
 			_first = _rtc.link()
@@ -290,12 +294,12 @@ func _poll_host() -> void:
 		if not _answered and _rtc.code() != "":
 			var text: String = NetSignal.answer(_rtc.code())
 			if text == "":
-				_fail("this machine's code could not be made")
+				_fail(OnlineWhy.SETUP_FAILED, "this machine's code could not be made")
 				return
 			_socket.send(text)
 			_answered = true
 	if _joined_at >= 0 and _now() - _joined_at >= JOIN_MS:
-		_fail("the host's machine was not found in time")
+		_fail(OnlineWhy.HOST_NOT_FOUND, "the host's machine was not found in time")
 
 
 func _make_rtc() -> NetHandshake:
@@ -321,8 +325,13 @@ func _forget(id: int) -> void:
 	_named_at.erase(id)
 
 
-func _fail(why: String) -> String:
-	if _problem == "":
+func _fail(named: StringName, in_words: String, facts: Dictionary = {}) -> NetWhy:
+	return _keep(NetWhy.new(named, in_words, facts))
+
+
+## The handshake failed for `why` (the first reason stands).
+func _keep(why: NetWhy) -> NetWhy:
+	if _problem == null:
 		_problem = why
 		_let_go()
 	return why

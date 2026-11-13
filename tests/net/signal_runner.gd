@@ -49,36 +49,37 @@ func _play() -> String:
 	if not NetWebRTC.available():
 		return "this build has no WebRTC"
 	var host: NetSignalHandshake = _made()
-	var why: String = host.offer()
-	if why != "":
-		return "the host: %s" % why
+	var refused: NetWhy = host.offer()
+	if refused != null:
+		return "the host: %s" % refused.text
+	var why: String = ""
 	var guest: NetSignalHandshake = null
 	# A machine that names a room nobody opened is told so.
 	var stranger: NetSignalHandshake = _made()
-	why = stranger.take("ZZZZZ")
-	if why != "":
-		return "the stranger: %s" % why
+	refused = stranger.take("ZZZZZ")
+	if refused != null:
+		return "the stranger: %s" % refused.text
 	for step in PATIENCE_STEPS:
 		await physics_frame
 		host.poll()
 		stranger.poll()
-		if host.problem() != "":
-			return "the host: %s" % host.problem()
+		if host.problem() != null:
+			return "the host: %s" % host.problem().text
 		if guest == null and host.code() != "":
 			print("SIGNAL room %s" % host.code())
 			guest = _made()
 			# As a player types it.
-			why = guest.take(" %s " % host.code().to_lower())
-			if why != "":
-				return "the guest: %s" % why
+			refused = guest.take(" %s " % host.code().to_lower())
+			if refused != null:
+				return "the guest: %s" % refused.text
 		if guest == null:
 			continue
 		guest.poll()
-		if guest.problem() != "":
-			return "the guest: %s" % guest.problem()
+		if guest.problem() != null:
+			return "the guest: %s" % guest.problem().text
 		if host.link() == null or guest.link() == null:
 			continue
-		if stranger.problem() != "no room has the code ZZZZZ":
+		if stranger.problem() == null or stranger.problem().name != OnlineWhy.NO_ROOM or stranger.problem().facts.get(OnlineWhy.ROOM) != "ZZZZZ":
 			return "the stranger was told: %s" % stranger.problem()
 		why = await _talk(host.link(), guest.link())
 		return why if why != "" else _relay_seen()

@@ -366,7 +366,9 @@ func _take_header(message: NetMessage) -> String:
 	# The frames service refuses a run of another build or other content.
 	if not frames.play_live(feed):
 		feed.replay = null
-		return "the host's run is not this game's (its build is %s)" % run.build
+		var other: String = "the host's run is not this game's (its build is %s)" % run.build
+		_refuse(other, OnlineWhy.OTHER_BUILD)
+		return other
 	replay = run
 	started = true
 	_headers = 1
@@ -383,7 +385,7 @@ func _play_next() -> void:
 	feed.replay = run
 	if not frames.play_live(feed):
 		feed.replay = replay
-		_refuse("the host's next run is not this game's (its build is %s)" % run.build)
+		_refuse("the host's next run is not this game's (its build is %s)" % run.build, OnlineWhy.OTHER_BUILD)
 		return
 	replay = run
 	_headers += 1
@@ -468,8 +470,8 @@ func _count_delay() -> void:
 	stats.rtt_mid_ms = _delay.rtt_ms()
 
 
-func _refuse(why: String) -> void:
-	super(why)
+func _refuse(why: String, named: StringName = OnlineWhy.LINK_REFUSED) -> void:
+	super(why, named)
 	feed.closed = true
 
 

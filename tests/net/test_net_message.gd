@@ -133,7 +133,7 @@ func test_an_unknown_kind_is_refused() -> void:
 
 
 ## A header carries every seat's staffs (core/sim/run_carry.gd): at their fullest, with the longest
-## build, it is exactly the most a header takes, and that crosses as a message.
+## build on the staffs of the longest ids, it is exactly the most a header takes, and that crosses as a message.
 func test_the_fullest_header_crosses() -> void:
 	var replay := Replay.new()
 	replay.build = "b".repeat(Replay.MAX_BUILD)
@@ -142,7 +142,7 @@ func test_the_fullest_header_crosses() -> void:
 	for i in RunCarry.MAX_CARDS:
 		staff.append(longest)
 	for seat in RunCarry.SEATS:
-		replay.carry.set_staffs(seat, [staff, staff, staff, staff])
+		replay.carry.set_staffs(seat, [staff, staff, staff, staff], [longest, longest, longest, longest])
 	var header: PackedByteArray = replay.header_bytes()
 	check_equal(header.size(), Replay.MAX_HEADER_BYTES, "the fullest header is the most a header takes")
 	check(NetMessage.MAX_HEADER <= NetMessage.MAX_BYTES, "and no more than a message may be")

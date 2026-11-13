@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## What a run's start takes along (core/sim/run_carry.gd, online lobby): each seat's staffs, as the
-## card ids in their slots. It comes back from its bytes slot for slot, a copy stands apart, what is
+## staff's own id and the card ids in their slots. It comes back from its bytes slot for slot, a copy stands apart, what is
 ## not an id or past a limit is left out when it is made, and the decoder refuses anything else.
 
 const FramesScript := preload("res://core/sim/frames.gd")
@@ -26,6 +26,31 @@ func test_it_comes_back_from_its_bytes_slot_for_slot() -> void:
 	none.encode_into(empty)
 	check_equal(empty, PackedByteArray([0]), "nothing taken along is one byte")
 	check(none.is_empty() and none.as_kept() == [[], [], [], []], "and nothing for every seat")
+
+
+## Each staff's own id comes back with its cards (owner, 2026-11-13: a staff equipped in the hub
+## goes into the run as it is); one not given is empty, the run's own staff.
+func test_each_staffs_own_id_comes_back() -> void:
+	var carry: RunCarry = RunCarry.of_kept([[[&"bolt"], [&"fire", &"bolt"], []], [], [[&"dash"]]], [[&"curl", &"dev"], [], [&"res://x"]])
+	check_equal(carry.heads_of(0), [&"curl", &"dev", &""] as Array[StringName], "seat 0's staffs, the third given none")
+	check_equal(carry.heads_of(2), [&""] as Array[StringName], "a path is no staff's id")
+	check(carry.heads_of(1).is_empty(), "a seat with no staffs has no ids")
+	var bytes := PackedByteArray()
+	carry.encode_into(bytes)
+	var back := RunCarry.new()
+	check_equal(back.decode_at(bytes, 0), "", "read")
+	check_equal(back.read_to, bytes.size(), "to its end")
+	check_equal(back.as_heads(), carry.as_heads(), "every staff's id, slot for slot")
+	check(back.equals(carry) and carry.copy().equals(carry), "the same, and a copy too")
+	var other: RunCarry = RunCarry.of_kept(carry.as_kept(), [[&"curl", &"star"]])
+	check(not other.equals(carry), "the same cards on other staffs are not the same")
+	# A staff's id that is not one is refused: seat 0's first staff is 1 card, "bolt" (bytes 3-7), then its id (8: its length, 9 on: "curl").
+	var dot: PackedByteArray = bytes.duplicate()
+	dot[9] = 0x2e
+	check(RunCarry.new().decode_at(dot, 0) != "", "a staff's id with a dot is refused")
+	var long: PackedByteArray = bytes.duplicate()
+	long[8] = InputFrame.MAX_TEXT + 1
+	check(RunCarry.new().decode_at(long, 0) != "", "a staff's id longer than an id is refused")
 
 
 func test_a_copy_stands_apart() -> void:

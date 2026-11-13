@@ -22,6 +22,8 @@ A ninth, by the owner on 2026-11-10: **the online lobby**, room codes through a 
 
 A tenth, planned with the owner on 2026-11-10 and approved on 2026-11-11: **props**, things in the world that stand, block, take hits, react by casting spell cards and give off motes (an exploding barrel's fuse and blast, a crate's rubble, a brazier's embers), each an actor with no controller and one content folder ([props.md](milestones/props.md), phase W). It runs beside the online lobby (owner, 2026-11-10).
 
+An eleventh, planned with the owner on 2026-11-13: **items**, things a body picks up, holds in bags (staffs, cards, relics, potions) and drops, with staff pickups first, counted cards, an inventory beside the builder and a rack in the hub ([items.md](milestones/items.md), phase I). It builds M3's bags and pickups early, for the staffs; what relics and potions do, and items as a run's rewards, stay M3.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

@@ -174,7 +174,7 @@ func _test_round_trip() -> void:
 func _test_room_round_trip() -> void:
 	var room := RoomBase.new()
 	room.id = &"start_room"
-	room.invincible = true
+	room.stand_up_after = 2.5
 	room.ambient = 0.8
 	var path := "user://test_base_room.tres"
 	_check(ResourceSaver.save(room, path) == OK, "room saves as text")
@@ -182,7 +182,7 @@ func _test_room_round_trip() -> void:
 	_check(loaded != null, "room loads back as RoomBase")
 	if loaded != null:
 		_check(loaded.id == &"start_room", "room keeps its id")
-		_check(loaded.invincible and is_equal_approx(loaded.ambient, 0.8), "room keeps its rules")
+		_check(is_equal_approx(loaded.stand_up_after, 2.5) and is_equal_approx(loaded.ambient, 0.8), "room keeps its rules")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 

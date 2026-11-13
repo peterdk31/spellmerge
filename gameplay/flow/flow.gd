@@ -79,7 +79,9 @@ extends Node
 ## The hub (docs/milestones/online-lobby.md, L1): `hub_requested` (the main menu's Play) starts a run
 ## in the hub room (`hub`), an island in the void where players join and leave as they like (coop's
 ## `player_joined` / `player_left`, at the room's spawns), try their staffs on the room's dummies,
-## and take nothing from hits (`RoomBase.invincible`: the hit lands, the health stays). Its wizards
+## and are hurt by hits as anywhere, but a wizard downed there stands up by itself at full health
+## `RoomBase.stand_up_after` seconds later (owner, 2026-11-13: duels between parties and test builds
+## without consequences), and everyone down restarts nothing. Its wizards
 ## have Play's staffs, but the `dev` staff on RT (HUB_DEV_BUTTON, owner 2026-11-13: to try bigger
 ## spells for now), Play's start cards, and every card in the bag (above). Its teleporter stone (a
 ## prop of the role `run_start`, stood on where its area is) is lit while every wizard stands on it:
@@ -268,6 +270,9 @@ var _enemies: Array[Node] = []
 var _wizards: Array[Node2D] = []
 var _downed: Array[bool] = [false, false, false, false]
 var _restart_left: float = -1.0
+## By seat: seconds until that seat's downed wizard stands up by itself (`RoomBase.stand_up_after`,
+## the hub), or -1 for none counting.
+var _stand_up_left: Array[float] = [-1.0, -1.0, -1.0, -1.0]
 var _next_wave_left: float = -1.0
 var _enemy_data: EnemyBase = null
 ## What is where in the room shown (read from the layout built for this run; worked out from it: a
@@ -332,6 +337,7 @@ func step(delta: float) -> void:
 	contents.forget_gone()
 	if world != null and state != State.IDLE:
 		yard.tend(delta, world, registry)
+	_count_stand_ups(delta)
 	if mode == MODE_HUB and state == State.RUNNING:
 		_count_stone()
 		return
@@ -466,6 +472,7 @@ func start_run(requester: int, kept: Array = [], heads: Array = []) -> bool:
 		return false
 	_starter = requester
 	_restart_left = -1.0
+	_stand_up_left.fill(-1.0)
 	_next_wave_left = -1.0
 	_clear_run()
 	_room = room
@@ -511,8 +518,6 @@ func start_run(requester: int, kept: Array = [], heads: Array = []) -> bool:
 	state = State.RUNNING
 	_show_world(new_world)
 	_set_walls(new_world)
-	for wizard: Node2D in _wizards:
-		_take_room_rules(wizard as Actor)
 	if events != null:
 		events.room_laid_out.emit(Rect2(Vector2.ZERO, size))
 		events.room_entered.emit(room.id)
@@ -545,6 +550,7 @@ func stop_run() -> void:
 		if is_instance_valid(shown):
 			_detach(shown)
 	_restart_left = -1.0
+	_stand_up_left.fill(-1.0)
 	_next_wave_left = -1.0
 	_back_to_hub = false
 	wave = 0
@@ -833,10 +839,11 @@ func _on_player_joined(player: int) -> void:
 	var at: Vector2 = joiners[player] if player < joiners.size() else _joiner_spawn(_room, player)
 	_add_wizard(world, _room, player, at)
 	var joiner: DownedScript = DownedScript.of(get_wizard(player))
-	# In a room where hits take nothing (the hub), a joiner needs no moment of protection.
-	if joiner != null and not _room.invincible:
+	# In a room where a fall costs nothing (the hub), a joiner needs no moment of protection.
+	if joiner != null and not _stands_up_by_itself():
 		joiner.protect(DownedScript.JOIN_PROTECTION)
 	_downed[player] = false
+	_stand_up_left[player] = -1.0
 	if _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
 	# Heard at the tick's start: the stone goes out under a joiner before any command is applied.
@@ -853,12 +860,13 @@ func _on_player_left(player: int) -> void:
 		return
 	_wizards.erase(wizard)
 	_downed[player] = false
+	_stand_up_left[player] = -1.0
 	var parent: Node = wizard.get_parent()
 	if parent != null:
 		parent.remove_child(wizard)
 	wizard.queue_free()
 	_count_stone()
-	if state == State.RUNNING and _restart_left < 0.0 and _all_down():
+	if state == State.RUNNING and _restart_left < 0.0 and _all_down() and not _stands_up_by_itself():
 		_restart_left = restart_delay()
 
 
@@ -917,8 +925,41 @@ func _on_player_downed(player: int) -> void:
 	if player < 0 or player >= PLAYER_SLOTS:
 		return
 	_downed[player] = true
+	if _stands_up_by_itself():
+		# Every fall there costs nothing: the wizard stands up by itself, and nothing restarts.
+		_stand_up_left[player] = _room.stand_up_after
+		return
 	if state == State.RUNNING and _all_down() and _restart_left < 0.0:
 		_restart_left = restart_delay()
+
+
+## True while the run's room stands a downed wizard up by itself (`RoomBase.stand_up_after`: the hub).
+func _stands_up_by_itself() -> bool:
+	return state != State.IDLE and _room != null and _room.stand_up_after >= 0.0
+
+
+## Count each seat's stand-up down by `delta`; at 0 its wizard stands up where it fell, at full
+## health, protected for a moment (`_stand_up`).
+func _count_stand_ups(delta: float) -> void:
+	for seat in PLAYER_SLOTS:
+		if _stand_up_left[seat] < 0.0:
+			continue
+		_stand_up_left[seat] -= delta
+		if _stand_up_left[seat] <= 0.0:
+			_stand_up_left[seat] = -1.0
+			_stand_up(seat)
+
+
+## Seat `seat`'s downed wizard stands up by itself at full health, protected for a moment.
+func _stand_up(seat: int) -> void:
+	var wizard: Node2D = get_wizard(seat)
+	var hero: DownedScript = DownedScript.of(wizard) if wizard != null else null
+	if hero == null:
+		return
+	var full: float = (wizard as Actor).health.max_health if (wizard as Actor).health != null else DownedScript.REVIVE_HEALTH
+	if hero.revive(seat, full):
+		_downed[seat] = false
+	hero.protect(DownedScript.JOIN_PROTECTION)
 
 
 ## Seconds from everyone down until the restart (or, in the sandbox, until everyone stands up).
@@ -930,6 +971,7 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 	if player < 0 or player >= PLAYER_SLOTS:
 		return
 	_downed[player] = false
+	_stand_up_left[player] = -1.0
 	if _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
 
@@ -1094,17 +1136,6 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 	# Its hurtbox registers it with Combat when it enters the tree.
 	parent.add_child(wizard)
 	_wizards.append(wizard)
-	# A joiner's world is in the tree, so its components are found; a new run's wizards get it once
-	# their world is shown (`start_run`).
-	if wizard.is_inside_tree():
-		_take_room_rules(wizard)
-
-
-## The room's rules on wizard `wizard` (in the tree, its components found): in an `invincible` room
-## (the hub) hits take nothing from it.
-func _take_room_rules(wizard: Actor) -> void:
-	if wizard.health != null and _room != null:
-		wizard.health.invincible = _room.invincible
 
 
 func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -> void:

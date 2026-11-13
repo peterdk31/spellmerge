@@ -12,7 +12,7 @@ It builds on the spike ([netcode-spike.md](netcode-spike.md)): host-ordered lock
    - **three training dummies** standing together off to one side (`content/enemies/training_dummy/`, as in the sandbox), to try spells on;
    - **the multiplayer altar**, which holds the room code.
 3. **A player presses join** on their device and their wizard appears. From then they walk, aim, cast and build their staffs as in a run.
-4. **In the hub, wizards are invincible:** a shot still hits them (the flash, the knockback), but takes no health, so nobody is ever downed there. Friendly fire stays on, as everywhere (owner, 2026-10-28).
+4. **In the hub, wizards are invincible:** a shot still hits them (the flash, the knockback), but takes no health, so nobody is ever downed there. *Changed by the owner, 2026-11-13:* hits hurt in the hub, and a downed wizard stands up by itself at full health a moment after (`RoomBase.stand_up_after`), so parties can fight each other and try builds there with no consequence. Friendly fire stays on, as everywhere (owner, 2026-10-28).
 5. **Online, on the host:** a host wizard walks to the altar and presses A. The altar opens the room and shows a **room code** of five characters (`KQ7RM`) over it, in the room, and on the HUD with Copy. Nothing connects anywhere before that.
 6. **On another machine:** the main menu's **Join online**, type the five characters, Connect. That machine loads the host's hub as it is right now, everyone where they stand, and its players press join. **A joining machine's wizards appear on the altar.**
 7. **Any mix, up to four seats and four machines:** two players on the host and two on a guest, one on each of four machines, three on the host and one guest.

@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The hub (docs/milestones/online-lobby.md, L1): `hub_requested` (the main menu's Play) starts the
-## hub room with three training dummies and no wave; players join and leave in any order; hits land
-## and take nothing; the teleporter stone is lit only while every wizard stands on it (put out by
+## hub room with three training dummies and no wave; players join and leave in any order; hits hurt,
+## but a wizard downed there stands up by itself at full health a moment later and nothing restarts
+## (owner, 2026-11-13); the teleporter stone is lit only while every wizard stands on it (put out by
 ## one stepping off or by a new join at once), and then the command `run_requested` (a seat's A)
 ## starts a run of waves, every seat keeping its staffs, whose end brings everyone back to the hub.
 ## Uses the real autoloads; time moves through Flow.step(), and commands are applied as the frames
@@ -50,6 +51,9 @@ func after_each() -> void:
 	flow.world_parent = null
 	for index in 4:
 		input.leave(index)
+	# The joins and leaves this test asked for are commands waiting for a tick: apply them now, so
+	# they never pile up across the file past what a frame holds.
+	await commands_applied()
 
 
 func _on_stone(standing: int, wizards: int, lit: bool) -> void:
@@ -150,7 +154,7 @@ func test_players_join_and_leave_in_any_order() -> void:
 			input.add_virtual_device(seat)
 			check(flow.get_wizard(seat) != null, "order %s: seat %d's wizard appears" % [order, seat])
 			var wizard := flow.get_wizard(seat) as Actor
-			check(wizard.health.invincible, "order %s: a joiner takes nothing from hits" % [order])
+			check(not wizard.health.invincible, "order %s: hits hurt a joiner" % [order])
 			check(not wizard.health.is_protected(), "order %s: a joiner needs no protection there" % [order])
 			check_equal(_last().y, _wizards().size(), "order %s: the stone counts the joiner at once" % [order])
 		check_equal(_wizards().size(), order.size(), "order %s: everyone is in" % [order])
@@ -317,17 +321,72 @@ func test_the_stone_is_told_again_after_a_restore() -> void:
 	check_equal(_last(), Vector3i(1, 1, 1), "the HUD and the lit look follow the restored state")
 
 
-func test_a_wizard_hit_in_the_hub_loses_no_health() -> void:
+func test_a_wizard_hit_in_the_hub_loses_health() -> void:
 	_start([0])
 	var wizard: Actor = _wizards()[0]
 	var full: float = wizard.health.health
 	var counted: bool = combat.call("hit", -1, wizard, 40.0, Vector2.RIGHT, 200.0)
 	check(counted, "the hit lands")
 	check_equal(hits, 1, "it is heard (its flash)")
-	check_equal(wizard.health.health, full, "and takes nothing")
-	for i in 10:
-		combat.call("hit", -1, wizard, wizard.health.max_health, Vector2.LEFT, 200.0)
-	check(not wizard.is_down(), "nobody is downed in the hub")
+	check_equal(wizard.health.health, full - 40.0, "and hurts")
+
+
+## Owner, 2026-11-13: no longer invincible in the hub; a downed wizard comes back to full life a
+## moment after, so parties may fight each other there and builds be tried, with no consequence.
+func test_a_wizard_downed_in_the_hub_stands_up_at_full_health() -> void:
+	_start([0, 1])
+	var wizard := flow.get_wizard(0) as Actor
+	wizard.health.take(wizard.health.max_health)
+	check(wizard.is_down(), "downed")
+	var after: float = _room().stand_up_after
+	check(after > 0.0, "the hub stands its wizards up")
+	flow.step(after * 0.5)
+	check(wizard.is_down(), "still down halfway")
+	flow.step(after * 0.5 + DT)
+	check(not wizard.is_down(), "it stands up by itself")
+	check_equal(wizard.health.health, wizard.health.max_health, "at full health")
+	check(wizard.health.is_protected(), "protected for a moment")
+	check_equal(flow.mode, FlowScript.MODE_HUB, "still the hub")
+
+
+func test_everyone_down_in_the_hub_restarts_nothing() -> void:
+	_start([0, 1])
+	var hub_world: Node = flow.world
+	for wizard in _wizards():
+		wizard.health.take(wizard.health.max_health)
+	check(not flow.is_restarting(), "no restart counts")
+	flow.step(_room().stand_up_after + DT)
+	from_frames()
+	check(flow.world == hub_world, "the same hub")
+	for wizard in _wizards():
+		check(not wizard.is_down(), "everyone stands")
+		check_equal(wizard.health.health, wizard.health.max_health, "at full health")
+
+
+func test_a_wizard_who_leaves_while_down_stands_up_nowhere() -> void:
+	_start([0, 1])
+	var wizard := flow.get_wizard(1) as Actor
+	wizard.health.take(wizard.health.max_health)
+	input.leave(1)
+	input.add_virtual_device(1)
+	var back := flow.get_wizard(1) as Actor
+	check(back != wizard and not back.is_down(), "a fresh wizard joins")
+	back.health.take(10.0)
+	flow.step(_room().stand_up_after + DT)
+	check_equal(back.health.health, back.health.max_health - 10.0, "the old fall heals nothing")
+
+
+func test_a_run_from_the_hub_still_downs_for_good() -> void:
+	_start([0, 1])
+	_place(0, true)
+	_place(1, true)
+	_tick()
+	_press_a(0)
+	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run started")
+	var wizard := flow.get_wizard(0) as Actor
+	wizard.health.take(wizard.health.max_health)
+	flow.step(_room().stand_up_after + DT)
+	check(wizard.is_down(), "in a run, nobody stands up by themselves")
 
 
 func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
@@ -348,7 +407,8 @@ func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
 	check_equal(_wizards().size(), 2, "both are there")
 	check_equal(_last(), Vector3i(0, 2, 0), "the stone counts them")
 	for wizard in _wizards():
-		check(wizard.health.invincible and not wizard.is_down(), "standing, and hits take nothing again")
+		check(not wizard.is_down(), "standing")
+		check_equal(wizard.health.health, wizard.health.max_health, "at full health")
 
 
 ## Owner, 2026-11-10: the hub is the arsenal a run's tools are picked from. What a seat built in

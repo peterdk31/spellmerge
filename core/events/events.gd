@@ -262,18 +262,8 @@ signal player_left(player: int)
 signal run_started(player_count: int)
 ## Sender: run. The run is over; `victory` is true if the players won.
 signal run_ended(victory: bool)
-## Sender: flow. The room just made, in world pixels (from (0, 0), `RoomPlaces.size`: what its
-## camera's limits are), sent just before `room_entered`. Heard by coop: the party's view stays
-## inside it, with no camera read (online-ready N9).
-signal room_laid_out(bounds: Rect2)
 ## Sender: flow. The players entered the room `room_id`.
 signal room_entered(room_id: StringName)
-## Sender: coop. The part of the world (world pixels) the party's shared view holds, worked out on
-## the tick from where the wizards stand, and `party`, the box round them inside it; sent when
-## either changes. Heard by feel, whose party
-## camera eases towards the view as it is drawn, keeping `party` in the picture, so the simulation
-## never reads the camera (online-ready N3, N9).
-signal view_fitted(view: Rect2, party: Rect2)
 ## Sender: core/loading. Work before playing has begun behind the loading screen (`Loading.run`;
 ## Flow runs `play_tasks` on Play). Heard by hud, which shows the screen until `loading_finished`.
 signal loading_started()

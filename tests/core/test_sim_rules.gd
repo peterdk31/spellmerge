@@ -101,7 +101,7 @@ func test_the_rules_find_what_they_are_for() -> void:
 		"call_deferred(&\"_go\")": true, "func _process(delta: float) -> void:": true,
 		"func _process_hits() -> void:": false, "if Input.is_action_pressed(&\"x\"):": true,
 		"var frame: InputFrame = frames.frame_of(seat)": false, "var aim: Vector2 = LocalInput.aim_at(a, b)": true,
-		"var size: Vector2 = get_viewport().get_visible_rect().size": true, "var view: Rect2 = fitted_view": false,
+		"var size: Vector2 = get_viewport().get_visible_rect().size": true, "var bounds: Rect2 = room_bounds": false,
 		"var a: float = sin(t)": true, "var a: float = DMath.sin(t)": false, "v = v.rotated(0.5)": true,
 		"v = DMath.rotated(v, 0.5)": false, "var r: float = randf()": true, "var r: float = sim.chance(&\"x\", 1, 2)": false,
 		"var f: float = Engine.get_physics_interpolation_fraction()": true, "var tree := Engine.get_main_loop()": false,

@@ -216,18 +216,15 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 
 ## Put the wizards in the four corners of an area twice the screen and snap the
 ## party camera to fit them, which zooms it out to its limit (0.5). The room is only
-## one screen, so the room Coop keeps the view inside (`room`, from `room_laid_out`) and the
-## camera's limits are widened first, or the zoom would stay at 1. Coop fits the view on the
-## tick (`step_rules`, sending `view_fitted` to Feel's party camera), which is then snapped to it.
+## one screen, so the camera's limits are widened first, or the zoom would stay at 1. The party
+## camera finds the wizards (every seat's: they are virtual devices) and is snapped to their view.
 ## Most of the picture is then outside the room; the panels are what is looked at.
 func _spread_wizards(flow: Node) -> void:
-	var coop: Node = root.get_node("Coop")
 	var corners: Array[Vector2] = [Vector2(24, 24), Vector2(1208, 24), Vector2(24, 648), Vector2(1208, 648)]
 	for index in 4:
 		var wizard: Node2D = flow.call("get_wizard", index) as Node2D
 		if wizard != null:
 			wizard.global_position = corners[index]
-	coop.set("room", Rect2(-64.0, -64.0, 1408.0, 848.0))
 	var party: RefCounted = _party_camera()
 	var camera: Camera2D = party.get("camera") as Camera2D
 	if camera != null:
@@ -235,11 +232,11 @@ func _spread_wizards(flow: Node) -> void:
 		camera.limit_top = -64
 		camera.limit_right = 1344
 		camera.limit_bottom = 784
-	coop.call("step_rules", 0.0)
+	party.call("look", root.get_node("Actors"), 0)
 	party.call("snap")
 
 
-## Feel's party camera (gameplay/feel/party_camera.gd), which eases the world's camera to Coop's view.
+## Feel's party camera (gameplay/feel/party_camera.gd), which eases the world's camera to the view that holds this machine's wizards.
 func _party_camera() -> RefCounted:
 	return root.get_node("Feel").get("party_camera") as RefCounted
 

@@ -12,8 +12,9 @@ const VIEW_ONLY: bool = true
 const SEGMENTS: int = SpellLimits.PULSE_SEGMENTS
 
 var rings: int = 0
-## Each ring's centre, its radius now (the middle of its edge), its caster (its ramp), its spell's
+## Each ring's id (the same while it lasts, never a later ring's), centre, its radius now (the middle of its edge), its caster (its ramp), its spell's
 ## tag (its cards' motes), look bits and core colour.
+var id: PackedInt64Array = PackedInt64Array()
 var centre: PackedVector2Array = PackedVector2Array()
 var radius: PackedFloat32Array = PackedFloat32Array()
 var caster: PackedInt32Array = PackedInt32Array()
@@ -30,6 +31,7 @@ func hold(wanted: int) -> void:
 	if centre.size() >= wanted:
 		return
 	var room: int = maxi(wanted, centre.size() * 2)
+	id.resize(room)
 	centre.resize(room)
 	radius.resize(room)
 	caster.resize(room)

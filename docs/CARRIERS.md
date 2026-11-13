@@ -114,8 +114,9 @@ runs it, and the looks read the `pulse_*` getters.
   at the first body it strikes ("if an enemy is hit, that segment should stop propagating out
   (unless pierce is on, obviously)": with Pierce it passes that many bodies, `PIERCE`). Bodies are
   judged nearest first, so a wall or a body shadows what is behind it and the rest of the ring
-  goes on. Feel draws it as motes along its edge where it is now, only where its segment still
-  reaches (`gameplay/feel/pulse_rings.gd`, from one typed read a frame: `CarrierPulse.read_view`,
+  goes on. Feel draws it as motes along its edge where it is now and a trail of tail motes over
+  the band its edge swept since the last frame, laid by area as a shot's tail is by distance
+  (owner, 2026-11-13), only where its segment still reaches (`gameplay/feel/pulse_rings.gd`, from one typed read a frame: `CarrierPulse.read_view`,
   a `PulseView`, as the portals' look reads a `PortalView`). Its guard of shots (below)
   follows them too ("They should follow the segments too"): a shot behind a wall or a struck body
   is not turned or stopped.

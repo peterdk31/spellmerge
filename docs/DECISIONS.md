@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-13: an unplugged pad pauses the game (owner)
+
+- **An unplugged pad no longer leaves its seat** (owner: "An unplugged pad should not result in the seat being left! It should instead pause the game, and wait for that controller to reconnect"): the seat and its wizard stay, the game stops for everyone until that controller is back. Leaving is the pause menu's "Leave game" (items I2). A task in docs/NEXT.md.
+
 ## 2026-11-13: hands that can be empty (items I2)
 
 - **An empty hand is a bit on the caster** (`Caster.empty_hands`), not a null staff in `Caster.staffs`: a null entry there already means "the `staff` of every button" for enemies and props, so a second meaning would change them. The inventory (I3) will hand the caster its staffs and set the bits.

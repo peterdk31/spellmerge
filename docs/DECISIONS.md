@@ -2,6 +2,20 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-13: items, bags and pickups (owner decisions; docs/milestones/items.md)
+
+- **Now:** a plan, docs/milestones/items.md (I1 to I9), written with the owner over several rounds; nothing built yet.
+- **Cards are counted, and a card is an item** (owner: "Cards are counted. The dev-bag has x20 of each"; "An exhausted card/item is simply not in the bag anymore"): its `.tres` is the item, a card in a staff is out of the bag. This ends the bag as a list of kinds with endless copies.
+- **Bags with a capacity in copies, shown x/y** (`x/∞` with none), each to be raised by meta progression: Staffs, Cards, Relics, Potions. **The staff bag is a regular bag,** and a staff is put on one of the hands, each a button (owner: "the staff bag should just be a regular bag with x/y staffs ... assign a staff to 1 of z slots, each mapping to a button"). A player may hold fewer than four staffs and starts with two; the builder builds every staff in the bag.
+- **One rule to pick up:** A takes it if its bag has room, else the hint shakes red and names nothing; the player makes room in the inventory. The owner's own simpler system, taken over a swap menu and piles: no menu on the ground at all, and no taking cards out of a staff on the ground (owner: "fine with the no taking cards out of a staff on the ground directly").
+- **A staff off a hand keeps its mana and regains none,** on the ground or in the bag: every staff has its own pool, so bagged staffs would otherwise be spare batteries.
+- **The hub's rack is ordinary items** (owner: "It should work as a regular item pickup, no special handling"), one premade staff for now.
+- **The inventory is on Select (Tab), the builder stays on B; leaving the game is a row in the pause menu** with no key of its own. Select was `leave` and Tab the builder's second key.
+- **During a possession the panel, the builder and the inventory show the possessed body** (the first one hit), whose cards and staffs can be rearranged and dropped; the wizard's health shows as a bar above it. **This replaces the decision of 2026-10-28** that the seat's panel and builder are always its own wizard. Every actor has an inventory for it, and what is picked up during a possession stays with that body.
+- **What a run's start takes along is the whole player** (owner: "RunCarry should carry a complete player (all bags ...) and this will also allow to carry any other information about a player we might add"): `PlayerRecord` in place of `RunCarry`, in tagged sections, read as strictly.
+- **Enemies may take and use items** (I9), so picking up is keyed by actor.
+- **Why the shape:** kinds as one table of rules, the pickup rule apart from the bags and the ground, menus that only send requests (owner: "code all of these features with low coupling, so systems and behaviour can be changed later ... the way to pickup items could be tweaked").
+
 ## 2026-11-13: each machine's camera holds its own seats (owner)
 
 - **The zoom-out camera is for players who share a screen** (owner: "only 'local players' use the zoom-in out multiplayer camera ... 2-4 machines connected over the internet does not need to share a camera"): the party camera holds the wizards of the seats played on this machine, so two players on one couch share the picture as before and each machine online follows its own. Mixed play (two on a couch and one online) holds the two.

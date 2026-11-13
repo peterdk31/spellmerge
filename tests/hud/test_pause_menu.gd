@@ -76,6 +76,7 @@ func _initialize() -> void:
 	_test_a_on_the_altar_asks_to_open_the_room()
 	_test_the_run_ending_closes_it()
 	_test_main_menu_leaves_for_the_main_menu()
+	await _test_leave_game_lets_the_seat_go()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: hud/menus pause menu")
@@ -190,7 +191,7 @@ func _test_start_opens_it_and_pauses_everyone() -> void:
 	_check(_menu().is_open() and _menu().visible, "Start opens the pause menu")
 	_check(_menu().owner_player == 1, "for the player who pressed it")
 	_check(_stops, "the game stops for everyone (the command pause_requested)")
-	_check(_names() == ["Resume", "Settings", "MainMenu"], "the main page out of the sandbox, got %s" % [_names()])
+	_check(_names() == ["Resume", "Settings", "LeaveGame", "MainMenu"], "the main page out of the sandbox, got %s" % [_names()])
 	_check(_menu().button("Resume").text.begins_with("> "), "the focus is marked with text")
 
 
@@ -224,7 +225,7 @@ func _test_sandbox_entry_and_actions() -> void:
 	_setup(2, true)
 	_tap(1, &"pause")
 	_frame()
-	_check(_names() == ["Resume", "Sandbox", "Settings", "MainMenu"], "in the sandbox the main page has Sandbox, got %s" % [_names()])
+	_check(_names() == ["Resume", "Sandbox", "Settings", "LeaveGame", "MainMenu"], "in the sandbox the main page has Sandbox, got %s" % [_names()])
 	_press(1, "Sandbox")
 	_check(_names() == ["ResetDummies", "ArenaEnemy", "ArenaCount", "ArenaSpawn", "ArenaClear", "AIView", "RingStyle", "PutStyle", "ReloadStyle", "SandboxBack"], "the sandbox page, got %s" % [_names()])
 	_press(1, "ResetDummies")
@@ -235,7 +236,7 @@ func _test_sandbox_entry_and_actions() -> void:
 	_frame()
 	_check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
 	_bus.sandbox_changed.emit(false)
-	_check(_names() == ["Resume", "Settings", "MainMenu"], "out of the sandbox the entry goes")
+	_check(_names() == ["Resume", "Settings", "LeaveGame", "MainMenu"], "out of the sandbox the entry goes")
 
 
 func _test_the_enemy_arena() -> void:
@@ -844,3 +845,26 @@ func _test_main_menu_leaves_for_the_main_menu() -> void:
 	_check(not _hud.get_panel(0).visible and not _hud.get_panel(1).visible, "and no panel is left over it")
 	if shown != null and shown.name == "MenuStandIn":
 		shown.free()
+
+
+## "Leave game" (items I2, in place of the `leave` action): the menu closes and lets the game go
+## first, then `seat_leave_requested` for the seat that opened it, whose device the input layer lets
+## go (`device_left`: the seat's LEAVE in its next frame); the other seat plays on.
+func _test_leave_game_lets_the_seat_go() -> void:
+	_setup(2)
+	var heard: Array[String] = []
+	_bus.pause_requested.connect(func(player: int, on: int) -> void: heard.append("pause %d %d" % [player, on]))
+	# Heard before the input layer, so the order is the menu's.
+	_bus.seat_leave_requested.connect(func(player: int) -> void: heard.append("leave %d" % player))
+	# The input layer hears the request once it is in the tree, as the autoload is.
+	root.add_child(_input)
+	await process_frame
+	_bus.device_left.connect(func(player: int, _device: int) -> void: heard.append("gone %d" % player))
+	_tap(1, &"pause")
+	_frame()
+	heard.clear()
+	_press(1, "LeaveGame")
+	_check(not _menu().is_open() and not _stops, "Leave game closes the menu and lets the game go")
+	_check(heard == ["pause 1 0", "leave 1", "gone 1"], "first the game is let go, then the seat leaves, got %s" % [heard])
+	_check(not _input.is_joined(1), "the seat that opened the menu is gone")
+	_check(_input.is_joined(0), "the other seat plays on")

@@ -19,8 +19,8 @@ extends FrameSource
 ## (a teammate's blast never makes it fight a teammate).
 ## Idler: stands still; it only opens its builder.
 ##
-## Builder: `build_random(seed)` builds a random staff into staff 3 (BUILD_STAFF, LB, empty at the
-## start) with the same `staff_change_requested` events a person sends (slot by slot, from the
+## Builder: `build_random(seed)` builds a random staff into staff 1 (BUILD_STAFF, RB: `dash` at the
+## start, so RT keeps its `bolt` and the wave is still cleared; LB is an empty hand since items I2) with the same `staff_change_requested` events a person sends (slot by slot, from the
 ## bag of the wizard). The cards come from `staff_fuzzer.gd`, seeded, so a failing run can be
 ## replayed. `open_builder()` is how bot 4 of the 4-bot test works: one press of `back` (B),
 ## and it stays there (the full builder, waves included).
@@ -34,8 +34,8 @@ const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
 ## How a bot plays (the brain's numbers).
 const PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
 
-## The staff a bot builds into: staff 3, LB (empty at the start).
-const BUILD_STAFF: int = 2
+## The staff a bot builds into: RB, over its start `dash` (RT keeps its `bolt`).
+const BUILD_STAFF: int = 0
 ## The staff buttons, by staff.
 const STAFF_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
 ## A random staff has at most this many cards, so a built staff stays quick to cast.

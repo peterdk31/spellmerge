@@ -1,6 +1,6 @@
 # Items: things a body picks up, holds in bags and drops
 
-**Status (2026-11-13): planned with the owner in an owner session** (the owner, after the last round: "Go ahead"); this document is step I1. Nothing is built yet. Asked by the owner: "Let's design a plan for having item pickups in the game. The first thing we need is staff pickups."
+**Status (2026-11-13): planned with the owner in an owner session** (the owner, after the last round: "Go ahead"); this document is step I1. I2 is built (below, "I2 done"); I3 is next. Asked by the owner: "Let's design a plan for having item pickups in the game. The first thing we need is staff pickups."
 
 The steps are **I1 to I9** (I for items). Each is one PR with its tests, in order.
 
@@ -118,6 +118,8 @@ This document, the roadmap's exception and the decisions.
 - Players start with two staffs, on RB and RT, in Play and the hub (the hub's dev staff on RT goes: the rack replaces it).
 - The pause menu gets "Leave game" for the seat that opened it; the `leave` action goes, on the pad and the keyboard.
 - Tests: a wizard with a gap between its staffs casts, shows and snapshots; the leave row lets the seat go at its tick on every machine.
+
+**I2 done (2026-11-13).** A hand is empty by `Caster.empty_hands` (a bit a button, state), set by `PlayerController.seat_wizard` for a null staff (`Caster.replace_staffs`, a boss's phase, fills every hand it is given, a null staff falling back as before); an empty hand has no cards, slots or pool, casts nothing, refuses the builder (`PlayerController.EMPTY_HAND`), is never put on show while a staff is held, and is announced with an empty plan, so the corner panel shows no row for it and the radial builder's LB and RB pass it (its tab a dim dash). Play and the hub hold curl on RB and star on RT (`Flow.START_HANDS`); `HUB_DEV_BUTTON` is gone. A carried empty hand stays empty: the carry's `&""` is the mode's, which is empty there, so the replay's header is unchanged until I4. The pause menu's "Leave game" sends `seat_leave_requested`, which the input layer hears (`device_left`, the seat's LEAVE in its next frame); the `leave` action and its glyph are gone. The stress bench hands its wizards three staffs with `replace_staffs` (Play's two and moon on LB), as they held before; the bots build into RB, so RT keeps its bolt. Tests: `tests/gameplay/player/test_player_hands.gd`, and the Flow, hub, input, pause menu and builder tests.
 
 ## I3: stacks, kinds, the inventory and counted cards
 

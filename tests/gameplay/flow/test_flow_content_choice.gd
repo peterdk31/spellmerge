@@ -46,35 +46,25 @@ func test_an_unknown_enemy_starts_no_run() -> void:
 	check(not flow.start_run(0), "a missing enemy must not start a run")
 
 
-## One staff file per setup, used as it is (owner, 2026-11-01): Play holds the four
-## basic staffs, the sandbox the dev staff on every button, the hub Play's with the dev staff on RT,
-## in every build channel.
+## One staff file per setup, used as it is (owner, 2026-11-01): Play and the hub hold the first two
+## basic staffs on RB and RT and two empty hands (items I2), the sandbox the dev staff on every
+## button, in every build channel.
 func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 	var registry: Node = root.get_node("Registry")
 	var dev: StaffBase = registry.call("get_resource", &"wizard", FlowScript.DEV_STAFF) as StaffBase
-	for mode: StringName in [FlowScript.MODE_WAVES, FlowScript.MODE_SANDBOX]:
+	for mode: StringName in [FlowScript.MODE_WAVES, FlowScript.MODE_SANDBOX, FlowScript.MODE_HUB]:
 		flow.mode = mode
 		var staffs: Array[StaffBase] = flow.staffs_for_mode()
-		check_equal(staffs.size(), 4, "%s: four staffs" % mode)
+		check_equal(staffs.size(), 4, "%s: four hands" % mode)
 		if staffs.size() != 4:
 			continue
 		for at in 4:
 			var wanted: StaffBase = dev
 			if mode != FlowScript.MODE_SANDBOX:
-				wanted = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase
-			check(staffs[at] == wanted, "%s: button %d holds the %s staff itself" % [mode, at, wanted.id])
-	# The hub (owner, 2026-11-13): Play's staffs, with the dev staff on RT.
-	flow.mode = FlowScript.MODE_HUB
-	var hub: Array[StaffBase] = flow.staffs_for_mode()
-	check_equal(hub.size(), 4, "hub: four staffs")
-	if hub.size() == 4:
-		for at in 4:
-			var wanted: StaffBase = dev
-			if at != FlowScript.HUB_DEV_BUTTON:
-				wanted = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase
-			check(hub[at] == wanted, "hub: button %d holds the %s staff itself" % [at, wanted.id])
-	check_equal(FlowScript.HUB_DEV_BUTTON, 1, "the hub's dev staff is on RT (button 1)")
-	check(flow.STARTER_HEADS[FlowScript.HUB_DEV_BUTTON] != FlowScript.DEV_STAFF, "the hub leaves Play's staffs as they are")
+				# Play and the hub (items I2): two staffs, RB and RT; LB and LT empty.
+				wanted = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase if at < FlowScript.START_HANDS else null
+			check(staffs[at] == wanted, "%s: button %d holds %s" % [mode, at, wanted.id if wanted != null else "nothing"])
+	check_equal(FlowScript.START_HANDS, 2, "players start with two staffs")
 	flow.mode = FlowScript.MODE_WAVES
 	var heads: Dictionary = {}
 	for id in FlowScript.STARTER_HEADS:
@@ -120,14 +110,15 @@ func test_play_start_cards_are_in_its_bag() -> void:
 
 
 func test_other_start_cards_reach_the_wizards() -> void:
-	flow.start_cards = [[&"nova"], [], [], [&"frost", &"bolt"]]
+	flow.start_cards = [[&"nova"], [&"frost", &"bolt"], [], []]
 	check(flow.start_run(0), "the run starts with other start cards")
 	var wizard: Actor = flow.get_wizard(0) as Actor
 	var a: Array[StringName] = wizard.caster.cards_of(0)
-	var b: Array[StringName] = wizard.caster.cards_of(3)
+	var b: Array[StringName] = wizard.caster.cards_of(1)
 	check_equal(a[0], &"nova", "staff A holds the chosen card")
-	check_equal(b.slice(0, 2), [&"frost", &"bolt"] as Array[StringName], "staff B too")
-	check(not wizard.caster.has_staff(1), "an empty start staff has no build")
+	check_equal(b.slice(0, 2), [&"frost", &"bolt"] as Array[StringName], "staff RT too")
+	check(wizard.caster.has_staff(1), "a staff with cards is built")
+	check(not wizard.caster.has_staff(2), "an empty hand has no build")
 
 
 func test_the_chosen_wizard_scene_is_the_one_spawned() -> void:

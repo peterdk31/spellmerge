@@ -4,8 +4,9 @@ extends Node
 ##
 ## Devices join by a button press (the `join` action): a gamepad takes the
 ## lowest free player index, the keyboard and mouse only ever take player 0
-## (P1), so P2-P4 are gamepads. The `leave` action, or unplugging a gamepad,
-## frees the slot.
+## (P1), so P2-P4 are gamepads. The pause menu's "Leave game" (`seat_leave_requested`; items I2:
+## it replaced the `leave` action, whose Select is the inventory's), or unplugging a gamepad, frees
+## the slot.
 ##
 ## **This machine's seats** (`set_own_seats(first, count)`; all four, from P1, unless told): the
 ## slots its real devices may take from then on. The keyboard takes only the first of them and a gamepad the
@@ -88,8 +89,8 @@ const TRIGGER_PRESSED: float = 0.5
 ## Pixels the mouse must travel before the keyboard player aims with it.
 const MOUSE_AIM_TRAVEL: float = 8.0
 
-## The per-player actions, defined in project.godot. `join` and `leave` are
-## handled here and are not per-player state. `staff_1` to `staff_4` cast the four staffs from
+## The per-player actions, defined in project.godot. `join` is handled here and is not per-player
+## state. `staff_1` to `staff_4` cast the four staffs from
 ## the shoulder buttons (owner, 2026-10-26): RB, RT, LB, LT on a pad; Space, the left and right
 ## mouse buttons and Q on the keyboard. The face buttons are the menus' (core/ui_focus):
 ## `accept` (A), `back` (B; in play it opens the builder, `hud/panels`) and `alternate` (X);
@@ -114,7 +115,6 @@ const CAPTURED_ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down", &"staff_1", &"staff_2", &"staff_3", &"staff_4",
 ]
 const JOIN: StringName = &"join"
-const LEAVE: StringName = &"leave"
 
 ## The kind of device of `player` changed: the glyphs for that player must be drawn again.
 signal glyph_kind_changed(player: int)
@@ -198,6 +198,12 @@ func _ready() -> void:
 		events.play_requested.connect(_on_run_requested)
 		events.sandbox_requested.connect(_on_run_requested)
 		events.hub_requested.connect(_on_run_requested)
+		events.seat_leave_requested.connect(_on_seat_leave_requested)
+
+
+## The pause menu's "Leave game" for seat `player`: its device goes (`leave`).
+func _on_seat_leave_requested(player: int) -> void:
+	leave(player)
 
 
 ## A run was asked for (Play's hub, the sandbox, a run of waves) by seat `requester`. The menu's buttons may
@@ -401,9 +407,6 @@ func handle_event(event: InputEvent) -> void:
 	# The keyboard in use for real (a key or a click) keeps P1.
 	if device == KEYBOARD and _keyboard_provisional and event.is_pressed() and (event is InputEventKey or event is InputEventMouseButton):
 		_keyboard_provisional = false
-	if event.is_action_pressed(LEAVE):
-		leave(player)
-		return
 	if event is InputEventMouseMotion:
 		# A brush of the mouse is not a decision to aim with it.
 		_mouse_travel += (event as InputEventMouseMotion).relative.length()

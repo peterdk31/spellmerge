@@ -54,6 +54,7 @@ func _initialize() -> void:
 	_test_leave_clears_held_actions()
 	_test_join_press_is_not_a_cast()
 	_test_invalid_player_index()
+	await _test_leave_game_frees_only_that_seat()
 	if _failures.is_empty():
 		print("TEST OK: core/input")
 		quit(0)
@@ -128,8 +129,10 @@ func _press_join(device: int) -> void:
 # --- Tests ------------------------------------------------------------------
 
 func _test_actions_defined() -> void:
-	for action: StringName in [&"move_left", &"move_right", &"move_up", &"move_down", &"staff_1", &"staff_2", &"staff_3", &"staff_4", &"accept", &"back", &"alternate", &"pause", &"join", &"leave"]:
+	for action: StringName in [&"move_left", &"move_right", &"move_up", &"move_down", &"staff_1", &"staff_2", &"staff_3", &"staff_4", &"accept", &"back", &"alternate", &"pause", &"join"]:
 		_check(InputMap.has_action(action), "project.godot defines the action %s" % action)
+	# Items I2: the pause menu's "Leave game" took its place (Select is the inventory's).
+	_check(not InputMap.has_action(&"leave"), "no leave action")
 	for action in InputManagerScript.ACTIONS:
 		_check(InputMap.has_action(action), "the manager's action %s is defined in project.godot" % action)
 
@@ -367,18 +370,18 @@ func _test_leave_frees_the_slot() -> void:
 	_check(_manager.device_of(1) == 7, "the next gamepad takes the freed slot 1")
 
 
+## No button leaves (items I2): Back and Backspace keep the seat (the pause menu's "Leave game"
+## does: `_test_leave_game_frees_only_that_seat`).
 func _test_leave_by_button() -> void:
 	_setup()
 	for pad in 4:
 		_press_join(pad)
-	for player in 4:
-		_manager.handle_event(_button(player, JOY_BUTTON_BACK))
-		_check(not _manager.is_joined(player), "the leave button frees player %d" % player)
-	_check(_manager.joined_count() == 0, "everybody can leave")
+	_manager.handle_event(_button(1, JOY_BUTTON_BACK))
+	_check(_manager.is_joined(1), "Back no longer leaves")
 	_setup()
 	_manager.handle_event(_key(KEY_ENTER))
 	_manager.handle_event(_key(KEY_BACKSPACE))
-	_check(not _manager.is_joined(0), "Backspace makes the keyboard player leave")
+	_check(_manager.is_joined(0), "Backspace no longer leaves")
 
 
 func _test_unplugged_gamepad_leaves() -> void:
@@ -679,9 +682,7 @@ func _test_bindings_route_as_documented() -> void:
 		_check(_manager.is_action_pressed(0, buttons[button]), "gamepad button %d is %s" % [button, buttons[button]])
 		_manager.handle_event(_button(0, button, false))
 		_check(not _manager.is_action_pressed(0, buttons[button]), "releasing gamepad button %d stops %s" % [button, buttons[button]])
-	_manager.handle_event(_button(0, JOY_BUTTON_BACK))
-	_check(not _manager.is_joined(0), "Back leaves")
-
+	_manager.leave(0)
 	_manager.handle_event(_key(KEY_ENTER))
 	var keys: Dictionary = {
 		KEY_LEFT: &"move_left", KEY_RIGHT: &"move_right", KEY_UP: &"move_up", KEY_DOWN: &"move_down",
@@ -694,8 +695,22 @@ func _test_bindings_route_as_documented() -> void:
 		_check(_manager.is_action_pressed(0, keys[key]), "key %d is %s" % [key, keys[key]])
 		_manager.handle_event(_key(key, false))
 		_check(not _manager.is_action_pressed(0, keys[key]), "releasing key %d stops %s" % [key, keys[key]])
-	_manager.handle_event(_key(KEY_BACKSPACE))
-	_check(not _manager.is_joined(0), "Backspace leaves")
+
+
+## The pause menu's "Leave game" (`seat_leave_requested`, heard once the manager is in the tree)
+## frees that seat alone, with `device_left`, as a pad pulled out would.
+func _test_leave_game_frees_only_that_seat() -> void:
+	_setup()
+	root.add_child(_manager)
+	await process_frame
+	for pad in 4:
+		_press_join(pad)
+	_log.clear()
+	_bus.seat_leave_requested.emit(1)
+	_check(not _manager.is_joined(1), "Leave game frees player 1")
+	_check(_manager.joined_count() == 3, "and only that seat")
+	_check(_log.size() == 1 and _log[0][0] == "left" and _log[0][1] == 1, "with device_left, got %s" % [_log])
+	_teardown()
 
 
 func _test_input_map_has_documented_bindings() -> void:
@@ -705,7 +720,7 @@ func _test_input_map_has_documented_bindings() -> void:
 		&"staff_1": [KEY_SPACE, KEY_SHIFT], &"staff_2": [KEY_J], &"staff_3": [KEY_K], &"staff_4": [KEY_Q, KEY_L],
 		&"accept": [KEY_ENTER, KEY_SPACE], &"back": [KEY_TAB, KEY_E], &"alternate": [KEY_X, KEY_DELETE],
 		&"pause": [KEY_ESCAPE],
-		&"join": [KEY_ENTER, KEY_SPACE], &"leave": [KEY_BACKSPACE],
+		&"join": [KEY_ENTER, KEY_SPACE],
 	}
 	for action: StringName in keys:
 		for key: Key in keys[action]:
@@ -715,7 +730,7 @@ func _test_input_map_has_documented_bindings() -> void:
 		&"move_up": JOY_BUTTON_DPAD_UP, &"move_down": JOY_BUTTON_DPAD_DOWN,
 		&"staff_1": JOY_BUTTON_RIGHT_SHOULDER, &"staff_3": JOY_BUTTON_LEFT_SHOULDER,
 		&"accept": JOY_BUTTON_A, &"back": JOY_BUTTON_B, &"alternate": JOY_BUTTON_X, &"pause": JOY_BUTTON_START,
-		&"join": JOY_BUTTON_A, &"leave": JOY_BUTTON_BACK,
+		&"join": JOY_BUTTON_A,
 	}
 	for action: StringName in pad:
 		_check(InputMap.action_has_event(action, _button(0, pad[action])), "%s is bound to gamepad button %d" % [action, pad[action]])

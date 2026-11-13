@@ -389,6 +389,31 @@ func test_lb_rb_switch_staffs_and_the_left_stick_moves_the_marker() -> void:
 	check(not _players[0].caster.has_staff(2), "the move keys never walked or cast anything")
 
 
+## A hand that holds no staff (items I2) is passed by LB and RB, and its tab is never shown; a
+## builder opened on it shows the next staff held.
+func test_lb_rb_pass_an_empty_hand() -> void:
+	_input.add_virtual_device(0)
+	var dev: StaffBase = _registry.get_resource(&"wizard", &"dev") as StaffBase
+	var hands: Array[StaffBase] = [dev, null, dev, null]
+	var player := own(_world.wizard(0, Vector2.ZERO, START, null, true, hands)) as Actor
+	_players.append(player)
+	_bus.player_joined.emit(0)
+	_bus.room_entered.emit(&"test_room")
+	var radial: RadialScript = _open(0)
+	check(not radial.holds_staff(1) and not radial.holds_staff(3), "RT and LT hold no staff")
+	check(radial.holds_staff(0) and radial.holds_staff(2), "RB and LB do")
+	check(radial.holds_staff(radial.viewed_staff()), "it opens on a staff held, got %d" % radial.viewed_staff())
+	var seen: Array[int] = []
+	for i in 4:
+		_tap(0, &"page_next")
+		_frame()
+		seen.append(radial.viewed_staff())
+	check_equal(seen, [2, 0, 2, 0] if seen[0] == 2 else [0, 2, 0, 2], "RB steps between the held staffs only")
+	_tap(0, &"page_prev")
+	_frame()
+	check(radial.holds_staff(radial.viewed_staff()), "LB too")
+
+
 func test_the_one_kind_ring_flips_with_the_dpad() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)

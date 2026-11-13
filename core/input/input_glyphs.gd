@@ -36,7 +36,7 @@ const NO_GLYPH: Dictionary = {"shape": Shape.KEY, "label": "?", "color": PLAIN}
 const _KEYS: Dictionary = {
 	&"staff_1": "Space", &"staff_2": "J", &"staff_3": "K", &"staff_4": "Q", &"accept": "Enter", &"back": "Tab",
 	&"alternate": "X", &"pause": "Esc", &"join": "Enter",
-	&"leave": "Bksp", &"move_up": "W", &"move_down": "S", &"move_left": "A", &"move_right": "D", &"page_prev": "Z", &"page_next": "C",
+	&"move_up": "W", &"move_down": "S", &"move_left": "A", &"move_right": "D", &"page_prev": "Z", &"page_next": "C",
 	&"extra": "R", &"kind_prev": "PgUp", &"kind_next": "PgDn",
 }
 
@@ -101,9 +101,6 @@ static func glyph(kind: int, action: StringName) -> Dictionary:
 			return _trigger(kind, true)
 		&"staff_4":
 			return _trigger(kind, false)
-		&"leave":
-			var back: String = "Share" if kind == Kind.PLAYSTATION else ("-" if kind == Kind.SWITCH else "Back")
-			return {"shape": Shape.SHOULDER, "label": back, "color": PLAIN}
 	return NO_GLYPH
 
 

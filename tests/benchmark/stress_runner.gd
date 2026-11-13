@@ -16,7 +16,7 @@ extends Node
 ## seven of the web run's fourteen minutes (2026-10-28, when the run went past its timeout).
 ##
 ## How the numbers are held. The bots cast their built spells through the real input
-## path (`staff_2` and `staff_3` held together, so both built staffs are used). Their
+## path (their brains play whatever staffs the wizard holds: RB's dash and the two built staffs). Their
 ## mana and health are kept full (so they keep casting), and enemies are added whenever
 ## fewer than the target stand, with more health than the game's imp, so fights go on.
 ## The shots the spells make are never enough for the caps, so each physics step
@@ -92,7 +92,10 @@ const FRAME_BUDGET_MS: float = 1000.0 / 60.0
 ## The hot events whose listeners the tree profile times (`--profile-signals`).
 const PROFILED_SIGNALS: Array[StringName] = [&"damage_dealt", &"projectile_hit", &"enemy_died", &"hit_landed", &"status_applied", &"reaction_triggered", &"spell_cast"]
 
-## The build of each player: the cards of staff X and staff Y (the A staff keeps its dash).
+## The build of each player: the cards of RT and LB (RB keeps its dash). A Play wizard holds two
+## staffs (items I2), so the runner hands each wizard three (`Caster.replace_staffs`, every hand it
+## is given held): Play's RB and RT and the moon staff on LB, as the wizards held before. Until the
+## inventory (I3) puts a staff on a hand, that is the one call that does.
 ## Heavy on purpose: splits, rings, orbits, triggers with payloads, all four elements.
 const STAFFS: Array[Array] = [
 	[
@@ -294,14 +297,35 @@ func _start_measuring(scenario: Dictionary) -> void:
 			return
 		_wizards.append(wizard)
 		_downs.append(Downed.of(wizard))
+		var held: Array[StaffBase] = _stress_hands()
+		if held.is_empty():
+			_finish(["a basic staff is missing from the registry"])
+			return
+		var rows: Array = [wizard.caster.cards_of(0)]
+		rows.append_array(STAFFS[index])
+		wizard.caster.replace_staffs(held, rows)
 		for at in 2:
-			var cards: Array[StringName] = []
-			cards.assign(STAFFS[index][at])
-			if not wizard.caster.set_staff(at + 1, cards):
+			if not wizard.caster.has_staff(at + 1):
 				_finish(["the stress staff %d of player %d was refused" % [at + 1, index + 1]])
 				return
 	print("BENCH: stress scenario %s: %d players, %d enemies, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], PLAYERS, _target_enemies, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])
 	_active = true
+
+
+## The hands of a stress wizard: Play's two staffs and the moon staff on LB (empty when one is
+## missing).
+func _stress_hands() -> Array[StaffBase]:
+	var out: Array[StaffBase] = []
+	var registry: Node = get_tree().root.get_node_or_null("Registry")
+	if registry == null:
+		return out
+	for id: StringName in [&"curl", &"star", &"moon"]:
+		var held: StaffBase = registry.call("get_resource", &"wizard", id) as StaffBase
+		if held == null:
+			out.clear()
+			return out
+		out.append(held)
+	return out
 
 
 ## The imp's data with more health, so the crowd is not killed within seconds.

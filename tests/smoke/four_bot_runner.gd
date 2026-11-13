@@ -3,7 +3,7 @@ extends Node
 ## first room through the real input path. Bots 1-3 fight; bot 4 opens its builder with B
 ## (`back`) when the room starts and idles in it the whole run (the full builder, waves
 ## included). Bots 1-3 also build: when the room starts each builds a seeded random staff into
-## staff 3 with `staff_change_requested`, and their brains (the enemies' AI, tests/bots/bot.gd)
+## staff 1 (RB, `BotScript.BUILD_STAFF`) with `staff_change_requested`, and their brains (the enemies' AI, tests/bots/bot.gd)
 ## play it with their other staffs, so the run is played with built staffs.
 ##
 ## It passes only if
@@ -13,7 +13,7 @@ extends Node
 ##  - bot 4's builder opened and was not seen closed afterwards (polled every frame). Bot 4
 ##    stands still and can be downed; it is not checked for that, and
 ##    a close while it was downed is printed as a note, not a failure, and
-##  - every fighter's build went through (staff 3 holds the cards the bot chose) and no
+##  - every fighter's build went through (staff 1 holds the cards the bot chose) and no
 ##    `build_refused` arrived, and
 ##  - the log has no `push_error` call, no line starting `ERROR:` and no "the
 ##    restart failed" warning (tests/smoke/error_log.gd, which has a unit test; it
@@ -199,7 +199,7 @@ func _check() -> Array[String]:
 		var wizard := _flow.call("get_wizard", index) as Actor
 		var bot: BotScript = _bots[index]
 		if wizard != null and not bot.built_cards.is_empty() and wizard.caster.cards_of(BotScript.BUILD_STAFF) != bot.built_cards:
-			failed.append("bot %d: staff 3 is not the staff it built" % (index + 1))
+			failed.append("bot %d: staff 1 is not the staff it built" % (index + 1))
 	if not _builder_seen_open:
 		failed.append("the builder of bot %d never opened" % (IDLER + 1))
 	elif _builder_closed_at >= 0.0:

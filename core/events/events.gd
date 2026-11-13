@@ -82,6 +82,11 @@ signal hub_requested(player: int)
 ## is let go: the other machines see this one leave) and hud (the main menu is shown). None of
 ## them asks another.
 signal main_menu_requested(player: int)
+## Sender: hud. `player` picked "Leave game" in the pause menu (items I2: it replaced the `leave`
+## action): that seat lets its device go, as a pad pulled out would. Not a command itself: heard by
+## core/input, whose `device_left` puts the seat's LEAVE in its next frame, so the seat goes at
+## that tick on every machine and in a replay.
+signal seat_leave_requested(player: int)
 ## Sender: hud. `player` pressed A (`accept`) with no menu open while the hub's teleporter stone was
 ## lit (`start_stone_changed`): start the run (online-lobby L1). A command: heard by flow at the next
 ## tick's start, which starts the run of waves if the stone is still lit then.

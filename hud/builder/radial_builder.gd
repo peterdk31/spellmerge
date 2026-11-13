@@ -36,7 +36,8 @@ extends Control
 ##   the gap. **Held** for `CLEAR_HOLD` seconds, LT clears the rest of the staff: a red frame
 ##   fills round the slots, then every card fades out at once (the press has already taken one
 ##   out, so a clear ends the same). **LB, RB** (`page_prev`, `page_next`) show the previous or
-##   next staff; **B** closes it.
+##   next staff, past a hand that holds none (its `staff_changed` plan is empty; items I2: its tab
+##   is drawn dim with a dash); **B** closes it.
 ## - **The tree** (owner, 2026-10-31, `tree_view.gd`): **Y** (`extra`; R) swaps the ring (and its
 ##   kind row) for a tree of the shown staff's cycle in the same space, and back. The right
 ##   stick (P1's mouse wheel) scrolls it; the left stick still moves the slot marker, whose card's
@@ -372,6 +373,8 @@ func open_builder() -> bool:
 	_move_dir = Vector2i.ZERO
 	_flyers.clear()
 	_fading.clear()
+	if not holds_staff(_viewed):
+		_viewed = _held_from(_viewed, 1)
 	_slot = _end_slot()
 	_tree_open = false
 	_tree.visible = false
@@ -392,6 +395,20 @@ func close_builder() -> bool:
 ## The staff shown, 0 to 3.
 func viewed_staff() -> int:
 	return _viewed
+
+
+## True when hand `staff` holds a staff (its plan is not empty; an empty hand's is `{}`).
+func holds_staff(staff: int) -> bool:
+	return staff >= 0 and staff < STAFF_COUNT and not _plans[staff].is_empty()
+
+
+## The first hand from `staff` on, `step_by` at a time, that holds a staff; `staff` when none does.
+func _held_from(staff: int, step_by: int) -> int:
+	for i in STAFF_COUNT:
+		var at: int = posmod(staff + step_by * i, STAFF_COUNT)
+		if holds_staff(at):
+			return at
+	return staff
 
 
 ## The marked slot of the shown staff.
@@ -1096,7 +1113,7 @@ func _on_cancelled(player: int) -> void:
 
 func _on_paged(player: int, step_by: int) -> void:
 	if player == index and _open:
-		_show_staff(posmod(_viewed + step_by, STAFF_COUNT))
+		_show_staff(_held_from(posmod(_viewed + step_by, STAFF_COUNT), signi(step_by)))
 
 
 # --- The ring ---------------------------------------------------------------------------
@@ -1293,6 +1310,12 @@ func _draw_tabs() -> void:
 	for staff in STAFF_COUNT:
 		var rect := Rect2(x, _tabs_at.y, 12.0, 11.0)
 		var on: bool = staff == _viewed
+		if not holds_staff(staff):
+			# An empty hand: an outline and a dash, never shown.
+			_frame(rect, LINE)
+			_text("-", Vector2(rect.get_center().x, rect.position.y + 1.0), DIM, true)
+			x += 13.0
+			continue
 		draw_rect(rect, LINE if not on else TEXT.darkened(0.15))
 		if on:
 			_frame(rect.grow(1.0), GOLD)

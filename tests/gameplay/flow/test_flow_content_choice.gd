@@ -47,7 +47,8 @@ func test_an_unknown_enemy_starts_no_run() -> void:
 
 
 ## One staff file per setup, used as it is (owner, 2026-11-01): Play holds the four
-## basic staffs, the sandbox the dev staff on every button, in every build channel.
+## basic staffs, the sandbox the dev staff on every button, the hub Play's with the dev staff on RT,
+## in every build channel.
 func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 	var registry: Node = root.get_node("Registry")
 	var dev: StaffBase = registry.call("get_resource", &"wizard", FlowScript.DEV_STAFF) as StaffBase
@@ -62,6 +63,18 @@ func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 			if mode != FlowScript.MODE_SANDBOX:
 				wanted = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase
 			check(staffs[at] == wanted, "%s: button %d holds the %s staff itself" % [mode, at, wanted.id])
+	# The hub (owner, 2026-11-13): Play's staffs, with the dev staff on RT.
+	flow.mode = FlowScript.MODE_HUB
+	var hub: Array[StaffBase] = flow.staffs_for_mode()
+	check_equal(hub.size(), 4, "hub: four staffs")
+	if hub.size() == 4:
+		for at in 4:
+			var wanted: StaffBase = dev
+			if at != FlowScript.HUB_DEV_BUTTON:
+				wanted = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase
+			check(hub[at] == wanted, "hub: button %d holds the %s staff itself" % [at, wanted.id])
+	check_equal(FlowScript.HUB_DEV_BUTTON, 1, "the hub's dev staff is on RT (button 1)")
+	check(flow.STARTER_HEADS[FlowScript.HUB_DEV_BUTTON] != FlowScript.DEV_STAFF, "the hub leaves Play's staffs as they are")
 	flow.mode = FlowScript.MODE_WAVES
 	var heads: Dictionary = {}
 	for id in FlowScript.STARTER_HEADS:

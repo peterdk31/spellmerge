@@ -12,7 +12,7 @@ extends RefCounted
 ##   asked), the seats joined at the start (`seats`, a bit per seat) and the run's rules (`rules`:
 ##   the shot cap, the step budgets; core/sim/session_rules.gd, online-ready N11),
 ##   so it plays the same on a machine whose own settings are others, and what the run takes along
-##   from the play before it (`carry`: each seat's staffs; core/sim/run_carry.gd, online lobby).
+##   from the play before it (`carry`: each seat's staffs and their cards; core/sim/run_carry.gd, online lobby).
 ## - **The ticks:** per tick a byte of the seats with a frame (a bit each), then each seat's frame
 ##   (its length, then `InputFrame` bytes). The game's stops need no mark: they are its state
 ##   (online-ready N4), so a replay stands still where the recording did. Kept as bytes (`add_tick`, `read_tick`), so an hour of four seats is
@@ -33,8 +33,9 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## The file format's version (2: the run's rules in the header, N11; 3: no "paused" bit in a
 ## tick's byte, the stops being state, N4; 4: no horde, its start, cap and commands gone; 5: what
-## the run takes along, after the rules). A replay of another format is refused.
-const FORMAT: int = 5
+## the run takes along, after the rules; 6: each carried staff's own id after its cards). A replay
+## of another format is refused.
+const FORMAT: int = 6
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): a run of waves, the sandbox, the hub (online-lobby

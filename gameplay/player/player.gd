@@ -152,6 +152,20 @@ static func staff_cards(body: Actor) -> Array:
 	return out
 
 
+## The id of each staff `body` holds now, by button (`&""` for one with no id): what Flow gives a
+## wizard made again as its staffs (`Flow.staffs_for_seat`), so it keeps the staffs themselves
+## beside their cards (`staff_cards`; owner, 2026-11-13). Empty for a body with no Caster.
+static func staff_ids(body: Actor) -> Array[StringName]:
+	var out: Array[StringName] = []
+	var caster: Caster = body.caster if body != null else null
+	if caster == null:
+		return out
+	for at in caster.staff_count:
+		var held: StaffBase = caster.staff_of(at)
+		out.append(held.id if held != null else &"")
+	return out
+
+
 ## The PlayerController in `body`'s scene (its home controller), or null. Works before `body` is
 ## in the tree.
 static func of(body: Node) -> PlayerController:

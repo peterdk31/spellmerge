@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-13: the hub's RT holds the dev staff (owner)
+
+- **The hub's wizards hold the `dev` staff on RT** (`Flow.HUB_DEV_BUTTON`; owner: "In the hub, players should have a dev staff on RT. Just to allow for testing bigger spells for now"): 20 slots, no delay, practically endless mana, beside Play's three other basic staffs, so a big build can be tried on the hub's dummies without going to the sandbox. For now: it goes when the hub has a better way to try spells.
+- **A run takes the staffs themselves along, not only their cards** (owner: "The dev staff should carry over into the run - this is just how it should be in general. Equip a staff in the hub, setup cards, start a run"): a run from the stone makes each wizard with the staffs it held in the hub and the cards on them (`Flow.staffs_for_seat`, by staff id under `wizard`; a button with no id, or one no staff has, holds the mode's). Before, only the cards went, onto Play's staffs, so a long build was cut to its staff's slots. Back in the hub the staffs start anew, since nothing comes back from a run (2026-11-10).
+- **The recording's header carries each staff's id after its cards** (`RunCarry`, replay format 6), so the hub begun anew for a joining machine holds the same staffs on every machine once staffs can be equipped there. An empty id is the run's own staff.
+
 ## 2026-11-11: a room is its scene; editor scripts; self-contained props (props W8a, W8b)
 
 - **Positions are written once, in the room's scene** (owner: "ideally I would like to be able to edit a room eg. the Hub by hand in the godot editor. This is easy if I can visually see what im moving"): spawns, doors, props, dummies and zones are nodes there, read by `RoomPlaces`; the `.tres` keeps the room's id, scene and rules. Before, every position was in the `.tres` and repeated by markers, with a test holding them together, so moving a thing in the editor did nothing.

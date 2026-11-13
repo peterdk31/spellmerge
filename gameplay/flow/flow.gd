@@ -80,7 +80,8 @@ extends Node
 ## in the hub room (`hub`), an island in the void where players join and leave as they like (coop's
 ## `player_joined` / `player_left`, at the room's spawns), try their staffs on the room's dummies,
 ## and take nothing from hits (`RoomBase.invincible`: the hit lands, the health stays). Its wizards
-## have Play's staffs and start cards, and every card in the bag (above). Its teleporter stone (a
+## have Play's staffs, but the `dev` staff on RT (HUB_DEV_BUTTON, owner 2026-11-13: to try bigger
+## spells for now), Play's start cards, and every card in the bag (above). Its teleporter stone (a
 ## prop of the role `run_start`, stood on where its area is) is lit while every wizard stands on it:
 ## counted each tick and whenever a wizard joins or leaves (`hub`, `HubRules`), told by
 ## `start_stone_changed`, the stone asked to enter `lit` or `unlit` to match, so its look and cue
@@ -166,6 +167,10 @@ const ACTION_CLEAR_ENEMIES: StringName = &"clear_enemies"
 ## button (RB, RT, LB, LT), by id under `wizard`.
 const DEV_STAFF: StringName = &"dev"
 const STARTER_HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
+## The button the hub's wizards hold the `dev` staff on instead of its basic staff: RT (owner,
+## 2026-11-13: to try bigger spells for now). A run from the stone has Play's staffs again, so a
+## build longer than that staff keeps only its first slots there.
+const HUB_DEV_BUTTON: int = 1
 ## The wave, sized for four players: one enemy per entry, placed at the room's
 ## enemy spawn with that index (wrapped if the room has fewer). An index used
 ## again puts the enemy a step further along the diagonal.
@@ -996,11 +1001,14 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 
 ## The four staffs a wizard of this run's `mode` holds, by button, as the registry has them:
 ## the sandbox's the `dev` staff on every button, Play's the four basic staffs
-## (STARTER_HEADS). Empty when one is missing.
+## (STARTER_HEADS), the hub's Play's with the `dev` staff on RT (HUB_DEV_BUTTON). Empty when one is
+## missing.
 func staffs_for_mode() -> Array[StaffBase]:
-	var ids: Array[StringName] = STARTER_HEADS
+	var ids: Array[StringName] = STARTER_HEADS.duplicate()
 	if mode == MODE_SANDBOX:
 		ids = [DEV_STAFF, DEV_STAFF, DEV_STAFF, DEV_STAFF]
+	elif mode == MODE_HUB:
+		ids[HUB_DEV_BUTTON] = DEV_STAFF
 	var out: Array[StaffBase] = []
 	if registry == null:
 		return out

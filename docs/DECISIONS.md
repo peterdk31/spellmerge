@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-13: the hub's RT holds the dev staff (owner)
+
+- **The hub's wizards hold the `dev` staff on RT** (`Flow.HUB_DEV_BUTTON`; owner: "In the hub, players should have a dev staff on RT. Just to allow for testing bigger spells for now"): 20 slots, no delay, practically endless mana, beside Play's three other basic staffs, so a big build can be tried on the hub's dummies without going to the sandbox. For now: it goes when the hub has a better way to try spells.
+- **A run from the stone still has Play's staffs:** the cards are carried, not the staff, so a build longer than RT's basic staff (the star, 4 slots) keeps only its first slots in the run; back in the hub the staffs start anew, since nothing comes back from a run (2026-11-10).
+
 ## 2026-11-11: a room is its scene; editor scripts; self-contained props (props W8a, W8b)
 
 - **Positions are written once, in the room's scene** (owner: "ideally I would like to be able to edit a room eg. the Hub by hand in the godot editor. This is easy if I can visually see what im moving"): spawns, doors, props, dummies and zones are nodes there, read by `RoomPlaces`; the `.tres` keeps the room's id, scene and rules. Before, every position was in the `.tres` and repeated by markers, with a test holding them together, so moving a thing in the editor did nothing.

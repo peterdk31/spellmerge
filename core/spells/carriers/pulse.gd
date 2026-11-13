@@ -459,6 +459,7 @@ func read_view(view: PulseView) -> void:
 			continue
 		var r: int = view.rings
 		view.hold(r + 1)
+		view.id[r] = _pu_born[at]
 		view.centre[r] = _pu_centre[at]
 		view.radius[r] = _pu_radius[at]
 		view.caster[r] = _pu_actor[at]

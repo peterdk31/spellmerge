@@ -122,6 +122,9 @@ var _paste_wait: float = 0.0
 
 
 func _ready() -> void:
+	# Over the world's layer, whatever draws there (a run left for the menu: its last motes fading,
+	# the spell light's multiply at its z), as a screen that covers it should be.
+	z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 	_version.text = BuildInfo.describe()
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript

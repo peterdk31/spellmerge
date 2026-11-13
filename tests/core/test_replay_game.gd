@@ -61,6 +61,75 @@ func test_a_wave_replay_plays_the_same_after_other_runs() -> void:
 	await _check_after_other_runs(&"play_requested", 2, 0, [&"sandbox_requested", &"play_requested"])
 
 
+## Back to the main menu (`main_menu_requested`, the pause menu's "Main menu"; online lobby) in the
+## middle of a hub, with the game stopped by the pause menu: the hub played next, from the menu,
+## plays as one recorded in a fresh game (the menu leaves nothing of the run behind, and the game
+## is not left stopped). The HUD's main menu is a stand-in here, which the next run's world
+## replaces as the current scene, as the real menu is.
+func test_a_hub_after_one_left_for_the_main_menu_plays_as_one_recorded_fresh() -> void:
+	var stand_in := PackedScene.new()
+	var menu := Node.new()
+	menu.name = "MenuStandIn"
+	stand_in.pack(menu)
+	menu.free()
+	var runs: Array[Desync] = await _hub_then_menu_then_hub(stand_in, -1)
+	for problem in _run.problems:
+		check(false, problem)
+	check_equal(runs[1].hashes.size(), TICKS, "the hub after the menu played every tick")
+	var tick: int = Desync.first_parting(runs[0], runs[1])
+	if tick >= 0:
+		# Again, keeping the parting tick's leaves, so the report names the members.
+		var again: Array[Desync] = await _hub_then_menu_then_hub(stand_in, tick)
+		check_equal(Desync.compare(again[0], again[1]), "", "it plays as the hub recorded fresh")
+
+
+## The hub recorded in a fresh game; another hub (a bot and a scripted player), stopped by the
+## player's pause menu and left for the main menu as the pause menu leaves it; the hub recorded
+## again from the menu. The hashes of the first and the last, keeping tick `keep`'s leaves.
+func _hub_then_menu_then_hub(stand_in: PackedScene, keep: int) -> Array[Desync]:
+	_run.run_seed = 0x5eed
+	_run.fresh_game = true
+	var fresh := Desync.new(keep)
+	await _run.record(&"hub_requested", 0, 1, fresh)
+	_run.fresh_game = false
+	# The game's HUD, after the fresh game above made it anew.
+	var hud: Node = root.get_node("Hud")
+	hud.set(&"main_menu", stand_in)
+	_run.run_seed = 0x0dd
+	_run.ticks = TICKS / 2
+	await _run.record(&"hub_requested", 1, 1, Desync.new())
+	_run.ticks = TICKS
+	_run.run_seed = 0x5eed
+	var events: Node = root.get_node("Events")
+	var flow: Node = root.get_node("Flow")
+	# A shot of the bot's in the air, so leaving has something of the run to end.
+	var projectiles: Node = root.get_node("Projectiles")
+	for i in 120:
+		if int(projectiles.call("get_count")) > 0:
+			break
+		await physics_frame
+	events.emit_signal("pause_requested", 1, 1)
+	await physics_frame
+	await physics_frame
+	check(paused, "the pause menu stopped the game")
+	check(int(projectiles.call("get_count")) > 0, "shots of the run are in the air")
+	# As the pause menu sends them: it closes first, then the machine leaves.
+	events.emit_signal("pause_requested", 1, 0)
+	events.emit_signal("main_menu_requested", 1)
+	check(flow.get(&"world") == null and int(flow.get(&"state")) == 0, "Flow is idle, its world gone")
+	check(current_scene != null and current_scene.name == "MenuStandIn", "the HUD's main menu is the current scene")
+	check_equal(int(projectiles.call("get_count")), 0, "no shot of the run goes on under the menu")
+	check(not (root.get_node("Tick").get(&"sim") as Sim).is_stopped(), "nor its stop")
+	await physics_frame
+	await physics_frame
+	check(not paused, "the game is not left stopped under the menu")
+	var late := Desync.new(keep)
+	await _run.record(&"hub_requested", 0, 1, late)
+	hud.set(&"main_menu", null)
+	_run.fresh_game = true
+	return [fresh, late]
+
+
 ## The run started by `start` with `bots` bots and `scripted` scripted players, recorded fresh,
 ## played after `others[0]`, and recorded again after `others[1]`: all three agree at every tick.
 func _check_after_other_runs(start: StringName, bots: int, scripted: int, others: Array[StringName]) -> void:

@@ -74,6 +74,7 @@ func _initialize() -> void:
 	_test_revive_four_players()
 	_test_revive_edges()
 	_test_a_wizards_bolt_hits_a_teammate()
+	_test_a_seat_that_leaves_with_its_menu_open_lets_the_game_go()
 	_stop()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/coop (join orders, leave orders, camera, a bolt hits a teammate)")
@@ -760,3 +761,19 @@ func _test_a_wizards_bolt_hits_a_teammate() -> void:
 	_check(_health(2) == _wizard(2).health.max_health - SHOT_DAMAGE, "an enemy shot still hurts a wizard")
 	spells.get("_profiles").erase(BOLT_TAG)
 	_stop()
+
+
+## The pause menu stops the game one reason a seat (`Coop.MENU_OF`): another seat's closing does not
+## let it go, and the seat leaving with its menu open does (online, a machine gone back to the main
+## menu or lost never sends its closing; everyone else stood stopped for good before).
+func _test_a_seat_that_leaves_with_its_menu_open_lets_the_game_go() -> void:
+	var game: Sim = Sim.found(_coop)
+	_events.call("apply_command", &"pause_requested", [1, 1])
+	_check(CoopScript.menu_stops(game), "seat 1's menu stops the game")
+	_events.call("apply_command", &"pause_requested", [2, 1])
+	_events.call("apply_command", &"pause_requested", [2, 0])
+	_check(CoopScript.menu_stops(game), "seat 2's closing does not let seat 1's stop go")
+	_events.emit_signal("seat_left", 1)
+	_check(not CoopScript.menu_stops(game) and not game.is_stopped(), "seat 1 leaving lets the game go")
+	_events.call("apply_command", &"pause_requested", [5, 1])
+	_check(not game.is_stopped(), "a seat out of range stops nothing")

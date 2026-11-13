@@ -144,6 +144,9 @@ func close(id: int) -> void:
 	_take_seat(id, NONE)
 	set_home(id, NONE)
 	_open[id] = 0
+	# Hashed with the closed ids too: a closed body leaves nothing of its own behind, so a run plays
+	# the same after any other (a still prop's flag was left, and a hub after a hub parted at tick 0).
+	still[id] = 0
 	_team[id] = NONE
 	_ramp[id] = NONE
 	_node[id] = 0

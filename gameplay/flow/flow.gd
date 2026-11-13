@@ -104,6 +104,11 @@ extends Node
 ## `PropYard`, props W8). The hub's rules (`hub`, `HubRules`) read the props by what they are
 ## (`PropBase.role`), never by id.
 ##
+## Back to the main menu (`main_menu_requested`, the pause menu's "Main menu"): `stop_run`, so the
+## world goes and Flow is idle, then the services are renewed as at a run's start
+## (`Tick.begin_run`), so nothing of the run steps under the menu; the HUD shows the menu again, and
+## the frames service and net/ end their part themselves. Not a command: only this machine leaves.
+##
 ## Modes: `mode` says which run this is: MODE_WAVES (Play), MODE_SANDBOX or MODE_HUB (above).
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
@@ -317,6 +322,7 @@ func _ready() -> void:
 	events.play_requested.connect(_on_play_requested)
 	events.sandbox_requested.connect(_on_sandbox_requested)
 	events.hub_requested.connect(_on_hub_requested)
+	events.main_menu_requested.connect(_on_main_menu_requested)
 	events.play_load_requested.connect(_on_play_load_requested)
 	# Commands, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"sandbox_action_requested", _on_sandbox_action_requested)
@@ -539,7 +545,7 @@ func room_id_for_mode() -> StringName:
 
 
 ## End the run in progress and free its world. Flow is idle again, so the next
-## `play_requested` starts a run. Nothing shows a menu yet; M3's run area will.
+## `play_requested` starts a run. The main menu is the HUD's to show (`main_menu_requested`).
 func stop_run() -> void:
 	if state == State.LOADING and loading != null:
 		loading.cancel()
@@ -560,6 +566,17 @@ func stop_run() -> void:
 	if was == MODE_SANDBOX and events != null:
 		events.sandbox_changed.emit(false)
 	_count_stone()
+
+
+## This machine goes back to the main menu (`main_menu_requested`, the pause menu): the run, the
+## intro or the loading stops and its world goes; the HUD shows the menu.
+func _on_main_menu_requested(_player: int) -> void:
+	stop_run()
+	# Every service as a fresh game's (as a run's start makes them, after its bodies left with the
+	# world above): no shot, decoy or stop of the run goes on under the menu.
+	var tick: TickScript = TickScript.of(self) as TickScript
+	if tick != null:
+		tick.begin_run()
 
 
 func _on_play_requested(player: int) -> void:

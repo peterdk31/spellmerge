@@ -54,14 +54,14 @@ func _linked() -> Array[NetLink]:
 	var host := NetRtc.new(PackedStringArray())
 	var client := NetRtc.new(PackedStringArray())
 	var sides: Array[NetRtc] = [host, client]
-	check_equal(host.offer(), "", "the host begins")
-	check(_wait(sides, func() -> bool: return host.code() != ""), "the host's code is made (%s)" % host.problem())
+	check_equal(_t(host.offer()), "", "the host begins")
+	check(_wait(sides, func() -> bool: return host.code() != ""), "the host's code is made (%s)" % _t(host.problem()))
 	check(_candidates(host.code()) > 0, "with an address to reach the host at in it")
-	check_equal(client.take(host.code()), "", "the client takes the host's code")
-	check(_wait(sides, func() -> bool: return client.code() != ""), "the client's code is made (%s)" % client.problem())
+	check_equal(_t(client.take(host.code())), "", "the client takes the host's code")
+	check(_wait(sides, func() -> bool: return client.code() != ""), "the client's code is made (%s)" % _t(client.problem()))
 	check(_candidates(client.code()) > 0, "with an address to reach the client at in it")
-	check_equal(host.take(client.code()), "", "the host takes the code that came back")
-	check(_wait(sides, func() -> bool: return host.link() != null and client.link() != null), "the two find each other (%s%s)" % [host.problem(), client.problem()])
+	check_equal(_t(host.take(client.code())), "", "the host takes the code that came back")
+	check(_wait(sides, func() -> bool: return host.link() != null and client.link() != null), "the two find each other (%s%s)" % [_t(host.problem()), _t(client.problem())])
 	return [host.link(), client.link()]
 
 
@@ -94,7 +94,7 @@ func test_a_build_without_webrtc_says_so_and_makes_no_peer() -> void:
 	if NetWebRTC.available():
 		return
 	var host := NetRtc.new(PackedStringArray())
-	check(host.offer() != "" and host.problem() != "", "Host is refused, in words (%s)" % host.problem())
+	check(_t(host.offer()) != "" and _t(host.problem()) != "", "Host is refused, in words (%s)" % _t(host.problem()))
 	check(host.link() == null and host.code() == "", "nothing is made")
 
 
@@ -110,17 +110,17 @@ func test_a_stun_server_and_a_relay_given_are_taken_and_two_machines_still_link(
 	# would stop WebRTC from starting at all.
 	var relay := NetRelay.new(PackedStringArray(["turn:127.0.0.1:9?transport=udp", "turn:127.0.0.1:9?transport=tcp", "turns:127.0.0.1:9?transport=tcp"]), "u", "p")
 	var alone := NetRtc.new(stun)
-	check_equal(alone.offer(), "", "a STUN server given as NetRtc.STUN is (a PackedStringArray) starts WebRTC")
+	check_equal(_t(alone.offer()), "", "a STUN server given as NetRtc.STUN is (a PackedStringArray) starts WebRTC")
 	alone.close()
 	var host := NetRtc.new(stun, relay)
 	var client := NetRtc.new(stun, relay)
 	var sides: Array[NetRtc] = [host, client]
-	check_equal(host.offer(), "", "with a relay too")
-	check(_wait(sides, func() -> bool: return host.code() != "" or host.problem() != ""), "the host's code is made")
-	check_equal(client.take(host.code()), "", "the client takes it")
-	check(_wait(sides, func() -> bool: return client.code() != "" or client.problem() != ""), "the client's code is made")
-	check_equal(host.take(client.code()), "", "the host takes the answer")
-	check(_wait(sides, func() -> bool: return host.link() != null and client.link() != null), "linked directly all the same (%s%s)" % [host.problem(), client.problem()])
+	check_equal(_t(host.offer()), "", "with a relay too")
+	check(_wait(sides, func() -> bool: return host.code() != "" or _t(host.problem()) != ""), "the host's code is made")
+	check_equal(_t(client.take(host.code())), "", "the client takes it")
+	check(_wait(sides, func() -> bool: return client.code() != "" or _t(client.problem()) != ""), "the client's code is made")
+	check_equal(_t(host.take(client.code())), "", "the host takes the answer")
+	check(_wait(sides, func() -> bool: return host.link() != null and client.link() != null), "linked directly all the same (%s%s)" % [_t(host.problem()), _t(client.problem())])
 	for side: NetRtc in sides:
 		if side.link() != null:
 			side.link().close()
@@ -218,24 +218,24 @@ func test_a_code_of_the_wrong_side_or_no_code_is_refused_and_another_may_be_give
 	var client := NetRtc.new(PackedStringArray())
 	var other_host := NetRtc.new(PackedStringArray())
 	var sides: Array[NetRtc] = [host, client, other_host]
-	check(client.take("hello") != "", "what is no code is refused")
-	check_equal(client.problem(), "", "and the client may still be given one")
-	check_equal(host.offer(), "", "the host begins")
-	check(host.offer() != "", "but not twice")
-	check(host.take("SM1.AAAA") != "", "the host refuses what is no code")
-	check_equal(other_host.offer(), "", "another host begins")
+	check_equal(client.take("hello").name, OnlineWhy.BAD_CODE, "what is no code is refused, by name")
+	check_equal(_t(client.problem()), "", "and the client may still be given one")
+	check_equal(_t(host.offer()), "", "the host begins")
+	check_equal(host.offer().name, OnlineWhy.NOT_NOW, "but not twice")
+	check(_t(host.take("SM1.AAAA")) != "", "the host refuses what is no code")
+	check_equal(_t(other_host.offer()), "", "another host begins")
 	check(_wait(sides, func() -> bool: return host.code() != "" and other_host.code() != ""), "the hosts' codes are made")
-	check(host.take(other_host.code()) != "", "a host refuses a host's code")
-	check_equal(client.take(host.code()), "", "the client takes the host's code after its refusals")
-	check(client.take(host.code()) != "", "but only one")
+	check_equal(host.take(other_host.code()).name, OnlineWhy.HOSTS_CODE, "a host refuses a host's code")
+	check_equal(_t(client.take(host.code())), "", "the client takes the host's code after its refusals")
+	check(_t(client.take(host.code())) != "", "but only one")
 	check(_wait(sides, func() -> bool: return client.code() != ""), "the client's code is made")
 	var other_client := NetRtc.new(PackedStringArray())
-	check(other_client.take(client.code()) != "" and other_client.problem() == "", "a joining machine refuses a joining machine's code")
-	check_equal(other_client.take(other_host.code()), "", "and takes a host's after")
+	check_equal([other_client.take(client.code()).name, other_client.problem()], [OnlineWhy.JOINERS_CODE, null], "a joining machine refuses a joining machine's code")
+	check_equal(_t(other_client.take(other_host.code())), "", "and takes a host's after")
 	sides.append(other_client)
-	check_equal(host.take(client.code()), "", "the host takes the client's code after its refusals")
-	check(host.take(client.code()) != "", "but only one")
-	check(_wait(sides, func() -> bool: return host.link() != null and client.link() != null), "and they find each other (%s%s)" % [host.problem(), client.problem()])
+	check_equal(_t(host.take(client.code())), "", "the host takes the client's code after its refusals")
+	check(_t(host.take(client.code())) != "", "but only one")
+	check(_wait(sides, func() -> bool: return host.link() != null and client.link() != null), "and they find each other (%s%s)" % [_t(host.problem()), _t(client.problem())])
 	for side in sides:
 		side.close()
 		if side.link() != null:
@@ -255,23 +255,29 @@ func test_no_link_says_why_as_far_as_the_codes_tell() -> void:
 	var named: String = "candidate:1 1 UDP 2114977791 0123abcd-4567-89ab-cdef-0123456789ab.local 59921 typ host"
 	var home: String = "candidate:2 1 UDP 1677729535 203.0.113.7 %d typ srflx raddr 0.0.0.0 rport 0"
 	var phone: String = "candidate:2 1 UDP 1677729535 198.51.100.9 40000 typ srflx raddr 0.0.0.0 rport 0"
-	var one_router: String = NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named, home % 61000]))
-	check(one_router.begins_with("both seem to be on one network"), "the same address from outside, by another port: one network (%s)" % one_router)
-	check(one_router.ends_with("(addresses: this machine 1 own, 1 outside, 0 relay; the other 1 own, 1 outside, 0 relay)"), "with the count of each machine's addresses")
-	var two: String = NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named, named, phone]))
-	check(two.begins_with("they are on two networks") and two.contains("only a relay"), "different addresses from outside: two networks, a relay's case (%s)" % two)
-	check(two.ends_with("this machine 1 own, 1 outside, 0 relay; the other 2 own, 1 outside, 0 relay)"), "counted")
-	var blind: String = NetRtc.why_no_link(_code_with([own]), _code_with([named, phone]))
-	check(blind.begins_with("this machine never learnt its address"), "no address from outside here: said of this machine (%s)" % blind)
-	var other_blind: String = NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named]))
-	check(other_blind.begins_with("the other machine never learnt its address"), "none in the other's code: said of the other (%s)" % other_blind)
+	var one_router: NetWhy = NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named, home % 61000]))
+	check_equal([one_router.name, one_router.facts[OnlineWhy.CAUSE]], [OnlineWhy.NO_LINK, OnlineWhy.CAUSE_ONE_NETWORK], "the same address from outside, by another port: one network (%s)" % one_router.text)
+	check_equal(_counts(one_router), [1, 1, 0, 1, 1, 0], "with the count of each machine's addresses, as facts")
+	check_equal([one_router.facts[OnlineWhy.IN_TIME], one_router.facts[OnlineWhy.LATE]], [false, false], "tried and failed, its code made in good time, unless told otherwise")
+	var two: NetWhy = NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named, named, phone]), true)
+	check_equal([two.facts[OnlineWhy.CAUSE], two.facts[OnlineWhy.IN_TIME]], [OnlineWhy.CAUSE_TWO_NETWORKS, true], "different addresses from outside: two networks, a relay's case (%s)" % two.text)
+	check_equal(_counts(two), [1, 1, 0, 2, 1, 0], "counted")
+	var blind: NetWhy = NetRtc.why_no_link(_code_with([own]), _code_with([named, phone]), false, true)
+	check_equal([blind.facts[OnlineWhy.CAUSE], blind.facts[OnlineWhy.LATE]], [OnlineWhy.CAUSE_HIDDEN_HERE, true], "no address from outside here: said of this machine, and that its code was made before its gathering was done (%s)" % blind.text)
+	var other_blind: NetWhy = NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named]))
+	check_equal(other_blind.facts[OnlineWhy.CAUSE], OnlineWhy.CAUSE_HIDDEN_THERE, "none in the other's code: said of the other (%s)" % other_blind.text)
 	var relay: String = "candidate:3 1 UDP 8331263 198.51.100.200 3478 typ relay raddr 203.0.113.7 rport 59921"
-	var relayed: String = NetRtc.why_no_link(_code_with([own, home % 59921, relay]), _code_with([named, phone, relay]))
-	check(relayed.begins_with("not even through the relay"), "a relay in either code that did not help: said so, not 'one network' by the relay's one address (%s)" % relayed)
-	check(relayed.ends_with("this machine 1 own, 1 outside, 1 relay; the other 1 own, 1 outside, 1 relay)"), "relays counted")
-	check(NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named, relay])).begins_with("not even through the relay"), "one side's relay is enough to say it")
-	for said: String in [one_router, two, blind, other_blind, relayed]:
-		check(not said.contains("203.0.113.7") and not said.contains("198.51.100.9") and not said.contains("198.51.100.200") and not said.contains("192.168.1.20") and not said.contains(".local"), "no address is named")
+	var relayed: NetWhy = NetRtc.why_no_link(_code_with([own, home % 59921, relay]), _code_with([named, phone, relay]))
+	check_equal(relayed.facts[OnlineWhy.CAUSE], OnlineWhy.CAUSE_RELAY, "a relay in either code that did not help: said so, not 'one network' by the relay's one address (%s)" % relayed.text)
+	check_equal(_counts(relayed), [1, 1, 1, 1, 1, 1], "relays counted")
+	check_equal(NetRtc.why_no_link(_code_with([own, home % 59921]), _code_with([named, relay])).facts[OnlineWhy.CAUSE], OnlineWhy.CAUSE_RELAY, "one side's relay is enough to say it")
+	var unknown: NetWhy = NetRtc.why_no_link(null, null, true)
+	check_equal([unknown.name, unknown.facts[OnlineWhy.CAUSE], unknown.facts.has(OnlineWhy.MINE_OWN)], [OnlineWhy.NO_LINK, OnlineWhy.CAUSE_UNKNOWN, false], "without both codes nothing is said of why")
+	for said: NetWhy in [one_router, two, blind, other_blind, relayed]:
+		var all: String = said.text + str(said.facts)
+		check(not all.contains("203.0.113.7") and not all.contains("198.51.100.9") and not all.contains("198.51.100.200") and not all.contains("192.168.1.20") and not all.contains(".local"), "no address is named, in the words or the facts")
+		for fact: Variant in said.facts.values():
+			check(fact is int or fact is bool or fact is StringName, "a fact is a number, yes or no, or a name: never text")
 
 
 ## The joining machine waits as long as its player does (its code travels to the host by hand);
@@ -286,26 +292,62 @@ func test_only_the_host_given_the_answer_runs_out_of_time() -> void:
 	host.clock = clock
 	client.clock = clock
 	var sides: Array[NetRtc] = [host, client]
-	check_equal(host.offer(), "", "the host begins")
+	check_equal(_t(host.offer()), "", "the host begins")
 	check(_wait(sides, func() -> bool: return host.code() != ""), "the host's code is made")
-	check_equal(client.take(host.code()), "", "the client takes it")
+	# Neither learns where the other is (`_unreachable`): no handshake is begun that the client's
+	# going would cut short.
+	check_equal(_t(client.take(_unreachable(host.code()))), "", "the client takes it")
 	check(_wait(sides, func() -> bool: return client.code() != ""), "the client's code is made")
 	# An hour passes before the host's player pastes the answer.
 	now[0] += 3600 * 1000
 	client.poll()
 	host.poll()
-	check_equal([client.problem(), host.problem()], ["", ""], "an hour later both still wait")
+	check_equal([_t(client.problem()), _t(host.problem())], ["", ""], "an hour later both still wait")
 	# The client's machine is gone by then: the host is given its code and finds nobody.
 	client.close()
-	check_equal(host.take(client.code()), "", "the host takes the answer")
+	check_equal(_t(host.take(_unreachable(client.code()))), "", "the host takes the answer")
 	now[0] += NetRtc.LINK_MS - 1
 	host.poll()
-	var early: String = host.problem()
+	var early: String = _t(host.problem())
 	now[0] += 2
 	host.poll()
-	check(host.problem() != "", "past its time the host gives up, in words (%s)" % host.problem())
-	check(host.problem().contains("this machine never learnt its address as seen from outside") and host.problem().contains("0 relay; the other"), "and says why as far as the codes tell: no STUN server here, so no address from outside")
-	check(early == "" or early == host.problem(), "and not before, unless WebRTC itself said so")
+	check(_t(host.problem()) != "", "past its time the host gives up, in words (%s)" % _t(host.problem()))
+	check_equal([host.problem().name, host.problem().facts[OnlineWhy.CAUSE], host.problem().facts[OnlineWhy.IN_TIME], host.problem().facts[OnlineWhy.MINE_OUTSIDE]], [OnlineWhy.NO_LINK, OnlineWhy.CAUSE_HIDDEN_HERE, true, 0], "and says why as far as the codes tell: no STUN server here, so no address from outside")
+	check(early == "" or early == _t(host.problem()), "and not before, unless WebRTC itself said so")
+	check_equal(host.problem().facts[OnlineWhy.LATE], false, "its code was made with its gathering done: nothing came too late")
+	host.close()
+
+
+func test_a_code_made_before_the_address_from_outside_came_says_so_when_no_link_follows() -> void:
+	if not _has_webrtc():
+		return
+	# The STUN server asked is one that never answers: the gathering is not done in the code's time.
+	var now: Array[int] = [1000]
+	var clock: Callable = func() -> int: return now[0]
+	var host := NetRtc.new(PackedStringArray(["stun:127.0.0.1:9"]))
+	var client := NetRtc.new(PackedStringArray())
+	host.clock = clock
+	client.clock = clock
+	check_equal(_t(host.offer()), "", "the host begins")
+	for i in 200:
+		host.poll()
+		if host.code() != "":
+			break
+		# The code's time passes at once: only the description is waited for.
+		now[0] += NetRtc.GATHER_MS
+		OS.delay_msec(2)
+	check(host.code() != "", "its code is made at the latest GATHER_MS after its description, the STUN server unheard (%s)" % _t(host.problem()))
+	# Neither learns where the other is: no handshake is begun that the going would cut short.
+	check_equal(_t(client.take(_unreachable(host.code()))), "", "the client takes it")
+	check(_wait([host, client] as Array[NetRtc], func() -> bool: return client.code() != ""), "the client's code is made")
+	client.close()
+	check_equal(_t(host.take(_unreachable(client.code()))), "", "the host takes the answer of a machine that is gone")
+	now[0] += NetRtc.LINK_MS + 1
+	host.poll()
+	var why: NetWhy = host.problem()
+	check(why != null and why.name == OnlineWhy.NO_LINK, "no link follows (%s)" % _t(why))
+	if why != null and why.name == OnlineWhy.NO_LINK:
+		check_equal([why.facts[OnlineWhy.CAUSE], why.facts[OnlineWhy.LATE], why.facts[OnlineWhy.MINE_OUTSIDE]], [OnlineWhy.CAUSE_HIDDEN_HERE, true, 0], "and it says the code was made before any address from outside had come")
 	host.close()
 
 
@@ -349,3 +391,31 @@ func test_two_fights_through_the_real_link_agree_at_every_tick() -> void:
 	check(_pair.host.guests[0].stats.checks >= TICKS / NetChecks.EVERY - 1, "the host compared the client's checks (%d)" % _pair.host.guests[0].stats.checks)
 	check_equal([_pair.host.guests[0].stats.mismatches, _pair.host.parted_tick], [0, -1], "none differed")
 	check(_pair.client.stats.presses > 0 and _pair.host_fight.wizard_casts > 0, "the fights fought, the client's presses in them")
+
+
+## What a handshake said went wrong, in its words for the log ("": nothing).
+func _t(why: NetWhy) -> String:
+	return why.text if why != null else ""
+
+
+## The code `text` with one address in place of its own, where nothing listens: a machine that is
+## gone for good. (Its real address may still answer for a moment after its peer closed, and a
+## handshake cut short there is an error in the log: the run then fails by chance.)
+func _unreachable(text: String) -> String:
+	var code := NetCode.new()
+	check_equal(code.read(text), "", "the code is one")
+	var mid: String = code.mids[0]
+	var index: int = code.indexes[0]
+	code.mids.clear()
+	code.indexes.clear()
+	code.names.clear()
+	check(code.add_candidate(mid, index, "candidate:1 1 UDP 2114977791 127.0.0.1 9 typ host"), "an address nobody answers at")
+	return code.to_text()
+
+
+## The counts of addresses a NO_LINK carries: this machine's own, outside, relay; then the other's.
+func _counts(why: NetWhy) -> Array[int]:
+	var counts: Array[int] = []
+	for key: StringName in [OnlineWhy.MINE_OWN, OnlineWhy.MINE_OUTSIDE, OnlineWhy.MINE_RELAY, OnlineWhy.THEIRS_OWN, OnlineWhy.THEIRS_OUTSIDE, OnlineWhy.THEIRS_RELAY]:
+		counts.append(why.facts[key])
+	return counts

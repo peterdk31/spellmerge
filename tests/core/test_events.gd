@@ -41,8 +41,8 @@ const EVENTS: Dictionary = {
 	&"online_leave_requested": [["player", TYPE_INT]],
 	&"online_open_requested": [["player", TYPE_INT]],
 	&"play_load_requested": [],
-	&"online_changed": [["phase", TYPE_STRING_NAME], ["code", TYPE_STRING], ["note", TYPE_STRING]],
-	&"online_line_changed": [["line", TYPE_STRING]],
+	&"online_changed": [["phase", TYPE_STRING_NAME], ["code", TYPE_STRING], ["reason", TYPE_STRING_NAME], ["facts", TYPE_DICTIONARY]],
+	&"online_line_changed": [["facts", TYPE_DICTIONARY], ["counters", TYPE_STRING]],
 	# Devices.
 	&"device_joined": [["player", TYPE_INT], ["device", TYPE_INT]],
 	&"device_left": [["player", TYPE_INT], ["device", TYPE_INT]],

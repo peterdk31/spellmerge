@@ -130,7 +130,7 @@ func _hosted() -> Array:
 	var relay := Relay.new()
 	relay.host = FakeSocket.new()
 	var host: NetSignalHandshake = _handshake(relay.host, true)
-	check_equal(host.offer(), "", "the host begins")
+	check_equal(_t(host.offer()), "", "the host begins")
 	_run(relay, [host], 3)
 	check_equal(host.code(), ROOM, "the room's code is the host's code")
 	return [host, relay.host, relay]
@@ -141,7 +141,7 @@ func _joining(relay: Relay, typed: String = ROOM) -> Array:
 	var socket := FakeSocket.new()
 	relay.waiting.append(socket)
 	var guest: NetSignalHandshake = _handshake(socket, false)
-	check_equal(guest.take(typed), "", "the joining machine takes the room's code")
+	check_equal(_t(guest.take(typed)), "", "the joining machine takes the room's code")
 	return [guest, socket]
 
 
@@ -159,7 +159,7 @@ func test_a_host_and_a_guest_hold_one_link_by_the_rooms_code() -> void:
 	var guest_socket: FakeSocket = joining[1]
 	check(host.link() == null and guest.link() == null, "no link yet")
 	_run(relay, [host, guest])
-	check_equal([host.problem(), guest.problem()], ["", ""], "neither failed")
+	check_equal([_t(host.problem()), _t(guest.problem())], ["", ""], "neither failed")
 	check(host.link() != null and guest.link() != null, "both hold a link")
 	_carries(host.link(), guest.link(), "the host's link reaches the guest's")
 	_carries(guest.link(), host.link(), "and back")
@@ -169,8 +169,8 @@ func test_a_host_and_a_guest_hold_one_link_by_the_rooms_code() -> void:
 	check_equal((hosted[1] as FakeSocket).sent, PackedStringArray(['{"t":"open"}', '{"t":"offer","id":1,"code":"%s"}' % LoopHandshake.HOST_CODE]), "what the host said")
 	check_equal((hosted[1] as FakeSocket).state(), FakeSocket.OPEN, "the host's room stays open")
 	_run(relay, [host, guest])
-	check_equal(host.problem(), "", "the guest's going from the room, once linked, is nothing to the host")
-	check_equal(guest.problem(), "", "nor is its own closed socket to the guest")
+	check_equal(_t(host.problem()), "", "the guest's going from the room, once linked, is nothing to the host")
+	check_equal(_t(guest.problem()), "", "nor is its own closed socket to the guest")
 
 
 func test_three_guests_each_get_a_link_of_their_own() -> void:
@@ -196,49 +196,51 @@ func test_nothing_connects_before_it_is_asked() -> void:
 	var socket := FakeSocket.new()
 	var made: NetSignalHandshake = _handshake(socket, true)
 	made.poll()
-	check_equal([socket.url, made.code(), made.problem()], ["", "", ""], "made and polled: nothing")
-	check_equal(made.offer(), "", "asked")
+	check_equal([socket.url, made.code(), _t(made.problem())], ["", "", ""], "made and polled: nothing")
+	check_equal(_t(made.offer()), "", "asked")
 	check_equal(socket.url, URL + "?relay=1", "the socket goes to the address it was given, and only there, asking for relays")
-	check_equal(made.offer(), "it has begun already", "once")
+	check_equal(_t(made.offer()), "it has begun already", "once")
 
 
 func test_a_room_code_that_is_none_is_refused_and_may_be_typed_again() -> void:
 	var socket := FakeSocket.new()
 	var guest: NetSignalHandshake = _handshake(socket, false)
 	for wrong: String in ["", "KQ7R", "KQ7R0", LoopHandshake.HOST_CODE]:
-		check(guest.take(wrong).contains("5 letters and digits"), "refused: %s" % wrong)
-	check_equal([socket.url, guest.problem()], ["", ""], "nothing connected and nothing failed")
-	check_equal(guest.take(ROOM), "", "a room's code is taken")
-	check_equal(guest.take(ROOM), "a code was given already", "once")
+		var refused: NetWhy = guest.take(wrong)
+		check(refused != null and refused.name == OnlineWhy.BAD_ROOM_CODE and refused.facts == {OnlineWhy.LENGTH: 5} and refused.text.contains("5 letters and digits"), "refused, by name and with a code's length: %s" % wrong)
+	check_equal([socket.url, _t(guest.problem())], ["", ""], "nothing connected and nothing failed")
+	check_equal(_t(guest.take(ROOM)), "", "a room's code is taken")
+	check_equal(_t(guest.take(ROOM)), "a code was given already", "once")
 	var host: NetSignalHandshake = _handshake(FakeSocket.new(), true)
 	host.offer()
-	check(host.take(LoopHandshake.JOIN_CODE) != "", "a host is given no code by hand")
-	check_equal(host.problem(), "", "and is none the worse for it")
+	check(_t(host.take(LoopHandshake.JOIN_CODE)) != "", "a host is given no code by hand")
+	check_equal(_t(host.problem()), "", "and is none the worse for it")
 
 
 func test_a_server_that_is_not_reached_says_so() -> void:
 	var refused := FakeSocket.new()
 	refused.refuses_with = "this build has no room server's address"
 	var made: NetSignalHandshake = _handshake(refused, true)
-	check_equal(made.offer(), refused.refuses_with, "no address: said at once")
-	check_equal(made.problem(), refused.refuses_with, "and it failed")
+	check_equal(_t(made.offer()), refused.refuses_with, "no address: said at once")
+	check_equal(_t(made.problem()), refused.refuses_with, "and it failed")
+	check_equal(made.problem().name, OnlineWhy.NO_SERVER, "by name: no room server")
 
 	var dropped := FakeSocket.new()
 	made = _handshake(dropped, true)
 	made.offer()
 	dropped.drop()
 	made.poll()
-	check_equal(made.problem(), "the room server could not be reached", "the connection refused")
+	check_equal(_t(made.problem()), "the room server could not be reached", "the connection refused")
 
 	var silent := FakeSocket.new()
 	made = _handshake(silent, false)
 	made.take(ROOM)
 	_now += NetSignalHandshake.CONNECT_MS - 1
 	made.poll()
-	check_equal(made.problem(), "", "still connecting just before the limit")
+	check_equal(_t(made.problem()), "", "still connecting just before the limit")
 	_now += 1
 	made.poll()
-	check_equal(made.problem(), "the room server could not be reached", "and given up at it")
+	check_equal([_t(made.problem()), made.problem().name], ["the room server could not be reached", OnlineWhy.NO_SERVER], "and given up at it")
 	check_equal(silent.state(), FakeSocket.CLOSED, "its socket closed")
 
 
@@ -255,10 +257,10 @@ func test_a_server_that_does_not_answer_says_so() -> void:
 		check_equal(socket.sent.size(), 1, "it said open or join")
 		_now += NetSignalHandshake.CONNECT_MS - 1
 		made.poll()
-		check_equal(made.problem(), "", "waiting just before the limit")
+		check_equal(_t(made.problem()), "", "waiting just before the limit")
 		_now += 1
 		made.poll()
-		check_equal(made.problem(), "the room server did not answer", "given up at it (hosting: %s)" % hosting)
+		check_equal([_t(made.problem()), made.problem().name], ["the room server did not answer", OnlineWhy.NO_SERVER], "given up at it (hosting: %s)" % hosting)
 
 
 func test_a_wrong_or_full_or_closed_room_says_so() -> void:
@@ -266,6 +268,11 @@ func test_a_wrong_or_full_or_closed_room_says_so() -> void:
 		'{"t":"no_room"}': "no room has the code KQ7RM",
 		'{"t":"full"}': "the room KQ7RM is full",
 		'{"t":"closed"}': "the host closed the room",
+	}
+	var named: Dictionary[String, Array] = {
+		'{"t":"no_room"}': [OnlineWhy.NO_ROOM, {OnlineWhy.ROOM: ROOM}],
+		'{"t":"full"}': [OnlineWhy.ROOM_FULL, {OnlineWhy.ROOM: ROOM}],
+		'{"t":"closed"}': [OnlineWhy.ROOM_CLOSED, {}],
 	}
 	for text: String in said:
 		var socket := FakeSocket.new()
@@ -276,7 +283,8 @@ func test_a_wrong_or_full_or_closed_room_says_so() -> void:
 		socket.arrive(text)
 		socket.drop()
 		guest.poll()
-		check_equal(guest.problem(), said[text], "%s, read though the socket closed with it" % text)
+		check_equal(_t(guest.problem()), said[text], "%s, read though the socket closed with it" % text)
+		check_equal([guest.problem().name, guest.problem().facts], named[text], "and by name, with the room's code as its fact")
 
 
 func test_the_room_closing_ends_the_host_and_leaves_its_links() -> void:
@@ -290,7 +298,7 @@ func test_the_room_closing_ends_the_host_and_leaves_its_links() -> void:
 	(hosted[1] as FakeSocket).arrive('{"t":"closed"}')
 	(hosted[1] as FakeSocket).drop()
 	_run(null, [host, guest], 2)
-	check_equal(host.problem(), "the room is closed", "the host is told")
+	check_equal(_t(host.problem()), "the room is closed", "the host is told")
 	check(host.link() == link and link.is_open(), "the link it handed over is its holder's, still open")
 	_carries(link, guest.link(), "and still carries")
 
@@ -305,7 +313,7 @@ func test_what_is_no_message_or_makes_no_sense_ends_the_handshake() -> void:
 		var hosted: Array = _hosted()
 		(hosted[1] as FakeSocket).arrive(text)
 		(hosted[0] as NetSignalHandshake).poll()
-		check_equal((hosted[0] as NetSignalHandshake).problem(), "the room server said something that is no message of its", "a host sent %s" % text)
+		check_equal(_t((hosted[0] as NetSignalHandshake).problem()), "the room server said something that is no message of its", "a host sent %s" % text)
 		check_equal((hosted[1] as FakeSocket).state(), FakeSocket.CLOSED, "its socket closed")
 	for text: String in for_guest:
 		var socket := FakeSocket.new()
@@ -316,7 +324,7 @@ func test_what_is_no_message_or_makes_no_sense_ends_the_handshake() -> void:
 		socket.arrive('{"t":"joined"}')
 		socket.arrive(text)
 		guest.poll()
-		check_equal(guest.problem(), "the room server said something that is no message of its", "a guest sent %s" % text)
+		check_equal(_t(guest.problem()), "the room server said something that is no message of its", "a guest sent %s" % text)
 	# Out of order: an offer before the room took the guest, a second offer, a guest named twice,
 	# a guest named before the room has its code.
 	var early := FakeSocket.new()
@@ -326,7 +334,7 @@ func test_what_is_no_message_or_makes_no_sense_ends_the_handshake() -> void:
 	guest.poll()
 	early.arrive(offer)
 	guest.poll()
-	check(guest.problem().contains("no message"), "an offer before joined")
+	check(_t(guest.problem()).contains("no message"), "an offer before joined")
 	check_equal(_inner.size(), 0, "and no inner handshake was made for it")
 
 	var twice := FakeSocket.new()
@@ -339,16 +347,16 @@ func test_what_is_no_message_or_makes_no_sense_ends_the_handshake() -> void:
 	twice.arrive('{"t":"joined"}')
 	twice.arrive(offer)
 	guest.poll()
-	check_equal(guest.problem(), "", "the first offer is taken")
+	check_equal(_t(guest.problem()), "", "the first offer is taken")
 	twice.arrive(offer)
 	guest.poll()
-	check(guest.problem().contains("no message"), "a second offer")
+	check(_t(guest.problem()).contains("no message"), "a second offer")
 
 	var hosted: Array = _hosted()
 	(hosted[1] as FakeSocket).arrive('{"t":"guest","id":2}')
 	(hosted[1] as FakeSocket).arrive('{"t":"guest","id":2}')
 	(hosted[0] as NetSignalHandshake).poll()
-	check((hosted[0] as NetSignalHandshake).problem().contains("no message"), "a guest named twice")
+	check(_t((hosted[0] as NetSignalHandshake).problem()).contains("no message"), "a guest named twice")
 
 	var roomless := FakeSocket.new()
 	var host: NetSignalHandshake = _handshake(roomless, true)
@@ -357,7 +365,7 @@ func test_what_is_no_message_or_makes_no_sense_ends_the_handshake() -> void:
 	host.poll()
 	roomless.arrive('{"t":"guest","id":1}')
 	host.poll()
-	check(host.problem().contains("no message"), "a guest before the room")
+	check(_t(host.problem()).contains("no message"), "a guest before the room")
 
 
 func test_a_guests_bad_code_costs_the_host_that_guest_alone() -> void:
@@ -371,14 +379,14 @@ func test_a_guests_bad_code_costs_the_host_that_guest_alone() -> void:
 	check(socket.sent[-1].begins_with('{"t":"offer","id":1,'), "guest 1 was offered")
 	socket.arrive('{"t":"answer","id":1,"code":"%s"}' % LoopHandshake.BROKEN_CODE)
 	_run(null, [host], 2)
-	check_equal(host.problem(), "", "the host goes on")
+	check_equal(_t(host.problem()), "", "the host goes on")
 	# An answer for nobody, and a guest gone that was never there, are nothing.
 	socket.arrive('{"t":"answer","id":1,"code":"%s"}' % LoopHandshake.JOIN_CODE)
 	socket.arrive('{"t":"answer","id":3,"code":"%s"}' % LoopHandshake.JOIN_CODE)
 	socket.arrive('{"t":"gone","id":1}')
 	socket.arrive('{"t":"gone","id":3}')
 	_run(null, [host], 2)
-	check_equal(host.problem(), "", "nothing")
+	check_equal(_t(host.problem()), "", "nothing")
 	check(host.link() == null, "and no link came of it")
 	# The next guest takes the freed id and links.
 	socket.taken = socket.sent.size()
@@ -395,7 +403,7 @@ func test_an_answer_before_the_offer_went_out_is_not_taken() -> void:
 	socket.arrive('{"t":"guest","id":1}')
 	socket.arrive('{"t":"answer","id":1,"code":"%s"}' % LoopHandshake.JOIN_CODE)
 	host.poll()
-	check_equal(host.problem(), "", "no fault of the room's")
+	check_equal(_t(host.problem()), "", "no fault of the room's")
 	_run(null, [host], 6)
 	check(host.link() == null, "but no link without an answer to the offer that was sent")
 
@@ -409,7 +417,7 @@ func test_a_guest_gone_before_its_link_is_let_go() -> void:
 	socket.arrive('{"t":"gone","id":1}')
 	socket.arrive('{"t":"guest","id":1}')
 	_run(null, [host], 4)
-	check_equal(host.problem(), "", "the id is given again with no fault")
+	check_equal(_t(host.problem()), "", "the id is given again with no fault")
 	check_equal(_inner.size(), 2, "a new inner handshake for the new guest")
 	var offers: int = 0
 	for text: String in socket.sent:
@@ -427,10 +435,10 @@ func test_a_joining_machine_gives_up_after_a_while_and_a_host_lets_a_slow_guest_
 	guest.poll()
 	_now += NetSignalHandshake.JOIN_MS - 1
 	guest.poll()
-	check_equal(guest.problem(), "", "waiting for the host's offer just before the limit")
+	check_equal(_t(guest.problem()), "", "waiting for the host's offer just before the limit")
 	_now += 1
 	guest.poll()
-	check_equal(guest.problem(), "the host's machine was not found in time", "given up at it")
+	check_equal([_t(guest.problem()), guest.problem().name], ["the host's machine was not found in time", OnlineWhy.HOST_NOT_FOUND], "given up at it")
 
 	var hosted: Array = _hosted()
 	var host: NetSignalHandshake = hosted[0]
@@ -438,10 +446,10 @@ func test_a_joining_machine_gives_up_after_a_while_and_a_host_lets_a_slow_guest_
 	_run(null, [host], 4)
 	_now += NetSignalHandshake.GUEST_MS
 	host.poll()
-	check_equal(host.problem(), "", "the room goes on")
+	check_equal(_t(host.problem()), "", "the room goes on")
 	(hosted[1] as FakeSocket).arrive('{"t":"guest","id":1}')
 	host.poll()
-	check_equal(host.problem(), "", "and the slow guest's id is free again")
+	check_equal(_t(host.problem()), "", "and the slow guest's id is free again")
 
 
 func test_giving_up_closes_the_socket_and_what_was_on_its_way() -> void:
@@ -451,7 +459,7 @@ func test_giving_up_closes_the_socket_and_what_was_on_its_way() -> void:
 	socket.arrive('{"t":"guest","id":1}')
 	_run(null, [host], 4)
 	host.close()
-	check_equal([socket.state(), host.problem()], [FakeSocket.CLOSED, "given up"], "closed")
+	check_equal([socket.state(), _t(host.problem())], [FakeSocket.CLOSED, "given up"], "closed")
 	var sent: int = socket.sent.size()
 	socket.arrive('{"t":"guest","id":2}')
 	_run(null, [host], 4)
@@ -470,7 +478,7 @@ func test_a_machine_that_cannot_link_fails_at_the_first_guest() -> void:
 	socket.arrive('{"t":"room","code":"KQ7RM"}')
 	socket.arrive('{"t":"guest","id":1}')
 	host.poll()
-	check_equal(host.problem(), "this build cannot link two machines", "said as the inner handshake says it")
+	check_equal([_t(host.problem()), host.problem().name], ["this build cannot link two machines", OnlineWhy.CANNOT_LINK], "said as the inner handshake says it")
 	check_equal(socket.state(), FakeSocket.CLOSED, "and the room is closed")
 
 
@@ -484,12 +492,12 @@ func test_a_guest_that_leaves_the_server_once_it_answered_still_links() -> void:
 	_run(null, [host], 4)
 	check(socket.sent[-1].begins_with('{"t":"offer","id":1,'), "guest 1 was offered")
 	var guest := LoopHandshake.new(_table(0))
-	check_equal(guest.take(LoopHandshake.HOST_CODE), "", "the joining machine's inner handshake takes the offer")
+	check_equal(_t(guest.take(LoopHandshake.HOST_CODE)), "", "the joining machine's inner handshake takes the offer")
 	socket.arrive('{"t":"answer","id":1,"code":"%s"}' % LoopHandshake.JOIN_CODE)
 	socket.arrive('{"t":"gone","id":1}')
 	socket.arrive('{"t":"guest","id":1}')
 	_run(null, [host], 4)
-	check_equal(host.problem(), "", "gone from the server after its answer, and its id given to the next: no fault")
+	check_equal(_t(host.problem()), "", "gone from the server after its answer, and its id given to the next: no fault")
 	var link: NetLink = host.next_link()
 	check(link != null and link.is_open(), "the host holds its link to it all the same")
 	check(host.next_link() == null, "once")
@@ -546,7 +554,7 @@ func test_a_relay_out_of_form_is_no_relay_and_the_machines_still_link() -> void:
 	relay.relay_text = '{"t":"relay","urls":["turn:a.b:53?transport=udp"],"username":"u","credential":"p","new":1}'
 	var guest: NetSignalHandshake = _joining(relay)[0]
 	_run(relay, [host, guest])
-	check_equal([host.problem(), guest.problem()], ["", ""], "neither failed")
+	check_equal([_t(host.problem()), _t(guest.problem())], ["", ""], "neither failed")
 	check(host.link() != null and guest.link() != null, "both hold a link")
 	check_equal([_host_relays, _guest_relays], [[null] as Array[NetRelay], [null] as Array[NetRelay]], "with no relay")
 
@@ -560,7 +568,7 @@ func test_a_relay_out_of_its_place_ends_the_handshake() -> void:
 	host.poll()
 	socket.arrive(RELAY_TEXT)
 	host.poll()
-	check_equal(host.problem(), "the room server said something that is no message of its", "a relay before the room")
+	check_equal(_t(host.problem()), "the room server said something that is no message of its", "a relay before the room")
 	# A joining machine: after it was told it is in.
 	var guest_socket := FakeSocket.new()
 	var guest: NetSignalHandshake = _handshake(guest_socket, false)
@@ -569,7 +577,12 @@ func test_a_relay_out_of_its_place_ends_the_handshake() -> void:
 	guest.poll()
 	guest_socket.arrive('{"t":"joined"}')
 	guest.poll()
-	check_equal(guest.problem(), "", "in the room")
+	check_equal(_t(guest.problem()), "", "in the room")
 	guest_socket.arrive(RELAY_TEXT)
 	guest.poll()
-	check_equal(guest.problem(), "the room server said something that is no message of its", "a relay after joined")
+	check_equal(_t(guest.problem()), "the room server said something that is no message of its", "a relay after joined")
+
+
+## What a handshake said went wrong, in its words for the log ("": nothing).
+func _t(why: NetWhy) -> String:
+	return why.text if why != null else ""

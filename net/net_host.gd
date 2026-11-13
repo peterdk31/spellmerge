@@ -1,5 +1,5 @@
 class_name NetHost
-extends RefCounted
+extends NetRun
 ## The host's side of an online run (netcode spike S2; online lobby L2 and L3,
 ## docs/milestones/online-lobby.md): the host records its run and every recorded tick goes out to
 ## each guest machine; each guest's seats are virtual devices here whose frames come from that
@@ -217,6 +217,7 @@ func rebegin(run: Replay) -> bool:
 			continue
 		if replay.tick_count() - guest.sent_ticks > MAX_FLUSH:
 			guest.problem = "it was %d ticks behind a run that began anew" % (replay.tick_count() - guest.sent_ticks)
+			guest.reason = OnlineWhy.FELL_BEHIND
 			remove_guest(guest)
 			continue
 		while guest.sent_ticks < replay.tick_count() and guest.hears():
@@ -323,6 +324,18 @@ func _parted() -> NetGuest:
 		if guest.parted_tick >= 0 and (first == null or guest.parted_tick < first.parted_tick):
 			first = guest
 	return first
+
+
+func counters() -> NetStats:
+	return totals()
+
+
+func parted_at() -> int:
+	return parted_tick
+
+
+func parted_in() -> PackedStringArray:
+	return parted_areas
 
 
 ## The guests' counters added up, with the host's own (a line for the screen, a log's row).

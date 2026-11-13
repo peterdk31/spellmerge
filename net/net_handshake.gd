@@ -14,6 +14,10 @@ extends RefCounted
 ## A code given to `take` is untrusted text: a handshake checks it before using it and says why
 ## when it refuses one (the player may paste another).
 ##
+## **Why something did not work is a `NetWhy`** (online lobby L5b): one of `OnlineWhy`'s names with
+## its few facts, never a sentence for the screen, so every kind of handshake fails by the same
+## names and whoever holds one passes the name on unread. null: nothing is wrong.
+##
 ## What carries the codes and the link is never known past this seam: by hand (`NetRtc`), a room
 ## server (`NetSignalHandshake`), or later a platform's own lobbies and relay.
 
@@ -21,9 +25,9 @@ extends RefCounted
 var _handed: bool = false
 
 
-## The host's start: its code is being made. "" when it began, else why it cannot.
-func offer() -> String:
-	return "this build cannot link two machines"
+## The host's start: its code is being made. null when it began, else why it cannot.
+func offer() -> NetWhy:
+	return NetWhy.new(OnlineWhy.CANNOT_LINK, "this build cannot link two machines")
 
 
 ## Whether what a joining player typed or pasted (`typed`) is this kind of handshake's to take:
@@ -32,10 +36,10 @@ func takes(_typed: String) -> bool:
 	return true
 
 
-## The other machine's code. "" when it was taken, else why it was not. Nothing changes then,
+## The other machine's code. null when it was taken, else why it was not. Nothing changes then,
 ## unless `problem()` says so after: the handshake itself failed on it.
-func take(_code: String) -> String:
-	return "this build cannot link two machines"
+func take(_code: String) -> NetWhy:
+	return NetWhy.new(OnlineWhy.CANNOT_LINK, "this build cannot link two machines")
 
 
 ## This machine's code for the other player, "" while it is not made yet.
@@ -63,9 +67,9 @@ func next_link() -> NetLink:
 	return link()
 
 
-## Why no link will come ("" while one still may, or is there).
-func problem() -> String:
-	return ""
+## Why no link will come (null while one still may, or is there).
+func problem() -> NetWhy:
+	return null
 
 
 ## Give up: nothing more is made or looked for. A link already handed over is its holder's.

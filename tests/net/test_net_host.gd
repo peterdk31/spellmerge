@@ -255,6 +255,7 @@ func test_a_guest_that_went_silent_is_gone_and_its_seat_leaves() -> void:
 		now[0] += 1000.0 / 60.0
 		_tick()
 	check(_guest.problem.begins_with("nothing was heard"), "past it the link is closed, and it says why (%s)" % _guest.problem)
+	check_equal(_guest.reason, OnlineWhy.SILENT, "by name too")
 	check(not _input.is_joined(SEAT) and _guest.is_gone(), "its seat leaves, as a pad pulled out would")
 	check(_host.is_running(), "and the host plays on")
 

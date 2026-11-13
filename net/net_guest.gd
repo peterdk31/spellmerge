@@ -73,6 +73,8 @@ var admitted: bool = false
 var check_from: int = 0
 ## This machine's pings heard (whoever holds the host knows from them that it is ready).
 var pings_heard: int = 0
+## The physics steps its holder has waited for it to be ready (the holder counts, and has the limit).
+var waited: int = 0
 ## The headers sent to it (the recordings it was joined to), and the one it says it plays (RUN;
 ## the first needs no saying). Its frames and checks are used while the two are the same.
 var headers_sent: int = 0

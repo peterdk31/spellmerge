@@ -49,6 +49,7 @@ static func read(layout: Node) -> RoomPlaces:
 		return places
 	places._walk(layout, Vector2.ZERO, "", "")
 	places.size = places._size_of(layout)
+	places._check_corner(layout)
 	return places
 
 
@@ -142,6 +143,22 @@ func _walk(node: Node, at: Vector2, path: String, bent: String) -> void:
 				JOINER_SPAWNS:
 					joiner_spawns.append(here)
 		_walk(child, here, named, below)
+
+
+## The room starts at (0, 0) (docs/DECISIONS.md, 2026-11-12, "the world draws its bodies by their
+## feet"): Flow's world draws its children by their place, the layout as one piece at its own, so
+## the layout's root stays at (0, 0) and nothing stands above or left of it, or a body there would
+## be drawn under the floor.
+func _check_corner(layout: Node) -> void:
+	var root := layout as Node2D
+	if root != null and root.position != Vector2.ZERO:
+		_problems.append("the room's root %s is at %s: put it back at (0, 0), and move what is in it instead." % [root.name, root.position])
+	var points := PackedVector2Array()
+	for list: PackedVector2Array in [player_spawns, enemy_spawns, doors, joiner_spawns, placed_at]:
+		points.append_array(list)
+	for at in points:
+		if at.x < 0.0 or at.y < 0.0:
+			_problems.append("a spawn, door or placement at %s lies above or left of the room's corner (0, 0): move it into the room." % at)
 
 
 ## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, its

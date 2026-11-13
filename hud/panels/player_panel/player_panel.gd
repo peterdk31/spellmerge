@@ -7,7 +7,8 @@ extends PanelContainer
 ## 2026-10-27): the corner and the border say whose panel it is, and the rows say more than the
 ## staff cast last did.
 ##
-## It only shows what it is told: `set_stats`, `set_menu_open`, `set_staff_plan`,
+## It only shows what it is told: `set_stats`, `set_menu_open`, `set_online` (a small "ONLINE" over
+## the bars of a seat played on another machine), `set_staff_plan`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
 ## which hears the events and reads the staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
 ## the same for any player index 0-3. Colours come from the shared theme (type variations
@@ -23,6 +24,8 @@ const PLAYER_COUNT: int = 4
 const STAFF_COUNT: int = 4
 const DOWN_TEXT: String = "DOWN"
 const MENU_TEXT: String = "MENU"
+## The word of a seat played on another machine (`set_online`).
+const ONLINE_TEXT: String = "ONLINE"
 
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
@@ -36,6 +39,8 @@ var _rows: Array[StaffRowScript] = []
 ## Per staff: whether its plan has a card (an empty staff shows no row).
 var _has_cards: Array[bool] = [false, false, false, false]
 
+@onready var _seat_row: Control = %SeatRow
+@onready var _seat: Label = %Seat
 @onready var _status: Label = %Status
 @onready var _health_bar: ProgressBar = %HealthBar
 @onready var _health_value: Label = %HealthValue
@@ -87,6 +92,20 @@ func set_menu_open(open: bool) -> void:
 		_menu_open = open
 		_refresh_status()
 		_refresh_rows()
+
+
+## Say that this seat is played on another machine (`on`), with a small word at the panel's top;
+## a seat played here says nothing (online lobby L5c). Told by `panels.gd`; nothing changes for
+## what it shows already.
+func set_online(on: bool) -> void:
+	if _seat_row.visible != on:
+		_seat.text = ONLINE_TEXT
+		_seat_row.visible = on
+
+
+## The seat's word shown ("" for a seat played here).
+func seat_text() -> String:
+	return _seat.text if _seat_row.visible else ""
 
 
 ## Show staff `staff` (0-3) as the plan of `staff_changed` says (`Spells.staff_view`), with

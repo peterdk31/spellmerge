@@ -6,7 +6,8 @@ extends RefCounted
 ## stood on where its own area is (`PropBase.area_rect`), never by a content id; the stone lit while
 ## every wizard of the hub stands on one, asked of each stone by the bus (`prop_state_requested`:
 ## LIT, UNLIT, the states a `run_start` prop has). It tells the party where it is (`hub_changed`),
-## the HUD who stands on the altar (`altar_changed`) and the stone's count (`start_stone_changed`).
+## the HUD who stands on the altar (`altar_changed`), the view where the altar is (`altar_placed`)
+## and the stone's count (`start_stone_changed`).
 ## Flow's state (it holds one), counted by Flow each tick and as a wizard joins or leaves.
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -21,7 +22,7 @@ const SEATS: int = 4
 
 ## Not state: what was last told, only drawn or heard outside the simulation, so a game whose state
 ## a snapshot replaced tells it again (DERIVED).
-const DERIVED: Array[StringName] = [&"_stone_sent", &"_altar_sent", &"_hub_sent"]
+const DERIVED: Array[StringName] = [&"_stone_sent", &"_altar_sent", &"_hub_sent", &"_place_sent", &"_place_stands"]
 
 ## The wizards on a stone and in the hub at the last count (none out of the hub).
 var standing: int = 0
@@ -29,6 +30,8 @@ var wizards: int = 0
 var _stone_sent: Vector2i = Vector2i(-1, -1)
 var _altar_sent: int = -1
 var _hub_sent: bool = false
+var _place_stands: bool = false
+var _place_sent: Vector2 = Vector2.ZERO
 
 
 ## True while every wizard of the hub stands on a stone, and there is one.
@@ -82,6 +85,16 @@ func count(in_hub: bool, party: Array[Node2D], contents: RoomContents, events: E
 	if at_altar != _altar_sent:
 		_altar_sent = at_altar
 		events.altar_changed.emit(at_altar)
+	# Where the first altar is, for what the view draws over it (the room's code).
+	var stands: bool = not altars.is_empty()
+	var place: Vector2 = Vector2.ZERO
+	if stands:
+		var area: Rect2 = area_at(altars[0].prop, altars[0].position)
+		place = Vector2(area.get_center().x, area.position.y)
+	if stands != _place_stands or place != _place_sent:
+		_place_stands = stands
+		_place_sent = place
+		events.altar_placed.emit(stands, place)
 	var lit: bool = is_lit()
 	# Asked whenever a stone is not in the state wanted (a stone stood again, or one that left it
 	# by its own triggers, follows at once).

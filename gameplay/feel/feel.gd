@@ -110,6 +110,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
 const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
+const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const SHOWN_BEAMS_PER_PLAYER: int = 24
@@ -416,6 +417,8 @@ var _lanes: LanesScript = null
 var _numbers: DamageNumberDrawerScript = null
 ## The markers at the picture's edge for teammates out of it (`teammate_markers.gd`).
 var _markers: TeammateMarkersScript = null
+## The open room's code over the hub's altar (`altar_code.gd`).
+var _altar_code: AltarCodeScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
 var mote_cap: int:
 	get:
@@ -665,6 +668,10 @@ func _ready() -> void:
 	_markers = TeammateMarkersScript.new()
 	_markers.name = "TeammateMarkers"
 	add_child(_markers)
+	_altar_code = AltarCodeScript.new()
+	_altar_code.name = "AltarCode"
+	add_child(_altar_code)
+	_altar_code.bind(events)
 	add_cue_part(&"flash", _play_flash, _prepare_flash)
 	add_cue_part(&"lane", _play_lane)
 	var parts: Dictionary = _spectacle.cue_parts()
@@ -2032,6 +2039,11 @@ func spectacle() -> SpectacleScript:
 ## Every actor's damage numbers (tests).
 func damage_numbers() -> DamageNumberDrawerScript:
 	return _numbers
+
+
+## The room's code over the altar (for tests).
+func altar_code() -> AltarCodeScript:
+	return _altar_code
 
 
 ## The markers for teammates out of the picture (for tests).

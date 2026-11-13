@@ -518,6 +518,25 @@ func test_the_hub_and_its_command_are_ignored_elsewhere() -> void:
 	check(flow.world == world, "run_requested out of the hub changes nothing")
 
 
+## Where the altar stands is told for the view (online-lobby L5c: the room's code over it): the top
+## middle of its area once in the hub, and none once the hub is left.
+func test_the_altars_place_is_told_in_the_hub_and_gone_out_of_it() -> void:
+	var told: Array = []
+	var hear: Callable = func(standing: bool, at: Vector2) -> void: told.append([standing, at])
+	events.connect("altar_placed", hear)
+	_start([0])
+	_tick()
+	_tick()
+	var altar: Rect2 = HubRules.area_of(_room().places(), HubRules.ROLE_PARTY_ALTAR)
+	check_equal(told, [[true, Vector2(altar.get_center().x, altar.position.y)]], "told once: over the altar's area, in its middle")
+	_place(0, true)
+	_tick()
+	_press_a(0)
+	_tick()
+	check_equal(told.back(), [false, Vector2.ZERO], "out of the hub no altar stands")
+	events.disconnect("altar_placed", hear)
+
+
 ## The altar (online-lobby L2): which seats' wizards stand on it is told as it changes.
 func test_the_seats_on_the_altar_are_told_as_they_change() -> void:
 	var told: Array[int] = []

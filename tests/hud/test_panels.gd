@@ -11,6 +11,7 @@ extends SceneTree
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
+const InputManagerScript := preload("res://core/input/input_manager.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const PanelScene := preload("res://hud/panels/player_panel/player_panel.tscn")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload, and
@@ -49,6 +50,7 @@ func _initialize() -> void:
 	_test_vignette_with_four_players()
 	_test_hud_four_players_in_four_corners()
 	_test_hud_menu_word_follows_ui_focus()
+	_test_a_seat_played_on_another_machine_says_online()
 	_test_bad_indices_are_ignored()
 	_test_hud_sends_no_events()
 	if _failures.is_empty():
@@ -357,6 +359,45 @@ func _test_hud_four_players_in_four_corners() -> void:
 		var wanted: Vector2 = panel.get_combined_minimum_size()
 		_check(wanted.x >= 100.0 and wanted.x <= 140.0 and wanted.y <= 80.0, "panel %d is small, got %s" % [player, wanted])
 	_free_hud(parts)
+
+
+## Online lobby L5c: while this machine plays with others, a seat in the game with no real device
+## of this machine on it says ONLINE; a seat played here, a bot's seat offline and every seat once
+## nothing is online say nothing.
+func _test_a_seat_played_on_another_machine_says_online() -> void:
+	var parts: Array = _make_hud()
+	var hud: HudScript = parts[0]
+	var bus: EventsScript = parts[1]
+	var input: InputManagerScript = InputManagerScript.new()
+	hud.input = input
+	input.join(InputManagerScript.KEYBOARD)
+	input.add_virtual_device(1)
+	bus.player_joined.emit(0)
+	bus.player_joined.emit(1)
+	bus.room_entered.emit(&"hub")
+	hud.poll()
+	_check(hud.get_panel(0).seat_text() == "" and hud.get_panel(1).seat_text() == "", "offline no seat is marked, a virtual device's (a bot's) neither")
+	var plain: float = hud.get_panel(1).get_combined_minimum_size().y
+	bus.online_changed.emit(EventsScript.ONLINE_PLAYING, "", &"", {})
+	hud.poll()
+	_check(hud.get_panel(0).seat_text() == "", "playing online, the seat this machine's keyboard holds says nothing")
+	_check(hud.get_panel(1).seat_text() == PlayerPanelScript.ONLINE_TEXT, "the seat another machine plays says ONLINE, got '%s'" % hud.get_panel(1).seat_text())
+	_check(hud.get_panel(2).seat_text() == "", "a seat nobody plays says nothing")
+	var marked: float = hud.get_panel(1).get_combined_minimum_size().y
+	_check(marked > plain and marked - plain <= 8.0, "the word costs the panel a small row, got %s more" % (marked - plain))
+	input.leave(1)
+	input.join_as(7, 1)
+	hud.poll()
+	_check(hud.get_panel(1).seat_text() == "", "a pad of this machine takes the seat (no event says so): the word goes")
+	input.leave(1)
+	input.add_virtual_device(1)
+	hud.poll()
+	_check(hud.get_panel(1).seat_text() == PlayerPanelScript.ONLINE_TEXT, "and comes back with the other machine")
+	bus.online_changed.emit(EventsScript.ONLINE_ENDED, "", &"", {})
+	hud.poll()
+	_check(hud.get_panel(1).seat_text() == "", "the other machines gone: nothing is marked")
+	_free_hud(parts)
+	input.free()
 
 
 func _test_hud_menu_word_follows_ui_focus() -> void:

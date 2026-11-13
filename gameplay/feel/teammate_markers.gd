@@ -21,10 +21,11 @@ const INSET: float = 18.0
 ## A wizard this far inside the picture's edge (screen pixels) needs no marker yet.
 const SHOWN_MARGIN: float = 4.0
 ## The part of each corner of the screen a marker keeps out of, in screen pixels: the HUD's corner
-## panels are there (a player's bars and staff rows, hud/panels) and would hide it. A marker that
+## panels are there (a player's bars and staff rows, and the word of a seat played on another
+## machine, hud/panels) and would hide it. A marker that
 ## would sit in a corner sits at this part's inner corner instead, still pointing at its wizard.
 ## Feel knows nothing of the HUD but this size.
-const CORNER: Vector2 = Vector2(124.0, 96.0)
+const CORNER: Vector2 = Vector2(124.0, 104.0)
 ## The arrowhead: from its tip back to its two barbs, half the width between them, and how far its
 ## back is cut in between them (so it reads as a way, not a triangle), in screen pixels.
 const LENGTH: float = 15.0

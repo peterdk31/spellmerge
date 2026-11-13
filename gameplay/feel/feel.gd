@@ -109,6 +109,7 @@ const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
+const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const SHOWN_BEAMS_PER_PLAYER: int = 24
@@ -413,6 +414,8 @@ var party_camera: PartyCameraScript = PartyCameraScript.new()
 var _lanes: LanesScript = null
 ## Every actor's damage numbers (`damage_number_drawer.gd`, props W5).
 var _numbers: DamageNumberDrawerScript = null
+## The markers at the picture's edge for teammates out of it (`teammate_markers.gd`).
+var _markers: TeammateMarkersScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
 var mote_cap: int:
 	get:
@@ -659,6 +662,9 @@ func _ready() -> void:
 	_numbers.events = events
 	_numbers.registry = registry
 	add_child(_numbers)
+	_markers = TeammateMarkersScript.new()
+	_markers.name = "TeammateMarkers"
+	add_child(_markers)
 	add_cue_part(&"flash", _play_flash, _prepare_flash)
 	add_cue_part(&"lane", _play_lane)
 	var parts: Dictionary = _spectacle.cue_parts()
@@ -765,8 +771,12 @@ func step(real_delta: float) -> void:
 		shake_offset += _kick
 		_apply_camera()
 	party_camera.follow(_live_camera())
-	party_camera.look(_actor_table(), _seats_here())
+	var seats_here: int = _seats_here()
+	party_camera.look(_actor_table(), seats_here)
 	party_camera.step(real_delta)
+	if _markers != null:
+		var shown: Camera2D = party_camera.camera
+		_markers.step(_actor_table(), seats_here, party_camera.visible_rect(), shown.zoom.x if is_instance_valid(shown) else 0.0, _clock)
 	_step_reactions(real_delta)
 	_step_shown_beams(real_delta)
 	_step_flashes(real_delta)
@@ -2022,6 +2032,11 @@ func spectacle() -> SpectacleScript:
 ## Every actor's damage numbers (tests).
 func damage_numbers() -> DamageNumberDrawerScript:
 	return _numbers
+
+
+## The markers for teammates out of the picture (for tests).
+func teammate_markers() -> TeammateMarkersScript:
+	return _markers
 
 
 ## The motes (null with the setting off; for tests and the benchmarks).

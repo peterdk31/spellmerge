@@ -11,6 +11,8 @@ extends "res://tests/support/suite.gd"
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 
 const DT: float = 1.0 / 60.0
+## The items on the hub's rack: the Wild star and the five premade builds (content/items/staffs/).
+const HUB_RACK: int = 6
 
 var flow: FlowScript
 var input: Node
@@ -696,22 +698,22 @@ func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> vo
 	_stop()
 
 
-## Items I6: the hub's rack is an ordinary item lying where the hub's scene places it (the Wild
-## star); a wizard by it takes it with A onto its first free hand (LB: players start with RB and
+## Items I6: the hub's rack is ordinary items lying where the hub's scene places them (the Wild
+## star and the premade builds, HUB_RACK of them); a wizard by it takes it with A onto its first free hand (LB: players start with RB and
 ## RT), and a run from the stone takes it along with the rest of the player.
 func test_the_rack_lies_in_the_hub_and_a_takes_it_along() -> void:
 	var items: Node = root.get_node("Items")
 	_start([0])
-	var lying: Array = items.call("lying")
-	check_equal(lying.size(), 1, "one item lies in the hub")
-	var rack: GroundItem = lying[0]
+	check_equal((items.call("lying") as Array).size(), HUB_RACK, "the hub's rack lies there")
+	var rack: GroundItem = _wild_star(items)
+	check(rack != null, "the Wild star among it")
 	check_equal([rack.stack.kind, rack.stack.id, rack.title], [ItemKinds.STAFF, &"star", "Wild star"], "the Wild star")
 	var wizard := flow.get_wizard(0) as Actor
 	wizard.position = rack.at + Vector2(6.0, 0.0)
 	items.call("step", DT)
 	check_equal(items.call("near_of", 0), rack.number, "in reach of the wizard by it")
 	events.call("apply_command", &"item_take_requested", [0, rack.number])
-	check((items.call("lying") as Array).is_empty(), "taken")
+	check(_wild_star(items) == null and (items.call("lying") as Array).size() == HUB_RACK - 1, "taken, the rest left")
 	var hands: PackedInt32Array = wizard.inventory.hands()
 	check(hands[2] != Inventory.NO_STAFF, "onto LB, the first free hand (%s)" % hands)
 	check_equal(wizard.caster.cards_of(2), rack.stack.cards, "with its crazy build")
@@ -732,16 +734,16 @@ func test_the_rack_lies_in_the_hub_and_a_takes_it_along() -> void:
 func test_the_hub_begun_anew_keeps_its_ground_and_a_runs_end_lays_the_rack_again() -> void:
 	var items: Node = root.get_node("Items")
 	_start([0, 1])
-	var rack: GroundItem = (items.call("lying") as Array)[0]
+	var rack: GroundItem = _wild_star(items)
 	var wizard := flow.get_wizard(0) as Actor
 	wizard.position = rack.at
 	events.call("apply_command", &"item_take_requested", [0, rack.number])
-	check((items.call("lying") as Array).is_empty(), "the rack taken")
+	check(_wild_star(items) == null, "the Wild star taken")
 	# A machine joins: the hub is recorded anew, its start sent once the header is written.
 	var replay: Replay = frames.call(&"record", &"hub_requested", 0) as Replay
-	check_equal([replay.ground.room, replay.ground.count()], [FlowScript.HUB_ROOM_ID, 0], "the recording's header says the hub's ground is bare")
+	check_equal([replay.ground.room, replay.ground.count()], [FlowScript.HUB_ROOM_ID, HUB_RACK - 1], "the recording's header says what is left on the hub's ground")
 	from_frames()
-	check((items.call("lying") as Array).is_empty(), "the hub begun anew under the recording: no rack lies there again")
+	check(_wild_star(items) == null and (items.call("lying") as Array).size() == HUB_RACK - 1, "the hub begun anew under the recording: the Wild star does not lie there again")
 	check((flow.get_wizard(0) as Actor).caster.cards_of(2) == rack.stack.cards, "and the wizard still holds it")
 	frames.call(&"stop_recording")
 	# A machine that plays the recording from its start, whose hub had a rack.
@@ -749,12 +751,12 @@ func test_the_hub_begun_anew_keeps_its_ground_and_a_runs_end_lays_the_rack_again
 	for index in 4:
 		input.leave(index)
 	check(frames.call(&"play", replay), "the recording plays")
-	check((items.call("lying") as Array).is_empty(), "no rack there either")
+	check(_wild_star(items) == null and (items.call("lying") as Array).size() == HUB_RACK - 1, "no Wild star there either")
 	frames.call(&"stop_playing")
 	_stop()
 	# A run's end: the party back in the hub finds the rack again.
 	_start([0])
-	rack = (items.call("lying") as Array)[0]
+	rack = _wild_star(items)
 	(flow.get_wizard(0) as Actor).position = rack.at
 	events.call("apply_command", &"item_take_requested", [0, rack.number])
 	_place(0, true)
@@ -766,5 +768,13 @@ func test_the_hub_begun_anew_keeps_its_ground_and_a_runs_end_lays_the_rack_again
 	flow.step(FlowScript.RESTART_DELAY)
 	from_frames()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
-	check_equal((items.call("lying") as Array).size(), 1, "the rack lies there again")
+	check_equal((items.call("lying") as Array).size(), HUB_RACK, "the whole rack lies there again")
 	_stop()
+
+
+## The Wild star lying on the hub's ground, or null.
+func _wild_star(items: Node) -> GroundItem:
+	for item: GroundItem in items.call("lying"):
+		if item.title == "Wild star":
+			return item
+	return null

@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3]
+[gd_scene load_steps=27 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/floor.svg" id="2_floor"]
@@ -8,6 +8,11 @@
 [ext_resource type="Script" path="res://core/base/room_zone.gd" id="15_zone"]
 [ext_resource type="Script" path="res://tools/item_stand_in.gd" id="16_item_stand_in"]
 [ext_resource type="Resource" path="res://content/items/staffs/wild_star/wild_star.tres" id="17_wild_star"]
+[ext_resource type="Resource" path="res://content/items/staffs/glacier_engine/glacier_engine.tres" id="18_glacier_engine"]
+[ext_resource type="Resource" path="res://content/items/staffs/hammer_of_the_faithless/hammer_of_the_faithless.tres" id="19_hammer_of_the_faithless"]
+[ext_resource type="Resource" path="res://content/items/staffs/corpse_bloom/corpse_bloom.tres" id="20_corpse_bloom"]
+[ext_resource type="Resource" path="res://content/items/staffs/death_from_every_sky/death_from_every_sky.tres" id="21_death_from_every_sky"]
+[ext_resource type="Resource" path="res://content/items/staffs/the_mutiny/the_mutiny.tres" id="22_the_mutiny"]
 [ext_resource type="Resource" path="res://content/props/hub_stone/hub_stone.tres" id="12_stone"]
 [ext_resource type="Resource" path="res://content/props/hub_altar/hub_altar.tres" id="13_altar"]
 [ext_resource type="Resource" path="res://content/enemies/training_dummy/training_dummy.tres" id="14_dummy"]
@@ -339,6 +344,31 @@ enemy = ExtResource("14_dummy")
 position = Vector2(448, 560)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("17_wild_star")
+
+[node name="GlacierEngine" type="Node2D" parent="Items"]
+position = Vector2(320, 624)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("18_glacier_engine")
+
+[node name="HammerOfTheFaithless" type="Node2D" parent="Items"]
+position = Vector2(384, 624)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("19_hammer_of_the_faithless")
+
+[node name="CorpseBloom" type="Node2D" parent="Items"]
+position = Vector2(448, 624)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("20_corpse_bloom")
+
+[node name="DeathFromEverySky" type="Node2D" parent="Items"]
+position = Vector2(512, 624)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("21_death_from_every_sky")
+
+[node name="TheMutiny" type="Node2D" parent="Items"]
+position = Vector2(576, 624)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("22_the_mutiny")
 
 [node name="Zones" type="Node2D" parent="."]
 

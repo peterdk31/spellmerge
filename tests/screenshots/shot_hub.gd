@@ -3,7 +3,8 @@ extends "res://tests/support/screenshot.gd"
 ## main menu's Play goes to.
 ##
 ## Shots: one player just arrived (the stone dark, the stone line counting); the same player by the
-## island's south-west edge, its rim of embers rising off it; two players on the stone and two off
+## island's south-west edge, its rim of embers rising off it; the same player by the rack's row of
+## premade builds, the Glacier Engine's hint up (content/items/staffs/); two players on the stone and two off
 ## it; all four on the lit stone ("A starts the run"), the stone's cue playing.
 
 const STEP_FRAMES := 3
@@ -30,6 +31,10 @@ func take() -> void:
 	_place(0, Vector2(200.0, 592.0))
 	await create_timer(3.0).timeout
 	await shot("hub_edge")
+	# The rack's row of premade builds, the first one in reach.
+	_place(0, Vector2(320.0, 640.0))
+	await settle(8)
+	await shot("hub_builds")
 	_place(0, room_spawn())
 	for index in range(1, 4):
 		_input.call("add_virtual_device", index)

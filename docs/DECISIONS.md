@@ -13,6 +13,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **The hint is the HUD's, over the item as this machine's camera shows it** (`hud/panels/item_hints.gd`, placed each frame from the viewport's canvas transform), not a world label of Feel's like the altar's code: it needs each player's button glyph, which is the HUD's widget. Feel draws the item itself.
 - **F joins `accept`** on the keyboard (the plan's "F as well"). Space is in `accept` too (for menus) and is also `staff_1`, so a keyboard player casting by an item also takes it, as the lit stone already starts the run on Space; left as it is for now (noted in items.md, I7).
 - **After a snapshot is restored the Items area says everything again** (`rebuild_derived`): gone for what this machine's looks were told of that the snapshot does not hold (a DERIVED record of what was said), then every row.
+- **A card's name and icon on the ground are Spells' to say** (`component_name`, `component_icon`), as for the HUD: no script outside core/spells reads a card's fields (`test_spell_field_reads.gd`); a staff's name is `StaffBase.shown_name()`.
 - **The ground is cleared at a run's start only** (one room a run, and the main menu renews the services too), not when a room is left on its own.
 
 ## 2026-11-14: the player loadout (items I4)

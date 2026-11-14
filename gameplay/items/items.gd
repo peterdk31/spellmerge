@@ -30,7 +30,7 @@ extends Node
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
-const RegistryScript := preload("res://core/registry/registry.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 
 const SEATS: int = 4
 ## No item (`item_near_changed`'s and `nearest`'s none).
@@ -51,13 +51,13 @@ const DIRECTIONS: Array[Vector2] = [
 ]
 
 ## Not state: services, set up again, and what this machine's looks were told (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"registry", &"_said"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"spells", &"_said"]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads.
 var events: EventsScript = null
 var actors: ActorsScript = null
 var projectiles: ProjectilesScript = null
-var registry: RegistryScript = null
+var spells: SpellsScript = null
 
 ## What lies on the ground, in the order it was laid (numbers rising).
 var _rows: Array[GroundItem] = []
@@ -79,8 +79,8 @@ func _ready() -> void:
 		actors = get_node_or_null("/root/Actors") as ActorsScript
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectilesScript
-	if registry == null:
-		registry = get_node_or_null("/root/Registry") as RegistryScript
+	if spells == null:
+		spells = get_node_or_null("/root/Spells") as SpellsScript
 	if events == null:
 		push_warning("Items: the Events autoload is missing, so nothing lies on the ground.")
 		return
@@ -184,7 +184,7 @@ func view_of(row: GroundItem) -> Dictionary:
 	if stack.staff != null:
 		var base: StaffBase = stack.staff
 		if row.title == "":
-			view["name"] = base.display_name
+			view["name"] = base.shown_name()
 		view["head"] = base.head
 		view["slots"] = base.slots
 		view["cooldown"] = base.cooldown
@@ -192,12 +192,11 @@ func view_of(row: GroundItem) -> Dictionary:
 		view["mana_regen"] = base.mana_regen
 		view["cards"] = stack.cards.duplicate()
 		return view
-	var content: Resource = _content_of(stack)
-	if content != null:
-		if row.title == "" and "display_name" in content:
-			view["name"] = String(content.get(&"display_name"))
-		if "icon" in content:
-			view["icon"] = content.get(&"icon") as Texture2D
+	if stack.kind == ItemKinds.CARD and spells != null:
+		# A card's name and icon are Spells' to say (no script outside core/spells reads a card).
+		if row.title == "":
+			view["name"] = spells.component_name(stack.id)
+		view["icon"] = spells.component_icon(stack.id)
 	if String(view["name"]) == "":
 		view["name"] = String(stack.id)
 	return view
@@ -264,17 +263,6 @@ func _holder(actor: int) -> Actor:
 		return null
 	var body := actors.node_of(actor) as Actor
 	return body if body != null and body.inventory != null else null
-
-
-## The content `stack` is one of, from its kind's folders (`ItemKinds.content_of`), or null.
-func _content_of(stack: ItemStack) -> Resource:
-	if registry == null:
-		return null
-	for folder: StringName in ItemKinds.content_of(stack.kind):
-		var found: Resource = registry.get_resource(folder, stack.id)
-		if ItemKinds.is_content(stack.kind, found):
-			return found
-	return null
 
 
 func _index_of(item: int) -> int:

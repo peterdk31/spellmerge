@@ -32,7 +32,7 @@ func before_each() -> void:
 	_items.events = _world.bus
 	_items.actors = _world.table
 	_items.projectiles = _world.projectiles
-	_items.registry = _world.registry
+	_items.spells = _world.spells
 	root.add_child(_items)
 	_staff = StaffBase.new()
 	_staff.id = &"test"
@@ -84,8 +84,9 @@ func test_a_room_lays_what_it_places_one_copy_each() -> void:
 	var view: Dictionary = _items.view_of(lying[0])
 	check_equal(view["name"], "Wild star", "the premade staff is shown by its own name")
 	check_equal([view["slots"], view["cards"]], [WILD_STAR.staff.slots, WILD_STAR.cards], "with its numbers and cards")
-	check_equal(_items.view_of(lying[1])["name"], bolt.display_name, "the card by its name")
-	check(_items.view_of(lying[1])["icon"] == bolt.icon, "and its icon")
+	check_equal(_items.view_of(lying[1])["name"], _world.spells.component_name(&"bolt"), "the card by its name")
+	check(_items.view_of(lying[1])["icon"] == _world.spells.component_icon(&"bolt"), "and its icon")
+	check(_items.view_of(lying[1])["icon"] != null, "it has one")
 
 
 func test_the_item_in_reach_is_said_as_it_changes() -> void:

@@ -20,7 +20,7 @@ extends Resource
 func shown_name() -> String:
 	if display_name != "":
 		return display_name
-	return staff.display_name if staff != null else String(id)
+	return staff.shown_name() if staff != null else String(id)
 
 
 ## What it is as a stack: its staff holding its cards, the pool full (null with no staff).

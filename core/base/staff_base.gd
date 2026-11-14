@@ -52,6 +52,11 @@ extends Resource
 @export_enum("neutral", "raised", "angry", "furious", "worried") var resting_mood: int = 0
 
 
+## The name shown: its own, else its id (items I6: a staff lying on the ground).
+func shown_name() -> String:
+	return display_name if display_name != "" else String(id)
+
+
 ## The allowed range of each number field, as {field name: Vector2(min, max)}, both ends
 ## included, the same shape as `SpellComponent.ranges()`.
 func ranges() -> Dictionary:

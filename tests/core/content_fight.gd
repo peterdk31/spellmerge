@@ -161,7 +161,7 @@ func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int 
 	items.events = fight.bus
 	items.actors = fight.actors
 	items.projectiles = fight.projectiles
-	items.registry = fight.registry
+	items.spells = fight.spells
 	world.add_child(items)
 	fight.bus.connect(&"staff_cast", _on_staff_cast)
 	var cards: Array[StringName] = [PLAIN]

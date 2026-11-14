@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
-## New content is covered by itself (online-ready N12, docs/milestones/online-ready.md): every card
-## and every enemy (and boss) the registry finds plays a short scripted fight
+## New content is covered by itself (online-ready N12, docs/milestones/online-ready.md): every card,
+## every enemy (and boss) and every premade item (items I6) the registry finds plays a short scripted fight
 ## (tests/core/content_fight.gd) twice, and through a snapshot taken after a tick of its own
 ## (between SNAPSHOT_FROM and SNAPSHOT_TO, by its id, so a failure plays again the same): both
 ## times agree at every tick, and the fight restored from the snapshot into a fresh world agrees
@@ -37,6 +37,13 @@ func before_each() -> void:
 func test_it_finds_the_content_itself() -> void:
 	check(_cards().size() >= 50, "it finds the cards (%d)" % _cards().size())
 	check(_enemies().size() >= 5, "it finds the enemies (%d)" % _enemies().size())
+
+
+## Items I6: every premade item (the hub's rack) lies by a wizard, who takes it and casts it.
+func test_every_item_plays_the_same_twice_and_through_a_snapshot() -> void:
+	check(_premade().size() >= 1, "it finds the premade items (%d)" % _premade().size())
+	for item in _premade():
+		_check(ContentFight.ITEM, item)
 
 
 func test_every_enemy_plays_the_same_twice_and_through_a_snapshot() -> void:
@@ -111,6 +118,17 @@ func _cards() -> Array[SpellComponent]:
 	return out
 
 
+## Every premade item of every kind (`ItemKinds.premade_of`), by kind, folder and id.
+func _premade() -> Array[Resource]:
+	var out: Array[Resource] = []
+	for kind: StringName in ItemKinds.kinds():
+		for folder: StringName in ItemKinds.premade_of(kind):
+			for item: Resource in _registry.get_all(folder):
+				if ItemKinds.stack_of(item) != null:
+					out.append(item)
+	return out
+
+
 ## Every enemy and boss, by folder then id.
 func _enemies() -> Array[EnemyBase]:
 	var out: Array[EnemyBase] = []
@@ -133,7 +151,7 @@ func _check(kind: StringName, resource: Resource) -> void:
 	var played: Array = _play(kind, resource, at)
 	var first: Desync = played[0]
 	var snapshot: Snapshot = played[1]
-	if kind == ContentFight.CARD:
+	if kind == ContentFight.CARD or kind == ContentFight.ITEM:
 		check(int(played[2]) > 0, "%s: its player casts it" % label)
 	for problem in snapshot.problems:
 		check(false, "%s, its snapshot: %s" % [label, problem])
@@ -166,7 +184,7 @@ func _play(kind: StringName, resource: Resource, at: int, keep: int = -1) -> Arr
 		run.capture(fight.areas())
 		if i == at:
 			snapshot = Snapshot.take(fight.areas(), fight.world)
-	var casts: int = fight.wizard_casts
+	var casts: int = fight.item_casts if kind == ContentFight.ITEM else fight.wizard_casts
 	fight.free_all()
 	return [run, snapshot, casts]
 

@@ -152,13 +152,16 @@ func test_a_whole_staff_request_is_counted_as_one_change() -> void:
 	check_equal([body.inventory.count_of(CARDS, &"bolt"), body.inventory.count_of(CARDS, &"fire")], [2, 1], "a clear gives every card back")
 
 
-func test_cards_given_back_past_the_bags_capacity_are_refused() -> void:
+func test_cards_given_back_past_the_bags_capacity_drop_at_the_feet() -> void:
 	var body := _wizard(0, {&"bolt": 1})
 	_world.bus.staff_change_requested.emit(0, 0, 0, &"bolt")
 	body.inventory.set_capacity(CARDS, 0)
+	var dropped: Array[StringName] = []
+	_world.bus.item_drop_requested.connect(func(_actor: int, stack: ItemStack) -> void: dropped.append(stack.id))
 	_world.bus.staff_change_requested.emit(0, 0, 0, &"")
-	check_equal(_refused, [[0, PlayerController.BAG_FULL]], "no room to give it back")
-	check_equal(body.caster.cards_of(0)[0], &"bolt", "so it stays in the staff")
+	check(_refused.is_empty(), "nothing is refused")
+	check_equal(body.caster.cards_of(0)[0], &"", "the staff is emptied")
+	check_equal(dropped, [&"bolt"] as Array[StringName], "the bolt went to the ground")
 	check_equal(_last(CARDS)[4], 0, "the capacity is announced")
 
 

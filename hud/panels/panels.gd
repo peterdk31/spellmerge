@@ -64,6 +64,10 @@ extends CanvasLayer
 ##   in the hub, how many wizards stand on the teleporter stone, or that A starts the run, at the
 ##   top middle under the online line (`start_stone_changed`). While the stone is lit, a player's
 ##   `accept` (A, Enter) with no menu open sends the command `run_requested` (`poll`).
+## - The item hints (`item_hints.gd`, node Root/ItemHints, made here; items I6): over the item in
+##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
+##   numbers and cards under it, shaking red when a take is refused (`item_refused`). A with no menu
+##   open and no lit stone takes it (`item_take_requested`); the altar's A comes after.
 ## - The frame rate readout (`hud/widgets/fps_counter.gd`, node Root/FpsCounter, made here; owner,
 ##   2026-11-02): "60 FPS" at the bottom middle, over everything, shown while the pause menu's
 ##   "Show FPS" switch is on (read after the menu is bound, then `show_fps_changed`).
@@ -85,11 +89,13 @@ const FpsCounterScript := preload("res://hud/widgets/fps_counter.gd")
 const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 const StoneLineScript := preload("res://hud/widgets/stone_line.gd")
 const PadLineScript := preload("res://hud/widgets/pad_line.gd")
+const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
 
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
 const BUILDER_ACTION: StringName = &"back"
-## A on the hub's lit stone starts the run (`run_requested`; online-lobby L1).
+## A on the hub's lit stone starts the run (`run_requested`; online-lobby L1); else it takes the
+## item in reach (`item_take_requested`; items I6), else it opens the altar's room.
 const START_ACTION: StringName = &"accept"
 ## Space between the screen edge and a panel.
 const EDGE_MARGIN: float = 4.0
@@ -155,6 +161,10 @@ var _break_left: float = 0.0
 var _fps: FpsCounterScript = null
 var _online_line: OnlineLineScript = null
 var _stone_line: StoneLineScript = null
+## Every player's hint over the item in reach (items I6), and by player whether a menu hides it
+## (filled each frame in place).
+var _item_hints: ItemHintsScript = null
+var _hint_menus: Array[bool] = [false, false, false, false]
 var _pad_line: PadLineScript = null
 
 
@@ -285,6 +295,12 @@ func _ready() -> void:
 	_pad_line.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, int(EDGE_MARGIN + PAD_LINE_DROP))
 	_pad_line.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_pad_line.bind(events)
+	# The item hints: in the world's picture, under the panels and the builders.
+	_item_hints = ItemHintsScript.new()
+	_item_hints.name = "ItemHints"
+	root_control.add_child(_item_hints)
+	root_control.move_child(_item_hints, 1)
+	_item_hints.bind(events, input, spells)
 	if events != null:
 		events.pad_wait_changed.connect(_on_pad_wait_changed)
 		events.player_joined.connect(_on_player_joined)
@@ -311,9 +327,26 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	poll()
+	step_hints(delta)
 	_vignette.step(delta)
 	step_break(delta)
 	step_staffs()
+
+
+## Put every player's item hint over its item as the camera shows it now (none outside a room,
+## and none for a player with a menu open). Called every frame; tests call it directly.
+func step_hints(delta: float) -> void:
+	var menus: Array[bool] = _hint_menus
+	for player in PLAYER_COUNT:
+		menus[player] = not _in_room or _has_menu(player) or (_pause_menu != null and _pause_menu.is_open())
+	var viewport: Viewport = get_viewport()
+	var to_screen: Transform2D = viewport.get_canvas_transform() if viewport != null else Transform2D.IDENTITY
+	_item_hints.step(delta, menus, transform.affine_inverse() * to_screen)
+
+
+## The item hints (for tests and screenshots).
+func get_item_hints() -> ItemHintsScript:
+	return _item_hints
 
 
 ## Count the break line down by `delta` seconds. It only draws; Flow decides when the wave
@@ -331,7 +364,8 @@ func _show_break_seconds() -> void:
 
 ## Read every joined player's `pause`, `back` and `accept` presses since the last poll (several
 ## presses in one frame count once) and open or close menus as the top of this file says; `accept`
-## with no menu open while the hub's stone is lit sends `run_requested`. Presses outside a room are
+## with no menu open while the hub's stone is lit sends `run_requested`, else with an item in reach
+## `item_take_requested`, else on the altar `online_open_requested`. Presses outside a room are
 ## dropped. Called every frame by _process; tests call it directly. One player's press never
 ## touches another player's menus.
 func poll() -> void:
@@ -352,6 +386,8 @@ func poll() -> void:
 			if start_now and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
 				if _stone_lit:
 					events.run_requested.emit(player)
+				elif _item_hints.item_of(player) >= 0:
+					events.item_take_requested.emit(player, _item_hints.item_of(player))
 				elif _altar_seats & (1 << player) != 0:
 					events.online_open_requested.emit(player)
 			if paused_now:
@@ -597,6 +633,7 @@ func _on_run_started(_player_count: int) -> void:
 ## their staffs again when they appear).
 func _on_run_ended(_victory: bool) -> void:
 	_reset_all()
+	_item_hints.clear()
 	for panel in _panels:
 		panel.clear_staffs()
 

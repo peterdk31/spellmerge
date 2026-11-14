@@ -48,6 +48,13 @@ const EVENTS: Dictionary = {
 	&"device_joined": [["player", TYPE_INT], ["device", TYPE_INT]],
 	&"device_left": [["player", TYPE_INT], ["device", TYPE_INT]],
 	&"pad_wait_requested": [["player", TYPE_INT], ["on", TYPE_INT]],
+	# Items on the ground (items I6).
+	&"item_take_requested": [["player", TYPE_INT], ["item", TYPE_INT]],
+	&"room_items_placed": [["items", TYPE_ARRAY], ["at", TYPE_PACKED_VECTOR2_ARRAY]],
+	&"item_drop_requested": [["actor", TYPE_INT], ["stack", TYPE_OBJECT]],
+	&"ground_item_changed": [["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
+	&"item_near_changed": [["player", TYPE_INT], ["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
+	&"item_refused": [["player", TYPE_INT], ["item", TYPE_INT]],
 	&"pad_wait_changed": [["seats", TYPE_INT]],
 	# Seats.
 	&"seat_joined": [["player", TYPE_INT]],
@@ -139,6 +146,7 @@ const EVENTS: Dictionary = {
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
+	&"room_items_placed", &"ground_item_changed",
 	&"loading_started", &"loading_progressed", &"loading_finished",
 	&"play_load_requested", &"online_changed", &"online_line_changed", &"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]

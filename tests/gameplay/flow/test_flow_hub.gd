@@ -694,3 +694,33 @@ func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> vo
 	frames.disconnect(&"recorded_anew", hear)
 	frames.call(&"stop_recording")
 	_stop()
+
+
+## Items I6: the hub's rack is an ordinary item lying where the hub's scene places it (the Wild
+## star); a wizard by it takes it with A onto its first free hand (LB: players start with RB and
+## RT), and a run from the stone takes it along with the rest of the player.
+func test_the_rack_lies_in_the_hub_and_a_takes_it_along() -> void:
+	var items: Node = root.get_node("Items")
+	_start([0])
+	var lying: Array = items.call("lying")
+	check_equal(lying.size(), 1, "one item lies in the hub")
+	var rack: GroundItem = lying[0]
+	check_equal([rack.stack.kind, rack.stack.id, rack.title], [ItemKinds.STAFF, &"star", "Wild star"], "the Wild star")
+	var wizard := flow.get_wizard(0) as Actor
+	wizard.position = rack.at + Vector2(6.0, 0.0)
+	items.call("step", DT)
+	check_equal(items.call("near_of", 0), rack.number, "in reach of the wizard by it")
+	events.call("apply_command", &"item_take_requested", [0, rack.number])
+	check((items.call("lying") as Array).is_empty(), "taken")
+	var hands: PackedInt32Array = wizard.inventory.hands()
+	check(hands[2] != Inventory.NO_STAFF, "onto LB, the first free hand (%s)" % hands)
+	check_equal(wizard.caster.cards_of(2), rack.stack.cards, "with its crazy build")
+	for seat in 1:
+		_place(seat, true)
+	_tick()
+	_press_a(0)
+	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run starts")
+	var carried := flow.get_wizard(0) as Actor
+	check_equal(carried.caster.cards_of(2), rack.stack.cards, "the run's wizard holds it on LB")
+	check((items.call("lying") as Array).is_empty(), "and the run's room has nothing lying")
+	_stop()

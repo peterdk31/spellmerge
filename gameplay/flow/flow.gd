@@ -102,7 +102,8 @@ extends Node
 ## (`RoomBase.build()`) and reads what is where from that instance, the one it shows (`RoomPlaces`:
 ## spawns, doors, placements, zones, its size). The placements' stand-ins and the zones are taken out
 ## (`RoomPlaces.strip`), and the room's contents stand the real bodies (`contents`, `RoomContents`:
-## props and dummies alike, by their data). The zone ZONE_PROP_YARD is the prop yard (`yard`,
+## props and dummies alike, by their data). The items it places (an `ItemStandIn`'s: items I6) are
+## no bodies: Flow hands them to the Items area as the room starts (`room_items_placed`). The zone ZONE_PROP_YARD is the prop yard (`yard`,
 ## `PropYard`, props W8). The hub's rules (`hub`, `HubRules`) read the props by what they are
 ## (`PropBase.role`), never by id.
 ##
@@ -528,6 +529,8 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	_set_walls(new_world)
 	if events != null:
 		events.room_entered.emit(room.id)
+		var items: Array = RoomContents.items_of(_places)
+		events.room_items_placed.emit(items[0], items[1])
 		events.sandbox_changed.emit(mode == MODE_SANDBOX)
 		if mode == MODE_WAVES:
 			events.wave_started.emit(wave)

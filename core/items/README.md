@@ -2,11 +2,11 @@
 
 ## Purpose
 
-What an item is (items I3, [docs/milestones/items.md](../../docs/milestones/items.md), "The model"): the kinds table and the stack. Who holds stacks is the actor kit's `Inventory` (`gameplay/actor/inventory.gd`); items on the ground are the Items area's (I6).
+What an item is (items I3, [docs/milestones/items.md](../../docs/milestones/items.md), "The model"): the kinds table and the stack. Who holds stacks is the actor kit's `Inventory` (`gameplay/actor/inventory.gd`); items on the ground are the Items area's (`gameplay/items/`, I6).
 
 ## Contract
 
-- **`item_kinds.gd` (`ItemKinds`):** one row a kind in `RULES` (staff, card, relic, potion): its bag (`bag_of`, `kind_in`; the bags in order are `BAGS`), whether it stacks (`stacks`), the registry folders its ids are in and the class a resource there must be (`content_of`, `is_content`), and what can be done with one held (`can`: DROP, DROP_ONE, HAND, USE). Nothing else names a kind to decide something: a new kind is a row and its own code.
+- **`item_kinds.gd` (`ItemKinds`):** one row a kind in `RULES` (staff, card, relic, potion): its bag (`bag_of`, `kind_in`; the bags in order are `BAGS`), whether it stacks (`stacks`), the registry folders its ids are in and the class a resource there must be (`content_of`, `is_content`), what can be done with one held (`can`: DROP, DROP_ONE, HAND, USE) and the folders its premade items are in (`premade_of`: the staff's `items`, content/items/). `stack_of(resource)` is one of what a resource is as a stack (a premade staff `StaffItem.stack()`, a staff empty, a card one copy; null for what is no kind's, a kind with no class of its own included): what a room's item placement lays. Nothing else names a kind to decide something: a new kind is a row and its own code.
 - **`item_stack.gd` (`ItemStack`):** a kind, an id and a count; a staff stack also has its `number` in its inventory, the `StaffBase` it is (content, never changed), its cards by slot (exactly its slots long: `fit`) and the mana it keeps while on no hand. `card(id, count)`, `of_staff(base, cards)` (pool full), `copy()`.
 - **Simulation:** a simulation folder (`StateWalk.FOLDERS`): a stack held by an inventory is state, walked and snapshotted member by member; nothing here has a clock or dice.
 

@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## godot --headless --path . --script res://tests/core/test_item_kinds.gd
 
 ## The questions every row answers.
-const KEYS: Array[String] = ["bag", "stacks", "content", "type", "actions"]
+const KEYS: Array[String] = ["bag", "stacks", "content", "type", "actions", "premade"]
 ## What can be done with one held, every action a row may name.
 const ACTIONS: Array[StringName] = [ItemKinds.DROP, ItemKinds.DROP_ONE, ItemKinds.HAND, ItemKinds.USE]
 
@@ -58,3 +58,34 @@ func test_is_content_goes_by_the_rows_class() -> void:
 	check(ItemKinds.is_content(ItemKinds.STAFF, StaffBase.new()), "a staff is a staff")
 	check(not ItemKinds.is_content(&"no_such_kind", StaffBase.new()), "no kind holds nothing")
 	check(not ItemKinds.is_content(ItemKinds.CARD, null), "nor nothing")
+
+
+## Items I6: every premade folder a row names is there, and the registry finds premade items of
+## that kind in it, each a stack of the kind (the hub's rack among them).
+func test_every_premade_folder_holds_items_of_its_kind() -> void:
+	var registry: Node = root.get_node("Registry")
+	for kind: StringName in ItemKinds.kinds():
+		for folder: StringName in ItemKinds.premade_of(kind):
+			check(DirAccess.dir_exists_absolute("res://content/%s" % folder), "%s: content/%s is there" % [kind, folder])
+			var found: int = 0
+			for id: StringName in registry.call("get_ids", folder):
+				var stack: ItemStack = ItemKinds.stack_of(registry.call("get_resource", folder, id) as Resource)
+				check(stack != null and stack.kind == kind, "%s: %s under %s is one" % [kind, id, folder])
+				found += 1
+			check(found > 0, "%s: some under %s" % [kind, folder])
+
+
+func test_stack_of_makes_one_of_anything_that_lies_on_the_ground() -> void:
+	var registry: Node = root.get_node("Registry")
+	var card: ItemStack = ItemKinds.stack_of(registry.call("get_resource", &"spells", &"bolt") as Resource)
+	check_equal([card.kind, card.id, card.count], [ItemKinds.CARD, &"bolt", 1], "a card, one copy")
+	var curl: StaffBase = registry.call("get_resource", &"wizard", &"curl") as StaffBase
+	var staff: ItemStack = ItemKinds.stack_of(curl)
+	check_equal([staff.kind, staff.id, staff.cards.size(), staff.mana], [ItemKinds.STAFF, &"curl", curl.slots, curl.max_mana], "a staff, empty and full")
+	var premade := StaffItem.new()
+	premade.staff = curl
+	premade.cards = [&"bolt"] as Array[StringName]
+	check_equal(ItemKinds.stack_of(premade).cards[0], &"bolt", "a premade staff with its cards")
+	check(ItemKinds.stack_of(StaffItem.new()) == null, "a premade staff with no staff is nothing")
+	check(ItemKinds.stack_of(StaffCards.new()) == null, "what is no kind's is nothing")
+	check(ItemKinds.stack_of(null) == null, "nor is nothing")

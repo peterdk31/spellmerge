@@ -427,14 +427,18 @@ func _test_bad_indices_are_ignored() -> void:
 
 
 ## The panels send no event but the player intents `spell_swap_requested` (a `swap` press) and
-## `run_requested` (A on the hub's lit stone; tested in test_pause_menu.gd);
+## `run_requested` (A on the hub's lit stone), `item_take_requested` (A by an item) and
+## `online_open_requested` (A on the altar; all tested in test_pause_menu.gd);
 ## the corner panel itself sends nothing. (Tested in test_quick.gd.)
 func _test_hud_sends_no_events() -> void:
 	var source := FileAccess.get_file_as_string("res://hud/panels/panels.gd")
 	source = source.replace("events.spell_swap_requested.emit(player)", "")
 	source = source.replace("events.run_requested.emit(player)", "")
 	source = source.replace("events.online_open_requested.emit(player)", "")
+	source = source.replace("events.item_take_requested.emit(player, _item_hints.item_of(player))", "")
+	source += FileAccess.get_file_as_string("res://hud/panels/item_hints.gd")
+	source += FileAccess.get_file_as_string("res://hud/widgets/item_hint.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/player_panel.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/staff_row.gd")
-	_check(not source.contains(".emit("), "the panel scripts send no events but the swap request and A on the hub's lit stone or its altar")
+	_check(not source.contains(".emit("), "the panel scripts send no events but the swap request and A on the hub's lit stone, an item or its altar")
 	_check(not source.contains("Input."), "the panel scripts read no input")

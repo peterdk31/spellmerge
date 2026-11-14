@@ -66,6 +66,7 @@ const COMMAND_NAMES: Array[StringName] = [
 	&"pause_requested",
 	&"run_requested",
 	&"pad_wait_requested",
+	&"item_take_requested",
 ]
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
@@ -75,6 +76,7 @@ const COMMAND_SHAPES: PackedStringArray = [
 	"i",
 	"i",
 	"",
+	"i",
 	"i",
 ]
 

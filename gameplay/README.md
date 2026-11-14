@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The rules of the game, in 11 sub-areas: `actor` (the shared body kit, actors G4), `player`, `combat`, `feel`, `coop`, `ai`, `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job and when it is built (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
+The rules of the game, in 12 sub-areas: `actor` (the shared body kit, actors G4), `player`, `combat`, `feel`, `coop`, `ai`, `items` (what lies on the ground, items I6), `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job and when it is built (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
 
 ## Contract shared by every sub-area
 
@@ -77,6 +77,11 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `pause_requested` | HUD | `run` |
 | `pad_wait_requested` | `core/input` (a command) | `coop` (the game stops while a seat waits for its unplugged gamepad) |
 | `pad_wait_changed` | `coop` | `hud` (the pad line, the pause menu) |
+| `item_take_requested` | HUD (a command) | `items` (A by an item in reach) |
+| `room_items_placed` | `flow` | `items` (what the room's scene places lies there) |
+| `item_drop_requested` | `actor` (an Inventory) | `items` (a card given back to a full bag lands at the feet) |
+| `ground_item_changed` | `items` | `feel` (the look on the ground) |
+| `item_near_changed`, `item_refused` | `items` | `hud` (the hint, its red shake) |
 | `sandbox_requested`, `sandbox_action_requested`, `sandbox_spawn_requested` | HUD | `flow` |
 | `play_load_requested` | net | `flow` (loads `play_tasks` ahead of a run two machines start together) |
 | `ai_view_changed` | HUD | `ai` (Entities) |

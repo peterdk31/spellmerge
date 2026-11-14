@@ -9,8 +9,10 @@ extends RefCounted
 ## Plain data, with no knowledge of what an item is: the inventory writes its own (`Inventory.
 ## loadout`) and takes one back (`Inventory.take_loadout`).
 ##
-## - **Bags** (`add_stack`, `bags`, `stack_ids`, `stack_counts`): by bag name, the stacks it holds
-##   that are counted, each an id and its copies, in their order.
+## - **Bags** (`add_stack`, `bags`, `stack_ids`, `stack_counts`, `without_bag`): by bag name, the
+##   stacks it holds that are counted, each an id and its copies, in their order. An id may come
+##   twice in one bag (a kind that does not stack is a stack a copy); one that stacks is merged by
+##   the inventory that takes it.
 ## - **Staffs** (`add_staff`, `staff_numbers`, `staff_id`, `staff_cards`): every staff owned, in the
 ##   inventory's order, each its number there, the staff it is (its content id) and its card ids by
 ##   slot (`&""` an empty slot). A staff's mana is not taken along: a run starts with every pool full.
@@ -215,6 +217,23 @@ func copy() -> PlayerLoadout:
 		made._staff_cards.append(cards.duplicate())
 	made._hands = _hands.duplicate()
 	made._size = _size
+	return made
+
+
+## A copy without the bag `bag`'s stacks (what it holds else stays): the bag's to be given anew.
+func without_bag(bag: StringName) -> PlayerLoadout:
+	var made: PlayerLoadout = copy()
+	var at: int = made._bags.find(bag)
+	if at < 0:
+		return made
+	var ids: Array[StringName] = made._stack_ids[at]
+	made._size -= _id_bytes(bag) + 2
+	for id: StringName in ids:
+		made._size -= _id_bytes(id) + 2
+	made._stacks -= ids.size()
+	made._bags.remove_at(at)
+	made._stack_ids.remove_at(at)
+	made._stack_counts.remove_at(at)
 	return made
 
 

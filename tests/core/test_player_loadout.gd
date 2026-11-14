@@ -79,6 +79,21 @@ func test_a_copy_stands_apart() -> void:
 	check(not other.equals(loadout), "the same things on other hands are not the same player")
 
 
+## `without_bag`: a copy with one bag gone, its size and bytes as if the bag was never written.
+func test_a_bag_can_be_left_out() -> void:
+	var loadout: PlayerLoadout = _player()
+	var less: PlayerLoadout = loadout.without_bag(&"cards")
+	check(less.stack_ids(&"cards").is_empty() and less.bags() == [&"relics"] as Array[StringName], "the card bag is gone, the relics stay")
+	check(less.staff_numbers() == loadout.staff_numbers() and less.hands() == loadout.hands(), "the staffs and hands stay")
+	check(loadout.equals(_player()), "the first is unchanged")
+	var bytes: PackedByteArray = _bytes(less)
+	check_equal(bytes.size(), less.size(), "its size is its bytes")
+	var back := PlayerLoadout.new()
+	check(back.decode_at(bytes, 0) == "" and back.equals(less), "and it reads back")
+	check(less.add_stack(&"cards", &"nova", 2) and less.stack_ids(&"cards") == [&"nova"] as Array[StringName], "a bag given anew")
+	check(loadout.without_bag(&"potions").equals(loadout), "a bag it has not: the same")
+
+
 func test_a_writer_refuses_what_is_no_id_or_past_a_limit() -> void:
 	var loadout: PlayerLoadout = _player()
 	var before: PackedByteArray = _bytes(loadout)

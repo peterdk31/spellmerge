@@ -734,6 +734,7 @@ func _start_run_from_stone(seat: int) -> void:
 	var party: PartyLoadout = _party_of()
 	mode = MODE_WAVES
 	_back_to_hub = true
+	party = _with_mode_cards(party)
 	if not start_run(seat, party):
 		# It refused before freeing anything (content missing): the hub stands as it was.
 		push_warning("Flow: the run from the stone did not start, so the party stays in the hub.")
@@ -750,6 +751,30 @@ func _party_of() -> PartyLoadout:
 		var seat: int = _seat_of(wizard) if is_instance_valid(wizard) else -1
 		if seat >= 0 and seat < PLAYER_SLOTS:
 			out.put(seat, PlayerScript.loadout_of(wizard as Actor))
+	return out
+
+
+## `party` with each seat's card bag the mode's (`bag_for_mode`) less the cards its staffs hold:
+## a run from the stone takes the whole player but its card bag, since the hub's (every card,
+## Inventory.DEV_COPIES of each) stays in the hub (owner, 2026-11-11: a run of waves from the stone
+## has Play's bag again), and a seat joining mid-run gets the same bag.
+func _with_mode_cards(party: PartyLoadout) -> PartyLoadout:
+	var bag: StringName = ItemKinds.bag_of(ItemKinds.CARD)
+	var out := PartyLoadout.new()
+	for seat in PartyLoadout.SEATS:
+		var loadout: PlayerLoadout = party.of(seat)
+		if loadout == null:
+			continue
+		var counts: Dictionary = bag_for_mode()
+		for number: int in loadout.staff_numbers():
+			for id: StringName in loadout.staff_cards(number):
+				if int(counts.get(id, 0)) > 0:
+					counts[id] = int(counts[id]) - 1
+		var made: PlayerLoadout = loadout.without_bag(bag)
+		for id: Variant in counts:
+			if int(counts[id]) > 0:
+				made.add_stack(bag, StringName(str(id)), int(counts[id]))
+		out.put(seat, made)
 	return out
 
 

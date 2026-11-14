@@ -112,26 +112,28 @@ func setup(owner_actor: Actor) -> void:
 ## the hands. What passes the loadout's limits is left out.
 func loadout() -> PlayerLoadout:
 	var made := PlayerLoadout.new()
+	# The staffs and the hands first, so a loadout at its limit loses a stack, never a hand.
 	for stack: ItemStack in _hands:
 		if stack != null:
 			made.add_staff(stack.number, stack.id, stack.cards)
-	for bag: StringName in ItemKinds.BAGS:
-		for stack: ItemStack in _stacks(bag):
-			if stack.number != NO_STAFF:
-				made.add_staff(stack.number, stack.id, stack.cards)
-			else:
-				made.add_stack(bag, stack.id, stack.count)
+	for stack: ItemStack in _stacks(ItemKinds.bag_of(ItemKinds.STAFF)):
+		made.add_staff(stack.number, stack.id, stack.cards)
 	var held: PackedInt32Array = hands()
 	for at in held.size():
 		if held[at] != NO_STAFF and made.staff_id(held[at]) == &"":
 			held[at] = NO_STAFF
 	made.set_hands(held)
+	for bag: StringName in ItemKinds.BAGS:
+		for stack: ItemStack in _stacks(bag):
+			if stack.number == NO_STAFF:
+				made.add_stack(bag, stack.id, stack.count)
 	return made
 
 
 ## Hold exactly what `loadout` says (before the actor is ready, in place of the start staffs and
 ## `give_cards`): its counted stacks in their bags, its staffs under their numbers (each the staff
-## `registry` has of its id; one it has none of is left out), on the hands the loadout puts them on
+## `registry` has of its id; one it has none of is left out; cards past its slots are cut, as
+## `ItemStack.of_staff` cuts them), on the hands the loadout puts them on
 ## or else in the staff bag, every pool full. A bag it has not, and a hand past HANDS, hold nothing.
 func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
 	cards_given = true

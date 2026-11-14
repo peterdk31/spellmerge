@@ -428,6 +428,21 @@ func test_staffs_built_in_the_hub_follow_into_the_run_and_nothing_comes_back() -
 	_press_a(0)
 	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run started")
 	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(1).slice(0, 3), built, "seat 1's staff came into the run")
+	# Regression (review of I4): the hub's bag of every card stays in the hub; the run has Play's,
+	# less the cards the staffs brought (Play's bag holds a dash and a bolt).
+	var in_run: Dictionary = {}
+	for pair: Array in _card_bag(1):
+		in_run[pair[0]] = pair[1]
+	var play: Dictionary = {}
+	for id: StringName in flow.play_bag:
+		play[id] = int(play.get(id, 0)) + 1
+	for id: StringName in (flow.get_wizard(1) as Actor).caster.cards_of(0) + (flow.get_wizard(1) as Actor).caster.cards_of(1):
+		if int(play.get(id, 0)) > 0:
+			play[id] = int(play[id]) - 1
+	for id: StringName in play.keys():
+		if int(play[id]) <= 0:
+			play.erase(id)
+	check_equal(in_run, play, "the run's card bag is Play's less the staffs' cards, not the hub's")
 	check_equal((flow.get_wizard(0) as Actor).caster.cards_of(1), fresh_rt, "seat 0's staff is as it was")
 	input.add_virtual_device(2)
 	check_equal((flow.get_wizard(2) as Actor).caster.cards_of(0).slice(0, 1), [&"dash"] as Array[StringName], "a seat joining mid-run starts with Play's cards")

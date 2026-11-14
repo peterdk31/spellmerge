@@ -105,7 +105,7 @@ func test_the_builder_cannot_put_a_card_on_an_empty_hand() -> void:
 	var cards: Array[StringName] = [&"bolt"]
 	_world.bus.staff_cards_requested.emit(0, 2, cards)
 	_world.run(1)
-	check_equal(refused, [PlayerController.EMPTY_HAND, PlayerController.EMPTY_HAND], "both requests are refused, with the reason")
+	check_equal(refused, [PlayerController.NO_STAFF, PlayerController.NO_STAFF], "both requests are refused, with the reason")
 	check(not wizard.caster.holds(0) and not wizard.caster.holds(2), "the hands stay empty")
 	check_equal(wizard.caster.cards_of(0), [] as Array[StringName], "with no cards")
 	_world.bus.staff_change_requested.emit(0, 3, 1, &"bolt")

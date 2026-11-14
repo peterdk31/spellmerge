@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
 [ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/head.svg" id="2_head"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://gameplay/actor/mover.gd" id="12_mover"]
 [ext_resource type="Script" path="res://gameplay/actor/footprint.gd" id="30_footprint"]
 [ext_resource type="Script" path="res://gameplay/actor/caster.gd" id="13_caster"]
+[ext_resource type="Script" path="res://gameplay/actor/inventory.gd" id="17_inventory"]
 [ext_resource type="Script" path="res://gameplay/player/downed.gd" id="14_downed"]
 [ext_resource type="Script" path="res://gameplay/player/player.gd" id="15_player"]
 [ext_resource type="Script" path="res://gameplay/player/staff_look.gd" id="16_look"]
@@ -39,6 +40,9 @@ radius = 6.0
 [node name="Caster" type="Node" parent="."]
 script = ExtResource("13_caster")
 staff_count = 4
+
+[node name="Inventory" type="Node" parent="."]
+script = ExtResource("17_inventory")
 
 [node name="Downed" type="Node" parent="."]
 script = ExtResource("14_downed")

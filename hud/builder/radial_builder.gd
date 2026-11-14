@@ -12,7 +12,8 @@ extends Control
 ##   layout `KIND`, one kind at a time, flipped with the d-pad (`kind_prev`, `kind_next`). Any
 ##   number of cards fits: the tiles shrink with the count and, below `ICON_MIN` pixels, become
 ##   plain marks; the card pointed at is always drawn full size. A card the player has several
-##   of shows the count, and one of a higher level its level (a bag of plain ids has neither yet).
+##   of shows the count, and one of a higher level its level (cards are counted, items I3: a card
+##   with none left is not on the ring; levels come with M3's rewards).
 ## - **Pointing:** the right stick (P1's mouse) points at a card: it pops out with a double gold
 ##   frame and the middle of the ring (the hub) shows its icon, name, kind and own numbers
 ##   (`Spells.component_stats`). Landing on a card rumbles the pad briefly; a gap rumbles
@@ -20,7 +21,11 @@ extends Control
 ##   its border (`STICKY_ANGLE`), so a wobbling thumb does not flicker between two cards.
 ## - **Ring styles** (owner, 2026-10-30): `ring_picker` swaps in another way to pick and draw the
 ##   ring (`rings/`: a zoom fan, a kinds-first ring), each in its own file so it is easy to drop.
-## - **The slots:** the shown staff's slots in five columns under the staff tabs, with a gold marker
+## - **The strip of staffs** (items I3): every staff the player owns, by its number in the
+##   inventory: the four hands first (RB, RT, LB, LT), each tab the hand's button glyph (an empty
+##   hand's dim), then the staffs in the bag, each tab its staff's head; it scrolls to keep the shown
+##   staff in view. The builder builds any of them; a staff in the bag is only compiled for the view.
+## - **The slots:** the shown staff's slots in five columns under the strip, with a gold marker
 ##   that the left stick moves (with key-repeat; P1's move keys, or a click on a slot). The
 ##   pointed card shows faded in the marked slot, so RT's result is seen before it is pressed:
 ##   while pointing, the slots show the staff as RT would leave it (the rest pushed on, its casts
@@ -36,8 +41,7 @@ extends Control
 ##   the gap. **Held** for `CLEAR_HOLD` seconds, LT clears the rest of the staff: a red frame
 ##   fills round the slots, then every card fades out at once (the press has already taken one
 ##   out, so a clear ends the same). **LB, RB** (`page_prev`, `page_next`) show the previous or
-##   next staff, past a hand that holds none (its `staff_changed` plan is empty; items I2: its tab
-##   is drawn dim with a dash); **B** closes it.
+##   next staff of the strip, past an empty hand; **B** closes it.
 ## - **The tree** (owner, 2026-10-31, `tree_view.gd`): **Y** (`extra`; R) swaps the ring (and its
 ##   kind row) for a tree of the shown staff's cycle in the same space, and back. The right
 ##   stick (P1's mouse wheel) scrolls it; the left stick still moves the slot marker, whose card's
@@ -51,12 +55,14 @@ extends Control
 ##   at: the mana of its dearest cast as a share of that staff's own pool (red with "!" above 100 %:
 ##   it cannot be cast), the damage of the cycle (every shot landing once) and the cycle's time.
 ##
-## What it shows comes only from events: `staff_changed` (the plain `Spells.staff_view`),
-## `bag_changed`, `build_refused`, `player_stats_changed` (the wizard's health) and
-## `staff_mana_changed` (each staff's own pool: the MP bar and the shares are the viewed
-## staff's). What it
-## asks for goes out as `staff_change_requested` (one slot) or `staff_cards_requested` (the whole
-## staff: a push, a closed gap, an undo, a clear), so this node never changes a staff itself.
+## What it shows comes only from events: `owned_staff_changed` (every staff owned, by number: the
+## plain `Spells.staff_view`), `hands_changed` (which number is on which hand), `bag_changed` (the
+## card bag's ids and counts), `build_refused`, `player_stats_changed` (the wizard's health) and
+## `staff_mana_changed` (each hand's own pool: the MP bar and the shares are the viewed staff's; a
+## staff in the bag shows its staff's pool, full: nothing takes a staff off a hand before items
+## I7). What it asks for goes out as `staff_change_requested` (one slot) or `staff_cards_requested`
+## (the whole staff: a push, a closed gap, an undo, a clear), naming the staff by its number, so
+## this node never changes a staff itself.
 ## It opens through `core/ui_focus` with itself as the one control, so its owner's gameplay
 ## input is captured and `back` and the paging buttons come as UIFocus signals; the sticks, the
 ## triggers are read from `core/input` (press counts and the menu sticks), only for its
@@ -77,6 +83,14 @@ enum Put { PUSH, REPLACE }
 
 const PLAYER_COUNT: int = 4
 const STAFF_COUNT: int = 4
+## Each hand's button, by hand (0 RB, 1 RT, 2 LB, 3 LT): its tab's glyph.
+const HAND_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
+## The strip of staffs: a bag staff's tab, a tab's height, the gap between tabs and the frame a
+## hand's tab draws round its glyph (so a tab never reads as the paging glyphs beside the strip).
+const TAB_WIDTH: float = 12.0
+const TAB_HEIGHT: float = 12.0
+const TAB_GAP: float = 1.0
+const TAB_PAD: float = 2.0
 const NO_CARD: StringName = &""
 const NONE: int = -1
 
@@ -214,9 +228,11 @@ var _ui_focus: UIFocusScript = null
 var _spells: SpellsScript = null
 var _input: InputManagerScript = null
 
-## Mirrors of what the player announced: each staff's view, the bag, each staff's pool.
-var _plans: Array[Dictionary] = [{}, {}, {}, {}]
-var _bag: Array[StringName] = []
+## Mirrors of what the player announced: each staff's view by its number, which number each hand
+## holds (NONE: empty), the strip's numbers in order (`_strip_order`), each hand's pool.
+var _plans: Dictionary = {}
+var _hands: PackedInt32Array = PackedInt32Array([NONE, NONE, NONE, NONE])
+var _strip: PackedInt32Array = PackedInt32Array()
 var _max_mana: PackedFloat32Array = PackedFloat32Array([100.0, 100.0, 100.0, 100.0])
 ## The wizard's health (negative until the first `player_stats_changed`) and each staff's mana
 ## now, for the bars.
@@ -224,7 +240,7 @@ var _health: float = -1.0
 var _max_health: float = 100.0
 var _mana: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 
-## The ring's entries, one per card id and level in the bag: {id, level, count, kind}.
+## The ring's entries, one per card id and level in the card bag: {id, level, count, kind}.
 var _entries: Array[Dictionary] = []
 ## The ring as drawn: per position its entry (NONE for a gap), its middle angle and its width
 ## (radians; 0 is up, clockwise).
@@ -239,6 +255,7 @@ var _open: bool = false
 ## The tree view (Y), drawn by its own node in the ring's place, and whether it shows.
 var _tree: TreeViewScript = null
 var _tree_open: bool = false
+## The number of the staff shown (RT's at the start: the start staffs' numbers are their buttons).
 var _viewed: int = 1
 var _slot: int = 0
 var _first_row: int = 0
@@ -286,9 +303,22 @@ var _center: Vector2 = Vector2.ZERO
 var _hints_at: Vector2 = Vector2.ZERO
 var _kinds_at: Vector2 = Vector2.ZERO
 
-## Button glyphs: the staff tabs (LB, RB), the hints (`HINT_ACTIONS`) and the kind row (d-pad).
+## Button glyphs: the strip's paging (LB, RB) and each hand's tab (RB, RT, LB, LT), the hints
+## (`HINT_ACTIONS`) and the kind row (d-pad).
 var _glyph_prev: ActionGlyphScript = null
 var _glyph_next: ActionGlyphScript = null
+var _hand_glyphs: Array[ActionGlyphScript] = []
+## The strip's tabs as laid out (`_place_strip`): per tab its number (NONE: an empty hand), its
+## hand (NONE: in the bag) and its rect; and the first tab shown.
+var _tab_numbers: PackedInt32Array = PackedInt32Array()
+var _tab_hands: PackedInt32Array = PackedInt32Array()
+var _tab_rects: Array[Rect2] = []
+var _strip_first: int = 0
+## True when the strip must be laid out again (a staff, a hand or the shown staff changed): only
+## then, never on every redraw.
+var _strip_stale: bool = true
+## The hand glyphs' widths the strip was laid out for (a device change resizes them).
+var _strip_glyphs: float = 0.0
 var _hint_glyphs: Array[ActionGlyphScript] = []
 var _hint_verbs: Array[String] = []
 var _hint_live: Array[bool] = []
@@ -303,6 +333,8 @@ func _ready() -> void:
 	set_process(false)
 	_glyph_prev = _make_glyph("GlyphPrev")
 	_glyph_next = _make_glyph("GlyphNext")
+	for hand in STAFF_COUNT:
+		_hand_glyphs.append(_make_glyph("GlyphHand%d" % hand))
 	for action in HINT_ACTIONS:
 		_hint_glyphs.append(_make_glyph("Hint_%s" % action))
 		_hint_verbs.append("")
@@ -325,8 +357,10 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 	_ui_focus = ui_focus
 	_spells = spells
 	_input = input
-	for glyph in [_glyph_prev, _glyph_next] + _hint_glyphs + _kind_glyphs:
+	for glyph in [_glyph_prev, _glyph_next] + _hand_glyphs + _hint_glyphs + _kind_glyphs:
 		(glyph as ActionGlyphScript).bind(input)
+	for hand in STAFF_COUNT:
+		_hand_glyphs[hand].show_action(index, HAND_ACTIONS[hand])
 	_tree.kind_colors = KIND_COLORS
 	_tree.spells = spells
 	_glyph_prev.show_action(index, &"page_prev")
@@ -336,7 +370,8 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 	_kind_glyphs[0].show_action(index, &"kind_prev")
 	_kind_glyphs[1].show_action(index, &"kind_next")
 	if _events != null:
-		_events.staff_changed.connect(_on_staff_changed)
+		_events.owned_staff_changed.connect(_on_owned_staff_changed)
+		_events.hands_changed.connect(_on_hands_changed)
 		_events.bag_changed.connect(_on_bag_changed)
 		_events.build_refused.connect(_on_build_refused)
 		_events.player_stats_changed.connect(_on_stats_changed)
@@ -375,6 +410,8 @@ func open_builder() -> bool:
 	_fading.clear()
 	if not holds_staff(_viewed):
 		_viewed = _held_from(_viewed, 1)
+	_strip_first = 0
+	_strip_stale = true
 	_slot = _end_slot()
 	_tree_open = false
 	_tree.visible = false
@@ -392,23 +429,57 @@ func close_builder() -> bool:
 	return _ui_focus.close(index)
 
 
-## The staff shown, 0 to 3.
+## The number of the staff shown.
 func viewed_staff() -> int:
 	return _viewed
 
 
-## True when hand `staff` holds a staff (its plan is not empty; an empty hand's is `{}`).
+## True when the player owns staff number `staff` (it has a plan).
 func holds_staff(staff: int) -> bool:
-	return staff >= 0 and staff < STAFF_COUNT and not _plans[staff].is_empty()
+	return not (_plans.get(staff, {}) as Dictionary).is_empty()
 
 
-## The first hand from `staff` on, `step_by` at a time, that holds a staff; `staff` when none does.
+## The strip of staffs: every staff number owned, the hands' by button, then the bag's.
+func strip() -> PackedInt32Array:
+	return _strip.duplicate()
+
+
+## `staff` when it is owned; else the strip's first staff from where `staff` would be, `step_by`
+## at a time; `staff` when none is owned.
 func _held_from(staff: int, step_by: int) -> int:
-	for i in STAFF_COUNT:
-		var at: int = posmod(staff + step_by * i, STAFF_COUNT)
-		if holds_staff(at):
-			return at
-	return staff
+	if holds_staff(staff) or _strip.is_empty():
+		return staff
+	return _strip[0] if step_by >= 0 else _strip[_strip.size() - 1]
+
+
+## The staff `step_by` places along the strip from staff `staff` (round), or `staff` itself.
+func _along_strip(staff: int, step_by: int) -> int:
+	if _strip.is_empty():
+		return staff
+	var at: int = _strip.find(staff)
+	if at < 0:
+		return _held_from(staff, step_by)
+	return _strip[posmod(at + step_by, _strip.size())]
+
+
+## The hand staff `staff` is on, or NONE (in the bag).
+func _hand_of(staff: int) -> int:
+	return _hands.find(staff) if staff != NONE else NONE
+
+
+## The mana of staff `staff` now and its pool's size: its hand's (`staff_mana_changed`), or for a
+## staff in the bag its staff's pool, full.
+func _mana_of(staff: int) -> float:
+	var hand: int = _hand_of(staff)
+	return _mana[hand] if hand != NONE else _pool_of(staff)
+
+
+func _pool_of(staff: int) -> float:
+	var hand: int = _hand_of(staff)
+	if hand != NONE:
+		return _max_mana[hand]
+	var base: StaffBase = (_plans.get(staff, {}) as Dictionary).get("staff") as StaffBase
+	return base.max_mana if base != null else 100.0
 
 
 ## The marked slot of the shown staff.
@@ -416,11 +487,10 @@ func marked_slot() -> int:
 	return _slot
 
 
-## The card ids of a staff as the player announced them, by slot (a copy).
+## The card ids of staff number `staff` as the player announced them, by slot (a copy).
 func cards_of(staff: int) -> Array[StringName]:
 	var out: Array[StringName] = []
-	if staff >= 0 and staff < STAFF_COUNT:
-		out.assign(_plans[staff].get("cards", []))
+	out.assign((_plans.get(staff, {}) as Dictionary).get("cards", []))
 	return out
 
 
@@ -476,7 +546,7 @@ func toggle_tree() -> void:
 
 
 func _sync_tree() -> void:
-	_tree.set_plan(_plans[_viewed], _max_mana[_viewed])
+	_tree.set_plan(_plan(_viewed), _pool_of(_viewed))
 	_tree.set_marked(_slot)
 
 
@@ -521,7 +591,7 @@ func card_info() -> Dictionary:
 func bar_shares() -> Vector2:
 	if _health < 0.0:
 		return Vector2.ZERO
-	return Vector2(clampf(_health / maxf(_max_health, 1.0), 0.0, 1.0), clampf(_mana[_viewed] / maxf(_max_mana[_viewed], 1.0), 0.0, 1.0))
+	return Vector2(clampf(_health / maxf(_max_health, 1.0), 0.0, 1.0), clampf(_mana_of(_viewed) / maxf(_pool_of(_viewed), 1.0), 0.0, 1.0))
 
 
 ## The lines the hub shows now.
@@ -531,14 +601,24 @@ func hub_lines() -> PackedStringArray:
 		var lines := PackedStringArray([_name_of(id), String(KIND_WORDS.get(_entries[_pointed]["kind"], ""))])
 		lines.append_array(_spells.component_stats(id) if _spells != null else PackedStringArray())
 		return lines
-	var lines := PackedStringArray(["Staff %d" % (_viewed + 1)])
-	lines.append_array(_number_lines(_numbers(_plans[_viewed]), {}))
+	var lines := PackedStringArray([_staff_label(_viewed)])
+	lines.append_array(_number_lines(_numbers(_plan(_viewed)), {}))
 	return lines
+
+
+## What the hub calls staff `staff`: "Staff 2" for the staff on RT (its hand's place, as the
+## corner panel's rows), else its staff's name (one in the bag).
+func _staff_label(staff: int) -> String:
+	var hand: int = _hand_of(staff)
+	if hand != NONE:
+		return "Staff %d" % (hand + 1)
+	var shown: String = str(_plan(staff).get("name", ""))
+	return shown if shown != "" else "Staff"
 
 
 ## The numbers under the slots, with what RT would make of them.
 func number_lines() -> PackedStringArray:
-	return _number_lines(_numbers(_plans[_viewed]), _preview)
+	return _number_lines(_numbers(_plan(_viewed)), _preview)
 
 
 ## The hint row's verbs, as shown (a verb whose button does nothing now is dimmed, not hidden).
@@ -590,6 +670,8 @@ func step(delta: float) -> void:
 		if _tree_open:
 			_tree.set_marked(_slot)
 		_refresh_hints()
+		if _strip_stale or _hand_glyph_widths() != _strip_glyphs:
+			_place_strip()
 		queue_redraw()
 
 
@@ -934,6 +1016,7 @@ func _end_slot() -> int:
 
 func _show_staff(staff: int) -> void:
 	_viewed = staff
+	_strip_stale = true
 	_slot = _end_slot()
 	_first_row = 0
 	_scroll_to_marker()
@@ -961,7 +1044,7 @@ func _refresh_preview() -> void:
 	_preview_view = {}
 	if _pointed == NONE or _spells == null:
 		return
-	var plan: Dictionary = _plans[_viewed]
+	var plan: Dictionary = _plan(_viewed)
 	var staff: StaffBase = plan.get("staff") as StaffBase
 	var cards: Array[StringName] = cards_of(_viewed)
 	if staff == null or _slot >= cards.size():
@@ -997,7 +1080,7 @@ func _numbers(plan: Dictionary) -> Dictionary:
 
 ## The share of the viewed staff's pool, in whole percent.
 func _percent(mana: float) -> int:
-	return roundi(mana / maxf(_max_mana[_viewed], 1.0) * 100.0)
+	return roundi(mana / maxf(_pool_of(_viewed), 1.0) * 100.0)
 
 
 func _number_lines(now: Dictionary, then: Dictionary) -> PackedStringArray:
@@ -1017,11 +1100,26 @@ func _number_lines(now: Dictionary, then: Dictionary) -> PackedStringArray:
 
 # --- Events -----------------------------------------------------------------------------
 
-func _on_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
-	if player != index or staff < 0 or staff >= STAFF_COUNT:
+## The plan of staff number `staff` as announced (`{}` for one not owned).
+func _plan(staff: int) -> Dictionary:
+	return _plans.get(staff, {}) as Dictionary
+
+
+func _on_owned_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
+	if player != index:
 		return
-	_plans[staff] = plan.duplicate(true)
+	if plan.is_empty():
+		_plans.erase(staff)
+	else:
+		_plans[staff] = plan.duplicate(true)
+	_strip_order()
+	_strip_stale = true
 	if staff == _viewed:
+		if not holds_staff(_viewed):
+			# The staff shown went: show another, from its first slot.
+			if holds_staff(_held_from(_viewed, 1)):
+				_show_staff(_held_from(_viewed, 1))
+			return
 		var count: int = cards_of(_viewed).size()
 		_slot = clampi(_slot, 0, maxi(count - 1, 0))
 		_refresh_preview()
@@ -1030,25 +1128,49 @@ func _on_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
 	_changed()
 
 
-func _on_bag_changed(player: int, bag: Array[StringName]) -> void:
+func _on_hands_changed(player: int, hands: PackedInt32Array) -> void:
 	if player != index:
 		return
-	_bag = bag.duplicate()
+	for hand in STAFF_COUNT:
+		_hands[hand] = hands[hand] if hand < hands.size() else NONE
+	_strip_order()
+	_strip_stale = true
+	_changed()
+
+
+## The strip's order: the hands' staffs by button, then every other staff owned by number.
+func _strip_order() -> void:
+	_strip.clear()
+	for hand in STAFF_COUNT:
+		if _hands[hand] != NONE and holds_staff(_hands[hand]):
+			_strip.append(_hands[hand])
+	var rest: Array[int] = []
+	for staff: int in _plans:
+		if not _strip.has(staff):
+			rest.append(staff)
+	rest.sort()
+	for staff in rest:
+		_strip.append(staff)
+
+
+func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, _capacity: int) -> void:
+	if player != index or bag != ItemKinds.bag_of(ItemKinds.CARD):
+		return
 	var keep: StringName = pointed_id()
+	var copies: Dictionary = {}
+	for at in ids.size():
+		if at < counts.size() and counts[at] > 0:
+			copies[ids[at]] = int(copies.get(ids[at], 0)) + counts[at]
 	_entries.clear()
-	var by_key: Dictionary = {}
-	var ordered: Array[StringName] = ring_order(_bag)
-	# A bag of plain ids: each card at level 1, counted. Levels come with M3's rewards.
+	var held: Array[StringName] = []
+	held.assign(copies.keys())
+	var ordered: Array[StringName] = ring_order(held)
+	# Every card at level 1, counted (items I3). Levels come with M3's rewards.
 	for kind in KINDS:
 		for id in ordered:
 			if _spells == null or _spells.component_kind(id) != kind:
 				continue
-			var key: String = "%s@1" % id
-			if by_key.has(key):
-				_entries[int(by_key[key])]["count"] = int(_entries[int(by_key[key])]["count"]) + 1
-				continue
-			by_key[key] = _entries.size()
-			_entries.append({"id": id, "level": 1, "count": 1, "kind": kind})
+			_entries.append({"id": id, "level": 1, "count": int(copies[id]), "kind": kind})
 	_kinds.clear()
 	for kind in KINDS:
 		if _entries.any(func(entry: Dictionary) -> bool: return entry["kind"] == kind):
@@ -1093,8 +1215,8 @@ func _on_staff_mana_changed(player: int, staff: int, mana: float, max_mana: floa
 	_mana[staff] = mana
 	if max_mana > 0.0:
 		_max_mana[staff] = max_mana
-	if _tree_open and staff == _viewed and max_mana > 0.0:
-		_tree.set_plan(_plans[_viewed], _max_mana[_viewed])
+	if _tree_open and staff == _hand_of(_viewed) and max_mana > 0.0:
+		_tree.set_plan(_plan(_viewed), _pool_of(_viewed))
 	_changed()
 
 
@@ -1113,7 +1235,7 @@ func _on_cancelled(player: int) -> void:
 
 func _on_paged(player: int, step_by: int) -> void:
 	if player == index and _open:
-		_show_staff(_held_from(posmod(_viewed + step_by, STAFF_COUNT), signi(step_by)))
+		_show_staff(_along_strip(_viewed, signi(step_by)))
 
 
 # --- The ring ---------------------------------------------------------------------------
@@ -1207,7 +1329,7 @@ func _place() -> void:
 	_tree.size = _ring_side.size
 	var tab_x: float = _tabs_at.x
 	_glyph_prev.position = Vector2(tab_x, _tabs_at.y)
-	_glyph_next.position = Vector2(tab_x + _glyph_prev.custom_minimum_size.x + 3.0 + 13.0 * STAFF_COUNT + 1.0, _tabs_at.y)
+	_glyph_next.position = Vector2(tab_x + _glyph_prev.custom_minimum_size.x + 3.0 + _strip_width() + 1.0, _tabs_at.y)
 
 
 func _row_of(slot: int) -> int:
@@ -1305,22 +1427,119 @@ func _draw() -> void:
 	_draw_flyers()
 
 
+## Lay the strip of staffs out (see the class doc): the hands' tabs (each its glyph's width), then
+## the bag's, scrolled so the shown staff's tab is in view; each hand's glyph on its tab.
+func _place_strip() -> void:
+	_strip_stale = false
+	_strip_glyphs = _hand_glyph_widths()
+	_tab_numbers.clear()
+	_tab_hands.clear()
+	_tab_rects.clear()
+	var widths: Array[float] = []
+	for hand in STAFF_COUNT:
+		_tab_numbers.append(_hands[hand] if holds_staff(_hands[hand]) else NONE)
+		_tab_hands.append(hand)
+		widths.append(maxf(_hand_glyphs[hand].custom_minimum_size.x + TAB_PAD * 2.0, TAB_WIDTH))
+	for staff in _strip:
+		if _hand_of(staff) == NONE:
+			_tab_numbers.append(staff)
+			_tab_hands.append(NONE)
+			widths.append(TAB_WIDTH)
+	var left: float = _tabs_at.x + _glyph_prev.custom_minimum_size.x + 3.0
+	var room: float = _strip_width()
+	_glyph_next.position = Vector2(left + room + 1.0, _tabs_at.y)
+	var shown: int = _tab_numbers.find(_viewed)
+	if shown >= 0:
+		_strip_first = mini(_strip_first, shown)
+		while _strip_first < shown and _width_of(widths, _strip_first, shown) > room:
+			_strip_first += 1
+	_strip_first = clampi(_strip_first, 0, maxi(_tab_numbers.size() - 1, 0))
+	var x: float = left
+	for at in _tab_numbers.size():
+		var rect := Rect2(x, _tabs_at.y - 1.0, widths[at], TAB_HEIGHT)
+		var visible_tab: bool = at >= _strip_first and rect.end.x <= left + room
+		if at < _strip_first:
+			rect.position.x = -1000.0
+		else:
+			x += widths[at] + TAB_GAP
+		if not visible_tab:
+			rect.position.x = -1000.0
+		_tab_rects.append(rect)
+		var hand: int = _tab_hands[at]
+		if hand != NONE:
+			var glyph: ActionGlyphScript = _hand_glyphs[hand]
+			glyph.visible = _open and visible_tab
+			glyph.position = rect.position + Vector2(floorf((rect.size.x - glyph.custom_minimum_size.x) * 0.5), 1.0)
+			glyph.modulate = Color(1.0, 1.0, 1.0, 1.0 if _tab_numbers[at] != NONE else 0.35)
+
+
+## The hand glyphs' widths added up (a device change resizes them; no allocation).
+func _hand_glyph_widths() -> float:
+	var total: float = _glyph_prev.custom_minimum_size.x + _glyph_next.custom_minimum_size.x
+	for glyph in _hand_glyphs:
+		total += glyph.custom_minimum_size.x
+	return total
+
+
+## The strip's width: the column's room between the paging glyphs, less the shown rows' range
+## when the staff has more slots than show.
+func _strip_width() -> float:
+	var room: float = COLUMN_WIDTH - 4.0 - _glyph_prev.custom_minimum_size.x - 3.0 - 1.0 - _glyph_next.custom_minimum_size.x
+	var count: int = cards_of(_viewed).size()
+	if ceili(float(count) / float(SLOT_COLUMNS)) > SLOT_ROWS:
+		room -= _text_width("%d-%d" % [count, count]) + 4.0
+	return room
+
+
+## The width of tabs `from` to `to` (both in) with their gaps.
+static func _width_of(widths: Array[float], from: int, to: int) -> float:
+	var total: float = 0.0
+	for at in range(from, to + 1):
+		total += widths[at] + (TAB_GAP if at > from else 0.0)
+	return total
+
+
+## The strip's tabs as drawn (for tests): per tab {staff (NONE: an empty hand), hand (NONE: in the
+## bag), rect (off to the left when scrolled out)}.
+func strip_tabs() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for at in _tab_numbers.size():
+		out.append({"staff": _tab_numbers[at], "hand": _tab_hands[at], "rect": _tab_rects[at]})
+	return out
+
+
 func _draw_tabs() -> void:
-	var x: float = _tabs_at.x + _glyph_prev.custom_minimum_size.x + 3.0
-	for staff in STAFF_COUNT:
-		var rect := Rect2(x, _tabs_at.y, 12.0, 11.0)
-		var on: bool = staff == _viewed
-		if not holds_staff(staff):
-			# An empty hand: an outline and a dash, never shown.
-			_frame(rect, LINE)
-			_text("-", Vector2(rect.get_center().x, rect.position.y + 1.0), DIM, true)
-			x += 13.0
+	var hidden_before: bool = false
+	var hidden_after: bool = false
+	for at in _tab_numbers.size():
+		var rect: Rect2 = _tab_rects[at]
+		if rect.position.x < 0.0:
+			if at < _strip_first:
+				hidden_before = true
+			else:
+				hidden_after = true
 			continue
-		draw_rect(rect, LINE if not on else TEXT.darkened(0.15))
-		if on:
-			_frame(rect.grow(1.0), GOLD)
-		_text(str(staff + 1), Vector2(rect.get_center().x, rect.position.y + 1.0), OUTLINE if on else TEXT, true)
-		x += 13.0
+		var staff: int = _tab_numbers[at]
+		if staff == NONE:
+			# An empty hand: an outline under its dim glyph, never shown.
+			_frame(rect, LINE)
+			continue
+		var on: bool = staff == _viewed
+		draw_rect(rect, LINE if not on else GOLD.darkened(0.35))
+		_frame(rect, GOLD if on else DIM)
+		if _tab_hands[at] == NONE:
+			# A staff in the bag: its head.
+			var base: StaffBase = _plan(staff).get("staff") as StaffBase
+			if base != null and base.head != null:
+				draw_texture_rect(base.head, Rect2(rect.position + Vector2(1.0, 0.5), Vector2(10.0, 10.0)), false)
+			else:
+				_text("*", Vector2(rect.get_center().x, rect.position.y + 1.0), OUTLINE if on else TEXT, true)
+	# More staffs past an end of the strip: a small gold notch under that end.
+	var y: float = _tabs_at.y + TAB_HEIGHT
+	if hidden_before:
+		draw_rect(Rect2(_glyph_prev.position.x + _glyph_prev.custom_minimum_size.x + 1.0, y, 2.0, 2.0), GOLD)
+	if hidden_after:
+		draw_rect(Rect2(_glyph_next.position.x - 3.0, y, 2.0, 2.0), GOLD)
 	var count: int = cards_of(_viewed).size()
 	var rows: int = ceili(float(count) / float(SLOT_COLUMNS))
 	if rows > SLOT_ROWS:
@@ -1333,7 +1552,7 @@ func _draw_slots() -> void:
 	# at the marker, the rest pushed on, and that staff's casts and wasted cards (owner, 2026-10-27).
 	var previewing: bool = not _preview_cards.is_empty()
 	var cards: Array[StringName] = _preview_cards if previewing else cards_of(_viewed)
-	var plan: Dictionary = _preview_view if previewing else _plans[_viewed]
+	var plan: Dictionary = _preview_view if previewing else _plan(_viewed)
 	var wasted: Dictionary = plan.get("wasted", {}) as Dictionary
 	var fade: float = 1.0 - clampf((_clock - _fade_start) / FADE_TIME, 0.0, 1.0) if not _fading.is_empty() else 0.0
 	var landing: Dictionary = {}
@@ -1412,7 +1631,7 @@ func _draw_groups(groups: PackedInt32Array) -> void:
 func slot_groups() -> PackedInt32Array:
 	if not _preview_cards.is_empty():
 		return _groups_of(_preview_view, _preview_cards.size())
-	return _groups_of(_plans[_viewed], cards_of(_viewed).size())
+	return _groups_of(_plan(_viewed), cards_of(_viewed).size())
 
 
 func _groups_of(plan: Dictionary, count: int) -> PackedInt32Array:

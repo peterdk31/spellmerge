@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the wizard on staffs (staffs A6a; the wizard actor and its seat since actors G7):
-## four staffs on four buttons, the start cards and the bag, `staff_change_requested` and
+## four staffs on four buttons, the start cards and the counted bag, `staff_change_requested` and
 ## `staff_cards_requested` applied and announced (`staff_changed`) or
 ## refused (`build_refused`), casting through `Spells.cast_staff`, a sustained (`hold`) card
 ## switched off only by a new press, mana held by sustained cards, the anchor a circling shot goes
@@ -175,7 +175,10 @@ func _tap(player: int, action: StringName) -> void:
 
 func test_the_bag_holds_every_card_in_the_registry() -> void:
 	var player := _wizard(0)
-	check_equal(_seat(player).bag.size(), _registry.items.size(), "the bag has every card")
+	var inventory: Inventory = player.inventory
+	check_equal(inventory.stacks_in(&"cards").size(), _registry.items.size(), "the bag has every card")
+	for id: StringName in _registry.items:
+		check_equal(inventory.count_of(&"cards", id), Inventory.DEV_COPIES, "%s: the dev bag's copies" % id)
 
 
 func test_the_start_cards_are_built_and_announced() -> void:

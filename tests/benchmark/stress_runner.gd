@@ -95,7 +95,8 @@ const PROFILED_SIGNALS: Array[StringName] = [&"damage_dealt", &"projectile_hit",
 ## The build of each player: the cards of RT and LB (RB keeps its dash). A Play wizard holds two
 ## staffs (items I2), so the runner hands each wizard three (`Caster.replace_staffs`, every hand it
 ## is given held): Play's RB and RT and the moon staff on LB, as the wizards held before. Until the
-## inventory (I3) puts a staff on a hand, that is the one call that does.
+## inventory puts a staff on a hand (items I7), that is the one call that does; the wizard's
+## inventory does not hear of it, which the bench, building nothing, never minds.
 ## Heavy on purpose: splits, rings, orbits, triggers with payloads, all four elements.
 const STAFFS: Array[Array] = [
 	[

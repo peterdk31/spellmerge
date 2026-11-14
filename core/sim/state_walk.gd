@@ -75,6 +75,7 @@ extends RefCounted
 ## tools read the simulation, they are not part of it.
 const FOLDERS: Array[String] = [
 	"res://core/actors/",
+	"res://core/items/",
 	"res://core/projectiles/",
 	"res://core/spells/",
 	"res://gameplay/",

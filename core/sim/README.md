@@ -11,6 +11,7 @@ Every script in these folders, and every inner class of one, is a **simulation s
 | Folder | Why |
 |---|---|
 | `core/actors/` | the actor table: who an actor is |
+| `core/items/` | the item stacks an inventory holds (items I3) |
 | `core/projectiles/` | every shot, its hits and its trails' samples |
 | `core/spells/` | the spell runtime, staffs, carriers |
 | `gameplay/` | every gameplay area (actor, ai, combat, coop, flow, player, and any new one), but `gameplay/feel/` |

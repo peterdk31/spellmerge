@@ -5,7 +5,7 @@ extends "res://tests/support/screenshot.gd"
 ## in turn, its ring and hub cropped into sheets of eight (radial_cards_1, radial_cards_2, ...).
 ## Then shots, in the sandbox with the radial builder picked: one player pointing at an atom (the hub
 ## shows its numbers, the marked slot its ghost, the card info panel the marked card), then after
-## two cards were put in, the one-kind ring on the modifiers, LT held half way to a clear, and all
+## two cards were put in (P1's strip holds a staff in the bag after its four hands), the one-kind ring on the modifiers, LT held half way to a clear, and all
 ## four players with their radials open at once, every quarter laid out alike (the corner panels
 ## hidden, the HP and MP bars on top of each column).
 
@@ -33,6 +33,9 @@ func take() -> void:
 		fail("the sandbox did not start with four wizards")
 		return
 	_hud.call("_on_builder_options_changed", 0, true)
+	# A staff in P1's bag (items I3), so the strip shows a bag staff's tab after the hands'.
+	var curl: StaffBase = root.get_node("Registry").call("get_resource", &"wizard", &"curl") as StaffBase
+	(flow.call("get_wizard", 0) as Actor).inventory.add(ItemStack.of_staff(curl))
 	if not await _open([0]):
 		return
 	var radial: Node = _hud.call("get_radial", 0)

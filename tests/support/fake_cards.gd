@@ -7,7 +7,7 @@ extends RefCounted
 ##     const FakeCards := preload("res://tests/support/fake_cards.gd")
 ##     var registry: Node = FakeCards.registry(300)       # card_000 .. card_299, kinds in turn
 ##     spells.registry = registry
-##     events.bag_changed.emit(0, FakeCards.ids(300))
+##     FakeCards.announce_bag(events, 0, FakeCards.ids(300))
 
 ## The kinds in the order the cards take them: card 0 a carrier, card 1 a modifier, and so on.
 const KINDS: Array[StringName] = [&"carrier", &"modifier", &"element", &"trigger", &"multicast"]
@@ -82,3 +82,28 @@ static func _card(kind: StringName, at: int) -> SpellComponent:
 	var multicast := MulticastBase.new()
 	multicast.extra_draws = 1
 	return multicast
+
+
+## Announce `ids` as `player`'s card bag (`bag_changed`, items I3): one entry a copy, so an id
+## listed twice is counted twice; no limit.
+static func announce_bag(events: Node, player: int, ids: Array[StringName]) -> void:
+	var order: Array[StringName] = []
+	var counts := PackedInt32Array()
+	for card_id in ids:
+		var at: int = order.find(card_id)
+		if at < 0:
+			order.append(card_id)
+			counts.append(1)
+		else:
+			counts[at] += 1
+	events.emit_signal(&"bag_changed", player, ItemKinds.bag_of(ItemKinds.CARD), order, counts, -1)
+
+
+## Announce `plans` as `player`'s staffs on its four hands, as the player does (items I3): staff
+## number `at` on hand `at`, an empty plan an empty hand (`owned_staff_changed`, `hands_changed`).
+static func announce_staffs(events: Node, player: int, plans: Array[Dictionary]) -> void:
+	var hands := PackedInt32Array()
+	for at in plans.size():
+		events.emit_signal(&"owned_staff_changed", player, at, plans[at])
+		hands.append(at if not plans[at].is_empty() else -1)
+	events.emit_signal(&"hands_changed", player, hands)

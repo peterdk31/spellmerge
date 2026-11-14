@@ -371,3 +371,28 @@ func test_the_press_that_enters_the_staffs_puts_nothing_on_a_hand() -> void:
 	_frame()
 	check_equal(inventory.layer(), InventoryScript.Layer.STAFFS, "in the staff bag")
 	check(_hand_asks.is_empty(), "and nothing asked of a hand")
+
+
+## Items I8: the menus are the driven body's. A possession closes an open inventory (it would name a
+## staff of the body shown before), and what it shows is the possessed imp's: its staff, its empty
+## card bag; when the possession ends, the wizard's again.
+func test_a_possession_closes_the_menus_and_they_show_the_body_the_seat_drives() -> void:
+	_start()
+	var imp_data: EnemyBase = load("res://content/enemies/ember_imp/ember_imp.tres") as EnemyBase
+	var imp := imp_data.scene.instantiate() as Actor
+	imp.data = imp_data
+	imp.position = Vector2(0.0, 60.0)
+	own(_world.add(imp))
+	var inventory: InventoryScript = _open()
+	check(inventory.is_open(), "the inventory is open")
+	Possession.begin(_wizard, imp, 1.0)
+	check(not inventory.is_open(), "a possession closes it")
+	check_equal(inventory.mirror().staffs(), PackedInt32Array([0]), "it shows the imp's one staff")
+	check_equal(inventory.mirror().base_of(0).id, &"ember_imp", "the imp's own")
+	check_equal(inventory.mirror().fill_text(CARDS), "0/∞", "and its empty card bag")
+	_frame()
+	_open()
+	check(inventory.is_open(), "it opens again on the imp's things")
+	imp.possessed_by.end()
+	check(not inventory.is_open(), "the possession's end closes it")
+	check_equal(inventory.mirror().staffs(), PackedInt32Array([0, 1, 4]), "and it shows the wizard's staffs again")

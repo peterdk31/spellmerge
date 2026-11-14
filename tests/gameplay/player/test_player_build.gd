@@ -6,8 +6,8 @@ extends "res://tests/support/suite.gd"
 ## switched off only by a new press, mana held by sustained cards, the anchor a circling shot goes
 ## round (Orbit), and four
 ## players building at once. And the seat (the PlayerController) on an actor that is not its
-## wizard: its input and casts follow the actor it drives, while its HUD numbers and builder stay
-## its own wizard's (owner, 2026-10-28), also while no controller drives the wizard; `release`
+## wizard: its input, casts, HUD numbers and builder follow the actor it drives (items I8), and are
+## its own wizard's while it drives nothing, also while no controller drives the wizard; `release`
 ## gives it back. It runs the real `Spells`, projectile
 ## manager and event bus, with cards built in code behind a stand-in registry, and the real
 ## wizard scene.
@@ -356,8 +356,9 @@ func test_a_seat_drives_another_actor_and_release_gives_it_back() -> void:
 	check_equal(table.seat_of(creature.id), 0, "the creature's seat is 0")
 	check_equal(table.seat_of(wizard.id), ActorsScript.NONE, "the wizard's body has no seat")
 	check_equal(creature.team(), ActorsScript.TEAM_WIZARDS, "the creature is on the seat's team")
-	check(_stats.is_empty(), "the seat's numbers do not become the creature's: %s" % [_stats])
-	check(_changed.is_empty(), "nor its staffs: %s" % [_changed])
+	# The seat's panel and builder are the body it drives (items I8).
+	check(not _stats.is_empty() and _stats.back()[1] == 40 and _stats.back()[2] == 40, "the seat's numbers become the creature's: %s" % [_stats])
+	check_equal(_changed.size(), 4, "and its staffs, every hand said (its two, two empty): %s" % [_changed])
 	# The seat's input moves and casts the creature, not the wizard.
 	_world.hold(0, &"move_right")
 	_run(1)
@@ -370,25 +371,20 @@ func test_a_seat_drives_another_actor_and_release_gives_it_back() -> void:
 	check_equal(_staff_casts, [[0, 0]], "seat 0's button casts the creature's staff, sent for seat 0")
 	check(creature.caster.mana_of(0) < creature.caster.max_mana_of(0), "with the creature's mana")
 	check_equal(wizard.caster.mana_of(0), wizard.caster.max_mana_of(0), "not the wizard's")
-	# Its numbers are the wizard's.
+	# Its numbers are the creature's.
 	_stats.clear()
-	_world.hurt(creature, 10)
-	check(_stats.is_empty(), "a hit on the creature is not seat 0's health: %s" % [_stats])
 	_world.hurt(wizard, 10)
-	check(not _stats.is_empty() and _stats.back()[0] == 0 and _stats.back()[1] == 90 and _stats.back()[2] == 100,
-		"a hit on the standing wizard is: %s" % [_stats])
-	# The builder builds the wizard's staffs.
+	check(_stats.is_empty(), "a hit on the standing wizard is not seat 0's health: %s" % [_stats])
+	_world.hurt(creature, 10)
+	check(not _stats.is_empty() and _stats.back()[0] == 0 and _stats.back()[1] == 30 and _stats.back()[2] == 40,
+		"a hit on the creature is: %s" % [_stats])
+	# The builder builds the creature's staffs: with no Inventory it has none to build.
 	_changed.clear()
-	var creature_row: Array[StringName] = creature.caster.cards_of(1)
+	var wizard_row: Array[StringName] = wizard.caster.cards_of(1)
 	_world.bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"))
-	check_equal(wizard.caster.cards_of(1), _ids("fire bolt - - - -"), "seat 0's builder builds the wizard's staff")
-	check_equal(creature.caster.cards_of(1), creature_row, "not the creature's")
-	check_equal(_changed.size(), 1, "the change is announced once")
-	if _changed.size() == 1:
-		check_equal([_changed[0][0], _changed[0][1]], [0, 1], "for seat 0, staff 1")
-		check_equal(_changed[0][2].get("cards"), _ids("fire bolt - - - -"), "with the wizard's new cards")
-	_world.bus.staff_cards_requested.emit(0, 3, _ids("bolt"))
-	check(_refused.is_empty() and wizard.caster.has_staff(3), "a staff the creature lacks is the wizard's to build")
+	check_equal(wizard.caster.cards_of(1), wizard_row, "seat 0's builder does not build the wizard's staff now")
+	check_equal(_refused.size(), 1, "the creature, with no inventory, refuses it: %s" % [_refused])
+	check(_changed.is_empty(), "and nothing is announced: %s" % [_changed])
 	# Release: the creature stands again and the seat is its wizard's.
 	_stats.clear()
 	_changed.clear()
@@ -398,7 +394,7 @@ func test_a_seat_drives_another_actor_and_release_gives_it_back() -> void:
 	check_equal(table.actor_of_seat(0), wizard.id, "the actor table has seat 0 on the wizard")
 	check_equal(table.seat_of(creature.id), ActorsScript.NONE, "the creature has no seat")
 	check_equal(creature.team(), ActorsScript.NONE, "nor the seat's team")
-	check(not _stats.is_empty() and _stats.back()[1] == 90, "the wizard's numbers are sent again: %s" % [_stats])
+	check(not _stats.is_empty() and _stats.back()[1] == 90 and _stats.back()[2] == 100, "the wizard's numbers are sent again: %s" % [_stats])
 	check_equal(_changed.size(), 4, "the wizard's four staffs are announced again")
 	_world.hold(0, &"move_right")
 	# Two steps: a hit-stop of the possession's hits may still cover part of the first (N4).

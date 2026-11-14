@@ -13,8 +13,8 @@ extends RefCounted
 ##   driver's) ends first.
 ## - **A controller drives the oldest body it possesses** (`ActorController.possessions`, oldest
 ##   first); each other one is driven by a `PuppetController` that copies its intent. The target's
-##   own controller is put aside (`ActorController.set_aside`; a seat's panel goes on showing its
-##   own wizard). Team and seat follow the driver into the actor table; a puppet is no seat.
+##   own controller is put aside (`ActorController.set_aside`; a seat's panel shows its own wizard
+##   meanwhile). Team and seat follow the driver into the actor table; a puppet is no seat.
 ## - **It ends** (`end`) when its time is up or the target dies or is down: the target gets its
 ##   own controller back (`started`: an AI picks a fresh target and winds up again). When the
 ##   driver was in it, it moves into its next oldest possession; with none left it goes home to
@@ -25,8 +25,10 @@ extends RefCounted
 ## The target keeps its possession in `Actor.possessed_by` and steps it (`step`). `possess_started`
 ## and `possess_ended` (`by_id` and the target's id) tell Feel. A ring in the driver's
 ## colour with the time left (`PossessedLook`) is drawn round the target while it lasts, and over
-## an actor a seat possesses that is not its own wizard, its health and mana too. A builder never
-## edits the target: a seat's builder edits its own wizard (owner, 2026-10-28).
+## an actor a seat possesses that is not its own wizard, its health and mana too. The seat's panel,
+## builder and inventory are the body it drives (items I8; owner, 2026-11-13, replacing "a seat's
+## builder edits its own wizard" of 2026-10-28): a possessed enemy's staffs are built, swapped and
+## dropped through its own Inventory, and what it takes stays with it.
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")

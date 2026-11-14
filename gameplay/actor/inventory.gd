@@ -2,7 +2,8 @@ class_name Inventory
 extends ActorComponent
 ## The inventory (items I3, docs/milestones/items.md, "The model"): the things an actor holds, in
 ## bags, and which of its staffs is on which hand. A component of the actor kit, never stepped; the
-## wizard has one (`content/wizard/base/wizard.tscn`). What a kind is and which bag holds it is
+## wizard has one (`content/wizard/base/wizard.tscn`), and an enemy with staffs is given one by its
+## actor (items I8: its staff bag empty, its staffs on its hands, its other bags empty). What a kind is and which bag holds it is
 ## `ItemKinds`' (core/items); nothing here names a kind to decide something.
 ##
 ## - **Bags:** one per `ItemKinds.BAGS` entry, each a list of `ItemStack`s and a capacity in copies
@@ -39,6 +40,8 @@ extends ActorComponent
 ##   `put_on_hand(stack, hand)` puts a staff there (its Caster's hand filled with its cards and the
 ##   mana it kept); `add` puts anything in its bag. Which of them a pickup does is the pickup rule's
 ##   (gameplay/items/pickup_rule.gd), not the inventory's.
+## - **A boss's phase** (items I8): `replace_hands` puts the phase's staffs on its hands in place of
+##   those there, which are gone; its Caster's staffs follow (`Caster.replace_staffs`).
 ## - **Hands and drops** (items I7, the inventory menu's requests): `set_hand(number, hand)` puts a
 ##   staff it owns on a hand (from the bag: the staff that was there goes into the bag; from another
 ##   hand: the two change places) or, with NO_HAND, takes it off into the staff bag (refused,
@@ -421,7 +424,8 @@ func set_cards(number: int, cards: Array[StringName]) -> Refusal:
 	var hand: int = hand_of(number)
 	var caster: Caster = actor.caster if actor != null else null
 	if hand >= 0 and caster != null and not caster.holds(hand):
-		# The Caster lost the hand behind the inventory's back (`Caster.replace_staffs`): refused.
+		# The Caster lost the hand behind the inventory's back (`Caster.replace_staffs` called on its
+		# own, not through `replace_hands`): refused.
 		return Refusal.NO_STAFF
 	var counted: bool = false
 	# The cards taken first, so the room they leave takes cards given back.
@@ -539,6 +543,45 @@ func set_hand(number: int, hand: int) -> Refusal:
 		staff_changed.emit(there.number)
 	hands_changed.emit()
 	return Refusal.NONE
+
+
+## Hold `new_staffs` (one per button) with `new_cards` (card ids by slot, per staff) on its hands
+## in place of the staffs there (items I8: a boss's phase, `Phases`): its Caster's staffs are
+## replaced (`Caster.replace_staffs`, each pool full), the staffs that were on hands are gone (not
+## into the bag), and each new one gets a new number and the cards its Caster built. The staff bag
+## keeps what it holds. Nothing for an empty `new_staffs`.
+func replace_hands(new_staffs: Array[StaffBase], new_cards: Array) -> void:
+	if new_staffs.is_empty():
+		return
+	var caster: Caster = actor.caster if actor != null else null
+	var changed := PackedInt32Array()
+	for at in HANDS:
+		if _hands[at] != null:
+			changed.append(_hands[at].number)
+			_hands[at] = null
+	if caster != null:
+		caster.replace_staffs(new_staffs, new_cards)
+	for at in mini(HANDS, new_staffs.size()):
+		var stack: ItemStack = null
+		if caster != null:
+			if not caster.holds(at):
+				continue
+			stack = ItemStack.of_staff(caster.staff_of(at), caster.cards_of(at))
+		else:
+			if new_staffs[at] == null:
+				continue
+			var cards: Array[StringName] = []
+			if at < new_cards.size() and new_cards[at] is Array:
+				for id: Variant in new_cards[at]:
+					cards.append(StringName(str(id)))
+			stack = ItemStack.of_staff(new_staffs[at], cards)
+		stack.number = _next_number
+		_next_number += 1
+		_hands[at] = stack
+		changed.append(stack.number)
+	for number in changed:
+		staff_changed.emit(number)
+	hands_changed.emit()
 
 
 ## Lay staff `number` on the ground (off its hand first, with the mana it had), as the class doc

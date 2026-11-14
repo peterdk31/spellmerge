@@ -112,6 +112,7 @@ const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_dra
 const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
 const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
+const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const SHOWN_BEAMS_PER_PLAYER: int = 24
@@ -422,6 +423,8 @@ var _markers: TeammateMarkersScript = null
 var _altar_code: AltarCodeScript = null
 ## The items on the ground (`ground_items.gd`, items I6).
 var _ground_items: GroundItemsScript = null
+## The health bars over wizards whose seat drives another body (`away_bars.gd`, items I8).
+var _away_bars: AwayBarsScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
 var mote_cap: int:
 	get:
@@ -685,6 +688,9 @@ func _ready() -> void:
 	_ground_items.name = "GroundItems"
 	add_child(_ground_items)
 	_ground_items.bind(events)
+	_away_bars = AwayBarsScript.new()
+	_away_bars.name = "AwayBars"
+	add_child(_away_bars)
 	add_cue_part(&"flash", _play_flash, _prepare_flash)
 	add_cue_part(&"lane", _play_lane)
 	var parts: Dictionary = _spectacle.cue_parts()
@@ -797,6 +803,8 @@ func step(real_delta: float) -> void:
 	if _markers != null:
 		var shown: Camera2D = party_camera.camera
 		_markers.step(_actor_table(), seats_here, party_camera.visible_rect(), shown.zoom.x if is_instance_valid(shown) else 0.0, _clock)
+	if _away_bars != null:
+		_away_bars.step(_actor_table())
 	_step_reactions(real_delta)
 	_step_shown_beams(real_delta)
 	_step_flashes(real_delta)
@@ -2062,6 +2070,11 @@ func ground_items() -> GroundItemsScript:
 ## The room's code over the altar (for tests).
 func altar_code() -> AltarCodeScript:
 	return _altar_code
+
+
+## The health bars over wizards whose seat is away (for tests).
+func away_bars() -> AwayBarsScript:
+	return _away_bars
 
 
 ## The markers for teammates out of the picture (for tests).

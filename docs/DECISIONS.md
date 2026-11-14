@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-14: the HUD follows the driven body (items I8)
+
+- **The shown body is the driven body, else the home body** (`PlayerController.shown`): the body a seat drives is the oldest it possesses, which is the plan's "first one hit". While the seat drives nothing (an enemy's AI possesses its wizard) the panel and the menus are its wizard, as before, so the player still sees their wizard being played against them and can build it.
+- **The menus close when the shown body changes:** the builder's and the inventory's requests name a staff by its number, and numbers are per inventory, so an open menu would name the other body's staff after a possession began or ended. `panels.gd` closes both on `inventory_announced`, which is sent exactly when the seat says a body anew (also when its wizard is made again). A command already in flight still applies to the new body; the window is one frame, and the menus are closed by then.
+- **An enemy's things go with its body:** what a possessing seat built out or took into an enemy's bags stays with the enemy and is gone when it dies (no drop on death; items as rewards are M3). Its staffs are its own `StaffBase`s, which the registry does not know, so a wizard carrying a taken enemy staff into a run leaves it out of the loadout (`Inventory.take_loadout`'s guard), as I4 decided for any staff the registry has none of.
+- **A boss's phase replaces the staffs on its hands, not the bag's,** and those it held are gone, not put in its bag: a phase is the boss's content changing, not an item swap; a possessing player who moved a staff into the bag keeps it there.
+- **The seat's mouse aims from the driven body's hand:** a possessed imp aimed from the wizard's hand, which could be across the room; it is part of the seat following the body it plays.
+- **The away bar is health only,** the possession overlay's bar without its mana: the wizard stands empty, so its staffs' mana is not what the player needs; its health tells them to come back.
+- **A restore moves the watch but sends no numbers:** `rebuild_derived` re-points the shown body's signals and says its staffs and things, but the panel's numbers (`player_stats_changed`) follow at the next step, since what was sent last is state and a restore must not change it.
+
 ## 2026-11-14: the review's leftovers (items I7b)
 
 - **A downed body's menu requests are refused, not held for later:** a request that arrives while the home body is down (the HUD has closed both menus, so only a late frame brings one) is answered with `NO_DOWN` and changes nothing. Holding it until the body is up would apply a change the player no longer sees; refusing it is one check per request in the player controller and says why.

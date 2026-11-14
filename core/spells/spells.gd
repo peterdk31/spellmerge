@@ -3739,6 +3739,14 @@ func home_of_seat(seat: int) -> int:
 	return table.home_of_seat(seat) if table != null else ActorsScript.NONE
 
 
+## The body seat `seat`'s (0-3) HUD is about (`Actors.shown_of_seat`, items I8): the one it drives,
+## else its own wizard; for the HUD, which knows seats and asks Spells by caster (`cast_index`,
+## `cooldown_left`).
+func shown_of_seat(seat: int) -> int:
+	var table: ActorsScript = _actor_table()
+	return table.shown_of_seat(seat) if table != null else ActorsScript.NONE
+
+
 ## The team `actor` aims for (Actors.NONE for no actor): a chain's jump and an arc's zap skip its
 ## bodies.
 func _team(actor: int) -> int:

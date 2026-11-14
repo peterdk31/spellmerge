@@ -67,7 +67,8 @@ extends Node2D
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
 ## health, walking speed, contact damage, staff, cards and mana. Data with no staff or no cards
-## leaves the actor without a caster (an enemy that only chases).
+## leaves the actor without a caster (an enemy that only chases); one with staffs gets an
+## `Inventory` too when its scene has none (items I8), which takes the staffs as its own.
 ##
 ## Local stop: while `Actors.hold(id, seconds)` holds it (Feel's hit-stop, which holds only the
 ## bodies in a hit), `step` does nothing and the body stands still; its looks step once at the
@@ -348,7 +349,7 @@ func step(delta: float) -> void:
 		look.step(delta)
 	if home_controller != null and home_controller != controller:
 		# Its own controller is away (it drives another actor, or another drives this one): it
-		# still watches its body (a seat's panel shows its own wizard; owner, 2026-10-28).
+		# still watches its body (a seat set aside shows its own wizard on its panel).
 		home_controller.watch_home(self, delta)
 
 
@@ -664,6 +665,15 @@ func _apply_data() -> void:
 		caster = null
 		return
 	caster.hold_staffs(data.staffs)
+	if inventory == null:
+		# An enemy holds its staffs in an inventory as a wizard does (items I8): a seat possessing it
+		# builds, swaps and drops them, and what it takes stays with the body. Set up right after
+		# the caster, whose staffs it takes; added as a boss's Phases is (a snapshot makes it again
+		# before `_ready`, and `_find_components` finds it then).
+		inventory = Inventory.new()
+		inventory.name = "Inventory"
+		add_child(inventory)
+		_components.insert(_components.find(caster) + 1, inventory)
 
 
 ## Make the body `factor` times its drawn size (a boss, a boss's phase): the node scales, and the

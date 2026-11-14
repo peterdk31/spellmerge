@@ -14,7 +14,7 @@ extends Node
 ## the signals of the actor it drives (connected there only, so a restored snapshot moves them:
 ## `rebuild_derived`), `set_aside` when it keeps
 ## state about another controller taking its actor (possess, G9), and `watch_home` when it reads
-## its own body while it is away (a seat's panel shows its own wizard; owner, 2026-10-28).
+## its own body while it is away (a seat set aside shows its own wizard on its panel).
 ##
 ## `driving` is the actor it drives now (null for none), kept by `Actor.drive` only: a controller
 ## drives at most one actor, and handing it to another takes it off the first.

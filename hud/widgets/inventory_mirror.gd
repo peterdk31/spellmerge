@@ -1,8 +1,8 @@
 extends RefCounted
 ## What the HUD knows of one player's inventory (items I7): a mirror of what the seat's events say,
 ## and nothing else. The inventory menu (`hud/menus/inventory/`) and the radial builder
-## (`hud/builder/`, items I7b) each keep one and ask it, so neither holds a copy of its own, the two
-## never drift, and a test can fill one by hand.
+## (`hud/builder/`, items I7b) each keep one, filled by the same events, so the two menus read the
+## seat's inventory through one set of rules, and a test can fill one by hand.
 ##
 ## - **Bags** (`bag_changed`): each bag's stack ids with their copies and its capacity
 ##   (`copies`, `capacity`, `fill_text`: "2/4", or "2/∞" with no limit; `count_of`, `ids_in`).

@@ -227,7 +227,8 @@ var _input: InputManagerScript = null
 
 ## What the player announced, the inventory menu's mirror (`hud/widgets/inventory_mirror.gd`,
 ## items I7b): the bags, each staff's view by its number and which number each hand holds. The
-## strip is the mirror's `staffs()`, kept as each event comes; then each hand's pool.
+## strip is a cache of the mirror's `staffs()`, set again on each event (never edited itself); then
+## each hand's pool.
 var _mirror: MirrorScript = MirrorScript.new()
 var _strip: PackedInt32Array = PackedInt32Array()
 var _max_mana: PackedFloat32Array = PackedFloat32Array([100.0, 100.0, 100.0, 100.0])
@@ -1091,8 +1092,9 @@ func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], count
 	var keep: StringName = pointed_id()
 	var copies: Dictionary = {}
 	for id in _mirror.ids_in(bag):
-		if _mirror.count_of(bag, id) > 0:
-			copies[id] = _mirror.count_of(bag, id)
+		var count: int = _mirror.count_of(bag, id)
+		if count > 0:
+			copies[id] = count
 	_entries.clear()
 	var held: Array[StringName] = []
 	held.assign(copies.keys())

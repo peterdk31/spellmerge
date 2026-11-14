@@ -220,3 +220,6 @@ func test_a_wizard_said_anew_forgets_the_staffs_before() -> void:
 	check_equal(_radial.cards_of(0).size(), 3, "its staff as said")
 	FakeCards.announce_bag(_bus, 0, FakeCards.ids(1))
 	check_equal(_radial.ring_entries().size(), 1, "and the new wizard's card bag")
+	var staffs: Array[StringName] = [&"test"]
+	_bus.bag_changed.emit(0, ItemKinds.bag_of(ItemKinds.STAFF), staffs, PackedInt32Array([1]), -1)
+	check_equal(_radial.ring_entries().size(), 1, "another bag leaves the card ring as it was")

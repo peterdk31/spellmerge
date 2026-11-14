@@ -386,3 +386,33 @@ static func _card_body_shots(fight: ContentFight) -> Array[int]:
 		if shots.call(&"get_body_shader_of", slot) == PoolCard.look_shader:
 			out.append(slot)
 	return out
+
+
+## Regression (review, items I8): a seat's panel is told the restored body's numbers, also when they
+## equal what was last said of another body. Seat 0 drives its wizard when the snapshot is taken,
+## then possesses an enemy (the panel hears the enemy's), and the snapshot is restored into the same
+## world: the seat hears its wizard again, and the next step says the wizard's health.
+func test_a_restore_mid_possession_tells_the_seat_its_bodys_numbers() -> void:
+	var played := SimScenes.new(root, &"fight")
+	played.step()
+	var areas: Dictionary = played.areas()
+	var wizard: Actor = areas["actor 0"]
+	var enemy: Actor = areas["actor 2"]
+	var seat: PlayerController = wizard.home_controller as PlayerController
+	var snapshot := Snapshot.take(areas, played.world())
+	_check_problems(&"fight", snapshot.problems)
+	check(Possession.begin(wizard, enemy, 30.0) != null, "seat 0 possesses the enemy")
+	played.step()
+	check(seat.shown() == enemy, "its panel is the enemy's")
+	var said: Array = []
+	enemy.events.player_stats_changed.connect(func(p: int, h: float, mh: float, _m: float, _mm: float) -> void: said.append([p, h, mh]))
+	_check_problems(&"fight", played.restore(snapshot))
+	areas = played.areas()
+	wizard = areas["actor 0"]
+	seat = wizard.home_controller as PlayerController
+	check(seat.shown() == wizard, "restored, the seat drives its wizard")
+	check(wizard.health.changed.is_connected(seat._on_health_changed), "and hears its health")
+	# The fight's scene steps only its enemies: the wizard's own step, as the Tick's.
+	wizard.step(1.0 / 16.0)
+	check(said.has([0, wizard.health.health, wizard.health.max_health]), "the wizard's numbers are said again at its next step: %s" % [said])
+	played.free_all()

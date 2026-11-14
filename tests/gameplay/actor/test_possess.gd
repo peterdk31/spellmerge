@@ -333,14 +333,17 @@ func test_a_possession_from_the_driven_body_adds_a_puppet_and_the_seat_moves_on_
 	_world.run(8)
 	check(far.controller is PuppetController, "the far imp is a puppet")
 	check(near.controller == seat, "the seat stays in the oldest, the near imp")
+	check(seat.shown() == near, "its HUD is the first one hit (items I8)")
 	check(wizard.controller == null, "and the wizard's body still stands")
 	# The near one dies: the seat moves on to the far imp, not home.
 	near.health.take(500, 0)
 	check(far.controller == seat, "the seat moves on to the far imp")
 	check(wizard.controller == null, "not yet home")
 	check_equal(_world.table.actor_of_seat(0), far.id, "seat 0 is on the far imp")
+	check(seat.shown() == far and far.health.changed.is_connected(seat._on_health_changed), "its HUD moves on with it")
 	_world.run(int(SECONDS / Fixture.STEP) + 1)
 	check(wizard.controller == seat, "then home")
+	check(seat.shown() == wizard and wizard.health.changed.is_connected(seat._on_health_changed), "and its HUD with it")
 	check(far.controller == _brain(far), "and the far imp has its own controller")
 
 
@@ -354,11 +357,13 @@ func test_when_the_driven_body_is_stolen_the_seat_moves_on() -> void:
 	Possession.begin(second, near, SECONDS)
 	check(near.controller == _seat(second), "seat 1 took the near imp")
 	check(far.controller == _seat(first), "seat 0 moved on to the far one")
+	check(_seat(first).shown() == far and _seat(second).shown() == near, "each seat's HUD is the body it drives (items I8)")
 	check(first.controller == null, "seat 0's wizard still stands")
 	Possession.begin(second, far, SECONDS)
 	check(far.controller is PuppetController and (far.controller as PuppetController).leader_controller == _seat(second),
 		"seat 1 steals the far one too, as its puppet")
 	check(first.controller == _seat(first), "and seat 0, with nothing left, is home")
+	check(_seat(first).shown() == first, "its HUD too")
 
 
 func test_a_seat_with_nothing_left_waits_behind_whoever_possesses_its_wizard() -> void:
@@ -372,6 +377,8 @@ func test_a_seat_with_nothing_left_waits_behind_whoever_possesses_its_wizard() -
 	_world.run(int(1.0 / Fixture.STEP) + 1)
 	check(imp.controller == _brain(imp), "seat 0's possession of the imp is over")
 	check(seat.driving == null and seat.is_set_aside(), "seat 0 waits: it drives nothing")
+	check(seat.shown() == wizard and wizard.health.changed.is_connected(seat._on_health_changed), "and its HUD is its wizard meanwhile (items I8)")
+	check(not imp.health.changed.is_connected(seat._on_health_changed), "not the imp it left")
 	check(wizard.controller == _brain(other), "while the imp's controller goes on")
 	_world.run(int(1.0 / Fixture.STEP) + 1)
 	check(wizard.controller == seat, "then seat 0 is home")
@@ -496,6 +503,7 @@ func test_the_panel_shows_the_driven_imp_and_the_wizard_again_when_it_ends() -> 
 	_world.run(2)
 	check(imp.controller == _seat(wizard), "seat 0 drives the imp")
 	check_equal(panel.health(), 50, "the panel shows the imp the seat drives (items I8)")
+	check_equal(hud.get_vignette().strength, 0.0, "the change of body is no hit: no red flash (review)")
 	_world.hurt(wizard, 30)
 	check_equal(panel.health(), 50, "a hit on the standing wizard is not on the panel (it shows over the wizard)")
 	_world.hurt(imp, 10)
@@ -509,9 +517,11 @@ func test_the_panel_shows_the_driven_imp_and_the_wizard_again_when_it_ends() -> 
 	hud.step_staffs()
 	check(imp.caster.mana_of(0) < imp.caster.max_mana_of(0), "seat 0's button casts the imp's staff")
 	check_equal(wizard.caster.mana_of(0), wizard.caster.max_mana_of(0), "not the wizard's")
+	var glow: float = hud.get_vignette().strength
 	_world.run(int(SECONDS / Fixture.STEP) + 1)
 	check(wizard.controller == _seat(wizard), "the possession is over")
 	check_equal(panel.health(), 70, "the panel is back on the wizard, with its hit")
+	check_equal(hud.get_vignette().strength, glow, "coming home to a hurt wizard flashes nothing more")
 	check_equal(panel.shown_rows(), 1, "and its one staff")
 	check_equal(_world.spells.shown_of_seat(0), wizard.id, "the rows' timing too")
 

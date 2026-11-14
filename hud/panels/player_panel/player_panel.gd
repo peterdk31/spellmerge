@@ -192,6 +192,12 @@ func reset() -> void:
 	_refresh_rows()
 
 
+## The next numbers are another body's (items I8: the seat shows the body it drives): the health
+## shown stays until they come, but is no longer what a drop in health is measured from.
+func forget_health() -> void:
+	_health = -1
+
+
 ## The health shown, or -1 before any numbers arrived.
 func health() -> float:
 	return _health

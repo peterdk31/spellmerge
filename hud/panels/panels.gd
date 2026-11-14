@@ -738,11 +738,18 @@ func _on_stats_changed(player: int, health: float, max_health: float, mana: floa
 
 
 ## The seat says its things anew (the body shown changed, items I8, or its wizard was made again):
-## its builder and inventory close, so neither names a staff of the body shown before.
+## its builder and inventory close, so neither names a staff of the body shown before, and its
+## panel's numbers start over (the body's own follow at once).
 func _on_inventory_announced(player: int) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		_radials[player].close_builder()
 		_inventories[player].close_inventory()
+		# Another body's numbers follow: no hit flash for the change, and none of the last body's
+		# mana held or told is read for this one's staff rows (review, items I8).
+		_panels[player].forget_health()
+		for staff in PlayerPanelScript.STAFF_COUNT:
+			_staff_mana[player * PlayerPanelScript.STAFF_COUNT + staff] = INF
+			_staff_reserved[player * PlayerPanelScript.STAFF_COUNT + staff] = 0.0
 
 
 func _on_menu_opened(player: int) -> void:

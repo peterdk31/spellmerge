@@ -101,7 +101,7 @@ const REFUSALS: Dictionary = {
 const CAST_SOUND_ID: StringName = &"cast"
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"registry", &"frames", &"_watched"]
+const DERIVED: Array[StringName] = [&"registry", &"frames", &"_watched", &"_sent_health", &"_sent_mana", &"_sent_shown", &"_sent_staff_mana", &"_sent_staff_max"]
 ## State as who they point at: the actor it drives and its home body, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_actor", &"_home"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -122,7 +122,8 @@ var _home: Actor = null
 ## Per staff: the seconds left in which a remembered press still counts (0 = none remembered).
 var _buffer_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _sound_player: AudioStreamPlayer = null
-## What the last `player_stats_changed` said, to send it only on a change.
+## What the last `player_stats_changed` said, to send it only on a change: what this machine's HUD
+## was told, not state (a restore sends everything again, `rebuild_derived`).
 var _sent_health: float = -1.0
 var _sent_mana: int = -1
 var _sent_shown: int = -1
@@ -275,10 +276,7 @@ func _show_anew() -> void:
 	if body == _watched:
 		return
 	_watch(body)
-	_sent_health = -1
-	_sent_mana = -1
-	_sent_staff_mana.fill(-1)
-	_sent_staff_max.fill(-1.0)
+	_forget_sent()
 	_announce_body()
 	announce_stats()
 
@@ -314,15 +312,26 @@ func _unwatch(body: Actor) -> void:
 
 
 ## A snapshot restored: it hears the body it drives (the base's) and the shown body, which may be
-## another than before. The HUD is told the shown body's staffs and things again when it changed;
-## its numbers follow at the next step (`_sent_*` are state, so nothing here changes them).
+## another than before. The HUD is told the shown body's staffs and things again when it changed,
+## and its numbers at the next step in any case (what was sent is forgotten: the restored body's
+## numbers may equal what was last said of another).
 func rebuild_derived() -> void:
 	super()
+	_forget_sent()
 	var body: Actor = shown()
 	if body == _watched:
 		return
 	_watch(body)
 	_announce_body()
+
+
+## Forget what the HUD was told, so the next `announce_stats` says every number again.
+func _forget_sent() -> void:
+	_sent_health = -1
+	_sent_mana = -1
+	_sent_shown = -1
+	_sent_staff_mana.fill(-1)
+	_sent_staff_max.fill(-1.0)
 
 
 ## Bind the home body and the builder's requests for good (this node goes with that body).
@@ -373,6 +382,8 @@ func stopped(actor: Actor) -> void:
 	unbind(actor)
 	if _actor == actor:
 		_actor = null
+		# Shown again: its wizard, until `started` hands it another body (most often at once).
+		_show_anew()
 
 
 ## It hears the casts of the body it drives.
@@ -505,8 +516,8 @@ func _fill_cards(inventory: Inventory) -> void:
 
 
 ## Everything of the shown body the HUD shows, to the seat's events (each time the shown body
-## changes): every hand's staff for the panel, then `inventory_announced`, every bag, every staff
-## owned and the hands (every actor has an Inventory).
+## changes): every hand's staff for the panel, then `inventory_announced`, what its sustained cards
+## hold (`mana_reserved`), every bag, every staff owned and the hands (every actor has an Inventory).
 func _announce_body() -> void:
 	var body: Actor = shown()
 	if body == null or body.events == null:
@@ -516,6 +527,10 @@ func _announce_body() -> void:
 			# A staff not built yet is announced when its Caster builds it.
 			_on_staff_built(at)
 	body.events.inventory_announced.emit(seat)
+	# What its sustained cards hold of each pool (the HUD forgot the last body's on the announcement).
+	if body.caster != null and body.caster.number >= 0 and body.spells != null:
+		for at in mini(body.caster.staff_count, STAFF_COUNT):
+			body.events.mana_reserved.emit(seat, at, body.spells.reserved_mana(body.caster.number, at))
 	for bag: StringName in ItemKinds.BAGS:
 		_on_bag_changed(bag)
 	if body.inventory != null:

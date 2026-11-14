@@ -77,6 +77,7 @@ func _initialize() -> void:
 	_test_the_run_ending_closes_it()
 	_test_main_menu_leaves_for_the_main_menu()
 	await _test_leave_game_lets_the_seat_go()
+	await _test_a_waiting_seat_is_named_and_can_be_let_go()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: hud/menus pause menu")
@@ -868,3 +869,50 @@ func _test_leave_game_lets_the_seat_go() -> void:
 	_check(heard == ["pause 1 0", "leave 1", "gone 1"], "first the game is let go, then the seat leaves, got %s" % [heard])
 	_check(not _input.is_joined(1), "the seat that opened the menu is gone")
 	_check(_input.is_joined(0), "the other seat plays on")
+
+
+## The owner, 2026-11-13: while the game waits for a seat's unplugged gamepad, the HUD says whose
+## controller is gone (the pad line, from co-op's `pad_wait_changed`), the waiting seat's own pause
+## menu closes, and the menu another player opens lets the waiting seat leave.
+func _test_a_waiting_seat_is_named_and_can_be_let_go() -> void:
+	_setup(1)
+	root.add_child(_input)
+	await process_frame
+	# Seat 1 is a real gamepad (device 3).
+	var join := InputEventJoypadButton.new()
+	join.device = 3
+	join.button_index = JOY_BUTTON_A
+	join.pressed = true
+	_input.handle_event(join)
+	_bus.player_joined.emit(1)
+	_check(_input.player_of(3) == 1, "the gamepad sits on seat 1")
+	var line: Label = _hud.get_pad_line()
+	_check(not line.visible, "no line while every seat has its device")
+	# Its own pause menu is open when the gamepad goes.
+	var start := InputEventJoypadButton.new()
+	start.device = 3
+	start.button_index = JOY_BUTTON_START
+	start.pressed = true
+	_input.handle_event(start)
+	_frame()
+	_check(_menu().owner_player == 1, "seat 1 opened the pause menu")
+	_input._on_joy_connection_changed(3, false)
+	# Co-op's part, done here: the waiting seats said.
+	_bus.pad_wait_changed.emit(1 << 1)
+	_check(not _menu().is_open(), "the waiting seat's menu closes: it cannot work it")
+	_check(line.visible and line.text.contains("P2") and not line.text.contains("P1"), "the line names the seat: %s" % line.text)
+	# Another player's menu offers to let it go.
+	_tap(0, &"pause")
+	_frame()
+	_check(_menu().owner_player == 0 and _names().has("LeaveWaiting"), "the menu offers the waiting seat's leave: %s" % [_names()])
+	_check(_menu().button("LeaveWaiting").text.contains("P2"), "naming the seat: %s" % _menu().button("LeaveWaiting").text)
+	_press(0, "LeaveWaiting")
+	_check(not _input.is_joined(1) and _input.is_joined(0), "only the waiting seat left")
+	_check(_menu().is_open(), "the menu stays open")
+	_bus.pad_wait_changed.emit(0)
+	_check(not line.visible and not _names().has("LeaveWaiting"), "nobody waits: no line, no row: %s" % [_names()])
+	# A seat that waits on another machine is not this menu's to let go.
+	_bus.pad_wait_changed.emit(1 << 2)
+	_check(line.visible and line.text.contains("P3") and not _names().has("LeaveWaiting"), "another machine's waiting seat is named, not offered")
+	_bus.main_menu_requested.emit(0)
+	_check(not line.visible, "back at the main menu no line stays")

@@ -75,6 +75,7 @@ func _initialize() -> void:
 	_test_revive_edges()
 	_test_a_wizards_bolt_hits_a_teammate()
 	_test_a_seat_that_leaves_with_its_menu_open_lets_the_game_go()
+	_test_an_unplugged_pad_stops_the_game_until_it_is_back()
 	_stop()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/coop (join orders, leave orders, camera, a bolt hits a teammate)")
@@ -777,3 +778,44 @@ func _test_a_seat_that_leaves_with_its_menu_open_lets_the_game_go() -> void:
 	_check(not CoopScript.menu_stops(game) and not game.is_stopped(), "seat 1 leaving lets the game go")
 	_events.call("apply_command", &"pause_requested", [5, 1])
 	_check(not game.is_stopped(), "a seat out of range stops nothing")
+
+
+## The owner, 2026-11-13: a seat whose gamepad is unplugged keeps playing (its wizard stays) and
+## the game stops for everyone, one reason a seat (`Coop.PAD_OF`), until that seat has a gamepad
+## again or leaves. Before, the input layer made the seat leave.
+func _test_an_unplugged_pad_stops_the_game_until_it_is_back() -> void:
+	_stop()
+	var game: Sim = Sim.found(_coop)
+	var waits: Array[int] = []
+	var hear: Callable = func(seats: int) -> void: waits.append(seats)
+	_events.connect("pad_wait_changed", hear)
+	_start_with(0)
+	_input.add_virtual_device(1)
+	_input.add_virtual_device(2)
+	# The room entered said that nobody waits.
+	_check(waits == [0], "a room entered says who waits: %s" % [waits])
+	waits.clear()
+	_events.call("apply_command", &"pad_wait_requested", [1, 1])
+	_check(game.stopped_for(CoopScript.PAD_OF[1]) and CoopScript.pad_waits(game) == 2, "seat 1's missing gamepad stops the game")
+	_check(_coop.is_joined(1) and _wizard(1) != null, "the seat and its wizard stay")
+	_check(waits == [2], "the waiting seat is said: %s" % [waits])
+	_events.call("apply_command", &"pad_wait_requested", [2, 1])
+	_events.call("apply_command", &"pad_wait_requested", [1, 0])
+	_check(game.is_stopped() and CoopScript.pad_waits(game) == 4, "seat 1's gamepad back does not let seat 2's stop go")
+	_check(waits == [2, 6, 4], "each change is said: %s" % [waits])
+	# The waiting seat leaves (the pause menu's "Leave game"): nobody waits for it.
+	_input.leave(2)
+	_check(not game.is_stopped() and waits[-1] == 0, "the waiting seat leaving lets the game go: %s" % [waits])
+	_events.call("apply_command", &"pad_wait_requested", [2, 1])
+	_check(not game.is_stopped(), "a seat that has left stops nothing")
+	_events.call("apply_command", &"pad_wait_requested", [7, 1])
+	_check(not game.is_stopped(), "a seat out of range stops nothing")
+	# The pause menu's stop stands apart from it.
+	_events.call("apply_command", &"pad_wait_requested", [1, 1])
+	_events.call("apply_command", &"pause_requested", [0, 1])
+	_events.call("apply_command", &"pad_wait_requested", [1, 0])
+	_check(game.is_stopped() and CoopScript.pad_waits(game) == 0, "the gamepad back leaves the pause menu's stop")
+	_events.call("apply_command", &"pause_requested", [0, 0])
+	_check(not game.is_stopped(), "and the menu closing lets the game go")
+	_events.disconnect("pad_wait_changed", hear)
+	_stop()

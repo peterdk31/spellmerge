@@ -1,8 +1,7 @@
 extends Node
 ## Co-op (autoload `Coop`): joining and leaving mid-run and revives. Up to four players; nobody ever waits for another player.
 ##
-## Joining and leaving: `core/input` turns a button press (or an unplugged
-## gamepad, or a bot's virtual device) into `device_joined` / `device_left`, and the frames
+## Joining and leaving: `core/input` turns a button press (or a bot's virtual device) into `device_joined` / `device_left`, and the frames
 ## service (core/sim) into the simulation's `seat_joined` / `seat_left` (offline as the device
 ## does; while a replay plays, as its frames say). Coop hears only those, never a device, and
 ## turns them into `player_joined(player)` / `player_left(player)`, once each
@@ -61,6 +60,10 @@ const FRESH_BECAUSE: String = "the seats' joins are the session's; room_entered 
 ## comes) must not leave everyone else stopped; and online two machines' menus may be open at
 ## once, each its own reason.
 const MENU_OF: Array[StringName] = [&"menu_0", &"menu_1", &"menu_2", &"menu_3"]
+## The reasons a seat's unplugged gamepad stops the game, one a seat (owner, 2026-11-13: the seat
+## keeps its wizard and everyone waits for the controller): let go when the seat has a gamepad
+## again, or leaves.
+const PAD_OF: Array[StringName] = [&"pad_0", &"pad_1", &"pad_2", &"pad_3"]
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -89,6 +92,7 @@ func _ready() -> void:
 	events.room_entered.connect(_on_room_entered)
 	# A command, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"pause_requested", _on_pause_requested)
+	events.listen(&"pad_wait_requested", _on_pad_wait_requested)
 
 
 ## `player` opened (`on` 1) or closed (`on` 0) the pause menu (a command, at a tick's start;
@@ -102,6 +106,34 @@ func _on_pause_requested(player: int, on: int) -> void:
 		game.stop(MENU_OF[player])
 	else:
 		game.go(MENU_OF[player])
+
+
+## Seat `player`'s gamepad was unplugged (`on` 1) or the seat has one again (`on` 0) (a command, at
+## a tick's start): the game stops for everyone while a seat that plays waits for its gamepad. A
+## seat that has left meanwhile stops nothing.
+func _on_pad_wait_requested(player: int, on: int) -> void:
+	if player < 0 or player >= PLAYER_SLOTS:
+		return
+	var game: Sim = Sim.found(self)
+	if on == 0:
+		game.go(PAD_OF[player])
+	elif _joined[player]:
+		game.stop(PAD_OF[player])
+	_send_pad_wait(game)
+
+
+## The seats `game` stands stopped for because their gamepad is unplugged, a bit each.
+static func pad_waits(game: Sim) -> int:
+	var seats: int = 0
+	for seat in PLAYER_SLOTS:
+		if game.stopped_for(PAD_OF[seat]):
+			seats |= 1 << seat
+	return seats
+
+
+func _send_pad_wait(game: Sim) -> void:
+	if events != null:
+		events.pad_wait_changed.emit(pad_waits(game))
 
 
 ## True while some seat's pause menu stops `game`.
@@ -240,6 +272,10 @@ func _on_seat_left(player: int) -> void:
 	var game: Sim = Sim.found(self)
 	if game != null:
 		game.go(MENU_OF[player])
+		# Nobody waits for the gamepad of a seat that left.
+		if game.stopped_for(PAD_OF[player]):
+			game.go(PAD_OF[player])
+			_send_pad_wait(game)
 	if not _joined[player]:
 		return
 	_set_revive(player, 0.0)
@@ -260,3 +296,5 @@ func _clear_revives() -> void:
 func _on_room_entered(_room_id: StringName) -> void:
 	refresh_wizards()
 	_clear_revives()
+	# A run's start let every stop go: whoever shows the waiting seats hears it.
+	_send_pad_wait(Sim.found(self))

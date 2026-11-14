@@ -50,6 +50,10 @@ extends CanvasLayer
 ##   they opened); with none open it opens the pause menu (`hud/menus/pause/`, node
 ##   Root/PauseMenu), which stops the game for everyone and is worked by the player who opened
 ##   it. Another player's `pause` does nothing while it is open.
+## - The pad line (`hud/widgets/pad_line.gd`, node Root/PadLine, made here; owner, 2026-11-13):
+##   while the game waits for a seat's unplugged gamepad (`pad_wait_changed`), whose controller is
+##   gone and how to go on. A waiting seat's open pause menu closes, and the pause menu another
+##   player opens offers "Leave game" for this machine's waiting seats.
 ## - The online line (`hud/widgets/online_line.gd`, node Root/OnlineLine, made here; netcode spike
 ##   S4): what playing with other machines has to say, at the top middle (`online_changed`'s
 ##   reason and the line of `online_line_changed`, worded by `hud/widgets/online_words.gd`).
@@ -80,6 +84,7 @@ const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
 const FpsCounterScript := preload("res://hud/widgets/fps_counter.gd")
 const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 const StoneLineScript := preload("res://hud/widgets/stone_line.gd")
+const PadLineScript := preload("res://hud/widgets/pad_line.gd")
 
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
@@ -90,6 +95,8 @@ const START_ACTION: StringName = &"accept"
 const EDGE_MARGIN: float = 4.0
 ## How far below the online line the stone line sits, in pixels.
 const STONE_LINE_DROP: float = 12.0
+## How far below the top the pad line sits: under the stone line.
+const PAD_LINE_DROP: float = 26.0
 ## The "Wave N" line and the build break line (hammer and "Build 12") sit side by side in one
 ## strip in the middle of the view.
 const WAVE_LABEL_WIDTH: float = 80.0
@@ -148,6 +155,7 @@ var _break_left: float = 0.0
 var _fps: FpsCounterScript = null
 var _online_line: OnlineLineScript = null
 var _stone_line: StoneLineScript = null
+var _pad_line: PadLineScript = null
 
 
 func _ready() -> void:
@@ -270,7 +278,15 @@ func _ready() -> void:
 	_stone_line.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, int(EDGE_MARGIN + STONE_LINE_DROP))
 	_stone_line.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_stone_line.bind(events)
+	# The pad line: under those, while the game waits for a seat's unplugged gamepad.
+	_pad_line = PadLineScript.new()
+	_pad_line.name = "PadLine"
+	root_control.add_child(_pad_line)
+	_pad_line.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, int(EDGE_MARGIN + PAD_LINE_DROP))
+	_pad_line.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_pad_line.bind(events)
 	if events != null:
+		events.pad_wait_changed.connect(_on_pad_wait_changed)
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)
 		events.player_stats_changed.connect(_on_stats_changed)
@@ -376,6 +392,26 @@ func _on_pause_pressed(player: int) -> void:
 			_pause_menu.close_menu()
 	elif _in_room:
 		_pause_menu.open_menu(player)
+
+
+## The seats the game waits for (their gamepad is unplugged; `pad_wait_changed`). A waiting seat
+## cannot work the pause menu, so one it had open closes and another player may open it; the menu
+## offers "Leave game" for the waiting seats of this machine (another machine's are its own to
+## let go).
+func _on_pad_wait_changed(seats: int) -> void:
+	if _pause_menu.is_open() and seats & (1 << _pause_menu.owner_player) != 0:
+		_pause_menu.close_menu()
+	var here: int = 0
+	if input != null:
+		for player in PLAYER_COUNT:
+			if seats & (1 << player) != 0 and input.is_waiting(player):
+				here |= 1 << player
+	_pause_menu.set_waiting_seats(here)
+
+
+## The pad line (for tests and screenshots).
+func get_pad_line() -> PadLineScript:
+	return _pad_line
 
 
 ## The pause menu (for tests and screenshots).
@@ -569,6 +605,9 @@ func _on_run_ended(_victory: bool) -> void:
 ## here asks Flow or net/: each does its own part of leaving.
 func _on_main_menu_requested(_player: int) -> void:
 	_on_run_ended(false)
+	# The run's stops went with it (Flow); a seat still waiting says so again in the next room.
+	_pad_line.show_seats(0)
+	_pause_menu.set_waiting_seats(0)
 	var tree: SceneTree = get_tree()
 	if tree == null:
 		return

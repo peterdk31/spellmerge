@@ -83,7 +83,7 @@ signal hub_requested(player: int)
 ## them asks another.
 signal main_menu_requested(player: int)
 ## Sender: hud. `player` picked "Leave game" in the pause menu (items I2: it replaced the `leave`
-## action): that seat lets its device go, as a pad pulled out would. Not a command itself: heard by
+## action): that seat lets its device go (a seat waiting for its unplugged gamepad too). Not a command itself: heard by
 ## core/input, whose `device_left` puts the seat's LEAVE in its next frame, so the seat goes at
 ## that tick on every machine and in a replay.
 signal seat_leave_requested(player: int)
@@ -137,8 +137,17 @@ signal online_line_changed(facts: Dictionary, counters: String)
 
 ## Sender: core/input. `device` (ids in input_manager.gd) took the free slot `player`, by a button press or as a bot's virtual device.
 signal device_joined(player: int, device: int)
-## Sender: core/input. `device` left slot `player`, by a button press or an unplugged gamepad. The slot is free again.
+## Sender: core/input. `device` left slot `player` (the pause menu's "Leave game"; an unplugged gamepad keeps its slot, `pad_wait_requested`). The slot is free again.
 signal device_left(player: int, device: int)
+## Sender: core/input. Seat `player`'s gamepad was unplugged (`on` 1) or the seat has one again
+## (`on` 0): the seat keeps its wizard, and the game stops for everyone while it waits (owner,
+## 2026-11-13). A command: heard by coop at the next tick's start (`Sim.stop`, a reason a seat), so
+## it stops at one tick on every machine and in a replay.
+signal pad_wait_requested(player: int, on: int)
+## Sender: coop. The seats the game stands stopped for because their gamepad is unplugged, a bit
+## each (0: none), sent whenever a seat starts or stops waiting and when a room is entered. Heard
+## by hud (the line that says whose controller is gone; the pause menu).
+signal pad_wait_changed(seats: int)
 
 # --- Seats (sender: core/sim, the frames service) -----------------------------
 

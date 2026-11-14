@@ -5,8 +5,17 @@ extends Node
 ## Devices join by a button press (the `join` action): a gamepad takes the
 ## lowest free player index, the keyboard and mouse only ever take player 0
 ## (P1), so P2-P4 are gamepads. The pause menu's "Leave game" (`seat_leave_requested`; items I2:
-## it replaced the `leave` action, whose Select is the inventory's), or unplugging a gamepad, frees
-## the slot.
+## it replaced the `leave` action, whose Select is the inventory's) frees the slot.
+##
+## **An unplugged gamepad keeps its seat** (owner, 2026-11-13): the seat waits for it
+## (`is_waiting`), holding nothing, and the game is asked to stop for everyone meanwhile (the
+## command `pad_wait_requested(player, 1)`, which co-op hears; asked again in every room entered
+## while it waits, since a run's start lets every stop go). The seat takes its gamepad back when
+## that one connects again (the same device id, which Godot usually gives a pad plugged back in) or
+## sends anything; else the first gamepad not seated that presses `join` takes the waiting seat
+## (the lowest, before any free slot). Then the game is asked to go on (`pad_wait_requested(player,
+## 0)`). "Leave game" frees a waiting seat like any other. The keyboard and virtual devices never
+## wait.
 ##
 ## **This machine's seats** (`set_own_seats(first, count)`; all four, from P1, unless told): the
 ## slots its real devices may take from then on. The keyboard takes only the first of them and a gamepad the
@@ -148,6 +157,8 @@ var _pressed_physics: Array[Dictionary] = []
 ## press frames, a tap that is released within the same frame still counts.
 var _press_count: Array[Dictionary] = []
 var _captured: Array[bool] = []
+## Per player: the seat's gamepad is unplugged and the seat waits for it (see the top).
+var _waiting: Array[bool] = []
 ## Per player: the raw right stick (x and y axis values, -1 to 1).
 var _aim_stick: Array[Vector2] = []
 ## Per player: the raw left stick, for menu_move().
@@ -185,6 +196,7 @@ func _init() -> void:
 		_pressed_physics.append(physics)
 		_press_count.append(counts)
 		_captured.append(false)
+		_waiting.append(false)
 		_aim_stick.append(Vector2.ZERO)
 		_move_stick.append(Vector2.ZERO)
 
@@ -199,6 +211,7 @@ func _ready() -> void:
 		events.sandbox_requested.connect(_on_run_requested)
 		events.hub_requested.connect(_on_run_requested)
 		events.seat_leave_requested.connect(_on_seat_leave_requested)
+		events.room_entered.connect(_on_room_entered)
 
 
 ## The pause menu's "Leave game" for seat `player`: its device goes (`leave`).
@@ -243,6 +256,12 @@ func player_of(device: int) -> int:
 
 func is_joined(player: int) -> bool:
 	return _valid(player) and _devices[player] != NO_DEVICE
+
+
+## True while `player`'s gamepad is unplugged and the seat waits for it (see the top): the seat is
+## still joined, and holds nothing.
+func is_waiting(player: int) -> bool:
+	return _valid(player) and _waiting[player]
 
 
 func joined_count() -> int:
@@ -311,7 +330,8 @@ func _hand_over(device: int) -> void:
 ## in their order, each taking the place it would have had it joined now (a provisional keyboard
 ## stays provisional), and those with no place left stay out. With `reseat` every real device
 ## leaves and joins again, as if it joined now (a menu's reset: nobody plays). Virtual devices are
-## not touched. False, and nothing changes, for seats outside the four.
+## not touched. A seat waiting for its unplugged gamepad that must move leaves instead (there is no
+## gamepad to seat). False, and nothing changes, for seats outside the four.
 func set_own_seats(first: int = 0, count: int = MAX_PLAYERS, reseat: bool = false) -> bool:
 	if first < 0 or count < 0 or first + count > MAX_PLAYERS:
 		return false
@@ -322,7 +342,8 @@ func set_own_seats(first: int = 0, count: int = MAX_PLAYERS, reseat: bool = fals
 	for player in MAX_PLAYERS:
 		var device: int = _devices[player]
 		if device != NO_DEVICE and not is_virtual(device) and (reseat or player < first or player >= first + count):
-			real.append(device)
+			if not _waiting[player]:
+				real.append(device)
 			leave(player)
 	_own_first = first
 	_own_count = count
@@ -357,6 +378,7 @@ func leave(player: int) -> bool:
 	var device: int = _devices[player]
 	_devices[player] = NO_DEVICE
 	_captured[player] = false
+	_waiting[player] = false
 	_clear_state(player)
 	if device == KEYBOARD:
 		_mouse_aiming = false
@@ -399,11 +421,19 @@ func handle_event(event: InputEvent) -> void:
 	var player: int = player_of(device)
 	if player == NO_PLAYER:
 		if event.is_action_pressed(JOIN):
-			if device != KEYBOARD and is_keyboard_provisional() and not join_asker.is_valid():
+			# A waiting seat comes before any free slot (and before whoever else gives seats out:
+			# the seat is this machine's already).
+			var waiting: int = _waiting.find(true) if _is_gamepad(device) else NO_PLAYER
+			if waiting != NO_PLAYER:
+				_take_back(waiting, device)
+			elif device != KEYBOARD and is_keyboard_provisional() and not join_asker.is_valid():
 				_hand_over(device)
 			else:
 				join(device)
 		return
+	# A gamepad that speaks is plugged in, whether or not its connection was told.
+	if _waiting[player]:
+		_take_back(player, device)
 	# The keyboard in use for real (a key or a click) keeps P1.
 	if device == KEYBOARD and _keyboard_provisional and event.is_pressed() and (event is InputEventKey or event is InputEventMouseButton):
 		_keyboard_provisional = false
@@ -491,10 +521,10 @@ func menu_tilt(player: int) -> Vector2:
 
 
 ## Shake the gamepad of `player`: `weak` and `strong` (0 to 1) are the two motors, for
-## `seconds`. False, and nothing happens, for the keyboard or a free slot. A virtual device
+## `seconds`. False, and nothing happens, for the keyboard, a free slot or an unplugged gamepad. A virtual device
 ## shakes nothing real, but `vibrator` hears it, so tests see the rumble.
 func rumble(player: int, weak: float, strong: float, seconds: float) -> bool:
-	if not is_joined(player) or _devices[player] == KEYBOARD:
+	if not is_joined(player) or _devices[player] == KEYBOARD or _waiting[player]:
 		return false
 	vibrator.call(_devices[player], clampf(weak, 0.0, 1.0), clampf(strong, 0.0, 1.0), maxf(seconds, 0.0))
 	return true
@@ -676,8 +706,51 @@ func _set_strength(player: int, action: StringName, strength: float) -> void:
 		_pressed_physics[player][action] = Engine.get_physics_frames()
 
 
+## A gamepad was plugged in or pulled out. One that holds a seat keeps it and the seat waits (see
+## the top), until it is back.
 func _on_joy_connection_changed(device: int, connected: bool) -> void:
+	var player: int = player_of(device)
+	if player == NO_PLAYER or not _is_gamepad(device):
+		return
 	if not connected:
-		var player: int = player_of(device)
-		if player != NO_PLAYER:
-			leave(player)
+		_wait(player)
+	elif _waiting[player]:
+		_take_back(player, device)
+
+
+static func _is_gamepad(device: int) -> bool:
+	return device >= 0 and not is_virtual(device)
+
+
+## Seat `player`'s gamepad is gone: the seat stays, lets go of everything it held, and the game is
+## asked to stop until it is back.
+func _wait(player: int) -> void:
+	if _waiting[player]:
+		return
+	_waiting[player] = true
+	_clear_state(player)
+	_ask_wait(player, true)
+
+
+## The waiting seat `player` plays again, on the gamepad `device` (its own back, or another that
+## took its place): the game is asked to go on.
+func _take_back(player: int, device: int) -> void:
+	_waiting[player] = false
+	_devices[player] = device
+	_pad_kind[player] = GlyphsScript.kind_of_pad(String(joy_name_provider.call(device)))
+	_clear_state(player)
+	_ask_wait(player, false)
+	glyph_kind_changed.emit(player)
+
+
+## The command that stops the game for seat `player`'s missing gamepad (`on`), or lets it go.
+func _ask_wait(player: int, on: bool) -> void:
+	if events != null:
+		events.pad_wait_requested.emit(player, 1 if on else 0)
+
+
+## A room was entered: a run's start lets every stop go, so each seat still waiting asks again.
+func _on_room_entered(_room_id: StringName) -> void:
+	for player in MAX_PLAYERS:
+		if _waiting[player]:
+			_ask_wait(player, true)

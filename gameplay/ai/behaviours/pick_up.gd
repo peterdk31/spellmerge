@@ -15,7 +15,8 @@ extends AIBehaviour
 ##   nowhere is left. Taken, it goes into the card bag and from there into that slot.
 ##
 ## It reads what each build would cast (`CastSense`) and the stacks' ids as they are, never a card.
-## Nothing is allocated but the card rows it tries (a decision with a card in sight).
+## An item it has no room for or no clear line to is not wanted. It allocates only in a decision with
+## an item in sight (the card rows it tries, the compile cache's keys).
 
 ## How far round its feet it looks (pixels).
 const LOOK: float = 96.0
@@ -33,8 +34,10 @@ func name() -> String:
 	return "pick up"
 
 
-## `picks[index]` the item's place in the brain's sight (`look_ground`), `memo[index]` the hand (a
-## staff) or the staff number × SLOTS + slot (a card) it goes to.
+## `picks[index]` the item's number on the ground, `memo[index]` the hand (a staff) or the staff
+## number × SLOTS + slot (a card) it goes to. An item it has no room for (`Inventory.has_room`: the
+## bag a card goes into, the staff bag the weakest goes into on a swap) or no clear line to
+## (`AISight`) is not wanted, so nothing it cannot take keeps it from fighting.
 func want(brain: AIBrain) -> float:
 	brain.picks[index] = NONE
 	brain.memo[index] = -1.0
@@ -42,23 +45,40 @@ func want(brain: AIBrain) -> float:
 	if brain.profile.takes.is_empty() or actor.inventory == null or actor.caster == null or actor.is_down():
 		return 0.0
 	var sight: GroundSight = brain.look_ground(LOOK)
+	# The weakest staff on a hand, worked out once (only when a staff is in sight and no hand is free).
+	var weakest: int = NONE
+	var lowest: float = INF
+	var weighed: bool = false
 	for at in sight.count:
 		var stack: ItemStack = sight.stacks[at]
 		if stack == null or not brain.profile.takes.has(stack.kind):
 			continue
-		var where: int = place_of(actor, stack)
+		if sight.in_reach[at] == 0 and not AISight.line_clear(actor.projectiles, actor.global_position, sight.places[at]):
+			continue
+		var where: int = NONE
+		if ItemKinds.can(stack.kind, ItemKinds.HAND):
+			if actor.inventory.free_hand() < 0 and not weighed:
+				weighed = true
+				weakest = weakest_hand(actor)
+				lowest = hand_strength(actor, weakest)
+			where = staff_hand(actor, stack, weakest, lowest)
+		elif stack.kind == ItemKinds.CARD and actor.inventory.has_room(stack):
+			where = card_place(actor, stack.id)
 		if where == NONE:
 			continue
-		brain.picks[index] = at
+		brain.picks[index] = sight.numbers[at]
 		brain.memo[index] = float(where)
 		return TAKE if sight.in_reach[at] != 0 else WALK
 	return 0.0
 
 
+## Walk to the item `want` chose, or take it once in reach. The sight is the one `want` filled in
+## this decision (`AIBrain.seen_ground`), the item found in it by its number.
 func act(brain: AIBrain) -> void:
-	var at: int = brain.picks[index]
-	var sight: GroundSight = brain.look_ground(LOOK) if at >= 0 else null
-	if sight == null or at >= sight.count:
+	var item: int = brain.picks[index]
+	var sight: GroundSight = brain.seen_ground()
+	var at: int = sight.numbers.find(item) if item != NONE else -1
+	if at < 0 or at >= sight.count:
 		return
 	if sight.in_reach[at] == 0:
 		brain.plan_move = AIBrain.Move.POINT
@@ -67,41 +87,46 @@ func act(brain: AIBrain) -> void:
 	var stack: ItemStack = sight.stacks[at]
 	var where: int = int(brain.memo[index])
 	if ItemKinds.can(stack.kind, ItemKinds.HAND):
-		_take_staff(brain, sight.numbers[at], where)
+		_take_staff(brain, item, where)
 	else:
-		_take_card(brain, sight.numbers[at], stack.id, where)
-
-
-## Where `stack` would go on `actor`, or NONE when it is not worth taking: for a staff the hand
-## (`staff_hand`), for a card the staff and slot (`card_place`); nothing for any other kind yet.
-static func place_of(actor: Actor, stack: ItemStack) -> int:
-	if ItemKinds.can(stack.kind, ItemKinds.HAND):
-		return staff_hand(actor, stack)
-	if stack.kind == ItemKinds.CARD:
-		return card_place(actor, stack.id)
-	return NONE
+		_take_card(brain, item, stack.id, where)
 
 
 ## The hand the staff `stack` would go on: a free one when it casts something, else, every hand
-## full, the weakest's when its first cast is stronger; NONE when it is not worth taking.
-static func staff_hand(actor: Actor, stack: ItemStack) -> int:
-	var caster: Caster = actor.caster
-	var gain: float = strength(caster.sense_of_build(stack.staff, stack.cards))
+## full, `weakest`'s (of strength `lowest`: `weakest_hand`) when its first cast is stronger and the
+## staff bag has room for the staff it puts there; NONE when it is not worth taking.
+static func staff_hand(actor: Actor, stack: ItemStack, weakest: int, lowest: float) -> int:
+	var gain: float = strength(actor.caster.sense_of_build(stack.staff, stack.cards))
 	if gain <= 0.0:
 		return NONE
 	var free: int = actor.inventory.free_hand()
 	if free >= 0:
 		return free
+	if weakest == NONE or gain <= lowest or not actor.inventory.has_room(stack):
+		return NONE
+	return weakest
+
+
+## The hand of the weakest staff on a hand (`hand_strength`; the first on a tie), NONE for none.
+static func weakest_hand(actor: Actor) -> int:
 	var weakest: int = NONE
 	var lowest: float = INF
-	for hand in caster.staff_count:
-		if not caster.holds(hand):
+	for hand in actor.caster.staff_count:
+		if not actor.caster.holds(hand):
 			continue
-		var held: float = strength(caster.sense_of_build(caster.staff_of(hand), caster.cards_of(hand)))
+		var held: float = hand_strength(actor, hand)
 		if held < lowest:
 			lowest = held
 			weakest = hand
-	return weakest if weakest != NONE and gain > lowest else NONE
+	return weakest
+
+
+## How strong the first cast of the staff on hand `hand` is (`strength`); INF for no hand.
+static func hand_strength(actor: Actor, hand: int) -> float:
+	var caster: Caster = actor.caster
+	if hand == NONE or not caster.holds(hand):
+		return INF
+	return strength(caster.sense_of_build(caster.staff_of(hand), caster.cards_of(hand)))
 
 
 ## Where the card `id` would go, as staff number × SLOTS + slot: the free slot of a staff on a hand

@@ -72,10 +72,13 @@ var current: int = 0
 var number: int = -1
 
 ## Not state: the compiled staffs' cache (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"_cache", &"_held_scratch"]
+const DERIVED: Array[StringName] = [&"_cache", &"_trials", &"_held_scratch"]
 
 ## Every compiled staff, by "spells id|staff id|cards".
 static var _cache: Dictionary = {}
+## The builds an AI only tried (`sense_of_build`, items I9), kept apart so trying never starts the
+## staffs' own cache over; by the same key, CACHE_SIZE at most.
+static var _trials: Dictionary = {}
 ## One float32, to round a value as a pool holds it (`_as_held`).
 static var _held_scratch: PackedFloat32Array = PackedFloat32Array([0.0])
 
@@ -540,12 +543,13 @@ func next_cast_sense(at: int = 0) -> CastSense:
 ## starts its cycle anew when it is built, so its next cast once built): an AI weighing a staff it
 ## might take or a card it might put in (items I9). Null for a build that casts nothing, no Spells,
 ## or, with `slot` >= 0, a card in that slot that does nothing (no cast of the cycle reads it, or
-## every cast that does wastes it: `CompiledStaff.wasted`). Compiled once per staff and cards, the
-## cache every caster shares.
+## every cast that does wastes it: `CompiledStaff.wasted`). Compiled once per staff and cards, shared
+## by every caster: a build held is the staffs' own cache's, any other is kept apart (`_trials`), so
+## trying never starts the staffs' cache over.
 func sense_of_build(base: StaffBase, cards: Array[StringName], slot: int = -1) -> CastSense:
 	if base == null or actor.spells == null:
 		return null
-	var compiled: CompiledStaff = _compiled(cards, base)
+	var compiled: CompiledStaff = _tried(cards, base)
 	if compiled.is_empty():
 		return null
 	if slot >= 0 and (compiled.wasted.has(slot) or not _reads(compiled, slot)):
@@ -585,7 +589,7 @@ func _install(at: int) -> void:
 
 
 func _compiled(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
-	var key: String = "%d|%d|%s" % [actor.spells.get_instance_id(), base.get_instance_id(), ",".join(PackedStringArray(cards))]
+	var key: String = _key(cards, base)
 	var found: CompiledStaff = _cache.get(key) as CompiledStaff
 	if found != null:
 		return found
@@ -594,6 +598,27 @@ func _compiled(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
 	found = actor.spells.compile_staff(cards, base)
 	_cache[key] = found
 	return found
+
+
+## The compiled staff of `cards` on `base` for a trial: the staffs' own cache's when it is there (a
+## build held), else the trials' (made there, never in the staffs' own).
+func _tried(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
+	var key: String = _key(cards, base)
+	var found: CompiledStaff = _cache.get(key) as CompiledStaff
+	if found == null:
+		found = _trials.get(key) as CompiledStaff
+	if found != null:
+		return found
+	if _trials.size() >= CACHE_SIZE:
+		_trials.clear()
+	found = actor.spells.compile_staff(cards, base)
+	_trials[key] = found
+	return found
+
+
+## The caches' key of `cards` on `base`: "spells id|staff id|cards".
+func _key(cards: Array[StringName], base: StaffBase) -> String:
+	return "%d|%d|%s" % [actor.spells.get_instance_id(), base.get_instance_id(), ",".join(PackedStringArray(cards))]
 
 
 ## True when a cast of `compiled`'s cycle reads the card in `slot`.

@@ -494,6 +494,12 @@ func look_ground(reach: float) -> GroundSight:
 	return _ground
 
 
+## Behaviours ask: what its last look saw (`look_ground`'s sight, as it was filled), without looking
+## again: a behaviour's `act` reads what its `want` looked at in the same decision.
+func seen_ground() -> GroundSight:
+	return _ground
+
+
 ## Behaviours ask: take the item `item` off the ground now (`actor_take_requested`: the Items area
 ## gives it to its Inventory as the pickup rule says, if it lies in reach and there is room).
 func take_item(item: int) -> void:
@@ -680,11 +686,11 @@ func _clear_plan() -> void:
 
 
 func _chase(intent: ActorIntent) -> void:
+	if plan_move == Move.POINT:
+		# A walk to a point (an item to take) goes on whether or not there is a target to aim at.
+		intent.move = _to_point()
 	var aimed: Node2D = _aim_node()
 	if aimed == null:
-		# Nothing to aim at: a walk to a point still goes on (an item to take).
-		if plan_move == Move.POINT:
-			intent.move = _to_point()
 		return
 	var now: Vector2 = aimed.global_position - actor.global_position
 	if now != Vector2.ZERO:
@@ -701,8 +707,6 @@ func _chase(intent: ActorIntent) -> void:
 			intent.move = -now.normalized() if now != Vector2.ZERO else Vector2.ZERO
 		Move.WAY:
 			intent.move = plan_way
-		Move.POINT:
-			intent.move = _to_point()
 		Move.STAND:
 			_press_on(intent)
 	if plan_urgent:

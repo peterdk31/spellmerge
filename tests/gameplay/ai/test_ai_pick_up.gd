@@ -186,3 +186,31 @@ func test_a_full_sight_keeps_the_nearest() -> void:
 	check_equal(sight.count, GroundSight.MOST, "at most MOST")
 	check_equal(sight.numbers[0], GroundSight.MOST + 2, "the nearest first")
 	check_equal(sight.numbers[GroundSight.MOST - 1], 3, "the farthest let go")
+
+
+## Regression (review of I9): a card in reach that its full bag has no room for is not wanted, so
+## the AI goes on fighting instead of standing by it for good.
+func test_a_card_with_no_room_in_its_bag_does_not_keep_it_from_fighting() -> void:
+	var body: Actor = _world.staffed_enemy([[&"", &"bolt"]], Vector2.ZERO, _taker([ItemKinds.CARD]))
+	body.inventory.set_capacity(CARDS, 0)
+	_items.lay(ItemStack.card(&"heavy"), Vector2(10.0, 0.0))
+	var casts: Array[int] = []
+	body.caster.cast_done.connect(func(at: int, _origin: Vector2, _direction: Vector2) -> void: casts.append(at))
+	_world.players[0].position = Vector2(80.0, 0.0)
+	_world.run(body, 40)
+	check_equal(_items.lying().size(), 1, "the card still lies there")
+	check(not casts.is_empty(), "and it casts at the wizard")
+
+
+## Regression (review of I9): trying builds never puts them in the staffs' own cache, which starts
+## over once full and would lose every held staff's compiled build.
+func test_a_tried_build_stays_out_of_the_staffs_cache() -> void:
+	var body: Actor = _world.staffed_enemy([[&"", &"bolt"]], Vector2.ZERO)
+	var tried: Array[StringName] = [&"pierce", &"bolt"]
+	var key: String = body.caster._key(tried, body.caster.staff_of(0))
+	check(body.caster.sense_of_build(body.caster.staff_of(0), tried) != null, "the tried build casts")
+	check(not Caster._cache.has(key), "not in the staffs' cache")
+	check(Caster._trials.has(key), "kept with the trials")
+	var held: String = body.caster._key(body.caster.cards_of(0), body.caster.staff_of(0))
+	check(Caster._cache.has(held), "the held build is the staffs' cache's")
+	check(not Caster._trials.has(held), "and is not compiled again for a trial")

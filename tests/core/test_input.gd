@@ -34,7 +34,11 @@ func _initialize() -> void:
 	_test_full_game_rejects_a_fifth()
 	_test_leave_frees_the_slot()
 	_test_leave_by_button()
-	_test_unplugged_gamepad_leaves()
+	_test_unplugged_gamepad_keeps_its_seat()
+	_test_another_gamepad_takes_a_waiting_seat()
+	_test_a_waiting_seat_can_leave()
+	_test_a_dead_pads_releases_do_not_end_the_wait()
+	_test_the_keyboard_takes_its_own_waiting_seat()
 	_test_virtual_device_every_index()
 	_test_virtual_device_slot_taken()
 	_test_virtual_device_is_not_joinable_by_button()
@@ -384,16 +388,125 @@ func _test_leave_by_button() -> void:
 	_check(_manager.is_joined(0), "Backspace no longer leaves")
 
 
-func _test_unplugged_gamepad_leaves() -> void:
+## The owner, 2026-11-13: an unplugged pad keeps its seat and the game is asked to wait for it.
+func _test_unplugged_gamepad_keeps_its_seat() -> void:
 	_setup()
+	var asked: Array = []
+	_bus.pad_wait_requested.connect(func(player: int, on: int) -> void: asked.append([player, on]))
 	for pad in 4:
 		_press_join(pad)
+	_manager.handle_event(_button(2, JOY_BUTTON_RIGHT_SHOULDER))
+	_manager.handle_event(_axis(2, JOY_AXIS_LEFT_X, 1.0))
+	_log.clear()
 	_manager._on_joy_connection_changed(2, false)
-	_check(not _manager.is_joined(2) and _manager.joined_count() == 3, "an unplugged gamepad frees its player")
+	_check(_manager.is_joined(2) and _manager.joined_count() == 4 and _manager.device_of(2) == 2, "an unplugged gamepad keeps its seat")
+	_check(_manager.is_waiting(2) and not _manager.is_waiting(1), "only its seat waits")
+	_check(_log.is_empty(), "no device left or joined")
+	_check(asked == [[2, 1]], "the game is asked to wait for seat 2's gamepad: %s" % [asked])
+	_check(_manager.get_move(2) == Vector2.ZERO and not _manager.is_action_pressed(2, &"staff_1"), "a waiting seat holds nothing")
+	_check(not _manager.rumble(2, 1.0, 1.0, 0.1), "an unplugged gamepad is not shaken")
+	_manager._on_joy_connection_changed(2, false)
+	_check(asked.size() == 1, "unplugged twice is once")
 	_manager._on_joy_connection_changed(8, false)
-	_check(_manager.joined_count() == 3, "unplugging a gamepad that never joined changes nothing")
+	_check(_manager.joined_count() == 4 and asked.size() == 1, "unplugging a gamepad that never joined changes nothing")
+	_manager._on_joy_connection_changed(8, true)
+	_check(asked.size() == 1 and _manager.player_of(8) == NO_PLAYER, "plugging in a gamepad does not join it without a button press")
+	# A room entered while it waits (a run's start let the stop go): asked again.
+	_manager._on_room_entered(&"room")
+	_check(asked == [[2, 1], [2, 1]], "a waiting seat asks again in a new room: %s" % [asked])
+	# Plugged back in under the same id: the seat plays again.
 	_manager._on_joy_connection_changed(2, true)
-	_check(_manager.joined_count() == 3, "plugging in a gamepad does not join it without a button press")
+	_check(not _manager.is_waiting(2) and _manager.device_of(2) == 2, "plugged back in, the seat has its gamepad again")
+	_check(asked[-1] == [2, 0], "the game is asked to go on: %s" % [asked])
+	_check(_log.is_empty(), "still no device left or joined")
+	_manager.handle_event(_button(2, JOY_BUTTON_RIGHT_SHOULDER))
+	_check(_manager.is_action_pressed(2, &"staff_1"), "its buttons work again")
+	_manager._on_room_entered(&"room")
+	_check(asked[-1] == [2, 0], "nobody waits, so a new room asks nothing")
+
+
+func _test_another_gamepad_takes_a_waiting_seat() -> void:
+	_setup()
+	var asked: Array = []
+	_bus.pad_wait_requested.connect(func(player: int, on: int) -> void: asked.append([player, on]))
+	_press_join(0)
+	_press_join(1)
+	_press_join(2)
+	# Two unplugged, one after the other: each seat waits by itself.
+	_manager._on_joy_connection_changed(2, false)
+	_manager._on_joy_connection_changed(1, false)
+	_check(_manager.is_waiting(1) and _manager.is_waiting(2) and asked == [[2, 1], [1, 1]], "two seats wait: %s" % [asked])
+	_log.clear()
+	# The keyboard and a virtual device never take a waiting seat.
+	_manager.handle_event(_key(KEY_ENTER))
+	_check(_manager.is_waiting(1) and _manager.player_of(InputManagerScript.KEYBOARD) == NO_PLAYER, "the keyboard takes no waiting seat")
+	# A new gamepad's join goes to the lowest waiting seat, before the free slot 3.
+	_press_join(7)
+	_check(_manager.player_of(7) == 1 and not _manager.is_waiting(1) and _manager.is_waiting(2), "another gamepad takes the lowest waiting seat")
+	_check(asked[-1] == [1, 0] and _log.is_empty(), "the game goes on for that seat, and no seat was left or joined: %s %s" % [asked, _log])
+	_check(not _manager.is_action_pressed(1, &"accept"), "the join press is not the seat's A")
+	# The old gamepad of that seat, back: a gamepad like any other, for the next waiting seat.
+	_manager._on_joy_connection_changed(1, true)
+	_check(_manager.player_of(1) == NO_PLAYER and _manager.is_waiting(2), "the replaced gamepad takes nothing by being plugged in")
+	# A waiting gamepad that speaks is back, whether or not its connection was told.
+	_manager.handle_event(_button(2, JOY_BUTTON_RIGHT_SHOULDER))
+	_check(not _manager.is_waiting(2) and asked[-1] == [2, 0] and _manager.is_action_pressed(2, &"staff_1"), "a waiting gamepad's press brings it back")
+	# With nobody waiting a join takes a free slot as ever.
+	_press_join(1)
+	_check(_manager.player_of(1) == 3, "then a join takes the free slot")
+
+
+func _test_a_waiting_seat_can_leave() -> void:
+	_setup()
+	_press_join(0)
+	_press_join(1)
+	_manager._on_joy_connection_changed(1, false)
+	_log.clear()
+	_check(_manager.leave(1), "a waiting seat leaves")
+	_check(not _manager.is_joined(1) and not _manager.is_waiting(1) and _log == [["left", 1, 1]], "its slot is free and the leave is said: %s" % [_log])
+	_manager._on_joy_connection_changed(1, true)
+	_check(not _manager.is_joined(1), "its gamepad back joins nothing by itself")
+	# A waiting seat that must move (this machine's seats changed) leaves: no gamepad to seat.
+	_press_join(1)
+	_manager._on_joy_connection_changed(1, false)
+	_check(_manager.set_own_seats(2, 2), "seats given")
+	_check(_manager.player_of(0) == 2 and _manager.player_of(1) == NO_PLAYER and not _manager.is_waiting(1) and not _manager.is_waiting(3), "the waiting seat left, the other moved")
+
+
+## A pad pulled out may still flush a release or a stick back at rest: no sign it is in hand.
+func _test_a_dead_pads_releases_do_not_end_the_wait() -> void:
+	_setup()
+	_press_join(0)
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 1.0))
+	_manager._on_joy_connection_changed(0, false)
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 0.0))
+	_manager.handle_event(_button(0, JOY_BUTTON_RIGHT_SHOULDER, false))
+	_manager.handle_event(_axis(0, JOY_AXIS_RIGHT_X, 0.1))
+	_check(_manager.is_waiting(0), "releases and a stick at rest keep the seat waiting")
+	_check(_manager.get_move(0) == Vector2.ZERO, "and the seat still holds nothing")
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 0.8))
+	_check(not _manager.is_waiting(0), "a stick pushed is a pad in hand")
+
+
+## A player alone whose only pad died goes on with the keyboard (on P1, the seat it may hold).
+func _test_the_keyboard_takes_its_own_waiting_seat() -> void:
+	_setup()
+	var asked: Array = []
+	_bus.pad_wait_requested.connect(func(player: int, on: int) -> void: asked.append([player, on]))
+	_press_join(0)
+	_manager._on_joy_connection_changed(0, false)
+	_log.clear()
+	_manager.handle_event(_key(KEY_ENTER))
+	_check(_manager.device_of(0) == InputManagerScript.KEYBOARD and not _manager.is_waiting(0), "the keyboard's join takes P1 back")
+	_check(asked == [[0, 1], [0, 0]] and _log.is_empty(), "the game goes on, and no seat left or joined: %s %s" % [asked, _log])
+	_check(not _manager.is_keyboard_provisional(), "the keyboard holds it for good")
+	# Only its own seat: a waiting P2 is a gamepad's to take.
+	_manager.leave(0)
+	_press_join(0)
+	_press_join(1)
+	_manager._on_joy_connection_changed(1, false)
+	_manager.handle_event(_key(KEY_ENTER))
+	_check(_manager.is_waiting(1) and _manager.player_of(InputManagerScript.KEYBOARD) == NO_PLAYER, "the keyboard takes no other waiting seat")
 
 
 func _test_virtual_device_every_index() -> void:

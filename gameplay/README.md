@@ -75,6 +75,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `reward_pick_requested` | HUD | `rewards` |
 | `door_vote_requested` | HUD | `flow` |
 | `pause_requested` | HUD | `run` |
+| `pad_wait_requested` | `core/input` (a command) | `coop` (the game stops while a seat waits for its unplugged gamepad) |
+| `pad_wait_changed` | `coop` | `hud` (the pad line, the pause menu) |
 | `sandbox_requested`, `sandbox_action_requested`, `sandbox_spawn_requested` | HUD | `flow` |
 | `play_load_requested` | net | `flow` (loads `play_tasks` ahead of a run two machines start together) |
 | `ai_view_changed` | HUD | `ai` (Entities) |

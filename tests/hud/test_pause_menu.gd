@@ -900,7 +900,7 @@ func _test_a_waiting_seat_is_named_and_can_be_let_go() -> void:
 	# Co-op's part, done here: the waiting seats said.
 	_bus.pad_wait_changed.emit(1 << 1)
 	_check(not _menu().is_open(), "the waiting seat's menu closes: it cannot work it")
-	_check(line.visible and line.text.contains("P2") and not line.text.contains("P1"), "the line names the seat: %s" % line.text)
+	_check(line.visible and line.text.contains("P2:") and not line.text.contains("P1:"), "the line names the seat: %s" % line.text)
 	# Another player's menu offers to let it go.
 	_tap(0, &"pause")
 	_frame()

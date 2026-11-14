@@ -13,7 +13,7 @@ const OUTLINE: int = 3
 ## A line for each waiting seat, then what to do.
 const SEAT_TEXT: String = "P%d: controller disconnected"
 ## `join` on a gamepad is A (or Start).
-const HINT_TEXT: String = "The game waits: plug it back in, or press A on another controller"
+const HINT_TEXT: String = "The game waits: plug it back in, or press A on another controller (Enter for P1)"
 
 
 func _ready() -> void:

@@ -221,7 +221,8 @@ func ground_now() -> GroundLoadout:
 	var made := GroundLoadout.new()
 	made.set_room(_room)
 	for row: GroundItem in _rows:
-		made.add_item(row.stack.kind, row.stack.id, row.title, row.stack.count, row.at, row.stack.mana, row.stack.cards)
+		if not made.add_item(row.stack.kind, row.stack.id, row.title, row.stack.count, row.at, row.stack.mana, row.stack.cards):
+			push_warning("Items: %s %s at %s passes what a recording carries of the ground, so a machine joining will not see it." % [row.stack.kind, row.stack.id, row.at])
 	return made
 
 

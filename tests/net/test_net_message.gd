@@ -154,13 +154,24 @@ func test_the_fullest_header_crosses() -> void:
 	check(number > 0 and loadout.size() > PlayerLoadout.MAX_BYTES - 4 and loadout.size() <= PlayerLoadout.MAX_BYTES, "a loadout filled to its limit (%d bytes)" % loadout.size())
 	for seat in PartyLoadout.SEATS:
 		replay.party.put(seat, loadout)
+	# What lies on the ground at its most too (items I6).
+	check(replay.ground.set_room(longest), "the ground's room")
+	var title: String = "t".repeat(GroundLoadout.MAX_TITLE)
+	# The longest items, then ones a card shorter each, so it fills to within a card of its limit.
+	for cards in range(staff.size(), -1, -1):
+		while replay.ground.add_item(longest, longest, title, GroundLoadout.MAX_COPIES, Vector2(1.5, 2.5), 3.25, staff.slice(0, cards)):
+			pass
+	while replay.ground.add_item(&"b", &"c", "", 1, Vector2.ZERO, 0.0, [] as Array[StringName]):
+		pass
+	check(replay.ground.size() > GroundLoadout.MAX_BYTES - 32 and replay.ground.size() <= GroundLoadout.MAX_BYTES, "a ground filled to its limit (%d bytes)" % replay.ground.size())
 	var header: PackedByteArray = replay.header_bytes()
-	check(header.size() <= Replay.MAX_HEADER_BYTES and header.size() > Replay.MAX_HEADER_BYTES - 16, "the fullest header is no more than a header takes (%d of %d)" % [header.size(), Replay.MAX_HEADER_BYTES])
+	check(header.size() <= Replay.MAX_HEADER_BYTES and header.size() > Replay.MAX_HEADER_BYTES - 48, "the fullest header is no more than a header takes (%d of %d)" % [header.size(), Replay.MAX_HEADER_BYTES])
 	check(NetMessage.MAX_HEADER <= NetMessage.MAX_BYTES, "and no more than a message may be")
 	check_equal(_message.decode(NetMessage.of_header(header)), "", "it crosses")
 	var back := Replay.new()
 	check_equal(back.decode(_message.body), "", "and reads back as a replay")
 	check(back.party.equals(replay.party), "with every seat's loadout")
+	check(back.ground.equals(replay.ground), "and the ground")
 
 
 func test_a_message_too_long_for_its_kind_is_refused() -> void:

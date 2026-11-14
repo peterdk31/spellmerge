@@ -96,3 +96,17 @@ func test_a_replay_header_carries_it_and_the_frames_give_it() -> void:
 	check_equal(frames.next_run_ground().room, &"", "no source and no replay: nothing")
 	frames.set_ground_source(func() -> GroundLoadout: return _sample())
 	check(frames.next_run_ground().equals(_sample()), "the game's, with no replay on the deck")
+
+
+## Regression (review): a recording's ground is its first run's only. A later run the same tape
+## starts (the party back from a run and out again, in one recording) lays its room fresh, never the
+## last run's leftovers.
+func test_a_recordings_ground_goes_into_its_first_run_only() -> void:
+	var replay := Replay.new()
+	replay.ground = _sample()
+	var tape := ReplayTape.playing(replay)
+	tape.next_run_seed()
+	check(tape.run_ground().equals(_sample()), "its first run lays it")
+	tape.next_run_seed()
+	check_equal(tape.run_ground().room, &"", "a later run takes nothing along")
+	check(replay.ground.equals(_sample()), "the replay itself is as it was")

@@ -213,10 +213,11 @@ func set_ground_source(source: Callable) -> void:
 
 
 ## What lies on the ground as the run that starts next begins (a copy): the replay's on the deck
-## (its header), else what the game says lies there now.
+## (its header; only into the first run it starts: `ReplayTape.run_ground`), else what the game says
+## lies there now.
 func next_run_ground() -> GroundLoadout:
 	if _tape != null:
-		return _tape.replay.ground.copy()
+		return _tape.run_ground()
 	return _ground_now()
 
 

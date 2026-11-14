@@ -92,8 +92,11 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	magic[0] = 0x58
 	cases["not a replay"] = magic
 	var format: PackedByteArray = good.duplicate()
-	format[4] = 9
+	format[4] = Replay.FORMAT + 1
 	cases["another format"] = format
+	var before_ground: PackedByteArray = good.duplicate()
+	before_ground[4] = 7
+	cases["format 7 (before the ground)"] = before_ground
 	var older: PackedByteArray = good.duplicate()
 	older[4] = 1
 	cases["format 1 (before the rules)"] = older

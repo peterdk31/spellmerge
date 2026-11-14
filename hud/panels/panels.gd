@@ -263,6 +263,7 @@ func _ready() -> void:
 			_seen_pause[player] = input.get_press_count(player, PAUSE_ACTION)
 			_seen_back[player] = input.get_press_count(player, BUILDER_ACTION)
 			_seen_start[player] = input.get_press_count(player, START_ACTION)
+			_seen_take[player] = input.get_press_count(player, TAKE_ACTION)
 	_pause_menu.save = save
 	_pause_menu.bind(events, ui_focus)
 	for radial in _radials:

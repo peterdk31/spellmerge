@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=22 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/floor.svg" id="2_floor"]
@@ -6,6 +6,8 @@
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="10_prop_stand_in"]
 [ext_resource type="Script" path="res://tools/enemy_stand_in.gd" id="11_enemy_stand_in"]
 [ext_resource type="Script" path="res://core/base/room_zone.gd" id="15_zone"]
+[ext_resource type="Script" path="res://tools/item_stand_in.gd" id="16_item_stand_in"]
+[ext_resource type="Resource" path="res://content/items/staffs/wild_star/wild_star.tres" id="17_wild_star"]
 [ext_resource type="Resource" path="res://content/props/hub_stone/hub_stone.tres" id="12_stone"]
 [ext_resource type="Resource" path="res://content/props/hub_altar/hub_altar.tres" id="13_altar"]
 [ext_resource type="Resource" path="res://content/enemies/training_dummy/training_dummy.tres" id="14_dummy"]
@@ -330,6 +332,13 @@ enemy = ExtResource("14_dummy")
 position = Vector2(304, 416)
 script = ExtResource("11_enemy_stand_in")
 enemy = ExtResource("14_dummy")
+
+[node name="Items" type="Node2D" parent="."]
+
+[node name="Rack" type="Node2D" parent="Items"]
+position = Vector2(448, 560)
+script = ExtResource("16_item_stand_in")
+item = ExtResource("17_wild_star")
 
 [node name="Zones" type="Node2D" parent="."]
 

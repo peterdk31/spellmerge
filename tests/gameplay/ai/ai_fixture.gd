@@ -115,9 +115,9 @@ func _init(root: Node, player_count: int = 1) -> void:
 ## tree (its hurtbox registers it in Combat as it enters), stepped by nobody. With `frames` (a
 ## frames service of the test's own, online-ready N12) its seat reads its input there, and it holds
 ## `cards` (four lists of card ids) on `staff` for every button.
-func wizard(index: int, at: Vector2, frames: FramesScript = null, staff: StaffBase = null, cards: Array = [[], [], [], []]) -> Actor:
+func wizard(index: int, at: Vector2, frames: FramesScript = null, staff: StaffBase = null, cards: Array = [[], [], [], []], staffs: Array[StaffBase] = []) -> Actor:
 	var body := WizardScene.instantiate() as Actor
-	var seat: PlayerController = PlayerController.seat_wizard(body, index, staff, cards.duplicate(true))
+	var seat: PlayerController = PlayerController.seat_wizard(body, index, staff, cards.duplicate(true), staffs)
 	if frames != null:
 		seat.frames = frames
 		seat.registry = registry

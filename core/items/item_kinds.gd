@@ -9,6 +9,8 @@ extends RefCounted
 ## - `content`: the registry folders its ids are found in (core/registry), and `type`: the class a
 ##   resource there must be to be one of it (`is_content`).
 ## - `actions`: what can be done with one held (`can`).
+## - `premade`: the registry folders its premade items are found in (`premade_of`: the hub's rack,
+##   a `StaffItem`; items I6), apart from its content.
 ##
 ##     var bag: StringName = ItemKinds.bag_of(ItemKinds.CARD)   # &"cards"
 ##     if ItemKinds.stacks(stack.kind): ...
@@ -27,14 +29,18 @@ const DROP_ONE: StringName = &"drop_one"
 const HAND: StringName = &"hand"
 const USE: StringName = &"use"
 
-## One row a kind (see the class doc). The staff items' own folder (`items`) joins `content` with
-## them (items I6); relics and potions do nothing yet, and their bags stay empty.
+## One row a kind (see the class doc). A premade staff (`StaffItem`, `items`) is a staff of the
+## `wizard` folder with its cards, so a stack's id is always its content's. Relics and potions do
+## nothing yet, and their bags stay empty: with no class of their own (`type` a plain Resource)
+## nothing is one of them on the ground (`stack_of`).
 const RULES: Dictionary = {
-	&"staff": {"bag": &"staffs", "stacks": false, "content": [&"wizard"], "type": &"StaffBase", "actions": [&"drop", &"hand"]},
-	&"card": {"bag": &"cards", "stacks": true, "content": [&"spells"], "type": &"SpellComponent", "actions": [&"drop_one"]},
-	&"relic": {"bag": &"relics", "stacks": false, "content": [&"relics"], "type": &"Resource", "actions": [&"drop"]},
-	&"potion": {"bag": &"potions", "stacks": true, "content": [], "type": &"Resource", "actions": [&"drop", &"use"]},
+	&"staff": {"bag": &"staffs", "stacks": false, "content": [&"wizard"], "type": &"StaffBase", "actions": [&"drop", &"hand"], "premade": [&"items"]},
+	&"card": {"bag": &"cards", "stacks": true, "content": [&"spells"], "type": &"SpellComponent", "actions": [&"drop_one"], "premade": []},
+	&"relic": {"bag": &"relics", "stacks": false, "content": [&"relics"], "type": &"Resource", "actions": [&"drop"], "premade": []},
+	&"potion": {"bag": &"potions", "stacks": true, "content": [], "type": &"Resource", "actions": [&"drop", &"use"], "premade": []},
 }
+## The class of a kind with none of its own yet.
+const NO_CLASS: StringName = &"Resource"
 
 
 ## Every kind, in the table's order.
@@ -88,6 +94,35 @@ static func is_content(kind: StringName, resource: Resource) -> bool:
 			return true
 		script = script.get_base_script()
 	return resource.is_class(String(type))
+
+
+## The registry folders the premade items of `kind` are found in (the hub's rack).
+static func premade_of(kind: StringName) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for folder: Variant in _row(kind).get("premade", []):
+		out.append(StringName(folder))
+	return out
+
+
+## One of what `resource` is, as a stack (what lies where a room places it, items I6): a premade
+## staff its staff with its cards (`StaffItem.stack`), a staff empty, a card one copy; null for
+## anything that is no kind's (a kind with no class of its own included).
+static func stack_of(resource: Resource) -> ItemStack:
+	if resource is StaffItem:
+		return (resource as StaffItem).stack()
+	for kind: StringName in RULES:
+		if StringName(_row(kind).get("type", NO_CLASS)) == NO_CLASS or not is_content(kind, resource):
+			continue
+		var id: StringName = StringName(str(resource.get(&"id")))
+		if id == &"":
+			return null
+		if resource is StaffBase:
+			return ItemStack.of_staff(resource as StaffBase)
+		var made := ItemStack.new()
+		made.kind = kind
+		made.id = id
+		return made
+	return null
 
 
 ## True when one held of `kind` can be `action`ed (DROP, DROP_ONE, HAND, USE).

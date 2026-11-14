@@ -31,15 +31,20 @@ extends ActorComponent
 ## - **Counted cards** (owner, 2026-11-13): `set_cards(number, cards)` (and `set_card`, one slot)
 ##   is the builder's change to a staff's cards. A card put in takes one copy from the card bag, a
 ##   card taken out gives it back; the change is refused, and nothing changes, when a card has no
-##   copy left (NO_CARD), the staff is not owned (NO_STAFF), the slot does not exist (NO_SLOT) or the
-##   cards given back do not fit the card bag (BAG_FULL; items I6 drops them at the feet instead).
-##   The answer is a `Refusal`; the words are the caller's.
+##   copy left (NO_CARD), the staff is not owned (NO_STAFF) or the slot does not exist (NO_SLOT).
+##   The answer is a `Refusal`; the words are the caller's. A card given back that the card bag has
+##   no room for is dropped at the body's feet instead (items I6: `item_drop_requested`, which the
+##   Items area lays on the ground), so a staff can always be emptied.
+## - **Taking things** (items I6): `free_hand()` is the first hand that can take a staff, and
+##   `put_on_hand(stack, hand)` puts a staff there (its Caster's hand filled with its cards and the
+##   mana it kept); `add` puts anything in its bag. Which of them a pickup does is the pickup rule's
+##   (gameplay/items/pickup_rule.gd), not the inventory's.
 ##
 ## Signals (local, for the actor's controller, which turns them into the seat's events):
 ## `bag_changed(bag)`, `staff_changed(number)` (its cards, or it came or went) and `hands_changed`.
 
 ## Why a change was refused (NONE: it was made).
-enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, BAG_FULL }
+enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD }
 
 ## A bag with no limit.
 const UNLIMITED: int = -1
@@ -398,31 +403,83 @@ func set_cards(number: int, cards: Array[StringName]) -> Refusal:
 	for id: StringName in row:
 		if id != &"":
 			change[id] = int(change.get(id, 0)) - 1
-	var net: int = 0
 	for id: StringName in change:
 		var by: int = int(change[id])
 		if by < 0 and count_of(bag, id) < -by:
 			return Refusal.NO_CARD
-		net += by
-	if net > 0 and not _fits(bag, net):
-		return Refusal.BAG_FULL
 	var hand: int = hand_of(number)
 	var caster: Caster = actor.caster if actor != null else null
 	if hand >= 0 and caster != null and not caster.holds(hand):
 		# The Caster lost the hand behind the inventory's back (`Caster.replace_staffs`): refused.
 		return Refusal.NO_STAFF
 	var counted: bool = false
+	# The cards taken first, so the room they leave takes cards given back.
 	for id: StringName in change:
-		if int(change[id]) != 0:
+		if int(change[id]) < 0:
 			_change_count(bag, id, int(change[id]))
 			counted = true
+	var dropped: Array[ItemStack] = []
+	for id: StringName in change:
+		var back: int = int(change[id])
+		if back <= 0:
+			continue
+		var kept: int = back if capacity_of(bag) == UNLIMITED else clampi(capacity_of(bag) - copies(bag), 0, back)
+		if kept > 0:
+			_change_count(bag, id, kept)
+			counted = true
+		for _copy in back - kept:
+			dropped.append(ItemStack.card(id))
 	found.cards = row
 	if hand >= 0 and caster != null:
 		caster.set_staff(hand, row)
 	if counted:
 		bag_changed.emit(bag)
 	staff_changed.emit(number)
+	for stack: ItemStack in dropped:
+		_drop(stack)
 	return Refusal.NONE
+
+
+## Lay `stack` on the ground at the body's feet (`item_drop_requested`: the Items area finds the
+## spot). It is gone from here already; with no bus it is gone for good.
+func _drop(stack: ItemStack) -> void:
+	if actor != null and actor.events != null:
+		actor.events.item_drop_requested.emit(actor.id, stack)
+
+
+## The first hand (button) that can take a staff: empty here, and a hand its Caster has (with no
+## Caster, any empty one); -1 for none.
+func free_hand() -> int:
+	var caster: Caster = actor.caster if actor != null else null
+	for at in _hands.size():
+		if _hands[at] != null:
+			continue
+		if caster == null or (at < caster.staff_count and not caster.holds(at)):
+			return at
+	return -1
+
+
+## Put the staff `stack` (a copy of it, given a new number) on the empty hand `hand`: its Caster's
+## hand holds it with its cards and the mana it kept (`Caster.fill_hand`). Returns false, and
+## nothing changes, for anything but a staff, a hand that is not free (`free_hand`'s kind) or a
+## Caster that refuses it.
+func put_on_hand(stack: ItemStack, hand: int) -> bool:
+	if stack == null or not ItemKinds.can(stack.kind, ItemKinds.HAND) or stack.staff == null:
+		return false
+	if hand < 0 or hand >= HANDS or _hands[hand] != null:
+		return false
+	var made: ItemStack = stack.copy()
+	made.count = 1
+	made.cards = made.fit(made.cards)
+	var caster: Caster = actor.caster if actor != null else null
+	if caster != null and not caster.fill_hand(hand, made.staff, made.cards, made.mana):
+		return false
+	made.number = _next_number
+	_next_number += 1
+	_hands[hand] = made
+	staff_changed.emit(made.number)
+	hands_changed.emit()
+	return true
 
 
 # --- Inside -----------------------------------------------------------------------------

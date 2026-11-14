@@ -18,6 +18,9 @@ var bodies: Array[Node] = []
 ## prop's (`PropBody.make`) or an enemy's scene with its data; null, with a warning, for data of a
 ## class nothing makes.
 static func make_body(data: Resource) -> Node2D:
+	if is_item(data):
+		# An item lies on the ground, no body (items I6): the Items area lays it (`room_items_placed`).
+		return null
 	if data is PropBase:
 		return PropBody.make(data as PropBase)
 	if data is EnemyBase:
@@ -33,6 +36,23 @@ static func make_body(data: Resource) -> Node2D:
 		return body
 	push_warning("RoomContents: nothing makes a body of %s." % data)
 	return null
+
+
+## True when the placed data `data` is an item (`ItemKinds.stack_of`): no body stands for it.
+static func is_item(data: Resource) -> bool:
+	return ItemKinds.stack_of(data) != null
+
+
+## The items `places` places (data `is_item`) and where each lies, in order: [Array[Resource],
+## PackedVector2Array].
+static func items_of(places: RoomPlaces) -> Array:
+	var items: Array[Resource] = []
+	var at := PackedVector2Array()
+	for i in places.placed.size():
+		if is_item(places.placed[i]):
+			items.append(places.placed[i])
+			at.append(places.placed_at[i])
+	return [items, at]
 
 
 ## Stand a body for every placement of `places` in `world` (one not yet in the tree, or one that

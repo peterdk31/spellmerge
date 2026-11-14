@@ -441,6 +441,26 @@ func set_staff(at: int, cards: Array[StringName]) -> bool:
 	return true
 
 
+## Put `base` on the empty hand `at` (items I6: a staff picked up), holding `cards` (card ids by
+## slot) and `mana` (kept within its pool: a staff off a hand regains none, so it comes back as it
+## left), built and installed as `set_staff` does; with every hand empty before, it goes on show.
+## Returns false, and nothing changes, for a button it has not, a hand that holds a staff, or no
+## staff.
+func fill_hand(at: int, base: StaffBase, cards: Array[StringName], mana: float) -> bool:
+	if base == null or at < 0 or at >= staff_count or holds(at):
+		return false
+	var none_held: bool = not holds(current)
+	if staffs.size() < MAX_STAFFS:
+		staffs.resize(MAX_STAFFS)
+	staffs[at] = base
+	empty_hands &= ~(1 << at)
+	_mana[at] = clampf(mana, 0.0, base.max_mana)
+	set_staff(at, cards)
+	if none_held:
+		_show(at)
+	return true
+
+
 ## Hold `new_staffs` (1-4, one per button; a null one falls back to `staff`, as in `hold_staffs`)
 ## with `new_cards` (card ids by slot, per staff) instead of the staffs it held: a boss's phase
 ## (`Phases`). Every button it is given holds its staff (none is an empty hand). Each pool starts

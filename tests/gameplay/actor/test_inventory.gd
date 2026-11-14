@@ -218,12 +218,54 @@ func test_every_refusal_changes_nothing() -> void:
 	check_equal(inventory.set_cards(0, _ids("bolt bolt bolt bolt")), Inventory.Refusal.NO_SLOT, "more cards than slots")
 	check_equal(inventory.set_cards(0, _ids("bolt bolt bolt")), Inventory.Refusal.NO_CARD, "more bolts than it has")
 	check_equal(inventory.set_card(0, 1, &"rune"), Inventory.Refusal.NO_CARD, "a card it has none of")
-	inventory.set_capacity(CARDS, 1)
-	check_equal(inventory.set_cards(0, [] as Array[StringName]), Inventory.Refusal.BAG_FULL, "no room for the bolt given back")
 	check_equal(inventory.cards_of(0), _ids("bolt - -"), "the staff is as it was")
 	check_equal(body.caster.cards_of(0), _ids("bolt - -"), "and so is the Caster's")
 	check_equal(inventory.count_of(CARDS, &"bolt"), 1, "and the bag")
 	check(_staffs_said.is_empty(), "nothing was said")
+
+
+## Items I6: a card given back that the full card bag has no room for drops at the body's feet
+## (`item_drop_requested`), so a staff can always be emptied; what fits stays in the bag.
+func test_cards_given_back_past_the_capacity_drop_at_the_feet() -> void:
+	var body := _wizard({&"bolt": 2, &"fire": 1})
+	var inventory: Inventory = body.inventory
+	check_equal(inventory.set_cards(0, _ids("bolt bolt fire")), Inventory.Refusal.NONE, "three in")
+	inventory.set_capacity(CARDS, 2)
+	var dropped: Array = []
+	_world.bus.item_drop_requested.connect(func(actor: int, stack: ItemStack) -> void: dropped.append([actor, stack.kind, stack.id, stack.count]))
+	check_equal(inventory.set_cards(0, [] as Array[StringName]), Inventory.Refusal.NONE, "emptied all the same")
+	check_equal(inventory.cards_of(0), _ids("- - -"), "the staff is empty")
+	check_equal(body.caster.cards_of(0), _ids("- - -"), "and so is the Caster's")
+	check_equal(inventory.copies(CARDS), 2, "the bag is full")
+	check_equal(inventory.count_of(CARDS, &"bolt"), 2, "a bolt fitted in the room left")
+	check_equal(dropped, [[body.id, ItemKinds.CARD, &"bolt", 1], [body.id, ItemKinds.CARD, &"fire", 1]], "the cards past its room went to the ground, a copy each, in the staff's order")
+
+
+## Items I6: a staff picked up goes on the first free hand, filling its Caster's hand with its
+## cards and the mana it kept; the hands that hold one are not free.
+func test_a_staff_goes_on_a_free_hand() -> void:
+	var body := _wizard()
+	var inventory: Inventory = body.inventory
+	check_equal(inventory.free_hand(), 1, "RT is the first free hand")
+	var other := StaffBase.new()
+	other.id = &"other"
+	other.slots = 2
+	other.max_mana = 50.0
+	var stack := ItemStack.of_staff(other, _ids("fire"))
+	stack.mana = 20.0
+	var hands_said: Array[int] = []
+	inventory.hands_changed.connect(func() -> void: hands_said.append(1))
+	check(not inventory.put_on_hand(stack, 0), "RB holds a staff already")
+	check(inventory.put_on_hand(stack, 1), "onto RT")
+	check_equal(inventory.hands(), PackedInt32Array([0, 4, 2, Inventory.NO_STAFF]), "numbered on from the hands")
+	check(body.caster.holds(1), "the Caster's RT holds it")
+	check_equal(body.caster.staff_of(1), other, "the staff itself")
+	check_equal(body.caster.cards_of(1), _ids("fire -"), "with its cards")
+	check_equal(body.caster.mana_of(1), 20.0, "and the mana it kept")
+	check_equal(inventory.count_of(CARDS, &"fire"), 1, "its cards were never the bag's")
+	check_equal(hands_said.size(), 1, "the hands were said")
+	check_equal(inventory.free_hand(), 3, "LT is free next")
+	check(not inventory.put_on_hand(ItemStack.card(&"bolt"), 3), "a card goes on no hand")
 
 
 ## Regression (review): a kind that does not stack is a stack a copy, whatever count it came with.

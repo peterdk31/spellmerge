@@ -11,6 +11,9 @@ extends RefCounted
 ##   casts it at the wizards, so the card's enemy side plays too) and an ember imp. Seat 1's wizard
 ##   stands by with a plain bolt.
 ## - **An enemy** (`ENEMY`): two of it against the two wizards, who cast plain bolts at them.
+## - **An item** (`ITEM`, items I6: a premade item of `ItemKinds.premade_of`): it lies by seat 0's
+##   wizard (in the fight's Items area), who holds only RB's plain bolt, takes it at TAKE_TICK (a
+##   command in its frame) and, a staff, casts it from RT as it casts RB; two imps stand by.
 ##
 ## The players read nothing of the game (`Scripted`, as a person's input): they walk a small
 ## square, sweep their aim across the enemies, tap their first staff and hold it in bursts, so a card
@@ -25,11 +28,17 @@ extends RefCounted
 
 const AIFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
+const ItemsScript := preload("res://gameplay/items/items.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 
 const CARD: StringName = &"card"
 const ENEMY: StringName = &"enemy"
+const ITEM: StringName = &"item"
+## The tick seat 0 asks for the item lying by it (an ITEM fight).
+const TAKE_TICK: int = 10
+## Where the item lies, from seat 0's wizard.
+const ITEM_FROM: Vector2 = Vector2(6.0, 0.0)
 ## The game's tick.
 const DT: float = 1.0 / 60.0
 ## The plain carrier a card that needs one is cast on, and what the wizards cast otherwise.
@@ -46,18 +55,24 @@ class Scripted:
 	extends FrameSource
 	var tick: int = 0
 	var seat: int = 0
+	## The item it asks for at TAKE_TICK (-1: none), and whether it casts RT as it casts RB.
+	var take: int = -1
+	var second: bool = false
 
 	func fill_frame(frame: InputFrame, _delta: float) -> void:
+		if take >= 0 and tick == TAKE_TICK:
+			frame.commands.append([&"item_take_requested", take] as Array)
 		var leg: int = (tick / 30) % 4
 		frame.set_move([Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][leg] * 0.5)
 		# A sweep of an eighth of a turn across +x, where the enemies stand.
 		frame.aim = posmod((tick * 300 + seat * 2000) % 8192 - 4096, InputFrame.AIM_STEPS)
-		if tick % 40 == 5 + seat * 7:
-			frame.press(0)
-		var burst: bool = tick % 90 >= 60
-		frame.hold(0, burst)
-		if burst and tick % 90 == 60:
-			frame.press(0)
+		for staff in (2 if second else 1):
+			if tick % 40 == 5 + seat * 7 + staff * 3:
+				frame.press(staff)
+			var burst: bool = tick % 90 >= 60
+			frame.hold(staff, burst)
+			if burst and tick % 90 == 60:
+				frame.press(staff)
 
 
 var kind: StringName
@@ -71,8 +86,12 @@ var steps: int = 0
 ## player never casts would pass for nothing) and the staffed enemy's.
 var wizard_casts: int = 0
 var enemy_casts: int = 0
+## Casts of seat 0's RT: the staff an item fight took.
+var item_casts: int = 0
 var fight: AIFixture
 var entities: EntitiesScript
+## The fight's Items area (what lies on the ground; every fight has one).
+var items: ItemsScript
 var frames: FramesScript
 var input: InputManagerScript
 ## The node everything of the fight is under (a snapshot's world).
@@ -135,6 +154,13 @@ func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int 
 	frames.auto_tick = false
 	frames.name = "Frames"
 	world.add_child(frames)
+	items = ItemsScript.new()
+	items.name = "Items"
+	items.events = fight.bus
+	items.actors = fight.actors
+	items.projectiles = fight.projectiles
+	items.registry = fight.registry
+	world.add_child(items)
 	fight.bus.connect(&"staff_cast", _on_staff_cast)
 	var cards: Array[StringName] = [PLAIN]
 	if kind == CARD:
@@ -145,9 +171,20 @@ func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int 
 		_sources.append(source)
 		frames.set_source(seat, source)
 		var held: Array[StringName] = cards if seat == 0 else ([PLAIN] as Array[StringName])
-		fight.players.append(fight.wizard(seat, WIZARDS_AT[seat], frames, _staff(), [held, [], [], []]))
+		# In an item fight seat 0 holds RB alone, so a staff taken goes onto RT, which it casts too.
+		var hands: Array[StaffBase] = []
+		if kind == ITEM and seat == 0:
+			hands.assign([_staff(), null, null, null])
+		fight.players.append(fight.wizard(seat, WIZARDS_AT[seat], frames, _staff(), [held, [], [], []], hands))
+	if kind == ITEM:
+		var stack: ItemStack = ItemKinds.stack_of(resource)
+		_sources[0].take = items.lay(stack, WIZARDS_AT[0] + ITEM_FROM)
+		_sources[0].second = stack.kind == ItemKinds.STAFF
 	if kind == CARD:
 		_staffed = fight.staffed_enemy([cards], FOES_AT[0])
+		fight.imp(FOES_AT[1])
+	elif kind == ITEM:
+		fight.imp(FOES_AT[0])
 		fight.imp(FOES_AT[1])
 	else:
 		var data: EnemyBase = resource as EnemyBase
@@ -203,13 +240,14 @@ func _tick() -> void:
 		var body: Actor = fight.actors.node_of(_ids[i]) as Actor
 		if body != null and body.is_inside_tree() and body.get_parent() != entities:
 			body.tick_step(DT)
+	items.step(DT)
 	ticks += 1
 
 
 ## The fight's areas by name: its services and every actor's body by actor id (as the Tick's
 ## `state_areas`).
 func areas() -> Dictionary:
-	return fight.areas({"entities": entities})
+	return fight.areas({"entities": entities, "items": items})
 
 
 ## Makes this fight as `snapshot` says (taken from a fight of the same content after its tick
@@ -237,6 +275,8 @@ func _prepare(body: Node) -> void:
 func _on_staff_cast(player: int, staff: int, _origin: Vector2, _direction: Vector2) -> void:
 	if not fight.players.is_empty() and is_instance_valid(fight.players[0]) and player == fight.players[0].id and staff == 0:
 		wizard_casts += 1
+	elif not fight.players.is_empty() and is_instance_valid(fight.players[0]) and player == fight.players[0].id and staff == 1:
+		item_casts += 1
 	elif _staffed != null and is_instance_valid(_staffed) and player == _staffed.id:
 		enemy_casts += 1
 

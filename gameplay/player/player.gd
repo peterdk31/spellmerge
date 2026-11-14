@@ -41,7 +41,8 @@ extends ActorController
 ##   only and naming a staff by its number; commands, heard at the tick's start: core/events
 ##   `listen`) builds the home body's staffs through its inventory (`Inventory.set_card`,
 ##   `set_cards`: counted, and a staff on a hand goes into the Caster), also during a possession.
-##   A refusal is sent as `build_refused` with its words (NO_STAFF, NO_SLOT, NO_CARD, BAG_FULL).
+##   A refusal is sent as `build_refused` with its words (NO_STAFF, NO_SLOT, NO_CARD); a card given back to a full
+##   bag is dropped at the body's feet (items I6), never refused.
 ## - **The card bag** (each run mode's, from flow through `seat_wizard`: card id to copies,
 ##   `Inventory.give_cards`); a wizard given none gets Inventory.DEV_COPIES of every card in the
 ##   registry when it first drives.
@@ -71,10 +72,9 @@ const STAFF_COUNT: int = 4
 const NO_STAFF: String = "You have no such staff."
 const NO_SLOT: String = "There is no such slot."
 const NO_CARD: String = "You do not have that card."
-const BAG_FULL: String = "Your card bag is full."
 const REFUSALS: Dictionary = {
 	Inventory.Refusal.NO_STAFF: NO_STAFF, Inventory.Refusal.NO_SLOT: NO_SLOT,
-	Inventory.Refusal.NO_CARD: NO_CARD, Inventory.Refusal.BAG_FULL: BAG_FULL,
+	Inventory.Refusal.NO_CARD: NO_CARD,
 }
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"

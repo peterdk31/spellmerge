@@ -378,13 +378,18 @@ func test_a_seat_drives_another_actor_and_release_gives_it_back() -> void:
 	_world.hurt(creature, 10)
 	check(not _stats.is_empty() and _stats.back()[0] == 0 and _stats.back()[1] == 30 and _stats.back()[2] == 40,
 		"a hit on the creature is: %s" % [_stats])
-	# The builder builds the creature's staffs: with no Inventory it has none to build.
+	# The builder builds the creature's staffs, from the creature's own card bag (every actor has
+	# an Inventory, items I8).
 	_changed.clear()
 	var wizard_row: Array[StringName] = wizard.caster.cards_of(1)
 	_world.bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"))
 	check_equal(wizard.caster.cards_of(1), wizard_row, "seat 0's builder does not build the wizard's staff now")
-	check_equal(_refused.size(), 1, "the creature, with no inventory, refuses it: %s" % [_refused])
+	check_equal(_refused, [[0, PlayerController.NO_CARD]], "the creature holds no fire: refused")
 	check(_changed.is_empty(), "and nothing is announced: %s" % [_changed])
+	_world.bus.staff_cards_requested.emit(0, 0, [] as Array[StringName])
+	check_equal(creature.caster.cards_of(0)[0], &"", "the builder empties the creature's staff")
+	check_equal(creature.inventory.count_of(&"cards", &"bolt"), 1, "its bolt in the creature's own bag")
+	check(_changed.size() == 1 and _changed[0][1] == 0, "announced for the seat: %s" % [_changed])
 	# Release: the creature stands again and the seat is its wizard's.
 	_stats.clear()
 	_changed.clear()

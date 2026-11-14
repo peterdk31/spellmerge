@@ -33,8 +33,8 @@ extends ActorController
 ##   shows a step later), `staff_changed` with the plain view of every hand's staff
 ##   (`Caster.plan_of`; an empty one for a hand it has not), and `build_refused`.
 ## - **The inventory's events** (the shown body's `Inventory`, items I3; all of them each time the
-##   shown body changes, after `inventory_announced`, then on every change; a body with none says
-##   empty bags and empty hands): `bag_changed` for each
+##   shown body changes, after `inventory_announced`, then on every change; every actor has one):
+##   `bag_changed` for each
 ##   bag (its ids, counts and capacity), `owned_staff_changed` for each staff it owns, by its number
 ##   (`Inventory.plan_of`, empty once it went), and `hands_changed` (which number is on which hand).
 ## - **The cast events** (from the actor it drives now, whose staffs its buttons cast): `spell_cast`
@@ -506,7 +506,7 @@ func _fill_cards(inventory: Inventory) -> void:
 
 ## Everything of the shown body the HUD shows, to the seat's events (each time the shown body
 ## changes): every hand's staff for the panel, then `inventory_announced`, every bag, every staff
-## owned and the hands (a body with no Inventory: empty bags and empty hands).
+## owned and the hands (every actor has an Inventory).
 func _announce_body() -> void:
 	var body: Actor = shown()
 	if body == null or body.events == null:
@@ -524,17 +524,13 @@ func _announce_body() -> void:
 	_on_hands_changed()
 
 
-## `bag_changed` for this seat: what the shown body's bag `bag` holds now (nothing, with no room,
-## for a body with no Inventory).
+## `bag_changed` for this seat: what the shown body's bag `bag` holds now.
 func _on_bag_changed(bag: StringName) -> void:
 	var body: Actor = shown()
-	if body == null or body.events == null:
+	if body == null or body.events == null or body.inventory == null:
 		return
 	var ids: Array[StringName] = []
 	var counts := PackedInt32Array()
-	if body.inventory == null:
-		body.events.bag_changed.emit(seat, bag, ids, counts, 0)
-		return
 	for stack: ItemStack in body.inventory.stacks_in(bag):
 		ids.append(stack.id)
 		counts.append(stack.count)
@@ -548,18 +544,11 @@ func _on_owned_staff_changed(number: int) -> void:
 		body.events.owned_staff_changed.emit(seat, number, body.inventory.plan_of(number))
 
 
-## `hands_changed` for this seat (every hand empty for a body with no Inventory).
+## `hands_changed` for this seat.
 func _on_hands_changed() -> void:
 	var body: Actor = shown()
-	if body == null or body.events == null:
-		return
-	if body.inventory != null:
+	if body != null and body.events != null and body.inventory != null:
 		body.events.hands_changed.emit(seat, body.inventory.hands())
-		return
-	var none := PackedInt32Array()
-	none.resize(Inventory.HANDS)
-	none.fill(Inventory.NO_STAFF)
-	body.events.hands_changed.emit(seat, none)
 
 
 ## The seat's events: the shown body's bus (every body shares one).

@@ -12,7 +12,8 @@ extends Node2D
 ##
 ## Components: found once in `_ready` among the children, at most one of each kind, none required:
 ## `health` (Health), `hurtbox` (Hurtbox), `contact` (Contact), `mover` (Mover), `caster`
-## (Caster), `inventory` (Inventory: what it holds, never stepped; items I3), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
+## (Caster), `inventory` (Inventory: what it holds, never stepped; items I3; the actor adds one when
+## its scene has none, so every actor has one, items I8), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
 ## circle when its scene has none, so every actor has one), `state_triggers` (PropStateTriggers: a prop's states,
 ## props W6; never stepped, it hears its body), plus any number of looks (ActorLook)
 ## and the first ActorController, its `home_controller`. Its `damage_numbers` (DamageNumbers,
@@ -67,8 +68,7 @@ extends Node2D
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
 ## health, walking speed, contact damage, staff, cards and mana. Data with no staff or no cards
-## leaves the actor without a caster (an enemy that only chases); one with staffs gets an
-## `Inventory` too when its scene has none (items I8), which takes the staffs as its own.
+## leaves the actor without a caster (an enemy that only chases).
 ##
 ## Local stop: while `Actors.hold(id, seconds)` holds it (Feel's hit-stop, which holds only the
 ## bodies in a hit), `step` does nothing and the body stands still; its looks step once at the
@@ -613,6 +613,14 @@ func _find_components() -> void:
 		if hurtbox != null and hurtbox.is_box():
 			footprint.fit_base(hurtbox.size, hurtbox.offset)
 		add_child(footprint)
+	if inventory == null:
+		# Every actor holds things (items I8; owner, 2026-11-14: "every actor to have one"): a seat
+		# possessing it builds, swaps and drops its staffs, and what it takes stays with the body.
+		# Added as the footprint is (a snapshot makes it again before `_ready`); an untouched one
+		# rests with its body (`Inventory.at_rest`).
+		inventory = Inventory.new()
+		inventory.name = "Inventory"
+		add_child(inventory)
 	if damage_numbers == null:
 		# Every actor shows its hits (props W5; the owner, 2026-11-10: "Add the damage numbers to
 		# every actor"): the plain numbers when its scene holds none.
@@ -665,15 +673,6 @@ func _apply_data() -> void:
 		caster = null
 		return
 	caster.hold_staffs(data.staffs)
-	if inventory == null:
-		# An enemy holds its staffs in an inventory as a wizard does (items I8): a seat possessing it
-		# builds, swaps and drops them, and what it takes stays with the body. Set up right after
-		# the caster, whose staffs it takes; added as a boss's Phases is (a snapshot makes it again
-		# before `_ready`, and `_find_components` finds it then).
-		inventory = Inventory.new()
-		inventory.name = "Inventory"
-		add_child(inventory)
-		_components.insert(_components.find(caster) + 1, inventory)
 
 
 ## Make the body `factor` times its drawn size (a boss, a boss's phase): the node scales, and the

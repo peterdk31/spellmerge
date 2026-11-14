@@ -108,6 +108,11 @@ func test_a_touched_body_is_walked_whole() -> void:
 	check_equal(rebuilt.rest_leaf(), null, "new cards")
 	var driven: Actor = _world.actor(Vector2(48.0, 0.0), [&"health", &"hurtbox"], Fixture.Scripted.new())
 	check_equal(driven.rest_leaf(), null, "a driven body")
+	# Every actor has an inventory (items I8); one that holds something new is no longer as made.
+	var holding: Actor = _prop(Vector2(64.0, 0.0))
+	check(holding.inventory != null and holding.rest_leaf() != null, "a prop's untouched inventory rests with it")
+	check(holding.inventory.add(ItemStack.card(&"bolt")), "it takes a card")
+	check_equal(holding.rest_leaf(), null, "something in its bag")
 	var leaves: Array[String] = []
 	StateWalk.new().walk("body", hit, func(path: String, _value: Variant) -> void: leaves.append(path))
 	check(leaves.size() > 10 and not leaves.has("body.rest"), "walked member by member")

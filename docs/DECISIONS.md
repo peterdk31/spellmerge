@@ -18,6 +18,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 ## 2026-11-13: an unplugged pad pauses the game (owner)
 
 - **An unplugged pad no longer leaves its seat** (owner: "An unplugged pad should not result in the seat being left! It should instead pause the game, and wait for that controller to reconnect"): the seat and its wizard stay, the game stops for everyone until that controller is back. Leaving is the pause menu's "Leave game" (items I2). A task in docs/NEXT.md.
+- **How it is built:** the input layer keeps the device on the seat and marks it waiting (`PlayerInput.is_waiting`), and sends a command (`pad_wait_requested`), so the stop is at one tick on every machine and in a replay; co-op holds the stop, one reason a seat (`Coop.PAD_OF`), beside the pause menu's. A run's start lets every stop go (`Tick.begin_run`), so the input layer asks again in each room entered while a seat waits, rather than the stop outliving a run (a replay must start from a fresh game's state). The HUD shows co-op's `pad_wait_changed`, not the device, so the other machine of a party sees why the game stands. Another gamepad's `join` takes the lowest waiting seat; the keyboard's `join` takes this machine's first seat when that one waits (the keyboard holds P1 only), so a player alone whose only gamepad is gone goes on with the keyboard. A waiting pad's release or a stick at rest does not end the wait (a pad pulled out may still flush them); a press or a pushed stick does.
 
 ## 2026-11-13: hands that can be empty (items I2)
 

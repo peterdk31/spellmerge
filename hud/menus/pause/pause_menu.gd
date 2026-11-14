@@ -8,7 +8,10 @@ extends PanelContainer
 ## - **Main:** Resume, Sandbox (only while the run is a sandbox, `sandbox_changed`), Settings, Leave
 ##   game (`seat_leave_requested`: the seat that opened the menu lets its device go and its wizard
 ##   leaves, at its tick on every machine; the others play on; items I2, in place of the `leave`
-##   action; the menu closes first), Main menu (`main_menu_requested`: this machine leaves the run,
+##   action; the menu closes first), "Leave game: P2 (no controller)" (only while a seat of this
+##   machine waits for its unplugged gamepad, `set_waiting_seats`; the lowest such seat: it leaves
+##   by the same `seat_leave_requested`, the game goes on once no seat waits, and the menu stays
+##   open), Main menu (`main_menu_requested`: this machine leaves the run,
 ##   online too, and the main menu shows again; the menu closes first).
 ## - **Sandbox** (staffs B7): Reset dummies (`sandbox_action_requested(player, reset_dummies)`;
 ##   it stays on the page); the enemy arena (enemy AI AI8): "Enemy: <name>" (every enemy in the registry, by its
@@ -118,6 +121,7 @@ const COUNT_TEXT: String = "Count: %d"
 const AI_VIEW_TEXT: String = "AI view: %s"
 const COUNT_MAX: int = 8
 const ACTION_CLEAR_ENEMIES: StringName = &"clear_enemies"
+const LEAVE_WAITING_TEXT: String = "Leave game: P%d (no controller)"
 const FULLSCREEN_TEXT: String = "Fullscreen: %s"
 const EFFECT_SLOTS_TEXT: String = "Effect slots: %d"
 const SHAKE_TEXT: String = "Screen shake: %s"
@@ -150,6 +154,8 @@ var page: Page = Page.MAIN
 var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
 var _sandbox_on: bool = false
+## The seats of this machine that wait for their unplugged gamepad, a bit each (`set_waiting_seats`).
+var _waiting_seats: int = 0
 ## The player whose menu is closing, for the command that lets the game go.
 var _closing_player: int = 0
 var _focused: Control = null
@@ -202,6 +208,7 @@ var ai_view: bool = false
 @onready var _sandbox: Button = _add(Page.MAIN, "Sandbox", "Sandbox")
 @onready var _settings: Button = _add(Page.MAIN, "Settings", "Settings")
 @onready var _leave: Button = _add(Page.MAIN, "LeaveGame", "Leave game")
+@onready var _leave_waiting: Button = _add(Page.MAIN, "LeaveWaiting", LEAVE_WAITING_TEXT % 1)
 @onready var _main_menu: Button = _add(Page.MAIN, "MainMenu", "Main menu")
 @onready var _reset: Button = _add(Page.SANDBOX, "ResetDummies", "Reset dummies")
 @onready var _arena_enemy: Button = _add(Page.SANDBOX, "ArenaEnemy", ENEMY_TEXT % "-")
@@ -437,6 +444,8 @@ func _show_page(next: Page) -> void:
 		for control: Button in _pages[on_page]:
 			control.visible = on_page == next
 	_sandbox.visible = next == Page.MAIN and _sandbox_on
+	_leave_waiting.visible = next == Page.MAIN and _waiting_seats != 0
+	_leave_waiting.set_meta(BASE_TEXT_META, LEAVE_WAITING_TEXT % (waiting_seat() + 1))
 	if next == Page.SETTINGS:
 		_show_fullscreen()
 	_mark_focus()
@@ -477,6 +486,25 @@ func _set_paused(on: bool) -> void:
 		get_tree().paused = on
 	elif _events != null:
 		_events.pause_requested.emit(seat, 1 if on else 0)
+
+
+## The seats of this machine whose gamepad is unplugged (a bit each; `panels.gd` tells): while any
+## waits, the main page offers to let the lowest leave. If the row focused goes, the first is.
+func set_waiting_seats(seats: int) -> void:
+	if seats == _waiting_seats:
+		return
+	_waiting_seats = seats
+	_show_page(page)
+	if is_open() and _focused != null and not _focused.visible:
+		_focus_first()
+
+
+## The lowest seat waiting for its gamepad (the one "Leave game: P2" lets go), or -1.
+func waiting_seat() -> int:
+	for seat in PLAYER_COUNT:
+		if _waiting_seats & (1 << seat) != 0:
+			return seat
+	return -1
 
 
 func _on_sandbox_changed(on: bool) -> void:
@@ -520,6 +548,12 @@ func _on_activated(player: int, control: Control) -> void:
 		close_menu()
 		if _events != null:
 			_events.seat_leave_requested.emit(player)
+	elif control == _leave_waiting:
+		var seat: int = waiting_seat()
+		if _events != null and seat >= 0:
+			# Gone from the row at once, so a second press never asks again before co-op says so.
+			set_waiting_seats(_waiting_seats & ~(1 << seat))
+			_events.seat_leave_requested.emit(seat)
 	elif control == _main_menu:
 		# Closed first, so the game is let go before this machine leaves it.
 		close_menu()

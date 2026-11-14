@@ -194,9 +194,9 @@ signal cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2, 
 signal build_refused(player: int, reason: String)
 ## Sender: player. A request of `player`'s inventory menu (`staff_hand_requested`, `bag_drop_requested`; items I7) was refused; `reason` says why in plain words. Heard by hud (the inventory's note).
 signal inventory_refused(player: int, reason: String)
-## Sender: player. What the bag `bag` (one of `ItemKinds.BAGS`) of `player`'s own wizard holds now (items I3): the ids of its stacks in the order they came, with the copies of each (`counts`, as long as `ids`; a card with none left is not there), and its `capacity` in copies (-1: no limit). Sent for every bag when the wizard appears and for a bag whenever it changes. Heard by hud (the builder reads the card bag).
 ## Sender: player. Everything `player`'s own wizard holds is said anew right after (every bag, every staff it owns, its hands; items I7): what was said of an earlier wizard of that seat (a run ended, the hub begun again) is gone, so a staff only it owned is forgotten. Sent each time the seat first drives a wizard or comes home. Heard by hud (the builder, the inventory).
 signal inventory_announced(player: int)
+## Sender: player. What the bag `bag` (one of `ItemKinds.BAGS`) of `player`'s own wizard holds now (items I3): the ids of its stacks in the order they came, with the copies of each (`counts`, as long as `ids`; a card with none left is not there), and its `capacity` in copies (-1: no limit). Sent for every bag when the wizard appears and for a bag whenever it changes. Heard by hud (the builder reads the card bag).
 signal bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, capacity: int)
 ## Sender: player. The staff number `staff` of `player`'s own wizard (its number in the inventory, stable while it owns it; on a hand or in the bag) was built or changed: `plan` as `staff_changed`'s, empty when the staff is no longer owned (items I3). Sent for every staff when the wizard appears. Heard by hud (the builder: every staff it builds).
 signal owned_staff_changed(player: int, staff: int, plan: Dictionary)

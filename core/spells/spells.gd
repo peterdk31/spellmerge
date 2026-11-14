@@ -1154,6 +1154,16 @@ func cooldown_left(actor: int, slot: int) -> float:
 	return _cooldown[actor * SpellLimits.STAFFS + slot] if _in_range(actor, slot) else 0.0
 
 
+## This actor's staff `slot` may cast again in no less than `seconds` (items I7: a staff put on a
+## hand is drawn, and waits its own cooldown, so moving staffs between hands skips no delay).
+func hold_staff(actor: int, slot: int, seconds: float) -> void:
+	if not _in_range(actor, slot) or not is_finite(seconds) or seconds <= 0.0:
+		return
+	var index: int = actor * SpellLimits.STAFFS + slot
+	_cooldown[index] = maxf(_cooldown[index], seconds)
+	_cooldown_rows = maxi(_cooldown_rows, index + 1)
+
+
 ## Which cast of its cycle this actor's staff makes next (0 once its cycle ended).
 func cast_index(actor: int, staff: int) -> int:
 	return _cursor[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else 0

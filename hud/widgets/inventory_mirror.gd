@@ -1,6 +1,6 @@
 extends RefCounted
 ## What the HUD knows of one player's inventory (items I7): a mirror of what the seat's events say,
-## and nothing else. The inventory menu (`inventory_menu.gd`) asks it, so the menu holds no copy of
+## and nothing else. The inventory menu (`hud/menus/inventory/`) asks it, so the menu holds no copy of
 ## its own and a test can fill one by hand.
 ##
 ## - **Bags** (`bag_changed`): each bag's stack ids with their copies and its capacity

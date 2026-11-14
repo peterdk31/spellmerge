@@ -216,3 +216,48 @@ func test_the_commands_cross_a_frame() -> void:
 	var back: InputFrame = InputFrame.from_bytes(frame.to_bytes())
 	check(back != null, "decodes")
 	check_equal(back.commands, frame.commands, "the same commands")
+
+
+## Review: a staff put on a hand is drawn and waits its own cooldown, so moving staffs between hands
+## skips no delay (the delay is the hand's in Spells; the staff's own cooldown holds it).
+func test_a_staff_moved_onto_a_hand_waits_its_own_cooldown() -> void:
+	var body := _wizard()
+	_staff.cooldown = 0.5
+	_other.cooldown = 1.5
+	check_equal(body.inventory.set_hand(4, 1), Inventory.Refusal.NONE, "the bag's staff onto RT")
+	check(_world.spells.cooldown_left(body.id, 1) >= 1.5, "RT waits its staff's cooldown (%s)" % _world.spells.cooldown_left(body.id, 1))
+	check_equal(body.inventory.set_hand(0, 1), Inventory.Refusal.NONE, "RB's staff onto RT: they change places")
+	check(_world.spells.cooldown_left(body.id, 0) >= 1.5, "RB waits the longer staff's cooldown")
+
+
+## Review: the staff on show moves to a hand still held when its own is emptied, and with no hand
+## held nothing empty is put on show.
+func test_the_staff_on_show_moves_to_a_hand_still_held() -> void:
+	var body := _wizard()
+	var shown: Array[int] = []
+	_world.bus.staff_shown.connect(func(_actor: int, _body: Node, at: int) -> void: shown.append(at))
+	check_equal(body.caster.current, 0, "RB on show")
+	body.caster.empty_hand(0)
+	check_equal(body.caster.current, 2, "LB, the hand still held")
+	check_equal(shown, [2] as Array[int], "said once")
+	body.caster.empty_hand(2)
+	check_equal(body.caster.current, 2, "no hand held: it stays")
+	check_equal(shown, [2] as Array[int], "and no empty hand is put on show")
+
+
+## Review: a kind that does not stack drops its stack itself, whatever it holds.
+func test_a_kind_that_does_not_stack_drops_its_own_stack() -> void:
+	var body := _wizard()
+	var relic := ItemStack.new()
+	relic.kind = &"relic"
+	relic.id = &"charm"
+	relic.count = 1
+	relic.mana = 7.0
+	if not ItemKinds.has(&"relic"):
+		check(true, "no relic kind yet")
+		return
+	check(body.inventory.add(relic), "a relic in its bag")
+	var bag: StringName = ItemKinds.bag_of(&"relic")
+	check_equal(body.inventory.drop(bag, &"charm"), Inventory.Refusal.NONE, "dropped")
+	check_equal(body.inventory.copies(bag), 0, "its bag is empty")
+	check_equal(_dropped.back()[5], 7.0, "the stack itself went, with what it held")

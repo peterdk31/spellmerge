@@ -2,6 +2,11 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## Items (2026-11-14, items I7 review)
+
+- **The builder on the inventory's mirror.** The radial builder keeps its own copy of `owned_staff_changed`, `hands_changed` and `inventory_announced`; `hud/widgets/inventory_mirror.gd` is the inventory's, and the builder can take it up so the two never drift.
+- **A downed body's requests.** The HUD closes both menus at 0 health, but the simulation takes the builder's and the inventory's requests from a downed body; if a command can reach it (a late frame online), refusing them there is one check in the player controller.
+
 ## The native module (owner, 2026-11-02)
 
 The projectile manager's hot loops run in C++ where the module is built (`native/README.md`, docs/DECISIONS.md 2026-11-02).

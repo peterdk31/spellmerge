@@ -424,11 +424,9 @@ func poll() -> void:
 					events.online_open_requested.emit(player)
 			if paused_now:
 				_on_pause_pressed(player)
-			elif back_now and not had_menu and not _has_menu(player) and _in_room \
-					and not _pause_menu.is_open() and not _panels[player].is_downed():
+			elif back_now and _may_open_menu(player, had_menu):
 				_radials[player].open_builder()
-			elif inventory_now and not had_menu and not _has_menu(player) and _in_room \
-					and not _pause_menu.is_open() and not _panels[player].is_downed():
+			elif inventory_now and _may_open_menu(player, had_menu):
 				_inventories[player].open_inventory()
 		_had_menu[player] = _has_menu(player)
 		# A seat in the game with no device of this machine on it is played on another one. Asked
@@ -447,6 +445,13 @@ func _plays_here(player: int) -> bool:
 ## online.
 func _on_online_changed(phase: StringName, _code: String, _reason: StringName, _facts: Dictionary) -> void:
 	_online = phase == EventsScript.ONLINE_CODE or phase == EventsScript.ONLINE_LINKED or phase == EventsScript.ONLINE_PLAYING
+
+
+## Whether `player` may open their builder or inventory now: in a room, no menu of theirs open at
+## this poll or the one before (`had_menu`: the press that closed one never opens another), the
+## pause menu closed and not down.
+func _may_open_menu(player: int, had_menu: bool) -> bool:
+	return not had_menu and not _has_menu(player) and _in_room and not _pause_menu.is_open() and not _panels[player].is_downed()
 
 
 ## Whether `player` has a menu open: their builder, their inventory, or the pause menu they work.

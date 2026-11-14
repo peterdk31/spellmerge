@@ -18,7 +18,7 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const WizardFixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const HudScript := preload("res://hud/panels/panels.gd")
 const InventoryScript := preload("res://hud/menus/inventory/inventory_menu.gd")
-const MirrorScript := preload("res://hud/menus/inventory/inventory_mirror.gd")
+const MirrorScript := preload("res://hud/widgets/inventory_mirror.gd")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload.
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const NO_SAVE: String = "user://test_no_save.cfg"
@@ -358,3 +358,16 @@ func test_the_columns_numbers_are_short() -> void:
 	check_equal(InventoryScript.number_text(100.0, false), "100", "mana")
 	check_equal(InventoryScript.number_text(12000.0, false), "12k", "thousands")
 	check_equal(InventoryScript.number_text(1000000.0, false), "1M", "the dev staff's million")
+
+
+## Review: Space is both `accept` and `staff_1` on the keyboard; the press that enters the staff bag
+## puts nothing on a hand.
+func test_the_press_that_enters_the_staffs_puts_nothing_on_a_hand() -> void:
+	_start()
+	var inventory: InventoryScript = _open()
+	_point("bag", STAFFS)
+	_tap(&"accept")
+	_tap(&"staff_1")
+	_frame()
+	check_equal(inventory.layer(), InventoryScript.Layer.STAFFS, "in the staff bag")
+	check(_hand_asks.is_empty(), "and nothing asked of a hand")

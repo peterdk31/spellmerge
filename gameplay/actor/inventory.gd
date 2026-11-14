@@ -570,11 +570,22 @@ func drop(bag: StringName, id: StringName) -> Refusal:
 	var kind: StringName = ItemKinds.kind_in(bag)
 	if kind == &"" or kind == ItemKinds.STAFF or count_of(bag, id) < 1:
 		return Refusal.NO_ITEM
-	take(bag, id, 1)
-	var lying := ItemStack.new()
-	lying.kind = kind
-	lying.id = id
-	lying.count = 1
+	var lying: ItemStack = null
+	if ItemKinds.stacks(kind):
+		_change_count(bag, id, -1)
+		lying = ItemStack.new()
+		lying.kind = kind
+		lying.id = id
+		lying.count = 1
+	else:
+		# A kind that does not stack: that stack itself goes, with whatever it holds.
+		var stacks: Array[ItemStack] = _bags[bag]
+		for at in stacks.size():
+			if stacks[at].id == id:
+				lying = stacks[at]
+				stacks.remove_at(at)
+				break
+	bag_changed.emit(bag)
 	_drop(lying)
 	return Refusal.NONE
 

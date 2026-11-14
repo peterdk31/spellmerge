@@ -36,7 +36,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
 const CardKindsScript := preload("res://hud/widgets/card_kinds.gd")
-const MirrorScript := preload("res://hud/menus/inventory/inventory_mirror.gd")
+const MirrorScript := preload("res://hud/widgets/inventory_mirror.gd")
 const StaffHeadScript := preload("res://hud/widgets/staff_head.gd")
 
 const NONE: int = -1

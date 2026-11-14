@@ -23,8 +23,8 @@ func before_each() -> void:
 
 
 func _menu(player: int = 0) -> RadialMenuScript:
-	var menu := RadialMenuScript.new(_host, player)
-	menu.bind(_input)
+	var menu := RadialMenuScript.new(_host)
+	menu.bind(_input, player)
 	menu.center = Vector2(200.0, 100.0)
 	return menu
 
@@ -49,6 +49,15 @@ func test_the_first_entry_sits_at_the_top_and_the_widths_share_the_ring() -> voi
 	check(menu.direction_to(10).is_equal_approx(Vector2.UP), "pointing up lands on the first entry")
 	check_equal(menu.direction_to(99), Vector2.ZERO, "an entry not on the ring has no direction")
 	check(menu.tile_center(PI * 0.5, 10.0).is_equal_approx(Vector2(210.0, 100.0)), "a quarter turn is to the right of the middle")
+
+
+func test_a_gap_first_still_puts_the_first_entry_at_the_top() -> void:
+	# The builder's ring with more than one kind starts with a gap.
+	var menu: RadialMenuScript = _menu()
+	menu.lay_out(PackedInt32Array([NONE, 10, 11]), PackedFloat32Array([0.6, 1.0, 1.0]))
+	check(absf(angle_difference(menu.angle_of_entry(10), 0.0)) < 0.0001, "the first entry is up, not the gap")
+	check(menu.direction_to(10).is_equal_approx(Vector2.UP), "pointing up lands on it")
+	check(menu.angle_of_entry(11) > 0.0 and menu.angle_of_entry(11) < PI, "the next one clockwise")
 
 
 func test_no_width_is_an_empty_ring() -> void:
@@ -87,6 +96,23 @@ func test_the_pointed_entry_holds_a_little_past_its_border() -> void:
 	check_equal(menu.pick_on_ring(menu.direction_to(1)), 1, "a neighbour's middle always picks the neighbour")
 
 
+func test_on_a_crowded_ring_the_hold_is_at_most_a_share_of_the_entry() -> void:
+	# 100 entries: each is narrower than STICKY_ANGLE / STICKY_SHARE, so the share caps the hold.
+	var entries := PackedInt32Array()
+	var widths := PackedFloat32Array()
+	for at in 100:
+		entries.append(at)
+		widths.append(1.0)
+	var menu: RadialMenuScript = _menu()
+	menu.lay_out(entries, widths)
+	var width: float = menu.place_widths()[0]
+	check(width * RadialMenuScript.STICKY_SHARE < RadialMenuScript.STICKY_ANGLE, "the share is the smaller")
+	menu.point_at(0, 0.0)
+	var border: float = width * 0.5
+	check_equal(menu.pick_on_ring(RadialMenuScript.direction_of(border + width * RadialMenuScript.STICKY_SHARE * 0.5)), 0, "within the share it holds")
+	check_equal(menu.pick_on_ring(RadialMenuScript.direction_of(border + width * RadialMenuScript.STICKY_SHARE * 1.5)), 1, "past the share, the neighbour, well short of STICKY_ANGLE")
+
+
 func test_layers_go_in_and_back_out_to_the_entry_entered() -> void:
 	var menu: RadialMenuScript = _menu()
 	check_equal(menu.depth(), 0, "the first ring")
@@ -107,10 +133,10 @@ func test_layers_go_in_and_back_out_to_the_entry_entered() -> void:
 
 
 func test_the_hint_row_lays_out_its_glyphs_and_dims_a_button_that_does_nothing() -> void:
-	var menu := RadialMenuScript.new(_host, 0)
+	var menu := RadialMenuScript.new(_host)
 	var actions: Array[StringName] = [&"staff_2", &"back"]
 	menu.make_hints(actions)
-	menu.bind(_input)
+	menu.bind(_input, 0)
 	menu.hints_at = Vector2(50.0, 80.0)
 	var verbs: Array[String] = ["Put in", "Close"]
 	var live: Array[bool] = [false, true]
@@ -137,8 +163,10 @@ func test_it_points_with_its_own_players_stick_only() -> void:
 	check(menu.aim().is_equal_approx(Vector2.RIGHT), "its player's stick")
 	check(menu.follow(menu.aim()), "the pointer line moves")
 	check(not menu.follow(Vector2.RIGHT), "and not again for the same aim")
-	check_equal(_menu(0).aim(), Vector2.ZERO, "another player's menu does not hear it")
+	var other: RadialMenuScript = _menu(0)
+	check(not other.uses_mouse(), "player 1 has no device here, so no mouse either")
+	check_equal(other.aim(), Vector2.ZERO, "another player's menu does not hear it")
 	check(not menu.uses_mouse(), "a pad player has no mouse")
-	var unbound := RadialMenuScript.new(_host, 1)
+	var unbound := RadialMenuScript.new(_host)
 	check_equal(unbound.aim(), Vector2.ZERO, "no input, no aim")
 	check_equal(unbound.stick_tilt(), Vector2.ZERO, "and no tilt")

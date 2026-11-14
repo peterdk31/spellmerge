@@ -241,7 +241,7 @@ var _mana: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _entries: Array[Dictionary] = []
 ## The ring itself (its places, pointing, the hint row): the shared radial menu, laid out from
 ## the entries by `_build_ring`; its entry numbers are indices into `_entries`.
-var _menu: RadialMenuScript = RadialMenuScript.new(self, 0)
+var _menu: RadialMenuScript = RadialMenuScript.new(self)
 ## The kinds the bag has, in ring order, and the one shown with the layout KIND.
 var _kinds: Array[StringName] = []
 var _kind_page: int = 0
@@ -320,7 +320,6 @@ func _ready() -> void:
 	_glyph_next = _make_glyph("GlyphNext")
 	for hand in STAFF_COUNT:
 		_hand_glyphs.append(_make_glyph("GlyphHand%d" % hand))
-	_menu.index = index
 	_menu.make_hints(HINT_ACTIONS)
 	_kind_glyphs.append(_make_glyph("KindPrev"))
 	_kind_glyphs.append(_make_glyph("KindNext"))
@@ -339,8 +338,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 	_ui_focus = ui_focus
 	_spells = spells
 	_input = input
-	_menu.index = index
-	_menu.bind(input)
+	_menu.bind(input, index)
 	for glyph in [_glyph_prev, _glyph_next] + _hand_glyphs + _kind_glyphs:
 		(glyph as ActionGlyphScript).bind(input)
 	for hand in STAFF_COUNT:
@@ -821,6 +819,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_tree.wheel(1)
 
 
+## P1's mouse works the slots and the tree too: whether it is P1's is the radial menu's question.
 func _uses_mouse() -> bool:
 	return _menu.uses_mouse()
 

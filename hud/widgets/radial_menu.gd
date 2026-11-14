@@ -9,9 +9,9 @@ extends RefCounted
 ## gets back which entry is pointed at. It draws into its host's canvas, from the host's `_draw`,
 ## so the host decides what lies over and under the ring; the hint glyphs are the host's children.
 ##
-##     var menu := RadialMenu.new(self, index)       # in the host's _ready, before bind
-##     menu.make_hints([&"staff_2", &"back"])
-##     menu.bind(input)                              # the PlayerInput node, or null
+##     var menu := RadialMenu.new(self)              # the host Control
+##     menu.make_hints([&"staff_2", &"back"])        # in the host's _ready, before bind
+##     menu.bind(input, player)                      # the PlayerInput node (or null), player 0-3
 ##     menu.center = ...; menu.hints_at = ...        # where the host lays it out
 ##     menu.lay_out(entries, widths)                 # the first place sits at the top
 ##     menu.point_at(menu.pick_on_ring(menu.aim()), clock)
@@ -52,12 +52,14 @@ const TEXT: Color = Color("#f4f1ea")
 const DIM: Color = Color("#7a7694")
 const GOLD: Color = Color("#f2c230")
 
-## The player 0-3 it is for.
+## The player 0-3 it is for (`bind`).
 var index: int = 0
-## The ring's middle and the hint row's top left, in the host's pixels (set by the host's layout).
+## The ring's middle and the hint row's top left, in the host's own pixels (set by the host's
+## layout); the mouse is read in the same pixels.
 var center: Vector2 = Vector2.ZERO
 var hints_at: Vector2 = Vector2.ZERO
-## The entry pointed at, or NONE. A host that lays the ring out again keeps or drops it.
+## The entry pointed at, or NONE. A host that lays the ring out again keeps or drops it by
+## writing it; written, it does not pop (`point_at` does) and the host redraws itself.
 var pointed: int = NONE
 
 var _host: Control = null
@@ -80,9 +82,8 @@ var _hint_live: Array[bool] = []
 var _hint_text_x: PackedFloat32Array = PackedFloat32Array()
 
 
-func _init(host: Control, player: int) -> void:
+func _init(host: Control) -> void:
 	_host = host
-	index = player
 
 
 ## The hint row's buttons, in order: one glyph each, a child of the host named "Hint_<action>".
@@ -99,10 +100,11 @@ func make_hints(actions: Array[StringName]) -> void:
 		_hint_text_x.append(0.0)
 
 
-## Connect the input manager (null: nothing points, and the glyphs use the autoload) and show the
-## hint row's buttons for this player.
-func bind(input: InputManagerScript) -> void:
+## Connect the input manager (null: nothing points, and the glyphs use the autoload) for player
+## `player`, and show the hint row's buttons for them.
+func bind(input: InputManagerScript, player: int) -> void:
 	_input = input
+	index = player
 	for at in _hint_glyphs.size():
 		_hint_glyphs[at].bind(input)
 		_hint_glyphs[at].show_action(index, _hint_actions[at])
@@ -114,6 +116,7 @@ func bind(input: InputManagerScript) -> void:
 ## the shares are scaled to the whole ring). The first entry's middle sits at the top. With no
 ## width at all the ring is empty.
 func lay_out(entries: PackedInt32Array, widths: PackedFloat32Array) -> void:
+	assert(entries.size() == widths.size(), "one width a place")
 	_entries = entries.duplicate()
 	_angles.clear()
 	_widths.clear()
@@ -211,7 +214,7 @@ func stick_tilt() -> Vector2:
 func mouse_aim() -> Vector2:
 	if not uses_mouse():
 		return Vector2.ZERO
-	var offset: Vector2 = _host.get_global_mouse_position() - center
+	var offset: Vector2 = _host.get_local_mouse_position() - center
 	var length: float = offset.length()
 	return offset / length if length > MOUSE_INNER and length < MOUSE_OUTER else Vector2.ZERO
 
@@ -221,7 +224,7 @@ func mouse_aim() -> Vector2:
 func mouse_reach() -> Vector2:
 	if not uses_mouse():
 		return Vector2.ZERO
-	var offset: Vector2 = _host.get_global_mouse_position() - center
+	var offset: Vector2 = _host.get_local_mouse_position() - center
 	return offset / RING_RADIUS if offset.length() < MOUSE_OUTER else Vector2.ZERO
 
 
@@ -285,6 +288,7 @@ func pointed_for(now: float) -> float:
 # --- Layers -----------------------------------------------------------------------------
 
 ## Enter entry `entry` (a sector whose own ring the host lays out next): pointing starts afresh.
+## Like writing `pointed`, entering and going back do not pop; the host lays out and redraws.
 func enter(entry: int) -> void:
 	_path.append(entry)
 	pointed = NONE
@@ -320,6 +324,7 @@ func entered() -> int:
 ## Lay the hint row out at `hints_at` for what the buttons do now: each button's verb and whether
 ## it does something (dimmed when not). Both as long as the row's buttons.
 func set_hints(verbs: Array[String], live: Array[bool]) -> void:
+	assert(verbs.size() == _hint_glyphs.size() and live.size() == _hint_glyphs.size(), "a verb and a flag a button")
 	_hint_verbs.assign(verbs)
 	_hint_live.assign(live)
 	var x: float = hints_at.x

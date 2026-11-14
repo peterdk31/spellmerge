@@ -5,8 +5,9 @@ extends RefCounted
 ## menu's Sandbox page ("Ring:", `hud/panels` sets it). They are experiments: deleting a style is
 ## its file, its test, and its entry in `PauseMenu.Ring` and `panels.gd`.
 ##
-## A style reads the radial's ring (its places, entries and kinds) and draws with the radial's own
-## helpers; the radial keeps everything else (the slots, RT, LT, the hub, the numbers).
+## A style reads the ring's places, the pointing and the sticks from the radial's shared radial
+## menu (`radial.menu()`, `hud/widgets/radial_menu.gd`) and the cards and kinds from the radial,
+## and draws with both; the radial keeps everything else (the slots, RT, LT, the hub, the numbers).
 
 const NONE: int = -1
 

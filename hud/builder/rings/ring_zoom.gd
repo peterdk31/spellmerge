@@ -8,6 +8,7 @@ extends "res://hud/builder/rings/ring_picker.gd"
 ## precise already. The numbers are first guesses, to tune by playing.
 
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
+const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
 
 ## Locks when the stick is pushed this far (0 to 1) and turns slower than STILL_SPEED (radians a
 ## second) for LOCK_TIME seconds.
@@ -52,11 +53,12 @@ func ring_angle_at(angle: float) -> float:
 
 func pick(radial: Control, delta: float) -> int:
 	var r: RadialScript = radial as RadialScript
-	var tilt: Vector2 = r.stick_tilt()
+	var menu: RadialMenuScript = r.menu()
+	var tilt: Vector2 = menu.stick_tilt()
 	if tilt == Vector2.ZERO:
 		reset()
-		var mouse: Vector2 = r.mouse_reach()
-		return r.pick_on_ring(mouse if mouse.length() * RadialScript.RING_RADIUS > RadialScript.MOUSE_INNER else Vector2.ZERO)
+		var mouse: Vector2 = menu.mouse_reach()
+		return menu.pick_on_ring(mouse if mouse.length() * RadialScript.RING_RADIUS > RadialScript.MOUSE_INNER else Vector2.ZERO)
 	var angle: float = RadialScript.angle_of(tilt)
 	var speed: float = 0.0 if is_nan(_last) or delta <= 0.0 else absf(angle_difference(_last, angle)) / delta
 	_last = angle
@@ -66,14 +68,14 @@ func pick(radial: Control, delta: float) -> int:
 	if not _locked:
 		_still = _still + delta if tilt.length() >= LOCK_TILT and speed < STILL_SPEED else 0.0
 		if _still < LOCK_TIME:
-			return r.pick_on_ring(tilt)
+			return menu.pick_on_ring(tilt)
 		_locked = true
 		_anchor = angle
 		_base = angle
 	var off: float = angle_difference(_anchor, angle)
 	if absf(off) > FAN_HALF:
 		_base += signf(off) * SLIDE_SPEED * _card_width(r) * delta
-	return r.pick_among(r._ring_entry, r._ring_angle, r._ring_width, ring_angle_at(angle))
+	return menu.pick_among(menu.place_entries(), menu.place_angles(), menu.place_widths(), ring_angle_at(angle))
 
 
 func is_animating() -> bool:
@@ -82,7 +84,7 @@ func is_animating() -> bool:
 
 ## The ring angle one card takes on the plain ring.
 func _card_width(r: RadialScript) -> float:
-	return r._card_room() / RadialScript.RING_RADIUS
+	return r.menu().place_room() / RadialScript.RING_RADIUS
 
 
 ## Where ring angle `angle` is drawn: spread 1 / GAIN times inside the fan, squeezed outside it.
@@ -98,28 +100,30 @@ func draw(radial: Control) -> bool:
 	if not _locked:
 		return false
 	var r: RadialScript = radial as RadialScript
+	var menu: RadialMenuScript = r.menu()
 	var radius: float = RadialScript.RING_RADIUS
-	r.draw_arc(r._center, radius, 0.0, TAU, 64, RadialScript.LINE, 1.0)
+	menu.draw_ring_line()
 	# The fan, outside the ring.
-	r.draw_arc(r._center, radius + RadialScript.ARC_OUT, _anchor - FAN_HALF - PI * 0.5, _anchor + FAN_HALF - PI * 0.5, 32, Color(RadialScript.GOLD, 0.6), 2.0)
-	var aim: Vector2 = r._drawn_aim
-	if aim != Vector2.ZERO:
-		r.draw_line(r._center + aim * (RadialScript.HUB_RADIUS + 2.0), r._center + aim * (radius - 11.0), Color(RadialScript.GOLD, 0.55), 1.0)
+	r.draw_arc(menu.center, radius + RadialScript.ARC_OUT, _anchor - FAN_HALF - PI * 0.5, _anchor + FAN_HALF - PI * 0.5, 32, Color(RadialScript.GOLD, 0.6), 2.0)
+	menu.draw_pointer()
 	var half: float = FAN_HALF * GAIN
 	var picked_at: float = NAN
-	for at in r._ring_entry.size():
-		var entry: int = r._ring_entry[at]
+	var places: PackedInt32Array = menu.place_entries()
+	var angles: PackedFloat32Array = menu.place_angles()
+	var widths: PackedFloat32Array = menu.place_widths()
+	for at in places.size():
+		var entry: int = places[at]
 		if entry == NONE:
 			continue
-		var angle: float = _drawn(r._ring_angle[at])
-		if entry == r._pointed:
+		var angle: float = _drawn(angles[at])
+		if entry == menu.pointed:
 			picked_at = angle
-		elif absf(angle_difference(_base, r._ring_angle[at])) <= half:
-			var size: float = clampf(floorf(r._ring_width[at] / GAIN * radius) - 2.0, MARK_SIZE, RadialScript.TILE_MAX)
-			r._draw_ring_card(entry, r._tile_center(angle, radius), size, false)
+		elif absf(angle_difference(_base, angles[at])) <= half:
+			var size: float = clampf(floorf(widths[at] / GAIN * radius) - 2.0, MARK_SIZE, RadialScript.TILE_MAX)
+			r._draw_ring_card(entry, menu.tile_center(angle, radius), size, false)
 		else:
-			var middle: Vector2 = r._tile_center(angle, radius)
+			var middle: Vector2 = menu.tile_center(angle, radius)
 			r.draw_rect(Rect2((middle - Vector2(MARK_SIZE, MARK_SIZE) * 0.5).round(), Vector2(MARK_SIZE, MARK_SIZE)), RadialScript.KIND_COLORS[r._entries[entry]["kind"]])
 	if not is_nan(picked_at):
-		r._draw_ring_card(r._pointed, r._tile_center(picked_at, radius + 4.0), RadialScript.TILE_PICKED, true)
+		r._draw_ring_card(menu.pointed, menu.tile_center(picked_at, radius + 4.0), RadialScript.TILE_PICKED, true)
 	return true

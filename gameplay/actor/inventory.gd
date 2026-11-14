@@ -6,7 +6,8 @@ extends ActorComponent
 ## `ItemKinds`' (core/items); nothing here names a kind to decide something.
 ##
 ## - **Bags:** one per `ItemKinds.BAGS` entry, each a list of `ItemStack`s and a capacity in copies
-##   (`capacity_of`; UNLIMITED, the start, for none; `set_capacity`). A kind that stacks keeps one
+##   (`capacity_of`; UNLIMITED for none; `set_capacity`), taken at its start from the run's rules
+##   (`SessionRules.bag_capacity`, items I4; with no run, UNLIMITED). A kind that stacks keeps one
 ##   stack per id with its count (`count_of`); every other item is a stack of its own. `add` puts a
 ##   stack in its kind's bag, refused when that bag has no room (`has_room`); `take` takes copies
 ##   out. `copies(bag)` is how full it is.
@@ -22,6 +23,11 @@ extends ActorComponent
 ##   `start_cards`), each numbered by the button it starts on, so the first staffs' numbers are
 ##   their buttons; later ones count on from HANDS. The card bag is what `give_cards` gave before
 ##   then (`cards_given`; the player fills one from the registry otherwise).
+## - **The player loadout** (items I4, core/sim/player_loadout.gd): `loadout()` is everything it
+##   holds as a run's start takes it along (its counted bags, every staff with its number and cards,
+##   its hands), and `take_loadout(loadout, registry)`, before the actor is ready, makes it hold
+##   exactly that in place of the start above (then `hand_staffs` and `hand_cards` are what its
+##   Caster is made with). A staff's mana is not in a loadout: every pool starts full.
 ## - **Counted cards** (owner, 2026-11-13): `set_cards(number, cards)` (and `set_card`, one slot)
 ##   is the builder's change to a staff's cards. A card put in takes one copy from the card bag, a
 ##   card taken out gives it back; the change is refused, and nothing changes, when a card has no
@@ -61,6 +67,8 @@ var _hands: Array[ItemStack] = []
 var _next_number: int = HANDS
 ## True once the card bag was given (`give_cards`), so nobody fills it again.
 var cards_given: bool = false
+## True once its staffs and hands were given (`take_loadout`), so it takes none from the Caster.
+var _staffs_given: bool = false
 ## True once it took the body's start staffs (`setup`).
 var _started: bool = false
 
@@ -79,8 +87,11 @@ func setup(owner_actor: Actor) -> void:
 		# Made again from a snapshot: its staffs are as they were saved.
 		return
 	_started = true
+	if actor.sim != null and actor.sim.rules != null:
+		for bag: StringName in ItemKinds.BAGS:
+			_capacity[bag] = actor.sim.rules.bag_capacity(bag)
 	var caster: Caster = actor.caster
-	if caster == null:
+	if caster == null or _staffs_given:
 		return
 	for at in mini(HANDS, caster.staff_count):
 		if not caster.holds(at):
@@ -92,6 +103,102 @@ func setup(owner_actor: Actor) -> void:
 		var stack := ItemStack.of_staff(caster.staff_of(at), cards)
 		stack.number = at
 		_hands[at] = stack
+
+
+# --- The player loadout ------------------------------------------------------------------
+
+## Everything it holds, as a run's start takes it along (items I4): every counted stack by bag,
+## every staff (the hands' by button, then the staff bag's) under its number with its cards, and
+## the hands. What passes the loadout's limits is left out.
+func loadout() -> PlayerLoadout:
+	var made := PlayerLoadout.new()
+	for stack: ItemStack in _hands:
+		if stack != null:
+			made.add_staff(stack.number, stack.id, stack.cards)
+	for bag: StringName in ItemKinds.BAGS:
+		for stack: ItemStack in _stacks(bag):
+			if stack.number != NO_STAFF:
+				made.add_staff(stack.number, stack.id, stack.cards)
+			else:
+				made.add_stack(bag, stack.id, stack.count)
+	var held: PackedInt32Array = hands()
+	for at in held.size():
+		if held[at] != NO_STAFF and made.staff_id(held[at]) == &"":
+			held[at] = NO_STAFF
+	made.set_hands(held)
+	return made
+
+
+## Hold exactly what `loadout` says (before the actor is ready, in place of the start staffs and
+## `give_cards`): its counted stacks in their bags, its staffs under their numbers (each the staff
+## `registry` has of its id; one it has none of is left out), on the hands the loadout puts them on
+## or else in the staff bag, every pool full. A bag it has not, and a hand past HANDS, hold nothing.
+func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
+	cards_given = true
+	_staffs_given = true
+	_hands.fill(null)
+	_next_number = HANDS
+	for bag: StringName in _bags:
+		_stacks(bag).clear()
+	for bag: StringName in loadout.bags():
+		if not _bags.has(bag):
+			continue
+		var kind: StringName = ItemKinds.kind_in(bag)
+		if kind == ItemKinds.STAFF:
+			# A staff is never counted: the loadout's staffs are below.
+			continue
+		var ids: Array[StringName] = loadout.stack_ids(bag)
+		var counts: PackedInt32Array = loadout.stack_counts(bag)
+		for at in ids.size():
+			var stack := ItemStack.new()
+			stack.kind = kind
+			stack.id = ids[at]
+			stack.count = counts[at]
+			_put(stack)
+	for number: int in loadout.staff_numbers():
+		var base: StaffBase = staff_content(registry, loadout.staff_id(number))
+		if base == null:
+			continue
+		var stack := ItemStack.of_staff(base, loadout.staff_cards(number))
+		stack.number = number
+		_next_number = maxi(_next_number, number + 1)
+		var hand: int = loadout.hand_of(number)
+		if hand >= 0 and hand < HANDS:
+			_hands[hand] = stack
+		else:
+			_stacks(ItemKinds.bag_of(ItemKinds.STAFF)).append(stack)
+
+
+## The staff `registry` has of the id `id` in the staff kind's content folders, or null.
+static func staff_content(registry: Node, id: StringName) -> StaffBase:
+	if registry == null or id == &"":
+		return null
+	for folder: StringName in ItemKinds.content_of(ItemKinds.STAFF):
+		var found: Resource = registry.call(&"get_resource", folder, id) as Resource
+		if ItemKinds.is_content(ItemKinds.STAFF, found):
+			return found as StaffBase
+	return null
+
+
+## By hand (button): the staff on it, or null for an empty hand: what its Caster is made with
+## after `take_loadout` (`Caster.staffs`).
+func hand_staffs() -> Array[StaffBase]:
+	var out: Array[StaffBase] = []
+	for stack: ItemStack in _hands:
+		out.append(stack.staff if stack != null else null)
+	return out
+
+
+## By hand (button): the cards of the staff on it by slot (none for an empty hand), beside
+## `hand_staffs` (`Caster.start_cards`).
+func hand_cards() -> Array:
+	var out: Array = []
+	for stack: ItemStack in _hands:
+		var cards: Array[StringName] = []
+		if stack != null:
+			cards.assign(stack.cards)
+		out.append(cards)
+	return out
 
 
 # --- Bags -------------------------------------------------------------------------------
@@ -172,27 +279,8 @@ func has_room(stack: ItemStack) -> bool:
 func add(stack: ItemStack) -> bool:
 	if not has_room(stack):
 		return false
-	var bag: StringName = ItemKinds.bag_of(stack.kind)
-	var stacks: Array[ItemStack] = _bags[bag]
-	if ItemKinds.stacks(stack.kind):
-		for held: ItemStack in stacks:
-			if held.id == stack.id:
-				held.count += stack.count
-				bag_changed.emit(bag)
-				return true
-	# A kind that does not stack: each copy a stack of its own (a staff each with its number).
-	var numbered: PackedInt32Array = PackedInt32Array()
-	for _copy in (stack.count if not ItemKinds.stacks(stack.kind) else 1):
-		var made: ItemStack = stack.copy()
-		if not ItemKinds.stacks(stack.kind):
-			made.count = 1
-		if made.kind == ItemKinds.STAFF:
-			made.number = _next_number
-			_next_number += 1
-			made.cards = made.fit(made.cards)
-			numbered.append(made.number)
-		stacks.append(made)
-	bag_changed.emit(bag)
+	var numbered: PackedInt32Array = _put(stack)
+	bag_changed.emit(ItemKinds.bag_of(stack.kind))
 	for number in numbered:
 		staff_changed.emit(number)
 	return true
@@ -336,6 +424,31 @@ func set_cards(number: int, cards: Array[StringName]) -> Refusal:
 
 
 # --- Inside -----------------------------------------------------------------------------
+
+## Put `stack` (a copy of it) in its kind's bag, whatever room there is, and tell nobody: a kind
+## that stacks joins its id's stack, any other is a stack a copy, a staff each with a new number.
+## Returns the numbers given.
+func _put(stack: ItemStack) -> PackedInt32Array:
+	var numbered := PackedInt32Array()
+	var stacks: Array[ItemStack] = _bags[ItemKinds.bag_of(stack.kind)]
+	if ItemKinds.stacks(stack.kind):
+		for held: ItemStack in stacks:
+			if held.id == stack.id:
+				held.count += stack.count
+				return numbered
+		stacks.append(stack.copy())
+		return numbered
+	for _copy in stack.count:
+		var made: ItemStack = stack.copy()
+		made.count = 1
+		if made.kind == ItemKinds.STAFF:
+			made.number = _next_number
+			_next_number += 1
+			made.cards = made.fit(made.cards)
+			numbered.append(made.number)
+		stacks.append(made)
+	return numbered
+
 
 func _stacks(bag: StringName) -> Array[ItemStack]:
 	if _bags.has(bag):

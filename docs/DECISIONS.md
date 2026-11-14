@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-14: the player loadout (items I4)
+
+- **Named `PlayerLoadout`** (owner: "PlayerLoadout could be a good name"), not "player record": it is what a player takes along, and "record" already means a replay here. Every seat's is a `PartyLoadout`.
+- **The loadout knows no item kind:** bags by name, stacks as id and copies, staffs as number, id and cards. The inventory writes and reads it, so core/sim stays below the actor kit, and a new kind needs no change here.
+- **Tagged sections, each with its length,** in a fixed order: an unknown tag is refused (as the plan says) rather than skipped, so a header never half-reads; a later section is a new tag after these, and the old ones' bytes stay as they are.
+- **The writers and the decoder share the limits,** and the decoder fills a fresh loadout through the writers: what one refuses the other refuses, and a loadout is never more than `MAX_BYTES`.
+- **A staff's mana is not carried:** a run starts with every pool full, as before; the owner's "a staff off a hand regains none" is about the bag within a run.
+- **A wizard made again holds its loadout's bag,** so `_less_carried` (I3's fix against counting a carried staff's cards twice) is gone: nothing is given twice by construction.
+- **A staff the registry has none of is left out** of a loadout taken: the replay's content hash already refuses other content, so this is only a guard.
+- **Each bag's capacity is a run's rule** (moved from I3): one `SessionRules` field per bag, `bag_` and its name, 0 for no limit, so the rules stay plain 32-bit numbers.
+
 ## 2026-11-14: stacks, kinds, the inventory and counted cards (items I3)
 
 - **The inventory takes the staffs the body was made with** (at `setup`, from the Caster's hands as `seat_wizard` set them), rather than `seat_wizard` handing them to it: one path covers every wizard, from Flow, a test or a scene. From then on it owns them: it changes a hand's cards with `Caster.set_staff`, and nothing else does.
@@ -11,7 +22,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Only the wizard has an inventory in I3.** An enemy's (its staff bag the staffs it holds) moves to I8, the first step that reads one (a possessed body's menus): a boss's phases swap its staffs in the Caster (`replace_staffs`), and routing that through an inventory belongs with the step that needs it. The stress bench's `replace_staffs` on wizards stays until I7 puts staffs on hands.
 - **A bag's capacity is not yet one of the run's rules:** every bag is unlimited in I3, and a `SessionRules` field changes the replay's header, which I4 changes anyway; it goes in there.
 - **Cards given back to a full card bag are refused** (`BAG_FULL`) until I6, which drops them at the body's feet, so a staff can always be emptied. Nothing has a capacity before then.
-- **A wizard made again with the staffs it carried gets the mode's bag less their cards** (`Flow._less_carried`): the hub begun anew for a joining machine then holds exactly what it held (nothing else changes a hub's counts), where a fresh bag beside the carried staffs would add copies at every rejoin. A run from the stone takes them out of Play's bag the same way. The player record (I4) carries the bags themselves and replaces this.
+- **A wizard made again with the staffs it carried gets the mode's bag less their cards** (`Flow._less_carried`): the hub begun anew for a joining machine then holds exactly what it held (nothing else changes a hub's counts), where a fresh bag beside the carried staffs would add copies at every rejoin. A run from the stone takes them out of Play's bag the same way. the player loadout (I4) carries the bags themselves and replaces this.
 - **The refusals are an enum** (`Inventory.Refusal`); their words are the player controller's, so the simulation holds no HUD text.
 - **`core/items/` is a simulation folder,** so its scripts are held to the simulation's rules and declared state like the rest.
 
@@ -24,7 +35,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 - **An empty hand is a bit on the caster** (`Caster.empty_hands`), not a null staff in `Caster.staffs`: a null entry there already means "the `staff` of every button" for enemies and props, so a second meaning would change them. The inventory (I3) will hand the caster its staffs and set the bits.
 - **An empty hand is never on show** while a staff is held: pressing it does nothing, so the look always shows a staff the wizard holds. With every hand empty the look shows the plain staff.
-- **No change to the replay's header in I2:** an empty hand carries `&""`, the run's own staff, which in Play and the hub is empty on LB and LT too. A hand emptied by a player (I7) needs its own mark, which the player record (I4) gives.
+- **No change to the replay's header in I2:** an empty hand carries `&""`, the run's own staff, which in Play and the hub is empty on LB and LT too. A hand emptied by a player (I7) needs its own mark, which the player loadout (I4) gives.
 - **"Leave game" is a device-layer request,** not a command: the input layer lets the device go as an unplugged pad, and its `device_left` puts the seat's LEAVE in its next frame, the path every machine and a replay already follow.
 - **The hub's dev staff on RT goes** (2026-11-13 below): players start with two staffs; the rack (I6) replaces it.
 
@@ -38,7 +49,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **The hub's rack is ordinary items** (owner: "It should work as a regular item pickup, no special handling"), one premade staff for now.
 - **The inventory is on Select (Tab), the builder stays on B; leaving the game is a row in the pause menu** with no key of its own. Select was `leave` and Tab the builder's second key.
 - **During a possession the panel, the builder and the inventory show the possessed body** (the first one hit), whose cards and staffs can be rearranged and dropped; the wizard's health shows as a bar above it. **This replaces the decision of 2026-10-28** that the seat's panel and builder are always its own wizard. Every actor has an inventory for it, and what is picked up during a possession stays with that body.
-- **What a run's start takes along is the whole player** (owner: "RunCarry should carry a complete player (all bags ...) and this will also allow to carry any other information about a player we might add"): `PlayerRecord` in place of `RunCarry`, in tagged sections, read as strictly.
+- **What a run's start takes along is the whole player** (owner: "RunCarry should carry a complete player (all bags ...) and this will also allow to carry any other information about a player we might add"): `PlayerLoadout` in place of `RunCarry`, in tagged sections, read as strictly.
 - **Enemies may take and use items** (I9), so picking up is keyed by actor.
 - **Why the shape:** kinds as one table of rules, the pickup rule apart from the bags and the ground, menus that only send requests (owner: "code all of these features with low coupling, so systems and behaviour can be changed later ... the way to pickup items could be tweaked").
 

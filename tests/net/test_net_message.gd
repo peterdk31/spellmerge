@@ -132,24 +132,35 @@ func test_an_unknown_kind_is_refused() -> void:
 		check(_message.decode(bytes) != "", "kind %d" % kind)
 
 
-## A header carries every seat's staffs (core/sim/run_carry.gd): at their fullest, with the longest
-## build on the staffs of the longest ids, it is exactly the most a header takes, and that crosses as a message.
+## A header carries every seat's player loadout (core/sim/party_loadout.gd): each filled until it
+## takes no more (staffs of the longest ids full of the longest cards, then stacks, then single
+## copies), with the longest build, it is no more than the most a header takes, and that crosses as
+## a message.
 func test_the_fullest_header_crosses() -> void:
 	var replay := Replay.new()
 	replay.build = "b".repeat(Replay.MAX_BUILD)
 	var longest := StringName("c".repeat(InputFrame.MAX_TEXT))
-	var staff: Array = []
-	for i in RunCarry.MAX_CARDS:
+	var staff: Array[StringName] = []
+	for i in PlayerLoadout.MAX_CARDS:
 		staff.append(longest)
-	for seat in RunCarry.SEATS:
-		replay.carry.set_staffs(seat, [staff, staff, staff, staff], [longest, longest, longest, longest])
+	var loadout := PlayerLoadout.new()
+	var number: int = 0
+	while loadout.add_staff(number, longest, staff):
+		number += 1
+	while loadout.add_stack(longest, longest, PlayerLoadout.MAX_COPIES):
+		pass
+	while loadout.add_stack(&"b", &"c", 1):
+		pass
+	check(number > 0 and loadout.size() > PlayerLoadout.MAX_BYTES - 4 and loadout.size() <= PlayerLoadout.MAX_BYTES, "a loadout filled to its limit (%d bytes)" % loadout.size())
+	for seat in PartyLoadout.SEATS:
+		replay.party.put(seat, loadout)
 	var header: PackedByteArray = replay.header_bytes()
-	check_equal(header.size(), Replay.MAX_HEADER_BYTES, "the fullest header is the most a header takes")
+	check(header.size() <= Replay.MAX_HEADER_BYTES and header.size() > Replay.MAX_HEADER_BYTES - 16, "the fullest header is no more than a header takes (%d of %d)" % [header.size(), Replay.MAX_HEADER_BYTES])
 	check(NetMessage.MAX_HEADER <= NetMessage.MAX_BYTES, "and no more than a message may be")
 	check_equal(_message.decode(NetMessage.of_header(header)), "", "it crosses")
 	var back := Replay.new()
 	check_equal(back.decode(_message.body), "", "and reads back as a replay")
-	check(back.carry.equals(replay.carry), "with every seat's staffs")
+	check(back.party.equals(replay.party), "with every seat's loadout")
 
 
 func test_a_message_too_long_for_its_kind_is_refused() -> void:

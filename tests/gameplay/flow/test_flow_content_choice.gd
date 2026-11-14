@@ -170,16 +170,30 @@ func _card_counts(wizard: Actor) -> Dictionary:
 	return out
 
 
-## Regression (review): a wizard made again with the staffs it carried (the hub begun anew for a
-## joining machine) owns no more copies than before: the carried cards come out of the mode's bag.
-func test_carried_cards_are_not_counted_twice() -> void:
+## A run that starts from a player loadout (items I4: the hub begun anew for a joining machine, a
+## run from the stone) holds exactly it: its card bag counted as it was (no copy given twice, the
+## regression of I3's review), its staffs under their numbers on their hands. A seat with no loadout
+## gets the mode's.
+func test_a_wizard_from_a_loadout_holds_exactly_it() -> void:
 	flow.mode = FlowScript.MODE_HUB
-	var kept: Array = [[[&"bolt", &"bolt", &"bolt"], [&"fire"]], [], [], []]
-	check(flow.start_run(0, kept), "the hub starts with a carried staff")
+	var loadout := PlayerLoadout.new()
+	loadout.add_stack(&"cards", &"bolt", 17)
+	loadout.add_stack(&"cards", &"fire", 1)
+	loadout.add_staff(0, FlowScript.STARTER_HEADS[0], [&"bolt", &"bolt", &"bolt"] as Array[StringName])
+	loadout.add_staff(5, FlowScript.DEV_STAFF, [&"fire"] as Array[StringName])
+	loadout.set_hands(PackedInt32Array([0, PlayerLoadout.NO_STAFF, PlayerLoadout.NO_STAFF, PlayerLoadout.NO_STAFF]))
+	var party := PartyLoadout.new()
+	party.put(0, loadout)
+	check(flow.start_run(0, party), "the hub starts with a loadout")
 	var wizard := flow.get_wizard(0) as Actor
-	var counts: Dictionary = _card_counts(wizard)
-	check_equal(int(counts.get(&"bolt", 0)), Inventory.DEV_COPIES - 3, "three bolts are the staff's, the rest the bag's")
-	check_equal(int(counts.get(&"fire", 0)), Inventory.DEV_COPIES - 1, "and one fire")
-	check_equal(int(counts.get(&"nova", 0)), Inventory.DEV_COPIES, "another card as many as ever")
-	check_equal(FlowScript._less_carried({&"dash": 1}, [[&"dash", &"dash"]]), {}, "never below none")
+	check_equal(_card_counts(wizard), {&"bolt": 17, &"fire": 1}, "its card bag is the loadout's, no copy given twice")
+	var held: PlayerLoadout = PlayerController.loadout_of(wizard)
+	check(held.stack_ids(&"cards") == loadout.stack_ids(&"cards") and held.stack_counts(&"cards") == loadout.stack_counts(&"cards"), "its loadout's bags are the loadout's")
+	check(held.staff_numbers() == loadout.staff_numbers() and held.hands() == loadout.hands(), "and its staffs' numbers and hands")
+	for number: int in loadout.staff_numbers():
+		var written: Array[StringName] = loadout.staff_cards(number)
+		check(held.staff_id(number) == loadout.staff_id(number) and held.staff_cards(number).slice(0, written.size()) == written, "staff %d is the staff it was, with its cards (padded to its slots)" % number)
+	check_equal(wizard.caster.cards_of(0).slice(0, 3), [&"bolt", &"bolt", &"bolt"] as Array[StringName], "RB's staff with its cards")
+	check(not wizard.caster.holds(1), "RT empty, as the loadout has it")
+	check_equal(wizard.inventory.hand_of(5), -1, "the dev staff in the staff bag")
 	flow.stop_run()

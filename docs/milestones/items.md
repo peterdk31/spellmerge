@@ -1,6 +1,6 @@
 # Items: things a body picks up, holds in bags and drops
 
-**Status (2026-11-13): planned with the owner in an owner session** (the owner, after the last round: "Go ahead"); this document is step I1. I2 and I3 are built (below, "I2 done", "I3 done"); I4 is next. Asked by the owner: "Let's design a plan for having item pickups in the game. The first thing we need is staff pickups."
+**Status (2026-11-13): planned with the owner in an owner session** (the owner, after the last round: "Go ahead"); this document is step I1. I2, I3 and I4 are built (below, "I2 done", "I3 done", "I4 done"); I5 is next. Asked by the owner: "Let's design a plan for having item pickups in the game. The first thing we need is staff pickups."
 
 The steps are **I1 to I9** (I for items). Each is one PR with its tests, in order.
 
@@ -58,7 +58,7 @@ A new kind is one row and its own code.
 - **The caster knows only the staffs on hands.** The inventory owns the staffs; it hands the caster what is on each hand, and a staff in the bag is compiled only for the builder's preview.
 - An enemy's staff bag is the staffs it holds today; its other bags are empty.
 
-**The player record** (`PlayerRecord`, core/sim; replaces `RunCarry`) is what a run's start takes along for a seat: its bags, its staffs by number and its hands. It is written in tagged sections, so a later section (a name, colours) is added beside the bags without changing theirs, and read as strictly as today: every count, length and id is checked, a section it does not know rejects the header. From the hub into a run, and nothing back (owner, 2026-11-10), as before.
+**The player loadout** (`PlayerLoadout`, core/sim; replaces `RunCarry`) is what a run's start takes along for a seat: its bags, its staffs by number and its hands. It is written in tagged sections, so a later section (a name, colours) is added beside the bags without changing theirs, and read as strictly as today: every count, length and id is checked, a section it does not know rejects the header. From the hub into a run, and nothing back (owner, 2026-11-10), as before.
 
 ## The ground
 
@@ -132,13 +132,15 @@ This document, the roadmap's exception and the decisions.
 
 **I3 done (2026-11-14).** `ItemKinds.RULES` and `ItemStack` (core/items, now a simulation folder); `Inventory` (gameplay/actor), on the wizard, takes the staffs the body was made with at `setup`, numbered by their button (later staffs count on from 4), owns the card bag (`give_cards`) and the hands, and does the counting (`set_cards`, `set_card`: refused as `Inventory.Refusal` NO_STAFF, NO_SLOT, NO_CARD, BAG_FULL). `PlayerController.bag` and `set_bag` are gone: the builder's requests name a staff's number and go to the inventory, and the seat's events are `bag_changed(player, bag, ids, counts, capacity)` (every bag), `owned_staff_changed(player, staff, plan)` (every staff owned) and `hands_changed`; `staff_changed` stays the hands', for the corner panel. Flow's bags are counted (`bag_for_mode`, card id to copies: 20 of every card in the sandbox and the hub, Play's one each), and the start cards come with their staffs, beside the bag; a wizard made again with the staffs it carried gets the mode's bag less their cards, so nothing is counted twice (until I4 carries the bags). The builder works by number: a strip of staffs (the hands' button glyphs in framed tabs, then the bag's staffs by their heads, scrolling, a gold notch where more lie past an end), counts on the ring, a card with none left off it. The bots build only from the copies they hold. **Moved:** an enemy's inventory to I8 (the first step that reads one); a bag's capacity as a run's rule to I4 (a `SessionRules` field is the header's change); cards given back to a full bag are refused until I6 drops them (DECISIONS, 2026-11-14). Tests: `tests/core/test_item_kinds.gd`, `tests/gameplay/actor/test_inventory.gd`, `tests/gameplay/player/test_player_card_bag.gd`, and the builder's, Flow's and the player's.
 
-## I4: the player record
+## I4: the player loadout
 
 (`core/sim/`, `gameplay/flow/`, `net/` only where it passes the header on)
 
-- `PlayerRecord` in place of `RunCarry`, in the replay's header: the bags, the staffs and the hands of each seat. Older recordings no longer decode.
+- `PlayerLoadout` in place of `RunCarry`, in the replay's header: the bags, the staffs and the hands of each seat. Older recordings no longer decode.
 - Each bag's capacity is one of the run's rules (`SessionRules`, moved from I3).
 - Tests: the decoder against every cut, count and id out of range; a run from the hub starts with the same bags on a machine that only has the recording.
+
+**I4 done (2026-11-14).** Named `PlayerLoadout` (the owner's suggestion, over "player record"), with `PartyLoadout` for every seat's (core/sim): plain data that knows no item, its bags (by name, each stack an id and its copies), its staffs (number, id, cards by slot) and its hands, written in three tagged sections, each its tag and length, and read as strictly as a frame (every cut, count, number and id; a section out of place or unknown rejects it; the writers refuse what the decoder would, sharing `MAX_*`). The replay's header holds a `PartyLoadout` in place of `RunCarry` (format 7; older recordings no longer decode); `Frames.set_party_source` and `next_run_party` in place of the carry's. `Inventory.loadout()` writes one and `take_loadout` holds exactly one (`hand_staffs`, `hand_cards` for its Caster); `PlayerController.loadout_of` and `seat_loadout`; Flow hands `start_run` a `PartyLoadout` (`_party_of`), a seat with none getting its mode's. `staff_cards`, `staff_ids`, `staffs_for_seat` and `_less_carried` are gone: a wizard made again holds its own bag, so nothing is counted twice by construction. A staff's mana is not carried (a run starts with every pool full). Each bag's capacity is a `SessionRules` field (`bag_staffs`, `bag_cards`, `bag_relics`, `bag_potions`; 0 no limit, `bag_capacity`), taken by the inventory at its start. Tests: `tests/core/test_player_loadout.gd` (the decoder, the writers' limits, random bytes, the party and the frames service), `test_replay.gd`, `test_session_rules.gd`, `tests/net/test_net_message.gd` (the fullest header crosses), the inventory's, the player's hands' and Flow's (the hub begun anew keeps every wizard's bags on a machine that only has the recording).
 
 ## I5: the shared radial widget
 

@@ -12,7 +12,8 @@ extends RefCounted
 ##   asked), the seats joined at the start (`seats`, a bit per seat) and the run's rules (`rules`:
 ##   the shot cap, the step budgets; core/sim/session_rules.gd, online-ready N11),
 ##   so it plays the same on a machine whose own settings are others, and what the run takes along
-##   from the play before it (`carry`: each seat's staffs and their cards; core/sim/run_carry.gd, online lobby).
+##   from the play before it (`party`: each seat's player loadout, its bags, staffs and hands;
+##   core/sim/party_loadout.gd, items I4).
 ## - **The ticks:** per tick a byte of the seats with a frame (a bit each), then each seat's frame
 ##   (its length, then `InputFrame` bytes). The game's stops need no mark: they are its state
 ##   (online-ready N4), so a replay stands still where the recording did. Kept as bytes (`add_tick`, `read_tick`), so an hour of four seats is
@@ -33,9 +34,10 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## The file format's version (2: the run's rules in the header, N11; 3: no "paused" bit in a
 ## tick's byte, the stops being state, N4; 4: no horde, its start, cap and commands gone; 5: what
-## the run takes along, after the rules; 6: each carried staff's own id after its cards). A replay
-## of another format is refused.
-const FORMAT: int = 6
+## the run takes along, after the rules; 6: each carried staff's own id after its cards; 7: the
+## players' loadouts in place of the carried staffs, and the bags' capacities among the rules, items
+## I4). A replay of another format is refused.
+const FORMAT: int = 7
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): a run of waves, the sandbox, the hub (online-lobby
@@ -48,7 +50,7 @@ const MAX_BYTES: int = 64 * 1024 * 1024
 const MAX_BUILD: int = 64
 ## The most bytes a header takes (`header_bytes`): magic, format, the build, content and seed, start,
 ## starter and seats, the rules, what is carried at its most, the tick count.
-const MAX_HEADER_BYTES: int = 4 + 1 + 1 + MAX_BUILD + 16 + 3 + SessionRules.BYTES + RunCarry.MAX_BYTES + 4
+const MAX_HEADER_BYTES: int = 4 + 1 + 1 + MAX_BUILD + 16 + 3 + SessionRules.BYTES + PartyLoadout.MAX_BYTES + 4
 
 var build: String = ""
 var content: int = 0
@@ -59,8 +61,8 @@ var seats: int = 0
 ## The rules the run played by (`Frames.record` takes this machine's; the runs it plays take them).
 var rules: SessionRules = SessionRules.defaults()
 ## What the run takes along from the play before it (`Frames.record` asks the game; the run it starts
-## takes it, `Frames.next_run_carry`).
-var carry: RunCarry = RunCarry.new()
+## takes it, `Frames.next_run_party`).
+var party: PartyLoadout = PartyLoadout.new()
 
 var _data: PackedByteArray = PackedByteArray()
 ## Where each tick starts in `_data`.
@@ -180,7 +182,7 @@ func _encode(ticks: bool) -> PackedByteArray:
 	out.append(starter)
 	out.append(seats & 0x0f)
 	rules.encode_into(out)
-	carry.encode_into(out)
+	party.encode_into(out)
 	at = out.size()
 	out.resize(at + 4)
 	out.encode_u32(at, _offsets.size() if ticks else 0)
@@ -206,7 +208,7 @@ func decode(bytes: PackedByteArray) -> String:
 		starter = 0
 		seats = 0
 		rules = SessionRules.defaults()
-		carry = RunCarry.new()
+		party = PartyLoadout.new()
 		_data = PackedByteArray()
 		_offsets = PackedInt32Array()
 	return problem
@@ -250,12 +252,12 @@ func _decode(bytes: PackedByteArray) -> String:
 		return rules_problem
 	rules = read_rules
 	at += SessionRules.BYTES
-	var read_carry := RunCarry.new()
-	var carry_problem: String = read_carry.decode_at(bytes, at)
-	if carry_problem != "":
-		return carry_problem
-	carry = read_carry
-	at = read_carry.read_to
+	var read_party := PartyLoadout.new()
+	var party_problem: String = read_party.decode_at(bytes, at)
+	if party_problem != "":
+		return party_problem
+	party = read_party
+	at = read_party.read_to
 	if at + 4 > bytes.size():
 		return "the header is cut short"
 	var ticks: int = bytes.decode_u32(at)

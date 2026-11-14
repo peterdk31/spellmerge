@@ -64,6 +64,27 @@ func test_every_rule_is_a_row_of_the_fields() -> void:
 	check(back.equals(changed) and changed.copy().equals(changed), "every row copied, compared and carried")
 
 
+## Each bag of an inventory has its capacity among the rules (items I4), none at the start.
+func test_every_bag_has_its_capacity_among_the_rules() -> void:
+	var rules := SessionRules.new()
+	var rows: Array[StringName] = []
+	for field: Array in SessionRules.FIELDS:
+		rows.append(field[0])
+	for bag: StringName in ItemKinds.BAGS:
+		check(rows.has(StringName(SessionRules.BAG_RULE + bag)), "the bag %s has a rule: add `bag_%s` to SessionRules" % [bag, bag])
+		check_equal(rules.bag_capacity(bag), SessionRules.NO_LIMIT, "%s has no limit at the start" % bag)
+	rules.bag_cards = 30
+	check_equal(rules.bag_capacity(&"cards"), 30, "a rule set is the bag's capacity in copies")
+	check_equal(rules.bag_capacity(&"staffs"), SessionRules.NO_LIMIT, "and no other bag's")
+	check_equal(rules.bag_capacity(&"no_such_bag"), SessionRules.NO_LIMIT, "a bag no rule names has no limit")
+	var bytes := PackedByteArray()
+	rules.encode_into(bytes)
+	var back := SessionRules.new()
+	check(back.decode_at(bytes, 0) == "" and back.bag_capacity(&"cards") == 30, "it comes back from a header")
+	bytes.encode_u32(4 * rows.find(&"bag_cards"), SessionRules.MAX_BAG + 1)
+	check(SessionRules.new().decode_at(bytes, 0) != "", "a capacity past the most is refused")
+
+
 ## A run takes the frames service's rules: a copy of this machine's, or of a replay's while one is
 ## on its deck (core/sim/replay_tape.gd).
 func test_a_run_takes_a_copy_of_the_machines_rules_or_a_replays() -> void:

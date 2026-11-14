@@ -23,12 +23,13 @@ extends RefCounted
 ##     frame.set_move(Vector2(0.5, -1.0))
 ##     frame.set_aim(Vector2.DOWN)
 ##     frame.press(0)
-##     frame.add_command(&"staff_change_requested", [2, 0, &"fire"])
+##     frame.add_command(&"staff_change_requested", [2, 0, &"fire", body_key])
 ##     var back: InputFrame = InputFrame.from_bytes(frame.to_bytes())   # null if rejected
 
 ## The format's version, the frame's first byte (2: the horde's commands gone, the kinds after
-## them renumbered; 3: `card_move_requested` gone with the list builder, the same).
-const VERSION: int = 3
+## them renumbered; 3: `card_move_requested` gone with the list builder, the same; 4: the four menu
+## requests carry the key of the body the menu showed, items I8).
+const VERSION: int = 4
 const SEATS: int = 4
 const STAFFS: int = 4
 ## A move axis of 1.0 is this byte.
@@ -71,7 +72,7 @@ const COMMAND_NAMES: Array[StringName] = [
 ]
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
-	"iis", "iS",
+	"iisi", "iSi",
 	"s", "si",
 	"i", "i",
 	"i",
@@ -79,7 +80,7 @@ const COMMAND_SHAPES: PackedStringArray = [
 	"",
 	"i",
 	"i",
-	"ii", "ssi",
+	"iii", "ssii",
 ]
 
 var seat: int = 0

@@ -18,11 +18,14 @@ extends CanvasLayer
 ## once per plan), and its next cast and delay are read each frame from `Spells.cast_index` and
 ## `Spells.cooldown_left`, plain numbers that allocate nothing (`step_staffs`).
 ##
-## A panel is always the player's own wizard (owner, 2026-10-28): its numbers and staff rows
-## (`player_stats_changed`, `staff_changed` and the timing of `Spells.home_of_seat`) stay the
-## wizard's while the seat drives another actor (possess, actors G9) and while an enemy's AI drives
-## the wizard, so a player always sees their wizard taking hits. The possession itself is drawn
-## in the world, over the possessed actor (`PossessedLook`).
+## A panel is the body its seat drives (items I8; owner, 2026-11-13, which replaces "always the
+## player's own wizard" of 2026-10-28): its numbers and staff rows (`player_stats_changed`,
+## `staff_changed` and the timing of `Spells.shown_of_seat`) are a possessed body's while the seat
+## possesses one, and the wizard's while an enemy's AI drives the wizard, so a player sees the body
+## they play. Their own wizard's health shows over its head meanwhile (Feel), and the possession's
+## time over the possessed actor (`PossessedLook`). When the seat says its things anew
+## (`inventory_announced`: the body shown changed, or its wizard was made again) its builder and
+## inventory close, so neither sends a request about a staff of the body shown before.
 ##
 ## The loading screen (`loading/`, node Root/Loading, over everything) shows from
 ## `loading_started` to `loading_finished`, while flow compiles the shaders before the first room.
@@ -339,6 +342,7 @@ func _ready() -> void:
 		events.room_cleared.connect(_on_room_cleared)
 		events.build_break_started.connect(_on_build_break_started)
 		events.staff_changed.connect(_on_staff_changed)
+		events.inventory_announced.connect(_on_inventory_announced)
 		events.staff_mana_changed.connect(_on_staff_mana_changed)
 		events.mana_reserved.connect(_on_mana_reserved)
 		events.cast_fizzled.connect(_on_cast_fizzled)
@@ -653,9 +657,8 @@ func step_staffs() -> void:
 		var panel: PlayerPanelScript = _panels[player]
 		if not panel.visible:
 			continue
-		# Spells keeps staffs by caster (actors G3b): the seat's own wizard, also while the seat
-		# drives another actor.
-		var actor: int = spells.home_of_seat(player)
+		# Spells keeps staffs by caster (actors G3b): the body the seat drives, else its wizard.
+		var actor: int = spells.shown_of_seat(player)
 		for staff in PlayerPanelScript.STAFF_COUNT:
 			# The cast a press would fire with the staff's mana (one it cannot pay is skipped;
 			# docs/milestones/cast-timing.md); unknown until the staff's mana was told.
@@ -734,6 +737,21 @@ func _on_stats_changed(player: int, health: float, max_health: float, mana: floa
 			_inventories[player].close_inventory()
 
 
+## The seat says its things anew (the body shown changed, items I8, or its wizard was made again):
+## its builder and inventory close, so neither names a staff of the body shown before, and its
+## panel's numbers start over (the body's own follow at once).
+func _on_inventory_announced(player: int, _body: int) -> void:
+	if player >= 0 and player < PLAYER_COUNT:
+		_radials[player].close_builder()
+		_inventories[player].close_inventory()
+		# Another body's numbers follow: no hit flash for the change, and none of the last body's
+		# mana held or told is read for this one's staff rows (review, items I8).
+		_panels[player].forget_health()
+		for staff in PlayerPanelScript.STAFF_COUNT:
+			_staff_mana[player * PlayerPanelScript.STAFF_COUNT + staff] = INF
+			_staff_reserved[player * PlayerPanelScript.STAFF_COUNT + staff] = 0.0
+
+
 func _on_menu_opened(player: int) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		_panels[player].set_menu_open(true)
@@ -758,12 +776,12 @@ func _on_mana_reserved(player: int, staff: int, amount: float) -> void:
 		_staff_reserved[player * PlayerPanelScript.STAFF_COUNT + staff] = amount
 
 
-## A press found no cast its mana pays (docs/milestones/cast-timing.md): the seat whose own wizard
+## A press found no cast its mana pays (docs/milestones/cast-timing.md): the seat whose shown body
 ## it was shows it on that staff's row.
 func _on_cast_fizzled(caster: int, staff: int) -> void:
 	if spells == null:
 		return
 	for player in PLAYER_COUNT:
-		if spells.home_of_seat(player) == caster:
+		if spells.shown_of_seat(player) == caster:
 			_panels[player].staff_fizzled(staff)
 

@@ -60,8 +60,8 @@ func before_each() -> void:
 	_hand_asks.clear()
 	_drop_asks.clear()
 	_dropped.clear()
-	_bus.staff_hand_requested.connect(func(player: int, staff: int, hand: int) -> void: _hand_asks.append([player, staff, hand]))
-	_bus.bag_drop_requested.connect(func(player: int, bag: StringName, id: StringName, staff: int) -> void: _drop_asks.append([player, bag, id, staff]))
+	_bus.staff_hand_requested.connect(func(player: int, staff: int, hand: int, _body: int) -> void: _hand_asks.append([player, staff, hand]))
+	_bus.bag_drop_requested.connect(func(player: int, bag: StringName, id: StringName, staff: int, _body: int) -> void: _drop_asks.append([player, bag, id, staff]))
 	_bus.item_drop_requested.connect(func(_actor: int, stack: ItemStack) -> void: _dropped.append(stack))
 	_hud = own((load(HUD_SCENE_PATH) as PackedScene).instantiate()) as HudScript
 	_hud.events = _bus
@@ -325,7 +325,7 @@ func test_a_wizard_said_anew_forgets_the_earlier_ones_staffs() -> void:
 	var inventory: InventoryScript = _open()
 	check(inventory.mirror().staffs().has(4), "the bag's staff is known")
 	check(_hud.get_radial(0).strip().has(4), "to the builder too")
-	_bus.inventory_announced.emit(0)
+	_bus.inventory_announced.emit(0, 0)
 	for number in [0, 1]:
 		_bus.owned_staff_changed.emit(0, number, _wizard.inventory.plan_of(number))
 	_bus.hands_changed.emit(0, PackedInt32Array([0, 1, -1, -1]))
@@ -371,3 +371,28 @@ func test_the_press_that_enters_the_staffs_puts_nothing_on_a_hand() -> void:
 	_frame()
 	check_equal(inventory.layer(), InventoryScript.Layer.STAFFS, "in the staff bag")
 	check(_hand_asks.is_empty(), "and nothing asked of a hand")
+
+
+## Items I8: the menus are the driven body's. A possession closes an open inventory (it would name a
+## staff of the body shown before), and what it shows is the possessed imp's: its staff, its empty
+## card bag; when the possession ends, the wizard's again.
+func test_a_possession_closes_the_menus_and_they_show_the_body_the_seat_drives() -> void:
+	_start()
+	var imp_data: EnemyBase = load("res://content/enemies/ember_imp/ember_imp.tres") as EnemyBase
+	var imp := imp_data.scene.instantiate() as Actor
+	imp.data = imp_data
+	imp.position = Vector2(0.0, 60.0)
+	own(_world.add(imp))
+	var inventory: InventoryScript = _open()
+	check(inventory.is_open(), "the inventory is open")
+	Possession.begin(_wizard, imp, 1.0)
+	check(not inventory.is_open(), "a possession closes it")
+	check_equal(inventory.mirror().staffs(), PackedInt32Array([0]), "it shows the imp's one staff")
+	check_equal(inventory.mirror().base_of(0).id, &"ember_imp", "the imp's own")
+	check_equal(inventory.mirror().fill_text(CARDS), "0/∞", "and its empty card bag")
+	_frame()
+	_open()
+	check(inventory.is_open(), "it opens again on the imp's things")
+	imp.possessed_by.end()
+	check(not inventory.is_open(), "the possession's end closes it")
+	check_equal(inventory.mirror().staffs(), PackedInt32Array([0, 1, 4]), "and it shows the wizard's staffs again")

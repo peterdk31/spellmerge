@@ -1,8 +1,8 @@
 class_name PossessedLook
 extends ActorLook
 ## What a possession shows over the possessed actor (actors G9; owner, 2026-10-28), so "that imp
-## is player 2's now, for 2 more seconds" reads at a glance while the corner panel stays the
-## player's own wizard:
+## is player 2's now, for 2 more seconds" reads at a glance, for the teammates too (the possessing
+## player's corner panel shows that body, items I8):
 ##
 ## - **The timer**, always: a small ring just above the character (a 32 px cell) in the style of
 ##   the wizard's revive ring: a dark outline, a Stone back ring and an arc for the time left in

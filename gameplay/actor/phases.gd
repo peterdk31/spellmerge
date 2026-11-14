@@ -8,7 +8,7 @@ extends ActorComponent
 ## Each step it checks the next phase's condition (`EnemyPhase.health_below`, a fraction of the
 ## most health, or `after_seconds` since the body appeared); the first that holds starts, once,
 ## in order. Starting one: the body is protected for its `transition` (`Health.protect`), its
-## staffs are replaced (`Caster.replace_staffs`, each pool full), its look changes (the Face's
+## staffs are replaced (`Inventory.replace_hands`, items I8: the Caster's follow; each pool full), its look changes (the Face's
 ## style and glow, the body's size; the sprite by whoever draws it, from `started`), and the
 ## controller hears it (`ActorController.phase_started`: an AI stands through the transition and
 ## takes the phase's profile).
@@ -55,7 +55,8 @@ func begin(index: int) -> void:
 		for entry: StaffCards in phase.staffs.slice(0, EnemyBase.MAX_STAFFS):
 			staffs.append(entry.staff if entry != null else null)
 			cards.append(entry.cards.duplicate() if entry != null else [])
-		actor.caster.replace_staffs(staffs, cards)
+		# Through its inventory (every actor has one), so the staffs it holds stay its Caster's (items I8).
+		actor.inventory.replace_hands(staffs, cards)
 	if phase.look != null:
 		_restyle(phase.look)
 	if actor.controller != null:

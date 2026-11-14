@@ -42,7 +42,7 @@ func before_each() -> void:
 	_focus.events = _bus
 	_focus._ready()
 	_spells = own(SpellsScript.new()) as SpellsScript
-	_bus.staff_change_requested.connect(func(player: int, staff: int, slot: int, card: StringName) -> void: _single.append([player, staff, slot, card]))
+	_bus.staff_change_requested.connect(func(player: int, staff: int, slot: int, card: StringName, _body: int) -> void: _single.append([player, staff, slot, card]))
 
 
 ## Open player 1's radial with a bag of the first `count` made-up cards (all of `kind` if set)
@@ -211,7 +211,7 @@ func test_a_wizard_said_anew_forgets_the_staffs_before() -> void:
 	check_equal(_radial.strip(), PackedInt32Array([0, 1, 2, 3, 7]), "the hands' by button, then the bag's")
 	_bus.hands_changed.emit(0, PackedInt32Array([7, 1, 2, 3]))
 	check_equal(_radial.strip(), PackedInt32Array([7, 1, 2, 3, 0]), "staff 7 on RB comes first")
-	_bus.inventory_announced.emit(0)
+	_bus.inventory_announced.emit(0, 0)
 	check_equal(_radial.strip(), PackedInt32Array(), "said anew: no staff is left from before")
 	check(not _radial.holds_staff(7), "staff 7 is forgotten")
 	_bus.owned_staff_changed.emit(0, 0, _spells.staff_view(row, staff))

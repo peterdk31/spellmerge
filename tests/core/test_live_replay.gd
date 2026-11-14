@@ -12,6 +12,8 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 
 const DT: float = 1.0 / 60.0
+## The key of the body a menu request names (items I8): any number, for the frames service.
+const BODY: int = 7
 ## The seat whose input is this machine's in these tests (the online client's).
 const LOCAL: int = 1
 
@@ -77,7 +79,7 @@ func before_each() -> void:
 	root.add_child(_bus)
 	root.add_child(_input)
 	root.add_child(_frames)
-	_bus.listen(&"staff_change_requested", func(seat: int, staff: int, slot: int, card: StringName) -> void: _heard.append([&"staff_change_requested", seat, staff, slot, card]))
+	_bus.listen(&"staff_change_requested", func(seat: int, staff: int, slot: int, card: StringName, _body: int) -> void: _heard.append([&"staff_change_requested", seat, staff, slot, card]))
 	_bus.seat_joined.connect(func(seat: int) -> void: _seats.append(seat + 1))
 	_bus.seat_left.connect(func(seat: int) -> void: _seats.append(-seat - 1))
 	_host = _hosts_run(30)
@@ -117,9 +119,9 @@ func _hosts_run(ticks: int) -> Replay:
 		if tick % 5 == 1:
 			frames[0].press(tick % 4)
 		if tick == 4:
-			frames[0].add_command(&"staff_change_requested", [1, 2, &"frost"])
+			frames[0].add_command(&"staff_change_requested", [1, 2, &"frost", BODY])
 		if tick == 9:
-			frames[1].add_command(&"staff_change_requested", [0, 0, &"bolt"])
+			frames[1].add_command(&"staff_change_requested", [0, 0, &"bolt", BODY])
 		if tick == 12:
 			frames[2].add_command(InputFrame.JOIN, [])
 			seats |= 0b0100
@@ -212,8 +214,8 @@ func test_the_local_seats_frame_is_sent_every_step() -> void:
 	check(_play(), "it plays")
 	_input.send_virtual(LOCAL, &"move_left", 1.0)
 	_input.send_virtual(LOCAL, &"staff_2", 1.0)
-	_bus.staff_change_requested.emit(LOCAL, 3, 1, &"fire")
-	_bus.staff_change_requested.emit(0, 0, 0, &"fire")
+	_bus.staff_change_requested.emit(LOCAL, 3, 1, &"fire", BODY)
+	_bus.staff_change_requested.emit(0, 0, 0, &"fire", BODY)
 	check_equal(_step(), 0, "no tick there")
 	check_equal(_feed.sent.size(), 1, "a frame all the same: one a step, while it waits too")
 	if _feed.sent.size() != 1:
@@ -222,7 +224,7 @@ func test_the_local_seats_frame_is_sent_every_step() -> void:
 	var frame: InputFrame = _sent_frame(0)
 	check_equal(frame.move_vector(), Vector2.LEFT, "the device's walk")
 	check(frame.is_pressed(1) and frame.is_held(1), "its press")
-	check_equal(frame.commands, [[&"staff_change_requested", 3, 1, &"fire"]], "the local seat's command goes out in its frame")
+	check_equal(frame.commands, [[&"staff_change_requested", 3, 1, &"fire", BODY]], "the local seat's command goes out in its frame")
 	check(_heard.is_empty(), "and nothing applies here: a command comes back in the host's frames; another seat's is dropped")
 	_feed.let_through = 3
 	_feed.asks = 3
@@ -243,14 +245,14 @@ func test_a_press_made_while_no_tick_runs_goes_out_at_the_next_step() -> void:
 	check_equal(_step(), 0, "waiting")
 	_input.send_virtual(LOCAL, &"staff_1", 1.0)
 	_input.send_virtual(LOCAL, &"staff_1", 0.0)
-	_bus.staff_change_requested.emit(LOCAL, 2, 0, &"bolt")
+	_bus.staff_change_requested.emit(LOCAL, 2, 0, &"bolt", BODY)
 	check_equal(_step(), 0, "still waiting")
 	check_equal(_feed.sent.size(), 2, "a frame each step")
 	if _feed.sent.size() != 2:
 		return
 	var frame: InputFrame = _sent_frame(1)
 	check(frame.is_pressed(0) and not frame.is_held(0), "the tap made while it waited, in the next step's frame")
-	check_equal(frame.commands, [[&"staff_change_requested", 2, 0, &"bolt"]], "and the command")
+	check_equal(frame.commands, [[&"staff_change_requested", 2, 0, &"bolt", BODY]], "and the command")
 	check(not _sent_frame(0).is_pressed(0), "not in the frame before")
 
 

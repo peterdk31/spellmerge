@@ -12,7 +12,8 @@ extends Node2D
 ##
 ## Components: found once in `_ready` among the children, at most one of each kind, none required:
 ## `health` (Health), `hurtbox` (Hurtbox), `contact` (Contact), `mover` (Mover), `caster`
-## (Caster), `inventory` (Inventory: what it holds, never stepped; items I3), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
+## (Caster), `inventory` (Inventory: what it holds, never stepped; items I3; the actor adds one when
+## its scene has none, so every actor has one, items I8), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
 ## circle when its scene has none, so every actor has one), `state_triggers` (PropStateTriggers: a prop's states,
 ## props W6; never stepped, it hears its body), plus any number of looks (ActorLook)
 ## and the first ActorController, its `home_controller`. Its `damage_numbers` (DamageNumbers,
@@ -348,7 +349,7 @@ func step(delta: float) -> void:
 		look.step(delta)
 	if home_controller != null and home_controller != controller:
 		# Its own controller is away (it drives another actor, or another drives this one): it
-		# still watches its body (a seat's panel shows its own wizard; owner, 2026-10-28).
+		# still watches its body (a seat set aside shows its own wizard on its panel).
 		home_controller.watch_home(self, delta)
 
 
@@ -393,6 +394,12 @@ func drive(guest: ActorController) -> void:
 		controller.driving = self
 		controller.started(self)
 	_tell_driver()
+
+
+## Its identity across machines (`Actors.key_of`: its id and its birth; online-ready N5), 0 while it
+## has no id. The menus name the body they show by it (items I8).
+func key() -> int:
+	return actors.key_of(id) if actors != null and id != ActorsScript.NONE else 0
 
 
 ## Give a guest controller back: the home controller drives again.
@@ -612,6 +619,14 @@ func _find_components() -> void:
 		if hurtbox != null and hurtbox.is_box():
 			footprint.fit_base(hurtbox.size, hurtbox.offset)
 		add_child(footprint)
+	if inventory == null:
+		# Every actor holds things (items I8; owner, 2026-11-14: "every actor to have one"): a seat
+		# possessing it builds, swaps and drops its staffs, and what it takes stays with the body.
+		# Added as the footprint is (a snapshot makes it again before `_ready`); an untouched one
+		# rests with its body (`Inventory.at_rest`).
+		inventory = Inventory.new()
+		inventory.name = "Inventory"
+		add_child(inventory)
 	if damage_numbers == null:
 		# Every actor shows its hits (props W5; the owner, 2026-11-10: "Add the damage numbers to
 		# every actor"): the plain numbers when its scene holds none.

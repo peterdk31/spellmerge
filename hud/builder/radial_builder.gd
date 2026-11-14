@@ -921,13 +921,13 @@ func _clear() -> void:
 func _ask_one(slot: int, id: StringName) -> void:
 	_note = ""
 	if _events != null:
-		_events.staff_change_requested.emit(index, _viewed, slot, id)
+		_events.staff_change_requested.emit(index, _viewed, slot, id, _mirror.body)
 
 
 func _ask_all(cards: Array[StringName]) -> void:
 	_note = ""
 	if _events != null:
-		_events.staff_cards_requested.emit(index, _viewed, cards)
+		_events.staff_cards_requested.emit(index, _viewed, cards, _mirror.body)
 
 
 func _say(text: String) -> void:
@@ -1045,10 +1045,10 @@ func _plan(staff: int) -> Dictionary:
 ## The seat's wizard says everything it holds anew (a wizard made again): the staffs of the one
 ## before are forgotten (regression, items I7: a staff only the run's wizard owned stayed on the
 ## strip back in the hub).
-func _on_inventory_announced(player: int) -> void:
+func _on_inventory_announced(player: int, body: int) -> void:
 	if player != index:
 		return
-	_mirror.clear()
+	_mirror.clear(body)
 	_strip = _mirror.staffs()
 	_strip_stale = true
 	_changed()

@@ -488,7 +488,7 @@ func put_on_hand(hand: int) -> void:
 	if _layer != Layer.STAFFS or entry.is_empty() or _events == null:
 		return
 	var number: int = entry["staff"]
-	_events.staff_hand_requested.emit(index, number, NONE if _mirror.hand_of(number) == hand else hand)
+	_events.staff_hand_requested.emit(index, number, NONE if _mirror.hand_of(number) == hand else hand, _mirror.body)
 
 
 ## X: drop the staff pointed at, or one copy of the card (`bag_drop_requested`).
@@ -498,17 +498,17 @@ func drop_pointed() -> void:
 		return
 	if _layer == Layer.STAFFS:
 		var base: StaffBase = _mirror.base_of(entry["staff"])
-		_events.bag_drop_requested.emit(index, _bag, base.id if base != null else &"", int(entry["staff"]))
+		_events.bag_drop_requested.emit(index, _bag, base.id if base != null else &"", int(entry["staff"]), _mirror.body)
 	elif _layer == Layer.CARDS:
-		_events.bag_drop_requested.emit(index, _bag, entry["card"], NONE)
+		_events.bag_drop_requested.emit(index, _bag, entry["card"], NONE, _mirror.body)
 
 
 # --- What it hears ----------------------------------------------------------------------
 
-func _on_inventory_announced(player: int) -> void:
+func _on_inventory_announced(player: int, body: int) -> void:
 	if player != index:
 		return
-	_mirror.clear()
+	_mirror.clear(body)
 	_refill()
 
 

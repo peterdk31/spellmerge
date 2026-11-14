@@ -187,7 +187,7 @@ func test_everyone_down_stands_up_with_their_staffs() -> void:
 		_start(count)
 		var world: Node = flow.world
 		var first := _wizards()[0]
-		events.emit_signal("staff_change_requested", PlayerController.of(first).seat, 2, 0, &"nova")
+		events.emit_signal("staff_change_requested", PlayerController.of(first).seat, 2, 0, &"nova", first.key())
 		await commands_applied()
 		for wizard in _wizards():
 			wizard.health.take(wizard.health.max_health)

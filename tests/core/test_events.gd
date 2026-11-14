@@ -12,8 +12,8 @@ const EventsScript := preload("res://core/events/events.gd")
 const EVENTS: Dictionary = {
 	# Player intent from the HUD.
 	&"play_requested": [["player", TYPE_INT]],
-	&"staff_change_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["slot", TYPE_INT], ["card_id", TYPE_STRING_NAME]],
-	&"staff_cards_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["cards", TYPE_ARRAY]],
+	&"staff_change_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["slot", TYPE_INT], ["card_id", TYPE_STRING_NAME], ["body", TYPE_INT]],
+	&"staff_cards_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["cards", TYPE_ARRAY], ["body", TYPE_INT]],
 	&"reward_pick_requested": [["player", TYPE_INT], ["choice", TYPE_INT]],
 	&"door_vote_requested": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"pause_requested": [["player", TYPE_INT], ["on", TYPE_INT]],
@@ -56,10 +56,10 @@ const EVENTS: Dictionary = {
 	&"item_near_changed": [["player", TYPE_INT], ["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
 	&"item_refused": [["player", TYPE_INT], ["item", TYPE_INT]],
 	# The inventory menu (items I7).
-	&"staff_hand_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["hand", TYPE_INT]],
-	&"bag_drop_requested": [["player", TYPE_INT], ["bag", TYPE_STRING_NAME], ["id", TYPE_STRING_NAME], ["staff", TYPE_INT]],
+	&"staff_hand_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["hand", TYPE_INT], ["body", TYPE_INT]],
+	&"bag_drop_requested": [["player", TYPE_INT], ["bag", TYPE_STRING_NAME], ["id", TYPE_STRING_NAME], ["staff", TYPE_INT], ["body", TYPE_INT]],
 	&"inventory_refused": [["player", TYPE_INT], ["reason", TYPE_STRING]],
-	&"inventory_announced": [["player", TYPE_INT]],
+	&"inventory_announced": [["player", TYPE_INT], ["body", TYPE_INT]],
 	&"pad_wait_changed": [["seats", TYPE_INT]],
 	# Seats.
 	&"seat_joined": [["player", TYPE_INT]],

@@ -5,13 +5,15 @@ extends "res://tests/support/suite.gd"
 ## into the bag; a card into the bag), and without room nothing is taken and the seat hears
 ## `item_refused`; two seats asking for one item in one tick: the first in seat order takes it; a
 ## drop lands a step from the body, away from the next item and never in a wall; a run's start
-## clears the ground; a snapshot with items lying comes back the same and says them again.
+## clears the ground; a snapshot with items lying comes back the same and says them again; a possessed
+## enemy's things are the seat's to rebuild, drop and take (items I8).
 ##
 ## godot --headless --path . --script res://tests/gameplay/items/test_items.gd
 
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const ItemsScript := preload("res://gameplay/items/items.gd")
 const WILD_STAR: StaffItem = preload("res://content/items/staffs/wild_star/wild_star.tres")
+const IMP: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 const CARDS: StringName = &"cards"
 const STAFFS: StringName = &"staffs"
@@ -207,7 +209,7 @@ func test_a_drop_from_the_inventory_lands_apart_from_the_item_in_reach() -> void
 	var near: int = _items.lay(ItemStack.card(&"bolt"), Vector2(100, 92))
 	_tick()
 	check_equal(_items.near_of(0), near, "the bolt is in reach")
-	_world.bus.bag_drop_requested.emit(0, CARDS, &"fire", Inventory.NO_STAFF)
+	_world.bus.bag_drop_requested.emit(0, CARDS, &"fire", Inventory.NO_STAFF, _world.body_key(0))
 	_tick()
 	var fire: GroundItem = _items.lying().back()
 	check_equal(fire.stack.id, &"fire", "the fire lies there")
@@ -216,7 +218,7 @@ func test_a_drop_from_the_inventory_lands_apart_from_the_item_in_reach() -> void
 	check_equal(_items.near_of(0), near, "the bolt is still the one in reach")
 	body.caster.set_mana(0, 33.0)
 	body.inventory.set_cards(0, [] as Array[StringName])
-	_world.bus.bag_drop_requested.emit(0, STAFFS, &"test", 0)
+	_world.bus.bag_drop_requested.emit(0, STAFFS, &"test", 0, _world.body_key(0))
 	_tick()
 	var staff: GroundItem = _items.lying().back()
 	check_equal(staff.stack.kind, ItemKinds.STAFF, "the staff lies there")
@@ -225,6 +227,49 @@ func test_a_drop_from_the_inventory_lands_apart_from_the_item_in_reach() -> void
 	check_equal(_items.take(body.id, staff.number), ItemsScript.Take.TAKEN, "taken again")
 	check(body.caster.holds(0), "back on a free hand")
 	check_equal(body.caster.mana_of(0), 33.0, "as it left")
+
+
+## Items I8: while a seat possesses an enemy its menus are that body's: the enemy's staff is rebuilt
+## (the card taken out goes into its own bag), dropped, and taken by the wizard afterwards; what the
+## enemy takes meanwhile goes into its own inventory.
+func test_a_possessed_enemys_staff_is_rebuilt_dropped_and_taken_by_the_wizard_after() -> void:
+	var body := _wizard(0, Vector2(100, 100), [false, false, false, false], {&"bolt": 1})
+	var imp := IMP.scene.instantiate() as Actor
+	imp.data = IMP
+	imp.position = Vector2(160, 100)
+	_world.add(imp)
+	check(Possession.begin(body, imp, 5.0) != null, "the seat possesses the imp")
+	_world.bus.staff_cards_requested.emit(0, 0, [&"bolt"] as Array[StringName], _world.body_key(0))
+	_tick()
+	check_equal(imp.caster.cards_of(0), [&"bolt", &""] as Array[StringName], "the builder builds the imp's staff")
+	check_equal(imp.inventory.count_of(CARDS, &"fire"), 1, "the fire taken out is in the imp's card bag")
+	check(body.inventory.count_of(CARDS, &"fire") == 0, "not the wizard's")
+	_world.bus.bag_drop_requested.emit(0, CARDS, &"fire", Inventory.NO_STAFF, _world.body_key(0))
+	_tick()
+	var fire: GroundItem = _items.lying().back()
+	check_equal(fire.stack.id, &"fire", "the inventory drops the imp's card")
+	imp.position = fire.at
+	_tick()
+	check_equal(_items.near_of(0), fire.number, "the card is in reach of the body the seat drives")
+	_ask(0, fire.number)
+	_tick()
+	check_equal(imp.inventory.count_of(CARDS, &"fire"), 1, "what the possessed imp takes goes into its own bag")
+	_world.bus.bag_drop_requested.emit(0, STAFFS, &"ember_imp", 0, _world.body_key(0))
+	_tick()
+	var staff: GroundItem = _items.lying().back()
+	check_equal([staff.stack.kind, staff.stack.id], [ItemKinds.STAFF, &"ember_imp"], "the imp's staff lies there")
+	check_equal(staff.stack.cards, [&"bolt", &""] as Array[StringName], "as it was built")
+	check(not imp.caster.holds(0), "off the imp's hand")
+	imp.possessed_by.end()
+	check_equal(_world.table.actor_of_seat(0), body.id, "the possession is over: the seat drives its wizard")
+	body.position = staff.at
+	_tick()
+	_ask(0, staff.number)
+	_tick()
+	check(body.caster.holds(0), "the wizard takes the imp's staff onto its free hand")
+	check_equal(body.caster.cards_of(0), [&"bolt", &""] as Array[StringName], "with the imp's build")
+	check_equal(body.caster.staff_of(0).id, &"ember_imp", "the imp's own staff")
+	check_equal(imp.inventory.count_of(CARDS, &"fire"), 1, "the imp keeps what it took")
 
 
 ## Regression (review): cards dropped together never pile up: each lands on a spot of its own.

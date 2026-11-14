@@ -13,6 +13,9 @@ extends RefCounted
 ##     mirror.hear_bag(bag, ids, counts, capacity)
 ##     mirror.hear_staff(number, plan)        # an empty plan: no longer owned
 ##     mirror.hear_hands(hands)
+##
+## - **The body** (`inventory_announced`, items I8): the key of the body all this is of (`body`),
+##   which the menus send with their requests so the seat refuses one for a body it no longer shows.
 
 const NONE: int = -1
 const HANDS: int = 4
@@ -25,6 +28,8 @@ var _bags: Dictionary = {}
 var _plans: Dictionary = {}
 ## By hand (button): the number on it, NONE for none.
 var _hands: PackedInt32Array = PackedInt32Array([NONE, NONE, NONE, NONE])
+## The key of the body it mirrors (`Actor.key`, from `inventory_announced`; 0 before any).
+var body: int = 0
 
 
 ## Bag `bag` holds `ids` with `counts` copies each and has room for `capacity` copies (-1: no limit).
@@ -46,8 +51,9 @@ func hear_hands(hands: PackedInt32Array) -> void:
 		_hands[hand] = hands[hand] if hand < hands.size() else NONE
 
 
-## Forget everything (a run ended: its wizard is gone).
-func clear() -> void:
+## Forget everything (a run ended: its wizard is gone), and mirror the body `of` from now on.
+func clear(of: int = 0) -> void:
+	body = of
 	_bags.clear()
 	_plans.clear()
 	_hands.fill(NONE)

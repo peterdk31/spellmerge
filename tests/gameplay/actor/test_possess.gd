@@ -7,9 +7,10 @@ extends "res://tests/support/suite.gd"
 ## target starts; the controller then moves to its next oldest body, else home, else waits behind
 ## whoever possesses its home; an enemy's controller possesses a wizard the same way (a scripted
 ## controller stands in for the AI), and goes on after its body dies; and `Actor.drive` never
-## leaves a controller on two bodies. The HUD stays the player's (owner, 2026-10-28): the seat's numbers, its corner panel
-## (a real Hud) and its builder are its own wizard's, live, while it drives an imp and while an AI
-## drives the wizard; the PossessedLook draws bars and the timer over a seat-driven imp, only the
+## leaves a controller on two bodies. The HUD follows the driven body (items I8; owner, 2026-11-13,
+## replacing "the HUD stays the player's" of 2026-10-28): the seat's numbers, its corner panel (a
+## real Hud) and its builder are the imp's, live, while it drives an imp, and its own wizard's while
+## an AI drives the wizard; the PossessedLook draws bars and the timer over a seat-driven imp, only the
 ## timer over an AI-driven wizard. Real wizard scene, real Spells and registry (the `possess` card).
 ##
 ## godot --headless --path . --script res://tests/gameplay/actor/test_possess.gd
@@ -118,7 +119,7 @@ func test_a_wizard_possesses_the_imp_its_bolt_hits_and_casts_its_staff_from_the_
 	check_equal(table.seat_of(wizard.id), ActorsScript.NONE, "the body has no seat")
 	check_equal(table.team_of(wizard.id), ActorsScript.TEAM_WIZARDS, "and keeps its home team")
 	check(imp.possessed_by != null and is_equal_approx(imp.possessed_by.seconds, SECONDS), "for the card's %s s" % SECONDS)
-	check(not _stats.has([0, 50, 50]), "seat 0's numbers never become the imp's: %s" % [_stats])
+	check(_stats.has([0, 50, 50]), "seat 0's numbers become the imp's (items I8): %s" % [_stats])
 	# The seat's first button casts the imp's staff, with the imp's mana.
 	_staff_casts.clear()
 	var mana: float = imp.caster.mana_of(0)
@@ -135,10 +136,10 @@ func test_a_wizard_possesses_the_imp_its_bolt_hits_and_casts_its_staff_from_the_
 	_stats.clear()
 	_world.hurt(wizard, 10)
 	check_equal(wizard.health.health, 90, "the standing body takes hits")
-	check_equal(_stats, [[0, 90, 100]], "which are seat 0's numbers still (the HUD is the player's own wizard)")
+	check(_stats.is_empty(), "which are not seat 0's numbers now (the HUD is the driven imp's): %s" % [_stats])
 	_stats.clear()
 	_world.hurt(imp, 5)
-	check(_stats.is_empty(), "a hit on the imp is not: %s" % [_stats])
+	check(_stats.size() == 1 and _stats[0][0] == 0 and _stats[0][2] == 50, "a hit on the imp is: %s" % [_stats])
 	check(imp.controller == seat, "a hit on the body does not end it")
 	check(_look(imp) != null, "the possession is drawn over the imp")
 
@@ -332,14 +333,17 @@ func test_a_possession_from_the_driven_body_adds_a_puppet_and_the_seat_moves_on_
 	_world.run(8)
 	check(far.controller is PuppetController, "the far imp is a puppet")
 	check(near.controller == seat, "the seat stays in the oldest, the near imp")
+	check(seat.shown() == near, "its HUD is the first one hit (items I8)")
 	check(wizard.controller == null, "and the wizard's body still stands")
 	# The near one dies: the seat moves on to the far imp, not home.
 	near.health.take(500, 0)
 	check(far.controller == seat, "the seat moves on to the far imp")
 	check(wizard.controller == null, "not yet home")
 	check_equal(_world.table.actor_of_seat(0), far.id, "seat 0 is on the far imp")
+	check(seat.shown() == far and far.health.changed.is_connected(seat._on_health_changed), "its HUD moves on with it")
 	_world.run(int(SECONDS / Fixture.STEP) + 1)
 	check(wizard.controller == seat, "then home")
+	check(seat.shown() == wizard and wizard.health.changed.is_connected(seat._on_health_changed), "and its HUD with it")
 	check(far.controller == _brain(far), "and the far imp has its own controller")
 
 
@@ -353,11 +357,13 @@ func test_when_the_driven_body_is_stolen_the_seat_moves_on() -> void:
 	Possession.begin(second, near, SECONDS)
 	check(near.controller == _seat(second), "seat 1 took the near imp")
 	check(far.controller == _seat(first), "seat 0 moved on to the far one")
+	check(_seat(first).shown() == far and _seat(second).shown() == near, "each seat's HUD is the body it drives (items I8)")
 	check(first.controller == null, "seat 0's wizard still stands")
 	Possession.begin(second, far, SECONDS)
 	check(far.controller is PuppetController and (far.controller as PuppetController).leader_controller == _seat(second),
 		"seat 1 steals the far one too, as its puppet")
 	check(first.controller == _seat(first), "and seat 0, with nothing left, is home")
+	check(_seat(first).shown() == first, "its HUD too")
 
 
 func test_a_seat_with_nothing_left_waits_behind_whoever_possesses_its_wizard() -> void:
@@ -371,6 +377,8 @@ func test_a_seat_with_nothing_left_waits_behind_whoever_possesses_its_wizard() -
 	_world.run(int(1.0 / Fixture.STEP) + 1)
 	check(imp.controller == _brain(imp), "seat 0's possession of the imp is over")
 	check(seat.driving == null and seat.is_set_aside(), "seat 0 waits: it drives nothing")
+	check(seat.shown() == wizard and wizard.health.changed.is_connected(seat._on_health_changed), "and its HUD is its wizard meanwhile (items I8)")
+	check(not imp.health.changed.is_connected(seat._on_health_changed), "not the imp it left")
 	check(wizard.controller == _brain(other), "while the imp's controller goes on")
 	_world.run(int(1.0 / Fixture.STEP) + 1)
 	check(wizard.controller == seat, "then seat 0 is home")
@@ -405,25 +413,81 @@ func test_an_enemy_possesses_a_wizard_and_its_controller_drives_it() -> void:
 
 # --- The builder during a possession ----------------------------------------------------
 
-func test_the_builder_edits_the_home_wizard_while_the_seat_drives_an_imp() -> void:
+func test_the_builder_edits_the_driven_ember_imp_and_what_it_takes_out_stays_with_it() -> void:
 	var wizard := _world.wizard(0)
-	var imp := _imp(Vector2(0.0, 60.0), [[&"possess", &"bolt"]])
-	var row: Array[StringName] = imp.caster.cards_of(0)
+	var imp := _ember_imp(Vector2(0.0, 60.0))
+	check(imp.inventory != null, "an enemy with staffs has an inventory (items I8)")
+	check_equal(imp.inventory.hands(), PackedInt32Array([0, -1, -1, -1]), "its staff on its first hand, numbered by it")
+	var wizard_row: Array[StringName] = wizard.caster.cards_of(0)
 	var changed: Array = []
+	var refused: Array = []
 	_world.bus.staff_changed.connect(func(p: int, at: int, plan: Dictionary) -> void: changed.append([p, at, plan.get("cards")]))
+	_world.bus.build_refused.connect(func(p: int, why: String) -> void: refused.append([p, why]))
 	Possession.begin(wizard, imp, 1.0)
-	check(changed.is_empty(), "driving the imp announces none of its staffs: %s" % [changed])
-	_world.bus.staff_cards_requested.emit(0, 0, _cards("bolt"))
-	check_equal(wizard.caster.cards_of(0)[0], &"bolt", "seat 0's builder builds the wizard's staff")
-	check_equal(imp.caster.cards_of(0), row, "not the imp's")
-	check(changed.size() == 1 and changed[0][0] == 0 and changed[0][1] == 0 and changed[0][2] == _cards("bolt - - -"),
-		"the panel and builder hear the wizard's new staff: %s" % [changed])
-	_world.bus.staff_cards_requested.emit(0, 3, _cards("bolt"))
-	check(wizard.caster.has_staff(3), "a staff the imp does not have is the wizard's to build")
+	check(changed.has([0, 0, _cards("fire bolt")]), "driving the imp announces its staff to the seat: %s" % [changed])
+	check(changed.has([0, 1, null]), "and empty rows for the hands it has not: %s" % [changed])
+	_world.bus.staff_cards_requested.emit(0, 0, _cards("bolt"), _world.body_key(0))
+	check_equal(imp.caster.cards_of(0), _cards("bolt -"), "seat 0's builder builds the imp's staff")
+	check_equal(imp.inventory.count_of(&"cards", &"fire"), 1, "the card taken out is in the imp's card bag")
+	check_equal(wizard.caster.cards_of(0), wizard_row, "the wizard's staff is as it was")
+	_world.bus.staff_cards_requested.emit(0, 3, _cards("bolt"), _world.body_key(0))
+	check_equal(refused, [[0, PlayerController.NO_STAFF]], "a staff only the wizard has is not the seat's to build now")
 	_world.run(int(1.0 / Fixture.STEP) + 1)
 	check(wizard.controller == _seat(wizard), "after the possession")
-	check_equal(wizard.caster.cards_of(0)[0], &"bolt", "the wizard keeps what was built")
-	check_equal(imp.caster.cards_of(0), row, "and the imp its own")
+	check_equal(imp.caster.cards_of(0), _cards("bolt -"), "the imp keeps what was built")
+	check_equal(imp.inventory.count_of(&"cards", &"fire"), 1, "and what was taken out")
+	check(changed.back()[0] == 0 and changed.has([0, 0, wizard_row]), "home again, the seat's panel hears the wizard's staffs: %s" % [changed])
+	_world.bus.staff_cards_requested.emit(0, 3, _cards("bolt"), _world.body_key(0))
+	check(wizard.caster.has_staff(3), "and its builder builds the wizard again")
+
+
+## Regression (review, items I8): a menu's request names the body its menu showed, so one sent just
+## before a possession began (a late frame online) never changes the possessed body's staff of the
+## same number: it is refused, and the one sent for the body shown now is heard.
+func test_a_request_for_the_body_shown_before_is_refused() -> void:
+	var wizard := _world.wizard(0)
+	var imp := _ember_imp(Vector2(0.0, 60.0))
+	var refused: Array = []
+	var dropped: Array = []
+	_world.bus.build_refused.connect(func(p: int, why: String) -> void: refused.append([p, why]))
+	_world.bus.inventory_refused.connect(func(p: int, why: String) -> void: refused.append([p, why]))
+	_world.bus.item_drop_requested.connect(func(_by: int, stack: ItemStack) -> void: dropped.append(stack.id))
+	var wizard_key: int = _world.body_key(0)
+	check_equal(wizard_key, wizard.key(), "the seat's menus name its wizard")
+	Possession.begin(wizard, imp, 1.0)
+	check_equal(_world.body_key(0), imp.key(), "and the imp once the seat drives it")
+	var row: Array[StringName] = imp.caster.cards_of(0)
+	_world.bus.staff_cards_requested.emit(0, 0, [] as Array[StringName], wizard_key)
+	_world.bus.bag_drop_requested.emit(0, &"staffs", &"ember_imp", 0, wizard_key)
+	check_equal(imp.caster.cards_of(0), row, "a build sent for the wizard leaves the imp's staff 0 as it was")
+	check(imp.caster.holds(0) and dropped.is_empty(), "a drop sent for the wizard drops nothing of the imp's")
+	check_equal(refused, [[0, PlayerController.NO_BODY], [0, PlayerController.NO_BODY]], "both refused, with why")
+	_world.bus.staff_cards_requested.emit(0, 0, [&"bolt"] as Array[StringName], imp.key())
+	check_equal(imp.caster.cards_of(0), _cards("bolt -"), "one sent for the imp is heard")
+
+
+func test_a_bosss_phase_swaps_its_staffs_through_its_inventory() -> void:
+	var data := ImpData.duplicate() as EnemyBase
+	var rod: StaffBase = data.staffs[0].staff
+	var phase := EnemyPhase.new()
+	for row: Array[StringName] in [_cards("bolt bolt"), _cards("fire")]:
+		var entry := StaffCards.new()
+		entry.staff = rod
+		entry.cards = row
+		phase.staffs.append(entry)
+	data.phases = [phase] as Array[EnemyPhase]
+	var imp := _ember_imp(Vector2(0.0, 60.0), data)
+	var said: Array = []
+	imp.inventory.staff_changed.connect(func(number: int) -> void: said.append(number))
+	imp.phases.begin(0)
+	check_equal(imp.caster.cards_of(0), _cards("bolt bolt"), "the Caster holds the phase's staffs")
+	check_equal(imp.caster.cards_of(1), _cards("fire -"), "every one of them")
+	check_equal(imp.inventory.hands(), PackedInt32Array([4, 5, -1, -1]), "the inventory holds them, numbered anew")
+	check_equal(imp.inventory.cards_of(4), _cards("bolt bolt"), "with the cards the Caster built")
+	check(not imp.inventory.numbers().has(0), "the staff it held before is gone")
+	check_equal(said, [0, 4, 5], "each staff gone or come is said")
+	check_equal(imp.inventory.set_cards(5, _cards("- -")), Inventory.Refusal.NONE, "and a phase's staff is built like any other")
+	check_equal(imp.caster.cards_of(1), _cards("- -"), "into the Caster")
 
 
 func test_the_builder_edits_the_wizard_an_ai_drives_and_the_change_stays() -> void:
@@ -431,14 +495,14 @@ func test_the_builder_edits_the_wizard_an_ai_drives_and_the_change_stays() -> vo
 	var imp := _imp(Vector2(0.0, 60.0))
 	Possession.begin(imp, wizard, 1.0)
 	check(wizard.controller == _brain(imp), "the imp's controller drives the wizard")
-	_world.bus.staff_cards_requested.emit(0, 1, _cards("fire bolt"))
+	_world.bus.staff_cards_requested.emit(0, 1, _cards("fire bolt"), _world.body_key(0))
 	check_equal(wizard.caster.cards_of(1), _cards("fire bolt - -"), "seat 0's builder builds its own wizard")
 	_world.run(int(1.0 / Fixture.STEP) + 1)
 	check(wizard.controller == _seat(wizard), "after the possession")
 	check_equal(wizard.caster.cards_of(1), _cards("fire bolt - -"), "nothing undoes the player's change")
 
 
-# --- The HUD stays the player's ---------------------------------------------------------
+# --- The HUD follows the driven body ---------------------------------------------------------
 
 ## A real Hud on the world's bus and spell runtime, with seat 0 joined and a room entered.
 func _hud() -> HudScript:
@@ -454,7 +518,7 @@ func _hud() -> HudScript:
 	return hud
 
 
-func test_the_panel_shows_the_home_wizards_live_health_while_the_seat_drives_an_imp() -> void:
+func test_the_panel_shows_the_driven_imp_and_the_wizard_again_when_it_ends() -> void:
 	var hud := _hud()
 	var wizard := _world.wizard(0, Vector2.ZERO, [[&"bolt"], [], [], []])
 	var imp := _imp(Vector2(0.0, 60.0), [[&"bolt"], [&"bolt"]])
@@ -463,20 +527,28 @@ func test_the_panel_shows_the_home_wizards_live_health_while_the_seat_drives_an_
 	Possession.begin(wizard, imp, SECONDS)
 	_world.run(2)
 	check(imp.controller == _seat(wizard), "seat 0 drives the imp")
-	check_equal(panel.health(), 100, "the panel still shows the wizard, not the imp's 50")
+	check_equal(panel.health(), 50, "the panel shows the imp the seat drives (items I8)")
+	check_equal(hud.get_vignette().strength, 0.0, "the change of body is no hit: no red flash (review)")
 	_world.hurt(wizard, 30)
-	check_equal(panel.health(), 70, "a hit on the standing wizard shows on its player's panel at once")
+	check_equal(panel.health(), 50, "a hit on the standing wizard is not on the panel (it shows over the wizard)")
 	_world.hurt(imp, 10)
-	check_equal(panel.health(), 70, "a hit on the imp does not")
-	check_equal(panel.shown_rows(), 1, "the rows are the wizard's one staff, not the imp's two")
-	# The rows' timing is read by the wizard's actor id, not the imp's the seat drives.
-	check_equal(_world.spells.home_of_seat(0), wizard.id, "Spells finds seat 0's own wizard for the rows' timing")
-	check_equal(_world.table.actor_of_seat(0), imp.id, "while the seat drives the imp")
+	check_equal(panel.health(), 40, "a hit on the imp is, at once")
+	check_equal(panel.shown_rows(), 2, "the rows are the imp's two staffs")
+	# The rows' timing is read by the imp's actor id, the body the seat drives.
+	check_equal(_world.spells.shown_of_seat(0), imp.id, "Spells finds the imp for the rows' timing")
+	check_equal(_world.spells.home_of_seat(0), wizard.id, "while the wizard is still the seat's own")
 	_tap(0, &"staff_1")
 	_world.run(1)
 	hud.step_staffs()
 	check(imp.caster.mana_of(0) < imp.caster.max_mana_of(0), "seat 0's button casts the imp's staff")
 	check_equal(wizard.caster.mana_of(0), wizard.caster.max_mana_of(0), "not the wizard's")
+	var glow: float = hud.get_vignette().strength
+	_world.run(int(SECONDS / Fixture.STEP) + 1)
+	check(wizard.controller == _seat(wizard), "the possession is over")
+	check_equal(panel.health(), 70, "the panel is back on the wizard, with its hit")
+	check_equal(hud.get_vignette().strength, glow, "coming home to a hurt wizard flashes nothing more")
+	check_equal(panel.shown_rows(), 1, "and its one staff")
+	check_equal(_world.spells.shown_of_seat(0), wizard.id, "the rows' timing too")
 
 
 func test_the_panel_keeps_the_players_live_stats_while_an_ai_drives_the_wizard() -> void:
@@ -558,18 +630,40 @@ func test_drive_never_leaves_a_controller_on_two_bodies() -> void:
 	check(wizard.controller == null, "taken off the wizard")
 	check(seat.driving == imp, "it drives the imp")
 	check(not wizard.caster.cast_done.is_connected(seat._on_cast_done), "the wizard's casts are not bound to it")
-	check(wizard.health.changed.is_connected(seat._on_health_changed), "its health stays bound (the panel is the wizard's)")
+	check(not wizard.health.changed.is_connected(seat._on_health_changed), "nor its health (the panel is the driven body's, items I8)")
+	check(imp.health.changed.is_connected(seat._on_health_changed), "the imp's health is")
 	check(imp.caster.cast_done.is_connected(seat._on_cast_done), "the imp's is")
 	check_equal(_world.table.seat_of(wizard.id), ActorsScript.NONE, "the wizard has no seat in the table")
 	wizard.drive(seat)
 	check(imp.controller == null and wizard.controller == seat, "and back, never on both")
 	check(not imp.caster.cast_done.is_connected(seat._on_cast_done), "the imp's caster is let go")
+	check(not imp.health.changed.is_connected(seat._on_health_changed), "nor its health")
 	_stats.clear()
 	_world.hurt(imp, 5)
 	check(_stats.is_empty(), "the imp's hits are not the seat's: %s" % [_stats])
 	_world.hurt(wizard, 5)
 	check(not _stats.is_empty() and _stats.back() == [0, 95, 100], "the wizard's are, once each")
 	check_equal(_stats.size(), 1, "sent once, not twice")
+
+
+## A restored snapshot can hand the seat another body than the one it heard (online-ready N10):
+## `rebuild_derived` moves its watch to the shown body and says that body's things again.
+func test_a_restore_moves_the_seats_watch_to_the_body_it_drives() -> void:
+	var wizard := _world.wizard(0)
+	var imp := _imp(Vector2(0.0, 60.0))
+	var seat := _seat(wizard)
+	Possession.begin(wizard, imp, SECONDS)
+	# As a restore leaves it: the seat drives the imp, but still hears the wizard.
+	seat._watch(wizard)
+	var said: Array = []
+	_world.bus.inventory_announced.connect(func(p: int, _body: int) -> void: said.append(p))
+	seat.rebuild_derived()
+	check(imp.health.changed.is_connected(seat._on_health_changed), "it hears the imp's health")
+	check(not wizard.health.changed.is_connected(seat._on_health_changed), "not the wizard's")
+	check_equal(said, [0], "and says the imp's things to the seat's HUD again")
+	said.clear()
+	seat.rebuild_derived()
+	check(said.is_empty(), "nothing when the watch is right already")
 
 
 # --- The real enemy (G6: an Actor driven by its AIController) ----------------------------------

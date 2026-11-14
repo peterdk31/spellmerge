@@ -3,7 +3,8 @@ extends "res://tests/support/suite.gd"
 ## was made with, numbered by button; bags and their capacity in copies; cards stack, staffs are
 ## numbered; a staff on a hand goes into the Caster when its cards change, and one in the bag is
 ## never installed; every change is counted and said; its player loadout (items I4) and a wizard
-## made from one; its bags' capacities from the run's rules.
+## made from one; its bags' capacities from the run's rules; every actor has one, and a body with no
+## Caster has no hands (items I8).
 ##
 ## godot --headless --path . --script res://tests/gameplay/actor/test_inventory.gd
 
@@ -308,3 +309,21 @@ func test_the_dev_bag_is_every_card_the_registry_finds() -> void:
 			cards += 1
 	check_equal(bag.size(), cards, "every card")
 	check(bag.values().all(func(copies: Variant) -> bool: return int(copies) == Inventory.DEV_COPIES), "DEV_COPIES of each")
+
+
+## Items I8: every actor has an inventory (the actor adds one when its scene has none), and hands
+## are a Caster's: a body that cannot cast keeps a staff in its bag and has no hand to put it on.
+func test_every_actor_has_an_inventory_and_one_with_no_caster_has_no_hands() -> void:
+	var body := Actor.new()
+	body.add_child(Health.new())
+	_world.add(body)
+	check(body.inventory != null, "an actor made with no Inventory has one")
+	check(body.inventory.at_rest(), "untouched, it is as made")
+	check_equal(body.inventory.free_hand(), -1, "with no Caster, no hand is free")
+	var stack := ItemStack.of_staff(_staff)
+	check(not body.inventory.put_on_hand(stack, 0), "a staff goes on no hand")
+	check(PickupRule.take(body.inventory, stack), "a pickup puts it in the bag")
+	check_equal(body.inventory.hands(), PackedInt32Array([-1, -1, -1, -1]), "every hand empty")
+	var number: int = body.inventory.numbers()[0]
+	check_equal(body.inventory.set_hand(number, 0), Inventory.Refusal.NO_HAND, "and no hand takes it from the bag")
+	check(not body.inventory.at_rest(), "it is no longer as made")

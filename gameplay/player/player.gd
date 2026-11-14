@@ -7,9 +7,12 @@ extends ActorController
 ## `Frames.frame_of`; online-ready N2) and never looks at another seat, so nobody waits for anybody.
 ##
 ## It IS the seat: the HUD, the builder and the rest of the game hear a seat only from here.
-## The seat's panel and builder are always its own wizard, its **home body** (the actor whose
-## home controller it is): its input drives whatever actor it drives now, but what the player
-## sees and builds is the wizard, which may stand vulnerable meanwhile (owner, 2026-10-28).
+## What the seat's panel, builder and inventory are about is its **shown body** (`shown`, items I8;
+## owner, 2026-11-13, decision 10, which replaces "always its own wizard" of 2026-10-28): the body
+## it drives now, the first one hit when it possesses several (`Possession`: a controller drives its
+## oldest), and its **home body** (the actor whose home controller it is, its wizard) while it
+## drives nothing (another controller drives the wizard, or it drives nothing yet). Its own wizard,
+## which may stand vulnerable meanwhile, shows its health over its head (Feel's away bar).
 ##
 ## - **Frame to intent** (`think`): the seat's `InputFrame` for this tick, never a device. What a
 ##   device says becomes a frame in front of it (`LocalInput`, core/input: the walk, the aim with
@@ -22,17 +25,16 @@ extends ActorController
 ##   press, or a hold while no sustained card is on). While the frame says captured (an overlay of
 ##   the seat is open) the move in progress stops (`Mover.stop`), the intent is empty and the
 ##   buffer forgets; while the actor is down, too.
-## - **The panel's events** (always from the home body, also while the seat drives another actor
-##   or another controller drives the wizard): `player_stats_changed` (when it first drives the
-##   wizard and each time it comes home, on a health change, when the mana of the staff on show
-##   crosses a whole number and when another staff goes on show; every staff has its own pool),
-##   `staff_mana_changed` (each staff's pool, when it crosses a whole number): the mana is looked
-##   at each step, in `think` or, while away, `watch_home`, so a regen shows a
-##   step later), `staff_changed` with the plain view of every hand's staff (`Caster.plan_of`),
-##   and `build_refused`.
-## - **The inventory's events** (the home body's `Inventory`, items I3; all of them when it first
-##   drives the wizard and each time it comes home, after `inventory_announced`, then on every
-##   change): `bag_changed` for each
+## - **The panel's events** (from the shown body; all of them each time the shown body changes, then
+##   on every change): `player_stats_changed` (on a health change, when the mana of the staff on
+##   show crosses a whole number and when another staff goes on show; every staff has its own
+##   pool), `staff_mana_changed` (each staff's pool, when it crosses a whole number): the mana is
+##   looked at each step, in `think` or, while the seat is set aside, `watch_home`, so a regen
+##   shows a step later), `staff_changed` with the plain view of every hand's staff
+##   (`Caster.plan_of`; an empty one for a hand it has not), and `build_refused`.
+## - **The inventory's events** (the shown body's `Inventory`, items I3; all of them each time the
+##   shown body changes, after `inventory_announced`, then on every change; every actor has one):
+##   `bag_changed` for each
 ##   bag (its ids, counts and capacity), `owned_staff_changed` for each staff it owns, by its number
 ##   (`Inventory.plan_of`, empty once it went), and `hands_changed` (which number is on which hand).
 ## - **The cast events** (from the actor it drives now, whose staffs its buttons cast): `spell_cast`
@@ -40,29 +42,38 @@ extends ActorController
 ##   from `core/registry`, nothing on null).
 ## - **The builder** (`staff_change_requested` and `staff_cards_requested`, each for this seat
 ##   only and naming a staff by its number; commands, heard at the tick's start: core/events
-##   `listen`) builds the home body's staffs through its inventory (`Inventory.set_card`,
-##   `set_cards`: counted, and a staff on a hand goes into the Caster), also during a possession.
+##   `listen`) builds the shown body's staffs through its inventory (`Inventory.set_card`,
+##   `set_cards`: counted, and a staff on a hand goes into the Caster): a possessed enemy's during
+##   a possession, its cards taken out going into that body's card bag (items I8).
 ##   A refusal is sent as `build_refused` with its words (NO_STAFF, NO_SLOT, NO_CARD); a card given back to a full
 ##   bag is dropped at the body's feet (items I6), never refused.
 ## - **The inventory menu** (items I7: `staff_hand_requested` and `bag_drop_requested`, commands for
-##   this seat only, a staff named by its number) puts the home body's staffs on hands, in the bag
+##   this seat only, a staff named by its number) puts the shown body's staffs on hands, in the bag
 ##   and on the ground, and drops its things (`Inventory.set_hand`, `drop_staff`, `drop`); a
 ##   refusal is `inventory_refused` with its words.
-## - **Down** (items I7b): while the home body is down every request of the builder's and the
+## - **Down** (items I7b): while the shown body is down every request of the builder's and the
 ##   inventory's is refused (NO_DOWN, as `build_refused` or `inventory_refused`) and changes nothing.
+## - **The body named** (items I8): each of those four requests carries the key of the body the menu
+##   showed (`Actor.key`, sent with `inventory_announced`); one for a body the seat no longer shows
+##   (sent just before a possession began or ended, a late frame online) is refused (NO_BODY), so
+##   it never changes another body's staff of the same number.
 ## - **The card bag** (each run mode's, from flow through `seat_wizard`: card id to copies,
 ##   `Inventory.give_cards`); a wizard given none gets Inventory.DEV_COPIES of every card in the
 ##   registry when it first drives.
 ## - **Possessed** (G9): when another actor's controller takes the actor it drives, it is set aside
 ##   (`set_aside`, `is_set_aside`) and drives nothing until `started` hands it an actor again; the
-##   panel goes on showing the wizard, and the time is drawn over the wizard (`PossessedLook`).
+##   panel shows the wizard (its home body) meanwhile, and the time is drawn over the wizard
+##   (`PossessedLook`).
 ##
 ## Its seat is in the actor table through the actor it drives (`Actor.seat`, `Actors.set_driver`),
 ## so Spells' budgets (and `mana_reserved`, which no HUD reads yet) reach this seat while it drives;
-## the HUD finds the home body by `Actors.home_of_seat`. It binds the home body's Health, Caster and
-## the builder's requests once, when it first drives it (it is a node of that body, so they go
-## together), and the driven actor's casts in `started`, letting go in `stopped`; it works the same
-## on any actor with a Caster, Health and Mover (each optional). Nothing here allocates per step.
+## the HUD finds the shown body by `Actors.shown_of_seat`. It hears the builder's requests once,
+## when it first drives its home body (it is a node of that body, so they go together), the driven
+## actor's casts in `started`, letting go in `stopped`, and the shown body's Health, Caster and
+## Inventory while it is the shown one (`_watch`, moved again after a restored snapshot:
+## `rebuild_derived`); it works the same on any actor with a Caster, Health, Inventory and Mover
+## (each optional). The seat's mouse aims from the hand of the body it drives. Nothing here
+## allocates per step.
 ##
 ## Flow puts a wizard together with `seat_wizard` before adding it to the tree, or, for a player
 ## a run's start takes along (items I4), with `seat_loadout` from its loadout (`loadout_of`).
@@ -85,6 +96,9 @@ const NO_ITEM: String = "You do not have that."
 ## Why every request of the builder's and the inventory's is refused while the home body is down
 ## (items I7b): the HUD closes both menus then, but a command can still arrive (a late frame online).
 const NO_DOWN: String = "You cannot do that while down."
+## Why a request of the builder's or the inventory's is refused when it names a body the seat no
+## longer shows (items I8: one sent just before a possession began or ended, a late frame online).
+const NO_BODY: String = "That is no longer the body you play."
 const REFUSALS: Dictionary = {
 	Inventory.Refusal.NO_STAFF: NO_STAFF, Inventory.Refusal.NO_SLOT: NO_SLOT,
 	Inventory.Refusal.NO_CARD: NO_CARD, Inventory.Refusal.NO_HAND: NO_HAND,
@@ -94,7 +108,7 @@ const REFUSALS: Dictionary = {
 const CAST_SOUND_ID: StringName = &"cast"
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"registry", &"frames"]
+const DERIVED: Array[StringName] = [&"registry", &"frames", &"_watched", &"_sent_health", &"_sent_mana", &"_sent_shown", &"_sent_staff_mana", &"_sent_staff_max"]
 ## State as who they point at: the actor it drives and its home body, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_actor", &"_home"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -115,7 +129,8 @@ var _home: Actor = null
 ## Per staff: the seconds left in which a remembered press still counts (0 = none remembered).
 var _buffer_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _sound_player: AudioStreamPlayer = null
-## What the last `player_stats_changed` said, to send it only on a change.
+## What the last `player_stats_changed` said, to send it only on a change: what this machine's HUD
+## was told, not state (a restore sends everything again, `rebuild_derived`).
 var _sent_health: float = -1.0
 var _sent_mana: int = -1
 var _sent_shown: int = -1
@@ -124,6 +139,9 @@ var _sent_staff_mana: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 var _sent_staff_max: PackedFloat32Array = PackedFloat32Array([-1.0, -1.0, -1.0, -1.0])
 ## True while a possession has set it aside (`set_aside`), until it drives again.
 var _aside: bool = false
+## The body whose Health, Caster and Inventory it hears (`_watch`): the shown body (`shown`) since
+## it last changed, or null.
+var _watched: Actor = null
 
 
 func _init() -> void:
@@ -239,6 +257,14 @@ func home() -> Actor:
 	return _home
 
 
+## The body the seat's panel, builder and inventory are about (items I8): the body it drives now,
+## else its home body; null before it drove anything.
+func shown() -> Actor:
+	if _actor != null and is_instance_valid(_actor):
+		return _actor
+	return _home if _home != null and is_instance_valid(_home) else null
+
+
 func started(actor: Actor) -> void:
 	_actor = actor
 	_aside = false
@@ -246,39 +272,84 @@ func started(actor: Actor) -> void:
 	bind(actor)
 	if _home == null and actor.home_controller == self:
 		_bind_home(actor)
-	elif actor != _home:
+	_show_anew()
+
+
+## The shown body changed (or it drives its first): hear it, and the panel and the menus get all of
+## it anew (a staff not built yet is announced when its Caster builds it). Nothing when it is the
+## body heard already.
+func _show_anew() -> void:
+	var body: Actor = shown()
+	if body == _watched:
 		return
-	# Home again (or for the first time): the panel gets the wizard's staffs (a staff not built
-	# yet is announced when its Caster builds it) and numbers anew.
-	if actor.caster != null and actor.caster.number >= 0:
-		for at in actor.caster.staff_count:
-			_on_staff_built(at)
-	_sent_health = -1
-	_sent_mana = -1
-	_sent_staff_mana.fill(-1)
-	_sent_staff_max.fill(-1.0)
+	_watch(body)
+	_forget_sent()
+	_announce_body()
 	announce_stats()
-	_announce_inventory()
 
 
-## Bind the home body's numbers and staffs, and the builder's requests, for good (this node goes
-## with that body).
-func _bind_home(actor: Actor) -> void:
-	_home = actor
-	# The seat's mouse aims from its wizard's hand (the frames service's local input layer).
-	if frames != null:
-		frames.set_aim_pivot(seat, _home_pivot)
-	if actor.caster != null:
-		actor.caster.staff_built.connect(_on_staff_built)
-	if actor.health != null:
-		actor.health.changed.connect(_on_health_changed)
-	var inventory: Inventory = actor.inventory
-	if inventory != null:
-		if not inventory.cards_given:
-			_fill_cards(inventory)
+## Hear `body`'s Health, Caster and Inventory (the shown body), and no longer the body heard before.
+func _watch(body: Actor) -> void:
+	if _watched != null and is_instance_valid(_watched):
+		_unwatch(_watched)
+	_watched = body
+	if body == null:
+		return
+	if body.caster != null and not body.caster.staff_built.is_connected(_on_staff_built):
+		body.caster.staff_built.connect(_on_staff_built)
+	if body.health != null and not body.health.changed.is_connected(_on_health_changed):
+		body.health.changed.connect(_on_health_changed)
+	var inventory: Inventory = body.inventory
+	if inventory != null and not inventory.bag_changed.is_connected(_on_bag_changed):
 		inventory.bag_changed.connect(_on_bag_changed)
 		inventory.staff_changed.connect(_on_owned_staff_changed)
 		inventory.hands_changed.connect(_on_hands_changed)
+
+
+func _unwatch(body: Actor) -> void:
+	if body.caster != null and body.caster.staff_built.is_connected(_on_staff_built):
+		body.caster.staff_built.disconnect(_on_staff_built)
+	if body.health != null and body.health.changed.is_connected(_on_health_changed):
+		body.health.changed.disconnect(_on_health_changed)
+	var inventory: Inventory = body.inventory
+	if inventory != null and inventory.bag_changed.is_connected(_on_bag_changed):
+		inventory.bag_changed.disconnect(_on_bag_changed)
+		inventory.staff_changed.disconnect(_on_owned_staff_changed)
+		inventory.hands_changed.disconnect(_on_hands_changed)
+
+
+## A snapshot restored: it hears the body it drives (the base's) and the shown body, which may be
+## another than before. The HUD is told the shown body's staffs and things again when it changed,
+## and its numbers at the next step in any case (what was sent is forgotten: the restored body's
+## numbers may equal what was last said of another).
+func rebuild_derived() -> void:
+	super()
+	_forget_sent()
+	var body: Actor = shown()
+	if body == _watched:
+		return
+	_watch(body)
+	_announce_body()
+
+
+## Forget what the HUD was told, so the next `announce_stats` says every number again.
+func _forget_sent() -> void:
+	_sent_health = -1
+	_sent_mana = -1
+	_sent_shown = -1
+	_sent_staff_mana.fill(-1)
+	_sent_staff_max.fill(-1.0)
+
+
+## Bind the home body and the builder's requests for good (this node goes with that body).
+func _bind_home(actor: Actor) -> void:
+	_home = actor
+	# The seat's mouse aims from the hand of the body it drives (the frames service's local input layer).
+	if frames != null:
+		frames.set_aim_pivot(seat, _aim_pivot)
+	var inventory: Inventory = actor.inventory
+	if inventory != null and not inventory.cards_given:
+		_fill_cards(inventory)
 	var bus: EventsScript = actor.events
 	if bus != null:
 		# Commands, heard at the tick's start (core/events, online-ready N2).
@@ -288,20 +359,23 @@ func _bind_home(actor: Actor) -> void:
 		bus.listen(&"bag_drop_requested", _on_bag_drop_requested)
 
 
-## Where the seat's mouse aims from: its home wizard's hand (`Actor.aim_pivot`), INF while it has
-## none in the world.
-func _home_pivot() -> Vector2:
-	if _home == null or not is_instance_valid(_home) or not _home.is_inside_tree():
+## Where the seat's mouse aims from: the hand of the body it drives (`Actor.aim_pivot`; items I8),
+## else its wizard's; INF while it has none in the world.
+func _aim_pivot() -> Vector2:
+	var body: Actor = shown()
+	if body == null or not body.is_inside_tree():
 		return Vector2.INF
-	return _home.aim_pivot()
+	return body.aim_pivot()
 
 
-## A possession took the actor it drove for `seconds`: it drives nothing until `started`.
+## A possession took the actor it drove for `seconds`: it drives nothing until `started`, and the
+## panel shows its wizard meanwhile.
 func set_aside(_actor_taken: Actor, _seconds: float) -> void:
 	_aside = true
+	_show_anew()
 
 
-## While it is away from its wizard, the wizard's mana still reaches the panel.
+## While another controller drives its wizard, the wizard's mana still reaches the panel.
 func watch_home(_body: Actor, _delta: float) -> void:
 	announce_stats()
 
@@ -315,6 +389,8 @@ func stopped(actor: Actor) -> void:
 	unbind(actor)
 	if _actor == actor:
 		_actor = null
+		# Shown again: its wizard, until `started` hands it another body (most often at once).
+		_show_anew()
 
 
 ## It hears the casts of the body it drives.
@@ -373,13 +449,14 @@ func forget_presses() -> void:
 		_buffer_left[at] = 0.0
 
 
-## Send `staff_mana_changed` for each staff of the home body whose whole mana or pool size
+## Send `staff_mana_changed` for each staff of the shown body whose whole mana or pool size
 ## differs from the last one sent, and `player_stats_changed` if its health, the staff on show or that staff's
 ## whole mana differ.
 func announce_stats() -> void:
-	if _home == null or not is_instance_valid(_home) or _home.events == null:
+	var body: Actor = shown()
+	if body == null or body.events == null:
 		return
-	var caster: Caster = _home.caster
+	var caster: Caster = body.caster
 	if caster != null:
 		for at in mini(caster.staff_count, STAFF_COUNT):
 			var whole: int = floori(caster.mana_of(at))
@@ -387,9 +464,9 @@ func announce_stats() -> void:
 			if whole != _sent_staff_mana[at] or most != _sent_staff_max[at]:
 				_sent_staff_mana[at] = whole
 				_sent_staff_max[at] = most
-				_home.events.staff_mana_changed.emit(seat, at, float(whole), most)
-	var health: float = _home.health.health if _home.health != null else 0.0
-	var max_health: float = _home.health.max_health if _home.health != null else 0.0
+				body.events.staff_mana_changed.emit(seat, at, float(whole), most)
+	var health: float = body.health.health if body.health != null else 0.0
+	var max_health: float = body.health.max_health if body.health != null else 0.0
 	var shown: int = caster.current if caster != null else 0
 	var whole_mana: int = floori(caster.mana_of(shown)) if caster != null else 0
 	if health == _sent_health and whole_mana == _sent_mana and shown == _sent_shown:
@@ -398,7 +475,7 @@ func announce_stats() -> void:
 	_sent_mana = whole_mana
 	_sent_shown = shown
 	var max_mana: float = caster.max_mana_of(shown) if caster != null else 0.0
-	_home.events.player_stats_changed.emit(seat, health, max_health, float(whole_mana), max_mana)
+	body.events.player_stats_changed.emit(seat, health, max_health, float(whole_mana), max_mana)
 
 
 func _on_health_changed(_health: float, _max_health: float) -> void:
@@ -406,7 +483,7 @@ func _on_health_changed(_health: float, _max_health: float) -> void:
 
 
 ## A staff of the driven actor was cast: the seat's cast events, the sound, the mana spent (the
-## home body's, when it is the one cast), and the buffered press is used up.
+## shown body's), and the buffered press is used up.
 func _on_cast_done(at: int, origin: Vector2, direction: Vector2) -> void:
 	if at >= 0 and at < STAFF_COUNT:
 		_buffer_left[at] = 0.0
@@ -422,10 +499,12 @@ func _on_cast_done(at: int, origin: Vector2, direction: Vector2) -> void:
 	_play_cast_sound()
 
 
-## A staff of the home body was built: the panel and the builder see its plain view.
+## A staff of the shown body was built: the panel and the builder see its plain view (empty for a
+## hand it has not).
 func _on_staff_built(at: int) -> void:
-	if _home != null and _home.events != null and _home.caster != null:
-		_home.events.staff_changed.emit(seat, at, _home.caster.plan_of(at))
+	var body: Actor = shown()
+	if body != null and body.events != null:
+		body.events.staff_changed.emit(seat, at, body.caster.plan_of(at) if body.caster != null else {})
 
 
 func _play_cast_sound() -> void:
@@ -443,65 +522,94 @@ func _fill_cards(inventory: Inventory) -> void:
 	inventory.give_cards(Inventory.dev_cards(registry))
 
 
-## Every bag, every staff owned and the hands of the home body, to the seat's events (when it
-## first drives the wizard, and each time it comes home).
-func _announce_inventory() -> void:
-	if _home == null or _home.inventory == null:
+## Everything of the shown body the HUD shows, to the seat's events (each time the shown body
+## changes): every hand's staff for the panel, then `inventory_announced`, what its sustained cards
+## hold (`mana_reserved`), every bag, every staff owned and the hands (every actor has an Inventory).
+func _announce_body() -> void:
+	var body: Actor = shown()
+	if body == null or body.events == null:
 		return
-	if _home.events != null:
-		_home.events.inventory_announced.emit(seat)
+	for at in STAFF_COUNT:
+		if body.caster == null or at >= body.caster.staff_count or body.caster.number >= 0:
+			# A staff not built yet is announced when its Caster builds it.
+			_on_staff_built(at)
+	body.events.inventory_announced.emit(seat, body.key())
+	# What its sustained cards hold of each pool (the HUD forgot the last body's on the announcement).
+	if body.caster != null and body.caster.number >= 0 and body.spells != null:
+		for at in mini(body.caster.staff_count, STAFF_COUNT):
+			body.events.mana_reserved.emit(seat, at, body.spells.reserved_mana(body.caster.number, at))
 	for bag: StringName in ItemKinds.BAGS:
 		_on_bag_changed(bag)
-	for number: int in _home.inventory.numbers():
-		_on_owned_staff_changed(number)
+	if body.inventory != null:
+		for number: int in body.inventory.numbers():
+			_on_owned_staff_changed(number)
 	_on_hands_changed()
 
 
-## `bag_changed` for this seat: what the home body's bag `bag` holds now.
+## `bag_changed` for this seat: what the shown body's bag `bag` holds now.
 func _on_bag_changed(bag: StringName) -> void:
-	if _home == null or _home.events == null or _home.inventory == null:
+	var body: Actor = shown()
+	if body == null or body.events == null or body.inventory == null:
 		return
 	var ids: Array[StringName] = []
 	var counts := PackedInt32Array()
-	for stack: ItemStack in _home.inventory.stacks_in(bag):
+	for stack: ItemStack in body.inventory.stacks_in(bag):
 		ids.append(stack.id)
 		counts.append(stack.count)
-	_home.events.bag_changed.emit(seat, bag, ids, counts, _home.inventory.capacity_of(bag))
+	body.events.bag_changed.emit(seat, bag, ids, counts, body.inventory.capacity_of(bag))
 
 
-## `owned_staff_changed` for this seat: staff `number` of the home body as it is now.
+## `owned_staff_changed` for this seat: staff `number` of the shown body as it is now.
 func _on_owned_staff_changed(number: int) -> void:
-	if _home != null and _home.events != null and _home.inventory != null:
-		_home.events.owned_staff_changed.emit(seat, number, _home.inventory.plan_of(number))
+	var body: Actor = shown()
+	if body != null and body.events != null and body.inventory != null:
+		body.events.owned_staff_changed.emit(seat, number, body.inventory.plan_of(number))
 
 
 ## `hands_changed` for this seat.
 func _on_hands_changed() -> void:
-	if _home != null and _home.events != null and _home.inventory != null:
-		_home.events.hands_changed.emit(seat, _home.inventory.hands())
+	var body: Actor = shown()
+	if body != null and body.events != null and body.inventory != null:
+		body.events.hands_changed.emit(seat, body.inventory.hands())
+
+
+## The seat's events: the shown body's bus (every body shares one).
+func _bus() -> EventsScript:
+	var body: Actor = shown()
+	return body.events if body != null else null
 
 
 func _refuse(reason: String) -> void:
-	if _home != null and _home.events != null:
-		_home.events.build_refused.emit(seat, reason)
+	var bus: EventsScript = _bus()
+	if bus != null:
+		bus.build_refused.emit(seat, reason)
 
 
-## The home body's Inventory: the builder edits the player's own wizard, also during a possession.
+## The shown body's Inventory: the builder and the inventory menu edit the body the seat drives
+## (items I8), its wizard while it drives nothing.
 func _builder_inventory() -> Inventory:
-	return _home.inventory if _home != null else null
+	var body: Actor = shown()
+	return body.inventory if body != null else null
 
 
-## True while the home body is down: its builder's and inventory's requests are refused (items I7b).
-func _home_down() -> bool:
-	return _home != null and _home.is_down()
+## Why a menu's request naming the body `key` is refused before it is tried: NO_BODY for a body the
+## seat no longer shows (items I8), NO_DOWN while the shown body is down (items I7b); "" for none.
+func _menu_refusal(key: int) -> String:
+	var body: Actor = shown()
+	if body == null or body.key() != key:
+		return NO_BODY
+	if body.is_down():
+		return NO_DOWN
+	return ""
 
 
 ## A builder asked to put `card_id` into `slot` of staff number `number` (`&""` empties it).
-func _on_staff_change_requested(player: int, number: int, slot: int, card_id: StringName) -> void:
+func _on_staff_change_requested(player: int, number: int, slot: int, card_id: StringName, body: int) -> void:
 	if player != seat:
 		return
-	if _home_down():
-		_refuse(NO_DOWN)
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse(why)
 		return
 	var inventory: Inventory = _builder_inventory()
 	_answer(inventory.set_card(number, slot, card_id) if inventory != null else Inventory.Refusal.NO_STAFF)
@@ -509,11 +617,12 @@ func _on_staff_change_requested(player: int, number: int, slot: int, card_id: St
 
 ## A builder asked to set every slot of staff number `number` at once (`cards` by slot; fewer than
 ## the staff's slots empties the rest). Refused, and nothing changes, as `Inventory.set_cards` says.
-func _on_staff_cards_requested(player: int, number: int, cards: Array[StringName]) -> void:
+func _on_staff_cards_requested(player: int, number: int, cards: Array[StringName], body: int) -> void:
 	if player != seat:
 		return
-	if _home_down():
-		_refuse(NO_DOWN)
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse(why)
 		return
 	var inventory: Inventory = _builder_inventory()
 	_answer(inventory.set_cards(number, cards) if inventory != null else Inventory.Refusal.NO_STAFF)
@@ -527,11 +636,12 @@ func _answer(refusal: Inventory.Refusal) -> void:
 
 ## The inventory menu asked to put staff number `number` on hand `hand` (-1: into the staff bag;
 ## items I7): `Inventory.set_hand`, refused as it says.
-func _on_staff_hand_requested(player: int, number: int, hand: int) -> void:
+func _on_staff_hand_requested(player: int, number: int, hand: int, body: int) -> void:
 	if player != seat:
 		return
-	if _home_down():
-		_refuse_inventory(NO_DOWN)
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse_inventory(why)
 		return
 	var inventory: Inventory = _builder_inventory()
 	_answer_inventory(inventory.set_hand(number, hand) if inventory != null else Inventory.Refusal.NO_STAFF)
@@ -539,11 +649,12 @@ func _on_staff_hand_requested(player: int, number: int, hand: int) -> void:
 
 ## The inventory menu asked to drop staff number `number`, or with -1 one copy of `id` from `bag`
 ## (items I7): `Inventory.drop_staff` or `drop`, refused as they say.
-func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number: int) -> void:
+func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number: int, body: int) -> void:
 	if player != seat:
 		return
-	if _home_down():
-		_refuse_inventory(NO_DOWN)
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse_inventory(why)
 		return
 	var inventory: Inventory = _builder_inventory()
 	var refusal: Inventory.Refusal = Inventory.Refusal.NO_ITEM
@@ -559,5 +670,6 @@ func _answer_inventory(refusal: Inventory.Refusal) -> void:
 
 
 func _refuse_inventory(reason: String) -> void:
-	if _home != null and _home.events != null:
-		_home.events.inventory_refused.emit(seat, reason)
+	var bus: EventsScript = _bus()
+	if bus != null:
+		bus.inventory_refused.emit(seat, reason)

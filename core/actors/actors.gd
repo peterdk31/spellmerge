@@ -15,7 +15,8 @@ extends Node
 ##   the actor a seat drives now.
 ## - `set_home(id, seat)` names the seat whose own body an actor is (a wizard, from its home
 ##   controller), and `home_of_seat(seat)` finds it while the seat drives another actor or
-##   another controller drives it (possess, G9): the HUD shows the home body (owner, 2026-10-28).
+##   another controller drives it (possess, G9); `shown_of_seat(seat)` is the body the seat's HUD
+##   is about (items I8): the one it drives, else its home body.
 ## - `budget_of(id)` is whose share of the shared limits it spends: its seat's when a seat drives
 ##   it, else `SHARED`, the one budget every actor no seat drives shares.
 ## - `set_node(id, node)` and `node_of(id)` find the actor's node; only its instance id is kept,
@@ -253,6 +254,13 @@ func set_home(id: int, seat: int) -> void:
 ## drives it), or NONE.
 func home_of_seat(seat: int) -> int:
 	return _seat_home[seat] if seat >= 0 and seat < SEATS else NONE
+
+
+## The body a seat's HUD is about (items I8): the one it drives now, else its own body (while
+## another controller drives that, or it drives nothing); NONE for neither.
+func shown_of_seat(seat: int) -> int:
+	var driven: int = actor_of_seat(seat)
+	return driven if driven != NONE else home_of_seat(seat)
 
 
 ## Whose share of the shared limits it spends: its seat (0-3) while a seat drives it, else SHARED.

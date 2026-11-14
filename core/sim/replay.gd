@@ -36,8 +36,9 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## tick's byte, the stops being state, N4; 4: no horde, its start, cap and commands gone; 5: what
 ## the run takes along, after the rules; 6: each carried staff's own id after its cards; 7: the
 ## players' loadouts in place of the carried staffs, and the bags' capacities among the rules, items
-## I4). A replay of another format is refused.
-const FORMAT: int = 7
+## I4; 8: what lies on the ground after the players' loadouts, items I6). A replay of another
+## format is refused.
+const FORMAT: int = 8
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): a run of waves, the sandbox, the hub (online-lobby
@@ -50,7 +51,7 @@ const MAX_BYTES: int = 64 * 1024 * 1024
 const MAX_BUILD: int = 64
 ## The most bytes a header takes (`header_bytes`): magic, format, the build, content and seed, start,
 ## starter and seats, the rules, what is carried at its most, the tick count.
-const MAX_HEADER_BYTES: int = 4 + 1 + 1 + MAX_BUILD + 16 + 3 + SessionRules.BYTES + PartyLoadout.MAX_BYTES + 4
+const MAX_HEADER_BYTES: int = 4 + 1 + 1 + MAX_BUILD + 16 + 3 + SessionRules.BYTES + PartyLoadout.MAX_BYTES + GroundLoadout.MAX_BYTES + 4
 
 var build: String = ""
 var content: int = 0
@@ -63,6 +64,9 @@ var rules: SessionRules = SessionRules.defaults()
 ## What the run takes along from the play before it (`Frames.record` asks the game; the run it starts
 ## takes it, `Frames.next_run_party`).
 var party: PartyLoadout = PartyLoadout.new()
+## What lies on the ground as the run starts, and in which room (`Frames.record` asks the game; a run
+## in that room lays it, `Frames.next_run_ground`; items I6).
+var ground: GroundLoadout = GroundLoadout.new()
 
 var _data: PackedByteArray = PackedByteArray()
 ## Where each tick starts in `_data`.
@@ -183,6 +187,7 @@ func _encode(ticks: bool) -> PackedByteArray:
 	out.append(seats & 0x0f)
 	rules.encode_into(out)
 	party.encode_into(out)
+	ground.encode_into(out)
 	at = out.size()
 	out.resize(at + 4)
 	out.encode_u32(at, _offsets.size() if ticks else 0)
@@ -209,6 +214,7 @@ func decode(bytes: PackedByteArray) -> String:
 		seats = 0
 		rules = SessionRules.defaults()
 		party = PartyLoadout.new()
+		ground = GroundLoadout.new()
 		_data = PackedByteArray()
 		_offsets = PackedInt32Array()
 	return problem
@@ -258,6 +264,12 @@ func _decode(bytes: PackedByteArray) -> String:
 		return party_problem
 	party = read_party
 	at = read_party.read_to
+	var read_ground := GroundLoadout.new()
+	var ground_problem: String = read_ground.decode_at(bytes, at)
+	if ground_problem != "":
+		return ground_problem
+	ground = read_ground
+	at = read_ground.read_to
 	if at + 4 > bytes.size():
 		return "the header is cut short"
 	var ticks: int = bytes.decode_u32(at)

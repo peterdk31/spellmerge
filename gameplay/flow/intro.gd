@@ -40,7 +40,7 @@ const DROP_GAPS: Array[float] = [0.45, 0.3, 0.2]
 const HIT_TIME: float = 7.6
 const HIT_STAGGER: float = 0.12
 ## The actions that skip it.
-const SKIP_ACTIONS: Array[StringName] = [&"accept", &"back", &"pause", &"staff_1", &"staff_2", &"staff_3", &"staff_4"]
+const SKIP_ACTIONS: Array[StringName] = [&"accept", &"take", &"back", &"pause", &"staff_1", &"staff_2", &"staff_3", &"staff_4"]
 const SEATS: int = 4
 
 ## The world: 128 px wide; the tower room to SHAFT_TOP, the shaft to SHAFT_END, the crypt floor

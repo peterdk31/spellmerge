@@ -33,6 +33,8 @@ func before_each() -> void:
 	_items.actors = _world.table
 	_items.projectiles = _world.projectiles
 	_items.spells = _world.spells
+	_items.registry = _world.registry
+	_items.frames = _world.frames
 	root.add_child(_items)
 	_staff = StaffBase.new()
 	_staff.id = &"test"
@@ -73,7 +75,7 @@ func _ask(seat: int, item: int) -> void:
 
 func test_a_room_lays_what_it_places_one_copy_each() -> void:
 	var bolt: SpellComponent = _world.registry.get_resource(&"spells", &"bolt") as SpellComponent
-	_world.bus.room_items_placed.emit([WILD_STAR, bolt, StaffCards.new()] as Array[Resource], PackedVector2Array([Vector2(10, 0), Vector2(40, 0), Vector2(70, 0)]))
+	_world.bus.room_items_placed.emit(&"test_room", [WILD_STAR, bolt, StaffCards.new()] as Array[Resource], PackedVector2Array([Vector2(10, 0), Vector2(40, 0), Vector2(70, 0)]))
 	var lying: Array[GroundItem] = _items.lying()
 	check_equal(lying.size(), 2, "the staff and the card lie there; what is no item does not")
 	check_equal([lying[0].number, lying[0].at, lying[0].stack.kind, lying[0].stack.id], [0, Vector2(10, 0), ItemKinds.STAFF, &"star"], "the premade staff is its staff")
@@ -223,6 +225,48 @@ func test_a_restore_says_gone_what_the_snapshot_does_not_hold() -> void:
 	check(_ground.has([later, true]), "the card laid after the snapshot is said gone: %s" % [_ground])
 	check(_ground.has([0, false]), "the one it holds is said again")
 	check_equal(_items.lying().size(), 1, "one lies there")
+
+
+## Owner, 2026-11-14: the hub's rack is fresh only when a host starts the hub or a party comes back
+## from a run. A run in the room the ground was taken in lays what a recording's header says lay
+## there (the hub begun anew for a joining machine: tests/gameplay/flow/test_flow_hub.gd plays it);
+## any other start lays the room's placements.
+func test_only_a_recording_of_the_same_room_keeps_its_ground() -> void:
+	var placed: Array[Resource] = [WILD_STAR]
+	var at := PackedVector2Array([Vector2(10, 0)])
+	_world.bus.room_items_placed.emit(&"hub", placed, at)
+	var rack: int = _items.lying()[0].number
+	_wizard(0, Vector2.ZERO)
+	check_equal(_items.take(_world.wizards[0].id, rack), ItemsScript.Take.TAKEN, "the rack taken")
+	_items.lay(ItemStack.card(&"fire"), Vector2(30, 5))
+	var ground: GroundLoadout = _items.ground_now()
+	check_equal([ground.room, ground.count(), ground.id_of(0)], [&"hub", 1, &"fire"], "what lies in the hub now: the frames' ground source")
+	# The frames service's ground with no recording is the game's now: bare after a run's start.
+	_items.begin_run()
+	check_equal(_world.frames.next_run_ground().room, &"", "nothing is carried with no recording")
+	_world.bus.room_items_placed.emit(&"hub", placed, at)
+	check_equal(_items.lying().size(), 1, "so the hub lays its rack: a host's start, a party back from a run")
+	check_equal(_items.lying()[0].title, "Wild star", "fresh")
+	_items.begin_run()
+	_world.bus.room_items_placed.emit(&"crypt", [] as Array[Resource], PackedVector2Array())
+	check(_items.lying().is_empty(), "another room lays its own")
+
+
+## A recording's header (a joining machine's only source) lays what it says, staffs with their
+## cards and mana, the premade staff by its own name.
+func test_a_recordings_ground_is_laid_again_as_it_was() -> void:
+	var ground := GroundLoadout.new()
+	ground.set_room(&"hub")
+	ground.add_item(ItemKinds.STAFF, &"star", "Wild star", 1, Vector2(4, 5), 12.5, [&"bolt", &"fire"] as Array[StringName])
+	ground.add_item(ItemKinds.CARD, &"frost", "", 1, Vector2(40, 5), 0.0, [] as Array[StringName])
+	ground.add_item(ItemKinds.CARD, &"no_such_card", "", 1, Vector2(80, 5), 0.0, [] as Array[StringName])
+	_items.lay_ground(ground)
+	var lying: Array[GroundItem] = _items.lying()
+	check_equal(lying.size(), 2, "what the registry has none of is left out")
+	check_equal([lying[0].stack.id, lying[0].title, lying[0].stack.mana, lying[0].at], [&"star", "Wild star", 12.5, Vector2(4, 5)], "the staff as it lay")
+	check_equal(lying[0].stack.cards, [&"bolt", &"fire", &"", &""] as Array[StringName], "with its cards in its slots")
+	check(lying[0].stack.staff == WILD_STAR.staff, "its staff found by its id")
+	check(_items.ground_now().equals(ground) == false, "the missing card is not said to lie there")
 
 
 func test_a_runs_start_clears_the_ground() -> void:

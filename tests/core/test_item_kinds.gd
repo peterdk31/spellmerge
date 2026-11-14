@@ -71,6 +71,9 @@ func test_every_premade_folder_holds_items_of_its_kind() -> void:
 			for id: StringName in registry.call("get_ids", folder):
 				var stack: ItemStack = ItemKinds.stack_of(registry.call("get_resource", folder, id) as Resource)
 				check(stack != null and stack.kind == kind, "%s: %s under %s is one" % [kind, id, folder])
+				var item: Resource = registry.call("get_resource", folder, id) as Resource
+				var name: String = (item as StaffItem).shown_name() if item is StaffItem else ""
+				check(GroundLoadout.new().add_item(kind, id, name, 1, Vector2.ZERO, 0.0, stack.cards if stack != null else ([] as Array[StringName])), "%s: %s's name and cards travel in a recording (plain text, at most %d letters)" % [kind, id, GroundLoadout.MAX_TITLE])
 				found += 1
 			check(found > 0, "%s: some under %s" % [kind, folder])
 

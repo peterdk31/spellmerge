@@ -160,6 +160,12 @@ func _tap(player: int, action: StringName) -> void:
 	_input.send_virtual(player, action, 0.0)
 
 
+## A pad's A (or Enter): it presses `accept` and `take` both.
+func _tap_a(player: int) -> void:
+	_tap(player, &"accept")
+	_tap(player, &"take")
+
+
 func _frame() -> void:
 	_hud.poll()
 	_focus.poll()
@@ -762,8 +768,9 @@ func _test_a_on_the_altar_asks_to_open_the_room() -> void:
 	_check((asked.size() == 1 and asked[0] == 1), "A once off the altar asks nothing: %s" % [asked])
 
 
-## Items I6: A (`accept`) with an item in reach (`item_near_changed`) sends `item_take_requested`
-## for its player and that item, with no menu open; the lit stone's A comes first, the altar's after.
+## Items I6: A (`take`; never `accept` alone, Space on the keyboard, which casts) with an item in
+## reach (`item_near_changed`) sends `item_take_requested` for its player and that item, with no
+## menu open; the lit stone's A comes first, the altar's after.
 ## The hint shows over the item while it is in reach, hides while its player has a menu open, and
 ## shakes red on `item_refused`.
 func _test_a_by_an_item_takes_it_after_the_stone_and_before_the_altar() -> void:
@@ -782,15 +789,20 @@ func _test_a_by_an_item_takes_it_after_the_stone_and_before_the_altar() -> void:
 	_check(hint.visible, "the hint shows over the item")
 	_check(String(hint.call("title")) == "Take Wild star", "it names the item: %s" % hint.call("title"))
 	_check(String(hint.call("line")).begins_with("4 slots"), "a staff's numbers: %s" % hint.call("line"))
+	_bus.altar_changed.emit(0)
 	_tap(1, &"accept")
 	_frame()
-	_check(takes == [[1, 7]] and rooms.is_empty(), "A takes the item, not the altar's room: %s %s" % [takes, rooms])
+	_check(takes.is_empty(), "accept alone (Space on the keyboard, which casts) takes nothing: %s" % [takes])
+	_bus.altar_changed.emit(0b0010)
+	_tap_a(1)
+	_frame()
+	_check(takes == [[1, 7]] and rooms.is_empty(), "A (take) takes the item, not the altar's room: %s %s" % [takes, rooms])
 	_bus.item_refused.emit(1, 7)
 	_check(bool(hint.call("is_refused")), "a refused take shakes it red")
 	_hud.step_hints(1.0)
 	_check(not bool(hint.call("is_refused")), "for a moment")
 	_bus.start_stone_changed.emit(2, 2, true)
-	_tap(1, &"accept")
+	_tap_a(1)
 	_frame()
 	_check(takes.size() == 1 and runs == [1], "on the lit stone A starts the run: %s %s" % [takes, runs])
 	_bus.start_stone_changed.emit(0, 2, false)
@@ -798,7 +810,7 @@ func _test_a_by_an_item_takes_it_after_the_stone_and_before_the_altar() -> void:
 	_frame()
 	_hud.step_hints(0.016)
 	_check(not hint.visible, "hidden while its player's builder is open")
-	_tap(1, &"accept")
+	_tap_a(1)
 	_frame()
 	_check(takes.size() == 1, "and A inside the builder is the builder's: %s" % [takes])
 	if _hud.get_radial(1).is_open():
@@ -808,7 +820,7 @@ func _test_a_by_an_item_takes_it_after_the_stone_and_before_the_altar() -> void:
 	_bus.item_near_changed.emit(1, -1, Vector2.ZERO, {})
 	_hud.step_hints(0.016)
 	_check(not hint.visible, "hidden with nothing in reach")
-	_tap(1, &"accept")
+	_tap_a(1)
 	_frame()
 	_check(takes.size() == 1 and rooms == [1], "then A on the altar opens the room: %s %s" % [takes, rooms])
 	_bus.altar_changed.emit(0)

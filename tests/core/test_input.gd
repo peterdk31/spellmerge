@@ -720,7 +720,8 @@ func _test_players_do_not_share_state() -> void:
 		_manager.handle_event(_button(player, actions[player]))
 	for player in 4:
 		for action in InputManagerScript.ACTIONS:
-			var expected: bool = action == names[player]
+			# Pad A is `accept` and `take` both (items I6).
+			var expected: bool = action == names[player] or (names[player] == &"accept" and action == &"take")
 			_check(_manager.is_action_pressed(player, action) == expected,
 				"player %d: %s pressed is %s" % [player, action, expected])
 

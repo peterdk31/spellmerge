@@ -108,10 +108,12 @@ const MOUSE_AIM_TRAVEL: float = 8.0
 ## `pause` (Start, Escape) opens the pause menu; `page_prev` and `page_next` (LB, RB; Z, C)
 ## page menus such as the builder's staff tabs. `extra` (Y; R) is a menu's third action (the
 ## radial builder's clear, held), and `kind_prev` / `kind_next` (d-pad left and right only, not
-## the stick; Page Up, Page Down) flip the radial builder's kind of card.
+## the stick; Page Up, Page Down) flip the radial builder's kind of card. `take` (A; F or Enter, never
+## Space, which casts) takes the item in reach in play (items I6, `hud/panels`).
 const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down", &"staff_1", &"staff_2", &"staff_3", &"staff_4",
 	&"accept", &"back", &"alternate", &"pause", &"page_prev", &"page_next", &"extra", &"kind_prev", &"kind_next",
+	&"take",
 ]
 ## The staff cast actions, by staff index (0 to 3: RB, RT, LB, LT).
 const CAST_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]

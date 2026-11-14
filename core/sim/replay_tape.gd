@@ -25,6 +25,8 @@ var seated: int = 0
 ## A live replay's feed (null: a replay file).
 var feed: LiveFeed = null
 var _dealer: RandomNumberGenerator = RandomNumberGenerator.new()
+## How many runs it has started (`next_run_seed`): the header's ground is its first run's only.
+var runs: int = 0
 
 
 func _init(of: Replay, playing_it: bool, fed_by: LiveFeed = null) -> void:
@@ -52,7 +54,15 @@ func is_live() -> bool:
 
 ## The seed of the next run it starts.
 func next_run_seed() -> int:
+	runs += 1
 	return _dealer.randi()
+
+
+## What lies on the ground as the run it starts begins: the header's for its first run (it was
+## taken as that run began), nothing for any later one (items I6: a run's leftovers never come back
+## in a later run of the same room).
+func run_ground() -> GroundLoadout:
+	return replay.ground.copy() if runs <= 1 else GroundLoadout.new()
 
 
 ## The rules a run it starts plays by (a copy: a run's change is its own).

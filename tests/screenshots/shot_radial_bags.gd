@@ -61,9 +61,11 @@ func take() -> void:
 		radial.index = player
 		layer.add_child(radial)
 		radial.bind(bus, focus, spells, _input)
-		bus.bag_changed.emit(player, FakeCards.ids(BAGS[player]))
+		FakeCards.announce_bag(bus, player, FakeCards.ids(BAGS[player]))
+		var plans: Array[Dictionary] = []
 		for at in 4:
-			bus.staff_changed.emit(player, at, spells.staff_view(row, staff))
+			plans.append(spells.staff_view(row, staff))
+		FakeCards.announce_staffs(bus, player, plans)
 		bus.player_stats_changed.emit(player, 100, 100, 100.0, 100.0)
 		if not radial.open_builder():
 			fail("the radial builder of player %d did not open" % (player + 1))

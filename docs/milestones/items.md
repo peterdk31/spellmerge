@@ -1,6 +1,6 @@
 # Items: things a body picks up, holds in bags and drops
 
-**Status (2026-11-13): planned with the owner in an owner session** (the owner, after the last round: "Go ahead"); this document is step I1. I2 is built (below, "I2 done"); I3 is next. Asked by the owner: "Let's design a plan for having item pickups in the game. The first thing we need is staff pickups."
+**Status (2026-11-13): planned with the owner in an owner session** (the owner, after the last round: "Go ahead"); this document is step I1. I2 and I3 are built (below, "I2 done", "I3 done"); I4 is next. Asked by the owner: "Let's design a plan for having item pickups in the game. The first thing we need is staff pickups."
 
 The steps are **I1 to I9** (I for items). Each is one PR with its tests, in order.
 
@@ -130,11 +130,14 @@ This document, the roadmap's exception and the decisions.
 - The builder's requests name a staff by its number; its strip of staffs; counts on the ring.
 - Tests: the kinds table against every content folder it names; counts through every builder request; a bag's capacity; a staff edited in the bag is not installed in the caster.
 
+**I3 done (2026-11-14).** `ItemKinds.RULES` and `ItemStack` (core/items, now a simulation folder); `Inventory` (gameplay/actor), on the wizard, takes the staffs the body was made with at `setup`, numbered by their button (later staffs count on from 4), owns the card bag (`give_cards`) and the hands, and does the counting (`set_cards`, `set_card`: refused as `Inventory.Refusal` NO_STAFF, NO_SLOT, NO_CARD, BAG_FULL). `PlayerController.bag` and `set_bag` are gone: the builder's requests name a staff's number and go to the inventory, and the seat's events are `bag_changed(player, bag, ids, counts, capacity)` (every bag), `owned_staff_changed(player, staff, plan)` (every staff owned) and `hands_changed`; `staff_changed` stays the hands', for the corner panel. Flow's bags are counted (`bag_for_mode`, card id to copies: 20 of every card in the sandbox and the hub, Play's one each), and the start cards come with their staffs, beside the bag; a wizard made again with the staffs it carried gets the mode's bag less their cards, so nothing is counted twice (until I4 carries the bags). The builder works by number: a strip of staffs (the hands' button glyphs in framed tabs, then the bag's staffs by their heads, scrolling, a gold notch where more lie past an end), counts on the ring, a card with none left off it. The bots build only from the copies they hold. **Moved:** an enemy's inventory to I8 (the first step that reads one); a bag's capacity as a run's rule to I4 (a `SessionRules` field is the header's change); cards given back to a full bag are refused until I6 drops them (DECISIONS, 2026-11-14). Tests: `tests/core/test_item_kinds.gd`, `tests/gameplay/actor/test_inventory.gd`, `tests/gameplay/player/test_player_card_bag.gd`, and the builder's, Flow's and the player's.
+
 ## I4: the player record
 
 (`core/sim/`, `gameplay/flow/`, `net/` only where it passes the header on)
 
 - `PlayerRecord` in place of `RunCarry`, in the replay's header: the bags, the staffs and the hands of each seat. Older recordings no longer decode.
+- Each bag's capacity is one of the run's rules (`SessionRules`, moved from I3).
 - Tests: the decoder against every cut, count and id out of range; a run from the hub starts with the same bags on a machine that only has the recording.
 
 ## I5: the shared radial widget
@@ -163,6 +166,7 @@ This document, the roadmap's exception and the decisions.
 
 (`gameplay/player/`, `hud/`, `gameplay/feel/`)
 
+- An enemy gets its inventory (moved from I3): its staff bag the staffs it holds, a boss's phases swapping them through it.
 - The panel's events, the builder's and the inventory's requests are the driven body's, the first one hit when several are possessed. What is taken during a possession stays with that body.
 - The wizard's health bar over its head while its seat is away.
 - Tests: a possessed enemy's staff rebuilt, dropped and taken by the wizard afterwards; the panel back on the wizard when the possession ends.

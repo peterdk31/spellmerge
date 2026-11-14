@@ -42,9 +42,11 @@ extends Node
 ## which the wizard builds itself; flow never touches a spell.
 ##
 ## Each mode's setup (owner, 2026-11-05): a new wizard gets the mode's staffs, start cards and
-## bag (the cards it may build with, `bag_for_mode`, handed over with `seat_wizard`): Play `dash`
-## and `bolt` (PLAY_BAG, `play_bag`); the sandbox and the hub every card (the hub's for now, owner
-## 2026-11-11: to try combos online until a better way to come by cards comes).
+## card bag (the cards it may build with, counted: `bag_for_mode`, card id to copies, handed over
+## with `seat_wizard`; items I3): Play one `dash` and one `bolt` (PLAY_BAG, `play_bag`: each entry
+## a copy); the sandbox and the hub Inventory.DEV_COPIES of every card (the hub's for now, owner
+## 2026-11-11: to try combos online until a better way to come by cards comes; owner 2026-11-13:
+## 20 of each). The start cards come with their staffs, beside the bag.
 ##
 ## The intro (living staffs H6, `intro.gd`): on a new save (`save`, a `SaveFile`, has no
 ## INTRO_SEEN flag) Play shows the intro first (state INTRO): one staff dropped per joined player,
@@ -138,7 +140,7 @@ const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 ## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
 ## The cards each staff starts with in Play: A, X, Y, B (owner, 2026-11-05: dash and a bolt).
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"bolt"], [], []]
-## Play's bag: the cards a Play wizard may build with (owner, 2026-11-05).
+## Play's bag: the cards a Play wizard may build with (owner, 2026-11-05), one copy an entry (items I3).
 const PLAY_BAG: Array[StringName] = [&"dash", &"bolt"]
 ## The cards a sandbox run starts with (owner, 2026-11-01: two showcase builds of the trigger
 ## tree on Y and B, to read in the builder's tree and try on the dummies). A and X as Play's.
@@ -1127,18 +1129,36 @@ func start_cards_for_mode() -> Array:
 	return start_cards
 
 
-## The bag a new wizard gets in this run's `mode`: every spell card of the registry in the
-## sandbox and the hub, `play_bag` in Play.
-func bag_for_mode() -> Array[StringName]:
-	var out: Array[StringName] = []
+## The card bag a new wizard gets in this run's `mode`, card id to copies (items I3):
+## Inventory.DEV_COPIES of every spell card of the registry in the sandbox and the hub, `play_bag`
+## in Play (an entry a copy).
+func bag_for_mode() -> Dictionary:
+	var out: Dictionary = {}
 	match mode:
 		MODE_SANDBOX, MODE_HUB:
-			if registry != null:
-				for id: StringName in registry.get_ids(&"spells"):
-					if registry.get_resource(&"spells", id) is SpellComponent:
-						out.append(id)
+			out = Inventory.dev_cards(registry)
 		_:
-			out.assign(play_bag)
+			for id: StringName in play_bag:
+				out[id] = int(out.get(id, 0)) + 1
+	return out
+
+
+## `bag` (card id to copies) less the cards `carried` staffs hold (by staff, lists of card ids),
+## none below 0: a wizard made again with the staffs it carried (the hub begun anew for a joining
+## machine, a run from the stone) owns no more copies than the mode's bag, so nothing is counted
+## twice (items I3; the player record, I4, carries the bags themselves).
+static func _less_carried(bag: Dictionary, carried: Array) -> Dictionary:
+	var out: Dictionary = bag.duplicate()
+	for staff: Variant in carried:
+		if not staff is Array:
+			continue
+		for id: Variant in staff:
+			var card := StringName(str(id))
+			if int(out.get(card, 0)) > 0:
+				out[card] = int(out[card]) - 1
+	for card: Variant in out.keys():
+		if int(out[card]) <= 0:
+			out.erase(card)
 	return out
 
 
@@ -1147,7 +1167,10 @@ func bag_for_mode() -> Array[StringName]:
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF, cards: Array = [], ids: Array = []) -> void:
 	var wizard := _wizard_scene.instantiate() as Actor
 	var staff_cards: Array = cards if not cards.is_empty() else start_cards_for_mode()
-	PlayerScript.seat_wizard(wizard, index, null, staff_cards.duplicate(true), staffs_for_seat(ids), bag_for_mode())
+	var bag: Dictionary = bag_for_mode()
+	if not cards.is_empty():
+		bag = _less_carried(bag, cards)
+	PlayerScript.seat_wizard(wizard, index, null, staff_cards.duplicate(true), staffs_for_seat(ids), bag)
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < _places.player_spawns.size():

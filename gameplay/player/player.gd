@@ -28,18 +28,23 @@ extends ActorController
 ##   crosses a whole number and when another staff goes on show; every staff has its own pool),
 ##   `staff_mana_changed` (each staff's pool, when it crosses a whole number): the mana is looked
 ##   at each step, in `think` or, while away, `watch_home`, so a regen shows a
-##   step later), `staff_changed` with the plain view of every built staff (`Caster.plan_of`),
-##   `bag_changed` and `build_refused`.
+##   step later), `staff_changed` with the plain view of every hand's staff (`Caster.plan_of`),
+##   and `build_refused`.
+## - **The inventory's events** (the home body's `Inventory`, items I3; all of them when it first
+##   drives the wizard and each time it comes home, then on every change): `bag_changed` for each
+##   bag (its ids, counts and capacity), `owned_staff_changed` for each staff it owns, by its number
+##   (`Inventory.plan_of`, empty once it went), and `hands_changed` (which number is on which hand).
 ## - **The cast events** (from the actor it drives now, whose staffs its buttons cast): `spell_cast`
 ##   (the carrier, `Caster.last_carrier_card`) and `staff_cast` on every cast (with the cast sound `cast`
 ##   from `core/registry`, nothing on null).
-## - **The builder** (`staff_change_requested` and `staff_cards_requested`,
-##   each for this seat only; commands, heard at the tick's start: core/events `listen`) builds the home body's staffs with `Caster.set_staff`, also during a
-##   possession. A change is refused only when the slot does not exist or the card is not in the
-##   `bag` (the run mode's, from `seat_wizard`; every card in the registry when none was given).
-## - **A set bag** (each run mode's, from flow through `seat_wizard`): `set_bag` makes the bag
-##   exactly that list and sends `bag_changed`. A set bag is never
-##   overwritten by the first fill, also when it was set before the wizard first drove.
+## - **The builder** (`staff_change_requested` and `staff_cards_requested`, each for this seat
+##   only and naming a staff by its number; commands, heard at the tick's start: core/events
+##   `listen`) builds the home body's staffs through its inventory (`Inventory.set_card`,
+##   `set_cards`: counted, and a staff on a hand goes into the Caster), also during a possession.
+##   A refusal is sent as `build_refused` with its words (NO_STAFF, NO_SLOT, NO_CARD, BAG_FULL).
+## - **The card bag** (each run mode's, from flow through `seat_wizard`: card id to copies,
+##   `Inventory.give_cards`); a wizard given none gets Inventory.DEV_COPIES of every card in the
+##   registry when it first drives.
 ## - **Possessed** (G9): when another actor's controller takes the actor it drives, it is set aside
 ##   (`set_aside`, `is_set_aside`) and drives nothing until `started` hands it an actor again; the
 ##   panel goes on showing the wizard, and the time is drawn over the wizard (`PossessedLook`).
@@ -61,8 +66,15 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const INPUT_BUFFER: float = 0.15
 ## The four staff buttons (0 RB, 1 RT, 2 LB, 3 LT; owner, 2026-10-26).
 const STAFF_COUNT: int = 4
-## Why the builder's request for a hand with no staff on it is refused (`build_refused`).
-const EMPTY_HAND: String = "That hand holds no staff."
+## Why a builder's request is refused (`build_refused`), by `Inventory.Refusal`.
+const NO_STAFF: String = "You have no such staff."
+const NO_SLOT: String = "There is no such slot."
+const NO_CARD: String = "You do not have that card."
+const BAG_FULL: String = "Your card bag is full."
+const REFUSALS: Dictionary = {
+	Inventory.Refusal.NO_STAFF: NO_STAFF, Inventory.Refusal.NO_SLOT: NO_SLOT,
+	Inventory.Refusal.NO_CARD: NO_CARD, Inventory.Refusal.BAG_FULL: BAG_FULL,
+}
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"
 
@@ -73,17 +85,13 @@ const REFS: Array[StringName] = [&"_actor", &"_home"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
 const VIEW: Array[StringName] = [&"_sound_player"]
 
-## The frames service (core/sim/frames.gd: this seat's input frame each tick) and the registry (the
-## bag, the cast sound). Only tests set these, before adding the node; otherwise the "Frames" and
+## The frames service (core/sim/frames.gd: this seat's input frame each tick) and the registry (a
+## card bag nobody gave, the cast sound). Only tests set these, before adding the node; otherwise the "Frames" and
 ## "Registry" autoloads are used. The frames service is the seat's only input (online-ready N9): a
 ## test feeds a seat through one of its own (tests/gameplay/player/wizard_fixture.gd), and one set
 ## to null later gives no input at all.
 var frames: FramesScript = null
 var registry: RegistryScript = null
-
-## The card ids this seat may build with. Filled from the registry when it first drives, unless
-## it was set (`set_bag`) before.
-var bag: Array[StringName] = []
 
 ## The actor driven now (set by `started`, cleared by `stopped`), or null.
 var _actor: Actor = null
@@ -91,7 +99,6 @@ var _actor: Actor = null
 var _home: Actor = null
 ## Per staff: the seconds left in which a remembered press still counts (0 = none remembered).
 var _buffer_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
-var _bag_filled: bool = false
 var _sound_player: AudioStreamPlayer = null
 ## What the last `player_stats_changed` said, to send it only on a change.
 var _sent_health: float = -1.0
@@ -123,18 +130,19 @@ func _ready() -> void:
 ## Get `body` (a wizard scene, not yet in the tree) ready for seat `seat_index`: its controller's
 ## seat, its ramp (the seat's colour), its four staffs (`staff` for every button, or `staffs`,
 ## one per button: the four heads, a null one an empty hand (items I2); and `cards`: four lists of
-## card ids, built when it enters the tree) and its `bag` (the run mode's, `set_bag`; empty: every
-## card of the registry). Returns its controller, or null when `body` has none.
-static func seat_wizard(body: Actor, seat_index: int, staff: StaffBase, cards: Array, staffs: Array[StaffBase] = [], bag: Array[StringName] = []) -> PlayerController:
+## card ids, built when it enters the tree; its Inventory takes them as its own) and its card bag
+## (`bag`, card id to copies: the run mode's; empty: Inventory.DEV_COPIES of every card of the
+## registry). Returns its controller, or null when `body` has none.
+static func seat_wizard(body: Actor, seat_index: int, staff: StaffBase, cards: Array, staffs: Array[StaffBase] = [], bag: Dictionary = {}) -> PlayerController:
 	var controller: PlayerController = of(body)
 	if controller == null:
 		return null
 	controller.seat = seat_index
-	if not bag.is_empty():
-		controller.set_bag(bag)
 	body.ramp = seat_index
 	for child in body.get_children():
-		if child is Caster:
+		if child is Inventory and not bag.is_empty():
+			(child as Inventory).give_cards(bag)
+		elif child is Caster:
 			var caster := child as Caster
 			caster.staff = staff
 			caster.staffs = staffs
@@ -223,6 +231,7 @@ func started(actor: Actor) -> void:
 	_sent_staff_mana.fill(-1)
 	_sent_staff_max.fill(-1.0)
 	announce_stats()
+	_announce_inventory()
 
 
 ## Bind the home body's numbers and staffs, and the builder's requests, for good (this node goes
@@ -236,15 +245,18 @@ func _bind_home(actor: Actor) -> void:
 		actor.caster.staff_built.connect(_on_staff_built)
 	if actor.health != null:
 		actor.health.changed.connect(_on_health_changed)
+	var inventory: Inventory = actor.inventory
+	if inventory != null:
+		if not inventory.cards_given:
+			_fill_cards(inventory)
+		inventory.bag_changed.connect(_on_bag_changed)
+		inventory.staff_changed.connect(_on_owned_staff_changed)
+		inventory.hands_changed.connect(_on_hands_changed)
 	var bus: EventsScript = actor.events
 	if bus != null:
 		# Commands, heard at the tick's start (core/events, online-ready N2).
 		bus.listen(&"staff_change_requested", _on_staff_change_requested)
 		bus.listen(&"staff_cards_requested", _on_staff_cards_requested)
-		if not _bag_filled:
-			_fill_bag()
-		else:
-			_announce_bag()
 
 
 ## Where the seat's mouse aims from: its home wizard's hand (`Actor.aim_pivot`), INF while it has
@@ -397,27 +409,45 @@ func _play_cast_sound() -> void:
 	_sound_player.play()
 
 
-func _fill_bag() -> void:
-	_bag_filled = true
-	bag.clear()
-	if registry != null:
-		for id: StringName in registry.get_ids(&"spells"):
-			if registry.get_resource(&"spells", id) is SpellComponent:
-				bag.append(id)
-	_announce_bag()
+## Fill `inventory`'s card bag nobody gave: Inventory.DEV_COPIES of every card in the registry.
+func _fill_cards(inventory: Inventory) -> void:
+	inventory.give_cards(Inventory.dev_cards(registry))
 
 
-## Make the bag exactly `cards` (a copy) and announce it. The first fill never overwrites it.
-func set_bag(cards: Array[StringName]) -> void:
-	_bag_filled = true
-	bag.assign(cards)
-	_announce_bag()
+## Every bag, every staff owned and the hands of the home body, to the seat's events (when it
+## first drives the wizard, and each time it comes home).
+func _announce_inventory() -> void:
+	if _home == null or _home.inventory == null:
+		return
+	for bag: StringName in ItemKinds.BAGS:
+		_on_bag_changed(bag)
+	for number: int in _home.inventory.numbers():
+		_on_owned_staff_changed(number)
+	_on_hands_changed()
 
 
-## `bag_changed` for this seat, once it has a home body (before that, binding it announces).
-func _announce_bag() -> void:
-	if _home != null and _home.events != null:
-		_home.events.bag_changed.emit(seat, bag.duplicate())
+## `bag_changed` for this seat: what the home body's bag `bag` holds now.
+func _on_bag_changed(bag: StringName) -> void:
+	if _home == null or _home.events == null or _home.inventory == null:
+		return
+	var ids: Array[StringName] = []
+	var counts := PackedInt32Array()
+	for stack: ItemStack in _home.inventory.stacks_in(bag):
+		ids.append(stack.id)
+		counts.append(stack.count)
+	_home.events.bag_changed.emit(seat, bag, ids, counts, _home.inventory.capacity_of(bag))
+
+
+## `owned_staff_changed` for this seat: staff `number` of the home body as it is now.
+func _on_owned_staff_changed(number: int) -> void:
+	if _home != null and _home.events != null and _home.inventory != null:
+		_home.events.owned_staff_changed.emit(seat, number, _home.inventory.plan_of(number))
+
+
+## `hands_changed` for this seat.
+func _on_hands_changed() -> void:
+	if _home != null and _home.events != null and _home.inventory != null:
+		_home.events.hands_changed.emit(seat, _home.inventory.hands())
 
 
 func _refuse(reason: String) -> void:
@@ -425,53 +455,29 @@ func _refuse(reason: String) -> void:
 		_home.events.build_refused.emit(seat, reason)
 
 
-## The home body's Caster: the builder edits the player's own wizard, also during a possession.
-func _builder_caster() -> Caster:
-	return _home.caster if _home != null else null
+## The home body's Inventory: the builder edits the player's own wizard, also during a possession.
+func _builder_inventory() -> Inventory:
+	return _home.inventory if _home != null else null
 
 
-## True (and refused with EMPTY_HAND) when button `at` of `caster` exists but holds no staff.
-func _refused_empty_hand(caster: Caster, at: int) -> bool:
-	if caster == null or at < 0 or at >= caster.staff_count or caster.holds(at):
-		return false
-	_refuse(EMPTY_HAND)
-	return true
-
-
-## A builder asked to put `card_id` into `slot` of staff `at` (`&""` empties it).
-func _on_staff_change_requested(player: int, at: int, slot: int, card_id: StringName) -> void:
+## A builder asked to put `card_id` into `slot` of staff number `number` (`&""` empties it).
+func _on_staff_change_requested(player: int, number: int, slot: int, card_id: StringName) -> void:
 	if player != seat:
 		return
-	var caster: Caster = _builder_caster()
-	if _refused_empty_hand(caster, at):
-		return
-	if caster == null or at < 0 or at >= caster.staff_count or slot < 0 or slot >= caster.slot_count(at):
-		_refuse("There is no such slot.")
-		return
-	if card_id != &"" and not bag.has(card_id):
-		_refuse("You do not have that card.")
-		return
-	var row: Array[StringName] = caster.cards_of(at)
-	row[slot] = card_id
-	caster.set_staff(at, row)
+	var inventory: Inventory = _builder_inventory()
+	_answer(inventory.set_card(number, slot, card_id) if inventory != null else Inventory.Refusal.NO_STAFF)
 
 
-## A builder asked to set every slot of staff `at` at once (`cards` by slot; fewer than the
-## staff's slots empties the rest). Refused, and nothing changes, for a staff that does not
-## exist, more cards than slots, or a card not in the `bag`.
-func _on_staff_cards_requested(player: int, at: int, cards: Array[StringName]) -> void:
+## A builder asked to set every slot of staff number `number` at once (`cards` by slot; fewer than
+## the staff's slots empties the rest). Refused, and nothing changes, as `Inventory.set_cards` says.
+func _on_staff_cards_requested(player: int, number: int, cards: Array[StringName]) -> void:
 	if player != seat:
 		return
-	var caster: Caster = _builder_caster()
-	if _refused_empty_hand(caster, at):
-		return
-	if caster == null or at < 0 or at >= caster.staff_count or cards.size() > caster.slot_count(at):
-		_refuse("There is no such slot.")
-		return
-	for card_id in cards:
-		if card_id != &"" and not bag.has(card_id):
-			_refuse("You do not have that card.")
-			return
-	caster.set_staff(at, cards)
+	var inventory: Inventory = _builder_inventory()
+	_answer(inventory.set_cards(number, cards) if inventory != null else Inventory.Refusal.NO_STAFF)
 
 
+## A refusal's words to the seat (`build_refused`); nothing for a change that was made.
+func _answer(refusal: Inventory.Refusal) -> void:
+	if refusal != Inventory.Refusal.NONE:
+		_refuse(str(REFUSALS.get(refusal, NO_STAFF)))

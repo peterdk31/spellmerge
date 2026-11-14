@@ -2,6 +2,19 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-14: stacks, kinds, the inventory and counted cards (items I3)
+
+- **The inventory takes the staffs the body was made with** (at `setup`, from the Caster's hands as `seat_wizard` set them), rather than `seat_wizard` handing them to it: one path covers every wizard, from Flow, a test or a scene. From then on it owns them: it changes a hand's cards with `Caster.set_staff`, and nothing else does.
+- **The start staffs are numbered by their button,** later staffs count on from 4, so every builder request a test, a bot or a replay already sent (`staff_change_requested(seat, 0, ...)`) names the same staff, and the command's shape is unchanged.
+- **A staff on a hand is out of the staff bag:** the bag's x/y counts the staffs off a hand. The builder's strip shows both (the hands, then the bag).
+- **The start cards come with their staffs, beside the bag:** Play's wizard has its dash and bolt in its staffs and one more of each in its bag (PLAY_BAG, an entry a copy), as a staff item (I6) brings its own cards.
+- **Only the wizard has an inventory in I3.** An enemy's (its staff bag the staffs it holds) moves to I8, the first step that reads one (a possessed body's menus): a boss's phases swap its staffs in the Caster (`replace_staffs`), and routing that through an inventory belongs with the step that needs it. The stress bench's `replace_staffs` on wizards stays until I7 puts staffs on hands.
+- **A bag's capacity is not yet one of the run's rules:** every bag is unlimited in I3, and a `SessionRules` field changes the replay's header, which I4 changes anyway; it goes in there.
+- **Cards given back to a full card bag are refused** (`BAG_FULL`) until I6, which drops them at the body's feet, so a staff can always be emptied. Nothing has a capacity before then.
+- **A wizard made again with the staffs it carried gets the mode's bag less their cards** (`Flow._less_carried`): the hub begun anew for a joining machine then holds exactly what it held (nothing else changes a hub's counts), where a fresh bag beside the carried staffs would add copies at every rejoin. A run from the stone takes them out of Play's bag the same way. The player record (I4) carries the bags themselves and replaces this.
+- **The refusals are an enum** (`Inventory.Refusal`); their words are the player controller's, so the simulation holds no HUD text.
+- **`core/items/` is a simulation folder,** so its scripts are held to the simulation's rules and declared state like the rest.
+
 ## 2026-11-13: an unplugged pad pauses the game (owner)
 
 - **An unplugged pad no longer leaves its seat** (owner: "An unplugged pad should not result in the seat being left! It should instead pause the game, and wait for that controller to reconnect"): the seat and its wizard stay, the game stops for everyone until that controller is back. Leaving is the pause menu's "Leave game" (items I2). A task in docs/NEXT.md.

@@ -38,9 +38,9 @@ const NUMBER_SPARED: StringName = &"spared"
 ## the online spike's Host/Join send it (the main menu's Play sends `hub_requested` since online-lobby
 ## L1). Heard by flow. A run's start, not a command.
 signal play_requested(player: int)
-## Sender: hud. `player` asked to put the card `card_id` into slot `slot` of their staff `staff` (0-3: A, X, Y, B); `&""` empties the slot. Heard by player, which applies it (staffs, docs/milestones/M2-staffs.md).
+## Sender: hud. `player` asked to put the card `card_id` into slot `slot` of their staff number `staff` (its number in the inventory, on a hand or in the bag: `owned_staff_changed`; items I3); `&""` empties the slot. Counted: the card comes out of the card bag, the one it replaces goes back. Heard by player, which applies it (staffs, docs/milestones/M2-staffs.md).
 signal staff_change_requested(player: int, staff: int, slot: int, card_id: StringName)
-## Sender: hud. `player` asked to set every slot of their staff `staff` at once: `cards` holds the card ids by slot (`&""` for an empty slot), as many as the staff has slots or fewer (the rest are emptied). The radial builder sends it for a push-right insert, a take-out that closes the gap, an undo and a clear, so each is one change. Heard by player.
+## Sender: hud. `player` asked to set every slot of their staff number `staff` (as `staff_change_requested`'s) at once: `cards` holds the card ids by slot (`&""` for an empty slot), as many as the staff has slots or fewer (the rest are emptied). The radial builder sends it for a push-right insert, a take-out that closes the gap, an undo and a clear, so each is one change. Heard by player.
 signal staff_cards_requested(player: int, staff: int, cards: Array[StringName])
 ## A player picked reward choice number `choice`. Heard by rewards.
 signal reward_pick_requested(player: int, choice: int)
@@ -182,9 +182,13 @@ signal carrier_ended(caster: int, carrier_card: StringName, at: Vector2, directi
 signal cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.
 signal build_refused(player: int, reason: String)
-## Sender: player. The component ids `player` may build with, in registry order. Sent when the wizard appears and whenever the bag changes.
-signal bag_changed(player: int, bag: Array[StringName])
-## Sender: player. The staff `staff` (0-3) of `player`'s own wizard was built or changed (never another actor's the seat drives). `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them. Heard by hud.
+## Sender: player. What the bag `bag` (one of `ItemKinds.BAGS`) of `player`'s own wizard holds now (items I3): the ids of its stacks in the order they came, with the copies of each (`counts`, as long as `ids`; a card with none left is not there), and its `capacity` in copies (-1: no limit). Sent for every bag when the wizard appears and for a bag whenever it changes. Heard by hud (the builder reads the card bag).
+signal bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, capacity: int)
+## Sender: player. The staff number `staff` of `player`'s own wizard (its number in the inventory, stable while it owns it; on a hand or in the bag) was built or changed: `plan` as `staff_changed`'s, empty when the staff is no longer owned (items I3). Sent for every staff when the wizard appears. Heard by hud (the builder: every staff it builds).
+signal owned_staff_changed(player: int, staff: int, plan: Dictionary)
+## Sender: player. Which staff is on which hand of `player`'s own wizard: by button (0 RB, 1 RT, 2 LB, 3 LT) the number of the staff on it, -1 for an empty hand (items I3). Sent when the wizard appears and whenever it changes. Heard by hud (the builder's strip of staffs).
+signal hands_changed(player: int, hands: PackedInt32Array)
+## Sender: player. The staff on hand `staff` (0-3: RB, RT, LB, LT) of `player`'s own wizard was built or changed (never another actor's the seat drives). `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them; empty for an empty hand. Heard by hud (the corner panel).
 signal staff_changed(player: int, staff: int, plan: Dictionary)
 ## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by feel.
 signal staff_cast(player: int, staff: int, origin: Vector2, direction: Vector2)

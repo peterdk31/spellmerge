@@ -21,7 +21,7 @@ extends FrameSource
 ##
 ## Builder: `build_random(seed)` builds a random staff into staff 1 (BUILD_STAFF, RB: `dash` at the
 ## start, so RT keeps its `bolt` and the wave is still cleared; LB is an empty hand since items I2) with the same `staff_change_requested` events a person sends (slot by slot, from the
-## bag of the wizard). The cards come from `staff_fuzzer.gd`, seeded, so a failing run can be
+## card bag of the wizard, never more copies than it holds). The cards come from `staff_fuzzer.gd`, seeded, so a failing run can be
 ## replayed. `open_builder()` is how bot 4 of the 4-bot test works: one press of `back` (B),
 ## and it stays there (the full builder, waves included).
 ##
@@ -95,8 +95,9 @@ func build_random(build_seed: int) -> bool:
 	var wizard := _flow.call("get_wizard", player) as Actor
 	if events == null or spells == null or wizard == null or wizard.caster == null:
 		return false
-	var bag: Array[StringName] = []
-	bag.assign(PlayerController.of(wizard).bag)
+	# One entry a copy in the wizard's card bag (items I3: cards are counted), so the bot never asks
+	# for more copies than it holds.
+	var bag: Array[StringName] = _copies(wizard)
 	var fuzzer := FuzzerScript.new(bag, func(id: StringName) -> StringName: return spells.call("component_kind", id))
 	if not fuzzer.can_build():
 		return false
@@ -105,11 +106,28 @@ func build_random(build_seed: int) -> bool:
 	var slots: int = wizard.caster.slot_count()
 	var cards: Array[StringName] = fuzzer.random_cards(rng, mini(BUILD_CARDS, slots))
 	built_cards.clear()
+	var left: Array[StringName] = bag.duplicate()
 	for slot in slots:
-		built_cards.append(cards[slot] if slot < cards.size() else &"")
+		var card: StringName = cards[slot] if slot < cards.size() else &""
+		# A card drawn more often than the bag holds it stays out (the slot empty).
+		if card != &"" and not left.has(card):
+			card = &""
+		left.erase(card)
+		built_cards.append(card)
 		events.emit_signal("staff_change_requested", player, BUILD_STAFF, slot, built_cards[slot])
 		requests_sent += 1
 	return true
+
+
+## The wizard's card bag, one entry a copy.
+static func _copies(wizard: Actor) -> Array[StringName]:
+	var out: Array[StringName] = []
+	if wizard.inventory == null:
+		return out
+	for stack: ItemStack in wizard.inventory.stacks_in(ItemKinds.bag_of(ItemKinds.CARD)):
+		for _copy in stack.count:
+			out.append(stack.id)
+	return out
 
 
 ## Open the builder as a person does: one press of `back` (B).

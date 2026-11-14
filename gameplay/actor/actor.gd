@@ -12,7 +12,7 @@ extends Node2D
 ##
 ## Components: found once in `_ready` among the children, at most one of each kind, none required:
 ## `health` (Health), `hurtbox` (Hurtbox), `contact` (Contact), `mover` (Mover), `caster`
-## (Caster), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
+## (Caster), `inventory` (Inventory: what it holds, never stepped; items I3), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
 ## circle when its scene has none, so every actor has one), `state_triggers` (PropStateTriggers: a prop's states,
 ## props W6; never stepped, it hears its body), plus any number of looks (ActorLook)
 ## and the first ActorController, its `home_controller`. Its `damage_numbers` (DamageNumbers,
@@ -162,6 +162,8 @@ var hurtbox: Hurtbox = null
 var contact: Contact = null
 var mover: Mover = null
 var caster: Caster = null
+## What it holds, in bags, and its staffs on hands (items I3), null for a body that holds nothing.
+var inventory: Inventory = null
 var footprint: Footprint = null
 ## A prop's states and their triggers (props W6), null for a body that has none.
 var state_triggers: PropStateTriggers = null
@@ -592,6 +594,8 @@ func _find_components() -> void:
 			mover = _first(mover, child) as Mover
 		elif child is Caster:
 			caster = _first(caster, child) as Caster
+		elif child is Inventory:
+			inventory = _first(inventory, child) as Inventory
 		elif child is Footprint:
 			footprint = _first(footprint, child) as Footprint
 		elif child is PropStateTriggers:
@@ -616,7 +620,8 @@ func _find_components() -> void:
 		add_child(damage_numbers)
 	# Set up and attached in this order: health first, the caster after the hurtbox (it names it),
 	# a prop's state triggers last (they shape the hurt shape and footprint, and cast).
-	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster, state_triggers]
+	# The inventory after the caster: it takes the staffs the caster was made with (items I3).
+	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster, inventory, state_triggers]
 	var at: int = 0
 	for component in ordered:
 		if component != null:

@@ -53,14 +53,16 @@ func _open(count: int, kind: StringName = &"") -> void:
 	_radial.index = 0
 	root.add_child(_radial)
 	_radial.bind(_bus, _focus, _spells, _input)
-	_bus.bag_changed.emit(0, FakeCards.ids(count))
+	FakeCards.announce_bag(_bus, 0, FakeCards.ids(count))
 	var staff := StaffBase.new()
 	staff.slots = 20
 	var row: Array[StringName] = []
 	row.resize(staff.slots)
 	row.fill(&"")
+	var plans: Array[Dictionary] = []
 	for at in 4:
-		_bus.staff_changed.emit(0, at, _spells.staff_view(row, staff))
+		plans.append(_spells.staff_view(row, staff))
+	FakeCards.announce_staffs(_bus, 0, plans)
 	check(_radial.open_builder(), "the radial opens")
 
 
@@ -182,7 +184,7 @@ func test_the_ring_is_a_to_z_by_the_names_shown() -> void:
 	(_spells.registry.items[FakeCards.id(0)] as SpellComponent).display_name = "zap"
 	var bag: Array[StringName] = FakeCards.ids(12)
 	bag.reverse()
-	_bus.bag_changed.emit(0, bag)
+	FakeCards.announce_bag(_bus, 0, bag)
 	var wanted: Array[StringName] = FakeCards.ids(12).slice(1)
 	wanted.append(FakeCards.id(0))
 	var shown: Array[StringName] = []

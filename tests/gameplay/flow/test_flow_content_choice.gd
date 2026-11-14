@@ -72,16 +72,17 @@ func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 	check_equal(heads.size(), 4, "the four basic staffs have four different heads")
 
 
-## Each mode's setup (owner, 2026-11-05): a new wizard's bag is the mode's. Play: dash and bolt;
-## the sandbox and the hub (owner, 2026-11-11): every card, a joiner's too.
+## Each mode's setup (owner, 2026-11-05): a new wizard's card bag is the mode's, counted (items
+## I3). Play: one dash and one bolt; the sandbox and the hub (owner, 2026-11-11 and 2026-11-13):
+## Inventory.DEV_COPIES of every card, a joiner's too.
 func test_each_mode_gives_its_own_bag() -> void:
 	var registry: Node = root.get_node("Registry")
-	var every: Array[StringName] = []
+	var every: Dictionary = {}
 	for id: StringName in registry.call("get_ids", &"spells"):
 		if registry.call("get_resource", &"spells", id) is SpellComponent:
-			every.append(id)
+			every[id] = Inventory.DEV_COPIES
 	var wanted: Dictionary = {
-		FlowScript.MODE_WAVES: [&"dash", &"bolt"] as Array[StringName],
+		FlowScript.MODE_WAVES: {&"dash": 1, &"bolt": 1},
 		FlowScript.MODE_SANDBOX: every,
 		FlowScript.MODE_HUB: every,
 	}
@@ -92,12 +93,12 @@ func test_each_mode_gives_its_own_bag() -> void:
 		var wizard := flow.get_wizard(0) as Actor
 		check(wizard != null, "%s: a wizard" % mode)
 		if wizard != null:
-			check_equal(PlayerController.of(wizard).bag, wanted[mode], "%s: the wizard's bag" % mode)
+			check_equal(_card_counts(wizard), wanted[mode], "%s: the wizard's bag" % mode)
 		flow._on_player_joined(1)
 		var joiner := flow.get_wizard(1) as Actor
 		check(joiner != null, "%s: a joiner's wizard" % mode)
 		if joiner != null:
-			check_equal(PlayerController.of(joiner).bag, wanted[mode], "%s: the joiner's bag" % mode)
+			check_equal(_card_counts(joiner), wanted[mode], "%s: the joiner's bag" % mode)
 		flow.stop_run()
 
 
@@ -159,3 +160,26 @@ func test_a_joiner_gets_the_wizard_scene_the_run_started_with() -> void:
 	flow._on_player_joined(1)
 	var joiner: Node = flow.get_wizard(1)
 	check(joiner != null and joiner.name != &"LaterWizard", "a joiner mid-run keeps the run's wizard scene")
+
+
+## `wizard`'s card bag as card id to copies.
+func _card_counts(wizard: Actor) -> Dictionary:
+	var out: Dictionary = {}
+	for stack: ItemStack in wizard.inventory.stacks_in(ItemKinds.bag_of(ItemKinds.CARD)):
+		out[stack.id] = stack.count
+	return out
+
+
+## Regression (review): a wizard made again with the staffs it carried (the hub begun anew for a
+## joining machine) owns no more copies than before: the carried cards come out of the mode's bag.
+func test_carried_cards_are_not_counted_twice() -> void:
+	flow.mode = FlowScript.MODE_HUB
+	var kept: Array = [[[&"bolt", &"bolt", &"bolt"], [&"fire"]], [], [], []]
+	check(flow.start_run(0, kept), "the hub starts with a carried staff")
+	var wizard := flow.get_wizard(0) as Actor
+	var counts: Dictionary = _card_counts(wizard)
+	check_equal(int(counts.get(&"bolt", 0)), Inventory.DEV_COPIES - 3, "three bolts are the staff's, the rest the bag's")
+	check_equal(int(counts.get(&"fire", 0)), Inventory.DEV_COPIES - 1, "and one fire")
+	check_equal(int(counts.get(&"nova", 0)), Inventory.DEV_COPIES, "another card as many as ever")
+	check_equal(FlowScript._less_carried({&"dash": 1}, [[&"dash", &"dash"]]), {}, "never below none")
+	flow.stop_run()

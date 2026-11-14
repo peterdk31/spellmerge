@@ -61,8 +61,9 @@ signal staff_built(at: int)
 ## The card ids built into each staff when the actor is ready (a list per staff).
 @export var start_cards: Array = []
 ## The buttons that hold no staff (a bit each, 1 << button): an empty hand (items I2). Set before
-## the actor is ready (`PlayerController.seat_wizard`); a staff is put on a hand by the inventory
-## later (items I3).
+## the actor is ready (`PlayerController.seat_wizard`). An actor with an `Inventory` (items I3) is
+## made with its staffs here, which the inventory then owns: it changes a hand's cards with
+## `set_staff`, and nothing else does.
 var empty_hands: int = 0
 ## The staff on show: the one pressed or held last (0 at the start).
 var current: int = 0

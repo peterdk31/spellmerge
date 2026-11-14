@@ -148,13 +148,13 @@ func test_the_ring_holds_every_card_once_grouped_by_kind() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
 	var entries: Array[Dictionary] = radial.ring_entries()
-	check_equal(entries.size(), PlayerController.of(_players[0]).bag.size(), "every card of the bag")
+	check_equal(entries.size(), _players[0].inventory.stacks_in(&"cards").size(), "every card of the bag")
 	var last: int = 0
 	for entry in entries:
 		var order: int = RadialScript.KINDS.find(entry["kind"])
 		check(order >= last, "%s is in kind order" % entry["id"])
 		last = order
-		check_equal(int(entry["count"]), 1, "one of each in a plain bag")
+		check_equal(int(entry["count"]), _players[0].inventory.count_of(&"cards", entry["id"]), "%s: its copies" % entry["id"])
 		check_equal(radial.direction_to(entry["id"]).is_zero_approx(), false, "%s can be pointed at" % entry["id"])
 
 
@@ -414,6 +414,55 @@ func test_lb_rb_pass_an_empty_hand() -> void:
 	check(radial.holds_staff(radial.viewed_staff()), "LB too")
 
 
+## The strip of staffs (items I3): the hands first, then the staffs in the bag; RB pages on to a
+## staff in the bag, and RT builds it by its number, which leaves the hands' staffs as they were.
+func test_the_strip_reaches_a_staff_in_the_bag_and_builds_it_by_number() -> void:
+	_start(1)
+	var inventory: Inventory = _players[0].inventory
+	var curl: StaffBase = _registry.get_resource(&"wizard", &"curl") as StaffBase
+	check(inventory.add(ItemStack.of_staff(curl)), "a staff into the bag")
+	var number: int = inventory.numbers()[inventory.numbers().size() - 1]
+	var radial: RadialScript = _open(0)
+	check_equal(radial.strip(), PackedInt32Array([0, 1, 2, 3, number]), "the hands' staffs, then the bag's")
+	var tabs: Array[Dictionary] = radial.strip_tabs()
+	check_equal([tabs[4]["staff"], tabs[4]["hand"]], [number, RadialScript.NONE], "its tab is after the hands', on no hand")
+	check_equal(radial.viewed_staff(), 1, "it opens on RT's staff")
+	for _i in 3:
+		_tap(0, &"page_next")
+		_frame()
+	check_equal(radial.viewed_staff(), number, "RB pages on to it past LB and LT")
+	tabs = radial.strip_tabs()
+	check(tabs[4]["rect"].position.x >= 0.0, "the strip scrolled its tab into view")
+	var before: Array[StringName] = _players[0].caster.cards_of(0)
+	_point(0, &"atom")
+	_tap(0, &"staff_2")
+	_frame()
+	check_equal(_single.back(), [0, number, 0, &"atom"], "the request names the staff's number")
+	check_equal(radial.cards_of(number)[0], &"atom", "the player answered for it")
+	check_equal(_players[0].caster.cards_of(0), before, "and no staff on a hand changed")
+	_let_go(0)
+	check_equal(radial.hub_lines()[0], curl.display_name, "the hub names a staff in the bag by its staff")
+	_tap(0, &"page_next")
+	_frame()
+	check_equal(radial.viewed_staff(), 0, "RB wraps round to the first hand")
+	check_equal(radial.hub_lines()[0], "Staff 1", "a hand's staff by its hand")
+	# Regression (review): the staff shown goes, and another is shown from its first slot.
+	_show_bag_staff(radial, number)
+	inventory.take(&"staffs", &"curl")
+	_frame()
+	check(radial.holds_staff(radial.viewed_staff()), "the builder shows a staff still owned")
+	check_equal(radial.strip(), PackedInt32Array([0, 1, 2, 3]), "and the strip lost its tab")
+
+
+## Page `radial` on to staff `number`.
+func _show_bag_staff(radial: RadialScript, number: int) -> void:
+	for _i in 8:
+		if radial.viewed_staff() == number:
+			return
+		_tap(0, &"page_next")
+		_frame()
+
+
 func test_the_one_kind_ring_flips_with_the_dpad() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
@@ -452,16 +501,25 @@ func test_the_numbers_show_the_mana_share_and_what_rt_would_change() -> void:
 	check(radial.number_lines()[0].get_slice(" > ", 0).ends_with("!"), "a cast dearer than all the mana is marked: %s" % radial.number_lines()[0])
 
 
-func test_a_bag_with_several_of_a_card_counts_them() -> void:
+## Cards are counted (items I3): the ring shows each card's copies left, and a card with none left
+## is not on it.
+func test_the_ring_counts_the_copies_and_a_card_with_none_left_goes() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	var bag: Array[StringName] = PlayerController.of(_players[0]).bag.duplicate()
-	bag.append(&"bolt")
-	bag.append(&"bolt")
-	_bus.bag_changed.emit(0, bag)
-	var bolts: Array[Dictionary] = radial.ring_entries().filter(func(entry: Dictionary) -> bool: return entry["id"] == &"bolt")
-	check_equal(bolts.size(), 1, "one place on the ring")
-	check_equal(int(bolts[0]["count"]), 3, "counted three times")
+	_players[0].inventory.give_cards({&"bolt": 3, &"fire": 1})
+	check_equal(_counts(radial), {&"bolt": 3, &"fire": 1}, "one place on the ring each, with its copies")
+	_bus.staff_change_requested.emit(0, 2, 0, &"fire")
+	check_equal(_counts(radial), {&"bolt": 3}, "the last fire is in a staff, so it leaves the ring")
+	_bus.staff_change_requested.emit(0, 2, 0, &"bolt")
+	check_equal(_counts(radial), {&"bolt": 2, &"fire": 1}, "taken out, it is back; the bolt put in is one less")
+
+
+## The ring's cards and their counts.
+func _counts(radial: RadialScript) -> Dictionary:
+	var out: Dictionary = {}
+	for entry in radial.ring_entries():
+		out[entry["id"]] = int(entry["count"])
+	return out
 
 
 func test_four_radials_open_at_once_each_for_its_own_player() -> void:

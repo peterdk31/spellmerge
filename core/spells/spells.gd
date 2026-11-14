@@ -765,7 +765,7 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 ## (read order), `text`, `mana`, `wind_up` (the seconds it winds up before it leaves), `wind_down` (the seconds its staff is busy after it), `delay` (the wait in all: the wind-down, and the staff's cooldown when the cycle ends with it), `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `ends_cycle`, `wrapped`, `targets` (card slot -> the
 ## carrier's slot) and `wasted` (slot ->
 ## true), and `tree` (the cast as the builder's tree draws it, `cast_tree`); `wasted` for the
-## staff (cards that did nothing in any cast that read them); and `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
+## staff (cards that did nothing in any cast that read them); `name`, the staff's name shown (`StaffBase.display_name`, "" for none; items I3: the builder names a staff in the bag by it); and `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
 ## (the radial builder shows what a card would change before it is put in).
 func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	var compiled: CompiledStaff = compile_staff(cards, staff)
@@ -780,7 +780,7 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 		})
 	var row: Array[StringName] = []
 	row.assign(compiled.cards)
-	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate(), "staff": staff}
+	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate(), "name": staff.display_name if staff != null else "", "staff": staff}
 
 
 

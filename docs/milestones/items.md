@@ -1,6 +1,6 @@
 # Items: things a body picks up, holds in bags and drops
 
-**Status (2026-11-13): planned with the owner in an owner session** (the owner, after the last round: "Go ahead"); this document is step I1. I2, I3 and I4 are built (below, "I2 done", "I3 done", "I4 done"); I5 is next. Asked by the owner: "Let's design a plan for having item pickups in the game. The first thing we need is staff pickups."
+**Status (2026-11-13): planned with the owner in an owner session** (the owner, after the last round: "Go ahead"); this document is step I1. I2 to I5 are built (below, "I2 done" to "I5 done"); I6 is next. Asked by the owner: "Let's design a plan for having item pickups in the game. The first thing we need is staff pickups."
 
 The steps are **I1 to I9** (I for items). Each is one PR with its tests, in order.
 
@@ -147,6 +147,8 @@ This document, the roadmap's exception and the decisions.
 (`hud/widgets/`, `hud/builder/`)
 
 - `RadialMenu` pulled out of `radial_builder.gd`. No behaviour changes; the builder's tests pass as they are.
+
+**I5 done (2026-11-14).** `hud/widgets/radial_menu.gd`: a helper the host Control owns, which draws into the host's canvas from the host's `_draw` (so what lies over the ring, the builder's flying cards, stays the host's) and knows nothing of what its places hold. The ring's places from entry numbers and widths (`lay_out`, the first entry at the top), pointing with the stick or P1's mouse (`aim`, `pick_on_ring`, `pick_among` with the hysteresis, `point_at`, the pointer line), the layers (`enter`, `back`, `depth`; the builder has none, the inventory's bags will), the hint row (`make_hints`, `set_hints`: the glyphs, as the host's children, and the verbs, dimmed when a button does nothing) and the ring's, hub's and arcs' drawing. The builder lays its cards out on it (`_build_ring`) and keeps the cards, the slots, the hub's words and the strip; its ring styles pick and draw through `radial.menu()`. The builder's tests pass unchanged. Tests: `tests/hud/test_radial_menu.gd`.
 
 ## I6: items on the ground
 

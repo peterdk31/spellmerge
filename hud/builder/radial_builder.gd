@@ -18,7 +18,8 @@ extends Control
 ##   frame and the middle of the ring (the hub) shows its icon, name, kind and own numbers
 ##   (`Spells.component_stats`). Landing on a card rumbles the pad briefly; a gap rumbles
 ##   nothing. Letting go of the stick lets the card go. The pointed card holds on a little past
-##   its border (`STICKY_ANGLE`), so a wobbling thumb does not flicker between two cards.
+##   its border (the radial menu's `STICKY_ANGLE`), so a wobbling thumb does not flicker between
+##   two cards.
 ## - **Ring styles** (owner, 2026-10-30): `ring_picker` swaps in another way to pick and draw the
 ##   ring (`rings/`: a zoom fan, a kinds-first ring), each in its own file so it is easy to drop.
 ## - **The strip of staffs** (items I3): every staff the player owns, by its number in the
@@ -67,12 +68,16 @@ extends Control
 ## input is captured and `back` and the paging buttons come as UIFocus signals; the sticks, the
 ## triggers are read from `core/input` (press counts and the menu sticks), only for its
 ## own player. Hints show the buttons (`widgets/action_glyph.gd`), never action names.
+## The ring, pointing at it and the hint row are the shared radial menu's (`widgets/radial_menu.gd`,
+## items I5): this builder lays its cards out on it and draws them, the inventory will lay out its
+## bags and items.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
+const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
 const RingPickerScript := preload("res://hud/builder/rings/ring_picker.gd")
 const TreeViewScript := preload("res://hud/builder/tree_view.gd")
 
@@ -133,9 +138,10 @@ const SLOT_SIZE: float = 16.0
 const SLOT_STEP: float = 18.0
 const SLOT_COLUMNS: int = 5
 const SLOT_ROWS: int = 4
-const RING_RADIUS: float = 56.0
-const HUB_RADIUS: float = 38.0
-const ARC_OUT: float = 12.0
+## The ring's sizes are the shared radial menu's (`hud/widgets/radial_menu.gd`).
+const RING_RADIUS: float = RadialMenuScript.RING_RADIUS
+const HUB_RADIUS: float = RadialMenuScript.HUB_RADIUS
+const ARC_OUT: float = RadialMenuScript.ARC_OUT
 ## The ring's middle sits this far below the quarter's top.
 const RING_FROM_EDGE: float = 84.0
 const TILE_MAX: float = 18.0
@@ -145,24 +151,15 @@ const ICON_MIN: float = 10.0
 const ICON_SIZE: float = 16.0
 ## A gap between two kinds is this many cards wide.
 const GAP_WIDTH: float = 0.6
-const FONT_SIZE: int = 8
 const LINE_STEP: float = 9.0
-const HINT_HEIGHT: float = 10.0
+const HINT_HEIGHT: float = RadialMenuScript.HINT_HEIGHT
 
-## The right stick points past this; the left stick moves the marker past MOVE_THRESHOLD, again
-## after MOVE_DELAY seconds held, then every MOVE_REPEAT.
-const POINT_THRESHOLD: float = 0.5
+## The left stick moves the marker past MOVE_THRESHOLD, again after MOVE_DELAY seconds held, then
+## every MOVE_REPEAT. (Pointing, its hysteresis and P1's mouse on the ring are the radial menu's.)
 const MOVE_THRESHOLD: float = 0.5
 const MOVE_DELAY: float = 0.3
 const MOVE_REPEAT: float = 0.11
-## Hysteresis: the pointed card stays pointed until the stick is this far (radians) past its
-## border, so a thumb's wobble does not flicker between neighbours; at most STICKY_SHARE of
-## the card's width, so a neighbour's middle always picks the neighbour.
-const STICKY_ANGLE: float = 0.07
-const STICKY_SHARE: float = 0.4
-## P1's mouse points when it is this far from the ring's middle, up to the arcs and a margin.
-const MOUSE_INNER: float = 10.0
-const MOUSE_OUTER: float = 90.0
+const MOUSE_INNER: float = RadialMenuScript.MOUSE_INNER
 const CLEAR_HOLD: float = 0.6
 ## LT held this long before the clear's red frame shows, so a quick take-out does not flash it.
 const CLEAR_SHOW: float = 0.12
@@ -205,7 +202,7 @@ var layout: Layout = Layout.ALL:
 	set(value):
 		layout = value
 		_kind_page = 0
-		_pointed = NONE
+		_menu.pointed = NONE
 		_build_ring()
 		_changed()
 var put: Put = Put.PUSH:
@@ -218,7 +215,7 @@ var put: Put = Put.PUSH:
 var ring_picker: RingPickerScript = null:
 	set(value):
 		ring_picker = value
-		_pointed = NONE
+		_menu.pointed = NONE
 		if ring_picker != null:
 			ring_picker.reset()
 		_changed()
@@ -242,11 +239,9 @@ var _mana: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 
 ## The ring's entries, one per card id and level in the card bag: {id, level, count, kind}.
 var _entries: Array[Dictionary] = []
-## The ring as drawn: per position its entry (NONE for a gap), its middle angle and its width
-## (radians; 0 is up, clockwise).
-var _ring_entry: PackedInt32Array = PackedInt32Array()
-var _ring_angle: PackedFloat32Array = PackedFloat32Array()
-var _ring_width: PackedFloat32Array = PackedFloat32Array()
+## The ring itself (its places, pointing, the hint row): the shared radial menu, laid out from
+## the entries by `_build_ring`; its entry numbers are indices into `_entries`.
+var _menu: RadialMenuScript = RadialMenuScript.new(self, 0)
 ## The kinds the bag has, in ring order, and the one shown with the layout KIND.
 var _kinds: Array[StringName] = []
 var _kind_page: int = 0
@@ -259,8 +254,6 @@ var _tree_open: bool = false
 var _viewed: int = 1
 var _slot: int = 0
 var _first_row: int = 0
-## The entry pointed at, or NONE.
-var _pointed: int = NONE
 ## The staff as RT would leave it with the pointed card, and its numbers ({} when none).
 var _preview: Dictionary = {}
 ## The staff as RT would leave it with the pointed card: its cards and its plain view (casts and
@@ -279,9 +272,6 @@ var _clear_done: bool = false
 var _note: String = ""
 var _note_left: float = 0.0
 var _clock: float = 0.0
-var _pointed_at: float = -1.0
-## The pointing direction last drawn, so the pointer line follows the stick.
-var _drawn_aim: Vector2 = Vector2.ZERO
 var _marker_at: float = -1.0
 ## Cards in flight: {texture, from, to, start, fade}.
 var _flyers: Array[Dictionary] = []
@@ -291,7 +281,8 @@ var _fade_start: float = -1.0
 var _dirty: bool = true
 
 ## Laid out by `_place()`: the quarter, the column on its left, the bars, the tabs and the slots'
-## top left, the card info panel, the ring's side, the ring's middle, the hint row and the kind row.
+## top left, the card info panel, the ring's side and the kind row (the ring's middle and the hint
+## row are the menu's `center` and `hints_at`).
 var _quarter: Rect2 = Rect2()
 var _column: Rect2 = Rect2()
 var _bars_at: Vector2 = Vector2.ZERO
@@ -299,8 +290,6 @@ var _tabs_at: Vector2 = Vector2.ZERO
 var _slots_at: Vector2 = Vector2.ZERO
 var _info: Rect2 = Rect2()
 var _ring_side: Rect2 = Rect2()
-var _center: Vector2 = Vector2.ZERO
-var _hints_at: Vector2 = Vector2.ZERO
 var _kinds_at: Vector2 = Vector2.ZERO
 
 ## Button glyphs: the strip's paging (LB, RB) and each hand's tab (RB, RT, LB, LT), the hints
@@ -319,10 +308,6 @@ var _strip_first: int = 0
 var _strip_stale: bool = true
 ## The hand glyphs' widths the strip was laid out for (a device change resizes them).
 var _strip_glyphs: float = 0.0
-var _hint_glyphs: Array[ActionGlyphScript] = []
-var _hint_verbs: Array[String] = []
-var _hint_live: Array[bool] = []
-var _hint_text_x: PackedFloat32Array = PackedFloat32Array()
 var _kind_glyphs: Array[ActionGlyphScript] = []
 
 
@@ -335,11 +320,8 @@ func _ready() -> void:
 	_glyph_next = _make_glyph("GlyphNext")
 	for hand in STAFF_COUNT:
 		_hand_glyphs.append(_make_glyph("GlyphHand%d" % hand))
-	for action in HINT_ACTIONS:
-		_hint_glyphs.append(_make_glyph("Hint_%s" % action))
-		_hint_verbs.append("")
-		_hint_live.append(true)
-		_hint_text_x.append(0.0)
+	_menu.index = index
+	_menu.make_hints(HINT_ACTIONS)
 	_kind_glyphs.append(_make_glyph("KindPrev"))
 	_kind_glyphs.append(_make_glyph("KindNext"))
 	for action in READ_ACTIONS:
@@ -357,7 +339,9 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 	_ui_focus = ui_focus
 	_spells = spells
 	_input = input
-	for glyph in [_glyph_prev, _glyph_next] + _hand_glyphs + _hint_glyphs + _kind_glyphs:
+	_menu.index = index
+	_menu.bind(input)
+	for glyph in [_glyph_prev, _glyph_next] + _hand_glyphs + _kind_glyphs:
 		(glyph as ActionGlyphScript).bind(input)
 	for hand in STAFF_COUNT:
 		_hand_glyphs[hand].show_action(index, HAND_ACTIONS[hand])
@@ -365,8 +349,6 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 	_tree.spells = spells
 	_glyph_prev.show_action(index, &"page_prev")
 	_glyph_next.show_action(index, &"page_next")
-	for at in HINT_ACTIONS.size():
-		_hint_glyphs[at].show_action(index, HINT_ACTIONS[at])
 	_kind_glyphs[0].show_action(index, &"kind_prev")
 	_kind_glyphs[1].show_action(index, &"kind_next")
 	if _events != null:
@@ -399,7 +381,7 @@ func open_builder() -> bool:
 		visible = false
 		return false
 	_open = true
-	_pointed = NONE
+	_menu.pointed = NONE
 	if ring_picker != null:
 		ring_picker.reset()
 	_note = ""
@@ -497,7 +479,7 @@ func cards_of(staff: int) -> Array[StringName]:
 ## The ring's entries in ring order (copies): {id, level, count, kind}.
 func ring_entries() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	for at in _ring_entry:
+	for at in _menu.place_entries():
 		if at != NONE:
 			out.append(_entries[at].duplicate())
 	return out
@@ -505,7 +487,7 @@ func ring_entries() -> Array[Dictionary]:
 
 ## The id of the card pointed at, or `&""`.
 func pointed_id() -> StringName:
-	return _entries[_pointed]["id"] if _pointed != NONE else NO_CARD
+	return _entries[_menu.pointed]["id"] if _menu.pointed != NONE else NO_CARD
 
 
 ## The kind the ring shows with the layout KIND.
@@ -515,9 +497,9 @@ func shown_kind() -> StringName:
 
 ## The direction the right stick must point to land on card `id` (zero if it is not on the ring).
 func direction_to(id: StringName) -> Vector2:
-	for at in _ring_entry.size():
-		if _ring_entry[at] != NONE and _entries[_ring_entry[at]]["id"] == id:
-			return direction_of(_ring_angle[at])
+	for entry in _menu.place_entries():
+		if entry != NONE and _entries[entry]["id"] == id:
+			return _menu.direction_to(entry)
 	return Vector2.ZERO
 
 
@@ -535,7 +517,7 @@ func tree_view() -> TreeViewScript:
 func toggle_tree() -> void:
 	_tree_open = not _tree_open
 	_tree.visible = _tree_open
-	_pointed = NONE
+	_menu.pointed = NONE
 	if ring_picker != null:
 		ring_picker.reset()
 	if _tree_open:
@@ -552,21 +534,21 @@ func _sync_tree() -> void:
 
 ## The ring's middle in view pixels (for screenshots).
 func ring_center() -> Vector2:
-	return _center
+	return _menu.center
 
 
 ## Where the parts sit, in view pixels (for the layout test): `quarter`, `column`, `bars`, `slots`
 ## (the four rows shown), `info`, `ring` (the ring with its kind arcs) and `hints`.
 func layout_parts() -> Dictionary:
 	var reach: float = RING_RADIUS + ARC_OUT + 2.0
-	var hints_width: float = _hint_text_x[_hint_text_x.size() - 1] + _text_width(_hint_verbs[_hint_verbs.size() - 1]) - _hints_at.x if not _hint_verbs.is_empty() else 0.0
+	var center: Vector2 = _menu.center
 	return {
 		"quarter": _quarter, "column": _column,
 		"bars": Rect2(_bars_at, Vector2(COLUMN_WIDTH, BARS_HEIGHT)),
 		"slots": Rect2(_slots_at - Vector2(3.0, 3.0), Vector2(SLOT_STEP * SLOT_COLUMNS + 4.0, SLOT_STEP * SLOT_ROWS + 4.0)),
 		"info": _info,
-		"ring": Rect2(_center - Vector2(reach, reach), Vector2(reach, reach) * 2.0),
-		"hints": Rect2(_hints_at, Vector2(hints_width, HINT_HEIGHT)),
+		"ring": Rect2(center - Vector2(reach, reach), Vector2(reach, reach) * 2.0),
+		"hints": _menu.hints_rect(),
 	}
 
 
@@ -596,9 +578,10 @@ func bar_shares() -> Vector2:
 
 ## The lines the hub shows now.
 func hub_lines() -> PackedStringArray:
-	if _pointed != NONE:
-		var id: StringName = _entries[_pointed]["id"]
-		var lines := PackedStringArray([_name_of(id), String(KIND_WORDS.get(_entries[_pointed]["kind"], ""))])
+	var pointed: int = _menu.pointed
+	if pointed != NONE:
+		var id: StringName = _entries[pointed]["id"]
+		var lines := PackedStringArray([_name_of(id), String(KIND_WORDS.get(_entries[pointed]["kind"], ""))])
 		lines.append_array(_spells.component_stats(id) if _spells != null else PackedStringArray())
 		return lines
 	var lines := PackedStringArray([_staff_label(_viewed)])
@@ -623,7 +606,7 @@ func number_lines() -> PackedStringArray:
 
 ## The hint row's verbs, as shown (a verb whose button does nothing now is dimmed, not hidden).
 func hint_verbs() -> Array[String]:
-	return _hint_verbs.duplicate()
+	return _menu.hint_verbs()
 
 
 ## The short note shown after a refusal or a press that did nothing, or "".
@@ -657,7 +640,7 @@ func step(delta: float) -> void:
 	if _note_left > 0.0:
 		_note_left -= delta
 		_dirty = true
-	if not _flyers.is_empty() or not _fading.is_empty() or _clear_held >= 0.0 or _clock - _pointed_at < POP_TIME or _clock - _marker_at < POP_TIME \
+	if not _flyers.is_empty() or not _fading.is_empty() or _clear_held >= 0.0 or _menu.pointed_for(_clock) < POP_TIME or _clock - _marker_at < POP_TIME \
 			or (ring_picker != null and ring_picker.is_animating()):
 		_dirty = true
 	if _fading.size() > 0 and _clock - _fade_start >= FADE_TIME:
@@ -722,7 +705,7 @@ func _poll_buttons() -> void:
 	var flips: int = _presses(&"kind_next") - _presses(&"kind_prev")
 	if flips != 0 and layout == Layout.KIND and not _kinds.is_empty():
 		_kind_page = posmod(_kind_page + flips, _kinds.size())
-		_pointed = NONE
+		_menu.pointed = NONE
 		_build_ring()
 		_refresh_preview()
 		_changed()
@@ -764,70 +747,33 @@ func _poll_pointer(delta: float) -> void:
 		# The right stick scrolls the tree.
 		_tree.step(delta, _input.menu_tilt(index).y if _input != null else 0.0)
 		return
-	var aim: Vector2 = _input.menu_aim(index) if _input != null else Vector2.ZERO
-	if aim.length() < POINT_THRESHOLD:
-		aim = _mouse_aim()
-	if aim.distance_squared_to(_drawn_aim) > 0.002:
-		_drawn_aim = aim
+	var aim: Vector2 = _menu.aim()
+	if _menu.follow(aim):
 		_dirty = true
-	if _ring_entry.is_empty():
+	if _menu.is_empty():
 		return
-	var picked: int = ring_picker.pick(self, delta) if ring_picker != null else pick_on_ring(aim)
-	if picked == _pointed:
+	var picked: int = ring_picker.pick(self, delta) if ring_picker != null else _menu.pick_on_ring(aim)
+	if not _menu.point_at(picked, _clock):
 		return
-	_pointed = picked
-	_pointed_at = _clock
 	if picked != NONE:
 		_rumble(RUMBLE_POINT)
 	_refresh_preview()
 	_changed()
 
 
-## The entry the plain ring has in direction `aim`, or NONE (zero aims at nothing).
-func pick_on_ring(aim: Vector2) -> int:
-	if aim == Vector2.ZERO:
-		return NONE
-	return pick_among(_ring_entry, _ring_angle, _ring_width, angle_of(aim))
+## The shared radial menu the ring is (for the ring styles, which pick and draw with it).
+func menu() -> RadialMenuScript:
+	return _menu
 
 
-## The entry at `angle` among ring places (their entries, NONE for a gap, middles and widths, in
-## radians), or NONE. The pointed entry holds `STICKY_ANGLE` past its border (hysteresis).
-func pick_among(entries: PackedInt32Array, angles: PackedFloat32Array, widths: PackedFloat32Array, angle: float) -> int:
-	var picked: int = NONE
-	for at in entries.size():
-		var off: float = absf(fposmod(angle - angles[at] + PI, TAU) - PI)
-		var half: float = widths[at] * 0.5
-		if entries[at] != NONE and entries[at] == _pointed:
-			half += minf(STICKY_ANGLE, widths[at] * STICKY_SHARE)
-		if off <= half:
-			picked = entries[at]
-			if picked == _pointed:
-				break
-	return picked
-
-
-## The ring's angle of a direction: 0 is up, clockwise, 0 to TAU.
+## The ring's angle of a direction: 0 is up, clockwise, 0 to TAU (the radial menu's).
 static func angle_of(aim: Vector2) -> float:
-	return fposmod(atan2(aim.x, -aim.y), TAU)
+	return RadialMenuScript.angle_of(aim)
 
 
 ## The direction of a ring angle (the inverse of `angle_of`).
 static func direction_of(angle: float) -> Vector2:
-	return Vector2(sin(angle), -cos(angle))
-
-
-## The right stick with how far it is pushed (0 to 1 past the dead zone), for the ring styles.
-func stick_tilt() -> Vector2:
-	return _input.menu_tilt(index) if _input != null else Vector2.ZERO
-
-
-## P1's mouse from the ring's middle, in ring radii (1 on the ring), or zero (other players, the
-## mouse off the ring and its arcs). For the ring styles, which read how far out it is.
-func mouse_reach() -> Vector2:
-	if not _uses_mouse():
-		return Vector2.ZERO
-	var offset: Vector2 = get_global_mouse_position() - _center
-	return offset / RING_RADIUS if offset.length() < MOUSE_OUTER else Vector2.ZERO
+	return RadialMenuScript.direction_of(angle)
 
 
 ## Hold LT (`staff_4`) to clear the rest of the staff, once per hold (owner, 2026-10-31). Its
@@ -855,15 +801,6 @@ func _poll_clear(delta: float) -> void:
 		_clear()
 
 
-## P1's mouse as a pointing direction, or zero (other players, the mouse off the ring).
-func _mouse_aim() -> Vector2:
-	if not _uses_mouse():
-		return Vector2.ZERO
-	var offset: Vector2 = get_global_mouse_position() - _center
-	var length: float = offset.length()
-	return offset / length if length > MOUSE_INNER and length < MOUSE_OUTER else Vector2.ZERO
-
-
 ## The slot under P1's mouse, or NONE.
 func _mouse_slot() -> int:
 	if not _uses_mouse():
@@ -885,19 +822,20 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _uses_mouse() -> bool:
-	return _input != null and _input.device_of(index) == InputManagerScript.KEYBOARD and is_inside_tree()
+	return _menu.uses_mouse()
 
 
 # --- Building ---------------------------------------------------------------------------
 
 func _put_in() -> void:
-	if _pointed == NONE:
+	var pointed: int = _menu.pointed
+	if pointed == NONE:
 		_say(POINT_NOTE)
 		return
 	var cards: Array[StringName] = cards_of(_viewed)
 	if _slot >= cards.size():
 		return
-	var id: StringName = _entries[_pointed]["id"]
+	var id: StringName = _entries[pointed]["id"]
 	if put == Put.PUSH and cards[_slot] != NO_CARD:
 		if cards[cards.size() - 1] != NO_CARD:
 			_say(FULL_NOTE)
@@ -908,7 +846,7 @@ func _put_in() -> void:
 		_ask_all(cards)
 	else:
 		_ask_one(_slot, id)
-	_fly(_spells.component_icon(id) if _spells != null else null, _tile_center(_pointed_position(), RING_RADIUS), _slot_rect(_slot).get_center(), false)
+	_fly(_spells.component_icon(id) if _spells != null else null, _menu.tile_center(_menu.angle_of_entry(pointed), RING_RADIUS), _slot_rect(_slot).get_center(), false)
 	_rumble(RUMBLE_PUT)
 	if _slot + 1 < cards.size():
 		_slot += 1
@@ -955,7 +893,7 @@ func _take_out() -> void:
 	else:
 		_ask_one(at, NO_CARD)
 	if id != NO_CARD:
-		_fly(_spells.component_icon(id) if _spells != null else null, _slot_rect(at).get_center(), _center, true)
+		_fly(_spells.component_icon(id) if _spells != null else null, _slot_rect(at).get_center(), _menu.center, true)
 	_rumble(RUMBLE_TAKE)
 	if at != _slot:
 		_slot = at
@@ -1042,14 +980,14 @@ func _refresh_preview() -> void:
 	_preview = {}
 	_preview_cards = []
 	_preview_view = {}
-	if _pointed == NONE or _spells == null:
+	if _menu.pointed == NONE or _spells == null:
 		return
 	var plan: Dictionary = _plan(_viewed)
 	var staff: StaffBase = plan.get("staff") as StaffBase
 	var cards: Array[StringName] = cards_of(_viewed)
 	if staff == null or _slot >= cards.size():
 		return
-	var id: StringName = _entries[_pointed]["id"]
+	var id: StringName = _entries[_menu.pointed]["id"]
 	if put == Put.PUSH and cards[_slot] != NO_CARD:
 		if cards[cards.size() - 1] != NO_CARD:
 			return
@@ -1177,10 +1115,10 @@ func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], count
 			_kinds.append(kind)
 	_kind_page = clampi(_kind_page, 0, maxi(_kinds.size() - 1, 0))
 	_build_ring()
-	_pointed = NONE
+	_menu.pointed = NONE
 	for at in _entries.size():
 		if _entries[at]["id"] == keep:
-			_pointed = at
+			_menu.pointed = at
 	_refresh_preview()
 	_changed()
 
@@ -1243,62 +1181,32 @@ func _on_paged(player: int, step_by: int) -> void:
 ## Lay the ring out from the entries: every kind in order with a gap before each (layout ALL),
 ## or the shown kind alone (KIND). The first card sits at the top.
 func _build_ring() -> void:
-	_ring_entry.clear()
-	_ring_angle.clear()
-	_ring_width.clear()
-	var widths: PackedFloat32Array = PackedFloat32Array()
+	var places := PackedInt32Array()
+	var widths := PackedFloat32Array()
 	if layout == Layout.ALL:
 		for kind in _kinds:
 			if _kinds.size() > 1:
-				_ring_entry.append(NONE)
+				places.append(NONE)
 				widths.append(GAP_WIDTH)
 			for at in _entries.size():
 				if _entries[at]["kind"] == kind:
-					_ring_entry.append(at)
+					places.append(at)
 					widths.append(1.0)
 	elif not _kinds.is_empty():
 		for at in _entries.size():
 			if _entries[at]["kind"] == _kinds[_kind_page]:
-				_ring_entry.append(at)
+				places.append(at)
 				widths.append(1.0)
-	var total: float = 0.0
-	for width in widths:
-		total += width
-	if total <= 0.0:
-		_ring_entry.clear()
+	_menu.lay_out(places, widths)
+	if _menu.is_empty():
 		return
-	var angle: float = 0.0
-	var first: float = NAN
-	for at in widths.size():
-		var width: float = widths[at] / total * TAU
-		_ring_width.append(width)
-		_ring_angle.append(angle + width * 0.5)
-		if is_nan(first) and _ring_entry[at] != NONE:
-			first = angle + width * 0.5
-		angle += width
-	for at in _ring_angle.size():
-		_ring_angle[at] = fposmod(_ring_angle[at] - first, TAU)
 	if ring_picker != null:
 		ring_picker.reset()
 
 
-## How wide (px) one card's place on the ring is.
-func _card_room() -> float:
-	for at in _ring_entry.size():
-		if _ring_entry[at] != NONE:
-			return _ring_width[at] * RING_RADIUS
-	return 0.0
-
-
-func _pointed_position() -> float:
-	for at in _ring_entry.size():
-		if _ring_entry[at] == _pointed:
-			return _ring_angle[at]
-	return 0.0
-
-
-func _tile_center(angle: float, radius: float) -> Vector2:
-	return _center + Vector2(sin(angle), -cos(angle)) * radius
+## The kind of ring entry `entry` (the ring's arcs are by kind).
+func _kind_of_entry(entry: int) -> StringName:
+	return _entries[entry]["kind"]
 
 
 # --- Layout -----------------------------------------------------------------------------
@@ -1320,11 +1228,11 @@ func _place() -> void:
 	_info = Rect2(column_x + 2.0, info_top, COLUMN_WIDTH - 4.0, _quarter.end.y - 3.0 - info_top)
 	var ring_left: float = column_x + COLUMN_WIDTH + EDGE
 	var ring_right: float = _quarter.end.x - EDGE
-	_center = Vector2(floorf((ring_left + ring_right) * 0.5), _quarter.position.y + RING_FROM_EDGE)
-	_hints_at = Vector2(ring_left, _quarter.end.y - HINT_HEIGHT - 2.0)
-	_kinds_at = Vector2(_center.x, _quarter.position.y + 2.0)
+	_menu.center = Vector2(floorf((ring_left + ring_right) * 0.5), _quarter.position.y + RING_FROM_EDGE)
+	_menu.hints_at = Vector2(ring_left, _quarter.end.y - HINT_HEIGHT - 2.0)
+	_kinds_at = Vector2(_menu.center.x, _quarter.position.y + 2.0)
 	# The ring's side, from the top down to the hint row: the tree's space (part T5).
-	_ring_side = Rect2(ring_left, top, ring_right - ring_left, _hints_at.y - 1.0 - top)
+	_ring_side = Rect2(ring_left, top, ring_right - ring_left, _menu.hints_at.y - 1.0 - top)
 	_tree.position = _ring_side.position
 	_tree.size = _ring_side.size
 	var tab_x: float = _tabs_at.x
@@ -1359,16 +1267,9 @@ func _slot_at(point: Vector2) -> int:
 ## slot), Y (the tree or the ring) and B, each glyph then its verb.
 func _refresh_hints() -> void:
 	var lt: StringName = lt_action()
-	_hint_verbs = [PUT_VERB, UNDO_VERB if lt == LT_UNDO else (GAP_VERB if lt == LT_GAP else TAKE_VERB), RING_VERB if _tree_open else TREE_VERB, CLOSE_VERB]
-	_hint_live = [_pointed != NONE and not _tree_open, lt != &"", true, true]
-	var x: float = _hints_at.x
-	for at in _hint_glyphs.size():
-		var glyph: ActionGlyphScript = _hint_glyphs[at]
-		glyph.position = Vector2(x, _hints_at.y)
-		glyph.modulate.a = 1.0 if _hint_live[at] else 0.4
-		x += glyph.custom_minimum_size.x + 2.0
-		_hint_text_x[at] = x
-		x += _text_width(_hint_verbs[at]) + 6.0
+	var verbs: Array[String] = [PUT_VERB, UNDO_VERB if lt == LT_UNDO else (GAP_VERB if lt == LT_GAP else TAKE_VERB), RING_VERB if _tree_open else TREE_VERB, CLOSE_VERB]
+	var live: Array[bool] = [_menu.pointed != NONE and not _tree_open, lt != &"", true, true]
+	_menu.set_hints(verbs, live)
 	var show_kinds: bool = layout == Layout.KIND and _kinds.size() > 1 and not _tree_open
 	for glyph in _kind_glyphs:
 		glyph.visible = show_kinds
@@ -1393,19 +1294,13 @@ func _changed() -> void:
 		set_process(true)
 
 
-func _font() -> Font:
-	return get_theme_default_font()
-
-
 func _text_width(text: String) -> float:
-	return _font().get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+	return _menu.text_width(text)
 
 
 ## Draw `text` with its top left at `at` (or centred on `at.x`).
 func _text(text: String, at: Vector2, color: Color, centered: bool = false) -> void:
-	var font: Font = _font()
-	var x: float = at.x - (_text_width(text) * 0.5 if centered else 0.0)
-	draw_string(font, Vector2(x, at.y + font.get_ascent(FONT_SIZE)).round(), text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, color)
+	_menu.draw_text(text, at, color, centered)
 
 
 func _frame(rect: Rect2, color: Color) -> void:
@@ -1423,7 +1318,7 @@ func _draw() -> void:
 	if not _tree_open:
 		_draw_ring()
 		_draw_hub()
-	_draw_hints()
+	_menu.draw_hints()
 	_draw_flyers()
 
 
@@ -1582,8 +1477,8 @@ func _draw_slots() -> void:
 	# without its colour.
 	if _slot < cards.size() and _slot_shown(_slot):
 		var mark: Rect2 = _slot_rect(_slot)
-		if _pointed != NONE and not previewing:
-			var ghost: StringName = _entries[_pointed]["id"]
+		if _menu.pointed != NONE and not previewing:
+			var ghost: StringName = _entries[_menu.pointed]["id"]
 			if put == Put.PUSH and cards[_slot] != NO_CARD:
 				draw_rect(Rect2(mark.position.x - 2.0, mark.position.y - 1.0, 2.0, mark.size.y + 2.0), GOLD)
 			else:
@@ -1735,43 +1630,31 @@ func _wrap(text: String, width: float) -> PackedStringArray:
 
 
 func _draw_ring() -> void:
-	if _ring_entry.is_empty():
+	if _menu.is_empty():
 		return
 	if ring_picker != null and ring_picker.draw(self):
 		return
-	draw_arc(_center, RING_RADIUS, 0.0, TAU, 64, LINE, 1.0)
+	_menu.draw_ring_line()
 	# The kind arcs, outside the ring.
-	var start: int = 0
-	while start < _ring_entry.size():
-		if _ring_entry[start] == NONE:
-			start += 1
-			continue
-		var kind: StringName = _entries[_ring_entry[start]]["kind"]
-		var end: int = start
-		while end + 1 < _ring_entry.size() and _ring_entry[end + 1] != NONE and _entries[_ring_entry[end + 1]]["kind"] == kind:
-			end += 1
-		var from: float = _ring_angle[start] - _ring_width[start] * 0.5 + 0.03
-		var to: float = _ring_angle[end] + _ring_width[end] * 0.5 - 0.03
-		if to < from:
-			to += TAU
-		draw_arc(_center, RING_RADIUS + ARC_OUT, from - PI * 0.5, to - PI * 0.5, 24, KIND_COLORS[kind], 2.0)
-		start = end + 1
+	_menu.draw_group_arcs(_kind_of_entry, KIND_COLORS)
 	if layout == Layout.KIND and _kinds.size() > 1:
 		_draw_kind_tabs()
 	# Where the stick points.
-	var aim: Vector2 = _drawn_aim
-	if aim != Vector2.ZERO:
-		draw_line(_center + aim * (HUB_RADIUS + 2.0), _center + aim * (RING_RADIUS - 11.0), Color(GOLD, 0.55), 1.0)
-	var size: float = clampf(floorf(_card_room()) - 2.0, 3.0, TILE_MAX)
-	for at in _ring_entry.size():
-		var entry: int = _ring_entry[at]
-		if entry == NONE or entry == _pointed:
+	_menu.draw_pointer()
+	var size: float = clampf(floorf(_menu.place_room()) - 2.0, 3.0, TILE_MAX)
+	var places: PackedInt32Array = _menu.place_entries()
+	var angles: PackedFloat32Array = _menu.place_angles()
+	var pointed: int = _menu.pointed
+	for at in places.size():
+		var entry: int = places[at]
+		if entry == NONE or entry == pointed:
 			continue
-		_draw_ring_card(entry, _tile_center(_ring_angle[at], RING_RADIUS), size, false)
-	if _pointed != NONE:
-		var pop: float = clampf((_clock - _pointed_at) / POP_TIME, 0.0, 1.0)
-		var shake: float = 1.0 if _clock - _pointed_at < POP_TIME * 1.5 and int((_clock - _pointed_at) / 0.03) % 2 == 1 else 0.0
-		_draw_ring_card(_pointed, _tile_center(_pointed_position(), RING_RADIUS + 4.0 * pop) + Vector2(shake, 0.0), TILE_PICKED, true)
+		_draw_ring_card(entry, _menu.tile_center(angles[at], RING_RADIUS), size, false)
+	if pointed != NONE:
+		var since: float = _menu.pointed_for(_clock)
+		var pop: float = clampf(since / POP_TIME, 0.0, 1.0)
+		var shake: float = 1.0 if since < POP_TIME * 1.5 and int(since / 0.03) % 2 == 1 else 0.0
+		_draw_ring_card(pointed, _menu.tile_center(_menu.angle_of_entry(pointed), RING_RADIUS + 4.0 * pop) + Vector2(shake, 0.0), TILE_PICKED, true)
 
 
 func _draw_ring_card(entry: int, middle: Vector2, size: float, picked: bool) -> void:
@@ -1812,28 +1695,24 @@ func _draw_kind_tabs() -> void:
 
 
 func _draw_hub() -> void:
-	draw_circle(_center, HUB_RADIUS, OUTLINE)
-	draw_arc(_center, HUB_RADIUS, 0.0, TAU, 48, LINE, 1.0)
+	_menu.draw_hub()
+	var center: Vector2 = _menu.center
+	var pointed: int = _menu.pointed
 	var lines: PackedStringArray = hub_lines()
-	if _pointed != NONE:
-		var id: StringName = _entries[_pointed]["id"]
-		_draw_icon(id, Rect2(_center + Vector2(-8.0, -34.0), Vector2(ICON_SIZE, ICON_SIZE)), 1.0)
-		_text(lines[0], _center + Vector2(0.0, -17.0), TEXT, true)
-		_text(lines[1], _center + Vector2(0.0, -8.0), KIND_COLORS.get(_entries[_pointed]["kind"], MUTED), true)
+	if pointed != NONE:
+		var id: StringName = _entries[pointed]["id"]
+		_draw_icon(id, Rect2(center + Vector2(-8.0, -34.0), Vector2(ICON_SIZE, ICON_SIZE)), 1.0)
+		_text(lines[0], center + Vector2(0.0, -17.0), TEXT, true)
+		_text(lines[1], center + Vector2(0.0, -8.0), KIND_COLORS.get(_entries[pointed]["kind"], MUTED), true)
 		for at in range(2, lines.size()):
-			_text(lines[at], _center + Vector2(0.0, 1.0 + (at - 2) * LINE_STEP), MUTED, true)
+			_text(lines[at], center + Vector2(0.0, 1.0 + (at - 2) * LINE_STEP), MUTED, true)
 		return
-	_text(lines[0], _center + Vector2(0.0, -26.0), TEXT, true)
+	_text(lines[0], center + Vector2(0.0, -26.0), TEXT, true)
 	for at in range(1, lines.size()):
 		var line: String = lines[at]
-		_text(line, _center + Vector2(0.0, -13.0 + (at - 1) * LINE_STEP), WARN if line.ends_with("!") else MUTED, true)
+		_text(line, center + Vector2(0.0, -13.0 + (at - 1) * LINE_STEP), WARN if line.ends_with("!") else MUTED, true)
 	# An empty bag says so; otherwise the hub asks for a card.
-	_text(NO_CARDS_TEXT if _ring_entry.is_empty() else "Point", _center + Vector2(0.0, 17.0), DIM, true)
-
-
-func _draw_hints() -> void:
-	for at in _hint_verbs.size():
-		_text(_hint_verbs[at], Vector2(_hint_text_x[at], _hints_at.y + 1.0), TEXT if _hint_live[at] else DIM)
+	_text(NO_CARDS_TEXT if _menu.is_empty() else "Point", center + Vector2(0.0, 17.0), DIM, true)
 
 
 ## `text` cut with ".." to fit `width` pixels.

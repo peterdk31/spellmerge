@@ -14,6 +14,7 @@ extends "res://hud/builder/rings/ring_picker.gd"
 ## either end of an unwrapped kind, the nearer end card is picked. The numbers are first guesses.
 
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
+const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
 
 enum Enter { HOLD, DEPTH }
 
@@ -83,9 +84,9 @@ func card_direction(radial: Control, id: StringName) -> Vector2:
 
 func pick(radial: Control, delta: float) -> int:
 	var r: RadialScript = radial as RadialScript
-	var aim: Vector2 = r.stick_tilt()
+	var aim: Vector2 = r.menu().stick_tilt()
 	if aim == Vector2.ZERO:
-		aim = r.mouse_reach()
+		aim = r.menu().mouse_reach()
 	var tilt: float = minf(aim.length(), 1.0)
 	var count: int = r._kinds.size()
 	if count == 0 or tilt <= 0.0:
@@ -161,7 +162,7 @@ func _close() -> void:
 func _pick_card(r: RadialScript, angle: float) -> int:
 	if _entries.is_empty():
 		return NONE
-	var picked: int = r.pick_among(_entries, _angles, _widths, angle)
+	var picked: int = r.menu().pick_among(_entries, _angles, _widths, angle)
 	if picked != NONE:
 		return picked
 	var last: int = _entries.size() - 1
@@ -172,12 +173,9 @@ func _pick_card(r: RadialScript, angle: float) -> int:
 
 func draw(radial: Control) -> bool:
 	var r: RadialScript = radial as RadialScript
-	var radius: float = RadialScript.RING_RADIUS
-	var center: Vector2 = r._center
-	r.draw_arc(center, radius, 0.0, TAU, 64, RadialScript.LINE, 1.0)
-	var aim: Vector2 = r._drawn_aim
-	if aim != Vector2.ZERO:
-		r.draw_line(center + aim * (RadialScript.HUB_RADIUS + 2.0), center + aim * (radius - 11.0), Color(RadialScript.GOLD, 0.55), 1.0)
+	var menu: RadialMenuScript = r.menu()
+	menu.draw_ring_line()
+	menu.draw_pointer()
 	if _open_kind == NONE:
 		_draw_kinds(r)
 	else:
@@ -191,6 +189,7 @@ func _draw_kinds(r: RadialScript) -> void:
 	var count: int = r._kinds.size()
 	var width: float = TAU / float(count)
 	var radius: float = RadialScript.RING_RADIUS
+	var menu: RadialMenuScript = r.menu()
 	for at in count:
 		var kind: StringName = r._kinds[at]
 		var middle: float = _sector_middle(at, count)
@@ -198,13 +197,13 @@ func _draw_kinds(r: RadialScript) -> void:
 		var to: float = middle + width * 0.5 - SECTOR_GAP - PI * 0.5
 		var on: bool = at == _kind_pointed
 		var color: Color = RadialScript.KIND_COLORS[kind]
-		r.draw_arc(r._center, radius, from, to, 24, color if on else Color(color, 0.45), 7.0 if on else 3.0)
+		r.draw_arc(menu.center, radius, from, to, 24, color if on else Color(color, 0.45), 7.0 if on else 3.0)
 		if on and enter == Enter.HOLD:
 			var share: float = clampf(_held / HOLD_TIME, 0.0, 1.0)
-			r.draw_arc(r._center, radius - 7.0, from, from + (to - from) * share, 24, RadialScript.GOLD, 2.0)
+			r.draw_arc(menu.center, radius - 7.0, from, from + (to - from) * share, 24, RadialScript.GOLD, 2.0)
 		var word: String = String(RadialScript.KIND_WORDS.get(kind, kind))
 		# Pushed outward by half its width at the sides, so the word stays clear of the arc.
-		var label: Vector2 = r._tile_center(middle, radius + RadialScript.ARC_OUT - 2.0)
+		var label: Vector2 = menu.tile_center(middle, radius + RadialScript.ARC_OUT - 2.0)
 		label.x += sin(middle) * r._text_width(word) * 0.5
 		r._text(word, label - Vector2(0.0, 4.0), RadialScript.TEXT if on else RadialScript.MUTED, true)
 
@@ -212,17 +211,18 @@ func _draw_kinds(r: RadialScript) -> void:
 ## The entered kind: its cards on the ring, its arc outside them and its name in the gap.
 func _draw_cards(r: RadialScript) -> void:
 	var radius: float = RadialScript.RING_RADIUS
+	var menu: RadialMenuScript = r.menu()
 	var kind: StringName = r._kinds[_open_kind]
 	var middle: float = _sector_middle(_open_kind, r._kinds.size())
-	r.draw_arc(r._center, radius + RadialScript.ARC_OUT, middle - SPAN * 0.5 - PI * 0.5, middle + SPAN * 0.5 - PI * 0.5, 48, RadialScript.KIND_COLORS[kind], 2.0)
+	r.draw_arc(menu.center, radius + RadialScript.ARC_OUT, middle - SPAN * 0.5 - PI * 0.5, middle + SPAN * 0.5 - PI * 0.5, 48, RadialScript.KIND_COLORS[kind], 2.0)
 	var word: String = String(RadialScript.KIND_WORDS.get(kind, kind))
-	r._text(word, r._tile_center(middle + PI, radius) - Vector2(0.0, 4.0), RadialScript.KIND_COLORS[kind], true)
+	r._text(word, menu.tile_center(middle + PI, radius) - Vector2(0.0, 4.0), RadialScript.KIND_COLORS[kind], true)
 	var size: float = clampf(floorf(_widths[0] * radius) - 1.0, RadialScript.ICON_MIN, RadialScript.TILE_MAX) if not _widths.is_empty() else 0.0
 	var picked_at: float = NAN
 	for at in _entries.size():
-		if _entries[at] == r._pointed:
+		if _entries[at] == menu.pointed:
 			picked_at = _angles[at]
 			continue
-		r._draw_ring_card(_entries[at], r._tile_center(_angles[at], radius), size, false)
+		r._draw_ring_card(_entries[at], menu.tile_center(_angles[at], radius), size, false)
 	if not is_nan(picked_at):
-		r._draw_ring_card(r._pointed, r._tile_center(picked_at, radius + 4.0), RadialScript.TILE_PICKED, true)
+		r._draw_ring_card(menu.pointed, menu.tile_center(picked_at, radius + 4.0), RadialScript.TILE_PICKED, true)

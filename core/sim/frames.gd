@@ -56,6 +56,8 @@ extends Node
 ##   before it (`next_run_party`, core/sim/party_loadout.gd: each seat's player loadout) is the same: the
 ##   replay's, else what the game says it would take now (`set_party_source`); a recording begun
 ##   writes the game's into its header, so the machines that play it start with what only this one had.
+##   What lies on the ground (`next_run_ground`, core/sim/ground_loadout.gd: the room and its items;
+##   items I6) goes the same way (`set_ground_source`).
 ##
 ## - **A run begun anew by the game** (`restart`; online lobby, docs/milestones/online-lobby.md): the
 ##   game itself asks for a run's start (a party back in its hub after a run). It is sent at the
@@ -117,6 +119,8 @@ var _restart: Array = []
 ## Says what a run that starts now takes along (`set_party_source`: returns a PartyLoadout), or invalid:
 ## nothing.
 var _party_source: Callable = Callable()
+## Says what lies on the ground now (`set_ground_source`: returns a GroundLoadout), or invalid: nothing.
+var _ground_source: Callable = Callable()
 
 
 func _init() -> void:
@@ -199,6 +203,26 @@ func next_run_party() -> PartyLoadout:
 	if _tape != null:
 		return _tape.replay.party.copy()
 	return _party_now()
+
+
+## What lies on the ground now, as the game says it (`source()` returns a GroundLoadout; the Items
+## area gives it): read when a recording begins (its header) and by `next_run_ground` with no replay
+## on the deck. An invalid Callable: nothing.
+func set_ground_source(source: Callable) -> void:
+	_ground_source = source
+
+
+## What lies on the ground as the run that starts next begins (a copy): the replay's on the deck
+## (its header), else what the game says lies there now.
+func next_run_ground() -> GroundLoadout:
+	if _tape != null:
+		return _tape.replay.ground.copy()
+	return _ground_now()
+
+
+func _ground_now() -> GroundLoadout:
+	var made: GroundLoadout = _ground_source.call() as GroundLoadout if _ground_source.is_valid() else null
+	return made if made != null else GroundLoadout.new()
 
 
 func _party_now() -> PartyLoadout:
@@ -320,6 +344,7 @@ func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	replay.seats = _device_seats()
 	replay.rules = SessionRules.machine().copy()
 	replay.party = _party_now()
+	replay.ground = _ground_now()
 	_tape = ReplayTape.recording(replay)
 	_carried.fill(0)
 	_send_start(start, starter)

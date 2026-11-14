@@ -530,7 +530,7 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	if events != null:
 		events.room_entered.emit(room.id)
 		var items: Array = RoomContents.items_of(_places)
-		events.room_items_placed.emit(items[0], items[1])
+		events.room_items_placed.emit(room.id, items[0], items[1])
 		events.sandbox_changed.emit(mode == MODE_SANDBOX)
 		if mode == MODE_WAVES:
 			events.wave_started.emit(wave)

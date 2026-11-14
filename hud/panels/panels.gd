@@ -66,8 +66,9 @@ extends CanvasLayer
 ##   `accept` (A, Enter) with no menu open sends the command `run_requested` (`poll`).
 ## - The item hints (`item_hints.gd`, node Root/ItemHints, made here; items I6): over the item in
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
-##   numbers and cards under it, shaking red when a take is refused (`item_refused`). A with no menu
-##   open and no lit stone takes it (`item_take_requested`); the altar's A comes after.
+##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
+##   Enter, never Space, which casts) with no menu open and no lit stone takes it
+##   (`item_take_requested`); the altar's A comes after.
 ## - The frame rate readout (`hud/widgets/fps_counter.gd`, node Root/FpsCounter, made here; owner,
 ##   2026-11-02): "60 FPS" at the bottom middle, over everything, shown while the pause menu's
 ##   "Show FPS" switch is on (read after the menu is bound, then `show_fps_changed`).
@@ -95,8 +96,10 @@ const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
 const BUILDER_ACTION: StringName = &"back"
 ## A on the hub's lit stone starts the run (`run_requested`; online-lobby L1); else it takes the
-## item in reach (`item_take_requested`; items I6), else it opens the altar's room.
+## item in reach (`item_take_requested`; items I6: `take`, A, F or Enter, never Space, which casts),
+## else it opens the altar's room.
 const START_ACTION: StringName = &"accept"
+const TAKE_ACTION: StringName = &"take"
 ## Space between the screen edge and a panel.
 const EDGE_MARGIN: float = 4.0
 ## How far below the online line the stone line sits, in pixels.
@@ -132,6 +135,7 @@ var _pause_menu: PauseMenuScript = null
 var _seen_pause: Array[int] = [0, 0, 0, 0]
 var _seen_back: Array[int] = [0, 0, 0, 0]
 var _seen_start: Array[int] = [0, 0, 0, 0]
+var _seen_take: Array[int] = [0, 0, 0, 0]
 ## True while the hub's teleporter stone is lit (`start_stone_changed`).
 var _stone_lit: bool = false
 ## The seats whose wizards stand on the hub's multiplayer altar (`altar_changed`), a bit each.
@@ -381,14 +385,18 @@ func poll() -> void:
 		var start_count: int = input.get_press_count(player, START_ACTION)
 		var start_now: bool = start_count > _seen_start[player]
 		_seen_start[player] = start_count
+		var take_count: int = input.get_press_count(player, TAKE_ACTION)
+		var take_now: bool = take_count > _seen_take[player]
+		_seen_take[player] = take_count
 		var had_menu: bool = _had_menu[player]
 		if input.is_joined(player):
-			if start_now and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
+			if (start_now or take_now) and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
 				if _stone_lit:
-					events.run_requested.emit(player)
-				elif _item_hints.item_of(player) >= 0:
+					if start_now:
+						events.run_requested.emit(player)
+				elif take_now and _item_hints.item_of(player) >= 0:
 					events.item_take_requested.emit(player, _item_hints.item_of(player))
-				elif _altar_seats & (1 << player) != 0:
+				elif start_now and _altar_seats & (1 << player) != 0:
 					events.online_open_requested.emit(player)
 			if paused_now:
 				_on_pause_pressed(player)

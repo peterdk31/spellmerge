@@ -50,7 +50,7 @@ const EVENTS: Dictionary = {
 	&"pad_wait_requested": [["player", TYPE_INT], ["on", TYPE_INT]],
 	# Items on the ground (items I6).
 	&"item_take_requested": [["player", TYPE_INT], ["item", TYPE_INT]],
-	&"room_items_placed": [["items", TYPE_ARRAY], ["at", TYPE_PACKED_VECTOR2_ARRAY]],
+	&"room_items_placed": [["room_id", TYPE_STRING_NAME], ["items", TYPE_ARRAY], ["at", TYPE_PACKED_VECTOR2_ARRAY]],
 	&"item_drop_requested": [["actor", TYPE_INT], ["stack", TYPE_OBJECT]],
 	&"ground_item_changed": [["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
 	&"item_near_changed": [["player", TYPE_INT], ["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],

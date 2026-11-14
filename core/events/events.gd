@@ -91,7 +91,7 @@ signal seat_leave_requested(player: int)
 ## lit (`start_stone_changed`): start the run (online-lobby L1). A command: heard by flow at the next
 ## tick's start, which starts the run of waves if the stone is still lit then.
 signal run_requested(player: int)
-## Sender: hud. `player` pressed A (`accept`; F on the keyboard) with no menu open while the item
+## Sender: hud. `player` pressed A (`take`: F or Enter on the keyboard, never Space, which casts) with no menu open while the item
 ## `item` lay in reach of the body they drive (`item_near_changed`; the lit stone comes first, the
 ## altar after): take it (items I6). A command: heard by items at the next tick's start, which takes
 ## it if it still lies in reach and its bag has room; no room says `item_refused`, an item gone
@@ -320,11 +320,12 @@ signal hub_changed(in_hub: bool)
 signal altar_changed(seats: int)
 ## Sender: flow. In the hub: whether a multiplayer altar stands (`standing`), and `at`, the top middle of the first one's area in room pixels (where something drawn over it sits). Sent as it changes; (false, zero) when the hub is left. For the view only. Heard by feel (the room's code drawn over the altar, online-lobby L5c).
 signal altar_placed(standing: bool, at: Vector2)
-## Sender: flow. The room a run is in was stood (items I6): the items its scene places
+## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
 ## where each lies, in the scene's order. Sent once a run's room is made, after the run's start.
-## Heard by items, which lays them on the ground.
-signal room_items_placed(items: Array[Resource], at: PackedVector2Array)
+## Heard by items, which lays them on the ground (or, the run taking along what lay on that room's
+## ground, `Frames.next_run_ground`, that instead).
+signal room_items_placed(room_id: StringName, items: Array[Resource], at: PackedVector2Array)
 ## Sender: an actor's Inventory (gameplay/actor). Lay `stack` (gone from the inventory already) on
 ## the ground beside the actor `actor` (items I6: a card given back to a full bag). Heard by items,
 ## which finds the spot; heard by nobody, the stack is lost.

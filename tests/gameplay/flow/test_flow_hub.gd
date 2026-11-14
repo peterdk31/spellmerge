@@ -724,3 +724,47 @@ func test_the_rack_lies_in_the_hub_and_a_takes_it_along() -> void:
 	check_equal(carried.caster.cards_of(2), rack.stack.cards, "the run's wizard holds it on LB")
 	check((items.call("lying") as Array).is_empty(), "and the run's room has nothing lying")
 	_stop()
+
+
+## Owner, 2026-11-14: the hub's rack is fresh only when a host starts the hub or a party comes back
+## to it from a run. Begun anew in place (a machine joining: the hub recorded anew), what lies there
+## stays as it was, also on a machine that only plays the recording; a run's end lays it fresh.
+func test_the_hub_begun_anew_keeps_its_ground_and_a_runs_end_lays_the_rack_again() -> void:
+	var items: Node = root.get_node("Items")
+	_start([0, 1])
+	var rack: GroundItem = (items.call("lying") as Array)[0]
+	var wizard := flow.get_wizard(0) as Actor
+	wizard.position = rack.at
+	events.call("apply_command", &"item_take_requested", [0, rack.number])
+	check((items.call("lying") as Array).is_empty(), "the rack taken")
+	# A machine joins: the hub is recorded anew, its start sent once the header is written.
+	var replay: Replay = frames.call(&"record", &"hub_requested", 0) as Replay
+	check_equal([replay.ground.room, replay.ground.count()], [FlowScript.HUB_ROOM_ID, 0], "the recording's header says the hub's ground is bare")
+	from_frames()
+	check((items.call("lying") as Array).is_empty(), "the hub begun anew under the recording: no rack lies there again")
+	check((flow.get_wizard(0) as Actor).caster.cards_of(2) == rack.stack.cards, "and the wizard still holds it")
+	frames.call(&"stop_recording")
+	# A machine that plays the recording from its start, whose hub had a rack.
+	flow.stop_run()
+	for index in 4:
+		input.leave(index)
+	check(frames.call(&"play", replay), "the recording plays")
+	check((items.call("lying") as Array).is_empty(), "no rack there either")
+	frames.call(&"stop_playing")
+	_stop()
+	# A run's end: the party back in the hub finds the rack again.
+	_start([0])
+	rack = (items.call("lying") as Array)[0]
+	(flow.get_wizard(0) as Actor).position = rack.at
+	events.call("apply_command", &"item_take_requested", [0, rack.number])
+	_place(0, true)
+	_tick()
+	_press_a(0)
+	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run from the stone")
+	for each in _wizards():
+		each.health.take(each.health.max_health)
+	flow.step(FlowScript.RESTART_DELAY)
+	from_frames()
+	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
+	check_equal((items.call("lying") as Array).size(), 1, "the rack lies there again")
+	_stop()

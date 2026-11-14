@@ -31,6 +31,8 @@ const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
+const FramesScript := preload("res://core/sim/frames.gd")
 
 const SEATS: int = 4
 ## No item (`item_near_changed`'s and `nearest`'s none).
@@ -51,14 +53,18 @@ const DIRECTIONS: Array[Vector2] = [
 ]
 
 ## Not state: services, set up again, and what this machine's looks were told (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"spells", &"_said"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"spells", &"registry", &"frames", &"_said"]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads.
 var events: EventsScript = null
 var actors: ActorsScript = null
 var projectiles: ProjectilesScript = null
 var spells: SpellsScript = null
+var registry: RegistryScript = null
+var frames: FramesScript = null
 
+## The room the ground is (`room_items_placed`'s; `&""` before one).
+var _room: StringName = &""
 ## What lies on the ground, in the order it was laid (numbers rising).
 var _rows: Array[GroundItem] = []
 ## The number the next item laid gets.
@@ -81,6 +87,13 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectilesScript
 	if spells == null:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
+	if registry == null:
+		registry = get_node_or_null("/root/Registry") as RegistryScript
+	if frames == null:
+		frames = get_node_or_null("/root/Frames") as FramesScript
+	if frames != null:
+		# What lies on the ground goes into a recording's header (core/sim/ground_loadout.gd).
+		frames.set_ground_source(ground_now)
 	if events == null:
 		push_warning("Items: the Events autoload is missing, so nothing lies on the ground.")
 		return
@@ -202,6 +215,30 @@ func view_of(row: GroundItem) -> Dictionary:
 	return view
 
 
+## What lies on the ground now, and in which room, as a run's start takes it along (the frames
+## service's ground source: a recording's header). What passes the loadout's limits is left out.
+func ground_now() -> GroundLoadout:
+	var made := GroundLoadout.new()
+	made.set_room(_room)
+	for row: GroundItem in _rows:
+		made.add_item(row.stack.kind, row.stack.id, row.title, row.stack.count, row.at, row.stack.mana, row.stack.cards)
+	return made
+
+
+## Lay what `ground` says lies there, in its order (each as its kind's content has it; one whose
+## content the registry has none of is left out).
+func lay_ground(ground: GroundLoadout) -> void:
+	for item in ground.count():
+		var stack: ItemStack = _stack_of(ground.kind_of(item), ground.id_of(item))
+		if stack == null:
+			continue
+		stack.count = ground.copies_of(item)
+		if stack.staff != null:
+			stack.cards = stack.fit(ground.cards_of(item))
+			stack.mana = ground.mana_of(item)
+		lay(stack, ground.place_of(item), ground.title_of(item))
+
+
 ## Say everything again (a snapshot restored: the looks of this machine drew what lay here
 ## before): gone for what it told them of that no longer lies there, then every row.
 func rebuild_derived() -> void:
@@ -224,8 +261,18 @@ func rebuild_derived() -> void:
 
 # --- Heard ------------------------------------------------------------------------------
 
-## The run's room was stood: lay what its scene places, one copy each, in its order.
-func _on_room_items_placed(items: Array[Resource], at: PackedVector2Array) -> void:
+## The run's room `room_id` was stood: when the run takes along what lay on this room's ground
+## (`Frames.next_run_ground`, a recording's header: the hub recorded anew for a joining machine, on
+## every machine; with no recording on the deck the ground was cleared at the run's start, so
+## nothing), that is laid again;
+## otherwise (a host starting it, a party back from a run, any other room) what its scene places,
+## one copy each, in its order: the rack is fresh then (owner, 2026-11-14).
+func _on_room_items_placed(room_id: StringName, items: Array[Resource], at: PackedVector2Array) -> void:
+	var carried: GroundLoadout = frames.next_run_ground() if frames != null else null
+	_room = room_id
+	if carried != null and room_id != &"" and carried.room == room_id:
+		lay_ground(carried)
+		return
 	for i in mini(items.size(), at.size()):
 		var stack: ItemStack = ItemKinds.stack_of(items[i])
 		if stack == null:
@@ -256,6 +303,18 @@ func _on_item_take_requested(player: int, item: int) -> void:
 
 
 # --- Inside -----------------------------------------------------------------------------
+
+## A stack of one `kind` `id`, its content found in its kind's folders (a staff its staff, full
+## and empty), or null for a kind or an id there is none of.
+func _stack_of(kind: StringName, id: StringName) -> ItemStack:
+	if registry == null or not ItemKinds.has(kind):
+		return null
+	for folder: StringName in ItemKinds.content_of(kind):
+		var found: Resource = registry.get_resource(folder, id)
+		if ItemKinds.is_content(kind, found):
+			return ItemKinds.stack_of(found)
+	return null
+
 
 ## The body of actor `actor` if it can hold things (it has an Inventory), else null.
 func _holder(actor: int) -> Actor:

@@ -1,7 +1,7 @@
 extends Control
 ## The hint over an item in reach (items I6, docs/milestones/items.md, "What the players see"): one
-## per player, over the item the body they drive can take (`item_near_changed`): the `accept`
-## button's glyph (A; Enter or F) with "Take" and the item's name, and a small tooltip under it: for
+## per player, over the item the body they drive can take (`item_near_changed`): the `take`
+## button's glyph (A; F on the keyboard) with "Take" and the item's name, and a small tooltip under it: for
 ## a staff its numbers (slots, cooldown, mana) and its row of cards, for a card its name alone. When
 ## a take is refused (`item_refused`: no room in its bag) it shakes and goes red for a moment; it
 ## names no bag (owner, 2026-11-13: the player sees what the item is).
@@ -19,7 +19,8 @@ const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 
 ## What A is called on the hint.
 const VERB: String = "Take"
-const ACTION: StringName = &"accept"
+## The button that takes it (A; F or Enter on the keyboard, never Space, which casts).
+const ACTION: StringName = &"take"
 const FONT_SIZE: int = 8
 const PAD: float = 3.0
 const GAP: float = 3.0

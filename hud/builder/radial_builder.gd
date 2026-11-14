@@ -56,12 +56,14 @@ extends Control
 ##   at: the mana of its dearest cast as a share of that staff's own pool (red with "!" above 100 %:
 ##   it cannot be cast), the damage of the cycle (every shot landing once) and the cycle's time.
 ##
-## What it shows comes only from events: `owned_staff_changed` (every staff owned, by number: the
+## What it shows comes only from events, kept in the inventory menu's mirror
+## (`hud/widgets/inventory_mirror.gd`, items I7b): `inventory_announced` (what follows is the
+## wizard's all: forget the staffs said before), `owned_staff_changed` (every staff owned, by number: the
 ## plain `Spells.staff_view`), `hands_changed` (which number is on which hand), `bag_changed` (the
 ## card bag's ids and counts), `build_refused`, `player_stats_changed` (the wizard's health) and
 ## `staff_mana_changed` (each hand's own pool: the MP bar and the shares are the viewed staff's; a
-## staff in the bag shows its staff's pool, full: nothing takes a staff off a hand before items
-## I7). What it asks for goes out as `staff_change_requested` (one slot) or `staff_cards_requested`
+## staff in the bag shows its staff's pool, full: the mana a staff keeps off a hand, items I7, is
+## not told). What it asks for goes out as `staff_change_requested` (one slot) or `staff_cards_requested`
 ## (the whole staff: a push, a closed gap, an undo, a clear), naming the staff by its number, so
 ## this node never changes a staff itself.
 ## It opens through `core/ui_focus` with itself as the one control, so its owner's gameplay
@@ -69,8 +71,8 @@ extends Control
 ## triggers are read from `core/input` (press counts and the menu sticks), only for its
 ## own player. Hints show the buttons (`widgets/action_glyph.gd`), never action names.
 ## The ring, pointing at it and the hint row are the shared radial menu's (`widgets/radial_menu.gd`,
-## items I5): this builder lays its cards out on it and draws them, the inventory will lay out its
-## bags and items.
+## items I5): this builder lays its cards out on it and draws them, the inventory
+## (`hud/menus/inventory/`, items I7) its bags and items.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -80,6 +82,9 @@ const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
 const RingPickerScript := preload("res://hud/builder/rings/ring_picker.gd")
 const TreeViewScript := preload("res://hud/builder/tree_view.gd")
+const CardKindsScript := preload("res://hud/widgets/card_kinds.gd")
+const StaffHeadScript := preload("res://hud/widgets/staff_head.gd")
+const MirrorScript := preload("res://hud/widgets/inventory_mirror.gd")
 
 ## How the ring shows the bag: every card at once, or one kind at a time.
 enum Layout { ALL, KIND }
@@ -99,15 +104,10 @@ const TAB_PAD: float = 2.0
 const NO_CARD: StringName = &""
 const NONE: int = -1
 
-## The kinds in ring order, their words and colours (docs/STYLE.md: none near a player colour).
-const KINDS: Array[StringName] = [&"carrier", &"modifier", &"element", &"trigger", &"multicast"]
-const KIND_WORDS: Dictionary = {
-	&"carrier": "Carrier", &"modifier": "Modifier", &"element": "Infusion", &"trigger": "Trigger", &"multicast": "Multicast",
-}
-const KIND_COLORS: Dictionary = {
-	&"carrier": Color("#ffa23c"), &"modifier": Color("#4fd6dc"), &"element": Color("#b4e82a"),
-	&"trigger": Color("#e08ad8"), &"multicast": Color("#d4d0e0"),
-}
+## The kinds in ring order, their words and colours: the HUD's one table (`widgets/card_kinds.gd`).
+const KINDS: Array[StringName] = CardKindsScript.KINDS
+const KIND_WORDS: Dictionary = CardKindsScript.WORDS
+const KIND_COLORS: Dictionary = CardKindsScript.COLORS
 const OUTLINE: Color = Color("#14121f")
 const SHADE: Color = Color(0.078, 0.071, 0.122, 0.86)
 const TILE: Color = Color("#2b2840")
@@ -225,10 +225,11 @@ var _ui_focus: UIFocusScript = null
 var _spells: SpellsScript = null
 var _input: InputManagerScript = null
 
-## Mirrors of what the player announced: each staff's view by its number, which number each hand
-## holds (NONE: empty), the strip's numbers in order (`_strip_order`), each hand's pool.
-var _plans: Dictionary = {}
-var _hands: PackedInt32Array = PackedInt32Array([NONE, NONE, NONE, NONE])
+## What the player announced, the inventory menu's mirror (`hud/widgets/inventory_mirror.gd`,
+## items I7b): the bags, each staff's view by its number and which number each hand holds. The
+## strip is a cache of the mirror's `staffs()`, set again on each event (never edited itself); then
+## each hand's pool.
+var _mirror: MirrorScript = MirrorScript.new()
 var _strip: PackedInt32Array = PackedInt32Array()
 var _max_mana: PackedFloat32Array = PackedFloat32Array([100.0, 100.0, 100.0, 100.0])
 ## The wizard's health (negative until the first `player_stats_changed`) and each staff's mana
@@ -350,6 +351,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 	_kind_glyphs[0].show_action(index, &"kind_prev")
 	_kind_glyphs[1].show_action(index, &"kind_next")
 	if _events != null:
+		_events.inventory_announced.connect(_on_inventory_announced)
 		_events.owned_staff_changed.connect(_on_owned_staff_changed)
 		_events.hands_changed.connect(_on_hands_changed)
 		_events.bag_changed.connect(_on_bag_changed)
@@ -416,7 +418,7 @@ func viewed_staff() -> int:
 
 ## True when the player owns staff number `staff` (it has a plan).
 func holds_staff(staff: int) -> bool:
-	return not (_plans.get(staff, {}) as Dictionary).is_empty()
+	return not _mirror.plan_of(staff).is_empty()
 
 
 ## The strip of staffs: every staff number owned, the hands' by button, then the bag's.
@@ -444,7 +446,7 @@ func _along_strip(staff: int, step_by: int) -> int:
 
 ## The hand staff `staff` is on, or NONE (in the bag).
 func _hand_of(staff: int) -> int:
-	return _hands.find(staff) if staff != NONE else NONE
+	return _mirror.hand_of(staff)
 
 
 ## The mana of staff `staff` now and its pool's size: its hand's (`staff_mana_changed`), or for a
@@ -458,7 +460,7 @@ func _pool_of(staff: int) -> float:
 	var hand: int = _hand_of(staff)
 	if hand != NONE:
 		return _max_mana[hand]
-	var base: StaffBase = (_plans.get(staff, {}) as Dictionary).get("staff") as StaffBase
+	var base: StaffBase = _mirror.base_of(staff)
 	return base.max_mana if base != null else 100.0
 
 
@@ -469,9 +471,7 @@ func marked_slot() -> int:
 
 ## The card ids of staff number `staff` as the player announced them, by slot (a copy).
 func cards_of(staff: int) -> Array[StringName]:
-	var out: Array[StringName] = []
-	out.assign((_plans.get(staff, {}) as Dictionary).get("cards", []))
-	return out
+	return _mirror.cards_of(staff)
 
 
 ## The ring's entries in ring order (copies): {id, level, count, kind}.
@@ -1039,17 +1039,26 @@ func _number_lines(now: Dictionary, then: Dictionary) -> PackedStringArray:
 
 ## The plan of staff number `staff` as announced (`{}` for one not owned).
 func _plan(staff: int) -> Dictionary:
-	return _plans.get(staff, {}) as Dictionary
+	return _mirror.plan_of(staff)
+
+
+## The seat's wizard says everything it holds anew (a wizard made again): the staffs of the one
+## before are forgotten (regression, items I7: a staff only the run's wizard owned stayed on the
+## strip back in the hub).
+func _on_inventory_announced(player: int) -> void:
+	if player != index:
+		return
+	_mirror.clear()
+	_strip = _mirror.staffs()
+	_strip_stale = true
+	_changed()
 
 
 func _on_owned_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
 	if player != index:
 		return
-	if plan.is_empty():
-		_plans.erase(staff)
-	else:
-		_plans[staff] = plan.duplicate(true)
-	_strip_order()
+	_mirror.hear_staff(staff, plan)
+	_strip = _mirror.staffs()
 	_strip_stale = true
 	if staff == _viewed:
 		if not holds_staff(_viewed):
@@ -1068,36 +1077,24 @@ func _on_owned_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
 func _on_hands_changed(player: int, hands: PackedInt32Array) -> void:
 	if player != index:
 		return
-	for hand in STAFF_COUNT:
-		_hands[hand] = hands[hand] if hand < hands.size() else NONE
-	_strip_order()
+	_mirror.hear_hands(hands)
+	_strip = _mirror.staffs()
 	_strip_stale = true
 	_changed()
 
 
-## The strip's order: the hands' staffs by button, then every other staff owned by number.
-func _strip_order() -> void:
-	_strip.clear()
-	for hand in STAFF_COUNT:
-		if _hands[hand] != NONE and holds_staff(_hands[hand]):
-			_strip.append(_hands[hand])
-	var rest: Array[int] = []
-	for staff: int in _plans:
-		if not _strip.has(staff):
-			rest.append(staff)
-	rest.sort()
-	for staff in rest:
-		_strip.append(staff)
-
-
-func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, _capacity: int) -> void:
-	if player != index or bag != ItemKinds.bag_of(ItemKinds.CARD):
+func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, capacity: int) -> void:
+	if player != index:
+		return
+	_mirror.hear_bag(bag, ids, counts, capacity)
+	if bag != ItemKinds.bag_of(ItemKinds.CARD):
 		return
 	var keep: StringName = pointed_id()
 	var copies: Dictionary = {}
-	for at in ids.size():
-		if at < counts.size() and counts[at] > 0:
-			copies[ids[at]] = int(copies.get(ids[at], 0)) + counts[at]
+	for id in _mirror.ids_in(bag):
+		var count: int = _mirror.count_of(bag, id)
+		if count > 0:
+			copies[id] = count
 	_entries.clear()
 	var held: Array[StringName] = []
 	held.assign(copies.keys())
@@ -1331,7 +1328,7 @@ func _place_strip() -> void:
 	_tab_rects.clear()
 	var widths: Array[float] = []
 	for hand in STAFF_COUNT:
-		_tab_numbers.append(_hands[hand] if holds_staff(_hands[hand]) else NONE)
+		_tab_numbers.append(_mirror.on_hand(hand) if holds_staff(_mirror.on_hand(hand)) else NONE)
 		_tab_hands.append(hand)
 		widths.append(maxf(_hand_glyphs[hand].custom_minimum_size.x + TAB_PAD * 2.0, TAB_WIDTH))
 	for staff in _strip:
@@ -1425,7 +1422,7 @@ func _draw_tabs() -> void:
 			# A staff in the bag: its head.
 			var base: StaffBase = _plan(staff).get("staff") as StaffBase
 			if base != null and base.head != null:
-				draw_texture_rect(base.head, Rect2(rect.position + Vector2(1.0, 0.5), Vector2(10.0, 10.0)), false)
+				StaffHeadScript.draw(self, base.head, Rect2(rect.position + Vector2(1.0, 0.5), Vector2(10.0, 10.0)), index)
 			else:
 				_text("*", Vector2(rect.get_center().x, rect.position.y + 1.0), OUTLINE if on else TEXT, true)
 	# More staffs past an end of the strip: a small gold notch under that end.

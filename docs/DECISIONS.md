@@ -2,6 +2,27 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-14: the review's leftovers (items I7b)
+
+- **A downed body's menu requests are refused, not held for later:** a request that arrives while the home body is down (the HUD has closed both menus, so only a late frame brings one) is answered with `NO_DOWN` and changes nothing. Holding it until the body is up would apply a change the player no longer sees; refusing it is one check per request in the player controller and says why.
+- **The builder takes the inventory's mirror whole,** its card bag too, rather than only the staffs and hands: one copy of what the seat said, written once.
+
+## 2026-11-14: the inventory (items I7)
+
+- **The drop command is `bag_drop_requested`, not the plan's `item_drop_requested`:** that name is already the inventory's word to the Items area, carrying a stack object no frame can hold. The HUD's command names a staff by its number (`staff`), anything else by its bag and id, one copy at a time; the inventory lets it go and says `item_drop_requested`, so the Items area lays a menu's drop exactly as a card given back to a full bag (I6), a step from the body, away from the item in reach.
+- **A staff put on a hand from another hand changes places with the one there; from the bag, the one there goes into the bag** (the plan's words). Moving between hands never fills the staff bag, and a swap from the bag leaves its count as it was, so only taking a staff off into a full bag is refused (NO_ROOM).
+- **A staff keeps its number wherever it goes in the inventory** (hand, bag, another hand): the builder's requests and the menus name it by number, so a move never renames it. A staff dropped and taken again is a new one (the ground has no numbers) and gets the next.
+- **The menus act on the home body, as the builder does,** until I8 moves the panel, the builder and the inventory to the driven body together.
+- **Off a hand, a staff keeps the mana it had** (`Caster.empty_hand` gives it back; the owner's "a staff off a hand regains none"); put on a hand it comes back with it (`fill_hand`, I6). Emptying the hand on show puts the first hand still held on show; with none held nothing is put on show. The builder still shows a bag staff's pool full: the mana a staff keeps in the bag is not said to the HUD; worth an event only if a player asks.
+- **Refusals have an event of their own, `inventory_refused`,** beside `build_refused`: each menu shows its own note and one event keeps one meaning.
+- **`inventory_announced` before a wizard's inventory is said anew:** the HUD could not tell a staff the seat no longer owns (its wizard made again, back in the hub from a run) from one it still did, because nothing said the old wizard's staffs were gone; the builder showed such a staff on its strip. One event, sent where the whole inventory is said, lets every mirror start over.
+- **Select is the inventory's (`inventory`), Tab its key on the keyboard;** the builder's `back` keeps B and E (the decision of 2026-11-13). The glyph says View on an Xbox pad, Create on a PlayStation, - on a Switch.
+- **The arrows are a table beside `StaffBase.ranges()`** (`BETTER`: more slots, draw, mana and regen are better; less wind-up, cooldown and spread; the tip neither), and `compared` says better, worse or the same; a test fails for a number `ranges()` names that the table does not. The menu shows three numbers (slots, delay, mana), each written short ("0.15s", "12k", "1M": the sandbox's million fits).
+- **A staff put on a hand is drawn: it waits its own cooldown** (`Spells.hold_staff`, from `Caster.fill_hand`; review). The delay before a cast is the hand's in Spells, and a rebuild only restarts the cycle, so a staff moved to a ready hand cast at once and a swap skipped a cycle-end reload. Carrying a staff's delay in its stack would be one more thing a bag keeps; the draw rule is one line and closes both. A staff picked up from the ground (I6) waits the same.
+- **On the staffs ring a hand's button acts at once,** P1's left click too (it is RT's button there, and its glyph shows on the column); there is no separate "select". The press that enters the staff bag (Space is `accept` and `staff_1`) acts on nothing: entering points at nothing (tested).
+- **The builder keeps its own copy of the inventory's events for now;** the inventory's mirror is in `hud/widgets/` for it to take up in I7b (owner, 2026-11-14: a step of its own, in another session, before I8), rather than a rewrite of the builder in this step.
+- **The left stick steps round the ring** as well as the right stick pointing: a keyboard player without the mouse, and anyone who would rather step, can reach every entry.
+
 ## 2026-11-14: items on the ground (items I6)
 
 - **An item placement is the item's own data** (`ItemStandIn.item`: a `StaffItem`, a staff or a card), and `ItemKinds.stack_of` makes the stack: the room's reader is unchanged, `RoomContents` stands no body for an item, and Flow hands the items to the Items area as one event (`room_items_placed`) when the room starts, so Flow names no item kind and the Items area no room.

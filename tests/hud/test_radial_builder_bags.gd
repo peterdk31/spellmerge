@@ -197,3 +197,29 @@ func test_the_ring_is_a_to_z_by_the_names_shown() -> void:
 	check(next.x > 0.0 and next.y < 0.0, "the second by name is just clockwise of the top (upper right)")
 	_aim(next)
 	check_equal(_radial.pointed_id(), FakeCards.id(2), "and it is picked there")
+
+
+## Items I7b: the builder keeps the inventory's mirror, so a wizard said anew (`inventory_announced`)
+## forgets the staffs of the one before: a staff only the run's wizard owned is off the strip back in
+## the hub (regression, items I7), and the bag tabs follow the hands as the mirror says.
+func test_a_wizard_said_anew_forgets_the_staffs_before() -> void:
+	_open(2)
+	var staff := StaffBase.new()
+	staff.slots = 3
+	var row: Array[StringName] = [&"", &"", &""]
+	_bus.owned_staff_changed.emit(0, 7, _spells.staff_view(row, staff))
+	check_equal(_radial.strip(), PackedInt32Array([0, 1, 2, 3, 7]), "the hands' by button, then the bag's")
+	_bus.hands_changed.emit(0, PackedInt32Array([7, 1, 2, 3]))
+	check_equal(_radial.strip(), PackedInt32Array([7, 1, 2, 3, 0]), "staff 7 on RB comes first")
+	_bus.inventory_announced.emit(0)
+	check_equal(_radial.strip(), PackedInt32Array(), "said anew: no staff is left from before")
+	check(not _radial.holds_staff(7), "staff 7 is forgotten")
+	_bus.owned_staff_changed.emit(0, 0, _spells.staff_view(row, staff))
+	_bus.hands_changed.emit(0, PackedInt32Array([0, -1, -1, -1]))
+	check_equal(_radial.strip(), PackedInt32Array([0]), "only what the new wizard says")
+	check_equal(_radial.cards_of(0).size(), 3, "its staff as said")
+	FakeCards.announce_bag(_bus, 0, FakeCards.ids(1))
+	check_equal(_radial.ring_entries().size(), 1, "and the new wizard's card bag")
+	var staffs: Array[StringName] = [&"test"]
+	_bus.bag_changed.emit(0, ItemKinds.bag_of(ItemKinds.STAFF), staffs, PackedInt32Array([1]), -1)
+	check_equal(_radial.ring_entries().size(), 1, "another bag leaves the card ring as it was")

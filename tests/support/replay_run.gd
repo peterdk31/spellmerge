@@ -8,7 +8,8 @@ extends RefCounted
 ## - **A scripted player** (`Scripted`: a frame source that reads nothing of the game, as a
 ##   person's input) walks, dashes, aims and casts the sandbox's staffs (the storm on LB, the fire
 ##   bolt) at the dummies while the "HUD" rebuilds a staff mid-run (a command): its replay plays
-##   with nobody watching, and its frames are the same on every platform.
+##   with nobody watching, and its frames are the same on every platform. The sandbox's shots down
+##   the wizard now and then, so not every cast it presses happens.
 ## - **Fighter bots** (tests/bots/bot.gd) play a wave. A bot reads the game through
 ##   queries that fill the services' caches, and those count as state (the projectile manager's
 ##   threat grid and target table), so its run replays exactly with the bots watching again
@@ -35,8 +36,10 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const CoopScript := preload("res://gameplay/coop/coop.gd")
 
-## The tick the scripted run's "HUD" rebuilds staff 0 (a command).
-const REBUILD_AT: int = 100
+## The tick the scripted run's "HUD" rebuilds staff 0 (a command), mid-run while the wizard stands:
+## the sandbox's shots down it now and then, and a downed body's requests are refused (items I7b),
+## so `record` says so if the wizard is down at this tick.
+const REBUILD_AT: int = 145
 const REBUILT: Array[StringName] = [&"triple", &"fire", &"bolt"]
 ## The ticks the scripted run's pause menu opens and closes (the command `pause_requested`): the game
 ## stands stopped between, and a replay stands stopped there too (online-ready N4).
@@ -163,6 +166,9 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 			snapshot = Snapshot.take(areas(), _root)
 		if scripted > 0 and i == REBUILD_AT:
 			# As the radial builder sends it: applied at the next tick's start, and recorded there.
+			var standing: Actor = _flow.call("get_wizard", bots) as Actor
+			if standing != null and standing.is_down():
+				problems.append("%s: the scripted wizard is down at the rebuild (tick %d): move REBUILD_AT" % [start, REBUILD_AT])
 			events.emit_signal("staff_cards_requested", bots, 0, REBUILT)
 		if i == stone_press_at and scripted > 0:
 			# As the HUD's panels send A on the lit stone: applied at the next tick's start.

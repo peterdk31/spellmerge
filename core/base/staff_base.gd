@@ -72,6 +72,24 @@ func ranges() -> Dictionary:
 	}
 
 
+## Which way each number of `ranges()` is better (items I7: the inventory's arrows between two
+## staffs): 1 when more is better, -1 when less is, 0 when neither (a look, not a strength).
+## `tests/core/test_staff_base.gd` checks it names every number `ranges()` does.
+const BETTER: Dictionary = {
+	"slots": 1, "draw": 1, "wind_up": -1, "cooldown": -1, "spread": -1, "tip": 0, "max_mana": 1, "mana_regen": 1,
+}
+
+
+## Whether staff `other`'s `field` (one of `ranges()`) is better than this staff's: 1 better, -1
+## worse, 0 the same or neither way (`BETTER`).
+func compared(other: StaffBase, field: String) -> int:
+	var a: float = float(get(field))
+	var b: float = float(other.get(field))
+	if is_equal_approx(a, b):
+		return 0
+	return int(BETTER.get(field, 0)) * (1 if b > a else -1)
+
+
 ## One line per field whose value is outside ranges(), as "field: value is outside
 ## [min, max]". Empty when every number is in range.
 func range_problems() -> PackedStringArray:

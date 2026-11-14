@@ -443,7 +443,9 @@ func set_staff(at: int, cards: Array[StringName]) -> bool:
 
 ## Put `base` on the empty hand `at` (items I6: a staff picked up), holding `cards` (card ids by
 ## slot) and `mana` (kept within its pool: a staff off a hand regains none, so it comes back as it
-## left), built and installed as `set_staff` does; with every hand empty before, it goes on show.
+## left), built and installed as `set_staff` does; it waits its own cooldown before it casts (drawn:
+## a staff moved between hands skips no delay, items I7); with every hand empty before, it goes on
+## show.
 ## Returns false, and nothing changes, for a button it has not, a hand that holds a staff, or no
 ## staff.
 func fill_hand(at: int, base: StaffBase, cards: Array[StringName], mana: float) -> bool:
@@ -456,9 +458,36 @@ func fill_hand(at: int, base: StaffBase, cards: Array[StringName], mana: float) 
 	empty_hands &= ~(1 << at)
 	_mana[at] = clampf(mana, 0.0, base.max_mana)
 	set_staff(at, cards)
+	# Drawn: it waits its own cooldown before it casts (items I7), whatever the hand waited for.
+	if actor.spells != null and number >= 0:
+		actor.spells.hold_staff(number, at, base.cooldown)
 	if none_held:
 		_show(at)
 	return true
+
+
+## Empty hand `at` (items I7: a staff put in the bag or dropped): it holds no staff, no cards and no
+## mana from now on, its wind-up and sustained cards end, and the staff on show moves to the first
+## hand still held (with none, `current` stays where it was and nothing is put on show: the look
+## shows the plain staff);
+## `staff_built` follows. Returns the mana it held (what the staff keeps off a hand), or -1, and
+## nothing changes, for a hand that holds no staff.
+func empty_hand(at: int) -> float:
+	if not holds(at):
+		return -1.0
+	var kept: float = _mana[at]
+	cancel_wind(at)
+	empty_hands |= 1 << at
+	if at < staffs.size():
+		staffs[at] = null
+	_cards[at] = [] as Array[StringName]
+	_mana[at] = 0.0
+	_edited = true
+	_install(at)
+	if current == at and holds(first_held()):
+		_show(first_held())
+	staff_built.emit(at)
+	return kept
 
 
 ## Hold `new_staffs` (1-4, one per button; a null one falls back to `staff`, as in `hold_staffs`)

@@ -123,7 +123,9 @@ func test_a_wizard_with_no_staff_at_all() -> void:
 	_world.run(2)
 	_world.release(0, &"staff_1")
 	check(not wizard.caster.has_staff(0), "nothing casts")
-	check_equal(PlayerController.staff_ids(wizard), [&"", &"", &"", &""] as Array[StringName], "no staff id is carried")
+	var loadout: PlayerLoadout = PlayerController.loadout_of(wizard)
+	check(loadout.staff_numbers().is_empty(), "its loadout owns no staff")
+	check_equal(loadout.hands(), PackedInt32Array([-1, -1, -1, -1]), "and every hand in it is empty")
 
 
 ## A wizard without the `staffs` list (`staff` on every button) has no empty hand, as before.
@@ -133,9 +135,22 @@ func test_no_list_means_every_hand_holds_the_staff() -> void:
 	check(wizard.caster.has_staff(1) and wizard.caster.has_staff(3), "the staffs with cards are built")
 
 
-func test_the_carried_ids_leave_an_empty_hand_empty() -> void:
+## The player loadout (items I4) marks an empty hand as empty, and a wizard seated from it holds
+## the same staffs on the same hands.
+func test_the_record_leaves_an_empty_hand_empty() -> void:
 	var wizard: Actor = _gapped()
-	check_equal(PlayerController.staff_ids(wizard), [&"", &"curl", &"", &"star"] as Array[StringName], "an empty hand carries no id")
+	var loadout: PlayerLoadout = PlayerController.loadout_of(wizard)
+	check_equal(loadout.hands(), PackedInt32Array([-1, 1, -1, 3]), "RB and LB are empty in its loadout")
+	check_equal([loadout.staff_id(1), loadout.staff_id(3)], [&"curl", &"star"], "RT's and LT's staffs, by id")
+	var again: Actor = Fixture.WizardScene.instantiate() as Actor
+	check(PlayerController.seat_loadout(again, 1, loadout, _world.registry) != null, "a wizard seated from the loadout")
+	PlayerController.of(again).frames = _world.frames
+	PlayerController.of(again).registry = _world.registry
+	_world.add(again)
+	check_equal(again.caster.empty_hands, 0b0101, "has the same empty hands")
+	check(not again.caster.holds(0) and again.caster.holds(1) and again.caster.staff_of(3).id == &"star", "and the same staffs on the others")
+	check_equal(again.caster.cards_of(1), wizard.caster.cards_of(1), "with their cards")
+	check(PlayerController.loadout_of(again).equals(loadout), "its own loadout is the same")
 
 
 ## A snapshot keeps which hands are empty and what is on show; restored after a change, the

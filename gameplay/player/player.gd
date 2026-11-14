@@ -56,7 +56,8 @@ extends ActorController
 ## together), and the driven actor's casts in `started`, letting go in `stopped`; it works the same
 ## on any actor with a Caster, Health and Mover (each optional). Nothing here allocates per step.
 ##
-## Flow puts a wizard together with `seat_wizard` before adding it to the tree.
+## Flow puts a wizard together with `seat_wizard` before adding it to the tree, or, for a player
+## a run's start takes along (items I4), with `seat_loadout` from its loadout (`loadout_of`).
 
 const FramesScript := preload("res://core/sim/frames.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -163,32 +164,44 @@ static func _empty_hands(staffs: Array[StaffBase]) -> int:
 	return bits
 
 
-## The cards `body`'s staffs hold now, by staff, each a list of card ids by slot (`&""` for an
-## empty slot): what `seat_wizard` takes as `cards`, so a wizard made again keeps its staffs (Flow,
-## from the hub into a run and back; online-lobby L1). Empty for a body with no Caster.
-static func staff_cards(body: Actor) -> Array:
-	var out: Array = []
-	var caster: Caster = body.caster if body != null else null
-	if caster == null:
-		return out
-	for at in caster.staff_count:
-		out.append(caster.cards_of(at))
-	return out
+## Get `body` (a wizard scene, not yet in the tree) ready for seat `seat_index` as the player
+## `loadout` says (items I4: what a run's start takes along): its controller's seat, its ramp, and
+## its Inventory holding exactly the loadout (`Inventory.take_loadout`, its staffs found in
+## `registry`), which its Caster's hands are made from. Returns its controller, or null when `body`
+## has none.
+static func seat_loadout(body: Actor, seat_index: int, loadout: PlayerLoadout, registry: Node) -> PlayerController:
+	var controller: PlayerController = of(body)
+	if controller == null:
+		return null
+	controller.seat = seat_index
+	body.ramp = seat_index
+	var inventory: Inventory = null
+	var caster: Caster = null
+	for child in body.get_children():
+		if child is Inventory:
+			inventory = child as Inventory
+		elif child is Caster:
+			caster = child as Caster
+	if inventory != null:
+		inventory.take_loadout(loadout, registry)
+	if caster != null:
+		caster.staff = null
+		caster.staffs = inventory.hand_staffs() if inventory != null else ([null, null, null, null] as Array[StaffBase])
+		caster.start_cards = inventory.hand_cards() if inventory != null else []
+		caster.empty_hands = _empty_hands(caster.staffs)
+	return controller
 
 
-## The id of each staff `body` holds now, by button (`&""` for one with no id, and for an empty
-## hand: the run's own, which a run from the hub has empty too): what Flow gives a
-## wizard made again as its staffs (`Flow.staffs_for_seat`), so it keeps the staffs themselves
-## beside their cards (`staff_cards`; owner, 2026-11-13). Empty for a body with no Caster.
-static func staff_ids(body: Actor) -> Array[StringName]:
-	var out: Array[StringName] = []
-	var caster: Caster = body.caster if body != null else null
-	if caster == null:
-		return out
-	for at in caster.staff_count:
-		var held: StaffBase = caster.staff_of(at) if caster.holds(at) else null
-		out.append(held.id if held != null else &"")
-	return out
+## What `body` holds now as a player loadout (its Inventory's, `Inventory.loadout`): what a wizard
+## made again is seated with (`seat_loadout`), so it keeps everything it held (Flow, from the hub
+## into a run; items I4). Null for a body with no Inventory.
+static func loadout_of(body: Actor) -> PlayerLoadout:
+	if body == null:
+		return null
+	for child in body.get_children():
+		if child is Inventory:
+			return (child as Inventory).loadout()
+	return null
 
 
 ## The PlayerController in `body`'s scene (its home controller), or null. Works before `body` is

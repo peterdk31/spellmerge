@@ -91,9 +91,9 @@ extends Node
 ## `start_stone_changed`, the stone asked to enter `lit` or `unlit` to match, so its look and cue
 ## are the prop's (props W8).
 ## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts a run of waves at
-## the tick's start, every wizard keeping its staffs, the staffs themselves and their cards (owner,
-## 2026-11-13: a staff equipped in the hub and the cards set on it go into the run as they are;
-## `start_run`'s `heads` and `kept`); that run's end
+## the tick's start, every wizard going in as the player it is: every bag, its staffs with their
+## cards and its hands (owner, 2026-11-13: what a run's start takes along is the whole player; items
+## I4, `start_run`'s `party`, a `PartyLoadout` of each wizard's `PlayerLoadout`); that run's end
 ## (everyone down) brings everyone back to the hub with nothing of the run, its staffs neither
 ## (owner, 2026-11-10: the hub is the arsenal a run's tools are picked from). A run started by
 ## `play_requested` restarts as before.
@@ -318,7 +318,7 @@ func _ready() -> void:
 	if spells == null:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
 	if frames != null:
-		frames.set_carry_source(_carry_now)
+		frames.set_party_source(_party_now)
 	if events == null:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
 		return
@@ -454,13 +454,12 @@ func _seat_of(wizard: Node) -> int:
 	return controller.seat if controller != null else -1
 
 
-## Build the world and start the run now, replacing any run in progress. `kept` (by seat, as
-## `_staffs_by_seat` makes it) gives a seat's wizard the cards its staffs held before (through the
-## hub's stone and back); a seat with none there starts with its mode's start cards. `heads` (by
-## seat, as `_heads_by_seat` makes it) gives it the staffs themselves it held (`staffs_for_seat`);
-## a seat or button with none, or with an id no staff has, holds its mode's. Returns
+## Build the world and start the run now, replacing any run in progress. `party` (as `_party_of`
+## makes it; items I4) gives each seat's wizard the player it was before, everything it held (from
+## the hub into a run, or the hub begun anew); a seat with no loadout there, and all of them with no
+## `party`, starts with what its mode gives (its staffs, start cards and bag). Returns
 ## false (and starts nothing) when content is missing or no player has a device.
-func start_run(requester: int, kept: Array = [], heads: Array = []) -> bool:
+func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id_for_mode()) as RoomBase if registry != null else null
 	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, enemy_id_to_play) as EnemyBase if registry != null else null
 	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null:
@@ -513,7 +512,7 @@ func start_run(requester: int, kept: Array = [], heads: Array = []) -> bool:
 	new_world.y_sort_enabled = true
 	new_world.add_child(layout)
 	_add_camera(new_world, size)
-	_spawn_players(new_world, room, players, kept, heads)
+	_spawn_players(new_world, room, players, party)
 	contents.stand(new_world, _places)
 	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
 	match mode:
@@ -597,15 +596,14 @@ func _start_play(player: int) -> void:
 
 
 ## The intro first on a new save (the run of `mode` starts when it ends), else the run now, its
-## seats' wizards with the cards `kept` on the staffs `heads` (by seat, as `start_run` takes them;
-## the intro keeps none).
-func _intro_then_run(player: int, kept: Array = [], heads: Array = []) -> void:
+## seats' wizards as `party` says (as `start_run` takes it; the intro keeps none).
+func _intro_then_run(player: int, party: PartyLoadout = null) -> void:
 	# Never in a run that is recorded or played back: the intro takes the machine's own time, and
 	# a recording must start the same on the machine that made it and on every one that plays it.
 	if wants_intro() and not (frames != null and (frames.is_recording() or frames.is_playing())):
 		play_intro(player)
 	else:
-		start_run(player, kept, heads)
+		start_run(player, party)
 
 
 ## True when Play should show the intro first: it is on and this save has not seen it.
@@ -698,26 +696,23 @@ func _start_sandbox(player: int) -> void:
 
 func _on_hub_requested(player: int) -> void:
 	# What the hub's wizards take along (the recording's, read before the hub it was made in goes).
-	var carry: RunCarry = frames.next_run_carry() if frames != null else RunCarry.new()
-	var kept: Array = carry.as_kept()
-	var heads: Array = carry.as_heads()
+	var party: PartyLoadout = frames.next_run_party() if frames != null else null
 	# Asked for in the hub, the hub starts anew (a recording of it begins: net/ opens the room), each
-	# wizard with the staffs it held.
+	# wizard with everything it held.
 	if state == State.RUNNING and mode == MODE_HUB:
 		stop_run()
 	if state != State.IDLE:
 		return
-	if not _load_then(_start_hub.bind(player, kept, heads)):
-		_start_hub(player, kept, heads)
+	if not _load_then(_start_hub.bind(player, party)):
+		_start_hub(player, party)
 
 
 ## The hub, once the work before a room is loaded: after the intro on a new save, as Play's run;
-## each seat's wizard with its staffs `heads` holding the cards in `kept` (by seat; a seat with
-## none: the hub's staffs and the start cards).
-func _start_hub(player: int, kept: Array = [], heads: Array = []) -> void:
+## each seat's wizard as `party` says (a seat with no loadout: the hub's staffs, start cards and bag).
+func _start_hub(player: int, party: PartyLoadout = null) -> void:
 	mode = MODE_HUB
 	_back_to_hub = false
-	_intro_then_run(player, kept, heads)
+	_intro_then_run(player, party)
 	if state == State.IDLE:
 		# Nothing started (content missing): idle is MODE_WAVES.
 		mode = MODE_WAVES
@@ -732,52 +727,40 @@ func _on_run_requested(player: int) -> void:
 	_start_run_from_stone(player)
 
 
-## The run of waves, from the hub's stone, for seat `seat`: every wizard keeps its staffs, the
-## staffs themselves and their cards (owner, 2026-11-13: a staff equipped in the hub goes into the
-## run as it is), and the run's end brings everyone back to the hub.
+## The run of waves, from the hub's stone, for seat `seat`: every wizard goes in as the player it
+## is, with every bag, its staffs and its hands (owner, 2026-11-13: what a run's start takes along
+## is the whole player), and the run's end brings everyone back to the hub.
 func _start_run_from_stone(seat: int) -> void:
-	var kept: Array = _staffs_by_seat()
-	var heads: Array = _heads_by_seat()
+	var party: PartyLoadout = _party_of()
 	mode = MODE_WAVES
 	_back_to_hub = true
-	if not start_run(seat, kept, heads):
+	if not start_run(seat, party):
 		# It refused before freeing anything (content missing): the hub stands as it was.
 		push_warning("Flow: the run from the stone did not start, so the party stays in the hub.")
 		_back_to_hub = false
 		mode = MODE_HUB
 
 
-## The cards every wizard's staffs hold now, by seat (empty for a seat with none): what
-## `start_run` makes each seat's wizard with, so staffs follow the party from the hub into the
-## run (owner, 2026-11-10); nothing comes back from it.
-func _staffs_by_seat() -> Array:
-	var out: Array = [[], [], [], []]
+## Every wizard's player loadout now, by its seat (items I4): what `start_run` makes each seat's
+## wizard from, so the whole player follows the party from the hub into the run (owner,
+## 2026-11-13); nothing comes back from it.
+func _party_of() -> PartyLoadout:
+	var out := PartyLoadout.new()
 	for wizard: Node2D in _wizards:
 		var seat: int = _seat_of(wizard) if is_instance_valid(wizard) else -1
 		if seat >= 0 and seat < PLAYER_SLOTS:
-			out[seat] = PlayerScript.staff_cards(wizard as Actor)
-	return out
-
-
-## The id of each staff every wizard holds now, by seat, one per button (empty for a seat with
-## none): what `start_run` makes each seat's wizard with as `heads`, beside `_staffs_by_seat`.
-func _heads_by_seat() -> Array:
-	var out: Array = [[], [], [], []]
-	for wizard: Node2D in _wizards:
-		var seat: int = _seat_of(wizard) if is_instance_valid(wizard) else -1
-		if seat >= 0 and seat < PLAYER_SLOTS:
-			out[seat] = PlayerScript.staff_ids(wizard as Actor)
+			out.put(seat, PlayerScript.loadout_of(wizard as Actor))
 	return out
 
 
 ## What a run that starts now takes along (the frames service asks, and writes it into a recording's
-## header; core/sim/run_carry.gd): in the hub, every wizard's staffs, so the hub begun anew for a
+## header; core/sim/party_loadout.gd): in the hub, every wizard's loadout, so the hub begun anew for a
 ## joining machine keeps them, on every machine; anywhere else nothing, since nothing comes back
 ## from a run (owner, 2026-11-10).
-func _carry_now() -> RunCarry:
+func _party_now() -> PartyLoadout:
 	if mode != MODE_HUB or state != State.RUNNING:
-		return RunCarry.new()
-	return RunCarry.of_kept(_staffs_by_seat(), _heads_by_seat())
+		return PartyLoadout.new()
+	return _party_of()
 
 
 ## The wizards in the world now.
@@ -1038,14 +1021,12 @@ func _add_camera(parent: Node2D, size: Vector2) -> void:
 	parent.add_child(camera)
 
 
-func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int], kept: Array = [], heads: Array = []) -> void:
+func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int], party: PartyLoadout = null) -> void:
 	_wizards.clear()
 	for index in PLAYER_SLOTS:
 		_downed[index] = false
 	for index: int in players:
-		var cards: Array = kept[index] if index < kept.size() else []
-		var ids: Array = heads[index] as Array if index < heads.size() and heads[index] is Array else []
-		_add_wizard(parent, room, index, Vector2.INF, cards, ids)
+		_add_wizard(parent, room, index, Vector2.INF, party.of(index) if party != null else null)
 
 
 ## The player spawn for a mid-run joiner: the one farthest from every enemy and
@@ -1105,22 +1086,6 @@ func staffs_for_mode() -> Array[StaffBase]:
 	return out
 
 
-## The four hands of a wizard that comes with the staffs of the ids `ids` (by button, as
-## `_heads_by_seat` makes them): each button the staff of its id under `wizard`, or, where there is
-## none, it is empty or no staff has it, the mode's (`staffs_for_mode`; null: an empty hand, as an
-## empty hand carried from the hub stays). Empty when the mode's is missing.
-func staffs_for_seat(ids: Array) -> Array[StaffBase]:
-	var out: Array[StaffBase] = staffs_for_mode()
-	if registry == null:
-		return out
-	for at in mini(ids.size(), out.size()):
-		var id := StringName(str(ids[at]))
-		var carried: StaffBase = registry.get_resource(&"wizard", id) as StaffBase if id != &"" else null
-		if carried != null:
-			out[at] = carried
-	return out
-
-
 ## The cards each staff of a new wizard starts with in this run's `mode`: `sandbox_cards` in the
 ## sandbox, `start_cards` in Play.
 func start_cards_for_mode() -> Array:
@@ -1143,34 +1108,14 @@ func bag_for_mode() -> Dictionary:
 	return out
 
 
-## `bag` (card id to copies) less the cards `carried` staffs hold (by staff, lists of card ids),
-## none below 0: a wizard made again with the staffs it carried (the hub begun anew for a joining
-## machine, a run from the stone) owns no more copies than the mode's bag, so nothing is counted
-## twice (items I3; the player record, I4, carries the bags themselves).
-static func _less_carried(bag: Dictionary, carried: Array) -> Dictionary:
-	var out: Dictionary = bag.duplicate()
-	for staff: Variant in carried:
-		if not staff is Array:
-			continue
-		for id: Variant in staff:
-			var card := StringName(str(id))
-			if int(out.get(card, 0)) > 0:
-				out[card] = int(out[card]) - 1
-	for card: Variant in out.keys():
-		if int(out[card]) <= 0:
-			out.erase(card)
-	return out
-
-
-## Add the wizard of seat `index` at `at` (INF: its spawn) with the staffs `cards` (by staff; empty:
-## the mode's start cards), on the staffs of the ids `ids` (by button; `staffs_for_seat`).
-func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF, cards: Array = [], ids: Array = []) -> void:
+## Add the wizard of seat `index` at `at` (INF: its spawn): the player `loadout` says (items I4,
+## `PlayerController.seat_loadout`), or with none the mode's staffs, start cards and bag.
+func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF, loadout: PlayerLoadout = null) -> void:
 	var wizard := _wizard_scene.instantiate() as Actor
-	var staff_cards: Array = cards if not cards.is_empty() else start_cards_for_mode()
-	var bag: Dictionary = bag_for_mode()
-	if not cards.is_empty():
-		bag = _less_carried(bag, cards)
-	PlayerScript.seat_wizard(wizard, index, null, staff_cards.duplicate(true), staffs_for_seat(ids), bag)
+	if loadout != null:
+		PlayerScript.seat_loadout(wizard, index, loadout, registry)
+	else:
+		PlayerScript.seat_wizard(wizard, index, null, start_cards_for_mode().duplicate(true), staffs_for_mode(), bag_for_mode())
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < _places.player_spawns.size():

@@ -15,6 +15,10 @@ extends RefCounted
 ##   past it the rest of the shots are tested in the next step). Only benchmarks change it.
 ## - `fire_shots`: the shots one budget's trigger fires may make in one step
 ##   (`Spells.fire_shots_per_step`; past it a fire waits for the next step). Only benchmarks change it.
+## - `bag_staffs`, `bag_cards`, `bag_relics`, `bag_potions`: the capacity of each bag of an
+##   inventory, in copies (items I4, docs/milestones/items.md; one rule per `ItemKinds.BAGS`
+##   entry, named `bag_` and the bag's name). 0, the default: no limit. An inventory takes its
+##   bags' at its start (`bag_capacity`); meta progression raises them later.
 ##
 ## A run takes them from the frames service (`Frames.next_run_rules`): the replay's while one
 ## records or plays (its header), otherwise a copy of this machine's. Online (later), the host's
@@ -25,6 +29,11 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 ## The ranges a replay's header is held to (the decoder refuses any other value).
 const MAX_SHOT_CAP: int = 1 << 20
 const MAX_WORK: int = 0x7fffffff
+const MAX_BAG: int = 0xffff
+## A bag with no limit, as `bag_capacity` answers (the rule's 0).
+const NO_LIMIT: int = -1
+## What a bag's rule is named: this and the bag's name.
+const BAG_RULE: String = "bag_"
 ## Every rule, in a replay header's order: its member, its name in a decoder's message, and the
 ## range a header may hold. A new rule is a member and a row here (and its default); copying,
 ## comparing, encoding and decoding follow (tests/core/test_session_rules.gd checks each member is
@@ -33,13 +42,21 @@ const FIELDS: Array = [
 	[&"shot_cap", "shot cap", 1, MAX_SHOT_CAP],
 	[&"hit_work", "hit work", 1, MAX_WORK],
 	[&"fire_shots", "fire shots", 0, MAX_WORK],
+	[&"bag_staffs", "staff bag", 0, MAX_BAG],
+	[&"bag_cards", "card bag", 0, MAX_BAG],
+	[&"bag_relics", "relic bag", 0, MAX_BAG],
+	[&"bag_potions", "potion bag", 0, MAX_BAG],
 ]
 ## The header's bytes: a 32-bit number for each of FIELDS.
-const BYTES: int = 12
+const BYTES: int = 28
 
 var shot_cap: int = ManagerScript.DEFAULT_CAP_DESKTOP
 var hit_work: int = ManagerScript.WORK_PER_STEP
 var fire_shots: int = SpellLimits.FIRE_SHOTS_PER_STEP
+var bag_staffs: int = 0
+var bag_cards: int = 0
+var bag_relics: int = 0
+var bag_potions: int = 0
 
 ## Not state: this machine's rules.
 const DERIVED: Array[StringName] = [&"_machine"]
@@ -85,6 +102,15 @@ func equals(other: SessionRules) -> bool:
 		if get(field[0]) != other.get(field[0]):
 			return false
 	return true
+
+
+## The capacity of the bag `bag` in copies, or NO_LIMIT (its rule is 0, or no rule names it).
+func bag_capacity(bag: StringName) -> int:
+	for field: Array in FIELDS:
+		if field[0] == StringName(BAG_RULE + bag):
+			var copies: int = get(field[0])
+			return copies if copies > 0 else NO_LIMIT
+	return NO_LIMIT
 
 
 ## Append the rules to `out` (BYTES bytes, a replay's header): each of FIELDS as 32 bits, in order.

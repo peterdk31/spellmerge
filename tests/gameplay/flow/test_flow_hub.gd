@@ -422,12 +422,16 @@ func test_staffs_built_in_the_hub_follow_into_the_run_and_nothing_comes_back() -
 	await commands_applied()
 	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(1).slice(0, 3), built, "seat 1 built its RT staff in the hub")
 	var fresh_rt: Array[StringName] = (flow.get_wizard(0) as Actor).caster.cards_of(1)
+	var hub_bag: Array = _card_bag(1)
 	_place(0, true)
 	_place(1, true)
 	_tick()
 	_press_a(0)
 	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run started")
 	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(1).slice(0, 3), built, "seat 1's staff came into the run")
+	# The whole player goes into the run (owner, I1 decision 11; confirmed 2026-11-14): its card
+	# bag is the one it held in the hub.
+	check_equal(_card_bag(1), hub_bag, "the run's card bag is the one held in the hub")
 	check_equal((flow.get_wizard(0) as Actor).caster.cards_of(1), fresh_rt, "seat 0's staff is as it was")
 	input.add_virtual_device(2)
 	check_equal((flow.get_wizard(2) as Actor).caster.cards_of(0).slice(0, 1), [&"dash"] as Array[StringName], "a seat joining mid-run starts with Play's cards")
@@ -444,7 +448,7 @@ func test_staffs_built_in_the_hub_follow_into_the_run_and_nothing_comes_back() -
 
 ## The hands go into the run as they are (items I2): RB and RT hold Play's staffs in the hub, LB
 ## and LT are empty, and so they are in the run; a seat joining mid-run holds the same; back in the
-## hub, the hub's own again. (The staffs themselves are carried by id: `staffs_for_seat`, below.)
+## hub, the hub's own again. (The whole player is carried, its loadout: below.)
 func test_the_hands_held_in_the_hub_go_into_the_run_as_they_are() -> void:
 	_start([0, 1])
 	for seat in [0, 1]:
@@ -478,22 +482,6 @@ func _check_two_hands(seat: int, where: String) -> void:
 		check_equal(wizard.caster.holds(at), held, "seat %d's hand %d %s %s" % [seat, at, "holds a staff" if held else "is empty", where])
 		if held:
 			check_equal(wizard.caster.staff_of(at).id, FlowScript.STARTER_HEADS[at], "seat %d's hand %d holds Play's staff %s" % [seat, at, where])
-
-
-## A staff id no staff has, or none, gives that button the mode's staff (`staffs_for_seat`).
-func test_a_carried_staff_no_staff_has_is_the_modes() -> void:
-	flow.mode = FlowScript.MODE_WAVES
-	var modes: Array[StaffBase] = flow.staffs_for_mode()
-	var dev: StaffBase = flow.registry.get_resource(&"wizard", FlowScript.DEV_STAFF) as StaffBase
-	var made: Array[StaffBase] = flow.staffs_for_seat([&"", FlowScript.DEV_STAFF, &"no_such_staff"])
-	check_equal(made.size(), 4, "four hands")
-	if made.size() == 4:
-		check(made[0] == modes[0], "an empty id: the mode's")
-		check(made[1] == dev, "a staff's id: that staff")
-		check(made[2] == modes[2], "an id no staff has: the mode's")
-		check(made[3] == modes[3], "a button with none carried: the mode's")
-		check(made[2] == null and made[3] == null, "the mode's LB and LT are empty hands, and stay so")
-	check(flow.staffs_for_seat([]) == modes, "nothing carried: the mode's staffs")
 
 
 func test_a_run_of_play_requested_still_restarts() -> void:
@@ -616,6 +604,14 @@ func test_the_bus_is_told_when_the_party_enters_and_leaves_the_hub() -> void:
 
 
 
+## Seat `seat`'s card bag as [id, copies] pairs, in order.
+func _card_bag(seat: int) -> Array:
+	var out: Array = []
+	for stack: ItemStack in (flow.get_wizard(seat) as Actor).inventory.stacks_in(&"cards"):
+		out.append([stack.id, stack.count])
+	return out
+
+
 func _cards(seat: int, staff: int) -> Array[StringName]:
 	return (flow.get_wizard(seat) as Actor).caster.cards_of(staff)
 
@@ -639,7 +635,7 @@ func test_a_seat_that_joins_the_hub_appears_beside_the_altar() -> void:
 
 
 ## The hub begun anew for a joining machine (net/ records it from its start) keeps every wizard's
-## staffs: what the hub's wizards hold is written into the recording's header, so a machine that
+## loadout (items I4): every bag, staff and hand the hub's wizards hold is written into the recording's header, so a machine that
 ## plays the recording from its start builds the same staffs. A run's end, recorded anew, takes
 ## nothing along (owner, 2026-11-10).
 func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> void:
@@ -655,9 +651,11 @@ func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> vo
 	check_equal(_cards(0, 1), fresh_rt, "seat 0's is as it was")
 	# Recorded: the start is sent by the frames service, after the header is written.
 	var replay: Replay = frames.call(&"record", &"hub_requested", 0) as Replay
-	check_equal((replay.carry.staffs_of(1)[1] as Array).slice(0, 3), built, "the recording's header carries it")
-	check_equal(replay.carry.seats(), 0b0011, "and every wizard's staffs")
-	check_equal(replay.carry.heads_of(1)[1], FlowScript.STARTER_HEADS[1], "the staffs themselves too")
+	check_equal(replay.party.of(1).staff_cards(1).slice(0, 3), built, "the recording's header carries it")
+	check_equal(replay.party.seats(), 0b0011, "and every wizard's loadout")
+	check_equal(replay.party.of(1).staff_id(1), FlowScript.STARTER_HEADS[1], "the staffs themselves too")
+	var bag_before: Array = _card_bag(1)
+	check(replay.party.of(1).equals(PlayerController.loadout_of(flow.get_wizard(1) as Actor)), "the whole player: bags and hands too")
 	check_equal(_cards(1, 1).slice(0, 3), built, "the hub begun anew under the recording keeps it")
 	frames.call(&"stop_recording")
 	# A machine that plays the recording from its start, which never had that staff.
@@ -667,6 +665,7 @@ func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> vo
 	check(frames.call(&"play", replay), "the recording plays")
 	check_equal(flow.mode, FlowScript.MODE_HUB, "in the hub")
 	check(flow.get_wizard(1) != null and _cards(1, 1).slice(0, 3) == built, "seat 1's wizard holds the staff it built on the machine that recorded")
+	check_equal(_card_bag(1), bag_before, "and the same card bag, counted as there")
 	check_equal(_cards(0, 1), fresh_rt, "seat 0's as there")
 	frames.call(&"stop_playing")
 	_stop()
@@ -690,7 +689,7 @@ func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> vo
 	from_frames()
 	check_equal(anew.size(), 1, "back in the hub, recorded anew")
 	if anew.size() == 1:
-		check(anew[0].carry.is_empty(), "its header takes nothing along")
+		check(anew[0].party.is_empty(), "its header takes nothing along")
 	check_equal(_cards(1, 1), fresh_rt, "and seat 1's staff is the hub's own again")
 	frames.disconnect(&"recorded_anew", hear)
 	frames.call(&"stop_recording")

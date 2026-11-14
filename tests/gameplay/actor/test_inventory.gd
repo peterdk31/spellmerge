@@ -2,7 +2,8 @@ extends "res://tests/support/suite.gd"
 ## Tests for the inventory (items I3, gameplay/actor/inventory.gd): it takes the staffs the body
 ## was made with, numbered by button; bags and their capacity in copies; cards stack, staffs are
 ## numbered; a staff on a hand goes into the Caster when its cards change, and one in the bag is
-## never installed; every change is counted and said.
+## never installed; every change is counted and said; its player loadout (items I4) and a wizard
+## made from one; its bags' capacities from the run's rules.
 ##
 ## godot --headless --path . --script res://tests/gameplay/actor/test_inventory.gd
 
@@ -82,6 +83,94 @@ func test_a_bag_has_a_capacity_counted_in_copies() -> void:
 	inventory.set_capacity(STAFFS, 1)
 	check(inventory.add(ItemStack.of_staff(_staff)), "one staff in a bag of one")
 	check(not inventory.add(ItemStack.of_staff(_staff)), "a second is refused")
+
+
+## A bag's capacity is one of the run's rules (items I4): an inventory takes its bags' at its start.
+func test_the_bags_capacities_are_the_runs_rules() -> void:
+	var hands: Array[StaffBase] = [_staff, null, null, null]
+	var body: Actor = _world.wizard(0, Vector2.ZERO, Fixture.NO_CARDS, null, false, hands)
+	PlayerController.seat_wizard(body, 0, null, Fixture.NO_CARDS, hands, {&"bolt": 2})
+	body.sim = Sim.new()
+	body.sim.rules.bag_cards = 3
+	body.sim.rules.bag_staffs = 1
+	_world.add(body)
+	var inventory: Inventory = body.inventory
+	check_equal(inventory.capacity_of(CARDS), 3, "the card bag holds what the rules say")
+	check_equal(inventory.capacity_of(STAFFS), 1, "the staff bag too")
+	check_equal(inventory.capacity_of(&"relics"), Inventory.UNLIMITED, "a bag whose rule is 0 has no limit")
+	check(inventory.add(ItemStack.card(&"fire", 1)) and not inventory.add(ItemStack.card(&"fire", 1)), "and it is held to it")
+
+
+## The player loadout (items I4): everything it holds, and a wizard made from it holds the same.
+func test_its_record_is_everything_it_holds() -> void:
+	var first: Actor = _wizard()
+	var inventory: Inventory = first.inventory
+	inventory.add(ItemStack.of_staff(_staff, _ids("fire")))
+	check_equal(inventory.set_cards(2, _ids("- bolt")), Inventory.Refusal.NONE, "LB's staff built")
+	var lamp := ItemStack.new()
+	lamp.kind = ItemKinds.RELIC
+	lamp.id = &"lamp"
+	inventory.add(lamp)
+	var loadout: PlayerLoadout = inventory.loadout()
+	check_equal(loadout.bags(), [CARDS, &"relics"] as Array[StringName], "the bags that hold something counted")
+	check_equal(loadout.stack_ids(CARDS), _ids("bolt fire"), "the card bag's stacks")
+	check_equal(loadout.stack_counts(CARDS), PackedInt32Array([1, 1]), "less the bolt LB's staff took")
+	check_equal(loadout.staff_numbers(), PackedInt32Array([0, 2, 4]), "every staff by its number: the hands', then the bag's")
+	check_equal(loadout.staff_id(4), &"test", "each the staff it is")
+	check_equal(loadout.staff_cards(2), _ids("- bolt -"), "with its cards by slot")
+	check_equal(loadout.hands(), inventory.hands(), "and the hands")
+	# A wizard made from it, the staffs found in a registry.
+	var registry := _Staffs.new()
+	registry.staff = _staff
+	var body: Actor = Fixture.WizardScene.instantiate() as Actor
+	PlayerController.seat_loadout(body, 0, loadout, registry)
+	PlayerController.of(body).frames = _world.frames
+	PlayerController.of(body).registry = _world.registry
+	_world.add(body)
+	var again: Inventory = body.inventory
+	check(again.loadout().equals(loadout), "holds the same: its loadout is the first's")
+	check_equal(again.numbers(), PackedInt32Array([0, 2, 4]), "the staffs under their numbers")
+	check_equal(again.hand_of(4), -1, "the bag's staff in the bag")
+	check_equal(again.count_of(CARDS, &"bolt"), 1, "the cards counted as they were, none given twice")
+	check(again.cards_given, "nobody fills its card bag again")
+	check_equal(body.caster.empty_hands, 0b1010, "its Caster holds the hands' staffs")
+	check_equal(body.caster.cards_of(2), _ids("- bolt -"), "with their cards")
+	check_equal(body.caster.cards_of(0), _ids("bolt - -"), "RB's too")
+	check_equal(again.staff(4).mana, _staff.max_mana, "a staff's pool starts full")
+	check(again.add(ItemStack.of_staff(_staff)) and again.numbers()[3] == 5, "the next staff counts on from the highest number")
+	registry.free()
+
+
+## A staff the registry has none of is left out (other content: the replay's content hash guards
+## it), its hand empty; an empty loadout is a player with nothing.
+func test_a_record_of_unknown_staffs_or_of_nothing() -> void:
+	var loadout := PlayerLoadout.new()
+	loadout.add_staff(0, &"no_such_staff", _ids("bolt"))
+	loadout.add_staff(1, &"test", _ids("fire"))
+	loadout.set_hands(PackedInt32Array([0, 1]))
+	var registry := _Staffs.new()
+	registry.staff = _staff
+	var body: Actor = Fixture.WizardScene.instantiate() as Actor
+	PlayerController.seat_loadout(body, 0, loadout, registry)
+	check_equal(body.get_node("Inventory").call("hands"), PackedInt32Array([-1, 1, -1, -1]), "only the staff it knows, on its hand")
+	body.free()
+	var bare: Actor = Fixture.WizardScene.instantiate() as Actor
+	PlayerController.seat_loadout(bare, 0, PlayerLoadout.new(), registry)
+	PlayerController.of(bare).frames = _world.frames
+	PlayerController.of(bare).registry = _world.registry
+	_world.add(bare)
+	check(bare.inventory.numbers().is_empty() and bare.inventory.copies(CARDS) == 0, "a wizard of an empty loadout holds nothing")
+	check_equal(bare.caster.empty_hands, 0b1111, "every hand empty")
+	registry.free()
+
+
+## A registry that has one staff, `staff`, under its id in `wizard`.
+class _Staffs:
+	extends Node
+	var staff: StaffBase
+
+	func get_resource(folder: StringName, id: StringName) -> Resource:
+		return staff if folder == &"wizard" and staff != null and id == staff.id else null
 
 
 func test_take_refuses_more_than_it_holds() -> void:

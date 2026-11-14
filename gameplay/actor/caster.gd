@@ -536,6 +536,24 @@ func next_cast_sense(at: int = 0) -> CastSense:
 	return actor.spells.next_cast_sense(number, at, free_mana(at)) if has_staff(at) else null
 
 
+## What the staff `base` holding `cards` (ids by slot) would cast first, as a `CastSense` (a staff
+## starts its cycle anew when it is built, so its next cast once built): an AI weighing a staff it
+## might take or a card it might put in (items I9). Null for a build that casts nothing, no Spells,
+## or, with `slot` >= 0, a card in that slot that does nothing (no cast of the cycle reads it, or
+## every cast that does wastes it: `CompiledStaff.wasted`). Compiled once per staff and cards, the
+## cache every caster shares.
+func sense_of_build(base: StaffBase, cards: Array[StringName], slot: int = -1) -> CastSense:
+	if base == null or actor.spells == null:
+		return null
+	var compiled: CompiledStaff = _compiled(cards, base)
+	if compiled.is_empty():
+		return null
+	if slot >= 0 and (compiled.wasted.has(slot) or not _reads(compiled, slot)):
+		return null
+	var sense: CastSense = compiled.casts[0].sense
+	return sense if sense != null and not sense.empty else null
+
+
 ## The hit radius of the next cast's first carrier (0 for none).
 func next_cast_radius(at: int = 0) -> float:
 	return actor.spells.next_cast_radius(number, at, free_mana(at)) if has_staff(at) else 0.0
@@ -576,6 +594,14 @@ func _compiled(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
 	found = actor.spells.compile_staff(cards, base)
 	_cache[key] = found
 	return found
+
+
+## True when a cast of `compiled`'s cycle reads the card in `slot`.
+static func _reads(compiled: CompiledStaff, slot: int) -> bool:
+	for cast: CompiledCast in compiled.casts:
+		if cast.slots.has(slot):
+			return true
+	return false
 
 
 ## The staff the cards sit in: `staff`, or a plain one of 4 slots when none is set.

@@ -45,8 +45,9 @@ const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 
 enum State { CHASE, WINDUP, RECOVER, REPOSITION, CHANNEL, TRANSITION, CALL }
-## How a plan walks: stand, toward or away from the target, or a set way (`plan_way`).
-enum Move { STAND, TOWARD, AWAY, WAY }
+## How a plan walks: stand, toward or away from the target, a set way (`plan_way`), or to a point
+## (`plan_point`: an item to take, items I9; walked to with or without a target).
+enum Move { STAND, TOWARD, AWAY, WAY, POINT }
 
 ## Seconds between looking for the nearest target again.
 const RETARGET_TIME: float = 0.5
@@ -97,7 +98,7 @@ const SPREAD_BONUS: float = 0.1
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the team board is
 ## Entities' (hashed there), handed over by the controller.
-const DERIVED: Array[StringName] = [&"entities", &"board", &"_face"]
+const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"actor", &"target", &"grudge", &"plan_target", &"_target_actor"]
 
@@ -153,6 +154,8 @@ var behaviour: AIBehaviour = null
 var plan_staff: int = -1
 var plan_move: Move = Move.STAND
 var plan_way: Vector2 = Vector2.ZERO
+## Where a POINT plan walks to (room pixels).
+var plan_point: Vector2 = Vector2.ZERO
 var plan_urgent: bool = false
 ## What the planned staff is aimed at when not `target` (a teammate to heal); null for `target`.
 var plan_target: Node2D = null
@@ -192,6 +195,9 @@ var _target_id: int = 0
 var _target_actor: Actor = null
 ## The actor's Face (the actor kit's), for the call's glance; null without one.
 var _face: Face = null
+## What it saw lying round it at its last look (`look_ground`), made once: scratch, filled and read
+## within one decision.
+var _ground: GroundSight = GroundSight.new()
 ## The last call of its team it has heard (`TeamBoard.called_at`).
 var _heard_call: float = -INF
 ## Its slot on the board at its last report and at its last noted attack (-1 for none).
@@ -478,6 +484,23 @@ func spread_bonus() -> float:
 	return profile.teamwork * SPREAD_BONUS / float(attackers)
 
 
+## Behaviours ask: what lies within `reach` of its feet (items I9: a `GroundSight`, the nearest
+## first, each with whether it is in reach to take), asked of the ground through the bus
+## (`ground_looked`), never of the Items area; empty with no bus. Filled anew at each look.
+func look_ground(reach: float) -> GroundSight:
+	_ground.clear()
+	if actor != null and actor.events != null:
+		actor.events.ground_looked.emit(actor.id, actor.global_position, reach, _ground)
+	return _ground
+
+
+## Behaviours ask: take the item `item` off the ground now (`actor_take_requested`: the Items area
+## gives it to its Inventory as the pickup rule says, if it lies in reach and there is room).
+func take_item(item: int) -> void:
+	if actor != null and actor.events != null:
+		actor.events.actor_take_requested.emit(actor.id, item)
+
+
 ## Behaviours ask: walk round the wall in the line for a while (REPOSITION).
 func reposition() -> void:
 	plan_move = Move.WAY
@@ -648,6 +671,7 @@ func _clear_plan() -> void:
 	plan_staff = -1
 	plan_move = Move.STAND
 	plan_way = Vector2.ZERO
+	plan_point = Vector2.ZERO
 	plan_urgent = false
 	plan_target = null
 
@@ -658,6 +682,9 @@ func _clear_plan() -> void:
 func _chase(intent: ActorIntent) -> void:
 	var aimed: Node2D = _aim_node()
 	if aimed == null:
+		# Nothing to aim at: a walk to a point still goes on (an item to take).
+		if plan_move == Move.POINT:
+			intent.move = _to_point()
 		return
 	var now: Vector2 = aimed.global_position - actor.global_position
 	if now != Vector2.ZERO:
@@ -674,6 +701,8 @@ func _chase(intent: ActorIntent) -> void:
 			intent.move = -now.normalized() if now != Vector2.ZERO else Vector2.ZERO
 		Move.WAY:
 			intent.move = plan_way
+		Move.POINT:
+			intent.move = _to_point()
 		Move.STAND:
 			_press_on(intent)
 	if plan_urgent:
@@ -812,6 +841,12 @@ func _in_lane(sense: CastSense, now: Vector2, radius: float) -> bool:
 func _to_chase() -> void:
 	state = State.CHASE
 	_decide_now = true
+
+
+## The way to `plan_point`, ZERO once there.
+func _to_point() -> Vector2:
+	var way: Vector2 = plan_point - actor.global_position
+	return way.normalized() if way.length_squared() > CLOSE_ENOUGH * CLOSE_ENOUGH else Vector2.ZERO
 
 
 ## Where an enemy stands in a fight: a profile that presses on walks toward its target instead, at

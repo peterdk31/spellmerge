@@ -38,6 +38,12 @@ extends Resource
 ## 0-1: how much it staggers fire with its team, spreads round a target and calls attacks.
 @export_range(0.0, 1.0) var teamwork: float = 0.5
 
+## The kinds of item it takes off the ground (items I9; `ItemKinds`' kinds: `&"staff"`, `&"card"`):
+## empty, it takes nothing and never looks. A staff goes on a free hand, or in place of its weakest
+## when every hand is full and the staff is stronger; a card into a free slot where it does something
+## (gameplay/ai/behaviours/pick_up.gd).
+@export var takes: Array[StringName] = []
+
 ## The profile an actor with no profile of its own plays by.
 static var _fallback: AIProfile = null
 

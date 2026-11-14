@@ -66,8 +66,8 @@ func before_each() -> void:
 	_rumbles.clear()
 	_whole.clear()
 	_single.clear()
-	_bus.staff_cards_requested.connect(func(player: int, staff: int, cards: Array[StringName]) -> void: _whole.append([player, staff, cards.duplicate()]))
-	_bus.staff_change_requested.connect(func(player: int, staff: int, slot: int, id: StringName) -> void: _single.append([player, staff, slot, id]))
+	_bus.staff_cards_requested.connect(func(player: int, staff: int, cards: Array[StringName], _body: int) -> void: _whole.append([player, staff, cards.duplicate()]))
+	_bus.staff_change_requested.connect(func(player: int, staff: int, slot: int, id: StringName, _body: int) -> void: _single.append([player, staff, slot, id]))
 	_hud = own((load(HUD_SCENE_PATH) as PackedScene).instantiate()) as HudScript
 	_hud.events = _bus
 	_hud.save = SaveFile.new(NO_SAVE)
@@ -273,7 +273,7 @@ func test_a_full_staff_refuses_a_push() -> void:
 	var full: Array[StringName] = []
 	for _slot in _players[0].caster.slot_count():
 		full.append(&"bolt")
-	_bus.staff_cards_requested.emit(0, 1, full)
+	_bus.staff_cards_requested.emit(0, 1, full, _world.body_key(0))
 	radial.mark_slot(0)
 	_point(0, &"fire")
 	var asked: int = _whole.size()
@@ -497,7 +497,7 @@ func test_the_numbers_show_the_mana_share_and_what_rt_would_change() -> void:
 	_point(0, &"atom")
 	check(radial.number_lines()[1].contains(" > "), "a pointed card shows what RT would make of the damage: %s" % radial.number_lines()[1])
 	var dear: Array[StringName] = _ids("split split split split split split nova bolt")
-	_bus.staff_cards_requested.emit(0, 1, dear)
+	_bus.staff_cards_requested.emit(0, 1, dear, _world.body_key(0))
 	check(radial.number_lines()[0].get_slice(" > ", 0).ends_with("!"), "a cast dearer than all the mana is marked: %s" % radial.number_lines()[0])
 
 
@@ -508,9 +508,9 @@ func test_the_ring_counts_the_copies_and_a_card_with_none_left_goes() -> void:
 	var radial: RadialScript = _open(0)
 	_players[0].inventory.give_cards({&"bolt": 3, &"fire": 1})
 	check_equal(_counts(radial), {&"bolt": 3, &"fire": 1}, "one place on the ring each, with its copies")
-	_bus.staff_change_requested.emit(0, 2, 0, &"fire")
+	_bus.staff_change_requested.emit(0, 2, 0, &"fire", _world.body_key(0))
 	check_equal(_counts(radial), {&"bolt": 3}, "the last fire is in a staff, so it leaves the ring")
-	_bus.staff_change_requested.emit(0, 2, 0, &"bolt")
+	_bus.staff_change_requested.emit(0, 2, 0, &"bolt", _world.body_key(0))
 	check_equal(_counts(radial), {&"bolt": 2, &"fire": 1}, "taken out, it is back; the bolt put in is one less")
 
 
@@ -544,10 +544,10 @@ func test_the_slots_frame_each_cast_of_the_cycle() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
 	# The dev staff draws one carrier a cast: fire bolt, then frost atom.
-	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt frost atom"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt frost atom"), _world.body_key(0))
 	var groups: PackedInt32Array = radial.slot_groups()
 	check_equal(Array(groups.slice(0, 5)), [0, 0, 1, 1, -1], "two casts of two cards, and an empty slot in none")
-	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"), _world.body_key(0))
 	check_equal(Array(radial.slot_groups().slice(0, 3)), [0, 0, -1], "one cast after an edit")
 
 
@@ -616,7 +616,7 @@ func test_the_card_info_shows_the_marked_card() -> void:
 	_let_go(0)
 	radial.mark_slot(5)
 	check_equal(radial.card_info()["name"], RadialScript.EMPTY_SLOT_TEXT, "an empty slot says so")
-	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit bolt atom"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit bolt atom"), _world.body_key(0))
 	radial.mark_slot(0)
 	check_equal(radial.card_info()["kind"], "Trigger", "a trigger")
 	check((radial.card_info()["stats"] as PackedStringArray).is_empty(), "shows no numbers")
@@ -670,7 +670,7 @@ func test_y_swaps_the_ring_for_the_tree_and_back() -> void:
 func test_the_tree_rows_come_from_the_staffs_plan() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit on_expire bolt fire atom frost atom"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit on_expire bolt fire atom frost atom"), _world.body_key(0))
 	_tap(0, &"extra")
 	_frame()
 	var rows: Array[Dictionary] = radial.tree_view().rows()
@@ -681,14 +681,14 @@ func test_the_tree_rows_come_from_the_staffs_plan() -> void:
 		check_equal([int(rows[1]["depth"]), int(rows[1]["trigger"]), rows[1]["name"]], [1, 0, _spells.component_name(&"on_hit")], "on hit, one level in")
 		check_equal([int(rows[2]["depth"]), int(rows[2]["trigger"]), rows[2]["name"]], [1, 1, _spells.component_name(&"on_expire")], "on expire beside it")
 	# An edit while the tree is open shows at once.
-	_bus.staff_cards_requested.emit(0, 1, _ids("bolt atom"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("bolt atom"), _world.body_key(0))
 	check_equal(radial.tree_view().rows().size(), 2, "two casts, a row each")
 
 
 func test_the_marked_card_is_marked_in_the_tree_and_a_tile_marks_its_slot() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit on_expire bolt fire atom frost atom"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit on_expire bolt fire atom frost atom"), _world.body_key(0))
 	_tap(0, &"extra")
 	_frame()
 	var tree: TreeViewScript = radial.tree_view()
@@ -725,7 +725,7 @@ func test_a_tall_tree_scrolls_and_follows_the_marker() -> void:
 	var many: Array[StringName] = []
 	for _at in 20:
 		many.append(&"bolt")
-	_bus.staff_cards_requested.emit(0, 1, many)
+	_bus.staff_cards_requested.emit(0, 1, many, _world.body_key(0))
 	_tap(0, &"extra")
 	_frame()
 	var tree: TreeViewScript = radial.tree_view()
@@ -750,7 +750,7 @@ func test_a_tall_tree_scrolls_and_follows_the_marker() -> void:
 func test_the_replay_steps_through_the_rows_and_loops() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit bolt atom"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit bolt atom"), _world.body_key(0))
 	_tap(0, &"extra")
 	_frame()
 	var tree: TreeViewScript = radial.tree_view()

@@ -53,6 +53,10 @@ extends ActorController
 ##   refusal is `inventory_refused` with its words.
 ## - **Down** (items I7b): while the shown body is down every request of the builder's and the
 ##   inventory's is refused (NO_DOWN, as `build_refused` or `inventory_refused`) and changes nothing.
+## - **The body named** (items I8): each of those four requests carries the key of the body the menu
+##   showed (`Actor.key`, sent with `inventory_announced`); one for a body the seat no longer shows
+##   (sent just before a possession began or ended, a late frame online) is refused (NO_BODY), so
+##   it never changes another body's staff of the same number.
 ## - **The card bag** (each run mode's, from flow through `seat_wizard`: card id to copies,
 ##   `Inventory.give_cards`); a wizard given none gets Inventory.DEV_COPIES of every card in the
 ##   registry when it first drives.
@@ -92,6 +96,9 @@ const NO_ITEM: String = "You do not have that."
 ## Why every request of the builder's and the inventory's is refused while the home body is down
 ## (items I7b): the HUD closes both menus then, but a command can still arrive (a late frame online).
 const NO_DOWN: String = "You cannot do that while down."
+## Why a request of the builder's or the inventory's is refused when it names a body the seat no
+## longer shows (items I8: one sent just before a possession began or ended, a late frame online).
+const NO_BODY: String = "That is no longer the body you play."
 const REFUSALS: Dictionary = {
 	Inventory.Refusal.NO_STAFF: NO_STAFF, Inventory.Refusal.NO_SLOT: NO_SLOT,
 	Inventory.Refusal.NO_CARD: NO_CARD, Inventory.Refusal.NO_HAND: NO_HAND,
@@ -526,7 +533,7 @@ func _announce_body() -> void:
 		if body.caster == null or at >= body.caster.staff_count or body.caster.number >= 0:
 			# A staff not built yet is announced when its Caster builds it.
 			_on_staff_built(at)
-	body.events.inventory_announced.emit(seat)
+	body.events.inventory_announced.emit(seat, body.key())
 	# What its sustained cards hold of each pool (the HUD forgot the last body's on the announcement).
 	if body.caster != null and body.caster.number >= 0 and body.spells != null:
 		for at in mini(body.caster.staff_count, STAFF_COUNT):
@@ -585,18 +592,24 @@ func _builder_inventory() -> Inventory:
 	return body.inventory if body != null else null
 
 
-## True while the shown body is down: its builder's and inventory's requests are refused (items I7b).
-func _home_down() -> bool:
+## Why a menu's request naming the body `key` is refused before it is tried: NO_BODY for a body the
+## seat no longer shows (items I8), NO_DOWN while the shown body is down (items I7b); "" for none.
+func _menu_refusal(key: int) -> String:
 	var body: Actor = shown()
-	return body != null and body.is_down()
+	if body == null or body.key() != key:
+		return NO_BODY
+	if body.is_down():
+		return NO_DOWN
+	return ""
 
 
 ## A builder asked to put `card_id` into `slot` of staff number `number` (`&""` empties it).
-func _on_staff_change_requested(player: int, number: int, slot: int, card_id: StringName) -> void:
+func _on_staff_change_requested(player: int, number: int, slot: int, card_id: StringName, body: int) -> void:
 	if player != seat:
 		return
-	if _home_down():
-		_refuse(NO_DOWN)
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse(why)
 		return
 	var inventory: Inventory = _builder_inventory()
 	_answer(inventory.set_card(number, slot, card_id) if inventory != null else Inventory.Refusal.NO_STAFF)
@@ -604,11 +617,12 @@ func _on_staff_change_requested(player: int, number: int, slot: int, card_id: St
 
 ## A builder asked to set every slot of staff number `number` at once (`cards` by slot; fewer than
 ## the staff's slots empties the rest). Refused, and nothing changes, as `Inventory.set_cards` says.
-func _on_staff_cards_requested(player: int, number: int, cards: Array[StringName]) -> void:
+func _on_staff_cards_requested(player: int, number: int, cards: Array[StringName], body: int) -> void:
 	if player != seat:
 		return
-	if _home_down():
-		_refuse(NO_DOWN)
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse(why)
 		return
 	var inventory: Inventory = _builder_inventory()
 	_answer(inventory.set_cards(number, cards) if inventory != null else Inventory.Refusal.NO_STAFF)
@@ -622,11 +636,12 @@ func _answer(refusal: Inventory.Refusal) -> void:
 
 ## The inventory menu asked to put staff number `number` on hand `hand` (-1: into the staff bag;
 ## items I7): `Inventory.set_hand`, refused as it says.
-func _on_staff_hand_requested(player: int, number: int, hand: int) -> void:
+func _on_staff_hand_requested(player: int, number: int, hand: int, body: int) -> void:
 	if player != seat:
 		return
-	if _home_down():
-		_refuse_inventory(NO_DOWN)
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse_inventory(why)
 		return
 	var inventory: Inventory = _builder_inventory()
 	_answer_inventory(inventory.set_hand(number, hand) if inventory != null else Inventory.Refusal.NO_STAFF)
@@ -634,11 +649,12 @@ func _on_staff_hand_requested(player: int, number: int, hand: int) -> void:
 
 ## The inventory menu asked to drop staff number `number`, or with -1 one copy of `id` from `bag`
 ## (items I7): `Inventory.drop_staff` or `drop`, refused as they say.
-func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number: int) -> void:
+func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number: int, body: int) -> void:
 	if player != seat:
 		return
-	if _home_down():
-		_refuse_inventory(NO_DOWN)
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse_inventory(why)
 		return
 	var inventory: Inventory = _builder_inventory()
 	var refusal: Inventory.Refusal = Inventory.Refusal.NO_ITEM

@@ -13,8 +13,8 @@ func _full() -> InputFrame:
 	frame.hold(0, true)
 	frame.hold(3, true)
 	frame.captured = true
-	check(frame.add_command(&"staff_change_requested", [1, 4, &"fire"]), "a staff change is a command")
-	check(frame.add_command(&"staff_cards_requested", [2, [&"split", &"", &"nova"] as Array[StringName]]), "a whole staff is a command")
+	check(frame.add_command(&"staff_change_requested", [1, 4, &"fire", 9]), "a staff change is a command")
+	check(frame.add_command(&"staff_cards_requested", [2, [&"split", &"", &"nova"] as Array[StringName], 9]), "a whole staff is a command")
 	check(frame.add_command(&"door_vote_requested", [-2]), "a door vote is a command")
 	check(frame.add_command(InputFrame.JOIN), "a join is a command")
 	return frame
@@ -64,7 +64,7 @@ func test_a_frame_comes_back_from_its_bytes() -> void:
 	check(back.is_pressed(0) and back.is_held(0) and back.is_held(3) and not back.is_held(1), "the buttons")
 	check(back.captured, "captured")
 	check_equal(back.commands.size(), 4, "every command")
-	check_equal(back.commands[0], [&"staff_change_requested", 1, 4, &"fire"], "a staff change with its arguments")
+	check_equal(back.commands[0], [&"staff_change_requested", 1, 4, &"fire", 9], "a staff change with its arguments")
 	check_equal(back.commands[2], [&"door_vote_requested", -2], "a negative int survives")
 	var cards: Array = back.commands[1][2]
 	check_equal(cards, [&"split", &"", &"nova"], "a list of ids, an empty one too")
@@ -78,8 +78,8 @@ func test_add_command_refuses_what_the_decoder_would() -> void:
 	var frame := InputFrame.new()
 	check(not frame.add_command(&"play_requested", []), "no such command")
 	check(not frame.add_command(&"staff_change_requested", [1, 2]), "too few arguments")
-	check(not frame.add_command(&"staff_change_requested", [1, 2.0, &"fire"]), "a float for an int")
-	check(not frame.add_command(&"staff_change_requested", [1, 2, &"../x"]), "a path for an id")
+	check(not frame.add_command(&"staff_change_requested", [1, 2.0, &"fire", 9]), "a float for an int")
+	check(not frame.add_command(&"staff_change_requested", [1, 2, &"../x", 9]), "a path for an id")
 	check(not frame.add_command(&"sandbox_spawn_requested", [&"imp", 1 << 40]), "an int past 32 bits")
 	check(frame.commands.is_empty(), "nothing was added")
 	for i in InputFrame.MAX_COMMANDS:

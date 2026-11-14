@@ -476,7 +476,7 @@ func _test_build_break_ignores_builders() -> void:
 		root.add_child(builder)
 		# The last player sits in a menu for the whole break.
 		_check(focus.call("open", count - 1, [builder] as Array[Control]) == true, "%d players: the last player opened a menu" % count)
-		_events.emit_signal("staff_change_requested", count - 1, 2, 0, &"fire")
+		_events.emit_signal("staff_change_requested", count - 1, 2, 0, &"fire", (_flow.get_wizard(count - 1) as Actor).key())
 		_flow.step(FlowScript.BUILD_BREAK - 0.1)
 		_check(focus.call("is_open", count - 1) == true, "%d players: the menu is still open late in the break" % count)
 		_check(_flow.wave == 1 and _flow.state == FlowScript.State.CLEARED, "%d players: the wave is not early while someone builds" % count)

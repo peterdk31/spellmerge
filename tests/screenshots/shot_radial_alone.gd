@@ -137,14 +137,14 @@ func _stage() -> void:
 
 
 ## The stand-in for the player: apply a request and announce the staff again.
-func _on_change_requested(player: int, staff: int, slot: int, card_id: StringName) -> void:
+func _on_change_requested(player: int, staff: int, slot: int, card_id: StringName, _body: int) -> void:
 	if player != PLAYER or staff >= STAFFS:
 		return
 	(_rows[staff] as Array)[slot] = card_id
 	_announce(staff)
 
 
-func _on_cards_requested(player: int, staff: int, cards: Array[StringName]) -> void:
+func _on_cards_requested(player: int, staff: int, cards: Array[StringName], _body: int) -> void:
 	if player != PLAYER or staff >= STAFFS:
 		return
 	var row: Array[StringName] = []

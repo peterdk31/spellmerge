@@ -30,9 +30,9 @@ func take() -> void:
 		fail("the sandbox did not start with four wizards")
 		return
 	_hud.call("_on_builder_options_changed", 0, true)
-	events.emit_signal("staff_cards_requested", 0, 1, _typed(NESTED))
+	events.emit_signal("staff_cards_requested", 0, 1, _typed(NESTED), (flow.call("get_wizard", 0) as Actor).key())
 	for index in 3:
-		events.emit_signal("staff_cards_requested", index + 1, 1, _typed(OTHERS[index]))
+		events.emit_signal("staff_cards_requested", index + 1, 1, _typed(OTHERS[index]), (flow.call("get_wizard", index + 1) as Actor).key())
 	if not await _open([0]):
 		return
 	tap(0, &"extra")

@@ -11,6 +11,8 @@ const FramesScript := preload("res://core/sim/frames.gd")
 const WizardFixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 
 const DT: float = 1.0 / 60.0
+## The key of the body a menu request names (items I8): any number, for the frames service.
+const BODY: int = 7
 
 var _bus: EventsScript
 var _input: InputManagerScript
@@ -44,8 +46,8 @@ func before_each() -> void:
 	root.add_child(_bus)
 	root.add_child(_input)
 	root.add_child(_frames)
-	_bus.listen(&"staff_change_requested", func(seat: int, staff: int, slot: int, card: StringName) -> void: _heard.append([&"staff_change_requested", seat, staff, slot, card]))
-	_bus.listen(&"staff_cards_requested", func(seat: int, staff: int, cards: Array[StringName]) -> void: _heard.append([&"staff_cards_requested", seat, staff, cards]))
+	_bus.listen(&"staff_change_requested", func(seat: int, staff: int, slot: int, card: StringName, _body: int) -> void: _heard.append([&"staff_change_requested", seat, staff, slot, card]))
+	_bus.listen(&"staff_cards_requested", func(seat: int, staff: int, cards: Array[StringName], _body: int) -> void: _heard.append([&"staff_cards_requested", seat, staff, cards]))
 
 
 func after_each() -> void:
@@ -76,11 +78,11 @@ func test_every_command_is_an_event_of_its_shape() -> void:
 
 
 func test_a_command_applies_at_the_next_tick_start() -> void:
-	_bus.staff_change_requested.emit(2, 1, 0, &"fire")
+	_bus.staff_change_requested.emit(2, 1, 0, &"fire", BODY)
 	check(_heard.is_empty(), "not when it is sent")
 	_frames.tick(DT)
 	check_equal(_heard, [[&"staff_change_requested", 2, 1, 0, &"fire"]], "at the next tick's start, the seat first")
-	check_equal(_frames.frame_of(2).commands, [[&"staff_change_requested", 1, 0, &"fire"]], "in its seat's frame")
+	check_equal(_frames.frame_of(2).commands, [[&"staff_change_requested", 1, 0, &"fire", BODY]], "in its seat's frame")
 	check(_frames.frame_of(0).commands.is_empty(), "and no other seat's")
 	_frames.tick(DT)
 	check_equal(_heard.size(), 1, "once")
@@ -89,9 +91,9 @@ func test_a_command_applies_at_the_next_tick_start() -> void:
 
 func test_commands_keep_their_order_and_types() -> void:
 	var cards: Array[StringName] = [&"split", &"", &"nova"]
-	_bus.staff_cards_requested.emit(0, 2, cards)
-	_bus.staff_change_requested.emit(0, 1, 3, &"")
-	_bus.staff_change_requested.emit(1, 0, 0, &"bolt")
+	_bus.staff_cards_requested.emit(0, 2, cards, BODY)
+	_bus.staff_change_requested.emit(0, 1, 3, &"", BODY)
+	_bus.staff_change_requested.emit(1, 0, 0, &"bolt", BODY)
 	_frames.tick(DT)
 	check_equal(_heard.size(), 3, "all three")
 	if _heard.size() == 3:
@@ -110,8 +112,8 @@ func test_without_a_sink_a_command_applies_as_sent() -> void:
 
 
 func test_a_bad_command_never_reaches_the_game() -> void:
-	_bus.staff_change_requested.emit(7, 1, 0, &"fire")
-	_bus.staff_change_requested.emit(0, 1, 0, &"../fire")
+	_bus.staff_change_requested.emit(7, 1, 0, &"fire", BODY)
+	_bus.staff_change_requested.emit(0, 1, 0, &"../fire", BODY)
 	_frames.tick(DT)
 	check(_heard.is_empty(), "no seat 7, no path for an id")
 
@@ -223,7 +225,7 @@ func test_a_recorded_run_plays_back_frame_for_frame() -> void:
 		if i == 3:
 			_input.send_virtual(0, &"staff_2", 1.0)
 		if i == 5:
-			_bus.staff_change_requested.emit(0, 1, 2, &"frost")
+			_bus.staff_change_requested.emit(0, 1, 2, &"frost", BODY)
 		if i == 7:
 			_input.add_virtual_device(1)
 		_frames.tick(DT)
@@ -245,7 +247,7 @@ func test_a_recorded_run_plays_back_frame_for_frame() -> void:
 	check(_input.is_joined(0) and _input.is_joined(2) and not _input.is_joined(1), "its seats join")
 	for i in 12:
 		if i == 2:
-			_bus.staff_change_requested.emit(3, 0, 0, &"bolt")
+			_bus.staff_change_requested.emit(3, 0, 0, &"bolt", BODY)
 		_frames.tick(DT)
 		check_equal(_frames_bytes(), recorded[i], "tick %d: the same frames" % i)
 		if i == 7:
@@ -262,7 +264,7 @@ func test_a_replay_plays_a_recorded_tick_each_tick() -> void:
 	var replay: Replay = _frames.record(&"sandbox_requested", 0)
 	_input.send_virtual(0, &"move_right", 1.0)
 	_frames.tick(DT)
-	_bus.staff_change_requested.emit(0, 1, 0, &"fire")
+	_bus.staff_change_requested.emit(0, 1, 0, &"fire", BODY)
 	_frames.tick(DT)
 	_input.send_virtual(0, &"move_right", 0.0)
 	_input.send_virtual(0, &"move_left", 1.0)
@@ -302,7 +304,7 @@ class Remote:
 	extends FrameSource
 
 	func fill_frame(frame: InputFrame, _delta: float) -> void:
-		frame.add_command(&"staff_change_requested", [1, 0, &"fire"])
+		frame.add_command(&"staff_change_requested", [1, 0, &"fire", BODY])
 		frame.add_command(InputFrame.LEAVE, [])
 		frame.add_command(InputFrame.JOIN, [])
 
@@ -321,7 +323,7 @@ func test_a_sources_commands_apply_but_it_seats_nobody() -> void:
 	var replay: Replay = _frames.record(&"sandbox_requested", 1)
 	_frames.tick(DT)
 	check_equal(_heard, [[&"staff_change_requested", 1, 1, 0, &"fire"]], "the source's command applies as its seat's")
-	check_equal(_frames.frame_of(1).commands, [[&"staff_change_requested", 1, 0, &"fire"]], "its JOIN and LEAVE are dropped from the frame")
+	check_equal(_frames.frame_of(1).commands, [[&"staff_change_requested", 1, 0, &"fire", BODY]], "its JOIN and LEAVE are dropped from the frame")
 	check_equal(seats, [2], "and seat nobody")
 	_input.leave(1)
 	check_equal(seats, [2, -2], "the input layer's leave does")
@@ -331,7 +333,7 @@ func test_a_sources_commands_apply_but_it_seats_nobody() -> void:
 	for seat in 4:
 		frames.append(InputFrame.new())
 	replay.read_tick(0, frames)
-	check_equal(frames[1].commands, [[&"staff_change_requested", 1, 0, &"fire"]], "recorded without them")
+	check_equal(frames[1].commands, [[&"staff_change_requested", 1, 0, &"fire", BODY]], "recorded without them")
 	replay.read_tick(1, frames)
 	check(frames[1].commands.has([InputFrame.LEAVE]), "and the device's leave is recorded at its tick")
 	check_equal(replay.seats_at(1), 0b0010, "the replay's seats before the leave")

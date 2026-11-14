@@ -109,7 +109,7 @@ func _test_builder_walk() -> void:
 ## (a command applies at the tick's start).
 func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	var builds: Array = []
-	var on_build := func(player: int, staff: int, slot: int, id: StringName) -> void: builds.append([player, staff, slot, id])
+	var on_build := func(player: int, staff: int, slot: int, id: StringName, _body: int) -> void: builds.append([player, staff, slot, id])
 	events.connect("staff_change_requested", on_build)
 	var before: int = bot.requests_sent
 	_check(bot.build_random(5), "a bot with a wizard builds")

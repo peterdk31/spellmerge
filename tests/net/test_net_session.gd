@@ -101,14 +101,14 @@ func test_a_clients_command_applies_once_on_both_machines_at_the_same_tick() -> 
 	var pair: NetPair = _new_pair(100.0)
 	check(pair.start(), "the host starts")
 	var heard: Array = []
-	var on_host := func(seat: int, staff: int, slot: int, card: StringName) -> void: heard.append(["host", pair.host_ticks() - 1, seat, staff, slot, card])
-	var on_client := func(seat: int, staff: int, slot: int, card: StringName) -> void: heard.append(["client", pair.client_ticks(), seat, staff, slot, card])
+	var on_host := func(seat: int, staff: int, slot: int, card: StringName, _body: int) -> void: heard.append(["host", pair.host_ticks() - 1, seat, staff, slot, card])
+	var on_client := func(seat: int, staff: int, slot: int, card: StringName, _body: int) -> void: heard.append(["client", pair.client_ticks(), seat, staff, slot, card])
 	# Heard as the simulation hears a command: when its frame's tick starts (`Events.listen`).
 	pair.host_fight.fight.bus.call(&"listen", &"staff_change_requested", on_host)
 	pair.client_fight.fight.bus.call(&"listen", &"staff_change_requested", on_client)
 	pair.run(60)
 	heard.clear()
-	pair.client_fight.fight.bus.emit_signal(&"staff_change_requested", NetHost.SEAT, 2, 0, CARD)
+	pair.client_fight.fight.bus.emit_signal(&"staff_change_requested", NetHost.SEAT, 2, 0, CARD, 7)
 	check(heard.is_empty(), "nothing applies when it is asked: it goes out in the seat's frame")
 	pair.run(60)
 	check(pair.let_client_catch_up(), "the client plays every tick")

@@ -60,8 +60,8 @@ func before_each() -> void:
 	_hand_asks.clear()
 	_drop_asks.clear()
 	_dropped.clear()
-	_bus.staff_hand_requested.connect(func(player: int, staff: int, hand: int) -> void: _hand_asks.append([player, staff, hand]))
-	_bus.bag_drop_requested.connect(func(player: int, bag: StringName, id: StringName, staff: int) -> void: _drop_asks.append([player, bag, id, staff]))
+	_bus.staff_hand_requested.connect(func(player: int, staff: int, hand: int, _body: int) -> void: _hand_asks.append([player, staff, hand]))
+	_bus.bag_drop_requested.connect(func(player: int, bag: StringName, id: StringName, staff: int, _body: int) -> void: _drop_asks.append([player, bag, id, staff]))
 	_bus.item_drop_requested.connect(func(_actor: int, stack: ItemStack) -> void: _dropped.append(stack))
 	_hud = own((load(HUD_SCENE_PATH) as PackedScene).instantiate()) as HudScript
 	_hud.events = _bus
@@ -325,7 +325,7 @@ func test_a_wizard_said_anew_forgets_the_earlier_ones_staffs() -> void:
 	var inventory: InventoryScript = _open()
 	check(inventory.mirror().staffs().has(4), "the bag's staff is known")
 	check(_hud.get_radial(0).strip().has(4), "to the builder too")
-	_bus.inventory_announced.emit(0)
+	_bus.inventory_announced.emit(0, 0)
 	for number in [0, 1]:
 		_bus.owned_staff_changed.emit(0, number, _wizard.inventory.plan_of(number))
 	_bus.hands_changed.emit(0, PackedInt32Array([0, 1, -1, -1]))

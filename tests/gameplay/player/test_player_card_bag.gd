@@ -109,56 +109,56 @@ func test_the_start_staffs_and_hands_are_announced_by_number() -> void:
 
 func test_a_card_put_in_takes_a_copy_and_taken_out_gives_it_back() -> void:
 	var body := _wizard(0, {&"bolt": 2})
-	_world.bus.staff_change_requested.emit(0, 1, 0, &"bolt")
+	_world.bus.staff_change_requested.emit(0, 1, 0, &"bolt", _world.body_key(0))
 	check_equal(body.caster.cards_of(1)[0], &"bolt", "the card is in the staff on the hand")
 	check_equal(body.inventory.count_of(CARDS, &"bolt"), 1, "one copy left in the bag")
 	check_equal(_last(CARDS)[3], PackedInt32Array([1]), "and the bag is announced")
-	_world.bus.staff_change_requested.emit(0, 1, 0, &"")
+	_world.bus.staff_change_requested.emit(0, 1, 0, &"", _world.body_key(0))
 	check_equal(body.inventory.count_of(CARDS, &"bolt"), 2, "taken out, it is back")
 	check(_refused.is_empty(), "nothing refused")
 
 
 func test_the_last_copy_goes_and_a_card_with_none_left_is_refused() -> void:
 	var body := _wizard(0, {&"bolt": 1, &"fire": 1})
-	_world.bus.staff_change_requested.emit(0, 0, 0, &"bolt")
+	_world.bus.staff_change_requested.emit(0, 0, 0, &"bolt", _world.body_key(0))
 	check_equal(_last(CARDS)[2], _ids("fire"), "a card with none left is not in the bag")
-	_world.bus.staff_change_requested.emit(0, 0, 1, &"bolt")
+	_world.bus.staff_change_requested.emit(0, 0, 1, &"bolt", _world.body_key(0))
 	check_equal(_refused, [[0, PlayerController.NO_CARD]], "the second bolt is refused, with the reason")
 	check_equal(body.caster.cards_of(0), _ids("bolt - - -"), "and the staff is unchanged")
 
 
 func test_a_card_replaced_in_its_slot_goes_back_as_the_new_one_comes_out() -> void:
 	var body := _wizard(0, {&"bolt": 1, &"fire": 1})
-	_world.bus.staff_change_requested.emit(0, 0, 0, &"bolt")
-	_world.bus.staff_change_requested.emit(0, 0, 0, &"fire")
+	_world.bus.staff_change_requested.emit(0, 0, 0, &"bolt", _world.body_key(0))
+	_world.bus.staff_change_requested.emit(0, 0, 0, &"fire", _world.body_key(0))
 	check_equal(body.caster.cards_of(0), _ids("fire - - -"), "fire in the slot")
 	check_equal([body.inventory.count_of(CARDS, &"bolt"), body.inventory.count_of(CARDS, &"fire")], [1, 0], "bolt back, fire out")
-	_world.bus.staff_change_requested.emit(0, 0, 0, &"fire")
+	_world.bus.staff_change_requested.emit(0, 0, 0, &"fire", _world.body_key(0))
 	check(_refused.is_empty(), "the same card again in its own slot needs no copy")
 
 
 func test_a_whole_staff_request_is_counted_as_one_change() -> void:
 	var body := _wizard(0, {&"bolt": 2, &"fire": 1})
-	_world.bus.staff_cards_requested.emit(0, 2, _ids("fire bolt bolt"))
+	_world.bus.staff_cards_requested.emit(0, 2, _ids("fire bolt bolt"), _world.body_key(0))
 	check_equal(body.inventory.stacks_in(CARDS).size(), 0, "every copy is in the staff")
 	_bags.clear()
 	# A push-right insert as the builder sends it: the row moves on, nothing comes or goes.
-	_world.bus.staff_cards_requested.emit(0, 2, _ids("- fire bolt bolt"))
+	_world.bus.staff_cards_requested.emit(0, 2, _ids("- fire bolt bolt"), _world.body_key(0))
 	check(_bags.is_empty(), "a row only moved changes no count")
-	_world.bus.staff_cards_requested.emit(0, 2, _ids("bolt bolt bolt"))
+	_world.bus.staff_cards_requested.emit(0, 2, _ids("bolt bolt bolt"), _world.body_key(0))
 	check_equal(_refused, [[0, PlayerController.NO_CARD]], "a third bolt is refused")
 	check_equal(body.caster.cards_of(2), _ids("- fire bolt bolt"), "and the staff is as it was")
-	_world.bus.staff_cards_requested.emit(0, 2, [] as Array[StringName])
+	_world.bus.staff_cards_requested.emit(0, 2, [] as Array[StringName], _world.body_key(0))
 	check_equal([body.inventory.count_of(CARDS, &"bolt"), body.inventory.count_of(CARDS, &"fire")], [2, 1], "a clear gives every card back")
 
 
 func test_cards_given_back_past_the_bags_capacity_drop_at_the_feet() -> void:
 	var body := _wizard(0, {&"bolt": 1})
-	_world.bus.staff_change_requested.emit(0, 0, 0, &"bolt")
+	_world.bus.staff_change_requested.emit(0, 0, 0, &"bolt", _world.body_key(0))
 	body.inventory.set_capacity(CARDS, 0)
 	var dropped: Array[StringName] = []
 	_world.bus.item_drop_requested.connect(func(_actor: int, stack: ItemStack) -> void: dropped.append(stack.id))
-	_world.bus.staff_change_requested.emit(0, 0, 0, &"")
+	_world.bus.staff_change_requested.emit(0, 0, 0, &"", _world.body_key(0))
 	check(_refused.is_empty(), "nothing is refused")
 	check_equal(body.caster.cards_of(0)[0], &"", "the staff is emptied")
 	check_equal(dropped, [&"bolt"] as Array[StringName], "the bolt went to the ground")
@@ -168,12 +168,12 @@ func test_cards_given_back_past_the_bags_capacity_drop_at_the_feet() -> void:
 func test_the_start_cards_come_with_their_staffs_beside_the_bag() -> void:
 	var body := _wizard(0, {&"bolt": 1}, [[&"bolt"], [], [], []])
 	check_equal(body.inventory.count_of(CARDS, &"bolt"), 1, "the start bolt is the staff's own, not the bag's")
-	_world.bus.staff_change_requested.emit(0, 0, 0, &"")
+	_world.bus.staff_change_requested.emit(0, 0, 0, &"", _world.body_key(0))
 	check_equal(body.inventory.count_of(CARDS, &"bolt"), 2, "taken out, it joins the bag")
 
 
 func test_a_request_for_a_staff_it_does_not_own_is_refused() -> void:
 	_wizard(0, {&"bolt": 1})
-	_world.bus.staff_change_requested.emit(0, 7, 0, &"bolt")
-	_world.bus.staff_cards_requested.emit(0, Inventory.NO_STAFF, _ids("bolt"))
+	_world.bus.staff_change_requested.emit(0, 7, 0, &"bolt", _world.body_key(0))
+	_world.bus.staff_cards_requested.emit(0, Inventory.NO_STAFF, _ids("bolt"), _world.body_key(0))
 	check_equal(_refused, [[0, PlayerController.NO_STAFF], [0, PlayerController.NO_STAFF]], "no such staff, twice")

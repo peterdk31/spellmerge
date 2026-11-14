@@ -420,7 +420,7 @@ func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
 func test_staffs_built_in_the_hub_follow_into_the_run_and_nothing_comes_back() -> void:
 	_start([0, 1])
 	var built: Array[StringName] = [&"bolt", &"dash", &"bolt"]
-	events.emit_signal("staff_cards_requested", 1, 1, built)
+	events.emit_signal("staff_cards_requested", 1, 1, built, (flow.get_wizard(1) as Actor).key())
 	await commands_applied()
 	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(1).slice(0, 3), built, "seat 1 built its RT staff in the hub")
 	var fresh_rt: Array[StringName] = (flow.get_wizard(0) as Actor).caster.cards_of(1)
@@ -643,7 +643,7 @@ func test_a_seat_that_joins_the_hub_appears_beside_the_altar() -> void:
 func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> void:
 	_start([0, 1])
 	var built: Array[StringName] = [&"bolt", &"dash", &"bolt"]
-	events.emit_signal("staff_cards_requested", 1, 1, built)
+	events.emit_signal("staff_cards_requested", 1, 1, built, (flow.get_wizard(1) as Actor).key())
 	await commands_applied()
 	var fresh_rt: Array[StringName] = _cards(0, 1)
 	var first: Node = flow.get_wizard(1)
@@ -673,7 +673,7 @@ func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> vo
 	_stop()
 	# A run's end recorded anew: nothing comes back.
 	_start([0, 1])
-	events.emit_signal("staff_cards_requested", 1, 1, built)
+	events.emit_signal("staff_cards_requested", 1, 1, built, (flow.get_wizard(1) as Actor).key())
 	await commands_applied()
 	var anew: Array[Replay] = []
 	var hear: Callable = func(next: Replay) -> void: anew.append(next)

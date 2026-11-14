@@ -396,6 +396,12 @@ func drive(guest: ActorController) -> void:
 	_tell_driver()
 
 
+## Its identity across machines (`Actors.key_of`: its id and its birth; online-ready N5), 0 while it
+## has no id. The menus name the body they show by it (items I8).
+func key() -> int:
+	return actors.key_of(id) if actors != null and id != ActorsScript.NONE else 0
+
+
 ## Give a guest controller back: the home controller drives again.
 func release() -> void:
 	drive(home_controller)

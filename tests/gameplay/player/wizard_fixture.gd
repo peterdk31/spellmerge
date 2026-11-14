@@ -164,6 +164,12 @@ func step_one(body: Actor, delta: float = STEP) -> void:
 	body.step(delta)
 
 
+## The key of the body seat `seat`'s HUD shows (`Actors.shown_of_seat`; items I8): what its menus
+## send with their requests.
+func body_key(seat: int) -> int:
+	return table.key_of(table.shown_of_seat(seat))
+
+
 ## A hit of `amount` on `body` through Combat, which takes it from its Health (actors G5).
 func hurt(body: Actor, amount: int, by: int = 0) -> void:
 	combat.hit(by, body, amount)

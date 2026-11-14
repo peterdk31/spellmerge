@@ -51,7 +51,7 @@ func before_each() -> void:
 	root.add_child(_bus)
 	root.add_child(_input)
 	root.add_child(_frames)
-	_bus.listen(&"staff_change_requested", func(seat: int, staff: int, slot: int, card: StringName) -> void: _heard.append([seat, staff, slot, card]))
+	_bus.listen(&"staff_change_requested", func(seat: int, staff: int, slot: int, card: StringName, _body: int) -> void: _heard.append([seat, staff, slot, card]))
 	_bus.seat_joined.connect(func(seat: int) -> void: _seats.append(seat + 1))
 	_bus.seat_left.connect(func(seat: int) -> void: _seats.append(-seat - 1))
 	_input.add_virtual_device(0)
@@ -176,11 +176,11 @@ func test_a_frame_is_used_at_its_tick_and_stood_in_for_when_late() -> void:
 	check(not stood.is_pressed(0), "but not pressed again")
 	check_equal(_guest.stats.stood_in, 1, "counted")
 	# It arrives two ticks late, with a press of another staff and a command.
-	_send(2, _frame(0b0011, 0b0010, Vector2.LEFT, [[&"staff_change_requested", 1, 0, &"frost"]]))
+	_send(2, _frame(0b0011, 0b0010, Vector2.LEFT, [[&"staff_change_requested", 1, 0, &"frost", 7]]))
 	_tick()
 	var late: InputFrame = _recorded(3)
 	check(late.is_pressed(1) and late.is_held(1) and late.move_vector() == Vector2.LEFT, "the late frame's press comes with the next tick")
-	check_equal(late.commands, [[&"staff_change_requested", 1, 0, &"frost"]], "and its command")
+	check_equal(late.commands, [[&"staff_change_requested", 1, 0, &"frost", 7]], "and its command")
 	check_equal(_heard, [[SEAT, 1, 0, &"frost"]], "applied once, as the client's seat's")
 	check_equal(_guest.stats.late_frames, 1, "counted as late")
 	_tick()
@@ -191,14 +191,14 @@ func test_a_frame_is_used_at_its_tick_and_stood_in_for_when_late() -> void:
 func test_frames_for_one_tick_are_used_together() -> void:
 	_start()
 	_tick()
-	_send(1, _frame(0b0001, 0b0001, Vector2.UP, [[&"staff_change_requested", 0, 0, &"bolt"]]))
-	_send(1, _frame(0b0000, 0b0100, Vector2.DOWN, [[&"staff_change_requested", 0, 1, &"fire"]]))
+	_send(1, _frame(0b0001, 0b0001, Vector2.UP, [[&"staff_change_requested", 0, 0, &"bolt", 7]]))
+	_send(1, _frame(0b0000, 0b0100, Vector2.DOWN, [[&"staff_change_requested", 0, 1, &"fire", 7]]))
 	_send(5, _frame(0b1000, 0b1000))
 	_tick()
 	var used: InputFrame = _recorded(1)
 	check(used.move_vector() == Vector2.DOWN and used.held_bits == 0, "the walk and the held buttons are the newest's")
 	check_equal(used.pressed_bits, 0b0101, "the presses are both's (a tap between two ticks is not lost)")
-	check_equal(used.commands, [[&"staff_change_requested", 0, 0, &"bolt"], [&"staff_change_requested", 0, 1, &"fire"]], "the commands both's, in order")
+	check_equal(used.commands, [[&"staff_change_requested", 0, 0, &"bolt", 7], [&"staff_change_requested", 0, 1, &"fire", 7]], "the commands both's, in order")
 	check_equal(_recorded(1).pressed_bits & 0b1000, 0, "a frame for a later tick waits")
 	for i in 4:
 		_tick()
@@ -211,7 +211,7 @@ func test_more_commands_than_a_frame_holds_wait_for_the_next() -> void:
 	for i in 3:
 		var commands: Array = []
 		for slot in 6:
-			commands.append([&"staff_change_requested", i, slot, &"bolt"])
+			commands.append([&"staff_change_requested", i, slot, &"bolt", 7])
 		_send(1, _frame(0, 0, Vector2.ZERO, commands))
 	_tick()
 	check_equal(_recorded(1).commands.size(), InputFrame.MAX_COMMANDS, "a full frame")
@@ -360,7 +360,7 @@ func test_a_refused_client_is_not_read_or_used_again() -> void:
 	_tick()
 	# A bad message, with good ones behind it that arrived before the link closed.
 	_far.send(NetMessage.of_pong(1))
-	_send(2, _frame(0b0001, 0b0001, Vector2.RIGHT, [[&"staff_change_requested", 0, 0, &"bolt"]]))
+	_send(2, _frame(0b0001, 0b0001, Vector2.RIGHT, [[&"staff_change_requested", 0, 0, &"bolt", 7]]))
 	_far.send(NetMessage.of_ping(5))
 	_tick()
 	check(_guest.problem != "" and not _guest.hears(), "refused")
@@ -392,7 +392,7 @@ func test_a_flood_of_commands_closes_the_link() -> void:
 	_tick()
 	var commands: Array = []
 	for slot in InputFrame.MAX_COMMANDS:
-		commands.append([&"staff_change_requested", 0, slot, &"bolt"])
+		commands.append([&"staff_change_requested", 0, slot, &"bolt", 7])
 	for i in 6:
 		_send(1, _frame(0, 0, Vector2.ZERO, commands))
 	_tick()
@@ -410,9 +410,9 @@ func test_frames_used_together_never_make_a_frame_past_its_limit() -> void:
 	for i in InputFrame.MAX_LIST:
 		ids.append(StringName("c".repeat(InputFrame.MAX_TEXT - 2) + "%02d" % i))
 	for staff in 12:
-		_send(1, _frame(0, 0, Vector2.ZERO, [[&"staff_cards_requested", staff % 4, ids]]))
+		_send(1, _frame(0, 0, Vector2.ZERO, [[&"staff_cards_requested", staff % 4, ids, 7]]))
 	var heard: Array = []
-	_bus.listen(&"staff_cards_requested", func(seat: int, staff: int, cards: Array) -> void: heard.append([seat, staff, cards.size()]))
+	_bus.listen(&"staff_cards_requested", func(seat: int, staff: int, cards: Array, _body: int) -> void: heard.append([seat, staff, cards.size()]))
 	for tick in 6:
 		_tick()
 		check(_recorded(tick + 1).to_bytes().size() <= InputFrame.MAX_BYTES, "tick %d's frame is within a frame's limit (%d bytes)" % [tick + 1, _recorded(tick + 1).to_bytes().size()])
@@ -427,7 +427,7 @@ func test_a_leave_behind_a_full_frame_waits_for_the_next_tick() -> void:
 	_tick()
 	var commands: Array = []
 	for slot in InputFrame.MAX_COMMANDS:
-		commands.append([&"staff_change_requested", 0, slot, &"bolt"])
+		commands.append([&"staff_change_requested", 0, slot, &"bolt", 7])
 	_send(1, _frame(0, 0, Vector2.ZERO, commands))
 	_send(1, _frame(0, 0, Vector2.ZERO, [[InputFrame.LEAVE]]))
 	_tick()
@@ -444,10 +444,10 @@ func test_a_leave_takes_a_place_in_the_frame_it_is_recorded_in() -> void:
 	_tick()
 	var commands: Array = []
 	for slot in InputFrame.MAX_COMMANDS - 1:
-		commands.append([&"staff_change_requested", 0, slot, &"bolt"])
+		commands.append([&"staff_change_requested", 0, slot, &"bolt", 7])
 	commands.append([InputFrame.LEAVE])
 	_send(1, _frame(0, 0, Vector2.ZERO, commands))
-	_send(1, _frame(0, 0, Vector2.ZERO, [[&"staff_change_requested", 3, 0, &"fire"]]))
+	_send(1, _frame(0, 0, Vector2.ZERO, [[&"staff_change_requested", 3, 0, &"fire", 7]]))
 	_tick()
 	check_equal(_recorded(1).commands.size(), InputFrame.MAX_COMMANDS, "fifteen commands and the leave fill the frame")
 	check(_recorded(1).commands.has([InputFrame.LEAVE]), "the leave is recorded, not dropped for want of room")

@@ -740,7 +740,7 @@ func _on_stats_changed(player: int, health: float, max_health: float, mana: floa
 ## The seat says its things anew (the body shown changed, items I8, or its wizard was made again):
 ## its builder and inventory close, so neither names a staff of the body shown before, and its
 ## panel's numbers start over (the body's own follow at once).
-func _on_inventory_announced(player: int) -> void:
+func _on_inventory_announced(player: int, _body: int) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		_radials[player].close_builder()
 		_inventories[player].close_inventory()

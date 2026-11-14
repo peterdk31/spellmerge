@@ -16,7 +16,7 @@ func _frame_bytes() -> PackedByteArray:
 	frame.seat = 1
 	frame.set_move(Vector2(0.5, -1.0))
 	frame.press(2)
-	frame.add_command(&"staff_change_requested", [2, 0, &"fire"])
+	frame.add_command(&"staff_change_requested", [2, 0, &"fire", 7])
 	return frame.to_bytes()
 
 

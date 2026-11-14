@@ -114,7 +114,7 @@ func build_random(build_seed: int) -> bool:
 			card = &""
 		left.erase(card)
 		built_cards.append(card)
-		events.emit_signal("staff_change_requested", player, BUILD_STAFF, slot, built_cards[slot])
+		events.emit_signal("staff_change_requested", player, BUILD_STAFF, slot, built_cards[slot], wizard.key())
 		requests_sent += 1
 	return true
 

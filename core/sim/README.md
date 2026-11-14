@@ -168,7 +168,7 @@ The tests say what is missed: `tests/core/test_state_declared.gd` from the types
 
 ## Example to copy
 
-`gameplay/combat/combat.gd`'s DERIVED and REFS lists (services, instance-id keys; the body of each row). A new HUD request the simulation hears: its name and shape in `InputFrame.COMMAND_NAMES` and `COMMAND_SHAPES` (at the end), its listener through `Events.listen` (`gameplay/flow/flow.gd`'s sandbox page). A new input source: a `FrameSource` (`tests/bots/bot.gd`).
+`gameplay/combat/combat.gd`'s DERIVED and REFS lists (services, instance-id keys; the body of each row). A new HUD request the simulation hears: its name and shape in `InputFrame.COMMAND_NAMES` and `COMMAND_SHAPES` (at the end; a request about a body's things names that body by its key, `Actor.key`, as the menus' four do since items I8), its listener through `Events.listen` (`gameplay/flow/flow.gd`'s sandbox page). A new input source: a `FrameSource` (`tests/bots/bot.gd`).
 
 ## Validate
 

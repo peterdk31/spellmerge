@@ -426,19 +426,44 @@ func test_the_builder_edits_the_driven_ember_imp_and_what_it_takes_out_stays_wit
 	Possession.begin(wizard, imp, 1.0)
 	check(changed.has([0, 0, _cards("fire bolt")]), "driving the imp announces its staff to the seat: %s" % [changed])
 	check(changed.has([0, 1, null]), "and empty rows for the hands it has not: %s" % [changed])
-	_world.bus.staff_cards_requested.emit(0, 0, _cards("bolt"))
+	_world.bus.staff_cards_requested.emit(0, 0, _cards("bolt"), _world.body_key(0))
 	check_equal(imp.caster.cards_of(0), _cards("bolt -"), "seat 0's builder builds the imp's staff")
 	check_equal(imp.inventory.count_of(&"cards", &"fire"), 1, "the card taken out is in the imp's card bag")
 	check_equal(wizard.caster.cards_of(0), wizard_row, "the wizard's staff is as it was")
-	_world.bus.staff_cards_requested.emit(0, 3, _cards("bolt"))
+	_world.bus.staff_cards_requested.emit(0, 3, _cards("bolt"), _world.body_key(0))
 	check_equal(refused, [[0, PlayerController.NO_STAFF]], "a staff only the wizard has is not the seat's to build now")
 	_world.run(int(1.0 / Fixture.STEP) + 1)
 	check(wizard.controller == _seat(wizard), "after the possession")
 	check_equal(imp.caster.cards_of(0), _cards("bolt -"), "the imp keeps what was built")
 	check_equal(imp.inventory.count_of(&"cards", &"fire"), 1, "and what was taken out")
 	check(changed.back()[0] == 0 and changed.has([0, 0, wizard_row]), "home again, the seat's panel hears the wizard's staffs: %s" % [changed])
-	_world.bus.staff_cards_requested.emit(0, 3, _cards("bolt"))
+	_world.bus.staff_cards_requested.emit(0, 3, _cards("bolt"), _world.body_key(0))
 	check(wizard.caster.has_staff(3), "and its builder builds the wizard again")
+
+
+## Regression (review, items I8): a menu's request names the body its menu showed, so one sent just
+## before a possession began (a late frame online) never changes the possessed body's staff of the
+## same number: it is refused, and the one sent for the body shown now is heard.
+func test_a_request_for_the_body_shown_before_is_refused() -> void:
+	var wizard := _world.wizard(0)
+	var imp := _ember_imp(Vector2(0.0, 60.0))
+	var refused: Array = []
+	var dropped: Array = []
+	_world.bus.build_refused.connect(func(p: int, why: String) -> void: refused.append([p, why]))
+	_world.bus.inventory_refused.connect(func(p: int, why: String) -> void: refused.append([p, why]))
+	_world.bus.item_drop_requested.connect(func(_by: int, stack: ItemStack) -> void: dropped.append(stack.id))
+	var wizard_key: int = _world.body_key(0)
+	check_equal(wizard_key, wizard.key(), "the seat's menus name its wizard")
+	Possession.begin(wizard, imp, 1.0)
+	check_equal(_world.body_key(0), imp.key(), "and the imp once the seat drives it")
+	var row: Array[StringName] = imp.caster.cards_of(0)
+	_world.bus.staff_cards_requested.emit(0, 0, [] as Array[StringName], wizard_key)
+	_world.bus.bag_drop_requested.emit(0, &"staffs", &"ember_imp", 0, wizard_key)
+	check_equal(imp.caster.cards_of(0), row, "a build sent for the wizard leaves the imp's staff 0 as it was")
+	check(imp.caster.holds(0) and dropped.is_empty(), "a drop sent for the wizard drops nothing of the imp's")
+	check_equal(refused, [[0, PlayerController.NO_BODY], [0, PlayerController.NO_BODY]], "both refused, with why")
+	_world.bus.staff_cards_requested.emit(0, 0, [&"bolt"] as Array[StringName], imp.key())
+	check_equal(imp.caster.cards_of(0), _cards("bolt -"), "one sent for the imp is heard")
 
 
 func test_a_bosss_phase_swaps_its_staffs_through_its_inventory() -> void:
@@ -470,7 +495,7 @@ func test_the_builder_edits_the_wizard_an_ai_drives_and_the_change_stays() -> vo
 	var imp := _imp(Vector2(0.0, 60.0))
 	Possession.begin(imp, wizard, 1.0)
 	check(wizard.controller == _brain(imp), "the imp's controller drives the wizard")
-	_world.bus.staff_cards_requested.emit(0, 1, _cards("fire bolt"))
+	_world.bus.staff_cards_requested.emit(0, 1, _cards("fire bolt"), _world.body_key(0))
 	check_equal(wizard.caster.cards_of(1), _cards("fire bolt - -"), "seat 0's builder builds its own wizard")
 	_world.run(int(1.0 / Fixture.STEP) + 1)
 	check(wizard.controller == _seat(wizard), "after the possession")
@@ -631,7 +656,7 @@ func test_a_restore_moves_the_seats_watch_to_the_body_it_drives() -> void:
 	# As a restore leaves it: the seat drives the imp, but still hears the wizard.
 	seat._watch(wizard)
 	var said: Array = []
-	_world.bus.inventory_announced.connect(func(p: int) -> void: said.append(p))
+	_world.bus.inventory_announced.connect(func(p: int, _body: int) -> void: said.append(p))
 	seat.rebuild_derived()
 	check(imp.health.changed.is_connected(seat._on_health_changed), "it hears the imp's health")
 	check(not wizard.health.changed.is_connected(seat._on_health_changed), "not the wizard's")

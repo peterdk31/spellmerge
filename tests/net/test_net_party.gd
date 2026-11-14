@@ -113,11 +113,11 @@ func test_a_second_seats_command_applies_once_on_every_machine_at_the_same_tick(
 	var fights: Array = [pair.host_fight]
 	fights.append_array(pair.client_fights)
 	for m in fights.size():
-		var on := func(seat: int, staff: int, slot: int, card: StringName) -> void: heard.append([m, (pair.host_ticks() - 1) if m == 0 else int(pair.client_played[m - 1]), seat, staff, slot, card])
+		var on := func(seat: int, staff: int, slot: int, card: StringName, _body: int) -> void: heard.append([m, (pair.host_ticks() - 1) if m == 0 else int(pair.client_played[m - 1]), seat, staff, slot, card])
 		(fights[m] as ContentFight).fight.bus.call(&"listen", &"staff_change_requested", on)
 	pair.run(60)
 	heard.clear()
-	pair.client_fights[1].fight.bus.emit_signal(&"staff_change_requested", 3, 2, 0, CARD)
+	pair.client_fights[1].fight.bus.emit_signal(&"staff_change_requested", 3, 2, 0, CARD, 7)
 	pair.run(60)
 	check(pair.let_client_catch_up(), "every guest plays every tick")
 	check_equal(heard.size(), 3, "it applied once on each machine: %s" % str(heard))

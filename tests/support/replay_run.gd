@@ -169,7 +169,7 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 			var standing: Actor = _flow.call("get_wizard", bots) as Actor
 			if standing != null and standing.is_down():
 				problems.append("%s: the scripted wizard is down at the rebuild (tick %d): move REBUILD_AT" % [start, REBUILD_AT])
-			events.emit_signal("staff_cards_requested", bots, 0, REBUILT)
+			events.emit_signal("staff_cards_requested", bots, 0, REBUILT, standing.key() if standing != null else 0)
 		if i == stone_press_at and scripted > 0:
 			# As the HUD's panels send A on the lit stone: applied at the next tick's start.
 			events.emit_signal("run_requested", bots)

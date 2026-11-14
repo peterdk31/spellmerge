@@ -247,21 +247,21 @@ func test_a_held_button_does_not_switch_a_hold_off_but_a_new_press_does() -> voi
 func test_a_change_request_builds_the_staff_and_is_announced() -> void:
 	var player := _wizard(2)
 	_changed.clear()
-	_world.bus.staff_change_requested.emit(2, 3, 0, &"bolt")
+	_world.bus.staff_change_requested.emit(2, 3, 0, &"bolt", _world.body_key(2))
 	check_equal(player.caster.cards_of(3)[0], &"bolt", "the card is in the slot")
 	check(player.caster.has_staff(3), "the staff can cast now")
 	check_equal(_changed.size(), 1, "the change is announced")
 	check_equal([_changed[0][0], _changed[0][1]], [2, 3], "for this player and staff")
-	_world.bus.staff_change_requested.emit(2, 3, 0, &"")
+	_world.bus.staff_change_requested.emit(2, 3, 0, &"", _world.body_key(2))
 	check(not player.caster.has_staff(3), "emptying the slot leaves nothing to cast")
 
 
 func test_a_wrong_request_is_refused_and_changes_nothing() -> void:
 	var player := _wizard(0)
 	var before: Array[StringName] = player.caster.cards_of(1)
-	_world.bus.staff_change_requested.emit(0, 1, 9, &"bolt")
-	_world.bus.staff_change_requested.emit(0, 4, 0, &"bolt")
-	_world.bus.staff_change_requested.emit(0, 1, 0, &"no_such_card")
+	_world.bus.staff_change_requested.emit(0, 1, 9, &"bolt", _world.body_key(0))
+	_world.bus.staff_change_requested.emit(0, 4, 0, &"bolt", _world.body_key(0))
+	_world.bus.staff_change_requested.emit(0, 1, 0, &"no_such_card", _world.body_key(0))
 	check_equal(_refused.size(), 3, "three refusals")
 	check_equal(player.caster.cards_of(1), before, "the staff is as it was")
 
@@ -269,7 +269,7 @@ func test_a_wrong_request_is_refused_and_changes_nothing() -> void:
 func test_a_request_for_another_player_is_ignored() -> void:
 	var first := _wizard(0)
 	var second := _wizard(1)
-	_world.bus.staff_change_requested.emit(1, 2, 0, &"bolt")
+	_world.bus.staff_change_requested.emit(1, 2, 0, &"bolt", _world.body_key(1))
 	check(not first.caster.has_staff(2), "player 1's staff Y is untouched")
 	check(second.caster.has_staff(2), "player 2's is built")
 
@@ -278,11 +278,11 @@ func test_a_whole_staff_request_sets_every_slot_in_one_change() -> void:
 	var player := _wizard(1)
 	var caster: Caster = player.caster
 	_changed.clear()
-	_world.bus.staff_cards_requested.emit(1, 2, _ids("fire bolt rune"))
+	_world.bus.staff_cards_requested.emit(1, 2, _ids("fire bolt rune"), _world.body_key(1))
 	check_equal(caster.cards_of(2).slice(0, 4), _ids("fire bolt rune -"), "the cards fill the first slots, the rest is empty")
 	check_equal(caster.cards_of(2).size(), caster.slot_count(), "the row keeps the staff's slots")
 	check_equal(_changed.size(), 1, "one change, announced once")
-	_world.bus.staff_cards_requested.emit(1, 2, [] as Array[StringName])
+	_world.bus.staff_cards_requested.emit(1, 2, [] as Array[StringName], _world.body_key(1))
 	check(not caster.has_staff(2), "an empty list clears the staff")
 
 
@@ -293,12 +293,12 @@ func test_a_wrong_whole_staff_request_is_refused_and_changes_nothing() -> void:
 	var too_many: Array[StringName] = []
 	for _slot in caster.slot_count() + 1:
 		too_many.append(&"bolt")
-	_world.bus.staff_cards_requested.emit(0, 1, too_many)
-	_world.bus.staff_cards_requested.emit(0, 4, _ids("bolt"))
-	_world.bus.staff_cards_requested.emit(0, 1, _ids("bolt no_such_card"))
+	_world.bus.staff_cards_requested.emit(0, 1, too_many, _world.body_key(0))
+	_world.bus.staff_cards_requested.emit(0, 4, _ids("bolt"), _world.body_key(0))
+	_world.bus.staff_cards_requested.emit(0, 1, _ids("bolt no_such_card"), _world.body_key(0))
 	check_equal(_refused.size(), 3, "three refusals")
 	check_equal(caster.cards_of(1), before, "the staff is as it was")
-	_world.bus.staff_cards_requested.emit(1, 1, _ids("rune"))
+	_world.bus.staff_cards_requested.emit(1, 1, _ids("rune"), _world.body_key(1))
 	check_equal(caster.cards_of(1), before, "another player's request is not this wizard's")
 
 
@@ -307,7 +307,7 @@ func test_four_players_build_different_staffs_at_once() -> void:
 		_wizard(index, [[], [], [], []])
 	var cards: Array[StringName] = [&"bolt", &"rune", &"dash", &"fire"]
 	for index in 4:
-		_world.bus.staff_change_requested.emit(index, index, 0, cards[index])
+		_world.bus.staff_change_requested.emit(index, index, 0, cards[index], _world.body_key(index))
 	for index in 4:
 		check_equal(_players[index].caster.cards_of(index)[0], cards[index], "player %d built its own staff" % index)
 		for other in 4:
@@ -331,7 +331,7 @@ func test_a_wizard_put_back_in_the_tree_hears_requests_again() -> void:
 	var player := _wizard(0)
 	root.remove_child(player)
 	root.add_child(player)
-	_world.bus.staff_change_requested.emit(0, 2, 0, &"bolt")
+	_world.bus.staff_change_requested.emit(0, 2, 0, &"bolt", _world.body_key(0))
 	check(player.caster.has_staff(2), "it still listens")
 
 
@@ -382,11 +382,11 @@ func test_a_seat_drives_another_actor_and_release_gives_it_back() -> void:
 	# an Inventory, items I8).
 	_changed.clear()
 	var wizard_row: Array[StringName] = wizard.caster.cards_of(1)
-	_world.bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"))
+	_world.bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"), _world.body_key(0))
 	check_equal(wizard.caster.cards_of(1), wizard_row, "seat 0's builder does not build the wizard's staff now")
 	check_equal(_refused, [[0, PlayerController.NO_CARD]], "the creature holds no fire: refused")
 	check(_changed.is_empty(), "and nothing is announced: %s" % [_changed])
-	_world.bus.staff_cards_requested.emit(0, 0, [] as Array[StringName])
+	_world.bus.staff_cards_requested.emit(0, 0, [] as Array[StringName], _world.body_key(0))
 	check_equal(creature.caster.cards_of(0)[0], &"", "the builder empties the creature's staff")
 	check_equal(creature.inventory.count_of(&"cards", &"bolt"), 1, "its bolt in the creature's own bag")
 	check(_changed.size() == 1 and _changed[0][1] == 0, "announced for the seat: %s" % [_changed])
@@ -425,7 +425,7 @@ func test_a_wizard_no_controller_drives_is_still_its_seats_panel_and_builder() -
 	check(wizard.caster.mana_of(0) > wizard.caster.max_mana_of(0) - 5.0, "it gets mana back")
 	check_equal(_stats.back()[3], float(floori(wizard.caster.mana_of(0))), "which shows too, with no controller on it")
 	check(_staff_casts.is_empty(), "a cast no seat pressed is no staff_cast")
-	_world.bus.staff_cards_requested.emit(0, 1, _ids("rune"))
+	_world.bus.staff_cards_requested.emit(0, 1, _ids("rune"), _world.body_key(0))
 	check_equal(wizard.caster.cards_of(1)[0], &"rune", "seat 0's builder builds it")
 	check(not _changed.is_empty() and _changed.back()[1] == 1, "and announces it")
 	check(seat.driven() == null, "while the seat drives nothing")

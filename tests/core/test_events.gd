@@ -55,6 +55,11 @@ const EVENTS: Dictionary = {
 	&"ground_item_changed": [["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
 	&"item_near_changed": [["player", TYPE_INT], ["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
 	&"item_refused": [["player", TYPE_INT], ["item", TYPE_INT]],
+	# The inventory menu (items I7).
+	&"staff_hand_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["hand", TYPE_INT]],
+	&"bag_drop_requested": [["player", TYPE_INT], ["bag", TYPE_STRING_NAME], ["id", TYPE_STRING_NAME], ["staff", TYPE_INT]],
+	&"inventory_refused": [["player", TYPE_INT], ["reason", TYPE_STRING]],
+	&"inventory_announced": [["player", TYPE_INT]],
 	&"pad_wait_changed": [["seats", TYPE_INT]],
 	# Seats.
 	&"seat_joined": [["player", TYPE_INT]],

@@ -56,12 +56,13 @@ extends Control
 ##   at: the mana of its dearest cast as a share of that staff's own pool (red with "!" above 100 %:
 ##   it cannot be cast), the damage of the cycle (every shot landing once) and the cycle's time.
 ##
-## What it shows comes only from events: `owned_staff_changed` (every staff owned, by number: the
+## What it shows comes only from events: `inventory_announced` (what follows is the wizard's all:
+## forget the staffs said before), `owned_staff_changed` (every staff owned, by number: the
 ## plain `Spells.staff_view`), `hands_changed` (which number is on which hand), `bag_changed` (the
 ## card bag's ids and counts), `build_refused`, `player_stats_changed` (the wizard's health) and
 ## `staff_mana_changed` (each hand's own pool: the MP bar and the shares are the viewed staff's; a
-## staff in the bag shows its staff's pool, full: nothing takes a staff off a hand before items
-## I7). What it asks for goes out as `staff_change_requested` (one slot) or `staff_cards_requested`
+## staff in the bag shows its staff's pool, full: the mana a staff keeps off a hand, items I7, is
+## not told). What it asks for goes out as `staff_change_requested` (one slot) or `staff_cards_requested`
 ## (the whole staff: a push, a closed gap, an undo, a clear), naming the staff by its number, so
 ## this node never changes a staff itself.
 ## It opens through `core/ui_focus` with itself as the one control, so its owner's gameplay
@@ -69,8 +70,8 @@ extends Control
 ## triggers are read from `core/input` (press counts and the menu sticks), only for its
 ## own player. Hints show the buttons (`widgets/action_glyph.gd`), never action names.
 ## The ring, pointing at it and the hint row are the shared radial menu's (`widgets/radial_menu.gd`,
-## items I5): this builder lays its cards out on it and draws them, the inventory will lay out its
-## bags and items.
+## items I5): this builder lays its cards out on it and draws them, the inventory
+## (`hud/menus/inventory/`, items I7) its bags and items.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -80,6 +81,8 @@ const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
 const RingPickerScript := preload("res://hud/builder/rings/ring_picker.gd")
 const TreeViewScript := preload("res://hud/builder/tree_view.gd")
+const CardKindsScript := preload("res://hud/widgets/card_kinds.gd")
+const StaffHeadScript := preload("res://hud/widgets/staff_head.gd")
 
 ## How the ring shows the bag: every card at once, or one kind at a time.
 enum Layout { ALL, KIND }
@@ -99,15 +102,10 @@ const TAB_PAD: float = 2.0
 const NO_CARD: StringName = &""
 const NONE: int = -1
 
-## The kinds in ring order, their words and colours (docs/STYLE.md: none near a player colour).
-const KINDS: Array[StringName] = [&"carrier", &"modifier", &"element", &"trigger", &"multicast"]
-const KIND_WORDS: Dictionary = {
-	&"carrier": "Carrier", &"modifier": "Modifier", &"element": "Infusion", &"trigger": "Trigger", &"multicast": "Multicast",
-}
-const KIND_COLORS: Dictionary = {
-	&"carrier": Color("#ffa23c"), &"modifier": Color("#4fd6dc"), &"element": Color("#b4e82a"),
-	&"trigger": Color("#e08ad8"), &"multicast": Color("#d4d0e0"),
-}
+## The kinds in ring order, their words and colours: the HUD's one table (`widgets/card_kinds.gd`).
+const KINDS: Array[StringName] = CardKindsScript.KINDS
+const KIND_WORDS: Dictionary = CardKindsScript.WORDS
+const KIND_COLORS: Dictionary = CardKindsScript.COLORS
 const OUTLINE: Color = Color("#14121f")
 const SHADE: Color = Color(0.078, 0.071, 0.122, 0.86)
 const TILE: Color = Color("#2b2840")
@@ -350,6 +348,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 	_kind_glyphs[0].show_action(index, &"kind_prev")
 	_kind_glyphs[1].show_action(index, &"kind_next")
 	if _events != null:
+		_events.inventory_announced.connect(_on_inventory_announced)
 		_events.owned_staff_changed.connect(_on_owned_staff_changed)
 		_events.hands_changed.connect(_on_hands_changed)
 		_events.bag_changed.connect(_on_bag_changed)
@@ -1042,6 +1041,19 @@ func _plan(staff: int) -> Dictionary:
 	return _plans.get(staff, {}) as Dictionary
 
 
+## The seat's wizard says everything it holds anew (a wizard made again): the staffs of the one
+## before are forgotten (regression, items I7: a staff only the run's wizard owned stayed on the
+## strip back in the hub).
+func _on_inventory_announced(player: int) -> void:
+	if player != index:
+		return
+	_plans.clear()
+	_hands.fill(NONE)
+	_strip_order()
+	_strip_stale = true
+	_changed()
+
+
 func _on_owned_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
 	if player != index:
 		return
@@ -1425,7 +1437,7 @@ func _draw_tabs() -> void:
 			# A staff in the bag: its head.
 			var base: StaffBase = _plan(staff).get("staff") as StaffBase
 			if base != null and base.head != null:
-				draw_texture_rect(base.head, Rect2(rect.position + Vector2(1.0, 0.5), Vector2(10.0, 10.0)), false)
+				StaffHeadScript.draw(self, base.head, Rect2(rect.position + Vector2(1.0, 0.5), Vector2(10.0, 10.0)), index)
 			else:
 				_text("*", Vector2(rect.get_center().x, rect.position.y + 1.0), OUTLINE if on else TEXT, true)
 	# More staffs past an end of the strip: a small gold notch under that end.

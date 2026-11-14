@@ -42,6 +42,10 @@ signal play_requested(player: int)
 signal staff_change_requested(player: int, staff: int, slot: int, card_id: StringName)
 ## Sender: hud. `player` asked to set every slot of their staff number `staff` (as `staff_change_requested`'s) at once: `cards` holds the card ids by slot (`&""` for an empty slot), as many as the staff has slots or fewer (the rest are emptied). The radial builder sends it for a push-right insert, a take-out that closes the gap, an undo and a clear, so each is one change. Heard by player.
 signal staff_cards_requested(player: int, staff: int, cards: Array[StringName])
+## Sender: hud. `player` asked, in the inventory (items I7), to put their staff number `staff` (as `staff_change_requested`'s) on hand `hand` (0-3: RB, RT, LB, LT): from the bag, the staff on that hand goes into the bag; from another hand, the two change places. `hand` -1 takes it off into the staff bag. A command: heard by player at the next tick's start, which applies it or says `inventory_refused`.
+signal staff_hand_requested(player: int, staff: int, hand: int)
+## Sender: hud. `player` asked, in the inventory (items I7), to drop one thing on the ground: their staff number `staff` (as `staff_change_requested`'s; `bag` and `id` are then the staff bag's and its id), or with `staff` -1 one copy of `id` from the bag `bag` (one of `ItemKinds.BAGS`). A command: heard by player at the next tick's start; the inventory lets it go (`item_drop_requested`, which the Items area lays beside the body) or player says `inventory_refused`.
+signal bag_drop_requested(player: int, bag: StringName, id: StringName, staff: int)
 ## A player picked reward choice number `choice`. Heard by rewards.
 signal reward_pick_requested(player: int, choice: int)
 ## A player voted for door number `door`. Heard by flow.
@@ -188,7 +192,11 @@ signal carrier_ended(caster: int, carrier_card: StringName, at: Vector2, directi
 signal cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.
 signal build_refused(player: int, reason: String)
+## Sender: player. A request of `player`'s inventory menu (`staff_hand_requested`, `bag_drop_requested`; items I7) was refused; `reason` says why in plain words. Heard by hud (the inventory's note).
+signal inventory_refused(player: int, reason: String)
 ## Sender: player. What the bag `bag` (one of `ItemKinds.BAGS`) of `player`'s own wizard holds now (items I3): the ids of its stacks in the order they came, with the copies of each (`counts`, as long as `ids`; a card with none left is not there), and its `capacity` in copies (-1: no limit). Sent for every bag when the wizard appears and for a bag whenever it changes. Heard by hud (the builder reads the card bag).
+## Sender: player. Everything `player`'s own wizard holds is said anew right after (every bag, every staff it owns, its hands; items I7): what was said of an earlier wizard of that seat (a run ended, the hub begun again) is gone, so a staff only it owned is forgotten. Sent each time the seat first drives a wizard or comes home. Heard by hud (the builder, the inventory).
+signal inventory_announced(player: int)
 signal bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, capacity: int)
 ## Sender: player. The staff number `staff` of `player`'s own wizard (its number in the inventory, stable while it owns it; on a hand or in the bag) was built or changed: `plan` as `staff_changed`'s, empty when the staff is no longer owned (items I3). Sent for every staff when the wizard appears. Heard by hud (the builder: every staff it builds).
 signal owned_staff_changed(player: int, staff: int, plan: Dictionary)

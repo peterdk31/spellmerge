@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-14: Items I7, the inventory
+
+Select (Tab) opens a player's inventory, a ring menu on the shared radial widget in their quarter: the four bags with how full each is; the staffs, where a hand's button puts the staff pointed at on that hand (or takes it off) and X drops it; the cards by kind, then counted, X dropping one. A column beside the ring shows the four hands' staffs with their numbers and, while a staff is pointed at, green and red arrows for what it would change. The simulation side is two new commands the player controller hands to the inventory (`staff_hand_requested`, `bag_drop_requested`), a staff keeping its number, cards and mana wherever it goes, and `Caster.empty_hand`. Found on the way: the builder kept an earlier wizard's staffs on its strip back in the hub (now `inventory_announced` lets the HUD start over), and drew a staff's head sheet squeezed into its tab (now one upright frame). Tests: the inventory's hands and drops, the menu with a real wizard, a drop landing apart from the item in reach, the arrows' table.
+
 ## 2026-11-13: Pulse rings leave a trail (owner session)
 
 The owner asked whether a Pulse's motes could trail its expanding ring. Feel now lays tail motes (the shots' `tail` kinds, one per ring by its id) over the band the edge swept since the last frame, by area, not by time, so the eased ring's fast start leaves as whole a trail as its slow end, at any frame rate and through a hit-stop; a stopped segment lays none past its stop. The edge keeps its outward sparks, a third fewer (90 to 60 a second per 100 px). Only the look changed: `pulse_rings.gd` remembers each ring's last drawn radius by a new `PulseView.id`; the carrier and the simulation are untouched. Tests: five new in test_pulse_rings.gd; 364 unit runs green.

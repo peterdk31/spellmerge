@@ -30,6 +30,9 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `build_refused` | `player` | `hud` (the builders) |
 | `bag_changed` | `player` | `hud` (the builders) |
 | `staff_cards_requested` | `hud` (the radial builder) | `player` |
+| `staff_hand_requested`, `bag_drop_requested` | `hud` (the inventory; commands, items I7) | `player` |
+| `inventory_refused` | `player` | `hud` (the inventory's note) |
+| `inventory_announced` | `player` (before a wizard's whole inventory is said anew) | `hud` (the builder, the inventory forget the earlier wizard's staffs) |
 | `staff_changed` | `player` | `hud` (the builders) |
 | `staff_cast` | `player` | `hud` (the corner panel) |
 | `caster_move_requested` | `core/spells` | `actor` (the Mover), each for its own actor id |
@@ -79,7 +82,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `pad_wait_changed` | `coop` | `hud` (the pad line, the pause menu) |
 | `item_take_requested` | HUD (a command) | `items` (A by an item in reach) |
 | `room_items_placed` | `flow` | `items` (what the room's scene places lies there) |
-| `item_drop_requested` | `actor` (an Inventory) | `items` (a card given back to a full bag lands at the feet) |
+| `item_drop_requested` | `actor` (an Inventory) | `items` (a card given back to a full bag, or what the inventory menu drops, lands beside the body) |
 | `ground_item_changed` | `items` | `feel` (the look on the ground) |
 | `item_near_changed`, `item_refused` | `items` | `hud` (the hint, its red shake) |
 | `sandbox_requested`, `sandbox_action_requested`, `sandbox_spawn_requested` | HUD | `flow` |

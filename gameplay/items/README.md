@@ -17,7 +17,7 @@ What lies on the ground, and picking it up (items I6, [docs/milestones/items.md]
 - **Dependency direction:** `core` ← `gameplay` ← `content`. It uses `core/` (the bus, the actor table, the projectile manager's walls, Spells for cards' names and icons) and the actor kit's Inventory; it knows nothing of the HUD, the AI or `net/`.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `ground_item_changed`, `item_near_changed`, `item_refused`.
-  - Listens to: `room_items_placed` (flow), `item_drop_requested` (an Inventory), and the command `item_take_requested` (HUD, through `Events.listen`).
+  - Listens to: `room_items_placed` (flow), `item_drop_requested` (an Inventory: a card given back to a full bag, or what the inventory menu dropped, items I7), and the command `item_take_requested` (HUD, through `Events.listen`).
 
 ## Allowed files
 

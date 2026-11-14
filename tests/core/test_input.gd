@@ -374,8 +374,8 @@ func _test_leave_frees_the_slot() -> void:
 	_check(_manager.device_of(1) == 7, "the next gamepad takes the freed slot 1")
 
 
-## No button leaves (items I2): Back and Backspace keep the seat (the pause menu's "Leave game"
-## does: `_test_leave_game_frees_only_that_seat`).
+## No button leaves (items I2): Back (the inventory's since items I7) and Backspace keep the seat
+## (the pause menu's "Leave game" does: `_test_leave_game_frees_only_that_seat`).
 func _test_leave_by_button() -> void:
 	_setup()
 	for pad in 4:
@@ -789,7 +789,7 @@ func _test_bindings_route_as_documented() -> void:
 	var buttons: Dictionary = {
 		JOY_BUTTON_RIGHT_SHOULDER: &"staff_1", JOY_BUTTON_LEFT_SHOULDER: &"staff_3", JOY_BUTTON_A: &"accept",
 		JOY_BUTTON_B: &"back", JOY_BUTTON_X: &"alternate", JOY_BUTTON_Y: &"extra", JOY_BUTTON_START: &"pause",
-		JOY_BUTTON_DPAD_LEFT: &"kind_prev", JOY_BUTTON_DPAD_RIGHT: &"kind_next",
+		JOY_BUTTON_DPAD_LEFT: &"kind_prev", JOY_BUTTON_DPAD_RIGHT: &"kind_next", JOY_BUTTON_BACK: &"inventory",
 	}
 	for button: JoyButton in buttons:
 		_manager.handle_event(_button(0, button))
@@ -800,7 +800,7 @@ func _test_bindings_route_as_documented() -> void:
 	_manager.handle_event(_key(KEY_ENTER))
 	var keys: Dictionary = {
 		KEY_LEFT: &"move_left", KEY_RIGHT: &"move_right", KEY_UP: &"move_up", KEY_DOWN: &"move_down",
-		KEY_SHIFT: &"staff_1", KEY_SPACE: &"staff_1", KEY_TAB: &"back", KEY_E: &"back", KEY_J: &"staff_2",
+		KEY_SHIFT: &"staff_1", KEY_SPACE: &"staff_1", KEY_TAB: &"inventory", KEY_E: &"back", KEY_J: &"staff_2",
 		KEY_K: &"staff_3", KEY_Q: &"staff_4", KEY_L: &"staff_4", KEY_ENTER: &"accept", KEY_X: &"alternate",
 		KEY_ESCAPE: &"pause", KEY_R: &"extra", KEY_PAGEUP: &"kind_prev", KEY_PAGEDOWN: &"kind_next",
 	}
@@ -832,7 +832,7 @@ func _test_input_map_has_documented_bindings() -> void:
 		&"move_left": [KEY_A, KEY_LEFT], &"move_right": [KEY_D, KEY_RIGHT],
 		&"move_up": [KEY_W, KEY_UP], &"move_down": [KEY_S, KEY_DOWN],
 		&"staff_1": [KEY_SPACE, KEY_SHIFT], &"staff_2": [KEY_J], &"staff_3": [KEY_K], &"staff_4": [KEY_Q, KEY_L],
-		&"accept": [KEY_ENTER, KEY_SPACE], &"back": [KEY_TAB, KEY_E], &"alternate": [KEY_X, KEY_DELETE],
+		&"accept": [KEY_ENTER, KEY_SPACE], &"back": [KEY_E], &"inventory": [KEY_TAB], &"alternate": [KEY_X, KEY_DELETE],
 		&"pause": [KEY_ESCAPE],
 		&"join": [KEY_ENTER, KEY_SPACE],
 	}
@@ -844,11 +844,12 @@ func _test_input_map_has_documented_bindings() -> void:
 		&"move_up": JOY_BUTTON_DPAD_UP, &"move_down": JOY_BUTTON_DPAD_DOWN,
 		&"staff_1": JOY_BUTTON_RIGHT_SHOULDER, &"staff_3": JOY_BUTTON_LEFT_SHOULDER,
 		&"accept": JOY_BUTTON_A, &"back": JOY_BUTTON_B, &"alternate": JOY_BUTTON_X, &"pause": JOY_BUTTON_START,
-		&"join": JOY_BUTTON_A,
+		&"join": JOY_BUTTON_A, &"inventory": JOY_BUTTON_BACK,
 	}
 	for action: StringName in pad:
 		_check(InputMap.action_has_event(action, _button(0, pad[action])), "%s is bound to gamepad button %d" % [action, pad[action]])
 	_check(InputMap.action_has_event(&"join", _button(0, JOY_BUTTON_START)), "join is bound to Start")
+	_check(not InputMap.action_has_event(&"back", _key(KEY_TAB)), "Tab is the inventory's, no longer the builder's (items I7)")
 	# The triggers are axes; the manager routes them itself (RT staff 2, LT staff 4).
 	_check(not InputMap.action_has_event(&"staff_1", _button(0, JOY_BUTTON_A)), "A no longer casts a staff")
 

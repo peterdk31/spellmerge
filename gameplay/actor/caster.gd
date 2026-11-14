@@ -461,6 +461,29 @@ func fill_hand(at: int, base: StaffBase, cards: Array[StringName], mana: float) 
 	return true
 
 
+## Empty hand `at` (items I7: a staff put in the bag or dropped): it holds no staff, no cards and no
+## mana from now on, its wind-up and sustained cards end, and the staff on show moves to the first
+## hand still held (with none, it stays where it was: the look shows the plain staff);
+## `staff_built` follows. Returns the mana it held (what the staff keeps off a hand), or -1, and
+## nothing changes, for a hand that holds no staff.
+func empty_hand(at: int) -> float:
+	if not holds(at):
+		return -1.0
+	var kept: float = _mana[at]
+	cancel_wind(at)
+	empty_hands |= 1 << at
+	if at < staffs.size():
+		staffs[at] = null
+	_cards[at] = [] as Array[StringName]
+	_mana[at] = 0.0
+	_edited = true
+	_install(at)
+	if current == at:
+		_show(first_held())
+	staff_built.emit(at)
+	return kept
+
+
 ## Hold `new_staffs` (1-4, one per button; a null one falls back to `staff`, as in `hold_staffs`)
 ## with `new_cards` (card ids by slot, per staff) instead of the staffs it held: a boss's phase
 ## (`Phases`). Every button it is given holds its staff (none is an empty hand). Each pool starts

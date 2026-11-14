@@ -35,7 +35,7 @@ extends CanvasLayer
 ## The buttons that open menus are read here, from the press counters of `core/input` (a tap
 ## released within a frame is not lost); each menu then takes its input through
 ## `core/ui_focus` (owner, 2026-10-26):
-## - `back` (B; Tab or E on the keyboard) opens that player's radial spell builder
+## - `back` (B; E on the keyboard) opens that player's radial spell builder
 ##   (`hud/builder/radial_builder.gd`, nodes Root/Radial1 to Root/Radial4, made here; owner,
 ##   2026-10-26) when they have no menu open, are not down and the pause menu is not open. It
 ##   never pauses the game; it is the full builder at any time, waves included (staffs A6a).
@@ -46,6 +46,10 @@ extends CanvasLayer
 ##   (`builder_options_changed`). The same page switches where every corner panel's staff rows
 ##   show a staff's delay, on the button glyph (the default) or on the next cast
 ##   (`reload_style_changed`; owner, 2026-10-27).
+## - `inventory` (Select; Tab) opens that player's inventory (`hud/menus/inventory/`, nodes
+##   Root/Inventory1 to Root/Inventory4, made here; items I7) under the same conditions as the
+##   builder; it closes itself on the same button, on B from its first ring and on Start, and the
+##   corner panel hides while it is open, as for the builder.
 ## - `pause` (Start; Escape) closes the menu its player has open (the builder, or the pause menu
 ##   they opened); with none open it opens the pause menu (`hud/menus/pause/`, node
 ##   Root/PauseMenu), which stops the game for everyone and is worked by the player who opened
@@ -79,6 +83,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const PauseMenuScript := preload("res://hud/menus/pause/pause_menu.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
+const InventoryScript := preload("res://hud/menus/inventory/inventory_menu.gd")
 const RingZoomScript := preload("res://hud/builder/rings/ring_zoom.gd")
 const RingKindsScript := preload("res://hud/builder/rings/ring_kinds.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
@@ -95,6 +100,8 @@ const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
 const BUILDER_ACTION: StringName = &"back"
+## Select (Tab) opens the inventory (items I7); the inventory closes itself on it.
+const INVENTORY_ACTION: StringName = &"inventory"
 ## A on the hub's lit stone starts the run (`run_requested`; online-lobby L1); else it takes the
 ## item in reach (`item_take_requested`; items I6: `take`, A, F or Enter, never Space, which casts),
 ## else it opens the altar's room.
@@ -129,11 +136,13 @@ var main_menu: PackedScene = null
 
 var _panels: Array[PlayerPanelScript] = []
 var _radials: Array[RadialScript] = []
+var _inventories: Array[InventoryScript] = []
 var _pause_menu: PauseMenuScript = null
 ## Per player: the `pause` and `back` press counts at the last poll, and whether a menu of
 ## theirs was open then.
 var _seen_pause: Array[int] = [0, 0, 0, 0]
 var _seen_back: Array[int] = [0, 0, 0, 0]
+var _seen_inventory: Array[int] = [0, 0, 0, 0]
 var _seen_start: Array[int] = [0, 0, 0, 0]
 var _seen_take: Array[int] = [0, 0, 0, 0]
 ## True while the hub's teleporter stone is lit (`start_stone_changed`).
@@ -246,6 +255,14 @@ func _ready() -> void:
 		# Under the corner panels (its shade leaves their band free but never dims them).
 		root_control.move_child(radial, _panels[0].get_index())
 		_radials.append(radial)
+	for player in PLAYER_COUNT:
+		var inventory := InventoryScript.new()
+		inventory.name = "Inventory%d" % (player + 1)
+		inventory.index = player
+		root_control.add_child(inventory)
+		# Under the corner panels, as the builders.
+		root_control.move_child(inventory, _panels[0].get_index())
+		_inventories.append(inventory)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if ui_focus == null:
@@ -262,12 +279,15 @@ func _ready() -> void:
 		for player in PLAYER_COUNT:
 			_seen_pause[player] = input.get_press_count(player, PAUSE_ACTION)
 			_seen_back[player] = input.get_press_count(player, BUILDER_ACTION)
+			_seen_inventory[player] = input.get_press_count(player, INVENTORY_ACTION)
 			_seen_start[player] = input.get_press_count(player, START_ACTION)
 			_seen_take[player] = input.get_press_count(player, TAKE_ACTION)
 	_pause_menu.save = save
 	_pause_menu.bind(events, ui_focus)
 	for radial in _radials:
 		radial.bind(events, ui_focus, spells, input)
+	for inventory in _inventories:
+		inventory.bind(events, ui_focus, spells, input)
 	_pause_menu.builder_options_changed.connect(_on_builder_options_changed)
 	_pause_menu.reload_style_changed.connect(_on_reload_style_changed)
 	# The frame rate readout: over everything, at the bottom middle.
@@ -383,6 +403,9 @@ func poll() -> void:
 		var back_count: int = input.get_press_count(player, BUILDER_ACTION)
 		var back_now: bool = back_count > _seen_back[player]
 		_seen_back[player] = back_count
+		var inventory_count: int = input.get_press_count(player, INVENTORY_ACTION)
+		var inventory_now: bool = inventory_count > _seen_inventory[player]
+		_seen_inventory[player] = inventory_count
 		var start_count: int = input.get_press_count(player, START_ACTION)
 		var start_now: bool = start_count > _seen_start[player]
 		_seen_start[player] = start_count
@@ -404,6 +427,9 @@ func poll() -> void:
 			elif back_now and not had_menu and not _has_menu(player) and _in_room \
 					and not _pause_menu.is_open() and not _panels[player].is_downed():
 				_radials[player].open_builder()
+			elif inventory_now and not had_menu and not _has_menu(player) and _in_room \
+					and not _pause_menu.is_open() and not _panels[player].is_downed():
+				_inventories[player].open_inventory()
 		_had_menu[player] = _has_menu(player)
 		# A seat in the game with no device of this machine on it is played on another one. Asked
 		# of the input layer each frame: a device handed over or mirrored sends no event.
@@ -423,15 +449,17 @@ func _on_online_changed(phase: StringName, _code: String, _reason: StringName, _
 	_online = phase == EventsScript.ONLINE_CODE or phase == EventsScript.ONLINE_LINKED or phase == EventsScript.ONLINE_PLAYING
 
 
-## Whether `player` has a menu open: their builder, or the pause menu they work.
+## Whether `player` has a menu open: their builder, their inventory, or the pause menu they work.
 func _has_menu(player: int) -> bool:
-	return _radials[player].is_open() or _pause_menu.owner_player == player
+	return _radials[player].is_open() or _inventories[player].is_open() or _pause_menu.owner_player == player
 
 
 ## `pause`: close the player's open menu, or open the pause menu for them.
 func _on_pause_pressed(player: int) -> void:
 	if _radials[player].is_open():
 		_radials[player].close_builder()
+	elif _inventories[player].is_open():
+		_inventories[player].close_inventory()
 	elif _pause_menu.is_open():
 		if _pause_menu.owner_player == player:
 			_pause_menu.close_menu()
@@ -470,6 +498,13 @@ func get_radial(player: int) -> RadialScript:
 	if player < 0 or player >= PLAYER_COUNT:
 		return null
 	return _radials[player]
+
+
+## The inventory of `player`, or null for a bad index.
+func get_inventory(player: int) -> InventoryScript:
+	if player < 0 or player >= PLAYER_COUNT:
+		return null
+	return _inventories[player]
 
 
 ## The pause menu's builder switches: the radial's ring and what a full slot does.
@@ -525,7 +560,7 @@ func get_panel(player: int) -> PlayerPanelScript:
 ## 2026-10-31, docs/milestones/M2-builder-tree.md). The radial is shown before its menu opens and
 ## hidden before it closes, so `visible` is already right when UIFocus says so.
 func _refresh(player: int) -> void:
-	_panels[player].visible = _in_room and _joined[player] and not _radials[player].visible
+	_panels[player].visible = _in_room and _joined[player] and not _radials[player].visible and not _inventories[player].visible
 
 
 func _on_player_joined(player: int) -> void:
@@ -678,6 +713,7 @@ func _reset_all() -> void:
 	_pause_menu.close_menu()
 	for player in PLAYER_COUNT:
 		_radials[player].close_builder()
+		_inventories[player].close_inventory()
 		_panels[player].reset()
 		_refresh(player)
 
@@ -690,6 +726,7 @@ func _on_stats_changed(player: int, health: float, max_health: float, mana: floa
 			_vignette.flash_hit(player, (before - health) / maxf(max_health, 1.0), _joined.count(true))
 		if health <= 0.0:
 			_radials[player].close_builder()
+			_inventories[player].close_inventory()
 
 
 func _on_menu_opened(player: int) -> void:

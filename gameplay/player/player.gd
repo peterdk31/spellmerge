@@ -31,7 +31,8 @@ extends ActorController
 ##   step later), `staff_changed` with the plain view of every hand's staff (`Caster.plan_of`),
 ##   and `build_refused`.
 ## - **The inventory's events** (the home body's `Inventory`, items I3; all of them when it first
-##   drives the wizard and each time it comes home, then on every change): `bag_changed` for each
+##   drives the wizard and each time it comes home, after `inventory_announced`, then on every
+##   change): `bag_changed` for each
 ##   bag (its ids, counts and capacity), `owned_staff_changed` for each staff it owns, by its number
 ##   (`Inventory.plan_of`, empty once it went), and `hands_changed` (which number is on which hand).
 ## - **The cast events** (from the actor it drives now, whose staffs its buttons cast): `spell_cast`
@@ -43,6 +44,10 @@ extends ActorController
 ##   `set_cards`: counted, and a staff on a hand goes into the Caster), also during a possession.
 ##   A refusal is sent as `build_refused` with its words (NO_STAFF, NO_SLOT, NO_CARD); a card given back to a full
 ##   bag is dropped at the body's feet (items I6), never refused.
+## - **The inventory menu** (items I7: `staff_hand_requested` and `bag_drop_requested`, commands for
+##   this seat only, a staff named by its number) puts the home body's staffs on hands, in the bag
+##   and on the ground, and drops its things (`Inventory.set_hand`, `drop_staff`, `drop`); a
+##   refusal is `inventory_refused` with its words.
 ## - **The card bag** (each run mode's, from flow through `seat_wizard`: card id to copies,
 ##   `Inventory.give_cards`); a wizard given none gets Inventory.DEV_COPIES of every card in the
 ##   registry when it first drives.
@@ -72,9 +77,13 @@ const STAFF_COUNT: int = 4
 const NO_STAFF: String = "You have no such staff."
 const NO_SLOT: String = "There is no such slot."
 const NO_CARD: String = "You do not have that card."
+const NO_HAND: String = "You have no such hand."
+const NO_ROOM: String = "That bag is full."
+const NO_ITEM: String = "You do not have that."
 const REFUSALS: Dictionary = {
 	Inventory.Refusal.NO_STAFF: NO_STAFF, Inventory.Refusal.NO_SLOT: NO_SLOT,
-	Inventory.Refusal.NO_CARD: NO_CARD,
+	Inventory.Refusal.NO_CARD: NO_CARD, Inventory.Refusal.NO_HAND: NO_HAND,
+	Inventory.Refusal.NO_ROOM: NO_ROOM, Inventory.Refusal.NO_ITEM: NO_ITEM,
 }
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"
@@ -270,6 +279,8 @@ func _bind_home(actor: Actor) -> void:
 		# Commands, heard at the tick's start (core/events, online-ready N2).
 		bus.listen(&"staff_change_requested", _on_staff_change_requested)
 		bus.listen(&"staff_cards_requested", _on_staff_cards_requested)
+		bus.listen(&"staff_hand_requested", _on_staff_hand_requested)
+		bus.listen(&"bag_drop_requested", _on_bag_drop_requested)
 
 
 ## Where the seat's mouse aims from: its home wizard's hand (`Actor.aim_pivot`), INF while it has
@@ -432,6 +443,8 @@ func _fill_cards(inventory: Inventory) -> void:
 func _announce_inventory() -> void:
 	if _home == null or _home.inventory == null:
 		return
+	if _home.events != null:
+		_home.events.inventory_announced.emit(seat)
 	for bag: StringName in ItemKinds.BAGS:
 		_on_bag_changed(bag)
 	for number: int in _home.inventory.numbers():
@@ -494,3 +507,30 @@ func _on_staff_cards_requested(player: int, number: int, cards: Array[StringName
 func _answer(refusal: Inventory.Refusal) -> void:
 	if refusal != Inventory.Refusal.NONE:
 		_refuse(str(REFUSALS.get(refusal, NO_STAFF)))
+
+
+## The inventory menu asked to put staff number `number` on hand `hand` (-1: into the staff bag;
+## items I7): `Inventory.set_hand`, refused as it says.
+func _on_staff_hand_requested(player: int, number: int, hand: int) -> void:
+	if player != seat:
+		return
+	var inventory: Inventory = _builder_inventory()
+	_answer_inventory(inventory.set_hand(number, hand) if inventory != null else Inventory.Refusal.NO_STAFF)
+
+
+## The inventory menu asked to drop staff number `number`, or with -1 one copy of `id` from `bag`
+## (items I7): `Inventory.drop_staff` or `drop`, refused as they say.
+func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number: int) -> void:
+	if player != seat:
+		return
+	var inventory: Inventory = _builder_inventory()
+	var refusal: Inventory.Refusal = Inventory.Refusal.NO_ITEM
+	if inventory != null:
+		refusal = inventory.drop_staff(number) if number != Inventory.NO_STAFF else inventory.drop(bag, id)
+	_answer_inventory(refusal)
+
+
+## A refusal of the inventory menu's to the seat (`inventory_refused`); nothing for a change made.
+func _answer_inventory(refusal: Inventory.Refusal) -> void:
+	if refusal != Inventory.Refusal.NONE and _home != null and _home.events != null:
+		_home.events.inventory_refused.emit(seat, str(REFUSALS.get(refusal, NO_ITEM)))

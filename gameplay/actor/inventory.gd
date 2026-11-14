@@ -39,17 +39,28 @@ extends ActorComponent
 ##   `put_on_hand(stack, hand)` puts a staff there (its Caster's hand filled with its cards and the
 ##   mana it kept); `add` puts anything in its bag. Which of them a pickup does is the pickup rule's
 ##   (gameplay/items/pickup_rule.gd), not the inventory's.
+## - **Hands and drops** (items I7, the inventory menu's requests): `set_hand(number, hand)` puts a
+##   staff it owns on a hand (from the bag: the staff that was there goes into the bag; from another
+##   hand: the two change places) or, with NO_HAND, takes it off into the staff bag (refused,
+##   NO_ROOM, when that bag is full). A staff keeps its number and its cards wherever it goes, and
+##   off a hand the mana it had (`Caster.empty_hand`). `drop_staff(number)` lays a staff it owns on
+##   the ground (off its hand first), `drop(bag, id)` one copy of anything else; both say
+##   `item_drop_requested`, as a card given back to a full bag does. Refused, and nothing changes,
+##   for a staff it does not own (NO_STAFF), a hand it has not (NO_HAND) or an item it holds none
+##   of (NO_ITEM).
 ##
 ## Signals (local, for the actor's controller, which turns them into the seat's events):
 ## `bag_changed(bag)`, `staff_changed(number)` (its cards, or it came or went) and `hands_changed`.
 
 ## Why a change was refused (NONE: it was made).
-enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD }
+enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM }
 
 ## A bag with no limit.
 const UNLIMITED: int = -1
 ## No staff (a hand that holds none, a number nobody has).
 const NO_STAFF: int = ItemStack.NO_NUMBER
+## No hand: `set_hand`'s "into the staff bag".
+const NO_HAND: int = -1
 ## How many hands: one per staff button.
 const HANDS: int = Caster.MAX_STAFFS
 ## How many of each card the dev bag holds (the sandbox's and the hub's; owner, 2026-11-13).
@@ -480,6 +491,129 @@ func put_on_hand(stack: ItemStack, hand: int) -> bool:
 	staff_changed.emit(made.number)
 	hands_changed.emit()
 	return true
+
+
+# --- Hands and drops (items I7) ----------------------------------------------------------
+
+## Put staff `number` on hand `hand` (NO_HAND: into the staff bag), as the class doc says. Its
+## Caster's hands follow: a staff off a hand keeps the mana it had there, one put on a hand comes
+## with the mana it kept.
+func set_hand(number: int, hand: int) -> Refusal:
+	var found: ItemStack = _staff(number)
+	if found == null:
+		return Refusal.NO_STAFF
+	var from: int = hand_of(number)
+	if hand == from:
+		return Refusal.NONE
+	var bag: StringName = ItemKinds.bag_of(ItemKinds.STAFF)
+	if hand == NO_HAND:
+		if not _fits(bag, 1):
+			return Refusal.NO_ROOM
+		if not _hand_in_step(from):
+			return Refusal.NO_STAFF
+		_stacks(bag).append(_off_hand(from))
+		bag_changed.emit(bag)
+		staff_changed.emit(number)
+		hands_changed.emit()
+		return Refusal.NONE
+	if hand < 0 or hand >= HANDS or not _has_hand(hand):
+		return Refusal.NO_HAND
+	if not _hand_in_step(hand) or (from >= 0 and not _hand_in_step(from)):
+		return Refusal.NO_STAFF
+	var there: ItemStack = _off_hand(hand) if _hands[hand] != null else null
+	if from >= 0:
+		# From another hand: the two change places.
+		_on_hand(_off_hand(from), hand)
+		if there != null:
+			_on_hand(there, from)
+	else:
+		# From the bag: the staff that was there goes into the bag in its place.
+		var stacks: Array[ItemStack] = _stacks(bag)
+		stacks.erase(found)
+		if there != null:
+			stacks.append(there)
+		_on_hand(found, hand)
+		bag_changed.emit(bag)
+	staff_changed.emit(number)
+	if there != null:
+		staff_changed.emit(there.number)
+	hands_changed.emit()
+	return Refusal.NONE
+
+
+## Lay staff `number` on the ground (off its hand first, with the mana it had), as the class doc
+## says.
+func drop_staff(number: int) -> Refusal:
+	var found: ItemStack = _staff(number)
+	if found == null:
+		return Refusal.NO_STAFF
+	var hand: int = hand_of(number)
+	if hand >= 0:
+		if not _hand_in_step(hand):
+			return Refusal.NO_STAFF
+		_off_hand(hand)
+		hands_changed.emit()
+	else:
+		var bag: StringName = ItemKinds.bag_of(ItemKinds.STAFF)
+		_stacks(bag).erase(found)
+		bag_changed.emit(bag)
+	staff_changed.emit(number)
+	var lying: ItemStack = found.copy()
+	lying.number = NO_STAFF
+	_drop(lying)
+	return Refusal.NONE
+
+
+## Lay one copy of `id` from `bag` on the ground, as the class doc says. A staff is dropped by its
+## number (`drop_staff`): asked here, it is NO_ITEM.
+func drop(bag: StringName, id: StringName) -> Refusal:
+	var kind: StringName = ItemKinds.kind_in(bag)
+	if kind == &"" or kind == ItemKinds.STAFF or count_of(bag, id) < 1:
+		return Refusal.NO_ITEM
+	take(bag, id, 1)
+	var lying := ItemStack.new()
+	lying.kind = kind
+	lying.id = id
+	lying.count = 1
+	_drop(lying)
+	return Refusal.NONE
+
+
+## True when hand `hand` exists on its Caster (any of HANDS without one).
+func _has_hand(hand: int) -> bool:
+	var caster: Caster = actor.caster if actor != null else null
+	return caster == null or hand < caster.staff_count
+
+
+## True when hand `hand` (-1: none) holds a staff here exactly when its Caster's does: false once
+## the Caster changed a hand behind the inventory's back (`Caster.replace_staffs`).
+func _hand_in_step(hand: int) -> bool:
+	var caster: Caster = actor.caster if actor != null else null
+	if hand < 0 or caster == null:
+		return true
+	return (_hands[hand] != null) == caster.holds(hand)
+
+
+## Take the staff off hand `hand` (it holds one): its Caster's hand is emptied, and the stack keeps
+## the mana it had there. Returns the stack; tells nobody.
+func _off_hand(hand: int) -> ItemStack:
+	var stack: ItemStack = _hands[hand]
+	_hands[hand] = null
+	var caster: Caster = actor.caster if actor != null else null
+	if caster != null:
+		var mana: float = caster.empty_hand(hand)
+		if mana >= 0.0:
+			stack.mana = mana
+	return stack
+
+
+## Put `stack` (a staff off every hand) on the empty hand `hand`, its Caster's hand holding its
+## cards and the mana it kept. Tells nobody.
+func _on_hand(stack: ItemStack, hand: int) -> void:
+	_hands[hand] = stack
+	var caster: Caster = actor.caster if actor != null else null
+	if caster != null:
+		caster.fill_hand(hand, stack.staff, stack.cards, stack.mana)
 
 
 # --- Inside -----------------------------------------------------------------------------

@@ -77,3 +77,23 @@ func test_a_carrier_no_carrier_has_is_refused() -> void:
 	carrier_card.carrier = &"fissure"
 	check(not carrier_card.range_problems().is_empty(), "no card may name a carrier that is gone")
 	check_equal(Carriers.of(&"fissure").id(), &"", "and it runs as nothing")
+
+## Items I7: the inventory's arrows know which way is better for every number `ranges()` names,
+## and nothing else; a staff compared with another says better, worse or the same.
+func test_the_arrows_table_covers_every_number_of_ranges() -> void:
+	var base := StaffBase.new()
+	var names: Array = base.ranges().keys()
+	names.sort()
+	var table: Array = StaffBase.BETTER.keys()
+	table.sort()
+	check_equal(table, names, "one entry for each number ranges() names")
+	for field: String in StaffBase.BETTER:
+		check([-1, 0, 1].has(StaffBase.BETTER[field]), "%s is better one way or neither" % field)
+	var other := StaffBase.new()
+	other.slots = base.slots + 2
+	other.cooldown = base.cooldown + 0.5
+	check_equal(base.compared(other, "slots"), 1, "more slots are better")
+	check_equal(base.compared(other, "cooldown"), -1, "a longer cooldown is worse")
+	check_equal(base.compared(other, "max_mana"), 0, "the same mana")
+	other.tip = base.tip + 4.0
+	check_equal(base.compared(other, "tip"), 0, "a longer tip is neither")

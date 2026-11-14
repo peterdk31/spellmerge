@@ -34,10 +34,10 @@ const PS_TRIANGLE: Color = Color(0.4, 0.8, 0.65)
 const NO_GLYPH: Dictionary = {"shape": Shape.KEY, "label": "?", "color": PLAIN}
 
 const _KEYS: Dictionary = {
-	&"staff_1": "Space", &"staff_2": "J", &"staff_3": "K", &"staff_4": "Q", &"accept": "Enter", &"back": "Tab",
+	&"staff_1": "Space", &"staff_2": "J", &"staff_3": "K", &"staff_4": "Q", &"accept": "Enter", &"back": "E",
 	&"alternate": "X", &"pause": "Esc", &"join": "Enter",
 	&"move_up": "W", &"move_down": "S", &"move_left": "A", &"move_right": "D", &"page_prev": "Z", &"page_next": "C",
-	&"extra": "R", &"kind_prev": "PgUp", &"kind_next": "PgDn", &"take": "F",
+	&"extra": "R", &"kind_prev": "PgUp", &"kind_next": "PgDn", &"take": "F", &"inventory": "Tab",
 }
 
 ## Name fragments (lower case) of a gamepad's name, per family.
@@ -93,6 +93,9 @@ static func glyph(kind: int, action: StringName) -> Dictionary:
 		&"pause":
 			var start: String = "Options" if kind == Kind.PLAYSTATION else ("+" if kind == Kind.SWITCH else "Menu")
 			return {"shape": Shape.SHOULDER, "label": start, "color": PLAIN}
+		&"inventory":
+			var select: String = "Create" if kind == Kind.PLAYSTATION else ("-" if kind == Kind.SWITCH else "View")
+			return {"shape": Shape.SHOULDER, "label": select, "color": PLAIN}
 		&"page_prev", &"staff_3":
 			return _bumper(kind, false)
 		&"page_next", &"staff_1":

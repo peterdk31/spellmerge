@@ -199,6 +199,34 @@ func test_a_drop_lands_a_step_away_from_the_next_item_and_never_in_a_wall() -> v
 	check_equal(_items.drop_spot(Vector2(100, 100)), Vector2(100, 100), "walled in: at the feet")
 
 
+## Items I7: what the inventory menu drops (`bag_drop_requested`) lands apart from the item in
+## reach, which stays the one in reach; a staff dropped from a hand lies with its cards and mana and,
+## taken again, goes back on a free hand as it left.
+func test_a_drop_from_the_inventory_lands_apart_from_the_item_in_reach() -> void:
+	var body := _wizard(0, Vector2(100, 100), [true, false, false, false], {&"fire": 1})
+	var near: int = _items.lay(ItemStack.card(&"bolt"), Vector2(100, 92))
+	_tick()
+	check_equal(_items.near_of(0), near, "the bolt is in reach")
+	_world.bus.bag_drop_requested.emit(0, CARDS, &"fire", Inventory.NO_STAFF)
+	_tick()
+	var fire: GroundItem = _items.lying().back()
+	check_equal(fire.stack.id, &"fire", "the fire lies there")
+	check(fire.at.distance_to(Vector2(100, 92)) >= 2.0 * ItemsScript.DROP_RADIUS, "apart from the bolt (%s)" % fire.at)
+	check(fire.at.distance_to(body.global_position) > Vector2(100, 92).distance_to(body.global_position), "further than the bolt")
+	check_equal(_items.near_of(0), near, "the bolt is still the one in reach")
+	body.caster.set_mana(0, 33.0)
+	body.inventory.set_cards(0, [] as Array[StringName])
+	_world.bus.bag_drop_requested.emit(0, STAFFS, &"test", 0)
+	_tick()
+	var staff: GroundItem = _items.lying().back()
+	check_equal(staff.stack.kind, ItemKinds.STAFF, "the staff lies there")
+	check_equal(staff.stack.mana, 33.0, "with the mana it had")
+	check(not body.caster.holds(0), "off its hand")
+	check_equal(_items.take(body.id, staff.number), ItemsScript.Take.TAKEN, "taken again")
+	check(body.caster.holds(0), "back on a free hand")
+	check_equal(body.caster.mana_of(0), 33.0, "as it left")
+
+
 ## Regression (review): cards dropped together never pile up: each lands on a spot of its own.
 func test_cards_dropped_together_each_land_on_a_spot_of_their_own() -> void:
 	var body := _wizard(0, Vector2(100, 100), [true, false, false, false], {&"bolt": 1, &"fire": 1, &"frost": 1})

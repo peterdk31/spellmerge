@@ -792,9 +792,6 @@ func _test_an_unplugged_pad_stops_the_game_until_it_is_back() -> void:
 	_start_with(0)
 	_input.add_virtual_device(1)
 	_input.add_virtual_device(2)
-	# The room entered said that nobody waits.
-	_check(waits == [0], "a room entered says who waits: %s" % [waits])
-	waits.clear()
 	_events.call("apply_command", &"pad_wait_requested", [1, 1])
 	_check(game.stopped_for(CoopScript.PAD_OF[1]) and CoopScript.pad_waits(game) == 2, "seat 1's missing gamepad stops the game")
 	_check(_coop.is_joined(1) and _wizard(1) != null, "the seat and its wizard stay")

@@ -1,5 +1,6 @@
 extends Node
-## Co-op (autoload `Coop`): joining and leaving mid-run and revives. Up to four players; nobody ever waits for another player.
+## Co-op (autoload `Coop`): joining and leaving mid-run and revives. Up to four players; nobody ever waits for another player,
+## but for a seat whose gamepad is unplugged (owner, 2026-11-13: the game stops until it is back).
 ##
 ## Joining and leaving: `core/input` turns a button press (or a bot's virtual device) into `device_joined` / `device_left`, and the frames
 ## service (core/sim) into the simulation's `seat_joined` / `seat_left` (offline as the device
@@ -296,5 +297,3 @@ func _clear_revives() -> void:
 func _on_room_entered(_room_id: StringName) -> void:
 	refresh_wizards()
 	_clear_revives()
-	# A run's start let every stop go: whoever shows the waiting seats hears it.
-	_send_pad_wait(Sim.found(self))

@@ -395,17 +395,18 @@ func _on_pause_pressed(player: int) -> void:
 
 
 ## The seats the game waits for (their gamepad is unplugged; `pad_wait_changed`). A waiting seat
-## cannot work the pause menu, so one it had open closes and another player may open it; the menu
-## offers "Leave game" for the waiting seats of this machine (another machine's are its own to
-## let go).
+## cannot work a menu, so whatever it had open closes (its builder, or the pause menu, which another
+## player may then open), as when a device left; the pause menu offers "Leave game" for the waiting
+## seats of this machine (another machine's are its own to let go).
 func _on_pad_wait_changed(seats: int) -> void:
-	if _pause_menu.is_open() and seats & (1 << _pause_menu.owner_player) != 0:
-		_pause_menu.close_menu()
 	var here: int = 0
-	if input != null:
-		for player in PLAYER_COUNT:
-			if seats & (1 << player) != 0 and input.is_waiting(player):
-				here |= 1 << player
+	for player in PLAYER_COUNT:
+		if seats & (1 << player) == 0:
+			continue
+		if ui_focus != null:
+			ui_focus.close(player)
+		if input != null and input.is_waiting(player):
+			here |= 1 << player
 	_pause_menu.set_waiting_seats(here)
 
 

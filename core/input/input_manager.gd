@@ -12,10 +12,12 @@ extends Node
 ## command `pad_wait_requested(player, 1)`, which co-op hears; asked again in every room entered
 ## while it waits, since a run's start lets every stop go). The seat takes its gamepad back when
 ## that one connects again (the same device id, which Godot usually gives a pad plugged back in) or
-## sends anything; else the first gamepad not seated that presses `join` takes the waiting seat
-## (the lowest, before any free slot). Then the game is asked to go on (`pad_wait_requested(player,
-## 0)`). "Leave game" frees a waiting seat like any other. The keyboard and virtual devices never
-## wait.
+## presses something (a release or a stick at rest is no sign of life: a pad pulled out may still
+## flush them); else the first gamepad not seated that presses `join` takes the waiting seat (the
+## lowest, before any free slot), and the keyboard's `join` takes this machine's first seat when
+## that one waits (so a player alone whose only pad died is never stuck). Then the game is asked to
+## go on (`pad_wait_requested(player, 0)`). "Leave game" frees a waiting seat like any other. The
+## keyboard and virtual devices never wait.
 ##
 ## **This machine's seats** (`set_own_seats(first, count)`; all four, from P1, unless told): the
 ## slots its real devices may take from then on. The keyboard takes only the first of them and a gamepad the
@@ -423,7 +425,7 @@ func handle_event(event: InputEvent) -> void:
 		if event.is_action_pressed(JOIN):
 			# A waiting seat comes before any free slot (and before whoever else gives seats out:
 			# the seat is this machine's already).
-			var waiting: int = _waiting.find(true) if _is_gamepad(device) else NO_PLAYER
+			var waiting: int = _waiting_seat_for(device)
 			if waiting != NO_PLAYER:
 				_take_back(waiting, device)
 			elif device != KEYBOARD and is_keyboard_provisional() and not join_asker.is_valid():
@@ -431,8 +433,10 @@ func handle_event(event: InputEvent) -> void:
 			else:
 				join(device)
 		return
-	# A gamepad that speaks is plugged in, whether or not its connection was told.
+	# A gamepad that presses something is plugged in, whether or not its connection was told.
 	if _waiting[player]:
+		if not _is_sign_of_life(event):
+			return
 		_take_back(player, device)
 	# The keyboard in use for real (a key or a click) keeps P1.
 	if device == KEYBOARD and _keyboard_provisional and event.is_pressed() and (event is InputEventKey or event is InputEventMouseButton):
@@ -722,6 +726,24 @@ static func _is_gamepad(device: int) -> bool:
 	return device >= 0 and not is_virtual(device)
 
 
+## The waiting seat a device not seated takes with its `join`, or NO_PLAYER: a gamepad the lowest,
+## the keyboard only this machine's first seat (the one it may hold).
+func _waiting_seat_for(device: int) -> int:
+	if _is_gamepad(device):
+		return _waiting.find(true)
+	if device == KEYBOARD and _own_count > 0 and _waiting[_own_first]:
+		return _own_first
+	return NO_PLAYER
+
+
+## Whether an event from a waiting seat's own gamepad says it is in hand: a press, or a stick or
+## trigger pushed past the dead zone (never a release or an axis at rest).
+static func _is_sign_of_life(event: InputEvent) -> bool:
+	if event is InputEventJoypadMotion:
+		return absf((event as InputEventJoypadMotion).axis_value) > DEADZONE
+	return event.is_pressed()
+
+
 ## Seat `player`'s gamepad is gone: the seat stays, lets go of everything it held, and the game is
 ## asked to stop until it is back.
 func _wait(player: int) -> void:
@@ -732,12 +754,16 @@ func _wait(player: int) -> void:
 	_ask_wait(player, true)
 
 
-## The waiting seat `player` plays again, on the gamepad `device` (its own back, or another that
-## took its place): the game is asked to go on.
+## The waiting seat `player` plays again, on `device` (its own gamepad back, another that took its
+## place, or the keyboard): the game is asked to go on.
 func _take_back(player: int, device: int) -> void:
 	_waiting[player] = false
 	_devices[player] = device
-	_pad_kind[player] = GlyphsScript.kind_of_pad(String(joy_name_provider.call(device)))
+	if device == KEYBOARD:
+		_keyboard_provisional = false
+		_pad_kind[player] = GlyphsScript.Kind.GAMEPAD
+	else:
+		_pad_kind[player] = GlyphsScript.kind_of_pad(String(joy_name_provider.call(device)))
 	_clear_state(player)
 	_ask_wait(player, false)
 	glyph_kind_changed.emit(player)

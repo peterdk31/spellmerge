@@ -549,8 +549,11 @@ func _on_activated(player: int, control: Control) -> void:
 		if _events != null:
 			_events.seat_leave_requested.emit(player)
 	elif control == _leave_waiting:
-		if _events != null and waiting_seat() >= 0:
-			_events.seat_leave_requested.emit(waiting_seat())
+		var seat: int = waiting_seat()
+		if _events != null and seat >= 0:
+			# Gone from the row at once, so a second press never asks again before co-op says so.
+			set_waiting_seats(_waiting_seats & ~(1 << seat))
+			_events.seat_leave_requested.emit(seat)
 	elif control == _main_menu:
 		# Closed first, so the game is let go before this machine leaves it.
 		close_menu()

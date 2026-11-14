@@ -145,7 +145,7 @@ signal device_left(player: int, device: int)
 ## it stops at one tick on every machine and in a replay.
 signal pad_wait_requested(player: int, on: int)
 ## Sender: coop. The seats the game stands stopped for because their gamepad is unplugged, a bit
-## each (0: none), sent whenever a seat starts or stops waiting and when a room is entered. Heard
+## each (0: none), sent whenever a seat starts or stops waiting. Heard
 ## by hud (the line that says whose controller is gone; the pause menu).
 signal pad_wait_changed(seats: int)
 

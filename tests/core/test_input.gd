@@ -37,6 +37,8 @@ func _initialize() -> void:
 	_test_unplugged_gamepad_keeps_its_seat()
 	_test_another_gamepad_takes_a_waiting_seat()
 	_test_a_waiting_seat_can_leave()
+	_test_a_dead_pads_releases_do_not_end_the_wait()
+	_test_the_keyboard_takes_its_own_waiting_seat()
 	_test_virtual_device_every_index()
 	_test_virtual_device_slot_taken()
 	_test_virtual_device_is_not_joinable_by_button()
@@ -469,6 +471,42 @@ func _test_a_waiting_seat_can_leave() -> void:
 	_manager._on_joy_connection_changed(1, false)
 	_check(_manager.set_own_seats(2, 2), "seats given")
 	_check(_manager.player_of(0) == 2 and _manager.player_of(1) == NO_PLAYER and not _manager.is_waiting(1) and not _manager.is_waiting(3), "the waiting seat left, the other moved")
+
+
+## A pad pulled out may still flush a release or a stick back at rest: no sign it is in hand.
+func _test_a_dead_pads_releases_do_not_end_the_wait() -> void:
+	_setup()
+	_press_join(0)
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 1.0))
+	_manager._on_joy_connection_changed(0, false)
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 0.0))
+	_manager.handle_event(_button(0, JOY_BUTTON_RIGHT_SHOULDER, false))
+	_manager.handle_event(_axis(0, JOY_AXIS_RIGHT_X, 0.1))
+	_check(_manager.is_waiting(0), "releases and a stick at rest keep the seat waiting")
+	_check(_manager.get_move(0) == Vector2.ZERO, "and the seat still holds nothing")
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 0.8))
+	_check(not _manager.is_waiting(0), "a stick pushed is a pad in hand")
+
+
+## A player alone whose only pad died goes on with the keyboard (on P1, the seat it may hold).
+func _test_the_keyboard_takes_its_own_waiting_seat() -> void:
+	_setup()
+	var asked: Array = []
+	_bus.pad_wait_requested.connect(func(player: int, on: int) -> void: asked.append([player, on]))
+	_press_join(0)
+	_manager._on_joy_connection_changed(0, false)
+	_log.clear()
+	_manager.handle_event(_key(KEY_ENTER))
+	_check(_manager.device_of(0) == InputManagerScript.KEYBOARD and not _manager.is_waiting(0), "the keyboard's join takes P1 back")
+	_check(asked == [[0, 1], [0, 0]] and _log.is_empty(), "the game goes on, and no seat left or joined: %s %s" % [asked, _log])
+	_check(not _manager.is_keyboard_provisional(), "the keyboard holds it for good")
+	# Only its own seat: a waiting P2 is a gamepad's to take.
+	_manager.leave(0)
+	_press_join(0)
+	_press_join(1)
+	_manager._on_joy_connection_changed(1, false)
+	_manager.handle_event(_key(KEY_ENTER))
+	_check(_manager.is_waiting(1) and _manager.player_of(InputManagerScript.KEYBOARD) == NO_PLAYER, "the keyboard takes no other waiting seat")
 
 
 func _test_virtual_device_every_index() -> void:

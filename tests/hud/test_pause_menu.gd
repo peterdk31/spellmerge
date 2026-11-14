@@ -909,6 +909,7 @@ func _test_a_waiting_seat_is_named_and_can_be_let_go() -> void:
 	_press(0, "LeaveWaiting")
 	_check(not _input.is_joined(1) and _input.is_joined(0), "only the waiting seat left")
 	_check(_menu().is_open(), "the menu stays open")
+	_check(not _names().has("LeaveWaiting"), "the row goes at once, so a second press asks nothing")
 	_bus.pad_wait_changed.emit(0)
 	_check(not line.visible and not _names().has("LeaveWaiting"), "nobody waits: no line, no row: %s" % [_names()])
 	# A seat that waits on another machine is not this menu's to let go.
@@ -916,3 +917,10 @@ func _test_a_waiting_seat_is_named_and_can_be_let_go() -> void:
 	_check(line.visible and line.text.contains("P3") and not _names().has("LeaveWaiting"), "another machine's waiting seat is named, not offered")
 	_bus.main_menu_requested.emit(0)
 	_check(not line.visible, "back at the main menu no line stays")
+	# A waiting seat's builder closes too, as when a device left.
+	_setup(2)
+	_bus.room_entered.emit(&"test_room")
+	_hud.get_radial(1).open_builder()
+	_check(_hud.get_radial(1).is_open(), "seat 1's builder is open")
+	_bus.pad_wait_changed.emit(1 << 1)
+	_check(not _hud.get_radial(1).is_open() and not _input.is_captured(1), "a waiting seat's builder closes and frees it")

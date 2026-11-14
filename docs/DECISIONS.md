@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-14: the review's leftovers (items I7b)
+
+- **A downed body's menu requests are refused, not held for later:** a request that arrives while the home body is down (the HUD has closed both menus, so only a late frame brings one) is answered with `NO_DOWN` and changes nothing. Holding it until the body is up would apply a change the player no longer sees; refusing it is one check per request in the player controller and says why.
+- **The builder takes the inventory's mirror whole,** its card bag too, rather than only the staffs and hands: one copy of what the seat said, written once.
+
 ## 2026-11-14: the inventory (items I7)
 
 - **The drop command is `bag_drop_requested`, not the plan's `item_drop_requested`:** that name is already the inventory's word to the Items area, carrying a stack object no frame can hold. The HUD's command names a staff by its number (`staff`), anything else by its bag and id, one copy at a time; the inventory lets it go and says `item_drop_requested`, so the Items area lays a menu's drop exactly as a card given back to a full bag (I6), a step from the body, away from the item in reach.

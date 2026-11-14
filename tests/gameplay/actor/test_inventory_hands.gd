@@ -4,7 +4,7 @@ extends "res://tests/support/suite.gd"
 ## one hand onto another (the two change places) and off a hand into the bag, each keeping its
 ## number, its cards and its mana; a staff or a card dropped; every refusal changes nothing; and the
 ## player controller's commands (`staff_hand_requested`, `bag_drop_requested`), whose refusals are
-## `inventory_refused`.
+## `inventory_refused`, every request refused while the body is down (items I7b).
 ##
 ## godot --headless --path . --script res://tests/gameplay/actor/test_inventory_hands.gd
 
@@ -205,6 +205,36 @@ func test_the_commands_go_to_the_seats_own_inventory() -> void:
 	_world.bus.staff_hand_requested.emit(0, 9, 1)
 	_world.bus.bag_drop_requested.emit(0, CARDS, &"rune", Inventory.NO_STAFF)
 	check_equal(_refused, [[0, PlayerController.NO_STAFF], [0, PlayerController.NO_ITEM]], "refusals are said in words, to the seat")
+
+
+## Items I7b: a downed body's builder and inventory requests are refused by the simulation, each
+## in words and changing nothing (the HUD closes both menus, but a late frame can still bring one).
+func test_a_downed_body_refuses_every_request() -> void:
+	var body := _wizard()
+	var built: Array = []
+	_world.bus.build_refused.connect(func(player: int, reason: String) -> void: built.append([player, reason]))
+	_world.hurt(body, 1000)
+	_world.run(1)
+	check(body.is_down(), "the wizard is down")
+	var hands: PackedInt32Array = body.inventory.hands()
+	var cards: Array[StringName] = body.inventory.plan_of(0).get("cards", []).duplicate()
+	var fire: int = body.inventory.count_of(CARDS, &"fire")
+	_world.bus.staff_hand_requested.emit(0, 4, 1)
+	_world.bus.bag_drop_requested.emit(0, CARDS, &"fire", Inventory.NO_STAFF)
+	_world.bus.bag_drop_requested.emit(0, STAFFS, &"test", 2)
+	_world.bus.staff_change_requested.emit(0, 0, 1, &"fire")
+	_world.bus.staff_cards_requested.emit(0, 0, _ids("- fire"))
+	check_equal(body.inventory.hands(), hands, "no staff moved")
+	check_equal(body.inventory.count_of(CARDS, &"fire"), fire, "no card dropped or spent")
+	check_equal(body.inventory.plan_of(0).get("cards", []), cards, "the staff unbuilt")
+	check(_dropped.is_empty(), "nothing on the ground")
+	check_equal(_refused, [[0, PlayerController.NO_DOWN], [0, PlayerController.NO_DOWN], [0, PlayerController.NO_DOWN]], "the inventory's refused in words")
+	check_equal(built, [[0, PlayerController.NO_DOWN], [0, PlayerController.NO_DOWN]], "and the builder's")
+	Fixture.downed(body).revive(1)
+	_world.run(1)
+	check(not body.is_down(), "up again")
+	_world.bus.staff_hand_requested.emit(0, 4, 1)
+	check_equal(body.inventory.hands()[1], 4, "requests are heard again once up")
 
 
 ## The commands cross the wire as every other: a frame with them decodes to the same.

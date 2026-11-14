@@ -1,6 +1,6 @@
 # Items: things a body picks up, holds in bags and drops
 
-**Status (2026-11-13): planned with the owner in an owner session** (the owner, after the last round: "Go ahead"); this document is step I1. I2 to I7 are built (below, "I2 done" to "I7 done"); I7b (the review's leftovers, owner 2026-11-14) is next, in a session of its own, then I8. Asked by the owner: "Let's design a plan for having item pickups in the game. The first thing we need is staff pickups."
+**Status (2026-11-13): planned with the owner in an owner session** (the owner, after the last round: "Go ahead"); this document is step I1. I2 to I7 are built (below, "I2 done" to "I7 done"); I7b (the review's leftovers, owner 2026-11-14) is built too ("I7b done"); I8 is next. Asked by the owner: "Let's design a plan for having item pickups in the game. The first thing we need is staff pickups."
 
 The steps are **I1 to I9** (I for items). Each is one PR with its tests, in order.
 
@@ -177,6 +177,8 @@ This document, the roadmap's exception and the decisions.
 - **The builder on the inventory's mirror.** The radial builder keeps its own copy of `owned_staff_changed`, `hands_changed` and `inventory_announced` (`_plans`, `_hands`, `_strip_order`); it takes up `hud/widgets/inventory_mirror.gd` instead, so the two menus never drift and the reset on `inventory_announced` is written once. No change in behaviour: the builder's tests pass as they are.
 - **A downed body's requests are refused by the simulation.** The HUD closes the builder and the inventory at 0 health, but the player controller still applies `staff_change_requested`, `staff_cards_requested`, `staff_hand_requested` and `bag_drop_requested` for a downed home body (a command can still arrive, a late frame online). It refuses them there, with words of its own.
 - Tests: the builder's existing tests and a regression for a wizard said anew (`tests/hud/test_inventory_menu.gd` has one); each request refused while down, changing nothing.
+
+**I7b done (2026-11-14).** The radial builder keeps an `InventoryMirror` (`hud/widgets/inventory_mirror.gd`) in place of `_plans` and `_hands`: `owned_staff_changed`, `hands_changed` and `bag_changed` go into it, `inventory_announced` clears it, and the strip is its `staffs()` (the builder's `_strip_order` is gone); the card ring reads the card bag's counts from it. No change in behaviour. The player controller refuses `staff_change_requested`, `staff_cards_requested`, `staff_hand_requested` and `bag_drop_requested` while the home body is down (`PlayerController.NO_DOWN`, "You cannot do that while down.", as `build_refused` or `inventory_refused`), changing nothing; up again, they are heard. Tests: `tests/hud/test_radial_builder_bags.gd` (a wizard said anew forgets the staffs before, the strip follows the hands), `tests/gameplay/actor/test_inventory_hands.gd` (every request refused while down, heard again once up). The replay tests' scripted rebuild (`tests/support/replay_run.gd`, `REBUILD_AT`) moved from tick 100 to tick 3: the sandbox's shots had downed the wizard by then, so the new rule refused it.
 
 ## I8: the HUD follows the driven body
 

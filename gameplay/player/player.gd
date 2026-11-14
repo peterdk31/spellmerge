@@ -48,6 +48,8 @@ extends ActorController
 ##   this seat only, a staff named by its number) puts the home body's staffs on hands, in the bag
 ##   and on the ground, and drops its things (`Inventory.set_hand`, `drop_staff`, `drop`); a
 ##   refusal is `inventory_refused` with its words.
+## - **Down** (items I7b): while the home body is down every request of the builder's and the
+##   inventory's is refused (NO_DOWN, as `build_refused` or `inventory_refused`) and changes nothing.
 ## - **The card bag** (each run mode's, from flow through `seat_wizard`: card id to copies,
 ##   `Inventory.give_cards`); a wizard given none gets Inventory.DEV_COPIES of every card in the
 ##   registry when it first drives.
@@ -80,6 +82,9 @@ const NO_CARD: String = "You do not have that card."
 const NO_HAND: String = "You have no such hand."
 const NO_ROOM: String = "That bag is full."
 const NO_ITEM: String = "You do not have that."
+## Why every request of the builder's and the inventory's is refused while the home body is down
+## (items I7b): the HUD closes both menus then, but a command can still arrive (a late frame online).
+const NO_DOWN: String = "You cannot do that while down."
 const REFUSALS: Dictionary = {
 	Inventory.Refusal.NO_STAFF: NO_STAFF, Inventory.Refusal.NO_SLOT: NO_SLOT,
 	Inventory.Refusal.NO_CARD: NO_CARD, Inventory.Refusal.NO_HAND: NO_HAND,
@@ -486,9 +491,17 @@ func _builder_inventory() -> Inventory:
 	return _home.inventory if _home != null else null
 
 
+## True while the home body is down: its builder's and inventory's requests are refused (items I7b).
+func _home_down() -> bool:
+	return _home != null and _home.is_down()
+
+
 ## A builder asked to put `card_id` into `slot` of staff number `number` (`&""` empties it).
 func _on_staff_change_requested(player: int, number: int, slot: int, card_id: StringName) -> void:
 	if player != seat:
+		return
+	if _home_down():
+		_refuse(NO_DOWN)
 		return
 	var inventory: Inventory = _builder_inventory()
 	_answer(inventory.set_card(number, slot, card_id) if inventory != null else Inventory.Refusal.NO_STAFF)
@@ -498,6 +511,9 @@ func _on_staff_change_requested(player: int, number: int, slot: int, card_id: St
 ## the staff's slots empties the rest). Refused, and nothing changes, as `Inventory.set_cards` says.
 func _on_staff_cards_requested(player: int, number: int, cards: Array[StringName]) -> void:
 	if player != seat:
+		return
+	if _home_down():
+		_refuse(NO_DOWN)
 		return
 	var inventory: Inventory = _builder_inventory()
 	_answer(inventory.set_cards(number, cards) if inventory != null else Inventory.Refusal.NO_STAFF)
@@ -514,6 +530,9 @@ func _answer(refusal: Inventory.Refusal) -> void:
 func _on_staff_hand_requested(player: int, number: int, hand: int) -> void:
 	if player != seat:
 		return
+	if _home_down():
+		_refuse_inventory(NO_DOWN)
+		return
 	var inventory: Inventory = _builder_inventory()
 	_answer_inventory(inventory.set_hand(number, hand) if inventory != null else Inventory.Refusal.NO_STAFF)
 
@@ -522,6 +541,9 @@ func _on_staff_hand_requested(player: int, number: int, hand: int) -> void:
 ## (items I7): `Inventory.drop_staff` or `drop`, refused as they say.
 func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number: int) -> void:
 	if player != seat:
+		return
+	if _home_down():
+		_refuse_inventory(NO_DOWN)
 		return
 	var inventory: Inventory = _builder_inventory()
 	var refusal: Inventory.Refusal = Inventory.Refusal.NO_ITEM
@@ -532,5 +554,10 @@ func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number
 
 ## A refusal of the inventory menu's to the seat (`inventory_refused`); nothing for a change made.
 func _answer_inventory(refusal: Inventory.Refusal) -> void:
-	if refusal != Inventory.Refusal.NONE and _home != null and _home.events != null:
-		_home.events.inventory_refused.emit(seat, str(REFUSALS.get(refusal, NO_ITEM)))
+	if refusal != Inventory.Refusal.NONE:
+		_refuse_inventory(str(REFUSALS.get(refusal, NO_ITEM)))
+
+
+func _refuse_inventory(reason: String) -> void:
+	if _home != null and _home.events != null:
+		_home.events.inventory_refused.emit(seat, reason)

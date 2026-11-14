@@ -35,8 +35,9 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const CoopScript := preload("res://gameplay/coop/coop.gd")
 
-## The tick the scripted run's "HUD" rebuilds staff 0 (a command).
-const REBUILD_AT: int = 100
+## The tick the scripted run's "HUD" rebuilds staff 0 (a command): early, while the wizard stands
+## (the sandbox's shots down it within a second, and a downed body's requests are refused, items I7b).
+const REBUILD_AT: int = 3
 const REBUILT: Array[StringName] = [&"triple", &"fire", &"bolt"]
 ## The ticks the scripted run's pause menu opens and closes (the command `pause_requested`): the game
 ## stands stopped between, and a replay stands stopped there too (online-ready N4).

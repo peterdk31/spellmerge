@@ -196,6 +196,34 @@ func test_a_drop_lands_a_step_away_from_the_next_item_and_never_in_a_wall() -> v
 	check_equal(_items.drop_spot(Vector2(100, 100)), Vector2(100, 100), "walled in: at the feet")
 
 
+## Regression (review): cards dropped together never pile up: each lands on a spot of its own.
+func test_cards_dropped_together_each_land_on_a_spot_of_their_own() -> void:
+	var body := _wizard(0, Vector2(100, 100), [true, false, false, false], {&"bolt": 1, &"fire": 1, &"frost": 1})
+	check_equal(body.inventory.set_cards(0, [&"bolt", &"fire", &"frost"] as Array[StringName]), Inventory.Refusal.NONE, "three in")
+	body.inventory.set_capacity(CARDS, 0)
+	check_equal(body.inventory.set_cards(0, [] as Array[StringName]), Inventory.Refusal.NONE, "all out")
+	var lying: Array[GroundItem] = _items.lying()
+	check_equal(lying.size(), 3, "all three lie on the ground")
+	for i in lying.size():
+		for j in range(i + 1, lying.size()):
+			check(lying[i].at.distance_to(lying[j].at) >= 2.0 * ItemsScript.DROP_RADIUS, "%s and %s lie apart (%s, %s)" % [lying[i].stack.id, lying[j].stack.id, lying[i].at, lying[j].at])
+
+
+## Regression (review): a restore over a ground that holds what the snapshot does not tells this
+## machine's looks that it is gone.
+func test_a_restore_says_gone_what_the_snapshot_does_not_hold() -> void:
+	_wizard(0, Vector2.ZERO)
+	_items.lay(ItemStack.card(&"bolt"), Vector2(60, 0))
+	var areas: Dictionary = {&"Items": _items}
+	var snapshot: Snapshot = Snapshot.take(areas, root)
+	var later: int = _items.lay(ItemStack.card(&"fire"), Vector2(90, 0))
+	_ground.clear()
+	check_equal(snapshot.restore(areas, root), PackedStringArray(), "restored")
+	check(_ground.has([later, true]), "the card laid after the snapshot is said gone: %s" % [_ground])
+	check(_ground.has([0, false]), "the one it holds is said again")
+	check_equal(_items.lying().size(), 1, "one lies there")
+
+
 func test_a_runs_start_clears_the_ground() -> void:
 	_wizard(0, Vector2.ZERO)
 	var item: int = _items.lay(ItemStack.card(&"bolt"), Vector2(5, 0))

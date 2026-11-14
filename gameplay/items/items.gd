@@ -8,7 +8,8 @@ extends Node
 ## - **Laid:** the room's placements (`room_items_placed`, from flow: each `ItemStandIn`'s data, one
 ##   copy each, `ItemKinds.stack_of`), and a drop (`item_drop_requested`, from an actor's Inventory:
 ##   a card given back to a full bag), which lands a step from the body at the first free spot of
-##   DIRECTIONS (no wall, no standing body's ground, no wall between: `ProjectileManager`'s grid),
+##   DIRECTIONS (no item lying there, no wall, no standing body's ground, no wall between:
+##   `ProjectileManager`'s grid),
 ##   tried from the side away from the item the body would take next, the same on every machine.
 ## - **In reach:** each tick (its step, `Tick.STEPS` "Items", after the bodies moved) it finds, for
 ##   the body each seat drives, the item in reach (`PickupRule.nearest`; none for a body with no
@@ -19,7 +20,9 @@ extends Node
 ##   two takes it) is one caller and an AI (I9) another. No room is `item_refused` for the seat.
 ## - **Said:** `ground_item_changed` as each item is laid and goes, with its view (`view_of`: plain
 ##   values for Feel's look and the HUD's hint). After a snapshot is restored it says everything
-##   again (`rebuild_derived`), for the looks of the machine it was restored on.
+##   again (`rebuild_derived`), for the looks of the machine it was restored on: gone for what they
+##   drew that no longer lies there, then every row. The ground is cleared at a run's start (also
+##   the one back to the main menu), never by a room left alone.
 ##
 ## It knows nothing of the HUD, the AI or `net/`, and calls no other area: it hears events, reads
 ## the actor table and asks the projectile manager's wall grid.
@@ -37,7 +40,8 @@ enum Take { TAKEN, GONE, NO_HOLDER, OUT_OF_REACH, NO_ROOM }
 ## How far from the feet a drop lands, then nearer if every way is blocked, in pixels; past both,
 ## at the feet.
 const DROP_STEPS: PackedFloat32Array = [18.0, 9.0]
-## The room an item takes on the ground: a drop's spot is free of walls this far round.
+## The room an item takes on the ground: a drop's spot is free of walls this far round, and of
+## every item lying there twice as far (no piles on the ground).
 const DROP_RADIUS: float = 4.0
 ## The ways a drop may land, clockwise from below (towards the camera); tried in order of how far
 ## each points away from the item the body would take next, this order on a tie.
@@ -45,11 +49,9 @@ const DIRECTIONS: Array[Vector2] = [
 	Vector2(0.0, 1.0), Vector2(-0.70710678, 0.70710678), Vector2(-1.0, 0.0), Vector2(-0.70710678, -0.70710678),
 	Vector2(0.0, -1.0), Vector2(0.70710678, -0.70710678), Vector2(1.0, 0.0), Vector2(0.70710678, 0.70710678),
 ]
-## The card folder the views name cards from.
-const CARDS_FOLDER: StringName = &"spells"
 
-## Not state: services, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"registry"]
+## Not state: services, set up again, and what this machine's looks were told (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"events", &"actors", &"projectiles", &"registry", &"_said"]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads.
 var events: EventsScript = null
@@ -61,6 +63,9 @@ var registry: RegistryScript = null
 var _rows: Array[GroundItem] = []
 ## The number the next item laid gets.
 var _next_number: int = 0
+## The item numbers this machine's looks were last told lie there (`ground_item_changed`): a
+## restore tells them gone for those it no longer holds. Not state: what was said here.
+var _said: Dictionary = {}
 ## By seat: the item last said in reach (`item_near_changed`), NONE for none.
 var _near: PackedInt32Array = PackedInt32Array([NONE, NONE, NONE, NONE])
 
@@ -122,8 +127,7 @@ func lay(stack: ItemStack, at: Vector2, title: String = "") -> int:
 	var row := GroundItem.make(_next_number, at, stack.copy(), title)
 	_next_number += 1
 	_rows.append(row)
-	if events != null:
-		events.ground_item_changed.emit(row.number, row.at, view_of(row))
+	_say_laid(row)
 	return row.number
 
 
@@ -149,7 +153,7 @@ func take(actor: int, item: int) -> Take:
 
 ## Where a drop from feet at `feet` lands: a step away (DROP_STEPS), the first free way of
 ## DIRECTIONS taken from the side away from `away` (the item the body would take next; none: from
-## below), at the feet when every way is blocked.
+## below), at the feet when every way is blocked (by walls or by items lying there).
 func drop_spot(feet: Vector2, away: Vector2 = Vector2.INF) -> Vector2:
 	var order: Array[int] = _ways_from(feet, away)
 	for distance in DROP_STEPS:
@@ -188,22 +192,28 @@ func view_of(row: GroundItem) -> Dictionary:
 		view["mana_regen"] = base.mana_regen
 		view["cards"] = stack.cards.duplicate()
 		return view
-	var content: Resource = registry.get_resource(CARDS_FOLDER, stack.id) if registry != null and stack.kind == ItemKinds.CARD else null
-	if content is SpellComponent:
-		if row.title == "":
-			view["name"] = (content as SpellComponent).display_name
-		view["icon"] = (content as SpellComponent).icon
+	var content: Resource = _content_of(stack)
+	if content != null:
+		if row.title == "" and "display_name" in content:
+			view["name"] = String(content.get(&"display_name"))
+		if "icon" in content:
+			view["icon"] = content.get(&"icon") as Texture2D
 	if String(view["name"]) == "":
 		view["name"] = String(stack.id)
 	return view
 
 
-## Say everything again (a snapshot restored: the looks of this machine know nothing of it).
+## Say everything again (a snapshot restored: the looks of this machine drew what lay here
+## before): gone for what it told them of that no longer lies there, then every row.
 func rebuild_derived() -> void:
 	if events == null:
 		return
+	for number: int in _said.keys():
+		if _index_of(number) < 0:
+			_said.erase(number)
+			events.ground_item_changed.emit(number, Vector2.ZERO, {})
 	for row: GroundItem in _rows:
-		events.ground_item_changed.emit(row.number, row.at, view_of(row))
+		_say_laid(row)
 	for seat in SEATS:
 		var item: int = _near[seat]
 		var at: int = _index_of(item)
@@ -256,6 +266,17 @@ func _holder(actor: int) -> Actor:
 	return body if body != null and body.inventory != null else null
 
 
+## The content `stack` is one of, from its kind's folders (`ItemKinds.content_of`), or null.
+func _content_of(stack: ItemStack) -> Resource:
+	if registry == null:
+		return null
+	for folder: StringName in ItemKinds.content_of(stack.kind):
+		var found: Resource = registry.get_resource(folder, stack.id)
+		if ItemKinds.is_content(stack.kind, found):
+			return found
+	return null
+
+
 func _index_of(item: int) -> int:
 	if item == NONE:
 		return -1
@@ -278,7 +299,14 @@ func _set_near(seat: int, item: int) -> void:
 		events.item_near_changed.emit(seat, NONE, Vector2.ZERO, {})
 
 
+func _say_laid(row: GroundItem) -> void:
+	_said[row.number] = true
+	if events != null:
+		events.ground_item_changed.emit(row.number, row.at, view_of(row))
+
+
 func _say_gone(row: GroundItem) -> void:
+	_said.erase(row.number)
 	if events != null:
 		events.ground_item_changed.emit(row.number, row.at, {})
 
@@ -306,9 +334,12 @@ func _ways_from(feet: Vector2, away: Vector2) -> Array[int]:
 	return order
 
 
-## True when an item may lie at `spot`, dropped from `feet`: no wall or standing ground round it and
-## none between.
+## True when an item may lie at `spot`, dropped from `feet`: no item lying there, no wall or
+## standing ground round it and none between.
 func _free(feet: Vector2, spot: Vector2) -> bool:
+	for row: GroundItem in _rows:
+		if row.at.distance_squared_to(spot) < 4.0 * DROP_RADIUS * DROP_RADIUS:
+			return false
 	if projectiles == null:
 		return true
 	return not projectiles.circle_blocked(spot, DROP_RADIUS) and projectiles.line_clear(feet, spot)

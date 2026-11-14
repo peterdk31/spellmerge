@@ -35,8 +35,10 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const CARD: StringName = &"card"
 const ENEMY: StringName = &"enemy"
 const ITEM: StringName = &"item"
-## The tick seat 0 asks for the item lying by it (an ITEM fight).
-const TAKE_TICK: int = 10
+## The tick seat 0 asks for the item lying by it (an ITEM fight): after every tick a fight is
+## snapshotted at (test_content_determinism.gd's SNAPSHOT_TO), so a snapshot holds it lying and
+## the take is played after the restore.
+const TAKE_TICK: int = 245
 ## Where the item lies, from seat 0's wizard.
 const ITEM_FROM: Vector2 = Vector2(6.0, 0.0)
 ## The game's tick.

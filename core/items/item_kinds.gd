@@ -108,21 +108,29 @@ static func premade_of(kind: StringName) -> Array[StringName]:
 ## staff its staff with its cards (`StaffItem.stack`), a staff empty, a card one copy; null for
 ## anything that is no kind's (a kind with no class of its own included).
 static func stack_of(resource: Resource) -> ItemStack:
+	var kind: StringName = kind_of(resource)
+	if kind == &"":
+		return null
 	if resource is StaffItem:
 		return (resource as StaffItem).stack()
+	if resource is StaffBase:
+		return ItemStack.of_staff(resource as StaffBase)
+	var made := ItemStack.new()
+	made.kind = kind
+	made.id = StringName(str(resource.get(&"id")))
+	return made
+
+
+## The kind `resource` is one of as `stack_of` would make it (`&""`: no kind's), without making
+## the stack.
+static func kind_of(resource: Resource) -> StringName:
+	if resource is StaffItem:
+		return STAFF if (resource as StaffItem).staff != null else &""
 	for kind: StringName in RULES:
 		if StringName(_row(kind).get("type", NO_CLASS)) == NO_CLASS or not is_content(kind, resource):
 			continue
-		var id: StringName = StringName(str(resource.get(&"id")))
-		if id == &"":
-			return null
-		if resource is StaffBase:
-			return ItemStack.of_staff(resource as StaffBase)
-		var made := ItemStack.new()
-		made.kind = kind
-		made.id = id
-		return made
-	return null
+		return kind if StringName(str(resource.get(&"id"))) != &"" else &""
+	return &""
 
 
 ## True when one held of `kind` can be `action`ed (DROP, DROP_ONE, HAND, USE).

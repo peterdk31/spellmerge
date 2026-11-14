@@ -94,8 +94,8 @@ signal run_requested(player: int)
 ## Sender: hud. `player` pressed A (`accept`; F on the keyboard) with no menu open while the item
 ## `item` lay in reach of the body they drive (`item_near_changed`; the lit stone comes first, the
 ## altar after): take it (items I6). A command: heard by items at the next tick's start, which takes
-## it if it still lies in reach and its bag has room, else says `item_refused` (an item gone
-## meanwhile, taken by a seat before it in that tick, says nothing).
+## it if it still lies in reach and its bag has room; no room says `item_refused`, an item gone
+## meanwhile (taken by a seat before it in that tick) or out of reach by then says nothing.
 signal item_take_requested(player: int, item: int)
 ## `player` picked a sandbox action on the pause menu's sandbox page: `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).
 signal sandbox_action_requested(player: int, action: StringName)
@@ -330,14 +330,14 @@ signal room_items_placed(items: Array[Resource], at: PackedVector2Array)
 ## which finds the spot; heard by nobody, the stack is lost.
 signal item_drop_requested(actor: int, stack: ItemStack)
 ## Sender: items. The item `item` (its number on the ground, never handed out again in a run) lies at
-## `at` as `view` says, or (an empty `view`) is gone: taken, or its room left. `view` is plain
+## `at` as `view` says, or (an empty `view`) is gone: taken, or the ground cleared at a run's start. `view` is plain
 ## values for the looks (`Items.view_of`): `kind`, `id`, `name`, `icon` (a Texture2D or null), and
 ## for a staff `head` (its head sheet), `slots`, `cooldown`, `max_mana`, `mana_regen` and `cards`
 ## (card ids by slot). Sent as each one is laid and as it goes. Heard by feel (the look on the ground).
 signal ground_item_changed(item: int, at: Vector2, view: Dictionary)
 ## Sender: items. The item in reach of the body `player` drives now is `item`, lying at `at` as
 ## `view` says (`ground_item_changed`'s), or none (-1, an empty view). Sent when it changes, and
-## (-1) when the room is left. Heard by hud (the hint and its tooltip; A takes it,
+## (-1) when the ground is cleared at a run's start. Heard by hud (the hint and its tooltip; A takes it,
 ## `item_take_requested`).
 signal item_near_changed(player: int, item: int, at: Vector2, view: Dictionary)
 ## Sender: items. `player` asked for the item `item` and its bag has no room (items I6): nothing was

@@ -9,10 +9,11 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **The take command names the item** (`item_take_requested(player, item)`): the simulation takes the one the player saw, if it still lies in reach; one taken by an earlier seat that tick, or out of reach by then, is silent; only no room shakes the hint.
 - **A body takes things only with an Inventory:** a possessed enemy has none until I8, so it has nothing in reach.
 - **A card given back to a full bag drops at the feet** (I3's `BAG_FULL` refusal is gone, as planned): the inventory says `item_drop_requested` on the bus, and the Items area finds the spot. The cards taken out first free their room, then what is given back fills it in the staff's order, and the rest drops a copy each.
-- **A drop's spot is a table, not an angle:** eight ways, tried furthest from the next item first, at two distances, checked against the projectile manager's grid (walls and standing bodies' ground) and a clear line from the feet; plain `+ - *`, so no `DMath` is needed and every machine finds the same spot.
+- **A drop's spot is a table, not an angle:** eight ways, tried furthest from the next item first, at two distances, checked against the items lying there (none within twice its radius: cards dropped together never pile up), the projectile manager's grid (walls and standing bodies' ground) and a clear line from the feet; plain `+ - *`, so no `DMath` is needed and every machine finds the same spot.
 - **The hint is the HUD's, over the item as this machine's camera shows it** (`hud/panels/item_hints.gd`, placed each frame from the viewport's canvas transform), not a world label of Feel's like the altar's code: it needs each player's button glyph, which is the HUD's widget. Feel draws the item itself.
 - **F joins `accept`** on the keyboard (the plan's "F as well"). Space is in `accept` too (for menus) and is also `staff_1`, so a keyboard player casting by an item also takes it, as the lit stone already starts the run on Space; left as it is for now (noted in items.md, I7).
-- **After a snapshot is restored the Items area says everything again** (`rebuild_derived`): the looks of a machine restored into know nothing of what lies there.
+- **After a snapshot is restored the Items area says everything again** (`rebuild_derived`): gone for what this machine's looks were told of that the snapshot does not hold (a DERIVED record of what was said), then every row.
+- **The ground is cleared at a run's start only** (one room a run, and the main menu renews the services too), not when a room is left on its own.
 
 ## 2026-11-14: the player loadout (items I4)
 

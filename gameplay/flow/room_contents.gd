@@ -40,7 +40,7 @@ static func make_body(data: Resource) -> Node2D:
 
 ## True when the placed data `data` is an item (`ItemKinds.stack_of`): no body stands for it.
 static func is_item(data: Resource) -> bool:
-	return ItemKinds.stack_of(data) != null
+	return ItemKinds.kind_of(data) != &""
 
 
 ## The items `places` places (data `is_item`) and where each lies, in order: [Array[Resource],

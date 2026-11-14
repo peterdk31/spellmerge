@@ -161,8 +161,10 @@ var _break_left: float = 0.0
 var _fps: FpsCounterScript = null
 var _online_line: OnlineLineScript = null
 var _stone_line: StoneLineScript = null
-## Every player's hint over the item in reach (items I6).
+## Every player's hint over the item in reach (items I6), and by player whether a menu hides it
+## (filled each frame in place).
 var _item_hints: ItemHintsScript = null
+var _hint_menus: Array[bool] = [false, false, false, false]
 var _pad_line: PadLineScript = null
 
 
@@ -334,7 +336,7 @@ func _process(delta: float) -> void:
 ## Put every player's item hint over its item as the camera shows it now (none outside a room,
 ## and none for a player with a menu open). Called every frame; tests call it directly.
 func step_hints(delta: float) -> void:
-	var menus: Array[bool] = [false, false, false, false]
+	var menus: Array[bool] = _hint_menus
 	for player in PLAYER_COUNT:
 		menus[player] = not _in_room or _has_menu(player) or (_pause_menu != null and _pause_menu.is_open())
 	var viewport: Viewport = get_viewport()

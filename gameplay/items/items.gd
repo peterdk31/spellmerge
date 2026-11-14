@@ -17,7 +17,11 @@ extends Node
 ## - **Taken:** `take(actor, item)` gives the item to the actor's Inventory as the pickup rule says,
 ##   if it still lies in reach and there is room (`PickupRule.take`); keyed by actor, so a seat's
 ##   request (`item_take_requested`, a command at the tick's start: seats in order, so the first of
-##   two takes it) is one caller and an AI (I9) another. No room is `item_refused` for the seat.
+##   two takes it) is one caller and an AI another (`actor_take_requested`, items I9: during the
+##   tick, as its brain decides). No room is `item_refused` for the seat.
+## - **Looked at** (items I9): `ground_looked` asks what lies within a reach of some feet; `look`
+##   fills the asker's `GroundSight` at once, nearest first, each with whether the pickup rule's
+##   reach takes it. So the AI sees the ground without calling this area.
 ## - **Said:** `ground_item_changed` as each item is laid and goes, with its view (`view_of`: plain
 ##   values for Feel's look and the HUD's hint). After a snapshot is restored it says everything
 ##   again (`rebuild_derived`), for the looks of the machine it was restored on: gone for what they
@@ -99,6 +103,8 @@ func _ready() -> void:
 		return
 	events.room_items_placed.connect(_on_room_items_placed)
 	events.item_drop_requested.connect(_on_item_drop_requested)
+	events.ground_looked.connect(_on_ground_looked)
+	events.actor_take_requested.connect(_on_actor_take_requested)
 	# A command, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"item_take_requested", _on_item_take_requested)
 
@@ -162,6 +168,17 @@ func take(actor: int, item: int) -> Take:
 	_rows.remove_at(at)
 	_say_gone(row)
 	return Take.TAKEN
+
+
+## Fill `sight` with what lies within `reach` of `feet` (`GroundSight`: the nearest first, the
+## lower number on a tie, at most its MOST), each marked in reach as the pickup rule says.
+func look(feet: Vector2, reach: float, sight: GroundSight) -> void:
+	sight.clear()
+	var most: float = reach * reach
+	for row: GroundItem in _rows:
+		var far: float = feet.distance_squared_to(row.at)
+		if far <= most:
+			sight.add(row.number, row.at, far, PickupRule.in_reach(feet, row.at), row.stack)
 
 
 ## Where a drop from feet at `feet` lands: a step away (DROP_STEPS), the first free way of
@@ -301,6 +318,17 @@ func _on_item_take_requested(player: int, item: int) -> void:
 		return
 	if take(actors.actor_of_seat(player), item) == Take.NO_ROOM and events != null:
 		events.item_refused.emit(player, item)
+
+
+## An actor looked round its feet (`ground_looked`, items I9): its sight is filled at once.
+func _on_ground_looked(_actor: int, feet: Vector2, reach: float, sight: GroundSight) -> void:
+	if sight != null:
+		look(feet, reach, sight)
+
+
+## An actor takes `item` (`actor_take_requested`, items I9: an AI): as `take` says, silently.
+func _on_actor_take_requested(actor: int, item: int) -> void:
+	take(actor, item)
 
 
 # --- Inside -----------------------------------------------------------------------------

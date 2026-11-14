@@ -338,6 +338,16 @@ signal room_items_placed(room_id: StringName, items: Array[Resource], at: Packed
 ## the ground beside the actor `actor` (items I6: a card given back to a full bag). Heard by items,
 ## which finds the spot; heard by nobody, the stack is lost.
 signal item_drop_requested(actor: int, stack: ItemStack)
+## Sender: ai (an actor's brain; items I9). The actor `actor` looks at what lies within `reach` of
+## its feet at `feet`: the Items area fills `sight` at once (`GroundSight`: the nearest first, each
+## with whether the pickup rule's reach takes it). Heard by items; heard by nobody, `sight` stays
+## empty. An ask with its answer, so the AI never calls the Items area.
+signal ground_looked(actor: int, feet: Vector2, reach: float, sight: GroundSight)
+## Sender: ai (items I9). The actor `actor` takes the item `item` off the ground: heard by items,
+## which gives it to the actor's Inventory at once as a seat's `item_take_requested` does (it must
+## still lie in reach, and the pickup rule must find room); nothing is said when it cannot. Not a
+## command: the simulation asks it of itself, during the tick.
+signal actor_take_requested(actor: int, item: int)
 ## Sender: items. The item `item` (its number on the ground, never handed out again in a run) lies at
 ## `at` as `view` says, or (an empty `view`) is gone: taken, or the ground cleared at a run's start. `view` is plain
 ## values for the looks (`Items.view_of`): `kind`, `id`, `name`, `icon` (a Texture2D or null), and

@@ -72,6 +72,18 @@ Card lists are written in slot order (docs/milestones/M2-staffs.md, "Reading a s
     - **The room stands its own enemies** (the boss arena stands the broom by its `EnemyStandIn`), so the hub never holds one. Cleared, or everyone down, the party is back in the hub as it left it: its staffs carry over as through the stone, and nothing found in the trial comes back.
     - The Sandbox's enemy arena lists bosses too.
 28. **The boss can be deleted by deleting its folders** (owner, 2026-11-15: "Yes!"), as a spell card is: `content/bosses/old_broom/`, its staffs (`content/wizard/staffs/broom_*`), its arena (`content/rooms/crypt/boss_broom/`), its cues (`content/cues/broom_*`), and its lines in docs/STORY.md. Everything general stays ("General pieces"), the cracked pillar and the dust heap too, as ordinary props. So no general code, test or default may name the broom or be tuned to it: its numbers live in its own data, and a test that needs a boss makes its own or finds one through the registry. OB17 checks it once: with those folders deleted, the full suite (`tools/ptest.sh`) and `tools/check.sh` pass.
+29. **The bosses README is a guide to making a boss** (owner, 2026-11-15: "Yes, add it"), written in OB3 with the broom as its example and brought up to date by each step that adds a general piece. It says what a boss is (enemy data, its own staffs, actor stats, an AI profile, phases with their adds, a layered look, a room to try it in, its cues; no script of its own), how to start one from the broom's folders, and how to delete one (decision 28). It also holds **the table of what is still engine work**, so whoever designs the next boss sees at once whether it is data and art only or needs a general piece first. Each piece, once built, leaves the table and becomes data:
+
+    | Kind of boss | The general piece it needs first |
+    | --- | --- |
+    | Several bodies (twin staffs, a broom and its dustpan) | Bodies that share health or a phase, and a fight that ends when all are down |
+    | Parts and weak spots (a crystal to break on a giant staff) | Bodies attached to a body, each with its own health and hit shape |
+    | Changes the arena (floods it, raises walls, drops the floor) | Rooms whose layout changes in play, and floors that hurt |
+    | Too big for the screen, or attacking from its edge | A body the camera and the room frame differently |
+    | Hurt only after an action (a puzzle) | Invulnerability by a condition |
+    | Fights with the players' own builds (copies a staff) | Reading another body's cards (the inventory comes close) |
+
+    The rule stays the enemy AI's (docs/milestones/M2-enemy-ai.md): a new mechanic goes into the shared engine, so every enemy gains it, never into one boss.
 
 ## General pieces
 
@@ -247,7 +259,7 @@ New props show up in the hub's prop yard by themselves.
 | OB1 | This document | docs |
 | OB2 | The trial gate: the prop and its lectern, the picks (`trial_picked`, `HubRules`), the gate's light, the `trial_requested` start and the way back; the Sandbox's enemy arena lists bosses | content/props, content/rooms/hub, gameplay/flow, core/sim, gameplay/feel (the picks over the gate) |
 | OB2b | The lectern's room menu | hud/menus |
-| OB3 | **The broom v0**: two phases with today's parts, on its own staffs. Sweep `bigger · dash` with `reach` (Lumber joins in OB4, Plow in OB11, the dust ring `on wall · … · pulse` in OB12), flick `scatter · slow · bolt`, swat `bigger · heavy · swing`, phase 2's trail `timer · dash · slow · fire · pool`; contact 8; a placeholder 96×64 sprite and a burning phase look; its lore line (a one-line `lore` on `EnemyBase`, checked by the story validator's line rules) and its canon in docs/STORY.md; the bosses README rewritten | content/bosses, content/wizard/staffs, core/base, docs |
+| OB3 | **The broom v0**: two phases with today's parts, on its own staffs. Sweep `bigger · dash` with `reach` (Lumber joins in OB4, Plow in OB11, the dust ring `on wall · … · pulse` in OB12), flick `scatter · slow · bolt`, swat `bigger · heavy · swing`, phase 2's trail `timer · dash · slow · fire · pool`; contact 8; a placeholder 96×64 sprite and a burning phase look; its lore line (a one-line `lore` on `EnemyBase`, checked by the story validator's line rules) and its canon in docs/STORY.md; the bosses README rewritten as a guide (decision 29) | content/bosses, content/wizard/staffs, core/base, docs |
 | OB4 | **Lumber**, its numbers; the broom's Sweep takes it | content/spells |
 | OB5 | The cracked pillar; the dust heap and the `touched` prop trigger | content/props, core/base, gameplay/actor |
 | OB6 | The arena | content/rooms |

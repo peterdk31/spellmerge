@@ -491,6 +491,21 @@ func test_the_layer_lies_on_the_floor_under_every_body() -> void:
 		check_equal(room.floor_colors().size(), 3, "%s's floor colours are sampled from its art" % room_id)
 
 
+## Ground cover GC3: the cover lies at the marks' z, before their layer in the tree (at one z the later
+## node draws on top), so the marks lie over the cover and every body over both.
+func test_the_marks_lie_over_the_ground_cover() -> void:
+	var pair: Array = _feel()
+	var feel: FeelScript = pair[1]
+	var cover: Node2D = feel.cover()
+	check(cover != null, "Feel has its cover")
+	check_equal(cover.z_index, feel.marks().sprite().z_index, "the cover is at the marks' z")
+	check(cover.z_index > RoomBase.FLOOR_Z and cover.z_index < 0, "over the room's floor and under the bodies")
+	check(feel.marks().sprite().is_greater_than(cover), "the marks' layer comes after the cover in the tree: drawn over it")
+	feel.set_floor_marks(false)
+	feel.set_floor_marks(true)
+	check(feel.marks().sprite().is_greater_than(cover), "and so does a layer made again by the setting")
+
+
 func test_a_rooms_floor_colours_can_be_set() -> void:
 	var room := RoomBase.new()
 	check_equal(room.floor_colors(), PackedColorArray(), "no art, no colours")

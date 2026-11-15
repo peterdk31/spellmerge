@@ -62,20 +62,10 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 	_sounds.clear()
 	for folder_name: String in _list_dir(content_root, true):
 		var folder: StringName = StringName(folder_name)
-		var found: Dictionary = {}
-		for path: String in _find_files(content_root.path_join(folder_name), PackedStringArray(["tres"])):
-			var res: Resource = ResourceLoader.load(path)
-			if res == null or not ("id" in res):
-				continue
-			var id: StringName = res.get("id")
-			if id == &"":
-				continue
-			if found.has(id):
-				push_warning("Registry: duplicate id '%s' in %s (kept %s)" % [id, path, (found[id] as Resource).resource_path])
-				if folder == &"spells":
-					_duplicates.append("'%s' in %s, kept %s" % [id, path, (found[id] as Resource).resource_path])
-				continue
-			found[id] = res
+		var duplicates: Array[String] = []
+		var found: Dictionary = _read_folder(content_root.path_join(folder_name), duplicates)
+		if folder == &"spells":
+			_duplicates.append_array(PackedStringArray(duplicates))
 		if not found.is_empty():
 			_resources[folder] = found
 			var ids: Array[StringName] = []
@@ -89,6 +79,41 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 			push_warning("Registry: duplicate sound '%s' in %s (kept %s)" % [sound_id, path, _sound_paths[sound_id]])
 			continue
 		_sound_paths[sound_id] = path
+
+
+## Every resource of the content folder `folder` (`cover`) under `content_root`, in id order, read
+## there and then: for the editor, where the `Registry` autoload does not run (ground cover GC2, rule
+## 7: the editor's cover preview finds the cover kinds by it), and for tools. The game asks the
+## autoload (`get_all`), which read the same files the same way at its start.
+static func scan_folder(folder: StringName, content_root: String = DEFAULT_CONTENT_ROOT) -> Array[Resource]:
+	var found: Dictionary = _read_folder(content_root.path_join(String(folder)), [] as Array[String])
+	var ids: Array[StringName] = []
+	for id: StringName in found:
+		ids.append(id)
+	ids.sort_custom(_name_less)
+	var result: Array[Resource] = []
+	for id in ids:
+		result.append(found[id] as Resource)
+	return result
+
+
+## Every `.tres` with an `id` below `folder_path`, by id (the first in sorted path order wins a
+## duplicate, with a warning, and a line in `duplicates`).
+static func _read_folder(folder_path: String, duplicates: Array[String]) -> Dictionary:
+	var found: Dictionary = {}
+	for path: String in _find_files(folder_path, PackedStringArray(["tres"])):
+		var res: Resource = ResourceLoader.load(path)
+		if res == null or not ("id" in res):
+			continue
+		var id: StringName = res.get("id")
+		if id == &"":
+			continue
+		if found.has(id):
+			push_warning("Registry: duplicate id '%s' in %s (kept %s)" % [id, path, (found[id] as Resource).resource_path])
+			duplicates.append("'%s' in %s, kept %s" % [id, path, (found[id] as Resource).resource_path])
+			continue
+		found[id] = res
+	return found
 
 
 ## Pushes one warning per problem `validate_spells()` finds, and returns how many.
@@ -266,7 +291,7 @@ func get_sound(id: StringName) -> AudioStream:
 ## Names in one directory, sorted. Exported games list imported files with a
 ## `.remap` or `.import` suffix; it is removed, so the same name works in the
 ## editor and in an export.
-func _list_dir(path: String, directories: bool) -> PackedStringArray:
+static func _list_dir(path: String, directories: bool) -> PackedStringArray:
 	var names: PackedStringArray = PackedStringArray()
 	var dir: DirAccess = DirAccess.open(path)
 	if dir == null:
@@ -284,14 +309,14 @@ func _list_dir(path: String, directories: bool) -> PackedStringArray:
 
 
 ## Every file with one of the extensions below `root`, in full-path sorted order.
-func _find_files(root: String, extensions: PackedStringArray) -> PackedStringArray:
+static func _find_files(root: String, extensions: PackedStringArray) -> PackedStringArray:
 	var found: PackedStringArray = PackedStringArray()
 	_collect_files(root, extensions, found)
 	found.sort()
 	return found
 
 
-func _collect_files(root: String, extensions: PackedStringArray, found: PackedStringArray) -> void:
+static func _collect_files(root: String, extensions: PackedStringArray, found: PackedStringArray) -> void:
 	for file_name: String in _list_dir(root, false):
 		if extensions.has(file_name.get_extension()):
 			found.append(root.path_join(file_name))

@@ -10,7 +10,8 @@ extends RefCounted
 ##   `Doors` or `JoinerSpawns` (by seat);
 ## - what stands in it: every `RoomPlacement` (a prop's `PropStandIn`, an enemy's `EnemyStandIn`,
 ##   tools/), its data (`placed()`) and its position, the feet of what stands there;
-## - its zones: every `RoomZone`, a name and a rectangle.
+## - its zones: every `RoomZone`, a name, a rectangle and its data (`RoomZone.data()`: a cover
+##   field's `CoverPatch`, ground cover GC2; null for a plain zone).
 ##
 ## **Places are whole translations:** a position is the sum of the positions up the tree, never
 ## through a rotation, skew or scale (those go through the engine's trigonometry, which differs
@@ -33,9 +34,11 @@ var joiner_spawns: PackedVector2Array = PackedVector2Array()
 ## What stands in it: each placement's data and where, in the tree's order.
 var placed: Array[Resource] = []
 var placed_at: PackedVector2Array = PackedVector2Array()
-## Its zones: a name and a rectangle each, in the tree's order.
+## Its zones: a name, a rectangle and its data each, in the tree's order (a zone with data may
+## have no name: &""; a plain zone's data is null).
 var zone_names: Array[StringName] = []
 var zone_rects: Array[Rect2] = []
+var zone_data: Array[Resource] = []
 ## Its size in pixels from (0, 0) (`size_of`).
 var size: Vector2 = Vector2.ZERO
 var _problems: PackedStringArray = PackedStringArray()
@@ -51,6 +54,15 @@ static func read(layout: Node) -> RoomPlaces:
 	places.size = places._size_of(layout)
 	places._check_corner(layout)
 	return places
+
+
+## The indices into the zones of those whose data is of class `kind` (`CoverPatch`), in order.
+func zones_of(kind: Script) -> PackedInt32Array:
+	var found := PackedInt32Array()
+	for i in zone_data.size():
+		if zone_data[i] != null and is_instance_of(zone_data[i], kind):
+			found.append(i)
+	return found
 
 
 ## The indices into `placed` of the data of class `kind` (`PropBase`, `EnemyBase`), in order.
@@ -78,14 +90,14 @@ func placed_at_of(kind: Script) -> PackedVector2Array:
 	return found
 
 
-## The first zone named `name` (an empty rectangle when it has none).
+## The first zone named `name` (an empty rectangle when it has none, or for no name).
 func zone(name: StringName) -> Rect2:
-	var i: int = zone_names.find(name)
+	var i: int = zone_names.find(name) if name != &"" else -1
 	return zone_rects[i] if i >= 0 else Rect2()
 
 
 ## What is wrong with its layout, one line each (empty when nothing is): a placement with nothing
-## picked, a zone with no name, a place under a rotated, skewed or scaled node.
+## picked, a zone with no name and no data, a place under a rotated, skewed or scaled node.
 func problems() -> PackedStringArray:
 	return _problems
 
@@ -126,11 +138,13 @@ func _walk(node: Node, at: Vector2, path: String, bent: String) -> void:
 			continue
 		if child is RoomZone:
 			var zone_node := child as RoomZone
-			if zone_node.zone_name == &"":
+			var held: Resource = zone_node.data()
+			if zone_node.zone_name == &"" and held == null:
 				_problems.append("%s is a zone with no name." % named)
 			else:
 				zone_names.append(zone_node.zone_name)
 				zone_rects.append(Rect2(at + Vector2(zone_node.offset_left, zone_node.offset_top), Vector2(zone_node.offset_right - zone_node.offset_left, zone_node.offset_bottom - zone_node.offset_top)))
+				zone_data.append(held)
 			continue
 		if child is Marker2D:
 			match StringName(node.name):
@@ -143,6 +157,39 @@ func _walk(node: Node, at: Vector2, path: String, bent: String) -> void:
 				JOINER_SPAWNS:
 					joiner_spawns.append(here)
 		_walk(child, here, named, below)
+
+
+## The rectangles of `layout`'s walls (a room's layout, in the tree or not), in room pixels, in the
+## tree's order: each rectangle shape of a static body on the wall layer (`RoomBase.WALL_LAYER`), as
+## the box round its corners (a wall is never turned: places are whole translations). The room's size
+## (`size`) and its cover (`CoverLayout.of`, ground cover GC2) are read from them.
+static func wall_rects(layout: Node) -> Array[Rect2]:
+	var found: Array[Rect2] = []
+	if layout == null:
+		return found
+	for node: Node in layout.find_children("*", "StaticBody2D", true, false):
+		var body := node as StaticBody2D
+		if (body.collision_layer & RoomBase.WALL_LAYER) == 0:
+			continue
+		for child: Node in body.get_children():
+			var shape := child as CollisionShape2D
+			var box := shape.shape as RectangleShape2D if shape != null else null
+			if box == null:
+				continue
+			# The layout may not be in the tree yet: its transform is walked by hand.
+			var xf: Transform2D = shape.transform
+			var up: Node = body
+			while up != null and up != layout:
+				if up is Node2D:
+					xf = (up as Node2D).transform * xf
+				up = up.get_parent()
+			var half: Vector2 = box.size * 0.5
+			var first: Vector2 = xf * half
+			var wall := Rect2(first, Vector2.ZERO)
+			for corner: Vector2 in [-half, Vector2(half.x, -half.y), Vector2(-half.x, half.y)]:
+				wall = wall.expand(xf * corner)
+			found.append(wall)
+	return found
 
 
 ## The room starts at (0, 0) (docs/DECISIONS.md, 2026-11-12, "the world draws its bodies by their
@@ -171,25 +218,8 @@ func _size_of(layout: Node) -> Vector2:
 	if floor_sprite != null and floor_sprite.texture != null:
 		var extent: Vector2 = floor_sprite.region_rect.size if floor_sprite.region_enabled else floor_sprite.texture.get_size()
 		most = most.max(floor_sprite.position + extent)
-	for node: Node in layout.find_children("*", "StaticBody2D", true, false):
-		var body := node as StaticBody2D
-		if (body.collision_layer & RoomBase.WALL_LAYER) == 0:
-			continue
-		for child: Node in body.get_children():
-			var shape := child as CollisionShape2D
-			var box := shape.shape as RectangleShape2D if shape != null else null
-			if box == null:
-				continue
-			# The layout may not be in the tree yet: its transform is walked by hand.
-			var xf: Transform2D = shape.transform
-			var up: Node = body
-			while up != null and up != layout:
-				if up is Node2D:
-					xf = (up as Node2D).transform * xf
-				up = up.get_parent()
-			var half: Vector2 = box.size * 0.5
-			for corner: Vector2 in [half, -half, Vector2(half.x, -half.y), Vector2(-half.x, half.y)]:
-				most = most.max(xf * corner)
+	for wall: Rect2 in wall_rects(layout):
+		most = most.max(wall.end)
 	for points: PackedVector2Array in [player_spawns, enemy_spawns, doors]:
 		for point: Vector2 in points:
 			most = most.max(point + Vector2(32.0, 32.0))

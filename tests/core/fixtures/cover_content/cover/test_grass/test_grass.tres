@@ -1,0 +1,67 @@
+[gd_resource type="Resource" script_class="CoverKind" format=3]
+
+[ext_resource type="Script" path="res://core/base/cover_kind.gd" id="1_kind"]
+[ext_resource type="Script" path="res://core/base/cover_state.gd" id="2_state"]
+[ext_resource type="Script" path="res://core/base/cover_trigger.gd" id="3_trigger"]
+
+[sub_resource type="Resource" id="rest_fire"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"fire"
+then = &"burning"
+
+[sub_resource type="Resource" id="burning_frost"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"frost"
+then = &"rest"
+
+[sub_resource type="Resource" id="burning_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 1.2
+then = &"ash"
+
+[sub_resource type="Resource" id="ash_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 30.0
+then = &"rest"
+
+[sub_resource type="Resource" id="rest"]
+script = ExtResource("2_state")
+state_id = &"rest"
+frames = PackedInt32Array(0, 1, 2)
+triggers = Array[ExtResource("3_trigger")]([SubResource("rest_fire")])
+
+[sub_resource type="Resource" id="burning"]
+script = ExtResource("2_state")
+state_id = &"burning"
+frames = PackedInt32Array(3, 4)
+sway = 0.5
+status = &"burn"
+status_strength = 1.0
+status_duration = 2.0
+status_every = 0.5
+spreads = &"fire"
+spread_chance = 0.6
+triggers = Array[ExtResource("3_trigger")]([SubResource("burning_frost"), SubResource("burning_after")])
+
+[sub_resource type="Resource" id="ash"]
+script = ExtResource("2_state")
+state_id = &"ash"
+frames = PackedInt32Array(5)
+sway = 0.0
+bend = 0.0
+triggers = Array[ExtResource("3_trigger")]([SubResource("ash_after")])
+
+[resource]
+script = ExtResource("1_kind")
+id = &"test_grass"
+display_name = "Test grass"
+biomes = Array[StringName]([&"test_meadow"])
+fill_density = 0.05
+clump_size = 2
+wall_gap = 1
+keep_gap = 1
+states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("burning"), SubResource("ash")])

@@ -73,7 +73,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `room_cleared` | `flow` | `rewards`, `run` |
 | `sandbox_changed` | `flow` | `hud` |
 | `door_voted` | `flow` | none yet |
-| `difficulty_changed` | `difficulty` | none yet |
+| `difficulty_changed` | `difficulty` (a difficulty setting's level, M3; never the room's scale, `run_room_scaled`) | none yet (enemy AI AI10: `ai`, the TeamBoard's skill) |
 | `reward_rolled`, `reward_taken` | `rewards` | none yet |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |
 | `play_requested` | HUD | `flow` |

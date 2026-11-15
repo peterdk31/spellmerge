@@ -3,11 +3,12 @@ extends Node
 ## and boss that stands there scaled to it (run generation RG5, docs/milestones/run-generation.md,
 ## "Scaling"). The run's area names each room's scale as the party enters it (`run_room_scaled`:
 ## its depth and the run's players, by the run definition's curves); this area keeps it as the
-## level (`level`, told as `difficulty_changed` at every room) and, as Flow stands an enemy or a boss
+## level (`level`) and, as Flow stands an enemy or a boss
 ## (`enemy_standing`, the body not yet in the tree), sets the body's `Actor.stat_scale` to it, so its
 ## data's health is multiplied by it when the body applies its data. Power, spell size and a boss's
 ## adds join the same scale as the boss plan's OB7 and OB13 land; a difficulty setting later is one
-## more factor of the level. Areas never call each other: this area knows the run and Flow by these
+## more factor of the level. The room's scale is not `difficulty_changed`: that event is kept for the
+## setting's level, which the enemies' skill follows (enemy AI AI10), never the room's depth. Areas never call each other: this area knows the run and Flow by these
 ## events only.
 ##
 ## The level is the run's state (hashed, saved in snapshots): a run's start renews it to 1
@@ -44,13 +45,12 @@ func begin_run() -> void:
 	SimFresh.renew(self)
 
 
-## The party enters a run's room `scale` times harder: the level, told.
+## The party enters a run's room `scale` times harder: the level.
 func _on_run_room_scaled(scale: float) -> void:
 	if not (scale > 0.0) or not is_finite(scale):
 		push_warning("Difficulty: a room's scale of %s, so the level stays %s." % [scale, level])
 		return
 	level = scale
-	events.difficulty_changed.emit(level)
 
 
 ## An enemy or a boss is about to stand in the room: it takes the room's level.

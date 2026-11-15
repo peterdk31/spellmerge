@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The difficulty area (run generation RG5, docs/milestones/run-generation.md, "Scaling";
 ## gameplay/difficulty/difficulty.gd), on the real autoloads: the room's scale the run names
-## (`run_room_scaled`) is the level, told (`difficulty_changed`); an enemy or a boss about to stand
+## (`run_room_scaled`) is the level (never `difficulty_changed`, the setting's, which the enemies'
+## skill follows: enemy AI AI10); an enemy or a boss about to stand
 ## (`enemy_standing`) takes it (`Actor.stat_scale`), so its data's health is multiplied by it; the level
 ## is the run's state, 1 again at every run's start, so the hub and the sandbox scale nothing; and in
 ## play, a pinned run of copies of the crypt arena (tests/support/pinned_run.gd) scaled by depth and
@@ -102,18 +103,18 @@ func _check_enemies_at(scale: float, label: String) -> void:
 		check(is_equal_approx(enemy.stat_scale, scale), "%s: %s is scaled %s, not %s" % [label, enemy.data.id, enemy.stat_scale, scale])
 		check(is_equal_approx(enemy.health.max_health, enemy.data.max_health * scale), "%s: %s has %s health of %s" % [label, enemy.data.id, enemy.health.max_health, enemy.data.max_health])
 		check_equal(enemy.health.health, enemy.health.max_health, "%s: %s at full health" % [label, enemy.data.id])
+		check(is_equal_approx(float(root.get_node("Combat").call("health_of", enemy)), enemy.data.max_health * scale), "%s: Combat, which hits take from, holds the scaled health" % label)
 
 
-func test_the_room_s_scale_is_the_level_and_told() -> void:
+func test_the_room_s_scale_is_the_level() -> void:
 	tick.begin_run()
 	check_equal(_level(), 1.0, "a run's start: as the data says")
 	events.emit_signal("run_room_scaled", 2.5)
 	check_equal(_level(), 2.5, "the room's scale is the level")
-	check_equal(told, [2.5] as Array[float], "and told")
+	check_equal(told, [] as Array[float], "not told as the difficulty setting's level")
 	events.emit_signal("run_room_scaled", 0.0)
 	events.emit_signal("run_room_scaled", NAN)
 	check_equal(_level(), 2.5, "a scale that is no factor changes nothing")
-	check_equal(told.size(), 1, "nor is told")
 
 
 func test_an_enemy_standing_takes_the_level_on_its_health() -> void:
@@ -160,6 +161,42 @@ func test_the_hub_and_the_sandbox_scale_nothing() -> void:
 	check_equal(_level(), 1.0, "the hub's start too")
 
 
+## Walk every standing wizard into the room's lit exit (the arena's right one, one way on).
+func _go_on(players: int) -> void:
+	for enemy: Node in flow.get(&"_enemies").duplicate():
+		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
+	flow.step(DT)
+	var exit: Actor = ExitRules.exits_in(flow.contents)[1]
+	for seat in players:
+		flow.get_wizard(seat).position = HubRules.area_at(exit.prop, exit.position).get_center()
+	flow.step(DT)
+
+
+## A snapshot taken in a scaled room restores its enemies with their scaled health and the level
+## into a machine whose run is unscaled, and the next room is scaled on from there.
+func test_a_snapshot_of_a_scaled_room_restores_its_scale() -> void:
+	_play_scaled(3, 2)
+	_go_on(2)
+	_check_enemies_at(1.8, "the second room")
+	var snapshot: Snapshot = Snapshot.take(tick.state_areas(), root)
+	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
+	var taken_hash: Dictionary = SimHash.areas(tick.state_areas(), StateWalk.new())
+	flow.stop_run()
+	scaled.scaling = null
+	events.emit_signal("play_requested", 0)
+	_check_enemies_at(1.0, "a joining machine's unscaled run")
+	scaled.scaling = RunScaling.new()
+	scaled.scaling.per_depth = ScaleCurve.make(1.0, 2.0)
+	scaled.scaling.per_player = ScaleCurve.make(1.0, 1.6)
+	check_equal(snapshot.restore(tick.state_areas(), root), PackedStringArray(), "restored without problems")
+	check_equal(SimHash.areas(tick.state_areas(), StateWalk.new()), taken_hash, "the game is the snapshot's")
+	check(is_equal_approx(_level(), 1.8), "the level is the snapshot's: %s" % _level())
+	_check_enemies_at(1.8, "the restored room")
+	_go_on(2)
+	check(is_equal_approx(_level(), 2.4), "the deepest room after it: %s" % _level())
+	_check_enemies_at(2.4, "the deepest room")
+
+
 ## Play: two players in a run three rows deep. The first room is scaled by the players alone (1.2),
 ## the next by its depth too (half way down: 1.5 x 1.2).
 func test_each_room_s_enemies_stand_at_its_scale() -> void:
@@ -169,14 +206,9 @@ func test_each_room_s_enemies_stand_at_its_scale() -> void:
 	check(first != null and is_equal_approx(first.scale, 1.2), "the first room's scale: %s" % (first.scale if first != null else -1.0))
 	check(is_equal_approx(_level(), 1.2), "the level is the room's")
 	_check_enemies_at(1.2, "the first room")
-	for enemy: Node in flow.get(&"_enemies").duplicate():
-		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
-	flow.step(DT)
-	for seat in 2:
-		flow.get_wizard(seat).position = HubRules.area_at(ExitRules.exits_in(flow.contents)[1].prop, ExitRules.exits_in(flow.contents)[1].position).get_center()
-	flow.step(DT)
+	_go_on(2)
 	var next: RunNode = run.call("room_now") as RunNode
 	check(next != null and next.depth == 1, "on into the second row")
 	check(is_equal_approx(_level(), 1.8), "the level is the deeper room's: %s" % _level())
 	_check_enemies_at(1.8, "the second room")
-	check_equal(told.size(), 2, "the level told at each room")
+	check(told.is_empty(), "the room's scale is never the setting's level")

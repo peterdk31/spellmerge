@@ -494,7 +494,7 @@ func _test_an_unknown_enemy_stands_nothing_and_an_empty_room_is_won() -> void:
 	for named: Array in names:
 		var enemies: Array[StringName] = []
 		enemies.assign(named)
-		var answer := func(_run_id: StringName) -> void:
+		var answer := func(_run_id: StringName, _players: int) -> void:
 			_events.emit_signal("run_room_chosen", _arena, enemies, [] as Array[StringName])
 		_events.connect("run_begun", answer)
 		_setup(1)

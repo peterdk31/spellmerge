@@ -20,6 +20,11 @@ extends Node
 ##    starts after the autoloads load, so errors during startup are not covered).
 ## If the run is not cleared within TIME_LIMIT game seconds the test fails.
 ##
+## The run is played unscaled (the run definition's `scaling` off while the test runs, run
+## generation RG5): three of its four seats fight, so a room scaled for four players would test
+## the balance (and fail by chance), not the game's paths. The scaling's own tests:
+## tests/gameplay/difficulty/test_difficulty.gd and tests/gameplay/run/test_run_generator.gd.
+##
 ## Two ways to start it. `four_bot_smoke.gd` (a SceneTree script, for
 ## `build.sh --quick --tests`) adds this node to the root. The main menu adds it when
 ## the game is started with the user argument `--four-bot` and this file is in the
@@ -75,6 +80,9 @@ var _refusals: Array[String] = []
 var _builds_failed: Array[String] = []
 var _builder_closed_at: float = -1.0
 var _idler_downed_at_close: bool = false
+## The run played and its scaling, put back when the node goes.
+var _run: RunDefinition = null
+var _run_scaling: RunScaling = null
 
 
 func _ready() -> void:
@@ -90,6 +98,7 @@ func _ready() -> void:
 	if _events == null or _flow == null or _input == null or _hud == null:
 		_finish(["the Events, PlayerInput, Flow and Hud autoloads must exist"])
 		return
+	_play_unscaled(root)
 	_events.connect("room_entered", _on_room_entered)
 	_events.connect("room_cleared", _on_room_cleared)
 	_events.connect("player_downed", _on_player_downed)
@@ -111,6 +120,20 @@ func _ready() -> void:
 ## Puts the global state back if the node is freed before it finished.
 func _exit_tree() -> void:
 	_stop_logging()
+	if _run != null:
+		_run.scaling = _run_scaling
+		_run = null
+
+
+## The run Play starts, with its scaling off until the node goes (see the class doc).
+func _play_unscaled(root: Node) -> void:
+	var registry: Node = root.get_node_or_null("Registry")
+	if registry == null:
+		return
+	_run = registry.call("get_resource", &"runs", _flow.get(&"run_id_to_play")) as RunDefinition
+	if _run != null:
+		_run_scaling = _run.scaling
+		_run.scaling = null
 
 
 func _stop_logging() -> void:

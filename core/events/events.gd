@@ -249,6 +249,10 @@ signal prop_state_requested(actor: int, state: StringName)
 ## Sender: core/spells. A carrier that hits nothing gives `target` a status (a portal's infusion on
 ## the bodies that go through it): Combat applies it as `apply_status` does, with no hit.
 signal status_requested(caster: int, target: Node, status_id: StringName, duration: float, strength: float)
+## Sender: flow. The enemy or boss body `enemy` (an `Actor` with its data, not yet in the tree) is
+## about to stand in the room (run generation RG5). Heard by difficulty, which scales its numbers to
+## the room's (`Actor.stat_scale`) before its data is applied.
+signal enemy_standing(enemy: Node)
 ## Sender: combat. `enemy` died; the actor `killer` landed the last hit (or NO_PLAYER). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal enemy_died(killer: int, enemy: Node, position: Vector2, shot: int)
 
@@ -303,9 +307,15 @@ signal run_started(player_count: int)
 ## Sender: run. The run is over; `victory` is true if the players won.
 signal run_ended(victory: bool)
 ## Sender: flow. A run of rooms of the run definition `run_id` (content/runs) begins, on the run's
-## fresh state (its seed dealt; run generation RG3). Heard by run, which makes the run's map and
-## answers with `run_room_chosen` for its first room.
-signal run_begun(run_id: StringName)
+## fresh state (its seed dealt; run generation RG3), for `players` players (the seats joined at its
+## start, the same on every machine and in every replay; RG5). Heard by run, which makes the run's
+## map and answers with `run_room_scaled` and `run_room_chosen` for its first room.
+signal run_begun(run_id: StringName, players: int)
+## Sender: run. The room of the run's map the party enters is `scale` times harder than the run's
+## first room with one player (run generation RG5: its depth and the run's players, the run
+## definition's `scaling`), sent before `run_room_chosen`. Heard by difficulty, which scales every
+## enemy and boss that stands in it (`enemy_standing`).
+signal run_room_scaled(scale: float)
 ## Sender: run. The room of the run's map the party enters: the room template `room_id`
 ## (content/rooms), what stands in it (`enemies`: enemy and boss ids, one per body) and the kinds of
 ## the rooms it leads to (`ways`: `RoomKind` ids, left to right as the map's links; none for the
@@ -387,7 +397,9 @@ signal item_near_changed(player: int, item: int, at: Vector2, view: Dictionary)
 signal item_refused(player: int, item: int)
 ## Sender: flow. The result of a door vote: `player` voted for `door`.
 signal door_voted(player: int, door: int)
-## Sender: difficulty. The difficulty level changed to `level`.
+## Sender: difficulty. The difficulty setting's level changed to `level` (M3; 1 at normal), which the
+## enemies' skill follows (enemy AI AI10). Never the room's scale (`run_room_scaled`): depth and
+## players scale numbers, not how well enemies aim. Not sent yet.
 signal difficulty_changed(level: float)
 
 # --- Rewards and progression ------------------------------------------------

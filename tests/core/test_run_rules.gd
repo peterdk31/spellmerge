@@ -283,3 +283,65 @@ func test_a_kind_that_leads_on_with_too_few_exits_is_named() -> void:
 	check(_names(_run(rules).problems(content), "'fight' leads on"), "a fight room with no exit leads nowhere")
 	check(not _names(_run(rules).problems(content), "'boss' leads on"), "the boss's room, the last, needs none")
 	check(content.templates_for(BIOME, &"fight").size() == 1 and content.templates_for(BIOME, &"fight", 1).is_empty(), "templates_for counts exits")
+
+
+# --- Scaling (run generation RG5) ------------------------------------------------------------
+
+func _near(actual: float, expected: float, message: String) -> void:
+	check(is_equal_approx(actual, expected), "%s: %s, not %s" % [message, actual, expected])
+
+
+func test_a_scale_curve_goes_from_its_start_to_its_end_by_its_easing() -> void:
+	var even := ScaleCurve.make(1.0, 3.0)
+	_near(even.at(0.0), 1.0, "its start")
+	_near(even.at(1.0), 3.0, "its end")
+	_near(even.at(0.5), 2.0, "evenly: half way at the middle")
+	_near(even.at(-1.0), 1.0, "before the span: its start")
+	_near(even.at(2.0), 3.0, "past the span: its end")
+	_near(ScaleCurve.make(1.0, 3.0, 2.0).at(0.5), 1.0 + 2.0 * 0.75, "an easing above 1: most of the change early")
+	_near(ScaleCurve.make(1.0, 3.0, 0.5).at(0.5), 1.0 + 2.0 * (1.0 - sqrt(0.5)), "below 1: most of it late")
+	_near(ScaleCurve.make(2.0, 1.0).at(0.5), 1.5, "a curve may fall")
+	check_equal(ScaleCurve.make(1.0, 3.0, 1.5).at(0.3), ScaleCurve.make(1.0, 3.0, 1.5).at(0.3), "the same numbers, the same factor")
+
+
+func test_a_room_s_scale_is_its_depth_s_factor_times_its_players() -> void:
+	var scaling := RunScaling.new()
+	scaling.per_depth = ScaleCurve.make(1.0, 2.0)
+	scaling.per_player = ScaleCurve.make(1.0, 1.6)
+	_near(scaling.room_scale(0, 4, 1), 1.0, "the first room, one player")
+	_near(scaling.room_scale(4, 4, 1), 2.0, "the deepest row: the depth's end")
+	_near(scaling.room_scale(2, 4, 1), 1.5, "half way down")
+	_near(scaling.room_scale(0, 4, 4), 1.6, "four players: the players' end")
+	_near(scaling.room_scale(0, 4, 2), 1.2, "each extra player a third of the way")
+	_near(scaling.room_scale(4, 4, 4), 3.2, "both multiply")
+	_near(scaling.room_scale(0, 4, 0), 1.0, "fewer than one player counts as one")
+	_near(scaling.room_scale(0, 4, 9), 1.6, "more than four as four")
+	_near(scaling.room_scale(0, 0, 1), 1.0, "a map of one row is its start")
+	scaling.per_player = null
+	_near(scaling.room_scale(4, 4, 4), 2.0, "no curve for players: players change nothing")
+	var rules: MapRules = _rules()
+	var run: RunDefinition = _run(rules)
+	_near(run.room_scale(rules, 4, 4), 1.0, "a run with no scaling is the same everywhere")
+	run.scaling = scaling
+	_near(run.room_scale(rules, rules.depth_max - 1, 1), 2.0, "the deepest row the rules allow is the depth's end")
+
+
+func test_a_budget_is_scaled_and_rounded_and_one_at_least() -> void:
+	check_equal(RunScaling.scaled_budget(16, 1.0), 16, "at 1, the budget")
+	check_equal(RunScaling.scaled_budget(16, 1.5), 24, "at 1.5")
+	check_equal(RunScaling.scaled_budget(10, 1.26), 13, "rounded")
+	check_equal(RunScaling.scaled_budget(1, 0.1), 1, "one at least")
+
+
+func test_a_bad_scaling_curve_is_named() -> void:
+	var run: RunDefinition = _run(_rules())
+	run.scaling = RunScaling.new()
+	check_equal(run.problems(_content()), PackedStringArray(), "a scaling with no curves is sound")
+	run.scaling.per_depth = ScaleCurve.make(1.0, 2.0, 1.5)
+	run.scaling.per_player = ScaleCurve.make(1.0, 1.75)
+	check_equal(run.problems(_content()), PackedStringArray(), "sound curves")
+	run.scaling.per_depth.end = 0.0
+	run.scaling.per_player.easing = NAN
+	var problems: PackedStringArray = run.problems(_content())
+	check(_names(problems, "scaling per depth: end 0"), "an end of 0 is named: %s" % problems)
+	check(_names(problems, "scaling per player: easing"), "an easing that is no number is named: %s" % problems)

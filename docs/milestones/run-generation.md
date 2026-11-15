@@ -85,7 +85,7 @@ The boss plan's decision 33, on the generated run: a seat's A at the lectern ope
 ## Data first: the first crypt run
 
 - `content/runs/crypt.tres`: the crypt, 4 to 6 rows deep, 1 to 3 rooms a row, each room leading on to 1 or 2, fights then the boss.
-- The crypt's room templates: arena_01 (fight) and two or three more fight rooms (RG3b, layout only, made like arena_01), and the boss's arena when OB6 brings it (`kinds: boss`). Until then a test run's boss row stands a crypt fight room tagged `boss` for tests only (a test template, never in content) and the real run has no boss row: **the crypt run with no boss in the registry ends at its deepest fight** (a won last room wins the run), so the game plays before the broom exists.
+- The crypt's room templates: arena_01 (fight) and two or three more fight rooms (RG3b, layout only, made like arena_01), and the boss's arena when OB6 brings it (`kinds: boss`). Until then a test run's boss row stands a crypt fight room tagged `boss` for tests only (a test template, never in content) and the real run has no boss row: **the crypt run with no boss in the registry ends at its deepest fight** (a won last room wins the run), so the game plays before the broom exists. (Done in OB6: the crypt run now ends in the broom's arena.)
 - The crypt's enemies name `crypt` with a cost; the broom names `crypt` from OB3.
 
 ## Steps

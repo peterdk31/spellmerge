@@ -1,0 +1,10 @@
+{
+	"id": "plow_ram",
+	"name": "Plow ram",
+	"does": "A plowed bolt is a battering ram: the first imp it meets does not spend it, so it hits the imp behind too.",
+	"needs": "plow",
+	"casts": [{"staff": 0, "cards": ["plow", "bolt"]}],
+	"imps": [[60, 0], [100, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "damaged", "imps": [0, 1]}]
+}

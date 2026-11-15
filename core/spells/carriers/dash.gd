@@ -162,6 +162,8 @@ func step(delta: float) -> void:
 			continue
 		_passes.remove_at(i)
 		var tag: int = dash.tag
+		# Its move is over: what it carried is let go (Plow, boss plan OB11).
+		kit.plow().let_go(tag, dash.body, dash.shot)
 		dash.spell = null
 		dash.hit = null
 		dash.struck.clear()
@@ -184,6 +186,15 @@ func _pass_reach(spell: CompiledSpell, body: int, shot: int) -> float:
 		var half: Vector2 = kit.projectiles.target_half(node)
 		reach = (kit.projectiles.target_round(node) + maxf(half.x, half.y)) * spell.radius_scale
 	return maxf(reach, SpellLimits.PASS_REACH) if is_finite(reach) else SpellLimits.PASS_REACH
+
+
+## How far round its mover a body this dash's pass struck reaches, for Plow (`Carrier.carry_reach`):
+## its pass's reach, for what it moves now (the cast under way is the hit's).
+func carry_reach(spell: CompiledSpell, actor: int, _slot: int) -> float:
+	var moved: int = CasterMoves.moved_by(kit.caster(), actor)
+	if moved >= 0:
+		return _pass_reach(spell, -1, moved)
+	return _pass_reach(spell, SpellRuntime.body_of(moved, actor), -1)
 
 
 ## The dash `dash` moved from `from` to `to`: it strikes each body within its reach (`_pass_reach`) of

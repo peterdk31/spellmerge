@@ -46,6 +46,7 @@ B.RETURN: {"any": FLIES},
 B.CHAIN:  {"any": HITS},
 B.HOLD:   {"any": LASTS, "not": MOVES_CASTER},
 B.HEAVY:  {"any": HITS, "or_cards": [B.BLAST]},
+B.PLOW:   {"any": FLIES | MOVES_CASTER, "not": INSTANT_HOMING},
 E.BLOCK:  {"any": MEETS_SHOTS, "cards": [B.SHIELD, B.DEFLECT]},
 E.WALL:   {"any": FLIES | LINE, "not_cards": [B.GHOST]},
 ```
@@ -193,6 +194,7 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | `on_move_end` | nothing | teleport (strikes where it lands), dash (its pass strikes no longer than its grace: a dash a head-on wall stopped strikes no more there, boss plan OB10) |
 | `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows), pool (forgets what it touches every `POOL_TICK`, so it strikes it again), portal (moves what went into its gates) |
 | `end_of`, `end_actor`, `clear`, `reset_actor` | nothing | dash, teleport, beam, swing, slam, decoy, familiar (what they keep) |
+| `carry_reach` | a shot's hit radius | dash (its pass's reach): how far round what it moves a body it struck may ride, for Plow (`Plow.carry`, boss plan OB11) |
 | `hit_caster` | the point | dash and teleport (`CarrierMove`): what they move casts their hits' payloads |
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
 | `reach_of` | 0 | atom, beam, swing, slam (for an enemy's telegraph) |

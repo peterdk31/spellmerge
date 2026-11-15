@@ -1,0 +1,110 @@
+[gd_resource type="Resource" script_class="PropBase" load_steps=21 format=3]
+
+[ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="1"]
+[ext_resource type="Resource" path="res://content/props/dust_heap/dust_heap_states.tres" id="2"]
+[ext_resource type="Script" path="res://core/base/staff_base.gd" id="3"]
+[ext_resource type="Script" path="res://core/base/staff_cards.gd" id="4"]
+[ext_resource type="Texture2D" path="res://content/props/dust_heap/heap.svg" id="5"]
+[ext_resource type="Script" path="res://core/base/prop_layer.gd" id="6"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="7"]
+[ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="8"]
+[ext_resource type="Texture2D" path="res://content/props/dust_heap/scattered.svg" id="9"]
+[ext_resource type="Texture2D" path="res://content/props/dust_heap/burnt.svg" id="10"]
+[ext_resource type="Script" path="res://core/base/prop_base.gd" id="11"]
+
+[sub_resource type="Resource" id="staff_1"]
+script = ExtResource("3")
+id = &"dust_heap"
+display_name = "Dust heap's blast"
+slots = 3
+cooldown = 0.0
+max_mana = 100.0
+mana_regen = 0.0
+
+[sub_resource type="Resource" id="staff_1_cards"]
+script = ExtResource("4")
+staff = SubResource("staff_1")
+cards = Array[StringName]([&"fire", &"blast", &"pulse"])
+
+[sub_resource type="Resource" id="heap_0_motes_0"]
+script = ExtResource("7")
+kind = &"dust"
+rate = 0.8
+from = 2
+at = Vector2(0, -8)
+size = Vector2(12, 4)
+colours = Array[StringName]([&"stone", &"bone"])
+
+[sub_resource type="Resource" id="heap_layer_0"]
+script = ExtResource("6")
+texture = ExtResource("5")
+offset = Vector2(0, 1)
+motes = Array[ExtResource("7")]([SubResource("heap_0_motes_0")])
+
+[sub_resource type="Resource" id="heap_look"]
+script = ExtResource("8")
+state_id = &"heap"
+layers = Array[ExtResource("6")]([SubResource("heap_layer_0")])
+
+[sub_resource type="Resource" id="scattered_0_motes_0"]
+script = ExtResource("7")
+kind = &"dust"
+rate = 24.0
+from = 2
+at = Vector2(0, -4)
+size = Vector2(28, 8)
+spread = 360.0
+reach = 8.0
+stop = 1.5
+colours = Array[StringName]([&"stone", &"bone"])
+
+[sub_resource type="Resource" id="scattered_layer_0"]
+script = ExtResource("6")
+texture = ExtResource("9")
+offset = Vector2(0, 2)
+drawn = 2
+motes = Array[ExtResource("7")]([SubResource("scattered_0_motes_0")])
+
+[sub_resource type="Resource" id="scattered_look"]
+script = ExtResource("8")
+state_id = &"scattered"
+layers = Array[ExtResource("6")]([SubResource("scattered_layer_0")])
+
+[sub_resource type="Resource" id="burnt_0_motes_0"]
+script = ExtResource("7")
+kind = &"ember"
+rate = 6.0
+from = 2
+at = Vector2(0, -4)
+size = Vector2(24, 4)
+stop = 3.0
+colours = Array[StringName]([&"fire", &"spark"])
+
+[sub_resource type="Resource" id="burnt_layer_0"]
+script = ExtResource("6")
+texture = ExtResource("10")
+offset = Vector2(0, 1)
+drawn = 2
+motes = Array[ExtResource("7")]([SubResource("burnt_0_motes_0")])
+
+[sub_resource type="Resource" id="burnt_look"]
+script = ExtResource("8")
+state_id = &"burnt"
+layers = Array[ExtResource("6")]([SubResource("burnt_layer_0")])
+
+[resource]
+script = ExtResource("11")
+id = &"dust_heap"
+display_name = "Dust heap"
+scene = ExtResource("1")
+max_health = 10.0
+invincible = true
+area_size = Vector2(36, 20)
+area_offset = Vector2(0, -4)
+size = Vector2(22, 10)
+offset = Vector2(0, -5)
+footprint_size = Vector2(24, 8)
+footprint_offset = Vector2(0, -4)
+staffs = Array[ExtResource("4")]([SubResource("staff_1_cards")])
+states = ExtResource("2")
+looks = Array[ExtResource("8")]([SubResource("heap_look"), SubResource("scattered_look"), SubResource("burnt_look")])

@@ -34,10 +34,14 @@ enum When {
 	## zapped its pool's worth goes dark). With `dry` on it fires only for the mana, which is told
 	## only of a staff that is free (a busy staff is refused as busy first); off, for any of them.
 	REFUSED,
+	## A body that walks (it has a Mover) overlaps its area (`PropBase.area_size`: its circle against
+	## the walls, at its feet, where its move left it; boss plan OB5): a dust heap walked or swept into.
+	## Every tick it does, so a prop that should hear it once goes to a state without the row.
+	TOUCHED,
 }
 
 ## The names of `When`, as the problems and the moments name them.
-const WHEN_NAMES: PackedStringArray = ["element_hit", "status", "reaction", "health_below", "death", "entered", "cast", "refused"]
+const WHEN_NAMES: PackedStringArray = ["element_hit", "status", "reaction", "health_below", "death", "entered", "cast", "refused", "touched"]
 ## The name a REFUSED moment comes with when the staff's mana paid none of its casts (`dry`).
 const DRY: StringName = &"dry"
 

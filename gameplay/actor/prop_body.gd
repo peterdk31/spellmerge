@@ -47,6 +47,7 @@ static func fill(body: Actor, data: PropBase) -> void:
 			hurt_box = data.size if hurtbox.is_box() else Vector2.ZERO
 		elif child is PropStateTriggers:
 			(child as PropStateTriggers).states = data.states
+			(child as PropStateTriggers).area = data.area_rect()
 	for child in body.get_children():
 		if child is Footprint:
 			_fill_ground(child as Footprint, data, hurt_box)

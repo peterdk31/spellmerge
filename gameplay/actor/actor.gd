@@ -65,6 +65,8 @@ extends Node2D
 ## wall grid, `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
 ## moved by over the step, so a body against a wall keeps only its slide. Actors walk through each
 ## other (Combat's push parts them); spells find them by their hurt circles. No physics engine.
+## Where the move left it, its circle tells every actor whose touch area it overlaps (`touched`,
+## `Actors.touching`: a dust heap walked into, boss plan OB5).
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
 ## health (times `stat_scale`, the room's scale), walking speed, contact damage, staff, cards and
@@ -105,10 +107,15 @@ signal status_gained(by: int, status: StringName)
 ## One of Combat's reactions between statuses, `reaction` (&"shatter"), happened on this actor, set
 ## off by the actor `by` (with its `reaction_triggered`): for its own listeners, as `damaged`.
 signal reacted(by: int, reaction: StringName)
+## The body `by`, which walks, overlaps this actor's touch area (`Actors.set_touch_area`) after its
+## move this tick (boss plan OB5: a prop's `touched` trigger), told by that body (`move`): for its own
+## listeners, as `damaged`.
+signal touched(by: int)
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); its components' list,
 ## found again from its children (`_find_components`; each component is walked as its member).
-const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim", &"_components"]
+## The touch areas it overlapped after its last move (`_touch`), scratch.
+const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim", &"_components", &"_touching"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
 const VIEW: Array[StringName] = [&"_looks", &"damage_numbers"]
 ## State as who it points at: the controller driving it now, which may be another body's (a
@@ -197,6 +204,8 @@ var size: float = 1.0
 var _looks: Array[ActorLook] = []
 ## True once the looks have shown the start of the local stop the body is in (see `step`).
 var _hold_shown: bool = false
+## Scratch of `_touch`: the actors whose touch area it overlaps.
+var _touching: PackedInt32Array = PackedInt32Array()
 ## Whether the Tick steps this body (core/sim/tick.gd, by actor id): off for a body another
 ## steps (a decoy: Entities) or a test steps by hand.
 var ticking: bool = true
@@ -297,6 +306,25 @@ func move(delta: float) -> void:
 	global_position = to
 	if to != unhindered:
 		velocity = (to - from) / delta
+	if actors != null and not actors.touch_ids.is_empty():
+		_touch()
+
+
+## Tell every actor whose touch area this body overlaps where its move left it (its circle against
+## the walls at its feet; `Actors.touching`), lowest id first: their `touched`. A body down, dying or
+## leaving touches nothing. Each tick it overlaps, so a prop that should hear it once leaves its
+## `touched` state (content/props/README.md).
+func _touch() -> void:
+	if id == ActorsScript.NONE or _down or _dying or _leaving:
+		return
+	var found: int = actors.touching(global_position, wall_radius(), _touching)
+	for i in found:
+		if _dying or _leaving:
+			# What a touched prop did ended this body (its blast): it touches no more.
+			return
+		var other := actors.node_of(_touching[i]) as Actor
+		if other != null and other != self and not other.is_dying() and not other.is_leaving():
+			other.touched.emit(id)
 
 
 ## The radius of the body against the walls: its footprint's circle (`Footprint.radius`).

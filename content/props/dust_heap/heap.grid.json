@@ -1,0 +1,27 @@
+{
+	"colours": {
+		"b": "#7a7694",
+		"h": "#d4d0e0",
+		"l": "#a39fb8",
+		"o": "#14121f",
+		"s": "#4a4663"
+	},
+	"rows": [
+		"........................",
+		"........................",
+		"........................",
+		"..........oooo..........",
+		"........oohhllo.........",
+		".......ohhlllbbo........",
+		"......ohllllbbbbo.......",
+		".....ohlllbbbbbbso......",
+		"....oolllbbbbbbbsso.....",
+		"...ohllbbbbbbbbbbsoo....",
+		"..ohlllbbbbbbbbbbbssoo..",
+		".ohllbbbbbbbbbbbbbbbsso.",
+		".olbbbbbbbbbbbbbbbbbsso.",
+		"..oooooooooooooooooooo..",
+		"........................",
+		"........................"
+	]
+}

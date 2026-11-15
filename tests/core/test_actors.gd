@@ -352,3 +352,31 @@ func test_a_closed_still_body_leaves_no_flag_behind() -> void:
 	check(_actors.is_still(id), "a still body is still")
 	_actors.close(id)
 	check_equal(_actors.still[id], 0, "closed, its id is as a fresh table's")
+
+
+## Boss plan OB5: a touch area (a prop's `touched` trigger) is named to every circle that overlaps
+## it, lowest id first, and closing its id takes it away.
+func test_touch_areas_name_the_circles_that_overlap_them() -> void:
+	var ids: Array[int] = _open_enemies(3)
+	var out := PackedInt32Array()
+	check_equal(_actors.touching(Vector2.ZERO, 8.0, out), 0, "no areas: nobody is touched")
+	_actors.set_touch_area(ids[2], Rect2(0.0, 0.0, 20.0, 10.0))
+	_actors.set_touch_area(ids[0], Rect2(10.0, 0.0, 20.0, 10.0))
+	check_equal(_actors.touch_ids, PackedInt32Array([ids[0], ids[2]]), "the ids with an area, lowest first")
+	check_equal(_actors.touch_area_of(ids[2]), Rect2(0.0, 0.0, 20.0, 10.0), "its box")
+	check_equal(_actors.touching(Vector2(15.0, 5.0), 0.0, out), 2, "a point in both")
+	check_equal(out.slice(0, 2), PackedInt32Array([ids[0], ids[2]]), "named lowest id first")
+	check_equal(_actors.touching(Vector2(-5.0, 5.0), 4.0, out), 0, "a circle short of the edge: none")
+	check_equal(_actors.touching(Vector2(-5.0, 5.0), 6.0, out), 1, "a circle over the edge: touched")
+	check_equal(out[0], ids[2], "the one it overlaps")
+	_actors.set_touch_area(ids[0], Rect2(10.0, 0.0, 20.0, 10.0))
+	check_equal(_actors.touch_ids.size(), 2, "laid again: not twice")
+	_actors.set_touch_area(ids[1], Rect2())
+	check_equal(_actors.touch_ids.size(), 2, "an empty area lays nothing")
+	_actors.close(ids[2])
+	check_equal(_actors.touch_ids, PackedInt32Array([ids[0]]), "a closed id's area is gone")
+	check_equal(_actors.touch_area_of(ids[2]), Rect2(), "and nothing of it is left")
+	_actors.set_touch_area(ids[2], Rect2(0.0, 0.0, 20.0, 10.0))
+	check(_actors.touch_ids.size() == 1, "an id not open takes none")
+	_actors.clear()
+	check(_actors.touch_ids.is_empty(), "a cleared table has none")

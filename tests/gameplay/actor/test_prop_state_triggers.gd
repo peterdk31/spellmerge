@@ -474,6 +474,130 @@ func test_problems_name_what_is_wrong() -> void:
 	check(found.contains("two states are named 'idle'"), "a name twice")
 
 
+# --- Touched (boss plan OB5) ---------------------------------------------------------
+
+## A prop at `at` that goes from `idle` to `walked` when a body walks into its area, a box 32 x 16 round
+## its feet (its states block nothing, so a walker passes over it).
+func _touchy(at: Vector2) -> Actor:
+	var rows: Array[PropTrigger] = [PropTrigger.make(PropTrigger.When.TOUCHED, 0, &"walked")]
+	var data: PropBase = _made([PropState.make(&"idle", rows, false), PropState.make(&"walked", [], false)], 10.0, true)
+	data.area_size = Vector2(32.0, 16.0)
+	return _prop(data, at)
+
+
+## A walker at `at` that walks along `way` (a body with a Mover), stepped and moved by hand.
+func _walker(at: Vector2, way: Vector2) -> Actor:
+	var controller := Fixture.Scripted.new()
+	controller.move = way
+	return _world.actor(at, [&"mover"], controller)
+
+
+## `steps` steps of `body`, each followed by its move (the Tick's `tick_step`), so it touches.
+func _walk(body: Actor, steps: int) -> void:
+	for i in steps:
+		body.step(Fixture.STEP)
+		body.move(Fixture.STEP)
+
+
+func test_a_body_walking_into_its_area_touches_it() -> void:
+	var prop: Actor = _touchy(Vector2(100.0, 0.0))
+	var walker: Actor = _walker(Vector2(40.0, 0.0), Vector2.RIGHT)
+	var heard: Array[int] = []
+	prop.touched.connect(func(by: int) -> void: heard.append(by))
+	_walk(walker, 1)
+	check_equal(_state(prop), &"idle", "a body far off touches nothing")
+	for i in 120:
+		_walk(walker, 1)
+		if _state(prop) != &"idle":
+			break
+	check_equal(_state(prop), &"walked", "walked into, it moved on")
+	check_equal(heard, [walker.id] as Array[int], "told once, by the body that walked in")
+	var edge: float = walker.global_position.x + walker.wall_radius()
+	check(edge >= 84.0 and edge < 84.0 + walker.mover.speed * Fixture.STEP + 0.01, "as its circle first met the area's edge (x %s)" % edge)
+	_walk(walker, 5)
+	check_equal(heard.size(), 1, "its state hears no touch: told no more")
+
+
+func test_only_a_state_that_hears_touches_lays_its_area() -> void:
+	var prop: Actor = _touchy(Vector2(100.0, 20.0))
+	check_equal(_world.table.touch_area_of(prop.id), Rect2(84.0, 12.0, 32.0, 16.0), "listening, its area round its feet is in the table")
+	check(prop.state_triggers.enter(&"walked"), "moved on")
+	check_equal(_world.table.touch_area_of(prop.id), Rect2(), "a state with no touched row lays none")
+	check(prop.state_triggers.enter(&"idle"), "back")
+	check_equal(_world.table.touch_area_of(prop.id), Rect2(84.0, 12.0, 32.0, 16.0), "laid again")
+	var id: int = prop.id
+	_world.actors.erase(prop)
+	prop.free()
+	check_equal(_world.table.touch_area_of(id), Rect2(), "gone, it leaves none")
+	check(_world.table.touch_ids.is_empty(), "and the walkers ask nobody")
+
+
+func test_a_body_that_does_not_walk_touches_nothing() -> void:
+	var prop: Actor = _touchy(Vector2(100.0, 0.0))
+	var stander: Actor = _dummy(Vector2(100.0, 0.0))
+	_world.run(5)
+	check_equal(_state(prop), &"idle", "a body with no Mover never touches")
+	check(is_instance_valid(stander), "it stood there all along")
+
+
+func test_a_downed_body_touches_nothing() -> void:
+	var prop: Actor = _touchy(Vector2(100.0, 0.0))
+	var walker: Actor = _walker(Vector2(100.0, 0.0), Vector2.ZERO)
+	walker.set_down(true)
+	_walk(walker, 3)
+	check_equal(_state(prop), &"idle", "down on it, it touches nothing")
+	walker.set_down(false)
+	_walk(walker, 1)
+	check_equal(_state(prop), &"walked", "up again, it does")
+
+
+func test_a_touched_row_needs_an_area() -> void:
+	var rows: Array[PropTrigger] = [PropTrigger.make(PropTrigger.When.TOUCHED, 0, &"walked")]
+	var data: PropBase = _made([PropState.make(&"idle", rows), PropState.make(&"walked")])
+	check("\n".join(data.problems(_known())).contains("no area"), "a touched row with nowhere to be touched")
+	data.area_size = Vector2(16.0, 16.0)
+	check(not "\n".join(data.problems(_known())).contains("no area"), "with an area it is sound")
+
+
+func test_a_touched_row_that_casts_and_never_leaves_is_named() -> void:
+	var rows: Array[PropTrigger] = [PropTrigger.make(PropTrigger.When.TOUCHED, 2)]
+	var data: PropBase = _made([PropState.make(&"idle", rows)])
+	data.area_size = Vector2(16.0, 16.0)
+	check("\n".join(data.problems(_known())).contains("every tick"), "a cast every tick a body stands on it")
+	rows.append(PropTrigger.make(PropTrigger.When.TOUCHED, 0, &"spent"))
+	data.states = PropStates.make([PropState.make(&"idle", rows), PropState.make(&"spent")])
+	check(not "\n".join(data.problems(_known())).contains("every tick"), "with a row that leaves, once")
+
+
+func test_its_area_grows_with_the_body() -> void:
+	var prop: Actor = _touchy(Vector2(100.0, 0.0))
+	prop.set_size(2.0)
+	check(prop.state_triggers.enter(&"walked") and prop.state_triggers.enter(&"idle"), "laid again")
+	check_equal(_world.table.touch_area_of(prop.id), Rect2(68.0, -16.0, 64.0, 32.0), "twice as big round its feet")
+
+
+func test_the_ticks_own_step_touches() -> void:
+	var prop: Actor = _touchy(Vector2(100.0, 0.0))
+	var walker: Actor = _walker(Vector2(100.0, 0.0), Vector2.ZERO)
+	walker.tick_step(Fixture.STEP)
+	check_equal(_state(prop), &"walked", "a body the Tick steps touches where its move left it")
+
+
+func test_a_snapshot_rolls_its_touch_area_back() -> void:
+	var prop: Actor = _touchy(Vector2(100.0, 0.0))
+	var snapshot := Snapshot.take(_areas(), root)
+	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
+	var walker: Actor = _walker(Vector2(100.0, 0.0), Vector2.ZERO)
+	_walk(walker, 1)
+	_world.actors.erase(walker)
+	walker.free()
+	check_equal(_state(prop), &"walked", "walked into since")
+	check(_world.table.touch_ids.is_empty(), "and listening no more")
+	check_equal(snapshot.restore(_areas(), root, _world.prepare), PackedStringArray(), "restored without problems")
+	check_equal(_state(prop), &"idle", "idle again")
+	check_equal(_world.table.touch_area_of(prop.id), Rect2(84.0, -8.0, 32.0, 16.0), "its area laid again")
+
+
 # --- State ------------------------------------------------------------------------
 
 func test_its_state_is_state() -> void:

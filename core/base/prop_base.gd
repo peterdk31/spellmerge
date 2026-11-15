@@ -28,7 +28,9 @@ extends Resource
 ## A prop with a role never stands in the yard, so a new role is added with the rule that reads it.
 @export var role: StringName = &""
 ## Where standing on it counts (props W8c), a box `area_size` across round `area_offset` from its
-## feet, apart from the ground that blocks (`footprint_*`): the stone's slab is stood on. Zero: none.
+## feet, apart from the ground that blocks (`footprint_*`): the stone's slab is stood on. It is also
+## where a body walking into it touches it (a `touched` trigger, boss plan OB5: a dust heap), so a
+## prop that blocks and hears touches has an area a little beyond its ground. Zero: none.
 @export var area_size: Vector2 = Vector2.ZERO
 @export var area_offset: Vector2 = Vector2.ZERO
 
@@ -127,7 +129,28 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 		found.append("%s has no states." % id)
 	else:
 		found.append_array(states.problems(String(id), mini(staffs.size(), MAX_STAFFS), known))
+		if states.listens(PropTrigger.When.TOUCHED) and not area_rect().has_area():
+			found.append("%s has a touched trigger but no area (area_size) to be touched in." % id)
+		found.append_array(_touch_problems())
 	found.append_array(look_problems())
+	return found
+
+
+## A state whose `touched` rows cast but none of them leaves it: a touch is told every tick a body
+## overlaps, so it would cast every tick (a prop that hears it once moves on with a `then`).
+func _touch_problems() -> PackedStringArray:
+	var found := PackedStringArray()
+	for state in states.list:
+		if state == null:
+			continue
+		var casts: bool = false
+		var leaves: bool = false
+		for row in state.triggers:
+			if row != null and row.when == PropTrigger.When.TOUCHED:
+				casts = casts or row.cast > 0
+				leaves = leaves or (row.then != &"" and row.then != state.state_id)
+		if casts and not leaves:
+			found.append("%s: the state '%s' casts on touched but never leaves it, so it would cast every tick a body stands in its area." % [id, state.state_id])
 	return found
 
 

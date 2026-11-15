@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="PropStates" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_trigger.gd" id="1"]
+[ext_resource type="Script" path="res://core/base/prop_state.gd" id="2"]
+[ext_resource type="Script" path="res://core/base/prop_states.gd" id="3"]
+
+[sub_resource type="Resource" id="fire_hit"]
+script = ExtResource("1")
+element = &"fire"
+cast = 1
+then = &"burnt"
+
+[sub_resource type="Resource" id="burn"]
+script = ExtResource("1")
+when = 1
+status = &"burn"
+cast = 1
+then = &"burnt"
+
+[sub_resource type="Resource" id="heap_touched"]
+script = ExtResource("1")
+when = 8
+then = &"scattered"
+
+[sub_resource type="Resource" id="heap"]
+script = ExtResource("2")
+state_id = &"heap"
+triggers = Array[ExtResource("1")]([SubResource("fire_hit"), SubResource("burn"), SubResource("heap_touched")])
+
+[sub_resource type="Resource" id="scattered"]
+script = ExtResource("2")
+state_id = &"scattered"
+triggers = Array[ExtResource("1")]([SubResource("fire_hit"), SubResource("burn")])
+blocks = false
+
+[sub_resource type="Resource" id="burnt"]
+script = ExtResource("2")
+state_id = &"burnt"
+blocks = false
+hittable = false
+
+[resource]
+script = ExtResource("3")
+list = Array[ExtResource("2")]([SubResource("heap"), SubResource("scattered"), SubResource("burnt")])

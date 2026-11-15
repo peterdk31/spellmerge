@@ -1,0 +1,28 @@
+{
+	"assets": [
+		{
+			"path": "content/props/cracked_pillar/intact.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from intact.grid.json, 2026-11-15)",
+			"prompt": "A stone pillar prop, 24x48, seen from a little above: a wide Stone cap with a Bone-lit top edge, a square shaft of stacked blocks with dark mortar lines, a wide base. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/cracked_pillar/cracked.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from cracked.grid.json, 2026-11-15)",
+			"prompt": "The stone pillar cracked: intact.svg with a zig-zag crack down its shaft, a chip off the cap's right corner and a split in its base. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/cracked_pillar/rubble.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from rubble.grid.json, 2026-11-15)",
+			"prompt": "The stone pillar fallen: a low pile of four Stone blocks, 24x16. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		}
+	]
+}

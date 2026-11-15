@@ -26,6 +26,10 @@ extends Node
 ##   body is. It is what the simulation keeps for "that body" (a shot's homing target, what it hit,
 ##   a chain's last body, an AI's target), never an instance id, which differs between machines
 ##   and runs. The births count from 0 at each run's start (`begin_run`).
+## - `set_touch_area(id, area)` gives an actor a box in room pixels that hears a body walk into it
+##   (a prop in a state with a `touched` trigger, boss plan OB5: `PropStateTriggers`), and
+##   `touching(centre, radius, out)` names the actors whose box a body's circle overlaps, lowest id
+##   first (the walking body asks after its move, `Actor.move`). Closing an id takes its box away.
 ##
 ## Packed arrays sized ACTORS, nothing allocated after start. An id outside the table or not
 ## open is safe everywhere: the questions answer NONE (`budget_of` SHARED, `node_of` null) and
@@ -93,6 +97,11 @@ var _lowest_free: int = 0
 var _count: int = 0
 ## One past the highest open id (0 when none is open): where `open_ids` stops looking.
 var _high: int = 0
+## The touch areas (`set_touch_area`): per actor its box's corners (nothing: both zero), and the ids
+## that have one, lowest first, so a body walking asks only them (none: one comparison). Read only.
+var _touch_low: PackedVector2Array = PackedVector2Array()
+var _touch_high: PackedVector2Array = PackedVector2Array()
+var touch_ids: PackedInt32Array = PackedInt32Array()
 
 
 func _init() -> void:
@@ -108,6 +117,8 @@ func _init() -> void:
 	_seat_actor.resize(SEATS)
 	_home_seat.resize(ACTORS)
 	_seat_home.resize(SEATS)
+	_touch_low.resize(ACTORS)
+	_touch_high.resize(ACTORS)
 	clear()
 
 
@@ -153,6 +164,7 @@ func close(id: int) -> void:
 	_node[id] = 0
 	_birth[id] = 0
 	_release_hold(id)
+	set_touch_area(id, Rect2())
 	_count -= 1
 	if id < _lowest_free:
 		_lowest_free = id
@@ -348,6 +360,53 @@ func is_still(id: int) -> bool:
 	return id >= 0 and id < ACTORS and still[id] != 0
 
 
+## The box in room pixels where a body walking into `id` touches it (a prop's `touched` trigger,
+## `PropStateTriggers`), in place of any before; an empty one takes it away. Only an open id has
+## one. The list of ids changes only here (a prop entering or leaving such a state), never each step.
+func set_touch_area(id: int, area: Rect2) -> void:
+	if id < 0 or id >= ACTORS:
+		return
+	var at: int = touch_ids.bsearch(id)
+	var had: bool = at < touch_ids.size() and touch_ids[at] == id
+	var has: bool = is_open(id) and area.has_area() and area.is_finite()
+	if has:
+		_touch_low[id] = area.position
+		_touch_high[id] = area.end
+		if not had:
+			touch_ids.insert(at, id)
+	else:
+		_touch_low[id] = Vector2.ZERO
+		_touch_high[id] = Vector2.ZERO
+		if had:
+			touch_ids.remove_at(at)
+
+
+## The touch area of `id` (`set_touch_area`), empty for none.
+func touch_area_of(id: int) -> Rect2:
+	if id < 0 or id >= ACTORS or _touch_high[id] == _touch_low[id]:
+		return Rect2()
+	return Rect2(_touch_low[id], _touch_high[id] - _touch_low[id])
+
+
+## The actors whose touch area a circle of `radius` round `centre` overlaps (a body's feet and its
+## circle against the walls; radius 0: the point alone), lowest id first, written into `out` (grown
+## when short, never shrunk, so a caller reuses it); returns how many.
+func touching(centre: Vector2, radius: float, out: PackedInt32Array) -> int:
+	var found: int = 0
+	var reach_sq: float = radius * radius
+	for id in touch_ids:
+		var low: Vector2 = _touch_low[id]
+		var high: Vector2 = _touch_high[id]
+		var near: Vector2 = Vector2(clampf(centre.x, low.x, high.x), clampf(centre.y, low.y, high.y))
+		if near.distance_squared_to(centre) > reach_sq:
+			continue
+		if found >= out.size():
+			out.resize(found + 4)
+		out[found] = id
+		found += 1
+	return found
+
+
 ## Seconds left of the local stop on `id` (0 when it is not held).
 func held_left(id: int) -> float:
 	return _held[id] if id >= 0 and id < ACTORS else 0.0
@@ -408,6 +467,9 @@ func clear() -> void:
 	_lowest_free = 0
 	_high = 0
 	_count = 0
+	_touch_low.fill(Vector2.ZERO)
+	_touch_high.fill(Vector2.ZERO)
+	touch_ids.clear()
 
 
 ## Seats `id` at `seat` (NONE, or anything outside 0-3, unseats it); whoever held that seat

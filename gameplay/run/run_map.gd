@@ -12,6 +12,9 @@ extends RefCounted
 var run: StringName = &""
 ## The biome its rooms are of (`MapRules.biome`).
 var biome: StringName = &""
+## How many players the run was made for (the seats joined at its start; run generation RG5): its
+## rooms' scales (`RunNode.scale`) count them.
+var players: int = 1
 ## Its rooms, row by row, each row left to right (`RunNode.index` is the place here).
 var nodes: Array[RunNode] = []
 ## Why no map could be made, one line each (empty for a map that was made).

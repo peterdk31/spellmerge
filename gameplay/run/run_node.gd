@@ -20,3 +20,7 @@ var room: StringName = &""
 var links: PackedInt32Array = PackedInt32Array()
 ## What stands in it as it starts (`EnemyBase.id`s, one per body; a fight's enemies, a boss room's boss).
 var enemies: Array[StringName] = []
+## How much harder it is than the run's first room with one player (run generation RG5,
+## `RunScaling.room_scale`: its depth and the run's players): its enemy budget was scaled by it, and
+## every enemy's and boss's health is (gameplay/difficulty).
+var scale: float = 1.0

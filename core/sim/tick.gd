@@ -65,7 +65,7 @@ const STEPS: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entiti
 ## manager and Combat), so no area is renewed under a body that leaves after; then the services in
 ## the tick's order. The actor table goes last, once every area has let its bodies go: its births
 ## count from 0 again (the keys, N5).
-const RUN_ORDER: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat", &"Items", &"Run"]
+const RUN_ORDER: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat", &"Items", &"Run", &"Difficulty"]
 ## The name the actor table is part of the state under.
 const ACTORS: StringName = &"Actors"
 

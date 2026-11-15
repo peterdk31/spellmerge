@@ -9,6 +9,12 @@ extends Resource
 ## Rows count from 0, the map's first room; a negative row counts from the end of the map, so -1
 ## is its last row whatever its depth (the boss's), -2 the one before.
 
+## The most its weight and limits may be (the editor's ranges; a rule change, run generation RG6,
+## may not pass them either).
+const MOST_WEIGHT: float = 100.0
+const MOST_PER_ROW: int = 16
+const MOST_PER_RUN: int = 64
+
 ## The kind (`RoomKind.id`).
 @export var kind: StringName = &""
 ## The first row it may stand in (0: the first room; below 0 from the end, -1 the last).
@@ -73,10 +79,12 @@ func problems(known: Array[StringName]) -> PackedStringArray:
 		found.append("Kind rule '%s': no room kind of that id." % kind)
 	if (first_row >= 0) == (last_row >= 0) and first_row > last_row:
 		found.append("Kind rule '%s': rows %d to %d, the first after the last." % [kind, first_row, last_row])
-	if weight <= 0.0:
-		found.append("Kind rule '%s': its weight is %s; above 0." % [kind, weight])
+	if not (weight > 0.0) or weight > MOST_WEIGHT:
+		found.append("Kind rule '%s': its weight is %s; above 0, %s at most." % [kind, weight, MOST_WEIGHT])
 	if max_per_row < 0 or max_per_run < 0:
 		found.append("Kind rule '%s': a limit below 0 (0 is no limit)." % kind)
+	if max_per_row > MOST_PER_ROW or max_per_run > MOST_PER_RUN:
+		found.append("Kind rule '%s': limits %d a row and %d a run; %d and %d at most." % [kind, max_per_row, max_per_run, MOST_PER_ROW, MOST_PER_RUN])
 	for before: StringName in not_after:
 		if not known.has(before):
 			found.append("Kind rule '%s': not_after names '%s', no room kind of that id." % [kind, before])

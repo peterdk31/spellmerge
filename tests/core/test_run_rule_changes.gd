@@ -242,7 +242,7 @@ func test_a_held_change_is_applied_once_through_the_generator() -> void:
 	scaled.changes = [RunRuleChange.make(&"x", RunRuleChange.Target.SCALE_DEPTH_END, 2.0, RunRuleChange.How.TIMES)] as Array[RunRuleChange]
 	var once: RunDefinition = scaled.changed_by(_unlocks([&"x"] as Array[StringName]))
 	RunGenerator.generate(once, _content(), Sim.seeded(1))
-	check(is_equal_approx(once.scaling.per_depth.end, 4.0), "a TIMES change once: 2 x 2, after the generator checked it too")
+	check(is_equal_approx(once.scaling.per_depth.end, 4.0), "a TIMES change once: 2 x 2")
 
 
 func test_a_change_past_the_rules_most_is_named() -> void:
@@ -251,6 +251,12 @@ func test_a_change_past_the_rules_most_is_named() -> void:
 	check(_names(run.problems(_content()), "35; 32 at most"), "a depth past the most")
 	run.changes = [RunRuleChange.make(&"wide", RunRuleChange.Target.WIDTH_MAX, 3.0, RunRuleChange.How.TIMES)] as Array[RunRuleChange]
 	check(_names(run.problems(_content()), "width up to 9"), "a width past the most")
+	run.changes = [RunRuleChange.make(&"steep", RunRuleChange.Target.SCALE_DEPTH_END, 1000.0, RunRuleChange.How.TIMES)] as Array[RunRuleChange]
+	check(_names(run.problems(_content()), "scaling per depth: end 2000"), "a scaling factor past the most")
+	run.changes = [RunRuleChange.make(&"heavy", RunRuleChange.Target.KIND_WEIGHT, 500.0, RunRuleChange.How.SET, &"", &"fight")] as Array[RunRuleChange]
+	check(_names(run.problems(_content()), "its weight is 500"), "a weight past the most")
+	run.changes = [RunRuleChange.make(&"crowd", RunRuleChange.Target.KIND_MAX_PER_ROW, 40.0, RunRuleChange.How.SET, &"", &"fight")] as Array[RunRuleChange]
+	check(_names(run.problems(_content()), "limits 40 a row"), "a limit past the most")
 	run.changes = []
 	for i in RunUnlocks.MAX_FLAGS + 1:
 		run.changes.append(RunRuleChange.make(StringName("f%d" % i), RunRuleChange.Target.WIDTH_MAX, 3.0))

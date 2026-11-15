@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="EnemyBase" load_steps=19 format=3]
+[gd_resource type="Resource" script_class="EnemyBase" load_steps=22 format=3]
 
 [ext_resource type="Script" path="res://core/base/enemy_base.gd" id="1_base"]
 [ext_resource type="PackedScene" path="res://content/bosses/old_broom/old_broom.tscn" id="2_scene"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://core/base/enemy_phase.gd" id="6_phase"]
 [ext_resource type="Script" path="res://core/base/phase_look.gd" id="7_look"]
 [ext_resource type="Texture2D" path="res://content/bosses/old_broom/burning.svg" id="8_burning"]
+[ext_resource type="Script" path="res://core/base/actor_stats.gd" id="9_stats"]
 
 [sub_resource type="Resource" id="Resource_sweep_staff"]
 script = ExtResource("3_staff")
@@ -103,11 +104,30 @@ script = ExtResource("7_look")
 texture = ExtResource("8_burning")
 glow = Color(1, 0.635, 0.235, 1)
 
+[sub_resource type="Resource" id="Resource_stats"]
+script = ExtResource("9_stats")
+power = 2.0
+mass = 6.0
+spell_scale = 1.5
+resist_burn = 0.3
+resist_chill = 0.6
+resist_possess = 0.7
+
+[sub_resource type="Resource" id="Resource_stats_2"]
+script = ExtResource("9_stats")
+power = 2.5
+mass = 6.0
+spell_scale = 1.5
+resist_burn = 0.3
+resist_chill = 0.6
+resist_possess = 0.7
+
 [sub_resource type="Resource" id="Resource_phase_2"]
 script = ExtResource("6_phase")
 health_below = 0.55
 staffs = Array[ExtResource("4_entry")]([SubResource("Resource_double_sweep"), SubResource("Resource_flick"), SubResource("Resource_swat")])
 profile = SubResource("Resource_spring_cleaning")
+stats = SubResource("Resource_stats_2")
 look = SubResource("Resource_burning")
 transition = 2.0
 
@@ -121,6 +141,7 @@ move_speed = 40.0
 contact_damage = 8
 scene = ExtResource("2_scene")
 boss = true
+stats = SubResource("Resource_stats")
 hit_color = Color(0.949, 0.761, 0.188, 1)
 staffs = Array[ExtResource("4_entry")]([SubResource("Resource_sweep"), SubResource("Resource_flick"), SubResource("Resource_swat")])
 profile = SubResource("Resource_tidying")

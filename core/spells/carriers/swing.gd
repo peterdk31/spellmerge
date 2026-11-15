@@ -454,6 +454,12 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _directi
 	return 1 if start(spell, tag, actor, origin, heading, chain, prev, source, kit.caster(), kit.caster_seq(), kit.is_echo(spell)) else 0
 
 
+## A swing's size is its arc's reach: a bigger body swings further round it, as wide.
+func scale_size(spell: CompiledSpell, factor: float) -> void:
+	super.scale_size(spell, factor)
+	spell.ray_length *= factor
+
+
 func reach_of(spell: CompiledSpell) -> float:
 	return spell.ray_length
 

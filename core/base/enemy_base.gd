@@ -23,6 +23,9 @@ extends Resource
 
 ## The body's scale (1: as drawn); a boss is bigger.
 @export var size: float = 1.0
+## Its stats (boss plan OB7: power, mass, spell scale, resists; null: every default, the game as it
+## is). Copied into the body's own `Stats` as it enters play.
+@export var stats: ActorStats = null
 
 ## Its own colour when hit (Feel): the spray of a hit on its body and its death's puff, in the
 ## palette ramp nearest it; not its spell's colours (those are its shots'). Ember for every enemy so
@@ -84,10 +87,13 @@ func profile_or_fallback() -> AIProfile:
 
 
 ## What is wrong with the enemy's data, one line each (empty when it is fine): too many staffs,
-## a staff entry's problems, a phase without a condition or with too many staffs, a cost below 1,
-## a depth below 0 or a biome twice.
+## a staff entry's problems, a phase without a condition or with too many staffs, its stats' or a
+## phase's stats' problems (`ActorStats.problems`), a cost below 1, a depth below 0 or a biome twice.
 func problems() -> PackedStringArray:
 	var found: PackedStringArray = StaffCards.list_problems(String(id), staffs, MAX_STAFFS)
+	if stats != null:
+		for line: String in stats.problems():
+			found.append("%s: stats: %s" % [id, line])
 	if cost < 1:
 		found.append("%s: its cost is %d; at least 1." % [id, cost])
 	if min_depth < 0:
@@ -102,6 +108,9 @@ func problems() -> PackedStringArray:
 			continue
 		if not phase.has_condition():
 			found.append("%s: phase %d has no condition (health_below or after_seconds)." % [id, at])
+		if phase.stats != null:
+			for line: String in phase.stats.problems():
+				found.append("%s: phase %d stats: %s" % [id, at, line])
 		if phase.staffs.size() > MAX_STAFFS:
 			found.append("%s: phase %d has %d staffs; at most %d." % [id, at, phase.staffs.size(), MAX_STAFFS])
 		for k in phase.staffs.size():

@@ -481,6 +481,12 @@ var _aim_pivot: PackedVector2Array = PackedVector2Array()
 ## caster * STAFFS + staff -> the last generation that staff used, so a build after an empty
 ## staff, or a caster opened again under the same id, goes on round the ring (old shots in the air keep theirs).
 var _ring: PackedInt32Array = PackedInt32Array()
+## caster * STAFFS + staff -> where the ring stood when the caster now under that id opened
+## (`open_caster`), and how many builds it has begun since (at most GENERATIONS; 0 once it closed):
+## which generations are its own (`cast_by_open`), so a shot of an earlier caster with the same id
+## is never taken for this one's (boss plan OB7: power is read from the caster's body).
+var _open_ring: PackedInt32Array = PackedInt32Array()
+var _open_builds: PackedInt32Array = PackedInt32Array()
 ## This runtime's carriers, by id (`Carriers.make_all`, bound to it through `_kit`).
 var _carriers: Dictionary = {}
 ## The carrier that runs nothing (id &""), for a spell whose carrier id no carrier has.
@@ -529,6 +535,9 @@ func _init() -> void:
 	_aim_pivot.fill(Vector2.INF)
 	_ring.resize(ACTORS * SpellLimits.STAFFS)
 	_ring.fill(-1)
+	_open_ring.resize(ACTORS * SpellLimits.STAFFS)
+	_open_ring.fill(-1)
+	_open_builds.resize(ACTORS * SpellLimits.STAFFS)
 	_cooldown.resize(ACTORS * SpellLimits.STAFFS)
 	_wind_due.resize(ACTORS * SpellLimits.STAFFS)
 	_wind_due.fill(INF)
@@ -757,9 +766,10 @@ func card_works(card_id: StringName, carrier: StringName) -> bool:
 ## Compiles a staff's cards (ids by slot, `&""` for an empty slot) into its cycle, the casts it
 ## makes until its cycle ends (staffs A4; the rules are docs/milestones/M2-staffs.md, "Reading a
 ## staff", and `StaffCompiler`). It never errors and refuses nothing: an unknown or useless
-## card is listed in `wasted`.
-func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
-	return StaffCompiler.new(_component).compile(cards, staff)
+## card is listed in `wasted`. `spell_scale` is the casting body's (boss plan OB7, its `Stats`):
+## × every spell's size (`Carrier.scale_size`), 1 as the cards say.
+func compile_staff(cards: Array[StringName], staff: StaffBase, spell_scale: float = 1.0) -> CompiledStaff:
+	return StaffCompiler.new(_component).compile(cards, staff, spell_scale)
 
 
 ## What the builder shows of a staff, as plain values so that nothing outside `core/spells`
@@ -986,6 +996,7 @@ func begin_generation(actor: int, staff: int, compiled: CompiledStaff) -> int:
 		return 0
 	var generation: int = (_ring[index] + 1) % SpellLimits.GENERATIONS
 	_ring[index] = generation
+	_open_builds[index] = mini(_open_builds[index] + 1, SpellLimits.GENERATIONS)
 	_current[index] = generation
 	var key: int = SpellTag.generation_key(SpellTag.make(actor, staff, 0, generation))
 	for node in _node_counts.get(key, 0):
@@ -3446,6 +3457,8 @@ func clear() -> void:
 	_pending.clear()
 	_penta_rings.clear()
 	_ring.fill(-1)
+	_open_ring.fill(-1)
+	_open_builds.fill(0)
 	_last_carrier_card.fill(&"")
 	_cast_count.fill(0)
 	_lc_count = 0
@@ -3579,7 +3592,26 @@ func open_caster(actor: int) -> bool:
 		return false
 	# Whatever an earlier caster with this id left (builds, holds, beams, launches) goes first.
 	close_caster(actor)
+	for staff in SpellLimits.STAFFS:
+		_open_ring[actor * SpellLimits.STAFFS + staff] = _ring[actor * SpellLimits.STAFFS + staff]
 	return true
+
+
+## True when the spell tag `tag` is of a build the caster open now under its id began (`open_caster`,
+## then `install_staff`), not one of an earlier caster with the same id whose shots still fly, nor
+## of a caster closed since: what reads the caster's body at the hit (Combat's power, boss plan OB7)
+## asks it first. Builds count from the caster's open; past GENERATIONS of them every generation
+## of the ring is its own (the older shots of each were revoked as it began them).
+func cast_by_open(tag: int) -> bool:
+	if not SpellTag.is_spell_tag(tag):
+		return false
+	var index: int = SpellTag.caster_of(tag) * SpellLimits.STAFFS + SpellTag.staff_of(tag)
+	var builds: int = _open_builds[index]
+	if builds <= 0:
+		return false
+	if builds >= SpellLimits.GENERATIONS:
+		return true
+	return posmod(SpellTag.generation_of(tag) - _open_ring[index] - 1, SpellLimits.GENERATIONS) < builds
 
 
 ## The caster `actor` is gone (its body left or died): its staffs are emptied, its own waiting
@@ -3592,6 +3624,8 @@ func close_caster(actor: int) -> void:
 	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.caster == CASTER_BODY)
 	for staff in SpellLimits.STAFFS:
 		var index: int = actor * SpellLimits.STAFFS + staff
+		_open_builds[index] = 0
+		_open_ring[index] = _ring[index]
 		_release_hold(index)
 		var old: int = _current[index]
 		_installed[index] = null

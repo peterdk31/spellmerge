@@ -416,3 +416,33 @@ func test_a_restore_mid_possession_tells_the_seat_its_bodys_numbers() -> void:
 	wizard.step(1.0 / 16.0)
 	check(said.has([0, wizard.health.health, wizard.health.max_health]), "the wizard's numbers are said again at its next step: %s" % [said])
 	played.free_all()
+
+
+## A body's stats (boss plan OB7) are its own state: changed in play, they come back as they were
+## in a fresh world, not as its data's (the body takes its data's only once, `Stats.taken`), and
+## the fight plays on the same.
+func test_a_body_s_changed_stats_are_restored() -> void:
+	var played := SimScenes.new(root, &"fight")
+	var enemy: Actor = played.areas()["actor 2"]
+	enemy.stats.power = 2.5
+	enemy.stats.mass = 4.0
+	enemy.stats.resist[Stats.POSSESS] = 0.5
+	for i in BEFORE:
+		played.step()
+	var snapshot := Snapshot.take(played.areas(), played.world())
+	var restored := SimScenes.new(root, &"fight")
+	_check_problems(&"stats", restored.restore(snapshot, played))
+	var again: Actor = restored.areas()["actor 2"]
+	check_equal(again.stats.power, 2.5, "its power as it was")
+	check_equal(again.stats.mass, 4.0, "its mass")
+	check_equal(again.stats.resist_of(Stats.POSSESS), 0.5, "its possess resist")
+	var first := Desync.new()
+	var second := Desync.new()
+	for i in AFTER:
+		played.step()
+		restored.step()
+		first.capture(played.areas())
+		second.capture(restored.areas())
+	check_equal(Desync.first_parting(first, second), -1, "and the fight plays on the same")
+	played.free_all()
+	restored.free_all()

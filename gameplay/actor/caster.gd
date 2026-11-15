@@ -595,7 +595,7 @@ func _compiled(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
 		return found
 	if _cache.size() >= CACHE_SIZE:
 		_cache.clear()
-	found = actor.spells.compile_staff(cards, base)
+	found = actor.spells.compile_staff(cards, base, _spell_scale())
 	_cache[key] = found
 	return found
 
@@ -611,14 +611,31 @@ func _tried(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
 		return found
 	if _trials.size() >= CACHE_SIZE:
 		_trials.clear()
-	found = actor.spells.compile_staff(cards, base)
+	found = actor.spells.compile_staff(cards, base, _spell_scale())
 	_trials[key] = found
 	return found
 
 
-## The caches' key of `cards` on `base`: "spells id|staff id|cards".
+## The caches' key of `cards` on `base` at the body's spell scale: "spells id|staff id|scale|cards".
 func _key(cards: Array[StringName], base: StaffBase) -> String:
-	return "%d|%d|%s" % [actor.spells.get_instance_id(), base.get_instance_id(), ",".join(PackedStringArray(cards))]
+	return "%d|%d|%s|%s" % [actor.spells.get_instance_id(), base.get_instance_id(), _spell_scale(), ",".join(PackedStringArray(cards))]
+
+
+## The size its spells are built at (boss plan OB7): its body's `Stats.spell_scale`, 1 without.
+func _spell_scale() -> float:
+	return actor.stats.spell_scale if actor.stats != null else 1.0
+
+
+## Build every staff it holds again with the cards it holds (its body's spell scale changed: a
+## boss's phase with stats of its own, `Phases`); `staff_built` follows for each. A staff built
+## again starts its cycle anew, as after an edit.
+func rebuild() -> void:
+	if number < 0:
+		return
+	for at in staff_count:
+		if holds(at):
+			_install(at)
+			staff_built.emit(at)
 
 
 ## True when a cast of `compiled`'s cycle reads the card in `slot`.

@@ -12,6 +12,8 @@ extends Resource
 @export var staffs: Array[StaffCards] = []
 ## How it plays (null: keep).
 @export var profile: AIProfile = null
+## Its stats from this phase on (boss plan OB7; null: keep the last).
+@export var stats: ActorStats = null
 ## How it looks (null: keep).
 @export var look: PhaseLook = null
 ## Seconds it stands, protected, while it changes (0: at once).

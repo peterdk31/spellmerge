@@ -146,6 +146,18 @@ func run_content() -> RunContent:
 	return RunContent.gather(get_all(&"room_kinds"), get_all(&"rooms"), enemies)
 
 
+## What keeps a map of the run `run_id` from being made from the content there is, one line each
+## (empty when nothing does): no run of that id under `runs`, or its definition's problems
+## (`RunDefinition.problems` on `run_content()`, as the generator checks them). Asked before a run's
+## start frees anything (Flow). The rolls of a map can still corner it (only `KindRule.not_after`
+## can; gameplay/run/run_generator.gd), which only the run's seed tells.
+func run_problems(run_id: StringName) -> PackedStringArray:
+	var definition := get_resource(&"runs", run_id) as RunDefinition
+	if definition == null:
+		return PackedStringArray(["No run '%s' in the registry." % run_id])
+	return definition.problems(run_content())
+
+
 ## The problems with the runs (`runs`: each `RunDefinition.problems` on `run_content()`), each room
 ## kind's (`RoomKind.problems`) and each room's as a run's template (`RoomBase.template_problems`),
 ## one line each; empty when every run can be made from the content there is.

@@ -11,8 +11,9 @@ extends Node
 ## a joining machine gets it from the snapshot. A run's start renews it (`begin_run`): out of a run
 ## of rooms (the hub, the sandbox) there is no map.
 ##
-## A definition the registry lacks, or a map that cannot be made, answers nothing: Flow starts no
-## run, and the warning says why (`RunMap.problems`).
+## A run that cannot be made from the content there is (`Registry.run_problems`, which Flow asks
+## before anything goes), or a map its rolls cornered, answers nothing (`RunMap.problems`): Flow
+## starts no run, and the warning says why.
 ##
 ## Next (RG4): the exits, the way on through the map (`at` moving on) and the run's end.
 
@@ -67,6 +68,7 @@ func _on_run_begun(run_id: StringName) -> void:
 	if definition == null:
 		push_warning("Run: no run '%s' in the registry, so no run of rooms begins." % run_id)
 		return
+	# A definition the content cannot make a map of says so in the map (`RunDefinition.problems`).
 	var made: RunMap = RunGenerator.generate(definition, registry.run_content(), Sim.found(self))
 	if not made.is_made():
 		push_warning("Run: no map for the run '%s': %s" % [run_id, "; ".join(made.problems)])
@@ -79,4 +81,5 @@ func _on_run_begun(run_id: StringName) -> void:
 func _enter(index: int) -> void:
 	at = index
 	var node: RunNode = map.node(index)
+	# A copy: what hears it never holds the map's own list.
 	events.run_room_chosen.emit(node.room, node.enemies.duplicate())

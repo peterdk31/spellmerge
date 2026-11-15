@@ -75,6 +75,7 @@ func _initialize() -> void:
 	_test_room_start_cue_on_every_wizard()
 	_test_main_menu_only_sends_hub_requested()
 	_test_a_run_with_no_map_starts_nothing()
+	_test_an_unknown_enemy_stands_nothing_and_an_empty_room_is_won()
 	# Last: it adds a boss to the registry.
 	_test_a_boss_room_stands_its_boss()
 	_stop()
@@ -484,6 +485,28 @@ func _test_a_run_with_no_map_starts_nothing() -> void:
 	_stop()
 
 
+## What the run names that the registry lacks (an enemy deleted after a map was made) stands nothing,
+## with a warning, and a room the run puts nothing in is won as it starts. The run's area never names
+## either: the answer is stood in for here, heard after the area's (Flow takes the last answer to its
+## `run_begun`).
+func _test_an_unknown_enemy_stands_nothing_and_an_empty_room_is_won() -> void:
+	var names: Array = [[&"no_such_enemy", &"ember_imp", &"no_such_enemy"], []]
+	for named: Array in names:
+		var enemies: Array[StringName] = []
+		enemies.assign(named)
+		var answer := func(_run_id: StringName) -> void:
+			_events.emit_signal("run_room_chosen", _arena, enemies)
+		_events.connect("run_begun", answer)
+		_setup(1)
+		_play()
+		_events.disconnect("run_begun", answer)
+		if enemies.is_empty():
+			_check(_cleared == [_arena], "a room with nothing in it is won as it starts, got %s" % [_cleared])
+		else:
+			_check(_flow.enemies_left() == 1, "the imp stands, the unknown id stands nothing, got %d" % _flow.enemies_left())
+		_stop()
+
+
 ## A room of a kind filled by a boss (`RoomKind.FILL_BOSS`) stands the boss the map names, by id
 ## (`EnemyBase.FOLDERS`: the bosses' folder too), and is cleared when it is down.
 func _test_a_boss_room_stands_its_boss() -> void:
@@ -491,11 +514,13 @@ func _test_a_boss_room_stands_its_boss() -> void:
 	var boss: EnemyBase = (registry.call("get_resource", &"enemies", &"ember_imp") as EnemyBase).duplicate() as EnemyBase
 	boss.id = &"test_flow_boss"
 	boss.boss = true
+	# A biome of its own: the boss pool is this boss alone, whatever bosses the crypt gets.
+	boss.biomes = [&"test_flow_lair"] as Array[StringName]
 	registry.call("add", &"bosses", boss)
 	var room: RoomBase = ARENA.duplicate() as RoomBase
 	room.id = &"test_flow_boss_room"
 	var was: StringName = _flow.run_id_to_play
-	_flow.run_id_to_play = PinnedRun.pin(registry, room, &"", RoomKind.FILL_BOSS)
+	_flow.run_id_to_play = PinnedRun.pin(registry, room, &"test_flow_lair", RoomKind.FILL_BOSS)
 	_setup(1)
 	_play()
 	_check(_flow.enemies_left() == 1, "the boss stands, got %d" % _flow.enemies_left())

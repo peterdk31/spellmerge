@@ -48,6 +48,12 @@ extends Node
 ##  - **burn ticks** are quiet for everyone: no event unless the tick kills;
 ##  - **contact:** an actor with contact damage hurts every actor of another team it touches,
 ##    once per CONTACT_COOLDOWN per victim (an imp walking through imps hurts none).
+##  - **carry** (Plow, boss plan OB11): a spell hit whose body Spells now carries (`Plow`) pushes
+##    nothing at once; it arms a pin (its `HitProfile.pin` × the caster's power) and keeps its push.
+##    When the carry ends (`carry_ended`), pinned against a wall the body takes the pin, else it is
+##    shoved on with the push along the way it was carried (÷ its mass; none when it slipped off).
+##    While a body carries it, the carried body touches that body for contact damage, wherever it
+##    rides in its pass. A carried hit a barrier takes whole is no carry: the body is let go;
 ##  - **stats** (boss plan OB7, the body's `Stats`): a spell hit's damage, its slam and the burn it
 ##    puts on are × its caster's power (read at the hit from the caster's body, `_power_of`; not
 ##    contact, not heals, not reactions; a static discharge is a share of the hit, so it follows); a shove (a hit's push, a pull) is ÷ the body's mass; a
@@ -253,6 +259,13 @@ var _shield: PackedInt32Array = PackedInt32Array()
 var _shield_left: PackedFloat32Array = PackedFloat32Array()
 var _shield_tag: PackedInt32Array = PackedInt32Array()
 var _shield_spares: PackedInt32Array = PackedInt32Array()
+# Plow's carries (boss plan OB11): the pin waiting for a wall, who dealt it, the spell's tag, the
+# push the carry's end shoves with, and the body that carries it (its row; NONE for a shot or none).
+var _pin: PackedInt32Array = PackedInt32Array()
+var _pin_by: PackedInt32Array = PackedInt32Array()
+var _pin_tag: PackedInt32Array = PackedInt32Array()
+var _pin_push: PackedFloat32Array = PackedFloat32Array()
+var _carried_by: PackedInt32Array = PackedInt32Array()
 # Heavy hits armed: the slam damage waiting for a wall, who dealt it and the spell's tag.
 var _slam: PackedInt32Array = PackedInt32Array()
 var _slam_by: PackedInt32Array = PackedInt32Array()
@@ -329,6 +342,13 @@ func _init() -> void:
 	_slam.resize(ACTORS)
 	_slam_by.resize(ACTORS)
 	_slam_tag.resize(ACTORS)
+	_pin.resize(ACTORS)
+	_pin_by.resize(ACTORS)
+	_pin_by.fill(EventsScript.NO_PLAYER)
+	_pin_tag.resize(ACTORS)
+	_pin_push.resize(ACTORS)
+	_carried_by.resize(ACTORS)
+	_carried_by.fill(ActorsScript.NONE)
 	_last_by.resize(ACTORS)
 	_last_by.fill(EventsScript.NO_PLAYER)
 	_hurt_radius.resize(ACTORS)
@@ -395,6 +415,8 @@ func setup() -> void:
 		events.pull_requested.connect(_on_pull_requested)
 	if not events.status_requested.is_connected(_on_status_requested):
 		events.status_requested.connect(_on_status_requested)
+	if not events.carry_ended.is_connected(_on_carry_ended):
+		events.carry_ended.connect(_on_carry_ended)
 	# The moments of other areas that hold bodies (online-ready N4, `hit_stop.gd`).
 	if not events.shot_blocked.is_connected(_on_shot_blocked):
 		events.shot_blocked.connect(_on_shot_blocked)
@@ -992,11 +1014,25 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 	var reaction: ReactionRow = null
 	if profile.element_id != &"" and _react_wait[row] <= 0.0:
 		reaction = _reaction_for(row, profile.element_id)
+	# A body Plow now carries (Spells heard the hit first) is moved by the carry, not pushed at once.
+	var carried: bool = profile.pin > 0 and spells != null and spells.plow().carrying(row, _tag)
+	var push: float = strength
+	if carried:
+		strength = 0.0
 	if not _hit(by, row, damage, direction, strength, kind, profile, false, team):
+		if carried and _same(row, node):
+			# A barrier took the hit whole: nothing of it carries the body either.
+			spells.plow().drop(row)
 		return
 	var discharged: bool = _discharged
 	if _same(row, node):
-		if strength > 0.0:
+		if carried:
+			_pin[row] = maxi(roundi(profile.pin * power), 1) if power != 1.0 else profile.pin
+			_pin_by[row] = by
+			_pin_tag[row] = _tag
+			_pin_push[row] = push
+			_carried_by[row] = spells.plow().carrier_body_of(row)
+		elif strength > 0.0:
 			# A push replaces the knockback, so it replaces the slam too.
 			_slam[row] = _slam_of(profile, damage, gust, power)
 			_slam_by[row] = by
@@ -1413,6 +1449,30 @@ func _tick(row: int, delta: float) -> void:
 		_react_wait[row] = maxf(_react_wait[row] - delta, 0.0)
 
 
+## A carry ended (Plow, boss plan OB11, `carry_ended`): the body `target` carried by the card `tag`
+## takes the pin its hit armed when `pinned`, else is shoved along `way` (zero: no shove) with the
+## hit's push, ÷ its mass. The pin is dealt with the slams, after this step's loop (`_send_slams`):
+## not the spell's own hit, so it sends no `kill_landed`. A carry whose hit Combat did not land arms
+## nothing and does nothing here.
+func _on_carry_ended(_caster: int, target: Node, _carrier: int, way: Vector2, pinned: bool, tag: int) -> void:
+	var row: int = _row_of_node(target)
+	if row == ActorsScript.NONE:
+		return
+	_carried_by[row] = ActorsScript.NONE
+	if _pin_tag[row] != tag or tag == 0:
+		return
+	if pinned:
+		_slam_due_node.append(_nodes[row])
+		_slam_due_by.append(_pin_by[row])
+		_slam_due_amount.append(_pin[row])
+		_slam_due_tag.append(tag)
+	elif way != Vector2.ZERO and _pin_push[row] > 0.0:
+		_knock[row] = way.normalized() * _pin_push[row] / _mass(row)
+	_pin[row] = 0
+	_pin_tag[row] = 0
+	_pin_push[row] = 0.0
+
+
 ## Deal the burn damage counted this step: quiet hits of kind `status`. After the loop, because
 ## hits can free rows.
 func _send_burns() -> void:
@@ -1496,6 +1556,12 @@ func _touch() -> void:
 		_victim_team.append(team)
 	if _victims.is_empty():
 		return
+	# A body carried by a toucher touches it wherever it rides in the pass (Plow, boss plan OB11).
+	for v in _victims.size():
+		var victim: int = _victims[v]
+		var carrier: int = _carried_by[victim]
+		if carrier != ActorsScript.NONE and _contact_damage[carrier] > 0 and _live_at[carrier] >= 0 and _contact_left[victim] <= 0.0 and carrier < team_rows and _teams[carrier] != _victim_team[v]:
+			_touched(victim, carrier)
 	if _victims.size() <= CONTACT_DIRECT or projectiles == null:
 		# The victims' hurt shapes once (nothing moves while contact is counted), and the box round
 		# them all, a pixel wider: a toucher whose shape stays out of it touches none of them, so
@@ -1691,7 +1757,7 @@ func _free_row(row: int) -> void:
 	_clear_state(row)
 
 
-## Statuses, push, barrier, reaction wait and slam off.
+## Statuses, push, barrier, reaction wait, slam and pin off.
 func _clear_state(row: int) -> void:
 	_knock[row] = Vector2.ZERO
 	for st in STATUS_COUNT:
@@ -1711,6 +1777,11 @@ func _clear_state(row: int) -> void:
 	_slam[row] = 0
 	_slam_by[row] = EventsScript.NO_PLAYER
 	_slam_tag[row] = 0
+	_pin[row] = 0
+	_pin_by[row] = EventsScript.NO_PLAYER
+	_pin_tag[row] = 0
+	_pin_push[row] = 0.0
+	_carried_by[row] = ActorsScript.NONE
 
 
 ## The row of `actor`: an actor id (the row itself, or the row of the body that casts under that

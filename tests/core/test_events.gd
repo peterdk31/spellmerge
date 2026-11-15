@@ -115,6 +115,7 @@ const EVENTS: Dictionary = {
 	&"wizard_shield_requested": [["caster", TYPE_INT], ["charges", TYPE_INT], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
 	&"pull_requested": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["strength", TYPE_FLOAT], ["tag", TYPE_INT], ["to", TYPE_VECTOR2]],
 	&"possess_requested": [["caster", TYPE_INT], ["target", TYPE_INT], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
+	&"carry_ended": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["carrier", TYPE_INT], ["way", TYPE_VECTOR2], ["pinned", TYPE_BOOL], ["tag", TYPE_INT]],
 	&"possess_started": [["caster", TYPE_INT], ["actor", TYPE_INT]],
 	&"possess_ended": [["caster", TYPE_INT], ["actor", TYPE_INT]],
 	&"hit_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2], ["kind", TYPE_STRING_NAME], ["shot", TYPE_INT]],

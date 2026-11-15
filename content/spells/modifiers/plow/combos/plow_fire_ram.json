@@ -1,0 +1,10 @@
+{
+	"id": "plow_fire_ram",
+	"name": "Plow fire ram",
+	"does": "A plowed fire bolt rams through a row of three imps and sets each alight.",
+	"needs": "plow",
+	"casts": [{"staff": 0, "cards": ["plow", "fire", "bolt"]}],
+	"imps": [[50, 0], [80, 0], [110, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status_count", "status": "burn", "min": 3}]
+}

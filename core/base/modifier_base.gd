@@ -110,6 +110,15 @@ enum Behaviour {
 	## it after the hit's heal or damage, and it never stops the spell that gave it
 	## (`Combat.give_barrier`).
 	BARRIER,
+	## What the carrier hits rides along in front of it instead of being passed (boss plan OB11):
+	## each body it strikes is carried by what moves it (a dash's body, or the shot), moved as far
+	## as that moves each step, until the move ends, when it is let go with the hit's shove. Pinned
+	## against what it slides on (a wall, a blocking prop's ground, the Wall card's stones), it takes
+	## `SpellLimits.PIN_SHARE` of the hit (`HitProfile.pin`) and the move ends there; walking out
+	## sideways past the pass lets it go. Never a downed body or one that cannot move (a prop); on
+	## a flying shot the bodies it carries do not spend it (a battering ram, `SpellLimits.PLOW_MOST`).
+	## All of it is `core/spells/plow.gd`; the pin and the shove are Combat's. Strength unused (1).
+	PLOW,
 }
 
 ## How more cards of one behaviour on a carrier combine (`StaffCompiler.stacked`): counts add
@@ -171,6 +180,9 @@ const RULES: Dictionary = {
 	Behaviour.ORBIT: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.STAYS | CarrierTraits.LINE, "not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE | CarrierTraits.SPAWNS | CarrierTraits.GATES}},
 	# Part of the hit, as a heal is: a blast strikes with it too.
 	Behaviour.BARRIER: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
+	# Something that moves along a way carries what it hits: a shot that flies, or a dash's body
+	# (not a teleport, over at once). A blast's hits move nothing (rules R4 F2).
+	Behaviour.PLOW: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.MOVES_CASTER, "not": CarrierTraits.INSTANT_HOMING}},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.

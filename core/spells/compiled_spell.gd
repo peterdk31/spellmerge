@@ -169,7 +169,7 @@ var slot: int = -1
 ## builder's tree (docs/milestones/M2-builder-tree.md, part T3).
 var card_slots: PackedInt32Array = PackedInt32Array()
 ## The behaviours that make a hit not plain (`plain_hit`), and its answer once worked out (-1 not yet).
-const PLAIN_HIT_BEHAVIOURS: Array[int] = [ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.BLAST]
+const PLAIN_HIT_BEHAVIOURS: Array[int] = [ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.PLOW]
 var _plain_hit: int = -1
 
 

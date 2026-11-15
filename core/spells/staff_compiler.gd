@@ -510,6 +510,9 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 	spell.shots = shots
 	spell.shots_requested = shots
 	spell.pierce = pierce
+	if carrier.flies() and spell.behaviour(ModifierBase.Behaviour.PLOW) > 0.0:
+		# A battering ram (Plow, boss plan OB11): the bodies it carries do not spend it.
+		spell.pierce += SpellLimits.PLOW_MOST
 	if spell.shots > 1 and spell.spread <= 0.0:
 		spell.spread = SpellLimits.SPLIT_SPREAD
 	spell.hit = HitProfile.new()
@@ -543,6 +546,9 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 	if heavy > 0.0:
 		spell.hit.knockback *= heavy
 		spell.hit.slam = roundi(spell.damage * SpellLimits.SLAM_SHARE)
+	if spell.behaviour(ModifierBase.Behaviour.PLOW) > 0.0:
+		# What it carries, pinned against a wall, takes twice the hit (boss plan OB11, decision 10).
+		spell.hit.pin = maxi(roundi(spell.damage * SpellLimits.PIN_SHARE), 1)
 	if spell.behaviour(ModifierBase.Behaviour.ECHO) > 0.0:
 		spell.echo_hit = spell.hit.scaled(SpellLimits.ECHO_DAMAGE, 1.0)
 	if spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0:

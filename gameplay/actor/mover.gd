@@ -27,7 +27,11 @@ extends ActorComponent
 ## A dash is the actor's own legs: it walks instead of the intent while it runs, and statuses
 ## (`Combat.pace`: chill slows, freeze stops) scale it as they scale walking. The other moves are
 ## done to the actor (the spell moves it): added on top, not slowed. Combat's push on the actor
-## (`Combat.consume_knockback`) is added every step. A swap card that names the actor as its
+## (`Combat.consume_knockback`) is added every step, and so is a carry (Plow, boss plan OB11:
+## `Plow.velocity_of`, as far as what carries it moved): done to it too, and its walk loses what
+## goes back into its carrier, so it slips off sideways or not at all. A carried step held up head on
+## along the way it is carried is a pin (`held_up`, `Plow.pinned`); a body whose carried body was
+## pinned ends its dash with that card there (`carry_ended`), as if it met the wall itself. A swap card that names the actor as its
 ## target (`target_move_requested`) puts it there at once. While the actor is down it stands: its
 ## moves end unanswered and new requests are ignored.
 ##
@@ -78,6 +82,8 @@ func attach() -> void:
 		actor.events.caster_move_requested.connect(_on_caster_move_requested)
 	if not actor.events.target_move_requested.is_connected(_on_target_move_requested):
 		actor.events.target_move_requested.connect(_on_target_move_requested)
+	if not actor.events.carry_ended.is_connected(_on_carry_ended):
+		actor.events.carry_ended.connect(_on_carry_ended)
 
 
 func detach() -> void:
@@ -87,6 +93,8 @@ func detach() -> void:
 		actor.events.caster_move_requested.disconnect(_on_caster_move_requested)
 	if actor.events.target_move_requested.is_connected(_on_target_move_requested):
 		actor.events.target_move_requested.disconnect(_on_target_move_requested)
+	if actor.events.carry_ended.is_connected(_on_carry_ended):
+		actor.events.carry_ended.disconnect(_on_carry_ended)
 
 
 ## Set the actor's `velocity` for this step: the walk (or its dashes), every other move and
@@ -120,8 +128,15 @@ func step(delta: float) -> void:
 		_moved += share
 		_lefts[at] -= delta
 	var velocity: Vector2 = _moved
+	var carry: Vector2 = _carry()
 	if not legs:
-		velocity += actor.intent.move.limit_length(1.0) * speed * pace
+		var walk: Vector2 = actor.intent.move.limit_length(1.0) * speed * pace
+		if carry != Vector2.ZERO:
+			# It cannot walk back into what carries it, only out to the side (or on ahead).
+			var way: Vector2 = carry.normalized()
+			walk -= way * minf(walk.dot(way), 0.0)
+		velocity += walk
+	velocity += carry
 	if actor.combat != null:
 		velocity += actor.combat.own_knockback(actor, actor.id, delta)
 	actor.velocity = velocity
@@ -146,12 +161,36 @@ func is_dashing() -> bool:
 ## step, so its end point is at the wall; one that glances off slides on. Walls, the ground of bodies
 ## that cannot move and the Wall card's stones alike (the one grid the body slides on).
 func held_up(asked: Vector2, got: Vector2) -> void:
+	var carry: Vector2 = _carry()
+	if carry != Vector2.ZERO:
+		var along: Vector2 = carry.normalized()
+		var pushed: float = asked.dot(along)
+		if pushed > 0.0 and got.dot(along) < pushed * HEAD_ON_SHARE:
+			# Pinned against what it slides on (Plow, boss plan OB11).
+			actor.spells.plow().pinned(actor.id)
 	for at in _count:
 		if _modes[at] != &"dash" or _lefts[at] <= 0.0 or _velocities[at].is_zero_approx():
 			continue
 		var way: Vector2 = _velocities[at].normalized()
 		var wanted: float = asked.dot(way)
 		if wanted > 0.0 and got.dot(way) < wanted * HEAD_ON_SHARE:
+			_lefts[at] = 0.0
+
+
+## The velocity the body is carried at this step (Plow, `Plow.velocity_of`), zero when it is not.
+func _carry() -> Vector2:
+	if actor.spells == null or actor.spells.plow().carried_count() == 0:
+		return Vector2.ZERO
+	return actor.spells.plow().velocity_of(actor.id)
+
+
+## A carry ended (`carry_ended`): a body this one carried was pinned, so this body's dash with that
+## card ends where it is, as if it met the wall itself (boss plan OB11; answered at the next step).
+func _on_carry_ended(_caster: int, _target: Node, carrier: int, _way: Vector2, pinned: bool, tag: int) -> void:
+	if not pinned or carrier != actor.id or carrier < 0:
+		return
+	for at in _count:
+		if _modes[at] == &"dash" and _tags[at] == tag:
 			_lefts[at] = 0.0
 
 

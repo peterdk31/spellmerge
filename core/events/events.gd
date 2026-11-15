@@ -279,6 +279,8 @@ signal wizard_shield_requested(caster: int, charges: int, seconds: float, tag: i
 signal pull_requested(caster: int, position: Vector2, radius: float, strength: float, tag: int, to: Vector2)
 ## Sender: core/spells. A carrier of the actor `caster` with `possess` hit the actor `target` (an actor id): the caster's controller is to possess it for `seconds`; the card has `tag`. One per hit. Heard by actor (the Possession rule).
 signal possess_requested(caster: int, target: int, seconds: float, tag: int)
+## Sender: core/spells (Plow, boss plan OB11). The body `target`, which a carrier of the actor `caster`'s card `tag` carried, is no longer carried: `pinned` against a wall (it takes the pin its hit armed, and `carrier`, the actor id of the body that carried it, or -1 for a shot, ends its dash there), or let go with a shove along `way` (zero: none, it slipped off or was dropped). One per carry. Heard by combat (the pin and the shove) and actor (the carrier's Mover, for its own id).
+signal carry_ended(caster: int, target: Node, carrier: int, way: Vector2, pinned: bool, tag: int)
 ## Sender: actor. A controller now possesses the actor `actor` (it drives it, or a puppet copies it); `caster` is that controller's home body (the body that cast `possess` when it has none). Heard by feel (a ring in the caster's ramp and the sound `possess`).
 signal possess_started(caster: int, actor: int)
 ## Sender: actor. The possession of the actor `actor` by the controller whose home body is `caster` ended (time up, the actor down or dead, a newer possession); the actor has its own controller back. Heard by feel (a ring going out).

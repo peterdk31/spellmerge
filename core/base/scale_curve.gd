@@ -8,6 +8,10 @@ extends Resource
 ## Read-only content, shared like a card; `at` is a pure function, through `DMath`, so it is the same
 ## to the bit on every machine.
 
+## The most any of its numbers may be (the editor's range; a rule change, run generation RG6, may
+## not pass it either).
+const MOST: float = 100.0
+
 ## The factor at the span's start (above 0).
 @export_range(0.01, 100.0, 0.01) var start: float = 1.0
 ## The factor at the span's end (above 0).
@@ -32,12 +36,12 @@ func at(t: float) -> float:
 	return start + (end - start) * (1.0 - DMath.pow(1.0 - along, easing))
 
 
-## What is wrong with the curve, one line each, named `what` (empty when every number is above 0
-## and finite).
+## What is wrong with the curve, one line each, named `what` (empty when every number is above 0,
+## finite and MOST at most).
 func problems(what: String) -> PackedStringArray:
 	var found := PackedStringArray()
 	for pair: Array in [["start", start], ["end", end], ["easing", easing]]:
 		var value: float = pair[1]
-		if not (value > 0.0) or not is_finite(value):
-			found.append("%s: %s %s; above 0." % [what, pair[0], value])
+		if not (value > 0.0) or not is_finite(value) or value > MOST:
+			found.append("%s: %s %s; above 0, %s at most." % [what, pair[0], value, MOST])
 	return found

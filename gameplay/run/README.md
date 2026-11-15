@@ -8,7 +8,7 @@ Built in M3 (see "Gameplay sub-areas" in docs/PLAN.md).
 
 A run has one seed, so the same seed gives the same rooms and rolls.
 
-Run generation ([docs/milestones/run-generation.md](../../docs/milestones/run-generation.md)) builds it early: RG2 brings the map and its generator; RG3 the area itself (`run.gd`), which makes the map at the run's start and fills the rooms from it; RG4 the way on through it; RG5 each room's scale.
+Run generation ([docs/milestones/run-generation.md](../../docs/milestones/run-generation.md)) builds it early: RG2 brings the map and its generator; RG3 the area itself (`run.gd`), which makes the map at the run's start and fills the rooms from it; RG4 the way on through it; RG5 each room's scale; RG6 the rule changes a save unlocks.
 
 ## The area (run generation RG3)
 
@@ -16,8 +16,9 @@ Run generation ([docs/milestones/run-generation.md](../../docs/milestones/run-ge
 - **The way on (RG4):** when every standing wizard stands in a lit exit, Flow sends `run_way_taken(way)` (0 = the room's leftmost link); the area moves `at` on to the room that link names (a row deeper: the depth moves on with it) and names it the same way (its scale, then the room).
 - **Scaling (RG5):** each room's scale (`RunNode.scale`) is the run definition's `scaling` (`RunScaling.room_scale`, core/base: a curve per depth, from the first row to the deepest the rules allow, times one per extra player, from one to four), worked out by the generator from the room's depth and the map's players (`RunMap.players`). It grows the room's enemy budget (`RunScaling.scaled_budget`) there, and every enemy's and boss's health through the difficulty area (gameplay/difficulty), which hears it as the party enters the room. A wizard joining later plays the map as it was made. A way the room has not moves nothing (a warning). The run's last room has no ways: cleared, Flow ends the run. Rooms hold layout only: what fights in a room is the map's.
 - **State:** `map` (the `RunMap`) and `at` (the index of the room the party is in; `room_now()`) are the run's state, hashed and saved in snapshots, so a joining machine gets them from the snapshot. It joins the Tick with no step and is renewed at every run's start (`begin_run`, `Tick.RUN_ORDER`): out of a run of rooms (the hub, the sandbox) there is no map.
+- **Meta progression's hook (RG6):** the map is made by the run definition as the run's unlocks change it (`RunDefinition.changed_by(sim.unlocks)`: each `RunRuleChange` whose save flag they hold, core/base); the generator stays a pure function of what it is handed. The unlocks are the run's start's (`Sim.unlocks`, core/sim/run_unlocks.gd: the host's save, in the replay's header), never this machine's save during a run. The area says which they are on this machine (`unlocks_now`, given to the frames service as its unlocks source, `Frames.set_unlocks_source`): the flags of its save (`save`, a `SaveFile`) that some run definition's rule change names (`RunDefinition.flags`), so nothing else of the save travels.
 - **No map:** a definition the registry lacks, or a map that cannot be made (`RunMap.problems`), answers nothing, with a warning saying why; Flow then starts no run (from the hub's stone, the party goes back to the hub).
-- **Tests:** `tests/gameplay/run/test_run.gd` (the map made from the run's seed and named to Flow, a way taken moving on to its room, the same seed the same map, renewed at a run's start, the map as state, Flow building the room the map names, the map made for the run's players and each room's scale told before it). A test that plays a room of its choosing pins it as a run of that one room (`tests/support/pinned_run.gd`).
+- **Tests:** `tests/gameplay/run/test_run.gd` (the map made from the run's seed and named to Flow, a way taken moving on to its room, the same seed the same map, renewed at a run's start, the map as state, Flow building the room the map names, the map made for the run's players and each room's scale told before it, this machine's unlocks its save's flags a rule change names, and the map made by the rules the run's unlocks leave, a guest's none). A test that plays a room of its choosing pins it as a run of that one room (`tests/support/pinned_run.gd`).
 
 ## The map (run generation RG2)
 
@@ -51,7 +52,7 @@ The area's entry script `run.gd` and its test `tests/gameplay/run/test_run.gd`; 
 ```sh
 tools/check.sh
 ci/build/build.sh --quick
-tools/ptest.sh 8 'test_run_generator|test_run_rules|test_runs|test_run\.gd|test_flow'
+tools/ptest.sh 8 'test_run_generator|test_run_rules|test_run_rule_changes|test_run_unlocks|test_runs|test_run\.gd|test_flow'
 ```
 
 ## Review questions

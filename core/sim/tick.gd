@@ -38,8 +38,9 @@ extends Node
 ## `Engine.physics_ticks_per_second`. `count` is the ticks since the run began (`begin_run`), or
 ## since the game began before any run, stopped and held ticks too.
 ##
-## **A run's start** (`begin_run`, online-ready N3b and N11): the run's seed and rules come from the
-## frames service (a replay's while one records or plays, else this machine's; `Frames.next_run`),
+## **A run's start** (`begin_run`, online-ready N3b and N11): the run's seed, rules and unlocks (the
+## save flags it plays by, run generation RG6) come from the frames service (a replay's while one
+## records or plays, else this machine's; `Frames.next_run`),
 ## the rules go to every area that takes them, then each area is renewed in RUN_ORDER, the actor
 ## table last. A change to the rules while a run plays is the command `shot_cap_requested`, applied
 ## at the next tick's start (and recorded with it).
@@ -242,8 +243,8 @@ func _show_stop() -> void:
 
 
 ## A run starts (Flow, once the last run's world is gone and before the new one is made;
-## online-ready N3b): the clock counts from 0 again, the run takes its seed and rules (the frames
-## service's: a replay's while one records or plays, else random and this machine's), every area
+## online-ready N3b): the clock counts from 0 again, the run takes its seed, rules and unlocks (the
+## frames service's: a replay's while one records or plays, else random and this machine's), every area
 ## takes the rules, then a fresh game's state (its `begin_run`, core/sim/sim_fresh.gd) in
 ## RUN_ORDER, and the actor table last. So a run plays the same whatever ran before it in this
 ## game, and a replay recorded in any run plays the same in any other.
@@ -255,9 +256,11 @@ func begin_run() -> void:
 	if frames != null:
 		sim.run_seed = frames.next_run_seed()
 		sim.rules = frames.next_run_rules()
+		sim.unlocks = frames.next_run_unlocks()
 	else:
 		sim.run_seed = SimSeed.fresh()
 		sim.rules = SessionRules.machine().copy()
+		sim.unlocks = RunUnlocks.new()
 	_hand_rules()
 	for name in RUN_ORDER:
 		var joined: SimArea = area(name)

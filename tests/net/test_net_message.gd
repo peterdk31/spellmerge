@@ -164,6 +164,10 @@ func test_the_fullest_header_crosses() -> void:
 	while replay.ground.add_item(&"b", &"c", "", 1, Vector2.ZERO, 0.0, [] as Array[StringName]):
 		pass
 	check(replay.ground.size() > GroundLoadout.MAX_BYTES - 32 and replay.ground.size() <= GroundLoadout.MAX_BYTES, "a ground filled to its limit (%d bytes)" % replay.ground.size())
+	# And the most save flags a run plays by, each the longest (run generation RG6).
+	for i in RunUnlocks.MAX_FLAGS:
+		replay.unlocks.add(StringName("%02d" % i + "u".repeat(RunUnlocks.MAX_FLAG - 2)))
+	check_equal(replay.unlocks.flags.size(), RunUnlocks.MAX_FLAGS, "the unlocks filled to their limit")
 	var header: PackedByteArray = replay.header_bytes()
 	check(header.size() <= Replay.MAX_HEADER_BYTES and header.size() > Replay.MAX_HEADER_BYTES - 48, "the fullest header is no more than a header takes (%d of %d)" % [header.size(), Replay.MAX_HEADER_BYTES])
 	check(NetMessage.MAX_HEADER <= NetMessage.MAX_BYTES, "and no more than a message may be")
@@ -172,6 +176,7 @@ func test_the_fullest_header_crosses() -> void:
 	check_equal(back.decode(_message.body), "", "and reads back as a replay")
 	check(back.party.equals(replay.party), "with every seat's loadout")
 	check(back.ground.equals(replay.ground), "and the ground")
+	check(back.unlocks.equals(replay.unlocks), "and the unlocks")
 
 
 func test_a_message_too_long_for_its_kind_is_refused() -> void:

@@ -47,8 +47,8 @@ const HEAD_BYTES: int = 5
 ## The highest tick a message may name: a replay's limit, and a frame sent ahead of it.
 const MAX_TICK: int = Replay.MAX_TICKS + 3600
 ## Limits, by what a message holds.
-## A replay's header at its most (with every seat's staffs full and the ground at its most, about
-## 82 kB; a few hundred bytes as played).
+## A replay's header at its most (with every seat's staffs full, the ground and the unlocks at their
+## most, about 85 kB; a few hundred bytes as played).
 const MAX_HEADER: int = Replay.MAX_HEADER_BYTES
 const MAX_TICK_BYTES: int = 1 + Replay.SEATS * (2 + InputFrame.MAX_BYTES)
 const MAX_NAME: int = 64

@@ -57,7 +57,9 @@ extends Node
 ##   replay's, else what the game says it would take now (`set_party_source`); a recording begun
 ##   writes the game's into its header, so the machines that play it start with what only this one had.
 ##   What lies on the ground (`next_run_ground`, core/sim/ground_loadout.gd: the room and its items;
-##   items I6) goes the same way (`set_ground_source`).
+##   items I6) goes the same way (`set_ground_source`), and so do the save flags the run plays by
+##   (`next_run_unlocks`, core/sim/run_unlocks.gd: the host's unlocks, run generation RG6;
+##   `set_unlocks_source`), which the Tick hands the run (`Sim.unlocks`).
 ##
 ## - **A run begun anew by the game** (`restart`; online lobby, docs/milestones/online-lobby.md): the
 ##   game itself asks for a run's start (a party back in its hub after a run). It is sent at the
@@ -121,6 +123,8 @@ var _restart: Array = []
 var _party_source: Callable = Callable()
 ## Says what lies on the ground now (`set_ground_source`: returns a GroundLoadout), or invalid: nothing.
 var _ground_source: Callable = Callable()
+## Says which save flags are unlocked now (`set_unlocks_source`: returns a RunUnlocks), or invalid: none.
+var _unlocks_source: Callable = Callable()
 
 
 func _init() -> void:
@@ -219,6 +223,27 @@ func next_run_ground() -> GroundLoadout:
 	if _tape != null:
 		return _tape.run_ground()
 	return _ground_now()
+
+
+## Which save flags are unlocked now on this machine, as the game says it (`source()` returns a
+## RunUnlocks; the Run area gives it, from this machine's save; run generation RG6): read when a
+## recording begins (its header) and by `next_run_unlocks` with no replay on the deck. An invalid
+## Callable: none.
+func set_unlocks_source(source: Callable) -> void:
+	_unlocks_source = source
+
+
+## The save flags the run that starts next plays by (a copy): the replay's on the deck (its header:
+## the host's save, never this machine's when it plays another's), else this machine's now.
+func next_run_unlocks() -> RunUnlocks:
+	if _tape != null:
+		return _tape.replay.unlocks.copy()
+	return _unlocks_now()
+
+
+func _unlocks_now() -> RunUnlocks:
+	var made: RunUnlocks = _unlocks_source.call() as RunUnlocks if _unlocks_source.is_valid() else null
+	return made.copy() if made != null else RunUnlocks.new()
 
 
 func _ground_now() -> GroundLoadout:
@@ -346,6 +371,7 @@ func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	replay.rules = SessionRules.machine().copy()
 	replay.party = _party_now()
 	replay.ground = _ground_now()
+	replay.unlocks = _unlocks_now()
 	_tape = ReplayTape.recording(replay)
 	_carried.fill(0)
 	_send_start(start, starter)

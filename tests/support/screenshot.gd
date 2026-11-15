@@ -18,17 +18,27 @@ extends SceneTree
 ##
 ## Before `take()`, the shaders are compiled behind the loading screen as on Play (`warm_up.gd`).
 ## A script that shows the load itself sets `warm_first = false` in its `_init()`.
+##
+## A run a shot starts plays the crypt's first arena alone (`PINNED_ROOM`, a pinned run:
+## tests/support/pinned_run.gd), so a shot staged by its places shows the same room every time; the
+## crypt run's own first room is any of its fight rooms, by the run's seed (run generation RG3b). A
+## script that shows the generated run sets `pin_room = false` in its `_init()`.
 
 const WarmUp := preload("res://tests/support/warm_up.gd")
 const SHOTS_DIR := "user://screenshots"
 ## The game's screen, which every sheet is laid out on.
 const SCREEN := Vector2(640.0, 360.0)
 const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
+const PinnedRun := preload("res://tests/support/pinned_run.gd")
+## The room a shot's run plays while `pin_room` is on.
+const PINNED_ROOM: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 ## The frames `settle()` waits when it is given none.
 var settle_frames: int = 20
 ## Whether the shaders are compiled (Flow's play tasks run) before `take()`.
 var warm_first: bool = true
+## Whether a run a shot starts plays `PINNED_ROOM` alone rather than the generated crypt run.
+var pin_room: bool = true
 var _failed: bool = false
 
 
@@ -38,6 +48,10 @@ func _initialize() -> void:
 	if warm_first and not await WarmUp.run(root):
 		fail("the shaders were not compiled before the shots (Flow's play tasks through Loading)")
 		return
+	var flow: Node = root.get_node_or_null("Flow")
+	var registry: Node = root.get_node_or_null("Registry")
+	if pin_room and flow != null and registry != null:
+		flow.set("run_id_to_play", PinnedRun.pin(registry, PINNED_ROOM))
 	await take()
 	if not _failed:
 		quit(0)

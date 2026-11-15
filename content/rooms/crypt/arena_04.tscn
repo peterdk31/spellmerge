@@ -1,0 +1,441 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/floor.svg" id="1_floor"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/wall.svg" id="2_wall"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/wall_top.svg" id="3_walltop"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/pillar.svg" id="4_pillar"]
+[ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/torch.tscn" id="5_torch"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/pillar_top.svg" id="9_pillartop"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/door.svg" id="6_door"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="7_rubble"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="8_skull"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_704x32"]
+size = Vector2(704, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_32x384"]
+size = Vector2(32, 384)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_96x32"]
+size = Vector2(96, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_32x32"]
+size = Vector2(32, 32)
+
+[node name="Arena04" type="Node2D"]
+
+[node name="Floor" type="Sprite2D" parent="."]
+z_index = -2
+modulate = Color(0.72, 0.7, 0.86, 1)
+texture_filter = 1
+texture_repeat = 2
+texture = ExtResource("1_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 704, 448)
+
+[node name="Walls" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Top" type="CollisionShape2D" parent="Walls"]
+position = Vector2(352, 16)
+shape = SubResource("RectangleShape2D_704x32")
+
+[node name="TopTiles" type="Sprite2D" parent="Walls"]
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(0, 0)
+texture = ExtResource("3_walltop")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 704, 32)
+
+[node name="Bottom" type="CollisionShape2D" parent="Walls"]
+position = Vector2(352, 432)
+shape = SubResource("RectangleShape2D_704x32")
+
+[node name="BottomTiles" type="Sprite2D" parent="Walls"]
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(0, 416)
+texture = ExtResource("3_walltop")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 704, 32)
+
+[node name="Left" type="CollisionShape2D" parent="Walls"]
+position = Vector2(16, 224)
+shape = SubResource("RectangleShape2D_32x384")
+
+[node name="LeftTiles" type="Sprite2D" parent="Walls"]
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(0, 32)
+texture = ExtResource("2_wall")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 32, 384)
+
+[node name="Right" type="CollisionShape2D" parent="Walls"]
+position = Vector2(688, 224)
+shape = SubResource("RectangleShape2D_32x384")
+
+[node name="RightTiles" type="Sprite2D" parent="Walls"]
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(672, 32)
+texture = ExtResource("2_wall")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 32, 384)
+
+[node name="Block1" type="CollisionShape2D" parent="Walls"]
+position = Vector2(176, 112)
+shape = SubResource("RectangleShape2D_96x32")
+
+[node name="Block1Tiles" type="Sprite2D" parent="Walls"]
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(128, 96)
+texture = ExtResource("3_walltop")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 96, 32)
+
+[node name="Block2" type="CollisionShape2D" parent="Walls"]
+position = Vector2(528, 112)
+shape = SubResource("RectangleShape2D_96x32")
+
+[node name="Block2Tiles" type="Sprite2D" parent="Walls"]
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(480, 96)
+texture = ExtResource("3_walltop")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 96, 32)
+
+[node name="Block3" type="CollisionShape2D" parent="Walls"]
+position = Vector2(176, 336)
+shape = SubResource("RectangleShape2D_96x32")
+
+[node name="Block3Tiles" type="Sprite2D" parent="Walls"]
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(128, 320)
+texture = ExtResource("3_walltop")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 96, 32)
+
+[node name="Block4" type="CollisionShape2D" parent="Walls"]
+position = Vector2(528, 336)
+shape = SubResource("RectangleShape2D_96x32")
+
+[node name="Block4Tiles" type="Sprite2D" parent="Walls"]
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(480, 320)
+texture = ExtResource("3_walltop")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 96, 32)
+
+[node name="Pillar1" type="CollisionShape2D" parent="Walls"]
+position = Vector2(304, 176)
+shape = SubResource("RectangleShape2D_32x32")
+
+[node name="Pillar2" type="CollisionShape2D" parent="Walls"]
+position = Vector2(400, 176)
+shape = SubResource("RectangleShape2D_32x32")
+
+[node name="Pillar3" type="CollisionShape2D" parent="Walls"]
+position = Vector2(304, 272)
+shape = SubResource("RectangleShape2D_32x32")
+
+[node name="Pillar4" type="CollisionShape2D" parent="Walls"]
+position = Vector2(400, 272)
+shape = SubResource("RectangleShape2D_32x32")
+
+[node name="Shade" type="Node2D" parent="."]
+
+[node name="TopShade" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.4)
+polygon = PackedVector2Array(32, 32, 672, 32, 672, 42, 32, 42)
+
+[node name="LeftShade" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.3)
+polygon = PackedVector2Array(32, 42, 40, 42, 40, 416, 32, 416)
+
+[node name="Block1Shade" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.35)
+polygon = PackedVector2Array(224, 104, 236, 110, 236, 140, 140, 140, 128, 128, 224, 128)
+
+[node name="Block2Shade" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.35)
+polygon = PackedVector2Array(576, 104, 588, 110, 588, 140, 492, 140, 480, 128, 576, 128)
+
+[node name="Block3Shade" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.35)
+polygon = PackedVector2Array(224, 328, 236, 334, 236, 364, 140, 364, 128, 352, 224, 352)
+
+[node name="Block4Shade" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.35)
+polygon = PackedVector2Array(576, 328, 588, 334, 588, 364, 492, 364, 480, 352, 576, 352)
+
+[node name="Pillar1Shade" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.35)
+polygon = PackedVector2Array(320, 168, 332, 174, 332, 204, 300, 204, 288, 192, 320, 192)
+
+[node name="Pillar2Shade" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.35)
+polygon = PackedVector2Array(416, 168, 428, 174, 428, 204, 396, 204, 384, 192, 416, 192)
+
+[node name="Pillar3Shade" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.35)
+polygon = PackedVector2Array(320, 264, 332, 270, 332, 300, 300, 300, 288, 288, 320, 288)
+
+[node name="Pillar4Shade" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.35)
+polygon = PackedVector2Array(416, 264, 428, 270, 428, 300, 396, 300, 384, 288, 416, 288)
+
+[node name="Pillars" type="Node2D" parent="."]
+texture_filter = 1
+
+[node name="Pillar1Base" type="Sprite2D" parent="Pillars"]
+position = Vector2(288, 160)
+texture = ExtResource("4_pillar")
+centered = false
+
+[node name="Pillar2Base" type="Sprite2D" parent="Pillars"]
+position = Vector2(384, 160)
+texture = ExtResource("4_pillar")
+centered = false
+
+[node name="Pillar3Base" type="Sprite2D" parent="Pillars"]
+position = Vector2(288, 256)
+texture = ExtResource("4_pillar")
+centered = false
+
+[node name="Pillar4Base" type="Sprite2D" parent="Pillars"]
+position = Vector2(384, 256)
+texture = ExtResource("4_pillar")
+centered = false
+
+[node name="PillarTops" type="Node2D" parent="."]
+z_index = 5
+modulate = Color(1, 1, 1, 0.6)
+texture_filter = 1
+
+[node name="Pillar1Top" type="Sprite2D" parent="PillarTops"]
+position = Vector2(288, 128)
+texture = ExtResource("9_pillartop")
+centered = false
+
+[node name="Pillar2Top" type="Sprite2D" parent="PillarTops"]
+position = Vector2(384, 128)
+texture = ExtResource("9_pillartop")
+centered = false
+
+[node name="Pillar3Top" type="Sprite2D" parent="PillarTops"]
+position = Vector2(288, 224)
+texture = ExtResource("9_pillartop")
+centered = false
+
+[node name="Pillar4Top" type="Sprite2D" parent="PillarTops"]
+position = Vector2(384, 224)
+texture = ExtResource("9_pillartop")
+centered = false
+
+[node name="Decor" type="Node2D" parent="."]
+
+[node name="Rubble1" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(40, 48)
+texture = ExtResource("7_rubble")
+centered = false
+
+[node name="Rubble2" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(632, 360)
+texture = ExtResource("7_rubble")
+centered = false
+
+[node name="Rubble3" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(96, 192)
+texture = ExtResource("7_rubble")
+centered = false
+
+[node name="Rubble4" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(584, 288)
+texture = ExtResource("7_rubble")
+centered = false
+
+[node name="Skull1" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(352, 160)
+texture = ExtResource("8_skull")
+centered = false
+
+[node name="Skull2" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(232, 304)
+texture = ExtResource("8_skull")
+centered = false
+
+[node name="Skull3" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(440, 112)
+texture = ExtResource("8_skull")
+centered = false
+
+[node name="Torch1" parent="Decor" instance=ExtResource("5_torch")]
+position = Vector2(96, 0)
+
+[node name="Core" parent="Decor/Torch1" index="1"]
+speed_scale = 0.95
+frame = 4
+
+[node name="Flame" parent="Decor/Torch1" index="3"]
+speed_scale = 1.1
+frame = 2
+
+[node name="Torch2" parent="Decor" instance=ExtResource("5_torch")]
+position = Vector2(224, 0)
+
+[node name="Core" parent="Decor/Torch2" index="1"]
+speed_scale = 1.2
+frame = 1
+
+[node name="Flame" parent="Decor/Torch2" index="3"]
+speed_scale = 0.9
+frame = 6
+
+[node name="Torch3" parent="Decor" instance=ExtResource("5_torch")]
+position = Vector2(448, 0)
+
+[node name="Core" parent="Decor/Torch3" index="1"]
+speed_scale = 1
+frame = 7
+
+[node name="Flame" parent="Decor/Torch3" index="3"]
+speed_scale = 1.15
+frame = 0
+
+[node name="Torch4" parent="Decor" instance=ExtResource("5_torch")]
+position = Vector2(576, 0)
+
+[node name="Core" parent="Decor/Torch4" index="1"]
+speed_scale = 0.85
+frame = 2
+
+[node name="Flame" parent="Decor/Torch4" index="3"]
+speed_scale = 1
+frame = 4
+
+[node name="Torch5" parent="Decor" instance=ExtResource("5_torch")]
+position = Vector2(160, 416)
+
+[node name="Core" parent="Decor/Torch5" index="1"]
+speed_scale = 1.1
+frame = 6
+
+[node name="Flame" parent="Decor/Torch5" index="3"]
+speed_scale = 0.95
+frame = 1
+
+[node name="Torch6" parent="Decor" instance=ExtResource("5_torch")]
+position = Vector2(512, 416)
+
+[node name="Core" parent="Decor/Torch6" index="1"]
+speed_scale = 0.9
+frame = 0
+
+[node name="Flame" parent="Decor/Torch6" index="3"]
+speed_scale = 1.2
+frame = 3
+
+[node name="Torch7" parent="Decor" instance=ExtResource("5_torch")]
+position = Vector2(0, 182)
+
+[node name="Core" parent="Decor/Torch7" index="1"]
+speed_scale = 1.15
+frame = 3
+
+[node name="Flame" parent="Decor/Torch7" index="3"]
+speed_scale = 0.85
+frame = 7
+
+[node name="Torch8" parent="Decor" instance=ExtResource("5_torch")]
+position = Vector2(672, 182)
+
+[node name="Core" parent="Decor/Torch8" index="1"]
+speed_scale = 1.05
+frame = 5
+
+[node name="Flame" parent="Decor/Torch8" index="3"]
+speed_scale = 1.25
+frame = 5
+
+[node name="ExitDoor" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(336, 0)
+texture = ExtResource("6_door")
+centered = false
+
+[node name="EntryDoor" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(336, 416)
+texture = ExtResource("6_door")
+centered = false
+
+[node name="PlayerSpawns" type="Node2D" parent="."]
+
+[node name="Player1" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(256, 384)
+
+[node name="Player2" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(320, 384)
+
+[node name="Player3" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(384, 384)
+
+[node name="Player4" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(448, 384)
+
+[node name="EnemySpawns" type="Node2D" parent="."]
+
+[node name="Enemy1" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(352, 224)
+
+[node name="Enemy2" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(64, 64)
+
+[node name="Enemy3" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(640, 64)
+
+[node name="Enemy4" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(64, 256)
+
+[node name="Enemy5" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(640, 256)
+
+[node name="Enemy6" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(352, 64)
+
+[node name="Enemy7" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(192, 224)
+
+[node name="Enemy8" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(512, 224)
+
+[node name="Doors" type="Node2D" parent="."]
+
+[node name="Exit" type="Marker2D" parent="Doors"]
+position = Vector2(352, 16)
+
+[node name="Entry" type="Marker2D" parent="Doors"]
+position = Vector2(352, 432)

@@ -463,7 +463,7 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 		# (its seed, dealt below) can still corner it (`Registry.run_problems`).
 		var problems: PackedStringArray = registry.run_problems(run_id_to_play) if registry != null else PackedStringArray(["No registry."])
 		if not problems.is_empty():
-			push_warning("Flow: the run '%s' cannot be made, so no run starts: %s" % [run_id_to_play, " ".join(problems)])
+			push_warning("Flow: the run '%s' cannot be made, so no run starts: %s" % [run_id_to_play, "; ".join(problems)])
 			return false
 	else:
 		room = registry.get_resource(ROOM_FOLDER, _room_id_for_mode()) as RoomBase if registry != null else null
@@ -570,12 +570,13 @@ func _begin_run_of_rooms() -> RoomBase:
 
 
 ## The run area's answer to `run_begun`: the room of the run's map the party enters, and what stands
-## in it (its own copy). Heard only while `start_run` asks.
+## in it (a copy of its own). Heard only while `start_run` asks: the next rooms of a run come with
+## the exits (RG4), which give this answer a caller of their own.
 func _on_run_room_chosen(room: StringName, enemies: Array[StringName]) -> void:
 	if not _asking:
 		return
 	_chosen_room = room
-	_chosen_enemies = enemies
+	_chosen_enemies = enemies.duplicate()
 
 
 ## End the run in progress and free its world. Flow is idle again, so the next
@@ -728,6 +729,8 @@ func _start_sandbox(player: int) -> void:
 func _on_hub_requested(player: int) -> void:
 	# What the hub's wizards take along (the recording's, read before the hub it was made in goes).
 	var party: PartyLoadout = frames.next_run_party() if frames != null else null
+	# Read once: a hub that then fails to start leaves no party behind for a later recording.
+	_party_back = PackedByteArray()
 	# Asked for in the hub, the hub starts anew (a recording of it begins: net/ opens the room), each
 	# wizard with everything it held.
 	if state == State.RUNNING and mode == MODE_HUB:
@@ -799,7 +802,11 @@ func _party_now() -> PartyLoadout:
 	if mode == MODE_HUB and state == State.RUNNING:
 		return _party_of()
 	var back := PartyLoadout.new()
-	if not _party_back.is_empty() and back.decode_at(_party_back, 0) != "":
+	if _party_back.is_empty():
+		return back
+	var problem: String = back.decode_at(_party_back, 0)
+	if problem != "":
+		push_warning("Flow: the party going back to the hub could not be read (%s), so it takes nothing." % problem)
 		return PartyLoadout.new()
 	return back
 
@@ -1162,17 +1169,16 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 func _stand_room_enemies(parent: Node2D, room: RoomBase, enemies: Array[StringName]) -> void:
 	_enemies.clear()
 	var placed: int = 0
-	# Each id once, in the order the map first names it, with how many of it stand.
-	var counts: Dictionary[StringName, int] = {}
+	if not enemies.is_empty() and _places.enemy_spawns.is_empty():
+		push_warning("Flow: the room '%s' has no enemy spawns, so its enemies cannot stand." % room.id)
+		return
 	for id: StringName in enemies:
-		counts[id] = counts.get(id, 0) + 1
-	for id: StringName in counts:
 		var data: EnemyBase = _enemy_data_of(id)
 		if data == null or data.scene == null:
 			push_warning("Flow: the run puts '%s' in the room '%s', which the registry has no enemy or boss for." % [id, room.id])
 			continue
-		_spawn_enemies(parent, data, counts[id], placed)
-		placed += counts[id]
+		_spawn_enemies(parent, data, 1, placed)
+		placed += 1
 
 
 ## The enemy or boss `enemy_id` (`EnemyBase.FOLDERS`, in turn), or null.

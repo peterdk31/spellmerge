@@ -5,6 +5,8 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/core/test_run_rules.gd
 
+const MadeUpRoom := preload("res://tests/support/made_up_room.gd")
+
 const BIOME: StringName = &"cellar"
 
 
@@ -16,7 +18,7 @@ func _kind(id: StringName, fill: StringName) -> RoomKind:
 
 
 func _room(id: StringName, kinds: Array[StringName], biome: StringName = BIOME) -> RoomBase:
-	var room := RoomBase.new()
+	var room := MadeUpRoom.new()
 	room.id = id
 	room.biome = biome
 	room.kinds = kinds
@@ -253,3 +255,31 @@ func test_with_no_room_kinds_every_kind_is_unknown() -> void:
 	var rules: MapRules = _rules()
 	rules.kinds[1].required = false
 	check(_names(_run(rules).problems(content), "'boss': no room kind"), "an optional kind no file defines is still named")
+
+
+## Run generation RG4: a room leads to as many rooms as it has exits, so a kind that leads on needs a
+## template with an exit for every way a room may lead (`MapRules.most_ways`); the last row's needs none.
+func test_a_kind_that_leads_on_with_too_few_exits_is_named() -> void:
+	var kinds: Array[Resource] = [_kind(&"fight", RoomKind.FILL_ENEMIES), _kind(&"boss", RoomKind.FILL_BOSS)]
+	var hall := _room(&"hall", [&"fight"] as Array[StringName]) as MadeUpRoom
+	var throne := _room(&"throne", [&"boss"] as Array[StringName]) as MadeUpRoom
+	var rooms: Array[Resource] = [hall, throne]
+	var enemies: Array[Resource] = [_enemy(&"rat"), _enemy(&"king", 0, true)]
+	hall.exits = 1
+	var content: RunContent = RunContent.gather(kinds, rooms, enemies)
+	check_equal(content.exits_of(&"hall"), 1, "the hall's exits are gathered")
+	var rules: MapRules = _rules()
+	check_equal(rules.most_ways(), 2, "a room may lead to two")
+	check(_names(_run(rules).problems(content), "'fight' leads on, but no cellar room"), "one exit for two ways: %s" % _run(rules).problems(content))
+	rules.branches_max = 1
+	check_equal(_run(rules).problems(content), PackedStringArray(), "one way, one exit")
+	rules.branches_max = 2
+	rules.width_max = 1
+	check_equal(rules.most_ways(), 1, "a row of one room: one way at most")
+	check_equal(_run(rules).problems(content), PackedStringArray(), "so one exit is enough")
+	hall.exits = 0
+	throne.exits = 0
+	content = RunContent.gather(kinds, rooms, enemies)
+	check(_names(_run(rules).problems(content), "'fight' leads on"), "a fight room with no exit leads nowhere")
+	check(not _names(_run(rules).problems(content), "'boss' leads on"), "the boss's room, the last, needs none")
+	check(content.templates_for(BIOME, &"fight").size() == 1 and content.templates_for(BIOME, &"fight", 1).is_empty(), "templates_for counts exits")

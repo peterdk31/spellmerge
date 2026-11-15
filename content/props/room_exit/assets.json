@@ -1,0 +1,22 @@
+{
+	"assets": [
+		{
+			"path": "content/props/room_exit/exit.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by tools/pixel_grid.py from a character grid, the grid by a small generator)",
+			"prompt": "A 48x48 room exit seen from above (transparent background), dark: a flat square floor plate of carved stone with bevelled corners and an Outline edge, a raised rim shaded as a bevel (Stone light at the top-left, Stone shadow at the bottom-right), a Stone base face with a carved line and three small carved cross runes on each side, and a sunken sealed well in the middle (Stone shadow worn with thin Outline streaks) round a carved diamond sigil in Stone base. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		},
+		{
+			"path": "content/props/room_exit/exit_lit.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by tools/pixel_grid.py from a character grid, the grid by a small generator)",
+			"prompt": "A 48x48 overlay drawn exactly over exit.svg when the room exit is lit (transparent background): only the glowing parts at the same pixels as the carvings: the runes and the diamond sigil in Void light, the well's inner edge in Void base, a Bone light core and scattered Void shadow sparks in the well. No glow halo (the game adds light). Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

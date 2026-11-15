@@ -37,8 +37,8 @@ func after_each() -> void:
 	tick.begin_run()
 
 
-func _on_chosen(room: StringName, enemies: Array[StringName]) -> void:
-	answers.append([room, enemies])
+func _on_chosen(room: StringName, enemies: Array[StringName], ways: Array[StringName]) -> void:
+	answers.append([room, enemies, ways])
 
 
 ## The map the generator makes for the crypt run on `seed`, as the area should have it.
@@ -130,3 +130,38 @@ func test_flow_builds_the_room_the_map_names() -> void:
 	flow.mode = FlowScript.MODE_HUB
 	check(flow.start_run(0), "the hub starts")
 	check(run.get(&"map") == null, "the hub has no map")
+
+
+## Run generation RG4: each room is named with the kinds of the rooms it leads to; a way taken moves
+## the run on to the room it links to (a row deeper) and names it; a way the room has not moves nothing.
+func test_a_way_taken_moves_on_through_the_map() -> void:
+	tick.begin_run()
+	tick.sim.run_seed = 7
+	events.emit_signal("run_begun", &"crypt")
+	var map: RunMap = run.get(&"map") as RunMap
+	if map == null or not map.is_made():
+		check(false, "the crypt run's map is made")
+		return
+	var first: RunNode = map.first()
+	var kinds: Array[StringName] = []
+	for link: int in first.links:
+		kinds.append(map.node(link).kind)
+	check_equal(answers[0][2], kinds, "the first room is named with the kinds it leads to")
+	events.emit_signal("run_way_taken", first.links.size())
+	check_equal(int(run.get(&"at")), 0, "a way the room has not: the party stays")
+	check_equal(answers.size(), 1, "and nothing is named")
+	var way: int = first.links.size() - 1
+	events.emit_signal("run_way_taken", way)
+	var now: RunNode = run.call("room_now") as RunNode
+	check(now != null and now.index == first.links[way], "the room that way links to")
+	check(now != null and now.row == 1, "a row deeper")
+	check_equal(answers.size(), 2, "named")
+	if answers.size() == 2 and now != null:
+		check_equal(answers[1][0], now.room, "its template")
+		check_equal(answers[1][1], now.enemies, "what stands in it")
+	# On to the last room, which leads nowhere.
+	while now != null and not now.links.is_empty():
+		events.emit_signal("run_way_taken", 0)
+		now = run.call("room_now") as RunNode
+	check(now != null and now.row == map.rows() - 1, "the last row reached")
+	check_equal(answers.back()[2], [] as Array[StringName], "the last room leads nowhere")

@@ -111,6 +111,7 @@ const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
 const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
 const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
+const ExitSignsScript := preload("res://gameplay/feel/exit_signs.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
@@ -421,6 +422,8 @@ var _numbers: DamageNumberDrawerScript = null
 var _markers: TeammateMarkersScript = null
 ## The open room's code over the hub's altar (`altar_code.gd`).
 var _altar_code: AltarCodeScript = null
+## The kind of room behind each lit exit of a run's room (`exit_signs.gd`).
+var _exit_signs: ExitSignsScript = null
 ## The items on the ground (`ground_items.gd`, items I6).
 var _ground_items: GroundItemsScript = null
 ## The health bars over wizards whose seat drives another body (`away_bars.gd`, items I8).
@@ -684,6 +687,10 @@ func _ready() -> void:
 	_altar_code.name = "AltarCode"
 	add_child(_altar_code)
 	_altar_code.bind(events)
+	_exit_signs = ExitSignsScript.new()
+	_exit_signs.name = "ExitSigns"
+	add_child(_exit_signs)
+	_exit_signs.bind(events, _room_kind_name)
 	_ground_items = GroundItemsScript.new()
 	_ground_items.name = "GroundItems"
 	add_child(_ground_items)
@@ -2065,6 +2072,18 @@ func damage_numbers() -> DamageNumberDrawerScript:
 ## The items on the ground's look (for tests).
 func ground_items() -> GroundItemsScript:
 	return _ground_items
+
+
+## The name for people of the room kind `kind` (`RoomKind.shown_name`), from the registry; its id in
+## words when the registry has none.
+func _room_kind_name(kind: StringName) -> String:
+	var data := registry.get_resource(&"room_kinds", kind) as RoomKind if registry != null else null
+	return data.shown_name() if data != null else String(kind).capitalize()
+
+
+## The names over a run's lit exits (for tests).
+func exit_signs() -> ExitSignsScript:
+	return _exit_signs
 
 
 ## The room's code over the altar (for tests).

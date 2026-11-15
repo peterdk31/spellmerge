@@ -51,7 +51,8 @@ func kept_rows(content: RunContent, depth: int) -> Array[int]:
 
 ## What is wrong with the rules, one line each (empty when a map can be made from `content` at every
 ## depth they allow): ranges out of order, a bad line of the table, a row no line may take, a
-## required line that takes no row or that the content cannot fill, and, at each depth, no row
+## required line that takes no row or that the content cannot fill, a kind that leads on with no
+## template of exits enough for the ways a room may lead (`exit_problems`), and, at each depth, no row
 ## kept, a row whose lines may follow none of the row before's (`not_after`), too few rooms of a
 ## line allowed in the run for the rows that need it, or a row too wide to be reached from the one
 ## before.
@@ -69,6 +70,7 @@ func problems(content: RunContent) -> PackedStringArray:
 	if not found.is_empty():
 		return found
 	found.append_array(_required_problems(content))
+	found.append_array(exit_problems(content))
 	for depth in range(depth_min, depth_max + 1):
 		found.append_array(_depth_problems(content, depth))
 	return found
@@ -110,6 +112,32 @@ func _required_problems(content: RunContent) -> PackedStringArray:
 		elif why != "":
 			found.append("%s: kind '%s' is required, but %s." % [biome, rule.kind, why])
 	return found
+
+
+## A line of the table that may stand in a row with one after it (where the content fills it) whose
+## kind no template of the biome hosts with exits enough for the most ways a room may lead on
+## (`most_ways`; run generation RG4: a room leads to as many rooms as it has exits, and the generator
+## never picks a template with fewer exits than its room's links).
+func exit_problems(content: RunContent) -> PackedStringArray:
+	var found := PackedStringArray()
+	var ways: int = most_ways()
+	var named: Dictionary = {}
+	for rule: KindRule in kinds:
+		if rule == null or named.has(rule.kind):
+			continue
+		var leads_on: bool = false
+		for depth in range(depth_min, depth_max + 1):
+			for row in depth - 1:
+				leads_on = leads_on or (rule.takes_row(row, depth) and content.cannot_fill(biome, rule.kind, row) == "")
+		if leads_on and content.templates_for(biome, rule.kind, ways).is_empty():
+			named[rule.kind] = true
+			found.append("%s: kind '%s' leads on, but no %s room hosting it has %d exits (props of the role %s) for the %d rooms it may lead to." % [biome, rule.kind, biome, ways, RoomBase.EXIT_ROLE, ways])
+	return found
+
+
+## The most rooms of the next row one room may lead to: `branches_max`, never more than a row holds.
+func most_ways() -> int:
+	return mini(branches_max, width_max)
 
 
 func _depth_problems(content: RunContent, depth: int) -> PackedStringArray:

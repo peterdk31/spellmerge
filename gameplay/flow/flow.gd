@@ -2,8 +2,8 @@ extends Node
 ## Flow (autoload `Flow`): starts a run's room, stands the enemies the run puts in it, announces
 ## `room_entered` and `room_cleared`, and ends the run when the room is won or every player is
 ## down. No waves (boss OB2a, docs/milestones/boss-old-broom.md, decision 30): a run is a path of
-## rooms through its generated map (run generation, docs/milestones/run-generation.md); the exits
-## come in RG4, door voting and the rest of the run in M3.
+## rooms through its generated map (run generation, docs/milestones/run-generation.md), walked by its
+## exits (RG4); the rest of the run comes in M3.
 ##
 ## Starting: `play_requested(player)` (the tests, the bots, the online spike). Flow
 ## begins the run `run_id_to_play` (`crypt`): the run area makes its map and names the first room
@@ -24,9 +24,17 @@ extends Node
 ## A room's fight (boss OB2a, decision 31; run generation RG3): the enemies the run's map puts in it
 ## (`run_room_chosen`, ids of `EnemyBase.FOLDERS`: enemies and bosses; rooms hold layout only) stand
 ## at its enemy spawns as it starts, round the spawns in turn (`stacked_position` when one is used
-## again). When the last is down, `room_cleared`; with no way on yet (the exits come in RG4) the run
-## is won, and RUN_WON_DELAY seconds later it ends as a lost one does: from the hub's stone, back to
-## the hub; from `play_requested`, a new run. A room the run puts nothing in is won as it starts.
+## again). When the last is down, `room_cleared`. A room the run puts nothing in is cleared as it starts.
+##
+## The way on (run generation RG4): the run names with each room the kinds of the rooms it leads to
+## (`run_room_chosen`'s `ways`). Cleared, its exits (props of the role `RoomBase.EXIT_ROLE`) light, one
+## a way (`exits`, `ExitRules`), and when every standing wizard stands in one lit exit, Flow tells the
+## run (`run_way_taken`), which answers with the room it leads to: the party enters it in the same run
+## and the same recording, as it is (`_enter_next_room`: every wizard keeps its health, staffs and
+## everything, a downed one stands up with the revive's health; nothing is dealt again, no run's start),
+## and what was in the room left goes with it. The run's last room (no way on: the boss's, or the
+## deepest fight of a run with no boss) cleared wins the run, and RUN_WON_DELAY seconds later it ends
+## as a lost one does: from the hub's stone, back to the hub; from `play_requested`, a new run.
 ##
 ## Restart: when every wizard is down, a timer of RESTART_DELAY seconds runs, then
 ## a fresh world replaces the old one: a new run (its own seed, so its own map), new wizards at full
@@ -206,7 +214,7 @@ enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); `sandbox`, worked
 ## out from `mode` (read only).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_places", &"_asking", &"_chosen_room", &"_chosen_enemies"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_room", &"_chosen_enemies", &"_chosen_ways"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -283,13 +291,20 @@ var _places: RoomPlaces = RoomPlaces.new()
 var contents: RoomContents = RoomContents.new()
 var yard: PropYard = PropYard.new()
 var hub: HubRules = HubRules.new()
+## The exits of a run's room and the ways they lead (run generation RG4).
+var exits: ExitRules = ExitRules.new()
+## The room's layout in the world, and the room it is of (a joining machine built the room the run
+## started in: a snapshot taken in a later room lays that room's out again, `rebuild_derived`).
+var _layout: Node = null
+var _layout_of: StringName = &""
 ## True while the run in progress was started from the hub's stone: its end goes back there.
 var _back_to_hub: bool = false
-## Scratch: the run area's answer to `run_begun` (`run_room_chosen`), taken only while `start_run`
-## asks for it (`_asking`) and read by the same call.
+## Scratch: the run area's answer to `run_begun` or `run_way_taken` (`run_room_chosen`), taken only
+## while Flow asks for it (`_asking`, `_room_asked`) and read by the same call.
 var _asking: bool = false
 var _chosen_room: StringName = &""
 var _chosen_enemies: Array[StringName] = []
+var _chosen_ways: Array[StringName] = []
 ## The party a run from the stone takes back to the hub when its map could not be made after the hub
 ## went (`PartyLoadout` bytes; empty: none): what a run starting now takes along (`_party_now`) until
 ## the hub starts again, so every wizard comes back as it went.
@@ -352,6 +367,11 @@ func step(delta: float) -> void:
 	if mode == MODE_HUB and state == State.RUNNING:
 		_count_stone()
 		return
+	if mode == MODE_RUN and state != State.IDLE and world != null:
+		var way: int = _count_exits()
+		if way != ExitRules.NONE:
+			_take_way(way)
+			return
 	if _restart_left < 0.0:
 		return
 	_restart_left -= delta
@@ -496,31 +516,21 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 		push_error("Flow: the Tick autoload is missing, so the run starts on the last run's state.")
 	else:
 		tick.begin_run()
+	exits.leave()
 	if mode == MODE_RUN:
 		room = _begin_run_of_rooms()
 		if room == null:
 			stop_run()
 			return false
+		exits.enter(_chosen_ways)
 	_room = room
-	# Built once: what is where is read from the layout shown (props W8c).
-	var layout: Node = room.build(tick.sim if tick != null else null)
-	_places = RoomPlaces.read(layout)
-	for problem in _places.problems():
-		push_warning("Flow: the room '%s': %s" % [room.id, problem])
-	var size: Vector2 = _places.size
-	# The stand-ins and zones are the editor's: the bodies are stood below, by the room's places.
-	RoomPlaces.strip(layout)
-	if projectiles != null:
-		var bounds := Rect2(Vector2.ZERO, size).grow(PROJECTILE_MARGIN)
-		projectiles.set_bounds(bounds)
 	var new_world := Node2D.new()
 	new_world.name = WORLD_NAME
 	# The bodies are drawn by their feet (view only): one standing in front of a prop is drawn over
 	# it, one behind it under it. The room's layout, at the top left, is one piece drawn first, its
 	# floor, walls and tops in their own order and z.
 	new_world.y_sort_enabled = true
-	new_world.add_child(layout)
-	_add_camera(new_world, size)
+	_lay_out(new_world, room, tick.sim if tick != null else null)
 	_spawn_players(new_world, room, players, party)
 	contents.stand(new_world, _places)
 	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
@@ -539,8 +549,41 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 		if mode == MODE_RUN:
 			_show_room_start()
 	_count_stone()
+	_count_exits()
 	_check_room_won()
 	return true
+
+
+## Lay `room`'s layout in `into` (a world), built once by the run's chance `sim`, under everything
+## else: what is where is read from the layout shown (props W8c, `_places`), the stand-ins and zones
+## taken out (the editor's: the bodies are stood by the room's places), the shots kept to the room,
+## and its camera. Any layout and camera there were go.
+func _lay_out(into: Node2D, room: RoomBase, sim: Sim) -> void:
+	if _layout != null and is_instance_valid(_layout):
+		_detach(_layout)
+	var layout: Node = room.build(sim)
+	_places = RoomPlaces.read(layout)
+	for problem in _places.problems():
+		push_warning("Flow: the room '%s': %s" % [room.id, problem])
+	RoomPlaces.strip(layout)
+	if projectiles != null:
+		projectiles.set_bounds(Rect2(Vector2.ZERO, _places.size).grow(PROJECTILE_MARGIN))
+	into.add_child(layout)
+	into.move_child(layout, 0)
+	_layout = layout
+	_layout_of = room.id
+	_add_camera(into, _places.size)
+
+
+## After a snapshot was restored (core/sim/README.md, "Snapshots"): a joining machine built the room
+## the run started in, so a snapshot taken after the party went on lays out the room it is in now.
+## Its bodies are the snapshot's own.
+func rebuild_derived() -> void:
+	if world == null or not is_instance_valid(world) or _room == null or _layout_of == _room.id:
+		return
+	var tick: TickScript = TickScript.of(self) as TickScript
+	_lay_out(world, _room, tick.sim if tick != null else null)
+	_set_walls(world)
 
 
 ## The room the next run of the sandbox or the hub is in (a run of rooms' is its map's).
@@ -553,30 +596,115 @@ func _room_id_for_mode() -> StringName:
 ## `run_room_chosen`; run generation RG3). The room, or null (with a warning) when no answer came or
 ## the registry lacks the room it names.
 func _begin_run_of_rooms() -> RoomBase:
+	var room: RoomBase = _room_asked(func() -> void: events.run_begun.emit(run_id_to_play))
+	if room == null:
+		push_warning("Flow: the run '%s' gave no room it could build (its map could not be made, or its room is missing), so no run starts." % run_id_to_play)
+	return room
+
+
+## The room the run area names in answer to what `ask` sends (`run_room_chosen`: `run_begun` for the
+## first room, `run_way_taken` for the next), with what stands in it and its ways (`_chosen_*`); null,
+## with a warning, when no answer came or the registry lacks the room it names.
+func _room_asked(ask: Callable) -> RoomBase:
 	_chosen_room = &""
 	_chosen_enemies = [] as Array[StringName]
+	_chosen_ways = [] as Array[StringName]
+	if events == null:
+		return null
 	_asking = true
-	if events != null:
-		events.run_begun.emit(run_id_to_play)
+	ask.call()
 	_asking = false
 	if _chosen_room == &"":
-		push_warning("Flow: the run '%s' gave no room (its map could not be made), so no run starts." % run_id_to_play)
 		return null
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, _chosen_room) as RoomBase
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, _chosen_room) as RoomBase if registry != null else null
 	if room == null or room.scene == null:
-		push_warning("Flow: the run's room '%s' is missing from the registry, so no run starts." % _chosen_room)
+		push_warning("Flow: the run's room '%s' is missing from the registry." % _chosen_room)
 		return null
 	return room
 
 
-## The run area's answer to `run_begun`: the room of the run's map the party enters, and what stands
-## in it (a copy of its own). Heard only while `start_run` asks: the next rooms of a run come with
-## the exits (RG4), which give this answer a caller of their own.
-func _on_run_room_chosen(room: StringName, enemies: Array[StringName]) -> void:
+## The run area's answer: the room of the run's map the party enters, what stands in it and the
+## kinds of the rooms it leads to (copies of its own). Heard only while Flow asks (`_room_asked`).
+func _on_run_room_chosen(room: StringName, enemies: Array[StringName], ways: Array[StringName]) -> void:
 	if not _asking:
 		return
 	_chosen_room = room
 	_chosen_enemies = enemies.duplicate()
+	_chosen_ways = ways.duplicate()
+
+
+## The exits of a run's room counted (`ExitRules.count`): each lit or dark as its way says, the view
+## told, and the way every standing wizard stands in (ExitRules.NONE for none).
+func _count_exits() -> int:
+	return exits.count(_wizards, contents, events)
+
+
+## Every standing wizard stands in the lit exit of way `way`: the run moves on through its map
+## (`run_way_taken`) and the party enters the room it names. A room the run cannot name keeps the
+## party where it is (a warning).
+func _take_way(way: int) -> void:
+	var room: RoomBase = _room_asked(func() -> void: events.run_way_taken.emit(way))
+	if room == null:
+		push_warning("Flow: the way %d out of the room '%s' leads to no room, so the party stays." % [way, room_id])
+		return
+	_enter_next_room(room)
+
+
+## The party goes on into `room`, the run's next room (run generation RG4), in the same world, run
+## and recording: no run's start, nothing dealt again. Everything of the room left goes (its layout,
+## its bodies, the shots in flight); every wizard stays itself, as it is (health, staffs, cards, bag,
+## everything), stood at its seat's spawn, a downed one up again with the revive's health (owner,
+## 2026-11-15), each protected for a moment; then the room's bodies and enemies stand, as at a run's
+## start, and the room is entered.
+func _enter_next_room(room: RoomBase) -> void:
+	if projectiles != null:
+		projectiles.clear()
+	_enemies.clear()
+	contents.clear()
+	yard.clear()
+	for child: Node in world.get_children():
+		if not (child is Node2D and _wizards.has(child as Node2D)):
+			_detach(child)
+	_layout = null
+	_room = room
+	_restart_left = -1.0
+	_stand_up_left.fill(-1.0)
+	var tick: TickScript = TickScript.of(self) as TickScript
+	_lay_out(world, room, tick.sim if tick != null else null)
+	for wizard: Node2D in _wizards:
+		_bring_in(wizard)
+	contents.stand(world, _places)
+	_stand_room_enemies(world, room, _chosen_enemies)
+	exits.enter(_chosen_ways)
+	room_id = room.id
+	state = State.RUNNING
+	_set_walls(world)
+	if events != null:
+		events.room_entered.emit(room.id)
+		var items: Array = RoomContents.items_of(_places)
+		events.room_items_placed.emit(room.id, items[0], items[1])
+		_show_room_start()
+	_count_exits()
+	_check_room_won()
+
+
+## A wizard of the party comes into the next room: at its seat's spawn, still, up again if it was
+## down (the revive's health), protected for a moment.
+func _bring_in(wizard: Node2D) -> void:
+	if not is_instance_valid(wizard):
+		return
+	var seat: int = _seat_of(wizard)
+	if seat >= 0 and seat < _places.player_spawns.size():
+		wizard.position = _places.player_spawns[seat]
+	var actor := wizard as Actor
+	if actor != null:
+		actor.velocity = Vector2.ZERO
+	var hero: DownedScript = DownedScript.of(wizard)
+	if hero == null:
+		return
+	if hero.revive(seat) and seat >= 0 and seat < PLAYER_SLOTS:
+		_downed[seat] = false
+	hero.protect(DownedScript.JOIN_PROTECTION)
 
 
 ## End the run in progress and free its world. Flow is idle again, so the next
@@ -595,6 +723,8 @@ func stop_run() -> void:
 	_party_back = PackedByteArray()
 	_clear_run()
 	state = State.IDLE
+	exits.leave()
+	_count_exits()
 	var was: StringName = mode
 	mode = MODE_RUN
 	if was == MODE_SANDBOX and events != null:
@@ -894,7 +1024,7 @@ func _on_player_joined(player: int) -> void:
 		joiner.protect(DownedScript.JOIN_PROTECTION)
 	_downed[player] = false
 	_stand_up_left[player] = -1.0
-	if state == State.RUNNING and _restart_left >= 0.0 and not _all_down():
+	if _can_be_lost() and _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
 	# Heard at the tick's start: the stone goes out under a joiner before any command is applied.
 	_count_stone()
@@ -916,7 +1046,7 @@ func _on_player_left(player: int) -> void:
 		parent.remove_child(wizard)
 	wizard.queue_free()
 	_count_stone()
-	if state == State.RUNNING and _restart_left < 0.0 and _all_down() and not _stands_up_by_itself():
+	if _can_be_lost() and _restart_left < 0.0 and _all_down() and not _stands_up_by_itself():
 		_restart_left = restart_delay()
 
 
@@ -929,17 +1059,28 @@ func _on_enemy_died(_player: int, enemy: Node, _position: Vector2, _shot: int) -
 	_check_room_won()
 
 
-## A run's room with no enemy left is won (decision 30): `room_cleared`, and with no way on yet (the
-## exits of RG4) the run ends RUN_WON_DELAY seconds later, as a lost one does.
+## A run's room with no enemy left is cleared (decision 30): `room_cleared`. Its exits light, one a
+## way on (run generation RG4); the run's last room (no way on) wins the run, which ends
+## RUN_WON_DELAY seconds later, as a lost one does.
 func _check_room_won() -> void:
 	if not _enemies.is_empty() or state != State.RUNNING or mode != MODE_RUN:
 		return
 	state = State.CLEARED
+	var last: bool = exits.ways.is_empty()
 	# Everyone already down (the last enemy fell to a shot still flying): that end keeps its time.
-	if _restart_left < 0.0:
+	if last and _restart_left < 0.0:
 		_restart_left = RUN_WON_DELAY
 	if events != null:
 		events.room_cleared.emit(room_id)
+	if not last:
+		exits.open = true
+		_count_exits()
+
+
+## True while everyone down ends the run: in a run's room under way, or in a cleared one its exits
+## lead on from (the last room won ends the run by itself).
+func _can_be_lost() -> bool:
+	return state == State.RUNNING or (state == State.CLEARED and exits.open)
 
 
 ## The sandbox's answer to everyone down: they all stand up where they are, protected for a
@@ -970,7 +1111,7 @@ func _on_player_downed(player: int) -> void:
 		# Every fall there costs nothing: the wizard stands up by itself, and nothing restarts.
 		_stand_up_left[player] = _room.stand_up_after
 		return
-	if state == State.RUNNING and _all_down() and _restart_left < 0.0:
+	if _can_be_lost() and _all_down() and _restart_left < 0.0:
 		_restart_left = restart_delay()
 
 
@@ -1013,7 +1154,7 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 		return
 	_downed[player] = false
 	_stand_up_left[player] = -1.0
-	if state == State.RUNNING and _restart_left >= 0.0 and not _all_down():
+	if _can_be_lost() and _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
 
 
@@ -1047,6 +1188,9 @@ func _set_walls(new_world: Node2D) -> void:
 
 
 func _add_camera(parent: Node2D, size: Vector2) -> void:
+	for old: Node in parent.get_children():
+		if old is Camera2D:
+			_detach(old)
 	var camera := Camera2D.new()
 	camera.position = size * 0.5
 	# Feel's party camera moves and zooms it to hold this machine's wizards; the limits keep it
@@ -1225,6 +1369,8 @@ func _clear_run() -> void:
 	if world != null and is_instance_valid(world):
 		_detach(world)
 	world = null
+	_layout = null
+	_layout_of = &""
 
 
 ## Put the world in the tree. Without `world_parent` it becomes the current scene

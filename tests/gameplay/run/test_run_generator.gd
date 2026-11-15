@@ -11,6 +11,8 @@ extends "res://tests/support/suite.gd"
 ## The seeds take seconds a run: the runner plays the tests in processes of their own (tests/support/suite.gd):
 # unit-test-shards: 3
 
+const MadeUpRoom := preload("res://tests/support/made_up_room.gd")
+
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 const BIOME: StringName = &"cellar"
@@ -35,7 +37,7 @@ func _kind(id: StringName, fill: StringName) -> RoomKind:
 
 
 func _room(id: StringName, kinds: Array[StringName]) -> RoomBase:
-	var room := RoomBase.new()
+	var room := MadeUpRoom.new()
 	room.id = id
 	room.biome = BIOME
 	room.kinds = kinds
@@ -185,12 +187,12 @@ func _node_broken(map: RunMap, node: RunNode, rules: MapRules, content: RunConte
 		for rule: KindRule in lines:
 			if not rule.may_follow(before.kind):
 				found.append("room %d: %s after %s" % [node.index, node.kind, before.kind])
-	var hosts: Array[RoomBase] = content.templates_for(map.biome, node.kind)
+	var hosts: Array[RoomBase] = content.templates_for(map.biome, node.kind, node.links.size())
 	var host_ids: Array[StringName] = []
 	for room: RoomBase in hosts:
 		host_ids.append(room.id)
 	if not host_ids.has(node.room):
-		found.append("room %d: template %s does not host %s" % [node.index, node.room, node.kind])
+		found.append("room %d: template %s does not host %s with %d exits" % [node.index, node.room, node.kind, node.links.size()])
 	elif taken.has(node.room):
 		for id: StringName in host_ids:
 			if not taken.has(id):
@@ -444,7 +446,7 @@ func test_deleting_any_room_enemy_or_boss_still_makes_a_map_or_says_why() -> voi
 	var boss := _enemy(&"test_boss", 10, 0, true)
 	boss.biomes = [&"crypt"] as Array[StringName]
 	enemies.append(boss)
-	var throne := RoomBase.new()
+	var throne := MadeUpRoom.new()
 	throne.id = &"test_throne"
 	throne.biome = &"crypt"
 	throne.kinds = [&"boss"] as Array[StringName]
@@ -467,6 +469,29 @@ func test_deleting_any_room_enemy_or_boss_still_makes_a_map_or_says_why() -> voi
 				check(not stands, "without %s, seed %d: it stands nowhere" % [named, value])
 				if _failures.size() > failed:
 					return
+
+
+## Run generation RG4: a room is laid out by a template with an exit for each of its links, never
+## fewer; a hall of one exit stands only where a room leads to one room (and in the last row).
+func test_a_room_is_laid_out_by_a_template_with_an_exit_a_link() -> void:
+	var kinds: Array[Resource] = [_kind(&"fight", RoomKind.FILL_ENEMIES), _kind(&"boss", RoomKind.FILL_BOSS)]
+	var narrow := _room(&"hall_narrow", [&"fight"] as Array[StringName]) as MadeUpRoom
+	narrow.exits = 1
+	var wide := _room(&"hall_wide", [&"fight"] as Array[StringName]) as MadeUpRoom
+	wide.exits = 2
+	var throne := _room(&"throne", [&"boss"] as Array[StringName]) as MadeUpRoom
+	throne.exits = 0
+	var content := RunContent.gather(kinds, [narrow, wide, throne] as Array[Resource], [_enemy(&"rat", 1), _enemy(&"king", 10, 0, true)] as Array[Resource])
+	var definition: RunDefinition = _run(_rules(4, 6, 1, 3, 1, 2))
+	var by_links: Dictionary = {}
+	for value in 300:
+		var map: RunMap = RunGenerator.generate(definition, content, Sim.seeded(value))
+		check_equal(_broken(map, definition, content), PackedStringArray(), "seed %d: a valid map" % value)
+		for node: RunNode in map.nodes:
+			check(content.exits_of(node.room) >= node.links.size(), "seed %d, room %d: %s has an exit for each of its %d links" % [value, node.index, node.room, node.links.size()])
+			by_links["%s %d" % [node.room, node.links.size()]] = true
+	check(by_links.has("hall_narrow 1") and by_links.has("hall_wide 2") and by_links.has("hall_wide 1"), "both halls stand, the narrow one where a room leads to one: %s" % [by_links.keys()])
+	check(not by_links.has("hall_narrow 2"), "never the narrow hall for two ways")
 
 
 func test_a_map_that_cannot_be_made_says_why() -> void:

@@ -13,8 +13,10 @@ extends RefCounted
 ## 2. **The kinds:** each room a line of the kind table that takes its row, by weight, within the
 ##    lines' limits (`max_per_row`, `max_per_run`), never after a kind it may not follow, and never
 ##    one that would leave the rest of its row or a later row no line.
-## 3. **The templates:** each room a template of the biome that hosts its kind, by chance, never
-##    one a room leading to it has while another is left.
+## 3. **The templates:** each room a template of the biome that hosts its kind and has an exit for
+##    each of its links (run generation RG4; the validator holds a kind that leads on to a template
+##    with exits enough, `MapRules.exit_problems`), by chance, never one a room leading to it has
+##    while another is left.
 ## 4. **The fill**, by its kind's `RoomKind.fill`: a fight's enemies from the biome's pool at its
 ##    depth, by chance, until its budget (`MapRules.room_budget`) is spent (one at least); a boss
 ##    room's boss from the boss pool. Ids, never files.
@@ -247,11 +249,11 @@ static func _pick_kinds(before: Array[RunNode], here: Array[RunNode], table: Arr
 	return true
 
 
-## Step 3: each room a template of the map's biome that hosts its kind, by chance; one no room
-## leading to it has, while one is left.
+## Step 3: each room a template of the map's biome that hosts its kind with an exit for each of its
+## links, by chance; one no room leading to it has, while one is left.
 static func _pick_templates(map: RunMap, content: RunContent, dice: Dice) -> void:
 	for node: RunNode in map.nodes:
-		var hosts: Array[RoomBase] = content.templates_for(map.biome, node.kind)
+		var hosts: Array[RoomBase] = content.templates_for(map.biome, node.kind, node.links.size())
 		var fresh: Array[RoomBase] = []
 		var taken: Array[StringName] = []
 		for parent: int in map.parents_of(node.index):

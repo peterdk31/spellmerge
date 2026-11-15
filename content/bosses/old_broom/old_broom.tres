@@ -24,7 +24,7 @@ mana_regen = 40.0
 [sub_resource type="Resource" id="Resource_sweep"]
 script = ExtResource("4_entry")
 staff = SubResource("Resource_sweep_staff")
-cards = Array[StringName]([&"reach", &"bigger", &"dash"])
+cards = Array[StringName]([&"bigger", &"lumber", &"dash"])
 
 [sub_resource type="Resource" id="Resource_flick_staff"]
 script = ExtResource("3_staff")
@@ -79,13 +79,13 @@ draw = 1
 wind_up = 0.6
 cooldown = 2.4
 spread = 0.0
-max_mana = 160.0
+max_mana = 200.0
 mana_regen = 60.0
 
 [sub_resource type="Resource" id="Resource_double_sweep"]
 script = ExtResource("4_entry")
 staff = SubResource("Resource_double_sweep_staff")
-cards = Array[StringName]([&"timer", &"reach", &"bigger", &"dash", &"slow", &"fire", &"pool", &"timer", &"reach", &"bigger", &"dash", &"slow", &"fire", &"pool"])
+cards = Array[StringName]([&"timer", &"bigger", &"lumber", &"dash", &"slow", &"fire", &"pool", &"timer", &"bigger", &"lumber", &"dash", &"slow", &"fire", &"pool"])
 
 [sub_resource type="Resource" id="Resource_spring_cleaning"]
 script = ExtResource("5_profile")

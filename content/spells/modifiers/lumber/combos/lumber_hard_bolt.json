@@ -1,0 +1,10 @@
+{
+	"id": "lumber_hard_bolt",
+	"name": "Lumber hard bolt",
+	"does": "A lumbering bolt hits for 15, three times a plain bolt's 5.",
+	"needs": "lumber",
+	"casts": [{"staff": 0, "cards": ["lumber", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 12}]
+}

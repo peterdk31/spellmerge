@@ -52,11 +52,15 @@ func test_every_staff_casts_and_wastes_no_card() -> void:
 		var view: Dictionary = spells.staff_view(entry.cards, entry.staff)
 		check(not bool(view.get("empty", true)), "%s casts" % name)
 		check_equal(view.get("wasted"), {}, "%s wastes no card (slot: wasted)" % name)
+		var cycle: float = 0.0
+		for cast: Dictionary in view.get("casts", []):
+			cycle += float(cast.get("mana", 0.0))
+		check(cycle <= entry.staff.max_mana, "%s: a full staff casts its whole cycle (%s of %s mana)" % [name, cycle, entry.staff.max_mana])
 
 
 func test_the_sweep_is_a_telegraphed_charge() -> void:
 	check_equal(BROOM.staffs.size(), 3, "phase 1: the Sweep, the dust flick and the swat")
-	check(BROOM.staffs[0].cards.has(&"dash") and BROOM.staffs[0].cards.has(&"reach"), "the Sweep is a long dash")
+	check(BROOM.staffs[0].cards.has(&"dash") and BROOM.staffs[0].cards.has(&"lumber"), "the Sweep is a long, heavy charge (Lumber, OB4)")
 	check(is_equal_approx(BROOM.staffs[0].staff.wind_up, 0.8), "winding up 0.8 s in phase 1")
 	check(BROOM.contact_damage > 0, "touching it hurts")
 
@@ -72,6 +76,7 @@ func test_spring_cleaning() -> void:
 	check(is_equal_approx(sweep.staff.wind_up, 0.6), "winding up 0.6 s")
 	check_equal(sweep.cards.count(&"dash"), 2, "two Sweeps, each with its own wind-up")
 	check_equal(sweep.cards.count(&"fire"), 2, "each leaving a burning trail")
+	check_equal(sweep.cards.count(&"lumber"), 2, "each a Lumber charge")
 	var casts: Array = _spells().staff_view(sweep.cards, sweep.staff).get("casts", [])
 	check_equal(casts.size(), 2, "its cycle is two casts")
 	for cast: Dictionary in casts:

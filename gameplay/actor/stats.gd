@@ -14,7 +14,8 @@ extends ActorComponent
 ## - `spell_scale`: × the radius of its spells, built into its staffs (`Caster`), so a change
 ##   asks its caster to build them again (`apply` says so).
 ## - `resist`: per status, the share it resists (0 to 1), a fixed array in Combat's status order
-##   (`Combat.STATUSES`, a freeze as a chill), then the possession's (POSSESS): the status lasts
+##   (`Combat.STATUSES`; a freeze is read as the chill's, `resist_of`, its own entry unused), then
+##   the possession's (POSSESS): the status lasts
 ##   (1 - share) as long (`resist_of`).
 ##
 ## State (hashed, in snapshots) like any member (core/sim/README.md).
@@ -75,7 +76,7 @@ func apply(from: ActorStats) -> bool:
 		mass = maxf(from.mass, LEAST)
 		spell_scale = maxf(from.spell_scale, LEAST)
 		for st in CombatScript.STATUS_COUNT:
-			resist[st] = from.resist_of(CombatScript.STATUSES[st])
+			resist[st] = from.resist_of(CombatScript.STATUSES[st]) if st != CombatScript.ST_FREEZE else 0.0
 		resist[POSSESS] = from.resist_of(&"possess")
 	return spell_scale != scale_was
 
@@ -83,6 +84,9 @@ func apply(from: ActorStats) -> bool:
 ## The share resisted of Combat's status `st` (its index in `Combat.STATUSES`), or of a possession
 ## (POSSESS); 0 for anything else.
 func resist_of(st: int) -> float:
+	if st == CombatScript.ST_FREEZE:
+		# A freeze is a chill's: one share for both, so a change to the chill's counts for it.
+		st = CombatScript.ST_CHILL
 	return resist[st] if st >= 0 and st < resist.size() else 0.0
 
 
@@ -94,6 +98,6 @@ func at_rest() -> bool:
 	if power != maxf(from.power, 0.0) or mass != maxf(from.mass, LEAST) or spell_scale != maxf(from.spell_scale, LEAST):
 		return false
 	for st in CombatScript.STATUS_COUNT:
-		if resist[st] != from.resist_of(CombatScript.STATUSES[st]):
+		if st != CombatScript.ST_FREEZE and resist[st] != from.resist_of(CombatScript.STATUSES[st]):
 			return false
 	return resist[POSSESS] == from.resist_of(&"possess")

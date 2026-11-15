@@ -50,7 +50,7 @@ extends Node
 ##    once per CONTACT_COOLDOWN per victim (an imp walking through imps hurts none).
 ##  - **stats** (boss plan OB7, the body's `Stats`): a spell hit's damage, its slam and the burn it
 ##    puts on are × its caster's power (read at the hit from the caster's body, `_power_of`; not
-##    contact, not heals, not reactions); a shove (a hit's push, a pull) is ÷ the body's mass; a
+##    contact, not heals, not reactions; a static discharge is a share of the hit, so it follows); a shove (a hit's push, a pull) is ÷ the body's mass; a
 ##    status lasts (1 - the body's resist) as long, a freeze as a chill.
 ##
 ## Knockback: Combat only keeps each actor's push. It never moves a body: whoever moves it adds
@@ -1236,11 +1236,12 @@ func _extend(by: int, row: int, reaction: ReactionRow) -> void:
 		_status_left[at + ST_CHILL] = 0.0
 		_status_power[at + ST_CHILL] = 0.0
 		_chill_stacks[row] = 0
-		_status_left[at + ST_FREEZE] += reaction.duration
-		if newly:
+		# The body's resist shortens what a reaction adds too (boss plan OB7), a freeze as a chill.
+		_status_left[at + ST_FREEZE] += reaction.duration * (1.0 - _resist(row, ST_FREEZE))
+		if newly and _status_left[at + ST_FREEZE] > 0.0:
 			_tell_status(by, _nodes[row], FREEZE)
 		return
-	_status_left[at + st] += reaction.duration
+	_status_left[at + st] += reaction.duration * (1.0 - _resist(row, st))
 	_status_power[at + st] += reaction.strength
 
 

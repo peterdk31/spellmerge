@@ -197,7 +197,6 @@ func test_resist_shortens_a_status_and_a_freeze() -> void:
 	body.stats.resist[CombatScript.ST_BURN] = 0.25
 	body.stats.resist[CombatScript.ST_HEX] = 1.0
 	body.stats.resist[CombatScript.ST_CHILL] = 0.5
-	body.stats.resist[CombatScript.ST_FREEZE] = 0.5
 	check(_world.combat.apply_status(-1, body, CombatScript.BURN, 4.0, 1.0), "a burn takes")
 	check(is_equal_approx(_world.combat.status_left(body, CombatScript.BURN), 3.0), "for three quarters of its time")
 	check(not _world.combat.apply_status(-1, body, CombatScript.HEX, 4.0, 10.0), "a share of 1 never takes it")
@@ -206,6 +205,7 @@ func test_resist_shortens_a_status_and_a_freeze() -> void:
 	check(is_equal_approx(_world.combat.status_left(body, CombatScript.CHILL), 1.0), "a chill for half its time")
 	_world.combat.apply_status(-1, body, CombatScript.CHILL, 2.0, 30.0)
 	check(is_equal_approx(_world.combat.status_left(body, CombatScript.FREEZE), CombatScript.FREEZE_TIME * 0.5), "three chills freeze it for half the time")
+	check_equal(body.stats.resist_of(CombatScript.ST_FREEZE), 0.5, "a freeze is read as the chill's share")
 	var plain: Actor = _target(Vector2(0.0, 80.0))
 	_world.combat.apply_status(-1, plain, CombatScript.BURN, 4.0, 1.0)
 	check(is_equal_approx(_world.combat.status_left(plain, CombatScript.BURN), 4.0), "a body resisting nothing takes it whole")
@@ -236,3 +236,34 @@ func test_spell_scale_grows_the_body_s_spells() -> void:
 	big.stats.spell_scale = 1.0
 	big.caster.rebuild()
 	check(is_equal_approx(_world.spells.carrier_radius(_tag(big)), radius), "built again at its new scale")
+
+
+func test_resist_shortens_what_a_reaction_adds() -> void:
+	# A review found an extending reaction (lightning on a chill freezes) skipped the resist.
+	var body: Actor = _target()
+	body.stats.resist[CombatScript.ST_CHILL] = 0.5
+	body.stats.resist[CombatScript.ST_BURN] = 0.75
+	var row: int = _world.combat._row_of(body)
+	var freeze := ReactionRow.new()
+	freeze.status_id = CombatScript.CHILL
+	freeze.duration = 2.0
+	_world.combat._extend(-1, row, freeze)
+	check(is_equal_approx(_world.combat.status_left(body, CombatScript.FREEZE), 1.0), "a reaction's freeze for half its time")
+	_world.combat.apply_status(-1, body, CombatScript.BURN, 4.0, 1.0)
+	var longer := ReactionRow.new()
+	longer.status_id = CombatScript.BURN
+	longer.duration = 4.0
+	_world.combat._extend(-1, row, longer)
+	check(is_equal_approx(_world.combat.status_left(body, CombatScript.BURN), 2.0), "a reaction's longer burn a quarter as long more")
+
+
+func test_spell_scale_grows_a_pulse_s_ring_and_a_blast() -> void:
+	var plain: Actor = _caster([&"pulse"])
+	var big: Actor = _caster([&"pulse"], _stats(1.0, 1.0, 2.0), Vector2(0.0, 100.0))
+	check(is_equal_approx(_world.spells.carrier_reach(_tag(big)), _world.spells.carrier_reach(_tag(plain)) * 2.0), "a pulse's ring reaches twice as far")
+	var blast: int = ModifierBase.Behaviour.BLAST
+	var plain_bolt: Actor = _caster([&"blast", &"bolt"], null, Vector2(0.0, 200.0))
+	var big_bolt: Actor = _caster([&"blast", &"bolt"], _stats(1.0, 1.0, 2.0), Vector2(0.0, 300.0))
+	var plain_blast: float = _world.spells.profile(_tag(plain_bolt)).behaviour(blast)
+	check(plain_blast > 0.0, "a blast has a radius")
+	check(is_equal_approx(_world.spells.profile(_tag(big_bolt)).behaviour(blast), plain_blast * 2.0), "twice as wide on a body of spell scale 2")

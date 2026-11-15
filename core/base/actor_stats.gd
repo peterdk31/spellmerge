@@ -10,15 +10,13 @@ extends Resource
 ## The statuses a body may resist, as the data names them; `possess` is the possession's seconds.
 ## A freeze is a chill's (three chills in a row): it lasts as the chill's share says.
 const RESISTED: Array[StringName] = [&"burn", &"chill", &"gust", &"hex", &"static", &"possess"]
-## The status a freeze is resisted as.
-const FREEZE_AS: StringName = &"chill"
 
 ## × the damage of the body's spell hits and what follows from them: heavy's slam, a burn its hit
 ## puts on. Not its contact damage (its own number) nor its heals.
 @export_range(0.0, 10.0, 0.05, "or_greater") var power: float = 1.0
 ## A shove on the body (a spell's knockback, a pull) is divided by it. Above 0.
 @export_range(0.05, 20.0, 0.05, "or_greater") var mass: float = 1.0
-## × the radius of the body's spells (a shot's size, a pulse's ring, a swing's reach, a pool): the
+## × the size of the body's spells (a shot's radius, a pulse's ring, a blast, a swing's arc, a pool): the
 ## actor's counterpart of `bigger`'s radius, without its damage or speed. Above 0.
 @export_range(0.05, 4.0, 0.05, "or_greater") var spell_scale: float = 1.0
 ## Each status's share resisted (0 to 1): it lasts (1 - share) as long; 1 never takes it.
@@ -31,7 +29,7 @@ const FREEZE_AS: StringName = &"chill"
 @export_range(0.0, 1.0, 0.05) var resist_possess: float = 0.0
 
 
-## The share of `status` resisted (0 to 1); a freeze as a chill (FREEZE_AS), anything else 0.
+## The share of `status` resisted (0 to 1); a freeze as a chill, anything else 0.
 func resist_of(status: StringName) -> float:
 	match status:
 		&"burn":

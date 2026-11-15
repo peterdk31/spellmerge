@@ -442,6 +442,13 @@ func step(delta: float) -> void:
 			kit.cast_done()
 
 
+## A pulse's size is its ring: a bigger body's ring grows faster, so it reaches as many times further
+## in the same time.
+func scale_size(spell: CompiledSpell, factor: float) -> void:
+	super.scale_size(spell, factor)
+	spell.speed *= factor
+
+
 ## How far it reaches (an AI's sense of it, a telegraph): as far as a plain ring grows, `speed`
 ## times `lifetime` (the shots' speed curve keeps the distance of its mean).
 func reach_of(spell: CompiledSpell) -> float:

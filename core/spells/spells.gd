@@ -3625,6 +3625,7 @@ func close_caster(actor: int) -> void:
 	for staff in SpellLimits.STAFFS:
 		var index: int = actor * SpellLimits.STAFFS + staff
 		_open_builds[index] = 0
+		_open_ring[index] = _ring[index]
 		_release_hold(index)
 		var old: int = _current[index]
 		_installed[index] = null

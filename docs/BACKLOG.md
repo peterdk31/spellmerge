@@ -32,7 +32,7 @@ For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 - **Staff spread (M3, owner 2026-10-27).** Found staffs have a `spread`: either rolled at random, or starting high and upgradable to lower values. The runtime and `spread_mult` (Sniper) are in since 2026-10-27; the dev and starter staffs aim true.
 - **Relics on cards (M3).** Explosion immunity (hit kind `burst`), self-damage refunded as mana, immunity to one element, triggers that fire twice.
 - **Enemy cards as rewards (M3–M4).** Elites and bosses with dearer staffs, whose cards can drop as rewards. Enemies casting from staffs moved into M2 (owner, 2026-10-27; M2-staffs.md phase F).
-- **Elements on the room (M3 rooms).** Fire lights grass, frost freezes water into floor, lightning electrifies water, void breaks weak walls.
+- **Elements on the room (M3 rooms).** Fire lights grass is planned in docs/milestones/ground-cover.md (phase GC); frost freezes water into floor, lightning electrifies water, void breaks weak walls.
 - **A map view, and other uses for A, X and Y (task, owner 2026-10-26).** The staffs moved to the shoulders, so A, X and Y do nothing in play (B opens the builder). The owner's first idea is a map view (the room sequence and where the players are, once M3 has rooms and doors); A, X and Y get their jobs then.
 - **Codex of discoveries (M5).** The first time a reaction, a combo or an unknown chain happens, the game notes it (with a short clip if the recorder can do it cheaply).
 - **Superseded by the pivot:** "Spell visuals round 2, part 2" (a burst per combo row) and the combo marks per combo class are replaced by the layered shot look (staffs B6); keep what still reads well.

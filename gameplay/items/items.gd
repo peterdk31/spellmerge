@@ -286,6 +286,8 @@ func rebuild_derived() -> void:
 ## otherwise (a host starting it, a party back from a run, any other room) what its scene places,
 ## one copy each, in its order: the rack is fresh then (owner, 2026-11-14).
 func _on_room_items_placed(room_id: StringName, items: Array[Resource], at: PackedVector2Array) -> void:
+	# A room the party went on into (run generation RG4): what lay in the room left goes with it.
+	clear()
 	var carried: GroundLoadout = frames.next_run_ground() if frames != null else null
 	_room = room_id
 	if carried != null and room_id != &"" and carried.room == room_id:

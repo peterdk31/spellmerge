@@ -47,6 +47,10 @@ extends Resource
 ## `ArtPixels.MIN_SHARE`): a floor is mostly one colour, its seams and highlights a few pixels in a
 ## hundred (the crypt's shadow is 7 %, its light 1.4 %).
 const FLOOR_MIN_SHARE: float = 0.01
+## The role of a room's exits (`PropBase.role`; run generation RG4): props of it placed in its scene
+## are the ways a run's party leaves the room by, lit once it is cleared, each leading to a room of
+## the next row of the run's map. A template leads to as many rooms as it has exits (`exit_count`).
+const EXIT_ROLE: StringName = &"room_exit"
 ## The layer of the walls' bodies (as Flow tells the projectile manager).
 const WALL_LAYER: int = 1
 ## The z of a layout's `Floor` sprite: under Feel's floor marks (one above it) and under the
@@ -81,6 +85,17 @@ func template_problems(known: Array[StringName]) -> PackedStringArray:
 		elif not known.has(kinds[at]):
 			found.append("%s: kind '%s' is no room kind." % [id, kinds[at]])
 	return found
+
+
+## How many exits its layout places (props of EXIT_ROLE, read once from its default layout:
+## `places()`): as a run's template it can lead to that many rooms of the next row (run generation
+## RG4). 0 with no scene.
+func exit_count() -> int:
+	var count: int = 0
+	for data: Resource in places().placed_of(PropBase):
+		if (data as PropBase).role == EXIT_ROLE:
+			count += 1
+	return count
 
 
 ## A new instance of its layout (props W8c): its scene, its placements, zones and spawns in it.

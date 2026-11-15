@@ -4,7 +4,9 @@ extends RefCounted
 ## their own, a room kind only that room hosts, a copy of the room hosting it (in `biome`, its own by
 ## default), and a run definition one row deep whose one room is of that kind: the generator can
 ## only pick that room, and fills it as the game fills any room of the kind (`fill`: the biome's
-## enemies by `budget`, or one of its bosses). Nothing of the game's content changes: what is
+## enemies by `budget`, or one of its bosses). With `depth` and `width` (run generation RG4), the run
+## is that many rows of copies of the room, every row after the first `width` rooms wide, each room
+## leading to every room of the next row (the room needs `width` exits). Nothing of the game's content changes: what is
 ## registered is new, under `PREFIX`.
 ##
 ##     var run_id: StringName = PinnedRun.pin(registry, arena)
@@ -19,8 +21,8 @@ const PREFIX: String = "pinned_"
 ## The run of the one room `room` (a copy of it as `room_id(room)`), registered in `registry` (the
 ## Registry autoload, or one of a test's), and its id. `biome` empty: the room's own (a room of no
 ## biome needs one whose enemies fill it). Pinned again, the same ids (nothing is added twice).
-static func pin(registry: Node, room: RoomBase, biome: StringName = &"", fill: StringName = RoomKind.FILL_ENEMIES, budget: int = 16) -> StringName:
-	var id: StringName = room_id(room)
+static func pin(registry: Node, room: RoomBase, biome: StringName = &"", fill: StringName = RoomKind.FILL_ENEMIES, budget: int = 16, depth: int = 1, width: int = 1) -> StringName:
+	var id: StringName = room_id(room, depth, width)
 	var kind := RoomKind.new()
 	kind.id = id
 	kind.fill = fill
@@ -32,12 +34,12 @@ static func pin(registry: Node, room: RoomBase, biome: StringName = &"", fill: S
 	registry.call("add", &"rooms", copy)
 	var rules := MapRules.new()
 	rules.biome = copy.biome
-	rules.depth_min = 1
-	rules.depth_max = 1
-	rules.width_min = 1
-	rules.width_max = 1
-	rules.branches_min = 1
-	rules.branches_max = 1
+	rules.depth_min = depth
+	rules.depth_max = depth
+	rules.width_min = width
+	rules.width_max = width
+	rules.branches_min = width
+	rules.branches_max = width
 	rules.room_budget = budget
 	rules.kinds = [KindRule.make(id, 0, -1)] as Array[KindRule]
 	var run := RunDefinition.new()
@@ -47,6 +49,10 @@ static func pin(registry: Node, room: RoomBase, biome: StringName = &"", fill: S
 	return id
 
 
-## The id of the copy of `room` a pinned run plays (and of its kind and its run).
-static func room_id(room: RoomBase) -> StringName:
-	return StringName(PREFIX + String(room.id))
+## The id of the copy of `room` a pinned run of `depth` rows `width` wide plays (and of its kind and
+## its run).
+static func room_id(room: RoomBase, depth: int = 1, width: int = 1) -> StringName:
+	var id: String = PREFIX + String(room.id)
+	if depth != 1 or width != 1:
+		id += "_%dx%d" % [depth, width]
+	return StringName(id)

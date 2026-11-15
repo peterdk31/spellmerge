@@ -307,9 +307,18 @@ signal run_ended(victory: bool)
 ## answers with `run_room_chosen` for its first room.
 signal run_begun(run_id: StringName)
 ## Sender: run. The room of the run's map the party enters: the room template `room_id`
-## (content/rooms) and what stands in it (`enemies`: enemy and boss ids, one per body). Heard by
-## flow, which builds it.
-signal run_room_chosen(room_id: StringName, enemies: Array[StringName])
+## (content/rooms), what stands in it (`enemies`: enemy and boss ids, one per body) and the kinds of
+## the rooms it leads to (`ways`: `RoomKind` ids, left to right as the map's links; none for the
+## run's last room). Heard by flow, which builds it and, once it is cleared, lights an exit a way.
+signal run_room_chosen(room_id: StringName, enemies: Array[StringName], ways: Array[StringName])
+## Sender: flow. The party leaves the run's room it is in for the next (run generation RG4), before
+## anything of it goes: what was cast in it ends quietly with it. Heard by core/spells (`leave_room`:
+## carriers, holds, waiting launches and moves end; builds stay).
+signal room_left()
+## Sender: flow. Every standing wizard stands in the lit exit of way `way` (0 = the leftmost of the
+## room's ways; run generation RG4): the party goes on. Heard by run, which moves on through the map
+## to that room and answers with `run_room_chosen`. Not a command: stepping in is position only.
+signal run_way_taken(way: int)
 ## Sender: flow. The players entered the room `room_id`.
 signal room_entered(room_id: StringName)
 ## Sender: core/loading. Work before playing has begun behind the loading screen (`Loading.run`;
@@ -319,7 +328,7 @@ signal loading_started()
 signal loading_progressed(done: int, total: int)
 ## Sender: core/loading. The load is over (done, or cancelled). Heard by hud.
 signal loading_finished()
-## Sender: flow. The room `room_id` was cleared: every enemy the run stood in it is down (boss OB2a: no waves; until the exits of run generation RG4, a cleared room wins the run).
+## Sender: flow. The room `room_id` was cleared: every enemy the run stood in it is down (boss OB2a: no waves). Its exits light (run generation RG4); the run's last room cleared wins the run.
 signal room_cleared(room_id: StringName)
 ## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.
 signal sandbox_changed(on: bool)
@@ -336,9 +345,15 @@ signal hub_changed(in_hub: bool)
 signal altar_changed(seats: int)
 ## Sender: flow. In the hub: whether a multiplayer altar stands (`standing`), and `at`, the top middle of the first one's area in room pixels (where something drawn over it sits). Sent as it changes; (false, zero) when the hub is left. For the view only. Heard by feel (the room's code drawn over the altar, online-lobby L5c).
 signal altar_placed(standing: bool, at: Vector2)
+## Sender: flow. In a run's cleared room (run generation RG4): the lit exits, each the top middle of
+## its area in room pixels (`at`) and the kind of room it leads to (`kinds`, `RoomKind` ids, as
+## many). Sent as it changes; empty when none is lit (a room under way, the room left). For the view
+## only. Heard by feel (the kind's name over each lit exit).
+signal room_exits_shown(at: PackedVector2Array, kinds: Array[StringName])
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
-## where each lies, in the scene's order. Sent once a run's room is made, after the run's start.
+## where each lies, in the scene's order. Sent once each room is made: after the run's start, and as
+## the party goes on into the next room of the run (run generation RG4: what lay in the room left goes).
 ## Heard by items, which lays them on the ground (or, the run taking along what lay on that room's
 ## ground, `Frames.next_run_ground`, that instead).
 signal room_items_placed(room_id: StringName, items: Array[Resource], at: PackedVector2Array)

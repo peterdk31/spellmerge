@@ -7,6 +7,9 @@ extends Resource
 @export var texture: Texture2D = null
 ## The face style (`Face.Style` as a number; -1: keep).
 @export var face_style: int = -1
+## The row of the face's own art it shows from this phase on (`Face.art_row`, a face with a
+## `FaceArt`: boss plan OB9, an angrier face for a later phase; -1: keep).
+@export var face_row: int = -1
 ## The eyes' glow (alpha 0: keep).
 @export var glow: Color = Color(0.0, 0.0, 0.0, 0.0)
 ## The body's scale (0: keep).

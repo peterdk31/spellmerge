@@ -198,8 +198,8 @@ func parts() -> Array[BodyPart]:
 	return _parts
 
 
-## Show the phase the body is in after a snapshot gave it its state back (its looks, from the
-## scene's on), and forget where the body was.
+## Show the phase the body is in after a snapshot gave it its state back (its looks and its face's,
+## from the scene's on), and forget where the body was.
 func sync() -> void:
 	_body.forget()
 	_idle_texture = _scene_texture
@@ -208,11 +208,16 @@ func sync() -> void:
 	for part in _parts:
 		part.texture = _part_art.get(part, part.texture) as Texture2D
 	_drop_phase_motes()
+	if _face != null:
+		_face.unstyle()
 	if actor.phases == null:
 		return
 	for index in actor.phases.current + 1:
 		if index >= 0 and index < actor.phases.list.size() and actor.phases.list[index] != null:
-			_show_phase(actor.phases.list[index])
+			var phase: EnemyPhase = actor.phases.list[index]
+			_show_phase(phase)
+			if _face != null and phase.look != null:
+				_face.restyle(phase.look.face_style, phase.look.glow, phase.look.face_row)
 
 
 ## How high the body is off its rest this step (px, up is positive), for tests.

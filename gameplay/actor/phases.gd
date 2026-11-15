@@ -79,11 +79,11 @@ func _holds(phase: EnemyPhase) -> bool:
 	return phase.after_seconds > 0.0 and elapsed >= phase.after_seconds
 
 
-## The Face's style and glow and the body's size; the sprite is its look's (`started`).
+## The Face's style, glow and own art's row and the body's size; the sprite is its look's (`started`).
 func _restyle(look: PhaseLook) -> void:
 	if look.size > 0.0:
 		actor.set_size(look.size)
 	for child in actor.get_children():
 		var face := child as Face
 		if face != null:
-			face.restyle(look.face_style, look.glow)
+			face.restyle(look.face_style, look.glow, look.face_row)

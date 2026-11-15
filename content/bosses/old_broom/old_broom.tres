@@ -113,6 +113,7 @@ colours = Array[StringName]([&"fire", &"spark"])
 
 [sub_resource type="Resource" id="Resource_burning"]
 script = ExtResource("7_look")
+face_row = 1
 glow = Color(1, 0.635, 0.235, 1)
 parts = Dictionary[StringName, Texture2D]({
 &"Head": ExtResource("8_burning")

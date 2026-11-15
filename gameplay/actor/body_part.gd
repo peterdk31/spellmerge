@@ -18,6 +18,9 @@ extends Sprite2D
 ## - `swish`: degrees it swings to and fro `swish_rate` times a second while the body goes.
 ## - `squash`: how much wider and lower it is while the body goes (a head dragged on the floor).
 ## - `sway`: degrees it sways `sway_rate` times a second while the body stands.
+## - `tap`: pixels it lifts and drops, `taps` times in quick succession every `tap_every` seconds,
+##   while the body stands idle (the IDLE pose; boss plan OB9: an impatient tap on the floor; a part
+##   on the floor lifts the parts on it with it).
 ## - `wall_squash`: how much it squashes, then stretches, along the way the body met a wall.
 ## - `shudder`: pixels it shakes as the body meets a wall, and all through a phase change.
 ## - `fling`: how far it flies when the body dies (Feel's remnant: the parts fly apart where it
@@ -40,6 +43,9 @@ const SHAKE_RATE: Vector2 = Vector2(97.0, 83.0)
 @export_range(0.0, 0.6, 0.01) var squash: float = 0.0
 @export var sway: float = 0.0
 @export var sway_rate: float = 0.5
+@export var tap: float = 0.0
+@export var taps: int = 2
+@export var tap_every: float = 1.5
 @export_range(0.0, 0.6, 0.01) var wall_squash: float = 0.0
 @export var shudder: float = 0.0
 @export_range(0.0, 4.0, 0.05) var fling: float = 1.0
@@ -51,6 +57,8 @@ const VIEW_ONLY: bool = true
 
 ## How much harder it shudders through a phase change than at a wall hit's start.
 const TRANSITION_SHUDDER: float = 1.5
+## Seconds of one tap (up and down again).
+const TAP_TIME: float = 0.14
 
 ## Its place, turn and scale as the scene made it (`take_rest`).
 var rest_position: Vector2 = Vector2.ZERO
@@ -88,6 +96,15 @@ func frame_for(pose: int) -> int:
 	return mini(pose_frames[pose], frames - 1)
 
 
+## How far up a tap has it at `seconds` on the look's clock, 0 to 1: `taps` quick lifts at the start
+## of every `tap_every` seconds, none between.
+func tap_lift(seconds: float) -> float:
+	var into: float = fmod(seconds, tap_every)
+	if into >= TAP_TIME * float(taps):
+		return 0.0
+	return absf(sin(into / TAP_TIME * PI))
+
+
 ## Draw the part as `body` says the body moves now.
 func show_pose(body: BodyPose) -> void:
 	take_rest()
@@ -95,6 +112,8 @@ func show_pose(body: BodyPose) -> void:
 	degrees += swish * body.going * sin(body.swish_time * TAU * swish_rate)
 	degrees += sway * (1.0 - body.going) * sin(body.time * TAU * sway_rate)
 	var at: Vector2 = -body.drive * lag
+	if tap > 0.0 and taps > 0 and tap_every > 0.0 and body.pose == BodyPose.Pose.IDLE:
+		at.y -= tap * (1.0 - body.going) * tap_lift(body.time)
 	var stretch: Vector2 = Vector2(1.0 + squash * body.going, 1.0 - squash * body.going)
 	var wall: float = body.wall_share()
 	if wall > 0.0 and wall_squash > 0.0:

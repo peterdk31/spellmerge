@@ -2,6 +2,14 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-15: Run generation RG8, the map on screen
+
+The pause menu has a Map page in a run of rooms: the run's map, its rows top to bottom from the first room, a line for each link, each room's kind as a letter ("F Fight  B Boss" under it) and "Room 3 of 6"; the party's room is framed in gold, and the rooms it can no longer reach (behind it, another branch) are dim. View only, Back or B to leave. It is opened from the pause menu only: the gamepad has no free button (Select opens the inventory, Start the pause menu).
+
+The HUD never names gameplay, so the run area tells the map as the party sees it (`run_map_changed(rows, kinds, links, at)`) as the party enters each room, an empty one at every run's start, and again after a snapshot's restore (`Run.rebuild_derived`) so a machine joining in a later room shows the same map. The widget (`hud/widgets/run_map_view.gd`) draws only what that event says, with the kinds' names from the registry (`RoomKind.shown_name`). This finishes the run generation plan; the lectern's known gap (it names depths a shallower map lacks) stays, since the map exists only once the run starts.
+
+Tests: `tests/hud/test_run_map_view.gd` (the map told, its layout, the rooms in reach, empty, the names, a copy), `tests/hud/test_pause_menu.gd` (the Map row and page, Back and B, the map going), `tests/gameplay/run/test_run.gd` (the map told on entering each room, after a restore, empty at a run's start and for a run the registry lacks), `tests/core/test_events.gd`. Screenshots: `tests/screenshots/shot_run_map.gd`. READMEs: hud, gameplay/run.
+
 ## 2026-11-15: Run generation RG7, the lectern
 
 The hub has a lectern (`content/props/start_lectern/`, a stone stand with an open book, right of the teleporter stone): a seat's A there opens that seat's menu of the stone's run's depths, "Room 1" up to "The boss", and its pick is where the party's next run from the stone starts. The run is generated as always; the party enters the first room of the picked depth's row (the boss pick always the map's last row), and everything else is the same run, its scale included. This replaces the boss plan's OB2c (decision 33) for the generated run, so testing a deep room or the boss no longer needs playing down to it.

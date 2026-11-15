@@ -330,6 +330,14 @@ signal run_room_scaled(scale: float)
 ## the rooms it leads to (`ways`: `RoomKind` ids, left to right as the map's links; none for the
 ## run's last room). Heard by flow, which builds it and, once it is cleared, lights an exit a way.
 signal run_room_chosen(room_id: StringName, enemies: Array[StringName], ways: Array[StringName])
+## Sender: run. The run's map as the party sees it (run generation RG8): one entry a room, in the
+## map's order (`RunMap.nodes`: row by row, each row left to right): its row (`rows`), its kind
+## (`kinds`: `RoomKind` ids) and the rooms of the next row it leads to (`links`: their places in these
+## lists, left to right), and the room the party is in (`at`). Sent as the party enters a room, and
+## empty (no rooms, `at` -1) as a run starts (the hub, the sandbox: no map) and when a run's map could
+## not be made; told again after a snapshot is restored. For the view only. Heard by hud (the pause
+## menu's map).
+signal run_map_changed(rows: PackedInt32Array, kinds: Array[StringName], links: Array[PackedInt32Array], at: int)
 ## Sender: flow. The party leaves the run's room it is in for the next (run generation RG4), before
 ## anything of it goes: what was cast in it ends quietly with it. Heard by core/spells (`leave_room`:
 ## carriers, holds, waiting launches and moves end; builds stay).

@@ -5,7 +5,8 @@ extends PanelContainer
 ## (node Root/PauseMenu); it sits in the middle of the view.
 ##
 ## Pages, one list of buttons each:
-## - **Main:** Resume, Sandbox (only while the run is a sandbox, `sandbox_changed`), Settings, Leave
+## - **Main:** Resume, Map (only while the run has a map, a run of rooms), Sandbox (only while the
+##   run is a sandbox, `sandbox_changed`), Settings, Leave
 ##   game (`seat_leave_requested`: the seat that opened the menu lets its device go and its wizard
 ##   leaves, at its tick on every machine; the others play on; items I2, in place of the `leave`
 ##   action; the menu closes first), "Leave game: P2 (no controller)" (only while a seat of this
@@ -13,6 +14,9 @@ extends PanelContainer
 ##   by the same `seat_leave_requested`, the game goes on once no seat waits, and the menu stays
 ##   open), Main menu (`main_menu_requested`: this machine leaves the run,
 ##   online too, and the main menu shows again; the menu closes first).
+## - **Map** (run generation RG8): the run's map (`hud/widgets/run_map_view.gd`, told by the run
+##   area's `run_map_changed`: its rows, links and kinds, and where the party is), view only, and
+##   Back. It goes back to the main page by itself if the map goes while it shows.
 ## - **Sandbox** (staffs B7): Reset dummies (`sandbox_action_requested(player, reset_dummies)`;
 ##   it stays on the page); the enemy arena (enemy AI AI8): "Enemy: <name>" (every enemy in the registry, by its
 ##   `shown_name()`; left and right or `accept` step through them), "Count: 1" (1-8, the same
@@ -84,15 +88,16 @@ extends PanelContainer
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
+const RunMapViewScript := preload("res://hud/widgets/run_map_view.gd")
 
 const PLAYER_COUNT: int = 4
-enum Page { MAIN, SANDBOX, SETTINGS }
+enum Page { MAIN, SANDBOX, SETTINGS, MAP }
 ## The radial builder's ring (see the top): the plain one with every card or one kind at a time,
 ## or a ring style from `hud/builder/rings/`.
 enum Ring { EVERY_CARD, ONE_KIND, ZOOM, KINDS_HOLD, KINDS_DEPTH }
 ## The title of each page.
 const TITLES: Dictionary = {
-	Page.MAIN: "PAUSED", Page.SANDBOX: "SANDBOX", Page.SETTINGS: "SETTINGS",
+	Page.MAIN: "PAUSED", Page.SANDBOX: "SANDBOX", Page.SETTINGS: "SETTINGS", Page.MAP: "MAP",
 }
 ## The sandbox actions, as flow knows them.
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
@@ -205,6 +210,7 @@ var ai_view: bool = false
 @onready var _title: Label = %Title
 @onready var _rows: VBoxContainer = %Rows
 @onready var _resume: Button = _add(Page.MAIN, "Resume", "Resume")
+@onready var _map_row: Button = _add(Page.MAIN, "Map", "Map")
 @onready var _sandbox: Button = _add(Page.MAIN, "Sandbox", "Sandbox")
 @onready var _settings: Button = _add(Page.MAIN, "Settings", "Settings")
 @onready var _leave: Button = _add(Page.MAIN, "LeaveGame", "Leave game")
@@ -237,6 +243,9 @@ var ai_view: bool = false
 @onready var _numbers: Button = _add(Page.SETTINGS, "DamageNumbers", NUMBERS_TEXT % "On")
 @onready var _fps: Button = _add(Page.SETTINGS, "ShowFps", FPS_TEXT % "Off")
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
+## The Map page's map (not a button: UIFocus never stops on it), over its Back.
+@onready var _map: RunMapViewScript = _add_map()
+@onready var _map_back: Button = _add(Page.MAP, "MapBack", "Back")
 
 
 func _ready() -> void:
@@ -265,6 +274,9 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_load_fps()
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
+	_map.name_of = _kind_name
+	_map.bind(_events)
+	_map.map_changed.connect(_on_map_changed)
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
 		_ui_focus.activated.connect(_on_activated)
@@ -333,6 +345,20 @@ func _add(on_page: Page, node_name: String, text: String) -> Button:
 		_pages[on_page] = []
 	(_pages[on_page] as Array).append(made)
 	return made
+
+
+## The Map page's map, in the rows after the buttons made before it (shown on that page only).
+func _add_map() -> RunMapViewScript:
+	var made := RunMapViewScript.new()
+	made.name = "RunMap"
+	made.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_rows.add_child(made)
+	return made
+
+
+## The map the Map page shows (for tests and screenshots).
+func map_view() -> RunMapViewScript:
+	return _map
 
 
 ## A slider bar drawn in `row` (at its right), for show only: the row works it (see the top).
@@ -445,6 +471,8 @@ func _show_page(next: Page) -> void:
 		for control: Button in _pages[on_page]:
 			control.visible = on_page == next
 	_sandbox.visible = next == Page.MAIN and _sandbox_on
+	_map_row.visible = next == Page.MAIN and _map.has_map()
+	_map.visible = next == Page.MAP
 	_leave_waiting.visible = next == Page.MAIN and _waiting_seats != 0
 	_leave_waiting.set_meta(BASE_TEXT_META, LEAVE_WAITING_TEXT % (waiting_seat() + 1))
 	if next == Page.SETTINGS:
@@ -516,6 +544,24 @@ func _on_sandbox_changed(on: bool) -> void:
 		_show_page(page)
 
 
+## The run's map changed: the Map row follows it, and a Map page whose map went goes back.
+func _on_map_changed() -> void:
+	if not _map.has_map() and page == Page.MAP:
+		_go(Page.MAIN)
+	else:
+		_show_page(page)
+		if is_open() and _focused != null and not _focused.visible:
+			_focus_first()
+
+
+## A room kind's name for people (`RoomKind.shown_name`), from the registry; its id in words if the
+## registry has no such kind.
+func _kind_name(kind: StringName) -> String:
+	var source: Node = registry if registry != null else get_node_or_null(^"/root/Registry")
+	var data: RoomKind = source.call("get_resource", &"room_kinds", kind) as RoomKind if source != null else null
+	return data.shown_name() if data != null else String(kind).capitalize()
+
+
 func _on_closed(player: int) -> void:
 	if player != owner_player:
 		return
@@ -539,6 +585,8 @@ func _on_activated(player: int, control: Control) -> void:
 		return
 	if control == _resume:
 		close_menu()
+	elif control == _map_row:
+		_go(Page.MAP)
 	elif control == _sandbox:
 		_read_arena()
 		_go(Page.SANDBOX)
@@ -612,7 +660,7 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_numbers(not damage_numbers)
 	elif control == _fps:
 		_set_fps(not show_fps)
-	elif control == _sandbox_back or control == _settings_back:
+	elif control == _sandbox_back or control == _settings_back or control == _map_back:
 		_go(Page.MAIN)
 
 

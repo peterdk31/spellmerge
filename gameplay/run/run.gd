@@ -8,7 +8,9 @@ extends Node
 ## harder it is (`run_room_scaled`, run generation RG5: its depth and the run's players), which
 ## difficulty scales its enemies by. When the party
 ## takes a lit exit (`run_way_taken(way)`, run generation RG4), it moves on through the map to the
-## room that way links to (`at`, and with it the depth) and names that room the same way. Areas never
+## room that way links to (`at`, and with it the depth) and names that room the same way. The view
+## hears the map as the party sees it (`run_map_changed`, run generation RG8: every room's row, kind
+## and links, and where the party is) as it enters each room, empty as a run starts. Areas never
 ## call each other: Flow knows the run by these events only, and this area knows nothing of a world,
 ## a body or a scene.
 ##
@@ -74,6 +76,13 @@ func _ready() -> void:
 ## A run's start: no map until a run of rooms begins (`run_begun`).
 func begin_run() -> void:
 	SimFresh.renew(self)
+	_tell_map()
+
+
+## After a snapshot is restored (core/sim/README.md, "Snapshots"): the view hears the restored map,
+## so a machine that joined a run in a later room shows it as the others do.
+func rebuild_derived() -> void:
+	_tell_map()
 
 
 ## The save flags this machine's save has unlocked now (`save`): those some run definition's rule
@@ -106,6 +115,7 @@ func _on_run_begun(run_id: StringName, players: int, start_depth: int) -> void:
 	var definition: RunDefinition = registry.get_resource(RUN_FOLDER, run_id) as RunDefinition if registry != null else null
 	if definition == null:
 		push_warning("Run: no run '%s' in the registry, so no run of rooms begins." % run_id)
+		_tell_map()
 		return
 	var sim: Sim = Sim.found(self)
 	# The rules the run's unlocks leave (the run's start's, never this machine's save now). A
@@ -114,6 +124,7 @@ func _on_run_begun(run_id: StringName, players: int, start_depth: int) -> void:
 	var made: RunMap = RunGenerator.generate(played, registry.run_content(), sim, players)
 	if not made.is_made():
 		push_warning("Run: no map for the run '%s': %s" % [run_id, "; ".join(made.problems)])
+		_tell_map()
 		return
 	map = made
 	_enter(made.start_at(start_depth, definition.start_depths()))
@@ -137,6 +148,24 @@ func _enter(index: int) -> void:
 	var ways: Array[StringName] = []
 	for link: int in node.links:
 		ways.append(map.node(link).kind)
+	_tell_map()
 	events.run_room_scaled.emit(node.scale)
 	# A copy: what hears it never holds the map's own list.
 	events.run_room_chosen.emit(node.room, node.enemies.duplicate(), ways)
+
+
+## Tell the view the map as the party sees it (`run_map_changed`): each room's row, kind and links,
+## in the map's order, and the room the party is in; no rooms and -1 with no map. Copies: what hears
+## it never holds the map's own lists.
+func _tell_map() -> void:
+	if events == null:
+		return
+	var rows := PackedInt32Array()
+	var kinds: Array[StringName] = []
+	var links: Array[PackedInt32Array] = []
+	if map != null:
+		for node: RunNode in map.nodes:
+			rows.append(node.row)
+			kinds.append(node.kind)
+			links.append(node.links.duplicate())
+	events.run_map_changed.emit(rows, kinds, links, at if map != null else -1)

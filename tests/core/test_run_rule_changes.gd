@@ -219,3 +219,39 @@ func test_a_save_names_the_flags_it_holds_among_those_asked() -> void:
 	SaveFile.new(path).set_flag(&"intro_seen")
 	check_equal(save.flags_among(asked), [&"harder"] as Array[StringName], "read again: only an asked flag it holds")
 	DirAccess.remove_absolute(path)
+
+
+## Regression (review of RG6): the played copy has no changes of its own, so the generator's check
+## never applies a held change twice (an ADD valid once, not twice, made no map).
+func test_a_held_change_is_applied_once_through_the_generator() -> void:
+	var run: RunDefinition = _run()
+	run.biomes[0].depth_min = 4
+	run.changes = [
+		RunRuleChange.make(&"short", RunRuleChange.Target.DEPTH_MIN, -1.0, RunRuleChange.How.ADD),
+		RunRuleChange.make(&"short", RunRuleChange.Target.DEPTH_MAX, -2.0, RunRuleChange.How.ADD),
+	] as Array[RunRuleChange]
+	check_equal(run.problems(_content()), PackedStringArray(), "sound: 3 to 3 rows with it")
+	var played: RunDefinition = run.changed_by(_unlocks([&"short"] as Array[StringName]))
+	check(played.changes.is_empty(), "the played copy has no changes left")
+	check_equal(run.changes.size(), 2, "the definition keeps its own")
+	check_equal(played.problems(_content()), PackedStringArray(), "the played rules are sound as they are")
+	for seed in 10:
+		var map: RunMap = RunGenerator.generate(played, _content(), Sim.seeded(seed))
+		check(map.is_made() and map.rows() == 3, "seed %d: made, 3 rows deep: %s" % [seed, map.problems])
+	var scaled: RunDefinition = _run()
+	scaled.changes = [RunRuleChange.make(&"x", RunRuleChange.Target.SCALE_DEPTH_END, 2.0, RunRuleChange.How.TIMES)] as Array[RunRuleChange]
+	var once: RunDefinition = scaled.changed_by(_unlocks([&"x"] as Array[StringName]))
+	RunGenerator.generate(once, _content(), Sim.seeded(1))
+	check(is_equal_approx(once.scaling.per_depth.end, 4.0), "a TIMES change once: 2 x 2, after the generator checked it too")
+
+
+func test_a_change_past_the_rules_most_is_named() -> void:
+	var run: RunDefinition = _run()
+	run.changes = [RunRuleChange.make(&"huge", RunRuleChange.Target.DEPTH_MAX, 30.0, RunRuleChange.How.ADD)] as Array[RunRuleChange]
+	check(_names(run.problems(_content()), "35; 32 at most"), "a depth past the most")
+	run.changes = [RunRuleChange.make(&"wide", RunRuleChange.Target.WIDTH_MAX, 3.0, RunRuleChange.How.TIMES)] as Array[RunRuleChange]
+	check(_names(run.problems(_content()), "width up to 9"), "a width past the most")
+	run.changes = []
+	for i in RunUnlocks.MAX_FLAGS + 1:
+		run.changes.append(RunRuleChange.make(StringName("f%d" % i), RunRuleChange.Target.WIDTH_MAX, 3.0))
+	check(_names(run.problems(_content()), "more than the %d a run's start carries" % RunUnlocks.MAX_FLAGS), "more flags than a run's start carries")

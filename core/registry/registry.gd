@@ -166,8 +166,8 @@ func run_problems(run_id: StringName) -> PackedStringArray:
 
 
 ## The problems with the runs (`runs`: each `RunDefinition.problems` on `run_content()`), each room
-## kind's (`RoomKind.problems`) and each room's as a run's template (`RoomBase.template_problems`),
-## one line each; empty when every run can be made from the content there is.
+## kind's (`RoomKind.problems`), each room's as a run's template (`RoomBase.template_problems`) and
+## more save flags named by the runs' rule changes than a run's start carries, one line each; empty when every run can be made from the content there is.
 func validate_runs() -> PackedStringArray:
 	var content: RunContent = run_content()
 	var found := PackedStringArray()
@@ -176,9 +176,16 @@ func validate_runs() -> PackedStringArray:
 	var known: Array[StringName] = content.kind_ids()
 	for room: RoomBase in content.rooms:
 		found.append_array(room.template_problems(known))
+	var flags: Array[StringName] = []
 	for res: Resource in get_all(&"runs"):
 		if res is RunDefinition:
 			found.append_array((res as RunDefinition).problems(content))
+			for flag: StringName in (res as RunDefinition).flags():
+				if not flags.has(flag):
+					flags.append(flag)
+	# A run's start carries the save flags every run's changes name (run generation RG6).
+	if flags.size() > RunUnlocks.MAX_FLAGS:
+		found.append("The runs' rule changes name %d save flags, more than the %d a run's start carries (RunUnlocks.MAX_FLAGS)." % [flags.size(), RunUnlocks.MAX_FLAGS])
 	return found
 
 

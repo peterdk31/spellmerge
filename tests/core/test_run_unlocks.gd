@@ -63,6 +63,7 @@ func test_the_bytes_come_back_and_bad_ones_are_refused() -> void:
 	cases["out of order"] = order
 	var twice := PackedByteArray([9, 2, 1, 0x61, 1, 0x61])
 	cases["a flag twice"] = twice
+	cases["a NUL in a flag (regression: it read back shorter)"] = PackedByteArray([9, 1, 2, 0x61, 0x00])
 	for name: String in cases:
 		var kept := RunUnlocks.of([&"kept"] as Array[StringName])
 		check(kept.decode_at(cases[name], 1) != "", "%s is refused" % name)
@@ -131,6 +132,9 @@ func test_the_tick_hands_the_run_its_unlocks() -> void:
 	frames.set(&"_tape", ReplayTape.playing(replay))
 	tick.begin_run()
 	check_equal(tick.sim.unlocks.flags, [&"harder"] as Array[StringName], "a replay's start, the header's")
+	frames.set(&"_tape", ReplayTape.playing(Replay.new()))
+	tick.begin_run()
+	check(tick.sim.unlocks.is_empty(), "a guest playing a host's run of none: none, though its own save holds a flag")
 	frames.set(&"_tape", null)
 	frames.set_unlocks_source(source)
 	tick.begin_run()

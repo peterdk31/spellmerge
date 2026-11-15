@@ -80,7 +80,8 @@ const SCALE_MEMBERS: Dictionary = {
 @export var kind: StringName = &""
 ## How `amount` changes the number.
 @export var how: How = How.SET
-## The amount (a whole number's result is rounded).
+## The amount (a whole number's result is rounded). A kind rule's limit of 0 is no limit: ADD makes
+## it a limit of `amount`, TIMES leaves it none; SET it to 0 to lift a limit.
 @export var amount: float = 0.0
 
 

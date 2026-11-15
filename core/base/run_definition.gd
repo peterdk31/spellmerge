@@ -46,7 +46,7 @@ func flags() -> Array[StringName]:
 
 ## The definition a run plays with `unlocks` (the run's, core/sim/run_unlocks.gd): itself when they
 ## hold none of its changes' flags, else a copy of its own (`copied`) with each change whose flag
-## they hold applied, in order. The registry's definition is never changed.
+## they hold applied, in order, and no changes of its own. The registry's definition is never changed.
 func changed_by(unlocks: RunUnlocks) -> RunDefinition:
 	var made: RunDefinition = null
 	for change: RunRuleChange in changes:
@@ -55,7 +55,12 @@ func changed_by(unlocks: RunUnlocks) -> RunDefinition:
 		if made == null:
 			made = copied()
 		change.apply_to(made)
-	return made if made != null else self
+	if made == null:
+		return self
+	# The rules played are final: a copy has no changes left to apply (its `problems` checks it as
+	# it is, never applying them twice).
+	made.changes = [] as Array[RunRuleChange]
+	return made
 
 
 ## A copy of its own, down to every biome's rules, their kind rules and the scaling's curves (the
@@ -115,7 +120,8 @@ func problems(content: RunContent) -> PackedStringArray:
 
 ## What is wrong with its rule changes, one line each: an empty entry, each change's own
 ## (`RunRuleChange.problems`), and the rules a flag leaves that can make no map: with each flag
-## alone, and with every flag at once (each set of flags between is not tried).
+## alone, and with every flag at once (each set of flags between is not tried), and more flags than
+## a run's start carries (`RunUnlocks.MAX_FLAGS`; the registry checks all runs together too).
 func change_problems(content: RunContent) -> PackedStringArray:
 	var found := PackedStringArray()
 	var name: String = String(id) if id != &"" else "A run"
@@ -124,6 +130,8 @@ func change_problems(content: RunContent) -> PackedStringArray:
 			found.append("%s: an empty rule change." % name)
 		else:
 			found.append_array(change.problems(self, name))
+	if flags().size() > RunUnlocks.MAX_FLAGS:
+		found.append("%s: its rule changes name %d flags, more than the %d a run's start carries." % [name, flags().size(), RunUnlocks.MAX_FLAGS])
 	if not found.is_empty():
 		return found
 	var sets: Array = []
@@ -137,7 +145,6 @@ func change_problems(content: RunContent) -> PackedStringArray:
 		var changed: RunDefinition = changed_by(RunUnlocks.of(with))
 		if changed == self:
 			continue
-		changed.changes = [] as Array[RunRuleChange]
 		for line: String in changed.problems(content):
 			found.append("With %s unlocked: %s" % [", ".join(PackedStringArray(with)), line])
 	return found

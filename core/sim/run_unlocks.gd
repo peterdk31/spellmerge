@@ -41,10 +41,15 @@ static func is_flag(flag: StringName) -> bool:
 	if text.is_empty() or text.length() > MAX_FLAG:
 		return false
 	for at in text.length():
-		var code: int = text.unicode_at(at)
-		if not ((code >= 97 and code <= 122) or (code >= 65 and code <= 90) or (code >= 48 and code <= 57) or code == 95):
+		if not _is_flag_byte(text.unicode_at(at)):
 			return false
 	return true
+
+
+## True for a letter, a digit or `_` (a NUL or any other byte is none, so every flag read is the
+## bytes it came from).
+static func _is_flag_byte(code: int) -> bool:
+	return (code >= 97 and code <= 122) or (code >= 65 and code <= 90) or (code >= 48 and code <= 57) or code == 95
 
 
 ## One more flag, in its place. Returns false, adding nothing, for what is not a flag, one it has,
@@ -107,11 +112,9 @@ func decode_at(bytes: PackedByteArray, at: int) -> String:
 		var text: PackedByteArray = bytes.slice(at, at + size)
 		at += size
 		for byte in text:
-			if byte > 126:
+			if not _is_flag_byte(byte):
 				return "an unlock that is not a flag"
 		var flag := StringName(text.get_string_from_ascii())
-		if not is_flag(flag):
-			return "an unlock that is not a flag"
 		if not read.is_empty() and String(read[-1]) >= String(flag):
 			return "the unlocks out of order"
 		read.append(flag)

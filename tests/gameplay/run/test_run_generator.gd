@@ -138,6 +138,12 @@ func _broken(map: RunMap, definition: RunDefinition, content: RunContent) -> Pac
 		last_depth = here[0].depth
 		if at > 0 and here.size() > rules.width_max:
 			found.append("row %d holds %d rooms, more than %d" % [at, here.size(), rules.width_max])
+		if at > 0 and here.size() < mini(rules.width_min, map.row(at - 1).size() * rules.branches_max) and not _limited(rules):
+			found.append("row %d holds %d rooms, fewer than %d" % [at, here.size(), rules.width_min])
+		if at == map.rows() - 1:
+			for node: RunNode in here:
+				if not node.links.is_empty():
+					found.append("room %d of the last row leads on" % node.index)
 		var per_row: Dictionary = {}
 		for node: RunNode in here:
 			found.append_array(_node_broken(map, node, rules, content, made_at))
@@ -229,6 +235,15 @@ func _fill_broken(map: RunMap, node: RunNode, rules: MapRules, content: RunConte
 	return found
 
 
+## True when a line of `rules` is limited (a row may then hold fewer than `width_min`, where the
+## limits leave no more).
+func _limited(rules: MapRules) -> bool:
+	for rule: KindRule in rules.kinds:
+		if rule.max_per_row > 0 or rule.max_per_run > 0:
+			return true
+	return false
+
+
 ## The depths `map` may have been made at: those whose kept rows are its rows.
 func _made_at(map: RunMap, rules: MapRules, content: RunContent) -> Array[int]:
 	var rows: Array[int] = _depths(map)
@@ -255,13 +270,17 @@ func _links_broken(map: RunMap, before: Array[RunNode], here: Array[RunNode], ru
 	var last: int = here[here.size() - 1].index
 	var parents: int = before.size()
 	var width: int = here.size()
-	var least: int = mini(mini(rules.branches_min, width), (width + parents - 1) / parents)
+	var least: int = mini(rules.branches_min, width)
 	var most: int = mini(rules.branches_max, width)
 	var reach_end: int = -1
+	var total: int = 0
+	var short: bool = false
 	for node: RunNode in before:
 		var links: PackedInt32Array = node.links
-		if links.size() < least or links.size() > most:
-			found.append("room %d leads to %d rooms, not %d to %d" % [node.index, links.size(), least, most])
+		total += links.size()
+		short = short or links.size() < least
+		if links.is_empty() or links.size() > most:
+			found.append("room %d leads to %d rooms, not 1 to %d" % [node.index, links.size(), most])
 		for k in links.size():
 			if links[k] < first or links[k] > last:
 				found.append("room %d leads out of the next row (%d)" % [node.index, links[k]])
@@ -271,6 +290,10 @@ func _links_broken(map: RunMap, before: Array[RunNode], here: Array[RunNode], ru
 			if links[0] < reach_end:
 				found.append("room %d's links cross the room before's" % node.index)
 			reach_end = links[links.size() - 1]
+	# Uncrossed links number at most width + parents - 1: a room falls short of branches_min only
+	# when every one of them is taken.
+	if short and total != width + parents - 1:
+		found.append("a room of row %d leads to fewer than %d rooms with %d of %d links free" % [before[0].row, least, width + parents - 1 - total, width + parents - 1])
 	for node: RunNode in here:
 		if map.parents_of(node.index).is_empty():
 			found.append("room %d is reached from no room" % node.index)
@@ -472,10 +495,28 @@ func test_a_kind_limited_in_the_run_keeps_rooms_for_the_rows_only_it_fills() -> 
 			return
 
 
-func test_a_corner_the_kinds_limits_leave_says_so() -> void:
-	# Rows 1 and 2 each a trap or the boss, each once a run, two rooms a row: row 1 takes both, and
-	# row 2 is left none. The validator cannot see it (each row can hold one of them); no attempt
-	# places it, and the map says the limits cornered it.
+func test_a_heavy_limited_kind_never_takes_the_room_a_later_row_needs() -> void:
+	# Elites in rows 1 and 2, once a run, ten times as likely as a fight in row 1; row 2 only an
+	# elite. Row 1 must leave it for row 2 however the weights fall (review of RG2: half the seeds
+	# found no map).
+	var rules := _rules(3, 3, 1, 1, 1, 1)
+	var elite := KindRule.make(&"trap", 1, 2, 10.0)
+	elite.max_per_run = 1
+	rules.kinds = [KindRule.make(&"fight", 0, 1), elite] as Array[KindRule]
+	var definition := _run(rules)
+	check_equal(definition.problems(_content()), PackedStringArray(), "a sound definition")
+	var failed: int = _failures.size()  # stop at the first seed that fails
+	for value in 300:
+		var map: RunMap = RunGenerator.generate(definition, _content(), Sim.seeded(value))
+		check_equal(_broken(map, definition, _content()), PackedStringArray(), "seed %d: a valid map" % value)
+		check(map.is_made() and map.row(1)[0].kind == &"fight" and map.row(2)[0].kind == &"trap", "seed %d: a fight, then the elite" % value)
+		if _failures.size() > failed:
+			return
+
+
+func test_limits_that_allow_fewer_rooms_than_width_min_make_rows_narrower() -> void:
+	# Rows 1 and 2 each a trap or the boss, each once a run, two rooms a row: two rooms in row 1
+	# would leave row 2 none, so each row holds one.
 	var rules := _rules(3, 3, 2, 2, 1, 2)
 	var trap := KindRule.make(&"trap", 1, 2)
 	trap.max_per_run = 1
@@ -483,24 +524,38 @@ func test_a_corner_the_kinds_limits_leave_says_so() -> void:
 	boss.max_per_run = 1
 	rules.kinds = [KindRule.make(&"fight", 0, 0), trap, boss] as Array[KindRule]
 	var definition := _run(rules)
-	check_equal(definition.problems(_content()), PackedStringArray(), "the validator passes it")
-	var map: RunMap = RunGenerator.generate(definition, _content(), Sim.seeded(3))
-	check(not map.is_made(), "no map within the limits")
-	check(map.problems.size() == 1 and map.problems[0].contains("tries"), "it says the limits cornered it: %s" % map.problems)
+	check_equal(definition.problems(_content()), PackedStringArray(), "a sound definition")
+	for value in 100:
+		var map: RunMap = RunGenerator.generate(definition, _content(), Sim.seeded(value))
+		check_equal(_broken(map, definition, _content()), PackedStringArray(), "seed %d: a valid map" % value)
+		check(map.row(1).size() == 1 and map.row(2).size() == 1, "seed %d: one room a row" % value)
 
 
-func test_rooms_never_repeat_a_template_on_a_path_while_others_are_left() -> void:
-	var failed: int = _failures.size()  # stop at the first seed that fails
-	var content: RunContent = _content()
-	var definition: RunDefinition = _made_up_runs()["one room a row"]
-	for value in 200:
-		var map: RunMap = RunGenerator.generate(definition, content, Sim.seeded(value))
-		for node: RunNode in map.nodes:
-			for parent: int in map.parents_of(node.index):
-				if map.nodes[parent].kind == node.kind:
-					check(map.nodes[parent].room != node.room, "seed %d: room %d repeats its template" % [value, node.index])
-		if _failures.size() > failed:
-			return
+func test_a_room_no_kind_may_follow_its_rooms_before_says_so() -> void:
+	# Row 1 a fight and a trap; row 2 two rooms, a boss (never after a trap) or a vault (never after
+	# a fight), each once a row; every room leads to two. Two rooms leading to two never cross only
+	# by sharing one: it follows a fight and a trap, and no kind may. The validator sees kinds, not
+	# links; every attempt is cornered, and the map says so.
+	var kinds: Array[Resource] = [_kind(&"fight", RoomKind.FILL_ENEMIES), _kind(&"trap", RoomKind.FILL_ENEMIES), _kind(&"vault", RoomKind.FILL_ENEMIES), _kind(&"boss", RoomKind.FILL_BOSS)]
+	var rooms: Array[Resource] = [_room(&"hall_a", [&"fight", &"trap", &"vault"] as Array[StringName]), _room(&"throne", [&"boss"] as Array[StringName])]
+	var content := RunContent.gather(kinds, rooms, [_enemy(&"rat", 1), _enemy(&"king", 10, 0, true)] as Array[Resource])
+	var rules := _rules(3, 3, 2, 2, 2, 2)
+	var fight := KindRule.make(&"fight", 0, 1)
+	fight.max_per_row = 1
+	var trap := KindRule.make(&"trap", 1, 1)
+	trap.max_per_row = 1
+	var boss := KindRule.make(&"boss", 2, 2)
+	boss.max_per_row = 1
+	boss.not_after = [&"trap"] as Array[StringName]
+	var vault := KindRule.make(&"vault", 2, 2)
+	vault.max_per_row = 1
+	vault.not_after = [&"fight"] as Array[StringName]
+	rules.kinds = [fight, trap, boss, vault] as Array[KindRule]
+	var definition := _run(rules)
+	check_equal(definition.problems(content), PackedStringArray(), "the validator passes it")
+	var map: RunMap = RunGenerator.generate(definition, content, Sim.seeded(3))
+	check(not map.is_made(), "no map within the rules")
+	check(map.problems.size() == 1 and map.problems[0].contains("tries"), "it says the rules cornered it: %s" % map.problems)
 
 
 func test_the_map_is_state() -> void:

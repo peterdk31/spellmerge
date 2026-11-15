@@ -6,11 +6,13 @@ extends RefCounted
 ## same map on every machine, in every replay and after every snapshot. Four steps, row by row:
 ##
 ## 1. **The shape:** the depth within the rules (rows the content fills nothing in are left out),
-##    the first row one room, each next row's width within the rules and what the row before can
-##    lead to, and links from each room to an unbroken run of the next row's rooms (`branches_min`
+##    the first row one room, each next row's width within the rules, what the row before can
+##    lead to and what the kinds' limits leave for it and the rows after (fewer than `width_min`
+##    only where those limits allow no more), and links from each room to an unbroken run of the next row's rooms (`branches_min`
 ##    to `branches_max`), never crossing, so every room is reached and leads on to the last row.
 ## 2. **The kinds:** each room a line of the kind table that takes its row, by weight, within the
-##    lines' limits (`max_per_row`, `max_per_run`) and never after a kind it may not follow.
+##    lines' limits (`max_per_row`, `max_per_run`), never after a kind it may not follow, and never
+##    one that would leave the rest of its row or a later row no line.
 ## 3. **The templates:** each room a template of the biome that hosts its kind, by chance, never
 ##    one a room leading to it has while another is left.
 ## 4. **The fill**, by its kind's `RoomKind.fill`: a fight's enemies from the biome's pool at its
@@ -18,10 +20,9 @@ extends RefCounted
 ##    room's boss from the boss pool. Ids, never files.
 ##
 ## Rolls are `sim.chance(PURPOSE, key, counter)`, the key a step's (`Step`) and the attempt's, the
-## counter that step's own count, so one step's rolls never shift another's. A line limited in the
-## run keeps rooms for the later rows only it can fill. When the kinds' limits still leave a room
-## no line (a table the validator passed may corner itself: two limited lines sharing rows, a
-## room led to by kinds no one line may follow), the map is tried
+## counter that step's own count, so one step's rolls never shift another's. The limits never corner
+## a map; `not_after` can, where a room is led to by kinds no one line may follow (the validator
+## checks kinds, not links): then the map is tried
 ## again with the next attempt's rolls, up to `ATTEMPTS`; then it is a map not made, and says why.
 ## So is a definition with problems (`RunDefinition.problems`): what is missing is named.
 ##
@@ -81,7 +82,9 @@ static func _shape_and_kinds(rules: MapRules, content: RunContent, dice: Dice) -
 		var lines: Array[KindRule] = table[at]
 		var width: int = 1
 		if at > 0:
-			var most: int = mini(mini(rules.width_max, _room(lines, in_run, _kept_for(table, at), rules.width_max)), before.size() * rules.branches_max)
+			var most: int = mini(rules.width_max, before.size() * rules.branches_max)
+			while most > 0 and not _fillable(table, at, most, lines, {}, in_run):
+				most -= 1
 			if most < 1:
 				return []
 			var least: int = mini(rules.width_min, most)
@@ -96,57 +99,82 @@ static func _shape_and_kinds(rules: MapRules, content: RunContent, dice: Dice) -
 			here.append(node)
 		if at > 0:
 			_link(before, here, rules, dice)
-		if not _pick_kinds(before, here, lines, in_run, dice):
+		if not _pick_kinds(before, here, table, at, in_run, dice):
 			return []
 		before = here
 	return nodes
 
 
-## How many rows after row `at` of `table` only one line can fill, by line (KindRule -> rows): a
-## line limited in the run keeps that many rooms for them.
-static func _kept_for(table: Array, at: int) -> Dictionary:
-	var kept: Dictionary = {}
+## True when `left` more rooms of row `at` (each a line of `lines`, with `in_row` of them placed in
+## the row already) and one room in each later row of `table` can each still take a line, within
+## the lines' `max_per_row` (this row's) and `max_per_run` (counting `in_run`). A room with a line
+## limited in neither is set aside; the rest, few, are tried line by line.
+static func _fillable(table: Array, at: int, left: int, lines: Array[KindRule], in_row: Dictionary, in_run: Dictionary) -> bool:
+	var slots: Array = []  # [lines of the room, true for a room of this row]
+	for k in left:
+		slots.append([lines, true])
 	for later in range(at + 1, table.size()):
-		var lines: Array[KindRule] = table[later]
-		if lines.size() == 1:
-			kept[lines[0]] = int(kept.get(lines[0], 0)) + 1
-	return kept
+		slots.append([table[later], false])
+	var tight: Array = []
+	for slot: Array in slots:
+		var free: bool = false
+		for rule: KindRule in slot[0]:
+			free = free or (rule.max_per_run == 0 and (not slot[1] or rule.max_per_row == 0))
+		if not free:
+			tight.append(slot)
+	return _place_slots(tight, 0, in_row.duplicate(), in_run.duplicate())
 
 
-## The most rooms a row of `lines` may still hold: `width_max` at most, each line at most its
-## `max_per_row` and what its `max_per_run` leaves after `in_run` and the rooms it keeps for later
-## rows only it can fill (`kept`).
-static func _room(lines: Array[KindRule], in_run: Dictionary, kept: Dictionary, width_max: int) -> int:
-	var room: int = 0
-	for rule: KindRule in lines:
-		var most: int = width_max
-		if rule.max_per_row > 0:
-			most = mini(most, rule.max_per_row)
-		if rule.max_per_run > 0:
-			most = mini(most, rule.max_per_run - int(in_run.get(rule, 0)) - int(kept.get(rule, 0)))
-		room += maxi(most, 0)
-	return mini(room, width_max)
+static func _place_slots(slots: Array, from: int, in_row: Dictionary, in_run: Dictionary) -> bool:
+	if from >= slots.size():
+		return true
+	var this_row: bool = slots[from][1]
+	for rule: KindRule in slots[from][0]:
+		if rule.max_per_run > 0 and int(in_run.get(rule, 0)) >= rule.max_per_run:
+			continue
+		if this_row and rule.max_per_row > 0 and int(in_row.get(rule, 0)) >= rule.max_per_row:
+			continue
+		in_run[rule] = int(in_run.get(rule, 0)) + 1
+		if this_row:
+			in_row[rule] = int(in_row.get(rule, 0)) + 1
+		if _place_slots(slots, from + 1, in_row, in_run):
+			return true
+		in_run[rule] = int(in_run[rule]) - 1
+		if this_row:
+			in_row[rule] = int(in_row[rule]) - 1
+	return false
 
 
 ## Links from the rooms of `before` to those of `here`: each room of `before` leads to an unbroken
 ## run of `here`'s rooms, the runs left to right, each starting where the last ended or just after
 ## (two neighbours share at most one room), the first at `here`'s first room and the last ending at
 ## its last. So no links cross, every room of `here` is reached, and each room of `before` leads to
-## `branches_min` to `branches_max` rooms, never more than `here` holds (and fewer than
-## `branches_min` only where `here` is too narrow for every room of `before` to have that many).
+## `branches_min` to `branches_max` rooms, never more than `here` holds. Uncrossed links number at
+## most `here` + `before` - 1: where that is too few for every room of `before` to have
+## `branches_min`, the fewest rooms fall short, by as little as can be (the longest runs shortened
+## first, by chance among equals).
 static func _link(before: Array[RunNode], here: Array[RunNode], rules: MapRules, dice: Dice) -> void:
 	var parents: int = before.size()
 	var width: int = here.size()
 	var most: int = mini(rules.branches_max, width)
-	var least: int = mini(mini(rules.branches_min, width), (width + parents - 1) / parents)
-	# Runs of `least` to `most` rooms sharing `shared` of the parents - 1 borders sum to width + shared.
-	var shared_min: int = maxi(0, parents * least - width)
-	var shared_max: int = mini(parents - 1, parents * most - width)
-	var shared: int = shared_min + dice.below(Step.LINKS, shared_max - shared_min + 1)
 	var lengths: Array[int] = []
 	lengths.resize(parents)
-	lengths.fill(least)
-	for extra in width + shared - parents * least:
+	lengths.fill(mini(rules.branches_min, width))
+	for cut in maxi(0, parents * lengths[0] - (width + parents - 1)):
+		var longest: int = lengths.max()
+		var open: Array[int] = []
+		for k in parents:
+			if lengths[k] == longest:
+				open.append(k)
+		lengths[open[dice.below(Step.LINKS, open.size())]] -= 1
+	var least_sum: int = 0
+	for length: int in lengths:
+		least_sum += length
+	# The runs sum to width + shared, sharing `shared` of the parents - 1 borders.
+	var shared_min: int = maxi(0, least_sum - width)
+	var shared_max: int = mini(parents - 1, parents * most - width)
+	var shared: int = shared_min + dice.below(Step.LINKS, shared_max - shared_min + 1)
+	for extra in width + shared - least_sum:
 		var open: Array[int] = []
 		for k in parents:
 			if lengths[k] < most:
@@ -169,12 +197,15 @@ static func _link(before: Array[RunNode], here: Array[RunNode], rules: MapRules,
 		start += lengths[k] - (1 if sharing[k] else 0)
 
 
-## Each room of `here` a line of `lines` by weight: within the line's `max_per_row` and
-## `max_per_run` (counted in `in_run`), and one every room leading to it may be followed by. False
-## when a room is left no line.
-static func _pick_kinds(before: Array[RunNode], here: Array[RunNode], lines: Array[KindRule], in_run: Dictionary, dice: Dice) -> bool:
+## Each room of `here` (row `at` of `table`) a line of its row by weight: within the line's
+## `max_per_row` and `max_per_run` (counted in `in_run`), one every room leading to it may be
+## followed by, and one that leaves the rest of the row and every later row a line
+## (`_fillable`). False when a room is left no line (only `not_after` can do that).
+static func _pick_kinds(before: Array[RunNode], here: Array[RunNode], table: Array, at: int, in_run: Dictionary, dice: Dice) -> bool:
+	var lines: Array[KindRule] = table[at]
 	var in_row: Dictionary = {}  # KindRule -> rooms of it in this row
-	for node: RunNode in here:
+	for k in here.size():
+		var node: RunNode = here[k]
 		var kinds_before: Array[StringName] = []
 		for parent: RunNode in before:
 			if parent.links.has(node.index):
@@ -189,9 +220,18 @@ static func _pick_kinds(before: Array[RunNode], here: Array[RunNode], lines: Arr
 			var follows: bool = true
 			for kind: StringName in kinds_before:
 				follows = follows and rule.may_follow(kind)
-			if follows:
-				open.append(rule)
-				total += rule.weight
+			if not follows:
+				continue
+			if rule.max_per_run > 0 or rule.max_per_row > 0:
+				in_row[rule] = int(in_row.get(rule, 0)) + 1
+				in_run[rule] = int(in_run.get(rule, 0)) + 1
+				var leaves: bool = _fillable(table, at, here.size() - k - 1, lines, in_row, in_run)
+				in_row[rule] = int(in_row[rule]) - 1
+				in_run[rule] = int(in_run[rule]) - 1
+				if not leaves:
+					continue
+			open.append(rule)
+			total += rule.weight
 		if open.is_empty():
 			return false
 		var roll: float = dice.roll(Step.KINDS) * total

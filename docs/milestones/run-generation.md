@@ -1,6 +1,6 @@
 # Run generation: a run defined as data, its map generated
 
-**Status (2026-11-15): approved by the owner** (after answering the plan's three questions: "Merge it"); this document is the plan, and RG1 is next. Nothing below is built yet. It replaces OB2b and OB2c of [boss-old-broom.md](boss-old-broom.md) (decisions 30-33: OB2a, no waves, stays done) and builds the core of M3's run structure early ([docs/PLAN.md](../PLAN.md): the `run`, `flow` and `difficulty` areas).
+**Status (2026-11-15): approved by the owner** (after answering the plan's three questions: "Merge it"); this document is the plan. **RG1 done (2026-11-15):** the data (`RunDefinition`, `MapRules`, `KindRule`, `RoomKind`, `RunContent`), rooms' `biome` and `kinds`, enemies' `biomes`, `cost` and `min_depth`, `content/runs/crypt.tres` and the validators (`Registry.validate_runs`). The room kinds have a registry folder of their own, `content/room_kinds/`, rather than `content/rooms/kinds/`, so the list of rooms never holds one. RG2 is next. It replaces OB2b and OB2c of [boss-old-broom.md](boss-old-broom.md) (decisions 30-33: OB2a, no waves, stays done) and builds the core of M3's run structure early ([docs/PLAN.md](../PLAN.md): the `run`, `flow` and `difficulty` areas).
 
 The steps are **RG1 to RG8** (RG for run generation). Each is one PR with its tests, in order.
 
@@ -44,7 +44,7 @@ Everything a run is made of is found by folder, and each piece says where it bel
   - the **scaling**: how the run grows harder with depth (`scaling`, below).
 - **A room template** (the room's `.tres`, `RoomBase`, as today, in its biome's folder): its **biome** (`biome`, `&"crypt"`), the **kinds it can host** (`kinds`: `fight`, `boss`), and its layout as now (spawns, props, its exits, below). **Rooms hold layout only again** (content/rooms/README.md): what fights in a room comes from the run, so OB2a's `RoomBase.enemies` goes in RG3 (the generator fills every room). A room offered for no run (the hub, the sandbox) hosts no kind.
 - **An enemy says where it fights** (its `EnemyBase`, as data): the **biomes** it appears in, its **cost** in a room's budget, and from which depth it may appear (`biomes`, `cost`, `min_depth`). The enemy pool of a biome is every enemy that names it, found by folder; a boss names its biome the same way under `content/bosses/` (the Old Broom: `crypt`), so the boss pool is found too.
-- **A room kind** (`RoomKind`, content/rooms/kinds/<id>.tres: `fight`, `boss`): what a room of that kind is for the game: how it is filled (`fill`: an enemy budget from the pool; the boss pool) and what ends it (its enemies down). A new kind (a reward room) is a new file and the behaviour its `fill` names, built with it.
+- **A room kind** (`RoomKind`, content/room_kinds/<id>.tres: `fight`, `boss`): what a room of that kind is for the game: how it is filled (`fill`: an enemy budget from the pool; the boss pool) and what ends it (its enemies down). A new kind (a reward room) is a new file and the behaviour its `fill` names, built with it.
 
 ## The generator (RG2)
 

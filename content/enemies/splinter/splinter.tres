@@ -33,3 +33,5 @@ contact_damage = 8
 scene = ExtResource("2_scene")
 staffs = Array[ExtResource("4_entry")]([SubResource("Resource_entry")])
 profile = ExtResource("5_profile")
+biomes = Array[StringName]([&"crypt"])
+cost = 2

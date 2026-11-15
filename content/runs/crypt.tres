@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="RunDefinition" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://core/base/run_definition.gd" id="1_run"]
+[ext_resource type="Script" path="res://core/base/map_rules.gd" id="2_rules"]
+[ext_resource type="Script" path="res://core/base/kind_rule.gd" id="3_kind"]
+
+[sub_resource type="Resource" id="fights"]
+script = ExtResource("3_kind")
+kind = &"fight"
+first_row = 0
+last_row = -2
+
+[sub_resource type="Resource" id="boss"]
+script = ExtResource("3_kind")
+kind = &"boss"
+first_row = -1
+last_row = -1
+max_per_row = 1
+max_per_run = 1
+required = false
+
+[sub_resource type="Resource" id="crypt"]
+script = ExtResource("2_rules")
+biome = &"crypt"
+depth_min = 4
+depth_max = 6
+width_min = 1
+width_max = 3
+branches_min = 1
+branches_max = 2
+kinds = Array[ExtResource("3_kind")]([SubResource("fights"), SubResource("boss")])
+
+[resource]
+script = ExtResource("1_run")
+id = &"crypt"
+display_name = "The Crypt"
+biomes = Array[ExtResource("2_rules")]([SubResource("crypt")])

@@ -19,8 +19,9 @@ extends Node
 ##
 ## Every build sees all of it: there is no demo subset (owner, 2026-11-05).
 ##
-## In a debug build the registry runs the spell validator at start (`validate_spells()`) and
-## pushes one warning per problem, so broken spell content shows up on the first run.
+## In a debug build the registry runs the spell validator at start (`validate_spells()`), and the
+## runs' (`validate_runs()`), and pushes one warning per problem, so broken spell or run content
+## shows up on the first run.
 ##
 ## Sounds are `.ogg` files anywhere under the audio root; the id is the file
 ## name without extension. An unknown id returns `null`, never an error.
@@ -47,6 +48,7 @@ func _ready() -> void:
 	if OS.is_debug_build():
 		warn_spell_problems()
 		warn_story_problems()
+		warn_run_problems()
 
 
 ## Reads the content and audio folders again. The roots can be changed so
@@ -133,6 +135,40 @@ func validate_story() -> Array[Dictionary]:
 		if res is SpellComponent:
 			cards.append(res as SpellComponent)
 	return SpellValidator.check_descriptions(cards)
+
+
+## What a run can be made of (run generation RG1, `RunContent`): the room kinds (`room_kinds`), the
+## rooms and the enemies and bosses (`EnemyBase.FOLDERS`) found in the last scan.
+func run_content() -> RunContent:
+	var enemies: Array[Resource] = []
+	for folder: StringName in EnemyBase.FOLDERS:
+		enemies.append_array(get_all(folder))
+	return RunContent.gather(get_all(&"room_kinds"), get_all(&"rooms"), enemies)
+
+
+## The problems with the runs (`runs`: each `RunDefinition.problems` on `run_content()`), each room
+## kind's (`RoomKind.problems`) and each room's as a run's template (`RoomBase.template_problems`),
+## one line each; empty when every run can be made from the content there is.
+func validate_runs() -> PackedStringArray:
+	var content: RunContent = run_content()
+	var found := PackedStringArray()
+	for res: Resource in get_all(&"room_kinds"):
+		if res is RoomKind:
+			found.append_array((res as RoomKind).problems())
+	for room: RoomBase in content.rooms:
+		found.append_array(room.template_problems(content.kind_ids()))
+	for res: Resource in get_all(&"runs"):
+		if res is RunDefinition:
+			found.append_array((res as RunDefinition).problems(content))
+	return found
+
+
+## Pushes one warning per problem `validate_runs()` finds, and returns how many.
+func warn_run_problems() -> int:
+	var problems: PackedStringArray = validate_runs()
+	for line: String in problems:
+		push_warning("Registry: " + line)
+	return problems.size()
 
 
 ## The resource with this id in this folder, or `null` when there is none.

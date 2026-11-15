@@ -37,7 +37,7 @@ Built in W6 (states and their triggers; the component and rows were named `React
 - **The rule:** on a moment every trigger of the current state that matches fires, in order; the first of them that names a `then` sets the next state, once, after they all fired. Triggers belong to states, so "only once" is a state change, never a flag. Leaving a state ends the wind-ups it cast (a lit barrel shot apart blows now, and its fuse no more). **Death doesn't free a prop:** its `death` triggers run and a possession of it ends; it is freed only by a `gone` state, and without a death row it stands with its health empty.
 - **A prop's casts pay from its staffs' pools, which never refill** (a still body is never stepped): the first cast of every staff a trigger casts must fit in a full pool (`tests/content/props/test_prop_data.gd`); a staff cast more than once over a prop's life needs a pool for each.
 - **A trigger's cast is the prop's own:** never a press (it sets off no `on recast`), its wind-up outlasts a possession (a lit barrel possessed still blows; a possessor's own presses end with it), and a `cast` trigger never casts the staff whose cast it hears while that cast leaves.
-- `PropBase.problems()` must be empty: no scene or state, a state named twice, a staff it does not hold, a state, element, status or reaction nobody knows, a number out of range, `entered` triggers that go round for ever, a `touched` trigger with no area.
+- `PropBase.problems()` must be empty: no scene or state, a state named twice, a staff it does not hold, a state, element, status or reaction nobody knows, a number out of range, `entered` triggers that go round for ever, a `touched` trigger with no area, a state whose `touched` rows cast and none leaves it (it would cast every tick).
 - Original names and art only.
 
 ## The exploding barrel, written out
@@ -81,7 +81,7 @@ scattered   element_hit fire  → cast 1, then burnt      (blocks off: dust on t
 burnt       blocks off, hittable off (a scorch mark)
 ```
 
-Its blast hurts everything near (a prop's shots hit every team), the heaps beside it too, which blow in turn.
+The scattered dust stays hittable, so fire finds it, and so it still catches a shot that crosses it (a hit that does nothing: it is invincible); a hurt shape that hears hits without stopping shots would be engine work of its own. Its blast hurts everything near (a prop's shots hit every team), the heaps beside it too, which blow in turn.
 
 ## Allowed files
 

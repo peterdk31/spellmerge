@@ -311,4 +311,6 @@ func _lay_touch() -> void:
 		return
 	var now: PropState = current()
 	var listening: bool = now != null and area.has_area() and now.listens(PropTrigger.When.TOUCHED)
-	actor.actors.set_touch_area(actor.id, Rect2(area.position + actor.global_position, area.size) if listening else Rect2())
+	# Scaled with the body (`Actor.set_size`), as its footprint is.
+	var box: Rect2 = Rect2(area.position * actor.size + actor.global_position, area.size * actor.size)
+	actor.actors.set_touch_area(actor.id, box if listening else Rect2())

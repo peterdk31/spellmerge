@@ -9,6 +9,7 @@ extends "res://tests/support/suite.gd"
 
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")
 const HEAP: PropBase = preload("res://content/props/dust_heap/dust_heap.tres")
 
@@ -47,36 +48,62 @@ func _dummy(x: float) -> Actor:
 	return body
 
 
-## A body walking right from `x` px left of the heap, stepped and moved `steps` times (the Tick's
-## `tick_step`, so it touches what it overlaps).
-func _walk_in(x: float, steps: int) -> Actor:
+## A body walking along `way` from `from` (the heap's feet at 200, 200).
+func _walker(from: Vector2, way: Vector2) -> Actor:
 	var controller := Fixture.Scripted.new()
-	controller.move = Vector2.RIGHT
-	var walker: Actor = _world.actor(Vector2(200.0 - x, 200.0), [&"mover"], controller)
+	controller.move = way
+	return _world.actor(from, [&"mover"], controller)
+
+
+## `steps` of the Tick's own step of `walker` (its step, then its move: it touches what it overlaps).
+func _walk(walker: Actor, steps: int) -> void:
 	for i in steps:
-		walker.step(Fixture.STEP)
-		walker.move(Fixture.STEP)
-	return walker
+		walker.tick_step(Fixture.STEP)
 
 
 func test_it_is_sound() -> void:
 	check_equal(HEAP.problems(PropNames.known(_world.registry)), PackedStringArray(), "its data")
 	check_equal(HEAP.look_problems(), PackedStringArray(), "its looks")
-	check(HEAP.area_rect().encloses(HEAP.ground_rect().grow(4.0)), "its area reaches past its ground, so a body stopped by it touches it")
+	# The ground cells laid are those whose centres lie in its ground: up to half a cell past it.
+	check(HEAP.area_rect().encloses(HEAP.ground_rect().grow(ProjectilesScript.WALL_CELL * 0.5)), "its area reaches past its ground, so a body stopped by it touches it")
 
 
 func test_a_body_walking_into_it_scatters_it() -> void:
 	var heap: Actor = _heap()
 	check(heap.footprint.solid and heap.hurtbox.is_on(), "a heap stands in the way and is hit")
-	_walk_in(60.0, 3)
+	var walker: Actor = _walker(Vector2(140.0, 200.0), Vector2.RIGHT)
+	_walk(walker, 3)
 	check_equal(_state(heap), &"heap", "a body on its way: whole")
-	_walk_in(60.0, 20)
+	_walk(walker, 20)
 	check_equal(_state(heap), &"scattered", "walked into: scattered")
 	check(not heap.footprint.solid, "it blocks no more")
 	check(heap.hurtbox.registered, "and fire still finds it")
 	check(not heap.is_dying(), "it stays where it is")
 	check_equal(_world.table.touch_area_of(heap.id), Rect2(), "scattered, it hears no touch")
 	check(_left.is_empty(), "walking into it blows nothing up")
+
+
+## A body its ground stops still touches it, from any side and any place against the 8 px cells
+## its ground is laid in (its area reaches past them): straight in from off the grid, and slanting.
+func test_a_body_its_ground_stops_still_scatters_it() -> void:
+	var starts: Array[Vector2] = [Vector2(140.0, 203.0), Vector2(197.0, 150.0), Vector2(259.0, 196.0), Vector2(203.0, 240.0), Vector2(150.0, 160.0)]
+	var ways: Array[Vector2] = [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP, Vector2(1.0, 1.0).normalized()]
+	for i in starts.size():
+		var heap: Actor = _heap()
+		var walker: Actor = _walker(starts[i], ways[i])
+		var blocked: bool = false
+		for step in 40:
+			var was: Vector2 = walker.global_position
+			_walk(walker, 1)
+			if _state(heap) != &"heap":
+				break
+			blocked = blocked or walker.global_position.is_equal_approx(was)
+		check_equal(_state(heap), &"scattered", "from %s along %s" % [starts[i], ways[i]])
+		check(not blocked, "touched before its ground held the body still (%s)" % starts[i])
+		_world.actors.erase(heap)
+		heap.free()
+		_world.actors.erase(walker)
+		walker.free()
 
 
 func test_fire_on_the_heap_blows_it_up() -> void:

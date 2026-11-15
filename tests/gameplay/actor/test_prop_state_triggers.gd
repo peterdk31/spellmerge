@@ -559,6 +559,30 @@ func test_a_touched_row_needs_an_area() -> void:
 	check(not "\n".join(data.problems(_known())).contains("no area"), "with an area it is sound")
 
 
+func test_a_touched_row_that_casts_and_never_leaves_is_named() -> void:
+	var rows: Array[PropTrigger] = [PropTrigger.make(PropTrigger.When.TOUCHED, 2)]
+	var data: PropBase = _made([PropState.make(&"idle", rows)])
+	data.area_size = Vector2(16.0, 16.0)
+	check("\n".join(data.problems(_known())).contains("every tick"), "a cast every tick a body stands on it")
+	rows.append(PropTrigger.make(PropTrigger.When.TOUCHED, 0, &"spent"))
+	data.states = PropStates.make([PropState.make(&"idle", rows), PropState.make(&"spent")])
+	check(not "\n".join(data.problems(_known())).contains("every tick"), "with a row that leaves, once")
+
+
+func test_its_area_grows_with_the_body() -> void:
+	var prop: Actor = _touchy(Vector2(100.0, 0.0))
+	prop.set_size(2.0)
+	check(prop.state_triggers.enter(&"walked") and prop.state_triggers.enter(&"idle"), "laid again")
+	check_equal(_world.table.touch_area_of(prop.id), Rect2(68.0, -16.0, 64.0, 32.0), "twice as big round its feet")
+
+
+func test_the_ticks_own_step_touches() -> void:
+	var prop: Actor = _touchy(Vector2(100.0, 0.0))
+	var walker: Actor = _walker(Vector2(100.0, 0.0), Vector2.ZERO)
+	walker.tick_step(Fixture.STEP)
+	check_equal(_state(prop), &"walked", "a body the Tick steps touches where its move left it")
+
+
 func test_a_snapshot_rolls_its_touch_area_back() -> void:
 	var prop: Actor = _touchy(Vector2(100.0, 0.0))
 	var snapshot := Snapshot.take(_areas(), root)

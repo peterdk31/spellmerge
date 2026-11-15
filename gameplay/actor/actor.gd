@@ -319,6 +319,9 @@ func _touch() -> void:
 		return
 	var found: int = actors.touching(global_position, wall_radius(), _touching)
 	for i in found:
+		if _dying or _leaving:
+			# What a touched prop did ended this body (its blast): it touches no more.
+			return
 		var other := actors.node_of(_touching[i]) as Actor
 		if other != null and other != self and not other.is_dying() and not other.is_leaving():
 			other.touched.emit(id)

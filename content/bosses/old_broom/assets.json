@@ -1,0 +1,22 @@
+{
+	"assets": [
+		{
+			"path": "content/bosses/old_broom/idle.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator from the pixel rules of docs/STYLE.md, 2026-11-15)",
+			"prompt": "The Old Broom, the first boss, a placeholder until its layered look (boss OB8, OB9): an old wooden broom handle, leaning a little, bound by a stone-grey band wound twice with a pale cord into a wide straw bristle head that fans out to the floor, ragged at the bottom. A 96x64 body with the bristles at the bottom, 1px dark outline, light from the top-left; the face (eyes and brows) is a separate layer on the band. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+		},
+		{
+			"path": "content/bosses/old_broom/burning.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator from the pixel rules of docs/STYLE.md, 2026-11-15)",
+			"prompt": "The Old Broom in its second phase, a placeholder until its layered look (boss OB8, OB9): the same 96x64 broom with its bristle head on fire, the streaks in the Fire ramp, spark-yellow embers in the lower bristles and small flames licking up from the head's edges. 1px dark outline, light from the top-left; only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+		}
+	]
+}

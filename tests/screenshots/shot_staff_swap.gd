@@ -34,7 +34,7 @@ func take() -> void:
 	feel.set("drive_engine", false)
 	var input: Node = root.get_node("PlayerInput")
 	input.call("add_virtual_device", 0)
-	# The sandbox: no waves (the arena's enemies' shots light the room), its staffs built
+	# The sandbox: no fight of its own (the arena's enemies' shots light the room), its staffs built
 	# (Flow.SANDBOX_START_CARDS: staff 1 is the fire bolt, its embers the cards' motes).
 	root.get_node("Events").emit_signal("sandbox_requested", 0)
 	if not await wait_for(func() -> bool: return get_first_node_in_group(&"wizards") != null, 600):

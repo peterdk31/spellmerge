@@ -4,6 +4,6 @@
 
 [resource]
 script = ExtResource("1_base")
-id = &"wave_start"
+id = &"room_start"
 parts = Array[Dictionary]([{"flash": &"ring_out", "zoom": 3, "seconds": 0.5, "bare": true, "way": &"right"}])
-sound = &"wave"
+sound = &"room_start"

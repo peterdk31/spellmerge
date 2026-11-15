@@ -1,7 +1,7 @@
 extends "res://tests/support/screenshot.gd"
 ## The portal's mote rift (the owner's pick, 2026-11-09; gameplay/feel/portal_look.gd: the lens the
 ## card's shader, the lips real motes) with one, two and four infusions, staged in an empty room (a
-## laid floor, no run: no waves, no telegraphs, no banner; docs/milestones/carrier-looks-fixes.md,
+## laid floor, no run: no enemies, no telegraphs, no banner; docs/milestones/carrier-looks-fixes.md,
 ## phase 4), as `shot_carrier_palettes` stages the still carriers: three seated wizards' staffs of
 ## fire; fire and frost; frost, void, fire and lightning (the dev staff, for five cards), each casting
 ## a portal to the right from a row of its own. `portal_rifts` open (a lip an infusion, the motes in

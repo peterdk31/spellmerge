@@ -1,10 +1,10 @@
 extends "res://tests/support/suite.gd"
 ## The hub (docs/milestones/online-lobby.md, L1): `hub_requested` (the main menu's Play) starts the
-## hub room with three training dummies and no wave; players join and leave in any order; hits hurt,
+## hub room with three training dummies and no enemies; players join and leave in any order; hits hurt,
 ## but a wizard downed there stands up by itself at full health a moment later and nothing restarts
 ## (owner, 2026-11-13); the teleporter stone is lit only while every wizard stands on it (put out by
 ## one stepping off or by a new join at once), and then the command `run_requested` (a seat's A)
-## starts a run of waves, every seat keeping its staffs, whose end brings everyone back to the hub.
+## starts a run, every seat keeping its staffs, whose end (won or lost) brings everyone back to the hub.
 ## Uses the real autoloads; time moves through Flow.step(), and commands are applied as the frames
 ## service applies them at a tick's start (`Events.apply_command`), unless a test says otherwise.
 
@@ -22,7 +22,6 @@ var combat: Node
 ## Every `start_stone_changed`, as (standing, wizards, lit).
 var stone: Array[Vector3i] = []
 var sandbox_flags: Array[bool] = []
-var waves: Array[int] = []
 var hits: int = 0
 
 
@@ -36,18 +35,15 @@ func before_each() -> void:
 	root.add_child(flow.world_parent)
 	stone.clear()
 	sandbox_flags.clear()
-	waves.clear()
 	hits = 0
 	events.connect("start_stone_changed", _on_stone)
 	events.connect("sandbox_changed", _on_sandbox_changed)
-	events.connect("wave_started", _on_wave_started)
 	events.connect("hit_landed", _on_hit_landed)
 
 
 func after_each() -> void:
 	events.disconnect("start_stone_changed", _on_stone)
 	events.disconnect("sandbox_changed", _on_sandbox_changed)
-	events.disconnect("wave_started", _on_wave_started)
 	events.disconnect("hit_landed", _on_hit_landed)
 	flow.stop_run()
 	flow.world_parent = null
@@ -64,10 +60,6 @@ func _on_stone(standing: int, wizards: int, lit: bool) -> void:
 
 func _on_sandbox_changed(on: bool) -> void:
 	sandbox_flags.append(on)
-
-
-func _on_wave_started(number: int) -> void:
-	waves.append(number)
 
 
 func _on_hit_landed(_by: int, _target: Node, _amount: float, _at: Vector2, _kind: StringName, _shot: int) -> void:
@@ -126,10 +118,9 @@ func _stop() -> void:
 		input.leave(index)
 	stone.clear()
 	sandbox_flags.clear()
-	waves.clear()
 
 
-func test_play_starts_the_hub_with_three_dummies_and_no_wave() -> void:
+func test_play_starts_the_hub_with_three_dummies_and_no_enemies() -> void:
 	for count: int in [1, 2, 4]:
 		_start(range(count))
 		check_equal(flow.mode, FlowScript.MODE_HUB, "%d players: the hub" % count)
@@ -140,7 +131,6 @@ func test_play_starts_the_hub_with_three_dummies_and_no_wave() -> void:
 			ids.append((dummy.get("data") as EnemyBase).id)
 		check_equal(ids, [&"training_dummy", &"training_dummy", &"training_dummy"] as Array[StringName], "%d players: three training dummies" % count)
 		check_equal(flow.enemies_left(), 0, "%d players: no enemies" % count)
-		check_equal(waves, [] as Array[int], "%d players: no wave" % count)
 		check_equal(sandbox_flags, [false] as Array[bool], "%d players: not the sandbox" % count)
 		check_equal(_last(), Vector3i(0, count, 0), "%d players: the stone says nobody is on it" % count)
 		check(not flow.is_stone_lit(), "%d players: the stone is dark" % count)
@@ -274,10 +264,10 @@ func test_a_by_any_seat_on_the_lit_stone_starts_the_run() -> void:
 		check(flow.is_stone_lit(), "seat %d: lit" % presser)
 		var hub_world: Node = flow.world
 		_press_a(presser)
-		check_equal(flow.mode, FlowScript.MODE_WAVES, "seat %d: A starts the run" % presser)
+		check_equal(flow.mode, FlowScript.MODE_RUN, "seat %d: A starts the run" % presser)
 		check_equal(flow.room_id, flow.room_id_to_play, "seat %d: in the run's room" % presser)
 		check(flow.world != hub_world, "seat %d: a new world" % presser)
-		check_equal(waves, [1] as Array[int], "seat %d: wave 1" % presser)
+		check(flow.enemies_left() > 0, "seat %d: the room's enemies stand" % presser)
 		check_equal(_wizards().size(), 4, "seat %d: everyone plays" % presser)
 		check_equal(_last(), Vector3i(0, 0, 0), "seat %d: the stone's line goes" % presser)
 		for wizard in _wizards():
@@ -306,7 +296,7 @@ func test_a_sent_by_the_hud_starts_the_run_at_the_next_tick() -> void:
 	events.emit_signal("run_requested", 0)
 	check_equal(flow.mode, FlowScript.MODE_HUB, "a command waits for the tick's start")
 	await commands_applied()
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "and starts the run there")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "and starts the run there")
 
 
 func test_the_stone_is_told_again_after_a_restore() -> void:
@@ -384,7 +374,7 @@ func test_a_run_from_the_hub_still_downs_for_good() -> void:
 	_place(1, true)
 	_tick()
 	_press_a(0)
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run started")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run started")
 	var wizard := flow.get_wizard(0) as Actor
 	wizard.health.take(wizard.health.max_health)
 	flow.step(_room().stand_up_after + DT)
@@ -397,7 +387,7 @@ func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
 	_place(1, true)
 	_tick()
 	_press_a(1)
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run started")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run started")
 	for wizard in _wizards():
 		wizard.health.take(wizard.health.max_health)
 	check(flow.is_restarting(), "everyone down ends the run")
@@ -411,6 +401,24 @@ func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
 	for wizard in _wizards():
 		check(not wizard.is_down(), "standing")
 		check_equal(wizard.health.health, wizard.health.max_health, "at full health")
+
+
+## A run from the stone won (its room cleared, with no room after it: boss OB2a) brings the party
+## back to the hub RUN_WON_DELAY later, as a lost one does.
+func test_a_won_run_from_the_stone_goes_back_to_the_hub() -> void:
+	_start([0, 1])
+	_place(0, true)
+	_place(1, true)
+	_tick()
+	_press_a(0)
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run started")
+	for enemy: Node in flow.get("_enemies").duplicate():
+		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
+	check_equal(flow.state, FlowScript.State.CLEARED, "won")
+	flow.step(FlowScript.RUN_WON_DELAY + 0.1)
+	from_frames()
+	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
+	check_equal(_wizards().size(), 2, "everyone with it")
 
 
 ## Owner, 2026-11-10: the hub is the arsenal a run's tools are picked from. What a seat built in
@@ -429,7 +437,7 @@ func test_staffs_built_in_the_hub_follow_into_the_run_and_nothing_comes_back() -
 	_place(1, true)
 	_tick()
 	_press_a(0)
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run started")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run started")
 	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(1).slice(0, 3), built, "seat 1's staff came into the run")
 	# The whole player goes into the run (owner, I1 decision 11; confirmed 2026-11-14): its card
 	# bag is the one it held in the hub.
@@ -459,7 +467,7 @@ func test_the_hands_held_in_the_hub_go_into_the_run_as_they_are() -> void:
 	_place(1, true)
 	_tick()
 	_press_a(0)
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run started")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run started")
 	for seat in [0, 1]:
 		_check_two_hands(seat, "in the run")
 	input.add_virtual_device(2)
@@ -493,7 +501,7 @@ func test_a_run_of_play_requested_still_restarts() -> void:
 	for wizard in _wizards():
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "a run started without the hub restarts")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "a run started without the hub restarts")
 	check(flow.world != first, "a fresh world")
 
 
@@ -501,7 +509,7 @@ func test_the_hub_and_its_command_are_ignored_elsewhere() -> void:
 	input.add_virtual_device(0)
 	events.emit_signal("play_requested", 0)
 	events.emit_signal("hub_requested", 0)
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "a hub request mid-run changes nothing")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "a hub request mid-run changes nothing")
 	var world: Node = flow.world
 	_press_a(0)
 	check(flow.world == world, "run_requested out of the hub changes nothing")
@@ -568,16 +576,16 @@ func test_the_hub_asked_for_in_the_hub_starts_anew() -> void:
 	check_equal(_wizards().size(), 2, "the same two seats")
 	check(flow.get_wizard(1) != first, "with new wizards")
 	check_equal(flow.get_wizard(1).position, before, "at their spawns")
-	# Not from a run of waves: that run plays on.
+	# Not from a run: that run plays on.
 	_place(0, true)
 	_place(1, true)
 	_tick()
 	_press_a(0)
 	_tick()
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run from the stone")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run from the stone")
 	events.emit_signal("hub_requested", 0)
 	_tick()
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "the hub asked for during a run changes nothing")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the hub asked for during a run changes nothing")
 	_stop()
 
 
@@ -683,7 +691,7 @@ func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> vo
 	_place(1, true)
 	_tick()
 	_press_a(0)
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run from the stone")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run from the stone")
 	check_equal(_cards(1, 1).slice(0, 3), built, "with the staff")
 	for wizard in _wizards():
 		wizard.health.take(wizard.health.max_health)
@@ -721,7 +729,7 @@ func test_the_rack_lies_in_the_hub_and_a_takes_it_along() -> void:
 		_place(seat, true)
 	_tick()
 	_press_a(0)
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run starts")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run starts")
 	var carried := flow.get_wizard(0) as Actor
 	check_equal(carried.caster.cards_of(2), rack.stack.cards, "the run's wizard holds it on LB")
 	check((items.call("lying") as Array).is_empty(), "and the run's room has nothing lying")
@@ -762,7 +770,7 @@ func test_the_hub_begun_anew_keeps_its_ground_and_a_runs_end_lays_the_rack_again
 	_place(0, true)
 	_tick()
 	_press_a(0)
-	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run from the stone")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run from the stone")
 	for each in _wizards():
 		each.health.take(each.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)

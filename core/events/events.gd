@@ -34,7 +34,7 @@ const NUMBER_SPARED: StringName = &"spared"
 
 # --- Player intent from the HUD (sender: hud) -------------------------------
 
-## A run of waves, at once, for `player`: the automated runs (the bots, the stress run), the tests and
+## A run of rooms, at once, for `player`: the automated runs (the bots, the stress run), the tests and
 ## the online spike's Host/Join send it (the main menu's Play sends `hub_requested` since online-lobby
 ## L1). Heard by flow. A run's start, not a command.
 signal play_requested(player: int)
@@ -93,7 +93,7 @@ signal main_menu_requested(player: int)
 signal seat_leave_requested(player: int)
 ## Sender: hud. `player` pressed A (`accept`) with no menu open while the hub's teleporter stone was
 ## lit (`start_stone_changed`): start the run (online-lobby L1). A command: heard by flow at the next
-## tick's start, which starts the run of waves if the stone is still lit then.
+## tick's start, which starts the run if the stone is still lit then.
 signal run_requested(player: int)
 ## Sender: hud. `player` pressed A (`take`: F or Enter on the keyboard, never Space, which casts) with no menu open while the item
 ## `item` lay in reach of the body they drive (`item_near_changed`; the lit stone comes first, the
@@ -188,7 +188,7 @@ signal projectile_expired(caster: int, position: Vector2, tag: int, shot: int)
 signal carrier_shown(caster: int, carrier_card: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int)
 ## Sender: core/spells. A carrier of the actor `caster` with no shot to end it ended at `at`, for looks only: a teleport or dash where its body landed (the carrier's end point), a slam where it struck. `carrier_card` names its carrier card (Feel plays the card's `end_cue` there), `direction` the way it went, `size` how big in pixels (a slam's ring, its card's radius), `tint` and `look` as `carrier_shown`'s.
 signal carrier_ended(caster: int, carrier_card: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int)
-## Sender: core/spells (a `blast` going off: the cue its card names, `ModifierBase.cue`), and anything else with a moment to show (an exploding barrel: `&"fireball"`; a prop's look, the cue of the state it enters, props W7; S6 item 13: flow `wave_start` and `stone_lit` (the hub's stone lighting, as no actor), player `revive`, combat `shield_block` and `pull`). Play the cue `cue` (a `CueBase`, `content/cues/<cue>.tres`; an unknown one shows nothing) at `at`, for looks and feel only (the hits are sent apart: each body a blast catches is a `projectile_hit` of its carrier). `caster` is the actor it is of (NO_PLAYER for none), `direction` the way it faces (zero for none), `size` how big in pixels (an explosion's radius, a ground strike's reach; what a part's `reach` is times), `tint` its element's colour (white for plain) and `look` its packed look kinds (`CompiledSpell.look`; 0 for none). Heard by gameplay/feel (`Feel.play_cue`).
+## Sender: core/spells (a `blast` going off: the cue its card names, `ModifierBase.cue`), and anything else with a moment to show (an exploding barrel: `&"fireball"`; a prop's look, the cue of the state it enters, props W7; S6 item 13: flow `room_start` and `stone_lit` (the hub's stone lighting, as no actor), player `revive`, combat `shield_block` and `pull`). Play the cue `cue` (a `CueBase`, `content/cues/<cue>.tres`; an unknown one shows nothing) at `at`, for looks and feel only (the hits are sent apart: each body a blast catches is a `projectile_hit` of its carrier). `caster` is the actor it is of (NO_PLAYER for none), `direction` the way it faces (zero for none), `size` how big in pixels (an explosion's radius, a ground strike's reach; what a part's `reach` is times), `tint` its element's colour (white for plain) and `look` its packed look kinds (`CompiledSpell.look`; 0 for none). Heard by gameplay/feel (`Feel.play_cue`).
 signal cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.
 signal build_refused(player: int, reason: String)
@@ -311,7 +311,7 @@ signal loading_started()
 signal loading_progressed(done: int, total: int)
 ## Sender: core/loading. The load is over (done, or cancelled). Heard by hud.
 signal loading_finished()
-## Sender: flow. The room `room_id` was cleared.
+## Sender: flow. The room `room_id` was cleared: every enemy it listed is down (boss OB2a: no waves; a room with no room after it wins the run).
 signal room_cleared(room_id: StringName)
 ## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.
 signal sandbox_changed(on: bool)
@@ -322,7 +322,7 @@ signal sandbox_changed(on: bool)
 ## The stone's look is the prop standing on it, which flow puts in its state `lit` or `unlit`
 ## (props W8, `prop_state_requested`), so feel needs no word of it.
 signal start_stone_changed(standing: int, wizards: int, lit: bool)
-## Sender: flow. The party entered the hub (`in_hub` true: a run in the hub room began) or left it (a run of waves from the stone, the game stopped). Sent when it changes. Heard by net (a machine may join a party only while it is in the hub); the simulation never reads it back.
+## Sender: flow. The party entered the hub (`in_hub` true: a run in the hub room began) or left it (a run from the stone, the game stopped). Sent when it changes. Heard by net (a machine may join a party only while it is in the hub); the simulation never reads it back.
 signal hub_changed(in_hub: bool)
 ## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (a prop of the role `party_altar`, where its area is), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).
 signal altar_changed(seats: int)
@@ -362,10 +362,6 @@ signal item_near_changed(player: int, item: int, at: Vector2, view: Dictionary)
 ## Sender: items. `player` asked for the item `item` and its bag has no room (items I6): nothing was
 ## taken. Heard by hud (the hint's red shake; it names no bag).
 signal item_refused(player: int, item: int)
-## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
-signal wave_started(wave: int)
-## Sender: flow. The build break between waves began and lasts `seconds`; the next wave starts when it ends, whoever is building. Follows `room_cleared`; `wave_started` ends it.
-signal build_break_started(seconds: float)
 ## Sender: flow. The result of a door vote: `player` voted for `door`.
 signal door_voted(player: int, door: int)
 ## Sender: difficulty. The difficulty level changed to `level`.

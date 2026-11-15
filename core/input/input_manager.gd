@@ -225,7 +225,7 @@ func _on_seat_leave_requested(player: int) -> void:
 	leave(player)
 
 
-## A run was asked for (Play's hub, the sandbox, a run of waves) by seat `requester`. The menu's buttons may
+## A run was asked for (Play's hub, the sandbox, a run of rooms) by seat `requester`. The menu's buttons may
 ## be pressed with the mouse by nobody who has joined: the keyboard then takes slot 0,
 ## provisionally (a gamepad that joins before the keyboard is used takes P1 over). Anyone already
 ## joined (a gamepad, in any slot) plays as they are and the keyboard stays out. The device layer's

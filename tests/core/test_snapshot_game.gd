@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## player joining the run online would. Every tick from there agrees with the recorded run's in every
 ## area. When they part, the desync report names the first tick, the areas and each member.
 ##
-## Every room the registry finds that holds a wave (it has enemy spawns) plays one so (online-ready
+## Every room the registry finds that lists enemies (a run's room: boss OB2a) is played so (online-ready
 ## N12): a new room is covered the day its folder lands, with no test written for it. The hub holds
 ## none; its own start is resumed from a snapshot on its stone. Cards and enemies are covered the same way, in a
 ## scripted fight each (tests/core/test_content_determinism.gd).
@@ -42,32 +42,32 @@ func test_a_sandbox_run_restored_plays_on_the_same() -> void:
 	await _check_resumed(&"sandbox_requested", 0, 1)
 
 
-## A wave in every room the registry finds, with a scripted player, not bots: a bot reads the game
+## A run in every room the registry finds that lists enemies, with a scripted player, not bots: a bot reads the game
 ## through queries that fill the services' caches, which count as state (core/sim/README.md,
 ## "Input"), so a run of bots goes on the same only with the same bots watching from the same state.
 ## A player joining a run never runs the host's bots; its frames come from the host.
-func test_a_wave_in_every_room_restored_plays_on_the_same() -> void:
+func test_a_run_in_every_room_restored_plays_on_the_same() -> void:
 	var registry := own(RegistryScript.new()) as RegistryScript
 	registry.scan()
 	var rooms: Array[StringName] = []
 	for id: StringName in registry.get_ids(&"rooms"):
-		# A room with no enemy spawns holds no wave (the hub: its own test below).
-		if not (registry.get_resource(&"rooms", id) as RoomBase).places().enemy_spawns.is_empty():
+		# A room that lists no enemies is no run's room (the hub: its own test below; the sandbox).
+		if not (registry.get_resource(&"rooms", id) as RoomBase).enemies.is_empty():
 			rooms.append(id)
-	check(rooms.size() >= 2, "it finds the rooms (%d)" % rooms.size())
+	check(rooms.size() >= 1, "it finds the rooms (%d)" % rooms.size())
 	for room in rooms:
 		_run.room = room
 		await _check_resumed(&"play_requested", 0, 1)
 
 
 ## The hub (online-lobby L1), snapshot while its player stands on the lit stone, resumed: the
-## resumed game starts the run of waves on the same tick (the press after the snapshot) and plays on
+## resumed game starts the run on the same tick (the press after the snapshot) and plays on
 ## the same.
 func test_the_hub_restored_starts_its_run_on_the_same_tick() -> void:
 	_run.stone_press_at = SNAPSHOT_AT + 20
 	await _check_resumed(&"hub_requested", 0, 1)
 	_run.stone_press_at = -1
-	check_equal(root.get_node("Flow").get(&"mode"), &"waves", "the resumed game started the run from the stone")
+	check_equal(root.get_node("Flow").get(&"mode"), &"run", "the resumed game started the run from the stone")
 
 
 ## A run started by `start` with `bots` fighter bots and `scripted` scripted players, recorded with a

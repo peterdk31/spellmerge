@@ -5,7 +5,7 @@ extends "res://tests/support/suite.gd"
 ## back from the same start gives the same state hash in every area at every tick. When they part,
 ## the desync report names the first tick, the areas and each differing member.
 ##
-## The runs (a scripted player in the sandbox, a wave of two bots), how each
+## The runs (a scripted player in the sandbox, a room of two bots), how each
 ## starts from a fresh game and what is held to the tick until N3 and N4 are in
 ## tests/support/replay_run.gd, which the platform runner (N2b) shares.
 ##
@@ -33,31 +33,31 @@ func test_a_scripted_sandbox_run_replays_tick_for_tick() -> void:
 	await _check_replay(&"sandbox_requested", 0, 1)
 
 
-func test_a_wave_of_bots_replays_tick_for_tick() -> void:
+func test_a_room_of_bots_replays_tick_for_tick() -> void:
 	await _check_replay(&"play_requested", 2, 0)
 
 
 ## The hub (online-lobby L1): a player walks onto the teleporter stone and presses A, which starts
-## the run of waves in the same recording; the replay starts it on the same tick and plays on the
+## the run in the same recording; the replay starts it on the same tick and plays on the
 ## same (its frames carry the press; nothing else does).
 func test_a_run_started_from_the_hub_replays_tick_for_tick() -> void:
 	_run.stone_press_at = 120
 	await _check_replay(&"hub_requested", 0, 1)
 	var flow: Node = root.get_node("Flow")
-	check_equal(flow.get(&"mode"), &"waves", "the replay started the run from the stone")
+	check_equal(flow.get(&"mode"), &"run", "the replay started the run from the stone")
 	check_equal(flow.get(&"room_id"), flow.get(&"room_id_to_play"), "in the run's room")
 
 
 ## A run starts from a fresh game's state (online-ready N3b): a replay recorded in a fresh game
 ## plays the same after other runs in the same game, and a run recorded after other runs plays the
 ## same as the one recorded fresh (the same frames and seed). The other runs between use what the
-## run does not (a wave's AI, the sandbox's dummies), and every service's clocks, counters,
+## run does not (a room's AI, the sandbox's dummies), and every service's clocks, counters,
 ## pools and slots. Without `Tick.begin_run` the runs part at tick 0.
 func test_a_sandbox_replay_plays_the_same_after_other_runs() -> void:
 	await _check_after_other_runs(&"sandbox_requested", 0, 1, [&"play_requested", &"play_requested"])
 
 
-func test_a_wave_replay_plays_the_same_after_other_runs() -> void:
+func test_a_room_replay_plays_the_same_after_other_runs() -> void:
 	await _check_after_other_runs(&"play_requested", 2, 0, [&"sandbox_requested", &"play_requested"])
 
 

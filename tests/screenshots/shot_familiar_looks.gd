@@ -35,7 +35,7 @@ func take() -> void:
 		var caster: int = int(wizard.get("id"))
 		events.call("emit_signal", "entity_spawn_requested", caster, &"familiar", at + Vector2(20.0, -6.0), 30.0, TAG + index, -1)
 		events.call("emit_signal", "entity_spawn_requested", caster, &"familiar", at + Vector2(-20.0, 6.0), 30.0, TAG + index, -1)
-	# Past the wave's banner.
+	# Past the room's banner.
 	for i in 6:
 		await settle()
 	if int(entities.call("count")) != 8:

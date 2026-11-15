@@ -41,7 +41,7 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 const FORMAT: int = 8
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
-## The requests a run starts by (core/events): a run of waves, the sandbox, the hub (online-lobby
+## The requests a run starts by (core/events): a run of rooms, the sandbox, the hub (online-lobby
 ## L1; the main menu's Play). A new one goes at the end, so the replays made before keep their start.
 const STARTS: Array[StringName] = [&"play_requested", &"sandbox_requested", &"hub_requested"]
 const SEATS: int = 4

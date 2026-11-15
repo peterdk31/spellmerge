@@ -427,7 +427,7 @@ func test_a_cue_with_every_plays_at_most_that_often_per_actor() -> void:
 
 ## The moments that had no look (S6, item 13) each have a cue file, played by name from their area.
 func test_the_new_moments_have_cues() -> void:
-	for id: StringName in [&"revive", &"shield_block", &"pull", &"wave_start"]:
+	for id: StringName in [&"revive", &"shield_block", &"pull", &"room_start"]:
 		var cue: CueBase = feel.cue_of(id)
 		check(cue != null, "%s is a cue file" % id)
 		if cue != null:

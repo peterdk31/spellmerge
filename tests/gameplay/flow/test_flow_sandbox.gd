@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The sandbox run (staffs B7): `sandbox_requested` starts the sandbox room with both dummies and
-## no wave, `sandbox_changed` tells the HUD, the sandbox actions add imps and put fresh dummies
-## back, a cleared imp wave starts no build break, and everyone down stands up again with their
+## no enemies of its own, `sandbox_changed` tells the HUD, the arena adds enemies or bosses and the
+## actions put fresh dummies back, clearing them ends nothing, and everyone down stands up again with their
 ## staffs kept. 1, 2 and 4 players. Uses the real autoloads; time moves through Flow.step().
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
@@ -10,7 +10,6 @@ var flow: FlowScript
 var input: Node
 var events: Node
 var sandbox_flags: Array[bool] = []
-var waves: Array[int] = []
 var cleared: int = 0
 
 
@@ -21,16 +20,13 @@ func before_each() -> void:
 	flow.world_parent = own(Node.new()) as Node
 	root.add_child(flow.world_parent)
 	sandbox_flags.clear()
-	waves.clear()
 	cleared = 0
 	events.connect("sandbox_changed", _on_sandbox_changed)
-	events.connect("wave_started", _on_wave_started)
 	events.connect("room_cleared", _on_room_cleared)
 
 
 func after_each() -> void:
 	events.disconnect("sandbox_changed", _on_sandbox_changed)
-	events.disconnect("wave_started", _on_wave_started)
 	events.disconnect("room_cleared", _on_room_cleared)
 	flow.stop_run()
 	flow.world_parent = null
@@ -42,8 +38,6 @@ func _on_sandbox_changed(on: bool) -> void:
 	sandbox_flags.append(on)
 
 
-func _on_wave_started(number: int) -> void:
-	waves.append(number)
 
 
 func _on_room_cleared(_room_id: StringName) -> void:
@@ -88,8 +82,7 @@ func test_sandbox_starts_the_sandbox_room_with_both_dummies() -> void:
 		check_equal(flow.room_id, FlowScript.SANDBOX_ROOM_ID, "%d players: the room" % count)
 		check_equal(_wizards().size(), count, "%d players: a wizard each" % count)
 		check_equal(_dummy_ids(), _wanted_ids(), "%d players: the training and the shooting dummy stand, and the group" % count)
-		check_equal(flow.enemies_left(), 0, "%d players: no wave" % count)
-		check_equal(waves, [] as Array[int], "%d players: no wave_started" % count)
+		check_equal(flow.enemies_left(), 0, "%d players: no enemies of its own" % count)
 		check_equal(sandbox_flags, [true] as Array[bool], "%d players: sandbox_changed(true) once" % count)
 		flow.stop_run()
 		for index in 4:
@@ -131,12 +124,12 @@ func test_the_enemy_arena_spawns_any_enemy_and_clears_them() -> void:
 	check_equal(flow.enemies_left(), 3, "three Storm Forks")
 	check_equal(flow.spawn_in_sandbox(&"splinter", 2), 2, "and two Splinters, from code too")
 	check_equal(flow.spawn_in_sandbox(&"no_such_enemy", 2), 0, "an unknown id spawns nothing")
-	check_equal(flow.spawn_in_sandbox(&"splinter", 100), FlowScript.WAVE_MAX - 5, "never past WAVE_MAX")
+	check_equal(flow.spawn_in_sandbox(&"splinter", 100), FlowScript.SANDBOX_MAX - 5, "never past SANDBOX_MAX")
 	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_CLEAR_ENEMIES)
 	await commands_applied()
 	check_equal(flow.enemies_left(), 0, "clear takes them all")
 	check_equal(flow.dummies().size(), _wanted_ids().size(), "the dummies stay")
-	check_equal(cleared, 0, "and clearing starts no break")
+	check_equal(cleared, 0, "and clearing sends no room_cleared")
 
 
 func test_the_enemy_arena_is_only_in_the_sandbox() -> void:
@@ -146,14 +139,26 @@ func test_the_enemy_arena_is_only_in_the_sandbox() -> void:
 	check_equal(flow.spawn_in_sandbox(&"storm_fork", 3), 0, "Play has no arena")
 
 
-func test_killing_the_arenas_enemies_starts_no_break() -> void:
+## The enemy arena spawns bosses too (`EnemyBase.FOLDERS`, boss OB2a).
+func test_the_enemy_arena_spawns_a_boss() -> void:
+	var registry: Node = root.get_node("Registry")
+	var boss: EnemyBase = (registry.call("get_resource", &"enemies", &"ember_imp") as EnemyBase).duplicate() as EnemyBase
+	boss.id = &"test_sandbox_boss"
+	registry.call("add", &"bosses", boss)
+	_start(1)
+	check_equal(flow.spawn_in_sandbox(&"test_sandbox_boss", 1), 1, "a boss spawns in the sandbox")
+	# Its seat's join is a command waiting for a tick: applied here, so the next test starts clean.
+	await commands_applied()
+
+
+func test_killing_the_arenas_enemies_ends_nothing() -> void:
 	_start(1)
 	flow.spawn_in_sandbox(&"ember_imp", 5)
 	for enemy: Node in flow._enemies.duplicate():
 		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
 	check_equal(flow.enemies_left(), 0, "the enemies are gone")
 	check_equal(cleared, 0, "no room_cleared in the sandbox")
-	check_equal(flow.build_break_left(), 0.0, "no build break")
+	check(not flow.is_restarting(), "and no end of the run counts")
 	check_equal(flow.state, FlowScript.State.RUNNING, "the sandbox keeps running")
 
 

@@ -84,7 +84,7 @@ func test_a_wizard_side_actor_that_dies_sends_no_enemy_died() -> void:
 	var mage: Actor = _actor(Vector2.ZERO, ActorsScript.TEAM_WIZARDS, 0, 10)
 	_world.combat.hit(1, mage, 25)
 	check(mage.is_dying(), "it died")
-	check(_deaths.is_empty(), "the wave does not count it")
+	check(_deaths.is_empty(), "the room's fight does not count it")
 
 
 func test_a_downable_actor_at_zero_is_downed_not_killed() -> void:

@@ -57,7 +57,7 @@ const PRIORITY: int = -1000
 ## The step of the actors' bodies, the Tick's own.
 const BODIES: StringName = &"bodies"
 ## The written order of the steps (`SimArea.steps`' keys): the services, the bodies, then the
-## run's rules and timers (Flow's: the intro, the next wave, the restart; Coop's: the view the
+## run's rules and timers (Flow's: the intro, the run's end; Coop's: the view the
 ## camera is fitted to, the revives).
 const STEPS: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities", BODIES, &"Items", &"Flow", &"Coop"]
 ## The order areas are renewed in at a run's start (`SimArea.renewed_by`): Entities first, whose

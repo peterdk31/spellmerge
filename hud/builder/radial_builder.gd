@@ -4,7 +4,7 @@ extends Control
 ## the left, the ring on its right; owner, 2026-10-31, docs/milestones/M2-builder-tree.md), never
 ## pauses the game, and is drawn in code at the view's 1x pixels. While it is open the corner
 ## panel is hidden (`hud/panels`): thin HP and MP bars framed in the player's colour sit on top of
-## the column instead, so health stays in view during a wave.
+## the column instead, so health stays in view during a fight.
 ##
 ## - **The ring:** every card of the bag on a circle, grouped by kind (carriers, modifiers,
 ##   infusions, triggers, multicasts) with a coloured arc and a gap between kinds, each kind A to Z

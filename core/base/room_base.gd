@@ -9,11 +9,17 @@ extends Resource
 
 ## Unique name of the room, also its file name; the registry finds it by this.
 @export var id: StringName = &""
+## Its name for people (a menu lists it by this); empty: its id in words.
+@export var display_name: String = ""
 ## The layout scene: its art and walls, and what is where (`RoomPlaces`). No scripts.
 @export var scene: PackedScene
+## Its fight (boss OB2a, decision 31: no waves): the enemies that stand at its enemy spawns as a run
+## enters it, line by line; the room is cleared when they are all down. Empty: no fight (the hub,
+## the sandbox: their dummies are placements of their scene).
+@export var enemies: Array[RoomEnemies] = []
 ## Seconds after which a downed wizard stands up by itself at full health (the hub: hits hurt there,
 ## but a fall costs nothing; owner, 2026-11-13). Below 0 (the default): never by itself, only by a
-## teammate's revive, a new wave or the restart. In such a room everyone down starts no restart.
+## teammate's revive or the restart. In such a room everyone down starts no restart.
 @export var stand_up_after: float = -1.0
 ## The colours of what its walls shed when struck (Feel's surface motes: chips), lightest first:
 ## light, base, shadow. Empty (the default): sampled from the room's own art (`surface_colors`),
@@ -47,6 +53,11 @@ const FLOOR_Z: int = -2
 var _surface: PackedColorArray = PackedColorArray()
 var _floor: PackedColorArray = PackedColorArray()
 var _places: RoomPlaces = null
+
+
+## Its name for people: `display_name`, else its id in words.
+func shown_name() -> String:
+	return display_name if display_name != "" else String(id).capitalize()
 
 
 ## A new instance of its layout (props W8c): its scene, its placements, zones and spawns in it.

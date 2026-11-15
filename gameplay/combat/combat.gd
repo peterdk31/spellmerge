@@ -33,7 +33,7 @@ extends Node
 ## `hit_landed`, `damage_dealt` (and the actor's own `Actor.damaged`) and `actor_hurt` are sent,
 ## and a body at 0 dies: `kill_landed` (a spell's own hit only), `enemy_died` (for every foe of
 ## the wizards, a kit actor by its own team so a possessed enemy still counts and a prop of the
-## world's never does; flow counts the wave by it), and the body is freed.
+## world's never does; flow counts the room's fight by it), and the body is freed.
 ##
 ## The one rules (owner, 2026-10-28), the same on every actor:
 ##  - **gust:** a spell hit shoves it harder (its power in per cent more), and a gusted body
@@ -880,7 +880,7 @@ func _die(row: int, by: int, where: Vector2, team: int) -> void:
 		if _tag != 0:
 			events.kill_landed.emit(by, node, where, _tag, _slot)
 		# A possessed enemy is on its driver's team while it lasts, but its death is an enemy's
-		# (the wave counts on it): an actor counts by its own team. Its depletion already ended the
+		# (the room's fight counts on it): an actor counts by its own team. Its depletion already ended the
 		# possession, so `team` (read before the hit) is the driver's. A prop is nobody's foe.
 		var own_team: int = kit.own_team() if kit != null else team
 		if ActorsScript.is_foe(ActorsScript.TEAM_WIZARDS, own_team):

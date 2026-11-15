@@ -1,7 +1,7 @@
 extends Node
 ## The 4-bot smoke test as a node: four bots join on virtual devices and play the
 ## first room through the real input path. Bots 1-3 fight; bot 4 opens its builder with B
-## (`back`) when the room starts and idles in it the whole run (the full builder, waves
+## (`back`) when the room starts and idles in it the whole run (the full builder, fights
 ## included). Bots 1-3 also build: when the room starts each builds a seeded random staff into
 ## staff 1 (RB, `BotScript.BUILD_STAFF`) with `staff_change_requested`, and their brains (the enemies' AI, tests/bots/bot.gd)
 ## play it with their other staffs, so the run is played with built staffs.

@@ -6,7 +6,9 @@ extends RoomPreview
 ## corner) and it draws the cover the game will lay there, from `CoverLayout.of` (the biome's fill and
 ## the fields, never under a wall or on a door, a spawn or a placement), with the same tufts Feel draws
 ## (`CoverSketch`, `CoverTufts`), still and at rest. Moving a field, a wall or a spawn moves the grass:
-## it looks at the room again every `LOOK_EVERY` seconds and draws again when its cover changed.
+## it looks at the room again every `LOOK_EVERY` seconds and draws again when its cover changed. It
+## draws at the game's z (`CoverSketch.Z`), under the props and walls, and with it in the scene the
+## fields draw only their outlines. A change to a kind's look alone is seen after `look_again`.
 ##
 ## The game never shows it: it is a `RoomPreview`, which `RoomPlaces` passes over and takes out of
 ## the room before play. An editor script (the owner's decision of 2026-11-11), so it lives in tools/.
@@ -37,7 +39,13 @@ var _since: float = 0.0
 
 
 func _ready() -> void:
+	CoverSketch.lay_under(self)
 	set_process(Engine.is_editor_hint())
+
+
+## It draws the room's cover: the fields leave their tufts to it (`RoomPreview`).
+func draws_cover() -> bool:
+	return true
 
 
 func _process(delta: float) -> void:

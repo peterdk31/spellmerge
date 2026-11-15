@@ -142,7 +142,8 @@ func test_one_batch_a_kind_made_by_batches_at_the_marks_z() -> void:
 		check_equal(batch.multimesh.custom_aabb, BatchesScript.WORLD, "%s's batch is made by Batches.multimesh(): never culled" % kind_id)
 		check(batch.multimesh.use_colors and batch.multimesh.use_custom_data, "%s's rows carry a colour and custom data, as the warm-up draws a batch" % kind_id)
 		check_equal((batch.material as ShaderMaterial).shader, CoverScript.SHADER, "drawn by the cover shader")
-		check_equal((batch.material as ShaderMaterial).get_shader_parameter(&"frame_count"), 6.0, "told its sheet's frames")
+		check_equal((batch.material as ShaderMaterial).get_shader_parameter(&"sheet_size"), Vector2(96, 16), "told its sheet's size, to draw exactly a frame of it")
+		check_equal((batch.material as ShaderMaterial).get_shader_parameter(&"frame_size"), Vector2(16, 16), "and its frames'")
 		check(batch.multimesh.instance_count > 0, "%s has tufts" % kind_id)
 
 
@@ -259,6 +260,20 @@ func test_a_cells_state_picks_its_frames() -> void:
 	check_equal(cover.rows_of(&"test_grass"), laid_rows, "a cell of no cover changes nothing")
 
 
+## The wind's time is Feel's clock, set each frame: by the game's Feel too.
+func test_feels_step_moves_the_wind() -> void:
+	var feel := root.get_node_or_null("Feel") as FeelScript
+	var layout_root: Node2D = _layout()
+	_field(layout_root, Rect2(200, 200, 64, 64), &"test_grass")
+	feel.cover().lay(CoverLayout.of(layout_root, _room(&"meadow"), [_grass(&"test_meadow")] as Array[CoverKind]))
+	var material := feel.cover().batch_of(&"test_grass").material as ShaderMaterial
+	feel.step(0.25)
+	var first: float = material.get_shader_parameter(&"view_time")
+	feel.step(0.5)
+	check(is_equal_approx(float(material.get_shader_parameter(&"view_time")) - first, 0.5), "Feel's step moves the wind by its time")
+	feel.cover().lay(CoverLayout.of(_layout(), _room(&"meadow"), [] as Array[CoverKind]))
+
+
 ## The wind's time is Feel's clock, set each frame.
 func test_the_wind_follows_feels_clock() -> void:
 	var cover: CoverScript = _cover()
@@ -269,30 +284,80 @@ func test_the_wind_follows_feels_clock() -> void:
 	check_equal((cover.batch_of(&"test_grass").material as ShaderMaterial).get_shader_parameter(&"view_time"), 12.5, "the shader's wind time")
 
 
-## The editor's drawing: a cover field draws the tufts of its rectangle, the preview the whole room's,
-## from the same layout the game works out.
+## The editor's drawing: a cover field draws the tufts of its rectangle, from the whole room's cover,
+## and again when the room changes under it; with a preview in the scene the preview draws the whole
+## room's and the field leaves its tufts to it. Both at the game's z.
 func test_the_editor_draws_the_rooms_tufts() -> void:
 	fixture_grass.sheet = _sheet()
+	CoverSketch.forget()
 	var layout_root: Node2D = _layout()
 	root.add_child(layout_root)
 	var field: CoverField = _field(layout_root, Rect2(200, 200, 96, 64), &"test_grass", 0.6)
 	field.content_root = FIXTURE_ROOT
 	field.draws_in_play = true
-	var preview := CoverPreview.new()
-	preview.content_root = FIXTURE_ROOT
-	layout_root.add_child(preview)
 	field.queue_redraw()
-	preview.queue_redraw()
 	await root.get_tree().process_frame
 	await root.get_tree().process_frame
 	var laid: CoverLayout = CoverLayout.of(layout_root, null, CoverSketch.kinds(FIXTURE_ROOT))
 	var every: int = CoverSketch.tufts(laid).size() / CoverSketch.TUFT_STRIDE
 	check(every > 0, "the room has tufts")
-	check_equal(preview.drawn, every, "the preview draws every tuft of the room")
 	check_equal(field.drawn, CoverSketch.tufts(laid, Rect2(200, 200, 96, 64)).size() / CoverSketch.TUFT_STRIDE, "the field draws the tufts of its rectangle")
 	check_equal(field.drawn, every, "here, all of them")
+	check(not field.call("_changed"), "nothing changed since")
+	var clearing: CoverField = _field(layout_root, Rect2(200, 200, 48, 64), &"")
+	check(field.call("_changed"), "a field laid over it changes what it would draw: it draws again")
+	layout_root.remove_child(clearing)
+	clearing.free()
+	var preview := CoverPreview.new()
+	preview.content_root = FIXTURE_ROOT
+	layout_root.add_child(preview)
+	check(CoverSketch.previewed(layout_root), "the scene is previewed")
+	field.queue_redraw()
+	preview.queue_redraw()
+	await root.get_tree().process_frame
+	await root.get_tree().process_frame
+	check_equal(preview.drawn, every, "the preview draws every tuft of the room")
+	check_equal(field.drawn, 0, "and the field leaves its tufts to it")
+	check_equal(CoverSketch.Z, RoomBase.FLOOR_Z + 1, "the cover's z in the game")
+	check_equal(preview.z_index, 0, "set on the server alone: no scene saves it")
 	layout_root.remove_child(preview)
 	preview.free()
+
+
+## A cover kind with problems is in no room's cover, the game's or the editor's.
+func test_a_broken_kind_is_left_out() -> void:
+	var broken := _grass(&"test_meadow")
+	broken.states[0].frames = PackedInt32Array([40])
+	check(not CoverSketch.usable(broken), "a kind drawing a frame its sheet lacks cannot be drawn")
+	check(CoverSketch.usable(_grass(&"test_meadow")), "the test grass can")
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan(FIXTURE_ROOT)
+	broken.id = &"test_broken"
+	check(registry.add(&"cover", broken), "the broken kind is in the registry")
+	var cover: CoverScript = _cover()
+	cover.registry = registry
+	var ids: Array[StringName] = []
+	for kind in cover.kinds():
+		ids.append(kind.id)
+	check_equal(ids, [&"test_grass"] as Array[StringName], "the broken kind is left out, the sound one kept")
+
+
+## A kind's tufts are drawn from the top of the room down, then from the left, across cells, so a
+## tuft lower on the floor is drawn over one behind it; the editor draws them in the same order.
+func test_the_tufts_are_drawn_from_the_back_forward() -> void:
+	var cover: CoverScript = _cover()
+	var layout_root: Node2D = _layout()
+	_field(layout_root, Rect2(64, 64, 512, 256), &"test_grass")
+	var laid: CoverLayout = CoverLayout.of(layout_root, _room(&"meadow"), [_grass(&"test_meadow")] as Array[CoverKind])
+	cover.lay(laid)
+	var feet: PackedVector2Array = _feet(cover, &"test_grass")
+	check(feet.size() > 100, "a field of tufts")
+	for at in range(1, feet.size()):
+		var before: Vector2 = feet[at - 1]
+		if feet[at].y < before.y or (feet[at].y == before.y and feet[at].x < before.x):
+			check(false, "tuft %d at %s is drawn after %s, which stands in front of it" % [at, feet[at], before])
+			break
+	check_equal(_rows(cover, &"test_grass"), CoverSketch.tufts(laid), "the editor's in the same order")
 
 
 ## The preview places nothing (`RoomPlaces` passes over it) and is taken out of the room shown with
@@ -303,6 +368,9 @@ func test_the_preview_is_never_in_the_room_shown() -> void:
 	layout_root.add_child(preview)
 	var marker := Marker2D.new()
 	preview.add_child(marker)
+	var holder := Node2D.new()
+	layout_root.add_child(holder)
+	holder.add_child(CoverPreview.new())
 	_field(layout_root, Rect2(200, 200, 64, 64), &"test_grass")
 	var places: RoomPlaces = RoomPlaces.read(layout_root)
 	check(places.problems().is_empty(), "a preview is no problem: %s" % "; ".join(places.problems()))

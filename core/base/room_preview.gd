@@ -7,3 +7,9 @@ extends Node2D
 ## as the game will show it. It places nothing and means nothing to the game: `RoomPlaces.read`
 ## passes over it, and it is taken out before play as placements and zones are
 ## (`RoomPlaces.strip`), so the room shown never holds it. A kind of preview extends this one.
+
+
+## True for a preview that draws the room's ground cover (`CoverPreview`): the cover fields then
+## leave their tufts to it.
+func draws_cover() -> bool:
+	return false

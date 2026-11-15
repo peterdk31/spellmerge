@@ -6,8 +6,8 @@ render_mode blend_mix, world_vertex_coords;
 
 // Ground cover (gameplay/feel/cover.gd; docs/milestones/ground-cover.md, rule 6): one batch a cover
 // kind, one row a tuft, its frame a cell of the kind's sheet (`CoverKind.sheet`, frames side by side
-// of `frame_size`). A tuft stands on its foot and sways in a slow wind from it: its tip moves by whole
-// pixels (docs/STYLE.md: pixels are hard), its foot never. The wind rolls across the room as a wave,
+// of `frame_size` along its top, the sheet `sheet_size`), the rows in drawing order (cover.gd). A
+// tuft stands on its foot and sways in a slow wind from it: its tip moves by whole pixels (docs/STYLE.md: pixels are hard), its foot never. The wind rolls across the room as a wave,
 // two slow sines so it never beats in step; its time is Feel's clock (`view_time`), a look's.
 //
 // A row (Cover.STRIDE floats):
@@ -18,8 +18,8 @@ render_mode blend_mix, world_vertex_coords;
 //                       (0-1, for bodies going through: GC4), where in the sway it starts (0-1)
 // The colour and custom data are between 0 and 1 and need no more than bytes.
 
-uniform float frame_count = 1.0;
 uniform vec2 frame_size = vec2(16.0, 16.0);
+uniform vec2 sheet_size = vec2(16.0, 16.0);
 uniform float view_time = 0.0;
 
 // Cover.SWAY_CODE: the most a tuft sways, in pixels.
@@ -47,7 +47,8 @@ void vertex() {
 		float tip = 1.0 - corner.y;
 		VERTEX = foot + vec2((corner.x - 0.5) * frame_size.x * flip + round(wind * sway * tip), (corner.y - 1.0) * frame_size.y);
 	}
-	UV = vec2((frame + corner.x) / max(frame_count, 1.0), corner.y);
+	// Exactly a frame of the sheet's top row, whatever the sheet's size (as the editor draws it).
+	UV = (vec2(frame * frame_size.x, 0.0) + corner * frame_size) / max(sheet_size, vec2(1.0));
 }
 
 void fragment() {

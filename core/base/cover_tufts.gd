@@ -7,8 +7,10 @@ extends RefCounted
 ## the look moves no roll of the run.
 ##
 ## A tuft is drawn from its foot (the bottom middle of its frame), a whole pixel in its cell; the
-## tufts of a cell stand in bands from its top down, so a cell's lower tufts are drawn over its
-## upper ones.
+## tufts of a cell stand in bands from its top down. A kind's tufts are drawn in the order of their
+## feet (`draw_key`: from the top of the room down, then from the left), so a tuft lower on the
+## floor is drawn over one behind it, across cells too. (Across kinds a batch is drawn whole: one
+## kind's batch over another's.)
 
 ## How far from a cell's side a foot keeps, in pixels, so a tuft's foot never lies on its neighbour.
 const EDGE: int = 1
@@ -45,6 +47,18 @@ static func mirrored(rolled: int) -> bool:
 
 
 ## Where in the wind's sway a tuft of roll `rolled` starts (0-1 of a sway), so the tufts of a field
-## do not sway as one.
+## do not sway as one: the roll hashed again, so it is not tied to the foot's place.
 static func phase(rolled: int) -> float:
-	return float((rolled >> 4) & 255) / 255.0
+	return float(hash(rolled) & 255) / 255.0
+
+
+## The key a tuft is drawn in order of (smaller first): its foot's row, then its column, then
+## `slot`, its place in the cells' order (so ties keep that order). A foot is at most 2^20 pixels
+## across and `slot` below 2^20.
+static func draw_key(foot: Vector2, slot: int) -> int:
+	return (int(foot.y) << 40) | (int(foot.x) << 20) | slot
+
+
+## The slot a `draw_key` was made with.
+static func slot_of(key: int) -> int:
+	return key & ((1 << 20) - 1)

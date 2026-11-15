@@ -2,7 +2,7 @@ extends "res://tests/support/screenshot.gd"
 ## Screenshots of ground cover's look (ground cover GC3, docs/milestones/ground-cover.md): every room
 ## template a run's map can pick (content/rooms, found by folder, as `shot_rooms.gd`), each just after
 ## its run starts with four wizards in it, covered by a stand-in grass made here that fills every
-## template's biome (the game has no cover of its own before GC8; the art is GC8's), still and in the
+## template's biome (the game has no cover of its own before GC8; the art is GC8's), a moment of its
 ## wind. A new room shows up here with no edit.
 ##
 ## Shots: `cover_<id>`, one a template; `cover_<id>_close`, its first player spawn's corner at 4×.

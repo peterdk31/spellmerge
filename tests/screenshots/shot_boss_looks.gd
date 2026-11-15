@@ -6,8 +6,12 @@ extends "res://tests/support/screenshot.gd"
 ## it does in a fight: the poses are the game's own, read from the body's state (`BodyPose`).
 ##
 ## A clip is a run of frames (every EVERY ticks, FRAMES of them) from the first tick its pose
-## holds (an idle clip starts again when its pose stops: idle is what it shows between the others); the script hurts the boss once the clips before need it (a hit for the hurt pose, below
-## its phase's health for the transition and the next phase's poses, then the kill for the remnant).
+## holds (an idle clip starts again when its pose stops: idle is what it shows between the others);
+## the script hurts the boss once the clips before need it (a hit for the hurt pose, below its first
+## phase's health for the transition and that phase's poses, then the kill for the remnant). A clip
+## is named by its pose (`move` is its own move, `cast` its staff animation; `phase_*` the poses in
+## its first phase, if it has one). Each frame is as big as the body's art at rest (its `Sprite` and
+## parts) and a margin, round its middle.
 ## Each clip is saved as a filmstrip, `boss_<id>_<clip>` (2x), and all of a boss's clips as one
 ## sheet, a row a clip in CLIPS' order, `boss_<id>_sheet` (1x). A boss with no room to stand in, or a
 ## clip that never comes in its time, is said and skipped; the script fails only when no boss
@@ -23,14 +27,14 @@ const Pose := BodyPose.Pose
 const CLIPS: Array[Dictionary] = [
 	{"name": "idle", "pose": Pose.IDLE, "phase": -1, "hold": true},
 	{"name": "windup", "pose": Pose.WINDUP, "phase": -1},
-	{"name": "sweep", "pose": Pose.MOVE, "phase": -1},
+	{"name": "move", "pose": Pose.MOVE, "phase": -1},
 	{"name": "wall", "pose": Pose.WALL, "phase": -1},
-	{"name": "swat", "pose": Pose.CAST, "phase": -1},
+	{"name": "cast", "pose": Pose.CAST, "phase": -1},
 	{"name": "hurt", "pose": Pose.HURT, "phase": -1},
 	{"name": "transition", "pose": Pose.TRANSITION, "phase": 0},
-	{"name": "phase2_idle", "pose": Pose.IDLE, "phase": 0, "hold": true},
-	{"name": "phase2_windup", "pose": Pose.WINDUP, "phase": 0},
-	{"name": "phase2_sweep", "pose": Pose.MOVE, "phase": 0},
+	{"name": "phase_idle", "pose": Pose.IDLE, "phase": 0, "hold": true},
+	{"name": "phase_windup", "pose": Pose.WINDUP, "phase": 0},
+	{"name": "phase_move", "pose": Pose.MOVE, "phase": 0},
 	{"name": "death", "pose": -1, "phase": 0},
 ]
 ## Frames a clip keeps, and the ticks between two.
@@ -39,9 +43,9 @@ const EVERY: int = 3
 ## The most ticks a stage waits for its clips (each phase), and before the boss shows.
 const STAGE_TICKS: int = 60 * 40
 const SHOW_TICKS: int = 60 * 5
-## Each frame: the pixels round the body (its middle CENTRE above its feet), at 1x.
-const HALF: Vector2i = Vector2i(64, 52)
-const CENTRE: Vector2 = Vector2(0.0, -30.0)
+## The pixels round the body's art at rest in each frame (1x), and the least half a frame is.
+const MARGIN: float = 16.0
+const LEAST_HALF: Vector2i = Vector2i(24, 24)
 ## A hit for the hurt pose, as a share of the boss's most health, every PRICK_EVERY ticks until it
 ## shows.
 const PRICK: float = 0.01
@@ -60,6 +64,9 @@ const TILE: float = 32.0
 
 var _registry: Node = null
 var _flow: Node = null
+## The boss being played: half its frame and the frame's middle from its feet (`_frame_of`).
+var _half: Vector2i = LEAST_HALF
+var _centre: Vector2 = Vector2.ZERO
 
 
 func _init() -> void:
@@ -105,6 +112,7 @@ func _play(data: EnemyBase) -> bool:
 		print("SKIP: the boss '%s' did not show" % data.id)
 		return false
 	Downed.of(wizard).protect(3600.0)
+	_frame_of(boss)
 	_face_off(boss, wizard)
 	var look := boss.get_node("CreatureLook") as CreatureLook
 	var frames: Dictionary = {}
@@ -125,8 +133,10 @@ func _play(data: EnemyBase) -> bool:
 			if lost > LOST_TICKS:
 				_face_off(boss, wizard)
 				lost = 0
-		var phase: int = boss.phases.current if alive and boss.phases != null else 0
+		var phase: int = boss.phases.current if alive and boss.phases != null else -1
 		var pose: int = look.body_pose() if alive else -1
+		# One picture a tick, whatever clips take it (a second grab would skip a tick).
+		var image: Image = null
 		for clip: Dictionary in CLIPS:
 			var name: String = clip["name"]
 			var kept: Array = frames.get(name, [])
@@ -148,8 +158,9 @@ func _play(data: EnemyBase) -> bool:
 				continue
 			if (tick - int(started[name])) % EVERY != 0:
 				continue
-			var image: Image = await grab()
-			kept.append(_crop(image, on_screen(last_at + CENTRE)))
+			if image == null:
+				image = await grab()
+			kept.append(_crop(image, on_screen(last_at + _centre)))
 			frames[name] = kept
 		# A wall met: stood near the room's side, its wizard between it and the wall, every few
 		# seconds until its move meets the wall.
@@ -169,7 +180,7 @@ func _play(data: EnemyBase) -> bool:
 					var left: float = boss.health.health - boss.health.max_health * (below - 0.02)
 					if left > 0.0:
 						root.get_node("Combat").call("hit", _id_of(wizard), boss, left)
-		elif stage == 1 and (_done(frames, 6, 10) or stage_ticks > STAGE_TICKS):
+		elif stage == 1 and (_done(frames, 6, 10) or stage_ticks > STAGE_TICKS or not _has_phases(boss, alive)):
 			stage = 2
 			stage_ticks = 0
 			if alive:
@@ -201,10 +212,37 @@ func _by_the_wall(boss: Actor, wizard: Node2D) -> void:
 	wizard.global_position = at + Vector2(WALL_GAP * 0.5, 0.0)
 
 
+## The frame for `boss`: its `Sprite`'s and parts' art at rest, in its own space, and MARGIN round it.
+func _frame_of(boss: Actor) -> void:
+	var bounds := Rect2()
+	var found: bool = false
+	var sprites: Array[Node] = [boss.get_node_or_null("Sprite")]
+	var parts: Array[BodyPart] = []
+	BodyPart.parts_of(boss.get_node_or_null("Sprite"), parts)
+	sprites.append_array(parts)
+	for node: Node in sprites:
+		var sprite := node as Sprite2D
+		if sprite == null or sprite.texture == null:
+			continue
+		var art: Rect2 = (boss.global_transform.affine_inverse() * sprite.global_transform) * sprite.get_rect()
+		bounds = art if not found else bounds.merge(art)
+		found = true
+	if not found:
+		bounds = Rect2(-Vector2(LEAST_HALF), Vector2(LEAST_HALF * 2))
+	bounds = bounds.grow(MARGIN)
+	_centre = bounds.get_center().round()
+	_half = Vector2i((bounds.size * 0.5).ceil()).max(LEAST_HALF)
+
+
+## True when the boss has a phase to show (alive, with phases).
+func _has_phases(boss: Actor, alive: bool) -> bool:
+	return alive and boss.phases != null and not boss.phases.list.is_empty()
+
+
 ## True when the frame round the body at `at` is all on the screen.
 func _in_view(at: Vector2) -> bool:
-	var view: Rect2 = root.get_visible_rect().grow_individual(-HALF.x, -HALF.y, -HALF.x, -HALF.y)
-	return view.has_point(on_screen(at + CENTRE))
+	var view: Rect2 = root.get_visible_rect().grow_individual(-_half.x, -_half.y, -_half.x, -_half.y)
+	return view.has_point(on_screen(at + _centre))
 
 
 ## True when every clip from `from` to before `to` (CLIPS' indices) has its frames.
@@ -218,18 +256,18 @@ func _done(frames: Dictionary, from: int, to: int) -> bool:
 ## The frame round the screen point `at`, at 1x.
 func _crop(image: Image, at: Vector2) -> Image:
 	var scale_to_image: Vector2 = Vector2(image.get_size()) / Vector2(root.get_visible_rect().size)
-	var size: Vector2i = Vector2i(Vector2(HALF * 2) * scale_to_image)
+	var size: Vector2i = Vector2i(Vector2(_half * 2) * scale_to_image)
 	var middle := Vector2i(at * scale_to_image)
 	var corner: Vector2i = (middle - size / 2).clamp(Vector2i.ZERO, image.get_size() - size)
 	var crop: Image = image.get_region(Rect2i(corner, size))
-	crop.resize(HALF.x * 2, HALF.y * 2, Image.INTERPOLATE_NEAREST)
+	crop.resize(_half.x * 2, _half.y * 2, Image.INTERPOLATE_NEAREST)
 	return crop
 
 
 ## Each clip's filmstrip (2x) and the boss's sheet (1x, a row a clip; a clip that never came is a
 ## dark row).
 func _save(data: EnemyBase, frames: Dictionary) -> void:
-	var cell: Vector2i = HALF * 2
+	var cell: Vector2i = _half * 2
 	var gap: int = 2
 	var sheet := Image.create((cell.x + gap) * FRAMES, (cell.y + gap) * CLIPS.size(), false, Image.FORMAT_RGBA8)
 	sheet.fill(Color(0.05, 0.05, 0.07))

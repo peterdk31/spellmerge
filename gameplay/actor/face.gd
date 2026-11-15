@@ -129,7 +129,9 @@ var _k: float = 0.0
 func setup(owner_actor: Actor) -> void:
 	super.setup(owner_actor)
 	if _eyes == null:
-		var own: bool = art != null and art.eyes != null and art.brows != null
+		var own: bool = art != null and art.problems().is_empty()
+		if art != null and not own:
+			push_warning("Face: its own art cannot be drawn (%s); it wears the shared sheets." % "; ".join(art.problems()))
 		_eyes = _layer(art.eyes if own else EYES_SHEET, art.eyes_origin if own else EYES_ORIGIN, art.frame if own else FRAME)
 		_brows = _layer(art.brows if own else BROWS_SHEET, art.brows_origin if own else BROWS_ORIGIN, art.frame if own else FRAME)
 		_own_art = own

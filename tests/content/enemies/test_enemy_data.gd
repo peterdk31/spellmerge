@@ -40,6 +40,26 @@ func test_every_enemy_is_sound() -> void:
 				check_equal(SpellValidator.check_staff(entry.staff).size(), 0, "%s: its phase's staff is valid" % data.id)
 
 
+func test_a_face_of_its_own_can_be_drawn() -> void:
+	# Boss plan OB9: a face's own art (`FaceArt`) has every sheet, whole frames and enough columns.
+	for data in _enemies():
+		var body: Node = data.scene.instantiate()
+		for child in body.get_children():
+			if child is Face and (child as Face).art != null:
+				check_equal((child as Face).art.problems(), PackedStringArray(), "%s: its face's own art" % data.id)
+		body.free()
+	var art := FaceArt.new()
+	art.frame = Vector2i(8, 8)
+	check_equal(art.problems().size(), 2, "no sheets: two problems")
+	var image := Image.create(72, 16, false, Image.FORMAT_RGBA8)
+	art.eyes = ImageTexture.create_from_image(image)
+	art.brows = ImageTexture.create_from_image(Image.create(44, 8, false, Image.FORMAT_RGBA8))
+	check_equal(art.problems().size(), 2, "nine eye columns, and brows not whole frames: %s" % art.problems())
+	art.eyes = ImageTexture.create_from_image(Image.create(80, 16, false, Image.FORMAT_RGBA8))
+	art.brows = ImageTexture.create_from_image(Image.create(40, 8, false, Image.FORMAT_RGBA8))
+	check_equal(art.problems(), PackedStringArray(), "ten eye columns and five brows: sound")
+
+
 func test_every_enemy_plays_by_the_enemy_ai() -> void:
 	# The dummies and the swarmers too (owner, 2026-11-01): one system for every enemy.
 	for data in _enemies():

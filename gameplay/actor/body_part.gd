@@ -19,8 +19,8 @@ extends Sprite2D
 ## - `squash`: how much wider and lower it is while the body goes (a head dragged on the floor).
 ## - `sway`: degrees it sways `sway_rate` times a second while the body stands.
 ## - `tap`: pixels it lifts and drops, `taps` times in quick succession every `tap_every` seconds,
-##   while the body stands (boss plan OB9: an impatient tap on the floor; a part on the floor lifts
-##   the parts on it with it).
+##   while the body stands idle (the IDLE pose; boss plan OB9: an impatient tap on the floor; a part
+##   on the floor lifts the parts on it with it).
 ## - `wall_squash`: how much it squashes, then stretches, along the way the body met a wall.
 ## - `shudder`: pixels it shakes as the body meets a wall, and all through a phase change.
 ## - `fling`: how far it flies when the body dies (Feel's remnant: the parts fly apart where it
@@ -112,7 +112,7 @@ func show_pose(body: BodyPose) -> void:
 	degrees += swish * body.going * sin(body.swish_time * TAU * swish_rate)
 	degrees += sway * (1.0 - body.going) * sin(body.time * TAU * sway_rate)
 	var at: Vector2 = -body.drive * lag
-	if tap > 0.0 and taps > 0 and tap_every > 0.0:
+	if tap > 0.0 and taps > 0 and tap_every > 0.0 and body.pose == BodyPose.Pose.IDLE:
 		at.y -= tap * (1.0 - body.going) * tap_lift(body.time)
 	var stretch: Vector2 = Vector2(1.0 + squash * body.going, 1.0 - squash * body.going)
 	var wall: float = body.wall_share()

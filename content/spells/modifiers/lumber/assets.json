@@ -7,7 +7,7 @@
 			"license": "CC-BY-SA-4.0",
 			"tier": "placeholder",
 			"tool": "Claude (SVG rects written by a small generator)",
-			"prompt": "A 16x16 icon for the Lumber card: a heavy wooden log seen from the side, its pale ringed end face to the right, grey motion lines trailing behind it, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"prompt": "A 16x16 icon for the Lumber card: a heavy wooden log seen from the side, its pale ringed end face to the right, dark motion dashes trailing behind it, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
 		}
 	]
 }

@@ -24,6 +24,8 @@ A tenth, planned with the owner on 2026-11-10 and approved on 2026-11-11: **prop
 
 An eleventh, planned with the owner on 2026-11-13: **items**, things a body picks up, holds in bags (staffs, cards, relics, potions) and drops, with staff pickups first, counted cards, an inventory beside the builder and a rack in the hub ([items.md](milestones/items.md), phase I). It builds M3's bags and pickups early, for the staffs; what relics and potions do, and items as a run's rewards, stay M3.
 
+A twelfth, planned with the owner on 2026-11-14 and 2026-11-15: **the first boss, the Old Broom**, after the crypt: a slow, sweeping charge that carries players into walls, two phases, pillars as shelter that gets used up, dust heaps that explode on fire, and mites the boss brings ([boss-old-broom.md](milestones/boss-old-broom.md), phase OB). It builds M3's first boss early, content first, on general pieces every actor gains (`ActorStats`, the Lumber and Plow cards, `on wall` for moves, poses, phase adds, held sounds); placing it in a run stays M3.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

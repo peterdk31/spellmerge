@@ -110,8 +110,8 @@ func test_a_body_of_one_sprite_leaves_none_and_a_room_clears_them() -> void:
 	check_equal(remnants.count(), RemnantsScript.MOST, "the pool fills")
 	check_equal(remnants.get_child_count(), RemnantsScript.MOST, "and never grows")
 	# Full: the oldest pieces give way, fresh (flying, whole).
-	for i in RemnantsScript.MOST:
-		remnants.step(STEP * 10.0)
+	# Still showing (flying or lying), so the pool is full when the next body dies.
+	remnants.step(0.5)
 	var last := _body(Vector2(500.0, 50.0))
 	remnants.leave(last.get_node("Sprite") as Sprite2D, Vector2(500.0, 40.0), 50.0)
 	last.free()

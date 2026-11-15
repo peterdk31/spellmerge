@@ -1,6 +1,6 @@
 # Run generation: a run defined as data, its map generated
 
-**Status (2026-11-15): proposed, waiting for the owner's approval** (the owner: "I need to approve the plan before continuing"). Nothing below is built yet. It replaces OB2b and OB2c of [boss-old-broom.md](boss-old-broom.md) (decisions 30-33: OB2a, no waves, stays done) and builds the core of M3's run structure early ([docs/PLAN.md](../PLAN.md): the `run`, `flow` and `difficulty` areas).
+**Status (2026-11-15): approved by the owner** (after answering the plan's three questions: "Merge it"); this document is the plan, and RG1 is next. Nothing below is built yet. It replaces OB2b and OB2c of [boss-old-broom.md](boss-old-broom.md) (decisions 30-33: OB2a, no waves, stays done) and builds the core of M3's run structure early ([docs/PLAN.md](../PLAN.md): the `run`, `flow` and `difficulty` areas).
 
 The steps are **RG1 to RG8** (RG for run generation). Each is one PR with its tests, in order.
 
@@ -19,7 +19,7 @@ The answers, the same day:
 
 - **Through the teleporter,** the party stands in the first room of a run nobody has seen before: the same crypt rooms, met in another order, with other enemies in them, every run.
 - **A room is a fight.** Its enemies stand as it starts; when the last is down, its **exits** light up: one exit per room the map lets it lead to, each showing what lies behind it (a fight, the boss).
-- **The party picks the way by walking** (the door rule, docs/DESIGN.md): an exit takes the party on once every wizard stands on it. Nobody picks for anyone; a wizard who walks elsewhere simply holds that exit dark.
+- **The party picks the way by walking** (the door rule, docs/DESIGN.md): an exit takes the party on once every wizard stands in it, with no button (owner, 2026-11-15). Nobody picks for anyone; a wizard who walks elsewhere simply holds that exit dark.
 - **Deeper is harder:** more enemies, tougher ones, and every number on them scaled up with depth and with the number of players.
 - **The last room is the boss's.** Won, the party is back in the hub; everyone down, the same, with nothing of the run.
 - **For testing,** the hub's lectern can make the teleporter start the generated run at any depth of its map, the boss's room included; the run is otherwise the same run.
@@ -60,7 +60,7 @@ The generator is one pure function from (definition, rules, content, seed) to a 
 ## Exits and the way on (RG4)
 
 - **An exit is a prop** of the role `room_exit` (content/props, self-contained, as the hub's stone: it says what it is and where it is stood on), placed in a room's scene, as many as the room may lead to (a room template with fewer exits than a node's links is not picked for that node). Dark until the room is cleared; then each exit with a link lights and shows the kind of room behind it (view only), the rest stay dark.
-- **Every wizard on one lit exit** takes the party on (`run_requested`, the stone's command: A, as on the stone, or the exit's own rule when the owner prefers stepping on it): the next room starts in the same run and the same recording, the party as it is (health, staffs, everything; the start staffs are not dealt again), the map and the depth moving on.
+- **Every wizard in one lit exit** takes the party on, with no button (owner, 2026-11-15: "Just everyone stepping into it"); stepping in is position only, so it is the simulation's own and needs no command. The next room starts in the same run and the same recording, the party as it is (health, staffs, everything; the start staffs are not dealt again), the map and the depth moving on.
 - **The boss's room has no exit:** won, the run is won (back in the hub, as OB2a does now).
 
 ## Scaling (RG5)
@@ -112,11 +112,11 @@ Each step's tests come with it. The boss plan's OB6 (the arena) then tags its ro
 - **Fair from 1 to 4 players:** the budget and every number scale with players, never the number of rooms.
 - **Short loops:** 4 to 6 rooms and a boss is a short first run (docs/DESIGN.md: 20 to 30 minutes for a whole run of several biomes, later).
 
-## Questions for the owner
+## Answered by the owner (2026-11-15)
 
-1. **Taking an exit:** A on a lit exit, as on the stone (proposed: the same command and habit as the stone), or stepping on it with everyone there and no button?
-2. **The first run's size:** 4 to 6 rows deep, 1 to 3 rooms a row, each leading to 1 or 2 (proposed), until the owner tunes it.
-3. **Between rooms:** the party carries everything into the next room as it is (health, mana, staffs); downed wizards stand up at the next room's start with the revive's health (proposed), or as they are?
+7. **Taking an exit: everyone stepping into it,** no button.
+8. **The first run's size:** 4 to 6 rows deep, 1 to 3 rooms a row, each leading to 1 or 2, until the owner tunes it ("Ok").
+9. **Between rooms:** the party carries everything into the next room as it is (health, mana, staffs); downed wizards stand up at the next room's start with the revive's health ("Ok").
 
 ## Not in this plan
 

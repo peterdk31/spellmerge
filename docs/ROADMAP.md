@@ -26,6 +26,8 @@ An eleventh, planned with the owner on 2026-11-13: **items**, things a body pick
 
 A twelfth, planned with the owner on 2026-11-14 and 2026-11-15: **the first boss, the Old Broom**, after the crypt: a slow, sweeping charge that carries players into walls, two phases, pillars as shelter that gets used up, dust heaps that explode on fire, and mites the boss brings ([boss-old-broom.md](milestones/boss-old-broom.md), phase OB). It builds M3's first boss early, content first, on general pieces every actor gains (actor stats, the Lumber and Plow cards, moves with speed curves and a pass as wide as the body, `on wall` for moves, poses and layered bodies, phase adds and health by player count, the AI's run-up, held sounds and music with intensity, the boss bar); placing it in a run stays M3.
 
+A thirteenth, planned with the owner on 2026-11-15: **run generation**, a run defined as data (its biome, map rules, room kinds and scaling) and its branching map generated from the run's seed and the content there is, filled with fights and the boss, scaled with depth and players, its rules open to meta progression on the host's save ([run-generation.md](milestones/run-generation.md), phase RG). It builds the core of M3's run structure early; waves are gone (boss OB2a). Reward and other rooms, unlocks and a difficulty setting stay M3 and later.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

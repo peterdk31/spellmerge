@@ -27,6 +27,8 @@ var registry: Node
 var entered: Array[StringName] = []
 var shown: Array = []
 var taken: Array[int] = []
+## Each `room_built` heard: the room, how many placements its layout still held, whether it was in the tree.
+var built: Array = []
 
 
 func before_each() -> void:
@@ -39,7 +41,9 @@ func before_each() -> void:
 	entered.clear()
 	shown.clear()
 	taken.clear()
+	built.clear()
 	events.connect("room_entered", _on_entered)
+	events.connect("room_built", _on_built)
 	events.connect("room_exits_shown", _on_shown)
 	events.connect("run_way_taken", _on_taken)
 	flow.world_parent = own(Node.new()) as Node
@@ -48,6 +52,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	events.disconnect("room_entered", _on_entered)
+	events.disconnect("room_built", _on_built)
 	events.disconnect("room_exits_shown", _on_shown)
 	events.disconnect("run_way_taken", _on_taken)
 	flow.stop_run()
@@ -61,6 +66,10 @@ func after_each() -> void:
 
 func _on_entered(room: StringName) -> void:
 	entered.append(room)
+
+
+func _on_built(room: StringName, layout: Node) -> void:
+	built.append([room, RoomPlaces.read(layout).placed.size(), layout.is_inside_tree(), layout.find_children("*", "RoomZone", true, false).size()])
 
 
 func _on_shown(at: PackedVector2Array, kinds: Array[StringName]) -> void:
@@ -270,12 +279,56 @@ func test_a_snapshot_taken_in_a_later_room_restores_into_the_first() -> void:
 		if flow.room_id != later:
 			break
 	check(flow.room_id != later and flow.get(&"_layout_of") != later, "the joining machine is in the other room")
+	built.clear()
 	var problems: PackedStringArray = snapshot.restore(tick.state_areas(), root)
 	check_equal(problems, PackedStringArray(), "restored without problems")
 	check_equal(flow.room_id, later, "in the later room")
 	check_equal(flow.get(&"_layout_of"), later, "its layout laid out again")
 	check_equal(_layouts(), 1, "one layout in the world")
 	check_equal(SimHash.areas(tick.state_areas(), StateWalk.new()), taken_hash, "the game is the snapshot's")
+	# Ground cover GC2: the later room's layout is told (`room_built`), so its cover is worked out.
+	check_equal(built.map(func(heard: Array) -> StringName: return heard[0]), [later], "room_built for the later room, once")
+	built.clear()
+	check_equal(snapshot.restore(tick.state_areas(), root), PackedStringArray(), "restored again, into the room shown")
+	check(built.is_empty(), "a restore into the room shown builds nothing and tells nothing")
+
+
+## Ground cover GC2: each room laid out is told (`room_built`), at a run's start and on going on, before
+## it is entered, its placements and zones still in it and not yet in the tree.
+func test_each_room_laid_out_is_told_before_it_is_entered() -> void:
+	var order: Array[String] = []
+	var told_built := func(room: StringName, _layout: Node) -> void: order.append("built " + String(room))
+	var told_entered := func(room: StringName) -> void: order.append("entered " + String(room))
+	events.connect("room_built", told_built)
+	events.connect("room_entered", told_entered)
+	_play(2, 1)
+	var first: StringName = flow.room_id
+	_clear_room()
+	_stand_in(0, 1)
+	flow.step(DT)
+	var second: StringName = flow.room_id
+	events.disconnect("room_built", told_built)
+	events.disconnect("room_entered", told_entered)
+	check_equal(order, ["built " + String(first), "entered " + String(first), "built " + String(second), "entered " + String(second)], "each room built, then entered")
+	var placed: int = ARENA.places().placed.size()
+	check(placed > 0, "the arena places its exits")
+	for heard: Array in built:
+		check_equal(heard[1], placed, "%s: its placements still in the layout told" % heard[0])
+		check_equal(heard[2], false, "%s: not yet in the tree" % heard[0])
+		check_equal(heard[3], ARENA.places().zone_names.size(), "%s: its zones still in it" % heard[0])
+
+
+## The hub, a room with zones (its prop yard, the lectern's place): `room_built` hands its layout with
+## them still in it, as a room's cover fields will be.
+func test_the_layout_told_still_holds_its_zones() -> void:
+	input.add_virtual_device(0)
+	events.emit_signal("hub_requested", 0)
+	var hub := registry.get_resource(&"rooms", FlowScript.HUB_ROOM_ID) as RoomBase
+	check(hub.places().zone_names.size() >= 2, "the hub has zones")
+	check(built.size() == 1 and built[0][0] == FlowScript.HUB_ROOM_ID, "the hub was told")
+	if built.size() == 1:
+		check_equal(built[0][3], hub.places().zone_names.size(), "its zones still in the layout told")
+	check(flow.world.find_children("*", "RoomZone", true, false).is_empty(), "and none left in the room shown")
 
 
 ## A seat that joins while the cleared room's exits are lit, with everyone else down, holds the

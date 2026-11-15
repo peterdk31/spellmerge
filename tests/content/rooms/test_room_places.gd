@@ -80,3 +80,53 @@ func test_the_room_the_game_shows_has_no_placements_or_zones() -> void:
 		RoomPlaces.strip(layout)
 		check(layout.find_children("*", "RoomPlacement", true, false).is_empty(), "%s: no placement left" % room.id)
 		check(layout.find_children("*", "RoomZone", true, false).is_empty(), "%s: no zone left" % room.id)
+
+
+## A cover field (ground cover GC2) is a zone with data: read with its rectangle and its patch, by
+## kind (`zones_of`), with no name and no problem; a plain zone with no name is still one; a plain
+## zone's data is null; and the game's room has no field left (`strip`).
+func test_a_cover_field_is_read_with_its_data_and_taken_out() -> void:
+	var layout := own(Node2D.new()) as Node2D
+	var zones := Node2D.new()
+	zones.position = Vector2(10, 20)
+	layout.add_child(zones)
+	var plain := RoomZone.new()
+	plain.zone_name = &"prop_yard"
+	plain.offset_right = 30
+	plain.offset_bottom = 30
+	zones.add_child(plain)
+	var field := CoverField.new()
+	field.kind = &"grass"
+	field.density = 0.4
+	field.offset_left = 5
+	field.offset_top = 6
+	field.offset_right = 105
+	field.offset_bottom = 56
+	zones.add_child(field)
+	var places: RoomPlaces = RoomPlaces.read(layout)
+	check_equal(places.problems(), PackedStringArray(), "a field needs no name")
+	check_equal(places.zone_names.size(), 2, "both zones read")
+	check(places.zone_data[0] == null, "a plain zone holds no data")
+	check_equal(places.zones_of(CoverPatch), PackedInt32Array([1]), "the field, by its data's kind")
+	var patch := places.zone_data[1] as CoverPatch
+	check(patch != null and patch.kind == &"grass" and is_equal_approx(patch.density, 0.4), "its kind and density")
+	check_equal(places.zone_rects[1], Rect2(15, 26, 100, 50), "its rectangle, through its holder")
+	check_equal(places.zone(&""), Rect2(), "no zone is found by no name")
+	check_equal(places.zone(&"prop_yard"), Rect2(10, 20, 30, 30), "a named zone still is")
+	zones.add_child(RoomZone.new())
+	check_equal(RoomPlaces.read(layout).problems().size(), 1, "a plain zone with no name is a problem")
+	RoomPlaces.strip(layout)
+	check(layout.find_children("*", "RoomZone", true, false).is_empty(), "the fields taken out with the zones")
+
+
+## Every room's cover, with the game's cover kinds, has no problems (a field naming a kind there is
+## none of), and the fill is on unless a room turns it off.
+func test_every_rooms_cover_is_sound() -> void:
+	var kinds: Array[CoverKind] = []
+	for item: Resource in _registry.get_all(&"cover"):
+		if item is CoverKind:
+			kinds.append(item as CoverKind)
+	check(RoomBase.new().cover_fill, "the fill is on by default")
+	for room in _rooms():
+		var layout: Node = own(room.build())
+		check_equal(CoverLayout.of(layout, room, kinds).problems(), PackedStringArray(), "%s: its cover is sound" % room.id)

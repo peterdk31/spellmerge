@@ -42,6 +42,10 @@ extends Resource
 ## so spells and torches read as the light in it. Only drawn while the "Spell light" setting is
 ## on; at most 1.0 (light only brightens past it).
 @export_range(0.3, 1.0, 0.05) var ambient: float = 1.0
+## Whether its biome's cover kinds fill its open floor by themselves (ground cover GC2,
+## `CoverLayout.of`: each `CoverKind` whose `biomes` names its `biome`). Off: only its fields
+## (`CoverField`) put cover in it.
+@export var cover_fill: bool = true
 
 ## The share of the most common colour a floor's colour needs to count (a wall's is the art rule's,
 ## `ArtPixels.MIN_SHARE`): a floor is mostly one colour, its seams and highlights a few pixels in a

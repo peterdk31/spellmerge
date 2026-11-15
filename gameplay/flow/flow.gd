@@ -475,11 +475,12 @@ func _seat_of(wizard: Node) -> int:
 ## makes it; items I4) gives each seat's wizard the player it was before, everything it held (from
 ## the hub into a run, or the hub begun anew); a seat with no loadout there, and all of them with no
 ## `party`, starts with what its mode gives (its staffs, start cards and bag). A run of rooms
-## (`MODE_RUN`) is the run `run_id_to_play`, its room the first of the map the run area makes
-## (`_begin_run_of_rooms`). Returns false (and starts nothing) when content is missing or no player
+## (`MODE_RUN`) is the run `run_id_to_play`, its room the first of the map the run area makes, or
+## the first of the row `start_depth` names (the lectern's pick, for the stone's run only;
+## `_begin_run_of_rooms`). Returns false (and starts nothing) when content is missing or no player
 ## has a device; a map its rolls cornered (rare: only `KindRule.not_after` can) is found only once
 ## the last run's world went, so Flow is idle then.
-func start_run(requester: int, party: PartyLoadout = null) -> bool:
+func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0) -> bool:
 	var room: RoomBase = null
 	if mode == MODE_RUN:
 		# What keeps the run's map from being made is asked before anything goes; only its rolls
@@ -523,7 +524,7 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	if mode == MODE_HUB:
 		hub.forget_start()
 	if mode == MODE_RUN:
-		room = _begin_run_of_rooms(players.size())
+		room = _begin_run_of_rooms(players.size(), start_depth)
 		if room == null:
 			stop_run()
 			return false
@@ -537,8 +538,7 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	new_world.y_sort_enabled = true
 	_lay_out(new_world, room, tick.sim if tick != null else null)
 	_spawn_players(new_world, room, players, party)
-	contents.stand(new_world, _places)
-	contents.stand_in_role_zones(new_world, _places, registry)
+	contents.stand(new_world, _places, registry)
 	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
 	if mode == MODE_RUN:
 		_stand_room_enemies(new_world, room, _chosen_enemies)
@@ -601,12 +601,10 @@ func _room_id_for_mode() -> StringName:
 ## map of `run_id_to_play` and answers with its first room and what stands in it (`run_begun`,
 ## `run_room_chosen`; run generation RG3). The room, or null (with a warning) when no answer came or
 ## the registry lacks the room it names. The run is made for `players` players (the seats joined at
-## its start; run generation RG5).
-func _begin_run_of_rooms(players: int) -> RoomBase:
-	# Where the stone's run starts (the lectern's pick, run generation RG7); any other run of rooms
-	# starts in its first room.
-	var depth: int = hub.start_depth if _back_to_hub else 0
-	var room: RoomBase = _room_asked(func() -> void: events.run_begun.emit(run_id_to_play, players, depth))
+## its start; run generation RG5) and entered at `start_depth` (the lectern's pick for the stone's
+## run, run generation RG7; 0 for every other: its first room).
+func _begin_run_of_rooms(players: int, start_depth: int) -> RoomBase:
+	var room: RoomBase = _room_asked(func() -> void: events.run_begun.emit(run_id_to_play, players, start_depth))
 	if room == null:
 		push_warning("Flow: the run '%s' gave no room it could build (its map could not be made, or its room is missing), so no run starts." % run_id_to_play)
 	return room
@@ -692,7 +690,7 @@ func _enter_next_room(room: RoomBase) -> void:
 	_lay_out(world, room, tick.sim if tick != null else null)
 	for wizard: Node2D in _wizards:
 		_bring_in(wizard)
-	contents.stand(world, _places)
+	contents.stand(world, _places, registry)
 	_stand_room_enemies(world, room, _chosen_enemies)
 	exits.enter(_chosen_ways)
 	room_id = room.id
@@ -943,7 +941,7 @@ func _start_run_from_stone(seat: int) -> void:
 	var party: PartyLoadout = _party_of()
 	mode = MODE_RUN
 	_back_to_hub = true
-	if not start_run(seat, party):
+	if not start_run(seat, party, hub.start_depth):
 		if state == State.IDLE:
 			# The hub went before the run's map was found cornered: the party goes back there, each
 			# wizard as it went.

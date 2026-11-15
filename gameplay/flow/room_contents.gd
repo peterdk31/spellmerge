@@ -7,8 +7,8 @@ extends RefCounted
 ## placement, null once its body went, forgotten in the tick it goes) and answers by kind and role.
 ##
 ## A room's zone named for a prop role (run generation RG7: the hub's `start_lectern`) is a place for
-## the registry's prop of that role (`stand_in_role_zones`): the first by id stands with its feet at
-## the zone's middle, after the placements. So such a prop is found by folder, never named by the
+## the registry's prop of that role (`stand`): the first by id stands with its feet at the zone's
+## middle, after the placements. So such a prop is found by folder, never named by the
 ## room's scene: deleting its folder leaves the zone empty and the room whole.
 ## Flow's state (it holds one), stepped by Flow.
 
@@ -64,16 +64,17 @@ static func items_of(places: RoomPlaces) -> Array:
 
 
 ## Stand a body for every placement of `places` in `world` (one not yet in the tree, or one that
-## is), in order.
-func stand(world: Node2D, places: RoomPlaces) -> void:
+## is), in order, then the props of `registry` its role zones place (`stand_in_role_zones`).
+func stand(world: Node2D, places: RoomPlaces, registry: RegistryScript) -> void:
 	clear()
 	for i in places.placed.size():
 		bodies.append(_stand(world, places, i))
+	stand_in_role_zones(world, places, registry)
 
 
 ## For each zone of `places` named for the role of a prop of `registry` (`PropBase.role`), stand
 ## that role's first prop by id in `world`, its feet at the zone's middle (whole pixels), after the
-## placements' bodies (call it after `stand`). A zone no prop's role names stands nothing.
+## placements' bodies (`stand` calls it). A zone no prop's role names stands nothing.
 func stand_in_role_zones(world: Node2D, places: RoomPlaces, registry: RegistryScript) -> void:
 	if registry == null:
 		return

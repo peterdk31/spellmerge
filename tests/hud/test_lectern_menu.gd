@@ -127,6 +127,19 @@ func test_it_closes_when_its_seat_leaves_the_lectern_or_the_hub() -> void:
 	check(not _hud.get_lectern(1).is_open(), "with no depth offered it never opens")
 
 
+func test_a_downed_seat_opens_nothing() -> void:
+	_bus.lectern_changed.emit(0b0001)
+	_bus.player_stats_changed.emit(0, 0.0, 100.0, 0.0, 100.0)
+	_tap(0, &"accept")
+	_frame()
+	check(not _hud.get_lectern(0).is_open(), "a downed wizard lying at the lectern opens nothing")
+	_bus.player_stats_changed.emit(0, 50.0, 100.0, 0.0, 100.0)
+	_frame()
+	_tap(0, &"accept")
+	_frame()
+	check(_hud.get_lectern(0).is_open(), "up again, it opens")
+
+
 func test_the_lit_stone_and_the_altar_come_first() -> void:
 	var runs: Array[int] = []
 	var rooms: Array[int] = []

@@ -362,7 +362,7 @@ func poll() -> void:
 					events.item_take_requested.emit(player, _item_hints.item_of(player))
 				elif start_now and _altar_seats & (1 << player) != 0:
 					events.online_open_requested.emit(player)
-				elif start_now and _lectern_seats & (1 << player) != 0:
+				elif start_now and _lectern_seats & (1 << player) != 0 and _in_room and not _panels[player].is_downed():
 					_open_lectern(player)
 			if paused_now:
 				_on_pause_pressed(player)

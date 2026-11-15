@@ -198,6 +198,24 @@ func test_a_run_not_from_the_stone_starts_in_its_first_room() -> void:
 	check(at != null and at.row == 0 and at.index == 0, "Play's run: its first room")
 
 
+## The rule is every room's, not the hub's alone: whatever room's places Flow stands (a run's later
+## rooms too, `RoomContents.stand`), a zone named for a prop role stands that role's first prop by
+## id at its middle, after the placements; a zone named for no role stands nothing.
+func test_a_role_zone_stands_its_prop_in_any_room() -> void:
+	var places := RoomPlaces.new()
+	places.zone_names = [&"prop_yard", HubRules.ROLE_START_LECTERN] as Array[StringName]
+	places.zone_rects = [Rect2(0, 0, 64, 64), Rect2(100, 40, 48, 32)] as Array[Rect2]
+	var world := own(Node2D.new()) as Node2D
+	var contents := RoomContents.new()
+	contents.stand(world, places, registry)
+	var lecterns: Array[Actor] = contents.with_role(HubRules.ROLE_START_LECTERN)
+	check_equal(lecterns.size(), 1, "the lectern stands")
+	check_equal(contents.bodies.size(), 1, "and nothing for the yard's zone")
+	if not lecterns.is_empty():
+		check_equal(lecterns[0].position, Vector2(124, 56), "at its zone's middle")
+		check(lecterns[0].get_parent() == world, "in the world")
+
+
 ## Deleting the lectern's folder: the hub stands none, nobody is ever at one, a pick is refused and
 ## the stone's run starts in its first room.
 func test_with_no_lectern_nothing_is_picked() -> void:

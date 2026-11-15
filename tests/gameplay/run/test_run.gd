@@ -51,7 +51,7 @@ func _expected(seed: int) -> RunMap:
 func test_a_run_begun_makes_its_map_and_names_its_first_room() -> void:
 	tick.begin_run()
 	tick.sim.run_seed = 41
-	events.emit_signal("run_begun", &"crypt", 1)
+	events.emit_signal("run_begun", &"crypt", 1, 0)
 	var map: RunMap = run.get(&"map") as RunMap
 	check(map != null and map.is_made(), "the crypt run's map is made")
 	if map == null:
@@ -65,12 +65,61 @@ func test_a_run_begun_makes_its_map_and_names_its_first_room() -> void:
 	check(run.call("room_now") == map.first(), "room_now is the first room")
 
 
+## The hub's lectern (run generation RG7): a run begun at a depth makes the same map from the run's
+## seed and the party enters the first room of the row that depth names (`RunMap.start_at`); its
+## scale is that room's.
+func test_a_run_begun_at_a_depth_enters_its_rows_first_room() -> void:
+	var scales: Array[float] = []
+	var hear := func(scale: float) -> void: scales.append(scale)
+	events.connect("run_room_scaled", hear)
+	var depths: int = (root.get_node("Registry").call("get_resource", &"runs", &"crypt") as RunDefinition).start_depths()
+	for depth: int in [1, depths - 1]:
+		tick.begin_run()
+		tick.sim.run_seed = 41
+		answers.clear()
+		scales.clear()
+		events.emit_signal("run_begun", &"crypt", 1, depth)
+		var map: RunMap = run.get(&"map") as RunMap
+		check(map != null and map.is_made(), "depth %d: the map is made" % depth)
+		if map == null:
+			continue
+		check_equal(SimHash.of(map), SimHash.of(_expected(41)), "depth %d: the same map as from the first room" % depth)
+		var at: RunNode = run.call("room_now") as RunNode
+		var row: int = map.rows() - 1 if depth == depths - 1 else depth
+		check_equal(at.index, map.row(row)[0].index, "depth %d: the first room of row %d" % [depth, row])
+		check(answers.size() == 1 and answers[0][0] == at.room, "depth %d: that room named" % depth)
+		check_equal(scales, [at.scale] as Array[float], "depth %d: at its scale" % depth)
+	events.disconnect("run_room_scaled", hear)
+
+
+## Where a run started at a depth begins (`RunMap.start_at`), on a map of five rows a lectern
+## offering six depths and on one made shallower than it offers.
+func test_where_a_depth_starts() -> void:
+	var map := RunMap.new()
+	var widths: Array[int] = [1, 2, 3, 2, 1]
+	for row in widths.size():
+		for i in widths[row]:
+			var node := RunNode.new()
+			node.index = map.nodes.size()
+			node.row = row
+			map.nodes.append(node)
+	check_equal(map.start_at(0, 6), 0, "0: the first room")
+	check_equal(map.start_at(-3, 6), 0, "less: the first room")
+	check_equal(map.start_at(1, 6), 1, "1: row 1's first room")
+	check_equal(map.start_at(2, 6), 3, "2: row 2's first room")
+	check_equal(map.start_at(4, 6), 6, "4, past the rows before the last: the deepest before it")
+	check_equal(map.start_at(5, 6), 8, "the last of the depths: the last row")
+	check_equal(map.start_at(9, 6), 8, "past them: the last row")
+	check_equal(map.start_at(3, 4), 8, "the last of fewer depths: the last row")
+	check_equal(RunMap.new().start_at(3, 6), 0, "a map not made: 0")
+
+
 func test_the_same_seed_gives_the_same_map_and_another_seed_another() -> void:
 	var hashes: Dictionary = {}
 	for seed: int in [5, 5, 6, 7, 8, 9]:
 		tick.begin_run()
 		tick.sim.run_seed = seed
-		events.emit_signal("run_begun", &"crypt", 1)
+		events.emit_signal("run_begun", &"crypt", 1, 0)
 		var map: RunMap = run.get(&"map") as RunMap
 		var value: int = SimHash.of(map)
 		if seed == 5 and hashes.has(5):
@@ -83,7 +132,7 @@ func test_the_same_seed_gives_the_same_map_and_another_seed_another() -> void:
 
 
 func test_a_run_start_takes_the_map_away() -> void:
-	events.emit_signal("run_begun", &"crypt", 1)
+	events.emit_signal("run_begun", &"crypt", 1, 0)
 	check(run.get(&"map") != null, "a map")
 	tick.begin_run()
 	check(run.get(&"map") == null and int(run.get(&"at")) == -1, "a run's start renews the area: no map")
@@ -91,7 +140,7 @@ func test_a_run_start_takes_the_map_away() -> void:
 
 
 func test_an_unknown_run_answers_nothing() -> void:
-	events.emit_signal("run_begun", &"no_such_run", 1)
+	events.emit_signal("run_begun", &"no_such_run", 1, 0)
 	check(run.get(&"map") == null, "no map")
 	check(answers.is_empty(), "no answer")
 
@@ -100,7 +149,7 @@ func test_the_map_is_part_of_the_game_state() -> void:
 	tick.begin_run()
 	check(tick.state_areas().has("Run"), "the Tick hashes the run's area")
 	var before: int = SimHash.of(run)
-	events.emit_signal("run_begun", &"crypt", 1)
+	events.emit_signal("run_begun", &"crypt", 1, 0)
 	check(SimHash.of(run) != before, "the map changes the hash")
 	var walk := StateWalk.new()
 	walk.values("Run", run, [])
@@ -137,7 +186,7 @@ func test_flow_builds_the_room_the_map_names() -> void:
 func test_a_way_taken_moves_on_through_the_map() -> void:
 	tick.begin_run()
 	tick.sim.run_seed = 7
-	events.emit_signal("run_begun", &"crypt", 1)
+	events.emit_signal("run_begun", &"crypt", 1, 0)
 	var map: RunMap = run.get(&"map") as RunMap
 	if map == null or not map.is_made():
 		check(false, "the crypt run's map is made")
@@ -177,7 +226,7 @@ func test_the_map_is_made_for_the_run_s_players_and_each_room_s_scale_told_first
 	events.connect("run_room_chosen", on_chosen)
 	tick.begin_run()
 	tick.sim.run_seed = 23
-	events.emit_signal("run_begun", &"crypt", 3)
+	events.emit_signal("run_begun", &"crypt", 3, 0)
 	var map: RunMap = run.get(&"map") as RunMap
 	var registry: Node = root.get_node("Registry")
 	var definition := registry.call("get_resource", &"runs", &"crypt") as RunDefinition
@@ -255,7 +304,7 @@ func test_the_map_is_made_by_the_rules_the_run_s_unlocks_leave() -> void:
 		tick.begin_run()
 		tick.sim.run_seed = seed
 		tick.sim.unlocks = unlocked.copy()
-		events.emit_signal("run_begun", id, 2)
+		events.emit_signal("run_begun", id, 2, 0)
 		var map: RunMap = run.get(&"map") as RunMap
 		check(map != null and map.is_made(), "seed %d: made" % seed)
 		if map == null:
@@ -269,7 +318,7 @@ func test_the_map_is_made_by_the_rules_the_run_s_unlocks_leave() -> void:
 		# The same seed with none unlocked: a guest's run, whatever its own save holds.
 		tick.begin_run()
 		tick.sim.run_seed = seed
-		events.emit_signal("run_begun", id, 2)
+		events.emit_signal("run_begun", id, 2, 0)
 		check_equal(SimHash.of(run.get(&"map")), SimHash.of(plain), "seed %d: none unlocked, the definition's own map" % seed)
 	check_equal(changed_maps, 4, "every changed map differs from its plain one")
 	check_equal(SimHash.of(definition.biomes[0]), before, "the registry's definition never changes")

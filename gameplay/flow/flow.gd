@@ -143,6 +143,8 @@ const LoadTask := preload("res://core/loading/load_task.gd")
 const PLAYER_SLOTS: int = 4
 ## The rooms' registry folder.
 const ROOM_FOLDER: StringName = &"rooms"
+## The registry folder of the run definitions (content/runs).
+const RUN_FOLDER: StringName = &"runs"
 ## The run a run of rooms is unless `run_id_to_play` says otherwise (a run definition's id,
 ## content/runs).
 const DEFAULT_RUN_ID: StringName = &"crypt"
@@ -347,6 +349,7 @@ func _ready() -> void:
 	events.listen(&"sandbox_action_requested", _on_sandbox_action_requested)
 	events.listen(&"sandbox_spawn_requested", _on_sandbox_spawn_requested)
 	events.listen(&"run_requested", _on_run_requested)
+	events.listen(&"start_depth_picked", _on_start_depth_picked)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
@@ -472,11 +475,12 @@ func _seat_of(wizard: Node) -> int:
 ## makes it; items I4) gives each seat's wizard the player it was before, everything it held (from
 ## the hub into a run, or the hub begun anew); a seat with no loadout there, and all of them with no
 ## `party`, starts with what its mode gives (its staffs, start cards and bag). A run of rooms
-## (`MODE_RUN`) is the run `run_id_to_play`, its room the first of the map the run area makes
-## (`_begin_run_of_rooms`). Returns false (and starts nothing) when content is missing or no player
+## (`MODE_RUN`) is the run `run_id_to_play`, its room the first of the map the run area makes, or
+## the first of the row `start_depth` names (the lectern's pick, for the stone's run only;
+## `_begin_run_of_rooms`). Returns false (and starts nothing) when content is missing or no player
 ## has a device; a map its rolls cornered (rare: only `KindRule.not_after` can) is found only once
 ## the last run's world went, so Flow is idle then.
-func start_run(requester: int, party: PartyLoadout = null) -> bool:
+func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0) -> bool:
 	var room: RoomBase = null
 	if mode == MODE_RUN:
 		# What keeps the run's map from being made is asked before anything goes; only its rolls
@@ -517,8 +521,10 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	else:
 		tick.begin_run()
 	exits.leave()
+	if mode == MODE_HUB:
+		hub.forget_start()
 	if mode == MODE_RUN:
-		room = _begin_run_of_rooms(players.size())
+		room = _begin_run_of_rooms(players.size(), start_depth)
 		if room == null:
 			stop_run()
 			return false
@@ -532,7 +538,7 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	new_world.y_sort_enabled = true
 	_lay_out(new_world, room, tick.sim if tick != null else null)
 	_spawn_players(new_world, room, players, party)
-	contents.stand(new_world, _places)
+	contents.stand(new_world, _places, registry)
 	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
 	if mode == MODE_RUN:
 		_stand_room_enemies(new_world, room, _chosen_enemies)
@@ -595,9 +601,10 @@ func _room_id_for_mode() -> StringName:
 ## map of `run_id_to_play` and answers with its first room and what stands in it (`run_begun`,
 ## `run_room_chosen`; run generation RG3). The room, or null (with a warning) when no answer came or
 ## the registry lacks the room it names. The run is made for `players` players (the seats joined at
-## its start; run generation RG5).
-func _begin_run_of_rooms(players: int) -> RoomBase:
-	var room: RoomBase = _room_asked(func() -> void: events.run_begun.emit(run_id_to_play, players))
+## its start; run generation RG5) and entered at `start_depth` (the lectern's pick for the stone's
+## run, run generation RG7; 0 for every other: its first room).
+func _begin_run_of_rooms(players: int, start_depth: int) -> RoomBase:
+	var room: RoomBase = _room_asked(func() -> void: events.run_begun.emit(run_id_to_play, players, start_depth))
 	if room == null:
 		push_warning("Flow: the run '%s' gave no room it could build (its map could not be made, or its room is missing), so no run starts." % run_id_to_play)
 	return room
@@ -683,7 +690,7 @@ func _enter_next_room(room: RoomBase) -> void:
 	_lay_out(world, room, tick.sim if tick != null else null)
 	for wizard: Node2D in _wizards:
 		_bring_in(wizard)
-	contents.stand(world, _places)
+	contents.stand(world, _places, registry)
 	_stand_room_enemies(world, room, _chosen_enemies)
 	exits.enter(_chosen_ways)
 	room_id = room.id
@@ -911,6 +918,22 @@ func _on_run_requested(player: int) -> void:
 	_start_run_from_stone(player)
 
 
+## The command `start_depth_picked` (a seat's pick on its lectern menu, run generation RG7; heard at
+## the tick's start): in the hub, while that seat's wizard stood at the lectern at the last count,
+## the stone's run starts at that depth of its map (within the depths offered; `HubRules.pick`).
+func _on_start_depth_picked(player: int, depth: int) -> void:
+	if mode != MODE_HUB or state != State.RUNNING or get_wizard(player) == null:
+		return
+	hub.pick(player, depth, start_depths())
+
+
+## How many depths the lectern offers the stone's run to start at: the run definition
+## `run_id_to_play`'s (`RunDefinition.start_depths`; 0 when the registry lacks it).
+func start_depths() -> int:
+	var definition: RunDefinition = registry.get_resource(RUN_FOLDER, run_id_to_play) as RunDefinition if registry != null else null
+	return definition.start_depths() if definition != null else 0
+
+
 ## The run, from the hub's stone, for seat `seat`: every wizard goes in as the player it
 ## is, with every bag, its staffs and its hands (owner, 2026-11-13: what a run's start takes along
 ## is the whole player), and the run's end brings everyone back to the hub.
@@ -918,7 +941,7 @@ func _start_run_from_stone(seat: int) -> void:
 	var party: PartyLoadout = _party_of()
 	mode = MODE_RUN
 	_back_to_hub = true
-	if not start_run(seat, party):
+	if not start_run(seat, party, hub.start_depth):
 		if state == State.IDLE:
 			# The hub went before the run's map was found cornered: the party goes back there, each
 			# wizard as it went.
@@ -978,7 +1001,8 @@ func is_stone_lit() -> bool:
 ## The hub's rules count the wizards on its stone and altar (none out of the hub), light the stone
 ## and tell what changed (`HubRules.count`).
 func _count_stone() -> void:
-	hub.count(mode == MODE_HUB and state != State.IDLE and _room != null, _wizards, contents, events)
+	var in_hub: bool = mode == MODE_HUB and state != State.IDLE and _room != null
+	hub.count(in_hub, _wizards, contents, events, start_depths() if in_hub else 0)
 
 
 ## A sandbox page's action. Ignored out of the sandbox. It changes the room only, never a

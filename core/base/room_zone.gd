@@ -5,7 +5,10 @@ extends ReferenceRect
 ## a place that is no thing (the hub's prop yard), drawn in the editor only, moved and sized by its
 ## handles. Found at any depth of a room's scene (`RoomPlaces.read`), taken out before play. Core
 ## knows a zone only by its name; what one means is the game's (Flow's `ZONE_PROP_YARD`). A thing
-## that means something is a self-contained prop instead (its own `PropBase.area`).
+## that means something is a self-contained prop instead (its own `PropBase.area`). A zone named for
+## a prop role (the hub's `start_lectern`, run generation RG7) is the place of the registry's prop of
+## that role, stood at its middle (gameplay/flow, `RoomContents`), so a room need not name a prop
+## that may be deleted.
 
 ## What the zone is to the game (`prop_yard`).
 @export var zone_name: StringName = &"":

@@ -50,6 +50,22 @@ func first() -> RunNode:
 	return node(0)
 
 
+## The room a run started at `depth` of the `depths` the lectern offers (run generation RG7,
+## `RunDefinition.start_depths`) begins in: the first by number of the row it names. 0 (or less), or
+## a map of one row: the first room. The last of `depths`: the last row (the boss's). Any other: that
+## row, or the deepest row before the last on a map made shallower, so only the last pick starts at
+## the boss. 0 for a map not made.
+func start_at(depth: int, depths: int) -> int:
+	var last: int = rows() - 1
+	if depth <= 0 or last <= 0:
+		return 0
+	var at_row: int = last if depth >= depths - 1 else mini(depth, last - 1)
+	for found: RunNode in nodes:
+		if found.row == at_row:
+			return found.index
+	return 0
+
+
 ## The rooms that lead to room `index` (their numbers, left to right).
 func parents_of(index: int) -> PackedInt32Array:
 	var found := PackedInt32Array()

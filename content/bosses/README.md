@@ -16,7 +16,7 @@ A boss is an enemy (content/enemies/README.md) with `boss = true`. It is **data,
 - **Its profile** (`profile`, an `AIProfile`): how it plays, also a sub-resource of its `.tres`, never in the shared `content/enemies/profiles/`.
 - **Its phases** (`phases`, `EnemyPhase`): each starts by its condition (`health_below` a share of the most, or `after_seconds`), once, in order; the boss stands protected for its `transition`, then fights with the phase's `staffs` (all of them: list again the ones that stay), its `profile` and its `look` (`PhaseLook`: a body texture, a face style and glow, a size). Phase adds (the phase brings its own enemies, so the boss works in any room) and health by player count are coming in OB13.
 - **Its scene** is an actor like an enemy's (see the broom's): `Health`, `Hurtbox` (a circle as wide as its body), `Contact`, `Mover`, `Footprint` (its feet against the walls), `Caster`, the `AIController`, its `CreatureLook`, its `Sprite` and a `Face`. A layered body and poses are coming in OB8; actor stats (power, mass, spell scale, resistances) in OB7.
-- **Its sounds** are named in its cues, `content/cues/<boss>_*.tres` (cues must sit in `content/cues`, where Feel finds them); held sounds and music with intensity are coming in OB15.
+- **Its sounds** are named in its cues, `content/cues/` files whose names start with a prefix of its own (the broom's `broom_*.tres`; cues must sit in `content/cues`, where Feel finds them); held sounds and music with intensity are coming in OB15.
 - **Its room** (optional): its best arena, a room of the `boss` kind in its biome (`content/rooms/<biome>/`). The fight must still work in any room.
 
 ### What is still engine work
@@ -38,7 +38,7 @@ A boss that needs one of these needs that general piece built first (in the shar
 - Each phase has a clear change in behaviour and a visible telegraph for every attack (its staff's `wind_up` and the cast's lane). Bosses never hit without warning.
 - Targeting considers every player (seats 0–3); a downed player can be revived and the fight never waits for anyone.
 - Use pools and the projectile manager; respect the global projectile cap. Communicate only through `core/` events. Original names and art only.
-- **A boss can be deleted by deleting its files** (decision 28 of the broom's plan): its folder, its room, its cues (`content/cues/<boss>_*.tres`), its sounds and music in `audio/` with their lines in `audio/manifest.json`, and its lines in docs/STORY.md. So no general code, test or default names a boss or is tuned to it: its numbers live in its own data. A test of boss behaviour builds its own small boss (`tests/gameplay/ai/test_ai_phases.gd`); only the tests that walk all content find bosses, through the registry, and pass with none.
+- **A boss can be deleted by deleting its files** (decision 28 of the broom's plan): its folder, its room, its cues (`content/cues/` files of its own prefix), its sounds and music in `audio/` with their lines in `audio/manifest.json`, and its lines in docs/STORY.md; this guide's example then moves to another boss. So no general code, test or default names a boss or is tuned to it: its numbers live in its own data. A test of boss behaviour builds its own small boss (`tests/gameplay/ai/test_ai_phases.gd`); only the tests that walk all content find bosses, through the registry, and pass with none.
 
 ## Allowed files
 
@@ -46,7 +46,7 @@ A boss that needs one of these needs that general piece built first (in the shar
 
 ## Steps
 
-1. Copy `old_broom/` to `content/bosses/<id>/` and rename its files; set `id` to the folder's name and point `scene` and the sprites at the new folder.
+1. Copy `old_broom/` to `content/bosses/<id>/` and rename its files; set `id` to the folder's name, the boss's and each of its staffs' (the spell validator holds a staff in an enemy's `.tres` to the folder's name), and point `scene` and the sprites at the new folder.
 2. Give it a name and its line of lore, and add its name and story to docs/STORY.md.
 3. Write its staffs (the cards, the `wind_up` that telegraphs each attack), its profile and its phases in the `.tres`; set `biomes` to the biome whose runs it ends.
 4. Replace the sprites and the face's `anchor` and `glow`; list each sprite in its `assets.json`; commit the `.uid` and `.import` files Godot creates.

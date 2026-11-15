@@ -38,7 +38,7 @@ func test_it_is_sound() -> void:
 
 func test_its_lore_is_one_short_line() -> void:
 	check(BROOM.lore != "", "it has its line of lore")
-	check_equal(StoryValidator.check_lore(BROOM.resource_path, BROOM.lore, true).size(), 0, "within the story's rules")
+	check_equal(StoryValidator.check_lore(BROOM.resource_path, BROOM.lore, BROOM.boss).size(), 0, "within the story's rules")
 
 
 func test_every_staff_casts_and_wastes_no_card() -> void:
@@ -72,6 +72,10 @@ func test_spring_cleaning() -> void:
 	check(is_equal_approx(sweep.staff.wind_up, 0.6), "winding up 0.6 s")
 	check_equal(sweep.cards.count(&"dash"), 2, "two Sweeps, each with its own wind-up")
 	check_equal(sweep.cards.count(&"fire"), 2, "each leaving a burning trail")
+	var casts: Array = _spells().staff_view(sweep.cards, sweep.staff).get("casts", [])
+	check_equal(casts.size(), 2, "its cycle is two casts")
+	for cast: Dictionary in casts:
+		check(float(cast.get("wind_up", 0.0)) >= sweep.staff.wind_up, "each winds up on its own: %s" % cast.get("wind_up"))
 
 
 func test_it_enters_play_and_changes_phase() -> void:
@@ -82,6 +86,7 @@ func test_it_enters_play_and_changes_phase() -> void:
 	check(body.caster.next_cast_sense(0).moves_caster, "staff 0, the Sweep, moves it")
 	check(body.phases != null, "its phases run")
 	fx.run(body, 2)
+	check_equal(body.phases.current, -1, "no phase at full health")
 	fx.combat.hit(fx.players[0].id, body, BROOM.max_health * 0.5)
 	fx.run(body, 1)
 	check_equal(body.phases.current, 0, "under 55% health, spring cleaning starts")

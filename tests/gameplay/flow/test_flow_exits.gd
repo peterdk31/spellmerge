@@ -69,7 +69,7 @@ func _on_entered(room: StringName) -> void:
 
 
 func _on_built(room: StringName, layout: Node) -> void:
-	built.append([room, RoomPlaces.read(layout).placed.size(), layout.is_inside_tree()])
+	built.append([room, RoomPlaces.read(layout).placed.size(), layout.is_inside_tree(), layout.find_children("*", "RoomZone", true, false).size()])
 
 
 func _on_shown(at: PackedVector2Array, kinds: Array[StringName]) -> void:
@@ -315,6 +315,20 @@ func test_each_room_laid_out_is_told_before_it_is_entered() -> void:
 	for heard: Array in built:
 		check_equal(heard[1], placed, "%s: its placements still in the layout told" % heard[0])
 		check_equal(heard[2], false, "%s: not yet in the tree" % heard[0])
+		check_equal(heard[3], ARENA.places().zone_names.size(), "%s: its zones still in it" % heard[0])
+
+
+## The hub, a room with zones (its prop yard, the lectern's place): `room_built` hands its layout with
+## them still in it, as a room's cover fields will be.
+func test_the_layout_told_still_holds_its_zones() -> void:
+	input.add_virtual_device(0)
+	events.emit_signal("hub_requested", 0)
+	var hub := registry.get_resource(&"rooms", FlowScript.HUB_ROOM_ID) as RoomBase
+	check(hub.places().zone_names.size() >= 2, "the hub has zones")
+	check(built.size() == 1 and built[0][0] == FlowScript.HUB_ROOM_ID, "the hub was told")
+	if built.size() == 1:
+		check_equal(built[0][3], hub.places().zone_names.size(), "its zones still in the layout told")
+	check(flow.world.find_children("*", "RoomZone", true, false).is_empty(), "and none left in the room shown")
 
 
 ## A seat that joins while the cleared room's exits are lit, with everyone else down, holds the

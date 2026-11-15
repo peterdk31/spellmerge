@@ -1,3 +1,4 @@
+@tool
 class_name CoverPatch
 extends Resource
 ## What a cover field puts over its rectangle (ground cover GC2, docs/milestones/ground-cover.md,

@@ -1,3 +1,4 @@
+@tool
 class_name CoverTrigger
 extends Resource
 ## One trigger of a cover kind's state (ground cover GC2, docs/milestones/ground-cover.md, rule 3):

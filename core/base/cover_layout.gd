@@ -17,7 +17,7 @@ extends RefCounted
 ##    deciding the cells whose middles lie in its rectangle: its kind with the chance of its
 ##    `density`, else none (a field of no kind clears them).
 ##
-## No source ever covers a cell under a wall (one a wall's rectangle overlaps, or outside the room) or
+## No source ever covers a cell under a wall (one a wall's rectangle overlaps) or
 ## the cell of a door, a spawn or a placement. The chances come from `hash4`, keyed by the room's id,
 ## the kind's id, the cell and what the roll is for (`ROLL_*`); never `sim.chance`.
 
@@ -50,7 +50,9 @@ const BLOCKED_POINT: int = 2
 
 ## The cover of `layout_root`, the layout `room` built (an instance, in the tree or not, its
 ## placements and zones still in it; left as it is), with the cover kinds `all_kinds` (the registry's
-## folder `cover`, in any order).
+## folder `cover`, in any order). It runs in the editor too: it reads only `room`'s properties (a
+## `RoomBase` is not an editor script, so its methods do not run there) and calls the kinds' methods,
+## which are editor scripts for that.
 static func of(layout_root: Node, room: RoomBase, all_kinds: Array[CoverKind]) -> CoverLayout:
 	var made := CoverLayout.new()
 	for kind in all_kinds:
@@ -204,7 +206,7 @@ func _fill(room_key: int, biome: StringName) -> void:
 				for x in range(maxi(cx - reach, 0), mini(cx + reach + 1, columns)):
 					var dx: int = x - cx
 					var dy: int = y - cy
-					# A disc a little rounder than its reach squared, so a reach of 1 is a plus and 2 a round clump.
+					# A disc a little rounder than its reach squared: a reach of 1 is a 3×3 square, 2 a round clump.
 					if dx * dx + dy * dy > reach * reach + reach:
 						continue
 					var cell: int = y * columns + x

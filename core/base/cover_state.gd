@@ -1,3 +1,4 @@
+@tool
 class_name CoverState
 extends Resource
 ## One state of a cover kind (ground cover GC2, docs/milestones/ground-cover.md, rule 3): how its

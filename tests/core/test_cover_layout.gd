@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## Where a room's ground cover grows (ground cover GC2, docs/milestones/ground-cover.md, rule 1):
 ## `CoverLayout.of` works out the same cover every time, from the game's reading and the editor's
-## (the layout Flow lays out and the room's scene; the kinds from the registry autoload and from its
-## editor scan); no cover lies under a wall or on a door, a spawn or a placement; the fill keeps its
+## (a layout built as Flow builds it and the scene as saved; the kinds from the registry autoload and from its
+## editor scan; the data classes the editor calls are editor scripts); no cover lies under a wall or on a door, a spawn or a placement; the fill keeps its
 ## gaps; a field overrides the fill and one of no kind clears it; a room with the fill off or with no
 ## biome has only its fields. The cover kinds are a test grass (tests/core/fixtures/cover_content),
 ## made to fill the real rooms' biomes, so the rooms are covered whether or not the game has cover yet.
@@ -16,6 +16,9 @@ var KNOWN: Dictionary = {
 	&"element": PackedStringArray(["fire", "frost", "lightning", "mend", "storm", "void"]),
 	&"status": PackedStringArray(["burn", "chill", "gust", "hex", "static"]),
 }
+
+## The hash of the test layout's cells with the test grass at 0.05 (`test_hash4_is_the_engines_hash_of_its_keys`).
+const PINNED_CELLS: int = 33864800
 
 var _registry: RegistryScript
 
@@ -133,8 +136,8 @@ func test_the_editor_scan_finds_the_kinds_the_registry_does() -> void:
 
 ## Every room's cover, worked out again and again, from a fresh build each time and with the kinds in
 ## any order: the same cells. The game's reading (a layout built with the run's chance, as Flow builds
-## it) and the editor's (the scene as saved) agree.
-func test_the_same_layout_every_time_by_the_games_and_the_editors_reading() -> void:
+## it) and the saved scene's (as the editor holds it) agree.
+func test_the_same_layout_every_time_by_the_games_and_the_saved_scenes_reading() -> void:
 	check(_rooms().size() >= 3, "the rooms are found")
 	var sim := Sim.new()
 	for room in _rooms():
@@ -144,7 +147,7 @@ func test_the_same_layout_every_time_by_the_games_and_the_editors_reading() -> v
 		var game: CoverLayout = CoverLayout.of(game_layout, room, kinds)
 		var editor: CoverLayout = CoverLayout.of(editor_layout, room, [kinds[1], kinds[0]] as Array[CoverKind])
 		var again: CoverLayout = CoverLayout.of(game_layout, room, kinds)
-		check_equal(game.cells, editor.cells, "%s: the game's and the editor's cover agree" % room.id)
+		check_equal(game.cells, editor.cells, "%s: the game's and the saved scene's cover agree" % room.id)
 		check_equal(game.cells, again.cells, "%s: the same cover read twice" % room.id)
 		check_equal([game.columns, game.rows], [ceili(room.places().size.x / 16.0), ceili(room.places().size.y / 16.0)], "%s: a cell each 16 px of the room" % room.id)
 		check_equal(game.problems(), PackedStringArray(), "%s: its cover has no problems" % room.id)
@@ -273,15 +276,21 @@ func test_the_clumps_are_keyed_by_room_and_kind() -> void:
 	var both: CoverLayout = CoverLayout.of(_layout(), _room(&"room_one"), [_grass(&"test_meadow", 0.05, 2, 1, 1, &"b_second"), _grass(&"test_meadow", 0.05, 2, 1, 1, &"a_first")] as Array[CoverKind])
 	check_equal(both.kinds[0].id, &"a_first", "the kinds in id order")
 	var first_alone: CoverLayout = CoverLayout.of(_layout(), _room(&"room_one"), [_grass(&"test_meadow", 0.05, 2, 1, 1, &"a_first")] as Array[CoverKind])
+	var kept: bool = true
 	for cell in both.cells.size():
-		if first_alone.cells[cell] != 0:
-			check(both.kind_at(cell).id == &"a_first", "cell %d: the first kind keeps what it filled" % cell)
-			break
+		if first_alone.cells[cell] != 0 and both.kind_at(cell).id != &"a_first":
+			kept = false
+	check(first_alone.count() > 0 and kept, "every cell the first kind fills alone it keeps beside the second")
 	check(both.count() > first_alone.count(), "the second fills more of what is left")
 
 
 func test_hash4_is_the_engines_hash_of_its_keys() -> void:
-	check_equal(CoverLayout.hash4(1, 2, 3, 4), hash(Vector4i(1, 2, 3, 4)), "the engine's hash of a Vector4i")
+	# Pinned: an engine that hashes otherwise would lay every room's cover out anew (and the cover
+	# area's cells, GC5), so a change of engine must show here.
+	check_equal(CoverLayout.hash4(1, 2, 3, 4), 3206438488, "the engine's hash of a Vector4i, pinned")
+	check_equal(CoverLayout.name_hash(&"grass"), 260508453, "a name's hash, pinned")
+	var pinned: CoverLayout = CoverLayout.of(_layout(), _room(&"pinned"), [_grass(&"test_meadow", 0.05)] as Array[CoverKind])
+	check_equal(hash(pinned.cells), PINNED_CELLS, "a fixed room's cover, pinned")
 	var keys: Array[int] = [CoverLayout.hash4(1, 2, 3, 4), CoverLayout.hash4(9, 2, 3, 4), CoverLayout.hash4(1, 9, 3, 4), CoverLayout.hash4(1, 2, 9, 4), CoverLayout.hash4(1, 2, 3, 9)]
 	for i in keys.size():
 		check(keys.find(keys[i]) == i, "each key changes it (%d)" % i)
@@ -298,3 +307,70 @@ func test_cells_and_places() -> void:
 	check_equal(cover.blocked[cover.cell_of(Vector2(330, 170))], CoverLayout.BLOCKED_WALL, "the pillar's cell is a wall's")
 	check_equal(cover.blocked[cover.cell_of(Vector2(100, 100))], CoverLayout.BLOCKED_POINT, "the spawn's cell is a place's")
 	check_equal(cover.blocked[cover.cell_of(Vector2(200, 100))], 0, "open floor")
+
+
+## The data classes the editor calls (its cover preview, GC3) are editor scripts: a resource whose
+## script is not one loads in the editor as a placeholder, whose methods cannot be called.
+func test_the_cover_data_is_editor_scripts() -> void:
+	for path: String in ["res://core/base/cover_kind.gd", "res://core/base/cover_state.gd", "res://core/base/cover_trigger.gd", "res://core/base/cover_patch.gd", "res://core/base/cover_field.gd", "res://core/base/room_zone.gd"]:
+		check((load(path) as GDScript).source_code.begins_with("@tool"), "%s starts with @tool" % path)
+
+
+## One clump alone in an open room: a disc of cells, dx² + dy² ≤ r² + r round its middle, of a reach
+## between half the kind's clump size (rounded up) and all of it.
+func test_a_clump_is_a_disc_of_its_reach() -> void:
+	var layout := own(Node2D.new()) as Node2D
+	for size: int in [1, 2, 3, 4]:
+		var seen: int = 0
+		for attempt in 40:
+			var room: RoomBase = _room(StringName("disc_%d_%d" % [size, attempt]))
+			var cover: CoverLayout = CoverLayout.of(layout, room, [_grass(&"test_meadow", 0.002, size, 0, 0)] as Array[CoverKind])
+			var centres: Array[int] = []
+			var key: int = CoverLayout.name_hash(room.id)
+			for cell in cover.cells.size():
+				if CoverLayout.rolls(0.002, key, CoverLayout.name_hash(&"test_grass"), cell, CoverLayout.ROLL_CLUMP):
+					centres.append(cell)
+			if centres.size() != 1:
+				continue
+			var centre: int = centres[0]
+			var cx: int = centre % cover.columns
+			var cy: int = centre / cover.columns
+			if cx < 6 or cy < 6 or cx >= cover.columns - 6 or cy >= cover.rows - 6:
+				continue
+			seen += 1
+			var reach: int = -1
+			for r in range(0, size + 1):
+				var disc: int = 0
+				var matches: bool = true
+				for cell in cover.cells.size():
+					var dx: int = cell % cover.columns - cx
+					var dy: int = cell / cover.columns - cy
+					var inside: bool = dx * dx + dy * dy <= r * r + r
+					if inside != (cover.cells[cell] != 0):
+						matches = false
+				if matches:
+					reach = r
+			check(reach >= (size + 1) / 2 and reach <= size, "clump size %d: a disc of reach %d" % [size, reach])
+		check(seen > 0, "clump size %d: a lone clump was found" % size)
+
+
+## A wall that covers part of a cell blocks it; a room's edge with no wall is still kept from; a room
+## not a whole number of cells has a last, part cell.
+func test_walls_and_edges_block_whole_cells() -> void:
+	var layout := own(Node2D.new()) as Node2D
+	var walls := StaticBody2D.new()
+	walls.collision_layer = RoomBase.WALL_LAYER
+	walls.position = Vector2(24, 100)
+	layout.add_child(walls)
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(16, 16)
+	shape.shape = rect
+	shape.position = Vector2(8, 8)
+	walls.add_child(shape)
+	var cover: CoverLayout = CoverLayout.of(layout, _room(&"edges"), [_grass(&"test_meadow", 1.0, 2, 1, 0)] as Array[CoverKind])
+	check_equal([cover.columns, cover.rows], [40, 23], "640×360: the last row a part cell")
+	for at: Vector2 in [Vector2(20, 105), Vector2(36, 105), Vector2(20, 120), Vector2(36, 120)]:
+		check_equal(cover.blocked[cover.cell_of(at)], CoverLayout.BLOCKED_WALL, "a wall over part of the cell at %s blocks it" % at)
+	check_equal(cover.blocked[cover.cell_of(Vector2(50, 105))], 0, "the cell beside it is open")
+	check(cover.kind_at(cover.cell_of(Vector2(4, 300))) == null and cover.kind_at(cover.cell_of(Vector2(20, 300))) != null, "the room's edge is kept from as a wall (wall_gap 1)")

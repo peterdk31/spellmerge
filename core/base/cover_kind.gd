@@ -1,3 +1,4 @@
+@tool
 class_name CoverKind
 extends Resource
 ## A kind of ground cover (ground cover GC2, docs/milestones/ground-cover.md, rules 1 and 3): grass,

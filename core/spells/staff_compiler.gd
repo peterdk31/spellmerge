@@ -511,7 +511,7 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 	spell.shots_requested = shots
 	spell.pierce = pierce
 	if carrier.flies() and spell.behaviour(ModifierBase.Behaviour.PLOW) > 0.0:
-		# A battering ram (Plow, boss plan OB11): the bodies it carries do not spend it.
+		# A battering ram (Plow, boss plan OB11): it passes on through what it meets, carrying it.
 		spell.pierce += SpellLimits.PLOW_MOST
 	if spell.shots > 1 and spell.spread <= 0.0:
 		spell.spread = SpellLimits.SPLIT_SPREAD

@@ -253,3 +253,90 @@ func test_a_plows_hit_arms_twice_its_damage() -> void:
 	check_equal(bolt.pierce, plain.pierce + SpellLimits.PLOW_MOST, "a flying shot's carried bodies do not spend it")
 	var dash: CompiledSpell = _world.spells.compile_staff([&"dash"] as Array[StringName], null).casts[0].group.spells[0]
 	check_equal(dash.hit.pin, 0, "a hit with no Plow arms none")
+
+
+func test_two_plowed_dashes_never_carry_each_other() -> void:
+	# Regression (review of OB11): an enemy's Plow dash carries a wizard, who dashes back with its
+	# own; each carrying the other, both ran off ever faster, through the walls.
+	_world.projectiles.set_walls([Rect2(400.0, -400.0, 10.0, 800.0)] as Array[Rect2])
+	var controller := Fixture.Scripted.new()
+	controller.team = ActorsScript.TEAM_ENEMIES
+	controller.aim = Vector2.RIGHT
+	var enemy: Actor = _world.actor(Vector2.ZERO, [&"health", &"hurtbox", &"mover", &"caster"], controller, [[&"lumber", &"plow", &"dash"] as Array[StringName]])
+	var wizard: Actor = _dasher(Vector2(30.0, 0.0), [&"lumber", &"plow", &"dash"])
+	_controller(wizard).aim = Vector2.LEFT
+	wizard.aim = Vector2.LEFT
+	_walk(1)
+	check(enemy.caster.cast(0), "the enemy dashes")
+	var steps: int = 0
+	while not _world.spells.plow().carrying(wizard.id, _world.tag_of(enemy)) and steps < 30:
+		_walk(1)
+		steps += 1
+	check(_world.spells.plow().carrying(wizard.id, _world.tag_of(enemy)), "it carries the wizard")
+	check(wizard.caster.cast(0), "the wizard dashes back into it")
+	var most: int = 0
+	for i in 90:
+		_walk(1)
+		most = maxi(most, _world.spells.plow().carried_count())
+	check_equal(most, 1, "the carrier is never carried by what it carries")
+	for body: Actor in [enemy, wizard]:
+		check(body.global_position.x < 400.0 and body.global_position.x > -400.0, "nobody ran off (%s)" % body.global_position)
+
+
+func test_a_plowed_bolt_pinned_against_a_wall_hits_once_and_pins_once() -> void:
+	# Regression (review of OB11): the bolt caught up with the body it carried at the wall and hit
+	# it again, arming a second pin.
+	_world.projectiles.set_walls([Rect2(150.0, -400.0, 40.0, 800.0)] as Array[Rect2])
+	var shooter: Actor = _dasher(Vector2.ZERO, [&"plow", &"bolt"], [&"health", &"hurtbox"])
+	var target: Actor = _target(Vector2(40.0, -12.0))
+	var pins: Array[bool] = []
+	_world.bus.carry_ended.connect(func(_caster: int, _body: Node, _carrier: int, _way: Vector2, was_pinned: bool, _tag: int) -> void: pins.append(was_pinned))
+	_walk(1)
+	check(shooter.caster.cast(0), "it fires at the wall")
+	_walk(60)
+	check_equal(pins, [true] as Array[bool], "carried into the wall and pinned")
+	var hit: float = _hit_of([&"plow", &"bolt"])
+	check_equal(_lost(target), roundi(hit) + maxi(roundi(hit * SpellLimits.PIN_SHARE), 1), "one hit and one pin of twice it")
+
+
+func test_a_pin_in_the_moves_last_step_still_counts() -> void:
+	# Regression (review of OB11): a pass that ended before the next step lost the pin its mover
+	# found, and shoved the body into the wall instead.
+	var dasher: Actor = _dasher(Vector2.ZERO, [&"slow", &"plow", &"dash"])
+	var target: Actor = _target(Vector2(20.0, 0.0))
+	var ends: Array[bool] = []
+	_world.bus.carry_ended.connect(func(_caster: int, _body: Node, _carrier: int, _way: Vector2, was_pinned: bool, _tag: int) -> void: ends.append(was_pinned))
+	_walk(1)
+	check(dasher.caster.cast(0), "it dashes")
+	var steps: int = 0
+	while _world.spells.plow().carried_count() == 0 and steps < 30:
+		_walk(1)
+		steps += 1
+	_world.spells.plow().pinned(target.id)
+	_world.spells.plow().let_go(_world.tag_of(dasher), dasher.id, -1)
+	check_equal(ends, [true] as Array[bool], "let go pinned")
+	var hit: float = _hit_of([&"slow", &"plow", &"dash"])
+	_world.combat.step(Fixture.STEP)
+	check_equal(_lost(target), roundi(hit) + maxi(roundi(hit * SpellLimits.PIN_SHARE), 1), "the pass and the pin")
+
+
+func test_a_body_that_stops_being_a_target_is_dropped() -> void:
+	# A downed body leaves the targets (its hurtbox goes, decision 21): its carry is dropped, with no
+	# pin and no shove.
+	var dasher: Actor = _dasher(Vector2.ZERO, [&"lumber", &"plow", &"dash"])
+	var target: Actor = _target(Vector2(30.0, 0.0))
+	var ends: Array[Vector2] = []
+	_world.bus.carry_ended.connect(func(_caster: int, _body: Node, _carrier: int, way: Vector2, was_pinned: bool, _tag: int) -> void:
+		check(not was_pinned, "not pinned")
+		ends.append(way))
+	_walk(1)
+	check(dasher.caster.cast(0), "it dashes")
+	var steps: int = 0
+	while _world.spells.plow().carried_count() == 0 and steps < 30:
+		_walk(1)
+		steps += 1
+	target.hurtbox.set_enabled(false)
+	var at: Vector2 = target.global_position
+	_walk(5)
+	check_equal(ends, [Vector2.ZERO] as Array[Vector2], "dropped, no shove")
+	check(target.global_position.distance_to(at) < 1.0, "and it stays where it was (%s -> %s)" % [at, target.global_position])

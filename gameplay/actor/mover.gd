@@ -31,7 +31,8 @@ extends ActorComponent
 ## `Plow.velocity_of`, as far as what carries it moved): done to it too, and its walk loses what
 ## goes back into its carrier, so it slips off sideways or not at all. A carried step held up head on
 ## along the way it is carried is a pin (`held_up`, `Plow.pinned`); a body whose carried body was
-## pinned ends its dash with that card there (`carry_ended`), as if it met the wall itself. A swap card that names the actor as its
+## pinned ends its dash with that card there (`carry_ended`), as if it met the wall itself. A swap
+## card that names the actor as its
 ## target (`target_move_requested`) puts it there at once. While the actor is down it stands: its
 ## moves end unanswered and new requests are ignored.
 ##
@@ -133,7 +134,7 @@ func step(delta: float) -> void:
 		var walk: Vector2 = actor.intent.move.limit_length(1.0) * speed * pace
 		if carry != Vector2.ZERO:
 			# It cannot walk back into what carries it, only out to the side (or on ahead).
-			var way: Vector2 = carry.normalized()
+			var way: Vector2 = actor.spells.plow().way_of(actor.id)
 			walk -= way * minf(walk.dot(way), 0.0)
 		velocity += walk
 	velocity += carry
@@ -163,9 +164,10 @@ func is_dashing() -> bool:
 func held_up(asked: Vector2, got: Vector2) -> void:
 	var carry: Vector2 = _carry()
 	if carry != Vector2.ZERO:
-		var along: Vector2 = carry.normalized()
+		var along: Vector2 = actor.spells.plow().way_of(actor.id)
 		var pushed: float = asked.dot(along)
-		if pushed > 0.0 and got.dot(along) < pushed * HEAD_ON_SHARE:
+		# Only while the carry itself pushes it on (not a carrier slowing, holding it back).
+		if carry.dot(along) > 0.0 and pushed > 0.0 and got.dot(along) < pushed * HEAD_ON_SHARE:
 			# Pinned against what it slides on (Plow, boss plan OB11).
 			actor.spells.plow().pinned(actor.id)
 	for at in _count:

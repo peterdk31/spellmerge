@@ -116,7 +116,7 @@ enum Behaviour {
 	## against what it slides on (a wall, a blocking prop's ground, the Wall card's stones), it takes
 	## `SpellLimits.PIN_SHARE` of the hit (`HitProfile.pin`) and the move ends there; walking out
 	## sideways past the pass lets it go. Never a downed body or one that cannot move (a prop); on
-	## a flying shot the bodies it carries do not spend it (a battering ram, `SpellLimits.PLOW_MOST`).
+	## a flying shot it passes more (a battering ram, `SpellLimits.PLOW_MOST`) and never hits a body it carries again.
 	## All of it is `core/spells/plow.gd`; the pin and the shove are Combat's. Strength unused (1).
 	PLOW,
 }

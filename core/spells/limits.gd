@@ -174,8 +174,8 @@ const SLAM_SHARE: float = 1.0
 ## A body a Plow hit carries, pinned against a wall, takes this share of the hit's damage (at least
 ## 1): twice heavy's slam (boss plan OB11, decision 10).
 const PIN_SHARE: float = 2.0
-## A flying shot with Plow passes through this many more bodies than its pierce, carrying each (a
-## battering ram, boss plan OB11): its pierce is raised by this many.
+## A flying shot with Plow passes through this many more of what it hits than its pierce, carrying
+## the bodies (a battering ram, boss plan OB11): its pierce is raised by this many.
 const PLOW_MOST: int = 8
 ## A carried body slips off when it is this many pixels farther aside of its carrier's way than the
 ## pass that struck it reaches (its own size in that), so a step's drift lets nothing go.

@@ -958,6 +958,9 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 	var profile: HitProfile = spells.hit_profile(tag, shot) if spells != null else null
 	if profile == null:
 		return
+	# A shot never hits a body it carries again (Plow, `Plow.rides_on`).
+	if shot >= 0 and spells.plow().carried_count() > 0 and spells.plow().rides_on(row, shot):
+		return
 	var saved_tag: int = _tag
 	var saved_slot: int = _slot
 	var saved_spell: int = _hit_spell
@@ -1015,7 +1018,7 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 	if profile.element_id != &"" and _react_wait[row] <= 0.0:
 		reaction = _reaction_for(row, profile.element_id)
 	# A body Plow now carries (Spells heard the hit first) is moved by the carry, not pushed at once.
-	var carried: bool = profile.pin > 0 and spells != null and spells.plow().carrying(row, _tag)
+	var carried: bool = spells != null and spells.plow().carried_count() > 0 and spells.plow().carrying(row, _tag)
 	var push: float = strength
 	if carried:
 		strength = 0.0
@@ -1027,7 +1030,7 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 	var discharged: bool = _discharged
 	if _same(row, node):
 		if carried:
-			_pin[row] = maxi(roundi(profile.pin * power), 1) if power != 1.0 else profile.pin
+			_pin[row] = maxi(roundi(profile.pin * power), 1)
 			_pin_by[row] = by
 			_pin_tag[row] = _tag
 			_pin_push[row] = push

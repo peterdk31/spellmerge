@@ -3034,6 +3034,9 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null:
 		return
+	# A shot never hits a body it carries again (Plow: it catches up with it at a wall).
+	if shot >= 0 and _plow.carried_count() > 0 and _plow.rides_on(projectiles.target_owner_of(target), shot):
+		return
 	# `relay` takes on what the actor hit last cast, before Combat reads this hit's profile (Spells
 	# hears `projectile_hit` first: its autoload comes before Combat's).
 	_relay(spell, target, tag, shot)

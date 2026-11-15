@@ -265,7 +265,8 @@ func test_a_by_any_seat_on_the_lit_stone_starts_the_run() -> void:
 		var hub_world: Node = flow.world
 		_press_a(presser)
 		check_equal(flow.mode, FlowScript.MODE_RUN, "seat %d: A starts the run" % presser)
-		check_equal(flow.room_id, flow.room_id_to_play, "seat %d: in the run's room" % presser)
+		var first: RunNode = (root.get_node("Run").call("room_now") as RunNode)
+		check(first != null and flow.room_id == first.room, "seat %d: in the first room of the run's map" % presser)
 		check(flow.world != hub_world, "seat %d: a new world" % presser)
 		check(flow.enemies_left() > 0, "seat %d: the room's enemies stand" % presser)
 		check_equal(_wizards().size(), 4, "seat %d: everyone plays" % presser)
@@ -379,6 +380,36 @@ func test_a_run_from_the_hub_still_downs_for_good() -> void:
 	wizard.health.take(wizard.health.max_health)
 	flow.step(_room().stand_up_after + DT)
 	check(wizard.is_down(), "in a run, nobody stands up by themselves")
+
+
+## A run whose map cannot be made is found only once the hub has gone (the map is made from the run's
+## seed, at its start): the party goes back to the hub, as at a run's end, and the stone works again.
+func test_a_run_with_no_map_from_the_stone_goes_back_to_the_hub() -> void:
+	var rules := MapRules.new()
+	rules.biome = &"test_hub_nowhere"
+	rules.depth_min = 1
+	rules.depth_max = 1
+	rules.kinds = [KindRule.make(&"fight", 0, -1)] as Array[KindRule]
+	var nowhere := RunDefinition.new()
+	nowhere.id = &"test_hub_nowhere"
+	nowhere.biomes = [rules] as Array[MapRules]
+	root.get_node("Registry").call("add", &"runs", nowhere)
+	var was: StringName = flow.run_id_to_play
+	flow.run_id_to_play = nowhere.id
+	_start([0])
+	_place(0, true)
+	_tick()
+	_press_a(0)
+	check_equal(flow.state, FlowScript.State.IDLE, "no run: the hub went first")
+	from_frames()
+	flow.run_id_to_play = was
+	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
+	check_equal(flow.room_id, FlowScript.HUB_ROOM_ID, "the hub's room")
+	check_equal(_wizards().size(), 1, "the wizard is there")
+	_place(0, true)
+	_tick()
+	_press_a(0)
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the stone starts the run again")
 
 
 func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:

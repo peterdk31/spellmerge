@@ -1,11 +1,13 @@
 extends Node
-## Flow (autoload `Flow`): starts a run's room, stands the enemies the room lists, announces
+## Flow (autoload `Flow`): starts a run's room, stands the enemies the run puts in it, announces
 ## `room_entered` and `room_cleared`, and ends the run when the room is won or every player is
 ## down. No waves (boss OB2a, docs/milestones/boss-old-broom.md, decision 30): a run is a path of
-## rooms; the paths and their exits come in OB2b, door voting and the rest of the run in M3.
+## rooms through its generated map (run generation, docs/milestones/run-generation.md); the exits
+## come in RG4, door voting and the rest of the run in M3.
 ##
 ## Starting: `play_requested(player)` (the tests, the bots, the online spike). Flow
-## asks `core/registry` for the room (`rooms` / `arena_01`), checks that
+## begins the run `run_id_to_play` (`crypt`): the run area makes its map and names the first room
+## and what stands in it (`run_begun`, answered by `run_room_chosen`; RG3), checks that
 ## the start recipes compile, builds one `Node2D` world (room scene, a wizard for every joined player,
 ## the room's enemies, a camera) and makes it the current scene, so the menu goes away. The
 ## whole thing is built in the same frame, far inside the 10 seconds allowed.
@@ -19,16 +21,16 @@ extends Node
 ## `player_joined` / `player_left` and Flow adds a wizard at the room's spawn for
 ## that slot, or removes it (the run goes on; nobody waits for anyone).
 ##
-## A room's fight (boss OB2a, decision 31): the enemies its data lists (`RoomBase.enemies`, ids of
-## `EnemyBase.FOLDERS`: enemies and bosses) stand at its enemy spawns as it starts, round the spawns
-## in turn (`stacked_position` when one is used again). When the last is down, `room_cleared`; with
-## no room after it (every room today; the paths come in OB2b) the run is won, and RUN_WON_DELAY
-## seconds later it ends as a lost one does: from the hub's stone, back to the hub; from
-## `play_requested`, the room again. A room that lists no enemy is won as it starts.
+## A room's fight (boss OB2a, decision 31; run generation RG3): the enemies the run's map puts in it
+## (`run_room_chosen`, ids of `EnemyBase.FOLDERS`: enemies and bosses; rooms hold layout only) stand
+## at its enemy spawns as it starts, round the spawns in turn (`stacked_position` when one is used
+## again). When the last is down, `room_cleared`; with no way on yet (the exits come in RG4) the run
+## is won, and RUN_WON_DELAY seconds later it ends as a lost one does: from the hub's stone, back to
+## the hub; from `play_requested`, a new run. A room the run puts nothing in is won as it starts.
 ##
 ## Restart: when every wizard is down, a timer of RESTART_DELAY seconds runs, then
-## a fresh world replaces the old one: new wizards at full health, the room's enemies again, no
-## projectiles left, and `Spells` cleared (every cooldown and build is forgotten; each
+## a fresh world replaces the old one: a new run (its own seed, so its own map), new wizards at full
+## health, no projectiles left, and `Spells` cleared (every cooldown and build is forgotten; each
 ## new wizard builds its start staffs again).
 ##
 ## Staffs (staffs A6a, docs/milestones/M2-staffs.md; living staffs H3; owner 2026-11-01: one
@@ -131,9 +133,12 @@ const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const LoadTask := preload("res://core/loading/load_task.gd")
 
 const PLAYER_SLOTS: int = 4
-## The rooms' registry folder, and the room a run starts in unless `room_id_to_play` says otherwise.
+## The rooms' registry folder.
 const ROOM_FOLDER: StringName = &"rooms"
-const DEFAULT_ROOM_ID: StringName = &"arena_01"
+## The run definitions' registry folder (content/runs), and the run a run of rooms is unless
+## `run_id_to_play` says otherwise.
+const RUN_FOLDER: StringName = &"runs"
+const DEFAULT_RUN_ID: StringName = &"crypt"
 ## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
 ## The cards each staff starts with in Play: A, X, Y, B (owner, 2026-11-05: dash and a bolt).
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"bolt"], [], []]
@@ -202,7 +207,7 @@ enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); `sandbox`, worked
 ## out from `mode` (read only).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_places"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_places", &"_chosen_room", &"_chosen_enemies"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -224,10 +229,11 @@ var spells: SpellsScript = null
 ## current scene (the main menu is freed).
 var world_parent: Node = null
 ## What the next run is made of, by registry id. Later features (the lectern, a loadout)
-## set these; the rooms, enemies and spell components themselves are content found by folder, so a
-## new one needs no change here. `wizard_scene` is the wizard every player gets (its art is in
+## set these; the runs, rooms, enemies and spell components themselves are content found by folder,
+## so a new one needs no change here. `run_id_to_play` is the run definition a run of rooms begins
+## (its rooms and what stands in them are its map's). `wizard_scene` is the wizard every player gets (its art is in
 ## the scene). The start recipes are component ids (a recipe as in `core/spells`).
-var room_id_to_play: StringName = DEFAULT_ROOM_ID
+var run_id_to_play: StringName = DEFAULT_RUN_ID
 var start_cards: Array = DEFAULT_START_CARDS.duplicate(true)
 ## Play's bag (PLAY_BAG unless a test sets another).
 var play_bag: Array[StringName] = PLAY_BAG.duplicate()
@@ -280,6 +286,9 @@ var yard: PropYard = PropYard.new()
 var hub: HubRules = HubRules.new()
 ## True while the run in progress was started from the hub's stone: its end goes back there.
 var _back_to_hub: bool = false
+## Scratch: the run area's answer to `run_begun` (`run_room_chosen`), read by the same `start_run`.
+var _chosen_room: StringName = &""
+var _chosen_enemies: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -323,6 +332,7 @@ func _ready() -> void:
 	events.player_revived.connect(_on_player_revived)
 	events.player_joined.connect(_on_player_joined)
 	events.player_left.connect(_on_player_left)
+	events.run_room_chosen.connect(_on_run_room_chosen)
 
 
 ## Advance the intro and the run's end (restart) timer by `delta` seconds; the prop yard; in the hub,
@@ -348,23 +358,27 @@ func step(delta: float) -> void:
 			# Back in the hub the party is ready for a new run: nothing of the run comes back
 			# with it, its staffs neither (owner, 2026-11-10). The hub is the arsenal the next
 			# run's tools are picked from.
-			_back_to_hub = false
-			if frames != null:
-				# The hub is a run's start of its own: asked of the frames service, which sends it
-				# between ticks, the same on every machine, and begins a new recording there
-				# when this run is recorded (a recording never grows past one stretch of play).
-				var starter: int = _starter
-				stop_run()
-				frames.restart(&"hub_requested", starter)
-				return
-			mode = MODE_HUB
-			if not start_run(_starter):
-				push_warning("Flow: the hub did not start again after the run, so the run is over.")
-				stop_run()
+			_return_to_hub(_starter)
 		elif not start_run(_starter):
 			# A warning, not an error: the run ends cleanly and a test provokes this on purpose.
 			push_warning("Flow: the restart failed, so the run is over; Play starts a new one.")
 			stop_run()
+
+
+## The party goes back to the hub, for seat `starter`, with nothing of the run (the run's end).
+func _return_to_hub(starter: int) -> void:
+	_back_to_hub = false
+	if frames != null:
+		# The hub is a run's start of its own: asked of the frames service, which sends it
+		# between ticks, the same on every machine, and begins a new recording there
+		# when this run is recorded (a recording never grows past one stretch of play).
+		stop_run()
+		frames.restart(&"hub_requested", starter)
+		return
+	mode = MODE_HUB
+	if not start_run(starter):
+		push_warning("Flow: the hub did not start again after the run, so the run is over.")
+		stop_run()
 
 
 ## True while the run's end (a restart, or the way back to the hub) is counting down.
@@ -429,13 +443,22 @@ func _seat_of(wizard: Node) -> int:
 ## Build the world and start the run now, replacing any run in progress. `party` (as `_party_of`
 ## makes it; items I4) gives each seat's wizard the player it was before, everything it held (from
 ## the hub into a run, or the hub begun anew); a seat with no loadout there, and all of them with no
-## `party`, starts with what its mode gives (its staffs, start cards and bag). Returns
-## false (and starts nothing) when content is missing or no player has a device.
+## `party`, starts with what its mode gives (its staffs, start cards and bag). A run of rooms
+## (`MODE_RUN`) is the run `run_id_to_play`, its room the first of the map the run area makes
+## (`_begin_run_of_rooms`). Returns false (and starts nothing) when content is missing or no player
+## has a device; a run of rooms whose map cannot be made is found only after the last run's world
+## went, so Flow is idle then.
 func start_run(requester: int, party: PartyLoadout = null) -> bool:
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id_for_mode()) as RoomBase if registry != null else null
-	if room == null or room.scene == null:
-		push_warning("Flow: the room is missing from the registry, so no run starts.")
-		return false
+	var room: RoomBase = null
+	if mode == MODE_RUN:
+		if registry == null or not (registry.get_resource(RUN_FOLDER, run_id_to_play) is RunDefinition):
+			push_warning("Flow: the run '%s' is missing from the registry, so no run starts." % run_id_to_play)
+			return false
+	else:
+		room = registry.get_resource(ROOM_FOLDER, _room_id_for_mode()) as RoomBase if registry != null else null
+		if room == null or room.scene == null:
+			push_warning("Flow: the room is missing from the registry, so no run starts.")
+			return false
 	if spells == null:
 		push_warning("Flow: the Spells autoload is missing, so no run starts.")
 		return false
@@ -453,7 +476,6 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	_restart_left = -1.0
 	_stand_up_left.fill(-1.0)
 	_clear_run()
-	_room = room
 	_wizard_scene = wizard_scene
 	# The run starts from a fresh game's state (online-ready N3b): the one clock from 0, and every
 	# service as a fresh one's (`Tick.begin_run`; the autoload, found on use).
@@ -462,6 +484,12 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 		push_error("Flow: the Tick autoload is missing, so the run starts on the last run's state.")
 	else:
 		tick.begin_run()
+	if mode == MODE_RUN:
+		room = _begin_run_of_rooms()
+		if room == null:
+			stop_run()
+			return false
+	_room = room
 	# Built once: what is where is read from the layout shown (props W8c).
 	var layout: Node = room.build(tick.sim if tick != null else null)
 	_places = RoomPlaces.read(layout)
@@ -485,7 +513,7 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	contents.stand(new_world, _places)
 	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
 	if mode == MODE_RUN:
-		_stand_room_enemies(new_world, room)
+		_stand_room_enemies(new_world, room, _chosen_enemies)
 	world = new_world
 	room_id = room.id
 	state = State.RUNNING
@@ -503,14 +531,34 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	return true
 
 
-## The room the next run of `mode` is in: the sandbox's, the hub's, or `room_id_to_play`.
-func room_id_for_mode() -> StringName:
-	match mode:
-		MODE_SANDBOX:
-			return SANDBOX_ROOM_ID
-		MODE_HUB:
-			return HUB_ROOM_ID
-	return room_id_to_play
+## The room the next run of the sandbox or the hub is in (a run of rooms' is its map's).
+func _room_id_for_mode() -> StringName:
+	return SANDBOX_ROOM_ID if mode == MODE_SANDBOX else HUB_ROOM_ID
+
+
+## A run of rooms begins (on the run's fresh state, after `Tick.begin_run`): the run area makes the
+## map of `run_id_to_play` and answers with its first room and what stands in it (`run_begun`,
+## `run_room_chosen`; run generation RG3). The room, or null (with a warning) when no answer came or
+## the registry lacks the room it names.
+func _begin_run_of_rooms() -> RoomBase:
+	_chosen_room = &""
+	_chosen_enemies = [] as Array[StringName]
+	if events != null:
+		events.run_begun.emit(run_id_to_play)
+	if _chosen_room == &"":
+		push_warning("Flow: the run '%s' gave no room (its map could not be made), so no run starts." % run_id_to_play)
+		return null
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, _chosen_room) as RoomBase
+	if room == null or room.scene == null:
+		push_warning("Flow: the run's room '%s' is missing from the registry, so no run starts." % _chosen_room)
+		return null
+	return room
+
+
+## The run area's answer: the room of the run's map the party enters, and what stands in it.
+func _on_run_room_chosen(room: StringName, enemies: Array[StringName]) -> void:
+	_chosen_room = room
+	_chosen_enemies = enemies.duplicate()
 
 
 ## End the run in progress and free its world. Flow is idle again, so the next
@@ -700,6 +748,11 @@ func _start_run_from_stone(seat: int) -> void:
 	mode = MODE_RUN
 	_back_to_hub = true
 	if not start_run(seat, party):
+		if state == State.IDLE:
+			# The hub went before the run's map was found wanting: the party goes back there.
+			push_warning("Flow: the run from the stone did not start, so the party goes back to the hub.")
+			_return_to_hub(seat)
+			return
 		# It refused before freeing anything (content missing): the hub stands as it was.
 		push_warning("Flow: the run from the stone did not start, so the party stays in the hub.")
 		_back_to_hub = false
@@ -846,8 +899,8 @@ func _on_enemy_died(_player: int, enemy: Node, _position: Vector2, _shot: int) -
 	_check_room_won()
 
 
-## A run's room with no enemy left is won (decision 30): `room_cleared`, and with no room after it
-## (every room until OB2b's paths) the run ends RUN_WON_DELAY seconds later, as a lost one does.
+## A run's room with no enemy left is won (decision 30): `room_cleared`, and with no way on yet (the
+## exits of RG4) the run ends RUN_WON_DELAY seconds later, as a lost one does.
 func _check_room_won() -> void:
 	if not _enemies.is_empty() or state != State.RUNNING or mode != MODE_RUN:
 		return
@@ -1081,19 +1134,18 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 	_wizards.append(wizard)
 
 
-## The enemies the room lists (`RoomBase.enemies`) stand at its enemy spawns, round them in turn.
-func _stand_room_enemies(parent: Node2D, room: RoomBase) -> void:
+## The enemies the run puts in the room (`enemies`: ids, one per body) stand at its enemy spawns,
+## round them in turn. An id the registry has no enemy or boss for stands nothing (a warning).
+func _stand_room_enemies(parent: Node2D, room: RoomBase, enemies: Array[StringName]) -> void:
 	_enemies.clear()
 	var placed: int = 0
-	for line: RoomEnemies in room.enemies:
-		if line == null:
-			continue
-		var data: EnemyBase = _enemy_data_of(line.enemy)
+	for id: StringName in enemies:
+		var data: EnemyBase = _enemy_data_of(id)
 		if data == null or data.scene == null:
-			push_warning("Flow: the room '%s' lists '%s', which the registry has no enemy or boss for." % [room.id, line.enemy])
+			push_warning("Flow: the run puts '%s' in the room '%s', which the registry has no enemy or boss for." % [id, room.id])
 			continue
-		_spawn_enemies(parent, data, line.count, placed)
-		placed += line.count
+		_spawn_enemies(parent, data, 1, placed)
+		placed += 1
 
 
 ## The enemy or boss `enemy_id` (`EnemyBase.FOLDERS`, in turn), or null.

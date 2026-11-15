@@ -62,6 +62,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `player_stats_changed` | `player` (the seat's own body, also while it is away) | `hud` |
 | `player_joined`, `player_left` | `coop` | `difficulty`, `flow`, `hud` |
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
+| `run_begun` | `flow` (a run of rooms begins, on its fresh state) | `run` (makes the run's map) |
+| `run_room_chosen` | `run` (the map's room the party enters, and what stands in it) | `flow` (builds it) |
 | `room_entered` | `flow` | `ai`, `coop`, `difficulty`, `hud`, `feel` (its walls' colours for motes; the party camera jumps to the new room) |
 | `room_cleared` | `flow` | `rewards`, `run` |
 | `sandbox_changed` | `flow` | `hud` |

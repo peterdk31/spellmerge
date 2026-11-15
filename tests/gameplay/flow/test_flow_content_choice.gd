@@ -1,6 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## A run is made of the content flow is told to use (by registry id), not of fixed names, so a new
-## room, enemy, start card, staff or wizard scene needs no edit in `flow.gd`. Uses the real autoloads.
+## run, room, enemy, start card, staff or wizard scene needs no edit in `flow.gd`. Uses the real
+## autoloads.
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 
@@ -19,7 +20,7 @@ func before_each() -> void:
 func after_each() -> void:
 	flow.world_parent = null
 	flow.stop_run()
-	flow.room_id_to_play = FlowScript.DEFAULT_ROOM_ID
+	flow.run_id_to_play = FlowScript.DEFAULT_RUN_ID
 	flow.start_cards = FlowScript.DEFAULT_START_CARDS.duplicate(true)
 	flow.play_bag = FlowScript.PLAY_BAG.duplicate()
 	flow.mode = FlowScript.MODE_RUN
@@ -28,14 +29,14 @@ func after_each() -> void:
 
 
 func test_the_defaults_are_the_m1_content() -> void:
-	check_equal(flow.room_id_to_play, &"arena_01", "default room")
+	check_equal(flow.run_id_to_play, &"crypt", "default run")
 	check_equal(flow.start_cards, [[&"dash"], [&"bolt"], [], []], "default start cards: dash on A, bolt on X")
 	check_equal(flow.play_bag, [&"dash", &"bolt"] as Array[StringName], "Play's bag: dash and bolt")
 
 
-func test_an_unknown_room_starts_no_run() -> void:
-	flow.room_id_to_play = &"no_such_room"
-	check(not flow.start_run(0), "a missing room must not start a run")
+func test_an_unknown_run_starts_no_run() -> void:
+	flow.run_id_to_play = &"no_such_run"
+	check(not flow.start_run(0), "a missing run must not start a run")
 	check_equal(flow.state, FlowScript.State.IDLE, "flow stays idle")
 
 

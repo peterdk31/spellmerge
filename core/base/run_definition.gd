@@ -16,6 +16,10 @@ extends Resource
 @export var biomes: Array[MapRules] = []
 ## How it grows harder with depth and players (run generation RG5; null: the same everywhere).
 @export var scaling: RunScaling = null
+## What the save may unlock in its rules (run generation RG6, `RunRuleChange`: a save flag and the
+## number it changes), applied in this order when the run's unlocks hold their flags
+## (`changed_by`). None yet: the first arrive with meta progression.
+@export var changes: Array[RunRuleChange] = []
 
 
 ## Its name for people: `display_name`, else its id in words.
@@ -31,9 +35,59 @@ func room_scale(rules: MapRules, depth: int, players: int) -> float:
 	return scaling.room_scale(depth, rules.depth_max - 1, players)
 
 
+## The save flags its rule changes name, each once, in their order.
+func flags() -> Array[StringName]:
+	var found: Array[StringName] = []
+	for change: RunRuleChange in changes:
+		if change != null and change.flag != &"" and not found.has(change.flag):
+			found.append(change.flag)
+	return found
+
+
+## The definition a run plays with `unlocks` (the run's, core/sim/run_unlocks.gd): itself when they
+## hold none of its changes' flags, else a copy of its own (`copied`) with each change whose flag
+## they hold applied, in order. The registry's definition is never changed.
+func changed_by(unlocks: RunUnlocks) -> RunDefinition:
+	var made: RunDefinition = null
+	for change: RunRuleChange in changes:
+		if change == null or unlocks == null or not unlocks.has(change.flag):
+			continue
+		if made == null:
+			made = copied()
+		change.apply_to(made)
+	return made if made != null else self
+
+
+## A copy of its own, down to every biome's rules, their kind rules and the scaling's curves (the
+## changes are shared: read-only), so changing it changes nothing else.
+func copied() -> RunDefinition:
+	var made: RunDefinition = duplicate(false) as RunDefinition
+	var biomes_made: Array[MapRules] = []
+	for rules: MapRules in biomes:
+		var rules_made: MapRules = rules.duplicate(false) as MapRules if rules != null else null
+		if rules_made != null:
+			var kinds_made: Array[KindRule] = []
+			for rule: KindRule in rules.kinds:
+				var rule_made: KindRule = rule.duplicate(false) as KindRule if rule != null else null
+				if rule_made != null:
+					rule_made.not_after = rule.not_after.duplicate()
+				kinds_made.append(rule_made)
+			rules_made.kinds = kinds_made
+		biomes_made.append(rules_made)
+	made.biomes = biomes_made
+	if scaling != null:
+		made.scaling = scaling.duplicate(false) as RunScaling
+		if scaling.per_depth != null:
+			made.scaling.per_depth = scaling.per_depth.duplicate(false) as ScaleCurve
+		if scaling.per_player != null:
+			made.scaling.per_player = scaling.per_player.duplicate(false) as ScaleCurve
+	made.changes = changes.duplicate()
+	return made
+
+
 ## What is wrong with the definition, one line each (empty when every biome's rules can make a map
-## from `content`): no id, no biome, an empty entry, a biome twice, each biome's `MapRules.problems`
-## and the scaling's (`RunScaling.problems`).
+## from `content`): no id, no biome, an empty entry, a biome twice, each biome's `MapRules.problems`,
+## the scaling's (`RunScaling.problems`) and the rule changes' (`change_problems`).
 func problems(content: RunContent) -> PackedStringArray:
 	var found := PackedStringArray()
 	var name: String = String(id) if id != &"" else "A run"
@@ -54,4 +108,36 @@ func problems(content: RunContent) -> PackedStringArray:
 			found.append("%s: %s" % [name, line])
 	if scaling != null:
 		found.append_array(scaling.problems(name))
+	if found.is_empty():
+		found.append_array(change_problems(content))
+	return found
+
+
+## What is wrong with its rule changes, one line each: an empty entry, each change's own
+## (`RunRuleChange.problems`), and the rules a flag leaves that can make no map: with each flag
+## alone, and with every flag at once (each set of flags between is not tried).
+func change_problems(content: RunContent) -> PackedStringArray:
+	var found := PackedStringArray()
+	var name: String = String(id) if id != &"" else "A run"
+	for change: RunRuleChange in changes:
+		if change == null:
+			found.append("%s: an empty rule change." % name)
+		else:
+			found.append_array(change.problems(self, name))
+	if not found.is_empty():
+		return found
+	var sets: Array = []
+	for flag: StringName in flags():
+		sets.append([flag] as Array[StringName])
+	if sets.size() > 1:
+		sets.append(flags())
+	for flag_set: Array in sets:
+		var with: Array[StringName] = []
+		with.assign(flag_set)
+		var changed: RunDefinition = changed_by(RunUnlocks.of(with))
+		if changed == self:
+			continue
+		changed.changes = [] as Array[RunRuleChange]
+		for line: String in changed.problems(content):
+			found.append("With %s unlocked: %s" % [", ".join(PackedStringArray(with)), line])
 	return found

@@ -34,6 +34,10 @@ var tick: int = 0
 ## What the run plays by (core/sim/session_rules.gd, online-ready N11): set at the run's start
 ## (`Tick.begin_run`), from a replay's header while one plays, else from this machine's settings.
 var rules: SessionRules = SessionRules.defaults()
+## The save flags the run plays by (core/sim/run_unlocks.gd, run generation RG6): set at the run's
+## start (`Tick.begin_run`), from a replay's header while one plays, else from this machine's save;
+## the Run area changes the run's rules by them. Never this machine's save during a run.
+var unlocks: RunUnlocks = RunUnlocks.new()
 ## Ticks the whole simulation still stands still (online-ready N4: the game-wide stop of a downed
 ## wizard or a boss's death, `hold`). Nothing steps then but the input frames; the drawing runs on.
 var hold_left: int = 0

@@ -194,3 +194,82 @@ func test_the_map_is_made_for_the_run_s_players_and_each_room_s_scale_told_first
 		check(now.scale > map.first().scale, "a row deeper, harder: %s after %s" % [now.scale, map.first().scale])
 	events.disconnect("run_room_scaled", on_scaled)
 	events.disconnect("run_room_chosen", on_chosen)
+
+
+## Run generation RG6: a run of the crypt's rules with one rule change, every room as deep as the
+## crypt allows once `test_deeper` is unlocked, registered once under an id of its own.
+func _unlockable() -> StringName:
+	var registry: Node = root.get_node("Registry")
+	var id: StringName = &"test_unlockable_crypt"
+	if registry.call("get_resource", &"runs", id) == null:
+		var crypt := registry.call("get_resource", &"runs", &"crypt") as RunDefinition
+		var made: RunDefinition = crypt.copied()
+		made.id = id
+		var deepest: float = float(crypt.biomes[0].depth_max)
+		made.changes = [
+			RunRuleChange.make(&"test_deeper", RunRuleChange.Target.DEPTH_MIN, deepest),
+			RunRuleChange.make(&"test_deeper", RunRuleChange.Target.SCALE_PLAYER_END, 2.0),
+		] as Array[RunRuleChange]
+		check_equal(made.problems(registry.call("run_content") as RunContent), PackedStringArray(), "the unlockable run is sound")
+		registry.call("add", &"runs", made)
+	return id
+
+
+func _map_of(definition: RunDefinition, seed: int, players: int) -> RunMap:
+	var registry: Node = root.get_node("Registry")
+	return RunGenerator.generate(definition, registry.call("run_content") as RunContent, Sim.seeded(seed), players)
+
+
+## Run generation RG6: this machine's unlocks are the flags of its save that some run's rule change
+## names, nothing else of the save.
+func test_this_machine_s_unlocks_are_its_save_s_flags_a_rule_change_names() -> void:
+	var id: StringName = _unlockable()
+	var path: String = "user://test_run_unlocks.cfg"
+	DirAccess.remove_absolute(path)
+	var kept: SaveFile = run.get(&"save") as SaveFile
+	run.set(&"save", SaveFile.new(path))
+	check((run.call("unlocks_now") as RunUnlocks).is_empty(), "a new save: none")
+	SaveFile.new(path).set_flag(&"intro_seen")
+	check((run.call("unlocks_now") as RunUnlocks).is_empty(), "a flag no rule change names travels not")
+	SaveFile.new(path).set_flag(&"test_deeper")
+	check_equal((run.call("unlocks_now") as RunUnlocks).flags, [&"test_deeper"] as Array[StringName], "a flag the run %s's change names" % id)
+	var frames: Node = root.get_node("Frames")
+	check_equal((frames.call("next_run_unlocks") as RunUnlocks).flags, [&"test_deeper"] as Array[StringName], "the frames service asks the area")
+	tick.begin_run()
+	check_equal(tick.sim.unlocks.flags, [&"test_deeper"] as Array[StringName], "and a run's start takes them")
+	run.set(&"save", kept)
+	DirAccess.remove_absolute(path)
+
+
+## Run generation RG6: the map is made by the rules the run's unlocks leave (the run's start's,
+## `Sim.unlocks`): with the flag unlocked, the changed definition's map; without (a guest playing the
+## host's run: its own save is never read), the definition's own; the registry's never changes.
+func test_the_map_is_made_by_the_rules_the_run_s_unlocks_leave() -> void:
+	var id: StringName = _unlockable()
+	var registry: Node = root.get_node("Registry")
+	var definition := registry.call("get_resource", &"runs", id) as RunDefinition
+	var before: int = SimHash.of(definition.biomes[0])
+	var unlocked := RunUnlocks.of([&"test_deeper"] as Array[StringName])
+	var changed_maps: int = 0
+	for seed: int in [3, 11, 19, 27]:
+		tick.begin_run()
+		tick.sim.run_seed = seed
+		tick.sim.unlocks = unlocked.copy()
+		events.emit_signal("run_begun", id, 2)
+		var map: RunMap = run.get(&"map") as RunMap
+		check(map != null and map.is_made(), "seed %d: made" % seed)
+		if map == null:
+			continue
+		var expected: RunMap = _map_of(definition.changed_by(unlocked), seed, 2)
+		check_equal(SimHash.of(map), SimHash.of(expected), "seed %d: the changed rules' map" % seed)
+		check(map.first().scale > _map_of(definition, seed, 2).first().scale, "seed %d: the player curve's change in each room's scale" % seed)
+		var plain: RunMap = _map_of(definition, seed, 2)
+		if SimHash.of(plain) != SimHash.of(map):
+			changed_maps += 1
+		# The same seed with none unlocked: a guest's run, whatever its own save holds.
+		tick.begin_run()
+		tick.sim.run_seed = seed
+		events.emit_signal("run_begun", id, 2)
+		check_equal(SimHash.of(run.get(&"map")), SimHash.of(plain), "seed %d: none unlocked, the definition's own map" % seed)
+	check_equal(changed_maps, 4, "every changed map differs from its plain one")
+	check_equal(SimHash.of(definition.biomes[0]), before, "the registry's definition never changes")

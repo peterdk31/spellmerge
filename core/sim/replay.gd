@@ -11,9 +11,11 @@ extends RefCounted
 ##   from it, core/sim/replay_tape.gd), how it started (`start`, one of STARTS, and `starter`, the seat that
 ##   asked), the seats joined at the start (`seats`, a bit per seat) and the run's rules (`rules`:
 ##   the shot cap, the step budgets; core/sim/session_rules.gd, online-ready N11),
-##   so it plays the same on a machine whose own settings are others, and what the run takes along
+##   so it plays the same on a machine whose own settings are others, what the run takes along
 ##   from the play before it (`party`: each seat's player loadout, its bags, staffs and hands;
-##   core/sim/party_loadout.gd, items I4).
+##   core/sim/party_loadout.gd, items I4), what lies on the ground (`ground`, items I6) and the save
+##   flags the run plays by (`unlocks`: the recording machine's, core/sim/run_unlocks.gd, run
+##   generation RG6).
 ## - **The ticks:** per tick a byte of the seats with a frame (a bit each), then each seat's frame
 ##   (its length, then `InputFrame` bytes). The game's stops need no mark: they are its state
 ##   (online-ready N4), so a replay stands still where the recording did. Kept as bytes (`add_tick`, `read_tick`), so an hour of four seats is
@@ -36,9 +38,9 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## tick's byte, the stops being state, N4; 4: no horde, its start, cap and commands gone; 5: what
 ## the run takes along, after the rules; 6: each carried staff's own id after its cards; 7: the
 ## players' loadouts in place of the carried staffs, and the bags' capacities among the rules, items
-## I4; 8: what lies on the ground after the players' loadouts, items I6). A replay of another
-## format is refused.
-const FORMAT: int = 8
+## I4; 8: what lies on the ground after the players' loadouts, items I6; 9: the save flags the
+## run plays by after the ground, run generation RG6). A replay of another format is refused.
+const FORMAT: int = 9
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): a run of rooms, the sandbox, the hub (online-lobby
@@ -50,8 +52,8 @@ const MAX_TICKS: int = 60 * 60 * 60 * 4
 const MAX_BYTES: int = 64 * 1024 * 1024
 const MAX_BUILD: int = 64
 ## The most bytes a header takes (`header_bytes`): magic, format, the build, content and seed, start,
-## starter and seats, the rules, what is carried at its most, the tick count.
-const MAX_HEADER_BYTES: int = 4 + 1 + 1 + MAX_BUILD + 16 + 3 + SessionRules.BYTES + PartyLoadout.MAX_BYTES + GroundLoadout.MAX_BYTES + 4
+## starter and seats, the rules, what is carried at its most, the unlocks, the tick count.
+const MAX_HEADER_BYTES: int = 4 + 1 + 1 + MAX_BUILD + 16 + 3 + SessionRules.BYTES + PartyLoadout.MAX_BYTES + GroundLoadout.MAX_BYTES + RunUnlocks.MAX_BYTES + 4
 
 var build: String = ""
 var content: int = 0
@@ -67,6 +69,9 @@ var party: PartyLoadout = PartyLoadout.new()
 ## What lies on the ground as the run starts, and in which room (`Frames.record` asks the game; a run
 ## in that room lays it, `Frames.next_run_ground`; items I6).
 var ground: GroundLoadout = GroundLoadout.new()
+## The save flags the run plays by (`Frames.record` asks the game: the recording machine's, the
+## host's; the runs it starts take them, `Frames.next_run_unlocks`; run generation RG6).
+var unlocks: RunUnlocks = RunUnlocks.new()
 
 var _data: PackedByteArray = PackedByteArray()
 ## Where each tick starts in `_data`.
@@ -188,6 +193,7 @@ func _encode(ticks: bool) -> PackedByteArray:
 	rules.encode_into(out)
 	party.encode_into(out)
 	ground.encode_into(out)
+	unlocks.encode_into(out)
 	at = out.size()
 	out.resize(at + 4)
 	out.encode_u32(at, _offsets.size() if ticks else 0)
@@ -215,6 +221,7 @@ func decode(bytes: PackedByteArray) -> String:
 		rules = SessionRules.defaults()
 		party = PartyLoadout.new()
 		ground = GroundLoadout.new()
+		unlocks = RunUnlocks.new()
 		_data = PackedByteArray()
 		_offsets = PackedInt32Array()
 	return problem
@@ -270,6 +277,12 @@ func _decode(bytes: PackedByteArray) -> String:
 		return ground_problem
 	ground = read_ground
 	at = read_ground.read_to
+	var read_unlocks := RunUnlocks.new()
+	var unlocks_problem: String = read_unlocks.decode_at(bytes, at)
+	if unlocks_problem != "":
+		return unlocks_problem
+	unlocks = read_unlocks
+	at = read_unlocks.read_to
 	if at + 4 > bytes.size():
 		return "the header is cut short"
 	var ticks: int = bytes.decode_u32(at)

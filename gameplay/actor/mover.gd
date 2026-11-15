@@ -12,7 +12,10 @@ extends ActorComponent
 ## wall, then backing off until the body (its footprint's circle, `Footprint.radius`) is clear of
 ## walls and of the ground of bodies that cannot move, and inside the room.
 ## Every other move (`dash`, `pull`, `swap`, `recoil`) is a velocity for its time; a `dash` turns
-## toward a target as it goes when its card homes (`CarrierDash.move_homing`). Each move answers
+## toward a target as it goes when its card homes (`CarrierDash.move_homing`), goes at its cards'
+## speed curve (`CarrierDash.move_curve`, `MoveCurve`: still its whole way in its time), and ends
+## where a wall stops it head on (`held_up`: under about 45 degrees from straight into it; a glancing
+## one slides on, boss plan OB10). Each move answers
 ## `caster_move_finished` where it ended: a teleport at once, the others the step after their
 ## last, once the body has walked it (the last step is shortened, so a move goes exactly its
 ## distance). A card's move is the actor's own when the card's tag names the actor's caster
@@ -41,15 +44,22 @@ const TELEPORT_BACKOFF: float = 4.0
 const MOVE_ROOM: int = 8
 ## The shortest time a move takes.
 const MIN_SECONDS: float = 0.01
+## A dash meets a wall head on when a step held up by it goes less than this share of the way the
+## dash asked along its own way: a wall square across it keeps none, one at 45 degrees half (the slide
+## keeps the part along the wall), so under about 45 degrees from straight in it ends (`held_up`).
+const HEAD_ON_SHARE: float = 0.5
 
 ## Walking speed in pixels per second at full tilt (an enemy's from `EnemyBase.move_speed`).
 @export var speed: float = 90.0
 
 ## The moves running (the first `_count`): each one's mode, velocity, seconds left (0 or less:
-## done, answered next step), its card's tag and its homing (a dash's, or null).
+## done, answered next step), its card's tag, its homing (a dash's, or null), its speed curve
+## (`MoveCurve`; NONE for an even one) and its whole time.
 var _modes: Array[StringName] = []
 var _velocities: PackedVector2Array = PackedVector2Array()
 var _lefts: PackedFloat32Array = PackedFloat32Array()
+var _curves: PackedVector3Array = PackedVector3Array()
+var _totals: PackedFloat32Array = PackedFloat32Array()
 var _tags: PackedInt64Array = PackedInt64Array()
 var _homings: Array[Homing] = []
 var _count: int = 0
@@ -100,8 +110,10 @@ func step(delta: float) -> void:
 			# A homing dash turns toward a target as it goes, as a homing shot does.
 			velocity = _homings[at].steer(actor.projectiles, _caster_number(), actor.global_position, velocity, delta)
 			_velocities[at] = velocity
-		# The last step is shortened, so a move goes exactly its distance.
-		var share: Vector2 = velocity * minf(delta, _lefts[at]) / maxf(delta, 0.0001)
+		# The last step is shortened, so a move goes exactly its distance; a curved one goes the
+		# curve's share of its way this step (`MoveCurve.share`).
+		var seconds: float = minf(delta, _lefts[at]) if _curves[at] == MoveCurve.NONE else MoveCurve.share(_curves[at], _totals[at], _lefts[at], delta) * _totals[at]
+		var share: Vector2 = velocity * seconds / maxf(delta, 0.0001)
 		if _modes[at] == &"dash":
 			legs = true
 			share *= pace
@@ -127,6 +139,20 @@ func is_dashing() -> bool:
 		if _modes[at] == &"dash":
 			return true
 	return false
+
+
+## The actor's move this step was held up (`Actor.move`): it asked to go `asked` and went `got`. A
+## dash that meets the wall head on (`HEAD_ON_SHARE`) ends where the body is, answered at the next
+## step, so its end point is at the wall; one that glances off slides on. Walls, the ground of bodies
+## that cannot move and the Wall card's stones alike (the one grid the body slides on).
+func held_up(asked: Vector2, got: Vector2) -> void:
+	for at in _count:
+		if _modes[at] != &"dash" or _lefts[at] <= 0.0 or _velocities[at].is_zero_approx():
+			continue
+		var way: Vector2 = _velocities[at].normalized()
+		var wanted: float = asked.dot(way)
+		if wanted > 0.0 and got.dot(way) < wanted * HEAD_ON_SHARE:
+			_lefts[at] = 0.0
 
 
 ## The way the moves went in the last step (unit length, or zero when they cancel), for the looks.
@@ -164,7 +190,10 @@ func _on_caster_move_requested(player: int, mode: StringName, move: Vector2, sec
 	_velocities[_count] = move / time
 	_lefts[_count] = time
 	_tags[_count] = tag
-	_homings[_count] = CarrierDash.of(actor.spells).move_homing(_caster_number()) if mode == &"dash" and actor.spells != null else null
+	var dash: CarrierDash = CarrierDash.of(actor.spells) if mode == &"dash" and actor.spells != null else null
+	_homings[_count] = dash.move_homing(_caster_number()) if dash != null else null
+	_curves[_count] = dash.move_curve(_caster_number()) if dash != null else MoveCurve.NONE
+	_totals[_count] = time
 	_count += 1
 
 
@@ -174,6 +203,8 @@ func _grow(size: int) -> void:
 	_lefts.resize(size)
 	_tags.resize(size)
 	_homings.resize(size)
+	_curves.resize(size)
+	_totals.resize(size)
 
 
 ## True when the move the event names `player` asks with the card `tag` is this actor's: a card of
@@ -233,6 +264,8 @@ func _answer() -> void:
 		_velocities[at] = _velocities[_count]
 		_lefts[at] = _lefts[_count]
 		_tags[at] = _tags[_count]
+		_curves[at] = _curves[_count]
+		_totals[at] = _totals[_count]
 		_homings[at] = _homings[_count]
 		_homings[_count] = null
 		if actor.events != null:

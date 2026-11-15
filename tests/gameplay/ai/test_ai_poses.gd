@@ -176,8 +176,9 @@ func test_its_move_meeting_a_wall_squashes_and_shakes_it() -> void:
 		shook = shook or absf(head.position.y - head.rest_position.y) >= 1.0
 	check(shook, "and it shudders")
 	_run(body, roundi(BodyPose.WALL_TIME / STEP) + 2)
-	check(body.mover.is_dashing(), "its move still grinds against the wall")
-	check(look.body_pose() != Pose.WALL, "but it hit once: the pose is a moment only")
+	# Boss plan OB10: a move meeting a wall head on ends there, so nothing grinds on.
+	check(not body.mover.is_dashing(), "its move ended at the wall")
+	check(look.body_pose() != Pose.WALL, "and it hit once: the pose is a moment only")
 
 
 func test_winding_up_it_rears_back_from_its_aim() -> void:

@@ -54,7 +54,9 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	var shot: int = moved
 	# The move turns on the homing curve at its own speed.
 	var turn: float = offset.length() / seconds / spell.homing_curve if spell.homing_range > 0.0 and spell.homing_curve > 0.0 and seconds > 0.0 else 0.0
-	if not kit.projectiles.move_shot(shot, offset, seconds, turn, spell.homing_range):
+	# A move along a way (a dash) keeps its cards' speed curve on a shot too (`MoveCurve`).
+	var curve: Vector3 = MoveCurve.of(spell) if moves_along() else MoveCurve.NONE
+	if not kit.projectiles.move_shot(shot, offset, seconds, turn, spell.homing_range, curve):
 		return 0
 	kit.moves().shield(spell, tag, -1, shot, seconds)
 	_moved_shot(spell, tag, actor, shot, seconds, chain, prev)

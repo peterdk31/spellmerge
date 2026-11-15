@@ -381,3 +381,144 @@ func test_a_stick_tilt_walks_slower_and_never_faster() -> void:
 	_controller(body).move = Vector2(3.0, 0.0)
 	_world.run(1)
 	check(is_equal_approx(body.velocity.x, body.mover.speed), "never above the speed")
+
+
+# --- Boss plan OB10: a move's speed curve, and a head-on wall ending a dash -------------------
+
+## `count` steps of `body` moved against the walls as the game moves it (`Actor.move`), then the
+## systems.
+func _walk(body: Actor, count: int) -> void:
+	for i in count:
+		body.step(Fixture.STEP)
+		body.move(Fixture.STEP)
+		_world.projectiles.step(Fixture.STEP)
+		_world.spells.step(Fixture.STEP)
+
+
+func test_a_dash_into_a_wall_head_on_ends_there() -> void:
+	var body: Actor = _mover()
+	_world.projectiles.set_walls([Rect2(150.0, 0.0, 40.0, 200.0)] as Array[Rect2])
+	# 200 px over 2 s, 100 px/s: the wall is 50 px away, met in about half a second.
+	_ask(body, &"dash", Vector2(200.0, 0.0), 2.0)
+	_walk(body, 12)
+	check_equal(_finished.size(), 1, "the dash is over at the wall, long before its 2 s: %s" % [_finished])
+	check(_finished.size() == 1 and _finished[0][1] == &"dash" and _finished[0][2].x > 130.0 and _finished[0][2].x <= 150.0, "it ends there, so its end point is at the wall: %s" % [_finished])
+	check(not body.mover.is_dashing(), "it no longer grinds against the wall")
+
+
+func test_a_dash_at_a_wall_under_45_degrees_from_straight_in_ends() -> void:
+	var body: Actor = _mover()
+	_world.projectiles.set_walls([Rect2(150.0, -400.0, 40.0, 800.0)] as Array[Rect2])
+	# 40 degrees off straight into the wall.
+	_ask(body, &"dash", Vector2.from_angle(deg_to_rad(40.0)) * 200.0, 2.0)
+	_walk(body, 20)
+	check_equal(_finished.size(), 1, "it ends at the wall: %s" % [_finished])
+
+
+func test_a_dash_glancing_off_a_wall_slides_on() -> void:
+	var body: Actor = _mover()
+	_world.projectiles.set_walls([Rect2(150.0, -400.0, 40.0, 800.0)] as Array[Rect2])
+	# 55 degrees off straight into the wall: it slides along it.
+	_ask(body, &"dash", Vector2.from_angle(deg_to_rad(55.0)) * 200.0, 2.0)
+	_walk(body, 20)
+	check(_finished.is_empty(), "it does not end at the wall: %s" % [_finished])
+	check(body.mover.is_dashing() and body.global_position.y > START.y + 60.0, "it slides on along it: %s" % body.global_position)
+	_walk(body, 14)
+	check_equal(_finished.size(), 1, "and ends when its time is up")
+
+
+func test_a_dash_into_the_ground_of_a_body_that_cannot_move_ends_there() -> void:
+	# A blocking prop's footprint is ground the body slides on, as a wall is (one grid).
+	var body: Actor = _mover()
+	_world.projectiles.set_footprint(_world.table.open(ActorsScript.TEAM_WORLD, ActorsScript.RAMP_ENEMY), Vector2(170.0, 100.0), Vector2(40.0, 120.0), 0.0)
+	_ask(body, &"dash", Vector2(200.0, 0.0), 2.0)
+	_walk(body, 12)
+	check_equal(_finished.size(), 1, "it ends at the prop: %s" % [_finished])
+	check(_finished.size() == 1 and _finished[0][2].x > 130.0 and _finished[0][2].x <= 150.0, "where the prop's ground starts: %s" % [_finished])
+
+
+func test_a_dash_held_up_by_no_wall_goes_its_whole_way() -> void:
+	var body: Actor = _mover()
+	_ask(body, &"dash", Vector2(100.0, 0.0), 1.0)
+	_walk(body, 17)
+	check(body.global_position.distance_to(START + Vector2(100.0, 0.0)) < 0.01, "its whole way: %s" % body.global_position)
+	check_equal(_finished.size(), 1, "answered once")
+
+
+func test_a_pull_into_a_wall_is_not_ended_by_it() -> void:
+	# Only a dash (the body's own legs) ends at a wall; a move done to the body runs its time.
+	var body: Actor = _mover()
+	_world.projectiles.set_walls([Rect2(150.0, 0.0, 40.0, 200.0)] as Array[Rect2])
+	_ask(body, &"pull", Vector2(200.0, 0.0), 1.0)
+	_walk(body, 12)
+	check(_finished.is_empty() and body.mover.is_moving(), "the pull goes on: %s" % [_finished])
+
+
+func test_a_curved_dash_lurches_off_and_drags_to_a_stop_over_its_whole_way() -> void:
+	# The Lumber card's curve (boss plan OB4, OB10), cast for real: its move goes its whole way in its
+	# whole time, slow at first, fast in the middle, stopping at the end.
+	var body: Actor = _world.actor(START, [&"mover", &"caster"], Fixture.Scripted.new(), [[&"lumber", &"dash"]])
+	body.combat = _combat
+	(body.controller as Fixture.Scripted).aim = Vector2.RIGHT
+	var asked: Array = []
+	_world.bus.caster_move_requested.connect(func(_caster: int, mode: StringName, move: Vector2, seconds: float, _tag: int) -> void:
+		if mode == &"dash":
+			asked.append([move, seconds]))
+	_walk(body, 1)
+	check(body.caster.cast(0), "it casts its dash")
+	var steps: Array[float] = []
+	var at: Vector2 = body.global_position
+	var from: Vector2 = at
+	for i in 60:
+		_walk(body, 1)
+		if not body.mover.is_dashing() and not steps.is_empty():
+			break
+		if body.mover.is_dashing():
+			steps.append(body.global_position.x - at.x)
+		at = body.global_position
+	check_equal(asked.size(), 1, "one dash asked")
+	if asked.size() != 1 or steps.size() < 6:
+		return
+	var move: Vector2 = asked[0][0]
+	var seconds: float = asked[0][1]
+	check(body.global_position.distance_to(from + move) < 0.05, "its whole way (%s of %s)" % [body.global_position - from, move])
+	check_equal(steps.size(), ceili(seconds / Fixture.STEP - 0.001), "in its whole time (%s s)" % seconds)
+	var even: float = move.length() / seconds * Fixture.STEP
+	var top: float = 0.0
+	for step in steps:
+		top = maxf(top, step)
+	check(steps[0] < even * 0.5, "it lurches off slowly (%.2f of an even %.2f)" % [steps[0], even])
+	check(top > even * 1.2, "picks up (%.2f)" % top)
+	check(steps[steps.size() - 1] < even * 0.3, "and drags to a stop (%.2f)" % steps[steps.size() - 1])
+
+
+func test_a_dash_with_no_curve_keeps_its_speed() -> void:
+	var body: Actor = _world.actor(START, [&"mover", &"caster"], Fixture.Scripted.new(), [[&"dash"]])
+	body.combat = _combat
+	(body.controller as Fixture.Scripted).aim = Vector2.RIGHT
+	_walk(body, 1)
+	check(body.caster.cast(0), "it casts its dash")
+	_walk(body, 1)
+	var first: float = body.velocity.x
+	_walk(body, 1)
+	check(first > 0.0 and is_equal_approx(body.velocity.x, first), "an even speed (%s, %s)" % [first, body.velocity.x])
+
+
+func test_a_curve_that_shapes_nothing_moves_as_an_even_dash() -> void:
+	# A curve below MoveCurve.MIN_AREA (or an ease alone) is screened to NONE where the dash is cast,
+	# so the body goes as an even dash to the bit, as a shot's move does.
+	var even: Actor = _mover(0)
+	var flat: Actor = _mover(1)
+	var dash: CarrierDash = CarrierDash.of(_world.spells)
+	var spell := CompiledSpell.new()
+	spell.move_start = 0.0025
+	spell.move_end = 0.0
+	spell.move_ease = 1.0
+	check(not MoveCurve.shapes(MoveCurve.of(spell)), "a curve with almost no area shapes nothing")
+	dash._move_body(spell, _world.tag_of(flat), flat.id, flat.id, flat.global_position, Vector2.RIGHT, Vector2(60.0, 0.0), 0.5, 0, 0)
+	check_equal(dash.move_curve(flat.id), MoveCurve.NONE, "it is taken as none")
+	_ask(even, &"dash", Vector2(60.0, 0.0), 0.5)
+	for i in 4:
+		_walk(even, 1)
+		_walk(flat, 1)
+		check_equal(flat.global_position - START, even.global_position - START, "step %d the same to the bit" % i)

@@ -190,7 +190,7 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | portal (a mouth and its exits, gates of the projectile manager), dash and teleport (a move, `CarrierMove`), wall (one solid line) |
 | `shoot` | a shot flying along its heading | rune (still, placed ahead), pool (still, spread `ray_length` ahead, never spent), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
 | `on_hit` | nothing | hook (pulls its caster), swap (trades places) |
-| `on_move_end` | nothing | teleport (strikes where it lands) |
+| `on_move_end` | nothing | teleport (strikes where it lands), dash (its pass strikes no longer than its grace: a dash a head-on wall stopped strikes no more there, boss plan OB10) |
 | `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows), pool (forgets what it touches every `POOL_TICK`, so it strikes it again), portal (moves what went into its gates) |
 | `end_of`, `end_actor`, `clear`, `reset_actor` | nothing | dash, teleport, beam, swing, slam, decoy, familiar (what they keep) |
 | `hit_caster` | the point | dash and teleport (`CarrierMove`): what they move casts their hits' payloads |

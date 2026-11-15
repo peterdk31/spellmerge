@@ -1,7 +1,9 @@
 class_name CarrierDash
 extends CarrierMove
 ## Moves its caster `ray_length` along the move direction, striking every body it passes once
-## (`&"dash"`). Homing turns it as it goes; its shield guards what it moves.
+## (`&"dash"`). Homing turns it as it goes; its shield guards what it moves. Its speed over the move
+## is its cards' curve (`MoveCurve`, `move_curve`), its pass is as wide as what it moves
+## (`_pass_reach`), and it ends where its mover stops (`on_move_end`: a head-on wall, boss plan OB10).
 
 
 ## A dash under way (rules R4c, `_start_pass`): it strikes every body its mover passes, once each.
@@ -23,6 +25,8 @@ class MovePass:
 	## Where the mover was at the last step (where it started, before the first), and the seconds left.
 	var last: Vector2 = Vector2.INF
 	var left: float = 0.0
+	## How far round its mover's way it strikes (`_pass_reach`, at its start).
+	var reach: float = SpellLimits.PASS_REACH
 	## The chain jumps its hits carry, the body before them, and what it hits with when not its
 	## spell's own `hit` (an echo's), as a swing's.
 	var chain: int = 0
@@ -31,6 +35,8 @@ class MovePass:
 	var struck: Array[Node] = []
 ## Per actor, the homing of its body's last dash; the body steers with it (`move_homing`).
 var _dash_homing: Array[Homing] = []
+## Per actor, the speed curve of its body's last dash (`MoveCurve`; `move_curve`).
+var _dash_curve: PackedVector3Array = PackedVector3Array()
 ## The homing of a dash that does not home (`move_homing` for an actor out of range).
 var _no_homing: Homing = Homing.new()
 ## The dashes under way (`_start_pass`), and spare records for the next ones.
@@ -61,6 +67,8 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	super(runtime_kit, staff_poses)
 	for i in SpellRuntime.ACTORS:
 		_dash_homing.append(Homing.new())
+	_dash_curve.resize(SpellRuntime.ACTORS)
+	_dash_curve.fill(MoveCurve.NONE)
 
 
 ## Every dash under way ends quietly (`Spells.clear`).
@@ -83,6 +91,9 @@ func _move_seconds(spell: CompiledSpell) -> float:
 ## part, gameplay/feel), `dash_land` where it lands (`carrier_ended`).
 func _move_body(spell: CompiledSpell, tag: int, actor: int, body: int, origin: Vector2, way: Vector2, offset: Vector2, seconds: float, chain: int, prev: int) -> void:
 	_dash_homing[body].start(spell, hash(Vector2i(actor, tag)))
+	# Screened once here, so the body's mover takes a curve only as `move_shot` takes one.
+	var curve: Vector3 = MoveCurve.of(spell)
+	_dash_curve[body] = curve if MoveCurve.shapes(curve) else MoveCurve.NONE
 	kit.events.caster_move_requested.emit(body, &"dash", offset, seconds, tag)
 	var reach: float = origin.distance_to(kit.projectiles.clip_to_walls(origin, origin + offset))
 	kit.set_cue_tag(tag)
@@ -117,6 +128,7 @@ func _start_pass(spell: CompiledSpell, tag: int, actor: int, body: int, shot: in
 	dash.seq = kit.projectiles.get_seq_of(shot) if shot >= 0 else 0
 	dash.last = kit.projectiles.get_anchor(body) if shot < 0 else kit.projectiles.get_position_of(shot)
 	dash.left = seconds + SpellLimits.PASS_GRACE
+	dash.reach = _pass_reach(spell, body, shot)
 	dash.chain = chain
 	dash.prev = prev
 	dash.hit = spell.echo_hit if kit.is_echo(spell) else null
@@ -157,12 +169,29 @@ func step(delta: float) -> void:
 		kit.shot_ended(tag)
 
 
-## The dash `dash` moved from `from` to `to`: it strikes each body within SpellLimits.PASS_REACH of that
-## way that it has not struck yet (`Projectiles.sweep` all round points PASS_REACH apart, so a
+## How far round its mover's way a dash of `spell` strikes (boss plan OB10: a move's pass is as wide
+## as its body): a body's hurt shape (the radius it is rounded by and the larger half of its box)
+## times the cards' and the body's growth (`radius_scale`: `bigger`, its spell scale), a shot's hit
+## radius (its cards' already); never under SpellLimits.PASS_REACH. A wizard's dash hardly changes,
+## a big body's strikes what the body meets, and with `bigger` or a spell scale past it, as those grow
+## its other spells.
+func _pass_reach(spell: CompiledSpell, body: int, shot: int) -> float:
+	var reach: float = 0.0
+	if shot >= 0:
+		reach = kit.projectiles.get_radius_of(shot)
+	else:
+		var node: Node = kit.body_node(body)
+		var half: Vector2 = kit.projectiles.target_half(node)
+		reach = (kit.projectiles.target_round(node) + maxf(half.x, half.y)) * spell.radius_scale
+	return maxf(reach, SpellLimits.PASS_REACH) if is_finite(reach) else SpellLimits.PASS_REACH
+
+
+## The dash `dash` moved from `from` to `to`: it strikes each body within its reach (`_pass_reach`) of
+## that way that it has not struck yet (`Projectiles.sweep` all round points its reach apart, so a
 ## fast dash misses nothing), and with `deflect` turns the shots within MOVE_GUARD_REACH of it.
 func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
 	var spell: CompiledSpell = dash.spell
-	var reach: float = SpellLimits.PASS_REACH
+	var reach: float = dash.reach
 	var way: Vector2 = from.direction_to(to) if not from.is_equal_approx(to) else kit.moves().move_heading[dash.body if dash.body >= 0 else dash.actor]
 	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
 		kit.guard(kit.projectiles.shots_on_segment(dash.actor, from, to, SpellLimits.MOVE_GUARD_REACH), dash.actor, dash.tag, true, 0, from, to, id())
@@ -177,6 +206,23 @@ func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
 			if dash.left <= 0.0 or dash.spell != spell:
 				return
 			dash.hit = took
+
+
+## A dash of the body (not a shot's) ended at `at` (`CasterMoves.end`: its way done, or a head-on
+## wall stopped it, `Mover`): its pass strikes no longer than SpellLimits.PASS_GRACE more, so a dash
+## stopped at a wall does not go on striking there for the rest of its time.
+func on_move_end(_spell: CompiledSpell, tag: int, actor: int, _at: Vector2, _heading: Vector2) -> void:
+	# The body that moved casts what its end point does (`CasterMoves.end`), so only its pass ends.
+	var body: int = SpellRuntime.body_of(kit.caster(), actor)
+	for dash in _passes:
+		if dash.tag == tag and dash.shot < 0 and dash.body == body:
+			dash.left = minf(dash.left, SpellLimits.PASS_GRACE)
+
+
+## The speed curve of `actor`'s last dash (`MoveCurve`), for its body's mover; NONE for an actor out
+## of range.
+func move_curve(actor: int) -> Vector3:
+	return _dash_curve[actor] if actor >= 0 and actor < _dash_curve.size() else MoveCurve.NONE
 
 
 ## The homing of `actor`'s last dash, for the wizard to turn it as it goes (`Homing.steer`); one

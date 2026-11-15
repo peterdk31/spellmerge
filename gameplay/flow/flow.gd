@@ -518,7 +518,7 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 		tick.begin_run()
 	exits.leave()
 	if mode == MODE_RUN:
-		room = _begin_run_of_rooms()
+		room = _begin_run_of_rooms(players.size())
 		if room == null:
 			stop_run()
 			return false
@@ -594,9 +594,10 @@ func _room_id_for_mode() -> StringName:
 ## A run of rooms begins (on the run's fresh state, after `Tick.begin_run`): the run area makes the
 ## map of `run_id_to_play` and answers with its first room and what stands in it (`run_begun`,
 ## `run_room_chosen`; run generation RG3). The room, or null (with a warning) when no answer came or
-## the registry lacks the room it names.
-func _begin_run_of_rooms() -> RoomBase:
-	var room: RoomBase = _room_asked(func() -> void: events.run_begun.emit(run_id_to_play))
+## the registry lacks the room it names. The run is made for `players` players (the seats joined at
+## its start; run generation RG5).
+func _begin_run_of_rooms(players: int) -> RoomBase:
+	var room: RoomBase = _room_asked(func() -> void: events.run_begun.emit(run_id_to_play, players))
 	if room == null:
 		push_warning("Flow: the run '%s' gave no room it could build (its map could not be made, or its room is missing), so no run starts." % run_id_to_play)
 	return room
@@ -1356,7 +1357,8 @@ func _enemy_data_of(enemy_id: StringName) -> EnemyBase:
 
 
 ## Add `count` enemies of `data` to `_enemies`, the first as the `first`-th of the room's fight: each
-## at the next enemy spawn in turn, stacked where a spawn is used again (`stacked_position`).
+## at the next enemy spawn in turn, stacked where a spawn is used again (`stacked_position`), told
+## to difficulty before it stands (`enemy_standing`: scaled to the room).
 func _spawn_enemies(parent: Node2D, data: EnemyBase, count: int, first: int) -> void:
 	var spawns: PackedVector2Array = _places.enemy_spawns
 	if spawns.is_empty():
@@ -1370,6 +1372,9 @@ func _spawn_enemies(parent: Node2D, data: EnemyBase, count: int, first: int) -> 
 		if enemy == null:
 			continue
 		enemy.position = stacked_position(spawns[spawn], times)
+		# Scaled to the room before its data is applied (difficulty, run generation RG5).
+		if events != null:
+			events.enemy_standing.emit(enemy)
 		parent.add_child(enemy)
 		_enemies.append(enemy)
 

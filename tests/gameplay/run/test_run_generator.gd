@@ -106,7 +106,17 @@ func _made_up_runs() -> Dictionary:
 	trap.not_after = [&"trap"] as Array[StringName]
 	traps.kinds.append(trap)
 	runs["traps, one a row, two a run, never one after another"] = _run(traps)
+	runs["scaled steeply with depth and players"] = _scaled(_run(_rules(4, 6, 1, 3, 1, 2)))
 	return runs
+
+
+## `run` grown three times harder to its deepest row, most of it early, and twice with four players,
+## most of it late (run generation RG5).
+func _scaled(run: RunDefinition) -> RunDefinition:
+	run.scaling = RunScaling.new()
+	run.scaling.per_depth = ScaleCurve.make(1.0, 3.0, 2.0)
+	run.scaling.per_player = ScaleCurve.make(1.0, 2.0, 0.5)
+	return run
 
 
 # --- The rules every map keeps ---------------------------------------------------------------
@@ -153,6 +163,9 @@ func _broken(map: RunMap, definition: RunDefinition, content: RunContent) -> Pac
 			per_run[node.kind] = int(per_run.get(node.kind, 0)) + 1
 			if node.depth != here[0].depth:
 				found.append("room %d stands for another row than its row's" % node.index)
+			var scale: float = definition.room_scale(rules, node.depth, map.players)
+			if node.scale != scale:
+				found.append("room %d is scaled %s, not %s (row %d, %d players)" % [node.index, node.scale, scale, node.depth, map.players])
 		for rule: KindRule in rules.kinds:
 			if rule.max_per_row > 0 and int(per_row.get(rule.kind, 0)) > rule.max_per_row:
 				found.append("row %d holds %d %s, more than %d" % [at, per_row[rule.kind], rule.kind, rule.max_per_row])
@@ -223,11 +236,13 @@ func _fill_broken(map: RunMap, node: RunNode, rules: MapRules, content: RunConte
 					found.append("room %d: %s is not of the pool at row %d" % [node.index, id, node.depth])
 					return found
 				spent += enemy.cost
-			# Past the budget only one enemy that alone costs more; within it, nothing more affordable.
-			if node.enemies.size() > 1 and spent > rules.room_budget:
-				found.append("room %d spends %d of a budget of %d" % [node.index, spent, rules.room_budget])
-			if spent <= rules.room_budget and rules.room_budget - spent >= cheapest:
-				found.append("room %d leaves %d of its budget, enough for another" % [node.index, rules.room_budget - spent])
+			# Past the budget (at the room's scale, run generation RG5) only one enemy that alone
+			# costs more; within it, nothing more affordable.
+			var budget: int = RunScaling.scaled_budget(rules.room_budget, node.scale)
+			if node.enemies.size() > 1 and spent > budget:
+				found.append("room %d spends %d of a budget of %d" % [node.index, spent, budget])
+			if spent <= budget and budget - spent >= cheapest:
+				found.append("room %d leaves %d of its budget, enough for another" % [node.index, budget - spent])
 		RoomKind.FILL_BOSS:
 			var bosses: Array[StringName] = []
 			for boss: EnemyBase in content.boss_pool(map.biome, node.depth):
@@ -306,7 +321,8 @@ func _check_seeds(definition: RunDefinition, content: RunContent, label: String)
 	var seen: Dictionary = {"rows": {}, "widths": {}, "branches": {}}
 	var broken: int = 0
 	for value in SEEDS:
-		var map: RunMap = RunGenerator.generate(definition, content, Sim.seeded(value))
+		# One to four players in turn (run generation RG5: the budget scales with them).
+		var map: RunMap = RunGenerator.generate(definition, content, Sim.seeded(value), 1 + value % RunScaling.MOST_PLAYERS)
 		var problems: PackedStringArray = _broken(map, definition, content)
 		if not problems.is_empty():
 			broken += 1
@@ -350,6 +366,10 @@ func test_a_wide_run_keeps_its_rules_over_many_seeds() -> void:
 
 func test_a_run_of_two_ways_at_least_keeps_its_rules_over_many_seeds() -> void:
 	_check_made_up("two ways at least")
+
+
+func test_a_scaled_run_keeps_its_rules_over_many_seeds() -> void:
+	_check_made_up("scaled steeply with depth and players")
 
 
 func test_a_run_of_one_room_a_row_keeps_its_rules_over_many_seeds() -> void:
@@ -605,3 +625,42 @@ func test_the_map_is_state() -> void:
 class Holder:
 	extends RefCounted
 	var map: RunMap = null
+
+
+## Run generation RG5: each room's scale is its depth's and the run's players' (the definition's
+## curves), its budget grows with it, and only the fill follows the players: the same seed gives the
+## same shape, kinds and templates for any number of players.
+func test_deeper_rooms_and_more_players_fill_bigger_budgets() -> void:
+	var content: RunContent = _content()
+	var definition: RunDefinition = _scaled(_run(_rules(5, 5, 1, 1, 1, 1)))
+	var rules: MapRules = definition.biomes[0]
+	var costs: Dictionary = {}
+	for enemy: EnemyBase in content.enemy_pool(BIOME, rules.depth_max):
+		costs[enemy.id] = enemy.cost
+	for value in 20:
+		var maps: Array[RunMap] = []
+		for players in range(1, RunScaling.MOST_PLAYERS + 1):
+			maps.append(RunGenerator.generate(definition, content, Sim.seeded(value), players))
+		var one: RunMap = maps[0]
+		var four: RunMap = maps[maps.size() - 1]
+		check(one.is_made() and four.is_made(), "seed %d: made for one player and for four" % value)
+		if not (one.is_made() and four.is_made()):
+			return
+		check_equal(one.first().scale, 1.0, "seed %d: the first room with one player is as the data says" % value)
+		check(is_equal_approx(four.first().scale, 2.0), "seed %d: with four, twice: %s" % [value, four.first().scale])
+		var last: RunNode = one.nodes[one.nodes.size() - 1]
+		check(last.kind == &"boss" and is_equal_approx(last.scale, 3.0), "seed %d: the boss's row, the deepest, three times: %s" % [value, last.scale])
+		check(is_equal_approx(four.nodes[four.nodes.size() - 1].scale, 6.0), "seed %d: and both, six" % value)
+		for at in one.nodes.size():
+			if one.nodes[at].kind != &"fight":
+				continue
+			var spent: Array[int] = []
+			for map: RunMap in maps:
+				var node: RunNode = map.nodes[at]
+				check_equal([node.room, node.kind, node.links], [one.nodes[at].room, one.nodes[at].kind, one.nodes[at].links], "seed %d room %d: the same room for any number of players" % [value, at])
+				var cost: int = 0
+				for id: StringName in node.enemies:
+					cost += int(costs.get(id, 0))
+				spent.append(cost)
+				check(cost >= RunScaling.scaled_budget(rules.room_budget, node.scale) - 2, "seed %d room %d: %d spent of a budget of %d" % [value, at, cost, RunScaling.scaled_budget(rules.room_budget, node.scale)])
+			check(spent[spent.size() - 1] > spent[0], "seed %d room %d: four players' fight costs more than one's (%s)" % [value, at, spent])

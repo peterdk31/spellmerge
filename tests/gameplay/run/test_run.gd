@@ -51,7 +51,7 @@ func _expected(seed: int) -> RunMap:
 func test_a_run_begun_makes_its_map_and_names_its_first_room() -> void:
 	tick.begin_run()
 	tick.sim.run_seed = 41
-	events.emit_signal("run_begun", &"crypt")
+	events.emit_signal("run_begun", &"crypt", 1)
 	var map: RunMap = run.get(&"map") as RunMap
 	check(map != null and map.is_made(), "the crypt run's map is made")
 	if map == null:
@@ -70,7 +70,7 @@ func test_the_same_seed_gives_the_same_map_and_another_seed_another() -> void:
 	for seed: int in [5, 5, 6, 7, 8, 9]:
 		tick.begin_run()
 		tick.sim.run_seed = seed
-		events.emit_signal("run_begun", &"crypt")
+		events.emit_signal("run_begun", &"crypt", 1)
 		var map: RunMap = run.get(&"map") as RunMap
 		var value: int = SimHash.of(map)
 		if seed == 5 and hashes.has(5):
@@ -83,7 +83,7 @@ func test_the_same_seed_gives_the_same_map_and_another_seed_another() -> void:
 
 
 func test_a_run_start_takes_the_map_away() -> void:
-	events.emit_signal("run_begun", &"crypt")
+	events.emit_signal("run_begun", &"crypt", 1)
 	check(run.get(&"map") != null, "a map")
 	tick.begin_run()
 	check(run.get(&"map") == null and int(run.get(&"at")) == -1, "a run's start renews the area: no map")
@@ -91,7 +91,7 @@ func test_a_run_start_takes_the_map_away() -> void:
 
 
 func test_an_unknown_run_answers_nothing() -> void:
-	events.emit_signal("run_begun", &"no_such_run")
+	events.emit_signal("run_begun", &"no_such_run", 1)
 	check(run.get(&"map") == null, "no map")
 	check(answers.is_empty(), "no answer")
 
@@ -100,7 +100,7 @@ func test_the_map_is_part_of_the_game_state() -> void:
 	tick.begin_run()
 	check(tick.state_areas().has("Run"), "the Tick hashes the run's area")
 	var before: int = SimHash.of(run)
-	events.emit_signal("run_begun", &"crypt")
+	events.emit_signal("run_begun", &"crypt", 1)
 	check(SimHash.of(run) != before, "the map changes the hash")
 	var walk := StateWalk.new()
 	walk.values("Run", run, [])
@@ -137,7 +137,7 @@ func test_flow_builds_the_room_the_map_names() -> void:
 func test_a_way_taken_moves_on_through_the_map() -> void:
 	tick.begin_run()
 	tick.sim.run_seed = 7
-	events.emit_signal("run_begun", &"crypt")
+	events.emit_signal("run_begun", &"crypt", 1)
 	var map: RunMap = run.get(&"map") as RunMap
 	if map == null or not map.is_made():
 		check(false, "the crypt run's map is made")
@@ -165,3 +165,32 @@ func test_a_way_taken_moves_on_through_the_map() -> void:
 		now = run.call("room_now") as RunNode
 	check(now != null and now.row == map.rows() - 1, "the last row reached")
 	check_equal(answers.back()[2], [] as Array[StringName], "the last room leads nowhere")
+
+
+## Run generation RG5: the map is made for the players the run begins with (the crypt's scaling),
+## and each room's scale is told (`run_room_scaled`) before the room is named, as the party enters it.
+func test_the_map_is_made_for_the_run_s_players_and_each_room_s_scale_told_first() -> void:
+	var heard: Array = []
+	var on_scaled := func(scale: float) -> void: heard.append([&"scaled", scale])
+	var on_chosen := func(room: StringName, _enemies: Array[StringName], _ways: Array[StringName]) -> void: heard.append([&"chosen", room])
+	events.connect("run_room_scaled", on_scaled)
+	events.connect("run_room_chosen", on_chosen)
+	tick.begin_run()
+	tick.sim.run_seed = 23
+	events.emit_signal("run_begun", &"crypt", 3)
+	var map: RunMap = run.get(&"map") as RunMap
+	var registry: Node = root.get_node("Registry")
+	var definition := registry.call("get_resource", &"runs", &"crypt") as RunDefinition
+	var expected: RunMap = RunGenerator.generate(definition, registry.call("run_content") as RunContent, Sim.seeded(23), 3)
+	check(map != null and map.players == 3, "made for three players")
+	check_equal(SimHash.of(map), SimHash.of(expected), "the generator's map for three players")
+	check(definition.scaling != null and map != null and map.first().scale > 1.0, "the crypt grows harder with players: %s" % (map.first().scale if map != null else -1.0))
+	if map != null:
+		check_equal(heard, [[&"scaled", map.first().scale], [&"chosen", map.first().room]], "the first room's scale, then the room")
+		heard.clear()
+		events.emit_signal("run_way_taken", 0)
+		var now: RunNode = run.call("room_now") as RunNode
+		check_equal(heard, [[&"scaled", now.scale], [&"chosen", now.room]], "the next room's the same way")
+		check(now.scale > map.first().scale, "a row deeper, harder: %s after %s" % [now.scale, map.first().scale])
+	events.disconnect("run_room_scaled", on_scaled)
+	events.disconnect("run_room_chosen", on_chosen)

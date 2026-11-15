@@ -17,9 +17,11 @@ extends RefCounted
 ##    each of its links (run generation RG4; the validator holds a kind that leads on to a template
 ##    with exits enough, `MapRules.exit_problems`), by chance, never one a room leading to it has
 ##    while another is left.
-## 4. **The fill**, by its kind's `RoomKind.fill`: a fight's enemies from the biome's pool at its
-##    depth, by chance, until its budget (`MapRules.room_budget`) is spent (one at least); a boss
-##    room's boss from the boss pool. Ids, never files.
+## 4. **The fill**, by its kind's `RoomKind.fill`: each room's scale from its depth and the run's
+##    players (`RunDefinition.room_scale`, run generation RG5), then a fight's enemies from the
+##    biome's pool at its depth, by chance, until its budget (`MapRules.room_budget` at its scale,
+##    `RunScaling.scaled_budget`) is spent (one at least); a boss room's boss from the boss pool.
+##    Ids, never files.
 ##
 ## Rolls are `sim.chance(PURPOSE, key, counter)`, the key a step's (`Step`) and the attempt's, the
 ## counter that step's own count, so one step's rolls never shift another's. The limits never corner
@@ -40,10 +42,12 @@ const ATTEMPTS: int = 8
 enum Step { DEPTH, WIDTH, LINKS, KINDS, TEMPLATES, FILL }
 
 
-## The map of `definition` made from `content` by `sim`'s chance (its run's seed). A map not made
-## (`RunMap.is_made` false) says why in `RunMap.problems`.
-static func generate(definition: RunDefinition, content: RunContent, sim: Sim) -> RunMap:
+## The map of `definition` made from `content` by `sim`'s chance (its run's seed) for a run of
+## `players` players (the seats joined at its start: every machine and replay counts the same). A
+## map not made (`RunMap.is_made` false) says why in `RunMap.problems`.
+static func generate(definition: RunDefinition, content: RunContent, sim: Sim, players: int = 1) -> RunMap:
 	var map := RunMap.new()
+	map.players = players
 	if definition == null:
 		map.problems = PackedStringArray(["No run definition."])
 		return map
@@ -67,7 +71,7 @@ static func generate(definition: RunDefinition, content: RunContent, sim: Sim) -
 			map.nodes = [] as Array[RunNode]
 			map.problems = PackedStringArray(["%s: %s" % [definition.id, missing]])
 			return map
-		_fill(map, rules, content, dice)
+		_fill(map, definition, rules, content, dice)
 		return map
 	map.problems = PackedStringArray(["%s: %s: no map within its rules after %d tries (the kinds' max_per_row, max_per_run and not_after leave a room no kind)." % [definition.id, rules.biome, ATTEMPTS]])
 	return map
@@ -275,12 +279,15 @@ static func _pick_templates(map: RunMap, content: RunContent, dice: Dice) -> Str
 	return ""
 
 
-## Step 4: each room filled as its kind's `fill` says.
-static func _fill(map: RunMap, rules: MapRules, content: RunContent, dice: Dice) -> void:
+## Step 4: each room its scale (its depth, the run's players), and filled as its kind's `fill`
+## says: a fight by its budget at that scale.
+static func _fill(map: RunMap, definition: RunDefinition, rules: MapRules, content: RunContent, dice: Dice) -> void:
 	for node: RunNode in map.nodes:
+		node.scale = definition.room_scale(rules, node.depth, map.players)
 		match content.kind(node.kind).fill:
 			RoomKind.FILL_ENEMIES:
-				node.enemies = _spend(content.enemy_pool(map.biome, node.depth), rules.room_budget, dice)
+				var budget: int = RunScaling.scaled_budget(rules.room_budget, node.scale)
+				node.enemies = _spend(content.enemy_pool(map.biome, node.depth), budget, dice)
 			RoomKind.FILL_BOSS:
 				var bosses: Array[EnemyBase] = content.boss_pool(map.biome, node.depth)
 				node.enemies = [bosses[dice.below(Step.FILL, bosses.size())].id] as Array[StringName]

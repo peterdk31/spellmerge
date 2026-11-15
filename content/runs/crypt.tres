@@ -1,8 +1,10 @@
-[gd_resource type="Resource" script_class="RunDefinition" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="RunDefinition" load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://core/base/run_definition.gd" id="1_run"]
 [ext_resource type="Script" path="res://core/base/map_rules.gd" id="2_rules"]
 [ext_resource type="Script" path="res://core/base/kind_rule.gd" id="3_kind"]
+[ext_resource type="Script" path="res://core/base/run_scaling.gd" id="4_scaling"]
+[ext_resource type="Script" path="res://core/base/scale_curve.gd" id="5_curve"]
 
 [sub_resource type="Resource" id="fights"]
 script = ExtResource("3_kind")
@@ -31,8 +33,26 @@ branches_max = 2
 room_budget = 16
 kinds = Array[ExtResource("3_kind")]([SubResource("fights"), SubResource("boss")])
 
+[sub_resource type="Resource" id="per_depth"]
+script = ExtResource("5_curve")
+start = 1.0
+end = 1.5
+easing = 1.0
+
+[sub_resource type="Resource" id="per_player"]
+script = ExtResource("5_curve")
+start = 1.0
+end = 1.75
+easing = 1.0
+
+[sub_resource type="Resource" id="scaling"]
+script = ExtResource("4_scaling")
+per_depth = SubResource("per_depth")
+per_player = SubResource("per_player")
+
 [resource]
 script = ExtResource("1_run")
 id = &"crypt"
 display_name = "The Crypt"
 biomes = Array[ExtResource("2_rules")]([SubResource("crypt")])
+scaling = SubResource("scaling")

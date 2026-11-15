@@ -67,8 +67,8 @@ extends Node2D
 ## other (Combat's push parts them); spells find them by their hurt circles. No physics engine.
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
-## health, walking speed, contact damage, staff, cards and mana. Data with no staff or no cards
-## leaves the actor without a caster (an enemy that only chases).
+## health (times `stat_scale`, the room's scale), walking speed, contact damage, staff, cards and
+## mana. Data with no staff or no cards leaves the actor without a caster (an enemy that only chases).
 ##
 ## Local stop: while `Actors.hold(id, seconds)` holds it (Feel's hit-stop, which holds only the
 ## bodies in a hit), `step` does nothing and the body stands still; its looks step once at the
@@ -130,6 +130,10 @@ const REFS: Array[StringName] = [&"controller"]
 
 ## The enemy's numbers, applied to the components in `_ready`. Set before adding the actor.
 var data: EnemyBase = null
+## How much harder the room made it (run generation RG5: the room's scale, set by difficulty before
+## the actor is added; 1 out of a run of rooms): its data's health is multiplied by it. Power and
+## spell size join it with the actor stats (the boss plan's OB7).
+var stat_scale: float = 1.0
 ## The prop this body was made from (`PropBody.make`, props W7; null for any other body): its look
 ## reads its art from it, and a body made again from a snapshot has it back (content, kept as
 ## itself), as an enemy has its `data`.
@@ -654,13 +658,13 @@ func _first(found: ActorComponent, child: Node) -> ActorComponent:
 	return child as ActorComponent
 
 
-## The enemy's numbers to its components: health, speed, touch, size and its 1-4 staffs (enemy AI
-## AI4, docs/milestones/M2-enemy-ai.md). Without a staff the caster is left out.
+## The enemy's numbers to its components: health (by `stat_scale`), speed, touch, size and its 1-4
+## staffs (enemy AI AI4, docs/milestones/M2-enemy-ai.md). Without a staff the caster is left out.
 func _apply_data() -> void:
 	if data == null:
 		return
 	if health != null:
-		health.max_health = data.max_health
+		health.max_health = data.max_health * stat_scale
 	if mover != null:
 		mover.speed = data.move_speed
 	if contact != null:

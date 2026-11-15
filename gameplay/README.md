@@ -62,8 +62,10 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `player_stats_changed` | `player` (the seat's own body, also while it is away) | `hud` |
 | `player_joined`, `player_left` | `coop` | `difficulty`, `flow`, `hud` |
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
-| `run_begun` | `flow` (a run of rooms begins, on its fresh state) | `run` (makes the run's map) |
+| `run_begun` | `flow` (a run of rooms begins, on its fresh state, with the seats joined at its start) | `run` (makes the run's map for them) |
+| `run_room_scaled` | `run` (how much harder the room the party enters is: its depth and the run's players; before `run_room_chosen`) | `difficulty` (the level) |
 | `run_room_chosen` | `run` (the map's room the party enters, what stands in it and the kinds of the rooms it leads to) | `flow` (builds it) |
+| `enemy_standing` | `flow` (an enemy or boss body about to stand, not yet in the tree) | `difficulty` (scales it to the room: `Actor.stat_scale`) |
 | `run_way_taken` | `flow` (every standing wizard in a lit exit) | `run` (moves on through the map) |
 | `room_exits_shown` | `flow` (the lit exits of a cleared room, and the kind behind each) | `feel` (the kind's name over each) |
 | `room_left` | `flow` (the party goes on to the next room of the run) | `core/spells` (what was cast in the room ends quietly) |

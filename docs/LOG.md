@@ -2,6 +2,12 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-15: Boss OB6, the broom's arena
+
+The boss's room, `content/rooms/crypt/boss_broom/` ("The broom's crypt"): 26×16 tiles (832×512 px, about 1.7 times arena_01) of the crypt's tiles, walls all round and an open middle; its cover is props, so the fight uses it up: four cracked pillars in a loose diamond round the middle and four dust heaps near the corners. An entry door, no exit: cleared, the run is won. It hosts the room kind `boss` in the crypt, so the crypt run's map now ends in it and the broom stands there from the boss pool (by the run generation plan, which replaced the plan's `RoomBase.enemies` and `follows`); the room names no boss, and its first enemy spawn, top middle, is the boss's, the four in the corners left for the phases' adds (OB13).
+
+Two general checks in `tests/content/rooms/test_template_layout.gd`, for every template found by folder: no spawn starts in a prop, and a room that hosts a boss holds every boss of its biome at its first enemy spawn (its hurt shape and ground at its data's size), clear of the walls and the props; with no boss there is nothing to check, so deleting the broom leaves them passing.
+
 ## 2026-11-15: Boss OB5, the cracked pillar, the dust heap and the `touched` trigger
 
 Two ordinary props for the broom's arena, and for any room (nothing in them names the boss). The **cracked pillar** (`content/props/cracked_pillar/`): a 24×48 stone pillar of 32 health, cover that cracks below half (a crack down its shaft, grit trickling) and falls to rubble that neither blocks nor is hit; data and art only. The **dust heap** (`content/props/dust_heap/`): an invincible mound of dust that blocks; a body walking into it scatters it (dust on the floor that blocks no more, still found by fire), and fire on the heap or the dust, a fire hit or a burn, blows it up (`fire · blast · pulse`, hurting everything near, the next heap too) and leaves a scorch mark.

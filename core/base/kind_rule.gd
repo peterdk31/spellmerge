@@ -40,6 +40,13 @@ static func make(of_kind: StringName, first: int = 0, last: int = -1, of_weight:
 	return rule
 
 
+## A copy of its own, its `not_after` too (run generation RG6, `MapRules.copied`).
+func copied() -> KindRule:
+	var made: KindRule = duplicate(false)
+	made.not_after = not_after.duplicate()
+	return made
+
+
 ## The row `row` as counted from the start of a map `depth` rows deep (a row below 0 counts from
 ## its end).
 static func row_at(row: int, depth: int) -> int:

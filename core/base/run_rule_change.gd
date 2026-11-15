@@ -10,7 +10,7 @@ extends Resource
 ## The flags in effect are the host's (core/sim/run_unlocks.gd: worked out from the save of the
 ## machine that starts the run, carried in its start and its replay's header), so every machine and
 ## every replay changes the rules alike. Read-only content, shared like a card: `apply_to` changes a
-## copy, never the definition the registry holds.
+## copy's parts, never the definition the registry holds.
 
 ## What it changes.
 enum Target {
@@ -117,22 +117,22 @@ func changed(value: float) -> float:
 	return amount
 
 
-## Change `definition` (a copy of its own, `RunDefinition.copied`: never the registry's) as it says.
-## A scaling target on a run with no scaling, or no such curve, gives it one at 1 first; a kind
-## target changes every line of its kind in the biomes it names; a target that names nothing there
-## changes nothing (`problems` says so).
-func apply_to(definition: RunDefinition) -> void:
+## Change a run's `biomes` and `scaling` (a copy's, `RunDefinition.copied`: never the registry's)
+## as it says, and return the scaling (a scaling target on a run with none, or no such curve, makes
+## one at 1 first). A kind target changes every line of its kind in the biomes it names; a target
+## that names nothing there changes nothing (`problems` says so). It takes the definition's parts,
+## never the definition, so the two scripts never name each other.
+func apply_to(biomes: Array[MapRules], scaling: RunScaling) -> RunScaling:
 	if is_scale_target():
 		var names: Array = SCALE_MEMBERS[target]
-		if definition.scaling == null:
-			definition.scaling = RunScaling.new()
-		var curve: ScaleCurve = definition.scaling.get(names[0]) as ScaleCurve
+		var made: RunScaling = scaling if scaling != null else RunScaling.new()
+		var curve: ScaleCurve = made.get(names[0]) as ScaleCurve
 		if curve == null:
 			curve = ScaleCurve.new()
-			definition.scaling.set(names[0], curve)
+			made.set(names[0], curve)
 		curve.set(names[1], changed(curve.get(names[1]) as float))
-		return
-	for rules: MapRules in definition.biomes:
+		return made
+	for rules: MapRules in biomes:
 		if rules == null or (biome != &"" and rules.biome != biome):
 			continue
 		if is_kind_target():
@@ -142,6 +142,7 @@ func apply_to(definition: RunDefinition) -> void:
 					_change_member(rule, member)
 		else:
 			_change_member(rules, MAP_MEMBERS[target])
+	return scaling
 
 
 ## Its member `member` of `of` changed: rounded when that is a whole number.
@@ -153,10 +154,10 @@ func _change_member(of: Object, member: StringName) -> void:
 		of.set(member, changed(value as float))
 
 
-## What is wrong with it in `definition`, one line each, named by `what` (the run): no flag or one
+## What is wrong with it in a run of `biomes`, one line each, named by `what` (the run): no flag or one
 ## that is not a plain id, an amount that is not finite, a biome the run has not, a kind target with
 ## no kind or one no line of its biomes has, a scaling target naming a biome.
-func problems(definition: RunDefinition, what: String) -> PackedStringArray:
+func problems(biomes: Array[MapRules], what: String) -> PackedStringArray:
 	var found := PackedStringArray()
 	var named: String = "%s: the rule change of '%s'" % [what, flag]
 	if flag == &"":
@@ -170,15 +171,15 @@ func problems(definition: RunDefinition, what: String) -> PackedStringArray:
 			found.append("%s: it changes the run's scaling, so it names no biome or kind." % named)
 		return found
 	var lines: int = 0
-	var biomes: int = 0
-	for rules: MapRules in definition.biomes:
+	var named_biomes: int = 0
+	for rules: MapRules in biomes:
 		if rules == null or (biome != &"" and rules.biome != biome):
 			continue
-		biomes += 1
+		named_biomes += 1
 		for rule: KindRule in rules.kinds:
 			if rule != null and kind != &"" and rule.kind == kind:
 				lines += 1
-	if biomes == 0:
+	if named_biomes == 0:
 		found.append("%s: the run has no biome '%s'." % [named, biome])
 	elif is_kind_target():
 		if kind == &"":

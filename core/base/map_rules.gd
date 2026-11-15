@@ -35,6 +35,17 @@ const MOST_WIDTH: int = 8
 @export_range(1, 200) var room_budget: int = 16
 
 
+## A copy of its own, its kind rules too (`KindRule.copied`), so changing it changes nothing else
+## (run generation RG6: the rules a run plays, `RunDefinition.copied`).
+func copied() -> MapRules:
+	var made: MapRules = duplicate(false)
+	var kinds_made: Array[KindRule] = []
+	for rule: KindRule in kinds:
+		kinds_made.append(rule.copied() if rule != null else null)
+	made.kinds = kinds_made
+	return made
+
+
 ## The lines of the table that may stand in row `row` of a map `depth` rows deep and that the
 ## content can fill there, in the table's order.
 func rules_at(content: RunContent, row: int, depth: int) -> Array[KindRule]:

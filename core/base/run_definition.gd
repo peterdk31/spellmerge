@@ -54,7 +54,7 @@ func changed_by(unlocks: RunUnlocks) -> RunDefinition:
 			continue
 		if made == null:
 			made = copied()
-		change.apply_to(made)
+		made.scaling = change.apply_to(made.biomes, made.scaling)
 	if made == null:
 		return self
 	# The rules played are final: a copy has no changes left to apply (its `problems` checks it as
@@ -66,26 +66,12 @@ func changed_by(unlocks: RunUnlocks) -> RunDefinition:
 ## A copy of its own, down to every biome's rules, their kind rules and the scaling's curves (the
 ## changes are shared: read-only), so changing it changes nothing else.
 func copied() -> RunDefinition:
-	var made: RunDefinition = duplicate(false) as RunDefinition
+	var made: RunDefinition = duplicate(false)
 	var biomes_made: Array[MapRules] = []
 	for rules: MapRules in biomes:
-		var rules_made: MapRules = rules.duplicate(false) as MapRules if rules != null else null
-		if rules_made != null:
-			var kinds_made: Array[KindRule] = []
-			for rule: KindRule in rules.kinds:
-				var rule_made: KindRule = rule.duplicate(false) as KindRule if rule != null else null
-				if rule_made != null:
-					rule_made.not_after = rule.not_after.duplicate()
-				kinds_made.append(rule_made)
-			rules_made.kinds = kinds_made
-		biomes_made.append(rules_made)
+		biomes_made.append(rules.copied() if rules != null else null)
 	made.biomes = biomes_made
-	if scaling != null:
-		made.scaling = scaling.duplicate(false) as RunScaling
-		if scaling.per_depth != null:
-			made.scaling.per_depth = scaling.per_depth.duplicate(false) as ScaleCurve
-		if scaling.per_player != null:
-			made.scaling.per_player = scaling.per_player.duplicate(false) as ScaleCurve
+	made.scaling = scaling.copied() if scaling != null else null
 	made.changes = changes.duplicate()
 	return made
 
@@ -129,7 +115,7 @@ func change_problems(content: RunContent) -> PackedStringArray:
 		if change == null:
 			found.append("%s: an empty rule change." % name)
 		else:
-			found.append_array(change.problems(self, name))
+			found.append_array(change.problems(biomes, name))
 	if flags().size() > RunUnlocks.MAX_FLAGS:
 		found.append("%s: its rule changes name %d flags, more than the %d a run's start carries." % [name, flags().size(), RunUnlocks.MAX_FLAGS])
 	if not found.is_empty():

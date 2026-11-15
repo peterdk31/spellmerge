@@ -14,7 +14,7 @@ A run is defined as data (run generation, docs/milestones/run-generation.md): a 
 
 | Run | Biomes | What it is |
 | --- | --- | --- |
-| `crypt` | `crypt`: 4 to 6 rows, 1 to 3 rooms a row, each leading to 1 or 2 | fights, then the boss in the last row (not required: until a boss names the crypt, the run ends at its deepest fight); 1.5 times harder by its deepest row, 1.3 times with four players (each extra player a tenth more) |
+| `crypt` | `crypt`: 4 to 6 rows, 1 to 3 rooms a row, each leading to 1 or 2 | fights, then the boss in the last row (not required: with no crypt room hosting `boss` or no boss naming the crypt, the run ends at its deepest fight; both exist since boss plan OB6); 1.5 times harder by its deepest row, 1.3 times with four players (each extra player a tenth more) |
 
 ## Allowed files
 

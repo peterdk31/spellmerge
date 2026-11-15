@@ -17,7 +17,7 @@ A boss is an enemy (content/enemies/README.md) with `boss = true`. It is **data,
 - **Its phases** (`phases`, `EnemyPhase`): each starts by its condition (`health_below` a share of the most, or `after_seconds`), once, in order; the boss stands protected for its `transition`, then fights with the phase's `staffs` (all of them: list again the ones that stay), its `profile` and its `look` (`PhaseLook`: a body texture, a face style and glow, a size). Phase adds (the phase brings its own enemies, so the boss works in any room) and health by player count are coming in OB13.
 - **Its scene** is an actor like an enemy's (see the broom's): `Health`, `Hurtbox` (a circle as wide as its body), `Contact`, `Mover`, `Footprint` (its feet against the walls), `Caster`, the `AIController`, its `CreatureLook`, its `Sprite` and a `Face`. A layered body and poses are coming in OB8; actor stats (power, mass, spell scale, resistances) in OB7.
 - **Its sounds** are named in its cues, `content/cues/` files whose names start with a prefix of its own (the broom's `broom_*.tres`; cues must sit in `content/cues`, where Feel finds them); held sounds and music with intensity are coming in OB15.
-- **Its room** (optional): its best arena, a room of the `boss` kind in its biome (`content/rooms/<biome>/`). The fight must still work in any room.
+- **Its room** (optional): its best arena, a room of the `boss` kind in its biome (`content/rooms/<biome>/`; the broom's: `content/rooms/crypt/boss_broom/`, a folder of its own so it is deleted with the boss). The fight must still work in any room.
 
 ### What is still engine work
 

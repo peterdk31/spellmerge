@@ -120,6 +120,94 @@ func test_exits_are_open_floor_clear_of_spawns() -> void:
 				check(not area.grow(SPAWN_RADIUS).has_point(point), "%s: the spawn %s is clear of the exit at %s" % [room.id, point, at[i]])
 
 
+## No one starts in a prop: every spawn is clear of every prop the room stands (its hurt shape, its
+## ground and its touch area: `_prop_box`), by a wizard's clearance.
+func test_spawns_are_clear_of_props() -> void:
+	for room in templates:
+		var places: RoomPlaces = room.places()
+		var props: Array[Resource] = places.placed_of(PropBase)
+		var at: PackedVector2Array = places.placed_at_of(PropBase)
+		for i in props.size():
+			var box: Rect2 = _prop_box(props[i] as PropBase, at[i])
+			for point in _spawns(room):
+				check(not box.grow(SPAWN_RADIUS).has_point(point), "%s: the spawn %s is clear of the %s at %s" % [room.id, point, (props[i] as PropBase).id, at[i]])
+
+
+## A room that hosts a boss stands it at its first enemy spawn (Flow, in turn): every boss of the
+## room's biome at any depth (found by folder; none, nothing to check) fits there, its
+## body (hurt shape and ground, at its data's `size`) inside the room and clear of every wall and
+## every prop it stands.
+func test_a_boss_room_holds_its_biomes_bosses_at_its_first_enemy_spawn() -> void:
+	var content: RunContent = registry.run_content()
+	for room in templates:
+		if not room.hosts(&"boss"):
+			continue
+		var places: RoomPlaces = room.places()
+		check(not places.enemy_spawns.is_empty(), "%s hosts a boss: it has an enemy spawn" % room.id)
+		if places.enemy_spawns.is_empty():
+			continue
+		var props: Array[Resource] = places.placed_of(PropBase)
+		var props_at: PackedVector2Array = places.placed_at_of(PropBase)
+		for boss: EnemyBase in _bosses_of(content, room.biome):
+			var body: Rect2 = _body_box(boss)
+			body.position += places.enemy_spawns[0]
+			check(_bounds(room).grow(-TILE).encloses(body), "%s: %s at %s is inside the walls" % [room.id, boss.id, places.enemy_spawns[0]])
+			for wall in _walls(room):
+				check(not wall.intersects(body), "%s: %s at %s is clear of the wall %s" % [room.id, boss.id, places.enemy_spawns[0], wall])
+			for i in props.size():
+				var box: Rect2 = _prop_box(props[i] as PropBase, props_at[i])
+				check(not box.intersects(body), "%s: %s at %s is clear of the %s at %s" % [room.id, boss.id, places.enemy_spawns[0], (props[i] as PropBase).id, props_at[i]])
+
+
+## Every boss that names biome `biome` (`EnemyBase.biomes`), whatever depth it may first stand at:
+## a boss stands in a run's last row, deeper than any `min_depth`.
+func _bosses_of(content: RunContent, biome: StringName) -> Array[EnemyBase]:
+	var found: Array[EnemyBase] = []
+	for enemy: EnemyBase in content.enemies:
+		if enemy.boss and enemy.biomes.has(biome):
+			found.append(enemy)
+	return found
+
+
+## What a prop standing at `at` takes up: its hurt shape and ground (`PropBase.extent`) and where a
+## body touches it (`area_rect`: a body starting in a dust heap's would scatter it at once).
+func _prop_box(prop: PropBase, at: Vector2) -> Rect2:
+	var box: Rect2 = prop.extent()
+	var area: Rect2 = prop.area_rect()
+	if area.has_area():
+		box = box.merge(area)
+	box.position += at
+	return box
+
+
+## The box round a body's feet its hurt shape and its ground take up, as its scene sets them (its
+## `Hurtbox` and `Footprint` components, found by type as the actor finds them; a scene with no
+## footprint gets the kit's default circle, `Footprint`'s own), times its data's `size`
+## (`Actor.set_size`).
+func _body_box(data: EnemyBase) -> Rect2:
+	var scene: Node = own(data.scene.instantiate()) as Node
+	var hurtbox: Hurtbox = null
+	var footprint: Footprint = null
+	for child: Node in scene.get_children():
+		if child is Hurtbox and hurtbox == null:
+			hurtbox = child as Hurtbox
+		elif child is Footprint and footprint == null:
+			footprint = child as Footprint
+	if footprint == null:
+		footprint = own(Footprint.new()) as Footprint
+	var box: Rect2 = _shape_box(footprint.size, footprint.radius, footprint.offset)
+	if hurtbox != null:
+		box = box.merge(_shape_box(hurtbox.size, hurtbox.radius, hurtbox.offset))
+	var scale: float = data.size if data.size > 0.0 else 1.0
+	return Rect2(box.position * scale, box.size * scale)
+
+
+## A box `size` across, or a circle of `radius`'s bounds, round `offset`.
+func _shape_box(size: Vector2, radius: float, offset: Vector2) -> Rect2:
+	var half: Vector2 = size * 0.5 if size.x > 0.0 and size.y > 0.0 else Vector2(radius, radius)
+	return Rect2(offset - half, half * 2.0)
+
+
 ## A template a run may pick for a room that leads on has an exit for each way a room may lead
 ## (`MapRules.most_ways`): with fewer the generator never picks it there (RG4), so it would stand
 ## only for a last room.

@@ -2,6 +2,16 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-15: Run generation RG7, the lectern
+
+The hub has a lectern (`content/props/start_lectern/`, a stone stand with an open book, right of the teleporter stone): a seat's A there opens that seat's menu of the stone's run's depths, "Room 1" up to "The boss", and its pick is where the party's next run from the stone starts. The run is generated as always; the party enters the first room of the picked depth's row (the boss pick always the map's last row), and everything else is the same run, its scale included. This replaces the boss plan's OB2c (decision 33) for the generated run, so testing a deep room or the boss no longer needs playing down to it.
+
+The pick is the command `start_depth_picked(seat, depth)`, kept only from a seat standing at the lectern in the hub, the party's one setting (`HubRules.start_depth`, hashed hub state), told with the depths offered (`start_depth_changed`) and named on the stone line ("Starts in: Room 3"). It reaches the run area as `run_begun`'s new `start_depth` (`RunMap.start_at`). A hub started anew forgets it, since a joining machine starts the hub from the replay's header, which carries no setting.
+
+So that deleting the lectern's folder leaves the hub whole, no scene names it: the hub has a zone named for its role, `start_lectern`, and the hub stands the registry's prop of that role there (`RoomContents.stand_in_role_zones`, a general rule: a zone named for a prop role is that prop's place). With no lectern nothing stands there, nobody is ever at one, a pick is refused and the run starts in its first room.
+
+Tests: `tests/gameplay/flow/test_flow_lectern.gd` (the lectern in its zone, the seats at it told, the pick kept, clamped and forgotten, the stone's run entered at each depth, Play's run at its first room, no lectern in the registry), `tests/gameplay/run/test_run.gd` (a run begun at a depth: the same map, that row's first room at its scale; `RunMap.start_at`), `tests/hud/test_lectern_menu.gd` (the menu, the pick, closing, what comes first, the stone line, the words), `tests/content/rooms/test_hub_data.gd` (the lectern's place), the prop's own test. READMEs: gameplay/flow, gameplay/run, hud, content/props, content/rooms.
+
 ## 2026-11-15: Boss OB5, the cracked pillar, the dust heap and the `touched` trigger
 
 Two ordinary props for the broom's arena, and for any room (nothing in them names the boss). The **cracked pillar** (`content/props/cracked_pillar/`): a 24×48 stone pillar of 32 health, cover that cracks below half (a crack down its shaft, grit trickling) and falls to rubble that neither blocks nor is hit; data and art only. The **dust heap** (`content/props/dust_heap/`): an invincible mound of dust that blocks; a body walking into it scatters it (dust on the floor that blocks no more, still found by fire), and fire on the heap or the dust, a fire hit or a burn, blows it up (`fire · blast · pulse`, hurting everything near, the next heap too) and leaves a scorch mark.

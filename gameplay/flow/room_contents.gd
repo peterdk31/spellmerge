@@ -5,7 +5,15 @@ extends RefCounted
 ## data by its class (`make_body`: a prop through `PropBody`, an enemy from its scene), so a new kind
 ## of placed thing is a branch here and nothing in Flow. It keeps them standing (a slot a
 ## placement, null once its body went, forgotten in the tick it goes) and answers by kind and role.
+##
+## A room's zone named for a prop role (run generation RG7: the hub's `start_lectern`) is a place for
+## the registry's prop of that role (`stand_in_role_zones`): the first by id stands with its feet at
+## the zone's middle, after the placements. So such a prop is found by folder, never named by the
+## room's scene: deleting its folder leaves the zone empty and the room whole.
 ## Flow's state (it holds one), stepped by Flow.
+
+const RegistryScript := preload("res://core/registry/registry.gd")
+const PROP_FOLDER: StringName = &"props"
 
 ## State as who they point at (core/sim/README.md).
 const REFS: Array[StringName] = [&"bodies"]
@@ -61,6 +69,36 @@ func stand(world: Node2D, places: RoomPlaces) -> void:
 	clear()
 	for i in places.placed.size():
 		bodies.append(_stand(world, places, i))
+
+
+## For each zone of `places` named for the role of a prop of `registry` (`PropBase.role`), stand
+## that role's first prop by id in `world`, its feet at the zone's middle (whole pixels), after the
+## placements' bodies (call it after `stand`). A zone no prop's role names stands nothing.
+func stand_in_role_zones(world: Node2D, places: RoomPlaces, registry: RegistryScript) -> void:
+	if registry == null:
+		return
+	for at in places.zone_names.size():
+		var data: PropBase = first_of_role(registry, places.zone_names[at])
+		if data == null:
+			continue
+		var body: Node2D = make_body(data)
+		if body == null:
+			continue
+		body.position = places.zone_rects[at].get_center().floor()
+		world.add_child(body)
+		bodies.append(body)
+
+
+## The prop of `registry` of the role `role` with the least id (null for none, or no role).
+static func first_of_role(registry: RegistryScript, role: StringName) -> PropBase:
+	var found: PropBase = null
+	if role == &"":
+		return found
+	for resource: Resource in registry.get_all(PROP_FOLDER):
+		var data := resource as PropBase
+		if data != null and data.role == role and data.scene != null and (found == null or String(data.id) < String(found.id)):
+			found = data
+	return found
 
 
 ## Stand fresh bodies for the placements of `places` whose data is of class `kind` (the sandbox's

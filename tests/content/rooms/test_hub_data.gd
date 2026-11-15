@@ -122,6 +122,28 @@ func test_the_prop_yard_is_open_floor() -> void:
 		check(not (load(other) as RoomBase).places().zone(FlowScript.ZONE_PROP_YARD).has_area(), "%s has none" % other)
 
 
+## The lectern's place (run generation RG7): a zone named for its role, where the hub stands the
+## registry's lectern (`RoomContents.stand_in_role_zones`), so the room's scene never names it. The
+## lectern there, and where it is stood at, are on open floor clear of the walls, the stone, the
+## altar, the yard and every spawn.
+func test_the_lecterns_place_is_open_floor() -> void:
+	var room: RoomBase = _room()
+	var zone: Rect2 = room.places().zone(HubRules.ROLE_START_LECTERN)
+	check(zone.has_area(), "the hub has a place for the lectern")
+	var lectern: PropBase = load("res://content/props/start_lectern/start_lectern.tres") as PropBase
+	var feet: Vector2 = zone.get_center().floor()
+	var taken: Rect2 = lectern.extent().merge(lectern.area_rect())
+	taken.position += feet
+	for wall: Rect2 in RoomScan.wall_rects(room_root):
+		check(not wall.intersects(taken), "clear of the wall %s" % wall)
+	check(not taken.intersects(HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).grow(16.0)), "clear of the stone")
+	check(not taken.intersects(HubRules.area_of(room.places(), HubRules.ROLE_PARTY_ALTAR).grow(16.0)), "clear of the altar")
+	check(not taken.intersects(room.places().zone(FlowScript.ZONE_PROP_YARD)), "clear of the yard")
+	for spawns: PackedVector2Array in [room.places().player_spawns, room.places().joiner_spawns, room.places().placed_at_of(EnemyBase)]:
+		for point: Vector2 in spawns:
+			check(not taken.intersects(_body(point)), "clear of the spawn %s" % point)
+
+
 func test_the_room_is_large_and_the_void_round_the_island_is_wall() -> void:
 	var size: Vector2 = RoomPlaces.read(room_root).size
 	check(size.x >= 1280.0 and size.y >= 800.0, "a large room: %s" % size)

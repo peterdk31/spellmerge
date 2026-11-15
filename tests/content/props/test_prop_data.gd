@@ -88,10 +88,10 @@ func test_every_cast_a_prop_reacts_with_is_paid_from_a_full_pool() -> void:
 
 ## What a prop is to the game's rules (props W8c, `PropBase.role`): a role is one the rules read
 ## (`HubRules`, `ExitRules`), and a prop of a role has what those rules need: a `run_start` stone the
-## states `lit` and `unlit` and an area to stand on, a `party_altar` an area, a `room_exit` the
-## states `dark` and `lit` and an area. A prop with no role stands in the hub's yard.
+## states `lit` and `unlit` and an area to stand on, a `party_altar` and a `start_lectern` an area,
+## a `room_exit` the states `dark` and `lit` and an area. A prop with no role stands in the hub's yard.
 func test_every_props_role_is_kept() -> void:
-	var roles: Array[StringName] = [HubRules.ROLE_RUN_START, HubRules.ROLE_PARTY_ALTAR, RoomBase.EXIT_ROLE]
+	var roles: Array[StringName] = [HubRules.ROLE_RUN_START, HubRules.ROLE_PARTY_ALTAR, HubRules.ROLE_START_LECTERN, RoomBase.EXIT_ROLE]
 	for data in _props():
 		if data.role == &"":
 			continue

@@ -35,6 +35,15 @@ func room_scale(rules: MapRules, depth: int, players: int) -> float:
 	return scaling.room_scale(depth, rules.depth_max - 1, players)
 
 
+## How many depths the hub's lectern offers a run of it to start at (run generation RG7): one a row
+## of its first biome's deepest map (`MapRules.depth_max`), "Room 1" to the last, the boss's (none
+## with no biome). A map made shallower starts a pick past its rows in its deepest row before the
+## last, and the last pick always in its last row (`RunMap.start_at`).
+func start_depths() -> int:
+	var rules: MapRules = biomes[0] if not biomes.is_empty() else null
+	return rules.depth_max if rules != null else 0
+
+
 ## The save flags its rule changes name, each once, in their order.
 func flags() -> Array[StringName]:
 	var found: Array[StringName] = []

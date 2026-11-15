@@ -313,7 +313,7 @@ func test_cells_and_places() -> void:
 ## script is not one loads in the editor as a placeholder, whose methods cannot be called.
 func test_the_cover_data_is_editor_scripts() -> void:
 	for path: String in ["res://core/base/cover_kind.gd", "res://core/base/cover_state.gd", "res://core/base/cover_trigger.gd", "res://core/base/cover_patch.gd", "res://core/base/cover_field.gd", "res://core/base/room_zone.gd"]:
-		check((load(path) as GDScript).source_code.begins_with("@tool"), "%s starts with @tool" % path)
+		check((load(path) as Script).is_tool(), "%s is an editor script (@tool)" % path)
 
 
 ## One clump alone in an open room: a disc of cells, dx² + dy² ≤ r² + r round its middle, of a reach

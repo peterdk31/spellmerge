@@ -12,6 +12,7 @@ const TILE: float = 32.0
 const STEPS: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
 
 var templates: Array[RoomBase] = []
+var registry: RegistryScript
 ## Each template's layout (one instance), wall rectangles and extent, by id.
 var layouts: Dictionary[StringName, Node] = {}
 var walls_of: Dictionary[StringName, Array] = {}
@@ -19,7 +20,7 @@ var bounds_of: Dictionary[StringName, Rect2] = {}
 
 
 func before_each() -> void:
-	var registry := own(RegistryScript.new()) as RegistryScript
+	registry = own(RegistryScript.new()) as RegistryScript
 	registry.scan()
 	templates = RoomScan.templates(registry)
 	layouts.clear()
@@ -97,6 +98,52 @@ func test_doors_lie_on_the_border() -> void:
 		for door in room.places().doors:
 			var on_border: bool = door.x < TILE or door.y < TILE or door.x > size.x - TILE or door.y > size.y - TILE
 			check(on_border, "%s: door %s lies on the border" % [room.id, door])
+
+
+## Where each exit is stood on (`room_exit` props, run generation RG4): open floor, clear of every
+## wall and spawn, so a wizard can step in and nobody starts in a way on.
+func test_exits_are_open_floor_clear_of_spawns() -> void:
+	for room in templates:
+		var places: RoomPlaces = room.places()
+		var props: Array[Resource] = places.placed_of(PropBase)
+		var at: PackedVector2Array = places.placed_at_of(PropBase)
+		for i in props.size():
+			var prop: PropBase = props[i] as PropBase
+			if prop.role != RoomBase.EXIT_ROLE:
+				continue
+			var area: Rect2 = prop.area_rect()
+			area.position += at[i]
+			check(_bounds(room).encloses(area), "%s: the exit at %s is inside the room" % [room.id, at[i]])
+			for wall in _walls(room):
+				check(not wall.intersects(area), "%s: the exit at %s is clear of the wall %s" % [room.id, at[i], wall])
+			for point in _spawns(room):
+				check(not area.grow(SPAWN_RADIUS).has_point(point), "%s: the spawn %s is clear of the exit at %s" % [room.id, point, at[i]])
+
+
+## A template a run may pick for a room that leads on has an exit for each way a room may lead
+## (`MapRules.most_ways`): with fewer the generator never picks it there (RG4), so it would stand
+## only for a last room.
+func test_templates_have_exits_for_every_way_on() -> void:
+	var checked: int = 0
+	for res: Resource in registry.get_all(&"runs"):
+		for rules: MapRules in (res as RunDefinition).biomes:
+			for rule: KindRule in rules.kinds:
+				if not _leads_on(rules, rule):
+					continue
+				for room in templates:
+					if room.biome == rules.biome and room.kinds.has(rule.kind):
+						checked += 1
+						check(room.exit_count() >= rules.most_ways(), "%s hosts %s in %s, which leads on to %d rooms: it has %d exits" % [room.id, rule.kind, rules.biome, rules.most_ways(), room.exit_count()])
+	check(checked >= 4, "the crypt's fight rooms are checked (%d)" % checked)
+
+
+## True if a room of `rule`'s kind may stand in a row before the last at some depth of `rules`.
+func _leads_on(rules: MapRules, rule: KindRule) -> bool:
+	for depth in range(rules.depth_min, rules.depth_max + 1):
+		for row in depth - 1:
+			if rule.takes_row(row, depth):
+				return true
+	return false
 
 
 ## Flood fill on the 32 px grid from the first player spawn.

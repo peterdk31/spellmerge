@@ -7,7 +7,8 @@ extends RefCounted
 ## holds its links). Dark while the room is under way; once it is cleared (`open`), the ways spread
 ## over its exits left to right (`exit_of`) and each of those is lit, asked of the prop by the bus
 ## (`prop_state_requested`: LIT, DARK, the states a `room_exit` has), the rest stay dark. When every
-## wizard standing (not down) stands in one lit exit, `count` names its way: the party goes on, with
+## wizard standing (not down) stands in one lit exit (where its own body is: a seat driving another
+## body holds the party until it comes back), `count` names its way: the party goes on, with
 ## no button (owner, 2026-11-15: "Just everyone stepping into it"). Stepping in is position only, so
 ## it is the simulation's own and needs no command.
 ##

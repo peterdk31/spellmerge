@@ -367,7 +367,7 @@ func step(delta: float) -> void:
 	if mode == MODE_HUB and state == State.RUNNING:
 		_count_stone()
 		return
-	if mode == MODE_RUN and state != State.IDLE and world != null:
+	if mode == MODE_RUN and state == State.CLEARED and exits.open and world != null:
 		var way: int = _count_exits()
 		if way != ExitRules.NONE:
 			_take_way(way)
@@ -541,10 +541,8 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	state = State.RUNNING
 	_show_world(new_world)
 	_set_walls(new_world)
+	_announce_room(room)
 	if events != null:
-		events.room_entered.emit(room.id)
-		var items: Array = RoomContents.items_of(_places)
-		events.room_items_placed.emit(room.id, items[0], items[1])
 		events.sandbox_changed.emit(mode == MODE_SANDBOX)
 		if mode == MODE_RUN:
 			_show_room_start()
@@ -577,7 +575,9 @@ func _lay_out(into: Node2D, room: RoomBase, sim: Sim) -> void:
 
 ## After a snapshot was restored (core/sim/README.md, "Snapshots"): a joining machine built the room
 ## the run started in, so a snapshot taken after the party went on lays out the room it is in now.
-## Its bodies are the snapshot's own.
+## Its bodies are the snapshot's own. The layout is built again by the run's chance as it is now:
+## the same as the host's while rooms are fixed scenes (`RoomBase.build` ignores it); a room put
+## together from pieces (M3) must build from what does not move on (its node's own key).
 func rebuild_derived() -> void:
 	if world == null or not is_instance_valid(world) or _room == null or _layout_of == _room.id:
 		return
@@ -645,18 +645,27 @@ func _count_exits() -> int:
 func _take_way(way: int) -> void:
 	var room: RoomBase = _room_asked(func() -> void: events.run_way_taken.emit(way))
 	if room == null:
-		push_warning("Flow: the way %d out of the room '%s' leads to no room, so the party stays." % [way, room_id])
+		# The run and its exits disagree (never in play): the room is the run's last, so the run
+		# is won, once, rather than the party held in an exit that leads nowhere.
+		push_warning("Flow: the way %d out of the room '%s' leads to no room, so the run ends here." % [way, room_id])
+		exits.leave()
+		_count_exits()
+		if _restart_left < 0.0:
+			_restart_left = RUN_WON_DELAY
 		return
 	_enter_next_room(room)
 
 
 ## The party goes on into `room`, the run's next room (run generation RG4), in the same world, run
-## and recording: no run's start, nothing dealt again. Everything of the room left goes (its layout,
-## its bodies, the shots in flight); every wizard stays itself, as it is (health, staffs, cards, bag,
+## and recording: no run's start, nothing dealt again. Everything of the room left goes: what was cast
+## in it (`room_left`: Spells ends its carriers, holds and waiting launches quietly), the shots in
+## flight, its layout and bodies; every wizard stays itself, as it is (health, staffs, cards, bag,
 ## everything), stood at its seat's spawn, a downed one up again with the revive's health (owner,
 ## 2026-11-15), each protected for a moment; then the room's bodies and enemies stand, as at a run's
 ## start, and the room is entered.
 func _enter_next_room(room: RoomBase) -> void:
+	if events != null:
+		events.room_left.emit()
 	if projectiles != null:
 		projectiles.clear()
 	_enemies.clear()
@@ -679,17 +688,25 @@ func _enter_next_room(room: RoomBase) -> void:
 	room_id = room.id
 	state = State.RUNNING
 	_set_walls(world)
+	_announce_room(room)
 	if events != null:
-		events.room_entered.emit(room.id)
-		var items: Array = RoomContents.items_of(_places)
-		events.room_items_placed.emit(room.id, items[0], items[1])
 		_show_room_start()
 	_count_exits()
 	_check_room_won()
 
 
-## A wizard of the party comes into the next room: at its seat's spawn, still, up again if it was
-## down (the revive's health), protected for a moment.
+## The room `room` stands in the world shown: `room_entered`, and the items its scene places
+## (`room_items_placed`), at a run's start and as the party goes on into the next room alike.
+func _announce_room(room: RoomBase) -> void:
+	if events == null:
+		return
+	events.room_entered.emit(room.id)
+	var items: Array = RoomContents.items_of(_places)
+	events.room_items_placed.emit(room.id, items[0], items[1])
+
+
+## A wizard of the party comes into the next room: at its seat's spawn, still (its moves, a dash's
+## or a pull's, end there), up again if it was down (the revive's health), protected for a moment.
 func _bring_in(wizard: Node2D) -> void:
 	if not is_instance_valid(wizard):
 		return
@@ -699,6 +716,8 @@ func _bring_in(wizard: Node2D) -> void:
 	var actor := wizard as Actor
 	if actor != null:
 		actor.velocity = Vector2.ZERO
+		if actor.mover != null:
+			actor.mover.drop()
 	var hero: DownedScript = DownedScript.of(wizard)
 	if hero == null:
 		return

@@ -481,3 +481,35 @@ func test_a_beam_with_no_pierce_hits_only_the_first() -> void:
 		_target(Vector2(40.0 + n * 40.0, 0.0))
 	_cast()
 	check_equal(_hits.size(), 1, "a beam stops at one")
+
+
+## Run generation RG4: the party leaves a room (`room_left`): what was cast in it ends quietly with it
+## (no blast, no payload, no request), the staff's build stays, and it casts again in the next room.
+func test_leaving_the_room_ends_its_familiars_quietly_and_keeps_the_build() -> void:
+	var held: int = _build(0, [&"hold", &"timer", &"blast", &"familiar", &"bolt"])
+	_cast()
+	check(_spells.is_holding(0, 0) and _spells.live_shots(held) == 1, "a held familiar casting on a timer")
+	_explosions.clear()
+	_bus.room_left.emit()
+	check_equal(_spells.live_shots(held), 0, "it no longer counts as a live shot")
+	check(not _spells.is_holding(0, 0), "the staff holds nothing")
+	check(_end_requests.is_empty(), "nobody is asked to end it: its room went")
+	check(_explosions.is_empty(), "no blast where it was")
+	_tick(90)
+	check_equal(_mgr.get_count(), 0, "its timer fires no more")
+	_bus.entity_ended.emit(0, &"familiar", Vector2(10, 10), held)
+	check(_explosions.is_empty() and _spells.live_shots(held) == 0, "an end heard later is ignored")
+	check_equal(_spells.current_tag(0, 0, 0), held, "the build stays")
+	_spawns.clear()
+	_cast()
+	check_equal(_spawns.size(), 1, "and casts again in the next room")
+
+
+func test_leaving_the_room_ends_a_pulse_ring() -> void:
+	_build(0, [&"blast", &"pulse"])
+	_cast()
+	_tick(5)
+	_bus.room_left.emit()
+	_explosions.clear()
+	_tick(60)
+	check(_explosions.is_empty(), "the ring of the room left never goes off")

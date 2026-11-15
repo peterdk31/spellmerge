@@ -242,19 +242,69 @@ func test_everyone_down_in_a_cleared_room_ends_the_run() -> void:
 
 
 ## A joining machine builds the room the run started in; a snapshot taken after the party went on
-## names a later room, whose layout `rebuild_derived` lays out again (core/sim/README.md, "Snapshots").
-func test_a_later_room_is_laid_out_again_after_a_snapshot() -> void:
+## names a later room. Restored there (core/sim/README.md, "Snapshots"), the game is the snapshot's
+## (the same hash), the later room's layout laid out again (`rebuild_derived`). Two templates of one
+## kind, so the second room is never the first's.
+func test_a_snapshot_taken_in_a_later_room_restores_into_the_first() -> void:
+	var run_id: StringName = PinnedRun.pin(registry, ARENA, &"", RoomKind.FILL_ENEMIES, 16, 2, 1)
+	var other := ARENA.duplicate() as RoomBase
+	other.id = StringName(String(run_id) + "_other")
+	other.biome = ARENA.biome
+	other.kinds = [run_id] as Array[StringName]
+	registry.call("add", &"rooms", other)
 	_play(2, 1)
-	flow.rebuild_derived()
-	var layout: Node = flow.get(&"_layout") as Node
-	check(layout != null and layout.is_inside_tree(), "the layout shown")
-	flow.set(&"_layout_of", &"another_room")
-	flow.rebuild_derived()
-	var again: Node = flow.get(&"_layout") as Node
-	check(again != layout and again != null and again.get_parent() == flow.world, "laid out again")
-	check_equal(flow.get(&"_layout_of"), flow.room_id, "as the room the run is in")
+	var first: StringName = flow.room_id
+	_clear_room()
+	_stand_in(0, 1)
+	flow.step(DT)
+	var later: StringName = flow.room_id
+	check(later != first, "the second room is the other template")
+	var snapshot: Snapshot = Snapshot.take(tick.state_areas(), root)
+	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
+	var taken_hash: Dictionary = SimHash.areas(tick.state_areas(), StateWalk.new())
+	# A joining machine: the run starts again (another seed) until its first room is not the later one.
+	for attempt in 32:
+		flow.stop_run()
+		events.emit_signal("play_requested", 0)
+		if flow.room_id != later:
+			break
+	check(flow.room_id != later and flow.get(&"_layout_of") != later, "the joining machine is in the other room")
+	var problems: PackedStringArray = snapshot.restore(tick.state_areas(), root)
+	check_equal(problems, PackedStringArray(), "restored without problems")
+	check_equal(flow.room_id, later, "in the later room")
+	check_equal(flow.get(&"_layout_of"), later, "its layout laid out again")
 	check_equal(_layouts(), 1, "one layout in the world")
-	check(not (flow.get(&"_places") as RoomPlaces).player_spawns.is_empty(), "its places read again")
+	check_equal(SimHash.areas(tick.state_areas(), StateWalk.new()), taken_hash, "the game is the snapshot's")
+
+
+## A seat that joins while the cleared room's exits are lit, with everyone else down, holds the
+## restart off, as in a room under way.
+func test_a_joiner_in_a_cleared_room_holds_the_restart_off() -> void:
+	_play(2, 1)
+	_clear_room()
+	var one := flow.get_wizard(0) as Actor
+	one.health.take(one.health.max_health)
+	check(flow.is_restarting(), "everyone down: the run is lost")
+	input.add_virtual_device(1)
+	events.emit_signal("player_joined", 1)
+	check(flow.get_wizard(1) != null, "the joiner stands")
+	check(not flow.is_restarting(), "the restart is off")
+	_stand_in(1, 1)
+	flow.step(DT)
+	check_equal(taken, [0] as Array[int], "the joiner, the one standing, takes the party on")
+	check(not one.is_down(), "and the downed wizard comes along, up")
+
+
+func test_the_room_left_is_told_before_it_goes() -> void:
+	var left: Array[int] = []
+	var told := func() -> void: left.append(entered.size())
+	events.connect("room_left", told)
+	_play(2, 1)
+	_clear_room()
+	_stand_in(0, 1)
+	flow.step(DT)
+	events.disconnect("room_left", told)
+	check_equal(left, [1] as Array[int], "room_left once, before the next room is entered")
 
 
 ## The exits spread the ways over them, left to right, in whole numbers.

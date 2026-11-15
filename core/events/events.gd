@@ -311,6 +311,10 @@ signal run_begun(run_id: StringName)
 ## the rooms it leads to (`ways`: `RoomKind` ids, left to right as the map's links; none for the
 ## run's last room). Heard by flow, which builds it and, once it is cleared, lights an exit a way.
 signal run_room_chosen(room_id: StringName, enemies: Array[StringName], ways: Array[StringName])
+## Sender: flow. The party leaves the run's room it is in for the next (run generation RG4), before
+## anything of it goes: what was cast in it ends quietly with it. Heard by core/spells (`leave_room`:
+## carriers, holds, waiting launches and moves end; builds stay).
+signal room_left()
 ## Sender: flow. Every standing wizard stands in the lit exit of way `way` (0 = the leftmost of the
 ## room's ways; run generation RG4): the party goes on. Heard by run, which moves on through the map
 ## to that room and answers with `run_room_chosen`. Not a command: stepping in is position only.
@@ -348,7 +352,8 @@ signal altar_placed(standing: bool, at: Vector2)
 signal room_exits_shown(at: PackedVector2Array, kinds: Array[StringName])
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
-## where each lies, in the scene's order. Sent once a run's room is made, after the run's start.
+## where each lies, in the scene's order. Sent once each room is made: after the run's start, and as
+## the party goes on into the next room of the run (run generation RG4: what lay in the room left goes).
 ## Heard by items, which lays them on the ground (or, the run taking along what lay on that room's
 ## ground, `Frames.next_run_ground`, that instead).
 signal room_items_placed(room_id: StringName, items: Array[Resource], at: PackedVector2Array)

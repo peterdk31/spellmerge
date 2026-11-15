@@ -60,7 +60,13 @@ static func generate(definition: RunDefinition, content: RunContent, sim: Sim) -
 		if nodes.is_empty():
 			continue
 		map.nodes = nodes
-		_pick_templates(map, content, dice)
+		var missing: String = _pick_templates(map, content, dice)
+		if missing != "":
+			# The validator holds every kind that leads on to a template with exits enough
+			# (`MapRules.exit_problems`): a map that still finds none is named, never stood.
+			map.nodes = [] as Array[RunNode]
+			map.problems = PackedStringArray(["%s: %s" % [definition.id, missing]])
+			return map
 		_fill(map, rules, content, dice)
 		return map
 	map.problems = PackedStringArray(["%s: %s: no map within its rules after %d tries (the kinds' max_per_row, max_per_run and not_after leave a room no kind)." % [definition.id, rules.biome, ATTEMPTS]])
@@ -250,10 +256,13 @@ static func _pick_kinds(before: Array[RunNode], here: Array[RunNode], table: Arr
 
 
 ## Step 3: each room a template of the map's biome that hosts its kind with an exit for each of its
-## links, by chance; one no room leading to it has, while one is left.
-static func _pick_templates(map: RunMap, content: RunContent, dice: Dice) -> void:
+## links, by chance; one no room leading to it has, while one is left. What is missing, or "" when
+## every room has its template.
+static func _pick_templates(map: RunMap, content: RunContent, dice: Dice) -> String:
 	for node: RunNode in map.nodes:
 		var hosts: Array[RoomBase] = content.templates_for(map.biome, node.kind, node.links.size())
+		if hosts.is_empty():
+			return "no %s room hosts '%s' with %d exits (room %d)." % [map.biome, node.kind, node.links.size(), node.index]
 		var fresh: Array[RoomBase] = []
 		var taken: Array[StringName] = []
 		for parent: int in map.parents_of(node.index):
@@ -263,6 +272,7 @@ static func _pick_templates(map: RunMap, content: RunContent, dice: Dice) -> voi
 				fresh.append(room)
 		var from: Array[RoomBase] = fresh if not fresh.is_empty() else hosts
 		node.room = from[dice.below(Step.TEMPLATES, from.size())].id
+	return ""
 
 
 ## Step 4: each room filled as its kind's `fill` says.

@@ -66,6 +66,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `run_room_chosen` | `run` (the map's room the party enters, what stands in it and the kinds of the rooms it leads to) | `flow` (builds it) |
 | `run_way_taken` | `flow` (every standing wizard in a lit exit) | `run` (moves on through the map) |
 | `room_exits_shown` | `flow` (the lit exits of a cleared room, and the kind behind each) | `feel` (the kind's name over each) |
+| `room_left` | `flow` (the party goes on to the next room of the run) | `core/spells` (what was cast in the room ends quietly) |
 | `room_entered` | `flow` | `ai`, `coop`, `difficulty`, `hud`, `feel` (its walls' colours for motes; the party camera jumps to the new room) |
 | `room_cleared` | `flow` | `rewards`, `run` |
 | `sandbox_changed` | `flow` | `hud` |

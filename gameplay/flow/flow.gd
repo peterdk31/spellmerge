@@ -1,13 +1,13 @@
 extends Node
-## Flow, the M1 slice (autoload `Flow`): starts the arena, spawns the fixed wave,
-## announces `room_entered` and `room_cleared`, and restarts the room when every
-## player is down. M3 replaces it with the real room sequence, door voting and
-## run lifecycle.
+## Flow (autoload `Flow`): starts a run's room, stands the enemies the room lists, announces
+## `room_entered` and `room_cleared`, and ends the run when the room is won or every player is
+## down. No waves (boss OB2a, docs/milestones/boss-old-broom.md, decision 30): a run is a path of
+## rooms; the paths and their exits come in OB2b, door voting and the rest of the run in M3.
 ##
-## Starting: the main menu sends `play_requested(player)` and nothing else. Flow
-## asks `core/registry` for the room (`rooms` / `arena_01`) and the enemy, checks that
+## Starting: `play_requested(player)` (the tests, the bots, the online spike). Flow
+## asks `core/registry` for the room (`rooms` / `arena_01`), checks that
 ## the start recipes compile, builds one `Node2D` world (room scene, a wizard for every joined player,
-## the wave, a camera) and makes it the current scene, so the menu goes away. The
+## the room's enemies, a camera) and makes it the current scene, so the menu goes away. The
 ## whole thing is built in the same frame, far inside the 10 seconds allowed.
 ##
 ## Players: one wizard for every player slot that has a device (`core/input`), so
@@ -19,16 +19,15 @@ extends Node
 ## `player_joined` / `player_left` and Flow adds a wizard at the room's spawn for
 ## that slot, or removes it (the run goes on; nobody waits for anyone).
 ##
-## Waves: wave 1 is WAVE (sized for four players); each wave after it has
-## WAVE_GROWTH more enemies, up to WAVE_MAX, from the same spawns and with the same
-## single enemy type. `wave_started(wave)` is sent as each begins. `room_cleared`
-## is sent when the last enemy of a wave has died, followed by `build_break_started`;
-## BUILD_BREAK seconds later, whoever is still building, the next wave stands in the same room (the world is kept; shots in flight are
-## cleared) and every downed wizard is back up, so a long run is "how many waves".
-## `difficulty` scales this properly in M3.
+## A room's fight (boss OB2a, decision 31): the enemies its data lists (`RoomBase.enemies`, ids of
+## `EnemyBase.FOLDERS`: enemies and bosses) stand at its enemy spawns as it starts, round the spawns
+## in turn (`stacked_position` when one is used again). When the last is down, `room_cleared`; with
+## no room after it (every room today; the paths come in OB2b) the run is won, and RUN_WON_DELAY
+## seconds later it ends as a lost one does: from the hub's stone, back to the hub; from
+## `play_requested`, the room again. A room that lists no enemy is won as it starts.
 ##
 ## Restart: when every wizard is down, a timer of RESTART_DELAY seconds runs, then
-## a fresh world replaces the old one: new wizards at full health, wave 1, no
+## a fresh world replaces the old one: new wizards at full health, the room's enemies again, no
 ## projectiles left, and `Spells` cleared (every cooldown and build is forgotten; each
 ## new wizard builds its start staffs again).
 ##
@@ -68,12 +67,12 @@ extends Node
 ##
 ## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
 ## main menu's Sandbox button, in every build) starts a run in the sandbox room
-## (`sandbox`): no waves, the dummies its scene stands (`RoomPlaces.dummies`: the training dummy,
+## (`sandbox`): no fight of its own, the dummies its scene stands (`RoomPlaces.dummies`: the training dummy,
 ## the shooting dummy, then a group of training dummies to try homing, pierce and spreads on), and `sandbox_changed(true)` so the HUD shows the sandbox page. The page sends
 ## `sandbox_action_requested`: `clear_enemies` takes the enemies the arena spawned away,
 ## `reset_dummies` puts fresh dummies back; `sandbox_spawn_requested` (the enemy arena, enemy AI AI8)
-## spawns any enemy (`spawn_in_sandbox`, while fewer than WAVE_MAX are up). Clearing them starts no
-## build break. When every wizard is down, after RESTART_DELAY they all stand up where they are and
+## spawns any enemy or boss (`spawn_in_sandbox`, while fewer than SANDBOX_MAX are up). Clearing them ends
+## nothing. When every wizard is down, after RESTART_DELAY they all stand up where they are and
 ## keep their staffs, instead of a restart. Its wizards hold four `dev` staffs and start with
 ## `sandbox_cards` (SANDBOX_START_CARDS), not `start_cards`: Play's A and X, and two showcase
 ## builds on Y (the most shots) and B (a decoy turret).
@@ -90,7 +89,7 @@ extends Node
 ## counted each tick and whenever a wizard joins or leaves (`hub`, `HubRules`), told by
 ## `start_stone_changed`, the stone asked to enter `lit` or `unlit` to match, so its look and cue
 ## are the prop's (props W8).
-## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts a run of waves at
+## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts a run at
 ## the tick's start, every wizard going in as the player it is: every bag, its staffs with their
 ## cards and its hands (owner, 2026-11-13: what a run's start takes along is the whole player; items
 ## I4, `start_run`'s `party`, a `PartyLoadout` of each wizard's `PlayerLoadout`); that run's end
@@ -112,21 +111,7 @@ extends Node
 ## (`Tick.begin_run`), so nothing of the run steps under the menu; the HUD shows the menu again, and
 ## the frames service and net/ end their part themselves. Not a command: only this machine leaves.
 ##
-## The trial gate (boss OB2, docs/milestones/boss-old-broom.md, decision 27): beside the hub's gate
-## (a prop of the role `trial_gate`) stands a lectern (`trial_lectern`), where a seat's A opens its
-## own menu of every room the lectern offers (`RoomBase.offered_for_trial`; the HUD's, OB2b), whose
-## pick is the command `trial_picked`, kept by the hub's rules by seat (`HubRules.picks`). The gate
-## is lit while every wizard stands in it and all of them picked the same room; then a seat's A
-## (`run_requested`, as on the stone) asks the frames service for the trial's start,
-## `trial_requested(seat, room)`, a run's start of its own recorded with its room, so the hub stands
-## until it comes and its party goes along (`_party_now`). The trial (MODE_TRIAL) is that room
-## with the enemies its scene stands (a boss's arena stands its boss), or, standing none, wave 1 of
-## `enemy_id_to_play`; every wizard goes in as the player it is, as through the stone. The room
-## cleared (after TRIAL_CLEARED_DELAY) or everyone down (after RESTART_DELAY), the party is back in
-## the hub as it left it: each seat's player as it went in (`_trial_party`), nothing found in the
-## trial coming back.
-##
-## Modes: `mode` says which run this is: MODE_WAVES (Play), MODE_SANDBOX, MODE_HUB or MODE_TRIAL (above).
+## Modes: `mode` says which run this is: MODE_RUN (a run of rooms), MODE_SANDBOX or MODE_HUB (above).
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -146,12 +131,9 @@ const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const LoadTask := preload("res://core/loading/load_task.gd")
 
 const PLAYER_SLOTS: int = 4
-## Registry folders, and the ids of the M1 content a run uses unless `room_id_to_play`,
-## `enemy_id_to_play` say otherwise.
+## The rooms' registry folder, and the room a run starts in unless `room_id_to_play` says otherwise.
 const ROOM_FOLDER: StringName = &"rooms"
 const DEFAULT_ROOM_ID: StringName = &"arena_01"
-const ENEMY_FOLDER: StringName = &"enemies"
-const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 ## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
 ## The cards each staff starts with in Play: A, X, Y, B (owner, 2026-11-05: dash and a bolt).
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"bolt"], [], []]
@@ -179,16 +161,12 @@ const HUB_ROOM_ID: StringName = &"hub"
 ## The zone of a room's scene Flow gives a meaning (`RoomPlaces.zone`; a place that is no thing):
 ## the prop yard (props W8).
 const ZONE_PROP_YARD: StringName = &"prop_yard"
-## The run modes (`mode`): Play's waves, the sandbox, the hub, a trial from the hub's gate.
-const MODE_WAVES: StringName = &"waves"
+## The run modes (`mode`): a run of rooms, the sandbox, the hub.
+const MODE_RUN: StringName = &"run"
 const MODE_SANDBOX: StringName = &"sandbox"
 const MODE_HUB: StringName = &"hub"
-const MODE_TRIAL: StringName = &"trial"
-## The start a trial goes by (`Replay.STARTS`, with its room) and the hub's.
-const TRIAL_START: StringName = &"trial_requested"
-const HUB_START: StringName = &"hub_requested"
-## The cue played on every standing wizard as a wave starts (`_show_wave_start`).
-const WAVE_START_CUE: StringName = &"wave_start"
+## The cue played on every standing wizard as a run's room starts (`_show_room_start`).
+const ROOM_START_CUE: StringName = &"room_start"
 ## The actions of `sandbox_action_requested`.
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
 ## The enemy arena (enemy AI AI8): every enemy the sandbox spawned goes.
@@ -201,24 +179,17 @@ const STARTER_HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
 ## other hands are empty (items I2, owner 2026-11-13: players start with two staffs). The sandbox
 ## holds the `dev` staff on every hand.
 const START_HANDS: int = 2
-## The wave, sized for four players: one enemy per entry, placed at the room's
-## enemy spawn with that index (wrapped if the room has fewer). An index used
-## again puts the enemy a step further along the diagonal.
-const WAVE: Array[int] = [0, 1, 2, 3, 4, 5, 0, 3]
-const WAVE_REPEAT_OFFSET: Vector2 = Vector2(14.0, 14.0)
-const WAVE_STACK_DEPTH: int = 3
-const WAVE_LAP_OFFSET: Vector2 = Vector2(-14.0, 14.0)
-## Enemies added by each wave after the first, and the most one wave holds.
-const WAVE_GROWTH: int = 2
-const WAVE_MAX: int = 24
-## Seconds from a cleared wave until the next one stands: the build break. A fixed
-## length, so nobody's building holds the wave back or speeds it up (a first guess,
-## tuned at C2).
-const BUILD_BREAK: float = 12.0
+## Where the enemies stand: round the room's enemy spawns in turn; a spawn used again puts the next
+## one a step further along the diagonal (SPAWN_STACK_DEPTH steps, then a lap to the side).
+const SPAWN_REPEAT_OFFSET: Vector2 = Vector2(14.0, 14.0)
+const SPAWN_STACK_DEPTH: int = 3
+const SPAWN_LAP_OFFSET: Vector2 = Vector2(-14.0, 14.0)
+## The most enemies the sandbox's enemy arena keeps up.
+const SANDBOX_MAX: int = 24
+## Seconds from a run's room won until the run ends: the kill seen out.
+const RUN_WON_DELAY: float = 2.0
 ## Seconds from the last wizard going down until the room restarts (under 3).
 const RESTART_DELAY: float = 1.5
-## Seconds from a trial's room cleared until the party is back in the hub: the kill seen out.
-const TRIAL_CLEARED_DELAY: float = 2.0
 ## Extra room around the room scene where projectiles may still fly, in pixels.
 const PROJECTILE_MARGIN: float = 32.0
 ## Name of the world node.
@@ -252,12 +223,11 @@ var spells: SpellsScript = null
 ## Where the world goes. Only tests set this; otherwise the world becomes the
 ## current scene (the main menu is freed).
 var world_parent: Node = null
-## What the next run is made of, by registry id. Later features (a room picker, a loadout)
-## set these; the room, enemy and spell components themselves are content found by folder, so a
+## What the next run is made of, by registry id. Later features (the lectern, a loadout)
+## set these; the rooms, enemies and spell components themselves are content found by folder, so a
 ## new one needs no change here. `wizard_scene` is the wizard every player gets (its art is in
 ## the scene). The start recipes are component ids (a recipe as in `core/spells`).
 var room_id_to_play: StringName = DEFAULT_ROOM_ID
-var enemy_id_to_play: StringName = DEFAULT_ENEMY_ID
 var start_cards: Array = DEFAULT_START_CARDS.duplicate(true)
 ## Play's bag (PLAY_BAG unless a test sets another).
 var play_bag: Array[StringName] = PLAY_BAG.duplicate()
@@ -280,10 +250,8 @@ var state: State = State.IDLE
 var world: Node2D = null
 ## The id of the room of the run in progress.
 var room_id: StringName = &""
-## The wave in progress (1 for the first of a run; 0 before a run and in the sandbox).
-var wave: int = 0
-## The mode of the run in progress, or of the next one (MODE_WAVES when idle).
-var mode: StringName = MODE_WAVES
+## The mode of the run in progress, or of the next one (MODE_RUN when idle).
+var mode: StringName = MODE_RUN
 ## True while the run is in the sandbox (and for its restarts). Read only: set `mode`.
 var sandbox: bool:
 	get:
@@ -302,8 +270,6 @@ var _restart_left: float = -1.0
 ## By seat: seconds until that seat's downed wizard stands up by itself (`RoomBase.stand_up_after`,
 ## the hub), or -1 for none counting.
 var _stand_up_left: Array[float] = [-1.0, -1.0, -1.0, -1.0]
-var _next_wave_left: float = -1.0
-var _enemy_data: EnemyBase = null
 ## What is where in the room shown (read from the layout built for this run; worked out from it: a
 ## joining machine builds the same room by the same `start_run` before a snapshot, so nothing
 ## rebuilds it).
@@ -312,12 +278,8 @@ var _places: RoomPlaces = RoomPlaces.new()
 var contents: RoomContents = RoomContents.new()
 var yard: PropYard = PropYard.new()
 var hub: HubRules = HubRules.new()
-## True while the run of waves in progress was started from the hub's stone: its end goes back there.
+## True while the run in progress was started from the hub's stone: its end goes back there.
 var _back_to_hub: bool = false
-## The room of the trial in progress (MODE_TRIAL), and what the party took into it, as a
-## PartyLoadout's bytes (what goes back to the hub with it: `_party_now`).
-var trial_room: StringName = &""
-var _trial_party: PackedByteArray = PackedByteArray()
 
 
 func _ready() -> void:
@@ -350,14 +312,12 @@ func _ready() -> void:
 	events.play_requested.connect(_on_play_requested)
 	events.sandbox_requested.connect(_on_sandbox_requested)
 	events.hub_requested.connect(_on_hub_requested)
-	events.trial_requested.connect(_on_trial_requested)
 	events.main_menu_requested.connect(_on_main_menu_requested)
 	events.play_load_requested.connect(_on_play_load_requested)
 	# Commands, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"sandbox_action_requested", _on_sandbox_action_requested)
 	events.listen(&"sandbox_spawn_requested", _on_sandbox_spawn_requested)
 	events.listen(&"run_requested", _on_run_requested)
-	events.listen(&"trial_picked", _on_trial_picked)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
@@ -365,8 +325,8 @@ func _ready() -> void:
 	events.player_left.connect(_on_player_left)
 
 
-## Advance the intro, the next wave's and the restart timers by `delta` seconds; the prop yard; in
-## the hub, the stone.
+## Advance the intro and the run's end (restart) timer by `delta` seconds; the prop yard; in the hub,
+## the stone.
 func step(delta: float) -> void:
 	if intro != null:
 		intro.step(delta)
@@ -377,11 +337,6 @@ func step(delta: float) -> void:
 	if mode == MODE_HUB and state == State.RUNNING:
 		_count_stone()
 		return
-	if _next_wave_left >= 0.0:
-		_next_wave_left -= delta
-		if _next_wave_left <= 0.0:
-			_next_wave_left = -1.0
-			_start_next_wave()
 	if _restart_left < 0.0:
 		return
 	_restart_left -= delta
@@ -389,8 +344,6 @@ func step(delta: float) -> void:
 		_restart_left = -1.0
 		if mode == MODE_SANDBOX:
 			_stand_everyone_up()
-		elif mode == MODE_TRIAL:
-			_back_from_trial()
 		elif _back_to_hub:
 			# Back in the hub the party is ready for a new run: nothing of the run comes back
 			# with it, its staffs neither (owner, 2026-11-10). The hub is the arsenal the next
@@ -402,7 +355,7 @@ func step(delta: float) -> void:
 				# when this run is recorded (a recording never grows past one stretch of play).
 				var starter: int = _starter
 				stop_run()
-				frames.restart(HUB_START, starter)
+				frames.restart(&"hub_requested", starter)
 				return
 			mode = MODE_HUB
 			if not start_run(_starter):
@@ -414,31 +367,21 @@ func step(delta: float) -> void:
 			stop_run()
 
 
-## Seconds of the build break left, or 0 when there is none.
-func build_break_left() -> float:
-	return maxf(_next_wave_left, 0.0)
-
-
-## True while a restart is counting down.
+## True while the run's end (a restart, or the way back to the hub) is counting down.
 func is_restarting() -> bool:
 	return _restart_left >= 0.0
 
 
-## Where the `times`-th enemy (0 = first) at `spawn` stands: up to WAVE_STACK_DEPTH
+## Where the `times`-th enemy (0 = first) at `spawn` stands: up to SPAWN_STACK_DEPTH
 ## steps along the diagonal, then the next row starts a lap further to the side, so
 ## a stack never runs into a wall.
 static func stacked_position(spawn: Vector2, times: int) -> Vector2:
-	var step: int = times % WAVE_STACK_DEPTH
-	var lap: int = times / WAVE_STACK_DEPTH
-	return spawn + WAVE_REPEAT_OFFSET * float(step) + WAVE_LAP_OFFSET * float(lap)
+	var step: int = times % SPAWN_STACK_DEPTH
+	var lap: int = times / SPAWN_STACK_DEPTH
+	return spawn + SPAWN_REPEAT_OFFSET * float(step) + SPAWN_LAP_OFFSET * float(lap)
 
 
-## How many enemies wave `number` (1 or more) has.
-static func wave_size(number: int) -> int:
-	return mini(WAVE.size() + WAVE_GROWTH * maxi(number - 1, 0), WAVE_MAX)
-
-
-## Enemies of the wave still alive (the sandbox's imps; never its dummies).
+## Enemies of the room's fight (or the sandbox's arena) still alive; never its dummies.
 func enemies_left() -> int:
 	return _enemies.size()
 
@@ -468,13 +411,13 @@ func get_wizard(index: int) -> Node2D:
 	return null
 
 
-## A wave starting: its cue (WAVE_START_CUE, content/cues; S6, item 13) on every wizard standing in
-## the world, so content gives the moment its look.
-func _show_wave_start() -> void:
+## A run's room starting: its cue (ROOM_START_CUE, content/cues; S6, item 13) on every wizard
+## standing in the world, so content gives the moment its look.
+func _show_room_start() -> void:
 	for wizard: Node2D in _wizards:
 		var actor := wizard as Actor
 		if actor != null and is_instance_valid(actor) and actor.is_inside_tree() and not actor.is_down():
-			events.cue_shown.emit(actor.id, WAVE_START_CUE, actor.global_position, Vector2.ZERO, 0.0, Color.WHITE, 0)
+			events.cue_shown.emit(actor.id, ROOM_START_CUE, actor.global_position, Vector2.ZERO, 0.0, Color.WHITE, 0)
 
 
 ## The home seat of a wizard actor (its PlayerController's), or -1.
@@ -490,9 +433,8 @@ func _seat_of(wizard: Node) -> int:
 ## false (and starts nothing) when content is missing or no player has a device.
 func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id_for_mode()) as RoomBase if registry != null else null
-	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, enemy_id_to_play) as EnemyBase if registry != null else null
-	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null:
-		push_warning("Flow: the room or the enemy is missing from the registry, so no run starts.")
+	if room == null or room.scene == null:
+		push_warning("Flow: the room is missing from the registry, so no run starts.")
 		return false
 	if spells == null:
 		push_warning("Flow: the Spells autoload is missing, so no run starts.")
@@ -510,10 +452,8 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	_starter = requester
 	_restart_left = -1.0
 	_stand_up_left.fill(-1.0)
-	_next_wave_left = -1.0
 	_clear_run()
 	_room = room
-	_enemy_data = enemy_data
 	_wizard_scene = wizard_scene
 	# The run starts from a fresh game's state (online-ready N3b): the one clock from 0, and every
 	# service as a fresh one's (`Tick.begin_run`; the autoload, found on use).
@@ -544,15 +484,8 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	_spawn_players(new_world, room, players, party)
 	contents.stand(new_world, _places)
 	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
-	match mode:
-		MODE_SANDBOX, MODE_HUB:
-			wave = 0
-		MODE_TRIAL:
-			wave = 0
-			_stand_trial_enemies(new_world, room, enemy_data)
-		_:
-			wave = 1
-			_spawn_wave(new_world, room, enemy_data, wave)
+	if mode == MODE_RUN:
+		_stand_room_enemies(new_world, room)
 	world = new_world
 	room_id = room.id
 	state = State.RUNNING
@@ -563,11 +496,10 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 		var items: Array = RoomContents.items_of(_places)
 		events.room_items_placed.emit(room.id, items[0], items[1])
 		events.sandbox_changed.emit(mode == MODE_SANDBOX)
-		if mode == MODE_WAVES:
-			events.wave_started.emit(wave)
-			_show_wave_start()
+		if mode == MODE_RUN:
+			_show_room_start()
 	_count_stone()
-	_check_trial_won()
+	_check_room_won()
 	return true
 
 
@@ -578,8 +510,6 @@ func room_id_for_mode() -> StringName:
 			return SANDBOX_ROOM_ID
 		MODE_HUB:
 			return HUB_ROOM_ID
-		MODE_TRIAL:
-			return trial_room
 	return room_id_to_play
 
 
@@ -595,15 +525,11 @@ func stop_run() -> void:
 			_detach(shown)
 	_restart_left = -1.0
 	_stand_up_left.fill(-1.0)
-	_next_wave_left = -1.0
 	_back_to_hub = false
-	trial_room = &""
-	_trial_party = PackedByteArray()
-	wave = 0
 	_clear_run()
 	state = State.IDLE
 	var was: StringName = mode
-	mode = MODE_WAVES
+	mode = MODE_RUN
 	if was == MODE_SANDBOX and events != null:
 		events.sandbox_changed.emit(false)
 	_count_stone()
@@ -629,7 +555,7 @@ func _on_play_requested(player: int) -> void:
 
 ## Play, once the work before a room is loaded: the intro first on a new save, else the run.
 func _start_play(player: int) -> void:
-	mode = MODE_WAVES
+	mode = MODE_RUN
 	_back_to_hub = false
 	_intro_then_run(player)
 
@@ -730,16 +656,15 @@ func _on_sandbox_requested(player: int) -> void:
 func _start_sandbox(player: int) -> void:
 	mode = MODE_SANDBOX
 	if not start_run(player):
-		mode = MODE_WAVES
+		mode = MODE_RUN
 
 
 func _on_hub_requested(player: int) -> void:
 	# What the hub's wizards take along (the recording's, read before the hub it was made in goes).
 	var party: PartyLoadout = frames.next_run_party() if frames != null else null
 	# Asked for in the hub, the hub starts anew (a recording of it begins: net/ opens the room), each
-	# wizard with everything it held; asked for at a trial's end (it stands still, `_back_from_trial`),
-	# the party is back from it. A trial still fought is never left so.
-	if (state == State.RUNNING and mode == MODE_HUB) or (state == State.CLEARED and mode == MODE_TRIAL):
+	# wizard with everything it held.
+	if state == State.RUNNING and mode == MODE_HUB:
 		stop_run()
 	if state != State.IDLE:
 		return
@@ -754,149 +679,25 @@ func _start_hub(player: int, party: PartyLoadout = null) -> void:
 	_back_to_hub = false
 	_intro_then_run(player, party)
 	if state == State.IDLE:
-		# Nothing started (content missing): idle is MODE_WAVES.
-		mode = MODE_WAVES
+		# Nothing started (content missing): idle is MODE_RUN.
+		mode = MODE_RUN
 
 
 ## The command `run_requested` (a seat pressed A on the lit stone; the HUD sends it, heard at the
-## tick's start): the run of waves starts, for that seat, while the stone is lit. The stone's count
+## tick's start): the run starts, for that seat, while the stone is lit. The stone's count
 ## is the last tick's, made again when a wizard joined or left since, so it is exact here.
 func _on_run_requested(player: int) -> void:
-	if state != State.RUNNING or get_wizard(player) == null:
+	if not is_stone_lit() or state != State.RUNNING or get_wizard(player) == null:
 		return
-	if is_stone_lit():
-		_start_run_from_stone(player)
-	elif is_gate_lit():
-		_send_to_trial(player)
+	_start_run_from_stone(player)
 
 
-## The command `trial_picked` (a seat's pick on the lectern's menu, heard at the tick's start): that
-## seat's wizard in the hub picks `room_id` for the gate, if the lectern offers it (`&""`: takes its
-## pick back).
-func _on_trial_picked(player: int, room_id: StringName) -> void:
-	if mode != MODE_HUB or state != State.RUNNING or get_wizard(player) == null:
-		return
-	if room_id != &"" and not is_trial_room(room_id):
-		return
-	hub.pick(player, room_id)
-	_count_stone()
-
-
-## True when the lectern offers the room `room_id` as a trial (`RoomBase.offered_for_trial`).
-func is_trial_room(room_id: StringName) -> bool:
-	if registry == null or room_id == &"":
-		return false
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase
-	return room != null and not RoomBase.offered_for_trial([room]).is_empty()
-
-
-## The party, from the lit gate, goes to the room every wizard picked, for seat `seat`: a run's
-## start of its own, asked of the frames service (sent between ticks, the same on every machine,
-## recorded with its room), the hub standing until it comes so its party goes along. With no frames
-## service (some tests), at once.
-func _send_to_trial(seat: int) -> void:
-	var room: StringName = hub.agreed_pick()
-	if frames != null:
-		frames.restart(TRIAL_START, seat, room)
-	else:
-		_on_trial_requested(seat, room)
-
-
-## A trial's start (`trial_requested`, from the frames service): the party goes into the room
-## `room_id`, for seat `player`, every wizard as the player it is (what the run takes along:
-## `Frames.next_run_party`, the hub's party), and its end brings it back to the hub as it left it.
-## A room the lectern does not offer starts nothing (the hub, if it is up, stands as it was).
-func _on_trial_requested(player: int, room_id: StringName) -> void:
-	if state == State.INTRO or state == State.LOADING:
-		return
-	if not is_trial_room(room_id):
-		push_warning("Flow: no trial room '%s', so no trial starts." % room_id)
-		return
-	var party: PartyLoadout = frames.next_run_party() if frames != null else _party_now()
-	# From nothing (a recording of a trial played from its start): the work before a room first, as
-	# the hub's start does; from the hub it is done.
-	if state == State.IDLE and _load_then(_start_trial.bind(player, room_id, party)):
-		return
-	_start_trial(player, room_id, party)
-
-
-## The trial in `room_id`, for seat `player`, each seat's wizard as `party` says.
-func _start_trial(player: int, room_id: StringName, party: PartyLoadout) -> void:
-	var was_mode: StringName = mode
-	var was_room: StringName = trial_room
-	var was_party: PackedByteArray = _trial_party
-	mode = MODE_TRIAL
-	trial_room = room_id
-	_trial_party = PackedByteArray()
-	party.encode_into(_trial_party)
-	_back_to_hub = false
-	if not start_run(player, party):
-		# It refused before freeing anything (content missing): what stood before stands.
-		push_warning("Flow: the trial in '%s' did not start." % room_id)
-		mode = was_mode
-		trial_room = was_room
-		_trial_party = was_party
-
-
-## What a trial takes along, read back from its bytes (empty when there are none).
-func _trial_party_loadout() -> PartyLoadout:
-	var party := PartyLoadout.new()
-	if _trial_party.is_empty():
-		return party
-	var problem: String = party.decode_at(_trial_party, 0)
-	if problem != "":
-		push_warning("Flow: what the party took into the trial does not read (%s), so it comes back with nothing." % problem)
-		return PartyLoadout.new()
-	return party
-
-
-## A trial's end (its room cleared, or everyone down): the party is back in the hub as it left it.
-## The hub is a run's start of its own, asked of the frames service; the trial stands until it
-## comes (nothing more happens in it: it is no longer running), so what goes back with the party is
-## still what it took in (`_party_now`). With no frames service, the hub starts at once.
-func _back_from_trial() -> void:
-	state = State.CLEARED
-	_restart_left = -1.0
-	if frames != null:
-		frames.restart(HUB_START, _starter)
-		return
-	var party: PartyLoadout = _party_now()
-	var starter: int = _starter
-	stop_run()
-	mode = MODE_HUB
-	if not start_run(starter, party):
-		push_warning("Flow: the hub did not start again after the trial.")
-		stop_run()
-
-
-## A trial's enemies: the ones its scene stands (a boss's arena stands its boss), or, with none,
-## wave 1 of the run's enemy at its enemy spawns, so every room offered is a fight. A room with
-## neither is won as it starts (`_check_trial_won`), so no trial is ever stuck.
-func _stand_trial_enemies(parent: Node2D, room: RoomBase, enemy_data: EnemyBase) -> void:
-	_enemies.clear()
-	for body: Node in contents.of_kind(EnemyBase):
-		_enemies.append(body)
-	if _enemies.is_empty():
-		_spawn_wave(parent, room, enemy_data, 1)
-
-
-## A trial with no enemy left is won: a moment to see the kill, then back to the hub
-## (`_back_from_trial`).
-func _check_trial_won() -> void:
-	if not _enemies.is_empty() or state != State.RUNNING or mode != MODE_TRIAL:
-		return
-	state = State.CLEARED
-	_restart_left = TRIAL_CLEARED_DELAY
-	if events != null:
-		events.room_cleared.emit(room_id)
-
-
-## The run of waves, from the hub's stone, for seat `seat`: every wizard goes in as the player it
+## The run, from the hub's stone, for seat `seat`: every wizard goes in as the player it
 ## is, with every bag, its staffs and its hands (owner, 2026-11-13: what a run's start takes along
 ## is the whole player), and the run's end brings everyone back to the hub.
 func _start_run_from_stone(seat: int) -> void:
 	var party: PartyLoadout = _party_of()
-	mode = MODE_WAVES
+	mode = MODE_RUN
 	_back_to_hub = true
 	if not start_run(seat, party):
 		# It refused before freeing anything (content missing): the hub stands as it was.
@@ -922,9 +723,6 @@ func _party_of() -> PartyLoadout:
 ## joining machine keeps them, on every machine; anywhere else nothing, since nothing comes back
 ## from a run (owner, 2026-11-10).
 func _party_now() -> PartyLoadout:
-	# A trial's end: the party goes back as it left the hub (nothing found in the trial comes back).
-	if mode == MODE_TRIAL and state != State.IDLE:
-		return _trial_party_loadout()
 	if mode != MODE_HUB or state != State.RUNNING:
 		return PartyLoadout.new()
 	return _party_of()
@@ -944,16 +742,10 @@ func is_stone_lit() -> bool:
 	return mode == MODE_HUB and hub.is_lit()
 
 
-## True while the hub's trial gate is lit: every wizard of the hub stands in it, and all of them
-## picked the same room (`HubRules.is_gate_lit`).
-func is_gate_lit() -> bool:
-	return mode == MODE_HUB and hub.is_gate_lit()
-
-
 ## The hub's rules count the wizards on its stone and altar (none out of the hub), light the stone
 ## and tell what changed (`HubRules.count`).
 func _count_stone() -> void:
-	hub.count(mode == MODE_HUB and state != State.IDLE and _room != null, _wizards, contents, events, registry)
+	hub.count(mode == MODE_HUB and state != State.IDLE and _room != null, _wizards, contents, events)
 
 
 ## A sandbox page's action. Ignored out of the sandbox. It changes the room only, never a
@@ -978,22 +770,19 @@ func _on_sandbox_spawn_requested(player: int, enemy_id: StringName, count: int) 
 
 
 ## Put `count` enemies of the registry's `enemy_id` in the sandbox room, at its enemy spawns, while
-## fewer than WAVE_MAX are up (the enemy arena: to play against one kind, or tune it; tests use it
+## fewer than SANDBOX_MAX are up (the enemy arena: to play against one kind, or tune it; tests use it
 ## too). Returns how many came; 0 out of a sandbox run or for an unknown id.
 func spawn_in_sandbox(enemy_id: StringName, count: int) -> int:
 	if mode != MODE_SANDBOX or state == State.IDLE or world == null or _room == null or registry == null:
 		return 0
-	var data: EnemyBase = null
-	for folder: StringName in EnemyBase.FOLDERS:
-		if data == null:
-			data = registry.get_resource(folder, enemy_id) as EnemyBase
+	var data: EnemyBase = _enemy_data_of(enemy_id)
 	if data == null or data.scene == null:
 		push_warning("Flow: no enemy '%s' to spawn in the sandbox." % enemy_id)
 		return 0
-	var room_left: int = WAVE_MAX - _enemies.size()
+	var room_left: int = SANDBOX_MAX - _enemies.size()
 	var wanted: int = clampi(count, 0, room_left)
 	var before: int = _enemies.size()
-	_spawn_enemies(world, _room, data, wanted)
+	_spawn_enemies(world, data, wanted, before)
 	return _enemies.size() - before
 
 
@@ -1022,7 +811,7 @@ func _on_player_joined(player: int) -> void:
 		joiner.protect(DownedScript.JOIN_PROTECTION)
 	_downed[player] = false
 	_stand_up_left[player] = -1.0
-	if _restart_left >= 0.0 and not _all_down():
+	if state == State.RUNNING and _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
 	# Heard at the tick's start: the stone goes out under a joiner before any command is applied.
 	_count_stone()
@@ -1054,32 +843,20 @@ func _on_enemy_died(_player: int, enemy: Node, _position: Vector2, _shot: int) -
 	if at < 0:
 		return
 	_enemies.remove_at(at)
-	if mode == MODE_TRIAL:
-		_check_trial_won()
-		return
-	if _enemies.is_empty() and state == State.RUNNING and mode == MODE_WAVES:
-		state = State.CLEARED
-		_next_wave_left = BUILD_BREAK
-		if events != null:
-			events.room_cleared.emit(room_id)
-			events.build_break_started.emit(BUILD_BREAK)
+	_check_room_won()
 
 
-## The next wave in the same room: downed wizards stand up (and are protected for
-## a moment), stray shots go, and a bigger wave spawns.
-func _start_next_wave() -> void:
-	if state != State.CLEARED or world == null or _room == null or _enemy_data == null:
+## A run's room with no enemy left is won (decision 30): `room_cleared`, and with no room after it
+## (every room until OB2b's paths) the run ends RUN_WON_DELAY seconds later, as a lost one does.
+func _check_room_won() -> void:
+	if not _enemies.is_empty() or state != State.RUNNING or mode != MODE_RUN:
 		return
-	if projectiles != null:
-		projectiles.clear()
-	_stand_up_wizards()
-	_restart_left = -1.0
-	wave += 1
-	_spawn_wave(world, _room, _enemy_data, wave)
-	state = State.RUNNING
+	state = State.CLEARED
+	# Everyone already down (the last enemy fell to a shot still flying): that end keeps its time.
+	if _restart_left < 0.0:
+		_restart_left = RUN_WON_DELAY
 	if events != null:
-		events.wave_started.emit(wave)
-		_show_wave_start()
+		events.room_cleared.emit(room_id)
 
 
 ## The sandbox's answer to everyone down: they all stand up where they are, protected for a
@@ -1153,7 +930,7 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 		return
 	_downed[player] = false
 	_stand_up_left[player] = -1.0
-	if _restart_left >= 0.0 and not _all_down():
+	if state == State.RUNNING and _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
 
 
@@ -1279,7 +1056,7 @@ func start_cards_for_mode() -> Array:
 func bag_for_mode() -> Dictionary:
 	var out: Dictionary = {}
 	match mode:
-		MODE_SANDBOX, MODE_HUB, MODE_TRIAL:
+		MODE_SANDBOX, MODE_HUB:
 			out = Inventory.dev_cards(registry)
 		_:
 			for id: StringName in play_bag:
@@ -1304,24 +1081,43 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 	_wizards.append(wizard)
 
 
-func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -> void:
+## The enemies the room lists (`RoomBase.enemies`) stand at its enemy spawns, round them in turn.
+func _stand_room_enemies(parent: Node2D, room: RoomBase) -> void:
 	_enemies.clear()
-	_spawn_enemies(parent, room, data, wave_size(number))
+	var placed: int = 0
+	for line: RoomEnemies in room.enemies:
+		if line == null:
+			continue
+		var data: EnemyBase = _enemy_data_of(line.enemy)
+		if data == null or data.scene == null:
+			push_warning("Flow: the room '%s' lists '%s', which the registry has no enemy or boss for." % [room.id, line.enemy])
+			continue
+		_spawn_enemies(parent, data, line.count, placed)
+		placed += line.count
 
 
-## Add `count` enemies to `_enemies`, placed as a wave of that size is.
-func _spawn_enemies(parent: Node2D, room: RoomBase, data: EnemyBase, count: int) -> void:
+## The enemy or boss `enemy_id` (`EnemyBase.FOLDERS`, in turn), or null.
+func _enemy_data_of(enemy_id: StringName) -> EnemyBase:
+	if registry == null:
+		return null
+	for folder: StringName in EnemyBase.FOLDERS:
+		var data: EnemyBase = registry.get_resource(folder, enemy_id) as EnemyBase
+		if data != null:
+			return data
+	return null
+
+
+## Add `count` enemies of `data` to `_enemies`, the first as the `first`-th of the room's fight: each
+## at the next enemy spawn in turn, stacked where a spawn is used again (`stacked_position`).
+func _spawn_enemies(parent: Node2D, data: EnemyBase, count: int, first: int) -> void:
 	var spawns: PackedVector2Array = _places.enemy_spawns
 	if spawns.is_empty():
-		push_warning("Flow: the room has no enemy spawns, so the wave is empty.")
+		push_warning("Flow: the room has no enemy spawns, so its enemies cannot stand.")
 		return
-	var uses: Dictionary = {}
 	for at: int in count:
-		# Wave 1 is WAVE as written; a bigger wave carries on round the spawns.
-		var entry: int = WAVE[at] if at < WAVE.size() else at
-		var spawn: int = entry % spawns.size()
-		var times: int = uses.get(spawn, 0)
-		uses[spawn] = times + 1
+		var nth: int = first + at
+		var spawn: int = nth % spawns.size()
+		var times: int = nth / spawns.size()
 		var enemy := RoomContents.make_body(data) as Actor
 		if enemy == null:
 			continue

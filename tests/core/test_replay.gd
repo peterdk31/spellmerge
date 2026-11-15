@@ -1,7 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The replay (core/sim/replay.gd, online-ready N2): its header (with the run's rules since N11, and
-## what the run takes along since the online lobby: the players' loadouts, items I4; the room a
-## trial starts in since boss OB2) and
+## what the run takes along since the online lobby: the players' loadouts, items I4) and
 ## ticks there and back through bytes and a file in user://replays/, and the strict decoder rejecting
 ## what is not a whole valid replay.
 
@@ -79,22 +78,6 @@ func test_a_replay_comes_back_from_its_bytes() -> void:
 	check(b[1].move == Vector2i.ZERO and b[1].commands.is_empty(), "a seat with no frame reads cleared")
 	check_equal(back.read_tick(3, b), -1, "no tick past the end")
 	check_equal(back.to_bytes(), replay.to_bytes(), "the same bytes again")
-	check_equal(back.start_room, &"", "a start that names no room has none")
-
-
-## A trial (boss OB2) is a start that names its room: the header keeps it.
-func test_a_trials_room_comes_back_from_its_bytes() -> void:
-	var replay := _made()
-	replay.start = &"trial_requested"
-	replay.start_room = &"arena_01"
-	var back: Replay = Replay.from_bytes(replay.to_bytes())
-	check(back != null, "valid")
-	if back == null:
-		return
-	check_equal(back.start, &"trial_requested", "how it started")
-	check_equal(back.start_room, &"arena_01", "in which room")
-	check_equal(back.tick_count(), 3, "every tick after it")
-	check_equal(back.to_bytes(), replay.to_bytes(), "the same bytes again")
 
 
 func test_the_decoder_rejects_bad_replays() -> void:
@@ -114,9 +97,6 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	var before_ground: PackedByteArray = good.duplicate()
 	before_ground[4] = 7
 	cases["format 7 (before the ground)"] = before_ground
-	var before_room: PackedByteArray = good.duplicate()
-	before_room[4] = 8
-	cases["format 8 (before the start's room)"] = before_room
 	var older: PackedByteArray = good.duplicate()
 	older[4] = 1
 	cases["format 1 (before the rules)"] = older
@@ -127,23 +107,8 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	var starter: PackedByteArray = good.duplicate()
 	starter[build_end + 17] = 4
 	cases["starter 4"] = starter
-	# The start's room: its length, then its letters (none for a start that names no room).
-	var room_at: int = build_end + 19
-	var trial: int = Replay.STARTS.find(&"trial_requested")
-	var trial_no_room: PackedByteArray = good.duplicate()
-	trial_no_room[build_end + 16] = trial
-	cases["a trial that names no room"] = trial_no_room
-	var named: PackedByteArray = good.slice(0, room_at) + PackedByteArray([1, 0x61]) + good.slice(room_at + 1)
-	cases["a room on a start that names none"] = named
-	var no_id: PackedByteArray = good.slice(0, room_at) + PackedByteArray([1, 0x2f]) + good.slice(room_at + 1)
-	no_id[build_end + 16] = trial
-	cases["a trial's room that is no id (a slash)"] = no_id
-	var long_room: PackedByteArray = good.duplicate()
-	long_room[build_end + 16] = trial
-	long_room[room_at] = 200
-	cases["a trial's room longer than the header"] = long_room
 	# The rules: shot cap, hit work, fire shots (three 32-bit numbers).
-	var rules_at: int = room_at + 1
+	var rules_at: int = build_end + 19
 	var no_cap: PackedByteArray = good.duplicate()
 	no_cap.encode_u32(rules_at, 0)
 	cases["a shot cap of 0"] = no_cap

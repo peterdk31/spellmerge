@@ -6,8 +6,8 @@ extends "res://tests/support/suite.gd"
 ##   under a holder, which would sort as one piece against the rest.
 ##
 ## These are Flow's code, the same in every room, so two rooms cover every way a body is stood: the
-## hub (wizards, the room's props and the prop yard's) and the first wave room (wizards and a wave
-## of enemies). What a room's own scene could break, its root moved off (0, 0) or a body standing
+## hub (wizards, the room's props and the prop yard's) and a run's first room (wizards and its
+## enemies). What a room's own scene could break, its root moved off (0, 0) or a body standing
 ## above or left of it, is one of `RoomPlaces.problems()`, read for every room by
 ## tests/content/rooms/test_room_places.gd without playing it. So this costs the same however many
 ## rooms there are.
@@ -34,7 +34,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	flow.stop_run()
-	flow.mode = FlowScript.MODE_WAVES
+	flow.mode = FlowScript.MODE_RUN
 	flow.world_parent = null
 	for index in 4:
 		input.leave(index)
@@ -67,8 +67,8 @@ func test_the_hub_sorts_its_wizards_and_props_together() -> void:
 	check_equal(flow.get_wizard(0).get_parent(), flow.world, "a wizard among them")
 
 
-func test_a_wave_room_sorts_its_wizards_and_enemies_together() -> void:
-	flow.mode = FlowScript.MODE_WAVES
+func test_a_run_room_sorts_its_wizards_and_enemies_together() -> void:
+	flow.mode = FlowScript.MODE_RUN
 	flow.start_run(0)
-	_check_world("a wave room", func(body: Node) -> bool: return (body as Actor).data != null)
-	check(flow.enemies_left() > 0, "a wave stood")
+	_check_world("a run's room", func(body: Node) -> bool: return (body as Actor).data != null)
+	check(flow.enemies_left() > 0, "its enemies stood")

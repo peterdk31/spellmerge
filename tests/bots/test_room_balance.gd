@@ -1,7 +1,7 @@
 extends SceneTree
-## Balance probe for checkpoint C1: fighter bots play the fixed wave with 1, 2, 3 and
+## Balance probe for checkpoint C1: fighter bots play the first room's fight with 1, 2, 3 and
 ## 4 players, one run after the other, and print a `BALANCE:` line per run (game
-## seconds to clear, health lost, wizards downed, casts). The wave is sized for four
+## seconds to clear, health lost, wizards downed, casts). The fight is sized for four
 ## players (docs/milestones/M1-core-loop.md), so this is how "alone" and "with four"
 ## are compared from data.
 ##
@@ -14,7 +14,7 @@ extends SceneTree
 ## delta), so a busy machine takes longer, not fewer game seconds.
 ## The numbers are in docs/LOG.md.
 ##
-## godot --headless --path . --script res://tests/bots/test_wave_balance.gd
+## godot --headless --path . --script res://tests/bots/test_room_balance.gd
 
 const BotScript := preload("res://tests/bots/bot.gd")
 
@@ -39,7 +39,7 @@ func _initialize() -> void:
 	for count in COUNTS:
 		await _run(count, events, flow, input)
 	if _failures.is_empty():
-		print("TEST OK: wave balance (1-4 fighter bots; see the BALANCE lines)")
+		print("TEST OK: room balance (1-4 fighter bots; see the BALANCE lines)")
 		quit(0)
 	else:
 		for reason in _failures:

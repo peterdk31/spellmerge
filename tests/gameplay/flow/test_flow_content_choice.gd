@@ -20,17 +20,15 @@ func after_each() -> void:
 	flow.world_parent = null
 	flow.stop_run()
 	flow.room_id_to_play = FlowScript.DEFAULT_ROOM_ID
-	flow.enemy_id_to_play = FlowScript.DEFAULT_ENEMY_ID
 	flow.start_cards = FlowScript.DEFAULT_START_CARDS.duplicate(true)
 	flow.play_bag = FlowScript.PLAY_BAG.duplicate()
-	flow.mode = FlowScript.MODE_WAVES
+	flow.mode = FlowScript.MODE_RUN
 	flow.wizard_scene = FlowScript.DefaultWizardScene
 	input.leave(0)
 
 
 func test_the_defaults_are_the_m1_content() -> void:
 	check_equal(flow.room_id_to_play, &"arena_01", "default room")
-	check_equal(flow.enemy_id_to_play, &"ember_imp", "default enemy")
 	check_equal(flow.start_cards, [[&"dash"], [&"bolt"], [], []], "default start cards: dash on A, bolt on X")
 	check_equal(flow.play_bag, [&"dash", &"bolt"] as Array[StringName], "Play's bag: dash and bolt")
 
@@ -41,18 +39,13 @@ func test_an_unknown_room_starts_no_run() -> void:
 	check_equal(flow.state, FlowScript.State.IDLE, "flow stays idle")
 
 
-func test_an_unknown_enemy_starts_no_run() -> void:
-	flow.enemy_id_to_play = &"no_such_enemy"
-	check(not flow.start_run(0), "a missing enemy must not start a run")
-
-
 ## One staff file per setup, used as it is (owner, 2026-11-01): Play and the hub hold the first two
 ## basic staffs on RB and RT and two empty hands (items I2), the sandbox the dev staff on every
 ## button, in every build channel.
 func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 	var registry: Node = root.get_node("Registry")
 	var dev: StaffBase = registry.call("get_resource", &"wizard", FlowScript.DEV_STAFF) as StaffBase
-	for mode: StringName in [FlowScript.MODE_WAVES, FlowScript.MODE_SANDBOX, FlowScript.MODE_HUB]:
+	for mode: StringName in [FlowScript.MODE_RUN, FlowScript.MODE_SANDBOX, FlowScript.MODE_HUB]:
 		flow.mode = mode
 		var staffs: Array[StaffBase] = flow.staffs_for_mode()
 		check_equal(staffs.size(), 4, "%s: four hands" % mode)
@@ -65,7 +58,7 @@ func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 				wanted = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase if at < FlowScript.START_HANDS else null
 			check(staffs[at] == wanted, "%s: button %d holds %s" % [mode, at, wanted.id if wanted != null else "nothing"])
 	check_equal(FlowScript.START_HANDS, 2, "players start with two staffs")
-	flow.mode = FlowScript.MODE_WAVES
+	flow.mode = FlowScript.MODE_RUN
 	var heads: Dictionary = {}
 	for id in FlowScript.STARTER_HEADS:
 		heads[(registry.call("get_resource", &"wizard", id) as StaffBase).head] = true
@@ -82,7 +75,7 @@ func test_each_mode_gives_its_own_bag() -> void:
 		if registry.call("get_resource", &"spells", id) is SpellComponent:
 			every[id] = Inventory.DEV_COPIES
 	var wanted: Dictionary = {
-		FlowScript.MODE_WAVES: {&"dash": 1, &"bolt": 1},
+		FlowScript.MODE_RUN: {&"dash": 1, &"bolt": 1},
 		FlowScript.MODE_SANDBOX: every,
 		FlowScript.MODE_HUB: every,
 	}

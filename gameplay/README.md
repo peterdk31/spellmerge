@@ -64,7 +64,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
 | `room_entered` | `flow` | `ai`, `coop`, `difficulty`, `hud`, `feel` (its walls' colours for motes; the party camera jumps to the new room) |
 | `room_cleared` | `flow` | `rewards`, `run` |
-| `wave_started`, `build_break_started` | `flow` | `hud` |
 | `sandbox_changed` | `flow` | `hud` |
 | `door_voted` | `flow` | none yet |
 | `difficulty_changed` | `difficulty` | none yet |
@@ -74,10 +73,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `hub_requested` | HUD | `flow`, `core/input` |
 | `run_requested` | HUD (a command) | `flow` |
 | `start_stone_changed` | `flow` | `hud`, `feel` |
-| `trial_picked` | HUD (a command; the lectern's menu, boss OB2b) | `flow` (each seat's pick for the hub's trial gate) |
-| `trial_requested` | `core/sim` (a run's start, recorded with its room) | `flow` (the trial) |
-| `trial_gate_changed`, `lectern_changed` | `flow` | `hud` (A on the lit gate; A at the lectern opens the room menu, OB2b) |
-| `trial_picks_changed` | `flow` | `feel` (the picks over the gate) |
 | `staff_change_requested` | HUD | `player` |
 | `reward_pick_requested` | HUD | `rewards` |
 | `door_vote_requested` | HUD | `flow` |
@@ -94,7 +89,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `play_load_requested` | net | `flow` (loads `play_tasks` ahead of a run two machines start together) |
 | `ai_view_changed` | HUD | `ai` (Entities) |
 
-`device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); the frames service turns them into the simulation's `seat_joined` and `seat_left` (offline at once; while a replay plays, only as its frames say), and `coop` turns those into `player_joined` and `player_left`. The rows sent by the HUD are its player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `hub_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the hub and send `room_entered`; `play_requested` starts a run of waves at once (the tests, the bots, the online spike's Host/Join).
+`device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); the frames service turns them into the simulation's `seat_joined` and `seat_left` (offline at once; while a replay plays, only as its frames say), and `coop` turns those into `player_joined` and `player_left`. The rows sent by the HUD are its player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `hub_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the hub and send `room_entered`; `play_requested` starts a run at once (the tests, the bots, the online spike's Host/Join).
 
 ## Allowed files
 

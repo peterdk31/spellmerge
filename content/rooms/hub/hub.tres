@@ -6,7 +6,6 @@
 [resource]
 script = ExtResource("1_base")
 id = &"hub"
-in_trials = false
 scene = ExtResource("2_scene")
 stand_up_after = 2.0
 ambient = 0.9

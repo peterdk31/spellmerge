@@ -23,7 +23,7 @@ func test_resource_has_an_id_a_scene_and_six_dummy_spawns() -> void:
 	check_equal(room.id, &"sandbox", "the id")
 	check(room.scene != null, "the room has a scene")
 	check_equal(room.places().player_spawns.size(), 4, "player spawns")
-	check(room.places().enemy_spawns.size() >= 4, "at least four enemy spawns, for the imp wave")
+	check(room.places().enemy_spawns.size() >= 4, "at least four enemy spawns, for the enemy arena")
 	check_equal(room.places().placed_at_of(EnemyBase).size(), 6, "dummy spawns: the training dummy, the shooting dummy and a group of four")
 
 

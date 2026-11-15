@@ -35,7 +35,7 @@ func test_resource_is_the_hub_where_a_fall_costs_nothing() -> void:
 	check(room.scene != null, "the room has a scene")
 	check_equal(room.places().player_spawns.size(), 4, "player spawns")
 	check_equal(room.places().placed_at_of(EnemyBase).size(), 3, "three dummies")
-	check(room.places().enemy_spawns.is_empty(), "no enemy spawns: no wave there")
+	check(room.places().enemy_spawns.is_empty(), "no enemy spawns: no fight there")
 	check(room.stand_up_after > 0.0, "a downed wizard stands up by itself in the hub")
 	check(HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).has_area(), "it has a teleporter stone")
 	for dummy: EnemyBase in room.places().placed_of(EnemyBase):

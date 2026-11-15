@@ -20,10 +20,10 @@ extends FrameSource
 ## Idler: stands still; it only opens its builder.
 ##
 ## Builder: `build_random(seed)` builds a random staff into staff 1 (BUILD_STAFF, RB: `dash` at the
-## start, so RT keeps its `bolt` and the wave is still cleared; LB is an empty hand since items I2) with the same `staff_change_requested` events a person sends (slot by slot, from the
+## start, so RT keeps its `bolt` and the room is still cleared; LB is an empty hand since items I2) with the same `staff_change_requested` events a person sends (slot by slot, from the
 ## card bag of the wizard, never more copies than it holds). The cards come from `staff_fuzzer.gd`, seeded, so a failing run can be
 ## replayed. `open_builder()` is how bot 4 of the 4-bot test works: one press of `back` (B),
-## and it stays there (the full builder, waves included).
+## and it stays there (the full builder, fights included).
 ##
 ## The brain thinks at each tick's start, when the frames service asks for the frame
 ## (`fill_frame`), so a run repeats. Nothing is allocated per step.

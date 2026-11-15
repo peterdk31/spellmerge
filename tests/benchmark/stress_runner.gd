@@ -64,6 +64,8 @@ const WARM_UP: float = 3.0
 const MEASURE: float = 10.0
 ## Health of a stress enemy (the game's imp has 20), so the crowd lasts.
 const ENEMY_HEALTH: float = 120.0
+## The enemy the stress crowd is made of (the imp, with more health).
+const STRESS_ENEMY: StringName = &"ember_imp"
 ## Enemies added per frame at most, and filler shots per physics step at most: TOP_UP_PER_STEP,
 ## or more for a larger target (one TOP_UP_SHARE of it a step). Sized for 3,000 shots; at the
 ## desktop's 6,000 more shots end on the crowd each step than 120 can replace, and the run fell
@@ -334,7 +336,7 @@ func _stress_enemy_data() -> EnemyBase:
 	var registry: Node = get_tree().root.get_node_or_null("Registry")
 	if registry == null:
 		return null
-	var data: EnemyBase = registry.call("get_resource", &"enemies", _flow.get("enemy_id_to_play")) as EnemyBase
+	var data: EnemyBase = registry.call("get_resource", &"enemies", STRESS_ENEMY) as EnemyBase
 	if data == null:
 		return null
 	var copy: EnemyBase = data.duplicate() as EnemyBase

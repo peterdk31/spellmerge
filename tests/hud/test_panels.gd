@@ -41,8 +41,6 @@ func _initialize() -> void:
 	_test_panel_shows_numbers()
 	_test_down_and_menu_words()
 	_test_hud_waits_for_room_and_join()
-	_test_wave_line()
-	_test_build_break_line()
 	_test_hud_routes_to_the_right_panel()
 	_test_leave_and_rejoin_resets_the_panel()
 	_test_run_boundaries_hide_panels()
@@ -204,61 +202,6 @@ func _test_run_boundaries_hide_panels() -> void:
 	_check(not hud.get_panel(0).visible, "panels wait for a room after run_started")
 	bus.room_entered.emit(&"arena_01")
 	_check(hud.get_panel(0).visible and hud.get_panel(3).visible, "joined players' panels return in the next run")
-	_free_hud(parts)
-
-
-func _test_wave_line() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	var label: Label = hud.get_wave_label()
-	_check(label != null and not label.visible, "the wave line is hidden before a wave")
-	bus.wave_started.emit(1)
-	_check(label.visible and label.text == "Wave 1", "wave 1 shows 'Wave 1', got '%s'" % label.text)
-	bus.wave_started.emit(7)
-	_check(label.text == "Wave 7", "the line follows wave_started, got '%s'" % label.text)
-	_check(label.mouse_filter == Control.MOUSE_FILTER_IGNORE, "the wave line takes no input")
-	bus.room_cleared.emit(&"arena_01")
-	_check(not label.visible, "the wave line is hidden once the wave is cleared (no run_ended needed)")
-	bus.build_break_started.emit(12.0)
-	_check(not label.visible and hud.get_break_row().visible, "the break line replaces the wave line")
-	bus.wave_started.emit(2)
-	_check(label.visible and label.text == "Wave 2", "the next wave shows the line again, got '%s'" % label.text)
-	_check(not hud.get_break_row().visible, "the wave line and the break line are never up together")
-	bus.room_entered.emit(&"arena_01")
-	_check(not label.visible, "a new room (a run stopped mid-wave) clears the old wave line")
-	bus.wave_started.emit(1)
-	bus.run_ended.emit(false)
-	_check(not label.visible, "the wave line is hidden when the run ends")
-	_free_hud(parts)
-
-
-func _test_build_break_line() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	var row: PanelContainer = hud.get_break_row()
-	var label: Label = hud.get_break_label()
-	_check(row != null and not row.visible, "the build break line is hidden before a break")
-	_check(row.find_child("Hammer", true, false) != null, "the break line has the hammer icon")
-	bus.wave_started.emit(1)
-	bus.room_cleared.emit(&"arena_01")
-	_check(not row.visible, "the line waits for build_break_started, not room_cleared")
-	bus.build_break_started.emit(12.0)
-	_check(row.visible and label.text == "Build 12", "the break shows 'Build 12', got '%s'" % label.text)
-	hud.step_break(0.5)
-	_check(label.text == "Build 12", "11.5 s left rounds up to 12, got '%s'" % label.text)
-	hud.step_break(0.6)
-	_check(label.text == "Build 11", "10.9 s left shows 11, got '%s'" % label.text)
-	hud.step_break(100.0)
-	_check(label.text == "Build 0", "the countdown stops at 0, got '%s'" % label.text)
-	_check(row.mouse_filter == Control.MOUSE_FILTER_IGNORE and label.mouse_filter == Control.MOUSE_FILTER_IGNORE, "the break line takes no input")
-	bus.build_break_started.emit(12.0)
-	bus.wave_started.emit(2)
-	_check(not row.visible, "the next wave hides the break line")
-	bus.build_break_started.emit(12.0)
-	bus.run_ended.emit(false)
-	_check(not row.visible, "the end of a run hides the break line")
 	_free_hud(parts)
 
 

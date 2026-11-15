@@ -154,9 +154,6 @@ func test_the_fullest_header_crosses() -> void:
 	check(number > 0 and loadout.size() > PlayerLoadout.MAX_BYTES - 4 and loadout.size() <= PlayerLoadout.MAX_BYTES, "a loadout filled to its limit (%d bytes)" % loadout.size())
 	for seat in PartyLoadout.SEATS:
 		replay.party.put(seat, loadout)
-	# A trial's start names its room at its longest (boss OB2).
-	replay.start = &"trial_requested"
-	replay.start_room = longest
 	# What lies on the ground at its most too (items I6).
 	check(replay.ground.set_room(longest), "the ground's room")
 	var title: String = "t".repeat(GroundLoadout.MAX_TITLE)
@@ -175,7 +172,6 @@ func test_the_fullest_header_crosses() -> void:
 	check_equal(back.decode(_message.body), "", "and reads back as a replay")
 	check(back.party.equals(replay.party), "with every seat's loadout")
 	check(back.ground.equals(replay.ground), "and the ground")
-	check_equal(back.start_room, longest, "and the trial's room")
 
 
 func test_a_message_too_long_for_its_kind_is_refused() -> void:

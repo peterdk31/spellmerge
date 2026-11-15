@@ -27,7 +27,7 @@ func take() -> void:
 	if wizard == null:
 		fail("no wizard in the arena")
 		return
-	# The camera follows the wizard and the wave's banner is below the screen's middle: the rest
+	# The camera follows the wizard and the room's banner is below the screen's middle: the rest
 	# stands above the wizard.
 	var centre: Vector2 = Vector2(320.0, 160.0)
 	wizard.global_position = centre + Vector2(-90.0, 50.0)

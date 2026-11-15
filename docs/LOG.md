@@ -2,9 +2,9 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
-## 2026-11-15: Boss OB2, the trial gate (owner session)
+## 2026-11-15: Boss OB2a, no waves (owner session)
 
-The hub has a trial gate and a lectern beside it (two props of new roles, read by the hub's rules). Each wizard picks a room to try (the command `trial_picked`, kept by seat and hashed; the lectern's menu that sends it is OB2b); the picks are drawn over the gate in each seat's colour, and the gate lights only while every wizard stands in it and all of them picked the same room. A on the lit gate asks for `trial_requested(seat, room)`, a run's start of its own whose room is written in the replay's header (format 9), so the hub's party goes along. The trial stands the room's own enemies (or one wave), and cleared or lost the party is back in the hub as it left it. The Sandbox's enemy arena lists bosses. Every room is offered unless it says not (`RoomBase.in_trials`; the hub and the sandbox say not).
+The owner replanned OB2 (decisions 30-33 in boss-old-broom.md): the room selector may use only the real game's mechanics, waves go, and a run is a path of rooms from the teleporter to the boss, the lectern only setting where it starts. OB2a takes out the trial gate's first build and the waves: a room lists its enemies (`RoomBase.enemies`, lines of an enemy or boss id and a count), stood at its enemy spawns; cleared with no room after it, the run is won and ends as a lost one does (from the stone, back to the hub). The wave line, the build break, `wave_started` and `build_break_started` are gone; the `wave_start` cue is `room_start`; the balance probe is `test_room_balance.gd`. The Sandbox's enemy arena lists and spawns bosses (`EnemyBase.FOLDERS`). Paths and exits (OB2b) and the lectern (OB2c) are next.
 
 ## 2026-11-14: Items I7, the inventory
 

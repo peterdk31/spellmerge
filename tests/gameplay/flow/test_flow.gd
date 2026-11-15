@@ -1,7 +1,7 @@
 extends SceneTree
-## Tests for gameplay/flow (the M1 arena glue), on the real autoloads: Play starts
-## the room with 1, 2 and 4 players, the wave is fixed, `room_entered` and
-## `room_cleared` are sent once, every wizard builds the two start spells, the cooldowns are reset on a new run,
+## Tests for gameplay/flow, on the real autoloads: Play starts the room with 1, 2 and 4 players,
+## the room's listed enemies stand (no waves: boss OB2a), `room_entered` and `room_cleared` are sent
+## once, a won room ends the run after RUN_WON_DELAY, every wizard builds the two start spells, the cooldowns are reset on a new run,
 ## the room restarts in under 3 seconds when every player is down (and not while
 ## one still stands), and the first room is up in the same call. Time moves by
 ## fixed deltas through Flow.step(); nothing waits.
@@ -20,9 +20,8 @@ var _combat: Node
 var _spells: SpellsScript
 var _entered: Array[StringName] = []
 var _cleared: Array[StringName] = []
-var _waves: Array[int] = []
-## The actors each `wave_start` cue was played as (S6, item 13).
-var _wave_cues: Array[int] = []
+## The actors each `room_start` cue was played as (S6, item 13).
+var _room_cues: Array[int] = []
 
 
 func _initialize() -> void:
@@ -40,10 +39,9 @@ func _initialize() -> void:
 	_spells = root.get_node_or_null("Spells") as SpellsScript
 	_events.connect("room_entered", func(id: StringName) -> void: _entered.append(id))
 	_events.connect("room_cleared", func(id: StringName) -> void: _cleared.append(id))
-	_events.connect("wave_started", func(number: int) -> void: _waves.append(number))
 	_events.connect("cue_shown", func(caster: int, cue: StringName, _at: Vector2, _d: Vector2, _s: float, _t: Color, _l: int) -> void:
-		if cue == FlowScript.WAVE_START_CUE:
-			_wave_cues.append(caster))
+		if cue == FlowScript.ROOM_START_CUE:
+			_room_cues.append(caster))
 	_test_restart_delay_is_under_three_seconds()
 	for count: int in [1, 2, 4]:
 		_test_play_starts_the_room(count)
@@ -51,7 +49,7 @@ func _initialize() -> void:
 	_test_play_is_ignored_while_running()
 	_test_unjoined_requester_other_than_p1_starts_nothing()
 	_test_cooldowns_reset_on_a_new_run()
-	_test_room_cleared_once_when_the_wave_is_dead()
+	_test_room_cleared_once_when_its_enemies_are_down()
 	_test_possessed_enemy_does_not_strand_the_room()
 	_test_restart_when_all_down()
 	_test_no_restart_while_one_stands()
@@ -60,20 +58,18 @@ func _initialize() -> void:
 	_test_last_enemy_dies_after_all_down()
 	_test_failed_restart_goes_idle()
 	_test_play_keeps_joined_pad_without_keyboard()
-	_test_wave_stands_on_floor()
-	_test_biggest_wave_stands_on_floor()
+	_test_room_enemies_stand_on_floor()
+	_test_a_full_sandbox_arena_stands_on_floor()
 	_test_restart_leaves_no_old_enemies_or_shots()
 	_test_walls_reach_the_projectile_manager()
-	_test_waves_grow_in_the_same_room()
-	_test_wave_size_is_capped()
-	_test_next_wave_stands_up_downed_wizards()
-	_test_restart_goes_back_to_wave_one()
-	_test_build_break_is_fixed()
-	_test_build_break_ignores_builders()
+	_test_a_won_room_ends_the_run()
+	_test_room_start_cue_on_every_wizard()
 	_test_main_menu_only_sends_hub_requested()
+	# Last: it adds rooms and a boss to the registry.
+	_test_a_room_lists_enemies_and_bosses_by_id()
 	_stop()
 	if _failures.is_empty():
-		print("TEST OK: gameplay/flow (play, wave, room_entered, room_cleared, restart)")
+		print("TEST OK: gameplay/flow (play, the room's enemies, room_entered, room_cleared, restart)")
 		quit(0)
 	else:
 		for failure in _failures:
@@ -93,8 +89,7 @@ func _setup(count: int) -> void:
 		_input.add_virtual_device(index)
 	_entered.clear()
 	_cleared.clear()
-	_waves.clear()
-	_wave_cues.clear()
+	_room_cues.clear()
 
 
 ## End the run and free every device, so the next test starts clean.
@@ -133,6 +128,15 @@ func _down(wizard: Actor) -> void:
 	wizard.health.take(wizard.health.max_health)
 
 
+## How many enemies the arena lists (its `RoomBase.enemies`, counted).
+func _room_count() -> int:
+	var room: RoomBase = load("res://content/rooms/crypt/arena_01.tres") as RoomBase
+	var count: int = 0
+	for line: RoomEnemies in room.enemies:
+		count += line.count
+	return count
+
+
 func _test_restart_delay_is_under_three_seconds() -> void:
 	_check(FlowScript.RESTART_DELAY < 3.0, "the restart delay must be under 3 seconds, is %f" % FlowScript.RESTART_DELAY)
 
@@ -152,8 +156,9 @@ func _test_play_starts_the_room(count: int) -> void:
 		_check(wizard != null and _seat(wizard) == index and wizard.ramp == index and wizard.caster.has_staff(0) and wizard.caster.has_staff(1), "%d players: wizard %d has its seat, its ramp and its dash and bolt staffs" % [count, index])
 		_check(wizard != null and wizard.caster.cards_of(0)[0] == &"dash" and wizard.caster.cards_of(1)[0] == &"bolt", "%d players: wizard %d has the start cards" % [count, index])
 		_check(wizard != null and wizard.position == Vector2(224.0 + 64.0 * index, 320.0), "%d players: wizard %d stands on its spawn" % [count, index])
-	_check(_flow.enemies_left() == FlowScript.WAVE.size(), "%d players: the wave has %d enemies, got %d" % [count, FlowScript.WAVE.size(), _flow.enemies_left()])
-	_check(_combat.call("actor_count") == FlowScript.WAVE.size() + count, "%d players: every enemy and wizard is registered with combat" % count)
+	_check(_room_count() > 0, "the arena lists its enemies")
+	_check(_flow.enemies_left() == _room_count(), "%d players: the room's %d enemies stand, got %d" % [count, _room_count(), _flow.enemies_left()])
+	_check(_combat.call("actor_count") == _room_count() + count, "%d players: every enemy and wizard is registered with combat" % count)
 	_check(_cleared.is_empty(), "%d players: room_cleared is not sent at the start" % count)
 	_stop()
 
@@ -202,11 +207,11 @@ func _test_cooldowns_reset_on_a_new_run() -> void:
 	_stop()
 
 
-func _test_room_cleared_once_when_the_wave_is_dead() -> void:
+func _test_room_cleared_once_when_its_enemies_are_down() -> void:
 	_setup(4)
 	_play()
 	var enemies: Array[Node] = _flow._enemies.duplicate()
-	_check(enemies.size() == FlowScript.WAVE.size(), "four players: the test sees the wave")
+	_check(enemies.size() == _room_count(), "four players: the test sees the room's enemies")
 	for at in enemies.size() - 1:
 		_events.emit_signal("enemy_died", at % 4, enemies[at], Vector2.ZERO, -1)
 	_check(_cleared.is_empty(), "room_cleared waits for the last enemy")
@@ -219,7 +224,7 @@ func _test_room_cleared_once_when_the_wave_is_dead() -> void:
 	_stop()
 
 
-## A player who possesses an enemy of the wave still lets the room clear: the possessed body is on
+## A player who possesses an enemy of the room still lets the room clear: the possessed body is on
 ## the wizards' team while it is driven, and its death must still count as an enemy's. Bots stopped
 ## building `possess` because the room stayed uncleared.
 func _test_possessed_enemy_does_not_strand_the_room() -> void:
@@ -230,7 +235,7 @@ func _test_possessed_enemy_does_not_strand_the_room() -> void:
 		var enemies: Array[Node] = _flow._enemies.duplicate()
 		var held := enemies[0] as Actor
 		var possession: Possession = Possession.begin(wizard, held, 3.0)
-		_check(possession != null and held.controller == wizard.home_controller, "the wizard possesses an enemy of the wave")
+		_check(possession != null and held.controller == wizard.home_controller, "the wizard possesses an enemy of the room")
 		var order: Array[Node] = enemies.duplicate()
 		if not possessed_first:
 			order.reverse()
@@ -257,7 +262,7 @@ func _test_restart_when_all_down() -> void:
 		_check(_wizards().size() == count, "%d players: the wizards are back" % count)
 		for wizard in _wizards():
 			_check(wizard.health.health == wizard.health.max_health and not wizard.is_down(), "%d players: wizard %d is standing at full health" % [count, _seat(wizard)])
-		_check(_flow.enemies_left() == FlowScript.WAVE.size(), "%d players: a new wave stands" % count)
+		_check(_flow.enemies_left() == _room_count(), "%d players: the room's enemies stand again" % count)
 		_check(not _flow.is_restarting(), "%d players: the timer is off after the restart" % count)
 		_stop()
 
@@ -285,13 +290,17 @@ func _test_revive_cancels_the_restart() -> void:
 	_stop()
 
 
+## Won, the run ends RUN_WON_DELAY later whatever the players do: going down then starts no
+## restart of its own, and a revive stops nothing.
 func _test_no_restart_after_clear() -> void:
 	_setup(1)
 	_play()
-	for enemy: Node in _flow._enemies.duplicate():
-		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
+	_kill_room()
+	_check(is_equal_approx(float(_flow.get("_restart_left")), FlowScript.RUN_WON_DELAY), "won: the run's end counts")
 	_down(_wizard(0))
-	_check(not _flow.is_restarting(), "a cleared room does not restart when the players go down")
+	_check(is_equal_approx(float(_flow.get("_restart_left")), FlowScript.RUN_WON_DELAY), "going down after the win changes nothing")
+	Downed.of(_wizard(0)).revive(0)
+	_check(_flow.is_restarting(), "nor does a revive")
 	_stop()
 
 
@@ -310,7 +319,7 @@ func _test_last_enemy_dies_after_all_down() -> void:
 	_check(_flow.is_restarting(), "the last enemy dying does not cancel the restart")
 	_flow.step(FlowScript.RESTART_DELAY)
 	_check(_flow.world != old_world and _flow.world != null, "the run restarted after the last enemy died with everyone down")
-	_check(_flow.state == FlowScript.State.RUNNING and _flow.enemies_left() == FlowScript.WAVE.size(), "the new run is running with a full wave")
+	_check(_flow.state == FlowScript.State.RUNNING and _flow.enemies_left() == _room_count(), "the new run is running with the room's enemies")
 	_stop()
 
 
@@ -339,8 +348,8 @@ func _test_play_keeps_joined_pad_without_keyboard() -> void:
 	_stop()
 
 
-## Every wave enemy stands inside the room and clear of the walls.
-func _test_wave_stands_on_floor() -> void:
+## Every enemy the room lists stands inside it and clear of the walls.
+func _test_room_enemies_stand_on_floor() -> void:
 	_setup(1)
 	_play()
 	var room: RoomBase = load("res://content/rooms/crypt/arena_01.tres") as RoomBase
@@ -353,7 +362,7 @@ func _test_wave_stands_on_floor() -> void:
 			walls.append(Rect2(shape_node.position - size * 0.5, size))
 	scene.free()
 	var inner := Rect2(Vector2.ZERO, Vector2(640.0, 384.0))
-	_check(_flow._enemies.size() == FlowScript.WAVE.size(), "the wave is up")
+	_check(_flow._enemies.size() == _room_count(), "the room's enemies are up")
 	for enemy: Node2D in _flow._enemies:
 		var body := Rect2(enemy.position - Vector2(12.0, 12.0), Vector2(24.0, 24.0))
 		_check(inner.encloses(body), "enemy at %s is inside the room" % enemy.position)
@@ -362,9 +371,9 @@ func _test_wave_stands_on_floor() -> void:
 	_stop()
 
 
-## Even the biggest wave stands on the floor: the stacked spawns stay inside the
-## room and clear of the walls.
-func _test_biggest_wave_stands_on_floor() -> void:
+## Even the most the sandbox's arena keeps up (SANDBOX_MAX), placed as a room's fight is, stand on
+## the floor: the stacked spawns stay inside the room and clear of the walls.
+func _test_a_full_sandbox_arena_stands_on_floor() -> void:
 	_setup(1)
 	_play()
 	var room: RoomBase = load("res://content/rooms/crypt/arena_01.tres") as RoomBase
@@ -377,15 +386,13 @@ func _test_biggest_wave_stands_on_floor() -> void:
 			walls.append(Rect2(shape_node.position - size * 0.5, size))
 	scene.free()
 	var inner := Rect2(Vector2.ZERO, Vector2(640.0, 384.0))
-	var uses: Dictionary = {}
-	for at: int in FlowScript.wave_size(FlowScript.WAVE_MAX):
-		var entry: int = FlowScript.WAVE[at] if at < FlowScript.WAVE.size() else at
-		var spawn: int = entry % room.places().enemy_spawns.size()
-		var times: int = uses.get(spawn, 0)
-		uses[spawn] = times + 1
+	var spawns: int = room.places().enemy_spawns.size()
+	for at: int in FlowScript.SANDBOX_MAX:
+		var spawn: int = at % spawns
+		var times: int = at / spawns
 		var position: Vector2 = FlowScript.stacked_position(room.places().enemy_spawns[spawn], times)
 		var body := Rect2(position - Vector2(12.0, 12.0), Vector2(24.0, 24.0))
-		_check(inner.encloses(body), "spawn %d of the biggest wave (%s) is inside the room" % [at, position])
+		_check(inner.encloses(body), "enemy %d of a full arena (%s) is inside the room" % [at, position])
 		for wall in walls:
 			_check(not wall.intersects(body), "spawn %d (%s) is clear of the wall %s" % [at, position, wall])
 	_stop()
@@ -400,139 +407,79 @@ func _test_restart_leaves_no_old_enemies_or_shots() -> void:
 	_down(_wizard(0))
 	_flow.step(FlowScript.RESTART_DELAY)
 	_check(projectiles.call("get_count") == 0, "the restart cleared the shots")
-	_check(_combat.call("actor_count") == FlowScript.WAVE.size() + 1, "combat knows only the new wave and the wizard, got %d" % _combat.call("actor_count"))
+	_check(_combat.call("actor_count") == _room_count() + 1, "combat knows only the room's new enemies and the wizard, got %d" % _combat.call("actor_count"))
 	_stop()
 
 
-## Kill every enemy of the current wave (as if shot down).
-func _kill_wave() -> void:
+## Kill every enemy of the room (as if shot down).
+func _kill_room() -> void:
 	for enemy: Node in _flow._enemies.duplicate():
 		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
 
 
-## After a clear and BUILD_BREAK the next, bigger wave stands in the same world.
-func _test_waves_grow_in_the_same_room() -> void:
+## A won room (every enemy down) with no room after it ends the run RUN_WON_DELAY later; a run from
+## `play_requested` starts the room again (a run from the hub's stone goes back there:
+## test_flow_hub.gd).
+func _test_a_won_room_ends_the_run() -> void:
 	for count: int in [1, 4]:
 		_setup(count)
 		_play()
 		var world: Node = _flow.world
-		_check(_waves == [1] and _flow.wave == 1, "%d players: wave 1 is announced once, got %s" % [count, _waves])
-		_check(_flow.enemies_left() == FlowScript.wave_size(1), "%d players: wave 1 has %d enemies" % [count, FlowScript.wave_size(1)])
-		_kill_wave()
-		_check(_flow.state == FlowScript.State.CLEARED and _waves == [1], "%d players: a cleared wave waits before the next" % count)
-		_flow.step(FlowScript.BUILD_BREAK - 0.5)
-		_check(_flow.enemies_left() == 0 and _waves == [1], "%d players: no next wave before the delay" % count)
-		_flow.step(0.5)
-		_check(_flow.world == world, "%d players: wave 2 stands in the same world" % count)
-		_check(_waves == [1, 2] and _flow.wave == 2, "%d players: wave_started(2) was sent, got %s" % [count, _waves])
-		_check(_wave_cues.size() == count * 2, "%d players: each wave played wave_start on every wizard, got %s" % [count, _wave_cues])
-		var ids: Array[int] = []
-		for index in count:
-			ids.append(int((_flow.get_wizard(index) as Actor).id))
-		_check(_wave_cues.slice(count).all(func(id: int) -> bool: return ids.has(id)), "%d players: as each wizard's actor" % count)
-		_check(_flow.state == FlowScript.State.RUNNING, "%d players: running again" % count)
-		_check(_flow.enemies_left() == FlowScript.wave_size(2), "%d players: wave 2 has %d enemies" % [count, FlowScript.wave_size(2)])
-		_check(FlowScript.wave_size(2) > FlowScript.wave_size(1), "wave 2 is bigger than wave 1")
-		_check(_entered.size() == 1, "%d players: room_entered is not sent again for a new wave" % count)
-		_kill_wave()
-		_check(_cleared.size() == 2, "%d players: room_cleared is sent for every wave, got %d" % [count, _cleared.size()])
-		_flow.step(FlowScript.BUILD_BREAK)
-		_check(_flow.wave == 3 and _flow.enemies_left() == FlowScript.wave_size(3), "%d players: wave 3 follows" % count)
+		_kill_room()
+		_check(_cleared == [&"arena_01"], "%d players: the room is cleared" % count)
+		_check(_flow.state == FlowScript.State.CLEARED, "%d players: won" % count)
+		_flow.step(FlowScript.RUN_WON_DELAY - 0.1)
+		_check(_flow.world == world, "%d players: the kill is seen out first" % count)
+		_flow.step(0.2)
+		_check(_flow.world != world and _flow.state == FlowScript.State.RUNNING, "%d players: the run ended and began again" % count)
+		_check(_flow.enemies_left() == _room_count(), "%d players: with the room's enemies" % count)
 		_stop()
 
 
-## The break is BUILD_BREAK seconds, announced once with its length, and counted by `build_break_left`.
-func _test_build_break_is_fixed() -> void:
-	_check(FlowScript.BUILD_BREAK > 3.0, "the build break is longer than M1's 3 s delay")
-	_setup(1)
-	var announced: Array[float] = []
-	var listener := func(seconds: float) -> void: announced.append(seconds)
-	_events.connect("build_break_started", listener)
-	_play()
-	_check(announced.is_empty() and _flow.build_break_left() == 0.0, "no break during a wave")
-	_kill_wave()
-	_check(announced == [FlowScript.BUILD_BREAK], "build_break_started is sent once with BUILD_BREAK, got %s" % [announced])
-	_check(is_equal_approx(_flow.build_break_left(), FlowScript.BUILD_BREAK), "the whole break is left at its start")
-	_flow.step(4.0)
-	_check(is_equal_approx(_flow.build_break_left(), FlowScript.BUILD_BREAK - 4.0), "the break counts down")
-	_flow.step(FlowScript.BUILD_BREAK)
-	_check(_flow.wave == 2 and _flow.build_break_left() == 0.0, "the wave started and no break is left")
-	_events.disconnect("build_break_started", listener)
-	_stop()
-
-
-## Whoever is building, the next wave starts after BUILD_BREAK, for 1, 2 and 4 players: no builder
-## (open overlay focus, build requests in flight) holds it back or speeds it up.
-func _test_build_break_ignores_builders() -> void:
-	var focus: Node = root.get_node_or_null("UIFocus")
-	_check(focus != null, "the UIFocus autoload exists")
-	if focus == null:
-		return
-	for count: int in [1, 2, 4]:
+## As a run's room starts, its cue plays on every wizard, as that wizard's actor.
+func _test_room_start_cue_on_every_wizard() -> void:
+	for count: int in [1, 4]:
 		_setup(count)
 		_play()
-		_kill_wave()
-		var builder: Control = Control.new()
-		root.add_child(builder)
-		# The last player sits in a menu for the whole break.
-		_check(focus.call("open", count - 1, [builder] as Array[Control]) == true, "%d players: the last player opened a menu" % count)
-		_events.emit_signal("staff_change_requested", count - 1, 2, 0, &"fire", (_flow.get_wizard(count - 1) as Actor).key())
-		_flow.step(FlowScript.BUILD_BREAK - 0.1)
-		_check(focus.call("is_open", count - 1) == true, "%d players: the menu is still open late in the break" % count)
-		_check(_flow.wave == 1 and _flow.state == FlowScript.State.CLEARED, "%d players: the wave is not early while someone builds" % count)
-		_flow.step(0.1)
-		_check(_flow.wave == 2 and _flow.state == FlowScript.State.RUNNING, "%d players: the wave starts on time while someone builds" % count)
-		_check(_flow.enemies_left() == FlowScript.wave_size(2), "%d players: the next wave is whole" % count)
-		for wizard: Actor in _wizards():
-			_check(not wizard.is_down(), "%d players: every wizard stands for the wave" % count)
-		focus.call("close", count - 1)
-		builder.free()
+		var ids: Array[int] = []
+		for index in count:
+			ids.append(int(_wizard(index).id))
+		_check(_room_cues.size() == count, "%d players: room_start on every wizard, got %s" % [count, _room_cues])
+		_check(_room_cues.all(func(id: int) -> bool: return ids.has(id)), "%d players: as each wizard's actor" % count)
 		_stop()
 
 
-func _test_wave_size_is_capped() -> void:
-	_check(FlowScript.wave_size(1) == FlowScript.WAVE.size(), "wave 1 is the WAVE list")
-	var last: int = 0
-	for number in range(1, 200):
-		var size: int = FlowScript.wave_size(number)
-		_check(size >= last and size <= FlowScript.WAVE_MAX, "wave %d size %d never shrinks or passes WAVE_MAX" % [number, size])
-		last = size
-	_check(FlowScript.wave_size(200) == FlowScript.WAVE_MAX, "a very late wave holds WAVE_MAX enemies")
-
-
-## A wizard who was down when the wave ended stands up for the next one, and nobody is hurt at once.
-func _test_next_wave_stands_up_downed_wizards() -> void:
-	_setup(2)
-	_play()
-	_down(_wizard(1))
-	_check(_wizard(1).is_down(), "wizard 2 is down")
-	_check(not _flow.is_restarting(), "one of two down: no restart")
-	_kill_wave()
-	_flow.step(FlowScript.BUILD_BREAK)
-	var wizard: Actor = _wizard(1)
-	_check(not wizard.is_down() and wizard.health.health > 0, "the downed wizard is up for wave 2")
-	_check(wizard.health.health == Downed.REVIVE_HEALTH, "it stands with the revive health")
-	_check(wizard.health.is_protected(), "the wizard is protected for a moment at the start of wave 2")
-	_check(not _flow.is_restarting(), "no restart is pending in wave 2")
-	_stop()
-
-
-## Losing the room starts again from wave 1.
-func _test_restart_goes_back_to_wave_one() -> void:
+## A room's lines name enemies or bosses by id (`EnemyBase.FOLDERS`); an id the registry lacks stands
+## nothing (so a deleted boss leaves no broken room), and a room that lists none is won as it starts.
+func _test_a_room_lists_enemies_and_bosses_by_id() -> void:
+	var registry: Node = root.get_node("Registry")
+	var arena: RoomBase = load("res://content/rooms/crypt/arena_01.tres") as RoomBase
+	var boss: EnemyBase = (registry.call("get_resource", &"enemies", &"ember_imp") as EnemyBase).duplicate() as EnemyBase
+	boss.id = &"test_flow_boss"
+	registry.call("add", &"bosses", boss)
+	var room: RoomBase = arena.duplicate() as RoomBase
+	room.id = &"test_flow_room"
+	var boss_line := RoomEnemies.new()
+	boss_line.enemy = boss.id
+	var gone := RoomEnemies.new()
+	gone.enemy = &"no_such_enemy"
+	gone.count = 3
+	room.enemies = [boss_line, gone] as Array[RoomEnemies]
+	registry.call("add", &"rooms", room)
 	_setup(1)
+	_flow.room_id_to_play = room.id
 	_play()
-	_kill_wave()
-	_flow.step(FlowScript.BUILD_BREAK)
-	_check(_flow.wave == 2, "the test reached wave 2")
-	var wizard: Actor = _wizard(0)
-	wizard.health.step(Downed.JOIN_PROTECTION) # the wave-start protection would absorb the hit
-	_down(wizard)
-	_flow.step(FlowScript.RESTART_DELAY)
-	_check(_flow.wave == 1 and _waves.back() == 1, "the restart begins at wave 1, got %d" % _flow.wave)
-	_check(_flow.enemies_left() == FlowScript.wave_size(1), "the restart has the wave 1 size")
-	# A pending next wave of the old run must not fire in the new one.
-	_flow.step(FlowScript.BUILD_BREAK)
-	_check(_flow.wave == 1, "no stray wave timer survives the restart")
+	_check(_flow.enemies_left() == 1, "the boss stands, the unknown id stands nothing, got %d" % _flow.enemies_left())
+	_stop()
+	var empty: RoomBase = arena.duplicate() as RoomBase
+	empty.id = &"test_flow_empty"
+	empty.enemies = [] as Array[RoomEnemies]
+	registry.call("add", &"rooms", empty)
+	_setup(1)
+	_flow.room_id_to_play = empty.id
+	_play()
+	_check(_cleared == [empty.id], "a room that lists no enemy is won as it starts, got %s" % [_cleared])
+	_flow.room_id_to_play = FlowScript.DEFAULT_ROOM_ID
 	_stop()
 
 

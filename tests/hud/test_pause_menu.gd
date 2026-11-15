@@ -73,7 +73,6 @@ func _initialize() -> void:
 	_test_b_opens_the_builder_in_play_only()
 	_test_start_closes_the_builder()
 	_test_a_on_the_lit_stone_starts_the_run()
-	_test_a_on_the_lit_trial_gate_sends_the_party()
 	_test_a_on_the_altar_asks_to_open_the_room()
 	_test_a_by_an_item_takes_it_after_the_stone_and_before_the_altar()
 	_test_the_run_ending_closes_it()
@@ -861,26 +860,6 @@ func _test_a_on_the_lit_stone_starts_the_run() -> void:
 	_tap(1, &"accept")
 	_frame()
 	_check(asked.size() == 1 and asked[0] == 1, "A once the stone is out asks nothing: %s" % [asked])
-
-
-## The hub's trial gate (boss OB2): A (`accept`) sends `run_requested` for its player while the gate
-## is lit (`trial_gate_changed`), as on the stone; nothing once it is out.
-func _test_a_on_the_lit_trial_gate_sends_the_party() -> void:
-	_setup(2)
-	var asked: Array[int] = []
-	_bus.run_requested.connect(func(player: int) -> void: asked.append(player))
-	_bus.trial_gate_changed.emit(2, 2, false)
-	_tap(0, &"accept")
-	_frame()
-	_check(asked.is_empty(), "A by the dark gate asks nothing: %s" % [asked])
-	_bus.trial_gate_changed.emit(2, 2, true)
-	_tap(0, &"accept")
-	_frame()
-	_check(asked.size() == 1 and asked[0] == 0, "A on the lit gate asks for it, for its player: %s" % [asked])
-	_bus.trial_gate_changed.emit(1, 2, false)
-	_tap(0, &"accept")
-	_frame()
-	_check(asked.size() == 1 and asked[0] == 0, "A once the gate is out asks nothing: %s" % [asked])
 
 
 func _test_start_closes_the_builder() -> void:

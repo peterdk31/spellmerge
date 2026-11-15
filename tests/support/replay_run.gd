@@ -10,7 +10,7 @@ extends RefCounted
 ##   bolt) at the dummies while the "HUD" rebuilds a staff mid-run (a command): its replay plays
 ##   with nobody watching, and its frames are the same on every platform. The sandbox's shots down
 ##   the wizard now and then, so not every cast it presses happens.
-## - **Fighter bots** (tests/bots/bot.gd) play a wave. A bot reads the game through
+## - **Fighter bots** (tests/bots/bot.gd) play a run's room. A bot reads the game through
 ##   queries that fill the services' caches, and those count as state (the projectile manager's
 ##   threat grid and target table), so its run replays exactly with the bots watching again
 ##   (their frames dropped; core/sim/frames.gd).
@@ -65,7 +65,7 @@ var run_seed: int = 0
 var problems: PackedStringArray = PackedStringArray()
 ## The hub's scripted player (online-lobby L1): at 0 or more the scripted players are `StoneWalker`s,
 ## walking from the hub's first spawn onto the teleporter stone, and the "HUD" sends the player's A
-## (`run_requested`, a command) at this tick, which starts the run of waves; -1, the `Scripted` player.
+## (`run_requested`, a command) at this tick, which starts the run; -1, the `Scripted` player.
 var stone_press_at: int = -1
 ## A tick to snapshot the recorded run after (online-ready N10; -1 for none), and the snapshot.
 var snapshot_at: int = -1

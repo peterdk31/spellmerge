@@ -3,7 +3,7 @@ extends "res://tests/support/screenshot.gd"
 ##
 ## Shots: one player firing fire bolts up the left lane at the training dummy and the group round
 ## it (damage numbers, DPS, burn); the pause menu's sandbox page open; four players, two per lane, with an imp
-## wave in and the shooting dummy's telegraph up.
+## fight on and the shooting dummy's telegraph up.
 
 ## Frames after a press for the menus to redraw; the full settle is kept for the shots.
 const STEP_FRAMES := 3

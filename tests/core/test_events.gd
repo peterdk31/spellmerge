@@ -22,8 +22,6 @@ const EVENTS: Dictionary = {
 	&"main_menu_requested": [["player", TYPE_INT]],
 	&"seat_leave_requested": [["player", TYPE_INT]],
 	&"run_requested": [["player", TYPE_INT]],
-	&"trial_picked": [["player", TYPE_INT], ["room_id", TYPE_STRING_NAME]],
-	&"trial_requested": [["player", TYPE_INT], ["room_id", TYPE_STRING_NAME]],
 	&"effect_slots_changed": [["slots", TYPE_INT]],
 	&"screen_shake_changed": [["enabled", TYPE_BOOL]],
 	&"damage_numbers_changed": [["on", TYPE_BOOL]],
@@ -139,13 +137,8 @@ const EVENTS: Dictionary = {
 	&"start_stone_changed": [["standing", TYPE_INT], ["wizards", TYPE_INT], ["lit", TYPE_BOOL]],
 	&"altar_changed": [["seats", TYPE_INT]],
 	&"altar_placed": [["standing", TYPE_BOOL], ["at", TYPE_VECTOR2]],
-	&"trial_gate_changed": [["standing", TYPE_INT], ["wizards", TYPE_INT], ["lit", TYPE_BOOL]],
-	&"lectern_changed": [["seats", TYPE_INT]],
-	&"trial_picks_changed": [["names", TYPE_PACKED_STRING_ARRAY], ["standing", TYPE_BOOL], ["at", TYPE_VECTOR2]],
 	&"hub_changed": [["in_hub", TYPE_BOOL]],
-	&"wave_started": [["wave", TYPE_INT]],
 	&"sandbox_changed": [["on", TYPE_BOOL]],
-	&"build_break_started": [["seconds", TYPE_FLOAT]],
 	&"door_voted": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"difficulty_changed": [["level", TYPE_FLOAT]],
 	# Rewards and progression.
@@ -157,11 +150,10 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
-	&"trial_gate_changed", &"lectern_changed", &"trial_picks_changed",
+	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed",
 	&"loading_started", &"loading_progressed", &"loading_finished",
-	&"play_load_requested", &"online_changed", &"online_line_changed", &"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"play_load_requested", &"online_changed", &"online_line_changed", &"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).

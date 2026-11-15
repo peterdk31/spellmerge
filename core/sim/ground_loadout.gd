@@ -10,7 +10,7 @@ extends RefCounted
 ## the frames service writes it into the header of a recording it begins (core/sim/replay.gd), and a
 ## run that starts reads it back (`Frames.next_run_ground`). A run whose room is that room (the hub
 ## begun anew for a joining machine) lays exactly that; any other start (a host starting the hub, a
-## party back from a run, a run of waves) lays its room's own placements, so the rack is fresh then.
+## party back from a run, a run's room) lays its room's own placements, so the rack is fresh then.
 ##
 ## The bytes: the room's id, a u16 count of items, then each item: its kind and id, its name (a
 ## byte of length, plain text), its copies (u16), where it lies (two 32-bit floats), its mana (a

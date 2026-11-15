@@ -41,7 +41,7 @@ extends CanvasLayer
 ## - `back` (B; E on the keyboard) opens that player's radial spell builder
 ##   (`hud/builder/radial_builder.gd`, nodes Root/Radial1 to Root/Radial4, made here; owner,
 ##   2026-10-26) when they have no menu open, are not down and the pause menu is not open. It
-##   never pauses the game; it is the full builder at any time, waves included (staffs A6a).
+##   never pauses the game; it is the full builder at any time, fights included (staffs A6a).
 ##   Inside a menu `back` is that menu's own (UIFocus `cancelled`), so a press only opens the
 ##   builder when the player had no menu open at the poll before it too. (The older list
 ##   builder is gone, owner 2026-11-11.) The pause menu's Sandbox page sets the radial's ring (its
@@ -69,9 +69,8 @@ extends CanvasLayer
 ##   machine on it (`core/input`) shows ONLINE (`PlayerPanel.set_online`, `poll`).
 ## - The stone line (`hud/widgets/stone_line.gd`, node Root/StoneLine, made here; online-lobby L1):
 ##   in the hub, how many wizards stand on the teleporter stone, or that A starts the run, at the
-##   top middle under the online line (`start_stone_changed`). While the stone is lit, or the trial
-##   gate is (`trial_gate_changed`, boss OB2), a player's `accept` (A, Enter) with no menu open sends
-##   the command `run_requested` (`poll`).
+##   top middle under the online line (`start_stone_changed`). While the stone is lit, a player's
+##   `accept` (A, Enter) with no menu open sends the command `run_requested` (`poll`).
 ## - The item hints (`item_hints.gd`, node Root/ItemHints, made here; items I6): over the item in
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
 ##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
@@ -94,7 +93,6 @@ const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.g
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 const LoadingScript := preload("res://hud/panels/loading/loading_screen.gd")
-const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
 const FpsCounterScript := preload("res://hud/widgets/fps_counter.gd")
 const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 const StoneLineScript := preload("res://hud/widgets/stone_line.gd")
@@ -106,8 +104,7 @@ const PAUSE_ACTION: StringName = &"pause"
 const BUILDER_ACTION: StringName = &"back"
 ## Select (Tab) opens the inventory (items I7); the inventory closes itself on it.
 const INVENTORY_ACTION: StringName = &"inventory"
-## A on the hub's lit stone or lit trial gate starts the run or the trial (`run_requested`;
-## online-lobby L1, boss OB2); else it takes the
+## A on the hub's lit stone starts the run (`run_requested`; online-lobby L1); else it takes the
 ## item in reach (`item_take_requested`; items I6: `take`, A, F or Enter, never Space, which casts),
 ## else it opens the altar's room.
 const START_ACTION: StringName = &"accept"
@@ -118,13 +115,6 @@ const EDGE_MARGIN: float = 4.0
 const STONE_LINE_DROP: float = 12.0
 ## How far below the top the pad line sits: under the stone line.
 const PAD_LINE_DROP: float = 26.0
-## The "Wave N" line and the build break line (hammer and "Build 12") sit side by side in one
-## strip in the middle of the view.
-const WAVE_LABEL_WIDTH: float = 80.0
-const WAVE_LABEL_FONT_SIZE: int = 12
-const WAVE_LABEL_OUTLINE: int = 3
-const BREAK_FONT_SIZE: int = 12
-const STRIP_SEPARATION: int = 6
 
 ## The event bus, the UI focus service, the input manager and the spell runtime (the
 ## radials ask it for names and icons). Only tests set these, before adding the
@@ -150,17 +140,13 @@ var _seen_back: Array[int] = [0, 0, 0, 0]
 var _seen_inventory: Array[int] = [0, 0, 0, 0]
 var _seen_start: Array[int] = [0, 0, 0, 0]
 var _seen_take: Array[int] = [0, 0, 0, 0]
-## True while the hub's teleporter stone is lit (`start_stone_changed`), and its trial gate
-## (`trial_gate_changed`).
+## True while the hub's teleporter stone is lit (`start_stone_changed`).
 var _stone_lit: bool = false
-var _gate_lit: bool = false
 ## The seats whose wizards stand on the hub's multiplayer altar (`altar_changed`), a bit each.
 var _altar_seats: int = 0
 ## Whether this machine plays with others now (`online_changed`): only then is a seat marked.
 var _online: bool = false
 var _had_menu: Array[bool] = [false, false, false, false]
-## A wave is in progress (the wave line shows).
-var _wave_active: bool = false
 ## Each seat's staffs' mana and what their sustained cards hold (`staff_mana_changed`,
 ## `mana_reserved`), by seat * STAFF_COUNT + staff: what a press could pay, for the staff rows.
 var _staff_mana: PackedFloat32Array = PackedFloat32Array()
@@ -169,14 +155,6 @@ var _joined: Array[bool] = [false, false, false, false]
 var _in_room: bool = false
 var _vignette: VignetteScript = null
 var _loading: LoadingScript = null
-## The strip in the middle of the view that holds the wave line and the break line.
-var _strip: HBoxContainer = null
-var _wave_label: Label = null
-## The build break line: a row (hidden outside a break) with the hammer and the countdown.
-var _break_row: PanelContainer = null
-var _break_label: Label = null
-## Seconds of the break left; counted down here from `build_break_started`, display only.
-var _break_left: float = 0.0
 ## The frame rate readout (see the top).
 var _fps: FpsCounterScript = null
 var _online_line: OnlineLineScript = null
@@ -200,55 +178,6 @@ func _ready() -> void:
 	var root_control: Control = get_node("Root") as Control
 	root_control.add_child(_vignette)
 	root_control.move_child(_vignette, 0)
-	_wave_label = Label.new()
-	_wave_label.name = "WaveLabel"
-	_wave_label.visible = false
-	_wave_label.add_theme_font_size_override("font_size", WAVE_LABEL_FONT_SIZE)
-	_wave_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	_wave_label.add_theme_constant_override("outline_size", WAVE_LABEL_OUTLINE)
-	var wave_backing := StyleBoxFlat.new()
-	wave_backing.bg_color = Color(0.0, 0.0, 0.0, 0.7)
-	_wave_label.add_theme_stylebox_override("normal", wave_backing)
-	_wave_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_wave_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_wave_label.custom_minimum_size = Vector2(WAVE_LABEL_WIDTH, 0.0)
-	_wave_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_strip = HBoxContainer.new()
-	_strip.name = "Strip"
-	_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_strip.alignment = BoxContainer.ALIGNMENT_CENTER
-	_strip.add_theme_constant_override("separation", STRIP_SEPARATION)
-	_strip.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
-	_strip.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_strip.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_strip.add_child(_wave_label)
-	# Above the vignette, below the panels and the builders (it sits in the gap between them).
-	root_control.add_child(_strip)
-	root_control.move_child(_strip, 1)
-	_break_row = PanelContainer.new()
-	_break_row.name = "BreakRow"
-	_break_row.visible = false
-	_break_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var backing := StyleBoxFlat.new()
-	backing.bg_color = Color(0.0, 0.0, 0.0, 0.7)
-	backing.content_margin_left = 2.0
-	backing.content_margin_right = 2.0
-	_break_row.add_theme_stylebox_override("panel", backing)
-	var box := HBoxContainer.new()
-	box.name = "Box"
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_theme_constant_override("separation", 4)
-	_break_row.add_child(box)
-	var hammer: Control = HammerIconScript.new()
-	hammer.name = "Hammer"
-	box.add_child(hammer)
-	_break_label = Label.new()
-	_break_label.name = "BreakLabel"
-	_break_label.add_theme_font_size_override("font_size", BREAK_FONT_SIZE)
-	_break_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(_break_label)
-	_break_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_strip.add_child(_break_row)
 	for player in PLAYER_COUNT:
 		var panel := get_node("Root/Panel%d" % (player + 1)) as PlayerPanelScript
 		panel.visible = false
@@ -341,11 +270,7 @@ func _ready() -> void:
 		events.room_entered.connect(_on_room_entered)
 		events.start_stone_changed.connect(_on_start_stone_changed)
 		events.altar_changed.connect(func(seats: int) -> void: _altar_seats = seats)
-		events.trial_gate_changed.connect(func(_standing: int, _wizards: int, lit: bool) -> void: _gate_lit = lit)
 		events.online_changed.connect(_on_online_changed)
-		events.wave_started.connect(_on_wave_started)
-		events.room_cleared.connect(_on_room_cleared)
-		events.build_break_started.connect(_on_build_break_started)
 		events.staff_changed.connect(_on_staff_changed)
 		events.inventory_announced.connect(_on_inventory_announced)
 		events.staff_mana_changed.connect(_on_staff_mana_changed)
@@ -363,7 +288,6 @@ func _process(delta: float) -> void:
 	poll()
 	step_hints(delta)
 	_vignette.step(delta)
-	step_break(delta)
 	step_staffs()
 
 
@@ -383,22 +307,9 @@ func get_item_hints() -> ItemHintsScript:
 	return _item_hints
 
 
-## Count the break line down by `delta` seconds. It only draws; Flow decides when the wave
-## starts, so a drift here never moves the wave. Called every frame; tests call it directly.
-func step_break(delta: float) -> void:
-	if not _break_row.visible:
-		return
-	_break_left = maxf(_break_left - delta, 0.0)
-	_show_break_seconds()
-
-
-func _show_break_seconds() -> void:
-	_break_label.text = "Build %d" % ceili(_break_left)
-
-
 ## Read every joined player's `pause`, `back` and `accept` presses since the last poll (several
 ## presses in one frame count once) and open or close menus as the top of this file says; `accept`
-## with no menu open while the hub's stone or trial gate is lit sends `run_requested`, else with an item in reach
+## with no menu open while the hub's stone is lit sends `run_requested`, else with an item in reach
 ## `item_take_requested`, else on the altar `online_open_requested`. Presses outside a room are
 ## dropped. Called every frame by _process; tests call it directly. One player's press never
 ## touches another player's menus.
@@ -424,7 +335,7 @@ func poll() -> void:
 		var had_menu: bool = _had_menu[player]
 		if input.is_joined(player):
 			if (start_now or take_now) and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
-				if _stone_lit or _gate_lit:
+				if _stone_lit:
 					if start_now:
 						events.run_requested.emit(player)
 				elif take_now and _item_hints.item_of(player) >= 0:
@@ -600,45 +511,8 @@ func _on_start_stone_changed(_standing: int, _wizards: int, lit: bool) -> void:
 
 func _on_room_entered(_room_id: StringName) -> void:
 	_in_room = true
-	_wave_label.visible = false  # stop_run sends no event; Flow sends wave_started right after
 	for player in PLAYER_COUNT:
 		_refresh(player)
-
-
-func _on_wave_started(wave: int) -> void:
-	_wave_label.text = "Wave %d" % wave
-	_wave_label.visible = true
-	_break_row.visible = false
-	_wave_active = true
-
-
-## The build break began: the hammer and a countdown of `seconds` show until the next wave.
-func _on_build_break_started(seconds: float) -> void:
-	_break_left = maxf(seconds, 0.0)
-	_show_break_seconds()
-	_break_row.visible = true
-
-
-## The build break line (hammer and countdown), or null before `_ready`.
-func get_break_row() -> PanelContainer:
-	return _break_row
-
-
-## The countdown text of the build break line.
-func get_break_label() -> Label:
-	return _break_label
-
-
-## The wave is cleared: the wave line goes (it shows only while a wave is on; nothing sends
-## `run_ended` yet).
-func _on_room_cleared(_room_id: StringName) -> void:
-	_wave_active = false
-	_wave_label.visible = false
-
-
-## Whether a wave is in progress (for tests).
-func is_wave_active() -> bool:
-	return _wave_active
 
 
 ## A staff was built or changed: its row shows the plan's cast sequence, with each card's icon
@@ -672,11 +546,6 @@ func step_staffs() -> void:
 			if is_finite(mana):
 				firing = spells.firing_cast(actor, staff, maxf(mana - _staff_reserved[player * PlayerPanelScript.STAFF_COUNT + staff], 0.0))
 			panel.set_staff_timing(staff, spells.cast_index(actor, staff), spells.cooldown_left(actor, staff), spells.is_winding(actor, staff), firing)
-
-
-## The "Wave N" line, or null before the script's `_ready`.
-func get_wave_label() -> Label:
-	return _wave_label
 
 
 ## A new run starts with no room entered yet: panels wait for `room_entered`.
@@ -719,9 +588,6 @@ func _on_main_menu_requested(_player: int) -> void:
 
 func _reset_all() -> void:
 	_in_room = false
-	_wave_active = false
-	_wave_label.visible = false
-	_break_row.visible = false
 	_vignette.clear()
 	_pause_menu.close_menu()
 	for player in PLAYER_COUNT:

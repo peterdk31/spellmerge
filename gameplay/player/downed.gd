@@ -12,7 +12,7 @@ extends ActorComponent
 ## whoever drives the body now, so a seat is downed and revived only through its own wizard.
 ##
 ## `protect(seconds)` makes the actor unhurtable for a while (`Health.protect`): flow uses
-## JOIN_PROTECTION for a wizard who joins mid-run or stands up for a new wave, coop a shorter time
+## JOIN_PROTECTION for a wizard who joins mid-run or stands up by itself (the sandbox, the hub), coop a shorter time
 ## after a revive. `revive_progress` from `coop` (for this seat) is kept for the revive ring the
 ## look draws (`revive_progress()`, 0 to 1).
 ##
@@ -24,7 +24,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const REVIVE_CUE: StringName = &"revive"
 ## Health after a revive.
 const REVIVE_HEALTH: float = 50.0
-## Seconds a wizard who joins mid-run (or stands up for a new wave) cannot be hurt.
+## Seconds a wizard who joins mid-run (or stands up by itself) cannot be hurt.
 const JOIN_PROTECTION: float = 2.0
 
 ## How far a teammate's revive has got (0 to 1), from `revive_progress`.

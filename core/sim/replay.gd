@@ -8,8 +8,8 @@ extends RefCounted
 ##
 ## - **The header:** the build (`build`: its version and commit), the content (`content`: a hash of
 ##   every content id, `content_of`), the run's seed (`run_seed`: the runs it starts deal theirs
-##   from it, core/sim/replay_tape.gd), how it started (`start`, one of STARTS, `starter`, the seat that
-##   asked, and `start_room`, the room a trial starts in: boss OB2), the seats joined at the start (`seats`, a bit per seat) and the run's rules (`rules`:
+##   from it, core/sim/replay_tape.gd), how it started (`start`, one of STARTS, and `starter`, the seat that
+##   asked), the seats joined at the start (`seats`, a bit per seat) and the run's rules (`rules`:
 ##   the shot cap, the step budgets; core/sim/session_rules.gd, online-ready N11),
 ##   so it plays the same on a machine whose own settings are others, and what the run takes along
 ##   from the play before it (`party`: each seat's player loadout, its bags, staffs and hands;
@@ -36,33 +36,28 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## tick's byte, the stops being state, N4; 4: no horde, its start, cap and commands gone; 5: what
 ## the run takes along, after the rules; 6: each carried staff's own id after its cards; 7: the
 ## players' loadouts in place of the carried staffs, and the bags' capacities among the rules, items
-## I4; 8: what lies on the ground after the players' loadouts, items I6; 9: the start's room after
-## the seats, the trial gate, boss OB2). A replay of another format is refused.
-const FORMAT: int = 9
+## I4; 8: what lies on the ground after the players' loadouts, items I6). A replay of another
+## format is refused.
+const FORMAT: int = 8
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
-## The requests a run starts by (core/events): a run of waves, the sandbox, the hub (online-lobby
-## L1; the main menu's Play), a trial from the hub's gate (boss OB2). A new one goes at the end, so
-## the replays made before keep their start.
-const STARTS: Array[StringName] = [&"play_requested", &"sandbox_requested", &"hub_requested", &"trial_requested"]
-## The starts that name a room (`start_room`; the event's second argument): the trial.
-const ROOM_STARTS: Array[StringName] = [&"trial_requested"]
+## The requests a run starts by (core/events): a run of rooms, the sandbox, the hub (online-lobby
+## L1; the main menu's Play). A new one goes at the end, so the replays made before keep their start.
+const STARTS: Array[StringName] = [&"play_requested", &"sandbox_requested", &"hub_requested"]
 const SEATS: int = 4
 ## Limits: four hours at 60 ticks a second, and the file's bytes.
 const MAX_TICKS: int = 60 * 60 * 60 * 4
 const MAX_BYTES: int = 64 * 1024 * 1024
 const MAX_BUILD: int = 64
 ## The most bytes a header takes (`header_bytes`): magic, format, the build, content and seed, start,
-## starter and seats, the start's room, the rules, what is carried at its most, the tick count.
-const MAX_HEADER_BYTES: int = 4 + 1 + 1 + MAX_BUILD + 16 + 3 + 1 + InputFrame.MAX_TEXT + SessionRules.BYTES + PartyLoadout.MAX_BYTES + GroundLoadout.MAX_BYTES + 4
+## starter and seats, the rules, what is carried at its most, the tick count.
+const MAX_HEADER_BYTES: int = 4 + 1 + 1 + MAX_BUILD + 16 + 3 + SessionRules.BYTES + PartyLoadout.MAX_BYTES + GroundLoadout.MAX_BYTES + 4
 
 var build: String = ""
 var content: int = 0
 var run_seed: int = 0
 var start: StringName = &"sandbox_requested"
 var starter: int = 0
-## The room the start names (one of ROOM_STARTS: the trial's room), else empty. A plain id.
-var start_room: StringName = &""
 var seats: int = 0
 ## The rules the run played by (`Frames.record` takes this machine's; the runs it plays take them).
 var rules: SessionRules = SessionRules.defaults()
@@ -190,10 +185,6 @@ func _encode(ticks: bool) -> PackedByteArray:
 	out.append(maxi(STARTS.find(start), 0))
 	out.append(starter)
 	out.append(seats & 0x0f)
-	var named: bool = ROOM_STARTS.has(start) and InputFrame.is_id(String(start_room))
-	var room: PackedByteArray = String(start_room).to_ascii_buffer() if named else PackedByteArray()
-	out.append(room.size())
-	out.append_array(room)
 	rules.encode_into(out)
 	party.encode_into(out)
 	ground.encode_into(out)
@@ -220,7 +211,6 @@ func decode(bytes: PackedByteArray) -> String:
 		content = 0
 		run_seed = 0
 		starter = 0
-		start_room = &""
 		seats = 0
 		rules = SessionRules.defaults()
 		party = PartyLoadout.new()
@@ -239,9 +229,9 @@ func _decode(bytes: PackedByteArray) -> String:
 		return "format %d, not %d" % [bytes[4], FORMAT]
 	var size: int = bytes[5]
 	var at: int = 6
-	# The fixed part: 16 bytes of content and seed, 3 of start, starter and seats, a byte at least of
-	# the start's room, the rules, a byte at least of what is carried, 4 of tick count.
-	if size > MAX_BUILD or at + size + 25 + SessionRules.BYTES > bytes.size():
+	# The fixed part: 16 bytes of content and seed, 3 of start, starter and seats, the rules, a byte
+	# at least of what is carried, 4 of tick count.
+	if size > MAX_BUILD or at + size + 24 + SessionRules.BYTES > bytes.size():
 		return "the header is cut short"
 	var text: PackedByteArray = bytes.slice(at, at + size)
 	for byte in text:
@@ -262,16 +252,6 @@ func _decode(bytes: PackedByteArray) -> String:
 		return "seats %d" % bytes[at + 2]
 	seats = bytes[at + 2]
 	at += 3
-	var room_size: int = bytes[at]
-	if room_size > InputFrame.MAX_TEXT or at + 1 + room_size > bytes.size():
-		return "the start's room is cut short"
-	var room: String = bytes.slice(at + 1, at + 1 + room_size).get_string_from_ascii()
-	if room.length() != room_size or not InputFrame.is_id(room):
-		return "the start's room is not an id"
-	if (room_size > 0) != ROOM_STARTS.has(start):
-		return "the start %s %s a room" % [start, "names no" if room_size > 0 else "needs"]
-	start_room = StringName(room)
-	at += 1 + room_size
 	var read_rules := SessionRules.new()
 	var rules_problem: String = read_rules.decode_at(bytes, at)
 	if rules_problem != "":

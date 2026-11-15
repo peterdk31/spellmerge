@@ -16,7 +16,10 @@ extends ActorComponent
 ##   whose trigger cast it, right after that trigger; while it runs, its triggers' casts of that
 ##   staff do nothing (a `refused` row that casts it again, or enters a state that does, would be
 ##   refused again at once, round and round);
-## - a state entered (`entered`).
+## - a state entered (`entered`);
+## - a body that walks overlapping its `area` (`Actor.touched`: `touched`, boss plan OB5), heard
+##   while its state has a `touched` trigger: only then is its area laid in the actor table
+##   (`Actors.set_touch_area`), where the walking bodies ask after their moves.
 ##
 ## One hit is up to three moments, in the order its health tells them: `health_below`, `death`, then
 ## the hit itself (`element_hit`), each read against the state it finds.
@@ -44,6 +47,8 @@ extends ActorComponent
 ## The state the body is in now, entered by a trigger (not the one it starts in).
 signal entered(state_id: StringName)
 
+const ActorsScript := preload("res://core/actors/actors.gd")
+
 ## Moments within moments this deep are not fired (a loop in the data, which `PropStates.problems`
 ## names).
 const MAX_DEPTH: int = 16
@@ -54,6 +59,9 @@ const DERIVED: Array[StringName] = [&"_depth", &"_entries", &"_leaving", &"_fizz
 
 ## Its states (set before the body is ready: `PropBody.make`).
 @export var states: PropStates = null
+## Where a body walking into it touches it, from its feet (`PropBase.area_rect`, set by
+## `PropBody.make`; empty: nowhere, and its `touched` triggers never fire).
+@export var area: Rect2 = Rect2()
 ## The index of the state it is in, in `states.list` (0: the one it starts in).
 var state: int = 0
 ## Its health as last told (`Health.changed`), for `health_below`'s crossing; -1 before it is set up.
@@ -79,6 +87,8 @@ func setup(owner_actor: Actor) -> void:
 	actor.damaged.connect(_on_damaged)
 	actor.status_gained.connect(_on_status_gained)
 	actor.reacted.connect(_on_reacted)
+	if states.listens(PropTrigger.When.TOUCHED):
+		actor.touched.connect(_on_touched)
 	if actor.health != null:
 		if _health_seen < 0.0:
 			_health_seen = actor.health.health
@@ -95,9 +105,12 @@ func attach() -> void:
 		actor.events.cast_fizzled.connect(_on_cast_fizzled)
 	if actor.events != null and states != null and not actor.events.prop_state_requested.is_connected(_on_state_requested):
 		actor.events.prop_state_requested.connect(_on_state_requested)
+	_lay_touch()
 
 
 func detach() -> void:
+	if actor.actors != null and is_instance_valid(actor.actors) and actor.id != ActorsScript.NONE:
+		actor.actors.set_touch_area(actor.id, Rect2())
 	if actor.events != null and is_instance_valid(actor.events) and actor.events.cast_left.is_connected(_on_cast_left):
 		actor.events.cast_left.disconnect(_on_cast_left)
 	if actor.events != null and is_instance_valid(actor.events) and actor.events.cast_fizzled.is_connected(_on_cast_fizzled):
@@ -167,6 +180,10 @@ func _on_status_gained(_by: int, status: StringName) -> void:
 
 func _on_reacted(_by: int, reaction: StringName) -> void:
 	_moment(PropTrigger.When.REACTION, reaction, 0.0)
+
+
+func _on_touched(_by: int) -> void:
+	_moment(PropTrigger.When.TOUCHED, &"", 0.0)
 
 
 func _on_health_changed(health: float, max_health: float) -> void:
@@ -258,6 +275,7 @@ func _enter(at: int, cast_bits: int) -> void:
 			if cast_bits & (1 << staff) == 0:
 				actor.caster.cancel_wind(staff)
 	_shape_body(true)
+	_lay_touch()
 	var now: PropState = current()
 	if actor.events != null:
 		actor.events.prop_state_changed.emit(actor.id, now.state_id)
@@ -283,3 +301,14 @@ func _shape_body(live: bool) -> void:
 			actor.footprint.set_solid(now.blocks)
 		else:
 			actor.footprint.solid = now.blocks
+
+
+## Its area in the actor table while the state it is in has a `touched` trigger (room pixels: the
+## area round its feet), else none, so the walking bodies ask only the props listening now. A prop
+## never moves, so this is laid as it enters the tree and as it enters a state.
+func _lay_touch() -> void:
+	if actor == null or actor.actors == null or actor.id == ActorsScript.NONE or not actor.is_inside_tree():
+		return
+	var now: PropState = current()
+	var listening: bool = now != null and area.has_area() and now.listens(PropTrigger.When.TOUCHED)
+	actor.actors.set_touch_area(actor.id, Rect2(area.position + actor.global_position, area.size) if listening else Rect2())

@@ -1,0 +1,74 @@
+[gd_resource type="Resource" script_class="PropBase" load_steps=18 format=3]
+
+[ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="1"]
+[ext_resource type="Resource" path="res://content/props/cracked_pillar/cracked_pillar_states.tres" id="2"]
+[ext_resource type="Texture2D" path="res://content/props/cracked_pillar/intact.svg" id="3"]
+[ext_resource type="Script" path="res://core/base/prop_layer.gd" id="4"]
+[ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="5"]
+[ext_resource type="Texture2D" path="res://content/props/cracked_pillar/cracked.svg" id="6"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="7"]
+[ext_resource type="Texture2D" path="res://content/props/cracked_pillar/rubble.svg" id="8"]
+[ext_resource type="Script" path="res://core/base/prop_base.gd" id="9"]
+
+[sub_resource type="Resource" id="intact_layer_0"]
+script = ExtResource("4")
+texture = ExtResource("3")
+
+[sub_resource type="Resource" id="intact_look"]
+script = ExtResource("5")
+state_id = &"intact"
+layers = Array[ExtResource("4")]([SubResource("intact_layer_0")])
+
+[sub_resource type="Resource" id="cracked_0_motes_0"]
+script = ExtResource("7")
+kind = &"grit"
+rate = 1.5
+from = 2
+at = Vector2(0, -28)
+size = Vector2(4, 24)
+colours = Array[StringName]([&"stone"])
+
+[sub_resource type="Resource" id="cracked_layer_0"]
+script = ExtResource("4")
+texture = ExtResource("6")
+motes = Array[ExtResource("7")]([SubResource("cracked_0_motes_0")])
+
+[sub_resource type="Resource" id="cracked_look"]
+script = ExtResource("5")
+state_id = &"cracked"
+layers = Array[ExtResource("4")]([SubResource("cracked_layer_0")])
+
+[sub_resource type="Resource" id="rubble_0_motes_0"]
+script = ExtResource("7")
+kind = &"dust"
+rate = 14.0
+from = 2
+at = Vector2(0, -6)
+size = Vector2(22, 10)
+spread = 360.0
+reach = 6.0
+stop = 2.5
+colours = Array[StringName]([&"stone", &"bone"])
+
+[sub_resource type="Resource" id="rubble_layer_0"]
+script = ExtResource("4")
+texture = ExtResource("8")
+motes = Array[ExtResource("7")]([SubResource("rubble_0_motes_0")])
+
+[sub_resource type="Resource" id="rubble_look"]
+script = ExtResource("5")
+state_id = &"rubble"
+layers = Array[ExtResource("4")]([SubResource("rubble_layer_0")])
+
+[resource]
+script = ExtResource("9")
+id = &"cracked_pillar"
+display_name = "Cracked pillar"
+scene = ExtResource("1")
+max_health = 32.0
+size = Vector2(20, 44)
+offset = Vector2(0, -24)
+footprint_size = Vector2(20, 8)
+footprint_offset = Vector2(0, -5)
+states = ExtResource("2")
+looks = Array[ExtResource("5")]([SubResource("intact_look"), SubResource("cracked_look"), SubResource("rubble_look")])

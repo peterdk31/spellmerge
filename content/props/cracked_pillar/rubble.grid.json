@@ -1,0 +1,26 @@
+{
+	"colours": {
+		"b": "#4a4663",
+		"l": "#7a7694",
+		"o": "#14121f",
+		"s": "#2b2840"
+	},
+	"rows": [
+		"........................",
+		"........................",
+		"........................",
+		"........................",
+		"....oooooo..............",
+		"....ollllo..............",
+		"....olbssoooooooo.......",
+		"....olbssollllllo.......",
+		"....oooooobbbbsso.......",
+		".oooooooolbbbbsso.......",
+		".ollllllolbbbbsoooooooo.",
+		".olbbbbsolbbbbsollllllo.",
+		".olbbbbsolbbbbsolbbbsso.",
+		".olbbbbsolbbbbsolbbbsso.",
+		".oooooooooooooooooooooo.",
+		"........................"
+	]
+}

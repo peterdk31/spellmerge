@@ -6,7 +6,7 @@ Things in the world that stand, block, take hits, react by casting spell cards a
 
 **Placing a prop in a room** (W8a/W8b/W8c): add a `PropStandIn` (tools/prop_stand_in.gd, a `RoomPlacement`) anywhere in the room's scene, pick the prop in the Inspector and move it; the editor draws the prop as the game will (any state, with its hurt shape, ground and area outlined), and the game stands the real prop there. Nothing to add to the prop's folder. **A prop is self-contained** (owner, 2026-11-11): what it means to the game comes with it, never with a room: its `role` (empty for most; `run_start`, `party_altar`: the hub's rules read them, `HubRules`; `room_exit`: a run's room's exits, `ExitRules`, run generation RG4) and where it is stood on (`area_size`, `area_offset`, apart from the ground that blocks). **The hub's prop yard** (W8, the hub scene's `RoomZone` `prop_yard`) stands every prop here with no `role` (most), in rows by id, each fresh again once it has been out of its first state (lit, broken) or gone for 10 s on end: a new prop appears there with no edit anywhere else. The hub's own teleporter stone and altar (`hub_stone`, `hub_altar`) are props too, of the roles `run_start` and `party_altar`, each stood on where its 96×96 `area` is: the hub's rules count a wizard on them there and light the stone by asking it (`prop_state_requested`) to enter `lit` or `unlit`, the states a `run_start` has (`tests/content/props/test_prop_data.gd` holds every role to what its rules need). A run's room leads on by its **exits** (`room_exit`, run generation RG4): floor plates stood on where their 48×48 `area` is, `dark` until the room is cleared, then the exits' rules (`ExitRules`) light one a way on (`lit`) and take the party on when every standing wizard stands in a lit one.
 
-Built in W6 (states and their triggers; the component and rows were named `Reactions` and `PropReaction` until the owner renamed them, 2026-11-11: Combat has reactions of its own). The look (art layers, mote sources, a light, a cue) is W7's, the hub's prop yard W8's (with the hub's stone and altar) and the first five props W9c's: the **exploding barrel** (`exploding_barrel`, the example below), the **crate** (`crate`), the **fire pit** (`fire_pit`), the **arc lodestone** (`arc_lodestone`) and the **burial jar** (`burial_jar`).
+Built in W6 (states and their triggers; the component and rows were named `Reactions` and `PropReaction` until the owner renamed them, 2026-11-11: Combat has reactions of its own). The look (art layers, mote sources, a light, a cue) is W7's, the hub's prop yard W8's (with the hub's stone and altar) and the first five props W9c's: the **exploding barrel** (`exploding_barrel`, the example below), the **crate** (`crate`), the **fire pit** (`fire_pit`), the **arc lodestone** (`arc_lodestone`) and the **burial jar** (`burial_jar`). The boss plan's OB5 added the **cracked pillar** (`cracked_pillar`: cover that cracks at half health and falls to rubble) and the **dust heap** (`dust_heap`, below) with the `touched` trigger.
 
 ## Contract
 
@@ -32,11 +32,12 @@ Built in W6 (states and their triggers; the component and rows were named `React
   | `entered` | its state was just entered (not the one it starts in) | |
   | `cast` | its staff N's cast leaves (a trigger's or a possessor's, after any wind-up) | `staff` |
   | `refused` | a trigger's cast of its staff N did not go: the staff busy (winding up, or in the delay after its last cast), nothing to cast, or, `dry`, its mana paying none of its casts (told only of a free staff); while it runs, its rows' casts of that staff do nothing | `staff`, `dry` (only when dry) |
+| `touched` | a body that walks (a Mover; not down) overlaps its area (`area_size`, `area_offset`): the body's circle against the walls at its feet, where its move left it, every tick it does (so a prop that hears it once goes to a state without the row). A prop that blocks needs an area a little past its ground, or a body stopped at its edge never reaches it | |
 
 - **The rule:** on a moment every trigger of the current state that matches fires, in order; the first of them that names a `then` sets the next state, once, after they all fired. Triggers belong to states, so "only once" is a state change, never a flag. Leaving a state ends the wind-ups it cast (a lit barrel shot apart blows now, and its fuse no more). **Death doesn't free a prop:** its `death` triggers run and a possession of it ends; it is freed only by a `gone` state, and without a death row it stands with its health empty.
 - **A prop's casts pay from its staffs' pools, which never refill** (a still body is never stepped): the first cast of every staff a trigger casts must fit in a full pool (`tests/content/props/test_prop_data.gd`); a staff cast more than once over a prop's life needs a pool for each.
 - **A trigger's cast is the prop's own:** never a press (it sets off no `on recast`), its wind-up outlasts a possession (a lit barrel possessed still blows; a possessor's own presses end with it), and a `cast` trigger never casts the staff whose cast it hears while that cast leaves.
-- `PropBase.problems()` must be empty: no scene or state, a state named twice, a staff it does not hold, a state, element, status or reaction nobody knows, a number out of range, `entered` triggers that go round for ever.
+- `PropBase.problems()` must be empty: no scene or state, a state named twice, a staff it does not hold, a state, element, status or reaction nobody knows, a number out of range, `entered` triggers that go round for ever, a `touched` trigger with no area.
 - Original names and art only.
 
 ## The exploding barrel, written out
@@ -66,6 +67,21 @@ charged   entered                → cast 1                (the charge, then the
           refused 1              → then idle             (charged while still in the delay after a zap)
 spent     (no triggers)
 ```
+
+## A prop walked into, written out
+
+The dust heap (`dust_heap`, boss plan OB5): invincible (only its triggers change it), a staff of `fire · blast · pulse` with no wind-up, its ground 24×8 and its area 36×20 round it, so a body that walks into it touches it before its ground stops it.
+
+```
+heap        element_hit fire  → cast 1, then burnt      (blown up)
+            status burn       → cast 1, then burnt      (a burning patch under it)
+            touched           → then scattered          (walked or swept into)
+scattered   element_hit fire  → cast 1, then burnt      (blocks off: dust on the floor, still hit by fire)
+            status burn       → cast 1, then burnt
+burnt       blocks off, hittable off (a scorch mark)
+```
+
+Its blast hurts everything near (a prop's shots hit every team), the heaps beside it too, which blow in turn.
 
 ## Allowed files
 

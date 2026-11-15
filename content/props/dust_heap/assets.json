@@ -1,0 +1,28 @@
+{
+	"assets": [
+		{
+			"path": "content/props/dust_heap/heap.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from heap.grid.json, 2026-11-15)",
+			"prompt": "A heap of swept-up dust prop, 24x16: a low grey mound, Bone-lit on its left, Stone in its shade on the right. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/dust_heap/scattered.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from scattered.grid.json, 2026-11-15)",
+			"prompt": "The dust heap scattered: a flat grey spread of dust on the floor with a few loose specks round it, 32x16. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/dust_heap/burnt.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from burnt.grid.json, 2026-11-15)",
+			"prompt": "The dust heap burnt: a dark Stone scorch mark on the floor with a few Fire embers, 32x16. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		}
+	]
+}

@@ -101,6 +101,13 @@ signal run_requested(player: int)
 ## it if it still lies in reach and its bag has room; no room says `item_refused`, an item gone
 ## meanwhile (taken by a seat before it in that tick) or out of reach by then says nothing.
 signal item_take_requested(player: int, item: int)
+## Sender: hud. `player` picked `depth` on the hub's lectern menu (run generation RG7; the menu a
+## seat's A opens at the lectern, `lectern_changed`): the stone's run begins in a room of that depth
+## of its map (0: the first room, as with no lectern; the last of `start_depth_changed`'s `depths`:
+## the map's last row, the boss's). A command: heard by flow at the next tick's start, which keeps it
+## as the party's one start (hub state, `start_depth_changed`) while that seat's wizard still stands
+## at the lectern in the hub.
+signal start_depth_picked(player: int, depth: int)
 ## `player` picked a sandbox action on the pause menu's sandbox page: `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).
 signal sandbox_action_requested(player: int, action: StringName)
 ## Sender: hud. `player` asked the enemy arena (the sandbox page, enemy AI AI8) for `count` enemies of the registry's `enemy_id`. Heard by flow.
@@ -308,9 +315,11 @@ signal run_started(player_count: int)
 signal run_ended(victory: bool)
 ## Sender: flow. A run of rooms of the run definition `run_id` (content/runs) begins, on the run's
 ## fresh state (its seed dealt; run generation RG3), for `players` players (the seats joined at its
-## start, the same on every machine and in every replay; RG5). Heard by run, which makes the run's
-## map and answers with `run_room_scaled` and `run_room_chosen` for its first room.
-signal run_begun(run_id: StringName, players: int)
+## start, the same on every machine and in every replay; RG5), starting at `start_depth` (the hub's
+## lectern, run generation RG7: 0 for the map's first room; the run definition's `start_depths()`
+## less one for its last row; `RunMap.start_at`). Heard by run, which makes the run's map and answers
+## with `run_room_scaled` and `run_room_chosen` for the room the party enters.
+signal run_begun(run_id: StringName, players: int, start_depth: int)
 ## Sender: run. The room of the run's map the party enters is `scale` times harder than the run's
 ## first room with one player (run generation RG5: its depth and the run's players, the run
 ## definition's `scaling`), sent before `run_room_chosen`. Heard by difficulty, which scales every
@@ -353,6 +362,16 @@ signal start_stone_changed(standing: int, wizards: int, lit: bool)
 signal hub_changed(in_hub: bool)
 ## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (a prop of the role `party_altar`, where its area is), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).
 signal altar_changed(seats: int)
+## Sender: flow. In the hub (run generation RG7): the seats whose wizards stand at the lectern (a
+## prop of the role `start_lectern`, where its area is), a bit each; 0 when the hub is left or no
+## lectern stands. Sent whenever it changes. Heard by hud (A at the lectern opens that seat's depth
+## menu, whose pick is `start_depth_picked`).
+signal lectern_changed(seats: int)
+## Sender: flow. In the hub (run generation RG7): the stone's run begins at `depth` of its map (0: the
+## first room) of the `depths` the lectern offers (the run definition's `start_depths()`: "Room 1"
+## up to the last, the boss's). Sent as the hub starts and whenever it changes; (0, 0) when the hub
+## is left. Heard by hud (the stone line says where the run starts; the lectern menu lists `depths`).
+signal start_depth_changed(depth: int, depths: int)
 ## Sender: flow. In the hub: whether a multiplayer altar stands (`standing`), and `at`, the top middle of the first one's area in room pixels (where something drawn over it sits). Sent as it changes; (false, zero) when the hub is left. For the view only. Heard by feel (the room's code drawn over the altar, online-lobby L5c).
 signal altar_placed(standing: bool, at: Vector2)
 ## Sender: flow. In a run's cleared room (run generation RG4): the lit exits, each the top middle of

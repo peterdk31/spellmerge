@@ -96,8 +96,11 @@ func room_now() -> RunNode:
 
 
 ## A run of rooms of the definition `run_id` begins (Flow, after the run's start) for `players`
-## players: its map is made from the run's seed for them, and its first room is the one the party enters.
-func _on_run_begun(run_id: StringName, players: int) -> void:
+## players: its map is made from the run's seed for them, and the party enters its first room, or
+## with a `start_depth` (the hub's lectern, run generation RG7) the first room of the row that depth
+## names (`RunMap.start_at`, by the depths the registry's definition offers, as the lectern listed
+## them). The map is the same either way: only where the party enters changes.
+func _on_run_begun(run_id: StringName, players: int, start_depth: int) -> void:
 	map = null
 	at = -1
 	var definition: RunDefinition = registry.get_resource(RUN_FOLDER, run_id) as RunDefinition if registry != null else null
@@ -113,7 +116,7 @@ func _on_run_begun(run_id: StringName, players: int) -> void:
 		push_warning("Run: no map for the run '%s': %s" % [run_id, "; ".join(made.problems)])
 		return
 	map = made
-	_enter(0)
+	_enter(made.start_at(start_depth, definition.start_depths()))
 
 
 ## The party took the way `way` out of the room it is in (0 = its leftmost link): it enters the room

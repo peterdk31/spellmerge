@@ -71,6 +71,11 @@ extends CanvasLayer
 ##   in the hub, how many wizards stand on the teleporter stone, or that A starts the run, at the
 ##   top middle under the online line (`start_stone_changed`). While the stone is lit, a player's
 ##   `accept` (A, Enter) with no menu open sends the command `run_requested` (`poll`).
+## - The lectern menus (`hud/menus/lectern/`, nodes Root/Lectern1 to Root/Lectern4, made here; run
+##   generation RG7): `accept` (A, Enter) with no menu open, no lit stone and no item in reach, while
+##   the seat's wizard stands at the hub's lectern (`lectern_changed`), opens that seat's menu of the
+##   stone's run's depths, whose pick is the command `start_depth_picked`; the altar comes first. It
+##   closes on `back`, on `pause` and by itself (its seat left the lectern, the hub was left).
 ## - The item hints (`item_hints.gd`, node Root/ItemHints, made here; items I6): over the item in
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
 ##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
@@ -98,6 +103,7 @@ const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 const StoneLineScript := preload("res://hud/widgets/stone_line.gd")
 const PadLineScript := preload("res://hud/widgets/pad_line.gd")
 const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
+const LecternMenuScript := preload("res://hud/menus/lectern/lectern_menu.gd")
 
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
@@ -113,8 +119,9 @@ const TAKE_ACTION: StringName = &"take"
 const EDGE_MARGIN: float = 4.0
 ## How far below the online line the stone line sits, in pixels.
 const STONE_LINE_DROP: float = 12.0
-## How far below the top the pad line sits: under the stone line.
-const PAD_LINE_DROP: float = 26.0
+## How far below the top the pad line sits: under the stone line and its second line (where the
+## run starts, run generation RG7).
+const PAD_LINE_DROP: float = 36.0
 
 ## The event bus, the UI focus service, the input manager and the spell runtime (the
 ## radials ask it for names and icons). Only tests set these, before adding the
@@ -132,6 +139,7 @@ var main_menu: PackedScene = null
 var _panels: Array[PlayerPanelScript] = []
 var _radials: Array[RadialScript] = []
 var _inventories: Array[InventoryScript] = []
+var _lecterns: Array[LecternMenuScript] = []
 var _pause_menu: PauseMenuScript = null
 ## Per player: the `pause` and `back` press counts at the last poll, and whether a menu of
 ## theirs was open then.
@@ -144,6 +152,8 @@ var _seen_take: Array[int] = [0, 0, 0, 0]
 var _stone_lit: bool = false
 ## The seats whose wizards stand on the hub's multiplayer altar (`altar_changed`), a bit each.
 var _altar_seats: int = 0
+## The seats whose wizards stand at the hub's lectern (`lectern_changed`), a bit each.
+var _lectern_seats: int = 0
 ## Whether this machine plays with others now (`online_changed`): only then is a seat marked.
 var _online: bool = false
 var _had_menu: Array[bool] = [false, false, false, false]
@@ -199,6 +209,12 @@ func _ready() -> void:
 		# Under the corner panels, as the builders.
 		root_control.move_child(inventory, _panels[0].get_index())
 		_inventories.append(inventory)
+	for player in PLAYER_COUNT:
+		var lectern := LecternMenuScript.new()
+		lectern.name = "Lectern%d" % (player + 1)
+		lectern.index = player
+		root_control.add_child(lectern)
+		_lecterns.append(lectern)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if ui_focus == null:
@@ -224,6 +240,8 @@ func _ready() -> void:
 		radial.bind(events, ui_focus, spells, input)
 	for inventory in _inventories:
 		inventory.bind(events, ui_focus, spells, input)
+	for lectern in _lecterns:
+		lectern.bind(events, ui_focus)
 	_pause_menu.builder_options_changed.connect(_on_builder_options_changed)
 	_pause_menu.reload_style_changed.connect(_on_reload_style_changed)
 	# The frame rate readout: over everything, at the bottom middle.
@@ -270,6 +288,7 @@ func _ready() -> void:
 		events.room_entered.connect(_on_room_entered)
 		events.start_stone_changed.connect(_on_start_stone_changed)
 		events.altar_changed.connect(func(seats: int) -> void: _altar_seats = seats)
+		events.lectern_changed.connect(func(seats: int) -> void: _lectern_seats = seats)
 		events.online_changed.connect(_on_online_changed)
 		events.staff_changed.connect(_on_staff_changed)
 		events.inventory_announced.connect(_on_inventory_announced)
@@ -310,7 +329,8 @@ func get_item_hints() -> ItemHintsScript:
 ## Read every joined player's `pause`, `back` and `accept` presses since the last poll (several
 ## presses in one frame count once) and open or close menus as the top of this file says; `accept`
 ## with no menu open while the hub's stone is lit sends `run_requested`, else with an item in reach
-## `item_take_requested`, else on the altar `online_open_requested`. Presses outside a room are
+## `item_take_requested`, else on the altar `online_open_requested`, else at the lectern opens the
+## seat's lectern menu. Presses outside a room are
 ## dropped. Called every frame by _process; tests call it directly. One player's press never
 ## touches another player's menus.
 func poll() -> void:
@@ -342,6 +362,8 @@ func poll() -> void:
 					events.item_take_requested.emit(player, _item_hints.item_of(player))
 				elif start_now and _altar_seats & (1 << player) != 0:
 					events.online_open_requested.emit(player)
+				elif start_now and _lectern_seats & (1 << player) != 0 and _in_room and not _panels[player].is_downed():
+					_open_lectern(player)
 			if paused_now:
 				_on_pause_pressed(player)
 			elif back_now and _may_open_menu(player, had_menu):
@@ -374,9 +396,27 @@ func _may_open_menu(player: int, had_menu: bool) -> bool:
 	return not had_menu and not _has_menu(player) and _in_room and not _pause_menu.is_open() and not _panels[player].is_downed()
 
 
-## Whether `player` has a menu open: their builder, their inventory, or the pause menu they work.
+## Whether `player` has a menu open: their builder, their inventory, their lectern menu, or the pause
+## menu they work.
 func _has_menu(player: int) -> bool:
-	return _radials[player].is_open() or _inventories[player].is_open() or _pause_menu.owner_player == player
+	return _radials[player].is_open() or _inventories[player].is_open() or _lecterns[player].is_open() or _pause_menu.owner_player == player
+
+
+## Open seat `player`'s lectern menu: placed in the middle of their quarter of the view, so four
+## open at once never cover each other.
+func _open_lectern(player: int) -> void:
+	var lectern: LecternMenuScript = _lecterns[player]
+	if not lectern.open_menu():
+		return
+	lectern.reset_size()
+	var view: Vector2 = (get_node("Root") as Control).size
+	var quarter: Vector2 = Vector2(0.25 + 0.5 * (player % 2), 0.75 if player >= 2 else 0.25) * view
+	lectern.position = (quarter - lectern.size * 0.5).round()
+
+
+## The lectern menu of seat `player` (for tests and screenshots).
+func get_lectern(player: int) -> LecternMenuScript:
+	return _lecterns[player]
 
 
 ## `pause`: close the player's open menu, or open the pause menu for them.
@@ -385,6 +425,8 @@ func _on_pause_pressed(player: int) -> void:
 		_radials[player].close_builder()
 	elif _inventories[player].is_open():
 		_inventories[player].close_inventory()
+	elif _lecterns[player].is_open():
+		_lecterns[player].close_menu()
 	elif _pause_menu.is_open():
 		if _pause_menu.owner_player == player:
 			_pause_menu.close_menu()

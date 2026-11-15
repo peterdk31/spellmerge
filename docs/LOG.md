@@ -2,6 +2,18 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-15: Run generation RG7, the lectern
+
+The hub has a lectern (`content/props/start_lectern/`, a stone stand with an open book, right of the teleporter stone): a seat's A there opens that seat's menu of the stone's run's depths, "Room 1" up to "The boss", and its pick is where the party's next run from the stone starts. The run is generated as always; the party enters the first room of the picked depth's row (the boss pick always the map's last row), and everything else is the same run, its scale included. This replaces the boss plan's OB2c (decision 33) for the generated run, so testing a deep room or the boss no longer needs playing down to it.
+
+The pick is the command `start_depth_picked(seat, depth)`, kept only from a seat standing at the lectern in the hub, the party's one setting (`HubRules.start_depth`, hashed hub state), told with the depths offered (`start_depth_changed`) and named on the stone line ("Starts in: Room 3"). It reaches the run area as `run_begun`'s new `start_depth` (`RunMap.start_at`). A hub started anew forgets it, since a joining machine starts the hub from the replay's header, which carries no setting.
+
+So that deleting the lectern's folder leaves the hub whole, no scene names it: the hub has a zone named for its role, `start_lectern`, and the hub stands the registry's prop of that role there (`RoomContents.stand_in_role_zones`, a general rule: a zone named for a prop role is that prop's place). With no lectern nothing stands there, nobody is ever at one, a pick is refused and the run starts in its first room.
+
+Reviewed by a fresh session (no blocking bug); changed after it: the role zones are stood by `RoomContents.stand` itself, so a run's later rooms get them too; the stone hands its pick to `start_run` (`start_depth`) instead of Flow guessing the stone's run; a downed seat opens no lectern menu; the menu naming a depth a shallower map has not is written down as a known gap in the milestone.
+
+Tests: `tests/gameplay/flow/test_flow_lectern.gd` (the lectern in its zone, a role zone in any room, the seats at it told, the pick kept, clamped and forgotten, the stone's run entered at each depth, Play's run at its first room, no lectern in the registry), `tests/gameplay/run/test_run.gd` (a run begun at a depth: the same map, that row's first room at its scale; `RunMap.start_at`), `tests/hud/test_lectern_menu.gd` (the menu, the pick, closing, what comes first, the stone line, the words), `tests/content/rooms/test_hub_data.gd` (the lectern's place), the prop's own test. READMEs: gameplay/flow, gameplay/run, hud, content/props, content/rooms.
+
 ## 2026-11-15: Boss OB6, the broom's arena
 
 The boss's room, `content/rooms/crypt/boss_broom/` ("The broom's crypt"): 26×16 tiles (832×512 px, about 1.7 times arena_01) of the crypt's tiles, walls all round and an open middle; its cover is props, so the fight uses it up: four cracked pillars in a loose diamond round the middle and four dust heaps near the corners. An entry door, no exit: cleared, the run is won. It hosts the room kind `boss` in the crypt, so the crypt run's map now ends in it and the broom stands there from the boss pool (by the run generation plan, which replaced the plan's `RoomBase.enemies` and `follows`); the room names no boss, and its first enemy spawn, top middle, is the boss's, the four in the corners left for the phases' adds (OB13).

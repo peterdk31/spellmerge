@@ -382,3 +382,14 @@ mouse_filter = 2
 border_color = Color(0.95, 0.76, 0.19, 1)
 border_width = 2.0
 zone_name = &"prop_yard"
+
+[node name="StartLectern" type="ReferenceRect" parent="Zones"]
+script = ExtResource("15_zone")
+offset_left = 776.0
+offset_top = 384.0
+offset_right = 824.0
+offset_bottom = 416.0
+mouse_filter = 2
+border_color = Color(0.31, 0.84, 0.86, 1)
+border_width = 2.0
+zone_name = &"start_lectern"

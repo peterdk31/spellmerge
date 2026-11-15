@@ -97,3 +97,21 @@ func test_it_enters_play_and_changes_phase() -> void:
 	check_equal(body.phases.current, 0, "under 55% health, spring cleaning starts")
 	check(body.caster.cards_of(0).count(&"dash") == 2, "with the double Sweep")
 	fx.free_all()
+
+
+func test_its_stats() -> void:
+	# Boss plan OB7, "The broom's data": its numbers live in its own data, never in general code.
+	var stats: ActorStats = BROOM.stats
+	check(stats != null, "it has stats")
+	check(is_equal_approx(stats.power, 2.0), "power 2 in phase 1")
+	check(stats.mass > 1.0 and stats.spell_scale > 1.0, "heavier and bigger-spelled than a wizard")
+	check(is_equal_approx(stats.resist_chill, 0.6) and is_equal_approx(stats.resist_burn, 0.3) and is_equal_approx(stats.resist_possess, 0.7), "its resists")
+	var phase_2: ActorStats = BROOM.phases[0].stats
+	check(phase_2 != null and is_equal_approx(phase_2.power, 2.5), "power 2.5 in phase 2")
+	var fx := Fixture.new(root)
+	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
+	check(is_equal_approx(body.stats.power, 2.0), "the body takes its stats")
+	fx.combat.hit(fx.players[0].id, body, BROOM.max_health * 0.5)
+	fx.run(body, 1)
+	check(is_equal_approx(body.stats.power, 2.5), "and phase 2's")
+	fx.free_all()

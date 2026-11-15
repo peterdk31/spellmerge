@@ -16,7 +16,7 @@ A run with 1 player and a run with 4 players should both feel fair.
 - **State:** `level` is the run's state (hashed, saved in snapshots); a run's start renews it to 1 (`begin_run`, `Tick.RUN_ORDER`), so the hub and the sandbox scale nothing.
 - **`enemy_standing` is the one way in:** an enemy or boss stood any other way than Flow's `_spawn_enemies` stands unscaled, so a new way of standing one (a boss's adds, a summon) sends it too.
 - **`difficulty_changed` is not the room's scale:** it is kept for a difficulty setting's level, which the enemies' skill follows (`TeamBoard.skill`, enemy AI AI10); depth and players never make enemies aim better or telegraph less.
-- **Later:** power and spell size join the same scale with the actor stats (the boss plan's OB7), a boss's adds with OB13; a difficulty setting is one more factor of the level (a run's rule, `SessionRules`, so every machine agrees).
+- **Later:** power and spell size may join the same scale through the body's own stats (`Stats`, gameplay/actor, boss plan OB7: its copy of its data's, which a room's scale would change as it stands, as `stat_scale` changes its health; nothing does yet), a boss's adds with OB13; a difficulty setting is one more factor of the level (a run's rule, `SessionRules`, so every machine agrees).
 - **Tests:** `tests/gameplay/difficulty/test_difficulty.gd` (the level from the run, never `difficulty_changed`; an enemy standing scaled; the level as state, renewed at a run's start; the hub and the sandbox unscaled; in play, each room's enemies at its scale). The curves themselves: `tests/core/test_run_rules.gd`; the budget: `tests/gameplay/run/test_run_generator.gd`.
 
 ## Contract

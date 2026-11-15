@@ -50,6 +50,9 @@ extends Resource
 ## Its staffs (1-4, as an enemy's: `EnemyBase.staffs`), the cards its triggers and a possessor
 ## cast; a trigger names one by number (1-4). A staff's wind-up is a fuse. Empty: it casts nothing.
 @export var staffs: Array[StaffCards] = []
+## Its stats (boss plan OB7: the power of its casts, its mass, its spells' size, its resists; null:
+## every default), copied into the body's own `Stats` as it is made.
+@export var stats: ActorStats = null
 ## Its states and their triggers, a file of their own (`<id>_states.tres`; two props may share one).
 @export var states: PropStates = null
 ## What it looks like in its states (props W7: `PropStateLook`, art layers, motes, a light, a cue),
@@ -115,7 +118,7 @@ func ground_rect() -> Rect2:
 
 
 ## What is wrong with the prop's data, one line each (empty when it is fine): no scene, no states,
-## its health, too many staffs or a staff's own problems, and its states' problems
+## its health, its stats' problems (`ActorStats.problems`), too many staffs or a staff's own problems, and its states' problems
 ## (`PropStates.problems`, with the names the game knows: `known`).
 func problems(known: Dictionary = {}) -> PackedStringArray:
 	var found := PackedStringArray()
@@ -123,6 +126,9 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 		found.append("%s has no scene (the shared content/props/base/prop.tscn)." % id)
 	if max_health <= 0.0:
 		found.append("%s: max_health is %s; above 0." % [id, max_health])
+	if stats != null:
+		for line: String in stats.problems():
+			found.append("%s: stats: %s" % [id, line])
 	# Numbered from 1, as its triggers name them.
 	found.append_array(StaffCards.list_problems(String(id), staffs, MAX_STAFFS, 1))
 	if states == null:

@@ -43,15 +43,19 @@ var _reached_end: bool = false
 var _in_payload: bool = false
 ## Slots that did something in some cast, so they are not listed as wasted for the staff.
 var _useful: Dictionary = {}
+## The casting body's spell scale (boss plan OB7: `Stats.spell_scale`), × every spell's size.
+var _spell_scale: float = 1.0
 
 
 func _init(lookup: Callable) -> void:
 	_lookup = lookup
 
 
-## The cycle of `cards` (ids by slot, `&""` for empty) in `staff`. Cards past `staff.slots`
-## are ignored; an unknown id is wasted.
-func compile(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
+## The cycle of `cards` (ids by slot, `&""` for empty) in `staff`, for a body of `spell_scale`
+## (its stats': every spell's size times it, `Carrier.scale_size`; 1 as the cards say). Cards past
+## `staff.slots` are ignored; an unknown id is wasted.
+func compile(cards: Array[StringName], staff: StaffBase, spell_scale: float = 1.0) -> CompiledStaff:
+	_spell_scale = spell_scale if spell_scale > 0.0 else 1.0
 	_out = CompiledStaff.new()
 	_out.staff = staff
 	_out.cards = cards.duplicate()
@@ -492,6 +496,9 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 	spell.pose_wind_up *= wind_up_mult
 	spell.speed = speed
 	spell.radius = radius
+	if _spell_scale != 1.0:
+		# The body's own size, after the cards' (boss plan OB7): as `bigger`'s radius, no damage or speed.
+		carrier.scale_size(spell, _spell_scale)
 	spell.shots = shots
 	spell.shots_requested = shots
 	spell.pierce = pierce

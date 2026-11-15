@@ -359,6 +359,15 @@ func hits_per_target(_lifetime: float) -> int:
 	return 1
 
 
+## Make `spell`'s size `factor` times what its cards made it, for a body of that spell scale (boss
+## plan OB7, `Stats.spell_scale`, at compile time): its hit radius, and how big it is drawn
+## (`radius_scale`), as a `bigger` card's radius does. A carrier whose size is its reach (a swing's
+## arc) scales that too.
+func scale_size(spell: CompiledSpell, factor: float) -> void:
+	spell.radius *= factor
+	spell.radius_scale *= factor
+
+
 ## How far a cast of `spell` reaches along its aim, for an enemy's telegraph (`Spells.next_cast_reach`);
 ## 0 for one that is not aimed.
 func reach_of(_spell: CompiledSpell) -> float:

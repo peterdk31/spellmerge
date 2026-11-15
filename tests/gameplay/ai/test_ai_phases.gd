@@ -91,3 +91,53 @@ func test_a_phase_by_time() -> void:
 	check_equal(boss.caster.staff_count, 1, "one staff again")
 	check(boss.caster.next_cast_sense(0).repeats_held, "a beam")
 	check(not boss.caster.has_staff(1), "the dash button is emptied")
+
+
+func test_a_phase_brings_its_stats_and_builds_at_their_size() -> void:
+	# Boss plan OB7: a phase's stats become the body's (null keeps the last); a new spell scale builds
+	# the staffs again, the phase's own or the ones it keeps.
+	fx.players[0].position = Vector2(150.0, 0.0)
+	var data: EnemyBase = _boss()
+	data.stats = ActorStats.new()
+	data.stats.power = 2.0
+	data.phases[0].stats = ActorStats.new()
+	data.phases[0].stats.power = 3.0
+	data.phases[0].stats.spell_scale = 2.0
+	data.phases[1].staffs = [] as Array[StaffCards]
+	data.phases[1].stats = ActorStats.new()
+	data.phases[1].stats.spell_scale = 1.0
+	var boss: Actor = fx.imp(Vector2.ZERO, data)
+	check_equal(boss.stats.power, 2.0, "its data's stats")
+	var radius: float = boss.caster.next_cast_radius(0)
+	boss.phases.begin(0)
+	check_equal(boss.stats.power, 3.0, "the phase's power")
+	var nova: float = boss.caster.next_cast_radius(0)
+	var plain: CompiledStaff = fx.spells.compile_staff(boss.caster.cards_of(0), boss.caster.staff_of(0))
+	check(is_equal_approx(nova, plain.casts[0].group.spells[0].radius * 2.0), "its staffs built at spell scale 2")
+	boss.phases.begin(1)
+	check_equal(boss.stats.power, 1.0, "the last phase's own stats")
+	check(is_equal_approx(boss.caster.next_cast_radius(0), nova * 0.5), "the staffs it keeps built again at scale 1")
+	check(radius > 0.0, "(a radius to compare)")
+	data.phases[0].stats = null
+	var keeps: Actor = fx.imp(Vector2(0.0, 80.0), data)
+	keeps.phases.begin(0)
+	check_equal(keeps.stats.power, 2.0, "a phase with no stats keeps the last")
+
+
+func test_a_phase_met_during_a_possession_starts_when_it_ends() -> void:
+	# Boss plan OB7, "A rule changed": the possessor never loses its staffs mid-cast.
+	fx.players[0].position = Vector2(150.0, 0.0)
+	var boss: Actor = fx.imp(Vector2.ZERO, _boss())
+	var possession: Possession = Possession.begin(fx.players[0], boss, 1.0)
+	check(possession != null, "a wizard possesses the boss")
+	fx.combat.hit(-1, boss, 55.0)
+	fx.run(boss, 2)
+	check_equal(boss.phases.current, -1, "under half health, no phase while it is possessed")
+	check_equal(boss.caster.cards_of(0).slice(0, 2), [&"fire", &"bolt"] as Array[StringName], "the possessor keeps its staffs")
+	var steps: int = 0
+	while boss.possessed_by != null and steps < 40:
+		fx.run(boss, 1)
+		steps += 1
+	check(boss.possessed_by == null, "the possession ends")
+	fx.run(boss, 1)
+	check_equal(boss.phases.current, 0, "and the phase starts then")

@@ -7,7 +7,10 @@ extends ActorComponent
 ##
 ## Each step it checks the next phase's condition (`EnemyPhase.health_below`, a fraction of the
 ## most health, or `after_seconds` since the body appeared); the first that holds starts, once,
-## in order. Starting one: the body is protected for its `transition` (`Health.protect`), its
+## in order. **Not during a possession** (boss plan OB7): a phase whose condition is met while the
+## body is possessed starts when the possession ends, so the possessor never loses its staffs
+## mid-cast. Starting one: its stats, when it names some, become the body's (`Stats.apply`; null
+## keeps the last), the body is protected for its `transition` (`Health.protect`), its
 ## staffs are replaced (`Inventory.replace_hands`, items I8: the Caster's follow; each pool full), its look changes (the Face's
 ## style and glow, the body's size; the sprite by whoever draws it, from `started`), and the
 ## controller hears it (`ActorController.phase_started`: an AI stands through the transition and
@@ -36,7 +39,7 @@ func step(delta: float) -> void:
 	if next >= list.size():
 		return
 	var phase: EnemyPhase = list[next]
-	if phase == null or not _holds(phase):
+	if phase == null or actor.possessed_by != null or not _holds(phase):
 		return
 	begin(next)
 
@@ -47,8 +50,13 @@ func begin(index: int) -> void:
 		return
 	current = index
 	var phase: EnemyPhase = list[index]
+	# The stats first: the staffs below are built at their spell scale.
+	var rescaled: bool = phase.stats != null and actor.stats != null and actor.stats.apply(phase.stats)
 	if phase.transition > 0.0 and actor.health != null:
 		actor.health.protect(phase.transition)
+	if rescaled and phase.staffs.is_empty() and actor.caster != null:
+		# The staffs it keeps are built again at the new size.
+		actor.caster.rebuild()
 	if not phase.staffs.is_empty() and actor.caster != null:
 		var staffs: Array[StaffBase] = []
 		var cards: Array = []

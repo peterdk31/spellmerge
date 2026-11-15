@@ -57,9 +57,12 @@ var target_id: int = -1
 var _look: PossessedLook = null
 
 
-## The controller of `by_body` (or its leader) possesses `target_body` for `seconds`. Returns the
-## possession, or null when none started (see the class doc).
+## The controller of `by_body` (or its leader) possesses `target_body` for `seconds`, shortened by
+## the target's possess resist (its `Stats`, boss plan OB7: (1 - share) as long; a share of 1 is
+## never possessed). Returns the possession, or null when none started (see the class doc).
 static func begin(by_body: Actor, target_body: Actor, length: float) -> Possession:
+	if is_instance_valid(target_body) and target_body.stats != null:
+		length *= 1.0 - target_body.stats.resist_of(Stats.POSSESS)
 	if by_body == target_body or length <= 0.0 or not can_start(by_body) or not can_start(target_body):
 		return null
 	# A body standing empty (its controller is away possessing) casts for its home controller.

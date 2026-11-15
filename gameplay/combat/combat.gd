@@ -48,6 +48,10 @@ extends Node
 ##  - **burn ticks** are quiet for everyone: no event unless the tick kills;
 ##  - **contact:** an actor with contact damage hurts every actor of another team it touches,
 ##    once per CONTACT_COOLDOWN per victim (an imp walking through imps hurts none).
+##  - **stats** (boss plan OB7, the body's `Stats`): a spell hit's damage, its slam and the burn it
+##    puts on are × its caster's power (read at the hit from the caster's body, `_power_of`; not
+##    contact, not heals, not reactions); a shove (a hit's push, a pull) is ÷ the body's mass; a
+##    status lasts (1 - the body's resist) as long, a freeze as a chill.
 ##
 ## Knockback: Combat only keeps each actor's push. It never moves a body: whoever moves it adds
 ## `consume_knockback(actor, delta)` to its own velocity each physics step and multiplies its
@@ -563,8 +567,10 @@ func _consume_knockback(row: int, delta: float) -> Vector2:
 ## application refreshes the time and keeps the stronger number (a status that ran out keeps none:
 ## put on again it has its new one); the third chill in a row
 ## freezes (`freeze`, FREEZE_TIME seconds) and clears the chill, and a frozen actor takes no
-## chill. Sends `status_applied`. Returns false for an unknown status, a time of 0, an actor
-## that is not registered or is down, or a chill on a frozen actor.
+## chill. The body's resist (its `Stats`, boss plan OB7) shortens the time, a freeze's as a chill's
+## (1 - share as long; a share of 1 takes none). Sends `status_applied`. Returns false for an
+## unknown status, a time of 0 (resisted whole too), an actor that is not registered or is down, or
+## a chill on a frozen actor.
 func apply_status(caster: int, actor: Variant, status_id: StringName, duration: float, strength: float) -> bool:
 	var row: int = _row_of(actor)
 	if row == ActorsScript.NONE:
@@ -580,6 +586,10 @@ func _apply_status_row(caster: int, row: int, status_id: StringName, duration: f
 	var st: int = STATUS_AT.get(status_id, -1)
 	if st < 0 or not STATUS_APPLIED[st]:
 		push_warning("Combat: unknown status '%s'." % status_id)
+		return false
+	# The body's resist shortens it (boss plan OB7): a share of 1 never takes it.
+	duration *= 1.0 - _resist(row, st)
+	if duration <= 0.0:
 		return false
 	var at: int = row * STATUS_COUNT
 	var power: float = strength / STATUS_STRENGTH_PER_POWER[st]
@@ -605,8 +615,8 @@ func _apply_status_row(caster: int, row: int, status_id: StringName, duration: f
 			_status_left[at + ST_CHILL] = 0.0
 			_status_power[at + ST_CHILL] = 0.0
 			_chill_stacks[row] = 0
-			_status_left[at + ST_FREEZE] = FREEZE_TIME
-			froze = true
+			_status_left[at + ST_FREEZE] = FREEZE_TIME * (1.0 - _resist(row, ST_FREEZE))
+			froze = _status_left[at + ST_FREEZE] > 0.0
 	var node: Node2D = _nodes[row]
 	_tell_status(caster, node, status_id)
 	if froze:
@@ -732,7 +742,7 @@ func pull(caster: int, position: Vector2, radius: float, strength: float, foes_o
 			continue
 		var body: Vector2 = _position_of(_nodes[row]) + _hurt_offset[row]
 		var toward: Vector2 = (Geometry2D.get_closest_point_to_segment(body, position, end) - body).normalized()
-		_knock[row] = toward * strength
+		_knock[row] = toward * strength / _mass(row)
 		_slam[row] = 0
 		# A body caught by a pull it was not in lately: the moment's cue (S6, item 13).
 		if _pulled_at[row] < _steps - PULL_GAP_STEPS and events != null:
@@ -823,7 +833,7 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 			discharge_share = _status_power[at + ST_STATIC]
 			_remove_status(row, STATIC)
 	if strength > 0.0:
-		_knock[row] = direction * strength
+		_knock[row] = direction * strength / _mass(row)
 	_last_by[row] = by
 	_last_kind[row] = kind
 	_last_name[row] = profile.source_name if profile != null else ""
@@ -959,7 +969,9 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 ## its own hit).
 func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: StringName) -> void:
 	var node: Node2D = _nodes[row]
-	var damage: float = profile.damage
+	# The caster's power (boss plan OB7), read now from its body: its hit, its slam and its burn.
+	var power: float = _power_of(_tag)
+	var damage: float = profile.damage * power
 	var strength: float = profile.knockback
 	# Away from the hit, measured to the hurt circle's centre (shots, beams and swings strike it at
 	# hand height), not the feet: a swing up at a body pushes it up, not down onto the caster. A
@@ -986,7 +998,7 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 	if _same(row, node):
 		if strength > 0.0:
 			# A push replaces the knockback, so it replaces the slam too.
-			_slam[row] = _slam_of(profile, damage, gust)
+			_slam[row] = _slam_of(profile, damage, gust, power)
 			_slam_by[row] = by
 			_slam_tag[row] = _hit_spell
 	# What the reactions kill is not the spell's own kill: no `kill_landed`.
@@ -1003,29 +1015,60 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 		var step_reaction: ReactionRow = reaction
 		var status_id: StringName = profile.status_id
 		var duration: float = profile.status_duration
-		var power: float = profile.status_strength
+		var status_power: float = profile.status_strength
 		if i > 0:
 			var element: StringName = profile.element_ids[i] if i < profile.element_ids.size() else &""
 			step_reaction = _reaction_for(row, element) if element != &"" and (reacted or _react_wait[row] <= 0.0) else null
 			status_id = profile.later_status_ids[i - 1] if i - 1 < profile.later_status_ids.size() else &""
 			duration = profile.later_status_durations[i - 1] if i - 1 < profile.later_status_durations.size() else 0.0
-			power = profile.later_status_strengths[i - 1] if i - 1 < profile.later_status_strengths.size() else 0.0
+			status_power = profile.later_status_strengths[i - 1] if i - 1 < profile.later_status_strengths.size() else 0.0
 		if step_reaction != null:
 			# The reaction runs instead of the status, and only on a target that lived.
 			_react(by, row, step_reaction)
 			reacted = true
 		elif status_id != &"" and not (i == 0 and discharged):
 			# (A discharge replaces the first status, so a lightning hit does not charge again at once.)
-			_apply_status_row(by, row, status_id, duration, power)
+			# A burn is the hit's damage over time: as strong as the caster's power makes its hit.
+			_apply_status_row(by, row, status_id, duration, status_power * power if status_id == BURN else status_power)
 
 
-## The slam a spell hit of `profile` dealing `damage` arms on a body it shoves, `gust` per cent
-## harder: a heavy hit's own, else GUST_SLAM_SHARE of its damage (at least 1) while it is gusted,
-## else none.
-static func _slam_of(profile: HitProfile, damage: float, gust: float) -> int:
+## The slam a spell hit of `profile` dealing `damage` (its caster's `power` in it) arms on a body it
+## shoves, `gust` per cent harder: a heavy hit's own times the power, else GUST_SLAM_SHARE of its
+## damage (at least 1) while it is gusted, else none.
+static func _slam_of(profile: HitProfile, damage: float, gust: float, power: float = 1.0) -> int:
 	if profile.slam > 0:
-		return profile.slam
+		return maxi(roundi(profile.slam * power), 1) if power != 1.0 else profile.slam
 	return maxi(roundi(damage * GUST_SLAM_SHARE), 1) if gust > 0.0 else 0
+
+
+## The power of the caster of the spell `tag` (boss plan OB7: its body's `Stats.power`), read at
+## the hit, so compiled spells stay shared between bodies and a change counts at once. 1 when the
+## caster is gone or its id is another body's now (`Spells.cast_by_open`), when it has no stats, or
+## for no spell (a plain hit).
+func _power_of(tag: int) -> float:
+	if tag == 0 or spells == null or not spells.cast_by_open(tag):
+		return 1.0
+	var table: ActorsScript = _table()
+	var body: Actor = table.node_of(SpellTag.caster_of(tag)) as Actor if table != null else null
+	return body.stats.power if body != null and body.stats != null else 1.0
+
+
+## The row's body's share resisted of the status `st` (its `Stats`, boss plan OB7), 0 for a plain
+## body or one with no stats.
+func _resist(row: int, st: int) -> float:
+	if _body[row] != BODY_ACTOR:
+		return 0.0
+	var stats: Stats = (_nodes[row] as Actor).stats
+	return stats.resist_of(st) if stats != null else 0.0
+
+
+## The row's body's mass (its `Stats`, boss plan OB7): what a shove on it is divided by; 1 for a
+## plain body or one with no stats.
+func _mass(row: int) -> float:
+	if _body[row] != BODY_ACTOR:
+		return 1.0
+	var stats: Stats = (_nodes[row] as Actor).stats
+	return stats.mass if stats != null else 1.0
 
 
 ## How much harder a spell hit of `profile` shoves the row `row`, in per cent: its gust's power

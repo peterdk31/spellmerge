@@ -14,7 +14,9 @@ extends Node2D
 ## `health` (Health), `hurtbox` (Hurtbox), `contact` (Contact), `mover` (Mover), `caster`
 ## (Caster), `inventory` (Inventory: what it holds, never stepped; items I3; the actor adds one when
 ## its scene has none, so every actor has one, items I8), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
-## circle when its scene has none, so every actor has one), `state_triggers` (PropStateTriggers: a prop's states,
+## circle when its scene has none, so every actor has one), `stats` (Stats: its power, mass, spell
+## scale and resists, boss plan OB7; added as the footprint is when its scene has none, never
+## stepped), `state_triggers` (PropStateTriggers: a prop's states,
 ## props W6; never stepped, it hears its body), plus any number of looks (ActorLook)
 ## and the first ActorController, its `home_controller`. Its `damage_numbers` (DamageNumbers,
 ## props W5) are a look too, added the same way when its scene has none, so every actor shows its
@@ -138,8 +140,8 @@ const REFS: Array[StringName] = [&"controller"]
 ## The enemy's numbers, applied to the components in `_ready`. Set before adding the actor.
 var data: EnemyBase = null
 ## How much harder the room made it (run generation RG5: the room's scale, set by difficulty before
-## the actor is added; 1 out of a run of rooms): its data's health is multiplied by it. Power and
-## spell size join it with the actor stats (the boss plan's OB7).
+## the actor is added; 1 out of a run of rooms): its data's health is multiplied by it. Its other
+## numbers are its `stats` (boss plan OB7), which a room's scale may change later as a relic does.
 var stat_scale: float = 1.0
 ## The prop this body was made from (`PropBody.make`, props W7; null for any other body): its look
 ## reads its art from it, and a body made again from a snapshot has it back (content, kept as
@@ -177,6 +179,8 @@ var caster: Caster = null
 ## What it holds, in bags, and its staffs on hands (items I3), null for a body that holds nothing.
 var inventory: Inventory = null
 var footprint: Footprint = null
+## Its stats (boss plan OB7): its own copy of its data's, read where they count (Combat, its Caster).
+var stats: Stats = null
 ## A prop's states and their triggers (props W6), null for a body that has none.
 var state_triggers: PropStateTriggers = null
 ## Its damage numbers (a look its scene holds, else one it added; see the class doc).
@@ -637,6 +641,8 @@ func _find_components() -> void:
 			inventory = _first(inventory, child) as Inventory
 		elif child is Footprint:
 			footprint = _first(footprint, child) as Footprint
+		elif child is Stats:
+			stats = _first(stats, child) as Stats
 		elif child is PropStateTriggers:
 			state_triggers = _first(state_triggers, child) as PropStateTriggers
 		elif child is ActorComponent:
@@ -651,6 +657,12 @@ func _find_components() -> void:
 		if hurtbox != null and hurtbox.is_box():
 			footprint.fit_base(hurtbox.size, hurtbox.offset)
 		add_child(footprint)
+	if stats == null:
+		# Every actor has stats (boss plan OB7, decision 22): the defaults, or its data's, taken as
+		# it is set up. Added as the footprint is (a snapshot makes it again before `_ready`).
+		stats = Stats.new()
+		stats.name = "Stats"
+		add_child(stats)
 	if inventory == null:
 		# Every actor holds things (items I8; owner, 2026-11-14: "every actor to have one"): a seat
 		# possessing it builds, swaps and drops its staffs, and what it takes stays with the body.
@@ -665,10 +677,11 @@ func _find_components() -> void:
 		damage_numbers = DamageNumbers.new()
 		damage_numbers.name = "DamageNumbers"
 		add_child(damage_numbers)
-	# Set up and attached in this order: health first, the caster after the hurtbox (it names it),
-	# a prop's state triggers last (they shape the hurt shape and footprint, and cast).
+	# Set up and attached in this order: the stats first (the caster builds its staffs at their
+	# spell scale), health, the caster after the hurtbox (it names it), a prop's state triggers last
+	# (they shape the hurt shape and footprint, and cast).
 	# The inventory after the caster: it takes the staffs the caster was made with (items I3).
-	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster, inventory, state_triggers]
+	var ordered: Array[ActorComponent] = [stats, health, hurtbox, contact, mover, footprint, caster, inventory, state_triggers]
 	var at: int = 0
 	for component in ordered:
 		if component != null:

@@ -71,6 +71,7 @@ Card lists are written in slot order (docs/milestones/M2-staffs.md, "Reading a s
     - **The trial is a start of its own,** `trial_requested(room_id)`, recorded in the replay's header as the hub's and a run's starts are, so replays, snapshots and online guests know the room.
     - **The room stands its own enemies** (the boss arena stands the broom by its `EnemyStandIn`), so the hub never holds one. Cleared, or everyone down, the party is back in the hub as it left it: its staffs carry over as through the stone, and nothing found in the trial comes back.
     - The Sandbox's enemy arena lists bosses too.
+28. **The boss can be deleted by deleting its folders** (owner, 2026-11-15: "Yes!"), as a spell card is: `content/bosses/old_broom/`, its staffs (`content/wizard/staffs/broom_*`), its arena (`content/rooms/crypt/boss_broom/`), its cues (`content/cues/broom_*`), and its lines in docs/STORY.md. Everything general stays ("General pieces"), the cracked pillar and the dust heap too, as ordinary props. So no general code, test or default may name the broom or be tuned to it: its numbers live in its own data, and a test that needs a boss makes its own or finds one through the registry. OB17 checks it once: with those folders deleted, the full suite (`tools/ptest.sh`) and `tools/check.sh` pass.
 
 ## General pieces
 
@@ -260,7 +261,7 @@ New props show up in the hub's prop yard by themselves.
 | OB14 | The AI's run-up, turns and aim lock (decision 26); the Big Sweep; the phases' locks | gameplay/ai, gameplay/feel (the lock's beat), content/bosses |
 | OB15 | Held sounds; music with intensity; every sound id of the sheet in its cue | gameplay/feel, core/base, content/cues |
 | OB16 | The boss bar and the entrance banner | gameplay/actor, hud |
-| OB17 | Tuning with bot playtests and the owner's; readability of fire on fire; a GIF of the whole fight | content/bosses |
+| OB17 | Tuning with bot playtests and the owner's; readability of fire on fire; a GIF of the whole fight; **the deletion check** (decision 28) | content/bosses |
 
 Each step's tests come with it: a card's test in its folder and the card-rules test (`tests/core/test_card_rules.gd`) for Lumber, Plow and `on wall`; the content determinism tests pick up the broom, the props and the room by themselves (`test_content_determinism.gd` already reads `bosses`; `test_snapshot_game.gd`); the stats in the state and snapshot tests; the native kernels' byte-for-byte tests for OB10.
 

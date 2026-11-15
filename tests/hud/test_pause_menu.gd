@@ -271,10 +271,25 @@ func _test_the_map_page() -> void:
 	_tap(0, &"back")
 	_frame()
 	_check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
+	# A room entered while the page shows (the pause not yet in effect online): it stays, on Back.
 	_press(0, "Map")
+	_bus.run_map_changed.emit(PackedInt32Array([0, 1]), [&"fight", &"boss"] as Array[StringName], links, 1)
+	_check(_menu().page == PauseMenuScript.Page.MAP and _menu().button("MapBack").text.begins_with("> "), "a new map keeps the page, Back focused")
+	_check(int(view.get("at")) == 1, "and shows where the party is now")
 	_bus.run_map_changed.emit(PackedInt32Array(), [] as Array[StringName], [] as Array[PackedInt32Array], -1)
 	_check(_menu().page == PauseMenuScript.Page.MAIN and _names() == ["Resume", "Settings", "LeaveGame", "MainMenu"], "the map gone: back to the main page, with no Map, got %s" % [_names()])
 	_check(_menu().button("Resume").text.begins_with("> "), "and its first row focused")
+	# A map arriving while the main page shows: the row comes and the focus stays where it was.
+	_focus.focus(0, _menu().button("Settings"))
+	_frame()
+	_bus.run_map_changed.emit(PackedInt32Array([0, 1]), [&"fight", &"boss"] as Array[StringName], links, 0)
+	_check(_names() == ["Resume", "Map", "Settings", "LeaveGame", "MainMenu"], "the Map row comes, got %s" % [_names()])
+	_check(_menu().button("Settings").text.begins_with("> "), "the focus stays on Settings")
+	# The Map row focused when the map goes: the first row is.
+	_focus.focus(0, _menu().button("Map"))
+	_frame()
+	_bus.run_map_changed.emit(PackedInt32Array(), [] as Array[StringName], [] as Array[PackedInt32Array], -1)
+	_check(_menu().is_open() and _menu().button("Resume").text.begins_with("> "), "the Map row gone: Resume is focused")
 
 
 func _test_the_enemy_arena() -> void:

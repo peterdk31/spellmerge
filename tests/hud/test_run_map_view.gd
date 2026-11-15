@@ -92,3 +92,43 @@ func test_what_it_holds_is_a_copy() -> void:
 	links[0].append(5)
 	links.append(PackedInt32Array())
 	check_equal(view.links.size(), 2, "its own list of rooms")
+
+
+## The content: every room kind's name starts with its own letter, so no two kinds look alike on
+## the map.
+func test_the_room_kinds_letters_differ() -> void:
+	var registry: Node = root.get_node("Registry")
+	var seen: Dictionary = {}
+	for found: Resource in registry.call("get_all", &"room_kinds"):
+		var kind := found as RoomKind
+		if kind == null:
+			continue
+		var letter: String = kind.shown_name().substr(0, 1).to_upper()
+		check(not seen.has(letter), "%s and %s both start with %s: the map would draw them alike" % [kind.id, seen.get(letter, ""), letter])
+		seen[letter] = kind.id
+	check(seen.size() >= 2, "the room kinds are found")
+
+
+## The content: the deepest and widest map any run definition's rules allow fits the room the pause
+## menu leaves the map (`MOST_SIZE`), with the kinds' line and where the party is.
+func test_every_run_s_biggest_map_fits_the_page() -> void:
+	var registry: Node = root.get_node("Registry")
+	var runs: int = 0
+	for found: Resource in registry.call("get_all", &"runs"):
+		var definition := found as RunDefinition
+		if definition == null:
+			continue
+		for rules: MapRules in definition.biomes:
+			runs += 1
+			var map_rows := PackedInt32Array()
+			var map_kinds: Array[StringName] = []
+			var map_links: Array[PackedInt32Array] = []
+			for row in rules.depth_max:
+				for column in rules.width_max:
+					map_rows.append(row)
+					map_kinds.append(&"fight" if row < rules.depth_max - 1 else &"boss")
+					map_links.append(PackedInt32Array())
+			view.show_map(map_rows, map_kinds, map_links, 0)
+			check(view.custom_minimum_size.x <= ViewScript.MOST_SIZE.x and view.custom_minimum_size.y <= ViewScript.MOST_SIZE.y,
+					"%s's biggest map (%d rows of %d) fits the page: %s" % [definition.id, rules.depth_max, rules.width_max, view.custom_minimum_size])
+	check(runs > 0, "the run definitions are found")

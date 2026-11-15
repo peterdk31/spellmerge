@@ -7,7 +7,11 @@ extends Control
 ## The pause menu's Map page shows it (hud/menus/pause).
 ##
 ## It shows what the bus says and nothing else (`run_map_changed`, the run area's); view only: it
-## sends nothing, and empty (out of a run of rooms) it has no map (`has_map`) and draws nothing.
+## sends nothing, and empty (out of a run of rooms) it has no map (`has_map`) and draws nothing. It
+## has no way to ask for the map: a view made after the run began shows nothing until the party
+## enters its next room (the pause menu's is made and bound as the HUD starts, before any run). Each
+## kind is told apart by its letter, so the room kinds' names start with different letters
+## (tests/hud/test_run_map_view.gd checks the content).
 
 const EventsScript := preload("res://core/events/events.gd")
 
@@ -30,8 +34,13 @@ const DIM_LINK_COLOR: Color = Color(0.290196, 0.27451, 0.388235, 1)
 const LETTER_COLOR: Color = Color(0.956863, 0.945098, 0.917647, 1)
 const DIM_LETTER_COLOR: Color = Color(0.639216, 0.623529, 0.721569, 1)
 const EDGE_COLOR: Color = Color(0.0784314, 0.0705882, 0.121569, 1)
-## Behind the map, so it reads over any room (the theme's dark backing).
-const BACKING_COLOR: Color = Color(0.0784314, 0.0705882, 0.121569, 0.7)
+## Behind the map, so it reads over any room (the theme's darkest colour, near opaque: the dim
+## rooms and links must not blend into a room's walls behind the pause menu).
+const BACKING_COLOR: Color = Color(0.0784314, 0.0705882, 0.121569, 0.95)
+## The most room the pause menu's Map page leaves the map on the 640x360 screen (its title, Back
+## and the panel's margins take the rest): every run definition's deepest and widest map fits
+## (tests/hud/test_run_map_view.gd checks the content).
+const MOST_SIZE := Vector2(600.0, 280.0)
 const HERE_TEXT: String = "Room %d of %d"
 
 ## The map shown changed (or went): the pause menu shows its Map row only while there is one.

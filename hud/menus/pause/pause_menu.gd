@@ -196,8 +196,8 @@ var tailless_motes: int = TaillessMotes.DEFAULT
 var save: SaveFile = null
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
 var display: Node = null
-## The content registry the enemy arena lists enemies from; tests may set their own first, else
-## the `Registry` autoload.
+## The content registry the enemy arena lists enemies from and the Map page names room kinds by;
+## tests may set their own first, else the `Registry` autoload.
 var registry: Node = null
 ## The enemy arena's choice: the enemies' ids (read when the sandbox page opens), the one picked,
 ## how many, and whether the AI view is on.

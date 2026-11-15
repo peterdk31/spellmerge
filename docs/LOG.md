@@ -8,7 +8,9 @@ The pause menu has a Map page in a run of rooms: the run's map, its rows top to 
 
 The HUD never names gameplay, so the run area tells the map as the party sees it (`run_map_changed(rows, kinds, links, at)`) as the party enters each room, an empty one at every run's start, and again after a snapshot's restore (`Run.rebuild_derived`) so a machine joining in a later room shows the same map. The widget (`hud/widgets/run_map_view.gd`) draws only what that event says, with the kinds' names from the registry (`RoomKind.shown_name`). This finishes the run generation plan; the lectern's known gap (it names depths a shallower map lacks) stays, since the map exists only once the run starts.
 
-Tests: `tests/hud/test_run_map_view.gd` (the map told, its layout, the rooms in reach, empty, the names, a copy), `tests/hud/test_pause_menu.gd` (the Map row and page, Back and B, the map going), `tests/gameplay/run/test_run.gd` (the map told on entering each room, after a restore, empty at a run's start and for a run the registry lacks), `tests/core/test_events.gd`. Screenshots: `tests/screenshots/shot_run_map.gd`. READMEs: hud, gameplay/run.
+A fresh session reviewed it and found nothing blocking. Changed after the review: the map's backing is close to opaque, so dim rooms read over a room's walls. Tests now check that the room kinds' names start with different letters and that every run's biggest map fits the page. The pause menu tests gained the cases where a map arrives or changes while the menu is open. The comments note that the view can only hear the map, not ask for it.
+
+Tests: `tests/hud/test_run_map_view.gd` (the map told, its layout, the rooms in reach, empty, the names, a copy), the kinds' letters apart, every run's biggest map fitting the page), `tests/hud/test_pause_menu.gd` (the Map row and page, Back and B, the map going), `tests/gameplay/run/test_run.gd` (the map told on entering each room, after a restore, empty at a run's start and for a run the registry lacks), `tests/core/test_events.gd`. Screenshots: `tests/screenshots/shot_run_map.gd`. READMEs: hud, gameplay/run.
 
 ## 2026-11-15: Run generation RG7, the lectern
 

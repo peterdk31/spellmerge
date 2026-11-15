@@ -69,6 +69,34 @@ func test_the_sweep_is_a_telegraphed_charge() -> void:
 	check(BROOM.contact_damage > 0, "touching it hurts")
 
 
+func test_the_dust_flick_goes_where_its_lane_shows() -> void:
+	# Decision 34 (OB10): three slow bolts aimed at the player, a little spread, not scattered.
+	var flick: StaffCards = BROOM.staffs[1]
+	check(not flick.cards.has(&"scatter"), "no scatter: it ignored the aim")
+	check(flick.cards.has(&"triple") and flick.cards.count(&"bolt") == 3 and flick.cards.count(&"slow") == 3, "a Triple of slow bolts")
+	check(flick.staff.spread > 0.0 and flick.staff.spread <= 15.0, "a small spread between them (%s degrees)" % flick.staff.spread)
+	var fx := Fixture.new(root)
+	fx.players[0].position = Vector2(200.0, 0.0)
+	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
+	body.aim = Vector2.RIGHT
+	check(body.caster.cast(1), "it flicks")
+	# Its shots of staff 1 once they leave (its wind-up first; its AI may cast its other staffs).
+	var shots: Array[Vector2] = []
+	for i in 60:
+		fx.run(body, 1)
+		shots.clear()
+		for slot in fx.projectiles.get_cap():
+			if fx.projectiles.is_alive(slot) and fx.projectiles.get_actor_of(slot) == body.id and SpellTag.staff_of(fx.projectiles.get_tag_of(slot)) == 1:
+				shots.append(fx.projectiles.get_velocity_of(slot))
+		if not shots.is_empty():
+			break
+	check_equal(shots.size(), 3, "three bolts")
+	for shot: Vector2 in shots:
+		var angle: float = rad_to_deg(absf(shot.angle()))
+		check(angle <= flick.staff.spread + 0.01, "each along the aim, within its spread (%.1f degrees)" % angle)
+	fx.free_all()
+
+
 func test_spring_cleaning() -> void:
 	check_equal(BROOM.phases.size(), 1, "a second phase")
 	var phase: EnemyPhase = BROOM.phases[0]

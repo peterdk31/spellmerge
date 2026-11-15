@@ -904,6 +904,8 @@ func component_stats(id: StringName) -> PackedStringArray:
 				out.append("%s x%s" % [pair[0], _short(float(pair[1]))])
 		if not is_equal_approx(modifier.speed_start, 1.0) or not is_equal_approx(modifier.speed_end, 1.0):
 			out.append("Speed x%s to x%s" % [_short(modifier.speed_start), _short(modifier.speed_end)])
+		if not is_equal_approx(modifier.move_start, 1.0) or not is_equal_approx(modifier.move_end, 1.0):
+			out.append("Move x%s to x%s" % [_short(modifier.move_start), _short(modifier.move_end)])
 	elif component is ElementBase:
 		var element: ElementBase = component
 		if element.status_id != &"":

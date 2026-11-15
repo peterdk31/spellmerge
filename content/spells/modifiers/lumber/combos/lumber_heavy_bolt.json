@@ -1,0 +1,10 @@
+{
+	"id": "lumber_heavy_bolt",
+	"name": "Lumber heavy bolt",
+	"does": "A lumbering fire bolt hits three times as hard as a plain one and burns the imp.",
+	"needs": "lumber",
+	"casts": [{"staff": 0, "cards": ["lumber", "fire", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 12}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

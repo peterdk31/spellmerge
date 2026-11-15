@@ -1,0 +1,10 @@
+{
+	"id": "lumber_long_charge",
+	"name": "Lumber long charge",
+	"does": "Lumber stretches a dash to 240 px: it runs through an imp a plain dash stops short of.",
+	"needs": "lumber",
+	"casts": [{"staff": 0, "cards": ["lumber", "dash"]}],
+	"imps": [[180, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "caster_moved", "mode": "dash"}, {"kind": "damaged", "imps": [0]}]
+}

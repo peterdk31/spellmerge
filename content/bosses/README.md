@@ -55,7 +55,7 @@ A boss that needs one of these needs that general piece built first (in the shar
 
 ## Example to copy
 
-`content/bosses/old_broom/` (the Old Broom, v0 of boss OB3): `old_broom.tres` (its Sweep `reach · bigger · dash` with a 0.8 s wind-up, its dust flick `scatter · slow · bolt`, its swat `bigger · heavy · swing`, its profile; phase 2 "Spring cleaning" under 55% health, with a double Sweep that leaves burning pools (`timer · reach · bigger · dash · slow · fire · pool`, twice), a faster profile and its burning look), `old_broom.tscn`, `idle.svg` and `burning.svg` (placeholders until its layered look, OB8 and OB9), `assets.json` and `test_old_broom.gd`.
+`content/bosses/old_broom/` (the Old Broom, v0 of boss OB3): `old_broom.tres` (its Sweep `bigger · lumber · dash` (Lumber since OB4) with a 0.8 s wind-up, its dust flick `scatter · slow · bolt`, its swat `bigger · heavy · swing`, its profile; phase 2 "Spring cleaning" under 55% health, with a double Sweep that leaves burning pools (`timer · bigger · lumber · dash · slow · fire · pool`, twice), a faster profile and its burning look), `old_broom.tscn`, `idle.svg` and `burning.svg` (placeholders until its layered look, OB8 and OB9), `assets.json` and `test_old_broom.gd`.
 
 ## Validate
 

@@ -309,6 +309,8 @@ func move(delta: float) -> void:
 	var to: Vector2 = projectiles.slide_body(from, velocity * delta, wall_radius()) if projectiles != null else unhindered
 	global_position = to
 	if to != unhindered:
+		# A dash held up head on by what it slides on ends there (`Mover.held_up`, boss plan OB10).
+		mover.held_up(velocity * delta, to - from)
 		velocity = (to - from) / delta
 	if actors != null and not actors.touch_ids.is_empty():
 		_touch()

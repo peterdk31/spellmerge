@@ -118,6 +118,11 @@ var spread_mult: float = 1.0
 var speed_start: float = SpellLimits.SHOT_SPEED_START
 var speed_end: float = SpellLimits.SHOT_SPEED_END
 var speed_ease: float = SpellLimits.SHOT_SPEED_EASE
+## Speed over a move (a dash's, `MoveCurve`): its modifiers' `move_start`, `move_end` and
+## `move_ease`, each multiplied. All 1 (the default): the move keeps its speed.
+var move_start: float = 1.0
+var move_end: float = 1.0
+var move_ease: float = 1.0
 
 
 ## True when the spell's shots change speed over their life (every spell's, unless its cards

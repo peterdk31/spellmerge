@@ -32,18 +32,18 @@ cards = Array[StringName]([&"bigger", &"lumber", &"dash"])
 script = ExtResource("3_staff")
 id = &"old_broom"
 display_name = "Dust flick"
-slots = 3
+slots = 7
 draw = 1
 wind_up = 0.5
 cooldown = 2.0
-spread = 0.0
+spread = 10.0
 max_mana = 100.0
 mana_regen = 40.0
 
 [sub_resource type="Resource" id="Resource_flick"]
 script = ExtResource("4_entry")
 staff = SubResource("Resource_flick_staff")
-cards = Array[StringName]([&"scatter", &"slow", &"bolt"])
+cards = Array[StringName]([&"triple", &"slow", &"bolt", &"slow", &"bolt", &"slow", &"bolt"])
 
 [sub_resource type="Resource" id="Resource_swat_staff"]
 script = ExtResource("3_staff")

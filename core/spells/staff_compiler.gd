@@ -333,7 +333,7 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
 ## uses that number: a shorter wind-down where it adds one to its staff (not a payload's carrier,
 ## `payload`), a shorter wind-up where the
-## carrier winds up (`winds_up`), damage where it hits (or blasts), speed where it travels and lifetime where it moves or lasts,
+## carrier winds up (`winds_up`), damage where it hits (or blasts), speed where it travels and lifetime where it moves or lasts, a move's curve where it moves its caster along a way,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
 ## behaviour (`Carrier.works`), its numbers ride with it.
 static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool, winds_up: bool) -> bool:
@@ -373,6 +373,10 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 	if not is_equal_approx(modifier.speed_start, 1.0) or not is_equal_approx(modifier.speed_end, 1.0):
 		any = true
 		if on.flies():
+			return true
+	if not is_equal_approx(modifier.move_start, 1.0) or not is_equal_approx(modifier.move_end, 1.0) or not is_equal_approx(modifier.move_ease, 1.0):
+		any = true
+		if on.moves_along():
 			return true
 	if not is_equal_approx(modifier.reach_mult, 1.0):
 		any = true
@@ -465,6 +469,9 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 		spell.speed_start *= modifier.speed_start
 		spell.speed_end *= modifier.speed_end
 		spell.speed_ease *= modifier.speed_ease
+		spell.move_start *= modifier.move_start
+		spell.move_end *= modifier.move_end
+		spell.move_ease *= modifier.move_ease
 		spell.lifetime *= modifier.lifetime_mult
 		if carrier.flies():
 			spell.lifetime *= modifier.reach_mult

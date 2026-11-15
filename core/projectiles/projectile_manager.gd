@@ -817,13 +817,16 @@ var _caster_at: PackedVector2Array = PackedVector2Array()
 ## The moves cards asked for (`move_shot`) that are still under way: a list per slot
 ## (`_move_head`, -1 for none) through one growing pool, as the hit memory. Each has its seconds
 ## left, the velocity it adds meanwhile, a homing move's turn rate, reach and the target it keeps
-## (0 for none), and the link (`_move_free` heads the free entries). The moves of a shot add up.
+## (0 for none), its speed curve and whole time (`MoveCurve`; NONE for an even one), and the link
+## (`_move_free` heads the free entries). The moves of a shot add up.
 var _move_head: PackedInt32Array = PackedInt32Array()
 var _move_left: PackedFloat32Array = PackedFloat32Array()
 var _move_vel: PackedVector2Array = PackedVector2Array()
 var _move_turn: PackedFloat32Array = PackedFloat32Array()
 var _move_range: PackedFloat32Array = PackedFloat32Array()
 var _move_home: PackedInt64Array = PackedInt64Array()
+var _move_curve: PackedVector3Array = PackedVector3Array()
+var _move_total: PackedFloat32Array = PackedFloat32Array()
 var _move_next: PackedInt32Array = PackedInt32Array()
 var _move_free: int = -1
 ## Shot behaviours (see "Shot behaviours, stepped in passes"): each behaviour's list of the shots
@@ -2534,10 +2537,12 @@ func _caster_position(slot: int) -> Vector2:
 ## new move runs beside the ones under way, each on its own time (two opposite pushes cancel, a
 ## pull after a recoil gets both). A moving shot still hits what it passes and still ends on a
 ## wall. A homing move (`turn_rate` above 0) turns toward the nearest
-## target within `within` pixels as it goes (`home_velocity`), the same distance in all.
+## target within `within` pixels as it goes (`home_velocity`), the same distance in all. A move
+## with a speed `curve` (`MoveCurve`: a dash's cards', boss plan OB10) goes its way at the curve's
+## speed, still the whole of it in its time.
 ## Returns false for an empty slot, an orbit shot (its caster holds it), or an offset or time
 ## that is not finite.
-func move_shot(slot: int, offset: Vector2, seconds: float, turn_rate: float = 0.0, within: float = 0.0) -> bool:
+func move_shot(slot: int, offset: Vector2, seconds: float, turn_rate: float = 0.0, within: float = 0.0, curve: Vector3 = MoveCurve.NONE) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] == MOTION_ORBIT:
 		return false
 	if not offset.is_finite() or not is_finite(seconds):
@@ -2563,6 +2568,8 @@ func move_shot(slot: int, offset: Vector2, seconds: float, turn_rate: float = 0.
 	_move_turn[at] = turn_rate if homes else 0.0
 	_move_range[at] = within if homes else 0.0
 	_move_home[at] = 0
+	_move_curve[at] = curve if MoveCurve.shapes(curve) else MoveCurve.NONE
+	_move_total[at] = seconds
 	# At the end of the list, so the moves run in the order they were asked.
 	_move_next[at] = -1
 	var last: int = _move_head[slot]
@@ -2595,6 +2602,8 @@ func _grow_moves(size: int) -> void:
 	_move_turn.resize(size)
 	_move_range.resize(size)
 	_move_home.resize(size)
+	_move_curve.resize(size)
+	_move_total.resize(size)
 	_move_next.resize(size)
 	for at in range(size - 1, old - 1, -1):
 		_move_next[at] = _move_free
@@ -4111,12 +4120,14 @@ func _pass_move(list: PackedInt32Array, first: int, count: int, delta: float) ->
 		while at >= 0:
 			var next: int = _move_next[at]
 			var part: float = minf(delta, _move_left[at])
+			# Its speed curve's share of the way this step (`MoveCurve`), as seconds at its even speed.
+			var curved: float = part if _move_curve[at] == MoveCurve.NONE else MoveCurve.share(_move_curve[at], _move_total[at], _move_left[at], delta) * _move_total[at]
 			_move_left[at] -= delta
 			if _move_turn[at] > 0.0:
 				_move_vel[at] = home_velocity(_actor[slot], _pos[slot], _move_vel[at], _move_turn[at], _move_range[at], part, _move_home[at], int(_seq[slot]), _layers[slot])
 				_move_home[at] = homing_target
-			_pos[slot] += _move_vel[at] * part
-			_base[slot] += _move_vel[at] * part
+			_pos[slot] += _move_vel[at] * curved
+			_base[slot] += _move_vel[at] * curved
 			if _move_left[at] <= 0.0:
 				if before < 0:
 					_move_head[slot] = next

@@ -128,6 +128,12 @@ func steers() -> bool:
 	return has(STEERS)
 
 
+## True when it moves its caster along a way over time (a dash; not a teleport, over at once): a
+## move's speed curve (`ModifierBase.move_start`) and a head-on wall ending it count on it.
+func moves_along() -> bool:
+	return has(MOVES_CASTER) and has(LASTS)
+
+
 ## True when `behaviour` does something on it (with a blast on it, when `blasts`): its traits, or
 ## the blast, meet what the behaviour needs (`ModifierBase.needs`). The carrier that runs nothing
 ## (id &"") runs no card.

@@ -286,6 +286,21 @@ var look_layer: int:
 @export var speed_end: float = 1.0
 @export var speed_ease: float = 1.0
 
+# --- Speed over a move ------------------------------------------------------------------
+
+## Factors on a move's speed as it starts (`move_start`) and as it ends (`move_end`), at full speed
+## between, and how quickly it gets there and back (`move_ease`: 1 evenly over the whole move, above 1
+## at full speed longer), for a carrier that moves its caster along a way (`Carrier.moves_along`: a
+## dash, boss plan OB10): start 0.1 and end 0 lurch off, pick up and drag to a stop. The move still
+## goes its distance in its time (`MoveCurve`), so the curve shapes it and never makes it longer.
+## Several cards multiply each other. All 1 changes nothing (every move's default: a move has no
+## burst of its own, as a flying shot has); wasted where the carrier does not move along a way. Not
+## `speed_start`'s numbers, which shape a flight and change how far it goes (a Lumber bolt would fly
+## a twentieth as far).
+@export var move_start: float = 1.0
+@export var move_end: float = 1.0
+@export var move_ease: float = 1.0
+
 
 func kind() -> StringName:
 	return &"modifier"
@@ -312,6 +327,9 @@ func ranges() -> Dictionary:
 		"speed_start": Vector2(0.1, 4.0),
 		"speed_end": Vector2(0.0, 4.0),
 		"speed_ease": Vector2(0.1, 8.0),
+		"move_start": Vector2(0.05, 4.0),
+		"move_end": Vector2(0.0, 4.0),
+		"move_ease": Vector2(1.0, 8.0),
 	})
 	return limits
 

@@ -37,7 +37,7 @@ func test_the_real_descriptions_have_no_problem() -> void:
 		# A component without a description only warns (see DECISIONS.md); a wrong one fails.
 		if problem["rule"] != "missing-lore":
 			lines.append(StoryValidator.format(problem))
-	check_equal(lines, [] as Array[String], "every description is valid")
+	check_equal(lines, [] as Array[String], "every description and line of lore is valid")
 
 
 func test_the_components_that_ship_have_a_description() -> void:
@@ -68,6 +68,39 @@ func test_the_text_limits() -> void:
 	check_equal(_rules(StoryValidator.check_line(FILE, "description", "   ")), ["empty-text"] as Array[String], "blank fails")
 	check_equal(_rules(StoryValidator.check_line(FILE, "description", "Two\nlines.")), ["text-not-a-line"] as Array[String], "a break fails")
 	check_equal(_rules(StoryValidator.check_line(FILE, "description", " padded")), ["text-not-a-line"] as Array[String], "padding fails")
+
+
+func test_an_enemys_lore() -> void:
+	# Boss OB3: `EnemyBase.lore`, a boss's line of why it fights; a stray needs none.
+	const ENEMY: String = "res://content/bosses/some_boss/some_boss.tres"
+	check_equal(StoryValidator.check_lore(ENEMY, "", false).size(), 0, "a stray without lore is fine")
+	check_equal(_rules(StoryValidator.check_lore(ENEMY, "", true)), ["missing-lore"] as Array[String], "a boss without lore only warns")
+	check_equal(StoryValidator.check_lore(ENEMY, "Swept up, and sour about it.", true).size(), 0, "a short line passes")
+	var long: Array[Dictionary] = StoryValidator.check_lore(ENEMY, "x".repeat(StoryValidator.MAX_LORE_CHARS + 1), false)
+	check_equal(_rules(long), ["text-too-long"] as Array[String], "a stray's lore keeps the limit too")
+	check(long.size() == 1 and str(long[0]["field"]) == "lore" and str(long[0]["file"]) == ENEMY, "named by its file and field")
+
+
+func test_the_story_check_reads_every_enemys_lore() -> void:
+	# Each enemy and boss the registry holds, in turn, given a line too long: the story check
+	# names it by its file and field. Its own line is put back after.
+	var registry: RegistryScript = _registry()
+	var checked: int = 0
+	for folder: StringName in EnemyBase.FOLDERS:
+		for res: Resource in registry.get_all(folder):
+			var enemy := res as EnemyBase
+			if enemy == null:
+				continue
+			var kept: String = enemy.lore
+			enemy.lore = "x".repeat(StoryValidator.MAX_LORE_CHARS + 1)
+			var named: bool = false
+			for problem: Dictionary in registry.validate_story():
+				if problem["rule"] == "text-too-long" and problem["file"] == enemy.resource_path and problem["field"] == "lore":
+					named = true
+			enemy.lore = kept
+			check(named, "%s: a line too long is named" % enemy.id)
+			checked += 1
+	check(checked > 0, "the enemies are found")
 
 
 func test_the_limits_agree_with_the_story_canon() -> void:

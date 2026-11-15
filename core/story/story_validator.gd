@@ -9,7 +9,7 @@ extends RefCounted
 ##
 ## A line players read (`check_line`) is one line of at most `MAX_LORE_CHARS` characters. The
 ## cards' descriptions are checked with it by `SpellValidator.check_descriptions` (only
-## `core/spells` reads a card's fields).
+## `core/spells` reads a card's fields), and the enemies' lore by `check_lore`.
 
 const MAX_LORE_CHARS: int = 60
 ## The speech limit of docs/STORY.md. No dialogue file exists yet; its validator comes with them.
@@ -26,6 +26,17 @@ static func check_line(file: String, field: String, line: String) -> Array[Dicti
 	elif line != line.strip_edges() or line.contains("\n"):
 		problems.append(_problem("text-not-a-line", file, field, "Keep it one line, with no spaces or breaks at either end."))
 	return problems
+
+
+## The problem with an enemy's line of lore (`EnemyBase.lore`, in the file `file`), or none: a boss
+## with none (`missing-lore`, which only warns, as a card's missing description), or a line that is not
+## a short line (`check_line`). A stray needs none.
+static func check_lore(file: String, lore: String, boss: bool) -> Array[Dictionary]:
+	if lore.is_empty():
+		if not boss:
+			return [] as Array[Dictionary]
+		return [_problem("missing-lore", file, "lore", "Give the boss its line of lore: why it fights, one line of at most %d characters." % MAX_LORE_CHARS)] as Array[Dictionary]
+	return check_line(file, "lore", lore)
 
 
 static func format(problem: Dictionary) -> String:

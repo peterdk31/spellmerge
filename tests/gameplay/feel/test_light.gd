@@ -455,15 +455,19 @@ func test_a_light_spots_data_is_read_and_checked() -> void:
 	spot.free()
 
 
-## Every light spot in the rooms' and decals' scenes is whole.
+## Every light spot in the rooms' (every room the registry finds) and the decals' scenes is whole.
 func test_every_light_spot_in_the_content_is_whole() -> void:
 	var seen: int = 0
-	for path: String in ["res://content/rooms/crypt/arena_01.tscn", "res://content/rooms/crypt/sandbox.tscn", "res://content/rooms/crypt/decals/torch.tscn"]:
-		var scene: Node = (load(path) as PackedScene).instantiate()
+	var scenes: Array[PackedScene] = [TORCH]
+	for room: Resource in registry.get_all(&"rooms"):
+		if room is RoomBase and (room as RoomBase).scene != null:
+			scenes.append((room as RoomBase).scene)
+	for packed: PackedScene in scenes:
+		var scene: Node = packed.instantiate()
 		for node: Node in scene.find_children("*", "", true, false):
 			if node.is_in_group(LightSpot.GROUP):
 				seen += 1
-				check_equal(LightSpot.problems(node), PackedStringArray(), "%s: %s" % [path, scene.get_path_to(node)])
+				check_equal(LightSpot.problems(node), PackedStringArray(), "%s: %s" % [packed.resource_path, scene.get_path_to(node)])
 		scene.free()
 	check(seen >= 5, "the torches are light spots, got %d" % seen)
 

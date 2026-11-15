@@ -350,6 +350,14 @@ signal room_left()
 signal run_way_taken(way: int)
 ## Sender: flow. The players entered the room `room_id`.
 signal room_entered(room_id: StringName)
+## Sender: flow (`_lay_out`, ground cover GC2). The room `room_id` was laid out: `layout_root` is the
+## layout the game shows, built and read but not yet in the tree, its placements and zones still in it
+## (the cover's fields). Sent whenever a room is laid out: a run's start, each room entered, and a
+## snapshot restored into another room (`Flow.rebuild_derived`); a restore into the room shown sends
+## nothing. Heard at once, before the placements and zones are taken out: a listener works out what it
+## needs from it then (`CoverLayout.of`) and keeps neither the node nor anything in it. It changes no
+## state. Heard by the cover area and feel (GC3, GC5).
+signal room_built(room_id: StringName, layout_root: Node)
 ## Sender: core/loading. Work before playing has begun behind the loading screen (`Loading.run`;
 ## Flow runs `play_tasks` on Play). Heard by hud, which shows the screen until `loading_finished`.
 signal loading_started()

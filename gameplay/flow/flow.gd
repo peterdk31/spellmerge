@@ -561,7 +561,9 @@ func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0)
 ## Lay `room`'s layout in `into` (a world), built once by the run's chance `sim`, under everything
 ## else: what is where is read from the layout shown (props W8c, `_places`), the stand-ins and zones
 ## taken out (the editor's: the bodies are stood by the room's places), the shots kept to the room,
-## and its camera. Any layout and camera there were go.
+## and its camera. Any layout and camera there were go. Whoever needs the layout itself (the ground
+## cover, worked out from its walls, places and fields) hears it as `room_built`, before the stand-ins
+## and zones are taken out (ground cover GC2).
 func _lay_out(into: Node2D, room: RoomBase, sim: Sim) -> void:
 	if _layout != null and is_instance_valid(_layout):
 		_detach(_layout)
@@ -569,6 +571,9 @@ func _lay_out(into: Node2D, room: RoomBase, sim: Sim) -> void:
 	_places = RoomPlaces.read(layout)
 	for problem in _places.problems():
 		push_warning("Flow: the room '%s': %s" % [room.id, problem])
+	# Told while its placements and zones are still in it (the cover's fields), before they go.
+	if events != null and layout != null:
+		events.room_built.emit(room.id, layout)
 	RoomPlaces.strip(layout)
 	if projectiles != null:
 		projectiles.set_bounds(Rect2(Vector2.ZERO, _places.size).grow(PROJECTILE_MARGIN))

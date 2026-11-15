@@ -288,8 +288,9 @@ var look_layer: int:
 
 # --- Speed over a move ------------------------------------------------------------------
 
-## Factors on a move's speed as it starts (`move_start`) and as it ends (`move_end`), at full speed
-## between, and how quickly it gets there and back (`move_ease`: 1 evenly over the whole move, above 1
+## Factors on a move's full speed as it starts (`move_start`) and as it ends (`move_end`), at full speed
+## between (full speed is above its even speed when the factors are below 1: the move still takes
+## its time, so start 0.1 is about a fifth of its even speed on Lumber), and how quickly it gets there and back (`move_ease`: 1 evenly over the whole move, above 1
 ## at full speed longer), for a carrier that moves its caster along a way (`Carrier.moves_along`: a
 ## dash, boss plan OB10): start 0.1 and end 0 lurch off, pick up and drag to a stop. The move still
 ## goes its distance in its time (`MoveCurve`), so the curve shapes it and never makes it longer.

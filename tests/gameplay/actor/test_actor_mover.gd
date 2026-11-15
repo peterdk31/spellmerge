@@ -502,3 +502,23 @@ func test_a_dash_with_no_curve_keeps_its_speed() -> void:
 	var first: float = body.velocity.x
 	_walk(body, 1)
 	check(first > 0.0 and is_equal_approx(body.velocity.x, first), "an even speed (%s, %s)" % [first, body.velocity.x])
+
+
+func test_a_curve_that_shapes_nothing_moves_as_an_even_dash() -> void:
+	# A curve below MoveCurve.MIN_AREA (or an ease alone) is screened to NONE where the dash is cast,
+	# so the body goes as an even dash to the bit, as a shot's move does.
+	var even: Actor = _mover(0)
+	var flat: Actor = _mover(1)
+	var dash: CarrierDash = CarrierDash.of(_world.spells)
+	var spell := CompiledSpell.new()
+	spell.move_start = 0.0025
+	spell.move_end = 0.0
+	spell.move_ease = 1.0
+	check(not MoveCurve.shapes(MoveCurve.of(spell)), "a curve with almost no area shapes nothing")
+	dash._move_body(spell, _world.tag_of(flat), flat.id, flat.id, flat.global_position, Vector2.RIGHT, Vector2(60.0, 0.0), 0.5, 0, 0)
+	check_equal(dash.move_curve(flat.id), MoveCurve.NONE, "it is taken as none")
+	_ask(even, &"dash", Vector2(60.0, 0.0), 0.5)
+	for i in 4:
+		_walk(even, 1)
+		_walk(flat, 1)
+		check_equal(flat.global_position - START, even.global_position - START, "step %d the same to the bit" % i)

@@ -374,7 +374,8 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 		any = true
 		if on.flies():
 			return true
-	if not is_equal_approx(modifier.move_start, 1.0) or not is_equal_approx(modifier.move_end, 1.0) or not is_equal_approx(modifier.move_ease, 1.0):
+	# An ease alone shapes nothing (start and end 1 keep the speed even), as for `speed_ease`.
+	if not is_equal_approx(modifier.move_start, 1.0) or not is_equal_approx(modifier.move_end, 1.0):
 		any = true
 		if on.moves_along():
 			return true

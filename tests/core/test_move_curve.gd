@@ -39,11 +39,12 @@ func test_a_curve_starts_and_ends_at_its_factors() -> void:
 func test_every_step_adds_up_to_the_whole_way() -> void:
 	for total: float in [0.5, 1.1, 2.0 / 3.0]:
 		for delta: float in [1.0 / 60.0, 0.0625, 0.3]:
-			var left: float = total
+			# Counted down in float32, as the Mover's and the manager's arrays hold it.
+			var left := PackedFloat32Array([total, total])
 			var sum: float = 0.0
-			while left > 0.0:
-				sum += MoveCurve.share(LURCH, total, left, delta)
-				left -= delta
+			while left[0] > 0.0:
+				sum += MoveCurve.share(LURCH, left[1], left[0], delta)
+				left[0] -= delta
 			check(absf(sum - 1.0) < 1e-6, "%s s in steps of %s: the whole way (%s)" % [total, delta, sum])
 
 

@@ -6,9 +6,10 @@ extends RefCounted
 ##
 ##     f(u) = 1 - (1 - start) (1 - u)^ease - (1 - end) u^ease
 ##
-## so it starts at `start` times its speed, ends at `end` times it, and is near full speed between
-## (an ease above 1 gets there sooner and leaves it later). Start and end below 1 make a lurch and a
-## drag (Lumber); above 1, a burst. The move still goes its whole distance in its whole time: each
+## so it starts at `start` times its full speed, ends at `end` times it, and is near full speed between
+## (an ease above 1 gets there sooner and leaves it later). Full speed is the even speed over the
+## curve's area (`factor`), so with factors below 1 it is above the even speed. Start and end below
+## 1 make a lurch and a drag (Lumber); above 1, a burst. The move still goes its whole distance in its whole time: each
 ## step goes the share of the way the curve's area over that step is of its whole area
 ## (`share`, worked out exactly from the area's formula, so the steps add up to the whole way
 ## however long each is). A curve is a Vector3 (start, end, ease); NONE keeps the speed even, and a

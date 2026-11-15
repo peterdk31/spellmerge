@@ -91,7 +91,9 @@ func _move_seconds(spell: CompiledSpell) -> float:
 ## part, gameplay/feel), `dash_land` where it lands (`carrier_ended`).
 func _move_body(spell: CompiledSpell, tag: int, actor: int, body: int, origin: Vector2, way: Vector2, offset: Vector2, seconds: float, chain: int, prev: int) -> void:
 	_dash_homing[body].start(spell, hash(Vector2i(actor, tag)))
-	_dash_curve[body] = MoveCurve.of(spell)
+	# Screened once here, so the body's mover takes a curve only as `move_shot` takes one.
+	var curve: Vector3 = MoveCurve.of(spell)
+	_dash_curve[body] = curve if MoveCurve.shapes(curve) else MoveCurve.NONE
 	kit.events.caster_move_requested.emit(body, &"dash", offset, seconds, tag)
 	var reach: float = origin.distance_to(kit.projectiles.clip_to_walls(origin, origin + offset))
 	kit.set_cue_tag(tag)
@@ -171,7 +173,8 @@ func step(delta: float) -> void:
 ## as its body): a body's hurt shape (the radius it is rounded by and the larger half of its box)
 ## times the cards' and the body's growth (`radius_scale`: `bigger`, its spell scale), a shot's hit
 ## radius (its cards' already); never under SpellLimits.PASS_REACH. A wizard's dash hardly changes,
-## a big body's strikes what the body meets.
+## a big body's strikes what the body meets, and with `bigger` or a spell scale past it, as those grow
+## its other spells.
 func _pass_reach(spell: CompiledSpell, body: int, shot: int) -> float:
 	var reach: float = 0.0
 	if shot >= 0:
@@ -208,9 +211,11 @@ func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
 ## A dash of the body (not a shot's) ended at `at` (`CasterMoves.end`: its way done, or a head-on
 ## wall stopped it, `Mover`): its pass strikes no longer than SpellLimits.PASS_GRACE more, so a dash
 ## stopped at a wall does not go on striking there for the rest of its time.
-func on_move_end(_spell: CompiledSpell, tag: int, _actor: int, _at: Vector2, _heading: Vector2) -> void:
+func on_move_end(_spell: CompiledSpell, tag: int, actor: int, _at: Vector2, _heading: Vector2) -> void:
+	# The body that moved casts what its end point does (`CasterMoves.end`), so only its pass ends.
+	var body: int = SpellRuntime.body_of(kit.caster(), actor)
 	for dash in _passes:
-		if dash.tag == tag and dash.shot < 0:
+		if dash.tag == tag and dash.shot < 0 and dash.body == body:
 			dash.left = minf(dash.left, SpellLimits.PASS_GRACE)
 
 

@@ -70,6 +70,26 @@ func test_the_text_limits() -> void:
 	check_equal(_rules(StoryValidator.check_line(FILE, "description", " padded")), ["text-not-a-line"] as Array[String], "padding fails")
 
 
+func test_an_enemys_lore() -> void:
+	# Boss OB3: `EnemyBase.lore`, a boss's line of why it fights; a stray needs none.
+	const ENEMY: String = "res://content/bosses/some_boss/some_boss.tres"
+	check_equal(StoryValidator.check_lore(ENEMY, "", false).size(), 0, "a stray without lore is fine")
+	check_equal(_rules(StoryValidator.check_lore(ENEMY, "", true)), ["missing-lore"] as Array[String], "a boss without lore only warns")
+	check_equal(StoryValidator.check_lore(ENEMY, "Swept up, and sour about it.", true).size(), 0, "a short line passes")
+	var long: Array[Dictionary] = StoryValidator.check_lore(ENEMY, "x".repeat(StoryValidator.MAX_LORE_CHARS + 1), false)
+	check_equal(_rules(long), ["text-too-long"] as Array[String], "a stray's lore keeps the limit too")
+	check(long.size() == 1 and str(long[0]["field"]) == "lore" and str(long[0]["file"]) == ENEMY, "named by its file and field")
+
+
+func test_the_story_check_reads_the_bosses_lore() -> void:
+	var registry: RegistryScript = _registry()
+	for folder: StringName in EnemyBase.FOLDERS:
+		for res: Resource in registry.get_all(folder):
+			var enemy := res as EnemyBase
+			if enemy != null and enemy.boss:
+				check(enemy.lore != "", "boss %s has its line of lore" % enemy.id)
+
+
 func test_the_limits_agree_with_the_story_canon() -> void:
 	check_equal(StoryValidator.MAX_LORE_CHARS, 60, "a description is at most 60 characters")
 	check_equal(StoryValidator.MAX_SPEECH_CHARS, 60, "a line of speech is at most 60")

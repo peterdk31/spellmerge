@@ -23,6 +23,7 @@ The characters and the story were rewritten on 2026-10-28 at the owner's word (d
 4. **The place.** The wizard's tower, and the crypt under it: a long shaft down from a hole in the tower floor, and below it rooms that are not the same from one visit to the next. Home is up. A later biome may be added; it follows the same tone.
 5. **The wizard.** Throws staffs away just because: new is better. Drops the old staff down the hole on new-staff day, says "Oops.", and walks off. From the staff's point of view it was an accident. Obviously. Never explains, because there is nothing to explain.
 6. **The foes.** **Strays** are the wizard's earlier staffs, all "accidentally" dropped. They are not evil, just sour about it, territorial, and here first. **Bosses** are powerful old staffs with a grudge, each with a reason, which a line of lore can give. The final boss is **the Favourite**, the wizard's current staff, polished and smug; after it, the wizard picks the Favourite up.
+   - **The Old Broom** (the crypt's boss, docs/milestones/boss-old-broom.md) was the wizard's first staff. It was not dropped down the hole: it was demoted to sweeping, and has swept the crypt ever since. Its grudge is the demotion. It sweeps everything in the crypt, staffs included, into the walls, and when pushed hard enough its bristles catch fire ("Spring cleaning"). Its lore line: *The wizard's first staff, demoted to sweeping. It remembers.*
 7. **The stakes and the ending.** If a run ends, the staff lands at the bottom of the shaft again. If the staffs win, the wizard picks one of them up, says "Huh. Still works.", and drops the Favourite down the hole. New is better; or is it?
 8. **Relics** are other things the wizard dropped down the hole. Each has a short, odd history of when and why.
 
@@ -37,4 +38,4 @@ The characters and the story were rewritten on 2026-10-28 at the owner's word (d
 
 ## Not fixed yet
 
-The biomes after the crypt, the bosses' names and stories, the shape of the hub, what lies below the crypt, and all dialogue beyond the intro's lines. A PR that adds these must fit the tone and canon above; Claude records the new canon here when it merges.
+The biomes after the crypt, the other bosses' names and stories, the shape of the hub, what lies below the crypt, and all dialogue beyond the intro's lines. A PR that adds these must fit the tone and canon above; Claude records the new canon here when it merges.

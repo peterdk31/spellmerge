@@ -8,6 +8,8 @@ extends SceneTree
 ## godot --headless --path . --script res://tests/gameplay/flow/test_walls_hold.gd
 
 ## The room is 640x384 with a 32 px wall border; a wizard's centre must stay inside it.
+const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 const INSIDE := Rect2(Vector2(32, 32), Vector2(576, 320))
 const FRAMES: int = 240
 const DIRECTIONS: Array[Vector2] = [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]
@@ -24,6 +26,8 @@ func _initialize() -> void:
 		printerr("TEST FAILED: the PlayerInput and Flow autoloads must exist")
 		quit(1)
 		return
+	# A run of arena_01 alone (the crypt run's first room is any of its fight rooms, RG3b).
+	flow.set("run_id_to_play", PinnedRun.pin(root.get_node("Registry"), ARENA))
 	for index in 4:
 		input.call("add_virtual_device", index)
 	_check(bool(flow.call("start_run", 0)), "Flow starts a run with four players")

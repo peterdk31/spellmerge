@@ -13,6 +13,9 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const PinnedRun := preload("res://tests/support/pinned_run.gd")
+## The room every run here plays (its spawns are named below): the crypt run picks among several.
+const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 const VIEW: Vector2 = Vector2(640.0, 360.0)
 const BOLT_TAG: int = 1
@@ -51,6 +54,9 @@ func _initialize() -> void:
 		printerr("TEST FAILED: the Feel autoload must have its party camera, and the Actors autoload exist")
 		quit(1)
 		return
+	# A run of arena_01 alone, so the spawns and limits checked below are its (run generation RG3b:
+	# the crypt run's first room is any of its fight rooms).
+	_flow.run_id_to_play = PinnedRun.pin(root.get_node("Registry"), ARENA)
 	_events.connect("player_joined", func(player: int) -> void: _joined_events.append(player))
 	_events.connect("player_left", func(player: int) -> void: _left_events.append(player))
 	_test_defaults()

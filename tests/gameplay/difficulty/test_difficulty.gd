@@ -103,7 +103,7 @@ func _check_enemies_at(scale: float, label: String) -> void:
 		check(is_equal_approx(enemy.stat_scale, scale), "%s: %s is scaled %s, not %s" % [label, enemy.data.id, enemy.stat_scale, scale])
 		check(is_equal_approx(enemy.health.max_health, enemy.data.max_health * scale), "%s: %s has %s health of %s" % [label, enemy.data.id, enemy.health.max_health, enemy.data.max_health])
 		check_equal(enemy.health.health, enemy.health.max_health, "%s: %s at full health" % [label, enemy.data.id])
-		check(is_equal_approx(float(root.get_node("Combat").call("health_of", enemy)), enemy.data.max_health * scale), "%s: Combat, which hits take from, holds the scaled health" % label)
+		check(is_equal_approx(float(root.get_node("Combat").call("health_of", enemy)), enemy.data.max_health * scale), "%s: registered in Combat at its scaled health" % label)
 
 
 func test_the_room_s_scale_is_the_level() -> void:
@@ -173,7 +173,8 @@ func _go_on(players: int) -> void:
 
 
 ## A snapshot taken in a scaled room restores its enemies with their scaled health and the level
-## into a machine whose run is unscaled, and the next room is scaled on from there.
+## into a machine whose run is unscaled, and the next room is scaled on from there: by the snapshot's
+## map (its rooms' scales are state), though the definition there has no scaling.
 func test_a_snapshot_of_a_scaled_room_restores_its_scale() -> void:
 	_play_scaled(3, 2)
 	_go_on(2)
@@ -185,9 +186,7 @@ func test_a_snapshot_of_a_scaled_room_restores_its_scale() -> void:
 	scaled.scaling = null
 	events.emit_signal("play_requested", 0)
 	_check_enemies_at(1.0, "a joining machine's unscaled run")
-	scaled.scaling = RunScaling.new()
-	scaled.scaling.per_depth = ScaleCurve.make(1.0, 2.0)
-	scaled.scaling.per_player = ScaleCurve.make(1.0, 1.6)
+	# The definition stays unscaled from here on: every scale after the restore is the snapshot's map's.
 	check_equal(snapshot.restore(tick.state_areas(), root), PackedStringArray(), "restored without problems")
 	check_equal(SimHash.areas(tick.state_areas(), StateWalk.new()), taken_hash, "the game is the snapshot's")
 	check(is_equal_approx(_level(), 1.8), "the level is the snapshot's: %s" % _level())

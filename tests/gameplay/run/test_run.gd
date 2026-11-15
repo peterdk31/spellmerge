@@ -216,6 +216,56 @@ func test_a_way_taken_moves_on_through_the_map() -> void:
 	check_equal(answers.back()[2], [] as Array[StringName], "the last room leads nowhere")
 
 
+## Run generation RG8: the view hears the map as the party sees it (`run_map_changed`): every room's
+## row, kind and links in the map's order, and the room the party is in, as it enters each room;
+## again after a snapshot's restore; empty as a run starts and for a run that cannot be made.
+func test_the_view_hears_the_map_as_the_party_enters_each_room() -> void:
+	var told: Array = []
+	var hear := func(rows: PackedInt32Array, kinds: Array[StringName], links: Array[PackedInt32Array], at: int) -> void:
+		told.append([rows, kinds, links, at])
+	events.connect("run_map_changed", hear)
+	tick.begin_run()
+	check_equal(told.size(), 1, "a run's start tells the view")
+	if told.size() == 1:
+		check(told[0][0].is_empty() and told[0][1].is_empty() and told[0][2].is_empty(), "no rooms")
+		check_equal(told[0][3], -1, "and nowhere")
+	tick.sim.run_seed = 7
+	told.clear()
+	events.emit_signal("run_begun", &"crypt", 1, 0)
+	var map: RunMap = run.get(&"map") as RunMap
+	if map == null or not map.is_made():
+		events.disconnect("run_map_changed", hear)
+		check(false, "the crypt run's map is made")
+		return
+	check_equal(told.size(), 1, "the first room entered tells the view")
+	var rows := PackedInt32Array()
+	var kinds: Array[StringName] = []
+	var links: Array[PackedInt32Array] = []
+	for node: RunNode in map.nodes:
+		rows.append(node.row)
+		kinds.append(node.kind)
+		links.append(node.links)
+	if told.size() == 1:
+		check_equal(told[0][0], rows, "every room's row, in the map's order")
+		check_equal(told[0][1], kinds, "its kind")
+		check_equal(told[0][2], links, "the rooms it leads to")
+		check_equal(told[0][3], 0, "the party is in the first room")
+		(told[0][2] as Array[PackedInt32Array])[0].append(99)
+		check(not map.first().links.has(99), "what is told is a copy")
+	events.emit_signal("run_way_taken", 0)
+	check_equal(told.size(), 2, "the next room entered tells it again")
+	if told.size() == 2:
+		check_equal(told[1][3], map.first().links[0], "where the party is now")
+	run.call("rebuild_derived")
+	check_equal(told.size(), 3, "a snapshot's restore tells it again")
+	if told.size() == 3:
+		check_equal(told[2][3], told[1][3], "the same room")
+	told.clear()
+	events.emit_signal("run_begun", &"no_such_run", 1, 0)
+	check(told.size() == 1 and (told[0][0] as PackedInt32Array).is_empty() and told[0][3] == -1, "a run the registry lacks: an empty map")
+	events.disconnect("run_map_changed", hear)
+
+
 ## Run generation RG5: the map is made for the players the run begins with (the crypt's scaling),
 ## and each room's scale is told (`run_room_scaled`) before the room is named, as the party enters it.
 func test_the_map_is_made_for_the_run_s_players_and_each_room_s_scale_told_first() -> void:

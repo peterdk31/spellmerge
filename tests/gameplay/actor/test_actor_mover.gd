@@ -38,7 +38,7 @@ class FakeCombat:
 
 var _world: Fixture
 var _combat: FakeCombat
-## Every caster_move_finished as [player, mode, position, tag].
+## Every caster_move_finished as [player, mode, position, tag, walled].
 var _finished: Array = []
 
 
@@ -47,8 +47,8 @@ func before_each() -> void:
 	_world.projectiles.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	_combat = own(FakeCombat.new()) as FakeCombat
 	_finished.clear()
-	_world.bus.caster_move_finished.connect(func(player: int, mode: StringName, position: Vector2, tag: int) -> void:
-		_finished.append([player, mode, position, tag]))
+	_world.bus.caster_move_finished.connect(func(player: int, mode: StringName, position: Vector2, tag: int, walled: bool) -> void:
+		_finished.append([player, mode, position, tag, walled]))
 
 
 func after_each() -> void:
@@ -85,7 +85,7 @@ func test_teleport_jumps_at_once_and_answers() -> void:
 	var body: Actor = _mover()
 	_ask(body, &"teleport", Vector2(60.0, 0.0), 0.0)
 	check_equal(body.global_position, START + Vector2(60.0, 0.0), "the actor is where the teleport aimed")
-	check_equal(_finished, [[0, &"teleport", START + Vector2(60.0, 0.0), _world.tag_of(body)]], "the landing is reported with the card's tag")
+	check_equal(_finished, [[0, &"teleport", START + Vector2(60.0, 0.0), _world.tag_of(body), false]], "the landing is reported with the card's tag")
 
 
 func test_teleport_stops_short_of_a_wall() -> void:
@@ -404,6 +404,7 @@ func test_a_dash_into_a_wall_head_on_ends_there() -> void:
 	check_equal(_finished.size(), 1, "the dash is over at the wall, long before its 2 s: %s" % [_finished])
 	check(_finished.size() == 1 and _finished[0][1] == &"dash" and _finished[0][2].x > 130.0 and _finished[0][2].x <= 150.0, "it ends there, so its end point is at the wall: %s" % [_finished])
 	check(not body.mover.is_dashing(), "it no longer grinds against the wall")
+	check(_finished.size() == 1 and _finished[0][4], "answered as ended by a wall, so its `on wall` fires (boss plan OB12)")
 
 
 func test_a_dash_at_a_wall_under_45_degrees_from_straight_in_ends() -> void:
@@ -413,6 +414,7 @@ func test_a_dash_at_a_wall_under_45_degrees_from_straight_in_ends() -> void:
 	_ask(body, &"dash", Vector2.from_angle(deg_to_rad(40.0)) * 200.0, 2.0)
 	_walk(body, 20)
 	check_equal(_finished.size(), 1, "it ends at the wall: %s" % [_finished])
+	check(_finished.size() == 1 and _finished[0][4], "ended by the wall")
 
 
 func test_a_dash_glancing_off_a_wall_slides_on() -> void:
@@ -425,6 +427,7 @@ func test_a_dash_glancing_off_a_wall_slides_on() -> void:
 	check(body.mover.is_dashing() and body.global_position.y > START.y + 60.0, "it slides on along it: %s" % body.global_position)
 	_walk(body, 14)
 	check_equal(_finished.size(), 1, "and ends when its time is up")
+	check(_finished.size() == 1 and not _finished[0][4], "not ended by the wall it glanced off")
 
 
 func test_a_dash_into_the_ground_of_a_body_that_cannot_move_ends_there() -> void:
@@ -435,6 +438,7 @@ func test_a_dash_into_the_ground_of_a_body_that_cannot_move_ends_there() -> void
 	_walk(body, 12)
 	check_equal(_finished.size(), 1, "it ends at the prop: %s" % [_finished])
 	check(_finished.size() == 1 and _finished[0][2].x > 130.0 and _finished[0][2].x <= 150.0, "where the prop's ground starts: %s" % [_finished])
+	check(_finished.size() == 1 and _finished[0][4], "ended by the prop's ground, as by a wall")
 
 
 func test_a_dash_held_up_by_no_wall_goes_its_whole_way() -> void:
@@ -443,6 +447,7 @@ func test_a_dash_held_up_by_no_wall_goes_its_whole_way() -> void:
 	_walk(body, 17)
 	check(body.global_position.distance_to(START + Vector2(100.0, 0.0)) < 0.01, "its whole way: %s" % body.global_position)
 	check_equal(_finished.size(), 1, "answered once")
+	check(_finished.size() == 1 and not _finished[0][4], "not ended by a wall")
 
 
 func test_a_pull_into_a_wall_is_not_ended_by_it() -> void:

@@ -80,3 +80,7 @@ const AOE: int = 1 << 28
 ## else (ranged) spares it only until it has left it: a shot over time, a beam along its path
 ## (owner, 2026-11-06).
 const MELEE: int = 1 << 29
+## Does it move its caster along a way over time (a dash; not a teleport, over at once)? A move's
+## speed curve (`ModifierBase.move_start`), Plow's carry and `on wall` at a head-on wall count on it
+## (boss plan OB10-OB12).
+const MOVES_ALONG: int = 1 << 30

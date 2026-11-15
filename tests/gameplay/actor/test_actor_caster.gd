@@ -230,7 +230,7 @@ func test_a_dash_card_dashes_the_actor_and_its_blast_goes_off_where_it_ends() ->
 	_world = Fixture.new(root, _move_cards())
 	var finished: Array = []
 	var areas: Array = []
-	_world.bus.caster_move_finished.connect(func(player: int, mode: StringName, at: Vector2, tag: int) -> void: finished.append([player, mode, at, tag]))
+	_world.bus.caster_move_finished.connect(func(player: int, mode: StringName, at: Vector2, tag: int, _walled: bool) -> void: finished.append([player, mode, at, tag]))
 	_world.bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: areas.append([player, at, radius]))
 	var imp: Actor = _creature([[&"blast", &"dash"]])
 	(imp.controller as Fixture.Scripted).aim = Vector2.RIGHT

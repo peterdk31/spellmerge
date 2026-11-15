@@ -99,7 +99,7 @@ func before_each() -> void:
 	_put(blast, &"blast")
 	_finished.clear()
 	_areas.clear()
-	_bus.caster_move_finished.connect(func(player: int, mode: StringName, at: Vector2, tag: int) -> void: _finished.append([player, mode, at, tag]))
+	_bus.caster_move_finished.connect(func(player: int, mode: StringName, at: Vector2, tag: int, _walled: bool) -> void: _finished.append([player, mode, at, tag]))
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	# The wizard of seat 0 (actors G7: the real scene); its hurtbox registers it in Combat.
 	_wizard = own(WizardScene.instantiate()) as Actor

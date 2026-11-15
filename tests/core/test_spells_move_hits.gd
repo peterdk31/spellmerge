@@ -192,7 +192,7 @@ func test_a_teleport_hits_what_is_where_it_lands() -> void:
 	var on_the_way: Node2D = _target(Vector2(50.0, 0.0))
 	_cast()
 	check_equal(_hits.size(), 0, "nothing before it has landed")
-	_bus.caster_move_finished.emit(0, &"teleport", Vector2(100.0, 0.0), tag)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(100.0, 0.0), tag, false)
 	check_equal(_hits_on(there, tag), 1, "the body where it landed is hit")
 	check_equal(_hits_on(on_the_way, tag), 0, "a teleport passes nothing on its way")
 

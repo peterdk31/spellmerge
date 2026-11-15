@@ -7,7 +7,7 @@
 script = ExtResource("1_base")
 id = &"on_wall"
 display_name = "On Wall"
-description = "Casts its spell where its shot strikes a wall."
+description = "Casts its spell where its shot strikes a wall, or where a wall stops its dash head on."
 complexity = 1
 icon = ExtResource("2_icon")
 event = 6

@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The On Wall card (content/spells/triggers/on_wall/, staffs C): a trigger that casts the group
-## read after its carrier where the carrier strikes a wall. Its combos do what they promise with
+## read after its carrier where the carrier strikes a wall (a dash: where a wall stops it head on, boss plan OB12). Its combos do what they promise with
 ## the card and fail without it, and with no wall in the way nothing fires.
 ##
 ## godot --headless --path . --script res://content/spells/triggers/on_wall/test_on_wall.gd
@@ -8,7 +8,7 @@ extends "res://tests/support/suite.gd"
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 
-const COMBOS: Array[String] = ["on_wall_bolt_nova", "on_wall_bolt_rune"]
+const COMBOS: Array[String] = ["on_wall_bolt_nova", "on_wall_bolt_rune", "on_wall_dash_pulse"]
 
 
 func _card() -> TriggerBase:
@@ -26,6 +26,8 @@ func _combo(id: String) -> Dictionary:
 ## without its walls; returns whether every check held.
 func _holds(combo: Dictionary, drop: String = "", walled: bool = true) -> bool:
 	var arena := ArenaScript.new(root)
+	if bool(combo.get("moves", false)):
+		arena.answer_moves()
 	for at: Array in combo["imps"]:
 		arena.add_imp(Vector2(float(at[0]), float(at[1])))
 	if walled:

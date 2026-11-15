@@ -66,6 +66,7 @@ func test_the_sweep_is_a_telegraphed_charge() -> void:
 	check_equal(BROOM.staffs.size(), 3, "phase 1: the Sweep, the dust flick and the swat")
 	check(BROOM.staffs[0].cards.has(&"dash") and BROOM.staffs[0].cards.has(&"lumber"), "the Sweep is a long, heavy charge (Lumber, OB4)")
 	check(BROOM.staffs[0].cards.has(&"plow"), "that carries what it meets and pins it to the walls (Plow, OB11)")
+	check_equal(BROOM.staffs[0].cards, [&"on_wall", &"bigger", &"lumber", &"plow", &"dash", &"pulse"] as Array[StringName], "a wall that stops it sets off its dust ring (OB12)")
 	check(is_equal_approx(BROOM.staffs[0].staff.wind_up, 0.8), "winding up 0.8 s in phase 1")
 	check(BROOM.contact_damage > 0, "touching it hurts")
 
@@ -113,6 +114,8 @@ func test_spring_cleaning() -> void:
 	check_equal(sweep.cards.count(&"fire"), 2, "each leaving a burning trail")
 	check_equal(sweep.cards.count(&"lumber"), 2, "each a Lumber charge")
 	check_equal(sweep.cards.count(&"plow"), 2, "each carrying and pinning (Plow, OB11)")
+	check_equal(sweep.cards.count(&"on_wall"), 2, "each ringing out at a wall (OB12)")
+	check_equal(sweep.cards.count(&"pulse"), 2, "its dust ring")
 	var casts: Array = _spells().staff_view(sweep.cards, sweep.staff).get("casts", [])
 	check_equal(casts.size(), 2, "its cycle is two casts")
 	for cast: Dictionary in casts:

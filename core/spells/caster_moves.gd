@@ -11,6 +11,10 @@ extends RefCounted
 ## there (`Carrier.on_move_end`: a teleport's landing strike), its blast and its `on expire` payload,
 ## cast by what moved. A move's shield guards what it moves (`shield`).
 
+## The triggers a move's end point fires, in order (`end`): a wall's first, then its expiry.
+const WALL_THEN_EXPIRE: Array[int] = [TriggerBase.Event.WALL, TriggerBase.Event.EXPIRE]
+const EXPIRE_ONLY: Array[int] = [TriggerBase.Event.EXPIRE]
+
 ## The runtime these moves belong to (`CarrierKit`): its projectile manager, event bus and the
 ## shared end-point path.
 var kit: CarrierKit = null
@@ -134,7 +138,9 @@ func step(delta: float) -> void:
 ## impact cue: where a teleport lands), a teleport strikes what is where it landed
 ## (`Carrier.on_move_end`), its `blast` goes off there and its `on expire` payload leaves from there,
 ## cast by `caster` (a value as `CarrierKit.caster`: the body or the shot that moved, or the point).
-func end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
+## When a wall ended it (`walled`: a dash stopped head on, or its carried body pinned), its `on wall`
+## payload leaves from there first, as a shot's last wall fires both (boss plan OB12).
+func end(tag: int, at: Vector2, heading: Vector2, caster: int, walled: bool = false) -> void:
 	var spell: CompiledSpell = kit.spell_of(tag)
 	var actor: int = SpellTag.caster_of(tag)
 	if spell == null or not at.is_finite():
@@ -148,9 +154,10 @@ func end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 	kit.carrier_of(spell).on_move_end(spell, tag, actor, at, heading)
 	kit.cast_done()
 	kit.blast(spell, tag, actor, at)
-	for trigger in spell.triggers:
-		if trigger.event == TriggerBase.Event.EXPIRE:
-			kit.fire(trigger.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, null, caster)
+	for event: int in WALL_THEN_EXPIRE if walled else EXPIRE_ONLY:
+		for trigger in spell.triggers:
+			if trigger.event == event:
+				kit.fire(trigger.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, null, caster)
 
 
 ## The body of the actor `body` was asked to make a move for the card `tag` that it answers with
@@ -163,9 +170,10 @@ func asked(body: int, tag: int) -> void:
 
 
 ## Where a dash or teleport ended, or a pull whose hit spent its shot (`pull_ends`): the carrier's
-## end point. Its `blast` and its `on expire` payload happen there, cast by the body that moved. A
-## move whose build has been forgotten, or that no card of `tag` asked of that body, does nothing.
-func finished(actor: int, mode: StringName, position: Vector2, tag: int) -> void:
+## end point. Its `blast` and its `on expire` payload happen there, cast by the body that moved, and
+## its `on wall` too when a wall ended it (`walled`, a dash's). A move whose build has been
+## forgotten, or that no card of `tag` asked of that body, does nothing.
+func finished(actor: int, mode: StringName, position: Vector2, tag: int, walled: bool) -> void:
 	if not SpellTag.is_spell_tag(tag) or not position.is_finite() or (mode != &"pull" and mode != &"dash" and mode != &"teleport"):
 		return
 	if actor != SpellTag.caster_of(tag):
@@ -182,7 +190,7 @@ func finished(actor: int, mode: StringName, position: Vector2, tag: int) -> void
 	elif mode == &"pull":
 		return
 	# The body moved, so it casts what its end point fires.
-	end(tag, position, move_heading[actor], SpellRuntime.body_caster(actor))
+	end(tag, position, move_heading[actor], SpellRuntime.body_caster(actor), walled and mode == &"dash")
 
 
 ## `pull` (rules R4 F1): the caster of the carrier with `tag` is pulled to `position`, where it hit

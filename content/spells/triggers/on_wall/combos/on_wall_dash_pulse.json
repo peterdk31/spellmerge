@@ -1,0 +1,11 @@
+{
+	"id": "on_wall_dash_pulse",
+	"name": "On wall dash pulse",
+	"does": "A dash into the wall ahead stops there head on and a fire pulse bursts round the wizard, lighting an imp standing by the wall off the dash's way.",
+	"casts": [{"staff": 0, "cards": ["on_wall", "dash", "fire", "pulse"]}],
+	"imps": [[40, 30]],
+	"walls": [[56, -200, 16, 400]],
+	"moves": true,
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

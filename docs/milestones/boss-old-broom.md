@@ -42,7 +42,7 @@ Card lists are written in slot order (docs/milestones/M2-staffs.md, "Reading a s
 10. **Plow's wall pin hits harder than heavy's slam** (2× the hit).
 11. **The broom has contact damage,** "so players can't just walk into it and stand there and fire", and a player Plow carries takes it too.
 12. **About 16 for a wall pin is fine for now;** the wizards' starting health will be tuned (probably lowered) later, and then power is turned down, not the card lists.
-13. **The dust flick keeps `scatter`; the wall's dust ring is a `pulse`,** looking like dust.
+13. **The dust flick keeps `scatter`; the wall's dust ring is a `pulse`,** looking like dust. *Changed by the owner on 2026-11-15, after OB9 (decision 34): the flick is aimed.*
 14. **Animating the boss is very important to get right:** a layered body moved by the game, plus a few drawn frames for the extreme poses, and its own face (not a stray's). The owner reviews the look before the fight is put together.
 15. **More mites.**
 16. **The boss's spells reach far, by `reach` cards** (one or more where needed), not an actor number.
@@ -94,6 +94,12 @@ Card lists are written in slot order (docs/milestones/M2-staffs.md, "Reading a s
     | Fights with the players' own builds (copies a staff) | Reading another body's cards (the inventory comes close) |
 
     The rule stays the enemy AI's (docs/milestones/M2-enemy-ai.md): a new mechanic goes into the shared engine, so every enemy gains it, never into one boss.
+
+## After OB9 (owner, 2026-11-15)
+
+34. **The dust flick is aimed** (owner: "Option 1, in OB10"). `scatter · slow · bolt` fired one bolt in a random direction (Scatter turns each carrier to a random way round the whole circle and ignores the aim, and the staff had no second carrier for it), while its lane showed the aim at the player. The flick becomes a Triple of slow bolts aimed at the player (`triple` in place of `scatter`, a slow bolt for each of its three carriers, the staff's slots to fit, a small `spread` between them if the staff needs it), so the shot goes where the lane shows. Built in OB10.
+35. **The broom's casts start low** (owner: "Keep them low"): its shots, its wind-up lane and its swat's arc start from its `hand_offset` near the binding, not the top of the handle; the game has no height, so a point drawn high is a point far north on the floor.
+36. **The AI walks round blocking props** (owner: "Just in OB14 is fine"). The OB8 broom got stuck on pillars: the AI's line and detour checks (`AISight`, `Projectiles.line_clear`) ask about room walls and the Wall card's stones only, never about the footprints of blocking props, so it walks into a pillar and grinds there. In OB14 those checks also treat blocking props' ground as walls, for every enemy, with a test of an enemy going round a pillar.
 
 ## The run's rooms (owner, 2026-11-15, after OB2's first build)
 
@@ -185,6 +191,7 @@ General behaviours in gameplay/ai:
 - **The run-up:** for a cast that moves its caster, the AI may first move to where that cast's line is longest (a wall's foot facing the open room). It makes the Big Sweep. Every dashing enemy gains it.
 - **Turns:** a profile number that makes an enemy turn its casts to the player it last aimed at longest ago, so the Sweep goes round the party (the enemy AI's spreading, L3, spreads bodies round one target; this is new).
 - **The aim lock** (decision 26): `aim_lock` on the profile, 0 by default; phase 1's profile locks at the wind-up's start, phase 2's for its last 0.25 s; measured against the cast's own wind-up left; a beat on the lane when it locks.
+- **Round blocking props** (decision 36): the AI's line and detour checks treat the ground of blocking props (a pillar's footprint) as walls, so an enemy walks round a pillar instead of grinding into it.
 - **A phase's new staffs start ready,** so the Big Sweep is the first move of phase 2; its staff's long cooldown (about 20 s) gives its pace after that.
 
 ### Sound (OB15)
@@ -233,7 +240,7 @@ Starting values, tuned in OB17. Damage is at power 2 (phase 1) and 2.5 (phase 2)
 | --- | --- | --- |
 | Sweep | `on wall · bigger · lumber · plow · dash · pulse` | pass about 8, pin about 16, ring 8 |
 | Big Sweep (from OB14) | `on wall · reach · reach · bigger · bigger · lumber · plow · dash · pulse` | as the Sweep; about 610 px long, a front about 3× its body wide |
-| Dust flick | `scatter · slow · bolt` | about 10 a bolt (to tune) |
+| Dust flick | `scatter · slow · bolt` (OB10, decision 34: an aimed `triple` of slow bolts) | about 10 a bolt (to tune) |
 | Swat | `bigger · heavy · swing` | about 5, and a 5 slam |
 
 Caught, carried and pinned costs about 8 + 8 (contact) + 16 = 32; slipping off sideways costs 8.
@@ -290,11 +297,11 @@ New props show up in the hub's prop yard by themselves.
 | OB7 | Actor stats; the broom gets power, mass, spell scale and resists | core/base, gameplay/actor, gameplay/combat, core/spells |
 | OB8 | Poses from states, layered bodies, the death remnant, following motes | gameplay/ai (look), gameplay/feel |
 | OB9 | **The broom's look: an animation sheet and a recorded preview of every pose, for the owner's review.** OB10 to OB16 do not wait for it; OB17 does | content/bosses |
-| OB10 | Moves: speed curves, a pass as wide as the body, a head-on wall ends the move | core/spells, native |
+| OB10 | Moves: speed curves, a pass as wide as the body, a head-on wall ends the move; the broom's dust flick aimed (decision 34) | core/spells, native, content/bosses |
 | OB11 | **Plow**; the broom's Sweep carries and pins | core/spells, gameplay/combat, content/spells |
 | OB12 | `on wall` for moves; the broom's dust ring | core/spells |
 | OB13 | Phase adds and health by player count; the broom's mites | core/base, gameplay/actor, gameplay/flow |
-| OB14 | The AI's run-up, turns and aim lock (decision 26); the Big Sweep; the phases' locks | gameplay/ai, gameplay/feel (the lock's beat), content/bosses |
+| OB14 | The AI's run-up, turns and aim lock (decision 26); walking round blocking props (decision 36); the Big Sweep; the phases' locks | gameplay/ai, gameplay/feel (the lock's beat), content/bosses |
 | OB15 | Held sounds; music with intensity; every sound id of the sheet in its cue | gameplay/feel, core/base, content/cues |
 | OB16 | The boss bar and the entrance banner | gameplay/actor, hud |
 | OB17 | Tuning with bot playtests and the owner's; readability of fire on fire; a GIF of the whole fight; **the deletion check** (decision 28) | content/bosses |

@@ -4,7 +4,8 @@ extends RefCounted
 ## one ConfigFile under `user://` (`path`, by default DEFAULT_PATH). So far it holds flags only:
 ## `has_flag(key)` and `set_flag(key)`, and settings: `get_setting(key, fallback)` and
 ## `set_setting(key, value)`, each written at once. A missing or unreadable file is a new
-## save. Runs and unlocks join it when they exist (M3).
+## save. Runs and unlocks join it when they exist (M3); a run's rule
+## changes are keyed by its flags (run generation RG6, `flags_among`).
 
 const DEFAULT_PATH: String = "user://save.cfg"
 const SECTION: String = "flags"
@@ -25,6 +26,18 @@ func _init(at: String = DEFAULT_PATH) -> void:
 ## True once `key` was set on this save.
 func has_flag(key: StringName) -> bool:
 	return bool(_config.get_value(SECTION, String(key), false))
+
+
+## The flags of `keys` set on this save, in their order, read from the file again (another
+## `SaveFile` may have set one since; run generation RG6: the flags a run's rule changes name,
+## `RunDefinition.flags`).
+func flags_among(keys: Array[StringName]) -> Array[StringName]:
+	_reload()
+	var found: Array[StringName] = []
+	for key: StringName in keys:
+		if has_flag(key) and not found.has(key):
+			found.append(key)
+	return found
 
 
 ## Set `key` on this save and write it. Returns false if it could not be written (it is still

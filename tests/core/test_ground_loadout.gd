@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## Tests for what lies on the ground as a run's start takes it along (items I6,
 ## core/sim/ground_loadout.gd): it comes back from its bytes as it was, every place and mana to the
 ## bit; the writers refuse what the decoder would; the decoder refuses every cut, bad id, bad name
-## and count out of range, changing nothing; a replay's header carries it (format 8), and the
+## and count out of range, changing nothing; a replay's header carries it (since format 8), and the
 ## frames service gives the replay's on the deck, else the game's.
 ##
 ## godot --headless --path . --script res://tests/core/test_ground_loadout.gd
@@ -90,7 +90,7 @@ func test_a_replay_header_carries_it_and_the_frames_give_it() -> void:
 	var back: Replay = Replay.from_bytes(replay.to_bytes())
 	check(back != null, "the replay reads")
 	check(back.ground.equals(_sample()), "its ground is the one written")
-	check_equal(Replay.FORMAT, 8, "format 8")
+	check(Replay.FORMAT >= 8, "the ground since format 8")
 	var frames := FramesScript.new()
 	own(frames)
 	check_equal(frames.next_run_ground().room, &"", "no source and no replay: nothing")

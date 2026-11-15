@@ -16,22 +16,34 @@ extends Node
 ## a joining machine gets it from the snapshot. A run's start renews it (`begin_run`): out of a run
 ## of rooms (the hub, the sandbox) there is no map.
 ##
+## **Meta progression's hook** (run generation RG6): the map is made by the run definition as the
+## run's unlocks change it (`RunDefinition.changed_by`: each `RunRuleChange` whose save flag they
+## hold). The unlocks are the run's start's (`Sim.unlocks`, core/sim/run_unlocks.gd): the host's
+## save, carried in the replay's header, never this machine's save during a run. This area says
+## which they are on this machine (`unlocks_now`, the frames service's unlocks source): the flags of
+## this machine's save (`save`) that some run's rule change names, so nothing else of the save
+## travels.
+##
 ## A run that cannot be made from the content there is (`Registry.run_problems`, which Flow asks
 ## before anything goes), or a map its rolls cornered, answers nothing (`RunMap.problems`): Flow
 ## starts no run, and the warning says why.
 
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const FramesScript := preload("res://core/sim/frames.gd")
 
 ## The registry folder of the run definitions (content/runs).
 const RUN_FOLDER: StringName = &"runs"
 
 ## Not state: services (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"save"]
 
-## The services. Only tests set these, before adding the node; otherwise the autoloads are used.
+## The services, and this machine's save (only `unlocks_now` reads it, for a run's start). Only
+## tests set these, before adding the node; otherwise the autoloads and the save file are used.
 var events: EventsScript = null
 var registry: RegistryScript = null
+var frames: FramesScript = null
+var save: SaveFile = null
 
 ## The run's map (null out of a run of rooms) and the room the party is in (its `RunNode.index`;
 ## -1 for none).
@@ -46,6 +58,12 @@ func _ready() -> void:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
+	if frames == null:
+		frames = get_node_or_null("/root/Frames") as FramesScript
+	if save == null:
+		save = SaveFile.new()
+	if frames != null:
+		frames.set_unlocks_source(unlocks_now)
 	if events == null:
 		push_warning("Run: the Events autoload is missing, so no run of rooms can begin.")
 		return
@@ -56,6 +74,20 @@ func _ready() -> void:
 ## A run's start: no map until a run of rooms begins (`run_begun`).
 func begin_run() -> void:
 	SimFresh.renew(self)
+
+
+## The save flags this machine's save has unlocked now (`save`): those some run definition's rule
+## change names (`RunDefinition.flags`), so a run's start carries nothing else of the save. The
+## frames service asks it at a run's start with no replay on the deck, and as a recording begins.
+func unlocks_now() -> RunUnlocks:
+	if save == null or registry == null:
+		return RunUnlocks.new()
+	var named: Array[StringName] = []
+	for found: Resource in registry.get_all(RUN_FOLDER):
+		var definition: RunDefinition = found as RunDefinition
+		if definition != null:
+			named.append_array(definition.flags())
+	return RunUnlocks.of(save.flags_among(named))
 
 
 ## The room the party is in (null out of a run of rooms).
@@ -72,8 +104,11 @@ func _on_run_begun(run_id: StringName, players: int) -> void:
 	if definition == null:
 		push_warning("Run: no run '%s' in the registry, so no run of rooms begins." % run_id)
 		return
-	# A definition the content cannot make a map of says so in the map (`RunDefinition.problems`).
-	var made: RunMap = RunGenerator.generate(definition, registry.run_content(), Sim.found(self), players)
+	var sim: Sim = Sim.found(self)
+	# The rules the run's unlocks leave (the run's start's, never this machine's save now). A
+	# definition the content cannot make a map of says so in the map (`RunDefinition.problems`).
+	var played: RunDefinition = definition.changed_by(sim.unlocks)
+	var made: RunMap = RunGenerator.generate(played, registry.run_content(), sim, players)
 	if not made.is_made():
 		push_warning("Run: no map for the run '%s': %s" % [run_id, "; ".join(made.problems)])
 		return

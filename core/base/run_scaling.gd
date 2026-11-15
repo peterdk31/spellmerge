@@ -22,6 +22,14 @@ const MOST_PLAYERS: int = InputFrame.SEATS
 @export var per_player: ScaleCurve = null
 
 
+## A copy of its own, its curves too (run generation RG6, `RunDefinition.copied`).
+func copied() -> RunScaling:
+	var made: RunScaling = duplicate(false)
+	made.per_depth = per_depth.duplicate(false) if per_depth != null else null
+	made.per_player = per_player.duplicate(false) if per_player != null else null
+	return made
+
+
 ## The scale of a room `depth` rows in (`RunNode.depth`; 0 the first) of a map whose rules allow
 ## `deepest` as their deepest row (`MapRules.depth_max` - 1), in a run of `players` players (1 to
 ## `MOST_PLAYERS`, clamped).

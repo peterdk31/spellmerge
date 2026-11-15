@@ -12,6 +12,11 @@ extends Resource
 ## leads on to the last row. A row no line of the table can fill from
 ## the content (only lines that are not `required`) is left out, so the map is that much shorter.
 
+## The deepest a map may be and the widest a row (the editor's ranges; a rule change, run
+## generation RG6, may not pass them either).
+const MOST_DEPTH: int = 32
+const MOST_WIDTH: int = 8
+
 ## The biome its rooms and enemies are of (`RoomBase.biome`, `EnemyBase.biomes`).
 @export var biome: StringName = &""
 ## How many rows deep the map is, at least and at most (the last row the boss's when the table says so).
@@ -28,6 +33,17 @@ extends Resource
 ## What a fight room's enemies cost at most together (`EnemyBase.cost`), before the run's scaling
 ## (RG5) grows it with depth and players: the generator (RG2) spends it on the biome's enemy pool.
 @export_range(1, 200) var room_budget: int = 16
+
+
+## A copy of its own, its kind rules too (`KindRule.copied`), so changing it changes nothing else
+## (run generation RG6: the rules a run plays, `RunDefinition.copied`).
+func copied() -> MapRules:
+	var made: MapRules = duplicate(false)
+	var kinds_made: Array[KindRule] = []
+	for rule: KindRule in kinds:
+		kinds_made.append(rule.copied() if rule != null else null)
+	made.kinds = kinds_made
+	return made
 
 
 ## The lines of the table that may stand in row `row` of a map `depth` rows deep and that the
@@ -80,6 +96,10 @@ func _range_problems() -> PackedStringArray:
 	var found := PackedStringArray()
 	if biome == &"":
 		found.append("Map rules name no biome.")
+	if depth_max > MOST_DEPTH:
+		found.append("%s: depth up to %d; %d at most." % [biome, depth_max, MOST_DEPTH])
+	if width_max > MOST_WIDTH or branches_max > MOST_WIDTH:
+		found.append("%s: width up to %d and branches up to %d; %d at most." % [biome, width_max, branches_max, MOST_WIDTH])
 	if depth_min < 1 or depth_min > depth_max:
 		found.append("%s: depth %d to %d; at least 1, the least first." % [biome, depth_min, depth_max])
 	if width_min < 1 or width_min > width_max:

@@ -37,6 +37,7 @@ func _made() -> Replay:
 	replay.rules.hit_work = 4000
 	replay.rules.fire_shots = 0
 	replay.party.put(2, _player())
+	replay.unlocks = RunUnlocks.of([&"deeper"] as Array[StringName])
 	var frames: Array[InputFrame] = _frames()
 	for tick in 3:
 		frames[0].set_move(Vector2(1.0, 0.0).rotated(tick))
@@ -66,6 +67,7 @@ func test_a_replay_comes_back_from_its_bytes() -> void:
 	check(back.rules.equals(replay.rules), "every rule")
 	check_equal(back.party.seats(), 0b0100, "what the run takes along: seat 2's loadout")
 	check(back.party.of(2) != null and back.party.of(2).equals(_player()), "its bags, staffs and hands")
+	check(back.unlocks.equals(replay.unlocks), "the save flags the run plays by (run generation RG6)")
 	check_equal(back.tick_count(), 3, "every tick")
 	var a: Array[InputFrame] = _frames()
 	var b: Array[InputFrame] = _frames()
@@ -97,6 +99,17 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	var before_ground: PackedByteArray = good.duplicate()
 	before_ground[4] = 7
 	cases["format 7 (before the ground)"] = before_ground
+	var before_unlocks: PackedByteArray = good.duplicate()
+	before_unlocks[4] = 8
+	cases["format 8 (before the unlocks)"] = before_unlocks
+	# The unlocks end the header, before its tick count: their count, the flag's length, its text.
+	var unlocks_at: int = _made().header_bytes().size() - 4 - 8
+	var unlock_count: PackedByteArray = good.duplicate()
+	unlock_count[unlocks_at] = RunUnlocks.MAX_FLAGS + 1
+	cases["more unlocks than there may be"] = unlock_count
+	var unlock_text: PackedByteArray = good.duplicate()
+	unlock_text[unlocks_at + 2] = 0x2f
+	cases["an unlock that is no flag (a slash)"] = unlock_text
 	var older: PackedByteArray = good.duplicate()
 	older[4] = 1
 	cases["format 1 (before the rules)"] = older
@@ -162,7 +175,7 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	for name: String in cases:
 		var replay := Replay.new()
 		check(replay.decode(cases[name]) != "", "%s is rejected" % name)
-		check(replay.tick_count() == 0 and replay.build == "" and replay.rules.equals(SessionRules.defaults()) and replay.party.is_empty(), "%s leaves it empty" % name)
+		check(replay.tick_count() == 0 and replay.build == "" and replay.rules.equals(SessionRules.defaults()) and replay.party.is_empty() and replay.unlocks.is_empty(), "%s leaves it empty" % name)
 	check(Replay.from_bytes(good) != null, "the good one is not")
 
 

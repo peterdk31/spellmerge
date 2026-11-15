@@ -28,6 +28,7 @@ width_min = 1
 width_max = 3
 branches_min = 1
 branches_max = 2
+room_budget = 16
 kinds = Array[ExtResource("3_kind")]([SubResource("fights"), SubResource("boss")])
 
 [resource]

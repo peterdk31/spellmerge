@@ -25,6 +25,9 @@ extends Resource
 @export_range(1, 8) var branches_max: int = 2
 ## Which kinds of room may stand in which rows, and how often.
 @export var kinds: Array[KindRule] = []
+## What a fight room's enemies cost at most together (`EnemyBase.cost`), before the run's scaling
+## (RG5) grows it with depth and players: the generator (RG2) spends it on the biome's enemy pool.
+@export_range(1, 200) var room_budget: int = 16
 
 
 ## The lines of the table that may stand in row `row` of a map `depth` rows deep and that the
@@ -83,6 +86,8 @@ func _range_problems() -> PackedStringArray:
 		found.append("%s: branches %d to %d; at least 1, the least first." % [biome, branches_min, branches_max])
 	if kinds.is_empty():
 		found.append("%s: no kind rules: no room could stand in the map." % biome)
+	if room_budget < 1:
+		found.append("%s: room_budget %d; at least 1." % [biome, room_budget])
 	return found
 
 
@@ -130,7 +135,7 @@ func _depth_problems(content: RunContent, depth: int) -> PackedStringArray:
 		return found
 	# From the end: a line stays in its row only if a line of the next row may follow it.
 	for at in range(rows.size() - 2, -1, -1):
-		var leading: Array[KindRule] = _leading(table[at], table[at + 1])
+		var leading: Array[KindRule] = leading_lines(table[at], table[at + 1])
 		if leading.is_empty():
 			found.append("%s: no kind of row %d may follow one of row %d (not_after)." % [at_depth, rows[at + 1], rows[at]])
 			return found
@@ -147,8 +152,9 @@ func _depth_problems(content: RunContent, depth: int) -> PackedStringArray:
 	return found
 
 
-## The lines of `before` that a line of `here` may follow.
-static func _leading(before: Array[KindRule], here: Array[KindRule]) -> Array[KindRule]:
+## The lines of `before` that a line of `here` may follow (the generator keeps a row to these, so
+## every room it places can lead on).
+static func leading_lines(before: Array[KindRule], here: Array[KindRule]) -> Array[KindRule]:
 	var found: Array[KindRule] = []
 	for last: KindRule in before:
 		for next: KindRule in here:

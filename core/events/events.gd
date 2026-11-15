@@ -92,9 +92,22 @@ signal main_menu_requested(player: int)
 ## that tick on every machine and in a replay.
 signal seat_leave_requested(player: int)
 ## Sender: hud. `player` pressed A (`accept`) with no menu open while the hub's teleporter stone was
-## lit (`start_stone_changed`): start the run (online-lobby L1). A command: heard by flow at the next
-## tick's start, which starts the run of waves if the stone is still lit then.
+## lit (`start_stone_changed`) or its trial gate was (`trial_gate_changed`): start the run
+## (online-lobby L1) or the trial (boss OB2). A command: heard by flow at the next tick's start,
+## which starts the run of waves if the stone is still lit then, or asks for the trial's start
+## (`trial_requested`) if the gate is.
 signal run_requested(player: int)
+## Sender: hud (the lectern's room menu, OB2b). `player` picked the room `room_id` to try through
+## the hub's trial gate (docs/milestones/boss-old-broom.md, decision 27): each wizard's pick is its
+## own. A command: heard by flow at the next tick's start (`HubRules`, which keeps the picks), which
+## ignores a room the lectern does not offer (`RoomBase.offered_for_trial`) and any pick out of the hub.
+signal trial_picked(player: int, room_id: StringName)
+## Sender: core/sim (the frames service, as a run's start: one of `Replay.STARTS`, recorded in a
+## replay's header with its room). The party goes from the hub through the lit trial gate into the
+## room `room_id`, for seat `player`, who pressed A there (`run_requested`). Heard by flow, which
+## starts the trial: every wizard as the player it is, and back in the hub as it left it once the
+## room is cleared or everyone is down.
+signal trial_requested(player: int, room_id: StringName)
 ## Sender: hud. `player` pressed A (`take`: F or Enter on the keyboard, never Space, which casts) with no menu open while the item
 ## `item` lay in reach of the body they drive (`item_near_changed`; the lit stone comes first, the
 ## altar after): take it (items I6). A command: heard by items at the next tick's start, which takes
@@ -328,6 +341,22 @@ signal hub_changed(in_hub: bool)
 signal altar_changed(seats: int)
 ## Sender: flow. In the hub: whether a multiplayer altar stands (`standing`), and `at`, the top middle of the first one's area in room pixels (where something drawn over it sits). Sent as it changes; (false, zero) when the hub is left. For the view only. Heard by feel (the room's code drawn over the altar, online-lobby L5c).
 signal altar_placed(standing: bool, at: Vector2)
+## Sender: flow. In the hub (boss OB2): `standing` of the `wizards` there stand in the trial gate (a
+## prop of the role `trial_gate`, where its area is; `HubRules`); `lit` while all of them do, there
+## is one, and all of them picked the same room, when any seat's A sends the party there
+## (`run_requested`). Sent as the hub starts and whenever it changes; (0, 0, false) when the hub is
+## left. Heard by hud (A on the lit gate). The gate's look is its prop's state (`lit`, `unlit`).
+signal trial_gate_changed(standing: int, wizards: int, lit: bool)
+## Sender: flow. In the hub (boss OB2): the seats whose wizards stand at the lectern (a prop of the
+## role `trial_lectern`, where its area is), a bit each; 0 when the hub is left. Sent whenever it
+## changes. Heard by hud (A there opens that seat's room menu, OB2b).
+signal lectern_changed(seats: int)
+## Sender: flow. In the hub (boss OB2): each seat's pick for the trial gate, by seat, as the shown
+## name of the room it picked ("" for none; `trial_picked`), whether a gate stands (`standing`) and
+## `at`, the top middle of the first one's area in room pixels. Sent as any of it changes; four
+## empty names, false and zero when the hub is left. For the view only. Heard by feel (the picks
+## drawn over the gate in each seat's colour).
+signal trial_picks_changed(names: PackedStringArray, standing: bool, at: Vector2)
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
 ## where each lies, in the scene's order. Sent once a run's room is made, after the run's start.

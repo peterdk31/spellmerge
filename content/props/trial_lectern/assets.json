@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/props/trial_lectern/lectern.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator)",
+			"prompt": "A 48x48 lectern seen from above and a little in front (transparent background): a low Stone footing at the bottom, a Wood post standing on it and a slanted Wood desk on top holding an open book with Bone pages, a Bone shadow spine, lines of text in Bone shadow and a Fire ribbon marker hanging from it, everything in a dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

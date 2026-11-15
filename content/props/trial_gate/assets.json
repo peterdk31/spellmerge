@@ -1,0 +1,22 @@
+{
+	"assets": [
+		{
+			"path": "content/props/trial_gate/gate.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator from a circle and an arch)",
+			"prompt": "A 96x96 trial gate seen from above (transparent background), unlit: a flat round platform of dark stone 88 px across, floor-level, with a raised rim shaded as a bevel (Stone light at the top-left, Stone shadow at the bottom-right), a 3 px Stone shadow front edge under its lower half, a Stone base top face carved in Stone shadow with an archway (two posts, a round top and a sill) round a dark Outline doorway, and eight small cross runes in a ring, inside a dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		},
+		{
+			"path": "content/props/trial_gate/gate_lit.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator from a circle and an arch)",
+			"prompt": "A 96x96 overlay drawn exactly over gate.svg when the trial gate is lit (transparent background): only the glowing parts, at the same pixels as the gate's carvings: the archway in Fire base, the eight runes in Fire base with Fire light hearts, a scatter of Fire shadow embers in the doorway and a Spark light keystone. No glow halo (the game adds light). Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

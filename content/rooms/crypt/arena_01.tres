@@ -6,4 +6,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"arena_01"
+display_name = "Crypt arena"
 scene = ExtResource("2_scene")

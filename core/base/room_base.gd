@@ -9,6 +9,12 @@ extends Resource
 
 ## Unique name of the room, also its file name; the registry finds it by this.
 @export var id: StringName = &""
+## Its name for people (the hub's lectern lists it by this); empty: its id in words.
+@export var display_name: String = ""
+## Whether the hub's lectern offers it as a trial (boss OB2, docs/milestones/boss-old-broom.md,
+## decision 27: a menu of every room, so a new room shows by itself). False for a room that is no
+## fight to try: the hub and the sandbox.
+@export var in_trials: bool = true
 ## The layout scene: its art and walls, and what is where (`RoomPlaces`). No scripts.
 @export var scene: PackedScene
 ## Seconds after which a downed wizard stands up by itself at full health (the hub: hits hurt there,
@@ -47,6 +53,24 @@ const FLOOR_Z: int = -2
 var _surface: PackedColorArray = PackedColorArray()
 var _floor: PackedColorArray = PackedColorArray()
 var _places: RoomPlaces = null
+
+
+## Its name for people: `display_name`, else its id in words.
+func shown_name() -> String:
+	return display_name if display_name != "" else String(id).capitalize()
+
+
+## The rooms of `rooms` the hub's lectern offers as trials (`in_trials`, with a scene), by id: the
+## one rule for which rooms a trial may go to, read by Flow (a pick it hears) and by the lectern's
+## menu (what it lists).
+static func offered_for_trial(rooms: Array) -> Array[RoomBase]:
+	var out: Array[RoomBase] = []
+	for item: Variant in rooms:
+		var room := item as RoomBase
+		if room != null and room.in_trials and room.scene != null and room.id != &"":
+			out.append(room)
+	out.sort_custom(func(a: RoomBase, b: RoomBase) -> bool: return String(a.id) < String(b.id))
+	return out
 
 
 ## A new instance of its layout (props W8c): its scene, its placements, zones and spawns in it.

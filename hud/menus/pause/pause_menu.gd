@@ -390,19 +390,20 @@ func _navigate(control: Control, direction: Vector2i) -> Control:
 	return null
 
 
-## The enemy arena: read every enemy from the registry (each time the sandbox page opens, so a
-## new folder shows up), keeping the one picked if it is still there.
+## The enemy arena: read every enemy, then every boss (boss OB2), from the registry (each time the
+## sandbox page opens, so a new folder shows up), keeping the one picked if it is still there.
 func _read_arena() -> void:
 	var source: Node = registry if registry != null else get_node_or_null(^"/root/Registry")
 	var before: StringName = arena_ids[arena_pick] if arena_pick < arena_ids.size() else &""
 	arena_ids.clear()
 	arena_names.clear()
 	if source != null:
-		for item: Variant in source.call("get_all", &"enemies"):
-			var data := item as EnemyBase
-			if data != null and data.scene != null:
-				arena_ids.append(data.id)
-				arena_names.append(data.shown_name())
+		for folder: StringName in EnemyBase.FOLDERS:
+			for item: Variant in source.call("get_all", folder):
+				var data := item as EnemyBase
+				if data != null and data.scene != null:
+					arena_ids.append(data.id)
+					arena_names.append(data.shown_name())
 	arena_pick = maxi(arena_ids.find(before), 0)
 	_pick_enemy(arena_pick)
 

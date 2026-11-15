@@ -40,6 +40,9 @@ const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 
 ## The most staffs an enemy may hold (the staff buttons).
 const MAX_STAFFS: int = 4
+## The registry folders an enemy's data is found in: the enemies, then the bosses (content/bosses;
+## boss OB2: the sandbox's enemy arena lists and spawns both).
+const FOLDERS: Array[StringName] = [&"enemies", &"bosses"]
 
 
 ## Its name for people: `display_name`, else its id in words.

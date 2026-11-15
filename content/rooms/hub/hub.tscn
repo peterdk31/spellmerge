@@ -1,4 +1,4 @@
-[gd_scene load_steps=27 format=3]
+[gd_scene load_steps=29 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/floor.svg" id="2_floor"]
@@ -16,6 +16,8 @@
 [ext_resource type="Resource" path="res://content/props/hub_stone/hub_stone.tres" id="12_stone"]
 [ext_resource type="Resource" path="res://content/props/hub_altar/hub_altar.tres" id="13_altar"]
 [ext_resource type="Resource" path="res://content/enemies/training_dummy/training_dummy.tres" id="14_dummy"]
+[ext_resource type="Resource" path="res://content/props/trial_gate/trial_gate.tres" id="23_gate"]
+[ext_resource type="Resource" path="res://content/props/trial_lectern/trial_lectern.tres" id="24_lectern"]
 
 [sub_resource type="Resource" id="MoteSource_rim"]
 script = ExtResource("9_motes")
@@ -320,6 +322,16 @@ prop = ExtResource("12_stone")
 position = Vector2(1008, 384)
 script = ExtResource("10_prop_stand_in")
 prop = ExtResource("13_altar")
+
+[node name="TrialGate" type="Node2D" parent="Props"]
+position = Vector2(848, 592)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("23_gate")
+
+[node name="Lectern" type="Node2D" parent="Props"]
+position = Vector2(960, 592)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("24_lectern")
 
 [node name="Dummies" type="Node2D" parent="."]
 

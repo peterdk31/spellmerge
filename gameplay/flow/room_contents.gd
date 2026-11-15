@@ -89,11 +89,18 @@ func of_kind(kind: Script) -> Array[Node]:
 ## The props standing whose `PropBase.role` is `role`, in order.
 func with_role(role: StringName) -> Array[Actor]:
 	var found: Array[Actor] = []
+	fill_with_role(role, found)
+	return found
+
+
+## `out` emptied and filled with the props standing whose `PropBase.role` is `role`, in order (a
+## list kept by the caller, so counting each tick allocates nothing).
+func fill_with_role(role: StringName, out: Array[Actor]) -> void:
+	out.clear()
 	for body in bodies:
 		var actor := body as Actor if body != null and is_instance_valid(body) else null
 		if actor != null and actor.prop != null and actor.prop.role == role:
-			found.append(actor)
-	return found
+			out.append(actor)
 
 
 ## The slot of `body` emptied (it died: a dummy).

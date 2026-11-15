@@ -111,6 +111,7 @@ const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
 const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
 const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
+const TrialPicksScript := preload("res://gameplay/feel/trial_picks.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
@@ -421,6 +422,8 @@ var _numbers: DamageNumberDrawerScript = null
 var _markers: TeammateMarkersScript = null
 ## The open room's code over the hub's altar (`altar_code.gd`).
 var _altar_code: AltarCodeScript = null
+## Each wizard's pick over the hub's trial gate (`trial_picks.gd`, boss OB2).
+var _trial_picks: TrialPicksScript = null
 ## The items on the ground (`ground_items.gd`, items I6).
 var _ground_items: GroundItemsScript = null
 ## The health bars over wizards whose seat drives another body (`away_bars.gd`, items I8).
@@ -684,6 +687,10 @@ func _ready() -> void:
 	_altar_code.name = "AltarCode"
 	add_child(_altar_code)
 	_altar_code.bind(events)
+	_trial_picks = TrialPicksScript.new()
+	_trial_picks.name = "TrialPicks"
+	add_child(_trial_picks)
+	_trial_picks.bind(events)
 	_ground_items = GroundItemsScript.new()
 	_ground_items.name = "GroundItems"
 	add_child(_ground_items)
@@ -2070,6 +2077,11 @@ func ground_items() -> GroundItemsScript:
 ## The room's code over the altar (for tests).
 func altar_code() -> AltarCodeScript:
 	return _altar_code
+
+
+## The picks over the trial gate (for tests).
+func trial_picks() -> TrialPicksScript:
+	return _trial_picks
 
 
 ## The health bars over wizards whose seat is away (for tests).

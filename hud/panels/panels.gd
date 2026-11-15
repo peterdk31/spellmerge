@@ -69,8 +69,9 @@ extends CanvasLayer
 ##   machine on it (`core/input`) shows ONLINE (`PlayerPanel.set_online`, `poll`).
 ## - The stone line (`hud/widgets/stone_line.gd`, node Root/StoneLine, made here; online-lobby L1):
 ##   in the hub, how many wizards stand on the teleporter stone, or that A starts the run, at the
-##   top middle under the online line (`start_stone_changed`). While the stone is lit, a player's
-##   `accept` (A, Enter) with no menu open sends the command `run_requested` (`poll`).
+##   top middle under the online line (`start_stone_changed`). While the stone is lit, or the trial
+##   gate is (`trial_gate_changed`, boss OB2), a player's `accept` (A, Enter) with no menu open sends
+##   the command `run_requested` (`poll`).
 ## - The item hints (`item_hints.gd`, node Root/ItemHints, made here; items I6): over the item in
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
 ##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
@@ -105,7 +106,8 @@ const PAUSE_ACTION: StringName = &"pause"
 const BUILDER_ACTION: StringName = &"back"
 ## Select (Tab) opens the inventory (items I7); the inventory closes itself on it.
 const INVENTORY_ACTION: StringName = &"inventory"
-## A on the hub's lit stone starts the run (`run_requested`; online-lobby L1); else it takes the
+## A on the hub's lit stone or lit trial gate starts the run or the trial (`run_requested`;
+## online-lobby L1, boss OB2); else it takes the
 ## item in reach (`item_take_requested`; items I6: `take`, A, F or Enter, never Space, which casts),
 ## else it opens the altar's room.
 const START_ACTION: StringName = &"accept"
@@ -148,8 +150,10 @@ var _seen_back: Array[int] = [0, 0, 0, 0]
 var _seen_inventory: Array[int] = [0, 0, 0, 0]
 var _seen_start: Array[int] = [0, 0, 0, 0]
 var _seen_take: Array[int] = [0, 0, 0, 0]
-## True while the hub's teleporter stone is lit (`start_stone_changed`).
+## True while the hub's teleporter stone is lit (`start_stone_changed`), and its trial gate
+## (`trial_gate_changed`).
 var _stone_lit: bool = false
+var _gate_lit: bool = false
 ## The seats whose wizards stand on the hub's multiplayer altar (`altar_changed`), a bit each.
 var _altar_seats: int = 0
 ## Whether this machine plays with others now (`online_changed`): only then is a seat marked.
@@ -337,6 +341,7 @@ func _ready() -> void:
 		events.room_entered.connect(_on_room_entered)
 		events.start_stone_changed.connect(_on_start_stone_changed)
 		events.altar_changed.connect(func(seats: int) -> void: _altar_seats = seats)
+		events.trial_gate_changed.connect(func(_standing: int, _wizards: int, lit: bool) -> void: _gate_lit = lit)
 		events.online_changed.connect(_on_online_changed)
 		events.wave_started.connect(_on_wave_started)
 		events.room_cleared.connect(_on_room_cleared)
@@ -393,7 +398,7 @@ func _show_break_seconds() -> void:
 
 ## Read every joined player's `pause`, `back` and `accept` presses since the last poll (several
 ## presses in one frame count once) and open or close menus as the top of this file says; `accept`
-## with no menu open while the hub's stone is lit sends `run_requested`, else with an item in reach
+## with no menu open while the hub's stone or trial gate is lit sends `run_requested`, else with an item in reach
 ## `item_take_requested`, else on the altar `online_open_requested`. Presses outside a room are
 ## dropped. Called every frame by _process; tests call it directly. One player's press never
 ## touches another player's menus.
@@ -419,7 +424,7 @@ func poll() -> void:
 		var had_menu: bool = _had_menu[player]
 		if input.is_joined(player):
 			if (start_now or take_now) and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
-				if _stone_lit:
+				if _stone_lit or _gate_lit:
 					if start_now:
 						events.run_requested.emit(player)
 				elif take_now and _item_hints.item_of(player) >= 0:

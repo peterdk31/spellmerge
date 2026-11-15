@@ -60,7 +60,8 @@ extends Node
 ##   items I6) goes the same way (`set_ground_source`).
 ##
 ## - **A run begun anew by the game** (`restart`; online lobby, docs/milestones/online-lobby.md): the
-##   game itself asks for a run's start (a party back in its hub after a run). It is sent at the
+##   game itself asks for a run's start (a party back in its hub after a run; a party sent from the
+##   hub through its trial gate, with the trial's room: boss OB2). It is sent at the
 ##   start of the next physics step, never inside a tick, so every machine starts it between the
 ##   same two ticks. With a run being recorded, a new recording begins there (`recorded_anew`):
 ##   a recording is one stretch from a run's start, and whoever sends it on (net/) sends the new
@@ -113,8 +114,8 @@ var _pivots: Array[Callable] = [Callable(), Callable(), Callable(), Callable()]
 var _watched: InputFrame = InputFrame.new()
 ## Per seat: the presses of the ticks that stood still since the last tick that stepped (`stood`).
 var _carried: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
-## A run's start the game asked for (`restart`), sent at the next step's start: the start and
-## the seat it is for (empty: none).
+## A run's start the game asked for (`restart`), sent at the next step's start: the start, the
+## seat it is for and the room it names (empty: none).
 var _restart: Array = []
 ## Says what a run that starts now takes along (`set_party_source`: returns a PartyLoadout), or invalid:
 ## nothing.
@@ -296,11 +297,13 @@ func _on_main_menu_requested(_player: int) -> void:
 	stop_playing()
 
 
-## The game asks for a run's start itself (one of `Replay.STARTS`, for seat `starter`): sent at
-## the start of the next physics step (see the top, "A run begun anew by the game"). Whoever asks
-## has ended its run first (it is idle until then).
-func restart(start: StringName, starter: int) -> void:
-	_restart = [start, starter]
+## The game asks for a run's start itself (one of `Replay.STARTS`, for seat `starter`, in the room
+## `room` for a start that names one: `Replay.ROOM_STARTS`): sent at the start of the next physics
+## step (see the top, "A run begun anew by the game"). Whoever asks has ended its run first (it is
+## idle until then), or, for a start that takes the play before it along (the trial: the hub's
+## party, `next_run_party`), lets it stand until the start comes.
+func restart(start: StringName, starter: int, room: StringName = &"") -> void:
+	_restart = [start, starter, room]
 
 
 ## The run the game asked for (`restart`) starts: recorded anew, after a replay from a file, or
@@ -313,14 +316,15 @@ func _begin_anew() -> void:
 		return
 	var start: StringName = _restart[0]
 	var starter: int = _restart[1]
+	var room: StringName = _restart[2]
 	_restart = []
 	if is_playing():
 		stop_playing()
-		_send_start(start, starter)
+		_send_start(start, starter, room)
 	elif is_recording():
-		recorded_anew.emit(record(start, starter))
+		recorded_anew.emit(record(start, starter, 0, room))
 	else:
-		_send_start(start, starter)
+		_send_start(start, starter, room)
 
 
 ## The tick just started stands still (the Tick, N4): its frames' presses wait for the next tick
@@ -333,8 +337,12 @@ func stood() -> void:
 ## Start a run by `start` (one of `Replay.STARTS`) for seat `starter` and record it from its first
 ## tick. Returns the replay it records into (it grows each tick until `stop_recording`). The run's
 ## seed is `run_seed`, or a random one when it is 0 (the platform runs, N2b, pick theirs, so every
-## platform plays the same run).
-func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
+## platform plays the same run). `room` is the room a start of `Replay.ROOM_STARTS` names (the
+## trial's), written into the header.
+func record(start: StringName, starter: int, run_seed: int = 0, room: StringName = &"") -> Replay:
+	if Replay.ROOM_STARTS.has(start) and (room == &"" or not InputFrame.is_id(String(room))):
+		push_warning("Frames: %s needs a room, so nothing is recorded." % start)
+		return null
 	stop_playing()
 	var replay := Replay.new()
 	replay.build = Replay.build_of()
@@ -342,13 +350,14 @@ func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	replay.run_seed = run_seed if run_seed != 0 else SimSeed.pick()
 	replay.start = start
 	replay.starter = starter
+	replay.start_room = room if Replay.ROOM_STARTS.has(start) else &""
 	replay.seats = _device_seats()
 	replay.rules = SessionRules.machine().copy()
 	replay.party = _party_now()
 	replay.ground = _ground_now()
 	_tape = ReplayTape.recording(replay)
 	_carried.fill(0)
-	_send_start(start, starter)
+	_send_start(start, starter, replay.start_room)
 	return replay
 
 
@@ -453,7 +462,7 @@ func _play(tape: ReplayTape) -> bool:
 		if kept & (1 << seat) == 0:
 			_pending[seat].clear()
 	_seat_changes(seated_before, tape.seated)
-	_send_start(replay.start, replay.starter)
+	_send_start(replay.start, replay.starter, replay.start_room)
 	return true
 
 
@@ -494,14 +503,18 @@ func play_tick() -> int:
 	return _tape.at if is_playing() else 0
 
 
-## Send the request `start` (one of `Replay.STARTS`, each an event with the seat that asks).
-func _send_start(start: StringName, starter: int) -> void:
+## Send the request `start` (one of `Replay.STARTS`, each an event with the seat that asks; one of
+## `Replay.ROOM_STARTS` with the room it names after it).
+func _send_start(start: StringName, starter: int, room: StringName = &"") -> void:
 	if events == null:
 		return
 	if not Replay.STARTS.has(start):
 		push_warning("Frames: %s does not start a run." % start)
 		return
-	events.emit_signal(start, starter)
+	if Replay.ROOM_STARTS.has(start):
+		events.emit_signal(start, starter, room)
+	else:
+		events.emit_signal(start, starter)
 
 
 func _build(delta: float) -> void:

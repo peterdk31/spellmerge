@@ -74,6 +74,10 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `hub_requested` | HUD | `flow`, `core/input` |
 | `run_requested` | HUD (a command) | `flow` |
 | `start_stone_changed` | `flow` | `hud`, `feel` |
+| `trial_picked` | HUD (a command; the lectern's menu, boss OB2b) | `flow` (each seat's pick for the hub's trial gate) |
+| `trial_requested` | `core/sim` (a run's start, recorded with its room) | `flow` (the trial) |
+| `trial_gate_changed`, `lectern_changed` | `flow` | `hud` (A on the lit gate; A at the lectern opens the room menu, OB2b) |
+| `trial_picks_changed` | `flow` | `feel` (the picks over the gate) |
 | `staff_change_requested` | HUD | `player` |
 | `reward_pick_requested` | HUD | `rewards` |
 | `door_vote_requested` | HUD | `flow` |

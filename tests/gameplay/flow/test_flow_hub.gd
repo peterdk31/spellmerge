@@ -208,7 +208,7 @@ func test_the_stone_prop_follows_the_stone() -> void:
 		ids.append(prop.prop.id)
 		if prop.prop.id == &"hub_stone":
 			stone_prop = prop
-	check_equal(ids, [&"hub_stone", &"hub_altar"] as Array[StringName], "the stone and the altar stand")
+	check_equal(ids, [&"hub_stone", &"hub_altar", &"trial_gate", &"trial_lectern"] as Array[StringName], "the stone, the altar, the trial gate and its lectern stand")
 	check(stone_prop != null and HubRules.area_of(_room().places(), HubRules.ROLE_RUN_START).has_point(stone_prop.position), "the stone prop on the stone")
 	if stone_prop == null:
 		events.disconnect("cue_shown", hear)

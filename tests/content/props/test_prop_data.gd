@@ -87,17 +87,17 @@ func test_every_cast_a_prop_reacts_with_is_paid_from_a_full_pool() -> void:
 
 
 ## What a prop is to the game's rules (props W8c, `PropBase.role`): a role is one the rules read
-## (`HubRules`), and a prop of a role has what those rules need: a `run_start` stone the states
-## `lit` and `unlit` and an area to stand on, a `party_altar` an area. A prop with no role stands in
-## the hub's yard.
+## (`HubRules.ROLES`), and a prop of a role has what those rules need: a lit one (`run_start`, the
+## stone, and `trial_gate`, boss OB2: `HubRules.LIT_ROLES`) the states `lit` and `unlit` and an area
+## to stand on, any other (`party_altar`, `trial_lectern`) an area. A prop with no role stands in the
+## hub's yard.
 func test_every_props_role_is_kept() -> void:
-	var roles: Array[StringName] = [HubRules.ROLE_RUN_START, HubRules.ROLE_PARTY_ALTAR]
 	for data in _props():
 		if data.role == &"":
 			continue
-		check(roles.has(data.role), "%s: its role '%s' is one the rules read (%s)" % [data.id, data.role, roles])
+		check(HubRules.ROLES.has(data.role), "%s: its role '%s' is one the rules read (%s)" % [data.id, data.role, HubRules.ROLES])
 		check(data.area_rect().has_area(), "%s: a %s has an area to stand on" % [data.id, data.role])
-		if data.role == HubRules.ROLE_RUN_START:
+		if HubRules.LIT_ROLES.has(data.role):
 			for state: StringName in [HubRules.LIT, HubRules.UNLIT]:
-				check(data.states.state_at(state) >= 0, "%s: a run_start has the state %s" % [data.id, state])
+				check(data.states.state_at(state) >= 0, "%s: a %s has the state %s" % [data.id, data.role, state])
 

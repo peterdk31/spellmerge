@@ -90,7 +90,7 @@ func test_a_replay_header_carries_it_and_the_frames_give_it() -> void:
 	var back: Replay = Replay.from_bytes(replay.to_bytes())
 	check(back != null, "the replay reads")
 	check(back.ground.equals(_sample()), "its ground is the one written")
-	check_equal(Replay.FORMAT, 8, "format 8")
+	check(Replay.FORMAT >= 8, "format 8 or later (the ground since 8)")
 	var frames := FramesScript.new()
 	own(frames)
 	check_equal(frames.next_run_ground().room, &"", "no source and no replay: nothing")

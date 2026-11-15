@@ -6,5 +6,6 @@
 [resource]
 script = ExtResource("1_base")
 id = &"sandbox"
+in_trials = false
 scene = ExtResource("2_scene")
 ambient = 0.85

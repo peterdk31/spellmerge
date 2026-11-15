@@ -42,6 +42,9 @@ var kind: StringName = &"shot"
 var heal: int = 0
 ## Damage an enemy takes when this hit knocks it into a wall (heavy); 0 for none.
 var slam: int = 0
+## Damage a body this hit carries takes when it is pinned against a wall (Plow, boss plan OB11); 0
+## for a hit that carries nothing.
+var pin: int = 0
 ## Blocked hits of the barrier the hit gives whatever it hits, friend or foe, after its heal or
 ## damage (the Barrier card); 0 for none. It lasts `barrier_seconds`.
 var barrier: int = 0
@@ -51,14 +54,14 @@ var barrier_seconds: float = 0.0
 var source_name: String = ""
 
 
-## A new profile with everything this one has: every element and status, the kind, heal, slam and
-## barrier.
+## A new profile with everything this one has: every element and status, the kind, heal, slam, pin
+## and barrier.
 ## For a hit that changes later (`relay`), so the shared one is never written.
 func copy() -> HitProfile:
 	return scaled(1.0, 1.0)
 
 
-## This hit at `share` of its strength (an echo, an arc zap): damage, heal, slam and barrier
+## This hit at `share` of its strength (an echo, an arc zap): damage, heal, slam, pin and barrier
 ## scaled, knockback by `knock_share`, and the rest (elements, statuses, kind) all kept, so a scaled
 ## hit is the same hit, weaker: an echoed mend still heals, an echoed heavy hit still slams.
 func scaled(share: float, knock_share: float) -> HitProfile:
@@ -66,6 +69,7 @@ func scaled(share: float, knock_share: float) -> HitProfile:
 	made.damage = damage * share
 	made.heal = heal if share == 1.0 else roundi(float(heal) * share)
 	made.slam = slam if share == 1.0 else roundi(float(slam) * share)
+	made.pin = pin if share == 1.0 else roundi(float(pin) * share)
 	made.barrier = barrier if share == 1.0 else roundi(float(barrier) * share)
 	made.barrier_seconds = barrier_seconds
 	made.knockback = knockback * knock_share

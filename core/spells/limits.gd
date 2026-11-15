@@ -171,6 +171,17 @@ const BARRIER_SECONDS: float = 4.0
 const KNOCKBACK: float = 120.0
 ## A heavy hit's knock into a wall hurts for this share of the hit's damage (at least 1).
 const SLAM_SHARE: float = 1.0
+## A body a Plow hit carries, pinned against a wall, takes this share of the hit's damage (at least
+## 1): twice heavy's slam (boss plan OB11, decision 10).
+const PIN_SHARE: float = 2.0
+## A flying shot with Plow passes through this many more of what it hits than its pierce, carrying
+## the bodies (a battering ram, boss plan OB11): its pierce is raised by this many.
+const PLOW_MOST: int = 8
+## A carried body slips off when it is this many pixels farther aside of its carrier's way than the
+## pass that struck it reaches (its own size in that), so a step's drift lets nothing go.
+const PLOW_SLIP: float = 4.0
+## Room for this many carries at first (`Plow`); the list doubles when it is full.
+const PLOW_ROOM: int = 8
 ## Speed of a chain jump when the spell's own speed is lower (a rune or a beam has none).
 const CHAIN_MIN_SPEED: float = 300.0
 ## Pixels a payload fired when a shot expires starts back along its path, so a shot that

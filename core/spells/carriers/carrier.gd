@@ -324,6 +324,15 @@ func on_hit(_spell: CompiledSpell, _tag: int, _actor: int, _target: Node, _posit
 	pass
 
 
+## How far round what moves it a body this carrier's hit (a card of `actor`) by the shot in `slot`
+## (-1: a strike) struck reaches, for Plow to carry it (`Plow.carry`; boss plan OB11): a shot's hit radius. A dash says its
+## pass's.
+func carry_reach(_spell: CompiledSpell, _actor: int, slot: int) -> float:
+	if slot >= 0 and kit != null and kit.projectiles != null:
+		return kit.projectiles.get_radius_of(slot)
+	return SpellLimits.PASS_REACH
+
+
 ## A move of this carrier ended at `at` (`CasterMoves.end`), before its blast and `on expire`.
 func on_move_end(_spell: CompiledSpell, _tag: int, _actor: int, _at: Vector2, _heading: Vector2) -> void:
 	pass

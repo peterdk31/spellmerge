@@ -426,6 +426,11 @@ func moves() -> CasterMoves:
 	return _rt._moves
 
 
+## The carries of Plow (`Plow`).
+func plow() -> Plow:
+	return _rt._plow
+
+
 ## Asks `ai` for an entity of `kind` (`entity_spawn_requested`) under a new key, which
 ## `Spells.entity_key` holds while the request is sent (Entities keeps it and hands it back with
 ## `familiar_at`); Entities names the actor it made in `Spells.entity_body` (`entity_body`). Returns

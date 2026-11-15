@@ -48,6 +48,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `heal_dealt` | `combat` | `feel` |
 | `wizard_shield_requested`, `pull_requested` | `core/spells` (staffs B2) | `combat` |
 | `possess_requested` | `core/spells` (actors G9) | `actor` (each actor, for its own id: `Possession.begin`) |
+| `carry_ended` | `core/spells` (Plow, boss plan OB11) | `combat` (the pin or the shove), `actor` (the Mover of the body that carried it, for its own id: a pin ends its dash) |
 | `possess_started`, `possess_ended` | `actor` (the Possession) | `feel` (a ring in the driver's ramp) |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |

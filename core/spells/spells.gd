@@ -498,6 +498,8 @@ var _poses: StaffPoses = null
 ## The moves carriers make of their caster or of the shot that cast them (dash, teleport, pull,
 ## swap, recoil): `CasterMoves`.
 var _moves: CasterMoves = null
+## What Plow carries (`core/spells/plow.gd`).
+var _plow: Plow = null
 ## The Skyfall modifier, all of it (`core/spells/skyfall.gd`).
 var _skyfall: Skyfall = null
 ## The circling modifier (core/spells/orbit.gd).
@@ -508,6 +510,7 @@ func _init() -> void:
 	_kit = CarrierKit.new(self)
 	_poses = StaffPoses.new(_kit)
 	_moves = CasterMoves.new(_kit)
+	_plow = Plow.new(_kit)
 	_skyfall = Skyfall.new(_kit)
 	_orbit = Orbit.new(_kit)
 	_carriers = Carriers.make_all()
@@ -1394,6 +1397,8 @@ func step(delta: float) -> void:
 	_moves.step(delta)
 	for carrier: Carrier in _carriers.values():
 		carrier.step(delta)
+	# After the carriers: a dash's pass that ended has let its carries go.
+	_plow.step(delta)
 	_step_live(delta)
 	_step_zaps(delta)
 	_step_magnets()
@@ -3029,6 +3034,9 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null:
 		return
+	# A shot never hits a body it carries again (Plow: it catches up with it at a wall).
+	if shot >= 0 and _plow.carried_count() > 0 and _plow.rides_on(projectiles.target_owner_of(target), shot):
+		return
 	# `relay` takes on what the actor hit last cast, before Combat reads this hit's profile (Spells
 	# hears `projectile_hit` first: its autoload comes before Combat's).
 	_relay(spell, target, tag, shot)
@@ -3098,6 +3106,8 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 	if not _blasting:
 		if spell.behaviour(ModifierBase.Behaviour.PULL) > 0.0:
 			pulled = _moves.pull(spell, tag, actor, position, slot, spent)
+		if spell.behaviour(ModifierBase.Behaviour.PLOW) > 0.0:
+			_plow.carry(spell, tag, actor, target, slot, _carrier_of(spell).carry_reach(spell, actor, slot))
 		_carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
 	# A spent shot's blast goes off where it hit; a pulling one's waits for the arrival.
 	if spent and not pulled:
@@ -3443,6 +3453,7 @@ func clear() -> void:
 	_jq_head = 0
 	_jq_count = 0
 	_moves.clear()
+	_plow.clear()
 	_caster = CASTER_BODY
 	_picks = 0
 	_outer_count = 0
@@ -3814,6 +3825,7 @@ func leave_room() -> void:
 	_drop_pending(func(_launch: PendingLaunch) -> bool: return true)
 	for actor in _caster_rows:
 		_moves.reset_actor(actor)
+		_plow.reset_actor(actor)
 		for staff in SpellLimits.STAFFS:
 			_cancel_wind(actor * SpellLimits.STAFFS + staff)
 
@@ -3829,6 +3841,7 @@ func _reset_caster(caster: int) -> void:
 		_hold_mana[index] = 0.0
 		_last_carrier_card[index] = &""
 	_moves.reset_actor(caster)
+	_plow.reset_actor(caster)
 	for carrier: Carrier in _carriers.values():
 		carrier.reset_actor(caster)
 	_aim_origin[caster] = Vector2.INF
@@ -4019,6 +4032,11 @@ func _on_entity_ended(actor: int, kind: StringName, position: Vector2, tag: int)
 func carrier(id: StringName) -> Carrier:
 	var found: Carrier = _carriers.get(id)
 	return found if found != null else _no_carrier
+
+
+## What Plow carries (`Plow`: the carry velocity a body's mover reads, `velocity_of`).
+func plow() -> Plow:
+	return _plow
 
 
 ## Each actor's staff animation (`StaffPoses`: where each actor's staff is now).

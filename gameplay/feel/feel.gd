@@ -2467,7 +2467,7 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 	# The body breaks into motes of its own art (S3), from where it stood at its rest scale.
 	var body: Sprite2D = _body_sprite(enemy)
 	var art: Sprite2D = _body_art(body)
-	if body != null and body != art and art != null:
+	if body != null and art != body:
 		_leave_remnant(body, enemy)
 	elif body != null:
 		_spectacle.break_body(body, _rest_transform(body, enemy), preset.death_mote_kind, preset.death_mote_share, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
@@ -2488,24 +2488,31 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 
 ## A dead layered body: each part breaks into a share of its motes, and the parts fly apart as a
 ## remnant from the body's middle to the floor at its feet.
+## Both from the body at its rest scale: a body killed mid-squash (the killing hit's) breaks and
+## flies as it stood, as a body of one sprite does (`_rest_transform`). The motes of all its parts
+## together are at most the preset's most.
 func _leave_remnant(body: Sprite2D, enemy: Node) -> void:
 	var parts: Array[BodyPart] = []
 	BodyPart.parts_of(body, parts)
+	var unsquash: Transform2D = _rest_transform(body, enemy) * body.global_transform.affine_inverse()
+	var most: int = maxi(preset.death_mote_most / maxi(parts.size(), 1), 1)
 	for part in parts:
 		if part.texture != null and part.is_visible_in_tree():
-			_spectacle.break_body(part, part.global_transform, preset.death_mote_kind, preset.death_mote_share * REMNANT_MOTE_SHARE, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
+			_spectacle.break_body(part, unsquash * part.global_transform, preset.death_mote_kind, preset.death_mote_share * REMNANT_MOTE_SHARE, most, preset.death_mote_speed, preset.death_mote_up)
 	var feet: Vector2 = (enemy as Node2D).global_position
 	var middle: Vector2 = feet + ((enemy as Actor).body_offset if enemy is Actor else Vector2.ZERO)
-	_remnants.leave(body, middle, feet.y)
+	_remnants.leave(body, middle, feet.y, unsquash)
 
 
-## The sprite a body's art is: its `Sprite` when it has art, else its first part with art (a layered
-## body's, boss plan OB8); null for none.
+## The sprite a body's art is: its `Sprite`, or, for a layered body (it has `BodyPart`s, whatever
+## its `Sprite` shows; boss plan OB8), its first part with art (null for none).
 func _body_art(body: Sprite2D) -> Sprite2D:
-	if body == null or body.texture != null:
-		return body
+	if body == null:
+		return null
 	var parts: Array[BodyPart] = []
 	BodyPart.parts_of(body, parts)
+	if parts.is_empty():
+		return body
 	for part in parts:
 		if part.texture != null:
 			return part

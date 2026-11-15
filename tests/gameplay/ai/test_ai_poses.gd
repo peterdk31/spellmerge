@@ -226,6 +226,19 @@ func test_a_hit_and_a_phase_change_show_their_poses() -> void:
 	check(look.body_pose() != Pose.TRANSITION, "until the transition ends")
 
 
+func test_a_layered_body_shows_no_strip_of_one_sprite() -> void:
+	# Its parts have the poses' frames: a hurt or wind-up strip on its Sprite would draw behind them
+	# and leave Feel's death no parts to break.
+	var body := _body(true)
+	var look := _look(body)
+	look.hurt_texture = _art(Vector2i(8, 8), 2)
+	_run(body, 2)
+	fx.combat.hit(fx.players[0].id, body, 5.0)
+	_run(body, 1)
+	check(look.is_hurt(), "it was hurt")
+	check((body.get_node("Sprite") as Sprite2D).texture == null, "its Sprite still shows no art")
+
+
 func test_the_face_rides_its_part() -> void:
 	var body := _body(true)
 	var face: Face = null

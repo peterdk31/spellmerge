@@ -35,8 +35,9 @@ extends ActorLook
 ## layered bodies"): every step it reads what the body is doing (`BodyPose`: TRANSITION through a
 ## boss's phase change (its AI's TRANSITION), WALL as its own move meets a wall, HURT, WINDUP while
 ## it telegraphs, MOVE while its own move carries it, CAST while its staff animation plays, else
-## IDLE), from states the game already has, so the pose is the same on every machine. A layered body
-## is drawn in parts, the `BodyPart`s under its `Sprite` (which then needs no art of its own): each
+## IDLE), from states the game already has, so the pose is the same on every machine; only a layered
+## body reads it. A layered body is drawn in parts, the `BodyPart`s under its `Sprite` (which shows
+## no art then: the strips and a phase's body sprite are a body of one sprite's): each
 ## step every part is drawn by that pose and motion (its lean, lag, swish, squash, sway, wall squash,
 ## shudder and pose frames), at `full_speed` px/s whole; the part that `carries_face` takes the
 ## actor's `Face` with it. A layered body's lift (the hop or the bob) moves its `Sprite`, and with it
@@ -173,14 +174,17 @@ func step(delta: float) -> void:
 	elif _pose != Pose.IDLE or _showing:
 		# Idle with nothing showing changes nothing either.
 		_update_sprite()
-	var transition: bool = ai != null and ai.brain.state == AIBrain.State.TRANSITION
-	_body.step(actor, delta, full_speed, telegraphing, transition, is_hurt(), pose_dir())
-	for part in _parts:
-		part.show_pose(_body)
+	if not _parts.is_empty():
+		# Only a layered body draws its pose (a body of one sprite has its strips above).
+		var transition: bool = ai != null and ai.brain.state == AIBrain.State.TRANSITION
+		_body.step(actor, delta, full_speed, telegraphing, transition, is_hurt(), pose_dir())
+		for part in _parts:
+			part.show_pose(_body)
 	_hop(delta)
 
 
-## The pose the body shows now (`BodyPose.Pose`), and what it is doing (for tests).
+## The pose a layered body shows now (`BodyPose.Pose`; IDLE for a body of one sprite, which reads
+## none), and what it is doing (for tests).
 func body_pose() -> BodyPose.Pose:
 	return _body.pose
 
@@ -199,7 +203,7 @@ func parts() -> Array[BodyPart]:
 func sync() -> void:
 	_body.forget()
 	_idle_texture = _scene_texture
-	if sprite != null and _pose == Pose.IDLE:
+	if sprite != null and _pose == Pose.IDLE and _parts.is_empty():
 		sprite.texture = _idle_texture
 	for part in _parts:
 		part.texture = _part_art.get(part, part.texture) as Texture2D
@@ -275,7 +279,8 @@ func _update_telegraph(progress: float) -> void:
 ## Which pose the sprite shows: the hurt one over the windup one over the idle strip. A pose
 ## without its texture is skipped.
 func _update_sprite() -> void:
-	if sprite == null:
+	# A layered body's sprite shows no art: its parts have the poses' frames.
+	if sprite == null or not _parts.is_empty():
 		return
 	var pose: Pose = Pose.IDLE
 	if _hurt_left > 0.0 and hurt_texture != null:
@@ -350,7 +355,7 @@ func _show_phase(phase: EnemyPhase) -> void:
 	var look: PhaseLook = phase.look
 	if look == null or sprite == null:
 		return
-	if look.texture != null:
+	if look.texture != null and _parts.is_empty():
 		_idle_texture = look.texture
 		if _pose == Pose.IDLE:
 			sprite.texture = _idle_texture

@@ -25,7 +25,9 @@ const BOUNCE_KEEP: float = 0.4
 ## Seconds it lies, then fades.
 const LIE: float = 1.6
 const FADE: float = 0.6
-## Flying, a piece draws over the bodies; lying, on the floor under them (the floor marks' z + 1).
+## Flying, a piece draws over the bodies (z 0); lying, on the floor under them, over the floor marks
+## (`RoomBase.FLOOR_Z` + 1): z 0 too, a tie with the bodies that Feel, an autoload before the world
+## in the tree, loses, so a lying piece draws under every body.
 const FLY_Z: int = 1
 const LIE_Z: int = RoomBase.FLOOR_Z + 2
 
@@ -66,25 +68,42 @@ func _ready() -> void:
 
 
 ## Leave the parts of the body whose `Sprite` is `body` (the `BodyPart`s under it) where they are
-## drawn now, flying apart from `middle` down to the floor at `feet` (world y). False when it has
-## no parts (a body of one sprite breaks into motes only).
-func leave(body: Sprite2D, middle: Vector2, feet: float) -> bool:
+## drawn now (each world transform first put through `unsquash`: Feel's, to the body's rest scale),
+## flying apart from `middle` down to the floor at `feet` (world y), drawn in the order the parts
+## were (a part `show_behind_parent` under its parent). False when it has no parts (a body of one
+## sprite breaks into motes only).
+func leave(body: Sprite2D, middle: Vector2, feet: float, unsquash: Transform2D = Transform2D.IDENTITY) -> bool:
 	if body == null:
 		return false
 	var parts: Array[BodyPart] = []
-	BodyPart.parts_of(body, parts)
+	_drawn_order_of(body, parts)
 	if parts.is_empty():
 		return false
 	for part in parts:
 		if part.texture == null or not part.is_visible_in_tree():
 			continue
-		_leave_part(part, middle, feet)
+		_leave_part(part, middle, feet, unsquash)
 	return true
 
 
-func _leave_part(part: BodyPart, middle: Vector2, feet: float) -> void:
+## The `BodyPart`s under `node` (and `node`, if it is one) in the order they are drawn: a child
+## `show_behind_parent` before its parent, the others after it.
+static func _drawn_order_of(node: Node, into: Array[BodyPart]) -> void:
+	for child in node.get_children():
+		if child is CanvasItem and (child as CanvasItem).show_behind_parent:
+			_drawn_order_of(child, into)
+	if node is BodyPart:
+		into.append(node as BodyPart)
+	for child in node.get_children():
+		if not (child is CanvasItem and (child as CanvasItem).show_behind_parent):
+			_drawn_order_of(child, into)
+
+
+func _leave_part(part: BodyPart, middle: Vector2, feet: float, unsquash: Transform2D) -> void:
 	var at: int = _take()
 	var sprite: Sprite2D = _sprites[at]
+	# Drawn over the pieces left before it, as the parts were drawn over each other.
+	move_child(sprite, -1)
 	sprite.texture = part.texture
 	sprite.hframes = part.hframes
 	sprite.vframes = part.vframes
@@ -97,7 +116,7 @@ func _leave_part(part: BodyPart, middle: Vector2, feet: float) -> void:
 	sprite.flip_v = part.flip_v
 	sprite.material = null
 	sprite.modulate = Color.WHITE
-	var shown: Transform2D = part.global_transform
+	var shown: Transform2D = unsquash * part.global_transform
 	sprite.rotation = shown.get_rotation()
 	sprite.scale = shown.get_scale()
 	sprite.z_index = FLY_Z

@@ -12,7 +12,7 @@ extends RefCounted
 ## | Pose | When |
 ## | --- | --- |
 ## | TRANSITION | a boss stands through a phase change (its AI's TRANSITION) |
-## | WALL | its own move (a dash, `Mover.is_dashing`) met a wall: the body went less than WALL_SHARE of the way its move would have taken it, after a step that went freely; held WALL_TIME |
+## | WALL | its own move (a dash, `Mover.is_dashing`) met a wall: the body went less than WALL_SHARE of the way its move would have taken it, once each time it is held up (a move grinding along a wall hits it once); held WALL_TIME |
 ## | HURT | a hit landed on it within the look's hurt time |
 ## | WINDUP | its AI winds up a cast it telegraphs |
 ## | MOVE | its own move carries it (a dash; not a pull or a push done to it) |
@@ -154,7 +154,7 @@ func wall_through() -> float:
 
 
 ## A wall met since the last step: its own move went less than WALL_SHARE of the way it would have,
-## and the step before went freely (a move grinding along a wall hits it once). A step a local stop
+## and it was not held up at the step before (a move grinding along a wall hits it once). A step a local stop
 ## shortened only goes farther than its velocity says, so it never reads as a wall.
 func _find_wall(actor: Actor) -> void:
 	if not _has_last or not _last_dashing or _last_delta <= 0.0:

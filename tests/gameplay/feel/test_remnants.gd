@@ -109,8 +109,40 @@ func test_a_body_of_one_sprite_leaves_none_and_a_room_clears_them() -> void:
 		body.free()
 	check_equal(remnants.count(), RemnantsScript.MOST, "the pool fills")
 	check_equal(remnants.get_child_count(), RemnantsScript.MOST, "and never grows")
+	# Full: the oldest pieces give way, fresh (flying, whole).
+	for i in RemnantsScript.MOST:
+		remnants.step(STEP * 10.0)
+	var last := _body(Vector2(500.0, 50.0))
+	remnants.leave(last.get_node("Sprite") as Sprite2D, Vector2(500.0, 40.0), 50.0)
+	last.free()
+	check_equal(remnants.count(), RemnantsScript.MOST, "still full, never more")
+	var fresh: int = 0
+	for i in remnants.count():
+		var piece: Sprite2D = remnants.piece(i)
+		if not remnants.is_lying(i) and piece.global_position.distance_to(Vector2(500.0, 46.0)) < 12.0:
+			fresh += 1
+			check(piece.modulate.a == 1.0 and piece.z_index == RemnantsScript.FLY_Z and piece.visible, "a fresh piece is whole and flying")
+	check_equal(fresh, 2, "the new body's two pieces took the oldest places")
 	remnants.clear()
 	check_equal(remnants.count(), 0, "a new room clears them")
+
+
+func test_the_pieces_are_drawn_in_the_parts_order() -> void:
+	var remnants := _remnants()
+	var body := _body(Vector2(200.0, 100.0))
+	var handle := body.get_node("Sprite/Head/Handle") as BodyPart
+	handle.show_behind_parent = true
+	remnants.leave(body.get_node("Sprite") as Sprite2D, Vector2(200.0, 88.0), 100.0)
+	var head_piece: Sprite2D = null
+	var handle_piece: Sprite2D = null
+	for i in remnants.count():
+		if remnants.piece(i).texture == handle.texture:
+			handle_piece = remnants.piece(i)
+		else:
+			head_piece = remnants.piece(i)
+	check(handle_piece != null and head_piece != null, "both left")
+	check(handle_piece.get_index() < head_piece.get_index(), "the part behind its parent is drawn under it")
+	body.free()
 
 
 func test_feel_leaves_a_layered_body_s_remnant_when_it_dies() -> void:
@@ -142,3 +174,15 @@ func test_feel_leaves_a_layered_body_s_remnant_when_it_dies() -> void:
 	plain.free()
 	bus.room_entered.emit(&"arena_01")
 	check_equal(feel.remnants().count(), 0, "a new room clears the remnant")
+	# Killed mid-squash, its Sprite showing a strip of its own (a hurt pose): still layered, and its
+	# pieces fly at its rest scale.
+	var squashed := _body(Vector2(300.0, 120.0))
+	(squashed.get_node("Sprite") as Sprite2D).texture = _art(Vector2i(8, 8))
+	bus.damage_dealt.emit(0, squashed, 1, Vector2.ZERO)
+	feel.step(STEP)
+	check((squashed.get_node("Sprite") as Sprite2D).scale != Vector2.ONE, "squashed when it is killed")
+	bus.enemy_died.emit(0, squashed, Vector2(300.0, 120.0), -1)
+	check_equal(feel.remnants().count(), 2, "a layered body leaves its remnant whatever its Sprite shows")
+	for i in feel.remnants().count():
+		check(feel.remnants().piece(i).scale.is_equal_approx(Vector2.ONE), "piece %d at the rest scale (%s)" % [i, feel.remnants().piece(i).scale])
+	squashed.free()

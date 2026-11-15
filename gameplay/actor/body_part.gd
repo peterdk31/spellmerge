@@ -5,7 +5,7 @@ extends Sprite2D
 ## body's look moves by what the body does (`BodyPose`). A layered body's parts are the `BodyPart`s
 ## under its `Sprite` (the body sprite Feel flashes, squashes and breaks: content/enemies/README.md),
 ## so a hit's flash and squash reach every part. A part may hold parts of its own: each moves in its
-## parent's frame (the broom's head and binding ride its handle's lean).
+## parent's frame (a stick on a head rides the head's swish, and leans on top of it).
 ##
 ## Where it turns from is its node's `position` (its pivot: where it is bound to its parent); its
 ## `offset` puts its art round that point. Its numbers say how it moves, each at the body's full speed
@@ -67,16 +67,6 @@ func take_rest() -> void:
 	rest_position = position
 	rest_rotation = rotation
 	rest_scale = scale
-
-
-## Back to its rest, its first frame.
-func rest() -> void:
-	take_rest()
-	position = rest_position
-	rotation = rest_rotation
-	scale = rest_scale
-	if hframes * vframes > 1:
-		frame = 0
 
 
 ## Every `BodyPart` under `root` (itself left out), parents before their parts, in the tree's order,

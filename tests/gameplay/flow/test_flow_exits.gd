@@ -244,15 +244,16 @@ func test_everyone_down_in_a_cleared_room_ends_the_run() -> void:
 ## A joining machine builds the room the run started in; a snapshot taken after the party went on
 ## names a later room. Restored there (core/sim/README.md, "Snapshots"), the game is the snapshot's
 ## (the same hash), the later room's layout laid out again (`rebuild_derived`). Two templates of one
-## kind, so the second room is never the first's.
+## kind, so the second room is never the first's (a run four rows deep, which no other test plays: the
+## second template stays in the registry).
 func test_a_snapshot_taken_in_a_later_room_restores_into_the_first() -> void:
-	var run_id: StringName = PinnedRun.pin(registry, ARENA, &"", RoomKind.FILL_ENEMIES, 16, 2, 1)
+	var run_id: StringName = PinnedRun.pin(registry, ARENA, &"", RoomKind.FILL_ENEMIES, 16, 4, 1)
 	var other := ARENA.duplicate() as RoomBase
 	other.id = StringName(String(run_id) + "_other")
 	other.biome = ARENA.biome
 	other.kinds = [run_id] as Array[StringName]
 	registry.call("add", &"rooms", other)
-	_play(2, 1)
+	_play(4, 1)
 	var first: StringName = flow.room_id
 	_clear_room()
 	_stand_in(0, 1)

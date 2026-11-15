@@ -3765,8 +3765,8 @@ func _budget(actor: int) -> int:
 
 ## The party left the room for the next of the run (`room_left`, run generation RG4): what every
 ## caster's spells left in it ends quietly with it, as the room goes (no blast, no payload, no end
-## point): its waiting launches, its held carriers, every carrier's own rows (beams, portals, rings,
-## swings, slams, decoys and familiars) and its moves. The shots in the air are the projectile
+## point): its casts winding up, its waiting launches, its held carriers, every carrier's own rows
+## (beams, portals, rings, swings, slams, decoys and familiars) and its moves. The shots in the air are the projectile
 ## manager's to end (each `shot_ended`). Every caster keeps its builds, delays and mana: the party
 ## goes on as it is.
 func leave_room() -> void:
@@ -3778,6 +3778,8 @@ func leave_room() -> void:
 	_drop_pending(func(_launch: PendingLaunch) -> bool: return true)
 	for actor in _caster_rows:
 		_moves.reset_actor(actor)
+		for staff in SpellLimits.STAFFS:
+			_cancel_wind(actor * SpellLimits.STAFFS + staff)
 
 
 ## A caster's own state back to new (its builds are handled by the caller).

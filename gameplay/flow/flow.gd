@@ -647,7 +647,7 @@ func _take_way(way: int) -> void:
 	if room == null:
 		# The run and its exits disagree (never in play): the room is the run's last, so the run
 		# is won, once, rather than the party held in an exit that leads nowhere.
-		push_warning("Flow: the way %d out of the room '%s' leads to no room, so the run ends here." % [way, room_id])
+		push_error("Flow: the way %d out of the room '%s' leads to no room, so the run ends here." % [way, room_id])
 		exits.leave()
 		_count_exits()
 		if _restart_left < 0.0:

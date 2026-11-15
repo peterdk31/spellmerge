@@ -513,3 +513,15 @@ func test_leaving_the_room_ends_a_pulse_ring() -> void:
 	_explosions.clear()
 	_tick(60)
 	check(_explosions.is_empty(), "the ring of the room left never goes off")
+
+
+func test_leaving_the_room_ends_a_cast_winding_up() -> void:
+	var slow: CarrierCard = _carrier_card(&"slow_bolt", 300.0, 1.0)
+	slow.wind_up = 0.5
+	_build(0, [&"slow_bolt"])
+	_cast()
+	check(_spells.is_winding(0, 0), "the cast winds up")
+	_bus.room_left.emit()
+	check(not _spells.is_winding(0, 0), "leaving the room ends it")
+	_tick(60)
+	check_equal(_mgr.get_count(), 0, "it never leaves in the next room")

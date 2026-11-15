@@ -7,8 +7,9 @@ extends Resource
 ## says whether one can be made from the content there is.
 ##
 ## The map is rows of rooms: the first row is one room, where the party enters, and every room
-## links to one or more of the next row's, never crossing another's links, so every room can be
-## reached from the first and leads on to the last row. A row no line of the table can fill from
+## links to one or more of the next row's (`branches_min` to `branches_max`, never more than the
+## next row holds), never crossing another's links, so every room can be reached from the first and
+## leads on to the last row. A row no line of the table can fill from
 ## the content (only lines that are not `required`) is left out, so the map is that much shorter.
 
 ## The biome its rooms and enemies are of (`RoomBase.biome`, `EnemyBase.biomes`).
@@ -47,9 +48,10 @@ func kept_rows(content: RunContent, depth: int) -> Array[int]:
 
 ## What is wrong with the rules, one line each (empty when a map can be made from `content` at every
 ## depth they allow): ranges out of order, a bad line of the table, a row no line may take, a
-## required kind the content cannot fill, and, at each depth, no row kept, too few rooms of a kind
-## allowed in the run for the rows that need it, a row nothing may lead to, or a row too wide to be
-## reached from the one before.
+## required line that takes no row or that the content cannot fill, and, at each depth, no row
+## kept, a row whose lines may follow none of the row before's (`not_after`), too few rooms of a
+## line allowed in the run for the rows that need it, or a row too wide to be reached from the one
+## before.
 func problems(content: RunContent) -> PackedStringArray:
 	var found: PackedStringArray = _range_problems()
 	if not found.is_empty():
@@ -84,82 +86,105 @@ func _range_problems() -> PackedStringArray:
 	return found
 
 
-## A required line whose kind the content cannot fill in a row it may take.
+## A required line that takes no row at any depth, or whose kind the content cannot fill in a row it takes.
 func _required_problems(content: RunContent) -> PackedStringArray:
 	var found := PackedStringArray()
 	for rule: KindRule in kinds:
 		if not rule.required:
 			continue
+		var takes: bool = false
 		var why: String = ""
 		for depth in range(depth_min, depth_max + 1):
 			for row in depth:
-				if why == "" and rule.takes_row(row, depth):
-					why = content.cannot_fill(biome, rule.kind, row)
-		if why != "":
+				if rule.takes_row(row, depth):
+					takes = true
+					if why == "":
+						why = content.cannot_fill(biome, rule.kind, row)
+		if not takes:
+			found.append("%s: kind '%s' is required, but it takes no row at %d to %d rows deep." % [biome, rule.kind, depth_min, depth_max])
+		elif why != "":
 			found.append("%s: kind '%s' is required, but %s." % [biome, rule.kind, why])
 	return found
 
 
 func _depth_problems(content: RunContent, depth: int) -> PackedStringArray:
 	var found := PackedStringArray()
+	var at_depth: String = "%s, %d rows deep" % [biome, depth]
 	for row in depth:
 		var any: bool = false
 		for rule: KindRule in kinds:
 			any = any or rule.takes_row(row, depth)
 		if not any:
-			found.append("%s, %d rows deep: no kind rule takes row %d." % [biome, depth, row])
+			found.append("%s: no kind rule takes row %d." % [at_depth, row])
 	if not found.is_empty():
 		return found
-	var rows: Array[int] = kept_rows(content, depth)
+	var rows: Array[int] = []
+	var table: Array = []  # for each kept row, its lines (Array[KindRule])
+	for row in depth:
+		var here: Array[KindRule] = rules_at(content, row, depth)
+		if not here.is_empty():
+			rows.append(row)
+			table.append(here)
 	if rows.is_empty():
-		found.append("%s, %d rows deep: the content fills no row." % [biome, depth])
+		found.append("%s: the content fills no row." % at_depth)
 		return found
-	if not _rows_matched(content, rows, depth):
-		found.append("%s, %d rows deep: the kinds' limits in a run (max_per_run) leave a row with no room." % [biome, depth])
-	var widest: int = 1
+	# From the end: a line stays in its row only if a line of the next row may follow it.
+	for at in range(rows.size() - 2, -1, -1):
+		var leading: Array[KindRule] = _leading(table[at], table[at + 1])
+		if leading.is_empty():
+			found.append("%s: no kind of row %d may follow one of row %d (not_after)." % [at_depth, rows[at + 1], rows[at]])
+			return found
+		table[at] = leading
+	if not _rows_matched(table):
+		found.append("%s: the kinds' limits in a run (max_per_run) leave a row with no room." % at_depth)
+	var reach: int = 1  # the most rooms the row before may hold; the first row is one room
 	for at in range(1, rows.size()):
-		var before: Array[KindRule] = rules_at(content, rows[at - 1], depth)
-		var here: Array[KindRule] = rules_at(content, rows[at], depth)
-		if not _any_may_follow(before, here):
-			found.append("%s, %d rows deep: no kind of row %d may follow one of row %d (not_after)." % [biome, depth, rows[at], rows[at - 1]])
-		var room: int = _row_room(here)
-		if mini(width_min, room) > widest * branches_max:
-			found.append("%s, %d rows deep: row %d holds at least %d rooms, more than the %d of row %d can lead to." % [biome, depth, rows[at], mini(width_min, room), widest, rows[at - 1]])
-		widest = mini(width_max, room)
+		var room: int = _row_room(table[at])
+		var least: int = mini(width_min, room)
+		if least > reach * branches_max:
+			found.append("%s: row %d holds at least %d rooms, more than the %d of row %d can lead to." % [at_depth, rows[at], least, reach, rows[at - 1]])
+		reach = mini(room, reach * branches_max)
 	return found
 
 
-## The most rooms a row of these lines may hold (`width_max` at most; a line's `max_per_row` limits it).
+## The lines of `before` that a line of `here` may follow.
+static func _leading(before: Array[KindRule], here: Array[KindRule]) -> Array[KindRule]:
+	var found: Array[KindRule] = []
+	for last: KindRule in before:
+		for next: KindRule in here:
+			if next.may_follow(last.kind):
+				found.append(last)
+				break
+	return found
+
+
+## The most rooms a row of these lines may hold: `width_max` at most, each line at most its
+## `max_per_row` and its `max_per_run`.
 func _row_room(rules: Array[KindRule]) -> int:
 	var room: int = 0
 	for rule: KindRule in rules:
-		room += width_max if rule.max_per_row == 0 else rule.max_per_row
+		var most: int = width_max
+		if rule.max_per_row > 0:
+			most = mini(most, rule.max_per_row)
+		if rule.max_per_run > 0:
+			most = mini(most, rule.max_per_run)
+		room += most
 	return mini(room, width_max)
 
 
-static func _any_may_follow(before: Array[KindRule], here: Array[KindRule]) -> bool:
-	for next: KindRule in here:
-		for last: KindRule in before:
-			if next.may_follow(last.kind):
-				return true
-	return false
-
-
-## True when every row of `rows` can hold one room of a line that takes it, with no line used
-## more often than its `max_per_run` (a matching of rows to lines, by augmenting paths).
-func _rows_matched(content: RunContent, rows: Array[int], depth: int) -> bool:
-	var options: Array = []
-	for row: int in rows:
-		options.append(rules_at(content, row, depth))
-	var taken: Dictionary = {}  # KindRule -> Array of row indices holding it
-	for at in rows.size():
-		if not _place(at, options, taken, {}):
+## True when every row of `table` (its lines, row by row) can hold one room of one of its lines,
+## with no line used more often than its `max_per_run` (a matching of rows to lines, by augmenting
+## paths).
+static func _rows_matched(table: Array) -> bool:
+	var taken: Dictionary = {}  # KindRule -> the rows holding it
+	for at in table.size():
+		if not _place(at, table, taken, {}):
 			return false
 	return true
 
 
-static func _place(at: int, options: Array, taken: Dictionary, seen: Dictionary) -> bool:
-	for rule: KindRule in options[at]:
+static func _place(at: int, table: Array, taken: Dictionary, seen: Dictionary) -> bool:
+	for rule: KindRule in table[at]:
 		if seen.has(rule):
 			continue
 		seen[rule] = true
@@ -169,8 +194,7 @@ static func _place(at: int, options: Array, taken: Dictionary, seen: Dictionary)
 			taken[rule] = holders
 			return true
 		for k in holders.size():
-			var other: int = holders[k]
-			if _place(other, options, taken, seen):
+			if _place(holders[k], table, taken, seen):
 				holders[k] = at
 				return true
 	return false

@@ -57,18 +57,20 @@ func may_follow(before: StringName) -> bool:
 
 
 ## What is wrong with the line, one line each (empty when it is fine): no kind, a kind not in
-## `known` (when given: the room kinds there are), a weight of 0 or less, a negative limit.
-func problems(known: Array[StringName] = []) -> PackedStringArray:
+## `known` (the room kinds there are), rows out of order, a weight of 0 or less, a negative limit.
+func problems(known: Array[StringName]) -> PackedStringArray:
 	var found := PackedStringArray()
 	if kind == &"":
 		found.append("A kind rule names no kind.")
-	elif not known.is_empty() and not known.has(kind):
+	elif not known.has(kind):
 		found.append("Kind rule '%s': no room kind of that id." % kind)
+	if (first_row >= 0) == (last_row >= 0) and first_row > last_row:
+		found.append("Kind rule '%s': rows %d to %d, the first after the last." % [kind, first_row, last_row])
 	if weight <= 0.0:
 		found.append("Kind rule '%s': its weight is %s; above 0." % [kind, weight])
 	if max_per_row < 0 or max_per_run < 0:
 		found.append("Kind rule '%s': a limit below 0 (0 is no limit)." % kind)
 	for before: StringName in not_after:
-		if not known.is_empty() and not known.has(before):
+		if not known.has(before):
 			found.append("Kind rule '%s': not_after names '%s', no room kind of that id." % [kind, before])
 	return found

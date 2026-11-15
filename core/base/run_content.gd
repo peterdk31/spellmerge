@@ -17,7 +17,8 @@ var enemies: Array[EnemyBase] = []
 
 ## The content in `of_kinds`, `of_rooms` and `of_enemies` (each what the registry's `get_all` gives
 ## for its folder, so in id order; for the enemies the folders of `EnemyBase.FOLDERS` one after the
-## other). What is not of the folder's class is left out.
+## other). What is not of the folder's class is left out, and so is an id met before (an enemy and a
+## boss of one id: the first folder's, as the game finds it).
 static func gather(of_kinds: Array[Resource], of_rooms: Array[Resource], of_enemies: Array[Resource]) -> RunContent:
 	var made := RunContent.new()
 	for item: Resource in of_kinds:
@@ -27,9 +28,12 @@ static func gather(of_kinds: Array[Resource], of_rooms: Array[Resource], of_enem
 	for item: Resource in of_rooms:
 		if item is RoomBase:
 			made.rooms.append(item as RoomBase)
+	var seen: Dictionary = {}
 	for item: Resource in of_enemies:
-		if item is EnemyBase:
-			made.enemies.append(item as EnemyBase)
+		var enemy := item as EnemyBase
+		if enemy != null and not seen.has(enemy.id):
+			seen[enemy.id] = true
+			made.enemies.append(enemy)
 	made.rooms.sort_custom(func(a: RoomBase, b: RoomBase) -> bool: return String(a.id) < String(b.id))
 	made.enemies.sort_custom(func(a: EnemyBase, b: EnemyBase) -> bool: return String(a.id) < String(b.id))
 	return made
@@ -67,18 +71,18 @@ func enemy_pool(biome: StringName, depth: int) -> Array[EnemyBase]:
 	return found
 
 
-## The bosses that fight in biome `biome`, in id order.
-func boss_pool(biome: StringName) -> Array[EnemyBase]:
+## The bosses that fight in biome `biome` from depth `depth` on, in id order.
+func boss_pool(biome: StringName, depth: int) -> Array[EnemyBase]:
 	var found: Array[EnemyBase] = []
 	for enemy: EnemyBase in enemies:
-		if enemy.boss and enemy.biomes.has(biome):
+		if enemy.boss and enemy.fights_in(biome, depth):
 			found.append(enemy)
 	return found
 
 
 ## Why a room of kind `kind_id` cannot stand in row `row` of biome `biome` (empty when it can): no
 ## such kind, no template of the biome hosts it, or what fills it has nothing there (no enemy that
-## fights there by that depth, no boss of the biome).
+## fights there by that depth, no boss of the biome by that depth).
 func cannot_fill(biome: StringName, kind_id: StringName, row: int) -> String:
 	var of_kind: RoomKind = kind(kind_id)
 	if of_kind == null:
@@ -90,6 +94,6 @@ func cannot_fill(biome: StringName, kind_id: StringName, row: int) -> String:
 			if enemy_pool(biome, row).is_empty():
 				return "no enemy fights in %s by row %d" % [biome, row]
 		RoomKind.FILL_BOSS:
-			if boss_pool(biome).is_empty():
-				return "no boss fights in %s" % biome
+			if boss_pool(biome, row).is_empty():
+				return "no boss fights in %s by row %d" % [biome, row]
 	return ""

@@ -152,11 +152,11 @@ func run_content() -> RunContent:
 func validate_runs() -> PackedStringArray:
 	var content: RunContent = run_content()
 	var found := PackedStringArray()
-	for res: Resource in get_all(&"room_kinds"):
-		if res is RoomKind:
-			found.append_array((res as RoomKind).problems())
+	for kind: StringName in content.kind_ids():
+		found.append_array(content.kind(kind).problems())
+	var known: Array[StringName] = content.kind_ids()
 	for room: RoomBase in content.rooms:
-		found.append_array(room.template_problems(content.kind_ids()))
+		found.append_array(room.template_problems(known))
 	for res: Resource in get_all(&"runs"):
 		if res is RunDefinition:
 			found.append_array((res as RunDefinition).problems(content))

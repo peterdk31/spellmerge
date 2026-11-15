@@ -87,7 +87,7 @@ func test_the_pools_follow_biome_and_depth() -> void:
 	check_equal(content.enemy_pool(BIOME, 0).size(), 1, "the rat alone at the first room")
 	check_equal(content.enemy_pool(BIOME, 2).size(), 2, "the ghoul joins at row 2")
 	check_equal(content.enemy_pool(&"attic", 4).size(), 0, "nobody fights in another biome")
-	check_equal(content.boss_pool(BIOME).size(), 1, "the king is the boss pool, not the enemy pool")
+	check_equal(content.boss_pool(BIOME, 0).size(), 1, "the king is the boss pool, not the enemy pool")
 
 
 func test_an_optional_kind_with_no_content_leaves_its_row_out() -> void:
@@ -186,3 +186,70 @@ func test_an_enemy_with_a_bad_cost_is_named() -> void:
 	var problems: PackedStringArray = enemy.problems()
 	check(_names(problems, "cost is 0"), "the cost: %s" % problems)
 	check(_names(problems, "twice"), "the biome twice: %s" % problems)
+
+
+func test_rows_out_of_order_are_named() -> void:
+	var rules: MapRules = _rules()
+	rules.kinds[1].first_row = -1
+	rules.kinds[1].last_row = -2
+	var problems: PackedStringArray = _run(rules).problems(_content())
+	check(_names(problems, "the first after the last"), "rows -1 to -2: %s" % problems)
+
+
+func test_a_required_kind_that_takes_no_row_is_named() -> void:
+	var rules: MapRules = _rules()
+	var shop := KindRule.make(&"fight", 8, 9)
+	rules.kinds.append(shop)
+	check(_names(_run(rules).problems(_content()), "takes no row"), "rows 8 and 9 of a map at most 5 deep")
+
+
+func test_a_row_whose_only_kind_cannot_lead_on_is_named() -> void:
+	# The fights may not lead to the boss and nothing else stands in the last row, so the row
+	# before it has no line left; one more kind there that may lead on makes it sound again.
+	var rules: MapRules = _rules()
+	rules.kinds[1].not_after = [&"fight"] as Array[StringName]
+	check(_names(_run(rules).problems(_content()), "not_after"), "no fight may lead to the boss")
+	var hall := KindRule.make(&"boss", -2, -2)
+	hall.max_per_run = 0
+	var content: RunContent = _content()
+	rules.kinds.append(hall)
+	check(not _names(_run(rules).problems(content), "not_after"), "a boss line in the row before leads on: %s" % _run(rules).problems(content))
+
+
+func test_a_line_capped_in_the_run_limits_its_row() -> void:
+	var rules: MapRules = _rules()
+	rules.width_min = 3
+	rules.width_max = 3
+	rules.branches_max = 2
+	var only := KindRule.make(&"fight", 1, 1)
+	only.max_per_run = 1
+	rules.kinds[0].first_row = 0
+	rules.kinds[0].last_row = 0
+	rules.kinds.insert(1, only)
+	rules.kinds.insert(2, KindRule.make(&"fight", 2, -2))
+	rules.depth_min = 4
+	rules.depth_max = 4
+	# Row 1 holds one room at most (its only line, once a run), so it is no wider than the one
+	# room before it can reach, and row 2's three are more than that one room leads to.
+	var problems: PackedStringArray = _run(rules).problems(_content())
+	check(not _names(problems, "row 1 holds"), "row 1 is one room: %s" % problems)
+	check(_names(problems, "row 2 holds at least 3 rooms, more than the 1 of row 1"), "the run's cap is the row's: %s" % problems)
+
+
+func test_a_boss_keeps_to_its_depth() -> void:
+	var content: RunContent = RunContent.gather([_kind(&"boss", RoomKind.FILL_BOSS)], [_room(&"throne", [&"boss"] as Array[StringName])], [_enemy(&"king", 5, true)])
+	check(content.cannot_fill(BIOME, &"boss", 3).contains("no boss"), "a boss from row 5 is not offered in row 3")
+	check_equal(content.cannot_fill(BIOME, &"boss", 5), "", "it is in row 5")
+
+
+func test_an_enemy_and_a_boss_of_one_id_count_once() -> void:
+	var content: RunContent = RunContent.gather([], [], [_enemy(&"broom"), _enemy(&"broom", 0, true)])
+	check_equal(content.enemies.size(), 1, "the first folder's, as the game finds it")
+	check_equal(content.boss_pool(BIOME, 0).size(), 0, "so no boss of that id")
+
+
+func test_with_no_room_kinds_every_kind_is_unknown() -> void:
+	var content: RunContent = RunContent.gather([], [_room(&"hall", [&"fight"] as Array[StringName])], [_enemy(&"rat")])
+	var rules: MapRules = _rules()
+	rules.kinds[1].required = false
+	check(_names(_run(rules).problems(content), "'boss': no room kind"), "an optional kind no file defines is still named")

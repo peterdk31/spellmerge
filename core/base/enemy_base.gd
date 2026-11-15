@@ -38,6 +38,17 @@ const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 ## A boss's phases, in order (empty: one phase).
 @export var phases: Array[EnemyPhase] = []
 
+# Where it fights (run generation RG1, docs/milestones/run-generation.md, "The model"): a biome's
+# enemy pool is every enemy that names the biome, a boss pool every boss that does (`RunContent`),
+# so an enemy joins runs by its own data and deleting it touches no other file.
+
+## The biomes it fights in (`RoomBase.biome`). Empty: no run's (the sandbox dummies).
+@export var biomes: Array[StringName] = []
+## What it costs of a room's enemy budget (at least 1): the tougher, the more.
+@export_range(1, 100) var cost: int = 1
+## The first row of a run's map it may stand in (0: the first room on).
+@export_range(0, 32) var min_depth: int = 0
+
 ## The most staffs an enemy may hold (the staff buttons).
 const MAX_STAFFS: int = 4
 ## The registry folders an enemy's data is found in: the enemies, then the bosses (content/bosses;
@@ -48,6 +59,11 @@ const FOLDERS: Array[StringName] = [&"enemies", &"bosses"]
 ## Its name for people: `display_name`, else its id in words.
 func shown_name() -> String:
 	return display_name if display_name != "" else String(id).replace("_", " ").capitalize()
+
+
+## True when it fights in biome `biome` in row `depth` of a run's map (0 the first room).
+func fights_in(biome: StringName, depth: int) -> bool:
+	return biomes.has(biome) and depth >= min_depth
 
 
 ## True when it holds at least one staff with a card.
@@ -64,9 +80,17 @@ func profile_or_fallback() -> AIProfile:
 
 
 ## What is wrong with the enemy's data, one line each (empty when it is fine): too many staffs,
-## a staff entry's problems, a phase without a condition or with too many staffs.
+## a staff entry's problems, a phase without a condition or with too many staffs, a cost below 1,
+## a depth below 0 or a biome twice.
 func problems() -> PackedStringArray:
 	var found: PackedStringArray = StaffCards.list_problems(String(id), staffs, MAX_STAFFS)
+	if cost < 1:
+		found.append("%s: its cost is %d; at least 1." % [id, cost])
+	if min_depth < 0:
+		found.append("%s: its min_depth is %d; at least 0." % [id, min_depth])
+	for at in biomes.size():
+		if biomes.find(biomes[at]) != at:
+			found.append("%s: biome '%s' twice." % [id, biomes[at]])
 	for at in phases.size():
 		var phase: EnemyPhase = phases[at]
 		if phase == null:

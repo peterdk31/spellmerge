@@ -13,5 +13,7 @@ count = 8
 script = ExtResource("1_base")
 id = &"arena_01"
 display_name = "Crypt arena"
+biome = &"crypt"
+kinds = Array[StringName]([&"fight"])
 enemies = Array[ExtResource("3_enemies")]([SubResource("imps")])
 scene = ExtResource("2_scene")

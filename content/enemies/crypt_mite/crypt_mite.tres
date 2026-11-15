@@ -13,3 +13,5 @@ move_speed = 70.0
 contact_damage = 3
 scene = ExtResource("2_scene")
 profile = ExtResource("9_profile")
+biomes = Array[StringName]([&"crypt"])
+cost = 1

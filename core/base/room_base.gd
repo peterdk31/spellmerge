@@ -4,8 +4,9 @@ extends Resource
 ## id, its scene and the rules over the whole room. Where things are (spawns, doors, props,
 ## dummies, zones) is written in its scene only, edited by hand in the Godot editor, and read by
 ## `RoomPlaces` from the layout it builds (`build()`); nothing here is one room's own (the hub's stone
-## is a self-contained prop placed in its scene). M3 extends it with the biome and the door rules,
-## and with rooms built from pieces.
+## is a self-contained prop placed in its scene). As a run's template (run generation RG1,
+## docs/milestones/run-generation.md) it says its biome and the room kinds it can host; M3 extends
+## it with the door rules and with rooms built from pieces.
 
 ## Unique name of the room, also its file name; the registry finds it by this.
 @export var id: StringName = &""
@@ -13,6 +14,12 @@ extends Resource
 @export var display_name: String = ""
 ## The layout scene: its art and walls, and what is where (`RoomPlaces`). No scripts.
 @export var scene: PackedScene
+## The biome it is a room of (run generation RG1): a run's map of that biome may use it
+## (`MapRules.biome`). Empty: no biome's.
+@export var biome: StringName = &""
+## The room kinds it can host (`RoomKind` ids: `fight`, `boss`), as a template a run's map picks for
+## a room of that kind. Empty: it is offered for no run (the hub, the sandbox).
+@export var kinds: Array[StringName] = []
 ## Its fight (boss OB2a, decision 31: no waves): the enemies that stand at its enemy spawns as a run
 ## enters it, line by line; the room is cleared when they are all down. Empty: no fight (the hub,
 ## the sandbox: their dummies are placements of their scene).
@@ -58,6 +65,25 @@ var _places: RoomPlaces = null
 ## Its name for people: `display_name`, else its id in words.
 func shown_name() -> String:
 	return display_name if display_name != "" else String(id).capitalize()
+
+
+## True when it can host a room of kind `kind_id` in a run (`kinds`).
+func hosts(kind_id: StringName) -> bool:
+	return kinds.has(kind_id)
+
+
+## What is wrong with it as a run's template, one line each (empty when it is fine): kinds with no
+## biome, a kind twice, a kind not in `known` (the room kinds there are).
+func template_problems(known: Array[StringName]) -> PackedStringArray:
+	var found := PackedStringArray()
+	if not kinds.is_empty() and biome == &"":
+		found.append("%s hosts %s but names no biome." % [id, kinds])
+	for at in kinds.size():
+		if kinds.find(kinds[at]) != at:
+			found.append("%s: kind '%s' twice." % [id, kinds[at]])
+		elif not known.has(kinds[at]):
+			found.append("%s: kind '%s' is no room kind." % [id, kinds[at]])
+	return found
 
 
 ## A new instance of its layout (props W8c): its scene, its placements, zones and spawns in it.

@@ -35,6 +35,7 @@ const FreshGame := preload("res://tests/support/fresh_game.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const CoopScript := preload("res://gameplay/coop/coop.gd")
+const PinnedRun := preload("res://tests/support/pinned_run.gd")
 
 ## The tick the scripted run's "HUD" rebuilds staff 0 (a command), mid-run while the wizard stands:
 ## the sandbox's shots down it now and then, and a downed body's requests are refused (items I7b),
@@ -70,9 +71,10 @@ var stone_press_at: int = -1
 ## A tick to snapshot the recorded run after (online-ready N10; -1 for none), and the snapshot.
 var snapshot_at: int = -1
 var snapshot: Snapshot = null
-## The room a run of Play is in (`Flow.room_id_to_play`, set again in every fresh game), or empty for
-## Flow's own. The snapshot test plays every room by it (online-ready N12).
-var room: StringName = &""
+## The room a run of Play is in, or null for the game's own run: a run of that one room
+## (tests/support/pinned_run.gd, `Flow.run_id_to_play`), pinned again in every fresh game. The
+## snapshot test plays every run's room template by it (online-ready N12, run generation RG3).
+var room: RoomBase = null
 ## True: each run starts from a fresh game (every autoload made again). False: in the same game,
 ## after whatever ran before, as a player starts one run after another (N3b: the run starts from
 ## a fresh game's state all the same).
@@ -187,8 +189,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		var wizard: Actor = _flow.call("get_wizard", bots) as Actor
 		if wizard == null or wizard.caster.cards_of(0).slice(0, REBUILT.size()) != REBUILT:
 			problems.append("%s: the rebuild did not apply in the recorded run" % start)
-	if room != &"" and start == &"play_requested" and StringName(_flow.get(&"room_id")) != room:
-		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), room])
+	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room):
+		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room)])
 	_check_settings(start)
 	for bot in players:
 		bot.leave()
@@ -401,8 +403,8 @@ func _find() -> void:
 	# under a test script.
 	_flow.set(&"loading_enabled", false)
 	_flow.set(&"intro_enabled", false)
-	if room != &"":
-		_flow.set(&"room_id_to_play", room)
+	if room != null:
+		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room))
 	var machine: SessionRules = SessionRules.machine()
 	machine.shot_cap = cap if cap > 0 else SessionRules.defaults().shot_cap
 	if not native:

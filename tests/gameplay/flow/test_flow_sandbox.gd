@@ -104,7 +104,7 @@ func test_play_after_the_sandbox_is_the_normal_game() -> void:
 	check_equal(sandbox_flags, [true, false] as Array[bool], "stopping the sandbox sends sandbox_changed(false)")
 	events.emit_signal("play_requested", 0)
 	check(not flow.sandbox, "Play is not a sandbox")
-	check_equal(flow.room_id, FlowScript.DEFAULT_ROOM_ID, "Play starts the normal room")
+	check(flow.room_id != FlowScript.SANDBOX_ROOM_ID and flow.mode == FlowScript.MODE_RUN, "Play starts the normal run")
 	check_equal(flow.dummies().size(), 0, "no dummies in the normal game")
 	check_equal(sandbox_flags.back(), false, "the normal game says it is no sandbox")
 
@@ -114,7 +114,7 @@ func test_sandbox_is_ignored_while_a_run_is_on() -> void:
 	events.emit_signal("play_requested", 0)
 	events.emit_signal("sandbox_requested", 0)
 	check(not flow.sandbox, "a sandbox request mid-run changes nothing")
-	check_equal(flow.room_id, FlowScript.DEFAULT_ROOM_ID, "the normal room stays")
+	check(flow.room_id != FlowScript.SANDBOX_ROOM_ID and flow.mode == FlowScript.MODE_RUN, "the normal run stays")
 
 
 func test_the_enemy_arena_spawns_any_enemy_and_clears_them() -> void:

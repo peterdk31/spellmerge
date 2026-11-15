@@ -6,9 +6,10 @@ extends "res://tests/support/suite.gd"
 ## player joining the run online would. Every tick from there agrees with the recorded run's in every
 ## area. When they part, the desync report names the first tick, the areas and each member.
 ##
-## Every room the registry finds that lists enemies (a run's room: boss OB2a) is played so (online-ready
-## N12): a new room is covered the day its folder lands, with no test written for it. The hub holds
-## none; its own start is resumed from a snapshot on its stone. Cards and enemies are covered the same way, in a
+## Every room template the registry finds (a room that hosts a run's kind: run generation RG3) is
+## played so, as the one room of a pinned run filled by the run's map (online-ready N12): a new room
+## is covered the day its folder lands, with no test written for it. The hub hosts none; its own
+## start is resumed from a snapshot on its stone. Cards and enemies are covered the same way, in a
 ## scripted fight each (tests/core/test_content_determinism.gd).
 ##
 ## The runs are the replay test's (tests/support/replay_run.gd). Each takes seconds: the runner plays
@@ -42,22 +43,23 @@ func test_a_sandbox_run_restored_plays_on_the_same() -> void:
 	await _check_resumed(&"sandbox_requested", 0, 1)
 
 
-## A run in every room the registry finds that lists enemies, with a scripted player, not bots: a bot reads the game
-## through queries that fill the services' caches, which count as state (core/sim/README.md,
+## A run in every room template the registry finds, with a scripted player, not bots: a bot reads
+## the game through queries that fill the services' caches, which count as state (core/sim/README.md,
 ## "Input"), so a run of bots goes on the same only with the same bots watching from the same state.
 ## A player joining a run never runs the host's bots; its frames come from the host.
 func test_a_run_in_every_room_restored_plays_on_the_same() -> void:
 	var registry := own(RegistryScript.new()) as RegistryScript
 	registry.scan()
-	var rooms: Array[StringName] = []
-	for id: StringName in registry.get_ids(&"rooms"):
-		# A room that lists no enemies is no run's room (the hub: its own test below; the sandbox).
-		if not (registry.get_resource(&"rooms", id) as RoomBase).enemies.is_empty():
-			rooms.append(id)
+	var rooms: Array[RoomBase] = []
+	for room: RoomBase in registry.run_content().rooms:
+		# A room that hosts no kind is no run's room (the hub: its own test below; the sandbox).
+		if not room.kinds.is_empty():
+			rooms.append(room)
 	check(rooms.size() >= 1, "it finds the rooms (%d)" % rooms.size())
 	for room in rooms:
 		_run.room = room
 		await _check_resumed(&"play_requested", 0, 1)
+	_run.room = null
 
 
 ## The hub (online-lobby L1), snapshot while its player stands on the lit stone, resumed: the
@@ -73,7 +75,7 @@ func test_the_hub_restored_starts_its_run_on_the_same_tick() -> void:
 ## A run started by `start` with `bots` fighter bots and `scripted` scripted players, recorded with a
 ## snapshot after SNAPSHOT_AT, then resumed from it in a fresh game: the two agree from there on.
 func _check_resumed(start: StringName, bots: int, scripted: int) -> void:
-	var label: String = start if _run.room == &"" else "%s in %s" % [start, _run.room]
+	var label: String = start if _run.room == null else "%s in %s" % [start, _run.room.id]
 	var recorded := Desync.new()
 	var resumed := Desync.new()
 	var replay: Replay = await _record(start, bots, scripted, recorded)

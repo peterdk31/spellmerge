@@ -13,7 +13,7 @@ hud/       panels and menus (send requests as events, show state from events)
 
 - **Dependency direction:** `core` ← `gameplay` ← `content`. A lower layer never names a higher one. One known exception: `flow.gd` preloads `content/wizard/base/wizard.tscn` as the default `wizard_scene` (listed under "Foundation" in BACKLOG.md).
 - **Areas never call each other.** They send and listen to typed signals on `Events` (table in [gameplay/README.md](../gameplay/README.md)); each event has one sender. One stated exception: every area may use the actor kit's public scripts (`gameplay/actor/`).
-- **Content is found, not listed.** `Registry` scans the folders, so a new spell, enemy or room is new files only. Code that needs content takes an id (`Flow.room_id_to_play`) and asks the registry; it names no file.
+- **Content is found, not listed.** `Registry` scans the folders, so a new spell, enemy or room is new files only. Code that needs content takes an id (`Flow.run_id_to_play`) and asks the registry; it names no file.
 - **Everything that acts is an actor** (phase G, [M2-actors.md](milestones/M2-actors.md)): a body (`Actor`) made of components (Health, Hurtbox, Contact, Mover, Caster; Downed and a look for players) and driven by one controller (`PlayerController`, which is a seat 0–3; `AIController`). Core keys everything by the actor id from `Actors`; it asks an actor's team only to aim, its ramp to draw, its seat for the HUD and its budget for the shared limits. Every spell hurts every actor it hits. No system has a "the player".
 - **Components hold configuration, systems hold the hot state.** Combat, Spells and the projectile manager keep per-actor state in packed arrays indexed by actor id; only the actor runs `_physics_process`, stepping its components in a fixed order.
 - **Hot paths are pooled.** Shots are rows in `Projectiles`; nodes come from `Pool`; nothing allocates per frame.
@@ -27,7 +27,7 @@ hud/       panels and menus (send requests as events, show state from events)
 | add a modifier behaviour or a trigger | the enum value and its one row in `ModifierBase.RULES` (what it needs from a carrier, how cards of it stack, whether it only means something in flight; docs/CARRIERS.md), and its code | the carriers |
 | add a body behaviour (a new kind of part every actor may have) | a new component in `gameplay/actor/` (see its README), put in the scenes that want it | `player.gd`, `ai.gd` |
 | let something else drive a body (an AI teammate, a takeover) | a controller (`ActorController`), handed over with `Actor.drive` | the body's components |
-| use another room or enemy in a run | set `Flow.room_id_to_play`, `enemy_id_to_play` (a room picker does this) | the wave or spawn code |
+| use another room or enemy in a run | add it with its `biome` and `kinds` (a room) or `biomes` and `cost` (an enemy): the run's map picks it; another run: set `Flow.run_id_to_play` | the generator or spawn code |
 | start a run with other staffs | set `Flow.start_cards` (four lists of card ids) and the staffs in `content/wizard/staffs/` (`starter`, `dev`, by build channel); every player builds them itself | `flow.gd`'s spawn code, `player.gd` |
 | change what a player may build with | the player's `bag` (filled from the registry until M3's rewards fill it); builds arrive as `staff_change_requested` and `staff_cards_requested` | the builder, `core/spells` |
 | swap a sprite, tile or animation strip | replace the file, keep the contract below | scripts, node names in scenes, tests |

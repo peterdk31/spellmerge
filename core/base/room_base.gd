@@ -5,8 +5,9 @@ extends Resource
 ## dummies, zones) is written in its scene only, edited by hand in the Godot editor, and read by
 ## `RoomPlaces` from the layout it builds (`build()`); nothing here is one room's own (the hub's stone
 ## is a self-contained prop placed in its scene). As a run's template (run generation RG1,
-## docs/milestones/run-generation.md) it says its biome and the room kinds it can host; M3 extends
-## it with the door rules and with rooms built from pieces.
+## docs/milestones/run-generation.md) it says its biome and the room kinds it can host; what fights
+## in it is the run's map's (RG3: rooms hold layout only). M3 extends it with the door rules and with
+## rooms built from pieces.
 
 ## Unique name of the room, also its file name; the registry finds it by this.
 @export var id: StringName = &""
@@ -20,10 +21,6 @@ extends Resource
 ## The room kinds it can host (`RoomKind` ids: `fight`, `boss`), as a template a run's map picks for
 ## a room of that kind. Empty: it is offered for no run (the hub, the sandbox).
 @export var kinds: Array[StringName] = []
-## Its fight (boss OB2a, decision 31: no waves): the enemies that stand at its enemy spawns as a run
-## enters it, line by line; the room is cleared when they are all down. Empty: no fight (the hub,
-## the sandbox: their dummies are placements of their scene).
-@export var enemies: Array[RoomEnemies] = []
 ## Seconds after which a downed wizard stands up by itself at full health (the hub: hits hurt there,
 ## but a fall costs nothing; owner, 2026-11-13). Below 0 (the default): never by itself, only by a
 ## teammate's revive or the restart. In such a room everyone down starts no restart.

@@ -18,6 +18,7 @@ extends "res://tests/support/screenshot.gd"
 ## (`wizard.visible = true`) and moves it.
 
 const ROOM: RoomBase = preload("res://tests/support/empty_stage/empty_stage.tres")
+const PinnedRun := preload("res://tests/support/pinned_run.gd")
 
 ## The run's world (bodies stood with `stand` go in it) and seat 0's wizard (hidden).
 var world: Node2D = null
@@ -33,13 +34,15 @@ func open_stage() -> bool:
 	if not need(["PlayerInput", "Flow", "Feel", "Registry"]):
 		return false
 	_flow = root.get_node("Flow")
-	# Refused when a sheet before this one in the same process registered it: the same room.
-	root.get_node("Registry").call("add", &"rooms", ROOM)
+	# A run of the one room (run generation RG3: a run's room is its map's), of the crypt's enemies;
+	# the stage has no enemy spawns, so none stands (Flow says so) and the room is won as it starts.
+	# Pinned again by a sheet after this one in the same process: the same ids, added once.
+	var run: StringName = PinnedRun.pin(root.get_node("Registry"), ROOM, &"crypt")
 	root.get_node("PlayerInput").call("add_virtual_device", 0)
-	var was: StringName = _flow.get("room_id_to_play")
-	_flow.set("room_id_to_play", ROOM.id)
+	var was: StringName = _flow.get("run_id_to_play")
+	_flow.set("run_id_to_play", run)
 	var started: bool = _flow.call("start_run", 0)
-	_flow.set("room_id_to_play", was)
+	_flow.set("run_id_to_play", was)
 	if not started:
 		fail("the empty stage did not start")
 		return false

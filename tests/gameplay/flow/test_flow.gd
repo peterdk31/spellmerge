@@ -1,6 +1,7 @@
 extends SceneTree
 ## Tests for gameplay/flow, on the real autoloads: Play starts the room with 1, 2 and 4 players,
-## the room's listed enemies stand (no waves: boss OB2a), `room_entered` and `room_cleared` are sent
+## the enemies the run's map puts in it stand (no waves: boss OB2a; run generation RG3; the arena
+## pinned as the run's one room, tests/support/pinned_run.gd, so its spawns are known), `room_entered` and `room_cleared` are sent
 ## once, a won room ends the run after RUN_WON_DELAY, every wizard builds the two start spells, the cooldowns are reset on a new run,
 ## the room restarts in under 3 seconds when every player is down (and not while
 ## one still stands), and the first room is up in the same call. Time moves by
@@ -11,6 +12,8 @@ extends SceneTree
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 var _failures: Array[String] = []
 var _events: Node
@@ -18,6 +21,9 @@ var _flow: FlowScript
 var _input: InputManagerScript
 var _combat: Node
 var _spells: SpellsScript
+var _run: Node
+## The pinned arena's id (a copy of arena_01, the run's one room).
+var _arena: StringName = &""
 var _entered: Array[StringName] = []
 var _cleared: Array[StringName] = []
 ## The actors each `room_start` cue was played as (S6, item 13).
@@ -37,6 +43,9 @@ func _initialize() -> void:
 		quit(1)
 		return
 	_spells = root.get_node_or_null("Spells") as SpellsScript
+	_run = root.get_node_or_null("Run")
+	_flow.run_id_to_play = PinnedRun.pin(registry, ARENA)
+	_arena = PinnedRun.room_id(ARENA)
 	_events.connect("room_entered", func(id: StringName) -> void: _entered.append(id))
 	_events.connect("room_cleared", func(id: StringName) -> void: _cleared.append(id))
 	_events.connect("cue_shown", func(caster: int, cue: StringName, _at: Vector2, _d: Vector2, _s: float, _t: Color, _l: int) -> void:
@@ -65,8 +74,10 @@ func _initialize() -> void:
 	_test_a_won_room_ends_the_run()
 	_test_room_start_cue_on_every_wizard()
 	_test_main_menu_only_sends_hub_requested()
-	# Last: it adds rooms and a boss to the registry.
-	_test_a_room_lists_enemies_and_bosses_by_id()
+	_test_a_run_with_no_map_starts_nothing()
+	_test_an_unknown_enemy_stands_nothing_and_an_empty_room_is_won()
+	# Last: it adds a boss to the registry.
+	_test_a_boss_room_stands_its_boss()
 	_stop()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/flow (play, the room's enemies, room_entered, room_cleared, restart)")
@@ -128,13 +139,11 @@ func _down(wizard: Actor) -> void:
 	wizard.health.take(wizard.health.max_health)
 
 
-## How many enemies the arena lists (its `RoomBase.enemies`, counted).
+## How many enemies the run's map puts in the room the party is in (each restart is a new run, and
+## a new map).
 func _room_count() -> int:
-	var room: RoomBase = load("res://content/rooms/crypt/arena_01.tres") as RoomBase
-	var count: int = 0
-	for line: RoomEnemies in room.enemies:
-		count += line.count
-	return count
+	var node: RunNode = _run.call("room_now") as RunNode
+	return node.enemies.size() if node != null else 0
 
 
 func _test_restart_delay_is_under_three_seconds() -> void:
@@ -149,7 +158,7 @@ func _test_play_starts_the_room(count: int) -> void:
 	_check(took < 10000, "%d players: the first room took %d ms, must be under 10 s" % [count, took])
 	_check(_flow.state == FlowScript.State.RUNNING, "%d players: flow is running after play_requested" % count)
 	_check(_flow.world != null and _flow.world.is_inside_tree(), "%d players: the world is in the tree" % count)
-	_check(_entered == [&"arena_01"], "%d players: room_entered(arena_01) was sent once, got %s" % [count, _entered])
+	_check(_entered == [_arena], "%d players: room_entered(arena_01) was sent once, got %s" % [count, _entered])
 	_check(_wizards().size() == count, "%d players: %d wizards spawned" % [count, _wizards().size()])
 	for index in count:
 		var wizard: Actor = _wizard(index)
@@ -217,7 +226,7 @@ func _test_room_cleared_once_when_its_enemies_are_down() -> void:
 	_check(_cleared.is_empty(), "room_cleared waits for the last enemy")
 	_check(_flow.enemies_left() == 1, "one enemy is left")
 	_events.emit_signal("enemy_died", 3, enemies[enemies.size() - 1], Vector2.ZERO, -1)
-	_check(_cleared == [&"arena_01"], "room_cleared(arena_01) was sent once, got %s" % _cleared)
+	_check(_cleared == [_arena], "room_cleared(arena_01) was sent once, got %s" % _cleared)
 	_check(_flow.state == FlowScript.State.CLEARED, "flow is in the cleared state")
 	_events.emit_signal("enemy_died", 0, enemies[0], Vector2.ZERO, -1)
 	_check(_cleared.size() == 1, "a repeated death does not send room_cleared again")
@@ -242,7 +251,7 @@ func _test_possessed_enemy_does_not_strand_the_room() -> void:
 		for enemy: Node in order:
 			_combat.call("hit", 0, enemy, 100000)
 		_check(_flow.enemies_left() == 0, "possessed killed first %s: no enemy is left, %d are" % [possessed_first, _flow.enemies_left()])
-		_check(_cleared == [&"arena_01"], "possessed killed first %s: the room clears, got %s" % [possessed_first, _cleared])
+		_check(_cleared == [_arena], "possessed killed first %s: the room clears, got %s" % [possessed_first, _cleared])
 		_stop()
 
 
@@ -315,7 +324,7 @@ func _test_last_enemy_dies_after_all_down() -> void:
 	_check(_flow.is_restarting(), "all down: restarting")
 	for enemy: Node in _flow._enemies.duplicate():
 		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
-	_check(_cleared == [&"arena_01"], "the room still counts as cleared, got %s" % [_cleared])
+	_check(_cleared == [_arena], "the room still counts as cleared, got %s" % [_cleared])
 	_check(_flow.is_restarting(), "the last enemy dying does not cancel the restart")
 	_flow.step(FlowScript.RESTART_DELAY)
 	_check(_flow.world != old_world and _flow.world != null, "the run restarted after the last enemy died with everyone down")
@@ -426,7 +435,7 @@ func _test_a_won_room_ends_the_run() -> void:
 		_play()
 		var world: Node = _flow.world
 		_kill_room()
-		_check(_cleared == [&"arena_01"], "%d players: the room is cleared" % count)
+		_check(_cleared == [_arena], "%d players: the room is cleared" % count)
 		_check(_flow.state == FlowScript.State.CLEARED, "%d players: won" % count)
 		_flow.step(FlowScript.RUN_WON_DELAY - 0.1)
 		_check(_flow.world == world, "%d players: the kill is seen out first" % count)
@@ -449,37 +458,76 @@ func _test_room_start_cue_on_every_wizard() -> void:
 		_stop()
 
 
-## A room's lines name enemies or bosses by id (`EnemyBase.FOLDERS`); an id the registry lacks stands
-## nothing (so a deleted boss leaves no broken room), and a room that lists none is won as it starts.
-func _test_a_room_lists_enemies_and_bosses_by_id() -> void:
+## A run whose map cannot be made (no room of its biome hosts its kind) starts nothing: Flow says so
+## and stays idle, so Play can start again.
+func _test_a_run_with_no_map_starts_nothing() -> void:
 	var registry: Node = root.get_node("Registry")
-	var arena: RoomBase = load("res://content/rooms/crypt/arena_01.tres") as RoomBase
+	var rules := MapRules.new()
+	rules.biome = &"test_flow_nowhere"
+	rules.depth_min = 1
+	rules.depth_max = 1
+	rules.kinds = [KindRule.make(&"fight", 0, -1)] as Array[KindRule]
+	var nowhere := RunDefinition.new()
+	nowhere.id = &"test_flow_nowhere"
+	nowhere.biomes = [rules] as Array[MapRules]
+	registry.call("add", &"runs", nowhere)
+	_setup(1)
+	var was: StringName = _flow.run_id_to_play
+	_flow.run_id_to_play = nowhere.id
+	_check(not _flow.start_run(0), "a run with no map starts no run")
+	_check(_flow.state == FlowScript.State.IDLE and _flow.world == null, "flow is idle, with no world")
+	_check(_entered.is_empty(), "no room was entered, got %s" % [_entered])
+	_flow.run_id_to_play = &"no_such_run"
+	_check(not _flow.start_run(0), "a run the registry lacks starts no run")
+	_flow.run_id_to_play = was
+	_play()
+	_check(_flow.state == FlowScript.State.RUNNING, "Play starts again after")
+	_stop()
+
+
+## What the run names that the registry lacks (an enemy deleted after a map was made) stands nothing,
+## with a warning, and a room the run puts nothing in is won as it starts. The run's area never names
+## either: the answer is stood in for here, heard after the area's (Flow takes the last answer to its
+## `run_begun`).
+func _test_an_unknown_enemy_stands_nothing_and_an_empty_room_is_won() -> void:
+	var names: Array = [[&"no_such_enemy", &"ember_imp", &"no_such_enemy"], []]
+	for named: Array in names:
+		var enemies: Array[StringName] = []
+		enemies.assign(named)
+		var answer := func(_run_id: StringName) -> void:
+			_events.emit_signal("run_room_chosen", _arena, enemies)
+		_events.connect("run_begun", answer)
+		_setup(1)
+		_play()
+		_events.disconnect("run_begun", answer)
+		if enemies.is_empty():
+			_check(_cleared == [_arena], "a room with nothing in it is won as it starts, got %s" % [_cleared])
+		else:
+			_check(_flow.enemies_left() == 1, "the imp stands, the unknown id stands nothing, got %d" % _flow.enemies_left())
+		_stop()
+
+
+## A room of a kind filled by a boss (`RoomKind.FILL_BOSS`) stands the boss the map names, by id
+## (`EnemyBase.FOLDERS`: the bosses' folder too), and is cleared when it is down.
+func _test_a_boss_room_stands_its_boss() -> void:
+	var registry: Node = root.get_node("Registry")
 	var boss: EnemyBase = (registry.call("get_resource", &"enemies", &"ember_imp") as EnemyBase).duplicate() as EnemyBase
 	boss.id = &"test_flow_boss"
+	boss.boss = true
+	# A biome of its own: the boss pool is this boss alone, whatever bosses the crypt gets.
+	boss.biomes = [&"test_flow_lair"] as Array[StringName]
 	registry.call("add", &"bosses", boss)
-	var room: RoomBase = arena.duplicate() as RoomBase
-	room.id = &"test_flow_room"
-	var boss_line := RoomEnemies.new()
-	boss_line.enemy = boss.id
-	var gone := RoomEnemies.new()
-	gone.enemy = &"no_such_enemy"
-	gone.count = 3
-	room.enemies = [boss_line, gone] as Array[RoomEnemies]
-	registry.call("add", &"rooms", room)
+	var room: RoomBase = ARENA.duplicate() as RoomBase
+	room.id = &"test_flow_boss_room"
+	var was: StringName = _flow.run_id_to_play
+	_flow.run_id_to_play = PinnedRun.pin(registry, room, &"test_flow_lair", RoomKind.FILL_BOSS)
 	_setup(1)
-	_flow.room_id_to_play = room.id
 	_play()
-	_check(_flow.enemies_left() == 1, "the boss stands, the unknown id stands nothing, got %d" % _flow.enemies_left())
-	_stop()
-	var empty: RoomBase = arena.duplicate() as RoomBase
-	empty.id = &"test_flow_empty"
-	empty.enemies = [] as Array[RoomEnemies]
-	registry.call("add", &"rooms", empty)
-	_setup(1)
-	_flow.room_id_to_play = empty.id
-	_play()
-	_check(_cleared == [empty.id], "a room that lists no enemy is won as it starts, got %s" % [_cleared])
-	_flow.room_id_to_play = FlowScript.DEFAULT_ROOM_ID
+	_check(_flow.enemies_left() == 1, "the boss stands, got %d" % _flow.enemies_left())
+	var node: RunNode = _run.call("room_now") as RunNode
+	var named: Array[StringName] = node.enemies if node != null else [] as Array[StringName]
+	_check(named == [boss.id], "the map names it, got %s" % [named])
+	_flow.run_id_to_play = was
 	_stop()
 
 

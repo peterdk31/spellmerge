@@ -302,6 +302,14 @@ signal player_left(player: int)
 signal run_started(player_count: int)
 ## Sender: run. The run is over; `victory` is true if the players won.
 signal run_ended(victory: bool)
+## Sender: flow. A run of rooms of the run definition `run_id` (content/runs) begins, on the run's
+## fresh state (its seed dealt; run generation RG3). Heard by run, which makes the run's map and
+## answers with `run_room_chosen` for its first room.
+signal run_begun(run_id: StringName)
+## Sender: run. The room of the run's map the party enters: the room template `room_id`
+## (content/rooms) and what stands in it (`enemies`: enemy and boss ids, one per body). Heard by
+## flow, which builds it.
+signal run_room_chosen(room_id: StringName, enemies: Array[StringName])
 ## Sender: flow. The players entered the room `room_id`.
 signal room_entered(room_id: StringName)
 ## Sender: core/loading. Work before playing has begun behind the loading screen (`Loading.run`;
@@ -311,7 +319,7 @@ signal loading_started()
 signal loading_progressed(done: int, total: int)
 ## Sender: core/loading. The load is over (done, or cancelled). Heard by hud.
 signal loading_finished()
-## Sender: flow. The room `room_id` was cleared: every enemy it listed is down (boss OB2a: no waves; a room with no room after it wins the run).
+## Sender: flow. The room `room_id` was cleared: every enemy the run stood in it is down (boss OB2a: no waves; until the exits of run generation RG4, a cleared room wins the run).
 signal room_cleared(room_id: StringName)
 ## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.
 signal sandbox_changed(on: bool)

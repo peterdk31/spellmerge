@@ -1,6 +1,6 @@
 # The Old Broom: the first boss
 
-**Status (2026-11-15): planned with the owner in an owner session** (the owner, after the last round: "Write up the plan and merge it"); this document is step OB1. Asked by the owner: "Let's try to design the first boss of the game. A boss the players will face after the first biome. It should be fought in a decently sized arena. The boss should have 2 phases. It should have a movement attack where it dashes slowly towards the players." Two questions are still the owner's ("Open questions"); the steps they touch wait for the answers.
+**Status (2026-11-15): planned with the owner in an owner session** (the owner, after the last round: "Write up the plan and merge it"); this document is step OB1. Asked by the owner: "Let's try to design the first boss of the game. A boss the players will face after the first biome. It should be fought in a decently sized arena. The boss should have 2 phases. It should have a movement attack where it dashes slowly towards the players." The two questions left open at its merge were answered the same day ("Answered after the merge").
 
 The steps are **OB1 to OB17** (OB for the Old Broom). Each is one PR with its tests, in order. **The content comes first** (owner, 2026-11-15): the broom, its staffs, its card, its props and its arena are made early with today's parts, so they can be played while the plan goes on, and each general step after that upgrades them the day it merges. Most steps are general engine work: "Even if the boss ends up being bad, the changes are general and good, so they can be used to make a different boss" (owner).
 
@@ -29,7 +29,7 @@ Card lists are written in slot order (docs/milestones/M2-staffs.md, "Reading a s
 ## Owner decisions (2026-11-14 and 2026-11-15)
 
 1. **The boss is the Old Broom.**
-2. **The Sweep is straight in phase 1 and curves a little in phase 2.** How it curves fairly is open question 2.
+2. **The Sweep is straight in phase 1 and curves a little in phase 2.** It curves by aiming through its wind-up, not by homing (decision 26).
 3. **Phase 2 has all of it:** fire, mites and a double Sweep.
 4. **The boss can be hurt freely,** at any time, not only in a punish window.
 5. **Pillars are destructible,** and their rubble is gone (it no longer blocks).
@@ -61,10 +61,15 @@ Card lists are written in slot order (docs/milestones/M2-staffs.md, "Reading a s
 - A dash strikes only 8 px round its mover's middle (`SpellLimits.PASS_REACH`), so a wide Sweep needs a move's pass to be as wide as its body (OB10).
 - Props don't move (docs/milestones/props.md), so Plow carries bodies only, never rubble.
 
-## Open questions (the owner's)
+## Answered after the merge (owner, 2026-11-15)
 
-1. **How the boss and the new rooms are tried from the hub (OB2).** The session proposed the pause menu's enemy arena in the hub and a room picker. Two rules stand in the way: one player choosing a room for everyone is a shared decision not made by walking (co-op rules 1 and 5; online the pause menu is that player's alone, rule 6), and the hub is the lobby, with no enemies but the dummies (online-lobby.md). **Proposal:** the hub gets a **trial gate** for each trial room, a prop walked through together by the door rule; the room stands its own enemies (the boss arena stands the broom by its `EnemyStandIn`, so the hub itself never holds one). The Sandbox's enemy arena lists bosses too.
-2. **How the phase-2 Sweep curves (OB3, OB14).** The Homing card bends hard (its curve is 73 px) while the lane is drawn straight, so a homing Sweep would break "every attack is telegraphed" and cancel the sideways slip the fight is built on. **Proposal:** in phase 2 the Sweep **follows its target through the wind-up** (the lane follows with it) and **locks for the last 0.2 s**, then runs straight. It reads as aiming at you, and a dodge timed to the lock still works. Until this is answered the phase-2 Sweep has no homing.
+26. **The phase-2 Sweep aims through its wind-up** (owner: "Agreed"). The Homing card bends hard (its curve is 73 px) while the lane is drawn straight, so a homing Sweep would break "every attack is telegraphed". Instead the Sweep **follows its target through the wind-up** (the lane follows with it) and **locks for the last 0.2 s**, then runs straight. It reads as aiming at you, and a dodge timed to the lock still works. Built in OB14 as a general AI rule (a profile number: how long before release an aim locks); the phase-2 Sweep has no Homing card.
+27. **A trial gate in the hub** (owner: "So a Prop that a player can interact with, that opens a menu of which room the players want to visit?"). A pause-menu room picker would let one player choose for everyone (co-op rules 1 and 5), and the hub is the lobby, with no enemies but the dummies (online-lobby.md). So:
+    - **The gate is a prop with a role** (`trial_gate`, as the teleporter stone's `run_start` and the altar's `party_altar`; content/props). A wizard in its area presses A and **a menu of every room** in the registry opens, read by folder like the enemy arena's list, so a new room shows by itself. The menu is that player's alone and pauses nothing (co-op rule 2).
+    - **A pick sets where the gate leads,** shown over the gate for everyone (the room's name). Any wizard may pick again. The pick is a command the simulation hears (`InputFrame.COMMAND_NAMES`, core/sim/README.md, "Input").
+    - **The party goes by walking:** the gate lights while every wizard stands in it, as the teleporter stone does, and takes them all to the room picked. Nobody is taken anywhere they did not walk to (co-op rule 5).
+    - **The room stands its own enemies** (the boss arena stands the broom by its `EnemyStandIn`), so the hub never holds one. The room is played as a trial: cleared or everyone down, the party is back in the hub, with what they hold.
+    - The Sandbox's enemy arena lists bosses too.
 
 ## General pieces
 
@@ -236,7 +241,7 @@ New props show up in the hub's prop yard by themselves.
 | Step | What | Areas |
 | --- | --- | --- |
 | OB1 | This document | docs |
-| OB2 | Trying it from the hub, as open question 1 decides; the Sandbox's enemy arena lists bosses | gameplay/flow, hud/menus, content/props |
+| OB2 | The trial gate (decision 27): the prop, its room menu, its command, the trial run and the way back; the Sandbox's enemy arena lists bosses | content/props, gameplay/flow, hud/menus, core/sim (the command) |
 | OB3 | **The broom v0**: two phases with today's parts, on its own staffs. Sweep `bigger · dash` with `reach` (Lumber joins in OB4, Plow in OB11, the dust ring `on wall · … · pulse` in OB12), flick `scatter · slow · bolt`, swat `bigger · heavy · swing`, phase 2's trail `timer · dash · slow · fire · pool`; contact 8; a placeholder 96×64 sprite and a burning phase look; its lore line (a one-line `lore` on `EnemyBase`, checked by the story validator's line rules) and its canon in docs/STORY.md; the bosses README rewritten | content/bosses, content/wizard/staffs, core/base, docs |
 | OB4 | **Lumber**, its numbers; the broom's Sweep takes it | content/spells |
 | OB5 | The cracked pillar; the dust heap and the `touched` prop trigger | content/props, core/base, gameplay/actor |
@@ -248,7 +253,7 @@ New props show up in the hub's prop yard by themselves.
 | OB11 | **Plow**; the broom's Sweep carries and pins | core/spells, gameplay/combat, content/spells |
 | OB12 | `on wall` for moves; the broom's dust ring | core/spells |
 | OB13 | Phase adds and health by player count; the broom's mites | core/base, gameplay/actor, gameplay/flow |
-| OB14 | The AI's run-up and turns; the Big Sweep; phase 2's aim (open question 2) | gameplay/ai, content/bosses |
+| OB14 | The AI's run-up, turns and late aim lock (decision 26); the Big Sweep; phase 2's aim | gameplay/ai, content/bosses |
 | OB15 | Held sounds; music with intensity; every sound id of the sheet in its cue | gameplay/feel, core/base, content/cues |
 | OB16 | The boss bar and the entrance banner | gameplay/actor, hud |
 | OB17 | Tuning with bot playtests and the owner's; readability of fire on fire; a GIF of the whole fight | content/bosses |
@@ -258,8 +263,8 @@ Each step's tests come with it: a card's test in its folder and the card-rules t
 ## Fit with the design
 
 - **Deep spell building:** the boss is cards a player can hold (Lumber and Plow are new cards for everyone); the fight rewards fire (heaps), the Wall card (`on wall`), decoys, `on kill` (mites) and possession.
-- **Nobody waits:** no cutscene; the entrance plays while everyone moves; a revive stays possible (Plow leaves the downed); trying rooms goes by the door rule (open question 1).
-- **Readable chaos:** every attack has a wind-up and a lane (and later a sound); the Sweep stays one lane at every player count; a curve never leaves its lane (open question 2).
+- **Nobody waits:** no cutscene; the entrance plays while everyone moves; a revive stays possible (Plow leaves the downed); trying rooms goes by walking into the trial gate together (decision 27).
+- **Readable chaos:** every attack has a wind-up and a lane (and later a sound); the Sweep stays one lane at every player count; the phase-2 aim moves its lane with it and locks before release (decision 26).
 - **Everything hurts everything:** the broom's own fire blows up heaps on it, its pins kill its own mites, players' spells break the pillars that shelter them.
 - **One game, the same everywhere:** every new number is the body's state; poses, remnants, motes and sound are drawn only.
 - **Fair from 1 to 4 players:** health and adds scale with players; the attacks do not multiply.

@@ -28,6 +28,8 @@ A twelfth, planned with the owner on 2026-11-14 and 2026-11-15: **the first boss
 
 A thirteenth, planned with the owner on 2026-11-15: **run generation**, a run defined as data (its biome, map rules, room kinds and scaling) and its branching map generated from the run's seed and the content there is, filled with fights and the boss, scaled with depth and players, its rules open to meta progression on the host's save ([run-generation.md](milestones/run-generation.md), phase RG). It builds the core of M3's run structure early; waves are gone (boss OB2a). Reward and other rooms, unlocks and a difficulty setting stay M3 and later.
 
+A fourteenth, planned with the owner on 2026-11-15: **ground cover**, grass and other cover on the floors that sways in the wind, bends as bodies walk through it, is trampled and burns: one layout worked out from each room (its biome's fill and fields placed by hand), the game's part a simulation grid, the look Feel's ([ground-cover.md](milestones/ground-cover.md), phase GC). It builds M3's "elements on the room" for fire on cover early, beside the boss plan; water, ice and breakable walls stay M3.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

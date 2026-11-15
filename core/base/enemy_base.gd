@@ -16,6 +16,10 @@ extends Resource
 ## True for a boss: its death stops the whole game for a moment (Feel); other kills hold only the
 ## bodies in them.
 @export var boss: bool = false
+## Its line of lore for people (boss OB3; the boss's entrance banner shows it, OB16): why it fights,
+## one line of at most `StoryValidator.MAX_LORE_CHARS` characters, checked with the other words of the
+## game (`Registry.validate_story`). A boss has one; a stray may leave it empty.
+@export var lore: String = ""
 
 ## The body's scale (1: as drawn); a boss is bigger.
 @export var size: float = 1.0

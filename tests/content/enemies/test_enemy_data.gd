@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Enemy data (enemy AI AI4, docs/milestones/M2-enemy-ai.md): 1-4 staffs of cards, a profile and a
-## boss's phases on `EnemyBase`, checked by `problems()`. Every enemy in the registry is sound, and
+## boss's phases on `EnemyBase`, checked by `problems()`. Every enemy and boss in the registry is sound, and
 ## an actor holds every staff its data names.
 ##
 ## godot --headless --path . --script res://tests/content/enemies/test_enemy_data.gd
@@ -14,9 +14,10 @@ func _enemies() -> Array[EnemyBase]:
 	var registry := RegistryScript.new()
 	registry.call("scan")
 	var found: Array[EnemyBase] = []
-	for item: Variant in registry.call("get_all", "enemies"):
-		if item is EnemyBase:
-			found.append(item as EnemyBase)
+	for folder: StringName in EnemyBase.FOLDERS:
+		for item: Variant in registry.call("get_all", folder):
+			if item is EnemyBase:
+				found.append(item as EnemyBase)
 	registry.free()
 	return found
 
@@ -34,6 +35,9 @@ func test_every_enemy_is_sound() -> void:
 		check_equal(data.problems(), PackedStringArray(), "%s: its data is sound" % data.id)
 		for entry: StaffCards in data.staffs:
 			check_equal(SpellValidator.check_staff(entry.staff).size(), 0, "%s: its staff is valid" % data.id)
+		for phase: EnemyPhase in data.phases:
+			for entry: StaffCards in phase.staffs:
+				check_equal(SpellValidator.check_staff(entry.staff).size(), 0, "%s: its phase's staff is valid" % data.id)
 
 
 func test_every_enemy_plays_by_the_enemy_ai() -> void:

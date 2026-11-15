@@ -1,0 +1,129 @@
+[gd_resource type="Resource" script_class="EnemyBase" load_steps=19 format=3]
+
+[ext_resource type="Script" path="res://core/base/enemy_base.gd" id="1_base"]
+[ext_resource type="PackedScene" path="res://content/bosses/old_broom/old_broom.tscn" id="2_scene"]
+[ext_resource type="Script" path="res://core/base/staff_base.gd" id="3_staff"]
+[ext_resource type="Script" path="res://core/base/staff_cards.gd" id="4_entry"]
+[ext_resource type="Script" path="res://core/base/ai_profile.gd" id="5_profile"]
+[ext_resource type="Script" path="res://core/base/enemy_phase.gd" id="6_phase"]
+[ext_resource type="Script" path="res://core/base/phase_look.gd" id="7_look"]
+[ext_resource type="Texture2D" path="res://content/bosses/old_broom/burning.svg" id="8_burning"]
+
+[sub_resource type="Resource" id="Resource_sweep_staff"]
+script = ExtResource("3_staff")
+id = &"old_broom"
+display_name = "Sweep"
+slots = 3
+draw = 1
+wind_up = 0.8
+cooldown = 2.6
+spread = 0.0
+max_mana = 100.0
+mana_regen = 40.0
+
+[sub_resource type="Resource" id="Resource_sweep"]
+script = ExtResource("4_entry")
+staff = SubResource("Resource_sweep_staff")
+cards = Array[StringName]([&"reach", &"bigger", &"dash"])
+
+[sub_resource type="Resource" id="Resource_flick_staff"]
+script = ExtResource("3_staff")
+id = &"old_broom"
+display_name = "Dust flick"
+slots = 3
+draw = 1
+wind_up = 0.5
+cooldown = 2.0
+spread = 0.0
+max_mana = 100.0
+mana_regen = 40.0
+
+[sub_resource type="Resource" id="Resource_flick"]
+script = ExtResource("4_entry")
+staff = SubResource("Resource_flick_staff")
+cards = Array[StringName]([&"scatter", &"slow", &"bolt"])
+
+[sub_resource type="Resource" id="Resource_swat_staff"]
+script = ExtResource("3_staff")
+id = &"old_broom"
+display_name = "Swat"
+slots = 3
+draw = 1
+wind_up = 0.35
+cooldown = 1.5
+spread = 0.0
+max_mana = 100.0
+mana_regen = 40.0
+
+[sub_resource type="Resource" id="Resource_swat"]
+script = ExtResource("4_entry")
+staff = SubResource("Resource_swat_staff")
+cards = Array[StringName]([&"bigger", &"heavy", &"swing"])
+
+[sub_resource type="Resource" id="Resource_tidying"]
+script = ExtResource("5_profile")
+name = "old broom: tidying up"
+aggression = 0.8
+caution = 0.1
+accuracy = 0.85
+lead = 0.2
+dodge = 0.0
+teamwork = 0.0
+
+[sub_resource type="Resource" id="Resource_double_sweep_staff"]
+script = ExtResource("3_staff")
+id = &"old_broom"
+display_name = "Double Sweep"
+slots = 14
+draw = 1
+wind_up = 0.6
+cooldown = 2.4
+spread = 0.0
+max_mana = 160.0
+mana_regen = 60.0
+
+[sub_resource type="Resource" id="Resource_double_sweep"]
+script = ExtResource("4_entry")
+staff = SubResource("Resource_double_sweep_staff")
+cards = Array[StringName]([&"timer", &"reach", &"bigger", &"dash", &"slow", &"fire", &"pool", &"timer", &"reach", &"bigger", &"dash", &"slow", &"fire", &"pool"])
+
+[sub_resource type="Resource" id="Resource_spring_cleaning"]
+script = ExtResource("5_profile")
+name = "old broom: spring cleaning"
+aggression = 0.95
+caution = 0.05
+accuracy = 0.9
+lead = 0.3
+dodge = 0.0
+rest_scale = 0.75
+teamwork = 0.0
+
+[sub_resource type="Resource" id="Resource_burning"]
+script = ExtResource("7_look")
+texture = ExtResource("8_burning")
+glow = Color(1, 0.635, 0.235, 1)
+
+[sub_resource type="Resource" id="Resource_phase_2"]
+script = ExtResource("6_phase")
+health_below = 0.55
+staffs = Array[ExtResource("4_entry")]([SubResource("Resource_double_sweep"), SubResource("Resource_flick"), SubResource("Resource_swat")])
+profile = SubResource("Resource_spring_cleaning")
+look = SubResource("Resource_burning")
+transition = 2.0
+
+[resource]
+script = ExtResource("1_base")
+id = &"old_broom"
+display_name = "The Old Broom"
+lore = "The wizard's first staff, demoted to sweeping. It remembers."
+max_health = 900.0
+move_speed = 40.0
+contact_damage = 8
+scene = ExtResource("2_scene")
+boss = true
+hit_color = Color(0.949, 0.761, 0.188, 1)
+staffs = Array[ExtResource("4_entry")]([SubResource("Resource_sweep"), SubResource("Resource_flick"), SubResource("Resource_swat")])
+profile = SubResource("Resource_tidying")
+phases = Array[ExtResource("6_phase")]([SubResource("Resource_phase_2")])
+biomes = Array[StringName]([&"crypt"])
+cost = 1

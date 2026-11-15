@@ -127,14 +127,21 @@ func validate_spells() -> Array[Dictionary]:
 	return problems
 
 
-## The problems with the words of the spell cards: each card's description
-## (`SpellComponent.description`, `SpellValidator.check_descriptions`; a missing one only warns).
+## The problems with the game's words: each spell card's description (`SpellComponent.description`,
+## `SpellValidator.check_descriptions`) and each enemy's and boss's lore (`EnemyBase.lore`,
+## `StoryValidator.check_lore`); a missing one only warns.
 func validate_story() -> Array[Dictionary]:
 	var cards: Array[SpellComponent] = []
 	for res: Resource in get_all(&"spells"):
 		if res is SpellComponent:
 			cards.append(res as SpellComponent)
-	return SpellValidator.check_descriptions(cards)
+	var problems: Array[Dictionary] = SpellValidator.check_descriptions(cards)
+	for folder: StringName in EnemyBase.FOLDERS:
+		for res: Resource in get_all(folder):
+			if res is EnemyBase:
+				var enemy := res as EnemyBase
+				problems.append_array(StoryValidator.check_lore(enemy.resource_path, enemy.lore, enemy.boss))
+	return problems
 
 
 ## What a run can be made of (run generation RG1, `RunContent`): the room kinds (`room_kinds`), the

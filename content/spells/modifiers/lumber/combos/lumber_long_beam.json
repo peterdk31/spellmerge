@@ -1,0 +1,10 @@
+{
+	"id": "lumber_long_beam",
+	"name": "Lumber long beam",
+	"does": "Lumber stretches a fire beam to 720 px: it burns an imp far past a plain or a reaching beam's end.",
+	"needs": "lumber",
+	"casts": [{"staff": 0, "cards": ["lumber", "fire", "beam"]}],
+	"imps": [[500, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

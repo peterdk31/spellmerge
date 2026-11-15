@@ -10,7 +10,7 @@ extends "res://tests/support/suite.gd"
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 
-const COMBOS: Array[String] = ["lumber_long_charge", "lumber_heavy_bolt"]
+const COMBOS: Array[String] = ["lumber_long_beam", "lumber_heavy_bolt"]
 
 
 func _card() -> ModifierBase:

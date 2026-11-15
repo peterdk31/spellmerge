@@ -3,7 +3,9 @@ extends "res://tests/support/suite.gd"
 ## and the look pick the right frames of the eye and brow sheets; down, a windup, a hit and
 ## `show_mood` win over the resting mood in that order; the layers trail the body and pop on a
 ## cast, and a teleport is not trailed; blinks come at each style's pace; glances and raised
-## brows only while idle, and never on a stray; a glance on purpose (`glance`, the AI's call).
+## brows only while idle, and never on a stray; a glance on purpose (`glance`, the AI's call); a
+## face of its own (`FaceArt`, boss plan OB9): its sheets at their frame size, its row, a phase's row
+## and back to its scene's.
 ##
 ## godot --headless --path . --script res://tests/gameplay/actor/test_face.gd
 
@@ -45,6 +47,13 @@ func _wearer(style: Face.Style, resting: Face.Mood = Face.Mood.NEUTRAL, controll
 	face.resting_mood = resting
 	body.add_child(face)
 	return _world.add(body, Vector2(100.0, 100.0))
+
+
+## A sheet `columns` × `rows` frames of `frame` pixels (a plain colour: only its size matters).
+func _sheet(frame: Vector2i, columns: int, rows: int) -> Texture2D:
+	var image := Image.create(frame.x * columns, frame.y * rows, false, Image.FORMAT_RGBA8)
+	image.fill(Color("f4f1ea"))
+	return ImageTexture.create_from_image(image)
 
 
 func _face(body: Actor) -> Face:
@@ -222,3 +231,54 @@ func test_glances_and_raised_brows_only_while_idle_and_never_on_a_stray() -> voi
 	check(glances[1] > 0 and raises[1] > 0, "a standing Show-off glances and raises a brow")
 	check(glances[0] == 0 and raises[0] == 0, "a moving one does neither")
 	check(glances[2] == 0 and raises[2] == 0, "a stray does neither")
+
+
+func test_a_face_of_its_own_draws_its_art_and_a_phase_its_row() -> void:
+	var art := FaceArt.new()
+	art.frame = Vector2i(24, 8)
+	art.eyes = _sheet(art.frame, 10, 2)
+	art.brows = _sheet(art.frame, 5, 2)
+	art.eyes_origin = Vector2(1.0, 0.0)
+	art.brows_origin = Vector2(1.0, 6.0)
+	var body := Actor.new()
+	var controller := ActorFixture.Scripted.new()
+	body.add_child(controller)
+	var face := Face.new()
+	face.name = "Face"
+	face.style = Face.Style.STERN
+	face.resting_mood = Face.Mood.ANGRY
+	face.art = art
+	face.anchor = Vector2(-10.0, -37.0)
+	body.add_child(face)
+	_world.add(body, Vector2(100.0, 100.0))
+	controller.aim = Vector2.RIGHT
+	_world.run(1)
+	if face.is_shut():
+		_world.run(10)
+	var eyes := face.get_child(0) as Sprite2D
+	var brows := face.get_child(1) as Sprite2D
+	check(eyes.texture == art.eyes and brows.texture == art.brows, "its own sheets, not the shared ones")
+	check_equal(Vector2i(eyes.hframes, eyes.vframes), Vector2i(10, 2), "the eyes cut at its frame size")
+	check_equal(Vector2i(brows.hframes, brows.vframes), Vector2i(5, 2), "and the brows")
+	check_equal(eyes.offset, -art.eyes_origin, "its eyes' origin")
+	check_equal(brows.offset, -art.brows_origin, "its brows' origin")
+	check_equal(face.eyes_frame(), Vector2i(5, 0), "its first row, whatever its style (looking right)")
+	check_equal(face.brows_frame(), Vector2i(Face.Mood.ANGRY, 0), "its brows' first row")
+	face.restyle(-1, Color(0.0, 0.0, 0.0, 0.0), 1)
+	_world.run(1)
+	if face.is_shut():
+		_world.run(10)
+	check_equal(face.eyes_frame(), Vector2i(5, 1), "a phase shows its second row")
+	check_equal(face.brows_frame(), Vector2i(Face.Mood.ANGRY, 1), "the brows too")
+	check_equal(face.style, Face.Style.STERN, "its style, its habits, kept")
+	face.restyle(-1, Color(0.0, 0.0, 0.0, 0.0), 7)
+	_world.run(1)
+	if face.is_shut():
+		_world.run(10)
+	check_equal(face.eyes_frame().y, 1, "a row past the sheet shows its last")
+	face.restyle(Face.Style.CHEER, Color.RED, 0)
+	face.unstyle()
+	_world.run(1)
+	check_equal(face.art_row, 0, "back to its scene's row")
+	check_equal(face.style, Face.Style.STERN, "and style")
+	check_equal(eyes.modulate, Color.WHITE, "and glow")

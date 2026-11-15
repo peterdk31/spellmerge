@@ -1,0 +1,25 @@
+{
+  "colours": {
+    "o": "#14121f",
+    "b": "#a39fb8",
+    "C": "#f4f1ea"
+  },
+  "rows": [
+    "..oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo............................",
+    ".oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo....oooooooo.....oooooo......oooooo....",
+    ".oobbbbbo....obbbbboo....oobbbbbo....obbbbboo....oobbbbbo....obbbbboo....oobbbbbo....obbbbboo....oobbbbbo....obbbbboo....oobbbbbo....obbbbboo....oobbbbbo....obbbbboo....oobbbbbo....obbbbboo....oobbbbbo....obbbbboo....obbbbbbo....obbbbbbo...",
+    ".oboCCCCo....oooCCCbo....obCooCCo....oCCooCbo....obCCCooo....oCCCCobo....obCCCCCo....oCCCCCbo....obCCCCCo....oCCCCCbo....obCCCCCo....oCCCCCbo....obCCCCCo....oCCCCCbo....obCCCCCo....oCCCCCbo....obCCCCCo....oCCCCCbo.....oooooo......oooooo....",
+    ".oooCCCCo....oooCCCCo....oCCooCCo....oCCooCCo....oCCCCooo....oCCCCooo....oooCCCCo....oooCCCCo....oCCooCCo....oCCooCCo....oCCCCooo....oCCCCooo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo...........................",
+    ".oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oooCCCCo....oooCCCCo....oCCooCCo....oCCooCCo....oCCCCooo....oCCCCooo....oooCCCCo....oooCCCCo....oCCooCCo....oCCooCCo....oCCCCooo....oCCCCooo...........................",
+    "..oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo............................",
+    "................................................................................................................................................................................................................................................",
+    "..oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo............................",
+    ".obbooooo....ooooobbo....obbooooo....ooooobbo....obbooooo....ooooobbo....obbooooo....ooooobbo....obbooooo....ooooobbo....obbooooo....ooooobbo....obbooooo....ooooobbo....obbooooo....ooooobbo....obbooooo....ooooobbo.....oooooo......oooooo....",
+    ".ooobbooo....ooobbCCo....oCCbbooo....ooobbCCo....oCCbbooo....ooobbooo....oCCbbooo....ooobbCCo....oCCbbooo....ooobbCCo....oCCbbooo....ooobbCCo....oCCbbooo....ooobbCCo....oCCbbooo....ooobbCCo....oCCbbooo....ooobbCCo....obbbbbbo....obbbbbbo...",
+    ".oooCCbbo....obbCCCCo....oCCoobbo....obbooCCo....oCCCCbbo....obbCCooo....oooCCbbo....obbCCCCo....oCCoobbo....obbooCCo....oCCCCbbo....obbCCooo....oCCCCbbo....obbCCCCo....oCCCCbbo....obbCCCCo....oCCCCbbo....obbCCCCo.....oooooo......oooooo....",
+    ".oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oooCCCCo....oooCCCCo....oCCooCCo....oCCooCCo....oCCCCooo....oCCCCooo....oooCCCCo....oooCCCCo....oCCooCCo....oCCooCCo....oCCCCooo....oCCCCooo...........................",
+    ".oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oCCCCCCo....oooCCCCo....oooCCCCo....oCCooCCo....oCCooCCo....oCCCCooo....oCCCCooo...........................",
+    "..oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo......oooooo............................",
+    "................................................................................................................................................................................................................................................"
+  ]
+}

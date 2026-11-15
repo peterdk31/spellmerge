@@ -1,0 +1,29 @@
+{
+  "colours": {
+    "o": "#14121f",
+    "b": "#a39fb8",
+    "B": "#d4d0e0",
+    "C": "#f4f1ea",
+    "f": "#8f2d2a",
+    "F": "#e0592f",
+    "G": "#ffa23c"
+  },
+  "rows": [
+    "........................oCooo.o.......o.oooCo....o.................o....oo.................oo.......o.ooo...ooo.o.......",
+    ".o..o.o.......o.o..o....CCCCCoCoo...ooCoCCCCCo..oCo.o...........o.oCo...CCooo...........oooCCo.....oCoCCCo.oCCCoCo......",
+    "oCooCoCoo...ooCoCooCo...oBBBCCCCCo.oCCCCCBBBo...CCCoCoo.......ooCoCCCo..oCCCCoo.......ooCCCCo....oooCCCBBo.oBBCCCooo....",
+    "CCCCCCCCCo.oCCCCCCCCCo...obbBBBBBo.oBBBBBbbo....oBBCCCCoo...ooCCCCBBo...oBBBCoCo.....oCoCBBBo...oCCCBBBoo...ooBBBCCCo...",
+    "oBBBBBBBBo.oBBBBBBBBo.....oobbboo...oobbboo......obBBBCCCo.oCCCBBBbo.....obbBCCCo...oCCCBbbo....CCBBbbbo.....obbbBBCCo..",
+    ".obbbbboo...oobbbbbo........ooo.......ooo.........obbbBBBo.oBBBbbbo.......oobBBBCo.oCBBBboo.....oBbbooo.......ooobbBo...",
+    "..ooooo.......ooooo................................oooboo...oobooo..........obboBo.oBobbo........ooo.............ooo....",
+    "......................................................o.......o..............oo.o...o.oo................................",
+    "........................oGooo.o.......o.oooGo....o.................o....oo.................oo.......o.ooo...ooo.o.......",
+    ".o..o.o.......o.o..o....GGGGGoGoo...ooGoGGGGGo..oGo.o...........o.oGo...GGooo...........oooGGo.....oGoGGGo.oGGGoGo......",
+    "oGooGoGoo...ooGoGooGo...oFFFGGGGGo.oGGGGGFFFo...GGGoGoo.......ooGoGGGo..oGGGGoo.......ooGGGGo....oooGGGFFo.oFFGGGooo....",
+    "GGGGGGGGGo.oGGGGGGGGGo...offFFFFFo.oFFFFFffo....oFFGGGGoo...ooGGGGFFo...oFFFGoGo.....oGoGFFFo...oGGGFFFoo...ooFFFGGGo...",
+    "oFFFFFFFFo.oFFFFFFFFo.....oofffoo...oofffoo......ofFFFGGGo.oGGGFFFfo.....offFGGGo...oGGGFffo....GGFFfffo.....offfFFGGo..",
+    ".offfffoo...oofffffo........ooo.......ooo.........offfFFFo.oFFFfffo.......oofFFFGo.oGFFFfoo.....oFffooo.......oooffFo...",
+    "..ooooo.......ooooo................................ooofoo...oofooo..........offoFo.oFoffo........ooo.............ooo....",
+    "......................................................o.......o..............oo.o...o.oo................................"
+  ]
+}

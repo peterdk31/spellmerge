@@ -29,7 +29,9 @@ extends ActorLook
 ##
 ## The sheets are art/faces/eyes.svg (one row per style; nine looks, then the blink) and
 ## art/faces/brows.svg (one column per mood; rows two brows and one). A stray's eyes are drawn
-## white and tinted with `glow`. Nothing here allocates per step, and the layers are only set when
+## white and tinted with `glow`. A face of its own (boss plan OB9) draws its `art`'s sheets instead
+## (`FaceArt`: the same layout at any frame size, in its body's folder), its row `art_row` (a phase
+## may show another, `restyle`); its `style` still sets its habits. Nothing here allocates per step, and the layers are only set when
 ## their frame or place changed (every actor wears a face; performance pass, 2026-10-28).
 
 enum Style { CHEER, EAGER, SLEEPY, STERN, STRAY, STRAY_ONE }
@@ -79,6 +81,10 @@ const RAISE_EVERY: PackedFloat32Array = [7.0, 4.0, 0.0, 0.0, 0.0, 0.0]
 @export var anchor: Vector2 = Vector2(11.0, -5.0)
 ## The eyes' tint: white for a player, the element colour for a stray.
 @export var glow: Color = Color.WHITE
+## A face of its own (a boss's): its sheets in place of the shared ones (null: the shared sheets,
+## their row the `style`'s), and the row of them it shows.
+@export var art: FaceArt = null
+@export var art_row: int = 0
 
 ## Where the body is drawn this step relative to rest (the bob, the hop), set by the body's look.
 var body_offset: Vector2 = Vector2.ZERO
@@ -86,6 +92,12 @@ var body_offset: Vector2 = Vector2.ZERO
 var _eyes: Sprite2D = null
 var _brows: Sprite2D = null
 var _rng: RandomNumberGenerator = null
+## True when the layers draw its own `art` (set up once, with the layers).
+var _own_art: bool = false
+## Its style, glow and row as its scene made them (taken at its first setup), for `unstyle`.
+var _scene_style: Style = Style.CHEER
+var _scene_glow: Color = Color.WHITE
+var _scene_row: int = 0
 ## Where the eyes and the brows have got to, trailing the body (global).
 var _eye_point: Vector2 = Vector2.ZERO
 var _brow_point: Vector2 = Vector2.ZERO
@@ -117,9 +129,14 @@ var _k: float = 0.0
 func setup(owner_actor: Actor) -> void:
 	super.setup(owner_actor)
 	if _eyes == null:
-		_eyes = _layer(EYES_SHEET, EYES_ORIGIN)
-		_brows = _layer(BROWS_SHEET, BROWS_ORIGIN)
+		var own: bool = art != null and art.eyes != null and art.brows != null
+		_eyes = _layer(art.eyes if own else EYES_SHEET, art.eyes_origin if own else EYES_ORIGIN, art.frame if own else FRAME)
+		_brows = _layer(art.brows if own else BROWS_SHEET, art.brows_origin if own else BROWS_ORIGIN, art.frame if own else FRAME)
+		_own_art = own
 		_rng = RandomNumberGenerator.new()
+		_scene_style = style
+		_scene_glow = glow
+		_scene_row = art_row
 	_rng.seed = hash(owner_actor.get_instance_id())
 	_eyes.modulate = glow
 	_blink_in = _wait(BLINK_EVERY)
@@ -133,17 +150,27 @@ func setup(owner_actor: Actor) -> void:
 		actor.damaged.connect(_on_damaged)
 
 
-## A boss's phase changes the face (`Phases`): `new_style` (a `Style` as a number; -1 keeps it) and
-## `new_glow` (alpha 0 keeps it).
-func restyle(new_style: int, new_glow: Color) -> void:
+## A boss's phase changes the face (`Phases`): `new_style` (a `Style` as a number; -1 keeps it),
+## `new_glow` (alpha 0 keeps it) and `new_row` (the row of its own art, `art_row`; -1 keeps it).
+func restyle(new_style: int, new_glow: Color, new_row: int = -1) -> void:
 	if new_style >= 0 and new_style < Style.size():
 		style = new_style as Style
+		_eyes_frame = Vector2i(-1, -1)
+		_brows_frame = Vector2i(-1, -1)
+	if new_row >= 0:
+		art_row = new_row
 		_eyes_frame = Vector2i(-1, -1)
 		_brows_frame = Vector2i(-1, -1)
 	if new_glow.a > 0.0:
 		glow = new_glow
 		if _eyes != null:
 			_eyes.modulate = glow
+
+
+## Back to its style, glow and row as its scene made them (a snapshot's phase is shown again from
+## them: `CreatureLook.sync`).
+func unstyle() -> void:
+	restyle(_scene_style, _scene_glow, _scene_row)
 
 
 ## Show `mood` for `seconds` (over the resting mood and the idle habits; down and a windup still
@@ -234,7 +261,7 @@ func step(delta: float) -> void:
 		elif _glance_left > 0.0:
 			looking = _glance
 		column = (looking.y + 1) * 3 + looking.x + 1
-	var eyes: Vector2i = Vector2i(column, style)
+	var eyes: Vector2i = Vector2i(column, _eye_row())
 	if eyes != _eyes_frame:
 		_eyes_frame = eyes
 		_eyes.frame_coords = eyes
@@ -247,7 +274,7 @@ func step(delta: float) -> void:
 		feeling = _shown_mood
 	elif _raise_left > 0.0:
 		feeling = Mood.RAISED
-	var brows: Vector2i = Vector2i(feeling, 1 if style == Style.STRAY_ONE else 0)
+	var brows: Vector2i = Vector2i(feeling, _brow_row())
 	if brows != _brows_frame:
 		_brows_frame = brows
 		_brows.frame_coords = brows
@@ -315,13 +342,27 @@ func _wait(every_by_style: PackedFloat32Array) -> float:
 	return every * _rng.randf_range(0.7, 1.3)
 
 
-func _layer(sheet: Texture2D, origin: Vector2) -> Sprite2D:
+## The eyes' row of their sheet: its own art's `art_row` (its last row at most), else the style's.
+func _eye_row() -> int:
+	if _own_art:
+		return clampi(art_row, 0, _eyes.vframes - 1)
+	return style
+
+
+## The brows' row: its own art's `art_row` (its last row at most), else one brow for a one-eyed stray.
+func _brow_row() -> int:
+	if _own_art:
+		return clampi(art_row, 0, _brows.vframes - 1)
+	return 1 if style == Style.STRAY_ONE else 0
+
+
+func _layer(sheet: Texture2D, origin: Vector2, frame_size: Vector2i) -> Sprite2D:
 	var sprite := Sprite2D.new()
 	sprite.texture = sheet
 	sprite.centered = false
 	sprite.offset = -origin
-	sprite.hframes = sheet.get_width() / FRAME.x
-	sprite.vframes = sheet.get_height() / FRAME.y
+	sprite.hframes = maxi(sheet.get_width() / maxi(frame_size.x, 1), 1)
+	sprite.vframes = maxi(sheet.get_height() / maxi(frame_size.y, 1), 1)
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(sprite)
 	return sprite

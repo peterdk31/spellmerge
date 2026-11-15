@@ -4,7 +4,9 @@ extends "res://tests/support/suite.gd"
 ## story's rules, every staff of both phases casts and wastes no card, and phase 2 ("Spring
 ## cleaning") brings the double Sweep, its burning look and its own profile under 55% health. Its
 ## body is layered (boss plan OB8): a head, its handle and its binding, which carries the face; in
-## phase 2 the head burns and gives off sparks that follow it.
+## phase 2 the head burns and gives off sparks that follow it. Its look (boss plan OB9): its own
+## face (an old staff's eyes and brows, angrier in phase 2), drawn frames for its extreme poses on
+## both heads, and an impatient tap standing.
 ##
 ## This test is the broom's own: deleting its folder deletes it (decision 28).
 ##
@@ -141,4 +143,33 @@ func test_its_layered_body() -> void:
 	var sparks: Node2D = look.phase_motes()
 	check(sparks != null and sparks.get_parent() == head, "its sparks come off the head")
 	check(MoteSource.follows(sparks), "and follow it")
+	fx.free_all()
+
+
+func test_its_own_face_and_drawn_poses() -> void:
+	# Boss plan OB9, decision 14: its own face, not a stray's, and a few drawn frames for the extreme
+	# poses; the numbers are its scene's.
+	var fx := Fixture.new(root)
+	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
+	var face := body.get_node("Face") as Face
+	check(face.art != null and face.art.eyes != null and face.art.brows != null, "a face of its own")
+	check(face.art.eyes.resource_path.begins_with("res://content/bosses/old_broom/"), "drawn in its folder")
+	check_equal(face.art.eyes.get_width(), face.art.frame.x * 10, "ten looks a row (nine and the blink)")
+	check_equal(face.art.brows.get_width(), face.art.frame.x * Face.Mood.size(), "a brow a mood")
+	check_equal(face.art.eyes.get_height(), face.art.frame.y * 2, "its own eyes and phase 2's")
+	check_equal(face.art.brows.get_height(), face.art.frame.y * 2, "its own brows and phase 2's")
+	check_equal(BROOM.phases[0].look.face_row, 1, "phase 2 shows the angrier row")
+	var head := body.get_node("Sprite/Head") as BodyPart
+	var burning: Texture2D = BROOM.phases[0].look.parts[&"Head"]
+	check_equal(head.texture.get_width(), head.hframes * 88, "the head's frames, 88 px each")
+	check_equal(burning.get_width(), head.texture.get_width(), "the burning head has the same frames")
+	check_equal(burning.get_height(), head.texture.get_height(), "of the same height")
+	var frames: Dictionary = {}
+	for pose in BodyPose.Pose.values():
+		frames[pose] = head.frame_for(pose)
+	check_equal(frames[BodyPose.Pose.IDLE], 0, "at rest: the first frame")
+	check_equal(frames[BodyPose.Pose.MOVE], 0, "sweeping too (the game swishes and squashes it)")
+	var drawn: Array = [frames[BodyPose.Pose.WINDUP], frames[BodyPose.Pose.WALL], frames[BodyPose.Pose.CAST], frames[BodyPose.Pose.TRANSITION]]
+	check_equal(drawn, [1, 2, 3, 4], "drawn frames for the wind-up, the wall hit, the swat and the phase change")
+	check(head.tap > 0.0, "it taps the floor standing")
 	fx.free_all()

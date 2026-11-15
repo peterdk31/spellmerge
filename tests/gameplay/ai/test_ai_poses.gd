@@ -266,9 +266,11 @@ func test_a_phase_brings_its_parts_art_and_motes_that_follow() -> void:
 	phase.look.motes.kind = &"ember"
 	phase.look.motes.colours = [&"fire"] as Array[StringName]
 	phase.look.motes_on = &"Head"
+	phase.look.face_row = 1
 	data.phases = [phase] as Array[EnemyPhase]
 	var body := _body(true, data)
 	var look := _look(body)
+	var face := body.get_node("Face") as Face
 	var head := body.get_node("Sprite/Head") as BodyPart
 	var handle := body.get_node("Sprite/Head/Handle") as BodyPart
 	var handle_art: Texture2D = handle.texture
@@ -286,14 +288,45 @@ func test_a_phase_brings_its_parts_art_and_motes_that_follow() -> void:
 	var motes: Node2D = look.phase_motes()
 	check(motes != null and motes.get_parent() == head, "its motes come off the part it names")
 	check(motes.is_in_group(MoteSource.GROUP) and MoteSource.of(motes) == phase.look.motes and MoteSource.follows(motes), "a source that follows the body")
+	check_equal(face.art_row, 1, "the phase's row of the face's own art (boss plan OB9)")
 	# After a snapshot the look shows the phase the body is in, from the scene's art on.
 	head.texture = first_art
+	face.art_row = 0
 	look.sync()
 	check(head.texture == burning, "sync shows the phase again")
+	check_equal(face.art_row, 1, "and its face's row")
 	check(look.phase_motes() != null and look.phase_motes() != motes, "with its motes, once")
 	body.phases.current = -1
 	look.sync()
 	check(head.texture == first_art and look.phase_motes() == null, "and the scene's own look before any phase")
+	check_equal(face.art_row, 0, "its face's own row too")
+
+
+func test_a_tapping_part_lifts_while_the_body_stands_only() -> void:
+	var body := _body(true)
+	var head := body.get_node("Sprite/Head") as BodyPart
+	head.tap = 2.0
+	head.taps = 2
+	head.tap_every = 1.0
+	check(is_equal_approx(head.tap_lift(BodyPart.TAP_TIME * 0.5), 1.0), "a tap is at its top half way through")
+	check_equal(head.tap_lift(0.5), 0.0, "and none between the taps")
+	var lifted: int = 0
+	var highest: float = 0.0
+	for i in 60:
+		_run(body, 1)
+		var up: float = head.rest_position.y - head.position.y
+		highest = maxf(highest, up)
+		if up > 0.0:
+			lifted += 1
+	check(highest >= 2.0, "standing, it lifts its tap's pixels (%.0f)" % highest)
+	check(lifted > 0 and lifted <= roundi(BodyPart.TAP_TIME * 2.0 / STEP) + 1, "twice quickly, then rests (%d steps up)" % lifted)
+	_dash(body, Vector2(160.0, 0.0), 0.8)
+	_run(body, 15)
+	var tapped: bool = false
+	for i in 30:
+		_run(body, 1)
+		tapped = tapped or head.position.y != head.rest_position.y
+	check(not tapped, "going at full speed, it never taps")
 
 
 func test_a_layered_body_moves_as_a_plain_one() -> void:

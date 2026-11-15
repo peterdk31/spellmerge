@@ -79,7 +79,7 @@ draw = 1
 wind_up = 0.6
 cooldown = 2.4
 spread = 0.0
-max_mana = 160.0
+max_mana = 200.0
 mana_regen = 60.0
 
 [sub_resource type="Resource" id="Resource_double_sweep"]

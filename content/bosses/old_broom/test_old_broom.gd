@@ -52,6 +52,10 @@ func test_every_staff_casts_and_wastes_no_card() -> void:
 		var view: Dictionary = spells.staff_view(entry.cards, entry.staff)
 		check(not bool(view.get("empty", true)), "%s casts" % name)
 		check_equal(view.get("wasted"), {}, "%s wastes no card (slot: wasted)" % name)
+		var cycle: float = 0.0
+		for cast: Dictionary in view.get("casts", []):
+			cycle += float(cast.get("mana", 0.0))
+		check(cycle <= entry.staff.max_mana, "%s: a full staff casts its whole cycle (%s of %s mana)" % [name, cycle, entry.staff.max_mana])
 
 
 func test_the_sweep_is_a_telegraphed_charge() -> void:

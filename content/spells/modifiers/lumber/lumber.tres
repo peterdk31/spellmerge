@@ -7,11 +7,12 @@
 script = ExtResource("1_base")
 id = &"lumber"
 display_name = "Lumber"
-description = "A bit slower, but goes 3x as far and hits 3x as hard."
+description = "Slower, but reaches 3x farther and hits 3x as hard."
 complexity = 3
 icon = ExtResource("2_icon")
 damage_mult = 3.0
 speed_mult = 0.85
 reach_mult = 3.0
-mana_mult = 1.75
+mana_mult = 2.75
+wind_down_mult = 1.3
 look_id = &"weight"

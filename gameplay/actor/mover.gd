@@ -120,6 +120,15 @@ func is_moving() -> bool:
 	return _count > 0
 
 
+## True while a dash (the actor's own legs, see the class doc) carries the actor, for the looks: a
+## body moved by its own move shows its move's pose (boss plan OB8), one pulled or pushed does not.
+func is_dashing() -> bool:
+	for at in _count:
+		if _modes[at] == &"dash":
+			return true
+	return false
+
+
 ## The way the moves went in the last step (unit length, or zero when they cancel), for the looks.
 func move_direction() -> Vector2:
 	return _moved.normalized()

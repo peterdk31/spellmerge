@@ -11,6 +11,7 @@ extends "res://tests/support/suite.gd"
 
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
+const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -158,7 +159,11 @@ func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
 	var feel_items: Array[CanvasItem] = []
 	_items(feel, feel_items)
 	for item in feel_items:
-		# The floor flashes lie under the bodies, so under the light (checked below).
+		# The floor flashes lie under the bodies, so under the light (checked below); so do a dead body's
+		# remnant's parts (boss plan OB8), lit as the bodies are.
+		if item == feel.remnants() or feel.remnants().is_ancestor_of(item):
+			check(_drawn_z(item) < at, "a remnant's %s (z %d) is under the light, as a body is" % [feel.get_path_to(item), _drawn_z(item)])
+			continue
 		if item != feel and item != light.apply and item != feel._floor_node:
 			check(_drawn_z(item) > at, "Feel's %s (z %d) is over the light" % [feel.get_path_to(item), _drawn_z(item)])
 	var shot_items: Array[CanvasItem] = []
@@ -167,6 +172,7 @@ func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
 		if item != manager:
 			check(_drawn_z(item) > at, "the shots' %s (z %d) are over the light" % [manager.get_path_to(item), _drawn_z(item)])
 	check(EntitiesScript.DRAW_Z > at, "the entities are over the light")
+	check(RemnantsScript.FLY_Z < at and RemnantsScript.LIE_Z < at, "a remnant flying or lying is under the light")
 	check(FeelScript.MOTE_Z > at and FeelScript.SHOWN_BEAM_Z > at and FeelScript.FLASH_Z > at, "motes, beams and flashes are over the light")
 	# The floor flashes lie on the floor under the bodies (owner, 2026-11-08), so under the light
 	# with the floor marks: lit by it, as the slam's cue lights its own strike (its `light` part).

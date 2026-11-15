@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
 [ext_resource type="Script" path="res://gameplay/actor/health.gd" id="2_health"]
@@ -9,8 +9,11 @@
 [ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="7_ai"]
 [ext_resource type="Script" path="res://gameplay/ai/creature_look.gd" id="8_look"]
 [ext_resource type="Script" path="res://gameplay/actor/face.gd" id="9_face"]
-[ext_resource type="Texture2D" path="res://content/bosses/old_broom/idle.svg" id="10_idle"]
 [ext_resource type="Script" path="res://gameplay/actor/footprint.gd" id="11_footprint"]
+[ext_resource type="Script" path="res://gameplay/actor/body_part.gd" id="12_part"]
+[ext_resource type="Texture2D" path="res://content/bosses/old_broom/head.svg" id="13_head"]
+[ext_resource type="Texture2D" path="res://content/bosses/old_broom/handle.svg" id="14_handle"]
+[ext_resource type="Texture2D" path="res://content/bosses/old_broom/binding.svg" id="15_binding"]
 
 [node name="OldBroom" type="Node2D"]
 script = ExtResource("1_actor")
@@ -44,11 +47,52 @@ script = ExtResource("7_ai")
 [node name="CreatureLook" type="Node2D" parent="." node_paths=PackedStringArray("sprite")]
 script = ExtResource("8_look")
 sprite = NodePath("../Sprite")
+full_speed = 220.0
+hops = false
 
 [node name="Sprite" type="Sprite2D" parent="."]
 texture_filter = 1
+
+[node name="Head" type="Sprite2D" parent="Sprite"]
+use_parent_material = true
+position = Vector2(0, -2)
+texture = ExtResource("13_head")
+offset = Vector2(-1, -15)
+script = ExtResource("12_part")
+lag = 5.0
+swish = 6.0
+swish_rate = 3.0
+squash = 0.12
+sway = 2.0
+sway_rate = 0.6
+wall_squash = 0.25
+shudder = 1.5
+fling = 2.0
+
+[node name="Handle" type="Sprite2D" parent="Sprite/Head"]
+show_behind_parent = true
+use_parent_material = true
 position = Vector2(0, -32)
-texture = ExtResource("10_idle")
+texture = ExtResource("14_handle")
+offset = Vector2(-2, -14)
+script = ExtResource("12_part")
+lean = 14.0
+sway = 3.0
+sway_rate = 0.6
+wall_squash = 0.3
+shudder = 1.0
+fling = 0.8
+
+[node name="Binding" type="Sprite2D" parent="Sprite/Head"]
+use_parent_material = true
+position = Vector2(0, -28)
+texture = ExtResource("15_binding")
+offset = Vector2(0, -2)
+script = ExtResource("12_part")
+wall_squash = 0.15
+shudder = 1.0
+fling = 2.0
+carries_face = true
 
 [node name="Face" type="Node2D" parent="."]
 script = ExtResource("9_face")

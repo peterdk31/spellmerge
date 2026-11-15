@@ -33,12 +33,16 @@ extends Resource
 ## carvings twinkle as magic rather than lie flat (used sparingly: every pixel is drawn each frame).
 ##
 ## A source is read once, where its node is when it appears (a room's art and a prop stand still):
-## its motes do not follow a node that moves, nor a mask's sprite as it animates or squashes.
+## its motes do not follow a node that moves, nor a mask's sprite as it animates or squashes. A node
+## that moves says so (`put`'s `follow`, its metadata `mote_follow`, FOLLOW; boss plan OB8: a boss's
+## burning head): where its motes leave from then moves with the node, each frame, by how far the
+## node went since it was read (not its turn nor its scale).
 
 ## The group a source's node is in, and the metadata keys of its source and of its mask's art.
 const GROUP: StringName = &"mote_source"
 const META: StringName = &"mote_source"
 const ART: StringName = &"mote_art"
+const FOLLOW: StringName = &"mote_follow"
 
 ## Where its motes leave from (relative to its node): a point (`at`); a line (`points`, else the
 ## node's own `Line2D` points; thrown outward, the left of the way the points run, so a rim drawn
@@ -90,13 +94,21 @@ const MOST_LIFE: float = 4.0
 
 
 ## Make `node` give off `source` (in the group, as its META), its art (a mask's; else its colours
-## when it names no ramps) the sprite at `art` from it (empty: none). The one writer of the
-## metadata, as `of` and `art_of` are its readers.
-static func put(node: Node, source: MoteSource, art: NodePath = NodePath()) -> void:
+## when it names no ramps) the sprite at `art` from it (empty: none), following the node as it moves
+## when `follow` (FOLLOW). The one writer of the metadata, as `of`, `art_of` and `follows` are its
+## readers. Call it before the node enters the tree: a source is read as its node appears.
+static func put(node: Node, source: MoteSource, art: NodePath = NodePath(), follow: bool = false) -> void:
 	node.add_to_group(GROUP)
 	node.set_meta(META, source)
 	if not art.is_empty():
 		node.set_meta(ART, art)
+	if follow:
+		node.set_meta(FOLLOW, true)
+
+
+## True when `node`'s source follows it as it moves (FOLLOW).
+static func follows(node: Node) -> bool:
+	return node != null and bool(node.get_meta(FOLLOW, false))
 
 
 ## The source on `node` (its META), or null.

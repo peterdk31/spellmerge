@@ -5,7 +5,9 @@ extends RefCounted
 ## for the state it is in. It follows the tree as spell light follows its spots (`watch`: a node in
 ## the group read when it enters, let go when it leaves; `take` reads them all again), each read
 ## once into its own copy (where it is in the world, its points, its mask's pixels, its colours), so
-## no node is held and nothing is asked of one each frame. Each frame (`give_off`) a source near the
+## no node is held and nothing is asked of one each frame, but where a node that moves is (a source
+## that follows its node, `MoteSource.follows`: a boss's burning head, boss plan OB8): its places
+## move by how far its node went since it was read. Each frame (`give_off`) a source near the
 ## view gives off its rate's share of motes from where its place picks (`mote_places.gd`: one class
 ## a kind of place, so this file names none), each in one of its colours at random, as motes of many a
 ## frame (`often`: in a crowded frame they give way to the moments and the hits first), and a
@@ -45,6 +47,10 @@ class Source:
 	## Where it was read from (for a warning), and whether its missing kind was warned of.
 	var path: NodePath = NodePath()
 	var warned: bool = false
+	## A source that follows its node: where the node was when read, and how far it has gone since.
+	var follow: bool = false
+	var origin: Vector2 = Vector2.ZERO
+	var moved: Vector2 = Vector2.ZERO
 
 
 var _sources: Array[Source] = []
@@ -124,6 +130,8 @@ func read(node: Node) -> void:
 	source.path = node.get_path()
 	source.look = look
 	source.place = MotePlaces.make(look.from)
+	source.follow = MoteSource.follows(node)
+	source.origin = where.global_position
 	var mask: PackedVector2Array = _mask_points(art) if source.place.wants_mask() and art != null else PackedVector2Array()
 	if not source.place.read(look, where, where.global_transform, mask):
 		push_warning("Mote source %s gives off nothing: it has nowhere to leave from (a line of no length, a mask with no lit pixel)." % source.path)
@@ -170,7 +178,9 @@ func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2(), stand: Place
 	for source in _sources:
 		if source.born < 0.0:
 			source.born = now
-		if pool == null or (near.has_area() and not near.intersects(source.bounds)):
+		if source.follow and not _follow(source):
+			continue
+		if pool == null or (near.has_area() and not near.intersects(Rect2(source.bounds.position + source.moved, source.bounds.size))):
 			source.owed = 0.0
 			continue
 		var since: float = now - source.born
@@ -194,6 +204,17 @@ func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2(), stand: Place
 			_throw(source, k, pool)
 	if standing:
 		stand.finish()
+
+
+## How far a following source's node has gone since it was read; false when the node is gone (it
+## leaves the tree, and the source with it, soon).
+func _follow(source: Source) -> bool:
+	var node := instance_from_id(source.node) as Node2D
+	if node == null or not node.is_inside_tree():
+		source.owed = 0.0
+		return false
+	source.moved = node.global_position - source.origin
+	return true
 
 
 ## The world middles of the lit pixels of the frame `art` shows, read once a texture's frame.
@@ -242,7 +263,8 @@ func _throw(source: Source, k: int, pool: MotesScript) -> void:
 	place.pick(_rng, look)
 	var ramp: int = source.sources[_rng.randi() % source.sources.size()]
 	var height: float = look.height if look.height > 0.0 else -1.0
-	var shown: Vector2 = place.at - Vector2(0.0, look.height) if look.height > 0.0 else place.at
+	var at: Vector2 = place.at + source.moved
+	var shown: Vector2 = at - Vector2(0.0, look.height) if look.height > 0.0 else at
 	pool.throw_part(k, shown, place.way, ramp, Color.WHITE, 1, look.reach, look.spread, 1.0, false, true, Vector2.ZERO, 1.0, 0, height)
 	given += 1
 
@@ -257,7 +279,7 @@ func _stand(source: Source, k: int, since: float, stand: PlacedMotesScript) -> v
 	for i in spots.size():
 		var seed: float = source.seeds[i]
 		var ramp: int = source.sources[mini(floori(seed * count), count - 1)]
-		stand.put(spots[i], k, ramp, Color.WHITE, fposmod(since + seed * life, life), seed, life)
+		stand.put(spots[i] + source.moved, k, ramp, Color.WHITE, fposmod(since + seed * life, life), seed, life)
 	placed += spots.size()
 
 

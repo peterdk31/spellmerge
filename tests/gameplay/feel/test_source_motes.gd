@@ -161,6 +161,45 @@ func test_a_point_a_box_and_a_rim_give_off_where_they_say() -> void:
 		check(counts[i] >= 27 and counts[i] <= 33, "source %d gives off about 30 in a second (%s)" % [i, counts])
 
 
+func test_a_source_that_follows_its_node_gives_off_where_the_node_is_now() -> void:
+	# Boss plan OB8: a moving body's motes (a boss's burning head) follow it; a plain source stays
+	# where it was read.
+	var still := _look(MoteSource.From.POINT, 30.0)
+	var still_node := _node(still, Vector2(400, 400))
+	var moving := _look(MoteSource.From.POINT, 30.0)
+	moving.at = Vector2(0, -4)
+	var node := own(Node2D.new()) as Node2D
+	node.position = Vector2(100, 100)
+	MoteSource.put(node, moving, NodePath(), true)
+	root.add_child(node)
+	check(MoteSource.follows(node) and not MoteSource.follows(still_node), "only the node put to follow follows")
+	var sources := SourceMotesScript.new(table)
+	sources.take(self)
+	var motes := _pool()
+	var now: float = _run(sources, motes, 0.2)
+	node.position = Vector2(300, 150)
+	still_node.position = Vector2(700, 700)
+	var before: int = motes.next_row()
+	_run(sources, motes, 0.5, now)
+	var near_node: int = 0
+	var near_still: int = 0
+	for row in range(before, motes.next_row()):
+		var at: Vector2 = _at(motes, row)
+		if at.distance_to(Vector2(300, 146)) <= 0.5:
+			near_node += 1
+		elif at.distance_to(Vector2(400, 400)) <= 0.5:
+			near_still += 1
+		else:
+			check(false, "a mote where neither source is: %s" % at)
+	check(near_node >= 12, "the following source gives off where its node went (%d)" % near_node)
+	check(near_still >= 12, "the plain one where it was read (%d)" % near_still)
+	node.get_parent().remove_child(node)
+	before = motes.next_row()
+	_run(sources, motes, 0.3, now + 0.5)
+	for row in range(before, motes.next_row()):
+		check(_at(motes, row).distance_to(Vector2(300, 146)) > 0.5, "nothing from a node gone")
+
+
 func test_a_mask_gives_off_from_its_lit_pixels_in_its_art_colours() -> void:
 	var look := _look(MoteSource.From.MASK, 60.0)
 	look.colours = []

@@ -11,3 +11,10 @@ extends Resource
 @export var glow: Color = Color(0.0, 0.0, 0.0, 0.0)
 ## The body's scale (0: keep).
 @export var size: float = 0.0
+## A layered body's parts' art from this phase on (boss plan OB8): a texture by the part's node
+## name (a `BodyPart` under the body's `Sprite`); a part not named keeps its art.
+@export var parts: Dictionary[StringName, Texture2D] = {}
+## Motes the body gives off from this phase on, following it (boss plan OB8: the burning head's
+## sparks), from the part named `motes_on` (empty: the body's `Sprite`); null keeps the last.
+@export var motes: MoteSource = null
+@export var motes_on: StringName = &""

@@ -15,9 +15,9 @@ extends RefCounted
 ##   the hit), and a body that carried it ends its dash there, as if it met the wall itself;
 ## - **let go:** its carrier's move is over (a dash's pass ends, `let_go`; a shot ends): Combat
 ##   shoves it on along the way it was carried, with the hit's own push;
-## - **slipped off:** it walked out aside past the pass (or was put far on ahead) (`hold`: the pass's reach, its own size and
-##   `SpellLimits.PLOW_SLIP`), so it is let go with no shove: slipping off sideways costs only the
-##   pass;
+## - **slipped off:** it walked out aside past the pass (`hold`: the pass's reach, its own size and
+##   `SpellLimits.PLOW_SLIP`), or was put far on ahead, so it is let go with no shove: slipping off
+##   sideways costs only the pass;
 ## - **dropped:** it is gone, down or no longer a target (a downed wizard is never carried), or its
 ##   carrier's build is forgotten: no pin and no shove.
 ##

@@ -181,7 +181,7 @@ func held_up(asked: Vector2, got: Vector2) -> void:
 
 ## The velocity the body is carried at this step (Plow, `Plow.velocity_of`), zero when it is not.
 func _carry() -> Vector2:
-	if actor.spells == null or actor.spells.plow().carried_count() == 0:
+	if actor == null or actor.spells == null or actor.spells.plow().carried_count() == 0:
 		return Vector2.ZERO
 	return actor.spells.plow().velocity_of(actor.id)
 

@@ -1,0 +1,42 @@
+{
+  "colours": {
+    "o": "#14121f",
+    "a": "#7a4a35",
+    "b": "#b8801f",
+    "c": "#f2c230"
+  },
+  "rows": [
+    "........................................................................................",
+    "........................................................................................",
+    "...........................ccbbaaccbbaaccbbaaccbbaaccbbaaacbbaaa........................",
+    "...........................ccbbaaccbbaaccbbaaccbbaaccbbaaacbbaaa........................",
+    ".........................ooccbbaaccbbaaccbbaaccbbaaccbbaaacbbaaoo.......................",
+    "........................oocccbbaaccbbaaccbbaacccbbaaccbbaaccbbaaoo......................",
+    ".......................oocccbbaaccbbbaaccbbaacccbbaaccbbbaaccbbaaoo.....................",
+    "......................oocccbbaacccbbaacccbbaacccbbaacccbbaaaccbbaaoo....................",
+    ".....................oocccbbaaaccbbbaacccbbaacccbbaaaccbbbaacccbbaaoo...................",
+    "....................oocccbbbaacccbbaaaccbbbaacccbbbaacccbbaaaccbbbaaoo..................",
+    "...................oocccbbbaacccbbbaacccbbbaacccbbbaacccbbbaaaccbbbaaoo.................",
+    "..................oocccbbbaaacccbbaaacccbbbaacccbbbaaacccbbaaacccbbbaaoo................",
+    ".................oocccbbbaaacccbbbaaacccbbbaacccbbbaaacccbbbaaacccbbbaaoo...............",
+    "................oocccbbbaaacccbbbaaacccbbbaaacccbbbaaacccbbbaaaaccbbbaaaoo..............",
+    "...............ooccccbbbaaacccbbbaaacccbbbaaaccccbbbaaacccbbbaaacccbbbaaaoo.............",
+    "..............ooccccbbbaaacccbbbbaaacccbbbaaaccccbbbaaacccbbbbaaacccbbbaaaoo............",
+    ".............ooccccbbbaaaccccbbbaaaccccbbbaaaccccbbbaaaccccbbbaaaacccbbbaaaoo...........",
+    "............ooccccbbbaaaacccbbbbaaaccccbbbaaaccccbbbaaaacccbbbbaaaccccbbbaaaoo..........",
+    "...........ooccccbbbbaaaccccbbbaaaacccbbbbaaaccccbbbbaaaccccbbbaaaacccbbbbaaaoo.........",
+    "..........ooccccbbbbaaaccccbbbbaaaccccbbbbaaaccccbbbbaaaccccbbbbaaaacccbbbbaaaoo........",
+    ".........ooccccbbbbaaaaccccbbbaaaaccccbbbbaaaccccbbbbaaaaccccbbbaaaaccccbbbbaaaoo.......",
+    "........ooccccbbbbaaaaccccbbbbaaaaccccbbbbaaaccccbbbbaaaaccccbbbbaaaaccccbbbbaaaoo......",
+    ".......ooccccbbbbaaaaccccbbbbaaaaccccbbbbaaaaccccbbbbaaaaccccbbbbaaaaacccbbbbaaaaoo.....",
+    "......oocccccbbbbaaaaccccbbbbaaaaccccbbbbaaaacccccbbbbaaaaccccbbbbaaaaccccbbbbaaaaoo....",
+    ".....oocccccbbbbaaaaccccbbbbbaaaaccccbbbbaaaacccccbbbbaaaaccccbbbbbaaaaccccbbbbaaaaoo...",
+    "....oocccccbbbbaaaacccccbbbbaaaacccccbbbbaaaacccccbbbbaaaacccccbbbbaaaaaccccbbbbaaaaoo..",
+    "...oocccccbbbbaaaaaccccbbbbbaaaacccccbbbbaaaacccccbbbbaaaaaccccbbbbbaaaacccccbbbbaaaao..",
+    "..oococccbocbbaocaccoccbbocaaaoccccocbbbocaaaoccccobbbboaaacocccbobbaaoaaccocbbbobaaaoo.",
+    "..occcocbbbocaaaoccccocbbbocaaaoccccocbbbocaacocccbobbbaoaaccoccbbobbaaoaaccocbbbobaaaoo",
+    "ooooccoococbocaocooccoococaocaocooccoococaocaocoocbooboaaoaaocoocbooboaaoacocoobbooboaao",
+    "occoccocoocaoococcoccocoocaoococcoccocoocaoococcocbobooaaooaoccocbobooaaooaoccocbobooaao",
+    "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+  ]
+}

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cxfh73twy6xj8"
-path="res://.godot/imported/idle.svg-26cc5a1aa79955ba6267d0609bb644f3.ctex"
+uid="uid://d2jksa77tinq6"
+path="res://.godot/imported/head_burning.svg-0c4c3455c42cc6156d6da76b524a1e14.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/bosses/old_broom/idle.svg"
-dest_files=["res://.godot/imported/idle.svg-26cc5a1aa79955ba6267d0609bb644f3.ctex"]
+source_file="res://content/bosses/old_broom/head_burning.svg"
+dest_files=["res://.godot/imported/head_burning.svg-0c4c3455c42cc6156d6da76b524a1e14.ctex"]
 
 [params]
 

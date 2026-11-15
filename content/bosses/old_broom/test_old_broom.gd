@@ -2,7 +2,9 @@ extends "res://tests/support/suite.gd"
 ## The Old Broom v0 (boss OB3, docs/milestones/boss-old-broom.md): the first boss, as data. Its data
 ## is sound, the registry finds it under bosses, it fights in the crypt, its line of lore keeps the
 ## story's rules, every staff of both phases casts and wastes no card, and phase 2 ("Spring
-## cleaning") brings the double Sweep, its burning look and its own profile under 55% health.
+## cleaning") brings the double Sweep, its burning look and its own profile under 55% health. Its
+## body is layered (boss plan OB8): a head, its handle and its binding, which carries the face; in
+## phase 2 the head burns and gives off sparks that follow it.
 ##
 ## This test is the broom's own: deleting its folder deletes it (decision 28).
 ##
@@ -71,7 +73,9 @@ func test_spring_cleaning() -> void:
 	check(is_equal_approx(phase.health_below, 0.55), "under 55% health")
 	check(phase.transition > 0.0, "a transition it stands through")
 	check(phase.profile != null and phase.profile != BROOM.profile, "its own profile")
-	check(phase.look != null and phase.look.texture != null, "its burning look")
+	check(phase.look != null and phase.look.parts.get(&"Head") is Texture2D, "its burning head (boss plan OB8)")
+	check(phase.look.motes != null and phase.look.motes_on == &"Head", "giving off sparks from the head")
+	check_equal(phase.look.motes.problems(false), PackedStringArray(), "the sparks' data")
 	var sweep: StaffCards = phase.staffs[0]
 	check(is_equal_approx(sweep.staff.wind_up, 0.6), "winding up 0.6 s")
 	check_equal(sweep.cards.count(&"dash"), 2, "two Sweeps, each with its own wind-up")
@@ -114,4 +118,27 @@ func test_its_stats() -> void:
 	fx.combat.hit(fx.players[0].id, body, BROOM.max_health * 0.5)
 	fx.run(body, 1)
 	check(is_equal_approx(body.stats.power, 2.5), "and phase 2's")
+	fx.free_all()
+
+
+func test_its_layered_body() -> void:
+	# Boss plan OB8: the broom's look is its own data (its scene and phase look), never general code.
+	var fx := Fixture.new(root)
+	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
+	var look := body.get_node("CreatureLook") as CreatureLook
+	var names: Array[StringName] = []
+	for part in look.parts():
+		names.append(StringName(part.name))
+	check_equal(names, [&"Head", &"Handle", &"Binding"] as Array[StringName], "its parts")
+	var head := body.get_node("Sprite/Head") as BodyPart
+	var binding := body.get_node("Sprite/Head/Binding") as BodyPart
+	check(binding.carries_face, "the face rides the binding")
+	check(head.fling > 1.0 and binding.fling > 1.0, "the bound head flies off when it dies")
+	var art: Texture2D = head.texture
+	fx.combat.hit(fx.players[0].id, body, BROOM.max_health * 0.5)
+	fx.run(body, 1)
+	check(head.texture != art and head.texture == BROOM.phases[0].look.parts[&"Head"], "phase 2 sets the head on fire")
+	var sparks: Node2D = look.phase_motes()
+	check(sparks != null and sparks.get_parent() == head, "its sparks come off the head")
+	check(MoteSource.follows(sparks), "and follow it")
 	fx.free_all()

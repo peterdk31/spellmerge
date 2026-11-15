@@ -101,6 +101,7 @@ const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const LanesScript := preload("res://gameplay/feel/lanes.gd")
+const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
@@ -123,6 +124,9 @@ const SHOWN_BEAM_SLOTS: int = SHOWN_BEAMS_PER_PLAYER * 5
 const ENEMY_SHOWN_BEAMS: int = 4
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const SHOWN_BEAM_Z: int = 18
+## The share of a layered body's death motes each of its parts breaks into (boss plan OB8): its parts
+## also fly apart whole as a remnant, so fewer motes read as splinters round them.
+const REMNANT_MOTE_SHARE: float = 0.5
 ## Where the spectacle draws (`spectacle.gd`): the motes under the beams and every flash and
 ## telegraph, the floor marks on the floor under every body, spell light just under the motes.
 const MOTE_Z: int = SpectacleScript.MOTE_Z
@@ -416,6 +420,8 @@ var _spectacle: SpectacleScript = null
 var party_camera: PartyCameraScript = PartyCameraScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
 var _lanes: LanesScript = null
+## What dead layered bodies leave: their parts flying apart (boss plan OB8, `remnants.gd`).
+var _remnants: RemnantsScript = null
 ## Every actor's damage numbers (`damage_number_drawer.gd`, props W5).
 var _numbers: DamageNumberDrawerScript = null
 ## The markers at the picture's edge for teammates out of it (`teammate_markers.gd`).
@@ -669,6 +675,9 @@ func _ready() -> void:
 	# Over the shots and every flash: a telegraph is the brightest thing on screen (docs/STYLE.md).
 	_lanes.z_index = SHOWN_BEAM_Z + 2
 	add_child(_lanes)
+	_remnants = RemnantsScript.new()
+	_remnants.name = "Remnants"
+	add_child(_remnants)
 	_numbers = DamageNumberDrawerScript.new()
 	_numbers.name = "DamageNumbers"
 	_numbers.events = events
@@ -835,6 +844,8 @@ func step(real_delta: float) -> void:
 		_lanes.spells = spells
 		_lanes.step()
 	_step_labels(real_delta)
+	if _remnants != null:
+		_remnants.step(real_delta)
 	if _numbers != null:
 		_numbers.step(real_delta)
 	_step_statuses(real_delta)
@@ -970,6 +981,8 @@ func _grow_reactions(size: int) -> void:
 ## shake and sound (view only since N4: the holds are the game's, `HitStop`).
 func _on_room_entered(_room_id: StringName) -> void:
 	party_camera.room_entered()
+	if _remnants != null:
+		_remnants.clear()
 	_reaction_heard.clear()
 	_juiced_frame.fill(0)
 	_juiced_step.fill(0)
@@ -2447,11 +2460,16 @@ func _ramp_of(caster: int) -> int:
 ## pixel by pixel before), then the cue `enemy_death` (a white-hot ring, its motes and mark, and a
 ## puff in the body's own colour; the killer and the shot hold for the kill, the dead body is freed
 ## at once) or, for a boss, `boss_death`, which also stops the whole game. The killing blow's sound
-## gives way to the death's.
+## gives way to the death's. A layered body (its `BodyPart`s, boss plan OB8) breaks each part into
+## motes (a share of each, `REMNANT_MOTE_SHARE`) and leaves its parts as a remnant flying apart
+## (`remnants.gd`).
 func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> void:
 	# The body breaks into motes of its own art (S3), from where it stood at its rest scale.
 	var body: Sprite2D = _body_sprite(enemy)
-	if body != null:
+	var art: Sprite2D = _body_art(body)
+	if body != null and body != art and art != null:
+		_leave_remnant(body, enemy)
+	elif body != null:
 		_spectacle.break_body(body, _rest_transform(body, enemy), preset.death_mote_kind, preset.death_mote_share, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
 	# The hit that killed it (its flash still showing here) is silenced for the death's sound.
 	if _hit_voice >= 0 and _hit_slot >= 0 and _hit_position == position and _flash_seconds[_hit_slot] > 0.0:
@@ -2465,7 +2483,38 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 		core = projectiles.get_core_of(shot)
 	# What broke is the body: its surface kinds and marks in the colours of its own art, its puff in
 	# its own colour.
-	play_cue(CueBase.BOSS_DEATH_CUE if _is_boss(enemy) else CueBase.ENEMY_DEATH_CUE, killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(body), 0, true, _hit_color_of(enemy))
+	play_cue(CueBase.BOSS_DEATH_CUE if _is_boss(enemy) else CueBase.ENEMY_DEATH_CUE, killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(art), 0, true, _hit_color_of(enemy))
+
+
+## A dead layered body: each part breaks into a share of its motes, and the parts fly apart as a
+## remnant from the body's middle to the floor at its feet.
+func _leave_remnant(body: Sprite2D, enemy: Node) -> void:
+	var parts: Array[BodyPart] = []
+	BodyPart.parts_of(body, parts)
+	for part in parts:
+		if part.texture != null and part.is_visible_in_tree():
+			_spectacle.break_body(part, part.global_transform, preset.death_mote_kind, preset.death_mote_share * REMNANT_MOTE_SHARE, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
+	var feet: Vector2 = (enemy as Node2D).global_position
+	var middle: Vector2 = feet + ((enemy as Actor).body_offset if enemy is Actor else Vector2.ZERO)
+	_remnants.leave(body, middle, feet.y)
+
+
+## The sprite a body's art is: its `Sprite` when it has art, else its first part with art (a layered
+## body's, boss plan OB8); null for none.
+func _body_art(body: Sprite2D) -> Sprite2D:
+	if body == null or body.texture != null:
+		return body
+	var parts: Array[BodyPart] = []
+	BodyPart.parts_of(body, parts)
+	for part in parts:
+		if part.texture != null:
+			return part
+	return null
+
+
+## The remnants dead layered bodies left (for tests).
+func remnants() -> RemnantsScript:
+	return _remnants
 
 
 ## The cues the carrier card `carrier_card` names and its radius (`CarrierCard.look_cues`: [cast_cue,

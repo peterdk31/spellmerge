@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://by8l8wwxf5284"
-path="res://.godot/imported/burning.svg-044ffc3f0275797ee088e491f2120f5a.ctex"
+uid="uid://bsiv20ey6uuoh"
+path="res://.godot/imported/binding.svg-1692f7a3f572c2edf2f9b14218b1510f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/bosses/old_broom/burning.svg"
-dest_files=["res://.godot/imported/burning.svg-044ffc3f0275797ee088e491f2120f5a.ctex"]
+source_file="res://content/bosses/old_broom/binding.svg"
+dest_files=["res://.godot/imported/binding.svg-1692f7a3f572c2edf2f9b14218b1510f.ctex"]
 
 [params]
 

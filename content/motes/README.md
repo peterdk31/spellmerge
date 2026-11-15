@@ -100,7 +100,7 @@ metadata/mote_source = SubResource("MoteSource_rim")
 In code, `MoteSource.put(node, source, art_path)` writes the same, before the node is added. **On a prop**, a source is a layer's (`PropLayer.motes`): content/props/README.md.
 
 **What to know:**
-- A source is read once, at the frame after its node appears, where the node is then: it does not follow a node that moves, nor a mask's sprite as it animates.
+- A source is read once, at the frame after its node appears, where the node is then: it does not follow a node that moves, nor a mask's sprite as it animates. A node that moves says so: `MoteSource.put(node, source, art, true)` (metadata `mote_follow`), and its motes then leave from where the node is each frame (not its turn nor its scale). A boss's phase look does this for its sparks (`PhaseLook.motes`, boss plan OB8).
 - Only sources within 64 px of the view give off (`VIEW_MARGIN`), so a room of hundreds costs what is on screen.
 - Its motes are of many a frame: in a crowded frame they give way to the hits and the moments first.
 - **Nothing fails silently.** A source that gives off nothing says so once in the log, naming its node (a problem in its data, nowhere to leave from, a kind that is not here), and `tests/content/test_mote_sources.gd` checks every source in every scene under content/ (its data, its kind, its art), found by folder; a prop's are checked with its looks (`tests/content/props/test_prop_data.gd`).

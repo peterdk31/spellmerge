@@ -31,6 +31,22 @@ extends ActorLook
 ## The actor's `Face` (its child of that kind, stepped after this look) is told the same lift
 ## (`Face.body_offset`), so its eyes and brows trail the hop.
 ##
+## Poses from states and layered bodies (boss plan OB8, docs/milestones/boss-old-broom.md, "Poses and
+## layered bodies"): every step it reads what the body is doing (`BodyPose`: TRANSITION through a
+## boss's phase change (its AI's TRANSITION), WALL as its own move meets a wall, HURT, WINDUP while
+## it telegraphs, MOVE while its own move carries it, CAST while its staff animation plays, else
+## IDLE), from states the game already has, so the pose is the same on every machine. A layered body
+## is drawn in parts, the `BodyPart`s under its `Sprite` (which then needs no art of its own): each
+## step every part is drawn by that pose and motion (its lean, lag, swish, squash, sway, wall squash,
+## shudder and pose frames), at `full_speed` px/s whole; the part that `carries_face` takes the
+## actor's `Face` with it. A layered body's lift (the hop or the bob) moves its `Sprite`, and with it
+## every part. `hops` false: it never hops, only bobs (a body that hovers).
+##
+## Phases (enemy AI AI7): a boss's phase look (`PhaseLook`) brings its body sprite, its parts' art by
+## name (`parts`) and motes that follow the body (`motes`, from the part `motes_on`: a node it adds
+## there, `MoteSource.put` with `follow`; a later phase's replace them, none keeps them). After a
+## snapshot (`sync`) the look shows the phase the body is in.
+##
 ## Nothing here allocates per frame, and a step sets nothing on the nodes that did not change:
 ## the sprite's pose only when it changes, the hop's lift only when it moves a whole pixel
 ## (performance pass, 2026-10-28).
@@ -60,8 +76,14 @@ const HOP_IDLE: float = 1.0
 ## The nodes it draws with (see the class doc); empty: the actor's child of that name.
 @export var sprite: Sprite2D = null
 @export var animation: AnimationPlayer = null
+## The speed (px/s) at which a layered body's parts move whole (a part's lean, lag, swish, squash).
+@export var full_speed: float = 120.0
+## False: it never hops, only bobs, walking or standing (a body that hovers).
+@export var hops: bool = true
 
 var _idle_texture: Texture2D = null
+## The body sprite as the scene made it (a snapshot's phase is shown from it again).
+var _scene_texture: Texture2D = null
 var _idle_hframes: int = 1
 ## Seconds the hurt pose still shows.
 var _hurt_left: float = 0.0
@@ -83,6 +105,17 @@ var _lift: Vector2 = Vector2.ZERO
 ## The controller driving the actor at the last step, and the same as an AI (or null).
 var _driver: ActorController = null
 var _ai: AIController = null
+## What the body is doing (OB8), its layered body's parts (empty: one sprite), the part the face
+## rides and the inverse of its rest in the actor's frame, and the sprite's own place.
+var _body: BodyPose = BodyPose.new()
+var _parts: Array[BodyPart] = []
+var _face_part: BodyPart = null
+var _face_rest: Transform2D = Transform2D.IDENTITY
+var _sprite_position: Vector2 = Vector2.ZERO
+## The parts' art as the scene made it (by part), for a snapshot's phase to be shown again, and the
+## node giving off the phase's motes (null for none).
+var _part_art: Dictionary = {}
+var _phase_motes: Node2D = null
 
 
 func setup(owner_actor: Actor) -> void:
@@ -93,12 +126,23 @@ func setup(owner_actor: Actor) -> void:
 		animation = actor.get_node_or_null(^"AnimationPlayer") as AnimationPlayer
 	if sprite != null:
 		_idle_texture = sprite.texture
+		_scene_texture = sprite.texture
 		_idle_hframes = sprite.hframes
 		_sprite_offset = sprite.offset
+		_sprite_position = sprite.position
+		_parts.clear()
+		BodyPart.parts_of(sprite, _parts)
 	for child in actor.get_children():
 		if child is Face:
 			_face = child as Face
 			break
+	for part in _parts:
+		part.take_rest()
+		_part_art[part] = part.texture
+		if part.carries_face and _face_part == null:
+			_face_part = part
+	if _face_part != null:
+		_face_rest = _in_actor(_face_part).affine_inverse()
 	# Connected once, on its own actor (not the bus, where a listener per enemy was called for
 	# every hit on anyone).
 	if not actor.damaged.is_connected(_on_damaged):
@@ -129,7 +173,42 @@ func step(delta: float) -> void:
 	elif _pose != Pose.IDLE or _showing:
 		# Idle with nothing showing changes nothing either.
 		_update_sprite()
+	var transition: bool = ai != null and ai.brain.state == AIBrain.State.TRANSITION
+	_body.step(actor, delta, full_speed, telegraphing, transition, is_hurt(), pose_dir())
+	for part in _parts:
+		part.show_pose(_body)
 	_hop(delta)
+
+
+## The pose the body shows now (`BodyPose.Pose`), and what it is doing (for tests).
+func body_pose() -> BodyPose.Pose:
+	return _body.pose
+
+
+func body() -> BodyPose:
+	return _body
+
+
+## The parts of its layered body (empty: one sprite).
+func parts() -> Array[BodyPart]:
+	return _parts
+
+
+## Show the phase the body is in after a snapshot gave it its state back (its looks, from the
+## scene's on), and forget where the body was.
+func sync() -> void:
+	_body.forget()
+	_idle_texture = _scene_texture
+	if sprite != null and _pose == Pose.IDLE:
+		sprite.texture = _idle_texture
+	for part in _parts:
+		part.texture = _part_art.get(part, part.texture) as Texture2D
+	_drop_phase_motes()
+	if actor.phases == null:
+		return
+	for index in actor.phases.current + 1:
+		if index >= 0 and index < actor.phases.list.size() and actor.phases.list[index] != null:
+			_show_phase(actor.phases.list[index])
 
 
 ## How high the body is off its rest this step (px, up is positive), for tests.
@@ -141,7 +220,7 @@ func lift() -> float:
 ## the face.
 func _hop(delta: float) -> void:
 	_hop_time += delta
-	var walking: bool = actor.velocity.length_squared() > HOP_SPEED * HOP_SPEED
+	var walking: bool = hops and actor.velocity.length_squared() > HOP_SPEED * HOP_SPEED
 	var up: float = 0.0
 	if walking:
 		up = roundf(absf(sin(_hop_time * HOP_RATE * PI)) * HOP_HEIGHT)
@@ -150,14 +229,27 @@ func _hop(delta: float) -> void:
 	# The staff animation of its cast (ActorLook's pose: lift, push, shake) on top.
 	var at: Vector2 = Vector2(0.0, -up) + pose_offset(_hop_time)
 	apply_pose(sprite, _face, false)
-	if at == _lift:
+	if at != _lift:
 		# Whole pixels: most steps the body is where it was.
-		return
-	_lift = at
-	if sprite != null:
-		sprite.offset = _sprite_offset + _lift
-	if _face != null:
-		_face.body_offset = _lift
+		_lift = at
+		if sprite != null and not _parts.is_empty():
+			# A layered body lifts as a whole: its parts ride its sprite.
+			sprite.position = _sprite_position + _lift
+		elif sprite != null:
+			sprite.offset = _sprite_offset + _lift
+		if _face != null and _face_part == null:
+			_face.body_offset = _lift
+	if _face != null and _face_part != null:
+		# The face rides its part (its lift too, through the sprite it hangs from).
+		var anchor: Vector2 = _face.position + _face.anchor
+		var shown: Vector2 = (_in_actor(_face_part) * (_face_rest * anchor) - anchor).round()
+		if _face.body_offset != shown:
+			_face.body_offset = shown
+
+
+## `node`'s transform in the actor's frame.
+func _in_actor(node: Node2D) -> Transform2D:
+	return actor.global_transform.affine_inverse() * node.global_transform
 
 
 
@@ -249,13 +341,52 @@ func ai_view_text() -> String:
 	return _ai_words if ai_view else ""
 
 
-## A boss's phase began: its look's body sprite, if it has one, becomes the idle one.
+## A boss's phase began: its look's body sprite, parts' art and motes (see the class doc).
 func _on_phase_started(_index: int, phase: EnemyPhase) -> void:
-	if phase.look == null or phase.look.texture == null or sprite == null:
+	_show_phase(phase)
+
+
+func _show_phase(phase: EnemyPhase) -> void:
+	var look: PhaseLook = phase.look
+	if look == null or sprite == null:
 		return
-	_idle_texture = phase.look.texture
-	if _pose == Pose.IDLE:
-		sprite.texture = _idle_texture
+	if look.texture != null:
+		_idle_texture = look.texture
+		if _pose == Pose.IDLE:
+			sprite.texture = _idle_texture
+	for part in _parts:
+		var art: Texture2D = look.parts.get(StringName(part.name)) as Texture2D
+		if art != null:
+			part.texture = art
+	if look.motes != null:
+		_drop_phase_motes()
+		var on: Sprite2D = sprite
+		for part in _parts:
+			if look.motes_on != &"" and StringName(part.name) == look.motes_on:
+				on = part
+				break
+		_phase_motes = Node2D.new()
+		_phase_motes.name = "PhaseMotes"
+		# Its art (a mask's, else the colours it names none of) is the part it comes off.
+		MoteSource.put(_phase_motes, look.motes, NodePath(".."), true)
+		on.add_child(_phase_motes)
+
+
+## The phase's motes stop: their node goes.
+func _drop_phase_motes() -> void:
+	if _phase_motes == null:
+		return
+	if is_instance_valid(_phase_motes):
+		var parent: Node = _phase_motes.get_parent()
+		if parent != null:
+			parent.remove_child(_phase_motes)
+		_phase_motes.free()
+	_phase_motes = null
+
+
+## The node giving off the phase's motes now (null for none), for tests.
+func phase_motes() -> Node2D:
+	return _phase_motes
 
 
 ## A hit on the actor shows the hurt pose at once.

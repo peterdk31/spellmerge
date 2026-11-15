@@ -4,8 +4,11 @@ extends Node
 ## run's fresh state, its seed dealt): this area makes the run's map once from the run's definition
 ## (`RUN_FOLDER`, content/runs), the content there is (`Registry.run_content`) and the run's chance
 ## (`RunGenerator.generate`), and answers with the map's first room and what stands in it
-## (`run_room_chosen`), which Flow builds. Areas never call each other: Flow knows the run by these
-## two events only, and this area knows nothing of a world, a body or a scene.
+## (`run_room_chosen`: with the kinds of the rooms it leads to), which Flow builds. When the party
+## takes a lit exit (`run_way_taken(way)`, run generation RG4), it moves on through the map to the
+## room that way links to (`at`, and with it the depth) and names that room the same way. Areas never
+## call each other: Flow knows the run by these events only, and this area knows nothing of a world,
+## a body or a scene.
 ##
 ## The map is the run's state (`map`, `at`: hashed, saved in snapshots), the same on every machine;
 ## a joining machine gets it from the snapshot. A run's start renews it (`begin_run`): out of a run
@@ -14,8 +17,6 @@ extends Node
 ## A run that cannot be made from the content there is (`Registry.run_problems`, which Flow asks
 ## before anything goes), or a map its rolls cornered, answers nothing (`RunMap.problems`): Flow
 ## starts no run, and the warning says why.
-##
-## Next (RG4): the exits, the way on through the map (`at` moving on) and the run's end.
 
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
@@ -47,6 +48,7 @@ func _ready() -> void:
 		push_warning("Run: the Events autoload is missing, so no run of rooms can begin.")
 		return
 	events.run_begun.connect(_on_run_begun)
+	events.run_way_taken.connect(_on_run_way_taken)
 
 
 ## A run's start: no map until a run of rooms begins (`run_begun`).
@@ -77,9 +79,23 @@ func _on_run_begun(run_id: StringName) -> void:
 	_enter(0)
 
 
-## The party enters room `index` of the map: what Flow builds is told (`run_room_chosen`).
+## The party took the way `way` out of the room it is in (0 = its leftmost link): it enters the room
+## that way links to. A way the room has not (no run of rooms, the last room) moves nothing.
+func _on_run_way_taken(way: int) -> void:
+	var node: RunNode = room_now()
+	if node == null or way < 0 or way >= node.links.size():
+		push_warning("Run: no way %d out of the room the party is in, so it stays." % way)
+		return
+	_enter(node.links[way])
+
+
+## The party enters room `index` of the map: what Flow builds is told (`run_room_chosen`), with the
+## kinds of the rooms it leads to, left to right.
 func _enter(index: int) -> void:
 	at = index
 	var node: RunNode = map.node(index)
+	var ways: Array[StringName] = []
+	for link: int in node.links:
+		ways.append(map.node(link).kind)
 	# A copy: what hears it never holds the map's own list.
-	events.run_room_chosen.emit(node.room, node.enemies.duplicate())
+	events.run_room_chosen.emit(node.room, node.enemies.duplicate(), ways)

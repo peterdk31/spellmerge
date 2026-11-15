@@ -726,6 +726,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.reaction_landed.disconnect(_on_reaction)
 		events.entity_ended.disconnect(_on_entity_ended)
 		events.caster_move_finished.disconnect(_moves.finished)
+		events.room_left.disconnect(leave_room)
 	projectiles = manager
 	events = bus
 	if projectiles != null:
@@ -742,6 +743,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.reaction_landed.connect(_on_reaction)
 		events.entity_ended.connect(_on_entity_ended)
 		events.caster_move_finished.connect(_moves.finished)
+		events.room_left.connect(leave_room)
 
 
 ## True when the card `card_id` does something on the carrier `carrier` (`CarrierCard.carrier`) on its
@@ -3759,6 +3761,25 @@ func _team(actor: int) -> int:
 func _budget(actor: int) -> int:
 	var table: ActorsScript = _actor_table()
 	return table.budget_of(actor) if table != null else ActorsScript.SHARED
+
+
+## The party left the room for the next of the run (`room_left`, run generation RG4): what every
+## caster's spells left in it ends quietly with it, as the room goes (no blast, no payload, no end
+## point): its casts winding up, its waiting launches, its held carriers, every carrier's own rows
+## (beams, portals, rings, swings, slams, decoys and familiars) and its moves. The shots in the air are the projectile
+## manager's to end (each `shot_ended`). Every caster keeps its builds, delays and mana: the party
+## goes on as it is.
+func leave_room() -> void:
+	for actor in _caster_rows:
+		for carrier: Carrier in _carriers.values():
+			carrier.end_actor(actor)
+	for index in _hold_tags.size():
+		_release_hold(index)
+	_drop_pending(func(_launch: PendingLaunch) -> bool: return true)
+	for actor in _caster_rows:
+		_moves.reset_actor(actor)
+		for staff in SpellLimits.STAFFS:
+			_cancel_wind(actor * SpellLimits.STAFFS + staff)
 
 
 ## A caster's own state back to new (its builds are handled by the caller).

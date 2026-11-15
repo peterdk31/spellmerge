@@ -3,7 +3,8 @@ extends RefCounted
 ## What a run can be made of (run generation RG1, docs/milestones/run-generation.md, "The model"):
 ## the room kinds, the room templates and the enemies and bosses there are, gathered once from the
 ## registry's folders (`gather`), and the questions a run's rules ask of them: which templates of a
-## biome host a kind, which enemies fight in a biome from a depth, which bosses. Every list is in id
+## biome host a kind (and lead on by enough exits), which enemies fight in a biome from a depth, which
+## bosses. Every list is in id
 ## order, so what is asked of it is the same on every machine. It reads no file and no node: a test
 ## gathers made-up content the same way.
 
@@ -13,6 +14,9 @@ var kinds: Dictionary = {}
 var rooms: Array[RoomBase] = []
 ## Every enemy and boss, in id order (`EnemyBase.boss` tells them apart).
 var enemies: Array[EnemyBase] = []
+## How many exits each room template has, by id (`RoomBase.exit_count`, read once as it is gathered):
+## a room of a run's map leads to at most that many rooms of the next row (run generation RG4).
+var exits: Dictionary = {}
 
 
 ## The content in `of_kinds`, `of_rooms` and `of_enemies` (each what the registry's `get_all` gives
@@ -28,6 +32,7 @@ static func gather(of_kinds: Array[Resource], of_rooms: Array[Resource], of_enem
 	for item: Resource in of_rooms:
 		if item is RoomBase:
 			made.rooms.append(item as RoomBase)
+			made.exits[(item as RoomBase).id] = (item as RoomBase).exit_count()
 	var seen: Dictionary = {}
 	for item: Resource in of_enemies:
 		var enemy := item as EnemyBase
@@ -53,13 +58,19 @@ func kind(id: StringName) -> RoomKind:
 	return kinds.get(id) as RoomKind
 
 
-## The templates of biome `biome` that can host kind `kind_id`, in id order.
-func templates_for(biome: StringName, kind_id: StringName) -> Array[RoomBase]:
+## The templates of biome `biome` that can host kind `kind_id` and lead on to `ways` rooms at least
+## (their exits), in id order.
+func templates_for(biome: StringName, kind_id: StringName, ways: int = 0) -> Array[RoomBase]:
 	var found: Array[RoomBase] = []
 	for room: RoomBase in rooms:
-		if room.biome == biome and room.hosts(kind_id):
+		if room.biome == biome and room.hosts(kind_id) and exits_of(room.id) >= ways:
 			found.append(room)
 	return found
+
+
+## How many exits the template `room_id` has (0 for one not gathered).
+func exits_of(room_id: StringName) -> int:
+	return int(exits.get(room_id, 0))
 
 
 ## The enemies (not bosses) that fight in biome `biome` from depth `depth` (row; 0 the first room) on, in id order.

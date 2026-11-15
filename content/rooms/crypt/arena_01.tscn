@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/floor.svg" id="1_floor"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/wall.svg" id="2_wall"]
@@ -9,6 +9,8 @@
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/door.svg" id="6_door"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="7_rubble"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="8_skull"]
+[ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="10_prop_stand_in"]
+[ext_resource type="Resource" path="res://content/props/room_exit/room_exit.tres" id="11_exit"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_horizontal"]
 size = Vector2(640, 32)
@@ -397,3 +399,15 @@ position = Vector2(320, 16)
 
 [node name="Entry" type="Marker2D" parent="Doors"]
 position = Vector2(320, 368)
+
+[node name="Exits" type="Node2D" parent="."]
+
+[node name="ExitLeft" type="Node2D" parent="Exits"]
+position = Vector2(272, 64)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("11_exit")
+
+[node name="ExitRight" type="Node2D" parent="Exits"]
+position = Vector2(368, 64)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("11_exit")

@@ -9,6 +9,8 @@ extends "res://tests/support/suite.gd"
 ## service applies them at a tick's start (`Events.apply_command`), unless a test says otherwise.
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
+const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 const DT: float = 1.0 / 60.0
 ## The items on the hub's rack: the Wild star and the five premade builds (content/items/staffs/).
@@ -463,9 +465,10 @@ func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
 		check_equal(wizard.health.health, wizard.health.max_health, "at full health")
 
 
-## A run from the stone won (its room cleared, with no room after it: boss OB2a) brings the party
+## A run from the stone won (its last room cleared: a run of one room, pinned) brings the party
 ## back to the hub RUN_WON_DELAY later, as a lost one does.
 func test_a_won_run_from_the_stone_goes_back_to_the_hub() -> void:
+	flow.run_id_to_play = PinnedRun.pin(root.get_node("Registry"), ARENA)
 	_start([0, 1])
 	_place(0, true)
 	_place(1, true)

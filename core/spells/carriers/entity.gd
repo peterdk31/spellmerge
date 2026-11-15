@@ -30,6 +30,21 @@ func clear() -> void:
 	_entities.clear()
 
 
+## The entities of `actor`'s spells end quietly (their room went: run generation RG4,
+## `Spells.leave_room`): no blast, no payload; each stops counting as a live shot, its timers leave,
+## and an `entity_ended` that comes later for it is ignored. Entities forgets the bodies itself.
+func end_actor(actor: int) -> void:
+	var tags: Array = _entities.keys()
+	for tag: int in tags:
+		if SpellTag.caster_of(tag) != actor:
+			continue
+		var count: int = _entities[tag]
+		_entities.erase(tag)
+		kit.live_leave(tag, true)
+		for _n in count:
+			kit.shot_ended(tag)
+
+
 ## One entity: `ai` makes it at `at` (`entity_spawn_requested`, `lifetime`
 ## seconds, or until ended for a `hold`). It counts as a live shot of `tag` until `entity_ended`,
 ## so its build stays known while it lives; its timer fires along `heading`. Returns 1 when asked for.

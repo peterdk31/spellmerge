@@ -472,19 +472,24 @@ func _value(path: String, value: Variant, holder: Object) -> void:
 
 
 ## A typed array of objects that say when they are idle (a carrier's homing per row, nearly all
-## idle): each idle one is one leaf without a visit of its own (it is a fresh one's state: never
-## numbered among the objects met), the rest are walked as objects. As `_value`'s loop otherwise.
-func _idle_rows(path: String, items: Array, has_empty: bool, holder: Object) -> void:
+## idle): the indices of the idle ones are one leaf, `.idle` (an idle one is a fresh one's state:
+## never visited, nor numbered among the objects met), then each other filled row is walked as an
+## object after its index. Hundreds of rows, a leaf or two each, were the costliest part of a hash.
+func _idle_rows(path: String, items: Array, _has_empty: bool, holder: Object) -> void:
+	var idle := PackedInt32Array()
+	var busy := PackedInt32Array()
 	for i in items.size():
 		var item: Object = items[i]
 		if item == null:
 			continue
-		if has_empty:
-			_leaf_at(path, i, i, "@")
 		if item.call(&"idle"):
-			_leaf_at(path, i, IDLE, ".idle")
+			idle.append(i)
 		else:
-			_object(_index(path, i) if with_paths else path, item, holder)
+			busy.append(i)
+	_leaf(path, idle, ".idle")
+	for i in busy:
+		_leaf_at(path, i, i, "@")
+		_object(_index(path, i) if with_paths else path, items[i], holder)
 
 
 ## A frozen object's one leaf: its members' hash (see the class doc), worked out once.

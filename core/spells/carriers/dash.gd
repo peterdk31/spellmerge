@@ -33,8 +33,10 @@ class MovePass:
 	var prev: int = 0
 	var hit: HitProfile = null
 	var struck: Array[Node] = []
-## Per actor, the homing of its body's last dash; the body steers with it (`move_homing`).
-var _dash_homing: Array[Homing] = []
+## By actor id, the homing of its body's last dash (only the bodies that have dashed: a table of
+## one per actor was hundreds of idle rows in every state hash); the body steers with it
+## (`move_homing`).
+var _dash_homing: Dictionary = {}
 ## Per actor, the speed curve of its body's last dash (`MoveCurve`; `move_curve`).
 var _dash_curve: PackedVector3Array = PackedVector3Array()
 ## The homing of a dash that does not home (`move_homing` for an actor out of range).
@@ -65,8 +67,6 @@ func step_order() -> int:
 
 func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	super(runtime_kit, staff_poses)
-	for i in SpellRuntime.ACTORS:
-		_dash_homing.append(Homing.new())
 	_dash_curve.resize(SpellRuntime.ACTORS)
 	_dash_curve.fill(MoveCurve.NONE)
 
@@ -90,7 +90,9 @@ func _move_seconds(spell: CompiledSpell) -> float:
 ## `carrier_shown`) gives off its streaks and cards where it really goes until it lands (a `stream`
 ## part, gameplay/feel), `dash_land` where it lands (`carrier_ended`).
 func _move_body(spell: CompiledSpell, tag: int, actor: int, body: int, origin: Vector2, way: Vector2, offset: Vector2, seconds: float, chain: int, prev: int) -> void:
-	_dash_homing[body].start(spell, hash(Vector2i(actor, tag)))
+	if not _dash_homing.has(body):
+		_dash_homing[body] = Homing.new()
+	(_dash_homing[body] as Homing).start(spell, hash(Vector2i(actor, tag)))
 	# Screened once here, so the body's mover takes a curve only as `move_shot` takes one.
 	var curve: Vector3 = MoveCurve.of(spell)
 	_dash_curve[body] = curve if MoveCurve.shapes(curve) else MoveCurve.NONE
@@ -239,4 +241,4 @@ func move_curve(actor: int) -> Vector3:
 ## The homing of `actor`'s last dash, for the wizard to turn it as it goes (`Homing.steer`); one
 ## that does not home when the dash does not, or `actor` is out of range.
 func move_homing(actor: int) -> Homing:
-	return _dash_homing[actor] if actor >= 0 and actor < _dash_homing.size() else _no_homing
+	return _dash_homing.get(actor, _no_homing) as Homing

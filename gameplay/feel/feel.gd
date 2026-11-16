@@ -115,6 +115,7 @@ const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
 const ExitSignsScript := preload("res://gameplay/feel/exit_signs.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
+const CoverScript := preload("res://gameplay/feel/cover.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const SHOWN_BEAMS_PER_PLAYER: int = 24
@@ -416,6 +417,9 @@ var _portal_look: PortalLookScript = null
 var _portal_view: PortalView = PortalView.new()
 ## The spectacle (`spectacle.gd`): motes, floor marks, spell light and their settings.
 var _spectacle: SpectacleScript = null
+## The room's ground cover (`cover.gd`, ground cover GC3): at the floor marks' z, before the
+## spectacle in the tree, so the marks lie over it.
+var _cover: CoverScript = null
 ## The party's camera: it holds this machine's wizards (`Frames.seats_here`), eased as it is drawn.
 var party_camera: PartyCameraScript = PartyCameraScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
@@ -660,6 +664,12 @@ func _ready() -> void:
 	add_child(_swing_trails)
 	_portal_look = PortalLookScript.new()
 	add_child(_portal_look)
+	# Before the spectacle: at the marks' z the later node draws on top, so the marks lie over the cover.
+	_cover = CoverScript.new(MARK_Z)
+	_cover.name = "Cover"
+	_cover.events = events
+	_cover.registry = registry
+	add_child(_cover)
 	_spectacle = SpectacleScript.new()
 	_spectacle.name = "Spectacle"
 	_spectacle.events = events
@@ -839,6 +849,7 @@ func step(real_delta: float) -> void:
 	if _portal_look != null:
 		_step_portals()
 	_status_motes(real_delta)
+	_cover.step(_clock)
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells
@@ -2117,6 +2128,11 @@ func teammate_markers() -> TeammateMarkersScript:
 ## The motes (null with the setting off; for tests and the benchmarks).
 func motes() -> MotesScript:
 	return _spectacle.pool if _spectacle != null else null
+
+
+## The room's ground cover's look (for tests and the screenshots).
+func cover() -> CoverScript:
+	return _cover
 
 
 ## The floor marks (null with the setting off; for tests and the benchmarks).

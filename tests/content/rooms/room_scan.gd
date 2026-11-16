@@ -72,10 +72,10 @@ static func sprite_rect(sprite: Sprite2D) -> Rect2:
 
 
 ## The game scripts in a room's scene: none is allowed. Its placements and zones (`RoomPlacement`,
-## `RoomZone`, props W8c) are not counted: editor scripts holding what stands where, taken out
-## before play.
+## `RoomZone`, props W8c) and its previews (`RoomPreview`, ground cover GC3) are not counted: editor
+## scripts holding what stands where or showing what the game works out, taken out before play.
 static func scripts_below(node: Node) -> int:
-	if node is RoomPlacement or node is RoomZone:
+	if node is RoomPlacement or node is RoomZone or node is RoomPreview:
 		return 0
 	var count: int = 1 if node.get_script() != null else 0
 	for child in node.get_children():

@@ -32,6 +32,9 @@ const ROLL_TUFT: int = 16
 ## A roll's chance is out of this (the low bits of `hash4`).
 const ROLL_RANGE: int = 65536
 
+## The room's key in every roll of its cover (`name_hash` of its id; 0 with no room), Feel's tufts'
+## and the editor's included (`CoverTufts`).
+var room_key: int = 0
 ## Its size in cells.
 var columns: int = 0
 var rows: int = 0
@@ -65,10 +68,10 @@ static func of(layout_root: Node, room: RoomBase, all_kinds: Array[CoverKind]) -
 	made.cells.resize(made.columns * made.rows)
 	made.blocked.resize(made.columns * made.rows)
 	made._block(RoomPlaces.wall_rects(layout_root), places)
-	var room_key: int = name_hash(room.id) if room != null else 0
+	made.room_key = name_hash(room.id) if room != null else 0
 	if room != null and room.cover_fill and room.biome != &"":
-		made._fill(room_key, room.biome)
-	made._lay_fields(room_key, places)
+		made._fill(made.room_key, room.biome)
+	made._lay_fields(made.room_key, places)
 	return made
 
 
@@ -183,7 +186,7 @@ func _distance_to(what: int) -> PackedInt32Array:
 
 ## The biome's fill (rule 1's first source): each kind filling `biome`, in id order, its clumps on the
 ## open floor it keeps to.
-func _fill(room_key: int, biome: StringName) -> void:
+func _fill(room: int, biome: StringName) -> void:
 	var from_wall: PackedInt32Array = _distance_to(BLOCKED_WALL)
 	var from_point: PackedInt32Array = _distance_to(BLOCKED_POINT)
 	for index in kinds.size():
@@ -195,11 +198,11 @@ func _fill(room_key: int, biome: StringName) -> void:
 		for centre in cells.size():
 			if not _keeps(kind, centre, from_wall, from_point):
 				continue
-			if not rolls(kind.fill_density, room_key, kind_key, centre, ROLL_CLUMP):
+			if not rolls(kind.fill_density, room, kind_key, centre, ROLL_CLUMP):
 				continue
 			var most: int = maxi(kind.clump_size, 0)
 			var least: int = (most + 1) / 2
-			var reach: int = least + (hash4(room_key, kind_key, centre, ROLL_REACH) % (most - least + 1))
+			var reach: int = least + (hash4(room, kind_key, centre, ROLL_REACH) % (most - least + 1))
 			var cx: int = centre % columns
 			var cy: int = centre / columns
 			for y in range(maxi(cy - reach, 0), mini(cy + reach + 1, rows)):
@@ -221,7 +224,7 @@ func _keeps(kind: CoverKind, cell: int, from_wall: PackedInt32Array, from_point:
 
 
 ## The room's fields (rule 1's second source), in the tree's order, over the fill.
-func _lay_fields(room_key: int, places: RoomPlaces) -> void:
+func _lay_fields(room: int, places: RoomPlaces) -> void:
 	for at in places.zones_of(CoverPatch):
 		var patch := places.zone_data[at] as CoverPatch
 		var rect: Rect2 = places.zone_rects[at]
@@ -240,4 +243,4 @@ func _lay_fields(room_key: int, places: RoomPlaces) -> void:
 				continue
 			if not rect.has_point(cell_rect(cell).get_center()):
 				continue
-			cells[cell] = mark if mark != 0 and rolls(patch.density, room_key, kind_key, cell, ROLL_FIELD) else 0
+			cells[cell] = mark if mark != 0 and rolls(patch.density, room, kind_key, cell, ROLL_FIELD) else 0

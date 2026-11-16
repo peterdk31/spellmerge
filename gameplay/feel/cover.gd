@@ -17,8 +17,21 @@ extends Node2D
 ## **A cell's state picks its tufts' frames** through each row's custom data (`show_state`; the
 ## cover area's changes, GC5): a state that draws no frame folds its tufts away. The rows are kept
 ## here and a changed kind's are handed to its batch once, at the frame's `step`, however many of its
-## cells changed. Nothing is allocated once a room is laid: a frame sets the wind's time and hands
-## over the changed rows (`step`).
+## cells changed.
+##
+## **Bodies bend it and trample it** (GC4; look only, decision 4): each frame `step` takes the bodies
+## of the actor table (wizards, enemies, props: everything that stands), keeps the `BODIES` nearest
+## the camera's middle and hands them to the shader, which leans the tufts near each away from it.
+## The same bodies walk Feel's view grid of when each covered cell was last walked through
+## (`walked_at`, one float a cell, Feel's clock), the shader's `trampled` texture: a walked cell's
+## tufts lie flat while bodies are in it and `TRAMPLE_HOLD` seconds after, then spring back over
+## `TRAMPLE_SPRING` (`flatness`), drawing their state's `trampled_frames` or pressed down. None of it
+## is the game's: no cell's state changes, and the simulation never reads it.
+##
+## Nothing is allocated once a room is laid: a frame sets the wind's time, hands over the bodies only
+## when they moved (into one of two arrays sized once, in turn, so the one the batches hold is never
+## written), writes the grid's walked cells into its image and hands that over only when one was,
+## and hands over the changed rows (`step`).
 ##
 ## Pure view: no state of the game is here, and nothing here is read by the simulation.
 
@@ -26,6 +39,7 @@ const SHADER: Shader = preload("res://gameplay/feel/cover.gdshader")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 const ROOM_FOLDER: StringName = &"rooms"
@@ -34,6 +48,19 @@ const COVER_FOLDER: StringName = &"cover"
 const STRIDE: int = 16
 ## The most a tuft sways at its tip, in pixels (the shader's SWAY_CODE).
 const SWAY_CODE: float = 8.0
+## The most bodies that bend the cover at once: the nearest the camera's middle (the shader's BODIES).
+const BODIES: int = 32
+## How near a body bends a tuft, and how far a tuft right at a body leans at its tip, in pixels.
+const BEND_REACH: float = 14.0
+const BEND_PIXELS: float = 4.0
+## A walked cell's tufts lie flat this long after the last body left it, then spring back over
+## `TRAMPLE_SPRING` (seconds of Feel's clock); flat, a tuft with no trampled frame is pressed down
+## by this much of its height.
+const TRAMPLE_HOLD: float = 0.6
+const TRAMPLE_SPRING: float = 1.5
+const FLATTEN: float = 0.5
+## When a cell never walked through was walked (long before any clock).
+const NEVER: float = -1.0e6
 
 ## The bus and the registry (Feel's; null in a test that lays a layout itself).
 var events: EventsScript = null
@@ -58,12 +85,34 @@ var _shown: PackedInt32Array = PackedInt32Array()
 ## The kinds a test or a screenshot gave (`use_kinds`); the registry's while null.
 var _given: Array[CoverKind] = []
 var _use_given: bool = false
+## The actor table's open ids (sized once to every actor), and the nearest bodies found this frame:
+## where each is and how far from the camera's middle (squared), `_near_count` of them.
+var _ids: PackedInt32Array = PackedInt32Array()
+var _near_at: PackedVector2Array = PackedVector2Array()
+var _near_far: PackedFloat32Array = PackedFloat32Array()
+var _near_count: int = 0
+## The two arrays the bodies are handed to the batches in, in turn (`_sent` the one they hold), and
+## how many were handed over last.
+var _send: Array[PackedVector2Array] = []
+var _sent: int = 0
+var _sent_count: int = 0
+## Feel's view grid: when each cell was last walked through (`NEVER`), a pixel a cell of an image
+## of the layout's size, and the texture the batches read it by (`trampled`).
+var _walked: Image = null
+var _walked_texture: ImageTexture = null
 
 
 ## Cover drawn at `z` (Feel's MARK_Z).
 func _init(z: int) -> void:
 	top_level = true
 	z_index = z
+	_ids.resize(ActorsScript.ACTORS)
+	_near_at.resize(BODIES)
+	_near_far.resize(BODIES)
+	for buffer in 2:
+		var bodies := PackedVector2Array()
+		bodies.resize(BODIES)
+		_send.append(bodies)
 
 
 func _ready() -> void:
@@ -110,6 +159,11 @@ func lay(laid: CoverLayout) -> void:
 		if batch != null:
 			batch.multimesh.instance_count = 0
 			batch.visible = false
+			# A spare holds none of this room's arrays or grid (so they stay written in place).
+			var spare_material := batch.material as ShaderMaterial
+			spare_material.set_shader_parameter(&"bodies", PackedVector2Array())
+			spare_material.set_shader_parameter(&"body_count", 0)
+			spare_material.set_shader_parameter(&"trampled", null)
 			_spare.append(batch)
 	_batches.clear()
 	_rows.clear()
@@ -120,6 +174,10 @@ func lay(laid: CoverLayout) -> void:
 	_shown.fill(0)
 	_dirty.resize(laid.kinds.size())
 	_dirty.fill(0)
+	_walked = Image.create_empty(maxi(laid.columns, 1), maxi(laid.rows, 1), false, Image.FORMAT_RF)
+	_walked.fill(Color(NEVER, 0.0, 0.0, 1.0))
+	_walked_texture = ImageTexture.create_from_image(_walked)
+	_sent_count = -1
 	for index in laid.kinds.size():
 		_rows.append(PackedFloat32Array())
 		_slot_row.append(PackedInt32Array())
@@ -157,17 +215,122 @@ func shown_state(cell: int) -> int:
 	return _shown[cell] if cell >= 0 and cell < _shown.size() else 0
 
 
-## Once a frame, at Feel's clock `now`: the wind's time, and the rows of each kind changed since the
-## last frame handed to its batch.
-func step(now: float) -> void:
+## The cell of the layout's grid the shader reads a tuft's walk from, for its foot `foot` (room
+## pixels): the cell it stands in, a foot on a cell's bottom edge its own (`CoverTufts.foot` puts
+## a foot 1 to `CELL` pixels below its cell's top). The shader's expression, mirrored.
+static func foot_cell(foot: Vector2) -> Vector2i:
+	var at: Vector2 = foot / float(CoverLayout.CELL) - Vector2(0.0, 0.001)
+	return Vector2i(floori(at.x), floori(at.y))
+
+
+## When cell `cell` was last walked through (Feel's clock; `NEVER` for never, or no such cell).
+func walked_at(cell: int) -> float:
+	if layout == null or _walked == null or cell < 0 or cell >= layout.cells.size():
+		return NEVER
+	return _walked.get_pixel(cell % layout.columns, cell / layout.columns).r
+
+
+## How flat cell `cell`'s tufts lie at Feel's clock `now` before their state's bend scales it (0
+## standing, 1 flat), as the shader works it out: flat while walked and `TRAMPLE_HOLD` seconds after,
+## springing back over `TRAMPLE_SPRING`.
+func flatness(cell: int, now: float) -> float:
+	return clampf(1.0 - (now - walked_at(cell) - TRAMPLE_HOLD) / TRAMPLE_SPRING, 0.0, 1.0)
+
+
+## The bodies handed to the shader by the last `step`, nearest the camera's middle first or not (in
+## the order found), `body_count()` of them. Read only.
+func bodies() -> PackedVector2Array:
+	return _send[_sent]
+
+
+func body_count() -> int:
+	return maxi(_sent_count, 0)
+
+
+## Once a frame, at Feel's clock `now`: the wind's time; the bodies of `table` (the actor table; null
+## for none) nearest `focus` (the middle of the camera's picture; `Vector2.INF`: the first found)
+## handed to the shader, and the cells they stand in walked; and the rows of each kind changed since
+## the last frame handed to its batch.
+func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF) -> void:
+	if layout != null:
+		_find_bodies(table, focus)
+		_walk(now)
+	var moved: bool = _bodies_moved()
+	if moved:
+		_sent = 1 - _sent
+		# Taken out while it is written, so the write is in place (as `show_state`'s rows).
+		var bodies_now: PackedVector2Array = _send[_sent]
+		_send[_sent] = PackedVector2Array()
+		for at in _near_count:
+			bodies_now[at] = _near_at[at]
+		_send[_sent] = bodies_now
+		_sent_count = _near_count
 	for index in _batches.size():
 		var batch: MultiMeshInstance2D = _batches[index]
 		if batch == null:
 			continue
-		(batch.material as ShaderMaterial).set_shader_parameter(&"view_time", now)
+		var material := batch.material as ShaderMaterial
+		material.set_shader_parameter(&"view_time", now)
+		if moved:
+			material.set_shader_parameter(&"bodies", _send[_sent])
+			material.set_shader_parameter(&"body_count", _sent_count)
 		if _dirty[index] != 0:
 			_dirty[index] = 0
 			batch.multimesh.buffer = _rows[index]
+
+
+## The bodies of `table` nearest `focus`, at most `BODIES`, into `_near_at` (in the order found: by
+## actor id, a nearer one taking the place of the farthest kept once they are full).
+func _find_bodies(table: ActorsScript, focus: Vector2) -> void:
+	_near_count = 0
+	if table == null:
+		return
+	var open: int = table.open_ids(_ids)
+	var farthest: int = 0
+	for n in open:
+		var body := table.node_of(_ids[n]) as Node2D
+		if body == null or not body.is_inside_tree():
+			continue
+		var at: Vector2 = body.global_position
+		var far: float = at.distance_squared_to(focus) if focus.is_finite() else 0.0
+		if _near_count < BODIES:
+			_near_at[_near_count] = at
+			_near_far[_near_count] = far
+			if far > _near_far[farthest]:
+				farthest = _near_count
+			_near_count += 1
+			continue
+		if far >= _near_far[farthest]:
+			continue
+		_near_at[farthest] = at
+		_near_far[farthest] = far
+		for k in BODIES:
+			if _near_far[k] > _near_far[farthest]:
+				farthest = k
+
+
+## The covered cells the bodies found stand in, walked at `now`; the grid handed over when one was.
+func _walk(now: float) -> void:
+	var walked: bool = false
+	for at in _near_count:
+		var cell: int = layout.cell_of(_near_at[at])
+		if cell < 0 or layout.cells[cell] == 0:
+			continue
+		_walked.set_pixel(cell % layout.columns, cell / layout.columns, Color(now, 0.0, 0.0, 1.0))
+		walked = true
+	if walked:
+		_walked_texture.update(_walked)
+
+
+## True when the bodies found differ from the ones handed over last.
+func _bodies_moved() -> bool:
+	if _near_count != _sent_count:
+		return true
+	var held: PackedVector2Array = _send[_sent]
+	for at in _near_count:
+		if held[at] != _near_at[at]:
+			return true
+	return false
 
 
 ## Show cell `cell` in state `state` of its kind (its index in `CoverKind.states`): its tufts draw
@@ -251,6 +414,8 @@ func _lay_kind(index: int) -> MultiMeshInstance2D:
 	var material := batch.material as ShaderMaterial
 	material.set_shader_parameter(&"frame_size", Vector2(kind.frame_size))
 	material.set_shader_parameter(&"sheet_size", Vector2(kind.sheet.get_size()))
+	material.set_shader_parameter(&"trampled", _walked_texture)
+	material.set_shader_parameter(&"body_count", 0)
 	batch.multimesh.instance_count = row
 	if row > 0:
 		batch.multimesh.buffer = rows
@@ -272,6 +437,11 @@ func _batch() -> MultiMeshInstance2D:
 	batch.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var material := ShaderMaterial.new()
 	material.shader = SHADER
+	material.set_shader_parameter(&"bend_reach", BEND_REACH)
+	material.set_shader_parameter(&"bend_pixels", BEND_PIXELS)
+	material.set_shader_parameter(&"trample_hold", TRAMPLE_HOLD)
+	material.set_shader_parameter(&"trample_spring", TRAMPLE_SPRING)
+	material.set_shader_parameter(&"flatten", FLATTEN)
 	batch.material = material
 	add_child(batch)
 	return batch
@@ -282,7 +452,8 @@ func _batch() -> MultiMeshInstance2D:
 ## where its sway starts).
 static func _write_look(rows: PackedFloat32Array, at: int, kind: CoverKind, state: CoverState, rolled: int) -> void:
 	var frame: int = CoverTufts.frame(rolled, state.frames)
-	rows[at + 8] = 1.0
+	var trampled: int = CoverTufts.frame(rolled, state.trampled_frames)
+	rows[at + 8] = float(trampled + 1) / 255.0
 	rows[at + 9] = 1.0
 	rows[at + 10] = 1.0
 	rows[at + 11] = 1.0 if frame >= 0 else 0.0

@@ -18,6 +18,10 @@ extends Resource
 @export_range(0.0, 2.0, 0.05) var sway: float = 1.0
 ## How far its tufts bend away from a body going through them (1: fully; 0: not at all).
 @export_range(0.0, 2.0, 0.05) var bend: float = 1.0
+## The frames its tufts draw while trampled (Feel's, look only: decision 4), each tuft picking one
+## by the same roll it picks its `frames` by. Empty: its own frames, pressed flat. A state that
+## does not bend (`bend` 0) is never trampled.
+@export var trampled_frames: PackedInt32Array = PackedInt32Array()
 
 @export_group("On a body standing in it")
 ## The status it gives a body standing in it (&"burn", &"chill"; a `ElementBase.status_id`), asked as

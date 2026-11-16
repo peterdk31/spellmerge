@@ -849,7 +849,8 @@ func step(real_delta: float) -> void:
 	if _portal_look != null:
 		_step_portals()
 	_status_motes(real_delta)
-	_cover.step(_clock)
+	var picture: Rect2 = party_camera.visible_rect()
+	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF)
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells

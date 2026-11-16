@@ -119,6 +119,10 @@ func test_the_test_grass_is_sound_and_a_broken_kind_is_named() -> void:
 	var problems: String = "\n".join(broken.problems(KNOWN))
 	for line: String in ["no id", "two states are named 'rest'", "'nowhere'", "after waits 0", "'soggy'", "with no chance"]:
 		check(problems.contains(line), "a broken kind's problems name %s:\n%s" % [line, problems])
+	var sheeted := GRASS.duplicate(true) as CoverKind
+	sheeted.sheet = ImageTexture.create_from_image(Image.create_empty(96, 16, false, Image.FORMAT_RGBA8))
+	sheeted.states[0].trampled_frames = PackedInt32Array([5, 6])
+	check("\n".join(sheeted.problems(KNOWN)).contains("draws frame 6 trampled"), "a trampled frame its sheet lacks is named")
 
 
 ## The editor finds the kinds without the autoload (`scan_folder`), as the autoload does.

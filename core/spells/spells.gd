@@ -3809,8 +3809,8 @@ func _refund(actor: int, staff: int, amount: float) -> void:
 		events.mana_refund_requested.emit(actor, staff, amount)
 
 
-## Siphon's look (the owner, 2026-11-16: the jet run backwards): the mana a hit at `at` gives back
-## streams from there into the actor `actor`'s staff tip (its aim's origin, else its anchor), told
+## Siphon's look (the owner, 2026-11-16: the jet run backwards): every siphon hit at `at` (the
+## refund may come to nothing, a full staff: the Caster's to say) streams from there into the actor `actor`'s staff tip (its aim's origin, else its anchor), told
 ## as `carrier_shown` of SIPHON_CARD, along the way and as far: for looks only.
 func _show_siphon(spell: CompiledSpell, actor: int, at: Vector2) -> void:
 	if events == null or actor < 0 or actor >= ACTORS or not at.is_finite():

@@ -2597,7 +2597,7 @@ func remnants() -> RemnantsScript:
 
 ## The cues the carrier card `carrier_card` names and its radius (`CarrierCard.look_cues`: [cast_cue,
 ## shown_cue, impact_cue, end_cue, radius], CUE_CAST to CUE_RADIUS), the defaults (`cast` and `impact`, radius
-## 0) for an id that is no carrier card; a modifier that shows itself (`carrier_shown` `zap`) brings its
+## 0) for an id that is no carrier card; a modifier that shows itself (`carrier_shown` `zap`, `siphon`) brings its
 ## own `cue` as its shown cue. Read once per card id, then kept: a cast or a hit allocates nothing.
 ## With no registry yet, or no carrier card id, the defaults are answered but not kept.
 func _carrier_card_cues_of(carrier_card: StringName) -> Array:

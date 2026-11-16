@@ -108,6 +108,9 @@ func test_its_mana_streams_back_into_the_staff() -> void:
 			shown.append([origin, direction, length]))
 	var imp: Node2D = arena.add_imp(Vector2(80.0, 0.0))
 	arena.install_cards(0, 0, ["siphon", "bolt"])
+	# The staff tip, away from the body (the game's own path: the Caster tells the aim's origin).
+	var tip := Vector2(6.0, -10.0)
+	arena.spells.set_aim(0, tip, Vector2.RIGHT)
 	arena.cast(0, 0)
 	arena.run(1.0)
 	check(shown.size() >= 1, "shown as it hits (%d)" % shown.size())
@@ -115,7 +118,7 @@ func test_its_mana_streams_back_into_the_staff() -> void:
 		var from: Vector2 = shown[0][0]
 		check(from.distance_to(imp.global_position) < 20.0, "from the hit (%s, the imp at %s)" % [from, imp.global_position])
 		var to: Vector2 = from + (shown[0][1] as Vector2) * float(shown[0][2])
-		check(to.distance_to(arena.spells.aim_origin_of(0)) < 0.5 or to.distance_to(arena.projectiles.get_anchor(0)) < 0.5, "to the caster's staff tip (%s)" % to)
+		check(to.distance_to(arena.spells.aim_origin_of(0)) < 0.5, "to the caster's staff tip (%s, the tip at %s)" % [to, arena.spells.aim_origin_of(0)])
 	arena.free_all()
 	var plain := ArenaScript.new(root)
 	var none: Array = []

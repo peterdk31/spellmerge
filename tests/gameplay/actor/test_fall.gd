@@ -24,7 +24,7 @@ const NARROW: Rect2 = Rect2(400.0, 0.0, 16.0, 360.0)
 const FALL_TICKS: int = 12
 
 var _world: Fixture
-var _fell: Array[Node] = []
+var _fell: Array[int] = []
 var _returned: Array[Vector2] = []
 var _died: Array[int] = []
 
@@ -37,8 +37,8 @@ func before_each() -> void:
 	_fell.clear()
 	_returned.clear()
 	_died.clear()
-	_world.bus.body_fell.connect(func(actor: Node) -> void: _fell.append(actor))
-	_world.bus.body_returned.connect(func(_actor: Node, at: Vector2) -> void: _returned.append(at))
+	_world.bus.body_fell.connect(func(actor: int) -> void: _fell.append(actor))
+	_world.bus.body_returned.connect(func(_actor: int, at: Vector2) -> void: _returned.append(at))
 	_world.bus.enemy_died.connect(func(killer: int, _enemy: Node, _at: Vector2, _shot: int) -> void: _died.append(killer))
 
 
@@ -84,12 +84,12 @@ func test_a_teleport_into_a_crack_one_and_two_cells_wide_falls() -> void:
 		check(_world.projectiles.is_hole(body.global_position), "over the crack at %s" % at)
 		_run(1)
 		check(body.is_falling() and body.is_down() and not body.is_downed(), "it falls at once, down but not downed (%s)" % at)
-		check(_fell.has(body), "body_fell told (%s)" % at)
+		check(_fell.has(body.id), "body_fell told with its id (%s)" % at)
 		_world.free_all()
 		_world = Fixture.new(root)
 		_world.projectiles.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 		_world.projectiles.set_holes([CRACK, THIN, NARROW] as Array[Rect2])
-		_world.bus.body_fell.connect(func(actor: Node) -> void: _fell.append(actor))
+		_world.bus.body_fell.connect(func(actor: int) -> void: _fell.append(actor))
 
 
 func test_a_dash_that_ends_in_a_crack_falls_and_one_over_it_does_not() -> void:
@@ -156,10 +156,10 @@ func test_an_enemy_that_falls_dies_through_combat_put_down_to_its_last_hitter() 
 	_run(1)
 	check(_world.combat.hit(wizard.id, enemy, 1.0, Vector2.RIGHT, 250.0), "the wizard hits it into the crack")
 	for i in 30:
-		if _fell.has(enemy):
+		if _fell.has(enemy.id):
 			break
 		_run(1)
-	check(_fell.has(enemy), "it falls once the push (and the hit's stop) is spent: %s" % enemy.global_position)
+	check(_fell.has(enemy.id), "it falls once the push (and the hit's stop) is spent: %s" % enemy.global_position)
 	_run(FALL_TICKS)
 	check(not is_instance_valid(enemy) or enemy.is_dying(), "it died of the fall")
 	check_equal(_died, [wizard.id] as Array[int], "an enemy's death, the wizard's kill")
@@ -292,3 +292,39 @@ func _areas() -> Dictionary:
 		if is_instance_valid(body) and body.is_inside_tree() and body.id != ActorsScript.NONE:
 			areas["actor %d" % body.id] = body
 	return areas
+
+
+## The review's case: a second fall soon after the return (inside its protection) costs a fifth again.
+func test_a_second_fall_while_protected_costs_again() -> void:
+	var body: Actor = _wizard()
+	_run(2)
+	for n in 2:
+		_ask(body, &"teleport", Vector2(66.0, 0.0), 0.0)
+		_run(FALL_TICKS + 1)
+		check(body.health.is_protected(), "protected after fall %d" % (n + 1))
+	check(is_equal_approx(body.health.health, 50.0 * (1.0 - 2.0 * HoleRules.FALL_COST)), "two falls, two fifths: %s" % body.health.health)
+
+
+## An enemy with no hurt shape (no row in Combat) that falls still dies as a foe of the wizards.
+func test_an_enemy_with_no_hurt_shape_dies_of_a_fall_as_a_foe() -> void:
+	var controller := Fixture.Scripted.new()
+	controller.team = ActorsScript.TEAM_ENEMIES
+	var enemy: Actor = _world.actor(Vector2(150.0, 100.0), [&"health", &"mover", &"caster"], controller)
+	_run(1)
+	_ask(enemy, &"teleport", Vector2(66.0, 0.0), 0.0)
+	_run(FALL_TICKS + 1)
+	check_equal(_died.size(), 1, "its death told")
+
+
+## A wizard falling is not out of the party (hub rework HR-H2): an exit waits for it to come back,
+## so nobody skips a fall's cost by leaving the room as it falls.
+func test_an_exit_waits_for_a_falling_wizard() -> void:
+	var standing: Actor = _wizard(Vector2(500.0, 100.0))
+	var falling: Actor = _wizard(START, 1)
+	_run(1)
+	_ask(falling, &"teleport", Vector2(66.0, 0.0), 0.0)
+	_run(1)
+	check(falling.is_falling(), "it falls")
+	var area := Rect2(480.0, 80.0, 40.0, 40.0)
+	check(not ExitRules._everyone_in([standing, falling] as Array[Node2D], area), "the party is not all in the exit while one falls")
+	check(ExitRules._everyone_in([standing] as Array[Node2D], area), "the one standing alone is")

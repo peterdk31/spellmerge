@@ -988,14 +988,15 @@ func fall_blame(target: Variant) -> int:
 
 
 ## A wizard `target` back from a fall pays for it: `fall_cost` of its most health, taken whole (no
-## barrier, hex or charge has a say: it is no hit), told as damage of KIND_FALL by nobody. At 0 it
-## is downed as by any hit. Nothing where falls are free, for a body down or not registered.
+## barrier, hex or charge has a say, nor protection: it is no hit, `Health.lose`), told as damage of
+## KIND_FALL by nobody. At 0 it is downed as by any hit. Nothing where falls are free, for a body down,
+## dying or not registered.
 func take_fall(target: Variant) -> void:
 	var row: int = _row_of(target)
-	if row == ActorsScript.NONE or fall_cost <= 0.0 or _body[row] != BODY_ACTOR or not _can_hurt(row):
+	if row == ActorsScript.NONE or fall_cost <= 0.0 or _body[row] != BODY_ACTOR:
 		return
 	var kit: Actor = _nodes[row] as Actor
-	if kit.health == null:
+	if kit.health == null or kit.is_down() or kit.is_dying() or kit.health.is_depleted():
 		return
 	var amount: float = kit.health.max_health * fall_cost
 	var where: Vector2 = _position_of(kit)
@@ -1003,7 +1004,8 @@ func take_fall(target: Variant) -> void:
 	_last_by[row] = EventsScript.NO_PLAYER
 	_last_kind[row] = KIND_FALL
 	_last_name[row] = ""
-	var left: float = _take(row, EventsScript.NO_PLAYER, amount, false)
+	kit.health.lose(amount, EventsScript.NO_PLAYER)
+	var left: float = kit.health.health
 	if events != null:
 		events.hit_landed.emit(EventsScript.NO_PLAYER, kit, amount, where, KIND_FALL, -1)
 		events.damage_dealt.emit(EventsScript.NO_PLAYER, kit, amount, where)
@@ -1016,10 +1018,13 @@ func take_fall(target: Variant) -> void:
 ## `fall_blame`), told as any death (`enemy_died` for a foe of the wizards, so a room can be cleared
 ## by sweeping strays into a crack), with no hit; protection and `invincible` do not keep it. A body
 ## something else ends at 0 health (`downable`: a decoy, a prop's death triggers) is emptied
-## (`Health.empty`) and ended that way. Returns true if it died or was ended; false for a body that
-## is not registered or is dying already.
+## (`Health.empty`) and ended that way. A kit Actor with no row (no hurt shape, or one switched off) is
+## registered for its death, so a foe's is still told. Returns true if it died or was ended; false for
+## a body that is no kit Actor or is dying already.
 func die_of_fall(target: Variant, by: int) -> bool:
 	var row: int = _row_of(target)
+	if row == ActorsScript.NONE and target is Actor:
+		row = register_actor(target as Actor, 1.0, 0.0)
 	if row == ActorsScript.NONE or _body[row] != BODY_ACTOR:
 		return false
 	var kit: Actor = _nodes[row] as Actor

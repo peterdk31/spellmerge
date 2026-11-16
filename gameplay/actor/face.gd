@@ -198,7 +198,7 @@ func is_calling() -> bool:
 
 ## The brows now.
 func mood() -> Mood:
-	if actor.is_down():
+	if actor.is_downed():
 		return Mood.WORRIED
 	if actor.controller != null and actor.controller.is_telegraphing():
 		return Mood.FURIOUS
@@ -225,7 +225,7 @@ func is_glancing() -> bool:
 
 ## True while the eyes are shut (a blink, or down).
 func is_shut() -> bool:
-	return _blink_left > 0.0 or actor.is_down()
+	return _blink_left > 0.0 or actor.is_downed()
 
 
 ## The frames the layers show (column, row of their sheets), for tests.
@@ -254,7 +254,7 @@ func step(delta: float) -> void:
 	_follow(delta)
 	# `is_shut`, `look` and `mood` written out (one `is_down` for all three): every actor wears a
 	# face and steps it every frame.
-	var down: bool = actor.is_down()
+	var down: bool = actor.is_downed()
 	var column: int = BLINK_COLUMN
 	if _blink_left <= 0.0 and not down:
 		var looking: Vector2i = Vector2i(_lean(actor.aim.x), _lean(actor.aim.y))

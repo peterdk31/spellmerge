@@ -51,6 +51,10 @@ func test_a_room_with_holes_plays_the_same_twice_and_through_a_snapshot() -> voi
 		check(card != null, "the %s card is found" % id)
 		if card != null:
 			_check(ContentFight.CARD, card, holes)
+			if id != &"pull":
+				# The fight really falls: its movers dash and jump into the pit.
+				var falls: int = int(_play(ContentFight.CARD, card, holes, TICKS)[3])
+				check(falls > 0, "the %s fight has bodies fall into a hole (%d)" % [id, falls])
 
 
 func _card(id: StringName) -> Resource:
@@ -207,7 +211,7 @@ func _play(kind: StringName, resource: Resource, holes: Array[Rect2], at: int, k
 			snapshot = Snapshot.take(fight.areas(), fight.world)
 	var casts: int = fight.item_casts if kind == ContentFight.ITEM else fight.wizard_casts
 	fight.free_all()
-	return [run, snapshot, casts]
+	return [run, snapshot, casts, fight.falls]
 
 
 ## A fresh world of `resource`'s fight made as `snapshot` (taken after tick `at`) says, played on to

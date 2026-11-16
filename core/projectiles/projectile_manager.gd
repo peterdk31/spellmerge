@@ -2275,7 +2275,8 @@ func circle_blocked(center: Vector2, radius: float, holes: bool = false) -> bool
 ## The nearest place to `point` where a circle of `radius` stands on the ground (hub rework HR-H2):
 ## `point` itself when the circle is clear there (`circle_blocked` with holes on), else the middle of
 ## the nearest cell, ring by ring of cells out to NEAREST_GROUND_RINGS, the first clear one in a
-## fixed order (the same on every machine); `point` when none is. What is put back on the ground
+## fixed order (the same on every machine); past them, the nearest clear cell of the whole grid (a
+## body far over the void); `point` when there is none. What is put back on the ground
 ## asks it: the boss its jump left over a hole, an add's spot on a ring, an item dropped over one, a
 ## body back from a fall with no ground of its own yet.
 func nearest_ground(point: Vector2, radius: float) -> Vector2:
@@ -2297,7 +2298,17 @@ func nearest_ground(point: Vector2, radius: float) -> Vector2:
 					best = middle
 		if best != Vector2.INF:
 			return best
-	return point
+	# Nothing near (a body far over the void): the nearest clear cell of the whole grid.
+	var far: Vector2 = point
+	var far_distance: float = INF
+	for y in _wall_h:
+		for x in _wall_w:
+			var middle: Vector2 = _bounds.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * WALL_CELL
+			var distance: float = middle.distance_squared_to(point)
+			if distance < far_distance and not circle_blocked(middle, radius, true):
+				far_distance = distance
+				far = middle
+	return far
 
 
 ## Where a body (a circle of `radius` at `from`) ends when it moves by `motion`, sliding along the

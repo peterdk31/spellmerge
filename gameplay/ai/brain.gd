@@ -368,7 +368,8 @@ func think(delta: float, intent: ActorIntent) -> void:
 				_attack_over()
 		State.REPOSITION:
 			_state_left -= delta
-			if target == null or _state_left <= 0.0 or (_ground_clear_now() and _line_clear()):
+			# Over once it can shoot (a hole is no wall to a shot, HR-H2).
+			if target == null or _state_left <= 0.0 or (_ground_clear_now(false) and _line_clear()):
 				_to_chase()
 				_perceive()
 				_decide()

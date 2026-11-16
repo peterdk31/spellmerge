@@ -90,6 +90,8 @@ const EVENTS: Dictionary = {
 	&"prop_state_requested": [["actor", TYPE_INT], ["state", TYPE_STRING_NAME]],
 	&"status_requested": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME], ["duration", TYPE_FLOAT], ["strength", TYPE_FLOAT]],
 	&"enemy_died": [["killer", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["shot", TYPE_INT]],
+	&"body_fell": [["actor", TYPE_INT]],
+	&"body_returned": [["actor", TYPE_INT], ["at", TYPE_VECTOR2]],
 	&"enemy_standing": [["enemy", TYPE_OBJECT]],
 	&"adds_requested": [["actor", TYPE_INT], ["adds", TYPE_OBJECT], ["key", TYPE_INT], ["wave", TYPE_BOOL]],
 	&"crumble_requested": [["actor", TYPE_INT]],

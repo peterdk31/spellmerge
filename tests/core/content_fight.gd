@@ -98,6 +98,8 @@ var wizard_casts: int = 0
 var enemy_casts: int = 0
 ## Casts of seat 0's RT: the staff an item fight took.
 var item_casts: int = 0
+## Bodies that fell into a hole (`body_fell`, hub rework HR-H2).
+var falls: int = 0
 var fight: AIFixture
 var entities: EntitiesScript
 ## The fight's Items area (what lies on the ground; every fight has one).
@@ -187,6 +189,7 @@ func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int 
 	world.add_child(cover)
 	_lay_cover()
 	fight.bus.connect(&"staff_cast", _on_staff_cast)
+	fight.bus.connect(&"body_fell", func(_actor: int) -> void: falls += 1)
 	var cards: Array[StringName] = [PLAIN]
 	if kind == CARD:
 		cards = staff_for(resource as SpellComponent)

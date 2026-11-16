@@ -112,11 +112,12 @@ func count(party: Array[Node2D], contents: RoomContents, events: EventsScript) -
 	return taken
 
 
-## True when at least one wizard of `party` stands (is not down) and every one standing is in `area`.
+## True when at least one wizard of `party` stands (is not downed) and every one standing is in `area`.
+## A wizard falling into a hole stands for this (hub rework HR-H2): the party waits for its return.
 static func _everyone_in(party: Array[Node2D], area: Rect2) -> bool:
 	var standing: int = 0
 	for wizard: Node2D in party:
-		if not is_instance_valid(wizard) or (wizard is Actor and (wizard as Actor).is_down()):
+		if not is_instance_valid(wizard) or (wizard is Actor and (wizard as Actor).is_downed()):
 			continue
 		standing += 1
 		if not area.has_point(wizard.position):

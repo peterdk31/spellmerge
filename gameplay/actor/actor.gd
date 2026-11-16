@@ -390,7 +390,7 @@ func _fall() -> void:
 	velocity = Vector2.ZERO
 	mover.stop()
 	if events != null:
-		events.body_fell.emit(self)
+		events.body_fell.emit(id)
 
 
 ## Its fall is over (see the class doc): its hurt shape back first (Combat needs its row), then a
@@ -413,7 +413,7 @@ func _land() -> void:
 	if health != null and not _down and not _dying:
 		health.protect(HoleRules.RETURN_PROTECTION)
 	if events != null and not _dying:
-		events.body_returned.emit(self, at)
+		events.body_returned.emit(id, at)
 
 
 ## True while it falls (see the class doc).

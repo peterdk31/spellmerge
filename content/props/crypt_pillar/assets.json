@@ -1,0 +1,40 @@
+{
+	"assets": [
+		{
+			"path": "content/props/crypt_pillar/intact.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (tools/pixel_grid.py from intact.grid.json, its grid by a small generator, 2026-11-16)",
+			"prompt": "A round crypt column, 48x64, seen from a little above: a round drum plinth with a lit top, a fluted round shaft shaded from a Stone light left through Stone base to Stone shadow on the right with a Bone shadow shine, two drum joints, a flaring echinus and a square abacus slab with a lit top edge. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/crypt_pillar/cracking.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (tools/pixel_grid.py from cracking.grid.json, its grid by a small generator, 2026-11-16)",
+			"prompt": "Six 48x64 frames side by side: the round crypt column of intact.svg cracking. A crack runs down from the capital step by step, the capital's right corner chips off and the chip falls, frame by frame, to the plinth's foot. Its first frame is intact.svg, its last the cracked column. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/crypt_pillar/splitting.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (tools/pixel_grid.py from splitting.grid.json, its grid by a small generator, 2026-11-16)",
+			"prompt": "Seven 48x64 frames side by side: the cracked crypt column splitting. A second crack runs down the left of the shaft, the capital's left half breaks off, tips and falls beside the column and lands as a block at its foot, and a branch of the first crack reaches the plinth. Its first frame is cracking.svg's last. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/crypt_pillar/collapsing.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (tools/pixel_grid.py from collapsing.grid.json, its grid by a small generator, 2026-11-16)",
+			"prompt": "Nine 48x64 frames side by side: the split crypt column collapsing. The shaft gives way drum by drum, its jagged top lower each frame, stones spilling out to both sides, the rest of the capital tipping off to the right, into a growing mound of rubble that ends as a low heap of stones at the foot. Its first frame is splitting.svg's last. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		}
+	]
+}

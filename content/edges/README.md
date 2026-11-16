@@ -4,7 +4,7 @@ How the edge of a room's ground looks, as data (hub rework, [docs/milestones/hub
 
 ## Contract
 
-`edge.json`. Required: `full_width`, `deep` and `lip`; every other part is optional, and an edge without it has none (a `drip` needs a `seam`: the drips take its bands' colours) (the crypt's walls have no seam, glow, rock face or motes):
+`edge.json`. Required: `full_width`, `deep` and `lip`; every other part is optional, and an edge without it has none (a `drip` needs a `seam`: the drips take its bands' colours) (the crypt's walls have no seam, glow, rock face or motes; its floating rooms' edge no seam, glow, top or face):
 
 | Field | What it is |
 |---|---|
@@ -30,6 +30,7 @@ A colour is a palette material's shade (`leaf.base`, `stone.shadow`) or `#rrggbb
 |---|---|---|
 | `magic` | the hub | the elements' light in long bands round the coast, a turf lip with pebbles, a banded stone face with roots, embers rising and drips falling (`rim_ember`, `rim_drip`) |
 | `crypt_wall` | the crypt's halls (`edge`) | a ragged masonry edge, its face of stone courses, a rough top falling into the dark, rubble along its foot; no seam, glow, rock face or motes |
+| `crypt_edge` | the crypt's floating rooms (`edge`; the owner's second round, crypt rework CR-G) | a slab of floor hanging in the dark: a broken flagstone lip with stones and grit fallen along it, the slab's rock underside hanging under its south edges with roots, dust falling off its edge (`pit_dust`); no masonry, no top or face, no seam or glow. The shape's `void` stays `"wall"`, so its edge is an invisible wall |
 | `crypt_pit` | the crypt's pits (`pit_edge`) | broken flagstone teeth, a faint cold seam of Mana, the shaft's wall going down into the dark, a still cold glow, dust falling in (`pit_dust`) |
 
 A shape file names one style for its outlines and frame (`edge`) and may name another for its pits and the cracks from them (`pit_edge`); each pixel's edge is drawn in the style of the open ground nearest it.

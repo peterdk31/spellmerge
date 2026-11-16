@@ -8,7 +8,9 @@ extends ActorLook
 ##   squashes, as any body's); the rest are sprites of its own. Each is drawn as its `drawn` says:
 ##   among the bodies, over them, on the floor (a slab), or not at all (a mask only). Each frame of a layer's picture stands
 ##   with its bottom middle on the feet, moved by its `offset`; a layer of several frames plays them
-##   on this look's own clock.
+##   on this look's own clock, from its first as its state is entered (the frames between the last
+##   look and this one, `PropLayer.loop_from`), from where it rests when the look is only shown
+##   (set up, or a snapshot gave the state back: nothing changed, so nothing plays its change).
 ## - **its motes:** a node in the group `mote_source` for every `MoteSource` of a layer, a mask's
 ##   reading that layer's sprite (`mote_art`); Feel gives them off (gameplay/feel/source_motes.gd),
 ##   so they come and go with the state.
@@ -54,6 +56,9 @@ func show_state(state_id: StringName, entered: bool) -> void:
 	var look: PropStateLook = actor.prop.look_of(state_id) if actor != null and actor.prop != null else null
 	if look != shown or look == null:
 		_build(look)
+		if not entered:
+			_settle()
+		_show_frames()
 	if entered and look != null and look.cue != &"" and actor.events != null:
 		var size: float = actor.hurtbox.outer_radius() if actor.hurtbox != null else 8.0
 		actor.events.cue_shown.emit(actor.id, look.cue, actor.global_position + actor.body_offset, Vector2.UP, size, Color.WHITE, 0)
@@ -146,13 +151,24 @@ func _clear() -> void:
 		body.frame = 0
 
 
+## True while a layer still changes its frame: one that loops, or a strip played once not yet at
+## its last frame.
 func _animated() -> bool:
 	if shown == null:
 		return false
 	for layer in shown.layers:
-		if layer != null and layer.frames > 1 and layer.fps > 0.0:
+		if layer != null and layer.is_animated() and not (layer.rest_frame() == layer.frames - 1 and _clock >= layer.settle_seconds()):
 			return true
 	return false
+
+
+## The look's clock moved on to where every layer rests (a look shown, not entered).
+func _settle() -> void:
+	if shown == null:
+		return
+	for layer in shown.layers:
+		if layer != null:
+			_clock = maxf(_clock, layer.settle_seconds())
 
 
 ## The animated layers' frames, on this look's own clock.
@@ -160,10 +176,19 @@ func _process(delta: float) -> void:
 	if shown == null:
 		return
 	_clock += delta
+	_show_frames()
+	# Every strip held on its last frame: nothing moves any more.
+	set_process(_animated())
+
+
+## Each animated layer's frame at the look's clock (`PropLayer.frame_at`).
+func _show_frames() -> void:
+	if shown == null:
+		return
 	for i in _sprites.size():
 		var layer: PropLayer = shown.layers[i] if i < shown.layers.size() else null
-		if layer != null and _sprites[i] != null and layer.frames > 1 and layer.fps > 0.0:
-			_sprites[i].frame = floori(_clock * layer.fps) % layer.frames
+		if layer != null and _sprites[i] != null and layer.is_animated():
+			_sprites[i].frame = layer.frame_at(_clock)
 
 
 func _on_entered(state_id: StringName) -> void:

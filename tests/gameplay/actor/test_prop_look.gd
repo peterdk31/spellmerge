@@ -191,6 +191,51 @@ func test_a_layer_of_frames_plays_them_on_its_own_clock() -> void:
 	check(not _look(still).is_processing(), "a still look runs nothing")
 
 
+## A strip played as its state is entered (docs/STYLE.md "Smooth", `PropLayer.loop_from`): the
+## frames between the last look and this one once, then round from `loop_from` (its last: held
+## there, and the look stops running); a look only shown (set up, a snapshot) starts at rest.
+func test_a_strip_plays_once_as_its_state_is_entered_then_holds_or_loops() -> void:
+	var held := PropLayer.new()
+	held.frames = 4
+	held.fps = 10.0
+	held.loop_from = 3
+	check_equal([held.frame_at(0.0), held.frame_at(0.15), held.frame_at(0.35), held.frame_at(9.0)], [0, 1, 3, 3], "once, then its last held")
+	check_equal(held.rest_frame(), 3, "it rests on its last")
+	var tail := PropLayer.new()
+	tail.frames = 5
+	tail.fps = 10.0
+	tail.loop_from = 2
+	check_equal([tail.frame_at(0.45), tail.frame_at(0.55), tail.frame_at(0.65), tail.frame_at(0.85)], [4, 2, 3, 2], "its first two once, then 2 to 4 round")
+	check_equal([tail.rest_frame(), tail.settle_seconds()], [2, 0.2], "it rests where its loop starts")
+	var data: PropBase = EXPLODING_BARREL.duplicate()
+	var look := PropStateLook.new()
+	look.state_id = &"fusing"
+	var layer := PropLayer.new()
+	# The idle art's 16 px across as two 8 px frames: a strip of two, its last held.
+	layer.texture = load(ART % "idle") as Texture2D
+	layer.frames = 2
+	layer.fps = 10.0
+	layer.loop_from = 1
+	look.layers = [layer]
+	var idle: PropStateLook = EXPLODING_BARREL.look_of(&"idle")
+	data.looks = [idle, look]
+	var body: Actor = _barrel(data)
+	check(body.state_triggers.enter(&"fusing"), "lit")
+	var sprite := body.get_node("Sprite") as Sprite2D
+	check_equal(sprite.frame, 0, "entered: the strip from its first frame")
+	_look(body)._process(0.15)
+	check_equal(sprite.frame, 1, "then its last")
+	check(not _look(body).is_processing(), "held: nothing runs")
+	_look(body).show_state(&"idle", false)
+	_look(body).show_state(&"fusing", false)
+	check_equal(sprite.frame, 1, "only shown (a snapshot's state): at rest, with no change played")
+	var bad := PropLayer.new()
+	bad.texture = layer.texture
+	bad.frames = 2
+	bad.loop_from = 2
+	check("\n".join(bad.problems("bad")).contains("loop_from"), "a loop from past its frames is named")
+
+
 ## Each layer at the depth it says (props W8: a slab on the floor, as the hub's stone): among the
 ## bodies, over them, on the floor (as the room's floor, under the marks), or not drawn.
 func test_a_layer_is_drawn_where_it_says() -> void:

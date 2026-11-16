@@ -9,7 +9,9 @@ the same files, and every room's ground in the repository is up to date with its
 inside walls (the crypt rework, docs/milestones/crypt-rework.md): its frame wanders, is pinned and
 keeps clear of what stands in the room; its pits are holes with an edge style of their own, their
 rims throwing into the pit and their cracks running outward; its walls have their own art (a face
-over the floor's top edges); its floor is slabbed.
+over the floor's top edges); its floor is slabbed. A floating crypt room (`crypt_edge`, the owner's
+second round): no wall art, the slab's rock underside hanging under its south edges, dust falling
+off its edge, and its edge still an invisible wall.
 
     python3 -m unittest discover -s tools
 """
@@ -408,6 +410,76 @@ class HallTest(unittest.TestCase):
             first = gs.inputs_hash(path)
             path.write_text(json.dumps({**HALL, "pit_edge": "magic"}), encoding="utf-8")
             self.assertNotEqual(gs.inputs_hash(path), first)
+
+
+class FloatingHallTest(unittest.TestCase):
+    """A floating crypt room (crypt rework CR-G, `crypt_edge`): a slab of floor hanging in the dark,
+    its edge an invisible wall."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.shape = {**HALL, "edge": "crypt_edge"}
+        cls.drawing = gs.Drawing(cls.shape, [], HALL_CLEAR)
+
+    def test_the_edge_is_an_invisible_wall(self) -> None:
+        d = self.drawing
+        g = d.ground
+        self.assertIsNone(d.wall_art, "no wall art: no masonry, no top, no face")
+        cells: dict = {}
+        GroundShapeTest._cells(d.walls, cells, "wall", self)
+        for y in range(0, d.h, gs.CELL):
+            for x in range(0, d.w, gs.CELL):
+                p = (y + gs.CELL // 2) * d.w + x + gs.CELL // 2
+                if not d.solid[p] and not g.pit[p] and g.crack[p] == 0.0:
+                    self.assertEqual(cells.get((x, y)), "wall", f"cell {x},{y}: off the slab, a wall stops a body")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        self.assertNotIn("WallArt", text)
+        self.assertIn('[node name="Walls" type="StaticBody2D"', text)
+
+    def test_the_slabs_underside_hangs_under_its_south_edge(self) -> None:
+        d = self.drawing
+        rock = gs.load_style("crypt_edge")["rock"]
+        hung = 0
+        for x in range(64, d.w - 64):
+            y = d.h - 1
+            while y > 0 and not d.solid[y * d.w + x]:
+                y -= 1
+            # the first pixel under the floor's south edge
+            below = (y + 1) * d.w + x
+            if y + 1 < d.h and d.under[below * 4 + 3] == 255:
+                hung += 1
+        self.assertGreater(hung, (d.w - 128) * 0.9, "the rock hangs under the south edge")
+        self.assertGreaterEqual(rock["depth"][1], 32, "deep enough to read as a slab's underside")
+        self.assertNotIn("glow", gs.load_style("crypt_edge"), "no glow along the slab's edge (only its pit's)")
+
+    def test_dust_falls_off_its_edge(self) -> None:
+        d = self.drawing
+        self.assertEqual(sorted(d.rim_sides), [0, 1], "a rim round the slab and one round its pit")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        self.assertEqual(text.count('kind = &"pit_dust"'), 2, "dust off the slab's edge and into its pit")
+
+    def test_its_lip_is_broken_stone(self) -> None:
+        d = self.drawing
+        load = gs.load_style
+
+        def bare(edge_id: str) -> dict:
+            style = load(edge_id)
+            if edge_id == "crypt_edge":
+                style["lip"] = {k: v for k, v in style["lip"].items() if k not in ("rubble", "pebbles")}
+            return style
+        gs.load_style = bare
+        try:
+            plain = gs.Drawing(self.shape, [], HALL_CLEAR)
+        finally:
+            gs.load_style = load
+        changed = sum(1 for p in range(d.w * d.h) if d.floor[p * 4:p * 4 + 4] != plain.floor[p * 4:p * 4 + 4])
+        self.assertGreater(changed, 300, "stones and grit lie along its lip")
+
+    def test_a_floating_room_with_no_pit_hangs_its_underside_on_the_walls(self) -> None:
+        d = gs.Drawing({k: v for k, v in self.shape.items() if k not in ("pits", "cracks", "pit_edge")}, [], HALL_CLEAR)
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        self.assertIn('[node name="Underside" type="Sprite2D" parent="Walls"]', text, "a hit on the edge sheds the rock's colours")
+        self.assertTrue(any(d.under[3::4]), "the rock is drawn")
 
 
 if __name__ == "__main__":

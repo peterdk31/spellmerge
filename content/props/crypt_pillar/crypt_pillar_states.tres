@@ -1,0 +1,63 @@
+[gd_resource type="Resource" script_class="PropStates" load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_trigger.gd" id="1"]
+[ext_resource type="Script" path="res://core/base/prop_state.gd" id="2"]
+[ext_resource type="Script" path="res://core/base/prop_states.gd" id="3"]
+
+[sub_resource type="Resource" id="intact_death"]
+script = ExtResource("1")
+when = 4
+then = &"rubble"
+
+[sub_resource type="Resource" id="intact_split"]
+script = ExtResource("1")
+when = 3
+share = 0.34
+then = &"split"
+
+[sub_resource type="Resource" id="intact_cracked"]
+script = ExtResource("1")
+when = 3
+share = 0.67
+then = &"cracked"
+
+[sub_resource type="Resource" id="intact"]
+script = ExtResource("2")
+state_id = &"intact"
+triggers = Array[ExtResource("1")]([SubResource("intact_death"), SubResource("intact_split"), SubResource("intact_cracked")])
+
+[sub_resource type="Resource" id="cracked_death"]
+script = ExtResource("1")
+when = 4
+then = &"rubble"
+
+[sub_resource type="Resource" id="cracked_split"]
+script = ExtResource("1")
+when = 3
+share = 0.34
+then = &"split"
+
+[sub_resource type="Resource" id="cracked"]
+script = ExtResource("2")
+state_id = &"cracked"
+triggers = Array[ExtResource("1")]([SubResource("cracked_death"), SubResource("cracked_split")])
+
+[sub_resource type="Resource" id="split_death"]
+script = ExtResource("1")
+when = 4
+then = &"rubble"
+
+[sub_resource type="Resource" id="split"]
+script = ExtResource("2")
+state_id = &"split"
+triggers = Array[ExtResource("1")]([SubResource("split_death")])
+
+[sub_resource type="Resource" id="rubble"]
+script = ExtResource("2")
+state_id = &"rubble"
+blocks = false
+hittable = false
+
+[resource]
+script = ExtResource("3")
+list = Array[ExtResource("2")]([SubResource("intact"), SubResource("cracked"), SubResource("split"), SubResource("rubble")])

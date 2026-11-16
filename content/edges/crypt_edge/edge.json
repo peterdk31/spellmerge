@@ -1,0 +1,23 @@
+{
+	"about": "The edge of a floating crypt room (docs/milestones/crypt-rework.md, the owner's second round): a slab of the crypt's floor hanging in the dark. No masonry and no wall art: a broken lip of flagstones with stones and grit fallen along it, the rock of the slab's underside hanging into the dark below its south edges, dust falling off it into the dark. The edge stays an invisible wall (a room's shape keeps its void a wall).",
+	"full_width": 12,
+	"deep": "#08070f",
+	"lip": {
+		"width": 2,
+		"shades": ["stone.shadow", "stone.base"],
+		"pebbles": {"every": 9, "shades": ["#14121f", "stone.base", "stone.light"]},
+		"rubble": {"every": 6, "sizes": [1, 3], "shades": ["#14121f", "stone.base", "stone.light"]}
+	},
+	"rock": {
+		"depth": [16, 40],
+		"shades": ["#1d1a2b", "stone.shadow"],
+		"strata": "#14121f",
+		"roots": "wood.shadow"
+	},
+	"rim": {
+		"kind": "pit_dust",
+		"per_100px": 3,
+		"every": 6,
+		"colours": ["stone", "bone"]
+	}
+}

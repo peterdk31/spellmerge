@@ -68,7 +68,9 @@ extends Node2D
 ## moved by over the step, so a body against a wall keeps only its slide. Actors walk through each
 ## other (Combat's push parts them); spells find them by their hurt circles. No physics engine.
 ## Where the move left it, its circle tells every actor whose touch area it overlaps (`touched`,
-## `Actors.touching`: a dust heap walked into, boss plan OB5).
+## `Actors.touching`: a dust heap walked into, boss plan OB5). In a room with holes the move is slid
+## in two parts (hub rework HR-H1, `_move_over_holes`): what crosses holes, then its own walk, which
+## stops at a hole's lip.
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
 ## health (times `stat_scale`, the room's scale, and by the players in play, `players`), walking speed, contact damage, staff, cards and
@@ -309,7 +311,12 @@ func move(delta: float) -> void:
 		return
 	var from: Vector2 = global_position
 	var unhindered: Vector2 = from + velocity * delta
-	var to: Vector2 = projectiles.slide_body(from, velocity * delta, wall_radius()) if projectiles != null else unhindered
+	var to: Vector2 = unhindered
+	if projectiles != null and projectiles.has_holes():
+		to = _move_over_holes(from, delta)
+	elif projectiles != null:
+		to = projectiles.slide_body(from, velocity * delta, wall_radius())
+	mover.crossing = Vector2.ZERO
 	global_position = to
 	if to != unhindered:
 		# A dash held up head on by what it slides on ends there (`Mover.held_up`, boss plan OB10).
@@ -317,6 +324,28 @@ func move(delta: float) -> void:
 		velocity = (to - from) / delta
 	if actors != null and not actors.touch_ids.is_empty():
 		_touch()
+
+
+## Where the body's move by `velocity` over `delta` ends in a room with holes (hub rework HR-H1,
+## docs/milestones/hub-rework.md, "Holes" 2 and 3), slid in two parts: first what crosses holes (the
+## Mover's `crossing`: its dashes and what is done to it), then its own walk, which stops at a hole's
+## lip. A walk whose body's centre is over a hole crosses too: it is not pushed back out of it (a
+## centre in a blocked cell leaves by its nearest open side), so a jump onto a hole (a teleport, a
+## swap, a portal's exit, whatever step it came in) or a push into one keeps the body there (falling
+## is HR-H2's). While something crosses and the body does not walk, nothing more is slid (a still
+## walk would push it back off the lip it is carried over). One slide of the sum could not tell the
+## parts apart.
+func _move_over_holes(from: Vector2, delta: float) -> Vector2:
+	var radius: float = wall_radius()
+	var motion: Vector2 = velocity * delta
+	var crossed: Vector2 = mover.crossing * delta
+	var at: Vector2 = from
+	if crossed != Vector2.ZERO:
+		at = projectiles.slide_body(from, crossed, radius, true)
+	var walk: Vector2 = motion - crossed
+	if walk == Vector2.ZERO and crossed != Vector2.ZERO:
+		return at
+	return projectiles.slide_body(at, walk, radius, projectiles.is_hole(at))
 
 
 ## Tell every actor whose touch area this body overlaps where its move left it (its circle against
@@ -382,6 +411,7 @@ func step(delta: float) -> void:
 			# A step a hold covered part of moves the body for what is left of it (online-ready
 			# N4): whoever moves it by its velocity moves it that far.
 			velocity *= delta / full
+			mover.crossing *= delta / full
 	else:
 		velocity = Vector2.ZERO
 	if hurtbox != null and hurtbox.registered == (_down or not hurtbox.enabled):

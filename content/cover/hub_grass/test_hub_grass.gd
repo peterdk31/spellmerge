@@ -43,14 +43,14 @@ func test_it_is_sound_and_fills_the_hub() -> void:
 	check_equal(_kit.problems(), PackedStringArray(), "its data")
 	check(GRASS.fills(&"hub"), "the hub's biome")
 	check(not GRASS.fills(&"crypt"), "not the crypt's")
-	check_equal(GRASS.frame_count(), 164, "six tufts at rest, two trampled, then each tuft's own strip of each stage of its fire: catching, burning, smouldering, ash, growing back and going out")
+	check_equal(GRASS.frame_count(), 194, "six tufts at rest, two trampled, then each tuft's own strip of each stage of its fire: catching, burning, smouldering, ash, growing back, going out as it catches and as it burns")
 	var rest: CoverState = GRASS.states[0]
 	check_equal(rest.state_id, &"rest", "it starts at rest")
 	check_equal(rest.frames, PackedInt32Array([0, 1, 2, 3, 4, 5]), "six tufts at rest, curved and leaning, so the grass is never a row of straight blades")
 	check(not rest.trampled_frames.is_empty(), "it draws trampled frames (GC4)")
 	for state: CoverState in GRASS.states:
 		check_equal(state.frames.size(), rest.frames.size(), "%s draws a frame for each tuft at rest, in their order, so a tuft keeps its blades through every change (a tuft picks the same place in each list: CoverTufts.frame)" % state.state_id)
-	for state_id: StringName in [&"catching", &"burning", &"smouldering", &"growing", &"doused", &"quenched"]:
+	for state_id: StringName in [&"catching", &"burning", &"smouldering", &"growing", &"doused", &"quenched", &"burning_doused", &"burning_quenched"]:
 		var change: CoverState = GRASS.states[GRASS.state_at(state_id)]
 		check(change.animation_frames >= 3 and not change.animation_loops, "%s plays its change through, a frame at a time (the owner, 2026-11-16: everything should look smooth)" % state_id)
 		var lasts: float = float(change.animation_frames) / float(change.animation_fps)
@@ -101,7 +101,8 @@ func test_frost_puts_it_out() -> void:
 	_kit.wait(0.4)
 	_kit.touch(&"frost", _kit.middle(cell))
 	_kit.steps(1)
-	check_equal(_kit.state_of(cell), &"doused", "burning, out too")
+	check_equal(_kit.state_of(cell), &"burning_doused", "burning, out too, from its burnt-down flames (its own frames, so it does not pop back to full grass)")
+	check(GRASS.states[GRASS.state_at(&"burning_doused")].status == &"", "burning nobody")
 	_kit.wait(0.4)
 	check_equal(_kit.state_of(cell), &"rest", "and back at rest")
 
@@ -168,8 +169,11 @@ func test_water_wets_it_puts_its_fire_out_and_wet_grass_does_not_light() -> void
 	_kit.wait(0.4)
 	check_equal(_kit.state_of(cell), &"burning", "lit again and burning")
 	_kit.touch(&"water", _kit.middle(cell))
+	_kit.steps(1)
+	check_equal(_kit.state_of(cell), &"burning_quenched", "water puts a burning cell out too, from its burnt-down flames")
+	check_equal(GRASS.states[GRASS.state_at(&"burning_quenched")].status, &"soak", "soaking already")
 	_kit.wait(0.4)
-	check_equal(_kit.state_of(cell), &"wet", "water puts a burning cell out too")
+	check_equal(_kit.state_of(cell), &"wet", "then it is wet")
 
 
 func test_wet_grass_soaks_whoever_stands_in_it() -> void:

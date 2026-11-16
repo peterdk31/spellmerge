@@ -204,7 +204,9 @@ func lay(laid: CoverLayout) -> void:
 	_dirty.resize(laid.kinds.size())
 	_dirty.fill(0)
 	_times = Image.create_empty(maxi(laid.columns, 1), maxi(laid.rows, 1), false, Image.FORMAT_RGF)
-	_times.fill(Color(NEVER, NEVER, 0.0, 1.0))
+	# Shown since the room was laid: a loop then steps evenly (a time from `NEVER` would lose the
+	# shader's float precision).
+	_times.fill(Color(NEVER, _now, 0.0, 1.0))
 	_times_texture = ImageTexture.create_from_image(_times)
 	_times_dirty = false
 	_sent_count = -1
@@ -263,8 +265,9 @@ func walked_at(cell: int) -> float:
 
 
 ## When cell `cell` began to show the state it shows (Feel's clock at the `step` before the change was
-## heard; `NEVER` for one shown since the room was laid, or no such cell): an animated state plays
-## from here.
+## heard, or before the room was laid; `NEVER` for no such cell): an animated state plays from here.
+## A restore re-tells a cell whose state this view showed otherwise (the cover area's
+## `rebuild_derived`), so its animation plays again from the restore: look only.
 func shown_at(cell: int) -> float:
 	if layout == null or _times == null or cell < 0 or cell >= layout.cells.size():
 		return NEVER

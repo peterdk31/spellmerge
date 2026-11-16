@@ -40,13 +40,13 @@ then = &"burning"
 script = ExtResource("3_trigger")
 when = 0
 element = &"frost"
-then = &"doused"
+then = &"burning_doused"
 
 [sub_resource type="Resource" id="burning_water"]
 script = ExtResource("3_trigger")
 when = 0
 element = &"water"
-then = &"quenched"
+then = &"burning_quenched"
 
 [sub_resource type="Resource" id="burning_after"]
 script = ExtResource("3_trigger")
@@ -101,6 +101,30 @@ script = ExtResource("3_trigger")
 when = 1
 seconds = 0.3
 then = &"rest"
+
+[sub_resource type="Resource" id="burning_doused_fire"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"fire"
+then = &"catching"
+
+[sub_resource type="Resource" id="burning_doused_water"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"water"
+then = &"wet"
+
+[sub_resource type="Resource" id="burning_doused_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.35
+then = &"rest"
+
+[sub_resource type="Resource" id="burning_quenched_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.35
+then = &"wet"
 
 [sub_resource type="Resource" id="quenched_after"]
 script = ExtResource("3_trigger")
@@ -247,7 +271,6 @@ triggers = Array[ExtResource("3_trigger")]([SubResource("growing_fire"), SubReso
 script = ExtResource("2_state")
 state_id = &"doused"
 frames = PackedInt32Array(146, 149, 152, 155, 158, 161)
-trampled_frames = PackedInt32Array(6, 7)
 animation_frames = 3
 animation_fps = 12
 triggers = Array[ExtResource("3_trigger")]([SubResource("doused_fire"), SubResource("doused_water"), SubResource("doused_after")])
@@ -256,7 +279,6 @@ triggers = Array[ExtResource("3_trigger")]([SubResource("doused_fire"), SubResou
 script = ExtResource("2_state")
 state_id = &"quenched"
 frames = PackedInt32Array(146, 149, 152, 155, 158, 161)
-trampled_frames = PackedInt32Array(6, 7)
 animation_frames = 3
 animation_fps = 12
 status = &"soak"
@@ -265,6 +287,27 @@ status_duration = 1.0
 status_every = 0.5
 motes = Array[ExtResource("4_motes")]([SubResource("wet_glints")])
 triggers = Array[ExtResource("3_trigger")]([SubResource("quenched_after")])
+
+[sub_resource type="Resource" id="burning_doused"]
+script = ExtResource("2_state")
+state_id = &"burning_doused"
+frames = PackedInt32Array(164, 169, 174, 179, 184, 189)
+animation_frames = 5
+animation_fps = 16
+triggers = Array[ExtResource("3_trigger")]([SubResource("burning_doused_fire"), SubResource("burning_doused_water"), SubResource("burning_doused_after")])
+
+[sub_resource type="Resource" id="burning_quenched"]
+script = ExtResource("2_state")
+state_id = &"burning_quenched"
+frames = PackedInt32Array(164, 169, 174, 179, 184, 189)
+animation_frames = 5
+animation_fps = 16
+status = &"soak"
+status_strength = 25.0
+status_duration = 1.0
+status_every = 0.5
+motes = Array[ExtResource("4_motes")]([SubResource("wet_glints")])
+triggers = Array[ExtResource("3_trigger")]([SubResource("burning_quenched_after")])
 
 [sub_resource type="Resource" id="wet"]
 script = ExtResource("2_state")
@@ -292,4 +335,4 @@ tufts_per_cell = 5
 sway = 1.5
 trample_hold = 5.0
 trample_spring = 4.0
-states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("catching"), SubResource("burning"), SubResource("smouldering"), SubResource("ash"), SubResource("growing"), SubResource("doused"), SubResource("quenched"), SubResource("wet")])
+states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("catching"), SubResource("burning"), SubResource("smouldering"), SubResource("ash"), SubResource("growing"), SubResource("doused"), SubResource("quenched"), SubResource("burning_doused"), SubResource("burning_quenched"), SubResource("wet")])

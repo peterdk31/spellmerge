@@ -110,6 +110,10 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 				var last: int = frame + maxi(state.animation_frames, 1) - 1
 				if frame < 0 or last >= frames:
 					found.append("%s draws frame %d, which its sheet (%d frames) lacks." % [named, last if frame >= 0 else frame, frames])
+			if state.animation_frames < 1 or state.animation_frames > 16:
+				found.append("%s plays %d frames a tuft; 1 to 16." % [named, state.animation_frames])
+			if state.animation_fps < 1 or state.animation_fps > 127:
+				found.append("%s plays %d frames a second; 1 to 127 (Feel's shader)." % [named, state.animation_fps])
 			for frame in state.trampled_frames:
 				if frame < 0 or frame >= frames:
 					found.append("%s draws frame %d trampled, which its sheet (%d frames) lacks." % [named, frame, frames])

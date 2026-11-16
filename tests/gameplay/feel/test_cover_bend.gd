@@ -179,13 +179,17 @@ func test_a_frame_allocates_nothing() -> void:
 	var table: ActorsScript = _table(places)
 	cover.step(0.0, table, Vector2(220, 220))
 	cover.step(0.016, table, Vector2(220, 220))
+	var cell: int = cover.layout.cell_of(Vector2(200, 200))
+	cover.show_state(cell, 1)
+	cover.show_state(cell, 0)
 	var objects: float = Performance.get_monitor(Performance.OBJECT_COUNT)
 	for frame in 200:
 		for id in 48:
 			var body := table.node_of(id) as Node2D
 			body.global_position += Vector2(0.5, 0.25)
+		cover.show_state(cell, frame % 2)
 		cover.step(0.032 + float(frame) * 0.016, table, Vector2(220, 220))
-	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "200 frames of bodies through the grass make no object")
+	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "200 frames of bodies through the grass, a cell changing each, make no object")
 	check_equal(cover.body_count(), CoverScript.BODIES, "the nearest bodies still handed over")
 
 

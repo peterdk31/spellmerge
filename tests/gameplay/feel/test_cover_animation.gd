@@ -9,6 +9,7 @@ extends "res://tests/support/suite.gd"
 ## godot --headless --path . --script res://tests/gameplay/feel/test_cover_animation.gd
 
 const CoverScript := preload("res://gameplay/feel/cover.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 var fixture_grass: CoverKind = preload("res://tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres")
 
 ## The field of grass every test lays: cells (12, 12) to (15, 15) of a room 640×384.
@@ -79,7 +80,7 @@ func test_a_states_animation_rides_in_its_rows() -> void:
 func test_a_change_is_timed_from_feels_clock() -> void:
 	var cover: CoverScript = _cover(_grass())
 	var cell: int = cover.layout.cell_of(Vector2(200, 200))
-	check_equal(cover.shown_at(cell), CoverScript.NEVER, "a cell as laid was never changed")
+	check_equal(cover.shown_at(cell), 0.0, "a cell as laid shows its state since the room was laid (Feel's clock then), so a loop steps evenly")
 	cover.step(7.5)
 	cover.show_state(cell, cover.layout.kinds[0].state_at(&"burning"))
 	check_equal(cover.shown_at(cell), 7.5, "a change heard begins at the clock of the last step")
@@ -87,8 +88,16 @@ func test_a_change_is_timed_from_feels_clock() -> void:
 	var texture := (cover.batch_of(&"test_grass").material as ShaderMaterial).get_shader_parameter(&"cell_times") as Texture2D
 	check(texture != null and texture.get_size() == Vector2(cover.layout.columns, cover.layout.rows), "the shader reads the grid, a texel a cell")
 	check_equal(cover.walked_at(cell), CoverScript.NEVER, "a change walks nothing: the walk is the grid's red, the change its green")
+	var body := own(Node2D.new()) as Node2D
+	root.add_child(body)
+	body.global_position = Vector2(200, 200)
+	var table := own(ActorsScript.new()) as ActorsScript
+	table.set_node(table.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY), body)
+	cover.step(8.0, table, Vector2.ZERO)
+	check_equal(cover.walked_at(cell), 8.0, "a walk")
+	check_equal(cover.shown_at(cell), 7.5, "keeps when the cell's state began")
 	cover.lay(cover.layout)
-	check_equal(cover.shown_at(cell), CoverScript.NEVER, "a room laid again starts unchanged")
+	check_equal(cover.shown_at(cell), 8.0, "a room laid again starts from when it was laid")
 
 
 func test_once_it_steps_through_and_holds_its_last_frame() -> void:
@@ -100,7 +109,6 @@ func test_once_it_steps_through_and_holds_its_last_frame() -> void:
 	check_equal(CoverScript.frame_at(burning, rolled, 0.35), first + 3, "to its last")
 	check_equal(CoverScript.frame_at(burning, rolled, 50.0), first + 3, "which it holds")
 	check_equal(CoverScript.frame_at(burning, rolled, -1.0e6), first, "never before its first")
-	check_equal(CoverScript.frame_at(burning, rolled, 1.0e6 + 3.0), first + 3, "a cell as laid (never changed) shows its last")
 
 
 func test_a_loop_wraps_from_each_tufts_own_place() -> void:
@@ -129,3 +137,11 @@ func test_an_animation_past_the_sheet_is_named() -> void:
 	check("\n".join(kind.problems()).contains("draws frame 10"), "frame 7's four frames run past a sheet of 9: %s" % "\n".join(kind.problems()))
 	kind.sheet = _sheet(11)
 	check(not "\n".join(kind.problems()).contains("which its sheet"), "a sheet that holds them all is sound")
+	var burning: CoverState = kind.states[kind.state_at(&"burning")]
+	burning.animation_fps = 0
+	check("\n".join(kind.problems()).contains("0 frames a second"), "a speed the shader cannot play is named")
+	burning.animation_fps = 200
+	check("\n".join(kind.problems()).contains("200 frames a second"), "too fast too")
+	burning.animation_fps = FPS
+	burning.animation_frames = 17
+	check("\n".join(kind.problems()).contains("plays 17 frames a tuft"), "and too long a strip")

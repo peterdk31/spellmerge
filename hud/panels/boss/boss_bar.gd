@@ -70,7 +70,7 @@ func bind(events: EventsScript) -> void:
 
 
 ## The boss `actor` entered play (`boss_shown`).
-func show_boss(actor: int, boss_name: String, _lore: String, marks: PackedFloat32Array) -> void:
+func show_boss(actor: int, boss_name: String, _lore: String, marks: PackedFloat32Array, _has_intro: bool = false) -> void:
 	if not _order.has(actor):
 		_order.append(actor)
 	var health: float = 1.0

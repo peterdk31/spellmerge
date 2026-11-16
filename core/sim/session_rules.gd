@@ -19,6 +19,12 @@ extends RefCounted
 ##   inventory, in copies (items I4, docs/milestones/items.md; one rule per `ItemKinds.BAGS`
 ##   entry, named `bag_` and the bag's name). 0, the default: no limit. An inventory takes its
 ##   bags' at its start (`bag_capacity`); meta progression raises them later.
+## - `boss_intros`: 1, the default: a boss with an intro stops the game for it as its fight starts
+##   (docs/milestones/boss-intro.md, rule 4; `BossIntroHold`); 0: none, the entrance banner. A rule,
+##   not a setting of the machine, because it changes when the game stops: a replay recorded with
+##   it on would not play back the same with it off. Off for automation (tests, bots, the smoke
+##   test, screenshots): Flow turns this machine's off where it turns its opening off, and the test
+##   suite does at each test's start; a test of the intro turns it on.
 ##
 ## A run takes them from the frames service (`Frames.next_run_rules`): the replay's while one
 ## records or plays (its header), otherwise a copy of this machine's. Online (later), the host's
@@ -46,9 +52,10 @@ const FIELDS: Array = [
 	[&"bag_cards", "card bag", 0, MAX_BAG],
 	[&"bag_relics", "relic bag", 0, MAX_BAG],
 	[&"bag_potions", "potion bag", 0, MAX_BAG],
+	[&"boss_intros", "boss intros", 0, 1],
 ]
 ## The header's bytes: a 32-bit number for each of FIELDS.
-const BYTES: int = 28
+const BYTES: int = 32
 
 var shot_cap: int = ManagerScript.DEFAULT_CAP_DESKTOP
 var hit_work: int = ManagerScript.WORK_PER_STEP
@@ -57,6 +64,7 @@ var bag_staffs: int = 0
 var bag_cards: int = 0
 var bag_relics: int = 0
 var bag_potions: int = 0
+var boss_intros: int = 1
 
 ## Not state: this machine's rules.
 const DERIVED: Array[StringName] = [&"_machine"]

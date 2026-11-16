@@ -173,7 +173,7 @@ func run(delta: float) -> void:
 	if ticks_frames:
 		frames.tick(delta)
 	# The frames' commands may have stopped the game or let it go: the picture follows at once, so
-	# the tree is never paused while the tick steps.
+	# the tree is never paused while the game goes.
 	if is_inside_tree():
 		_show_stop()
 	var stopped: bool = sim.is_stopped()
@@ -198,7 +198,7 @@ func _run_steps(delta: float, stopped: bool) -> void:
 			continue
 		if step.key == BODIES:
 			_step_bodies(delta)
-		elif _order_area[i].is_stepped() and step.call.is_valid():
+		elif _order_area[i].is_stepped(stopped) and step.call.is_valid():
 			step.call.call(delta)
 
 
@@ -254,6 +254,7 @@ func begin_run() -> void:
 	# The last run's stops and hold end with it (a new run starts with the game going).
 	sim.hold_left = 0
 	sim.stops.clear()
+	sim.held_through.fill(0)
 	if frames != null:
 		sim.run_seed = frames.next_run_seed()
 		sim.rules = frames.next_run_rules()

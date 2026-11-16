@@ -70,6 +70,7 @@ const COMMAND_NAMES: Array[StringName] = [
 	&"item_take_requested",
 	&"staff_hand_requested", &"bag_drop_requested",
 	&"start_depth_picked",
+	&"boss_intro_next_requested",
 ]
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
@@ -82,6 +83,7 @@ const COMMAND_SHAPES: PackedStringArray = [
 	"i",
 	"i",
 	"iii", "ssii",
+	"i",
 	"i",
 ]
 

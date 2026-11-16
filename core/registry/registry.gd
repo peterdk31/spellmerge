@@ -153,8 +153,9 @@ func validate_spells() -> Array[Dictionary]:
 
 
 ## The problems with the game's words: each spell card's description (`SpellComponent.description`,
-## `SpellValidator.check_descriptions`) and each enemy's and boss's lore (`EnemyBase.lore`,
-## `StoryValidator.check_lore`); a missing one only warns.
+## `SpellValidator.check_descriptions`), each enemy's and boss's lore (`EnemyBase.lore`,
+## `StoryValidator.check_lore`; a missing one only warns) and what a boss says in its intro
+## (`BossIntro.lines`, `StoryValidator.check_speech`).
 func validate_story() -> Array[Dictionary]:
 	var cards: Array[SpellComponent] = []
 	for res: Resource in get_all(&"spells"):
@@ -166,6 +167,8 @@ func validate_story() -> Array[Dictionary]:
 			if res is EnemyBase:
 				var enemy := res as EnemyBase
 				problems.append_array(StoryValidator.check_lore(enemy.resource_path, enemy.lore, enemy.boss))
+				if enemy.boss_intro != null:
+					problems.append_array(StoryValidator.check_speech(enemy.resource_path, enemy.boss_intro.lines))
 	return problems
 
 

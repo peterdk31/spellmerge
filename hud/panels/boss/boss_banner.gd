@@ -54,7 +54,7 @@ func bind(events: EventsScript) -> void:
 
 
 ## Show the banner of the boss that entered play (`boss_shown`).
-func show_boss(_actor: int, boss_name: String, lore: String, _marks: PackedFloat32Array) -> void:
+func show_boss(_actor: int, boss_name: String, lore: String, _marks: PackedFloat32Array, _has_intro: bool = false) -> void:
 	_name.text = boss_name
 	_lore.text = lore
 	_lore.visible = lore != ""

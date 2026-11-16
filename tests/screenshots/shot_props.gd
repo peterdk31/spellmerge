@@ -3,11 +3,16 @@ extends "res://tests/support/empty_stage.gd"
 ## stage (tests/support/empty_stage.gd), a row a prop (the registry's `props`, by id), a column a state, each body made by
 ## `PropBody.make` and put into its state as a trigger would, its look's art, motes and light
 ## showing; each prop's cells as big as its art (a barrel to the hub's 96 px stone). `props` is the
-## whole sheet a moment later (the motes given off), `props_4x` the first prop close up.
+## whole sheet a moment later (the motes given off; a state's change played to its rest),
+## `props_4x` the first prop close up, and `props_changes` every change a prop plays as its state is
+## entered (a layer whose strip plays once, `PropLayer.loop_from`: a crypt pillar's crumbles, a
+## crypt gate's opening and closing), a row of its frames each.
 
 ## Pixels round each prop's art, and the widest a row of the sheet runs.
 const PAD: float = 12.0
 const ROW_WIDTH: float = 600.0
+## Pixels between the frames of a change's strip (`props_changes`), so the longest fits the screen.
+const STRIP_PAD: float = 2.0
 ## The screen's middle, where the sheet is centred.
 const CENTRE: Vector2 = SCREEN * 0.5
 
@@ -19,6 +24,11 @@ func take() -> void:
 	for resource: Resource in root.get_node("Registry").call("get_all", &"props"):
 		if resource is PropBase:
 			props.append(resource as PropBase)
+	# The changes first, on a stage of their own (the stage's run moves on after a while).
+	await _changes(props)
+	await close_stage()
+	if not await open_stage():
+		return
 	# Each prop a block of its states side by side, a cell as big as its biggest art (props differ
 	# from a barrel to the hub's 96 px stone); blocks run in rows across the screen.
 	var cells: Array[Rect2] = []
@@ -50,6 +60,8 @@ func take() -> void:
 			stand(body, bottom - _first_offset(data))
 			if column > 0:
 				_put_in(body, data.states.list[column].state_id)
+				# Its change played through to where it rests (a crumble down to its rubble).
+				(body.get_node("PropLook") as PropLook)._process(5.0)
 	# The motes given off for a while (under the exploding barrel's 1 s fuse).
 	for i in 40:
 		await physics_frame
@@ -58,6 +70,46 @@ func take() -> void:
 	var first := Rect2(sheet.position + cells[0].position, Vector2(cells[0].size.x * float(props[0].states.list.size()), cells[0].size.y))
 	await snap(first.get_center(), "props_4x", Vector2i(first.size * 0.5) + Vector2i(2, 2), 4 if first.size.y <= 48.0 else 2)
 	await close_stage()
+
+
+## `props_changes`: each strip a look plays once as its state is entered, its frames side by side
+## in a row, the rows one under another, sprites only (the strips' art as the data holds it).
+func _changes(props: Array[PropBase]) -> void:
+	var strips: Array[PropLayer] = []
+	for data in props:
+		for look in data.looks:
+			if look == null:
+				continue
+			for layer in look.layers:
+				if layer != null and layer.is_animated() and layer.loop_from > 0:
+					strips.append(layer)
+	if strips.is_empty():
+		return
+	var width: float = 0.0
+	var height: float = 0.0
+	for layer in strips:
+		width = maxf(width, float(layer.frame_size().x * layer.frames) + STRIP_PAD * float(layer.frames))
+		height += float(layer.frame_size().y) + STRIP_PAD
+	var top_left := CENTRE - Vector2(width, height) * 0.5
+	var y: float = 0.0
+	var made: Array[Node] = []
+	for layer in strips:
+		var size := Vector2(layer.frame_size())
+		for i in layer.frames:
+			var sprite := Sprite2D.new()
+			layer.dress(sprite)
+			sprite.frame = i
+			sprite.centered = false
+			sprite.offset = Vector2.ZERO
+			sprite.position = (top_left + Vector2((size.x + STRIP_PAD) * float(i), y)).round()
+			world.add_child(sprite)
+			made.append(sprite)
+		y += size.y + STRIP_PAD
+	await process_frame
+	await snap(CENTRE, "props_changes", Vector2i(Vector2(width, height) * 0.5) + Vector2i(4, 8), 2)
+	for node in made:
+		node.queue_free()
+	await process_frame
 
 
 ## The biggest frame of any layer of any of its looks.

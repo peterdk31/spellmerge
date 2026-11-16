@@ -1,0 +1,106 @@
+[gd_resource type="Resource" script_class="PropBase" load_steps=21 format=3]
+
+[ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="1"]
+[ext_resource type="Resource" path="res://content/props/crypt_pillar/crypt_pillar_states.tres" id="2"]
+[ext_resource type="Texture2D" path="res://content/props/crypt_pillar/intact.svg" id="3"]
+[ext_resource type="Script" path="res://core/base/prop_layer.gd" id="4"]
+[ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="5"]
+[ext_resource type="Texture2D" path="res://content/props/crypt_pillar/cracking.svg" id="6"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="7"]
+[ext_resource type="Texture2D" path="res://content/props/crypt_pillar/splitting.svg" id="8"]
+[ext_resource type="Texture2D" path="res://content/props/crypt_pillar/collapsing.svg" id="9"]
+[ext_resource type="Script" path="res://core/base/prop_base.gd" id="10"]
+
+[sub_resource type="Resource" id="intact_layer"]
+script = ExtResource("4")
+texture = ExtResource("3")
+
+[sub_resource type="Resource" id="intact_look"]
+script = ExtResource("5")
+state_id = &"intact"
+layers = Array[ExtResource("4")]([SubResource("intact_layer")])
+
+[sub_resource type="Resource" id="cracked_grit"]
+script = ExtResource("7")
+kind = &"grit"
+rate = 1.5
+from = 2
+at = Vector2(0, -40)
+size = Vector2(6, 28)
+colours = Array[StringName]([&"stone"])
+
+[sub_resource type="Resource" id="cracked_layer"]
+script = ExtResource("4")
+texture = ExtResource("6")
+frames = 6
+fps = 10.0
+loop_from = 5
+motes = Array[ExtResource("7")]([SubResource("cracked_grit")])
+
+[sub_resource type="Resource" id="cracked_look"]
+script = ExtResource("5")
+state_id = &"cracked"
+cue = &"pillar_crack"
+layers = Array[ExtResource("4")]([SubResource("cracked_layer")])
+
+[sub_resource type="Resource" id="split_grit"]
+script = ExtResource("7")
+kind = &"grit"
+rate = 3.0
+from = 2
+at = Vector2(0, -32)
+size = Vector2(16, 40)
+colours = Array[StringName]([&"stone"])
+
+[sub_resource type="Resource" id="split_layer"]
+script = ExtResource("4")
+texture = ExtResource("8")
+frames = 7
+fps = 10.0
+loop_from = 6
+motes = Array[ExtResource("7")]([SubResource("split_grit")])
+
+[sub_resource type="Resource" id="split_look"]
+script = ExtResource("5")
+state_id = &"split"
+cue = &"pillar_crack"
+layers = Array[ExtResource("4")]([SubResource("split_layer")])
+
+[sub_resource type="Resource" id="rubble_dust"]
+script = ExtResource("7")
+kind = &"dust"
+rate = 16.0
+from = 2
+at = Vector2(0, -8)
+size = Vector2(34, 12)
+spread = 360.0
+reach = 7.0
+stop = 2.5
+colours = Array[StringName]([&"stone", &"bone"])
+
+[sub_resource type="Resource" id="rubble_layer"]
+script = ExtResource("4")
+texture = ExtResource("9")
+frames = 9
+fps = 12.0
+loop_from = 8
+motes = Array[ExtResource("7")]([SubResource("rubble_dust")])
+
+[sub_resource type="Resource" id="rubble_look"]
+script = ExtResource("5")
+state_id = &"rubble"
+cue = &"pillar_break"
+layers = Array[ExtResource("4")]([SubResource("rubble_layer")])
+
+[resource]
+script = ExtResource("10")
+id = &"crypt_pillar"
+display_name = "Crypt pillar"
+scene = ExtResource("1")
+max_health = 60.0
+size = Vector2(22, 52)
+offset = Vector2(0, -28)
+footprint_size = Vector2(26, 12)
+footprint_offset = Vector2(0, -6)
+states = ExtResource("2")
+looks = Array[ExtResource("5")]([SubResource("intact_look"), SubResource("cracked_look"), SubResource("split_look"), SubResource("rubble_look")])

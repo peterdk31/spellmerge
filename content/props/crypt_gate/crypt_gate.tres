@@ -1,0 +1,73 @@
+[gd_resource type="Resource" script_class="PropBase" load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_base.gd" id="1_base"]
+[ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="2_scene"]
+[ext_resource type="Resource" path="res://content/props/crypt_gate/crypt_gate_states.tres" id="3_states"]
+[ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="4_look"]
+[ext_resource type="Script" path="res://core/base/prop_layer.gd" id="5_layer"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="6_motes"]
+[ext_resource type="Texture2D" path="res://content/props/crypt_gate/closing.svg" id="7_closing"]
+[ext_resource type="Texture2D" path="res://content/props/crypt_gate/opening.svg" id="8_opening"]
+
+[sub_resource type="Resource" id="closing"]
+script = ExtResource("5_layer")
+texture = ExtResource("7_closing")
+frames = 6
+fps = 10.0
+loop_from = 5
+
+[sub_resource type="Resource" id="dark_look"]
+script = ExtResource("4_look")
+state_id = &"dark"
+layers = Array[ExtResource("5_layer")]([SubResource("closing")])
+light_reach = 56.0
+light_at = Vector2(0, -20)
+light_flicker = 0.1
+light_tint = Color(0.878, 0.541, 0.847, 1)
+light_until = 0.3
+
+[sub_resource type="Resource" id="veil_glimmer"]
+script = ExtResource("6_motes")
+kind = &"glimmer"
+rate = 10.0
+from = 2
+at = Vector2(0, -24)
+size = Vector2(16, 36)
+way = Vector2(0, -1)
+spread = 30.0
+reach = 4.0
+start = 0.5
+colours = Array[StringName]([&"void"])
+
+[sub_resource type="Resource" id="opening"]
+script = ExtResource("5_layer")
+texture = ExtResource("8_opening")
+frames = 11
+fps = 10.0
+loop_from = 5
+motes = Array[ExtResource("6_motes")]([SubResource("veil_glimmer")])
+
+[sub_resource type="Resource" id="lit_look"]
+script = ExtResource("4_look")
+state_id = &"lit"
+layers = Array[ExtResource("5_layer")]([SubResource("opening")])
+light_reach = 56.0
+light_at = Vector2(0, -20)
+light_flicker = 0.1
+light_tint = Color(0.878, 0.541, 0.847, 1)
+light_after = 0.5
+cue = &"stone_lit"
+
+[resource]
+script = ExtResource("1_base")
+id = &"crypt_gate"
+display_name = "Crypt gate"
+scene = ExtResource("2_scene")
+invincible = true
+role = &"room_exit"
+radius = 16.0
+offset = Vector2(0, -24)
+area_size = Vector2(24, 64)
+area_offset = Vector2(0, -26)
+states = ExtResource("3_states")
+looks = Array[ExtResource("4_look")]([SubResource("dark_look"), SubResource("lit_look")])

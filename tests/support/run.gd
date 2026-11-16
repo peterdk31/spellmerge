@@ -52,7 +52,10 @@ func _initialize() -> void:
 ## Runs the suite in `path`; whether every test passed.
 func _run_file(path: String) -> bool:
 	var script: Script = load(path) as Script
-	if script == null or not _is_suite(script):
+	if script == null or not script.can_instantiate():
+		printerr("TEST FAILED: %s did not load (its error is above)" % path)
+		return false
+	if not _is_suite(script):
 		printerr("TEST FAILED: %s is not a suite (it must extend res://tests/support/suite.gd)" % path)
 		return false
 	var suite: SuiteScript = script.new() as SuiteScript

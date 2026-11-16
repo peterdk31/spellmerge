@@ -222,10 +222,10 @@ func test_a_layer_is_drawn_where_it_says() -> void:
 func test_feels_source_motes_read_a_props_sources() -> void:
 	var body: Actor = _barrel()
 	var sources := SourceMotesScript.new(RampTableScript.new())
-	sources.take(self)
+	sources.take(tree)
 	check_equal(sources.source_count(), 1, "the idle flame mark")
 	_enter(body, &"fusing")
-	sources.watch(self)
+	sources.watch(tree)
 	check_equal(sources.source_count(), 2, "the lit barrel's two")
 	_enter(body, &"broken")
 	sources.give_off(0.0, null)

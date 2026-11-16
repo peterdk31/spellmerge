@@ -24,7 +24,8 @@ extends Node
 ##   godot --headless --path . --script res://tests/support/run.gd -- res://tests/<area>/test_<name>.gd
 ##
 ## The suite reads the tree as a SceneTree script would: `root`, `process_frame`, `physics_frame`,
-## `paused`, `current_scene` and `call_group` are the host's tree's.
+## `paused`, `current_scene` and `call_group` are the host's tree's (`tree`: hand it to a helper that
+## takes the SceneTree).
 ##
 ## A long test file can be run in several processes side by side: a line `# unit-test-shards: N`
 ## in it makes the runner start it N times, with the user argument `--shard=K/N` (K from 0), and each
@@ -37,23 +38,24 @@ extends Node
 const _SUITE_FRAMES := preload("res://core/sim/frames.gd")
 const _SUITE_TICK := preload("res://core/sim/tick.gd")
 
-## The host's tree's root window, and its frame signals (set by `run_in`).
+## The host's tree (a helper that takes the SceneTree takes this), its root window and its frame
+## signals (set by `run_in`).
+var tree: SceneTree
 var root: Window
 var process_frame: Signal
 var physics_frame: Signal
 ## The host's tree's pause and current scene.
 var paused: bool:
 	get:
-		return _tree.paused
+		return tree.paused
 	set(value):
-		_tree.paused = value
+		tree.paused = value
 var current_scene: Node:
 	get:
-		return _tree.current_scene
+		return tree.current_scene
 	set(value):
-		_tree.current_scene = value
+		tree.current_scene = value
 
-var _tree: SceneTree
 var _failures: Array[String] = []
 var _current: String = ""
 var _owned: Array[Object] = []
@@ -61,11 +63,11 @@ var _owned: Array[Object] = []
 
 ## Runs every `test_*` method (of the shard the user arguments ask for) on `tree`; returns the
 ## failures, each "test_name: what was wrong" (empty when all passed).
-func run_in(tree: SceneTree) -> Array[String]:
-	_tree = tree
-	root = tree.root
-	process_frame = tree.process_frame
-	physics_frame = tree.physics_frame
+func run_in(host: SceneTree) -> Array[String]:
+	tree = host
+	root = host.root
+	process_frame = host.process_frame
+	physics_frame = host.physics_frame
 	var names: Array[String] = []
 	for method: Dictionary in get_method_list():
 		var method_name: String = method["name"]
@@ -100,7 +102,7 @@ func run_in(tree: SceneTree) -> Array[String]:
 
 ## The host's tree's `call_group`.
 func call_group(group: StringName, method: StringName, ...args: Array) -> void:
-	_tree.call_group.callv([group, method] + args)
+	tree.call_group.callv([group, method] + args)
 
 
 ## The shard a run's user arguments ask for, as (K, N) from `--shard=K/N`; (0, 1) (the whole file)

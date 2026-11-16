@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The rules of the game, in 12 sub-areas: `actor` (the shared body kit, actors G4), `player`, `combat`, `feel`, `coop`, `ai`, `items` (what lies on the ground, items I6), `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job and when it is built (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
+The rules of the game, in 13 sub-areas: `actor` (the shared body kit, actors G4), `player`, `combat`, `feel`, `coop`, `ai`, `items` (what lies on the ground, items I6), `cover` (the ground cover's game: fire, frost and what it does to bodies, ground cover GC5), `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job and when it is built (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
 
 ## Contract shared by every sub-area
 
@@ -74,7 +74,10 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `room_exits_shown` | `flow` (the lit exits of a cleared room, and the kind behind each) | `feel` (the kind's name over each) |
 | `room_left` | `flow` (the party goes on to the next room of the run) | `core/spells` (what was cast in the room ends quietly) |
 | `room_entered` | `flow` | `ai`, `coop`, `difficulty`, `hud`, `feel` (its walls' colours for motes; the party camera jumps to the new room) |
-| `room_built` | `flow` | `feel` (ground cover GC3: the cover's look, `cover.gd`) and the cover area (GC5): the room's cover worked out from its layout, `CoverLayout.of` |
+| `room_built` | `flow` | `feel` (ground cover GC3: the cover's look, `cover.gd`) and `cover` (GC5): the room's cover worked out from its layout, `CoverLayout.of` |
+| `floor_touched` | `core/spells` (a blast, a pulse's ring, a pool lying and on its ticks, a shot's end; ground cover GC5) | `cover` (the `element` triggers of the cells inside its circle, at its next step) |
+| `cover_changed` | `cover` (each tick's changes; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look) |
+| `status_requested` | `core/spells` (a portal's infusion) and `cover` (a status of the cover a body stands in, ground cover GC5 rule 4: asked as any status is) | `combat` |
 | `room_cleared` | `flow` | `rewards`, `run` |
 | `sandbox_changed` | `flow` | `hud` |
 | `door_voted` | `flow` | none yet |

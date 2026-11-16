@@ -58,6 +58,8 @@ func after_each() -> void:
 	flow.run_id_to_play = was_run
 	for index in 4:
 		input.leave(index)
+	# The seats' leaves are commands: applied here, so the next test starts clean.
+	await commands_applied()
 
 
 func _on_room_cleared(_room_id: StringName) -> void:
@@ -134,6 +136,7 @@ func test_the_burst_stands_by_the_players_in_play_round_the_boss() -> void:
 		flow.stop_run()
 		for index in 4:
 			input.leave(index)
+		await commands_applied()
 
 
 func test_waves_stand_under_the_cap_of_those_alive() -> void:
@@ -202,3 +205,75 @@ func test_health_follows_the_players_in_play_keeping_its_share() -> void:
 	await commands_applied()
 	check(is_equal_approx(boss.health.max_health, 100.0), "one player: its data's, got %s" % boss.health.max_health)
 	check(is_equal_approx(boss.health.health, 50.0), "still half, got %s" % boss.health.health)
+
+
+func test_each_call_turns_the_ring_so_a_wave_stands_apart() -> void:
+	_start(1)
+	var boss: Actor = _boss()
+	boss.phases.begin(0)
+	var burst: Array[Actor] = _imps()
+	boss.phases.step(1.0)
+	var wave: Array[Actor] = _imps()
+	wave = wave.filter(func(imp: Actor) -> bool: return not burst.has(imp))
+	check_equal(wave.size(), 1, "a wave of one")
+	for imp: Actor in burst:
+		check(imp.position.distance_to(wave[0].position) > 1.0, "the wave's add stands apart from the burst's")
+
+
+## An add freed with no death told (it left the room some other way) is forgotten: it counts no more
+## against the cap, and the room is cleared all the same once the boss is down.
+func test_an_add_gone_without_a_death_is_forgotten() -> void:
+	_start(1)
+	var boss: Actor = _boss()
+	boss.phases.begin(0)
+	var gone: Actor = _imps()[0]
+	gone.get_parent().remove_child(gone)
+	gone.free()
+	check_equal(flow.adds.alive(boss, Phases.adds_key(0, 0)), 1, "a freed add is not alive")
+	combat.call("hit", -1, boss, 10000.0)
+	flow.step(0.01)
+	check_equal(flow.enemies_left(), 0, "every add gone")
+	check_equal(cleared, 1, "the room is cleared")
+
+
+func test_the_adds_are_forgotten_with_the_room() -> void:
+	_start(1)
+	_boss().phases.begin(0)
+	check(not flow.adds.adds.is_empty(), "adds stand")
+	flow.stop_run()
+	check(flow.adds.adds.is_empty() and flow.adds.stood == 0, "a run's end forgets them")
+
+
+func test_the_sandbox_holds_adds_to_its_most() -> void:
+	for index in 1:
+		input.add_virtual_device(index)
+	events.emit_signal("sandbox_requested", 0)
+	check_equal(flow.spawn_in_sandbox(BOSS_ID, 1), 1, "the boss in the arena")
+	check_equal(flow.spawn_in_sandbox(&"ember_imp", FlowScript.SANDBOX_MAX - 2), FlowScript.SANDBOX_MAX - 2, "the arena nearly full")
+	var boss: Actor = _boss()
+	boss.phases.begin(0)
+	check_equal(flow.enemies_left(), FlowScript.SANDBOX_MAX, "its burst only up to the arena's most")
+	flow.clear_sandbox_enemies()
+	check(flow.adds.adds.is_empty(), "clearing the arena forgets the adds")
+
+
+## Restored from a snapshot taken between the boss's death and the crumble, its adds are made again
+## with no caller, and crumble at the next step as they did: the room is cleared.
+func test_adds_without_a_caller_restored_still_crumble() -> void:
+	_start(1)
+	var boss: Actor = _boss()
+	boss.phases.begin(0)
+	var imps: int = _imps().size()
+	combat.call("hit", -1, boss, 10000.0)
+	var tick: Node = root.get_node("Tick")
+	var snapshot: Snapshot = Snapshot.take(tick.call("state_areas"), root)
+	check_equal(snapshot.problems, PackedStringArray(), "the snapshot is whole")
+	flow.step(0.01)
+	check_equal(cleared, 1, "cleared after the crumble")
+	check_equal(snapshot.restore(tick.call("state_areas"), root), PackedStringArray(), "restored without problems")
+	check_equal(flow.enemies_left(), imps, "the adds stand again")
+	check_equal(flow.adds.adds.size(), imps, "kept as adds")
+	check(flow.adds.callers.all(func(caller: Node) -> bool: return caller == null), "with no caller")
+	flow.step(0.01)
+	check_equal(flow.enemies_left(), 0, "they crumble again")
+	check_equal(cleared, 2, "and the room is cleared again")

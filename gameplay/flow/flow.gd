@@ -1470,12 +1470,13 @@ func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> v
 	var reach: float = caller.hurtbox.outer_radius() if caller.hurtbox != null else caller.wall_radius()
 	var slide: Callable = projectiles.slide_body if projectiles != null else Callable()
 	var radius: float = _body_radius_of(data)
+	var turn: int = adds.stood
 	for n: int in count:
 		var at: Vector2
 		if at_spawns:
 			at = stacked_position(spawns[adds.stood % spawns.size()], adds.stood / spawns.size())
 		else:
-			at = RoomAdds.ring(centre, reach, radius, n, count, slide)
+			at = RoomAdds.ring(centre, reach, radius, n, count, slide, turn)
 		var add: Actor = _stand_enemy(world, data, at)
 		if add != null:
 			adds.track(add, caller, key)
@@ -1491,27 +1492,47 @@ func _enemy_of(actor: int) -> Actor:
 
 
 ## How wide the ground of an enemy of `data` is against the walls (its scene's `Footprint` circle, else
-## the default one), at its data's size: the room an add needs on the ring. Asked once a call of adds.
-func _body_radius_of(data: EnemyBase) -> float:
+## the default one), at its data's size: the room an add needs on the ring. Read from its scene's
+## state (`SceneState`), no body made.
+static func _body_radius_of(data: EnemyBase) -> float:
 	var base: float = Footprint.DEFAULT_RADIUS
-	var made: Node = data.scene.instantiate() if data.scene != null else null
-	if made != null:
-		var footprint := made.get_node_or_null("Footprint") as Footprint
-		if footprint != null:
-			base = footprint.radius
-		made.free()
+	var scene_state: SceneState = data.scene.get_state() if data.scene != null else null
+	if scene_state != null:
+		for node in scene_state.get_node_count():
+			if scene_state.get_node_name(node) != &"Footprint" or scene_state.get_node_path(node, true) != NodePath("."):
+				continue
+			for p in scene_state.get_node_property_count(node):
+				if scene_state.get_node_property_name(node, p) == &"radius":
+					base = float(scene_state.get_node_property_value(node, p))
 	return base * (data.size if data.size > 0.0 else 1.0)
 
 
 ## The adds whose caller died crumble (boss plan OB13), each through Combat (`crumble_requested`):
 ## its death is told as any other, and the room is cleared when the last is down.
+## An add that went without a death told, or that Combat could not crumble (no health), is forgotten
+## here, so the room is cleared all the same.
 func _crumble_orphans() -> void:
-	if events == null:
+	if events == null or not adds.has_orphans():
 		return
+	var left: int = 0
 	for add: Node in adds.orphans():
 		var actor := add as Actor
-		if actor != null and not actor.is_dying():
-			events.crumble_requested.emit(actor.id)
+		if actor == null or actor.is_dying():
+			continue
+		events.crumble_requested.emit(actor.id)
+		if is_instance_valid(actor) and not actor.is_dying():
+			# Combat could not crumble it: it goes from the room's fight as it is.
+			adds.orphan(actor)
+			_enemies.erase(actor)
+			_detach(actor)
+			left += 1
+	var gone: int = adds.forget_gone()
+	for at in range(_enemies.size() - 1, -1, -1):
+		if not is_instance_valid(_enemies[at]):
+			_enemies.remove_at(at)
+			gone += 1
+	if left + gone > 0:
+		_check_room_won()
 
 
 ## Forget the old run: wizards leave `Combat` (the enemies do it themselves when

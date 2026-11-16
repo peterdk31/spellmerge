@@ -86,6 +86,11 @@ func test_adds_count_by_the_players_in_play() -> void:
 	phase.adds = [bad, null] as Array[EnemyAdds]
 	data.phases = [phase] as Array[EnemyPhase]
 	check_equal(data.problems().size(), 4, "the phase's adds' problems, an empty entry too: %s" % data.problems())
+	var many: Array[EnemyAdds] = []
+	for k in Phases.ADDS_MOST + 1:
+		many.append(adds)
+	phase.adds = many
+	check_equal(data.problems().size(), 1, "more entries than a phase may have: %s" % data.problems())
 	check(is_equal_approx(data.health_for(4, 2.0), 100.0 * 2.0 * 3.1), "health by players and the room's scale")
 	check(is_equal_approx(data.health_for(1), 100.0) and is_equal_approx(data.health_for(0), 100.0), "one player: its own")
 

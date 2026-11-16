@@ -124,6 +124,8 @@ func problems() -> PackedStringArray:
 		if phase.stats != null:
 			for line: String in phase.stats.problems():
 				found.append("%s: phase %d stats: %s" % [id, at, line])
+		if phase.adds.size() > Phases.ADDS_MOST:
+			found.append("%s: phase %d has %d adds entries; at most %d." % [id, at, phase.adds.size(), Phases.ADDS_MOST])
 		for k in phase.adds.size():
 			if phase.adds[k] == null:
 				found.append("%s: phase %d adds %d are empty." % [id, at, k])

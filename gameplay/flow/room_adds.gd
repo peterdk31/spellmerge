@@ -9,6 +9,9 @@ extends RefCounted
 
 ## Pixels between the caller's hurt shape and an add's body on the ring.
 const RING_GAP: float = 10.0
+## Radians each add stood before turns the next call's ring (about 137.5°, the golden angle: no two
+## calls stand on the same spots).
+const RING_TURN: float = 2.399963
 
 ## State as who they point at (core/sim/README.md).
 const REFS: Array[StringName] = [&"adds", &"callers"]
@@ -31,13 +34,22 @@ func track(add: Node, caller: Node, key: int) -> void:
 	stood += 1
 
 
-## How many of `caller`'s entry `key` are alive.
+## How many of `caller`'s entry `key` are alive (an add freed without a death told is not).
 func alive(caller: Node, key: int) -> int:
 	var found: int = 0
 	for i in adds.size():
-		if callers[i] == caller and keys[i] == key:
+		if callers[i] == caller and keys[i] == key and is_instance_valid(adds[i]):
 			found += 1
 	return found
+
+
+## True while an add has no caller (it is to crumble), or went without a death told (it is to be
+## forgotten): Flow's step asks it first, so a room with no adds allocates nothing.
+func has_orphans() -> bool:
+	for i in adds.size():
+		if callers[i] == null or not is_instance_valid(adds[i]):
+			return true
+	return false
 
 
 ## The body `body` is gone: forget it as an add, and every add it called has no caller now.
@@ -52,13 +64,28 @@ func orphan(body: Node) -> void:
 			callers[i] = null
 
 
-## The adds whose caller is gone, in the order they stood (they crumble).
+## The adds whose caller is gone, in the order they stood (they crumble), and those freed without a
+## death told (null: Flow forgets them).
 func orphans() -> Array[Node]:
 	var found: Array[Node] = []
 	for i in adds.size():
-		if callers[i] == null and is_instance_valid(adds[i]):
+		if not is_instance_valid(adds[i]):
+			found.append(null)
+		elif callers[i] == null:
 			found.append(adds[i])
 	return found
+
+
+## Forget every add freed without a death told; returns how many.
+func forget_gone() -> int:
+	var gone: int = 0
+	for i in range(adds.size() - 1, -1, -1):
+		if not is_instance_valid(adds[i]):
+			adds.remove_at(i)
+			callers.remove_at(i)
+			keys.remove_at(i)
+			gone += 1
+	return gone
 
 
 ## Every add forgotten (the room's enemies went).
@@ -70,10 +97,11 @@ func clear() -> void:
 
 
 ## Where the `n`-th of `of` adds stands on a ring round `centre`, a caller whose hurt shape reaches
-## `caller_reach`, for an add of `radius`: evenly spaced, the first straight down, slid out from the
+## `caller_reach`, for an add of `radius`: evenly spaced, the first turned by `turn` from straight
+## down (the adds stood before, so a wave does not stand on the burst), slid out from the
 ## middle against the walls (`slide`, the projectile manager's `slide_body`), so none stands in a
 ## wall or a blocking prop.
-static func ring(centre: Vector2, caller_reach: float, radius: float, n: int, of: int, slide: Callable) -> Vector2:
-	var angle: float = TAU * float(n) / float(maxi(of, 1))
+static func ring(centre: Vector2, caller_reach: float, radius: float, n: int, of: int, slide: Callable, turn: int = 0) -> Vector2:
+	var angle: float = TAU * float(n) / float(maxi(of, 1)) + RING_TURN * float(turn)
 	var out: Vector2 = DMath.rotated(Vector2.DOWN, angle) * (caller_reach + radius + RING_GAP)
 	return slide.call(centre, out, radius) if slide.is_valid() else centre + out

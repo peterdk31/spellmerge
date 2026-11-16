@@ -17,6 +17,9 @@ extends "res://tests/support/suite.gd"
 const SpellsScript := preload("res://core/spells/spells.gd")
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const BROOM: EnemyBase = preload("res://content/bosses/old_broom/old_broom.tres")
+## The colours of the portrait's eyes in its rest pose (Bone light and shadow, the outline): where its
+## eyes frame may light.
+const EYE_COLOURS: Array[String] = ["f4f1ea", "a39fb8", "14121f"]
 
 
 func _spells() -> SpellsScript:
@@ -362,7 +365,9 @@ func test_its_intro() -> void:
 		for x: int in size:
 			if sheet.get_pixel(BossIntro.EYES * size + x, y).a > 0.0:
 				lit += 1
-				check(sheet.get_pixel(BossIntro.REST * size + x, y).a > 0.0, "an eye lit at (%d, %d) is on the silhouette" % [x, y])
+				var under: Color = sheet.get_pixel(BossIntro.REST * size + x, y)
+				check(under.a > 0.0, "an eye lit at (%d, %d) is on the silhouette" % [x, y])
+				check(EYE_COLOURS.has(under.to_html(false)), "an eye lit at (%d, %d) is over the rest pose's eye, not its wood or straw (%s)" % [x, y, under.to_html(false)])
 	check(lit > 0, "its eyes light up in the dark")
 	check(_height(sheet, BossIntro.MEAN) > _height(sheet, BossIntro.REST), "it rears up for the reveal: the mean pose stands taller than the hunched rest")
 

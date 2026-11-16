@@ -1,0 +1,13 @@
+{
+	"id": "squall_spreads_the_wet",
+	"name": "Squall spreads the wet",
+	"does": "A water bolt soaks one imp; a storm bolt on it blows the water onto the imps round it.",
+	"casts": [
+		{"staff": 0, "cards": ["water", "bolt"]},
+		{"staff": 1, "cards": ["storm", "bolt"], "at": 0.3}
+	],
+	"imps": [[100, 0], [120, 26], [120, -26]],
+	"seconds": 2.0,
+	"needs": "water",
+	"checks": [{"kind": "reaction", "reaction": "squall"}, {"kind": "status_count", "status": "soak", "min": 3}]
+}

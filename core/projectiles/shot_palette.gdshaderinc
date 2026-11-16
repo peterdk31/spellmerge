@@ -14,6 +14,8 @@ const vec3 FIRE_BASE = vec3(0.878, 0.349, 0.184);
 const vec3 FIRE_LIGHT = vec3(1.0, 0.635, 0.235);
 const vec3 ICE_LIGHT = vec3(0.769, 0.965, 0.949);
 const vec3 SPARK_LIGHT = vec3(1.0, 0.953, 0.651);
+const vec3 WATER_BASE = vec3(0.118, 0.612, 0.549);
+const vec3 WATER_LIGHT = vec3(0.435, 0.863, 0.753);
 const vec3 VOID_BASE = vec3(0.627, 0.188, 0.604);
 const vec3 VOID_LIGHT = vec3(0.878, 0.541, 0.847);
 const vec3 ARC_BASE = vec3(0.706, 0.910, 0.165);
@@ -25,15 +27,16 @@ const vec3 STONE_SHADOW = vec3(0.169, 0.157, 0.251);
 const vec3 STONE_BASE = vec3(0.290, 0.275, 0.388);
 const vec3 STONE_LIGHT = vec3(0.478, 0.463, 0.580);
 // The materials a core's tint can name, three shades each (shadow, base, light): Fire, Spark,
-// Ice, Void, Arc, Bone.
-const int MATERIALS = 6;
-const vec3 SHADES[18] = vec3[](
+// Ice, Void, Arc, Bone, Water.
+const int MATERIALS = 7;
+const vec3 SHADES[21] = vec3[](
 	vec3(0.561, 0.176, 0.165), vec3(0.878, 0.349, 0.184), vec3(1.0, 0.635, 0.235),
 	vec3(0.722, 0.502, 0.122), vec3(0.949, 0.761, 0.188), vec3(1.0, 0.953, 0.651),
 	vec3(0.122, 0.439, 0.502), vec3(0.310, 0.839, 0.863), vec3(0.769, 0.965, 0.949),
 	vec3(0.290, 0.078, 0.314), vec3(0.627, 0.188, 0.604), vec3(0.878, 0.541, 0.847),
 	vec3(0.247, 0.420, 0.063), vec3(0.706, 0.910, 0.165), vec3(0.933, 1.0, 0.651),
-	vec3(0.639, 0.624, 0.722), vec3(0.831, 0.816, 0.878), vec3(0.957, 0.945, 0.918));
+	vec3(0.639, 0.624, 0.722), vec3(0.831, 0.816, 0.878), vec3(0.957, 0.945, 0.918),
+	vec3(0.059, 0.290, 0.267), vec3(0.118, 0.612, 0.549), vec3(0.435, 0.863, 0.753));
 
 // The layer kinds (LOOK_* in projectile_manager.gd): one bit each in the look.
 const float L_EMBERS = 1.0;
@@ -57,10 +60,11 @@ const float L_ZIG = 18.0;
 const float L_DOUBLE = 19.0;
 const float L_CONVERGE = 20.0;
 const float L_DRIFT = 21.0;
-const float KIND_COUNT = 21.0;
+const float L_DROPS = 22.0;
+const float KIND_COUNT = 22.0;
 // Flags in the look, not particles: the enemy ramp (Blight ochre takes the player's place; staffs
 // F2), and an exact colour (a reaction's own, its ramp made from it instead of the palette material
-// it is nearest). Kind 22 is free (Feel's poof flag until flash kinds F2).
+// it is nearest). Kind 22 is water's drops (Feel's poof flag until flash kinds F2).
 const float ENEMY_RAMP = 23.0;
 const float EXACT = 24.0;
 // Particles a shot keeps in the air at most, and how many a shot with `n` emitting kinds uses:

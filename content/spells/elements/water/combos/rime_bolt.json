@@ -1,0 +1,13 @@
+{
+	"id": "rime_bolt",
+	"name": "Rime bolt",
+	"does": "A water bolt soaks the imp; a frost bolt on it then freezes it solid at once.",
+	"casts": [
+		{"staff": 0, "cards": ["water", "bolt"]},
+		{"staff": 1, "cards": ["frost", "bolt"], "at": 0.3}
+	],
+	"imps": [[100, 0]],
+	"seconds": 2.0,
+	"needs": "water",
+	"checks": [{"kind": "reaction", "reaction": "rime"}, {"kind": "status", "imps": [0], "status": "freeze"}]
+}

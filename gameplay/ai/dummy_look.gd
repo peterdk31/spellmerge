@@ -33,7 +33,7 @@ const REACTION_REACH: float = 2.0
 ## The statuses the status line names, in this order.
 const STATUSES: Array[StringName] = [
 	CombatScript.BURN, CombatScript.CHILL, CombatScript.FREEZE, CombatScript.GUST,
-	CombatScript.HEX, CombatScript.STATIC,
+	CombatScript.HEX, CombatScript.STATIC, CombatScript.SOAK,
 ]
 
 ## Damage taken since this dummy stood up.

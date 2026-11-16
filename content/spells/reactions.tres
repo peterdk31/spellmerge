@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ReactionTable" load_steps=19 format=3]
+[gd_resource type="Resource" script_class="ReactionTable" load_steps=29 format=3]
 
 [ext_resource type="Script" path="res://core/base/reaction_table.gd" id="1_table"]
 [ext_resource type="Script" path="res://core/base/reaction_row.gd" id="2_row"]
@@ -152,6 +152,96 @@ element_id = &"frost"
 effect = 1
 damage = 4
 
+[sub_resource type="Resource" id="Resource_douse_burn"]
+script = ExtResource("2_row")
+reaction_id = &"douse"
+display_name = "Douse"
+status_id = &"burn"
+element_id = &"water"
+effect = 4
+
+[sub_resource type="Resource" id="Resource_douse_soak"]
+script = ExtResource("2_row")
+reaction_id = &"douse"
+display_name = "Douse"
+status_id = &"soak"
+element_id = &"fire"
+effect = 4
+
+[sub_resource type="Resource" id="Resource_rime_soak"]
+script = ExtResource("2_row")
+reaction_id = &"rime"
+display_name = "Rime"
+status_id = &"soak"
+element_id = &"frost"
+effect = 5
+duration = 1.5
+
+[sub_resource type="Resource" id="Resource_rime_chill"]
+script = ExtResource("2_row")
+reaction_id = &"rime"
+display_name = "Rime"
+status_id = &"chill"
+element_id = &"water"
+effect = 2
+duration = 1.5
+
+[sub_resource type="Resource" id="Resource_current_soak"]
+script = ExtResource("2_row")
+reaction_id = &"current"
+display_name = "Current"
+status_id = &"soak"
+element_id = &"lightning"
+effect = 6
+damage = 5
+radius = 80.0
+
+[sub_resource type="Resource" id="Resource_current_static"]
+script = ExtResource("2_row")
+reaction_id = &"current"
+display_name = "Current"
+status_id = &"static"
+element_id = &"water"
+effect = 6
+damage = 5
+radius = 80.0
+
+[sub_resource type="Resource" id="Resource_squall_soak"]
+script = ExtResource("2_row")
+reaction_id = &"squall"
+display_name = "Squall"
+status_id = &"soak"
+element_id = &"storm"
+effect = 3
+radius = 56.0
+
+[sub_resource type="Resource" id="Resource_squall_gust"]
+script = ExtResource("2_row")
+reaction_id = &"squall"
+display_name = "Squall"
+status_id = &"gust"
+element_id = &"water"
+effect = 3
+radius = 56.0
+
+[sub_resource type="Resource" id="Resource_drown_soak"]
+script = ExtResource("2_row")
+reaction_id = &"drown"
+display_name = "Drown"
+status_id = &"soak"
+element_id = &"void"
+effect = 1
+damage = 6
+
+[sub_resource type="Resource" id="Resource_drown_hex"]
+script = ExtResource("2_row")
+reaction_id = &"drown"
+display_name = "Drown"
+status_id = &"hex"
+element_id = &"water"
+effect = 1
+damage = 6
+
 [resource]
 script = ExtResource("1_table")
-rows = Array[ExtResource("2_row")]([SubResource("Resource_shatter_chill"), SubResource("Resource_shatter_gust"), SubResource("Resource_thaw_burn"), SubResource("Resource_thaw_chill"), SubResource("Resource_flare_burn"), SubResource("Resource_flare_gust"), SubResource("Resource_kindle_burn"), SubResource("Resource_kindle_hex"), SubResource("Resource_stillness_chill"), SubResource("Resource_stillness_hex"), SubResource("Resource_rift_gust"), SubResource("Resource_rift_hex"), SubResource("Resource_overload_burn"), SubResource("Resource_overload_static"), SubResource("Resource_superconduct_chill"), SubResource("Resource_superconduct_static")])
+rows = Array[ExtResource("2_row")]([SubResource("Resource_shatter_chill"), SubResource("Resource_shatter_gust"), SubResource("Resource_thaw_burn"), SubResource("Resource_thaw_chill"), SubResource("Resource_flare_burn"), SubResource("Resource_flare_gust"), SubResource("Resource_kindle_burn"), SubResource("Resource_kindle_hex"), SubResource("Resource_stillness_chill"), SubResource("Resource_stillness_hex"), SubResource("Resource_rift_gust"), SubResource("Resource_rift_hex"), SubResource("Resource_overload_burn"), SubResource("Resource_overload_static"), SubResource("Resource_superconduct_chill"), SubResource("Resource_superconduct_static"), SubResource("Resource_douse_burn"), SubResource("Resource_douse_soak"), SubResource("Resource_rime_soak"), SubResource("Resource_rime_chill"), SubResource("Resource_current_soak"), SubResource("Resource_current_static"), SubResource("Resource_squall_soak"), SubResource("Resource_squall_gust"), SubResource("Resource_drown_soak"), SubResource("Resource_drown_hex")])

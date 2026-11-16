@@ -50,7 +50,8 @@ extends Node2D
 ## (`move`). Tests call `step(delta)` with fixed deltas and move the body themselves.
 ##
 ## Still (props W2, docs/milestones/props.md): a body that no controller drives and that has no
-## Mover is still. Nothing it does changes from tick to tick, so the Tick never steps it
+## Mover is still (and keeps no time: a prop with a `timer` row is stepped, props' fountain). Nothing
+## it does changes from tick to tick, so the Tick never steps it
 ## (`Actors.still`, set when its id opens and at every change of driver, `_tell_driver`): a prop.
 ## Hits still land on it (Combat writes its health and statuses), its casts still go (a trigger's,
 ## or a possessor's: a possession gives it a driver, and it is stepped while that lasts), and a
@@ -276,10 +277,11 @@ func tick_step(delta: float) -> void:
 	move(delta)
 
 
-## True while no controller drives it and it has no Mover (props W2; see the class doc): the Tick
-## does not step it.
+## True while no controller drives it, it has no Mover and it keeps no time (props W2; see the
+## class doc): the Tick does not step it. A prop with a `timer` row keeps time
+## (`PropStateTriggers.keeps_time`): it is stepped, so its clock runs and its pools refill.
 func is_still() -> bool:
-	return controller == null and mover == null
+	return controller == null and mover == null and (state_triggers == null or not state_triggers.keeps_time())
 
 
 ## The body as a few values for the state hash while it rests (props W2; see the class doc): still,
@@ -414,6 +416,10 @@ func step(delta: float) -> void:
 		intent.clear()
 	if intent.aim != Vector2.ZERO:
 		aim = intent.aim.normalized()
+	if state_triggers != null:
+		# A prop's state clock (its `timer` rows), before its caster steps, as a controller's press;
+		# slowed as a wind-up is (a chill stretches it, a freeze holds it).
+		state_triggers.step(delta * (combat.own_pace(self, id) if combat != null else 1.0))
 	if caster != null:
 		caster.step(delta)
 	if mover != null:

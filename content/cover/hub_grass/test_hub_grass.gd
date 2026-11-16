@@ -99,3 +99,30 @@ func test_burning_it_gives_off_embers_and_smoke() -> void:
 	_kit.steps(1)
 	check(_kit.look.motes.cells_giving_off(GRASS.id, GRASS.state_at(&"burning")) >= 1, "Feel gives them off from the burning cell")
 	check_equal(_kit.look.motes.cells_giving_off(GRASS.id, 0), 0, "and none from the grass at rest")
+
+
+func test_water_wets_it_puts_its_fire_out_and_wet_grass_does_not_light() -> void:
+	_kit.free_all()
+	_kit = Kit.new(root, _still())
+	var cell: int = _kit.cell(4, 6)
+	_kit.touch(&"water", _kit.middle(cell))
+	_kit.steps(1)
+	check_equal(_kit.state_of(cell), &"wet", "water wets it")
+	_kit.touch(&"fire", _kit.middle(cell))
+	_kit.steps(1)
+	check_equal(_kit.state_of(cell), &"wet", "wet grass does not catch fire")
+	_kit.wait(8.5)
+	check_equal(_kit.state_of(cell), &"rest", "it dries in 8 s")
+	_kit.touch(&"fire", _kit.middle(cell))
+	_kit.steps(1)
+	check_equal(_kit.state_of(cell), &"burning", "dry, it lights again")
+	_kit.touch(&"water", _kit.middle(cell))
+	_kit.steps(1)
+	check_equal(_kit.state_of(cell), &"wet", "and water puts the fire out")
+
+
+func test_wet_grass_soaks_whoever_stands_in_it() -> void:
+	var wet: CoverState = GRASS.states[GRASS.state_at(&"wet")]
+	check_equal(wet.status, &"soak", "a body standing in wet grass is soaked")
+	check(wet.status_every > 0.0 and wet.status_duration > wet.status_every, "for as long as it stands in it")
+	check(not wet.motes.is_empty(), "it glints with water while wet")

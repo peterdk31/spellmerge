@@ -34,7 +34,7 @@ const FRAGMENT_ROOTS: Array[String] = ["res://content", "res://art", "res://audi
 ## The statuses an element may put on a target. `freeze` is not here: three stacks of chill
 ## make it, no element sets it. `tests/content/spells/test_validators.gd` checks this list
 ## against the ones `gameplay/combat` implements.
-const KNOWN_STATUSES: Array[StringName] = [&"burn", &"chill", &"gust", &"hex", &"static"]
+const KNOWN_STATUSES: Array[StringName] = [&"burn", &"chill", &"gust", &"hex", &"static", &"soak"]
 
 ## Allowed numbers of a reaction row, {field: Vector2(min, max)}, both ends included.
 const REACTION_RANGES: Dictionary = {
@@ -44,7 +44,7 @@ const REACTION_RANGES: Dictionary = {
 	"strength": Vector2(0.0, 100.0),
 	"pull": Vector2(0.0, 2000.0),
 	# The last effect; test_validators.gd fails when an effect is added after it.
-	"effect": Vector2(0, ReactionRow.Effect.SPREAD),
+	"effect": Vector2(0, ReactionRow.Effect.CONDUCT),
 }
 
 
@@ -291,7 +291,7 @@ static func _check_trigger(trigger: TriggerBase) -> Array[Dictionary]:
 static func _check_row_effect(row: ReactionRow, file: String, where: String) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
 	match row.effect:
-		ReactionRow.Effect.BURST, ReactionRow.Effect.SPREAD:
+		ReactionRow.Effect.BURST, ReactionRow.Effect.SPREAD, ReactionRow.Effect.CONDUCT:
 			if row.radius <= 0.0:
 				problems.append(_problem("required-field", file, where + ".radius", "This effect works in a circle: set `radius` above 0."))
 		ReactionRow.Effect.CONSUME:
@@ -300,6 +300,12 @@ static func _check_row_effect(row: ReactionRow, file: String, where: String) -> 
 		ReactionRow.Effect.EXTEND:
 			if row.duration <= 0.0:
 				problems.append(_problem("required-field", file, where + ".duration", "EXTEND lengthens the status: set `duration` above 0."))
+		ReactionRow.Effect.FREEZE:
+			if row.duration <= 0.0:
+				problems.append(_problem("required-field", file, where + ".duration", "FREEZE freezes for a time: set `duration` above 0."))
+		ReactionRow.Effect.CONDUCT:
+			if row.damage <= 0:
+				problems.append(_problem("required-field", file, where + ".damage", "CONDUCT strikes the soaked bodies: set `damage` above 0."))
 	return problems
 
 

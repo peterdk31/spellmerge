@@ -155,6 +155,13 @@ Particle place_particle(float look, vec2 from, float a, float i, float cyc, floa
 		p.at = from + vec2(-2.0 * z - (h - 0.5) * 3.0 * z, (h - 0.5) * 3.0 * z);
 		p.shown = a < 0.95 && mod(floor(sim_time * 12.0 + i), 3.0) > 0.5;
 		p.rgb = a < 0.5 ? BONE_SHADOW : STONE_LIGHT;
+	} else if (look == L_DROPS) {
+		// Water: a drop shaken off to one side that falls, then a two-pixel splash.
+		float side = h < 0.5 ? -1.0 : 1.0;
+		p.at = floor(from + vec2(-2.0 * a, side * 2.0 * a + 8.0 * a * a) * z);
+		p.shown = a < 0.85;
+		p.run = a > 0.65 ? 1.0 : 0.0;
+		p.rgb = a < 0.35 ? WATER_LIGHT : WATER_BASE;
 	}
 	return p;
 }

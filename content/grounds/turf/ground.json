@@ -1,0 +1,6 @@
+{
+	"about": "Dark turf, a meadow at night: darker than the hub's grass tufts so they show over it, in soft patches, flecked with Leaf.",
+	"base": "#26361d",
+	"patches": {"colour": "#2f4223", "scales": [90, 40, 18], "above": 0.5},
+	"speckle": [["leaf.shadow", 0.025], ["leaf.base", 0.012], ["#14121f", 0.004]]
+}

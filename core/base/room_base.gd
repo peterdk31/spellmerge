@@ -61,6 +61,12 @@ const FLOOR_MIN_SHARE: float = 0.01
 const EXIT_ROLE: StringName = &"room_exit"
 ## The layer of the walls' bodies (as Flow tells the projectile manager).
 const WALL_LAYER: int = 1
+## The layer of the holes' bodies (hub rework HR-H1, docs/milestones/hub-rework.md, "Holes"): a
+## `StaticBody2D` whose `collision_layer` is exactly this, its `RectangleShape2D`s over the cells a
+## walking body cannot step into and nothing else minds (shots, sight and gates pass over a hole).
+## A body that is also on the wall layer is a wall; where a wall and a hole cover one cell, the wall
+## wins (`RoomPlaces.hole_rects`, `ProjectileManager.set_holes`).
+const HOLE_LAYER: int = 2
 ## The z of a layout's `Floor` sprite: under Feel's floor marks (one above it) and under the
 ## bodies (0), so a mark lies on the floor and never over anyone.
 const FLOOR_Z: int = -2

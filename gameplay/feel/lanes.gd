@@ -2,7 +2,8 @@ extends Node2D
 ## Telegraph lanes: a cue's `lane` parts (`CueBase`, "part": "lane"; docs/milestones/cast-timing.md,
 ## T6b). While a cast winds up, a lane runs from its caster's staff tip along its live aim (the aim
 ## follows the caster until the cast leaves, owner 2026-11-06), as long as its carrier reaches and
-## as wide as it hits, in the cast's tint: its dashes march toward the tip, its arrowhead grows and
+## as wide as it hits (widening to its cone's width at its far end for a cone, a spray's:
+## `Spells.carrier_lane`), in the cast's tint: its dashes march toward the tip, its arrowhead grows and
 ## the lane brightens as the wind-up runs out (`telegraph.gdshader`). It ends the step the cast
 ## leaves or is cancelled (`Spells.is_winding`), so it always shows a cast that comes. A carrier
 ## that is not aimed (a nova, an orbit) shows none. When its caster's AI locks its aim (`beat`,
@@ -20,8 +21,15 @@ const BEAM_TEXTURE: Texture2D = preload("res://art/vfx/beam.svg")
 const MOST: int = 32
 ## The lane starts this far past the staff tip, so it never covers the caster's own hand.
 const START: float = 4.0
-## A sprite's region height (its texture's), with the lane in its middle.
+## A sprite's region height (its texture's), with the lane in its middle; a cone's wider than
+## `NEAR_MOST` is taller, up to twice `LANE_MOST` and its glow.
 const HEIGHT: float = 32.0
+## The widest a lane is drawn either side of its middle (pixels; the shader's `LANE_MOST`).
+const LANE_MOST: float = 40.0
+## The widest a lane is at its caster's end (pixels either side; as ever, before cones).
+const NEAR_MOST: float = 14.0
+## Pixels of glow drawn past a lane's edge.
+const GLOW: float = 4.0
 ## The lane is the hit width of what is coming plus this margin, either side half of it.
 const LANE_MARGIN: float = 8.0
 ## How much lighter than the tint the lane's light shade is.
@@ -91,13 +99,21 @@ func play(caster: int, tag: int, seconds: float, tint: Color, reach: float) -> v
 	_beat[at] = 0.0
 	var sprite: Sprite2D = _sprites[at]
 	var run: float = length - START
-	sprite.offset = Vector2(START, -HEIGHT * 0.5)
-	sprite.region_rect = Rect2(0.0, 0.0, run, HEIGHT)
+	var radius: float = float(spells.call("carrier_radius", tag))
+	var lane: float = float(spells.call("carrier_lane", tag))
+	var near: float = minf(radius + LANE_MARGIN * 0.5, NEAR_MOST)
+	# Only a cone widens (its lane wider than its hit radius); any other lane is as wide all along.
+	var far: float = maxf(lane + LANE_MARGIN * 0.5, near) if lane > radius else near
+	# Tall enough for its widest end and its glow, its middle kept on the texture's middle row.
+	var high: float = HEIGHT if far <= NEAR_MOST else maxf(HEIGHT, 2.0 * ceilf(minf(far, LANE_MOST) + GLOW))
+	sprite.offset = Vector2(START, -high * 0.5)
+	sprite.region_rect = Rect2(0.0, (HEIGHT - high) * 0.5, run, high)
 	var material: ShaderMaterial = sprite.material as ShaderMaterial
 	material.set_shader_parameter(&"ramp_base", tint)
 	material.set_shader_parameter(&"ramp_light", tint.lerp(Color.WHITE, LIGHTER))
 	material.set_shader_parameter(&"beam_length", run)
-	material.set_shader_parameter(&"telegraph_lane", float(spells.call("carrier_radius", tag)) + LANE_MARGIN * 0.5)
+	material.set_shader_parameter(&"telegraph_lane", near)
+	material.set_shader_parameter(&"telegraph_lane_end", far)
 	material.set_shader_parameter(&"telegraph_progress", 0.0)
 	material.set_shader_parameter(&"telegraph_beat", 0.0)
 	_place(at)

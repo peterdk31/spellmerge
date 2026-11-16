@@ -167,12 +167,25 @@ func _walk(node: Node, at: Vector2, path: String, bent: String) -> void:
 ## the box round its corners (a wall is never turned: places are whole translations). The room's size
 ## (`size`) and its cover (`CoverLayout.of`, ground cover GC2) are read from them.
 static func wall_rects(layout: Node) -> Array[Rect2]:
+	return _layer_rects(layout, false)
+
+
+## The rectangles of `layout`'s holes (hub rework HR-H1), as `wall_rects` reads walls: each rectangle
+## shape of a static body whose layer is exactly the hole layer (`RoomBase.HOLE_LAYER`; a body also on
+## the wall layer is a wall). Where one overlaps a wall, the wall wins (the projectile manager's
+## grids, `ProjectileManager.is_hole`). The room's size (`size`) counts them.
+static func hole_rects(layout: Node) -> Array[Rect2]:
+	return _layer_rects(layout, true)
+
+
+## The rectangles of `layout`'s walls (`holes` false) or holes (true); see `wall_rects`.
+static func _layer_rects(layout: Node, holes: bool) -> Array[Rect2]:
 	var found: Array[Rect2] = []
 	if layout == null:
 		return found
 	for node: Node in layout.find_children("*", "StaticBody2D", true, false):
 		var body := node as StaticBody2D
-		if (body.collision_layer & RoomBase.WALL_LAYER) == 0:
+		if holes != (body.collision_layer == RoomBase.HOLE_LAYER) or (not holes and (body.collision_layer & RoomBase.WALL_LAYER) == 0):
 			continue
 		for child: Node in body.get_children():
 			var shape := child as CollisionShape2D
@@ -212,8 +225,8 @@ func _check_corner(layout: Node) -> void:
 
 
 ## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, its
-## `Floor` sprite (the whole room, under the walls, in a crypt) and its walls' rectangles (a room
-## whose floor is not one rectangle: the hub's island, the void round it all wall). The room Flow
+## `Floor` sprite (the whole room, under the walls, in a crypt) and its walls' and holes' rectangles
+## (a room whose floor is not one rectangle: the hub's island, the void round it). The room Flow
 ## makes is this size (its camera's limits).
 func _size_of(layout: Node) -> Vector2:
 	var most := Vector2(640.0, 360.0)
@@ -223,6 +236,8 @@ func _size_of(layout: Node) -> Vector2:
 		most = most.max(floor_sprite.position + extent)
 	for wall: Rect2 in wall_rects(layout):
 		most = most.max(wall.end)
+	for hole: Rect2 in hole_rects(layout):
+		most = most.max(hole.end)
 	for points: PackedVector2Array in [player_spawns, enemy_spawns, doors]:
 		for point: Vector2 in points:
 			most = most.max(point + Vector2(32.0, 32.0))

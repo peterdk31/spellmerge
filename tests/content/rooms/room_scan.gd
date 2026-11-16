@@ -41,17 +41,11 @@ static func only_markers(root: Node, group: String) -> bool:
 	return true
 
 
-## The rectangles of the RectangleShape2D collision shapes under `Walls`.
+## The rectangles of the room's walls (RectangleShape2D shapes of its wall-layer bodies, at any depth).
 static func wall_rects(root: Node) -> Array[Rect2]:
-	var rects: Array[Rect2] = []
-	for child in root.get_node("Walls").get_children():
-		var shape_node: CollisionShape2D = child as CollisionShape2D
-		if shape_node == null:
-			continue
-		var rectangle: RectangleShape2D = shape_node.shape as RectangleShape2D
-		if rectangle != null:
-			rects.append(Rect2(shape_node.position - rectangle.size * 0.5, rectangle.size))
-	return rects
+	# The game's own reader: walls at any depth (a room's ground drawn from a shape keeps its walls
+	# in the instanced ground scene, hub rework HR2), each where it really is.
+	return RoomPlaces.wall_rects(root)
 
 
 ## The room's extent: the box round its wall rectangles (a crypt room's border holds the rest).

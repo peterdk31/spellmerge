@@ -148,7 +148,8 @@ func test_every_card_shader_takes_every_uniform_its_area_sets() -> void:
 
 func test_every_still_cards_look_is_one_its_shader_and_clock_can_draw() -> void:
 	# A still card's shape and clock reach its shader by its body (`set_body_shape`), and a body is
-	# its shader: cards sharing one must share them, or one card's motes leave from the other's shape.
+	# its shader: cards sharing one must share them, or one card's motes leave from the other's shape
+	# (and how it lies, `set_body_ground`).
 	# Its coming and going fit what the still clock tells (`STILL_START`, `STILL_END`).
 	var by_shader: Dictionary = {}
 	for each: Array in _looked_cards():
@@ -156,9 +157,9 @@ func test_every_still_cards_look_is_one_its_shader_and_clock_can_draw() -> void:
 		if each[1] != Carrier.LOOK_STILL:
 			continue
 		check(carrier_card.look_open <= ProjectilesScript.STILL_START and carrier_card.look_fade <= ProjectilesScript.STILL_END, "%s comes and goes within what its still clock tells" % carrier_card.id)
-		var numbers: Array = [carrier_card.look_shape, carrier_card.look_open, carrier_card.look_fade]
+		var numbers: Array = [carrier_card.look_shape, carrier_card.look_open, carrier_card.look_fade, carrier_card.look_on_floor, carrier_card.look_merges]
 		if by_shader.has(carrier_card.look_shader):
 			var first: Array = by_shader[carrier_card.look_shader]
-			check(first[1] == numbers, "%s shares %s's shader, so its look shape and clock too" % [carrier_card.id, first[0]])
+			check(first[1] == numbers, "%s shares %s's shader, so its look shape, clock and how it lies too" % [carrier_card.id, first[0]])
 		else:
 			by_shader[carrier_card.look_shader] = [carrier_card.id, numbers]

@@ -162,6 +162,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(state, "_state", PACKED_BYTE_ARRAY) \
 	X(motion, "_motion", PACKED_BYTE_ARRAY) \
 	X(vel, "_vel", PACKED_VECTOR2_ARRAY) \
+	X(facing, "_facing", PACKED_VECTOR2_ARRAY) \
 	X(flags, "_flags", PACKED_INT32_ARRAY) \
 	X(layers, "_layers", PACKED_INT32_ARRAY) \
 	X(actor, "_actor", PACKED_INT32_ARRAY) \
@@ -1711,7 +1712,7 @@ inline int64_t tail_code(int64_t seq) {
 void ShotKernel::draw_shots(Object *m, double fraction) {
 	const Names &k = *names;
 	Arr<PackedByteArray> alive, motion, drawn_batch, body;
-	Arr<PackedVector2Array> prev, pos, vel, orbit_centre;
+	Arr<PackedVector2Array> prev, pos, vel, facing, orbit_centre;
 	Arr<PackedFloat32Array> drawn_size, born, life, light_intensity, light_reach;
 	Arr<PackedInt32Array> drawn_particles, draw_out, rooms, flags;
 	Arr<PackedColorArray> drawn_color, core;
@@ -1725,6 +1726,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	prev.load(m, k.prev);
 	pos.load(m, k.pos);
 	vel.load(m, k.vel);
+	facing.load(m, k.facing);
 	orbit_centre.load(m, k.orbit_centre);
 	drawn_size.load(m, k.drawn_size);
 	born.load(m, k.born);
@@ -1948,7 +1950,9 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 				// `_write_stones` for a shot that is not solid: one quad, a rune's or a card body's
 				// (its batch's shader draws it).
 				Vector2 dir = Vector2(1, 0);
-				if (vel[slot].length_squared() > 0.0f) {
+				if (facing[slot].length_squared() > 0.0f) {
+					dir = facing[slot];
+				} else if (vel[slot].length_squared() > 0.0f) {
 					dir = vel[slot].normalized();
 				}
 				write_quad(b, dir, size, at, look_data, core[slot], KIND_RUNE, still_code(sim_time - (double)born[slot], (double)life[slot]));

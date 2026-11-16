@@ -1,0 +1,9 @@
+{
+	"id": "spray_cone",
+	"name": "Hose",
+	"does": "A spray pours a short jet ahead: the two imps in its cone are splashed and pushed back, while the imp behind the caster is never touched.",
+	"casts": [{"staff": 0, "cards": ["spray"]}],
+	"imps": [[50, 0], [64, 9], [-30, 0]],
+	"seconds": 0.6,
+	"checks": [{"kind": "damaged", "imps": [0, 1]}, {"kind": "lost_at_most", "imps": [2], "max": 0}]
+}

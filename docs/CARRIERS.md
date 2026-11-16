@@ -21,7 +21,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `LINE` | Is it a line that is there at once (a beam)? |
 | `STAYS` | Is it a shot that stays in the world a while (a bolt, a rune, a pool, a wall...)? |
 | `HITS` | Does it hit things itself (not a decoy or a familiar)? |
-| `LASTS` | Does it last a while (not a slam or a teleport, which are over at once)? |
+| `LASTS` | Does it last a while (not a slam, a teleport or a spray, which are over at once)? |
 | `STEERS` | Can homing steer it (turn it, bend it, place it on a target, or creep it toward one: a rune, a wall, a decoy)? |
 | `MEETS_SHOTS` | Can it stop or turn other shots (not a familiar)? |
 | `MOVES_CASTER` | Does it move its caster (a dash, a teleport)? |
@@ -33,7 +33,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `CASTS_FROM_SHOT` | Is it shots of the projectile manager, each casting what it fires while it lives (a bolt, a rune, a pool, a wall)? |
 | `CASTS_FROM_BODY` | Is it a body of its own, an actor, that casts what it fires (a decoy)? |
 | `AOE` | Does it go out all round the point it is cast at, not along an aim (a pulse's ring)? Not aimed: scatter, mirror and nova turn nothing there and the AI reads it as an area round its caster; it goes out as a shot does: Return and Ghost work on it. |
-| `MELEE` | Is it held by or carried with the body that casts it, never leaving it (swing, slam, dash, teleport)? Then it never hits that body (`CarrierKit.spared`); a ranged carrier spares it only until it has left it: a shot over time, a beam along its path (it hits its caster when it bounces or bends back into them). |
+| `MELEE` | Is it held by or carried with the body that casts it, never leaving it (swing, slam, spray, dash, teleport)? Then it never hits that body (`CarrierKit.spared`); a ranged carrier spares it only until it has left it: a shot over time, a beam along its path (it hits its caster when it bounces or bends back into them). |
 
 (and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
 `carrier.gd`.)
@@ -190,7 +190,7 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | Hook | Default | Overridden by |
 | --- | --- | --- |
 | `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | portal (a mouth and its exits, gates of the projectile manager), dash and teleport (a move, `CarrierMove`), wall (one solid line) |
-| `shoot` | a shot flying along its heading | rune (still, placed ahead), pool (still, spread `ray_length` ahead, never spent), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
+| `shoot` | a shot flying along its heading | rune (still, placed ahead), pool (still, spread `ray_length` ahead, never spent), beam, swing, slam (a row of their own), spray (a cone struck at once from the hand, its blast and `on expire` where its jet ends), decoy and familiar (a body, `CarrierEntity`) |
 | `on_hit` | nothing | hook (pulls its caster), swap (trades places) |
 | `on_move_end` | nothing | teleport (strikes where it lands), dash (its pass strikes no longer than its grace: a dash a head-on wall stopped strikes no more there, boss plan OB10) |
 | `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows), pool (forgets what it touches every `POOL_TICK`, so it strikes it again), portal (moves what went into its gates) |
@@ -198,7 +198,9 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | `carry_reach` | a shot's hit radius | dash (its pass's reach): how far round what it moves a body it struck may ride, for Plow (`Plow.carry`, boss plan OB11) |
 | `hit_caster` | the point | dash and teleport (`CarrierMove`): what they move casts their hits' payloads |
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
-| `reach_of` | 0 | atom, beam, swing, slam (for an enemy's telegraph) |
+| `reach_of` | 0 | atom, beam, swing, slam, spray (for an enemy's telegraph) |
+| `lane_radius` | its hit radius | spray (its cone's half-width at its reach): how wide it strikes either side of its aim, for an enemy's AI (`CastSense.radius`) and its telegraph lane's far end (`Spells.carrier_lane`: the lane widens into the cone) |
+| `pours_held` | false | spray: held on, it pours: a held cast right after its last skips its staff's wind-up (`Spells.cast_staff`), so an enemy telegraphs its spray once and pours while it holds; a new press winds up again (the Spitter, content/enemies/spitter/) |
 | `tip_of` | INF | beam, swing: where a row is, for a `timer` or `on hurt` on it (`LC_ROW`) |
 
 Carriers that share a mechanism share a base or a kit: dash and teleport extend `CarrierMove` (the

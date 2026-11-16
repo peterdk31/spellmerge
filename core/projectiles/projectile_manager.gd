@@ -602,6 +602,10 @@ const STILL_SHADER: Shader = preload("res://core/projectiles/shot_still.gdshader
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
 ## before the current scene, so at z_index 0 the room's floor hid every shot.
 const DRAW_Z: int = 50
+## Draw order of a card body that lies on the floor (`set_body_ground`: a pool): over the floor's
+## marks (`RoomBase.FLOOR_Z` + 1) at the bodies' z 0, a tie that the manager, an autoload before
+## the world and the other areas in the tree, loses, so it draws under every body.
+const FLOOR_DRAW_Z: int = RoomBase.FLOOR_Z + 2
 ## A shot is drawn this many times wider than its hit circle (the art has empty
 ## margins and a pixel-art bolt is small on a 640x360 view).
 const DRAW_SCALE: float = 3.0
@@ -634,6 +638,11 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 	Color("#7fc0f0"), Color("#f59ab8"), Color("#8fd46a"), Color("#c99af0"), Color("#e3cf6b"),
 ]
 
+## How a card body lies (`set_body_ground`): on the floor, under the bodies; its overlapping shots
+## drawn as one.
+const GROUND_FLOOR: int = 1
+const GROUND_MERGES: int = 2
+
 ## There are more draw batches now (`register_body` numbered a card body): `count` in all. Whoever
 ## mirrors the batches (Feel's spell light) adds theirs for the new ones.
 signal batches_grown(count: int)
@@ -656,7 +665,7 @@ const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
 ## the frame's `_process`, `update_draw` and the sparks it gives off, on real time and the drawing's
 ## own generator).
-const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_body_ground", &"_merges", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -727,6 +736,9 @@ var _prev: PackedVector2Array = PackedVector2Array()
 ## Where the path of a shot the hit-work budget passed over starts (read only with F_DEFERRED).
 var _untested: PackedVector2Array = PackedVector2Array()
 var _vel: PackedVector2Array = PackedVector2Array()
+## The way a still shot was thrown (`set_facing`: a pool, spat out ahead), a unit vector, or zero:
+## its quad turns by it (by its velocity without one), so its card's shader knows it.
+var _facing: PackedVector2Array = PackedVector2Array()
 var _life: PackedFloat32Array = PackedFloat32Array()
 var _radius: PackedFloat32Array = PackedFloat32Array()
 ## The caster's actor id, and its team, ramp and budget when the shot was spawned.
@@ -963,6 +975,15 @@ var _footprint_half: PackedVector2Array = PackedVector2Array()
 var _footprint_round: PackedByteArray = PackedByteArray()
 var _footprints_laid: int = 0
 var _footprint_missed: Dictionary = {}
+## The holes (`set_holes`, hub rework HR-H1: a room's `RoomBase.HOLE_LAYER` bodies): per wall cell, 1
+## where the room has a hole (a wall over one wins: walking and every move stop at the wall, and
+## `is_hole` says no); whether there are any. And the grid a walk slides on (`slide_body`): per cell,
+## 1 where there is ground (`_ground_cells`) or a hole, kept up to date wherever either changes, so
+## the native kernel is handed one grid of each and stays as it is. All state, as the wall and
+## ground grids are (Flow lays nothing again when a snapshot is restored into the room it is in).
+var _hole_cells: PackedByteArray = PackedByteArray()
+var _has_holes: bool = false
+var _walk_cells: PackedByteArray = PackedByteArray()
 ## The shot that cast the next ray (`ray_cast_by`), and its number then; -1 for none.
 var _ray_caster: int = -1
 var _ray_caster_seq: int = -1
@@ -1015,6 +1036,12 @@ var _body_meshes: PackedInt32Array = PackedInt32Array()
 ## `look_fade`), handed to their batches' shader as `look_shape` and `look_clock`: {body: [shape,
 ## clock]}. A body never shaped leaves its shader's own defaults alone.
 var _body_shapes: Dictionary = {}
+## The card bodies whose card says how they lie (`set_body_ground`): {body: GROUND_* bits}. A body
+## not in it is drawn as a shot, over everyone, and never merged.
+var _body_ground: Dictionary = {}
+## What a merging body tells both its batches' shader of its shots (`StillMerge`): {body:
+## StillMerge}.
+var _merges: Dictionary = {}
 var _batch_total: int = BATCH_BODY_FIRST
 ## What the drawing wrote (`_draw_shots`, `ShotKernel.draw_shots`): the instances of each batch
 ## (BATCH_*), then the particles asked for, 0 (was the trails' cost), the shots drawn, the enemy shots drawn,
@@ -1397,6 +1424,73 @@ func set_body_shape(body: int, shape: Vector2, clock: Vector2) -> void:
 			_apply_body_shape(_nodes[batch], body)
 
 
+## How card body `body` lies (`CarrierCard.look_on_floor`, `look_merges`): `on_floor` draws its
+## batches at FLOOR_DRAW_Z, under every body, instead of over everyone as a shot; with `merges` its
+## shader is told every shot of the body drawn each frame (`StillMerge`), so it draws the ones that
+## overlap as one. Spells sets it as it numbers the card's body; a body is its shader, so the cards
+## sharing one must agree (test_card_looks checks the cards do).
+func set_body_ground(body: int, on_floor: bool, merges: bool) -> void:
+	if body < 1 or body > _body_shaders.size():
+		return
+	var ground: int = (GROUND_FLOOR if on_floor else 0) | (GROUND_MERGES if merges else 0)
+	if ground == 0:
+		_body_ground.erase(body)
+	else:
+		_body_ground[body] = ground
+	if merges and not _merges.has(body):
+		_merges[body] = StillMerge.new()
+	elif not merges:
+		_merges.erase(body)
+	for enemy: bool in [false, true]:
+		var batch: int = body_batch(body, enemy)
+		if batch < _nodes.size() and _nodes[batch] != null:
+			_nodes[batch].z_index = _body_z(body, enemy)
+			if not merges:
+				StillMerge.hand_none(_nodes[batch].material as ShaderMaterial)
+
+
+## Whether card body `body` lies on the floor (`set_body_ground`), and whether it merges.
+func body_on_floor(body: int) -> bool:
+	return (int(_body_ground.get(body, 0)) & GROUND_FLOOR) != 0
+
+
+func body_merges(body: int) -> bool:
+	return (int(_body_ground.get(body, 0)) & GROUND_MERGES) != 0
+
+
+## The z card body `body`'s batch draws at (the enemy ramp's with `enemy`): a shot's, or the
+## floor's for a body that lies on it (`set_body_ground`).
+func _body_z(body: int, enemy: bool) -> int:
+	return FLOOR_DRAW_Z if body_on_floor(body) else _batch_z(body_batch(body, enemy))
+
+
+## Tells both batches of each merging body of the body's shots drawn this frame, in one list
+## (`StillMerge`: the hat ramps' batch's rows, then the enemy ramp's), when it drew any; the rows
+## are the ones uploaded (the kernel's when it drew). Both are told, so neither material keeps the
+## list that is written next.
+func _hand_merges(kernel_draw: bool) -> void:
+	for body: int in _merges:
+		var hat_batch: int = body_batch(body, false)
+		var foe_batch: int = body_batch(body, true)
+		if foe_batch >= _batch_total:
+			continue
+		var hats: int = _draw_out[DRAW_OUT_FIRST + hat_batch]
+		var foes: int = _draw_out[DRAW_OUT_FIRST + foe_batch]
+		if hats + foes == 0:
+			continue
+		var merge: StillMerge = _merges[body]
+		merge.fill(_drawn_rows(hat_batch, hats, kernel_draw), hats, _drawn_rows(foe_batch, foes, kernel_draw), foes)
+		merge.hand_to(_nodes[hat_batch].material as ShaderMaterial, false)
+		merge.hand_to(_nodes[foe_batch].material as ShaderMaterial, true)
+
+
+## The rows batch `batch` uploads this frame (the kernel's when it drew), or none for `out` 0.
+func _drawn_rows(batch: int, out: int, kernel_draw: bool) -> PackedFloat32Array:
+	if out == 0:
+		return PackedFloat32Array()
+	return _kernel.call(&"buffer", batch) if kernel_draw else _buffers[batch]
+
+
 ## Hands card body `body`'s look shape and clock to its batch `node`'s shader, once it has them.
 func _apply_body_shape(node: MultiMeshInstance2D, body: int) -> void:
 	var shaped: Variant = _body_shapes.get(body)
@@ -1476,7 +1570,7 @@ func _make_body_batches(body: int) -> void:
 		if _nodes.size() <= batch:
 			_nodes.resize(batch + 1)
 		if _nodes[batch] == null:
-			_nodes[batch] = _make_batch(_batch_z(batch), _body_shaders[body - 1], head_mesh() if mesh == MESH_HEAD else null)
+			_nodes[batch] = _make_batch(_body_z(body, enemy), _body_shaders[body - 1], head_mesh() if mesh == MESH_HEAD else null)
 			_nodes[batch].multimesh.custom_aabb = _nodes[BATCH_BOLT].multimesh.custom_aabb
 			_apply_body_shape(_nodes[batch], body)
 			_place_body_node(body, enemy)
@@ -1629,6 +1723,7 @@ func set_cap(value: int) -> void:
 	_prev.resize(_cap)
 	_untested.resize(_cap)
 	_vel.resize(_cap)
+	_facing.resize(_cap)
 	_life.resize(_cap)
 	_radius.resize(_cap)
 	_actor.resize(_cap)
@@ -1781,10 +1876,15 @@ func set_bounds(rect: Rect2) -> void:
 	_wall_w = maxi(ceili(rect.size.x / WALL_CELL), 1)
 	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
 	_wall_cells.resize(_wall_w * _wall_h)
+	_hole_cells.resize(_wall_w * _wall_h)
+	_hole_cells.fill(0)
+	_has_holes = false
+	_walk_cells.resize(_wall_w * _wall_h)
 	clear_walls()
 	# The ground is laid again in the new grid (footprints keep their place in the world).
 	_ground_cells.resize(_wall_w * _wall_h)
 	_ground_cells.fill(0)
+	_walk_cells.fill(0)
 	_footprint_missed.clear()
 	if _footprints_laid > 0:
 		for actor in ACTORS:
@@ -1821,10 +1921,12 @@ func set_walls(rects: Array[Rect2]) -> void:
 		_add_wall(rect)
 
 
-## Remove every wall. A solid shot lays itself again at its next step.
+## Remove every wall, and every hole (a room's holes are laid with its walls: `set_holes`). A solid
+## shot lays itself again at its next step.
 func clear_walls() -> void:
 	_wall_cells.fill(0)
 	_has_walls = false
+	_drop_holes()
 	for slot: int in _solids:
 		var solid: Solid = _solids[slot]
 		solid.cells.clear()
@@ -1835,6 +1937,14 @@ func clear_walls() -> void:
 ## be in the tree. Shapes that are not rectangles are ignored; a turned rectangle
 ## counts as its bounding box.
 func add_wall_body(body: CollisionObject2D) -> void:
+	for rect in _body_rects(body):
+		_add_wall(rect)
+
+
+## The world rectangles of a body's enabled rectangle shapes (each turned one as its bounding box).
+## Made each call (a room's walls and holes are laid once a room).
+static func _body_rects(body: CollisionObject2D) -> Array[Rect2]:
+	var rects: Array[Rect2] = []
 	for child in body.get_children():
 		var shape_node := child as CollisionShape2D
 		if shape_node == null or shape_node.disabled:
@@ -1850,7 +1960,90 @@ func add_wall_body(body: CollisionObject2D) -> void:
 			var point: Vector2 = xf * corner
 			low = low.min(point)
 			high = high.max(point)
-		_add_wall(Rect2(low, high - low))
+		rects.append(Rect2(low, high - low))
+	return rects
+
+
+## Make these world rectangles holes (hub rework HR-H1, docs/milestones/hub-rework.md, "Holes"),
+## replacing any set before: the cells whose any part they cover, as a wall's. A walk stops at a
+## hole's lip (`slide_body`); a move done to a body or a dash crosses it (`slide_body`'s `crossing`);
+## shots, rays, sight and the walls' checks never see it. Parts outside the bounds are ignored.
+## Call it after `set_walls` or `clear_walls`, which remove the holes.
+func set_holes(rects: Array[Rect2]) -> void:
+	_drop_holes()
+	for rect in rects:
+		_add_hole(rect)
+
+
+## Take every hole out: the walking grid is the ground alone again.
+func _drop_holes() -> void:
+	if not _has_holes:
+		return
+	_hole_cells.fill(0)
+	_has_holes = false
+	for cell in _walk_cells.size():
+		_walk_cells[cell] = 1 if _ground_cells[cell] != 0 else 0
+
+
+## Add the rectangle shapes of a body (a room's static body on the hole layer) as holes, as
+## `add_wall_body` adds a wall's. The body must be in the tree.
+func add_hole_body(body: CollisionObject2D) -> void:
+	for rect in _body_rects(body):
+		_add_hole(rect)
+
+
+func _add_hole(rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / WALL_CELL), 0)
+	var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / WALL_CELL), 0)
+	var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / WALL_CELL), _wall_w)
+	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
+	for y in range(y0, y1):
+		for x in range(x0, x1):
+			_hole_cells[y * _wall_w + x] = 1
+			_walk_cells[y * _wall_w + x] = 1
+			_has_holes = true
+
+
+## True when the room has a hole (`set_holes`) at `point` that no wall covers (a wall over a hole
+## wins: a Wall card's stones over a crack are a wall while they stand). Outside the grid: false.
+func is_hole(point: Vector2) -> bool:
+	if not _has_holes:
+		return false
+	var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
+	var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
+	if cx < 0 or cx >= _wall_w or cy < 0 or cy >= _wall_h:
+		return false
+	var cell: int = cy * _wall_w + cx
+	return _hole_cells[cell] != 0 and _wall_cells[cell] == 0
+
+
+## True when a circle of `radius` at `center` reaches over a hole cell no wall covers (`is_hole`): it
+## overlaps the cell, not only touches it, as the walk's slide finds an overlap (`WallSlide`).
+func touches_hole(center: Vector2, radius: float) -> bool:
+	if not _has_holes:
+		return false
+	var r: float = maxf(radius, 0.0)
+	var x0: int = maxi(floori((center.x - r - _bounds.position.x) / WALL_CELL), 0)
+	var x1: int = mini(floori((center.x + r - _bounds.position.x) / WALL_CELL), _wall_w - 1)
+	var y0: int = maxi(floori((center.y - r - _bounds.position.y) / WALL_CELL), 0)
+	var y1: int = mini(floori((center.y + r - _bounds.position.y) / WALL_CELL), _wall_h - 1)
+	for cy in range(y0, y1 + 1):
+		for cx in range(x0, x1 + 1):
+			var cell: int = cy * _wall_w + cx
+			if _hole_cells[cell] == 0 or _wall_cells[cell] != 0:
+				continue
+			var low: Vector2 = _bounds.position + Vector2(cx, cy) * WALL_CELL
+			if center.distance_squared_to(center.clamp(low, low + Vector2(WALL_CELL, WALL_CELL))) < r * r:
+				return true
+	return false
+
+
+## True while the room has holes (`set_holes`): a body's move is then slid in two parts
+## (`Actor.move`).
+func has_holes() -> bool:
+	return _has_holes
 
 
 func _add_wall(rect: Rect2) -> void:
@@ -1864,6 +2057,21 @@ func _add_wall(rect: Rect2) -> void:
 		for x in range(x0, x1):
 			_wall_cells[y * _wall_w + x] |= ROOM_CELL
 			_has_walls = true
+
+
+## The still shot in `slot` was thrown along `facing` (a pool spat out ahead): its quad turns by it,
+## so its card's shader draws which way it was thrown. Only the look: nothing it does follows it.
+## False for an empty slot, a shot that is not still or no direction.
+func set_facing(slot: int, facing: Vector2) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] != MOTION_STILL or facing.is_zero_approx() or not facing.is_finite():
+		return false
+	_facing[slot] = facing.normalized()
+	return true
+
+
+## The way the still shot in `slot` was thrown (`set_facing`), or zero.
+func get_facing_of(slot: int) -> Vector2:
+	return _facing[slot] if slot >= 0 and slot < _cap else Vector2.ZERO
 
 
 ## Make the still shot in `slot` a wall while it lives (the Wall card, rules R4 F6): a row of
@@ -2002,7 +2210,15 @@ func line_clear(from: Vector2, to: Vector2) -> bool:
 ## from `from` to `to`: where a body walking along it would not be held up by one (boss plan OB14,
 ## decision 36: an AI walks round a blocking prop). Walks the whole segment.
 func ground_clear(from: Vector2, to: Vector2) -> bool:
-	return _footprints_laid == 0 or _way_hit(from, to, false) < 0.0
+	return _footprints_laid == 0 or _way_hit(from, to, false, false) < 0.0
+
+
+## True when neither the ground of a body that cannot move nor a hole (`set_holes`) lies on the
+## segment from `from` to `to`: where a walk along it would not stop at a pillar or a hole's lip
+## (hub rework HR-H1; the AI's walking checks take it in HR-H2, its line of fire never). Walks the
+## whole segment.
+func walk_clear(from: Vector2, to: Vector2) -> bool:
+	return _way_hit(from, to, false, true) < 0.0
 
 
 ## How far (pixels, at most `most`) a walk from `from` along `way` goes before the first cell of a
@@ -2011,7 +2227,7 @@ func ground_clear(from: Vector2, to: Vector2) -> bool:
 func clear_run(from: Vector2, way: Vector2, most: float) -> float:
 	if way == Vector2.ZERO or most <= 0.0:
 		return 0.0
-	var t: float = _way_hit(from, from + way.normalized() * most, true)
+	var t: float = _way_hit(from, from + way.normalized() * most, true, false)
 	return most if t < 0.0 else t * most
 
 ## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell or
@@ -2035,11 +2251,15 @@ func circle_blocked(center: Vector2, radius: float) -> bool:
 
 ## Where a body (a circle of `radius` at `from`) ends when it moves by `motion`, sliding along the
 ## walls it meets, the room's and the solid shots', and the ground of the bodies that cannot move
-## (online-ready N6: the actors' move, in place of the engine's physics; `WallSlide`).
-func slide_body(from: Vector2, motion: Vector2, radius: float) -> Vector2:
-	if not _has_walls and _footprints_laid == 0:
+## (online-ready N6: the actors' move, in place of the engine's physics; `WallSlide`), and, unless
+## the move is `crossing` (a dash, or a move done to the body: hub rework HR-H1, `Actor.move`), the
+## room's holes, whose lip a walk stops at. The kernel is handed the walls and one other grid: the
+## ground and the holes merged for a walk (`_walk_cells`), the ground alone for a crossing.
+func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = false) -> Vector2:
+	var holes: bool = _has_holes and not crossing
+	if not _has_walls and _footprints_laid == 0 and not holes:
 		return from + motion
-	return WallSlide.slide(_wall_cells, _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
+	return WallSlide.slide(_wall_cells, _walk_cells if holes else _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
 
 
 ## The body of the actor `actor` cannot move, and stands on this ground from now on (props W4: its
@@ -2086,6 +2306,7 @@ func _lay_footprint(actor: int) -> void:
 	for cell in _footprint_cells(actor):
 		if _ground_cells[cell] < 255:
 			_ground_cells[cell] += 1
+			_walk_cells[cell] = 1
 		else:
 			missed.append(cell)
 	if not missed.is_empty():
@@ -2098,6 +2319,7 @@ func _mark_footprint(actor: int, by: int) -> void:
 	for cell in _footprint_cells(actor):
 		if missed.is_empty() or not missed.has(cell):
 			_ground_cells[cell] += by
+			_walk_cells[cell] = 1 if _ground_cells[cell] != 0 or _hole_cells[cell] != 0 else 0
 
 
 ## The cells of the footprint of `actor` in the grid as it is now: those whose centres lie in its
@@ -2178,14 +2400,16 @@ func _wall_hit(from: Vector2, to: Vector2) -> float:
 	return -1.0
 
 
-## The first cell of the ground (`set_footprint`), and with `walls` of the wall grid too, on the
-## path from `from` to `to`, as `_wall_hit` finds a wall: t in [0, 1] where the path enters it, -1
-## when there is none. Not a shot's (shots hit a blocking body, they do not stop on its ground): an
-## AI's walk (`ground_clear`, `clear_run`), so it has none of `_wall_hit`'s fast paths, and the
-## native kernels have no copy of it.
-func _way_hit(from: Vector2, to: Vector2, walls: bool) -> float:
-	if (not walls or not _has_walls) and _footprints_laid == 0:
+## The first cell of the ground (`set_footprint`), with `walls` of the wall grid too and with
+## `holes` of the holes (`set_holes`), on the path from `from` to `to`, as `_wall_hit` finds a wall:
+## t in [0, 1] where the path enters it, -1 when there is none. Not a shot's (shots hit a blocking
+## body, they do not stop on its ground): an AI's walk (`ground_clear`, `walk_clear`, `clear_run`),
+## so it has none of `_wall_hit`'s fast paths, and the native kernels have no copy of it.
+func _way_hit(from: Vector2, to: Vector2, walls: bool, holes: bool) -> float:
+	var with_holes: bool = holes and _has_holes
+	if (not walls or not _has_walls) and _footprints_laid == 0 and not with_holes:
 		return -1.0
+	var ground: PackedByteArray = _walk_cells if with_holes else _ground_cells
 	var start: Vector2 = (from - _bounds.position) / WALL_CELL
 	var delta: Vector2 = (to - from) / WALL_CELL
 	var cx: int = floori(start.x)
@@ -2207,7 +2431,7 @@ func _way_hit(from: Vector2, to: Vector2, walls: bool) -> float:
 	for _n in full:
 		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h:
 			var cell: int = cy * _wall_w + cx
-			if _ground_cells[cell] != 0 or (walls and _wall_cells[cell] != 0):
+			if ground[cell] != 0 or (walls and _wall_cells[cell] != 0):
 				return t
 		if next_x < next_y:
 			t = next_x
@@ -3515,6 +3739,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_skip_on[slot] = 0.0
 	_skip_near[slot] = 0.0
 	_flags[slot] = F_QUAD if motion == MOTION_STILL else 0
+	_facing[slot] = Vector2.ZERO
 	_bounce[slot] = 0
 	_shield[slot] = 0
 	_deflect[slot] = 0
@@ -5310,6 +5535,7 @@ func update_draw(fraction: float = -1.0) -> void:
 		_kernel.call(&"draw_shots", self, fraction)
 	else:
 		_draw_shots(fraction)
+	_hand_merges(kernel_draw)
 	spark_birth_count = _draw_out[DRAW_BIRTHS]
 	tail_demand = _draw_out[DRAW_TAIL] + int(_end_wanted)
 	if tail_births_on:
@@ -5479,7 +5705,9 @@ func _draw_shots(fraction: float) -> void:
 		if (_flags[slot] & F_QUAD) != 0:
 			# Only a rune's quad turns with the shot (a bolt's head is a `+` whatever way it flies).
 			var dir: Vector2 = Vector2.RIGHT
-			if _vel[slot].length_squared() > 0.0:
+			if _facing[slot].length_squared() > 0.0:
+				dir = _facing[slot]
+			elif _vel[slot].length_squared() > 0.0:
 				dir = _vel[slot].normalized()
 			_draw_out[DRAW_OUT_FIRST + batch] = _write_stones(_buffers[batch], _draw_out[DRAW_OUT_FIRST + batch], slot, dir, _drawn_size[slot], at, look_data)
 			continue

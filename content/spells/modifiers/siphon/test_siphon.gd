@@ -93,3 +93,41 @@ func test_four_players_are_refunded_each() -> void:
 	for player in 4:
 		check_equal(refunded.get(player, 0.0), _card().behaviour_strength, "player %d got one hit's mana back" % player)
 	arena.free_all()
+
+
+func test_its_mana_streams_back_into_the_staff() -> void:
+	# The jet run backwards (the owner, 2026-11-16): each hit that gives mana back shows it, from the
+	# hit to the caster's staff tip, as `carrier_shown` of the Siphon card, whose cue pours it.
+	check_equal(_card().cue, &"siphon_drain", "its cue pours the mana back")
+	var cue := load("res://content/cues/siphon_drain.tres") as CueBase
+	check(cue != null and cue.problems().is_empty(), "a cue with no problems")
+	var arena := ArenaScript.new(root)
+	var shown: Array = []
+	arena.bus.carrier_shown.connect(func(_caster: int, card: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if card == &"siphon":
+			shown.append([origin, direction, length]))
+	var imp: Node2D = arena.add_imp(Vector2(80.0, 0.0))
+	arena.install_cards(0, 0, ["siphon", "bolt"])
+	# The staff tip, away from the body (the game's own path: the Caster tells the aim's origin).
+	var tip := Vector2(6.0, -10.0)
+	arena.spells.set_aim(0, tip, Vector2.RIGHT)
+	arena.cast(0, 0)
+	arena.run(1.0)
+	check(shown.size() >= 1, "shown as it hits (%d)" % shown.size())
+	if shown.size() >= 1:
+		var from: Vector2 = shown[0][0]
+		check(from.distance_to(imp.global_position) < 20.0, "from the hit (%s, the imp at %s)" % [from, imp.global_position])
+		var to: Vector2 = from + (shown[0][1] as Vector2) * float(shown[0][2])
+		check(to.distance_to(arena.spells.aim_origin_of(0)) < 0.5, "to the caster's staff tip (%s, the tip at %s)" % [to, arena.spells.aim_origin_of(0)])
+	arena.free_all()
+	var plain := ArenaScript.new(root)
+	var none: Array = []
+	plain.bus.carrier_shown.connect(func(_caster: int, card: StringName, _o: Vector2, _d: Vector2, _l: float, _t: Color, _k: int) -> void:
+		if card == &"siphon":
+			none.append(card))
+	plain.add_imp(Vector2(80.0, 0.0))
+	plain.install_cards(0, 0, ["bolt"])
+	plain.cast(0, 0)
+	plain.run(1.0)
+	check(none.is_empty(), "a bolt without it shows none")
+	plain.free_all()

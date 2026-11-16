@@ -151,3 +151,12 @@ func test_one_heap_sets_off_the_next() -> void:
 	_world.run(BLAST_STEPS)
 	check_equal(_state(second), &"burnt", "the blast's fire blew the heap beside it")
 	check_equal(_left.count(first.caster_number()) + _left.count(second.caster_number()), 2, "each once")
+
+
+## Its sounds (boss plan OB15): each state it breaks into plays its cue, naming its sound.
+func test_its_sounds() -> void:
+	var registry: Node = root.get_node("Registry")
+	var scattered: CueBase = registry.get_resource(&"cues", HEAP.look_of(&"scattered").cue) as CueBase
+	check(scattered != null and scattered.sound == &"dust_scatter", "its scattered state sounds dust_scatter as it is entered (boss plan OB15)")
+	var burnt: CueBase = registry.get_resource(&"cues", HEAP.look_of(&"burnt").cue) as CueBase
+	check(burnt != null and burnt.sound == &"dust_explode", "its burnt state sounds dust_explode as it is entered (boss plan OB15)")

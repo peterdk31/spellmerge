@@ -17,6 +17,9 @@ extends Resource
 ## The adds it brings (boss plan OB13, `EnemyAdds`): a burst as it starts, then waves while it
 ## lasts, asked of Flow by the body's `Phases` (`adds_requested`).
 @export var adds: Array[EnemyAdds] = []
+## The intensity of the body's music from this phase on (boss plan OB15, `MusicTrack`: how many of
+## its layers play, or which entry): 0, one more than the phase before (the body starts at 1).
+@export_range(0, 4) var intensity: int = 0
 ## How it looks (null: keep).
 @export var look: PhaseLook = null
 ## Seconds it stands, protected, while it changes (0: at once).

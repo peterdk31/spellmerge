@@ -53,6 +53,26 @@ func test_every_phases_adds_are_enemies_of_the_registry() -> void:
 	registry.free()
 
 
+## Boss plan OB15: every cue an enemy's data names (its staffs' moments, every phase's, and its phases'
+## looks') is a cue of the registry, so a name mistyped is not silent.
+func test_every_cue_an_enemy_names_is_a_cue() -> void:
+	var registry := RegistryScript.new()
+	registry.call("scan")
+	for data in _enemies():
+		var entries: Array[StaffCards] = data.staffs.duplicate()
+		for phase: EnemyPhase in data.phases:
+			entries.append_array(phase.staffs)
+			if phase.look != null and phase.look.cue != &"":
+				check(registry.call("get_resource", &"cues", phase.look.cue) != null, "%s: its phase look's cue '%s' is a cue" % [data.id, phase.look.cue])
+		for entry: StaffCards in entries:
+			if entry == null or entry.staff == null:
+				continue
+			for cue: StringName in [entry.staff.wind_cue, entry.staff.cast_cue, entry.staff.move_cue, entry.staff.wall_cue]:
+				if cue != &"":
+					check(registry.call("get_resource", &"cues", cue) != null, "%s: its staff %s's cue '%s' is a cue" % [data.id, entry.staff.display_name, cue])
+	registry.free()
+
+
 ## Boss plan OB13: an entry's numbers for the players in play (each "per player" after the first), its
 ## cap of those alive, and what is wrong with one.
 func test_adds_count_by_the_players_in_play() -> void:

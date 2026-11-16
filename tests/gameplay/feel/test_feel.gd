@@ -8,6 +8,7 @@ extends SceneTree
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
+const SoundsScript := preload("res://gameplay/feel/sounds.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript :=preload("res://core/registry/registry.gd")
@@ -109,12 +110,8 @@ func _setup(sound_id: StringName = &"", projectiles: Node = null) -> void:
 
 func _teardown() -> void:
 	# A voice that is still playing keeps its stream (a resource) alive at exit.
-	if _feel != null and is_instance_valid(_feel):
-		for child in _feel.get_children():
-			var voice := child as AudioStreamPlayer
-			if voice != null:
-				voice.stop()
-				voice.stream = null
+	if _feel != null and is_instance_valid(_feel) and _feel.sounds() != null:
+		_feel.sounds().clear()
 	for node: Node in [_feel, _camera, _registry, _bus, _actors]:
 		if node != null and is_instance_valid(node):
 			node.free()
@@ -130,11 +127,7 @@ func _hit(player: int, at: Vector2 = Vector2.ZERO) -> void:
 
 
 func _voices_with_stream() -> int:
-	var count: int = 0
-	for child in _feel.get_children():
-		if child is AudioStreamPlayer and (child as AudioStreamPlayer).stream != null:
-			count += 1
-	return count
+	return _feel.sounds().voices_with_stream()
 
 
 # --- Tests ------------------------------------------------------------------
@@ -247,6 +240,7 @@ func _test_known_sound_plays() -> void:
 	for i in 20:
 		_hit(i % 4)
 	_check(_voices_with_stream() <= FeelScript.SOUND_VOICES, "sounds never use more voices than SOUND_VOICES")
+	_check(_feel.sounds().voices_of(&"zap") <= SoundsScript.PER_SOUND, "one sound plays on at most PER_SOUND voices at once")
 
 
 ## A frame's hit sounds start at most HIT_SOUNDS_PER_FRAME voices (shot scale H3: past them each
@@ -255,10 +249,11 @@ func _test_a_frame_s_hit_sounds_leave_voices_free() -> void:
 	_setup(&"zap")
 	for i in 20:
 		_hit(i % 4, Vector2(float(i), 0.0))
-	_check(_voices_with_stream() == FeelScript.HIT_SOUNDS_PER_FRAME, "a frame's hits start HIT_SOUNDS_PER_FRAME voices (got %d)" % _voices_with_stream())
+	_check(_feel.sounds().started == FeelScript.HIT_SOUNDS_PER_FRAME, "a frame's hits start HIT_SOUNDS_PER_FRAME sounds (got %d)" % _feel.sounds().started)
+	_check(_voices_with_stream() == SoundsScript.PER_SOUND, "on at most PER_SOUND voices of the one sound (got %d)" % _voices_with_stream())
 	_feel.step(0.015625)
 	_hit(0, Vector2(-30.0, 0.0))
-	_check(_voices_with_stream() == FeelScript.HIT_SOUNDS_PER_FRAME + 1, "the next frame's hit sounds")
+	_check(_feel.sounds().started == FeelScript.HIT_SOUNDS_PER_FRAME + 1, "the next frame's hit sounds")
 
 
 func _test_downed_has_no_particles() -> void:

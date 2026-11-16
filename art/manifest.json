@@ -773,6 +773,15 @@
       "tier": "placeholder",
       "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
       "prompt": "The glow of the hub's island edge, drawn by tools/ground_shape.py at half size: every seam pixel's band colour by how wide the edge is there, blurred near and far, added over the room (content/edges/magic). Soft and partly transparent on purpose (the owner, 2026-11-16: the style guide is a starting point for the hub)."
+    },
+    {
+      "path": "art/ui/fonts/title.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "good",
+      "tool": "Claude (tools/pixel_grid.py from title.grid.json, 2026-11-16; the glyphs drawn on a 5x8 grid, doubled with Scale2x, made heavy by a one-pixel smear and worn by up to two nicks each)",
+      "prompt": "The title type (docs/milestones/boss-intro.md, rule 7): an original bitmap face for boss names, every printable ASCII character on a 12x16 cell, 16 a row in six rows, heavy and a little worn, in Bone light, drawn at 2x. Imported as an image font (font_data_image)."
     }
   ]
 }

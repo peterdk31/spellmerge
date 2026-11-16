@@ -30,6 +30,8 @@ A thirteenth, planned with the owner on 2026-11-15: **run generation**, a run de
 
 A fourteenth, planned with the owner on 2026-11-15: **ground cover**, grass and other cover on the floors that sways in the wind, bends as bodies walk through it, is trampled and burns: one layout worked out from each room (its biome's fill and fields placed by hand), the game's part a simulation grid, the look Feel's ([ground-cover.md](milestones/ground-cover.md), phase GC). It builds M3's "elements on the room" for fire on cover early, beside the boss plan; water, ice and breakable walls stay M3.
 
+A fifteenth, planned with the owner on 2026-11-16: **the boss intro**, a screen-wide overlay as a boss's fight starts: the boss a silhouette, then its name in a title type and the boss revealed looking mean, its lines if it has any, and the fight starting on any player's A ([boss-intro.md](milestones/boss-intro.md), phase BI). It replaces the boss plan's entrance banner for a boss with an intro, and is the one stop for everyone beside the pause menu and an unplugged pad (docs/DESIGN.md, no-waiting rule 7). Waiting for the owner's approval.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

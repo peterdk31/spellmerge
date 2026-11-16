@@ -42,6 +42,7 @@ Spell rules (chosen on 2026-10-26, the pivot at C2):
 4. Unpicked rewards carry over as an unspent icon.
 5. Shared decisions are made by walking (the door rule).
 6. Only the real pause menu stops the game, and any player can open it. Online (later) it stops nothing: it opens like the builder, for that player only (the owner, 2026-11-04).
+7. A boss's intro stops the game for everyone, on every machine, and any player's A moves it on, so nobody waits for one player in particular (the owner, 2026-11-16; [docs/milestones/boss-intro.md](milestones/boss-intro.md)). An unplugged gamepad also stops it until it is back (the owner, 2026-11-13).
 
 ## One game, the same everywhere
 

@@ -320,6 +320,33 @@ func test_the_staff_s_wind_up_comes_before_every_cast() -> void:
 	check(_spells.is_winding(3, 0), "the next cast of the cycle winds up too")
 
 
+## Held on, a spray pours (`Carrier.pours_held`; the Spitter, content/enemies/spitter/): its first
+## cast winds up its staff (an enemy's telegraph), the held casts after it do not, and a new press
+## winds it up again. A held swing is a new blow each time and winds up each time.
+func test_a_held_spray_winds_up_once_and_pours_on() -> void:
+	_fake.items[&"spray"] = load("res://content/spells/carriers/spray/spray.tres")
+	_fake.items[&"swing"] = load("res://content/spells/carriers/swing/swing.tres")
+	_staff.wind_up = 0.5
+	_staff.cooldown = 0.0
+	_install(1, 0, "spray")
+	check_equal(_spells.press_staff(1, 0, Vector2.ZERO, AIM, 100.0), 0.0, "the press is taken")
+	check(_spells.is_winding(1, 0), "the first cast winds up (its telegraph)")
+	_tick(45)
+	check(not _spells.is_winding(1, 0), "and leaves")
+	var paid: float = _spells.cast_staff(1, 0, Vector2.ZERO, AIM, 100.0)
+	check(paid > 0.0, "held, the next cast pours at once, paying its mana (%s, the staff ready in %s s)" % [paid, _spells.cooldown_left(1, 0)])
+	check(not _spells.is_winding(1, 0), "with no wind-up of the staff's")
+	_tick(40)
+	_spells.press_staff(1, 0, Vector2.ZERO, AIM, 100.0)
+	check(_spells.is_winding(1, 0), "a new press is a new attack: it winds up again")
+	_install(2, 0, "swing")
+	_spells.press_staff(2, 0, Vector2.ZERO, AIM, 100.0)
+	_tick(60)
+	check(not _spells.is_winding(2, 0), "a swing's first cast left")
+	_spells.cast_staff(2, 0, Vector2.ZERO, AIM, 100.0)
+	check(_spells.is_winding(2, 0), "held, a swing still winds up every blow")
+
+
 func test_a_payload_winds_up_where_its_trigger_fired() -> void:
 	_target(Vector2(30.0, 0.0))
 	_carrier_card(&"bolt", 300.0, 1.0).wind_down = 0.1

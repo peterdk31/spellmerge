@@ -370,6 +370,10 @@ var _pending_free: Array[PendingLaunch] = []
 var _clock: float = 0.0
 ## actor * STAFFS + staff -> casts made, which names the next cast's scatter and staff spread.
 var _cast_count: PackedInt32Array = PackedInt32Array()
+## actor * STAFFS + staff -> 1 while its last cast left with a carrier that pours on when held
+## (`Carrier.pours_held`: a spray) and no new press has come since: its next held cast of such a
+## carrier skips its staff's wind-up (`cast_staff`).
+var _pouring: PackedByteArray = PackedByteArray()
 ## actor * STAFFS + staff -> how far the novas of its latest cast stand turned off their aim, as a
 ## share of the gap between two ways (`_nova_share`): SpellLimits.RING_STEP more each cast.
 var _cast_turn: PackedFloat32Array = PackedFloat32Array()
@@ -528,6 +532,7 @@ func _init() -> void:
 	_cursor.resize(ACTORS * SpellLimits.STAFFS)
 	_hold_mana.resize(ACTORS * SpellLimits.STAFFS)
 	_cast_count.resize(ACTORS * SpellLimits.STAFFS)
+	_pouring.resize(ACTORS * SpellLimits.STAFFS)
 	_cast_turn.resize(ACTORS * SpellLimits.STAFFS)
 	for i in ACTORS * SpellLimits.STAFFS:
 		_hold_tags.append(PackedInt64Array())
@@ -997,6 +1002,7 @@ func begin_generation(actor: int, staff: int, compiled: CompiledStaff) -> int:
 	var index: int = actor * SpellLimits.STAFFS + staff
 	_release_hold(index)
 	_cancel_wind(index)
+	_pouring[index] = 0
 	# The old build casts no more: its cast's later firings go (a payload of a shot in the air
 	# fires on, as the shot flies on).
 	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.staff == staff and launch.caster == CASTER_BODY)
@@ -1160,6 +1166,13 @@ func carrier_radius(tag: int) -> float:
 	return spell.radius if spell != null else 0.0
 
 
+## How wide the cast `tag` strikes either side of its aim at its far end (`Carrier.lane_radius`: a
+## spray's cone is wider there than its hit radius); what a telegraph lane widens to.
+func carrier_lane(tag: int) -> float:
+	var spell: CompiledSpell = _profiles.get(tag) as CompiledSpell
+	return _carrier_of(spell).lane_radius(spell) if spell != null else 0.0
+
+
 ## Where `actor` holds its staff's tip and the way it aims (`set_aim`), INF while it has none: what a
 ## telegraph lane follows while the cast winds up.
 func aim_origin_of(actor: int) -> Vector2:
@@ -1236,6 +1249,11 @@ func is_holding(actor: int, staff: int) -> bool:
 ## frees their reservation and returns 0.0. The caller decides which presses may do that (a
 ## held button should not switch on and off again and again).
 ##
+## A held cast (this, not `press_staff`) of a carrier that pours on when held (`Carrier.pours_held`:
+## a spray) right after such a cast left skips its staff's wind-up: an enemy telegraphs its spray
+## once, then pours it while it holds the button (its cards' own wind-up stays; a player's staff has
+## none). A held swing still winds up every time.
+##
 ## `walk` is the way the caster's body walks (zero when it stands): a move it casts itself (a dash,
 ## a teleport: MOVES_CASTER) takes that way in place of `direction` (`CarrierMove`; staffs A6a, kept
 ## by the owner in R4 F1, teleport too since 2026-11-08).
@@ -1270,24 +1288,29 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 	if cast.group.is_empty():
 		_after_cast(index, compiled, cast)
 		return REFUSED
-	if cast.wind_up > 0.0:
+	var wind_up: float = cast.wind_up
+	if _pouring[index] != 0 and compiled.staff != null and _carrier_of(cast.group.spells[0]).pours_held():
+		# Held on, a spray pours on: its staff's wind-up (an enemy's telegraph) was its first cast's,
+		# and only a new press winds it again (`press_staff`). Its cards' own wind-up stays.
+		wind_up = maxf(wind_up - compiled.staff.wind_up, 0.0)
+	if wind_up > 0.0:
 		# It winds up first (docs/milestones/cast-timing.md): the staff is busy, its pose winds,
 		# and the cast leaves from where the caster holds the staff then (`_release_winds`), its
 		# mana paid as it leaves (`mana_spend_requested`).
-		_wind_due[index] = _clock + cast.wind_up
+		_wind_due[index] = _clock + wind_up
 		_wind_walk[index] = turn
 		_wind_origin[index] = origin
 		_wind_dir[index] = aim
 		_winding += 1
-		_cooldown[index] = cast.wind_up
+		_cooldown[index] = wind_up
 		_cooldown_rows = maxi(_cooldown_rows, index + 1)
-		_wind_pose(actor, staff, cast, aim)
+		_wind_pose(actor, staff, cast, aim, wind_up)
 		if events != null:
 			# Its look (an enemy's telegraph) is the first carrier card's `wind_cue` (T6b).
 			var first_spell: CompiledSpell = cast.group.spells[0]
 			# A staff may name its own (a barrel's fuse; props W6): it plays in place of the card's.
 			var staff_cue: StringName = compiled.staff.wind_cue if compiled.staff != null else &""
-			events.cast_winding.emit(actor, staff, first_spell.carrier_card_id, origin, aim, cast.wind_up, first_spell.tint, first_spell.look, SpellTag.make(actor, staff, first_spell.node, _current[index]), staff_cue)
+			events.cast_winding.emit(actor, staff, first_spell.carrier_card_id, origin, aim, wind_up, first_spell.tint, first_spell.look, SpellTag.make(actor, staff, first_spell.node, _current[index]), staff_cue)
 		return 0.0
 	_walk_turn[actor] = turn
 	if not _leave(index, compiled, cast, origin, aim):
@@ -1311,6 +1334,7 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:
 		return false
 	_cast_count[index] += 1
+	_pouring[index] = 1 if _carrier_of(cast.group.spells[0]).pours_held() else 0
 	_after_cast(index, compiled, cast)
 	_last_infused[actor] = null
 	for carrier in cast.group.spells:
@@ -1322,15 +1346,15 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 	return true
 
 
-## The staff's pose winds for a cast that winds up, from its press: the first carrier's keys, its
-## wind-up the cast's, turning with the live aim (the aim follows the caster until the cast
+## The staff's pose winds for a cast that winds up, from its press: the first carrier's keys, over
+## `wind_up` (the cast's, less its staff's for a spray poured on), turning with the live aim (the aim follows the caster until the cast
 ## leaves); the carrier starts its strike when it leaves.
-func _wind_pose(actor: int, staff: int, cast: CompiledCast, aim: Vector2) -> void:
+func _wind_pose(actor: int, staff: int, cast: CompiledCast, aim: Vector2, wind_up: float) -> void:
 	var spell: CompiledSpell = cast.group.spells[0]
 	if spell.staff_pose.is_empty() or actor < 0 or actor >= ACTORS:
 		return
 	var tag: int = SpellTag.make(actor, staff, spell.node, _current[actor * SpellLimits.STAFFS + staff])
-	_poses.start(actor, spell, tag, cast.wind_up, StaffPoses.strike_of(spell, spell.lifetime), aim, _carrier_of(spell).pose_side(actor, aim))
+	_poses.start(actor, spell, tag, wind_up, StaffPoses.strike_of(spell, spell.lifetime), aim, _carrier_of(spell).pose_side(actor, aim))
 
 
 ## The casts whose wind-up is over leave now, from where their caster holds the staff and along
@@ -3365,6 +3389,9 @@ func _lc_follow(i: int) -> bool:
 ## (`cast_staff`, whose return this is), so the carrier this press casts is not one of them.
 func press_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, mana: float, walk: Vector2 = Vector2.ZERO) -> float:
 	recast_staff(actor, staff)
+	if _in_range(actor, staff):
+		# A new press is a new attack: it winds up whole, a spray too.
+		_pouring[actor * SpellLimits.STAFFS + staff] = 0
 	return cast_staff(actor, staff, origin, direction, mana, walk)
 
 
@@ -3547,6 +3574,7 @@ func clear() -> void:
 	_open_builds.fill(0)
 	_last_carrier_card.fill(&"")
 	_cast_count.fill(0)
+	_pouring.fill(0)
 	_cast_turn.fill(0.0)
 	_lc_count = 0
 	_zapper_count = 0
@@ -3926,6 +3954,7 @@ func _reset_caster(caster: int) -> void:
 		_cooldown[index] = 0.0
 		_cursor[index] = 0
 		_cast_count[index] = 0
+		_pouring[index] = 0
 		_cast_turn[index] = 0.0
 		_hold_mana[index] = 0.0
 		_last_carrier_card[index] = &""

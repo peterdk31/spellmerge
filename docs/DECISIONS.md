@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-16: The Spitter; a held spray pours after one telegraph, and its lane is a cone
+
+- **The owner** (PR #777's session): a new crypt enemy, the Spitter, that telegraphs and then sprays acid in a cone with the Spray carrier, in the crypt's pool now (not sandbox-only).
+- **Now:** the Spitter (`content/enemies/spitter/`: a 1-slot staff of `spray`, wind-up 0.8 s, 16 mana, 3 back a second; 22 health, speed 40; cost 3 from row 1) plays by a new shared profile, `sprayer` (aggression 0.5, so it keeps between about 36 and 62 px of its target, inside the spray's 80; `channel_max` 1.2 s; `track_speed` 45° a second). Its acid is the Spray's own jet in the enemies' Blight, so it needs no element, cue or card of its own.
+- **A held spray pours** (`Carrier.pours_held`, true for the spray only): a held cast of it right after its last skips its staff's wind-up (`Spells.cast_staff`, `_pouring`); a new press (`press_staff`) winds up again. Before, an enemy's held spray wound its 0.8 s telegraph before every 1-damage puff, so it spat once a second rather than pouring. A player's staff has no wind-up, so nothing changes for a player; a card's own wind-up still comes every cast; a held swing still winds up every blow (the Old Broom's Swat telegraphs each one).
+- **A cone's telegraph is a cone:** a lane widens from the hit radius at the caster's end to `Carrier.lane_radius` at its far end (`Spells.carrier_lane`, the shader's `telegraph_lane_end`), so the spray's warning covers what it will strike (about 25 px either side at 80 px) and not a 4 px strip. Every other carrier's lane is as before.
+- **Not chosen:** a shorter wind-up on the Spitter's staff (every puff would still be a new attack, and a shorter telegraph is less fair); a `hold` card on its staff (a toggle the AI leaves switched on, outside its channel and its target's lane); a new Acid element (not needed: the Blight jet reads as acid, and an element is a palette decision).
+
 ## 2026-11-16: Nova and Penta rings turn on with every cast; a shot leaving its caster spares them (owner)
 
 - **The owner:** "When firing a nova, one of the nova projectiles always fire right back at the staff direction, hitting the wizard. Can the nova rotate for each cast? I also think Penta should do this".

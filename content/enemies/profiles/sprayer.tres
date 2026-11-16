@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AIProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/ai_profile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+name = "sprayer"
+aggression = 0.5
+caution = 0.4
+accuracy = 0.85
+lead = 0.3
+dodge = 0.35
+track_speed = 45.0
+channel_max = 1.2

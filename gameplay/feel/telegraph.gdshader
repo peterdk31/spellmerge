@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // A telegraph lane (staffs F8b; a cue's `lane` part since cast timing T6b, gameplay/feel/lanes.gd):
 // drawn on a Sprite2D whose region is the lane. Where the cast winding up goes, `beam_length` pixels along the aim and
-// `telegraph_lane` pixels either side of the middle. `telegraph_progress` runs 0 to 1 over the
+// `telegraph_lane` pixels either side of the middle at the caster's end, widening evenly to
+// `telegraph_lane_end` at the far end (a cone: a spray's; as wide as at the start for any other,
+// `Carrier.lane_radius`). `telegraph_progress` runs 0 to 1 over the
 // windup: the dashes march toward the tip, the arrowhead grows, the lane brightens, and the last
 // part is white-hot.
 //
@@ -20,8 +22,13 @@ uniform vec4 ramp_light : source_color = vec4(1.0, 0.635, 0.235, 1.0);
 uniform float beam_length = 0.0;
 uniform float telegraph_progress = 0.0;
 uniform float telegraph_lane = 6.0;
+// Pixels either side of the middle at the far end (below `telegraph_lane`: as wide as it).
+uniform float telegraph_lane_end = 0.0;
 // 1 to 0 over a beat as the caster's aim locks (boss plan OB14, `lanes.gd`): the lane flashes hot.
 uniform float telegraph_beat = 0.0;
+
+// The widest a lane is drawn either side (pixels; `lanes.gd` makes its sprite tall enough).
+const float LANE_MOST = 40.0;
 
 float falloff(float x, float reach) {
 	float k = max(1.0 - x / reach, 0.0);
@@ -38,7 +45,9 @@ void fragment() {
 	float y = floor(UV.y / TEXTURE_PIXEL_SIZE.y - 0.5 / TEXTURE_PIXEL_SIZE.y);
 	float p = clamp(telegraph_progress, 0.0, 1.0);
 	bool last = p >= 0.8;
-	float lane = clamp(round(telegraph_lane), 1.0, 14.0);
+	float near = clamp(telegraph_lane, 1.0, LANE_MOST);
+	float far = clamp(max(telegraph_lane_end, near), near, LANE_MOST);
+	float lane = round(mix(near, far, clamp(at / len, 0.0, 1.0)));
 	float beat = clamp(telegraph_beat, 0.0, 1.0);
 	// The arrowhead at the far end, growing as the cast nears.
 	float head = round(mix(3.0, 7.0, p));

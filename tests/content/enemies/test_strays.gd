@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The strays (living staffs H5, docs/milestones/M2-living-staffs.md, "The strays"): the Cinder
-## Rod (`ember_imp`), the Splinter, the Storm Fork, the Rime Crook and the Bone Scepter are actors
+## Rod (`ember_imp`), the Splinter, the Storm Fork, the Rime Crook, the Bone Scepter and the Spitter are actors
 ## whose art is one 32 px body; each wears the shared Face in a stray style (one eye on the Splinter), angry at rest, its eyes in its
 ## element's colour, and the face goes furious while it winds up; each has the telegraph parts;
 ## each staff compiles from player cards and its first cast is affordable on full mana; and they
@@ -15,18 +15,20 @@ const STRAYS: Array[EnemyBase] = [
 	preload("res://content/enemies/storm_fork/storm_fork.tres"),
 	preload("res://content/enemies/rime_crook/rime_crook.tres"),
 	preload("res://content/enemies/bone_scepter/bone_scepter.tres"),
+	preload("res://content/enemies/spitter/spitter.tres"),
 ]
 ## Each stray's face style and eye glow (its element's light shade, docs/STYLE.md).
-const STYLES: Array[Face.Style] = [Face.Style.STRAY, Face.Style.STRAY_ONE, Face.Style.STRAY, Face.Style.STRAY, Face.Style.STRAY]
+const STYLES: Array[Face.Style] = [Face.Style.STRAY, Face.Style.STRAY_ONE, Face.Style.STRAY, Face.Style.STRAY, Face.Style.STRAY, Face.Style.STRAY]
 const GLOWS: Array[Color] = [
 	Color(1, 0.635, 0.235, 1),
 	Color(1, 0.635, 0.235, 1),
 	Color(0.706, 0.91, 0.165, 1),
 	Color(0.769, 0.965, 0.949, 1),
 	Color(0.878, 0.541, 0.847, 1),
+	Color(1, 0.953, 0.651, 1),
 ]
 ## The cards each stray's staff holds, in the same order.
-const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"pull", &"bolt"], [&"on_hit", &"bolt", &"skyfall", &"void", &"bolt"]]
+const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"pull", &"bolt"], [&"on_hit", &"bolt", &"skyfall", &"void", &"bolt"], [&"spray"]]
 const FRAME: int = 32
 
 var _world: AiFixture
@@ -102,10 +104,10 @@ func test_each_stray_casts_the_cards_it_was_planned_with() -> void:
 		check_equal(held, CARDS[i], "%s: its cards" % STRAYS[i].id)
 
 
-## Four players in the room: the Rime Crook and the Bone Scepter wind up, cast their spells (frost
-## · hook, a bolt and a void bolt falling where it hit) at the nearest of them and nobody waits (they are actors on the enemy team).
+## Four players in the room: the Rime Crook, the Bone Scepter and the Spitter wind up, cast their
+## spells (frost · hook, a bolt and a void bolt falling where it hit, a spray) at the nearest of them and nobody waits (they are actors on the enemy team).
 func test_the_new_strays_attack_four_players() -> void:
-	for data in [STRAYS[3], STRAYS[4]]:
+	for data in [STRAYS[3], STRAYS[4], STRAYS[5]]:
 		var world := AiFixture.new(root, 4)
 		for seat in 4:
 			world.players[seat].position = Vector2(60.0 + 20.0 * seat, 10.0 * seat)

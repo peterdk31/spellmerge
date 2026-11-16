@@ -59,7 +59,7 @@ Cards name the cues they play (S6 2): a carrier's `cast_cue` (`CarrierCard`; on 
 | `discharge_arc` | Feel, for `discharge_arc`, from the struck body to each one zapped, as long as the gap | the arc in exactly the discharge's colour (`color`) |
 | `pillar_crack`, `pillar_break` | the cracked pillar's `cracked` and `rubble` states (`PropStateLook.cue`) | their sounds only (boss plan OB15) |
 | `dust_scatter`, `dust_explode` | the dust heap's `scattered` and `burnt` states | their sounds only; the blast's look is its staff's |
-| `boss_intro` | the boss's entrance banner (boss plan OB16) | the sound `boss_intro` under its name |
+| `boss_intro` | a boss entering play, under its banner (boss plan OB16; Feel, on `boss_shown`, on its body) | the sound `boss_intro` under its name |
 | `broom_*` | the Old Broom's own (content/bosses/old_broom: its staffs' moments and its phase 2's ignition) | its Sweeps' scrapes (a lane, a ring and a held scrape; the Big Sweep's louder), the swish held while it sweeps, the wall crunch, the swat, the ignition; deleted with the broom |
 | `nova` | the Nova modifier's `cue`, once per nova at its caster (`cue_shown`) | the ring leaving the caster, 120 px across, a ring of its cards' motes, and a burn ring on the floor round the caster |
 | `rune_burst` | the rune card's `impact_cue`, where a rune goes off (on a body or not: a rune lies on the floor) | the crystal slamming down (a column struck down onto the spot, `fall`; the owner, 2026-11-09: yes to the slam-down), the rune's burst (a dotted flash, a ring widening) and its scar on the floor, as big as the rune |

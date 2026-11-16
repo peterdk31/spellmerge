@@ -273,6 +273,20 @@ signal adds_requested(actor: int, adds: EnemyAdds, key: int, wave: bool)
 ## caller died crumbles. Heard by combat, which takes its health and tells its death as any other
 ## (`enemy_died` with NO_PLAYER for a foe of the wizards).
 signal crumble_requested(actor: int)
+## Sender: actor (a boss body's `BossPresence` look, boss plan OB16). The boss `actor` entered play:
+## `boss_name` its name for people (`EnemyBase.shown_name`: its `display_name`, else its id in words), `lore` its one line, `marks`
+## each phase's health share (`EnemyPhase.health_below`, largest first; none for a phase by time).
+## Sent once each time its body enters the tree; `boss_health_changed` follows at once. View only:
+## heard by the HUD (the boss bar and the entrance banner) and feel (the `boss_intro` cue).
+signal boss_shown(actor: int, boss_name: String, lore: String, marks: PackedFloat32Array)
+## Sender: actor (`BossPresence`, boss plan OB16). The shown boss `actor` has `health` of
+## `max_health` now (a hit, a heal, a player joining or leaving, a snapshot put back). View only;
+## heard by the HUD.
+signal boss_health_changed(actor: int, health: float, max_health: float)
+## Sender: actor (`BossPresence`, boss plan OB16). The shown boss `actor` is out of play: it died
+## (its `died`, beside combat's `enemy_died`) or its body left the tree (the room or the run ended).
+## Once for each `boss_shown`. View only; heard by the HUD.
+signal boss_hidden(actor: int)
 ## Sender: combat. `enemy` died; the actor `killer` landed the last hit (or NO_PLAYER). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal enemy_died(killer: int, enemy: Node, position: Vector2, shot: int)
 

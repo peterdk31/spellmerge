@@ -722,6 +722,12 @@ func _apply_data() -> void:
 		phases.name = "Phases"
 		add_child(phases)
 		_components.append(phases)
+	if data.boss and _boss_presence() == null:
+		# A boss tells the HUD it is in play (boss plan OB16): a look, added as its Phases are.
+		var presence := BossPresence.new()
+		presence.name = "BossPresence"
+		add_child(presence)
+		_looks.append(presence)
 	if caster == null:
 		return
 	if not data.has_staffs():
@@ -729,6 +735,14 @@ func _apply_data() -> void:
 		caster = null
 		return
 	caster.hold_staffs(data.staffs)
+
+
+## The look that tells the HUD a boss is in play (`BossPresence`, boss plan OB16), or null.
+func _boss_presence() -> BossPresence:
+	for look in _looks:
+		if look is BossPresence:
+			return look as BossPresence
+	return null
 
 
 ## `count` wizards are in play now (boss plan OB13): its most health follows its data's

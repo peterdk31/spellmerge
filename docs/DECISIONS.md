@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-16: Mana, a palette material for mana on the move
+
+- **Now:** a new material, **Mana** (`#161c55` `#2c3aa8` `#6f86f0`), in docs/STYLE.md, `art/kit`'s palette files, `core/base/palette.gd` and the SVG art test (49 colours). A siphon's mana, knocked off a body and streaming back into the staff tip (`siphon_drain`), is drawn in it: the stream in its base, the burst off the hit in its light.
+- **Why:** the owner, 2026-11-16: "mana should be dark blue. Gold can be used later when a player can steal coins by hitting an enemy (from a relic)". The palette had no blue but Player 1's (a colour on screen that close always means that player) and Ice's cyan (frost). Mana is a deep ultramarine: darker and bluer than Player 1 (base hue about 233° against its 215°), far from Ice.
+- **Not chosen:** Spark's gold (kept for coins, the owner), Player 1's blue (a player's), Ice (frost's).
+
 ## 2026-11-16: Leaf, a palette material for growth (ground cover GC8)
 
 - **Now:** a new material, **Leaf** (`#2f4022` `#5b7233` `#a0ad55`), in docs/STYLE.md, `art/kit`'s palette files, `core/base/palette.gd` and the SVG art test (46 colours). The hub's grass and the crypt's moss are drawn in it.

@@ -1,9 +1,9 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=15 format=3]
 
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/floor.svg" id="1_floor"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/wall.svg" id="2_wall"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/wall_top.svg" id="3_walltop"]
+[ext_resource type="PackedScene" path="res://content/rooms/crypt/arena_01_ground.tscn" id="1_ground"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/pillar.svg" id="4_pillar"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/pillar_stump_top.svg" id="12_stump"]
+[ext_resource type="PackedScene" path="res://content/rooms/decor/beam.tscn" id="13_beam"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/torch.tscn" id="5_torch"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/pillar_top.svg" id="9_pillartop"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/door.svg" id="6_door"]
@@ -14,81 +14,16 @@
 [ext_resource type="Script" path="res://core/base/cover_field.gd" id="gc_field"]
 [ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_horizontal"]
-size = Vector2(640, 32)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_vertical"]
-size = Vector2(32, 320)
-
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_pillar"]
 size = Vector2(32, 32)
 
 [node name="Arena01" type="Node2D"]
 
-[node name="Floor" type="Sprite2D" parent="."]
-z_index = -2
-modulate = Color(0.72, 0.7, 0.86, 1)
-texture_filter = 1
-texture_repeat = 2
-texture = ExtResource("1_floor")
-centered = false
-region_enabled = true
-region_rect = Rect2(0, 0, 640, 384)
+[node name="Floor" parent="." instance=ExtResource("1_ground")]
 
 [node name="Walls" type="StaticBody2D" parent="."]
 collision_layer = 1
 collision_mask = 0
-
-[node name="Top" type="CollisionShape2D" parent="Walls"]
-position = Vector2(320, 16)
-shape = SubResource("RectangleShape2D_horizontal")
-
-[node name="TopTiles" type="Sprite2D" parent="Walls"]
-texture_filter = 1
-texture_repeat = 2
-texture = ExtResource("3_walltop")
-centered = false
-region_enabled = true
-region_rect = Rect2(0, 0, 640, 32)
-
-[node name="Bottom" type="CollisionShape2D" parent="Walls"]
-position = Vector2(320, 368)
-shape = SubResource("RectangleShape2D_horizontal")
-
-[node name="BottomTiles" type="Sprite2D" parent="Walls"]
-texture_filter = 1
-texture_repeat = 2
-position = Vector2(0, 352)
-texture = ExtResource("3_walltop")
-centered = false
-region_enabled = true
-region_rect = Rect2(0, 0, 640, 32)
-
-[node name="Left" type="CollisionShape2D" parent="Walls"]
-position = Vector2(16, 192)
-shape = SubResource("RectangleShape2D_vertical")
-
-[node name="LeftTiles" type="Sprite2D" parent="Walls"]
-texture_filter = 1
-texture_repeat = 2
-position = Vector2(0, 32)
-texture = ExtResource("2_wall")
-centered = false
-region_enabled = true
-region_rect = Rect2(0, 0, 32, 320)
-
-[node name="Right" type="CollisionShape2D" parent="Walls"]
-position = Vector2(624, 192)
-shape = SubResource("RectangleShape2D_vertical")
-
-[node name="RightTiles" type="Sprite2D" parent="Walls"]
-texture_filter = 1
-texture_repeat = 2
-position = Vector2(608, 32)
-texture = ExtResource("2_wall")
-centered = false
-region_enabled = true
-region_rect = Rect2(0, 0, 32, 320)
 
 [node name="Pillar1" type="CollisionShape2D" parent="Walls"]
 position = Vector2(176, 144)
@@ -115,14 +50,6 @@ position = Vector2(336, 208)
 shape = SubResource("RectangleShape2D_pillar")
 
 [node name="Shade" type="Node2D" parent="."]
-
-[node name="TopShade" type="Polygon2D" parent="Shade"]
-color = Color(0.078, 0.071, 0.122, 0.4)
-polygon = PackedVector2Array(32, 32, 608, 32, 608, 42, 32, 42)
-
-[node name="LeftShade" type="Polygon2D" parent="Shade"]
-color = Color(0.078, 0.071, 0.122, 0.3)
-polygon = PackedVector2Array(32, 42, 40, 42, 40, 352, 32, 352)
 
 [node name="Pillar1Shade" type="Polygon2D" parent="Shade"]
 color = Color(0.078, 0.071, 0.122, 0.35)
@@ -208,7 +135,7 @@ centered = false
 
 [node name="Pillar5Top" type="Sprite2D" parent="PillarTops"]
 position = Vector2(288, 128)
-texture = ExtResource("9_pillartop")
+texture = ExtResource("12_stump")
 centered = false
 
 [node name="Pillar6Top" type="Sprite2D" parent="PillarTops"]
@@ -220,13 +147,13 @@ centered = false
 
 [node name="Rubble1" type="Sprite2D" parent="Decor"]
 texture_filter = 1
-position = Vector2(40, 48)
+position = Vector2(254, 166)
 texture = ExtResource("7_rubble")
 centered = false
 
 [node name="Rubble2" type="Sprite2D" parent="Decor"]
 texture_filter = 1
-position = Vector2(560, 296)
+position = Vector2(536, 288)
 texture = ExtResource("7_rubble")
 centered = false
 
@@ -238,7 +165,7 @@ centered = false
 
 [node name="Rubble4" type="Sprite2D" parent="Decor"]
 texture_filter = 1
-position = Vector2(504, 40)
+position = Vector2(246, 196)
 texture = ExtResource("7_rubble")
 centered = false
 
@@ -259,6 +186,9 @@ texture_filter = 1
 position = Vector2(520, 160)
 texture = ExtResource("8_skull")
 centered = false
+
+[node name="Beam" parent="Decor" instance=ExtResource("13_beam")]
+position = Vector2(306, 204)
 
 [node name="Torch1" parent="Decor" instance=ExtResource("5_torch")]
 position = Vector2(80, 0)
@@ -439,18 +369,6 @@ border_color = Color(0.56, 0.68, 0.33, 1)
 border_width = 2.0
 kind = &"cobweb"
 density = 0.5
-
-[node name="MossLeftWall" type="ReferenceRect" parent="Cover"]
-script = ExtResource("gc_field")
-offset_left = 32.0
-offset_top = 112.0
-offset_right = 64.0
-offset_bottom = 288.0
-mouse_filter = 2
-border_color = Color(0.56, 0.68, 0.33, 1)
-border_width = 2.0
-kind = &"crypt_moss"
-density = 0.7
 
 [node name="CoverPreview" type="Node2D" parent="."]
 script = ExtResource("gc_preview")

@@ -40,13 +40,14 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## players' loadouts in place of the carried staffs, and the bags' capacities among the rules, items
 ## I4; 8: what lies on the ground after the players' loadouts, items I6; 9: the save flags the
 ## run plays by after the ground, run generation RG6; 10: the boss intros among the rules,
-## docs/milestones/boss-intro.md). A replay of another format is refused.
-const FORMAT: int = 10
+## docs/milestones/boss-intro.md; 11: the start of the room crypt rework
+## CR-S removed gone and the hub's renumbered, docs/DECISIONS.md 2026-11-16). A replay of another format is refused.
+const FORMAT: int = 11
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
-## The requests a run starts by (core/events): a run of rooms, the sandbox, the hub (online-lobby
-## L1; the main menu's Play). A new one goes at the end, so the replays made before keep their start.
-const STARTS: Array[StringName] = [&"play_requested", &"sandbox_requested", &"hub_requested"]
+## The requests a run starts by (core/events): a run of rooms, the hub (online-lobby L1; the main
+## menu's Play). A new one goes at the end, so the replays made before keep their start.
+const STARTS: Array[StringName] = [&"play_requested", &"hub_requested"]
 const SEATS: int = 4
 ## Limits: four hours at 60 ticks a second, and the file's bytes.
 const MAX_TICKS: int = 60 * 60 * 60 * 4
@@ -59,7 +60,7 @@ const MAX_HEADER_BYTES: int = 4 + 1 + 1 + MAX_BUILD + 16 + 3 + SessionRules.BYTE
 var build: String = ""
 var content: int = 0
 var run_seed: int = 0
-var start: StringName = &"sandbox_requested"
+var start: StringName = &"hub_requested"
 var starter: int = 0
 var seats: int = 0
 ## The rules the run played by (`Frames.record` takes this machine's; the runs it plays take them).

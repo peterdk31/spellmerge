@@ -230,21 +230,6 @@ func test_the_rooms_enemies_stand_on_the_floor() -> void:
 			check(not wall.intersects(body), "enemy at %s is clear of the wall %s" % [enemy.position, wall])
 
 
-## Even the most the sandbox's arena keeps up (SANDBOX_MAX), placed as a room's fight is, stand on
-## the floor: the stacked spawns stay inside the room and clear of the walls. No run needed.
-func test_a_full_sandbox_arena_stands_on_the_floor() -> void:
-	var walls: Array[Rect2] = _arena_walls()
-	var spawns: int = ARENA.places().enemy_spawns.size()
-	for at: int in FlowScript.SANDBOX_MAX:
-		var spawn: int = at % spawns
-		var times: int = at / spawns
-		var position: Vector2 = FlowScript.stacked_position(ARENA.places().enemy_spawns[spawn], times)
-		var body := Rect2(position - Vector2(12.0, 12.0), Vector2(24.0, 24.0))
-		check(INNER.encloses(body), "enemy %d of a full arena (%s) is inside the room" % [at, position])
-		for wall in walls:
-			check(not wall.intersects(body), "spawn %d (%s) is clear of the wall %s" % [at, position, wall])
-
-
 ## As a run's room starts, its cue plays on every wizard, as that wizard's actor.
 func test_the_room_start_cue_plays_on_every_wizard_as_its_actor() -> void:
 	for count: int in [1, 4]:

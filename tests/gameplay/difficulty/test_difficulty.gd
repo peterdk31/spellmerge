@@ -4,7 +4,7 @@ extends "res://tests/support/suite.gd"
 ## (`run_room_scaled`) is the level (never `difficulty_changed`, the setting's, which the enemies'
 ## skill follows: enemy AI AI10); an enemy or a boss about to stand
 ## (`enemy_standing`) takes it (`Actor.stat_scale`), so its data's health is multiplied by it; the level
-## is the run's state, 1 again at every run's start, so the hub and the sandbox scale nothing; and in
+## is the run's state, 1 again at every run's start, so the hub scales nothing; and in
 ## play, a pinned run of copies of the crypt arena (tests/support/pinned_run.gd) scaled by depth and
 ## players stands each room's enemies at the room's scale, deeper rooms harder.
 const FlowScript := preload("res://gameplay/flow/flow.gd")
@@ -142,17 +142,10 @@ func test_the_level_is_state_and_a_run_s_start_renews_it() -> void:
 	check_equal(_level(), 1.0, "a run's start: 1 again")
 
 
-## The hub and the sandbox are no run of rooms: whatever the last run's level, nothing is scaled there.
-func test_the_hub_and_the_sandbox_scale_nothing() -> void:
+## The hub is no run of rooms: whatever the last run's level, nothing is scaled there.
+func test_the_hub_scales_nothing() -> void:
 	events.emit_signal("run_room_scaled", 3.0)
 	input.add_virtual_device(0)
-	flow.mode = FlowScript.MODE_SANDBOX
-	check(flow.start_run(0), "the sandbox starts")
-	check_equal(_level(), 1.0, "the sandbox's start renews the level")
-	check(flow.spawn_in_sandbox(IMP.id, 1) == 1, "an imp is spawned")
-	_check_enemies_at(1.0, "the sandbox")
-	flow.stop_run()
-	events.emit_signal("run_room_scaled", 3.0)
 	flow.mode = FlowScript.MODE_HUB
 	check(flow.start_run(0), "the hub starts")
 	check_equal(_level(), 1.0, "the hub's start too")

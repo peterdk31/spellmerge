@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import platform_hashes as ph  # noqa: E402
 
 
-def log(*ticks: tuple[str, dict[str, str]], scene: str = "sandbox", inputs: str = "abc",
+def log(*ticks: tuple[str, dict[str, str]], scene: str = "hub", inputs: str = "abc",
         leaves: list[tuple[str, str, str, str]] | None = None, result: str = "REPLAY HASHES OK",
         prefix: str = "", self_check: str = "agree") -> str:
     lines = [f"{prefix}REPLAY START\t{scene}\tLinux\tticks={len(ticks)}\tnative=on\tcap=1000",
@@ -35,7 +35,7 @@ class ParseTest(unittest.TestCase):
     def test_reads_ticks_leaves_and_result(self) -> None:
         run = ph.parse("linux", log(("w0", {"Spells": "1", "actor 0": "2"}), ("w1", {"Spells": "3", "actor 0": "2"}),
                                     leaves=[("Spells", "d1", "Spells._walk_turn", "PackedFloat32Array(0.5)")]))
-        scene = run.scenes["sandbox"]
+        scene = run.scenes["hub"]
         self.assertEqual(run.result, "REPLAY HASHES OK")
         self.assertEqual(scene.input, "abc")
         self.assertEqual(scene.ticks[1], ("w1", {"Spells": "3", "actor 0": "2"}))
@@ -44,11 +44,11 @@ class ParseTest(unittest.TestCase):
 
     def test_skips_the_browser_console_prefix(self) -> None:
         run = ph.parse("web", log(("w0", {"A": "1"}), prefix="console.log: "))
-        self.assertEqual(len(run.scenes["sandbox"].ticks), 1)
+        self.assertEqual(len(run.scenes["hub"].ticks), 1)
         self.assertEqual(run.result, "REPLAY HASHES OK")
 
     def test_a_missing_tick_is_an_error(self) -> None:
-        text = log(("w0", {"A": "1"})).replace("REPLAY TICK\tsandbox\t0", "REPLAY TICK\tsandbox\t3")
+        text = log(("w0", {"A": "1"})).replace("REPLAY TICK\thub\t0", "REPLAY TICK\thub\t3")
         with self.assertRaises(ValueError):
             ph.parse("linux", text)
 
@@ -59,7 +59,7 @@ class CompareTest(unittest.TestCase):
         b = ph.parse("web", log(("w0", {"A": "1"}), ("w1", {"A": "2"})))
         text, agree = ph.report(a, b)
         self.assertTrue(agree)
-        self.assertIn("sandbox: agrees at all 2 ticks", text)
+        self.assertIn("hub: agrees at all 2 ticks", text)
 
     def test_names_the_first_tick_and_its_areas(self) -> None:
         a = ph.parse("linux", log(("w0", {"A": "1", "B": "1"}), ("w1", {"A": "2", "B": "2"}), ("w2", {"A": "3", "B": "3"})))
@@ -68,7 +68,7 @@ class CompareTest(unittest.TestCase):
         self.assertEqual((parting.tick, parting.areas), (1, ["B"]))
         text, agree = ph.report(a, b)
         self.assertFalse(agree)
-        self.assertIn("sandbox: parts at tick 1, in B (2 vs 9)", text)
+        self.assertIn("hub: parts at tick 1, in B (2 vs 9)", text)
 
     def test_names_the_members_from_kept_leaves(self) -> None:
         leaves_a = [("B", "d1", "B.x", "1.0"), ("B", "d2", "B.y", "2.0")]
@@ -110,7 +110,7 @@ class RunProblemsTest(unittest.TestCase):
         good = log(("w0", {"A": "1"}))
         on = ph.parse("windows", "console.log: REPLAY BUILD\twebrtc=on\n" + good)
         self.assertEqual(on.build, {"webrtc": "on"})
-        self.assertEqual(list(on.scenes), ["sandbox"])  # the build line is no scene
+        self.assertEqual(list(on.scenes), ["hub"])  # the build line is no scene
         self.assertEqual(ph.run_problems(on), ([], 0))
         lines, status = ph.run_problems(ph.parse("windows", "REPLAY BUILD\twebrtc=off\n" + good))
         self.assertEqual(status, 2)
@@ -120,7 +120,7 @@ class RunProblemsTest(unittest.TestCase):
     def test_a_replay_parting_from_its_own_recording(self) -> None:
         lines, status = ph.run_problems(ph.parse("windows", log(("w0", {"A": "1"}), self_check="parts at tick 7")))
         self.assertEqual(status, 1)
-        self.assertEqual(lines, ["windows: sandbox: its replay parts at tick 7 against its recording"])
+        self.assertEqual(lines, ["windows: hub: its replay parts at tick 7 against its recording"])
 
 
 class CommandsTest(unittest.TestCase):
@@ -148,7 +148,7 @@ class CommandsTest(unittest.TestCase):
         self.assertEqual(self.main("compare", str(linux), str(same))[0], 0)
         status, text = self.main("compare", str(linux), str(same), str(other))
         self.assertEqual(status, 1)
-        self.assertIn("windows against linux:\n  sandbox: parts at tick 1, in A (2 vs 5)", text)
+        self.assertIn("windows against linux:\n  hub: parts at tick 1, in A (2 vs 5)", text)
         status, text = self.main("compare", str(linux), str(other), str(broken))
         self.assertEqual(status, 2)
         self.assertIn("broken: the run did not finish (REPLAY HASHES FAILED: no wizard)", text)

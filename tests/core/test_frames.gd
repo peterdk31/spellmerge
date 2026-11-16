@@ -195,7 +195,7 @@ func test_a_source_fills_its_seat_instead_of_the_device() -> void:
 func test_the_run_on_the_deck_is_saved_as_far_as_it_got() -> void:
 	check_equal(_frames.save_run("frames_test_run"), ERR_UNAVAILABLE, "with no run on the deck there is nothing to save")
 	_input.add_virtual_device(0)
-	var replay: Replay = _frames.record(&"sandbox_requested", 0)
+	var replay: Replay = _frames.record(&"hub_requested", 0)
 	for i in 5:
 		_frames.tick(DT)
 	check_equal(_frames.save_run("frames_test_run"), OK, "a run being recorded is saved")
@@ -215,8 +215,8 @@ func test_a_recorded_run_plays_back_frame_for_frame() -> void:
 	_frames.set_source(2, walker)
 	_frames.tick(DT)
 	var starts: Array = []
-	_bus.sandbox_requested.connect(func(seat: int) -> void: starts.append(seat))
-	var replay: Replay = _frames.record(&"sandbox_requested", 0)
+	_bus.hub_requested.connect(func(seat: int) -> void: starts.append(seat))
+	var replay: Replay = _frames.record(&"hub_requested", 0)
 	check_equal(starts, [0], "recording starts the run")
 	check(_frames.is_recording(), "and records it")
 	var first_seed: int = _frames.next_run_seed()
@@ -261,7 +261,7 @@ func test_a_recorded_run_plays_back_frame_for_frame() -> void:
 ## held when it was recorded, it stands so again from its own state, so nothing is skipped.
 func test_a_replay_plays_a_recorded_tick_each_tick() -> void:
 	_input.add_virtual_device(0)
-	var replay: Replay = _frames.record(&"sandbox_requested", 0)
+	var replay: Replay = _frames.record(&"hub_requested", 0)
 	_input.send_virtual(0, &"move_right", 1.0)
 	_frames.tick(DT)
 	_bus.staff_change_requested.emit(0, 1, 0, &"fire", BODY)
@@ -320,7 +320,7 @@ func test_a_sources_commands_apply_but_it_seats_nobody() -> void:
 	check_equal(seats, [2], "a device joining seats its seat at once")
 	_frames.tick(DT)
 	_frames.set_source(1, Remote.new())
-	var replay: Replay = _frames.record(&"sandbox_requested", 1)
+	var replay: Replay = _frames.record(&"hub_requested", 1)
 	_frames.tick(DT)
 	check_equal(_heard, [[&"staff_change_requested", 1, 1, 0, &"fire"]], "the source's command applies as its seat's")
 	check_equal(_frames.frame_of(1).commands, [[&"staff_change_requested", 1, 0, &"fire", BODY]], "its JOIN and LEAVE are dropped from the frame")
@@ -345,7 +345,7 @@ func test_a_sources_commands_apply_but_it_seats_nobody() -> void:
 func test_a_replay_sought_has_that_ticks_seats() -> void:
 	_input.add_virtual_device(0)
 	_input.add_virtual_device(1)
-	var replay: Replay = _frames.record(&"sandbox_requested", 0)
+	var replay: Replay = _frames.record(&"hub_requested", 0)
 	for i in 6:
 		if i == 2:
 			_input.leave(1)

@@ -68,7 +68,7 @@ const NO_STAFF: int = ItemStack.NO_NUMBER
 const NO_HAND: int = -1
 ## How many hands: one per staff button.
 const HANDS: int = Caster.MAX_STAFFS
-## How many of each card the dev bag holds (the sandbox's and the hub's; owner, 2026-11-13).
+## How many of each card the dev bag holds (the hub's; owner, 2026-11-13).
 const DEV_COPIES: int = 20
 
 ## The contents of bag `bag` changed (`stacks_in`, `count_of`, `copies`).
@@ -228,7 +228,7 @@ func hand_cards() -> Array:
 
 # --- Bags -------------------------------------------------------------------------------
 
-## The dev bag (the sandbox's and the hub's, and a wizard's given none): DEV_COPIES of every card
+## The dev bag (the hub's, and a wizard's given none): DEV_COPIES of every card
 ## `registry` finds in the card kind's content folders, card id to copies, in the registry's order.
 static func dev_cards(registry: Node) -> Dictionary:
 	var out: Dictionary = {}

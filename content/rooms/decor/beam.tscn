@@ -1,0 +1,40 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Texture2D" path="res://art/tilesets/decor/beam.png" id="1_beam"]
+[ext_resource type="Texture2D" path="res://art/tilesets/decor/beam_pool.png" id="2_pool"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="3_motes"]
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_add"]
+blend_mode = 1
+
+[sub_resource type="Resource" id="MoteSource_dust"]
+script = ExtResource("3_motes")
+kind = &"falling_dust"
+rate = 3.0
+from = 1
+colours = Array[StringName]([&"bone"])
+
+[node name="Beam" type="Node2D"]
+
+[node name="Pool" type="Sprite2D" parent="." groups=["painted_light"]]
+z_index = -1
+material = SubResource("CanvasItemMaterial_add")
+texture_filter = 1
+texture = ExtResource("2_pool")
+
+[node name="Column" type="Sprite2D" parent="."]
+z_index = 4
+material = SubResource("CanvasItemMaterial_add")
+texture_filter = 1
+position = Vector2(0, -100)
+texture = ExtResource("1_beam")
+
+[node name="Light" type="Marker2D" parent="." groups=["light_spot"]]
+metadata/light_tint = Color(0.82, 0.86, 1, 1)
+metadata/light_reach = 72.0
+metadata/light_strength = 0.55
+
+[node name="Dust" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+points = PackedVector2Array(14, -196, -14, -196)
+metadata/mote_source = SubResource("MoteSource_dust")

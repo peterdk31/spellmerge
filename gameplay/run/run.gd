@@ -16,7 +16,7 @@ extends Node
 ##
 ## The map is the run's state (`map`, `at`: hashed, saved in snapshots), the same on every machine;
 ## a joining machine gets it from the snapshot. A run's start renews it (`begin_run`): out of a run
-## of rooms (the hub, the sandbox) there is no map.
+## of rooms (the hub) there is no map.
 ##
 ## **Meta progression's hook** (run generation RG6): the map is made by the run definition as the
 ## run's unlocks change it (`RunDefinition.changed_by`: each `RunRuleChange` whose save flag they

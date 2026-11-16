@@ -110,7 +110,7 @@ func test_a_recording_writes_the_game_s_unlocks_in_its_header() -> void:
 	var frames: FramesScript = FramesScript.new()
 	_source_flags = [&"harder", &"deeper"]
 	frames.set_unlocks_source(_source)
-	var replay: Replay = frames.record(&"sandbox_requested", 0, 77)
+	var replay: Replay = frames.record(&"hub_requested", 0, 77)
 	check_equal(replay.unlocks.flags, [&"deeper", &"harder"] as Array[StringName], "a recording begun writes them in its header")
 	_source_flags = []
 	check_equal(frames.next_run_unlocks().flags, [&"deeper", &"harder"] as Array[StringName], "while it records, the header's, though the save changed")

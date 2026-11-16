@@ -32,7 +32,7 @@ extends Node
 ##    no machine may load inside a run another one plays. Only then is its session pumped: the
 ##    joining machine has its devices seated by the host (`NetClient.seat_devices`) and pings;
 ##    the host hears from READY_PINGS pings that it is ready.
-## 2. **The run:** PLAYING. By hand, the host starts a sandbox, recorded, both machines from its
+## 2. **The run:** PLAYING. By hand, the host starts the hub, recorded, both machines from its
 ##    first tick. In a room, the joining machine is put into the hub the host is in: the host
 ##    records its hub (a hub that is not recorded yet, or was for longer than MAX_CATCH_UP ticks,
 ##    starts anew, recorded), and the joining machine plays the recording from its first tick
@@ -86,10 +86,9 @@ const PLAYING: StringName = EventsScript.ONLINE_PLAYING
 const ENDED: StringName = EventsScript.ONLINE_ENDED
 const FAILED: StringName = EventsScript.ONLINE_FAILED
 
-## How a run by hand starts (one of `Replay.STARTS`): a sandbox, for its storms.
-const START: StringName = &"sandbox_requested"
-## How a party's recording starts: the hub.
-const ROOM_START: StringName = &"hub_requested"
+## How an online run starts (one of `Replay.STARTS`): the hub, by hand (both machines from its first
+## tick) and through a room (a party's recording) alike.
+const START: StringName = &"hub_requested"
 ## The ways machines find each other (`_handshake_for`).
 const BY_HAND: StringName = &"hand"
 const THROUGH_ROOM: StringName = &"room"
@@ -141,7 +140,7 @@ var _host: NetHost = null
 var _client: NetClient = null
 var _hosting: bool = false
 ## The host's: true for a party (its hub, joined a while in, open for the next machine when one
-## leaves), false for one run two machines start together (a sandbox). Whatever the way in.
+## leaves), false for one run two machines start together (a hub, by hand). Whatever the way in.
 var _party: bool = false
 var _handshake: NetHandshake = null
 ## The host's: the seat that asked, and the run it records (null: none).
@@ -426,7 +425,7 @@ func _admit(guest: NetGuest) -> void:
 		if _host.replay == null:
 			if _replay == null or frames.recorded() != _replay or _replay.tick_count() > MAX_CATCH_UP:
 				# The hub begins anew, recorded: what the joining machine catches up on.
-				_replay = frames.record(ROOM_START, _starter)
+				_replay = frames.record(START, _starter)
 			_host.begin(_replay, false)
 		if not _host.admit(guest):
 			_turn_away(guest, NetWhy.new(OnlineWhy.LEFT, "the other player left"))

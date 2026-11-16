@@ -64,7 +64,7 @@ const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 # enemy pool is every enemy that names the biome, a boss pool every boss that does (`RunContent`),
 # so an enemy joins runs by its own data and deleting it touches no other file.
 
-## The biomes it fights in (`RoomBase.biome`). Empty: no run's (the sandbox dummies).
+## The biomes it fights in (`RoomBase.biome`). Empty: no run's (the dummies).
 @export var biomes: Array[StringName] = []
 ## What it costs of a room's enemy budget (at least 1): the tougher, the more.
 @export_range(1, 100) var cost: int = 1
@@ -74,7 +74,7 @@ const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 ## The most staffs an enemy may hold (the staff buttons).
 const MAX_STAFFS: int = 4
 ## The registry folders an enemy's data is found in: the enemies, then the bosses (content/bosses;
-## boss OB2: the sandbox's enemy arena lists and spawns both).
+## boss OB2: a run's map stands both).
 const FOLDERS: Array[StringName] = [&"enemies", &"bosses"]
 
 

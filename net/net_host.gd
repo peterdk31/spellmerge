@@ -29,7 +29,7 @@ extends NetRun
 ##
 ##     var host := NetHost.new(Frames, PlayerInput, Tick.state_areas)
 ##     var guest: NetGuest = host.add_guest(link)
-##     host.begin(replay)    # the run Frames.record returned; or: host.start(&"sandbox_requested", 0)
+##     host.begin(replay)    # the run Frames.record returned; or: host.start(&"hub_requested", 0)
 ##     ...  # every physics step: host.pump(); after every tick: host.after_tick()
 
 const FramesScript := preload("res://core/sim/frames.gd")

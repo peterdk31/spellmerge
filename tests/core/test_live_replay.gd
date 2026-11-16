@@ -403,7 +403,7 @@ func test_a_run_recorded_begins_a_new_recording_there() -> void:
 	var anew: Array[Replay] = []
 	_frames.recorded_anew.connect(func(replay: Replay) -> void: anew.append(replay))
 	_input.add_virtual_device(0)
-	var first: Replay = _frames.record(&"sandbox_requested", 0, 5)
+	var first: Replay = _frames.record(&"hub_requested", 0, 5)
 	for i in 7:
 		_step()
 	_frames.restart(&"hub_requested", 0)

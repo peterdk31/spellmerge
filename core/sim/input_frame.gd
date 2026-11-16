@@ -28,8 +28,9 @@ extends RefCounted
 
 ## The format's version, the frame's first byte (2: the horde's commands gone, the kinds after
 ## them renumbered; 3: `card_move_requested` gone with the list builder, the same; 4: the four menu
-## requests carry the key of the body the menu showed, items I8).
-const VERSION: int = 4
+## requests carry the key of the body the menu showed, items I8; 5: the two commands of the room
+## crypt rework CR-S removed gone, docs/DECISIONS.md 2026-11-16, the kinds after them renumbered).
+const VERSION: int = 5
 const SEATS: int = 4
 const STAFFS: int = 4
 ## A move axis of 1.0 is this byte.
@@ -61,7 +62,6 @@ const LEAVE: StringName = &"leave"
 const COMMAND_NAMES: Array[StringName] = [
 	JOIN, LEAVE,
 	&"staff_change_requested", &"staff_cards_requested",
-	&"sandbox_action_requested", &"sandbox_spawn_requested",
 	&"reward_pick_requested", &"door_vote_requested",
 	&"shot_cap_requested",
 	&"pause_requested",
@@ -75,7 +75,6 @@ const COMMAND_NAMES: Array[StringName] = [
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
 	"iisi", "iSi",
-	"s", "si",
 	"i", "i",
 	"i",
 	"i",

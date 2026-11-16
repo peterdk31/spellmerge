@@ -9,6 +9,8 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 ## Clearance a spawn needs around it (a wizard is about 12 px wide).
 const SPAWN_RADIUS: float = 12.0
 const TILE: float = 32.0
+## The walls' grid (the projectile manager's `WALL_CELL`), on which the reach is flooded.
+const CELL: float = 8.0
 const STEPS: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
 
 var templates: Array[RoomBase] = []
@@ -234,30 +236,32 @@ func _leads_on(rules: MapRules, rule: KindRule) -> bool:
 	return false
 
 
-## Flood fill on the 32 px grid from the first player spawn.
+## Flood fill on the 8 px wall grid from the first player spawn, through the cells a wizard fits
+## in (no wall or hole within a cell of it: the walls of a room drawn from a shape are 8 px steps,
+## and a gap narrower than a wizard must not count as a way; crypt rework CR3).
 func test_every_spawn_can_be_reached() -> void:
 	for room in templates:
-		var seen: Dictionary = _flood(room, _cell(room.places().player_spawns[0]))
+		var blocked: Dictionary = _blocked_cells(room)
+		var seen: Dictionary = _flood(room, blocked, _cell(room.places().player_spawns[0]))
 		for point in _spawns(room):
 			check(seen.has(_cell(point)), "%s: spawn %s can be reached from the first player spawn" % [room.id, point])
 
 
-## No floor cell is shut off from the party: a pocket nobody can walk into is a place an enemy
-## could be pushed into and never reached.
+## No floor a wizard fits on is shut off from the party: a pocket nobody can walk into is a place an
+## enemy could be pushed into and never reached, and a pit never cuts a room in two.
 func test_every_floor_cell_can_be_reached() -> void:
 	for room in templates:
-		var walls: Array[Rect2] = _walls(room)
-		var seen: Dictionary = _flood(room, _cell(room.places().player_spawns[0]))
+		var blocked: Dictionary = _blocked_cells(room)
+		var seen: Dictionary = _flood(room, blocked, _cell(room.places().player_spawns[0]))
 		var grid: Vector2i = _grid(room)
 		for y in grid.y:
 			for x in grid.x:
 				var cell := Vector2i(x, y)
-				if not _blocked(walls, cell):
-					check(seen.has(cell), "%s: the floor cell %s can be reached" % [room.id, cell])
+				if _fits(blocked, cell):
+					check(seen.has(cell), "%s: the floor at %s can be reached" % [room.id, Vector2(cell) * CELL])
 
 
-func _flood(room: RoomBase, start: Vector2i) -> Dictionary:
-	var walls: Array[Rect2] = _walls(room)
+func _flood(room: RoomBase, blocked: Dictionary, start: Vector2i) -> Dictionary:
 	var grid: Vector2i = _grid(room)
 	var seen: Dictionary = {start: true}
 	var queue: Array[Vector2i] = [start]
@@ -267,24 +271,37 @@ func _flood(room: RoomBase, start: Vector2i) -> Dictionary:
 			var next: Vector2i = cell + step
 			if next.x < 0 or next.y < 0 or next.x >= grid.x or next.y >= grid.y or seen.has(next):
 				continue
-			if not _blocked(walls, next):
+			if _fits(blocked, next):
 				seen[next] = true
 				queue.append(next)
 	return seen
 
 
-func _blocked(walls: Array[Rect2], cell: Vector2i) -> bool:
-	var centre: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * TILE
-	for wall in walls:
-		if wall.has_point(centre):
-			return true
-	return false
+## The 8 px cells whose middle lies in a wall or a hole.
+func _blocked_cells(room: RoomBase) -> Dictionary:
+	var found: Dictionary = {}
+	var rects: Array[Rect2] = _walls(room) + RoomPlaces.hole_rects(layouts[room.id])
+	for rect in rects:
+		for y in range(floori(rect.position.y / CELL), ceili(rect.end.y / CELL)):
+			for x in range(floori(rect.position.x / CELL), ceili(rect.end.x / CELL)):
+				if rect.has_point((Vector2(x, y) + Vector2(0.5, 0.5)) * CELL):
+					found[Vector2i(x, y)] = true
+	return found
+
+
+## True when a wizard fits in `cell`: no wall or hole in it or in the cells round it.
+func _fits(blocked: Dictionary, cell: Vector2i) -> bool:
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if blocked.has(cell + Vector2i(dx, dy)):
+				return false
+	return true
 
 
 func _grid(room: RoomBase) -> Vector2i:
 	var size: Vector2 = _bounds(room).end
-	return Vector2i(int(size.x / TILE), int(size.y / TILE))
+	return Vector2i(int(size.x / CELL), int(size.y / CELL))
 
 
 func _cell(point: Vector2) -> Vector2i:
-	return Vector2i(int(point.x / TILE), int(point.y / TILE))
+	return Vector2i(int(point.x / CELL), int(point.y / CELL))

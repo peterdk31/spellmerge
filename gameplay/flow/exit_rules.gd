@@ -42,7 +42,7 @@ func enter(room_ways: Array[StringName]) -> void:
 	open = false
 
 
-## No room of a run is in play (the hub, the sandbox, the run over): no way, every exit dark.
+## No room of a run is in play (the hub, the run over): no way, every exit dark.
 func leave() -> void:
 	ways.clear()
 	open = false

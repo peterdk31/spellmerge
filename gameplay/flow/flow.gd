@@ -45,15 +45,14 @@ extends Node
 ## staff file per setup, used as it is): every wizard gets the hands of its run's mode
 ## (`staffs_for_mode`), straight from the registry under `wizard`, never copied or changed: in
 ## Play and the hub the first two basic staffs of STARTER_HEADS on RB and RT (`content/wizard/staffs/`,
-## each its own head; START_HANDS, items I2: the other two hands empty), in the sandbox four times the `dev` staff (DEV_STAFF: 20 slots,
-## no delay, practically infinite mana). The build channel plays no part. With them the mode's
+## each its own head; START_HANDS, items I2: the other two hands empty). The build channel plays no part. With them the mode's
 ## cards (`start_cards_for_mode`; Play's `start_cards`: A `dash`, X `bolt`, Y and B empty),
 ## which the wizard builds itself; flow never touches a spell.
 ##
 ## Each mode's setup (owner, 2026-11-05): a new wizard gets the mode's staffs, start cards and
 ## card bag (the cards it may build with, counted: `bag_for_mode`, card id to copies, handed over
 ## with `seat_wizard`; items I3): Play one `dash` and one `bolt` (PLAY_BAG, `play_bag`: each entry
-## a copy); the sandbox and the hub Inventory.DEV_COPIES of every card (the hub's for now, owner
+## a copy); the hub Inventory.DEV_COPIES of every card (the hub's for now, owner
 ## 2026-11-11: to try combos online until a better way to come by cards comes; owner 2026-11-13:
 ## 20 of each). The start cards come with their staffs, beside the bag.
 ##
@@ -63,7 +62,7 @@ extends Node
 ## It plays only for people: off (`intro_enabled` false) when a test script is the main loop or
 ## the game was started with user arguments (the 4-bot test, the stress run, the timing run).
 ##
-## Loading (owner, 2026-10-29): Play and Sandbox first do the work that must be ready before a
+## Loading (owner, 2026-10-29): Play and the hub first do the work that must be ready before a
 ## room (`play_tasks`, LoadTasks) behind the loading screen (state LOADING), through
 ## `core/loading` (the autoload `Loading`, which sends the events the HUD's screen is drawn from);
 ## then the intro or the run starts. Today that work is the shader warm-up
@@ -75,18 +74,6 @@ extends Node
 ## (`loading_enabled` false) only when a test script is the main loop; the automated runs (the
 ## four-bot and stress runs) load like a player, and wait for `room_entered`.
 ##
-## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
-## main menu's Sandbox button, in every build) starts a run in the sandbox room
-## (`sandbox`): no fight of its own, the dummies its scene stands (`RoomPlaces.dummies`: the training dummy,
-## the shooting dummy, then a group of training dummies to try homing, pierce and spreads on), and `sandbox_changed(true)` so the HUD shows the sandbox page. The page sends
-## `sandbox_action_requested`: `clear_enemies` takes the enemies the arena spawned away,
-## `reset_dummies` puts fresh dummies back; `sandbox_spawn_requested` (the enemy arena, enemy AI AI8)
-## spawns any enemy or boss (`spawn_in_sandbox`, while fewer than SANDBOX_MAX are up). Clearing them ends
-## nothing. When every wizard is down, after RESTART_DELAY they all stand up where they are and
-## keep their staffs, instead of a restart. Its wizards hold four `dev` staffs and start with
-## `sandbox_cards` (SANDBOX_START_CARDS), not `start_cards`: Play's A and X, and two showcase
-## builds on Y (the most shots) and B (a decoy turret).
-##
 ## The hub (docs/milestones/online-lobby.md, L1): `hub_requested` (the main menu's Play) starts a run
 ## in the hub room (`hub`), an island in the void where players join and leave as they like (coop's
 ## `player_joined` / `player_left`, at the room's spawns), try their staffs on the room's dummies,
@@ -94,7 +81,8 @@ extends Node
 ## `RoomBase.stand_up_after` seconds later (owner, 2026-11-13: duels between parties and test builds
 ## without consequences), and everyone down restarts nothing. Its wizards
 ## have Play's staffs (two, RB and RT: START_HANDS; items I2 took the `dev` staff off RT, the
-## rack of items I6 replaces it), Play's start cards, and every card in the bag (above). Its teleporter stone (a
+## rack of items I6 replaces it: its premade staffs are built on the `dev` staff, content/items),
+## Play's start cards, and every card in the bag (above). Its teleporter stone (a
 ## prop of the role `run_start`, stood on where its area is) is lit while every wizard stands on it:
 ## counted each tick and whenever a wizard joins or leaves (`hub`, `HubRules`), told by
 ## `start_stone_changed`, the stone asked to enter `lit` or `unlit` to match, so its look and cue
@@ -123,7 +111,7 @@ extends Node
 ##
 ## A boss's intro (docs/milestones/boss-intro.md): at the end of a run's room's setup (a run's first
 ## room and the next room alike, `_open_boss_intro`), the first boss with an intro among the room's own
-## enemies (`EnemyBase.boss_intro`; never the sandbox's spawns or a phase's adds) stops the game on
+## enemies (`EnemyBase.boss_intro`; never a phase's adds) stops the game on
 ## that tick (`boss_intro`, `BossIntroHold`), when the run's rules have intros on
 ## (`SessionRules.boss_intros`, off for automation where `intro_enabled` is). The command
 ## `boss_intro_next_requested` (any seat's A, from the HUD) turns its pages; past the last the game goes
@@ -132,7 +120,7 @@ extends Node
 ## enemies. Presses made while it stood still, and on the tick it closes, are dropped
 ## (`Frames.drop_presses`), so a staff pressed during it casts nothing as the fight starts.
 ##
-## Modes: `mode` says which run this is: MODE_RUN (a run of rooms), MODE_SANDBOX or MODE_HUB (above).
+## Modes: `mode` says which run this is: MODE_RUN (a run of rooms) or MODE_HUB (above).
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -164,53 +152,26 @@ const DEFAULT_RUN_ID: StringName = &"crypt"
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"bolt"], [], []]
 ## Play's bag: the cards a Play wizard may build with (owner, 2026-11-05), one copy an entry (items I3).
 const PLAY_BAG: Array[StringName] = [&"dash", &"bolt"]
-## The cards a sandbox run starts with (owner, 2026-11-01: two showcase builds of the trigger
-## tree on Y and B, to read in the builder's tree and try on the dummies). A and X as Play's.
-## Y, the most shots: a fire nova of bolts split three times (216 shots) whose every shot, when it
-## ends, fires a frost nova of bolts split three times (216 each): far past the projectile cap (6,000 on
-## desktop), which it holds for a few seconds; 67.5 mana. Two payload levels only: a
-## third would queue a million shots, minutes of backlog at `SpellLimits.FIRE_SHOTS_PER_STEP`.
-## B, a decoy turret: every 0.5 s it fires a homing fire, frost and lightning bolt (the
-## lightning one sets off a chaining lightning atom on hit), and when it is hurt a void nova of
-## bolts; 59.6 mana, every card used.
-const SANDBOX_START_CARDS: Array = [
-	[&"dash"],
-	[&"fire", &"bolt"],
-	[&"on_expire", &"fire", &"split", &"split", &"split", &"nova", &"bolt", &"frost", &"split", &"split", &"split", &"nova", &"bolt"],
-	[&"timer", &"on_hurt", &"decoy", &"triple", &"homing", &"fire", &"bolt", &"homing", &"frost", &"bolt",
-		&"on_hit", &"homing", &"lightning", &"bolt", &"chain", &"lightning", &"atom", &"void", &"nova", &"bolt"],
-]
-## The sandbox room and the hub's (which dummies each stands is its scene's, `RoomPlaces.dummies`).
-const SANDBOX_ROOM_ID: StringName = &"sandbox"
+## The hub's room (which dummies it stands is its scene's, `RoomPlaces.dummies`).
 const HUB_ROOM_ID: StringName = &"hub"
 ## The zone of a room's scene Flow gives a meaning (`RoomPlaces.zone`; a place that is no thing):
 ## the prop yard (props W8).
 const ZONE_PROP_YARD: StringName = &"prop_yard"
-## The run modes (`mode`): a run of rooms, the sandbox, the hub.
+## The run modes (`mode`): a run of rooms, the hub.
 const MODE_RUN: StringName = &"run"
-const MODE_SANDBOX: StringName = &"sandbox"
 const MODE_HUB: StringName = &"hub"
 ## The cue played on every standing wizard as a run's room starts (`_show_room_start`).
 const ROOM_START_CUE: StringName = &"room_start"
-## The actions of `sandbox_action_requested`.
-const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
-## The enemy arena (enemy AI AI8): every enemy the sandbox spawned goes.
-const ACTION_CLEAR_ENEMIES: StringName = &"clear_enemies"
-## The sandbox's staff, on every button, and the four basic staffs of Play by
-## button (RB, RT, LB, LT), by id under `wizard`.
-const DEV_STAFF: StringName = &"dev"
+## The four basic staffs of Play by button (RB, RT, LB, LT), by id under `wizard`.
 const STARTER_HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
 ## How many of STARTER_HEADS a wizard of Play and the hub holds, from RB on: two, RB and RT; the
-## other hands are empty (items I2, owner 2026-11-13: players start with two staffs). The sandbox
-## holds the `dev` staff on every hand.
+## other hands are empty (items I2, owner 2026-11-13: players start with two staffs).
 const START_HANDS: int = 2
 ## Where the enemies stand: round the room's enemy spawns in turn; a spawn used again puts the next
 ## one a step further along the diagonal (SPAWN_STACK_DEPTH steps, then a lap to the side).
 const SPAWN_REPEAT_OFFSET: Vector2 = Vector2(14.0, 14.0)
 const SPAWN_STACK_DEPTH: int = 3
 const SPAWN_LAP_OFFSET: Vector2 = Vector2(-14.0, 14.0)
-## The most enemies the sandbox's enemy arena keeps up.
-const SANDBOX_MAX: int = 24
 ## Seconds from a run's room won until the run ends: the kill seen out.
 const RUN_WON_DELAY: float = 2.0
 ## Seconds from the last wizard going down until the room restarts (under 3).
@@ -225,9 +186,8 @@ const INTRO_SEEN: StringName = &"intro_seen"
 
 enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md); `sandbox`, worked
-## out from `mode` (read only).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_room", &"_chosen_enemies", &"_chosen_ways"]
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_room", &"_chosen_enemies", &"_chosen_ways"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -257,9 +217,6 @@ var run_id_to_play: StringName = DEFAULT_RUN_ID
 var start_cards: Array = DEFAULT_START_CARDS.duplicate(true)
 ## Play's bag (PLAY_BAG unless a test sets another).
 var play_bag: Array[StringName] = PLAY_BAG.duplicate()
-## What the sandbox's wizards start with instead (SANDBOX_START_CARDS unless a test or a
-## screenshot sets other cards).
-var sandbox_cards: Array = SANDBOX_START_CARDS.duplicate(true)
 var wizard_scene: PackedScene = DefaultWizardScene
 ## Whether Play may show the intro (see the class doc), and the save it is remembered in.
 var intro_enabled: bool = true
@@ -278,12 +235,6 @@ var world: Node2D = null
 var room_id: StringName = &""
 ## The mode of the run in progress, or of the next one (MODE_RUN when idle).
 var mode: StringName = MODE_RUN
-## True while the run is in the sandbox (and for its restarts). Read only: set `mode`.
-var sandbox: bool:
-	get:
-		return mode == MODE_SANDBOX
-	set(_value):
-		push_error("Flow: `sandbox` is read only; set `mode`.")
 
 var _starter: int = 0
 var _room: RoomBase = null
@@ -361,13 +312,10 @@ func _ready() -> void:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
 		return
 	events.play_requested.connect(_on_play_requested)
-	events.sandbox_requested.connect(_on_sandbox_requested)
 	events.hub_requested.connect(_on_hub_requested)
 	events.main_menu_requested.connect(_on_main_menu_requested)
 	events.play_load_requested.connect(_on_play_load_requested)
 	# Commands, heard at the tick's start (core/events, online-ready N2).
-	events.listen(&"sandbox_action_requested", _on_sandbox_action_requested)
-	events.listen(&"sandbox_spawn_requested", _on_sandbox_spawn_requested)
 	events.listen(&"run_requested", _on_run_requested)
 	events.listen(&"start_depth_picked", _on_start_depth_picked)
 	events.listen(&"boss_intro_next_requested", _on_boss_intro_next_requested)
@@ -403,9 +351,7 @@ func step(delta: float) -> void:
 	_restart_left -= delta
 	if _restart_left <= 0.0:
 		_restart_left = -1.0
-		if mode == MODE_SANDBOX:
-			_stand_everyone_up()
-		elif _back_to_hub:
+		if _back_to_hub:
 			# Back in the hub the party is ready for a new run: nothing of the run comes back
 			# with it, its staffs neither (owner, 2026-11-10). The hub is the arsenal the next
 			# run's tools are picked from.
@@ -449,12 +395,12 @@ static func stacked_position(spawn: Vector2, times: int) -> Vector2:
 	return spawn + SPAWN_REPEAT_OFFSET * float(step) + SPAWN_LAP_OFFSET * float(lap)
 
 
-## Enemies of the room's fight (or the sandbox's arena) still alive; never its dummies.
+## Enemies of the room's fight still alive; never its dummies.
 func enemies_left() -> int:
 	return _enemies.size()
 
 
-## The dummies of the sandbox or the hub still standing.
+## The dummies of the room (the hub's) still standing.
 func dummies() -> Array[Node]:
 	return contents.of_kind(EnemyBase)
 
@@ -573,10 +519,8 @@ func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0)
 	_show_world(new_world)
 	_set_walls(new_world)
 	_announce_room(room)
-	if events != null:
-		events.sandbox_changed.emit(mode == MODE_SANDBOX)
-		if mode == MODE_RUN:
-			_show_room_start()
+	if events != null and mode == MODE_RUN:
+		_show_room_start()
 	_count_stone()
 	_count_exits()
 	_check_room_won()
@@ -623,9 +567,9 @@ func rebuild_derived() -> void:
 	_set_walls(world)
 
 
-## The room the next run of the sandbox or the hub is in (a run of rooms' is its map's).
+## The room the next run of the hub is in (a run of rooms' is its map's).
 func _room_id_for_mode() -> StringName:
-	return SANDBOX_ROOM_ID if mode == MODE_SANDBOX else HUB_ROOM_ID
+	return HUB_ROOM_ID
 
 
 ## A run of rooms begins (on the run's fresh state, after `Tick.begin_run`): the run area makes the
@@ -813,10 +757,7 @@ func stop_run() -> void:
 	state = State.IDLE
 	exits.leave()
 	_count_exits()
-	var was: StringName = mode
 	mode = MODE_RUN
-	if was == MODE_SANDBOX and events != null:
-		events.sandbox_changed.emit(false)
 	_count_stone()
 
 
@@ -929,19 +870,6 @@ func _is_automated() -> bool:
 func _on_play_load_requested() -> void:
 	if state == State.IDLE:
 		_load_then(func() -> void: pass)
-
-
-func _on_sandbox_requested(player: int) -> void:
-	if state != State.IDLE:
-		return
-	if not _load_then(_start_sandbox.bind(player)):
-		_start_sandbox(player)
-
-
-func _start_sandbox(player: int) -> void:
-	mode = MODE_SANDBOX
-	if not start_run(player):
-		mode = MODE_RUN
 
 
 func _on_hub_requested(player: int) -> void:
@@ -1066,52 +994,6 @@ func _count_stone() -> void:
 	hub.count(in_hub, _wizards, contents, events, start_depths() if in_hub else 0)
 
 
-## A sandbox page's action. Ignored out of the sandbox. It changes the room only, never a
-## player's staffs or menus.
-func _on_sandbox_action_requested(player: int, action: StringName) -> void:
-	if mode != MODE_SANDBOX or state == State.IDLE or world == null or _room == null or player < 0 or player >= PLAYER_SLOTS:
-		return
-	match action:
-		ACTION_CLEAR_ENEMIES:
-			clear_sandbox_enemies()
-		ACTION_RESET_DUMMIES:
-			contents.stand_again(world, _places, EnemyBase)
-		_:
-			push_warning("Flow: unknown sandbox action '%s'." % action)
-
-
-## The enemy arena's spawn (enemy AI AI8): `count` enemies of `enemy_id`. Ignored out of the sandbox.
-func _on_sandbox_spawn_requested(player: int, enemy_id: StringName, count: int) -> void:
-	if player < 0 or player >= PLAYER_SLOTS:
-		return
-	spawn_in_sandbox(enemy_id, count)
-
-
-## Put `count` enemies of the registry's `enemy_id` in the sandbox room, at its enemy spawns, while
-## fewer than SANDBOX_MAX are up (the enemy arena: to play against one kind, or tune it; tests use it
-## too). Returns how many came; 0 out of a sandbox run or for an unknown id.
-func spawn_in_sandbox(enemy_id: StringName, count: int) -> int:
-	if mode != MODE_SANDBOX or state == State.IDLE or world == null or _room == null or registry == null:
-		return 0
-	var data: EnemyBase = _enemy_data_of(enemy_id)
-	if data == null or data.scene == null:
-		push_warning("Flow: no enemy '%s' to spawn in the sandbox." % enemy_id)
-		return 0
-	var room_left: int = SANDBOX_MAX - _enemies.size()
-	var wanted: int = clampi(count, 0, room_left)
-	var before: int = _enemies.size()
-	_spawn_enemies(world, data, wanted, before)
-	return _enemies.size() - before
-
-
-## Every enemy the sandbox spawned goes (its dummies stay).
-func clear_sandbox_enemies() -> void:
-	for enemy: Node in _enemies:
-		if is_instance_valid(enemy):
-			_detach(enemy)
-	_forget_enemies()
-
-
 ## Add the wizard of a player who joined mid-run: at the room's spawn for joiners when it has them
 ## (the hub: beside the altar, where a joining machine's wizards arrive), else at the player spawn
 ## farthest from danger. Ignored while no run is up, and for a slot that already has a wizard.
@@ -1194,26 +1076,6 @@ func _can_be_lost() -> bool:
 	return state == State.RUNNING or (state == State.CLEARED and exits.open)
 
 
-## The sandbox's answer to everyone down: they all stand up where they are, protected for a
-## moment, with their staffs as they were; stray shots go.
-func _stand_everyone_up() -> void:
-	if projectiles != null:
-		projectiles.clear()
-	_stand_up_wizards()
-
-
-## Every downed wizard stands up (revived by itself) and every wizard is protected for a moment.
-func _stand_up_wizards() -> void:
-	for wizard: Node2D in _wizards:
-		var hero: DownedScript = DownedScript.of(wizard) if is_instance_valid(wizard) else null
-		if hero == null:
-			continue
-		var seat: int = hero.seat()
-		if hero.revive(seat) and seat >= 0 and seat < PLAYER_SLOTS:
-			_downed[seat] = false
-		hero.protect(DownedScript.JOIN_PROTECTION)
-
-
 func _on_player_downed(player: int) -> void:
 	if player < 0 or player >= PLAYER_SLOTS:
 		return
@@ -1255,7 +1117,7 @@ func _stand_up(seat: int) -> void:
 	hero.protect(DownedScript.JOIN_PROTECTION)
 
 
-## Seconds from everyone down until the restart (or, in the sandbox, until everyone stands up).
+## Seconds from everyone down until the restart.
 func restart_delay() -> float:
 	return RESTART_DELAY
 
@@ -1363,14 +1225,12 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 
 
 ## The four hands of a wizard of this run's `mode`, by button, as the registry has their staffs:
-## the sandbox's the `dev` staff on every button, Play's and the hub's the first START_HANDS basic
-## staffs (STARTER_HEADS) and null for an empty hand after them. Empty when one is missing.
+## Play's and the hub's the first START_HANDS basic staffs (STARTER_HEADS) and null for an empty hand
+## after them. Empty when one is missing.
 func staffs_for_mode() -> Array[StaffBase]:
 	var ids: Array[StringName] = []
 	for at in STARTER_HEADS.size():
 		ids.append(STARTER_HEADS[at] if at < START_HANDS else &"")
-	if mode == MODE_SANDBOX:
-		ids = [DEV_STAFF, DEV_STAFF, DEV_STAFF, DEV_STAFF]
 	var out: Array[StaffBase] = []
 	if registry == null:
 		return out
@@ -1386,21 +1246,19 @@ func staffs_for_mode() -> Array[StaffBase]:
 	return out
 
 
-## The cards each staff of a new wizard starts with in this run's `mode`: `sandbox_cards` in the
-## sandbox, `start_cards` in Play.
+## The cards each staff of a new wizard starts with in this run's `mode`: `start_cards`, in Play and
+## the hub alike.
 func start_cards_for_mode() -> Array:
-	if mode == MODE_SANDBOX:
-		return sandbox_cards
 	return start_cards
 
 
 ## The card bag a new wizard gets in this run's `mode`, card id to copies (items I3):
-## Inventory.DEV_COPIES of every spell card of the registry in the sandbox and the hub, `play_bag`
-## in Play (an entry a copy).
+## Inventory.DEV_COPIES of every spell card of the registry in the hub, `play_bag` in Play (an entry
+## a copy).
 func bag_for_mode() -> Dictionary:
 	var out: Dictionary = {}
 	match mode:
-		MODE_SANDBOX, MODE_HUB:
+		MODE_HUB:
 			out = Inventory.dev_cards(registry)
 		_:
 			for id: StringName in play_bag:
@@ -1484,7 +1342,7 @@ func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2) -> Actor:
 	return enemy
 
 
-## The room's enemies are forgotten (they went with the room, or the sandbox's arena was cleared),
+## The room's enemies are forgotten (they went with the room),
 ## their adds and the boss's intro too (closed if open: the game goes on).
 func _forget_enemies() -> void:
 	_enemies.clear()
@@ -1511,8 +1369,8 @@ func _count_players() -> void:
 
 
 ## The body `actor` calls the adds `entry` (its entry `key`; a `wave` or its phase's burst; boss plan
-## OB13): as many as the entry names for the wizards in play, under its cap of those alive (and the
-## sandbox's most), on a ring round the body or at the room's enemy spawns. Only for a body Flow stood,
+## OB13): as many as the entry names for the wizards in play, under its cap of those alive, on a
+## ring round the body or at the room's enemy spawns. Only for a body Flow stood,
 ## while a room is up; an id the registry has no enemy for stands nothing (a warning).
 func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> void:
 	if entry == null or world == null or state == State.IDLE:
@@ -1527,8 +1385,6 @@ func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> v
 	var players: int = _players_in_play()
 	var wanted: int = entry.wave_for(players) if wave else entry.burst_for(players)
 	var count: int = entry.allowed(wanted, adds.alive(caller, key), players)
-	if mode == MODE_SANDBOX:
-		count = mini(count, maxi(SANDBOX_MAX - _enemies.size(), 0))
 	var spawns: PackedVector2Array = _places.enemy_spawns
 	var at_spawns: bool = entry.at == EnemyAdds.At.SPAWNS and not spawns.is_empty()
 	var centre: Vector2 = world.to_local(caller.global_position)

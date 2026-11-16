@@ -71,7 +71,7 @@ func after_each() -> void:
 
 
 func _start() -> Replay:
-	var replay: Replay = _host.start(&"sandbox_requested", 0, 99)
+	var replay: Replay = _host.start(&"hub_requested", 0, 99)
 	_seats.clear()
 	return replay
 
@@ -124,7 +124,7 @@ func _recorded(tick: int) -> InputFrame:
 func test_start_seats_the_client_and_sends_the_header() -> void:
 	check(not _input.is_joined(SEAT), "the client's seat is free")
 	_seats.clear()
-	var replay: Replay = _host.start(&"sandbox_requested", 0, 99)
+	var replay: Replay = _host.start(&"hub_requested", 0, 99)
 	check(replay != null and _host.is_running(), "it starts")
 	check(_input.is_joined(SEAT) and InputManagerScript.is_virtual(_input.device_of(SEAT)), "the client's seat holds a virtual device")
 	check_equal(_seats, [SEAT + 1], "seated by the frames service, as a pad's")
@@ -136,17 +136,17 @@ func test_start_seats_the_client_and_sends_the_header() -> void:
 	var header: Replay = Replay.from_bytes(message.body)
 	check(header != null and header.tick_count() == 0, "a replay's header, no ticks")
 	if header != null:
-		check_equal([header.seats, header.run_seed, header.start, header.build], [0b0011, 99, &"sandbox_requested", Replay.build_of()], "both seats, the seed, the start, this build")
-	check(_host.start(&"sandbox_requested", 0) == null, "it starts once")
+		check_equal([header.seats, header.run_seed, header.start, header.build], [0b0011, 99, &"hub_requested", Replay.build_of()], "both seats, the seed, the start, this build")
+	check(_host.start(&"hub_requested", 0) == null, "it starts once")
 
 
 func test_it_does_not_start_over_a_closed_link_or_a_seat_held_here() -> void:
 	_input.join(3)
 	check_equal(_input.player_of(3), SEAT, "a pad of this machine holds the client's seat")
-	check(_host.start(&"sandbox_requested", 0) == null and not _frames.is_recording(), "no start: the spike seats one client, on that seat")
+	check(_host.start(&"hub_requested", 0) == null and not _frames.is_recording(), "no start: the spike seats one client, on that seat")
 	_input.leave(SEAT)
 	_far.close()
-	check(_host.start(&"sandbox_requested", 0) == null, "no start over a closed link")
+	check(_host.start(&"hub_requested", 0) == null, "no start over a closed link")
 
 
 func test_every_tick_goes_out_after_it() -> void:
@@ -325,7 +325,7 @@ func test_a_frame_before_the_run_closes_the_link() -> void:
 	_send(1, _frame())
 	_host.pump()
 	check(not _far.is_open(), "closed")
-	check(_host.start(&"sandbox_requested", 0) == null, "and no run starts over it")
+	check(_host.start(&"hub_requested", 0) == null, "and no run starts over it")
 
 
 func test_it_reads_a_set_number_of_messages_a_tick() -> void:
@@ -577,7 +577,7 @@ func _frame_of(seat: int, held: int, move: Vector2) -> PackedByteArray:
 
 func test_every_guest_gets_the_header_and_every_tick() -> void:
 	var far: Array[NetLoopback] = _two_guests()
-	check(_host.start(&"sandbox_requested", 0, 99) != null, "it starts")
+	check(_host.start(&"hub_requested", 0, 99) != null, "it starts")
 	check(_input.is_joined(1) and _input.is_joined(2) and _input.is_joined(3), "every guest's seats seated")
 	_tick()
 	_tick()
@@ -597,7 +597,7 @@ func test_every_guest_gets_the_header_and_every_tick() -> void:
 
 func test_each_guest_plays_its_own_seats() -> void:
 	var far: Array[NetLoopback] = _two_guests()
-	_host.start(&"sandbox_requested", 0, 99)
+	_host.start(&"hub_requested", 0, 99)
 	far[0].send(NetMessage.of_frame(0, _frame_of(1, 0b0001, Vector2.LEFT)))
 	far[0].send(NetMessage.of_frame(0, _frame_of(2, 0b0010, Vector2.UP)))
 	far[1].send(NetMessage.of_frame(0, _frame_of(3, 0b0100, Vector2.RIGHT)))
@@ -610,7 +610,7 @@ func test_each_guest_plays_its_own_seats() -> void:
 
 func test_a_guest_that_sends_another_guests_seat_is_closed_alone() -> void:
 	var far: Array[NetLoopback] = _two_guests()
-	_host.start(&"sandbox_requested", 0, 99)
+	_host.start(&"hub_requested", 0, 99)
 	_tick()
 	far[0].send(NetMessage.of_frame(1, _frame_of(3, 0b0001, Vector2.LEFT)))
 	far[1].send(NetMessage.of_frame(1, _frame_of(3, 0b0100, Vector2.RIGHT)))
@@ -630,7 +630,7 @@ func test_a_guest_that_sends_another_guests_seat_is_closed_alone() -> void:
 func test_each_guests_checks_are_its_own() -> void:
 	var far: Array[NetLoopback] = _two_guests()
 	_host.checks = NetChecks.new(2)
-	_host.start(&"sandbox_requested", 0, 99)
+	_host.start(&"hub_requested", 0, 99)
 	var theirs := NetChecks.new(2)
 	var mine: Dictionary[String, int] = {}
 	for tick in 2:
@@ -661,7 +661,7 @@ func test_each_guests_checks_are_its_own() -> void:
 ## seen, the next), never off the host's game a tick before the recording says so.
 func test_a_gone_guests_seats_leave_each_in_its_own_frame() -> void:
 	var far: Array[NetLoopback] = _two_guests()
-	_host.start(&"sandbox_requested", 0, 99)
+	_host.start(&"hub_requested", 0, 99)
 	_tick()
 	far[0].send(NetMessage.of_frame(1, _frame_of(1, 0b0001, Vector2.LEFT)))
 	far[0].close()
@@ -687,7 +687,7 @@ func _left_in(seat: int) -> int:
 ## guest's, all its seats together.
 func test_a_guest_of_two_seats_shares_one_limit_of_frames_waiting() -> void:
 	var far: Array[NetLoopback] = _two_guests()
-	_host.start(&"sandbox_requested", 0, 99)
+	_host.start(&"hub_requested", 0, 99)
 	var half: int = NetGuest.MAX_QUEUED / 2
 	var sent: int = 0
 	while sent <= half:
@@ -776,7 +776,7 @@ func test_a_run_under_way_is_joined_from_its_first_tick() -> void:
 	# Areas enough that every part of a check's window holds some.
 	for i in 240:
 		_areas["area %d" % i] = Area.new()
-	var replay: Replay = _frames.record(&"sandbox_requested", 0, 7)
+	var replay: Replay = _frames.record(&"hub_requested", 0, 7)
 	for i in NetHost.SEND_A_TICK + 100:
 		_frames.tick(DT)
 	check(_host.begin(replay), "the host joins the client to the run it records")
@@ -977,7 +977,7 @@ func test_the_recording_a_guest_plays_is_counted_past_a_byte() -> void:
 
 
 func test_a_guest_still_owed_ticks_gets_the_rest_of_the_recording_before_the_new_one() -> void:
-	var replay: Replay = _frames.record(&"sandbox_requested", 0, 7)
+	var replay: Replay = _frames.record(&"hub_requested", 0, 7)
 	for i in NetHost.SEND_A_TICK + 100:
 		_frames.tick(DT)
 	_host.begin(replay)
@@ -996,7 +996,7 @@ func test_a_guest_still_owed_ticks_gets_the_rest_of_the_recording_before_the_new
 
 
 func test_a_guest_too_far_behind_a_run_begun_anew_is_let_go() -> void:
-	var replay: Replay = _frames.record(&"sandbox_requested", 0, 7)
+	var replay: Replay = _frames.record(&"hub_requested", 0, 7)
 	for i in NetHost.MAX_FLUSH + 300:
 		_frames.tick(DT)
 	_host.begin(replay)

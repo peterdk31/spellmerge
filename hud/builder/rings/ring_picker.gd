@@ -2,7 +2,7 @@ extends RefCounted
 ## A ring style for the radial builder (`../radial_builder.gd`, its `ring_picker`; owner,
 ## 2026-10-30): how the right stick picks a card and how the ring is drawn, for trying ways to
 ## pick among many cards with a pad. Each style is one file in this folder, chosen on the pause
-## menu's Sandbox page ("Ring:", `hud/panels` sets it). They are experiments: deleting a style is
+## menu's Settings page ("Ring:", `hud/panels` sets it). They are experiments: deleting a style is
 ## its file, its test, and its entry in `PauseMenu.Ring` and `panels.gd`.
 ##
 ## A style reads the ring's places, the pointing and the sticks from the radial's shared radial

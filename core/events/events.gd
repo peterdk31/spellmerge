@@ -13,15 +13,15 @@ extends Node
 ##   revived, joined and left, and the casts the wizard announces for the HUD and Feel.
 
 ## Commands (online-ready N2, docs/milestones/online-ready.md): the HUD's `*_requested` events the
-## simulation hears (`InputFrame.COMMAND_NAMES`: the builder's, the sandbox page's,
-## rewards and doors) apply at the start of the next tick, never in the middle of one. The
+## simulation hears (`InputFrame.COMMAND_NAMES`: the builder's, the pause menu's,
+## the hub's, the items', rewards and doors) apply at the start of the next tick, never in the middle of one. The
 ## HUD sends them as before; the bus hands each to `command_sink` (the frames service,
 ## core/sim/frames.gd, the autoload "Frames"), which puts it into its seat's next input frame and
 ## applies it with `apply_command` when that tick starts, so a replay (and later the network) gives
 ## the same command at the same tick. With no sink (a test's own bus) a command applies as it is
 ## sent. The simulation hears a command through `listen`, never by connecting to its signal (that
 ## would hear it as it is sent); the HUD and tests may still connect to see it sent. The requests
-## that start a run (`play_requested`, `sandbox_requested`, `hub_requested`) are not commands: a
+## that start a run (`play_requested`, `hub_requested`) are not commands: a
 ## replay's header says how its run started.
 ##
 ## "No actor" (`Actors.NONE`): the world, where no actor did it. Also "no seat".
@@ -71,12 +71,10 @@ signal floor_marks_changed(on: bool)
 signal spell_light_changed(on: bool)
 ## Sender: hud. The "Tailless motes" dev slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: the spark pool the shots' births share while the tails are off (`TaillessMotes` in core/settings; S5 step 4). Heard by core/projectiles (`tailless_particle_cap`) and feel (`Motes.frame_rows`, `TaillessMotes.frame_rows_of`).
 signal tailless_motes_changed(pool: int)
-## The Sandbox button was pressed (in every build). Heard by flow, which starts the sandbox (staffs B7).
-signal sandbox_requested(player: int)
 ## Sender: hud. The main menu's Play was pressed: everyone goes to the hub, the island where players
 ## join and start a run from the teleporter stone (docs/milestones/online-lobby.md, L1). Heard by
 ## flow, which starts it, and core/input, which joins the keyboard first. A run's start, as
-## `sandbox_requested` is (`Replay.STARTS`), not a command.
+## `play_requested` is (`Replay.STARTS`), not a command.
 signal hub_requested(player: int)
 ## Sender: hud. `player` picked "Main menu" in the pause menu: this machine leaves what it plays and
 ## shows the main menu again (online lobby, docs/milestones/online-lobby.md: a machine whose host
@@ -114,12 +112,6 @@ signal start_depth_picked(player: int, depth: int)
 ## start, whose intro (`BossIntroHold`) turns the page only while `page` is still the page, so two
 ## seats pressing on one tick turn one page.
 signal boss_intro_next_requested(player: int, page: int)
-## `player` picked a sandbox action on the pause menu's sandbox page: `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).
-signal sandbox_action_requested(player: int, action: StringName)
-## Sender: hud. `player` asked the enemy arena (the sandbox page, enemy AI AI8) for `count` enemies of the registry's `enemy_id`. Heard by flow.
-signal sandbox_spawn_requested(player: int, enemy_id: StringName, count: int)
-## Sender: hud. The sandbox page's "AI view" switch flipped: each enemy shows what its AI is doing. Heard by ai (enemy AI AI8).
-signal ai_view_changed(on: bool)
 ## `player` opened (`on` 1) or closed (`on` 0) the pause menu: offline the game stops while it is
 ## open (online-ready N4). A command: heard by the Tick (core/sim/tick.gd, `Sim.stop`), which pauses
 ## the tree for the picture once the game stands stopped.
@@ -394,7 +386,7 @@ signal run_room_chosen(room_id: StringName, enemies: Array[StringName], ways: Ar
 ## map's order (`RunMap.nodes`: row by row, each row left to right): its row (`rows`), its kind
 ## (`kinds`: `RoomKind` ids) and the rooms of the next row it leads to (`links`: their places in these
 ## lists, left to right), and the room the party is in (`at`). Sent as the party enters a room, and
-## empty (no rooms, `at` -1) as a run starts (the hub, the sandbox: no map) and when a run's map could
+## empty (no rooms, `at` -1) as a run starts (the hub: no map) and when a run's map could
 ## not be made; told again after a snapshot is restored. For the view only. Heard by hud (the pause
 ## menu's map).
 signal run_map_changed(rows: PackedInt32Array, kinds: Array[StringName], links: Array[PackedInt32Array], at: int)
@@ -446,8 +438,6 @@ signal loading_progressed(done: int, total: int)
 signal loading_finished()
 ## Sender: flow. The room `room_id` was cleared: every enemy the run stood in it is down (boss OB2a: no waves). Its exits light (run generation RG4); the run's last room cleared wins the run.
 signal room_cleared(room_id: StringName)
-## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.
-signal sandbox_changed(on: bool)
 ## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
 ## teleporter stone (a prop of the role `run_start`, where its area is; `HubRules`); `lit` while all of them do (and at least one is there),
 ## when any seat's A starts the run (`run_requested`). Sent as the hub starts and whenever it

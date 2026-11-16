@@ -55,7 +55,7 @@ func test_host_and_join_are_there_and_the_box_is_closed() -> void:
 func test_host_asks_for_a_code_shows_it_and_passes_the_answer_on() -> void:
 	_button("Host").pressed.emit()
 	check_equal(_sent, [[&"host", 0]], "Host asks, as seat 0")
-	check(_shown("Online") and not _shown("Host") and not _shown("Join") and not _shown("Play") and not _shown("Sandbox"), "the box opens in the buttons' place")
+	check(_shown("Online") and not _shown("Host") and not _shown("Join") and not _shown("Play"), "the box opens in the buttons' place")
 	_bus.online_changed.emit(&"making", "", &"", {})
 	check(not _shown("MineRow") and not _shown("TheirsRow"), "while the code is made there is nothing to copy or paste")
 	_bus.online_changed.emit(&"code", "SM1.host", &"", {})
@@ -120,7 +120,7 @@ func test_cancel_closes_the_box_and_says_so() -> void:
 	_bus.online_changed.emit(&"code", "SM1.host", &"", {})
 	_button("Cancel").pressed.emit()
 	check_equal(_sent.back(), [&"leave", 0], "Cancel says the player gave up")
-	check(not _shown("Online") and _shown("Host") and _shown("Join") and _shown("Play") and _shown("Sandbox"), "the box closes; the buttons are back")
+	check(not _shown("Online") and _shown("Host") and _shown("Join") and _shown("Play"), "the box closes; the buttons are back")
 	_button("Join").pressed.emit()
 	check_equal((_menu.get_node("%Mine") as LineEdit).text, "", "the next try starts without the old code")
 

@@ -6,7 +6,7 @@ extends Control
 ## - The cast the staff fires next has a gold frame and full-bright icons; the other casts are
 ##   dimmer, so the highlight is told by brightness too, not by colour alone.
 ## - A wasted card (the compiler's `wasted` for that cast) is greyed and struck through.
-## - The staff's delay shows one of two ways, `style` (the pause menu's Sandbox page switches it
+## - The staff's delay shows one of two ways, `style` (the pause menu's Settings page switches it
 ##   for every row; owner, 2026-10-27, mockup https://claude.ai/artifact/V9Zy2uXqFbmKFATM5mhzMC):
 ##   - `BUTTON` (the default): the button glyph is the timer. A shade covers it after a cast and
 ##     pulls back up as the delay runs, so the four glyphs, one above the other, say at a glance

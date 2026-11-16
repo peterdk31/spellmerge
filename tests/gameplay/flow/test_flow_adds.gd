@@ -254,19 +254,6 @@ func test_the_adds_are_forgotten_with_the_room() -> void:
 	check(flow.adds.adds.is_empty() and flow.adds.stood == 0, "a run's end forgets them")
 
 
-func test_the_sandbox_holds_adds_to_its_most() -> void:
-	for index in 1:
-		input.add_virtual_device(index)
-	events.emit_signal("sandbox_requested", 0)
-	check_equal(flow.spawn_in_sandbox(BOSS_ID, 1), 1, "the boss in the arena")
-	check_equal(flow.spawn_in_sandbox(&"ember_imp", FlowScript.SANDBOX_MAX - 2), FlowScript.SANDBOX_MAX - 2, "the arena nearly full")
-	var boss: Actor = _boss()
-	boss.phases.begin(0)
-	check_equal(flow.enemies_left(), FlowScript.SANDBOX_MAX, "its burst only up to the arena's most")
-	flow.clear_sandbox_enemies()
-	check(flow.adds.adds.is_empty(), "clearing the arena forgets the adds")
-
-
 ## Restored from a snapshot taken between the boss's death and the crumble, its adds are made again
 ## with no caller, and crumble at the next step as they did: the room is cleared.
 func test_adds_without_a_caller_restored_still_crumble() -> void:

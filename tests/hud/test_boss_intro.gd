@@ -309,7 +309,7 @@ func test_the_bar_waits_for_the_close_and_fades_in() -> void:
 
 
 func test_with_no_intro_opened_the_bar_and_banner_show_at_the_frames_end() -> void:
-	# The run's rule off (automation), or a boss the sandbox spawned: no intro opens for it.
+	# The run's rule off (automation): no intro opens for it.
 	bus.boss_shown.emit(BOSS, IntroBoss.NAME, IntroBoss.LORE, PackedFloat32Array(), true)
 	check(not hud.get_boss_bar().visible, "kept back on the frame it shows")
 	(hud as Node).call("_process", DT)

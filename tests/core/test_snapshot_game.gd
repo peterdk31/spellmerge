@@ -22,7 +22,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const StandInGrass := preload("res://tests/support/stand_in_grass.gd")
 
 ## Ticks recorded, and the tick the snapshot is taken after (past the scripted player's rebuild and
-## pause in the sandbox, so the frames after it hold neither).
+## pause in the hub, so the frames after it hold neither).
 const TICKS: int = 260
 const SNAPSHOT_AT: int = 180
 const RUN_SEED: int = 0x5eed
@@ -58,8 +58,8 @@ func _biomes() -> Array[StringName]:
 	return found
 
 
-func test_a_sandbox_run_restored_plays_on_the_same() -> void:
-	await _check_resumed(&"sandbox_requested", 0, 1)
+func test_a_scripted_hub_run_restored_plays_on_the_same() -> void:
+	await _check_resumed(&"hub_requested", 0, 1)
 
 
 ## A run in every room template the registry finds, with a scripted player, not bots: a bot reads
@@ -71,7 +71,7 @@ func test_a_run_in_every_room_restored_plays_on_the_same() -> void:
 	registry.scan()
 	var rooms: Array[RoomBase] = []
 	for room: RoomBase in registry.run_content().rooms:
-		# A room that hosts no kind is no run's room (the hub: its own test below; the sandbox).
+		# A room that hosts no kind is no run's room (the hub: its own tests).
 		if not room.kinds.is_empty():
 			rooms.append(room)
 	check(rooms.size() >= 1, "it finds the rooms (%d)" % rooms.size())

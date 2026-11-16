@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"falling_dust"
+gravity = 3.0
+drag = 0.6
+bounce = 0.0
+wobble = 0.7
+wobble_rate = 1.2
+glow = 0.4
+shade_from = 1
+shape = "
+#
+
+.
+"
+shape_play = "loop"
+shape_rate = 1.0
+shape_turns = false
+count = 1
+speed = Vector2(2.0, 8.0)
+spread = 24.0
+up = Vector2(0.0, 0.0)
+life = Vector2(4.0, 7.0)
+height = 0.0

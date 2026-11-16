@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## The game's ground cover in its rooms (ground cover GC8, docs/milestones/ground-cover.md): the hub
 ## is grassy (its biome `hub`, its grass's fill and a meadow) with its ways kept clear, the stone,
-## the altar, the lectern and the paths from the spawns to them; every crypt room holds moss and a
-## few cobwebs, few enough not to crowd its fights; every room with cover holds a `CoverPreview`, so
+## the altar, the lectern and the paths from the spawns to them; every crypt room holds a few
+## cobwebs, few enough not to crowd its fights, and no moss (crypt rework, docs/milestones/
+## crypt-rework.md: the owner, 2026-11-16, "Not even sure it is needed at all"); every room with cover holds a `CoverPreview`, so
 ## the editor shows it; and every kind's fill reaches a room. Rooms and kinds are found by folder.
 const RegistryScript := preload("res://core/registry/registry.gd")
 
@@ -96,7 +97,7 @@ func test_the_hub_is_grassy_and_its_ways_are_clear() -> void:
 		check_equal(_covered_along(layout, spawn, stone), PackedStringArray(), "the way from %s by the altar to the stone is clear" % spawn)
 
 
-func test_every_crypt_room_holds_moss_and_a_few_cobwebs() -> void:
+func test_every_crypt_room_holds_a_few_cobwebs_and_no_moss() -> void:
 	var rooms: int = 0
 	for room in _rooms():
 		if room.biome != &"crypt" or room.kinds.is_empty():
@@ -107,7 +108,6 @@ func test_every_crypt_room_holds_moss_and_a_few_cobwebs() -> void:
 		for cell in layout.blocked.size():
 			if layout.blocked[cell] == 0:
 				open += 1
-		check(layout.count(&"crypt_moss") > 0, "%s has moss" % room.id)
 		check(layout.count(&"cobweb") > 0, "%s has cobwebs" % room.id)
 		var share: float = float(layout.count(&"cobweb")) / float(maxi(open, 1))
 		check(share <= MOST_COBWEBS, "%s: its cobwebs hold %.1f%% of its floor, at most %.0f%%" % [room.id, share * 100.0, MOST_COBWEBS * 100.0])

@@ -1,7 +1,7 @@
 extends Node
 ## Two game processes on one machine, linked as two players would link them (netcode spike S4,
 ## docs/milestones/netcode-spike.md): the real game, its main menu's requests, the real WebRTC
-## handshake and link (no STUN server: one machine), a sandbox run on both, each seat played by a
+## handshake and link (no STUN server: one machine), a hub run on both, each seat played by a
 ## script. What the unit tests cannot cover (the autoloads wired together: NetPlay, the frames
 ## service, the Tick, Flow, Coop) plays here, and the sessions' own hash checks say whether the
 ## two processes agreed. `tools/online_pair.sh` starts both and reads their lines.

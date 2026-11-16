@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The loading screen before the first room (owner, 2026-10-29): the first Play of a session
 ## does `Flow.play_tasks` (the shader warm-up) behind it through `Loading` (state LOADING,
 ## `loading_started`, `loading_progressed`, `loading_finished`), then the run starts; a later Play
-## starts at once; Sandbox waits the same way; a run stopped while loading starts nothing. The
+## starts at once; the hub waits the same way; a run stopped while loading starts nothing. The
 ## HUD's screen shows in between. Uses the real autoloads; `Loading` is stepped by hand.
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")
@@ -97,11 +97,11 @@ func test_a_later_play_starts_at_once() -> void:
 	check_equal(_started, 1, "the screen showed once")
 
 
-func test_the_sandbox_loads_too() -> void:
-	events.sandbox_requested.emit(0)
-	check_equal(flow.state, FlowScript.State.LOADING, "the sandbox waits for the shaders as well")
+func test_the_hub_loads_too() -> void:
+	events.hub_requested.emit(0)
+	check_equal(flow.state, FlowScript.State.LOADING, "the hub waits for the shaders as well")
 	_load()
-	check(flow.sandbox and flow.state == FlowScript.State.RUNNING, "then it starts")
+	check(flow.mode == FlowScript.MODE_HUB and flow.state == FlowScript.State.RUNNING, "then it starts")
 
 
 ## A run two machines start together cannot wait at its start (netcode spike S4): asked ahead,
@@ -116,7 +116,7 @@ func test_a_load_asked_for_ahead_starts_nothing_and_the_run_after_starts_at_once
 	check(flow.state == FlowScript.State.IDLE and flow.world == null, "and nothing started: Flow is idle")
 	events.play_load_requested.emit()
 	check_equal([flow.state, _started], [FlowScript.State.IDLE, 1], "asked again there is nothing to load: nothing happens")
-	events.sandbox_requested.emit(0)
+	events.hub_requested.emit(0)
 	check_equal(flow.state, FlowScript.State.RUNNING, "the run asked for after starts at once, with no screen")
 	check_equal(_started, 1, "the screen showed once")
 	events.play_load_requested.emit()
@@ -136,10 +136,10 @@ func test_a_run_stopped_while_loading_starts_nothing() -> void:
 func test_presses_while_loading_are_ignored() -> void:
 	events.play_requested.emit(0)
 	events.play_requested.emit(0)
-	events.sandbox_requested.emit(0)
+	events.hub_requested.emit(0)
 	check_equal(_started, 1, "one loading")
 	_load()
-	check(not flow.sandbox and flow.state == FlowScript.State.RUNNING, "the first press's run starts")
+	check(flow.mode == FlowScript.MODE_RUN and flow.state == FlowScript.State.RUNNING, "the first press's run starts")
 
 
 ## The screenshot scripts and the clip recorder compile the shaders first the same way

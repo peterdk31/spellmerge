@@ -1,0 +1,17 @@
+{
+	"about": "Flagstones swept clean (docs/milestones/crypt-rework.md): the Old Broom's ring, the long strokes of its bristles round the ring's middle. An area's material.",
+	"base": "#433f5b",
+	"slabs": {
+		"size": 30,
+		"jitter": 0.85,
+		"squash": 0.8,
+		"tone": "stone.base",
+		"vary": 0.6,
+		"joint": "#2b2840",
+		"joint_width": 1.1,
+		"light": "#57537a",
+		"light_width": 1.0
+	},
+	"strokes": {"colour": "#57537a", "count": 46, "share": 0.1, "inner": 40},
+	"speckle": [["stone.shadow", 0.008]]
+}

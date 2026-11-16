@@ -10,13 +10,15 @@ script = ExtResource("9_source")
 kind = &"rising"
 rate = 34.0
 from = 0
+start = 0.25
 
 [sub_resource type="Resource" id="Mote_2"]
 script = ExtResource("9_source")
 kind = &"spark"
 rate = 60.0
 from = 2
-stop = 0.3
+start = 0.25
+stop = 0.55
 
 [resource]
 script = ExtResource("1_base")
@@ -46,3 +48,4 @@ look_on_floor = true
 look_merges = true
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.06, "turn": 35, "lift": -2, "push": 3, "stretch": -0.2, "ease": "in"}, {"phase": "after", "at": 0.3}])
 cast_cue = &"cast_rune"
+shown_cue = &"pool_throw"

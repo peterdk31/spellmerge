@@ -74,6 +74,40 @@ func test_it_is_spat_out_the_way_it_was_cast() -> void:
 	arena.free_all()
 
 
+func test_it_is_thrown_from_the_staff_to_where_it_lies() -> void:
+	# The wizard spits it out of the wand like a water gun and it lies where that lands (the owner,
+	# 2026-11-16): its `shown_cue` is played from the cast's origin, as far as the pool lies.
+	check_equal(_card().shown_cue, &"pool_throw", "its throw is its shown cue")
+	var arena := ArenaScript.new(root)
+	var shown: Array = []
+	arena.bus.carrier_shown.connect(func(_caster: int, card: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		shown.append([card, origin, direction, length]))
+	arena.install_cards(0, 0, ["pool"])
+	arena.cast(0, 0)
+	arena.run(0.1)
+	var lies: Vector2 = Vector2.INF
+	for slot in arena.projectiles.get_cap():
+		if arena.projectiles.is_alive(slot):
+			lies = arena.projectiles.get_position_of(slot)
+	check_equal(shown.size(), 1, "told once")
+	if shown.size() == 1 and lies.is_finite():
+		check_equal(shown[0][0], &"pool", "as the pool")
+		var landed: Vector2 = (shown[0][1] as Vector2) + (shown[0][2] as Vector2) * float(shown[0][3])
+		check(landed.distance_to(lies) < 0.5, "from where it was cast to where it lies (%s, %s)" % [landed, lies])
+	arena.free_all()
+
+
+func test_it_lies_there_once_the_throw_lands() -> void:
+	# The puddle splashes in as the thrown blobs land: its shader waits the blobs' flight, and its
+	# splash motes start then.
+	var glob := load("res://content/motes/glob.tres") as MoteKind
+	var code: String = (_card().look_shader as Shader).code
+	var arrive: float = code.get_slice("const float ARRIVE = ", 1).get_slice(";", 0).to_float()
+	check(arrive > 0.0 and arrive >= glob.life.x - 0.05 and arrive <= glob.life.y, "it lies there as the blobs land (%s s, they fly %s s)" % [arrive, glob.life])
+	for stream: CardMoteStream in _card().look_motes:
+		check(is_equal_approx(stream.start, arrive), "its %s motes start as it lands" % stream.kind)
+
+
 func test_two_combos_name_it() -> void:
 	var found: int = 0
 	for combo: Dictionary in preload("res://tests/support/combo_files.gd").read_all():

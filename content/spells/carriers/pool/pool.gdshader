@@ -30,7 +30,9 @@ render_mode blend_premul_alpha;
 // darker by a dither in its middle. Over it, in world space so they run on across merged pools: light lines
 // slowly shifting (a warped noise, in its other infusions in turn by a slow noise: the first's
 // with one), ripples spreading and fading (flattened by the slant) and glints of white-hot
-// twinkling. It splashes in while it is new (it overshoots and settles; the drops it throws are
+// twinkling. It is spat out of the staff (its card's `shown_cue`, `pool_throw`: blobs of it and
+// its spell's motes flying out as far as it lies) and lies there once they land, ARRIVE seconds
+// on. It splashes in while it is new (it overshoots and settles; the drops it throws are
 // motes too, its card's `look_motes`, off its rim for its first moments) and dries out over its
 // last second, pulling back from its outline to its middle and leaving a wet stain that fades.
 // Its card particles are given off from its outline; a faint light lies round it, gone as it
@@ -75,7 +77,10 @@ uniform vec4 merge_place[MERGE_MOST];
 
 // The most other pools a pool runs together with (picked in vertex(), the nearest listed first).
 const int NEAR_MOST = 4;
-// Seconds it splashes in for.
+// Seconds before it lies there: the liquid spat out of the staff is in the air (its card's
+// `shown_cue`, `pool_throw`: `glob` motes that land as their life ends, 0.26 to 0.3 s).
+const float ARRIVE = 0.25;
+// Seconds it splashes in for, once it lands.
 const float SPILL = 0.35;
 // How soft the union of outlines is, in pixels: how far apart two still run together.
 const float MELD = 3.0;
@@ -122,10 +127,10 @@ varying vec2 world;
 vec2 life_of(float code) {
 	float since = still_since(code);
 	float dry = 1.0 - still_left(code) / STILL_END;
-	// An ease out that overshoots, then settles.
-	float k = clamp(since / SPILL, 0.0, 1.0) - 1.0;
+	// Nothing while it flies, then an ease out that overshoots and settles.
+	float k = clamp((since - ARRIVE) / SPILL, 0.0, 1.0) - 1.0;
 	float splash = max(0.05, 1.0 + 2.70158 * k * k * k + 1.70158 * k * k);
-	return vec2(since < SPILL ? splash : mix(1.0, 0.8, dry), dry);
+	return vec2(since < ARRIVE ? 0.0 : (since < ARRIVE + SPILL ? splash : mix(1.0, 0.8, dry)), dry);
 }
 
 // A listed pool's still clock's code and facing (`StillMerge`: the code plus the facing's step).
@@ -209,7 +214,7 @@ float spill_at(vec2 q) {
 // (below 0 inside): its oval, pushed out to `spill` of it there and further the way it was thrown,
 // over its gradient.
 float edge_of(vec2 q, vec4 at, float spill) {
-	vec2 rad = at.z * look_shape * life_of(code_of(at.w)).x;
+	vec2 rad = at.z * look_shape * max(life_of(code_of(at.w)).x, 0.001);
 	vec2 d = q - at.xy;
 	vec2 e = d / rad;
 	float n = length(e);
@@ -332,6 +337,10 @@ vec4 liquid(vec2 q, float depth, float deep) {
 }
 
 vec4 body_look() {
+	if (life.x <= 0.0) {
+		// Still in the air.
+		return vec4(0.0);
+	}
 	vec2 wp = floor(world);
 	vec2 q = wp + 0.5;
 	// The pixel from its own middle, whole numbers, for its particles.

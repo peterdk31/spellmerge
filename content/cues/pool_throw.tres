@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"pool_throw"
+parts = Array[Dictionary]([{"part": &"motes", "kind": &"glob", "reach": 1.0, "spread": 8.0, "way": &"aim"}, {"part": &"motes", "kind": &"spell", "count": 8, "reach": 1.0, "spread": 14.0, "way": &"aim"}])

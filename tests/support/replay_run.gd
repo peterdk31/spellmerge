@@ -79,6 +79,9 @@ var room: RoomBase = null
 ## after whatever ran before, as a player starts one run after another (N3b: the run starts from
 ## a fresh game's state all the same).
 var fresh_game: bool = true
+## Cover kinds the game's cover area and Feel lay instead of the registry's (ground cover GC5; empty:
+## the registry's), given again in every fresh game. The snapshot test puts cover in its rooms so.
+var cover: Array[CoverKind] = []
 
 var _tree: SceneTree
 var _root: Window
@@ -405,6 +408,9 @@ func _find() -> void:
 	_flow.set(&"intro_enabled", false)
 	if room != null:
 		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room))
+	var kinds: Variant = cover if not cover.is_empty() else null
+	_root.get_node("Cover").call(&"use_kinds", kinds)
+	_feel.cover().use_kinds(kinds)
 	var machine: SessionRules = SessionRules.machine()
 	machine.shot_cap = cap if cap > 0 else SessionRules.defaults().shot_cap
 	if not native:

@@ -1917,6 +1917,7 @@ func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int =
 	cue_tag = tag
 	events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, radius, spell.tint, spell.look)
 	cue_tag = 0
+	_touch_floor(spell, actor, at, radius)
 	var chain: int = spell.chain_jumps
 	var prev: int = 0
 	if tag == _ray.tag:
@@ -1929,6 +1930,24 @@ func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int =
 	_blasting = true
 	_strike_round(spell, tag, actor, at, Vector2.RIGHT, radius, _blast_hit(spell, hit_profile(tag, shot)), chain, prev)
 	_blasting = was
+
+
+## Each element of `spell` touched the floor within `radius` of `at` (`floor_touched`, ground cover
+## GC5, rule 5: one event an element, in its infusions' order), for whatever lies on the floor (the
+## cover area). Nothing for a spell of no element.
+func _touch_floor(spell: CompiledSpell, actor: int, at: Vector2, radius: float) -> void:
+	if events == null or spell == null or not at.is_finite():
+		return
+	for element: StringName in spell.element_ids:
+		events.floor_touched.emit(actor, element, at, maxf(radius, 0.0))
+
+
+## A shot (or a ray) of `spell` ended at `at`: its elements touch the floor there, within its radius
+## (rule 5); a shot with a blast touches as its blast does (`_blast`), so not twice.
+func _touch_end(spell: CompiledSpell, actor: int, at: Vector2) -> void:
+	if spell == null or spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0:
+		return
+	_touch_floor(spell, actor, at, spell.radius)
 
 
 ## Queues a launch `wait` seconds from now: `group` (a burst's later firing) or, with no group,
@@ -2285,6 +2304,7 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 		events.carrier_shown.emit(actor, RAY_CARD, origin, heading, got, spell.tint, spell.look)
 	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the payload from.
 	if got > 0.0:
+		_touch_end(spell, actor, end)
 		_blast(spell, tag, actor, end)
 	if got > 0.0:
 		_fire_payloads(spell, TriggerBase.Event.EXPIRE, tag, actor, end, end_heading, null)
@@ -3093,7 +3113,11 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 	if spell.plain_hit():
 		# No siphon, possess, pull or blast: only the carrier's own part.
 		if not _blasting:
+			var ended: bool = slot >= 0 and not projectiles.is_alive(slot)
 			_carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
+			# A shot the hit spent ends here: its elements touch the floor (ground cover GC5).
+			if ended:
+				_touch_end(spell, actor, position)
 		return
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
 	if refund > 0.0:
@@ -3111,6 +3135,7 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 		_carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
 	# A spent shot's blast goes off where it hit; a pulling one's waits for the arrival.
 	if spent and not pulled:
+		_touch_end(spell, actor, position)
 		_blast(spell, tag, actor, position, slot)
 
 
@@ -3179,6 +3204,7 @@ func _on_expired(actor: int, position: Vector2, tag: int, shot: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
 	# Every carrier blasts at its end point (rules R1d): a pulling shot that missed, where it ended.
 	if spell != null:
+		_touch_end(spell, actor, position)
 		_blast(spell, tag, actor, position, shot)
 	# A shot that ends on a wall meets that wall and ends: its `on wall` and `on expire` both fire.
 	if projectiles.expired_on_wall:

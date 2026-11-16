@@ -10,7 +10,8 @@ extends "res://tests/support/suite.gd"
 ## played so, as the one room of a pinned run filled by the run's map (online-ready N12): a new room
 ## is covered the day its folder lands, with no test written for it. The hub hosts none; its own
 ## start is resumed from a snapshot on its stone. Cards and enemies are covered the same way, in a
-## scripted fight each (tests/core/test_content_determinism.gd).
+## scripted fight each (tests/core/test_content_determinism.gd). Every room of a biome is played under
+## a stand-in grass that fills it (ground cover GC5), so fire spreads in it and the snapshot holds one.
 ##
 ## The runs are the replay test's (tests/support/replay_run.gd). Each takes seconds: the runner plays
 ## them in processes of their own (tests/support/suite.gd):
@@ -18,6 +19,7 @@ extends "res://tests/support/suite.gd"
 
 const ReplayRun := preload("res://tests/support/replay_run.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const StandInGrass := preload("res://tests/support/stand_in_grass.gd")
 
 ## Ticks recorded, and the tick the snapshot is taken after (past the scripted player's rebuild and
 ## pause in the sandbox, so the frames after it hold neither).
@@ -33,10 +35,27 @@ func before_each() -> void:
 	_run.ticks = TICKS
 	# One seed, so a run recorded again for the report is the same run.
 	_run.run_seed = RUN_SEED
+	# Ground cover over every open cell of every room of a biome (ground cover GC5), so the scripted
+	# player's fire lights it and the snapshot holds a fire.
+	var grass: CoverKind = StandInGrass.make(_biomes(), 1.0, 1)
+	grass.wall_gap = 0
+	_run.cover = [grass] as Array[CoverKind]
 
 
 func after_each() -> void:
+	_run.cover = [] as Array[CoverKind]
 	await _run.fresh()
+
+
+## Every room's biome the registry finds.
+func _biomes() -> Array[StringName]:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var found: Array[StringName] = []
+	for room: RoomBase in registry.run_content().rooms:
+		if room.biome != &"" and not found.has(room.biome):
+			found.append(room.biome)
+	return found
 
 
 func test_a_sandbox_run_restored_plays_on_the_same() -> void:
@@ -56,9 +75,14 @@ func test_a_run_in_every_room_restored_plays_on_the_same() -> void:
 		if not room.kinds.is_empty():
 			rooms.append(room)
 	check(rooms.size() >= 1, "it finds the rooms (%d)" % rooms.size())
+	var burnt: PackedStringArray = PackedStringArray()
 	for room in rooms:
 		_run.room = room
 		await _check_resumed(&"play_requested", 0, 1)
+		# The resumed game holds the run's cover from the snapshot on: a fire there rolled to spread.
+		if int(root.get_node("Cover").call(&"rolls")) > 0:
+			burnt.append(String(room.id))
+	check(not burnt.is_empty(), "fire burnt in some room's cover (%s)" % ", ".join(burnt))
 	_run.room = null
 
 

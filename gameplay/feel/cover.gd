@@ -15,7 +15,8 @@ extends Node2D
 ## over both.
 ##
 ## **A cell's state picks its tufts' frames** through each row's custom data (`show_state`; the
-## cover area's changes, GC5): a state that draws no frame folds its tufts away. The rows are kept
+## cover area's changes, heard as `cover_changed`, GC5): a state that draws no frame folds its
+## tufts away. The rows are kept
 ## here and a changed kind's are handed to its batch once, at the frame's `step`, however many of its
 ## cells changed.
 ##
@@ -119,6 +120,8 @@ func _ready() -> void:
 	ShaderWarmupScript.want(SHADER, ShaderWarmupScript.BATCH)
 	if events != null and not events.room_built.is_connected(_on_room_built):
 		events.room_built.connect(_on_room_built)
+	if events != null and not events.cover_changed.is_connected(_on_cover_changed):
+		events.cover_changed.connect(_on_cover_changed)
 
 
 ## Lay the cover with `kinds` instead of the registry's from the next room on (tests and
@@ -150,6 +153,12 @@ func kinds() -> Array[CoverKind]:
 func _on_room_built(room_id: StringName, layout_root: Node) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	lay(CoverLayout.of(layout_root, room, kinds()))
+
+
+## The cover area's changes (`cover_changed`, GC5): each cell shows its new state.
+func _on_cover_changed(cells: PackedInt32Array, states: PackedInt32Array) -> void:
+	for at in mini(cells.size(), states.size()):
+		show_state(cells[at], states[at])
 
 
 ## Show `laid`, a room's cover, every cell in its kind's first state (at rest).

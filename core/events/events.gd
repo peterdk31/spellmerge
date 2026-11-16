@@ -253,8 +253,10 @@ signal status_applied(caster: int, target: Node, status_id: StringName)
 signal prop_state_changed(actor: int, state: StringName)
 ## Sender: flow (its hub rules, `HubRules`, props W8c). The prop `actor` is asked to enter its state `state` from outside its triggers (the hub's `run_start` stone, lit while every wizard stands on it), during the tick, as a trigger's `then` would. Heard by actor (that prop's `PropStateTriggers`, which enters it at once; a state it lacks, or one it is in, changes nothing). Not a command: the simulation asks itself.
 signal prop_state_requested(actor: int, state: StringName)
-## Sender: core/spells. A carrier that hits nothing gives `target` a status (a portal's infusion on
-## the bodies that go through it): Combat applies it as `apply_status` does, with no hit.
+## Sender: core/spells, and the cover area (ground cover GC5, rule 4: the status of the cover a body
+## stands in, burning grass's burn, by NO_PLAYER). Something that hits nothing gives `target` a status
+## (a portal's infusion on the bodies that go through it; burning grass on whoever stands in it):
+## Combat applies it as `apply_status` does, with no hit, by its own rules (resist and all).
 signal status_requested(caster: int, target: Node, status_id: StringName, duration: float, strength: float)
 ## Sender: flow. The enemy or boss body `enemy` (an `Actor` with its data, not yet in the tree) is
 ## about to stand in the room (run generation RG5). Heard by difficulty, which scales its numbers to
@@ -367,6 +369,21 @@ signal room_entered(room_id: StringName)
 ## needs from it then (`CoverLayout.of`) and keeps neither the node nor anything in it. It changes no
 ## state. Heard by the cover area and feel (GC3, GC5).
 signal room_built(room_id: StringName, layout_root: Node)
+## Sender: core/spells (ground cover GC5, rule 5). An element of a spell touched the floor: `element`
+## (a card id, &"fire") within `radius` of `at`, by the actor `caster` (NO_PLAYER for none). Sent
+## where a blast or a pulse's ring goes off, as a pool lies and on each of its ticks
+## (`SpellLimits.POOL_TICK`), and where a shot ends (a hit that spends it, its life, a wall); never
+## by a shot in flight (decision 1). One event per element of the spell, in its infusions' order.
+## Heard by the cover area, which queues it and fires the `element` triggers of the cells inside the
+## circle at its next step. Spells knows nothing of cover.
+signal floor_touched(caster: int, element: StringName, at: Vector2, radius: float)
+## Sender: the cover area (ground cover GC5, rule 6). The cells `cells` of the room's cover (its
+## `CoverLayout`'s cell indices) are now in the states `states` (each an index in its kind's
+## `CoverKind.states`; 0 at rest), one event a tick with that tick's changes; after each
+## `room_built`, every cell not at rest once (a machine that joins mid-fire draws the fire), and after
+## a restore every cell whose state the view was last told otherwise. Read the arrays while it is
+## sent; they are reused. Heard by feel (the tufts' look, `cover.gd`).
+signal cover_changed(cells: PackedInt32Array, states: PackedInt32Array)
 ## Sender: core/loading. Work before playing has begun behind the loading screen (`Loading.run`;
 ## Flow runs `play_tasks` on Play). Heard by hud, which shows the screen until `loading_finished`.
 signal loading_started()

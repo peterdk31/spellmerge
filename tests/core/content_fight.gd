@@ -29,6 +29,12 @@ extends RefCounted
 const AIFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const ItemsScript := preload("res://gameplay/items/items.gd")
+const CoverScript := preload("res://gameplay/cover/cover.gd")
+## The fight's ground cover (ground cover GC5): the test grass over the whole floor, so every fire,
+## frost and burn of a card or an enemy plays on it too.
+const GRASS: CoverKind = preload("res://tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres")
+const COVER_ROOM: StringName = &"content_fight"
+const COVER_FIELD: Rect2 = Rect2(0.0, 0.0, 608.0, 336.0)
 const FramesScript := preload("res://core/sim/frames.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 
@@ -94,6 +100,7 @@ var fight: AIFixture
 var entities: EntitiesScript
 ## The fight's Items area (what lies on the ground; every fight has one).
 var items: ItemsScript
+var cover: CoverScript
 var frames: FramesScript
 var input: InputManagerScript
 ## The node everything of the fight is under (a snapshot's world).
@@ -165,6 +172,13 @@ func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int 
 	items.registry = fight.registry
 	items.frames = frames
 	world.add_child(items)
+	cover = CoverScript.new()
+	cover.name = "Cover"
+	cover.events = fight.bus
+	cover.actors = fight.actors
+	cover.use_kinds([GRASS])
+	world.add_child(cover)
+	_lay_cover()
 	fight.bus.connect(&"staff_cast", _on_staff_cast)
 	var cards: Array[StringName] = [PLAIN]
 	if kind == CARD:
@@ -194,6 +208,30 @@ func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int 
 		var data: EnemyBase = resource as EnemyBase
 		for at in FOES_AT:
 			fight.enemy(data.scene, data, at)
+
+
+## The fight's room for the cover: a layout of the screen's size (a wall in its last cell) with the
+## test grass over COVER_FIELD, built and entered as Flow tells a room.
+func _lay_cover() -> void:
+	var layout := Node2D.new()
+	var walls := StaticBody2D.new()
+	walls.collision_layer = RoomBase.WALL_LAYER
+	layout.add_child(walls)
+	var shape := CollisionShape2D.new()
+	var box := RectangleShape2D.new()
+	box.size = Vector2(16.0, 16.0)
+	shape.shape = box
+	shape.position = COVER_FIELD.end + Vector2(24.0, 24.0)
+	walls.add_child(shape)
+	var field := CoverField.new()
+	field.kind = GRASS.id
+	field.density = 1.0
+	field.offset_right = COVER_FIELD.end.x
+	field.offset_bottom = COVER_FIELD.end.y
+	layout.add_child(field)
+	fight.bus.room_built.emit(COVER_ROOM, layout)
+	fight.bus.room_entered.emit(COVER_ROOM)
+	layout.free()
 
 
 ## A wizard's staff: no wait between casts, a deep pool.
@@ -244,6 +282,7 @@ func _tick() -> void:
 		var body: Actor = fight.actors.node_of(_ids[i]) as Actor
 		if body != null and body.is_inside_tree() and body.get_parent() != entities:
 			body.tick_step(DT)
+	cover.step(DT)
 	items.step(DT)
 	ticks += 1
 
@@ -251,7 +290,7 @@ func _tick() -> void:
 ## The fight's areas by name: its services and every actor's body by actor id (as the Tick's
 ## `state_areas`).
 func areas() -> Dictionary:
-	return fight.areas({"entities": entities, "items": items})
+	return fight.areas({"entities": entities, "items": items, "cover": cover})
 
 
 ## Makes this fight as `snapshot` says (taken from a fight of the same content after its tick

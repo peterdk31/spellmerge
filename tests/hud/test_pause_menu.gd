@@ -124,7 +124,6 @@ func _stand_in() -> PackedScene:
 
 func _teardown() -> void:
 	_stops = false
-	_actions.clear()
 	_cap_requests.clear()
 	_heard.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:

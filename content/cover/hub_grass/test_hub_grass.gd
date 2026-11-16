@@ -33,9 +33,10 @@ func test_it_is_sound_and_fills_the_hub() -> void:
 	check_equal(_kit.problems(), PackedStringArray(), "its data")
 	check(GRASS.fills(&"hub"), "the hub's biome")
 	check(not GRASS.fills(&"crypt"), "not the crypt's")
-	check_equal(GRASS.frame_count(), 8, "eight frames: three at rest, two burning, ash, two trampled")
+	check_equal(GRASS.frame_count(), 11, "eleven frames: three at rest, two burning, ash, two trampled, then three more at rest")
 	var rest: CoverState = GRASS.states[0]
 	check_equal(rest.state_id, &"rest", "it starts at rest")
+	check_equal(rest.frames, PackedInt32Array([0, 1, 2, 8, 9, 10]), "six tufts at rest, curved and leaning, so the grass is never a row of straight blades")
 	check(not rest.trampled_frames.is_empty(), "it draws trampled frames (GC4)")
 	check(rest.status == &"", "grass at rest harms nobody")
 

@@ -31,6 +31,10 @@ extends Resource
 ## The sound its death plays in place of its death cue's (`enemy_death`, `boss_death`; empty: the
 ## cue's own), so a boss splinters as only it does while the cue stays everyone's.
 @export var death_sound: StringName = &""
+## Its intro (docs/milestones/boss-intro.md, `BossIntro`; null: none, the entrance banner): the
+## overlay that stops the game as its fight starts, its portrait, lines, accent and cues. A
+## sub-resource of its data, as its music is.
+@export var boss_intro: BossIntro = null
 
 ## The body's scale (1: as drawn); a boss is bigger.
 @export var size: float = 1.0
@@ -114,6 +118,8 @@ func problems() -> PackedStringArray:
 			found.append("%s: stats: %s" % [id, line])
 	if music != null:
 		found.append_array(music.problems(String(id)))
+	if boss_intro != null:
+		found.append_array(boss_intro.problems(String(id)))
 	if not is_finite(health_per_player) or health_per_player < 0.0:
 		found.append("%s: its health_per_player is %s; 0 or more." % [id, health_per_player])
 	if cost < 1:

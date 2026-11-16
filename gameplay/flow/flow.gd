@@ -121,6 +121,17 @@ extends Node
 ## (`Tick.begin_run`), so nothing of the run steps under the menu; the HUD shows the menu again, and
 ## the frames service and net/ end their part themselves. Not a command: only this machine leaves.
 ##
+## A boss's intro (docs/milestones/boss-intro.md): at the end of a run's room's setup (a run's first
+## room and the next room alike, `_open_boss_intro`), the first boss with an intro among the room's own
+## enemies (`EnemyBase.boss_intro`; never the sandbox's spawns or a phase's adds) stops the game on
+## that tick (`boss_intro`, `BossIntroHold`), when the run's rules have intros on
+## (`SessionRules.boss_intros`, off for automation where `intro_enabled` is). The command
+## `boss_intro_next_requested` (any seat's A, from the HUD) turns its pages; past the last the game goes
+## on. It closes by itself when its boss leaves the tree (a step that runs through its stop: Flow's
+## own does not run while the game is stopped) or the last seat leaves, and goes with the room's
+## enemies. Presses made while it stood still, and on the tick it closes, are dropped
+## (`Frames.drop_presses`), so a staff pressed during it casts nothing as the fight starts.
+##
 ## Modes: `mode` says which run this is: MODE_RUN (a run of rooms), MODE_SANDBOX or MODE_HUB (above).
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
@@ -297,6 +308,8 @@ var hub: HubRules = HubRules.new()
 var exits: ExitRules = ExitRules.new()
 ## The adds standing, each with the body that called it (boss plan OB13).
 var adds: RoomAdds = RoomAdds.new()
+## The boss's intro of the room (docs/milestones/boss-intro.md, `BossIntroHold`).
+var boss_intro: BossIntroHold = BossIntroHold.new()
 ## The room's layout in the world, and the room it is of (a joining machine built the room the run
 ## started in: a snapshot taken in a later room lays that room's out again, `rebuild_derived`).
 var _layout: Node = null
@@ -317,11 +330,15 @@ var _party_back: PackedByteArray = PackedByteArray()
 
 func _ready() -> void:
 	# The tick steps it (core/sim/tick.gd, core/sim/sim_area.gd).
-	SimArea.join(self, &"Flow").steps(&"Flow", step).fresh_because(FRESH_BECAUSE)
+	# Its intro's watch runs through the intro's own stop, when nothing else of Flow steps.
+	SimArea.join(self, &"Flow").steps(&"Flow", step).steps(&"Flow", _watch_boss_intro, [BossIntroHold.STOP]).fresh_because(FRESH_BECAUSE)
 	if save == null:
 		save = SaveFile.new()
 	if _is_automated():
 		intro_enabled = false
+		# Nobody is there to press A: the runs this machine starts have no boss intros (a rule, so
+		# a replay of such a run plays back the same anywhere).
+		SessionRules.machine().boss_intros = 0
 	var tree: MainLoop = Engine.get_main_loop()
 	if tree != null and tree.get_script() != null:
 		loading_enabled = false
@@ -339,6 +356,7 @@ func _ready() -> void:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
 	if frames != null:
 		frames.set_party_source(_party_now)
+	boss_intro.events = events
 	if events == null:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
 		return
@@ -352,6 +370,7 @@ func _ready() -> void:
 	events.listen(&"sandbox_spawn_requested", _on_sandbox_spawn_requested)
 	events.listen(&"run_requested", _on_run_requested)
 	events.listen(&"start_depth_picked", _on_start_depth_picked)
+	events.listen(&"boss_intro_next_requested", _on_boss_intro_next_requested)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
@@ -559,6 +578,7 @@ func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0)
 	_count_stone()
 	_count_exits()
 	_check_room_won()
+	_open_boss_intro()
 	return true
 
 
@@ -710,6 +730,35 @@ func _enter_next_room(room: RoomBase) -> void:
 		_show_room_start()
 	_count_exits()
 	_check_room_won()
+	_open_boss_intro()
+
+
+## The end of a run's room's setup (the world in the tree, its ids open, the room announced): the
+## first boss with an intro among the room's own enemies opens it, and the game stops on this tick.
+func _open_boss_intro() -> void:
+	if mode == MODE_RUN and state == State.RUNNING:
+		boss_intro.open_in(_enemies, Sim.found(self))
+
+
+## A seat pressed A on page `page` of the boss's intro (a command, at the tick's start): the page
+## turns while it is still that page, and past the last the game goes on.
+func _on_boss_intro_next_requested(player: int, page: int) -> void:
+	if player < 0 or player >= PLAYER_SLOTS:
+		return
+	if boss_intro.turn(page, Sim.found(self)):
+		_drop_stood_presses()
+
+
+## Flow's step through the intro's stop: the intro closes when its boss left the tree.
+func _watch_boss_intro(_delta: float) -> void:
+	if boss_intro.watch(Sim.found(self)):
+		_drop_stood_presses()
+
+
+## The intro closed: the presses of the ticks it stood still, and of this one, never reach the fight.
+func _drop_stood_presses() -> void:
+	if frames != null:
+		frames.drop_presses()
 
 
 ## The room `room` stands in the world shown: `room_entered`, and the items its scene places
@@ -1101,6 +1150,9 @@ func _on_player_left(player: int) -> void:
 	wizard.queue_free()
 	_count_players()
 	_count_stone()
+	# Nobody is left to press A, and Flow does not step while the intro stops the game.
+	if _wizards.is_empty() and boss_intro.close(Sim.found(self)):
+		_drop_stood_presses()
 	if _can_be_lost() and _restart_left < 0.0 and _all_down() and not _stands_up_by_itself():
 		_restart_left = restart_delay()
 
@@ -1428,10 +1480,11 @@ func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2) -> Actor:
 
 
 ## The room's enemies are forgotten (they went with the room, or the sandbox's arena was cleared),
-## their adds too.
+## their adds and the boss's intro too (closed if open: the game goes on).
 func _forget_enemies() -> void:
 	_enemies.clear()
 	adds.clear()
+	boss_intro.clear(Sim.found(self))
 
 
 ## The wizards in play (1 at least): what an enemy's health and a phase's adds are counted for.

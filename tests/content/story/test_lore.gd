@@ -106,3 +106,31 @@ func test_the_story_check_reads_every_enemys_lore() -> void:
 func test_the_limits_agree_with_the_story_canon() -> void:
 	check_equal(StoryValidator.MAX_LORE_CHARS, 60, "a description is at most 60 characters")
 	check_equal(StoryValidator.MAX_SPEECH_CHARS, 60, "a line of speech is at most 60")
+
+
+## What a boss says in its intro is speech (docs/milestones/boss-intro.md, rule 1; docs/STORY.md):
+## one line each of at most MAX_SPEECH_CHARS, at most `BossIntro.MAX_LINES` of them.
+func test_a_boss_intros_lines_are_held_to_the_speech_rule() -> void:
+	var file: String = "res://content/bosses/test/test.tres"
+	check_equal(StoryValidator.check_speech(file, ["What an awful smell of The Wizard.", "I must clean it up."] as Array[String]), [] as Array[Dictionary], "two short lines: fine")
+	check_equal(StoryValidator.check_speech(file, [] as Array[String]), [] as Array[Dictionary], "no lines: fine")
+	check_equal(_rules(StoryValidator.check_speech(file, ["One.", "Two.", "Three.", "Four."] as Array[String])), ["too-many-lines"] as Array[String], "four lines")
+	var long: String = "x".repeat(StoryValidator.MAX_SPEECH_CHARS + 1)
+	var problems: Array[Dictionary] = StoryValidator.check_speech(file, ["Fine.", long] as Array[String])
+	check_equal(_rules(problems), ["speech-too-long"] as Array[String], "a line too long")
+	check_equal(problems[0]["field"] if not problems.is_empty() else "", "boss_intro.lines[1]", "named by its number")
+	check_equal(_rules(StoryValidator.check_speech(file, ["  "] as Array[String])), ["empty-text"] as Array[String], "an empty line")
+	check_equal(_rules(StoryValidator.check_speech(file, [" Spaced."] as Array[String])), ["text-not-a-line"] as Array[String], "spaces at an end")
+
+
+## The story check reads every boss's intro: a boss's line too long is found in the game's words.
+func test_the_story_check_reads_a_boss_intros_lines() -> void:
+	var registry: RegistryScript = _registry()
+	var data := EnemyBase.new()
+	data.id = &"test_speaking_boss"
+	data.boss = true
+	data.lore = "It was made for this test."
+	data.boss_intro = BossIntro.new()
+	data.boss_intro.lines = ["x".repeat(StoryValidator.MAX_SPEECH_CHARS + 1)] as Array[String]
+	registry.add(&"bosses", data)
+	check(_rules(registry.validate_story()).has("speech-too-long"), "its line is checked")

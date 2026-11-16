@@ -14,7 +14,13 @@ func test_the_defaults_are_the_platforms() -> void:
 	check_equal(made.shot_cap, ManagerScript.DEFAULT_CAP_WEB if web else ManagerScript.DEFAULT_CAP_DESKTOP, "the shot cap")
 	check_equal(made.hit_work, ManagerScript.WORK_PER_STEP, "the hit work")
 	check_equal(made.fire_shots, SpellLimits.FIRE_SHOTS_PER_STEP, "the fire pacing")
+	check_equal(made.boss_intros, 1, "boss intros on (docs/milestones/boss-intro.md, rule 4)")
+	SessionRules.reset_machine()
 	check(SessionRules.machine().equals(made), "this machine's start as them")
+
+
+func test_the_suite_turns_boss_intros_off_for_automation() -> void:
+	check_equal(SessionRules.machine().boss_intros, 0, "off in this machine's rules as a test starts (rule 4)")
 
 
 func test_a_copy_stands_apart() -> void:

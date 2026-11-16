@@ -7,7 +7,7 @@
 script = ExtResource("1_base")
 id = &"spray"
 display_name = "Spray"
-description = "Hold fire: a short jet pours out ahead, pushing back all it splashes."
+description = "Hold fire: a short jet pours out, pushing all it splashes."
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 1

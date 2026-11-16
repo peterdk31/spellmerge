@@ -15,7 +15,7 @@ const E := TriggerBase.Event
 const SHOTS: Array = [&"atom", &"rune", &"swap", &"wall", &"pool"]
 ## What is over at once: no timer ticks, nothing hears a hurt on it (rules R4d) and nothing is left
 ## for a recast.
-const AT_ONCE: Array = [&"slam", &"teleport"]
+const AT_ONCE: Array = [&"slam", &"teleport", &"spray"]
 
 var _items: Dictionary = {}
 var _compiler: StaffCompiler
@@ -66,7 +66,8 @@ func _expected(event: int, carrier: StringName) -> bool:
 		E.BLOCK:
 			# Wherever a shield or deflect runs: not on a familiar (a decoy has a barrier), nor a
 			# portal, which passes every shot on (owner, 2026-11-05).
-			return carrier != &"familiar" and carrier != &"portal"
+			# Nor a spray, whose jet meets no shot.
+			return carrier != &"familiar" and carrier != &"portal" and carrier != &"spray"
 		E.WALL:
 			# A dash too, stopped by a wall head on (boss plan OB12); a teleport is over at once.
 			return [&"atom", &"swap", &"beam", &"dash"].has(carrier)

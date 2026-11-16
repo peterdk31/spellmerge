@@ -17,7 +17,8 @@ extends RefCounted
 ## through a rotation, skew or scale (those go through the engine's trigonometry, which differs
 ## between platforms: the game's places must be the same on every machine); a place under a node
 ## that has one is one of `problems()` (art elsewhere may be mirrored or turned freely). Placements and zones are the editor's: `strip` takes them out of
-## the room the game shows, where the game stands the real bodies.
+## the room the game shows, where the game stands the real bodies; so is an editor's preview
+## (`RoomPreview`: the whole room's cover, ground cover GC3), which places nothing and is passed over.
 
 const PLAYER_SPAWNS: StringName = &"PlayerSpawns"
 const ENEMY_SPAWNS: StringName = &"EnemySpawns"
@@ -102,11 +103,11 @@ func problems() -> PackedStringArray:
 	return _problems
 
 
-## Take every placement and zone out of `layout`, a room the game is about to show (not yet in the
-## tree), wherever they are: they are freed at once.
+## Take every placement, zone and preview (`RoomPreview`) out of `layout`, a room the game is about
+## to show (not yet in the tree), wherever they are: they are freed at once.
 static func strip(layout: Node) -> void:
 	for child in layout.get_children():
-		if child is RoomPlacement or child is RoomZone:
+		if child is RoomPlacement or child is RoomZone or child is RoomPreview:
 			layout.remove_child(child)
 			child.free()
 		else:
@@ -118,6 +119,8 @@ static func strip(layout: Node) -> void:
 ## art may be mirrored or turned freely).
 func _walk(node: Node, at: Vector2, path: String, bent: String) -> void:
 	for child in node.get_children():
+		if child is RoomPreview:
+			continue
 		var here: Vector2 = at
 		var below: String = bent
 		var named: String = "%s/%s" % [path, child.name] if path != "" else String(child.name)

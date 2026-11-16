@@ -588,6 +588,9 @@ func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 			pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, 0.0, part.spread, part.up, false, true, line, life, 0 if alone else cards_look)
 			return
 		each = -1 if part.count < 0 and cue.power == 1.0 else maxi(roundi(float(part.kind_count if part.count < 0 else part.count) * cue.power), 1)
+		if part.gather > 0.0 and cue.size > 0.0:
+			_gather(part, cue, at, surface if alone else spell, Color.WHITE if alone else core, part.kind_count if each < 0 else each, life, 0 if alone else cards_look)
+			return
 		pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, reach, part.spread, part.up, part.ring, part.often, line, life, 0 if alone else cards_look)
 		return
 	var kinds: PackedInt32Array = cards.motes_of(cue.tag, cue.look) if named == &"spell" else _surface_kinds
@@ -622,6 +625,20 @@ func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 		part.turn = posmod(part.turn + count, n_kinds)
 
 
+## A `gather` part's `count` motes (`CueBase`): each from a point of the cloud `part.gather` wide
+## round `at`, aimed at the end of the cue's line and thrown exactly as far (times its `reach`),
+## so they come to a point there.
+func _gather(part: MotesPart, cue: CueContextScript, at: Vector2, source: int, core: Color, count: int, life: float, look: int) -> void:
+	var end: Vector2 = cue.at + cue.aim * cue.size
+	var times: float = part.reach if part.reach >= 0.0 else 1.0
+	for n in count:
+		var from: Vector2 = at + Vector2.from_angle(_rng.randf() * TAU) * part.gather * sqrt(_rng.randf())
+		var to_end: Vector2 = end - from
+		if to_end.length_squared() < 1.0:
+			continue
+		pool.throw_part(part.kind_at, from, to_end, source, core, 1, to_end.length() * times * cue.power, 0.0, part.up, false, false, Vector2.ZERO, life, look)
+
+
 ## A jet's frame share of `count` for the kind `at` of `kinds` (jets.gd): an even split, the
 ## remainder going to the kinds from `turn` on, so turning `turn` on by the count each frame gives
 ## every kind its share in all and the shares add up to `count`.
@@ -652,6 +669,7 @@ func prepare_motes_part(part: Dictionary) -> MotesPart:
 	made.line = bool(part.get("line", false))
 	made.life = float(part.get("life", 1.0))
 	made.lasts = float(part.get("for", 0.0))
+	made.gather = float(part.get("gather", 0.0))
 	return made
 
 

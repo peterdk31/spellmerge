@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"siphon_drain"
-parts = Array[Dictionary]([{"flash": &"ring_in", "along": 1.0, "bare": true}, {"part": &"motes", "kind": &"drain", "count": 36, "for": 0.25, "reach": 1.0, "spread": 8.0, "way": &"aim", "color": Color(0.949, 0.761, 0.188, 1)}, {"part": &"motes", "kind": &"spell", "count": 6, "for": 0.2, "reach": 0.5, "spread": 20.0, "way": &"aim"}])
+parts = Array[Dictionary]([{"flash": &"ring_in", "along": 1.0, "bare": true}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 12.0, "spread": 360.0, "way": &"aim", "color": Color(0.949, 0.761, 0.188, 1)}, {"part": &"motes", "kind": &"drain", "count": 36, "for": 0.3, "reach": 1.0, "gather": 10.0, "way": &"aim", "color": Color(0.949, 0.761, 0.188, 1)}])
 every = 0.15

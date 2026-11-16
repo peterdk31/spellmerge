@@ -211,3 +211,17 @@ func test_a_copy_takes_every_field() -> void:
 	var cue_copy := CueContextScript.new()
 	cue_copy.copy_from(cue)
 	check(_differs(cue, cue_copy).is_empty(), "a cue's copy takes every field (missed: %s)" % [_differs(cue, cue_copy)])
+
+
+func test_a_gathering_part_is_checked() -> void:
+	var cue := CueBase.new()
+	cue.id = &"test_gather"
+	cue.parts = [{"part": &"motes", "kind": &"drain", "count": 12, "gather": 10.0, "reach": 1.0}]
+	check(cue.problems().is_empty(), "a gathering part of one kind is fine: %s" % [cue.problems()])
+	cue.parts = [{"part": &"motes", "kind": &"spell", "count": 12, "gather": 10.0}]
+	check(" ".join(cue.problems()).contains("names one kind"), "of one kind by its id only")
+	cue.parts = [{"part": &"motes", "kind": &"drain", "count": 12, "gather": 10.0, "spread": 20.0}]
+	check(" ".join(cue.problems()).contains("takes no spread"), "and no spread: each is aimed at the point")
+	var spectacle := SpectacleScript.new()
+	check(is_equal_approx(spectacle.prepare_motes_part({"part": &"motes", "kind": &"drain", "gather": 10.0}).gather, 10.0), "prepared as its cloud's width")
+	spectacle.free()

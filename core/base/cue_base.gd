@@ -68,6 +68,10 @@ extends Resource
 ## evenly over that time instead of at once, from the cue's point along its way, each with the
 ## part's other keys (gameplay/feel/jets.gd): a stream poured out of a staff. It takes a `count`,
 ## and neither `share` nor `often`.
+## A motes part with `gather` (pixels) leaves from a cloud that wide round the cue's point and
+## comes to a point at the end of the cue's line: each mote aimed at it, flying exactly that far
+## (times `reach`), so they meet there (a siphon's mana knocked off a body, back into the staff
+## tip). One kind by its id only; it takes no `spread`, `ring` or `line`.
 ## A cue played on a body (`Feel.play_cue`'s `follow`: a staff's poof, a possession's ring) follows
 ## it: its flashes move with the body while they last, where they were played from it, and end
 ## when it is gone. Its motes, marks and lights stay where it played (they fly, lie and glow in
@@ -177,7 +181,7 @@ const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`flash`), motes and a floor mark.
 const PART_KEYS: Array[String] = ["part", "flash", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto", "along", "floor"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "bare", "often", "share", "body", "along", "line", "life", "for"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "bare", "often", "share", "body", "along", "line", "life", "for", "gather"]
 ## The longest a `motes` part throws for (its `for`, seconds).
 const MOTES_FOR_MOST: float = 4.0
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
@@ -360,6 +364,14 @@ func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 			found.append("%s: motes part %d's for is not over 0 and at most %s seconds" % [id, i, MOTES_FOR_MOST])
 		if not part.has("count") or part.has("share") or bool(part.get("often", false)):
 			found.append("%s: motes part %d pours for a while (for), so it takes a count, and neither share nor often" % [id, i])
+	if part.has("gather"):
+		if float(part["gather"]) < 0.0 or float(part["gather"]) > 64.0:
+			found.append("%s: motes part %d's gather is not 0 to 64 pixels" % [id, i])
+		if MOTE_GROUPS.has(StringName(part.get("kind", "spell"))):
+			found.append("%s: motes part %d gathers to a point, so it names one kind by its id" % [id, i])
+		for key: String in ["spread", "ring", "line", "share"]:
+			if part.has(key):
+				found.append("%s: motes part %d gathers to a point, so it takes no %s" % [id, i, key])
 	if part.has("share"):
 		if float(part["share"]) <= 0.0:
 			found.append("%s: motes part %d's share is 0 or less" % [id, i])

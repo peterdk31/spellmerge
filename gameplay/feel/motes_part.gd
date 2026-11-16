@@ -40,6 +40,9 @@ var kind_count: int = 1
 ## frame's share starts among its spell's kinds (turning, so no kind is short in all).
 var lasts: float = 0.0
 var turn: int = 0
+## How wide a cloud round the cue's point its motes leave from, each aimed at the end of the cue's
+## line, there to meet (`gather`; 0: none).
+var gather: float = 0.0
 
 
 ## Takes every field of `other` (a jet's own copy of the part it pours, `jets.gd`).
@@ -72,3 +75,4 @@ func copy_from(other: RefCounted) -> void:
 	kind_count = from.kind_count
 	lasts = from.lasts
 	turn = from.turn
+	gather = from.gather

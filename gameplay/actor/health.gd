@@ -78,6 +78,17 @@ func reset(amount: float) -> void:
 	changed.emit(health, max_health)
 
 
+## Make `most` the most health, the health keeping its share of it (boss plan OB13: a player joining
+## or leaving changes a boss's most and current health by the same share). Ignored for a most that is
+## not above 0; at 0 health it stays 0.
+func rescale(most: float) -> void:
+	if not (most > 0.0) or not is_finite(most) or most == max_health:
+		return
+	health = clampf(health * most / max_health, 0.0, most) if max_health > 0.0 else most
+	max_health = most
+	changed.emit(health, max_health)
+
+
 ## Unhurtable for `seconds` (at least what is left). Nothing at 0 health, and nothing for a still
 ## body (props W2, `Actor.is_still`): its step, which counts a protection down, never runs.
 func protect(seconds: float) -> void:

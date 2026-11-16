@@ -15,6 +15,13 @@ extends ActorComponent
 ## style and glow, the body's size; the sprite by whoever draws it, from `started`), and the
 ## controller hears it (`ActorController.phase_started`: an AI stands through the transition and
 ## takes the phase's profile).
+##
+## **Its adds** (boss plan OB13, `EnemyPhase.adds`, `EnemyAdds`): as a phase starts, each of its adds
+## entries is asked for on the bus (`adds_requested`: the body's actor id, the entry, its `key` and
+## not a wave), and an entry with waves is asked again every `every` seconds while the phase lasts
+## (`wave` true), counted by the body's own steps and not while it is possessed (whoever drives it
+## calls nobody). Flow stands them (how many by the players in play, under the entry's cap) and lets
+## them crumble when the body dies; the next phase's adds replace the last's waves.
 
 ## A phase began: its index in the data's `phases`, and the phase.
 signal started(index: int, phase: EnemyPhase)
@@ -25,6 +32,12 @@ var list: Array[EnemyPhase] = []
 var current: int = -1
 ## Seconds since the body appeared.
 var elapsed: float = 0.0
+## Seconds to the next wave of each adds entry of the phase in play (one a entry; 0 for none).
+var wave_left: PackedFloat64Array = PackedFloat64Array()
+
+## How many adds entries a phase may have: an entry's `key` is its phase's index times this, plus
+## its own index.
+const ADDS_MOST: int = 16
 
 
 func setup(owner_actor: Actor) -> void:
@@ -35,6 +48,8 @@ func setup(owner_actor: Actor) -> void:
 ## Move time on and start the next phase when its condition holds.
 func step(delta: float) -> void:
 	elapsed += delta
+	if actor.possessed_by == null:
+		_count_waves(delta)
 	var next: int = current + 1
 	if next >= list.size():
 		return
@@ -69,7 +84,44 @@ func begin(index: int) -> void:
 		_restyle(phase.look)
 	if actor.controller != null:
 		actor.controller.phase_started(actor, phase)
+	_call_adds(index, phase)
 	started.emit(index, phase)
+
+
+## Which adds entry `entry` of phase `phase` is, for Flow's count of those alive (`adds_requested`).
+static func adds_key(phase: int, entry: int) -> int:
+	return phase * ADDS_MOST + entry
+
+
+## The phase's burst of adds, and its waves' count started.
+func _call_adds(index: int, phase: EnemyPhase) -> void:
+	var entries: int = mini(phase.adds.size(), ADDS_MOST)
+	wave_left.resize(entries)
+	for k in entries:
+		var adds: EnemyAdds = phase.adds[k]
+		wave_left[k] = adds.every if adds != null and adds.has_waves() else 0.0
+		if adds != null and adds.count + adds.per_player > 0:
+			_ask(adds, adds_key(index, k), false)
+
+
+## Each wave due of the phase in play.
+func _count_waves(delta: float) -> void:
+	if current < 0 or wave_left.is_empty():
+		return
+	var phase: EnemyPhase = list[current]
+	for k in wave_left.size():
+		if wave_left[k] <= 0.0:
+			continue
+		wave_left[k] -= delta
+		if wave_left[k] <= 0.0:
+			var adds: EnemyAdds = phase.adds[k]
+			wave_left[k] += adds.every
+			_ask(adds, adds_key(current, k), true)
+
+
+func _ask(adds: EnemyAdds, key: int, wave: bool) -> void:
+	if actor.events != null:
+		actor.events.adds_requested.emit(actor.id, adds, key, wave)
 
 
 func _holds(phase: EnemyPhase) -> bool:

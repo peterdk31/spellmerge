@@ -118,8 +118,22 @@ func test_spring_cleaning() -> void:
 	check_equal(sweep.cards.count(&"pulse"), 2, "its dust ring")
 	var casts: Array = _spells().staff_view(sweep.cards, sweep.staff).get("casts", [])
 	check_equal(casts.size(), 2, "its cycle is two casts")
+	# Its mites (OB13): 4 + 2 a player at once, 2 + 1 a player every 10 s, at most 6 + 2 a player.
+	check_equal(phase.adds.size(), 1, "mites pour out")
+	var mites: EnemyAdds = phase.adds[0]
+	check_equal(mites.enemy, &"crypt_mite", "crypt mites")
+	check_equal([mites.burst_for(1), mites.burst_for(4)], [4, 10], "4 + 2 a player at once")
+	check_equal([mites.wave_for(1), mites.wave_for(4)], [2, 5], "2 + 1 a player a wave")
+	check(is_equal_approx(mites.every, 10.0), "every 10 s")
+	check_equal([mites.cap_for(1), mites.cap_for(4)], [6, 12], "at most 6 + 2 a player alive")
+	check_equal(mites.at, EnemyAdds.At.RING, "out of the broom, round it")
 	for cast: Dictionary in casts:
 		check(float(cast.get("wind_up", 0.0)) >= sweep.staff.wind_up, "each winds up on its own: %s" % cast.get("wind_up"))
+
+
+func test_its_health_by_players() -> void:
+	check(is_equal_approx(BROOM.health_per_player, 0.7), "0.7 of its health more for each player after the first")
+	check(is_equal_approx(BROOM.health_for(4), BROOM.max_health * 3.1), "four players: 3.1 times")
 
 
 func test_it_enters_play_and_changes_phase() -> void:

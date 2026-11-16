@@ -56,6 +56,22 @@ func test_depleted_comes_once_with_the_killer() -> void:
 	check_equal(body.health.health, 25, "a reset brings it back")
 
 
+## Boss plan OB13: a new most keeps the health's share of it; 0 stays 0, and a most not above 0 is
+## ignored.
+func test_rescale_keeps_the_share() -> void:
+	var body: Actor = _body()
+	body.health.take(25)
+	body.health.rescale(80.0)
+	check_equal(body.health.max_health, 80.0, "the new most")
+	check_equal(body.health.health, 40.0, "half of it, as before")
+	body.health.rescale(0.0)
+	body.health.rescale(-5.0)
+	check_equal(body.health.max_health, 80.0, "a most not above 0 changes nothing")
+	body.health.take(100)
+	body.health.rescale(200.0)
+	check_equal(body.health.health, 0.0, "at 0 it stays 0")
+
+
 func test_protection_holds_for_its_time() -> void:
 	var body: Actor = _body()
 	body.health.protect(0.25)

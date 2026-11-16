@@ -262,6 +262,15 @@ signal status_requested(caster: int, target: Node, status_id: StringName, durati
 ## about to stand in the room (run generation RG5). Heard by difficulty, which scales its numbers to
 ## the room's (`Actor.stat_scale`) before its data is applied.
 signal enemy_standing(enemy: Node)
+## Sender: actor (a body's `Phases`, boss plan OB13). The body `actor` calls the adds `adds` (an
+## `EnemyAdds` of its phase in play): the phase's burst as it starts, or one of its waves (`wave`).
+## `key` says which of its entries they are (`Phases.adds_key`), for the count of those alive under
+## the entry's cap. Heard by flow, which stands them (none for a body it did not stand).
+signal adds_requested(actor: int, adds: EnemyAdds, key: int, wave: bool)
+## Sender: flow (boss plan OB13). The body `actor` dies with no hit and nobody's kill: an add whose
+## caller died crumbles. Heard by combat, which takes its health and tells its death as any other
+## (`enemy_died` with NO_PLAYER for a foe of the wizards).
+signal crumble_requested(actor: int)
 ## Sender: combat. `enemy` died; the actor `killer` landed the last hit (or NO_PLAYER). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal enemy_died(killer: int, enemy: Node, position: Vector2, shot: int)
 

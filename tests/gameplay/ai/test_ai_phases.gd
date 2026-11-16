@@ -141,3 +141,40 @@ func test_a_phase_met_during_a_possession_starts_when_it_ends() -> void:
 	check(boss.possessed_by == null, "the possession ends")
 	fx.run(boss, 1)
 	check_equal(boss.phases.current, 0, "and the phase starts then")
+
+
+## A phase's adds (boss plan OB13): asked for on the bus as it starts, each entry by its key; an entry
+## with waves again every `every` seconds of the body's own steps while the phase lasts, never while
+## it is possessed; the next phase's adds replace the last's waves.
+func test_a_phase_asks_for_its_adds_and_their_waves() -> void:
+	var data: EnemyBase = _boss()
+	var burst := EnemyAdds.new()
+	burst.enemy = &"ember_imp"
+	burst.count = 3
+	var waves := EnemyAdds.new()
+	waves.enemy = &"ember_imp"
+	waves.every = 1.0
+	waves.wave_count = 2
+	data.phases[0].adds = [burst, waves] as Array[EnemyAdds]
+	var asked: Array = []
+	fx.bus.adds_requested.connect(func(actor: int, adds: EnemyAdds, key: int, wave: bool) -> void: asked.append([actor, adds, key, wave]))
+	var boss: Actor = fx.imp(Vector2.ZERO, data)
+	boss.phases.begin(0)
+	check_equal(asked, [[boss.id, burst, Phases.adds_key(0, 0), false]], "the burst as the phase starts (the waves' entry has none)")
+	asked.clear()
+	boss.phases.step(0.5)
+	check_equal(asked.size(), 0, "no wave before its time")
+	boss.phases.step(0.5)
+	check_equal(asked, [[boss.id, waves, Phases.adds_key(0, 1), true]], "a wave after `every` seconds")
+	asked.clear()
+	boss.possessed_by = Possession.new()
+	boss.phases.step(5.0)
+	check_equal(asked.size(), 0, "nobody called while it is possessed")
+	boss.possessed_by = null
+	boss.phases.step(1.0)
+	check_equal(asked.size(), 1, "the waves go on after")
+	asked.clear()
+	boss.phases.begin(1)
+	boss.phases.step(3.0)
+	check_equal(asked.size(), 0, "the next phase, with no adds, ends the waves")
+	check(Phases.adds_key(1, 0) != Phases.adds_key(0, 1), "each phase's entries have keys of their own")

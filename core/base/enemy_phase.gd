@@ -14,6 +14,9 @@ extends Resource
 @export var profile: AIProfile = null
 ## Its stats from this phase on (boss plan OB7; null: keep the last).
 @export var stats: ActorStats = null
+## The adds it brings (boss plan OB13, `EnemyAdds`): a burst as it starts, then waves while it
+## lasts, asked of Flow by the body's `Phases` (`adds_requested`).
+@export var adds: Array[EnemyAdds] = []
 ## How it looks (null: keep).
 @export var look: PhaseLook = null
 ## Seconds it stands, protected, while it changes (0: at once).

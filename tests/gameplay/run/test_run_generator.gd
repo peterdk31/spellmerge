@@ -6,8 +6,6 @@ extends "res://tests/support/suite.gd"
 ## map; deleting any room, enemy or boss still gives a valid map or names what is missing; and the
 ## map is state (walked without problems, hashed, saved and restored by a snapshot).
 ##
-## godot --headless --path . --script res://tests/gameplay/run/test_run_generator.gd
-##
 ## The seeds take seconds a run: the runner plays the tests in processes of their own (tests/support/suite.gd):
 # unit-test-shards: 3
 

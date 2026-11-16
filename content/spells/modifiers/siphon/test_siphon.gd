@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Siphon card (content/spells/modifiers/siphon/, staffs C): each hit of the next shot gives
 ## mana back, through `mana_refund_requested`. Its combos hurt what they promise, and the mana
 ## comes back with the card and not without it.
-##
-## godot --headless --path . --script res://content/spells/modifiers/siphon/test_siphon.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

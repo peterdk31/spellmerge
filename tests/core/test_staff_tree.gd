@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The builder tree's data (docs/milestones/M2-builder-tree.md, part T3): each compiled spell
 ## knows its own card slots (`CompiledSpell.card_slots`), and `Spells.staff_view` gives every
 ## cast a `tree` of rows, depth first, built from the real cards.
-##
-## godot --headless --path . --script res://tests/core/test_staff_tree.gd
-
 const SpellsScript := preload("res://core/spells/spells.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 

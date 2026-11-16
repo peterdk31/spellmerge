@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## rule 1: works or wasted): every behaviour on every carrier either runs or is wasted with a
 ## reason a player can read, and a wasted card changes nothing else. The real cards are played on
 ## every carrier by tests/core/test_card_rules.gd; here the table itself and a few real cells.
-##
-## godot --headless --path . --script res://tests/core/test_behaviour_table.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

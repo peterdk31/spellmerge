@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## after its carrier from where that carrier is when its staff casts again, while it lives. Its
 ## combos do what they promise with the card, fail without it, and fail when the staff is cast
 ## only once: the second press is what sets it off.
-##
-## godot --headless --path . --script res://content/spells/triggers/on_recast/test_on_recast.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

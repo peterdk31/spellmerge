@@ -3,9 +3,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Runs the unit tests in parallel, as ci/build/build.sh --quick --tests does: tools/ptest.sh [jobs] [path-regex]
 #
-# Every tests/**/test_*.gd and card test (content/**/test_*.gd) is its own Godot process, side by
-# side, the longest first; one import first. The runner is ci/build/unit_tests.sh (fixed frames,
-# shards, the timed tests run again alone if they fail among the others). Needs the pinned Godot
+# Every tests/**/test_*.gd and card test (content/**/test_*.gd), the suites 8 to a Godot process
+# (TEST_BATCH), processes side by side, the longest first; one import first. The runner is
+# ci/build/unit_tests.sh (batches, fixed frames, shards, the timed tests run again alone if they fail
+# among the others). Needs the pinned Godot
 # in build/godot (run ci/build/build.sh --quick once). `jobs` defaults to the cores. Logs and
 # each run's time: build/logs/ptest/ (unit-results.txt has one line per run).
 set -u

@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## on the floor that blocks no more and stays where it is); fire on the heap or on the scattered dust
 ## blows it up (Fire · Blast · Pulse, hurting everything near) and leaves a scorch mark. The trigger's
 ## own rules: tests/gameplay/actor/test_prop_state_triggers.gd ("Touched").
-##
-## godot --headless --path . --script res://content/props/dust_heap/test_dust_heap.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")

@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## `toggle_fullscreen` switch the window between fullscreen and windowed, read from the window
 ## itself (owner, 2026-10-27: the web version must run in fullscreen). The window is faked:
 ## headless has none.
-##
-## godot --headless --path . --script res://tests/core/test_display.gd
-
 const DisplayScript := preload("res://core/display/display.gd")
 
 var _mode: int = DisplayServer.WINDOW_MODE_WINDOWED

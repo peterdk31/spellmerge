@@ -7,9 +7,6 @@ extends "res://tests/support/suite.gd"
 ## is the run's state, 1 again at every run's start, so the hub and the sandbox scale nothing; and in
 ## play, a pinned run of copies of the crypt arena (tests/support/pinned_run.gd) scaled by depth and
 ## players stands each room's enemies at the room's scale, deeper rooms harder.
-##
-## godot --headless --path . --script res://tests/gameplay/difficulty/test_difficulty.gd
-
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")

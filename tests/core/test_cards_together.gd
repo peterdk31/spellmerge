@@ -4,10 +4,6 @@ extends "res://tests/support/card_rig.gd"
 ## levels deep, the three first triggers mixed, and the per-step fire cap with real triggers.
 ## Each card's own test is in its folder (content/spells/<kind>s/<id>/test_<id>.gd); these use the
 ## first cards (bolt, nova, rune, split, pierce, on hit, on expire, timer, on wall) as examples.
-##
-## godot --headless --path . --script res://tests/core/test_cards_together.gd
-
-
 func before_each() -> void:
 	super()
 	_seat_wizards()

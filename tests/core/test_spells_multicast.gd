@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## (the same way for the same cast), burst fires a group again and again, echo fires a carrier
 ## once more at half damage, and mirror also fires it backwards. It runs a real projectile
 ## manager and event bus, stepped by hand, with cards built in code.
-##
-## godot --headless --path . --script res://tests/core/test_spells_multicast.gd
-
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

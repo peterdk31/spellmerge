@@ -1,9 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the glyph widget (hud/widgets/action_glyph.gd): the button of an
 ## action is drawn for the controller the player holds, and it changes live when that changes.
-##
-## godot --headless --path . --script res://tests/hud/test_action_glyph.gd
-
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const GlyphsScript := preload("res://core/input/input_glyphs.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")

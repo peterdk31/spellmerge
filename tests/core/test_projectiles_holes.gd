@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## against the ground and the holes merged (`slide_body`), a crossing move against the ground alone;
 ## shots, rays, the walls' checks and a body's room to stand (`circle_blocked`) never see a hole; a
 ## wall over a hole wins (`is_hole`). The manager is stepped by hand.
-##
-## godot --headless --path . --script res://tests/core/test_projectiles_holes.gd
-
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 

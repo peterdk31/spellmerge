@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## under its node, four players building at once, a rebuild mid-flight, the generation ring
 ## wrapping and revoking. It uses cards built in code and a stand-in registry, so no content is
 ## needed. The compiler's own rules are in test_staff_compiler.gd.
-##
-## godot --headless --path . --script res://tests/core/test_spell_tags.gd
-
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 
 const SpellsScript := preload("res://core/spells/spells.gd")

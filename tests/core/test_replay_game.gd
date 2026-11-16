@@ -21,7 +21,7 @@ var _run: ReplayRun
 
 
 func before_each() -> void:
-	_run = ReplayRun.new(self)
+	_run = ReplayRun.new(tree)
 	_run.ticks = TICKS
 
 

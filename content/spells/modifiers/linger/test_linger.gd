@@ -1,9 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The Linger card (content/spells/modifiers/linger/, staffs C): the next shot stops mid-air for a second, then goes on. Each of its combos does
 ## what it promises with the card and fails without it.
-##
-## godot --headless --path . --script res://content/spells/modifiers/linger/test_linger.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/support/suite.gd"
 ## The exactness test of the projectile step (shots stepped by behaviour, 2026-10-28): one busy,
 ## mixed scene stepped by hand, compared line by line with a recording of what the step did before
 ## it was split into passes (`fixtures/projectile_step/expected.json`, recorded on main c900bd4;
@@ -53,19 +53,17 @@ extends SceneTree
 ## test at the first step that differs.
 ##
 ## A change that is meant to change what shots do records the scene again and says why in its PR:
-##     godot --headless --path . --script res://tests/core/test_projectiles_step_exact.gd -- --record
-## prints the new JSON (between the RECORD lines) to paste into the fixture. `-- --full` prints the
+##     godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_step_exact.gd --record
+## prints the new JSON (between the RECORD lines) to paste into the fixture. `--full` prints the
 ## events and states in place of the digests: run it on both versions and diff the two to see
-## what changed.
+## what changed. With either, nothing is compared.
 ##
-## The scene runs twice: with the native kernel (`Projectiles.native`, native/README.md) and with
-## the GDScript it stands for, and each run is compared with the recording, so the two step alike to
-## the bit. Without the native module only the GDScript runs (the test says so); with
-## SPELLMERGE_NATIVE=required in the environment (ci/build/build.sh sets it after building the
-## module) its absence fails the test. `-- --record` and `-- --full` run the GDScript (`-- --native`:
-## the native kernel).
-##
-## godot --headless --path . --script res://tests/core/test_projectiles_step_exact.gd
+## Two tests, each a run of the scene on a fresh manager: one steps it with the GDScript, one with
+## the native kernel it stands for (`Projectiles.native`, native/README.md), and each run is
+## compared with the recording, so the two step alike to the bit. Without the native module the
+## native test only says so; with SPELLMERGE_NATIVE=required in the environment (ci/build/build.sh
+## sets it after building the module) its absence fails it. `--record` and `--full` print the
+## GDScript's run (with `--native` as well: the native kernel's).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -88,7 +86,6 @@ const TAG_CHILD: int = 3
 const TAG_KIT: int = 4
 const TAG_ENEMY: int = 5
 
-var _failures: Array[String] = []
 var _bus: EventsScript
 var _mgr: ManagerScript
 var _table: ActorSeats.ActorsScript
@@ -101,81 +98,65 @@ var _children: int = 0
 var _log: PackedStringArray = PackedStringArray()
 var _events: PackedStringArray = PackedStringArray()
 var _full: bool = false
-## Whether this run steps with the native kernel.
-var _native: bool = false
 
 
-func _initialize() -> void:
-	await process_frame
-	var args: PackedStringArray = OS.get_cmdline_user_args()
-	_full = args.has("--full")
-	if args.has("--record") or _full:
-		_native = args.has("--native")
-		_run_scene()
-		if _full:
-			print("\n".join(_log))
-		else:
-			print("RECORD BEGIN")
-			print(JSON.stringify({"lines": _log}, "\t"))
-			print("RECORD END")
-		_teardown()
-		quit(0)
+func test_the_gdscript_step_matches_the_recording() -> void:
+	if _printing():
+		if not OS.get_cmdline_user_args().has("--native"):
+			_print_scene(false)
 		return
-	_native = false
-	_run_scene()
-	_compare()
-	_teardown()
-	if NativeScript.loaded():
-		_native = true
-		_run_scene()
-		_check(_mgr.is_native(), "the native run steps with the native kernel")
-		_compare()
-		_teardown()
-	elif OS.get_environment("SPELLMERGE_NATIVE") == "required":
-		_failures.append("SPELLMERGE_NATIVE=required, but the native module is not loaded (ci/build/native.sh)")
-	else:
+	_run_scene(false)
+	_compare(false)
+
+
+func test_the_native_step_matches_the_recording() -> void:
+	if _printing():
+		if OS.get_cmdline_user_args().has("--native"):
+			_print_scene(true)
+		return
+	if not NativeScript.loaded():
+		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "SPELLMERGE_NATIVE=required, but the native module is not loaded (ci/build/native.sh)")
 		print("NOTE: the native module is not built; only the GDScript step was compared")
-	if _failures.is_empty():
-		print("TEST OK: core/projectiles step exactness")
-		quit(0)
+		return
+	_run_scene(true)
+	check(_mgr.is_native(), "the native run steps with the native kernel")
+	_compare(true)
+
+
+## Whether this run records the scene (`--record`) or prints it in full (`--full`) instead of
+## comparing it.
+func _printing() -> bool:
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	return args.has("--record") or args.has("--full")
+
+
+func _print_scene(native: bool) -> void:
+	_full = OS.get_cmdline_user_args().has("--full")
+	_run_scene(native)
+	if _full:
+		print("\n".join(_log))
 	else:
-		for failure in _failures:
-			printerr("TEST FAILED: " + failure)
-		quit(1)
+		print("RECORD BEGIN")
+		print(JSON.stringify({"lines": _log}, "\t"))
+		print("RECORD END")
 
 
-func _compare() -> void:
+func _compare(native: bool) -> void:
 	var file: FileAccess = FileAccess.open(EXPECTED_PATH, FileAccess.READ)
 	if file == null:
-		_failures.append("no recording at " + EXPECTED_PATH)
+		check(false, "no recording at " + EXPECTED_PATH)
 		return
 	var data: Variant = JSON.parse_string(file.get_as_text())
 	if not data is Dictionary or not (data as Dictionary).get("lines") is Array:
-		_failures.append("the recording is not {\"lines\": [...]}")
+		check(false, "the recording is not {\"lines\": [...]}")
 		return
 	var expected: Array = (data as Dictionary)["lines"]
-	_check(_log.size() == STEPS, "a line for every step (%d)" % _log.size())
+	check_equal(_log.size(), STEPS, "a line for every step")
 	for i in mini(expected.size(), _log.size()):
 		if str(expected[i]) != _log[i]:
-			_failures.append(("native: " if _native else "") + "step %d differs (run with -- --full on both versions and diff):\n  expected %s\n  got      %s" % [i, expected[i], _log[i]])
+			check(false, ("native: " if native else "") + "step %d differs (run with --full on both versions and diff):\n  expected %s\n  got      %s" % [i, expected[i], _log[i]])
 			return
-	_check(expected.size() == _log.size(), "as many lines as recorded (%d, recorded %d)" % [_log.size(), expected.size()])
-
-
-func _check(condition: bool, message: String) -> void:
-	if not condition:
-		_failures.append(message)
-
-
-func _teardown() -> void:
-	for node in _targets + _wizards:
-		if is_instance_valid(node):
-			node.free()
-	_targets.clear()
-	_wizards.clear()
-	for node: Node in [_mgr, _bus, _table]:
-		if node != null and is_instance_valid(node):
-			node.free()
+	check_equal(_log.size(), expected.size(), "as many lines as recorded")
 
 
 func _f(value: float) -> String:
@@ -194,15 +175,19 @@ func _name_of(node: Variant) -> String:
 	return (node as Node).name
 
 
-func _run_scene() -> void:
+## Builds the scene on a fresh manager (owned: the suite frees it all after the test) and steps
+## it, a line in `_log` for each step; `native` picks the kernel.
+func _run_scene(native: bool) -> void:
 	_log.clear()
 	_events.clear()
 	_hits_on.clear()
+	_wizards.clear()
+	_targets.clear()
 	_children = 0
-	_bus = EventsScript.new()
-	_mgr = ManagerScript.new()
-	_mgr.native = _native
-	_table = ActorSeats.table()
+	_bus = own(EventsScript.new()) as EventsScript
+	_mgr = own(ManagerScript.new()) as ManagerScript
+	_mgr.native = native
+	_table = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_imp = ActorSeats.enemy(_table)
 	_mgr.actors = _table
 	_mgr.events = _bus
@@ -245,7 +230,7 @@ func _run_scene() -> void:
 
 
 func _add_body(name: String, at: Vector2, radius: float, layer: int, owner: int) -> Node2D:
-	var node := Node2D.new()
+	var node := own(Node2D.new()) as Node2D
 	node.name = name
 	root.add_child(node)
 	node.global_position = at

@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## A body shows the hit looks of at most `PER_BODY` hits of one staff a frame (gameplay/feel/
 ## body_looks.gd; owner, 2026-11-07): each staff counts apart, the next frame counts again, and a
 ## frame of many bodies keeps every body's count when the table grows.
-##
-## godot --headless --path . --script res://tests/gameplay/feel/test_body_looks.gd
-
 const BodyLooks := preload("res://gameplay/feel/body_looks.gd")
 
 

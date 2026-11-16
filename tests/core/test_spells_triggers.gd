@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## its trigger allows, and a `relay` shot that hits an actor takes on that actor's last infusion
 ## (owner, 2026-10-28; `on ally` is gone). It runs a real projectile manager and event bus,
 ## stepped by hand, with cards built in code, and a table of four wizards at actor ids 0-3.
-##
-## godot --headless --path . --script res://tests/core/test_spells_triggers.gd
-
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

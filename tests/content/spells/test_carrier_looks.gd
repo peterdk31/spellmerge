@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## `shown_cue`, `impact_cue` and `end_cue`; S6 2): every cue it names is a cue file (content/cues/),
 ## and its looks have no problems. Which cue each card's moments play, and a wall's stones, are in
 ## each card's own test (content/spells/carriers/<id>/test_<id>.gd).
-##
-## godot --headless --path . --script res://tests/content/spells/test_carrier_looks.gd
-
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 var registry: RegistryScript

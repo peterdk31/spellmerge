@@ -1,9 +1,5 @@
 extends "res://tests/support/card_rig.gd"
 ## The Homing card (content/spells/modifiers/homing/, M2 part 12): the shot curves toward a target beside its aim, a beam aims at one near its line; nothing without a target. Homing on every carrier card: test_homing_carriers.gd.
-##
-## godot --headless --path . --script res://content/spells/modifiers/homing/test_homing.gd
-
-
 func test_the_card_is_homing() -> void:
 	_check_card(&"homing", 2)
 	check_equal(_modifier(&"homing").behaviour, ModifierBase.Behaviour.HOMING, "it homes")

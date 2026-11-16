@@ -1,8 +1,6 @@
 extends SceneTree
 ## Tests for tests/benchmark/probe.gd: it counts frames, finds the percentile, and
 ## reports without failing.
-##
-## godot --headless --path . --script res://tests/benchmark/test_probe.gd
 
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")

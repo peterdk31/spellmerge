@@ -7,9 +7,6 @@ extends "res://tests/support/suite.gd"
 ## are wasted. Which cards do something on it follows from its yes/no answers and what each card
 ## needs, as on any carrier; tests/core/test_card_rules.gd plays every card on it, on you and in a
 ## payload.
-##
-## godot --headless --path . --script res://content/spells/carriers/pulse/test_pulse.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

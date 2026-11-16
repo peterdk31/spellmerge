@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## shot hits every body but its caster's own. The wizards here sit at ids that are not their
 ## seats (enemies at 0-6, wizards at 7-10 seated 0-3), so no test passes by a seat number
 ## standing in for an id. The manager is stepped by hand.
-##
-## godot --headless --path . --script res://tests/core/test_projectiles_actors.gd
-
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const SpellTagScript := preload("res://core/spells/spell_tag.gd")

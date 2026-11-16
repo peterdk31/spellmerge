@@ -1,412 +1,577 @@
-extends SceneTree
-## Tests for the entity kit (staffs B5, gameplay/ai/entities.gd and its use in ai.gd): decoys
-## (actors that aim themselves) that enemies chase when nearest and shoot down, familiars that circle their wizard (they cast nothing
-## themselves: core/spells fires their triggers, rules R4 F3), the per-player cap, ending by tag, quiet clears, swap moves, and four
-## players at once. Time moves by fixed binary-fraction deltas.
-##
-## godot --headless --path . --script res://tests/gameplay/ai/test_entities.gd
+extends "res://tests/support/suite.gd"
+## The entity kit (staffs B5, gameplay/ai/entities.gd and its use in ai.gd): decoys (actors that
+## aim themselves) that enemies chase when nearest and shoot down, familiars that circle their
+## wizard (they cast nothing themselves: core/spells fires their triggers, rules R4 F3), the
+## per-player cap, ending by tag, quiet clears, swap moves, and four players at once. Each test
+## builds its own small world (ai_fixture.gd, with as many wizards as it needs) and an Entities on
+## it, in the tree so the decoys are projectile targets at their real positions; `after_each` frees
+## both. Time moves by fixed binary-fraction steps. Enemies' own decoys and familiars are
+## test_ai_entities.gd's.
 
 const AiFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
-const EventsScript := preload("res://core/events/events.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 const STEP: float = 0.0625
 const TAG: int = 1 << 20
 
-var _failures: Array[String] = []
-var _world: AiFixture = null
-var _entities: EntitiesScript = null
+var world: AiFixture = null
+var entities: EntitiesScript = null
 ## Every entity_ended as [caster, kind, position, tag] (the owner's actor id; the fixture's
 ## wizards are the actors 0-3, seated 0-3).
-var _ended: Array[Array] = []
+var ended: Array[Array] = []
 
 
-func _initialize() -> void:
-	await process_frame
-	_test_a_decoy_is_chased_when_it_is_the_nearest()
-	_test_a_decoy_aims_at_the_nearest_foe()
-	_test_enemy_shots_break_a_decoy()
-	_test_a_decoy_belongs_to_its_owner_and_breaks_when_its_health_is_gone()
-	_test_decoy_runs_out()
-	_test_decoy_copies_its_wizard()
-	_test_a_decoy_is_placed_again()
-	_test_a_decoy_placed_again_aims_the_way_it_was_placed()
-	_test_familiar_circles_its_wizard()
-	_test_a_familiar_from_a_trigger_circles_the_shot_then_where_it_ended()
-	_test_cap_ends_the_oldest()
-	_test_end_requested_by_tag()
-	_test_held_entity_lasts()
-	_test_room_and_run_clear_quietly()
-	_test_four_players_keep_their_own()
-	_test_bad_requests_are_ignored()
-	_test_swap_moves_only_the_named_enemy()
-	_test_a_familiar_is_drawn_by_its_cards_look()
-	_teardown()
-	if _failures.is_empty():
-		print("TEST OK: gameplay/ai entities (decoys, familiars, swap)")
-		quit(0)
-	else:
-		for failure in _failures:
-			printerr("TEST FAILED: " + failure)
-		quit(1)
+func after_each() -> void:
+	if entities != null and is_instance_valid(entities):
+		entities.free()
+	entities = null
+	if world != null:
+		world.free_all()
+	world = null
+	ended.clear()
 
 
-func _check(condition: bool, message: String) -> void:
-	if not condition:
-		_failures.append(message)
-
-
+## A world of `player_count` wizards and Entities on it.
 func _setup(player_count: int = 1) -> void:
-	_teardown()
-	_world = AiFixture.new(root, player_count)
-	_entities = EntitiesScript.new()
-	_entities.events = _world.bus
-	_entities.projectiles = _world.projectiles
-	_entities.spells = _world.spells
-	_entities.actors = _world.actors
-	_entities.combat = _world.combat
+	world = AiFixture.new(root, player_count)
+	entities = EntitiesScript.new()
+	entities.events = world.bus
+	entities.projectiles = world.projectiles
+	entities.spells = world.spells
+	entities.actors = world.actors
+	entities.combat = world.combat
 	# In the tree, so the decoys are projectile targets at their real positions.
-	root.add_child(_entities)
-	_ended.clear()
-	_world.bus.entity_ended.connect(func(player: int, kind: StringName, at: Vector2, tag: int) -> void:
-		_ended.append([player, kind, at, tag]))
-
-
-func _teardown() -> void:
-	if _entities != null and is_instance_valid(_entities):
-		_entities.free()
-	_entities = null
-	if _world != null:
-		_world.free_all()
-	_world = null
+	root.add_child(entities)
+	world.bus.entity_ended.connect(func(player: int, kind: StringName, at: Vector2, tag: int) -> void:
+		ended.append([player, kind, at, tag]))
 
 
 ## An imp of the fixture (an actor) whose AI asks these Entities for decoys.
 func _imp(at: Vector2) -> Actor:
-	_world.entities = _entities
-	return _world.imp(at)
-
-
-## A still enemy as the projectile manager knows one (a target on LAYER_ENEMY), in the tree.
-func _enemy_target(at: Vector2) -> Node2D:
-	var enemy := Node2D.new()
-	enemy.position = at
-	_entities.add_child(enemy)
-	_world.projectiles.add_target(enemy, 10.0, ProjectileManagerScript.LAYER_ENEMY)
-	return enemy
+	world.entities = entities
+	return world.imp(at)
 
 
 func _spawn(caster: int, kind: StringName, at: Vector2, seconds: float = 5.0, tag: int = TAG) -> void:
-	_world.bus.entity_spawn_requested.emit(caster, kind, at, seconds, tag, -1)
+	world.bus.entity_spawn_requested.emit(caster, kind, at, seconds, tag, -1)
 
 
 ## `count` physics frames of the whole world: every imp, Combat, the projectiles, Spells (the
 ## imps cast their staffs), the entities.
 func _run(count: int) -> void:
 	for i in count:
-		for enemy in _world.enemies:
+		for enemy in world.enemies:
 			if is_instance_valid(enemy):
 				enemy.step(STEP)
 				enemy.position += enemy.velocity * STEP
-		_world.combat.step(STEP)
-		_world.projectiles.step(STEP)
-		_world.spells.call("step", STEP)
-		_entities.step(STEP)
+		world.combat.step(STEP)
+		world.projectiles.step(STEP)
+		world.spells.call("step", STEP)
+		entities.step(STEP)
 
 
-# --- Tests ------------------------------------------------------------------
+## The first wizard's decoy at the origin, its wizard far off; null (a failure) if none was made.
+func _decoy() -> Actor:
+	_setup(1)
+	world.players[0].position = Vector2(-400.0, 0.0)
+	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
+	var decoy: Actor = entities.decoy_of(0)
+	check(decoy != null, "a decoy is made")
+	return decoy
+
+
+# --- Decoys as targets -----------------------------------------------------------------------
 
 ## No lure (owner, 2026-11-02): a decoy is an actor of its owner's team, chased when it is the
 ## nearest, as any.
-func _test_a_decoy_is_chased_when_it_is_the_nearest() -> void:
+func test_an_imp_nearer_the_decoy_chases_the_decoy() -> void:
 	_setup(1)
-	_world.players[0].position = Vector2(60.0, 0.0)
+	world.players[0].position = Vector2(60.0, 0.0)
 	_spawn(0, EntitiesScript.DECOY, Vector2(-30.0, 0.0))
 	var imp: Actor = _imp(Vector2.ZERO)
 	_run(1)
-	_check(AiFixture.ai(imp).target == _entities.decoy_of(0), "an imp nearer the decoy chases the decoy")
-	_check(imp.aim.x < 0.0, "and turns on it")
-	_world.bus.room_entered.emit(&"next")
+	check(AiFixture.ai(imp).target == entities.decoy_of(0), "an imp nearer the decoy chases the decoy")
+	check(imp.aim.x < 0.0, "it turns on the decoy")
+
+
+func test_a_nearer_wizard_is_chased_before_a_decoy_farther_off() -> void:
+	_setup(1)
+	world.players[0].position = Vector2(60.0, 0.0)
 	_spawn(0, EntitiesScript.DECOY, Vector2(-150.0, 0.0))
-	var other: Actor = _imp(Vector2(10.0, 0.0))
+	var imp: Actor = _imp(Vector2(10.0, 0.0))
 	_run(1)
-	_check(AiFixture.ai(other).target == _world.players[0], "a nearer wizard is chased before a decoy farther off")
+	check(AiFixture.ai(imp).target == world.players[0], "a nearer wizard is chased before a decoy farther off")
+
+
+func test_a_decoy_is_an_unseated_actor_of_its_owners_team() -> void:
+	var decoy: Actor = _decoy()
+	if decoy == null:
+		return
+	check(decoy.is_inside_tree(), "a decoy is an actor in the world")
+	check(decoy.home_controller is DecoyController, "driven by its own controller")
+	check_equal(world.actors.team_of(decoy.id), world.actors.team_of(0), "on its owner's team")
+	check_equal(world.actors.seat_of(decoy.id), -1, "no seat drives it")
 
 
 ## The decoy aims itself at the nearest actor of another team, and turns when another comes nearer.
-func _test_a_decoy_aims_at_the_nearest_foe() -> void:
-	_setup(1)
-	_world.players[0].position = Vector2(-400.0, 0.0)
-	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
-	var decoy: Actor = _entities.decoy_of(0)
-	_check(decoy != null and decoy.is_inside_tree(), "a decoy is an actor in the world")
+func test_a_decoy_aims_at_the_nearest_foe() -> void:
+	var decoy: Actor = _decoy()
 	if decoy == null:
 		return
-	_check(decoy.home_controller is DecoyController, "driven by its own controller")
-	_check(_world.actors.team_of(decoy.id) == _world.actors.team_of(0), "on its owner's team")
-	_check(_world.actors.seat_of(decoy.id) == -1, "no seat drives it")
 	_imp(Vector2(0.0, 120.0))
 	_run(1)
-	_check(decoy.aim.dot(Vector2.DOWN) > 0.99, "it aims at the imp below it (%s)" % decoy.aim)
+	check(decoy.aim.dot(Vector2.DOWN) > 0.99, "it aims at the imp below it (%s)" % decoy.aim)
+
+
+func test_a_decoy_turns_to_a_nearer_foe_once_it_looks_again() -> void:
+	var decoy: Actor = _decoy()
+	if decoy == null:
+		return
+	_imp(Vector2(0.0, 120.0))
+	_run(1)
 	_imp(Vector2(-60.0, 0.0))
 	_run(int(AIBrain.RETARGET_TIME / STEP) + 1)
-	_check(decoy.aim.dot(Vector2.LEFT) > 0.99, "and at a nearer one once it looks again (%s)" % decoy.aim)
-	_check(decoy.global_position.is_equal_approx(Vector2.ZERO), "a decoy whose card does not home stands")
+	check(decoy.aim.dot(Vector2.LEFT) > 0.99, "it aims at a nearer one once it looks again (%s)" % decoy.aim)
 
 
-func _test_enemy_shots_break_a_decoy() -> void:
+func test_a_decoy_whose_card_does_not_home_stands() -> void:
+	var decoy: Actor = _decoy()
+	if decoy == null:
+		return
+	_imp(Vector2(0.0, 120.0))
+	_run(int(AIBrain.RETARGET_TIME / STEP) + 2)
+	check(decoy.global_position.is_equal_approx(Vector2.ZERO), "the decoy stands where it was put")
+
+
+# --- Decoys break ----------------------------------------------------------------------------
+
+## A decoy 80 px from an imp, its wizard far off, shot at for 30 seconds; the decoy and the imp.
+func _shot_down() -> Array[Actor]:
 	_setup(1)
-	_world.players[0].position = Vector2(5000.0, 0.0)
+	world.players[0].position = Vector2(5000.0, 0.0)
 	_spawn(0, EntitiesScript.DECOY, Vector2(80.0, 0.0), 60.0)
-	var decoy: Actor = _entities.decoy_of(0)
+	var decoy: Actor = entities.decoy_of(0)
 	var imp: Actor = _imp(Vector2.ZERO)
 	_run(int(30.0 / STEP))
-	_check(_ended.size() == 1, "the decoy breaks once after enemy shots, got %d ends" % _ended.size())
-	if _ended.size() == 1:
-		_check(_ended[0][0] == 0 and _ended[0][1] == EntitiesScript.DECOY and _ended[0][3] == TAG, "entity_ended names the player, the kind and the tag")
-		# A body like any: the hits push it (its Mover), so it ends where the last one left it.
-		_check(decoy != null and (_ended[0][2] as Vector2).is_equal_approx(decoy.global_position), "a decoy ends where it stood when it broke (%s)" % _ended[0][2])
-	_check(_entities.count() == 0, "the broken decoy is gone")
+	return [decoy, imp]
+
+
+func test_enemy_shots_break_a_decoy_once() -> void:
+	_shot_down()
+	check_equal(ended.size(), 1, "the decoy breaks once after enemy shots")
+	check_equal(entities.count(), 0, "the broken decoy is gone")
+
+
+func test_a_decoy_broken_by_shots_ends_naming_its_owner_kind_tag_and_place() -> void:
+	var decoy: Actor = _shot_down()[0]
+	check_equal(ended.size(), 1, "one end")
+	if ended.size() != 1:
+		return
+	check(ended[0][0] == 0 and ended[0][1] == EntitiesScript.DECOY and ended[0][3] == TAG, "entity_ended names the player, the kind and the tag")
+	# A body like any: the hits push it (its Mover), so it ends where the last one left it.
+	check(decoy != null and (ended[0][2] as Vector2).is_equal_approx(decoy.global_position), "a decoy ends where it stood when it broke (%s)" % ended[0][2])
+
+
+func test_the_imp_goes_back_to_the_wizard_once_the_decoy_breaks() -> void:
+	var imp: Actor = _shot_down()[1]
 	_run(2)
-	_check(AiFixture.ai(imp).target == _world.players[0], "the imp goes back to the wizard once the decoy breaks")
+	check(AiFixture.ai(imp).target == world.players[0], "the imp goes back to the wizard once the decoy breaks")
 
 
 ## It belongs to its owner: the owner's shots pass it (its hurt circle is the owner's target), every
-## other actor's hurt it (actors G3c). It breaks when its health is gone, quietly for Combat: no kill.
-func _test_a_decoy_belongs_to_its_owner_and_breaks_when_its_health_is_gone() -> void:
+## other actor's hurt it (actors G3c).
+func test_a_decoys_hurt_circle_is_its_owners() -> void:
 	_setup(2)
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
-	var decoy: Actor = _entities.decoy_of(0)
+	var decoy: Actor = entities.decoy_of(0)
+	check(decoy != null and world.projectiles.target_owner_of(decoy) == 0, "its hurt circle is owned by its owner, whose shots pass it")
+
+
+func test_combat_knows_a_decoy_with_its_health() -> void:
+	_setup(2)
+	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
+	var decoy: Actor = entities.decoy_of(0)
+	check(decoy != null and is_equal_approx(world.combat.health_of(decoy), EntitiesScript.DECOY_HEALTH), "Combat knows it with DECOY_HEALTH")
+
+
+func test_a_decoy_holds_until_its_health_is_gone() -> void:
+	_setup(2)
+	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
+	var decoy: Actor = entities.decoy_of(0)
 	if decoy == null:
-		_check(false, "a decoy")
+		check(false, "a decoy")
 		return
-	_check(_world.projectiles.target_owner_of(decoy) == 0, "its hurt circle is owned by its owner, whose shots pass it")
-	_check(is_equal_approx(_world.combat.health_of(decoy), EntitiesScript.DECOY_HEALTH), "Combat knows it with DECOY_HEALTH")
-	var kills: Array[int] = [0]
-	_world.bus.kill_landed.connect(func(_by: int, _node: Node, _at: Vector2, _tag: int, _shot: int) -> void: kills[0] += 1)
-	_world.bus.enemy_died.connect(func(_by: int, _node: Node, _at: Vector2, _shot: int) -> void: kills[0] += 1)
 	decoy.health.take(EntitiesScript.DECOY_HEALTH - 1.0, 1)
 	_run(1)
-	_check(_entities.count(EntitiesScript.DECOY) == 1 and _ended.is_empty(), "it holds until its health is gone")
+	check(entities.count(EntitiesScript.DECOY) == 1 and ended.is_empty(), "it holds with health left")
 	decoy.health.take(1.0, 1)
 	_run(1)
-	_check(_entities.count() == 0 and _ended.size() == 1, "then it breaks, once")
-	_check(not decoy.is_inside_tree() and not _world.combat.is_registered(decoy), "out of the world: nothing hits or chases it")
-	_check(kills[0] == 0, "a broken decoy is no kill")
+	check(entities.count() == 0 and ended.size() == 1, "then it breaks, once")
+	check(not decoy.is_inside_tree() and not world.combat.is_registered(decoy), "out of the world: nothing hits or chases it")
 
 
-func _test_decoy_runs_out() -> void:
+## It breaks quietly for Combat: no kill.
+func test_a_broken_decoy_is_no_kill() -> void:
+	_setup(2)
+	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
+	var decoy: Actor = entities.decoy_of(0)
+	if decoy == null:
+		check(false, "a decoy")
+		return
+	var kills: Array[int] = [0]
+	world.bus.kill_landed.connect(func(_by: int, _node: Node, _at: Vector2, _tag: int, _shot: int) -> void: kills[0] += 1)
+	world.bus.enemy_died.connect(func(_by: int, _node: Node, _at: Vector2, _shot: int) -> void: kills[0] += 1)
+	decoy.health.take(EntitiesScript.DECOY_HEALTH, 1)
+	_run(1)
+	check_equal(ended.size(), 1, "it broke")
+	check_equal(kills[0], 0, "a broken decoy is no kill")
+
+
+func test_a_decoy_lasts_its_seconds_then_ends_once() -> void:
 	_setup(1)
 	_spawn(0, EntitiesScript.DECOY, Vector2(30.0, 40.0), 1.0)
-	var decoy: Actor = _entities.decoy_of(0)
 	_run(int(0.9 / STEP))
-	_check(_entities.count() == 1, "a decoy lasts its seconds")
+	check_equal(entities.count(), 1, "a decoy lasts its seconds")
 	_run(int(0.2 / STEP))
-	_check(_entities.count() == 0 and _ended.size() == 1, "and then ends, once")
-	_check(decoy != null and not AIBrain.can_target(decoy), "an ended decoy is no target")
+	check(entities.count() == 0 and ended.size() == 1, "then ends, once")
 
 
-func _test_decoy_copies_its_wizard() -> void:
+func test_a_decoy_that_ran_out_is_no_target() -> void:
 	_setup(1)
-	# The wizard is the real scene (living staffs H3): its Sprite shows a frame of its head sheet.
-	var sprite := _world.players[0].get_node("Sprite") as Sprite2D
+	_spawn(0, EntitiesScript.DECOY, Vector2(30.0, 40.0), 1.0)
+	var decoy: Actor = entities.decoy_of(0)
+	_run(int(1.1 / STEP))
+	check(decoy != null and not AIBrain.can_target(decoy), "an ended decoy is no target")
+
+
+# --- Decoys look like their wizard -----------------------------------------------------------
+
+## The first wizard's Sprite turned to another frame of its head sheet (the real scene, living
+## staffs H3), and its decoy at (10, 10).
+func _copied() -> Array:
+	_setup(1)
+	var sprite := world.players[0].get_node("Sprite") as Sprite2D
 	sprite.frame_coords = Vector2i(9, 0)
 	_spawn(0, EntitiesScript.DECOY, Vector2(10.0, 10.0))
-	var decoy: Actor = _entities.decoy_of(0)
-	_check(decoy != null and decoy.visible, "the decoy shows")
-	if decoy != null:
-		var look := decoy.get_node("Look") as DecoyLook
-		_check(look.sprite.texture == sprite.texture and look.sprite.frame == sprite.frame, "it copies the wizard's sprite and the way it points")
-		var material := look.sprite.material as ShaderMaterial
-		_check(decoy.modulate.a == 1.0 and material != null, "never see-through (the glow look): drawn by the shot shader")
-		_check((material.get_shader_parameter(&"dissolve") as float) > 0.0, "part fallen apart, so it never reads as a second wizard")
-		_check(material.get_shader_parameter(&"dissolve_color") != Color(0.957, 0.945, 0.918, 1.0), "in its player's colour")
-		_check(decoy.position.is_equal_approx(Vector2(10.0, 10.0)), "it stands where the card put it")
+	return [sprite, entities.decoy_of(0)]
 
+
+func test_a_decoy_copies_its_wizards_sprite_and_the_way_it_points() -> void:
+	var made: Array = _copied()
+	var sprite: Sprite2D = made[0]
+	var decoy: Actor = made[1]
+	check(decoy != null and decoy.visible, "the decoy shows")
+	if decoy == null:
+		return
+	var look := decoy.get_node("Look") as DecoyLook
+	check(look.sprite.texture == sprite.texture and look.sprite.frame == sprite.frame, "it copies the wizard's sprite and the way it points")
+
+
+## Never see-through (the glow look) and part fallen apart, so it never reads as a second wizard.
+func test_a_decoy_is_drawn_opaque_by_the_shot_shader_part_dissolved() -> void:
+	var decoy: Actor = _copied()[1]
+	if decoy == null:
+		check(false, "a decoy")
+		return
+	var material := (decoy.get_node("Look") as DecoyLook).sprite.material as ShaderMaterial
+	check(decoy.modulate.a == 1.0 and material != null, "never see-through: drawn by the shot shader")
+	check(material != null and (material.get_shader_parameter(&"dissolve") as float) > 0.0, "part fallen apart, so it never reads as a second wizard")
+
+
+func test_a_decoy_stands_where_the_card_put_it() -> void:
+	var decoy: Actor = _copied()[1]
+	check(decoy != null and decoy.position.is_equal_approx(Vector2(10.0, 10.0)), "it stands where the card put it")
+
+
+# --- Decoys placed again ---------------------------------------------------------------------
 
 ## A row's decoy is made new each time (online-ready N10b: nothing of an earlier decoy carries over,
 ## which no snapshot holds): the ended one is freed as its row holds the next, which is full, under a
-## fresh id.
-func _test_a_decoy_is_placed_again() -> void:
+## fresh id. The first decoy (hurt, then run out) and the next.
+func _placed_again() -> Array:
 	_setup(1)
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO, 1.0)
-	var first: Actor = _entities.decoy_of(0)
+	var first: Actor = entities.decoy_of(0)
 	if first == null:
-		_check(false, "a decoy")
-		return
+		check(false, "a decoy")
+		return [null, null]
 	first.health.take(5.0, 1)
 	_run(int(1.5 / STEP))
-	_check(_entities.count() == 0, "it ran out")
+	check_equal(entities.count(), 0, "it ran out")
 	_spawn(0, EntitiesScript.DECOY, Vector2(50.0, 0.0))
-	var again: Actor = _entities.decoy_of(0)
-	_check(again != null and again != first, "a new actor")
-	_check(not is_instance_valid(first), "the ended one is freed")
+	return [first, entities.decoy_of(0)]
+
+
+func test_a_decoy_placed_again_is_a_new_actor_in_place_of_the_freed_one() -> void:
+	var made: Array = _placed_again()
+	var first: Variant = made[0]
+	var again: Actor = made[1] as Actor
+	check(again != null and is_instance_valid(again) and again != first, "a new actor")
+	check(not is_instance_valid(first), "the ended one is freed")
+
+
+func test_a_decoy_placed_again_is_whole_in_the_world_and_hurtable() -> void:
+	var again: Actor = _placed_again()[1] as Actor
 	if again == null:
+		check(false, "the row's next decoy")
 		return
-	_check(again.is_inside_tree() and again.id >= 0 and is_equal_approx(again.health.health, EntitiesScript.DECOY_HEALTH), "in the world with an id and full health")
-	_check(_world.combat.is_registered(again), "and hurtable again")
+	check(again.is_inside_tree() and again.id >= 0, "in the world with an id")
+	check(is_equal_approx(again.health.health, EntitiesScript.DECOY_HEALTH), "with full health")
+	check(world.combat.is_registered(again), "hurtable again")
 
 
 ## A decoy placed again with no foe about aims the way it was placed, not where its row's last
 ## decoy aimed. Regression: the controller's last aim stayed in the actor's intent.
-func _test_a_decoy_placed_again_aims_the_way_it_was_placed() -> void:
-	_setup(1)
-	_world.players[0].position = Vector2(-400.0, 0.0)
-	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
-	var decoy: Actor = _entities.decoy_of(0)
+func test_a_decoy_placed_again_aims_the_way_it_was_placed() -> void:
+	var decoy: Actor = _decoy()
 	if decoy == null:
-		_check(false, "a decoy")
 		return
 	var imp: Actor = _imp(Vector2(0.0, 120.0))
 	_run(1)
-	_check(decoy.aim.dot(Vector2.DOWN) > 0.99, "it aims at the imp below it (%s)" % decoy.aim)
-	_world.bus.entity_end_requested.emit(0, TAG)
-	_world.enemies.erase(imp)
+	check(decoy.aim.dot(Vector2.DOWN) > 0.99, "it aims at the imp below it (%s)" % decoy.aim)
+	world.bus.entity_end_requested.emit(0, TAG)
+	world.enemies.erase(imp)
 	imp.free()
-	_world.players[0].position = Vector2(400.0, 0.0)
+	world.players[0].position = Vector2(400.0, 0.0)
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
 	_run(2)
-	decoy = _entities.decoy_of(0)
-	_check(decoy != null, "the row's next decoy")
+	decoy = entities.decoy_of(0)
+	check(decoy != null, "the row's next decoy")
 	if decoy == null:
 		return
-	_check(decoy.aim.dot(Vector2.LEFT) > 0.99, "with no foe it aims the way it was placed, away from its wizard (%s)" % decoy.aim)
+	check(decoy.aim.dot(Vector2.LEFT) > 0.99, "with no foe it aims the way it was placed, away from its wizard (%s)" % decoy.aim)
 
 
-func _test_familiar_circles_its_wizard() -> void:
+# --- Familiars -------------------------------------------------------------------------------
+
+## The first wizard at (100, 100) and its familiar placed 30 px to its right.
+func _familiar() -> Node2D:
 	_setup(1)
-	var wizard: Node2D = _world.players[0]
+	var wizard: Node2D = world.players[0]
 	wizard.position = Vector2(100.0, 100.0)
 	_spawn(0, EntitiesScript.FAMILIAR, wizard.position + Vector2(30.0, 0.0))
-	var centre: Vector2 = wizard.position + EntitiesScript.FAMILIAR_CENTRE
-	var first: Vector2 = _entities.positions_of(0, TAG)[0]
-	_check(is_equal_approx(first.distance_to(centre), EntitiesScript.FAMILIAR_ORBIT), "a familiar starts on its circle round the wizard")
+	return wizard
+
+
+func test_a_familiar_starts_on_its_circle_round_its_wizard() -> void:
+	var wizard: Node2D = _familiar()
+	var first: Vector2 = entities.positions_of(0, TAG)[0]
+	check(is_equal_approx(first.distance_to(wizard.position + EntitiesScript.FAMILIAR_CENTRE), EntitiesScript.FAMILIAR_ORBIT), "a familiar starts on its circle round the wizard")
+
+
+func test_a_familiar_turns_round_its_wizard() -> void:
+	var wizard: Node2D = _familiar()
+	var first: Vector2 = entities.positions_of(0, TAG)[0]
 	_run(8)
-	var later: Vector2 = _entities.positions_of(0, TAG)[0]
-	_check(not later.is_equal_approx(first) and is_equal_approx(later.distance_to(centre), EntitiesScript.FAMILIAR_ORBIT), "it turns round the wizard")
+	var later: Vector2 = entities.positions_of(0, TAG)[0]
+	check(not later.is_equal_approx(first), "it moved")
+	check(is_equal_approx(later.distance_to(wizard.position + EntitiesScript.FAMILIAR_CENTRE), EntitiesScript.FAMILIAR_ORBIT), "on its circle")
+
+
+func test_a_familiar_follows_its_wizard() -> void:
+	var wizard: Node2D = _familiar()
+	_run(8)
 	wizard.position += Vector2(200.0, 0.0)
 	_run(1)
-	var moved: Vector2 = _entities.positions_of(0, TAG)[0]
-	_check(is_equal_approx(moved.distance_to(wizard.position + EntitiesScript.FAMILIAR_CENTRE), EntitiesScript.FAMILIAR_ORBIT), "it follows the wizard")
-	# Drawn as an orbit shot by the shots' shader (the glow look): its player, the orbit kind and
-	# the bend of its circle, flying along it.
-	_check(_entities.drawn_familiars() == 1, "one familiar drawn")
-	var buffer: PackedFloat32Array = _entities._familiar_node.multimesh.buffer
+	var moved: Vector2 = entities.positions_of(0, TAG)[0]
+	check(is_equal_approx(moved.distance_to(wizard.position + EntitiesScript.FAMILIAR_CENTRE), EntitiesScript.FAMILIAR_ORBIT), "it follows the wizard")
+
+
+## Drawn as an orbit shot by the shots' shader (the glow look): the orbit kind and the bend of its
+## circle, with no flat circles of its own.
+func test_a_familiar_is_drawn_as_an_orbit_shot_bending_round_its_circle() -> void:
+	_familiar()
+	_run(8)
+	check_equal(entities.drawn_familiars(), 1, "one familiar drawn")
+	var buffer: PackedFloat32Array = entities._familiar_node.multimesh.buffer
 	var coded: float = (1.0 - buffer[15]) * ProjectileManagerScript.KIND_STEPS
-	_check(floori(coded + 0.5) == ProjectileManagerScript.KIND_ORBIT, "as an orbit shot")
-	_check(is_equal_approx(coded - ProjectileManagerScript.KIND_ORBIT, ProjectileManagerScript.bend_code(1.0 / EntitiesScript.FAMILIAR_ORBIT)), "bending round its circle")
-	_check(roundi(buffer[8] * 255.0) % 4 == 0, "in player 1's colours")
+	check_equal(floori(coded + 0.5), ProjectileManagerScript.KIND_ORBIT, "as an orbit shot")
+	check(is_equal_approx(coded - ProjectileManagerScript.KIND_ORBIT, ProjectileManagerScript.bend_code(1.0 / EntitiesScript.FAMILIAR_ORBIT)), "bending round its circle")
+	check(not entities.has_method("_draw"), "no flat circles drawn any more")
+
+
+func test_a_familiar_is_drawn_in_its_players_colours() -> void:
+	_familiar()
+	_run(8)
+	var buffer: PackedFloat32Array = entities._familiar_node.multimesh.buffer
+	check_equal(roundi(buffer[8] * 255.0) % 4, 0, "in player 1's colours")
+
+
+func test_a_familiar_is_drawn_flying_along_its_circle() -> void:
+	var wizard: Node2D = _familiar()
+	_run(8)
+	var at: Vector2 = entities.positions_of(0, TAG)[0]
+	var buffer: PackedFloat32Array = entities._familiar_node.multimesh.buffer
 	var along := Vector2(buffer[0], buffer[4]).normalized()
-	var round_about: Vector2 = (moved - (wizard.position + EntitiesScript.FAMILIAR_CENTRE)).normalized()
-	_check(absf(along.dot(round_about)) < 0.2, "flying along its circle, not out of it")
-	_check(not _entities.has_method("_draw"), "no flat circles drawn any more")
+	var round_about: Vector2 = (at - (wizard.position + EntitiesScript.FAMILIAR_CENTRE)).normalized()
+	check(absf(along.dot(round_about)) < 0.2, "flying along its circle, not out of it")
 
 
 ## A familiar a trigger made (its caster a shot) circles that shot, not the wizard; once the shot
-## is gone it circles where the shot was last.
-func _test_a_familiar_from_a_trigger_circles_the_shot_then_where_it_ended() -> void:
+## is gone it circles where the shot was last. The shot's handle.
+func _familiar_of_a_shot() -> int:
 	_setup(1)
-	_world.players[0].position = Vector2(-300.0, 0.0)
-	var shot: int = _world.projectiles.spawn(0, Vector2(100.0, 0.0), Vector2(40.0, 0.0), 2.0, 2.0, 0)
-	_world.bus.entity_spawn_requested.emit(0, EntitiesScript.FAMILIAR, Vector2(100.0, 0.0), 5.0, TAG, shot)
+	world.players[0].position = Vector2(-300.0, 0.0)
+	var shot: int = world.projectiles.spawn(0, Vector2(100.0, 0.0), Vector2(40.0, 0.0), 2.0, 2.0, 0)
+	world.bus.entity_spawn_requested.emit(0, EntitiesScript.FAMILIAR, Vector2(100.0, 0.0), 5.0, TAG, shot)
 	_run(10)
-	var at: Vector2 = _entities.positions_of(0, TAG)[0]
-	var centre: Vector2 = _world.projectiles.get_position_of(shot)
-	_check(absf(at.distance_to(centre) - EntitiesScript.FAMILIAR_ORBIT) < 4.0, "it circles the shot as it flies: %s round %s" % [at, centre])
+	return shot
+
+
+func test_a_familiar_from_a_trigger_circles_the_shot_as_it_flies() -> void:
+	var shot: int = _familiar_of_a_shot()
+	var at: Vector2 = entities.positions_of(0, TAG)[0]
+	var centre: Vector2 = world.projectiles.get_position_of(shot)
+	check(absf(at.distance_to(centre) - EntitiesScript.FAMILIAR_ORBIT) < 4.0, "it circles the shot as it flies: %s round %s" % [at, centre])
+
+
+func test_a_familiar_from_a_trigger_keeps_circling_where_the_shot_ended() -> void:
+	var shot: int = _familiar_of_a_shot()
 	_run(40)
-	_check(not _world.projectiles.is_alive(shot), "the shot is gone")
-	var last: Vector2 = _entities.positions_of(0, TAG)[0]
+	check(not world.projectiles.is_alive(shot), "the shot is gone")
+	var last: Vector2 = entities.positions_of(0, TAG)[0]
 	_run(10)
-	var later: Vector2 = _entities.positions_of(0, TAG)[0]
-	_check(not later.is_equal_approx(last) and absf(later.distance_to(Vector2(180.0, 0.0)) - EntitiesScript.FAMILIAR_ORBIT) < 6.0, "it keeps circling where the shot ended: %s" % later)
+	var later: Vector2 = entities.positions_of(0, TAG)[0]
+	check(not later.is_equal_approx(last) and absf(later.distance_to(Vector2(180.0, 0.0)) - EntitiesScript.FAMILIAR_ORBIT) < 6.0, "it keeps circling where the shot ended: %s" % later)
 
 
-func _test_cap_ends_the_oldest() -> void:
+## The familiar card's own look (docs/milestones/card-looks.md, phase 3): every familiar's orb is
+## drawn by the shader Spells answers for the familiar card as an orb, set once on the familiars'
+## batch.
+func test_a_familiar_is_drawn_by_its_cards_shader() -> void:
+	_setup()
+	var material: ShaderMaterial = entities._familiar_node.material as ShaderMaterial
+	check(material.shader == preload("res://content/spells/carriers/familiar/familiar.gdshader"), "drawn by the familiar card's shader, got %s" % material.shader.resource_path)
+
+
+## With no Spells (or no shader of its own) the plain orbit shot's.
+func test_a_familiar_with_no_spells_is_drawn_as_a_plain_orbit_shot() -> void:
+	_setup()
+	var material: ShaderMaterial = entities._familiar_node.material as ShaderMaterial
+	entities.spells = null
+	entities.use_familiar_look()
+	check(material.shader == EntitiesScript.ORBIT_SHADER, "the plain orbit shot with no Spells")
+
+
+# --- The cap, ends and clears ----------------------------------------------------------------
+
+## PER_PLAYER decoys (tags TAG and on) and a familiar for the first wizard.
+func _full_row() -> void:
 	_setup(1)
 	for i in EntitiesScript.PER_PLAYER:
 		_spawn(0, EntitiesScript.DECOY, Vector2(float(i) * 10.0, 0.0), 5.0, TAG + i)
 	_spawn(0, EntitiesScript.FAMILIAR, Vector2.ZERO, 5.0, TAG + 50)
-	_check(_ended.is_empty(), "PER_PLAYER decoys and a familiar fit")
+
+
+func test_per_player_decoys_and_a_familiar_fit() -> void:
+	_full_row()
+	check(ended.is_empty(), "PER_PLAYER decoys and a familiar fit")
+
+
+func test_one_decoy_more_ends_the_players_oldest_decoy() -> void:
+	_full_row()
 	_spawn(0, EntitiesScript.DECOY, Vector2(99.0, 0.0), 5.0, TAG + 9)
-	_check(_ended.size() == 1 and _ended[0][3] == TAG, "one more decoy ends the player's oldest decoy")
-	_check(_entities.count(EntitiesScript.DECOY, 0) == EntitiesScript.PER_PLAYER, "the player keeps PER_PLAYER decoys")
-	_check(_entities.count(EntitiesScript.FAMILIAR, 0) == 1, "the familiar is untouched")
+	check(ended.size() == 1 and ended[0][3] == TAG, "one more decoy ends the player's oldest decoy")
+	check_equal(entities.count(EntitiesScript.DECOY, 0), EntitiesScript.PER_PLAYER, "the player keeps PER_PLAYER decoys")
 
 
-func _test_end_requested_by_tag() -> void:
+func test_one_decoy_more_leaves_the_familiar() -> void:
+	_full_row()
+	_spawn(0, EntitiesScript.DECOY, Vector2(99.0, 0.0), 5.0, TAG + 9)
+	check_equal(entities.count(EntitiesScript.FAMILIAR, 0), 1, "the familiar is untouched")
+
+
+## Entities of tags TAG and TAG + 1 for player 0, and of TAG for player 1, then an end of player
+## 0's TAG asked.
+func _end_by_tag() -> void:
 	_setup(2)
 	_spawn(0, EntitiesScript.FAMILIAR, Vector2.ZERO, INF, TAG)
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO, INF, TAG)
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO, INF, TAG + 1)
 	_spawn(1, EntitiesScript.DECOY, Vector2.ZERO, INF, TAG)
-	_world.bus.entity_end_requested.emit(0, TAG)
-	_check(_ended.size() == 2, "entity_end_requested ends both entities of that player and tag")
-	_check(_entities.count() == 2, "and leaves the other tag, and the other player's same tag")
+	world.bus.entity_end_requested.emit(0, TAG)
 
 
-func _test_held_entity_lasts() -> void:
+func test_an_end_asked_by_tag_ends_every_entity_of_that_player_and_tag() -> void:
+	_end_by_tag()
+	check_equal(ended.size(), 2, "entity_end_requested ends both entities of that player and tag")
+
+
+func test_an_end_asked_by_tag_leaves_other_tags_and_players() -> void:
+	_end_by_tag()
+	check_equal(entities.count(), 2, "it leaves the other tag, and the other player's same tag")
+
+
+func test_inf_or_zero_seconds_last_until_asked_to_end() -> void:
 	_setup(1)
 	_spawn(0, EntitiesScript.FAMILIAR, Vector2.ZERO, INF)
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO, 0.0)
 	_run(int(30.0 / STEP))
-	_check(_entities.count() == 2 and _ended.is_empty(), "INF or 0 seconds last until asked to end")
+	check(entities.count() == 2 and ended.is_empty(), "INF or 0 seconds last until asked to end")
 
 
-func _test_room_and_run_clear_quietly() -> void:
+func test_a_new_room_clears_every_entity_quietly() -> void:
 	_setup(1)
 	_spawn(0, EntitiesScript.FAMILIAR, Vector2.ZERO)
 	_spawn(0, EntitiesScript.DECOY, Vector2(5.0, 0.0))
-	_world.bus.room_entered.emit(&"next")
-	_check(_entities.count() == 0 and _ended.is_empty(), "a new room clears every entity without entity_ended")
-	_check(_entities.decoy_of(0) == null, "and its decoys are gone")
+	world.bus.room_entered.emit(&"next")
+	check(entities.count() == 0 and ended.is_empty(), "a new room clears every entity without entity_ended")
+	check(entities.decoy_of(0) == null, "its decoys are gone")
+
+
+func test_the_end_of_the_run_clears_every_entity_quietly() -> void:
+	_setup(1)
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
-	_world.bus.run_ended.emit(false)
-	_check(_entities.count() == 0 and _ended.is_empty(), "so does the end of the run")
+	world.bus.run_ended.emit(false)
+	check(entities.count() == 0 and ended.is_empty(), "the end of the run clears every entity without entity_ended")
 
 
-func _test_four_players_keep_their_own() -> void:
+## Four players, each with full rows of decoys and familiars.
+func _four_full() -> void:
 	_setup(4)
 	for player in 4:
 		for i in EntitiesScript.PER_PLAYER:
 			_spawn(player, EntitiesScript.DECOY, Vector2(float(player) * 100.0, float(i)), 5.0, TAG + player)
 			_spawn(player, EntitiesScript.FAMILIAR, Vector2(float(player) * 100.0, float(i)), 5.0, TAG + player)
-	_check(_entities.count() == EntitiesScript.PLAYER_ROWS and _ended.is_empty(), "four players fill their rows without ending each other's")
+
+
+func test_four_players_fill_their_rows_without_ending_each_others() -> void:
+	_four_full()
+	check(entities.count() == EntitiesScript.PLAYER_ROWS and ended.is_empty(), "four players fill their rows without ending each other's")
+
+
+func test_a_full_pool_ends_only_the_asking_players_oldest() -> void:
+	_four_full()
 	_spawn(2, EntitiesScript.DECOY, Vector2.ZERO, 5.0, TAG + 2)
-	_check(_ended.size() == 1 and _ended[0][0] == 2, "a full pool ends only the asking player's oldest")
+	check(ended.size() == 1 and ended[0][0] == 2, "a full pool ends only the asking player's oldest")
 	for player in 4:
-		_check(_entities.count(EntitiesScript.DECOY, player) == EntitiesScript.PER_PLAYER, "player %d keeps their decoys" % (player + 1))
+		check_equal(entities.count(EntitiesScript.DECOY, player), EntitiesScript.PER_PLAYER, "player %d keeps their decoys" % (player + 1))
 
 
-func _test_bad_requests_are_ignored() -> void:
+func test_bad_requests_make_nothing() -> void:
 	_setup(1)
 	_spawn(EntitiesScript.ACTORS, EntitiesScript.DECOY, Vector2.ZERO)
 	_spawn(-1, EntitiesScript.DECOY, Vector2.ZERO)
 	_spawn(0, EntitiesScript.DECOY, Vector2(NAN, 0.0))
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO, NAN)
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO, 5.0, SpellTag.make(1, 0, 0, 1))
-	_check(_entities.count() == 0, "bad actor ids, positions and times make nothing, nor a spell tag of another caster")
+	check_equal(entities.count(), 0, "bad actor ids, positions and times make nothing, nor a spell tag of another caster")
 
 
-func _test_swap_moves_only_the_named_enemy() -> void:
+# --- Swap ------------------------------------------------------------------------------------
+
+func test_a_swap_moves_only_the_enemy_it_names() -> void:
 	_setup(1)
 	var moved: Actor = _imp(Vector2(50.0, 0.0))
 	var other: Actor = _imp(Vector2(-50.0, 0.0))
-	_world.bus.target_move_requested.emit(0, moved, Vector2(300.0, 200.0))
-	_check(moved.position.is_equal_approx(Vector2(300.0, 200.0)), "target_move_requested moves the enemy it names")
-	_check(other.position.is_equal_approx(Vector2(-50.0, 0.0)), "and no other")
-	_world.bus.target_move_requested.emit(0, moved, Vector2(INF, 0.0))
-	_check(moved.position.is_equal_approx(Vector2(300.0, 200.0)), "a move to nowhere is ignored")
+	world.bus.target_move_requested.emit(0, moved, Vector2(300.0, 200.0))
+	check(moved.position.is_equal_approx(Vector2(300.0, 200.0)), "target_move_requested moves the enemy it names")
+	check(other.position.is_equal_approx(Vector2(-50.0, 0.0)), "and no other")
 
 
-## The familiar card's own look (docs/milestones/card-looks.md, phase 3): every familiar's orb is
-## drawn by the shader Spells answers for the familiar card as an orb, set once on the familiars'
-## batch; with no Spells (or no shader of its own) the plain orbit shot's.
-func _test_a_familiar_is_drawn_by_its_cards_look() -> void:
-	_setup()
-	var material: ShaderMaterial = _entities._familiar_node.material as ShaderMaterial
-	_check(material.shader == preload("res://content/spells/carriers/familiar/familiar.gdshader"), "familiar look: drawn by the familiar card's shader, got %s" % material.shader.resource_path)
-	_entities.spells = null
-	_entities.use_familiar_look()
-	_check(material.shader == EntitiesScript.ORBIT_SHADER, "familiar look: the plain orbit shot with no Spells")
-	_teardown()
+func test_a_swap_to_nowhere_is_ignored() -> void:
+	_setup(1)
+	var moved: Actor = _imp(Vector2(50.0, 0.0))
+	world.bus.target_move_requested.emit(0, moved, Vector2(INF, 0.0))
+	check(moved.position.is_equal_approx(Vector2(50.0, 0.0)), "a move to nowhere is ignored")

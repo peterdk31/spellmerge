@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## answered with `caster_move_finished`; moves of another caster ignored; a swap that names the
 ## actor as target; a down actor standing. Ported from tests/gameplay/player/test_player_caster.gd with the same
 ## expectations, on actors driven by a scripted controller and stepped by hand.
-##
-## godot --headless --path . --script res://tests/gameplay/actor/test_actor_mover.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")

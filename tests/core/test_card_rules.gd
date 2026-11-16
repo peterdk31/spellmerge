@@ -59,8 +59,6 @@ extends "res://tests/support/suite.gd"
 ## It prints the matrix of every kind (✓ works, W wasted, ✗ silent no-op) so a PR shows coverage.
 ## Rule 2 (a card's effect survives a bounce, a jump, an echo, a payload) is not checked here yet.
 ##
-## godot --headless --path . --script res://tests/core/test_card_rules.gd
-##
 ## The runner plays it in six processes side by side (tests/support/suite.gd, "shards"):
 # unit-test-shards: 6
 

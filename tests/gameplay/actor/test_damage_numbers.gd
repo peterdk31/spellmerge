@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## circle's or a box's), the amount, the hit's element, its kind (`hit`, `heal`, `spared` for an
 ## invincible actor) and the look's own numbers. Feel's drawer is tested in
 ## tests/gameplay/feel/test_damage_number_drawer.gd.
-##
-## godot --headless --path . --script res://tests/gameplay/actor/test_damage_numbers.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ActorScript := preload("res://gameplay/actor/actor.gd")

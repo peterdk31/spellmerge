@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## (a still body is never stepped), so it zaps its pool's worth, ZAPS, and then goes dark (`spent`)
 ## for good (owner, 2026-11-12: a `refused` row, `dry`). A charge while its staff is still in the
 ## delay after its last zap is refused too, and it is simply idle again.
-##
-## godot --headless --path . --script res://content/props/arc_lodestone/test_arc_lodestone.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")

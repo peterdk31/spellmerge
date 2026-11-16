@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## A run's rules as data (run generation RG1, docs/milestones/run-generation.md, "The model"):
 ## `RunDefinition`, `MapRules`, `KindRule` and `RoomKind`, and `RunContent`'s questions, on made-up
 ## content. Every problem the validator names is named, and a sound definition has none.
-##
-## godot --headless --path . --script res://tests/core/test_run_rules.gd
-
 const MadeUpRoom := preload("res://tests/support/made_up_room.gd")
 
 const BIOME: StringName = &"cellar"

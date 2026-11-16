@@ -3,8 +3,6 @@ extends SceneTree
 ## `ci/build/build.sh --quick --tests`: all four scenarios (a web build skips the desktop one), a few
 ## seconds each. The full run is `stress.gd`.
 ##
-## godot --headless --path . --script res://tests/benchmark/test_stress.gd
-##
 ## The unit test runner plays each scenario in a process of its own (`--shard=K/N`, as
 ## tests/support/suite.gd takes it; the checks before the run are made in each):
 # unit-test-shards: 4

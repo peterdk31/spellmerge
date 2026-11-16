@@ -1,71 +1,31 @@
-extends SceneTree
-## Tests for core/base: the spell, enemy and room base resources have their M1
-## fields with safe defaults, and a saved .tres keeps the values.
-##
-## godot --headless --path . --script res://tests/core/test_base.gd
+extends "res://tests/support/suite.gd"
+## Tests for core/base: the spell, enemy and room base resources have their M1 fields with safe
+## defaults and no demo flag, and a saved .tres keeps the values (one test per resource). A room's
+## places are read from its scene (props W8a/W8c): each test builds a small layout (`_layout`, with
+## `_add_piece` for a piece of scene that carries its own places) and checks one rule of
+## `RoomPlaces.read`, `problems` or `strip`. A zone read by name, a zone with no name being a
+## problem and `strip` taking the zones out are tests/content/rooms/test_room_places.gd's.
 
-var _failures: Array[String] = []
+const SAVED: String = "user://test_base_resource.tres"
 
-
-func _initialize() -> void:
-	_test_spell()
-	_test_enemy()
-	_test_room()
-	_test_no_demo_flag()
-	_test_round_trip()
-	_test_room_round_trip()
-	_test_enemy_round_trip()
-	if _failures.is_empty():
-		print("TEST OK: core/base")
-		quit(0)
-	else:
-		for failure in _failures:
-			printerr("TEST FAILED: " + failure)
-		quit(1)
+## The prop the fixture layout's stand-ins place.
+var crate: PropBase
 
 
-func _check(condition: bool, message: String) -> void:
-	if not condition:
-		_failures.append(message)
+func before_each() -> void:
+	crate = PropBase.new()
+	crate.id = &"crate"
 
 
-func _test_spell() -> void:
-	var spell := CarrierCard.new()
-	spell.id = &"fire_bolt"
-	spell.display_name = "Fire Bolt"
-	spell.mana_cost = 5.0
-	spell.wind_down = 0.4
-	spell.base_damage = 3
-	spell.speed = 220.0
-	spell.lifetime = 1.5
-	_check(spell.id == &"fire_bolt" and spell.display_name == "Fire Bolt", "spell id and name")
-	_check(spell.mana_cost == 5.0 and spell.wind_down == 0.4, "spell cost and cooldown")
-	_check(spell.base_damage == 3 and spell.speed == 220.0 and spell.lifetime == 1.5, "spell damage, speed, lifetime")
+func after_each() -> void:
+	if FileAccess.file_exists(SAVED):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVED))
 
 
-func _test_enemy() -> void:
-	var enemy := EnemyBase.new()
-	enemy.id = &"ember_imp"
-	enemy.max_health = 8
-	enemy.move_speed = 60.0
-	enemy.contact_damage = 1
-	_check(enemy.id == &"ember_imp" and enemy.max_health == 8, "enemy id and health")
-	_check(enemy.move_speed == 60.0 and enemy.contact_damage == 1, "enemy speed and contact damage")
-	_check(enemy.scene == null, "enemy scene is empty by default")
-
-
-func _test_room() -> void:
-	var room := RoomBase.new()
-	_check(room.scene == null, "room scene is empty by default")
-	_check(room.places().player_spawns.is_empty() and room.places().zone(&"anything") == Rect2(), "no scene, no places")
-	_test_room_places()
-
-
-## A room's places are read from its scene (props W8a): markers in their holders (through a moved
-## parent), stand-ins (`PropStandIn`) with their data, zones by name; a stand-in or zone with no data is a problem,
-## and `strip` takes the editor's nodes out.
-func _test_room_places() -> void:
-	var layout := Node2D.new()
+## A layout (owned) with two player spawns in a holder moved to (100, 0), a crate's stand-in at
+## (40, 50) and a zone "stone" in a holder moved to (10, 10).
+func _layout() -> Node2D:
+	var layout: Node2D = own(Node2D.new()) as Node2D
 	var spawns := Node2D.new()
 	spawns.name = "PlayerSpawns"
 	spawns.position = Vector2(100, 0)
@@ -78,30 +38,24 @@ func _test_room_places() -> void:
 	props.name = "Props"
 	layout.add_child(props)
 	var stand_in := PropStandIn.new()
-	var data := PropBase.new()
-	data.id = &"crate"
-	stand_in.prop = data
+	stand_in.prop = crate
 	stand_in.position = Vector2(40, 50)
 	props.add_child(stand_in)
-	props.add_child(PropStandIn.new())
 	var zones := Node2D.new()
 	zones.name = "Zones"
 	zones.position = Vector2(10, 10)
 	layout.add_child(zones)
 	var rect := RoomZone.new()
-	rect.offset_left = 0
-	rect.offset_top = 0
 	rect.offset_right = 30
 	rect.offset_bottom = 20
 	rect.zone_name = &"stone"
 	zones.add_child(rect)
-	zones.add_child(RoomZone.new())
-	var places: RoomPlaces = RoomPlaces.read(layout)
-	_check(places.player_spawns == PackedVector2Array([Vector2(101, 5), Vector2(102, 5)]), "spawns through their moved holder: %s" % places.player_spawns)
-	_check(places.placed == ([data] as Array[Resource]) and places.placed_at == PackedVector2Array([Vector2(40, 50)]), "a stand-in's prop where it stands")
-	_check(places.zone(&"stone") == Rect2(10, 10, 30, 20), "a zone by name: %s" % places.zone(&"stone"))
-	_check(places.problems().size() == 2, "a stand-in with no prop and a zone with no name: %s" % places.problems())
-	# A piece of scene carries its own (props W8c): a placement and spawns deep inside it.
+	return layout
+
+
+## A piece of scene at (200, 0) in `layout` carrying its own places: an enemy spawn at (3, 4) in an
+## inner holder and a crate's stand-in at (10, 10).
+func _add_piece(layout: Node2D) -> Node2D:
 	var piece := Node2D.new()
 	piece.position = Vector2(200, 0)
 	layout.add_child(piece)
@@ -112,92 +66,208 @@ func _test_room_places() -> void:
 	marker.position = Vector2(3, 4)
 	inner.add_child(marker)
 	var deep := PropStandIn.new()
-	deep.prop = data
+	deep.name = "Deep"
+	deep.prop = crate
 	deep.position = Vector2(10, 10)
 	piece.add_child(deep)
-	places = RoomPlaces.read(layout)
-	_check(places.enemy_spawns == PackedVector2Array([Vector2(203, 4)]), "spawns at any depth: %s" % places.enemy_spawns)
-	_check(places.placed_at == PackedVector2Array([Vector2(40, 50), Vector2(210, 10)]), "placements at any depth, in the tree's order: %s" % places.placed_at)
-	_check(places.placed_of(PropBase).size() == 2 and places.placed_of(EnemyBase).is_empty(), "by kind")
-	# Places are whole translations: a place under a rotated or scaled node is a problem (its spawn
-	# and its placement), art with nothing placed under it is not.
-	piece.rotation = 0.5
-	_check(RoomPlaces.read(layout).problems().size() == 4, "the places under a rotated piece are named: %s" % RoomPlaces.read(layout).problems())
-	piece.rotation = 0.0
-	piece.scale = Vector2(-1, 1)
-	_check(RoomPlaces.read(layout).problems().size() == 4, "and under a mirrored one")
-	piece.scale = Vector2.ONE
-	var art := Sprite2D.new()
-	art.rotation = 1.0
-	art.scale = Vector2(-1, 1)
-	art.add_child(Sprite2D.new())
-	layout.add_child(art)
-	_check(RoomPlaces.read(layout).problems().size() == 2, "turned or mirrored art with no place under it is free: %s" % RoomPlaces.read(layout).problems())
-	# The room starts at (0, 0) (the world draws its bodies by their feet, the layout as one piece at
-	# its own place): a moved root is a problem, and so is a place above or left of the corner.
-	layout.position = Vector2(0, 40)
-	_check(RoomPlaces.read(layout).problems().size() == 3, "a moved root is named: %s" % RoomPlaces.read(layout).problems())
-	layout.position = Vector2.ZERO
-	piece.position = Vector2(200, -30)
-	_check(RoomPlaces.read(layout).problems().size() == 4, "a spawn and a placement above the corner, each named: %s" % RoomPlaces.read(layout).problems())
-	piece.position = Vector2(-220, 0)
-	_check(RoomPlaces.read(layout).problems().size() == 4, "and left of it: %s" % RoomPlaces.read(layout).problems())
-	piece.position = Vector2(200, 0)
-	RoomPlaces.strip(layout)
-	_check(layout.find_children("*", "RoomPlacement", true, false).is_empty() and not is_instance_valid(deep), "every placement taken out, at any depth")
-	_check(layout.find_children("*", "RoomZone", true, false).is_empty(), "every zone taken out")
-	_check(layout.get_node_or_null("PlayerSpawns") != null, "the spawns kept")
-	layout.free()
+	return piece
 
 
-func _test_no_demo_flag() -> void:
+func _problems(layout: Node2D) -> PackedStringArray:
+	return RoomPlaces.read(layout).problems()
+
+
+func _saved_and_loaded(resource: Resource) -> Resource:
+	check_equal(ResourceSaver.save(resource, SAVED), OK, "the resource saves as text")
+	return ResourceLoader.load(SAVED, "", ResourceLoader.CACHE_MODE_IGNORE)
+
+
+# The base resources.
+
+func test_a_spell_holds_its_m1_fields() -> void:
+	var spell := CarrierCard.new()
+	spell.id = &"fire_bolt"
+	spell.display_name = "Fire Bolt"
+	spell.mana_cost = 5.0
+	spell.wind_down = 0.4
+	spell.base_damage = 3
+	spell.speed = 220.0
+	spell.lifetime = 1.5
+	check(spell.id == &"fire_bolt" and spell.display_name == "Fire Bolt", "spell id and name")
+	check(spell.mana_cost == 5.0 and spell.wind_down == 0.4, "spell cost and cooldown")
+	check(spell.base_damage == 3 and spell.speed == 220.0 and spell.lifetime == 1.5, "spell damage, speed, lifetime")
+
+
+func test_a_spell_id_is_empty_by_default() -> void:
+	check_equal(CarrierCard.new().id, &"", "spell: id is empty by default")
+
+
+func test_an_enemy_holds_its_m1_fields() -> void:
+	var enemy := EnemyBase.new()
+	enemy.id = &"ember_imp"
+	enemy.max_health = 8
+	enemy.move_speed = 60.0
+	enemy.contact_damage = 1
+	check(enemy.id == &"ember_imp" and enemy.max_health == 8, "enemy id and health")
+	check(enemy.move_speed == 60.0 and enemy.contact_damage == 1, "enemy speed and contact damage")
+
+
+func test_an_enemy_scene_is_empty_by_default() -> void:
+	check(EnemyBase.new().scene == null, "enemy scene is empty by default")
+
+
+func test_a_room_scene_is_empty_by_default() -> void:
+	check(RoomBase.new().scene == null, "room scene is empty by default")
+
+
+func test_no_base_resource_has_a_demo_flag() -> void:
 	# There is no demo subset (owner, 2026-11-05): no base class carries a `demo` flag.
-	_check(not ("demo" in CarrierCard.new()), "spell: no demo flag")
-	_check(not ("demo" in EnemyBase.new()), "enemy: no demo flag")
-	_check(not ("demo" in RoomBase.new()), "room: no demo flag")
-	_check(CarrierCard.new().id == &"", "spell: id is empty by default")
+	check(not ("demo" in CarrierCard.new()), "spell: no demo flag")
+	check(not ("demo" in EnemyBase.new()), "enemy: no demo flag")
+	check(not ("demo" in RoomBase.new()), "room: no demo flag")
 
 
-func _test_round_trip() -> void:
+func test_a_saved_spell_keeps_its_values() -> void:
 	var spell := CarrierCard.new()
 	spell.id = &"fire_bolt"
 	spell.base_damage = 4
-	var path := "user://test_base_spell.tres"
-	_check(ResourceSaver.save(spell, path) == OK, "spell saves as text")
-	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as CarrierCard
-	_check(loaded != null, "spell loads back as CarrierCard")
+	var loaded: CarrierCard = _saved_and_loaded(spell) as CarrierCard
+	check(loaded != null, "spell loads back as CarrierCard")
 	if loaded != null:
-		_check(loaded.id == &"fire_bolt" and loaded.base_damage == 4, "spell keeps its values")
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+		check(loaded.id == &"fire_bolt" and loaded.base_damage == 4, "spell keeps its values")
 
 
-func _test_room_round_trip() -> void:
+func test_a_saved_room_keeps_its_values() -> void:
 	var room := RoomBase.new()
 	room.id = &"start_room"
 	room.stand_up_after = 2.5
 	room.ambient = 0.8
-	var path := "user://test_base_room.tres"
-	_check(ResourceSaver.save(room, path) == OK, "room saves as text")
-	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as RoomBase
-	_check(loaded != null, "room loads back as RoomBase")
+	var loaded: RoomBase = _saved_and_loaded(room) as RoomBase
+	check(loaded != null, "room loads back as RoomBase")
 	if loaded != null:
-		_check(loaded.id == &"start_room", "room keeps its id")
-		_check(is_equal_approx(loaded.stand_up_after, 2.5) and is_equal_approx(loaded.ambient, 0.8), "room keeps its rules")
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+		check_equal(loaded.id, &"start_room", "room keeps its id")
+		check(is_equal_approx(loaded.stand_up_after, 2.5) and is_equal_approx(loaded.ambient, 0.8), "room keeps its rules")
 
 
-func _test_enemy_round_trip() -> void:
+func test_a_saved_enemy_keeps_its_values() -> void:
 	var enemy := EnemyBase.new()
 	enemy.id = &"ember_imp"
 	enemy.max_health = 8
 	enemy.move_speed = 60.0
 	enemy.contact_damage = 2
-	var path := "user://test_base_enemy.tres"
-	_check(ResourceSaver.save(enemy, path) == OK, "enemy saves as text")
-	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as EnemyBase
-	_check(loaded != null, "enemy loads back as EnemyBase")
+	var loaded: EnemyBase = _saved_and_loaded(enemy) as EnemyBase
+	check(loaded != null, "enemy loads back as EnemyBase")
 	if loaded != null:
-		_check(loaded.id == &"ember_imp" and loaded.max_health == 8, "enemy keeps its id and health")
-		_check(loaded.move_speed == 60.0 and loaded.contact_damage == 2, "enemy keeps its speed and damage")
-		_check(loaded.scene == null, "enemy scene stays empty")
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+		check(loaded.id == &"ember_imp" and loaded.max_health == 8, "enemy keeps its id and health")
+		check(loaded.move_speed == 60.0 and loaded.contact_damage == 2, "enemy keeps its speed and damage")
+		check(loaded.scene == null, "enemy scene stays empty")
+
+
+# A room's places.
+
+func test_a_room_without_a_scene_has_no_places() -> void:
+	var places: RoomPlaces = RoomBase.new().places()
+	check(places.player_spawns.is_empty() and places.zone(&"anything") == Rect2(), "no scene, no places")
+
+
+func test_spawns_are_read_through_their_moved_holder() -> void:
+	var places: RoomPlaces = RoomPlaces.read(_layout())
+	check_equal(places.player_spawns, PackedVector2Array([Vector2(101, 5), Vector2(102, 5)]), "spawns through their moved holder")
+
+
+func test_a_stand_in_places_its_prop_where_it_stands() -> void:
+	var places: RoomPlaces = RoomPlaces.read(_layout())
+	check(places.placed == ([crate] as Array[Resource]), "the stand-in's prop is placed")
+	check_equal(places.placed_at, PackedVector2Array([Vector2(40, 50)]), "where the stand-in stands")
+
+
+func test_the_fixture_layout_has_no_problems() -> void:
+	var layout: Node2D = _layout()
+	_add_piece(layout)
+	check_equal(_problems(layout), PackedStringArray(), "the layout the other tests bend is sound")
+
+
+func test_a_stand_in_with_no_prop_is_a_problem() -> void:
+	var layout: Node2D = _layout()
+	layout.get_node(^"Props").add_child(PropStandIn.new())
+	check_equal(_problems(layout).size(), 1, "a stand-in with no prop is named: %s" % _problems(layout))
+
+
+func test_spawns_inside_a_piece_are_found_at_any_depth() -> void:
+	var layout: Node2D = _layout()
+	_add_piece(layout)
+	check_equal(RoomPlaces.read(layout).enemy_spawns, PackedVector2Array([Vector2(203, 4)]), "spawns at any depth")
+
+
+func test_placements_are_found_at_any_depth_in_tree_order() -> void:
+	var layout: Node2D = _layout()
+	_add_piece(layout)
+	check_equal(RoomPlaces.read(layout).placed_at, PackedVector2Array([Vector2(40, 50), Vector2(210, 10)]), "placements at any depth, in the tree's order")
+
+
+func test_placements_are_picked_by_kind() -> void:
+	var layout: Node2D = _layout()
+	_add_piece(layout)
+	var places: RoomPlaces = RoomPlaces.read(layout)
+	check(places.placed_of(PropBase).size() == 2 and places.placed_of(EnemyBase).is_empty(), "by kind")
+
+
+func test_places_under_a_rotated_piece_are_problems() -> void:
+	# Places are whole translations: a place under a rotated or scaled node is a problem (its spawn
+	# and its placement).
+	var layout: Node2D = _layout()
+	_add_piece(layout).rotation = 0.5
+	check_equal(_problems(layout).size(), 2, "the spawn and the placement under a rotated piece are named: %s" % _problems(layout))
+
+
+func test_places_under_a_mirrored_piece_are_problems() -> void:
+	var layout: Node2D = _layout()
+	_add_piece(layout).scale = Vector2(-1, 1)
+	check_equal(_problems(layout).size(), 2, "the spawn and the placement under a mirrored piece are named: %s" % _problems(layout))
+
+
+func test_turned_or_mirrored_art_with_no_place_under_it_is_no_problem() -> void:
+	var layout: Node2D = _layout()
+	_add_piece(layout)
+	var art := Sprite2D.new()
+	art.rotation = 1.0
+	art.scale = Vector2(-1, 1)
+	art.add_child(Sprite2D.new())
+	layout.add_child(art)
+	check_equal(_problems(layout), PackedStringArray(), "turned or mirrored art with no place under it is free")
+
+
+func test_a_moved_layout_root_is_a_problem() -> void:
+	# The room starts at (0, 0) (the world draws its bodies by their feet, the layout as one piece at
+	# its own place).
+	var layout: Node2D = _layout()
+	_add_piece(layout)
+	layout.position = Vector2(0, 40)
+	check_equal(_problems(layout).size(), 1, "a moved root is named: %s" % _problems(layout))
+
+
+func test_places_above_the_corner_are_problems() -> void:
+	var layout: Node2D = _layout()
+	_add_piece(layout).position = Vector2(200, -30)
+	check_equal(_problems(layout).size(), 2, "a spawn and a placement above the corner, each named: %s" % _problems(layout))
+
+
+func test_places_left_of_the_corner_are_problems() -> void:
+	var layout: Node2D = _layout()
+	_add_piece(layout).position = Vector2(-220, 0)
+	check_equal(_problems(layout).size(), 2, "a spawn and a placement left of the corner, each named: %s" % _problems(layout))
+
+
+func test_strip_takes_out_every_placement_at_any_depth() -> void:
+	var layout: Node2D = _layout()
+	var deep: Node = _add_piece(layout).get_node(^"Deep")
+	RoomPlaces.strip(layout)
+	check(layout.find_children("*", "RoomPlacement", true, false).is_empty(), "every placement taken out")
+	check(not is_instance_valid(deep), "the one deep in a piece too")
+
+
+func test_strip_keeps_the_spawns() -> void:
+	var layout: Node2D = _layout()
+	_add_piece(layout)
+	RoomPlaces.strip(layout)
+	check(layout.get_node_or_null(^"PlayerSpawns") != null, "the spawns kept")

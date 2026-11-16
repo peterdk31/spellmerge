@@ -1,9 +1,5 @@
 extends "res://tests/support/card_rig.gd"
 ## The Chain card (content/spells/modifiers/chain/, M2 part 12): a hit jumps on to the nearest other targets, two jumps a card, no cap.
-##
-## godot --headless --path . --script res://content/spells/modifiers/chain/test_chain.gd
-
-
 func test_the_card_is_chain() -> void:
 	_check_card(&"chain", 2)
 	check_equal(_modifier(&"chain").behaviour, ModifierBase.Behaviour.CHAIN, "it chains")

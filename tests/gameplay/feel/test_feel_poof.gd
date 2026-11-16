@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## lower end behind the hand along the aim to its tip, so a part can play anywhere on it), following the body, in the colour and cards of the new staff's first spell; a followed cue's flash moves with
 ## its body frame by frame exactly as the old poof's did, and ends when the body goes; the live cue
 ## shows something at StaffLook's swap of the body and face.
-##
-## godot --headless --path . --script res://tests/gameplay/feel/test_feel_poof.gd
-
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")

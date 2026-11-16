@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## factors and its ease, a move that still goes its whole way in its whole time whatever its steps,
 ## NONE changing nothing, a curve read from a staff's cards, those cards wasted where nothing moves
 ## along a way, and a dash moving a shot along its curve too.
-##
-## godot --headless --path . --script res://tests/core/test_move_curve.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")

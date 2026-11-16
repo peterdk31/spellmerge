@@ -8,9 +8,6 @@ extends "res://tests/support/suite.gd"
 ## the wizards are seated 0-3 at the actor ids 0-3.
 ## Hits arrive as `projectile_hit` on a test bus, with hand-made hit
 ## profiles; time moves by `Combat.step` with a fixed delta.
-##
-## godot --headless --path . --script res://tests/gameplay/combat/test_combat_enemy_spells.gd
-
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

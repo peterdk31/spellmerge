@@ -15,9 +15,6 @@ extends "res://tests/support/suite.gd"
 ## shared runner's speed is not a spell.
 ## A failure names the seed and the staff, so it can be replayed: change `SEED` or `STAFFS`, or
 ## build the staff by hand in the arena.
-##
-## godot --headless --path . --script res://tests/bots/test_spell_fuzz.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")

@@ -6,9 +6,6 @@ extends "res://tests/support/suite.gd"
 ## test bus, with hand-made hit profiles; time moves by `Combat.step` with a fixed delta. Hits name
 ## actor ids (actors G3b): the test's actor table seats the wizards 0-3 at the ids 0-3 and opens
 ## one unseated enemy actor for the enemies' spells.
-##
-## godot --headless --path . --script res://tests/gameplay/combat/test_combat_kit.gd
-
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

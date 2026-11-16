@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## cards' particles, given off from its caster's anchor back along the way it goes, from its cue
 ## until its carrier ends. They were the projectile manager's (`follow_caster`) until 2026-11-05;
 ## these are its tests, moved with it.
-##
-## godot --headless --path . --script res://tests/gameplay/feel/test_streams.gd
-
 const StreamsScript := preload("res://gameplay/feel/streams.gd")
 const BirthsScript := preload("res://gameplay/feel/births.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")

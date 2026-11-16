@@ -6,9 +6,6 @@ extends "res://tests/support/suite.gd"
 ## charges), on a swap too; and a move cast by a point (its shot is gone) moves the wizard. It runs
 ## a real projectile manager and event bus, stepped by hand, with cards built in code; the
 ## wizard's body is its anchor, moved by the test as its mover would.
-##
-## godot --headless --path . --script res://tests/core/test_spells_move_hits.gd
-
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## at a random moment while it is in reach, whatever its distance, the body the shot is about to hit too. A zap hits at half the
 ## shot's damage, with its infusions; it is a hit, so it sets off `on hit` and chains. More zap cards
 ## combine as chances (two are 75%). `slow · lightning · zap · bolt` is the lightning orb.
-##
-## godot --headless --path . --script res://content/spells/modifiers/zap/test_zap.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 ## Past the longest wait of a won zap (SpellLimits.ZAP_WAIT_MOST), short of a second roll
 ## (SpellLimits.ZAP_AGAIN).

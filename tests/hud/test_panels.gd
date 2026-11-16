@@ -1,13 +1,15 @@
-extends SceneTree
-## Tests for hud/panels and hud/theme: a panel per player index 0-3 in its own
-## colour (theme variation), health and mana shown from
-## `player_stats_changed` only, "DOWN" and "MENU" words (state is never colour alone; a
-## possession has no word: the panel stays the player's own wizard, owner 2026-10-28, tested in
-## tests/gameplay/actor/test_possess.gd), panels shown only for joined players once a room was
-## entered, four players at once without crosstalk, a corner each, and every panel fits the
-## 640x360 view.
+extends "res://tests/support/suite.gd"
+## Tests for hud/panels and hud/theme, one behaviour per test: a panel per player index 0-3 in its
+## own colour (theme variation), health and mana shown from `player_stats_changed` only, "DOWN"
+## and "MENU" words (state is never colour alone; a possession has no word: the panel stays the
+## player's own wizard, owner 2026-10-28, tested in tests/gameplay/actor/test_possess.gd), panels
+## shown only for joined players once a room was entered, four players at once without crosstalk,
+## a corner each, the hurt vignette, the ONLINE word on a seat another machine plays, and the panel
+## scripts sending no events but the player intents.
 ##
-## godot --headless --path . --script res://tests/hud/test_panels.gd
+## The theme tests read the theme alone, the panel tests make one player panel, and the HUD tests
+## make the panels scene (hud/panels/panels.tscn) on a bus, UI focus and save of their own; all of
+## it is freed after each test.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -22,358 +24,531 @@ const NO_SAVE: String = "user://test_no_save.cfg"
 const HudScript := preload("res://hud/panels/panels.gd")
 const SpellmergeTheme := preload("res://hud/theme/spellmerge_theme.tres")
 ## Panel background alpha must stay below 1 (a wizard or enemy under a corner panel shows
-## through) and at or above this floor (the 0.75 fallback in docs/DECISIONS.md is higher;
-## below 0.4 the text would stand on almost nothing). All four panel_p1-p4 boxes change together.
+## through) and at or above this floor (docs/DECISIONS.md, 2026-10-17: below 0.4 the text would
+## stand on almost nothing). All four panel_p1-p4 boxes change together.
 const PANEL_ALPHA_MIN: float = 0.4
 ## The sizes the HUD was designed with at 640x360; lowering them is a deliberate decision.
 const LABEL_SIZE_MIN: int = 12
 const BUTTON_SIZE_MIN: int = 14
 
-var _failures: Array[String] = []
+var _hud: HudScript
+var _bus: EventsScript
+var _focus: UIFocusScript
 
 
-func _initialize() -> void:
-	# The root joins the scene tree only after _initialize returns: wait one frame.
-	await process_frame
-	_test_theme_has_the_variations()
-	_test_project_uses_the_theme()
-	_test_panel_per_player()
-	_test_panel_shows_numbers()
-	_test_down_and_menu_words()
-	_test_hud_waits_for_room_and_join()
-	_test_hud_routes_to_the_right_panel()
-	_test_leave_and_rejoin_resets_the_panel()
-	_test_run_boundaries_hide_panels()
-	_test_hurt_vignette()
-	_test_vignette_with_four_players()
-	_test_hud_four_players_in_four_corners()
-	_test_hud_menu_word_follows_ui_focus()
-	_test_a_seat_played_on_another_machine_says_online()
-	_test_bad_indices_are_ignored()
-	_test_hud_sends_no_events()
-	if _failures.is_empty():
-		print("TEST OK: hud/panels and hud/theme")
-		quit(0)
-	else:
-		for failure in _failures:
-			printerr("TEST FAILED: " + failure)
-		quit(1)
+func before_each() -> void:
+	_hud = null
+	_bus = null
+	_focus = null
 
 
-func _check(condition: bool, message: String) -> void:
-	if not condition:
-		_failures.append(message)
+## The panels scene on a bus, UI focus and save of its own, in the tree; `joined` players have
+## joined, and a room was entered when `room`.
+func _make_hud(joined: Array[int] = [], room: bool = false) -> HudScript:
+	_bus = own(EventsScript.new()) as EventsScript
+	_focus = own(UIFocusScript.new()) as UIFocusScript
+	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
+	_hud.events = _bus
+	_hud.save = SaveFile.new(NO_SAVE)
+	_hud.ui_focus = _focus
+	root.add_child(own(_hud))
+	for player in joined:
+		_bus.player_joined.emit(player)
+	if room:
+		_bus.room_entered.emit(&"arena_01")
+	return _hud
 
 
-func _make_hud() -> Array:
-	var bus: EventsScript = EventsScript.new()
-	var focus: UIFocusScript = UIFocusScript.new()
-	var hud: HudScript = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
-	hud.events = bus
-	hud.save = SaveFile.new(NO_SAVE)
-	hud.ui_focus = focus
-	root.add_child(hud)
-	return [hud, bus, focus]
+## One player panel for `index`, in the tree.
+func _panel(index: int = 0) -> PlayerPanelScript:
+	var panel := PanelScene.instantiate() as PlayerPanelScript
+	panel.index = index
+	root.add_child(own(panel))
+	return panel
 
 
-func _free_hud(parts: Array) -> void:
-	for node: Node in parts:
-		node.free()
+func _label(panel: Control, label: String) -> String:
+	return (panel.find_child(label, true, false) as Label).text
 
 
-func _test_theme_has_the_variations() -> void:
+func _bar(panel: Control, bar: String) -> ProgressBar:
+	return panel.find_child(bar, true, false) as ProgressBar
+
+
+# --- The theme ---------------------------------------------------------------------------------
+
+
+func test_the_theme_has_a_panel_and_a_label_variation_per_player() -> void:
 	for n in range(1, 5):
-		_check(SpellmergeTheme.has_stylebox("panel", "PlayerPanel%d" % n), "theme has PlayerPanel%d" % n)
-		_check(SpellmergeTheme.has_color("font_color", "PlayerLabel%d" % n), "theme has PlayerLabel%d" % n)
-	for type_name in ["HealthBar", "ManaBar"]:
-		_check(SpellmergeTheme.has_stylebox("fill", type_name), "theme has %s" % type_name)
+		check(SpellmergeTheme.has_stylebox("panel", "PlayerPanel%d" % n), "theme has PlayerPanel%d" % n)
+		check(SpellmergeTheme.has_color("font_color", "PlayerLabel%d" % n), "theme has PlayerLabel%d" % n)
+
+
+func test_the_theme_has_the_bar_fills() -> void:
+	for type_name: String in ["HealthBar", "ManaBar"]:
+		check(SpellmergeTheme.has_stylebox("fill", type_name), "theme has %s" % type_name)
+
+
+func test_every_player_panel_has_its_own_border_colour() -> void:
 	# The four panel borders differ, so no two players look alike.
 	var borders: Array[Color] = []
 	for n in range(1, 5):
 		var box := SpellmergeTheme.get_stylebox("panel", "PlayerPanel%d" % n) as StyleBoxFlat
-		_check(box != null and not borders.has(box.border_color), "player panel %d has its own border colour" % n)
+		check(box != null and not borders.has(box.border_color), "player panel %d has its own border colour" % n)
 		if box != null:
 			borders.append(box.border_color)
-			_check(box.bg_color.a < 1.0 and box.bg_color.a >= PANEL_ALPHA_MIN, "player panel %d background is translucent but readable, alpha %s" % [n, box.bg_color.a])
-	_check(SpellmergeTheme.get_font_size("font_size", "Label") >= LABEL_SIZE_MIN, "labels are at least %d px" % LABEL_SIZE_MIN)
-	_check(SpellmergeTheme.get_font_size("font_size", "Button") >= BUTTON_SIZE_MIN, "buttons are at least %d px" % BUTTON_SIZE_MIN)
 
 
-func _test_project_uses_the_theme() -> void:
+func test_every_player_panel_background_is_translucent_but_readable() -> void:
+	for n in range(1, 5):
+		var box := SpellmergeTheme.get_stylebox("panel", "PlayerPanel%d" % n) as StyleBoxFlat
+		check(box != null and box.bg_color.a < 1.0 and box.bg_color.a >= PANEL_ALPHA_MIN, "player panel %d background is translucent but readable, alpha %s" % [n, box.bg_color.a if box != null else -1.0])
+
+
+func test_the_theme_fonts_are_no_smaller_than_designed() -> void:
+	check(SpellmergeTheme.get_font_size("font_size", "Label") >= LABEL_SIZE_MIN, "labels are at least %d px" % LABEL_SIZE_MIN)
+	check(SpellmergeTheme.get_font_size("font_size", "Button") >= BUTTON_SIZE_MIN, "buttons are at least %d px" % BUTTON_SIZE_MIN)
+
+
+func test_the_project_uses_the_single_hud_theme() -> void:
 	var path := str(ProjectSettings.get_setting("gui/theme/custom", ""))
-	_check(path == "res://hud/theme/spellmerge_theme.tres", "the project theme is the single HUD theme, got '%s'" % path)
+	check_equal(path, "res://hud/theme/spellmerge_theme.tres", "the project theme is the single HUD theme")
+
+
+func test_the_hud_is_an_autoload() -> void:
 	var autoload := str(ProjectSettings.get_setting("autoload/Hud", ""))
-	_check(autoload == "*res://hud/panels/panels.tscn", "autoload Hud is registered, got '%s'" % autoload)
+	check_equal(autoload, "*res://hud/panels/panels.tscn", "autoload Hud is registered")
 
 
-func _test_panel_per_player() -> void:
+# --- One panel ---------------------------------------------------------------------------------
+
+
+func test_each_panel_uses_its_players_theme_variation() -> void:
 	for player in 4:
-		var panel := PanelScene.instantiate() as PlayerPanelScript
-		panel.index = player
-		root.add_child(panel)
-		_check(panel.theme_type_variation == StringName("PlayerPanel%d" % (player + 1)), "panel %d uses its theme variation" % player)
-		panel.free()
+		var panel: PlayerPanelScript = _panel(player)
+		check_equal(panel.theme_type_variation, StringName("PlayerPanel%d" % (player + 1)), "panel %d uses its theme variation" % player)
 
 
-func _test_panel_shows_numbers() -> void:
-	var panel := PanelScene.instantiate() as PlayerPanelScript
-	panel.index = 1
-	root.add_child(panel)
+func test_the_health_bar_shows_the_health() -> void:
+	var panel: PlayerPanelScript = _panel(1)
 	panel.set_stats(64, 100, 37.8, 100.0)
-	var health_bar := panel.find_child("HealthBar", true, false) as ProgressBar
-	var mana_bar := panel.find_child("ManaBar", true, false) as ProgressBar
-	_check(health_bar.value == 64.0 and health_bar.max_value == 100.0, "health bar shows 64 of 100")
-	_check(is_equal_approx(mana_bar.value, 37.8) and mana_bar.max_value == 100.0, "mana bar shows the mana")
-	_check((panel.find_child("HealthValue", true, false) as Label).text == "64", "health number is 64")
-	_check((panel.find_child("ManaValue", true, false) as Label).text == "37", "mana number is whole, 37")
-	_check(not panel.is_downed() and panel.status_text() == "", "a healthy player has no status word")
+	check(_bar(panel, "HealthBar").value == 64.0 and _bar(panel, "HealthBar").max_value == 100.0, "health bar shows 64 of 100")
+
+
+func test_the_mana_bar_shows_the_mana() -> void:
+	var panel: PlayerPanelScript = _panel(1)
+	panel.set_stats(64, 100, 37.8, 100.0)
+	check(is_equal_approx(_bar(panel, "ManaBar").value, 37.8) and _bar(panel, "ManaBar").max_value == 100.0, "mana bar shows the mana")
+
+
+func test_the_health_number_is_shown() -> void:
+	var panel: PlayerPanelScript = _panel(1)
+	panel.set_stats(64, 100, 37.8, 100.0)
+	check_equal(_label(panel, "HealthValue"), "64", "health number")
+
+
+func test_the_mana_number_is_shown_whole() -> void:
+	var panel: PlayerPanelScript = _panel(1)
+	panel.set_stats(64, 100, 37.8, 100.0)
+	check_equal(_label(panel, "ManaValue"), "37", "mana number is whole")
+
+
+func test_a_healthy_player_has_no_status_word() -> void:
+	var panel: PlayerPanelScript = _panel(1)
+	panel.set_stats(64, 100, 37.8, 100.0)
+	check(not panel.is_downed(), "not shown down")
+	check_equal(panel.status_text(), "", "no status word")
+
+
+func test_another_staffs_bigger_pool_resizes_the_mana_bar() -> void:
 	# Every staff has its own pool: another staff on show with the same whole mana but a bigger
 	# pool still resizes the bar.
+	var panel: PlayerPanelScript = _panel(1)
+	panel.set_stats(64, 100, 37.8, 100.0)
 	panel.set_stats(64, 100, 37.8, 1000.0)
-	_check(mana_bar.max_value == 1000.0, "another staff's pool size shows, same mana: %s" % mana_bar.max_value)
-	panel.free()
+	check_equal(_bar(panel, "ManaBar").max_value, 1000.0, "another staff's pool size shows, same mana")
 
 
-func _test_down_and_menu_words() -> void:
-	var panel := PanelScene.instantiate() as PlayerPanelScript
-	root.add_child(panel)
+func test_an_open_overlay_shows_menu() -> void:
+	var panel: PlayerPanelScript = _panel()
 	panel.set_stats(100, 100, 100.0, 100.0)
 	panel.set_menu_open(true)
-	_check(panel.status_text() == "MENU", "an open overlay shows MENU")
+	check_equal(panel.status_text(), "MENU", "an open overlay shows MENU")
+
+
+func test_no_health_shows_down_over_menu() -> void:
+	var panel: PlayerPanelScript = _panel()
+	panel.set_menu_open(true)
 	panel.set_stats(0, 100, 50.0, 100.0)
-	_check(panel.is_downed() and panel.status_text() == "DOWN", "no health shows DOWN, which wins over MENU")
+	check(panel.is_downed(), "no health is down")
+	check_equal(panel.status_text(), "DOWN", "DOWN wins over MENU")
+
+
+func test_a_revive_with_the_overlay_open_shows_menu_again() -> void:
+	var panel: PlayerPanelScript = _panel()
+	panel.set_menu_open(true)
+	panel.set_stats(0, 100, 50.0, 100.0)
 	panel.set_stats(50, 100, 50.0, 100.0)
-	_check(panel.status_text() == "MENU", "a revive shows MENU again while the overlay is open")
+	check_equal(panel.status_text(), "MENU", "a revive shows MENU again while the overlay is open")
+
+
+func test_closing_the_overlay_clears_the_word() -> void:
+	var panel: PlayerPanelScript = _panel()
+	panel.set_stats(100, 100, 100.0, 100.0)
+	panel.set_menu_open(true)
 	panel.set_menu_open(false)
-	_check(panel.status_text() == "", "closing the overlay clears the word")
-	panel.free()
+	check_equal(panel.status_text(), "", "closing the overlay clears the word")
 
 
-func _test_hud_waits_for_room_and_join() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
+# --- Which panels show -------------------------------------------------------------------------
+
+
+func test_every_panel_starts_hidden() -> void:
+	var hud: HudScript = _make_hud()
 	for player in 4:
-		_check(not hud.get_panel(player).visible, "panel %d starts hidden" % player)
-	bus.player_joined.emit(0)
-	bus.player_joined.emit(2)
-	_check(not hud.get_panel(0).visible, "a joined player's panel waits for a room")
-	bus.room_entered.emit(&"arena_01")
-	_check(hud.get_panel(0).visible and hud.get_panel(2).visible, "joined players' panels show once a room is entered")
-	_check(not hud.get_panel(1).visible and not hud.get_panel(3).visible, "players who did not join have no panel")
-	bus.player_joined.emit(1)
-	_check(hud.get_panel(1).visible, "a mid-run joiner's panel shows at once")
-	bus.player_left.emit(0)
-	_check(not hud.get_panel(0).visible and hud.get_panel(2).visible, "a leaver's panel hides and the others stay")
-	_free_hud(parts)
+		check(not hud.get_panel(player).visible, "panel %d starts hidden" % player)
 
 
-func _test_leave_and_rejoin_resets_the_panel() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	bus.room_entered.emit(&"arena_01")
-	bus.player_joined.emit(1)
-	bus.player_stats_changed.emit(1, 0, 5, 3.0, 10.0)
-	_check(hud.get_panel(1).is_downed(), "the panel shows down before the player leaves")
-	bus.player_left.emit(1)
-	_check(not hud.get_panel(1).is_downed() and hud.get_panel(1).status_text() == "", "leaving clears the down state")
+func test_a_joined_players_panel_waits_for_a_room() -> void:
+	var hud: HudScript = _make_hud([0, 2])
+	check(not hud.get_panel(0).visible, "a joined player's panel waits for a room")
+
+
+func test_joined_players_panels_show_once_a_room_is_entered() -> void:
+	var hud: HudScript = _make_hud([0, 2], true)
+	check(hud.get_panel(0).visible and hud.get_panel(2).visible, "joined players' panels show once a room is entered")
+
+
+func test_players_who_did_not_join_have_no_panel() -> void:
+	var hud: HudScript = _make_hud([0, 2], true)
+	check(not hud.get_panel(1).visible and not hud.get_panel(3).visible, "players who did not join have no panel")
+
+
+func test_a_mid_run_joiners_panel_shows_at_once() -> void:
+	var hud: HudScript = _make_hud([0, 2], true)
+	_bus.player_joined.emit(1)
+	check(hud.get_panel(1).visible, "a mid-run joiner's panel shows at once")
+
+
+func test_a_leavers_panel_hides_while_the_others_stay() -> void:
+	var hud: HudScript = _make_hud([0, 2], true)
+	_bus.player_left.emit(0)
+	check(not hud.get_panel(0).visible, "a leaver's panel hides")
+	check(hud.get_panel(2).visible, "the others stay")
+
+
+func test_leaving_clears_the_down_state() -> void:
+	var hud: HudScript = _make_hud([1], true)
+	_bus.player_stats_changed.emit(1, 0, 5, 3.0, 10.0)
+	check(hud.get_panel(1).is_downed(), "the panel shows down before the player leaves")
+	_bus.player_left.emit(1)
+	check(not hud.get_panel(1).is_downed() and hud.get_panel(1).status_text() == "", "leaving clears the down state")
+
+
+func test_stats_alone_do_not_show_a_panel() -> void:
+	var hud: HudScript = _make_hud([], true)
+	_bus.player_stats_changed.emit(1, 5, 5, 10.0, 10.0)
+	check(not hud.get_panel(1).visible, "stats alone do not show a panel")
+
+
+func test_a_rejoined_panel_shows_the_numbers_sent_before_the_join() -> void:
 	# Stats may arrive before the join: they are kept and shown when the join comes.
-	bus.player_stats_changed.emit(1, 5, 5, 10.0, 10.0)
-	_check(not hud.get_panel(1).visible, "stats alone do not show a panel")
-	bus.player_joined.emit(1)
-	_check(hud.get_panel(1).visible and not hud.get_panel(1).is_downed(), "the rejoined panel shows with fresh numbers")
-	_free_hud(parts)
+	var hud: HudScript = _make_hud([1], true)
+	_bus.player_stats_changed.emit(1, 0, 5, 3.0, 10.0)
+	_bus.player_left.emit(1)
+	_bus.player_stats_changed.emit(1, 5, 5, 10.0, 10.0)
+	_bus.player_joined.emit(1)
+	check(hud.get_panel(1).visible, "the rejoined panel shows")
+	check(not hud.get_panel(1).is_downed(), "with fresh numbers")
 
 
-func _test_run_boundaries_hide_panels() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	bus.player_joined.emit(0)
-	bus.player_joined.emit(3)
-	bus.room_entered.emit(&"arena_01")
-	bus.player_stats_changed.emit(0, 0, 5, 0.0, 10.0)
-	_check(hud.get_panel(0).visible and hud.get_panel(3).visible, "panels show during the run")
-	bus.run_ended.emit(false)
-	_check(not hud.get_panel(0).visible and not hud.get_panel(3).visible, "run_ended hides all panels")
-	_check(not hud.get_panel(0).is_downed(), "run_ended clears the down state")
-	bus.run_started.emit(2)
-	_check(not hud.get_panel(0).visible, "panels wait for a room after run_started")
-	bus.room_entered.emit(&"arena_01")
-	_check(hud.get_panel(0).visible and hud.get_panel(3).visible, "joined players' panels return in the next run")
-	_free_hud(parts)
+func test_run_ended_hides_every_panel() -> void:
+	var hud: HudScript = _make_hud([0, 3], true)
+	check(hud.get_panel(0).visible and hud.get_panel(3).visible, "panels show during the run")
+	_bus.run_ended.emit(false)
+	check(not hud.get_panel(0).visible and not hud.get_panel(3).visible, "run_ended hides all panels")
 
 
-func _test_hud_routes_to_the_right_panel() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	bus.player_stats_changed.emit(2, 40, 100, 10.0, 100.0)
-	var value := func(player: int, label: String) -> String:
-		return (hud.get_panel(player).find_child(label, true, false) as Label).text
-	_check(value.call(2, "HealthValue") == "40" and value.call(2, "ManaValue") == "10", "player 2's panel shows its numbers")
-	_check(value.call(0, "HealthValue") == "100" and value.call(3, "HealthValue") == "100", "the other panels are untouched")
-	bus.player_stats_changed.emit(3, 0, 100, 0.0, 100.0)
-	_check(hud.get_panel(3).is_downed() and not hud.get_panel(2).is_downed(), "only player 3 is shown down")
-	_free_hud(parts)
+func test_run_ended_clears_the_down_state() -> void:
+	var hud: HudScript = _make_hud([0, 3], true)
+	_bus.player_stats_changed.emit(0, 0, 5, 0.0, 10.0)
+	_bus.run_ended.emit(false)
+	check(not hud.get_panel(0).is_downed(), "run_ended clears the down state")
 
 
-func _test_hurt_vignette() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	var vignette := hud.get_vignette()
-	bus.player_joined.emit(2)
-	bus.room_entered.emit(&"arena_01")
-	bus.player_stats_changed.emit(2, 100, 100, 10.0, 100.0)
-	_check(not vignette.visible, "no vignette when a wizard appears")
-	bus.player_stats_changed.emit(2, 100, 100, 5.0, 100.0)
-	_check(not vignette.visible, "no vignette when only mana changes")
-	bus.player_stats_changed.emit(2, 80, 100, 5.0, 100.0)
-	_check(vignette.visible and vignette.strength > 0.0, "a health drop shows the vignette")
-	var first: float = vignette.strength
-	bus.player_stats_changed.emit(2, 60, 100, 5.0, 100.0)
-	_check(vignette.strength > first and vignette.strength <= vignette.MAX_STRENGTH, "more hits glow more, up to a limit")
-	for i in 10:
-		bus.player_stats_changed.emit(2, 59 - i, 100, 5.0, 100.0)
-	_check(vignette.strength <= vignette.MAX_STRENGTH, "the vignette never passes its limit")
-	for i in 30:
-		vignette.step(0.0625)
-	_check(not vignette.visible and vignette.strength == 0.0, "the vignette fades out")
-	bus.player_stats_changed.emit(2, 80, 100, 5.0, 100.0)
-	_check(not vignette.visible, "a revive or heal shows no vignette")
-	bus.player_stats_changed.emit(2, 10, 100, 5.0, 100.0)
-	bus.run_ended.emit(false)
-	_check(not vignette.visible, "a run ending clears the vignette")
-	_check(vignette.mouse_filter == Control.MOUSE_FILTER_IGNORE, "the vignette takes no input")
-	_free_hud(parts)
+func test_panels_wait_for_a_room_after_run_started() -> void:
+	var hud: HudScript = _make_hud([0, 3], true)
+	_bus.run_ended.emit(false)
+	_bus.run_started.emit(2)
+	check(not hud.get_panel(0).visible, "panels wait for a room after run_started")
 
 
-func _test_vignette_with_four_players() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	var vignette := hud.get_vignette()
+func test_joined_players_panels_return_in_the_next_run() -> void:
+	var hud: HudScript = _make_hud([0, 3], true)
+	_bus.run_ended.emit(false)
+	_bus.run_started.emit(2)
+	_bus.room_entered.emit(&"arena_01")
+	check(hud.get_panel(0).visible and hud.get_panel(3).visible, "joined players' panels return in the next run")
+
+
+func test_stats_reach_only_their_players_panel() -> void:
+	var hud: HudScript = _make_hud()
+	_bus.player_stats_changed.emit(2, 40, 100, 10.0, 100.0)
+	check(_label(hud.get_panel(2), "HealthValue") == "40" and _label(hud.get_panel(2), "ManaValue") == "10", "player 2's panel shows its numbers")
+	check(_label(hud.get_panel(0), "HealthValue") == "100" and _label(hud.get_panel(3), "HealthValue") == "100", "the other panels are untouched")
+
+
+func test_only_the_downed_players_panel_shows_down() -> void:
+	var hud: HudScript = _make_hud()
+	_bus.player_stats_changed.emit(2, 40, 100, 10.0, 100.0)
+	_bus.player_stats_changed.emit(3, 0, 100, 0.0, 100.0)
+	check(hud.get_panel(3).is_downed(), "player 3 is shown down")
+	check(not hud.get_panel(2).is_downed(), "player 2 is not")
+
+
+func test_four_players_show_four_panels() -> void:
+	var hud: HudScript = _make_hud([0, 1, 2, 3], true)
 	for player in 4:
-		bus.player_joined.emit(player)
-		bus.player_stats_changed.emit(player, 100, 100, 5.0, 100.0)
-	bus.room_entered.emit(&"arena_01")
-	# Eight seconds of a fight: each wizard loses 10 of 100 health every half second.
-	var peak: float = 0.0
-	for tick in 64:
-		var player: int = tick % 4
-		bus.player_stats_changed.emit(player, 90, 100, 5.0, 100.0)
-		bus.player_stats_changed.emit(player, 100, 100, 5.0, 100.0)
-		vignette.step(0.125)
-		peak = maxf(peak, vignette.strength)
-	_check(peak < vignette.MAX_STRENGTH * 0.8, "four wizards under fire do not keep the vignette at its limit")
-	vignette.clear()
-	vignette.flash_hit(0, 0.05, 1)
-	var small: float = vignette.strength
-	vignette.clear()
-	vignette.flash_hit(0, 0.5, 1)
-	_check(small < vignette.strength, "a small hit glows less than a big one")
-	vignette.clear()
-	vignette.enabled = false
-	vignette.flash_hit(0, 0.5, 1)
-	_check(not vignette.visible and vignette.strength == 0.0, "the vignette can be turned off")
-	_free_hud(parts)
+		check(hud.get_panel(player).visible, "panel %d is shown" % player)
 
 
-func _test_hud_four_players_in_four_corners() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	for player in 4:
-		bus.player_joined.emit(player)
-	bus.room_entered.emit(&"arena_01")
-	# Each panel is anchored to its corner and grows away from it, onto the screen.
+func test_each_panel_is_anchored_to_its_corner() -> void:
+	var hud: HudScript = _make_hud([0, 1, 2, 3], true)
 	var right: Array[bool] = [false, true, false, true]
 	var bottom: Array[bool] = [false, false, true, true]
 	for player in 4:
 		var panel: Control = hud.get_panel(player)
-		_check(panel.visible, "panel %d is shown" % player)
-		_check(panel.anchor_left == (1.0 if right[player] else 0.0), "panel %d is on the %s" % [player, "right" if right[player] else "left"])
-		_check(panel.anchor_top == (1.0 if bottom[player] else 0.0), "panel %d is at the %s" % [player, "bottom" if bottom[player] else "top"])
-		_check(panel.grow_horizontal == (Control.GROW_DIRECTION_BEGIN if right[player] else Control.GROW_DIRECTION_END), "panel %d grows away from its side" % player)
-		_check(panel.grow_vertical == (Control.GROW_DIRECTION_BEGIN if bottom[player] else Control.GROW_DIRECTION_END), "panel %d grows away from its edge" % player)
-		# Four panels of this size leave most of the 640x360 view free.
-		var wanted: Vector2 = panel.get_combined_minimum_size()
-		_check(wanted.x >= 100.0 and wanted.x <= 140.0 and wanted.y <= 80.0, "panel %d is small, got %s" % [player, wanted])
-	_free_hud(parts)
+		check(panel.anchor_left == (1.0 if right[player] else 0.0), "panel %d is on the %s" % [player, "right" if right[player] else "left"])
+		check(panel.anchor_top == (1.0 if bottom[player] else 0.0), "panel %d is at the %s" % [player, "bottom" if bottom[player] else "top"])
 
 
-## Online lobby L5c: while this machine plays with others, a seat in the game with no real device
-## of this machine on it says ONLINE; a seat played here, a bot's seat offline and every seat once
-## nothing is online say nothing.
-func _test_a_seat_played_on_another_machine_says_online() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	var input: InputManagerScript = InputManagerScript.new()
+func test_each_panel_grows_away_from_its_corner_onto_the_screen() -> void:
+	var hud: HudScript = _make_hud([0, 1, 2, 3], true)
+	var right: Array[bool] = [false, true, false, true]
+	var bottom: Array[bool] = [false, false, true, true]
+	for player in 4:
+		var panel: Control = hud.get_panel(player)
+		check(panel.grow_horizontal == (Control.GROW_DIRECTION_BEGIN if right[player] else Control.GROW_DIRECTION_END), "panel %d grows away from its side" % player)
+		check(panel.grow_vertical == (Control.GROW_DIRECTION_BEGIN if bottom[player] else Control.GROW_DIRECTION_END), "panel %d grows away from its edge" % player)
+
+
+# --- The hurt vignette -------------------------------------------------------------------------
+
+
+## A HUD with player 2 in a room, its wizard just appeared (full health, mana 10).
+func _hud_with_player_two() -> HudScript:
+	var hud: HudScript = _make_hud([2], true)
+	_bus.player_stats_changed.emit(2, 100, 100, 10.0, 100.0)
+	return hud
+
+
+func test_no_vignette_when_a_wizard_appears() -> void:
+	var hud: HudScript = _hud_with_player_two()
+	check(not hud.get_vignette().visible, "no vignette when a wizard appears")
+
+
+func test_no_vignette_when_only_mana_changes() -> void:
+	var hud: HudScript = _hud_with_player_two()
+	_bus.player_stats_changed.emit(2, 100, 100, 5.0, 100.0)
+	check(not hud.get_vignette().visible, "no vignette when only mana changes")
+
+
+func test_a_health_drop_shows_the_vignette() -> void:
+	var hud: HudScript = _hud_with_player_two()
+	_bus.player_stats_changed.emit(2, 80, 100, 10.0, 100.0)
+	check(hud.get_vignette().visible and hud.get_vignette().strength > 0.0, "a health drop shows the vignette")
+
+
+func test_more_hits_glow_more_up_to_a_limit() -> void:
+	var vignette := _hud_with_player_two().get_vignette()
+	_bus.player_stats_changed.emit(2, 80, 100, 10.0, 100.0)
+	var first: float = vignette.strength
+	_bus.player_stats_changed.emit(2, 60, 100, 10.0, 100.0)
+	check(vignette.strength > first and vignette.strength <= vignette.MAX_STRENGTH, "more hits glow more, up to a limit")
+
+
+func test_the_vignette_never_passes_its_limit() -> void:
+	var vignette := _hud_with_player_two().get_vignette()
+	for i in 12:
+		_bus.player_stats_changed.emit(2, 80 - i, 100, 10.0, 100.0)
+	check(vignette.strength <= vignette.MAX_STRENGTH, "the vignette never passes its limit")
+
+
+func test_the_vignette_fades_out() -> void:
+	var vignette := _hud_with_player_two().get_vignette()
+	_bus.player_stats_changed.emit(2, 60, 100, 10.0, 100.0)
+	for i in 30:
+		vignette.step(0.0625)
+	check(not vignette.visible and vignette.strength == 0.0, "the vignette fades out")
+
+
+func test_a_heal_shows_no_vignette() -> void:
+	var vignette := _hud_with_player_two().get_vignette()
+	_bus.player_stats_changed.emit(2, 50, 100, 10.0, 100.0)
+	for i in 30:
+		vignette.step(0.0625)
+	_bus.player_stats_changed.emit(2, 80, 100, 10.0, 100.0)
+	check(not vignette.visible, "a revive or heal shows no vignette")
+
+
+func test_a_run_ending_clears_the_vignette() -> void:
+	var vignette := _hud_with_player_two().get_vignette()
+	_bus.player_stats_changed.emit(2, 10, 100, 10.0, 100.0)
+	_bus.run_ended.emit(false)
+	check(not vignette.visible, "a run ending clears the vignette")
+
+
+func test_the_vignette_takes_no_input() -> void:
+	check_equal(_make_hud().get_vignette().mouse_filter, Control.MOUSE_FILTER_IGNORE, "the vignette takes no input")
+
+
+func test_four_wizards_under_fire_do_not_keep_the_vignette_at_its_limit() -> void:
+	var hud: HudScript = _make_hud()
+	var vignette := hud.get_vignette()
+	for player in 4:
+		_bus.player_joined.emit(player)
+		_bus.player_stats_changed.emit(player, 100, 100, 5.0, 100.0)
+	_bus.room_entered.emit(&"arena_01")
+	# Eight seconds of a fight: each wizard loses 10 of 100 health every half second.
+	var peak: float = 0.0
+	for tick in 64:
+		var player: int = tick % 4
+		_bus.player_stats_changed.emit(player, 90, 100, 5.0, 100.0)
+		_bus.player_stats_changed.emit(player, 100, 100, 5.0, 100.0)
+		vignette.step(0.125)
+		peak = maxf(peak, vignette.strength)
+	check(peak < vignette.MAX_STRENGTH * 0.8, "four wizards under fire do not keep the vignette at its limit (peak %s)" % peak)
+
+
+func test_a_small_hit_glows_less_than_a_big_one() -> void:
+	var vignette := _make_hud().get_vignette()
+	vignette.flash_hit(0, 0.05, 1)
+	var small: float = vignette.strength
+	vignette.clear()
+	vignette.flash_hit(0, 0.5, 1)
+	check(small < vignette.strength, "a small hit glows less than a big one")
+
+
+func test_the_vignette_can_be_turned_off() -> void:
+	var vignette := _make_hud().get_vignette()
+	vignette.enabled = false
+	vignette.flash_hit(0, 0.5, 1)
+	check(not vignette.visible and vignette.strength == 0.0, "the vignette can be turned off")
+
+
+# --- The ONLINE word (online lobby L5c) --------------------------------------------------------
+# While this machine plays with others, a seat in the game with no real device of this machine on
+# it says ONLINE; a seat played here, a bot's seat offline and every seat once nothing is online
+# say nothing.
+
+
+## A HUD in the hub with seat 0 on this machine's keyboard and seat 1 on a virtual device (a bot
+## offline, another machine online), online when `online`.
+func _seats_hud(online: bool) -> HudScript:
+	var hud: HudScript = _make_hud()
+	var input := own(InputManagerScript.new()) as InputManagerScript
 	hud.input = input
 	input.join(InputManagerScript.KEYBOARD)
 	input.add_virtual_device(1)
-	bus.player_joined.emit(0)
-	bus.player_joined.emit(1)
-	bus.room_entered.emit(&"hub")
+	_bus.player_joined.emit(0)
+	_bus.player_joined.emit(1)
+	_bus.room_entered.emit(&"hub")
+	if online:
+		_bus.online_changed.emit(EventsScript.ONLINE_PLAYING, "", &"", {})
 	hud.poll()
-	_check(hud.get_panel(0).seat_text() == "" and hud.get_panel(1).seat_text() == "", "offline no seat is marked, a virtual device's (a bot's) neither")
-	var plain: float = hud.get_panel(1).get_combined_minimum_size().y
-	bus.online_changed.emit(EventsScript.ONLINE_PLAYING, "", &"", {})
-	hud.poll()
-	_check(hud.get_panel(0).seat_text() == "", "playing online, the seat this machine's keyboard holds says nothing")
-	_check(hud.get_panel(1).seat_text() == PlayerPanelScript.ONLINE_TEXT, "the seat another machine plays says ONLINE, got '%s'" % hud.get_panel(1).seat_text())
-	_check(hud.get_panel(2).seat_text() == "", "a seat nobody plays says nothing")
-	var marked: float = hud.get_panel(1).get_combined_minimum_size().y
-	_check(marked > plain and marked - plain <= 8.0, "the word costs the panel a small row, got %s more" % (marked - plain))
-	input.leave(1)
-	input.join_as(7, 1)
-	hud.poll()
-	_check(hud.get_panel(1).seat_text() == "", "a pad of this machine takes the seat (no event says so): the word goes")
-	input.leave(1)
-	input.add_virtual_device(1)
-	hud.poll()
-	_check(hud.get_panel(1).seat_text() == PlayerPanelScript.ONLINE_TEXT, "and comes back with the other machine")
-	bus.online_changed.emit(EventsScript.ONLINE_ENDED, "", &"", {})
-	hud.poll()
-	_check(hud.get_panel(1).seat_text() == "", "the other machines gone: nothing is marked")
-	_free_hud(parts)
-	input.free()
+	return hud
 
 
-func _test_hud_menu_word_follows_ui_focus() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var focus: UIFocusScript = parts[2]
-	focus.opened.emit(1)
-	_check(hud.get_panel(1).status_text() == "MENU", "an overlay open for player 1 shows MENU on panel 1")
-	_check(hud.get_panel(0).status_text() == "" and hud.get_panel(2).status_text() == "", "the other panels show nothing")
-	focus.closed.emit(1)
-	_check(hud.get_panel(1).status_text() == "", "closing clears the word")
-	_free_hud(parts)
+func test_offline_no_seat_is_marked_online() -> void:
+	var hud: HudScript = _seats_hud(false)
+	check(hud.get_panel(0).seat_text() == "" and hud.get_panel(1).seat_text() == "", "offline no seat is marked, a virtual device's (a bot's) neither")
 
 
-func _test_bad_indices_are_ignored() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	bus.player_joined.emit(7)
-	bus.player_left.emit(-1)
-	bus.player_stats_changed.emit(4, 1, 100, 1.0, 100.0)
-	bus.player_stats_changed.emit(-1, 1, 100, 1.0, 100.0)
-	_check(hud.get_panel(4) == null and hud.get_panel(-1) == null, "get_panel gives null for a bad index")
+func test_online_the_seat_this_machine_plays_says_nothing() -> void:
+	check_equal(_seats_hud(true).get_panel(0).seat_text(), "", "playing online, the seat this machine's keyboard holds says nothing")
+
+
+func test_online_the_seat_another_machine_plays_says_online() -> void:
+	check_equal(_seats_hud(true).get_panel(1).seat_text(), PlayerPanelScript.ONLINE_TEXT, "the seat another machine plays says ONLINE")
+
+
+func test_online_a_seat_nobody_plays_says_nothing() -> void:
+	check_equal(_seats_hud(true).get_panel(2).seat_text(), "", "a seat nobody plays says nothing")
+
+
+func test_a_pad_of_this_machine_taking_the_seat_removes_the_word() -> void:
+	# No event says so: the HUD sees it when it polls.
+	var hud: HudScript = _seats_hud(true)
+	hud.input.leave(1)
+	hud.input.join_as(7, 1)
+	hud.poll()
+	check_equal(hud.get_panel(1).seat_text(), "", "a pad of this machine takes the seat: the word goes")
+
+
+func test_the_word_comes_back_with_the_other_machine() -> void:
+	var hud: HudScript = _seats_hud(true)
+	hud.input.leave(1)
+	hud.input.join_as(7, 1)
+	hud.poll()
+	hud.input.leave(1)
+	hud.input.add_virtual_device(1)
+	hud.poll()
+	check_equal(hud.get_panel(1).seat_text(), PlayerPanelScript.ONLINE_TEXT, "the word comes back with the other machine")
+
+
+func test_once_online_play_ends_no_seat_is_marked() -> void:
+	var hud: HudScript = _seats_hud(true)
+	_bus.online_changed.emit(EventsScript.ONLINE_ENDED, "", &"", {})
+	hud.poll()
+	check_equal(hud.get_panel(1).seat_text(), "", "the other machines gone: nothing is marked")
+
+
+# --- The MENU word from UI focus ---------------------------------------------------------------
+
+
+func test_an_overlay_open_for_a_player_shows_menu_on_their_panel() -> void:
+	var hud: HudScript = _make_hud()
+	_focus.opened.emit(1)
+	check_equal(hud.get_panel(1).status_text(), "MENU", "an overlay open for player 1 shows MENU on panel 1")
+
+
+func test_an_overlay_open_for_one_player_leaves_the_other_panels_blank() -> void:
+	var hud: HudScript = _make_hud()
+	_focus.opened.emit(1)
+	check(hud.get_panel(0).status_text() == "" and hud.get_panel(2).status_text() == "", "the other panels show nothing")
+
+
+func test_the_overlay_closing_clears_the_menu_word() -> void:
+	var hud: HudScript = _make_hud()
+	_focus.opened.emit(1)
+	_focus.closed.emit(1)
+	check_equal(hud.get_panel(1).status_text(), "", "closing clears the word")
+
+
+# --- Bad indices -------------------------------------------------------------------------------
+
+
+func test_get_panel_gives_null_for_a_bad_index() -> void:
+	var hud: HudScript = _make_hud()
+	check(hud.get_panel(4) == null and hud.get_panel(-1) == null, "get_panel gives null for a bad index")
+
+
+func test_events_for_a_bad_index_change_no_panel() -> void:
+	var hud: HudScript = _make_hud()
+	_bus.player_joined.emit(7)
+	_bus.player_left.emit(-1)
+	_bus.player_stats_changed.emit(4, 1, 100, 1.0, 100.0)
+	_bus.player_stats_changed.emit(-1, 1, 100, 1.0, 100.0)
 	for player in 4:
-		_check(hud.get_panel(player).status_text() == "", "no panel changed for a bad index")
-	_free_hud(parts)
+		check_equal(hud.get_panel(player).status_text(), "", "panel %d changed for a bad index" % player)
+		check(not hud.get_panel(player).visible, "panel %d shows for a bad index" % player)
 
 
-## The panels send no event but the player intents `spell_swap_requested` (a `swap` press) and
-## `run_requested` (A on the hub's lit stone), `item_take_requested` (A by an item) and
-## `online_open_requested` (A on the altar; all tested in test_pause_menu.gd);
-## the corner panel itself sends nothing. (Tested in test_quick.gd.)
-func _test_hud_sends_no_events() -> void:
+# --- What the panel scripts may do -------------------------------------------------------------
+
+
+## The panel scripts' source, the player intents they may send taken out.
+func _panel_source() -> String:
 	var source := FileAccess.get_file_as_string("res://hud/panels/panels.gd")
 	source = source.replace("events.spell_swap_requested.emit(player)", "")
 	source = source.replace("events.run_requested.emit(player)", "")
@@ -383,5 +558,16 @@ func _test_hud_sends_no_events() -> void:
 	source += FileAccess.get_file_as_string("res://hud/widgets/item_hint.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/player_panel.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/staff_row.gd")
-	_check(not source.contains(".emit("), "the panel scripts send no events but the swap request and A on the hub's lit stone, an item or its altar")
-	_check(not source.contains("Input."), "the panel scripts read no input")
+	return source
+
+
+## The panels send no event but the player intents `spell_swap_requested` (a `swap` press) and
+## `run_requested` (A on the hub's lit stone), `item_take_requested` (A by an item) and
+## `online_open_requested` (A on the altar; all tested in test_pause_menu.gd); the corner panel
+## itself sends nothing. (Tested in test_quick.gd.)
+func test_the_panel_scripts_send_only_the_player_intents() -> void:
+	check(not _panel_source().contains(".emit("), "the panel scripts send no events but the swap request and A on the hub's lit stone, an item or its altar")
+
+
+func test_the_panel_scripts_read_no_input() -> void:
+	check(not _panel_source().contains("Input."), "the panel scripts read no input")

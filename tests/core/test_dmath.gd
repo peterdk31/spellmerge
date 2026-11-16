@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## Without the native module the twin is still checked against the engine (SPELLMERGE_NATIVE=required
 ## fails the comparison instead).
-##
-## godot --headless --path . --script res://tests/core/test_dmath.gd
-
 const NativeScript := preload("res://core/native/native.gd")
 
 ## The functions of one argument, by name: [native method, twin, engine].

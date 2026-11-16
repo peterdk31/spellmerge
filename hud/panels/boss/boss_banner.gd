@@ -5,6 +5,11 @@ extends VBoxContainer
 ## input; nobody waits for it, and it waits while the game is paused (the panels do not step it).
 ## A second boss shown meanwhile takes its place; the panels clear it with the rest (`clear`). Its sound is the `boss_intro` cue, Feel's.
 ##
+## A boss with an intro (`boss_shown`'s `has_intro`, docs/milestones/boss-intro.md, rule 5) has the
+## overlay for its entrance, not the banner: it is kept back until it is released (`release`, the
+## panels' `BossIntroWait`), and shows then only when no intro played (the run's rule off, a boss the
+## sandbox spawned).
+##
 ##     banner.show_boss(actor, "The Old Broom", "Its lore line.", marks)
 ##     banner.step(delta)    # called every frame by the HUD
 
@@ -24,6 +29,8 @@ var _name: Label = null
 var _lore: Label = null
 ## Seconds since it began showing; negative while it shows nothing.
 var _time: float = -1.0
+## The bosses with an intro kept back, by actor id: [name, lore].
+var _kept: Dictionary = {}
 
 
 func _init() -> void:
@@ -51,10 +58,31 @@ func _ready() -> void:
 func bind(events: EventsScript) -> void:
 	if events != null:
 		events.boss_shown.connect(show_boss)
+		events.boss_hidden.connect(forget)
 
 
-## Show the banner of the boss that entered play (`boss_shown`).
-func show_boss(_actor: int, boss_name: String, lore: String, _marks: PackedFloat32Array, _has_intro: bool = false) -> void:
+## Show the banner of the boss that entered play (`boss_shown`); one with an intro is kept back.
+func show_boss(actor: int, boss_name: String, lore: String, _marks: PackedFloat32Array, has_intro: bool = false) -> void:
+	if has_intro:
+		_kept[actor] = [boss_name, lore]
+		return
+	_show(boss_name, lore)
+
+
+## The boss `actor` kept back is released: its banner shows only when no intro `played`.
+func release(actor: int, played: bool) -> void:
+	var row: Array = _kept.get(actor, []) as Array
+	_kept.erase(actor)
+	if not played and row.size() == 2:
+		_show(row[0] as String, row[1] as String)
+
+
+## The boss `actor` left play (`boss_hidden`): nothing kept back of it shows.
+func forget(actor: int) -> void:
+	_kept.erase(actor)
+
+
+func _show(boss_name: String, lore: String) -> void:
 	_name.text = boss_name
 	_lore.text = lore
 	_lore.visible = lore != ""
@@ -70,11 +98,16 @@ func step(delta: float) -> void:
 	_time += delta
 	modulate.a = alpha_at(_time)
 	if _time >= FADE_IN + HOLD + FADE_OUT:
-		clear()
+		_hide()
 
 
 ## Hide it at once (a run starts or ends).
 func clear() -> void:
+	_kept.clear()
+	_hide()
+
+
+func _hide() -> void:
 	_time = -1.0
 	modulate.a = 0.0
 	visible = false

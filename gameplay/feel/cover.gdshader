@@ -35,12 +35,12 @@ uniform float view_time = 0.0;
 // The bodies bending it (Cover.BODIES at most) and how many there are.
 uniform vec2 bodies[32];
 uniform int body_count = 0;
-// Cover's bend and trample numbers (Cover.BEND_REACH, BEND_PIXELS, TRAMPLE_HOLD, TRAMPLE_SPRING,
-// FLATTEN), set once a batch.
+// Cover's bend numbers (Cover.BEND_REACH, BEND_PIXELS, FLATTEN), set once a batch, and its kind's
+// trample (CoverKind.trample_hold, trample_spring), set as a kind is laid.
 uniform float bend_reach = 14.0;
 uniform float bend_pixels = 4.0;
-uniform float trample_hold = 5.0;
-uniform float trample_spring = 4.0;
+uniform float trample_hold = 0.6;
+uniform float trample_spring = 1.5;
 uniform float flatten = 0.5;
 // Feel's view grid: when each cell (CoverLayout.CELL pixels) was last walked through.
 uniform sampler2D trampled : filter_nearest;

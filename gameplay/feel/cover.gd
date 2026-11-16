@@ -25,8 +25,8 @@ extends Node2D
 ## the camera's middle and hands them to the shader, which leans the tufts near each away from it.
 ## The same bodies walk Feel's view grid of when each covered cell was last walked through
 ## (`walked_at`, one float a cell, Feel's clock), the shader's `trampled` texture: a walked cell's
-## tufts lie flat while bodies are in it and `TRAMPLE_HOLD` seconds after, then spring back over
-## `TRAMPLE_SPRING` (`flatness`), drawing their state's `trampled_frames` or pressed down. None of it
+## tufts lie flat while bodies are in it and its kind's `trample_hold` seconds after, then spring
+## back over its `trample_spring` (`flatness`), drawing their state's `trampled_frames` or pressed down. None of it
 ## is the game's: no cell's state changes, and the simulation never reads it.
 ##
 ## Nothing is allocated once a room is laid: a frame sets the wind's time, hands over the bodies only
@@ -60,11 +60,12 @@ const BODIES: int = 32
 ## How near a body bends a tuft, and how far a tuft right at a body leans at its tip, in pixels.
 const BEND_REACH: float = 14.0
 const BEND_PIXELS: float = 4.0
-## A walked cell's tufts lie flat this long after the last body left it, then spring back over
-## `TRAMPLE_SPRING` (seconds of Feel's clock); flat, a tuft with no trampled frame is pressed down
-## by this much of its height.
-const TRAMPLE_HOLD: float = 5.0
-const TRAMPLE_SPRING: float = 4.0
+## Where a body's feet reach from its position, in pixels: it walks every covered cell these points
+## lie in, the row just in front of it too, whose tufts stand over the trail (GC9: a one-cell
+## trail was hidden by them in dense grass).
+const FOOTPRINT: PackedVector2Array = [Vector2(-6.0, -4.0), Vector2(6.0, -4.0), Vector2(-6.0, 10.0), Vector2(6.0, 10.0)]
+## Flat, a tuft with no trampled frame is pressed down by this much of its height (how long a walked
+## cell lies flat and springs back is its kind's: `CoverKind.trample_hold`, `trample_spring`).
 const FLATTEN: float = 0.5
 ## When a cell never walked through was walked (long before any clock).
 const NEVER: float = -1.0e6
@@ -255,10 +256,13 @@ func walked_at(cell: int) -> float:
 
 
 ## How flat cell `cell`'s tufts lie at Feel's clock `now` before their state's bend scales it (0
-## standing, 1 flat), as the shader works it out: flat while walked and `TRAMPLE_HOLD` seconds after,
-## springing back over `TRAMPLE_SPRING`.
+## standing, 1 flat), as the shader works it out: flat while walked and its kind's `trample_hold`
+## seconds after, springing back over its `trample_spring`; 0 for a cell of no cover.
 func flatness(cell: int, now: float) -> float:
-	return clampf(1.0 - (now - walked_at(cell) - TRAMPLE_HOLD) / TRAMPLE_SPRING, 0.0, 1.0)
+	if layout == null or cell < 0 or cell >= layout.cells.size() or layout.cells[cell] == 0:
+		return 0.0
+	var kind: CoverKind = layout.kinds[layout.cells[cell] - 1]
+	return clampf(1.0 - (now - walked_at(cell) - kind.trample_hold) / maxf(kind.trample_spring, 0.001), 0.0, 1.0)
 
 
 ## The bodies handed to the shader by the last `step`, nearest the camera's middle first or not (in
@@ -336,15 +340,17 @@ func _find_bodies(table: ActorsScript, focus: Vector2) -> void:
 				farthest = k
 
 
-## The covered cells the bodies found stand in, walked at `now`; the grid handed over when one was.
+## The covered cells under the bodies found (their `FOOTPRINT`), walked at `now`; the grid handed
+## over when one was.
 func _walk(now: float) -> void:
 	var walked: bool = false
 	for at in _near_count:
-		var cell: int = layout.cell_of(_near_at[at])
-		if cell < 0 or layout.cells[cell] == 0:
-			continue
-		_walked.set_pixel(cell % layout.columns, cell / layout.columns, Color(now, 0.0, 0.0, 1.0))
-		walked = true
+		for foot in FOOTPRINT:
+			var cell: int = layout.cell_of(_near_at[at] + foot)
+			if cell < 0 or layout.cells[cell] == 0:
+				continue
+			_walked.set_pixel(cell % layout.columns, cell / layout.columns, Color(now, 0.0, 0.0, 1.0))
+			walked = true
 	if walked:
 		_walked_texture.update(_walked)
 
@@ -448,6 +454,8 @@ func _lay_kind(index: int) -> MultiMeshInstance2D:
 	material.set_shader_parameter(&"sheet_size", Vector2(kind.sheet.get_size()))
 	material.set_shader_parameter(&"trampled", _walked_texture)
 	material.set_shader_parameter(&"body_count", 0)
+	material.set_shader_parameter(&"trample_hold", kind.trample_hold)
+	material.set_shader_parameter(&"trample_spring", kind.trample_spring)
 	batch.multimesh.instance_count = row
 	if row > 0:
 		batch.multimesh.buffer = rows
@@ -471,8 +479,6 @@ func _batch() -> MultiMeshInstance2D:
 	material.shader = SHADER
 	material.set_shader_parameter(&"bend_reach", BEND_REACH)
 	material.set_shader_parameter(&"bend_pixels", BEND_PIXELS)
-	material.set_shader_parameter(&"trample_hold", TRAMPLE_HOLD)
-	material.set_shader_parameter(&"trample_spring", TRAMPLE_SPRING)
 	material.set_shader_parameter(&"flatten", FLATTEN)
 	batch.material = material
 	add_child(batch)

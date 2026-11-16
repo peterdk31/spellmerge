@@ -1,9 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## Bodies bend ground cover and trample it (ground cover GC4, docs/milestones/ground-cover.md, rule 6
 ## and decision 4): Feel's look only. Each frame the cover takes the actor table's bodies, keeps the
-## `BODIES` nearest the camera's middle and hands them to every batch's shader; the cells they stand
-## in, covered ones only, are walked in Feel's view grid (the shader's `trampled` texture), flat while
-## walked and a while after, then springing back; a state's trampled frames ride in its rows' colour;
+## `BODIES` nearest the camera's middle and hands them to every batch's shader; the cells under their
+## `FOOTPRINT` (theirs and the row in front), covered ones only, are walked in Feel's view grid (the
+## shader's `trampled` texture), flat while walked and their kind's hold after, then springing back; a state's trampled frames ride in its rows' colour;
 ## and a frame of it allocates nothing (in the style of the motes' tests).
 ##
 ## godot --headless --path . --script res://tests/gameplay/feel/test_cover_bend.gd
@@ -17,8 +17,10 @@ var fixture_grass: CoverKind = preload("res://tests/core/fixtures/cover_content/
 const FIELD := Rect2(192, 192, 64, 64)
 
 
-## How long a trail walked through the grass at least stays flat (more than half: its trampled frames).
-const TRAIL_LASTS: float = 5.0
+## The test grass's trample, its own numbers (not `CoverKind`'s defaults), so the cover is seen to
+## read its kind's.
+const HOLD: float = 2.0
+const SPRING: float = 3.0
 
 
 ## A sheet of `frames` 16×16 frames.
@@ -34,6 +36,8 @@ func _grass() -> CoverKind:
 	kind.biomes = [] as Array[StringName]
 	kind.sheet = _sheet(7)
 	kind.states[0].trampled_frames = PackedInt32Array([6])
+	kind.trample_hold = HOLD
+	kind.trample_spring = SPRING
 	return kind
 
 
@@ -105,7 +109,8 @@ func test_the_bodies_nearest_the_camera_are_handed_to_every_batch() -> void:
 	var held: PackedVector2Array = material.get_shader_parameter(&"bodies")
 	check_equal(held, given, "and where they are")
 	check_equal(material.get_shader_parameter(&"bend_reach"), CoverScript.BEND_REACH, "the bend's numbers are Feel's")
-	check_equal(material.get_shader_parameter(&"trample_hold"), CoverScript.TRAMPLE_HOLD, "and the trample's")
+	check_equal(material.get_shader_parameter(&"trample_hold"), HOLD, "the trample's are its kind's")
+	check_equal(material.get_shader_parameter(&"trample_spring"), SPRING, "both")
 
 
 func test_with_no_camera_the_first_bodies_bend_it_and_none_without_a_table() -> void:
@@ -129,12 +134,15 @@ func test_a_body_walks_the_covered_cell_it_stands_in() -> void:
 	cover.step(5.0, table, Vector2.ZERO)
 	check_equal(cover.walked_at(cell), 5.0, "the covered cell a body stands in is walked at Feel's clock")
 	check_equal(cover.walked_at(bare_cell), CoverScript.NEVER, "a cell with no cover is not")
+	check_equal(cover.walked_at(cover.layout.cell_of(inside + Vector2(0, 10))), 5.0, "nor only that one: its feet reach the row in front, whose tufts would stand over a one-cell trail (GC9)")
+	check_equal(cover.walked_at(cover.layout.cell_of(inside + Vector2(0, 26))), CoverScript.NEVER, "but no farther")
+	check_equal(cover.walked_at(cover.layout.cell_of(inside + Vector2(16, 0))), CoverScript.NEVER, "nor a cell beside it its feet miss")
 	check_equal(cover.flatness(cell, 5.0), 1.0, "flat while walked")
-	check_equal(cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD), 1.0, "and a while after")
-	check(cover.flatness(cell, 5.0 + TRAIL_LASTS) > 0.5, "a trail through the grass still lies flat %.0f s after the last body left (the owner, 2026-11-16: it sprang back far too soon)" % TRAIL_LASTS)
-	var half: float = cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD + CoverScript.TRAMPLE_SPRING * 0.5)
-	check(is_equal_approx(half, 0.5), "springing back, got %f" % half)
-	check(cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD + CoverScript.TRAMPLE_SPRING + 0.01) == 0.0, "and up again")
+	check_equal(cover.flatness(cell, 5.0 + HOLD), 1.0, "and its kind's hold after")
+	var half: float = cover.flatness(cell, 5.0 + HOLD + SPRING * 0.5)
+	check(is_equal_approx(half, 0.5), "springing back over its kind's spring, got %f" % half)
+	check(cover.flatness(cell, 5.0 + HOLD + SPRING + 0.01) == 0.0, "and up again")
+	check_equal(cover.flatness(bare_cell, 5.0), 0.0, "a cell of no cover is never flat")
 	var texture := (cover.batch_of(&"test_grass").material as ShaderMaterial).get_shader_parameter(&"trampled") as Texture2D
 	check(texture != null and texture.get_size() == Vector2(cover.layout.columns, cover.layout.rows), "the shader reads the grid, a texel a cell")
 	(table.node_of(0) as Node2D).global_position = Vector2(40, 200)

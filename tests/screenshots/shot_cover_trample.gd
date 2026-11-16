@@ -1,14 +1,15 @@
 extends "res://tests/support/screenshot.gd"
 ## A wizard walking through ground cover (ground cover GC4, docs/milestones/ground-cover.md, rule 6,
-## decision 4): the crypt's first arena under the hub's own grass (content/cover/hub_grass, its art
-## and trampled frames) filling all its open floor, the first wizard walked along a line through it, the tufts bending
-## away from it and lying trampled behind it, then springing back. Feel's look only.
+## decision 4): the hub's own grass (content/cover/hub_grass, its art and trampled frames) where it
+## grows in the hub, which has no enemies to fight over the pictures, the first wizard walked along
+## a line through it, the tufts bending away from it and lying trampled behind it, then springing
+## back. Feel's look only.
 ##
 ## Shots: `cover_trample_4x`, a strip of the same patch of floor as the wizard walks through it and
 ## after (FRAMES: the frame of each picture, from the walk's start), at 4×.
 
 const FeelScript := preload("res://gameplay/feel/feel.gd")
-const HUB_GRASS: CoverKind = preload("res://content/cover/hub_grass/hub_grass.tres")
+const RegistryScript := preload("res://core/registry/registry.gd")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 
 ## The walk: along `RUN` covered cells side by side (the run nearest the first player spawn), a
@@ -23,21 +24,22 @@ const GAP: int = 2
 
 
 func take() -> void:
-	if not need(["PlayerInput", "Flow", "Feel"]):
+	if not need(["PlayerInput", "Flow", "Feel", "Registry", "Events"]):
 		return
 	var input: Node = root.get_node("PlayerInput")
 	var flow: Node = root.get_node("Flow")
 	var feel := root.get_node("Feel") as FeelScript
+	var hub := (root.get_node("Registry") as RegistryScript).get_resource(&"rooms", &"hub") as RoomBase
+	if hub == null:
+		fail("no hub room")
+		return
 	input.call("add_virtual_device", 0)
-	feel.cover().use_kinds([_grass_everywhere()] as Array[CoverKind])
-	if not flow.call("start_run", 0):
-		fail("the run did not start")
+	root.get_node("Events").emit_signal("hub_requested", 0)
+	if not await wait_for(func() -> bool: return flow.get("mode") == &"hub" and flow.call("get_wizard", 0) != null, 600):
+		fail("the hub did not start")
 		return
-	if not await wait_for(func() -> bool: return get_first_node_in_group(&"wizards") != null, 600):
-		fail("no wizard came")
-		return
-	var wizard := get_first_node_in_group(&"wizards") as Node2D
-	var spawns: PackedVector2Array = PINNED_ROOM.places().player_spawns
+	var wizard := flow.call("get_wizard", 0) as Node2D
+	var spawns: PackedVector2Array = hub.places().player_spawns
 	var from: Vector2 = _walk_start(feel.cover().layout, spawns[0] if not spawns.is_empty() else Vector2(320, 180))
 	if not from.is_finite():
 		fail("the room has no %d covered cells side by side" % RUN)
@@ -64,16 +66,6 @@ func take() -> void:
 		return
 	strip.resize(strip.get_width() * 4, strip.get_height() * 4, Image.INTERPOLATE_NEAREST)
 	save(strip, "cover_trample_4x")
-	feel.cover().use_kinds(null)
-
-
-## The hub's grass, filling every open cell of the pinned room's biome.
-func _grass_everywhere() -> CoverKind:
-	var kind := HUB_GRASS.duplicate(true) as CoverKind
-	kind.biomes = [PINNED_ROOM.biome] as Array[StringName]
-	kind.fill_density = 1.0
-	kind.clump_size = 8
-	return kind
 
 
 ## The start of the run of `RUN` covered cells side by side nearest `near` (the middle of its

@@ -38,6 +38,9 @@ func test_it_is_sound_and_fills_the_hub() -> void:
 	check_equal(rest.state_id, &"rest", "it starts at rest")
 	check_equal(rest.frames, PackedInt32Array([0, 1, 2, 8, 9, 10]), "six tufts at rest, curved and leaning, so the grass is never a row of straight blades")
 	check(not rest.trampled_frames.is_empty(), "it draws trampled frames (GC4)")
+	check(GRASS.trample_hold >= 4.0, "a trail through it stays flat a good while after the last body left (the owner, 2026-11-16: it sprang back far too soon), got %.1f s" % GRASS.trample_hold)
+	check(GRASS.trample_spring >= 2.0, "and grows back slowly, not at once, got %.1f s" % GRASS.trample_spring)
+	check(GRASS.tufts_per_cell >= 5, "dense: at least five tufts a cell (the owner, 2026-11-16)")
 	check(rest.status == &"", "grass at rest harms nobody")
 
 

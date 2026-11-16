@@ -40,6 +40,10 @@ extends Resource
 @export_range(1, 8) var tufts_per_cell: int = 3
 ## How far its tufts sway in the wind at a state's full `sway`, in pixels at their tips.
 @export var sway: float = 1.0
+## How long a cell of it walked through lies flat after the last body left it, then how long it
+## takes to spring back, in seconds of Feel's clock (GC4, look only: Feel's `Cover.flatness`).
+@export_range(0.0, 30.0, 0.1) var trample_hold: float = 0.6
+@export_range(0.1, 30.0, 0.1) var trample_spring: float = 1.5
 
 @export_group("")
 ## Its states; the first is the one every cell of it starts in (at rest).

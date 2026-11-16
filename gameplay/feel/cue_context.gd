@@ -44,6 +44,7 @@ var power: float = 1.0
 func copy_from(other: RefCounted) -> void:
 	var from: CueContextScript = other as CueContextScript
 	if from == null:
+		push_error("CueContext.copy_from: %s is no cue context" % other)
 		return
 	caster = from.caster
 	ramp = from.ramp

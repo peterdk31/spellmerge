@@ -28,18 +28,17 @@ var _from: PackedFloat64Array = PackedFloat64Array()
 var _lasts: PackedFloat32Array = PackedFloat32Array()
 var _whole: PackedInt32Array = PackedInt32Array()
 var _thrown: PackedInt32Array = PackedInt32Array()
-## What throws a part with a cue (the spectacle's motes player), and makes a part to copy into.
+## What throws a part with a cue (the spectacle's motes player).
 var _throw: Callable
 ## Feel's clock at the last step.
 var _clock: float = -1.0
 
 
-## `throw(part, cue)` throws a motes part's `count` now (the spectacle's motes player);
-## `make_part()` makes an empty part (`motes_part.gd`), each slot's own.
-func _init(throw: Callable, make_part: Callable) -> void:
+## `throw(part, cue)` throws a motes part's `count` now (the spectacle's motes player).
+func _init(throw: Callable) -> void:
 	_throw = throw
 	for n in MOST:
-		_parts.append(make_part.call() as MotesPartScript)
+		_parts.append(MotesPartScript.new())
 		_cues.append(CueContextScript.new())
 	_from.resize(MOST)
 	_lasts.resize(MOST)
@@ -63,9 +62,15 @@ func start(part: MotesPartScript, cue: CueContextScript, now: float) -> void:
 		for n in count:
 			if _from[n] + _lasts[n] < _from[slot] + _lasts[slot]:
 				slot = n
-	_parts[slot].copy_from(part)
+	var own: MotesPartScript = _parts[slot]
+	own.copy_from(part)
+	own.turn = 0
+	# Its power is in its whole count and in how far it throws (a cue's power scales both), so
+	# each frame's share is thrown at power 1.
+	own.radius *= cue.power
+	if own.reach >= 0.0:
+		own.reach *= cue.power
 	_cues[slot].copy_from(cue)
-	# The share is the part's whole count, its power already in it.
 	_cues[slot].power = 1.0
 	_from[slot] = now
 	_lasts[slot] = lasts

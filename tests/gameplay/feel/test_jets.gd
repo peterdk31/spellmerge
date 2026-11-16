@@ -21,7 +21,7 @@ var jets: JetsScript
 func before_each() -> void:
 	thrown.clear()
 	jets = JetsScript.new(func(part: MotesPartScript, cue: CueContextScript) -> void:
-		thrown.append([part.count, cue.at, cue.aim, part.named]), MotesPartScript.new)
+		thrown.append([part.count, cue.at, cue.aim, part.named, part.reach, part.radius, cue.power]))
 
 
 func _part(count: int, lasts: float) -> MotesPartScript:
@@ -92,7 +92,11 @@ func test_a_full_set_of_jets_gives_way_to_a_new_one() -> void:
 	var seen: bool = false
 	for each: Array in thrown:
 		seen = seen or each[1] == Vector2(-1.0, -1.0)
-	check(seen, "the new one pours, in the place of the one that would end soonest")
+	check(seen, "the new one pours")
+	var evicted: bool = false
+	for each: Array in thrown:
+		evicted = evicted or each[1] == Vector2(0.0, 0.0)
+	check(not evicted, "in the place of the one that would end soonest (the first, 2 s)")
 
 
 func test_a_part_with_for_is_prepared_as_a_jet() -> void:
@@ -114,3 +118,96 @@ func test_a_cue_checks_its_jets() -> void:
 	check(" ".join(cue.problems()).contains("for is not"), "and pours for at most MOTES_FOR_MOST")
 	cue.parts = [{"part": &"motes", "kind": &"glob", "count": 12, "for": 0.3, "often": true}]
 	check(" ".join(cue.problems()).contains("neither share nor often"), "and is never one of many a frame")
+
+
+func test_a_strong_cue_pours_more_and_further() -> void:
+	# A cue's power is times its motes parts' counts and how far they fly (CueBase): a jet's too.
+	var part := _part(10, 0.1)
+	part.reach = 1.0
+	part.radius = 8.0
+	var cue := _cue(Vector2.ZERO)
+	cue.power = 2.0
+	jets.start(part, cue, 0.0)
+	for n in 12:
+		jets.step(float(n + 1) * DT)
+	check_equal(_total(), 20, "twice the count")
+	check(is_equal_approx(thrown[0][4], 2.0) and is_equal_approx(thrown[0][5], 16.0), "twice as far (reach %s, radius %s)" % [thrown[0][4], thrown[0][5]])
+	check(is_equal_approx(thrown[0][6], 1.0), "each share thrown at power 1, its power in it")
+	check(is_equal_approx(part.reach, 1.0), "the cue's own part is left as it was")
+
+
+func test_a_jets_share_of_its_spells_kinds_adds_up() -> void:
+	# A spell's motes are split between its cards' kinds: a jet's few a frame must not give each kind
+	# one more than it is due (review, 2026-11-16: it poured three times its count).
+	var kinds: int = 3
+	var given := PackedInt32Array([0, 0, 0])
+	var turn: int = 0
+	var whole: int = 0
+	for frame in 30:
+		var count: int = 1 + frame % 2
+		var frame_total: int = 0
+		for at in kinds:
+			var each: int = SpectacleScript.jet_share(count, kinds, turn, at)
+			given[at] += each
+			frame_total += each
+		check_equal(frame_total, count, "a frame's share is thrown, no more")
+		turn = posmod(turn + count, kinds)
+		whole += count
+	check_equal(given[0] + given[1] + given[2], whole, "the whole count in all")
+	check(absi(given[0] - given[1]) <= 1 and absi(given[1] - given[2]) <= 1, "each kind its share (%s)" % [given])
+
+
+func test_the_spectacle_pours_only_while_motes_are_thrown_and_ends_its_jets_with_the_room() -> void:
+	var spectacle := SpectacleScript.new()
+	var part := _part(30, 1.0)
+	spectacle.jets.start(part, _cue(Vector2.ZERO), 0.0)
+	spectacle.particles_enabled = false
+	spectacle.step(0.1)
+	check(not spectacle.jets.is_pouring(), "particles off: its jets end (nothing thrown, no pool read)")
+	spectacle.jets.start(part, _cue(Vector2.ZERO), 0.1)
+	spectacle.use_room(null)
+	check(not spectacle.jets.is_pouring(), "a new room ends them too")
+	spectacle.free()
+
+
+## Every field of a script's own, set to something other than its default.
+func _fill(target: Object) -> void:
+	for prop: Dictionary in target.get_property_list():
+		if (int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0:
+			continue
+		var name: StringName = prop["name"]
+		match typeof(target.get(name)):
+			TYPE_INT:
+				target.set(name, 7)
+			TYPE_FLOAT:
+				target.set(name, 0.375)
+			TYPE_BOOL:
+				target.set(name, not bool(target.get(name)))
+			TYPE_STRING_NAME:
+				target.set(name, &"filled")
+			TYPE_VECTOR2:
+				target.set(name, Vector2(3.0, 4.0))
+			TYPE_COLOR:
+				target.set(name, Color(0.25, 0.5, 0.75, 1.0))
+
+
+func _differs(a: Object, b: Object) -> PackedStringArray:
+	var found := PackedStringArray()
+	for prop: Dictionary in a.get_property_list():
+		if (int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE) != 0 and a.get(prop["name"]) != b.get(prop["name"]):
+			found.append(String(prop["name"]))
+	return found
+
+
+func test_a_copy_takes_every_field() -> void:
+	# A field added later must be copied too, or a jet throws with its default.
+	var part := MotesPartScript.new()
+	_fill(part)
+	var copy := MotesPartScript.new()
+	copy.copy_from(part)
+	check(_differs(part, copy).is_empty(), "a motes part's copy takes every field (missed: %s)" % [_differs(part, copy)])
+	var cue := CueContextScript.new()
+	_fill(cue)
+	var cue_copy := CueContextScript.new()
+	cue_copy.copy_from(cue)
+	check(_differs(cue, cue_copy).is_empty(), "a cue's copy takes every field (missed: %s)" % [_differs(cue, cue_copy)])

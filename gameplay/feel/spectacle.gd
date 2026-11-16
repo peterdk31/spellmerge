@@ -99,7 +99,7 @@ var births: BirthsScript = BirthsScript.new()
 var streams: StreamsScript = StreamsScript.new()
 ## The cues' mote jets under way (`motes` parts with `for`: a stream poured out of a staff;
 ## `jets.gd`), each frame's share thrown by the motes player.
-var jets: JetsScript = JetsScript.new(_play_motes_part, MotesPart.new)
+var jets: JetsScript = JetsScript.new(_play_motes_part)
 ## The motes still carriers' shots give off while they stand (`still_motes.gd`: a wall's stream, a
 ## pool's rising motes), from the rows the projectile manager draws them by.
 var still_motes: StillMotesScript = StillMotesScript.new()
@@ -225,7 +225,11 @@ func step(now: float, table: ActorsScript = null) -> void:
 	cards.new_frame()
 	_trail_motes()
 	streams.step(now, projectiles, births, motes_on())
-	jets.step(now)
+	# A jet throws through the motes player, so it pours only while motes are thrown.
+	if motes_on():
+		jets.step(now)
+	else:
+		jets.clear()
 	_drawn_motes()
 	source_motes.give_off(now, pool if motes_on() else null, view_rect(), _standing)
 	if barriers != null:
@@ -593,6 +597,11 @@ func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 	# What a surface sheds (the walls', or a room's own kinds) cools through the surface's colours,
 	# as does a part whose `colours` say so; one whose `colours` are the spell's, through its ramp.
 	var of_surface: bool = named == &"surface" or part.colours == &"surface"
+	# A jet's frame share (`for`, jets.gd) is split exactly, the remainder turning round the kinds
+	# from frame to frame, so a jet pours its count in all and no kind gets one it is not due.
+	var jet: bool = part.lasts > 0.0 and count >= 0
+	var n_kinds: int = maxi(kinds.size(), 1)
+	var at_kind: int = 0
 	for k in kinds:
 		# A card's own surface kind (grit) cools through the walls' colours, unless in an exact one.
 		var walls: bool = of_surface or (pool.kinds()[k].surface and part.colours != &"spell" and not exact)
@@ -603,7 +612,21 @@ func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 		# How many of this kind: its share of the part's count (else its own count), times the power.
 		var each_share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
 		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(each_share * cue.power), 1)
+		if jet:
+			each = jet_share(count, n_kinds, part.turn, at_kind)
+			at_kind += 1
+			if each == 0:
+				continue
 		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, part.spread, part.up, part.ring, part.often, line, life, 0 if walls else cards_look)
+	if jet:
+		part.turn = posmod(part.turn + count, n_kinds)
+
+
+## A jet's frame share of `count` for the kind `at` of `kinds` (jets.gd): an even split, the
+## remainder going to the kinds from `turn` on, so turning `turn` on by the count each frame gives
+## every kind its share in all and the shares add up to `count`.
+static func jet_share(count: int, kinds: int, turn: int, at: int) -> int:
+	return count / kinds + (1 if posmod(at - turn, kinds) < count % kinds else 0)
 
 
 ## A cue's `motes` part read into its typed fields once (`Feel.add_cue_part`'s `prepare`, S6 2: a
@@ -871,6 +894,8 @@ func _on_room_entered(room_id: StringName) -> void:
 ## The room `room` (null for none) is the one played in now: its walls' colours and motes, and its
 ## ambient light (`room_entered` calls this; tests too).
 func use_room(room: RoomBase) -> void:
+	# A jet poured in the room before ends with it.
+	jets.clear()
 	_surface_colors = room.surface_colors() if room != null else PackedColorArray()
 	_surface_ids = room.surface_kinds if room != null else ([] as Array[StringName])
 	_take_surface_kinds()

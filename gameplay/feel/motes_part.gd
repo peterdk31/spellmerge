@@ -36,14 +36,17 @@ var pool_seen: Object = null
 var kind_at: int = -1
 var kind_surface: bool = false
 var kind_count: int = 1
-## Seconds it pours for (`for`; 0: all at once).
+## Seconds it pours for (`for`; 0: all at once), and for a jet's copy, where the remainder of a
+## frame's share starts among its spell's kinds (turning, so no kind is short in all).
 var lasts: float = 0.0
+var turn: int = 0
 
 
 ## Takes every field of `other` (a jet's own copy of the part it pours, `jets.gd`).
 func copy_from(other: RefCounted) -> void:
 	var from: MotesPartScript = other as MotesPartScript
 	if from == null:
+		push_error("MotesPart.copy_from: %s is no motes part" % other)
 		return
 	named = from.named
 	colours = from.colours
@@ -68,3 +71,4 @@ func copy_from(other: RefCounted) -> void:
 	kind_surface = from.kind_surface
 	kind_count = from.kind_count
 	lasts = from.lasts
+	turn = from.turn

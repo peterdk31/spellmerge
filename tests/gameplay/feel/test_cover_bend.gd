@@ -1,0 +1,201 @@
+extends "res://tests/support/suite.gd"
+## Bodies bend ground cover and trample it (ground cover GC4, docs/milestones/ground-cover.md, rule 6
+## and decision 4): Feel's look only. Each frame the cover takes the actor table's bodies, keeps the
+## `BODIES` nearest the camera's middle and hands them to every batch's shader; the cells they stand
+## in, covered ones only, are walked in Feel's view grid (the shader's `trampled` texture), flat while
+## walked and a while after, then springing back; a state's trampled frames ride in its rows' colour;
+## and a frame of it allocates nothing (in the style of the motes' tests).
+##
+## godot --headless --path . --script res://tests/gameplay/feel/test_cover_bend.gd
+
+const CoverScript := preload("res://gameplay/feel/cover.gd")
+const FeelScript := preload("res://gameplay/feel/feel.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
+var fixture_grass: CoverKind = preload("res://tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres")
+
+## The field of grass every test lays: cells (12, 12) to (15, 15) of a room 640×384.
+const FIELD := Rect2(192, 192, 64, 64)
+
+
+## A sheet of `frames` 16×16 frames.
+static func _sheet(frames: int) -> Texture2D:
+	var image := Image.create_empty(16 * frames, 16, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.2, 0.5, 0.2))
+	return ImageTexture.create_from_image(image)
+
+
+## The test grass with a sheet of seven frames, its resting state drawing frame 6 trampled.
+func _grass() -> CoverKind:
+	var kind := fixture_grass.duplicate(true) as CoverKind
+	kind.biomes = [] as Array[StringName]
+	kind.sheet = _sheet(7)
+	kind.states[0].trampled_frames = PackedInt32Array([6])
+	return kind
+
+
+## A room 640×384, walls round the edge a tile thick, and a field of grass over `FIELD`.
+func _layout() -> Node2D:
+	var layout := own(Node2D.new()) as Node2D
+	var walls := StaticBody2D.new()
+	walls.collision_layer = RoomBase.WALL_LAYER
+	layout.add_child(walls)
+	for box: Rect2 in [Rect2(0, 0, 640, 32), Rect2(0, 352, 640, 32), Rect2(0, 0, 32, 384), Rect2(608, 0, 32, 384)]:
+		var shape := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		rect.size = box.size
+		shape.shape = rect
+		shape.position = box.get_center()
+		walls.add_child(shape)
+	var field := CoverField.new()
+	field.kind = &"test_grass"
+	field.density = 1.0
+	field.offset_left = FIELD.position.x
+	field.offset_top = FIELD.position.y
+	field.offset_right = FIELD.end.x
+	field.offset_bottom = FIELD.end.y
+	layout.add_child(field)
+	return layout
+
+
+func _room() -> RoomBase:
+	var room := RoomBase.new()
+	room.id = &"meadow"
+	return room
+
+
+func _cover() -> CoverScript:
+	var cover: CoverScript = own(CoverScript.new(RoomBase.FLOOR_Z + 1)) as CoverScript
+	root.add_child(cover)
+	cover.lay(CoverLayout.of(_layout(), _room(), [_grass()] as Array[CoverKind]))
+	return cover
+
+
+## An actor table of a body at each of `places`, in id order.
+func _table(places: PackedVector2Array) -> ActorsScript:
+	var table := own(ActorsScript.new()) as ActorsScript
+	for at in places:
+		var body := own(Node2D.new()) as Node2D
+		root.add_child(body)
+		body.global_position = at
+		var id: int = table.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+		table.set_node(id, body)
+	return table
+
+
+func test_the_bodies_nearest_the_camera_are_handed_to_every_batch() -> void:
+	var cover: CoverScript = _cover()
+	check(cover.layout.count(&"test_grass") > 0, "the field is laid")
+	var places := PackedVector2Array()
+	# 40 bodies along a line from the camera's middle at (0, 0): the 32 nearest are the first 32,
+	# given in an order that is not theirs.
+	for n in 40:
+		places.append(Vector2(float((n * 7) % 40) * 10.0, 0.0))
+	var table: ActorsScript = _table(places)
+	cover.step(1.0, table, Vector2.ZERO)
+	check_equal(cover.body_count(), CoverScript.BODIES, "at most BODIES bodies")
+	var given: PackedVector2Array = cover.bodies()
+	for at in cover.body_count():
+		check(given[at].x < 320.0, "only the nearest bodies are handed over, got %s" % given[at])
+	var material := cover.batch_of(&"test_grass").material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"body_count"), CoverScript.BODIES, "the shader is told how many")
+	var held: PackedVector2Array = material.get_shader_parameter(&"bodies")
+	check_equal(held, given, "and where they are")
+	check_equal(material.get_shader_parameter(&"bend_reach"), CoverScript.BEND_REACH, "the bend's numbers are Feel's")
+	check_equal(material.get_shader_parameter(&"trample_hold"), CoverScript.TRAMPLE_HOLD, "and the trample's")
+
+
+func test_with_no_camera_the_first_bodies_bend_it_and_none_without_a_table() -> void:
+	var cover: CoverScript = _cover()
+	cover.step(1.0, _table(PackedVector2Array([Vector2(10, 10), Vector2(20, 20)])))
+	check_equal(cover.body_count(), 2, "every body when they are few")
+	cover.step(2.0, null)
+	check_equal(cover.body_count(), 0, "none without a table")
+	check_equal((cover.batch_of(&"test_grass").material as ShaderMaterial).get_shader_parameter(&"body_count"), 0, "and the shader is told")
+
+
+func test_a_body_walks_the_covered_cell_it_stands_in() -> void:
+	var cover: CoverScript = _cover()
+	var inside := Vector2(200, 200)
+	var bare := Vector2(40, 40)
+	var table: ActorsScript = _table(PackedVector2Array([inside, bare]))
+	var cell: int = cover.layout.cell_of(inside)
+	var bare_cell: int = cover.layout.cell_of(bare)
+	check_equal(cover.walked_at(cell), CoverScript.NEVER, "a cell never walked")
+	check_equal(cover.flatness(cell, 0.0), 0.0, "stands up")
+	cover.step(5.0, table, Vector2.ZERO)
+	check_equal(cover.walked_at(cell), 5.0, "the covered cell a body stands in is walked at Feel's clock")
+	check_equal(cover.walked_at(bare_cell), CoverScript.NEVER, "a cell with no cover is not")
+	check_equal(cover.flatness(cell, 5.0), 1.0, "flat while walked")
+	check_equal(cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD), 1.0, "and a while after")
+	var half: float = cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD + CoverScript.TRAMPLE_SPRING * 0.5)
+	check(is_equal_approx(half, 0.5), "springing back, got %f" % half)
+	check(cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD + CoverScript.TRAMPLE_SPRING + 0.01) == 0.0, "and up again")
+	var texture := (cover.batch_of(&"test_grass").material as ShaderMaterial).get_shader_parameter(&"trampled") as Texture2D
+	check(texture != null and texture.get_size() == Vector2(cover.layout.columns, cover.layout.rows), "the shader reads the grid, a texel a cell")
+	(table.node_of(0) as Node2D).global_position = Vector2(40, 200)
+	cover.step(6.0, table, Vector2.ZERO)
+	check_equal(cover.walked_at(cell), 5.0, "a cell left keeps when it was last walked")
+	cover.lay(CoverLayout.of(_layout(), _room(), [_grass()] as Array[CoverKind]))
+	check_equal(cover.walked_at(cell), CoverScript.NEVER, "a room laid again starts never walked")
+
+
+func test_a_states_trampled_frames_ride_in_its_rows() -> void:
+	var cover: CoverScript = _cover()
+	var rows: PackedFloat32Array = cover.rows_of(&"test_grass")
+	check(rows.size() > 0, "rows laid")
+	for at in range(0, rows.size(), CoverScript.STRIDE):
+		check_equal(roundi(rows[at + 8] * 255.0), 7, "a resting tuft draws frame 6 trampled (its code 7)")
+	var cell: int = cover.layout.cell_of(Vector2(200, 200))
+	cover.show_state(cell, cover.layout.kinds[0].state_at(&"burning"))
+	rows = cover.rows_of(&"test_grass")
+	var plain: int = 0
+	for at in range(0, rows.size(), CoverScript.STRIDE):
+		if roundi(rows[at + 8] * 255.0) == 0:
+			plain += 1
+	check_equal(plain, cover.layout.kinds[0].tufts_per_cell, "a state with no trampled frames is pressed flat instead (code 0)")
+
+
+## A frame of it, bodies moving through the grass, makes no object and allocates no row.
+func test_a_frame_allocates_nothing() -> void:
+	var cover: CoverScript = _cover()
+	var places := PackedVector2Array()
+	for n in 48:
+		places.append(Vector2(200.0 + float(n % 8) * 6.0, 200.0 + float(n / 8) * 6.0))
+	var table: ActorsScript = _table(places)
+	cover.step(0.0, table, Vector2(220, 220))
+	cover.step(0.016, table, Vector2(220, 220))
+	var objects: float = Performance.get_monitor(Performance.OBJECT_COUNT)
+	for frame in 200:
+		for id in 48:
+			var body := table.node_of(id) as Node2D
+			body.global_position += Vector2(0.5, 0.25)
+		cover.step(0.032 + float(frame) * 0.016, table, Vector2(220, 220))
+	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "200 frames of bodies through the grass make no object")
+	check_equal(cover.body_count(), CoverScript.BODIES, "the nearest bodies still handed over")
+
+
+## Feel hands its actor table and the camera's middle to the cover each frame.
+func test_feels_step_bends_the_cover() -> void:
+	var feel := root.get_node_or_null("Feel") as FeelScript
+	check(feel != null, "the game's Feel")
+	if feel == null:
+		return
+	var table: ActorsScript = _table(PackedVector2Array([Vector2(200, 200)]))
+	var actors_before: Variant = feel.actors
+	feel.actors = table
+	feel.cover().lay(CoverLayout.of(_layout(), _room(), [_grass()] as Array[CoverKind]))
+	feel.step(0.016)
+	check_equal(feel.cover().body_count(), 1, "the actor table's body bends it")
+	check(feel.cover().walked_at(feel.cover().layout.cell_of(Vector2(200, 200))) > CoverScript.NEVER, "and tramples its cell")
+	feel.actors = actors_before
+	feel.cover().lay(CoverLayout.of(_layout(), _room(), [] as Array[CoverKind]))
+
+
+## The shader compiles with the uniforms the cover sets (a shader that fails to compile lists none:
+## a regression test for a name the shading language keeps, such as `flat`).
+func test_the_shader_compiles_with_its_uniforms() -> void:
+	var names := PackedStringArray()
+	for uniform: Dictionary in CoverScript.SHADER.get_shader_uniform_list():
+		names.append(String(uniform[&"name"]))
+	for wanted: String in ["view_time", "frame_size", "sheet_size", "bodies", "body_count", "bend_reach", "bend_pixels", "trample_hold", "trample_spring", "flatten", "trampled"]:
+		check(names.has(wanted), "the cover shader compiles and has '%s' (got %s)" % [wanted, names])

@@ -322,7 +322,8 @@ func test_the_staff_s_wind_up_comes_before_every_cast() -> void:
 
 ## Held on, a spray pours (`Carrier.pours_held`; the Spitter, content/enemies/spitter/): its first
 ## cast winds up its staff (an enemy's telegraph), the held casts after it do not, and a new press
-## winds it up again. A held swing is a new blow each time and winds up each time.
+## winds it up again, as do a rebuild and a cast that does not follow on. A held swing is a new
+## blow each time and winds up each time.
 func test_a_held_spray_winds_up_once_and_pours_on() -> void:
 	_fake.items[&"spray"] = load("res://content/spells/carriers/spray/spray.tres")
 	_fake.items[&"swing"] = load("res://content/spells/carriers/swing/swing.tres")
@@ -339,6 +340,14 @@ func test_a_held_spray_winds_up_once_and_pours_on() -> void:
 	_tick(40)
 	_spells.press_staff(1, 0, Vector2.ZERO, AIM, 100.0)
 	check(_spells.is_winding(1, 0), "a new press is a new attack: it winds up again")
+	_tick(45)
+	_install(1, 0, "spray")
+	_spells.cast_staff(1, 0, Vector2.ZERO, AIM, 100.0)
+	check(_spells.is_winding(1, 0), "a rebuild winds up again")
+	_tick(45)
+	_tick(60)
+	_spells.cast_staff(1, 0, Vector2.ZERO, AIM, 100.0)
+	check(_spells.is_winding(1, 0), "and a cast that does not follow on (a prop's trigger a second later) winds up whole")
 	_install(2, 0, "swing")
 	_spells.press_staff(2, 0, Vector2.ZERO, AIM, 100.0)
 	_tick(60)

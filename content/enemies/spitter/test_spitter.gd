@@ -105,6 +105,26 @@ func test_it_telegraphs_before_its_spray_hurts() -> void:
 	check(hurt - telegraphed >= wind_up - AiFixture.STEP, "the player is hurt only after a whole telegraph (%.2f s from %.2f s, wind-up %.2f s)" % [hurt, telegraphed, wind_up])
 
 
+func test_every_pour_comes_after_a_telegraph() -> void:
+	# The review, 2026-11-16: a held spray skips its staff's wind-up, so each attack must start with a
+	# press that winds up whole: every hold is right after a telegraph.
+	_world.players[0].position = Vector2(55.0, 0.0)
+	var body: Actor = _spitter()
+	var mind: AIController = AiFixture.ai(body)
+	var holds: int = 0
+	var was: int = -1
+	var told: bool = false
+	for step in int(10.0 / AiFixture.STEP):
+		_world.run(body, 1)
+		told = told or mind.is_telegraphing()
+		if mind.state == AIController.State.CHANNEL and was != AIController.State.CHANNEL:
+			holds += 1
+			check(told, "hold %d came after a telegraph" % holds)
+			told = false
+		was = mind.state
+	check(holds >= 3, "it attacks again and again (%d holds in 10 s)" % holds)
+
+
 func test_it_holds_the_spray_for_a_moment_and_lets_go() -> void:
 	var out: Dictionary = _fight(55.0)
 	var casts: Array[float] = out["casts"]

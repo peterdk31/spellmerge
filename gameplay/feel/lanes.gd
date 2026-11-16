@@ -21,11 +21,13 @@ const BEAM_TEXTURE: Texture2D = preload("res://art/vfx/beam.svg")
 const MOST: int = 32
 ## The lane starts this far past the staff tip, so it never covers the caster's own hand.
 const START: float = 4.0
-## A sprite's region height (its texture's), with the lane in its middle; a wider lane's is taller,
-## up to twice `LANE_MOST` and its glow.
+## A sprite's region height (its texture's), with the lane in its middle; a cone's wider than
+## `NEAR_MOST` is taller, up to twice `LANE_MOST` and its glow.
 const HEIGHT: float = 32.0
 ## The widest a lane is drawn either side of its middle (pixels; the shader's `LANE_MOST`).
 const LANE_MOST: float = 40.0
+## The widest a lane is at its caster's end (pixels either side; as ever, before cones).
+const NEAR_MOST: float = 14.0
 ## Pixels of glow drawn past a lane's edge.
 const GLOW: float = 4.0
 ## The lane is the hit width of what is coming plus this margin, either side half of it.
@@ -97,10 +99,13 @@ func play(caster: int, tag: int, seconds: float, tint: Color, reach: float) -> v
 	_beat[at] = 0.0
 	var sprite: Sprite2D = _sprites[at]
 	var run: float = length - START
-	var near: float = float(spells.call("carrier_radius", tag)) + LANE_MARGIN * 0.5
-	var far: float = maxf(float(spells.call("carrier_lane", tag)) + LANE_MARGIN * 0.5, near)
+	var radius: float = float(spells.call("carrier_radius", tag))
+	var lane: float = float(spells.call("carrier_lane", tag))
+	var near: float = minf(radius + LANE_MARGIN * 0.5, NEAR_MOST)
+	# Only a cone widens (its lane wider than its hit radius); any other lane is as wide all along.
+	var far: float = maxf(lane + LANE_MARGIN * 0.5, near) if lane > radius else near
 	# Tall enough for its widest end and its glow, its middle kept on the texture's middle row.
-	var high: float = maxf(HEIGHT, 2.0 * ceilf(minf(far, LANE_MOST) + GLOW))
+	var high: float = HEIGHT if far <= NEAR_MOST else maxf(HEIGHT, 2.0 * ceilf(minf(far, LANE_MOST) + GLOW))
 	sprite.offset = Vector2(START, -high * 0.5)
 	sprite.region_rect = Rect2(0.0, (HEIGHT - high) * 0.5, run, high)
 	var material: ShaderMaterial = sprite.material as ShaderMaterial

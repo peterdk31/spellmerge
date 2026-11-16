@@ -31,7 +31,7 @@ So `nova · skyfall · bolt` drops 8 bolts on a ring of spots round you. `skyfal
 ### How it works
 
 - A new behaviour, `NOVA`, at the end of `ModifierBase.Behaviour`. `behaviour_strength` is how many ways: 8 on the card. More cards add (`Stack.ADD`), with no cap (built 2026-11-09: the owner's rule that cards are not limited; the plan first proposed a cap of 24).
-- The runtime casts the carrier N times from the same origin, by the same caster. Copy k goes along the aim turned by k/N of a full turn (`DMath.rotated`); copy 0 goes along the aim. Each copy is a whole launch, so a carrier keeps its own shots: `split · nova · bolt` is 8 fans of 3.
+- The runtime casts the carrier N times from the same origin, by the same caster. Copy k goes along the aim turned by k/N of a full turn (`DMath.rotated`) and by the card's turn this cast (owner, 2026-11-16: each cast turns on by `SpellLimits.RING_STEP` of a gap; copy 0 of the first cast goes along the aim, so no way keeps going straight back across the caster). Each copy is a whole launch, so a carrier keeps its own shots: `split · nova · bolt` is 8 fans of 3.
 - **Why not shots and spread, like Split?** Split is `shot_mult` (staff_compiler.gd:497), and a spread only means something on a carrier that fans (`SPREAD`). A nova built that way would do nothing on a wall and nothing to an orbit. It is not a multicast either: a multicast draws more carriers, and the owner asked for a card that changes the next one.
 - **Its look:** the card's `cue`, `nova` (content/cues/nova.tres: the ring out, a ring of motes, the `burn_ring` mark), played once per nova at its centre with `cue_shown`, the way a blast plays its cue (spells.gd:1741). The atom's special case goes (atom.gd:27-32, 39-40).
 

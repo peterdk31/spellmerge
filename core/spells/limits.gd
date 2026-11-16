@@ -209,3 +209,9 @@ const PENTA_WITHIN: float = 0.8
 ## How fast a penta's ring turns, in radians a second (owner, 2026-11-06: "rotate continuously"):
 ## once round every two seconds.
 const PENTA_TURN: float = PI
+## How far a ring of copies (a Nova's ways, a Penta's ring) turns on from one cast of its card to
+## the next, as a share of the gap between two copies (owner, 2026-11-16: "Can the nova rotate for
+## each cast? I also think Penta should do this"): the golden ratio's, so casts in a row never stand
+## the same and no copy keeps one way (a Nova's straight back across its caster every cast, a
+## Penta's where its turning back and forth would bring it again).
+const RING_STEP: float = 0.6180339887

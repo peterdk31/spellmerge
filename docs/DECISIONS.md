@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-16: Nova and Penta rings turn on with every cast (owner)
+
+- **The owner:** "When firing a nova, one of the nova projectiles always fire right back at the staff direction, hitting the wizard. Can the nova rotate for each cast? I also think Penta should do this".
+- **Now:** a Nova card's ways stand turned off the aim by a turn of the card's own (`Spells._nova_turn`, kept by tag in `_nova_turns`): none on its first cast (copy 0 along the aim, as 2026-11-09), then `SpellLimits.RING_STEP` (0.618, the golden ratio's share) of a gap more on each cast, so no way flies straight back every time and casts in a row never stand the same. A firing and its mirror share the turn.
+- **Penta** already turned (2026-11-06), but each cast turns back what the last turned, so a steady rhythm of casts (a held button) stood its ring on only two sets of points. Each cast now also steps on by the same share of its gap.
+- **Not chosen:** a random turn (it would need rolls of its own, and could repeat); the first cast half a gap off the aim (the copies a sixteenth of a turn off straight back still cross the wizard, and the combos stand their imps on the aim's lines); a turn by the clock for Nova (a steady rhythm of casts would stand it the same again, as it did Penta).
+- **Not this change:** a nova's copy still hits a wizard who is moving as it leaves (the sparing of `ProjectileManager._still_spares` is judged against where the body stands, not how it moves); a fix of its own.
+
 ## 2026-11-16: Leaf, a palette material for growth (ground cover GC8)
 
 - **Now:** a new material, **Leaf** (`#2f4022` `#5b7233` `#a0ad55`), in docs/STYLE.md, `art/kit`'s palette files, `core/base/palette.gd` and the SVG art test (46 colours). The hub's grass and the crypt's moss are drawn in it.

@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-16: the boss intro stops the game for everyone (owner)
+
+- **The owner:** "We need a cool screen wide overlay when facing a boss in its arena. [...] After the last dialog (if any) a player should press A to close the overlay and start the fight." The plan is [milestones/boss-intro.md](milestones/boss-intro.md) (BI1 to BI6), reviewed by a fresh-context agent against the code before it was handed to the owner.
+- **It reverses the boss plan's entrance** ("No cutscene, nobody waits", OB16's banner) for a boss with an intro, and adds rule 7 to DESIGN.md's no-waiting rules: the intro stops every machine, and any player's A moves it on (owner: "All players can move it forward"), so nobody waits for one player in particular.
+- **The pause and its page are the simulation's** (a stop of `Sim`, turned by a command carrying the page its sender saw), so every machine and a replay stop and go on the same tick; the look is the HUD's, on real time.
+- **Also the owner's:** a drawn portrait for each boss; the boss is the only speaker; only at the fight's start, never at a phase change.
+- **The session's, for the owner to overrule:** a bitmap title type beside the body font (the allowed file types, AGENTS.md hard rule 2, have no `.ttf`), and the intro as a run's rule (`SessionRules.boss_intros`), off for tests and bots.
 ## 2026-11-16: The Spitter; a held spray pours after one telegraph, and its lane is a cone
 
 - **The owner** (PR #777's session): a new crypt enemy, the Spitter, that telegraphs and then sprays acid in a cone with the Spray carrier, in the crypt's pool now (not sandbox-only).

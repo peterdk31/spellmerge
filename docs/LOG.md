@@ -2,6 +2,11 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-16: Boss intro BI1, the plan
+
+The boss intro is planned with the owner and approved ([docs/milestones/boss-intro.md](milestones/boss-intro.md), BI1 to BI6): a screen-wide overlay as a boss's fight starts, the boss a silhouette, then its name in a title type and the boss revealed looking mean, its lines, and the fight starting on any player's A after the last. The pause and its pages are the simulation's (a stop of `Sim`, turned by a command carrying the page its sender saw); the look is the HUD's. The owner's answers: any player moves it on, a drawn portrait for each boss, the boss the only speaker, only at the fight's start, and the broom's two lines. DESIGN.md gains no-waiting rule 7 (pillar 2's exception, also in AGENTS.md and the co-op README), STYLE.md the title type, STORY.md speech in use; the boss plan's entrance points here.
+
+Reviewed by a fresh-context agent against the code; changed after it: the hold opens at the end of a room's setup, `boss_shown` says whether the boss has an intro, Feel plays the intro's cues while the tree is paused, the rules' header and replay format exactly, A kept out of the other menus, closed when the last seat leaves or the run ends, the docs' other no-waiting lines.
 ## 2026-11-16: The Spitter, a crypt enemy that sprays
 
 A new stray, **the Spitter** (`content/enemies/spitter/`): a snake staff (an olive snake coiled round a wooden staff, jaws open, one eye; the owner's direction), holding a staff of the new Spray carrier. It keeps to its spray's short reach, telegraphs (0.8 s, its lane now a widening cone), then holds a cone of Blight acid on a player for about a second, turning slowly after them (the new `sprayer` profile), and joins the crypt's enemy pool (cost 3, from row 1). Two engine changes made it play as designed: a held spray pours after one wind-up instead of winding its staff up before every puff (`Carrier.pours_held`), and a telegraph lane widens to a cone's width at its far end (`Spells.carrier_lane`).

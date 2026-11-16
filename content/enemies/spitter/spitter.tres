@@ -13,6 +13,7 @@ display_name = "Spitter's staff"
 slots = 1
 draw = 1
 wind_up = 0.8
+cast_cue = &"spitter_acid"
 cooldown = 0.0
 spread = 0.0
 max_mana = 16.0

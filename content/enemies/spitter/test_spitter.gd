@@ -52,6 +52,20 @@ func test_its_data_is_a_sound_stray_with_a_spray_staff() -> void:
 	check(face != null and face.style == Face.Style.STRAY and face.resting_mood == Face.Mood.ANGRY, "it wears an angry stray face")
 
 
+func test_its_acid_is_a_jet_in_the_enemies_blight() -> void:
+	var staff: StaffBase = SPITTER.staffs[0].staff
+	var cue := _world.registry.call("get_resource", &"cues", staff.cast_cue) as CueBase
+	check(cue != null, "its staff's cast cue (%s) is a cue" % staff.cast_cue)
+	if cue == null:
+		return
+	check_equal(cue.problems(), PackedStringArray(), "a sound one")
+	for part: Dictionary in cue.parts:
+		var shade: bool = false
+		for blight: Color in Palette.shades_of(&"blight"):
+			shade = shade or (part.get("color", Color.BLACK) as Color).is_equal_approx(blight)
+		check(part.has("for") and shade, "each part pours, in a shade of Blight: %s" % [part])
+
+
 func test_it_joins_the_crypt_pool_as_a_mid_strength_enemy() -> void:
 	check(SPITTER.biomes.has(&"crypt"), "it fights in the crypt (the owner, 2026-11-16)")
 	check(SPITTER.cost >= 2 and SPITTER.cost <= 3, "mid-strength in a room's budget (%d)" % SPITTER.cost)

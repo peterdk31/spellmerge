@@ -63,8 +63,8 @@ const BEND_PIXELS: float = 4.0
 ## A walked cell's tufts lie flat this long after the last body left it, then spring back over
 ## `TRAMPLE_SPRING` (seconds of Feel's clock); flat, a tuft with no trampled frame is pressed down
 ## by this much of its height.
-const TRAMPLE_HOLD: float = 0.6
-const TRAMPLE_SPRING: float = 1.5
+const TRAMPLE_HOLD: float = 5.0
+const TRAMPLE_SPRING: float = 4.0
 const FLATTEN: float = 0.5
 ## When a cell never walked through was walked (long before any clock).
 const NEVER: float = -1.0e6

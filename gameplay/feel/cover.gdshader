@@ -39,8 +39,8 @@ uniform int body_count = 0;
 // FLATTEN), set once a batch.
 uniform float bend_reach = 14.0;
 uniform float bend_pixels = 4.0;
-uniform float trample_hold = 0.6;
-uniform float trample_spring = 1.5;
+uniform float trample_hold = 5.0;
+uniform float trample_spring = 4.0;
 uniform float flatten = 0.5;
 // Feel's view grid: when each cell (CoverLayout.CELL pixels) was last walked through.
 uniform sampler2D trampled : filter_nearest;

@@ -1,14 +1,14 @@
 extends "res://tests/support/screenshot.gd"
 ## A wizard walking through ground cover (ground cover GC4, docs/milestones/ground-cover.md, rule 6,
-## decision 4): the crypt's first arena under the stand-in grass (tests/support/stand_in_grass.gd)
-## filling all its open floor, the first wizard walked along a line through it, the tufts bending
+## decision 4): the crypt's first arena under the hub's own grass (content/cover/hub_grass, its art
+## and trampled frames) filling all its open floor, the first wizard walked along a line through it, the tufts bending
 ## away from it and lying trampled behind it, then springing back. Feel's look only.
 ##
 ## Shots: `cover_trample_4x`, a strip of the same patch of floor as the wizard walks through it and
 ## after (FRAMES: the frame of each picture, from the walk's start), at 4×.
 
 const FeelScript := preload("res://gameplay/feel/feel.gd")
-const StandInGrass := preload("res://tests/support/stand_in_grass.gd")
+const HUB_GRASS: CoverKind = preload("res://content/cover/hub_grass/hub_grass.tres")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 
 ## The walk: along `RUN` covered cells side by side (the run nearest the first player spawn), a
@@ -16,7 +16,7 @@ const CoverScript := preload("res://gameplay/feel/cover.gd")
 const RUN: int = 6
 const WALK := Vector2(96.0, 0.0)
 ## The frames pictured: through the walk, then while the trampled grass springs back.
-const FRAMES: PackedInt32Array = [0, 24, 48, 72, 96, 120, 150, 190, 240]
+const FRAMES: PackedInt32Array = [0, 24, 48, 72, 96, 240, 420, 560, 700]
 ## Half the patch pictured round the walk's middle, and the gap between pictures.
 const HALF := Vector2i(64, 24)
 const GAP: int = 2
@@ -29,7 +29,7 @@ func take() -> void:
 	var flow: Node = root.get_node("Flow")
 	var feel := root.get_node("Feel") as FeelScript
 	input.call("add_virtual_device", 0)
-	feel.cover().use_kinds([StandInGrass.make([PINNED_ROOM.biome] as Array[StringName], 1.0, 8)] as Array[CoverKind])
+	feel.cover().use_kinds([_grass_everywhere()] as Array[CoverKind])
 	if not flow.call("start_run", 0):
 		fail("the run did not start")
 		return
@@ -65,6 +65,15 @@ func take() -> void:
 	strip.resize(strip.get_width() * 4, strip.get_height() * 4, Image.INTERPOLATE_NEAREST)
 	save(strip, "cover_trample_4x")
 	feel.cover().use_kinds(null)
+
+
+## The hub's grass, filling every open cell of the pinned room's biome.
+func _grass_everywhere() -> CoverKind:
+	var kind := HUB_GRASS.duplicate(true) as CoverKind
+	kind.biomes = [PINNED_ROOM.biome] as Array[StringName]
+	kind.fill_density = 1.0
+	kind.clump_size = 8
+	return kind
 
 
 ## The start of the run of `RUN` covered cells side by side nearest `near` (the middle of its

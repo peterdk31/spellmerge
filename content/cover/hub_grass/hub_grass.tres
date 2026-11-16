@@ -136,6 +136,6 @@ clump_size = 3
 wall_gap = 1
 keep_gap = 1
 sheet = ExtResource("5_sheet")
-tufts_per_cell = 3
+tufts_per_cell = 5
 sway = 1.5
 states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("burning"), SubResource("ash"), SubResource("wet")])

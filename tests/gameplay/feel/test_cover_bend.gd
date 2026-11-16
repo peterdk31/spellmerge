@@ -17,6 +17,10 @@ var fixture_grass: CoverKind = preload("res://tests/core/fixtures/cover_content/
 const FIELD := Rect2(192, 192, 64, 64)
 
 
+## How long a trail walked through the grass at least stays flat (more than half: its trampled frames).
+const TRAIL_LASTS: float = 5.0
+
+
 ## A sheet of `frames` 16×16 frames.
 static func _sheet(frames: int) -> Texture2D:
 	var image := Image.create_empty(16 * frames, 16, false, Image.FORMAT_RGBA8)
@@ -127,6 +131,7 @@ func test_a_body_walks_the_covered_cell_it_stands_in() -> void:
 	check_equal(cover.walked_at(bare_cell), CoverScript.NEVER, "a cell with no cover is not")
 	check_equal(cover.flatness(cell, 5.0), 1.0, "flat while walked")
 	check_equal(cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD), 1.0, "and a while after")
+	check(cover.flatness(cell, 5.0 + TRAIL_LASTS) > 0.5, "a trail through the grass still lies flat %.0f s after the last body left (the owner, 2026-11-16: it sprang back far too soon)" % TRAIL_LASTS)
 	var half: float = cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD + CoverScript.TRAMPLE_SPRING * 0.5)
 	check(is_equal_approx(half, 0.5), "springing back, got %f" % half)
 	check(cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD + CoverScript.TRAMPLE_SPRING + 0.01) == 0.0, "and up again")

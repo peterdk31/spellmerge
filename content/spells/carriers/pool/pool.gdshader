@@ -206,7 +206,7 @@ float noise(vec2 x) {
 // pool there, so it is worked out once a pixel. Its bumps creep slowly.
 float spill_at(vec2 q) {
 	float lobes = noise(q / LOBE_PX + vec2(31.0, 17.0)) - 0.5;
-	float bumps = noise(q / BUMP_PX + vec2(sim_time * 0.15, 5.0)) - 0.5;
+	float bumps = noise(q / BUMP_PX + vec2(sim_time * 0.16, 5.0)) - 0.5;
 	return 1.0 + 2.0 * (LOBES * lobes + BUMPS * bumps);
 }
 

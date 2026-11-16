@@ -6,8 +6,8 @@
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
 			"tier": "placeholder",
-			"tool": "Claude (drawn as a grid, written as idle.grid.json and made into the SVG by tools/pixel_grid.py, 2026-11-16)",
-			"prompt": "The Spitter, a stray: a hollow dried Wood gourd on a short Wood staff, a Stone band round its belly and another round the shaft, and a Stone spout sticking up from its shoulder, dark inside, that it sprays from; a Stone ferrule. A 32x32 body with its ferrule at the bottom (row 28), 1px dark outline, light from the top-left; the face (eyes and brows) is a separate layer on the gourd's upper half. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours and no Blight (its spray is drawn in the enemies' Blight by the game)."
+			"tool": "Claude (drawn as a grid, written as idle.grid.json and made into the SVG by tools/pixel_grid.py, 2026-11-16; a snake staff, the owner's direction)",
+			"prompt": "The Spitter, a stray: a snake staff. An olive (Leaf) snake with a pale Skin belly coiled twice round a Wood staff, its neck rising from the staff's head into a wedge-shaped head side-on, facing right, jaws open with Bone fangs and a forked Fire tongue; a Skin band round the shaft and a ferrule. A 32x32 body with its ferrule at the bottom (row 28), 1px dark outline, light from the top-left; the face (one eye and its brow) is a separate layer on the head. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours and no Blight (its spray is drawn in the enemies' Blight by the game)."
 		}
 	]
 }

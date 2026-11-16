@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The strays (living staffs H5, docs/milestones/M2-living-staffs.md, "The strays"): the Cinder
 ## Rod (`ember_imp`), the Splinter, the Storm Fork, the Rime Crook, the Bone Scepter and the Spitter are actors
-## whose art is one 32 px body; each wears the shared Face in a stray style (one eye on the Splinter), angry at rest, its eyes in its
+## whose art is one 32 px body; each wears the shared Face in a stray style (one eye on the Splinter and the Spitter), angry at rest, its eyes in its
 ## element's colour, and the face goes furious while it winds up; each has the telegraph parts;
 ## each staff compiles from player cards and its first cast is affordable on full mana; and they
 ## hop on their tips while they walk (the face goes with the body) and bob while they stand.
@@ -18,7 +18,7 @@ const STRAYS: Array[EnemyBase] = [
 	preload("res://content/enemies/spitter/spitter.tres"),
 ]
 ## Each stray's face style and eye glow (its element's light shade, docs/STYLE.md).
-const STYLES: Array[Face.Style] = [Face.Style.STRAY, Face.Style.STRAY_ONE, Face.Style.STRAY, Face.Style.STRAY, Face.Style.STRAY, Face.Style.STRAY]
+const STYLES: Array[Face.Style] = [Face.Style.STRAY, Face.Style.STRAY_ONE, Face.Style.STRAY, Face.Style.STRAY, Face.Style.STRAY, Face.Style.STRAY_ONE]
 const GLOWS: Array[Color] = [
 	Color(1, 0.635, 0.235, 1),
 	Color(1, 0.635, 0.235, 1),

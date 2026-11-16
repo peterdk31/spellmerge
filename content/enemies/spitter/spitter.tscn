@@ -44,7 +44,7 @@ texture = ExtResource("10_idle")
 
 [node name="Face" type="Node2D" parent="."]
 script = ExtResource("9_face")
-style = 4
+style = 5
 resting_mood = 2
-anchor = Vector2(-4, -19)
+anchor = Vector2(-2, -25)
 glow = Color(1, 0.953, 0.651, 1)

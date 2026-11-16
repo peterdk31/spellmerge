@@ -49,7 +49,7 @@ func test_its_data_is_a_sound_stray_with_a_spray_staff() -> void:
 	check(SPITTER.profile.channel_max > 0.0, "which holds a held cast down")
 	var body: Node = own(SPITTER.scene.instantiate()) as Node
 	var face := body.get_node_or_null(^"Face") as Face
-	check(face != null and face.style == Face.Style.STRAY and face.resting_mood == Face.Mood.ANGRY, "it wears an angry stray face")
+	check(face != null and face.style == Face.Style.STRAY_ONE and face.resting_mood == Face.Mood.ANGRY, "it wears an angry one-eyed stray face: a snake staff, side-on (the owner, 2026-11-16)")
 
 
 func test_its_acid_is_a_jet_in_the_enemies_blight() -> void:

@@ -1,6 +1,6 @@
 # Hub rework: the Landing
 
-**Status (2026-11-16): a draft for the owner.** Asked by the owner: "Can you come up with a complete rework of the hub? Right now it looks kinda rough. It should look cool and inviting." Nothing here is built. The steps are **HR1 to HR6** (HR for hub rework), one PR each with its tests, in order, once the owner has answered the questions at the end. It changes how the hub looks and where things stand in it, and adds two general rules to the game: a placed prop may start in a state of its own (for the campfire), and **holes** (for the cracks: the section "Holes"). Otherwise it never changes what the hub does: the stone, the altar, the lectern, the rack, the dummies, the prop yard, joining and the run's start all work as today (docs/milestones/online-lobby.md, items.md, run-generation.md, ground-cover.md).
+**Status (2026-11-16): approved by the owner** ("Go with your picks!", answering every question at the end with the plan's pick; the answers are written there). HR1 done (this document); HR2 next. Asked by the owner: "Can you come up with a complete rework of the hub? Right now it looks kinda rough. It should look cool and inviting." The steps are **HR1 to HR6** and **HR-H1 and HR-H2** (HR for hub rework, H for holes), one PR each with its tests, in the order of "Steps". It changes how the hub looks and where things stand in it, and adds two general rules to the game: a placed prop may start in a state of its own (for the campfire), and **holes** (for the cracks: the section "Holes"). Otherwise it never changes what the hub does: the stone, the altar, the lectern, the rack, the dummies, the prop yard, joining and the run's start all work as today (docs/milestones/online-lobby.md, items.md, run-generation.md, ground-cover.md).
 
 ## What is rough today
 
@@ -81,7 +81,22 @@ Holes are new to the game and general: the crypt's rooms may have them later (a 
 
 Each step updates the docs it touches: the hub's paragraph in content/rooms/README.md (the generator now in the repository, the new places, the cover's fields), content/cover/README.md (the hub's fields), content/motes/README.md (`falling_dust`), docs/STYLE.md (rule 6), docs/STORY.md (question 1), and docs/ROADMAP.md (an entry for this plan once the owner approves it).
 
-## Questions for the owner
+## The owner's answers (2026-11-16: "Go with your picks!")
+
+1. The Landing: yes. Canon 4 and the intro's last shot change (HR5).
+2. The floor: dark turf, stone only on the plaza, the paths and the slabs; the grass drawn a shade lighter.
+3. Brightness: ambient 1.0 and warm lights everywhere, the void kept dark.
+4. Size: about 44×28 tiles.
+5. The seats' crystals: in the player colours.
+6. The look: the soft light (glow, the beam, a deep blue void).
+7. The plaza's runes: plain room art; only the stone lights up, as today.
+8. Pushed into a hole: yes, knockback, pulls, recoil, swaps and carries cross holes too.
+9. The island's own edge: a hole, the same void as in the cracks.
+10. A fall outside the hub: a wizard loses 20% of its most health and is back on its last ground; an enemy or a prop is gone; a boss never falls.
+
+**The cracks' look** (owner, 2026-11-16: "the edges of the cracks are too wide (it makes them light up way too much in its tips, which should feel and look like thin cracks instead)"): a crack's seam is as wide as the crack. Where it is wider than about 10 px it has the coast's lip, seam, glow, motes and rock face; narrower, it is a thin dark line into the void with a one-pixel seam in its band's shadow shade, a spark here and there, a faint glow, few motes and no rock face, tapering to a hairline. The generator draws the seam from each crack's width (`organic_half.png`, `cracks_view.png`, `cracks_view_north.png` drawn again). A hole is still the crack's cells however thin: a hairline is narrower than one 8 px cell, so its tip ends a cell short in the hole grid, and the art alone runs on.
+
+## The questions (answered above)
 
 1. **The Landing:** the bottom of the shaft, the light from the tower above, a camp the dropped staffs made, with the crypt below it (canon 4 and the intro's last shot change to match)? Or keep it an island in the void with no story place, and the story as it is?
 2. **The floor:** turf (Leaf shadow, a dark meadow, the grass over it) with stone only on the plaza, the paths and the slabs? Or stone everywhere with grass on it, as today but lighter?

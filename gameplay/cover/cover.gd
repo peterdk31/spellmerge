@@ -23,6 +23,9 @@ extends Node
 ##   `room_built`, every cell not at rest (Feel, an earlier autoload, has laid the room at rest by
 ##   then); after a restore (`rebuild_derived`), every cell whose state this machine's view was last
 ##   told otherwise.
+## - **Looked at** (rule 8, GC7): `cover_danger_looked` asks where the floor round a place would harm
+##   a body; `look` fills the asker's `CoverSight` at once, marking each cell of its window whose
+##   state gives a status (the cells `_affect_bodies` would ask one for). The AI steers by it.
 ##
 ## **State and derived:** each cell's state and seconds in it, the active cells, the queued touches,
 ## each harmed body's time to its next status and the roll counter are state. The layout and the kinds
@@ -52,7 +55,7 @@ const NEIGHBOURS: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0
 const DERIVED: Array[StringName] = [
 	&"events", &"actors", &"registry", &"sim", &"layout", &"_moves", &"_given", &"_use_given", &"_said",
 	&"_changed_cells", &"_changed_states", &"_ids", &"_spread_cells", &"_spread_by",
-	&"_next_ids", &"_next_keys", &"_next_left", &"_rest_harms",
+	&"_next_ids", &"_next_keys", &"_next_left", &"_rest_harms", &"_harming",
 ]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads (and the
@@ -69,6 +72,10 @@ var _moves: CoverMoves = null
 ## True when a kind with cells in the room gives a status at rest (cobwebs), so a room all at rest still has
 ## bodies to look at; false, a step with no cell out of rest and nobody harmed looks at none.
 var _rest_harms: bool = false
+## How many cells are in a state that gives a status now (GC7): worked out from the state as a room is
+## laid, entered or restored, and kept with each cell's change, so a look with none returns at once
+## (ash and grass at rest harm nobody).
+var _harming: int = 0
 ## Kinds given instead of the registry's (`use_kinds`: tests, before the game has cover of its own).
 var _given: Array[CoverKind] = []
 var _use_given: bool = false
@@ -125,6 +132,7 @@ func _ready() -> void:
 	events.room_built.connect(_on_room_built)
 	events.room_entered.connect(_on_room_entered)
 	events.floor_touched.connect(_on_floor_touched)
+	events.cover_danger_looked.connect(_on_cover_danger_looked)
 
 
 ## A run's start: the area is a fresh one's (the room laid next sizes it).
@@ -191,6 +199,31 @@ func harmed() -> PackedInt32Array:
 	return _harm_ids
 
 
+## Fill `sight` with where the floor within `reach` of `at` would harm a body standing on it (rule 8):
+## its window's cells whose state gives a status. Empty in a room with no cover, and at once when no
+## cell is in such a state (`_harming`: grass at rest and ash harm nobody), so a look costs a fight
+## with nothing burning almost nothing. Allocates nothing.
+func look(at: Vector2, reach: float, sight: CoverSight) -> void:
+	sight.clear()
+	if layout == null or _state.size() != layout.cells.size() or _state.is_empty() or not at.is_finite():
+		return
+	if _harming == 0:
+		return
+	if not sight.open(at, reach, layout.columns, layout.rows):
+		return
+	var cells: PackedByteArray = layout.cells
+	var harms_table: PackedByteArray = _moves.harms_table
+	var width: int = _moves.width
+	for y in range(sight.origin.y, sight.origin.y + sight.rows):
+		for x in range(sight.origin.x, sight.origin.x + sight.columns):
+			var cell: int = y * layout.columns + x
+			var kind: int = cells[cell] - 1
+			if kind < 0:
+				continue
+			if harms_table[kind * width + _state[cell]] != 0:
+				sight.mark(x, y)
+
+
 # --- Heard -----------------------------------------------------------------------------
 
 ## A room was laid out: its cover worked out from its layout. The state is only sized, at rest, when
@@ -206,6 +239,7 @@ func _on_room_built(room_id: StringName, layout_root: Node) -> void:
 			_rest_harms = true
 	if _state.is_empty():
 		_size_at_rest()
+	_count_harming()
 	_said.resize(layout.cells.size())
 	_said.fill(0)
 	_tell_all()
@@ -221,6 +255,7 @@ func _on_room_entered(_room_id: StringName) -> void:
 	_harm_ids.resize(0)
 	_harm_keys.resize(0)
 	_harm_left.resize(0)
+	_count_harming()
 	_tell_all()
 	_flush()
 
@@ -234,8 +269,15 @@ func _on_floor_touched(_caster: int, element: StringName, at: Vector2, radius: f
 	_touch_radius.append(radius)
 
 
+## An actor looked at the floor round it (`cover_danger_looked`, rule 8): its sight is filled at once.
+func _on_cover_danger_looked(_actor: int, at: Vector2, reach: float, sight: CoverSight) -> void:
+	if sight != null:
+		look(at, reach, sight)
+
+
 ## After a snapshot was restored: the view is told every cell whose state it was told otherwise.
 func rebuild_derived() -> void:
+	_count_harming()
 	_tell_all()
 	_flush()
 
@@ -369,6 +411,8 @@ func _moved_to(cell: int, element: int) -> int:
 ## Cell `cell` enters state `to`: its seconds from 0, in or out of the active cells, told.
 func _enter(cell: int, to: int) -> void:
 	var was: int = _state[cell]
+	var row: int = (layout.cells[cell] - 1) * _moves.width
+	_harming += int(_moves.harms_table[row + to]) - int(_moves.harms_table[row + was])
 	_state[cell] = to
 	_age[cell] = 0.0
 	if was == 0 and to != 0:
@@ -425,6 +469,19 @@ func _size_at_rest() -> void:
 	_state.fill(0)
 	_age.resize(cells)
 	_age.fill(0.0)
+
+
+## How many cells are in a state that gives a status (`_harming`), from the state.
+func _count_harming() -> void:
+	_harming = 0
+	if layout == null or _moves == null or _state.size() != layout.cells.size():
+		return
+	var cells: PackedByteArray = layout.cells
+	var harms_table: PackedByteArray = _moves.harms_table
+	var width: int = _moves.width
+	for cell in _state.size():
+		if cells[cell] > 0 and harms_table[(cells[cell] - 1) * width + _state[cell]] != 0:
+			_harming += 1
 
 
 func _clear_touches() -> void:

@@ -386,6 +386,12 @@ signal floor_touched(caster: int, element: StringName, at: Vector2, radius: floa
 ## a restore every cell whose state the view was last told otherwise. Read the arrays while it is
 ## sent; they are reused. Heard by feel (the tufts' look, `cover.gd`).
 signal cover_changed(cells: PackedInt32Array, states: PackedInt32Array)
+## Sender: ai (an actor's brain; ground cover GC7, rule 8). The actor `actor` looks at where the floor
+## within `reach` of `at` would harm a body standing on it: the cover area fills `sight` at once
+## (`CoverSight`: a window of the room's cover cells, each marked where its state gives a status, as
+## burning grass does). Heard by the cover area; heard by nobody, or in a room with no cover, `sight`
+## stays empty (every cell safe). An ask with its answer, so the AI never calls the cover area.
+signal cover_danger_looked(actor: int, at: Vector2, reach: float, sight: CoverSight)
 ## Sender: core/loading. Work before playing has begun behind the loading screen (`Loading.run`;
 ## Flow runs `play_tasks` on Play). Heard by hud, which shows the screen until `loading_finished`.
 signal loading_started()

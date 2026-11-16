@@ -25,7 +25,12 @@ New tests extend `tests/support/suite.gd` (`extends "res://tests/support/suite.g
 
 ## How the tests run
 
-`ci/build/unit_tests.sh` runs them, for `ci/build/build.sh --tests` and `tools/ptest.sh` alike: every `test_*.gd` under `tests/` and `content/` is a Godot process of its own, up to one per core at once, the longest first (by the last run's times, `build/unit-test-times.txt`), each with `--fixed-fps 60`, so a frame is 1/60 s of game time and none waits for the clock (a test counts game time in frames or deltas, never on the clock). A file of many seconds is split: a line `# unit-test-shards: N` in it starts it N times with `--shard=K/N`, and the suite runs every Nth test method in each (`tests/support/suite.gd`); a long matrix is cut into several methods for it (`test_card_rules.gd`'s modifier parts), and a runner that is not a suite takes the shard itself (`test_stress.gd` by scenario, `test_projectile_timing.gd` by round). The suite prints each method's time (`TEST TIME:`), and the runner the five longest runs. The tests that time the machine (budgets in wall time: `test_projectiles_kit`, `test_spell_fuzz`) run with the rest and only if one fails are run again alone. The whole suite takes about a minute on 24 cores, most of it Godot's start (about 1.2 s a process, alone).
+`ci/build/unit_tests.sh` runs them, for `ci/build/build.sh --tests` and `tools/ptest.sh` alike, up to one Godot process per core at once, the longest first (by the last run's times, `build/unit-test-times.txt`), each with `--fixed-fps 60`, so a frame is 1/60 s of game time and none waits for the clock (a test counts game time in frames or deltas, never on the clock).
+
+- **Suites run several to a process.** A Godot start compiles nearly the whole game (the autoloads reach most scripts: about 1.5 s on a fast machine, nearly 4 s on a slow one), and it was half of the suite's time when every file had a process of its own. A suite is a node, not a program: the host `tests/support/run.gd` runs the files it is handed one after another, each on a fresh game (every autoload made again, the root's leftovers freed, the tree unpaused, the input map and `user://` reset), and the runner hands it the suites 8 at a time, in batches by path (the same batches on every run of the same tree). Each file still gets its own log and result line. A file that fails in its batch is run again alone: if it passes alone, it still fails, with a note that a file before it left state behind (a static member, a project setting); find what it left and clear it. One test file: `godot --headless --path . --script res://tests/support/run.gd -- res://tests/<area>/test_<name>.gd`.
+- **A file that needs a process of its own** (one of many seconds, or one that times the machine) says `# unit-test-alone`. A file of many seconds is split: a line `# unit-test-shards: N` in it starts it N times (alone) with `--shard=K/N`, and the suite runs every Nth test method in each (`tests/support/suite.gd`); a long matrix is cut into several methods for it (`test_card_rules.gd`'s modifier parts), and a runner that is not a suite takes the shard itself (`test_stress.gd` by scenario, `test_projectile_timing.gd` by round).
+- The suite prints each method's time (`TEST TIME:`), and the runner the five longest files. The tests that time the machine (budgets in wall time: `test_projectiles_kit`, `test_spell_fuzz`) run alone, with the rest, and only if one fails are run again with nothing beside them.
+- **What is slow:** past the start, most of the time is the determinism tests' state hash (`StateWalk`, every tick of every fight, several times a fight): a content fight's 300 ticks step in 0.2 s and hash in about 2 s. A test that hashes should hash only what it compares.
 
 ## Folders
 
@@ -65,13 +70,15 @@ New tests extend `tests/support/suite.gd` (`extends "res://tests/support/suite.g
 
 ```sh
 ci/build/build.sh --quick        # downloads the pinned Godot once, imports, runs the editor smoke test
-ci/build/build.sh --quick --tests  # the same, then every tests/**/test_*.gd and each card's own content/spells/**/test_<id>.gd (about a second each)
+ci/build/build.sh --quick --tests  # the same, then every tests/**/test_*.gd and each card's own content/spells/**/test_<id>.gd
+tools/ptest.sh 4 'test_staff'      # after one build: only the test files whose path matches, 4 processes at once
 ci/build/build.sh --quick --screenshots  # the same, then every tests/screenshots/shot_*.gd on a virtual display
 ```
 
-Rules every unit test script (a `SceneTree` script) follows, learned the hard way:
+Rules every unit test follows, learned the hard way:
 
-- Start `_initialize()` with `await process_frame`. The root joins the scene tree only after `_initialize` returns, so before that nodes added to `root` are not in the tree (no `_ready`, no `global_position`, no absolute `get_node` paths).
+- A suite reads the tree through its own members, as a `SceneTree` script would: `root`, `process_frame`, `physics_frame`, `paused`, `current_scene`, `call_group`; a helper that takes the `SceneTree` is handed `tree`, never `self` (the suite is a node). Its tests run after the root is in the tree. An old test that is a `SceneTree` script of its own (the benchmark and smoke runners) starts `_initialize()` with `await process_frame`: the root joins the scene tree only after `_initialize` returns.
+- Leave nothing behind for the next file in the process: free what you add to `root` (`own()` it), stop a run you started, unpause the tree, put back a static member or a project setting you changed.
 - The real autoloads exist in the run (`Events`, `Projectiles`, `Combat`, ...). A test of "autoload missing" takes the node out of `root` and puts it back.
 - Nodes that the projectile manager must see as targets have to be in the tree.
 - The log must have no line starting `ERROR:` or `SCRIPT ERROR:` (the build fails on it); warnings are fine. Free what you create and stop audio players before the end; wait a moment (`await create_timer(0.3).timeout`) so the audio server lets go, or the exit reports leaks and a resource in use.

@@ -139,6 +139,9 @@ run_batch() { # run_batch <test>...: the suites in one process; prints a results
     ended=$(grep -m1 -F "SUITE END: res://$test " "$log" || true)
     if ((!clean)) || [[ -z "$ended" ]]; then
       run_one "$test" -
+      echo "UNIT RUNNER: run alone: its batch crashed, timed out or logged an error outside every file" \
+        "(the batch's log: $batch_log)" >>"$log"
+      echo "unit tests: $test ran alone: its batch failed as a whole ($batch_log)" >&2
       continue
     fi
     status=PASS

@@ -28,6 +28,12 @@ func id() -> StringName:
 	return &"spray"
 
 
+## Held on, it pours: only its first cast of a press winds up its staff (an enemy telegraphs once,
+## then pours while it holds; the Spitter, content/enemies/spitter/).
+func pours_held() -> bool:
+	return true
+
+
 ## What draws its look: no shot of its own (its jet is a cue, `carrier_shown`).
 func look_drawer() -> int:
 	return LOOK_NONE

@@ -1,6 +1,6 @@
 # Crypt rework: the Vaults
 
-**Status (2026-11-16): a plan, waiting on the owner.** CR1 is this document and the owner's answers to the questions at the end; nothing is built until they are answered. Asked by the owner: "Redesign the crypt. Draw inspiration from the new hub design." The steps are **CR1 to CR7** (CR for crypt rework), one PR each with its tests, in the order of "Steps". The rework changes how the crypt's rooms look, and in two of them where the floor has fallen in (pits, which are the hub's **holes**). Otherwise the crypt plays as it does today: the same templates, kinds, doors, exits, pillars on the same cells, enemies, boss and run (docs/milestones/run-generation.md, boss-old-broom.md). One spawn moves (arena_04's middle enemy spawn, off its pit). Reviewed against the code by a fresh-context agent on 2026-11-16; its findings are written into the rules below.
+**Status (2026-11-16): approved by the owner** ("I do like the direction you are going", answering every question; the answers are written in "The owner's answers"). CR1 done (this document); CR-S next (the sandbox goes), then CR2. Asked by the owner: "Redesign the crypt. Draw inspiration from the new hub design." The steps are **CR1 to CR7 and CR-S** (CR for crypt rework, S for the sandbox), one PR each with its tests, in the order of "Steps". The rework changes how the crypt's rooms look, adds pits (the hub's **holes**) to some of them, and **may change any room's layout where that makes it look better** (owner, 2026-11-16: "Room layouts, pillars, enemy spawns etc is not required to be exactly the same. You can change anything you want to make it look better"). The crypt's templates, kinds, enemies, boss and run stay; every room is still checked by the template tests. And the sandbox room goes (question 6). Reviewed against the code by a fresh-context agent on 2026-11-16; its findings are written into the rules below.
 
 ## What is rough today
 
@@ -33,7 +33,7 @@ The mockups are darker than the game would be (question 3): they set the mood, a
 
 ## The rooms
 
-The layouts are kept: every spawn but one, every door, exit, pillar, low wall and prop stays on its cell, so the template tests, the AI's ways and the run's balance stay as they are. Only the pits (question 2) change where you can walk.
+The table is the starting point, not a limit: pillars, low walls, spawns, doors and exits may move, be added or go where a room looks better for it (the owner's answer above), as long as every template test holds (four player spawns, enough enemy spawns, two exits, every floor cell reached, a way round every pit) and a room keeps room for four to dodge.
 
 | Room | Its landmark | Its light | A pit? (question 2) |
 |---|---|---|---|
@@ -42,7 +42,7 @@ The layouts are kept: every spawn but one, every door, exit, pillar, low wall an
 | **arena_03, the ossuary court** | The low walls built of bones: skull niches in their faces and in the north wall, bones piled at their feet | Torches, low; the court in the middle lit by a shaft | No: the low walls already make the room |
 | **arena_04, the crossing** | The ring of pillars round the middle, where the floor fell in: a round pit, two cracks running out of it between the pillars | The shaft falling into the pit; candles on the four sarcophagi | Yes: the pit inside the ring (about 56×44 px round (352, 224), small enough to dash over), its cracks narrowing to hairlines, their lengths bounded by the keep-clear circles round the pillars, `Enemy6`, `Enemy7`, `Enemy8` and the exits. **`Enemy1` (352, 224) stands where the pit is,** so it moves out of the ring to (256, 224), between the ring and `Enemy7` |
 | **boss_broom, the broom's hall** | The swept ring: the broom keeps the middle of its hall swept, so the floor there is clean stone with stroke marks, and everything (dust, bones, broken stone) has been pushed out into a drift round it and into heaps against the walls; the dust heaps (props) stand in those drifts | Ten torches; a wide shaft on the middle | No: the boss never falls (HR-H2), so a pit would only work against the party; its adds would fall, but they are the boss's to call |
-| **sandbox** | Unchanged (a testing room, question 6) | | |
+| **sandbox** | Removed (question 6, CR-S) | | |
 
 ## The rules
 
@@ -61,9 +61,9 @@ The layouts are kept: every spawn but one, every door, exit, pillar, low wall an
    - **the shaft** is a `light_spot` (it lights the floor in its colour while spell light is on) with its painted column in `painted_light`, as a torch is: lit once either way;
    - **a shot of a real fight:** `shot_rooms.gd` gains a shot a room a few seconds into its fight, with spell light on and off (`room_<id>_fight`, `room_<id>_fight_plain`). The owner looks at the antechamber's before CR4 draws the rest.
 7. **Past the style guide where it helps, as the hub went** (question 4, which lists each place it does). The ground's art is a PNG drawn per pixel, as the hub's is. The 32 grid, the pixel look and the outline colour stay. The crypt's colours stay in the palette's Stone, Bone, Wood and Fire, plus Mana for the pits' cold light, so the crypt still looks like the crypt next to its enemies. The pits' cold light changes only by frames of whole-pixel shapes (the "Smooth" rule), never by an alpha pulse; the plan's pick is a still glow and the falling dust as the only movement.
-8. **The cover stays,** redrawn into the new floor: the crypt's moss grows in the halls' damp corners and along the roots, not in large patches across the middle, and the cobwebs stay in the corners. The fields are drawn again round the new places, and `test_room_cover.gd` holds the moss of a crypt room to at most 8% of its floor (question 5), as it holds the cobwebs to 6% today.
+8. **The cobwebs stay, the moss goes** (question 5: "Much less. Not even sure it is needed at all"): the crypt's rooms grow no moss (`crypt_moss` no longer names the crypt among its `biomes`, and the rooms' moss fields go); the cobwebs stay in the corners, at most 6% of a room's floor as today. If nothing else grows `crypt_moss`, its folder goes in CR3. A tuft of roots' moss, if a room wants one, is decor.
 9. **A room drawn from a shape names its floor-mark and debris colours** in its `.tres`, as the hub does, so its large ground art is never sampled.
-10. **Every reworked test passes for tiled rooms and shaped ones alike,** since CR3 to CR6 leave the crypt mixed, and the sandbox stays tiled.
+10. **Every reworked test passes for tiled rooms and shaped ones alike,** since CR3 to CR6 leave the crypt mixed.
 
 ## Built for every room
 
@@ -111,7 +111,8 @@ A crypt room is still free to keep its tiles: the template tests check what a ro
 
 ## Steps
 
-- **CR1: this plan,** and the owner's answers. *Needs the owner.*
+- **CR1: this plan,** and the owner's answers. Done.
+- **CR-S: the sandbox goes** (question 6), before the rooms, so no step draws a room that is about to go. The room (`content/rooms/crypt/sandbox.*`), the mode (`Flow.MODE_SANDBOX`, `sandbox_requested`, `sandbox_changed`, `sandbox_action_requested`, `sandbox_spawn_requested`, the enemy arena, `SANDBOX_START_CARDS`, `SANDBOX_MAX`), the main menu's Sandbox button (dev and preview builds open on Play), and the pause menu's Sandbox page with its tools (spawn, clear, reset dummies, AI view: dropped, owner's answer). **The showcase staffs move to the hub:** the sandbox's two showcase builds (Y's 216-shot fire and frost nova, B's decoy turret) become premade staffs on the hub's rack beside its five (`content/items/staffs/`, each an `ItemStandIn` under `Items`). Whatever else started in the sandbox starts in the hub instead: online play by hand (`net/`'s by-hand start, and the replay's start it records), the benchmarks' storm (`tests/benchmark/sandbox_storm*.gd`, its shots fired in the hub) and every test that starts a sandbox. The `dev` staff stays only if something still uses it. The docs that name the sandbox follow (content/rooms/README.md, gameplay/flow/README.md, hud/README.md, net/README.md, tests/README.md, docs/DECISIONS.md: a dated decision).
 - **CR2: the generator's new pieces,** on fixture shapes only (the table above, top to bottom: outlines held clear and pinned, the wall art, the face, the optional parts, pits and their rims and rock, cracks from a pit, an edge style per edge, the rubble lip, slabs unless HR3 built them, `toward_edge`, `strokes`); `content/edges/crypt_wall/` and `crypt_pit/`, `content/grounds/flagstone/`, `dust/` and `swept/`, the mote kind `pit_dust`; the READMEs (content/rooms "A room's ground from a shape", content/edges, content/grounds, content/motes). No room changes.
 - **CR3: the antechamber,** the first room drawn from a shape: arena_01's shape file and ground scene, its pins (doors, torches), the new pillars, the candles, roots and bone decals, the shaft (and HR4's pieces if they have not landed), the cover's fields, its `.tres` (`ambient`, its colours); the reworked tests and the fight shots (rule 6). **The owner looks at its fight shots** before CR4.
 - **CR4: the nave and the ossuary court:** arena_02 with its pit in the south-west corner (question 2) and the sarcophagus and its candles; arena_03 with the bone walls (the low walls' art drawn again, skull niches in the faces) and its side ways pinned at 32 px.
@@ -119,11 +120,23 @@ A crypt room is still free to keep its tiles: the template tests check what a ro
 - **CR6: the broom's hall:** the swept ring (`dust` and `swept` areas), the drifts and heaps against the walls round the dust heap props, the shaft.
 - **CR7: the owner's playtest on `/preview/`,** and the fixes it asks for.
 
-**The old crypt tiles stay.** `floor.svg`, `wall.svg` and `wall_top.svg` are used by the sandbox and by the tests' own stages (`tests/support/screenshot.gd`, `tests/clips/stage.gd`, `tests/benchmark/fire_cap_view.gd`, `tests/screenshots/shot_art.gd`, `tests/core/test_svg_art.gd`), and are docs/STYLE.md's golden references (its table, `art/kit/golden.json`). Removing them is a separate decision for the owner, not part of this plan.
+**The old crypt tiles stay.** `floor.svg`, `wall.svg` and `wall_top.svg` are used by the tests' own stages (`tests/support/screenshot.gd`, `tests/clips/stage.gd`, `tests/benchmark/fire_cap_view.gd`, `tests/screenshots/shot_art.gd`, `tests/core/test_svg_art.gd`), and are docs/STYLE.md's golden references (its table, `art/kit/golden.json`). Removing them is a separate decision for the owner, not part of this plan.
 
-Each step updates the docs it touches: the crypt's paragraphs in content/rooms/README.md, content/cover/README.md (the crypt's fields), docs/STYLE.md (rule 7, as the hub's line), docs/STORY.md (the Vaults, with a yes to question 1), and docs/ROADMAP.md (an entry for this plan once the owner approves it).
+Each step updates the docs it touches: the crypt's paragraphs in content/rooms/README.md, content/cover/README.md (the crypt's fields), docs/STYLE.md (rule 7: the guide is updated, the owner's answer to question 4, with what the hub and the crypt draw past the old rules: per-pixel PNG grounds, soft light, gradients; CR2 writes it), docs/STORY.md (the Vaults, with a yes to question 1), and docs/ROADMAP.md (an entry for this plan once the owner approves it).
 
-## The questions
+## The owner's answers (2026-11-16)
+
+"I do like the direction you are going", and "Room layouts, pillars, enemy spawns etc is not required to be exactly the same. You can change anything you want to make it look better."
+
+1. The Vaults: yes ("Ok"). Canon 4 gains its line (CR3).
+2. Pits: "Pits or just holes is ok to have in some rooms." The plan's two rooms to start; more where a room looks better for one.
+3. How dark: the mood, as planned ("The plans look good").
+4. Past the style guide: yes, "Go past it. The style-guide should be updated."
+5. The moss: "Much less. Not even sure it is needed at all." None in the crypt (rule 8).
+6. The sandbox: "Remove the sandbox. We have the hub now. Move the staffs to the hub though." Asked which staffs and what of its page: the two showcase builds go on the hub's rack; the page's tools are dropped (CR-S).
+7. The floor: cool, quiet stone.
+
+## The questions (answered above)
 
 1. **The Vaults:** the crypt as the old burial halls under the Landing, cracked by its weight, with its roots coming through and its light falling in as shafts ("Home is up", seen from below)? docs/STORY.md's canon 4 gains a line. Or keep the crypt's story as it is and use only the look?
 2. **Pits:** the floor fallen in (holes) in the nave's south-west corner and in the crossing's ring, as the plan picks? Or in more rooms? Or nowhere, keeping the crypt's gameplay exactly as it is and the rework only a look? A fall in a run costs a wizard a fifth of its most health (HR-H2), and an enemy knocked in is gone. The plan's pick is the two rooms: it gives the run some rooms where pushes matter, without making every room about the edges.

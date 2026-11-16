@@ -379,6 +379,12 @@ func blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> void:
 	_rt._blast(spell, tag, actor, at)
 
 
+## Each element of `spell` touches the floor within `radius` of `at` (`floor_touched`, ground cover
+## GC5): a pool as it lies and on its ticks, a pulse's ring where it goes off.
+func touch_floor(spell: CompiledSpell, actor: int, at: Vector2, radius: float) -> void:
+	_rt._touch_floor(spell, actor, at, radius)
+
+
 ## Fires the payload of every trigger of `spell` on `event` (a `TriggerBase.Event`) from `at`
 ## along `heading`, cast by the point `at`.
 func fire_payloads(spell: CompiledSpell, event: int, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node) -> void:

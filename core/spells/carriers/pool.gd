@@ -45,6 +45,8 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directio
 		_pl_slot.append(slot)
 		_pl_seq.append(seq)
 		_pl_clock.append(SpellLimits.POOL_TICK)
+		# Its elements touch the floor as it lies (ground cover GC5), and again on each tick.
+		kit.touch_floor(spell, actor, kit.projectiles.get_position_of(slot), spell.radius)
 	return made
 
 
@@ -67,7 +69,17 @@ func step(delta: float) -> void:
 		if _pl_clock[i] <= 0.0:
 			_pl_clock[i] += SpellLimits.POOL_TICK
 			kit.projectiles.forget_hits(slot)
+			_touch(slot)
 		i += 1
+
+
+## The pool in `slot` touches the floor where it lies now (it may creep) with its spell's elements,
+## within its radius (`CarrierKit.touch_floor`).
+func _touch(slot: int) -> void:
+	var tag: int = kit.projectiles.get_tag_of(slot)
+	var spell: CompiledSpell = kit.spell_of(tag)
+	if spell != null:
+		kit.touch_floor(spell, SpellTag.caster_of(tag), kit.projectiles.get_position_of(slot), spell.radius)
 
 
 ## Takes row `i` off (the last row takes its place).

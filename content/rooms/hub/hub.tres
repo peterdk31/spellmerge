@@ -9,4 +9,6 @@ id = &"hub"
 scene = ExtResource("2_scene")
 biome = &"hub"
 stand_up_after = 2.0
-ambient = 0.9
+ambient = 1.0
+floor_mark_colors = PackedColorArray(0.2275, 0.3098, 0.1569, 1, 0.1843, 0.2588, 0.1373, 1, 0.149, 0.2118, 0.1137, 1)
+debris_colors = PackedColorArray(0.4784, 0.4627, 0.5804, 1, 0.2902, 0.2745, 0.3882, 1, 0.1686, 0.1569, 0.251, 1)

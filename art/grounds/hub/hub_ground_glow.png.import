@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cj7v0gt4l1iwy"
-path="res://.godot/imported/floor.svg-28d328d9f82f37bf6a5d6c7d56efba48.ctex"
+uid="uid://c00orebsec7l5"
+path="res://.godot/imported/hub_ground_glow.png-db0e2445ce5a434c49925534d2075436.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/tilesets/hub/floor.svg"
-dest_files=["res://.godot/imported/floor.svg-28d328d9f82f37bf6a5d6c7d56efba48.ctex"]
+source_file="res://art/grounds/hub/hub_ground_glow.png"
+dest_files=["res://.godot/imported/hub_ground_glow.png-db0e2445ce5a434c49925534d2075436.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

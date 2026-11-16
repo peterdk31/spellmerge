@@ -394,6 +394,14 @@ func ai_holds() -> bool:
 	return has(REPEATS_HELD) or has(LINE)
 
 
+## Whether, held on, it is poured rather than cast anew (a spray, a hose): a held cast of it right
+## after the last skips its staff's wind-up (`Spells.cast_staff`), so an enemy's telegraph comes
+## once, before it starts pouring. False by default: a held swing is a new blow each time and winds
+## up each time.
+func pours_held() -> bool:
+	return false
+
+
 ## How wide a cast of `spell` strikes either side of its aim (pixels), for an enemy's AI (its lane,
 ## `CastSense.radius`): its hit radius, by default; a cone's (a spray's) is wider out at its reach.
 func lane_radius(spell: CompiledSpell) -> float:

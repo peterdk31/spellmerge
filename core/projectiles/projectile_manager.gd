@@ -977,6 +977,15 @@ var _footprint_half: PackedVector2Array = PackedVector2Array()
 var _footprint_round: PackedByteArray = PackedByteArray()
 var _footprints_laid: int = 0
 var _footprint_missed: Dictionary = {}
+## The holes (`set_holes`, hub rework HR-H1: a room's `RoomBase.HOLE_LAYER` bodies): per wall cell, 1
+## where the room has a hole (a wall over one wins: walking and every move stop at the wall, and
+## `is_hole` says no); whether there are any. And the grid a walk slides on (`slide_body`): per cell,
+## 1 where there is ground (`_ground_cells`) or a hole, kept up to date wherever either changes, so
+## the native kernel is handed one grid of each and stays as it is. All state, as the wall and
+## ground grids are (Flow lays nothing again when a snapshot is restored into the room it is in).
+var _hole_cells: PackedByteArray = PackedByteArray()
+var _has_holes: bool = false
+var _walk_cells: PackedByteArray = PackedByteArray()
 ## The shot that cast the next ray (`ray_cast_by`), and its number then; -1 for none.
 var _ray_caster: int = -1
 var _ray_caster_seq: int = -1
@@ -1869,10 +1878,15 @@ func set_bounds(rect: Rect2) -> void:
 	_wall_w = maxi(ceili(rect.size.x / WALL_CELL), 1)
 	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
 	_wall_cells.resize(_wall_w * _wall_h)
+	_hole_cells.resize(_wall_w * _wall_h)
+	_hole_cells.fill(0)
+	_has_holes = false
+	_walk_cells.resize(_wall_w * _wall_h)
 	clear_walls()
 	# The ground is laid again in the new grid (footprints keep their place in the world).
 	_ground_cells.resize(_wall_w * _wall_h)
 	_ground_cells.fill(0)
+	_walk_cells.fill(0)
 	_footprint_missed.clear()
 	if _footprints_laid > 0:
 		for actor in ACTORS:
@@ -1909,10 +1923,12 @@ func set_walls(rects: Array[Rect2]) -> void:
 		_add_wall(rect)
 
 
-## Remove every wall. A solid shot lays itself again at its next step.
+## Remove every wall, and every hole (a room's holes are laid with its walls: `set_holes`). A solid
+## shot lays itself again at its next step.
 func clear_walls() -> void:
 	_wall_cells.fill(0)
 	_has_walls = false
+	_drop_holes()
 	for slot: int in _solids:
 		var solid: Solid = _solids[slot]
 		solid.cells.clear()
@@ -1923,6 +1939,14 @@ func clear_walls() -> void:
 ## be in the tree. Shapes that are not rectangles are ignored; a turned rectangle
 ## counts as its bounding box.
 func add_wall_body(body: CollisionObject2D) -> void:
+	for rect in _body_rects(body):
+		_add_wall(rect)
+
+
+## The world rectangles of a body's enabled rectangle shapes (each turned one as its bounding box).
+## Made each call (a room's walls and holes are laid once a room).
+static func _body_rects(body: CollisionObject2D) -> Array[Rect2]:
+	var rects: Array[Rect2] = []
 	for child in body.get_children():
 		var shape_node := child as CollisionShape2D
 		if shape_node == null or shape_node.disabled:
@@ -1938,7 +1962,90 @@ func add_wall_body(body: CollisionObject2D) -> void:
 			var point: Vector2 = xf * corner
 			low = low.min(point)
 			high = high.max(point)
-		_add_wall(Rect2(low, high - low))
+		rects.append(Rect2(low, high - low))
+	return rects
+
+
+## Make these world rectangles holes (hub rework HR-H1, docs/milestones/hub-rework.md, "Holes"),
+## replacing any set before: the cells whose any part they cover, as a wall's. A walk stops at a
+## hole's lip (`slide_body`); a move done to a body or a dash crosses it (`slide_body`'s `crossing`);
+## shots, rays, sight and the walls' checks never see it. Parts outside the bounds are ignored.
+## Call it after `set_walls` or `clear_walls`, which remove the holes.
+func set_holes(rects: Array[Rect2]) -> void:
+	_drop_holes()
+	for rect in rects:
+		_add_hole(rect)
+
+
+## Take every hole out: the walking grid is the ground alone again.
+func _drop_holes() -> void:
+	if not _has_holes:
+		return
+	_hole_cells.fill(0)
+	_has_holes = false
+	for cell in _walk_cells.size():
+		_walk_cells[cell] = 1 if _ground_cells[cell] != 0 else 0
+
+
+## Add the rectangle shapes of a body (a room's static body on the hole layer) as holes, as
+## `add_wall_body` adds a wall's. The body must be in the tree.
+func add_hole_body(body: CollisionObject2D) -> void:
+	for rect in _body_rects(body):
+		_add_hole(rect)
+
+
+func _add_hole(rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / WALL_CELL), 0)
+	var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / WALL_CELL), 0)
+	var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / WALL_CELL), _wall_w)
+	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
+	for y in range(y0, y1):
+		for x in range(x0, x1):
+			_hole_cells[y * _wall_w + x] = 1
+			_walk_cells[y * _wall_w + x] = 1
+			_has_holes = true
+
+
+## True when the room has a hole (`set_holes`) at `point` that no wall covers (a wall over a hole
+## wins: a Wall card's stones over a crack are a wall while they stand). Outside the grid: false.
+func is_hole(point: Vector2) -> bool:
+	if not _has_holes:
+		return false
+	var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
+	var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
+	if cx < 0 or cx >= _wall_w or cy < 0 or cy >= _wall_h:
+		return false
+	var cell: int = cy * _wall_w + cx
+	return _hole_cells[cell] != 0 and _wall_cells[cell] == 0
+
+
+## True when a circle of `radius` at `center` reaches over a hole cell no wall covers (`is_hole`): it
+## overlaps the cell, not only touches it, as the walk's slide finds an overlap (`WallSlide`).
+func touches_hole(center: Vector2, radius: float) -> bool:
+	if not _has_holes:
+		return false
+	var r: float = maxf(radius, 0.0)
+	var x0: int = maxi(floori((center.x - r - _bounds.position.x) / WALL_CELL), 0)
+	var x1: int = mini(floori((center.x + r - _bounds.position.x) / WALL_CELL), _wall_w - 1)
+	var y0: int = maxi(floori((center.y - r - _bounds.position.y) / WALL_CELL), 0)
+	var y1: int = mini(floori((center.y + r - _bounds.position.y) / WALL_CELL), _wall_h - 1)
+	for cy in range(y0, y1 + 1):
+		for cx in range(x0, x1 + 1):
+			var cell: int = cy * _wall_w + cx
+			if _hole_cells[cell] == 0 or _wall_cells[cell] != 0:
+				continue
+			var low: Vector2 = _bounds.position + Vector2(cx, cy) * WALL_CELL
+			if center.distance_squared_to(center.clamp(low, low + Vector2(WALL_CELL, WALL_CELL))) < r * r:
+				return true
+	return false
+
+
+## True while the room has holes (`set_holes`): a body's move is then slid in two parts
+## (`Actor.move`).
+func has_holes() -> bool:
+	return _has_holes
 
 
 func _add_wall(rect: Rect2) -> void:
@@ -2105,7 +2212,15 @@ func line_clear(from: Vector2, to: Vector2) -> bool:
 ## from `from` to `to`: where a body walking along it would not be held up by one (boss plan OB14,
 ## decision 36: an AI walks round a blocking prop). Walks the whole segment.
 func ground_clear(from: Vector2, to: Vector2) -> bool:
-	return _footprints_laid == 0 or _way_hit(from, to, false) < 0.0
+	return _footprints_laid == 0 or _way_hit(from, to, false, false) < 0.0
+
+
+## True when neither the ground of a body that cannot move nor a hole (`set_holes`) lies on the
+## segment from `from` to `to`: where a walk along it would not stop at a pillar or a hole's lip
+## (hub rework HR-H1; the AI's walking checks take it in HR-H2, its line of fire never). Walks the
+## whole segment.
+func walk_clear(from: Vector2, to: Vector2) -> bool:
+	return _way_hit(from, to, false, true) < 0.0
 
 
 ## How far (pixels, at most `most`) a walk from `from` along `way` goes before the first cell of a
@@ -2114,7 +2229,7 @@ func ground_clear(from: Vector2, to: Vector2) -> bool:
 func clear_run(from: Vector2, way: Vector2, most: float) -> float:
 	if way == Vector2.ZERO or most <= 0.0:
 		return 0.0
-	var t: float = _way_hit(from, from + way.normalized() * most, true)
+	var t: float = _way_hit(from, from + way.normalized() * most, true, false)
 	return most if t < 0.0 else t * most
 
 ## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell or
@@ -2138,11 +2253,15 @@ func circle_blocked(center: Vector2, radius: float) -> bool:
 
 ## Where a body (a circle of `radius` at `from`) ends when it moves by `motion`, sliding along the
 ## walls it meets, the room's and the solid shots', and the ground of the bodies that cannot move
-## (online-ready N6: the actors' move, in place of the engine's physics; `WallSlide`).
-func slide_body(from: Vector2, motion: Vector2, radius: float) -> Vector2:
-	if not _has_walls and _footprints_laid == 0:
+## (online-ready N6: the actors' move, in place of the engine's physics; `WallSlide`), and, unless
+## the move is `crossing` (a dash, or a move done to the body: hub rework HR-H1, `Actor.move`), the
+## room's holes, whose lip a walk stops at. The kernel is handed the walls and one other grid: the
+## ground and the holes merged for a walk (`_walk_cells`), the ground alone for a crossing.
+func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = false) -> Vector2:
+	var holes: bool = _has_holes and not crossing
+	if not _has_walls and _footprints_laid == 0 and not holes:
 		return from + motion
-	return WallSlide.slide(_wall_cells, _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
+	return WallSlide.slide(_wall_cells, _walk_cells if holes else _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
 
 
 ## The body of the actor `actor` cannot move, and stands on this ground from now on (props W4: its
@@ -2189,6 +2308,7 @@ func _lay_footprint(actor: int) -> void:
 	for cell in _footprint_cells(actor):
 		if _ground_cells[cell] < 255:
 			_ground_cells[cell] += 1
+			_walk_cells[cell] = 1
 		else:
 			missed.append(cell)
 	if not missed.is_empty():
@@ -2201,6 +2321,7 @@ func _mark_footprint(actor: int, by: int) -> void:
 	for cell in _footprint_cells(actor):
 		if missed.is_empty() or not missed.has(cell):
 			_ground_cells[cell] += by
+			_walk_cells[cell] = 1 if _ground_cells[cell] != 0 or _hole_cells[cell] != 0 else 0
 
 
 ## The cells of the footprint of `actor` in the grid as it is now: those whose centres lie in its
@@ -2281,14 +2402,16 @@ func _wall_hit(from: Vector2, to: Vector2) -> float:
 	return -1.0
 
 
-## The first cell of the ground (`set_footprint`), and with `walls` of the wall grid too, on the
-## path from `from` to `to`, as `_wall_hit` finds a wall: t in [0, 1] where the path enters it, -1
-## when there is none. Not a shot's (shots hit a blocking body, they do not stop on its ground): an
-## AI's walk (`ground_clear`, `clear_run`), so it has none of `_wall_hit`'s fast paths, and the
-## native kernels have no copy of it.
-func _way_hit(from: Vector2, to: Vector2, walls: bool) -> float:
-	if (not walls or not _has_walls) and _footprints_laid == 0:
+## The first cell of the ground (`set_footprint`), with `walls` of the wall grid too and with
+## `holes` of the holes (`set_holes`), on the path from `from` to `to`, as `_wall_hit` finds a wall:
+## t in [0, 1] where the path enters it, -1 when there is none. Not a shot's (shots hit a blocking
+## body, they do not stop on its ground): an AI's walk (`ground_clear`, `walk_clear`, `clear_run`),
+## so it has none of `_wall_hit`'s fast paths, and the native kernels have no copy of it.
+func _way_hit(from: Vector2, to: Vector2, walls: bool, holes: bool) -> float:
+	var with_holes: bool = holes and _has_holes
+	if (not walls or not _has_walls) and _footprints_laid == 0 and not with_holes:
 		return -1.0
+	var ground: PackedByteArray = _walk_cells if with_holes else _ground_cells
 	var start: Vector2 = (from - _bounds.position) / WALL_CELL
 	var delta: Vector2 = (to - from) / WALL_CELL
 	var cx: int = floori(start.x)
@@ -2310,7 +2433,7 @@ func _way_hit(from: Vector2, to: Vector2, walls: bool) -> float:
 	for _n in full:
 		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h:
 			var cell: int = cy * _wall_w + cx
-			if _ground_cells[cell] != 0 or (walls and _wall_cells[cell] != 0):
+			if ground[cell] != 0 or (walls and _wall_cells[cell] != 0):
 				return t
 		if next_x < next_y:
 			t = next_x

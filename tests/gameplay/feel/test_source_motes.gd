@@ -130,6 +130,47 @@ func test_a_line_gives_off_its_rate_along_it_thrown_outward() -> void:
 	check(seen_fire and seen_ice, "each in one of the source's palette materials, both used")
 
 
+## A banded line (`MoteSource.band_length`, hub rework: the coast's seam): a mote's colour is its
+## band's, by how far along the line it leaves, in the order named and round again.
+func test_a_banded_line_gives_off_each_bands_colour() -> void:
+	var look := _look(MoteSource.From.LINE, 60.0)
+	look.band_length = 100.0
+	_node(look)
+	var sources := SourceMotesScript.new(table)
+	sources.take(self)
+	var motes := _pool()
+	var before: int = motes.next_row()
+	_run(sources, motes, 3.0)
+	var fire: int = table.source(Palette.ramp_of(&"fire"))
+	var ice: int = table.source(Palette.ramp_of(&"ice"))
+	var bad: int = 0
+	var born: int = motes.next_row() - before
+	for row in range(before, before + born):
+		var at: Vector2 = _at(motes, row)
+		var data: PackedFloat32Array = motes.row_data(row)
+		var source: int = roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE)
+		# The square runs (100,100) right, down, left, up: 100 px a side, a band a side.
+		var side: int = 0
+		if absf(at.x - 200.0) <= 2.0 and at.y > 102.0 and at.y < 198.0:
+			side = 1
+		elif absf(at.y - 200.0) <= 2.0 and at.x > 102.0 and at.x < 198.0:
+			side = 2
+		elif absf(at.x - 100.0) <= 2.0 and at.y > 102.0 and at.y < 198.0:
+			side = 3
+		elif not (absf(at.y - 100.0) <= 2.0 and at.x > 102.0 and at.x < 198.0):
+			continue
+		if source != (fire if side % 2 == 0 else ice):
+			bad += 1
+	check(born > 100, "it gives off (%d)" % born)
+	check_equal(bad, 0, "motes in another band's colour")
+	check_equal(SourceMotesScript.band_of(look, 250.0, 2), 0, "250 px along, the third band: the first colour again")
+	check_equal(SourceMotesScript.band_of(look, 150.0, 2), 1, "150 px along: the second")
+	var boxed := _look(MoteSource.From.AREA)
+	boxed.size = Vector2(10, 10)
+	boxed.band_length = 50.0
+	check(not boxed.problems(false).is_empty(), "only a line runs in bands")
+
+
 func test_a_point_a_box_and_a_rim_give_off_where_they_say() -> void:
 	var point := _look(MoteSource.From.POINT, 30.0)
 	point.at = Vector2(4, -6)

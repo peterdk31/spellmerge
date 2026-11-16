@@ -1,0 +1,951 @@
+#!/usr/bin/env python3
+"""Draw a room's ground from a shape file (docs/milestones/hub-rework.md, "Built for every room").
+
+    python3 tools/ground_shape.py content/rooms/hub/hub.shape.json      # write the room's ground
+    python3 tools/ground_shape.py --check                                # every shape file up to date?
+
+A shape file (`<room>.shape.json`, beside the room's scene) says what a room's ground is: its
+outlines (land inside, the void or a wall outside), the cracks that run into them from their
+edge, the areas of another ground material inside them, which edge style its edges are drawn in
+(`content/edges/<id>/edge.json`) and which ground material its floor is (`content/grounds/<id>/
+ground.json`). From it this writes the room's ground scene, `<room>_ground.tscn`, beside it, and
+its art, in `art/grounds/<room>/` (art lives under art/; a room's folder holds its layout):
+
+- `<room>_ground_floor.png`: the floor as the room shows it, every pixel a body may stand on
+  opaque and every other pixel clear (the void or a wall's own art shows there). The scene's root
+  is a `Sprite2D` of it named `Floor` (the room instances it under that name, so everything that
+  reads a room's `Floor` sprite reads it), at `RoomBase.FLOOR_Z`.
+- `<room>_ground_under.png`: the rock face under every edge that faces down, hanging into the
+  void (a sprite on the walls' body, so a hit on the edge sheds its colours).
+- `<room>_ground_glow.png`: the edges' glow, at half size, added over what lies below it.
+- the walls, as rectangles of whole 8 px cells on the wall layer: a cell is wall when the pixel
+  at its middle is clear in the floor art, so the art and the walls never disagree;
+- the edges' motes: a hidden closed `Line2D` round every outline (`Rim`, `Rim2`, ...) and an open
+  one under each run of rock face (`Drip1`, ...), each a `MoteSource` of the edge style's kinds;
+  a rim's colours run in bands along it (`MoteSource.band_length`), the same bands the edge's seam
+  is drawn in, so the motes match the edge they leave.
+
+**Cracks thin out smoothly.** Everything about an edge beside a crack follows the crack's width
+there: the lip's width, the seam's shade, the glow, the rock face and the motes, from the edge
+style's `full_width` (the whole edge) to nothing at a hairline. A crack narrower than a cell
+(`CELL`) is drawn into the floor (dark, opaque) rather than cut out of it, so it is never a wall
+or a hole of less than a cell; only its wide part is clear.
+
+The scene's root carries the hash of everything it was made from (`metadata/ground_inputs`):
+`--check` fails when a shape file, its edge style, its ground materials or this generator changed
+since its scene was written. Python 3.10 and the standard library only (tools/README.md); the same
+inputs always give the same files.
+"""
+
+from __future__ import annotations
+
+import argparse
+import array
+import hashlib
+import json
+import math
+import re
+import struct
+import sys
+import zlib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+# Bump when what the generator draws changes, so every room's `--check` asks for a new run.
+VERSION = 1
+PALETTE = ROOT / "core/base/palette.gd"
+EDGES = ROOT / "content/edges"
+GROUNDS = ROOT / "content/grounds"
+# The size of a wall cell, in pixels (the projectile manager's wall grid: `WALL_CELL`).
+CELL = 8
+# `RoomBase.FLOOR_Z`, and the z of the glow (over the floor and its marks, under every body).
+FLOOR_Z = -2
+GLOW_Z = -1
+# `RoomBase.WALL_LAYER`.
+WALL_LAYER = 1
+# The colour shown down a crack too thin to cut out of the floor.
+DEEP = (8, 9, 24)
+
+
+# ----------------------------------------------------------------------------------------------
+# Colours
+
+
+def materials(path: Path = PALETTE) -> dict[str, list[tuple[int, int, int]]]:
+    """The palette's materials by name, each its shadow, base and light (core/base/palette.gd)."""
+    found: dict[str, list[tuple[int, int, int]]] = {}
+    pattern = re.compile(r'&"(\w+)":\s*\[Color\("([0-9a-f]{6})"\),\s*Color\("([0-9a-f]{6})"\),\s*Color\("([0-9a-f]{6})"\)\]')
+    for match in pattern.finditer(path.read_text(encoding="utf-8")):
+        found[match.group(1)] = [_rgb(match.group(i)) for i in (2, 3, 4)]
+    return found
+
+
+def _rgb(text: str) -> tuple[int, int, int]:
+    text = text.lstrip("#")
+    return (int(text[0:2], 16), int(text[2:4], 16), int(text[4:6], 16))
+
+
+SHADES = {"shadow": 0, "base": 1, "light": 2}
+
+
+def colour(spec: str, mats: dict[str, list[tuple[int, int, int]]]) -> tuple[int, int, int]:
+    """A colour as data names it: `#rrggbb`, or a palette material's shade (`leaf.base`)."""
+    if spec.startswith("#"):
+        return _rgb(spec)
+    name, _, shade = spec.partition(".")
+    if name not in mats or shade not in SHADES:
+        raise ValueError(f"unknown colour {spec!r}: write #rrggbb or <material>.<shadow|base|light>")
+    return mats[name][SHADES[shade]]
+
+
+def _mix(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
+    return (round(a[0] + (b[0] - a[0]) * t), round(a[1] + (b[1] - a[1]) * t), round(a[2] + (b[2] - a[2]) * t))
+
+
+# ----------------------------------------------------------------------------------------------
+# Hashes and noise (seeded, the same everywhere)
+
+
+def hash32(*values: int) -> int:
+    """A 32-bit hash of whole numbers (FNV-1a over them, then mixed)."""
+    x = 2166136261
+    for value in values:
+        x = ((x ^ (int(value) & 0xFFFFFFFF)) * 16777619) & 0xFFFFFFFF
+    x ^= x >> 13
+    x = (x * 0x5BD1E995) & 0xFFFFFFFF
+    return x ^ (x >> 15)
+
+
+def unit(*values: int) -> float:
+    """A number in [0, 1) from whole numbers."""
+    return hash32(*values) / 4294967296.0
+
+
+def _smooth(t: float) -> float:
+    return t * t * (3.0 - 2.0 * t)
+
+
+def noise1(s: float, seed: int, period: int = 0) -> float:
+    """Smooth value noise along a line, in [0, 1); with `period`, it repeats every that many units."""
+    i = math.floor(s)
+    t = _smooth(s - i)
+    a, b = i, i + 1
+    if period > 0:
+        a, b = a % period, b % period
+    return unit(seed, a) * (1.0 - t) + unit(seed, b) * t
+
+
+def noise2(x: float, y: float, scale: float, seed: int) -> float:
+    """Smooth value noise over the plane, cells of `scale` pixels, in [0, 1)."""
+    fx, fy = x / scale, y / scale
+    ix, iy = math.floor(fx), math.floor(fy)
+    tx, ty = _smooth(fx - ix), _smooth(fy - iy)
+    a = unit(seed, ix, iy)
+    b = unit(seed, ix + 1, iy)
+    c = unit(seed, ix, iy + 1)
+    d = unit(seed, ix + 1, iy + 1)
+    return (a * (1.0 - tx) + b * tx) * (1.0 - ty) + (c * (1.0 - tx) + d * tx) * ty
+
+
+def fbm2(x: float, y: float, scales: list[float], seed: int) -> float:
+    """Several octaves of `noise2`, the first the strongest, in [0, 1)."""
+    total, weight, amp = 0.0, 0.0, 1.0
+    for i, scale in enumerate(scales):
+        total += noise2(x, y, scale, seed + i) * amp
+        weight += amp
+        amp *= 0.5
+    return total / weight
+
+
+# ----------------------------------------------------------------------------------------------
+# PNG (written by hand: no image library)
+
+
+def png(width: int, height: int, rgba: bytearray) -> bytes:
+    """A PNG of `rgba` (4 bytes a pixel, rows top down): indexed when it has at most 256 colours
+    (the floor's few shades pack far smaller), else true colour with alpha."""
+    colours: dict[bytes, int] = {}
+    for i in range(0, len(rgba), 4):
+        key = bytes(rgba[i:i + 4])
+        if key not in colours:
+            if len(colours) == 256:
+                colours = {}
+                break
+            colours[key] = len(colours)
+    rows = bytearray()
+    if colours:
+        index = {key: i for key, i in colours.items()}
+        for y in range(height):
+            rows.append(0)
+            start = y * width * 4
+            rows.extend(index[bytes(rgba[start + x * 4:start + x * 4 + 4])] for x in range(width))
+        header = struct.pack(">IIBBBBB", width, height, 8, 3, 0, 0, 0)
+        palette = b"".join(key[:3] for key in colours)
+        alpha = bytes(key[3] for key in colours)
+        chunks = [(b"IHDR", header), (b"PLTE", palette), (b"tRNS", alpha)]
+    else:
+        stride = width * 4
+        for y in range(height):
+            rows.append(0)
+            rows.extend(rgba[y * stride:(y + 1) * stride])
+        chunks = [(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))]
+    chunks.append((b"IDAT", zlib.compress(bytes(rows), 9)))
+    chunks.append((b"IEND", b""))
+    out = bytearray(b"\x89PNG\r\n\x1a\n")
+    for kind, data in chunks:
+        out += struct.pack(">I", len(data)) + kind + data
+        out += struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+    return bytes(out)
+
+
+def read_png(data: bytes) -> tuple[int, int, bytearray]:
+    """Read back a PNG this file wrote (indexed or RGBA, filter 0): width, height and its RGBA."""
+    pos = 8
+    width = height = kind = 0
+    idat = bytearray()
+    palette = b""
+    alpha = b""
+    while pos < len(data):
+        (length,) = struct.unpack(">I", data[pos:pos + 4])
+        chunk = data[pos + 4:pos + 8]
+        body = data[pos + 8:pos + 8 + length]
+        pos += 12 + length
+        if chunk == b"IHDR":
+            width, height, _, kind = struct.unpack(">IIBB", body[:10])
+        elif chunk == b"PLTE":
+            palette = body
+        elif chunk == b"tRNS":
+            alpha = body
+        elif chunk == b"IDAT":
+            idat += body
+    raw = zlib.decompress(bytes(idat))
+    rgba = bytearray(width * height * 4)
+    per = 1 if kind == 3 else 4
+    for y in range(height):
+        row = raw[y * (width * per + 1) + 1:(y + 1) * (width * per + 1)]
+        for x in range(width):
+            o = (y * width + x) * 4
+            if kind == 3:
+                i = row[x]
+                rgba[o:o + 3] = palette[i * 3:i * 3 + 3]
+                rgba[o + 3] = alpha[i] if i < len(alpha) else 255
+            else:
+                rgba[o:o + 4] = row[x * 4:x * 4 + 4]
+    return width, height, rgba
+
+
+# ----------------------------------------------------------------------------------------------
+# The shape
+
+
+def outline_points(spec: dict, step: float = 2.0) -> list[tuple[float, float]]:
+    """An outline's points, clockwise on screen: a wavy, rough oval.
+
+    `centre` and `radii` place the oval; `waves` ([[k, amount, phase], ...]) bend it k times round;
+    `rough` ([[scale, amount], ...]) roughens it along its length with noise of that many pixels
+    (the large bays and points first, the small notches last), seeded by `seed`."""
+    cx, cy = spec["centre"]
+    rx, ry = spec["radii"]
+    seed = int(spec.get("seed", 0))
+    mean = (rx + ry) * 0.5
+    count = max(64, int(math.tau * mean / step))
+    points = []
+    for i in range(count):
+        a = i / count * math.tau
+        r = 1.0
+        for k, amount, phase in spec.get("waves", []):
+            r += amount * math.sin(k * a + phase)
+        for j, (scale, amount) in enumerate(spec.get("rough", [])):
+            period = max(1, round(math.tau * mean / scale))
+            r += amount * 2.0 * (noise1(a / math.tau * period, seed + 17 * j, period) - 0.5)
+        points.append((cx + math.cos(a) * rx * r, cy + math.sin(a) * ry * r))
+    return points
+
+
+def fill_polygon(mask: bytearray, width: int, height: int, points: list[tuple[float, float]], value: int) -> None:
+    """Set every pixel whose middle is inside `points` (even-odd) to `value`."""
+    edges = [(points[i], points[(i + 1) % len(points)]) for i in range(len(points))]
+    ys = [p[1] for p in points]
+    top, bottom = max(0, int(min(ys))), min(height - 1, int(max(ys)) + 1)
+    for y in range(top, bottom + 1):
+        sy = y + 0.5
+        xs = []
+        for (x1, y1), (x2, y2) in edges:
+            if (y1 <= sy < y2) or (y2 <= sy < y1):
+                xs.append(x1 + (sy - y1) * (x2 - x1) / (y2 - y1))
+        xs.sort()
+        row = y * width
+        for k in range(0, len(xs) - 1, 2):
+            start = max(0, math.ceil(xs[k] - 0.5))
+            end = min(width - 1, math.floor(xs[k + 1] - 0.5))
+            for x in range(start, end + 1):
+                mask[row + x] = value
+
+
+class Ground:
+    """A room's ground as it is worked out: which pixels are land, how wide a crack is where it
+    runs, and which ground material each pixel of land is."""
+
+    def __init__(self, shape: dict) -> None:
+        self.width, self.height = (int(v) for v in shape["size"])
+        if self.width % CELL or self.height % CELL:
+            raise ValueError(f"size {shape['size']} is not whole {CELL} px cells")
+        n = self.width * self.height
+        self.land = bytearray(n)
+        # The crack's width at each of its pixels (0: no crack).
+        self.crack = array.array("f", bytes(4 * n))
+        # The index of a pixel's ground material in `grounds` (0: the floor's own).
+        self.material = bytearray(n)
+        self.shape = shape
+        self.keep_clear = [tuple(c) for c in shape.get("keep_clear", [])]
+        self.outlines = [outline_points(o) for o in shape.get("outlines", [])]
+        for points in self.outlines:
+            fill_polygon(self.land, self.width, self.height, points, 1)
+        for i, area in enumerate(shape.get("areas", [])):
+            area_mask = bytearray(n)
+            fill_polygon(area_mask, self.width, self.height, outline_points(area, 3.0), 1)
+            for p in range(n):
+                if area_mask[p] and self.land[p]:
+                    self.material[p] = i + 1
+        for crack in shape.get("cracks", []):
+            self._crack(crack)
+
+    def _near_keep_clear(self, x: float, y: float) -> bool:
+        return any(math.hypot(x - cx, y - cy) < r for cx, cy, r in self.keep_clear)
+
+    def _crack(self, spec: dict) -> None:
+        """Carve a crack in from the edge of outline `outline` (default 0): it starts where a line
+        out from the outline's middle at `angle` (in turns, 0 to the right, clockwise) leaves the
+        land, and wanders back in `width` pixels wide at its mouth, tapering over `length` steps of
+        3 px and forking, never into a `keep_clear` circle."""
+        outline = self.shape["outlines"][int(spec.get("outline", 0))]
+        cx, cy = outline["centre"]
+        rx, ry = outline["radii"]
+        a = float(spec["angle"]) * math.tau
+        x, y = float(cx), float(cy)
+        while 0 <= x < self.width and 0 <= y < self.height and self.land[int(y) * self.width + int(x)]:
+            x += math.cos(a)
+            y += math.sin(a) * ry / rx
+        seed = int(spec.get("seed", 0))
+        heading = a + math.pi + (unit(seed, 3) - 0.5) * 0.4
+        self._walk(x - math.cos(a) * 4.0, y - math.sin(a) * 4.0, heading, float(spec["width"]), int(spec["length"]), seed, 0)
+
+    def _walk(self, x: float, y: float, heading: float, width: float, steps: int, seed: int, depth: int) -> None:
+        for i in range(steps):
+            heading += math.sin(i * 0.37 + seed) * 0.22 + (unit(seed, i) - 0.5) * 0.25
+            x += math.cos(heading) * 3.0
+            y += math.sin(heading) * 3.0
+            if self._near_keep_clear(x, y) or not (0 <= x < self.width and 0 <= y < self.height):
+                return
+            if i > 6 and not self.land[int(y) * self.width + int(x)] and self.crack[int(y) * self.width + int(x)] == 0.0:
+                return
+            w = width * max(0.0, 1.0 - i / steps) ** 1.6
+            if w < 1.5:
+                return
+            self._stamp(x, y, w)
+            if depth < 2 and i > 4 and hash32(seed, i, 7) % 26 == 0:
+                turn = 0.7 if hash32(seed, i, 8) % 2 else -0.7
+                self._walk(x, y, heading + turn, w * 0.9, int((steps - i) * 0.6), seed * 31 + i, depth + 1)
+
+    def _stamp(self, x: float, y: float, w: float) -> None:
+        r = w * 0.5
+        reach = int(r + 6)
+        seed = int(self.shape.get("seed", 0))
+        for py in range(max(0, int(y) - reach), min(self.height, int(y) + reach + 1)):
+            for px in range(max(0, int(x) - reach), min(self.width, int(x) + reach + 1)):
+                d = math.hypot(px + 0.5 - x, py + 0.5 - y)
+                if d > r + 5.0:
+                    continue
+                edge = r
+                if w > 6.0:
+                    # A wide crack's walls are as rough as the coast's; a thin one is a clean line.
+                    edge += min(r * 0.9, 4.0) * 2.0 * (fbm2(px, py, [12.0, 6.0], seed + 310) - 0.5)
+                    edge += 1.5 * (fbm2(px, py, [4.0, 2.0], seed + 311) - 0.5)
+                if d <= edge:
+                    p = py * self.width + px
+                    if self.land[p] or self.crack[p] > 0.0:
+                        self.land[p] = 0
+                        if w > self.crack[p]:
+                            self.crack[p] = w
+
+
+# ----------------------------------------------------------------------------------------------
+# Drawing
+
+
+def load_style(edge_id: str) -> dict:
+    return json.loads((EDGES / edge_id / "edge.json").read_text(encoding="utf-8"))
+
+
+def load_ground(ground_id: str) -> dict:
+    return json.loads((GROUNDS / ground_id / "ground.json").read_text(encoding="utf-8"))
+
+
+class Drawing:
+    """Everything the generator writes for one shape: three images, the wall cells, the rims and
+    the drip lines."""
+
+    def __init__(self, shape: dict) -> None:
+        self.mats = materials()
+        self.ground = Ground(shape)
+        self.style = load_style(shape["edge"])
+        self.grounds = [load_ground(shape["ground"])] + [load_ground(a["ground"]) for a in shape.get("areas", [])]
+        g = self.ground
+        self.w, self.h = g.width, g.height
+        n = self.w * self.h
+        full = float(self.style["full_width"])
+        # Solid: what a body may stand on. Land, and a crack too thin for a whole cell.
+        self.solid = bytearray(n)
+        for p in range(n):
+            if g.land[p] or 0.0 < g.crack[p] < CELL:
+                self.solid[p] = 1
+        # t: how much of the whole edge a place has, from the nearest crack's width (1 away from
+        # cracks, on the coast and in a crack's wide mouth; toward 0 where a crack narrows).
+        near = array.array("f", bytes(4 * n))
+        for p in range(n):
+            w = g.crack[p]
+            if w > 0.0:
+                px, py = p % self.w, p // self.w
+                for dy in range(-4, 5):
+                    for dx in range(-4 + abs(dy), 5 - abs(dy)):
+                        x, y = px + dx, py + dy
+                        if 0 <= x < self.w and 0 <= y < self.h and near[y * self.w + x] < w:
+                            near[y * self.w + x] = w
+        self.t = array.array("f", [1.0]) * n
+        for p in range(n):
+            if near[p] > 0.0:
+                self.t[p] = min(1.0, max(0.0, (near[p] - 1.5) / (full - 1.5)))
+        self.floor = bytearray(n * 4)
+        self.under = bytearray(n * 4)
+        self.rims: list[list[tuple[float, float]]] = []
+        self.drips: list[list[tuple[float, float]]] = []
+        self.band = array.array("h", [-1]) * n
+        self._rim_paths: list[tuple[list[int], int]] = []
+        self._draw_floor()
+        self._trace_rims()
+        self._spread_bands()
+        self._draw_edges()
+        self._draw_under()
+        self.glow_w, self.glow_h, self.glow = self._draw_glow()
+        self.walls = self._wall_rects()
+
+    # -- the floor and its edges --
+
+    def _put(self, image: bytearray, p: int, rgb: tuple[int, int, int], a: int = 255) -> None:
+        image[p * 4] = rgb[0]
+        image[p * 4 + 1] = rgb[1]
+        image[p * 4 + 2] = rgb[2]
+        image[p * 4 + 3] = a
+
+    def _draw_floor(self) -> None:
+        g = self.ground
+        # Each ground material's patches, worked out on a coarse grid (cheap) and looked up.
+        step = 4
+        cols, rows = self.w // step + 2, self.h // step + 2
+        patch_maps = []
+        for k, ground in enumerate(self.grounds):
+            spec = ground.get("patches")
+            if spec is None:
+                patch_maps.append(None)
+                continue
+            seed = int(g.shape.get("seed", 0)) * 13 + k * 101 + int(spec.get("seed", 0))
+            patch_maps.append([fbm2(cx * step, cy * step, spec["scales"], seed) for cy in range(rows) for cx in range(cols)])
+        bases = [colour(gr["base"], self.mats) for gr in self.grounds]
+        patches = [colour(gr["patches"]["colour"], self.mats) if gr.get("patches") else None for gr in self.grounds]
+        above = [float(gr["patches"].get("above", 0.5)) if gr.get("patches") else 2.0 for gr in self.grounds]
+        speckles = [[(colour(c, self.mats), float(share)) for c, share in gr.get("speckle", [])] for gr in self.grounds]
+        for p in range(self.w * self.h):
+            if not self.solid[p]:
+                continue
+            x, y = p % self.w, p // self.w
+            if not g.land[p]:
+                self._put(self.floor, p, DEEP)
+                continue
+            k = g.material[p]
+            rgb = bases[k]
+            pm = patch_maps[k]
+            if pm is not None and _bilinear(pm, cols, x / step, y / step) > above[k]:
+                rgb = patches[k]
+            roll = unit(x, y, 4041)
+            for speck, share in speckles[k]:
+                if roll < share:
+                    rgb = speck
+                    break
+                roll -= share
+            self._put(self.floor, p, rgb)
+
+    def _is_edge(self, p: int) -> bool:
+        """Land with a 4-neighbour that is not land (the void, a crack or the room's border)."""
+        if not self.ground.land[p]:
+            return False
+        x, y = p % self.w, p // self.w
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if not (0 <= nx < self.w and 0 <= ny < self.h) or not self.ground.land[ny * self.w + nx]:
+                return True
+        return False
+
+    def _trace_rims(self) -> None:
+        """The rims: the boundary of each piece of solid ground, traced clockwise on screen (the void
+        on the left of the way it runs), a point every few pixels."""
+        seen = bytearray(self.w * self.h)
+        every = int(self.style["rim"].get("every", 4))
+        for p in range(self.w * self.h):
+            if not self.solid[p] or seen[p]:
+                continue
+            x, y = p % self.w, p // self.w
+            if y > 0 and self.solid[p - self.w]:
+                continue
+            # A pixel on a top edge of solid ground not traced yet: trace its boundary.
+            path = self._moore(x, y)
+            if len(path) < 16:
+                for q in path:
+                    seen[q] = 1
+                continue
+            for q in path:
+                seen[q] = 1
+            # Keep only outer boundaries (a ring traced round a piece of ground, not round a pond).
+            area = 0.0
+            for i in range(len(path)):
+                x1, y1 = path[i] % self.w, path[i] // self.w
+                x2, y2 = path[(i + 1) % len(path)] % self.w, path[(i + 1) % len(path)] // self.w
+                area += x1 * y2 - x2 * y1
+            if area <= 0.0:
+                continue
+            points = [(path[i] % self.w + 0.5, path[i] // self.w + 0.5) for i in range(0, len(path), every)]
+            self.rims.append(points)
+            self._rim_paths.append((path, every))
+
+    def _moore(self, sx: int, sy: int) -> list[int]:
+        """Moore-neighbour tracing of the solid pixels' boundary from the top-edge pixel (sx, sy),
+        clockwise on screen."""
+        ways = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
+        start = sy * self.w + sx
+        path = [start]
+        x, y = sx, sy
+        back = 6  # we came from above (the pixel above is not solid)
+        for _ in range(self.w * self.h * 2):
+            found = False
+            for k in range(8):
+                d = (back + 1 + k) % 8
+                nx, ny = x + ways[d][0], y + ways[d][1]
+                if 0 <= nx < self.w and 0 <= ny < self.h and self.solid[ny * self.w + nx]:
+                    back = (d + 4) % 8
+                    x, y = nx, ny
+                    found = True
+                    break
+            if not found:
+                break
+            p = y * self.w + x
+            if p == start:
+                break
+            path.append(p)
+        return path
+
+    def _spread_bands(self) -> None:
+        """Every pixel within reach of a rim takes the colour band of the nearest stretch of rim:
+        the rim's own pixels by how far along it they lie, every other by a walk out from them."""
+        length = float(self.style["seam"]["band_length"])
+        count = len(self.style["seam"]["colours"])
+        frontier: list[int] = []
+        for path, every in self._rim_paths:
+            run = 0.0
+            last = None
+            marks = []
+            for i in range(0, len(path), every):
+                q = path[i]
+                here = (q % self.w + 0.5, q // self.w + 0.5)
+                if last is not None:
+                    run += math.dist(last, here)
+                marks.append(run)
+                last = here
+            for i, q in enumerate(path):
+                band = int(marks[min(i // every, len(marks) - 1)] / length) % count
+                if self.band[q] < 0:
+                    self.band[q] = band
+                    frontier.append(q)
+        reach = int(self.style["seam"].get("reach", 120))
+        for _ in range(reach):
+            nxt: list[int] = []
+            for q in frontier:
+                x, y = q % self.w, q // self.w
+                b = self.band[q]
+                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                    if 0 <= nx < self.w and 0 <= ny < self.h:
+                        r = ny * self.w + nx
+                        if self.band[r] < 0:
+                            self.band[r] = b
+                            nxt.append(r)
+            frontier = nxt
+            if not frontier:
+                break
+
+    def _seam_colour(self, p: int) -> tuple[int, int, int] | None:
+        b = self.band[p]
+        if b < 0:
+            return None
+        return self.mats[self.style["seam"]["colours"][b]]
+
+    def _draw_edges(self) -> None:
+        """The seam (the edge's own pixels, in its band's shades by t) and the lip inside it (as wide
+        as t allows), over the floor."""
+        g = self.ground
+        lip_cols = [colour(c, self.mats) for c in self.style["lip"]["shades"]]
+        lip_width = int(self.style["lip"]["width"])
+        # The distance in from the edge, up to the lip's width, by a walk in from the edges.
+        dist = bytearray(self.w * self.h)
+        frontier = [p for p in range(self.w * self.h) if self._is_edge(p)]
+        for p in frontier:
+            dist[p] = 1
+        for d in range(2, lip_width + 2):
+            nxt = []
+            for q in frontier:
+                x, y = q % self.w, q // self.w
+                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                    if 0 <= nx < self.w and 0 <= ny < self.h:
+                        r = ny * self.w + nx
+                        if g.land[r] and not dist[r]:
+                            dist[r] = d
+                            nxt.append(r)
+            frontier = nxt
+        self.seam: list[int] = []
+        for p in range(self.w * self.h):
+            d = dist[p]
+            if not d:
+                continue
+            t = self.t[p]
+            x, y = p % self.w, p // self.w
+            roll = unit(x, y, 5051)
+            if d == 1:
+                ramp = self._seam_colour(p)
+                if ramp is None:
+                    continue
+                # Light and base where the edge is whole, base then shadow as a crack narrows.
+                if roll < t * 0.5:
+                    rgb = ramp[2]
+                elif roll < 0.25 + t * 0.75:
+                    rgb = ramp[1]
+                else:
+                    rgb = ramp[0]
+                self._put(self.floor, p, rgb)
+                self.seam.append(p)
+            elif d - 1 <= lip_width * t + 0.2 and t > 0.2:
+                self._put(self.floor, p, lip_cols[1] if roll < 0.3 else lip_cols[0])
+        pebbles = self.style["lip"].get("pebbles")
+        if pebbles:
+            shades = [colour(c, self.mats) for c in pebbles["shades"]]
+            for i, p in enumerate(self.seam):
+                if self.t[p] < 0.9 or hash32(p, 6061) % int(pebbles["every"]):
+                    continue
+                x, y = p % self.w, p // self.w
+                for dy in range(-6, -3):
+                    for dx in range(-2, 2):
+                        q = (y + dy) * self.w + x + dx
+                        if 0 <= y + dy < self.h and 0 <= x + dx < self.w and g.land[q]:
+                            inner = -5 <= dy <= -4 and -1 <= dx <= 0
+                            self._put(self.floor, q, shades[2] if (inner and dx == -1 and dy == -5) else shades[1] if inner else shades[0])
+
+    def _draw_under(self) -> None:
+        """The rock face under every edge that faces down, hanging into the clear pixels below it:
+        as deep as the edge style says (noise along the edge), shallower and darker down a crack as
+        it narrows; banded, with roots; its bottom gives off the drips."""
+        rock = self.style["rock"]
+        shades = [colour(c, self.mats) for c in rock["shades"]]
+        strata = colour(rock["strata"], self.mats)
+        root = colour(rock["roots"], self.mats)
+        lo, hi = rock["depth"]
+        seed = int(self.ground.shape.get("seed", 0)) + 21
+        bottoms: dict[int, int] = {}
+        for x in range(self.w):
+            for y in range(self.h - 1):
+                p = y * self.w + x
+                if not self.solid[p] or self.solid[p + self.w]:
+                    continue
+                t = self.t[p]
+                depth = int((lo + (hi - lo) * noise1(x / 14.0, seed) ** 1.8) * t)
+                bottom = y
+                for d in range(1, depth + 1):
+                    yy = y + d
+                    if yy >= self.h:
+                        break
+                    q = yy * self.w + x
+                    if self.solid[q]:
+                        break
+                    k = noise2(x, yy, 7.0, seed + 1)
+                    rgb = shades[1] if k > 0.55 else shades[0]
+                    if math.sin((yy + noise1(x / 9.0, seed + 2) * 18.0) / 5.0) > 0.85:
+                        rgb = strata
+                    rgb = _mix(DEEP, rgb, t)
+                    self._put(self.under, q, rgb)
+                    bottom = yy
+                if bottom > y and t > 0.6:
+                    q = bottom * self.w + x
+                    self._put(self.under, q, strata)
+                    bottoms[x * self.h + bottom] = q
+                    if hash32(x, y, seed) % 7 == 0:
+                        length = 6 + hash32(x, y, seed, 2) % 30
+                        for d in range(1, length):
+                            yy = bottom + d
+                            if yy < self.h and not self.solid[yy * self.w + x]:
+                                self._put(self.under, yy * self.w + x, root)
+        # The drips leave from the rock's bottom: runs of neighbouring columns, left to right.
+        cells = sorted(bottoms)
+        runs: list[list[tuple[float, float]]] = []
+        last = None
+        for key in cells:
+            x, y = key // self.h, key % self.h
+            if last is not None and x == last[0] + 1 and abs(y - last[1]) <= 6:
+                runs[-1].append((x + 0.5, y + 1.0))
+            else:
+                runs.append([(x + 0.5, y + 1.0)])
+            last = (x, y)
+        every = int(self.style["rim"].get("every", 4))
+        self.drips = [run[::every] + ([run[-1]] if (len(run) - 1) % every else []) for run in runs if len(run) >= 12]
+
+    def _draw_glow(self) -> tuple[int, int, bytearray]:
+        """The edges' glow, at half size: every seam pixel adds its band's base colour by its t, blurred
+        twice (near and far) and added together."""
+        glow = self.style["glow"]
+        gw, gh = self.w // 2, self.h // 2
+        acc = [array.array("f", bytes(4 * gw * gh)) for _ in range(3)]
+        for p in self.seam:
+            ramp = self._seam_colour(p)
+            if ramp is None:
+                continue
+            k = self.t[p] ** 1.5
+            x, y = (p % self.w) // 2, (p // self.w) // 2
+            q = y * gw + x
+            for c in range(3):
+                acc[c][q] += ramp[1][c] * k / 255.0 * 0.25
+        out = [array.array("f", bytes(4 * gw * gh)) for _ in range(3)]
+        for radius, strength in glow["blurs"]:
+            for c in range(3):
+                blurred = _box_blur(_box_blur(acc[c], gw, gh, int(radius), True), gw, gh, int(radius), False)
+                for q in range(gw * gh):
+                    out[c][q] += blurred[q] * float(strength)
+        image = bytearray(gw * gh * 4)
+        for q in range(gw * gh):
+            r, g, b = out[0][q], out[1][q], out[2][q]
+            a = min(1.0, max(r, g, b))
+            if a < 1.0 / 255.0:
+                continue
+            image[q * 4] = min(255, round(r / a * 255))
+            image[q * 4 + 1] = min(255, round(g / a * 255))
+            image[q * 4 + 2] = min(255, round(b / a * 255))
+            image[q * 4 + 3] = round(a * 255)
+        return gw, gh, image
+
+    def _wall_rects(self) -> list[tuple[int, int, int, int]]:
+        """The walls: every cell whose middle pixel is not solid, merged into rectangles (runs along
+        a row, then runs of the same span down the rows), as (x, y, w, h) in pixels."""
+        cols, rows = self.w // CELL, self.h // CELL
+        wall = [[not self.solid[(r * CELL + CELL // 2) * self.w + c * CELL + CELL // 2] for c in range(cols)] for r in range(rows)]
+        open_runs: dict[tuple[int, int], list[int]] = {}
+        rects: list[tuple[int, int, int, int]] = []
+        for r in range(rows + 1):
+            runs = set()
+            if r < rows:
+                c = 0
+                while c < cols:
+                    if wall[r][c]:
+                        start = c
+                        while c < cols and wall[r][c]:
+                            c += 1
+                        runs.add((start, c))
+                    else:
+                        c += 1
+            for span in list(open_runs):
+                if span not in runs:
+                    top, height = open_runs.pop(span)
+                    rects.append((span[0] * CELL, top * CELL, (span[1] - span[0]) * CELL, height * CELL))
+            for span in runs:
+                if span in open_runs:
+                    open_runs[span][1] += 1
+                else:
+                    open_runs[span] = [r, 1]
+        rects.sort(key=lambda rect: (rect[1], rect[0]))
+        return rects
+
+
+def _bilinear(grid: list[float], cols: int, fx: float, fy: float) -> float:
+    ix, iy = int(fx), int(fy)
+    tx, ty = fx - ix, fy - iy
+    i = iy * cols + ix
+    return (grid[i] * (1.0 - tx) + grid[i + 1] * tx) * (1.0 - ty) + (grid[i + cols] * (1.0 - tx) + grid[i + cols + 1] * tx) * ty
+
+
+def _box_blur(src: array.array, w: int, h: int, radius: int, along_rows: bool) -> array.array:
+    out = array.array("f", bytes(4 * w * h))
+    span = 2 * radius + 1
+    if along_rows:
+        for y in range(h):
+            row = y * w
+            total = 0.0
+            for x in range(-radius, radius + 1):
+                if 0 <= x < w:
+                    total += src[row + x]
+            for x in range(w):
+                out[row + x] = total / span
+                if x - radius >= 0:
+                    total -= src[row + x - radius]
+                if x + radius + 1 < w:
+                    total += src[row + x + radius + 1]
+    else:
+        for x in range(w):
+            total = 0.0
+            for y in range(-radius, radius + 1):
+                if 0 <= y < h:
+                    total += src[y * w + x]
+            for y in range(h):
+                out[y * w + x] = total / span
+                if y - radius >= 0:
+                    total -= src[(y - radius) * w + x]
+                if y + radius + 1 < h:
+                    total += src[(y + radius + 1) * w + x]
+    return out
+
+
+# ----------------------------------------------------------------------------------------------
+# Writing
+
+
+def inputs_hash(shape_path: Path) -> str:
+    """The hash of everything a shape's ground is made from: the shape, its edge style, its ground
+    materials, the palette and this generator's VERSION."""
+    shape = json.loads(shape_path.read_text(encoding="utf-8"))
+    digest = hashlib.sha256()
+    digest.update(f"ground_shape {VERSION}\n".encode())
+    digest.update(shape_path.read_bytes())
+    digest.update((EDGES / shape["edge"] / "edge.json").read_bytes())
+    for ground in [shape["ground"]] + [a["ground"] for a in shape.get("areas", [])]:
+        digest.update((GROUNDS / ground / "ground.json").read_bytes())
+    digest.update(PALETTE.read_bytes())
+    return digest.hexdigest()[:16]
+
+
+# Where a room's ground art goes: art lives under art/ (content/rooms/README.md: rooms hold layout).
+ART = ROOT / "art/grounds"
+
+
+def outputs_of(shape_path: Path) -> dict[str, Path]:
+    """The scene beside the shape file, its art in art/grounds/<room>/."""
+    stem = shape_path.name.removesuffix(".shape.json")
+    art = ART / stem
+    return {
+        "scene": shape_path.parent / f"{stem}_ground.tscn",
+        "floor": art / f"{stem}_ground_floor.png",
+        "under": art / f"{stem}_ground_under.png",
+        "glow": art / f"{stem}_ground_glow.png",
+    }
+
+
+def res_path(path: Path) -> str:
+    return "res://" + path.resolve().relative_to(ROOT).as_posix()
+
+
+def _vec(points: list[tuple[float, float]]) -> str:
+    return ", ".join(f"{_num(x)}, {_num(y)}" for x, y in points)
+
+
+def _num(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else f"{value:.1f}"
+
+
+def scene_text(drawing: Drawing, outs: dict[str, Path], digest: str) -> str:
+    style = drawing.style
+    rim = style["rim"]
+    drip = style["drip"]
+    colours = ", ".join(f'&"{c}"' for c in style["seam"]["colours"])
+    sizes = sorted({(w, h) for _, _, w, h in drawing.walls})
+    shape_ids = {size: f"Box_{size[0]}x{size[1]}" for size in sizes}
+    lines = [f"[gd_scene load_steps={5 + len(drawing.rims) + len(drawing.drips) + len(sizes)} format=3]", ""]
+    lines.append(f'[ext_resource type="Texture2D" path="{res_path(outs["floor"])}" id="1_floor"]')
+    lines.append(f'[ext_resource type="Texture2D" path="{res_path(outs["under"])}" id="2_under"]')
+    lines.append(f'[ext_resource type="Texture2D" path="{res_path(outs["glow"])}" id="3_glow"]')
+    lines.append('[ext_resource type="Script" path="res://core/base/mote_source.gd" id="4_motes"]')
+    lines.append("")
+    lines += ['[sub_resource type="CanvasItemMaterial" id="GlowAdd"]', "blend_mode = 1", ""]
+    for i, points in enumerate(drawing.rims):
+        length = sum(math.dist(points[k], points[(k + 1) % len(points)]) for k in range(len(points)))
+        lines += [f'[sub_resource type="Resource" id="MoteSource_rim{i + 1}"]', 'script = ExtResource("4_motes")',
+                  f'kind = &"{rim["kind"]}"', f"rate = {length / 100.0 * float(rim['per_100px']):.1f}", "from = 1",
+                  f"colours = Array[StringName]([{colours}])", f"band_length = {_num(float(style['seam']['band_length']))}", ""]
+    for i, points in enumerate(drawing.drips):
+        length = sum(math.dist(points[k], points[k + 1]) for k in range(len(points) - 1))
+        lines += [f'[sub_resource type="Resource" id="MoteSource_drip{i + 1}"]', 'script = ExtResource("4_motes")',
+                  f'kind = &"{drip["kind"]}"', f"rate = {max(0.1, length / 100.0 * float(drip['per_100px'])):.1f}", "from = 1",
+                  f"colours = Array[StringName]([{colours}])", f"band_length = {_num(float(style['seam']['band_length']))}", ""]
+    for size in sizes:
+        lines += [f'[sub_resource type="RectangleShape2D" id="{shape_ids[size]}"]', f"size = Vector2({size[0]}, {size[1]})", ""]
+    lines += ['[node name="Floor" type="Sprite2D"]', f"z_index = {FLOOR_Z}", "texture_filter = 1", 'texture = ExtResource("1_floor")',
+              "centered = false", f'metadata/ground_inputs = "{digest}"', ""]
+    lines += ['[node name="Glow" type="Sprite2D" parent="."]', 'material = SubResource("GlowAdd")', "z_as_relative = false",
+              f"z_index = {GLOW_Z}", "texture_filter = 2", "scale = Vector2(2, 2)", 'texture = ExtResource("3_glow")', "centered = false", ""]
+    lines += ['[node name="Walls" type="StaticBody2D" parent="."]', f"collision_layer = {WALL_LAYER}", "collision_mask = 0", ""]
+    lines += ['[node name="Underside" type="Sprite2D" parent="Walls"]', "z_as_relative = false", f"z_index = {FLOOR_Z}",
+              "texture_filter = 1", 'texture = ExtResource("2_under")', "centered = false", ""]
+    for i, (x, y, w, h) in enumerate(drawing.walls):
+        lines += [f'[node name="W{i + 1}" type="CollisionShape2D" parent="Walls"]', f"position = Vector2({_num(x + w / 2)}, {_num(y + h / 2)})",
+                  f'shape = SubResource("{shape_ids[(w, h)]}")', ""]
+    for i, points in enumerate(drawing.rims):
+        name = "Rim" if i == 0 else f"Rim{i + 1}"
+        lines += [f'[node name="{name}" type="Line2D" parent="." groups=["mote_source"]]', "visible = false", "closed = true",
+                  f"points = PackedVector2Array({_vec(points)})", f'metadata/mote_source = SubResource("MoteSource_rim{i + 1}")', ""]
+    for i, points in enumerate(drawing.drips):
+        lines += [f'[node name="Drip{i + 1}" type="Line2D" parent="." groups=["mote_source"]]', "visible = false",
+                  f"points = PackedVector2Array({_vec(points)})", f'metadata/mote_source = SubResource("MoteSource_drip{i + 1}")', ""]
+    return "\n".join(lines)
+
+
+def generate(shape_path: Path) -> dict[str, Path]:
+    """Write the ground of the shape file `shape_path`; the files written, by what they are."""
+    shape = json.loads(shape_path.read_text(encoding="utf-8"))
+    drawing = Drawing(shape)
+    outs = outputs_of(shape_path)
+    outs["floor"].parent.mkdir(parents=True, exist_ok=True)
+    outs["floor"].write_bytes(png(drawing.w, drawing.h, drawing.floor))
+    outs["under"].write_bytes(png(drawing.w, drawing.h, drawing.under))
+    outs["glow"].write_bytes(png(drawing.glow_w, drawing.glow_h, drawing.glow))
+    outs["scene"].write_text(scene_text(drawing, outs, inputs_hash(shape_path)), encoding="utf-8")
+    return outs
+
+
+def shape_files() -> list[Path]:
+    return sorted((ROOT / "content").rglob("*.shape.json"))
+
+
+def stale(shape_path: Path) -> str | None:
+    """Why the ground of `shape_path` is out of date (None when it is up to date)."""
+    scene = outputs_of(shape_path)["scene"]
+    if not scene.exists():
+        return f"{scene.relative_to(ROOT)} is missing"
+    match = re.search(r'metadata/ground_inputs = "([0-9a-f]+)"', scene.read_text(encoding="utf-8"))
+    if match is None or match.group(1) != inputs_hash(shape_path):
+        return f"{scene.relative_to(ROOT)} is older than its shape, edge style, ground materials or the generator"
+    for kind in ("floor", "under", "glow"):
+        if not outputs_of(shape_path)[kind].exists():
+            return f"{outputs_of(shape_path)[kind].relative_to(ROOT)} is missing"
+    return None
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("shapes", nargs="*", type=Path, help="shape files to draw (default with --check: every one)")
+    parser.add_argument("--check", action="store_true", help="write nothing; fail when a room's ground is out of date")
+    args = parser.parse_args(argv)
+    if args.check:
+        problems = [f"{path.relative_to(ROOT)}: {why}" for path in (args.shapes or shape_files()) if (why := stale(path.resolve()))]
+        for problem in problems:
+            print(problem, file=sys.stderr)
+        if problems:
+            print("Run python3 tools/ground_shape.py <shape file> to draw it again.", file=sys.stderr)
+        return 1 if problems else 0
+    if not args.shapes:
+        parser.error("name the shape files to draw")
+    for path in args.shapes:
+        outs = generate(path.resolve())
+        print("wrote " + ", ".join(str(p.relative_to(ROOT)) for p in outs.values()))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

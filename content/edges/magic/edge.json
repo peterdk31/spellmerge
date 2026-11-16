@@ -1,0 +1,32 @@
+{
+	"about": "The hub's magic edge (docs/milestones/hub-rework.md): a seam of the elements' light in long bands round the coast, a turf lip, a banded rock face hanging into the void with roots, embers rising off it and drips falling from the rock; a crack has the whole edge where it is full_width wide and fades to a hairline.",
+	"full_width": 14,
+	"seam": {
+		"colours": ["fire", "spark", "arc", "ice", "void"],
+		"band_length": 420,
+		"reach": 120
+	},
+	"lip": {
+		"width": 3,
+		"shades": ["leaf.base", "leaf.light"],
+		"pebbles": {"every": 37, "shades": ["#14121f", "stone.base", "stone.light"]}
+	},
+	"rock": {
+		"depth": [10, 90],
+		"shades": ["stone.shadow", "stone.base"],
+		"strata": "#14121f",
+		"roots": "wood.shadow"
+	},
+	"glow": {
+		"blurs": [[3, 2.0], [9, 1.2]]
+	},
+	"rim": {
+		"kind": "rim_ember",
+		"per_100px": 8,
+		"every": 4
+	},
+	"drip": {
+		"kind": "rim_drip",
+		"per_100px": 3
+	}
+}

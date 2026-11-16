@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The hub room (content/rooms/hub, docs/milestones/online-lobby.md, L1): a large island floating
-## in the void, the void round it all wall, the teleporter stone in the middle, three dummies
+## in the void (its ground drawn from a shape: hub rework HR2), the void round it all wall, the teleporter stone in the middle, three dummies
 ## together off to one side and the multiplayer altar, both props (props W8: content/props/hub_stone,
 ## hub_altar), and the prop yard, all placed in its scene (props W8a: `RoomPlaces`). No scripts;
 ## the stone's art lies on the stone in both its states; nothing starts on the stone or in a wall;
@@ -144,30 +144,54 @@ func test_the_lecterns_place_is_open_floor() -> void:
 			check(not taken.intersects(_body(point)), "clear of the spawn %s" % point)
 
 
+## The room's ground is drawn from its shape (hub rework HR2, tools/ground_shape.py): the room's
+## `Floor` is the generated ground scene, its art opaque wherever a body may stand.
+func _floor_image() -> Image:
+	var floor_sprite := room_root.get_node_or_null("Floor") as Sprite2D
+	return floor_sprite.texture.get_image() if floor_sprite != null and floor_sprite.texture != null else null
+
+
+## Whether the floor's art is opaque at `point` (a body may stand there).
+static func _ground_at(image: Image, point: Vector2) -> bool:
+	var x: int = floori(point.x)
+	var y: int = floori(point.y)
+	return x >= 0 and y >= 0 and x < image.get_width() and y < image.get_height() and image.get_pixel(x, y).a > 0.5
+
+
+## The walls as a set of 8 px cells (a cell is in it when its middle is in a wall), so a check of
+## thousands of cells does not walk every wall.
+func _wall_cells(walls: Array[Rect2]) -> Dictionary:
+	var cells: Dictionary = {}
+	for wall: Rect2 in walls:
+		var x: float = floorf(wall.position.x / 8.0) * 8.0
+		while x < wall.end.x:
+			var y: float = floorf(wall.position.y / 8.0) * 8.0
+			while y < wall.end.y:
+				if wall.has_point(Vector2(x + 4.0, y + 4.0)):
+					cells[Vector2i(int(x / 8.0), int(y / 8.0))] = true
+				y += 8.0
+			x += 8.0
+	return cells
+
+
 func test_the_room_is_large_and_the_void_round_the_island_is_wall() -> void:
 	var size: Vector2 = RoomPlaces.read(room_root).size
 	check(size.x >= 1280.0 and size.y >= 800.0, "a large room: %s" % size)
-	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
-	var floor_rects: Array[Rect2] = []
-	for node: Node in room_root.get_children():
-		if node is Sprite2D and String(node.name).begins_with("Floor"):
-			floor_rects.append(RoomScan.sprite_rect(node as Sprite2D))
-	check(floor_rects.size() >= 2, "the island is made of floor pieces")
-	check_equal((room_root.get_node("Floor") as Sprite2D).z_index, RoomBase.FLOOR_Z, "its floor under the marks")
+	var floor_sprite := room_root.get_node_or_null("Floor") as Sprite2D
+	check(floor_sprite != null, "the room's Floor is its drawn ground")
+	if floor_sprite == null:
+		return
+	check_equal(floor_sprite.z_index, RoomBase.FLOOR_Z, "its floor under the marks")
+	check_equal(floor_sprite.texture.get_size(), size, "the ground's art is the whole room")
+	var image: Image = _floor_image()
+	var cells: Dictionary = _wall_cells(RoomScan.wall_rects(room_root))
 	# Every 8-pixel cell of the room is floor or wall, never both, never neither: no way off the island.
-	var cell: float = 8.0
-	var y: float = cell * 0.5
 	var bad: int = 0
-	while y < size.y:
-		var x: float = cell * 0.5
-		while x < size.x:
-			var point := Vector2(x, y)
-			var on_floor: bool = floor_rects.any(func(r: Rect2) -> bool: return r.has_point(point))
-			var in_wall: bool = walls.any(func(r: Rect2) -> bool: return r.has_point(point))
-			if on_floor == in_wall:
+	for cy in int(size.y / 8.0):
+		for cx in int(size.x / 8.0):
+			var on_floor: bool = _ground_at(image, Vector2(cx * 8 + 4, cy * 8 + 4))
+			if on_floor == cells.has(Vector2i(cx, cy)):
 				bad += 1
-			x += cell
-		y += cell
 	check_equal(bad, 0, "cells that are both floor and wall, or neither")
 
 
@@ -205,19 +229,17 @@ func test_nothing_starts_in_a_wall_or_on_the_stone() -> void:
 		check(not wall.intersects(stone.grow(BODY_RADIUS)), "the stone has room round it (wall %s)" % wall)
 
 
-## The island's edge gives off motes (a `MoteSource` line, props W7; the owner's pick, "A, mixed elements"): one hidden
-## rim node, a sound look whose kind exists, in the elements' palette ramps, its points clockwise
-## round the floor so every stretch has floor on its right and void (wall) on its left.
+## The island's edge gives off motes (a `MoteSource` line, props W7; the owner's pick, "A, mixed elements";
+## hub rework HR2: drawn with the ground): the hidden rim node `Rim`, a sound look whose kind exists, in
+## the elements' palette ramps in bands along it (the seam's), its points clockwise round the floor so
+## every stretch has the ground on its right and the void on its left (all but a few at sharp corners,
+## where a line through every fourth pixel of the edge cuts across).
 func test_the_rim_of_motes_runs_round_the_island() -> void:
-	var rims: Array[Node] = []
-	for node: Node in room_root.find_children("*", "", true, false):
-		if node.is_in_group(MoteSource.GROUP):
-			rims.append(node)
-	check_equal(rims.size(), 1, "one rim")
-	if rims.is_empty():
+	var line := room_root.find_child("Rim", true, false) as Line2D
+	check(line != null and line.is_in_group(MoteSource.GROUP), "the rim, a mote source")
+	if line == null:
 		return
-	var line := rims[0] as Line2D
-	check(line != null and not line.visible and line.closed, "a hidden, closed Line2D")
+	check(not line.visible and line.closed, "a hidden, closed Line2D")
 	var look: MoteSource = MoteSource.of(line)
 	check(look != null and look.problems(false).is_empty(), "a sound MoteSource")
 	check(look != null and look.from == MoteSource.From.LINE and look.points.is_empty(), "a line along the node's own points")
@@ -225,7 +247,8 @@ func test_the_rim_of_motes_runs_round_the_island() -> void:
 		return
 	check(ResourceLoader.exists("res://content/motes/%s.tres" % look.kind), "its kind %s is a mote kind" % look.kind)
 	check_equal(look.colours, [&"fire", &"spark", &"arc", &"ice", &"void"] as Array[StringName], "the elements' five materials")
-	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
+	check(look.band_length > 0.0, "in bands along the rim, as its seam is drawn")
+	var image: Image = _floor_image()
 	var bad: int = 0
 	var points: PackedVector2Array = line.points
 	for i in points.size():
@@ -234,11 +257,14 @@ func test_the_rim_of_motes_runs_round_the_island() -> void:
 		var mid: Vector2 = (a + b) * 0.5
 		var way: Vector2 = (b - a).normalized()
 		var left := Vector2(way.y, -way.x)
-		var outside: Vector2 = mid + left * 4.0
-		var inside: Vector2 = mid - left * 4.0
-		if not walls.any(func(r: Rect2) -> bool: return r.has_point(outside)) or walls.any(func(r: Rect2) -> bool: return r.has_point(inside)):
+		if _ground_at(image, mid + left * 3.0) or not _ground_at(image, mid - left * 3.0):
 			bad += 1
-	check_equal(bad, 0, "stretches without void on their left and floor on their right")
+	check(points.size() > 500, "a rim all round a large island (%d points)" % points.size())
+	check(bad * 50 <= points.size(), "stretches without the void on their left and ground on their right: %d of %d" % [bad, points.size()])
+	for node: Node in room_root.find_children("*", "", true, false):
+		if node.is_in_group(MoteSource.GROUP):
+			var source: MoteSource = MoteSource.of(node)
+			check(source != null and source.problems(false).is_empty(), "%s is a sound source" % node.name)
 
 
 func test_the_dummies_stand_together_away_from_the_stone() -> void:

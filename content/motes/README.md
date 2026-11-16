@@ -52,6 +52,7 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 | `drip` | none (named by the rune's `look_motes`) | light dripping off a rune's crystal once armed: shown at the crystal's foot, it falls straight to the floor and goes | a pixel, now and then a hotter one |
 | `ward` | none (the barriers' shells, gameplay/feel/barriers.gd) | a barrier's bubble: standing still on its shell, twinkling white-hot to light; knocked off by a block, it flies out and slows, cooling | a pixel, now and then a hotter one |
 | `rim_ember` | none (named by a `MoteSource`: the hub's island edge, gameplay/feel/source_motes.gd) | given off all along a room's floor edge: rises slowly off it and drifts a little outward, swaying, white-hot at first and cooling through the source's ramps (the hub's: the elements' colours, one a mote) | a pixel with a pixel of tail below it as it rises, flickering hotter now and then (it starts at its ramp's light shade) |
+| `rim_drip` | none (named by a `MoteSource`: the drip lines under a room's ground drawn from a shape, hub rework HR2; tools/ground_shape.py) | given off along the bottom of the rock face under an edge: falls slowly away into the void, swaying a little, cooling through the source's ramps (the hub's: the band of the coast it hangs under) | a pixel with a fainter one below it, flickering |
 | `smoke` | none (named by burning cover's state, `content/cover/hub_grass`: ground cover GC8) | rises slowly off burning cover and sways, starting a shade down (no white heat) and cooling dark, never glowing | a 2x2 puff that thins to a pixel over its life |
 
 ## How to make something in the world give off motes
@@ -74,6 +75,7 @@ One stream of one kind of mote, given off all the time while its node is in the 
 | `kind` | (none: required) | the mote kind, a file here (`ember`, `dust`, `glimmer`, `rim_ember`, ...) |
 | `rate` | 4 | motes a second from the whole source, at the "Particle amount" setting's Full (the setting thins it as every mote) |
 | `colours` | (none) | palette materials by name (`&"fire"`, `&"ice"`, `&"stone"`: docs/STYLE.md, `core/base/palette.gd`), one a mote at random, each cooling white-hot, light, base, shadow; never a player's colour nor Blight. Empty: the colours of its art (`mote_art`) |
+| `band_length` | 0 (at random) | a line only: its colours run in bands this many pixels long along it, in the order named and round again, instead of one a mote at random (the hub's coast: the seam a ground drawn from a shape is drawn in the same bands, content/edges) |
 | `from` | point | where its motes leave from, from its node: `point` (`at`), `line` (`points`, else the node's own `Line2D`; thrown outward, the left of the way the points run), `area` (a box `size` across round `at`), `rim` (an oval `size` across round `at`, thrown out from its middle), `mask` (the lit pixels of its art) |
 | `way`, `spread` | up, 120 degrees | the way a point's, a box's and a mask's motes are thrown, and how far round it |
 | `reach` | 6 px | how far a mote is thrown; its kind's own speed carries it no further |

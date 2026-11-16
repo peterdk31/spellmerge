@@ -87,6 +87,11 @@ const MOST_LIFE: float = 4.0
 ## &"ice", &"stone"), one a mote at random: white-hot, then the material's light, base and shadow.
 ## Never a player's colour nor Blight. Empty: the colours of its art (`mote_art`), lightest first.
 @export var colours: Array[StringName] = []
+## LINE only: when above 0, its colours run in bands this many pixels long along the line, in the
+## order named and round again (a coast's seam of the elements: hub rework, tools/ground_shape.py
+## draws the edge in the same bands), instead of one a mote at random. Its art's colours (no
+## `colours`) are always at random.
+@export_range(0.0, 10000.0, 1.0) var band_length: float = 0.0
 ## MASK only: its motes stand on the lit pixels instead of being given off.
 @export var stand: bool = false
 ## A standing mote's round, white-hot to its last shade, in seconds.
@@ -140,6 +145,8 @@ func problems(has_art: bool = true) -> PackedStringArray:
 		found.append("a mote source has no way to throw")
 	if stop > 0.0 and stop <= start:
 		found.append("a mote source stops at %s s, before it starts at %s s" % [stop, start])
+	if band_length < 0.0 or (band_length > 0.0 and from != From.LINE):
+		found.append("only a line's colours run in bands (band_length %s)" % band_length)
 	if colours.is_empty() and not has_art:
 		found.append("a mote source has no colours (name palette materials, or give it art to take them from)")
 	found.append_array(Palette.world_problems(colours, "a mote source"))

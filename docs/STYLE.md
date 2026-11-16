@@ -23,7 +23,7 @@ The art rules for Spellmerge, written so a person, an agent or a script can chec
 
 ## Palette
 
-49 colours: one outline colour and sixteen materials of three shades each. Write hex values in lower case. No other colour is allowed in a final or placeholder asset.
+52 colours: one outline colour and seventeen materials of three shades each. Write hex values in lower case. No other colour is allowed in a final or placeholder asset.
 
 | Material | Shadow | Base | Light | Use |
 | --- | --- | --- | --- | --- |
@@ -35,6 +35,7 @@ The art rules for Spellmerge, written so a person, an agent or a script can chec
 | **Wood** | `#3d2a2e` | `#7a4a35` | `#b27a4a` | Staffs, doors, furniture |
 | **Skin** | `#8a5a44` | `#d99a74` | `#f5cfa8` | Faces and hands |
 | **Ice** | `#1f7080` | `#4fd6dc` | `#c4f6f2` | Frost spells, ice, cold effects |
+| **Water** | `#0f4a44` | `#1e9c8c` | `#6fdcc0` | Water spells, the soaked status, fountains and puddles: a deep sea teal, greener and darker than Ice's cyan (frost), far from Mana's ultramarine and Player 1's blue, and bluer than Player 3's green |
 | **Void** | `#4a1450` | `#a0309a` | `#e08ad8` | Void spells, void effects |
 | **Mana** | `#161c55` | `#2c3aa8` | `#6f86f0` | Mana itself, seen moving (a siphon's mana knocked off a body and back into the staff; the owner, 2026-11-16: "mana should be dark blue"): a deep ultramarine, bluer and darker than Player 1's blue so it never reads as a player's |
 | **Arc** | `#3f6b10` | `#b4e82a` | `#eeffa6` | Lightning spells and the static charge: an acid lime, apart from Spark's gold, the players' greens and Ice's cyan |
@@ -140,7 +141,7 @@ A minimal valid example, a stone **wall** tile with its lit top-left edge and sh
 
 The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
 
-- **Font:** one pixel font, set in `hud/theme`, at whole-number sizes only. Body text is Bone light on Stone shadow; headings Bone base; warnings Fire light; gold and pickups Spark light. No other text colours.
+- **Font:** one pixel font, set in `hud/theme`, at whole-number sizes only, and one title type beside it for the names of bosses (and later biomes) only: a bitmap face drawn for the game on the pixel grid, `TitleLabel` in the theme, the game's first font file (docs/milestones/boss-intro.md, rule 7). Body text is Bone light on Stone shadow; headings Bone base; warnings Fire light; gold and pickups Spark light. No other text colours.
 - **Panels:** a 1 px Outline border, Stone shadow fill, a Stone light top and left inner edge (3 shades at most). Corners are cut by one pixel, not rounded.
 - **Player panels:** the border and name tab use that player's ramp (base fill, light top-left edge, shadow bottom-right edge). Next to the colour sit the player's number (1–4) and a shape, so colour is never the only signal. Health bars are Fire and mana bars Bone on a Stone shadow trough; neither uses a player colour.
 - **Icons:** 16×16 for spells and relics in the overlay, 8×8 for status marks, with the 1 px outline and at most 3 shades per material.

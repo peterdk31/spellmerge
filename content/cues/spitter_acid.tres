@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"spitter_acid"
+parts = Array[Dictionary]([{"part": &"motes", "kind": &"glob", "count": 12, "for": 0.15, "radius": 72.0, "spread": 12.0, "way": &"aim", "up": 0.4, "color": Color(0.890196, 0.811765, 0.419608, 1)}, {"part": &"motes", "kind": &"glob", "count": 8, "for": 0.15, "radius": 56.0, "spread": 20.0, "way": &"aim", "up": 0.6, "color": Color(0.65098, 0.541176, 0.164706, 1)}])

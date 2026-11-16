@@ -18,6 +18,36 @@ when = 0
 element = &"frost"
 then = &"rest"
 
+[sub_resource type="Resource" id="rest_water"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"water"
+then = &"wet"
+
+[sub_resource type="Resource" id="burning_water"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"water"
+then = &"wet"
+
+[sub_resource type="Resource" id="wet_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 8.0
+then = &"rest"
+
+[sub_resource type="Resource" id="wet_glints"]
+script = ExtResource("4_motes")
+kind = &"drip"
+rate = 0.6
+from = 2
+at = Vector2(0, -2)
+size = Vector2(10, 4)
+spread = 0.0
+reach = 0.0
+height = 3.0
+colours = Array[StringName]([&"water"])
+
 [sub_resource type="Resource" id="burning_after"]
 script = ExtResource("3_trigger")
 when = 1
@@ -59,7 +89,7 @@ script = ExtResource("2_state")
 state_id = &"rest"
 frames = PackedInt32Array(0, 1, 2, 8, 9, 10)
 trampled_frames = PackedInt32Array(6, 7)
-triggers = Array[ExtResource("3_trigger")]([SubResource("rest_fire")])
+triggers = Array[ExtResource("3_trigger")]([SubResource("rest_fire"), SubResource("rest_water")])
 
 [sub_resource type="Resource" id="burning"]
 script = ExtResource("2_state")
@@ -74,7 +104,7 @@ status_duration = 1.5
 status_every = 0.5
 spreads = &"fire"
 spread_chance = 0.6
-triggers = Array[ExtResource("3_trigger")]([SubResource("burning_frost"), SubResource("burning_after")])
+triggers = Array[ExtResource("3_trigger")]([SubResource("burning_frost"), SubResource("burning_water"), SubResource("burning_after")])
 
 [sub_resource type="Resource" id="ash"]
 script = ExtResource("2_state")
@@ -83,6 +113,18 @@ frames = PackedInt32Array(5)
 sway = 0.0
 bend = 0.0
 triggers = Array[ExtResource("3_trigger")]([SubResource("ash_after")])
+
+[sub_resource type="Resource" id="wet"]
+script = ExtResource("2_state")
+state_id = &"wet"
+frames = PackedInt32Array(0, 1, 2, 8, 9, 10)
+trampled_frames = PackedInt32Array(6, 7)
+motes = Array[ExtResource("4_motes")]([SubResource("wet_glints")])
+status = &"soak"
+status_strength = 25.0
+status_duration = 1.0
+status_every = 0.5
+triggers = Array[ExtResource("3_trigger")]([SubResource("wet_after")])
 
 [resource]
 script = ExtResource("1_kind")
@@ -96,4 +138,4 @@ keep_gap = 1
 sheet = ExtResource("5_sheet")
 tufts_per_cell = 3
 sway = 1.5
-states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("burning"), SubResource("ash")])
+states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("burning"), SubResource("ash"), SubResource("wet")])

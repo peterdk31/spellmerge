@@ -82,8 +82,8 @@ func test_hops_and_wake_are_kinds_that_pack_and_emit() -> void:
 	check(not ManagerScript.look_has(look, ManagerScript.LOOK_HOPS - 1), "its neighbour is not")
 	check(ManagerScript.LOOK_WAKE < ManagerScript.LOOK_COUNT, "both kinds are inside the look range")
 	check(ManagerScript.LOOK_COUNT - 1 <= ManagerScript.LOOK_MAX_KINDS, "and inside what the instance data holds")
-	var later: Array[int] = [ManagerScript.LOOK_HOPS, ManagerScript.LOOK_WAKE, ManagerScript.LOOK_WEIGHT, ManagerScript.LOOK_RIPPLE, ManagerScript.LOOK_CURL, ManagerScript.LOOK_ZIG, ManagerScript.LOOK_DOUBLE, ManagerScript.LOOK_CONVERGE, ManagerScript.LOOK_DRIFT]
-	check(later.back() == ManagerScript.LOOK_COUNT - 1, "drift is the last kind, below the poof flag (kind 22)")
+	var later: Array[int] = [ManagerScript.LOOK_HOPS, ManagerScript.LOOK_WAKE, ManagerScript.LOOK_WEIGHT, ManagerScript.LOOK_RIPPLE, ManagerScript.LOOK_CURL, ManagerScript.LOOK_ZIG, ManagerScript.LOOK_DOUBLE, ManagerScript.LOOK_CONVERGE, ManagerScript.LOOK_DRIFT, ManagerScript.LOOK_DROPS]
+	check(later.back() == ManagerScript.LOOK_COUNT - 1, "drops (water) is the last kind, below the enemy ramp flag (kind 23)")
 	for kind: int in later:
 		check((ManagerScript.EMITTING_MASK >> (kind - 1)) & 1 == 1, "kind %d gives off particles" % kind)
 

@@ -110,6 +110,20 @@ class AtlasTest(unittest.TestCase):
                                 ("hex", "void", "effect = 3\nradius = 60.0\n"))
         self.assertIn("spreads the status to other targets within 60 pixels", row["does"])
 
+    def test_remove_says_it_takes_the_status_away(self) -> None:
+        row = self.add_reaction("t_rem", ("burn", "water", "effect = 4\n"), ("soak", "fire", "effect = 4\n"))
+        self.assertEqual(row["does"], "Water on burning or Fire on soaked: takes the status away.")
+
+    def test_freeze_names_its_seconds(self) -> None:
+        row = self.add_reaction("t_frz", ("soak", "frost", "effect = 5\nduration = 1.5\n"),
+                                ("soak", "storm", "effect = 5\nduration = 1.5\n"))
+        self.assertIn("freezes the target for 1.5 seconds (or keeps it frozen that much longer), using up the status", row["does"])
+
+    def test_conduct_names_its_damage_and_reach(self) -> None:
+        row = self.add_reaction("t_cdc", ("soak", "lightning", "effect = 6\ndamage = 5\nradius = 80.0\n"),
+                                ("static", "water", "effect = 6\ndamage = 5\nradius = 80.0\n"))
+        self.assertEqual(row["does"], "Lightning on soaked or Water on charged: deals 5 damage to the target and to every soaked target within 80 pixels, drying them.")
+
     def test_the_real_reactions_get_one_sentence_per_distinct_effect(self) -> None:
         for e in atlas.build()["entries"]:
             if e["kind"] == "reaction":

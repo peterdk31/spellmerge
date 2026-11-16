@@ -82,27 +82,31 @@ const FREEZE: StringName = &"freeze"
 const GUST: StringName = &"gust"
 const HEX: StringName = &"hex"
 const STATIC: StringName = &"static"
+const SOAK: StringName = &"soak"
 ## Every status by its index (`ST_*`): a row keeps each one's seconds left and power in
 ## `_status_left` and `_status_power`, at `row * STATUS_COUNT + ST_*`. A plain status (gust, hex,
 ## static) is only its name, its index and its row in each table below; burn and chill have rules of
 ## their own, in the few places that name them (`_apply_status_row`, `_extend`, `_remove_status`,
-## `_tick`). What a status does to a hit is where the hit is dealt (`_hit`, `_apply_spell`, `_pace`).
-const STATUSES: Array[StringName] = [BURN, CHILL, FREEZE, GUST, HEX, STATIC]
+## `_tick`), and soak (water's) two: a soaked body takes no burn and a soak puts a burn out
+## (`_apply_status_row`), and heals on it are its power in per cent stronger (`_heal`). What a status
+## does to a hit is where the hit is dealt (`_hit`, `_apply_spell`, `_pace`).
+const STATUSES: Array[StringName] = [BURN, CHILL, FREEZE, GUST, HEX, STATIC, SOAK]
 const ST_BURN: int = 0
 const ST_CHILL: int = 1
 const ST_FREEZE: int = 2
 const ST_GUST: int = 3
 const ST_HEX: int = 4
 const ST_STATIC: int = 5
-const STATUS_COUNT: int = 6
+const ST_SOAK: int = 6
+const STATUS_COUNT: int = 7
 ## A status's index by its name.
-const STATUS_AT: Dictionary[StringName, int] = {BURN: ST_BURN, CHILL: ST_CHILL, FREEZE: ST_FREEZE, GUST: ST_GUST, HEX: ST_HEX, STATIC: ST_STATIC}
+const STATUS_AT: Dictionary[StringName, int] = {BURN: ST_BURN, CHILL: ST_CHILL, FREEZE: ST_FREEZE, GUST: ST_GUST, HEX: ST_HEX, STATIC: ST_STATIC, SOAK: ST_SOAK}
 ## By ST_*: whether `apply_status` puts it on (freeze only comes from chill).
-const STATUS_APPLIED: Array[bool] = [true, true, false, true, true, true]
+const STATUS_APPLIED: Array[bool] = [true, true, false, true, true, true, true]
 ## By ST_*: what `apply_status`'s strength is in its power (its power is the strength over this):
-## burn's damage a second, chill's share of speed (its strength a percent), gust's, hex's and
-## static's percent; freeze has none.
-const STATUS_STRENGTH_PER_POWER: Array[float] = [1.0, 100.0, 0.0, 1.0, 1.0, 1.0]
+## burn's damage a second, chill's share of speed (its strength a percent), gust's, hex's,
+## static's and soak's percent (soak's: how much more a heal on it heals); freeze has none.
+const STATUS_STRENGTH_PER_POWER: Array[float] = [1.0, 100.0, 0.0, 1.0, 1.0, 1.0, 1.0]
 ## The id a discharge is announced with on `reaction_triggered`, at each actor it hits.
 const DISCHARGE: StringName = &"discharge"
 
@@ -173,7 +177,7 @@ const STATIC_RANGE: float = 96.0
 ## The statuses a reaction can start from, in the order they are looked at: a hit reacts with the
 ## first the target has that has a row for the hit's element (a frozen target counts as chilled).
 ## The one list of that order (`_status_bits`).
-const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, GUST, HEX, STATIC]
+const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, GUST, HEX, STATIC, SOAK]
 ## `_hit`'s `team` when its caller has not read the row's team (it reads it then).
 const TEAM_UNREAD: int = -2
 ## A consume reaction does this many times its damage to a frozen actor.
@@ -627,6 +631,11 @@ func _apply_status_row(caster: int, row: int, status_id: StringName, duration: f
 	if duration <= 0.0:
 		return false
 	var at: int = row * STATUS_COUNT
+	# Soak (water's): a soaked body does not catch fire, and a soak puts a burn out.
+	if st == ST_BURN and _status_left[at + ST_SOAK] > 0.0:
+		return false
+	if st == ST_SOAK:
+		_remove_status(row, BURN)
 	var power: float = strength / STATUS_STRENGTH_PER_POWER[st]
 	var froze: bool = false
 	# A fresh status starts from its own strength; one still on keeps the stronger.
@@ -668,7 +677,7 @@ func _tell_status(by: int, node: Node2D, status_id: StringName) -> void:
 		(node as Actor).status_gained.emit(by, status_id)
 
 
-## Seconds left of `status_id` (burn, chill, freeze, gust, hex or static) on `actor`; 0 when
+## Seconds left of `status_id` (burn, chill, freeze, gust, hex, static or soak) on `actor`; 0 when
 ## it is off or the actor is not registered.
 func status_left(actor: Variant, status_id: StringName) -> float:
 	var row: int = _row_of(actor)
@@ -1059,6 +1068,10 @@ func _on_room_entered(room_id: StringName) -> void:
 func _heal(by: int, row: int, amount: float) -> bool:
 	if amount <= 0.0 or not _can_heal(row):
 		return false
+	# A soaked body is healed its soak's power in per cent more (water and mend).
+	var at: int = row * STATUS_COUNT
+	if _status_left[at + ST_SOAK] > 0.0:
+		amount += amount * _status_power[at + ST_SOAK] / 100.0
 	var node: Node2D = _nodes[row]
 	match _body[row]:
 		BODY_ACTOR:
@@ -1360,6 +1373,14 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 			_extend(by, row, reaction)
 		ReactionRow.Effect.SPREAD:
 			_spread(by, row, centre, reaction)
+		ReactionRow.Effect.REMOVE:
+			_remove_status(row, reaction.status_id)
+		ReactionRow.Effect.FREEZE:
+			_remove_status(row, reaction.status_id)
+			_freeze(by, row, reaction.duration)
+		ReactionRow.Effect.CONDUCT:
+			_remove_status(row, reaction.status_id)
+			_conduct(by, row, centre, reaction)
 	_tag = spell_tag
 	_tell_reacted(by, node, reaction.reaction_id)
 
@@ -1401,17 +1422,55 @@ func _extend(by: int, row: int, reaction: ReactionRow) -> void:
 		return
 	var at: int = row * STATUS_COUNT
 	if st == ST_CHILL:
-		var newly: bool = _status_left[at + ST_FREEZE] <= 0.0
-		_status_left[at + ST_CHILL] = 0.0
-		_status_power[at + ST_CHILL] = 0.0
-		_chill_stacks[row] = 0
-		# The body's resist shortens what a reaction adds too (boss plan OB7), a freeze as a chill.
-		_status_left[at + ST_FREEZE] += reaction.duration * (1.0 - _resist(row, ST_FREEZE))
-		if newly and _status_left[at + ST_FREEZE] > 0.0:
-			_tell_status(by, _nodes[row], FREEZE)
+		_freeze(by, row, reaction.duration)
 		return
 	_status_left[at + st] += reaction.duration * (1.0 - _resist(row, st))
 	_status_power[at + st] += reaction.strength
+
+
+## The row `row` freezes for `seconds` more (EXTEND on a chill, FREEZE): its chill and stacks go, and
+## a body not frozen yet is told it froze. The body's resist shortens it (boss plan OB7), a freeze
+## as a chill.
+func _freeze(by: int, row: int, seconds: float) -> void:
+	var at: int = row * STATUS_COUNT
+	var newly: bool = _status_left[at + ST_FREEZE] <= 0.0
+	_status_left[at + ST_CHILL] = 0.0
+	_status_power[at + ST_CHILL] = 0.0
+	_chill_stacks[row] = 0
+	_status_left[at + ST_FREEZE] += seconds * (1.0 - _resist(row, ST_FREEZE))
+	if newly and _status_left[at + ST_FREEZE] > 0.0:
+		_tell_status(by, _nodes[row], FREEZE)
+
+
+## CONDUCT: `reaction.damage` to the struck row and to every other soaked body within the circle,
+## each losing its soak, with an arc from the struck body to each (Feel draws a discharge's).
+## Reaction damage, so it sets off no reaction (a charged body it strikes still discharges, static's
+## rule, as a burst's strike does); the soaked bodies of every team, as a hit's.
+func _conduct(by: int, row: int, centre: Vector2, reaction: ReactionRow) -> void:
+	var node: Node2D = _nodes[row]
+	if projectiles != null:
+		var near: Array[Node2D] = _take_scratch()
+		var count: int = projectiles.targets_in(centre, reaction.radius, ProjectileManagerScript.ACTOR_LAYERS, near)
+		for i in count:
+			var other_node: Node2D = near[i]
+			if other_node == node or not is_instance_valid(other_node):
+				continue
+			var other: int = _row_of_node(other_node)
+			if other == ActorsScript.NONE or _status_left[other * STATUS_COUNT + ST_SOAK] <= 0.0:
+				continue
+			_remove_status(other, SOAK)
+			if events != null:
+				var zapped: Vector2 = _position_of(other_node) + _hurt_offset[other]
+				events.reaction_triggered.emit(by, reaction.reaction_id, zapped, _slot)
+				hit_stop.reaction(by, reaction.reaction_id, _slot)
+				events.discharge_arc.emit(by, centre, zapped)
+				# A listener may have changed the registrations.
+				other = _row_of_node(other_node)
+			if other != ActorsScript.NONE:
+				_hit(by, other, reaction.damage, Vector2.ZERO, 0.0, KIND_REACTION, null, false)
+		_give_scratch()
+	if _same(row, node):
+		_hit(by, row, reaction.damage, Vector2.ZERO, 0.0, KIND_REACTION, null, false)
 
 
 ## SPREAD: the status, as it is now, goes on every other actor in the circle.

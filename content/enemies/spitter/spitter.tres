@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="EnemyBase" load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://core/base/enemy_base.gd" id="1_base"]
+[ext_resource type="PackedScene" path="res://content/enemies/spitter/spitter.tscn" id="2_scene"]
+[ext_resource type="Script" path="res://core/base/staff_base.gd" id="3_staff"]
+[ext_resource type="Script" path="res://core/base/staff_cards.gd" id="4_entry"]
+[ext_resource type="Resource" path="res://content/enemies/profiles/sprayer.tres" id="5_profile"]
+
+[sub_resource type="Resource" id="Resource_staff"]
+script = ExtResource("3_staff")
+id = &"spitter"
+display_name = "Spitter's staff"
+slots = 1
+draw = 1
+wind_up = 0.8
+cast_cue = &"spitter_acid"
+cooldown = 0.0
+spread = 0.0
+max_mana = 16.0
+mana_regen = 3.0
+
+[sub_resource type="Resource" id="Resource_entry"]
+script = ExtResource("4_entry")
+staff = SubResource("Resource_staff")
+cards = Array[StringName]([&"spray"])
+
+[resource]
+script = ExtResource("1_base")
+id = &"spitter"
+display_name = "Spitter"
+max_health = 22.0
+move_speed = 40.0
+contact_damage = 0
+scene = ExtResource("2_scene")
+staffs = Array[ExtResource("4_entry")]([SubResource("Resource_entry")])
+profile = ExtResource("5_profile")
+biomes = Array[StringName]([&"crypt"])
+cost = 3
+min_depth = 1

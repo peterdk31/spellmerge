@@ -133,6 +133,8 @@ func test_line_is_as_long_as_the_shot_flies() -> void:
 	check(line.offset.x + line.region_rect.size.x == reach, "the lane and its arrowhead end where the bolt ends")
 	var material: ShaderMaterial = line.material as ShaderMaterial
 	check(float(material.get_shader_parameter(&"telegraph_lane")) >= bolt.radius, "the lane is at least as wide as the bolt")
+	check_equal(material.get_shader_parameter(&"telegraph_lane_end"), material.get_shader_parameter(&"telegraph_lane"), "and as wide at its far end: only a cone widens (a spray's)")
+	check_equal(line.region_rect.size.y, 32.0, "its sprite as tall as ever")
 
 
 func test_line_follows_the_aim() -> void:

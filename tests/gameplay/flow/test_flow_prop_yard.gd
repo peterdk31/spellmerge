@@ -12,7 +12,7 @@ const FlowScript := preload("res://gameplay/flow/flow.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## The yard's props by id (every prop with no role).
-const YARD: Array[StringName] = [&"arc_lodestone", &"burial_jar", &"cracked_pillar", &"crate", &"dust_heap", &"exploding_barrel", &"fire_pit"]
+const YARD: Array[StringName] = [&"arc_lodestone", &"burial_jar", &"cracked_pillar", &"crate", &"dust_heap", &"exploding_barrel", &"fire_pit", &"fountain"]
 
 const DT: float = 1.0 / 60.0
 

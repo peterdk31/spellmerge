@@ -14,7 +14,7 @@ Card lists are written in slot order (docs/milestones/M2-staffs.md, "Reading a s
 
 ## What the players see
 
-- **The entrance:** the broom stands sweeping, not noticing anyone. A name banner ("The Old Broom") and its lore line show; its first Sweep comes about 2 s later. No cutscene, nobody waits.
+- **The entrance:** the broom stands sweeping, not noticing anyone. A name banner ("The Old Broom") and its lore line show; its first Sweep comes about 2 s later. No cutscene, nobody waits. **Replaced (owner, 2026-11-16)** by the boss intro ([boss-intro.md](boss-intro.md)): a screen-wide overlay that stops the game until any player's A after the boss's last line; the banner stays for a boss without an intro.
 - **The Sweep:** it rears back, the lane on the floor shows its path (the enemy telegraph every enemy cast has, cast-timing T6b) and a scrape is heard, then it lurches forward, picks up speed and drags to a stop, wide and heavy. What it meets rides along in front of it; pinned against a wall, it hurts. Slipping off sideways costs only the pass.
 - **Wall hits:** when it meets a wall, a pillar or a player's Wall stones head on, it stops and a ring of dust bursts out (a pulse).
 - **Dust flicks and a swat:** a scatter of slow dust bolts keeps players moving; anyone hugging it is swatted, and touching it hurts (contact damage), so nobody stands on it and fires.

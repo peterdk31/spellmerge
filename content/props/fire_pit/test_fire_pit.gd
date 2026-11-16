@@ -59,3 +59,12 @@ func test_fire_lights_it_and_frost_puts_it_out() -> void:
 	check_equal(_world.shoot(pit, &"frost").slice(0, 1), [&"frost"] as Array[StringName], "a frost hit")
 	check_equal(pit.state_triggers.state_id(), &"unlit", "puts it out")
 	check_equal(_in_group(pit, LightSpot.GROUP), 0, "dark again")
+
+
+func test_water_puts_it_out() -> void:
+	var pit: Actor = _world.add(PropBody.make(PIT), Vector2(200, 200))
+	_world.shoot(pit, &"fire")
+	check_equal(pit.state_triggers.state_id(), &"lit", "lit")
+	check_equal(_world.shoot(pit, &"water").slice(0, 1), [&"water"] as Array[StringName], "a water hit")
+	check_equal(pit.state_triggers.state_id(), &"unlit", "puts it out")
+	check_equal(_in_group(pit, LightSpot.GROUP), 0, "dark again")

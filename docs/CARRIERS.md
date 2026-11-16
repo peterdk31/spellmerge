@@ -199,7 +199,8 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | `hit_caster` | the point | dash and teleport (`CarrierMove`): what they move casts their hits' payloads |
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
 | `reach_of` | 0 | atom, beam, swing, slam, spray (for an enemy's telegraph) |
-| `lane_radius` | its hit radius | spray (its cone's half-width at its reach): how wide it strikes either side of its aim, for an enemy's AI (`CastSense.radius`) |
+| `lane_radius` | its hit radius | spray (its cone's half-width at its reach): how wide it strikes either side of its aim, for an enemy's AI (`CastSense.radius`) and its telegraph lane's far end (`Spells.carrier_lane`: the lane widens into the cone) |
+| `pours_held` | false | spray: held on, it pours: a held cast right after its last skips its staff's wind-up (`Spells.cast_staff`), so an enemy telegraphs its spray once and pours while it holds; a new press winds up again (the Spitter, content/enemies/spitter/) |
 | `tip_of` | INF | beam, swing: where a row is, for a `timer` or `on hurt` on it (`LC_ROW`) |
 
 Carriers that share a mechanism share a base or a kit: dash and teleport extend `CarrierMove` (the

@@ -1,0 +1,36 @@
+{
+	"assets": [
+		{
+			"path": "content/props/fountain/still.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from still.grid.json, 2026-11-16)",
+			"prompt": "A fountain prop, 32x32 seen from above at an angle: a round Stone basin with a front wall, holding Water with a few light ripples, and a Stone pillar in its middle carrying a small bowl that pours a thin stream off its right lip. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/fountain/still_motes.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from still.grid.json, 2026-11-16)",
+			"prompt": "The mote points of still.svg: two pixels of the water in its top bowl, in Bone light, nothing else."
+		},
+		{
+			"path": "content/props/fountain/welling.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from welling.grid.json, 2026-11-16)",
+			"prompt": "The fountain welling up before a burst: still.svg with a column of Water bulging up out of the top bowl, foam in Bone light at its top, water pouring off both lips of the bowl and foam on the basin's water. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/fountain/welling_motes.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from welling.grid.json, 2026-11-16)",
+			"prompt": "The mote points of welling.svg: four pixels up the bulging column of water, in Bone light, nothing else."
+		}
+	]
+}

@@ -6,7 +6,7 @@ extends "res://tests/support/screenshot.gd"
 ## SHOWN_FRAMES, once they have built up as they do in a fight.
 
 const IMP_SCENE := preload("res://content/enemies/ember_imp/ember_imp.tscn")
-const IDS: Array[StringName] = [&"burn", &"chill", &"freeze", &"gust", &"hex", &"static"]
+const IDS: Array[StringName] = [&"burn", &"chill", &"freeze", &"gust", &"hex", &"static", &"soak"]
 ## Pixels between neighbours in the row.
 const GAP: float = 40.0
 ## Status seconds, long enough to outlast the shots.

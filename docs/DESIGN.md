@@ -11,7 +11,7 @@ Spellmerge is a 2D top-down action roguelite for 1–4 co-op players (local co-o
 ## Pillars
 
 1. **Deep spell building:** few components, many combinations.
-2. **Nobody waits for anybody:** 1–4 players act independently at all times.
+2. **Nobody waits for anybody:** 1–4 players act independently at all times. The only stops for everyone are the pause menu, a boss's intro and an unplugged gamepad (the no-waiting rules below).
 3. **A mix of tones:** a self-aware, slightly comic magic world with real stakes.
 4. **Readable chaos:** 32×32 pixel art, clear telegraphs, player colours.
 
@@ -24,7 +24,7 @@ Spellmerge is a 2D top-down action roguelite for 1–4 co-op players (local co-o
 | Spells | Cards placed in a staff in any order and read left to right: carriers (what leaves the caster), modifiers and infusions (change the next carrier, or the caster when none follows), multicast (more carriers per cast) and triggers (the next cast becomes the payload). Reading wraps around the staff. Every arrangement is legal and does something; there is no complexity budget. |
 | Relics | Passives found in runs, some altering how cards behave. |
 
-Starting cards: carriers (bolt, beam, rune, dash, teleport, swap, wall, decoy, familiar, swing, slam, portal: the owner, 2026-11-05), modifiers (split, pierce, homing, chain, bigger, faster, shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper, reach, return, slow, arc, possess, deflect, pull, penta: the owner, 2026-11-05; nova, skyfall and orbit, 2026-11-09, which replaced the nova, rain and orbit carriers; barrier, 2026-11-12), infusions (fire, frost, storm, void, lightning, mend), triggers (on hit, on expire, timer, on block, on kill, on cast, on wall, on hurt, on reaction; on recast; on near, 2026-11-12), multicast (double, triple, scatter, burst).
+Starting cards: carriers (bolt, beam, rune, dash, teleport, swap, wall, decoy, familiar, swing, slam, portal: the owner, 2026-11-05), modifiers (split, pierce, homing, chain, bigger, faster, shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper, reach, return, slow, arc, possess, deflect, pull, penta: the owner, 2026-11-05; nova, skyfall and orbit, 2026-11-09, which replaced the nova, rain and orbit carriers; barrier, 2026-11-12), infusions (fire, frost, storm, void, lightning, mend; water, 2026-11-16), triggers (on hit, on expire, timer, on block, on kill, on cast, on wall, on hurt, on reaction; on recast; on near, 2026-11-12), multicast (double, triple, scatter, burst).
 
 Spell rules (chosen on 2026-10-26, the pivot at C2):
 
@@ -37,11 +37,12 @@ Spell rules (chosen on 2026-10-26, the pivot at C2):
 ## No-waiting co-op rules
 
 1. No player controls another player's choices; there is no leader and no shared menu.
-2. Menus are per-player (the builder) and never pause the game for others; only the pause menu does (rule 6).
+2. Menus are per-player (the builder) and never pause the game for others; only the pause menu does (rule 6). A boss's intro is no menu: it offers no choice (rule 7).
 3. Rewards are rolled per player.
 4. Unpicked rewards carry over as an unspent icon.
 5. Shared decisions are made by walking (the door rule).
-6. Only the real pause menu stops the game, and any player can open it. Online (later) it stops nothing: it opens like the builder, for that player only (the owner, 2026-11-04).
+6. Of the menus only the real pause menu stops the game, and any player can open it. Online (later) it stops nothing: it opens like the builder, for that player only (the owner, 2026-11-04).
+7. A boss's intro stops the game for everyone, on every machine, and any player's A moves it on, so nobody waits for one player in particular (the owner, 2026-11-16; [docs/milestones/boss-intro.md](milestones/boss-intro.md)). Besides these, an unplugged gamepad stops the game for everyone until it is back or its seat leaves (the owner, 2026-11-13).
 
 ## One game, the same everywhere
 

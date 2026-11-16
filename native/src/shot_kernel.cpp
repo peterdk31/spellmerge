@@ -130,7 +130,7 @@ constexpr double LOOK_CELL_PER_RADIUS = 0.25;
 constexpr int LOOK_ZOOM_MAX = 15;
 constexpr double SPECK_RADIUS = 2.0;
 constexpr int64_t LOOK_ENEMY_RAMP = 1 << 22;
-constexpr int64_t EMITTING_MASK = ((1 << 21) - 1) & ~(1 << 10);
+constexpr int64_t EMITTING_MASK = ((1 << 22) - 1) & ~(1 << 10);
 constexpr int PARTICLES_PER_SHOT_MAX = 12;
 // core/actors: the first ramp that is not a hat's, "no team", and the world's (nobody's foe).
 constexpr int RAMP_ENEMY = 4;

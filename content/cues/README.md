@@ -18,6 +18,8 @@ A cue played on a body follows it (S6, item 9; `Feel.play_cue`'s `follow`): its 
 
 A part may be a stream (`{"part": &"stream", "kind": &"dash_path", "rate": 120.0, "side": 13.0}`; `gameplay/feel/streams.gd`): motes given off from the cue's caster while it moves, back along the way it goes, from when the cue plays until the carrier it shows ends (`carrier_ended` of its caster and spell), its caster has no anchor, or its `seconds` (2) run out. `kind` is `dash_path` (the dash path kinds, in the caster's ramp) or `spell` (its cards, at a shot's rate for each layer); `side` and `ahead` spread where they leave from, and `feet_layers` leave from `below` pixels under it.
 
+A motes part may pour for a while (`"for": 0.25` seconds, with a `count`): a jet, its count thrown spread evenly over that time from the cue's point along its way, each throw with the part's other keys (`gameplay/feel/jets.gd`): a stream poured out of a staff.
+
 A part may be a held sound (`{"part": &"held", "sound": &"scrape", "seconds": 2.0, "volume": 4.0}`; boss plan OB15, `gameplay/feel/sounds.gd`): the `stream` part's counterpart, a sound looping from the cue's caster while its moment lasts: a wind-up cue's until the cast leaves or is cancelled, a move's (a staff's `move_cue`) until that move ends, any other cue's its `seconds` (4); its body gone ends it too. A staff names cues of its own moments (`StaffBase`: `wind_cue` in place of its card's, and besides its cards' cues `move_cue`, `cast_cue` and `wall_cue`), and a boss's phase look one as the phase starts (`PhaseLook.cue`).
 
 A cue that comes by the hundred (a body caught by a pull, every step) says `every`: the least seconds between two plays for the same actor; a play sooner is left out whole (S6, item 13).

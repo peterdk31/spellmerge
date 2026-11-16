@@ -64,6 +64,10 @@ extends Resource
 ## its middle). A motes part with `line` true is thrown from all along the line instead of from one
 ## point (each mote from a point of it at random): a staff unravelling into motes.
 ## A motes part's `life` is times its kinds' own lives (0.5: a moment over twice as fast).
+## A motes part with `for` (seconds, at most MOTES_FOR_MOST) is a jet: its `count` is thrown spread
+## evenly over that time instead of at once, from the cue's point along its way, each with the
+## part's other keys (gameplay/feel/jets.gd): a stream poured out of a staff. It takes a `count`,
+## and neither `share` nor `often`.
 ## A cue played on a body (`Feel.play_cue`'s `follow`: a staff's poof, a possession's ring) follows
 ## it: its flashes move with the body while they last, where they were played from it, and end
 ## when it is gone. Its motes, marks and lights stay where it played (they fly, lie and glow in
@@ -173,7 +177,9 @@ const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`flash`), motes and a floor mark.
 const PART_KEYS: Array[String] = ["part", "flash", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto", "along", "floor"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "bare", "often", "share", "body", "along", "line", "life"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "bare", "often", "share", "body", "along", "line", "life", "for"]
+## The longest a `motes` part throws for (its `for`, seconds).
+const MOTES_FOR_MOST: float = 4.0
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare", "along"]
 const STREAM_KEYS: Array[String] = ["part", "kind", "rate", "side", "ahead", "feet_layers", "below", "seconds"]
@@ -348,6 +354,12 @@ func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: motes part %d's life is not over 0 and at most 4 times its kinds'" % [id, i])
 	if float(part.get("below", 0.0)) < 0.0 or float(part.get("below", 0.0)) > 32.0:
 		found.append("%s: motes part %d's below is not 0 to 32 pixels" % [id, i])
+	if part.has("for"):
+		var lasts: float = float(part["for"])
+		if lasts <= 0.0 or lasts > MOTES_FOR_MOST:
+			found.append("%s: motes part %d's for is not over 0 and at most %s seconds" % [id, i, MOTES_FOR_MOST])
+		if not part.has("count") or part.has("share") or bool(part.get("often", false)):
+			found.append("%s: motes part %d pours for a while (for), so it takes a count, and neither share nor often" % [id, i])
 	if part.has("share"):
 		if float(part["share"]) <= 0.0:
 			found.append("%s: motes part %d's share is 0 or less" % [id, i])

@@ -26,9 +26,12 @@ const MarksScript := preload("res://gameplay/feel/marks.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
+## A cue's `motes` part as typed fields (`motes_part.gd`).
+const MotesPart := preload("res://gameplay/feel/motes_part.gd")
 const CardKindsScript := preload("res://gameplay/feel/card_kinds.gd")
 const BirthsScript := preload("res://gameplay/feel/births.gd")
 const StreamsScript := preload("res://gameplay/feel/streams.gd")
+const JetsScript := preload("res://gameplay/feel/jets.gd")
 const HitSharesScript := preload("res://gameplay/feel/hit_shares.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const BarriersScript := preload("res://gameplay/feel/barriers.gd")
@@ -94,6 +97,9 @@ var births: BirthsScript = BirthsScript.new()
 ## `streams.gd`), given off into `births` each step. Feel ends one when its carrier ends
 ## (`end_streams`).
 var streams: StreamsScript = StreamsScript.new()
+## The cues' mote jets under way (`motes` parts with `for`: a stream poured out of a staff;
+## `jets.gd`), each frame's share thrown by the motes player.
+var jets: JetsScript = JetsScript.new(_play_motes_part, MotesPart.new)
 ## The motes still carriers' shots give off while they stand (`still_motes.gd`: a wall's stream, a
 ## pool's rising motes), from the rows the projectile manager draws them by.
 var still_motes: StillMotesScript = StillMotesScript.new()
@@ -219,6 +225,7 @@ func step(now: float, table: ActorsScript = null) -> void:
 	cards.new_frame()
 	_trail_motes()
 	streams.step(now, projectiles, births, motes_on())
+	jets.step(now)
 	_drawn_motes()
 	source_motes.give_off(now, pool if motes_on() else null, view_rect(), _standing)
 	if barriers != null:
@@ -503,6 +510,10 @@ func status_motes(card: StringName, layer: int, at: Vector2, reach: float, core:
 func play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 	if pool == null or not particles_enabled:
 		return
+	if part.lasts > 0.0:
+		# A jet (`for`): its count poured over its seconds (`jets.gd`).
+		jets.start(part, cue, _clock)
+		return
 	if not part.often:
 		_play_motes_part(part, cue)
 		return
@@ -617,6 +628,7 @@ func prepare_motes_part(part: Dictionary) -> MotesPart:
 	made.place = clampf(float(part["along"]), 0.0, 1.0) if part.has("along") else -1.0
 	made.line = bool(part.get("line", false))
 	made.life = float(part.get("life", 1.0))
+	made.lasts = float(part.get("for", 0.0))
 	return made
 
 
@@ -893,40 +905,3 @@ func _fit_marks(room_id: StringName) -> void:
 	var bounds: Rect2 = projectiles.bounds() if projectiles != null else Rect2()
 	marks.enter(bounds, projectiles.wall_image() if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
 	marks.set_floor_colors(room.floor_colors() if room != null else PackedColorArray())
-
-
-## A cue's `motes` part as typed fields (`prepare_motes_part`; `CueBase` names each key): its kind
-## (`spell`, `surface` or a kind's id), `colours`, `count` (-1: the kinds' own), `reach` (-1: none),
-## `radius`, `spread` (-1: the kind's own), `up`, `ring`, `often`, `way`, `below`, and its exact
-## `color` (alpha 0: none).
-class MotesPart:
-	extends RefCounted
-	var named: StringName = &"spell"
-	var colours: StringName = &""
-	var count: int = -1
-	var reach: float = -1.0
-	var radius: float = 0.0
-	var spread: float = -1.0
-	var up: float = 1.0
-	var ring: bool = false
-	var often: bool = false
-	## Its `share` (-1: none; a shed's, which is `often` too).
-	var share: float = -1.0
-	## In the body's own colour (`CueContext.body`), as a flash's `body`.
-	var body: bool = false
-	## In the caster's ramp without the cards, as a flash's `bare`.
-	var bare: bool = false
-	var way: StringName = &"aim"
-	var below: float = 0.0
-	var color: Color = Color(0.0, 0.0, 0.0, 0.0)
-	## Where on the cue's line it is thrown from (`along`, 0 to 1; -1: the cue's point), whether
-	## from all along the line (`line`), and its `life` (times its kinds' own lives) (S6 item 9).
-	var place: float = -1.0
-	var line: bool = false
-	var life: float = 1.0
-	## A named kind's index in the pool `pool_seen` (-1: none), whether it is a surface kind, and
-	## its own count, kept for that pool.
-	var pool_seen: Object = null
-	var kind_at: int = -1
-	var kind_surface: bool = false
-	var kind_count: int = 1

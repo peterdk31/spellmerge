@@ -6,6 +6,7 @@ extends RefCounted
 ## allocates nothing (docs/milestones/spell-spectacle-2.md, S1).
 
 const ActorsScript := preload("res://core/actors/actors.gd")
+const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 
 ## The actor that set it off (`ActorsScript.NONE` for none), and its ramp (`Feel._ramp_of`).
 var caster: int = ActorsScript.NONE
@@ -36,6 +37,29 @@ var follow: Node2D = null
 ## exactly; alpha 0 for none) and its `power` (what its sizes, counts, holds and shake are times).
 var color: Color = Color(0.0, 0.0, 0.0, 0.0)
 var power: float = 1.0
+
+
+## Takes every field of `other` (a cue kept to play on after the one it was played with is
+## refilled: a jet, `jets.gd`).
+func copy_from(other: RefCounted) -> void:
+	var from: CueContextScript = other as CueContextScript
+	if from == null:
+		return
+	caster = from.caster
+	ramp = from.ramp
+	at = from.at
+	aim = from.aim
+	size = from.size
+	tint = from.tint
+	look = from.look
+	target = from.target
+	shot = from.shot
+	surface = from.surface
+	body = from.body
+	tag = from.tag
+	follow = from.follow
+	color = from.color
+	power = from.power
 
 
 ## Where a part not prepared into fields plays (a light; `CueBase`'s `along`): its fraction of the cue's line from its point (0, the

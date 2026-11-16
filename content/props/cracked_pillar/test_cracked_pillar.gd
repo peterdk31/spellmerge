@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## down its shaft, grit trickling); its death brings it down to rubble that nothing bumps into or
 ## hits, dust rising for its first seconds.
 ##
-## godot --headless --path . --script res://content/props/cracked_pillar/test_cracked_pillar.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/props/cracked_pillar/test_cracked_pillar.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")

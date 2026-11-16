@@ -4,8 +4,7 @@ extends "res://tests/support/card_rig.gd"
 ## the same place, each copy aimed out round a circle and keeping its own shots and reach. The circle
 ## turns on with every cast (owner, 2026-11-16), its first along the aim.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/nova/test_nova.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/nova/test_nova.gd
 var _cues: Array = []
 
 

@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## not by its step. The state hash sums up a still body that is as it was made as a few values
 ## (`Actor.rest_leaf`). A stand-in prop is an actor with Health, a Hurtbox and a Caster.
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_actor_still.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_actor_still.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 
 var _world: Fixture

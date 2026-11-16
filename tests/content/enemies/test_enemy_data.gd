@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## boss's phases on `EnemyBase`, checked by `problems()`. Every enemy and boss in the registry is sound, and
 ## an actor holds every staff its data names.
 ##
-## godot --headless --path . --script res://tests/content/enemies/test_enemy_data.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/enemies/test_enemy_data.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const ImpData: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")

@@ -2,8 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The Relay card (content/spells/modifiers/relay/, staffs C): the next shot takes on the infusions of the last cast of the actor it
 ## hits. Each of its combos does what it promises with the card and fails without it.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/relay/test_relay.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/relay/test_relay.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

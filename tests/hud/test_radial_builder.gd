@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## panel hidden while it is open). The wizards are real (the real registry and spell
 ## runtime, the 20-slot dev staff), so every request is answered as in the game.
 ##
-## godot --headless --path . --script res://tests/hud/test_radial_builder.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_radial_builder.gd
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")

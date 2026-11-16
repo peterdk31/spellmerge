@@ -3,9 +3,7 @@ extends "res://tests/support/suite.gd"
 ## right by each prop's `PropBase.extent`, `PropYard.GAP` apart, each row centred in the yard, its props'
 ## feet on one line; whole pixels; a prop that does not fit at Vector2.INF, and the ones after it.
 ##
-## godot --headless --path . --script res://tests/gameplay/flow/test_prop_yard_places.gd
-
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/flow/test_prop_yard_places.gd
 ## A prop whose hurt circle is `radius` round `offset` from its feet.
 func _prop(radius: float, offset: Vector2 = Vector2(0.0, -8.0)) -> PropBase:
 	var prop := PropBase.new()

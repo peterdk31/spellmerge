@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## registry and spell runtime, as in test_radial_builder.gd; every real card is found by the
 ## registry's own scan.
 ##
-## godot --headless --path . --script res://tests/hud/test_radial_rings.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_radial_rings.gd
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")

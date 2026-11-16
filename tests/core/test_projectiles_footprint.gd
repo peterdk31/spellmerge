@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## walls (`set_walls`, `clear_walls`); overlapping ones are counted, and laying the same again
 ## changes nothing. The manager is stepped by hand.
 ##
-## godot --headless --path . --script res://tests/core/test_projectiles_footprint.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_footprint.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 

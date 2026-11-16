@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## a barrier on the caster. The combos with the card are in its folder's combos/ (test_combos.gd
 ## plays them); here an enemy shot is sent through each shielded thing, from every seat.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/shield/test_shield.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/shield/test_shield.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

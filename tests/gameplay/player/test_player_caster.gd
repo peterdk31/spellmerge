@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## the wizard's when its card's tag names the wizard's caster number (its actor id).
 ## The kit's own Mover is tested on bare actors in tests/gameplay/actor/test_actor_mover.gd.
 ##
-## godot --headless --path . --script res://tests/gameplay/player/test_player_caster.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/player/test_player_caster.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")

@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## its `join`. The run is recorded (Frames) and its replay must give the same state hash at every
 ## tick (tests/support/replay_run.gd).
 ##
-## godot --headless --path . --script res://tests/core/test_pad_wait.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_pad_wait.gd
 const ReplayRun := preload("res://tests/support/replay_run.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const CoopScript := preload("res://gameplay/coop/coop.gd")

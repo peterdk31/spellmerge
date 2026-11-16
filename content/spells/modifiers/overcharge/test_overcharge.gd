@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## doubles the next carrier's damage and its mana cost, the opposite of siphon: an
 ## overcharged carrier hurts an imp twice as much as a plain one.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/overcharge/test_overcharge.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/overcharge/test_overcharge.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## reach still lands, and a team changed by a death earlier in the step counts for that step's
 ## touch.
 ##
-## godot --headless --path . --script res://tests/gameplay/combat/test_combat_crowd.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/combat/test_combat_crowd.gd
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")

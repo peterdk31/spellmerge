@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## a remnant and breaks each part into a share of its motes, a body of one sprite breaks as before.
 ## Bodies made here (decision 28).
 ##
-## godot --headless --path . --script res://tests/gameplay/feel/test_remnants.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_remnants.gd
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")

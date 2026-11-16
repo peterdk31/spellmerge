@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## and throwing it outward; the caster's own body is skipped and a teammate is hit. Its blast and
 ## `on expire` happen at the impact, and a shield or deflect works on the shots in its ring.
 ##
-## godot --headless --path . --script res://content/spells/carriers/slam/test_slam.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/carriers/slam/test_slam.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

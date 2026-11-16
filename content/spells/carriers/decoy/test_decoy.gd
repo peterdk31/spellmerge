@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## a regular actor (owner, 2026-11-06) with a barrier for its shield, a deflect as it appears, and
 ## a payload's left-over cards landing on it.
 ##
-## godot --headless --path . --script res://content/spells/carriers/decoy/test_decoy.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/carriers/decoy/test_decoy.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 const World := preload("res://tests/support/card_rules_world.gd")

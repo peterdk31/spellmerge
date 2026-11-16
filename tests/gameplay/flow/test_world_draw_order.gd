@@ -15,8 +15,7 @@ extends "res://tests/support/suite.gd"
 ## Regression (the owner's playtest of 2026-11-12, "I can kinda walk in behind their bottom"): the
 ## props were drawn over the wizards wherever they stood.
 ##
-## godot --headless --path . --script res://tests/gameplay/flow/test_world_draw_order.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/flow/test_world_draw_order.gd
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 
 var flow: FlowScript

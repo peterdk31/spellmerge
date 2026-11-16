@@ -1,9 +1,7 @@
 extends "res://tests/support/card_rig.gd"
 ## The Bigger card (content/spells/modifiers/bigger/, M2 part 12): a wider, slower, harder hit that catches what a bare bolt misses.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/bigger/test_bigger.gd
-
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/bigger/test_bigger.gd
 func test_the_card_is_bigger() -> void:
 	_check_card(&"bigger", 1)
 	check_equal(_modifier(&"bigger").behaviour, ModifierBase.Behaviour.NONE, "numbers only")

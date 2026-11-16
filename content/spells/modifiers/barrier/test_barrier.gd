@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## heal. Shield is another thing: it guards the carrier itself (and what a move moves). Its combos are in its folder's
 ## combos/ (test_combos.gd plays them).
 ##
-## godot --headless --path . --script res://content/spells/modifiers/barrier/test_barrier.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/barrier/test_barrier.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 const ALLY_HURT: int = 40

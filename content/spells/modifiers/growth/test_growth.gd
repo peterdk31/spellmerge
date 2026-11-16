@@ -2,8 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The Growth card (content/spells/modifiers/growth/, staffs C): the next shot grows, and hits harder, as it flies. Each of its combos does
 ## what it promises with the card and fails without it.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/growth/test_growth.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/growth/test_growth.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

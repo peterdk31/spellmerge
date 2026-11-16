@@ -2,8 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The staffs rework's classes (staffs A3, docs/milestones/M2-staffs.md): `StaffBase` and the
 ## two shipped staffs, `MulticastBase`, and the new values of the card enums.
 ##
-## godot --headless --path . --script res://tests/core/test_staff_base.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_staff_base.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 

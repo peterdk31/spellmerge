@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## few seconds, fading in and out, stopping nothing. The bodies that send it are tested in
 ## tests/gameplay/actor/test_boss_presence.gd.
 ##
-## godot --headless --path . --script res://tests/hud/test_boss_bar.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_boss_bar.gd
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const HudScript := preload("res://hud/panels/panels.gd")

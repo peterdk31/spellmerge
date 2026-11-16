@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## Wall card's solid shot both block the line; a long line is walked to its end; the detour way
 ## is free and leads to where the goal is in view; with no projectile manager nothing blocks.
 ##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_sight.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_sight.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 

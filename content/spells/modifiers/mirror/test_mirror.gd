@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## backwards. The engine side is tested in `tests/core/test_spells_multicast.gd`; here the card's
 ## data and its combos.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/mirror/test_mirror.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/mirror/test_mirror.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

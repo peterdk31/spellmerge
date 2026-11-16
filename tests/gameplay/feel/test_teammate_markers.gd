@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## owner, 2026-11-13): one for each wizard played on another machine that is out of this machine's
 ## picture, on the edge towards it, in its hat colour, and told apart when it is down.
 ##
-## godot --headless --path . --script res://tests/gameplay/feel/test_teammate_markers.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_teammate_markers.gd
 const MarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")

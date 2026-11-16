@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## whatever stands in it every `SpellLimits.POOL_TICK` while it lives (`CarrierPool`). A body that
 ## stays is hit again and again, one beside it never, and the patch ends with its life.
 ##
-## godot --headless --path . --script res://content/spells/carriers/pool/test_pool.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/carriers/pool/test_pool.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

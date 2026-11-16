@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## speed, its `on expire` goes off where a shot of that speed and life would end, a card's speed
 ## numbers multiply the default, and four players' shots all move this way at once.
 ##
-## godot --headless --path . --script res://tests/core/test_shot_speed_curve.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_shot_speed_curve.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## walked and a while after, then springing back; a state's trampled frames ride in its rows' colour;
 ## and a frame of it allocates nothing (in the style of the motes' tests).
 ##
-## godot --headless --path . --script res://tests/gameplay/feel/test_cover_bend.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_cover_bend.gd
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")

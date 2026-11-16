@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## point and hurts everything in the circle, the caster too. Each of its combos does what it
 ## promises with the card and fails without it.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/blast/test_blast.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/blast/test_blast.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

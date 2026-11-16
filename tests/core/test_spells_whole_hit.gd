@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## the kind stay; only the strength is scaled. An echoed mend bolt heals a teammate, a relay mend
 ## bolt still heals, an echoed beam's chain jumps hit at the echo's half on every tick.
 ##
-## godot --headless --path . --script res://tests/core/test_spells_whole_hit.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_whole_hit.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 ## What the imp lacks before a mend bolt reaches it.

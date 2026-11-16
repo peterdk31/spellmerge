@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## accepts, and a stage played twice gives the same simulation. The pixels of the recorder
 ## need a display, so they are not checked here (docs/DECISIONS.md, 2026-10-25).
 ##
-## godot --headless --path . --script res://tests/clips/test_clip_scenarios.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/clips/test_clip_scenarios.gd
 const ScenariosScript := preload("res://tests/clips/scenarios.gd")
 const StageScript := preload("res://tests/clips/stage.gd")
 const RecordScript := preload("res://tests/clips/record.gd")

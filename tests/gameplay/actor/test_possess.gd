@@ -13,8 +13,7 @@ extends "res://tests/support/suite.gd"
 ## an AI drives the wizard; the PossessedLook draws bars and the timer over a seat-driven imp, only the
 ## timer over an AI-driven wizard. Real wizard scene, real Spells and registry (the `possess` card).
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_possess.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_possess.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")

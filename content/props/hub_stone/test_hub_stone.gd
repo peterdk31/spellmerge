@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## stands on it, `HubRules.UNLIT` as one steps off); lit, its runes glow, give off glimmers and light,
 ## and the stone's cue plays.
 ##
-## godot --headless --path . --script res://content/props/hub_stone/test_hub_stone.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/props/hub_stone/test_hub_stone.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const STONE: PropBase = preload("res://content/props/hub_stone/hub_stone.tres")
 

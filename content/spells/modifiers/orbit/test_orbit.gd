@@ -6,8 +6,7 @@ extends "res://tests/support/card_rig.gd"
 ## the card's 3 s (`lifetime_base`, which Slow and Reach still stretch). No special rules: room walls
 ## end a circling shot (ghost passes), the AI sees it, homing does nothing on it. A beam sweeps.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/orbit/test_orbit.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/orbit/test_orbit.gd
 ## Where the caster stands in these tests.
 const AT := Vector2(200.0, 200.0)
 

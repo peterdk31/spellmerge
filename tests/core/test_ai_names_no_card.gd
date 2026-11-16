@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## no script of the AI's decisions or of the test bot names a card or a carrier, so no code like
 ## "if the next cast is a dash, dash" can creep in. It reads `CastSense` instead.
 ##
-## godot --headless --path . --script res://tests/core/test_ai_names_no_card.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_ai_names_no_card.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## The AI's own scripts: every script under the AI's folder, and the test bot's. `entities.gd`

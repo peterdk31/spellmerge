@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## the particle rule of that area, nothing read from the row floats the spell light reads, and a
 ## warm-up before the first room.
 ##
-## godot --headless --path . --script res://tests/content/spells/test_card_looks.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/spells/test_card_looks.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")

@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## made from one; its bags' capacities from the run's rules; every actor has one, and a body with no
 ## Caster has no hands (items I8).
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_inventory.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_inventory.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 
 const CARDS: StringName = &"cards"

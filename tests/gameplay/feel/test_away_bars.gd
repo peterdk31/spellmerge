@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## drives its wizard, none over a wizard an enemy's AI drives (its panel shows it), and higher over
 ## a wizard that is itself possessed meanwhile (over that timer). Real wizard scene and actor table.
 ##
-## godot --headless --path . --script res://tests/gameplay/feel/test_away_bars.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_away_bars.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")

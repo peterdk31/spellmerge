@@ -9,8 +9,7 @@ extends "res://tests/support/suite.gd"
 ## its caster's part or is named by `actor_part_problems`; a table with no case here fails. A desync
 ## report names the caster.
 ##
-## godot --headless --path . --script res://tests/core/test_spells_parts.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_parts.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 

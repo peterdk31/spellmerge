@@ -13,8 +13,7 @@ extends "res://tests/support/suite.gd"
 ## G3b): the four wizards sit at actor ids apart from their seats, so the HUD has to ask for a
 ## seat's own wizard (`Spells.home_of_seat`).
 ##
-## godot --headless --path . --script res://tests/hud/test_staff_strip.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_staff_strip.gd
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")

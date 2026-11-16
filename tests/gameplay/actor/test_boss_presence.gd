@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## boss of the test's own; nothing here names a boss of the game. The bar and the banner are tested
 ## in tests/hud/test_boss_bar.gd.
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_boss_presence.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_boss_presence.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 
 var fx: Fixture

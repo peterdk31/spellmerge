@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## by every caster of the same staff and cards. Its cards' moves move the actor (ported from
 ## tests/gameplay/ai/test_ai_moves.gd: a dash and its blast, a teleport, a recoil).
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_actor_caster.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_actor_caster.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const StaffKit := preload("res://tests/support/staff_kit.gd")

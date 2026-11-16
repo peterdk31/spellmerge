@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## than the one before and faster each time; the captions run in order. Uses the real autoloads
 ## with a save of its own; time moves only by Flow.step.
 ##
-## godot --headless --path . --script res://tests/gameplay/flow/test_intro.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/flow/test_intro.gd
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const IntroScript := preload("res://gameplay/flow/intro.gd")
 const SAVE_PATH: String = "user://test_intro_save.cfg"

@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## for a box: how far a point is off it, where a path comes nearest it (where it goes in, or the
 ## nearest end or corner), how far a line passes off it, and how far it reaches.
 ##
-## godot --headless --path . --script res://tests/core/test_hit_shape.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_hit_shape.gd
 ## A bench: 80 by 16.
 const BENCH: Vector2 = Vector2(40.0, 8.0)
 

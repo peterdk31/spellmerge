@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## read after its carrier where the carrier's shield stops an enemy shot. Its combos do what they
 ## promise with the card and fail without it, without the shield, and with no enemy shot to block.
 ##
-## godot --headless --path . --script res://content/spells/triggers/on_block/test_on_block.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/triggers/on_block/test_on_block.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

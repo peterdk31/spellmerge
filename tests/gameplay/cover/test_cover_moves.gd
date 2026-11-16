@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## rules (a row to a state its kind lacks, or to the state itself, moves nothing; the first `after`
 ## row whose seconds have passed); a kind is its index in the layout's kinds, an element its index.
 ##
-## godot --headless --path . --script res://tests/gameplay/cover/test_cover_moves.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/cover/test_cover_moves.gd
 const CoverMoves := preload("res://gameplay/cover/cover_moves.gd")
 const GRASS: CoverKind = preload("res://tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres")
 

@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## it is drawn only: a layered body moves exactly as a plain one. Bodies made here (the imp's scene
 ## with parts added), never a boss of the content (decision 28).
 ##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_poses.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_poses.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const ImpData: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
 const STEP: float = 1.0 / 60.0

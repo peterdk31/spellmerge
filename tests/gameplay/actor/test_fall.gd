@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## never falls; a body downed over a hole falls and comes back still down; a long dash off the
 ## room's edge falls. Real actors in the actor fixture's world, real Combat.
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_fall.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_fall.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const EventsScript := preload("res://core/events/events.gd")

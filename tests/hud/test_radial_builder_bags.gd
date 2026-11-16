@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## exactly, a gap or an empty ring must pick nothing and rumble nothing. The builder runs alone
 ## on its own bus with a stand-in registry; the staff views come from the real `Spells`.
 ##
-## godot --headless --path . --script res://tests/hud/test_radial_builder_bags.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_radial_builder_bags.gd
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")

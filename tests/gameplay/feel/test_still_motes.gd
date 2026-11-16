@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## card's `look_shape`, which its shader draws by too), thinning while it comes and as it goes
 ## (`look_open`, `look_fade`), in the shot's colours and now and then its infusions' own kinds.
 ##
-## godot --headless --path . --script res://tests/gameplay/feel/test_still_motes.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_still_motes.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

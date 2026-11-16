@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## bolt's flight, a beam's length), and on a carrier card it cannot steer the Homing card must be listed
 ## as wasted and change nothing.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/homing/test_homing_carriers.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/homing/test_homing_carriers.gd
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

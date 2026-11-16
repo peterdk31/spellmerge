@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## would cast is still read (the reading order does not change) but wasted and not attached.
 ## Cards are built in code.
 ##
-## godot --headless --path . --script res://tests/core/test_trigger_table.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_trigger_table.gd
 const E := TriggerBase.Event
 
 ## The table as the runtime runs it today (core/spells/spells.gd): event -> the carriers it can

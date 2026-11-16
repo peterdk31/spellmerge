@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## actor (`actor_take_requested`), never calling the Items area. A world of its own
 ## (tests/gameplay/ai/ai_fixture.gd) with an Items area on its bus, stepped by hand.
 ##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_pick_up.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_pick_up.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const ItemsScript := preload("res://gameplay/items/items.gd")
 const PickUp := preload("res://gameplay/ai/behaviours/pick_up.gd")

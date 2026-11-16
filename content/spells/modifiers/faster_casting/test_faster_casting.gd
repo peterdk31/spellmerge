@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## too, in any slot order) and its wind-down, for a quarter more mana. It replaced Quicken and
 ## Short Delay.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/faster_casting/test_faster_casting.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/faster_casting/test_faster_casting.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

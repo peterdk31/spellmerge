@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## and keeps its life while every other shot flies on; it thaws on time; a shot that is gone cannot
 ## be frozen. The manager is stepped by hand.
 ##
-## godot --headless --path . --script res://tests/core/test_projectiles_freeze.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_freeze.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

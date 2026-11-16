@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## controller (`input_glyphs.gd`), and what `PlayerInput.glyph_kind(player)` says as devices
 ## join and leave and the keyboard player switches between keys and the mouse.
 ##
-## godot --headless --path . --script res://tests/core/test_input_glyphs.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_input_glyphs.gd
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const GlyphsScript := preload("res://core/input/input_glyphs.gd")
 

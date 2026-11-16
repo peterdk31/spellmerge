@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## ids). Enemies are plain bodies Combat opens an actor for (the enemies' team); `_foe` makes a
 ## body of the wizards' team, for the rules that aim by team (static discharges).
 ##
-## godot --headless --path . --script res://tests/gameplay/combat/test_combat_statuses.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/combat/test_combat_statuses.gd
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")

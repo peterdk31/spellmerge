@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## more carriers into the group being read, so three carriers leave in one cast. Each of its combos
 ## does what it promises with the card and fails without it.
 ##
-## godot --headless --path . --script res://content/spells/multicasts/triple/test_triple.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/multicasts/triple/test_triple.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

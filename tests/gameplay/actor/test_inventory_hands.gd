@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## player controller's commands (`staff_hand_requested`, `bag_drop_requested`), whose refusals are
 ## `inventory_refused`, every request refused while the body is down (items I7b).
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_inventory_hands.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_inventory_hands.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 
 const CARDS: StringName = &"cards"

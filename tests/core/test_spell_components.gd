@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## ranges and range problems, and the reaction table (found by pair, never registered as
 ## content).
 ##
-## godot --headless --path . --script res://tests/core/test_spell_components.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spell_components.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 const FIXTURE: String = "res://tests/core/fixtures/spell_components"
 

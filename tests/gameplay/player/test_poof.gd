@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## of the poof, then change and the brows lift; holding one button, or pressing the one on show
 ## again, never poofs. The real wizard scene and the four starter heads, on the stand-in spells.
 ##
-## godot --headless --path . --script res://tests/gameplay/player/test_poof.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/player/test_poof.gd
 const WizardFixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const HEAD_STAFFS: Array[StaffBase] = [
 	preload("res://content/wizard/staffs/curl/curl.tres"),

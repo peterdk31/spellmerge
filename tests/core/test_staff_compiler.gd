@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## "Reading a staff", as slots in and casts out, plus the numbers of a cast, Pulses, wasted
 ## cards and the builder view. Cards are built in code behind a stand-in registry.
 ##
-## godot --headless --path . --script res://tests/core/test_staff_compiler.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_staff_compiler.gd
 const SpellsScript := preload("res://core/spells/spells.gd")
 
 

@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## aimed in at it; it reads no other card (homing steers each copy, as anywhere); more cards add
 ## copies; wasted where nothing leaves from a point (a dash, a swing).
 ##
-## godot --headless --path . --script res://content/spells/modifiers/penta/test_penta.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/penta/test_penta.gd
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 

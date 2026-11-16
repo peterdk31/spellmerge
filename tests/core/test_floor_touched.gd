@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## (at its widest: a returning ring where it turns home); never by a shot in flight, and never by a
 ## spell of no element.
 ##
-## godot --headless --path . --script res://tests/core/test_floor_touched.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_floor_touched.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 
 var _world: Fixture

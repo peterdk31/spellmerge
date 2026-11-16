@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## knows its own card slots (`CompiledSpell.card_slots`), and `Spells.staff_view` gives every
 ## cast a `tree` of rows, depth first, built from the real cards.
 ##
-## godot --headless --path . --script res://tests/core/test_staff_tree.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_staff_tree.gd
 const SpellsScript := preload("res://core/spells/spells.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 

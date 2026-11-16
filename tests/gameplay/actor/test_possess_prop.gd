@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## possession and the seat goes home. Real wizard scene, real Spells and registry (the `possess`
 ## card); a stand-in prop (`ActorFixture.prop_body`).
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_possess_prop.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_possess_prop.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")

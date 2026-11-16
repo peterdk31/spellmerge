@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## walks on as it would; a way is probed through every cell it crosses. A world of its own (tests/gameplay/ai/ai_fixture.gd) with a cover area on
 ## its bus, laid with the test grass and stepped only to light it.
 ##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_cover.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_cover.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const CoverScript := preload("res://gameplay/cover/cover.gd")
 const GRASS: CoverKind = preload("res://tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres")

@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## combos do what they promise with the card and fail without it, and when nothing sets up the
 ## reaction.
 ##
-## godot --headless --path . --script res://content/spells/triggers/on_reaction/test_on_reaction.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/triggers/on_reaction/test_on_reaction.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

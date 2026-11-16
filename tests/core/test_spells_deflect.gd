@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## Swings and beams now touch shots, so a shield on them blocks too (the parry). All are the real
 ## cards (the Deflect card is content/spells/modifiers/deflect/, melee I5), in the combo arena.
 ##
-## godot --headless --path . --script res://tests/core/test_spells_deflect.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_deflect.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

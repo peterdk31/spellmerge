@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## its infusions, as a hit that sets off `on hit` payloads and chains. It runs a real projectile
 ## manager and event bus, stepped by hand, with cards built in code.
 ##
-## godot --headless --path . --script res://tests/core/test_spells_slow_return_arc.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_slow_return_arc.gd
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

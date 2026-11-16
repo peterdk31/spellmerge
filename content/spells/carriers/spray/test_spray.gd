@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## behind it, its own caster is never struck, and its blast and `on expire` payload go off where it
 ## ends. Its look is told as `carrier_shown`, from the hand as far as it reaches.
 ##
-## godot --headless --path . --script res://content/spells/carriers/spray/test_spray.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/carriers/spray/test_spray.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

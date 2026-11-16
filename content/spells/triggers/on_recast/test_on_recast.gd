@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## combos do what they promise with the card, fail without it, and fail when the staff is cast
 ## only once: the second press is what sets it off.
 ##
-## godot --headless --path . --script res://content/spells/triggers/on_recast/test_on_recast.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/triggers/on_recast/test_on_recast.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

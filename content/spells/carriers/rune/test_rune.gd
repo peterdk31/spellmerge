@@ -1,8 +1,7 @@
 extends "res://tests/support/card_rig.gd"
 ## The Rune card (content/spells/carriers/rune/, M2 part 10): it stays where it was placed and hits what walks in.
 ##
-## godot --headless --path . --script res://content/spells/carriers/rune/test_rune.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/carriers/rune/test_rune.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

@@ -11,8 +11,7 @@ extends "res://tests/support/suite.gd"
 ## `status_count` (status, min), `lost_at_least` (imps, min: health lost in all), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max),
 ## `caster_moved` (mode: a card moved its caster, for example a dash), `blocked` (min: enemy shots a barrier or a shielded shot stopped), `deflected` (min: enemy shots a deflect turned), `healed` (min: health heals gave wizard bodies), `lost_at_most` (imps, max: health each imp lost, for a hit that should barely hurt or not at all), `spawned` (entity, min: decoys or familiars a cast asked for).
 ##
-## godot --headless --path . --script res://tests/content/spells/test_combos.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/spells/test_combos.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 const MIN_COMBOS: int = 20

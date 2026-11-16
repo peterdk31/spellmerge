@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## biome has only its fields. The cover kinds are a test grass (tests/core/fixtures/cover_content),
 ## made to fill the real rooms' biomes, so the rooms are covered whether or not the game has cover yet.
 ##
-## godot --headless --path . --script res://tests/core/test_cover_layout.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_cover_layout.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 const FIXTURE_ROOT: String = "res://tests/core/fixtures/cover_content"
 const GRASS: CoverKind = preload("res://tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres")

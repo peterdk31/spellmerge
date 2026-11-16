@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## walk through it), its own payloads leave it, and all of it goes when it ends, leaving the
 ## room's walls as they were. The manager is stepped by hand.
 ##
-## godot --headless --path . --script res://tests/core/test_projectiles_solid.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_solid.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 

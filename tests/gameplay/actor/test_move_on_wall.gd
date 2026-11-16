@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## wastes the card. Real actors (a Mover each) and the real cards, moved against the walls as the game
 ## moves them: `on_wall · dash · pulse` is a wall bounce that bursts.
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_move_on_wall.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_move_on_wall.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 

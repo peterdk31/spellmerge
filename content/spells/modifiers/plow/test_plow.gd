@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## (`combos/`, each with `needs: plow`) are held with and without it by
 ## tests/content/spells/test_combos.gd.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/plow/test_plow.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/plow/test_plow.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

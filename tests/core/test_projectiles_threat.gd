@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## the shot of another team that will come within a radius of a point soonest, and the way off
 ## its line. Enemies at ids 0-6, wizards at 7-10, as in test_projectiles_actors.gd.
 ##
-## godot --headless --path . --script res://tests/core/test_projectiles_threat.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_threat.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

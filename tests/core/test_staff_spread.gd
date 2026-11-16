@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## same way. A staff with no spread aims true, the carriers of a multicast included (owner,
 ## 2026-10-27: spread belongs to the staff, not to the cards).
 ##
-## godot --headless --path . --script res://tests/core/test_staff_spread.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_staff_spread.gd
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")

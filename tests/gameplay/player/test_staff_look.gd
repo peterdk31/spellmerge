@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## shows the column of its swing, not of its aim. The real wizard scene and the four
 ## starter heads, on the stand-in spell runtime.
 ##
-## godot --headless --path . --script res://tests/gameplay/player/test_staff_look.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/player/test_staff_look.gd
 const WizardFixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
 const HEAD_STAFFS: Array[StaffBase] = [

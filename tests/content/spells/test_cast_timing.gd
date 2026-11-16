@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## for long (a big card costs mana instead), the starter staffs share one cooldown, and a held
 ## beam on a starter staff stays on with no gap.
 ##
-## godot --headless --path . --script res://tests/content/spells/test_cast_timing.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/spells/test_cast_timing.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const STARTERS: Array[StaffBase] = [preload("res://content/wizard/staffs/crystal/crystal.tres"), preload("res://content/wizard/staffs/curl/curl.tres"), preload("res://content/wizard/staffs/moon/moon.tres"), preload("res://content/wizard/staffs/star/star.tres")]
 ## The longest wind-down a card may have: a lockout past it is a mana cost (the retune's rule).

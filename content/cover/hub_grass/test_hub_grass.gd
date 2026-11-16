@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## ash and grows back after 30 s; frost puts it out; its burning gives off embers and smoke; its
 ## sheet holds every frame its states draw, trampled too.
 ##
-## godot --headless --path . --script res://content/cover/hub_grass/test_hub_grass.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/cover/hub_grass/test_hub_grass.gd
 const Kit := preload("res://tests/gameplay/cover/cover_kit.gd")
 const GRASS: CoverKind = preload("res://content/cover/hub_grass/hub_grass.tres")
 

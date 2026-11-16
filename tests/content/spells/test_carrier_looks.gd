@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## and its looks have no problems. Which cue each card's moments play, and a wall's stones, are in
 ## each card's own test (content/spells/carriers/<id>/test_<id>.gd).
 ##
-## godot --headless --path . --script res://tests/content/spells/test_carrier_looks.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/spells/test_carrier_looks.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 var registry: RegistryScript

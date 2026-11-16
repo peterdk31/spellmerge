@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## body_looks.gd; owner, 2026-11-07): each staff counts apart, the next frame counts again, and a
 ## frame of many bodies keeps every body's count when the table grows.
 ##
-## godot --headless --path . --script res://tests/gameplay/feel/test_body_looks.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_body_looks.gd
 const BodyLooks := preload("res://gameplay/feel/body_looks.gd")
 
 

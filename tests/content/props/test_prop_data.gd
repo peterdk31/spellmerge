@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## never refill). Found by folder (`content/props/<id>/<id>.tres`), so a new prop is checked too; the
 ## test exploding barrel (tests/gameplay/actor/fixtures) stands in for the casts until the first props (W9).
 ##
-## godot --headless --path . --script res://tests/content/props/test_prop_data.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/props/test_prop_data.gd
 const MoteKinds := preload("res://tests/content/mote_kinds.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")

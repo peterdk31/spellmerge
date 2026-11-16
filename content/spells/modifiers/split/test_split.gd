@@ -1,9 +1,7 @@
 extends "res://tests/support/card_rig.gd"
 ## The Split card (content/spells/modifiers/split/, M2 part 12): three weaker shots in a fan; every split multiplies.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/split/test_split.gd
-
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/split/test_split.gd
 func test_the_card_is_split() -> void:
 	_check_card(&"split", 2)
 	check_equal(_modifier(&"split").behaviour, ModifierBase.Behaviour.NONE, "numbers only")

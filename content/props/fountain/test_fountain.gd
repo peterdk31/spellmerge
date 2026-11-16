@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## is stepped, so its pools refill and it bursts for ever; its casts are a quarter of their power
 ## (its stats), so a fountain soaks and shoves far more than it hurts.
 ##
-## godot --headless --path . --script res://content/props/fountain/test_fountain.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/props/fountain/test_fountain.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")

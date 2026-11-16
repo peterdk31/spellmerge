@@ -3,9 +3,7 @@ extends "res://tests/support/suite.gd"
 ## share of its life over which it dissolves, `active_left` how long it may still act and `fade_left`
 ## how whole it looks, one rule for the logic and the looks (owner, 2026-10-31).
 ##
-## godot --headless --path . --script res://tests/core/test_carrier_fade.gd
-
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_carrier_fade.gd
 func test_a_carrier_with_no_fade_acts_to_its_end() -> void:
 	var bolt: Carrier = Carriers.of(&"atom")
 	check_equal(bolt.fade(), 0.0, "a shot carrier ends at once")

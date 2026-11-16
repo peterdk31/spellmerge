@@ -15,8 +15,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## This test is the broom's own: deleting its folder deletes it (decision 28).
 ##
-## godot --headless --path . --script res://content/bosses/old_broom/test_old_broom.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/bosses/old_broom/test_old_broom.gd
 const SpellsScript := preload("res://core/spells/spells.gd")
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const BROOM: EnemyBase = preload("res://content/bosses/old_broom/old_broom.tres")

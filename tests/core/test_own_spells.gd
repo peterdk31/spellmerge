@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## `ProjectileManager.exclude`), and a carrier that never leaves it (a swing, a beam) always.
 ## Nothing else is spared: no team, no caster.
 ##
-## godot --headless --path . --script res://tests/core/test_own_spells.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_own_spells.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

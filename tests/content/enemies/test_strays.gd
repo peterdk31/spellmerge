@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## each staff compiles from player cards and its first cast is affordable on full mana; and they
 ## hop on their tips while they walk (the face goes with the body) and bob while they stand.
 ##
-## godot --headless --path . --script res://tests/content/enemies/test_strays.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/enemies/test_strays.gd
 const AiFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const STRAYS: Array[EnemyBase] = [
 	preload("res://content/enemies/ember_imp/ember_imp.tres"),

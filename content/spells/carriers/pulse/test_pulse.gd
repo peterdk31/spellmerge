@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## needs, as on any carrier; tests/core/test_card_rules.gd plays every card on it, on you and in a
 ## payload.
 ##
-## godot --headless --path . --script res://content/spells/carriers/pulse/test_pulse.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/carriers/pulse/test_pulse.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

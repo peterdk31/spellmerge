@@ -1,9 +1,7 @@
 extends "res://tests/support/card_rig.gd"
 ## The On expire card (content/spells/triggers/on_expire/, M2 part 13): the held spell fires where the shot ended, in front of a wall it reached, not when it ended on a hit.
 ##
-## godot --headless --path . --script res://content/spells/triggers/on_expire/test_on_expire.gd
-
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/triggers/on_expire/test_on_expire.gd
 func before_each() -> void:
 	super()
 	_seat_wizards()

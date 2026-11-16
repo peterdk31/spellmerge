@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## table matches the projectile manager's LOOK_* kinds number for number, every card and mote or
 ## mark kind names a look that exists, and a name that is no look is a problem the validator names.
 ##
-## godot --headless --path . --script res://tests/core/test_look_names.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_look_names.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SPELLS: String = "res://content/spells"
 

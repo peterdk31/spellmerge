@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## clears the ground; a snapshot with items lying comes back the same and says them again; a possessed
 ## enemy's things are the seat's to rebuild, drop and take (items I8).
 ##
-## godot --headless --path . --script res://tests/gameplay/items/test_items.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/items/test_items.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const ItemsScript := preload("res://gameplay/items/items.gd")
 const WILD_STAR: StaffItem = preload("res://content/items/staffs/wild_star/wild_star.tres")

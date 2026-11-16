@@ -9,8 +9,7 @@ extends "res://tests/support/suite.gd"
 ## with no room goes one at a time). The carriers that are not rows only (beam, swing, slam, wall,
 ## the moves and bodies) are cast too, and a fall from the sky: they must be untouched by the switch.
 ##
-## godot --headless --path . --script res://tests/core/test_spells_land_shots.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_land_shots.gd
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")

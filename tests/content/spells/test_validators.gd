@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## and each kind of component and the reaction table has a broken fixture that fails with the
 ## rule, file, field and fix. Also the registry's `validate_spells()` and its duplicate ids.
 ##
-## godot --headless --path . --script res://tests/content/spells/test_validators.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/spells/test_validators.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const FIXTURES: String = "res://tests/content/spells/fixtures"

@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## until its carrier ends. They were the projectile manager's (`follow_caster`) until 2026-11-05;
 ## these are its tests, moved with it.
 ##
-## godot --headless --path . --script res://tests/gameplay/feel/test_streams.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_streams.gd
 const StreamsScript := preload("res://gameplay/feel/streams.gd")
 const BirthsScript := preload("res://gameplay/feel/births.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")

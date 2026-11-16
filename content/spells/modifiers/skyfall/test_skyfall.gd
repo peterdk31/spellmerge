@@ -6,8 +6,7 @@ extends "res://tests/support/card_rig.gd"
 ## to the line (its caster too: the hole is a point, it spares no body) and end there; a placed
 ## carrier lands on the line. No card moves the hole: homing steers the carrier, reach lengthens it.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/skyfall/test_skyfall.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/skyfall/test_skyfall.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 ## Where the caster stands in these tests: the spot its casts fall onto.

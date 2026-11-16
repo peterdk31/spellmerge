@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## holds by what each casts next. Real cards from the registry, enemies from the imp's scene with
 ## staffs made here, stepped by hand.
 ##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_brain.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_brain.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 
 var fx: Fixture

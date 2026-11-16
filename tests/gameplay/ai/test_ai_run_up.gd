@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## walls and a pillar's ground laid by hand, the bodies moved against them as the game moves them
 ## (`Actor.move`).
 ##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_run_up.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_run_up.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const ImpData: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
 

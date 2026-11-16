@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## that names nothing, or leaves rules that make no map, is named by the validator. On made-up
 ## content.
 ##
-## godot --headless --path . --script res://tests/core/test_run_rule_changes.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_run_rule_changes.gd
 const MadeUpRoom := preload("res://tests/support/made_up_room.gd")
 
 const BIOME: StringName = &"cellar"

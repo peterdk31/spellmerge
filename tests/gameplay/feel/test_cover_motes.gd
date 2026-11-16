@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## the view, at most `MOST_A_FRAME` a frame; a stream that cannot be given off from a cell (a mask,
 ## a standing one) refused and the others given off; a frame of it allocates nothing.
 ##
-## godot --headless --path . --script res://tests/gameplay/feel/test_cover_motes.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_cover_motes.gd
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 const CoverMotesScript := preload("res://gameplay/feel/cover_motes.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")

@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## it is drawn and not past it, its touch reaches as far as its box, and the footprint the actor adds
 ## under it is the box's base. `set_size` scales the box with the body.
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_hurt_box.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_hurt_box.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")

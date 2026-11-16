@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## frost hit puts it out. It casts nothing yet: its fire was to be cast at whoever comes near, by a
 ## prop state event the owner put off (2026-11-12, "skip the prop near for now").
 ##
-## godot --headless --path . --script res://content/props/fire_pit/test_fire_pit.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/props/fire_pit/test_fire_pit.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")
 const PIT: PropBase = preload("res://content/props/fire_pit/fire_pit.tres")

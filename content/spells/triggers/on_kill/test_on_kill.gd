@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## read after its carrier where the carrier's hit kills. Its combos do what they promise with the
 ## card and fail without it, and when the imp ahead is too sturdy to die.
 ##
-## godot --headless --path . --script res://content/spells/triggers/on_kill/test_on_kill.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/triggers/on_kill/test_on_kill.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

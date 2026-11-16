@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## draws its look as the game's body does (`PropLook`), state by state, so the editor never lies;
 ## and the room the game shows has no placement or zone left (`RoomPlaces.strip`).
 ##
-## godot --headless --path . --script res://tests/content/rooms/test_room_places.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/rooms/test_room_places.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")

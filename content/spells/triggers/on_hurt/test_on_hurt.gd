@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## Its combos do what they promise with the card and fail without it, and when nothing hurts the
 ## caster.
 ##
-## godot --headless --path . --script res://content/spells/triggers/on_hurt/test_on_hurt.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/triggers/on_hurt/test_on_hurt.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

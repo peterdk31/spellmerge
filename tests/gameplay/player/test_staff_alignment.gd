@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## strike (`carrier_shown`) is drawn there too. A new card that lands is checked here without a line
 ## added; a new carrier that strikes a point says so in `traits()` (`STRIKES_POINT`).
 ##
-## godot --headless --path . --script res://tests/gameplay/player/test_staff_alignment.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/player/test_staff_alignment.gd
 const WizardFixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 ## How far the drawn tip may be from the point struck: the body is placed on whole pixels.
 const SLACK: float = 1.0

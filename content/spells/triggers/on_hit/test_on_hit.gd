@@ -1,9 +1,7 @@
 extends "res://tests/support/card_rig.gd"
 ## The On hit card (content/spells/triggers/on_hit/, M2 part 13): the held spell fires from where a shot lands, at every hit of a pierce, never without a hit.
 ##
-## godot --headless --path . --script res://content/spells/triggers/on_hit/test_on_hit.gd
-
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/triggers/on_hit/test_on_hit.gd
 func before_each() -> void:
 	super()
 	_seat_wizards()

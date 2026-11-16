@@ -1,9 +1,7 @@
 extends "res://tests/support/card_rig.gd"
 ## The Pierce card (content/spells/modifiers/pierce/, M2 part 12): the shot passes through one more target in line (a beam reaches one further); cards add up.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/pierce/test_pierce.gd
-
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/pierce/test_pierce.gd
 func test_the_card_is_pierce() -> void:
 	_check_card(&"pierce", 1)
 	check_equal(_modifier(&"pierce").behaviour, ModifierBase.Behaviour.NONE, "numbers only")

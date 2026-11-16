@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## impact at every turn, and `ray_path` holds the path it walked. Without bounces it stops at
 ## the wall, as before. The manager is stepped by hand.
 ##
-## godot --headless --path . --script res://tests/core/test_projectiles_ray_bounce.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_ray_bounce.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 

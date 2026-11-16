@@ -8,8 +8,7 @@ extends "res://tests/support/suite.gd"
 ## grass (tests/core/fixtures/cover_content) with a sheet made here, so the look is tested whether or
 ## not the game has cover yet.
 ##
-## godot --headless --path . --script res://tests/gameplay/feel/test_cover_look.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_cover_look.gd
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const EventsScript := preload("res://core/events/events.gd")

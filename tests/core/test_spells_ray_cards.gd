@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## hit and every one after while it is on. Cards built in code on a real projectile manager, and
 ## the real cards in the combo arena where combat has to answer.
 ##
-## godot --headless --path . --script res://tests/core/test_spells_ray_cards.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_ray_cards.gd
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

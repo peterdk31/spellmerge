@@ -7,8 +7,7 @@ extends "res://tests/support/suite.gd"
 ## face of its own (`FaceArt`, boss plan OB9): its sheets at their frame size, its row, a phase's row
 ## and back to its scene's.
 ##
-## godot --headless --path . --script res://tests/gameplay/actor/test_face.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_face.gd
 const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 
 

@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## room, an enemy or a boss keeps this passing while the run can still be made, and names what is
 ## missing when it cannot (`Registry.validate_runs`).
 ##
-## godot --headless --path . --script res://tests/content/runs/test_runs.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/runs/test_runs.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 var _registry: RegistryScript = null

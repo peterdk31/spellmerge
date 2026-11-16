@@ -9,8 +9,7 @@ extends "res://tests/support/suite.gd"
 ## forgotten when the seat's wizard is said anew (the builder's too). The wizard is real (the real
 ## registry and spell runtime), so every request is answered as in the game.
 ##
-## godot --headless --path . --script res://tests/hud/test_inventory_menu.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_inventory_menu.gd
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")

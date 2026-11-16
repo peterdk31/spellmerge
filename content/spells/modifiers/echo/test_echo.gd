@@ -3,8 +3,7 @@ extends "res://tests/support/suite.gd"
 ## later at half damage, and an echo does not echo. The engine side is tested in
 ## `tests/core/test_spells_multicast.gd`; here the card's data and its combos.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/echo/test_echo.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/echo/test_echo.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

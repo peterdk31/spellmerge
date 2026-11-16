@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## it once. The engine side is tested in `tests/core/test_spells_swing.gd`; here the card's data,
 ## the playground's numbers and how it plays with other cards.
 ##
-## godot --headless --path . --script res://content/spells/carriers/swing/test_swing.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/carriers/swing/test_swing.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 

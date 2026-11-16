@@ -4,8 +4,7 @@ extends "res://tests/support/suite.gd"
 ## `tests/core/test_spells_moves.gd` and `tests/gameplay/player/test_player_caster.gd`; here the
 ## card's data and its combos.
 ##
-## godot --headless --path . --script res://content/spells/modifiers/recoil/test_recoil.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/recoil/test_recoil.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

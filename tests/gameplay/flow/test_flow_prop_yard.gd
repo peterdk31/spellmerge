@@ -6,8 +6,7 @@ extends "res://tests/support/suite.gd"
 ## where the room puts them, never in the yard. The registry is the game's own (props W9c: the
 ## exploding barrel, the crate, the fire pit, the arc lodestone and the burial jar).
 ##
-## godot --headless --path . --script res://tests/gameplay/flow/test_flow_prop_yard.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/flow/test_flow_prop_yard.gd
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 

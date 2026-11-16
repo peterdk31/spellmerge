@@ -10,8 +10,7 @@ extends "res://tests/support/suite.gd"
 ## hit-work budget runs out in some steps) must send the very hits it sent before the change: the
 ## fingerprint below was recorded on the manager before S5 (and again for H2, below).
 ##
-## godot --headless --path . --script res://tests/core/test_projectiles_targets.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_targets.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

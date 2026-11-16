@@ -5,8 +5,7 @@ extends "res://tests/support/suite.gd"
 ## few cobwebs, few enough not to crowd its fights; every room with cover holds a `CoverPreview`, so
 ## the editor shows it; and every kind's fill reaches a room. Rooms and kinds are found by folder.
 ##
-## godot --headless --path . --script res://tests/content/rooms/test_room_cover.gd
-
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/rooms/test_room_cover.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## The most of a crypt room's open floor its cobwebs may hold (GC7: the AI walks round them).

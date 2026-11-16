@@ -1,39 +1,31 @@
-extends SceneTree
-## Tests for core/registry: lookup by folder and id, every resource seen, duplicate
-## ids, and sounds by id (`null` for an unknown one), on a fixture folder.
+extends "res://tests/support/suite.gd"
+## Tests for core/registry, one rule per test, each on a registry of its own scanning a fixture
+## folder (tests/core/fixtures/registry): lookup by folder and id, nested folders, skipped files
+## and duplicate ids, every resource seen (no demo filter), unknown folders and ids, `add` for a
+## test's own fixture, sounds by id (`null` for an unknown one), a rescan and missing roots, and an
+## export's `.remap` and `.import` names (on empty files the test writes under user:// and takes
+## out after).
 ##
-## godot --headless --path . --script res://tests/core/test_registry.gd
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_registry.gd
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 const FIXTURE: String = "res://tests/core/fixtures/registry"
+## An export's file names, made empty under EXPORT_ROOT by `_export_files`.
+const EXPORT_ROOT: String = "user://registry_suffix_test"
+const EXPORT_FILES: Array[String] = ["content/spells/a.tres.remap", "content/spells/b.tres", "content/spells/b.tres.remap", "audio/sfx/boom.ogg.import", "audio/sfx/boom.ogg", "audio/sfx/pop.ogg.import", "audio/sfx/notes.txt"]
 
-var _failures: Array[String] = []
-
-
-func _initialize() -> void:
-	# The root joins the scene tree only after _initialize returns: wait one frame.
-	await process_frame
-	_test_lookup()
-	_test_nested_folders_and_skipped_files()
-	_test_duplicate_id_keeps_the_first()
-	_test_every_resource_is_seen()
-	_test_unknown_folder_and_id()
-	_test_sounds()
-	_test_rescan_and_missing_roots()
-	_test_export_suffixes_and_default_sounds()
-	_test_add_a_fixture()
-	if _failures.is_empty():
-		print("TEST OK: core/registry")
-		quit(0)
-	else:
-		for failure in _failures:
-			printerr("TEST FAILED: " + failure)
-		quit(1)
+var registry: Node
 
 
-func _check(condition: bool, message: String) -> void:
-	if not condition:
-		_failures.append(message)
+func before_each() -> void:
+	registry = own(RegistryScript.new()) as Node
+	registry.scan(FIXTURE + "/content", FIXTURE + "/audio", PackedStringArray(["tres"]))
+
+
+func after_each() -> void:
+	for file_name in EXPORT_FILES:
+		if FileAccess.file_exists(EXPORT_ROOT + "/" + file_name):
+			DirAccess.remove_absolute(EXPORT_ROOT + "/" + file_name)
 
 
 ## A typed copy: the registry returns Array[StringName], which never equals an untyped array.
@@ -43,109 +35,149 @@ func _names(values: Array) -> Array[StringName]:
 	return result
 
 
-func _registry() -> Node:
-	var registry: Node = RegistryScript.new()
-	registry.scan(FIXTURE + "/content", FIXTURE + "/audio", PackedStringArray(["tres"]))
-	return registry
+## Writes EXPORT_FILES, empty, under EXPORT_ROOT (taken out in after_each).
+func _export_files() -> void:
+	DirAccess.make_dir_recursive_absolute(EXPORT_ROOT + "/content/spells")
+	DirAccess.make_dir_recursive_absolute(EXPORT_ROOT + "/audio/sfx")
+	for file_name in EXPORT_FILES:
+		FileAccess.open(EXPORT_ROOT + "/" + file_name, FileAccess.WRITE).close()
 
 
-func _test_lookup() -> void:
-	var registry: Node = _registry()
-	var spark: Resource = registry.get_resource(&"spells", &"spark")
-	_check(spark is CarrierCard, "spark is a CarrierCard")
-	_check(registry.get_resource(&"enemies", &"blob") is EnemyBase, "blob is an EnemyBase")
-	_check(registry.get_resource(&"rooms", &"hall") is RoomBase, "hall is a RoomBase")
-	_check(registry.get_folders() == _names([&"enemies", &"rooms", &"spells"]), "folders are found, sorted: %s" % [registry.get_folders()])
-	_check(registry.get_resource(&"enemies", &"spark") == null, "ids are per folder")
-	registry.free()
+# Lookup.
+
+func test_a_resource_is_found_by_folder_and_id() -> void:
+	check(registry.get_resource(&"spells", &"spark") is CarrierCard, "spark is a CarrierCard")
+	check(registry.get_resource(&"enemies", &"blob") is EnemyBase, "blob is an EnemyBase")
+	check(registry.get_resource(&"rooms", &"hall") is RoomBase, "hall is a RoomBase")
 
 
-## `add` registers a resource as a scan would (tests: a fixture beside the content): found by id,
-## its id in order, a new folder made; never one with no id or an id the folder holds.
-func _test_add_a_fixture() -> void:
-	var registry: Node = _registry()
-	var blob: EnemyBase = registry.get_resource(&"enemies", &"blob") as EnemyBase
-	var other: EnemyBase = blob.duplicate() as EnemyBase
-	other.id = &"aardvark"
-	_check(registry.add(&"enemies", other), "a new id is added")
-	_check(registry.get_resource(&"enemies", &"aardvark") == other, "and found")
-	_check(registry.get_ids(&"enemies") == _names([&"aardvark", &"blob"]), "in id order: %s" % [registry.get_ids(&"enemies")])
-	_check(not registry.add(&"enemies", other.duplicate()), "an id the folder holds is refused")
-	_check(not registry.add(&"enemies", Resource.new()), "a resource with no id is refused")
-	_check(registry.add(&"props", other), "a new folder")
-	_check(registry.get_folders().has(&"props"), "listed")
-	registry.free()
+func test_folders_are_found_sorted() -> void:
+	check_equal(registry.get_folders(), _names([&"enemies", &"rooms", &"spells"]), "folders are found, sorted")
 
 
-func _test_nested_folders_and_skipped_files() -> void:
-	var registry: Node = _registry()
-	_check(registry.get_resource(&"spells", &"deep") != null,"a resource two folders down is found")
-	_check(registry.get_ids(&"spells") == _names([&"deep", &"ember", &"spark"]),"ids are sorted; a .tres without an id is skipped: %s" % [registry.get_ids(&"spells")])
-	registry.free()
+func test_ids_are_per_folder() -> void:
+	check(registry.get_resource(&"enemies", &"spark") == null, "a spell's id is not an enemy's")
 
 
-func _test_duplicate_id_keeps_the_first() -> void:
-	var registry: Node = _registry()
+func test_a_resource_two_folders_down_is_found() -> void:
+	check(registry.get_resource(&"spells", &"deep") != null, "a resource two folders down is found")
+
+
+func test_ids_are_sorted_and_a_tres_without_an_id_is_skipped() -> void:
+	check_equal(registry.get_ids(&"spells"), _names([&"deep", &"ember", &"spark"]), "the spells' ids, sorted, with no entry for the .tres that has no id")
+
+
+func test_a_duplicate_id_keeps_the_first_file() -> void:
 	var spark: CarrierCard = registry.get_resource(&"spells", &"spark") as CarrierCard
-	_check(spark != null and spark.display_name == "Spark", "the first file in sorted order wins a duplicate id")
-	registry.free()
+	check(spark != null and spark.display_name == "Spark", "the first file in sorted order wins a duplicate id")
 
 
-func _test_every_resource_is_seen() -> void:
+func test_the_registry_has_no_demo_filter() -> void:
 	# There is no demo subset (owner, 2026-11-05): every build sees every resource.
-	var registry: Node = _registry()
-	_check(not ("demo_only" in registry), "the registry has no demo filter")
-	_check(registry.get_ids(&"spells") == _names([&"deep", &"ember", &"spark"]), "every spell id is listed")
-	_check(registry.get_all(&"spells").size() == 3, "get_all gives every spell")
-	_check(registry.get_resource(&"enemies", &"blob") != null, "every enemy is found")
-	_check(registry.get_resource(&"rooms", &"hall") != null, "every room is found")
-	registry.free()
+	check(not ("demo_only" in registry), "the registry has no demo filter")
 
 
-func _test_unknown_folder_and_id() -> void:
-	var registry: Node = _registry()
-	_check(registry.get_resource(&"nope", &"spark") == null, "an unknown folder gives null")
-	_check(registry.get_resource(&"spells", &"nope") == null, "an unknown id gives null")
-	_check(registry.get_ids(&"nope").is_empty(), "an unknown folder has no ids")
-	_check(registry.get_all(&"nope").is_empty(), "an unknown folder has no resources")
-	registry.free()
+func test_get_all_gives_every_resource_of_a_folder() -> void:
+	check_equal(registry.get_all(&"spells").size(), 3, "get_all gives every spell")
 
 
-func _test_sounds() -> void:
-	var registry: Node = _registry()
-	_check(registry.get_sound(&"zap") is AudioStream, "a known sound id returns the stream")
-	_check(registry.get_sound(&"zap") == registry.get_sound(&"zap"), "a sound is loaded once and reused")
-	_check(registry.get_sound(&"no_such_sound") == null, "an unknown sound id returns null")
-	_check(registry.get_sound(&"") == null, "an empty sound id returns null")
-	registry.free()
+func test_an_unknown_folder_gives_nothing() -> void:
+	check(registry.get_resource(&"nope", &"spark") == null, "an unknown folder gives null")
+	check(registry.get_ids(&"nope").is_empty(), "an unknown folder has no ids")
+	check(registry.get_all(&"nope").is_empty(), "an unknown folder has no resources")
 
 
-func _test_rescan_and_missing_roots() -> void:
-	var registry: Node = _registry()
+func test_an_unknown_id_gives_null() -> void:
+	check(registry.get_resource(&"spells", &"nope") == null, "an unknown id gives null")
+
+
+# Add (a test's fixture beside the content).
+
+func _aardvark() -> EnemyBase:
+	var other: EnemyBase = (registry.get_resource(&"enemies", &"blob") as EnemyBase).duplicate() as EnemyBase
+	other.id = &"aardvark"
+	return other
+
+
+func test_an_added_resource_is_found_by_its_id() -> void:
+	var other: EnemyBase = _aardvark()
+	check(registry.add(&"enemies", other), "a new id is added")
+	check(registry.get_resource(&"enemies", &"aardvark") == other, "and found")
+
+
+func test_an_added_id_is_listed_in_order() -> void:
+	registry.add(&"enemies", _aardvark())
+	check_equal(registry.get_ids(&"enemies"), _names([&"aardvark", &"blob"]), "in id order")
+
+
+func test_add_refuses_an_id_the_folder_holds() -> void:
+	var other: EnemyBase = _aardvark()
+	registry.add(&"enemies", other)
+	check(not registry.add(&"enemies", other.duplicate()), "an id the folder holds is refused")
+
+
+func test_add_refuses_a_resource_with_no_id() -> void:
+	check(not registry.add(&"enemies", Resource.new()), "a resource with no id is refused")
+
+
+func test_add_to_a_new_folder_lists_the_folder() -> void:
+	check(registry.add(&"props", _aardvark()), "added to a new folder")
+	check(registry.get_folders().has(&"props"), "the new folder is listed")
+
+
+# Sounds.
+
+func test_a_known_sound_id_gives_its_stream() -> void:
+	check(registry.get_sound(&"zap") is AudioStream, "a known sound id returns the stream")
+
+
+func test_a_sound_is_loaded_once_and_reused() -> void:
+	check(registry.get_sound(&"zap") == registry.get_sound(&"zap"), "a sound is loaded once and reused")
+
+
+func test_an_unknown_sound_id_gives_null() -> void:
+	check(registry.get_sound(&"no_such_sound") == null, "an unknown sound id returns null")
+
+
+func test_an_empty_sound_id_gives_null() -> void:
+	check(registry.get_sound(&"") == null, "an empty sound id returns null")
+
+
+# A rescan.
+
+func test_a_missing_content_root_gives_no_folders() -> void:
 	registry.scan(FIXTURE + "/missing", FIXTURE + "/missing")
-	_check(registry.get_folders().is_empty(), "a missing content root gives no folders")
-	_check(registry.get_sound(&"zap") == null, "a missing audio root gives no sounds")
-	_check(registry.get_resource(&"spells", &"spark") == null, "a rescan forgets the old content")
-	registry.free()
+	check(registry.get_folders().is_empty(), "a missing content root gives no folders")
 
 
-func _test_export_suffixes_and_default_sounds() -> void:
-	# An export lists `x.tres.remap` and `x.ogg.import`; only the names matter.
-	var root: String = "user://registry_suffix_test"
-	var files: PackedStringArray = ["content/spells/a.tres.remap", "content/spells/b.tres", "content/spells/b.tres.remap", "audio/sfx/boom.ogg.import", "audio/sfx/boom.ogg", "audio/sfx/pop.ogg.import", "audio/sfx/notes.txt"]
-	DirAccess.make_dir_recursive_absolute(root + "/content/spells")
-	DirAccess.make_dir_recursive_absolute(root + "/audio/sfx")
-	for file_name: String in files:
-		FileAccess.open(root + "/" + file_name, FileAccess.WRITE).close()
-	var registry: Node = RegistryScript.new()
-	var tres_files: PackedStringArray = registry._find_files(root + "/content", PackedStringArray(["tres"]))
-	_check(tres_files == PackedStringArray([root + "/content/spells/a.tres", root + "/content/spells/b.tres"]), "a .remap suffix is stripped and not listed twice: %s" % [tres_files])
-	var ogg_files: PackedStringArray = registry._find_files(root + "/audio", PackedStringArray(["ogg"]))
-	_check(ogg_files == PackedStringArray([root + "/audio/sfx/boom.ogg", root + "/audio/sfx/pop.ogg"]), "an .import suffix is stripped and not listed twice: %s" % [ogg_files])
-	# The content root is skipped on purpose: the .tres files above are empty, so loading
-	# them would log errors. Scanning a real content root is covered by the fixture tests.
-	registry.scan(root + "/no_content", root + "/audio")
-	_check(registry._sound_paths.has(&"pop") and registry._sound_paths.has(&"boom"), "the default scan indexes .ogg names")
-	registry.free()
-	for file_name: String in files:
-		DirAccess.remove_absolute(root + "/" + file_name)
+func test_a_missing_audio_root_gives_no_sounds() -> void:
+	registry.scan(FIXTURE + "/missing", FIXTURE + "/missing")
+	check(registry.get_sound(&"zap") == null, "a missing audio root gives no sounds")
+
+
+func test_a_rescan_forgets_the_old_content() -> void:
+	registry.scan(FIXTURE + "/missing", FIXTURE + "/missing")
+	check(registry.get_resource(&"spells", &"spark") == null, "a rescan forgets the old content")
+
+
+# An export's names (`x.tres.remap`, `x.ogg.import`): only the names matter.
+
+func test_a_remap_suffix_is_stripped_and_listed_once() -> void:
+	_export_files()
+	var found: PackedStringArray = registry._find_files(EXPORT_ROOT + "/content", PackedStringArray(["tres"]))
+	check_equal(found, PackedStringArray([EXPORT_ROOT + "/content/spells/a.tres", EXPORT_ROOT + "/content/spells/b.tres"]), "a .remap suffix is stripped and not listed twice")
+
+
+func test_an_import_suffix_is_stripped_and_listed_once() -> void:
+	_export_files()
+	var found: PackedStringArray = registry._find_files(EXPORT_ROOT + "/audio", PackedStringArray(["ogg"]))
+	check_equal(found, PackedStringArray([EXPORT_ROOT + "/audio/sfx/boom.ogg", EXPORT_ROOT + "/audio/sfx/pop.ogg"]), "an .import suffix is stripped and not listed twice")
+
+
+func test_the_default_scan_indexes_ogg_names() -> void:
+	_export_files()
+	# The content root is skipped on purpose: the .tres files above are empty, so loading them
+	# would log errors. Scanning a real content root is covered by the fixture tests.
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(EXPORT_ROOT + "/no_content", EXPORT_ROOT + "/audio")
+	check(fresh._sound_paths.has(&"pop") and fresh._sound_paths.has(&"boom"), "the default scan indexes .ogg names")

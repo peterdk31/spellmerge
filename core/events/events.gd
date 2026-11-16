@@ -297,8 +297,9 @@ signal boss_intro_opened(actor: int, boss_name: String, lore: String, intro: Bos
 ## `boss_intro_next_requested`). View only; heard by the HUD.
 signal boss_intro_paged(page: int)
 ## Sender: flow (`BossIntroHold`). The boss `actor`'s intro closed: its last page was turned (the game
-## goes on from this tick), its boss left, the last seat left or the run ended. View only; heard by
-## the HUD (the overlay goes, the boss bar comes) and feel.
+## goes on from this tick), its boss left, the last seat left or the run ended; `actor` NO_PLAYER after a
+## snapshot restored with none open (whatever the HUD shows closes). View only; heard by the HUD (the
+## overlay goes, the boss bar comes) and feel.
 signal boss_intro_closed(actor: int)
 ## Sender: actor (`BossPresence`, boss plan OB16). The shown boss `actor` has `health` of
 ## `max_health` now (a hit, a heal, a player joining or leaving, a snapshot put back). View only;

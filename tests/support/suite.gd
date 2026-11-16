@@ -116,6 +116,7 @@ func _still_chance() -> void:
 		game.rules.boss_intros = 0
 		game.hold_left = 0
 		game.stops.clear()
+		game.held_through.fill(0)
 
 
 ## Runs before every test. Override it for setup the tests share.

@@ -1484,7 +1484,10 @@ func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2) -> Actor:
 func _forget_enemies() -> void:
 	_enemies.clear()
 	adds.clear()
+	var was_open: bool = boss_intro.opened
 	boss_intro.clear(Sim.found(self))
+	if was_open:
+		_drop_stood_presses()
 
 
 ## The wizards in play (1 at least): what an enemy's health and a phase's adds are counted for.

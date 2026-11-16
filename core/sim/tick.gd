@@ -254,6 +254,7 @@ func begin_run() -> void:
 	# The last run's stops and hold end with it (a new run starts with the game going).
 	sim.hold_left = 0
 	sim.stops.clear()
+	sim.held_through.fill(0)
 	if frames != null:
 		sim.run_seed = frames.next_run_seed()
 		sim.rules = frames.next_run_rules()

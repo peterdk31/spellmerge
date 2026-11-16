@@ -278,6 +278,7 @@ func tick(delta: float) -> void:
 		if _carried[seat] != 0:
 			_frames[seat].pressed_bits |= _carried[seat]
 			_carried[seat] = 0
+	_mask_held_through()
 
 
 ## A physics step starts (the Tick, before any of its ticks; `delta` is a step's length): returns
@@ -360,11 +361,30 @@ func stood() -> void:
 ## a stop that ends by a command (a boss's intro, docs/milestones/boss-intro.md) lets the game go
 ## without a staff pressed meanwhile casting on the first tick that steps. Called by the simulation
 ## while a tick's commands apply (or in its steps), so it happens on the same tick on every machine and
-## in a replay; the recording keeps the frames as they were built. Buttons still held stay held.
+## in a replay; the recording keeps the frames as they were built. A staff button still held is not
+## held for the game until it is let go (`Sim.held_through`, the game's state).
 func drop_presses() -> void:
 	_carried.fill(0)
+	var game: Sim = Sim.found(self)
 	for seat in SEATS:
 		_frames[seat].pressed_bits = 0
+		# Taken out of the frames by `_mask_held_through`, at this tick's start's end or the next's.
+		game.held_through[seat] |= _frames[seat].held_bits
+
+
+## The staff buttons held through a stop's end stay out of the frames until each is let go
+## (`Sim.held_through`).
+func _mask_held_through() -> void:
+	var game: Sim = Sim.found(self)
+	for seat in SEATS:
+		var masked: int = game.held_through[seat]
+		if masked == 0:
+			continue
+		var frame: InputFrame = _frames[seat]
+		var still: int = masked & frame.held_bits
+		frame.held_bits &= ~still
+		frame.pressed_bits &= ~still
+		game.held_through[seat] = still
 
 
 ## Start a run by `start` (one of `Replay.STARTS`) for seat `starter` and record it from its first

@@ -358,6 +358,48 @@ func test_a_staff_pressed_during_it_casts_nothing_on_the_first_tick() -> void:
 	check(int(casts.get(wizard.id, 0)) > 0, "a tap in the fight casts")
 
 
+## A keyboard's Space is A and staff 1 at once (review of BI2): a staff held down as the intro closes
+## is not held for the fight until it is let go, then it casts again.
+func test_a_staff_held_through_the_close_casts_nothing_until_let_go() -> void:
+	_play()
+	var wizard: Actor = flow.get_wizard(0) as Actor
+	await _next(0, 0)
+	input.send_virtual(0, &"staff_1", 1.0)
+	events.emit_signal("boss_intro_next_requested", 0, 1)
+	await commands_applied()
+	check(not tick.sim.is_stopped(), "the fight goes on")
+	for i in 20:
+		await physics_frame
+	check_equal(int(casts.get(wizard.id, 0)), 0, "held through the close: no cast while it stays held")
+	check(tick.sim.held_through[0] != 0, "kept out of the frames as the game's state")
+	input.send_virtual(0, &"staff_1", 0.0)
+	await physics_frame
+	await physics_frame
+	check_equal(tick.sim.held_through[0], 0, "let go: no longer kept out")
+	input.send_virtual(0, &"staff_1", 1.0)
+	for i in 3:
+		await physics_frame
+	input.send_virtual(0, &"staff_1", 0.0)
+	check(int(casts.get(wizard.id, 0)) > 0, "pressed again, it casts")
+
+
+## A snapshot with no intro open restored over a machine showing one (a joiner's own run's, a seek):
+## the intro closes and the HUD is told, with no actor (review of BI2).
+func test_a_snapshot_with_none_open_closes_one_shown() -> void:
+	_play()
+	await _next(0, 0)
+	await _next(0, 1)
+	check(not _stopped(), "closed")
+	var snapshot: Snapshot = Snapshot.take(tick.state_areas(), root)
+	flow.stop_run()
+	_play()
+	check(_stopped(), "a run of its own, its intro open")
+	heard.clear()
+	check_equal(snapshot.restore(tick.state_areas(), root), PackedStringArray(), "restored without problems")
+	check(not flow.boss_intro.opened and not _stopped(), "closed, and the game goes")
+	check_equal(_of(&"closed"), [[&"closed", ActorsScript.NONE]] as Array[Array], "the HUD told none is open")
+
+
 func test_a_snapshot_mid_intro_restores_its_page_and_opens_it_not_fresh() -> void:
 	_play(2)
 	var boss: Actor = _boss()

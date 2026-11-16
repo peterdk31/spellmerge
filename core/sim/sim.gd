@@ -44,6 +44,11 @@ var hold_left: int = 0
 ## Why the game stands stopped, one reason each (`stop`): the pause menu, and any
 ## other stop an area makes. Stopped while any is here; the drawing stops too (the Tick pauses the tree).
 var stops: Array[StringName] = []
+## Per seat, the staff buttons (a bit a staff) it held as a stop ended that wanted no presses carried
+## (`Frames.drop_presses`: a boss's intro): not held for the game until each is let go, so a button
+## that closed the stop (a keyboard's Space is A and a staff) casts nothing as the game goes on. State,
+## so a snapshot and a joining machine keep it; the frames service applies it to every frame.
+var held_through: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 
 const TickScript := preload("res://core/sim/tick.gd")
 

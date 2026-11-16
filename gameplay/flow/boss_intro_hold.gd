@@ -17,7 +17,7 @@ extends RefCounted
 ##   the tree (`watch`, a step that runs through its stop), when the last seat leaves, and with the
 ##   room's enemies (`clear`: the room or the run ends).
 ## - **A snapshot** saves and restores its members; `rebuild_derived` tells it open again, not
-##   fresh, so the HUD shows that page already revealed (rule 3).
+##   fresh, so the HUD shows that page already revealed (rule 3), or closed (no actor) when none is.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -116,16 +116,22 @@ func clear(game: Sim) -> void:
 
 ## The intro of the boss open, or null.
 func intro_of() -> BossIntro:
+	if not is_instance_valid(boss):
+		return null
 	var actor := boss as Actor
-	if actor == null or not is_instance_valid(actor) or actor.data == null:
+	if actor == null or actor.data == null:
 		return null
 	return actor.data.boss_intro
 
 
-## After a snapshot was restored: told open again, not fresh (rule 3), so the HUD shows the page.
+## After a snapshot was restored: told open again, not fresh (rule 3), so the HUD shows the page; told
+## closed when none is open (no actor: a HUD showing one, its own run's, closes it), so the HUD never
+## guesses either way.
 func rebuild_derived() -> void:
 	if opened:
 		_tell_opened(false)
+	elif events != null:
+		events.boss_intro_closed.emit(ActorsScript.NONE)
 
 
 func _tell_opened(fresh: bool) -> void:

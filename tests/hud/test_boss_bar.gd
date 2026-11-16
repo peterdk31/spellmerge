@@ -17,9 +17,6 @@ const BossBannerScript := preload("res://hud/panels/boss/boss_banner.gd")
 ## Loaded when needed, not preloaded: the scene is also the "Hud" autoload (see test_panels.gd).
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const NO_SAVE: String = "user://test_no_save.cfg"
-## The widest a corner panel may be (test_panels.gd's bound), and the view's width.
-const PANEL_MOST: float = 140.0
-const VIEW_WIDTH: float = 640.0
 const MARKS: PackedFloat32Array = [0.6, 0.25]
 
 var hud: HudScript
@@ -121,12 +118,30 @@ func test_a_boss_with_no_lore_shows_its_name_alone() -> void:
 	check(not (banner.get_node("Lore") as Label).visible, "no empty lore line")
 
 
-func test_the_bar_fits_between_the_top_corner_panels() -> void:
+func test_a_notch_dims_once_its_mark_is_passed() -> void:
 	var bar: BossBarScript = hud.get_boss_bar()
 	bus.boss_shown.emit(7, "The Test Boss", "", MARKS)
+	bus.boss_health_changed.emit(7, 100.0, 100.0)
+	check(not bar.is_passed(0.6) and not bar.is_passed(0.25), "full: both marks ahead")
+	bus.boss_health_changed.emit(7, 60.0, 100.0)
+	check(bar.is_passed(0.6) and not bar.is_passed(0.25), "at the first mark: it is passed, the second not")
+
+
+func test_the_bar_fits_between_the_top_corner_panels_and_over_the_pad_line() -> void:
+	var bar: BossBarScript = hud.get_boss_bar()
+	for player in 4:
+		bus.player_joined.emit(player)
+	bus.room_entered.emit(&"arena_01")
+	bus.boss_shown.emit(7, "The Test Boss", "", MARKS)
+	await process_frame
+	await process_frame
 	check_equal(bar.anchor_left, 0.5, "anchored to the middle")
-	check_equal(bar.grow_horizontal, Control.GROW_DIRECTION_BOTH, "and grows both ways")
-	var wide: float = bar.get_combined_minimum_size().x
-	check(wide <= VIEW_WIDTH - 2.0 * (HudScript.EDGE_MARGIN + PANEL_MOST), "it fits between the corner panels, got %s" % wide)
-	check(bar.get_combined_minimum_size().y <= 24.0, "a thin band, got %s" % bar.get_combined_minimum_size().y)
+	var rect: Rect2 = bar.get_global_rect()
+	for player in 2:
+		var panel: Rect2 = hud.get_panel(player).get_global_rect()
+		check(not rect.intersects(panel), "clear of corner panel %d: %s against %s" % [player + 1, rect, panel])
+	var pad_top: float = HudScript.EDGE_MARGIN + HudScript.PAD_LINE_DROP
+	check(rect.end.y + BossBarScript.MARK_OUT <= pad_top, "its notches end above the pad line, %s against %s" % [rect.end.y + BossBarScript.MARK_OUT, pad_top])
+	check(rect.position.y >= HudScript.EDGE_MARGIN + HudScript.BOSS_BAR_DROP, "under the online line")
+	check(bar.get_index() < (hud.get_node("Root/PauseMenu") as Node).get_index(), "under the pause menu")
 	check(bar.mouse_filter == Control.MOUSE_FILTER_IGNORE, "it takes no input")

@@ -274,11 +274,11 @@ signal adds_requested(actor: int, adds: EnemyAdds, key: int, wave: bool)
 ## (`enemy_died` with NO_PLAYER for a foe of the wizards).
 signal crumble_requested(actor: int)
 ## Sender: actor (a boss body's `BossPresence` look, boss plan OB16). The boss `actor` entered play:
-## `name` its name for people (its data's `display_name`, else its id), `lore` its one line, `marks`
+## `boss_name` its name for people (`EnemyBase.shown_name`: its `display_name`, else its id in words), `lore` its one line, `marks`
 ## each phase's health share (`EnemyPhase.health_below`, largest first; none for a phase by time).
 ## Sent once each time its body enters the tree; `boss_health_changed` follows at once. View only:
 ## heard by the HUD (the boss bar and the entrance banner) and feel (the `boss_intro` cue).
-signal boss_shown(actor: int, name: String, lore: String, marks: PackedFloat32Array)
+signal boss_shown(actor: int, boss_name: String, lore: String, marks: PackedFloat32Array)
 ## Sender: actor (`BossPresence`, boss plan OB16). The shown boss `actor` has `health` of
 ## `max_health` now (a hit, a heal, a player joining or leaving, a snapshot put back). View only;
 ## heard by the HUD.

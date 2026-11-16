@@ -32,8 +32,8 @@ extends CanvasLayer
 ##
 ## The boss bar (`boss/boss_bar.gd`, node Root/BossBar, at the top middle) and the entrance banner
 ## (`boss/boss_banner.gd`, node Root/BossBanner, over the world, under the panels) show what
-## `boss_shown`, `boss_health_changed` and `boss_hidden` say (boss plan OB16); a run starting or
-## ending clears them.
+## `boss_shown`, `boss_health_changed` and `boss_hidden` say (boss plan OB16); the bar is under the
+## menus, and the banner waits while the game is paused. Going back to the menu clears them.
 ##
 ## A red vignette (`vignette/`, node Root/Vignette, behind the panels) glows when a
 ## wizard's health falls, strongest toward that wizard's corner and fading in under
@@ -294,6 +294,8 @@ func _ready() -> void:
 	_boss_bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, int(EDGE_MARGIN + BOSS_BAR_DROP))
 	_boss_bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_boss_bar.bind(events)
+	# Under the menus and the loading screen (the pause menu's shade dims it).
+	root_control.move_child(_boss_bar, _pause_menu.get_index())
 	# The entrance banner: over play, under the panels and the menus (just over the vignette).
 	_boss_banner = BossBannerScript.new()
 	_boss_banner.name = "BossBanner"
@@ -333,7 +335,9 @@ func _process(delta: float) -> void:
 	poll()
 	step_hints(delta)
 	_vignette.step(delta)
-	_boss_banner.step(delta)
+	if not get_tree().paused:
+		# The entrance waits while the game is paused.
+		_boss_banner.step(delta)
 	step_staffs()
 
 

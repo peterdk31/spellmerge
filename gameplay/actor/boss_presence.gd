@@ -32,11 +32,9 @@ func setup(owner_actor: Actor) -> void:
 	if not actor.tree_entered.is_connected(show_boss):
 		# Back in the tree (its id opened again by its `_enter_tree`).
 		actor.tree_entered.connect(show_boss)
-	if actor.id != ActorsScript.NONE:
-		# Added to a body already in play.
-		show_boss()
-	elif not actor.ready.is_connected(show_boss):
-		# Set up in the actor's `_ready`, which opens its id after its looks: shown once it is ready.
+	if not actor.ready.is_connected(show_boss):
+		# Set up in the actor's `_ready` (added by its `_apply_data`), which opens its id after its
+		# looks, or a snapshot gave it one already: shown once it is ready either way.
 		actor.ready.connect(show_boss, CONNECT_ONE_SHOT)
 
 
@@ -46,7 +44,7 @@ func show_boss() -> void:
 		return
 	_shown = true
 	_shown_id = actor.id
-	actor.events.boss_shown.emit(actor.id, shown_name(actor.data), actor.data.lore if actor.data != null else "", marks_of(actor.data))
+	actor.events.boss_shown.emit(actor.id, actor.data.shown_name() if actor.data != null else "", actor.data.lore if actor.data != null else "", marks_of(actor.data))
 	_tell_health()
 
 
@@ -67,13 +65,6 @@ func is_shown() -> bool:
 
 func sync() -> void:
 	_tell_health()
-
-
-## The name the HUD shows for `data`: its `display_name`, else its id.
-static func shown_name(data: EnemyBase) -> String:
-	if data == null:
-		return ""
-	return data.display_name if data.display_name != "" else String(data.id)
 
 
 ## A mark for each phase of `data` that starts by health: its share of the most health, between 0

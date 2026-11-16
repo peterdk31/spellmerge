@@ -3074,7 +3074,7 @@ func _on_possess_ended(caster: int, actor: int) -> void:
 
 
 ## A boss entered play (boss plan OB16): its entrance cue on its body, under the HUD's banner.
-func _on_boss_shown(actor: int, _name: String, _lore: String, _marks: PackedFloat32Array) -> void:
+func _on_boss_shown(actor: int, _boss_name: String, _lore: String, _marks: PackedFloat32Array) -> void:
 	_cue_on_body(BOSS_INTRO, actor, actor)
 
 

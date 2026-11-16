@@ -3,7 +3,8 @@ extends VBoxContainer
 ## entrance"): one bar at the top middle for everyone while a boss is in play: its name, its health
 ## and a mark at each phase's health share. It shows what the bus says and nothing else:
 ## `boss_shown` (a boss entered play), `boss_health_changed` and `boss_hidden` (it died or left);
-## a run starting or ending clears it (`clear`, from the panels). With more than one boss in play
+## in play each boss's own `boss_hidden` takes it away as its body leaves, and the panels clear it
+## with the rest (`clear`: a run starting or ending, the main menu). With more than one boss in play
 ## it shows the first shown that is still in play. Display only: it takes no input.
 ##
 ## Marks are drawn on the bar as notches (a shape, so a phase is never shown by colour alone); a
@@ -127,6 +128,11 @@ func shown_marks() -> PackedFloat32Array:
 	return _shown_marks
 
 
+## True when the boss shown has `mark` (a share) behind it: its notch is drawn dim.
+func is_passed(mark: float) -> bool:
+	return visible and _bar.value <= mark
+
+
 func _refresh() -> void:
 	var actor: int = shown_boss()
 	visible = actor >= 0
@@ -147,5 +153,5 @@ func _draw_marks() -> void:
 	var size: Vector2 = _marks.size
 	for mark in _shown_marks:
 		var x: float = roundf(size.x * mark)
-		var color: Color = MARK_PASSED if _bar.value <= mark else MARK_COLOR
+		var color: Color = MARK_PASSED if is_passed(mark) else MARK_COLOR
 		_marks.draw_rect(Rect2(x, -MARK_OUT, 1.0, size.y + MARK_OUT * 2.0), color)

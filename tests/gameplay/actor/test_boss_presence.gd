@@ -74,12 +74,12 @@ func test_a_boss_is_shown_once_with_its_name_lore_and_marks_then_its_health() ->
 	check_equal(heard[1], [&"health", body.id, 200.0, 200.0], "then its health, full")
 
 
-func test_a_boss_with_no_name_is_shown_by_its_id() -> void:
+func test_a_boss_with_no_name_is_shown_by_its_id_in_words() -> void:
 	var data: EnemyBase = _boss_data()
 	data.display_name = ""
 	data.phases = [] as Array[EnemyPhase]
 	fx.imp(Vector2.ZERO, data)
-	check_equal(heard[0][2], "test_boss", "its id")
+	check_equal(heard[0][2], "Test Boss", "its id in words (`EnemyBase.shown_name`)")
 	check_equal(heard[0][4], PackedFloat32Array(), "no phases: no marks")
 
 

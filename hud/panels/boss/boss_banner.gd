@@ -2,8 +2,8 @@ extends VBoxContainer
 ## The entrance banner (boss plan OB16, docs/milestones/boss-old-broom.md, "HUD: the boss bar and
 ## the entrance"): as a boss enters play (`boss_shown`) its name and its lore line show over play in
 ## the upper middle of the view for a few seconds, fading in and out. It stops nothing and takes no
-## input; nobody waits for it. A second boss shown meanwhile takes its place; a run starting or
-## ending clears it (`clear`, from the panels). Its sound is the `boss_intro` cue, Feel's.
+## input; nobody waits for it, and it waits while the game is paused (the panels do not step it).
+## A second boss shown meanwhile takes its place; the panels clear it with the rest (`clear`). Its sound is the `boss_intro` cue, Feel's.
 ##
 ##     banner.show_boss(actor, "The Old Broom", "Its lore line.", marks)
 ##     banner.step(delta)    # called every frame by the HUD

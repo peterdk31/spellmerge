@@ -260,6 +260,8 @@ The plumbing exists: a cue names a `sound` (core/base/cue_base.gd), silent until
 | Moment | Cue | Sound id | Length, loop | Notes |
 | --- | --- | --- | --- | --- |
 | Entrance | `boss_intro` | `boss_intro` | 1–2 s | Under the name banner |
+| Intro, the silhouette | the intro's `dark_cue`, `broom_intro_dark` | `broom_creak` | about 0.7 s | The wood creaking in the dark, before the reveal (boss intro BI5, docs/milestones/boss-intro.md) |
+| Intro, the reveal | the intro's `reveal_cue`, `broom_intro_reveal` | `broom_intro_reveal` | 1–2 s | The sting as its name slams in; in place of `boss_intro`, which still plays for a boss with no intro, an intro with no reveal cue of its own, and the broom when its intro does not play (the run's rule off, as in automation) |
 | Sweep wind-up | the Sweep's `wind_cue` | `broom_scrape` | held | A telegraph: heard off screen |
 | Big Sweep wind-up | the Big Sweep's `wind_cue` | `broom_big_scrape` | held | Louder and longer, known without looking |
 | Sweep | the Sweep's move | `broom_swish` | held | The swish's rhythm |

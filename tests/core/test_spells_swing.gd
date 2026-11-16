@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## wedge once (also between two steps of a fast sweep), skipping only its caster; it turns
 ## clockwise and back by turns, winds up before every swing, and ends at the end of its arc. It runs a real projectile manager and event bus, stepped by hand, with cards
 ## built in code.
-##
-## godot --headless --path . --script res://tests/core/test_spells_swing.gd
-
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

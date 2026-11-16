@@ -6,9 +6,6 @@ extends "res://tests/support/suite.gd"
 ## boss or at the room's spawns, clear of the walls; its waves under the cap of those alive; the adds
 ## crumble when the boss dies (nobody's kill) and the room is cleared after the last; its health
 ## follows the wizards joining and leaving, keeping its share. 1, 2 and 4 players.
-##
-## godot --headless --path . --script res://tests/gameplay/flow/test_flow_adds.gd
-
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")

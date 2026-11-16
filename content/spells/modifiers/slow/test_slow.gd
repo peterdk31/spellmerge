@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Slow card (content/spells/modifiers/slow/, owner 2026-10-27): the next carrier at a third of
 ## its speed for three times its life (`lifetime_mult`), so it crawls about as far. With a timer
 ## it lays its payloads close together; with `arc` it makes a slow orb (the Arc card's combos).
-##
-## godot --headless --path . --script res://content/spells/modifiers/slow/test_slow.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

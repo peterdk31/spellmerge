@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## board's reports and a healer that heals its hurt teammates, never a wizard; attackers spreading
 ## round their target; the call before a group attack. Real cards from the registry, enemies from the imp's scene with staffs made
 ## here, stepped by hand.
-##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_team.gd
-
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 

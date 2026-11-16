@@ -467,6 +467,28 @@ func test_a_frozen_object_is_hashed_by_its_contents_once() -> void:
 	check(again.problems.size() > 0 and again.problems[0].contains("FROZEN"), "one changed after it was made is named: %s" % [again.problems])
 
 
+func test_idle_rows_are_one_leaf_together() -> void:
+	var a := Rows.new()
+	for i in 100:
+		a.rows.append(Row.new())
+	var leaves: Array[String] = []
+	StateWalk.new().walk("a", a, func(path: String, _value: Variant) -> void:
+		if path.begins_with("a.rows"):
+			leaves.append(path))
+	check(leaves.size() <= 3, "a hundred idle rows are a few leaves, not one each: %s" % [leaves])
+
+
+func test_which_row_is_at_work_counts() -> void:
+	var a := Rows.new()
+	var b := Rows.new()
+	for i in 3:
+		a.rows.append(Row.new())
+		b.rows.append(Row.new())
+	a.rows[1].reach = 1.0
+	b.rows[2].reach = 1.0
+	check(SimHash.of(a) != SimHash.of(b), "the same work in another row hashes apart")
+
+
 func test_idle_rows_and_spare_records_hash_as_little() -> void:
 	var a := Rows.new()
 	var b := Rows.new()

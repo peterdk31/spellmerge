@@ -1,9 +1,9 @@
-extends SceneTree
-## Tests for core/events: the autoload is registered, every event exists with
-## its seat (`player`) or actor id (`caster`, `actor`, `killer`) first where it
-## has one, and signals reach listeners for all four player indices.
-##
-## godot --headless --path . --script res://tests/core/test_events.gd
+extends "res://tests/support/suite.gd"
+## Tests for core/events: the autoload is registered; every event exists, with the arguments
+## listed below, and no signal is left out of the list; an event has its seat (`player`) or actor
+## id (`caster`, `actor`, `killer`) first exactly when it is per-player or per-actor; NO_PLAYER is
+## outside the seats; and signals reach listeners for all four player indices (on a bus of its
+## own, freed after each test).
 
 const EventsScript := preload("res://core/events/events.gd")
 
@@ -187,83 +187,81 @@ const NOT_PER_PLAYER: Array[StringName] = [
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).
 const FIRST_KEYS: Array[String] = ["player", "caster", "actor", "killer"]
 
-var _failures: Array[String] = []
-var _received: Array[int] = []
+var received: Array[int] = []
 
 
-func _initialize() -> void:
-	_test_autoload_registered()
-	_test_signals_exist()
-	_test_no_player_value()
-	_test_play_requested_all_players()
-	_test_player_events_all_players()
-	if _failures.is_empty():
-		print("TEST OK: core/events")
-		quit(0)
-	else:
-		for failure in _failures:
-			printerr("TEST FAILED: " + failure)
-		quit(1)
-
-
-func _check(condition: bool, message: String) -> void:
-	if not condition:
-		_failures.append(message)
+func before_each() -> void:
+	received.clear()
 
 
 func _on_player(player: int) -> void:
-	_received.append(player)
+	received.append(player)
 
 
-func _test_autoload_registered() -> void:
-	var path := str(ProjectSettings.get_setting("autoload/Events", ""))
-	_check(path == "*res://core/events/events.gd", "autoload Events is registered, got '%s'" % path)
-
-
-func _test_signals_exist() -> void:
-	var signals: Dictionary = {}
+## The signals events.gd declares, as name -> its argument list.
+func _signals() -> Dictionary[StringName, Array]:
+	var signals: Dictionary[StringName, Array] = {}
 	var script: Script = EventsScript
 	for info: Dictionary in script.get_script_signal_list():
 		signals[StringName(info["name"])] = info["args"]
+	return signals
+
+
+func test_the_events_autoload_is_registered() -> void:
+	var path: String = str(ProjectSettings.get_setting("autoload/Events", ""))
+	check_equal(path, "*res://core/events/events.gd", "autoload Events is registered")
+
+
+func test_every_listed_event_exists() -> void:
+	var signals: Dictionary[StringName, Array] = _signals()
 	for event: StringName in EVENTS:
-		_check(signals.has(event), "signal %s exists" % event)
+		check(signals.has(event), "signal %s exists" % event)
+
+
+func test_every_event_takes_its_listed_arguments() -> void:
+	var signals: Dictionary[StringName, Array] = _signals()
+	for event: StringName in EVENTS:
 		if not signals.has(event):
 			continue
 		var expected: Array = EVENTS[event]
 		var args: Array = signals[event]
-		_check(args.size() == expected.size(), "%s takes %d arguments, got %d" % [event, expected.size(), args.size()])
+		check(args.size() == expected.size(), "%s takes %d arguments, got %d" % [event, expected.size(), args.size()])
 		for i in mini(args.size(), expected.size()):
-			_check(args[i]["name"] == expected[i][0] and args[i]["type"] == expected[i][1],
+			check(args[i]["name"] == expected[i][0] and args[i]["type"] == expected[i][1],
 				"%s argument %d is %s (type %d), got %s (type %d)" % [event, i, expected[i][0], expected[i][1], args[i]["name"], args[i]["type"]])
+
+
+func test_an_event_has_a_seat_or_actor_first_exactly_when_it_is_per_player() -> void:
+	for event: StringName in EVENTS:
+		var expected: Array = EVENTS[event]
 		var has_player: bool = not NOT_PER_PLAYER.has(event)
 		var first: String = "" if expected.is_empty() else expected[0][0]
-		_check(has_player == FIRST_KEYS.has(first),
+		check(has_player == FIRST_KEYS.has(first),
 			"%s has a seat or an actor id first exactly when it is per-player or per-actor" % event)
-	for event: StringName in signals:
-		_check(EVENTS.has(event), "signal %s in events.gd is covered by this test" % event)
 
 
-func _test_no_player_value() -> void:
-	_check(EventsScript.NO_PLAYER == -1, "NO_PLAYER is -1, outside the seats and the actor ids")
+func test_every_signal_in_events_is_listed_here() -> void:
+	for event: StringName in _signals():
+		check(EVENTS.has(event), "signal %s in events.gd is covered by this test" % event)
 
 
-func _test_play_requested_all_players() -> void:
-	var bus: Node = EventsScript.new()
-	_received.clear()
+func test_no_player_is_outside_the_seats_and_actor_ids() -> void:
+	check_equal(EventsScript.NO_PLAYER, -1, "NO_PLAYER is -1, outside the seats and the actor ids")
+
+
+func test_play_requested_reaches_a_listener_for_every_seat() -> void:
+	var bus: Node = own(EventsScript.new())
 	bus.play_requested.connect(_on_player)
 	for player in 4:
 		bus.play_requested.emit(player)
-	_check(_received == [0, 1, 2, 3], "play_requested reaches the listener for players 0-3, got %s" % [_received])
-	bus.free()
+	check_equal(received, [0, 1, 2, 3] as Array[int], "play_requested reaches the listener for players 0-3")
 
 
-func _test_player_events_all_players() -> void:
-	var bus: Node = EventsScript.new()
-	_received.clear()
+func test_player_events_keep_the_player_index() -> void:
+	var bus: Node = own(EventsScript.new())
 	bus.player_downed.connect(_on_player)
 	bus.player_joined.connect(_on_player)
 	for player in 4:
 		bus.player_downed.emit(player)
 		bus.player_joined.emit(player)
-	_check(_received == [0, 0, 1, 1, 2, 2, 3, 3], "player events keep the player index, got %s" % [_received])
-	bus.free()
+	check_equal(received, [0, 0, 1, 1, 2, 2, 3, 3] as Array[int], "player events keep the player index")

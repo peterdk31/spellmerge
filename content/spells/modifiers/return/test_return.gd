@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## carrier): the next shot flies out for half its life, then back to its caster. A piercing one
 ## hits the same imp on the way out and back; its `on expire` goes off at the caster's feet; it is
 ## wasted on a carrier that does not fly out.
-##
-## godot --headless --path . --script res://content/spells/modifiers/return/test_return.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

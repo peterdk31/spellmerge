@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## template is sound, and the crypt run is found with the crypt's rooms and enemies. Deleting a
 ## room, an enemy or a boss keeps this passing while the run can still be made, and names what is
 ## missing when it cannot (`Registry.validate_runs`).
-##
-## godot --headless --path . --script res://tests/content/runs/test_runs.gd
-
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 var _registry: RegistryScript = null

@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## portal card's shader (or the plain one), sized by how open it is, and its lips, loose motes and
 ## the line to each exit are real motes (`placed_motes.gd`), the first lip in the first infusion and
 ## the second in the second.
-##
-## godot --headless --path . --script res://tests/gameplay/feel/test_portal_look.gd
-
 const PortalLookScript := preload("res://gameplay/feel/portal_look.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

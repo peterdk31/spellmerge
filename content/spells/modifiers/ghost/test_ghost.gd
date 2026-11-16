@@ -1,9 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The Ghost card (content/spells/modifiers/ghost/, staffs C): the next shot passes through walls. Each of its combos does
 ## what it promises with the card and fails without it.
-##
-## godot --headless --path . --script res://content/spells/modifiers/ghost/test_ghost.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

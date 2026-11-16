@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Sniper card (content/spells/modifiers/sniper/, owner 2026-10-27): a modifier whose
 ## `spread_mult` of 0.25 makes the next carrier keep a quarter of its staff's spread. Two
 ## multiply; on a staff that aims true it changes nothing; it lands only on the next carrier.
-##
-## godot --headless --path . --script res://content/spells/modifiers/sniper/test_sniper.gd
-
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")

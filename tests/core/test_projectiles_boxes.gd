@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## homing search and the shot that spares the body it started on. A long bench is hit at its ends,
 ## where a circle round its centre as deep as it would miss, and missed past them. The manager is
 ## stepped by hand; the native twin is held to these by tests/core/test_native_kernel.gd.
-##
-## godot --headless --path . --script res://tests/core/test_projectiles_boxes.gd
-
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")

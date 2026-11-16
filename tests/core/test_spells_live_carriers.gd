@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## tip, a decoy, the caster's body during a dash; from a body, along its aim now); the first timer tick and the
 ## first arc zap come after the interval or half the carrier's life, whichever is shorter. It
 ## runs a real projectile manager and event bus, stepped by hand, with cards built in code.
-##
-## godot --headless --path . --script res://tests/core/test_spells_live_carriers.gd
-
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

@@ -7,9 +7,6 @@ extends "res://tests/support/suite.gd"
 ## own spells start from it as anyone's. The world is nobody's foe (`Actors.is_foe`): nothing aims at
 ## a prop or hurts it by touch, its death is no enemy's, and a heavy hit on it is one hit (it is never
 ## knocked into a wall). A stand-in prop (`ActorFixture.prop_body`).
-##
-## godot --headless --path . --script res://tests/gameplay/actor/test_footprint.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")

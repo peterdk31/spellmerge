@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## point; a dash that glances off a wall, or meets none, fires nothing; a teleport (over at once)
 ## wastes the card. Real actors (a Mover each) and the real cards, moved against the walls as the game
 ## moves them: `on_wall · dash · pulse` is a wall bounce that bursts.
-##
-## godot --headless --path . --script res://tests/gameplay/actor/test_move_on_wall.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 

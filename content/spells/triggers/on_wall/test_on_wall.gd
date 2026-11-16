@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The On Wall card (content/spells/triggers/on_wall/, staffs C): a trigger that casts the group
 ## read after its carrier where the carrier strikes a wall (a dash: where a wall stops it head on, boss plan OB12). Its combos do what they promise with
 ## the card and fail without it, and with no wall in the way nothing fires.
-##
-## godot --headless --path . --script res://content/spells/triggers/on_wall/test_on_wall.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

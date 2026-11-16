@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## component carries its own one-line description (`SpellComponent.description`, in its `.tres`),
 ## `Spells` hands the text out, and each kind of mistake is reported with its rule, file, field
 ## and fix.
-##
-## godot --headless --path . --script res://tests/content/story/test_lore.gd
-
 const RegistryScript := preload("res://core/registry/registry.gd")
 const FILE: String = "res://content/spells/carriers/bolt/bolt.tres"
 

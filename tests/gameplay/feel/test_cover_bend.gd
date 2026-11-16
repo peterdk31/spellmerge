@@ -6,9 +6,6 @@ extends "res://tests/support/suite.gd"
 ## shader's `cell_times` texture, its red), flat while walked and their kind's hold after, then
 ## springing back; a state's trampled frames ride in its rows' colour; and a frame of it allocates
 ## nothing (in the style of the motes' tests).
-##
-## godot --headless --path . --script res://tests/gameplay/feel/test_cover_bend.gd
-
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")

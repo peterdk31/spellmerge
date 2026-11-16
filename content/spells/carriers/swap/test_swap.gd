@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Swap card (content/spells/carriers/swap/, staffs C): a straight shot that trades places with
 ## the target it hits. The engine side is tested in `tests/core/test_spells_moves.gd` and
 ## `tests/gameplay/player/test_player_caster.gd`; here the card's data. Its combos run in `test_combos.gd`; here they are only checked to exist.
-##
-## godot --headless --path . --script res://content/spells/carriers/swap/test_swap.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

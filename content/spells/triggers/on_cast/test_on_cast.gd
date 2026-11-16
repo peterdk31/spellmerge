@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The On Cast card (content/spells/triggers/on_cast/, staffs C): a trigger that casts the group
 ## read after its carrier at once, from the caster. Its combo does what it promises with the card
 ## and fails without it.
-##
-## godot --headless --path . --script res://content/spells/triggers/on_cast/test_on_cast.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

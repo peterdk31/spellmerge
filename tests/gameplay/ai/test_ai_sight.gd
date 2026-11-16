@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## `AISight` (gameplay/ai/sight.gd, owner 2026-11-01): what an AI sees of walls. A room wall and a
 ## Wall card's solid shot both block the line; a long line is walked to its end; the detour way
 ## is free and leads to where the goal is in view; with no projectile manager nothing blocks.
-##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_sight.gd
-
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 

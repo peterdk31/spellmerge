@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The portal carrier (docs/milestones/portal.md): its gates in the projectile manager, beams that
 ## go on from every exit, shots that go through (a copy at every further exit), both ways, no cap
 ## on exits or passes, bodies moved and given its infusion's status, and what it does nothing with.
-##
-## godot --headless --path . --script res://content/spells/carriers/portal/test_portal.gd
-
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

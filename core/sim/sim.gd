@@ -63,6 +63,13 @@ static func seeded(value: int) -> Sim:
 	return made
 
 
+## Drops the shared sim of nodes out of the tree, so the next `found` makes a fresh one, as a fresh
+## process has: for the tests (tests/support/suite.gd, before each test), since game code may hold
+## or stop it.
+static func forget_out_of_tree() -> void:
+	_still = null
+
+
 ## The game's sim (the Tick's) for a node in the tree, else a shared one at seed 0.
 static func found(node: Node) -> Sim:
 	var clock: TickScript = TickScript.of(node) as TickScript

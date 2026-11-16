@@ -7,9 +7,6 @@ extends "res://tests/support/suite.gd"
 ## waits for seat 1's; seat 1's comes back under its own id, and another gamepad takes seat 0 with
 ## its `join`. The run is recorded (Frames) and its replay must give the same state hash at every
 ## tick (tests/support/replay_run.gd).
-##
-## godot --headless --path . --script res://tests/core/test_pad_wait.gd
-
 const ReplayRun := preload("res://tests/support/replay_run.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const CoopScript := preload("res://gameplay/coop/coop.gd")
@@ -31,7 +28,7 @@ var _run: ReplayRun
 
 
 func before_each() -> void:
-	_run = ReplayRun.new(self)
+	_run = ReplayRun.new(tree)
 
 
 func after_each() -> void:

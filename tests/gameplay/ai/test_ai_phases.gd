@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## A boss's phases (enemy AI AI7, docs/milestones/M2-enemy-ai.md): data only. A test boss made
 ## here: the imp's body with a bolt staff, then, under half health, a protected pause, a nova and a
 ## dash, a bigger body, a calmer face and an aggressive profile; then, after a while, a beam.
-##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_phases.gd
-
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const ImpData: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
 

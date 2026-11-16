@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## spell spares only the body it is cast from, a shot until it is clear of it (`Spells._launch`,
 ## `ProjectileManager.exclude`), and a carrier that never leaves it (a swing, a beam) always.
 ## Nothing else is spared: no team, no caster.
-##
-## godot --headless --path . --script res://tests/core/test_own_spells.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

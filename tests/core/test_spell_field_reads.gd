@@ -6,9 +6,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## The scan is a text heuristic: it cannot see a spell reached through an untyped variable, a
 ## call result (`get_spell().damage`) or `get()`, so reviews still look for those.
-##
-## godot --headless --path . --script res://tests/core/test_spell_field_reads.gd
-
 ## Fields that only a spell has: any receiver counts. (`burst.lifetime` is a CPUParticles2D
 ## property in gameplay/feel, and is dropped before the scan.)
 const UNIQUE_FIELDS: String = "(mana_cost|wind_down|lifetime|display_name|base_damage|damage_scale|orbit_radius|ray_length|shot_mult|damage_mult|speed_mult|radius_mult|wind_down_mult|mana_mult|extra_pierce|behaviour_strength|chain_jumps|homing_curve|trigger_interval|trigger_event|shots_requested|shots_clamped|element_name|carrier_card_name)"

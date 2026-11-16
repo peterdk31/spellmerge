@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## `fire · blast · pulse` that winds up 1 s and a blast staff with none) in all its paths: lit and blown, shot
 ## while lit, shot apart, possessed and pressed; a chain of three; several triggers on one hit; a
 ## `gone` state; an invincible prop; the triggers one by one; its state in the hash and a snapshot.
-##
-## godot --headless --path . --script res://tests/gameplay/actor/test_prop_state_triggers.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")

@@ -105,6 +105,7 @@ const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
 const SoundsScript := preload("res://gameplay/feel/sounds.gd")
 const MusicScript := preload("res://gameplay/feel/music.gd")
 const BodySoundsScript := preload("res://gameplay/feel/body_sounds.gd")
+const BossIntroSoundScript := preload("res://gameplay/feel/boss_intro_sound.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
@@ -307,7 +308,10 @@ const MAX_KICK_PIXELS: float = 4.0
 ## `possess_ended`; content/cues).
 const POSSESS_START: StringName = &"possess_start"
 const POSSESS_END: StringName = &"possess_end"
-## The cue of a boss's entrance, on its body as its banner shows (`boss_shown`, boss plan OB16).
+## The cue of a boss's entrance, on its body as its banner shows (`boss_shown`, boss plan OB16). A
+## boss with an intro has its overlay's sounds instead (`boss_intro_sound.gd`,
+## docs/milestones/boss-intro.md, rule 8), and this cue only when no intro played for it (the run's
+## rule off, a boss the sandbox spawned: `BossIntroWait`).
 const BOSS_INTRO: StringName = &"boss_intro"
 
 ## The services. Only tests set these, before adding the node; otherwise the
@@ -324,6 +328,8 @@ var registry: RegistryScript = null:
 			_spectacle.registry = value
 		if _numbers != null:
 			_numbers.registry = value
+		if _intro_sound != null:
+			_intro_sound.registry = value
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
 ## shot's end reads them; performance, 2026-11-02).
 var projectiles: ProjectileManagerScript = null:
@@ -393,6 +399,10 @@ var _music: MusicScript = null
 ## What the bodies sound of their own: their phases' held sounds and cues, and the music they and the
 ## room ask for (`body_sounds.gd`).
 var _body_sounds: BodySoundsScript = null
+## The boss intro's two cues, played while the tree is paused for it, and what holds a boss with an
+## intro's entrance cue back until it is known whether its intro played.
+var _intro_sound: BossIntroSoundScript = null
+var _intro_wait: BossIntroWait = BossIntroWait.new()
 ## The sound the death cue being played sounds in place of its own (an enemy's `death_sound`), read
 ## once by the next `play_cue` (so a cue its parts play does not take it).
 var _sound_instead: StringName = &""
@@ -725,6 +735,10 @@ func _ready() -> void:
 	_body_sounds.sounds = _sounds
 	_body_sounds.music = _music
 	_body_sounds.play_cue = _play_body_cue
+	_intro_sound = BossIntroSoundScript.new()
+	_intro_sound.name = "BossIntroSound"
+	_intro_sound.registry = registry
+	add_child(_intro_sound)
 	add_cue_part(&"held", _play_held)
 	_numbers = DamageNumberDrawerScript.new()
 	_numbers.name = "DamageNumbers"
@@ -798,6 +812,9 @@ func _ready() -> void:
 	events.possess_started.connect(_on_possess_started)
 	events.possess_ended.connect(_on_possess_ended)
 	events.boss_shown.connect(_on_boss_shown)
+	_intro_sound.bind(events)
+	_intro_wait.bind(events)
+	_intro_wait.released.connect(_on_boss_released)
 	events.projectile_impact.connect(_on_projectile_impact)
 	events.carrier_shown.connect(_on_carrier_shown)
 	events.cast_winding.connect(_on_cast_winding)
@@ -869,6 +886,7 @@ func step(real_delta: float) -> void:
 		_markers.step(_actor_table(), seats_here, party_camera.visible_rect(), shown.zoom.x if is_instance_valid(shown) else 0.0, _clock)
 	if _away_bars != null:
 		_away_bars.step(_actor_table())
+	_intro_wait.settle()
 	_step_reactions(real_delta)
 	_step_shown_beams(real_delta)
 	_step_flashes(real_delta)
@@ -3087,9 +3105,22 @@ func _on_possess_ended(caster: int, actor: int) -> void:
 	_cue_on_body(POSSESS_END, caster, actor)
 
 
-## A boss entered play (boss plan OB16): its entrance cue on its body, under the HUD's banner.
-func _on_boss_shown(actor: int, _boss_name: String, _lore: String, _marks: PackedFloat32Array, _has_intro: bool) -> void:
-	_cue_on_body(BOSS_INTRO, actor, actor)
+## A boss entered play (boss plan OB16): its entrance cue on its body, under the HUD's banner; one
+## with an intro waits (`_intro_wait`).
+func _on_boss_shown(actor: int, _boss_name: String, _lore: String, _marks: PackedFloat32Array, has_intro: bool) -> void:
+	if not has_intro:
+		_cue_on_body(BOSS_INTRO, actor, actor)
+
+
+## A boss with an intro waits no more: its entrance cue plays only when no intro `played`.
+func _on_boss_released(actor: int, played: bool) -> void:
+	if not played:
+		_cue_on_body(BOSS_INTRO, actor, actor)
+
+
+## The boss intro's sounds (for tests).
+func boss_intro_sound() -> BossIntroSoundScript:
+	return _intro_sound
 
 
 ## Play the cue `id` of `caster` at the drawn body of `actor` (its `body_offset`), following the

@@ -8,8 +8,6 @@ extends "res://tests/support/suite.gd"
 ## last seat leaves and when the run ends; a staff pressed during it casts nothing as the fight starts;
 ## a snapshot mid-intro restores its page and tells it open, not fresh; a recording of it plays back
 ## the same.
-##
-## godot --headless --path . --script res://tests/gameplay/flow/test_boss_intro_hold.gd
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")

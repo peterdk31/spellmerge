@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Wall card (content/spells/carriers/wall/, staffs C): a carrier that raises a short-lived solid
 ## wall across the aim (rules R4 F6). The engine side is tested in
 ## `tests/core/test_spells_entity_carriers.gd`; here the card's data and its combos.
-##
-## godot --headless --path . --script res://content/spells/carriers/wall/test_wall.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

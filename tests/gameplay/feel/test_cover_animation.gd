@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## cell began to show the state (Feel's clock: `shown_at`, the view grid's green). Its numbers ride in
 ## the rows' colour; `Cover.frame_at` is the shader's sum, mirrored; a frame of a sheet an animation
 ## runs past is named. Feel's look only.
-##
-## godot --headless --path . --script res://tests/gameplay/feel/test_cover_animation.gd
-
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 var fixture_grass: CoverKind = preload("res://tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres")

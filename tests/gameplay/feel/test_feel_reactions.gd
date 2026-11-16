@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## Feel hears `reaction_triggered` (M2 part 8): a flash, the reaction's name rising and a
 ## sound by id, the same for every player, silent when the sound is missing, and never more
 ## than the fixed pools hold.
-##
-## godot --headless --path . --script res://tests/gameplay/feel/test_feel_reactions.gd
-
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")

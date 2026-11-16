@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The shots' looks by name (`core/base/look_names.gd`; owner, 2026-11-09: names, not numbers): the
 ## table matches the projectile manager's LOOK_* kinds number for number, every card and mote or
 ## mark kind names a look that exists, and a name that is no look is a problem the validator names.
-##
-## godot --headless --path . --script res://tests/core/test_look_names.gd
-
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SPELLS: String = "res://content/spells"
 

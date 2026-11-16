@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Wild star (items I6, content/items/staffs/wild_star): the hub's rack, a premade staff with a
 ## crazy build lying there for anyone to take. Its data is sound, every card it names is a card,
 ## and its build wastes none of them.
-##
-## godot --headless --path . --script res://content/items/staffs/wild_star/test_wild_star.gd
-
 const SpellsScript := preload("res://core/spells/spells.gd")
 const WILD_STAR: StaffItem = preload("res://content/items/staffs/wild_star/wild_star.tres")
 

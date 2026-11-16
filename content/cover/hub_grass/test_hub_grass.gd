@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## standers and spreading fire, then it smoulders, goes to ash and grows back after 30 s; frost and
 ## water put it out, its flames going out; its fire gives off embers and smoke; its sheet holds every
 ## frame its states draw, and every change plays through frames, each tuft its own.
-##
-## godot --headless --path . --script res://content/cover/hub_grass/test_hub_grass.gd
-
 const Kit := preload("res://tests/gameplay/cover/cover_kit.gd")
 const GRASS: CoverKind = preload("res://content/cover/hub_grass/hub_grass.tres")
 

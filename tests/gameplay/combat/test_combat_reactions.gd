@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## compiled spell built from the real element resources; time moves by `Combat.step`.
 ## The players are actors 0-3 of the test's actor table, seated 0-3 (actors G3b: hits name actor
 ## ids). `_foe` makes a body of the wizards' team, for the rules that aim by team (a discharge).
-##
-## godot --headless --path . --script res://tests/gameplay/combat/test_combat_reactions.gd
-
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")

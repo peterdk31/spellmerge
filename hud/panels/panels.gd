@@ -35,6 +35,16 @@ extends CanvasLayer
 ## `boss_shown`, `boss_health_changed` and `boss_hidden` say (boss plan OB16); the bar is under the
 ## menus, and the banner waits while the game is paused. Going back to the menu clears them.
 ##
+## The boss intro's overlay (`boss/boss_intro.gd`, node Root/BossIntro, over the world, the corner
+## panels and the boss bar, under the menus and the pause shade; docs/milestones/boss-intro.md, rule
+## 5) plays a boss's intro from `boss_intro_opened`, `boss_intro_paged` and `boss_intro_closed`, stepped
+## every frame (the tree is paused for the whole intro). While it is open a seat's `accept` is its
+## (`BossIntro.press`: the next page's command for a seat of this machine), the builder, the inventory
+## and the lectern menu do not open, and the ones open as it opens close, so A is never two menus' at
+## once; the pause menu still opens, and while it is open its A is the menu's. A boss with an intro
+## (`boss_shown`'s `has_intro`) keeps the bar and the banner back until its intro is over (a
+## `BossIntroWait`, `core/base/`): the bar then fades in; the banner shows only when no intro played.
+##
 ## A red vignette (`vignette/`, node Root/Vignette, behind the panels) glows when a
 ## wizard's health falls, strongest toward that wizard's corner and fading in under
 ## half a second. It is read from `player_stats_changed` alone (a drop in health),
@@ -111,6 +121,7 @@ const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
 const LecternMenuScript := preload("res://hud/menus/lectern/lectern_menu.gd")
 const BossBarScript := preload("res://hud/panels/boss/boss_bar.gd")
 const BossBannerScript := preload("res://hud/panels/boss/boss_banner.gd")
+const BossIntroScript := preload("res://hud/panels/boss/boss_intro.gd")
 
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
@@ -187,6 +198,9 @@ var _pad_line: PadLineScript = null
 ## The boss bar (top middle) and the entrance banner (upper middle), boss plan OB16.
 var _boss_bar: BossBarScript = null
 var _boss_banner: BossBannerScript = null
+## The boss intro's overlay, and what keeps a boss with an intro off the bar and the banner meanwhile.
+var _boss_intro: BossIntroScript = null
+var _intro_wait: BossIntroWait = BossIntroWait.new()
 
 
 func _ready() -> void:
@@ -302,6 +316,16 @@ func _ready() -> void:
 	root_control.add_child(_boss_banner)
 	root_control.move_child(_boss_banner, 1)
 	_boss_banner.bind(events)
+	# The boss intro's overlay: over the world, the corner panels and the bar, under the menus.
+	_boss_intro = BossIntroScript.new()
+	_boss_intro.name = "BossIntro"
+	_boss_intro.menu_open = _pause_menu.is_open
+	root_control.add_child(_boss_intro)
+	root_control.move_child(_boss_intro, _pause_menu.get_index())
+	_boss_intro.bind(events)
+	_intro_wait.bind(events)
+	_intro_wait.released.connect(_boss_bar.release)
+	_intro_wait.released.connect(_boss_banner.release)
 	# The item hints: in the world's picture, under the panels and the builders.
 	_item_hints = ItemHintsScript.new()
 	_item_hints.name = "ItemHints"
@@ -326,6 +350,7 @@ func _ready() -> void:
 		events.run_started.connect(_on_run_started)
 		events.run_ended.connect(_on_run_ended)
 		events.main_menu_requested.connect(_on_main_menu_requested)
+		events.boss_intro_opened.connect(_on_boss_intro_opened)
 	if ui_focus != null:
 		ui_focus.opened.connect(_on_menu_opened)
 		ui_focus.closed.connect(_on_menu_closed)
@@ -335,6 +360,10 @@ func _process(delta: float) -> void:
 	poll()
 	step_hints(delta)
 	_vignette.step(delta)
+	# The intro plays while the tree is paused for it; a boss it held back shows once it is over.
+	_boss_intro.step(delta)
+	_intro_wait.settle()
+	_boss_bar.step(delta)
 	if not get_tree().paused:
 		# The entrance waits while the game is paused.
 		_boss_banner.step(delta)
@@ -385,7 +414,11 @@ func poll() -> void:
 		_seen_take[player] = take_count
 		var had_menu: bool = _had_menu[player]
 		if input.is_joined(player):
-			if (start_now or take_now) and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
+			if _boss_intro.is_open():
+				# A is the intro's while it is open (it asks whether the pause menu is).
+				if start_now and not had_menu and not _has_menu(player):
+					_boss_intro.press(player)
+			elif (start_now or take_now) and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
 				if _stone_lit:
 					if start_now:
 						events.run_requested.emit(player)
@@ -424,7 +457,7 @@ func _on_online_changed(phase: StringName, _code: String, _reason: StringName, _
 ## this poll or the one before (`had_menu`: the press that closed one never opens another), the
 ## pause menu closed and not down.
 func _may_open_menu(player: int, had_menu: bool) -> bool:
-	return not had_menu and not _has_menu(player) and _in_room and not _pause_menu.is_open() and not _panels[player].is_downed()
+	return not had_menu and not _has_menu(player) and _in_room and not _pause_menu.is_open() and not _panels[player].is_downed() and not _boss_intro.is_open()
 
 
 ## Whether `player` has a menu open: their builder, their inventory, their lectern menu, or the pause
@@ -550,6 +583,20 @@ func get_boss_banner() -> BossBannerScript:
 	return _boss_banner
 
 
+## The boss intro's overlay (for tests and screenshots).
+func get_boss_intro() -> BossIntroScript:
+	return _boss_intro
+
+
+## A boss's intro opened: every builder, inventory and lectern menu closes, so A is only the
+## intro's (the pause menu stays as it is).
+func _on_boss_intro_opened(_actor: int, _boss_name: String, _lore: String, _intro: BossIntro, _page: int, _fresh: bool) -> void:
+	for player in PLAYER_COUNT:
+		_radials[player].close_builder()
+		_inventories[player].close_inventory()
+		_lecterns[player].close_menu()
+
+
 ## The red vignette (for tests).
 func get_vignette() -> VignetteScript:
 	return _vignette
@@ -673,6 +720,8 @@ func _reset_all() -> void:
 	_vignette.clear()
 	_boss_bar.clear()
 	_boss_banner.clear()
+	_boss_intro.clear()
+	_intro_wait.clear()
 	_pause_menu.close_menu()
 	for player in PLAYER_COUNT:
 		_radials[player].close_builder()

@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## not (`line_clear`, `shot_clear`, `cover`), so it shoots across a crack and never hides behind one.
 ## A dodge or a move of its own whose end would be over a hole is not cast. Real cards, the imp's
 ## scene, stepped by hand.
-##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_holes.gd
-
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 
 ## A crack across the room, from x 100 to 132.

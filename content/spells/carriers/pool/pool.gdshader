@@ -302,7 +302,7 @@ vec4 body_look(vec2 uv) {
 		return vec4(0.0);
 	}
 	// Its glow: a soft light round the puddle, gone as it dries.
-	float lit = 0.2 * falloff(m, 0.8 * min(r.x, r.y) + MELD) * (1.0 - life.y);
+	float lit = 0.08 * falloff(m, 0.4 * min(r.x, r.y) + MELD) * (1.0 - life.y);
 	if (has_layer(L_SPARKS)) {
 		// Lightning flickers.
 		lit *= 0.55 + 0.9 * hash(floor(sim_time * 20.0), 0.0, 21.0);

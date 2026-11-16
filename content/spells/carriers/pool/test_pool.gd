@@ -24,6 +24,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 	check(card.look_problems().is_empty(), "its look is one the shaders draw: %s" % [card.look_problems()])
 	check(card.look_on_floor, "it lies on the floor, under every body")
 	check(card.look_merges, "and pools that overlap are drawn as one")
+	check(card.look_light_intensity < 0.5 and card.look_light_reach < 1.0, "it lights the floor round it dimly, not the room (the owner, 2026-11-16)")
 	var pool: Carrier = Carriers.of(&"pool")
 	check(pool.stays() and pool.hits() and pool.lasts(), "it stays, hits and lasts")
 	check(not pool.flies() and not pool.has(Carrier.PIERCE), "it never flies, and its hits never spend it")

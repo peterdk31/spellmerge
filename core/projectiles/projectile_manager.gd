@@ -731,6 +731,9 @@ var _prev: PackedVector2Array = PackedVector2Array()
 ## Where the path of a shot the hit-work budget passed over starts (read only with F_DEFERRED).
 var _untested: PackedVector2Array = PackedVector2Array()
 var _vel: PackedVector2Array = PackedVector2Array()
+## The way a still shot was thrown (`set_facing`: a pool, spat out ahead), a unit vector, or zero:
+## its quad turns by it (by its velocity without one), so its card's shader knows it.
+var _facing: PackedVector2Array = PackedVector2Array()
 var _life: PackedFloat32Array = PackedFloat32Array()
 var _radius: PackedFloat32Array = PackedFloat32Array()
 ## The caster's actor id, and its team, ramp and budget when the shot was spawned.
@@ -1022,9 +1025,9 @@ var _body_shapes: Dictionary = {}
 ## The card bodies whose card says how they lie (`set_body_ground`): {body: GROUND_* bits}. A body
 ## not in it is drawn as a shot, over everyone, and never merged.
 var _body_ground: Dictionary = {}
-## What each batch of a merging body tells its shader of the body's shots (`StillMerge`), by
-## batch: null for a batch that does not merge.
-var _merges: Array[StillMerge] = []
+## What a merging body tells both its batches' shader of its shots (`StillMerge`): {body:
+## StillMerge}.
+var _merges: Dictionary = {}
 var _batch_total: int = BATCH_BODY_FIRST
 ## What the drawing wrote (`_draw_shots`, `ShotKernel.draw_shots`): the instances of each batch
 ## (BATCH_*), then the particles asked for, 0 (was the trails' cost), the shots drawn, the enemy shots drawn,
@@ -1420,13 +1423,16 @@ func set_body_ground(body: int, on_floor: bool, merges: bool) -> void:
 		_body_ground.erase(body)
 	else:
 		_body_ground[body] = ground
+	if merges and not _merges.has(body):
+		_merges[body] = StillMerge.new()
+	elif not merges:
+		_merges.erase(body)
 	for enemy: bool in [false, true]:
 		var batch: int = body_batch(body, enemy)
-		if _merges.size() <= batch:
-			_merges.resize(batch + 1)
-		_merges[batch] = (_merges[batch] if _merges[batch] != null else StillMerge.new()) if merges else null
 		if batch < _nodes.size() and _nodes[batch] != null:
 			_nodes[batch].z_index = _body_z(body, enemy)
+			if not merges:
+				StillMerge.hand_none(_nodes[batch].material as ShaderMaterial)
 
 
 ## Whether card body `body` lies on the floor (`set_body_ground`), and whether it merges.
@@ -1444,22 +1450,31 @@ func _body_z(body: int, enemy: bool) -> int:
 	return FLOOR_DRAW_Z if body_on_floor(body) else _batch_z(body_batch(body, enemy))
 
 
-## Tells each merging body's batches of the body's shots drawn this frame (`StillMerge`): its own
-## rows, then the other batch's of the pair. Only a batch with shots drawn is told; the rows are
-## the ones uploaded (the kernel's when it drew).
+## Tells both batches of each merging body of the body's shots drawn this frame, in one list
+## (`StillMerge`: the hat ramps' batch's rows, then the enemy ramp's), when it drew any; the rows
+## are the ones uploaded (the kernel's when it drew). Both are told, so neither material keeps the
+## list that is written next.
 func _hand_merges(kernel_draw: bool) -> void:
-	for batch in mini(_merges.size(), _batch_total):
-		var merge: StillMerge = _merges[batch]
-		var out: int = _draw_out[DRAW_OUT_FIRST + batch]
-		if merge == null or out == 0:
+	for body: int in _merges:
+		var hat_batch: int = body_batch(body, false)
+		var foe_batch: int = body_batch(body, true)
+		if foe_batch >= _batch_total:
 			continue
-		# The other batch of the pair: body batches come in pairs from BATCH_BODY_FIRST, hats first.
-		var partner: int = batch + (1 if (batch - BATCH_BODY_FIRST) % 2 == 0 else -1)
-		var others: int = _draw_out[DRAW_OUT_FIRST + partner]
-		var own: PackedFloat32Array = _kernel.call(&"buffer", batch) if kernel_draw else _buffers[batch]
-		var other: PackedFloat32Array = (_kernel.call(&"buffer", partner) if kernel_draw else _buffers[partner]) if others > 0 else PackedFloat32Array()
-		merge.fill(own, out, other, others)
-		merge.hand_to(_nodes[batch].material as ShaderMaterial)
+		var hats: int = _draw_out[DRAW_OUT_FIRST + hat_batch]
+		var foes: int = _draw_out[DRAW_OUT_FIRST + foe_batch]
+		if hats + foes == 0:
+			continue
+		var merge: StillMerge = _merges[body]
+		merge.fill(_drawn_rows(hat_batch, hats, kernel_draw), hats, _drawn_rows(foe_batch, foes, kernel_draw), foes)
+		merge.hand_to(_nodes[hat_batch].material as ShaderMaterial, false)
+		merge.hand_to(_nodes[foe_batch].material as ShaderMaterial, true)
+
+
+## The rows batch `batch` uploads this frame (the kernel's when it drew), or none for `out` 0.
+func _drawn_rows(batch: int, out: int, kernel_draw: bool) -> PackedFloat32Array:
+	if out == 0:
+		return PackedFloat32Array()
+	return _kernel.call(&"buffer", batch) if kernel_draw else _buffers[batch]
 
 
 ## Hands card body `body`'s look shape and clock to its batch `node`'s shader, once it has them.
@@ -1694,6 +1709,7 @@ func set_cap(value: int) -> void:
 	_prev.resize(_cap)
 	_untested.resize(_cap)
 	_vel.resize(_cap)
+	_facing.resize(_cap)
 	_life.resize(_cap)
 	_radius.resize(_cap)
 	_actor.resize(_cap)
@@ -1929,6 +1945,21 @@ func _add_wall(rect: Rect2) -> void:
 		for x in range(x0, x1):
 			_wall_cells[y * _wall_w + x] |= ROOM_CELL
 			_has_walls = true
+
+
+## The still shot in `slot` was thrown along `facing` (a pool spat out ahead): its quad turns by it,
+## so its card's shader draws which way it was thrown. Only the look: nothing it does follows it.
+## False for an empty slot, a shot that is not still or no direction.
+func set_facing(slot: int, facing: Vector2) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] != MOTION_STILL or facing.is_zero_approx() or not facing.is_finite():
+		return false
+	_facing[slot] = facing.normalized()
+	return true
+
+
+## The way the still shot in `slot` was thrown (`set_facing`), or zero.
+func get_facing_of(slot: int) -> Vector2:
+	return _facing[slot] if slot >= 0 and slot < _cap else Vector2.ZERO
 
 
 ## Make the still shot in `slot` a wall while it lives (the Wall card, rules R4 F6): a row of
@@ -3580,6 +3611,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_skip_on[slot] = 0.0
 	_skip_near[slot] = 0.0
 	_flags[slot] = F_QUAD if motion == MOTION_STILL else 0
+	_facing[slot] = Vector2.ZERO
 	_bounce[slot] = 0
 	_shield[slot] = 0
 	_deflect[slot] = 0
@@ -5545,7 +5577,9 @@ func _draw_shots(fraction: float) -> void:
 		if (_flags[slot] & F_QUAD) != 0:
 			# Only a rune's quad turns with the shot (a bolt's head is a `+` whatever way it flies).
 			var dir: Vector2 = Vector2.RIGHT
-			if _vel[slot].length_squared() > 0.0:
+			if _facing[slot].length_squared() > 0.0:
+				dir = _facing[slot]
+			elif _vel[slot].length_squared() > 0.0:
 				dir = _vel[slot].normalized()
 			_draw_out[DRAW_OUT_FIRST + batch] = _write_stones(_buffers[batch], _draw_out[DRAW_OUT_FIRST + batch], slot, dir, _drawn_size[slot], at, look_data)
 			continue

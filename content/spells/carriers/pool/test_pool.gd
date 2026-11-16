@@ -58,6 +58,22 @@ func test_it_ends_with_its_life() -> void:
 	check_equal(longer[0], whole[0], "nothing more once its %s s are over" % card.lifetime)
 
 
+func test_it_is_spat_out_the_way_it_was_cast() -> void:
+	# Its look spills ahead and throws its drops that way (the owner, 2026-11-16: "like the wand
+	# spitting out the elements the pool is made of"): its shot faces the way it was cast.
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, ["pool"])
+	arena.cast(0, 0)
+	arena.run(0.1)
+	var found: int = 0
+	for slot in arena.projectiles.get_cap():
+		if arena.projectiles.is_alive(slot):
+			found += 1
+			check(arena.projectiles.get_facing_of(slot).is_equal_approx(Vector2.RIGHT), "cast along +x, it faces +x (%s)" % arena.projectiles.get_facing_of(slot))
+	check_equal(found, 1, "one pool")
+	arena.free_all()
+
+
 func test_two_combos_name_it() -> void:
 	var found: int = 0
 	for combo: Dictionary in preload("res://tests/support/combo_files.gd").read_all():

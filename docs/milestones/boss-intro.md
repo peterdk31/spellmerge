@@ -73,7 +73,7 @@ The view is 640×360. The overlay's timing is the HUD's frame (real time, as the
 1. "What an awful smell of The Wizard."
 2. "I must clean it up."
 
- The players are the wizard's dropped staffs (docs/STORY.md), so the broom smells the wizard on them; its grudge is the demotion to sweeping, and it sweeps them up.
+The players are the wizard's dropped staffs (docs/STORY.md), so the broom smells the wizard on them; its grudge is the demotion to sweeping, and it sweeps them up.
 
 **Names:** "intro" alone is the game's opening (`gameplay/flow/intro.gd`, `Flow.intro`, `intro_enabled`), so everything here is `boss_intro`: `BossIntro`, `EnemyBase.boss_intro`, `BossIntroHold`, `boss_intro_opened`, `boss_intro_paged`, `boss_intro_closed`, `boss_intro_next_requested`, the stop `&"boss_intro"`, the rule `boss_intros`. The shared `boss_intro` cue (OB15) keeps its name: it is the reveal's sound for a boss with no cue of its own.
 

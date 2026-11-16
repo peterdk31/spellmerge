@@ -220,7 +220,7 @@ func run(seconds: float, least: float = 0.0) -> int:
 		for body: Actor in _bodies:
 			if is_instance_valid(body) and body.is_inside_tree():
 				body.step(STEP)
-				body.position += body.velocity * STEP
+				body.move(STEP)
 		projectiles.step(STEP)
 		spells.step(STEP)
 		combat.step(STEP)
@@ -382,7 +382,7 @@ func _listen() -> void:
 		_put("cue %s %s at %s r%d" % [_who(caster), cue, _at(at), roundi(size)]))
 	bus.caster_move_requested.connect(func(caster: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
 		_put("move %s %s %s by %s in %d ms" % [_who(caster), mode, _node(tag), _at(to), roundi(seconds * 1000.0)]))
-	bus.caster_move_finished.connect(func(caster: int, mode: StringName, at: Vector2, tag: int) -> void:
+	bus.caster_move_finished.connect(func(caster: int, mode: StringName, at: Vector2, tag: int, _walled: bool) -> void:
 		_put("moved %s %s %s at %s" % [_who(caster), mode, _node(tag), _at(at)]))
 	bus.target_move_requested.connect(func(caster: int, target: Node, to: Vector2) -> void:
 		_put("swap %s %s to %s" % [_who(caster), _name_of(target), _at(to)]))

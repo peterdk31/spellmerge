@@ -134,7 +134,7 @@ func test_a_homing_teleport_lands_on_a_target_in_reach_and_strikes_it() -> void:
 	wizard.staff_reach = 14.0
 	# Where the wizard's body (its centre) landed from the enemy's hurt circle, as it lands.
 	var gap: Array[float] = [-1.0]
-	world.bus.caster_move_finished.connect(func(_actor: int, _mode: StringName, _at: Vector2, _tag: int) -> void:
+	world.bus.caster_move_finished.connect(func(_actor: int, _mode: StringName, _at: Vector2, _tag: int, _walled: bool) -> void:
 		gap[0] = (wizard.global_position + wizard.body_offset).distance_to(enemy.global_position + (enemy as Actor).body_offset))
 	world.run(0.5, 0.5)
 	check(world.combat.health_of(enemy) < World.HEALTH, "its landing strike hit the target (health %s)" % world.combat.health_of(enemy))
@@ -156,7 +156,7 @@ func test_a_homing_teleport_with_no_target_in_reach_teleports_in_place() -> void
 	var start: Vector2 = wizard.global_position
 	var landed: Array[int] = [0]
 	var swung: Array[int] = [0]
-	world.bus.caster_move_finished.connect(func(actor: int, mode: StringName, _at: Vector2, _tag: int) -> void:
+	world.bus.caster_move_finished.connect(func(actor: int, mode: StringName, _at: Vector2, _tag: int, _walled: bool) -> void:
 		if mode == &"teleport" and actor == wizard.id:
 			landed[0] += 1)
 	# The swing its landing casts: a live sweep of the wizard's, seen as the world steps.

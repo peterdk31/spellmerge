@@ -20,7 +20,8 @@ enum Event {
 	KILL,
 	## At once, from the caster, when the carrier is cast (B2).
 	CAST,
-	## The shot hits a wall; the payload fires from there (B1, B2).
+	## The shot hits a wall, or a move along a way (a dash) is stopped by one head on, a body it
+	## carries pinned included (boss plan OB12); the payload fires from there (B1, B2).
 	WALL,
 	## The caster takes damage while the carrier lives; the payload fires from the caster (B2, B3).
 	HURT,
@@ -52,7 +53,7 @@ const NEEDS: Dictionary = {
 	Event.BLOCK: {"any": CarrierTraits.MEETS_SHOTS, "cards": [ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT]},
 	Event.KILL: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST]},
 	Event.REACTION: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST], "cards": [ModifierBase.Behaviour.RELAY], "or_infused": true},
-	Event.WALL: {"any": CarrierTraits.FLIES | CarrierTraits.LINE, "not_cards": [ModifierBase.Behaviour.GHOST]},
+	Event.WALL: {"any": CarrierTraits.FLIES | CarrierTraits.LINE | CarrierTraits.MOVES_ALONG, "not_cards": [ModifierBase.Behaviour.GHOST]},
 }
 
 ## The events a carrier that lasts is listed for while it lives, and fires from where it is then

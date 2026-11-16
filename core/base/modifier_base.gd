@@ -181,8 +181,8 @@ const RULES: Dictionary = {
 	# Part of the hit, as a heal is: a blast strikes with it too.
 	Behaviour.BARRIER: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
 	# Something that moves along a way carries what it hits: a shot that flies, or a dash's body
-	# (not a teleport, over at once). A blast's hits move nothing (rules R4 F2).
-	Behaviour.PLOW: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.MOVES_CASTER, "not": CarrierTraits.INSTANT_HOMING}},
+	# (`MOVES_ALONG`: not a teleport, over at once). A blast's hits move nothing (rules R4 F2).
+	Behaviour.PLOW: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.MOVES_ALONG}},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.

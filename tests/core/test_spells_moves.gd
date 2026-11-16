@@ -159,7 +159,7 @@ func test_a_blast_teleport_explodes_on_arrival() -> void:
 	var tag: int = _build(0, [&"blast", &"teleport"])
 	_cast()
 	check_equal(_areas.size(), 0, "nothing before the player has arrived")
-	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag, false)
 	check_equal(_areas.size(), 1, "one explosion")
 	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(90, 5)) and is_equal_approx(_areas[0][2], 30.0), "where the wizard arrived, as wide as the blast: %s" % [_areas])
 
@@ -168,7 +168,7 @@ func test_an_on_expire_teleport_fires_its_payload_on_arrival() -> void:
 	var tag: int = _build(0, [&"on_expire", &"teleport", &"spark"])
 	_cast()
 	check_equal(_mgr.get_count(), 0, "nothing yet")
-	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag, false)
 	check_equal(_mgr.get_count(), 1, "the payload left the arrival point")
 	for slot in _mgr.get_cap():
 		if _mgr.is_alive(slot):
@@ -179,17 +179,17 @@ func test_an_on_expire_teleport_fires_its_payload_on_arrival() -> void:
 func test_a_dash_ends_with_its_blast_too() -> void:
 	var tag: int = _build(0, [&"blast", &"dash"])
 	_cast()
-	_bus.caster_move_finished.emit(0, &"dash", Vector2(70, 0), tag)
+	_bus.caster_move_finished.emit(0, &"dash", Vector2(70, 0), tag, false)
 	check_equal(_areas.size(), 1, "the dash explodes where it stops")
 
 
 func test_a_move_that_ended_for_another_player_or_mode_is_ignored() -> void:
 	var tag: int = _build(0, [&"blast", &"teleport"])
 	_cast()
-	_bus.caster_move_finished.emit(1, &"teleport", Vector2(90, 0), tag)
-	_bus.caster_move_finished.emit(0, &"recoil", Vector2(90, 0), tag)
-	_bus.caster_move_finished.emit(0, &"teleport", Vector2.INF, tag)
-	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 0), 0)
+	_bus.caster_move_finished.emit(1, &"teleport", Vector2(90, 0), tag, false)
+	_bus.caster_move_finished.emit(0, &"recoil", Vector2(90, 0), tag, false)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2.INF, tag, false)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 0), 0, false)
 	check_equal(_areas.size(), 0, "none of them is the end of this teleport")
 
 
@@ -199,7 +199,7 @@ func test_a_move_of_a_forgotten_build_does_nothing() -> void:
 	_build(0, [&"bolt"])
 	for i in SpellLimits.GENERATIONS:
 		_build(0, [&"bolt"])
-	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 0), tag)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 0), tag, false)
 	check_equal(_areas.size(), 0, "its tag means nothing any more")
 
 
@@ -228,7 +228,7 @@ func test_a_blast_pull_explodes_on_arrival_not_at_the_hit() -> void:
 	_cast()
 	_tick(30)
 	check_equal(_areas.size(), 0, "not where the shot struck")
-	_bus.caster_move_finished.emit(0, &"pull", Vector2(45, 0), tag)
+	_bus.caster_move_finished.emit(0, &"pull", Vector2(45, 0), tag, false)
 	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(45, 0)), "where the wizard arrived: %s" % [_areas])
 
 
@@ -286,7 +286,7 @@ func test_a_teleport_shows_where_it_leaves_and_ends_where_it_lands() -> void:
 	_cast()
 	check(shown.size() == 1 and shown[0][1] == &"teleport" and shown[0][2].is_equal_approx(Vector2.ZERO) and shown[0][3].is_equal_approx(Vector2.RIGHT) and is_equal_approx(shown[0][4], 100.0), "it shows where it leaves, its way and distance: %s" % [shown])
 	check_equal(ended.size(), 0, "nothing lands before the body has moved")
-	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag, false)
 	check(ended.size() == 1 and ended[0][0] == 0 and ended[0][1] == &"teleport" and ended[0][2].is_equal_approx(Vector2(90, 5)), "and ends where the body landed: %s" % [ended])
 
 
@@ -417,7 +417,7 @@ func test_the_move_heading_is_the_last_asked_move() -> void:
 	_cast()
 	_tick(120)
 	check(_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.UP, 100.0) >= 0.0, "the second cast went off")
-	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag, false)
 	var seen: int = 0
 	for slot in _mgr.get_cap():
 		if _mgr.is_alive(slot):
@@ -433,7 +433,7 @@ func test_a_pull_works_for_player_two() -> void:
 	_spells.cast_staff(2, 0, Vector2(0, 100), Vector2.RIGHT, 100.0)
 	_tick(30)
 	check(_moves.size() == 1 and _moves[0][0] == 2 and _moves[0][1] == &"pull" and _moves[0][4] == tag, "the pull is player 2's: %s" % [_moves])
-	_bus.caster_move_finished.emit(2, &"pull", Vector2(45, 100), tag)
+	_bus.caster_move_finished.emit(2, &"pull", Vector2(45, 100), tag, false)
 	var found: bool = false
 	for slot in _mgr.get_cap():
 		if _mgr.is_alive(slot) and SpellTag.caster_of(_mgr.get_tag_of(slot)) == 2 and _mgr.get_position_of(slot).is_equal_approx(Vector2(45, 100)):
@@ -450,7 +450,7 @@ func test_a_piercing_pull_ends_once_where_its_shot_ends() -> void:
 	_cast()
 	_tick(30)
 	check(_moves.size() == 1 and _moves[0][1] == &"pull", "the hit pulls: %s" % [_moves])
-	_bus.caster_move_finished.emit(0, &"pull", Vector2(45, 0), tag)
+	_bus.caster_move_finished.emit(0, &"pull", Vector2(45, 0), tag, false)
 	check_equal(_spells.live_shots(spark), 0, "nothing goes off where the caster arrives")
 	_tick(35)
 	check_equal(_spells.live_shots(spark), 1, "the payload goes off once, where the shot ended")
@@ -470,9 +470,9 @@ func test_a_teleport_of_player_three_ignores_other_players_arrivals() -> void:
 	var tag: int = _build(3, [&"on_expire", &"teleport", &"spark"])
 	_spells.cast_staff(3, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
 	check(_moves.size() == 1 and _moves[0][0] == 3 and _moves[0][1] == &"teleport", "asked for player 3: %s" % [_moves])
-	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 0), tag)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 0), tag, false)
 	check_equal(_mgr.get_count(), 0, "another player's arrival fires nothing")
-	_bus.caster_move_finished.emit(3, &"teleport", Vector2(90, 0), tag)
+	_bus.caster_move_finished.emit(3, &"teleport", Vector2(90, 0), tag, false)
 	check_equal(_mgr.get_count(), 1, "its own does")
 
 
@@ -551,7 +551,7 @@ func test_a_dash_shows_from_its_start_to_its_landing_with_its_tag() -> void:
 	check(shown.size() == 1 and shown[0][0] == 0 and shown[0][1] == tag, "for its caster, with its tag")
 	check_equal(ended.size(), 0, "nothing lands before the body has moved")
 	# The body says where it landed (gameplay/actor, as for a teleport).
-	_bus.caster_move_finished.emit(0, &"dash", Vector2(80, 0), tag)
+	_bus.caster_move_finished.emit(0, &"dash", Vector2(80, 0), tag, false)
 	check_equal(ended.size(), 1, "and ends where it lands")
 	check(ended.size() == 1 and shown.size() == 1 and ended[0] == shown[0], "with the same caster and tag")
 	_build(0, [&"blink"])
@@ -576,7 +576,7 @@ func test_a_dash_keeps_its_own_way_when_its_move_ends_another_dash() -> void:
 	_bus.caster_move_requested.connect(func(player: int, _mode: StringName, _to: Vector2, _seconds: float, _tag: int) -> void:
 		if player == 0 and not ended[0]:
 			ended[0] = true
-			_bus.caster_move_finished.emit(1, &"dash", Vector2(48.0, 0.0), first))
+			_bus.caster_move_finished.emit(1, &"dash", Vector2(48.0, 0.0), first, false))
 	_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
 	check(_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.DOWN, 100.0) >= 0.0, "wizard 0's dash is cast")
 	check(ended[0], "and it ended wizard 1's on the way")
@@ -686,7 +686,7 @@ func test_a_chain_of_homing_teleports_may_hop_to_the_same_enemy() -> void:
 	var landed: Vector2 = _moves[0][2]
 	# The body landed there (a test moves no body: its anchor goes with it here).
 	_mgr.set_anchor(0, landed)
-	_bus.caster_move_finished.emit(0, &"teleport", landed, tag)
+	_bus.caster_move_finished.emit(0, &"teleport", landed, tag, false)
 	check_equal(_moves.size(), 2, "a second hop")
 	check(_moves[1][2].length() < 0.01, "the one enemy in reach is picked again: it stays beside it: %s" % _moves[1][2])
 	check(lone != null, "the enemy is there")

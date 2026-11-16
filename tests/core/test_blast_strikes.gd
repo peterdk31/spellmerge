@@ -234,7 +234,7 @@ func test_a_pulling_shots_blast_moves_nothing_more() -> void:
 	_cast()
 	_tick(20)
 	check_equal(_moves.size(), 1, "the shot pulls once, to its hit")
-	_bus.caster_move_finished.emit(0, &"pull", Vector2(55.0, 0.0), tag)
+	_bus.caster_move_finished.emit(0, &"pull", Vector2(55.0, 0.0), tag, false)
 	check_equal(_blasts.size(), 1, "it explodes where the wizard arrives")
 	check_equal(_moves.size(), 1, "what the explosion strikes pulls the wizard no more")
 

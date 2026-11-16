@@ -423,9 +423,9 @@ func test_a_dash_is_asked_for_by_the_actor_and_ends_with_its_blast() -> void:
 	var tag: int = _build(imp, [&"blast", &"dash"])
 	_cast(imp, Vector2(50.0, 50.0))
 	check(_moves.size() == 1 and _moves[0][0] == imp and _moves[0][1] == tag, "the move is asked for by the enemy's id: %s" % [_moves])
-	_bus.caster_move_finished.emit(W0, &"dash", Vector2(130.0, 50.0), tag)
+	_bus.caster_move_finished.emit(W0, &"dash", Vector2(130.0, 50.0), tag, false)
 	check_equal(_areas.size(), 0, "another actor's answer for its tag is ignored")
-	_bus.caster_move_finished.emit(imp, &"dash", Vector2(130.0, 50.0), tag)
+	_bus.caster_move_finished.emit(imp, &"dash", Vector2(130.0, 50.0), tag, false)
 	check(_areas.size() == 1 and _areas[0][0] == imp and (_areas[0][1] as Vector2).is_equal_approx(Vector2(130.0, 50.0)), "where it ends, its blast, by its id")
 
 

@@ -25,6 +25,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `STEERS` | Can homing steer it (turn it, bend it, place it on a target, or creep it toward one: a rune, a wall, a decoy)? |
 | `MEETS_SHOTS` | Can it stop or turn other shots (not a familiar)? |
 | `MOVES_CASTER` | Does it move its caster (a dash, a teleport)? |
+| `MOVES_ALONG` | Does it move its caster along a way over time (a dash; not a teleport, over at once)? A move's speed curve, Plow's carry and `on wall` at a head-on wall count on it (boss plan OB10-OB12). |
 | `STRIKES_POINT` | Does it strike one point near its caster's hand (a slam)? Its staff animation can `land` there (`strike_point`). |
 | `BLOCKS` | Does it stand in the world and stop other actors' shots (a wall)? Read only by the AI's summary (`CastSense`). |
 | `SPAWNS` | Does it make a body of its own that stays (a decoy, a familiar)? Read only by `CastSense`. |
@@ -46,9 +47,9 @@ B.RETURN: {"any": FLIES},
 B.CHAIN:  {"any": HITS},
 B.HOLD:   {"any": LASTS, "not": MOVES_CASTER},
 B.HEAVY:  {"any": HITS, "or_cards": [B.BLAST]},
-B.PLOW:   {"any": FLIES | MOVES_CASTER, "not": INSTANT_HOMING},
+B.PLOW:   {"any": FLIES | MOVES_ALONG},
 E.BLOCK:  {"any": MEETS_SHOTS, "cards": [B.SHIELD, B.DEFLECT]},
-E.WALL:   {"any": FLIES | LINE, "not_cards": [B.GHOST]},
+E.WALL:   {"any": FLIES | LINE | MOVES_ALONG, "not_cards": [B.GHOST]},
 ```
 
 A need may also name cards: `"or_cards"` stand in for the traits (what a blast strikes is the
@@ -149,7 +150,7 @@ runs it, and the looks read the `pulse_*` getters.
 | `timer`, `on hurt`, `on recast`, `on near` (toward the foe that set it off) | its own shot, its own body (a decoy), or what it moves (the shot that cast it, else the wizard's body); a beam's or swing's tip, a familiar, a portal: a point; a Pulse: what it is round |
 | `on expire` | a move's end: what it moved (the wizard's body, or the shot); a shot with `pull`: what it pulled there; a Pulse: what it is round; anything else: a point |
 | `on hit`, `on kill`, `on reaction` | a shot that flies on after its hit (it pierces, sticks, or its hits never spend it: a wall), what a move moves (a dash's pass and a teleport's landing are that body's or shot's strikes: `Carrier.hit_caster`), else a point |
-| `on wall` | a shot that bounces on, else a point |
+| `on wall` | a shot that bounces on; a dash a wall stopped head on, or whose carried body was pinned (Plow): what it moved, at its end point (boss plan OB12); else a point |
 | `on block` | the shot whose shield stopped one, or the body its barrier is on (a decoy, a dashing or teleporting wizard); a deflect's block is a point's |
 
 **What fires a payload casts all of it**, every carrier in it (owner, 2026-11-06): a

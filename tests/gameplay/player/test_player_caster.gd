@@ -25,7 +25,7 @@ func before_each() -> void:
 	_world = Fixture.new(root, true)
 	_world.projectiles.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	_finished.clear()
-	_world.bus.caster_move_finished.connect(func(caster: int, mode: StringName, position: Vector2, tag: int) -> void:
+	_world.bus.caster_move_finished.connect(func(caster: int, mode: StringName, position: Vector2, tag: int, _walled: bool) -> void:
 		_finished.append([caster, mode, position, tag]))
 
 

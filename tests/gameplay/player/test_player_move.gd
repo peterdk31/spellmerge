@@ -209,7 +209,7 @@ func _test_dash_end_is_reported_where_it_stopped() -> void:
 	_setup(1)
 	var player: Actor = _players[0]
 	var ends: Array = []
-	_world.bus.caster_move_finished.connect(func(p: int, mode: StringName, at: Vector2, tag: int) -> void: ends.append([p, mode, at, tag]))
+	_world.bus.caster_move_finished.connect(func(p: int, mode: StringName, at: Vector2, tag: int, _walled: bool) -> void: ends.append([p, mode, at, tag]))
 	_dash(0)
 	_run(int(DASH_TIME / STEP) + 1)
 	_check(ends.size() == 1, "the end is reported once, got %s" % [ends])

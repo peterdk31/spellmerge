@@ -16,7 +16,8 @@ extends ActorComponent
 ## speed curve (`CarrierDash.move_curve`, `MoveCurve`: still its whole way in its time), and ends
 ## where a wall stops it head on (`held_up`: under about 45 degrees from straight into it; a glancing
 ## one slides on, boss plan OB10). Each move answers
-## `caster_move_finished` where it ended: a teleport at once, the others the step after their
+## `caster_move_finished` where it ended, saying whether a wall ended it (`walled`: so its card's
+## `on wall` fires, boss plan OB12): a teleport at once, the others the step after their
 ## last, once the body has walked it (the last step is shortened, so a move goes exactly its
 ## distance). A card's move is the actor's own when the card's tag names the actor's caster
 ## number (`Actor.caster_number`, its actor id), which is also the event's `caster`, unless the
@@ -59,15 +60,20 @@ const HEAD_ON_SHARE: float = 0.5
 
 ## The moves running (the first `_count`): each one's mode, velocity, seconds left (0 or less:
 ## done, answered next step), its card's tag, its homing (a dash's, or null), its speed curve
-## (`MoveCurve`; NONE for an even one) and its whole time.
+## (`MoveCurve`; NONE for an even one), its whole time and whether a wall ended it (`held_up`, a pin
+## of what it carried: answered `walled`).
 var _modes: Array[StringName] = []
 var _velocities: PackedVector2Array = PackedVector2Array()
 var _lefts: PackedFloat32Array = PackedFloat32Array()
 var _curves: PackedVector3Array = PackedVector3Array()
 var _totals: PackedFloat32Array = PackedFloat32Array()
 var _tags: PackedInt64Array = PackedInt64Array()
+var _walled: PackedByteArray = PackedByteArray()
 var _homings: Array[Homing] = []
 var _count: int = 0
+## How many of the moves the last `step` stepped (the first ones; a move asked since is after
+## them), so `held_up` ends only a move the body walked this step, its last, shortened one too.
+var _stepped: int = 0
 ## What the moves added in the last step (pixels per second), for the looks.
 var _moved: Vector2 = Vector2.ZERO
 
@@ -103,6 +109,7 @@ func detach() -> void:
 func step(delta: float) -> void:
 	if actor.is_down():
 		_count = 0
+		_stepped = 0
 		_homings.fill(null)
 		_moved = Vector2.ZERO
 		actor.velocity = Vector2.ZERO
@@ -128,6 +135,7 @@ func step(delta: float) -> void:
 			share *= pace
 		_moved += share
 		_lefts[at] -= delta
+	_stepped = _count
 	var velocity: Vector2 = _moved
 	var carry: Vector2 = _carry()
 	if not legs:
@@ -170,13 +178,15 @@ func held_up(asked: Vector2, got: Vector2) -> void:
 		if carry.dot(along) > 0.0 and pushed > 0.0 and got.dot(along) < pushed * HEAD_ON_SHARE:
 			# Pinned against what it slides on (Plow, boss plan OB11).
 			actor.spells.plow().pinned(actor.id)
-	for at in _count:
-		if _modes[at] != &"dash" or _lefts[at] <= 0.0 or _velocities[at].is_zero_approx():
+	# Every move the body walked this step, its last one too (its time is up, answered at the next).
+	for at in mini(_stepped, _count):
+		if _modes[at] != &"dash" or _velocities[at].is_zero_approx():
 			continue
 		var way: Vector2 = _velocities[at].normalized()
 		var wanted: float = asked.dot(way)
 		if wanted > 0.0 and got.dot(way) < wanted * HEAD_ON_SHARE:
 			_lefts[at] = 0.0
+			_walled[at] = 1
 
 
 ## The velocity the body is carried at this step (Plow, `Plow.velocity_of`), zero when it is not.
@@ -187,13 +197,15 @@ func _carry() -> Vector2:
 
 
 ## A carry ended (`carry_ended`): a body this one carried was pinned, so this body's dash with that
-## card ends where it is, as if it met the wall itself (boss plan OB11; answered at the next step).
+## card ends where it is, as if it met the wall itself (boss plan OB11; answered at the next step,
+## `walled`, so its `on wall` fires there: OB12).
 func _on_carry_ended(_caster: int, _target: Node, carrier: int, _way: Vector2, pinned: bool, tag: int) -> void:
 	if not pinned or carrier != actor.id or carrier < 0:
 		return
 	for at in _count:
 		if _modes[at] == &"dash" and _tags[at] == tag:
 			_lefts[at] = 0.0
+			_walled[at] = 1
 
 
 ## The way the moves went in the last step (unit length, or zero when they cancel), for the looks.
@@ -212,6 +224,7 @@ func stop() -> void:
 ## starts with none.
 func drop() -> void:
 	_count = 0
+	_stepped = 0
 	_homings.fill(null)
 	_moved = Vector2.ZERO
 
@@ -231,6 +244,7 @@ func _on_caster_move_requested(player: int, mode: StringName, move: Vector2, sec
 	_velocities[_count] = move / time
 	_lefts[_count] = time
 	_tags[_count] = tag
+	_walled[_count] = 0
 	var dash: CarrierDash = CarrierDash.of(actor.spells) if mode == &"dash" and actor.spells != null else null
 	_homings[_count] = dash.move_homing(_caster_number()) if dash != null else null
 	_curves[_count] = dash.move_curve(_caster_number()) if dash != null else MoveCurve.NONE
@@ -243,6 +257,7 @@ func _grow(size: int) -> void:
 	_velocities.resize(size)
 	_lefts.resize(size)
 	_tags.resize(size)
+	_walled.resize(size)
 	_homings.resize(size)
 	_curves.resize(size)
 	_totals.resize(size)
@@ -286,7 +301,7 @@ func _teleport(move: Vector2, tag: int) -> void:
 			goal = goal.move_toward(start, TELEPORT_BACKOFF)
 	actor.global_position = goal
 	if actor.events != null:
-		actor.events.caster_move_finished.emit(_caster_number(), &"teleport", goal, tag)
+		actor.events.caster_move_finished.emit(_caster_number(), &"teleport", goal, tag, false)
 
 
 ## Answers the moves that are done where the actor is, so their cards go off there (blast, a
@@ -300,17 +315,19 @@ func _answer() -> void:
 			continue
 		var mode: StringName = _modes[at]
 		var tag: int = _tags[at]
+		var walled: bool = _walled[at] != 0
 		_count -= 1
 		_modes[at] = _modes[_count]
 		_velocities[at] = _velocities[_count]
 		_lefts[at] = _lefts[_count]
 		_tags[at] = _tags[_count]
+		_walled[at] = _walled[_count]
 		_curves[at] = _curves[_count]
 		_totals[at] = _totals[_count]
 		_homings[at] = _homings[_count]
 		_homings[_count] = null
 		if actor.events != null:
-			actor.events.caster_move_finished.emit(_caster_number(), mode, actor.global_position, tag)
+			actor.events.caster_move_finished.emit(_caster_number(), mode, actor.global_position, tag, walled)
 
 
 ## A swap card moved this actor (it was the target): it is there at once, its move and aim kept.

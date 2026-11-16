@@ -144,12 +144,20 @@ func test_the_editor_scan_finds_the_kinds_the_registry_does() -> void:
 func test_the_same_layout_every_time_by_the_games_and_the_saved_scenes_reading() -> void:
 	check(_rooms().size() >= 3, "the rooms are found")
 	var sim := Sim.new()
+	# The game's own kinds too, which the rooms' fields name (GC8).
+	var own_kinds: Array[CoverKind] = []
+	for item: Resource in _registry.get_all(&"cover"):
+		if item is CoverKind:
+			own_kinds.append(item as CoverKind)
 	for room in _rooms():
 		var kinds: Array[CoverKind] = [_grass(room.biome if room.biome != &"" else &"none", 0.1), _grass(room.biome if room.biome != &"" else &"none", 0.05, 3, 0, 0, &"test_moss")]
+		kinds.append_array(own_kinds)
+		var backwards: Array[CoverKind] = kinds.duplicate()
+		backwards.reverse()
 		var game_layout: Node = own(room.build(sim))
 		var editor_layout: Node = own(room.scene.instantiate())
 		var game: CoverLayout = CoverLayout.of(game_layout, room, kinds)
-		var editor: CoverLayout = CoverLayout.of(editor_layout, room, [kinds[1], kinds[0]] as Array[CoverKind])
+		var editor: CoverLayout = CoverLayout.of(editor_layout, room, backwards)
 		var again: CoverLayout = CoverLayout.of(game_layout, room, kinds)
 		check_equal(game.cells, editor.cells, "%s: the game's and the saved scene's cover agree" % room.id)
 		check_equal(game.cells, again.cells, "%s: the same cover read twice" % room.id)

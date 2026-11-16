@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/floor.svg" id="1_floor"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/wall.svg" id="2_wall"]
@@ -11,6 +11,8 @@
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="8_skull"]
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="10_prop_stand_in"]
 [ext_resource type="Resource" path="res://content/props/room_exit/room_exit.tres" id="11_exit"]
+[ext_resource type="Script" path="res://core/base/cover_field.gd" id="gc_field"]
+[ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_640x32"]
 size = Vector2(640, 32)
@@ -453,3 +455,44 @@ prop = ExtResource("11_exit")
 position = Vector2(368, 64)
 script = ExtResource("10_prop_stand_in")
 prop = ExtResource("11_exit")
+
+[node name="Cover" type="Node2D" parent="."]
+
+[node name="WebsTopLeft" type="ReferenceRect" parent="Cover"]
+script = ExtResource("gc_field")
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 96.0
+offset_bottom = 80.0
+mouse_filter = 2
+border_color = Color(0.56, 0.68, 0.33, 1)
+border_width = 2.0
+kind = &"cobweb"
+density = 0.5
+
+[node name="WebsBottomRight" type="ReferenceRect" parent="Cover"]
+script = ExtResource("gc_field")
+offset_left = 544.0
+offset_top = 368.0
+offset_right = 608.0
+offset_bottom = 416.0
+mouse_filter = 2
+border_color = Color(0.56, 0.68, 0.33, 1)
+border_width = 2.0
+kind = &"cobweb"
+density = 0.5
+
+[node name="MossRightWall" type="ReferenceRect" parent="Cover"]
+script = ExtResource("gc_field")
+offset_left = 576.0
+offset_top = 96.0
+offset_right = 608.0
+offset_bottom = 208.0
+mouse_filter = 2
+border_color = Color(0.56, 0.68, 0.33, 1)
+border_width = 2.0
+kind = &"crypt_moss"
+density = 0.7
+
+[node name="CoverPreview" type="Node2D" parent="."]
+script = ExtResource("gc_preview")

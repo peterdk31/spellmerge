@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/floor.svg" id="1_floor"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/wall.svg" id="2_wall"]
@@ -10,6 +10,8 @@
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="8_prop_stand_in"]
 [ext_resource type="Resource" path="res://content/props/cracked_pillar/cracked_pillar.tres" id="9_pillar"]
 [ext_resource type="Resource" path="res://content/props/dust_heap/dust_heap.tres" id="10_heap"]
+[ext_resource type="Script" path="res://core/base/cover_field.gd" id="gc_field"]
+[ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_832x32"]
 size = Vector2(832, 32)
@@ -344,3 +346,56 @@ prop = ExtResource("10_heap")
 position = Vector2(688, 400)
 script = ExtResource("8_prop_stand_in")
 prop = ExtResource("10_heap")
+
+[node name="Cover" type="Node2D" parent="."]
+
+[node name="WebsTopLeft" type="ReferenceRect" parent="Cover"]
+script = ExtResource("gc_field")
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 112.0
+offset_bottom = 96.0
+mouse_filter = 2
+border_color = Color(0.56, 0.68, 0.33, 1)
+border_width = 2.0
+kind = &"cobweb"
+density = 0.4
+
+[node name="WebsTopRight" type="ReferenceRect" parent="Cover"]
+script = ExtResource("gc_field")
+offset_left = 720.0
+offset_top = 32.0
+offset_right = 800.0
+offset_bottom = 96.0
+mouse_filter = 2
+border_color = Color(0.56, 0.68, 0.33, 1)
+border_width = 2.0
+kind = &"cobweb"
+density = 0.4
+
+[node name="WebsBottomLeft" type="ReferenceRect" parent="Cover"]
+script = ExtResource("gc_field")
+offset_left = 32.0
+offset_top = 400.0
+offset_right = 96.0
+offset_bottom = 480.0
+mouse_filter = 2
+border_color = Color(0.56, 0.68, 0.33, 1)
+border_width = 2.0
+kind = &"cobweb"
+density = 0.4
+
+[node name="WebsBottomRight" type="ReferenceRect" parent="Cover"]
+script = ExtResource("gc_field")
+offset_left = 736.0
+offset_top = 400.0
+offset_right = 800.0
+offset_bottom = 480.0
+mouse_filter = 2
+border_color = Color(0.56, 0.68, 0.33, 1)
+border_width = 2.0
+kind = &"cobweb"
+density = 0.4
+
+[node name="CoverPreview" type="Node2D" parent="."]
+script = ExtResource("gc_preview")

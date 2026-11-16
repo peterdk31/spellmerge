@@ -1,0 +1,12 @@
+{
+	"assets": [
+		{
+			"path": "content/cover/hub_grass/tufts.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from tufts.grid.json, 2026-11-16)",
+			"prompt": "Eight 16x16 frames side by side of a grass tuft standing on its foot at the frame's bottom middle: three tufts at rest (thin blades in Leaf shades, dark at the foot, lit tips), two burning (shorter blades in Fire shades, a white-hot Spark tip), one of ash (a low Stone stubble), two trampled (blades lying along the floor). Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no outline (floor decoration), light from the top-left."
+		}
+	]
+}

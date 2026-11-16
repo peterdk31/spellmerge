@@ -35,7 +35,7 @@ The game's part of a room's ground cover (ground cover GC5, [docs/milestones/gro
 
 ## Example to copy
 
-The test grass, `tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres` (the game's own kinds come with GC8's art).
+The game's kinds are content (`content/cover/`, GC8: the hub's grass, the crypt's moss and cobwebs; content/cover/README.md); the test grass, `tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres`, is the tests' own. A kind's test plays its states through this area with `tests/gameplay/cover/cover_kit.gd`.
 
 ## Validate
 

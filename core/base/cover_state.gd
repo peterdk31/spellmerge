@@ -22,6 +22,11 @@ extends Resource
 ## by the same roll it picks its `frames` by. Empty: its own frames, pressed flat. A state that
 ## does not bend (`bend` 0) is never trampled.
 @export var trampled_frames: PackedInt32Array = PackedInt32Array()
+## The motes its cells give off while they show it (Feel's, look only: burning grass's embers and
+## smoke; ground cover GC8), each a `MoteSource` read as if the cell were its node: its place round
+## the cell's middle, its rate a cell's (`gameplay/feel/cover_motes.gd`). Not a mask nor a standing
+## source: a cell has no art. Empty: none (most states).
+@export var motes: Array[MoteSource] = []
 
 @export_group("On a body standing in it")
 ## The status it gives a body standing in it (&"burn", &"chill"; a `ElementBase.status_id`), asked as

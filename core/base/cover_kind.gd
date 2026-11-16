@@ -107,8 +107,9 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 		var named: String = "%s: %s" % [owner, state.state_id]
 		if sheet != null:
 			for frame in state.frames:
-				if frame < 0 or frame >= frames:
-					found.append("%s draws frame %d, which its sheet (%d frames) lacks." % [named, frame, frames])
+				var last: int = frame + maxi(state.animation_frames, 1) - 1
+				if frame < 0 or last >= frames:
+					found.append("%s draws frame %d, which its sheet (%d frames) lacks." % [named, last if frame >= 0 else frame, frames])
 			for frame in state.trampled_frames:
 				if frame < 0 or frame >= frames:
 					found.append("%s draws frame %d trampled, which its sheet (%d frames) lacks." % [named, frame, frames])

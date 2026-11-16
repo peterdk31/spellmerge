@@ -10,10 +10,15 @@ render_mode blend_mix, world_vertex_coords;
 // tuft stands on its foot and sways in a slow wind from it: its tip moves by whole pixels (docs/STYLE.md: pixels are hard), its foot never. The wind rolls across the room as a wave,
 // two slow sines so it never beats in step; its time is Feel's clock (`view_time`), a look's.
 //
+// An animated state (CoverState.animation_frames; docs/STYLE.md, "Smooth") steps each tuft through
+// its frames, side by side in the sheet from its first, from when its cell began to show the state
+// (`cell_times`' green, Feel's clock) at its fps: once, holding the last, or looping from the
+// tuft's own place in the loop (its sway's start, a byte). Cover.frame_at mirrors it.
+//
 // Bodies bend it and trample it (GC4, look only: decision 4). Each frame Feel hands over the bodies
 // nearest the camera (`bodies`, at most Cover.BODIES, `body_count` of them): a tuft within
 // `bend_reach` of one leans its tip away from it and is pressed lower, the nearer the more. Feel's
-// view grid of when each cell was last walked through (`trampled`, a float a cell, Feel's clock)
+// view grid of when each cell was last walked through (`cell_times`' red, Feel's clock)
 // flattens a cell's tufts while bodies walk it and for `trample_hold` seconds after, then lets them
 // spring back over `trample_spring`: a tuft drawing a trampled frame (COLOR.r) swaps to it while
 // more than half flat, one with none is pressed down by whole pixels. How far a tuft bends (its
@@ -23,6 +28,8 @@ render_mode blend_mix, world_vertex_coords;
 //   MODEL_MATRIX[0].x   1, or -1 for a tuft drawn mirrored
 //   MODEL_MATRIX[3].xy  its foot, in world pixels
 //   COLOR.r             its trampled frame + 1, / 255; 0 for none (pressed flat instead)
+//   COLOR.g             how many frames it plays, / 255 (1: a still frame)
+//   COLOR.b             its frames a second (1-127), + 128 when it loops, / 255
 //   COLOR.a             1 shown; 0 not drawn (a state that draws no frame: folded away)
 //   INSTANCE_CUSTOM     its frame / 255, its sway in pixels at its tip / SWAY_CODE, how far it bends
 //                       (0-1), where in the sway it starts (0-1)
@@ -42,8 +49,9 @@ uniform float bend_pixels = 4.0;
 uniform float trample_hold = 0.6;
 uniform float trample_spring = 1.5;
 uniform float flatten = 0.5;
-// Feel's view grid: when each cell (CoverLayout.CELL pixels) was last walked through.
-uniform sampler2D trampled : filter_nearest;
+// Feel's view grid, a texel a cell (CoverLayout.CELL pixels): when it was last walked through (red)
+// and when it began to show its state (green).
+uniform sampler2D cell_times : filter_nearest;
 
 // Cover.SWAY_CODE: the most a tuft sways, in pixels.
 const float SWAY_CODE = 8.0;
@@ -87,8 +95,18 @@ void vertex() {
 		}
 		float pushed = min(length(push), 1.0) * bend;
 		vec2 lean = pushed > 0.0 ? normalize(push) * pushed * bend_pixels : vec2(0.0);
+		vec2 times = texelFetch(cell_times, ivec2(floor(foot / CELL - vec2(0.0, 0.001))), 0).rg;
+		// Animated: its frame now, from when its cell began to show its state.
+		float count = floor(COLOR.g * 255.0 + 0.5);
+		if (count > 1.0) {
+			float code = floor(COLOR.b * 255.0 + 0.5);
+			float loops = step(128.0, code);
+			float fps = code - 128.0 * loops;
+			float stepped = floor(max(view_time - times.g, 0.0) * fps);
+			frame += loops > 0.5 ? mod(stepped + floor(INSTANCE_CUSTOM.a * 255.0 + 0.5), count) : min(stepped, count - 1.0);
+		}
 		// Walked through lately: flat, then springing back.
-		float since = view_time - texelFetch(trampled, ivec2(floor(foot / CELL - vec2(0.0, 0.001))), 0).r;
+		float since = view_time - times.r;
 		float lying = clamp(1.0 - (since - trample_hold) / max(trample_spring, 0.001), 0.0, 1.0) * bend;
 		float lower = abs(lean.y) * 0.5;
 		if (trampled_frame >= 0.0 && lying > 0.5) {

@@ -3,8 +3,9 @@ extends "res://tests/support/suite.gd"
 ## and decision 4): Feel's look only. Each frame the cover takes the actor table's bodies, keeps the
 ## `BODIES` nearest the camera's middle and hands them to every batch's shader; the cells under their
 ## `FOOTPRINT` (theirs and the row in front), covered ones only, are walked in Feel's view grid (the
-## shader's `trampled` texture), flat while walked and their kind's hold after, then springing back; a state's trampled frames ride in its rows' colour;
-## and a frame of it allocates nothing (in the style of the motes' tests).
+## shader's `cell_times` texture, its red), flat while walked and their kind's hold after, then
+## springing back; a state's trampled frames ride in its rows' colour; and a frame of it allocates
+## nothing (in the style of the motes' tests).
 ##
 ## godot --headless --path . --script res://tests/gameplay/feel/test_cover_bend.gd
 
@@ -143,7 +144,7 @@ func test_a_body_walks_the_covered_cell_it_stands_in() -> void:
 	check(is_equal_approx(half, 0.5), "springing back over its kind's spring, got %f" % half)
 	check(cover.flatness(cell, 5.0 + HOLD + SPRING + 0.01) == 0.0, "and up again")
 	check_equal(cover.flatness(bare_cell, 5.0), 0.0, "a cell of no cover is never flat")
-	var texture := (cover.batch_of(&"test_grass").material as ShaderMaterial).get_shader_parameter(&"trampled") as Texture2D
+	var texture := (cover.batch_of(&"test_grass").material as ShaderMaterial).get_shader_parameter(&"cell_times") as Texture2D
 	check(texture != null and texture.get_size() == Vector2(cover.layout.columns, cover.layout.rows), "the shader reads the grid, a texel a cell")
 	(table.node_of(0) as Node2D).global_position = Vector2(40, 200)
 	cover.step(6.0, table, Vector2.ZERO)
@@ -211,7 +212,7 @@ func test_the_shader_compiles_with_its_uniforms() -> void:
 	var names := PackedStringArray()
 	for uniform: Dictionary in CoverScript.SHADER.get_shader_uniform_list():
 		names.append(String(uniform[&"name"]))
-	for wanted: String in ["view_time", "frame_size", "sheet_size", "bodies", "body_count", "bend_reach", "bend_pixels", "trample_hold", "trample_spring", "flatten", "trampled"]:
+	for wanted: String in ["view_time", "frame_size", "sheet_size", "bodies", "body_count", "bend_reach", "bend_pixels", "trample_hold", "trample_spring", "flatten", "cell_times"]:
 		check(names.has(wanted), "the cover shader compiles and has '%s' (got %s)" % [wanted, names])
 
 

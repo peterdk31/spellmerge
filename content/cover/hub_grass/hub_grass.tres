@@ -12,17 +12,23 @@ when = 0
 element = &"fire"
 then = &"catching"
 
+[sub_resource type="Resource" id="rest_water"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"water"
+then = &"wet"
+
 [sub_resource type="Resource" id="catching_frost"]
 script = ExtResource("3_trigger")
 when = 0
 element = &"frost"
-then = &"rest"
+then = &"doused"
 
 [sub_resource type="Resource" id="catching_water"]
 script = ExtResource("3_trigger")
 when = 0
 element = &"water"
-then = &"wet"
+then = &"quenched"
 
 [sub_resource type="Resource" id="catching_after"]
 script = ExtResource("3_trigger")
@@ -30,53 +36,17 @@ when = 1
 seconds = 0.3
 then = &"burning"
 
-[sub_resource type="Resource" id="catching_embers"]
-script = ExtResource("4_motes")
-kind = &"ember"
-rate = 2.0
-from = 2
-at = Vector2(0, 5)
-size = Vector2(12, 4)
-spread = 60.0
-reach = 3.0
-height = 3.0
-colours = Array[StringName]([&"fire", &"spark"])
-
 [sub_resource type="Resource" id="burning_frost"]
 script = ExtResource("3_trigger")
 when = 0
 element = &"frost"
-then = &"rest"
-
-[sub_resource type="Resource" id="rest_water"]
-script = ExtResource("3_trigger")
-when = 0
-element = &"water"
-then = &"wet"
+then = &"doused"
 
 [sub_resource type="Resource" id="burning_water"]
 script = ExtResource("3_trigger")
 when = 0
 element = &"water"
-then = &"wet"
-
-[sub_resource type="Resource" id="wet_after"]
-script = ExtResource("3_trigger")
-when = 1
-seconds = 8.0
-then = &"rest"
-
-[sub_resource type="Resource" id="wet_glints"]
-script = ExtResource("4_motes")
-kind = &"drip"
-rate = 0.6
-from = 2
-at = Vector2(0, -2)
-size = Vector2(10, 4)
-spread = 0.0
-reach = 0.0
-height = 3.0
-colours = Array[StringName]([&"water"])
+then = &"quenched"
 
 [sub_resource type="Resource" id="burning_after"]
 script = ExtResource("3_trigger")
@@ -90,23 +60,71 @@ when = 1
 seconds = 1.0
 then = &"ash"
 
-[sub_resource type="Resource" id="smouldering_smoke"]
-script = ExtResource("4_motes")
-kind = &"smoke"
-rate = 1.0
-from = 2
-at = Vector2(0, 3)
-size = Vector2(10, 4)
-spread = 30.0
-reach = 2.0
-height = 7.0
-colours = Array[StringName]([&"stone"])
-
 [sub_resource type="Resource" id="ash_after"]
 script = ExtResource("3_trigger")
 when = 1
 seconds = 30.0
+then = &"growing"
+
+[sub_resource type="Resource" id="growing_fire"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"fire"
+then = &"catching"
+
+[sub_resource type="Resource" id="growing_water"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"water"
+then = &"wet"
+
+[sub_resource type="Resource" id="growing_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 1.5
 then = &"rest"
+
+[sub_resource type="Resource" id="doused_fire"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"fire"
+then = &"catching"
+
+[sub_resource type="Resource" id="doused_water"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"water"
+then = &"wet"
+
+[sub_resource type="Resource" id="doused_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.3
+then = &"rest"
+
+[sub_resource type="Resource" id="quenched_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.3
+then = &"wet"
+
+[sub_resource type="Resource" id="wet_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 8.0
+then = &"rest"
+
+[sub_resource type="Resource" id="catching_embers"]
+script = ExtResource("4_motes")
+kind = &"ember"
+rate = 2.0
+from = 2
+at = Vector2(0, 5)
+size = Vector2(12, 4)
+spread = 60.0
+reach = 3.0
+height = 3.0
+colours = Array[StringName]([&"fire", &"spark"])
 
 [sub_resource type="Resource" id="burning_embers"]
 script = ExtResource("4_motes")
@@ -132,70 +150,132 @@ reach = 3.0
 height = 8.0
 colours = Array[StringName]([&"stone"])
 
+[sub_resource type="Resource" id="smouldering_smoke"]
+script = ExtResource("4_motes")
+kind = &"smoke"
+rate = 1.0
+from = 2
+at = Vector2(0, 3)
+size = Vector2(10, 4)
+spread = 30.0
+reach = 2.0
+height = 7.0
+colours = Array[StringName]([&"stone"])
+
+[sub_resource type="Resource" id="wet_glints"]
+script = ExtResource("4_motes")
+kind = &"drip"
+rate = 0.6
+from = 2
+at = Vector2(0, -2)
+size = Vector2(10, 4)
+spread = 0.0
+reach = 0.0
+height = 3.0
+colours = Array[StringName]([&"water"])
+
 [sub_resource type="Resource" id="rest"]
 script = ExtResource("2_state")
 state_id = &"rest"
-frames = PackedInt32Array(0, 1, 2, 8, 9, 10)
+frames = PackedInt32Array(0, 1, 2, 3, 4, 5)
 trampled_frames = PackedInt32Array(6, 7)
 triggers = Array[ExtResource("3_trigger")]([SubResource("rest_fire"), SubResource("rest_water")])
 
 [sub_resource type="Resource" id="catching"]
 script = ExtResource("2_state")
 state_id = &"catching"
-frames = PackedInt32Array(11, 15, 12, 16, 17, 18)
+frames = PackedInt32Array(8, 13, 18, 23, 28, 33)
 sway = 0.8
 bend = 0.6
-motes = Array[ExtResource("4_motes")]([SubResource("catching_embers")])
+animation_frames = 5
+animation_fps = 16
 status = &"burn"
 status_strength = 2.0
 status_duration = 1.5
 status_every = 0.5
 spreads = &"fire"
 spread_chance = 0.6
+motes = Array[ExtResource("4_motes")]([SubResource("catching_embers")])
 triggers = Array[ExtResource("3_trigger")]([SubResource("catching_frost"), SubResource("catching_water"), SubResource("catching_after")])
 
 [sub_resource type="Resource" id="burning"]
 script = ExtResource("2_state")
 state_id = &"burning"
-frames = PackedInt32Array(3, 19, 4, 20, 21, 22)
+frames = PackedInt32Array(38, 44, 50, 56, 62, 68)
 sway = 0.5
 bend = 0.3
-motes = Array[ExtResource("4_motes")]([SubResource("burning_embers"), SubResource("burning_smoke")])
+animation_frames = 6
+animation_fps = 7
 status = &"burn"
 status_strength = 2.0
 status_duration = 1.5
 status_every = 0.5
 spreads = &"fire"
 spread_chance = 0.6
+motes = Array[ExtResource("4_motes")]([SubResource("burning_embers"), SubResource("burning_smoke")])
 triggers = Array[ExtResource("3_trigger")]([SubResource("burning_frost"), SubResource("burning_water"), SubResource("burning_after")])
 
 [sub_resource type="Resource" id="smouldering"]
 script = ExtResource("2_state")
 state_id = &"smouldering"
-frames = PackedInt32Array(13, 23, 14, 24, 25, 26)
+frames = PackedInt32Array(74, 79, 84, 89, 94, 99)
 sway = 0.0
 bend = 0.0
+animation_frames = 5
+animation_fps = 5
 motes = Array[ExtResource("4_motes")]([SubResource("smouldering_smoke")])
 triggers = Array[ExtResource("3_trigger")]([SubResource("smouldering_after")])
 
 [sub_resource type="Resource" id="ash"]
 script = ExtResource("2_state")
 state_id = &"ash"
-frames = PackedInt32Array(5)
+frames = PackedInt32Array(104, 105, 106, 107, 108, 109)
 sway = 0.0
 bend = 0.0
 triggers = Array[ExtResource("3_trigger")]([SubResource("ash_after")])
 
-[sub_resource type="Resource" id="wet"]
+[sub_resource type="Resource" id="growing"]
 script = ExtResource("2_state")
-state_id = &"wet"
-frames = PackedInt32Array(0, 1, 2, 8, 9, 10)
+state_id = &"growing"
+frames = PackedInt32Array(110, 116, 122, 128, 134, 140)
+sway = 0.6
+animation_frames = 6
+animation_fps = 4
+triggers = Array[ExtResource("3_trigger")]([SubResource("growing_fire"), SubResource("growing_water"), SubResource("growing_after")])
+
+[sub_resource type="Resource" id="doused"]
+script = ExtResource("2_state")
+state_id = &"doused"
+frames = PackedInt32Array(146, 149, 152, 155, 158, 161)
 trampled_frames = PackedInt32Array(6, 7)
-motes = Array[ExtResource("4_motes")]([SubResource("wet_glints")])
+animation_frames = 3
+animation_fps = 12
+triggers = Array[ExtResource("3_trigger")]([SubResource("doused_fire"), SubResource("doused_water"), SubResource("doused_after")])
+
+[sub_resource type="Resource" id="quenched"]
+script = ExtResource("2_state")
+state_id = &"quenched"
+frames = PackedInt32Array(146, 149, 152, 155, 158, 161)
+trampled_frames = PackedInt32Array(6, 7)
+animation_frames = 3
+animation_fps = 12
 status = &"soak"
 status_strength = 25.0
 status_duration = 1.0
 status_every = 0.5
+motes = Array[ExtResource("4_motes")]([SubResource("wet_glints")])
+triggers = Array[ExtResource("3_trigger")]([SubResource("quenched_after")])
+
+[sub_resource type="Resource" id="wet"]
+script = ExtResource("2_state")
+state_id = &"wet"
+frames = PackedInt32Array(0, 1, 2, 3, 4, 5)
+trampled_frames = PackedInt32Array(6, 7)
+status = &"soak"
+status_strength = 25.0
+status_duration = 1.0
+status_every = 0.5
+motes = Array[ExtResource("4_motes")]([SubResource("wet_glints")])
 triggers = Array[ExtResource("3_trigger")]([SubResource("wet_after")])
 
 [resource]
@@ -212,4 +292,4 @@ tufts_per_cell = 5
 sway = 1.5
 trample_hold = 5.0
 trample_spring = 4.0
-states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("catching"), SubResource("burning"), SubResource("smouldering"), SubResource("ash"), SubResource("wet")])
+states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("catching"), SubResource("burning"), SubResource("smouldering"), SubResource("ash"), SubResource("growing"), SubResource("doused"), SubResource("quenched"), SubResource("wet")])

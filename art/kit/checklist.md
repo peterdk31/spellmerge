@@ -2,7 +2,7 @@
 
 One page. Full rules: docs/STYLE.md (the Style Guide page on the website shows them with pictures).
 
-## The six rules
+## The seven rules
 
 1. **32×32 grid.** One art pixel is one screen pixel. Bigger things are whole multiples (64×64, 96×64).
 2. **Light from the top-left.** Highlights on the top and left, shadows on the bottom and right.
@@ -10,6 +10,7 @@ One page. Full rules: docs/STYLE.md (the Style Guide page on the website shows t
 4. **At most 3 shades per material:** shadow, base, light.
 5. **Only the 43 palette colours.** No gradients, blur, antialiasing or partial transparency.
 6. **Four players stay readable:** bold silhouettes; the player colours belong to the players only.
+7. **Everything looks smooth:** a change of look plays the frames between, never one jump.
 
 ## Before you open the PR
 
@@ -21,6 +22,7 @@ One page. Full rules: docs/STYLE.md (the Style Guide page on the website shows t
 - [ ] Floors are flat; walls and raised props have the lit top-left edge. Tiles repeat without a seam.
 - [ ] Imports with filtering off (nearest neighbour).
 - [ ] Manifest entry in `art/manifest.json` with the honest origin (`human` or `ai`; for AI also tool and prompt).
+- [ ] Smooth: a change of look has the frames between (at least 3), each stage ends where the next begins, and a variant keeps its own shape (docs/STYLE.md, "Smooth").
 - [ ] A screenshot of it in the game in the PR.
 
 ## Frame counts

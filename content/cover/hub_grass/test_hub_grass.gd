@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## The hub's grass (ground cover GC8, content/cover/hub_grass, docs/milestones/ground-cover.md decision
 ## 2): it fills the hub by itself; fire lights it, catching then burning (1.2 s in all), burning its
-## standers and spreading fire, then it smoulders, goes to ash and grows back after 30 s; frost puts
-## it out; its fire gives off embers and smoke; its sheet holds every frame its states draw.
+## standers and spreading fire, then it smoulders, goes to ash and grows back after 30 s; frost and
+## water put it out, its flames going out; its fire gives off embers and smoke; its sheet holds every
+## frame its states draw, and every change plays through frames, each tuft its own.
 ##
 ## godot --headless --path . --script res://content/cover/hub_grass/test_hub_grass.gd
 
@@ -30,18 +31,30 @@ func _still() -> CoverKind:
 	return still
 
 
+## The seconds after which `state` moves on by itself (0 for never).
+static func _after(state: CoverState) -> float:
+	for row in state.triggers:
+		if row.when == CoverTrigger.When.AFTER:
+			return row.seconds
+	return 0.0
+
+
 func test_it_is_sound_and_fills_the_hub() -> void:
 	check_equal(_kit.problems(), PackedStringArray(), "its data")
 	check(GRASS.fills(&"hub"), "the hub's biome")
 	check(not GRASS.fills(&"crypt"), "not the crypt's")
-	check_equal(GRASS.frame_count(), 27, "twenty-seven frames: six tufts at rest, ash, two trampled, and each tuft catching, burning and smouldering")
+	check_equal(GRASS.frame_count(), 164, "six tufts at rest, two trampled, then each tuft's own strip of each stage of its fire: catching, burning, smouldering, ash, growing back and going out")
 	var rest: CoverState = GRASS.states[0]
 	check_equal(rest.state_id, &"rest", "it starts at rest")
-	check_equal(rest.frames, PackedInt32Array([0, 1, 2, 8, 9, 10]), "six tufts at rest, curved and leaning, so the grass is never a row of straight blades")
+	check_equal(rest.frames, PackedInt32Array([0, 1, 2, 3, 4, 5]), "six tufts at rest, curved and leaning, so the grass is never a row of straight blades")
 	check(not rest.trampled_frames.is_empty(), "it draws trampled frames (GC4)")
-	for state_id: StringName in [&"catching", &"burning", &"smouldering"]:
-		var fire: CoverState = GRASS.states[GRASS.state_at(state_id)]
-		check_equal(fire.frames.size(), rest.frames.size(), "%s draws a frame for each tuft at rest, in their order, so a tuft keeps its blades as it burns (a tuft picks the same place in each list: CoverTufts.frame)" % state_id)
+	for state: CoverState in GRASS.states:
+		check_equal(state.frames.size(), rest.frames.size(), "%s draws a frame for each tuft at rest, in their order, so a tuft keeps its blades through every change (a tuft picks the same place in each list: CoverTufts.frame)" % state.state_id)
+	for state_id: StringName in [&"catching", &"burning", &"smouldering", &"growing", &"doused", &"quenched"]:
+		var change: CoverState = GRASS.states[GRASS.state_at(state_id)]
+		check(change.animation_frames >= 3 and not change.animation_loops, "%s plays its change through, a frame at a time (the owner, 2026-11-16: everything should look smooth)" % state_id)
+		var lasts: float = float(change.animation_frames) / float(change.animation_fps)
+		check(lasts <= _after(change) + 0.05, "%s's frames play out within its %.1f s (%.2f s)" % [state_id, _after(change), lasts])
 	check(GRASS.trample_hold >= 4.0, "a trail through it stays flat a good while after the last body left (the owner, 2026-11-16: it sprang back far too soon), got %.1f s" % GRASS.trample_hold)
 	check(GRASS.trample_spring >= 2.0, "and grows back slowly, not at once, got %.1f s" % GRASS.trample_spring)
 	check(GRASS.tufts_per_cell >= 5, "dense: at least five tufts a cell (the owner, 2026-11-16)")
@@ -67,7 +80,9 @@ func test_fire_lights_it_and_it_burns_to_ash_then_grows_back() -> void:
 	_kit.wait(29.0)
 	check_equal(_kit.state_of(cell), &"ash", "ash for most of 30 s")
 	_kit.wait(1.5)
-	check_equal(_kit.state_of(cell), &"rest", "the hub's grass grows back")
+	check_equal(_kit.state_of(cell), &"growing", "then the hub's grass grows back out of the ash")
+	_kit.wait(1.5)
+	check_equal(_kit.state_of(cell), &"rest", "to the grass at rest")
 
 
 func test_frost_puts_it_out() -> void:
@@ -78,12 +93,17 @@ func test_frost_puts_it_out() -> void:
 	_kit.steps(1)
 	_kit.touch(&"frost", _kit.middle(cell))
 	_kit.steps(1)
-	check_equal(_kit.state_of(cell), &"rest", "catching, back at rest")
+	check_equal(_kit.state_of(cell), &"doused", "catching, its flames go out")
+	check(GRASS.states[GRASS.state_at(&"doused")].status == &"", "and burn nobody")
+	_kit.wait(0.4)
+	check_equal(_kit.state_of(cell), &"rest", "back at rest")
 	_kit.touch(&"fire", _kit.middle(cell))
 	_kit.wait(0.4)
 	_kit.touch(&"frost", _kit.middle(cell))
 	_kit.steps(1)
-	check_equal(_kit.state_of(cell), &"rest", "burning, back at rest too")
+	check_equal(_kit.state_of(cell), &"doused", "burning, out too")
+	_kit.wait(0.4)
+	check_equal(_kit.state_of(cell), &"rest", "and back at rest")
 
 
 func test_a_fire_spreads_through_it() -> void:
@@ -139,13 +159,16 @@ func test_water_wets_it_puts_its_fire_out_and_wet_grass_does_not_light() -> void
 	check_equal(_kit.state_of(cell), &"catching", "dry, it lights again")
 	_kit.touch(&"water", _kit.middle(cell))
 	_kit.steps(1)
-	check_equal(_kit.state_of(cell), &"wet", "and water puts the fire out as it catches")
+	check_equal(_kit.state_of(cell), &"quenched", "and water puts the fire out as it catches, its flames going out")
+	check_equal(GRASS.states[GRASS.state_at(&"quenched")].status, &"soak", "soaking whoever stands in it already")
+	_kit.wait(0.4)
+	check_equal(_kit.state_of(cell), &"wet", "then it is wet")
 	_kit.wait(8.5)
 	_kit.touch(&"fire", _kit.middle(cell))
 	_kit.wait(0.4)
 	check_equal(_kit.state_of(cell), &"burning", "lit again and burning")
 	_kit.touch(&"water", _kit.middle(cell))
-	_kit.steps(1)
+	_kit.wait(0.4)
 	check_equal(_kit.state_of(cell), &"wet", "water puts a burning cell out too")
 
 

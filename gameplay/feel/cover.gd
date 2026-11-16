@@ -16,7 +16,9 @@ extends Node2D
 ##
 ## **A cell's state picks its tufts' frames** through each row's custom data (`show_state`; the
 ## cover area's changes, heard as `cover_changed`, GC5): a state that draws no frame folds its
-## tufts away. The rows are kept
+## tufts away. An animated state (`CoverState.animation_frames`; docs/STYLE.md, "Smooth") plays its
+## frames from when the cell began to show it (`shown_at`, the grid's second channel), once or
+## looping, worked out in the shader. The rows are kept
 ## here and a changed kind's are handed to its batch once, at the frame's `step`, however many of its
 ## cells changed.
 ##
@@ -24,7 +26,7 @@ extends Node2D
 ## of the actor table (wizards, enemies, props: everything that stands), keeps the `BODIES` nearest
 ## the camera's middle and hands them to the shader, which leans the tufts near each away from it.
 ## The same bodies walk Feel's view grid of when each covered cell was last walked through
-## (`walked_at`, one float a cell, Feel's clock), the shader's `trampled` texture: a walked cell's
+## (`walked_at`, its first channel, Feel's clock; the shader's `cell_times` texture): a walked cell's
 ## tufts lie flat while bodies are in it and its kind's `trample_hold` seconds after, then spring
 ## back over its `trample_spring` (`flatness`), drawing their state's `trampled_frames` or pressed down. None of it
 ## is the game's: no cell's state changes, and the simulation never reads it.
@@ -110,10 +112,14 @@ var _near_count: int = 0
 var _send: Array[PackedVector2Array] = []
 var _sent: int = 0
 var _sent_count: int = 0
-## Feel's view grid: when each cell was last walked through (`NEVER`), a pixel a cell of an image
-## of the layout's size, and the texture the batches read it by (`trampled`).
-var _walked: Image = null
-var _walked_texture: ImageTexture = null
+## Feel's view grid, a pixel a cell of an image of the layout's size: when each cell was last walked
+## through (red) and when it began to show its state (green), Feel's clock (`NEVER` for never); and
+## the texture the batches read it by (`cell_times`), handed over when it changed (`_times_dirty`).
+var _times: Image = null
+var _times_texture: ImageTexture = null
+var _times_dirty: bool = false
+## Feel's clock at the last `step`: when a change heard since began to show.
+var _now: float = 0.0
 
 
 ## Cover drawn at `z` (Feel's MARK_Z).
@@ -185,7 +191,7 @@ func lay(laid: CoverLayout) -> void:
 			var spare_material := batch.material as ShaderMaterial
 			spare_material.set_shader_parameter(&"bodies", PackedVector2Array())
 			spare_material.set_shader_parameter(&"body_count", 0)
-			spare_material.set_shader_parameter(&"trampled", null)
+			spare_material.set_shader_parameter(&"cell_times", null)
 			_spare.append(batch)
 	_batches.clear()
 	_rows.clear()
@@ -197,9 +203,10 @@ func lay(laid: CoverLayout) -> void:
 	_shown.fill(0)
 	_dirty.resize(laid.kinds.size())
 	_dirty.fill(0)
-	_walked = Image.create_empty(maxi(laid.columns, 1), maxi(laid.rows, 1), false, Image.FORMAT_RF)
-	_walked.fill(Color(NEVER, 0.0, 0.0, 1.0))
-	_walked_texture = ImageTexture.create_from_image(_walked)
+	_times = Image.create_empty(maxi(laid.columns, 1), maxi(laid.rows, 1), false, Image.FORMAT_RGF)
+	_times.fill(Color(NEVER, NEVER, 0.0, 1.0))
+	_times_texture = ImageTexture.create_from_image(_times)
+	_times_dirty = false
 	_sent_count = -1
 	for index in laid.kinds.size():
 		_rows.append(PackedFloat32Array())
@@ -250,9 +257,32 @@ static func foot_cell(foot: Vector2) -> Vector2i:
 
 ## When cell `cell` was last walked through (Feel's clock; `NEVER` for never, or no such cell).
 func walked_at(cell: int) -> float:
-	if layout == null or _walked == null or cell < 0 or cell >= layout.cells.size():
+	if layout == null or _times == null or cell < 0 or cell >= layout.cells.size():
 		return NEVER
-	return _walked.get_pixel(cell % layout.columns, cell / layout.columns).r
+	return _times.get_pixel(cell % layout.columns, cell / layout.columns).r
+
+
+## When cell `cell` began to show the state it shows (Feel's clock at the `step` before the change was
+## heard; `NEVER` for one shown since the room was laid, or no such cell): an animated state plays
+## from here.
+func shown_at(cell: int) -> float:
+	if layout == null or _times == null or cell < 0 or cell >= layout.cells.size():
+		return NEVER
+	return _times.get_pixel(cell % layout.columns, cell / layout.columns).g
+
+
+## The frame of its kind's sheet a tuft of roll `rolled` draws `age` seconds after its cell began to
+## show `state` (-1 for none), as the shader works it out: an animated state's tuft steps through its
+## frames at its fps, once (holding the last) or looping from its own place (`CoverTufts.phase`).
+static func frame_at(state: CoverState, rolled: int, age: float) -> int:
+	var first: int = CoverTufts.frame(rolled, state.frames)
+	var count: int = state.animation_frames
+	if first < 0 or count <= 1:
+		return first
+	var stepped: int = floori(maxf(age, 0.0) * float(state.animation_fps))
+	if state.animation_loops:
+		return first + (stepped + roundi(CoverTufts.phase(rolled) * 255.0)) % count
+	return first + mini(stepped, count - 1)
 
 
 ## How flat cell `cell`'s tufts lie at Feel's clock `now` before their state's bend scales it (0
@@ -282,9 +312,13 @@ func body_count() -> int:
 ## (Feel's spectacle's; null: the particles are off) from the cells near `view` (the camera's
 ## picture; empty: everywhere).
 func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, pool: MotesScript = null, view: Rect2 = Rect2()) -> void:
+	_now = now
 	if layout != null:
 		_find_bodies(table, focus)
 		_walk(now)
+	if _times_dirty:
+		_times_dirty = false
+		_times_texture.update(_times)
 	motes.give_off(now, pool, view)
 	var moved: bool = _bodies_moved()
 	if moved:
@@ -340,19 +374,20 @@ func _find_bodies(table: ActorsScript, focus: Vector2) -> void:
 				farthest = k
 
 
-## The covered cells under the bodies found (their `FOOTPRINT`), walked at `now`; the grid handed
-## over when one was.
+## The covered cells under the bodies found (their `FOOTPRINT`), walked at `now`; the grid marked
+## to be handed over when one was.
 func _walk(now: float) -> void:
-	var walked: bool = false
 	for at in _near_count:
 		for foot in FOOTPRINT:
 			var cell: int = layout.cell_of(_near_at[at] + foot)
 			if cell < 0 or layout.cells[cell] == 0:
 				continue
-			_walked.set_pixel(cell % layout.columns, cell / layout.columns, Color(now, 0.0, 0.0, 1.0))
-			walked = true
-	if walked:
-		_walked_texture.update(_walked)
+			var x: int = cell % layout.columns
+			var y: int = cell / layout.columns
+			var times: Color = _times.get_pixel(x, y)
+			times.r = now
+			_times.set_pixel(x, y, times)
+			_times_dirty = true
 
 
 ## True when the bodies found differ from the ones handed over last.
@@ -379,6 +414,12 @@ func show_state(cell: int, state: int) -> void:
 	if _first_slot[cell] < 0:
 		return
 	_shown[cell] = state
+	var x: int = cell % layout.columns
+	var y: int = cell / layout.columns
+	var times: Color = _times.get_pixel(x, y)
+	times.g = _now
+	_times.set_pixel(x, y, times)
+	_times_dirty = true
 	# Taken out while it is written, so the write is in place (a copy-on-write array held twice
 	# would be copied).
 	var rows: PackedFloat32Array = _rows[index]
@@ -452,7 +493,7 @@ func _lay_kind(index: int) -> MultiMeshInstance2D:
 	var material := batch.material as ShaderMaterial
 	material.set_shader_parameter(&"frame_size", Vector2(kind.frame_size))
 	material.set_shader_parameter(&"sheet_size", Vector2(kind.sheet.get_size()))
-	material.set_shader_parameter(&"trampled", _walked_texture)
+	material.set_shader_parameter(&"cell_times", _times_texture)
 	material.set_shader_parameter(&"body_count", 0)
 	material.set_shader_parameter(&"trample_hold", kind.trample_hold)
 	material.set_shader_parameter(&"trample_spring", kind.trample_spring)
@@ -485,15 +526,16 @@ func _batch() -> MultiMeshInstance2D:
 	return batch
 
 
-## Write a tuft's look in `state` of `kind` into the row at `at` of `rows`: its colour (shown, or not
-## drawn, alpha 0, when the state draws no frame) and its custom data (its frame, its sway, its bend,
-## where its sway starts).
+## Write a tuft's look in `state` of `kind` into the row at `at` of `rows`: its colour (its trampled
+## frame; how many frames it plays, and how fast and whether they loop; shown, or not drawn, alpha 0,
+## when the state draws no frame) and its custom data (its first frame, its sway, its bend, where its
+## sway starts).
 static func _write_look(rows: PackedFloat32Array, at: int, kind: CoverKind, state: CoverState, rolled: int) -> void:
 	var frame: int = CoverTufts.frame(rolled, state.frames)
 	var trampled: int = CoverTufts.frame(rolled, state.trampled_frames)
 	rows[at + 8] = float(trampled + 1) / 255.0
-	rows[at + 9] = 1.0
-	rows[at + 10] = 1.0
+	rows[at + 9] = float(clampi(state.animation_frames, 1, 255)) / 255.0
+	rows[at + 10] = float(clampi(state.animation_fps, 1, 127) + (128 if state.animation_loops else 0)) / 255.0
 	rows[at + 11] = 1.0 if frame >= 0 else 0.0
 	rows[at + 12] = float(maxi(frame, 0)) / 255.0
 	rows[at + 13] = clampf(kind.sway * state.sway / SWAY_CODE, 0.0, 1.0)

@@ -12,8 +12,18 @@ extends Resource
 
 @export_group("Look")
 ## The tuft frames of its kind's sheet (`CoverKind.sheet`) it draws, by index; each tuft picks one.
-## Empty: its tufts are not drawn (cover burnt away to bare floor).
+## Empty: its tufts are not drawn (cover burnt away to bare floor). Animated (`animation_frames`
+## above 1), each is the first of its tuft's frames.
 @export var frames: PackedInt32Array = PackedInt32Array()
+## How many frames each tuft plays (docs/STYLE.md, "Smooth"): each of `frames` is the first of that
+## many side by side in the sheet, played in order from when the cell begins to show the state
+## (Feel's clock, look only), at `animation_fps`. 1: a still frame.
+@export_range(1, 16) var animation_frames: int = 1
+## Frames a second, a whole number (Feel's shader takes 1 to 127).
+@export_range(1, 127) var animation_fps: int = 8
+## True: it loops, each tuft from its own place in the loop (a flame's flicker); false: it plays once
+## and holds its last frame (a change: catching, dying down, growing back).
+@export var animation_loops: bool = false
 ## How far its tufts sway in the wind (1: the kind's full sway; 0: still, as ash).
 @export_range(0.0, 2.0, 0.05) var sway: float = 1.0
 ## How far its tufts bend away from a body going through them (1: fully; 0: not at all).

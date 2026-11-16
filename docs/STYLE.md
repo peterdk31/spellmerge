@@ -12,6 +12,7 @@ The art rules for Spellmerge, written so a person, an agent or a script can chec
 4. **At most 3 shades per material** (shadow, base, light).
 5. **Only palette colours.** No gradients, no blur, no antialiasing, no partial transparency.
 6. Four players on screen must stay readable: bold silhouettes, and the four player colours are never mistaken for each other.
+7. **Everything looks smooth.** Nothing changes its look in one jump: a change plays the frames between ("Smooth").
 
 ## The 32×32 grid
 
@@ -85,7 +86,7 @@ Every character is a body and a face (living staffs H2–H5; the code is `gamepl
 
 ## Animation frame counts
 
-One animation is one horizontal strip: frame 1 at the left, each frame 32 px wide, so a 6-frame animation is 192×32. File names end with the animation: `idle.png`, `walk.png`. Playback speed is set in the scene, not in the art. Use fewer frames rather than more: held frames cost nothing.
+One animation is one horizontal strip: frame 1 at the left, each frame 32 px wide, so a 6-frame animation is 192×32. File names end with the animation: `idle.png`, `walk.png`. Playback speed is set in the scene, not in the art. A pose that holds needs no more frames (held frames cost nothing), but a change of look is never a single frame ("Smooth", below).
 
 | Animation | Frames | Loops | Speed | Notes |
 | --- | --- | --- | --- | --- |
@@ -104,6 +105,16 @@ One animation is one horizontal strip: frame 1 at the left, each frame 32 px wid
 The table is a guide, and the living staffs need few of it: a player's body has no strips (a frame per direction, moved by the game) and a stray is one frame; the face's motion is code. The real values are the constants in `gameplay/player/staff_look.gd`, `gameplay/actor/face.gd` and `gameplay/ai/creature_look.gd`.
 
 A single still image has 1 frame and is a plain 32×32 file.
+
+## Smooth
+
+Everything should look smooth (the owner, 2026-11-16). Nothing on screen changes its look in one jump:
+
+- **A change plays the frames between the two looks.** Grass catching fire, burning down, going out and growing back; a door opening; a prop breaking; a state of anything drawn. A change of look not in the table above has at least 3 frames, more when it takes longer than a quarter of a second (about one frame each 0.1 to 0.2 s).
+- **Stages hand over.** Each stage's last frame is the next stage's first look (or one step from it), so a chain of stages reads as one movement: the grass's burning ends as short flames, its smouldering starts from those stubs and ends as the ash.
+- **A thing keeps its own shape through a change.** A look drawn in variants (six grass tufts) has each variant's own strip for each stage, in the same order, so a tuft burns as itself rather than swapping to another tuft's flames.
+- **Pixels stay hard.** Smooth is in-between frames and motion by whole pixels, never sub-pixel blur, cross-fades or partial transparency ("Light and shading": no gradients, no dithering for smooth fades).
+- **Code that swaps a look** (a state's frames, a sprite's texture, a node shown or hidden) plays a change's frames or eases it; a test or the reviewer names one that pops. Ground cover does this by data: `CoverState.animation_frames`, `animation_fps`, `animation_loops` (content/cover/README.md).
 
 The art only shows timing; it doesn't set it. The telegraph's length and the moment damage lands are set by the AI and the scene (the telegraph frames can be held longer there; 0.25 s is only the shortest), never by the animation.
 
@@ -176,4 +187,5 @@ Before an art PR is opened, by the bot or a commissioned artist:
 - [ ] Floors are flat; walls and raised props have the lit top-left edge. Tiles repeat without a seam.
 - [ ] Imports with filtering off.
 - [ ] Manifest entry with the honest origin (and tool and prompt for AI).
+- [ ] Smooth: a change of look has the frames between (at least 3), each stage ends where the next begins, and a variant keeps its own shape ("Smooth").
 - [ ] A screenshot of it in the game in the PR.

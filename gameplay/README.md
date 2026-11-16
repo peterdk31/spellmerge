@@ -79,7 +79,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `cover_changed` | `cover` (each tick's changes; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look) |
 | `status_requested` | `core/spells` (a portal's infusion) and `cover` (a status of the cover a body stands in, ground cover GC5 rule 4: asked as any status is) | `combat` |
 | `room_cleared` | `flow` | `rewards`, `run` |
-| `sandbox_changed` | `flow` | `hud` |
 | `door_voted` | `flow` | none yet |
 | `difficulty_changed` | `difficulty` (a difficulty setting's level, M3; never the room's scale, `run_room_scaled`) | none yet (enemy AI AI10: `ai`, the TeamBoard's skill) |
 | `reward_rolled`, `reward_taken` | `rewards` | none yet |
@@ -101,7 +100,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `ground_looked`, `actor_take_requested` | `ai` (a brain whose profile takes items, I9) | `items` (fills the look at once; gives the item to the actor's Inventory) |
 | `ground_item_changed` | `items` | `feel` (the look on the ground) |
 | `item_near_changed`, `item_refused` | `items` | `hud` (the hint, its red shake) |
-| `sandbox_requested`, `sandbox_action_requested`, `sandbox_spawn_requested` | HUD | `flow` |
 | `play_load_requested` | net | `flow` (loads `play_tasks` ahead of a run two machines start together) |
 | `ai_view_changed` | HUD | `ai` (Entities) |
 

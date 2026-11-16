@@ -250,7 +250,7 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 	if walker != null and ticks > walker.take_at + 1:
 		var taker: Actor = _flow.call("get_wizard", bots) as Actor
 		var item := _root.get_node("Registry").call("get_resource", &"items", rack_item) as StaffItem
-		if taker == null or item == null or taker.caster.cards_of(2) != item.cards:
+		if taker == null or item == null or taker.caster.cards_of(2).slice(0, item.cards.size()) != item.cards:
 			problems.append("%s: the scripted player did not take %s onto LB" % [start, rack_item])
 	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room):
 		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room)])

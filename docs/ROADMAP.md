@@ -38,7 +38,7 @@ A sixteenth, planned with the owner on 2026-11-16: **the boss intro**, a screen-
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |
 | M1 | [Core loop prototype](milestones/M1-core-loop.md) | **Closed** on 2026-10-21 by the owner (C1: go, after two iterate rounds); its open owner items carry into M2 | 4-bot smoke test passes on web, plus M0's carried-over dry runs and 3 daily releases in a row |
-| M2 | [Spell system: staffs](milestones/M2-staffs.md) (first design: [M2-spell-system.md](milestones/M2-spell-system.md)) | **In progress**: C2 (#264) answered with pivot on 2026-10-26; the staffs rework is being built | Every staffs part merged, every card in two combos, bots build staffs, the owner's sandbox playtest, then C2 again |
+| M2 | [Spell system: staffs](milestones/M2-staffs.md) (first design: [M2-spell-system.md](milestones/M2-spell-system.md)) | **In progress**: C2 (#264) answered with pivot on 2026-10-26; the staffs rework is being built | Every staffs part merged, every card in two combos, bots build staffs, the owner's playtest, then C2 again |
 | M3 | Run structure | Not started | A full run can be completed |
 | M4 | Polish and variety | Not started | Polished enough to show off |
 | M5 | Meta-progression | Not started | Runs give lasting progression |

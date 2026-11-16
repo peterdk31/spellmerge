@@ -207,7 +207,9 @@ func _start() -> void:
 	_events.emit_signal("item_take_requested", PLAYER, item.number)
 	await _ticks(2)
 	if _own_cards:
-		_events.emit_signal("staff_cards_requested", PLAYER, STORM_STAFF, _cards, _wizard.key())
+		# By the staff's number (the inventory's), as the builder names it: the one on LB.
+		var number: int = PlayerController.loadout_of(_wizard).hands()[STORM_STAFF]
+		_events.emit_signal("staff_cards_requested", PLAYER, number, _cards, _wizard.key())
 		await _ticks(2)
 	if _wizard.caster.staffs.size() <= STORM_STAFF or _wizard.caster.staffs[STORM_STAFF] == null:
 		_finish(["the wizard did not take %s onto LB" % STORM_ITEM])

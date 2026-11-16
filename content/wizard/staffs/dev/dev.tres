@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"dev"
-display_name = "Sandbox staff"
+display_name = "Cog staff"
 slots = 20
 draw = 1
 cooldown = 0.0

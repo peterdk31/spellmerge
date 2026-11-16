@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-16: The sandbox goes (owner decision)
+
+- **The owner** (crypt rework, question 6): "Remove the sandbox. We have the hub now. Move the staffs to the hub though." Asked further: the sandbox page's tools (spawn any enemy or boss, clear enemies, reset dummies, the AI view) are dropped, not moved; the sandbox's two showcase builds go onto the hub's rack as premade staffs.
+- **Gone:** the room (`content/rooms/crypt/sandbox.*`), `Flow.MODE_SANDBOX` and all it alone used, the events `sandbox_requested`, `sandbox_changed`, `sandbox_action_requested`, `sandbox_spawn_requested` and `ai_view_changed`, the main menu's Sandbox button (Play has the focus in every build), the pause menu's Sandbox page. Its builder switches (Ring, Full slot, Reload) were not its tools, so they moved to the Settings page.
+- **The staffs moved:** Y's build is the Frostfire Cascade and B's the Patient Sentry (`content/items/staffs/`), on the `dev` staff at the two ends of the hub rack's row. The `dev` staff stays for them and the five premade builds.
+- **What started a sandbox starts the hub:** online play by hand (`NetPlay.START`), a replay's default start, the storm benchmark (`hub_storm.gd`, its wizard taking the Frostfire Cascade from the rack) and the tests. Two formats change, decoded as strictly as before: the input frame's (5: the two commands gone, the kinds after them renumbered) and the replay's (11: two starts). Old recordings are refused, as every format change refuses them.
+- Built in crypt rework CR-S (docs/milestones/crypt-rework.md).
+
 ## 2026-11-16: the fountain, a prop on a timer (props, owner request)
 
 - **The owner** (earlier session, PR #777): a fountain prop that sprays water in bursts, readable, on the simulation's clock.

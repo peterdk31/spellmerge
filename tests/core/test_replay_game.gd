@@ -98,7 +98,11 @@ func _hub_then_menu_then_hub(stand_in: PackedScene, keep: int) -> Array[Desync]:
 	hud.set(&"main_menu", stand_in)
 	_run.run_seed = 0x0dd
 	_run.ticks = TICKS / 2
+	# The hub begun anew in the same game keeps its ground (items I6): the storm the first took is
+	# not on the rack, so this player plays from its spawn.
+	_run.rack_item = &""
 	await _run.record(&"hub_requested", 1, 1, Desync.new())
+	_run.rack_item = ReplayRun.STORM_ITEM
 	_run.ticks = TICKS
 	_run.run_seed = 0x5eed
 	var events: Node = root.get_node("Events")

@@ -133,11 +133,12 @@ static func of_shard(names: Array[String], shard: Vector2i) -> Array[String]:
 ## an earlier test started dealt the game's sim a random seed, and whatever this test makes rolls
 ## from that sim unless it hands its own. The machine's session rules start as its defaults too
 ## (core/sim/session_rules.gd, online-ready N11), whatever an earlier test set, and no replay deals.
-## And the game goes (online-ready N4): no stop or hold an earlier test left on the game's sim stands
-## this one still. No boss's intro stops a run a test starts (docs/milestones/boss-intro.md, rule 4:
+## And the game goes (online-ready N4): no stop or hold an earlier test left on the game's sim, or on
+## the sim shared by nodes out of the tree (`Sim.found`), stands this one still. No boss's intro stops a run a test starts (docs/milestones/boss-intro.md, rule 4:
 ## off for automation); a test of the intro turns `boss_intros` on in this machine's rules.
 func _still_chance() -> void:
 	SessionRules.reset_machine()
+	Sim.forget_out_of_tree()
 	SessionRules.machine().boss_intros = 0
 	var frames: _SUITE_FRAMES = root.get_node_or_null(^"Frames") as _SUITE_FRAMES
 	if frames != null:

@@ -13,10 +13,9 @@
 # - Batches: a Godot start compiles the whole game (seconds), so the suites are run TEST_BATCH
 #   (default 8) to a process, in batches by path (the same batches on every run of the same tree);
 #   the host starts each file on a fresh game. A file that needs a process of its own says
-#   `# unit-test-alone`. A batch whose start or end logged an error (not inside one file), or that
-#   stopped before its end, has its files run again alone, and their results are those. A file that
-#   fails in its batch is run again alone too, to say whether it fails only after the files before
-#   it (state they left behind: still a failure).
+#   `# unit-test-alone`. A file that fails in its batch (its part, a crash or timeout in it, or an
+#   error logged after its end) is run again alone, and fails either way: a failure seen only in a
+#   batch is still a failure, with a note in its log (`run_batch`).
 # - Fixed frames (`--fixed-fps 60`): every frame is 1/60 s of game time and none waits for the
 #   clock, so a test of 600 physics ticks takes what they cost, not 10 s.
 # - Shards: a test file with a line `# unit-test-shards: N` runs alone as N processes, each with the
@@ -98,10 +97,11 @@ log_of() { # log_of <test> <K/N or ->: the file's log
 }
 
 run_one() { # run_one <test> <K/N or ->: one file alone, into its own log; prints its results line
-  local test="$1" shard="$2" status=PASS args=() log data started="$EPOCHREALTIME"
+  local test="$1" shard="$2" status=PASS args=() log data started="$EPOCHREALTIME" suite=0
   log=$(log_of "$test" "$shard")
   data="$DATA/$(basename "$log" .log)"
   if is_suite "$test"; then
+    suite=1
     args=(--script "res://$HOST" -- "res://$test")
     [[ "$shard" == - ]] || args+=("--shard=$shard")
   else
@@ -112,56 +112,77 @@ run_one() { # run_one <test> <K/N or ->: one file alone, into its own log; print
   XDG_DATA_HOME="$data" timeout 900 "$GODOT" --headless --fixed-fps 60 --path . "${args[@]}" \
     >"$log" 2>&1 || status=FAIL
   grep -qE '^(SCRIPT )?ERROR:' "$log" && status=FAIL
+  # A suite passes only when the host saw it to its end.
+  ((suite)) && ! grep -qF "SUITE END: res://$test PASS " "$log" && status=FAIL
   echo "$status $(awk "BEGIN { printf \"%.1f\", $EPOCHREALTIME - $started }") $test $shard $log"
 }
 
+# The rule for a batch: a file's result is its own part of the batch's log. A file whose part failed,
+# that was cut off (the process crashed or timed out in it), or after whose end the log has an error
+# before the next file starts, is run again alone, and fails either way: alone, with its own log;
+# passing alone, with its batch part and a note (a failure seen only in a batch is still a failure).
+# A file the batch never reached is run alone, and its result is that. An error before the first
+# file (the start, which is the same alone) runs every file alone.
 run_batch() { # run_batch <test>...: the suites in one process; prints a results line per file
-  local tests=("$@") test log status alone again
+  local tests=("$@") test log alone ended why
   local name="unit-batch-${tests[0]%.gd}"
   name="${name//\//-}"
-  local batch_log="$LOGS/$name.log" data="$DATA/$name" clean=1 code=0
+  local batch_log="$LOGS/$name.log" data="$DATA/$name" code=0
   rm -rf "$data" && mkdir -p "$data"
   XDG_DATA_HOME="$data" timeout 900 "$GODOT" --headless --fixed-fps 60 --path . --script "res://$HOST" \
     -- "${tests[@]/#/res://}" >"$batch_log" 2>&1 || code=$?
-  # 1 is a file that failed (its own part says which); anything else is a crash or the timeout.
-  ((code == 0 || code == 1)) || clean=0
-  # An error at the start or the end (outside every file's part) is no one file's: all run alone.
-  awk -v start="SUITE START: " -v end="SUITE END: " '
-    index($0, start) == 1 { inside = 1; next } index($0, end) == 1 { inside = 0; next }
-    !inside && /^(SCRIPT )?ERROR:/ { found = 1 } END { exit found ? 0 : 1 }' "$batch_log" && clean=0
+  # Each error outside every file's part, by the file that ended last before it ("-" for the start).
+  local stray
+  stray=$(awk -v start="SUITE START: " -v end="SUITE END: " '
+    BEGIN { last = "-" }
+    index($0, start) == 1 { inside = 1; next }
+    index($0, end) == 1 { inside = 0; split(substr($0, length(end) + 1), w, " "); last = w[1]; next }
+    !inside && /^(SCRIPT )?ERROR:/ { print last }' "$batch_log" | sort -u)
   for test in "${tests[@]}"; do
     log=$(log_of "$test" -)
     # The batch's start (before the first file), then the file's own part.
     awk -v start="SUITE START: " -v file="res://$test" '
       index($0, start) == 1 { begun = 1; mine = ($0 == start file) }
       !begun || mine { print } mine && index($0, "SUITE END: " file " ") == 1 { exit }' "$batch_log" >"$log"
-    local ended
     ended=$(grep -m1 -F "SUITE END: res://$test " "$log" || true)
-    if ((!clean)) || [[ -z "$ended" ]]; then
+    why=""
+    if grep -qxF -- "-" <<<"$stray"; then
       run_one "$test" -
-      echo "UNIT RUNNER: run alone: its batch crashed, timed out or logged an error outside every file" \
-        "(the batch's log: $batch_log)" >>"$log"
-      echo "unit tests: $test ran alone: its batch failed as a whole ($batch_log)" >&2
+      echo "UNIT RUNNER: run alone: its batch logged an error before its first file (the batch's log: $batch_log)" >>"$log"
+      continue
+    elif ! grep -qF "SUITE START: res://$test" "$log"; then
+      run_one "$test" -
+      echo "UNIT RUNNER: run alone: its batch stopped before it (the batch's log: $batch_log)" >>"$log"
+      continue
+    elif [[ -z "$ended" ]]; then
+      why="the process crashed or timed out in it (exit $code)"
+    elif [[ "$ended" != *" PASS "* ]] || grep -qE '^(SCRIPT )?ERROR:' "$log"; then
+      why="it failed"
+    elif grep -qxF -- "res://$test" <<<"$stray"; then
+      why="an error was logged after its end"
+    elif [[ "$test" == "${tests[-1]}" ]] && ((code != 0 && code != 1)); then
+      why="the process crashed or timed out after its end (exit $code)"
+    fi
+    if [[ -z "$why" ]]; then
+      echo "PASS $(awk -v l="$ended" 'BEGIN { n = split(l, w, " "); printf "%.1f", w[n - 1] / 1000 }') $test - $log"
       continue
     fi
-    status=PASS
-    [[ "$ended" == *" PASS "* ]] || status=FAIL
-    grep -qE '^(SCRIPT )?ERROR:' "$log" && status=FAIL
-    if [[ "$status" == FAIL ]]; then
-      # Alone too (into the same log): a failure alone is the file's own. One that passes alone
-      # fails only after the files before it: still a failure, its log the batch's part.
-      mv "$log" "$log.batch"
-      alone=$(run_one "$test" -)
-      if [[ "$alone" == FAIL* ]]; then
-        rm -f "$log.batch"
-        echo "$alone"
-        continue
-      fi
-      mv "$log.batch" "$log"
-      echo "UNIT RUNNER: $test fails after the files before it in one process and passes alone:" \
-        "a file before it left state behind (the batch's log: $batch_log)" >>"$log"
+    mv "$log" "$log.batch"
+    alone=$(run_one "$test" -)
+    if [[ "$alone" == FAIL* ]]; then
+      rm -f "$log.batch"
+      echo "$alone"
+      continue
     fi
-    echo "$status $(awk -v l="$ended" 'BEGIN { n = split(l, w, " "); printf "%.1f", w[n - 1] / 1000 }') $test - $log"
+    mv "$log.batch" "$log"
+    if [[ "$test" == "${tests[0]}" ]]; then
+      echo "UNIT RUNNER: in its batch $why, and it passes alone; it was the batch's first file, so" \
+        "no file before it left state: look at what differs, or at what it leaves (the batch's log: $batch_log)" >>"$log"
+    else
+      echo "UNIT RUNNER: in its batch $why, and it passes alone: a file before it left state behind," \
+        "or it leaves state the process trips on (the batch's log: $batch_log)" >>"$log"
+    fi
+    echo "FAIL $(awk -v l="$ended" 'BEGIN { n = split(l, w, " "); printf "%.1f", (n > 1 ? w[n - 1] : 0) / 1000 }') $test - $log"
   done
 }
 

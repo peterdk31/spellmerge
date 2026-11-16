@@ -441,7 +441,7 @@ func _value(path: String, value: Variant, holder: Object) -> void:
 				return
 			var rows: Script = items.get_typed_script() as Script
 			if rows != null and _idles_of(rows):
-				_idle_rows(path, items, empty > 0, holder)
+				_idle_rows(path, items, holder)
 				return
 			for i in items.size():
 				var item: Variant = items[i]
@@ -476,7 +476,7 @@ func _value(path: String, value: Variant, holder: Object) -> void:
 ## idle): the indices of the idle ones are one leaf, `.idle` (an idle one is a fresh one's state:
 ## never visited, nor numbered among the objects met), then each other filled row is walked as an
 ## object after its index. Hundreds of rows, a leaf or two each, were the costliest part of a hash.
-func _idle_rows(path: String, items: Array, _has_empty: bool, holder: Object) -> void:
+func _idle_rows(path: String, items: Array, holder: Object) -> void:
 	var idle := PackedInt32Array()
 	var busy := PackedInt32Array()
 	for i in items.size():

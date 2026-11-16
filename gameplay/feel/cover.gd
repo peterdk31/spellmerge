@@ -34,6 +34,9 @@ extends Node2D
 ## written), writes the grid's walked cells into its image and hands that over only when one was,
 ## and hands over the changed rows (`step`).
 ##
+## **A burning cell gives off embers and smoke** (GC8): a state's `motes`, given off by
+## `cover_motes.gd` from every cell showing it (`show_state` tells it), into the spectacle's pool.
+##
 ## Pure view: no state of the game is here, and nothing here is read by the simulation.
 
 const SHADER: Shader = preload("res://gameplay/feel/cover.gdshader")
@@ -42,6 +45,9 @@ const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const CoverMotesScript := preload("res://gameplay/feel/cover_motes.gd")
+const MotesScript := preload("res://gameplay/feel/mote.gd")
+const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 
 const ROOM_FOLDER: StringName = &"rooms"
 const COVER_FOLDER: StringName = &"cover"
@@ -69,6 +75,9 @@ var registry: RegistryScript = null
 
 ## The cover laid (null before the first room). Read only.
 var layout: CoverLayout = null
+## The motes its cells give off in the states that name some (burning grass's embers and smoke,
+## GC8). Read only, but for its `ramp_table` (Feel's spectacle's, set once).
+var motes: CoverMotesScript = CoverMotesScript.new()
 ## Each laid kind's batch, in the layout's kinds' order (a kind with no sheet has none: null).
 var _batches: Array[MultiMeshInstance2D] = []
 ## Each laid kind's rows (STRIDE floats a tuft), the copy every change is written to, and whether
@@ -196,6 +205,7 @@ func lay(laid: CoverLayout) -> void:
 		_slot_row.append(PackedInt32Array())
 		_slot_rolls.append(PackedInt64Array())
 		_batches.append(_lay_kind(index))
+	motes.lay(laid)
 
 
 ## The batch of the kind `kind_id` in the room laid (null for none, or a kind with no sheet).
@@ -264,11 +274,14 @@ func body_count() -> int:
 ## Once a frame, at Feel's clock `now`: the wind's time; the bodies of `table` (the actor table; null
 ## for none) nearest `focus` (the middle of the camera's picture; `Vector2.INF`: the first found)
 ## handed to the shader, and the cells they stand in walked; and the rows of each kind changed since
-## the last frame handed to its batch.
-func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF) -> void:
+## the last frame handed to its batch; and the motes of the states that give some off, into `pool`
+## (Feel's spectacle's; null: the particles are off) from the cells near `view` (the camera's
+## picture; empty: everywhere).
+func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, pool: MotesScript = null, view: Rect2 = Rect2()) -> void:
 	if layout != null:
 		_find_bodies(table, focus)
 		_walk(now)
+	motes.give_off(now, pool, view)
 	var moved: bool = _bodies_moved()
 	if moved:
 		_sent = 1 - _sent
@@ -350,11 +363,14 @@ func _bodies_moved() -> bool:
 ## Show cell `cell` in state `state` of its kind (its index in `CoverKind.states`): its tufts draw
 ## that state's frames with its sway and bend, or fold away when it draws none.
 func show_state(cell: int, state: int) -> void:
-	if layout == null or cell < 0 or cell >= _first_slot.size() or _first_slot[cell] < 0:
+	if layout == null or cell < 0 or cell >= layout.cells.size() or layout.cells[cell] == 0:
 		return
 	var index: int = layout.cells[cell] - 1
 	var kind: CoverKind = layout.kinds[index]
 	if state < 0 or state >= kind.states.size() or kind.states[state] == null:
+		return
+	motes.show(cell, state)
+	if _first_slot[cell] < 0:
 		return
 	_shown[cell] = state
 	# Taken out while it is written, so the write is in place (a copy-on-write array held twice

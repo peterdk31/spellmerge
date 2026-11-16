@@ -17,8 +17,9 @@ extends Node
 ##   standing in a cell whose state gives a status is asked that status (`status_requested`, as any
 ##   status is: Combat applies it by its own rules, resist and all, and a prop's `status` trigger
 ##   lights a dust heap or a barrel) at once and again every `status_every` seconds while it stays in
-##   such a cell. Its time to the next is kept by actor id and key, and dropped the tick it leaves
-##   (or its id goes: ids are handed out again).
+##   such a cell. Its time to the next is kept by actor id and key, and runs on after it leaves:
+##   it is dropped once that time is out (GC8: stepping in and out is asked no oftener than
+##   standing in it) or its id goes (ids are handed out again).
 ## - **Said** (rule 6): `cover_changed(cells, states)`, once a tick with that tick's changes; after a
 ##   `room_built`, every cell not at rest (Feel, an earlier autoload, has laid the room at rest by
 ##   then); after a restore (`rebuild_derived`), every cell whose state this machine's view was last
@@ -423,7 +424,9 @@ func _enter(cell: int, to: int) -> void:
 
 
 ## Every open actor's body, in id order, standing in a cell whose state gives a status: asked it at
-## once and again every `status_every` seconds while it stays in such cover.
+## once and again every `status_every` seconds while it stays in such cover. A body that steps out
+## keeps its time till its next one running, and is dropped only when it runs out (GC8): stepping
+## in and out of cobwebs is asked no oftener than standing in them, so a short chill never stacks.
 func _affect_bodies(delta: float) -> void:
 	var count: int = actors.open_ids(_ids) if actors != null else 0
 	var old: int = 0
@@ -433,15 +436,20 @@ func _affect_bodies(delta: float) -> void:
 		var body := actors.node_of(id) as Node2D
 		if body == null or not is_instance_valid(body) or not body.is_inside_tree():
 			continue
-		var state: CoverState = cover_state_at(layout.cell_of(body.global_position))
-		if state == null or state.status == &"":
-			continue
 		var key: int = actors.key_of(id)
 		while old < _harm_ids.size() and _harm_ids[old] < id:
 			old += 1
-		var left: float = 0.0
-		if old < _harm_ids.size() and _harm_ids[old] == id and _harm_keys[old] == key:
-			left = _harm_left[old] - delta
+		var kept: bool = old < _harm_ids.size() and _harm_ids[old] == id and _harm_keys[old] == key
+		var left: float = _harm_left[old] - delta if kept else 0.0
+		var state: CoverState = cover_state_at(layout.cell_of(body.global_position))
+		if state == null or state.status == &"":
+			# Out of harmful cover: its time runs on, and it is dropped once it is out.
+			if left > 0.0:
+				_next_ids[harmed] = id
+				_next_keys[harmed] = key
+				_next_left[harmed] = left
+				harmed += 1
+			continue
 		if left <= 0.0:
 			left = maxf(state.status_every, delta)
 			if events != null:

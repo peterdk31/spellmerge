@@ -1,0 +1,81 @@
+[gd_resource type="Resource" script_class="CoverKind" format=3]
+
+[ext_resource type="Script" path="res://core/base/cover_kind.gd" id="1_kind"]
+[ext_resource type="Script" path="res://core/base/cover_state.gd" id="2_state"]
+[ext_resource type="Script" path="res://core/base/cover_trigger.gd" id="3_trigger"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="4_motes"]
+[ext_resource type="Texture2D" path="res://content/cover/cobweb/tufts.svg" id="5_sheet"]
+
+[sub_resource type="Resource" id="rest_fire"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"fire"
+then = &"burning"
+
+[sub_resource type="Resource" id="burning_frost"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"frost"
+then = &"rest"
+
+[sub_resource type="Resource" id="burning_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.5
+then = &"gone"
+
+[sub_resource type="Resource" id="burning_embers"]
+script = ExtResource("4_motes")
+kind = &"ember"
+rate = 6.0
+from = 2
+at = Vector2(0, -6)
+size = Vector2(12, 10)
+spread = 90.0
+reach = 3.0
+height = 2.0
+colours = Array[StringName]([&"fire", &"spark"])
+
+[sub_resource type="Resource" id="rest"]
+script = ExtResource("2_state")
+state_id = &"rest"
+frames = PackedInt32Array(0, 1)
+sway = 0.0
+bend = 0.0
+status = &"chill"
+status_strength = 30.0
+status_duration = 0.45
+status_every = 0.5
+triggers = Array[ExtResource("3_trigger")]([SubResource("rest_fire")])
+
+[sub_resource type="Resource" id="burning"]
+script = ExtResource("2_state")
+state_id = &"burning"
+frames = PackedInt32Array(2, 3)
+sway = 0.0
+bend = 0.0
+motes = Array[ExtResource("4_motes")]([SubResource("burning_embers")])
+spreads = &"fire"
+spread_chance = 1.0
+triggers = Array[ExtResource("3_trigger")]([SubResource("burning_frost"), SubResource("burning_after")])
+
+[sub_resource type="Resource" id="gone"]
+script = ExtResource("2_state")
+state_id = &"gone"
+frames = PackedInt32Array()
+sway = 0.0
+bend = 0.0
+
+[resource]
+script = ExtResource("1_kind")
+id = &"cobweb"
+display_name = "Cobwebs"
+biomes = Array[StringName]([&"crypt"])
+fill_density = 0.012
+clump_size = 0
+wall_gap = 0
+keep_gap = 2
+sheet = ExtResource("5_sheet")
+tufts_per_cell = 1
+sway = 0.0
+states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("burning"), SubResource("gone")])

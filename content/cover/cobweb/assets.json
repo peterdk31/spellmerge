@@ -1,0 +1,12 @@
+{
+	"assets": [
+		{
+			"path": "content/cover/cobweb/tufts.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from tufts.grid.json, 2026-11-16)",
+			"prompt": "Four 16x16 frames side by side of a cobweb lying on the floor: two webs at rest (eight spokes from a knot and two rings, a thread or two broken, in Bone shades), two burning (the same webs in Fire and Spark shades, a few threads gone). Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no outline (floor decoration)."
+		}
+	]
+}

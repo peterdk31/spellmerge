@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-16: Leaf, a palette material for growth (ground cover GC8)
+
+- **Now:** a new material, **Leaf** (`#2f4022` `#5b7233` `#a0ad55`), in docs/STYLE.md, `art/kit`'s palette files, `core/base/palette.gd` and the SVG art test (46 colours). The hub's grass and the crypt's moss are drawn in it.
+- **Why:** the palette had no green but the players' (which tiles and props never use, so a colour on screen always means a player) and Arc's acid lime (lightning's). Leaf is a dull olive: darker and yellower than Player 3's green (base hue about 80° against its 133°) and far less bright and saturated than Arc. The bot may add colours as long as every copy is updated (the owner's Ice and Void decision, below).
+- **Not chosen:** Player 3's green (it belongs to a player), Arc (it would read as a static charge on the floor), Blight's ochre (the enemies' spells).
+
 ## 2026-11-16: what ground cover costs (ground cover GC6)
 
 Measured with `tests/benchmark/cover_cost.gd` (new; headless, a shared cloud machine, the native module on, the run's seed fixed): the largest room (the boss's arena, `boss_broom`: 1,243 cells of 1,716 under a stand-in grass over every open cell; the crypt arenas 628 to 814), 100 stand-ins (`prop_stand_in.tres`, never dying) spread over it, each moving a little every tick so Feel always has new places to bend and trample by, and the wizard. Four scenes: **none** (no cover: the game as main plays it until GC8's art), **rest** (all of it covered, at rest), **burning** (all of it lit by one touch and held burning: the plan's "all of it burning at once"; 92 bodies standing in it, each burnt every half second through Combat) and **front** (the grass as it is, lit at the middle and spreading by the run's chance for 15 s). Each run first plays a throwaway pass, so no scene is measured cold. Main and this branch on the same machine, by turns (ms; the machine's noise is about ±0.1 ms on the averages and much more on a max):

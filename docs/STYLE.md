@@ -23,7 +23,7 @@ The art rules for Spellmerge, written so a person, an agent or a script can chec
 
 ## Palette
 
-43 colours: one outline colour and fourteen materials of three shades each. Write hex values in lower case. No other colour is allowed in a final or placeholder asset.
+46 colours: one outline colour and fifteen materials of three shades each. Write hex values in lower case. No other colour is allowed in a final or placeholder asset.
 
 | Material | Shadow | Base | Light | Use |
 | --- | --- | --- | --- | --- |
@@ -37,6 +37,7 @@ The art rules for Spellmerge, written so a person, an agent or a script can chec
 | **Ice** | `#1f7080` | `#4fd6dc` | `#c4f6f2` | Frost spells, ice, cold effects |
 | **Void** | `#4a1450` | `#a0309a` | `#e08ad8` | Void spells, void effects |
 | **Arc** | `#3f6b10` | `#b4e82a` | `#eeffa6` | Lightning spells and the static charge: an acid lime, apart from Spark's gold, the players' greens and Ice's cyan |
+| **Leaf** | `#2f4022` | `#5b7233` | `#a0ad55` | Grass, moss and other growth on the floor (ground cover): a dull olive, darker and yellower than Player 3's green and far duller than Arc's lime |
 | **Blight** (ochre) | `#4d3f12` | `#a68a2a` | `#e3cf6b` | Enemies' spells: where a player's colour shows in a shot, an enemy's shows this (the owner, 2026-10-27). A dull ochre, darker than Spark's gold and far from the four player hues |
 | **Player 1** (blue) | `#1d3a6b` | `#3b73c9` | `#7fc0f0` | Player 1's robe, hat, panel and markers |
 | **Player 2** (rose) | `#7a2347` | `#d9477a` | `#f59ab8` | Player 2 |

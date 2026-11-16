@@ -349,6 +349,30 @@ func test_a_boss_enters_with_its_intro_and_a_stray_with_none() -> void:
 	check_equal(feel.sounds().started, started + 1, "once")
 
 
+func test_a_boss_with_an_intro_enters_with_its_cue_only_when_no_intro_plays() -> void:
+	# docs/milestones/boss-intro.md, rule 8: the overlay's own sounds are its entrance.
+	var feel: FeelScript = _world()
+	_know([&"boss_intro"])
+	var data: EnemyBase = Fixture.staffed([[&"bolt"]])
+	data.id = &"test_boss"
+	data.boss = true
+	data.boss_intro = BossIntro.new()
+	var started: int = feel.sounds().started
+	var boss: Actor = fx.imp(Vector2.ZERO, data)
+	fx.bus.boss_intro_opened.emit(boss.id, "", "", data.boss_intro, 0, true)
+	feel.step(1.0 / 60.0)
+	check_equal(feel.sounds().started, started, "its intro opened: no entrance cue under the overlay")
+	fx.bus.boss_intro_closed.emit(boss.id)
+	feel.step(1.0 / 60.0)
+	check_equal(feel.sounds().started, started, "nor as it closes")
+	var stray: Actor = fx.imp(Vector2(60, 0), data)
+	check_equal(feel.sounds().started, started, "a boss with an intro waits for the frame's end")
+	feel.step(1.0 / 60.0)
+	check_equal(feel.sounds().last, &"boss_intro", "none opened for it (the rule off, a sandbox spawn): the entrance cue")
+	check_equal(feel.sounds().started, started + 1, "once")
+	check(stray != null, "the second boss stands")
+
+
 # --- Phases and music ------------------------------------------------------------------------
 
 ## A boss of the test's own: its music (two stacked layers), a phase that burns (a held sound, an

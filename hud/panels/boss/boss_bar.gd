@@ -9,6 +9,11 @@ extends VBoxContainer
 ##
 ## Marks are drawn on the bar as notches (a shape, so a phase is never shown by colour alone); a
 ## mark the health has fallen past is drawn dim.
+##
+## A boss with an intro (`boss_shown`'s `has_intro`, docs/milestones/boss-intro.md, rule 5) is kept
+## but not shown until it is released (`release`: its intro closed, or none opened for it; the panels'
+## `BossIntroWait` says when), and then the bar fades in over FADE_IN (`step`, the HUD's frame). Its
+## health is followed meanwhile, so it shows the right share as it comes.
 
 const EventsScript := preload("res://core/events/events.gd")
 
@@ -20,6 +25,8 @@ const BAR_SIZE: Vector2 = Vector2(200.0, 6.0)
 const MARK_OUT: float = 2.0
 const MARK_COLOR: Color = Color(0.96, 0.92, 0.85, 1.0)
 const MARK_PASSED: Color = Color(0.96, 0.92, 0.85, 0.35)
+## Seconds the bar fades in over once a boss's intro is over.
+const FADE_IN: float = 0.3
 
 ## The bosses in play, in the order they were shown (actor ids), and what was told of each:
 ## id -> [name, marks, health, max_health].
@@ -30,6 +37,8 @@ var _bar: ProgressBar = null
 var _marks: Control = null
 ## The marks of the boss shown, for drawing.
 var _shown_marks: PackedFloat32Array = PackedFloat32Array()
+## The bosses kept but not shown yet: their intro is not over (actor ids).
+var _held: PackedInt32Array = PackedInt32Array()
 
 
 func _init() -> void:
@@ -69,10 +78,12 @@ func bind(events: EventsScript) -> void:
 		events.boss_hidden.connect(hide_boss)
 
 
-## The boss `actor` entered play (`boss_shown`).
-func show_boss(actor: int, boss_name: String, _lore: String, marks: PackedFloat32Array, _has_intro: bool = false) -> void:
+## The boss `actor` entered play (`boss_shown`); with an intro it is held until `release`.
+func show_boss(actor: int, boss_name: String, _lore: String, marks: PackedFloat32Array, has_intro: bool = false) -> void:
 	if not _order.has(actor):
 		_order.append(actor)
+	if has_intro and not _held.has(actor):
+		_held.append(actor)
 	var health: float = 1.0
 	var most: float = 1.0
 	if _told.has(actor):
@@ -92,11 +103,37 @@ func set_health(actor: int, health: float, max_health: float) -> void:
 	_refresh()
 
 
+## The boss `actor`'s intro is over (or none opened): the bar shows it, fading in.
+func release(actor: int, _played: bool = true) -> void:
+	var at: int = _held.find(actor)
+	if at < 0:
+		return
+	_held.remove_at(at)
+	var before: bool = visible
+	_refresh()
+	if visible and not before:
+		modulate.a = 0.0
+
+
+## Move the fade in on by `delta` seconds (the HUD's frame).
+func step(delta: float) -> void:
+	if modulate.a < 1.0:
+		modulate.a = minf(modulate.a + delta / FADE_IN, 1.0)
+
+
+## True while the boss `actor` is kept but not shown (its intro is not over).
+func is_held(actor: int) -> bool:
+	return _held.has(actor)
+
+
 ## The boss `actor` is out of play (`boss_hidden`).
 func hide_boss(actor: int) -> void:
 	var at: int = _order.find(actor)
 	if at >= 0:
 		_order.remove_at(at)
+	at = _held.find(actor)
+	if at >= 0:
+		_held.remove_at(at)
 	_told.erase(actor)
 	_refresh()
 
@@ -105,12 +142,17 @@ func hide_boss(actor: int) -> void:
 func clear() -> void:
 	_order.clear()
 	_told.clear()
+	_held.clear()
+	modulate.a = 1.0
 	_refresh()
 
 
-## The actor id of the boss shown, or -1 for none.
+## The actor id of the boss shown (the first shown that is not held), or -1 for none.
 func shown_boss() -> int:
-	return _order[0] if not _order.is_empty() else -1
+	for actor in _order:
+		if not _held.has(actor):
+			return actor
+	return -1
 
 
 ## The share of its most health the boss shown has (0 to 1; 0 for none).

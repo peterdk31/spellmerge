@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "tests/support/intro_boss/portrait.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (a grid written by a small generator, drawn by tools/pixel_grid.py from portrait.grid.json, 2026-11-16)",
+			"prompt": "A stand-in boss intro portrait for the tests only: three 96x96 frames side by side, a hunched Stone blob (rest), the same blob reared up with a lit left side, angry brows and Fire eyes (mean), and the two Fire eyes alone (eyes). 1px dark outline, palette colours from docs/STYLE.md."
+		}
+	]
+}

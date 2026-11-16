@@ -38,6 +38,7 @@ extends Node
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const CoverMoves := preload("res://gameplay/cover/cover_moves.gd")
 
 const ROOM_FOLDER: StringName = &"rooms"
 const COVER_FOLDER: StringName = &"cover"
@@ -49,9 +50,9 @@ const NEIGHBOURS: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0
 ## Not state: services, the room's layout (from `room_built`), what this machine's view was told, and
 ## scratch emptied within a step (core/sim/README.md).
 const DERIVED: Array[StringName] = [
-	&"events", &"actors", &"registry", &"sim", &"layout", &"_given", &"_use_given", &"_said",
-	&"_changed_cells", &"_changed_states", &"_ids", &"_spread_cells", &"_spread_elements",
-	&"_next_ids", &"_next_keys", &"_next_left",
+	&"events", &"actors", &"registry", &"sim", &"layout", &"_moves", &"_given", &"_use_given", &"_said",
+	&"_changed_cells", &"_changed_states", &"_ids", &"_spread_cells", &"_spread_by",
+	&"_next_ids", &"_next_keys", &"_next_left", &"_rest_harms",
 ]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads (and the
@@ -63,6 +64,11 @@ var sim: Sim = null
 
 ## The room's cover, worked out from its layout as built (`room_built`); null before a room.
 var layout: CoverLayout = null
+## Its kinds' moves as tables (`cover_moves.gd`), worked out with it.
+var _moves: CoverMoves = null
+## True when a kind with cells in the room gives a status at rest (cobwebs), so a room all at rest still has
+## bodies to look at; false, a step with no cell out of rest and nobody harmed looks at none.
+var _rest_harms: bool = false
 ## Kinds given instead of the registry's (`use_kinds`: tests, before the game has cover of its own).
 var _given: Array[CoverKind] = []
 var _use_given: bool = false
@@ -76,7 +82,7 @@ var _changed_states: PackedInt32Array = PackedInt32Array()
 ## (sized for every actor once, so a step with bodies in harmful cover makes no array).
 var _ids: PackedInt32Array = PackedInt32Array()
 var _spread_cells: PackedInt32Array = PackedInt32Array()
-var _spread_elements: Array[StringName] = []
+var _spread_by: PackedInt32Array = PackedInt32Array()
 var _next_ids: PackedInt32Array = PackedInt32Array()
 var _next_keys: PackedInt64Array = PackedInt64Array()
 var _next_left: PackedFloat32Array = PackedFloat32Array()
@@ -192,6 +198,12 @@ func harmed() -> PackedInt32Array:
 func _on_room_built(room_id: StringName, layout_root: Node) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	layout = CoverLayout.of(layout_root, room, kinds())
+	_moves = CoverMoves.of(layout.kinds)
+	# Only a kind with a cell in this room counts (the layout holds every kind given, whatever its biome).
+	_rest_harms = false
+	for kind in layout.kinds:
+		if not kind.states.is_empty() and kind.states[0] != null and kind.states[0].status != &"" and layout.count(kind.id) > 0:
+			_rest_harms = true
 	if _state.is_empty():
 		_size_at_rest()
 	_said.resize(layout.cells.size())
@@ -238,17 +250,26 @@ func step(delta: float) -> void:
 		return
 	_apply_touches()
 	_step_cells(delta)
-	_affect_bodies(delta)
+	# With every cell at rest, none harmful at rest and nobody harmed, no body can be harmed: the
+	# bodies are not looked at (what a room at rest costs, GC6).
+	if _rest_harms or not _active.is_empty() or not _harm_ids.is_empty():
+		_affect_bodies(delta)
 	_flush()
 
 
 ## Every queued touch, in the order heard: the cells inside its circle in cell order.
 func _apply_touches() -> void:
 	var cell_size: float = float(CoverLayout.CELL)
+	var cells: PackedByteArray = layout.cells
+	var to_table: PackedInt32Array = _moves.to_table
+	var width: int = _moves.width
+	var elements: int = _moves.elements.size()
 	for t in _touch_elements.size():
 		var at: Vector2 = _touch_at[t]
 		var radius: float = _touch_radius[t]
-		var element: StringName = _touch_elements[t]
+		var element: int = _moves.element(_touch_elements[t])
+		if element < 0:
+			continue
 		var centre: int = layout.cell_of(at)
 		var x0: int = maxi(floori((at.x - radius) / cell_size), 0)
 		var x1: int = mini(floori((at.x + radius) / cell_size), layout.columns - 1)
@@ -257,74 +278,92 @@ func _apply_touches() -> void:
 		for y in range(y0, y1 + 1):
 			for x in range(x0, x1 + 1):
 				var cell: int = y * layout.columns + x
+				var kind: int = cells[cell] - 1
+				if kind < 0:
+					continue
 				var middle := Vector2((float(x) + 0.5) * cell_size, (float(y) + 0.5) * cell_size)
 				if cell == centre or middle.distance_squared_to(at) <= radius * radius:
-					_touch_cell(cell, element)
+					# `_moved_to`, read from the table here: this loop may cover the whole room.
+					var to: int = to_table[(kind * width + _state[cell]) * elements + element]
+					if to >= 0:
+						_enter(cell, to)
 	_clear_touches()
 
 
 ## The cells not at rest count on: an `after` trigger moves one on; one that spreads rolls for each
-## neighbour its element would move on. The spreads apply once every cell has stepped.
+## of its four neighbours (in NEIGHBOURS' order) that its element would move on, one roll each, the
+## chance its state's `spread_chance` a second. The spreads apply once every cell has stepped. The
+## kinds' moves are read from their tables here (`_moves`, `after` and `_moved_to` inlined): every
+## cell may be burning at once.
 func _step_cells(delta: float) -> void:
 	var game: Sim = sim if sim != null else Sim.found(self)
+	var cells: PackedByteArray = layout.cells
+	var columns: int = layout.columns
+	var rows: int = layout.rows
+	var width: int = _moves.width
+	var elements: int = _moves.elements.size()
+	var to_table: PackedInt32Array = _moves.to_table
+	var spread_table: PackedInt32Array = _moves.spread_table
+	var chance_table: PackedFloat64Array = _moves.chance_table
+	var after_first: PackedInt32Array = _moves.after_first
+	var after_count: PackedInt32Array = _moves.after_count
+	var after_seconds: PackedFloat64Array = _moves.after_seconds
+	var after_to: PackedInt32Array = _moves.after_to
 	var i: int = 0
 	while i < _active.size():
 		var cell: int = _active[i]
-		var kind: CoverKind = layout.kind_at(cell)
-		var now: int = _state[cell]
-		var state: CoverState = kind.states[now]
+		var row: int = (cells[cell] - 1) * width + _state[cell]
 		_age[cell] += delta
-		var moved: bool = false
-		for row in state.triggers:
-			if row != null and row.when == CoverTrigger.When.AFTER and _age[cell] >= row.seconds:
-				var to: int = kind.state_at(row.then)
-				if to >= 0 and to != now:
-					_enter(cell, to)
-					moved = true
-					break
-		if not moved and state.spreads != &"" and state.spread_chance > 0.0:
-			_roll_spreads(game, cell, state, delta)
+		var age: float = _age[cell]
+		var to: int = -1
+		var first: int = after_first[row]
+		for at in range(first, first + after_count[row]):
+			if age >= after_seconds[at]:
+				to = after_to[at]
+				break
+		if to >= 0:
+			_enter(cell, to)
+		elif spread_table[row] >= 0:
+			var element: int = spread_table[row]
+			var chance: float = chance_table[row] * delta
+			var x: int = cell % columns
+			var y: int = cell / columns
+			for direction in NEIGHBOURS.size():
+				var nx: int = x + NEIGHBOURS[direction].x
+				var ny: int = y + NEIGHBOURS[direction].y
+				if nx < 0 or ny < 0 or nx >= columns or ny >= rows:
+					continue
+				var other: int = ny * columns + nx
+				var kind: int = cells[other] - 1
+				if kind < 0 or to_table[(kind * width + _state[other]) * elements + element] < 0:
+					continue
+				var roll: float = game.chance(SPREAD, cell * NEIGHBOURS.size() + direction, _rolls)
+				_rolls += 1
+				if roll < chance:
+					_spread_cells.append(other)
+					_spread_by.append(element)
 		# A cell gone to rest left the list; the next is in its place.
 		if i < _active.size() and _active[i] == cell:
 			i += 1
 	for s in _spread_cells.size():
-		_touch_cell(_spread_cells[s], _spread_elements[s])
+		_touch_cell(_spread_cells[s], _spread_by[s])
 	_spread_cells.resize(0)
-	_spread_elements.clear()
+	_spread_by.resize(0)
 
 
-## Cell `cell` in `state` rolls for each of its four neighbours (in NEIGHBOURS' order) that its
-## element would move on: one roll each, the chance `spread_chance` a second.
-func _roll_spreads(game: Sim, cell: int, state: CoverState, delta: float) -> void:
-	var x: int = cell % layout.columns
-	var y: int = cell / layout.columns
-	for direction in NEIGHBOURS.size():
-		var nx: int = x + NEIGHBOURS[direction].x
-		var ny: int = y + NEIGHBOURS[direction].y
-		if nx < 0 or ny < 0 or nx >= layout.columns or ny >= layout.rows:
-			continue
-		var other: int = ny * layout.columns + nx
-		var kind: CoverKind = layout.kind_at(other)
-		if kind == null or kind.states[_state[other]].on_element(state.spreads) == &"":
-			continue
-		var roll: float = game.chance(SPREAD, cell * NEIGHBOURS.size() + direction, _rolls)
-		_rolls += 1
-		if roll < state.spread_chance * delta:
-			_spread_cells.append(other)
-			_spread_elements.append(state.spreads)
-
-
-## `element` touched cell `cell`: its state's trigger on it (if any) moves it on.
-func _touch_cell(cell: int, element: StringName) -> void:
-	var kind: CoverKind = layout.kind_at(cell)
-	if kind == null:
-		return
-	var then: StringName = kind.states[_state[cell]].on_element(element)
-	if then == &"":
-		return
-	var to: int = kind.state_at(then)
-	if to >= 0 and to != _state[cell]:
+## `element` (its index in `_moves.elements`) touched cell `cell`: its state's trigger on it (if
+## any) moves it on.
+func _touch_cell(cell: int, element: int) -> void:
+	var to: int = _moved_to(cell, element)
+	if to >= 0:
 		_enter(cell, to)
+
+
+## The state `element` (its index) would move cell `cell` on to, or -1 for none: no cover, no
+## trigger on it, a state its kind lacks, or the state the cell is in (a spread rolls only where
+## this is one).
+func _moved_to(cell: int, element: int) -> int:
+	return _moves.moved_to(layout.cells[cell] - 1, _state[cell], element)
 
 
 ## Cell `cell` enters state `to`: its seconds from 0, in or out of the active cells, told.

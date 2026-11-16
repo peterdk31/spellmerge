@@ -407,3 +407,73 @@ func test_a_restore_with_less_fire_tells_the_view_back_to_rest() -> void:
 	check_equal(snapshot.restore({"cover": _cover}, root), PackedStringArray(), "restored to before the fire")
 	check_equal(_cover.state_at(cell), 0, "at rest")
 	check_equal(_changes, [[PackedInt32Array([cell]), PackedInt32Array([0])]], "the view told it is at rest again")
+
+
+func test_no_roll_for_a_neighbour_its_element_leaves_in_the_state_it_is_in() -> void:
+	# Regression (GC6): a state whose element row names the state itself moves nothing, so a burning
+	# neighbour of such grass costs no roll (the area rolled four a cell a tick with every cell lit).
+	var again := GRASS.duplicate(true) as CoverKind
+	var row := CoverTrigger.new()
+	row.when = CoverTrigger.When.ELEMENT
+	row.element = &"fire"
+	row.then = &"burning"
+	again.states[BURNING].triggers.append(row)
+	_cover.free()
+	_cover = _make_cover(7, [again], _make_layout(Rect2(32.0, 32.0, 32.0, 16.0)))
+	_touch(&"fire", _middle(_cell(2, 2)), 24.0)
+	_steps(1)
+	check_equal(_cover.state_at(_cell(2, 2)), BURNING, "both lit")
+	check_equal(_cover.state_at(_cell(3, 2)), BURNING, "both lit (2)")
+	_steps(30)
+	check_equal(_cover.rolls(), 0, "neither rolls for the other, already burning")
+
+
+func test_cover_harmful_at_rest_harms_with_nothing_burning() -> void:
+	# The step looks at no body while every cell is at rest and none harms at rest (GC6); cover that
+	# does (cobwebs) still harms whoever stands in it.
+	var webs := GRASS.duplicate(true) as CoverKind
+	webs.states[0].status = &"chill"
+	webs.states[0].status_strength = 0.5
+	webs.states[0].status_duration = 1.0
+	webs.states[0].status_every = 0.5
+	var body: Actor = _world.actor(_middle(_cell(6, 6)), [&"health", &"hurtbox"])
+	_cover.free()
+	_cover = _make_cover(7, [webs])
+	_steps(1)
+	check(_cover.active_cells().is_empty(), "nothing out of rest")
+	check_equal(_cover.harmed(), PackedInt32Array([body.id]), "the body in it is harmed")
+	check_equal(_asked.filter(func(heard: Array) -> bool: return heard[0] == body and heard[1] == &"chill").size(), 1, "asked its status")
+	# The test grass harms nobody at rest: a body in it is never asked, and nothing is kept.
+	_cover.free()
+	_asked.clear()
+	_cover = _make_cover(7, [GRASS])
+	_steps(30)
+	check(_cover.harmed().is_empty(), "nobody harmed by grass at rest")
+	check(_asked.is_empty(), "nobody asked")
+	# Lit, then gone back to rest: the body that was harmed is dropped all the same.
+	_touch(&"fire", _middle(_cell(6, 6)))
+	_steps(1)
+	check_equal(_cover.harmed(), PackedInt32Array([body.id]), "burning: harmed")
+	_touch(&"frost", _middle(_cell(6, 6)))
+	_steps(1)
+	check(_cover.active_cells().is_empty(), "put out: every cell at rest")
+	check(_cover.harmed().is_empty(), "and the body dropped")
+
+
+func test_only_cover_in_the_room_counts_as_harmful_at_rest() -> void:
+	# Regression (GC6 review): the layout holds every kind given, whatever its biome or field, so a
+	# kind harmful at rest with no cell in the room (cobwebs elsewhere) must not keep the bodies'
+	# step looking every tick.
+	var webs := GRASS.duplicate(true) as CoverKind
+	webs.id = &"z_webs"
+	webs.biomes = [] as Array[StringName]
+	webs.states[0].status = &"chill"
+	_cover.free()
+	_cover = _make_cover(7, [GRASS, webs])
+	check_equal(_cover.layout.count(webs.id), 0, "the webs have no cell here")
+	check(not _cover.get(&"_rest_harms"), "so nothing here harms at rest")
+	var here := GRASS.duplicate(true) as CoverKind
+	here.states[0].status = &"chill"
+	_cover.free()
+	_cover = _make_cover(7, [here])
+	check(_cover.get(&"_rest_harms"), "cover in the room harmful at rest counts")

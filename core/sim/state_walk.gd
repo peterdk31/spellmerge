@@ -52,7 +52,7 @@ extends RefCounted
 ## places, and was a third of the spells area's hash). `verify_frozen` works it out again each time
 ## and names one that changed; `tests/core/test_state_walked.gd` walks every card so.
 ## An object whose script has `func idle() -> bool` and is idle (its state is a fresh one's, waiting
-## to be started: a beam leg's homing while it does not home) is one leaf, `&"idle"`, not its members
+## to be started: a dash's homing while no dash homes) is one leaf, `&"idle"`, not its members
 ## (N3c: a carrier keeps one per row, nearly all idle, and they were most of a hash); in a typed array
 ## of them, the idle rows together are one leaf, their indices (`_idle_rows`).
 ## A body walked as an area that is at rest (`rest_leaf()` gives an array, not null: an actor that

@@ -329,12 +329,18 @@ func move(delta: float) -> void:
 ## Where the body's move by `velocity` over `delta` ends in a room with holes (hub rework HR-H1,
 ## docs/milestones/hub-rework.md, "Holes" 2 and 3), slid in two parts: first what crosses holes (the
 ## Mover's `crossing`: its dashes and what is done to it), then its own walk, which stops at a hole's
-## lip. A walk whose body's centre is over a hole crosses too: it is not pushed back out of it (a
-## centre in a blocked cell leaves by its nearest open side), so a jump onto a hole (a teleport, a
-## swap, a portal's exit, whatever step it came in) or a push into one keeps the body there (falling
-## is HR-H2's). While something crosses and the body does not walk, nothing more is slid (a still
-## walk would push it back off the lip it is carried over). One slide of the sum could not tell the
-## parts apart.
+## lip. One slide of the sum could not tell the parts apart. The walk:
+## - **from over a hole** crosses: it is not pushed back out (a centre in a blocked cell leaves by its
+##   nearest open side), so a jump onto a hole (a teleport, a swap, a portal's exit, whatever step it
+##   came in) or a push into one keeps the body there (falling is HR-H2's);
+## - **while something crosses and the circle already reaches over a lip** is slid against the ground
+##   alone, so it never pushes the body back out against the push (a push slower than the body's
+##   radius a tick would never carry it in, and a carry would be pinned at the lip as at a wall), and
+##   is dropped if it would set the centre over a hole: it never steps in;
+## - **while something crosses and the body does not walk** is not slid (a still walk would push it
+##   back off the lip it is carried over);
+## - **otherwise** stops at the lip (a circle only over a lip, with nothing crossing, is nudged back
+##   onto the ground, as at a wall).
 func _move_over_holes(from: Vector2, delta: float) -> Vector2:
 	var radius: float = wall_radius()
 	var motion: Vector2 = velocity * delta
@@ -345,7 +351,12 @@ func _move_over_holes(from: Vector2, delta: float) -> Vector2:
 	var walk: Vector2 = motion - crossed
 	if walk == Vector2.ZERO and crossed != Vector2.ZERO:
 		return at
-	return projectiles.slide_body(at, walk, radius, projectiles.is_hole(at))
+	if projectiles.is_hole(at):
+		return projectiles.slide_body(at, walk, radius, true)
+	if crossed != Vector2.ZERO and projectiles.touches_hole(at, radius):
+		var walked: Vector2 = projectiles.slide_body(at, walk, radius, true)
+		return at if projectiles.is_hole(walked) else walked
+	return projectiles.slide_body(at, walk, radius)
 
 
 ## Tell every actor whose touch area this body overlaps where its move left it (its circle against

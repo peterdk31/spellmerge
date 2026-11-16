@@ -149,3 +149,14 @@ func test_a_room_bodys_shapes_are_laid_as_holes() -> void:
 	check(mgr.is_hole(Vector2(201.0, 100.0)) and mgr.is_hole(Vector2(231.0, 300.0)), "its rectangle is a hole")
 	check(not mgr.is_hole(Vector2(199.0, 100.0)) and not mgr.is_hole(Vector2(233.0, 100.0)), "and only it")
 	body.free()
+
+
+func test_touches_hole_is_a_circles_overlap() -> void:
+	check(not mgr.touches_hole(Vector2(195.0, 100.0), 6.0), "no holes, no touch")
+	_crack()
+	check(mgr.touches_hole(Vector2(195.0, 100.0), 6.0), "a circle reaching 1 px over the lip")
+	check(not mgr.touches_hole(Vector2(194.0, 100.0), 6.0), "one only touching the lip is not over it")
+	check(not mgr.touches_hole(Vector2(150.0, 100.0), 6.0), "one far off")
+	mgr.set_walls([Rect2(200.0, 80.0, 8.0, 40.0)] as Array[Rect2])
+	mgr.set_holes([CRACK] as Array[Rect2])
+	check(not mgr.touches_hole(Vector2(195.0, 100.0), 6.0), "a wall over the lip's cells wins")

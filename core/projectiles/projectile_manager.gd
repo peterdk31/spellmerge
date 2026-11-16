@@ -2019,6 +2019,27 @@ func is_hole(point: Vector2) -> bool:
 	return _hole_cells[cell] != 0 and _wall_cells[cell] == 0
 
 
+## True when a circle of `radius` at `center` reaches over a hole cell no wall covers (`is_hole`): it
+## overlaps the cell, not only touches it, as the walk's slide finds an overlap (`WallSlide`).
+func touches_hole(center: Vector2, radius: float) -> bool:
+	if not _has_holes:
+		return false
+	var r: float = maxf(radius, 0.0)
+	var x0: int = maxi(floori((center.x - r - _bounds.position.x) / WALL_CELL), 0)
+	var x1: int = mini(floori((center.x + r - _bounds.position.x) / WALL_CELL), _wall_w - 1)
+	var y0: int = maxi(floori((center.y - r - _bounds.position.y) / WALL_CELL), 0)
+	var y1: int = mini(floori((center.y + r - _bounds.position.y) / WALL_CELL), _wall_h - 1)
+	for cy in range(y0, y1 + 1):
+		for cx in range(x0, x1 + 1):
+			var cell: int = cy * _wall_w + cx
+			if _hole_cells[cell] == 0 or _wall_cells[cell] != 0:
+				continue
+			var low: Vector2 = _bounds.position + Vector2(cx, cy) * WALL_CELL
+			if center.distance_squared_to(center.clamp(low, low + Vector2(WALL_CELL, WALL_CELL))) < r * r:
+				return true
+	return false
+
+
 ## True while the room has holes (`set_holes`): a body's move is then slid in two parts
 ## (`Actor.move`).
 func has_holes() -> bool:

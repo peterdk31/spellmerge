@@ -66,14 +66,15 @@ func _ask(body: Actor, mode: StringName, move: Vector2, seconds: float) -> void:
 	_world.bus.caster_move_requested.emit(body.caster_number(), mode, move, seconds, _world.tag_of(body))
 
 
-## `count` ticks as the game steps a body: its step, then its move (`Actor.tick_step`).
-func _run(count: int) -> void:
+## `count` ticks of `step` seconds (the fixture's 1/16 unless said) as the game steps a body: its
+## step, then its move (`Actor.tick_step`).
+func _run(count: int, step: float = Fixture.STEP) -> void:
 	for i in count:
 		for body in _world.actors:
 			if is_instance_valid(body) and body.is_inside_tree():
-				body.tick_step(Fixture.STEP)
-		_world.projectiles.step(Fixture.STEP)
-		_world.spells.step(Fixture.STEP)
+				body.tick_step(step)
+		_world.projectiles.step(step)
+		_world.spells.step(step)
 
 
 func test_walking_stops_at_a_holes_lip() -> void:
@@ -176,6 +177,39 @@ func test_a_push_carries_a_body_walking_away_into_the_crack() -> void:
 	check(_world.projectiles.is_hole(body.global_position), "it is still over the crack")
 
 
+func test_a_slow_push_carries_a_walking_body_in_at_the_games_tick() -> void:
+	# Regression (review of HR-H1): a push of a Slam's size moves a body 4 px a tick at 60 ticks a
+	# second, less than its radius; the walk's slide once pushed it back out of the lip every tick.
+	for walk: Vector2 in [Vector2.LEFT, Vector2.UP, Vector2.DOWN, Vector2.RIGHT]:
+		_world.free_all()
+		before_each()
+		var body: Actor = _walker(Vector2(LIP, 100.0))
+		_controller(body).move = walk
+		_combat.push = Vector2(240.0, 0.0)
+		_run(6, 1.0 / 60.0)
+		check(_world.projectiles.is_hole(body.global_position), "a push carries it in, walking %s: %s" % [walk, body.global_position])
+
+
+func test_a_slow_pull_carries_a_body_walking_alongside_in() -> void:
+	var body: Actor = _walker(Vector2(LIP, 100.0))
+	_ask(body, &"pull", Vector2(40.0, 0.0), 1.0)
+	_controller(body).move = Vector2.DOWN
+	_run(30, 1.0 / 60.0)
+	check(_world.projectiles.is_hole(body.global_position), "pulled 40 px a second while it walks along the lip, it goes in: %s" % body.global_position)
+	check(body.global_position.y > 120.0, "its walk went on: %s" % body.global_position)
+
+
+func test_a_slow_push_never_lets_the_walk_step_in() -> void:
+	# A push along the lip, the circle over it, and a walk into the crack: the walk is dropped where
+	# it would set the centre over the hole.
+	var body: Actor = _walker(Vector2(197.0, 100.0))
+	_controller(body).move = Vector2.RIGHT
+	_combat.push = Vector2(0.0, 120.0)
+	_run(20, 1.0 / 60.0)
+	check(not _world.projectiles.is_hole(body.global_position), "it never walked in: %s" % body.global_position)
+	check(body.global_position.y > 130.0, "the push carried it along: %s" % body.global_position)
+
+
 func test_knockback_at_the_lip_while_walking_into_it() -> void:
 	# A push away from the crack and a walk into it: the walk stops at the lip, the push carries on.
 	var body: Actor = _walker(Vector2(LIP, 100.0))
@@ -212,6 +246,19 @@ func test_a_room_with_no_holes_moves_a_body_as_one_slide() -> void:
 	body.move(Fixture.STEP)
 	check_equal(body.global_position, expected, "one slide of the sum")
 	check_equal(body.mover.crossing, Vector2.ZERO, "the crossing share is used by the move")
+	# The velocity is summed in the order it was before holes (a pull, the walk, the push), which
+	# single-precision vectors would otherwise round apart.
+	_world.free_all()
+	before_each()
+	_world.projectiles.set_holes([] as Array[Rect2])
+	var pulled: Actor = _walker(START)
+	_ask(pulled, &"pull", Vector2(0.1, 0.3), 0.7)
+	_controller(pulled).move = Vector2(0.6, 0.8)
+	_combat.push = Vector2(0.7, 0.1)
+	pulled.step(Fixture.STEP)
+	var pull: Vector2 = Vector2(0.1, 0.3) / 0.7
+	var share: Vector2 = pull * Fixture.STEP / Fixture.STEP
+	check_equal(pulled.velocity, share + Vector2(0.6, 0.8).limit_length(1.0) * pulled.mover.speed * 1.0 + _combat.push, "moves, then the walk, then the push")
 
 
 

@@ -158,10 +158,14 @@ func step(delta: float) -> void:
 			var way: Vector2 = actor.spells.plow().way_of(actor.id)
 			walk -= way * minf(walk.dot(way), 0.0)
 	# Everything but its own walk crosses holes (`crossing`): its moves, its carry, Combat's push.
-	crossing = _moved + carry
-	if actor.combat != null:
-		crossing += actor.combat.own_knockback(actor, actor.id, delta)
-	actor.velocity = crossing + walk
+	# The velocity is summed in the order it always was, so a room with no holes moves to the bit as
+	# before.
+	var knockback: Vector2 = actor.combat.own_knockback(actor, actor.id, delta) if actor.combat != null else Vector2.ZERO
+	crossing = _moved + carry + knockback
+	var velocity: Vector2 = _moved
+	if not legs:
+		velocity += walk
+	actor.velocity = velocity + carry + knockback
 
 
 ## True while a move carries the actor.

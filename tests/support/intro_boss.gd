@@ -18,7 +18,8 @@ const LINES: Array[String] = ["You will not pass this test.", "Nobody ever passe
 static func make(registry: Node, biome: StringName = &"test_overlay_lair", lines: Array[String] = LINES) -> EnemyBase:
 	var data: EnemyBase = (registry.call("get_resource", &"enemies", &"ember_imp") as EnemyBase).duplicate() as EnemyBase
 	data.id = ID
-	data.display_name = NAME
+	# Set by name: a fixture outside the test files reads no field a spell has too (test_spell_field_reads).
+	data.set(&"display_name", NAME)
 	data.lore = LORE
 	data.boss = true
 	data.biomes = [biome] as Array[StringName]

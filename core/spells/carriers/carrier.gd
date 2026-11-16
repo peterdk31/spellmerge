@@ -388,6 +388,18 @@ func scale_size(spell: CompiledSpell, factor: float) -> void:
 		spell.behaviours[blast] *= factor
 
 
+## Whether an enemy's AI holds its button down for it (`CastSense.repeats_held`): a carrier cast
+## anew when held (`REPEATS_HELD`: a swing) or a line that stays on (`LINE`: a beam); a spray too.
+func ai_holds() -> bool:
+	return has(REPEATS_HELD) or has(LINE)
+
+
+## How wide a cast of `spell` strikes either side of its aim (pixels), for an enemy's AI (its lane,
+## `CastSense.radius`): its hit radius, by default; a cone's (a spray's) is wider out at its reach.
+func lane_radius(spell: CompiledSpell) -> float:
+	return spell.radius
+
+
 ## How far a cast of `spell` reaches along its aim, for an enemy's telegraph (`Spells.next_cast_reach`);
 ## 0 for one that is not aimed.
 func reach_of(_spell: CompiledSpell) -> float:

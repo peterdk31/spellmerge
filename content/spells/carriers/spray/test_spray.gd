@@ -100,3 +100,45 @@ func test_a_wall_hides_what_is_behind_it_and_cuts_it_short() -> void:
 	check_equal(arena.lost(arena.imps[0]), 0, "the imp behind the wall is dry")
 	check(shown.size() == 1 and float(shown[0]) < 34.0, "its jet stops at the wall (%s)" % [shown])
 	arena.free_all()
+
+
+func test_an_enemy_holds_it_and_knows_its_cone() -> void:
+	# The review, 2026-11-16: an enemy fired one puff and rested. Held, it is cast anew (`REPEATS_HELD`)
+	# and the AI's lane is its cone's width out at its reach, not its 4 px hit radius.
+	var spell := CompiledSpell.new()
+	spell.carrier = &"spray"
+	spell.ray_length = 80.0
+	spell.arc = 24.0
+	spell.radius = 4.0
+	var spray: Carrier = Carriers.of(&"spray")
+	check(spray.ai_holds(), "an enemy holds it down, so it pours on")
+	var lane: float = spray.lane_radius(spell)
+	check(lane > 16.0 and lane < 30.0, "its lane is its cone's width at its reach (%s px)" % lane)
+	spell.radius = 8.0
+	check(spray.lane_radius(spell) > lane, "a bigger one is wider")
+
+
+func test_a_bigger_caster_sprays_further() -> void:
+	var spell := CompiledSpell.new()
+	spell.ray_length = 80.0
+	spell.radius = 4.0
+	Carriers.of(&"spray").scale_size(spell, 2.0)
+	check(is_equal_approx(spell.ray_length, 160.0), "twice the caster, twice the reach")
+
+
+func test_its_end_is_where_a_wall_cuts_it_and_its_payload_goes_off_there() -> void:
+	var arena := ArenaScript.new(root)
+	arena.add_wall(Rect2(60.0, -40.0, 8.0, 80.0))
+	var imp: Node2D = arena.add_imp(Vector2(48.0, 0.0))
+	# A frost nova where the jet ends: it chills the imp beside the wall.
+	arena.install_cards(0, 0, ["on_expire", "spray", "frost", "nova", "bolt"])
+	arena.cast(0, 0)
+	arena.run(1.0)
+	check(arena.lost(imp) > 0, "the spray and its payload reach the imp before the wall")
+	arena.free_all()
+
+
+func test_two_cones_of_a_split_spray_each_strike() -> void:
+	var out: Array = _cast(["split", "spray"], [Vector2(50.0, -22.0), Vector2(50.0, 22.0)])
+	var lost: Array[int] = out[0]
+	check(lost[0] > 0 and lost[1] > 0, "a cone either way, each striking its imp (%s)" % [lost])

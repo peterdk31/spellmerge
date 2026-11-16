@@ -53,7 +53,9 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directio
 		# Spat out of the staff to where it lies, for looks (its `shown_cue`: the liquid flying out
 		# as far as the pool, landing as it splashes in).
 		var lies: Vector2 = kit.projectiles.get_position_of(slot)
+		kit.set_cue_tag(tag)
 		kit.events.carrier_shown.emit(actor, spell.carrier_card_id, origin, origin.direction_to(lies) if lies != origin else heading, origin.distance_to(lies), spell.tint, spell.look)
+		kit.set_cue_tag(0)
 	if made > 0 and kit.projectiles.is_alive(slot) and kit.projectiles.get_seq_of(slot) == seq:
 		_pl_slot.append(slot)
 		_pl_seq.append(seq)

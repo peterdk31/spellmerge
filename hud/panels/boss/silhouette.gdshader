@@ -14,21 +14,24 @@ uniform vec4 dark : source_color = vec4(0.0784, 0.0706, 0.1216, 1.0);
 // frame's pixel.
 uniform vec2 frame_x = vec2(0.0, 1.0);
 
-float opaque_at(sampler2D sheet, vec2 uv) {
-	if (uv.x < frame_x.x || uv.x > frame_x.y || uv.y < 0.0 || uv.y > 1.0) {
-		return 0.0;
-	}
-	return step(0.5, texture(sheet, uv).a);
+// 1 when `uv` is inside the frame and `alpha` (the sheet's there) is opaque.
+float opaque_at(vec2 uv, float alpha) {
+	float inside = step(frame_x.x, uv.x) * step(uv.x, frame_x.y) * step(0.0, uv.y) * step(uv.y, 1.0);
+	return inside * step(0.5, alpha);
 }
 
 void fragment() {
 	vec4 own = texture(TEXTURE, UV);
 	float shown = step(0.5, own.a);
 	vec2 px = TEXTURE_PIXEL_SIZE;
-	float inner = opaque_at(TEXTURE, UV + vec2(px.x, 0.0))
-		* opaque_at(TEXTURE, UV - vec2(px.x, 0.0))
-		* opaque_at(TEXTURE, UV + vec2(0.0, px.y))
-		* opaque_at(TEXTURE, UV - vec2(0.0, px.y));
+	vec2 right = UV + vec2(px.x, 0.0);
+	vec2 left = UV - vec2(px.x, 0.0);
+	vec2 down = UV + vec2(0.0, px.y);
+	vec2 up = UV - vec2(0.0, px.y);
+	float inner = opaque_at(right, texture(TEXTURE, right).a)
+		* opaque_at(left, texture(TEXTURE, left).a)
+		* opaque_at(down, texture(TEXTURE, down).a)
+		* opaque_at(up, texture(TEXTURE, up).a);
 	float edge = shown * (1.0 - inner);
 	vec3 colour = mix(dark.rgb, own.rgb, reveal);
 	colour = mix(colour, rim_color.rgb, edge * rim);

@@ -2,6 +2,27 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-16: what ground cover costs (ground cover GC6)
+
+Measured with `tests/benchmark/cover_cost.gd` (new; headless, a shared cloud machine, the native module on, the run's seed fixed): the largest room (the boss's arena, `boss_broom`: 1,243 cells of 1,716 under a stand-in grass over every open cell; the crypt arenas 628 to 814), 100 stand-ins (`prop_stand_in.tres`, never dying) spread over it, each moving a little every tick so Feel always has new places to bend and trample by, and the wizard. Four scenes: **none** (no cover: the game as main plays it until GC8's art), **rest** (all of it covered, at rest), **burning** (all of it lit by one touch and held burning: the plan's "all of it burning at once"; 92 bodies standing in it, each burnt every half second through Combat) and **front** (the grass as it is, lit at the middle and spreading by the run's chance for 15 s). Main and this branch on the same machine, by turns (ms; the machine's noise is about ±0.1 ms on the averages and much more on a max):
+
+| | none | rest | burning | front |
+| --- | --- | --- | --- | --- |
+| a tick, main | 0.34 | 0.54 | 9.65 (p95 14.6) | 0.77 (max 2.4) |
+| a tick, GC6 | 0.35 | 0.38 | 2.79 (p95 4.1) | 0.66 (max 3.3) |
+| the Cover step alone, main | 0.002 | 0.22 | 9.25 | |
+| the Cover step alone, GC6 | 0.002 | 0.006-0.014 | 1.84 | |
+| a frame (Feel's step), GC6 | 0.34 | 0.39 | 0.61 | 0.40 |
+| Feel's cover step alone, GC6 | 0.13 | 0.21 | 0.13 | |
+
+**What it asked for, and what was done** (both in `gameplay/cover/cover.gd`; the fire is the same: the front's rolls, cells and state hash match main's with the same seed):
+
+- **A room at rest cost 0.22 ms a tick:** the area looked up the cell of every body every tick to find the ones in harmful cover, with nothing harmful anywhere. Now the bodies are looked at only while a cell is out of rest, a kind of the room harms at rest (cobwebs, decision 3: `_rest_harms`, worked out with the layout) or a body is still kept as harmed: what a covered room at rest costs is gone (6-14 µs).
+- **All of it burning cost 9-13 ms a tick:** each burning cell looked its kind's states and triggers up as resources (an `after` row, then each of its four neighbours' `element` rows by name, `state_at` by name) every tick. The kinds' moves are now tables worked out once with the layout (`gameplay/cover/cover_moves.gd`, derived: each kind's state's move on each element, its `after` rows that would move it, what it spreads and at what chance), and the two loops that may cover the whole room (the touches, the cells' step) read them directly: 1.8 ms. What is left is the loop itself, about 1.5 µs a burning cell; a native kernel was not asked for (the plan: only if the benchmark asks), since a whole room burning at once is the worst the game can do, and a real fire's front holds tens of cells (the front's worst tick: 27 cells burning).
+- **A neighbour that its element would leave in its own state was rolled for:** a state whose element row names itself (none in content) moved nothing, yet each burning cell rolled for each burning neighbour every tick (four rolls a cell). Now a spread rolls only for a neighbour its element moves to another state, as gameplay/cover/README.md always said; a regression test holds it. The test grass and every kind so far roll exactly as before.
+- **Feel's tufts told a change** (`show_state`) rolled each tuft again (`CoverTufts.roll`, the kind's name hashed each call); the rolls are now kept from laying the room (`_slot_rolls`). The tick a whole room catches at once (1,243 cells lit in one touch, in the tick the touches and the cells' step and the bodies' first burns all land) is a spike of 17-24 ms on both, Feel's share of it 5.6-9.8 ms (7.3 on main); a blast lights tens of cells, so it was left there.
+- **Not measured:** the GPU (headless; one batch a kind and one shader, the bend's cost with its 32 bodies, the same as GC3 and GC4 drew it), and the hash at large (the Cover area's share of a state hash is 0.02-0.03 ms whatever burns: its packed arrays). Feel's frame is unchanged by fire but for the tufts told.
+
 ## 2026-11-14: the HUD follows the driven body (items I8)
 
 - **Every actor has an inventory** (owner, 2026-11-14: "I would like every actor to have one, since props can also cast"), not only wizards and enemies with staffs: the actor adds one when its scene has none, so nothing asks whether a body can hold things, and a boss's phase always swaps its staffs through it. Two rules keep it cheap and meaningful: **hands are a Caster's** (a body with no Caster has none; a staff it takes stays in its bag), and **an untouched inventory is at rest** (`at_rest`), so a still prop's state hash stays its few rest values. Without that, the first I8 commit's inventories (on enemies with staffs, which the prop benchmark's stand-ins are) made the hash of 1,000 still bodies four times slower (45 to 182 ms). A snapshot holds one inventory more a body (about half as long again for 1,000 props); snapshots are taken at a join and a replay's seek, never in a tick, so that stays. With 100 enemies, which never rest, the stress benchmark's state hash goes from 29 to 33 ms (about 45 µs an enemy; 0.63 to 0.70 ms a tick spread over the ticks), and frame times are unchanged.

@@ -82,6 +82,9 @@ var _spare: Array[MultiMeshInstance2D] = []
 ## each cell shows.
 var _first_slot: PackedInt32Array = PackedInt32Array()
 var _slot_row: Array[PackedInt32Array] = []
+## Each kind's roll of each slot (`CoverTufts.roll`), kept from laying it, so a cell's change rolls
+## nothing again (a whole room catching at once, GC6).
+var _slot_rolls: Array[PackedInt64Array] = []
 var _shown: PackedInt32Array = PackedInt32Array()
 ## The kinds a test or a screenshot gave (`use_kinds`); the registry's while null.
 var _given: Array[CoverKind] = []
@@ -177,6 +180,7 @@ func lay(laid: CoverLayout) -> void:
 	_batches.clear()
 	_rows.clear()
 	_slot_row.clear()
+	_slot_rolls.clear()
 	_first_slot.resize(laid.cells.size())
 	_first_slot.fill(-1)
 	_shown.resize(laid.cells.size())
@@ -190,6 +194,7 @@ func lay(laid: CoverLayout) -> void:
 	for index in laid.kinds.size():
 		_rows.append(PackedFloat32Array())
 		_slot_row.append(PackedInt32Array())
+		_slot_rolls.append(PackedInt64Array())
 		_batches.append(_lay_kind(index))
 
 
@@ -356,11 +361,12 @@ func show_state(cell: int, state: int) -> void:
 	# would be copied).
 	var rows: PackedFloat32Array = _rows[index]
 	_rows[index] = PackedFloat32Array()
-	var kind_key: int = CoverLayout.name_hash(kind.id)
 	var slot_row: PackedInt32Array = _slot_row[index]
+	var slot_rolls: PackedInt64Array = _slot_rolls[index]
+	var first: int = _first_slot[cell]
+	var look: CoverState = kind.states[state]
 	for tuft in kind.tufts_per_cell:
-		var rolled: int = CoverTufts.roll(layout, kind_key, cell, tuft)
-		_write_look(rows, slot_row[_first_slot[cell] + tuft] * STRIDE, kind, kind.states[state], rolled)
+		_write_look(rows, slot_row[first + tuft] * STRIDE, kind, look, slot_rolls[first + tuft])
 	_rows[index] = rows
 	_dirty[index] = 1
 
@@ -416,6 +422,7 @@ func _lay_kind(index: int) -> MultiMeshInstance2D:
 		rows[at + 7] = foot.y
 		_write_look(rows, at, kind, rest, rolls[at_slot])
 	_slot_row[index] = slot_row
+	_slot_rolls[index] = rolls
 	var row: int = tufts
 	var batch: MultiMeshInstance2D = _batch()
 	batch.name = "Cover_%s" % kind.id

@@ -295,6 +295,8 @@ var yard: PropYard = PropYard.new()
 var hub: HubRules = HubRules.new()
 ## The exits of a run's room and the ways they lead (run generation RG4).
 var exits: ExitRules = ExitRules.new()
+## The adds standing, each with the body that called it (boss plan OB13).
+var adds: RoomAdds = RoomAdds.new()
 ## The room's layout in the world, and the room it is of (a joining machine built the room the run
 ## started in: a snapshot taken in a later room lays that room's out again, `rebuild_derived`).
 var _layout: Node = null
@@ -356,6 +358,7 @@ func _ready() -> void:
 	events.player_joined.connect(_on_player_joined)
 	events.player_left.connect(_on_player_left)
 	events.run_room_chosen.connect(_on_run_room_chosen)
+	events.adds_requested.connect(_on_adds_requested)
 
 
 ## Advance the intro and the run's end (restart) timer by `delta` seconds; the prop yard; in the hub,
@@ -366,6 +369,7 @@ func step(delta: float) -> void:
 	contents.forget_gone()
 	if world != null and state != State.IDLE:
 		yard.tend(delta, world, registry)
+		_crumble_orphans()
 	_count_stand_ups(delta)
 	if mode == MODE_HUB and state == State.RUNNING:
 		_count_stone()
@@ -681,7 +685,7 @@ func _enter_next_room(room: RoomBase) -> void:
 		events.room_left.emit()
 	if projectiles != null:
 		projectiles.clear()
-	_enemies.clear()
+	_forget_enemies()
 	contents.clear()
 	yard.clear()
 	for child: Node in world.get_children():
@@ -1053,7 +1057,7 @@ func clear_sandbox_enemies() -> void:
 	for enemy: Node in _enemies:
 		if is_instance_valid(enemy):
 			_detach(enemy)
-	_enemies.clear()
+	_forget_enemies()
 
 
 ## Add the wizard of a player who joined mid-run: at the room's spawn for joiners when it has them
@@ -1067,6 +1071,7 @@ func _on_player_joined(player: int) -> void:
 	var joiners: PackedVector2Array = _places.joiner_spawns
 	var at: Vector2 = joiners[player] if player < joiners.size() else _joiner_spawn(_room, player)
 	_add_wizard(world, _room, player, at)
+	_count_players()
 	var joiner: DownedScript = DownedScript.of(get_wizard(player))
 	# In a room where a fall costs nothing (the hub), a joiner needs no moment of protection.
 	if joiner != null and not _stands_up_by_itself():
@@ -1094,6 +1099,7 @@ func _on_player_left(player: int) -> void:
 	if parent != null:
 		parent.remove_child(wizard)
 	wizard.queue_free()
+	_count_players()
 	_count_stone()
 	if _can_be_lost() and _restart_left < 0.0 and _all_down() and not _stands_up_by_itself():
 		_restart_left = restart_delay()
@@ -1101,6 +1107,7 @@ func _on_player_left(player: int) -> void:
 
 func _on_enemy_died(_player: int, enemy: Node, _position: Vector2, _shot: int) -> void:
 	contents.forget(enemy)
+	adds.orphan(enemy)
 	var at: int = _enemies.find(enemy)
 	if at < 0:
 		return
@@ -1360,7 +1367,7 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 ## The enemies the run puts in the room (`enemies`: ids, one per body) stand at its enemy spawns,
 ## round them in turn. An id the registry has no enemy or boss for stands nothing (a warning).
 func _stand_room_enemies(parent: Node2D, room: RoomBase, enemies: Array[StringName]) -> void:
-	_enemies.clear()
+	_forget_enemies()
 	var placed: int = 0
 	if not enemies.is_empty() and _places.enemy_spawns.is_empty():
 		push_warning("Flow: the room '%s' has no enemy spawns, so its enemies cannot stand." % room.id)
@@ -1397,15 +1404,114 @@ func _spawn_enemies(parent: Node2D, data: EnemyBase, count: int, first: int) -> 
 		var nth: int = first + at
 		var spawn: int = nth % spawns.size()
 		var times: int = nth / spawns.size()
-		var enemy := RoomContents.make_body(data) as Actor
-		if enemy == null:
-			continue
-		enemy.position = stacked_position(spawns[spawn], times)
-		# Scaled to the room before its data is applied (difficulty, run generation RG5).
-		if events != null:
-			events.enemy_standing.emit(enemy)
-		parent.add_child(enemy)
-		_enemies.append(enemy)
+		_stand_enemy(parent, data, stacked_position(spawns[spawn], times))
+
+
+## One enemy of `data` stands at `at` in `parent`, among the room's fight: counted for the wizards in
+## play (`Actor.players`, boss plan OB13) and told to difficulty (`enemy_standing`: scaled to the
+## room, run generation RG5), both before its data is applied. Null when no body could be made.
+func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2) -> Actor:
+	var enemy := RoomContents.make_body(data) as Actor
+	if enemy == null:
+		return null
+	enemy.position = at
+	enemy.players = _players_in_play()
+	if events != null:
+		events.enemy_standing.emit(enemy)
+	parent.add_child(enemy)
+	_enemies.append(enemy)
+	return enemy
+
+
+## The room's enemies are forgotten (they went with the room, or the sandbox's arena was cleared),
+## their adds too.
+func _forget_enemies() -> void:
+	_enemies.clear()
+	adds.clear()
+
+
+## The wizards in play (1 at least): what an enemy's health and a phase's adds are counted for.
+func _players_in_play() -> int:
+	return maxi(_wizards.size(), 1)
+
+
+## A wizard joined or left: every enemy standing counts the wizards in play again (its health by
+## `EnemyBase.health_per_player`, keeping its share).
+func _count_players() -> void:
+	var players: int = _players_in_play()
+	for enemy: Node in _enemies:
+		var actor := enemy as Actor
+		if actor != null and is_instance_valid(actor):
+			actor.count_players(players)
+
+
+## The body `actor` calls the adds `entry` (its entry `key`; a `wave` or its phase's burst; boss plan
+## OB13): as many as the entry names for the wizards in play, under its cap of those alive (and the
+## sandbox's most), on a ring round the body or at the room's enemy spawns. Only for a body Flow stood,
+## while a room is up; an id the registry has no enemy for stands nothing (a warning).
+func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> void:
+	if entry == null or world == null or state == State.IDLE:
+		return
+	var caller: Actor = _enemy_of(actor)
+	if caller == null:
+		return
+	var data: EnemyBase = _enemy_data_of(entry.enemy)
+	if data == null or data.scene == null:
+		push_warning("Flow: '%s' calls the adds '%s', which the registry has no enemy for." % [caller.name, entry.enemy])
+		return
+	var players: int = _players_in_play()
+	var wanted: int = entry.wave_for(players) if wave else entry.burst_for(players)
+	var count: int = entry.allowed(wanted, adds.alive(caller, key), players)
+	if mode == MODE_SANDBOX:
+		count = mini(count, maxi(SANDBOX_MAX - _enemies.size(), 0))
+	var spawns: PackedVector2Array = _places.enemy_spawns
+	var at_spawns: bool = entry.at == EnemyAdds.At.SPAWNS and not spawns.is_empty()
+	var centre: Vector2 = world.to_local(caller.global_position)
+	var reach: float = caller.hurtbox.outer_radius() if caller.hurtbox != null else caller.wall_radius()
+	var slide: Callable = projectiles.slide_body if projectiles != null else Callable()
+	var radius: float = _body_radius_of(data)
+	for n: int in count:
+		var at: Vector2
+		if at_spawns:
+			at = stacked_position(spawns[adds.stood % spawns.size()], adds.stood / spawns.size())
+		else:
+			at = RoomAdds.ring(centre, reach, radius, n, count, slide)
+		var add: Actor = _stand_enemy(world, data, at)
+		if add != null:
+			adds.track(add, caller, key)
+
+
+## The enemy standing in the room whose actor id is `actor`, or null.
+func _enemy_of(actor: int) -> Actor:
+	for enemy: Node in _enemies:
+		var body := enemy as Actor
+		if actor >= 0 and body != null and is_instance_valid(body) and body.id == actor:
+			return body
+	return null
+
+
+## How wide the ground of an enemy of `data` is against the walls (its scene's `Footprint` circle, else
+## the default one), at its data's size: the room an add needs on the ring. Asked once a call of adds.
+func _body_radius_of(data: EnemyBase) -> float:
+	var base: float = Footprint.DEFAULT_RADIUS
+	var made: Node = data.scene.instantiate() if data.scene != null else null
+	if made != null:
+		var footprint := made.get_node_or_null("Footprint") as Footprint
+		if footprint != null:
+			base = footprint.radius
+		made.free()
+	return base * (data.size if data.size > 0.0 else 1.0)
+
+
+## The adds whose caller died crumble (boss plan OB13), each through Combat (`crumble_requested`):
+## its death is told as any other, and the room is cleared when the last is down.
+func _crumble_orphans() -> void:
+	if events == null:
+		return
+	for add: Node in adds.orphans():
+		var actor := add as Actor
+		if actor != null and not actor.is_dying():
+			events.crumble_requested.emit(actor.id)
 
 
 ## Forget the old run: wizards leave `Combat` (the enemies do it themselves when
@@ -1416,7 +1522,7 @@ func _clear_run() -> void:
 			if is_instance_valid(wizard):
 				combat.unregister_actor(wizard)
 	_wizards.clear()
-	_enemies.clear()
+	_forget_enemies()
 	contents.clear()
 	yard.clear()
 	if world != null and is_instance_valid(world):

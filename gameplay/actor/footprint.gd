@@ -20,8 +20,10 @@ extends ActorComponent
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 
+## The circle's radius when its scene names none.
+const DEFAULT_RADIUS: float = 6.0
 ## The circle's radius in pixels: the body against the walls (a wizard 6, a mite 5).
-@export var radius: float = 6.0
+@export var radius: float = DEFAULT_RADIUS
 ## A box this wide and high in place of the circle, for a body that cannot move (zero: the circle).
 ## A body that walks slides as its circle whatever this is.
 @export var size: Vector2 = Vector2.ZERO

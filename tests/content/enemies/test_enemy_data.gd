@@ -40,6 +40,56 @@ func test_every_enemy_is_sound() -> void:
 				check_equal(SpellValidator.check_staff(entry.staff).size(), 0, "%s: its phase's staff is valid" % data.id)
 
 
+## Boss plan OB13: every phase's adds name an enemy of the registry that is not a boss (a boss calling
+## a boss would have two bars and two deaths to wait for).
+func test_every_phases_adds_are_enemies_of_the_registry() -> void:
+	var registry := RegistryScript.new()
+	registry.call("scan")
+	for data in _enemies():
+		for phase: EnemyPhase in data.phases:
+			for adds: EnemyAdds in phase.adds:
+				var called := registry.call("get_resource", &"enemies", adds.enemy) as EnemyBase
+				check(called != null and not called.boss, "%s: its adds '%s' are an enemy of the registry" % [data.id, adds.enemy])
+	registry.free()
+
+
+## Boss plan OB13: an entry's numbers for the players in play (each "per player" after the first), its
+## cap of those alive, and what is wrong with one.
+func test_adds_count_by_the_players_in_play() -> void:
+	var adds := EnemyAdds.new()
+	adds.enemy = &"ember_imp"
+	adds.count = 4
+	adds.per_player = 2
+	adds.every = 10.0
+	adds.wave_count = 2
+	adds.wave_per_player = 1
+	adds.cap = 6
+	adds.cap_per_player = 2
+	check_equal([adds.burst_for(1), adds.burst_for(4), adds.burst_for(0)], [4, 10, 4], "4 and 2 a player after the first")
+	check_equal([adds.wave_for(1), adds.wave_for(3)], [2, 4], "waves of 2 and 1 a player")
+	check_equal([adds.cap_for(1), adds.cap_for(4)], [6, 12], "the cap")
+	check_equal(adds.allowed(10, 0, 4), 10, "under the cap: all")
+	check_equal(adds.allowed(4, 9, 4), 3, "the cap's room only")
+	check_equal(adds.allowed(4, 14, 4), 0, "never fewer than none")
+	adds.cap = 0
+	check_equal(adds.allowed(40, 100, 1), 40, "no cap")
+	check_equal(adds.problems(), PackedStringArray(), "sound")
+	var bad := EnemyAdds.new()
+	bad.wave_count = 2
+	check_equal(bad.problems().size(), 3, "no enemy, nobody called, a wave with no time: %s" % bad.problems())
+	var data := EnemyBase.new()
+	data.id = &"boss"
+	data.max_health = 100.0
+	data.health_per_player = 0.7
+	var phase := EnemyPhase.new()
+	phase.health_below = 0.5
+	phase.adds = [bad, null] as Array[EnemyAdds]
+	data.phases = [phase] as Array[EnemyPhase]
+	check_equal(data.problems().size(), 4, "the phase's adds' problems, an empty entry too: %s" % data.problems())
+	check(is_equal_approx(data.health_for(4, 2.0), 100.0 * 2.0 * 3.1), "health by players and the room's scale")
+	check(is_equal_approx(data.health_for(1), 100.0) and is_equal_approx(data.health_for(0), 100.0), "one player: its own")
+
+
 func test_a_face_of_its_own_can_be_drawn() -> void:
 	# Boss plan OB9: a face's own art (`FaceArt`) has every sheet, whole frames and enough columns.
 	for data in _enemies():

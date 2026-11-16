@@ -90,6 +90,8 @@ const EVENTS: Dictionary = {
 	&"status_requested": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME], ["duration", TYPE_FLOAT], ["strength", TYPE_FLOAT]],
 	&"enemy_died": [["killer", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["shot", TYPE_INT]],
 	&"enemy_standing": [["enemy", TYPE_OBJECT]],
+	&"adds_requested": [["actor", TYPE_INT], ["adds", TYPE_OBJECT], ["key", TYPE_INT], ["wave", TYPE_BOOL]],
+	&"crumble_requested": [["actor", TYPE_INT]],
 	# Staffs (docs/milestones/M2-staffs.md, "Events").
 	&"staff_changed": [["player", TYPE_INT], ["staff", TYPE_INT], ["plan", TYPE_DICTIONARY]],
 	&"staff_cast": [["player", TYPE_INT], ["staff", TYPE_INT], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],

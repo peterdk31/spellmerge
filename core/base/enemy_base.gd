@@ -1,13 +1,17 @@
 class_name EnemyBase
 extends Resource
-## An enemy: its body's numbers, its scene, its staffs, how it plays them and a boss's phases.
-## M3 extends it with player-count scaling.
+## An enemy: its body's numbers, its scene, its staffs, how it plays them and a boss's phases, and its
+## health by the players in play (`health_per_player`, boss plan OB13).
 
 ## Unique name of the enemy, also its folder name; the registry finds it by this.
 @export var id: StringName = &""
 ## Its name for people (the enemy arena's picker); empty: its id.
 @export var display_name: String = ""
 @export var max_health: float = 1.0
+## The share of `max_health` each player in play after the first adds (boss plan OB13; 0: the same for
+## any number). Counted from the wizards in play when the body stands; one joining or leaving later
+## changes its most and its current health by the same share (`Actor.count_players`).
+@export_range(0.0, 4.0) var health_per_player: float = 0.0
 ## Pixels per second.
 @export var move_speed: float = 0.0
 ## Damage a player takes from touching the enemy.
@@ -68,6 +72,11 @@ func shown_name() -> String:
 	return display_name if display_name != "" else String(id).replace("_", " ").capitalize()
 
 
+## Its most health with `players` in play (1 at least) at the room's scale `scale` (`Actor.stat_scale`).
+func health_for(players: int, scale: float = 1.0) -> float:
+	return max_health * scale * (1.0 + health_per_player * float(maxi(players, 1) - 1))
+
+
 ## True when it fights in biome `biome` in row `depth` of a run's map (0 the first room).
 func fights_in(biome: StringName, depth: int) -> bool:
 	return biomes.has(biome) and depth >= min_depth
@@ -88,12 +97,16 @@ func profile_or_fallback() -> AIProfile:
 
 ## What is wrong with the enemy's data, one line each (empty when it is fine): too many staffs,
 ## a staff entry's problems, a phase without a condition or with too many staffs, its stats' or a
-## phase's stats' problems (`ActorStats.problems`), a cost below 1, a depth below 0 or a biome twice.
+## phase's stats' problems (`ActorStats.problems`), a phase's adds' problems (`EnemyAdds.problems`:
+## whether the enemy is in the registry is `Registry`'s to know, checked by the enemy data's test), a
+## health per player that is not a number, a cost below 1, a depth below 0 or a biome twice.
 func problems() -> PackedStringArray:
 	var found: PackedStringArray = StaffCards.list_problems(String(id), staffs, MAX_STAFFS)
 	if stats != null:
 		for line: String in stats.problems():
 			found.append("%s: stats: %s" % [id, line])
+	if not is_finite(health_per_player) or health_per_player < 0.0:
+		found.append("%s: its health_per_player is %s; 0 or more." % [id, health_per_player])
 	if cost < 1:
 		found.append("%s: its cost is %d; at least 1." % [id, cost])
 	if min_depth < 0:
@@ -111,6 +124,12 @@ func problems() -> PackedStringArray:
 		if phase.stats != null:
 			for line: String in phase.stats.problems():
 				found.append("%s: phase %d stats: %s" % [id, at, line])
+		for k in phase.adds.size():
+			if phase.adds[k] == null:
+				found.append("%s: phase %d adds %d are empty." % [id, at, k])
+				continue
+			for line: String in phase.adds[k].problems():
+				found.append("%s: phase %d adds %d: %s" % [id, at, k, line])
 		if phase.staffs.size() > MAX_STAFFS:
 			found.append("%s: phase %d has %d staffs; at most %d." % [id, at, phase.staffs.size(), MAX_STAFFS])
 		for k in phase.staffs.size():

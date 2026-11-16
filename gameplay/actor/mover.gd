@@ -71,6 +71,9 @@ var _tags: PackedInt64Array = PackedInt64Array()
 var _walled: PackedByteArray = PackedByteArray()
 var _homings: Array[Homing] = []
 var _count: int = 0
+## How many of the moves the last `step` stepped (the first ones; a move asked since is after
+## them), so `held_up` ends only a move the body walked this step, its last, shortened one too.
+var _stepped: int = 0
 ## What the moves added in the last step (pixels per second), for the looks.
 var _moved: Vector2 = Vector2.ZERO
 
@@ -106,6 +109,7 @@ func detach() -> void:
 func step(delta: float) -> void:
 	if actor.is_down():
 		_count = 0
+		_stepped = 0
 		_homings.fill(null)
 		_moved = Vector2.ZERO
 		actor.velocity = Vector2.ZERO
@@ -131,6 +135,7 @@ func step(delta: float) -> void:
 			share *= pace
 		_moved += share
 		_lefts[at] -= delta
+	_stepped = _count
 	var velocity: Vector2 = _moved
 	var carry: Vector2 = _carry()
 	if not legs:
@@ -173,8 +178,9 @@ func held_up(asked: Vector2, got: Vector2) -> void:
 		if carry.dot(along) > 0.0 and pushed > 0.0 and got.dot(along) < pushed * HEAD_ON_SHARE:
 			# Pinned against what it slides on (Plow, boss plan OB11).
 			actor.spells.plow().pinned(actor.id)
-	for at in _count:
-		if _modes[at] != &"dash" or _lefts[at] <= 0.0 or _velocities[at].is_zero_approx():
+	# Every move the body walked this step, its last one too (its time is up, answered at the next).
+	for at in mini(_stepped, _count):
+		if _modes[at] != &"dash" or _velocities[at].is_zero_approx():
 			continue
 		var way: Vector2 = _velocities[at].normalized()
 		var wanted: float = asked.dot(way)
@@ -197,7 +203,7 @@ func _on_carry_ended(_caster: int, _target: Node, carrier: int, _way: Vector2, p
 	if not pinned or carrier != actor.id or carrier < 0:
 		return
 	for at in _count:
-		if _modes[at] == &"dash" and _tags[at] == tag and _lefts[at] > 0.0:
+		if _modes[at] == &"dash" and _tags[at] == tag:
 			_lefts[at] = 0.0
 			_walled[at] = 1
 
@@ -218,6 +224,7 @@ func stop() -> void:
 ## starts with none.
 func drop() -> void:
 	_count = 0
+	_stepped = 0
 	_homings.fill(null)
 	_moved = Vector2.ZERO
 

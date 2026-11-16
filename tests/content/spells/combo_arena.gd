@@ -161,7 +161,8 @@ func shoot_at(from: Vector2, to: Vector2) -> void:
 ## at once, and answers where it landed (`caster_move_finished`), so a move's end point and its
 ## landing strike happen there, as a wizard's Mover would (a step later for all but a teleport).
 ## A move stops MOVE_CLEARANCE short of the first wall in its way, and a dash stopped so is answered
-## as ended by the wall (`walled`: its `on wall` fires, boss plan OB12). Its guard body, if it has
+## as ended by the wall (`walled`: its `on wall` fires, boss plan OB12): a simplification, since the
+## Mover slides a glancing dash on and ends only one met head on. Its guard body, if it has
 ## one, goes along.
 func answer_moves() -> void:
 	bus.caster_move_requested.connect(func(player: int, mode: StringName, move: Vector2, _seconds: float, tag: int) -> void:

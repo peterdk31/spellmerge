@@ -62,6 +62,48 @@ func test_a_dash_into_a_wall_head_on_fires_its_on_wall_there() -> void:
 	check(_pulses.size() == 1 and _pulses[0].distance_to(dasher.global_position) < 1.0, "round the dasher, which cast it: %s, %s" % [_pulses, dasher.global_position])
 
 
+func test_a_wall_met_on_the_dashs_last_step_counts() -> void:
+	# Regression (review of OB12): the 80 px dash's last, shortened step is the one the wall holds up;
+	# its time is up then, but the body was stopped head on, so its `on wall` fires.
+	for wall_x: float in [72.0, 76.0, 80.0, 84.0, 87.0]:
+		_world.free_all()
+		_world = Fixture.new(root)
+		_pulses.clear()
+		_world.bus.carrier_shown.connect(func(_caster: int, card: StringName, origin: Vector2, _direction: Vector2, _length: float, _tint: Color, _look: int) -> void:
+			if card == &"pulse":
+				_pulses.append(origin))
+		_world.projectiles.set_walls([Rect2(wall_x, -200.0, 40.0, 400.0)] as Array[Rect2])
+		var dasher: Actor = _dasher(Vector2.ZERO, [&"on_wall", &"dash", &"pulse"])
+		_walk(1)
+		check(dasher.caster.cast(0), "it dashes at the wall at %s" % wall_x)
+		_walk(40)
+		check(dasher.global_position.x < 80.0, "the wall at %s stopped it (%s)" % [wall_x, dasher.global_position])
+		check_equal(_pulses.size(), 1, "the wall at %s fired its `on wall`: %s" % [wall_x, _pulses])
+
+
+func test_its_on_wall_fires_before_its_on_expire() -> void:
+	# As a shot's last wall fires both, `on wall` first (`CasterMoves.end`): a plain ring for the
+	# wall, a fire ring for the end, told apart by their tint.
+	_world.projectiles.set_walls([Rect2(50.0, -200.0, 40.0, 400.0)] as Array[Rect2])
+	var staff := StaffBase.new()
+	staff.slots = 6
+	var controller := Fixture.Scripted.new()
+	controller.team = ActorsScript.TEAM_WIZARDS
+	controller.aim = Vector2.RIGHT
+	var dasher: Actor = _world.actor(Vector2.ZERO, [&"health", &"hurtbox", &"mover", &"caster"], controller, [[&"on_wall", &"on_expire", &"dash", &"pulse", &"fire", &"pulse"]], staff)
+	var tints: Array[Color] = []
+	_world.bus.carrier_shown.connect(func(_caster: int, card: StringName, _origin: Vector2, _direction: Vector2, _length: float, tint: Color, _look: int) -> void:
+		if card == &"pulse":
+			tints.append(tint))
+	var plain: Color = _world.spells.compile_staff([&"pulse"] as Array[StringName], null).casts[0].group.spells[0].tint
+	var fire: Color = _world.spells.compile_staff([&"fire", &"pulse"] as Array[StringName], null).casts[0].group.spells[0].tint
+	check(plain != fire, "the two rings look apart")
+	_walk(1)
+	check(dasher.caster.cast(0), "it dashes at the wall")
+	_walk(40)
+	check_equal(tints, [plain, fire] as Array[Color], "the wall's ring, then the end's")
+
+
 func test_a_dash_in_the_open_fires_no_on_wall() -> void:
 	var dasher: Actor = _dasher(Vector2.ZERO, [&"on_wall", &"dash", &"pulse"])
 	_walk(1)
@@ -100,8 +142,9 @@ func test_a_pinned_carried_body_fires_the_carriers_on_wall() -> void:
 	check(_pulses.size() == 1 and _pulses[0].distance_to(target.global_position) <= 30.0, "beside the pinned body: %s, %s" % [_pulses, target.global_position])
 
 
-func test_a_pin_in_the_open_counts_as_the_wall() -> void:
-	# A carried body held up head on is a wall met, wherever it is held (a prop's ground, a stone).
+func test_a_pin_told_in_the_open_counts_as_the_wall() -> void:
+	# The pin's own path (`carry_ended` to the carrier's Mover): wherever its Mover finds the carried
+	# body held up head on (a wall, a prop's ground, a stone), its carrier's dash ends `walled`.
 	var dasher: Actor = _dasher(Vector2.ZERO, [&"on_wall", &"plow", &"dash", &"pulse"])
 	var target: Actor = _target(Vector2(20.0, 0.0))
 	_walk(1)

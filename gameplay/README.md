@@ -39,7 +39,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `mana_reserved` | `core/spells` (to the seat that drives the caster) | none (the Caster reads `Spells.reserved_mana`, actors G7) |
 | `mana_refund_requested` | `core/spells` (for every actor) | `actor` (the Caster), each for its own actor id |
 | `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai`; `target_move_requested` also `actor` (the Mover) |
-| `caster_move_finished` | `actor` (the Mover), each with its own actor id | `core/spells`, `feel` (where a dash lands) |
+| `caster_move_finished` | `actor` (the Mover), each with its own actor id | `core/spells` (`walled`: a wall ended it, so its `on wall` fires; boss plan OB12) |
 | `entity_ended` | `ai` (Entities) | `core/spells` |
 | `shot_blocked` | `core/projectiles` | `core/spells` (on block) |
 | `barrier_changed` | `combat` (a barrier given, grown, blocking, run out or cleared) | `feel` (the barrier's bubble) |

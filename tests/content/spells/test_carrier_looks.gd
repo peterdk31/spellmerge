@@ -60,6 +60,22 @@ func test_a_look_shader_that_is_not_canvas_item_is_reported() -> void:
 	check(carrier_card.look_problems().is_empty(), "a card's own canvas-item shader is fine")
 
 
+func test_a_floor_or_merging_look_on_a_shot_that_is_not_still_is_reported() -> void:
+	var carrier_card := CarrierCard.new()
+	carrier_card.id = &"test_carrier"
+	carrier_card.carrier = &"pool"
+	carrier_card.look_shader = preload("res://content/spells/carriers/pool/pool.gdshader")
+	carrier_card.look_on_floor = true
+	carrier_card.look_merges = true
+	check(carrier_card.look_problems().is_empty(), "a still carrier's own shader may lie on the floor and merge")
+	carrier_card.look_shader = null
+	check(" ".join(carrier_card.look_problems()).contains("look_on_floor"), "with no shader of its own, nothing lies or merges")
+	carrier_card.look_shader = preload("res://content/spells/carriers/bolt/bolt.gdshader")
+	carrier_card.carrier = &"atom"
+	carrier_card.look_merges = false
+	check(" ".join(carrier_card.look_problems()).contains("look_on_floor"), "nor does a shot that flies")
+
+
 ## `shot_shader` was renamed `look_shader` (docs/milestones/card-looks.md): a card written with the
 ## old name keeps its look (it is taken as `look_shader`) and the validator names it, so it never
 ## loads clean and draws plain in silence.

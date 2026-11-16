@@ -365,6 +365,9 @@ static func reach(carrier_card: CarrierCard) -> float:
 			return carrier_card.speed * carrier_card.lifetime * 0.75
 		&"beam":
 			return minf(carrier_card.ray_length * 0.5, 90.0)
+		&"spray":
+			# In its cone, half way out.
+			return carrier_card.ray_length * 0.5
 		&"swing":
 			return carrier_card.ray_length * 0.75
 		&"slam":

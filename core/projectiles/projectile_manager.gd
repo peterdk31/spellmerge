@@ -602,6 +602,10 @@ const STILL_SHADER: Shader = preload("res://core/projectiles/shot_still.gdshader
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
 ## before the current scene, so at z_index 0 the room's floor hid every shot.
 const DRAW_Z: int = 50
+## Draw order of a card body that lies on the floor (`set_body_ground`: a pool): over the floor's
+## marks (`RoomBase.FLOOR_Z` + 1) at the bodies' z 0, a tie that the manager, an autoload before
+## the world and the other areas in the tree, loses, so it draws under every body.
+const FLOOR_DRAW_Z: int = RoomBase.FLOOR_Z + 2
 ## A shot is drawn this many times wider than its hit circle (the art has empty
 ## margins and a pixel-art bolt is small on a 640x360 view).
 const DRAW_SCALE: float = 3.0
@@ -634,6 +638,11 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 	Color("#7fc0f0"), Color("#f59ab8"), Color("#8fd46a"), Color("#c99af0"), Color("#e3cf6b"),
 ]
 
+## How a card body lies (`set_body_ground`): on the floor, under the bodies; its overlapping shots
+## drawn as one.
+const GROUND_FLOOR: int = 1
+const GROUND_MERGES: int = 2
+
 ## There are more draw batches now (`register_body` numbered a card body): `count` in all. Whoever
 ## mirrors the batches (Feel's spell light) adds theirs for the new ones.
 signal batches_grown(count: int)
@@ -656,7 +665,7 @@ const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
 ## the frame's `_process`, `update_draw` and the sparks it gives off, on real time and the drawing's
 ## own generator).
-const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_body_ground", &"_merges", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -727,6 +736,9 @@ var _prev: PackedVector2Array = PackedVector2Array()
 ## Where the path of a shot the hit-work budget passed over starts (read only with F_DEFERRED).
 var _untested: PackedVector2Array = PackedVector2Array()
 var _vel: PackedVector2Array = PackedVector2Array()
+## The way a still shot was thrown (`set_facing`: a pool, spat out ahead), a unit vector, or zero:
+## its quad turns by it (by its velocity without one), so its card's shader knows it.
+var _facing: PackedVector2Array = PackedVector2Array()
 var _life: PackedFloat32Array = PackedFloat32Array()
 var _radius: PackedFloat32Array = PackedFloat32Array()
 ## The caster's actor id, and its team, ramp and budget when the shot was spawned.
@@ -1015,6 +1027,12 @@ var _body_meshes: PackedInt32Array = PackedInt32Array()
 ## `look_fade`), handed to their batches' shader as `look_shape` and `look_clock`: {body: [shape,
 ## clock]}. A body never shaped leaves its shader's own defaults alone.
 var _body_shapes: Dictionary = {}
+## The card bodies whose card says how they lie (`set_body_ground`): {body: GROUND_* bits}. A body
+## not in it is drawn as a shot, over everyone, and never merged.
+var _body_ground: Dictionary = {}
+## What a merging body tells both its batches' shader of its shots (`StillMerge`): {body:
+## StillMerge}.
+var _merges: Dictionary = {}
 var _batch_total: int = BATCH_BODY_FIRST
 ## What the drawing wrote (`_draw_shots`, `ShotKernel.draw_shots`): the instances of each batch
 ## (BATCH_*), then the particles asked for, 0 (was the trails' cost), the shots drawn, the enemy shots drawn,
@@ -1397,6 +1415,73 @@ func set_body_shape(body: int, shape: Vector2, clock: Vector2) -> void:
 			_apply_body_shape(_nodes[batch], body)
 
 
+## How card body `body` lies (`CarrierCard.look_on_floor`, `look_merges`): `on_floor` draws its
+## batches at FLOOR_DRAW_Z, under every body, instead of over everyone as a shot; with `merges` its
+## shader is told every shot of the body drawn each frame (`StillMerge`), so it draws the ones that
+## overlap as one. Spells sets it as it numbers the card's body; a body is its shader, so the cards
+## sharing one must agree (test_card_looks checks the cards do).
+func set_body_ground(body: int, on_floor: bool, merges: bool) -> void:
+	if body < 1 or body > _body_shaders.size():
+		return
+	var ground: int = (GROUND_FLOOR if on_floor else 0) | (GROUND_MERGES if merges else 0)
+	if ground == 0:
+		_body_ground.erase(body)
+	else:
+		_body_ground[body] = ground
+	if merges and not _merges.has(body):
+		_merges[body] = StillMerge.new()
+	elif not merges:
+		_merges.erase(body)
+	for enemy: bool in [false, true]:
+		var batch: int = body_batch(body, enemy)
+		if batch < _nodes.size() and _nodes[batch] != null:
+			_nodes[batch].z_index = _body_z(body, enemy)
+			if not merges:
+				StillMerge.hand_none(_nodes[batch].material as ShaderMaterial)
+
+
+## Whether card body `body` lies on the floor (`set_body_ground`), and whether it merges.
+func body_on_floor(body: int) -> bool:
+	return (int(_body_ground.get(body, 0)) & GROUND_FLOOR) != 0
+
+
+func body_merges(body: int) -> bool:
+	return (int(_body_ground.get(body, 0)) & GROUND_MERGES) != 0
+
+
+## The z card body `body`'s batch draws at (the enemy ramp's with `enemy`): a shot's, or the
+## floor's for a body that lies on it (`set_body_ground`).
+func _body_z(body: int, enemy: bool) -> int:
+	return FLOOR_DRAW_Z if body_on_floor(body) else _batch_z(body_batch(body, enemy))
+
+
+## Tells both batches of each merging body of the body's shots drawn this frame, in one list
+## (`StillMerge`: the hat ramps' batch's rows, then the enemy ramp's), when it drew any; the rows
+## are the ones uploaded (the kernel's when it drew). Both are told, so neither material keeps the
+## list that is written next.
+func _hand_merges(kernel_draw: bool) -> void:
+	for body: int in _merges:
+		var hat_batch: int = body_batch(body, false)
+		var foe_batch: int = body_batch(body, true)
+		if foe_batch >= _batch_total:
+			continue
+		var hats: int = _draw_out[DRAW_OUT_FIRST + hat_batch]
+		var foes: int = _draw_out[DRAW_OUT_FIRST + foe_batch]
+		if hats + foes == 0:
+			continue
+		var merge: StillMerge = _merges[body]
+		merge.fill(_drawn_rows(hat_batch, hats, kernel_draw), hats, _drawn_rows(foe_batch, foes, kernel_draw), foes)
+		merge.hand_to(_nodes[hat_batch].material as ShaderMaterial, false)
+		merge.hand_to(_nodes[foe_batch].material as ShaderMaterial, true)
+
+
+## The rows batch `batch` uploads this frame (the kernel's when it drew), or none for `out` 0.
+func _drawn_rows(batch: int, out: int, kernel_draw: bool) -> PackedFloat32Array:
+	if out == 0:
+		return PackedFloat32Array()
+	return _kernel.call(&"buffer", batch) if kernel_draw else _buffers[batch]
+
+
 ## Hands card body `body`'s look shape and clock to its batch `node`'s shader, once it has them.
 func _apply_body_shape(node: MultiMeshInstance2D, body: int) -> void:
 	var shaped: Variant = _body_shapes.get(body)
@@ -1476,7 +1561,7 @@ func _make_body_batches(body: int) -> void:
 		if _nodes.size() <= batch:
 			_nodes.resize(batch + 1)
 		if _nodes[batch] == null:
-			_nodes[batch] = _make_batch(_batch_z(batch), _body_shaders[body - 1], head_mesh() if mesh == MESH_HEAD else null)
+			_nodes[batch] = _make_batch(_body_z(body, enemy), _body_shaders[body - 1], head_mesh() if mesh == MESH_HEAD else null)
 			_nodes[batch].multimesh.custom_aabb = _nodes[BATCH_BOLT].multimesh.custom_aabb
 			_apply_body_shape(_nodes[batch], body)
 			_place_body_node(body, enemy)
@@ -1629,6 +1714,7 @@ func set_cap(value: int) -> void:
 	_prev.resize(_cap)
 	_untested.resize(_cap)
 	_vel.resize(_cap)
+	_facing.resize(_cap)
 	_life.resize(_cap)
 	_radius.resize(_cap)
 	_actor.resize(_cap)
@@ -1864,6 +1950,21 @@ func _add_wall(rect: Rect2) -> void:
 		for x in range(x0, x1):
 			_wall_cells[y * _wall_w + x] |= ROOM_CELL
 			_has_walls = true
+
+
+## The still shot in `slot` was thrown along `facing` (a pool spat out ahead): its quad turns by it,
+## so its card's shader draws which way it was thrown. Only the look: nothing it does follows it.
+## False for an empty slot, a shot that is not still or no direction.
+func set_facing(slot: int, facing: Vector2) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] != MOTION_STILL or facing.is_zero_approx() or not facing.is_finite():
+		return false
+	_facing[slot] = facing.normalized()
+	return true
+
+
+## The way the still shot in `slot` was thrown (`set_facing`), or zero.
+func get_facing_of(slot: int) -> Vector2:
+	return _facing[slot] if slot >= 0 and slot < _cap else Vector2.ZERO
 
 
 ## Make the still shot in `slot` a wall while it lives (the Wall card, rules R4 F6): a row of
@@ -3515,6 +3616,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_skip_on[slot] = 0.0
 	_skip_near[slot] = 0.0
 	_flags[slot] = F_QUAD if motion == MOTION_STILL else 0
+	_facing[slot] = Vector2.ZERO
 	_bounce[slot] = 0
 	_shield[slot] = 0
 	_deflect[slot] = 0
@@ -5310,6 +5412,7 @@ func update_draw(fraction: float = -1.0) -> void:
 		_kernel.call(&"draw_shots", self, fraction)
 	else:
 		_draw_shots(fraction)
+	_hand_merges(kernel_draw)
 	spark_birth_count = _draw_out[DRAW_BIRTHS]
 	tail_demand = _draw_out[DRAW_TAIL] + int(_end_wanted)
 	if tail_births_on:
@@ -5479,7 +5582,9 @@ func _draw_shots(fraction: float) -> void:
 		if (_flags[slot] & F_QUAD) != 0:
 			# Only a rune's quad turns with the shot (a bolt's head is a `+` whatever way it flies).
 			var dir: Vector2 = Vector2.RIGHT
-			if _vel[slot].length_squared() > 0.0:
+			if _facing[slot].length_squared() > 0.0:
+				dir = _facing[slot]
+			elif _vel[slot].length_squared() > 0.0:
 				dir = _vel[slot].normalized()
 			_draw_out[DRAW_OUT_FIRST + batch] = _write_stones(_buffers[batch], _draw_out[DRAW_OUT_FIRST + batch], slot, dir, _drawn_size[slot], at, look_data)
 			continue

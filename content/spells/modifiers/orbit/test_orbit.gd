@@ -264,9 +264,11 @@ func test_a_rune_pool_and_wall_circle_as_they_are() -> void:
 		before.append(_angle_of(slot, _at(n)))
 	# The rune arms first (held still), then all go round by their drift.
 	_tick(roundi((SpellLimits.RUNE_ARM + 1.0) / DT), _all())
+	# A pool is held while its liquid is in the air (`SpellLimits.POOL_LAND`), then goes round.
+	var held: Array[float] = [SpellLimits.RUNE_ARM, SpellLimits.POOL_LAND, 0.0]
 	for n in range(1, 3):
 		var turned: float = wrapf(_angle_of(_first(tags[n]), _at(n)) - before[n], -PI, PI)
-		check(absf(wrapf(turned - (SpellLimits.RUNE_ARM + 1.0) * TAU / 3.0, -PI, PI)) < 0.05, "the %s turned a third of a turn a second (%.2f rad)" % [names[n], turned])
+		check(absf(wrapf(turned - (SpellLimits.RUNE_ARM + 1.0 - held[n]) * TAU / 3.0, -PI, PI)) < 0.05, "the %s turned a third of a turn a second once it stood (%.2f rad)" % [names[n], turned])
 	var rune_turned: float = wrapf(_angle_of(_first(tags[0]), _at(0)) - before[0], -PI, PI)
 	check(absf(rune_turned - TAU / 3.0) < 0.05, "the rune turned once armed (%.2f rad)" % rune_turned)
 

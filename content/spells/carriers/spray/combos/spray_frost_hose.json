@@ -1,0 +1,9 @@
+{
+	"id": "spray_frost_hose",
+	"name": "Frost hose",
+	"does": "A frost spray splashes the imp ahead and chills it.",
+	"casts": [{"staff": 0, "cards": ["frost", "spray"]}],
+	"imps": [[56, 0]],
+	"seconds": 0.6,
+	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+}

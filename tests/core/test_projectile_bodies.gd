@@ -284,3 +284,143 @@ func test_a_bodys_shape_reaches_its_shader() -> void:
 	root.add_child(later)
 	var made := later._nodes[ManagerScript.body_batch(kept, false)].material as ShaderMaterial
 	check_equal(made.get_shader_parameter(&"look_shape"), Vector2(1.25, 0.6), "a shape set before the batches are made reaches them when they are")
+
+
+func test_a_body_on_the_floor_draws_under_the_bodies() -> void:
+	# The pool was drawn over everyone, at the shots' z (the owner, 2026-11-16: "it should be drawn
+	# on the floor").
+	var early: int = mgr.register_body(POOL)
+	mgr.set_body_ground(early, true, false)
+	root.add_child(mgr)
+	var stone: int = mgr.register_body(STONE)
+	for enemy: bool in [false, true]:
+		check_equal(mgr._nodes[ManagerScript.body_batch(early, enemy)].z_index, ManagerScript.FLOOR_DRAW_Z, "a body said to lie on the floor before its batches were made draws there")
+		check_equal(mgr._nodes[ManagerScript.body_batch(stone, enemy)].z_index, ManagerScript.DRAW_Z + (1 if enemy else 0), "any other as a shot")
+	check(ManagerScript.FLOOR_DRAW_Z > RoomBase.FLOOR_Z and ManagerScript.FLOOR_DRAW_Z <= 0, "over the room's floor, never over a body (z 0)")
+	mgr.set_body_ground(stone, true, false)
+	check_equal(mgr._nodes[ManagerScript.body_batch(stone, false)].z_index, ManagerScript.FLOOR_DRAW_Z, "and one whose batches are made moves down")
+	mgr.set_body_ground(stone, false, false)
+	check_equal(mgr._nodes[ManagerScript.body_batch(stone, false)].z_index, ManagerScript.DRAW_Z, "and back")
+	check(mgr.body_on_floor(early) and not mgr.body_merges(early) and not mgr.body_on_floor(stone), "it says how each lies")
+
+
+func test_a_merging_body_tells_its_shader_of_every_shot() -> void:
+	root.add_child(mgr)
+	var pool: int = mgr.register_body(POOL)
+	var stone: int = mgr.register_body(STONE)
+	mgr.set_body_ground(pool, true, true)
+	_drawn_still(pool, Vector2(120.0, 90.0))
+	_drawn_still(pool, Vector2(150.0, 96.0))
+	_drawn_still(stone, Vector2(300.0, 90.0))
+	mgr.update_draw(1.0)
+	for enemy: bool in [false, true]:
+		var material := mgr._nodes[ManagerScript.body_batch(pool, enemy)].material as ShaderMaterial
+		check_equal(material.get_shader_parameter(&"merge_count"), 2, "both pools, not the stone, told to both batches")
+		check_equal(material.get_shader_parameter(&"merge_first"), 0, "no hat ramp's pools: the enemy ramp's start the list")
+		var places: PackedVector4Array = material.get_shader_parameter(&"merge_place")
+		check_equal(places.size(), StillMerge.MOST, "a list of the shader's size")
+		var found: Array = [Vector2(places[0].x, places[0].y), Vector2(places[1].x, places[1].y)]
+		check(found.has(Vector2(120.0, 90.0)) and found.has(Vector2(150.0, 96.0)), "where each is drawn (%s)" % [found])
+		check(is_equal_approx(places[0].z, ManagerScript.look_size(14.0) * ManagerScript.STILL_HIT), "its hit size as drawn (%f)" % places[0].z)
+		check(places[0].w - roundf(places[0].w) > 0.0, "its still clock's code: just placed")
+	var stone_material := mgr._nodes[ManagerScript.body_batch(stone, true)].material as ShaderMaterial
+	check_equal(stone_material.get_shader_parameter(&"merge_count"), null, "a body that does not merge is told nothing")
+	mgr.set_body_ground(pool, true, false)
+	var stopped := mgr._nodes[ManagerScript.body_batch(pool, true)].material as ShaderMaterial
+	check_equal(stopped.get_shader_parameter(&"merge_count"), 0, "a body that stops merging is told of none")
+
+
+func test_both_batches_are_told_one_list_in_one_order() -> void:
+	# Each batch listing its own first let the two disagree on which pool draws a pixel (review,
+	# 2026-11-16): one list, the hat ramps' then the enemy ramp's, and each told where its own start.
+	var hats := PackedFloat32Array()
+	hats.resize(ManagerScript.DRAW_STRIDE * 2)
+	var foes := PackedFloat32Array()
+	foes.resize(ManagerScript.DRAW_STRIDE)
+	mgr._write_quad(hats, 0, Vector2.RIGHT, 96.0, Vector2(10.0, 20.0), Color.WHITE, Color.WHITE, 1, 0.0, 0.1)
+	mgr._write_quad(hats, ManagerScript.DRAW_STRIDE, Vector2.RIGHT, 96.0, Vector2(30.0, 20.0), Color.WHITE, Color.WHITE, 1, 0.0, -0.1)
+	mgr._write_quad(foes, 0, Vector2.RIGHT, 48.0, Vector2(50.0, 60.0), Color.WHITE, Color.WHITE, 1)
+	var merge := StillMerge.new()
+	merge.fill(hats, 2, foes, 1)
+	var places: PackedVector4Array = merge.places()
+	check_equal(merge.count, 3, "the hat ramps' two and the enemy ramp's one")
+	check_equal(Vector2(places[0].x, places[0].y), Vector2(10.0, 20.0), "the hat ramps' first, in row order")
+	check_equal(Vector2(places[1].x, places[1].y), Vector2(30.0, 20.0), "")
+	check_equal(Vector2(places[2].x, places[2].y), Vector2(50.0, 60.0), "then the enemy ramp's")
+	check(is_equal_approx(places[2].z, 48.0 * ManagerScript.STILL_HIT), "each its hit size as drawn")
+	check(absf(places[0].w - 0.1) < 0.001 and absf(places[1].w + 0.1) < 0.001, "and its clock's code (facing +x: step 0)")
+	var hat_material := ShaderMaterial.new()
+	var foe_material := ShaderMaterial.new()
+	hat_material.shader = POOL
+	foe_material.shader = POOL
+	merge.hand_to(hat_material, false)
+	merge.hand_to(foe_material, true)
+	check_equal(hat_material.get_shader_parameter(&"merge_first"), 0, "the hat ramps' batch finds its shots from the start")
+	check_equal(foe_material.get_shader_parameter(&"merge_first"), 2, "the enemy ramp's after the hat ramps'")
+	check(hat_material.get_shader_parameter(&"merge_place") == foe_material.get_shader_parameter(&"merge_place"), "one list for both")
+	var many := PackedFloat32Array()
+	many.resize(ManagerScript.DRAW_STRIDE * (StillMerge.MOST + 5))
+	merge.fill(many, StillMerge.MOST + 5, foes, 1)
+	check_equal(merge.count, StillMerge.MOST, "never past the shader's list: the rest are drawn alone")
+	check_equal(merge.enemy_first, StillMerge.MOST, "and the enemy ramp's past it")
+
+
+func test_a_merge_fills_its_lists_in_turn() -> void:
+	# A list a material holds is copied if written (an allocation a frame): the next frame fills
+	# the other.
+	var rows := PackedFloat32Array()
+	rows.resize(ManagerScript.DRAW_STRIDE)
+	mgr._write_quad(rows, 0, Vector2.RIGHT, 96.0, Vector2(10.0, 20.0), Color.WHITE, Color.WHITE, 1)
+	var merge := StillMerge.new()
+	merge.fill(rows, 1, PackedFloat32Array(), 0)
+	var first: PackedVector4Array = merge.places()
+	mgr._write_quad(rows, 0, Vector2.RIGHT, 96.0, Vector2(70.0, 20.0), Color.WHITE, Color.WHITE, 1)
+	merge.fill(rows, 1, PackedFloat32Array(), 0)
+	check_equal(first[0].x, 10.0, "the list handed out last frame is left as it was")
+	check_equal(merge.places()[0].x, 70.0, "the frame's own is the other")
+
+
+func test_the_merge_list_is_the_shaders_size() -> void:
+	var code: String = POOL.code
+	check(code.contains("const int MERGE_MOST = %d;" % StillMerge.MOST), "pool.gdshader's MERGE_MOST is StillMerge.MOST")
+	check(code.contains("const float FACING_STEPS = %d.0;" % StillMerge.FACING_STEPS), "and its FACING_STEPS StillMerge's")
+
+
+func test_a_still_shot_thrown_one_way_turns_its_quad_that_way() -> void:
+	root.add_child(mgr)
+	var pool: int = mgr.register_body(POOL)
+	var slot: int = _drawn_still(pool, Vector2(120.0, 90.0))
+	var down := Vector2(0.0, 1.0)
+	check(mgr.set_facing(slot, down * 3.0), "a still shot takes a facing")
+	check(mgr.get_facing_of(slot).is_equal_approx(down), "made a unit vector")
+	var flying: int = mgr.spawn(0, Vector2(10, 10), Vector2(50, 0), 1.0)
+	check(not mgr.set_facing(flying, down), "a flying shot never: it faces where it flies")
+	check(not mgr.set_facing(slot, Vector2.ZERO), "nor no direction")
+	mgr.set_body_ground(pool, true, true)
+	var across: Array = []
+	mgr.still_shots_drawn.connect(func(view: StillShotView) -> void:
+		across.append(view.across(0)))
+	mgr.watch_body(pool, true)
+	mgr.update_draw(1.0)
+	check(across.size() == 1 and (across[0] as Vector2).is_equal_approx(down), "its quad turns the way it was thrown (%s)" % [across])
+	var material := mgr._nodes[ManagerScript.body_batch(pool, true)].material as ShaderMaterial
+	var w: float = (material.get_shader_parameter(&"merge_place") as PackedVector4Array)[0].w
+	check_equal(roundi(w), StillMerge.FACING_STEPS / 4, "and its shader is told so, a quarter turn")
+	check(absf(w - roundf(w) - mgr.still_code(mgr.sim_time - mgr._born[slot], mgr._life[slot])) < 0.001, "beside its clock's code")
+	var again: int = _drawn_still(pool, Vector2(200.0, 90.0))
+	check_equal(mgr.get_facing_of(again), Vector2.ZERO, "a new still shot faces nowhere until told")
+
+
+func test_the_projectile_manager_is_before_the_world_and_the_areas_that_draw_over_the_floor() -> void:
+	# FLOOR_DRAW_Z is the bodies' z 0, a tie the manager loses by being an earlier autoload than the
+	# areas drawing at 0 (Feel's lying remnants and ground items) and than the world (added after
+	# every autoload).
+	var lines: PackedStringArray = FileAccess.get_file_as_string("res://project.godot").split("\n")
+	var at: Dictionary = {}
+	for n in lines.size():
+		var name: String = lines[n].get_slice("=", 0)
+		if name in ["Projectiles", "Feel", "Entities"]:
+			at[name] = n
+	check(at.size() == 3, "the three autoloads are listed (%s)" % [at])
+	if at.size() == 3:
+		check(at["Projectiles"] < at["Feel"] and at["Projectiles"] < at["Entities"], "the manager comes first, so a pool draws under them at one z")

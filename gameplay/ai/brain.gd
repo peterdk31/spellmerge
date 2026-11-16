@@ -31,6 +31,14 @@ extends RefCounted
 ## so a dodging enemy holds its dash on a staff with none), and the move goes the way it walks.
 ## Its own timers slow by `Combat.pace`; a cast's wind-up is the staff's and does not.
 ##
+## **The aim lock** (boss plan OB14, decision 26): with the profile's `aim_lock` above 0 its aim
+## stops following the target once the cast it winds up has no more than that left in Spells
+## (`Caster.wind_left`), and it tells the lane so (`aim_locked`). **Turns** (`AIProfile.turns`):
+## after an attack it may turn to the foe it aimed at longest ago, and keeps that one its target
+## until its next attack. **Round blocking props** (decision 36): a pillar's ground stands in its
+## line as a wall does (`AISight.ground_clear`, feet to feet), and a walk at the target or to a
+## point that would meet one goes round it (`AISight.detour`) instead.
+##
 ## **Enemies telegraph, allies don't** (owner, 2026-11-01): a telegraph is a warning for the
 ## players. How long a cast winds up is its staff's data (an enemy's staff has a `wind_up`, a
 ## player's none; cast-timing, owner 2026-11-06), whoever holds it; only a brain driving an actor
@@ -95,12 +103,14 @@ const REACTION_JITTER: float = 0.2
 const NO_KEY: int = -1
 const SLOT_TURN: float = deg_to_rad(50.0)
 const SPREAD_BONUS: float = 0.1
+## Turns (boss plan OB14): how many foes it remembers aiming at, and when.
+const TURN_MEMORY: int = 8
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the team board is
 ## Entities' (hashed there), handed over by the controller.
-const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground"]
+const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground", &"_open_ids"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
-const REFS: Array[StringName] = [&"actor", &"target", &"grudge", &"plan_target", &"_target_actor"]
+const REFS: Array[StringName] = [&"actor", &"target", &"grudge", &"plan_target", &"_target_actor", &"_turn_to"]
 
 ## The actor it drives, the profile it plays by and Entities (its team board; null: none).
 var actor: Actor = null
@@ -122,8 +132,11 @@ var grudge: Node2D = null
 ## From its body to the target's, and how far.
 var to_target: Vector2 = Vector2.ZERO
 var distance: float = 0.0
-## No wall between its body and the target's.
+## No wall between its body and the target's, and no blocking body's ground between their feet.
 var line_clear: bool = true
+## No blocking body's ground (a pillar's) between its feet and the target's: a walk at it is not
+## held up by one (boss plan OB14).
+var ground_clear: bool = true
 ## Seconds until the soonest shot coming at it arrives (-1 for none), and the way off its line.
 var threat_time: float = -1.0
 var threat_away: Vector2 = Vector2.ZERO
@@ -156,6 +169,9 @@ var plan_move: Move = Move.STAND
 var plan_way: Vector2 = Vector2.ZERO
 ## Where a POINT plan walks to (room pixels).
 var plan_point: Vector2 = Vector2.ZERO
+## Where the run-up (boss plan OB14) found to start its move, between its `want` and its `act`
+## (Vector2.INF: cast it from here).
+var run_up_point: Vector2 = Vector2.INF
 var plan_urgent: bool = false
 ## What the planned staff is aimed at when not `target` (a teammate to heal); null for `target`.
 var plan_target: Node2D = null
@@ -179,6 +195,17 @@ var _last_intent: ActorIntent = null
 var _locked_aim: Vector2 = Vector2.DOWN
 ## The aim error of the attack under way (radians), drawn once as it starts winding up.
 var _aim_error: float = 0.0
+## The attack under way stopped following its target (its profile's `aim_lock`).
+var _aim_locked: bool = false
+## Turns: the keys of the foes it aimed at (0: a free row) and when (its `clock`), whether it turns
+## after the attack under way, and the foe it turned to (null: none), kept its target until its
+## next attack.
+var _aimed_keys: PackedInt64Array = PackedInt64Array([0, 0, 0, 0, 0, 0, 0, 0])
+var _aimed_at: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0])
+var _turn_due: bool = false
+var _turn_to: Node2D = null
+## Scratch: the open actors' ids, read when it turns.
+var _open_ids: PackedInt32Array = PackedInt32Array()
 var _state_left: float = 0.0
 var _channel_left: float = 0.0
 var _decide_left: float = 0.0
@@ -234,6 +261,9 @@ func reset() -> void:
 	_target_actor = null
 	grudge = null
 	_grudge_left = 0.0
+	_turn_due = false
+	_turn_to = null
+	_aimed_keys.fill(0)
 	_state_left = 0.0
 	_looked = false
 	_retarget_left = _retarget_offset
@@ -271,9 +301,14 @@ func think(delta: float, intent: ActorIntent) -> void:
 				_decide()
 			_chase(intent)
 		State.WINDUP:
-			# The cast winds up in Spells; the aim follows the target until it leaves.
+			# The cast winds up in Spells; the aim follows the target until it leaves, or until its
+			# profile's lock (measured against the wind-up the cast has left, so a chill moves it).
+			if not _aim_locked and profile.aim_lock > 0.0 and actor.caster != null and actor.caster.is_winding(chosen) and actor.caster.wind_left(chosen) <= profile.aim_lock:
+				_aim_locked = true
+				if warns() and actor.events != null:
+					actor.events.aim_locked.emit(actor.id, chosen)
 			var aimed: Node2D = _aim_node()
-			if aimed != null:
+			if aimed != null and not _aim_locked:
 				_locked_aim = _aim_for(_chosen_sense, aimed.global_position - actor.global_position, _aim_error)
 			intent.aim = _locked_aim
 			_press_on(intent)
@@ -477,6 +512,29 @@ func slot_way() -> Vector2:
 	return way.normalized() if way.length_squared() > 1.0 else Vector2.ZERO
 
 
+## Behaviours ask: how far a move of `sense` (one that runs it along, a dash) would run from where
+## it stands at the target before a wall or a blocking body's ground holds it up (pixels, at most
+## its `move_reach`; boss plan OB14, the run-up).
+func run_here(sense: CastSense) -> float:
+	if target == null or sense == null:
+		return 0.0
+	return AISight.run_along(actor.projectiles, actor.global_position, to_target, sense.move_reach, actor.wall_radius())
+
+
+## Behaviours ask: where to stand to run a move of `sense` at the target the longest way (a wall's
+## foot facing the open room, `AISight.run_up_spot`), and how far it would run from there: a
+## Vector3 of the place (x, y) and the run (z); z is -1 when there is no such place.
+func run_up(sense: CastSense) -> Vector3:
+	if target == null or sense == null:
+		return Vector3(0.0, 0.0, -1.0)
+	var radius: float = actor.wall_radius()
+	var spot: Vector2 = AISight.run_up_spot(actor.projectiles, actor.global_position, target.global_position, sense.move_reach, radius)
+	if spot == Vector2.INF:
+		return Vector3(0.0, 0.0, -1.0)
+	var run: float = AISight.run_along(actor.projectiles, spot, target.global_position - spot, sense.move_reach, radius)
+	return Vector3(spot.x, spot.y, run)
+
+
 ## Behaviours ask: a little more keenness to fight a target few of its team attack (teamwork).
 func spread_bonus() -> float:
 	if attackers <= 0:
@@ -555,12 +613,14 @@ func _perceive() -> void:
 	if target != null:
 		to_target = target.global_position - actor.global_position
 		distance = to_target.length()
-		line_clear = _line_clear()
+		ground_clear = AISight.ground_clear(actor.projectiles, actor.global_position, target.global_position)
+		line_clear = ground_clear and _line_clear()
 		_note_attack()
 	else:
 		to_target = Vector2.ZERO
 		distance = 0.0
 		line_clear = true
+		ground_clear = true
 		attackers = 0
 	health_fraction = health_of(actor)
 	if board != null:
@@ -671,6 +731,24 @@ func _decide() -> void:
 	_clear_plan()
 	if best != null:
 		best.act(self)
+	_steer()
+
+
+## A walk at the target, or to a point while it has one, that a blocking body's ground (a pillar)
+## would hold up goes round it instead (boss plan OB14, decision 36), looked at again at its next
+## decision. An urgent one (a dodge) goes as it is.
+func _steer() -> void:
+	if plan_urgent or target == null or actor.projectiles == null:
+		return
+	var goal: Vector2 = Vector2.INF
+	if plan_move == Move.TOWARD and not ground_clear:
+		goal = target.global_position
+	elif plan_move == Move.POINT and not AISight.ground_clear(actor.projectiles, actor.global_position, plan_point):
+		goal = plan_point
+	if goal == Vector2.INF:
+		return
+	plan_move = Move.WAY
+	plan_way = AISight.detour(actor.projectiles, actor.global_position, goal, DETOUR_PROBE)
 
 
 func _clear_plan() -> void:
@@ -776,6 +854,8 @@ func _call(delta: float, intent: ActorIntent) -> void:
 func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) -> void:
 	chosen = at
 	_chosen_sense = _sense_of(at)
+	_aim_locked = false
+	_note_aimed()
 	windup_time = windup
 	recover_time = rest_for(at)
 	state = State.WINDUP
@@ -845,6 +925,66 @@ func _in_lane(sense: CastSense, now: Vector2, radius: float) -> bool:
 func _to_chase() -> void:
 	state = State.CHASE
 	_decide_now = true
+	if _turn_due:
+		# The attack is over: it turns to the foe it aimed at longest ago (`AIProfile.turns`).
+		_turn_due = false
+		_turn_to = _longest_ago_foe()
+		_retarget_left = 0.0
+
+
+## Turns (boss plan OB14): the attack starting is aimed at the target (remembered with the time),
+## the foe it turned to is let go, and whether it turns after this one is rolled.
+func _note_aimed() -> void:
+	_turn_to = null
+	if profile.turns <= 0.0:
+		return
+	var key: int = _target_id if _aim_node() == target else 0
+	if key != 0 and key != NO_KEY:
+		# Its own row, else a free one, else the oldest.
+		var row: int = _aimed_keys.find(key)
+		if row < 0:
+			row = _aimed_keys.find(0)
+		if row < 0:
+			row = 0
+			for i in TURN_MEMORY:
+				if _aimed_at[i] < _aimed_at[row]:
+					row = i
+		_aimed_keys[row] = key
+		_aimed_at[row] = clock
+	_turn_due = _roll() < profile.turns
+
+
+## Of the foes it can target now (every open actor of another team it may aim at, `Actors.is_foe`),
+## the one it aimed at longest ago (one never aimed at before any), the nearest of those; null for
+## none.
+func _longest_ago_foe() -> Node2D:
+	var table: ActorsScript = actor.actors
+	if table == null:
+		return null
+	var team: int = actor.team()
+	var count: int = table.open_ids(_open_ids)
+	var best: Node2D = null
+	var best_at: float = INF
+	var best_far: float = INF
+	for n in count:
+		var id: int = _open_ids[n]
+		if id == actor.id or not ActorsScript.is_foe(team, table.team_of(id)):
+			continue
+		var node: Node2D = table.node_of(id) as Node2D
+		if node == null or not can_target(node):
+			continue
+		var key: int = table.key_of(id)
+		var at: float = -INF
+		for i in TURN_MEMORY:
+			if _aimed_keys[i] == key and key != 0:
+				at = _aimed_at[i]
+				break
+		var far: float = actor.global_position.distance_squared_to(node.global_position)
+		if at < best_at or (at == best_at and far < best_far):
+			best = node
+			best_at = at
+			best_far = far
+	return best
 
 
 ## The way to `plan_point`, ZERO once there.
@@ -951,6 +1091,10 @@ func _find_target() -> Node2D:
 	lookup_count += 1
 	if grudge != null and _grudge_left > 0.0:
 		return grudge
+	if _turn_to != null:
+		if can_target(_turn_to):
+			return _turn_to
+		_turn_to = null
 	return nearest_foe(actor)
 
 

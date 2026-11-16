@@ -26,6 +26,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `projectile_hit` | `core/projectiles` | `combat` |
 | `projectile_impact` | `core/projectiles` | `feel` |
 | `carrier_shown` | `core/spells` | `feel` |
+| `aim_locked` | `ai` (an enemy's AI stops following its target with the cast it winds up: its profile's `aim_lock`; boss plan OB14) | `feel` (a beat on the cast's lane) |
 | `projectile_expired` | `core/projectiles` | `core/spells` (on expire), `feel` |
 | `build_refused` | `player` | `hud` (the builders) |
 | `bag_changed` | `player` | `hud` (the builders) |

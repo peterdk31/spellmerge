@@ -178,3 +178,37 @@ func test_a_phase_asks_for_its_adds_and_their_waves() -> void:
 	boss.phases.step(3.0)
 	check_equal(asked.size(), 0, "the next phase, with no adds, ends the waves")
 	check(Phases.adds_key(1, 0) != Phases.adds_key(0, 1), "each phase's entries have keys of their own")
+
+
+func test_a_phases_staffs_start_ready() -> void:
+	# Boss plan OB14: a phase's new staffs start ready (so the broom's Big Sweep is phase 2's first
+	# move), whatever cooldown the hand had before; its staff's long cooldown gives its pace after.
+	var data: EnemyBase = _boss()
+	var slow: StaffCards = Fixture.staff_entry([&"bolt"], 100.0, 50.0, 20.0)
+	data.staffs = [slow] as Array[StaffCards]
+	data.phases[0].staffs = [slow] as Array[StaffCards]
+	fx.players[0].position = Vector2(2000.0, 0.0)
+	var boss: Actor = fx.imp(Vector2.ZERO, data)
+	fx.run(boss, 1)
+	check(boss.caster.cast(0), "it casts the slow staff")
+	fx.run(boss, int(1.0 / Fixture.STEP))
+	check(not boss.caster.cast_ready(0.0, 0), "and waits its long cooldown")
+	fx.combat.hit(fx.players[0].id, boss, 55.0)
+	fx.run(boss, 1)
+	check_equal(boss.phases.current, 0, "the phase starts")
+	check(boss.caster.cast_ready(0.0, 0), "its staff is ready at once")
+
+
+func test_a_staff_may_wait_before_its_first_cast() -> void:
+	# `StaffBase.first_wait`: a body entering play with it waits; 0 (every other staff) is ready.
+	var data: EnemyBase = _boss()
+	var waits: StaffCards = Fixture.staff_entry([&"bolt"], 100.0, 50.0)
+	waits.staff.first_wait = 2.0
+	data.staffs = [Fixture.staff_entry([&"bolt"], 100.0, 50.0), waits] as Array[StaffCards]
+	fx.players[0].position = Vector2(2000.0, 0.0)
+	var boss: Actor = fx.imp(Vector2.ZERO, data)
+	fx.run(boss, 1)
+	check(boss.caster.cast_ready(0.0, 0), "a staff with no wait is ready")
+	check(not boss.caster.cast_ready(0.0, 1), "the one that waits is not")
+	fx.run(boss, int(2.0 / Fixture.STEP))
+	check(boss.caster.cast_ready(0.0, 1), "and is after its wait")

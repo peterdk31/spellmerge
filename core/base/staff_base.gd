@@ -27,6 +27,10 @@ extends Resource
 ## Seconds the staff waits after the last cast of its cycle, after that cast's wind-down, before
 ## it starts over (docs/milestones/cast-timing.md).
 @export var cooldown: float = 0.5
+## Seconds a body that enters play holding this staff waits before its first cast of it (boss plan
+## OB14: the Big Sweep is not a boss's first move); 0: ready at once. A boss's phase's staffs start
+## ready whatever this is (`Caster.replace_staffs`).
+@export var first_wait: float = 0.0
 ## Degrees a shot may leave off its line, either side, at random (seeded per cast); 0 aims true.
 ## The carriers of a multicast leave along one aim, so only this sets them apart.
 @export var spread: float = 0.0
@@ -64,7 +68,8 @@ func ranges() -> Dictionary:
 		"slots": Vector2(1, 64),
 		"draw": Vector2(1, 4),
 		"wind_up": Vector2(0.0, 2.0),
-		"cooldown": Vector2(0.0, 5.0),
+		"cooldown": Vector2(0.0, 30.0),
+		"first_wait": Vector2(0.0, 60.0),
 		"spread": Vector2(0.0, 45.0),
 		"tip": Vector2(0.0, 32.0),
 		"max_mana": Vector2(0.0, 1000000.0),
@@ -76,7 +81,7 @@ func ranges() -> Dictionary:
 ## staffs): 1 when more is better, -1 when less is, 0 when neither (a look, not a strength).
 ## `tests/core/test_staff_base.gd` checks it names every number `ranges()` does.
 const BETTER: Dictionary = {
-	"slots": 1, "draw": 1, "wind_up": -1, "cooldown": -1, "spread": -1, "tip": 0, "max_mana": 1, "mana_regen": 1,
+	"slots": 1, "draw": 1, "wind_up": -1, "cooldown": -1, "first_wait": -1, "spread": -1, "tip": 0, "max_mana": 1, "mana_regen": 1,
 }
 
 

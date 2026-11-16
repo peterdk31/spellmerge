@@ -15,6 +15,7 @@ const LIST: Array[Script] = [
 	preload("res://gameplay/ai/behaviours/open.gd"),
 	preload("res://gameplay/ai/behaviours/heal_ally.gd"),
 	preload("res://gameplay/ai/behaviours/pick_up.gd"),
+	preload("res://gameplay/ai/behaviours/run_up.gd"),
 ]
 
 ## Not state: the behaviours made once (core/sim/README.md).

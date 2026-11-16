@@ -329,6 +329,54 @@ func test_its_sounds() -> void:
 		check(registry.get_resource(&"props", prop) != null, "the arena's %s is there" % prop)
 
 
+## Its intro (boss intro BI5): the owner's two lines (2026-11-16), the Spark ramp, a portrait of its
+## own in its folder whose eyes frame lights only where its silhouette's eyes are, and its own cues,
+## sound only (the world stands still under the overlay, so a flash or a mote would not move).
+func test_its_intro() -> void:
+	var intro: BossIntro = BROOM.boss_intro
+	check(intro != null, "it has an intro")
+	if intro == null:
+		return
+	var registry: Node = root.get_node("Registry")
+	check_equal(intro.problems(String(BROOM.id), func(cue: StringName) -> bool: return registry.get_resource(&"cues", cue) != null), PackedStringArray(), "its intro")
+	var lines: Array[String] = ["What an awful smell of The Wizard.", "I must clean it up."]
+	check_equal(intro.lines, lines, "the owner's two lines")
+	check_equal(intro.pages(), 2, "two pages")
+	check_equal(intro.accent, &"spark", "the Spark ramp")
+	check(intro.portrait != null and intro.portrait.resource_path.begins_with("res://content/bosses/old_broom/"), "its portrait is in its folder")
+	for pair: Array in [[intro.dark_cue, &"broom_creak"], [intro.reveal_cue, &"broom_intro_reveal"]]:
+		var id: StringName = pair[0]
+		check(String(id).begins_with("broom_"), "%s is its own cue" % id)
+		var cue: CueBase = registry.get_resource(&"cues", id) as CueBase
+		check(cue != null, "its cue %s exists in content/cues" % id)
+		if cue != null:
+			check_equal(cue.problems(), PackedStringArray(), "%s is sound" % id)
+			check_equal(cue.sound, pair[1], "%s plays its sound" % id)
+			check(cue.parts.is_empty(), "%s is its sound only" % id)
+	if intro.portrait == null:
+		return
+	var sheet: Image = intro.portrait.get_image()
+	var lit: int = 0
+	var size: int = BossIntro.FRAME
+	for y: int in size:
+		for x: int in size:
+			if sheet.get_pixel(BossIntro.EYES * size + x, y).a > 0.0:
+				lit += 1
+				check(sheet.get_pixel(BossIntro.REST * size + x, y).a > 0.0, "an eye lit at (%d, %d) is on the silhouette" % [x, y])
+	check(lit > 0, "its eyes light up in the dark")
+	check(_height(sheet, BossIntro.MEAN) > _height(sheet, BossIntro.REST), "it rears up for the reveal: the mean pose stands taller than the hunched rest")
+
+
+## How many rows from the top of `frame` of `sheet` the art starts, from its bottom: its height.
+static func _height(sheet: Image, frame: int) -> int:
+	var size: int = BossIntro.FRAME
+	for y: int in size:
+		for x: int in size:
+			if sheet.get_pixel(frame * size + x, y).a > 0.0:
+				return size - y
+	return 0
+
+
 static func _part_of(cue: Variant, type: StringName) -> Dictionary:
 	if cue is CueBase:
 		for part: Dictionary in (cue as CueBase).parts:

@@ -53,6 +53,15 @@
 			"tier": "placeholder",
 			"tool": "Claude (drawn as grids by a small script, written as .grid.json files and made into SVGs by tools/pixel_grid.py, 2026-11-15)",
 			"prompt": "The Old Broom's own brows (boss OB9): big bushy old brows in Bone, tufted on top, 9 wide; a sheet of 24x8 frames in the face's layout: five columns of moods (neutral, raised, angry, furious, worried) and two rows, its own and singed in the Fire ramp for its second phase. 1px dark outline, light from the top-left; only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+		},
+		{
+			"path": "content/bosses/old_broom/portrait.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (drawn as a grid by a small script, written as portrait.grid.json and made into an SVG by tools/pixel_grid.py, 2026-11-16)",
+			"prompt": "The Old Broom's intro portrait (boss intro BI5): three 96x96 frames side by side, the broom close up, its corded binding with its own face, its straight handle with the empty stone socket where its gem was, its straw head on the floor. Rest: hunched on its bristles, low, the handle sagging forward, the head squashed wide, heavy lids half shut and brows drooping (the silhouette's shape). Mean: reared up tall, the handle straight, the bristles splayed into separate clumps, the brows down hard to the middle, the lids slanted down over fire-red pupils. Eyes: only the open part of the rest pose's eyes, in the Spark ramp, to glow over the silhouette. 1px dark outline, light from the top-left; only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
 		}
 	]
 }

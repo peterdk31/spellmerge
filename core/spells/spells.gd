@@ -1194,6 +1194,15 @@ func cast_index(actor: int, staff: int) -> int:
 	return _cursor[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else 0
 
 
+## The staff (`StaffBase`) this actor holds in slot `staff` now, or null: for what is drawn of its
+## own moments (Feel: a staff's `cast_cue`, `shown_cue` and `wall_cue`, boss plan OB15). Read only.
+func staff_of(actor: int, staff: int) -> StaffBase:
+	if not _in_range(actor, staff):
+		return null
+	var compiled: CompiledStaff = _installed[actor * SpellLimits.STAFFS + staff]
+	return compiled.staff if compiled != null else null
+
+
 ## The carrier card (its id) of the last cast this actor's staff made, `&""` before any. The
 ## wizard's player sends it with `spell_cast`.
 func last_carrier_card(actor: int, staff: int) -> StringName:

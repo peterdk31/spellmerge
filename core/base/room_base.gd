@@ -46,6 +46,10 @@ extends Resource
 ## `CoverLayout.of`: each `CoverKind` whose `biomes` names its `biome`). Off: only its fields
 ## (`CoverField`) put cover in it.
 @export var cover_fill: bool = true
+## Its music (boss plan OB15, `MusicTrack`; null: silence), played while the room is the one in play
+## unless an enemy with music of its own lives (`EnemyBase.music`). Rooms of one biome may share a
+## track's file (a `.tres` beside them) or each hold their own.
+@export var music: MusicTrack = null
 
 ## The share of the most common colour a floor's colour needs to count (a wall's is the art rule's,
 ## `ArtPixels.MIN_SHARE`): a floor is mostly one colour, its seams and highlights a few pixels in a
@@ -88,6 +92,8 @@ func template_problems(known: Array[StringName]) -> PackedStringArray:
 			found.append("%s: kind '%s' twice." % [id, kinds[at]])
 		elif not known.has(kinds[at]):
 			found.append("%s: kind '%s' is no room kind." % [id, kinds[at]])
+	if music != null:
+		found.append_array(music.problems(String(id)))
 	return found
 
 

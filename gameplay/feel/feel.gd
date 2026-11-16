@@ -102,6 +102,8 @@ const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const LanesScript := preload("res://gameplay/feel/lanes.gd")
 const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
+const SoundsScript := preload("res://gameplay/feel/sounds.gd")
+const MusicScript := preload("res://gameplay/feel/music.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
@@ -168,8 +170,13 @@ const BEAM_SPLASH_FADE: float = 0.3
 const BEAM_PARTICLE_RATE: float = 3.25
 const BEAM_PARTICLES_MOST: int = 12
 
-## Sounds that can play at once.
-const SOUND_VOICES: int = 8
+## The registry folder of the rooms (a room's music).
+const ROOM_FOLDER: StringName = &"rooms"
+## One-shot sounds that can play at once (`sounds.gd`).
+const SOUND_VOICES: int = SoundsScript.VOICES
+## How often the bodies' phases and the music are looked at (s): a phase's held sound and cue, the
+## music's track and intensity (`_step_music`).
+const MUSIC_POLL: float = 0.1
 ## The share of the effect slots a frame's hit flashes leave to the rest (casts, kills,
 ## statuses): `effect_slots` / this (`_flashes_shown`).
 const HIT_FLASH_RESERVE: int = 4
@@ -377,8 +384,21 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _hit_slot: int = -1
 var _hit_position: Vector2 = Vector2.INF
 var _hit_voice: int = -1
-var _voices: Array[AudioStreamPlayer] = []
-var _next_voice: int = 0
+## Every sound but the music (`sounds.gd`: one-shots where they happen, held sounds), and the music
+## (`music.gd`), boss plan OB15.
+var _sounds: SoundsScript = null
+var _music: MusicScript = null
+## The room in play's music (`RoomBase.music`; null: none), and the seconds to the next look at the
+## bodies' phases and music (MUSIC_POLL).
+var _room_music: MusicTrack = null
+var _music_wait: float = 0.0
+## The phase each actor id's body was last seen in (`Phases.current`), and that body (its instance
+## id): a phase seen to change plays its look's cue; a body first seen does not.
+var _phase_seen: PackedInt32Array = PackedInt32Array()
+var _phase_body: PackedInt64Array = PackedInt64Array()
+var _open_scratch: PackedInt32Array = PackedInt32Array()
+## The sound the death cue being played sounds in place of its own (an enemy's `death_sound`).
+var _sound_instead: StringName = &""
 ## Hit reactions: the sprite, the scale it had, and seconds left (parallel arrays, the first
 ## `_react_count` in use; they grow to the largest crowd seen and never shrink, so a busy frame
 ## allocates only the first time). Instance ids, not references: a sprite may be freed while it
@@ -688,6 +708,19 @@ func _ready() -> void:
 	_remnants = RemnantsScript.new()
 	_remnants.name = "Remnants"
 	add_child(_remnants)
+	_sounds = SoundsScript.new()
+	_sounds.name = "Sounds"
+	_sounds.registry = registry
+	add_child(_sounds)
+	_music = MusicScript.new()
+	_music.name = "Music"
+	_music.registry = registry
+	add_child(_music)
+	_phase_seen.resize(ActorsScript.ACTORS)
+	_phase_seen.fill(-1)
+	_phase_body.resize(ActorsScript.ACTORS)
+	_open_scratch.resize(ActorsScript.ACTORS)
+	add_cue_part(&"held", _play_held)
 	_numbers = DamageNumberDrawerScript.new()
 	_numbers.name = "DamageNumbers"
 	_numbers.events = events
@@ -746,10 +779,6 @@ func _ready() -> void:
 	_label_left.resize(REACTION_SLOTS)
 	_label_total.resize(REACTION_SLOTS)
 	_label_start.resize(REACTION_SLOTS)
-	for i in SOUND_VOICES:
-		var voice := AudioStreamPlayer.new()
-		add_child(voice)
-		_voices.append(voice)
 	if events == null:
 		push_warning("Feel: the Events autoload is missing, so there is no juice.")
 		return
@@ -768,6 +797,8 @@ func _ready() -> void:
 	events.cast_winding.connect(_on_cast_winding)
 	events.aim_locked.connect(_on_aim_locked)
 	events.carrier_ended.connect(_on_carrier_ended)
+	events.cast_left.connect(_on_cast_left)
+	events.caster_move_finished.connect(_on_caster_move_finished)
 	events.cue_shown.connect(_on_cue_shown)
 	events.reaction_triggered.connect(_on_reaction_triggered)
 	events.discharge_arc.connect(_on_discharge_arc)
@@ -856,6 +887,11 @@ func step(real_delta: float) -> void:
 	if _lanes != null:
 		_lanes.spells = spells
 		_lanes.step(real_delta)
+	if _sounds != null:
+		_sounds.registry = registry
+		_sounds.spells = spells
+		_sounds.step(real_delta)
+	_step_music(real_delta)
 	_step_labels(real_delta)
 	if _remnants != null:
 		_remnants.step(real_delta)
@@ -992,8 +1028,14 @@ func _grow_reactions(size: int) -> void:
 
 ## A run starts (`room_entered`): no reaction was heard and no hit was juiced, so the first ones
 ## shake and sound (view only since N4: the holds are the game's, `HitStop`).
-func _on_room_entered(_room_id: StringName) -> void:
+func _on_room_entered(room_id: StringName) -> void:
 	party_camera.room_entered()
+	# What held a sound is gone with the last room; the music is the new room's (`_step_music`).
+	if _sounds != null:
+		_sounds.clear()
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
+	_room_music = room.music if room != null else null
+	_music_wait = 0.0
 	if _remnants != null:
 		_remnants.clear()
 	_reaction_heard.clear()
@@ -1607,7 +1649,7 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 			if body != null and body.global_position.distance_to(at) > 1.0:
 				way = body.global_position.direction_to(at)
 		_kick = (_kick + way * cue.kick * power).limit_length(MAX_KICK_PIXELS)
-	_play(cue.sound)
+	_play(_sound_instead if _sound_instead != &"" else cue.sound, at)
 
 
 ## Whether `plan`, played as the look of the hit being shown, would show nothing: each of its parts
@@ -1805,6 +1847,8 @@ func _on_carrier_ended(caster: int, carrier_card: StringName, at: Vector2, direc
 	var tag: int = _cue_tag()
 	if _spectacle != null:
 		_spectacle.end_streams(caster, tag)
+	if _sounds != null:
+		_sounds.end_carrier(caster, tag)
 	var cue: StringName = _carrier_card_cues_of(carrier_card)[CUE_END] as StringName
 	if cue != &"":
 		play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, tag)
@@ -2491,7 +2535,7 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 		_spectacle.break_body(body, _rest_transform(body, enemy), preset.death_mote_kind, preset.death_mote_share, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
 	# The hit that killed it (its flash still showing here) is silenced for the death's sound.
 	if _hit_voice >= 0 and _hit_slot >= 0 and _hit_position == position and _flash_seconds[_hit_slot] > 0.0:
-		_voices[_hit_voice].stop()
+		_sounds.stop(_hit_voice)
 	# Its motes: the killing shot's cards' kinds (read while the event is sent), and the surface
 	# kinds in the colours of the body's own art.
 	var look: int = 0
@@ -2501,7 +2545,10 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 		core = projectiles.get_core_of(shot)
 	# What broke is the body: its surface kinds and marks in the colours of its own art, its puff in
 	# its own colour.
+	# A body whose data names its own death sound sounds it in place of the cue's (boss plan OB15).
+	_sound_instead = (enemy as Actor).data.death_sound if enemy is Actor and (enemy as Actor).data != null else &""
 	play_cue(CueBase.BOSS_DEATH_CUE if _is_boss(enemy) else CueBase.ENEMY_DEATH_CUE, killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(art), 0, true, _hit_color_of(enemy))
+	_sound_instead = &""
 
 
 ## A dead layered body: each part breaks into a share of its motes, and the parts fly apart as a
@@ -2619,6 +2666,153 @@ func lanes() -> LanesScript:
 	return _lanes
 
 
+## The sounds and the music (for tests).
+func sounds() -> SoundsScript:
+	return _sounds
+
+
+func music() -> MusicScript:
+	return _music
+
+
+## A cue's `held` part (`CueBase`, boss plan OB15): its sound held while its moment lasts, from its
+## caster's body: a wind-up cue's until the cast leaves (`Sounds.Until.WIND`), a cue of a spell (a
+## staff's `shown_cue`) until its carrier ends (`CARRIER`), else its seconds where it was played.
+func _play_held(part: Variant, cue: CueContextScript) -> void:
+	if _sounds == null or not part is Dictionary:
+		return
+	var held: Dictionary = part as Dictionary
+	var until: int = SoundsScript.Until.SECONDS
+	var key: int = 0
+	if _cue_wind >= 0:
+		until = SoundsScript.Until.WIND
+		key = _cue_wind
+	elif cue.tag != 0:
+		until = SoundsScript.Until.CARRIER
+		key = cue.tag
+	var follow: Node2D = cue.follow
+	if follow == null and until != SoundsScript.Until.SECONDS:
+		var table: ActorsScript = _actor_table()
+		follow = table.node_of(cue.caster) as Node2D if table != null and table.is_open(cue.caster) else null
+	_sounds.registry = registry
+	_sounds.spells = spells
+	_sounds.hold(StringName(held.get("sound", "")), until, cue.caster, key, follow, cue.at, float(held.get("seconds", 4.0)), float(held.get("volume", 0.0)))
+
+
+## The staff (`StaffBase`) the spell tagged `tag` was cast from, as its caster holds it now (null:
+## none, or no spell runtime).
+func _staff_of_tag(tag: int) -> StaffBase:
+	if tag == 0 or spells == null or not spells.has_method(&"staff_of"):
+		return null
+	return spells.call(&"staff_of", SpellTag.caster_of(tag), SpellTag.staff_of(tag)) as StaffBase
+
+
+## A cast left its staff (`cast_left`): the staff's own `cast_cue` (boss plan OB15: a swat), from
+## where its caster holds it, along its aim.
+func _on_cast_left(caster: int, staff: int) -> void:
+	if spells == null or not spells.has_method(&"staff_of"):
+		return
+	var own: StaffBase = spells.call(&"staff_of", caster, staff) as StaffBase
+	if own == null or own.cast_cue == &"":
+		return
+	var origin: Vector2 = spells.call(&"aim_origin_of", caster)
+	var way: Vector2 = spells.call(&"aim_of", caster)
+	if not origin.is_finite():
+		var table: ActorsScript = _actor_table()
+		var body: Node2D = table.node_of(caster) as Node2D if table != null and table.is_open(caster) else null
+		if body == null:
+			return
+		origin = body.global_position
+	play_cue(own.cast_cue, caster, origin, way if way.is_finite() else Vector2.ZERO)
+
+
+## A move ended (`caster_move_finished`): one a wall stopped (`walled`, boss plan OB12) plays its
+## staff's `wall_cue` where it stopped (OB15: the broom's crunch).
+func _on_caster_move_finished(_caster: int, _mode: StringName, position: Vector2, tag: int, walled: bool) -> void:
+	if not walled or not position.is_finite():
+		return
+	var own: StaffBase = _staff_of_tag(tag)
+	if own != null and own.wall_cue != &"":
+		play_cue(own.wall_cue, SpellTag.caster_of(tag), position, Vector2.ZERO, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, tag)
+
+
+## Every MUSIC_POLL seconds the bodies are looked at (boss plan OB15): each body's phase (a phase
+## seen to start plays its look's `cue`, and its look's `sound` is held while it lasts), and the
+## music: the first living body whose data has music (`EnemyBase.music`, at its phase's intensity),
+## else the room's (`RoomBase.music`). Then the music steps. Drawn only: it reads the bodies' state.
+func _step_music(real_delta: float) -> void:
+	if _music == null:
+		return
+	_music_wait -= real_delta
+	if _music_wait <= 0.0:
+		_music_wait = MUSIC_POLL
+		var table: ActorsScript = _actor_table()
+		var track: MusicTrack = _room_music
+		var intensity: int = 1
+		var found: bool = false
+		var open: int = table.open_ids(_open_scratch) if table != null else 0
+		for n in open:
+			var id: int = _open_scratch[n]
+			var body: Actor = table.node_of(id) as Actor
+			if body == null or not is_instance_valid(body) or body.data == null:
+				continue
+			if body.phases != null:
+				_look_at_phase(id, body)
+			if not found and body.data.music != null and not body.is_dying():
+				found = true
+				track = body.data.music
+				intensity = _intensity_of(body)
+		_music.registry = registry
+		_music.play(track, intensity)
+	_music.step(real_delta)
+
+
+## The body `body` (actor `id`) in its phase: a phase seen to change plays its look's cue from the
+## body, and its look's sound is held from it while the phase lasts (the last phase's let go).
+func _look_at_phase(id: int, body: Actor) -> void:
+	var phase: int = body.phases.current
+	var first: bool = _phase_body[id] != body.get_instance_id()
+	if not first and _phase_seen[id] == phase:
+		return
+	var was: int = -2 if first else _phase_seen[id]
+	_phase_body[id] = body.get_instance_id()
+	_phase_seen[id] = phase
+	var look: PhaseLook = _phase_look(body, phase)
+	if not first and phase > was and phase >= 0 and look != null and body.phases.list[phase].look == look and look.cue != &"":
+		play_cue(look.cue, id, body.global_position, Vector2.ZERO, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, CASTER_RAMP, body)
+	if _sounds == null:
+		return
+	var sound: StringName = look.sound if look != null else &""
+	if _sounds.held_of(id, SoundsScript.Until.PHASE) == sound and sound != &"":
+		return
+	_sounds.release(id, SoundsScript.Until.PHASE)
+	if sound != &"":
+		_sounds.registry = registry
+		_sounds.hold(sound, SoundsScript.Until.PHASE, id, phase, body, body.global_position, INF)
+
+
+## The look body `body` wears in phase `phase`: the latest phase up to it that names one (null: its
+## own).
+static func _phase_look(body: Actor, phase: int) -> PhaseLook:
+	for at in range(mini(phase, body.phases.list.size() - 1), -1, -1):
+		var entry: EnemyPhase = body.phases.list[at]
+		if entry != null and entry.look != null:
+			return entry.look
+	return null
+
+
+## The music's intensity for `body` (boss plan OB15): 1 before its first phase, then each phase's
+## `intensity`, or one more than the phase before when it names none.
+static func _intensity_of(body: Actor) -> int:
+	var intensity: int = 1
+	if body.phases == null:
+		return intensity
+	for at in mini(body.phases.current + 1, body.phases.list.size()):
+		var entry: EnemyPhase = body.phases.list[at]
+		intensity = entry.intensity if entry != null and entry.intensity > 0 else intensity + 1
+	return intensity
+
+
 ## A barrier on an actor changed (combat's `barrier_changed`): the spectacle draws its shell, a
 ## bubble of motes round the actor in its spell's colours (`barriers.gd`).
 func _on_barrier_changed(actor: int, charges: int, seconds: float, tag: int, way: Vector2, radius: float) -> void:
@@ -2637,6 +2831,11 @@ func _on_carrier_shown(caster: int, carrier_card: StringName, origin: Vector2, d
 	var cue: StringName = _carrier_card_cues_of(carrier_card)[CUE_SHOWN] as StringName
 	if cue != &"":
 		play_cue(cue, caster, origin, direction, length, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
+	# Its staff's own moment besides (boss plan OB15: a Sweep's swish, held until it lands).
+	var tag: int = _cue_tag()
+	var own: StaffBase = _staff_of_tag(tag)
+	if own != null and own.shown_cue != &"":
+		play_cue(own.shown_cue, caster, origin, direction, length, tint, look, ActorsScript.NONE, -1, -1, tag)
 	var ramp: int = _ramp_of(caster)
 	if carrier_card != &"beam" or length <= 0.0 or direction == Vector2.ZERO:
 		return
@@ -2999,24 +3198,18 @@ func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = V
 	if sound != &"" and _hit_sounds >= HIT_SOUNDS_PER_FRAME:
 		_hit_voice = -1
 		return
-	_hit_voice = _play(sound)
+	_hit_voice = _play(sound, position)
 	if _hit_voice >= 0:
 		_hit_sounds += 1
 
 
-## Plays a sound; returns the voice used, or -1 for none.
-func _play(id: StringName) -> int:
-	if registry == null or id == &"":
+## Plays a sound where it happens (`at`; INF: the middle of the picture); returns the voice used, or
+## -1 for none.
+func _play(id: StringName, at: Vector2 = Vector2.INF) -> int:
+	if _sounds == null:
 		return -1
-	var sound: AudioStream = registry.get_sound(id)
-	if sound == null:
-		return -1
-	var used: int = _next_voice
-	var voice: AudioStreamPlayer = _voices[used]
-	_next_voice = (_next_voice + 1) % SOUND_VOICES
-	voice.stream = sound
-	voice.play()
-	return used
+	_sounds.registry = registry
+	return _sounds.play(id, at)
 
 
 ## True for the death of a boss: an enemy whose data says `boss`.

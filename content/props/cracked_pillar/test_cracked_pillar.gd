@@ -56,3 +56,12 @@ func test_spells_chip_it() -> void:
 	var pillar: Actor = _pillar()
 	check_equal(_world.shoot(pillar, &"fire").slice(0, 1), [&"fire"] as Array[StringName], "a shot lands on its box")
 	check(pillar.health.health < pillar.health.max_health, "and chips it")
+
+
+## Its sounds (boss plan OB15): each state it breaks into plays its cue, naming its sound.
+func test_its_sounds() -> void:
+	var registry: Node = root.get_node("Registry")
+	var cracked: CueBase = registry.get_resource(&"cues", PILLAR.look_of(&"cracked").cue) as CueBase
+	check(cracked != null and cracked.sound == &"pillar_crack", "its cracked state sounds pillar_crack as it is entered (boss plan OB15)")
+	var rubble: CueBase = registry.get_resource(&"cues", PILLAR.look_of(&"rubble").cue) as CueBase
+	check(rubble != null and rubble.sound == &"pillar_break", "its rubble state sounds pillar_break as it is entered (boss plan OB15)")

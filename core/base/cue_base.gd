@@ -20,6 +20,17 @@ extends Resource
 ## arrowhead growing until the cast leaves (`Spells.is_winding`; `size` is the wind-up's seconds).
 ## A carrier that is not aimed (a nova, an orbit) shows none. `gameplay/feel/lanes.gd` draws it.
 ##
+## A `held` part (boss plan OB15) is a sound that lasts while its moment lasts, the `stream` part's
+## counterpart: looping from its caster's body as it goes (or where it was played, with none) until
+## the moment ends: a wind-up cue's until the cast leaves or is cancelled (`Spells.is_winding`), a
+## carrier's (a staff's `shown_cue`, a dash setting off) until that carrier ends (`carrier_ended`),
+## or its `seconds` (4 when not given), whichever comes first; the body gone ends it too. Its keys:
+##   `sound`      its sound id (required; silent until an `.ogg` exists)
+##   `seconds`    the most it lasts
+##   `volume`     decibels on top of the sound's own (0 when not given; a louder scrape, +4)
+## A new held part of the same cue for the same caster takes over. Feel plays it
+## (`gameplay/feel/sounds.gd`).
+##
 ## A part with no `part` (or `"part": "flash"`) is a flash Feel draws:
 ##   `flash`      a flash kind's id (required; content/flashes, `FlashKind`)
 ##   `zoom`       its size step, fixed (1 when neither this nor `reach` is given; a fraction is
@@ -167,8 +178,12 @@ const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "car
 const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare", "along"]
 const STREAM_KEYS: Array[String] = ["part", "kind", "rate", "side", "ahead", "feet_layers", "below", "seconds"]
 const LANE_KEYS: Array[String] = ["part", "reach"]
+const HELD_KEYS: Array[String] = ["part", "sound", "seconds", "volume"]
+## The most seconds a `held` part lasts, and its volume's range in decibels.
+const HELD_MOST: float = 30.0
+const HELD_VOLUME: float = 24.0
 ## The part types a cue may have (a part's `part`; none is `flash`), each with the keys it may have.
-const PART_TYPES: Dictionary = {&"flash": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS, &"stream": STREAM_KEYS, &"lane": LANE_KEYS}
+const PART_TYPES: Dictionary = {&"flash": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS, &"stream": STREAM_KEYS, &"lane": LANE_KEYS, &"held": HELD_KEYS}
 ## What a `stream` part gives off (its `kind`).
 const STREAM_KINDS: Array[StringName] = [&"dash_path", &"spell"]
 ## The kinds a `motes` part names besides a kind's id, and a mark part's turns.
@@ -256,7 +271,22 @@ func _type_problems(type: StringName, i: int, part: Dictionary) -> PackedStringA
 			return _light_problems(i, part)
 		&"stream":
 			return _stream_problems(i, part)
+		&"held":
+			return _held_problems(i, part)
 	return PackedStringArray()
+
+
+## What is wrong with the `held` part `i` (`part`): no sound, or its seconds or volume out of range.
+func _held_problems(i: int, part: Dictionary) -> PackedStringArray:
+	var found := PackedStringArray()
+	if StringName(part.get("sound", "")) == &"":
+		found.append("%s: held part %d names no sound" % [id, i])
+	var seconds: float = float(part.get("seconds", 4.0))
+	if seconds <= 0.0 or seconds > HELD_MOST:
+		found.append("%s: held part %d's seconds are not over 0 and at most %s" % [id, i, HELD_MOST])
+	if absf(float(part.get("volume", 0.0))) > HELD_VOLUME:
+		found.append("%s: held part %d's volume is not within %s dB" % [id, i, HELD_VOLUME])
+	return found
 
 
 ## What is wrong with the flash part `i` (`part`): no kind, or sizes that clash or are 0 or less.

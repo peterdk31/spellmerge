@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="EnemyBase" load_steps=28 format=3]
+[gd_resource type="Resource" script_class="EnemyBase" load_steps=30 format=3]
 
 [ext_resource type="Script" path="res://core/base/enemy_base.gd" id="1_base"]
 [ext_resource type="PackedScene" path="res://content/bosses/old_broom/old_broom.tscn" id="2_scene"]
@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="10_motes"]
 [ext_resource type="Script" path="res://core/base/actor_stats.gd" id="9_stats"]
 [ext_resource type="Script" path="res://core/base/enemy_adds.gd" id="11_adds"]
+[ext_resource type="Script" path="res://core/base/music_track.gd" id="12_music"]
 
 [sub_resource type="Resource" id="Resource_sweep_staff"]
 script = ExtResource("3_staff")
@@ -19,6 +20,9 @@ display_name = "Sweep"
 slots = 6
 draw = 1
 wind_up = 0.8
+wind_cue = &"broom_scrape"
+shown_cue = &"broom_swish"
+wall_cue = &"broom_wall"
 cooldown = 2.6
 spread = 0.0
 max_mana = 100.0
@@ -53,6 +57,7 @@ display_name = "Swat"
 slots = 3
 draw = 1
 wind_up = 0.35
+cast_cue = &"broom_swat"
 cooldown = 1.5
 spread = 0.0
 max_mana = 100.0
@@ -70,6 +75,9 @@ display_name = "Big Sweep"
 slots = 9
 draw = 1
 wind_up = 1.2
+wind_cue = &"broom_big_scrape"
+shown_cue = &"broom_swish"
+wall_cue = &"broom_wall"
 cooldown = 20.0
 first_wait = 12.0
 spread = 0.0
@@ -100,6 +108,9 @@ display_name = "Double Sweep"
 slots = 20
 draw = 1
 wind_up = 0.6
+wind_cue = &"broom_scrape"
+shown_cue = &"broom_swish"
+wall_cue = &"broom_wall"
 cooldown = 2.4
 spread = 0.0
 max_mana = 240.0
@@ -143,6 +154,8 @@ parts = Dictionary[StringName, Texture2D]({
 })
 motes = SubResource("Resource_sparks")
 motes_on = &"Head"
+sound = &"broom_burning"
+cue = &"broom_ignite"
 
 [sub_resource type="Resource" id="Resource_stats"]
 script = ExtResource("9_stats")
@@ -184,11 +197,19 @@ adds = Array[ExtResource("11_adds")]([SubResource("Resource_mites")])
 look = SubResource("Resource_burning")
 transition = 2.0
 
+[sub_resource type="Resource" id="Resource_music"]
+script = ExtResource("12_music")
+layers = Array[StringName]([&"boss_broom", &"boss_broom_fire"])
+stacked = true
+fade = 1.5
+
 [resource]
 script = ExtResource("1_base")
 id = &"old_broom"
 display_name = "The Old Broom"
 lore = "The wizard's first staff, demoted to sweeping. It remembers."
+music = SubResource("Resource_music")
+death_sound = &"broom_splinter"
 max_health = 900.0
 health_per_player = 0.7
 move_speed = 40.0

@@ -766,6 +766,7 @@ func _ready() -> void:
 	events.projectile_impact.connect(_on_projectile_impact)
 	events.carrier_shown.connect(_on_carrier_shown)
 	events.cast_winding.connect(_on_cast_winding)
+	events.aim_locked.connect(_on_aim_locked)
 	events.carrier_ended.connect(_on_carrier_ended)
 	events.cue_shown.connect(_on_cue_shown)
 	events.reaction_triggered.connect(_on_reaction_triggered)
@@ -854,7 +855,7 @@ func step(real_delta: float) -> void:
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells
-		_lanes.step()
+		_lanes.step(real_delta)
 	_step_labels(real_delta)
 	if _remnants != null:
 		_remnants.step(real_delta)
@@ -2594,6 +2595,13 @@ func _on_cast_winding(caster: int, staff: int, carrier_card: StringName, origin:
 	play_cue(cue, caster, origin, direction, seconds, tint, look, ActorsScript.NONE, -1, -1, tag, true, NO_BODY, _ramp_of(caster), table.node_of(caster) as Node2D)
 	_cue_tip = ActorsScript.NONE
 	_cue_wind = -1
+
+
+## An enemy's AI locked its aim on the cast it winds up (`aim_locked`, boss plan OB14): its lane
+## flashes, a beat that says "it no longer follows you".
+func _on_aim_locked(caster: int, staff: int) -> void:
+	if _lanes != null:
+		_lanes.beat(caster, staff)
 
 
 ## A cue's `lane` part (`CueBase`; T6b): a telegraph lane for the cast of the cue's tag, as long as

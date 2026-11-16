@@ -6,7 +6,9 @@ extends "res://tests/support/suite.gd"
 ## body is layered (boss plan OB8): a head, its handle and its binding, which carries the face; in
 ## phase 2 the head burns and gives off sparks that follow it. Its look (boss plan OB9): its own
 ## face (an old staff's eyes and brows, angrier in phase 2), drawn frames for its extreme poses on
-## both heads, and an impatient tap standing.
+## both heads, and an impatient tap standing. Its Big Sweep (boss plan OB14): a long Sweep it runs up
+## to a wall's foot for, about every 20 s, not its first move but phase 2's; phase 1 locks its aim as
+## its wind-up starts, phase 2 for its last 0.25 s, and both turn to the player swept longest ago.
 ##
 ## This test is the broom's own: deleting its folder deletes it (decision 28).
 ##
@@ -63,12 +65,79 @@ func test_every_staff_casts_and_wastes_no_card() -> void:
 
 
 func test_the_sweep_is_a_telegraphed_charge() -> void:
-	check_equal(BROOM.staffs.size(), 3, "phase 1: the Sweep, the dust flick and the swat")
+	check_equal(BROOM.staffs.size(), 4, "phase 1: the Sweep, the dust flick, the swat and the Big Sweep")
 	check(BROOM.staffs[0].cards.has(&"dash") and BROOM.staffs[0].cards.has(&"lumber"), "the Sweep is a long, heavy charge (Lumber, OB4)")
 	check(BROOM.staffs[0].cards.has(&"plow"), "that carries what it meets and pins it to the walls (Plow, OB11)")
 	check_equal(BROOM.staffs[0].cards, [&"on_wall", &"bigger", &"lumber", &"plow", &"dash", &"pulse"] as Array[StringName], "a wall that stops it sets off its dust ring (OB12)")
 	check(is_equal_approx(BROOM.staffs[0].staff.wind_up, 0.8), "winding up 0.8 s in phase 1")
 	check(BROOM.contact_damage > 0, "touching it hurts")
+
+
+func test_the_big_sweep() -> void:
+	# Boss plan OB14, "The broom's data": on wall · reach · reach · bigger · bigger · lumber · plow ·
+	# dash · pulse, about 610 px long, every 20-25 s, first when phase 2 starts.
+	var big: StaffCards = BROOM.staffs[3]
+	check_equal(big.cards, [&"on_wall", &"reach", &"reach", &"bigger", &"bigger", &"lumber", &"plow", &"dash", &"pulse"] as Array[StringName], "the Sweep, twice as far and wider")
+	check(big.staff.cooldown >= 18.0 and big.staff.cooldown <= 25.0, "its long cooldown gives its pace (%s s)" % big.staff.cooldown)
+	check(big.staff.first_wait > 0.0, "not its first move as it enters (%s s)" % big.staff.first_wait)
+	check(big.staff.wind_up >= BROOM.staffs[0].staff.wind_up, "winding up no quicker than the Sweep")
+	check(BROOM.phases[0].staffs.has(big), "it stays in phase 2")
+	var fx := Fixture.new(root)
+	fx.players[0].position = Vector2(200.0, 0.0)
+	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
+	var sense: CastSense = body.caster.next_cast_sense(3)
+	check(sense != null and sense.moves_along and sense.harms(), "a move along its line that hurts: what the run-up is for")
+	check(sense.move_reach > 560.0 and sense.move_reach < 660.0, "about 610 px long (%s)" % sense.move_reach)
+	check(not body.caster.cast_ready(0.0, 3), "it waits as the fight starts")
+	fx.combat.hit(fx.players[0].id, body, BROOM.max_health * 0.5)
+	fx.run(body, 1)
+	check_equal(body.phases.current, 0, "spring cleaning")
+	check(body.caster.cast_ready(0.0, 3), "the Big Sweep is ready as phase 2 starts: its first move")
+	fx.free_all()
+
+
+func test_phase_2_opens_with_a_run_up_and_the_big_sweep() -> void:
+	# A room the arena's size (832 × 512, walls round it); the broom in its middle, a wizard near.
+	var fx := Fixture.new(root)
+	fx.projectiles.set_bounds(Rect2(0.0, 0.0, 832.0, 512.0))
+	fx.projectiles.set_walls([
+		Rect2(0.0, 0.0, 832.0, 32.0), Rect2(0.0, 480.0, 832.0, 32.0),
+		Rect2(0.0, 0.0, 32.0, 512.0), Rect2(800.0, 0.0, 32.0, 512.0)] as Array[Rect2])
+	fx.players[0].position = Vector2(470.0, 300.0)
+	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2(416.0, 200.0))
+	fx.run(body, 1)
+	fx.combat.hit(fx.players[0].id, body, BROOM.max_health * 0.5)
+	var swept_from: Vector2 = Vector2.INF
+	var other: bool = false
+	for i in int(20.0 / Fixture.STEP):
+		body.step(Fixture.STEP)
+		body.move(Fixture.STEP)
+		fx.combat.step(Fixture.STEP)
+		fx.projectiles.step(Fixture.STEP)
+		fx.spells.call("step", Fixture.STEP)
+		fx.players[0].position = Vector2(470.0, 300.0)
+		for at in 3:
+			other = other or body.caster.is_winding(at)
+		if body.caster.is_winding(3):
+			swept_from = body.global_position
+			break
+	check(swept_from != Vector2.INF, "it winds up the Big Sweep")
+	check(not other, "before anything else")
+	var brain: AIBrain = Fixture.ai(body).brain
+	var sense: CastSense = body.caster.next_cast_sense(3)
+	if swept_from != Vector2.INF:
+		check(brain.run_here(sense) >= sense.move_reach * 0.8, "from where its line is long: %s of %s px from %s" % [brain.run_here(sense), sense.move_reach, swept_from])
+	fx.free_all()
+
+
+func test_its_aim_locks_and_turns() -> void:
+	# Decision 26: phase 1 locks at the wind-up's start, phase 2 for its last 0.25 s.
+	var longest: float = 0.0
+	for entry: StaffCards in BROOM.staffs:
+		longest = maxf(longest, entry.staff.wind_up)
+	check(BROOM.profile.aim_lock >= longest, "phase 1 goes where its lane first showed (%s s)" % BROOM.profile.aim_lock)
+	check(is_equal_approx(BROOM.phases[0].profile.aim_lock, 0.25), "phase 2 follows, then commits for 0.25 s")
+	check(BROOM.profile.turns > 0.0 and BROOM.phases[0].profile.turns > 0.0, "its Sweeps go round the party")
 
 
 func test_the_dust_flick_goes_where_its_lane_shows() -> void:
@@ -140,7 +209,7 @@ func test_it_enters_play_and_changes_phase() -> void:
 	var fx := Fixture.new(root)
 	fx.players[0].position = Vector2(200.0, 0.0)
 	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
-	check(body.caster != null and body.caster.staff_count == 3, "it holds its three staffs")
+	check(body.caster != null and body.caster.staff_count == 4, "it holds its four staffs")
 	check(body.caster.next_cast_sense(0).moves_caster, "staff 0, the Sweep, moves it")
 	check(body.phases != null, "its phases run")
 	fx.run(body, 2)

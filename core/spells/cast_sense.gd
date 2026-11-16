@@ -41,6 +41,9 @@ var homing: bool = false
 ## True when it moves its caster (a dash, a teleport), and how far.
 var moves_caster: bool = false
 var move_reach: float = 0.0
+## True when that move runs its caster along a way over time (a dash; not a teleport's jump): the
+## longer its line is clear, the farther it goes (boss plan OB14, the AI's run-up).
+var moves_along: bool = false
 ## True when it stops other actors' shots: a carrier that blocks (a wall), or a shield or deflect
 ## on the caster or on its carriers.
 var blocks: bool = false
@@ -144,6 +147,8 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		moves_caster = true
 		# A dash runs its `ray_length` (or its flight), a teleport jumps it.
 		move_reach = maxf(move_reach, maxf(spell_reach, maxf(spell.ray_length, spell.speed * spell.lifetime)))
+		if spell.has_trait(CarrierTraits.MOVES_ALONG):
+			moves_along = true
 	if spell.has_trait(CarrierTraits.BLOCKS) or (shield and spell.has_trait(CarrierTraits.GUARDS)):
 		blocks = true
 	if spell.has_trait(CarrierTraits.SPAWNS):

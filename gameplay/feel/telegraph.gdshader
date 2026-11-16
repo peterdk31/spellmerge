@@ -20,6 +20,8 @@ uniform vec4 ramp_light : source_color = vec4(1.0, 0.635, 0.235, 1.0);
 uniform float beam_length = 0.0;
 uniform float telegraph_progress = 0.0;
 uniform float telegraph_lane = 6.0;
+// 1 to 0 over a beat as the caster's aim locks (boss plan OB14, `lanes.gd`): the lane flashes hot.
+uniform float telegraph_beat = 0.0;
 
 float falloff(float x, float reach) {
 	float k = max(1.0 - x / reach, 0.0);
@@ -37,6 +39,7 @@ void fragment() {
 	float p = clamp(telegraph_progress, 0.0, 1.0);
 	bool last = p >= 0.8;
 	float lane = clamp(round(telegraph_lane), 1.0, 14.0);
+	float beat = clamp(telegraph_beat, 0.0, 1.0);
 	// The arrowhead at the far end, growing as the cast nears.
 	float head = round(mix(3.0, 7.0, p));
 	float back = len - at;
@@ -50,10 +53,10 @@ void fragment() {
 		COLOR = vec4(last ? hot : hi, 1.0);
 	} else if (side == lane + 0.5 && mod(at, 3.0) < 1.0) {
 		// The lane's edges, dotted, so the hit width reads.
-		COLOR = vec4(mid, 1.0);
+		COLOR = vec4(beat > 0.0 ? hot : mid, 1.0);
 	} else {
 		float inside = side <= lane + 0.5 ? 1.0 : falloff(side - lane, 3.0);
-		float lit = inside * (0.14 + 0.3 * p) + 0.4 * p * falloff(side, 2.0);
+		float lit = inside * (0.14 + 0.3 * p + 0.5 * beat) + 0.4 * p * falloff(side, 2.0);
 		COLOR = vec4(glow * lit, 0.0);
 	}
 }

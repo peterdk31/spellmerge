@@ -25,8 +25,8 @@ its art, in `art/grounds/<room>/` (art lives under art/; a room's folder holds i
   a rim's colours run in bands along it (`MoteSource.band_length`), the same bands the edge's seam
   is drawn in, so the motes match the edge they leave.
 
-**Cracks thin out smoothly.** Everything about an edge beside a crack follows the crack's width
-there: the lip's width, the seam's shade, the glow, the rock face and the motes, from the edge
+**Cracks thin out smoothly.** Everything drawn about an edge beside a crack follows the crack's width
+there: the lip's width, the seam's shade, the glow and the rock face, from the edge
 style's `full_width` (the whole edge) to nothing at a hairline. A crack narrower than a cell
 (`CELL`) is drawn into the floor (dark, opaque) rather than cut out of it, so it is never a wall
 or a hole of less than a cell; only its wide part is clear.
@@ -58,13 +58,14 @@ EDGES = ROOT / "content/edges"
 GROUNDS = ROOT / "content/grounds"
 # The size of a wall cell, in pixels (the projectile manager's wall grid: `WALL_CELL`).
 CELL = 8
-# `RoomBase.FLOOR_Z`, and the z of the glow (over the floor and its marks, under every body).
+# `RoomBase.FLOOR_Z`, and the z of the glow (over the floor, under every body; at the marks' and the
+# cover's z, so it is drawn by tree order among them, before them: it is the room's).
 FLOOR_Z = -2
 GLOW_Z = -1
 # `RoomBase.WALL_LAYER`.
 WALL_LAYER = 1
-# The colour shown down a crack too thin to cut out of the floor.
-DEEP = (8, 9, 24)
+# The most bytes a file may be (AGENTS.md, hard rule 3: 1 MB an image).
+MOST_BYTES = 1024 * 1024
 
 
 # ----------------------------------------------------------------------------------------------
@@ -238,6 +239,45 @@ def read_png(data: bytes) -> tuple[int, int, bytearray]:
 # The shape
 
 
+def placements(shape_path: Path) -> list[tuple[float, float, float]]:
+    """Where the room's things stand, as circles a crack keeps clear of: every node of the room's
+    scene (`<room>.tscn` beside its shape) placed under another node (its spawns, props, dummies,
+    items: anything but the room's own top-level nodes), `keep_clear_round` pixels round, and every
+    zone (a `ReferenceRect` under `Zones`), as a row of circles along it, each out to its piece's
+    corners and that much more.
+    So moving a thing in the editor moves the cracks away from it (its ground is then out of date
+    until drawn again: `--check`)."""
+    shape = json.loads(shape_path.read_text(encoding="utf-8"))
+    radius = float(shape.get("keep_clear_round", 0))
+    scene = shape_path.parent / (shape_path.name.removesuffix(".shape.json") + ".tscn")
+    if radius <= 0 or not scene.exists():
+        return []
+    found: list[tuple[float, float, float]] = []
+    for block in re.split(r"\n(?=\[)", scene.read_text(encoding="utf-8")):
+        head = re.match(r'\[node name="[^"]+"(?: type="(\w+)")? parent="([^"]+)"', block)
+        if head is None or head.group(2) == ".":
+            continue
+        if head.group(1) == "ReferenceRect":
+            if head.group(2) != "Zones":
+                continue
+            sides = {k: float(v) for k, v in re.findall(r"offset_(left|top|right|bottom) = ([-\d.]+)", block)}
+            if len(sides) == 4:
+                # A row (or column) of circles along a long zone, each round a square-ish piece of it.
+                w, h = sides["right"] - sides["left"], sides["bottom"] - sides["top"]
+                count = max(1, math.ceil(max(w, h) / max(1.0, min(w, h))))
+                for i in range(count):
+                    t = (i + 0.5) / count
+                    cx = sides["left"] + (w * t if w >= h else w / 2)
+                    cy = sides["top"] + (h * t if h > w else h / 2)
+                    piece = (w / count, h) if w >= h else (w, h / count)
+                    found.append((cx, cy, math.hypot(*piece) / 2 + radius))
+            continue
+        at = re.search(r"position = Vector2\(([-\d.]+), ([-\d.]+)\)", block)
+        if at:
+            found.append((float(at.group(1)), float(at.group(2)), radius))
+    return found
+
+
 def outline_points(spec: dict, step: float = 2.0) -> list[tuple[float, float]]:
     """An outline's points, clockwise on screen: a wavy, rough oval.
 
@@ -286,7 +326,7 @@ class Ground:
     """A room's ground as it is worked out: which pixels are land, how wide a crack is where it
     runs, and which ground material each pixel of land is."""
 
-    def __init__(self, shape: dict) -> None:
+    def __init__(self, shape: dict, placed: list[tuple[float, float, float]] | None = None) -> None:
         self.width, self.height = (int(v) for v in shape["size"])
         if self.width % CELL or self.height % CELL:
             raise ValueError(f"size {shape['size']} is not whole {CELL} px cells")
@@ -297,7 +337,7 @@ class Ground:
         # The index of a pixel's ground material in `grounds` (0: the floor's own).
         self.material = bytearray(n)
         self.shape = shape
-        self.keep_clear = [tuple(c) for c in shape.get("keep_clear", [])]
+        self.keep_clear = [tuple(c) for c in shape.get("keep_clear", [])] + list(placed or [])
         self.outlines = [outline_points(o) for o in shape.get("outlines", [])]
         for points in self.outlines:
             fill_polygon(self.land, self.width, self.height, points, 1)
@@ -385,10 +425,11 @@ class Drawing:
     """Everything the generator writes for one shape: three images, the wall cells, the rims and
     the drip lines."""
 
-    def __init__(self, shape: dict) -> None:
+    def __init__(self, shape: dict, placed: list[tuple[float, float, float]] | None = None) -> None:
         self.mats = materials()
-        self.ground = Ground(shape)
+        self.ground = Ground(shape, placed)
         self.style = load_style(shape["edge"])
+        self.deep = colour(self.style["deep"], self.mats)
         self.grounds = [load_ground(shape["ground"])] + [load_ground(a["ground"]) for a in shape.get("areas", [])]
         g = self.ground
         self.w, self.h = g.width, g.height
@@ -399,6 +440,7 @@ class Drawing:
         for p in range(n):
             if g.land[p] or 0.0 < g.crack[p] < CELL:
                 self.solid[p] = 1
+        self._drop_slivers()
         # t: how much of the whole edge a place has, from the nearest crack's width (1 away from
         # cracks, on the coast and in a crack's wide mouth; toward 0 where a crack narrows).
         near = array.array("f", bytes(4 * n))
@@ -418,7 +460,8 @@ class Drawing:
         self.floor = bytearray(n * 4)
         self.under = bytearray(n * 4)
         self.rims: list[list[tuple[float, float]]] = []
-        self.drips: list[list[tuple[float, float]]] = []
+        # Each drip line: the palette material of the seam band it hangs under, and its points.
+        self.drips: list[tuple[str, list[tuple[float, float]]]] = []
         self.band = array.array("h", [-1]) * n
         self._rim_paths: list[tuple[list[int], int]] = []
         self._draw_floor()
@@ -428,6 +471,35 @@ class Drawing:
         self._draw_under()
         self.glow_w, self.glow_h, self.glow = self._draw_glow()
         self.walls = self._wall_rects()
+
+    def _drop_slivers(self) -> None:
+        """Clear every piece of ground that holds no open cell (no cell whose middle is ground): a
+        sliver a crack cut loose would be drawn over the walls and given a rim of its own."""
+        g = self.ground
+        seen = bytearray(self.w * self.h)
+        for p0 in range(self.w * self.h):
+            if not self.solid[p0] or seen[p0]:
+                continue
+            piece = [p0]
+            seen[p0] = 1
+            k = 0
+            open_cell = False
+            while k < len(piece):
+                q = piece[k]
+                k += 1
+                x, y = q % self.w, q // self.w
+                if x % CELL == CELL // 2 and y % CELL == CELL // 2:
+                    open_cell = True
+                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                    if 0 <= nx < self.w and 0 <= ny < self.h:
+                        r = ny * self.w + nx
+                        if self.solid[r] and not seen[r]:
+                            seen[r] = 1
+                            piece.append(r)
+            if not open_cell:
+                for q in piece:
+                    self.solid[q] = 0
+                    g.land[q] = 0
 
     # -- the floor and its edges --
 
@@ -459,7 +531,7 @@ class Drawing:
                 continue
             x, y = p % self.w, p // self.w
             if not g.land[p]:
-                self._put(self.floor, p, DEEP)
+                self._put(self.floor, p, self.deep)
                 continue
             k = g.material[p]
             rgb = bases[k]
@@ -523,22 +595,27 @@ class Drawing:
         path = [start]
         x, y = sx, sy
         back = 6  # we came from above (the pixel above is not solid)
+        first = -1
         for _ in range(self.w * self.h * 2):
-            found = False
+            step = -1
             for k in range(8):
                 d = (back + 1 + k) % 8
                 nx, ny = x + ways[d][0], y + ways[d][1]
                 if 0 <= nx < self.w and 0 <= ny < self.h and self.solid[ny * self.w + nx]:
-                    back = (d + 4) % 8
-                    x, y = nx, ny
-                    found = True
+                    step = d
                     break
-            if not found:
+            if step < 0:
                 break
-            p = y * self.w + x
-            if p == start:
+            # Jacob's stop: back at the start and about to leave it the way it first left, so a
+            # start on a one-pixel neck still goes round the whole boundary.
+            if y * self.w + x == start and step == first:
                 break
-            path.append(p)
+            if first < 0:
+                first = step
+            back = (step + 4) % 8
+            x, y = x + ways[step][0], y + ways[step][1]
+            if y * self.w + x != start:
+                path.append(y * self.w + x)
         return path
 
     def _spread_bands(self) -> None:
@@ -655,6 +732,8 @@ class Drawing:
         lo, hi = rock["depth"]
         seed = int(self.ground.shape.get("seed", 0)) + 21
         bottoms: dict[int, int] = {}
+        # The edge pixel each bottom hangs under (its seam band is the drips' colour).
+        edges: dict[int, int] = {}
         for x in range(self.w):
             for y in range(self.h - 1):
                 p = y * self.w + x
@@ -674,32 +753,41 @@ class Drawing:
                     rgb = shades[1] if k > 0.55 else shades[0]
                     if math.sin((yy + noise1(x / 9.0, seed + 2) * 18.0) / 5.0) > 0.85:
                         rgb = strata
-                    rgb = _mix(DEEP, rgb, t)
+                    rgb = _mix(self.deep, rgb, t)
                     self._put(self.under, q, rgb)
                     bottom = yy
                 if bottom > y and t > 0.6:
                     q = bottom * self.w + x
                     self._put(self.under, q, strata)
                     bottoms[x * self.h + bottom] = q
+                    edges[x * self.h + bottom] = p
                     if hash32(x, y, seed) % 7 == 0:
                         length = 6 + hash32(x, y, seed, 2) % 30
                         for d in range(1, length):
                             yy = bottom + d
                             if yy < self.h and not self.solid[yy * self.w + x]:
                                 self._put(self.under, yy * self.w + x, root)
-        # The drips leave from the rock's bottom: runs of neighbouring columns, left to right.
+        # The drips leave from the rock's bottom: runs of neighbouring columns under one band of the
+        # seam, each in that band's colour alone; a line runs right to left, so the left of its way
+        # (where a line throws its motes) is down.
         cells = sorted(bottoms)
-        runs: list[list[tuple[float, float]]] = []
+        runs: list[tuple[int, list[tuple[float, float]]]] = []
         last = None
         for key in cells:
             x, y = key // self.h, key % self.h
-            if last is not None and x == last[0] + 1 and abs(y - last[1]) <= 6:
-                runs[-1].append((x + 0.5, y + 1.0))
+            band = self.band[edges[key]]
+            if last is not None and x == last[0] + 1 and abs(y - last[1]) <= 6 and band == last[2]:
+                runs[-1][1].append((x + 0.5, y + 1.0))
             else:
-                runs.append([(x + 0.5, y + 1.0)])
-            last = (x, y)
+                runs.append((band, [(x + 0.5, y + 1.0)]))
+            last = (x, y, band)
         every = int(self.style["rim"].get("every", 4))
-        self.drips = [run[::every] + ([run[-1]] if (len(run) - 1) % every else []) for run in runs if len(run) >= 12]
+        self.drips = []
+        for band, run in runs:
+            if len(run) < 12 or band < 0:
+                continue
+            points = run[::every] + ([run[-1]] if (len(run) - 1) % every else [])
+            self.drips.append((self.style["seam"]["colours"][band], points[::-1]))
 
     def _draw_glow(self) -> tuple[int, int, bytearray]:
         """The edges' glow, at half size: every seam pixel adds its band's base colour by its t, blurred
@@ -809,12 +897,14 @@ def _box_blur(src: array.array, w: int, h: int, radius: int, along_rows: bool) -
 
 
 def inputs_hash(shape_path: Path) -> str:
-    """The hash of everything a shape's ground is made from: the shape, its edge style, its ground
-    materials, the palette and this generator's VERSION."""
+    """The hash of everything a shape's ground is made from: the shape, where the room's things stand
+    (`placements`), its edge style, its ground materials, the palette and this generator."""
     shape = json.loads(shape_path.read_text(encoding="utf-8"))
     digest = hashlib.sha256()
     digest.update(f"ground_shape {VERSION}\n".encode())
+    digest.update(Path(__file__).read_bytes())
     digest.update(shape_path.read_bytes())
+    digest.update(repr(placements(shape_path)).encode())
     digest.update((EDGES / shape["edge"] / "edge.json").read_bytes())
     for ground in [shape["ground"]] + [a["ground"] for a in shape.get("areas", [])]:
         digest.update((GROUNDS / ground / "ground.json").read_bytes())
@@ -869,11 +959,11 @@ def scene_text(drawing: Drawing, outs: dict[str, Path], digest: str) -> str:
         lines += [f'[sub_resource type="Resource" id="MoteSource_rim{i + 1}"]', 'script = ExtResource("4_motes")',
                   f'kind = &"{rim["kind"]}"', f"rate = {length / 100.0 * float(rim['per_100px']):.1f}", "from = 1",
                   f"colours = Array[StringName]([{colours}])", f"band_length = {_num(float(style['seam']['band_length']))}", ""]
-    for i, points in enumerate(drawing.drips):
+    for i, (material, points) in enumerate(drawing.drips):
         length = sum(math.dist(points[k], points[k + 1]) for k in range(len(points) - 1))
         lines += [f'[sub_resource type="Resource" id="MoteSource_drip{i + 1}"]', 'script = ExtResource("4_motes")',
                   f'kind = &"{drip["kind"]}"', f"rate = {max(0.1, length / 100.0 * float(drip['per_100px'])):.1f}", "from = 1",
-                  f"colours = Array[StringName]([{colours}])", f"band_length = {_num(float(style['seam']['band_length']))}", ""]
+                  f'colours = Array[StringName]([&"{material}"])', ""]
     for size in sizes:
         lines += [f'[sub_resource type="RectangleShape2D" id="{shape_ids[size]}"]', f"size = Vector2({size[0]}, {size[1]})", ""]
     lines += ['[node name="Floor" type="Sprite2D"]', f"z_index = {FLOOR_Z}", "texture_filter = 1", 'texture = ExtResource("1_floor")',
@@ -890,22 +980,39 @@ def scene_text(drawing: Drawing, outs: dict[str, Path], digest: str) -> str:
         name = "Rim" if i == 0 else f"Rim{i + 1}"
         lines += [f'[node name="{name}" type="Line2D" parent="." groups=["mote_source"]]', "visible = false", "closed = true",
                   f"points = PackedVector2Array({_vec(points)})", f'metadata/mote_source = SubResource("MoteSource_rim{i + 1}")', ""]
-    for i, points in enumerate(drawing.drips):
+    for i, (_, points) in enumerate(drawing.drips):
         lines += [f'[node name="Drip{i + 1}" type="Line2D" parent="." groups=["mote_source"]]', "visible = false",
                   f"points = PackedVector2Array({_vec(points)})", f'metadata/mote_source = SubResource("MoteSource_drip{i + 1}")', ""]
     return "\n".join(lines)
 
 
+def draw(shape_path: Path) -> "Drawing":
+    """The drawing of the shape file `shape_path`, with the room's placements kept clear."""
+    return Drawing(json.loads(shape_path.read_text(encoding="utf-8")), placements(shape_path))
+
+
+def files_of(drawing: "Drawing", shape_path: Path) -> dict[str, bytes]:
+    """The bytes of every file the ground of `shape_path` is, by what it is (as `generate` writes them)."""
+    outs = outputs_of(shape_path)
+    found = {
+        "floor": png(drawing.w, drawing.h, drawing.floor),
+        "under": png(drawing.w, drawing.h, drawing.under),
+        "glow": png(drawing.glow_w, drawing.glow_h, drawing.glow),
+        "scene": scene_text(drawing, outs, inputs_hash(shape_path)).encode("utf-8"),
+    }
+    for kind, data in found.items():
+        if len(data) > MOST_BYTES:
+            raise ValueError(f"{outs[kind].name} would be {len(data)} bytes, over the {MOST_BYTES} a file may be (AGENTS.md, hard rule 3)")
+    return found
+
+
 def generate(shape_path: Path) -> dict[str, Path]:
     """Write the ground of the shape file `shape_path`; the files written, by what they are."""
-    shape = json.loads(shape_path.read_text(encoding="utf-8"))
-    drawing = Drawing(shape)
+    drawing = draw(shape_path)
     outs = outputs_of(shape_path)
     outs["floor"].parent.mkdir(parents=True, exist_ok=True)
-    outs["floor"].write_bytes(png(drawing.w, drawing.h, drawing.floor))
-    outs["under"].write_bytes(png(drawing.w, drawing.h, drawing.under))
-    outs["glow"].write_bytes(png(drawing.glow_w, drawing.glow_h, drawing.glow))
-    outs["scene"].write_text(scene_text(drawing, outs, inputs_hash(shape_path)), encoding="utf-8")
+    for kind, data in files_of(drawing, shape_path).items():
+        outs[kind].write_bytes(data)
     return outs
 
 

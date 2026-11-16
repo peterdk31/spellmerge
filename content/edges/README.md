@@ -8,7 +8,8 @@ How the edge of a room's ground looks, as data (hub rework, [docs/milestones/hub
 
 | Field | What it is |
 |---|---|
-| `full_width` | A crack this many pixels wide or wider has the whole edge (lip, seam, glow, rock face, motes); narrower, every part of it fades smoothly with the width, to nothing at a hairline. |
+| `full_width` | A crack this many pixels wide or wider has the whole edge (lip, seam, glow, rock face); narrower, each of them fades smoothly with the width, to nothing at a hairline. |
+| `deep` | The colour shown down a crack too thin to cut out of the floor (drawn into it, opaque). |
 | `seam.colours` | The palette materials (core/base/palette.gd: `fire`, `ice`, ...) the edge's own pixels are drawn in, in bands along the rim, in this order and round again. Never a player's colour nor Blight. |
 | `seam.band_length` | How long a band is along the rim, in pixels; the rim's motes take the same bands (`MoteSource.band_length`). |
 | `seam.reach` | How far from the rim a pixel still takes the nearest band (cracks and the rock face), in pixels. |

@@ -35,89 +35,89 @@ region_rect = Rect2(0, 0, 1600, 1088)
 [node name="PlayerSpawns" type="Node2D" parent="."]
 
 [node name="P1" type="Marker2D" parent="PlayerSpawns"]
-position = Vector2(720, 684)
+position = Vector2(720, 688)
 
 [node name="P2" type="Marker2D" parent="PlayerSpawns"]
-position = Vector2(768, 684)
+position = Vector2(768, 688)
 
 [node name="P3" type="Marker2D" parent="PlayerSpawns"]
-position = Vector2(832, 684)
+position = Vector2(832, 688)
 
 [node name="P4" type="Marker2D" parent="PlayerSpawns"]
-position = Vector2(880, 684)
+position = Vector2(880, 688)
 
 [node name="JoinerSpawns" type="Node2D" parent="."]
 
 [node name="J1" type="Marker2D" parent="JoinerSpawns"]
-position = Vector2(1108, 620)
+position = Vector2(1108, 624)
 
 [node name="J2" type="Marker2D" parent="JoinerSpawns"]
-position = Vector2(1148, 620)
+position = Vector2(1148, 624)
 
 [node name="J3" type="Marker2D" parent="JoinerSpawns"]
-position = Vector2(1188, 620)
+position = Vector2(1188, 624)
 
 [node name="J4" type="Marker2D" parent="JoinerSpawns"]
-position = Vector2(1228, 620)
+position = Vector2(1228, 624)
 
 [node name="Props" type="Node2D" parent="."]
 
 [node name="Stone" type="Node2D" parent="Props"]
-position = Vector2(800, 540)
+position = Vector2(800, 544)
 script = ExtResource("10_prop_stand_in")
 prop = ExtResource("12_stone")
 
 [node name="Altar" type="Node2D" parent="Props"]
-position = Vector2(1168, 540)
+position = Vector2(1168, 544)
 script = ExtResource("10_prop_stand_in")
 prop = ExtResource("13_altar")
 
 [node name="Dummies" type="Node2D" parent="."]
 
 [node name="Dummy1" type="Node2D" parent="Dummies"]
-position = Vector2(416, 492)
+position = Vector2(416, 496)
 script = ExtResource("11_enemy_stand_in")
 enemy = ExtResource("14_dummy")
 
 [node name="Dummy2" type="Node2D" parent="Dummies"]
-position = Vector2(368, 572)
+position = Vector2(368, 576)
 script = ExtResource("11_enemy_stand_in")
 enemy = ExtResource("14_dummy")
 
 [node name="Dummy3" type="Node2D" parent="Dummies"]
-position = Vector2(464, 572)
+position = Vector2(464, 576)
 script = ExtResource("11_enemy_stand_in")
 enemy = ExtResource("14_dummy")
 
 [node name="Items" type="Node2D" parent="."]
 
 [node name="Rack" type="Node2D" parent="Items"]
-position = Vector2(608, 716)
+position = Vector2(608, 720)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("17_wild_star")
 
 [node name="GlacierEngine" type="Node2D" parent="Items"]
-position = Vector2(480, 780)
+position = Vector2(480, 784)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("18_glacier_engine")
 
 [node name="HammerOfTheFaithless" type="Node2D" parent="Items"]
-position = Vector2(544, 780)
+position = Vector2(544, 784)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("19_hammer_of_the_faithless")
 
 [node name="CorpseBloom" type="Node2D" parent="Items"]
-position = Vector2(608, 780)
+position = Vector2(608, 784)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("20_corpse_bloom")
 
 [node name="DeathFromEverySky" type="Node2D" parent="Items"]
-position = Vector2(672, 780)
+position = Vector2(672, 784)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("21_death_from_every_sky")
 
 [node name="TheMutiny" type="Node2D" parent="Items"]
-position = Vector2(736, 780)
+position = Vector2(736, 784)
 script = ExtResource("16_item_stand_in")
 item = ExtResource("22_the_mutiny")
 
@@ -126,9 +126,9 @@ item = ExtResource("22_the_mutiny")
 [node name="PropYard" type="ReferenceRect" parent="Zones"]
 script = ExtResource("15_zone")
 offset_left = 480.0
-offset_top = 316.0
+offset_top = 320.0
 offset_right = 1120.0
-offset_bottom = 444.0
+offset_bottom = 448.0
 mouse_filter = 2
 border_color = Color(0.95, 0.76, 0.19, 1)
 border_width = 2.0
@@ -137,9 +137,9 @@ zone_name = &"prop_yard"
 [node name="StartLectern" type="ReferenceRect" parent="Zones"]
 script = ExtResource("15_zone")
 offset_left = 936.0
-offset_top = 540.0
+offset_top = 544.0
 offset_right = 984.0
-offset_bottom = 572.0
+offset_bottom = 576.0
 mouse_filter = 2
 border_color = Color(0.31, 0.84, 0.86, 1)
 border_width = 2.0
@@ -150,9 +150,9 @@ zone_name = &"start_lectern"
 [node name="Meadow" type="ReferenceRect" parent="Cover"]
 script = ExtResource("gc_field")
 offset_left = 320.0
-offset_top = 444.0
+offset_top = 448.0
 offset_right = 512.0
-offset_bottom = 620.0
+offset_bottom = 624.0
 mouse_filter = 2
 border_color = Color(0.56, 0.68, 0.33, 1)
 border_width = 2.0
@@ -162,9 +162,9 @@ density = 0.85
 [node name="ClearStone" type="ReferenceRect" parent="Cover"]
 script = ExtResource("gc_field")
 offset_left = 720.0
-offset_top = 460.0
+offset_top = 464.0
 offset_right = 880.0
-offset_bottom = 620.0
+offset_bottom = 624.0
 mouse_filter = 2
 border_color = Color(0.83, 0.82, 0.88, 1)
 border_width = 2.0
@@ -173,9 +173,9 @@ density = 0.0
 [node name="ClearSpawnPath" type="ReferenceRect" parent="Cover"]
 script = ExtResource("gc_field")
 offset_left = 704.0
-offset_top = 620.0
+offset_top = 624.0
 offset_right = 896.0
-offset_bottom = 716.0
+offset_bottom = 720.0
 mouse_filter = 2
 border_color = Color(0.83, 0.82, 0.88, 1)
 border_width = 2.0
@@ -184,9 +184,9 @@ density = 0.0
 [node name="ClearAltarPath" type="ReferenceRect" parent="Cover"]
 script = ExtResource("gc_field")
 offset_left = 880.0
-offset_top = 508.0
+offset_top = 512.0
 offset_right = 1104.0
-offset_bottom = 636.0
+offset_bottom = 640.0
 mouse_filter = 2
 border_color = Color(0.83, 0.82, 0.88, 1)
 border_width = 2.0
@@ -195,9 +195,9 @@ density = 0.0
 [node name="ClearAltar" type="ReferenceRect" parent="Cover"]
 script = ExtResource("gc_field")
 offset_left = 1104.0
-offset_top = 476.0
+offset_top = 480.0
 offset_right = 1232.0
-offset_bottom = 604.0
+offset_bottom = 608.0
 mouse_filter = 2
 border_color = Color(0.83, 0.82, 0.88, 1)
 border_width = 2.0
@@ -206,9 +206,9 @@ density = 0.0
 [node name="ClearJoiners" type="ReferenceRect" parent="Cover"]
 script = ExtResource("gc_field")
 offset_left = 1088.0
-offset_top = 604.0
+offset_top = 608.0
 offset_right = 1248.0
-offset_bottom = 644.0
+offset_bottom = 648.0
 mouse_filter = 2
 border_color = Color(0.83, 0.82, 0.88, 1)
 border_width = 2.0

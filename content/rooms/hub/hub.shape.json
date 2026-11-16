@@ -1,5 +1,5 @@
 {
-	"about": "The hub's island (docs/milestones/hub-rework.md, HR2): a magic island in the void, its coast of bays and points, seven cracks running in from it clear of everything that stands there. tools/ground_shape.py draws hub_ground.tscn and its art from this.",
+	"about": "The hub's island (docs/milestones/hub-rework.md, HR2): a magic island in the void, its coast of bays and points, seven cracks running in from it, kept 110 px clear of everything the room's scene places (tools/ground_shape.py reads hub.tscn). tools/ground_shape.py draws hub_ground.tscn and its art from this.",
 	"size": [1600, 1088],
 	"seed": 7,
 	"edge": "magic",
@@ -22,9 +22,5 @@
 		{"angle": 0.9, "width": 14, "length": 140, "seed": 305},
 		{"angle": 1.05, "width": 15, "length": 160, "seed": 306}
 	],
-	"keep_clear": [
-		[800, 540, 160], [1168, 556, 150], [416, 532, 130],
-		[560, 380, 110], [800, 380, 110], [1040, 380, 110],
-		[800, 684, 110], [608, 780, 190], [1168, 620, 120], [960, 556, 60]
-	]
+	"keep_clear_round": 110
 }

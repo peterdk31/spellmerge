@@ -12,6 +12,7 @@ the same files, and every room's ground in the repository is up to date with its
 from __future__ import annotations
 
 import math
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -73,7 +74,7 @@ class GroundShapeTest(unittest.TestCase):
 
     def test_the_rim_runs_clockwise_round_the_ground_in_bands(self) -> None:
         d = self.drawing
-        self.assertEqual(len(d.rims), 1, "one rim round one island")
+        self.assertEqual(len(d.rims), 1, "one rim round one island, no sliver with one of its own")
         rim = d.rims[0]
         area = sum(rim[i][0] * rim[(i + 1) % len(rim)][1] - rim[(i + 1) % len(rim)][0] * rim[i][1] for i in range(len(rim)))
         self.assertGreater(area, 0.0, "clockwise: the void on the left of the way it runs")
@@ -106,7 +107,7 @@ class GroundShapeTest(unittest.TestCase):
         self.assertTrue(thin, "the crack thins out below a cell")
         for p in thin:
             self.assertTrue(d.solid[p], "a thin crack is ground to stand on")
-            self.assertEqual(tuple(d.floor[p * 4:p * 4 + 4]), gs.DEEP + (255,), "drawn dark and opaque")
+            self.assertEqual(tuple(d.floor[p * 4:p * 4 + 4]), d.deep + (255,), "drawn dark and opaque, in the edge style's deep")
 
     def test_a_crack_thins_out_with_no_step(self) -> None:
         widths: list[float] = []
@@ -148,11 +149,93 @@ class GroundShapeTest(unittest.TestCase):
         self.assertEqual(text.count('groups=["mote_source"]'), len(d.rims) + len(d.drips))
         self.assertIn("band_length = 420", text, "the rim's colours in the seam's bands")
 
+    def test_the_drips_fall_from_the_rock_in_the_colour_above_them(self) -> None:
+        d = self.drawing
+        self.assertTrue(d.drips, "the rock face drips")
+        for material, points in d.drips:
+            self.assertIn(material, d.style["seam"]["colours"])
+            for a, b in zip(points, points[1:]):
+                self.assertLess(b[0], a[0], "right to left, so the left of its way, where a line throws, is down")
+            x, y = int(points[len(points) // 2][0]), int(points[len(points) // 2][1]) - 1
+            while y > 0 and not d.solid[y * d.w + x]:
+                y -= 1
+            self.assertEqual(d.style["seam"]["colours"][d.band[y * d.w + x]], material, "in the band of the edge it hangs under")
+
+    def test_every_piece_of_ground_holds_an_open_cell(self) -> None:
+        # A shape whose crack cuts a sliver loose: the sliver is cleared, never drawn over the walls.
+        for shape in (ISLAND, {**ISLAND, "cracks": [{"angle": a, "width": 16, "length": 80, "seed": 400 + i} for i, a in enumerate((0.1, 0.2, 0.3, 0.4, 0.6, 0.8))]}):
+            d = gs.Drawing(shape)
+            seen = bytearray(d.w * d.h)
+            for p0 in range(d.w * d.h):
+                if not d.solid[p0] or seen[p0]:
+                    continue
+                piece, k, open_cell = [p0], 0, False
+                seen[p0] = 1
+                while k < len(piece):
+                    q = piece[k]
+                    k += 1
+                    x, y = q % d.w, q // d.w
+                    open_cell = open_cell or (x % gs.CELL == gs.CELL // 2 and y % gs.CELL == gs.CELL // 2)
+                    for r in (q - 1, q + 1, q - d.w, q + d.w):
+                        if 0 <= r < len(seen) and d.solid[r] and not seen[r] and abs(r % d.w - x) <= 1:
+                            seen[r] = 1
+                            piece.append(r)
+                self.assertTrue(open_cell, f"the piece of ground at {p0 % d.w},{p0 // d.w} holds an open cell")
+            # Every rim is round a piece that holds an open cell (just checked): no sliver has one.
+            self.assertGreaterEqual(len(d.rims), 1)
+
+    def test_a_boundary_through_a_one_pixel_neck_is_traced_whole(self) -> None:
+        # Two squares joined at a corner pixel: the trace starts on the neck and still goes all round.
+        shape = {**ISLAND, "outlines": [], "cracks": [], "areas": [], "size": [64, 48]}
+        d = gs.Drawing.__new__(gs.Drawing)
+        d.w, d.h = 64, 48
+        d.solid = bytearray(64 * 48)
+        for y in range(8, 24):
+            for x in range(8, 24):
+                d.solid[y * 64 + x] = 1
+        for y in range(24, 40):
+            for x in range(24, 40):
+                d.solid[y * 64 + x] = 1
+        path = d._moore(8, 8)
+        self.assertIn(39 * 64 + 39, path, "the far square's far corner is on the traced boundary")
+        self.assertIsNotNone(shape)
+
+    def test_cracks_keep_clear_of_the_rooms_placements(self) -> None:
+        placed = [(200.0, 60.0, 40.0)]
+        d = gs.Drawing(ISLAND, placed)
+        g = d.ground
+        for p in range(g.width * g.height):
+            if g.crack[p] > 0.0:
+                self.assertGreaterEqual(math.hypot(p % g.width - 200, p // g.width - 60), 36, "clear of a placement")
+        for path in gs.shape_files():
+            self.assertTrue(gs.placements(path), f"{path.relative_to(gs.ROOT)}: its cracks keep clear of its scene's placements")
+
+    def test_the_numbers_shared_with_the_game(self) -> None:
+        base = (gs.ROOT / "core/base/room_base.gd").read_text(encoding="utf-8")
+        self.assertIn(f"const FLOOR_Z: int = {gs.FLOOR_Z}", base)
+        self.assertIn(f"const WALL_LAYER: int = {gs.WALL_LAYER}", base)
+        manager = (gs.ROOT / "core/projectiles/projectile_manager.gd").read_text(encoding="utf-8")
+        self.assertIn(f"const WALL_CELL: float = {float(gs.CELL)}", manager)
+
+    def test_the_hubs_mark_colours_are_its_turfs(self) -> None:
+        # The hub names its floor-mark colours (its art is too large to sample): they must be its turf's.
+        turf = gs.load_ground("turf")
+        mats = gs.materials()
+        tres = (gs.ROOT / "content/rooms/hub/hub.tres").read_text(encoding="utf-8")
+        numbers = [float(v) for v in re.search(r"floor_mark_colors = PackedColorArray\(([^)]*)\)", tres).group(1).split(",")]
+        shades = [tuple(round(numbers[i + c] * 255) for c in range(3)) for i in (0, 4, 8)]
+        self.assertEqual(shades[1], gs.colour(turf["patches"]["colour"], mats), "base: the turf's patches")
+        self.assertEqual(shades[2], gs.colour(turf["base"], mats), "shadow: the turf's own colour")
+
     def test_every_rooms_ground_is_up_to_date(self) -> None:
         shapes = gs.shape_files()
         self.assertTrue(shapes, "the hub has a shape file")
         for path in shapes:
             self.assertIsNone(gs.stale(path), f"{path.relative_to(gs.ROOT)}: run python3 tools/ground_shape.py {path.relative_to(gs.ROOT)}")
+            # Drawn again here, every file is the one committed (a hand-edited scene or picture fails).
+            outs = gs.outputs_of(path)
+            for kind, data in gs.files_of(gs.draw(path), path).items():
+                self.assertEqual(outs[kind].read_bytes(), data, f"{outs[kind].relative_to(gs.ROOT)} is as drawn")
 
 
 if __name__ == "__main__":

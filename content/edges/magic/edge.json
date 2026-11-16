@@ -1,6 +1,7 @@
 {
 	"about": "The hub's magic edge (docs/milestones/hub-rework.md): a seam of the elements' light in long bands round the coast, a turf lip, a banded rock face hanging into the void with roots, embers rising off it and drips falling from the rock; a crack has the whole edge where it is full_width wide and fades to a hairline.",
 	"full_width": 14,
+	"deep": "#08091a",
 	"seam": {
 		"colours": ["fire", "spark", "arc", "ice", "void"],
 		"band_length": 420,

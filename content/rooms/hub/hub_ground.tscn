@@ -1,4 +1,4 @@
-[gd_scene load_steps=134 format=3]
+[gd_scene load_steps=137 format=3]
 
 [ext_resource type="Texture2D" path="res://art/grounds/hub/hub_ground_floor.png" id="1_floor"]
 [ext_resource type="Texture2D" path="res://art/grounds/hub/hub_ground_under.png" id="2_under"]
@@ -11,15 +11,7 @@ blend_mode = 1
 [sub_resource type="Resource" id="MoteSource_rim1"]
 script = ExtResource("4_motes")
 kind = &"rim_ember"
-rate = 483.8
-from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
-
-[sub_resource type="Resource" id="MoteSource_rim2"]
-script = ExtResource("4_motes")
-kind = &"rim_ember"
-rate = 3.4
+rate = 477.3
 from = 1
 colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
 band_length = 420
@@ -27,130 +19,142 @@ band_length = 420
 [sub_resource type="Resource" id="MoteSource_drip1"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 0.6
+rate = 1.4
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"void"])
 
 [sub_resource type="Resource" id="MoteSource_drip2"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 1.4
+rate = 1.6
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"void"])
 
 [sub_resource type="Resource" id="MoteSource_drip3"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 1.6
+rate = 3.9
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"void"])
 
 [sub_resource type="Resource" id="MoteSource_drip4"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 6.4
+rate = 2.4
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"ice"])
 
 [sub_resource type="Resource" id="MoteSource_drip5"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
 rate = 3.5
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"ice"])
 
 [sub_resource type="Resource" id="MoteSource_drip6"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
 rate = 1.5
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"ice"])
 
 [sub_resource type="Resource" id="MoteSource_drip7"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 10.4
+rate = 1.3
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"ice"])
 
 [sub_resource type="Resource" id="MoteSource_drip8"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 3.3
+rate = 0.9
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"ice"])
 
 [sub_resource type="Resource" id="MoteSource_drip9"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 1.7
+rate = 2.4
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"ice"])
 
 [sub_resource type="Resource" id="MoteSource_drip10"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 2.6
+rate = 2.5
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"arc"])
 
 [sub_resource type="Resource" id="MoteSource_drip11"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 4.9
+rate = 3.3
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"arc"])
 
 [sub_resource type="Resource" id="MoteSource_drip12"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 4.2
+rate = 1.7
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"arc"])
 
 [sub_resource type="Resource" id="MoteSource_drip13"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 4.6
+rate = 2.6
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"arc"])
 
 [sub_resource type="Resource" id="MoteSource_drip14"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 3.0
+rate = 4.9
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"arc"])
 
 [sub_resource type="Resource" id="MoteSource_drip15"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
-rate = 1.3
+rate = 4.4
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"arc"])
 
 [sub_resource type="Resource" id="MoteSource_drip16"]
 script = ExtResource("4_motes")
 kind = &"rim_drip"
+rate = 4.7
+from = 1
+colours = Array[StringName]([&"fire"])
+
+[sub_resource type="Resource" id="MoteSource_drip17"]
+script = ExtResource("4_motes")
+kind = &"rim_drip"
+rate = 3.0
+from = 1
+colours = Array[StringName]([&"fire"])
+
+[sub_resource type="Resource" id="MoteSource_drip18"]
+script = ExtResource("4_motes")
+kind = &"rim_drip"
+rate = 1.3
+from = 1
+colours = Array[StringName]([&"fire"])
+
+[sub_resource type="Resource" id="MoteSource_drip19"]
+script = ExtResource("4_motes")
+kind = &"rim_drip"
+rate = 0.7
+from = 1
+colours = Array[StringName]([&"fire"])
+
+[sub_resource type="Resource" id="MoteSource_drip20"]
+script = ExtResource("4_motes")
+kind = &"rim_drip"
 rate = 1.9
 from = 1
-colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
-band_length = 420
+colours = Array[StringName]([&"ice"])
 
 [sub_resource type="RectangleShape2D" id="Box_8x8"]
 size = Vector2(8, 8)
@@ -490,7 +494,7 @@ z_index = -2
 texture_filter = 1
 texture = ExtResource("1_floor")
 centered = false
-metadata/ground_inputs = "86c66f743399e14d"
+metadata/ground_inputs = "0adef659b41d626c"
 
 [node name="Glow" type="Sprite2D" parent="."]
 material = SubResource("GlowAdd")
@@ -657,837 +661,835 @@ position = Vector2(1444, 188)
 shape = SubResource("Box_312x24")
 
 [node name="W37" type="CollisionShape2D" parent="Walls"]
-position = Vector2(924, 188)
-shape = SubResource("Box_24x8")
-
-[node name="W38" type="CollisionShape2D" parent="Walls"]
-position = Vector2(928, 196)
-shape = SubResource("Box_16x8")
-
-[node name="W39" type="CollisionShape2D" parent="Walls"]
 position = Vector2(120, 204)
 shape = SubResource("Box_240x8")
 
-[node name="W40" type="CollisionShape2D" parent="Walls"]
-position = Vector2(932, 204)
-shape = SubResource("Box_8x8")
-
-[node name="W41" type="CollisionShape2D" parent="Walls"]
+[node name="W38" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1448, 208)
 shape = SubResource("Box_304x16")
 
-[node name="W42" type="CollisionShape2D" parent="Walls"]
+[node name="W39" type="CollisionShape2D" parent="Walls"]
 position = Vector2(116, 216)
 shape = SubResource("Box_232x16")
 
-[node name="W43" type="CollisionShape2D" parent="Walls"]
-position = Vector2(916, 212)
-shape = SubResource("Box_8x8")
-
-[node name="W44" type="CollisionShape2D" parent="Walls"]
-position = Vector2(944, 212)
-shape = SubResource("Box_16x8")
-
-[node name="W45" type="CollisionShape2D" parent="Walls"]
-position = Vector2(936, 220)
-shape = SubResource("Box_16x8")
-
-[node name="W46" type="CollisionShape2D" parent="Walls"]
+[node name="W40" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1452, 220)
 shape = SubResource("Box_296x8")
 
-[node name="W47" type="CollisionShape2D" parent="Walls"]
+[node name="W41" type="CollisionShape2D" parent="Walls"]
 position = Vector2(112, 240)
 shape = SubResource("Box_224x32")
 
-[node name="W48" type="CollisionShape2D" parent="Walls"]
-position = Vector2(940, 228)
-shape = SubResource("Box_8x8")
-
-[node name="W49" type="CollisionShape2D" parent="Walls"]
+[node name="W42" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1456, 232)
 shape = SubResource("Box_288x16")
 
-[node name="W50" type="CollisionShape2D" parent="Walls"]
-position = Vector2(948, 236)
-shape = SubResource("Box_24x8")
-
-[node name="W51" type="CollisionShape2D" parent="Walls"]
-position = Vector2(956, 244)
-shape = SubResource("Box_8x8")
-
-[node name="W52" type="CollisionShape2D" parent="Walls"]
+[node name="W43" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1464, 244)
 shape = SubResource("Box_272x8")
 
-[node name="W53" type="CollisionShape2D" parent="Walls"]
+[node name="W44" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1468, 252)
 shape = SubResource("Box_264x8")
 
-[node name="W54" type="CollisionShape2D" parent="Walls"]
+[node name="W45" type="CollisionShape2D" parent="Walls"]
 position = Vector2(116, 264)
 shape = SubResource("Box_232x16")
 
-[node name="W55" type="CollisionShape2D" parent="Walls"]
+[node name="W46" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1476, 260)
 shape = SubResource("Box_248x8")
 
-[node name="W56" type="CollisionShape2D" parent="Walls"]
+[node name="W47" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1472, 268)
 shape = SubResource("Box_256x8")
 
-[node name="W57" type="CollisionShape2D" parent="Walls"]
+[node name="W48" type="CollisionShape2D" parent="Walls"]
 position = Vector2(120, 276)
 shape = SubResource("Box_240x8")
 
-[node name="W58" type="CollisionShape2D" parent="Walls"]
+[node name="W49" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1344, 284)
 shape = SubResource("Box_16x24")
 
-[node name="W59" type="CollisionShape2D" parent="Walls"]
+[node name="W50" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1480, 276)
 shape = SubResource("Box_240x8")
 
-[node name="W60" type="CollisionShape2D" parent="Walls"]
+[node name="W51" type="CollisionShape2D" parent="Walls"]
 position = Vector2(132, 284)
 shape = SubResource("Box_264x8")
 
-[node name="W61" type="CollisionShape2D" parent="Walls"]
+[node name="W52" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1484, 288)
 shape = SubResource("Box_232x16")
 
-[node name="W62" type="CollisionShape2D" parent="Walls"]
+[node name="W53" type="CollisionShape2D" parent="Walls"]
 position = Vector2(112, 292)
 shape = SubResource("Box_224x8")
 
-[node name="W63" type="CollisionShape2D" parent="Walls"]
+[node name="W54" type="CollisionShape2D" parent="Walls"]
 position = Vector2(240, 292)
 shape = SubResource("Box_16x8")
 
-[node name="W64" type="CollisionShape2D" parent="Walls"]
+[node name="W55" type="CollisionShape2D" parent="Walls"]
 position = Vector2(268, 292)
 shape = SubResource("Box_8x8")
 
-[node name="W65" type="CollisionShape2D" parent="Walls"]
+[node name="W56" type="CollisionShape2D" parent="Walls"]
 position = Vector2(116, 304)
 shape = SubResource("Box_232x16")
 
-[node name="W66" type="CollisionShape2D" parent="Walls"]
+[node name="W57" type="CollisionShape2D" parent="Walls"]
 position = Vector2(272, 300)
 shape = SubResource("Box_16x8")
 
-[node name="W67" type="CollisionShape2D" parent="Walls"]
+[node name="W58" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1340, 300)
 shape = SubResource("Box_8x8")
 
-[node name="W68" type="CollisionShape2D" parent="Walls"]
+[node name="W59" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1488, 308)
 shape = SubResource("Box_224x24")
 
-[node name="W69" type="CollisionShape2D" parent="Walls"]
+[node name="W60" type="CollisionShape2D" parent="Walls"]
 position = Vector2(300, 308)
 shape = SubResource("Box_24x8")
 
-[node name="W70" type="CollisionShape2D" parent="Walls"]
+[node name="W61" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1332, 308)
 shape = SubResource("Box_24x8")
 
-[node name="W71" type="CollisionShape2D" parent="Walls"]
+[node name="W62" type="CollisionShape2D" parent="Walls"]
 position = Vector2(120, 320)
 shape = SubResource("Box_240x16")
 
-[node name="W72" type="CollisionShape2D" parent="Walls"]
+[node name="W63" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1328, 320)
 shape = SubResource("Box_16x16")
 
-[node name="W73" type="CollisionShape2D" parent="Walls"]
+[node name="W64" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1492, 328)
 shape = SubResource("Box_216x16")
 
-[node name="W74" type="CollisionShape2D" parent="Walls"]
+[node name="W65" type="CollisionShape2D" parent="Walls"]
 position = Vector2(124, 332)
 shape = SubResource("Box_248x8")
 
-[node name="W75" type="CollisionShape2D" parent="Walls"]
+[node name="W66" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1324, 332)
 shape = SubResource("Box_24x8")
 
-[node name="W76" type="CollisionShape2D" parent="Walls"]
+[node name="W67" type="CollisionShape2D" parent="Walls"]
 position = Vector2(128, 344)
 shape = SubResource("Box_256x16")
 
-[node name="W77" type="CollisionShape2D" parent="Walls"]
+[node name="W68" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1324, 340)
 shape = SubResource("Box_8x8")
 
-[node name="W78" type="CollisionShape2D" parent="Walls"]
+[node name="W69" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1496, 344)
 shape = SubResource("Box_208x16")
 
-[node name="W79" type="CollisionShape2D" parent="Walls"]
+[node name="W70" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1320, 348)
 shape = SubResource("Box_16x8")
 
-[node name="W80" type="CollisionShape2D" parent="Walls"]
+[node name="W71" type="CollisionShape2D" parent="Walls"]
 position = Vector2(132, 356)
 shape = SubResource("Box_264x8")
 
-[node name="W81" type="CollisionShape2D" parent="Walls"]
+[node name="W72" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1316, 356)
 shape = SubResource("Box_8x8")
 
-[node name="W82" type="CollisionShape2D" parent="Walls"]
+[node name="W73" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1504, 356)
 shape = SubResource("Box_192x8")
 
-[node name="W83" type="CollisionShape2D" parent="Walls"]
+[node name="W74" type="CollisionShape2D" parent="Walls"]
 position = Vector2(136, 380)
 shape = SubResource("Box_272x40")
 
-[node name="W84" type="CollisionShape2D" parent="Walls"]
+[node name="W75" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1308, 364)
 shape = SubResource("Box_8x8")
 
-[node name="W85" type="CollisionShape2D" parent="Walls"]
+[node name="W76" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1508, 364)
 shape = SubResource("Box_184x8")
 
-[node name="W86" type="CollisionShape2D" parent="Walls"]
+[node name="W77" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1312, 372)
 shape = SubResource("Box_16x8")
 
-[node name="W87" type="CollisionShape2D" parent="Walls"]
+[node name="W78" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1512, 372)
 shape = SubResource("Box_176x8")
 
-[node name="W88" type="CollisionShape2D" parent="Walls"]
+[node name="W79" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1316, 380)
 shape = SubResource("Box_8x8")
 
-[node name="W89" type="CollisionShape2D" parent="Walls"]
+[node name="W80" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1516, 380)
 shape = SubResource("Box_168x8")
 
-[node name="W90" type="CollisionShape2D" parent="Walls"]
+[node name="W81" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1532, 388)
 shape = SubResource("Box_136x8")
 
-[node name="W91" type="CollisionShape2D" parent="Walls"]
+[node name="W82" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1540, 396)
 shape = SubResource("Box_120x8")
 
-[node name="W92" type="CollisionShape2D" parent="Walls"]
+[node name="W83" type="CollisionShape2D" parent="Walls"]
 position = Vector2(128, 404)
 shape = SubResource("Box_256x8")
 
-[node name="W93" type="CollisionShape2D" parent="Walls"]
+[node name="W84" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1544, 404)
 shape = SubResource("Box_112x8")
 
-[node name="W94" type="CollisionShape2D" parent="Walls"]
+[node name="W85" type="CollisionShape2D" parent="Walls"]
 position = Vector2(120, 412)
 shape = SubResource("Box_240x8")
 
-[node name="W95" type="CollisionShape2D" parent="Walls"]
+[node name="W86" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1548, 412)
 shape = SubResource("Box_104x8")
 
-[node name="W96" type="CollisionShape2D" parent="Walls"]
+[node name="W87" type="CollisionShape2D" parent="Walls"]
 position = Vector2(112, 420)
 shape = SubResource("Box_224x8")
 
-[node name="W97" type="CollisionShape2D" parent="Walls"]
+[node name="W88" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1552, 420)
 shape = SubResource("Box_96x8")
 
-[node name="W98" type="CollisionShape2D" parent="Walls"]
+[node name="W89" type="CollisionShape2D" parent="Walls"]
 position = Vector2(108, 432)
 shape = SubResource("Box_216x16")
 
-[node name="W99" type="CollisionShape2D" parent="Walls"]
+[node name="W90" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1560, 428)
 shape = SubResource("Box_80x8")
 
-[node name="W100" type="CollisionShape2D" parent="Walls"]
+[node name="W91" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1564, 436)
 shape = SubResource("Box_72x8")
 
-[node name="W101" type="CollisionShape2D" parent="Walls"]
+[node name="W92" type="CollisionShape2D" parent="Walls"]
 position = Vector2(100, 444)
 shape = SubResource("Box_200x8")
 
-[node name="W102" type="CollisionShape2D" parent="Walls"]
+[node name="W93" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1568, 452)
 shape = SubResource("Box_64x24")
 
-[node name="W103" type="CollisionShape2D" parent="Walls"]
+[node name="W94" type="CollisionShape2D" parent="Walls"]
 position = Vector2(88, 452)
 shape = SubResource("Box_176x8")
 
-[node name="W104" type="CollisionShape2D" parent="Walls"]
+[node name="W95" type="CollisionShape2D" parent="Walls"]
 position = Vector2(80, 460)
 shape = SubResource("Box_160x8")
 
-[node name="W105" type="CollisionShape2D" parent="Walls"]
+[node name="W96" type="CollisionShape2D" parent="Walls"]
 position = Vector2(76, 468)
 shape = SubResource("Box_152x8")
 
-[node name="W106" type="CollisionShape2D" parent="Walls"]
+[node name="W97" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1572, 472)
 shape = SubResource("Box_56x16")
 
-[node name="W107" type="CollisionShape2D" parent="Walls"]
+[node name="W98" type="CollisionShape2D" parent="Walls"]
 position = Vector2(72, 480)
 shape = SubResource("Box_144x16")
 
-[node name="W108" type="CollisionShape2D" parent="Walls"]
+[node name="W99" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1576, 500)
 shape = SubResource("Box_48x40")
 
-[node name="W109" type="CollisionShape2D" parent="Walls"]
+[node name="W100" type="CollisionShape2D" parent="Walls"]
 position = Vector2(68, 504)
 shape = SubResource("Box_136x32")
 
-[node name="W110" type="CollisionShape2D" parent="Walls"]
+[node name="W101" type="CollisionShape2D" parent="Walls"]
 position = Vector2(64, 524)
 shape = SubResource("Box_128x8")
 
-[node name="W111" type="CollisionShape2D" parent="Walls"]
+[node name="W102" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1580, 536)
 shape = SubResource("Box_40x32")
 
-[node name="W112" type="CollisionShape2D" parent="Walls"]
+[node name="W103" type="CollisionShape2D" parent="Walls"]
 position = Vector2(60, 532)
 shape = SubResource("Box_120x8")
 
-[node name="W113" type="CollisionShape2D" parent="Walls"]
+[node name="W104" type="CollisionShape2D" parent="Walls"]
 position = Vector2(56, 540)
 shape = SubResource("Box_112x8")
 
-[node name="W114" type="CollisionShape2D" parent="Walls"]
+[node name="W105" type="CollisionShape2D" parent="Walls"]
 position = Vector2(52, 548)
 shape = SubResource("Box_104x8")
 
-[node name="W115" type="CollisionShape2D" parent="Walls"]
+[node name="W106" type="CollisionShape2D" parent="Walls"]
 position = Vector2(48, 556)
 shape = SubResource("Box_96x8")
 
-[node name="W116" type="CollisionShape2D" parent="Walls"]
+[node name="W107" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1576, 560)
 shape = SubResource("Box_48x16")
 
-[node name="W117" type="CollisionShape2D" parent="Walls"]
+[node name="W108" type="CollisionShape2D" parent="Walls"]
 position = Vector2(44, 564)
 shape = SubResource("Box_88x8")
 
-[node name="W118" type="CollisionShape2D" parent="Walls"]
+[node name="W109" type="CollisionShape2D" parent="Walls"]
 position = Vector2(36, 572)
 shape = SubResource("Box_72x8")
 
-[node name="W119" type="CollisionShape2D" parent="Walls"]
+[node name="W110" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1568, 572)
 shape = SubResource("Box_64x8")
 
-[node name="W120" type="CollisionShape2D" parent="Walls"]
+[node name="W111" type="CollisionShape2D" parent="Walls"]
 position = Vector2(32, 580)
 shape = SubResource("Box_64x8")
 
-[node name="W121" type="CollisionShape2D" parent="Walls"]
+[node name="W112" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1560, 580)
 shape = SubResource("Box_80x8")
 
-[node name="W122" type="CollisionShape2D" parent="Walls"]
+[node name="W113" type="CollisionShape2D" parent="Walls"]
 position = Vector2(28, 592)
 shape = SubResource("Box_56x16")
 
-[node name="W123" type="CollisionShape2D" parent="Walls"]
+[node name="W114" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1556, 604)
 shape = SubResource("Box_88x40")
 
-[node name="W124" type="CollisionShape2D" parent="Walls"]
+[node name="W115" type="CollisionShape2D" parent="Walls"]
 position = Vector2(44, 608)
 shape = SubResource("Box_88x16")
 
-[node name="W125" type="CollisionShape2D" parent="Walls"]
+[node name="W116" type="CollisionShape2D" parent="Walls"]
 position = Vector2(32, 620)
 shape = SubResource("Box_64x8")
 
-[node name="W126" type="CollisionShape2D" parent="Walls"]
+[node name="W117" type="CollisionShape2D" parent="Walls"]
 position = Vector2(80, 620)
 shape = SubResource("Box_16x8")
 
-[node name="W127" type="CollisionShape2D" parent="Walls"]
+[node name="W118" type="CollisionShape2D" parent="Walls"]
 position = Vector2(108, 620)
 shape = SubResource("Box_8x8")
 
-[node name="W128" type="CollisionShape2D" parent="Walls"]
+[node name="W119" type="CollisionShape2D" parent="Walls"]
 position = Vector2(36, 636)
 shape = SubResource("Box_72x24")
 
-[node name="W129" type="CollisionShape2D" parent="Walls"]
+[node name="W120" type="CollisionShape2D" parent="Walls"]
 position = Vector2(104, 628)
 shape = SubResource("Box_48x8")
 
-[node name="W130" type="CollisionShape2D" parent="Walls"]
+[node name="W121" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1552, 632)
 shape = SubResource("Box_96x16")
 
-[node name="W131" type="CollisionShape2D" parent="Walls"]
+[node name="W122" type="CollisionShape2D" parent="Walls"]
 position = Vector2(120, 636)
 shape = SubResource("Box_16x8")
 
-[node name="W132" type="CollisionShape2D" parent="Walls"]
+[node name="W123" type="CollisionShape2D" parent="Walls"]
 position = Vector2(152, 636)
 shape = SubResource("Box_32x8")
 
-[node name="W133" type="CollisionShape2D" parent="Walls"]
+[node name="W124" type="CollisionShape2D" parent="Walls"]
 position = Vector2(140, 644)
 shape = SubResource("Box_24x8")
 
-[node name="W134" type="CollisionShape2D" parent="Walls"]
+[node name="W125" type="CollisionShape2D" parent="Walls"]
 position = Vector2(172, 644)
 shape = SubResource("Box_8x8")
 
-[node name="W135" type="CollisionShape2D" parent="Walls"]
+[node name="W126" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1548, 648)
 shape = SubResource("Box_104x16")
 
-[node name="W136" type="CollisionShape2D" parent="Walls"]
+[node name="W127" type="CollisionShape2D" parent="Walls"]
 position = Vector2(40, 652)
 shape = SubResource("Box_80x8")
 
-[node name="W137" type="CollisionShape2D" parent="Walls"]
+[node name="W128" type="CollisionShape2D" parent="Walls"]
 position = Vector2(188, 652)
 shape = SubResource("Box_40x8")
 
-[node name="W138" type="CollisionShape2D" parent="Walls"]
+[node name="W129" type="CollisionShape2D" parent="Walls"]
 position = Vector2(44, 660)
 shape = SubResource("Box_88x8")
 
-[node name="W139" type="CollisionShape2D" parent="Walls"]
+[node name="W130" type="CollisionShape2D" parent="Walls"]
 position = Vector2(212, 660)
 shape = SubResource("Box_8x8")
 
-[node name="W140" type="CollisionShape2D" parent="Walls"]
+[node name="W131" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1360, 660)
 shape = SubResource("Box_16x8")
 
-[node name="W141" type="CollisionShape2D" parent="Walls"]
+[node name="W132" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1540, 660)
 shape = SubResource("Box_120x8")
 
-[node name="W142" type="CollisionShape2D" parent="Walls"]
+[node name="W133" type="CollisionShape2D" parent="Walls"]
 position = Vector2(52, 668)
 shape = SubResource("Box_104x8")
 
-[node name="W143" type="CollisionShape2D" parent="Walls"]
+[node name="W134" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1372, 668)
 shape = SubResource("Box_8x8")
 
-[node name="W144" type="CollisionShape2D" parent="Walls"]
+[node name="W135" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1400, 668)
 shape = SubResource("Box_32x8")
 
-[node name="W145" type="CollisionShape2D" parent="Walls"]
+[node name="W136" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1448, 668)
 shape = SubResource("Box_32x8")
 
-[node name="W146" type="CollisionShape2D" parent="Walls"]
+[node name="W137" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1484, 668)
 shape = SubResource("Box_24x8")
 
-[node name="W147" type="CollisionShape2D" parent="Walls"]
+[node name="W138" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1552, 668)
 shape = SubResource("Box_96x8")
 
-[node name="W148" type="CollisionShape2D" parent="Walls"]
+[node name="W139" type="CollisionShape2D" parent="Walls"]
 position = Vector2(60, 676)
 shape = SubResource("Box_120x8")
 
-[node name="W149" type="CollisionShape2D" parent="Walls"]
+[node name="W140" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1384, 676)
 shape = SubResource("Box_16x8")
 
-[node name="W150" type="CollisionShape2D" parent="Walls"]
+[node name="W141" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1424, 676)
 shape = SubResource("Box_32x8")
 
-[node name="W151" type="CollisionShape2D" parent="Walls"]
+[node name="W142" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1468, 676)
 shape = SubResource("Box_24x8")
 
-[node name="W152" type="CollisionShape2D" parent="Walls"]
+[node name="W143" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1548, 684)
 shape = SubResource("Box_104x24")
 
-[node name="W153" type="CollisionShape2D" parent="Walls"]
+[node name="W144" type="CollisionShape2D" parent="Walls"]
 position = Vector2(64, 684)
 shape = SubResource("Box_128x8")
 
-[node name="W154" type="CollisionShape2D" parent="Walls"]
+[node name="W145" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1428, 684)
 shape = SubResource("Box_8x8")
 
-[node name="W155" type="CollisionShape2D" parent="Walls"]
+[node name="W146" type="CollisionShape2D" parent="Walls"]
 position = Vector2(60, 700)
 shape = SubResource("Box_120x24")
 
-[node name="W156" type="CollisionShape2D" parent="Walls"]
+[node name="W147" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1544, 700)
 shape = SubResource("Box_112x8")
 
-[node name="W157" type="CollisionShape2D" parent="Walls"]
+[node name="W148" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1540, 728)
 shape = SubResource("Box_120x48")
 
-[node name="W158" type="CollisionShape2D" parent="Walls"]
+[node name="W149" type="CollisionShape2D" parent="Walls"]
 position = Vector2(64, 716)
 shape = SubResource("Box_128x8")
 
-[node name="W159" type="CollisionShape2D" parent="Walls"]
+[node name="W150" type="CollisionShape2D" parent="Walls"]
 position = Vector2(68, 728)
 shape = SubResource("Box_136x16")
 
-[node name="W160" type="CollisionShape2D" parent="Walls"]
+[node name="W151" type="CollisionShape2D" parent="Walls"]
 position = Vector2(72, 740)
 shape = SubResource("Box_144x8")
 
-[node name="W161" type="CollisionShape2D" parent="Walls"]
+[node name="W152" type="CollisionShape2D" parent="Walls"]
 position = Vector2(80, 752)
 shape = SubResource("Box_160x16")
 
-[node name="W162" type="CollisionShape2D" parent="Walls"]
+[node name="W153" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1536, 760)
 shape = SubResource("Box_128x16")
 
-[node name="W163" type="CollisionShape2D" parent="Walls"]
+[node name="W154" type="CollisionShape2D" parent="Walls"]
 position = Vector2(88, 768)
 shape = SubResource("Box_176x16")
 
-[node name="W164" type="CollisionShape2D" parent="Walls"]
+[node name="W155" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1532, 772)
 shape = SubResource("Box_136x8")
 
-[node name="W165" type="CollisionShape2D" parent="Walls"]
+[node name="W156" type="CollisionShape2D" parent="Walls"]
 position = Vector2(92, 780)
 shape = SubResource("Box_184x8")
 
-[node name="W166" type="CollisionShape2D" parent="Walls"]
+[node name="W157" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1084, 784)
 shape = SubResource("Box_8x16")
 
-[node name="W167" type="CollisionShape2D" parent="Walls"]
+[node name="W158" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1524, 780)
 shape = SubResource("Box_152x8")
 
-[node name="W168" type="CollisionShape2D" parent="Walls"]
+[node name="W159" type="CollisionShape2D" parent="Walls"]
 position = Vector2(96, 788)
 shape = SubResource("Box_192x8")
 
-[node name="W169" type="CollisionShape2D" parent="Walls"]
+[node name="W160" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1060, 788)
 shape = SubResource("Box_8x8")
 
-[node name="W170" type="CollisionShape2D" parent="Walls"]
+[node name="W161" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1508, 788)
 shape = SubResource("Box_184x8")
 
-[node name="W171" type="CollisionShape2D" parent="Walls"]
+[node name="W162" type="CollisionShape2D" parent="Walls"]
 position = Vector2(100, 796)
 shape = SubResource("Box_200x8")
 
-[node name="W172" type="CollisionShape2D" parent="Walls"]
+[node name="W163" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1068, 796)
 shape = SubResource("Box_24x8")
 
-[node name="W173" type="CollisionShape2D" parent="Walls"]
+[node name="W164" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1496, 796)
 shape = SubResource("Box_208x8")
 
-[node name="W174" type="CollisionShape2D" parent="Walls"]
+[node name="W165" type="CollisionShape2D" parent="Walls"]
 position = Vector2(108, 804)
 shape = SubResource("Box_216x8")
 
-[node name="W175" type="CollisionShape2D" parent="Walls"]
+[node name="W166" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1072, 804)
 shape = SubResource("Box_32x8")
 
-[node name="W176" type="CollisionShape2D" parent="Walls"]
+[node name="W167" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1108, 804)
 shape = SubResource("Box_24x8")
 
-[node name="W177" type="CollisionShape2D" parent="Walls"]
+[node name="W168" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1480, 804)
 shape = SubResource("Box_240x8")
 
-[node name="W178" type="CollisionShape2D" parent="Walls"]
+[node name="W169" type="CollisionShape2D" parent="Walls"]
 position = Vector2(116, 812)
 shape = SubResource("Box_232x8")
 
-[node name="W179" type="CollisionShape2D" parent="Walls"]
+[node name="W170" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1044, 812)
 shape = SubResource("Box_40x8")
 
-[node name="W180" type="CollisionShape2D" parent="Walls"]
+[node name="W171" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1100, 812)
 shape = SubResource("Box_56x8")
 
-[node name="W181" type="CollisionShape2D" parent="Walls"]
+[node name="W172" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1436, 812)
 shape = SubResource("Box_328x8")
 
-[node name="W182" type="CollisionShape2D" parent="Walls"]
+[node name="W173" type="CollisionShape2D" parent="Walls"]
 position = Vector2(120, 820)
 shape = SubResource("Box_240x8")
 
-[node name="W183" type="CollisionShape2D" parent="Walls"]
+[node name="W174" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1048, 820)
 shape = SubResource("Box_16x8")
 
-[node name="W184" type="CollisionShape2D" parent="Walls"]
+[node name="W175" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1076, 820)
 shape = SubResource("Box_24x8")
 
-[node name="W185" type="CollisionShape2D" parent="Walls"]
+[node name="W176" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1140, 820)
 shape = SubResource("Box_40x8")
 
-[node name="W186" type="CollisionShape2D" parent="Walls"]
+[node name="W177" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1428, 820)
 shape = SubResource("Box_344x8")
 
-[node name="W187" type="CollisionShape2D" parent="Walls"]
+[node name="W178" type="CollisionShape2D" parent="Walls"]
 position = Vector2(124, 828)
 shape = SubResource("Box_248x8")
 
-[node name="W188" type="CollisionShape2D" parent="Walls"]
+[node name="W179" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1068, 828)
 shape = SubResource("Box_8x8")
 
-[node name="W189" type="CollisionShape2D" parent="Walls"]
+[node name="W180" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1136, 828)
 shape = SubResource("Box_16x8")
 
-[node name="W190" type="CollisionShape2D" parent="Walls"]
+[node name="W181" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1376, 832)
 shape = SubResource("Box_448x16")
 
-[node name="W191" type="CollisionShape2D" parent="Walls"]
+[node name="W182" type="CollisionShape2D" parent="Walls"]
 position = Vector2(136, 836)
 shape = SubResource("Box_272x8")
 
-[node name="W192" type="CollisionShape2D" parent="Walls"]
+[node name="W183" type="CollisionShape2D" parent="Walls"]
 position = Vector2(140, 844)
 shape = SubResource("Box_280x8")
 
-[node name="W193" type="CollisionShape2D" parent="Walls"]
+[node name="W184" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1372, 844)
 shape = SubResource("Box_456x8")
 
-[node name="W194" type="CollisionShape2D" parent="Walls"]
+[node name="W185" type="CollisionShape2D" parent="Walls"]
 position = Vector2(148, 856)
 shape = SubResource("Box_296x16")
 
-[node name="W195" type="CollisionShape2D" parent="Walls"]
+[node name="W186" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1356, 852)
 shape = SubResource("Box_488x8")
 
-[node name="W196" type="CollisionShape2D" parent="Walls"]
+[node name="W187" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1348, 860)
 shape = SubResource("Box_504x8")
 
-[node name="W197" type="CollisionShape2D" parent="Walls"]
+[node name="W188" type="CollisionShape2D" parent="Walls"]
 position = Vector2(152, 872)
 shape = SubResource("Box_304x16")
 
-[node name="W198" type="CollisionShape2D" parent="Walls"]
+[node name="W189" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1340, 868)
 shape = SubResource("Box_520x8")
 
-[node name="W199" type="CollisionShape2D" parent="Walls"]
+[node name="W190" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1332, 876)
 shape = SubResource("Box_536x8")
 
-[node name="W200" type="CollisionShape2D" parent="Walls"]
+[node name="W191" type="CollisionShape2D" parent="Walls"]
 position = Vector2(156, 896)
 shape = SubResource("Box_312x32")
 
-[node name="W201" type="CollisionShape2D" parent="Walls"]
+[node name="W192" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1328, 884)
 shape = SubResource("Box_544x8")
 
-[node name="W202" type="CollisionShape2D" parent="Walls"]
+[node name="W193" type="CollisionShape2D" parent="Walls"]
+position = Vector2(588, 892)
+shape = SubResource("Box_8x8")
+
+[node name="W194" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1320, 892)
 shape = SubResource("Box_560x8")
 
-[node name="W203" type="CollisionShape2D" parent="Walls"]
+[node name="W195" type="CollisionShape2D" parent="Walls"]
+position = Vector2(584, 900)
+shape = SubResource("Box_16x8")
+
+[node name="W196" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1312, 900)
 shape = SubResource("Box_576x8")
 
-[node name="W204" type="CollisionShape2D" parent="Walls"]
+[node name="W197" type="CollisionShape2D" parent="Walls"]
+position = Vector2(568, 908)
+shape = SubResource("Box_48x8")
+
+[node name="W198" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1308, 908)
 shape = SubResource("Box_584x8")
 
-[node name="W205" type="CollisionShape2D" parent="Walls"]
+[node name="W199" type="CollisionShape2D" parent="Walls"]
 position = Vector2(164, 916)
 shape = SubResource("Box_328x8")
 
-[node name="W206" type="CollisionShape2D" parent="Walls"]
+[node name="W200" type="CollisionShape2D" parent="Walls"]
+position = Vector2(560, 916)
+shape = SubResource("Box_48x8")
+
+[node name="W201" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1300, 916)
 shape = SubResource("Box_600x8")
 
-[node name="W207" type="CollisionShape2D" parent="Walls"]
+[node name="W202" type="CollisionShape2D" parent="Walls"]
 position = Vector2(172, 924)
 shape = SubResource("Box_344x8")
 
-[node name="W208" type="CollisionShape2D" parent="Walls"]
+[node name="W203" type="CollisionShape2D" parent="Walls"]
 position = Vector2(372, 924)
 shape = SubResource("Box_24x8")
 
-[node name="W209" type="CollisionShape2D" parent="Walls"]
+[node name="W204" type="CollisionShape2D" parent="Walls"]
+position = Vector2(544, 924)
+shape = SubResource("Box_16x8")
+
+[node name="W205" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1288, 924)
 shape = SubResource("Box_624x8")
 
-[node name="W210" type="CollisionShape2D" parent="Walls"]
+[node name="W206" type="CollisionShape2D" parent="Walls"]
 position = Vector2(336, 932)
 shape = SubResource("Box_672x8")
 
-[node name="W211" type="CollisionShape2D" parent="Walls"]
+[node name="W207" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1284, 932)
 shape = SubResource("Box_632x8")
 
-[node name="W212" type="CollisionShape2D" parent="Walls"]
+[node name="W208" type="CollisionShape2D" parent="Walls"]
 position = Vector2(344, 940)
 shape = SubResource("Box_688x8")
 
-[node name="W213" type="CollisionShape2D" parent="Walls"]
+[node name="W209" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1268, 940)
 shape = SubResource("Box_664x8")
 
-[node name="W214" type="CollisionShape2D" parent="Walls"]
+[node name="W210" type="CollisionShape2D" parent="Walls"]
 position = Vector2(352, 948)
 shape = SubResource("Box_704x8")
 
-[node name="W215" type="CollisionShape2D" parent="Walls"]
+[node name="W211" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1264, 948)
 shape = SubResource("Box_672x8")
 
-[node name="W216" type="CollisionShape2D" parent="Walls"]
+[node name="W212" type="CollisionShape2D" parent="Walls"]
 position = Vector2(372, 956)
 shape = SubResource("Box_744x8")
 
-[node name="W217" type="CollisionShape2D" parent="Walls"]
+[node name="W213" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1256, 956)
 shape = SubResource("Box_688x8")
 
-[node name="W218" type="CollisionShape2D" parent="Walls"]
+[node name="W214" type="CollisionShape2D" parent="Walls"]
 position = Vector2(384, 964)
 shape = SubResource("Box_768x8")
 
-[node name="W219" type="CollisionShape2D" parent="Walls"]
+[node name="W215" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1244, 964)
 shape = SubResource("Box_712x8")
 
-[node name="W220" type="CollisionShape2D" parent="Walls"]
+[node name="W216" type="CollisionShape2D" parent="Walls"]
 position = Vector2(404, 972)
 shape = SubResource("Box_808x8")
 
-[node name="W221" type="CollisionShape2D" parent="Walls"]
+[node name="W217" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1212, 972)
 shape = SubResource("Box_776x8")
 
-[node name="W222" type="CollisionShape2D" parent="Walls"]
+[node name="W218" type="CollisionShape2D" parent="Walls"]
 position = Vector2(800, 1032)
 shape = SubResource("Box_1600x112")
 
 [node name="Rim" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
 closed = true
-points = PackedVector2Array(806.5, 87.5, 810.5, 87.5, 814.5, 88.5, 818.5, 90.5, 822.5, 92.5, 826.5, 95.5, 830.5, 97.5, 834.5, 98.5, 838.5, 100.5, 842.5, 101.5, 846.5, 102.5, 850.5, 103.5, 854.5, 102.5, 858.5, 102.5, 862.5, 103.5, 866.5, 104.5, 870.5, 106.5, 874.5, 108.5, 878.5, 109.5, 882.5, 110.5, 886.5, 112.5, 890.5, 113.5, 894.5, 115.5, 898.5, 115.5, 902.5, 115.5, 906.5, 114.5, 910.5, 114.5, 914.5, 114.5, 917.5, 115.5, 916.5, 119.5, 914.5, 122.5, 910.5, 126.5, 909.5, 130.5, 908.5, 134.5, 907.5, 138.5, 907.5, 142.5, 909.5, 146.5, 912.5, 149.5, 914.5, 153.5, 917.5, 157.5, 918.5, 161.5, 918.5, 165.5, 917.5, 169.5, 917.5, 173.5, 917.5, 177.5, 917.5, 181.5, 916.5, 185.5, 916.5, 189.5, 917.5, 193.5, 920.5, 197.5, 919.5, 201.5, 917.5, 204.5, 914.5, 207.5, 913.5, 211.5, 915.5, 215.5, 919.5, 215.5, 921.5, 211.5, 922.5, 207.5, 924.5, 204.5, 928.5, 203.5, 930.5, 207.5, 932.5, 211.5, 933.5, 215.5, 932.5, 219.5, 930.5, 223.5, 931.5, 227.5, 934.5, 231.5, 938.5, 234.5, 938.5, 238.5, 942.5, 239.5, 946.5, 241.5, 950.5, 243.5, 954.5, 245.5, 955.5, 249.5, 958.5, 252.5, 962.5, 250.5, 964.5, 246.5, 963.5, 242.5, 960.5, 238.5, 956.5, 235.5, 952.5, 233.5, 948.5, 231.5, 944.5, 228.5, 942.5, 224.5, 942.5, 220.5, 943.5, 216.5, 944.5, 216.5, 947.5, 218.5, 950.5, 221.5, 954.5, 220.5, 953.5, 216.5, 952.5, 212.5, 951.5, 208.5, 947.5, 205.5, 943.5, 205.5, 940.5, 203.5, 937.5, 199.5, 936.5, 195.5, 936.5, 191.5, 935.5, 187.5, 932.5, 185.5, 933.5, 181.5, 930.5, 178.5, 930.5, 174.5, 932.5, 170.5, 934.5, 166.5, 933.5, 162.5, 932.5, 158.5, 931.5, 154.5, 929.5, 150.5, 930.5, 146.5, 927.5, 142.5, 925.5, 138.5, 926.5, 134.5, 928.5, 130.5, 929.5, 126.5, 931.5, 122.5, 931.5, 118.5, 928.5, 115.5, 924.5, 115.5, 928.5, 115.5, 932.5, 115.5, 936.5, 115.5, 940.5, 115.5, 944.5, 116.5, 948.5, 117.5, 952.5, 118.5, 956.5, 119.5, 960.5, 120.5, 964.5, 122.5, 968.5, 125.5, 972.5, 127.5, 976.5, 128.5, 980.5, 128.5, 984.5, 127.5, 988.5, 127.5, 992.5, 128.5, 996.5, 130.5, 1000.5, 133.5, 1004.5, 135.5, 1008.5, 136.5, 1012.5, 136.5, 1016.5, 137.5, 1020.5, 138.5, 1024.5, 138.5, 1028.5, 138.5, 1032.5, 138.5, 1036.5, 138.5, 1040.5, 138.5, 1044.5, 139.5, 1048.5, 139.5, 1052.5, 140.5, 1056.5, 139.5, 1060.5, 138.5, 1064.5, 137.5, 1068.5, 136.5, 1072.5, 135.5, 1076.5, 134.5, 1080.5, 134.5, 1084.5, 134.5, 1088.5, 135.5, 1092.5, 135.5, 1096.5, 135.5, 1100.5, 135.5, 1104.5, 135.5, 1108.5, 135.5, 1112.5, 135.5, 1116.5, 135.5, 1120.5, 135.5, 1124.5, 134.5, 1128.5, 134.5, 1132.5, 133.5, 1136.5, 133.5, 1140.5, 133.5, 1144.5, 132.5, 1148.5, 132.5, 1152.5, 132.5, 1156.5, 132.5, 1160.5, 132.5, 1164.5, 132.5, 1168.5, 133.5, 1172.5, 133.5, 1176.5, 134.5, 1180.5, 134.5, 1184.5, 134.5, 1188.5, 135.5, 1192.5, 135.5, 1196.5, 135.5, 1200.5, 136.5, 1204.5, 137.5, 1208.5, 138.5, 1212.5, 140.5, 1216.5, 143.5, 1220.5, 146.5, 1224.5, 150.5, 1228.5, 154.5, 1231.5, 158.5, 1235.5, 160.5, 1239.5, 162.5, 1243.5, 162.5, 1247.5, 163.5, 1251.5, 163.5, 1255.5, 164.5, 1259.5, 164.5, 1263.5, 164.5, 1267.5, 164.5, 1271.5, 165.5, 1275.5, 166.5, 1279.5, 169.5, 1282.5, 173.5, 1284.5, 177.5, 1285.5, 181.5, 1285.5, 185.5, 1286.5, 189.5, 1286.5, 193.5, 1288.5, 197.5, 1291.5, 201.5, 1292.5, 205.5, 1293.5, 209.5, 1294.5, 213.5, 1297.5, 217.5, 1301.5, 220.5, 1305.5, 223.5, 1308.5, 227.5, 1310.5, 231.5, 1311.5, 235.5, 1315.5, 239.5, 1319.5, 241.5, 1323.5, 242.5, 1327.5, 245.5, 1331.5, 249.5, 1335.5, 252.5, 1339.5, 253.5, 1343.5, 254.5, 1347.5, 254.5, 1351.5, 256.5, 1354.5, 258.5, 1354.5, 262.5, 1354.5, 266.5, 1354.5, 268.5, 1351.5, 264.5, 1347.5, 263.5, 1343.5, 265.5, 1340.5, 269.5, 1339.5, 273.5, 1338.5, 277.5, 1336.5, 281.5, 1335.5, 285.5, 1336.5, 289.5, 1336.5, 293.5, 1338.5, 297.5, 1337.5, 301.5, 1333.5, 304.5, 1329.5, 305.5, 1325.5, 306.5, 1321.5, 309.5, 1318.5, 312.5, 1317.5, 316.5, 1316.5, 320.5, 1317.5, 324.5, 1318.5, 328.5, 1318.5, 331.5, 1314.5, 331.5, 1310.5, 333.5, 1310.5, 337.5, 1313.5, 339.5, 1317.5, 337.5, 1318.5, 338.5, 1317.5, 342.5, 1315.5, 346.5, 1313.5, 350.5, 1310.5, 354.5, 1308.5, 358.5, 1307.5, 362.5, 1306.5, 366.5, 1306.5, 370.5, 1309.5, 374.5, 1311.5, 378.5, 1313.5, 381.5, 1317.5, 381.5, 1320.5, 377.5, 1319.5, 373.5, 1316.5, 369.5, 1314.5, 365.5, 1315.5, 361.5, 1317.5, 357.5, 1321.5, 356.5, 1325.5, 356.5, 1329.5, 355.5, 1330.5, 351.5, 1328.5, 347.5, 1330.5, 343.5, 1331.5, 339.5, 1331.5, 335.5, 1334.5, 332.5, 1336.5, 328.5, 1337.5, 324.5, 1338.5, 320.5, 1339.5, 316.5, 1340.5, 312.5, 1342.5, 308.5, 1345.5, 304.5, 1346.5, 300.5, 1349.5, 296.5, 1350.5, 292.5, 1349.5, 288.5, 1349.5, 284.5, 1351.5, 280.5, 1354.5, 276.5, 1355.5, 272.5, 1358.5, 273.5, 1362.5, 275.5, 1365.5, 279.5, 1365.5, 283.5, 1365.5, 287.5, 1366.5, 291.5, 1369.5, 295.5, 1372.5, 299.5, 1373.5, 303.5, 1373.5, 307.5, 1374.5, 311.5, 1377.5, 315.5, 1381.5, 318.5, 1383.5, 322.5, 1385.5, 326.5, 1385.5, 330.5, 1388.5, 334.5, 1392.5, 338.5, 1394.5, 342.5, 1393.5, 346.5, 1394.5, 350.5, 1397.5, 353.5, 1401.5, 355.5, 1405.5, 356.5, 1409.5, 358.5, 1412.5, 362.5, 1414.5, 366.5, 1418.5, 370.5, 1421.5, 374.5, 1424.5, 377.5, 1428.5, 379.5, 1432.5, 380.5, 1436.5, 381.5, 1440.5, 382.5, 1444.5, 383.5, 1448.5, 384.5, 1452.5, 385.5, 1456.5, 387.5, 1460.5, 388.5, 1464.5, 389.5, 1468.5, 391.5, 1472.5, 393.5, 1476.5, 395.5, 1480.5, 399.5, 1484.5, 402.5, 1488.5, 405.5, 1492.5, 408.5, 1496.5, 411.5, 1500.5, 415.5, 1504.5, 419.5, 1508.5, 422.5, 1512.5, 425.5, 1516.5, 428.5, 1520.5, 432.5, 1524.5, 434.5, 1528.5, 437.5, 1531.5, 441.5, 1534.5, 445.5, 1536.5, 449.5, 1538.5, 453.5, 1539.5, 457.5, 1539.5, 461.5, 1540.5, 465.5, 1541.5, 469.5, 1542.5, 473.5, 1544.5, 477.5, 1547.5, 481.5, 1549.5, 485.5, 1550.5, 489.5, 1551.5, 493.5, 1551.5, 497.5, 1551.5, 501.5, 1550.5, 505.5, 1550.5, 509.5, 1552.5, 513.5, 1555.5, 517.5, 1556.5, 521.5, 1557.5, 525.5, 1559.5, 529.5, 1560.5, 533.5, 1559.5, 537.5, 1557.5, 541.5, 1557.5, 545.5, 1557.5, 549.5, 1556.5, 553.5, 1553.5, 557.5, 1551.5, 561.5, 1547.5, 565.5, 1543.5, 567.5, 1539.5, 569.5, 1535.5, 571.5, 1531.5, 573.5, 1527.5, 576.5, 1523.5, 578.5, 1519.5, 580.5, 1515.5, 582.5, 1511.5, 586.5, 1510.5, 590.5, 1512.5, 594.5, 1513.5, 598.5, 1514.5, 602.5, 1514.5, 606.5, 1514.5, 610.5, 1514.5, 614.5, 1513.5, 618.5, 1511.5, 622.5, 1509.5, 626.5, 1506.5, 630.5, 1503.5, 634.5, 1500.5, 638.5, 1498.5, 642.5, 1498.5, 646.5, 1497.5, 650.5, 1497.5, 654.5, 1493.5, 654.5, 1489.5, 654.5, 1485.5, 656.5, 1481.5, 658.5, 1477.5, 661.5, 1473.5, 665.5, 1470.5, 668.5, 1466.5, 667.5, 1462.5, 665.5, 1458.5, 664.5, 1455.5, 661.5, 1451.5, 660.5, 1447.5, 661.5, 1443.5, 662.5, 1439.5, 663.5, 1435.5, 666.5, 1432.5, 670.5, 1428.5, 673.5, 1424.5, 671.5, 1420.5, 669.5, 1416.5, 665.5, 1413.5, 662.5, 1409.5, 660.5, 1405.5, 660.5, 1401.5, 661.5, 1398.5, 663.5, 1396.5, 664.5, 1392.5, 664.5, 1388.5, 664.5, 1384.5, 666.5, 1380.5, 668.5, 1377.5, 669.5, 1374.5, 666.5, 1372.5, 662.5, 1368.5, 658.5, 1364.5, 657.5, 1360.5, 656.5, 1356.5, 657.5, 1354.5, 661.5, 1357.5, 665.5, 1361.5, 666.5, 1364.5, 668.5, 1367.5, 671.5, 1371.5, 674.5, 1373.5, 677.5, 1377.5, 679.5, 1381.5, 681.5, 1385.5, 680.5, 1389.5, 679.5, 1393.5, 677.5, 1396.5, 674.5, 1400.5, 673.5, 1404.5, 674.5, 1408.5, 675.5, 1411.5, 678.5, 1415.5, 679.5, 1419.5, 682.5, 1423.5, 684.5, 1427.5, 686.5, 1431.5, 685.5, 1435.5, 684.5, 1439.5, 681.5, 1443.5, 677.5, 1447.5, 673.5, 1451.5, 671.5, 1455.5, 674.5, 1459.5, 678.5, 1463.5, 680.5, 1467.5, 681.5, 1471.5, 681.5, 1475.5, 680.5, 1479.5, 677.5, 1483.5, 675.5, 1487.5, 673.5, 1490.5, 670.5, 1494.5, 669.5, 1498.5, 668.5, 1500.5, 667.5, 1499.5, 671.5, 1496.5, 675.5, 1494.5, 679.5, 1495.5, 683.5, 1496.5, 687.5, 1495.5, 691.5, 1492.5, 695.5, 1488.5, 698.5, 1486.5, 702.5, 1483.5, 706.5, 1480.5, 710.5, 1478.5, 714.5, 1477.5, 718.5, 1477.5, 722.5, 1477.5, 726.5, 1479.5, 730.5, 1481.5, 734.5, 1482.5, 738.5, 1481.5, 742.5, 1480.5, 746.5, 1477.5, 750.5, 1475.5, 754.5, 1474.5, 758.5, 1471.5, 762.5, 1467.5, 766.5, 1463.5, 770.5, 1459.5, 773.5, 1455.5, 776.5, 1451.5, 778.5, 1447.5, 781.5, 1443.5, 782.5, 1439.5, 783.5, 1435.5, 784.5, 1431.5, 785.5, 1427.5, 785.5, 1423.5, 786.5, 1419.5, 787.5, 1415.5, 788.5, 1411.5, 790.5, 1407.5, 791.5, 1403.5, 792.5, 1399.5, 793.5, 1395.5, 794.5, 1391.5, 795.5, 1387.5, 797.5, 1383.5, 798.5, 1379.5, 798.5, 1375.5, 799.5, 1371.5, 799.5, 1367.5, 800.5, 1363.5, 800.5, 1359.5, 802.5, 1355.5, 805.5, 1351.5, 807.5, 1347.5, 808.5, 1343.5, 808.5, 1339.5, 808.5, 1335.5, 808.5, 1331.5, 808.5, 1327.5, 808.5, 1323.5, 808.5, 1319.5, 809.5, 1315.5, 809.5, 1311.5, 810.5, 1307.5, 810.5, 1303.5, 811.5, 1299.5, 811.5, 1295.5, 811.5, 1291.5, 811.5, 1287.5, 811.5, 1283.5, 811.5, 1279.5, 811.5, 1275.5, 811.5, 1271.5, 812.5, 1267.5, 814.5, 1263.5, 816.5, 1259.5, 817.5, 1255.5, 819.5, 1251.5, 820.5, 1247.5, 822.5, 1243.5, 823.5, 1239.5, 823.5, 1235.5, 824.5, 1231.5, 825.5, 1227.5, 825.5, 1223.5, 825.5, 1219.5, 825.5, 1215.5, 824.5, 1211.5, 823.5, 1207.5, 823.5, 1203.5, 823.5, 1199.5, 823.5, 1195.5, 824.5, 1191.5, 825.5, 1187.5, 825.5, 1183.5, 824.5, 1179.5, 823.5, 1175.5, 822.5, 1171.5, 821.5, 1167.5, 821.5, 1163.5, 821.5, 1159.5, 821.5, 1156.5, 818.5, 1152.5, 817.5, 1148.5, 815.5, 1144.5, 816.5, 1140.5, 817.5, 1136.5, 817.5, 1132.5, 814.5, 1130.5, 810.5, 1126.5, 807.5, 1122.5, 805.5, 1118.5, 803.5, 1114.5, 800.5, 1110.5, 799.5, 1106.5, 801.5, 1102.5, 802.5, 1098.5, 802.5, 1094.5, 805.5, 1090.5, 805.5, 1088.5, 801.5, 1085.5, 797.5, 1082.5, 793.5, 1084.5, 789.5, 1087.5, 786.5, 1088.5, 782.5, 1086.5, 778.5, 1082.5, 776.5, 1078.5, 779.5, 1077.5, 783.5, 1077.5, 787.5, 1074.5, 791.5, 1074.5, 795.5, 1073.5, 797.5, 1070.5, 794.5, 1067.5, 790.5, 1065.5, 786.5, 1061.5, 783.5, 1057.5, 784.5, 1055.5, 788.5, 1055.5, 792.5, 1056.5, 796.5, 1060.5, 799.5, 1056.5, 801.5, 1052.5, 804.5, 1049.5, 808.5, 1046.5, 811.5, 1042.5, 812.5, 1038.5, 810.5, 1034.5, 808.5, 1031.5, 805.5, 1027.5, 804.5, 1023.5, 804.5, 1022.5, 808.5, 1024.5, 812.5, 1028.5, 815.5, 1032.5, 817.5, 1036.5, 819.5, 1040.5, 821.5, 1044.5, 823.5, 1048.5, 823.5, 1052.5, 821.5, 1056.5, 817.5, 1059.5, 814.5, 1063.5, 811.5, 1067.5, 811.5, 1071.5, 813.5, 1069.5, 816.5, 1065.5, 820.5, 1062.5, 824.5, 1063.5, 828.5, 1067.5, 831.5, 1071.5, 829.5, 1074.5, 825.5, 1078.5, 824.5, 1082.5, 822.5, 1086.5, 821.5, 1090.5, 821.5, 1094.5, 820.5, 1098.5, 820.5, 1102.5, 820.5, 1106.5, 818.5, 1108.5, 814.5, 1111.5, 813.5, 1114.5, 817.5, 1118.5, 820.5, 1122.5, 824.5, 1125.5, 827.5, 1129.5, 827.5, 1133.5, 831.5, 1137.5, 830.5, 1141.5, 829.5, 1145.5, 828.5, 1149.5, 829.5, 1153.5, 831.5, 1155.5, 830.5, 1152.5, 834.5, 1148.5, 838.5, 1144.5, 841.5, 1140.5, 844.5, 1136.5, 845.5, 1132.5, 846.5, 1128.5, 846.5, 1124.5, 846.5, 1120.5, 847.5, 1116.5, 848.5, 1112.5, 852.5, 1108.5, 855.5, 1104.5, 857.5, 1100.5, 858.5, 1096.5, 859.5, 1092.5, 861.5, 1088.5, 863.5, 1084.5, 865.5, 1080.5, 867.5, 1076.5, 868.5, 1072.5, 868.5, 1068.5, 870.5, 1064.5, 874.5, 1062.5, 878.5, 1059.5, 882.5, 1055.5, 883.5, 1051.5, 884.5, 1047.5, 884.5, 1043.5, 886.5, 1039.5, 890.5, 1035.5, 894.5, 1031.5, 897.5, 1027.5, 899.5, 1023.5, 901.5, 1019.5, 903.5, 1015.5, 907.5, 1011.5, 910.5, 1007.5, 913.5, 1003.5, 915.5, 999.5, 917.5, 995.5, 919.5, 991.5, 921.5, 987.5, 922.5, 983.5, 922.5, 979.5, 923.5, 975.5, 925.5, 971.5, 928.5, 967.5, 931.5, 963.5, 932.5, 959.5, 933.5, 955.5, 935.5, 951.5, 936.5, 947.5, 937.5, 943.5, 938.5, 939.5, 938.5, 935.5, 939.5, 931.5, 941.5, 927.5, 945.5, 924.5, 949.5, 920.5, 953.5, 916.5, 955.5, 912.5, 956.5, 908.5, 957.5, 904.5, 957.5, 900.5, 959.5, 896.5, 960.5, 892.5, 962.5, 888.5, 964.5, 884.5, 965.5, 880.5, 966.5, 876.5, 966.5, 872.5, 966.5, 868.5, 966.5, 864.5, 967.5, 860.5, 967.5, 856.5, 967.5, 852.5, 968.5, 848.5, 968.5, 844.5, 969.5, 840.5, 970.5, 836.5, 971.5, 832.5, 971.5, 828.5, 971.5, 824.5, 972.5, 820.5, 972.5, 816.5, 972.5, 812.5, 972.5, 808.5, 970.5, 804.5, 968.5, 800.5, 966.5, 796.5, 964.5, 792.5, 964.5, 788.5, 964.5, 784.5, 965.5, 780.5, 966.5, 776.5, 965.5, 772.5, 965.5, 768.5, 964.5, 764.5, 963.5, 760.5, 962.5, 756.5, 961.5, 752.5, 959.5, 748.5, 957.5, 744.5, 956.5, 740.5, 954.5, 736.5, 954.5, 732.5, 953.5, 728.5, 953.5, 724.5, 952.5, 720.5, 951.5, 716.5, 951.5, 712.5, 951.5, 708.5, 950.5, 704.5, 949.5, 700.5, 947.5, 696.5, 945.5, 692.5, 943.5, 688.5, 941.5, 684.5, 938.5, 680.5, 936.5, 676.5, 934.5, 672.5, 932.5, 668.5, 930.5, 664.5, 928.5, 660.5, 927.5, 656.5, 926.5, 652.5, 925.5, 648.5, 924.5, 644.5, 924.5, 640.5, 924.5, 636.5, 925.5, 632.5, 925.5, 628.5, 926.5, 624.5, 926.5, 620.5, 926.5, 616.5, 926.5, 612.5, 926.5, 608.5, 927.5, 604.5, 928.5, 600.5, 929.5, 596.5, 930.5, 592.5, 930.5, 588.5, 930.5, 584.5, 929.5, 580.5, 928.5, 576.5, 928.5, 572.5, 927.5, 568.5, 927.5, 564.5, 927.5, 560.5, 926.5, 556.5, 927.5, 552.5, 927.5, 548.5, 927.5, 544.5, 927.5, 540.5, 927.5, 536.5, 926.5, 532.5, 926.5, 528.5, 926.5, 524.5, 927.5, 520.5, 927.5, 516.5, 926.5, 512.5, 925.5, 508.5, 924.5, 504.5, 924.5, 500.5, 924.5, 496.5, 924.5, 492.5, 924.5, 488.5, 925.5, 484.5, 925.5, 480.5, 926.5, 476.5, 926.5, 472.5, 927.5, 468.5, 928.5, 464.5, 929.5, 460.5, 929.5, 456.5, 930.5, 452.5, 930.5, 448.5, 931.5, 444.5, 931.5, 440.5, 931.5, 436.5, 931.5, 432.5, 931.5, 428.5, 930.5, 424.5, 929.5, 420.5, 928.5, 416.5, 927.5, 412.5, 927.5, 408.5, 927.5, 404.5, 926.5, 400.5, 926.5, 396.5, 926.5, 392.5, 925.5, 388.5, 924.5, 384.5, 923.5, 380.5, 922.5, 376.5, 922.5, 372.5, 922.5, 368.5, 922.5, 364.5, 923.5, 360.5, 923.5, 356.5, 924.5, 352.5, 924.5, 348.5, 924.5, 344.5, 923.5, 340.5, 921.5, 336.5, 919.5, 332.5, 917.5, 328.5, 915.5, 324.5, 914.5, 320.5, 913.5, 316.5, 910.5, 314.5, 906.5, 312.5, 902.5, 311.5, 898.5, 310.5, 894.5, 309.5, 890.5, 309.5, 886.5, 309.5, 882.5, 308.5, 878.5, 305.5, 874.5, 302.5, 870.5, 300.5, 866.5, 299.5, 862.5, 298.5, 858.5, 297.5, 854.5, 294.5, 850.5, 290.5, 847.5, 286.5, 845.5, 282.5, 843.5, 278.5, 839.5, 274.5, 836.5, 270.5, 834.5, 266.5, 833.5, 262.5, 832.5, 258.5, 831.5, 254.5, 830.5, 250.5, 829.5, 246.5, 826.5, 242.5, 823.5, 238.5, 820.5, 234.5, 816.5, 231.5, 812.5, 227.5, 809.5, 223.5, 807.5, 219.5, 804.5, 215.5, 802.5, 211.5, 800.5, 207.5, 798.5, 203.5, 796.5, 199.5, 793.5, 195.5, 791.5, 191.5, 788.5, 187.5, 785.5, 183.5, 781.5, 179.5, 777.5, 179.5, 773.5, 179.5, 769.5, 178.5, 765.5, 174.5, 762.5, 170.5, 760.5, 166.5, 759.5, 162.5, 757.5, 159.5, 753.5, 158.5, 749.5, 155.5, 745.5, 151.5, 743.5, 147.5, 740.5, 143.5, 737.5, 139.5, 733.5, 136.5, 729.5, 133.5, 725.5, 132.5, 721.5, 130.5, 717.5, 127.5, 713.5, 123.5, 709.5, 121.5, 705.5, 121.5, 701.5, 122.5, 697.5, 123.5, 693.5, 124.5, 689.5, 125.5, 685.5, 125.5, 681.5, 123.5, 677.5, 119.5, 674.5, 115.5, 671.5, 111.5, 669.5, 107.5, 667.5, 103.5, 666.5, 99.5, 664.5, 95.5, 663.5, 91.5, 661.5, 87.5, 657.5, 84.5, 653.5, 81.5, 649.5, 77.5, 646.5, 73.5, 643.5, 71.5, 639.5, 71.5, 635.5, 71.5, 631.5, 70.5, 627.5, 68.5, 623.5, 67.5, 619.5, 67.5, 616.5, 71.5, 617.5, 74.5, 620.5, 77.5, 624.5, 80.5, 628.5, 84.5, 631.5, 88.5, 634.5, 92.5, 634.5, 96.5, 632.5, 100.5, 634.5, 104.5, 632.5, 108.5, 632.5, 112.5, 633.5, 115.5, 637.5, 119.5, 640.5, 123.5, 643.5, 127.5, 645.5, 131.5, 647.5, 135.5, 649.5, 139.5, 650.5, 143.5, 647.5, 147.5, 646.5, 151.5, 643.5, 155.5, 644.5, 159.5, 643.5, 163.5, 643.5, 167.5, 646.5, 169.5, 649.5, 172.5, 653.5, 176.5, 656.5, 180.5, 656.5, 184.5, 657.5, 188.5, 658.5, 192.5, 658.5, 196.5, 656.5, 200.5, 656.5, 204.5, 660.5, 208.5, 663.5, 212.5, 663.5, 214.5, 659.5, 213.5, 655.5, 209.5, 651.5, 205.5, 649.5, 201.5, 648.5, 197.5, 649.5, 193.5, 649.5, 189.5, 649.5, 185.5, 646.5, 181.5, 645.5, 177.5, 643.5, 173.5, 640.5, 169.5, 637.5, 165.5, 633.5, 161.5, 631.5, 157.5, 631.5, 153.5, 631.5, 149.5, 633.5, 145.5, 634.5, 141.5, 635.5, 137.5, 636.5, 133.5, 637.5, 130.5, 634.5, 127.5, 630.5, 124.5, 626.5, 120.5, 623.5, 116.5, 621.5, 112.5, 619.5, 108.5, 619.5, 104.5, 619.5, 100.5, 621.5, 96.5, 621.5, 92.5, 621.5, 89.5, 617.5, 90.5, 613.5, 87.5, 610.5, 86.5, 606.5, 83.5, 603.5, 79.5, 602.5, 75.5, 601.5, 71.5, 600.5, 67.5, 599.5, 63.5, 598.5, 59.5, 600.5, 57.5, 602.5, 55.5, 598.5, 54.5, 594.5, 54.5, 590.5, 56.5, 586.5, 59.5, 582.5, 63.5, 579.5, 67.5, 577.5, 71.5, 574.5, 75.5, 572.5, 79.5, 569.5, 83.5, 567.5, 87.5, 564.5, 91.5, 562.5, 95.5, 559.5, 99.5, 556.5, 103.5, 552.5, 106.5, 548.5, 109.5, 544.5, 113.5, 541.5, 116.5, 537.5, 120.5, 533.5, 123.5, 529.5, 126.5, 525.5, 129.5, 521.5, 133.5, 517.5, 135.5, 513.5, 134.5, 509.5, 132.5, 505.5, 133.5, 501.5, 134.5, 497.5, 135.5, 493.5, 139.5, 489.5, 143.5, 486.5, 145.5, 482.5, 146.5, 478.5, 147.5, 474.5, 150.5, 470.5, 154.5, 467.5, 158.5, 463.5, 162.5, 461.5, 166.5, 459.5, 170.5, 457.5, 174.5, 455.5, 178.5, 453.5, 182.5, 451.5, 186.5, 449.5, 190.5, 448.5, 194.5, 446.5, 198.5, 446.5, 202.5, 445.5, 206.5, 444.5, 210.5, 443.5, 214.5, 442.5, 217.5, 438.5, 216.5, 434.5, 217.5, 430.5, 221.5, 426.5, 224.5, 422.5, 228.5, 418.5, 232.5, 416.5, 236.5, 413.5, 240.5, 411.5, 244.5, 409.5, 248.5, 407.5, 252.5, 406.5, 256.5, 404.5, 260.5, 403.5, 264.5, 401.5, 268.5, 400.5, 272.5, 399.5, 276.5, 396.5, 276.5, 392.5, 272.5, 388.5, 271.5, 384.5, 272.5, 380.5, 273.5, 376.5, 272.5, 372.5, 271.5, 368.5, 269.5, 364.5, 266.5, 360.5, 262.5, 356.5, 258.5, 353.5, 256.5, 349.5, 255.5, 345.5, 255.5, 341.5, 252.5, 337.5, 248.5, 333.5, 244.5, 329.5, 240.5, 325.5, 237.5, 321.5, 236.5, 317.5, 237.5, 313.5, 236.5, 309.5, 234.5, 305.5, 231.5, 301.5, 229.5, 297.5, 228.5, 293.5, 227.5, 289.5, 230.5, 291.5, 234.5, 293.5, 238.5, 294.5, 242.5, 294.5, 246.5, 293.5, 250.5, 291.5, 254.5, 290.5, 258.5, 289.5, 261.5, 293.5, 263.5, 296.5, 264.5, 300.5, 268.5, 303.5, 272.5, 306.5, 276.5, 308.5, 280.5, 307.5, 284.5, 307.5, 288.5, 307.5, 292.5, 309.5, 296.5, 308.5, 300.5, 311.5, 304.5, 311.5, 308.5, 310.5, 310.5, 306.5, 306.5, 303.5, 302.5, 302.5, 298.5, 301.5, 294.5, 300.5, 290.5, 301.5, 286.5, 301.5, 282.5, 300.5, 278.5, 298.5, 275.5, 295.5, 273.5, 291.5, 269.5, 288.5, 266.5, 285.5, 262.5, 283.5, 259.5, 279.5, 255.5, 280.5, 251.5, 281.5, 247.5, 280.5, 243.5, 280.5, 239.5, 279.5, 237.5, 276.5, 236.5, 272.5, 236.5, 268.5, 237.5, 264.5, 236.5, 260.5, 233.5, 256.5, 229.5, 255.5, 225.5, 257.5, 222.5, 259.5, 224.5, 255.5, 225.5, 251.5, 226.5, 247.5, 227.5, 243.5, 227.5, 239.5, 227.5, 235.5, 227.5, 231.5, 227.5, 227.5, 228.5, 223.5, 230.5, 219.5, 232.5, 215.5, 235.5, 211.5, 239.5, 207.5, 243.5, 203.5, 247.5, 200.5, 251.5, 198.5, 255.5, 194.5, 257.5, 190.5, 257.5, 186.5, 258.5, 182.5, 261.5, 179.5, 265.5, 177.5, 269.5, 175.5, 273.5, 172.5, 277.5, 168.5, 279.5, 164.5, 283.5, 160.5, 286.5, 156.5, 290.5, 152.5, 294.5, 149.5, 298.5, 148.5, 302.5, 147.5, 306.5, 146.5, 310.5, 144.5, 314.5, 141.5, 318.5, 139.5, 322.5, 136.5, 326.5, 134.5, 330.5, 133.5, 334.5, 131.5, 338.5, 129.5, 342.5, 127.5, 346.5, 123.5, 349.5, 120.5, 353.5, 118.5, 357.5, 116.5, 361.5, 115.5, 365.5, 114.5, 369.5, 113.5, 373.5, 112.5, 377.5, 112.5, 381.5, 112.5, 385.5, 112.5, 389.5, 113.5, 393.5, 113.5, 397.5, 113.5, 401.5, 114.5, 405.5, 114.5, 409.5, 115.5, 413.5, 116.5, 417.5, 116.5, 421.5, 117.5, 425.5, 117.5, 429.5, 118.5, 433.5, 118.5, 437.5, 118.5, 441.5, 118.5, 445.5, 118.5, 449.5, 119.5, 453.5, 120.5, 457.5, 120.5, 461.5, 121.5, 465.5, 121.5, 469.5, 120.5, 473.5, 119.5, 477.5, 118.5, 481.5, 117.5, 485.5, 117.5, 489.5, 118.5, 493.5, 119.5, 497.5, 120.5, 501.5, 121.5, 505.5, 121.5, 509.5, 120.5, 513.5, 118.5, 517.5, 115.5, 521.5, 114.5, 525.5, 113.5, 529.5, 113.5, 533.5, 113.5, 537.5, 112.5, 541.5, 109.5, 545.5, 106.5, 549.5, 104.5, 553.5, 103.5, 557.5, 104.5, 561.5, 105.5, 565.5, 106.5, 569.5, 107.5, 573.5, 108.5, 577.5, 109.5, 581.5, 110.5, 585.5, 111.5, 589.5, 111.5, 593.5, 112.5, 597.5, 113.5, 601.5, 113.5, 605.5, 113.5, 609.5, 112.5, 613.5, 111.5, 617.5, 109.5, 621.5, 107.5, 625.5, 105.5, 629.5, 104.5, 633.5, 103.5, 637.5, 101.5, 641.5, 100.5, 645.5, 100.5, 649.5, 99.5, 653.5, 99.5, 657.5, 98.5, 661.5, 98.5, 665.5, 98.5, 669.5, 98.5, 673.5, 98.5, 677.5, 98.5, 681.5, 97.5, 685.5, 96.5, 689.5, 95.5, 693.5, 94.5, 697.5, 95.5, 701.5, 97.5, 705.5, 98.5, 709.5, 99.5, 713.5, 99.5, 717.5, 99.5, 721.5, 100.5, 725.5, 100.5, 729.5, 101.5, 733.5, 100.5, 737.5, 99.5, 741.5, 99.5, 745.5, 99.5, 749.5, 99.5, 753.5, 100.5, 757.5, 100.5, 761.5, 99.5, 765.5, 99.5, 769.5, 98.5, 773.5, 97.5, 777.5, 96.5, 781.5, 94.5, 785.5, 93.5, 789.5, 91.5, 793.5, 90.5, 797.5, 89.5, 801.5, 88.5, 805.5, 88.5)
+points = PackedVector2Array(806.5, 87.5, 810.5, 87.5, 814.5, 88.5, 818.5, 90.5, 822.5, 92.5, 826.5, 95.5, 830.5, 97.5, 834.5, 98.5, 838.5, 100.5, 842.5, 101.5, 846.5, 102.5, 850.5, 103.5, 854.5, 102.5, 858.5, 102.5, 862.5, 103.5, 866.5, 104.5, 870.5, 106.5, 874.5, 108.5, 878.5, 109.5, 882.5, 110.5, 886.5, 112.5, 890.5, 113.5, 894.5, 115.5, 898.5, 115.5, 902.5, 115.5, 906.5, 114.5, 910.5, 114.5, 914.5, 114.5, 917.5, 115.5, 916.5, 119.5, 914.5, 122.5, 910.5, 126.5, 909.5, 130.5, 908.5, 134.5, 907.5, 138.5, 907.5, 142.5, 909.5, 146.5, 912.5, 149.5, 914.5, 153.5, 917.5, 157.5, 918.5, 161.5, 918.5, 165.5, 917.5, 169.5, 917.5, 173.5, 917.5, 177.5, 917.5, 181.5, 916.5, 185.5, 919.5, 188.5, 923.5, 188.5, 927.5, 187.5, 931.5, 183.5, 932.5, 179.5, 929.5, 176.5, 932.5, 172.5, 933.5, 168.5, 934.5, 164.5, 933.5, 160.5, 931.5, 156.5, 930.5, 152.5, 929.5, 148.5, 929.5, 144.5, 926.5, 140.5, 925.5, 136.5, 927.5, 132.5, 928.5, 128.5, 931.5, 124.5, 931.5, 120.5, 930.5, 116.5, 926.5, 115.5, 926.5, 115.5, 930.5, 115.5, 934.5, 115.5, 938.5, 115.5, 942.5, 115.5, 946.5, 116.5, 950.5, 117.5, 954.5, 118.5, 958.5, 120.5, 962.5, 121.5, 966.5, 124.5, 970.5, 126.5, 974.5, 128.5, 978.5, 128.5, 982.5, 128.5, 986.5, 127.5, 990.5, 127.5, 994.5, 129.5, 998.5, 132.5, 1002.5, 134.5, 1006.5, 135.5, 1010.5, 136.5, 1014.5, 137.5, 1018.5, 137.5, 1022.5, 138.5, 1026.5, 138.5, 1030.5, 138.5, 1034.5, 138.5, 1038.5, 138.5, 1042.5, 138.5, 1046.5, 139.5, 1050.5, 140.5, 1054.5, 140.5, 1058.5, 139.5, 1062.5, 138.5, 1066.5, 137.5, 1070.5, 135.5, 1074.5, 134.5, 1078.5, 134.5, 1082.5, 134.5, 1086.5, 135.5, 1090.5, 135.5, 1094.5, 135.5, 1098.5, 135.5, 1102.5, 135.5, 1106.5, 135.5, 1110.5, 135.5, 1114.5, 135.5, 1118.5, 135.5, 1122.5, 134.5, 1126.5, 134.5, 1130.5, 134.5, 1134.5, 133.5, 1138.5, 133.5, 1142.5, 132.5, 1146.5, 132.5, 1150.5, 132.5, 1154.5, 132.5, 1158.5, 132.5, 1162.5, 132.5, 1166.5, 133.5, 1170.5, 133.5, 1174.5, 134.5, 1178.5, 134.5, 1182.5, 134.5, 1186.5, 134.5, 1190.5, 135.5, 1194.5, 135.5, 1198.5, 136.5, 1202.5, 137.5, 1206.5, 138.5, 1210.5, 139.5, 1214.5, 142.5, 1218.5, 145.5, 1222.5, 148.5, 1226.5, 152.5, 1229.5, 156.5, 1233.5, 159.5, 1237.5, 161.5, 1241.5, 162.5, 1245.5, 163.5, 1249.5, 163.5, 1253.5, 164.5, 1257.5, 164.5, 1261.5, 164.5, 1265.5, 164.5, 1269.5, 165.5, 1273.5, 165.5, 1277.5, 167.5, 1280.5, 171.5, 1283.5, 175.5, 1285.5, 179.5, 1285.5, 183.5, 1285.5, 187.5, 1286.5, 191.5, 1287.5, 195.5, 1290.5, 199.5, 1291.5, 203.5, 1292.5, 207.5, 1293.5, 211.5, 1295.5, 215.5, 1299.5, 218.5, 1303.5, 221.5, 1307.5, 225.5, 1309.5, 229.5, 1310.5, 233.5, 1313.5, 237.5, 1317.5, 240.5, 1321.5, 241.5, 1325.5, 243.5, 1329.5, 247.5, 1333.5, 251.5, 1337.5, 253.5, 1341.5, 253.5, 1345.5, 254.5, 1349.5, 255.5, 1353.5, 256.5, 1355.5, 260.5, 1354.5, 264.5, 1354.5, 268.5, 1353.5, 266.5, 1349.5, 263.5, 1345.5, 264.5, 1341.5, 267.5, 1339.5, 271.5, 1338.5, 275.5, 1337.5, 279.5, 1335.5, 283.5, 1336.5, 287.5, 1336.5, 291.5, 1337.5, 295.5, 1338.5, 299.5, 1335.5, 303.5, 1331.5, 304.5, 1327.5, 305.5, 1323.5, 307.5, 1319.5, 310.5, 1317.5, 314.5, 1316.5, 318.5, 1317.5, 322.5, 1317.5, 326.5, 1319.5, 330.5, 1316.5, 331.5, 1312.5, 331.5, 1308.5, 335.5, 1311.5, 339.5, 1315.5, 338.5, 1319.5, 336.5, 1318.5, 340.5, 1316.5, 344.5, 1314.5, 348.5, 1312.5, 352.5, 1308.5, 356.5, 1307.5, 360.5, 1307.5, 364.5, 1306.5, 368.5, 1307.5, 372.5, 1310.5, 376.5, 1311.5, 380.5, 1315.5, 381.5, 1319.5, 379.5, 1320.5, 375.5, 1317.5, 371.5, 1314.5, 367.5, 1314.5, 363.5, 1315.5, 359.5, 1319.5, 356.5, 1323.5, 356.5, 1327.5, 356.5, 1330.5, 353.5, 1329.5, 349.5, 1329.5, 345.5, 1331.5, 341.5, 1331.5, 337.5, 1332.5, 334.5, 1335.5, 330.5, 1337.5, 326.5, 1338.5, 322.5, 1339.5, 318.5, 1339.5, 314.5, 1341.5, 310.5, 1344.5, 306.5, 1346.5, 302.5, 1347.5, 298.5, 1350.5, 294.5, 1350.5, 290.5, 1349.5, 286.5, 1350.5, 282.5, 1352.5, 278.5, 1355.5, 274.5, 1356.5, 272.5, 1360.5, 274.5, 1364.5, 277.5, 1365.5, 281.5, 1365.5, 285.5, 1365.5, 289.5, 1367.5, 293.5, 1370.5, 297.5, 1372.5, 301.5, 1373.5, 305.5, 1373.5, 309.5, 1375.5, 313.5, 1379.5, 317.5, 1382.5, 320.5, 1384.5, 324.5, 1385.5, 328.5, 1386.5, 332.5, 1390.5, 336.5, 1393.5, 340.5, 1394.5, 344.5, 1393.5, 348.5, 1395.5, 352.5, 1399.5, 354.5, 1403.5, 356.5, 1407.5, 357.5, 1411.5, 360.5, 1413.5, 364.5, 1416.5, 368.5, 1420.5, 372.5, 1422.5, 376.5, 1426.5, 378.5, 1430.5, 380.5, 1434.5, 381.5, 1438.5, 381.5, 1442.5, 382.5, 1446.5, 383.5, 1450.5, 385.5, 1454.5, 386.5, 1458.5, 387.5, 1462.5, 388.5, 1466.5, 390.5, 1470.5, 391.5, 1474.5, 394.5, 1478.5, 397.5, 1482.5, 400.5, 1486.5, 403.5, 1490.5, 406.5, 1494.5, 409.5, 1498.5, 413.5, 1502.5, 417.5, 1506.5, 421.5, 1510.5, 423.5, 1514.5, 426.5, 1518.5, 430.5, 1522.5, 433.5, 1526.5, 436.5, 1530.5, 439.5, 1533.5, 443.5, 1535.5, 447.5, 1537.5, 451.5, 1538.5, 455.5, 1539.5, 459.5, 1540.5, 463.5, 1541.5, 467.5, 1542.5, 471.5, 1543.5, 475.5, 1545.5, 479.5, 1548.5, 483.5, 1549.5, 487.5, 1550.5, 491.5, 1551.5, 495.5, 1551.5, 499.5, 1550.5, 503.5, 1550.5, 507.5, 1551.5, 511.5, 1553.5, 515.5, 1556.5, 519.5, 1557.5, 523.5, 1558.5, 527.5, 1560.5, 531.5, 1560.5, 535.5, 1558.5, 539.5, 1557.5, 543.5, 1557.5, 547.5, 1556.5, 551.5, 1554.5, 555.5, 1552.5, 559.5, 1549.5, 563.5, 1545.5, 566.5, 1541.5, 568.5, 1537.5, 570.5, 1533.5, 572.5, 1529.5, 574.5, 1525.5, 577.5, 1521.5, 579.5, 1517.5, 581.5, 1513.5, 584.5, 1510.5, 588.5, 1511.5, 592.5, 1513.5, 596.5, 1514.5, 600.5, 1514.5, 604.5, 1514.5, 608.5, 1514.5, 612.5, 1513.5, 616.5, 1512.5, 620.5, 1510.5, 624.5, 1507.5, 628.5, 1504.5, 632.5, 1502.5, 636.5, 1499.5, 640.5, 1498.5, 644.5, 1497.5, 648.5, 1497.5, 652.5, 1495.5, 654.5, 1491.5, 654.5, 1487.5, 655.5, 1483.5, 656.5, 1479.5, 659.5, 1475.5, 663.5, 1472.5, 667.5, 1468.5, 668.5, 1464.5, 666.5, 1460.5, 665.5, 1457.5, 663.5, 1453.5, 660.5, 1449.5, 661.5, 1445.5, 662.5, 1441.5, 662.5, 1437.5, 665.5, 1434.5, 668.5, 1430.5, 672.5, 1426.5, 673.5, 1422.5, 670.5, 1418.5, 667.5, 1414.5, 664.5, 1411.5, 661.5, 1407.5, 660.5, 1403.5, 661.5, 1399.5, 661.5, 1398.5, 665.5, 1394.5, 665.5, 1390.5, 664.5, 1386.5, 664.5, 1382.5, 667.5, 1378.5, 669.5, 1375.5, 668.5, 1373.5, 664.5, 1370.5, 660.5, 1366.5, 657.5, 1362.5, 656.5, 1358.5, 656.5, 1355.5, 659.5, 1355.5, 663.5, 1359.5, 665.5, 1363.5, 666.5, 1365.5, 669.5, 1369.5, 673.5, 1372.5, 675.5, 1375.5, 679.5, 1379.5, 680.5, 1383.5, 681.5, 1387.5, 679.5, 1391.5, 678.5, 1395.5, 676.5, 1398.5, 674.5, 1402.5, 673.5, 1406.5, 674.5, 1410.5, 676.5, 1413.5, 679.5, 1417.5, 681.5, 1421.5, 683.5, 1425.5, 685.5, 1429.5, 686.5, 1433.5, 684.5, 1437.5, 683.5, 1441.5, 679.5, 1445.5, 675.5, 1449.5, 672.5, 1453.5, 672.5, 1457.5, 676.5, 1461.5, 679.5, 1465.5, 681.5, 1469.5, 681.5, 1473.5, 680.5, 1477.5, 679.5, 1481.5, 676.5, 1485.5, 674.5, 1489.5, 672.5, 1492.5, 670.5, 1496.5, 669.5, 1500.5, 667.5, 1500.5, 669.5, 1497.5, 673.5, 1495.5, 677.5, 1494.5, 681.5, 1495.5, 685.5, 1496.5, 689.5, 1494.5, 693.5, 1490.5, 696.5, 1487.5, 700.5, 1484.5, 704.5, 1481.5, 708.5, 1479.5, 712.5, 1478.5, 716.5, 1477.5, 720.5, 1477.5, 724.5, 1478.5, 728.5, 1480.5, 732.5, 1481.5, 736.5, 1482.5, 740.5, 1481.5, 744.5, 1478.5, 748.5, 1476.5, 752.5, 1474.5, 756.5, 1473.5, 760.5, 1469.5, 764.5, 1465.5, 768.5, 1461.5, 771.5, 1457.5, 774.5, 1453.5, 777.5, 1449.5, 780.5, 1445.5, 781.5, 1441.5, 783.5, 1437.5, 783.5, 1433.5, 784.5, 1429.5, 785.5, 1425.5, 786.5, 1421.5, 787.5, 1417.5, 788.5, 1413.5, 789.5, 1409.5, 790.5, 1405.5, 791.5, 1401.5, 792.5, 1397.5, 793.5, 1393.5, 795.5, 1389.5, 796.5, 1385.5, 797.5, 1381.5, 798.5, 1377.5, 798.5, 1373.5, 799.5, 1369.5, 799.5, 1365.5, 800.5, 1361.5, 801.5, 1357.5, 803.5, 1353.5, 806.5, 1349.5, 807.5, 1345.5, 808.5, 1341.5, 808.5, 1337.5, 808.5, 1333.5, 808.5, 1329.5, 808.5, 1325.5, 808.5, 1321.5, 809.5, 1317.5, 809.5, 1313.5, 810.5, 1309.5, 810.5, 1305.5, 810.5, 1301.5, 811.5, 1297.5, 811.5, 1293.5, 811.5, 1289.5, 811.5, 1285.5, 811.5, 1281.5, 811.5, 1277.5, 811.5, 1273.5, 811.5, 1269.5, 813.5, 1265.5, 816.5, 1261.5, 817.5, 1257.5, 818.5, 1253.5, 820.5, 1249.5, 821.5, 1245.5, 822.5, 1241.5, 823.5, 1237.5, 824.5, 1233.5, 824.5, 1229.5, 825.5, 1225.5, 825.5, 1221.5, 825.5, 1217.5, 824.5, 1213.5, 824.5, 1209.5, 823.5, 1205.5, 823.5, 1201.5, 823.5, 1197.5, 824.5, 1193.5, 825.5, 1189.5, 825.5, 1185.5, 824.5, 1181.5, 824.5, 1177.5, 823.5, 1173.5, 822.5, 1169.5, 821.5, 1165.5, 821.5, 1161.5, 822.5, 1158.5, 819.5, 1154.5, 817.5, 1150.5, 816.5, 1146.5, 815.5, 1142.5, 816.5, 1138.5, 817.5, 1134.5, 816.5, 1131.5, 812.5, 1128.5, 808.5, 1124.5, 806.5, 1120.5, 804.5, 1116.5, 801.5, 1112.5, 799.5, 1108.5, 800.5, 1104.5, 802.5, 1100.5, 802.5, 1096.5, 803.5, 1092.5, 805.5, 1089.5, 803.5, 1087.5, 799.5, 1083.5, 795.5, 1082.5, 791.5, 1086.5, 788.5, 1088.5, 784.5, 1088.5, 780.5, 1084.5, 776.5, 1080.5, 777.5, 1078.5, 781.5, 1077.5, 785.5, 1076.5, 789.5, 1073.5, 793.5, 1074.5, 797.5, 1072.5, 795.5, 1068.5, 792.5, 1066.5, 788.5, 1063.5, 784.5, 1059.5, 784.5, 1055.5, 786.5, 1055.5, 790.5, 1055.5, 794.5, 1058.5, 798.5, 1058.5, 800.5, 1054.5, 803.5, 1051.5, 806.5, 1048.5, 810.5, 1044.5, 811.5, 1040.5, 811.5, 1036.5, 809.5, 1032.5, 807.5, 1029.5, 804.5, 1025.5, 804.5, 1022.5, 806.5, 1022.5, 810.5, 1026.5, 813.5, 1030.5, 816.5, 1034.5, 818.5, 1038.5, 820.5, 1042.5, 822.5, 1046.5, 823.5, 1050.5, 822.5, 1054.5, 819.5, 1057.5, 815.5, 1061.5, 812.5, 1065.5, 810.5, 1069.5, 812.5, 1071.5, 814.5, 1067.5, 818.5, 1063.5, 822.5, 1062.5, 826.5, 1065.5, 830.5, 1069.5, 831.5, 1072.5, 827.5, 1076.5, 824.5, 1080.5, 823.5, 1084.5, 821.5, 1088.5, 821.5, 1092.5, 820.5, 1096.5, 820.5, 1100.5, 820.5, 1104.5, 819.5, 1108.5, 816.5, 1109.5, 812.5, 1112.5, 815.5, 1116.5, 819.5, 1120.5, 822.5, 1123.5, 826.5, 1127.5, 827.5, 1131.5, 829.5, 1135.5, 831.5, 1139.5, 829.5, 1143.5, 828.5, 1147.5, 828.5, 1151.5, 831.5, 1153.5, 832.5, 1150.5, 836.5, 1146.5, 840.5, 1142.5, 843.5, 1138.5, 845.5, 1134.5, 846.5, 1130.5, 846.5, 1126.5, 846.5, 1122.5, 847.5, 1118.5, 847.5, 1114.5, 850.5, 1110.5, 854.5, 1106.5, 856.5, 1102.5, 857.5, 1098.5, 859.5, 1094.5, 860.5, 1090.5, 862.5, 1086.5, 864.5, 1082.5, 866.5, 1078.5, 867.5, 1074.5, 868.5, 1070.5, 869.5, 1066.5, 872.5, 1063.5, 876.5, 1061.5, 880.5, 1057.5, 882.5, 1053.5, 883.5, 1049.5, 884.5, 1045.5, 885.5, 1041.5, 888.5, 1037.5, 892.5, 1033.5, 895.5, 1029.5, 898.5, 1025.5, 900.5, 1021.5, 902.5, 1017.5, 905.5, 1013.5, 908.5, 1009.5, 911.5, 1005.5, 914.5, 1001.5, 916.5, 997.5, 918.5, 993.5, 920.5, 989.5, 921.5, 985.5, 922.5, 981.5, 923.5, 977.5, 924.5, 973.5, 927.5, 969.5, 930.5, 965.5, 932.5, 961.5, 933.5, 957.5, 934.5, 953.5, 935.5, 949.5, 937.5, 945.5, 938.5, 941.5, 938.5, 937.5, 938.5, 933.5, 940.5, 929.5, 943.5, 925.5, 947.5, 922.5, 951.5, 918.5, 954.5, 914.5, 956.5, 910.5, 956.5, 906.5, 957.5, 902.5, 958.5, 898.5, 959.5, 894.5, 961.5, 890.5, 963.5, 886.5, 965.5, 882.5, 966.5, 878.5, 966.5, 874.5, 966.5, 870.5, 966.5, 866.5, 966.5, 862.5, 967.5, 858.5, 967.5, 854.5, 967.5, 850.5, 968.5, 846.5, 968.5, 842.5, 969.5, 838.5, 970.5, 834.5, 971.5, 830.5, 971.5, 826.5, 971.5, 822.5, 972.5, 818.5, 972.5, 814.5, 972.5, 810.5, 971.5, 806.5, 969.5, 802.5, 967.5, 798.5, 965.5, 794.5, 964.5, 790.5, 964.5, 786.5, 965.5, 782.5, 965.5, 778.5, 966.5, 774.5, 965.5, 770.5, 965.5, 766.5, 964.5, 762.5, 963.5, 758.5, 962.5, 754.5, 960.5, 750.5, 958.5, 746.5, 956.5, 742.5, 955.5, 738.5, 954.5, 734.5, 953.5, 730.5, 953.5, 726.5, 952.5, 722.5, 952.5, 718.5, 951.5, 714.5, 951.5, 710.5, 951.5, 706.5, 949.5, 702.5, 948.5, 698.5, 946.5, 694.5, 944.5, 690.5, 942.5, 686.5, 940.5, 682.5, 937.5, 678.5, 935.5, 674.5, 933.5, 670.5, 931.5, 666.5, 929.5, 662.5, 928.5, 658.5, 927.5, 654.5, 925.5, 650.5, 924.5, 646.5, 924.5, 642.5, 924.5, 638.5, 924.5, 634.5, 925.5, 630.5, 926.5, 626.5, 926.5, 622.5, 926.5, 618.5, 926.5, 614.5, 926.5, 610.5, 926.5, 606.5, 927.5, 602.5, 928.5, 598.5, 929.5, 594.5, 930.5, 590.5, 930.5, 586.5, 930.5, 582.5, 929.5, 578.5, 928.5, 574.5, 928.5, 570.5, 927.5, 566.5, 927.5, 562.5, 926.5, 558.5, 926.5, 554.5, 927.5, 553.5, 925.5, 554.5, 921.5, 554.5, 917.5, 558.5, 917.5, 562.5, 918.5, 566.5, 919.5, 570.5, 919.5, 574.5, 919.5, 578.5, 918.5, 582.5, 917.5, 586.5, 915.5, 588.5, 911.5, 592.5, 907.5, 593.5, 903.5, 595.5, 899.5, 595.5, 895.5, 592.5, 892.5, 588.5, 889.5, 584.5, 890.5, 580.5, 894.5, 580.5, 898.5, 578.5, 901.5, 574.5, 904.5, 570.5, 906.5, 566.5, 906.5, 562.5, 906.5, 558.5, 906.5, 554.5, 904.5, 550.5, 905.5, 547.5, 908.5, 543.5, 911.5, 539.5, 915.5, 535.5, 919.5, 536.5, 923.5, 539.5, 926.5, 535.5, 926.5, 531.5, 926.5, 527.5, 927.5, 523.5, 927.5, 519.5, 927.5, 515.5, 926.5, 511.5, 925.5, 507.5, 924.5, 503.5, 924.5, 499.5, 924.5, 495.5, 924.5, 491.5, 924.5, 487.5, 925.5, 483.5, 925.5, 479.5, 926.5, 475.5, 926.5, 471.5, 927.5, 467.5, 928.5, 463.5, 929.5, 459.5, 929.5, 455.5, 930.5, 451.5, 930.5, 447.5, 931.5, 443.5, 931.5, 439.5, 931.5, 435.5, 931.5, 431.5, 931.5, 427.5, 930.5, 423.5, 929.5, 419.5, 928.5, 415.5, 927.5, 411.5, 927.5, 407.5, 926.5, 403.5, 926.5, 399.5, 926.5, 395.5, 925.5, 391.5, 925.5, 387.5, 924.5, 383.5, 923.5, 379.5, 922.5, 375.5, 922.5, 371.5, 922.5, 367.5, 922.5, 363.5, 923.5, 359.5, 923.5, 355.5, 924.5, 351.5, 924.5, 347.5, 924.5, 343.5, 923.5, 339.5, 921.5, 335.5, 918.5, 331.5, 916.5, 327.5, 915.5, 323.5, 914.5, 319.5, 913.5, 315.5, 909.5, 313.5, 905.5, 312.5, 901.5, 310.5, 897.5, 309.5, 893.5, 309.5, 889.5, 309.5, 885.5, 309.5, 881.5, 308.5, 877.5, 305.5, 873.5, 302.5, 869.5, 300.5, 865.5, 298.5, 861.5, 298.5, 857.5, 296.5, 853.5, 293.5, 849.5, 289.5, 847.5, 285.5, 845.5, 281.5, 842.5, 277.5, 838.5, 273.5, 835.5, 269.5, 834.5, 265.5, 833.5, 261.5, 832.5, 257.5, 831.5, 253.5, 830.5, 249.5, 828.5, 245.5, 825.5, 241.5, 822.5, 237.5, 819.5, 234.5, 815.5, 230.5, 811.5, 226.5, 809.5, 222.5, 806.5, 218.5, 804.5, 214.5, 801.5, 210.5, 799.5, 206.5, 797.5, 202.5, 795.5, 198.5, 792.5, 194.5, 790.5, 190.5, 787.5, 186.5, 784.5, 182.5, 780.5, 179.5, 776.5, 179.5, 772.5, 179.5, 768.5, 177.5, 764.5, 173.5, 761.5, 169.5, 760.5, 165.5, 758.5, 161.5, 756.5, 159.5, 752.5, 157.5, 748.5, 154.5, 744.5, 150.5, 742.5, 146.5, 740.5, 142.5, 736.5, 139.5, 732.5, 135.5, 728.5, 133.5, 724.5, 131.5, 720.5, 130.5, 716.5, 126.5, 712.5, 122.5, 708.5, 121.5, 704.5, 121.5, 700.5, 123.5, 696.5, 124.5, 692.5, 124.5, 688.5, 125.5, 684.5, 125.5, 680.5, 122.5, 676.5, 118.5, 673.5, 114.5, 670.5, 110.5, 668.5, 106.5, 667.5, 102.5, 665.5, 98.5, 664.5, 94.5, 663.5, 90.5, 660.5, 86.5, 656.5, 84.5, 652.5, 80.5, 649.5, 76.5, 646.5, 72.5, 642.5, 71.5, 638.5, 71.5, 634.5, 71.5, 630.5, 70.5, 626.5, 68.5, 622.5, 67.5, 618.5, 68.5, 616.5, 72.5, 618.5, 75.5, 621.5, 77.5, 625.5, 81.5, 629.5, 85.5, 632.5, 89.5, 634.5, 93.5, 633.5, 97.5, 632.5, 101.5, 634.5, 105.5, 632.5, 109.5, 632.5, 113.5, 634.5, 116.5, 638.5, 120.5, 640.5, 124.5, 644.5, 128.5, 646.5, 132.5, 648.5, 136.5, 649.5, 140.5, 649.5, 144.5, 647.5, 148.5, 645.5, 152.5, 644.5, 156.5, 644.5, 160.5, 642.5, 164.5, 644.5, 168.5, 646.5, 170.5, 650.5, 173.5, 654.5, 177.5, 656.5, 181.5, 656.5, 185.5, 657.5, 189.5, 658.5, 193.5, 658.5, 197.5, 655.5, 201.5, 657.5, 205.5, 661.5, 209.5, 663.5, 213.5, 662.5, 214.5, 658.5, 212.5, 654.5, 208.5, 651.5, 204.5, 648.5, 200.5, 648.5, 196.5, 649.5, 192.5, 649.5, 188.5, 648.5, 184.5, 646.5, 180.5, 645.5, 176.5, 642.5, 172.5, 639.5, 168.5, 636.5, 164.5, 632.5, 160.5, 631.5, 156.5, 630.5, 152.5, 632.5, 148.5, 633.5, 144.5, 634.5, 140.5, 635.5, 136.5, 636.5, 132.5, 636.5, 130.5, 633.5, 126.5, 629.5, 123.5, 625.5, 119.5, 623.5, 115.5, 621.5, 111.5, 619.5, 107.5, 619.5, 103.5, 619.5, 99.5, 621.5, 95.5, 621.5, 91.5, 620.5, 89.5, 616.5, 89.5, 612.5, 87.5, 609.5, 85.5, 605.5, 82.5, 603.5, 78.5, 602.5, 74.5, 601.5, 70.5, 600.5, 66.5, 598.5, 62.5, 598.5, 58.5, 601.5, 56.5, 601.5, 55.5, 597.5, 54.5, 593.5, 55.5, 589.5, 56.5, 585.5, 60.5, 581.5, 64.5, 578.5, 68.5, 576.5, 72.5, 574.5, 76.5, 571.5, 80.5, 569.5, 84.5, 566.5, 88.5, 564.5, 92.5, 561.5, 96.5, 558.5, 100.5, 555.5, 103.5, 551.5, 106.5, 547.5, 110.5, 543.5, 114.5, 540.5, 117.5, 536.5, 120.5, 532.5, 124.5, 528.5, 127.5, 524.5, 130.5, 520.5, 134.5, 516.5, 135.5, 512.5, 133.5, 508.5, 132.5, 504.5, 133.5, 500.5, 134.5, 496.5, 136.5, 492.5, 140.5, 488.5, 144.5, 485.5, 146.5, 481.5, 146.5, 477.5, 147.5, 473.5, 151.5, 469.5, 155.5, 466.5, 159.5, 462.5, 163.5, 460.5, 167.5, 458.5, 171.5, 456.5, 175.5, 455.5, 179.5, 452.5, 183.5, 450.5, 187.5, 449.5, 191.5, 447.5, 195.5, 446.5, 199.5, 445.5, 203.5, 445.5, 207.5, 444.5, 211.5, 443.5, 215.5, 441.5, 217.5, 437.5, 216.5, 433.5, 218.5, 429.5, 222.5, 425.5, 225.5, 421.5, 229.5, 418.5, 233.5, 415.5, 237.5, 413.5, 241.5, 410.5, 245.5, 408.5, 249.5, 407.5, 253.5, 405.5, 257.5, 404.5, 261.5, 402.5, 265.5, 401.5, 269.5, 400.5, 273.5, 398.5, 277.5, 395.5, 275.5, 391.5, 272.5, 387.5, 271.5, 383.5, 273.5, 379.5, 272.5, 375.5, 272.5, 371.5, 271.5, 367.5, 269.5, 363.5, 265.5, 359.5, 261.5, 355.5, 258.5, 352.5, 255.5, 348.5, 255.5, 344.5, 254.5, 340.5, 251.5, 336.5, 247.5, 332.5, 243.5, 328.5, 239.5, 324.5, 237.5, 320.5, 237.5, 316.5, 237.5, 312.5, 236.5, 308.5, 233.5, 304.5, 231.5, 300.5, 229.5, 296.5, 228.5, 292.5, 227.5, 288.5, 231.5, 292.5, 235.5, 294.5, 239.5, 294.5, 243.5, 294.5, 247.5, 293.5, 251.5, 291.5, 255.5, 290.5, 259.5, 290.5, 262.5, 293.5, 263.5, 297.5, 265.5, 301.5, 269.5, 303.5, 273.5, 307.5, 277.5, 308.5, 281.5, 307.5, 285.5, 307.5, 289.5, 307.5, 293.5, 309.5, 297.5, 309.5, 301.5, 311.5, 305.5, 311.5, 309.5, 309.5, 309.5, 305.5, 305.5, 303.5, 301.5, 301.5, 297.5, 300.5, 293.5, 300.5, 289.5, 301.5, 285.5, 301.5, 281.5, 299.5, 277.5, 297.5, 275.5, 294.5, 272.5, 290.5, 268.5, 287.5, 265.5, 284.5, 262.5, 282.5, 258.5, 279.5, 254.5, 280.5, 250.5, 280.5, 246.5, 280.5, 242.5, 280.5, 238.5, 279.5, 237.5, 275.5, 236.5, 271.5, 237.5, 267.5, 237.5, 263.5, 235.5, 259.5, 232.5, 256.5, 228.5, 255.5, 224.5, 258.5, 223.5, 258.5, 224.5, 254.5, 225.5, 250.5, 226.5, 246.5, 227.5, 242.5, 227.5, 238.5, 227.5, 234.5, 227.5, 230.5, 227.5, 226.5, 228.5, 222.5, 230.5, 218.5, 233.5, 214.5, 236.5, 210.5, 240.5, 206.5, 244.5, 202.5, 248.5, 199.5, 252.5, 197.5, 256.5, 193.5, 257.5, 189.5, 257.5, 185.5, 259.5, 181.5, 262.5, 178.5, 266.5, 177.5, 270.5, 175.5, 274.5, 171.5, 277.5, 167.5, 280.5, 163.5, 284.5, 159.5, 287.5, 155.5, 291.5, 151.5, 295.5, 149.5, 299.5, 147.5, 303.5, 146.5, 307.5, 145.5, 311.5, 143.5, 315.5, 141.5, 319.5, 138.5, 323.5, 136.5, 327.5, 134.5, 331.5, 132.5, 335.5, 130.5, 339.5, 129.5, 343.5, 126.5, 347.5, 122.5, 350.5, 119.5, 354.5, 117.5, 358.5, 116.5, 362.5, 114.5, 366.5, 113.5, 370.5, 112.5, 374.5, 112.5, 378.5, 112.5, 382.5, 112.5, 386.5, 113.5, 390.5, 113.5, 394.5, 113.5, 398.5, 114.5, 402.5, 114.5, 406.5, 115.5, 410.5, 115.5, 414.5, 116.5, 418.5, 116.5, 422.5, 117.5, 426.5, 117.5, 430.5, 118.5, 434.5, 118.5, 438.5, 118.5, 442.5, 118.5, 446.5, 119.5, 450.5, 119.5, 454.5, 120.5, 458.5, 120.5, 462.5, 121.5, 466.5, 121.5, 470.5, 120.5, 474.5, 119.5, 478.5, 118.5, 482.5, 117.5, 486.5, 117.5, 490.5, 118.5, 494.5, 119.5, 498.5, 120.5, 502.5, 121.5, 506.5, 121.5, 510.5, 120.5, 514.5, 117.5, 518.5, 115.5, 522.5, 114.5, 526.5, 113.5, 530.5, 113.5, 534.5, 113.5, 538.5, 111.5, 542.5, 108.5, 546.5, 105.5, 550.5, 103.5, 554.5, 103.5, 558.5, 104.5, 562.5, 105.5, 566.5, 106.5, 570.5, 108.5, 574.5, 108.5, 578.5, 109.5, 582.5, 110.5, 586.5, 111.5, 590.5, 112.5, 594.5, 112.5, 598.5, 113.5, 602.5, 113.5, 606.5, 113.5, 610.5, 112.5, 614.5, 111.5, 618.5, 109.5, 622.5, 107.5, 626.5, 105.5, 630.5, 104.5, 634.5, 102.5, 638.5, 101.5, 642.5, 100.5, 646.5, 99.5, 650.5, 99.5, 654.5, 98.5, 658.5, 98.5, 662.5, 98.5, 666.5, 98.5, 670.5, 98.5, 674.5, 98.5, 678.5, 97.5, 682.5, 96.5, 686.5, 95.5, 690.5, 94.5, 694.5, 95.5, 698.5, 96.5, 702.5, 97.5, 706.5, 98.5, 710.5, 99.5, 714.5, 99.5, 718.5, 100.5, 722.5, 100.5, 726.5, 100.5, 730.5, 101.5, 734.5, 100.5, 738.5, 99.5, 742.5, 99.5, 746.5, 99.5, 750.5, 99.5, 754.5, 100.5, 758.5, 100.5, 762.5, 99.5, 766.5, 98.5, 770.5, 98.5, 774.5, 97.5, 778.5, 96.5, 782.5, 94.5, 786.5, 92.5, 790.5, 91.5, 794.5, 90.5, 798.5, 89.5, 802.5, 88.5)
 metadata/mote_source = SubResource("MoteSource_rim1")
-
-[node name="Rim2" type="Line2D" parent="." groups=["mote_source"]]
-visible = false
-closed = true
-points = PackedVector2Array(221.5, 265.5, 223.5, 269.5, 226.5, 273.5, 227.5, 277.5, 227.5, 281.5, 227.5, 285.5, 226.5, 281.5, 225.5, 277.5, 223.5, 273.5, 222.5, 269.5)
-metadata/mote_source = SubResource("MoteSource_rim2")
 
 [node name="Drip1" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(54.5, 608, 58.5, 615, 62.5, 610, 66.5, 611)
+points = PackedVector2Array(215.5, 824, 214.5, 821, 210.5, 817, 206.5, 820, 202.5, 833, 198.5, 846, 194.5, 844)
 metadata/mote_source = SubResource("MoteSource_drip1")
 
 [node name="Drip2" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(194.5, 844, 198.5, 846, 202.5, 833, 206.5, 820, 210.5, 817, 214.5, 821, 215.5, 824)
+points = PackedVector2Array(308.5, 929, 307.5, 926, 303.5, 916, 299.5, 903, 295.5, 886, 291.5, 884, 287.5, 886)
 metadata/mote_source = SubResource("MoteSource_drip2")
 
 [node name="Drip3" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(287.5, 886, 291.5, 884, 295.5, 886, 299.5, 903, 303.5, 916, 307.5, 926, 308.5, 929)
+points = PackedVector2Array(363.5, 955, 361.5, 959, 357.5, 976, 353.5, 996, 349.5, 1002, 345.5, 991, 341.5, 974, 337.5, 962, 333.5, 960, 329.5, 960, 325.5, 960, 321.5, 959, 317.5, 958, 313.5, 954, 309.5, 943)
 metadata/mote_source = SubResource("MoteSource_drip3")
 
 [node name="Drip4" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(309.5, 943, 313.5, 954, 317.5, 958, 321.5, 959, 325.5, 960, 329.5, 960, 333.5, 960, 337.5, 962, 341.5, 974, 345.5, 991, 349.5, 1002, 353.5, 996, 357.5, 976, 361.5, 959, 365.5, 953, 369.5, 955, 373.5, 957, 377.5, 958, 381.5, 955, 385.5, 948, 389.5, 942, 393.5, 941, 397.5, 942, 401.5, 941, 405.5, 941, 409.5, 945, 413.5, 963, 414.5, 969)
+points = PackedVector2Array(414.5, 969, 412.5, 957, 408.5, 943, 404.5, 941, 400.5, 941, 396.5, 942, 392.5, 941, 388.5, 943, 384.5, 950, 380.5, 957, 376.5, 958, 372.5, 956, 368.5, 954, 364.5, 954)
 metadata/mote_source = SubResource("MoteSource_drip4")
 
 [node name="Drip5" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(417.5, 990, 421.5, 1001, 425.5, 997, 429.5, 992, 433.5, 988, 437.5, 984, 441.5, 974, 445.5, 965, 449.5, 963, 453.5, 962, 457.5, 961, 461.5, 960, 465.5, 957, 469.5, 950, 473.5, 944, 477.5, 942, 481.5, 953, 482.5, 959)
+points = PackedVector2Array(482.5, 959, 481.5, 953, 477.5, 942, 473.5, 944, 469.5, 950, 465.5, 957, 461.5, 960, 457.5, 961, 453.5, 962, 449.5, 963, 445.5, 965, 441.5, 974, 437.5, 984, 433.5, 988, 429.5, 992, 425.5, 997, 421.5, 1001, 417.5, 990)
 metadata/mote_source = SubResource("MoteSource_drip5")
 
 [node name="Drip6" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(498.5, 969, 502.5, 953, 506.5, 953, 510.5, 969, 512.5, 981)
+points = PackedVector2Array(512.5, 981, 510.5, 969, 506.5, 953, 502.5, 953, 498.5, 969)
 metadata/mote_source = SubResource("MoteSource_drip6")
 
 [node name="Drip7" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(513.5, 988, 517.5, 1006, 521.5, 1007, 525.5, 1005, 529.5, 1002, 533.5, 1000, 537.5, 984, 541.5, 964, 545.5, 954, 549.5, 956, 553.5, 967, 557.5, 979, 561.5, 982, 565.5, 970, 569.5, 954, 573.5, 946, 577.5, 946, 581.5, 943, 585.5, 941, 589.5, 942, 593.5, 943, 597.5, 946, 601.5, 949, 605.5, 947, 609.5, 943, 613.5, 940, 617.5, 940, 621.5, 945, 625.5, 957, 629.5, 967, 633.5, 969, 637.5, 975, 641.5, 981, 645.5, 983, 649.5, 976, 653.5, 968, 657.5, 964, 661.5, 969, 665.5, 983, 669.5, 1000, 673.5, 1006, 677.5, 987)
+points = PackedVector2Array(535.5, 994, 533.5, 1000, 529.5, 1002, 525.5, 1005, 521.5, 1007, 517.5, 1006, 513.5, 988)
 metadata/mote_source = SubResource("MoteSource_drip7")
 
 [node name="Drip8" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(678.5, 980, 682.5, 960, 686.5, 956, 690.5, 962, 694.5, 975, 698.5, 989, 702.5, 995, 706.5, 1005, 710.5, 1018, 714.5, 1024, 717.5, 1014)
+points = PackedVector2Array(551.5, 936, 548.5, 933, 544.5, 939, 540.5, 956)
 metadata/mote_source = SubResource("MoteSource_drip8")
 
 [node name="Drip9" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(721.5, 986, 725.5, 969, 729.5, 966, 733.5, 965, 737.5, 965, 741.5, 966, 745.5, 969, 748.5, 984)
+points = PackedVector2Array(646.5, 982, 643.5, 983, 639.5, 978, 635.5, 972, 631.5, 968, 627.5, 963, 623.5, 950, 619.5, 941, 615.5, 939, 611.5, 941, 607.5, 945, 603.5, 948, 599.5, 948, 595.5, 945)
 metadata/mote_source = SubResource("MoteSource_drip9")
 
 [node name="Drip10" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(764.5, 1003, 768.5, 986, 772.5, 985, 776.5, 986, 780.5, 988, 784.5, 988, 788.5, 986, 792.5, 985, 796.5, 984, 800.5, 986, 804.5, 987, 808.5, 988, 812.5, 990, 816.5, 999, 818.5, 1010)
+points = PackedVector2Array(677.5, 987, 675.5, 999, 671.5, 1006, 667.5, 992, 663.5, 975, 659.5, 965, 655.5, 966, 651.5, 973, 647.5, 980)
 metadata/mote_source = SubResource("MoteSource_drip10")
 
 [node name="Drip11" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(835.5, 996, 839.5, 983, 843.5, 984, 847.5, 994, 851.5, 1010, 855.5, 1016, 859.5, 1021, 863.5, 1030, 867.5, 1035, 871.5, 1031, 875.5, 1016, 879.5, 1004, 883.5, 1000, 887.5, 1000, 891.5, 1000, 895.5, 1000, 899.5, 1002, 903.5, 1017, 907.5, 1034)
+points = PackedVector2Array(717.5, 1014, 714.5, 1024, 710.5, 1018, 706.5, 1005, 702.5, 995, 698.5, 989, 694.5, 975, 690.5, 962, 686.5, 956, 682.5, 960, 678.5, 980)
 metadata/mote_source = SubResource("MoteSource_drip11")
 
 [node name="Drip12" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(948.5, 958, 952.5, 961, 956.5, 963, 960.5, 971, 964.5, 979, 968.5, 978, 972.5, 966, 976.5, 955, 980.5, 950, 984.5, 951, 988.5, 953, 992.5, 953, 996.5, 953, 1000.5, 955, 1004.5, 959, 1008.5, 960, 1012.5, 956, 1016.5, 952, 1020.5, 947, 1024.5, 945, 1028.5, 949, 1032.5, 954, 1036.5, 955, 1038.5, 948)
+points = PackedVector2Array(748.5, 984, 745.5, 969, 741.5, 966, 737.5, 965, 733.5, 965, 729.5, 966, 725.5, 969, 721.5, 986)
 metadata/mote_source = SubResource("MoteSource_drip12")
 
 [node name="Drip13" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(1157.5, 877, 1161.5, 886, 1165.5, 884, 1169.5, 881, 1173.5, 879, 1177.5, 878, 1181.5, 861, 1185.5, 842, 1189.5, 837, 1193.5, 837, 1197.5, 838, 1201.5, 840, 1205.5, 841, 1209.5, 839, 1213.5, 837, 1217.5, 836, 1221.5, 837, 1225.5, 837, 1229.5, 837, 1233.5, 836, 1237.5, 836, 1241.5, 835, 1245.5, 833, 1249.5, 835, 1253.5, 849, 1254.5, 854)
+points = PackedVector2Array(818.5, 1010, 816.5, 999, 812.5, 990, 808.5, 988, 804.5, 987, 800.5, 986, 796.5, 984, 792.5, 985, 788.5, 986, 784.5, 988, 780.5, 988, 776.5, 986, 772.5, 985, 768.5, 986, 764.5, 1003)
 metadata/mote_source = SubResource("MoteSource_drip13")
 
 [node name="Drip14" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(1257.5, 873, 1261.5, 882, 1265.5, 884, 1269.5, 887, 1273.5, 889, 1277.5, 885, 1281.5, 872, 1285.5, 860, 1289.5, 857, 1293.5, 862, 1297.5, 871, 1301.5, 877, 1305.5, 871, 1307.5, 863)
+points = PackedVector2Array(907.5, 1034, 903.5, 1017, 899.5, 1002, 895.5, 1000, 891.5, 1000, 887.5, 1000, 883.5, 1000, 879.5, 1004, 875.5, 1016, 871.5, 1031, 867.5, 1035, 863.5, 1030, 859.5, 1021, 855.5, 1016, 851.5, 1010, 847.5, 994, 843.5, 984, 839.5, 983, 835.5, 996)
 metadata/mote_source = SubResource("MoteSource_drip14")
 
 [node name="Drip15" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(1355.5, 856, 1359.5, 857, 1363.5, 864, 1367.5, 879, 1371.5, 889, 1375.5, 886)
+points = PackedVector2Array(1033.5, 954, 1029.5, 950, 1025.5, 946, 1021.5, 946, 1017.5, 950, 1013.5, 955, 1009.5, 959, 1005.5, 960, 1001.5, 956, 997.5, 953, 993.5, 953, 989.5, 952, 985.5, 951, 981.5, 951, 977.5, 954, 973.5, 964, 969.5, 975, 965.5, 980, 961.5, 973, 957.5, 965, 953.5, 960, 949.5, 960, 945.5, 954, 941.5, 950, 937.5, 950, 933.5, 951)
 metadata/mote_source = SubResource("MoteSource_drip15")
 
 [node name="Drip16" type="Line2D" parent="." groups=["mote_source"]]
 visible = false
-points = PackedVector2Array(1515.5, 626, 1519.5, 617, 1523.5, 610, 1527.5, 606, 1531.5, 600, 1535.5, 595, 1539.5, 591, 1543.5, 586, 1547.5, 579, 1550.5, 573)
+points = PackedVector2Array(1254.5, 854, 1251.5, 839, 1247.5, 834, 1243.5, 834, 1239.5, 835, 1235.5, 836, 1231.5, 837, 1227.5, 837, 1223.5, 837, 1219.5, 837, 1215.5, 836, 1211.5, 837, 1207.5, 840, 1203.5, 841, 1199.5, 839, 1195.5, 837, 1191.5, 837, 1187.5, 839, 1183.5, 850, 1179.5, 871, 1175.5, 878, 1171.5, 879, 1167.5, 882, 1163.5, 885, 1159.5, 883, 1155.5, 872)
 metadata/mote_source = SubResource("MoteSource_drip16")
+
+[node name="Drip17" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+points = PackedVector2Array(1307.5, 863, 1305.5, 871, 1301.5, 877, 1297.5, 871, 1293.5, 862, 1289.5, 857, 1285.5, 860, 1281.5, 872, 1277.5, 885, 1273.5, 889, 1269.5, 887, 1265.5, 884, 1261.5, 882, 1257.5, 873)
+metadata/mote_source = SubResource("MoteSource_drip17")
+
+[node name="Drip18" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+points = PackedVector2Array(1375.5, 886, 1371.5, 889, 1367.5, 879, 1363.5, 864, 1359.5, 857, 1355.5, 856)
+metadata/mote_source = SubResource("MoteSource_drip18")
+
+[node name="Drip19" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+points = PackedVector2Array(1392.5, 851, 1388.5, 858, 1384.5, 861, 1380.5, 871)
+metadata/mote_source = SubResource("MoteSource_drip19")
+
+[node name="Drip20" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+points = PackedVector2Array(1550.5, 573, 1547.5, 579, 1543.5, 586, 1539.5, 591, 1535.5, 595, 1531.5, 600, 1527.5, 606, 1523.5, 610, 1519.5, 617, 1515.5, 626)
+metadata/mote_source = SubResource("MoteSource_drip20")

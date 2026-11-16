@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="CarrierCard" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/carrier_card.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/carriers/spray/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"spray"
+display_name = "Spray"
+description = "Hold fire: a short jet pours out ahead, pushing back all it splashes."
+complexity = 2
+icon = ExtResource("2_icon")
+base_damage = 1
+mana_cost = 2.0
+wind_down = 0.15
+speed = 0.0
+lifetime = 0.15
+radius = 4.0
+shots = 1
+spread = 0.0
+carrier = &"spray"
+pierce = 0
+ray_length = 80.0
+arc = 24.0
+knockback = 60.0
+staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.04, "push": 2, "stretch": 0.1, "glow": 0.4, "shake": 0.4, "ease": "out"}, {"phase": "after", "at": 0.14}])
+cast_cue = &"cast_atom"
+shown_cue = &"spray_jet"

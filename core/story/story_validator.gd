@@ -9,10 +9,12 @@ extends RefCounted
 ##
 ## A line players read (`check_line`) is one line of at most `MAX_LORE_CHARS` characters. The
 ## cards' descriptions are checked with it by `SpellValidator.check_descriptions` (only
-## `core/spells` reads a card's fields), and the enemies' lore by `check_lore`.
+## `core/spells` reads a card's fields), and the enemies' lore by `check_lore`. What a boss says
+## in its intro (`BossIntro.lines`, docs/milestones/boss-intro.md) is speech (`check_speech`): one
+## line each of at most `MAX_SPEECH_CHARS`, at most `BossIntro.MAX_LINES` of them.
 
 const MAX_LORE_CHARS: int = 60
-## The speech limit of docs/STORY.md. No dialogue file exists yet; its validator comes with them.
+## The speech limit of docs/STORY.md: a line a boss says in its intro (`check_speech`).
 const MAX_SPEECH_CHARS: int = 60
 
 
@@ -37,6 +39,25 @@ static func check_lore(file: String, lore: String, boss: bool) -> Array[Dictiona
 			return [] as Array[Dictionary]
 		return [_problem("missing-lore", file, "lore", "Give the boss its line of lore: why it fights, one line of at most %d characters." % MAX_LORE_CHARS)] as Array[Dictionary]
 	return check_line(file, "lore", lore)
+
+
+## The problems with what a boss says in its intro (`BossIntro.lines`, in the file `file`), or none:
+## more than `BossIntro.MAX_LINES` lines (`too-many-lines`), or a line that is empty, longer than
+## `MAX_SPEECH_CHARS` or not one line (each named by its number, `lines[0]`).
+static func check_speech(file: String, lines: Array[String]) -> Array[Dictionary]:
+	var problems: Array[Dictionary] = []
+	if lines.size() > BossIntro.MAX_LINES:
+		problems.append(_problem("too-many-lines", file, "boss_intro.lines", "Keep at most %d lines; it has %d." % [BossIntro.MAX_LINES, lines.size()]))
+	for at in lines.size():
+		var line: String = lines[at]
+		var field: String = "boss_intro.lines[%d]" % at
+		if line.strip_edges().is_empty():
+			problems.append(_problem("empty-text", file, field, "Write what the boss says, or take the line out."))
+		elif line.length() > MAX_SPEECH_CHARS:
+			problems.append(_problem("speech-too-long", file, field, "Cut it from %d to at most %d characters." % [line.length(), MAX_SPEECH_CHARS]))
+		elif line != line.strip_edges() or line.contains("\n"):
+			problems.append(_problem("text-not-a-line", file, field, "Keep it one line, with no spaces or breaks at either end."))
+	return problems
 
 
 static func format(problem: Dictionary) -> String:

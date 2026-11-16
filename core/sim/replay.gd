@@ -39,8 +39,9 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## the run takes along, after the rules; 6: each carried staff's own id after its cards; 7: the
 ## players' loadouts in place of the carried staffs, and the bags' capacities among the rules, items
 ## I4; 8: what lies on the ground after the players' loadouts, items I6; 9: the save flags the
-## run plays by after the ground, run generation RG6). A replay of another format is refused.
-const FORMAT: int = 9
+## run plays by after the ground, run generation RG6; 10: the boss intros among the rules,
+## docs/milestones/boss-intro.md). A replay of another format is refused.
+const FORMAT: int = 10
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): a run of rooms, the sandbox, the hub (online-lobby

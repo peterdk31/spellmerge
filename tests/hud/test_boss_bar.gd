@@ -43,7 +43,7 @@ func test_nothing_shows_with_no_boss() -> void:
 
 func test_a_boss_shown_fills_the_bar_and_its_health_follows() -> void:
 	var bar: BossBarScript = hud.get_boss_bar()
-	bus.boss_shown.emit(7, "The Test Boss", "A line.", MARKS)
+	bus.boss_shown.emit(7, "The Test Boss", "A line.", MARKS, false)
 	bus.boss_health_changed.emit(7, 400.0, 400.0)
 	check(bar.visible, "the bar shows")
 	check_equal(bar.shown_boss(), 7, "of this boss")
@@ -61,9 +61,9 @@ func test_a_boss_shown_fills_the_bar_and_its_health_follows() -> void:
 
 func test_with_two_bosses_the_first_shows_until_it_goes() -> void:
 	var bar: BossBarScript = hud.get_boss_bar()
-	bus.boss_shown.emit(4, "First", "", PackedFloat32Array())
+	bus.boss_shown.emit(4, "First", "", PackedFloat32Array(), false)
 	bus.boss_health_changed.emit(4, 50.0, 100.0)
-	bus.boss_shown.emit(9, "Second", "", PackedFloat32Array([0.5]))
+	bus.boss_shown.emit(9, "Second", "", PackedFloat32Array([0.5]), false)
 	bus.boss_health_changed.emit(9, 30.0, 40.0)
 	check_equal(bar.shown_name(), "First", "the first shown")
 	check_equal(bar.shown_share(), 0.5, "with its own health")
@@ -74,18 +74,18 @@ func test_with_two_bosses_the_first_shows_until_it_goes() -> void:
 
 
 func test_a_run_ending_or_starting_clears_both() -> void:
-	bus.boss_shown.emit(7, "The Test Boss", "A line.", MARKS)
+	bus.boss_shown.emit(7, "The Test Boss", "A line.", MARKS, false)
 	bus.run_ended.emit(false)
 	check(not hud.get_boss_bar().visible, "no bar after the run")
 	check(not hud.get_boss_banner().visible, "no banner after the run")
-	bus.boss_shown.emit(7, "The Test Boss", "A line.", MARKS)
+	bus.boss_shown.emit(7, "The Test Boss", "A line.", MARKS, false)
 	bus.run_started.emit(1)
 	check(not hud.get_boss_bar().visible, "none as a run starts")
 
 
 func test_the_banner_shows_its_name_and_lore_and_fades() -> void:
 	var banner: BossBannerScript = hud.get_boss_banner()
-	bus.boss_shown.emit(7, "The Test Boss", "It was made for this test.", MARKS)
+	bus.boss_shown.emit(7, "The Test Boss", "It was made for this test.", MARKS, false)
 	check(banner.visible and banner.is_showing(), "the banner shows")
 	check_equal(banner.shown_name(), "The Test Boss", "its name")
 	check_equal(banner.shown_lore(), "It was made for this test.", "its lore line")
@@ -102,7 +102,7 @@ func test_the_banner_shows_its_name_and_lore_and_fades() -> void:
 
 func test_the_banner_spans_the_view_in_its_upper_middle() -> void:
 	var banner: BossBannerScript = hud.get_boss_banner()
-	bus.boss_shown.emit(7, "The Test Boss", "It was made for this test.", MARKS)
+	bus.boss_shown.emit(7, "The Test Boss", "It was made for this test.", MARKS, false)
 	await process_frame
 	var view: Vector2 = banner.get_parent_area_size()
 	check_equal(banner.size.x, view.x, "as wide as the view, so its lines are centred and never squeezed")
@@ -112,14 +112,14 @@ func test_the_banner_spans_the_view_in_its_upper_middle() -> void:
 
 func test_a_boss_with_no_lore_shows_its_name_alone() -> void:
 	var banner: BossBannerScript = hud.get_boss_banner()
-	bus.boss_shown.emit(7, "Nameless", "", PackedFloat32Array())
+	bus.boss_shown.emit(7, "Nameless", "", PackedFloat32Array(), false)
 	check_equal(banner.shown_name(), "Nameless", "its name")
 	check(not (banner.get_node("Lore") as Label).visible, "no empty lore line")
 
 
 func test_a_notch_dims_once_its_mark_is_passed() -> void:
 	var bar: BossBarScript = hud.get_boss_bar()
-	bus.boss_shown.emit(7, "The Test Boss", "", MARKS)
+	bus.boss_shown.emit(7, "The Test Boss", "", MARKS, false)
 	bus.boss_health_changed.emit(7, 100.0, 100.0)
 	check(not bar.is_passed(0.6) and not bar.is_passed(0.25), "full: both marks ahead")
 	bus.boss_health_changed.emit(7, 60.0, 100.0)
@@ -131,7 +131,7 @@ func test_the_bar_fits_between_the_top_corner_panels_and_over_the_pad_line() -> 
 	for player in 4:
 		bus.player_joined.emit(player)
 	bus.room_entered.emit(&"arena_01")
-	bus.boss_shown.emit(7, "The Test Boss", "", MARKS)
+	bus.boss_shown.emit(7, "The Test Boss", "", MARKS, false)
 	await process_frame
 	await process_frame
 	check_equal(bar.anchor_left, 0.5, "anchored to the middle")

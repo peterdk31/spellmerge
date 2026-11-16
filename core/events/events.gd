@@ -108,6 +108,12 @@ signal item_take_requested(player: int, item: int)
 ## as the party's one start (hub state, `start_depth_changed`) while that seat's wizard still stands
 ## at the lectern in the hub.
 signal start_depth_picked(player: int, depth: int)
+## Sender: hud. `player` pressed A on page `page` of the boss's intro, written out on their screen
+## (docs/milestones/boss-intro.md, rule 2): the next page for everyone, or past the last the fight.
+## Any seat on any machine moves it on (decision 1). A command: heard by flow at the next tick's
+## start, whose intro (`BossIntroHold`) turns the page only while `page` is still the page, so two
+## seats pressing on one tick turn one page.
+signal boss_intro_next_requested(player: int, page: int)
 ## `player` picked a sandbox action on the pause menu's sandbox page: `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).
 signal sandbox_action_requested(player: int, action: StringName)
 ## Sender: hud. `player` asked the enemy arena (the sandbox page, enemy AI AI8) for `count` enemies of the registry's `enemy_id`. Heard by flow.
@@ -276,9 +282,25 @@ signal crumble_requested(actor: int)
 ## Sender: actor (a boss body's `BossPresence` look, boss plan OB16). The boss `actor` entered play:
 ## `boss_name` its name for people (`EnemyBase.shown_name`: its `display_name`, else its id in words), `lore` its one line, `marks`
 ## each phase's health share (`EnemyPhase.health_below`, largest first; none for a phase by time).
+## `has_intro` whether its data has an intro (`EnemyBase.boss_intro`, docs/milestones/boss-intro.md):
+## then the bar waits for `boss_intro_closed`, and no banner shows.
 ## Sent once each time its body enters the tree; `boss_health_changed` follows at once. View only:
 ## heard by the HUD (the boss bar and the entrance banner) and feel (the `boss_intro` cue).
-signal boss_shown(actor: int, boss_name: String, lore: String, marks: PackedFloat32Array)
+signal boss_shown(actor: int, boss_name: String, lore: String, marks: PackedFloat32Array, has_intro: bool)
+## Sender: flow (`BossIntroHold`, docs/milestones/boss-intro.md, rule 2). The boss `actor`'s intro is
+## open: the game stands stopped on the room's tick until its last page is turned. `boss_name` and
+## `lore` as `boss_shown`'s, `intro` its data, `page` the page it is on. `fresh` true as it opens (the
+## HUD plays the timeline from the start), false when a snapshot restored it open (the HUD shows that
+## page already revealed). View only; heard by the HUD and feel.
+signal boss_intro_opened(actor: int, boss_name: String, lore: String, intro: BossIntro, page: int, fresh: bool)
+## Sender: flow (`BossIntroHold`). The open intro turned to page `page` (a seat's A,
+## `boss_intro_next_requested`). View only; heard by the HUD.
+signal boss_intro_paged(page: int)
+## Sender: flow (`BossIntroHold`). The boss `actor`'s intro closed: its last page was turned (the game
+## goes on from this tick), its boss left, the last seat left or the run ended; `actor` NO_PLAYER after a
+## snapshot restored with none open (whatever the HUD shows closes). View only; heard by the HUD (the
+## overlay goes, the boss bar comes) and feel.
+signal boss_intro_closed(actor: int)
 ## Sender: actor (`BossPresence`, boss plan OB16). The shown boss `actor` has `health` of
 ## `max_health` now (a hit, a heal, a player joining or leaving, a snapshot put back). View only;
 ## heard by the HUD.

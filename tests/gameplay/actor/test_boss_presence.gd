@@ -18,7 +18,7 @@ var heard: Array[Array] = []
 func before_each() -> void:
 	fx = Fixture.new(root)
 	heard.clear()
-	fx.bus.boss_shown.connect(func(actor: int, boss_name: String, lore: String, marks: PackedFloat32Array) -> void: heard.append([&"shown", actor, boss_name, lore, marks]))
+	fx.bus.boss_shown.connect(func(actor: int, boss_name: String, lore: String, marks: PackedFloat32Array, has_intro: bool) -> void: heard.append([&"shown", actor, boss_name, lore, marks, has_intro]))
 	fx.bus.boss_health_changed.connect(func(actor: int, health: float, most: float) -> void: heard.append([&"health", actor, health, most]))
 	fx.bus.boss_hidden.connect(func(actor: int) -> void: heard.append([&"hidden", actor]))
 
@@ -70,7 +70,15 @@ func test_a_boss_is_shown_once_with_its_name_lore_and_marks_then_its_health() ->
 	check_equal(heard[0][2], "The Test Boss", "its name")
 	check_equal(heard[0][3], "It was made for this test.", "its lore")
 	check_equal(heard[0][4], PackedFloat32Array([0.6, 0.25]), "a mark a phase by health, largest first; none for one by time")
+	check_equal(heard[0][5], false, "no intro in its data")
 	check_equal(heard[1], [&"health", body.id, 200.0, 200.0], "then its health, full")
+
+
+func test_a_boss_with_an_intro_says_so() -> void:
+	var data: EnemyBase = _boss_data()
+	data.boss_intro = BossIntro.new()
+	fx.imp(Vector2.ZERO, data)
+	check_equal(heard[0][5], true, "has_intro: its data has one (docs/milestones/boss-intro.md, rule 5)")
 
 
 func test_a_boss_with_no_name_is_shown_by_its_id_in_words() -> void:

@@ -7,7 +7,8 @@ extends ActorLook
 ##
 ## It draws nothing and is never stepped. As its body is in play (ready with its id open, and again
 ## each time it comes back into the tree) it sends `boss_shown` on the bus (its id, its name, its
-## lore line and a mark at each phase's health share), then `boss_health_changed`; each change of its
+## lore line, a mark at each phase's health share and whether it has an intro, `EnemyBase.boss_intro`),
+## then `boss_health_changed`; each change of its
 ## Health follows (`Health.changed`: a hit, a heal, a player joining or leaving); and `boss_hidden`
 ## once when it dies or its body leaves the tree. After a snapshot (`sync`) the health is told again,
 ## the boss is not shown again (the HUD still shows it). The HUD keeps the bar and plays the banner;
@@ -44,7 +45,7 @@ func show_boss() -> void:
 		return
 	_shown = true
 	_shown_id = actor.id
-	actor.events.boss_shown.emit(actor.id, actor.data.shown_name() if actor.data != null else "", actor.data.lore if actor.data != null else "", marks_of(actor.data))
+	actor.events.boss_shown.emit(actor.id, actor.data.shown_name() if actor.data != null else "", actor.data.lore if actor.data != null else "", marks_of(actor.data), actor.data != null and actor.data.boss_intro != null)
 	_tell_health()
 
 

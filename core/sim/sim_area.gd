@@ -102,6 +102,25 @@ func takes_rules(call: Callable) -> SimArea:
 
 
 ## True when the tick steps it now: `ticking`, and its node is there and may process (a node
-## disabled by its process mode is not stepped; the tree is never paused while the tick steps).
-func is_stepped() -> bool:
-	return ticking and node != null and is_instance_valid(node) and node.is_inside_tree() and node.can_process()
+## disabled by its process mode is not stepped; the tree is never paused while the game goes). A step
+## that runs through a stop (`through_stop`) runs while the Tick pauses the tree for that stop
+## (`Tick._show_stop`): only the tree's pause is passed over, never a node disabled by its process mode.
+func is_stepped(through_stop: bool = false) -> bool:
+	if not ticking or node == null or not is_instance_valid(node) or not node.is_inside_tree():
+		return false
+	if node.can_process():
+		return true
+	return through_stop and node.get_tree().paused and node.process_mode != Node.PROCESS_MODE_DISABLED and _enabled_but_for_the_pause(node)
+
+
+## True when nothing above `node` disables it (a pause aside): a node under a disabled parent is never
+## stepped.
+static func _enabled_but_for_the_pause(of: Node) -> bool:
+	var at: Node = of
+	while at != null:
+		if at.process_mode == Node.PROCESS_MODE_DISABLED:
+			return false
+		if at.process_mode != Node.PROCESS_MODE_INHERIT:
+			return true
+		at = at.get_parent()
+	return true

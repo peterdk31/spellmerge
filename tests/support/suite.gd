@@ -134,9 +134,11 @@ static func of_shard(names: Array[String], shard: Vector2i) -> Array[String]:
 ## from that sim unless it hands its own. The machine's session rules start as its defaults too
 ## (core/sim/session_rules.gd, online-ready N11), whatever an earlier test set, and no replay deals.
 ## And the game goes (online-ready N4): no stop or hold an earlier test left on the game's sim stands
-## this one still.
+## this one still. No boss's intro stops a run a test starts (docs/milestones/boss-intro.md, rule 4:
+## off for automation); a test of the intro turns `boss_intros` on in this machine's rules.
 func _still_chance() -> void:
 	SessionRules.reset_machine()
+	SessionRules.machine().boss_intros = 0
 	var frames: _SUITE_FRAMES = root.get_node_or_null(^"Frames") as _SUITE_FRAMES
 	if frames != null:
 		frames.stop_recording()
@@ -146,8 +148,10 @@ func _still_chance() -> void:
 	if game != null:
 		game.run_seed = 0
 		game.rules = SessionRules.defaults()
+		game.rules.boss_intros = 0
 		game.hold_left = 0
 		game.stops.clear()
+		game.held_through.fill(0)
 
 
 ## Runs before every test. Override it for setup the tests share.

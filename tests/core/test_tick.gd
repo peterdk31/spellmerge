@@ -303,6 +303,22 @@ func test_a_stopped_game_runs_the_frames_and_the_steps_through_their_own_stops()
 	check_equal(_tick.count, 4, "every tick counted")
 
 
+## The Tick pauses the tree while the game is stopped (the picture stands): a step through its own stop
+## still runs then, though its area's node cannot process under the pause (boss intro BI2: Flow's watch
+## of a boss's intro never ran before), and a disabled area still does not.
+func test_a_step_through_its_own_stop_runs_while_the_tree_is_paused() -> void:
+	_tick.sim.stop(OWN_STOP)
+	paused = true
+	_tick.run(TickScript.DT)
+	check(_names().has("Flow.step"), "the step through its own stop runs under the stop's pause")
+	check(not _names().has("Coop.step_rules"), "the others stand")
+	calls.clear()
+	_stand_in("Flow").process_mode = Node.PROCESS_MODE_DISABLED
+	_tick.run(TickScript.DT)
+	check(not _names().has("Flow.step"), "an area disabled by its process mode is never stepped")
+	_stand_in("Flow").process_mode = Node.PROCESS_MODE_INHERIT
+
+
 ## The tree's pause is the picture's: a tree paused with the sim going (the pause menu while a replay
 ## plays) runs no tick at all, and the Tick pauses the tree while the sim is stopped.
 func test_a_paused_tree_runs_no_tick_and_a_stop_pauses_the_tree() -> void:

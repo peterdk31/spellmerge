@@ -34,6 +34,8 @@ A fifteenth, planned with the owner on 2026-11-16 and approved the same day: **t
 
 A sixteenth, planned with the owner on 2026-11-16: **the boss intro**, a screen-wide overlay as a boss's fight starts: the boss a silhouette, then its name in a title type and the boss revealed looking mean, its lines if it has any, and the fight starting on any player's A ([boss-intro.md](milestones/boss-intro.md), phase BI). It replaces the boss plan's entrance banner for a boss with an intro, and is the one stop for everyone beside the pause menu and an unplugged pad (docs/DESIGN.md, no-waiting rule 7). Approved the same day.
 
+A seventeenth, planned with the owner on 2026-11-16 and approved the same day: **the crypt rework**, the Vaults: every crypt room a floating slab of quiet cool flagstones in the dark, drawn from a shape as the hub is, with warm light against the dark, a landmark a room, pits (holes), gates for exits and pillars as props that crumble ([crypt-rework.md](milestones/crypt-rework.md), phase CR). The sandbox goes with it, its showcase staffs on the hub's rack. One session a step, each merged before the next.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

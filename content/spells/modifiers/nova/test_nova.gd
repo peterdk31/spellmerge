@@ -179,6 +179,14 @@ func test_a_nova_of_penta_rings_spreads_them_out() -> void:
 	for slot in slots:
 		spots[_mgr.get_position_of(slot).round()] = true
 	check_equal(spots.size(), 40, "on forty points, none stacked")
+	# Evenly round (owner, 2026-11-16: the Penta step is taken once a cast, not once a copy).
+	var angles: Array[float] = []
+	for slot in slots:
+		angles.append(fposmod(_mgr.get_position_of(slot).angle(), TAU))
+	angles.sort()
+	for n in angles.size():
+		var gap: float = fposmod(angles[(n + 1) % angles.size()] - angles[n], TAU)
+		check(absf(gap - TAU / 40.0) < 0.01, "evenly spread: gap %d is %.3f rad" % [n, gap])
 
 
 ## A nova of dashes (owner, 2026-11-09: as Mirror's): eight moves round a circle add up to none.

@@ -419,7 +419,7 @@ var _ring_turn: float = 0.0
 ## Each Penta card's last ring, by its tag (`_penta`): the angle it stood at, the clock then, and
 ## how fast and which way it turns (the next cast of that card turns the other way).
 var _penta_rings: Dictionary = {}
-## Each Nova card's last turn, by its tag (`_nova_turn`): how far its ways stood turned off the aim,
+## Each Nova card's last turn, by its tag (`_nova_share`): how far its ways stood turned off the aim,
 ## as a share of the gap between two ways.
 var _nova_turns: Dictionary = {}
 
@@ -1756,11 +1756,14 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool, again: bool = false) -> int:
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
 	_echo_spell = spell if echoed else null
-	var spin: float = _nova_turn(spell, tag)
+	var share: float = _nova_share(spell, tag)
+	var spin: float = share * TAU / float(spell.nova_ways()) if share > 0.0 else 0.0
 	var launched: int = _cast_nova(spell, tag, actor, origin, heading, source, spin)
 	if launched > 0 and spell.mirrors():
 		# The same cast again, its aim reversed: every card it has does what it did the first time.
 		launched += _cast_nova(spell, tag, actor, origin, -heading, source, spin)
+	if launched > 0 and spell.nova_ways() > 1:
+		_nova_turns[tag] = share
 	_echo_spell = null
 	if launched > 0 and _holds(spell, tag):
 		_start_hold(tag)
@@ -1780,24 +1783,20 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	return launched
 
 
-## How far the ways of this firing of a nova `spell` stand turned off its aim, in radians, 0 for no
-## nova. Each firing of the card turns on from the last by SpellLimits.RING_STEP of the gap between
-## two ways (owner, 2026-11-16: "Can the nova rotate for each cast?"), the first along the aim
-## (owner, 2026-11-09), so no way keeps flying the same way; the same on every machine (`_nova_turns`).
-func _nova_turn(spell: CompiledSpell, tag: int) -> float:
-	var copies: int = spell.nova_ways()
-	if copies <= 1:
+## How far the ways of this firing of a nova `spell` stand turned off its aim, as a share of the gap
+## between two ways (0 for no nova). Each firing of the card that launches turns on from the last by
+## SpellLimits.RING_STEP of a gap (owner, 2026-11-16: "Can the nova rotate for each cast?"), the
+## first along the aim (owner, 2026-11-09), so no way keeps flying the same way; the same on every
+## machine (`_nova_turns`, kept by `_fire_spell` once the firing launched).
+func _nova_share(spell: CompiledSpell, tag: int) -> float:
+	if spell.nova_ways() <= 1 or not _nova_turns.has(tag):
 		return 0.0
-	var share: float = 0.0
-	if _nova_turns.has(tag):
-		share = fposmod(float(_nova_turns[tag]) + SpellLimits.RING_STEP, 1.0)
-	_nova_turns[tag] = share
-	return share * TAU / float(copies)
+	return fposmod(float(_nova_turns[tag]) + SpellLimits.RING_STEP, 1.0)
 
 
 ## One firing of `spell` along `heading`, as a nova when it has one (owner, 2026-11-09): the cast
 ## made `copies` times from `origin` by the same caster, copy k along `heading` turned by `spin`
-## (`_nova_turn`) and k/copies of a full turn, and the card's cue (`nova`) played once at the
+## (`_nova_share`) and k/copies of a full turn, and the card's cue (`nova`) played once at the
 ## centre. Both a firing and its mirror go through here with the same `spin`, so a card never does
 ## more on one than on the other; each way recoils on its own, so a nova's pushes cancel as a
 ## mirror's do. Returns the shots made.
@@ -1882,8 +1881,10 @@ func _penta(spell: CompiledSpell, copies: int, tag: int, actor: int, origin: Vec
 	if _penta_rings.has(tag):
 		var last: Vector3 = _penta_rings[tag]
 		# Turned on by a step as well, so a steady rhythm of casts (each turning back what the last
-		# turned) never stands the ring on the same points again (SpellLimits.RING_STEP).
-		turned = fposmod(last.x + last.z * (_clock - last.y) + SpellLimits.RING_STEP * TAU / float(copies), TAU)
+		# turned) never stands the ring on the same points again (SpellLimits.RING_STEP). Only a cast
+		# at a later time steps: a nova's copies and a mirror, cast at once, stand on the same ring.
+		var step: float = SpellLimits.RING_STEP * TAU / float(copies) if _clock != last.y else 0.0
+		turned = fposmod(last.x + last.z * (_clock - last.y) + step, TAU)
 		turn = -last.z
 	_penta_rings[tag] = Vector3(turned, _clock, turn)
 	turned += offset

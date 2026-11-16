@@ -83,7 +83,7 @@ enum Behaviour {
 	PENTA,
 	## The carrier is cast `behaviour_strength` times (8 the card; more cards add, with no cap) instead of once, from the same place by the same caster, each copy
 	## aimed out along the aim turned by its share of a full turn and by the card's turn this cast
-	## (`Spells._nova_turn`: each cast turns on, owner 2026-11-16) (owner, 2026-11-09: "a Nova
+	## (`Spells._nova_share`: each cast turns on, owner 2026-11-16) (owner, 2026-11-09: "a Nova
 	## modifier card, which would allow us to make novas of other carriers"; it replaced the nova
 	## carrier card). Each copy is a whole cast, so a carrier keeps its own shots and reach. Works on every
 	## carrier, as Mirror does: eight moves round a circle add up to none, and each still strikes.

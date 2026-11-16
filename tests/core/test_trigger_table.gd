@@ -68,7 +68,8 @@ func _expected(event: int, carrier: StringName) -> bool:
 			# portal, which passes every shot on (owner, 2026-11-05).
 			return carrier != &"familiar" and carrier != &"portal"
 		E.WALL:
-			return [&"atom", &"swap", &"beam"].has(carrier)
+			# A dash too, stopped by a wall head on (boss plan OB12); a teleport is over at once.
+			return [&"atom", &"swap", &"beam", &"dash"].has(carrier)
 	return true
 
 
@@ -106,7 +107,7 @@ func test_the_same_cards_read_alike_whether_the_trigger_fires_or_not() -> void:
 func test_triggers_that_never_fire_are_wasted() -> void:
 	var cells: Array = [
 		[&"on_hit", &"decoy"],
-		[&"on_wall", &"dash"],
+		[&"on_wall", &"teleport"],
 		[&"on_wall", &"rune"],
 		[&"on_wall", &"swing"],
 		[&"on_hurt", &"slam"],
@@ -126,7 +127,7 @@ func test_triggers_that_never_fire_are_wasted() -> void:
 func test_triggers_that_fire_are_not_wasted() -> void:
 	var cells: Array = [
 		[&"on_hit", &"atom"], [&"on_timer", &"atom"], [&"on_hurt", &"rune"], [&"on_timer", &"wall"],
-		[&"on_hit", &"beam"], [&"on_hit", &"swing"], [&"on_wall", &"beam"], [&"on_wall", &"swap"],
+		[&"on_hit", &"beam"], [&"on_hit", &"swing"], [&"on_wall", &"beam"], [&"on_wall", &"swap"], [&"on_wall", &"dash"],
 		[&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"slam"],
 		[&"on_timer", &"beam"], [&"on_timer", &"dash"], [&"on_timer", &"swing"],
 		[&"on_hurt", &"beam"], [&"on_hurt", &"decoy"], [&"on_hurt", &"dash"],

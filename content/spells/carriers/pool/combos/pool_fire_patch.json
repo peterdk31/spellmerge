@@ -5,6 +5,6 @@
 	"needs": "pool",
 	"casts": [{"staff": 0, "cards": ["fire", "pool"]}],
 	"imps": [[56, 0], [56, 44]],
-	"seconds": 2.2,
+	"seconds": 2.5,
 	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 8}, {"kind": "status", "imps": [0], "status": "burn"}]
 }

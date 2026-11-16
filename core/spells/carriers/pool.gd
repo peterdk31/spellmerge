@@ -6,13 +6,18 @@ extends Carrier
 ## chilling, a mend spring keeps healing). Its hits never spend it. Homing makes it creep toward a
 ## target, as a rune does.
 ##
-## Its rows: the live pools' slots (with their birth, `seq`), the time to each one's next tick and
-## whose it is.
+## It is thrown out of the staff and lies where it lands (the owner, 2026-11-16): for
+## `SpellLimits.POOL_LAND` seconds it is in the air, held (`freeze_shot`: it hits nothing, its life
+## waits), and it touches the floor only once it lands.
+##
+## Its rows: the live pools' slots (with their birth, `seq`), the time to each one's next tick, the
+## time until it lands (0 once it has) and whose it is.
 ## A row whose slot has ended, or holds another shot, is dropped at its next step.
 
 var _pl_slot: PackedInt32Array = PackedInt32Array()
 var _pl_seq: PackedInt64Array = PackedInt64Array()
 var _pl_clock: PackedFloat32Array = PackedFloat32Array()
+var _pl_land: PackedFloat32Array = PackedFloat32Array()
 ## The actor whose pool it is, as it was cast (its touches of the floor name it).
 var _pl_actor: PackedInt32Array = PackedInt32Array()
 
@@ -52,10 +57,11 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directio
 	if made > 0 and kit.projectiles.is_alive(slot) and kit.projectiles.get_seq_of(slot) == seq:
 		_pl_slot.append(slot)
 		_pl_seq.append(seq)
-		_pl_clock.append(SpellLimits.POOL_TICK)
+		# Its first strike is as it lands (the manager's, once it is no longer held), so its ticks
+		# count from then.
+		_pl_clock.append(SpellLimits.POOL_LAND + SpellLimits.POOL_TICK)
+		_pl_land.append(SpellLimits.POOL_LAND)
 		_pl_actor.append(actor)
-		# Its elements touch the floor as it lies (ground cover GC5), and again on each tick.
-		kit.touch_floor(spell, actor, kit.projectiles.get_position_of(slot), spell.radius)
 	return made
 
 
@@ -63,8 +69,9 @@ func spawn_row(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _dir
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.POOL_REACH
 	var at: Vector2 = kit.on_floor(spell, kit.projectiles.clip_to_walls(origin, origin + heading * reach))
 	var slot: int = kit.projectiles.spawn(actor, at, Vector2.ZERO, lifetime, spell.radius, SpellRuntime.HITS, SpellRuntime.PIERCE_ALL, tag, SpellRuntime.ProjectilesScript.MOTION_STILL)
-	# Spat out ahead: its look spills and splashes the way it was thrown.
+	# Spat out ahead: its look spills and splashes the way it was thrown; in the air until it lands.
 	kit.projectiles.set_facing(slot, heading)
+	kit.projectiles.freeze_shot(slot, SpellLimits.POOL_LAND)
 	return slot
 
 
@@ -77,6 +84,13 @@ func step(delta: float) -> void:
 		if not kit.projectiles.is_alive(slot) or kit.projectiles.get_seq_of(slot) != _pl_seq[i]:
 			_drop(i)
 			continue
+		if _pl_land[i] > 0.0:
+			_pl_land[i] -= delta
+			if _pl_land[i] <= 0.0:
+				# It lands: its elements touch the floor where it lies (ground cover GC5), and
+				# again on each tick.
+				_pl_land[i] = 0.0
+				_touch(slot, _pl_actor[i])
 		_pl_clock[i] -= delta
 		if _pl_clock[i] <= 0.0:
 			_pl_clock[i] += SpellLimits.POOL_TICK
@@ -99,10 +113,12 @@ func _drop(i: int) -> void:
 	_pl_slot[i] = _pl_slot[last]
 	_pl_seq[i] = _pl_seq[last]
 	_pl_clock[i] = _pl_clock[last]
+	_pl_land[i] = _pl_land[last]
 	_pl_actor[i] = _pl_actor[last]
 	_pl_slot.resize(last)
 	_pl_seq.resize(last)
 	_pl_clock.resize(last)
+	_pl_land.resize(last)
 	_pl_actor.resize(last)
 
 
@@ -111,6 +127,7 @@ func clear() -> void:
 	_pl_slot.resize(0)
 	_pl_seq.resize(0)
 	_pl_clock.resize(0)
+	_pl_land.resize(0)
 	_pl_actor.resize(0)
 
 

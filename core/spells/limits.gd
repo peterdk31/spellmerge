@@ -156,6 +156,11 @@ const SHOT_MOVES_START: int = 64
 ## Seconds a rune hits nothing after it is placed (owner, 2026-11-06: a trap arms): then it hits
 ## whatever is on it, the body whose hit cast it too (`CarrierRune`).
 const RUNE_ARM: float = 1.0
+## Seconds a pool's liquid is in the air, thrown out of the staff, before the pool lies where it
+## lands (the owner, 2026-11-16: "the pool should wait for the landing before it hits"): it hits
+## nothing and touches no floor until then (`CarrierPool`). Its look waits as long (`ARRIVE` in
+## content/spells/carriers/pool/pool.gdshader, and its card's motes' `start`).
+const POOL_LAND: float = 0.25
 ## Seconds between a pool's strikes of what stands in it (`CarrierPool`): every tick it forgets the
 ## bodies it touches, so each is hit again, its infusion's status put on again.
 const POOL_TICK: float = 0.5

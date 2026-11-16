@@ -44,11 +44,20 @@ func _losses(seconds: float) -> Array[int]:
 
 
 func test_it_strikes_what_stands_in_it_every_tick() -> void:
-	var early: Array[int] = _losses(SpellLimits.POOL_TICK * 0.5)
-	check_equal(early[0], 1, "the first strike as it spreads")
-	var later: Array[int] = _losses(SpellLimits.POOL_TICK * 4.5)
+	var early: Array[int] = _losses(SpellLimits.POOL_LAND + SpellLimits.POOL_TICK * 0.5)
+	check_equal(early[0], 1, "the first strike as it lands")
+	var later: Array[int] = _losses(SpellLimits.POOL_LAND + SpellLimits.POOL_TICK * 4.5)
 	check_equal(later[0], 5, "then one every tick: five in four and a half ticks")
 	check_equal(later[1], 0, "a body beside it is never struck")
+
+
+func test_it_hits_nothing_until_it_lands() -> void:
+	# Thrown out of the staff, it is in the air first (the owner, 2026-11-16: "the pool should wait
+	# for the landing before it hits").
+	var flying: Array[int] = _losses(SpellLimits.POOL_LAND * 0.8)
+	check_equal(flying[0], 0, "nothing struck while it is in the air")
+	var landed: Array[int] = _losses(SpellLimits.POOL_LAND + 0.05)
+	check_equal(landed[0], 1, "struck as it lands")
 
 
 func test_it_ends_with_its_life() -> void:
@@ -104,6 +113,7 @@ func test_it_lies_there_once_the_throw_lands() -> void:
 	var code: String = (_card().look_shader as Shader).code
 	var arrive: float = code.get_slice("const float ARRIVE = ", 1).get_slice(";", 0).to_float()
 	check(arrive > 0.0 and arrive >= glob.life.x - 0.05 and arrive <= glob.life.y, "it lies there as the blobs land (%s s, they fly %s s)" % [arrive, glob.life])
+	check(is_equal_approx(arrive, SpellLimits.POOL_LAND), "its look lands when it starts to hit (%s s, POOL_LAND %s s)" % [arrive, SpellLimits.POOL_LAND])
 	for stream: CardMoteStream in _card().look_motes:
 		check(is_equal_approx(stream.start, arrive), "its %s motes start as it lands" % stream.kind)
 

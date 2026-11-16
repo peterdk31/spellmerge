@@ -40,5 +40,7 @@ knockback = 1.0
 look_shader = ExtResource("3_shader")
 look_motes = Array[ExtResource("9_source")]([SubResource("Mote_1"), SubResource("Mote_2")])
 look_shape = Vector2(1.3, 0.75)
+look_on_floor = true
+look_merges = true
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.06, "turn": 35, "lift": -2, "push": 3, "stretch": -0.2, "ease": "in"}, {"phase": "after", "at": 0.3}])
 cast_cue = &"cast_rune"

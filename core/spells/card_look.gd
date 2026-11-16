@@ -24,6 +24,10 @@ var motes: Array[CardMoteStream] = []
 var shape: Vector2 = Vector2.ZERO
 var open: float = 0.0
 var fade: float = 0.0
+## Whether its still look lies on the floor, under the bodies, and whether its overlapping shots
+## are drawn as one (`CarrierCard.look_on_floor`, `look_merges`; `ProjectileManager.set_body_ground`).
+var on_floor: bool = false
+var merges: bool = false
 
 ## The look of a card with none of its own, or of an id that is no carrier card: drawn plain, lit
 ## as any. Shared.
@@ -38,6 +42,8 @@ static func from_card(card: CarrierCard) -> CardLook:
 	look.shape = card.look_shape
 	look.open = card.look_open
 	look.fade = card.look_fade
+	look.on_floor = card.look_on_floor
+	look.merges = card.look_merges
 	return look
 
 

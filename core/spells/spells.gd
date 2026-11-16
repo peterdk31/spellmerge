@@ -697,7 +697,8 @@ func _body_of(carrier_card: StringName, shader: Shader, mesh: int) -> int:
 
 
 ## Hands a still card's look shape and clock (its `CardLook`: `look_shape`, `look_open`,
-## `look_fade`) to the manager for its body `body` (`set_body_shape`), so its shader draws by the
+## `look_fade`) to the manager for its body `body` (`set_body_shape`), and whether it lies on the
+## floor and merges (`set_body_ground`), so its shader draws by the
 ## numbers its motes leave by (`gameplay/feel/still_motes.gd` reads the same `CardLook`). Every place
 ## a body is numbered shapes it here. A head body (`mesh` MESH_HEAD) has no still look.
 func _shape_body(body: int, carrier_card: StringName, mesh: int) -> void:
@@ -705,6 +706,7 @@ func _shape_body(body: int, carrier_card: StringName, mesh: int) -> void:
 		return
 	var look: CardLook = _looks[carrier_card]
 	projectiles.set_body_shape(body, look.shape, Vector2(look.open, look.fade))
+	projectiles.set_body_ground(body, look.on_floor, look.merges)
 
 
 ## `_shot_mesh`'s answer for a carrier whose look is not the projectile manager's shots.

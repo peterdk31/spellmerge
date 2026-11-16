@@ -22,6 +22,8 @@ func test_the_card_is_a_valid_carrier() -> void:
 	check(card.look_shader == preload("res://content/spells/carriers/pool/pool.gdshader"), "drawn as a puddle, by its folder's shader")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 	check(card.look_problems().is_empty(), "its look is one the shaders draw: %s" % [card.look_problems()])
+	check(card.look_on_floor, "it lies on the floor, under every body")
+	check(card.look_merges, "and pools that overlap are drawn as one")
 	var pool: Carrier = Carriers.of(&"pool")
 	check(pool.stays() and pool.hits() and pool.lasts(), "it stays, hits and lasts")
 	check(not pool.flies() and not pool.has(Carrier.PIERCE), "it never flies, and its hits never spend it")

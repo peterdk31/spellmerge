@@ -284,3 +284,68 @@ func test_a_bodys_shape_reaches_its_shader() -> void:
 	root.add_child(later)
 	var made := later._nodes[ManagerScript.body_batch(kept, false)].material as ShaderMaterial
 	check_equal(made.get_shader_parameter(&"look_shape"), Vector2(1.25, 0.6), "a shape set before the batches are made reaches them when they are")
+
+
+func test_a_body_on_the_floor_draws_under_the_bodies() -> void:
+	# The pool was drawn over everyone, at the shots' z (the owner, 2026-11-16: "it should be drawn
+	# on the floor").
+	var early: int = mgr.register_body(POOL)
+	mgr.set_body_ground(early, true, false)
+	root.add_child(mgr)
+	var stone: int = mgr.register_body(STONE)
+	for enemy: bool in [false, true]:
+		check_equal(mgr._nodes[ManagerScript.body_batch(early, enemy)].z_index, ManagerScript.FLOOR_DRAW_Z, "a body said to lie on the floor before its batches were made draws there")
+		check_equal(mgr._nodes[ManagerScript.body_batch(stone, enemy)].z_index, ManagerScript.DRAW_Z + (1 if enemy else 0), "any other as a shot")
+	check(ManagerScript.FLOOR_DRAW_Z > RoomBase.FLOOR_Z and ManagerScript.FLOOR_DRAW_Z <= 0, "over the room's floor, never over a body (z 0)")
+	mgr.set_body_ground(stone, true, false)
+	check_equal(mgr._nodes[ManagerScript.body_batch(stone, false)].z_index, ManagerScript.FLOOR_DRAW_Z, "and one whose batches are made moves down")
+	mgr.set_body_ground(stone, false, false)
+	check_equal(mgr._nodes[ManagerScript.body_batch(stone, false)].z_index, ManagerScript.DRAW_Z, "and back")
+	check(mgr.body_on_floor(early) and not mgr.body_merges(early) and not mgr.body_on_floor(stone), "it says how each lies")
+
+
+func test_a_merging_body_tells_its_shader_of_every_shot() -> void:
+	root.add_child(mgr)
+	var pool: int = mgr.register_body(POOL)
+	var stone: int = mgr.register_body(STONE)
+	mgr.set_body_ground(pool, true, true)
+	_drawn_still(pool, Vector2(120.0, 90.0))
+	_drawn_still(pool, Vector2(150.0, 96.0))
+	_drawn_still(stone, Vector2(300.0, 90.0))
+	mgr.update_draw(1.0)
+	var material := mgr._nodes[ManagerScript.body_batch(pool, true)].material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"merge_count"), 2, "both pools, not the stone")
+	var places: PackedVector4Array = material.get_shader_parameter(&"merge_place")
+	var seeds: PackedFloat32Array = material.get_shader_parameter(&"merge_seed")
+	check_equal(places.size(), StillMerge.MOST, "a list of the shader's size")
+	var found: Array = [Vector2(places[0].x, places[0].y), Vector2(places[1].x, places[1].y)]
+	check(found.has(Vector2(120.0, 90.0)) and found.has(Vector2(150.0, 96.0)), "where each is drawn (%s)" % [found])
+	check(is_equal_approx(places[0].z, ManagerScript.look_size(14.0) * ManagerScript.STILL_HIT), "its hit size as drawn (%f)" % places[0].z)
+	check(places[0].w > 0.0, "its still clock's code: just placed")
+	check(is_equal_approx(seeds[1], StillMerge.row_seed(1)), "each seeded by its row, as its shader seeds itself")
+	var stone_material := mgr._nodes[ManagerScript.body_batch(stone, true)].material as ShaderMaterial
+	check_equal(stone_material.get_shader_parameter(&"merge_count"), null, "a body that does not merge is told nothing")
+
+
+func test_a_merge_lists_its_own_batch_first_then_the_others() -> void:
+	var own := PackedFloat32Array()
+	own.resize(ManagerScript.DRAW_STRIDE * 2)
+	var other := PackedFloat32Array()
+	other.resize(ManagerScript.DRAW_STRIDE)
+	mgr._write_quad(own, 0, Vector2.RIGHT, 96.0, Vector2(10.0, 20.0), Color.WHITE, Color.WHITE, 1, 0.0, 0.1)
+	mgr._write_quad(own, ManagerScript.DRAW_STRIDE, Vector2.RIGHT, 96.0, Vector2(30.0, 20.0), Color.WHITE, Color.WHITE, 1, 0.0, -0.1)
+	mgr._write_quad(other, 0, Vector2.RIGHT, 48.0, Vector2(50.0, 60.0), Color.WHITE, Color.WHITE, 1)
+	var merge := StillMerge.new()
+	merge.fill(own, 2, other, 1)
+	check_equal(merge.count, 3, "its two and the other batch's one")
+	check_equal(Vector2(merge.places[0].x, merge.places[0].y), Vector2(10.0, 20.0), "its own first, in row order (a shot finds itself at its INSTANCE_ID)")
+	check_equal(Vector2(merge.places[1].x, merge.places[1].y), Vector2(30.0, 20.0), "")
+	check_equal(Vector2(merge.places[2].x, merge.places[2].y), Vector2(50.0, 60.0), "then the other batch's")
+	check(is_equal_approx(merge.places[2].z, 48.0 * ManagerScript.STILL_HIT), "each its hit size as drawn")
+	check(absf(merge.places[0].w - 0.1) < 0.001 and absf(merge.places[1].w + 0.1) < 0.001, "and its clock's code")
+	check(is_equal_approx(merge.seeds[2], StillMerge.row_seed(0)), "the other's seeded by its own batch's row")
+	var many := PackedFloat32Array()
+	many.resize(ManagerScript.DRAW_STRIDE * (StillMerge.MOST + 5))
+	merge.fill(many, StillMerge.MOST + 5, other, 1)
+	check_equal(merge.count, StillMerge.MOST, "never past the shader's list: the rest are drawn alone")
+	check_equal(merge.places.size(), StillMerge.MOST, "refilled in place")

@@ -626,7 +626,7 @@ func _perceive_threat() -> void:
 
 
 ## Whether it stands in harmful cover, and the nearest cell's middle out of it with no wall between
-## (`harm_exit`; the lower cell, row by row, on a tie).
+## (`harm_exit`; on a tie the first in row order, the topmost).
 func _perceive_harm() -> void:
 	in_harm = false
 	harm_exit = Vector2.INF
@@ -729,7 +729,8 @@ func _decide() -> void:
 		elif wanted > second_want:
 			second = candidate
 			second_want = wanted
-	if second != null and second_want >= best_want * 0.7 and _roll() < profile.randomness * 0.5:
+	# Standing in harmful cover with a way out, it takes no chance (GC7): it does not roll.
+	if second != null and not (in_harm and harm_exit != Vector2.INF) and second_want >= best_want * 0.7 and _roll() < profile.randomness * 0.5:
 		best = second
 	behaviour = best
 	_clear_plan()
@@ -922,6 +923,7 @@ func _steer_off_harm(intent: ActorIntent) -> void:
 	var at: Vector2 = actor.global_position
 	var sight: CoverSight = look_harm(HARM_LOOK)
 	if sight.count == 0:
+		_steer_side = 0.0
 		return
 	var way: Vector2 = move.normalized()
 	if _clear_of_harm(sight, at, way):

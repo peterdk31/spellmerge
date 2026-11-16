@@ -24,7 +24,7 @@ const BURNING: int = 1
 
 var _world: Fixture
 var _cover: CoverScript
-## The test grass, burning for good and spreading nothing, so a test lights exactly what it means.
+## The test grass, burning until frost puts it out and spreading nothing, so a test lights exactly what it means.
 var _grass: CoverKind
 ## How often anyone looked at the floor (`cover_danger_looked`).
 var _looks: int = 0
@@ -37,7 +37,12 @@ func before_each() -> void:
 	_grass = GRASS.duplicate(true) as CoverKind
 	_grass.states[BURNING].spreads = &""
 	_grass.states[BURNING].spread_chance = 0.0
-	_grass.states[BURNING].triggers = [] as Array[CoverTrigger]
+	# Frost still puts it out; its wait to ash is gone.
+	var rows: Array[CoverTrigger] = []
+	for row in _grass.states[BURNING].triggers:
+		if row.when != CoverTrigger.When.AFTER:
+			rows.append(row)
+	_grass.states[BURNING].triggers = rows
 	_cover = CoverScript.new()
 	_cover.events = _world.bus
 	_cover.actors = _world.actors
@@ -220,6 +225,46 @@ func test_an_enemy_in_burning_grass_steps_out_before_it_fights() -> void:
 			out_at = i
 			break
 	check(out_at >= 0, "out of it first (at %s)" % [body.position])
+
+
+func test_a_reckless_random_committed_enemy_steps_out_before_it_fights() -> void:
+	# Review: at 1.2 the way out lost to a fight boosted by commitment and a teammate's call, and the
+	# random swap to the second best took the fight on some decisions.
+	_burn(10, 14, 8, 12)
+	var reckless: AIProfile = Fixture.exact().duplicate() as AIProfile
+	reckless.caution = 0.0
+	reckless.commitment = 1.0
+	reckless.randomness = 1.0
+	reckless.teamwork = 1.0
+	var body: Actor = _world.staffed_enemy([[&"bolt"]], Vector2(200.0, 168.0), reckless)
+	_world.players[0].position = Vector2(300.0, 168.0)
+	var brain: AIBrain = Fixture.ai(body).brain
+	var out_at: int = -1
+	for i in 32:
+		_world.run(body, 1)
+		if brain.behaviour != null:
+			check_equal(brain.behaviour.name(), "evade" if brain.in_harm else brain.behaviour.name(), "in the fire it only ever evades")
+		if not _burning_at(body.position):
+			out_at = i
+			break
+	check(out_at >= 0, "out of it first (at %s)" % [body.position])
+	check(not brain.plan_urgent or brain.behaviour.name() != "evade", "walking out is never urgent: a dash would overshoot")
+
+
+func test_the_count_of_harming_cells_follows_the_state_and_a_restore() -> void:
+	var sight := CoverSight.new()
+	var at := CoverSight.middle(Vector2i(12, 6))
+	_burn(12, 12, 6, 6)
+	_cover.look(at, 32.0, sight)
+	check_equal(sight.count, 1, "burning: marked")
+	_world.bus.floor_touched.emit(0, &"frost", at, 0.0)
+	_cover.step(Fixture.STEP)
+	_cover.look(at, 32.0, sight)
+	check_equal(sight.count, 0, "put out: nothing harms, the look returns at once")
+	_burn(12, 12, 6, 6)
+	_cover.rebuild_derived()
+	_cover.look(at, 32.0, sight)
+	check_equal(sight.count, 1, "counted again from the state after a restore")
 
 
 func test_a_bot_steps_out_of_burning_grass() -> void:

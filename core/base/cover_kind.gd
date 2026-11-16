@@ -105,6 +105,9 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 			for frame in state.frames:
 				if frame < 0 or frame >= frames:
 					found.append("%s draws frame %d, which its sheet (%d frames) lacks." % [named, frame, frames])
+			for frame in state.trampled_frames:
+				if frame < 0 or frame >= frames:
+					found.append("%s draws frame %d trampled, which its sheet (%d frames) lacks." % [named, frame, frames])
 		if state.status != &"":
 			if state.status_every <= 0.0:
 				found.append("%s gives %s with no time between two (status_every)." % [named, state.status])

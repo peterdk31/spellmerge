@@ -1,5 +1,5 @@
 {
-	"about": "The crypt's floor (docs/milestones/crypt-rework.md): large irregular flagstones of one cool, quiet Stone, softly jointed, a lit upper edge, grit and dust gathering toward the walls.",
+	"about": "The crypt's floor (docs/milestones/crypt-rework.md): large irregular flagstones of one cool, quiet Stone, softly jointed, a lit upper edge, grit and dust gathering toward the floor's edges (its walls and its pits).",
 	"base": "#433f5b",
 	"slabs": {
 		"size": 30,

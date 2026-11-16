@@ -230,6 +230,26 @@ func test_the_rooms_enemies_stand_on_the_floor() -> void:
 			check(not wall.intersects(body), "enemy at %s is clear of the wall %s" % [enemy.position, wall])
 
 
+## The most enemies a crypt room's fight stands: its budget (16, content/runs/crypt.tres) grown by
+## its scaling at its deepest row and four players (1.5 and 1.3), each enemy costing at least 1.
+const MOST_IN_A_ROOM: int = 32
+
+
+## Enemies stacked at a room's spawns (`stacked_position`, a fight's and its adds') stand inside the
+## room and clear of its walls, however many the fight stands.
+func test_a_full_room_fight_stands_on_the_floor() -> void:
+	var walls: Array[Rect2] = _arena_walls()
+	var spawns: int = ARENA.places().enemy_spawns.size()
+	for at: int in MOST_IN_A_ROOM:
+		var spawn: int = at % spawns
+		var times: int = at / spawns
+		var position: Vector2 = FlowScript.stacked_position(ARENA.places().enemy_spawns[spawn], times)
+		var body := Rect2(position - Vector2(12.0, 12.0), Vector2(24.0, 24.0))
+		check(INNER.encloses(body), "enemy %d of a full fight (%s) is inside the room" % [at, position])
+		for wall in walls:
+			check(not wall.intersects(body), "enemy %d (%s) is clear of the wall %s" % [at, position, wall])
+
+
 ## As a run's room starts, its cue plays on every wizard, as that wizard's actor.
 func test_the_room_start_cue_plays_on_every_wizard_as_its_actor() -> void:
 	for count: int in [1, 4]:

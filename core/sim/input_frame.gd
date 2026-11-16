@@ -28,8 +28,9 @@ extends RefCounted
 
 ## The format's version, the frame's first byte (2: the horde's commands gone, the kinds after
 ## them renumbered; 3: `card_move_requested` gone with the list builder, the same; 4: the four menu
-## requests carry the key of the body the menu showed, items I8; 5: the two commands of the room
-## crypt rework CR-S removed gone, docs/DECISIONS.md 2026-11-16, the kinds after them renumbered).
+## requests carry the key of the body the menu showed, items I8; 5: `sandbox_action_requested`
+## and `sandbox_spawn_requested` gone with the sandbox, crypt rework CR-S, docs/DECISIONS.md
+## 2026-11-16, the kinds after them renumbered).
 const VERSION: int = 5
 const SEATS: int = 4
 const STAFFS: int = 4

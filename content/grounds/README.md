@@ -12,7 +12,7 @@ What the floor of a room's ground is made of, as data (hub rework, [docs/milesto
 | `patches` | Optional: soft patches of another colour (`colour`) wherever smooth noise of these `scales` (pixels, the largest first) is above `above` (0 to 1). |
 | `speckle` | Flecks: `[colour, share]` pairs, each that share of its pixels (0.025: one in forty). |
 | `slabs` | Optional: irregular flagstones from a seeded cell pattern, never a tile: their `size` (pixels), how far each slab's middle strays (`jitter`, 0 to 1), how much flatter than wide (`squash`), a colour each slab's tone leans toward by chance (`tone`, up to `vary`), the joints' colour and width (`joint`, `joint_width`) and a lit upper edge (`light`, `light_width`). |
-| `toward_edge` | Optional: a colour mixed in by noise, more of it the nearer the floor's edge (dust and grit at a wall's foot: a material, not a shadow): within `reach` pixels, at most `most` of a pixel, its noise's `scales`. |
+| `toward_edge` | Optional: a colour mixed in by noise, more of it the nearer the floor's edge, a wall's or a pit's alike (dust and grit: a material, not a shadow): within `reach` pixels, at most `most` of a pixel, its noise's `scales`. |
 | `strokes` | Optional: long faint arcs round the area's middle (`centre`; the room's middle for its floor) in `colour`: `count` round, `share` of the pixels on one, from `inner` pixels out (a broom's sweeping). |
 | `about` | A line saying what it is (optional). |
 
@@ -22,7 +22,7 @@ A colour is a palette material's shade (`leaf.shadow`) or `#rrggbb`; the hub's g
 |---|---|---|
 | `turf` | the hub's floor | dark turf, a meadow at night, in soft patches, flecked with Leaf |
 | `earth` | areas (clearings, paths) | trodden earth in Wood's shades, flecked with pebbles |
-| `flagstone` | the crypt's floor | large irregular flagstones of one cool, quiet Stone, softly jointed, grit toward the walls |
+| `flagstone` | the crypt's floor | large irregular flagstones of one cool, quiet Stone, softly jointed, grit toward the floor's edges |
 | `dust` | areas (drifts) | dust and grit lying thick, in patches |
 | `swept` | areas (the broom's ring) | flagstones swept clean, the strokes of a broom round the area's middle |
 

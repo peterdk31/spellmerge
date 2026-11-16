@@ -293,7 +293,7 @@ def placements(shape_path: Path) -> list[tuple[float, float, float]]:
 
 def clear_points(shape_path: Path) -> list[tuple[float, float, float]]:
     """Where a frame's floor is pushed out to (its `clear`): every node of the room's scene whose
-    parent's path starts with one of `clear.of` (e.g. `PlayerSpawns`, `Props`), `clear.round`
+    parent is one of `clear.of` (e.g. `PlayerSpawns`, `Props`: groups at the room's origin), `clear.round`
     pixels round, so a wandering wall never covers what stands in the room."""
     shape = json.loads(shape_path.read_text(encoding="utf-8"))
     spec = shape.get("frame", {}).get("clear")
@@ -305,7 +305,9 @@ def clear_points(shape_path: Path) -> list[tuple[float, float, float]]:
     found: list[tuple[float, float, float]] = []
     for block in re.split(r"\n(?=\[)", scene.read_text(encoding="utf-8")):
         head = re.match(r'\[node name="[^"]+"(?: type="(\w+)")? parent="([^"]+)"', block)
-        if head is None or head.group(2).split("/")[0] not in parents:
+        # Direct children only: a child's position is its own place in the room (its parent, a
+        # plain group node, stands at the room's origin); a grandchild's is not.
+        if head is None or head.group(2) not in parents:
             continue
         at = re.search(r"position = Vector2\(([-\d.]+), ([-\d.]+)\)", block)
         if at:

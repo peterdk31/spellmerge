@@ -40,8 +40,9 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## players' loadouts in place of the carried staffs, and the bags' capacities among the rules, items
 ## I4; 8: what lies on the ground after the players' loadouts, items I6; 9: the save flags the
 ## run plays by after the ground, run generation RG6; 10: the boss intros among the rules,
-## docs/milestones/boss-intro.md; 11: the start of the room crypt rework
-## CR-S removed gone and the hub's renumbered, docs/DECISIONS.md 2026-11-16). A replay of another format is refused.
+## docs/milestones/boss-intro.md; 11: `sandbox_requested` gone from
+## STARTS with the sandbox, crypt rework CR-S, docs/DECISIONS.md 2026-11-16, `hub_requested`
+## renumbered). A replay of another format is refused.
 const FORMAT: int = 11
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"

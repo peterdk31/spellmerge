@@ -4,7 +4,7 @@ How the edge of a room's ground looks, as data (hub rework, [docs/milestones/hub
 
 ## Contract
 
-`edge.json`. Required: `full_width`, `deep` and `lip`; every other part is optional, and an edge without it has none (the crypt's walls have no seam, glow, rock face or motes):
+`edge.json`. Required: `full_width`, `deep` and `lip`; every other part is optional, and an edge without it has none (a `drip` needs a `seam`: the drips take its bands' colours) (the crypt's walls have no seam, glow, rock face or motes):
 
 | Field | What it is |
 |---|---|

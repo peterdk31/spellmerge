@@ -2,7 +2,8 @@ extends "res://tests/support/suite.gd"
 ## Every room template's look (content/rooms: every room a run's map can pick, found by folder),
 ## only what matters to play: the floor covers the room, each wall sprite draws over a collision
 ## shape and each shape is drawn (a ground drawn from a shape by its wall art), and decoration
-## never blocks anything. Which tile, torch or decal
+## never blocks anything. (No template is drawn from a shape until crypt rework CR3, so its
+## branches for one, a ground's wall art and its own bodies, wait for that room.) Which tile, torch or decal
 ## goes where is free to change.
 
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")

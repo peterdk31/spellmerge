@@ -238,7 +238,8 @@ func _leads_on(rules: MapRules, rule: KindRule) -> bool:
 
 ## Flood fill on the 8 px wall grid from the first player spawn, through the cells a wizard fits
 ## in (no wall or hole within a cell of it: the walls of a room drawn from a shape are 8 px steps,
-## and a gap narrower than a wizard must not count as a way; crypt rework CR3).
+## and a gap narrower than a wizard must not count as a way; crypt rework CR2). So every way a
+## room's party takes is at least three cells (24 px) wide.
 func test_every_spawn_can_be_reached() -> void:
 	for room in templates:
 		var blocked: Dictionary = _blocked_cells(room)
@@ -259,6 +260,10 @@ func test_every_floor_cell_can_be_reached() -> void:
 				var cell := Vector2i(x, y)
 				if _fits(blocked, cell):
 					check(seen.has(cell), "%s: the floor at %s can be reached" % [room.id, Vector2(cell) * CELL])
+				elif not blocked.has(cell):
+					# Open floor too narrow to stand in (beside a wall or a pit): a wizard reaching the
+					# cells round it reaches it, so no narrow pocket is left out of the flood.
+					check(_beside(seen, cell), "%s: the narrow floor at %s lies beside floor the party reaches" % [room.id, Vector2(cell) * CELL])
 
 
 func _flood(room: RoomBase, blocked: Dictionary, start: Vector2i) -> Dictionary:
@@ -287,6 +292,15 @@ func _blocked_cells(room: RoomBase) -> Dictionary:
 				if rect.has_point((Vector2(x, y) + Vector2(0.5, 0.5)) * CELL):
 					found[Vector2i(x, y)] = true
 	return found
+
+
+## True when a cell round `cell` (or `cell` itself) is in `seen`.
+func _beside(seen: Dictionary, cell: Vector2i) -> bool:
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if seen.has(cell + Vector2i(dx, dy)):
+				return true
+	return false
 
 
 ## True when a wizard fits in `cell`: no wall or hole in it or in the cells round it.

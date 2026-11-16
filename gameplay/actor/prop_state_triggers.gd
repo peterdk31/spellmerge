@@ -17,6 +17,9 @@ extends ActorComponent
 ##   staff do nothing (a `refused` row that casts it again, or enters a state that does, would be
 ##   refused again at once, round and round);
 ## - a state entered (`entered`);
+## - its state's clock passing a whole number of a `timer` row's seconds (`timer`, told by `step`):
+##   a prop with a timer row in any state keeps time (`keeps_time`), so its body is stepped, not
+##   still, and its pools refill;
 ## - a body that walks overlapping its `area` (`Actor.touched`: `touched`, boss plan OB5), heard
 ##   while its state has a `touched` trigger: only then is its area laid in the actor table
 ##   (`Actors.set_touch_area`), where the walking bodies ask after their moves.
@@ -64,6 +67,8 @@ const DERIVED: Array[StringName] = [&"_depth", &"_entries", &"_leaving", &"_fizz
 @export var area: Rect2 = Rect2()
 ## The index of the state it is in, in `states.list` (0: the one it starts in).
 var state: int = 0
+## Seconds it has been in that state, counted while the state has a `timer` row (`step`).
+var clock: float = 0.0
 ## Its health as last told (`Health.changed`), for `health_below`'s crossing; -1 before it is set up.
 var _health_seen: float = -1.0
 var _depth: int = 0
@@ -119,9 +124,26 @@ func detach() -> void:
 		actor.events.prop_state_requested.disconnect(_on_state_requested)
 
 
-## In the state it starts in, its health as told (props W2: a fresh prop rests).
+## In the state it starts in, its health as told (props W2: a fresh prop rests), its clock at 0.
 func at_rest() -> bool:
-	return state == 0 and (actor.health == null or _health_seen == actor.health.health)
+	return state == 0 and clock == 0.0 and (actor.health == null or _health_seen == actor.health.health)
+
+
+## True when some state of its data has a `timer` row: the body is then stepped (`Actor.is_still`
+## is false), and `step` counts its state's clock.
+func keeps_time() -> bool:
+	return states != null and states.listens(PropTrigger.When.TIMER)
+
+
+## One tick of its body (`Actor.step`, for a prop that keeps time): while its state has a `timer`
+## row, the state's clock goes on by `delta` and the rows it passes fire.
+func step(delta: float) -> void:
+	var now: PropState = current()
+	if now == null or delta <= 0.0 or not now.listens(PropTrigger.When.TIMER):
+		return
+	var before: float = clock
+	clock += delta
+	_moment(PropTrigger.When.TIMER, &"", clock, before)
 
 
 ## True while it is in the state it starts in (the first of its states).
@@ -268,6 +290,7 @@ func _moment(kind: PropTrigger.When, name: StringName, amount: float, before: fl
 ## entered it, so their wind-ups go on.
 func _enter(at: int, cast_bits: int) -> void:
 	state = at
+	clock = 0.0
 	_entries += 1
 	var entries: int = _entries
 	if actor.caster != null:

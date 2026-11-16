@@ -221,7 +221,7 @@ func test_without_combat_there_are_no_overlays() -> void:
 
 
 func test_a_status_is_shown_as_its_element_card() -> void:
-	for id: StringName in [&"burn", &"chill", &"gust", &"hex", &"static"]:
+	for id: StringName in [&"burn", &"chill", &"gust", &"hex", &"static", &"soak"]:
 		var card: Array = _feel._status_card(id)
 		check(not card.is_empty() and card[ElementBase.STATUS_LOOK_STATUS] == id, "%s is the status of a card" % id)
 		var tint: Color = card[ElementBase.STATUS_LOOK_TINT] as Color

@@ -1,0 +1,13 @@
+{
+	"id": "douse_the_flames",
+	"name": "Douse the flames",
+	"does": "A fire bolt sets the imp burning; a water bolt after it puts the fire out.",
+	"casts": [
+		{"staff": 0, "cards": ["fire", "bolt"]},
+		{"staff": 1, "cards": ["water", "bolt"], "at": 0.3}
+	],
+	"imps": [[100, 0]],
+	"seconds": 2.0,
+	"needs": "water",
+	"checks": [{"kind": "reaction", "reaction": "douse"}]
+}

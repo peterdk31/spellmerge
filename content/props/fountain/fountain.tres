@@ -1,0 +1,111 @@
+[gd_resource type="Resource" script_class="PropBase" load_steps=26 format=3]
+
+[ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="1"]
+[ext_resource type="Resource" path="res://content/props/fountain/fountain_states.tres" id="2"]
+[ext_resource type="Script" path="res://core/base/staff_base.gd" id="3"]
+[ext_resource type="Script" path="res://core/base/staff_cards.gd" id="4"]
+[ext_resource type="Texture2D" path="res://content/props/fountain/still.svg" id="5"]
+[ext_resource type="Script" path="res://core/base/prop_layer.gd" id="6"]
+[ext_resource type="Texture2D" path="res://content/props/fountain/still_motes.svg" id="7"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="8"]
+[ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="9"]
+[ext_resource type="Texture2D" path="res://content/props/fountain/welling.svg" id="10"]
+[ext_resource type="Texture2D" path="res://content/props/fountain/welling_motes.svg" id="11"]
+[ext_resource type="Script" path="res://core/base/prop_base.gd" id="12"]
+[ext_resource type="Script" path="res://core/base/actor_stats.gd" id="13"]
+
+[sub_resource type="Resource" id="staff_1"]
+script = ExtResource("3")
+id = &"fountain"
+display_name = "Fountain's burst"
+slots = 3
+wind_up = 0.6
+wind_cue = &"wind_area"
+cooldown = 0.0
+max_mana = 30.0
+mana_regen = 10.0
+
+[sub_resource type="Resource" id="staff_1_cards"]
+script = ExtResource("4")
+staff = SubResource("staff_1")
+cards = Array[StringName]([&"water", &"nova", &"spray"])
+
+[sub_resource type="Resource" id="staff_2"]
+script = ExtResource("3")
+id = &"fountain"
+display_name = "Fountain's spill"
+slots = 2
+cooldown = 0.0
+max_mana = 20.0
+mana_regen = 10.0
+
+[sub_resource type="Resource" id="staff_2_cards"]
+script = ExtResource("4")
+staff = SubResource("staff_2")
+cards = Array[StringName]([&"water", &"pulse"])
+
+[sub_resource type="Resource" id="stats"]
+script = ExtResource("13")
+power = 0.25
+
+[sub_resource type="Resource" id="still_layer_0"]
+script = ExtResource("6")
+texture = ExtResource("5")
+
+[sub_resource type="Resource" id="still_1_motes_0"]
+script = ExtResource("8")
+kind = &"drip"
+rate = 1.5
+from = 4
+spread = 0.0
+reach = 0.0
+colours = Array[StringName]([&"water"])
+
+[sub_resource type="Resource" id="still_layer_1"]
+script = ExtResource("6")
+texture = ExtResource("7")
+drawn = 3
+motes = Array[ExtResource("8")]([SubResource("still_1_motes_0")])
+
+[sub_resource type="Resource" id="still_look"]
+script = ExtResource("9")
+state_id = &"still"
+layers = Array[ExtResource("6")]([SubResource("still_layer_0"), SubResource("still_layer_1")])
+
+[sub_resource type="Resource" id="welling_layer_0"]
+script = ExtResource("6")
+texture = ExtResource("10")
+
+[sub_resource type="Resource" id="welling_1_motes_0"]
+script = ExtResource("8")
+kind = &"droplet"
+rate = 24.0
+from = 4
+spread = 140.0
+reach = 4.0
+colours = Array[StringName]([&"water", &"bone"])
+
+[sub_resource type="Resource" id="welling_layer_1"]
+script = ExtResource("6")
+texture = ExtResource("11")
+drawn = 3
+motes = Array[ExtResource("8")]([SubResource("welling_1_motes_0")])
+
+[sub_resource type="Resource" id="welling_look"]
+script = ExtResource("9")
+state_id = &"welling"
+layers = Array[ExtResource("6")]([SubResource("welling_layer_0"), SubResource("welling_layer_1")])
+
+[resource]
+script = ExtResource("12")
+id = &"fountain"
+display_name = "Fountain"
+scene = ExtResource("1")
+max_health = 10.0
+invincible = true
+size = Vector2(26, 14)
+offset = Vector2(0, -7)
+staffs = Array[ExtResource("4")]([SubResource("staff_1_cards"), SubResource("staff_2_cards")])
+stats = SubResource("stats")
+states = ExtResource("2")
+looks = Array[ExtResource("9")]([SubResource("still_look"), SubResource("welling_look")])

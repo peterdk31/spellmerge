@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="PropStates" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_trigger.gd" id="1"]
+[ext_resource type="Script" path="res://core/base/prop_state.gd" id="2"]
+[ext_resource type="Script" path="res://core/base/prop_states.gd" id="3"]
+
+[sub_resource type="Resource" id="still_timer_0"]
+script = ExtResource("1")
+when = 9
+seconds = 2.4
+cast = 1
+then = &"welling"
+
+[sub_resource type="Resource" id="still_refused_1"]
+script = ExtResource("1")
+when = 7
+staff = 1
+then = &"still"
+
+[sub_resource type="Resource" id="still"]
+script = ExtResource("2")
+state_id = &"still"
+triggers = Array[ExtResource("1")]([SubResource("still_timer_0"), SubResource("still_refused_1")])
+
+[sub_resource type="Resource" id="welling_cast_0"]
+script = ExtResource("1")
+when = 6
+staff = 1
+cast = 2
+then = &"still"
+
+[sub_resource type="Resource" id="welling_timer_1"]
+script = ExtResource("1")
+when = 9
+seconds = 3.0
+then = &"still"
+
+[sub_resource type="Resource" id="welling"]
+script = ExtResource("2")
+state_id = &"welling"
+triggers = Array[ExtResource("1")]([SubResource("welling_cast_0"), SubResource("welling_timer_1")])
+
+[resource]
+script = ExtResource("3")
+list = Array[ExtResource("2")]([SubResource("still"), SubResource("welling")])

@@ -2,6 +2,34 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-16: the fountain, a prop on a timer (props, owner request)
+
+- **The owner** (earlier session, PR #777): a fountain prop that sprays water in bursts, readable, on the simulation's clock.
+- **A `timer` prop trigger** (`PropTrigger.When.TIMER`, its `seconds`): it fires every `seconds` a prop stays in its state, from when the state was entered (or from the start, in the state it starts in), counted by `PropStateTriggers.clock` (state, hashed and in snapshots) on the tick, never real time, at the body's pace (a chill slows it, a freeze holds it, as a wind-up), with a hair of slack so 144 steps of 1/60 s are 2.4 s (`TIMER_SLACK`; found by the review). A general row, not a fountain rule: any prop may keep time.
+- **A prop that keeps time is stepped** (`Actor.is_still` is false for it, `PropStateTriggers.keeps_time`): props are still so a standing prop costs nothing a tick (props W2), and its pools never refill. A fountain must step to count and must refill to burst for ever, so the one prop that needs it pays a body's step (about 10 us); every other prop stays still. `Actor.step` steps the clock before the caster, as a controller's press.
+- **The fountain** (`content/props/fountain`): invincible and blocking, two staffs: `water · nova · spray` winding up 0.6 s (its `wind_area` ring and its `welling` look, the water bulging out of its bowl with droplets: the telegraph), then eight jets round it; and `water · pulse` cast as the jets leave, a ring whose end wets the floor (`touch_floor`: the hub's grass goes wet). `still` → 2.4 s → `welling` → the burst → `still`: a burst every 3 s; `welling` goes back to `still` after 3 s should its burst never leave (a fallback row). Its stats cast at a quarter of their power (`ActorStats.power` 0.25), so it soaks, shoves and douses far more than it hurts (a burst does well under a point to what stands by it); everything still hurts everything.
+- **Placed in the hub's prop yard** (no role), as every new prop; no crypt room places it yet: where a fountain belongs in a run's rooms is the owner's call (the room editor's prop list has it, `PropStandIn`).
+- **Water on props:** a lit exploding barrel hit by water is doused (`fusing` −water→ `idle`); a lit fire pit goes out as with frost.
+- **Open, for the owner:** a soaked barrel still lights on a fire hit (its fuse hears the hit's element, not a burn; the soak only stops the burn status); whether a wet barrel should refuse to light is a small data change (`status burn` instead of `element_hit fire`) with its own trade-offs. The fountain's pace (2.4 s + 0.6 s), reach (80 px jets) and power are a first pick.
+
+## 2026-11-16: Water, the seventh element (owner request)
+
+- **The owner** (earlier session, PR #777) chose a proper Water element for the fountain, not plain water: a card with a status and reactions with every element.
+- **The card** (`content/spells/elements/water/`): damage ×0.8, puts on **soak** (4 s, strength 50), tint the new Water material, look `drops` (look kind 22, free since the poof became a flash kind: drops shaken off the path that fall and splash; the `droplet` mote kind). Five combos, one a reaction.
+- **Soak, its own rules** (Combat): a soaked body takes no burn, and a soak puts a burn out (in `_apply_status_row`, so the grass's burn and a spread's too); a heal on a soaked body heals its strength in per cent more (water then mend: +50%). Mend still only heals (owner, 2026-11-12): only how much it heals changes. Resisted as any status (`ActorStats.resist_soak`).
+- **Reactions** (`content/spells/reactions.tres`), one each with every element, both ways:
+  - **Douse** (water on burn, fire on soak): `REMOVE`, a new effect kind: the status goes and nothing else. Water saves a burning teammate; a soaked body shrugs off a fire hit's burn (its damage still lands).
+  - **Rime** (frost on soak: `FREEZE`, a new kind, 1.5 s, the soak used up; water on chill: `EXTEND`, a freeze of 1.5 s as superconduct's): one frost hit freezes a soaked body.
+  - **Current** (lightning on soak, water on static): `CONDUCT`, a new kind: 5 to the struck body and to every other soaked body within 80 px, each losing its soak, an arc to each. Soak a crowd (a spray, a squall), then one bolt. Water on a charged body also sets its charge off as any hit does (static's rule), so it zaps twice there: the pair is kept because the Spell atlas and the clips expect every reaction to be a pair, and a charged body in a soaked crowd is a set-up worth paying.
+  - **Squall** (storm on soak: `SPREAD` the soak 56 px; water on gust: `SPREAD` the gust 56 px): the wind carries the water onto the bodies round it, setting current and rime up.
+  - **Drown** (void on soak, water on hex): `CONSUME`, 6 bonus damage (doubled on a frozen body, as shatter's).
+  - **Mend** has no status, so no row: its interaction is soak's heal.
+- **Its colour: Water**, a new palette material (`#0f4a44` `#1e9c8c` `#6fdcc0`, 52 colours), a deep sea teal: base hue about 172° against Ice's cyan 183° and far darker (value 0.61 against 0.86), so frost and water read apart; 40° from Player 3's green and far from Player 1's blue (216°) and Mana's ultramarine (233°). In docs/STYLE.md, `core/base/palette.gd`, `art/kit`'s palette files, the SVG art test and the shot shaders' palette (`SHADES`, so a water shot's core is drawn in its own ramp, not Ice's).
+- **The reaction colours** (each at least 0.45 apart from every other, `test_feel_reactions.gd`): with nine already taken the free ones are few and dark or loud: douse a dull magenta, rime violet, current electric green, squall olive green, drown deep blue. Sounds: none yet, as every reaction (silent until an `.ogg` exists).
+- **Ground cover:** water wets the hub's grass (`wet`, 8 s: it does not light, glints with drips and soaks whoever stands in it; water on burning grass puts it out into `wet`), and puts a burning cobweb out.
+- **Native:** the shot kernel's `EMITTING_MASK` covers the new kind (it mirrors the manager's to the bit).
+- **Not done (docs/DESIGN.md is the owner's):** its starting cards' infusions list (fire, frost, storm, void, lightning, mend) does not name water; whether Water is a starting card or a found one is the owner's to write there.
+
 ## 2026-11-16: Nova and Penta rings turn on with every cast; a shot leaving its caster spares them (owner)
 
 - **The owner:** "When firing a nova, one of the nova projectiles always fire right back at the staff direction, hitting the wizard. Can the nova rotate for each cast? I also think Penta should do this".

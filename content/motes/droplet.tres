@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"droplet"
+look_ids = Array[StringName]([&"drops"])
+gravity = 420.0
+drag = 1.5
+bounce = 0.25
+glow = 0.35
+shade_from = 1
+shape = "
+#
+
+o
+#
+
+#.#
+"
+shape_play = "loop"
+shape_rate = 6.0
+shape_turns = false
+count = 5
+speed = Vector2(30.0, 90.0)
+up = Vector2(40.0, 80.0)
+life = Vector2(0.45, 0.8)
+spread = 120.0
+height = 4.0

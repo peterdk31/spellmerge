@@ -18,6 +18,15 @@ enum Effect {
 	EXTEND,
 	## Copies the status to the other targets within `radius`.
 	SPREAD,
+	## Removes the status and does nothing else (water putting a burn out).
+	REMOVE,
+	## Freezes the target for `duration` seconds (a frozen one stays frozen that much longer),
+	## the status used up (frost on a soaked body).
+	FREEZE,
+	## `damage` to the target and to every other body within `radius` that is soaked, each losing
+	## its soak, with an arc from the target to each (lightning running through water). The status
+	## the target had is used up.
+	CONDUCT,
 }
 
 ## The reaction's name, for `reaction_triggered` and feel, for example &"shatter".

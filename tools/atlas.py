@@ -31,8 +31,8 @@ KIND_FOLDERS = {"form": "carriers", "element": "elements", "modifier": "modifier
                 "multicast": "multicasts"}
 KIND_ORDER = ("form", "element", "modifier", "trigger", "multicast", "combo", "reaction")
 # ReactionRow.Effect, in the order of the enum in core/base/reaction_row.gd.
-EFFECTS = ("burst", "consume", "extend", "spread")
-STATUS_WORDS = {"burn": "burning", "chill": "chilled", "gust": "gusted", "hex": "hexed"}
+EFFECTS = ("burst", "consume", "extend", "spread", "remove", "freeze", "conduct")
+STATUS_WORDS = {"burn": "burning", "chill": "chilled", "gust": "gusted", "hex": "hexed", "soak": "soaked", "static": "charged"}
 
 
 def _value(text: str, key: str, default: str = "") -> str:
@@ -137,6 +137,12 @@ def _row_effect(row: dict) -> str:
         if damage:
             text += f", dealing {damage} damage"
         return text
+    if effect == "remove":
+        return "takes the status away"
+    if effect == "freeze":
+        return f"freezes the target for {row['duration']:g} seconds (or keeps it frozen that much longer), using up the status"
+    if effect == "conduct":
+        return f"deals {damage} damage to the target and to every soaked target within {row['radius']:g} pixels, drying them"
     return f"spreads the status to other targets within {row['radius']:g} pixels"
 
 

@@ -464,9 +464,11 @@ const LOOK_ZIG: int = 18
 const LOOK_DOUBLE: int = 19
 const LOOK_CONVERGE: int = 20
 const LOOK_DRIFT: int = 21
-## Kind 22 is free (Feel's poof flag until the poof became a flash kind of its own: flash kinds
-## F2), 23 the enemy ramp and 24 the exact colour: not kinds.
-const LOOK_COUNT: int = 22
+## Water: drops shaken off the path that fall and splash (kind 22, Feel's poof flag until the poof
+## became a flash kind of its own: flash kinds F2). 23 is the enemy ramp and 24 the exact colour:
+## not kinds.
+const LOOK_DROPS: int = 22
+const LOOK_COUNT: int = 23
 ## The most kinds the instance data has room for: three bytes of bits (`_look_color`).
 const LOOK_MAX_KINDS: int = 24
 ## A flag in the look, not a kind (kind 23 of the shader): drawn in the enemy ramp (Blight
@@ -541,7 +543,7 @@ const SPARK_TAG_BITS: int = 12
 const SPARK_BIRTHS_MAX: int = 1024
 ## How often each look kind gives off a particle at a moment (by look kind; 0 the plain shot's
 ## twinkle, 11 the weave none).
-const SPARK_RATES: PackedFloat32Array = [0.18, 0.45, 0.32, 0.4, 0.55, 0.45, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0, 0.25, 1.0, 0.7, 0.4, 1.0, 1.0, 0.5, 0.5, 1.0, 0.4]
+const SPARK_RATES: PackedFloat32Array = [0.18, 0.45, 0.32, 0.4, 0.55, 0.45, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0, 0.25, 1.0, 0.7, 0.4, 1.0, 1.0, 0.5, 0.5, 1.0, 0.4, 0.45]
 ## A dash's speed streak: a birth of this look kind is one of the motes' dash path kinds
 ## (`MoteKind.dash_path`). The manager lays none: a dash's streaks are a `stream` part of its cue,
 ## which Feel gives off in this format (gameplay/feel/streams.gd; spell-spectacle-2.md, S5).

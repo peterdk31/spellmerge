@@ -38,10 +38,17 @@ enum When {
 	## the walls, at its feet, where its move left it; boss plan OB5): a dust heap walked or swept into.
 	## Every tick it does, so a prop that should hear it once goes to a state without the row.
 	TOUCHED,
+	## Every `seconds` it stays in its state, counted on the simulation's clock from when the state
+	## was entered (or from the start, in the state it starts in): a fountain's bursts. A prop with
+	## a timer row in any state is stepped (it is not still), so its pools refill as any staff's.
+	TIMER,
 }
 
 ## The names of `When`, as the problems and the moments name them.
-const WHEN_NAMES: PackedStringArray = ["element_hit", "status", "reaction", "health_below", "death", "entered", "cast", "refused", "touched"]
+const WHEN_NAMES: PackedStringArray = ["element_hit", "status", "reaction", "health_below", "death", "entered", "cast", "refused", "touched", "timer"]
+## TIMER: a clock this close under a whole number of its seconds has reached it (a clock summed
+## from steps of 1/60 s is a hair under 2.4 after 144 of them, and would fire a step late).
+const TIMER_SLACK: float = 1e-6
 ## The name a REFUSED moment comes with when the staff's mana paid none of its casts (`dry`).
 const DRY: StringName = &"dry"
 
@@ -60,6 +67,8 @@ const DRY: StringName = &"dry"
 @export_range(0, 4) var staff: int = 0
 ## REFUSED: only when the staff's mana pays none of its casts (off: whatever stopped it).
 @export var dry: bool = false
+## TIMER: the seconds between two of it (above 0).
+@export var seconds: float = 0.0
 
 ## What it does: cast this staff of the prop's (1-4; 0: none), as the prop, along its aim.
 @export_range(0, 4) var cast: int = 0
@@ -78,8 +87,10 @@ static func make(when_kind: When, cast_staff: int = 0, then_state: StringName = 
 
 ## True when this row fires on a moment of `kind` with `name` (the element, status or reaction it
 ## is about, or REFUSED's `DRY`; empty for the others) and `amount` (a hit's damage, the health
-## share it fell to, the staff number that cast or was refused). HEALTH_BELOW is handed the share it fell from too (`before`): it fires
-## on the hit that crosses its share.
+## share it fell to, the staff number that cast or was refused, TIMER the seconds in its state now).
+## HEALTH_BELOW is handed the share it fell from too (`before`): it fires on the hit that crosses its
+## share; TIMER the seconds it had been in its state before this step: it fires on each step that
+## passes a whole number of its `seconds`.
 func heard(kind: When, name: StringName, amount: float, before: float = 1.0) -> bool:
 	if kind != when:
 		return false
@@ -96,6 +107,8 @@ func heard(kind: When, name: StringName, amount: float, before: float = 1.0) -> 
 			return int(amount) == staff
 		When.REFUSED:
 			return int(amount) == staff and (not dry or name == DRY)
+		When.TIMER:
+			return seconds > 0.0 and floori(amount / seconds + TIMER_SLACK) > floori(before / seconds + TIMER_SLACK)
 	return true
 
 
@@ -136,6 +149,9 @@ func problems(staffs: int, state_ids: PackedStringArray, known: Dictionary = {})
 		When.HEALTH_BELOW:
 			if share <= 0.0 or share > 1.0:
 				found.append("health_below: share is %s; above 0, at most 1." % share)
+		When.TIMER:
+			if not (seconds > 0.0):
+				found.append("timer: seconds is %s; above 0." % seconds)
 		When.CAST, When.REFUSED:
 			if staff < 1 or staff > staffs:
 				found.append("%s hears staff %d; the prop holds %d." % [when_name(), staff, staffs])

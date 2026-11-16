@@ -76,3 +76,14 @@ func test_shot_apart_while_lit_it_blows_at_once_and_its_fuse_is_over() -> void:
 	check(not _world.spells.is_winding(barrel.caster_number(), 0), "and its fuse is over")
 	_world.run(FUSE_STEPS)
 	check_equal(_left.count(barrel.caster_number()), 1, "it never blows twice")
+
+
+func test_water_douses_a_lit_fuse() -> void:
+	var barrel: Actor = _barrel()
+	_world.shoot(barrel, &"fire")
+	check_equal(barrel.state_triggers.state_id(), &"fusing", "a fire hit lights its fuse")
+	check_equal(_world.shoot(barrel, &"water").slice(0, 1), [&"water"] as Array[StringName], "a water hit")
+	check_equal(barrel.state_triggers.state_id(), &"idle", "douses it")
+	_world.run(FUSE_STEPS)
+	check_equal(_left.count(barrel.caster_number()), 0, "and it never blows")
+	check_equal(barrel.state_triggers.state_id(), &"idle", "it stands, cold")

@@ -1,0 +1,13 @@
+{
+	"id": "soak_and_current",
+	"name": "Soak and current",
+	"does": "A water spray soaks a huddle of imps; one lightning bolt then runs through every soaked imp at once.",
+	"casts": [
+		{"staff": 0, "cards": ["water", "spray"]},
+		{"staff": 1, "cards": ["lightning", "bolt"], "at": 0.7}
+	],
+	"imps": [[56, 0], [70, 18], [70, -18]],
+	"seconds": 2.0,
+	"needs": "water",
+	"checks": [{"kind": "reaction", "reaction": "current"}]
+}

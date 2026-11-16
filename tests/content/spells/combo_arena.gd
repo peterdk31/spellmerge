@@ -24,6 +24,8 @@ const STEP: float = 1.0 / 60.0
 ## Health of an imp, high enough that no combo kills it by accident.
 const IMP_HEALTH: float = 400.0
 const IMP_RADIUS: float = 10.0
+## How far short of a wall a move stops (`answer_moves`): about a wizard's body.
+const MOVE_CLEARANCE: float = 8.0
 ## Mana handed to every cast.
 const MANA: float = 100.0
 
@@ -158,17 +160,25 @@ func shoot_at(from: Vector2, to: Vector2) -> void:
 ## Moves each player where its cards ask (`caster_move_requested`: a dash, a teleport, a pull...),
 ## at once, and answers where it landed (`caster_move_finished`), so a move's end point and its
 ## landing strike happen there, as a wizard's Mover would (a step later for all but a teleport).
-## Its guard body, if it has one, goes along.
+## A move stops MOVE_CLEARANCE short of the first wall in its way, and a dash stopped so is answered
+## as ended by the wall (`walled`: its `on wall` fires, boss plan OB12): a simplification, since the
+## Mover slides a glancing dash on and ends only one met head on. Its guard body, if it has
+## one, goes along.
 func answer_moves() -> void:
 	bus.caster_move_requested.connect(func(player: int, mode: StringName, move: Vector2, _seconds: float, tag: int) -> void:
 		if player < 0 or player >= _casters.size() or not move.is_finite():
 			return
-		_casters[player] += move
+		var from: Vector2 = _casters[player]
+		var goal: Vector2 = projectiles.clip_to_walls(from, from + move)
+		var walled: bool = not goal.is_equal_approx(from + move)
+		if walled:
+			goal = goal.move_toward(from, MOVE_CLEARANCE)
+		_casters[player] = goal
 		projectiles.set_anchor(player, _casters[player])
 		for body: Node2D in bodies:
 			if (body as Guard).actor_id == player:
 				body.global_position = _casters[player]
-		bus.caster_move_finished.emit(player, mode, _casters[player], tag))
+		bus.caster_move_finished.emit(player, mode, _casters[player], tag, walled and mode == &"dash"))
 
 
 ## Makes the decoys and familiars cards ask for (`Entities`, stepped by `run`): a decoy is an actor

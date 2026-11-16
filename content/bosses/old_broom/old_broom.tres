@@ -15,7 +15,7 @@
 script = ExtResource("3_staff")
 id = &"old_broom"
 display_name = "Sweep"
-slots = 4
+slots = 6
 draw = 1
 wind_up = 0.8
 cooldown = 2.6
@@ -26,7 +26,7 @@ mana_regen = 40.0
 [sub_resource type="Resource" id="Resource_sweep"]
 script = ExtResource("4_entry")
 staff = SubResource("Resource_sweep_staff")
-cards = Array[StringName]([&"bigger", &"lumber", &"plow", &"dash"])
+cards = Array[StringName]([&"on_wall", &"bigger", &"lumber", &"plow", &"dash", &"pulse"])
 
 [sub_resource type="Resource" id="Resource_flick_staff"]
 script = ExtResource("3_staff")
@@ -76,7 +76,7 @@ teamwork = 0.0
 script = ExtResource("3_staff")
 id = &"old_broom"
 display_name = "Double Sweep"
-slots = 16
+slots = 20
 draw = 1
 wind_up = 0.6
 cooldown = 2.4
@@ -87,7 +87,7 @@ mana_regen = 60.0
 [sub_resource type="Resource" id="Resource_double_sweep"]
 script = ExtResource("4_entry")
 staff = SubResource("Resource_double_sweep_staff")
-cards = Array[StringName]([&"timer", &"bigger", &"lumber", &"plow", &"dash", &"slow", &"fire", &"pool", &"timer", &"bigger", &"lumber", &"plow", &"dash", &"slow", &"fire", &"pool"])
+cards = Array[StringName]([&"timer", &"on_wall", &"bigger", &"lumber", &"plow", &"dash", &"slow", &"fire", &"pool", &"pulse", &"timer", &"on_wall", &"bigger", &"lumber", &"plow", &"dash", &"slow", &"fire", &"pool", &"pulse"])
 
 [sub_resource type="Resource" id="Resource_spring_cleaning"]
 script = ExtResource("5_profile")

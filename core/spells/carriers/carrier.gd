@@ -33,6 +33,7 @@ const MOVES: int = CarrierTraits.MOVES
 const LINE: int = CarrierTraits.LINE
 const MEETS_SHOTS: int = CarrierTraits.MEETS_SHOTS
 const MOVES_CASTER: int = CarrierTraits.MOVES_CASTER
+const MOVES_ALONG: int = CarrierTraits.MOVES_ALONG
 const STRIKES_POINT: int = CarrierTraits.STRIKES_POINT
 const BLOCKS: int = CarrierTraits.BLOCKS
 const SPAWNS: int = CarrierTraits.SPAWNS
@@ -128,10 +129,10 @@ func steers() -> bool:
 	return has(STEERS)
 
 
-## True when it moves its caster along a way over time (a dash; not a teleport, over at once): a
-## move's speed curve (`ModifierBase.move_start`) and a head-on wall ending it count on it.
+## True when it moves its caster along a way over time (`MOVES_ALONG`: a dash; not a teleport, over
+## at once): a move's speed curve (`ModifierBase.move_start`) and a head-on wall ending it count on it.
 func moves_along() -> bool:
-	return has(MOVES_CASTER) and has(LASTS)
+	return has(MOVES_ALONG)
 
 
 ## True when `behaviour` does something on it (with a blast on it, when `blasts`): its traits, or

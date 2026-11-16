@@ -56,7 +56,7 @@ static func of(spells: SpellRuntime) -> CarrierDash:
 
 
 func traits() -> int:
-	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF | MOVES_CASTER | MEETS_SHOTS | MELEE
+	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF | MOVES_CASTER | MOVES_ALONG | MEETS_SHOTS | MELEE
 
 
 func step_order() -> int:

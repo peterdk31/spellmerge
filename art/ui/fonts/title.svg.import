@@ -1,0 +1,25 @@
+[remap]
+
+importer="font_data_image"
+type="FontFile"
+uid="uid://cqox3eiss45q1"
+path="res://.godot/imported/title.svg-124f89122552b9504265f0ef78b704e6.fontdata"
+
+[deps]
+
+source_file="res://art/ui/fonts/title.svg"
+dest_files=["res://.godot/imported/title.svg-124f89122552b9504265f0ef78b704e6.fontdata"]
+
+[params]
+
+character_ranges=PackedStringArray("32-126")
+kerning_pairs=PackedStringArray()
+columns=16
+rows=6
+image_margin=Rect2i(0, 0, 0, 0)
+character_margin=Rect2i(0, 0, 0, 0)
+ascent=14
+descent=2
+fallbacks=[]
+compress=true
+scaling_mode=1

@@ -150,6 +150,9 @@ const PIERCE_ALL: int = 1 << 30
 const RAY_CARD: StringName = &"beam"
 ## The look of a zap and its sparks (Feel draws lightning for it).
 const ZAP_CARD: StringName = &"zap"
+## The look of a siphon's mana coming back (`carrier_shown` names the Siphon card, whose `cue`
+## Feel plays): from the hit to the caster's staff tip.
+const SIPHON_CARD: StringName = &"siphon"
 ## Bodies a zap shot remembers rolling for (`_rec_zapped`), and the won zaps it can keep waiting
 ## (`_rec_due_body`; past that it makes the zap at once).
 const ZAP_MEMORY: int = 32
@@ -367,6 +370,9 @@ var _pending_free: Array[PendingLaunch] = []
 var _clock: float = 0.0
 ## actor * STAFFS + staff -> casts made, which names the next cast's scatter and staff spread.
 var _cast_count: PackedInt32Array = PackedInt32Array()
+## actor * STAFFS + staff -> how far the novas of its latest cast stand turned off their aim, as a
+## share of the gap between two ways (`_nova_share`): SpellLimits.RING_STEP more each cast.
+var _cast_turn: PackedFloat32Array = PackedFloat32Array()
 ## The scatter and spread rolls of the cast or later firing being launched: its key (the cast's
 ## actor, staff and count; a later firing's from it) and the rolls made by it so far (`_scatter_roll`).
 var _scatter_key: int = 0
@@ -522,6 +528,7 @@ func _init() -> void:
 	_cursor.resize(ACTORS * SpellLimits.STAFFS)
 	_hold_mana.resize(ACTORS * SpellLimits.STAFFS)
 	_cast_count.resize(ACTORS * SpellLimits.STAFFS)
+	_cast_turn.resize(ACTORS * SpellLimits.STAFFS)
 	for i in ACTORS * SpellLimits.STAFFS:
 		_hold_tags.append(PackedInt64Array())
 		_last_carrier_card.append(&"")
@@ -697,7 +704,8 @@ func _body_of(carrier_card: StringName, shader: Shader, mesh: int) -> int:
 
 
 ## Hands a still card's look shape and clock (its `CardLook`: `look_shape`, `look_open`,
-## `look_fade`) to the manager for its body `body` (`set_body_shape`), so its shader draws by the
+## `look_fade`) to the manager for its body `body` (`set_body_shape`), and whether it lies on the
+## floor and merges (`set_body_ground`), so its shader draws by the
 ## numbers its motes leave by (`gameplay/feel/still_motes.gd` reads the same `CardLook`). Every place
 ## a body is numbered shapes it here. A head body (`mesh` MESH_HEAD) has no still look.
 func _shape_body(body: int, carrier_card: StringName, mesh: int) -> void:
@@ -705,6 +713,7 @@ func _shape_body(body: int, carrier_card: StringName, mesh: int) -> void:
 		return
 	var look: CardLook = _looks[carrier_card]
 	projectiles.set_body_shape(body, look.shape, Vector2(look.open, look.fade))
+	projectiles.set_body_ground(body, look.on_floor, look.merges)
 
 
 ## `_shot_mesh`'s answer for a carrier whose look is not the projectile manager's shots.
@@ -1298,6 +1307,7 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 		# seeded, so a cast a listener makes now does not take this one's.
 		events.cast_left.emit(actor, staff)
 	_scatter_from(hash(Vector3i(actor, staff, _cast_count[index])))
+	_cast_turn[index] = fposmod(float(_cast_count[index]) * SpellLimits.RING_STEP, 1.0)
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:
 		return false
 	_cast_count[index] += 1
@@ -1753,10 +1763,12 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool, again: bool = false) -> int:
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
 	_echo_spell = spell if echoed else null
-	var launched: int = _cast_nova(spell, tag, actor, origin, heading, source)
+	var share: float = _nova_share(spell, actor, staff)
+	var spin: float = share * TAU / float(spell.nova_ways()) if share > 0.0 else 0.0
+	var launched: int = _cast_nova(spell, tag, actor, origin, heading, source, spin)
 	if launched > 0 and spell.mirrors():
 		# The same cast again, its aim reversed: every card it has does what it did the first time.
-		launched += _cast_nova(spell, tag, actor, origin, -heading, source)
+		launched += _cast_nova(spell, tag, actor, origin, -heading, source, spin)
 	_echo_spell = null
 	if launched > 0 and _holds(spell, tag):
 		_start_hold(tag)
@@ -1776,13 +1788,26 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	return launched
 
 
+## How far the ways of a nova `spell` that `actor`'s staff `staff` fires stand turned off its aim,
+## as a share of the gap between two ways (0 for no nova): its latest cast's turn (`_cast_turn`,
+## SpellLimits.RING_STEP of a gap more for each cast the staff has made; owner, 2026-11-16: "Can
+## the nova rotate for each cast?"), so its first cast goes along the aim (owner, 2026-11-09),
+## every nova of one cast (its mirror, its echo, its payloads') shares a turn, and the next cast
+## turns on; the same on every machine.
+func _nova_share(spell: CompiledSpell, actor: int, staff: int) -> float:
+	var index: int = actor * SpellLimits.STAFFS + staff
+	if spell.nova_ways() <= 1 or actor < 0 or staff < 0 or index >= _cast_turn.size():
+		return 0.0
+	return _cast_turn[index]
+
+
 ## One firing of `spell` along `heading`, as a nova when it has one (owner, 2026-11-09): the cast
-## made `copies` times from `origin` by the same caster, copy k along `heading` turned by k/copies
-## of a full turn (copy 0 along the aim), and the card's cue (`nova`) played once at the centre.
-## Both a firing and its mirror go through here, so a card never does more on one than on the
-## other; each way recoils on its own, so a nova's pushes cancel as a mirror's do. Returns the shots
-## made.
-func _cast_nova(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
+## made `copies` times from `origin` by the same caster, copy k along `heading` turned by `spin`
+## (`_nova_share`) and k/copies of a full turn, and the card's cue (`nova`) played once at the
+## centre. Both a firing and its mirror go through here with the same `spin`, so a card never does
+## more on one than on the other; each way recoils on its own, so a nova's pushes cancel as a
+## mirror's do. Returns the shots made.
+func _cast_nova(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node, spin: float) -> int:
 	var copies: int = spell.nova_ways()
 	if copies <= 1:
 		var once: int = _cast_once(spell, tag, actor, origin, heading, source, 0.0)
@@ -1792,8 +1817,8 @@ func _cast_nova(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
 	var made: int = 0
 	for n in copies:
-		var turn: float = TAU * float(n) / float(copies)
-		var aim: Vector2 = DMath.rotated(way, turn) if n > 0 else way
+		var turn: float = spin + TAU * float(n) / float(copies)
+		var aim: Vector2 = DMath.rotated(way, turn) if turn != 0.0 else way
 		var shots: int = _cast_once(spell, tag, actor, origin, aim, source, turn)
 		if shots > 0:
 			_recoil(spell, tag, actor, aim)
@@ -1846,8 +1871,9 @@ func _cast_once(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 ## when that is less. It turns (owner, 2026-11-06: "rotate continuously") at SpellLimits.PENTA_TURN,
 ## and each cast turns the other way from the one before (owner, 2026-11-06: "Penta could simply
 ## swap rotation direction every cast"; `_penta_rings`): a cast stands where its card's last ring
-## has turned to (the first from a start of the card's own), so casts in a row (a held button, a
-## mirror, an echo) sweep back and forth. A copy that stays on its point and
+## has turned to (the first from a start of the card's own) and a step on (SpellLimits.RING_STEP of
+## the gap between two copies: owner, 2026-11-16), so casts in a row (a held button, a mirror, an
+## echo) sweep back and forth without standing on the same points again. A copy that stays on its point and
 ## aims from it (a beam) turns with its ring while it lasts (`_ring_*`, CarrierBeam). A still shot
 ## stays where it was placed, as anywhere, and a flying one flies off. It does not follow its
 ## centre (owner: "Don't let it follow the centre"). Each point stops short of a wall, and each
@@ -1861,7 +1887,11 @@ func _penta(spell: CompiledSpell, copies: int, tag: int, actor: int, origin: Vec
 	var turn: float = SpellLimits.PENTA_TURN
 	if _penta_rings.has(tag):
 		var last: Vector3 = _penta_rings[tag]
-		turned = fposmod(last.x + last.z * (_clock - last.y), TAU)
+		# Turned on by a step as well, so a steady rhythm of casts (each turning back what the last
+		# turned) never stands the ring on the same points again (SpellLimits.RING_STEP). Only a cast
+		# at a later time steps: a nova's copies and a mirror, cast at once, stand on the same ring.
+		var step: float = SpellLimits.RING_STEP * TAU / float(copies) if _clock != last.y else 0.0
+		turned = fposmod(last.x + last.z * (_clock - last.y) + step, TAU)
 		turn = -last.z
 	_penta_rings[tag] = Vector3(turned, _clock, turn)
 	turned += offset
@@ -3138,6 +3168,7 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
 	if refund > 0.0:
 		_refund(actor, SpellTag.staff_of(tag), refund)
+		_show_siphon(spell, actor, position)
 	var possess: float = spell.behaviour(ModifierBase.Behaviour.POSSESS)
 	if possess > 0.0:
 		_possess(actor, target, possess, tag)
@@ -3516,6 +3547,7 @@ func clear() -> void:
 	_open_builds.fill(0)
 	_last_carrier_card.fill(&"")
 	_cast_count.fill(0)
+	_cast_turn.fill(0.0)
 	_lc_count = 0
 	_zapper_count = 0
 	_magnet_count = 0
@@ -3803,6 +3835,20 @@ func _refund(actor: int, staff: int, amount: float) -> void:
 		events.mana_refund_requested.emit(actor, staff, amount)
 
 
+## Siphon's look (the owner, 2026-11-16: the jet run backwards): every siphon hit at `at` (the
+## refund may come to nothing, a full staff: the Caster's to say) streams from there into the actor `actor`'s staff tip (its aim's origin, else its anchor), told
+## as `carrier_shown` of SIPHON_CARD, along the way and as far: for looks only.
+func _show_siphon(spell: CompiledSpell, actor: int, at: Vector2) -> void:
+	if events == null or actor < 0 or actor >= ACTORS or not at.is_finite():
+		return
+	var tip: Vector2 = aim_origin_of(actor)
+	if not tip.is_finite() and projectiles != null:
+		tip = projectiles.get_anchor(actor)
+	if not tip.is_finite() or at.distance_squared_to(tip) < 1.0:
+		return
+	events.carrier_shown.emit(actor, SIPHON_CARD, at, at.direction_to(tip), at.distance_to(tip), spell.tint, spell.look)
+
+
 ## The node of the actor `body`'s body (null for -1, an actor with none, or no table).
 func _body_node(body: int) -> Node:
 	if body < 0:
@@ -3880,6 +3926,7 @@ func _reset_caster(caster: int) -> void:
 		_cooldown[index] = 0.0
 		_cursor[index] = 0
 		_cast_count[index] = 0
+		_cast_turn[index] = 0.0
 		_hold_mana[index] = 0.0
 		_last_carrier_card[index] = &""
 	_moves.reset_actor(caster)

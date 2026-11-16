@@ -151,6 +151,14 @@ var _pose_packed: bool = false
 ## going by them (a wall's seam), and its motes come in and thin with them.
 @export var look_open: float = 0.3
 @export var look_fade: float = 0.8
+## A still card's look lies on the floor (a pool): drawn under every body and over the floor's
+## marks, not over everyone as a shot is (`ProjectileManager.set_body_ground`).
+@export var look_on_floor: bool = false
+## A still card's shots that overlap are drawn as one (a pool's puddles run together): its look
+## shader is handed every one of its body's shots drawn this frame (`ProjectileManager.MERGE_MOST`
+## at most, the uniforms `merge_count`, `merge_place` and `merge_seed`), and draws each pixel from
+## the one nearest (copy `carriers/pool/pool.gdshader`).
+@export var look_merges: bool = false
 ## The old names of renamed look fields this card was loaded with (`_set`), each still taken (a
 ## `shot_shader` is its `look_shader`), and named by `look_problems` so the card is fixed.
 var _renamed: PackedStringArray = PackedStringArray()
@@ -179,7 +187,8 @@ func look_cues() -> Array:
 
 
 ## What is wrong with its looks, one line each (empty when nothing is): a look shader that is not
-## a canvas-item shader, one its carrier never draws, an old field name, motes never given off. Whether the cues it names exist is the registry's to say
+## a canvas-item shader, one its carrier never draws, an old field name, motes never given off, a
+## floor or merging look on a shot that is not still. Whether the cues it names exist is the registry's to say
 ## (tests/content/spells/test_carrier_looks.gd).
 func look_problems() -> PackedStringArray:
 	var found := PackedStringArray()
@@ -191,6 +200,8 @@ func look_problems() -> PackedStringArray:
 		found.append("%s: look_shader '%s' is never drawn: its carrier `%s` has no look of its own (Carrier.look_drawer)" % [id, look_shader.resource_path, carrier])
 	if not look_motes.is_empty() and Carriers.exists(carrier) and (Carriers.of(carrier).look_drawer() != Carrier.LOOK_STILL or look_shader == null):
 		found.append("%s: look_motes are never given off: only a still carrier's shots drawn by a look_shader of the card's own give them off" % id)
+	if (look_on_floor or look_merges) and Carriers.exists(carrier) and (Carriers.of(carrier).look_drawer() != Carrier.LOOK_STILL or look_shader == null):
+		found.append("%s: look_on_floor and look_merges are a still look's: only a still carrier's shots drawn by a look_shader of the card's own lie on the floor or merge" % id)
 	for stream: CardMoteStream in look_motes:
 		if stream == null:
 			found.append("%s: an empty look mote stream" % id)

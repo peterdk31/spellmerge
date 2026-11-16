@@ -29,7 +29,11 @@ extends SceneTree
 ## whose circle crosses that wall end there, and half the wizards' orbits are bolts with a speed
 ## (and speed curves) where all had a fixed angular speed; the drift-only orbits move as before,
 ## to the bit; and again for 5B, 2026-11-09, when a still shot's body became a flag of its own,
-## `F_QUAD`, in its flags: only the runes' flags differ, every line else to the bit).
+## `F_QUAD`, in its flags: only the runes' flags differ, every line else to the bit; and again
+## 2026-11-16, when a shot cast from its own caster's body came to spare that body as long as it is
+## coming at it (owner: a moving wizard, and an atom crossing it in one step, were hit by their own
+## nova): the same to step 38; at 39 a payload a wizard's own hit cast from that wizard's body no
+## longer hits it on its way out, so that shot lives on and the slots, hits and work after it differ).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),

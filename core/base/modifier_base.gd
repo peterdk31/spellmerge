@@ -82,7 +82,8 @@ enum Behaviour {
 	## carrier that moves its caster or strikes from the hand.
 	PENTA,
 	## The carrier is cast `behaviour_strength` times (8 the card; more cards add, with no cap) instead of once, from the same place by the same caster, each copy
-	## aimed out along the aim turned by its share of a full turn (owner, 2026-11-09: "a Nova
+	## aimed out along the aim turned by its share of a full turn and by the card's turn this cast
+	## (`Spells._nova_share`: each cast turns on, owner 2026-11-16) (owner, 2026-11-09: "a Nova
 	## modifier card, which would allow us to make novas of other carriers"; it replaced the nova
 	## carrier card). Each copy is a whole cast, so a carrier keeps its own shots and reach. Works on every
 	## carrier, as Mirror does: eight moves round a circle add up to none, and each still strikes.
@@ -143,7 +144,9 @@ const RULES: Dictionary = {
 	Behaviour.CHAIN: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
 	Behaviour.SHIELD: {"needs": {"any": CarrierTraits.MEETS_SHOTS}},
 	Behaviour.BLAST: {},
-	Behaviour.HOLD: {"needs": {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER}},
+	# Kept on: a carrier that lasts, or one cast anew while held (a spray pours on; the owner,
+	# 2026-11-16: "Hold should work like for a beam").
+	Behaviour.HOLD: {"needs": {"any": CarrierTraits.LASTS | CarrierTraits.REPEATS_HELD, "not": CarrierTraits.MOVES_CASTER}},
 	# It pushes what casts the carrier back: a body or a shot (at runtime; a point has nothing to push).
 	Behaviour.RECOIL: {},
 	Behaviour.BOUNCE: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}},
@@ -259,8 +262,9 @@ var look_layer: int:
 	set(value):
 		look_id = LookNames.name_of(value)
 ## The cue (`content/cues`) Feel plays when this card's behaviour goes off: `blast`'s explosion,
-## as big as its radius, or `zap`'s arc wherever a zap shows itself (`carrier_shown` names the card;
-## as long as the zap). When several cards of one behaviour name a cue, the first in slot order
+## as big as its radius, `zap`'s arc wherever a zap shows itself (`carrier_shown` names the card;
+## as long as the zap), or `siphon`'s mana streaming back from each hit to its caster's staff tip
+## (as far). When several cards of one behaviour name a cue, the first in slot order
 ## is played (`CompiledSpell.cue_of`); none plays nothing.
 @export var cue: StringName = &""
 

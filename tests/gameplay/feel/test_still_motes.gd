@@ -253,6 +253,9 @@ func test_a_pool_splashes_only_as_it_lands() -> void:
 	_run(30)
 	var before: int = motes.next_row()
 	_place(POOL, Vector2(300.0, 200.0))
+	# Thrown out of the staff, it lands POOL_LAND on and splashes for its splash stream's seconds.
+	_run(12)
+	check_equal(_written(before).filter(func(each: Array) -> bool: return each[2] == &"spark").size(), 0, "none while it is in the air")
 	_run(24)
 	var splash: int = _written(before).filter(func(each: Array) -> bool: return each[2] == &"spark").size()
 	check(splash >= 4, "drops thrown as it lands (%d)" % splash)

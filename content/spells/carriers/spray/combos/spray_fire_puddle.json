@@ -1,0 +1,10 @@
+{
+	"id": "spray_fire_puddle",
+	"name": "Fire puddle",
+	"needs": "pool",
+	"does": "Where the spray's jet ends it spills a fire pool further on, so pointing the hose paints the floor with fire: the imp standing where the pool lands burns.",
+	"casts": [{"staff": 0, "cards": ["on_expire", "spray", "fire", "pool"]}],
+	"imps": [[136, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

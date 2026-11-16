@@ -144,6 +144,21 @@ func test_a_zap_plays_its_cards_cue_as_long_as_the_zap() -> void:
 	check(is_equal_approx(arc["seconds"] as float, 0.25), "a zap's seconds")
 
 
+func test_a_siphon_pours_its_mana_back_along_the_way_it_is_shown() -> void:
+	# The Siphon card shows itself too (`carrier_shown` `siphon`, from a hit to its caster's staff
+	# tip): its cue pours a jet back along that way (the owner, 2026-11-16).
+	var card: ModifierBase = registry.get_resource(&"spells", &"siphon") as ModifierBase
+	check_equal(card.cue, &"siphon_drain", "siphon.tres names the cue `siphon_drain`")
+	var spectacle: Object = feel.get(&"_spectacle")
+	var jets: Object = spectacle.get(&"jets") if spectacle != null else null
+	check(jets != null, "Feel has its spectacle's jets")
+	if jets == null:
+		return
+	jets.call(&"clear")
+	bus.carrier_shown.emit(0, &"siphon", Vector2(80, 0), Vector2.LEFT, 80.0, FROST, 0)
+	check(bool(jets.call(&"is_pouring")), "it pours")
+
+
 func test_a_zaps_spark_into_the_air_burns_out_sooner() -> void:
 	bus.carrier_shown.emit(0, &"zap", Vector2.ZERO, Vector2.UP, 16.0, FROST, 0)
 	check_equal(feel.flashes_of(&"arc"), 1, "one spark (`if_size_upto` 22), not both parts")

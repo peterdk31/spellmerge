@@ -156,6 +156,11 @@ const SHOT_MOVES_START: int = 64
 ## Seconds a rune hits nothing after it is placed (owner, 2026-11-06: a trap arms): then it hits
 ## whatever is on it, the body whose hit cast it too (`CarrierRune`).
 const RUNE_ARM: float = 1.0
+## Seconds a pool's liquid is in the air, thrown out of the staff, before the pool lies where it
+## lands (the owner, 2026-11-16: "the pool should wait for the landing before it hits"): it hits
+## nothing and touches no floor until then (`CarrierPool`). Its look waits as long (`ARRIVE` in
+## content/spells/carriers/pool/pool.gdshader, and its card's motes' `start`).
+const POOL_LAND: float = 0.25
 ## Seconds between a pool's strikes of what stands in it (`CarrierPool`): every tick it forgets the
 ## bodies it touches, so each is hit again, its infusion's status put on again.
 const POOL_TICK: float = 0.5
@@ -209,3 +214,9 @@ const PENTA_WITHIN: float = 0.8
 ## How fast a penta's ring turns, in radians a second (owner, 2026-11-06: "rotate continuously"):
 ## once round every two seconds.
 const PENTA_TURN: float = PI
+## How far a ring of copies (a Nova's ways, a Penta's ring) turns on from one cast of its card to
+## the next, as a share of the gap between two copies (owner, 2026-11-16: "Can the nova rotate for
+## each cast? I also think Penta should do this"): the golden ratio's, so casts in a row never stand
+## the same and no copy keeps one way (a Nova's straight back across its caster every cast, a
+## Penta's where its turning back and forth would bring it again).
+const RING_STEP: float = 0.6180339887

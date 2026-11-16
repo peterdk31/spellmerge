@@ -46,6 +46,57 @@ func test_a_nova_from_the_staff_tip_spares_its_caster() -> void:
 		arena.free_all()
 
 
+## An atom's nova (owner, 2026-11-16: "a nova atom seem to also hit a standing wizard"): an atom is
+## so fast that its step crosses the whole body and ends past it; it still spares its caster.
+func test_a_nova_of_atoms_spares_a_standing_caster() -> void:
+	for off: float in [12.0, 14.0, 16.0]:
+		check_equal(_nova_lost("atom", off, Vector2.ZERO), 0, "an atom nova cast %d px off its caster never hits them" % int(off))
+
+
+## A moving caster (owner, 2026-11-16: "fix the moving wizard self-hit bug too"): walking back,
+## forward or sideways as the nova leaves, the wizard is not hit by the copies crossing them.
+func test_a_nova_spares_a_moving_caster() -> void:
+	for carrier: String in ["bolt", "atom"]:
+		for off: float in [14.0, 18.0]:
+			for walk: Vector2 in [Vector2(-90.0, 0.0), Vector2(90.0, 0.0), Vector2(0.0, 90.0), Vector2(-150.0, 0.0), Vector2(150.0, 0.0), Vector2(-90.0, 90.0)]:
+				check_equal(_nova_lost(carrier, off, walk), 0, "a %s nova cast %d px off a caster walking %s never hits them" % [carrier, int(off), walk])
+
+
+## The same walks with a body that is not the caster's (an imp) in the wizard's place: the copies
+## do cross it, so the test above would see a hit if the caster were not spared.
+func test_the_copies_do_reach_a_body_in_the_casters_place() -> void:
+	for carrier: String in ["bolt", "atom"]:
+		for walk: Vector2 in [Vector2.ZERO, Vector2(-90.0, 0.0), Vector2(90.0, 0.0)]:
+			check(_nova_lost(carrier, 14.0, walk, false) > 0, "a %s nova hits an imp walking %s where the caster would be" % [carrier, walk])
+
+
+## A caster who moves ahead of their own shot (owner, 2026-11-06: their own spells hurt them once
+## they have left them): a bolt and a teleport along its aim in one cast, the bolt flying on into
+## the wizard where they landed, hits them.
+func test_a_bolt_hits_its_caster_who_teleported_ahead_of_it() -> void:
+	check(_self_lost(["double", "bolt", "teleport"]) > 0, "the bolt catches up with the wizard who blinked ahead of it")
+
+
+## Health the caster (or, with `own` false, an imp in their place) loses to three casts of `nova ·
+## carrier` toward +x from `off` px ahead of the body, the body walking at `walk` px a second the
+## while.
+func _nova_lost(carrier: String, off: float, walk: Vector2, own: bool = true) -> int:
+	var arena := ArenaScript.new(root)
+	arena.answer_moves()
+	var body: Node2D = arena.add_guard(0, Vector2(-off, 0.0)) if own else arena.add_imp(Vector2(-off, 0.0))
+	arena.install_cards(0, 0, ["nova", carrier])
+	for n in 3:
+		arena.place_caster(0, body.global_position + Vector2(off, 0.0))
+		check(arena.cast(0, 0), "%s nova %d is cast" % [carrier, n])
+		# Long enough for the nova's wind-down, so the next cast is taken.
+		for step in 75:
+			body.global_position += walk / 60.0
+			arena.run(1.0 / 60.0)
+	var lost: int = arena.lost(body)
+	arena.free_all()
+	return lost
+
+
 func test_a_return_bolt_hurts_its_caster() -> void:
 	check(_self_lost(["return", "bolt"]) > 0, "a bolt that comes back hits its caster")
 

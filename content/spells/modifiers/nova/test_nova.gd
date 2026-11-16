@@ -1,7 +1,8 @@
 extends "res://tests/support/card_rig.gd"
 ## The Nova card (content/spells/modifiers/nova/; owner, 2026-11-09: a modifier that makes a nova of
 ## any carrier, in place of the old nova carrier card): the next carrier is cast eight ways at once, from
-## the same place, each copy aimed out round a circle and keeping its own shots and reach.
+## the same place, each copy aimed out round a circle and keeping its own shots and reach. The circle
+## turns on with every cast (owner, 2026-11-16), its first along the aim.
 ##
 ## godot --headless --path . --script res://content/spells/modifiers/nova/test_nova.gd
 
@@ -52,11 +53,68 @@ func test_a_nova_of_bolts_throws_a_ring_in_every_direction() -> void:
 	check_equal(hit.size(), 8, "each exactly once")
 
 
+## The angles off `aim`, in eighths of a turn (from -0.5 up to 7.5), that the bolts of `tag` not in
+## `before` fly at.
+func _ways_of(tag: int, aim: Vector2, before: Array[int] = []) -> Array[float]:
+	var out: Array[float] = []
+	for slot in _slots(tag):
+		if not before.has(slot):
+			out.append(fposmod(aim.angle_to(_mgr.get_velocity_of(slot)) / (TAU / 8.0) + 0.5, 8.0) - 0.5)
+	out.sort()
+	return out
+
+
+## The first cast's first copy goes along the aim (owner, 2026-11-09).
 func test_the_first_copy_goes_along_the_aim() -> void:
 	var ahead: Node2D = _target(Vector2(0.0, 60.0))
-	_cast_with(&"bolt", [&"nova"], 0, Vector2.ZERO, Vector2.DOWN)
+	var tag: int = _cast_with(&"bolt", [&"nova"], 0, Vector2.ZERO, Vector2.DOWN)
+	var ways: Array[float] = _ways_of(tag, Vector2.DOWN)
+	check_equal(ways.size(), 8, "eight bolts")
+	for n in ways.size():
+		check(absf(ways[n] - n) < 0.01, "bolt %d flies %.2f eighths off the aim" % [n, ways[n]])
 	_tick(20)
 	check(_hit_targets().has(ahead), "the bolt aimed down hits the target below")
+
+
+## Each cast of the card turns on from the last (owner, 2026-11-16: "one of the nova projectiles
+## always fire right back at the staff direction, hitting the wizard. Can the nova rotate for each
+## cast?") by SpellLimits.RING_STEP of a gap, so casts in a row never stand the same.
+func test_each_cast_turns_on_from_the_last() -> void:
+	var tag: int = _cast_with(&"bolt", [&"nova"], 0, Vector2.ZERO)
+	var turns: Array[float] = [_ways_of(tag, Vector2.RIGHT)[0]]
+	for n in 4:
+		_tick(150)
+		var before: Array[int] = _slots(tag)
+		check(_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "cast %d of the same staff" % (n + 1))
+		var ways: Array[float] = _ways_of(tag, Vector2.RIGHT, before)
+		check_equal(ways.size(), 8, "eight bolts on cast %d" % (n + 1))
+		if ways.is_empty():
+			return
+		for k in ways.size():
+			check(absf(ways[k] - k - ways[0]) < 0.01, "evenly round on cast %d" % (n + 1))
+		turns.append(ways[0])
+	for n in range(1, turns.size()):
+		var step: float = fposmod(turns[n] - turns[n - 1], 1.0)
+		check(absf(step - SpellLimits.RING_STEP) < 0.01, "cast %d turned on by %.3f of a gap from the last" % [n, step])
+		for m in n:
+			check(absf(turns[n] - turns[m]) > 0.05, "cast %d stands apart from cast %d" % [n, m])
+
+
+## A firing and its mirror share the turn: the mirrored ring is the first reversed, its sixteen
+## bolts two on each of the same eight ways.
+func test_a_mirror_shares_the_turn() -> void:
+	var tag: int = _cast_with(&"bolt", [&"mirror", &"nova"], 0, Vector2.ZERO)
+	# The second cast, which stands turned off the aim.
+	_tick(150)
+	var before: Array[int] = _slots(tag)
+	check(_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "cast again")
+	var ways: Array[float] = _ways_of(tag, Vector2.RIGHT, before)
+	check_equal(ways.size(), 16, "two rings of eight")
+	check(not ways.is_empty() and absf(ways[0]) > 0.05, "turned off the aim (%s)" % [ways])
+	var lines: Dictionary = {}
+	for way in ways:
+		lines[posmod(roundi(way * 100.0), 800)] = true
+	check_equal(lines.size(), 8, "on the same eight ways, none between")
 
 
 func test_each_copy_keeps_its_carriers_reach() -> void:
@@ -121,6 +179,14 @@ func test_a_nova_of_penta_rings_spreads_them_out() -> void:
 	for slot in slots:
 		spots[_mgr.get_position_of(slot).round()] = true
 	check_equal(spots.size(), 40, "on forty points, none stacked")
+	# Evenly round (owner, 2026-11-16: the Penta step is taken once a cast, not once a copy).
+	var angles: Array[float] = []
+	for slot in slots:
+		angles.append(fposmod(_mgr.get_position_of(slot).angle(), TAU))
+	angles.sort()
+	for n in angles.size():
+		var gap: float = fposmod(angles[(n + 1) % angles.size()] - angles[n], TAU)
+		check(absf(gap - TAU / 40.0) < 0.01, "evenly spread: gap %d is %.3f rad" % [n, gap])
 
 
 ## A nova of dashes (owner, 2026-11-09: as Mirror's): eight moves round a circle add up to none.

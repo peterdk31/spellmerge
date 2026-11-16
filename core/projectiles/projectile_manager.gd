@@ -253,6 +253,11 @@ const F_QUAD: int = 512
 
 ## Seconds one sine wave of a spiral shot takes.
 const SPIRAL_PERIOD: float = 0.5
+## How much farther off its caster's body than it was cast a shot cast from it may be, or its line
+## pass, coming at it, and still be leaving it (`exclude`, `_still_spares`): what a walking body steps
+## toward its own shot as it crosses (owner, 2026-11-16: a moving wizard was hit by its own nova).
+## `exclude` adds it into `_skip_near`, which the native kernel reads.
+const SPARE_DRIFT: float = 4.0
 
 ## Default global caps on live projectiles for each platform. The web cap was 1,000 (the PLAN
 ## budget) until the first web stress run: a physics step of 14 to 20 ms made the engine
@@ -1042,9 +1047,9 @@ var _step_index: int = 0
 ## `exclude`), and above 0 while that holds: until a hit test finds the shot clear of that body where its step starts.
 var _skip_id: PackedInt64Array = PackedInt64Array()
 var _skip_on: PackedFloat32Array = PackedFloat32Array()
-## Per slot: how far off that body's hit shape the shot was cast, when the body is its own caster's
-## (the staff tip stands off it; 0 for any other body): within this, coming at the body, it is
-## still leaving it (`_still_spares`).
+## Per slot: when the body is its own caster's (the staff tip stands off it), how far off that body's
+## hit shape the shot may be, and its line pass, coming at it, while it is still leaving it: how far
+## off it was cast and SPARE_DRIFT; 0 for any other body (`_still_spares`).
 var _skip_near: PackedFloat32Array = PackedFloat32Array()
 ## Where each actor's orbit shots circle (INF for no anchor), see `set_anchor`; ACTORS of them.
 var _anchors: PackedVector2Array = PackedVector2Array()
@@ -6163,9 +6168,10 @@ func touches_target(node: Node, point: Vector2, radius: float) -> bool:
 ## been clear of it: the first hit test whose step starts with the shot off that body's hit shape
 ## ends the exclusion (`_still_spares`), and from then on it hits that body as any other (owner,
 ## 2026-11-06: no timer, so a slow shot born on its source can no longer hit it as it crawls out).
-## A body its own caster owns is the one it was cast from, at the staff tip off that body: how far
-## off it was cast (`_skip_near`) it still spares the body while coming at it, so a shot aimed back
-## across its caster (a nova's, a mirror's) passes them (owner, 2026-11-07).
+## A body its own caster owns is the one it was cast from, at the staff tip off that body: it still
+## spares the body while coming at it (`_skip_near`), so a shot aimed back across its caster (a
+## nova's, a mirror's) passes them (owner, 2026-11-07), however fast it is and however they move
+## (owner, 2026-11-16).
 func exclude(slot: int, node: Node) -> void:
 	if slot >= 0 and slot < _cap and _alive[slot] != 0 and node != null:
 		# Kept by its key (N5); a node that is no target (none registered) is never hit anyway.
@@ -6179,7 +6185,7 @@ func exclude(slot: int, node: Node) -> void:
 		if body == null or not body.is_inside_tree():
 			return
 		var off: float = HitShape.gap(_pos[slot] - (body.global_position + _target_offset[at]), _target_half[at]) - _radius[slot] - _target_radius[at]
-		_skip_near[slot] = off if off > 0.0 and is_finite(off) else 0.0
+		_skip_near[slot] = (off if off > 0.0 and is_finite(off) else 0.0) + SPARE_DRIFT
 
 
 ## The spawn number of the shot in `slot`: it changes when the slot is reused, so a
@@ -6620,11 +6626,13 @@ func _hit_test(slot: int) -> bool:
 
 
 ## Whether the shot in `slot`, its step starting at `start` and going `way`, still spares the body
-## it started on (`exclude`): its step starts on that body's hit shape, or, cast from that body
-## (`_skip_near` off it), it is coming at it, its line going into it, and ends no farther off than it
-## was cast. A shot cast from a staff tip off its caster's body does not hit that body as it crosses
-## it on its way out (owner, 2026-11-07: a nova's shot aimed back across the wizard hit them); one
-## that has passed it, or turns back (return, bounce), does.
+## it started on (`exclude`): its step starts on that body's hit shape, or, cast from that body, it
+## is coming at it from no farther off than `_skip_near`, its line passing within that of it. A
+## caster that moved far ahead of its own shot (a teleport along the aim) is not spared. A shot cast from a staff tip off its
+## caster's body does not hit that body as it crosses it on its way out (owner, 2026-11-07: a nova's
+## shot aimed back across the wizard hit them), even crossing it in one step (an atom) or with the
+## body walking into its line (owner, 2026-11-16); one that has passed it, or leaves it and turns
+## back (return, bounce), does.
 func _still_spares(slot: int, start: Vector2, way: Vector2) -> bool:
 	var t: int = _target_key.find(_skip_id[slot]) if _skip_id[slot] != 0 else -1
 	if t < 0 or (_target_layer[t] & _layers[slot]) == 0:
@@ -6638,15 +6646,14 @@ func _still_spares(slot: int, start: Vector2, way: Vector2) -> bool:
 	var near: float = _skip_near[slot]
 	if near <= 0.0:
 		return false
-	var ahead: float = to_centre.dot(way)
 	var within: float = reach + near
-	var end_sq: float = (to_centre - way).length_squared() if box == Vector2.ZERO else HitShape.gap_sq(to_centre - way, box)
-	if ahead <= 0.0 or end_sq > within * within:
+	var ahead: float = to_centre.dot(way)
+	if ahead <= 0.0 or apart_sq > within * within:
 		return false
 	# The square of how far the body's shape stands off the shot's line.
 	if box == Vector2.ZERO:
-		return apart_sq - ahead * ahead / way.length_squared() <= reach * reach
-	return HitShape.line_gap_sq(-to_centre, way, box) <= reach * reach
+		return apart_sq - ahead * ahead / way.length_squared() <= within * within
+	return HitShape.line_gap_sq(-to_centre, way, box) <= within * within
 
 
 ## Hit the `found` targets `_hit_test` kept for the shot in `slot` (`_cand_*`), nearest first;

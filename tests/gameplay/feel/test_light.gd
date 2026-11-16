@@ -20,7 +20,6 @@ const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const TORCH := preload("res://content/rooms/crypt/decals/torch.tscn")
-const SANDBOX := preload("res://content/rooms/crypt/sandbox.tres")
 const ARENA := preload("res://content/rooms/crypt/arena_01.tres")
 
 ## The scenes with bodies and room art: everything in them is drawn under the light.
@@ -29,7 +28,7 @@ const BODY_SCENES: Array[PackedScene] = [
 	preload("res://content/enemies/training_dummy/training_dummy.tscn"),
 	preload("res://content/enemies/bone_husk/bone_husk.tscn"),
 	preload("res://content/rooms/crypt/arena_01.tscn"),
-	preload("res://content/rooms/crypt/sandbox.tscn"),
+	preload("res://content/rooms/crypt/arena_02.tscn"),
 	preload("res://content/rooms/crypt/decals/torch.tscn"),
 ]
 
@@ -481,22 +480,30 @@ func test_every_light_spot_in_the_content_is_whole() -> void:
 	check(seen >= 5, "the torches are light spots, got %d" % seen)
 
 
-## A room sets the light's ambient (the sandbox's 0.85, the owner's pick; others 1.0), and the
-## light keeps it when the setting is turned off and on.
+## A room sets the light's ambient (its `.tres`'s; 1.0, as drawn, by default), and the light keeps
+## it when the setting is turned off and on. Two rooms of the test's own (copies of the arena), so
+## the content's own ambients may change freely.
 func test_a_room_sets_the_ambient() -> void:
+	check(is_equal_approx(RoomBase.new().ambient, 1.0), "a room is as drawn by default")
+	var dark := ARENA.duplicate() as RoomBase
+	dark.id = &"test_dark_room"
+	dark.ambient = 0.85
+	registry.add(&"rooms", dark)
+	var plain := ARENA.duplicate() as RoomBase
+	plain.id = &"test_plain_room"
+	plain.ambient = 1.0
+	registry.add(&"rooms", plain)
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
-	check(is_equal_approx(ARENA.ambient, 1.0), "a room is as drawn by default")
-	check(is_equal_approx(SANDBOX.ambient, 0.85), "the sandbox is a little darker (the owner, 2026-11-04)")
-	bus.room_entered.emit(SANDBOX.id)
-	check(is_equal_approx(feel.light().ambient, 0.85), "the sandbox's ambient")
+	bus.room_entered.emit(dark.id)
+	check(is_equal_approx(feel.light().ambient, 0.85), "the darker room's ambient")
 	check(is_equal_approx(float((feel.light().apply.material as ShaderMaterial).get_shader_parameter(&"ambient")), 0.85), "to the rect")
 	bus.spell_light_changed.emit(false)
 	bus.spell_light_changed.emit(true)
 	check(is_equal_approx(feel.light().ambient, 0.85), "kept through the setting")
-	bus.room_entered.emit(ARENA.id)
-	check(is_equal_approx(feel.light().ambient, 1.0), "the arena's")
+	bus.room_entered.emit(plain.id)
+	check(is_equal_approx(feel.light().ambient, 1.0), "the plain room's")
 
 
 ## The steps are a switch: 3 by default (dim, lit, bright), 0 smooth; the shader's default too.

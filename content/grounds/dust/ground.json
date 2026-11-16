@@ -1,0 +1,6 @@
+{
+	"about": "Dust and grit lying thick (docs/milestones/crypt-rework.md): the drifts the Old Broom sweeps against its hall's walls. An area's material.",
+	"base": "#4f4a5e",
+	"patches": {"colour": "#5c5568", "scales": [14, 6], "above": 0.55},
+	"speckle": [["bone.shadow", 0.02], ["stone.shadow", 0.02], ["#14121f", 0.004]]
+}

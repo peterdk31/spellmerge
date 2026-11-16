@@ -59,7 +59,7 @@ extends CanvasLayer
 ##   never pauses the game; it is the full builder at any time, fights included (staffs A6a).
 ##   Inside a menu `back` is that menu's own (UIFocus `cancelled`), so a press only opens the
 ##   builder when the player had no menu open at the poll before it too. (The older list
-##   builder is gone, owner 2026-11-11.) The pause menu's Sandbox page sets the radial's ring (its
+##   builder is gone, owner 2026-11-11.) The pause menu's Settings page sets the radial's ring (its
 ##   layout, or a ring style from `builder/rings/`) and full-slot choice
 ##   (`builder_options_changed`). The same page switches where every corner panel's staff rows
 ##   show a staff's delay, on the button glyph (the default) or on the next cast

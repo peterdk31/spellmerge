@@ -6,10 +6,11 @@ extends RefCounted
 ## can be compared (tools/platform_hashes.py).
 ##
 ## - **A scripted player** (`Scripted`: a frame source that reads nothing of the game, as a
-##   person's input) walks, dashes, aims and casts the sandbox's staffs (the storm on LB, the fire
-##   bolt) at the dummies while the "HUD" rebuilds a staff mid-run (a command): its replay plays
-##   with nobody watching, and its frames are the same on every platform. The sandbox's shots down
-##   the wizard now and then, so not every cast it presses happens.
+##   person's input) walks, dashes, aims and casts its staffs (the storm on LB, the bolt) while the
+##   "HUD" rebuilds a staff mid-run (a command): its replay plays with nobody watching, and its
+##   frames are the same on every platform. In the hub (with no stone press) it first walks to the
+##   rack and takes the storm, `rack_item` (`RackWalker`; the "HUD" sends A by it, the command
+##   `item_take_requested`), onto its first free hand, LB, as a player takes it.
 ## - **Fighter bots** (tests/bots/bot.gd) play a run's room. A bot reads the game through
 ##   queries that fill the services' caches, and those count as state (the projectile manager's
 ##   threat grid and target table), so its run replays exactly with the bots watching again
@@ -25,7 +26,7 @@ extends RefCounted
 ##
 ##     var run := ReplayRun.new(tree)
 ##     var recorded := Desync.new()
-##     var replay: Replay = await run.record(&"sandbox_requested", 0, 1, recorded)
+##     var replay: Replay = await run.record(&"hub_requested", 0, 1, recorded)
 ##     var played := Desync.new()
 ##     await run.play(replay, 0, played)
 ##     # run.problems: what went wrong on the way (a bot that did not join, ...)
@@ -38,14 +39,18 @@ const CoopScript := preload("res://gameplay/coop/coop.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
 
 ## The tick the scripted run's "HUD" rebuilds staff 0 (a command), mid-run while the wizard stands:
-## the sandbox's shots down it now and then, and a downed body's requests are refused (items I7b),
-## so `record` says so if the wizard is down at this tick.
+## a downed body's requests are refused (items I7b), so `record` says so if the wizard is down at
+## this tick.
 const REBUILD_AT: int = 145
 const REBUILT: Array[StringName] = [&"triple", &"fire", &"bolt"]
 ## The ticks the scripted run's pause menu opens and closes (the command `pause_requested`): the game
 ## stands stopped between, and a replay stands stopped there too (online-ready N4).
 const PAUSE_AT: int = 150
 const RESUME_AT: int = 170
+## The premade staff the hub's scripted player takes from the rack first (content/items/staffs/): the
+## Frostfire Cascade, a fire nova split three times whose every shot fires a frost nova split three
+## times as it ends, far past the projectile cap.
+const STORM_ITEM: StringName = &"frostfire_cascade"
 
 ## Ticks recorded and played (four seconds of game by default).
 var ticks: int = 240
@@ -79,6 +84,9 @@ var room: RoomBase = null
 ## after whatever ran before, as a player starts one run after another (N3b: the run starts from
 ## a fresh game's state all the same).
 var fresh_game: bool = true
+## The premade staff the first scripted player of a hub with no stone press walks to and takes
+## (`RackWalker`); empty: it plays as `Scripted` from its spawn.
+var rack_item: StringName = STORM_ITEM
 ## Cover kinds the game's cover area and Feel lay instead of the registry's (ground cover GC5; empty:
 ## the registry's), given again in every fresh game. The snapshot test puts cover in its rooms so.
 var cover: Array[CoverKind] = []
@@ -92,7 +100,7 @@ var _feel: FeelScript
 
 
 ## A player that reads nothing of the game: it walks a square, turns its aim a step each tick,
-## taps the storm (staff 2) and dashes (staff 0) now and then, and holds the fire bolt (staff 1) in
+## taps the storm (staff 2) and dashes (staff 0) now and then, and holds the bolt (staff 1) in
 ## bursts. Homing and chains, kept by key since N5, are played twice by test_determinism's storm.
 class Scripted:
 	extends FrameSource
@@ -144,6 +152,46 @@ class StoneWalker:
 		tick += 1
 
 
+## The hub's player who takes a premade staff from the rack (crypt rework CR-S: the storm the
+## showcase builds left there), reading nothing of the game either: from its seat's spawn in the hub
+## it walks towards the item at full tilt until it is in reach (`PickupRule.REACH`) and stands; the
+## "HUD" sends A by it at `take_at`, and after that it plays as `Scripted` does. Where the spawn and
+## the item lie is the room's data.
+class RackWalker:
+	extends FrameSource
+	const HUB := preload("res://content/rooms/hub/hub.tres")
+	const STEP: float = 1.5
+	var at: Vector2
+	var way: Vector2
+	var walk: int
+	var take_at: int
+	var tick: int = 0
+	var then: Scripted = Scripted.new()
+
+	func _init(seat: int, item: StringName) -> void:
+		at = place_of(item)
+		var to: Vector2 = at - (HUB as RoomBase).places().player_spawns[seat]
+		way = to.normalized()
+		walk = floori((to.length() - 4.0) / STEP)
+		take_at = walk + 1
+
+	## Where the hub's scene lays the premade item `item` (Vector2.INF where it lays none).
+	static func place_of(item: StringName) -> Vector2:
+		var places: RoomPlaces = (HUB as RoomBase).places()
+		for i in places.placed.size():
+			var data := places.placed[i] as StaffItem
+			if data != null and data.id == item:
+				return places.placed_at[i]
+		return Vector2.INF
+
+	func fill_frame(frame: InputFrame, delta: float) -> void:
+		if tick < walk:
+			frame.set_move(way)
+		elif tick > take_at:
+			then.fill_frame(frame, delta)
+		tick += 1
+
+
 func _init(tree: SceneTree) -> void:
 	_tree = tree
 	_root = tree.root
@@ -155,9 +203,13 @@ func _init(tree: SceneTree) -> void:
 func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay:
 	await fresh()
 	var players: Array[BotScript] = _join_bots(bots)
+	var walker: RackWalker = null
 	for at in scripted:
 		_input.call("add_virtual_device", bots + at)
 		var source: FrameSource = Scripted.new() if stone_press_at < 0 else StoneWalker.new(stone_press_at)
+		if at == 0 and _takes_from_rack(start):
+			walker = RackWalker.new(bots, rack_item)
+			source = walker
 		_frames.call("set_source", bots + at, source)
 	# One physics step after the game is fresh, as `play` takes.
 	await _tree.physics_frame
@@ -175,6 +227,9 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 			if standing != null and standing.is_down():
 				problems.append("%s: the scripted wizard is down at the rebuild (tick %d): move REBUILD_AT" % [start, REBUILD_AT])
 			events.emit_signal("staff_cards_requested", bots, 0, REBUILT, standing.key() if standing != null else 0)
+		if walker != null and i == walker.take_at:
+			# As the HUD's panels send A by an item in reach: applied at the next tick's start.
+			events.emit_signal("item_take_requested", bots, _item_lying_at(walker.at))
 		if i == stone_press_at and scripted > 0:
 			# As the HUD's panels send A on the lit stone: applied at the next tick's start.
 			events.emit_signal("run_requested", bots)
@@ -187,11 +242,16 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		if scripted > 0:
 			_check_stopped(start + " recorded", i)
 	replay = _frames.call("stop_recording")
-	# The sandbox's staffs take any card; Play's only its bag's.
-	if scripted > 0 and ticks > REBUILD_AT + 1 and start == &"sandbox_requested":
+	# The hub's bag holds every card; Play's only its own.
+	if scripted > 0 and ticks > REBUILD_AT + 1 and _takes_from_rack(start):
 		var wizard: Actor = _flow.call("get_wizard", bots) as Actor
 		if wizard == null or wizard.caster.cards_of(0).slice(0, REBUILT.size()) != REBUILT:
 			problems.append("%s: the rebuild did not apply in the recorded run" % start)
+	if walker != null and ticks > walker.take_at + 1:
+		var taker: Actor = _flow.call("get_wizard", bots) as Actor
+		var item := _root.get_node("Registry").call("get_resource", &"items", rack_item) as StaffItem
+		if taker == null or item == null or taker.caster.cards_of(2).slice(0, item.cards.size()) != item.cards:
+			problems.append("%s: the scripted player did not take %s onto LB" % [start, rack_item])
 	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room):
 		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room)])
 	_check_settings(start)
@@ -354,6 +414,21 @@ static func has_command(replay: Replay, command_name: StringName = &"staff_cards
 				if command[0] == command_name:
 					return true
 	return false
+
+
+## True when the first scripted player of a run started by `start` takes `rack_item` first: in the
+## hub, with no stone press.
+func _takes_from_rack(start: StringName) -> bool:
+	return start == &"hub_requested" and stone_press_at < 0 and rack_item != &""
+
+
+## The number of the item lying at `at` (the HUD knows it from `item_near_changed`), or -1.
+func _item_lying_at(at: Vector2) -> int:
+	for item: GroundItem in _root.get_node("Items").call("lying"):
+		if item.at.is_equal_approx(at):
+			return item.number
+	problems.append("no item lies at %s to take" % at)
+	return -1
 
 
 ## Whatever runs stops, and the game starts afresh (with `fresh_game`; else it goes on in the same

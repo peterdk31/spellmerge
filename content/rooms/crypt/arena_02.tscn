@@ -503,17 +503,5 @@ border_width = 2.0
 kind = &"cobweb"
 density = 0.5
 
-[node name="MossMiddle" type="ReferenceRect" parent="Cover"]
-script = ExtResource("gc_field")
-offset_left = 320.0
-offset_top = 208.0
-offset_right = 448.0
-offset_bottom = 272.0
-mouse_filter = 2
-border_color = Color(0.56, 0.68, 0.33, 1)
-border_width = 2.0
-kind = &"crypt_moss"
-density = 0.5
-
 [node name="CoverPreview" type="Node2D" parent="."]
 script = ExtResource("gc_preview")

@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## A crowd of shots on one body (the sandbox storm, 2026-11-02): a hit that repeats the last one
+## A crowd of shots on one body (the storm benchmark, 2026-11-02): a hit that repeats the last one
 ## Feel gave its flash, hold and sound (the same actor, attacker and kind, with no physics frame
 ## and no Feel step between) does not do them again; its spray and shake still come. Any of
 ## those differing, the hit is a hit of its own.

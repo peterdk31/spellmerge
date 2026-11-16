@@ -4,12 +4,14 @@ extends "res://tests/support/screenshot.gd"
 ## the delay as a shade on the button glyph (a dashed next cast during a recharge), and "+N"
 ## for a long staff.
 ##
-## The sandbox with the dev staffs and four built staffs per wizard: the dash, a three-cast
+## The hub with the dev staffs and four built staffs per wizard (tests/support/dev_hub.gd): the dash, a three-cast
 ## staff, one with a wasted card and a long one. Shots: one player just after casting (with a 3x
 ## crop of the panel), then four players, each having cast something else (with a 3x crop of
 ## each corner), and the same four corners again with the pause menu's other reload switch, the
 ## shade on the next cast (`hud_staffs_next_cast_p1-4`); and cast timing's looks by hand
 ## (`hud_staffs_cast_timing`: a wind-up, casts short of mana, a fizzle).
+
+const DevHub := preload("res://tests/support/dev_hub.gd")
 
 ## The staffs every wizard starts with: a dash; three casts; two triggers before the same
 ## carrier, the second with nothing left to fire (wasted); a long staff that does not fit the row.
@@ -36,11 +38,12 @@ func take() -> void:
 	_input = root.get_node("PlayerInput")
 	_flow = root.get_node("Flow")
 	var events: Node = root.get_node("Events")
-	_flow.set("sandbox_cards", CARDS.duplicate(true))
 	_input.call("add_virtual_device", 0)
-	events.emit_signal("sandbox_requested", 0)
-	if not await wait_for(func() -> bool: return _flow.get("sandbox") and _flow.call("get_wizard", 0) != null):
-		fail("the sandbox did not start")
+	if not DevHub.start(_flow, root.get_node("Registry"), CARDS):
+		fail("the hub did not start")
+		return
+	if not await wait_for(func() -> bool: return _flow.call("get_wizard", 0) != null):
+		fail("the hub has no wizard")
 		return
 	await settle(5)
 	await _cast_all(1)
@@ -52,9 +55,11 @@ func take() -> void:
 	await settle(3)
 	for index in range(1, 4):
 		_input.call("add_virtual_device", index)
-	events.emit_signal("sandbox_requested", 0)
+	if not DevHub.start(_flow, root.get_node("Registry"), CARDS):
+		fail("the hub did not start with four wizards")
+		return
 	if not await wait_for(func() -> bool: return _flow.call("get_wizard", 3) != null):
-		fail("the sandbox did not start with four wizards")
+		fail("the hub did not start with four wizards")
 		return
 	for index in 4:
 		Downed.of(_flow.call("get_wizard", index) as Node).protect(60.0)

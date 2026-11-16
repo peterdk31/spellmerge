@@ -20,7 +20,7 @@ const FROZEN: bool = true
 var index: int = -1
 
 
-## A short name for the arena's AI view and the tests.
+## A short name, for the tests.
 func name() -> String:
 	return "behaviour"
 

@@ -1,0 +1,27 @@
+{
+	"about": "The crypt's walls (docs/milestones/crypt-rework.md): a ragged masonry edge round a hall's floor, its face of stone courses where the camera looks at it, a rough top falling into the dark, rubble and grit fallen along its foot. No seam, glow, rock face or motes.",
+	"full_width": 14,
+	"deep": "#0b0a12",
+	"lip": {
+		"width": 2,
+		"shades": ["#2b2840", "#36334c"],
+		"rubble": {"every": 7, "sizes": [1, 3], "shades": ["#14121f", "stone.base", "stone.light"]}
+	},
+	"top": {
+		"shades": ["#1d1a2b", "stone.shadow"],
+		"joint": "#14121f",
+		"rim": "stone.base",
+		"deep": "#0b0a12",
+		"fade": [5, 20]
+	},
+	"face": {
+		"height": 22,
+		"course": 7,
+		"block": 16,
+		"shades": ["stone.base", "stone.shadow"],
+		"joint": "#221f33",
+		"light": "stone.light",
+		"cap": "#14121f",
+		"foot": ["#14121f", 4]
+	}
+}

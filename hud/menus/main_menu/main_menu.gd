@@ -1,16 +1,14 @@
 extends Control
-## The main menu: the name, the tagline, the build version and the Sandbox and Play buttons.
+## The main menu: the name, the tagline, the build version and the Play button.
 ## Play only sends the intent event `hub_requested`; the flow area hears it and takes everyone
 ## to the hub, where players join and start a run from the teleporter stone (docs/milestones/
 ## online-lobby.md, L1). The menu never calls flow and never changes the scene itself.
-## In every build a Sandbox button stands above Play (owner, 2026-11-05); it sends
-## `sandbox_requested`. In `dev` and `preview` builds it has the focus, so those builds start in
-## the sandbox with one press (staffs B7); in the others Play has it.
+## Play has the focus in every build, so one press starts the game.
 ## Below Play, "Fullscreen: Off" (or On) asks `Display` (core) to fill the screen: on the web a
 ## click or key press is what lets the browser do it (owner, 2026-10-27). F11 or Alt+Enter do the
 ## same anywhere.
 ## **Host and Join** (netcode spike S4, docs/milestones/netcode-spike.md; in every build): two
-## players on two machines play a sandbox together by swapping one code each way, by copy and
+## players on two machines play together by swapping one code each way, by copy and
 ## paste. The menu knows no network: it sends what its player asked (`online_host_requested`,
 ## `online_join_requested` with the host's code, `online_answer_requested` with the code that came
 ## back, `online_leave_requested`) and shows what `online_changed` says: this machine's code with a
@@ -30,8 +28,6 @@ const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 ## The player index sent with `hub_requested`: the menu is used by P1 (the mouse
 ## and keyboard, or the gamepad that joined first).
 const MENU_PLAYER: int = 0
-## The build channels where the Sandbox button has the focus (`BuildInfo.channel()`); it shows in all.
-const SANDBOX_FOCUS_CHANNELS: Array[String] = ["dev", "preview"]
 
 ## The user argument (`-- --four-bot`) that starts the 4-bot test, and its script.
 const FOUR_BOT_ARGUMENT: String = "--four-bot"
@@ -45,11 +41,11 @@ const STRESS_NODE: String = "StressRunner"
 const TIMING_ARGUMENT: String = "--projectile-timing"
 const TIMING_RUNNER: String = "res://tests/benchmark/projectile_timing_runner.gd"
 const TIMING_NODE: String = "ProjectileTimingRunner"
-## The sandbox storm (`--storm`, tests/benchmark/sandbox_storm_runner.gd): in the Web Test export it
+## The hub storm (`--storm`, tests/benchmark/hub_storm_runner.gd): in the Web Test export it
 ## is the storm on a real GPU in a browser (the owner's harness, tests/benchmark/README.md).
 const STORM_ARGUMENT: String = "--storm"
-const STORM_RUNNER: String = "res://tests/benchmark/sandbox_storm_runner.gd"
-const STORM_NODE: String = "SandboxStormRunner"
+const STORM_RUNNER: String = "res://tests/benchmark/hub_storm_runner.gd"
+const STORM_NODE: String = "HubStormRunner"
 ## The replay hashes (`--replay-hashes`, tests/platforms/replay_hashes_runner.gd): the same recorded
 ## runs on Linux, Windows and the web, every tick's state hash printed (online-ready N2b).
 const REPLAY_HASHES_ARGUMENT: String = "--replay-hashes"
@@ -89,14 +85,11 @@ var events: EventsScript = null
 
 ## Only tests set this: makes the node to add instead of loading the runner script.
 var runner_factory: Callable = Callable()
-## The build channel; `BuildInfo.channel()` unless a test sets it before adding the node.
-var channel: String = BuildInfo.channel()
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
 var display: Node = null
 
 @onready var _version: Label = %Version
 @onready var _play: Button = %Play
-@onready var _sandbox: Button = %Sandbox
 @onready var _fullscreen: Button = %Fullscreen
 @onready var _hint: Label = %Hint
 @onready var _host: Button = %Host
@@ -131,7 +124,6 @@ func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	_play.pressed.connect(_on_play_pressed)
-	_sandbox.pressed.connect(_on_sandbox_pressed)
 	if display == null:
 		display = get_node_or_null(^"/root/Display")
 	_fullscreen.pressed.connect(_on_fullscreen_pressed)
@@ -151,11 +143,7 @@ func _ready() -> void:
 	set_process(false)
 	if events != null:
 		events.online_changed.connect(_on_online_changed)
-	_sandbox.visible = true
-	if SANDBOX_FOCUS_CHANNELS.has(channel):
-		_sandbox.grab_focus()
-	else:
-		_play.grab_focus()
+	_play.grab_focus()
 	print("Spellmerge %s: main menu ready" % BuildInfo.describe())
 	var args: PackedStringArray = _cmdline_arguments()
 	_start_four_bot_test(args)
@@ -190,7 +178,7 @@ func _start_timing_test(args: PackedStringArray) -> bool:
 	return _start_runner(args, TIMING_ARGUMENT, TIMING_NODE)
 
 
-## The same for the sandbox storm (`--storm`).
+## The same for the hub storm (`--storm`).
 func _start_storm(args: PackedStringArray) -> bool:
 	return _start_runner(args, STORM_ARGUMENT, STORM_NODE)
 
@@ -238,7 +226,7 @@ func _runner_script(node_name: String) -> GDScript:
 				return load("res://tests/benchmark/projectile_timing_runner.gd") as GDScript
 		STORM_NODE:
 			if ResourceLoader.exists(STORM_RUNNER):
-				return load("res://tests/benchmark/sandbox_storm_runner.gd") as GDScript
+				return load("res://tests/benchmark/hub_storm_runner.gd") as GDScript
 		REPLAY_HASHES_NODE:
 			if ResourceLoader.exists(REPLAY_HASHES_RUNNER):
 				return load("res://tests/platforms/replay_hashes_runner.gd") as GDScript
@@ -262,13 +250,6 @@ func _on_play_pressed() -> void:
 		push_warning("Main menu: the Events autoload is missing, so Play does nothing.")
 		return
 	events.hub_requested.emit(MENU_PLAYER)
-
-
-func _on_sandbox_pressed() -> void:
-	if events == null:
-		push_warning("Main menu: the Events autoload is missing, so Sandbox does nothing.")
-		return
-	events.sandbox_requested.emit(MENU_PLAYER)
 
 
 func _on_host_pressed() -> void:
@@ -301,7 +282,7 @@ func _open_online() -> void:
 func _set_online_open(open: bool) -> void:
 	_online.visible = open
 	_hush_online_line(open)
-	for button: Control in [_sandbox, _play, _fullscreen, _host.get_parent() as Control, _hint]:
+	for button: Control in [_play, _fullscreen, _host.get_parent() as Control, _hint]:
 		button.visible = not open
 	if not open:
 		_fullscreen.visible = display != null

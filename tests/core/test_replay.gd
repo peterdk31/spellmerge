@@ -30,7 +30,7 @@ func _made() -> Replay:
 	replay.build = "dev 0123abcd"
 	replay.content = -42
 	replay.run_seed = 0x1234_5678_9abc
-	replay.start = &"sandbox_requested"
+	replay.start = &"hub_requested"
 	replay.starter = 2
 	replay.seats = 0b0101
 	replay.rules.shot_cap = 750
@@ -60,7 +60,7 @@ func test_a_replay_comes_back_from_its_bytes() -> void:
 	check_equal(back.build, "dev 0123abcd", "the build")
 	check_equal(back.content, -42, "the content")
 	check_equal(back.run_seed, 0x1234_5678_9abc, "the seed")
-	check_equal(back.start, &"sandbox_requested", "how it started")
+	check_equal(back.start, &"hub_requested", "how it started")
 	check_equal(back.starter, 2, "who started it")
 	check_equal(back.seats, 0b0101, "the seats")
 	check_equal(str(back.rules), str(replay.rules), "the run's rules")
@@ -102,6 +102,9 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	var before_unlocks: PackedByteArray = good.duplicate()
 	before_unlocks[4] = 8
 	cases["format 8 (before the unlocks)"] = before_unlocks
+	var before_hub_start: PackedByteArray = good.duplicate()
+	before_hub_start[4] = 10
+	cases["format 10 (its starts numbered as before crypt rework CR-S)"] = before_hub_start
 	# The unlocks end the header, before its tick count: their count, the flag's length, its text.
 	var unlocks_at: int = _made().header_bytes().size() - 4 - 8
 	var unlock_count: PackedByteArray = good.duplicate()
@@ -117,6 +120,10 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	var start: PackedByteArray = good.duplicate()
 	start[build_end + 16] = 7
 	cases["an unknown start"] = start
+	# The first start past the list (crypt rework CR-S took one out: format 11 has two).
+	var past: PackedByteArray = good.duplicate()
+	past[build_end + 16] = Replay.STARTS.size()
+	cases["a start past the list"] = past
 	var starter: PackedByteArray = good.duplicate()
 	starter[build_end + 17] = 4
 	cases["starter 4"] = starter

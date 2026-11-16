@@ -4,7 +4,7 @@ extends "res://tests/support/suite.gd"
 ## crypt arena pinned to a biome of its own (tests/support/pinned_run.gd). The game stops on the
 ## room's tick with the boss's id open, by both ways into a room, only for a boss with an intro and the
 ## run's rule on; any seat turns a page, a stale page is ignored, the last page lets the game go; it
-## stacks with the pause menu and a waited-for pad; none in the sandbox or for adds; it closes when the
+## stacks with the pause menu and a waited-for pad; none for adds; it closes when the
 ## last seat leaves and when the run ends; a staff pressed during it casts nothing as the fight starts;
 ## a snapshot mid-intro restores its page and tells it open, not fresh; a recording of it plays back
 ## the same.
@@ -277,15 +277,7 @@ func test_it_stacks_with_the_pause_menu_and_a_waited_for_pad() -> void:
 	check(not tick.sim.is_stopped(), "the game goes once the pad is back")
 
 
-func test_none_in_the_sandbox_or_for_adds() -> void:
-	flow.mode = FlowScript.MODE_SANDBOX
-	input.add_virtual_device(0)
-	events.emit_signal("sandbox_requested", 0)
-	check_equal(flow.spawn_in_sandbox(BOSS_ID, 1), 1, "the boss with an intro spawns in the sandbox")
-	await commands_applied()
-	check(not _stopped() and heard.is_empty(), "the sandbox's spawns open none")
-	flow.stop_run()
-	flow.mode = FlowScript.MODE_RUN
+func test_none_for_adds() -> void:
 	_play(1, 1, PLAIN_LAIR)
 	var plain: Actor = _boss()
 	plain.phases.begin(0)

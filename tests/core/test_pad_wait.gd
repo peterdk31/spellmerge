@@ -3,7 +3,7 @@ extends "res://tests/support/suite.gd"
 ## stops for everyone until that seat has a gamepad again, and a recording of it plays the same.
 ## Before, the input layer made the seat leave and its wizard went.
 ##
-## Two gamepads play the sandbox. Seat 1's is pulled out while it walks, seat 0's while the game
+## Two gamepads play the hub. Seat 1's is pulled out while it walks, seat 0's while the game
 ## waits for seat 1's; seat 1's comes back under its own id, and another gamepad takes seat 0 with
 ## its `join`. The run is recorded (Frames) and its replay must give the same state hash at every
 ## tick (tests/support/replay_run.gd).
@@ -48,7 +48,7 @@ func test_an_unplugged_pad_stops_the_game_and_its_replay_plays_the_same() -> voi
 	check(input.player_of(0) == 0 and input.player_of(1) == 1, "two gamepads joined")
 	await physics_frame
 	var recorded := Desync.new()
-	var replay: Replay = frames.record(&"sandbox_requested", 0, RUN_SEED)
+	var replay: Replay = frames.record(&"hub_requested", 0, RUN_SEED)
 	var stood_at: Vector2 = Vector2.INF
 	var back_at: Vector2 = Vector2.INF
 	for i in TICKS:

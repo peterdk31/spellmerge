@@ -1,6 +1,6 @@
 extends Node
 ## The same game on every platform, a first look (online-ready N2b, docs/milestones/online-ready.md):
-## a scripted sandbox fight and a run's room of two bots are recorded and played back on the real game
+## a scripted hub fight (the storm taken from its rack) and a run's room of two bots are recorded and played back on the real game
 ## (tests/support/replay_run.gd), and every tick's state hash, per area, is printed, so the runs on
 ## Linux, Windows and the web can be compared line by line. `tools/platform_hashes.py` exports the
 ## three builds, runs each and names the first tick and area that part (tools/README.md).
@@ -11,7 +11,7 @@ extends Node
 ##     build/linux-test/Spellmerge.x86_64 --headless -- --replay-hashes --ticks=600
 ##
 ## User arguments (on the web, the page's `args`):
-## - `--scenes=sandbox,room` (SCENES: the scripted sandbox fight, two bots in a run's room);
+## - `--scenes=hub,room` (SCENES: the scripted hub fight, two bots in a run's room);
 ## - `--ticks=N`, the ticks of each run (TICKS);
 ## - `--keep=SCENE:TICK`, repeatable: the played run of SCENE prints every leaf of tick TICK
 ##   (`REPLAY LEAF`), so the compare tool names the members that part;
@@ -36,10 +36,10 @@ const ReplayRun := preload("res://tests/support/replay_run.gd")
 
 ## The runs, by name: how each starts, its fighter bots and its scripted players.
 const SCENES: Dictionary = {
-	"sandbox": {"start": &"sandbox_requested", "bots": 0, "scripted": 1},
+	"hub": {"start": &"hub_requested", "bots": 0, "scripted": 1},
 	"room": {"start": &"play_requested", "bots": 2, "scripted": 0},
 }
-const DEFAULT_SCENES: PackedStringArray = ["sandbox", "room"]
+const DEFAULT_SCENES: PackedStringArray = ["hub", "room"]
 ## Ticks of each run: ten seconds of game.
 const TICKS: int = 600
 ## The run's seed on every platform (any fixed one; a random one would deal each different rolls).

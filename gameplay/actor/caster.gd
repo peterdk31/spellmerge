@@ -304,7 +304,7 @@ func max_mana_of(at: int) -> float:
 	return staff_of(at).max_mana if holds(at) else 0.0
 
 
-## Set the mana staff `at` holds, kept within 0 and its maximum (tests, a sandbox refill).
+## Set the mana staff `at` holds, kept within 0 and its maximum (tests).
 func set_mana(at: int, value: float) -> void:
 	if at >= 0 and at < _mana.size():
 		_mana[at] = clampf(value, 0.0, max_mana_of(at))

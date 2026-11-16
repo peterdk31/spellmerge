@@ -3,14 +3,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The same game on every platform (online-ready N2b and N8, docs/milestones/online-ready.md).
 
-Runs the replay hashes (tests/platforms/replay_hashes_runner.gd: a scripted sandbox fight and two
+Runs the replay hashes (tests/platforms/replay_hashes_runner.gd: a scripted hub fight and two
 bots in a run's room, recorded and played back, every tick's state hash per area
 printed) in the test exports on Linux, Windows and the web, and names the first tick and area where a
 platform parts from Linux, with both hashes of each area. When one parts, `run` plays that scene
 again on both, keeping the parting tick's leaves, and names the members that differ.
 
-  tools/platform_hashes.py run [--platforms linux,windows,web] [--ticks 600] [--scenes sandbox,room]
-  tools/platform_hashes.py play NAME --build DIR [--ticks 600] [--scenes sandbox,room] [--log FILE]
+  tools/platform_hashes.py run [--platforms linux,windows,web] [--ticks 600] [--scenes hub,room]
+  tools/platform_hashes.py play NAME --build DIR [--ticks 600] [--scenes hub,room] [--log FILE]
   tools/platform_hashes.py compare build/platforms/linux.log build/platforms/web.log ...
 
 `run` needs one `ci/build/build.sh --quick` in the checkout (the pinned Godot and the Linux native
@@ -372,7 +372,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def run_options(p: argparse.ArgumentParser) -> None:
         p.add_argument("--ticks", type=int, default=600)
-        p.add_argument("--scenes", default="sandbox,room")
+        p.add_argument("--scenes", default="hub,room")
         p.add_argument("--timeout", type=float, default=1800.0, help="seconds per run")
 
     r = sub.add_parser("run", help="export, run on each platform and compare")

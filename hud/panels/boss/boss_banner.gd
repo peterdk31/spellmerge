@@ -7,8 +7,8 @@ extends VBoxContainer
 ##
 ## A boss with an intro (`boss_shown`'s `has_intro`, docs/milestones/boss-intro.md, rule 5) has the
 ## overlay for its entrance, not the banner: it is kept back until it is released (`release`, the
-## panels' `BossIntroWait`), and shows then only when no intro played (the run's rule off, a boss the
-## sandbox spawned).
+## panels' `BossIntroWait`), and shows then only when no intro played (the run's rule off, a boss a
+## phase called).
 ##
 ##     banner.show_boss(actor, "The Old Broom", "Its lore line.", marks)
 ##     banner.step(delta)    # called every frame by the HUD

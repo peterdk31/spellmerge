@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## A live replay on the real game (netcode spike S1, docs/milestones/netcode-spike.md): a scripted
-## sandbox run (its storm, a rebuild and a pause by commands) recorded by the Frames autoload, then
+## hub run (the storm it takes from the rack, a rebuild and a pause by commands) recorded by the Frames autoload, then
 ## played from a fresh game twice: whole, as a replay file, and live, its ticks arriving as over a
 ## link with jitter and stalls (`ReplayRun.play_live`), its own player's seat this machine's and
 ## driven otherwise (those frames are sent, never played). The Tick runs no tick while the next has
@@ -42,7 +42,7 @@ static func _arrivals(ticks: int) -> PackedInt32Array:
 
 func test_a_run_played_live_agrees_with_it_played_whole() -> void:
 	var recorded := Desync.new()
-	var replay: Replay = await _run.record(&"sandbox_requested", 0, 1, recorded)
+	var replay: Replay = await _run.record(&"hub_requested", 0, 1, recorded)
 	check(replay != null and replay.tick_count() == TICKS, "recorded")
 	if replay == null:
 		return

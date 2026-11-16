@@ -1,6 +1,6 @@
 extends "res://tests/support/screenshot.gd"
 ## The staff swap's look (S6, item 9; docs/milestones/spell-spectacle-2.md): the wizard in the
-## sandbox puts its fire staff on show once for each look (no cast), and each is shown as a
+## hub puts its fire staff on show once for each look (no cast), and each is shown as a
 ## filmstrip of the frames after it (FRAMES: the swap of the body and face at 35% of 0.18 s, then
 ## what lingers), a row a look, at 1x and at 4x: the old poof (living staffs H4, drawn as its code
 ## drew it), then the cue files `staff_swap` (the live one), `staff_swap_b` and `staff_swap_c`, for
@@ -9,15 +9,17 @@ extends "res://tests/support/screenshot.gd"
 ## Two staff angles (AIMS): `staff_swap_{1x,4x}` aimed up and right, `staff_swap_upright_{1x,4x}`
 ## nearly straight up; also each row alone at 4x (`staff_swap[_upright]_<row>_4x`).
 
+const DevHub := preload("res://tests/support/dev_hub.gd")
+
 ## The frames after the press each column shows (at 60 a second).
 const FRAMES: Array[int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 28]
 const ROWS: Array[StringName] = [&"old", &"staff_swap", &"staff_swap_b", &"staff_swap_c"]
 ## Half the crop round the staff, in screen pixels.
 const HALF: Vector2i = Vector2i(26, 22)
 const GAP: int = 2
-## Where the wizard stands (an empty patch of the sandbox's floor), and the staff each look puts on
+## Where the wizard stands (an empty patch of the hub's floor), and the staff each look puts on
 ## show (the fire bolt).
-const SPOT: Vector2 = Vector2(96.0, 250.0)
+const SPOT: Vector2 = Vector2(672.0, 640.0)
 const SHOWN: int = 1
 ## The aims the sheets are taken at, and their names' endings.
 const AIMS: Array[Vector2] = [Vector2(1.0, -1.0), Vector2(0.12, -1.0)]
@@ -34,11 +36,13 @@ func take() -> void:
 	feel.set("drive_engine", false)
 	var input: Node = root.get_node("PlayerInput")
 	input.call("add_virtual_device", 0)
-	# The sandbox: no fight of its own (the arena's enemies' shots light the room), its staffs built
-	# (Flow.SANDBOX_START_CARDS: staff 1 is the fire bolt, its embers the cards' motes).
-	root.get_node("Events").emit_signal("sandbox_requested", 0)
+	# The hub, no fight of its own, its staffs built (DevHub's: staff 1 is the fire bolt, its embers
+	# the cards' motes).
+	if not DevHub.start(root.get_node("Flow"), root.get_node("Registry")):
+		fail("the hub did not start")
+		return
 	if not await wait_for(func() -> bool: return get_first_node_in_group(&"wizards") != null, 600):
-		fail("the sandbox did not start")
+		fail("the hub has no wizard")
 		return
 	var wizard: Node2D = get_first_node_in_group(&"wizards") as Node2D
 	wizard.global_position = SPOT

@@ -196,7 +196,7 @@ func test_host_and_join_walk_into_one_run_the_same_on_both_machines() -> void:
 	check_equal(_host.phases(), [NetPlayScript.MAKING, NetPlayScript.CODE, NetPlayScript.LINKING, NetPlayScript.LINKED, NetPlayScript.PLAYING] as Array[StringName], "the host's phases, each said once")
 	check_equal(_client.phases(), [NetPlayScript.MAKING, NetPlayScript.CODE, NetPlayScript.LINKED, NetPlayScript.PLAYING] as Array[StringName], "the client's")
 	check(_host.fight.frames.is_recording() and _client.fight.frames.is_live(), "the host records its run, the client plays it live")
-	check_equal((_host.play.session as NetHost).replay.start, NetPlayScript.START, "started as a sandbox")
+	check_equal((_host.play.session as NetHost).replay.start, NetPlayScript.START, "started as the hub")
 	check((_client.play.session as NetClient).stats.pings >= 2, "the client measured its ping before the run (%d pings)" % (_client.play.session as NetClient).stats.pings)
 	_steps(200)
 	check(_host.ticks >= 200 and _client.ticks >= _host.ticks - 10, "both play (%d and %d ticks)" % [_host.ticks, _client.ticks])
@@ -543,7 +543,7 @@ func test_a_machine_joins_the_room_by_its_code_and_plays_the_hosts_run() -> void
 	check_equal([_host.play.phase, _client.play.phase], [NetPlayScript.PLAYING, NetPlayScript.PLAYING], "both play")
 	check_equal(_client.phases(), [NetPlayScript.MAKING, NetPlayScript.LINKED, NetPlayScript.PLAYING] as Array[StringName], "the joining machine shows no code of its own")
 	check(_host.fight.frames.is_recording() and _client.fight.frames.is_live(), "the host records its hub, the joining machine plays it live")
-	check_equal((_host.play.session as NetHost).replay.start, NetPlayScript.ROOM_START, "begun as the hub")
+	check_equal((_host.play.session as NetHost).replay.start, NetPlayScript.START, "begun as the hub")
 	check_equal((_host.play.session as NetHost).guest_seats(), 1 << 1, "the joining machine's player has the lowest free seat")
 	check(InputManagerScript.is_virtual(_host.fight.input.device_of(1)) and _client.fight.input.is_joined(1), "a virtual device on the host, the machine's own device on it there")
 	check(_host.room != null and _host.room.problem() == null and _host.play.code == RoomHandshake.ROOM, "the room stays open under the run")
@@ -653,7 +653,7 @@ func test_the_altar_asked_again_says_the_code_again_and_closes_nothing() -> void
 
 func test_the_altar_opens_nothing_under_a_replay() -> void:
 	_seat_scripted_players()
-	var replay: Replay = _host.fight.frames.record(&"sandbox_requested", 0, 5)
+	var replay: Replay = _host.fight.frames.record(&"hub_requested", 0, 5)
 	for i in 4:
 		_host.fight.frames.tick(ContentFight.DT)
 	_host.fight.frames.stop_recording()
@@ -751,7 +751,7 @@ func test_a_machine_too_far_behind_a_run_begun_anew_is_let_go_and_the_host_knows
 			break
 		_steps(1)
 	check(host.guests.size() == 2 and host.guests[1].admitted and host.replay.tick_count() - host.guests[1].sent_ticks > NetHost.MAX_FLUSH, "the late machine is in the run, far behind it")
-	_host.fight.frames.restart(NetPlayScript.ROOM_START, 0)
+	_host.fight.frames.restart(NetPlayScript.START, 0)
 	_steps(3)
 	check_equal(host.guests.size(), 1, "the run begun anew: it is let go")
 	check_equal([_host.play.phase, _host.play.reason], [NetPlayScript.PLAYING, OnlineWhy.FELL_BEHIND], "the others play on, and the host knows why it went")
@@ -771,7 +771,7 @@ func test_the_run_begun_anew_goes_on_in_a_new_recording_on_every_machine() -> vo
 	var host: NetHost = _host.play.session as NetHost
 	var first: Replay = host.replay
 	check(first.tick_count() > 100, "three machines play the first recording")
-	_host.fight.frames.restart(NetPlayScript.ROOM_START, 0)
+	_host.fight.frames.restart(NetPlayScript.START, 0)
 	_steps(120)
 	var second: Replay = host.replay
 	check(second != first and _host.fight.frames.recorded() == second, "the host records into a new recording, and its session sends that one")

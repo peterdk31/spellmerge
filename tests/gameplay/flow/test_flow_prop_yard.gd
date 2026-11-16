@@ -140,7 +140,9 @@ func test_a_yard_prop_that_goes_stands_again() -> void:
 
 func test_a_room_without_a_yard_stands_none() -> void:
 	input.add_virtual_device(0)
-	root.get_node("Events").emit_signal("sandbox_requested", 0)
-	check_equal(flow.mode, FlowScript.MODE_SANDBOX, "the sandbox")
+	# A run of rooms: the crypt's rooms have no yard.
+	root.get_node("Events").emit_signal("play_requested", 0)
+	check(flow.mode == FlowScript.MODE_RUN and flow.world != null, "a run of rooms")
 	check(flow.yard_props().is_empty(), "no yard there")
-	check(flow.room_props().is_empty(), "and no props")
+	for body: Node in flow.room_props():
+		check((body as Actor).prop.role != &"", "only the room's own props (%s), none of the yard's" % (body as Actor).prop.id)

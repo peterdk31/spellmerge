@@ -13,6 +13,17 @@ The art rules for Spellmerge, written so a person, an agent or a script can chec
 5. **Only palette colours.** No gradients, no blur, no antialiasing, no partial transparency.
 6. Four players on screen must stay readable: bold silhouettes, and the four player colours are never mistaken for each other.
 7. **Everything looks smooth.** Nothing changes its look in one jump: a change plays the frames between ("Smooth").
+8. **Rooms go further** (the owner, 2026-11-16: "Go past it. The style-guide should be updated"): a room's ground and light may use colours outside the palette, soft light, glow and gradients, drawn per pixel as PNGs (see "Rooms"). The characters, enemies, props, spells and UI keep rules 1 to 7.
+
+## Rooms
+
+The hub (docs/milestones/hub-rework.md) and the crypt (docs/milestones/crypt-rework.md) are drawn past the rules above where it makes them look better. What a room may do, and what it still may not:
+
+- **May:** a ground drawn per pixel from a shape (`tools/ground_shape.py`: content/rooms/README.md, "A room's ground from a shape") as PNGs, not rect-only SVGs; colours and shades outside the palette in its ground, its walls' art, its void and its light (a turf, a cool quiet stone, a deep dark); soft light and glow (a torch's or a candle's pool, a shaft of light from above, an edge's glow, a pit's cold breath); gradients in the void, a beam, a wall's top falling into the dark; organic lines everywhere, never a tile's straight edge where the eye goes (the owner, 2026-11-16).
+- **May not:** blur or fade what moves (rule 7 holds: a change of look is frames of whole pixels, never an alpha pulse); use a player's colours or Blight in the world (they mean a player and the enemies' spells); outshine the fight. A room's floor is one quiet value, quieter than every shot, enemy and wizard on it ("Readability"); its dark is at its walls and in its corners, never where the fight is.
+- **Still:** the 32×32 grid for where things stand and how big they are, whole pixels, the pixel look, light from the top-left on what stands in the room (pillars, props), and the size and file rules (AGENTS.md).
+
+The tile rules below ("Floor tiles are flat", the golden floor and wall) are for tiled rooms and the tests' own stages; a room drawn from a shape follows this section.
 
 ## The 32×32 grid
 

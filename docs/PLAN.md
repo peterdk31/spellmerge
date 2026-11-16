@@ -216,7 +216,7 @@ The full rules and the starting cards are in docs/DESIGN.md and docs/milestones/
 - Each player has a corner panel in their colour. It expands toward the centre for the builder or rewards, never covers another panel, and fills the screen in single player.
 - The builder shows a player's four staffs as rows of slots and a bag of collected cards: pick a card up and place it, with a cast plan that says what each cast does, live numbers and the card's description.
 - **Full builder:** cleared rooms and the hub, no time limit.
-- **During combat:** quick actions only (place a card from the bag into an empty slot). Test builds (`dev`, `preview`) are a sandbox where the full builder is always open.
+- **During combat:** quick actions only (place a card from the bag into an empty slot). Test builds (`dev`, `preview`) are for trying builds: the full builder is always open there.
 - Gamepad first; P1 can also use keyboard and mouse, and the mouse only acts on P1's panel.
 
 ### Door rule
@@ -385,7 +385,7 @@ Every daily release ships two builds from the same code:
 | Web demo | Everything, as the full build (owner, 2026-11-05) | GitHub Pages and itch.io, playable in the browser |
 | Full build | Everything | Windows and Linux downloads on GitHub Releases and itch.io; later Steam |
 
-There is no demo flag on content (owner, 2026-11-05: the sandbox shows every card, and so does every build). If the full game ever outgrows the web budgets, the Web preset's `exclude_filter` (export_presets.cfg) can leave content out, by the owner's decision. Windows builds are unsigned at first, so Windows shows a SmartScreen warning until signing is added for Steam.
+There is no demo flag on content (owner, 2026-11-05: every build shows every card; the hub's bag holds them all). If the full game ever outgrows the web budgets, the Web preset's `exclude_filter` (export_presets.cfg) can leave content out, by the owner's decision. Windows builds are unsigned at first, so Windows shows a SmartScreen warning until signing is added for Steam.
 
 ## Planning system
 

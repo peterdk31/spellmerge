@@ -1,8 +1,10 @@
 extends "res://tests/support/screenshot.gd"
 ## Screenshots of the radial builder's ring styles (owner, 2026-10-30; hud/builder/rings/), in
-## the sandbox: the zoom ring locked on a card (its fan spread under the stick), the kinds ring
-## with Hold (resting on the modifiers, the sector filling) and the modifiers unwrapped with one
+## the hub (the dev staffs, tests/support/dev_hub.gd): the zoom ring locked on a card (its fan
+## spread under the stick), the kinds ring with Hold (resting on the modifiers, the sector filling) and the modifiers unwrapped with one
 ## picked, and with Depth (half a push pointing at the elements, then pushed out and open).
+
+const DevHub := preload("res://tests/support/dev_hub.gd")
 
 var _input: Node = null
 var _hud: Node = null
@@ -15,9 +17,11 @@ func take() -> void:
 	_hud = root.get_node("Hud")
 	var flow: Node = root.get_node("Flow")
 	_input.call("add_virtual_device", 0)
-	root.get_node("Events").emit_signal("sandbox_requested", 0)
+	if not DevHub.start(flow, root.get_node("Registry")):
+		fail("the hub did not start")
+		return
 	if not await wait_for(func() -> bool: return flow.call("get_wizard", 0) != null):
-		fail("the sandbox did not start")
+		fail("the hub has no wizard")
 		return
 	# Zoom (ring 2): held still on a modifier, then turned a little inside the fan.
 	_hud.call("_on_builder_options_changed", 2, true)

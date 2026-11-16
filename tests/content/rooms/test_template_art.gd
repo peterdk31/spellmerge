@@ -1,7 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## Every room template's look (content/rooms: every room a run's map can pick, found by folder),
 ## only what matters to play: the floor covers the room, each wall sprite draws over a collision
-## shape and each shape is drawn, and decoration never blocks anything. Which tile, torch or decal
+## shape and each shape is drawn (a ground drawn from a shape by its wall art), and decoration
+## never blocks anything. (No template is drawn from a shape until crypt rework CR3, so its
+## branches for one, a ground's wall art and its own bodies, wait for that room.) Which tile, torch or decal
 ## goes where is free to change.
 
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
@@ -60,14 +62,29 @@ func test_every_collision_shape_has_a_wall_sprite() -> void:
 			for child in pillars.get_children():
 				if child is Sprite2D:
 					drawn.append(RoomScan.sprite_rect(child as Sprite2D))
+		# A ground drawn from a shape (tools/ground_shape.py) draws its own walls: its `WallArt`,
+		# opaque over every wall cell of its `Walls` body (tools/test_ground_shape.py checks that per
+		# pixel); here, at the middle of each of its rectangles.
+		var ground_walls: Array[Rect2] = []
+		var art: Image = null
+		var ground: Node = layout.get_node_or_null("Floor/Walls")
+		if ground != null:
+			ground_walls = RoomScan.wall_rects(ground)
+			var art_sprite: Sprite2D = ground.get_node_or_null("WallArt") as Sprite2D
+			art = art_sprite.texture.get_image() if art_sprite != null else null
 		for rect in RoomScan.wall_rects(layout):
+			if ground_walls.has(rect):
+				var middle: Vector2i = Vector2i(rect.get_center())
+				check(art != null and art.get_pixelv(middle).a > 0.5, "%s: the ground's wall %s is drawn by its wall art" % [room.id, rect])
+				continue
 			check(drawn.has(rect), "%s: the wall %s is drawn" % [room.id, rect])
 
 
 func test_decoration_has_no_collision() -> void:
 	for room in templates:
 		for child in _layout(room).get_children():
-			if child.name != "Walls":
+			# The room's walls, and a ground drawn from a shape (its own walls and holes).
+			if child.name != "Walls" and not child.has_meta(&"ground_inputs"):
 				check_equal(_collision_nodes_below(child), 0, "%s: collision objects under %s" % [room.id, child.name])
 
 

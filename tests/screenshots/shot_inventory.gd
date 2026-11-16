@@ -1,9 +1,11 @@
 extends "res://tests/support/screenshot.gd"
-## Screenshots of the inventory (items I7, hud/menus/inventory/): in the sandbox, P1 with a staff in
+## Screenshots of the inventory (items I7, hud/menus/inventory/): in the hub (the dev staffs, tests/support/dev_hub.gd), P1 with a staff in
 ## the bag opens it on the ring of the four bags (inventory_bags), enters the staffs and points at
 ## the bag's staff, the hands column showing its arrows against every hand (inventory_staffs),
 ## enters the cards' kinds (inventory_kinds) and the carriers with their counts (inventory_cards);
 ## then all four players with their inventories open at once (inventory_four_players).
+
+const DevHub := preload("res://tests/support/dev_hub.gd")
 
 var _input: Node = null
 var _hud: Node = null
@@ -18,9 +20,11 @@ func take() -> void:
 	var events: Node = root.get_node("Events")
 	for index in 4:
 		_input.call("add_virtual_device", index)
-	events.emit_signal("sandbox_requested", 0)
+	if not DevHub.start(flow, root.get_node("Registry")):
+		fail("the hub did not start")
+		return
 	if not await wait_for(func() -> bool: return flow.call("get_wizard", 3) != null):
-		fail("the sandbox did not start with four wizards")
+		fail("the hub did not start with four wizards")
 		return
 	var registry: Node = root.get_node("Registry")
 	var crystal: StaffBase = registry.call("get_resource", &"wizard", &"crystal") as StaffBase

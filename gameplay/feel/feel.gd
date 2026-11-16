@@ -311,7 +311,7 @@ const POSSESS_END: StringName = &"possess_end"
 ## The cue of a boss's entrance, on its body as its banner shows (`boss_shown`, boss plan OB16). A
 ## boss with an intro has its overlay's sounds instead (`boss_intro_sound.gd`,
 ## docs/milestones/boss-intro.md, rule 8), and this cue only when no intro played for it (the run's
-## rule off, a boss the sandbox spawned: `BossIntroWait`).
+## rule off, a boss a phase called: `BossIntroWait`).
 const BOSS_INTRO: StringName = &"boss_intro"
 
 ## The services. Only tests set these, before adding the node; otherwise the
@@ -372,7 +372,7 @@ var shake_enabled: bool = true:
 ## Another hit with all of them the same (no time has passed for Feel or the game) would only do
 ## them again: the flash is restarted to the same time, the hold is refused for
 ## both bodies (each rests from the first), and the same sound would start on the next voice in the
-## same frame. So it skips them (a crowd of shots on one body: 2026-11-02, "Sandbox storm").
+## same frame. So it skips them (a crowd of shots on one body: docs/DECISIONS.md, 2026-11-02).
 var _juiced_frame: PackedInt64Array = PackedInt64Array()
 var _juiced_step: PackedInt64Array = PackedInt64Array()
 ## Feel's steps so far (`step`).

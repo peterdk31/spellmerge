@@ -146,7 +146,7 @@ func staff_fizzled(staff: int) -> void:
 
 
 ## How every row shows its staff's delay: on the button glyph (the default) or on the next cast
-## (`StaffRowScript.Style`; the pause menu's Sandbox page switches it, owner 2026-10-27).
+## (`StaffRowScript.Style`; the pause menu's Settings page switches it, owner 2026-10-27).
 func set_reload_style(style: StaffRowScript.Style) -> void:
 	for row in _rows:
 		row.style = style

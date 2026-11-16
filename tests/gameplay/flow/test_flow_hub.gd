@@ -13,8 +13,9 @@ const PinnedRun := preload("res://tests/support/pinned_run.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 const DT: float = 1.0 / 60.0
-## The items on the hub's rack: the Wild star and the five premade builds (content/items/staffs/).
-const HUB_RACK: int = 6
+## The items on the hub's rack: the Wild star and the seven premade builds (content/items/staffs/;
+## the two showcase builds of crypt rework CR-S among them).
+const HUB_RACK: int = 8
 
 var flow: FlowScript
 var input: Node
@@ -23,7 +24,6 @@ var frames: Node
 var combat: Node
 ## Every `start_stone_changed`, as (standing, wizards, lit).
 var stone: Array[Vector3i] = []
-var sandbox_flags: Array[bool] = []
 var hits: int = 0
 
 
@@ -36,16 +36,13 @@ func before_each() -> void:
 	flow.world_parent = own(Node.new()) as Node
 	root.add_child(flow.world_parent)
 	stone.clear()
-	sandbox_flags.clear()
 	hits = 0
 	events.connect("start_stone_changed", _on_stone)
-	events.connect("sandbox_changed", _on_sandbox_changed)
 	events.connect("hit_landed", _on_hit_landed)
 
 
 func after_each() -> void:
 	events.disconnect("start_stone_changed", _on_stone)
-	events.disconnect("sandbox_changed", _on_sandbox_changed)
 	events.disconnect("hit_landed", _on_hit_landed)
 	flow.run_id_to_play = FlowScript.DEFAULT_RUN_ID
 	flow.stop_run()
@@ -59,10 +56,6 @@ func after_each() -> void:
 
 func _on_stone(standing: int, wizards: int, lit: bool) -> void:
 	stone.append(Vector3i(standing, wizards, 1 if lit else 0))
-
-
-func _on_sandbox_changed(on: bool) -> void:
-	sandbox_flags.append(on)
 
 
 func _on_hit_landed(_by: int, _target: Node, _amount: float, _at: Vector2, _kind: StringName, _shot: int) -> void:
@@ -120,7 +113,6 @@ func _stop() -> void:
 	for index in 4:
 		input.leave(index)
 	stone.clear()
-	sandbox_flags.clear()
 
 
 func test_play_starts_the_hub_with_three_dummies_and_no_enemies() -> void:
@@ -134,7 +126,6 @@ func test_play_starts_the_hub_with_three_dummies_and_no_enemies() -> void:
 			ids.append((dummy.get("data") as EnemyBase).id)
 		check_equal(ids, [&"training_dummy", &"training_dummy", &"training_dummy"] as Array[StringName], "%d players: three training dummies" % count)
 		check_equal(flow.enemies_left(), 0, "%d players: no enemies" % count)
-		check_equal(sandbox_flags, [false] as Array[bool], "%d players: not the sandbox" % count)
 		check_equal(_last(), Vector3i(0, count, 0), "%d players: the stone says nobody is on it" % count)
 		check(not flow.is_stone_lit(), "%d players: the stone is dark" % count)
 		flow.stop_run()

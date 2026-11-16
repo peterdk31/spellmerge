@@ -37,6 +37,9 @@ var after_first: PackedInt32Array = PackedInt32Array()
 var after_count: PackedInt32Array = PackedInt32Array()
 var after_seconds: PackedFloat64Array = PackedFloat64Array()
 var after_to: PackedInt32Array = PackedInt32Array()
+## For each kind and state: 1 when a body standing in it is given a status (GC7: what the AI's look
+## marks, and what the area counts as harming).
+var harms_table: PackedByteArray = PackedByteArray()
 
 
 ## The tables of `kinds` (a layout's, in its order).
@@ -66,6 +69,8 @@ func _build(kinds: Array[CoverKind]) -> void:
 	after_first.resize(rows)
 	after_count.resize(rows)
 	after_count.fill(0)
+	harms_table.resize(rows)
+	harms_table.fill(0)
 	for k in kinds.size():
 		var kind: CoverKind = kinds[k]
 		for s in kind.states.size():
@@ -74,6 +79,7 @@ func _build(kinds: Array[CoverKind]) -> void:
 			after_first[row] = after_seconds.size()
 			if state == null:
 				continue
+			harms_table[row] = 1 if state.status != &"" else 0
 			for e in elements.size():
 				var then: StringName = state.on_element(elements[e])
 				var to: int = kind.state_at(then) if then != &"" else -1

@@ -1231,16 +1231,20 @@ func _joined_players() -> Array[int]:
 	return frames.joined_seats() if frames != null else [] as Array[int]
 
 
-## Tell the projectile manager where the walls are: every static body on the wall
-## layer (1) of the room. The world must be in the tree.
+## Tell the projectile manager where the walls and holes are: every static body on the wall layer
+## (`RoomBase.WALL_LAYER`) of the room, and every one on exactly the hole layer (`HOLE_LAYER`). The
+## world must be in the tree.
 func _set_walls(new_world: Node2D) -> void:
 	if projectiles == null or not new_world.is_inside_tree():
 		return
 	projectiles.clear_walls()
 	for node: Node in new_world.find_children("*", "StaticBody2D", true, false):
 		var body := node as StaticBody2D
-		if (body.collision_layer & 1) != 0:
+		if (body.collision_layer & RoomBase.WALL_LAYER) != 0:
 			projectiles.add_wall_body(body)
+		elif body.collision_layer == RoomBase.HOLE_LAYER:
+			# The room's holes (hub rework HR-H1, RoomBase.HOLE_LAYER), in their own grid.
+			projectiles.add_hole_body(body)
 
 
 func _add_camera(parent: Node2D, size: Vector2) -> void:

@@ -190,15 +190,6 @@
       "prompt": "A 32x32 tile of the empty void round the hub's floating island, repeating in both directions: a flat Outline fill with a few sparse faint specks of magic (single Stone shadow pixels, one Void shadow pixel, one tiny four-point glint of Stone shadow round a Stone base centre), none on the outer edge pixels so it repeats without a seam. It reads as nothing behind the bright island. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "art/tilesets/hub/floor.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (SVG rects written by a small generator from a character grid)",
-      "prompt": "A 32x32 floor tile for the hub's floating island, very dark: Outline fill with two staggered rows of slabs whose joints are broken lines of Stone shadow, and four lone Stone shadow specks, so the floor reads as faint slabs against the void. Repeats both ways with no seam line. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
-    },
-    {
       "path": "content/wizard/base/wizard_idle.svg",
       "origin": "ai",
       "author": "Claude",
@@ -755,6 +746,33 @@
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
       "prompt": "Style sample I (new palette): a seamless 32x32 crypt floor of four large 16x16 beveled tiles like sample F's, in a warm brown ramp (a proposed palette change, not in docs/STYLE.md) so the cool player colours stand out. Only non-overlapping rect elements."
+    },
+    {
+      "path": "art/grounds/hub/hub_ground_floor.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The hub's island floor, drawn per pixel by tools/ground_shape.py from content/rooms/hub/hub.shape.json: dark turf in soft patches flecked with Leaf (content/grounds/turf), its coast of bays and points with a seam of the elements' light in long bands, a turf lip and pebbles inside it, and seven cracks running in from the coast, their seam and lip thinning with their width (content/edges/magic); clear wherever a body may not stand."
+    },
+    {
+      "path": "art/grounds/hub/hub_ground_under.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The rock face under the hub's island, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down, deep by noise along the edge, with Outline strata and Wood roots, darker and shallower down a crack as it narrows (content/edges/magic)."
+    },
+    {
+      "path": "art/grounds/hub/hub_ground_glow.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The glow of the hub's island edge, drawn by tools/ground_shape.py at half size: every seam pixel's band colour by how wide the edge is there, blurred near and far, added over the room (content/edges/magic). Soft and partly transparent on purpose (the owner, 2026-11-16: the style guide is a starting point for the hub)."
     }
   ]
 }

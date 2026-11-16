@@ -9,6 +9,7 @@ extends "res://tests/support/suite.gd"
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
+const FlowScript := preload("res://gameplay/flow/flow.gd")
 
 var _registry: RegistryScript
 var _world: Fixture
@@ -130,3 +131,44 @@ func test_every_rooms_cover_is_sound() -> void:
 	for room in _rooms():
 		var layout: Node = own(room.build())
 		check_equal(CoverLayout.of(layout, room, kinds).problems(), PackedStringArray(), "%s: its cover is sound" % room.id)
+
+
+## A static body in `layout` on `layer` at `at`, with one rectangle `size` across from its corner.
+func _body_rect(layout: Node, layer: int, at: Vector2, size: Vector2) -> void:
+	var body := StaticBody2D.new()
+	body.collision_layer = layer
+	body.position = at
+	layout.add_child(body)
+	var shape := CollisionShape2D.new()
+	var box := RectangleShape2D.new()
+	box.size = size
+	shape.shape = box
+	shape.position = size * 0.5
+	body.add_child(shape)
+
+
+func test_a_rooms_holes_are_read_apart_from_its_walls_and_count_in_its_size() -> void:
+	# Hub rework HR-H1: a body exactly on the hole layer is a hole; one on the wall layer (even with
+	# the hole layer too) is a wall; a hole past every wall makes the room that big.
+	var layout := own(Node2D.new()) as Node2D
+	_body_rect(layout, RoomBase.WALL_LAYER, Vector2(0.0, 0.0), Vector2(640.0, 16.0))
+	_body_rect(layout, RoomBase.HOLE_LAYER, Vector2(200.0, 16.0), Vector2(32.0, 344.0))
+	_body_rect(layout, RoomBase.HOLE_LAYER, Vector2(640.0, 0.0), Vector2(160.0, 480.0))
+	_body_rect(layout, RoomBase.WALL_LAYER | RoomBase.HOLE_LAYER, Vector2(300.0, 100.0), Vector2(8.0, 8.0))
+	check_equal(RoomPlaces.hole_rects(layout), [Rect2(200.0, 16.0, 32.0, 344.0), Rect2(640.0, 0.0, 160.0, 480.0)] as Array[Rect2], "the holes, in the tree's order")
+	check_equal(RoomPlaces.wall_rects(layout), [Rect2(0.0, 0.0, 640.0, 16.0), Rect2(300.0, 100.0, 8.0, 8.0)] as Array[Rect2], "the walls, a body on both layers among them")
+	check_equal(RoomPlaces.read(layout).size, Vector2(800.0, 480.0), "the room reaches the far hole's corner")
+
+
+func test_flow_hands_a_rooms_holes_to_the_projectile_manager() -> void:
+	var world := Node2D.new()
+	_body_rect(world, RoomBase.WALL_LAYER, Vector2(0.0, 0.0), Vector2(64.0, 8.0))
+	_body_rect(world, RoomBase.HOLE_LAYER, Vector2(200.0, 0.0), Vector2(32.0, 64.0))
+	root.add_child(world)
+	var flow := own(FlowScript.new()) as FlowScript
+	flow.projectiles = _world.projectiles
+	_world.projectiles.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	flow._set_walls(world)
+	check(_world.projectiles.is_hole(Vector2(216.0, 32.0)), "the hole body is a hole")
+	check(not _world.projectiles.is_hole(Vector2(32.0, 4.0)) and not _world.projectiles.line_clear(Vector2(32.0, 20.0), Vector2(32.0, 0.0)), "the wall body is a wall")
+	world.free()

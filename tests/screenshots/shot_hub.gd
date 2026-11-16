@@ -5,7 +5,8 @@ extends "res://tests/support/screenshot.gd"
 ## Shots: one player just arrived (the stone dark, the stone line counting); the same player by the
 ## island's south-west edge, its rim of embers rising off it; the same player by the rack's row of
 ## premade builds, the Glacier Engine's hint up (content/items/staffs/); two players on the stone and two off
-## it; all four on the lit stone ("A starts the run"), the stone's cue playing.
+## it; all four on the lit stone ("A starts the run"), the stone's cue playing; the whole island from
+## above (hub rework HR2).
 
 const STEP_FRAMES := 3
 
@@ -32,7 +33,7 @@ func take() -> void:
 	await create_timer(3.0).timeout
 	await shot("hub_edge")
 	# The rack's row of premade builds, the first one in reach.
-	_place(0, Vector2(320.0, 640.0))
+	_place(0, Vector2(480.0, 796.0))
 	await settle(8)
 	await shot("hub_builds")
 	_place(0, room_spawn())
@@ -56,13 +57,35 @@ func take() -> void:
 		return
 	await settle(8)
 	await shot("hub_stone_lit")
+	# The whole island (hub rework HR2): its coast, cracks, rock face and motes, through a view of
+	# the shot's own on the same world (Feel's party camera drives only the screen's camera, and
+	# never shows more than the room at zoom 0.5), at half size.
+	var size: Vector2 = _room().places().size
+	var whole := SubViewport.new()
+	whole.size = Vector2i(size)
+	whole.world_2d = root.get_viewport().world_2d
+	whole.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	var lens := Camera2D.new()
+	lens.position = size * 0.5
+	whole.add_child(lens)
+	root.add_child(whole)
+	lens.make_current()
+	await settle(30)
+	await RenderingServer.frame_post_draw
+	var island: Image = whole.get_texture().get_image()
+	island.resize(int(size.x * 0.5), int(size.y * 0.5), Image.INTERPOLATE_BILINEAR)
+	save(island, "hub_island")
+	whole.queue_free()
 	_flow.call("stop_run")
 	await settle(STEP_FRAMES)
 
 
+func _room() -> RoomBase:
+	return root.get_node("Registry").call("get_resource", &"rooms", &"hub") as RoomBase
+
+
 func room_spawn() -> Vector2:
-	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", &"hub") as RoomBase
-	return room.places().player_spawns[0]
+	return _room().places().player_spawns[0]
 
 
 func _stone() -> Rect2:

@@ -37,6 +37,13 @@ extends ActorComponent
 ## target (`target_move_requested`) puts it there at once. While the actor is down it stands: its
 ## moves end unanswered and new requests are ignored.
 ##
+## Holes (hub rework HR-H1, docs/milestones/hub-rework.md, "Holes" 2 and 3): its own walk stops at a
+## hole's lip; its dashes and everything done to it (its other moves, a carry, Combat's push) cross
+## holes. `step` keeps the share of `velocity` that crosses (`crossing`), and the body's move slides
+## the two parts apart (`Actor.move`). A jump (a teleport, a swap, a portal's exit) crosses: it puts
+## the body there at once, and a walk from over a hole is not pushed back out of it. A teleport's
+## back-off from walls never minds holes.
+##
 ## Nothing here allocates in `step` (but the list of moves growing when full).
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -76,6 +83,11 @@ var _count: int = 0
 var _stepped: int = 0
 ## What the moves added in the last step (pixels per second), for the looks.
 var _moved: Vector2 = Vector2.ZERO
+## The share of this step's `velocity` that crosses holes (hub rework HR-H1, docs/milestones/
+## hub-rework.md, "Holes" 2 and 3): its dashes, its other moves, its carry and Combat's push, all but
+## its own walk. Set by `step`, used and emptied by the body's move (`Actor.move`), so it is zero
+## between ticks.
+var crossing: Vector2 = Vector2.ZERO
 
 
 func _init() -> void:
@@ -112,6 +124,7 @@ func step(delta: float) -> void:
 		_stepped = 0
 		_homings.fill(null)
 		_moved = Vector2.ZERO
+		crossing = Vector2.ZERO
 		actor.velocity = Vector2.ZERO
 		return
 	# The moves whose last step has been walked (the body moved after it) say where they ended.
@@ -136,19 +149,23 @@ func step(delta: float) -> void:
 		_moved += share
 		_lefts[at] -= delta
 	_stepped = _count
-	var velocity: Vector2 = _moved
 	var carry: Vector2 = _carry()
+	var walk: Vector2 = Vector2.ZERO
 	if not legs:
-		var walk: Vector2 = actor.intent.move.limit_length(1.0) * speed * pace
+		walk = actor.intent.move.limit_length(1.0) * speed * pace
 		if carry != Vector2.ZERO:
 			# It cannot walk back into what carries it, only out to the side (or on ahead).
 			var way: Vector2 = actor.spells.plow().way_of(actor.id)
 			walk -= way * minf(walk.dot(way), 0.0)
+	# Everything but its own walk crosses holes (`crossing`): its moves, its carry, Combat's push.
+	# The velocity is summed in the order it always was, so a room with no holes moves to the bit as
+	# before.
+	var knockback: Vector2 = actor.combat.own_knockback(actor, actor.id, delta) if actor.combat != null else Vector2.ZERO
+	crossing = _moved + carry + knockback
+	var velocity: Vector2 = _moved
+	if not legs:
 		velocity += walk
-	velocity += carry
-	if actor.combat != null:
-		velocity += actor.combat.own_knockback(actor, actor.id, delta)
-	actor.velocity = velocity
+	actor.velocity = velocity + carry + knockback
 
 
 ## True while a move carries the actor.
@@ -227,6 +244,7 @@ func drop() -> void:
 	_stepped = 0
 	_homings.fill(null)
 	_moved = Vector2.ZERO
+	crossing = Vector2.ZERO
 
 
 ## A card of this actor asked to move it by `move` over `seconds` (see the class doc).

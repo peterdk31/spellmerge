@@ -3,7 +3,7 @@ extends "res://tests/support/suite.gd"
 ## floating staff (`StaffLook`, with a default head) and wears a `Face`; each starter head
 ## (content/wizard/staffs/curl, star, moon, crystal) has a head sheet of 48 px frames, one column
 ## per direction and one row per ramp, with the player colour on the head only, so the four rows
-## differ; and each brings its own personality and tip. The sandbox's `dev` staff (owner,
+## differ; and each brings its own personality and tip. The `dev` staff (owner,
 ## 2026-11-01: a head of its own, the cog) has a sheet of the same shape and a tip; its face style
 ## is free, as the four starters take the four player styles. How a head looks is free to change; these
 ## checks only hold the contract the look relies on.
@@ -11,7 +11,7 @@ extends "res://tests/support/suite.gd"
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
-## Every staff with a head sheet: the starters and the sandbox's.
+## Every staff with a head sheet: the starters and the dev staff (the premade builds').
 const SHEETS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal", &"dev"]
 const OUTLINE: Color = Color("14121f")
 
@@ -96,7 +96,7 @@ func test_the_rows_differ_only_on_the_head() -> void:
 		check(_main_colour(image, 0, 0).a > 0.0, "%s: the first frame is drawn" % staff.id)
 
 
-func test_the_sandbox_staff_brings_a_tip() -> void:
+func test_the_dev_staff_brings_a_tip() -> void:
 	var dev: StaffBase = _heads([&"dev"] as Array[StringName])[0]
 	check(dev != null and dev.tip > 0.0, "dev: a tip")
 

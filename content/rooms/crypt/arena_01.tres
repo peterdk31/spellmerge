@@ -10,6 +10,3 @@ display_name = "Crypt arena"
 biome = &"crypt"
 kinds = Array[StringName]([&"fight"])
 scene = ExtResource("2_scene")
-ambient = 0.8
-floor_mark_colors = PackedColorArray(0.3412, 0.3255, 0.4784, 1, 0.2627, 0.2471, 0.3569, 1, 0.1686, 0.1569, 0.251, 1)
-debris_colors = PackedColorArray(0.4784, 0.4627, 0.5804, 1, 0.2902, 0.2745, 0.3882, 1, 0.1686, 0.1569, 0.251, 1)

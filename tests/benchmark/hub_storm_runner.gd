@@ -1,11 +1,13 @@
 extends Node
-## The sandbox storm: a showcase of how many shots the game holds, and a count of how many of them
-## land. One wizard in the real sandbox (Flow's MODE_SANDBOX: its room, its dummies and the `dev`
-## staff on every button) stands among the training dummies and casts the sandbox's Y build
-## (Flow.SANDBOX_START_CARDS[STORM_STAFF]: a fire nova split three times, 216 shots, whose every
-## shot fires a frost nova split three times when it ends) with its button held through the real
-## input path (a virtual device, as a bot holds it), so it casts whenever the staff is ready: about
-## every three seconds, the cast delay its cards add. One cast asks
+## The hub storm: a showcase of how many shots the game holds, and a count of how many of them
+## land. One wizard in the real hub (Flow's MODE_HUB: its room, its dummies and its rack) takes the
+## Frostfire Cascade from the rack (STORM_ITEM, content/items/staffs/frostfire_cascade: the `dev`
+## staff holding a fire nova split three times, 216 shots, whose every shot fires a frost nova split
+## three times when it ends; one of crypt rework CR-S's two showcase builds) as a player does (A by
+## it: the command `item_take_requested`, onto its first free hand, LB), stands among the training
+## dummies and casts it with its button held through the real input path (a virtual device, as a bot
+## holds it), so it casts whenever the staff is ready: about every three seconds, the cast delay its
+## cards add. One cast asks
 ## for about 46,000 shots, far past the projectile cap, so the cap and the trigger pacing
 ## (`SpellLimits.FIRE_SHOTS_PER_STEP`) decide what flies.
 ##
@@ -18,8 +20,9 @@ extends Node
 ##
 ## Run in a window it is the showcase: a line at the top shows the live numbers, and with `--stay`
 ## it keeps casting after the report. User arguments: `--seconds=N` (SECONDS), `--cap=N` (the projectile cap; the platform's by default), `--no-native` (the
-## projectile manager's GDScript), `--cards=a,b,c` (another build on the storm's staff, card ids: a beam build, say, whose
-## hits are not shots, so it passes with none; spell spectacle 2, S6 items 10 and 11),
+## projectile manager's GDScript), `--cards=a,b,c` (another build on the storm's staff, card ids, as
+## the builder sends it, `staff_cards_requested`, from the hub's bag of every card: a beam build, say,
+## whose hits are not shots, so it passes with none; spell spectacle 2, S6 items 10 and 11),
 ## `--stay`, `--profile` (the tree profile, tree_profile.gd: each
 ## script's time a physics step and a frame) and `--profile-signals` (with it, the time of each
 ## listener of the hot events, PROFILED_SIGNALS). It is the benchmark for drawing many shots that
@@ -31,8 +34,8 @@ extends Node
 ## "--storm --seconds=10"`; the page's `args` are read like the user arguments. Its frame time is the
 ## real one (no `--fixed-fps` there), uncapped when Chrome runs without vsync.
 ##
-## The wizard is placed among the dummies at the start and kept up (mana full, revived and
-## protected), since the shooting dummy in the other lane shoots back.
+## The wizard is placed by the rack to take the staff, then among the dummies, and kept up (mana
+## full, revived and protected).
 ##
 ## Motes (docs/milestones/spell-spectacle.md, P1c): `--motes=N` sets Feel's "Particles" cap (0
 ## turns motes off; the platform's default otherwise) and `--mote-density=X` its "Particle amount".
@@ -49,12 +52,13 @@ const TimedMotesScript := preload("res://tests/benchmark/timed_motes.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 
 const PLAYER: int = 0
-## The staff that holds the split-and-nova build (Y; Flow.SANDBOX_START_CARDS).
+## The premade staff the storm is, from the hub's rack, and the hand it is taken onto (LB: a hub
+## wizard holds RB and RT, so LB is its first free hand).
+const STORM_ITEM: StringName = &"frostfire_cascade"
 const STORM_STAFF: int = 2
 const STAFF_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
-## Where the wizard stands: in the middle of the training dummies of the sandbox's first lane
-## (its dummy spawns 0 and 2 to 5).
-const STORM_AT: Vector2 = Vector2(168.0, 150.0)
+## Where the wizard stands: in the middle of the hub's three training dummies.
+const STORM_AT: Vector2 = Vector2(416.0, 544.0)
 ## Game seconds counted.
 const SECONDS: float = 12.0
 ## The events whose listeners `--profile-signals` times: every event a shot's hit or end sends.
@@ -107,8 +111,9 @@ var _peak_shots: int = 0
 var _shot_sum: int = 0
 var _shot_samples: int = 0
 var _show_left: float = 0.0
-## Whether the storm's staff holds another build (`--cards`).
+## Whether the storm's staff holds another build (`--cards`), and which.
 var _own_cards: bool = false
+var _cards: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -149,12 +154,8 @@ func _ready() -> void:
 		if arg.begins_with("--cards="):
 			# Another build on the storm's staff (a beam or swing build: what Feel draws itself and
 			# its motes; spell spectacle 2, S6 items 10 and 11), comma separated card ids.
-			var cards: Array = []
 			for id in arg.trim_prefix("--cards=").split(",", false):
-				cards.append(StringName(id))
-			var all: Array = (_flow.get("sandbox_cards") as Array).duplicate(true)
-			all[STORM_STAFF] = cards
-			_flow.set("sandbox_cards", all)
+				_cards.append(StringName(id))
 			_own_cards = true
 	if int(_input.call("add_virtual_device", PLAYER)) == int(_input.get("NO_DEVICE")):
 		_finish(["player %d's virtual device is taken" % (PLAYER + 1)])
@@ -170,7 +171,7 @@ func _ready() -> void:
 		_label.position = Vector2(4.0, 346.0)
 		_label.add_theme_font_size_override(&"font_size", 8)
 		layer.add_child(_label)
-	_events.emit_signal("sandbox_requested", PLAYER)
+	_events.emit_signal("hub_requested", PLAYER)
 	var loading: Node = root.get_node_or_null("Loading")
 	if loading != null and bool(loading.call("is_loading")):
 		_events.connect("room_entered", _on_loaded, CONNECT_ONE_SHOT)
@@ -189,14 +190,28 @@ func _on_loaded(_room_id: StringName) -> void:
 
 
 func _start() -> void:
-	if not bool(_flow.get("sandbox")) or _flow.get("world") == null:
-		_finish(["the sandbox did not start"])
+	if _flow.get("mode") != FlowScript.MODE_HUB or _flow.get("world") == null:
+		_finish(["the hub did not start"])
 		return
 	_wizard = _flow.call("get_wizard", PLAYER) as Actor
 	if _wizard == null:
 		_finish(["player %d's wizard is missing" % (PLAYER + 1)])
 		return
 	_downed = Downed.of(_wizard)
+	# Commands apply at the next tick's start: the take, then (`--cards`) the build.
+	var item: GroundItem = _rack_item()
+	if item == null:
+		_finish(["the hub's rack has no %s" % STORM_ITEM])
+		return
+	_wizard.global_position = item.at
+	_events.emit_signal("item_take_requested", PLAYER, item.number)
+	await _ticks(2)
+	if _own_cards:
+		_events.emit_signal("staff_cards_requested", PLAYER, STORM_STAFF, _cards, _wizard.key())
+		await _ticks(2)
+	if _wizard.caster.staffs.size() <= STORM_STAFF or _wizard.caster.staffs[STORM_STAFF] == null:
+		_finish(["the wizard did not take %s onto LB" % STORM_ITEM])
+		return
 	_wizard.global_position = STORM_AT
 	for node: Node in _flow.call("dummies"):
 		var dummy := node as Actor
@@ -205,10 +220,10 @@ func _start() -> void:
 			_dummy_hits.append(0)
 			_dummy_health.append(float(_combat.call("health_of", dummy)))
 	if _dummies.is_empty():
-		_finish(["the sandbox has no dummies"])
+		_finish(["the hub has no dummies"])
 		return
-	var cards: Array = (_flow.get("sandbox_cards") as Array)[STORM_STAFF] as Array
-	print("BENCH: storm: the sandbox's %s staff on %s, held for %.0f s at %s, %d dummies, cap %d, native %s" % [
+	var cards: Array[StringName] = _wizard.caster.cards_of(STORM_STAFF)
+	print("BENCH: storm: the hub's %s staff on %s, held for %.0f s at %s, %d dummies, cap %d, native %s" % [
 		String(_wizard.caster.staffs[STORM_STAFF].id) if _wizard.caster.staffs.size() > STORM_STAFF and _wizard.caster.staffs[STORM_STAFF] != null else "?",
 		" ".join(PackedStringArray(cards)), seconds, STORM_AT, _dummies.size(),
 		int(_projectiles.call("get_cap")), "on" if bool(_projectiles.call("is_native")) else "off"])
@@ -382,6 +397,24 @@ func _report() -> void:
 ## start config (`args`) hands them over in the Web Test export (`--storm`, the main menu).
 static func _arguments() -> PackedStringArray:
 	return OS.get_cmdline_user_args() + OS.get_cmdline_args()
+
+
+## The rack's STORM_ITEM lying in the hub (null when it lies there no more).
+func _rack_item() -> GroundItem:
+	var items: Node = get_tree().root.get_node_or_null("Items")
+	var data := get_tree().root.get_node("Registry").call("get_resource", &"items", STORM_ITEM) as StaffItem
+	if items == null or data == null:
+		return null
+	for item: GroundItem in items.call("lying"):
+		if item.title == data.shown_name():
+			return item
+	return null
+
+
+## `count` of the game's ticks (physics steps) go by.
+func _ticks(count: int) -> void:
+	for i in count:
+		await get_tree().physics_frame
 
 
 ## Feel's motes (null with them off).

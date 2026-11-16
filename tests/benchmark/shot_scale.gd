@@ -79,7 +79,7 @@ const PIERCE: int = 2
 ## Bodies never die here, so every scene keeps its targets.
 const BODY_HEALTH: float = 1.0e12
 const BODY_RADIUS: float = 7.0
-## The events a shot's hit or end sends (the sandbox storm's PROFILED_SIGNALS).
+## The events a shot's hit or end sends (the hub storm's PROFILED_SIGNALS).
 const TIMED_SIGNALS: Array[StringName] = [&"projectile_hit", &"projectile_impact", &"projectile_expired", &"damage_dealt", &"hit_landed", &"status_applied", &"reaction_triggered"]
 ## The lines printed: the manager's parts (its PROF_* times, in step order), then the rest of the tick.
 const PARTS: Array[String] = ["refresh targets", "common pass", "passes before hits", "hit pass", "  in the kernel", "  hand-backs and their listeners (GDScript)", "passes after hits", "manager step", "Spells step", "Combat step", "Feel step", "spawn (the script's)", "update_draw"]

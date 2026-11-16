@@ -105,8 +105,8 @@
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (tools/pixel_grid.py from pillar.grid.json)",
-      "prompt": "The lower half of a round 2.5D crypt column (crypt rework CR3, docs/milestones/crypt-rework.md), 32x32 over its footprint: a round shaft 20 px wide, lit on the left, Stone shadow on its right third, drum joints every 11 px with a few chips, standing on a square plinth with a Stone light top row and a shaded right side. Drawn from pillar.grid.json by tools/pixel_grid.py. Palette colours from docs/STYLE.md."
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The lower half of a 2.5D crypt pillar, 32x32, drawn over its 32x32 footprint: a round shaft 22 px wide (Stone light on the left, base in the middle, Stone shadow on the right, one drum joint) standing on a 30 px wide plinth with a Stone light top edge and a Stone shadow foot, dark Outline. Its upper half is pillar_top.svg. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/tilesets/crypt/pillar_top.svg",
@@ -114,17 +114,8 @@
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
-      "tool": "Claude (tools/pixel_grid.py from pillar_top.grid.json)",
-      "prompt": "The upper half of a round 2.5D crypt column, 32x32, drawn above pillar.svg and over characters: a square abacus with a lit top, a flaring echinus, and the shaft (lit left, shadow right) with its drum joints continuing into pillar.svg. Drawn from pillar_top.grid.json by tools/pixel_grid.py. Palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "art/tilesets/crypt/pillar_stump_top.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/pixel_grid.py from pillar_stump_top.grid.json)",
-      "prompt": "The upper half of a broken crypt column, 32x32, over pillar.svg: the round shaft snapped off in a jagged line about halfway up, its broken top catching the light, clear above. Drawn from pillar_stump_top.grid.json by tools/pixel_grid.py. Palette colours from docs/STYLE.md."
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The upper half of a 2.5D crypt pillar, 32x32, drawn directly above pillar.svg and in front of characters: a lit Stone light capital top face with a few Stone base cracks, a Stone base lip with a Stone light top edge and a Stone shadow underside, a Stone shadow cast under the lip and the top of the shaft (light left, base middle, shadow right) that continues into pillar.svg. Dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/tilesets/crypt/torch.svg",
@@ -791,60 +782,6 @@
       "tier": "placeholder",
       "tool": "Claude (tools/pixel_grid.py from title.grid.json, 2026-11-16; the glyphs drawn on a 5x8 grid, doubled with Scale2x, made heavy by a one-pixel smear and worn by up to two nicks each)",
       "prompt": "The title type (docs/milestones/boss-intro.md, rule 7): an original bitmap face for boss names, every printable ASCII character on a 12x16 cell, 16 a row in six rows, heavy and a little worn, in Bone light, drawn at 2x. Imported as an image font (font_data_image)."
-    },
-    {
-      "path": "art/grounds/arena_01/arena_01_ground_floor.png",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework and extended for the crypt rework, 2026-11-16)",
-      "prompt": "The antechamber's floor, drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_01.shape.json: large irregular flagstones of a cool, quiet Stone, softly jointed with a lit upper edge, grit and dust gathering toward the walls (content/grounds/flagstone), a lip of rubble along the walls' foot and the dark foot of the north wall's face (content/edges/crypt_wall); clear wherever a body may not stand."
-    },
-    {
-      "path": "art/grounds/arena_01/arena_01_ground_wall.png",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework and extended for the crypt rework, 2026-11-16)",
-      "prompt": "The antechamber's walls, drawn per pixel by tools/ground_shape.py and tools/ground_walls.py: a masonry face of stone courses over the floor's top edges, a lit top row under a dark cap, and the walls' rough top falling into the dark away from the floor, following the hall's ragged outline (content/edges/crypt_wall)."
-    },
-    {
-      "path": "art/grounds/arena_01/arena_01_ground_under.png",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework and extended for the crypt rework, 2026-11-16)",
-      "prompt": "Empty: the antechamber has no rock face (its edge style crypt_wall has none, and it has no pit). Written by tools/ground_shape.py for every room drawn from a shape."
-    },
-    {
-      "path": "art/grounds/arena_01/arena_01_ground_glow.png",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework and extended for the crypt rework, 2026-11-16)",
-      "prompt": "Empty: the antechamber's edges have no glow (content/edges/crypt_wall). Written by tools/ground_shape.py for every room drawn from a shape."
-    },
-    {
-      "path": "art/tilesets/decor/beam.png",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (a Python script)",
-      "prompt": "A shaft of pale light falling from a crack in the vault (crypt rework, docs/milestones/crypt-rework.md): a 64x224 column, narrow at the top and wider at the floor, its light in whole steps of transparency (no smooth ramp), fading out over its last rows. Drawn additively over the room. Generated by a short script in the session that made it."
-    },
-    {
-      "path": "art/tilesets/decor/beam_pool.png",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (a Python script)",
-      "prompt": "The pool of light where the shaft meets the floor: an 80x32 oval in pale blue-white, its transparency in whole steps. Painted light (hidden while spell light draws the spot's own light). Generated by a short script in the session that made it."
     }
   ]
 }

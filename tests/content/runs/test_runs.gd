@@ -34,7 +34,7 @@ func test_the_crypt_run_has_fights_in_every_row_it_keeps() -> void:
 
 
 func test_rooms_for_no_run_host_no_kind() -> void:
-	for id: StringName in [&"hub", &"sandbox"]:
+	for id: StringName in [&"hub"]:
 		var room := _registry.get_resource(&"rooms", id) as RoomBase
 		check(room != null and room.kinds.is_empty(), "%s is offered for no run" % id)
 

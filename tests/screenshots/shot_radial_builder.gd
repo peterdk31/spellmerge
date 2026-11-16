@@ -3,11 +3,13 @@ extends "res://tests/support/screenshot.gd"
 ##
 ## Card sheets first: every real card the registry found (so a new card adds itself), pointed at
 ## in turn, its ring and hub cropped into sheets of eight (radial_cards_1, radial_cards_2, ...).
-## Then shots, in the sandbox with the radial builder picked: one player pointing at an atom (the hub
+## Then shots, in the hub (the dev staffs on every hand, tests/support/dev_hub.gd) with the radial builder picked: one player pointing at an atom (the hub
 ## shows its numbers, the marked slot its ghost, the card info panel the marked card), then after
 ## two cards were put in (P1's strip holds a staff in the bag after its four hands), the one-kind ring on the modifiers, LT held half way to a clear, and all
 ## four players with their radials open at once, every quarter laid out alike (the corner panels
 ## hidden, the HP and MP bars on top of each column).
+
+const DevHub := preload("res://tests/support/dev_hub.gd")
 
 ## A card sheet: crops of SHEET_CROP px round the ring's middle, SHEET_COLUMNS by SHEET_ROWS.
 const SHEET_CROP := 150
@@ -28,9 +30,11 @@ func take() -> void:
 	var events: Node = root.get_node("Events")
 	for index in 4:
 		_input.call("add_virtual_device", index)
-	events.emit_signal("sandbox_requested", 0)
+	if not DevHub.start(flow, root.get_node("Registry")):
+		fail("the hub did not start")
+		return
 	if not await wait_for(func() -> bool: return flow.call("get_wizard", 3) != null):
-		fail("the sandbox did not start with four wizards")
+		fail("the hub did not start with four wizards")
 		return
 	_hud.call("_on_builder_options_changed", 0, true)
 	# A staff in P1's bag (items I3), so the strip shows a bag staff's tab after the hands'.

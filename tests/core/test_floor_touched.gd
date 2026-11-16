@@ -1,9 +1,10 @@
 extends "res://tests/support/suite.gd"
 ## Where an element touches the floor (ground cover GC5, rule 5, core/spells): `floor_touched`, one
 ## event an element of the spell, in its infusions' order, where a shot ends (a hit that spends it,
-## its life; with its radius), where a blast goes off (with the blast's radius, not twice), as a pool
-## lies and on each of its ticks, and where a pulse's ring goes off; never by a shot in flight, and
-## never by a spell of no element.
+## its life; with its radius), where a blast goes off (with the blast's radius, not twice, for a shot
+## or a ring), as a pool lies, on each of its ticks and as it ends, and where a pulse's ring goes off
+## (at its widest: a returning ring where it turns home); never by a shot in flight, and never by a
+## spell of no element.
 ##
 ## godot --headless --path . --script res://tests/core/test_floor_touched.gd
 
@@ -99,3 +100,26 @@ func test_a_pulse_touches_where_its_ring_goes_off() -> void:
 	_world.run(80)
 	check_equal(_elements(), [&"fire"] as Array[StringName], "once")
 	check(float(_touched[0][3]) > 16.0, "as wide as its ring (%s)" % _touched[0][3])
+
+
+func test_a_pulse_with_a_blast_touches_once_as_its_blast() -> void:
+	_cast([&"fire", &"blast", &"pulse"])
+	_world.run(80)
+	check_equal(_elements(), [&"fire"] as Array[StringName], "once: the blast, not the ring too")
+
+
+func test_a_returning_pulse_touches_once_where_it_turns_home() -> void:
+	_cast([&"fire", &"return", &"pulse"])
+	_world.run(120)
+	check_equal(_elements(), [&"fire"] as Array[StringName], "once, where it was widest")
+	check(float(_touched[0][3]) > 16.0, "as wide as its ring then (%s)" % _touched[0][3])
+
+
+func test_a_pools_end_touches_where_it_lay() -> void:
+	_cast([&"fire", &"pool"])
+	_world.run(1)
+	var at: Vector2 = _touched[0][2]
+	_world.run(200)
+	check(_world.spells.carrier(&"pool").call(&"pool_count") == 0, "it ran out")
+	var last: Array = _touched[_touched.size() - 1]
+	check(at.distance_to(last[2]) < 1.0, "its last touch where it lay")

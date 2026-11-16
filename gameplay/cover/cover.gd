@@ -72,7 +72,8 @@ var _said: PackedByteArray = PackedByteArray()
 ## This tick's changes, sent once (`_flush`).
 var _changed_cells: PackedInt32Array = PackedInt32Array()
 var _changed_states: PackedInt32Array = PackedInt32Array()
-## Scratch: the open actor ids, the spreads rolled this step, the harmed bodies being worked out.
+## Scratch: the open actor ids, the spreads rolled this step, the harmed bodies being worked out
+## (sized for every actor once, so a step with bodies in harmful cover makes no array).
 var _ids: PackedInt32Array = PackedInt32Array()
 var _spread_cells: PackedInt32Array = PackedInt32Array()
 var _spread_elements: Array[StringName] = []
@@ -109,6 +110,9 @@ func _ready() -> void:
 	if registry == null:
 		registry = get_node_or_null(^"/root/Registry") as RegistryScript
 	_ids.resize(ActorsScript.ACTORS)
+	_next_ids.resize(ActorsScript.ACTORS)
+	_next_keys.resize(ActorsScript.ACTORS)
+	_next_left.resize(ActorsScript.ACTORS)
 	if events == null:
 		push_warning("Cover: the Events autoload is missing, so the ground cover plays nothing.")
 		return
@@ -338,11 +342,9 @@ func _enter(cell: int, to: int) -> void:
 ## Every open actor's body, in id order, standing in a cell whose state gives a status: asked it at
 ## once and again every `status_every` seconds while it stays in such cover.
 func _affect_bodies(delta: float) -> void:
-	_next_ids.resize(0)
-	_next_keys.resize(0)
-	_next_left.resize(0)
 	var count: int = actors.open_ids(_ids) if actors != null else 0
 	var old: int = 0
+	var harmed: int = 0
 	for n in count:
 		var id: int = _ids[n]
 		var body := actors.node_of(id) as Node2D
@@ -361,20 +363,18 @@ func _affect_bodies(delta: float) -> void:
 			left = maxf(state.status_every, delta)
 			if events != null:
 				events.status_requested.emit(EventsScript.NO_PLAYER, body, state.status, state.status_duration, state.status_strength)
-		_next_ids.append(id)
-		_next_keys.append(key)
-		_next_left.append(left)
-	if _harm_ids.is_empty() and _next_ids.is_empty():
-		return
-	var ids: PackedInt32Array = _harm_ids
-	_harm_ids = _next_ids
-	_next_ids = ids
-	var keys: PackedInt64Array = _harm_keys
-	_harm_keys = _next_keys
-	_next_keys = keys
-	var lefts: PackedFloat32Array = _harm_left
-	_harm_left = _next_left
-	_next_left = lefts
+		_next_ids[harmed] = id
+		_next_keys[harmed] = key
+		_next_left[harmed] = left
+		harmed += 1
+	# Written over in place: the same count resizes nothing.
+	_harm_ids.resize(harmed)
+	_harm_keys.resize(harmed)
+	_harm_left.resize(harmed)
+	for n in harmed:
+		_harm_ids[n] = _next_ids[n]
+		_harm_keys[n] = _next_keys[n]
+		_harm_left[n] = _next_left[n]
 
 
 # --- Upkeep ----------------------------------------------------------------------------

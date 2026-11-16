@@ -3113,9 +3113,10 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 	if spell.plain_hit():
 		# No siphon, possess, pull or blast: only the carrier's own part.
 		if not _blasting:
+			var ended: bool = slot >= 0 and not projectiles.is_alive(slot)
 			_carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
 			# A shot the hit spent ends here: its elements touch the floor (ground cover GC5).
-			if slot >= 0 and not projectiles.is_alive(slot):
+			if ended:
 				_touch_end(spell, actor, position)
 		return
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)

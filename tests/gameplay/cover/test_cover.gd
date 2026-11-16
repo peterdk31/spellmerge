@@ -349,3 +349,61 @@ func test_a_run_start_renews_it() -> void:
 	check_equal(_cover.rolls(), 0, "the counter from 0")
 	check(_cover.active_cells().is_empty(), "nothing active")
 	check_equal(_cover.get(&"_state"), PackedByteArray(), "empty until the next room sizes it")
+
+
+func test_a_cell_rolls_only_for_neighbours_its_element_moves_on() -> void:
+	# One cell of grass alone: its neighbours are bare floor, so it never rolls.
+	_cover.free()
+	_cover = _make_cover(7, [GRASS], _make_layout(Rect2(32.0, 32.0, 16.0, 16.0)))
+	_touch(&"fire", _middle(_cell(2, 2)))
+	_steps(30)
+	check_equal(_cover.rolls(), 0, "no roll for bare floor")
+	# Two side by side, one burning: one roll a tick for the other while it is at rest.
+	_cover.free()
+	_cover = _make_cover(7, [GRASS], _make_layout(Rect2(32.0, 32.0, 32.0, 16.0)))
+	_touch(&"fire", _middle(_cell(2, 2)))
+	_steps(1)
+	check_equal(_cover.rolls(), 1, "one roll in the tick it is lit, for its one neighbour of grass")
+	var both: bool = _cover.state_at(_cell(3, 2)) != 0
+	_steps(1)
+	check_equal(_cover.rolls(), 1 if both else 2, "a roll a tick while the neighbour would catch")
+
+
+func test_an_id_handed_out_again_is_asked_at_once() -> void:
+	var cell: int = _cell(6, 6)
+	var body: Actor = _world.actor(_middle(cell), [&"health", &"hurtbox"])
+	var id: int = body.id
+	_touch(&"fire", _middle(cell))
+	_steps(1)
+	check_equal(_cover.harmed(), PackedInt32Array([id]), "harmed")
+	# The body goes and another opens under its id the same tick, standing in the same fire.
+	_world.actors.erase(body)
+	body.free()
+	var other: Actor = _world.actor(_middle(cell), [&"health", &"hurtbox"])
+	check_equal(other.id, id, "the id handed out again")
+	_asked.clear()
+	_steps(1)
+	check_equal(_asked.size(), 1, "the new body is asked at once, not after the old one's wait")
+
+
+func test_touches_in_one_tick_apply_in_the_order_heard() -> void:
+	var cell: int = _cell(4, 4)
+	_touch(&"fire", _middle(cell))
+	_touch(&"frost", _middle(cell))
+	_steps(1)
+	check_equal(_cover.state_at(cell), 0, "lit, then put out")
+	_touch(&"frost", _middle(cell))
+	_touch(&"fire", _middle(cell))
+	_steps(1)
+	check_equal(_cover.state_at(cell), BURNING, "frost on grass does nothing, then fire lights it")
+
+
+func test_a_restore_with_less_fire_tells_the_view_back_to_rest() -> void:
+	var snapshot: Snapshot = Snapshot.take({"cover": _cover}, root)
+	var cell: int = _cell(4, 4)
+	_touch(&"fire", _middle(cell))
+	_steps(1)
+	_changes.clear()
+	check_equal(snapshot.restore({"cover": _cover}, root), PackedStringArray(), "restored to before the fire")
+	check_equal(_cover.state_at(cell), 0, "at rest")
+	check_equal(_changes, [[PackedInt32Array([cell]), PackedInt32Array([0])]], "the view told it is at rest again")

@@ -6,12 +6,15 @@ extends Carrier
 ## chilling, a mend spring keeps healing). Its hits never spend it. Homing makes it creep toward a
 ## target, as a rune does.
 ##
-## Its rows: the live pools' slots (with their birth, `seq`) and the time to each one's next tick.
+## Its rows: the live pools' slots (with their birth, `seq`), the time to each one's next tick and
+## whose it is.
 ## A row whose slot has ended, or holds another shot, is dropped at its next step.
 
 var _pl_slot: PackedInt32Array = PackedInt32Array()
 var _pl_seq: PackedInt64Array = PackedInt64Array()
 var _pl_clock: PackedFloat32Array = PackedFloat32Array()
+## The actor whose pool it is, as it was cast (its touches of the floor name it).
+var _pl_actor: PackedInt32Array = PackedInt32Array()
 
 
 func id() -> StringName:
@@ -45,6 +48,7 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directio
 		_pl_slot.append(slot)
 		_pl_seq.append(seq)
 		_pl_clock.append(SpellLimits.POOL_TICK)
+		_pl_actor.append(actor)
 		# Its elements touch the floor as it lies (ground cover GC5), and again on each tick.
 		kit.touch_floor(spell, actor, kit.projectiles.get_position_of(slot), spell.radius)
 	return made
@@ -69,17 +73,16 @@ func step(delta: float) -> void:
 		if _pl_clock[i] <= 0.0:
 			_pl_clock[i] += SpellLimits.POOL_TICK
 			kit.projectiles.forget_hits(slot)
-			_touch(slot)
+			_touch(slot, _pl_actor[i])
 		i += 1
 
 
 ## The pool in `slot` touches the floor where it lies now (it may creep) with its spell's elements,
 ## within its radius (`CarrierKit.touch_floor`).
-func _touch(slot: int) -> void:
-	var tag: int = kit.projectiles.get_tag_of(slot)
-	var spell: CompiledSpell = kit.spell_of(tag)
+func _touch(slot: int, actor: int) -> void:
+	var spell: CompiledSpell = kit.spell_of(kit.projectiles.get_tag_of(slot))
 	if spell != null:
-		kit.touch_floor(spell, SpellTag.caster_of(tag), kit.projectiles.get_position_of(slot), spell.radius)
+		kit.touch_floor(spell, actor, kit.projectiles.get_position_of(slot), spell.radius)
 
 
 ## Takes row `i` off (the last row takes its place).
@@ -88,9 +91,11 @@ func _drop(i: int) -> void:
 	_pl_slot[i] = _pl_slot[last]
 	_pl_seq[i] = _pl_seq[last]
 	_pl_clock[i] = _pl_clock[last]
+	_pl_actor[i] = _pl_actor[last]
 	_pl_slot.resize(last)
 	_pl_seq.resize(last)
 	_pl_clock.resize(last)
+	_pl_actor.resize(last)
 
 
 ## Every pool gone at once (`Spells.clear`): their shots go with the manager's.
@@ -98,6 +103,7 @@ func clear() -> void:
 	_pl_slot.resize(0)
 	_pl_seq.resize(0)
 	_pl_clock.resize(0)
+	_pl_actor.resize(0)
 
 
 ## How many pools tick, for tests.

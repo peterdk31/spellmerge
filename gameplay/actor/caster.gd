@@ -144,6 +144,10 @@ func attach() -> void:
 				for id: Variant in start_cards[at]:
 					cards.append(StringName(str(id)))
 			set_staff(at, cards)
+			# A staff it enters play with may wait before its first cast (boss plan OB14).
+			var held: StaffBase = staff_of(at)
+			if held != null and held.first_wait > 0.0 and actor.spells != null:
+				actor.spells.hold_staff(number, at, held.first_wait)
 		# The start cards are how it was made, not an edit.
 		_edited = false
 	else:
@@ -335,6 +339,13 @@ func is_winding(at: int) -> bool:
 	return has_staff(at) and actor.spells.is_winding(number, at)
 
 
+## Seconds the cast staff `at` winds up has left before it leaves (stretched by a chill, held by a
+## freeze: `hold_winds`), 0 when none winds up: what an AI's aim lock is measured against (boss plan
+## OB14).
+func wind_left(at: int) -> float:
+	return actor.spells.cooldown_left(number, at) if is_winding(at) else 0.0
+
+
 ## Every cast its driver wound up leaves no more, for free (its driver changed: `Actor.drive`); the
 ## body's own (`cast`'s `own`: a lit barrel's fuse) go on.
 func cancel_winds() -> void:
@@ -496,8 +507,9 @@ func empty_hand(at: int) -> float:
 ## Hold `new_staffs` (1-4, one per button; a null one falls back to `staff`, as in `hold_staffs`)
 ## with `new_cards` (card ids by slot, per staff) instead of the staffs it held: a boss's phase
 ## (`Phases`). Every button it is given holds its staff (none is an empty hand). Each pool starts
-## full; a button it no longer has is emptied (its sustained cards end). `staff_built` follows for
-## each.
+## full and each staff ready, with no cooldown left (boss plan OB14: so a phase's Big Sweep is its
+## first move); a button it no longer has is emptied (its sustained cards end). `staff_built`
+## follows for each.
 func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 	if new_staffs.is_empty():
 		return
@@ -516,6 +528,8 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 				cards.append(StringName(str(id)))
 		if at < staff_count:
 			set_staff(at, cards)
+			if actor.spells != null and number >= 0:
+				actor.spells.ready_staff(number, at)
 		else:
 			_cards[at] = [] as Array[StringName]
 			_install(at)

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="EnemyBase" load_steps=26 format=3]
+[gd_resource type="Resource" script_class="EnemyBase" load_steps=28 format=3]
 
 [ext_resource type="Script" path="res://core/base/enemy_base.gd" id="1_base"]
 [ext_resource type="PackedScene" path="res://content/bosses/old_broom/old_broom.tscn" id="2_scene"]
@@ -63,6 +63,24 @@ script = ExtResource("4_entry")
 staff = SubResource("Resource_swat_staff")
 cards = Array[StringName]([&"bigger", &"heavy", &"swing"])
 
+[sub_resource type="Resource" id="Resource_big_sweep_staff"]
+script = ExtResource("3_staff")
+id = &"old_broom"
+display_name = "Big Sweep"
+slots = 9
+draw = 1
+wind_up = 1.2
+cooldown = 20.0
+first_wait = 12.0
+spread = 0.0
+max_mana = 200.0
+mana_regen = 20.0
+
+[sub_resource type="Resource" id="Resource_big_sweep"]
+script = ExtResource("4_entry")
+staff = SubResource("Resource_big_sweep_staff")
+cards = Array[StringName]([&"on_wall", &"reach", &"reach", &"bigger", &"bigger", &"lumber", &"plow", &"dash", &"pulse"])
+
 [sub_resource type="Resource" id="Resource_tidying"]
 script = ExtResource("5_profile")
 name = "old broom: tidying up"
@@ -71,6 +89,8 @@ caution = 0.1
 accuracy = 0.85
 lead = 0.2
 dodge = 0.0
+aim_lock = 10.0
+turns = 0.5
 teamwork = 0.0
 
 [sub_resource type="Resource" id="Resource_double_sweep_staff"]
@@ -99,6 +119,8 @@ accuracy = 0.9
 lead = 0.3
 dodge = 0.0
 rest_scale = 0.75
+aim_lock = 0.25
+turns = 0.7
 teamwork = 0.0
 
 [sub_resource type="Resource" id="Resource_sparks"]
@@ -155,7 +177,7 @@ at = 0
 [sub_resource type="Resource" id="Resource_phase_2"]
 script = ExtResource("6_phase")
 health_below = 0.55
-staffs = Array[ExtResource("4_entry")]([SubResource("Resource_double_sweep"), SubResource("Resource_flick"), SubResource("Resource_swat")])
+staffs = Array[ExtResource("4_entry")]([SubResource("Resource_double_sweep"), SubResource("Resource_flick"), SubResource("Resource_swat"), SubResource("Resource_big_sweep")])
 profile = SubResource("Resource_spring_cleaning")
 stats = SubResource("Resource_stats_2")
 adds = Array[ExtResource("11_adds")]([SubResource("Resource_mites")])
@@ -175,7 +197,7 @@ scene = ExtResource("2_scene")
 boss = true
 stats = SubResource("Resource_stats")
 hit_color = Color(0.949, 0.761, 0.188, 1)
-staffs = Array[ExtResource("4_entry")]([SubResource("Resource_sweep"), SubResource("Resource_flick"), SubResource("Resource_swat")])
+staffs = Array[ExtResource("4_entry")]([SubResource("Resource_sweep"), SubResource("Resource_flick"), SubResource("Resource_swat"), SubResource("Resource_big_sweep")])
 profile = SubResource("Resource_tidying")
 phases = Array[ExtResource("6_phase")]([SubResource("Resource_phase_2")])
 biomes = Array[StringName]([&"crypt"])

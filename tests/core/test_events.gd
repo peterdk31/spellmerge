@@ -106,6 +106,7 @@ const EVENTS: Dictionary = {
 	&"mana_spend_requested": [["caster", TYPE_INT], ["staff", TYPE_INT], ["amount", TYPE_FLOAT]],
 	&"cast_fizzled": [["caster", TYPE_INT], ["staff", TYPE_INT]],
 	&"cast_winding": [["caster", TYPE_INT], ["staff", TYPE_INT], ["carrier_card", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tint", TYPE_COLOR], ["look", TYPE_INT], ["tag", TYPE_INT], ["cue", TYPE_STRING_NAME]],
+	&"aim_locked": [["caster", TYPE_INT], ["staff", TYPE_INT]],
 	&"cast_left": [["caster", TYPE_INT], ["staff", TYPE_INT]],
 	&"mana_reserved": [["player", TYPE_INT], ["staff", TYPE_INT], ["amount", TYPE_FLOAT]],
 	&"shot_blocked": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],

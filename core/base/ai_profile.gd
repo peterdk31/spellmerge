@@ -27,6 +27,16 @@ extends Resource
 ## never does. An aimed cast is wanted beyond its band too, more the higher it is. 0: an enemy,
 ## which stands to cast and keeps its range.
 @export_range(0.0, 1.0) var press_on: float = 0.0
+## Seconds before a cast leaves that its aim stops following its target (boss plan OB14, decision
+## 26): measured against the wind-up its cast has left (`Caster.wind_left`), so a chill or a freeze
+## that stretches the wind-up moves the lock with it. 0: it follows until the cast leaves (every
+## enemy before OB14); at least the cast's wind-up: it locks as the wind-up starts. Its lane shows
+## the lock with a beat (`aim_locked`).
+@export_range(0.0, 10.0) var aim_lock: float = 0.0
+## 0-1: how often, after an attack, it turns to the foe it last aimed at longest ago (one never
+## aimed at first; the nearest of those) and keeps that one its target until its next attack, in
+## place of the nearest (boss plan OB14: the Sweep goes round the party). 0: never.
+@export_range(0.0, 1.0) var turns: float = 0.0
 ## Degrees a second a held cast turns after its target (0: the aim stays locked).
 @export_range(0.0, 720.0) var track_speed: float = 0.0
 ## The longest it holds a cast (seconds).

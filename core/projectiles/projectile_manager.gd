@@ -1993,6 +1993,22 @@ func line_clear(from: Vector2, to: Vector2) -> bool:
 	return _wall_hit(from, to) < 0.0
 
 
+## True when no ground of a body that cannot move (`set_footprint`: a pillar's) lies on the segment
+## from `from` to `to`: where a body walking along it would not be held up by one (boss plan OB14,
+## decision 36: an AI walks round a blocking prop). Walks the whole segment.
+func ground_clear(from: Vector2, to: Vector2) -> bool:
+	return _footprints_laid == 0 or _way_hit(from, to, false) < 0.0
+
+
+## How far (pixels, at most `most`) a walk from `from` along `way` goes before the first cell of a
+## wall, a solid shot or a blocking body's ground (`most` when none), cell by cell: how long a move
+## along that line could run (boss plan OB14, an AI's run-up). ZERO `way`: 0.
+func clear_run(from: Vector2, way: Vector2, most: float) -> float:
+	if way == Vector2.ZERO or most <= 0.0:
+		return 0.0
+	var t: float = _way_hit(from, from + way.normalized() * most, true)
+	return most if t < 0.0 else t * most
+
 ## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell or
 ## the ground of a body that cannot move (checked at the centre and eight points on its rim, each
 ## in its 8-pixel cell): where a body could not stand (a teleport checks the body with it).
@@ -2144,6 +2160,50 @@ func _wall_hit(from: Vector2, to: Vector2) -> float:
 	for _n in full:
 		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
 			return t
+		if next_x < next_y:
+			t = next_x
+			next_x += per_x
+			cx += step_x
+		else:
+			t = next_y
+			next_y += per_y
+			cy += step_y
+		if t > 1.0:
+			return -1.0
+	return -1.0
+
+
+## The first cell of the ground (`set_footprint`), and with `walls` of the wall grid too, on the
+## path from `from` to `to`, as `_wall_hit` finds a wall: t in [0, 1] where the path enters it, -1
+## when there is none. Not a shot's (shots hit a blocking body, they do not stop on its ground): an
+## AI's walk (`ground_clear`, `clear_run`), so it has none of `_wall_hit`'s fast paths, and the
+## native kernels have no copy of it.
+func _way_hit(from: Vector2, to: Vector2, walls: bool) -> float:
+	if (not walls or not _has_walls) and _footprints_laid == 0:
+		return -1.0
+	var start: Vector2 = (from - _bounds.position) / WALL_CELL
+	var delta: Vector2 = (to - from) / WALL_CELL
+	var cx: int = floori(start.x)
+	var cy: int = floori(start.y)
+	var step_x: int = 1 if delta.x > 0.0 else -1
+	var step_y: int = 1 if delta.y > 0.0 else -1
+	var next_x: float = INF
+	var next_y: float = INF
+	var per_x: float = INF
+	var per_y: float = INF
+	if delta.x != 0.0:
+		per_x = absf(1.0 / delta.x)
+		next_x = (float(cx + (1 if step_x > 0 else 0)) - start.x) / delta.x
+	if delta.y != 0.0:
+		per_y = absf(1.0 / delta.y)
+		next_y = (float(cy + (1 if step_y > 0 else 0)) - start.y) / delta.y
+	var t: float = 0.0
+	var full: int = absi(floori(start.x + delta.x) - cx) + absi(floori(start.y + delta.y) - cy) + 1
+	for _n in full:
+		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h:
+			var cell: int = cy * _wall_w + cx
+			if _ground_cells[cell] != 0 or (walls and _wall_cells[cell] != 0):
+				return t
 		if next_x < next_y:
 			t = next_x
 			next_x += per_x

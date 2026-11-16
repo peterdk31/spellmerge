@@ -5,7 +5,8 @@ extends Node2D
 ## as wide as it hits, in the cast's tint: its dashes march toward the tip, its arrowhead grows and
 ## the lane brightens as the wind-up runs out (`telegraph.gdshader`). It ends the step the cast
 ## leaves or is cancelled (`Spells.is_winding`), so it always shows a cast that comes. A carrier
-## that is not aimed (a nova, an orbit) shows none.
+## that is not aimed (a nova, an orbit) shows none. When its caster's AI locks its aim (`beat`,
+## boss plan OB14) the lane flashes for BEAT_TIME, and from then on it no longer turns.
 ##
 ## It reads the runtime (`Spells`: where the caster holds its staff and aims, the carrier's reach,
 ## whether it still winds up) and keeps nothing the simulation reads. Feel owns one and steps it once
@@ -25,6 +26,8 @@ const HEIGHT: float = 32.0
 const LANE_MARGIN: float = 8.0
 ## How much lighter than the tint the lane's light shade is.
 const LIGHTER: float = 0.45
+## Seconds the beat of a lock flashes the lane (`beat`).
+const BEAT_TIME: float = 0.2
 
 ## The spell runtime (`Spells`), read only.
 var spells: Node = null
@@ -36,6 +39,8 @@ var _caster: PackedInt32Array = PackedInt32Array()
 var _staff: PackedInt32Array = PackedInt32Array()
 var _total: PackedFloat32Array = PackedFloat32Array()
 var _reach: PackedFloat32Array = PackedFloat32Array()
+## Seconds left of each lane's beat (0: none).
+var _beat: PackedFloat32Array = PackedFloat32Array()
 
 
 func _ready() -> void:
@@ -45,6 +50,7 @@ func _ready() -> void:
 	_staff.resize(MOST)
 	_total.resize(MOST)
 	_reach.resize(MOST)
+	_beat.resize(MOST)
 	for i in MOST:
 		var sprite := Sprite2D.new()
 		sprite.texture = BEAM_TEXTURE
@@ -82,6 +88,7 @@ func play(caster: int, tag: int, seconds: float, tint: Color, reach: float) -> v
 	_staff[at] = staff
 	_total[at] = seconds
 	_reach[at] = length
+	_beat[at] = 0.0
 	var sprite: Sprite2D = _sprites[at]
 	var run: float = length - START
 	sprite.offset = Vector2(START, -HEIGHT * 0.5)
@@ -92,18 +99,41 @@ func play(caster: int, tag: int, seconds: float, tint: Color, reach: float) -> v
 	material.set_shader_parameter(&"beam_length", run)
 	material.set_shader_parameter(&"telegraph_lane", float(spells.call("carrier_radius", tag)) + LANE_MARGIN * 0.5)
 	material.set_shader_parameter(&"telegraph_progress", 0.0)
+	material.set_shader_parameter(&"telegraph_beat", 0.0)
 	_place(at)
 
 
-## Once a frame: each lane follows its caster's staff tip and aim and shows how far its wind-up has
-## run; one whose cast left, or was cancelled, goes.
-func step() -> void:
+## Once a frame, `delta` real seconds on: each lane follows its caster's staff tip and aim and
+## shows how far its wind-up has run, and its beat fades; one whose cast left, or was cancelled,
+## goes.
+func step(delta: float = 0.0) -> void:
 	var i: int = 0
 	while i < count:
 		if spells == null or not bool(spells.call("is_winding", _caster[i], _staff[i])) or not _place(i):
 			_remove(i)
 			continue
+		if _beat[i] > 0.0:
+			_beat[i] = maxf(_beat[i] - delta, 0.0)
+			(_sprites[i].material as ShaderMaterial).set_shader_parameter(&"telegraph_beat", _beat[i] / BEAT_TIME)
 		i += 1
+
+
+## The aim of `caster`'s cast of staff `staff` locked (`aim_locked`): its lane flashes. Nothing
+## for a cast with no lane.
+func beat(caster: int, staff: int) -> void:
+	for i in count:
+		if _caster[i] == caster and _staff[i] == staff:
+			_beat[i] = BEAT_TIME
+			(_sprites[i].material as ShaderMaterial).set_shader_parameter(&"telegraph_beat", 1.0)
+			return
+
+
+## How much of its beat the lane of `caster` has left (0-1; 0 for none), for tests.
+func beat_of(caster: int) -> float:
+	for i in count:
+		if _caster[i] == caster:
+			return _beat[i] / BEAT_TIME
+	return 0.0
 
 
 ## How far the lane of `caster` reaches (0 for none), for tests.
@@ -151,4 +181,5 @@ func _remove(i: int) -> void:
 		_staff[i] = _staff[last]
 		_total[i] = _total[last]
 		_reach[i] = _reach[last]
+		_beat[i] = _beat[last]
 	count = last

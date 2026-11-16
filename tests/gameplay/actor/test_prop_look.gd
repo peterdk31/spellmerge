@@ -207,6 +207,11 @@ func test_a_strip_plays_once_as_its_state_is_entered_then_holds_or_loops() -> vo
 	tail.loop_from = 2
 	check_equal([tail.frame_at(0.45), tail.frame_at(0.55), tail.frame_at(0.65), tail.frame_at(0.85)], [4, 2, 3, 2], "its first two once, then 2 to 4 round")
 	check_equal([tail.rest_frame(), tail.settle_seconds()], [2, 0.2], "it rests where its loop starts")
+	var odd := PropLayer.new()
+	odd.frames = 16
+	odd.fps = 11.0
+	odd.loop_from = 15
+	check_equal(odd.frame_at(odd.settle_seconds()), 15, "a clock set to its rest is on its rest frame, whatever the rounding")
 	var data: PropBase = EXPLODING_BARREL.duplicate()
 	var look := PropStateLook.new()
 	look.state_id = &"fusing"
@@ -229,6 +234,26 @@ func test_a_strip_plays_once_as_its_state_is_entered_then_holds_or_loops() -> vo
 	_look(body).show_state(&"idle", false)
 	_look(body).show_state(&"fusing", false)
 	check_equal(sprite.frame, 1, "only shown (a snapshot's state): at rest, with no change played")
+	check(not _look(body).is_processing(), "and nothing runs")
+	# Two layers only shown: each at its own rest (a slow strip held, a quick one at its loop's start).
+	var slow := PropLayer.new()
+	slow.texture = layer.texture
+	slow.frames = 2
+	slow.fps = 2.0
+	slow.loop_from = 1
+	var quick := PropLayer.new()
+	quick.texture = layer.texture
+	quick.frames = 8
+	quick.fps = 10.0
+	quick.loop_from = 2
+	quick.drawn = PropLayer.Drawn.OVER_BODIES
+	look.layers = [slow, quick]
+	var both: Actor = _barrel(data, Vector2(300, 200))
+	_look(both).show_state(&"fusing", false)
+	var sprites: Array[Sprite2D] = []
+	sprites.append(both.get_node("Sprite") as Sprite2D)
+	sprites.append(_look(both).get_node("Layer1") as Sprite2D)
+	check_equal([sprites[0].frame, sprites[1].frame], [1, 2], "each layer at its own rest")
 	var bad := PropLayer.new()
 	bad.texture = layer.texture
 	bad.frames = 2

@@ -72,18 +72,29 @@ func test_it_lights_and_goes_dark() -> void:
 	check(body.state_triggers.enter(ExitRules.LIT), "lit")
 	check_equal(sprite.frame, 0, "opening from its dark frame")
 	check_equal(_cues.size(), 1, "its cue plays")
-	check_equal(_in_group(body, MoteSource.GROUP), 1, "its veil gives off glimmers")
-	check_equal(_in_group(body, LightSpot.GROUP), 1, "and light")
+	check_equal(_in_group(body, MoteSource.GROUP), 1, "its veil gives off glimmers (from when it is full)")
+	check_equal(_in_group(body, LightSpot.GROUP), 0, "no light while the arch is still sealed")
 	var opening: PropLayer = GATE.look_of(ExitRules.LIT).layers[0]
+	look._process(0.3)
+	check_equal(_in_group(body, LightSpot.GROUP), 0, "nor while the veil rises")
+	look._process(0.25)
+	check_equal(sprite.frame, opening.loop_from, "the veil full")
+	check_equal(_in_group(body, LightSpot.GROUP), 1, "and its light with it")
 	look._process(10.0)
 	check(sprite.frame >= opening.loop_from, "then its light ripples round (frame %d)" % sprite.frame)
 	check(look.is_processing(), "and keeps rippling")
 	check(body.state_triggers.enter(ExitRules.DARK), "dark again")
 	check_equal(sprite.frame, 0, "the light drains from full")
+	check_equal(_in_group(body, LightSpot.GROUP), 1, "its light still shining")
+	look._process(0.35)
+	check_equal(_in_group(body, LightSpot.GROUP), 0, "until the veil is mostly drained")
 	look._process(2.0)
 	check_equal(sprite.frame, sprite.hframes - 1, "down to dark")
 	check(not look.is_processing(), "and rests")
 	check_equal(_in_group(body, MoteSource.GROUP) + _in_group(body, LightSpot.GROUP), 0, "no motes, no light")
+	var shown: Actor = _world.add(PropBody.make(GATE), Vector2(300, 200))
+	(shown.get_node("PropLook") as PropLook).show_state(ExitRules.LIT, false)
+	check_equal(_in_group(shown, LightSpot.GROUP), 1, "a lit gate only shown (a snapshot's): at rest, its light shining")
 
 
 ## Opening and closing hand over (docs/STYLE.md "Smooth"): the opening starts where the closing
@@ -98,14 +109,17 @@ func test_its_changes_hand_over() -> void:
 	check(not _same(_frame(closing, 0), _frame(closing, closing.rest_frame())), "and they differ")
 
 
-## Stood on in the mouth of its arch: a box round its threshold, inside the arch's width, so a
-## wizard who walks into the light is in it.
+## Stood on in its arch: a box as wide as its mouth, from its threshold up through the arch, so a
+## wizard who walks into the light is in it; its top is the arch's, so the exits' sign (drawn over
+## an exit's area, `ExitSigns`) stands over the gate, not on its veil.
 func test_it_is_stood_on_in_its_arch() -> void:
 	var area: Rect2 = GATE.area_rect()
 	check(area.has_point(Vector2(0, -8)) and area.has_point(Vector2(0, 4)), "the threshold and just inside the arch")
-	var art: Vector2 = Vector2(GATE.look_of(ExitRules.DARK).layers[0].frame_size())
-	check(area.size.x < art.x * 0.6, "narrower than the arch's posts")
-	check(area.position.y + area.size.y <= 8.0, "never far in front of it")
+	var layer: PropLayer = GATE.look_of(ExitRules.DARK).layers[0]
+	var art := Rect2(layer.drawn_at() - Vector2(layer.frame_size()) * 0.5, Vector2(layer.frame_size()))
+	check(area.size.x < art.size.x * 0.6, "narrower than the arch's posts")
+	check(area.end.y <= 8.0, "never far in front of it")
+	check(area.position.y <= art.position.y + 8.0 and area.position.y >= art.position.y - 4.0, "its top at the arch's (%s, art from %s)" % [area.position.y, art.position.y])
 
 
 ## The exits' rules light it as they light a plate exit.

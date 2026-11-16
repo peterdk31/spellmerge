@@ -51,6 +51,10 @@ func frame_size() -> Vector2i:
 	return Vector2i(texture.get_width() / maxi(frames, 1), texture.get_height())
 
 
+## How far into a frame a clock may fall short and still be on it (float rounding).
+const FRAME_SLACK: float = 0.0001
+
+
 ## True when it plays its frames (several, and a speed).
 func is_animated() -> bool:
 	return frames > 1 and fps > 0.0
@@ -60,7 +64,8 @@ func is_animated() -> bool:
 func frame_at(seconds: float) -> int:
 	if not is_animated():
 		return 0
-	var played: int = floori(maxf(seconds, 0.0) * fps)
+	# A hair of slack, so a clock set to a frame's start (`settle_seconds`) is on that frame.
+	var played: int = floori(maxf(seconds, 0.0) * fps + FRAME_SLACK)
 	if played < frames:
 		return played
 	var start: int = clampi(loop_from, 0, frames - 1)

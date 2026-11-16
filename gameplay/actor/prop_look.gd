@@ -15,7 +15,8 @@ extends ActorLook
 ##   reading that layer's sprite (`mote_art`); Feel gives them off (gameplay/feel/source_motes.gd),
 ##   so they come and go with the state.
 ## - **its light:** a marker in the group `light_spot` (core/base/light_spot.gd) where it says, in its
-##   tint or its layer's art colour; Feel's spell light draws it.
+##   tint or its layer's art colour; Feel's spell light draws it. It shines in its window on the look's clock
+##   (`PropStateLook.light_after`, `light_until`), so it comes and goes with the art.
 ## - **its cue,** played on the bus where the body stands as its state is entered (never for the
 ##   state it starts in, nor for one a snapshot gave it back: `sync`, after which it shows the state
 ##   with no cue). Entering a state of the same look plays the cue and keeps what is shown.
@@ -35,6 +36,11 @@ var _parts: Array[Node] = []
 ## look has shown (s, its animations' clock).
 var _sprites: Array[Sprite2D] = []
 var _clock: float = 0.0
+## True when the look was only shown (not entered): each layer runs on from its own rest, and the
+## light is past its start.
+var _rested: bool = false
+## The look's light while it shines (null: not now).
+var _light: Marker2D = null
 
 
 func setup(owner_actor: Actor) -> void:
@@ -56,9 +62,9 @@ func show_state(state_id: StringName, entered: bool) -> void:
 	var look: PropStateLook = actor.prop.look_of(state_id) if actor != null and actor.prop != null else null
 	if look != shown or look == null:
 		_build(look)
-		if not entered:
-			_settle()
+		_rested = not entered
 		_show_frames()
+		set_process(_animated())
 	if entered and look != null and look.cue != &"" and actor.events != null:
 		var size: float = actor.hurtbox.outer_radius() if actor.hurtbox != null else 8.0
 		actor.events.cue_shown.emit(actor.id, look.cue, actor.global_position + actor.body_offset, Vector2.UP, size, Color.WHITE, 0)
@@ -82,8 +88,6 @@ func _build(look: PropStateLook) -> void:
 		for k in layer.motes.size():
 			if layer.motes[k] != null:
 				_add_motes(layer.motes[k], sprite, "Motes%d_%d" % [i, k])
-	if look.light_reach > 0.0:
-		_add_light(look)
 	set_process(_animated())
 
 
@@ -120,6 +124,7 @@ func _add_motes(source: MoteSource, sprite: Sprite2D, label: String) -> void:
 func _add_light(look: PropStateLook) -> void:
 	var marker := Marker2D.new()
 	marker.name = "Light"
+	_light = marker
 	marker.position = look.light_at
 	var art := NodePath()
 	if look.light_tint.a <= 0.0 and look.light_layer >= 0 and look.light_layer < _sprites.size() and _sprites[look.light_layer] != null:
@@ -144,6 +149,8 @@ func _clear() -> void:
 	_sprites.clear()
 	shown = null
 	_clock = 0.0
+	_rested = false
+	_light = null
 	var body: Sprite2D = actor.get_node_or_null(NodePath(BODY_SPRITE)) as Sprite2D if actor != null else null
 	if body != null:
 		body.texture = null
@@ -151,24 +158,22 @@ func _clear() -> void:
 		body.frame = 0
 
 
-## True while a layer still changes its frame: one that loops, or a strip played once not yet at
-## its last frame.
+## True while something still changes: a layer that loops, a strip played once not yet at its
+## last frame, or a light still to come or go.
 func _animated() -> bool:
 	if shown == null:
 		return false
 	for layer in shown.layers:
-		if layer != null and layer.is_animated() and not (layer.rest_frame() == layer.frames - 1 and _clock >= layer.settle_seconds()):
+		if layer != null and layer.is_animated() and not (layer.rest_frame() == layer.frames - 1 and _layer_clock(layer) >= layer.settle_seconds()):
 			return true
+	if shown.light_reach > 0.0 and not _rested:
+		return _clock < shown.light_after or (shown.light_until > 0.0 and _clock < shown.light_until)
 	return false
 
 
-## The look's clock moved on to where every layer rests (a look shown, not entered).
-func _settle() -> void:
-	if shown == null:
-		return
-	for layer in shown.layers:
-		if layer != null:
-			_clock = maxf(_clock, layer.settle_seconds())
+## `layer`'s own clock: the look's, from its rest when the look was only shown.
+func _layer_clock(layer: PropLayer) -> float:
+	return _clock + (layer.settle_seconds() if _rested else 0.0)
 
 
 ## The animated layers' frames, on this look's own clock.
@@ -177,18 +182,30 @@ func _process(delta: float) -> void:
 		return
 	_clock += delta
 	_show_frames()
-	# Every strip held on its last frame: nothing moves any more.
+	# Every strip held on its last frame and the light settled: nothing moves any more.
 	set_process(_animated())
 
 
-## Each animated layer's frame at the look's clock (`PropLayer.frame_at`).
+## Each animated layer's frame at its clock (`PropLayer.frame_at`), and the light in its window.
 func _show_frames() -> void:
 	if shown == null:
 		return
 	for i in _sprites.size():
 		var layer: PropLayer = shown.layers[i] if i < shown.layers.size() else null
 		if layer != null and _sprites[i] != null and layer.is_animated():
-			_sprites[i].frame = layer.frame_at(_clock)
+			_sprites[i].frame = layer.frame_at(_layer_clock(layer))
+	var shine: bool = shown.light_reach > 0.0
+	if shine and not _rested:
+		shine = _clock + PropLayer.FRAME_SLACK >= shown.light_after and (shown.light_until <= 0.0 or _clock < shown.light_until)
+	elif shine:
+		shine = shown.light_until <= 0.0
+	if shine and _light == null:
+		_add_light(shown)
+	elif not shine and _light != null:
+		_parts.erase(_light)
+		remove_child(_light)
+		_light.queue_free()
+		_light = null
 
 
 func _on_entered(state_id: StringName) -> void:

@@ -20,6 +20,11 @@ loop_from = 5
 script = ExtResource("4_look")
 state_id = &"dark"
 layers = Array[ExtResource("5_layer")]([SubResource("closing")])
+light_reach = 56.0
+light_at = Vector2(0, -20)
+light_flicker = 0.1
+light_tint = Color(0.878, 0.541, 0.847, 1)
+light_until = 0.3
 
 [sub_resource type="Resource" id="veil_glimmer"]
 script = ExtResource("6_motes")
@@ -50,6 +55,7 @@ light_reach = 56.0
 light_at = Vector2(0, -20)
 light_flicker = 0.1
 light_tint = Color(0.878, 0.541, 0.847, 1)
+light_after = 0.5
 cue = &"stone_lit"
 
 [resource]
@@ -61,7 +67,7 @@ invincible = true
 role = &"room_exit"
 radius = 16.0
 offset = Vector2(0, -24)
-area_size = Vector2(24, 24)
-area_offset = Vector2(0, -6)
+area_size = Vector2(24, 64)
+area_offset = Vector2(0, -26)
 states = ExtResource("3_states")
 looks = Array[ExtResource("4_look")]([SubResource("dark_look"), SubResource("lit_look")])

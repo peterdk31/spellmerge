@@ -52,16 +52,18 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 | `drip` | none (named by the rune's `look_motes`) | light dripping off a rune's crystal once armed: shown at the crystal's foot, it falls straight to the floor and goes | a pixel, now and then a hotter one |
 | `ward` | none (the barriers' shells, gameplay/feel/barriers.gd) | a barrier's bubble: standing still on its shell, twinkling white-hot to light; knocked off by a block, it flies out and slows, cooling | a pixel, now and then a hotter one |
 | `rim_ember` | none (named by a `MoteSource`: the hub's island edge, gameplay/feel/source_motes.gd) | given off all along a room's floor edge: rises slowly off it and drifts a little outward, swaying, white-hot at first and cooling through the source's ramps (the hub's: the elements' colours, one a mote) | a pixel with a pixel of tail below it as it rises, flickering hotter now and then (it starts at its ramp's light shade) |
+| `smoke` | none (named by burning cover's state, `content/cover/hub_grass`: ground cover GC8) | rises slowly off burning cover and sways, starting a shade down (no white heat) and cooling dark, never glowing | a 2x2 puff that thins to a pixel over its life |
 
 ## How to make something in the world give off motes
 
-The owner's rule (2026-11-09): motes are the world's magic building blocks, so almost everything gives some off. There are three ways, by what gives them off:
+The owner's rule (2026-11-09): motes are the world's magic building blocks, so almost everything gives some off. There are four ways, by what gives them off:
 
 | What gives them off | How | Where it is described |
 |---|---|---|
 | A thing that stands in the world: a room's art, a prop in one of its states | a **`MoteSource`** on a node (below) | here; `core/base/mote_source.gd` |
 | A still spell's shots (a wall, a pool, a rune) | its card's `look_motes`, a list of `CardMoteStream` | "A still card's own", above |
 | A moment (a hit, a blast, a cast) | a `motes` part of its cue | `core/base/cue_base.gd`, content/cues |
+| Ground cover in a state (burning grass's embers and smoke) | its state's `motes`, `MoteSource`s read as if each cell in that state were their node, their rate a cell's (never a mask nor a standing one) | content/cover/README.md; `gameplay/feel/cover_motes.gd` |
 
 ### A `MoteSource`
 

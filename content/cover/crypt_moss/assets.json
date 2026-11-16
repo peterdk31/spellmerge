@@ -1,0 +1,12 @@
+{
+	"assets": [
+		{
+			"path": "content/cover/crypt_moss/tufts.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tool": "Claude (tools/pixel_grid.py from tufts.grid.json, 2026-11-16)",
+			"prompt": "Four 16x16 frames side by side of a low moss cushion lying on the floor, its foot at the frame's bottom middle: three cushions at rest in Leaf shades (lit from the top-left, shadow at the bottom right), one trampled flat. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no outline (floor decoration)."
+		}
+	]
+}

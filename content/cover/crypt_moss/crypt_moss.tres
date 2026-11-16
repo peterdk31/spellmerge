@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="CoverKind" format=3]
+
+[ext_resource type="Script" path="res://core/base/cover_kind.gd" id="1_kind"]
+[ext_resource type="Script" path="res://core/base/cover_state.gd" id="2_state"]
+[ext_resource type="Texture2D" path="res://content/cover/crypt_moss/tufts.svg" id="3_sheet"]
+
+[sub_resource type="Resource" id="rest"]
+script = ExtResource("2_state")
+state_id = &"rest"
+frames = PackedInt32Array(0, 1, 2)
+sway = 0.4
+bend = 0.6
+trampled_frames = PackedInt32Array(3)
+
+[resource]
+script = ExtResource("1_kind")
+id = &"crypt_moss"
+display_name = "Moss"
+biomes = Array[StringName]([&"crypt"])
+fill_density = 0.025
+clump_size = 2
+wall_gap = 0
+keep_gap = 1
+sheet = ExtResource("3_sheet")
+tufts_per_cell = 2
+sway = 1.0
+states = Array[ExtResource("2_state")]([SubResource("rest")])

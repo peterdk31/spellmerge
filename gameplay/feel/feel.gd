@@ -693,6 +693,8 @@ func _ready() -> void:
 	_spectacle.registry = registry
 	_spectacle.particles_enabled = particles_enabled
 	add_child(_spectacle)
+	# Burning cover's embers and smoke cool through the spectacle's ramps (GC8).
+	_cover.motes.ramp_table = _spectacle.ramp_table()
 	# The floor flashes (a slam's burst and star) share the floor marks' z; at one z the later node
 	# draws on top, so they come after the spectacle, whose mark layer (made whenever the setting
 	# turns on) is inside it: a new strike shows over the marks earlier ones left.
@@ -879,7 +881,7 @@ func step(real_delta: float) -> void:
 		_step_portals()
 	_status_motes(real_delta)
 	var picture: Rect2 = party_camera.visible_rect()
-	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF)
+	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture)
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells

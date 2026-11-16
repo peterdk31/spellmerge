@@ -9,11 +9,13 @@ extends RefCounted
 ## The cells of a state with motes are kept in a packed list a state (and each cell's place in it,
 ## so a change moves it at once); a frame gives off each stream's rate times its cells, from cells
 ## picked at random, at most `MOST_A_FRAME` motes in all, and none from a cell farther than
-## `VIEW_MARGIN` from the view: a whole room burning costs what a screen of motes does. Nothing is
-## allocated once a room is laid.
+## `VIEW_MARGIN` from the view: a whole room burning costs what a screen of motes does. A frame
+## allocates nothing; a cell's change may grow its state's list (a change, not a frame).
 ##
 ## A stream that cannot be given off (a problem in its data, a mask, which needs art a cell has not,
-## or a standing source) says so once, naming its kind and state, and the others go on.
+## a standing source, or a start or a stop, which a cell that changes state has no clock for) says
+## so each time a room is laid, naming its kind and state, and the others go on. A box's `spacing`
+## snaps round the cell's middle, not the world's grid.
 ##
 ## Pure view: its dice are its own and it runs on Feel's clock; nothing here is read by the game.
 
@@ -211,4 +213,6 @@ static func stream_problems(look: MoteSource) -> PackedStringArray:
 		found.append("a cover state's motes cannot leave from a mask (a cell has no art)")
 	if look.stand:
 		found.append("a cover state's motes cannot stand")
+	if look.start > 0.0 or look.stop > 0.0:
+		found.append("a cover state's motes have no start or stop (they last while the cell is in the state)")
 	return found

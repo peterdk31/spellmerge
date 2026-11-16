@@ -54,6 +54,20 @@ func test_it_chills_whoever_stands_in_it_and_never_freezes_them() -> void:
 	check(not _kit.has_status(body, &"chill"), "out of them, the chill wears off")
 
 
+## Regression (GC8's review): walking in and out of webs asked a chill at each step in, so three
+## within a chill's time froze the walker.
+func test_walking_in_and_out_of_it_never_freezes() -> void:
+	var cell: int = _kit.cell(5, 5)
+	var body: Actor = _kit.world.actor(_kit.middle(cell), [&"health", &"hurtbox"])
+	var frozen: bool = false
+	for i in roundi(5.0 / Kit.DT):
+		body.position = _kit.middle(cell) if (i / 12) % 2 == 0 else _kit.middle(_kit.cell(18, 8)) + Vector2(16.0, 16.0)
+		_kit.steps(1)
+		frozen = frozen or _kit.has_status(body, &"freeze")
+	check(not frozen, "five seconds of 0.2 s in, 0.2 s out: never frozen")
+	check(_kit.asked.size() >= 5, "while chilled again and again (%d)" % _kit.asked.size())
+
+
 func test_fire_burns_it_away_for_good() -> void:
 	_kit.free_all()
 	_kit = Kit.new(root, _still())

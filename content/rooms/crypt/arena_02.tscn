@@ -491,12 +491,12 @@ border_width = 2.0
 kind = &"cobweb"
 density = 0.5
 
-[node name="WebsTopRight" type="ReferenceRect" parent="Cover"]
+[node name="WebsBottomRight" type="ReferenceRect" parent="Cover"]
 script = ExtResource("gc_field")
 offset_left = 672.0
-offset_top = 32.0
+offset_top = 304.0
 offset_right = 736.0
-offset_bottom = 80.0
+offset_bottom = 352.0
 mouse_filter = 2
 border_color = Color(0.56, 0.68, 0.33, 1)
 border_width = 2.0

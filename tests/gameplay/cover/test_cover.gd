@@ -263,21 +263,42 @@ func test_a_body_standing_in_burning_grass_burns_every_half_second() -> void:
 	check_equal(asked, 3, "asked at once and every half second while it burns (%d)" % asked)
 	_steps(5)
 	check_equal(_cover.state_at(cell), ASH, "ash")
-	check(_cover.harmed().is_empty(), "ash harms nobody: dropped")
+	_steps(31)
+	check(_cover.harmed().is_empty(), "ash harms nobody: dropped once its time is out")
 
 
-func test_a_body_leaving_is_dropped_and_asked_again_on_coming_back() -> void:
+func test_a_body_leaving_keeps_its_time_and_is_dropped_when_it_is_out() -> void:
 	var cell: int = _cell(6, 6)
 	var body: Actor = _world.actor(_middle(cell), [&"health", &"hurtbox"])
 	_touch(&"fire", _middle(cell))
 	_steps(1)
 	body.position = _middle(_cell(15, 1))
 	_steps(1)
-	check(_cover.harmed().is_empty(), "out of it: dropped")
+	check_equal(_cover.harmed(), PackedInt32Array([body.id]), "out of it: its time runs on")
 	body.position = _middle(cell)
 	_asked.clear()
 	_steps(1)
-	check_equal(_asked.size(), 1, "back in: asked at once")
+	check(_asked.is_empty(), "back in at once: not asked again early")
+	body.position = _middle(_cell(15, 1))
+	_steps(31)
+	check(_cover.harmed().is_empty(), "out of it for half a second: dropped")
+	body.position = _middle(cell)
+	_steps(1)
+	check_equal(_asked.size(), 1, "back in then: asked at once")
+
+
+## Regression (GC8's review): a body stepping in and out of harmful cover was dropped each time it
+## left and asked again at once each time it came back, so a short chill stacked into a freeze.
+func test_stepping_in_and_out_is_asked_no_oftener_than_standing_in_it() -> void:
+	var cell: int = _cell(6, 6)
+	var body: Actor = _world.actor(_middle(cell), [&"health", &"hurtbox"])
+	_touch(&"fire", _middle(cell))
+	_steps(1)
+	_asked.clear()
+	for i in 60:
+		body.position = _middle(cell) if i % 6 < 3 else _middle(_cell(15, 1))
+		_steps(1)
+	check(_asked.size() <= 2, "a second of stepping in and out every 0.05 s: at most two asks (%d)" % _asked.size())
 
 
 func test_a_dust_heap_standing_in_burning_grass_blows() -> void:
@@ -457,7 +478,8 @@ func test_cover_harmful_at_rest_harms_with_nothing_burning() -> void:
 	_touch(&"frost", _middle(_cell(6, 6)))
 	_steps(1)
 	check(_cover.active_cells().is_empty(), "put out: every cell at rest")
-	check(_cover.harmed().is_empty(), "and the body dropped")
+	_steps(30)
+	check(_cover.harmed().is_empty(), "and the body dropped once its time is out, though nothing harms")
 
 
 func test_only_cover_in_the_room_counts_as_harmful_at_rest() -> void:

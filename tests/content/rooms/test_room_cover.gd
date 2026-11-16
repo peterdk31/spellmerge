@@ -117,6 +117,37 @@ func test_every_crypt_room_holds_moss_and_a_few_cobwebs() -> void:
 	check(rooms >= 5, "the four arenas and the boss's arena (%d)" % rooms)
 
 
+## No cover that harms at rest (cobwebs) on a spawn's or a door's cell or the eight round it, hand-placed fields
+## too (the fill keeps its own `keep_gap`; a field keeps only the spawn's own cell bare): nobody
+## starts in a web, nor walks through one coming in.
+func test_no_harmful_cover_beside_a_spawn_or_a_door() -> void:
+	for room in _rooms():
+		var layout: CoverLayout = _cover_of(room)
+		var places: RoomPlaces = room.places()
+		var points := PackedVector2Array()
+		points.append_array(places.player_spawns)
+		points.append_array(places.enemy_spawns)
+		points.append_array(places.doors)
+		points.append_array(places.joiner_spawns)
+		for point in points:
+			var own: int = layout.cell_of(point)
+			var reach := layout.cell_rect(own).grow(float(CoverLayout.CELL)) if own >= 0 else Rect2(point, Vector2.ZERO)
+			var near := PackedStringArray()
+			for cell in layout.cells.size():
+				var kind: CoverKind = layout.kind_at(cell)
+				if kind != null and kind.states[0].status != &"" and reach.has_point(layout.cell_rect(cell).get_center()):
+					near.append(String(kind.id))
+			check_equal(near, PackedStringArray(), "%s: nothing harmful on or beside the cell of %s" % [room.id, point])
+
+
+## Every mote a cover state gives off is a mote kind there is (content/motes).
+func test_every_cover_states_motes_are_mote_kinds() -> void:
+	for kind in _kinds():
+		for state in kind.states:
+			for look: MoteSource in state.motes:
+				check(_registry.get_resource(&"motes", look.kind) != null, "%s: %s gives off '%s', a mote kind" % [kind.id, state.state_id, look.kind])
+
+
 func test_every_kinds_fill_reaches_a_room() -> void:
 	var biomes: Array[StringName] = []
 	for room in _rooms():

@@ -71,7 +71,7 @@ extends Node2D
 ## `Actors.touching`: a dust heap walked into, boss plan OB5).
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
-## health (times `stat_scale`, the room's scale), walking speed, contact damage, staff, cards and
+## health (times `stat_scale`, the room's scale, and by the players in play, `players`), walking speed, contact damage, staff, cards and
 ## mana. Data with no staff or no cards leaves the actor without a caster (an enemy that only chases).
 ##
 ## Local stop: while `Actors.hold(id, seconds)` holds it (Feel's hit-stop, which holds only the
@@ -143,6 +143,9 @@ var data: EnemyBase = null
 ## the actor is added; 1 out of a run of rooms): its data's health is multiplied by it. Its other
 ## numbers are its `stats` (boss plan OB7), which a room's scale may change later as a relic does.
 var stat_scale: float = 1.0
+## The wizards in play its health is counted for (boss plan OB13, `EnemyBase.health_per_player`): set
+## by Flow before the actor is added, and changed while it stands by `count_players`.
+var players: int = 1
 ## The prop this body was made from (`PropBody.make`, props W7; null for any other body): its look
 ## reads its art from it, and a body made again from a snapshot has it back (content, kept as
 ## itself), as an enemy has its `data`.
@@ -707,7 +710,7 @@ func _apply_data() -> void:
 	if data == null:
 		return
 	if health != null:
-		health.max_health = data.max_health * stat_scale
+		health.max_health = data.health_for(players, stat_scale)
 	if mover != null:
 		mover.speed = data.move_speed
 	if contact != null:
@@ -726,6 +729,17 @@ func _apply_data() -> void:
 		caster = null
 		return
 	caster.hold_staffs(data.staffs)
+
+
+## `count` wizards are in play now (boss plan OB13): its most health follows its data's
+## `health_per_player`, and its health keeps its share of it (`Health.rescale`).
+func count_players(count: int) -> void:
+	count = maxi(count, 1)
+	if count == players:
+		return
+	players = count
+	if data != null and health != null:
+		health.rescale(data.health_for(players, stat_scale))
 
 
 ## Make the body `factor` times its drawn size (a boss, a boss's phase): the node scales, and the

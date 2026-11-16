@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="EnemyBase" load_steps=24 format=3]
+[gd_resource type="Resource" script_class="EnemyBase" load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://core/base/enemy_base.gd" id="1_base"]
 [ext_resource type="PackedScene" path="res://content/bosses/old_broom/old_broom.tscn" id="2_scene"]
@@ -10,6 +10,7 @@
 [ext_resource type="Texture2D" path="res://content/bosses/old_broom/head_burning.svg" id="8_burning"]
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="10_motes"]
 [ext_resource type="Script" path="res://core/base/actor_stats.gd" id="9_stats"]
+[ext_resource type="Script" path="res://core/base/enemy_adds.gd" id="11_adds"]
 
 [sub_resource type="Resource" id="Resource_sweep_staff"]
 script = ExtResource("3_staff")
@@ -139,12 +140,25 @@ resist_burn = 0.3
 resist_chill = 0.6
 resist_possess = 0.7
 
+[sub_resource type="Resource" id="Resource_mites"]
+script = ExtResource("11_adds")
+enemy = &"crypt_mite"
+count = 4
+per_player = 2
+every = 10.0
+wave_count = 2
+wave_per_player = 1
+cap = 6
+cap_per_player = 2
+at = 0
+
 [sub_resource type="Resource" id="Resource_phase_2"]
 script = ExtResource("6_phase")
 health_below = 0.55
 staffs = Array[ExtResource("4_entry")]([SubResource("Resource_double_sweep"), SubResource("Resource_flick"), SubResource("Resource_swat")])
 profile = SubResource("Resource_spring_cleaning")
 stats = SubResource("Resource_stats_2")
+adds = Array[ExtResource("11_adds")]([SubResource("Resource_mites")])
 look = SubResource("Resource_burning")
 transition = 2.0
 
@@ -154,6 +168,7 @@ id = &"old_broom"
 display_name = "The Old Broom"
 lore = "The wizard's first staff, demoted to sweeping. It remembers."
 max_health = 900.0
+health_per_player = 0.7
 move_speed = 40.0
 contact_damage = 8
 scene = ExtResource("2_scene")

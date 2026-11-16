@@ -417,6 +417,8 @@ func setup() -> void:
 		events.status_requested.connect(_on_status_requested)
 	if not events.carry_ended.is_connected(_on_carry_ended):
 		events.carry_ended.connect(_on_carry_ended)
+	if not events.crumble_requested.is_connected(_on_crumble_requested):
+		events.crumble_requested.connect(_on_crumble_requested)
 	# The moments of other areas that hold bodies (online-ready N4, `hit_stop.gd`).
 	if not events.shot_blocked.is_connected(_on_shot_blocked):
 		events.shot_blocked.connect(_on_shot_blocked)
@@ -922,6 +924,42 @@ func _die(row: int, by: int, where: Vector2, team: int) -> void:
 		kit.die(by)
 	elif is_instance_valid(node) and node.is_inside_tree():
 		node.queue_free()
+
+
+## The body `target` (an actor id or its node) dies with no hit and nobody's kill (boss plan OB13: an
+## add whose caller died crumbles): its health goes to 0 and its death is told as any other
+## (`enemy_died` with NO_PLAYER for a foe of the wizards, its stop), with no hit, damage or
+## `kill_landed`; protection does not keep it. Returns true if it died. Nothing for a body that is not
+## registered, a dead one, or one something downs instead (`downable`: a wizard).
+func crumble(target: Variant) -> bool:
+	var row: int = _row_of(target)
+	if row == ActorsScript.NONE or _body[row] == BODY_NONE:
+		return false
+	var node: Node2D = _nodes[row]
+	var kit: Actor = node as Actor if _body[row] == BODY_ACTOR else null
+	if kit != null and (kit.downable or kit.is_dying() or kit.health == null or kit.health.is_depleted()):
+		return false
+	if kit == null and _health[row] <= 0.0:
+		return false
+	var team: int = _team(row)
+	var where: Vector2 = _position_of(node)
+	if kit != null:
+		kit.health.reset(0.0)
+	else:
+		_health[row] = 0.0
+	# Nobody's spell: no tag and no shot while its death is told.
+	var saved_tag: int = _tag
+	var saved_slot: int = _slot
+	_tag = 0
+	_slot = -1
+	_die(row, ActorsScript.NONE, where, team)
+	_tag = saved_tag
+	_slot = saved_slot
+	return true
+
+
+func _on_crumble_requested(actor: int) -> void:
+	crumble(actor)
 
 
 ## A heal hit: `amount` health for the row `row` from `by`'s spell. A down or dead actor is not

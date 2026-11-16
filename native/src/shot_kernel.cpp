@@ -929,17 +929,16 @@ struct HitPass {
 		if (near <= 0.0) {
 			return false;
 		}
-		const double ahead = (double)to_centre.dot(way);
 		const double within = reach + near;
-		const double end_sq = box == Vector2() ? (double)(to_centre - way).length_squared() : gap_sq(to_centre - way, box);
-		if (ahead <= 0.0 || end_sq > within * within) {
+		const double ahead = (double)to_centre.dot(way);
+		if (ahead <= 0.0 || apart_sq > within * within) {
 			return false;
 		}
 		// The square of how far the body's shape stands off the shot's line.
 		if (box == Vector2()) {
-			return apart_sq - ahead * ahead / (double)way.length_squared() <= reach * reach;
+			return apart_sq - ahead * ahead / (double)way.length_squared() <= within * within;
 		}
-		return line_gap_sq(-to_centre, way, box) <= reach * reach;
+		return line_gap_sq(-to_centre, way, box) <= within * within;
 	}
 };
 

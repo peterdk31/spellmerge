@@ -57,7 +57,7 @@ colours = Array[StringName]([&"stone"])
 [sub_resource type="Resource" id="rest"]
 script = ExtResource("2_state")
 state_id = &"rest"
-frames = PackedInt32Array(0, 1, 2)
+frames = PackedInt32Array(0, 1, 2, 8, 9, 10)
 trampled_frames = PackedInt32Array(6, 7)
 triggers = Array[ExtResource("3_trigger")]([SubResource("rest_fire")])
 

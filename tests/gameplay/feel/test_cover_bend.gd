@@ -1,10 +1,11 @@
 extends "res://tests/support/suite.gd"
 ## Bodies bend ground cover and trample it (ground cover GC4, docs/milestones/ground-cover.md, rule 6
 ## and decision 4): Feel's look only. Each frame the cover takes the actor table's bodies, keeps the
-## `BODIES` nearest the camera's middle and hands them to every batch's shader; the cells they stand
-## in, covered ones only, are walked in Feel's view grid (the shader's `trampled` texture), flat while
-## walked and a while after, then springing back; a state's trampled frames ride in its rows' colour;
-## and a frame of it allocates nothing (in the style of the motes' tests).
+## `BODIES` nearest the camera's middle and hands them to every batch's shader; the cells under their
+## `FOOTPRINT` (theirs and the row in front), covered ones only, are walked in Feel's view grid (the
+## shader's `cell_times` texture, its red), flat while walked and their kind's hold after, then
+## springing back; a state's trampled frames ride in its rows' colour; and a frame of it allocates
+## nothing (in the style of the motes' tests).
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -12,6 +13,12 @@ var fixture_grass: CoverKind = preload("res://tests/core/fixtures/cover_content/
 
 ## The field of grass every test lays: cells (12, 12) to (15, 15) of a room 640×384.
 const FIELD := Rect2(192, 192, 64, 64)
+
+
+## The test grass's trample, its own numbers (not `CoverKind`'s defaults), so the cover is seen to
+## read its kind's.
+const HOLD: float = 2.0
+const SPRING: float = 3.0
 
 
 ## A sheet of `frames` 16×16 frames.
@@ -27,6 +34,8 @@ func _grass() -> CoverKind:
 	kind.biomes = [] as Array[StringName]
 	kind.sheet = _sheet(7)
 	kind.states[0].trampled_frames = PackedInt32Array([6])
+	kind.trample_hold = HOLD
+	kind.trample_spring = SPRING
 	return kind
 
 
@@ -98,7 +107,8 @@ func test_the_bodies_nearest_the_camera_are_handed_to_every_batch() -> void:
 	var held: PackedVector2Array = material.get_shader_parameter(&"bodies")
 	check_equal(held, given, "and where they are")
 	check_equal(material.get_shader_parameter(&"bend_reach"), CoverScript.BEND_REACH, "the bend's numbers are Feel's")
-	check_equal(material.get_shader_parameter(&"trample_hold"), CoverScript.TRAMPLE_HOLD, "and the trample's")
+	check_equal(material.get_shader_parameter(&"trample_hold"), HOLD, "the trample's are its kind's")
+	check_equal(material.get_shader_parameter(&"trample_spring"), SPRING, "both")
 
 
 func test_with_no_camera_the_first_bodies_bend_it_and_none_without_a_table() -> void:
@@ -122,12 +132,16 @@ func test_a_body_walks_the_covered_cell_it_stands_in() -> void:
 	cover.step(5.0, table, Vector2.ZERO)
 	check_equal(cover.walked_at(cell), 5.0, "the covered cell a body stands in is walked at Feel's clock")
 	check_equal(cover.walked_at(bare_cell), CoverScript.NEVER, "a cell with no cover is not")
+	check_equal(cover.walked_at(cover.layout.cell_of(inside + Vector2(0, 10))), 5.0, "nor only that one: its feet reach the row in front, whose tufts would stand over a one-cell trail (GC9)")
+	check_equal(cover.walked_at(cover.layout.cell_of(inside + Vector2(0, 26))), CoverScript.NEVER, "but no farther")
+	check_equal(cover.walked_at(cover.layout.cell_of(inside + Vector2(16, 0))), CoverScript.NEVER, "nor a cell beside it its feet miss")
 	check_equal(cover.flatness(cell, 5.0), 1.0, "flat while walked")
-	check_equal(cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD), 1.0, "and a while after")
-	var half: float = cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD + CoverScript.TRAMPLE_SPRING * 0.5)
-	check(is_equal_approx(half, 0.5), "springing back, got %f" % half)
-	check(cover.flatness(cell, 5.0 + CoverScript.TRAMPLE_HOLD + CoverScript.TRAMPLE_SPRING + 0.01) == 0.0, "and up again")
-	var texture := (cover.batch_of(&"test_grass").material as ShaderMaterial).get_shader_parameter(&"trampled") as Texture2D
+	check_equal(cover.flatness(cell, 5.0 + HOLD), 1.0, "and its kind's hold after")
+	var half: float = cover.flatness(cell, 5.0 + HOLD + SPRING * 0.5)
+	check(is_equal_approx(half, 0.5), "springing back over its kind's spring, got %f" % half)
+	check(cover.flatness(cell, 5.0 + HOLD + SPRING + 0.01) == 0.0, "and up again")
+	check_equal(cover.flatness(bare_cell, 5.0), 0.0, "a cell of no cover is never flat")
+	var texture := (cover.batch_of(&"test_grass").material as ShaderMaterial).get_shader_parameter(&"cell_times") as Texture2D
 	check(texture != null and texture.get_size() == Vector2(cover.layout.columns, cover.layout.rows), "the shader reads the grid, a texel a cell")
 	(table.node_of(0) as Node2D).global_position = Vector2(40, 200)
 	cover.step(6.0, table, Vector2.ZERO)
@@ -162,13 +176,17 @@ func test_a_frame_allocates_nothing() -> void:
 	var table: ActorsScript = _table(places)
 	cover.step(0.0, table, Vector2(220, 220))
 	cover.step(0.016, table, Vector2(220, 220))
+	var cell: int = cover.layout.cell_of(Vector2(200, 200))
+	cover.show_state(cell, 1)
+	cover.show_state(cell, 0)
 	var objects: float = Performance.get_monitor(Performance.OBJECT_COUNT)
 	for frame in 200:
 		for id in 48:
 			var body := table.node_of(id) as Node2D
 			body.global_position += Vector2(0.5, 0.25)
+		cover.show_state(cell, frame % 2)
 		cover.step(0.032 + float(frame) * 0.016, table, Vector2(220, 220))
-	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "200 frames of bodies through the grass make no object")
+	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "200 frames of bodies through the grass, a cell changing each, make no object")
 	check_equal(cover.body_count(), CoverScript.BODIES, "the nearest bodies still handed over")
 
 
@@ -195,7 +213,7 @@ func test_the_shader_compiles_with_its_uniforms() -> void:
 	var names := PackedStringArray()
 	for uniform: Dictionary in CoverScript.SHADER.get_shader_uniform_list():
 		names.append(String(uniform[&"name"]))
-	for wanted: String in ["view_time", "frame_size", "sheet_size", "bodies", "body_count", "bend_reach", "bend_pixels", "trample_hold", "trample_spring", "flatten", "trampled"]:
+	for wanted: String in ["view_time", "frame_size", "sheet_size", "bodies", "body_count", "bend_reach", "bend_pixels", "trample_hold", "trample_spring", "flatten", "cell_times"]:
 		check(names.has(wanted), "the cover shader compiles and has '%s' (got %s)" % [wanted, names])
 
 

@@ -40,6 +40,10 @@ extends Resource
 @export_range(1, 8) var tufts_per_cell: int = 3
 ## How far its tufts sway in the wind at a state's full `sway`, in pixels at their tips.
 @export var sway: float = 1.0
+## How long a cell of it walked through lies flat after the last body left it, then how long it
+## takes to spring back, in seconds of Feel's clock (GC4, look only: Feel's `Cover.flatness`).
+@export_range(0.0, 30.0, 0.1) var trample_hold: float = 0.6
+@export_range(0.1, 30.0, 0.1) var trample_spring: float = 1.5
 
 @export_group("")
 ## Its states; the first is the one every cell of it starts in (at rest).
@@ -103,8 +107,13 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 		var named: String = "%s: %s" % [owner, state.state_id]
 		if sheet != null:
 			for frame in state.frames:
-				if frame < 0 or frame >= frames:
-					found.append("%s draws frame %d, which its sheet (%d frames) lacks." % [named, frame, frames])
+				var last: int = frame + maxi(state.animation_frames, 1) - 1
+				if frame < 0 or last >= frames:
+					found.append("%s draws frame %d, which its sheet (%d frames) lacks." % [named, last if frame >= 0 else frame, frames])
+			if state.animation_frames < 1 or state.animation_frames > 16:
+				found.append("%s plays %d frames a tuft; 1 to 16." % [named, state.animation_frames])
+			if state.animation_fps < 1 or state.animation_fps > 127:
+				found.append("%s plays %d frames a second; 1 to 127 (Feel's shader)." % [named, state.animation_fps])
 			for frame in state.trampled_frames:
 				if frame < 0 or frame >= frames:
 					found.append("%s draws frame %d trampled, which its sheet (%d frames) lacks." % [named, frame, frames])

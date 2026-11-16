@@ -543,6 +543,8 @@ func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0)
 	_lay_out(new_world, room, tick.sim if tick != null else null)
 	_spawn_players(new_world, room, players, party)
 	contents.stand(new_world, _places, registry)
+	for problem in contents.problems:
+		push_warning("Flow: the room's bodies: %s" % problem)
 	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
 	if mode == MODE_RUN:
 		_stand_room_enemies(new_world, room, _chosen_enemies)
@@ -700,6 +702,8 @@ func _enter_next_room(room: RoomBase) -> void:
 	for wizard: Node2D in _wizards:
 		_bring_in(wizard)
 	contents.stand(world, _places, registry)
+	for problem in contents.problems:
+		push_warning("Flow: the room's bodies: %s" % problem)
 	_stand_room_enemies(world, room, _chosen_enemies)
 	exits.enter(_chosen_ways)
 	room_id = room.id
@@ -732,9 +736,8 @@ func _bring_in(wizard: Node2D) -> void:
 		wizard.position = _places.player_spawns[seat]
 	var actor := wizard as Actor
 	if actor != null:
-		actor.velocity = Vector2.ZERO
-		if actor.mover != null:
-			actor.mover.drop()
+		# Still, out of any fall, with no last ground yet (hub rework HR-H2).
+		actor.placed()
 	var hero: DownedScript = DownedScript.of(wizard)
 	if hero == null:
 		return
@@ -1245,6 +1248,8 @@ func _set_walls(new_world: Node2D) -> void:
 		elif body.collision_layer == RoomBase.HOLE_LAYER:
 			# The room's holes (hub rework HR-H1, RoomBase.HOLE_LAYER), in their own grid.
 			projectiles.add_hole_body(body)
+	# Outside the room is the void in a room with holes (hub rework HR-H2, question 9).
+	projectiles.set_holes_outside(Rect2(Vector2.ZERO, _places.size) if _places != null else projectiles.bounds())
 
 
 func _add_camera(parent: Node2D, size: Vector2) -> void:
@@ -1481,6 +1486,9 @@ func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> v
 			at = stacked_position(spawns[adds.stood % spawns.size()], adds.stood / spawns.size())
 		else:
 			at = RoomAdds.ring(centre, reach, radius, n, count, slide, turn)
+			if projectiles != null and projectiles.touches_hole(world.to_global(at), radius):
+				# A spot on the ring over a hole takes the nearest ground (hub rework HR-H2).
+				at = world.to_local(projectiles.nearest_ground(world.to_global(at), radius))
 		var add: Actor = _stand_enemy(world, data, at)
 		if add != null:
 			adds.track(add, caller, key)

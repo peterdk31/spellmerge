@@ -151,8 +151,8 @@ var to_target: Vector2 = Vector2.ZERO
 var distance: float = 0.0
 ## No wall between its body and the target's, and no blocking body's ground between their feet.
 var line_clear: bool = true
-## No blocking body's ground (a pillar's) between its feet and the target's: a walk at it is not
-## held up by one (boss plan OB14).
+## No blocking body's ground (a pillar's) nor a hole (hub rework HR-H2) between its feet and the
+## target's: a walk at it is not held up by one (boss plan OB14).
 var ground_clear: bool = true
 ## Seconds until the soonest shot coming at it arrives (-1 for none), and the way off its line.
 var threat_time: float = -1.0
@@ -660,7 +660,8 @@ func _perceive() -> void:
 		to_target = target.global_position - actor.global_position
 		distance = to_target.length()
 		ground_clear = _ground_clear_now()
-		line_clear = ground_clear and _line_clear()
+		# A hole is no wall to a shot (HR-H2): the line of fire minds only a blocking body's ground.
+		line_clear = (ground_clear or _ground_clear_now(false)) and _line_clear()
 		_note_attack()
 	else:
 		to_target = Vector2.ZERO
@@ -814,7 +815,7 @@ func _steer() -> void:
 	var goal: Vector2 = Vector2.INF
 	if plan_move == Move.TOWARD and not ground_clear:
 		goal = _walk_goal()
-	elif plan_move == Move.POINT and not AISight.ground_clear(actor.projectiles, actor.global_position, plan_point):
+	elif plan_move == Move.POINT and not AISight.feet_clear(actor.projectiles, actor.global_position, plan_point):
 		goal = plan_point
 	if goal == Vector2.INF:
 		return
@@ -861,7 +862,7 @@ func _chase(intent: ActorIntent) -> void:
 	if plan_urgent:
 		if not _tapped and intent.move != Vector2.ZERO:
 			var mover: int = _ready_mover()
-			if mover >= 0:
+			if mover >= 0 and _lands_on_ground(mover, intent.move):
 				intent.press(mover)
 				_tapped = true
 	else:
@@ -871,6 +872,10 @@ func _chase(intent: ActorIntent) -> void:
 	var windup: float = windup_for(plan_staff)
 	if not actor.caster.cast_ready(0.0, plan_staff):
 		# Not ready yet: wait as planned, so the telegraph only ever shows a cast that comes.
+		return
+	var moved: CastSense = _sense_of(plan_staff)
+	if moved != null and moved.moves_caster and not _lands_on_ground(plan_staff, intent.move if intent.move != Vector2.ZERO else aim_way):
+		# Its own move would leave it over a hole (HR-H2): not cast; it walks as planned.
 		return
 	if _begin_call(windup, intent):
 		return
@@ -1151,6 +1156,25 @@ func _ready_mover() -> int:
 	return -1
 
 
+## True unless staff `at`'s next cast moves the body (a dash, a teleport; `CastSense.moves_caster`)
+## along `way` to end over a hole (hub rework HR-H2, "Holes" 5: the AI never ends a move of its own
+## over one): its end is its reach along the way (a dash walks the way it is cast, staffs A6a), or,
+## homing, the target's feet when they are nearer, short of the first wall either way.
+func _lands_on_ground(at: int, way: Vector2) -> bool:
+	var projectiles: ProjectileManagerScript = actor.projectiles
+	if projectiles == null or not projectiles.has_holes() or way == Vector2.ZERO:
+		return true
+	var sense: CastSense = _sense_of(at)
+	if sense == null or not sense.moves_caster:
+		return true
+	var from: Vector2 = actor.global_position
+	var reach: float = sense.move_reach
+	if sense.homing and target != null:
+		reach = minf(reach, from.distance_to(target.global_position))
+	var end: Vector2 = projectiles.clip_to_walls(from, from + way.normalized() * reach)
+	return not projectiles.is_hole(end)
+
+
 ## `senses[at]` from the last decision, else asked now.
 func _sense_of(at: int) -> CastSense:
 	if at < 0:
@@ -1193,15 +1217,18 @@ func _aim_node() -> Node2D:
 	return target
 
 
-## No blocking body's ground between its feet and the target's (`AISight.ground_clear`), up to the
-## edge of the target's own ground when it stands on some (a body that cannot move lays it under its
-## own feet: `_walk_goal`).
-func _ground_clear_now() -> bool:
+## No blocking body's ground between its feet and the target's, nor with `holes` a hole (HR-H2:
+## `AISight.feet_clear`, a walk; without, `AISight.ground_clear`, the line of fire), up to the edge
+## of the target's own ground when it stands on some (a body that cannot move lays it under its own
+## feet: `_walk_goal`).
+func _ground_clear_now(holes: bool = true) -> bool:
 	if target == null:
 		return true
 	var goal: Vector2 = _walk_goal()
 	if goal.distance_squared_to(actor.global_position) <= 1.0:
 		return true
+	if holes:
+		return AISight.feet_clear(actor.projectiles, actor.global_position, goal)
 	return AISight.ground_clear(actor.projectiles, actor.global_position, goal)
 
 

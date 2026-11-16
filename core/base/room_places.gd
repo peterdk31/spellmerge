@@ -42,6 +42,9 @@ var zone_rects: Array[Rect2] = []
 var zone_data: Array[Resource] = []
 ## Its size in pixels from (0, 0) (`size_of`).
 var size: Vector2 = Vector2.ZERO
+## Its holes' rectangles (`hole_rects`, hub rework HR-H2): a spawn, a door or a placement over one is
+## a problem, and so is a prop's footprint (checked where the room is laid, `RoomContents`).
+var holes: Array[Rect2] = []
 var _problems: PackedStringArray = PackedStringArray()
 
 
@@ -54,7 +57,35 @@ static func read(layout: Node) -> RoomPlaces:
 	places._walk(layout, Vector2.ZERO, "", "")
 	places.size = places._size_of(layout)
 	places._check_corner(layout)
+	places.holes = hole_rects(layout)
+	places._check_holes()
 	return places
+
+
+## The hole `rect` overlaps, or an empty rectangle (hub rework HR-H2).
+func hole_under(rect: Rect2) -> Rect2:
+	for hole: Rect2 in holes:
+		if hole.intersects(rect):
+			return hole
+	return Rect2()
+
+
+## A spawn, a door or a placement over a hole (its point in one) is a problem (hub rework HR-H2,
+## "Holes" 6): a body would fall the moment it moved.
+func _check_holes() -> void:
+	if holes.is_empty():
+		return
+	for list: PackedVector2Array in [player_spawns, enemy_spawns, doors, joiner_spawns, placed_at]:
+		for at: Vector2 in list:
+			if _in_hole(at):
+				_problems.append("a spawn, door or placement at %s lies over a hole: move it onto the ground." % at)
+
+
+func _in_hole(at: Vector2) -> bool:
+	for hole: Rect2 in holes:
+		if hole.has_point(at):
+			return true
+	return false
 
 
 ## The indices into the zones of those whose data is of class `kind` (`CoverPatch`), in order.

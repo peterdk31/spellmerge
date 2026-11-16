@@ -172,3 +172,30 @@ func test_flow_hands_a_rooms_holes_to_the_projectile_manager() -> void:
 	check(_world.projectiles.is_hole(Vector2(216.0, 32.0)), "the hole body is a hole")
 	check(not _world.projectiles.is_hole(Vector2(32.0, 4.0)) and not _world.projectiles.line_clear(Vector2(32.0, 20.0), Vector2(32.0, 0.0)), "the wall body is a wall")
 	world.free()
+
+
+## Hub rework HR-H2: a spawn, a door or a placement over a hole is a problem; one beside it is not.
+func test_a_place_over_a_hole_is_a_problem() -> void:
+	var layout := own(Node2D.new()) as Node2D
+	var holes := StaticBody2D.new()
+	holes.collision_layer = RoomBase.HOLE_LAYER
+	layout.add_child(holes)
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(32, 64)
+	shape.shape = rect
+	shape.position = Vector2(216, 132)
+	holes.add_child(shape)
+	var spawns := Node2D.new()
+	spawns.name = "PlayerSpawns"
+	layout.add_child(spawns)
+	for at: Vector2 in [Vector2(150, 132), Vector2(210, 140)]:
+		var marker := Marker2D.new()
+		marker.position = at
+		spawns.add_child(marker)
+	var places: RoomPlaces = RoomPlaces.read(layout)
+	check_equal(places.holes, [Rect2(200, 100, 32, 64)] as Array[Rect2], "its holes kept")
+	check_equal(places.problems().size(), 1, "one place over the hole: %s" % places.problems())
+	check(places.problems().size() == 1 and "(210.0, 140.0)" in places.problems()[0], "the spawn over it named")
+	check(places.hole_under(Rect2(190, 120, 16, 16)).has_area(), "a footprint reaching over it finds it")
+	check(not places.hole_under(Rect2(150, 120, 16, 16)).has_area(), "one beside it does not")

@@ -123,6 +123,9 @@ const KIND_BURST: StringName = &"burst"
 const KIND_REACTION: StringName = &"reaction"
 const KIND_STATUS: StringName = &"status"
 const KIND_HEAL: StringName = &"heal"
+## A fall's cost (hub rework HR-H2, `take_fall`), and a pull's mark on who moved a body last (`pull`).
+const KIND_FALL: StringName = &"fall"
+const KIND_PULL: StringName = &"pull"
 
 ## What "downed by your own ..." calls a hit when its spell has no name of its own.
 const KIND_NAMES: Dictionary = {
@@ -132,6 +135,8 @@ const KIND_NAMES: Dictionary = {
 	KIND_BURST: "Blast",
 	KIND_REACTION: "Reaction",
 	KIND_STATUS: "Burn",
+	KIND_FALL: "fall",
+	KIND_PULL: "Pull",
 }
 
 ## How many rows there are: one per actor id.
@@ -276,6 +281,10 @@ var _last_by: PackedInt32Array = PackedInt32Array()
 var _last_kind: Array[StringName] = []
 var _last_name: PackedStringArray = PackedStringArray()
 
+## The share of a wizard's most health a fall costs in the room it is in (hub rework HR-H2: set as a
+## room is entered, `room_entered`; 0 where the room's falls are free, `RoomBase.falls_free`).
+var fall_cost: float = HoleRules.FALL_COST
+
 ## True while a discharge is being dealt, so nothing it causes can start another.
 var _discharging: bool = false
 ## True when the last `_hit` set a static charge off (a spell's hit then puts no first status on).
@@ -419,6 +428,8 @@ func setup() -> void:
 		events.carry_ended.connect(_on_carry_ended)
 	if not events.crumble_requested.is_connected(_on_crumble_requested):
 		events.crumble_requested.connect(_on_crumble_requested)
+	if not events.room_entered.is_connected(_on_room_entered):
+		events.room_entered.connect(_on_room_entered)
 	# The moments of other areas that hold bodies (online-ready N4, `hit_stop.gd`).
 	if not events.shot_blocked.is_connected(_on_shot_blocked):
 		events.shot_blocked.connect(_on_shot_blocked)
@@ -768,6 +779,10 @@ func pull(caster: int, position: Vector2, radius: float, strength: float, foes_o
 		var toward: Vector2 = (Geometry2D.get_closest_point_to_segment(body, position, end) - body).normalized()
 		_knock[row] = toward * strength / _mass(row)
 		_slam[row] = 0
+		# Who moved it last (hub rework HR-H2: a body pulled into a hole is the puller's kill).
+		_last_by[row] = caster
+		_last_kind[row] = KIND_PULL
+		_last_name[row] = ""
 		# A body caught by a pull it was not in lately: the moment's cue (S6, item 13).
 		if _pulled_at[row] < _steps - PULL_GAP_STEPS and events != null:
 			events.cue_shown.emit(caster, PULL_CUE, body, toward, 0.0, Color.WHITE, 0)
@@ -960,6 +975,78 @@ func crumble(target: Variant) -> bool:
 
 func _on_crumble_requested(actor: int) -> void:
 	crumble(actor)
+
+
+# --- Falls (hub rework HR-H2, docs/milestones/hub-rework.md, "Holes" 4, question 10) -----------
+
+## Whom a fall of `target` (an actor id or its node) is put down to: whoever last hit or pulled it
+## (`_last_by`), NO_PLAYER for nobody or a body that is not registered. The actor asks as it starts
+## to fall, while its row is still there (a falling body's hurtbox is off).
+func fall_blame(target: Variant) -> int:
+	var row: int = _row_of(target)
+	return _last_by[row] if row != ActorsScript.NONE else EventsScript.NO_PLAYER
+
+
+## A wizard `target` back from a fall pays for it: `fall_cost` of its most health, taken whole (no
+## barrier, hex or charge has a say: it is no hit), told as damage of KIND_FALL by nobody. At 0 it
+## is downed as by any hit. Nothing where falls are free, for a body down or not registered.
+func take_fall(target: Variant) -> void:
+	var row: int = _row_of(target)
+	if row == ActorsScript.NONE or fall_cost <= 0.0 or _body[row] != BODY_ACTOR or not _can_hurt(row):
+		return
+	var kit: Actor = _nodes[row] as Actor
+	if kit.health == null:
+		return
+	var amount: float = kit.health.max_health * fall_cost
+	var where: Vector2 = _position_of(kit)
+	var team: int = _team(row)
+	_last_by[row] = EventsScript.NO_PLAYER
+	_last_kind[row] = KIND_FALL
+	_last_name[row] = ""
+	var left: float = _take(row, EventsScript.NO_PLAYER, amount, false)
+	if events != null:
+		events.hit_landed.emit(EventsScript.NO_PLAYER, kit, amount, where, KIND_FALL, -1)
+		events.damage_dealt.emit(EventsScript.NO_PLAYER, kit, amount, where)
+		kit.damaged.emit(EventsScript.NO_PLAYER, amount, &"")
+	if left == 0.0 and _same(row, kit):
+		_die(row, EventsScript.NO_PLAYER, where, team)
+
+
+## The body `target` does not come back from its fall: it dies of it, killed by `by` (its
+## `fall_blame`), told as any death (`enemy_died` for a foe of the wizards, so a room can be cleared
+## by sweeping strays into a crack), with no hit; protection and `invincible` do not keep it. A body
+## something else ends at 0 health (`downable`: a decoy, a prop's death triggers) is emptied
+## (`Health.empty`) and ended that way. Returns true if it died or was ended; false for a body that
+## is not registered or is dying already.
+func die_of_fall(target: Variant, by: int) -> bool:
+	var row: int = _row_of(target)
+	if row == ActorsScript.NONE or _body[row] != BODY_ACTOR:
+		return false
+	var kit: Actor = _nodes[row] as Actor
+	if kit.is_dying() or kit.is_leaving():
+		return false
+	if kit.downable and kit.health != null:
+		kit.health.empty(by)
+		return true
+	var team: int = _team(row)
+	var where: Vector2 = _position_of(kit)
+	if kit.health != null:
+		kit.health.reset(0.0)
+	var saved_tag: int = _tag
+	var saved_slot: int = _slot
+	_tag = 0
+	_slot = -1
+	_die(row, by, where, team)
+	_tag = saved_tag
+	_slot = saved_slot
+	return true
+
+
+## A room is entered: what a fall costs there (`RoomBase.falls_free`; HoleRules.FALL_COST, the
+## default, for a room the registry does not know).
+func _on_room_entered(room_id: StringName) -> void:
+	var room: RoomBase = registry.get_resource(&"rooms", room_id) as RoomBase if registry != null else null
+	fall_cost = 0.0 if room != null and room.falls_free else HoleRules.FALL_COST
 
 
 ## A heal hit: `amount` health for the row `row` from `by`'s spell. A down or dead actor is not

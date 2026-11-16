@@ -63,8 +63,15 @@ func seat() -> int:
 	return actor.home_controller.seat if actor != null and actor.home_controller != null else ActorsScript.NONE
 
 
+## True while it is down (its own state, `Actor.is_downed`; a fall alone is not, hub rework HR-H2).
 func is_down() -> bool:
-	return actor != null and actor.is_down()
+	return actor != null and actor.is_downed()
+
+
+## True while its body stands in play: not down and not falling (`Actor.is_down`), so it may revive a
+## teammate.
+func stands() -> bool:
+	return actor != null and not actor.is_down()
 
 
 ## How far a teammate's revive has got, 0 to 1 (0 when standing).

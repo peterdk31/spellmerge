@@ -39,6 +39,27 @@ func test_it_finds_the_content_itself() -> void:
 	check(_enemies().size() >= 5, "it finds the enemies (%d)" % _enemies().size())
 
 
+## Hub rework HR-H2: a crypt room with holes (a pit between the wizards and the foes, and a crack
+## through the wizards' walk): an enemy, a dash, a teleport and a pull play the same twice and through
+## a snapshot while bodies walk round the holes, cross them and fall in (a fall's state, the last
+## ground, the return and the death through Combat all hashed and restored).
+func test_a_room_with_holes_plays_the_same_twice_and_through_a_snapshot() -> void:
+	var holes: Array[Rect2] = [Rect2(80.0, -120.0, 40.0, 320.0), Rect2(-24.0, 24.0, 16.0, 16.0)]
+	_check(ContentFight.ENEMY, _registry.get_resource(&"enemies", &"ember_imp"), holes)
+	for id: StringName in [&"dash", &"teleport", &"pull"]:
+		var card: Resource = _card(id)
+		check(card != null, "the %s card is found" % id)
+		if card != null:
+			_check(ContentFight.CARD, card, holes)
+
+
+func _card(id: StringName) -> Resource:
+	for card in _cards():
+		if card.id == id:
+			return card
+	return null
+
+
 ## Items I6: every premade item (the hub's rack) lies by a wizard, who takes it and casts it.
 func test_every_item_plays_the_same_twice_and_through_a_snapshot() -> void:
 	check(_premade().size() >= 1, "it finds the premade items (%d)" % _premade().size())
@@ -145,21 +166,21 @@ static func _snapshot_tick(resource: Resource) -> int:
 
 
 ## `resource`'s fight twice and through its snapshot; each parting is a failure with its report.
-func _check(kind: StringName, resource: Resource) -> void:
+func _check(kind: StringName, resource: Resource, holes: Array[Rect2] = []) -> void:
 	var label: String = "%s %s" % [kind, resource.get(&"id")]
 	var at: int = _snapshot_tick(resource)
-	var played: Array = _play(kind, resource, at)
+	var played: Array = _play(kind, resource, holes, at)
 	var first: Desync = played[0]
 	var snapshot: Snapshot = played[1]
 	if kind == ContentFight.CARD or kind == ContentFight.ITEM:
 		check(int(played[2]) > 0, "%s: its player casts it" % label)
 	for problem in snapshot.problems:
 		check(false, "%s, its snapshot: %s" % [label, problem])
-	var second: Desync = _play(kind, resource, at)[0]
+	var second: Desync = _play(kind, resource, holes, at)[0]
 	var tick: int = Desync.first_parting(first, second)
 	if tick >= 0:
-		check(false, "%s played twice: %s" % [label, Desync.compare(_play(kind, resource, at, tick)[0], _play(kind, resource, at, tick)[0])])
-	var restored: Array = _resume(kind, resource, snapshot, at)
+		check(false, "%s played twice: %s" % [label, Desync.compare(_play(kind, resource, holes, at, tick)[0], _play(kind, resource, holes, at, tick)[0])])
+	var restored: Array = _resume(kind, resource, holes, snapshot, at)
 	for problem: String in restored[1]:
 		check(false, "%s restored: %s" % [label, problem])
 	var after := Desync.new()
@@ -167,16 +188,16 @@ func _check(kind: StringName, resource: Resource) -> void:
 	tick = Desync.first_parting(after, restored[0])
 	if tick < 0:
 		return
-	var kept: Desync = _play(kind, resource, at, at + 1 + tick)[0]
+	var kept: Desync = _play(kind, resource, holes, at, at + 1 + tick)[0]
 	kept.hashes = kept.hashes.slice(at + 1)
 	kept.keep_tick = tick
-	check(false, "%s restored from tick %d parts %d ticks after: %s" % [label, at, tick + 1, Desync.compare(kept, _resume(kind, resource, snapshot, at, tick)[0])])
+	check(false, "%s restored from tick %d parts %d ticks after: %s" % [label, at, tick + 1, Desync.compare(kept, _resume(kind, resource, holes, snapshot, at, tick)[0])])
 
 
 ## `resource`'s fight from a fresh world: [its hashes (the leaves of tick `keep` kept), its
 ## snapshot after tick `at`, the player's casts of the content].
-func _play(kind: StringName, resource: Resource, at: int, keep: int = -1) -> Array:
-	var fight := ContentFight.new(root, kind, resource)
+func _play(kind: StringName, resource: Resource, holes: Array[Rect2], at: int, keep: int = -1) -> Array:
+	var fight := ContentFight.new(root, kind, resource, 2, holes)
 	var run := Desync.new(keep)
 	var snapshot: Snapshot = null
 	for i in TICKS:
@@ -191,8 +212,8 @@ func _play(kind: StringName, resource: Resource, at: int, keep: int = -1) -> Arr
 
 ## A fresh world of `resource`'s fight made as `snapshot` (taken after tick `at`) says, played on to
 ## TICKS: [its hashes from tick `at` + 1 (the leaves of the `keep`-th kept), the restore's problems].
-func _resume(kind: StringName, resource: Resource, snapshot: Snapshot, at: int, keep: int = -1) -> Array:
-	var fight := ContentFight.new(root, kind, resource)
+func _resume(kind: StringName, resource: Resource, holes: Array[Rect2], snapshot: Snapshot, at: int, keep: int = -1) -> Array:
+	var fight := ContentFight.new(root, kind, resource, 2, holes)
 	var problems: PackedStringArray = fight.restore(snapshot, at)
 	var run := Desync.new(keep)
 	for i in range(at + 1, TICKS):

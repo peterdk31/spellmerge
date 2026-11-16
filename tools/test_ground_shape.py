@@ -1,7 +1,8 @@
 """Tests of tools/ground_shape.py, a room's ground from a shape file (docs/milestones/hub-rework.md).
 
 On small fixture shapes, not the hub's: the walls follow the art's clear pixels cell by cell, the
-rims run clockwise round the ground with their colour bands, a crack opens onto the coast, keeps
+rims run clockwise round the ground with their colour bands, a crack's open cells are holes and the
+void is wall or holes as the shape says, a crack opens onto the coast, keeps
 clear of what it must and thins out with no step (a fork starts nearly as wide as its parent), a
 crack thinner than a cell is drawn into the floor and is never a wall, the same shape always draws
 the same files, and every room's ground in the repository is up to date with its shape.
@@ -57,20 +58,42 @@ class GroundShapeTest(unittest.TestCase):
         area = sum(points[i][0] * points[(i + 1) % len(points)][1] - points[(i + 1) % len(points)][0] * points[i][1] for i in range(len(points)))
         self.assertGreater(area, 0.0, "y grows down, so a positive area is clockwise on screen")
 
-    def test_a_wall_where_the_art_is_clear_cell_by_cell(self) -> None:
-        d = self.drawing
-        cells = {}
-        for x, y, w, h in d.walls:
-            self.assertEqual((x % gs.CELL, y % gs.CELL, w % gs.CELL, h % gs.CELL), (0, 0, 0, 0), "whole cells")
+    @staticmethod
+    def _cells(rects: list[tuple[int, int, int, int]], into: dict, kind: str, test: unittest.TestCase) -> None:
+        for x, y, w, h in rects:
+            test.assertEqual((x % gs.CELL, y % gs.CELL, w % gs.CELL, h % gs.CELL), (0, 0, 0, 0), "whole cells")
             for cy in range(y, y + h, gs.CELL):
                 for cx in range(x, x + w, gs.CELL):
-                    self.assertNotIn((cx, cy), cells, "walls never overlap")
-                    cells[(cx, cy)] = True
+                    test.assertNotIn((cx, cy), into, "walls and holes never overlap")
+                    into[(cx, cy)] = kind
+
+    def test_a_wall_or_a_hole_where_the_art_is_clear_cell_by_cell(self) -> None:
+        # The void outside the outline is wall (the default `void`); a crack's open cells are holes.
+        d = self.drawing
+        cells: dict = {}
+        self._cells(d.walls, cells, "wall", self)
+        self._cells(d.holes, cells, "hole", self)
+        self.assertTrue(d.holes, "the crack is a hole")
         for cy in range(0, d.h, gs.CELL):
             for cx in range(0, d.w, gs.CELL):
                 middle = (cy + gs.CELL // 2) * d.w + cx + gs.CELL // 2
                 clear = d.floor[middle * 4 + 3] == 0
-                self.assertEqual((cx, cy) in cells, clear, f"cell {cx},{cy}: a wall exactly where the art is clear")
+                self.assertEqual((cx, cy) in cells, clear, f"cell {cx},{cy}: open exactly where the art is clear")
+                if clear:
+                    self.assertEqual(cells[(cx, cy)], "hole" if d.ground.crack[middle] > 0.0 else "wall", f"cell {cx},{cy}: a hole in the crack, wall in the void")
+
+    def test_a_void_of_holes_has_no_walls(self) -> None:
+        # An island in the void (the hub): the void is the same void as in the cracks.
+        d = gs.Drawing(dict(ISLAND, void="hole"))
+        self.assertEqual(d.walls, [], "no walls")
+        cells: dict = {}
+        self._cells(d.holes, cells, "hole", self)
+        open_cells = sum(1 for cy in range(0, d.h, gs.CELL) for cx in range(0, d.w, gs.CELL) if d.floor[((cy + gs.CELL // 2) * d.w + cx + gs.CELL // 2) * 4 + 3] == 0)
+        self.assertEqual(len(cells), open_cells, "every open cell a hole")
+        text = gs.scene_text(d, {"floor": gs.ROOT / "art/a.png", "under": gs.ROOT / "art/b.png", "glow": gs.ROOT / "art/c.png"}, "abc")
+        self.assertNotIn('name="Walls"', text)
+        self.assertIn(f'[node name="Holes" type="StaticBody2D" parent="."]\ncollision_layer = {gs.HOLE_LAYER}', text)
+        self.assertIn('[node name="Underside" type="Sprite2D" parent="."]', text, "the rock face on the root: no wall to shed it")
 
     def test_the_rim_runs_clockwise_round_the_ground_in_bands(self) -> None:
         d = self.drawing
@@ -136,6 +159,7 @@ class GroundShapeTest(unittest.TestCase):
         self.assertEqual(again.under, self.drawing.under)
         self.assertEqual(again.glow, self.drawing.glow)
         self.assertEqual(again.walls, self.drawing.walls)
+        self.assertEqual(again.holes, self.drawing.holes)
         self.assertEqual(again.rims, self.drawing.rims)
 
     def test_the_scene(self) -> None:
@@ -146,6 +170,8 @@ class GroundShapeTest(unittest.TestCase):
         self.assertIn(f"z_index = {gs.FLOOR_Z}", text)
         self.assertIn('metadata/ground_inputs = "abc"', text)
         self.assertEqual(text.count('type="CollisionShape2D" parent="Walls"'), len(d.walls))
+        self.assertEqual(text.count('type="CollisionShape2D" parent="Holes"'), len(d.holes))
+        self.assertIn('[node name="Underside" type="Sprite2D" parent="Walls"]', text, "the rock face on the walls, which shed it")
         self.assertEqual(text.count('groups=["mote_source"]'), len(d.rims) + len(d.drips))
         self.assertIn("band_length = 420", text, "the rim's colours in the seam's bands")
 
@@ -214,6 +240,7 @@ class GroundShapeTest(unittest.TestCase):
         base = (gs.ROOT / "core/base/room_base.gd").read_text(encoding="utf-8")
         self.assertIn(f"const FLOOR_Z: int = {gs.FLOOR_Z}", base)
         self.assertIn(f"const WALL_LAYER: int = {gs.WALL_LAYER}", base)
+        self.assertIn(f"const HOLE_LAYER: int = {gs.HOLE_LAYER}", base)
         manager = (gs.ROOT / "core/projectiles/projectile_manager.gd").read_text(encoding="utf-8")
         self.assertIn(f"const WALL_CELL: float = {float(gs.CELL)}", manager)
 

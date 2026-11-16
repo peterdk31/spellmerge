@@ -439,6 +439,10 @@ var _spectacle: SpectacleScript = null
 ## The room's ground cover (`cover.gd`, ground cover GC3): at the floor marks' z, before the
 ## spectacle in the tree, so the marks lie over it.
 var _cover: CoverScript = null
+## The look of a fall into a hole (hub rework HR-H2), drawn from the bodies' state, and its motes'
+## thrower (made once).
+var _fall_look: FallLook = FallLook.new()
+var _fall_motes: Callable = Callable()
 ## The party's camera: it holds this machine's wizards (`Frames.seats_here`), eased as it is drawn.
 var party_camera: PartyCameraScript = PartyCameraScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
@@ -883,6 +887,9 @@ func step(real_delta: float) -> void:
 	if _portal_look != null:
 		_step_portals()
 	_status_motes(real_delta)
+	if not _fall_motes.is_valid():
+		_fall_motes = _throw_fall_motes
+	_fall_look.step(_actor_table(), real_delta, _fall_motes if _spectacle.motes_on() else Callable())
 	var picture: Rect2 = party_camera.visible_rect()
 	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture)
 	_spectacle.step(_clock, _actor_table())
@@ -1383,6 +1390,11 @@ func _status_motes(real_delta: float) -> void:
 		var count: int = floori(rate * real_delta + _rng.randf())
 		if count > 0:
 			_spectacle.status_motes(card[ElementBase.STATUS_LOOK_CARD] as StringName, card[ElementBase.STATUS_LOOK_LAYER] as int, enemy.global_position, 4.0 * STATUS_ZOOM, status_color(id), count)
+
+
+## A falling body's motes (`FallLook`): `count` of them round `at`, the void's, drifting.
+func _throw_fall_motes(at: Vector2, count: int) -> void:
+	_spectacle.status_motes(&"", LookNames.layer_of(&"drift"), at, 6.0, FallLook.MOTE_COLOUR, count)
 
 
 ## End the flash that shows status `at`, if it still shows it.

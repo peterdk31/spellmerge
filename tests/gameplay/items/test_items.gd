@@ -201,6 +201,19 @@ func test_a_drop_lands_a_step_away_from_the_next_item_and_never_in_a_wall() -> v
 	check_equal(_items.drop_spot(Vector2(100, 100)), Vector2(100, 100), "walled in: at the feet")
 
 
+## Hub rework HR-H2: nothing lies over a hole. A drop beside a crack lands on the ground, and an item
+## laid over one (a body that fell let it go) lands at the nearest ground.
+func test_an_item_dropped_over_a_hole_lands_at_the_nearest_ground() -> void:
+	_world.projectiles.set_holes([Rect2(104, 60, 40, 80)] as Array[Rect2])
+	var spot: Vector2 = _items.drop_spot(Vector2(100, 100))
+	check(not _world.projectiles.touches_hole(spot, ItemsScript.DROP_RADIUS), "a drop beside the crack is on the ground: %s" % spot)
+	var number: int = _items.lay(ItemStack.card(&"fire"), Vector2(124, 100))
+	var laid: GroundItem = _items.lying().back()
+	check_equal(laid.number, number, "it lies")
+	check(not _world.projectiles.circle_blocked(laid.at, ItemsScript.DROP_RADIUS, true), "on the ground, not over the crack: %s" % laid.at)
+	check(laid.at.distance_to(Vector2(124, 100)) < 40.0, "near where it was let go: %s" % laid.at)
+
+
 ## Items I7: what the inventory menu drops (`bag_drop_requested`) lands apart from the item in
 ## reach, which stays the one in reach; a staff dropped from a hand lies with its cards and mana and,
 ## taken again, goes back on a free hand as it left.

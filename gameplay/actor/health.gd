@@ -62,6 +62,18 @@ func take(amount: float, killer: int = -1) -> bool:
 	return true
 
 
+## Lose everything at once, whatever protects it (hub rework HR-H2: a fall a body does not come
+## back from, `Combat.die_of_fall`): at 0, `depleted` from `killer`. Nothing at 0 already.
+func empty(killer: int = -1) -> void:
+	if health <= 0.0:
+		return
+	health = 0.0
+	_protect_left = 0.0
+	protecting = false
+	changed.emit(health, max_health)
+	depleted.emit(killer)
+
+
 ## Gain `amount`, up to `max_health`. Ignored at 0 health (a revive is the way back: `reset`).
 ## Returns true if any was added.
 func heal(amount: float) -> bool:

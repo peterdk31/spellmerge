@@ -37,7 +37,49 @@ func test_a_hole_is_where_its_rectangle_is() -> void:
 	check(mgr.has_holes(), "the crack is laid")
 	check(mgr.is_hole(Vector2(201.0, 100.0)) and mgr.is_hole(Vector2(231.0, 100.0)), "its cells are holes")
 	check(not mgr.is_hole(Vector2(199.0, 100.0)) and not mgr.is_hole(Vector2(233.0, 100.0)), "the ground beside it is not")
-	check(not mgr.is_hole(Vector2(-20.0, 100.0)), "outside the grid is no hole (falling off a room's edge is HR-H2's)")
+	check(mgr.is_hole(Vector2(-20.0, 100.0)), "outside the grid is a hole in a room with holes (HR-H2, question 9)")
+	var none := own(ManagerScript.new()) as ManagerScript
+	none.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	check(not none.is_hole(Vector2(-20.0, 100.0)), "and none in a room with none")
+
+
+## Outside the room is the void in a room with holes (HR-H2, question 9): the bounds' margin round
+## the room becomes holes; a room with none is left as it is.
+func test_outside_the_room_is_a_hole() -> void:
+	var grid := own(ManagerScript.new()) as ManagerScript
+	grid.set_bounds(Rect2(-32.0, -32.0, 704.0, 424.0))
+	grid.set_holes_outside(Rect2(0.0, 0.0, 640.0, 360.0))
+	check(not grid.is_hole(Vector2(-10.0, 100.0)), "no holes: the margin is left open")
+	grid.set_holes([Rect2(200.0, 0.0, 32.0, 360.0)] as Array[Rect2])
+	grid.set_holes_outside(Rect2(0.0, 0.0, 640.0, 360.0))
+	check(grid.is_hole(Vector2(-10.0, 100.0)) and grid.is_hole(Vector2(650.0, 370.0)), "the margin is the void")
+	check(not grid.is_hole(Vector2(4.0, 100.0)), "the room's own edge cell is ground")
+	check(not grid.walk_clear(Vector2(20.0, 100.0), Vector2(-20.0, 100.0)), "a walk off the room meets the void")
+
+
+## Where a body stands on the ground (HR-H2): the place itself when clear, else the nearest cell
+## clear of walls, props' ground and holes; `circle_blocked` with holes on sees a hole.
+func test_the_nearest_ground() -> void:
+	var grid := own(ManagerScript.new()) as ManagerScript
+	grid.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	grid.set_holes([Rect2(200.0, 0.0, 32.0, 360.0)] as Array[Rect2])
+	check(grid.circle_blocked(Vector2(216.0, 100.0), 6.0, true), "a circle over the crack is blocked with holes on")
+	check(not grid.circle_blocked(Vector2(216.0, 100.0), 6.0), "and not without")
+	check_equal(grid.nearest_ground(Vector2(150.0, 100.0), 6.0), Vector2(150.0, 100.0), "clear ground is itself")
+	var left: Vector2 = grid.nearest_ground(Vector2(203.0, 100.0), 6.0)
+	check(not grid.circle_blocked(left, 6.0, true) and left.x < 200.0, "beside the lip it came from: %s" % left)
+	var right: Vector2 = grid.nearest_ground(Vector2(229.0, 100.0), 6.0)
+	check(not grid.circle_blocked(right, 6.0, true) and right.x > 232.0, "the other lip from the other side: %s" % right)
+	check_equal(grid.nearest_ground(Vector2(203.0, 100.0), 6.0), left, "the same every time")
+
+
+## The floor marks' mask (HR-H2): with holes asked for, a hole is masked as a wall is.
+func test_the_wall_image_masks_holes_when_asked() -> void:
+	var grid := own(ManagerScript.new()) as ManagerScript
+	grid.set_bounds(Rect2(0.0, 0.0, 64.0, 64.0))
+	grid.set_holes([Rect2(16.0, 16.0, 8.0, 8.0)] as Array[Rect2])
+	check_equal(grid.wall_image().get_pixel(2, 2).r, 0.0, "walls alone: the hole is open")
+	check(grid.wall_image(true).get_pixel(2, 2).r > 0.9, "with holes: masked")
 
 
 func test_a_walk_stops_at_the_lip_and_a_crossing_goes_over() -> void:

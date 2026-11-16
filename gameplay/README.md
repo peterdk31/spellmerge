@@ -96,6 +96,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `item_take_requested` | HUD (a command) | `items` (A by an item in reach) |
 | `room_items_placed` | `flow` | `items` (what the room's scene places lies there) |
 | `item_drop_requested` | `actor` (an Inventory) | `items` (a card given back to a full bag, or what the inventory menu drops, lands beside the body) |
+| `cover_danger_looked` | `ai` (every brain, as it walks and at each decision, ground cover GC7) | `cover` (fills the look at once: where the floor would harm) |
 | `ground_looked`, `actor_take_requested` | `ai` (a brain whose profile takes items, I9) | `items` (fills the look at once; gives the item to the actor's Inventory) |
 | `ground_item_changed` | `items` | `feel` (the look on the ground) |
 | `item_near_changed`, `item_refused` | `items` | `hud` (the hint, its red shake) |

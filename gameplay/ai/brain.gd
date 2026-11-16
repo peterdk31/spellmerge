@@ -31,6 +31,15 @@ extends RefCounted
 ## so a dodging enemy holds its dash on a staff with none), and the move goes the way it walks.
 ## Its own timers slow by `Combat.pace`; a cast's wind-up is the staff's and does not.
 ##
+## **Harmful floor** (ground cover GC7, docs/milestones/ground-cover.md, rule 8): it asks the floor
+## round it through the bus (`cover_danger_looked`, a `CoverSight`), never the cover area. At each
+## decision it notes whether it stands in harmful cover and the nearest cell out of it in view
+## (`in_harm`, `harm_exit`: `evade` walks there). Every step it walks, it probes the cells along its
+## move (every cell to `HARM_PROBE` ahead, past the cell it stands in) and, if one harms, turns to the nearest of
+## the eight ways (`AISight.DIRECTIONS`) whose cells do not and whose line is clear of walls, keeping
+## to the side it turned last; with none free it walks on as it would. It has no pathfinder: this is
+## steering, beside `AISight.detour`.
+##
 ## **Enemies telegraph, allies don't** (owner, 2026-11-01): a telegraph is a warning for the
 ## players. How long a cast winds up is its staff's data (an enemy's staff has a `wind_up`, a
 ## player's none; cast-timing, owner 2026-11-06), whoever holds it; only a brain driving an actor
@@ -95,10 +104,17 @@ const REACTION_JITTER: float = 0.2
 const NO_KEY: int = -1
 const SLOT_TURN: float = deg_to_rad(50.0)
 const SPREAD_BONUS: float = 0.1
+## Harmful floor (GC7): how far ahead along its move it probes (every cell on the way), how far round it
+## it looks each step and at a decision (for the way out), and the bonus the side it turned last gets
+## (above any difference of two ways' dots: that side's free ways come first while its way is blocked).
+const HARM_PROBE: float = 24.0
+const HARM_LOOK: float = 32.0
+const HARM_EXIT_LOOK: float = 64.0
+const HARM_SIDE_KEEP: float = 2.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the team board is
 ## Entities' (hashed there), handed over by the controller.
-const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground"]
+const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground", &"_cover"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"actor", &"target", &"grudge", &"plan_target", &"_target_actor"]
 
@@ -127,6 +143,10 @@ var line_clear: bool = true
 ## Seconds until the soonest shot coming at it arrives (-1 for none), and the way off its line.
 var threat_time: float = -1.0
 var threat_away: Vector2 = Vector2.ZERO
+## It stands in harmful cover (GC7), and the middle of the nearest cell out of it with no wall between
+## (Vector2.INF for none in sight).
+var in_harm: bool = false
+var harm_exit: Vector2 = Vector2.INF
 ## Seconds since a hit it still remembers (counting down from HURT_MEMORY; 0 for none).
 var hurt_left: float = 0.0
 ## Its health as a fraction of the most (1 without Health).
@@ -198,6 +218,12 @@ var _face: Face = null
 ## What it saw lying round it at its last look (`look_ground`), made once: scratch, filled and read
 ## within one decision.
 var _ground: GroundSight = GroundSight.new()
+## Where the floor round it harms (`look_harm`), made once: scratch, filled and read within one step.
+var _cover: CoverSight = CoverSight.new()
+## The side (the sign of the cross of its move and the way it turned to) it last turned off harmful
+## floor, 0 before the first and once its way is clear again: kept while it walks round a fire, so it
+## goes round one way and does not swing between two.
+var _steer_side: float = 0.0
 ## The last call of its team it has heard (`TeamBoard.called_at`).
 var _heard_call: float = -INF
 ## Its slot on the board at its last report and at its last noted attack (-1 for none).
@@ -238,6 +264,9 @@ func reset() -> void:
 	_looked = false
 	_retarget_left = _retarget_offset
 	_decide_now = true
+	in_harm = false
+	harm_exit = Vector2.INF
+	_steer_side = 0.0
 	behaviour = null
 	_clear_plan()
 	if _last_intent != null and chosen >= 0:
@@ -312,6 +341,7 @@ func think(delta: float, intent: ActorIntent) -> void:
 				_to_chase()
 		State.CALL:
 			_call(delta, intent)
+	_steer_off_harm(intent)
 
 
 ## True from the start of a windup until its cast leaves: the attack is coming.
@@ -500,6 +530,16 @@ func seen_ground() -> GroundSight:
 	return _ground
 
 
+## Behaviours ask: where the floor within `reach` of its feet would harm it (GC7: a `CoverSight`),
+## asked of the cover through the bus (`cover_danger_looked`), never of the cover area; empty with no
+## bus. Filled anew at each look.
+func look_harm(reach: float) -> CoverSight:
+	_cover.clear()
+	if actor != null and actor.events != null:
+		actor.events.cover_danger_looked.emit(actor.id, actor.global_position, reach, _cover)
+	return _cover
+
+
 ## Behaviours ask: take the item `item` off the ground now (`actor_take_requested`: the Items area
 ## gives it to its Inventory as the pickup rule says, if it lies in reach and there is room).
 func take_item(item: int) -> void:
@@ -567,6 +607,7 @@ func _perceive() -> void:
 		_report_slot = board.report(actor.team(), actor.id, actor.global_position, health_fraction, _report_slot)
 	_read_staffs()
 	_perceive_threat()
+	_perceive_harm()
 
 
 func _perceive_threat() -> void:
@@ -582,6 +623,29 @@ func _perceive_threat() -> void:
 	if threat_time >= 0.0 and profile.dodge > 0.0 and profile.randomness > 0.0 and _roll() < profile.randomness * 0.3:
 		# Sometimes it sees the shot late.
 		threat_time = -1.0
+
+
+## Whether it stands in harmful cover, and the nearest cell's middle out of it with no wall between
+## (`harm_exit`; the lower cell, row by row, on a tie).
+func _perceive_harm() -> void:
+	in_harm = false
+	harm_exit = Vector2.INF
+	var at: Vector2 = actor.global_position
+	var sight: CoverSight = look_harm(HARM_EXIT_LOOK)
+	if not sight.harms(at):
+		return
+	in_harm = true
+	var best: float = INF
+	for y in range(sight.origin.y, sight.origin.y + sight.rows):
+		for x in range(sight.origin.x, sight.origin.x + sight.columns):
+			var cell := Vector2i(x, y)
+			if sight.harms_cell(cell):
+				continue
+			var middle: Vector2 = CoverSight.middle(cell)
+			var far: float = middle.distance_squared_to(at)
+			if far < best and AISight.line_clear(actor.projectiles, at, middle):
+				best = far
+				harm_exit = middle
 
 
 ## With teamwork, it notes its target on the board and reads its slot round it (`TeamBoard`).
@@ -845,6 +909,47 @@ func _in_lane(sense: CastSense, now: Vector2, radius: float) -> bool:
 func _to_chase() -> void:
 	state = State.CHASE
 	_decide_now = true
+
+
+## Every step it walks: the cells along its move (every cell to HARM_PROBE ahead, past the one it stands in) are
+## probed, and when one harms its move turns to the nearest of the eight ways whose cells do not and
+## whose line is clear of walls (on the side it turned last first, while it walks round), at the same
+## speed; with no such way it walks on as it would. Looks only while it walks, and costs one ask when no cell harms.
+func _steer_off_harm(intent: ActorIntent) -> void:
+	var move: Vector2 = intent.move
+	if move == Vector2.ZERO or actor == null or actor.events == null:
+		return
+	var at: Vector2 = actor.global_position
+	var sight: CoverSight = look_harm(HARM_LOOK)
+	if sight.count == 0:
+		return
+	var way: Vector2 = move.normalized()
+	if _clear_of_harm(sight, at, way):
+		_steer_side = 0.0
+		return
+	var best: Vector2 = Vector2.ZERO
+	var best_score: float = -INF
+	for other: Vector2 in AISight.DIRECTIONS:
+		if not _clear_of_harm(sight, at, other):
+			continue
+		var score: float = other.dot(way)
+		if _steer_side != 0.0 and signf(way.cross(other)) == _steer_side:
+			score += HARM_SIDE_KEEP
+		if score > best_score and AISight.line_clear(actor.projectiles, at, at + other * HARM_PROBE):
+			best_score = score
+			best = other
+	if best == Vector2.ZERO:
+		return
+	var side: float = way.cross(best)
+	if absf(side) > 0.001:
+		_steer_side = signf(side)
+	intent.move = best * move.length()
+
+
+## True when no cell along `way` from `at` (every cell to HARM_PROBE ahead, `CoverSight.harms_along`),
+## but the one `at` is in, harms.
+func _clear_of_harm(sight: CoverSight, at: Vector2, way: Vector2) -> bool:
+	return not sight.harms_along(at, at + way * HARM_PROBE)
 
 
 ## The way to `plan_point`, ZERO once there.

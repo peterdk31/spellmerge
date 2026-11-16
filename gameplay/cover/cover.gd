@@ -23,6 +23,9 @@ extends Node
 ##   `room_built`, every cell not at rest (Feel, an earlier autoload, has laid the room at rest by
 ##   then); after a restore (`rebuild_derived`), every cell whose state this machine's view was last
 ##   told otherwise.
+## - **Looked at** (rule 8, GC7): `cover_danger_looked` asks where the floor round a place would harm
+##   a body; `look` fills the asker's `CoverSight` at once, marking each cell of its window whose
+##   state gives a status (the cells `_affect_bodies` would ask one for). The AI steers by it.
 ##
 ## **State and derived:** each cell's state and seconds in it, the active cells, the queued touches,
 ## each harmed body's time to its next status and the roll counter are state. The layout and the kinds
@@ -125,6 +128,7 @@ func _ready() -> void:
 	events.room_built.connect(_on_room_built)
 	events.room_entered.connect(_on_room_entered)
 	events.floor_touched.connect(_on_floor_touched)
+	events.cover_danger_looked.connect(_on_cover_danger_looked)
 
 
 ## A run's start: the area is a fresh one's (the room laid next sizes it).
@@ -191,6 +195,30 @@ func harmed() -> PackedInt32Array:
 	return _harm_ids
 
 
+## Fill `sight` with where the floor within `reach` of `at` would harm a body standing on it (rule 8):
+## its window's cells whose state gives a status. Empty in a room with no cover, and at once when no
+## cell can harm (all at rest and nothing harmful at rest), so a look costs a fight with no fire
+## almost nothing. Allocates nothing.
+func look(at: Vector2, reach: float, sight: CoverSight) -> void:
+	sight.clear()
+	if layout == null or _state.size() != layout.cells.size() or _state.is_empty() or not at.is_finite():
+		return
+	if not _rest_harms and _active.is_empty():
+		return
+	if not sight.open(at, reach, layout.columns, layout.rows):
+		return
+	var cells: PackedByteArray = layout.cells
+	for y in range(sight.origin.y, sight.origin.y + sight.rows):
+		for x in range(sight.origin.x, sight.origin.x + sight.columns):
+			var cell: int = y * layout.columns + x
+			var kind: int = cells[cell] - 1
+			if kind < 0:
+				continue
+			var state: CoverState = layout.kinds[kind].states[_state[cell]]
+			if state != null and state.status != &"":
+				sight.mark(x, y)
+
+
 # --- Heard -----------------------------------------------------------------------------
 
 ## A room was laid out: its cover worked out from its layout. The state is only sized, at rest, when
@@ -232,6 +260,12 @@ func _on_floor_touched(_caster: int, element: StringName, at: Vector2, radius: f
 	_touch_elements.append(element)
 	_touch_at.append(at)
 	_touch_radius.append(radius)
+
+
+## An actor looked at the floor round it (`cover_danger_looked`, rule 8): its sight is filled at once.
+func _on_cover_danger_looked(_actor: int, at: Vector2, reach: float, sight: CoverSight) -> void:
+	if sight != null:
+		look(at, reach, sight)
 
 
 ## After a snapshot was restored: the view is told every cell whose state it was told otherwise.

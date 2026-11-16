@@ -127,13 +127,19 @@ func on_screen(at: Vector2) -> Vector2:
 
 ## Saves the `half` × 2 pixels of `image` round the screen point `at`, `zoom` times bigger.
 func save_crop(image: Image, at: Vector2, shot_name: String, half: Vector2i = Vector2i(48, 48), zoom: int = 4) -> void:
-	var scale_to_image: Vector2 = Vector2(image.get_size()) / Vector2(root.get_visible_rect().size)
-	var middle := Vector2i(at * scale_to_image)
-	var corner: Vector2i = (middle - half).clamp(Vector2i.ZERO, image.get_size() - half * 2)
-	var crop: Image = image.get_region(Rect2i(corner, half * 2))
+	var crop: Image = crop_round(image, at, half)
 	if zoom != 1:
 		crop.resize(crop.get_width() * zoom, crop.get_height() * zoom, Image.INTERPOLATE_NEAREST)
 	save(crop, shot_name)
+
+
+## The `half` × 2 pixels of `image` round the screen point `at` (kept inside the image), at the
+## screen's scale.
+func crop_round(image: Image, at: Vector2, half: Vector2i = Vector2i(48, 48)) -> Image:
+	var scale_to_image: Vector2 = Vector2(image.get_size()) / Vector2(root.get_visible_rect().size)
+	var middle := Vector2i(at * scale_to_image)
+	var corner: Vector2i = (middle - half).clamp(Vector2i.ZERO, image.get_size() - half * 2)
+	return image.get_region(Rect2i(corner, half * 2))
 
 
 ## `save_crop` of the screen as it is drawn this frame, round the world point `at`.

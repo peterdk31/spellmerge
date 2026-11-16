@@ -10,7 +10,37 @@
 script = ExtResource("3_trigger")
 when = 0
 element = &"fire"
+then = &"catching"
+
+[sub_resource type="Resource" id="catching_frost"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"frost"
+then = &"rest"
+
+[sub_resource type="Resource" id="catching_water"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"water"
+then = &"wet"
+
+[sub_resource type="Resource" id="catching_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 0.3
 then = &"burning"
+
+[sub_resource type="Resource" id="catching_embers"]
+script = ExtResource("4_motes")
+kind = &"ember"
+rate = 2.0
+from = 2
+at = Vector2(0, 5)
+size = Vector2(12, 4)
+spread = 60.0
+reach = 3.0
+height = 3.0
+colours = Array[StringName]([&"fire", &"spark"])
 
 [sub_resource type="Resource" id="burning_frost"]
 script = ExtResource("3_trigger")
@@ -51,8 +81,26 @@ colours = Array[StringName]([&"water"])
 [sub_resource type="Resource" id="burning_after"]
 script = ExtResource("3_trigger")
 when = 1
-seconds = 1.2
+seconds = 0.9
+then = &"smouldering"
+
+[sub_resource type="Resource" id="smouldering_after"]
+script = ExtResource("3_trigger")
+when = 1
+seconds = 1.0
 then = &"ash"
+
+[sub_resource type="Resource" id="smouldering_smoke"]
+script = ExtResource("4_motes")
+kind = &"smoke"
+rate = 1.0
+from = 2
+at = Vector2(0, 3)
+size = Vector2(10, 4)
+spread = 30.0
+reach = 2.0
+height = 7.0
+colours = Array[StringName]([&"stone"])
 
 [sub_resource type="Resource" id="ash_after"]
 script = ExtResource("3_trigger")
@@ -91,6 +139,21 @@ frames = PackedInt32Array(0, 1, 2, 8, 9, 10)
 trampled_frames = PackedInt32Array(6, 7)
 triggers = Array[ExtResource("3_trigger")]([SubResource("rest_fire"), SubResource("rest_water")])
 
+[sub_resource type="Resource" id="catching"]
+script = ExtResource("2_state")
+state_id = &"catching"
+frames = PackedInt32Array(11, 12)
+sway = 0.8
+bend = 0.6
+motes = Array[ExtResource("4_motes")]([SubResource("catching_embers")])
+status = &"burn"
+status_strength = 2.0
+status_duration = 1.5
+status_every = 0.5
+spreads = &"fire"
+spread_chance = 0.6
+triggers = Array[ExtResource("3_trigger")]([SubResource("catching_frost"), SubResource("catching_water"), SubResource("catching_after")])
+
 [sub_resource type="Resource" id="burning"]
 script = ExtResource("2_state")
 state_id = &"burning"
@@ -105,6 +168,15 @@ status_every = 0.5
 spreads = &"fire"
 spread_chance = 0.6
 triggers = Array[ExtResource("3_trigger")]([SubResource("burning_frost"), SubResource("burning_water"), SubResource("burning_after")])
+
+[sub_resource type="Resource" id="smouldering"]
+script = ExtResource("2_state")
+state_id = &"smouldering"
+frames = PackedInt32Array(13, 14)
+sway = 0.0
+bend = 0.0
+motes = Array[ExtResource("4_motes")]([SubResource("smouldering_smoke")])
+triggers = Array[ExtResource("3_trigger")]([SubResource("smouldering_after")])
 
 [sub_resource type="Resource" id="ash"]
 script = ExtResource("2_state")
@@ -140,4 +212,4 @@ tufts_per_cell = 5
 sway = 1.5
 trample_hold = 5.0
 trample_spring = 4.0
-states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("burning"), SubResource("ash"), SubResource("wet")])
+states = Array[ExtResource("2_state")]([SubResource("rest"), SubResource("catching"), SubResource("burning"), SubResource("smouldering"), SubResource("ash"), SubResource("wet")])

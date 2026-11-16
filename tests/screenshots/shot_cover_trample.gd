@@ -58,7 +58,7 @@ func take() -> void:
 			await physics_frame
 			await process_frame
 		var image: Image = await grab()
-		var crop: Image = _crop(image, on_screen(middle))
+		var crop: Image = crop_round(image, on_screen(middle), HALF)
 		strip.blit_rect(crop, Rect2i(Vector2i.ZERO, cell), Vector2i(column * (cell.x + GAP), 0))
 	var walked: float = feel.cover().walked_at(feel.cover().layout.cell_of(middle))
 	if walked <= CoverScript.NEVER:
@@ -85,13 +85,3 @@ func _walk_start(layout: CoverLayout, near: Vector2) -> Vector2:
 			if not best.is_finite() or (start + WALK * 0.5).distance_to(near) < (best + WALK * 0.5).distance_to(near):
 				best = start
 	return best
-
-
-## The `HALF` × 2 pixels of `image` round the screen point `at`, at the screen's scale.
-func _crop(image: Image, at: Vector2) -> Image:
-	var scale_to_image: Vector2 = Vector2(image.get_size()) / Vector2(root.get_visible_rect().size)
-	var corner: Vector2i = (Vector2i(at * scale_to_image) - HALF).clamp(Vector2i.ZERO, image.get_size() - HALF * 2)
-	var crop: Image = image.get_region(Rect2i(corner, HALF * 2))
-	if crop.get_size() != HALF * 2:
-		crop.resize(HALF.x * 2, HALF.y * 2, Image.INTERPOLATE_NEAREST)
-	return crop

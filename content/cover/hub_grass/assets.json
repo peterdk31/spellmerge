@@ -5,8 +5,8 @@
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tool": "Claude (tools/pixel_grid.py from tufts.grid.json, 2026-11-16; rest and trampled frames redrawn 2026-11-16)",
-			"prompt": "Eleven 16x16 frames side by side of a grass tuft standing on its foot at the frame's bottom middle: three tufts at rest (pointy blades two pixels wide at the foot tapering to one, curving outward, Leaf's shadow for the blades behind and at the foot, Leaf's base for the blades in front, each front tip one pixel of Leaf's light), two burning (shorter blades in Fire shades, a white-hot Spark tip), one of ash (a low Stone stubble), two trampled (the same pointy blades pressed flat and splayed along the floor, lit tips), then three more at rest: windswept (every blade leaning one way), arched (blades bowing over), and a short dense clump. Never straight upright blades. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no outline (floor decoration), light from the top-left."
+			"tool": "Claude (tools/pixel_grid.py from tufts.grid.json, 2026-11-16; rest, trampled and fire frames redrawn 2026-11-16)",
+			"prompt": "Fifteen 16x16 frames side by side of a grass tuft standing on its foot at the frame's bottom middle, every frame but the ash drawn from the same pointy blades (two pixels at the foot tapering to one, curving outward; Leaf's shadow for the blades behind and at the foot, Leaf's base for the blades in front; no lit tips): three tufts at rest, two burning (the same blades in flames: Fire's dark red at the foot, Fire's base, Fire's light and a white-hot Spark tip, a little shorter), one of ash (a low Stone stubble), two trampled (the blades pressed flat and splayed along the floor), three more at rest (windswept, arched, a short dense clump), two catching (the green blades with flames climbing their lower third from a red foot) and two smouldering (charred Stone stubs half as tall with a glowing Fire end). Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no outline (floor decoration), light from the top-left."
 		}
 	]
 }

@@ -6,7 +6,9 @@ extends "res://tests/support/screenshot.gd"
 ## embers and smoke rising (GC8). A new room or a new cover kind shows up here with no edit.
 ##
 ## Shots: `cover_<id>`, one a room; `cover_<id>_close`, its first player spawn's corner at 4×;
-## `cover_<id>_fire`, a fire lit in the cover nearest that spawn, a moment later, at 4×.
+## `cover_<id>_fire`, a fire lit in the cover nearest that spawn, a moment later, at 4×;
+## `cover_<id>_fire_strip`, that fire from the moment it is lit (FIRE_STRIP: the frame of each
+## picture), catching, burning, smouldering and going to ash, at 4×.
 
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
@@ -15,6 +17,11 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 ## How far the fire reaches (px), and the frames it burns before its shot.
 const FIRE_RADIUS: float = 20.0
 const FIRE_FRAMES: int = 40
+## The frames of the fire strip's pictures, from the fire lit (FIRE_FRAMES among them), the half of
+## each picture round the fire, and the gap between pictures.
+const FIRE_STRIP: PackedInt32Array = [0, 10, 20, 40, 60, 90, 130, 180]
+const STRIP_HALF := Vector2i(40, 28)
+const GAP: int = 2
 
 var _events: Node = null
 var _feel: FeelScript = null
@@ -67,9 +74,29 @@ func _shots(room: RoomBase) -> bool:
 	var fire: Vector2 = _burnable_near(layout, spawns[0])
 	if fire.is_finite():
 		_events.emit_signal("floor_touched", 0, &"fire", fire, FIRE_RADIUS)
-		await settle(FIRE_FRAMES)
-		await snap(fire, "cover_%s_fire" % room.id, Vector2i(64, 40))
+		await _fire_strip(fire, "cover_%s_fire" % room.id)
 	return true
+
+
+## The fire lit at `fire` pictured at each of FIRE_STRIP's frames, saved as `<shot_name>_strip`, and
+## at FIRE_FRAMES as `shot_name`.
+func _fire_strip(fire: Vector2, shot_name: String) -> void:
+	var cell: Vector2i = STRIP_HALF * 2
+	var strip := Image.create((cell.x + GAP) * FIRE_STRIP.size(), cell.y, false, Image.FORMAT_RGBA8)
+	strip.fill(Color(0.05, 0.05, 0.07))
+	var frame: int = 0
+	for column in FIRE_STRIP.size():
+		if FIRE_STRIP[column] > frame:
+			await settle(FIRE_STRIP[column] - frame)
+			frame = FIRE_STRIP[column]
+		var image: Image = await grab()
+		if frame == FIRE_FRAMES:
+			save_crop(image, on_screen(fire), shot_name, Vector2i(64, 40))
+		var crop: Image = crop_round(image, on_screen(fire), STRIP_HALF)
+		crop.convert(Image.FORMAT_RGBA8)
+		strip.blit_rect(crop, Rect2i(Vector2i.ZERO, cell), Vector2i(column * (cell.x + GAP), 0))
+	strip.resize(strip.get_width() * 4, strip.get_height() * 4, Image.INTERPOLATE_NEAREST)
+	save(strip, shot_name + "_strip")
 
 
 ## The middle of the covered cell nearest `at` whose kind fire moves on; INF for none.

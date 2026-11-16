@@ -12,7 +12,7 @@ A kind of ground cover (ground cover GC8, [docs/milestones/ground-cover.md](../.
 
 | Kind | Fills | What it does | States |
 |---|---|---|---|
-| `hub_grass` (Grass) | the hub | fire lights it; it burns whoever stands in it (burn 2 for 1.5 s, every 0.5 s) and spreads fire (0.6 a second a neighbour), giving off embers and smoke; frost puts it out; water wets it (puts its fire out too): wet grass does not light, glints with drips and soaks whoever stands in it (soak 25 for 1 s, every 0.5 s) until it dries | `rest` −fire→ `burning` (1.2 s) → `ash` (30 s) → `rest`; `burning` −frost→ `rest`; `rest`, `burning` −water→ `wet` (8 s) → `rest` |
+| `hub_grass` (Grass) | the hub | fire lights it: it catches (flames at its blades' feet), burns (the blades in flames), smoulders (charred, harming nobody) and goes to ash; catching or burning, it burns whoever stands in it (burn 2 for 1.5 s, every 0.5 s) and spreads fire (0.6 a second a neighbour), giving off embers and smoke; frost puts it out; water wets it (puts its fire out too): wet grass does not light, glints with drips and soaks whoever stands in it (soak 25 for 1 s, every 0.5 s) until it dries | `rest` −fire→ `catching` (0.3 s) → `burning` (0.9 s) → `smouldering` (1 s) → `ash` (30 s) → `rest`; `catching`, `burning` −frost→ `rest`; `rest`, `catching`, `burning` −water→ `wet` (8 s) → `rest` |
 | `crypt_moss` (Moss) | the crypt | look only: sways a little, bends, is trampled; fire and frost leave it | `rest` |
 | `cobweb` (Cobwebs) | the crypt, sparsely, a web a cell | chills whoever walks through it (30% slower); fire burns it away fast, for good, with embers; frost or water puts a burning web out | `rest` −fire→ `burning` (0.5 s) → `gone`; `burning` −frost or water→ `rest` |
 

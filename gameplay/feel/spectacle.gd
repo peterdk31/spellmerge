@@ -946,5 +946,6 @@ func _fit_marks(room_id: StringName) -> void:
 		return
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	var bounds: Rect2 = projectiles.bounds() if projectiles != null else Rect2()
-	marks.enter(bounds, projectiles.wall_image() if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
+	# Its holes are masked as its walls are (hub rework HR-H2): no mark is laid over a hole.
+	marks.enter(bounds, projectiles.wall_image(true) if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
 	marks.set_floor_colors(room.floor_colors() if room != null else PackedColorArray())

@@ -50,7 +50,8 @@ extends Node2D
 ## (`move`). Tests call `step(delta)` with fixed deltas and move the body themselves.
 ##
 ## Still (props W2, docs/milestones/props.md): a body that no controller drives and that has no
-## Mover is still. Nothing it does changes from tick to tick, so the Tick never steps it
+## Mover is still (and keeps no time: a prop with a `timer` row is stepped, props' fountain). Nothing
+## it does changes from tick to tick, so the Tick never steps it
 ## (`Actors.still`, set when its id opens and at every change of driver, `_tell_driver`): a prop.
 ## Hits still land on it (Combat writes its health and statuses), its casts still go (a trigger's,
 ## or a possessor's: a possession gives it a driver, and it is stepped while that lasts), and a
@@ -72,6 +73,20 @@ extends Node2D
 ## in two parts (hub rework HR-H1, `_move_over_holes`): what crosses holes, then its own walk, which
 ## stops at a hole's lip.
 ##
+## Falls (hub rework HR-H2, docs/milestones/hub-rework.md, "Holes" 4 and 5): right after its move, a
+## body that walks whose centre is over a hole and that crosses nothing (no move of its Mover left,
+## nothing done to it this tick, not held by a local stop) falls (`body_fell`): its moves end
+## answered where it is, and for `HoleRules.FALL_SECONDS` (`fall_left`) it is down to everything that
+## asks (`is_down`: its hurt shape, casting, its orbits and beams, touches, the AI's targets, reviving
+## others), though not downed (`is_downed`, the Downed component's state). Then a wizard (a seat's
+## own body) comes back on its last ground (`ground`: where it last stood with no hole near, kept each
+## move; forgotten when it is `placed`; with none, the nearest ground), pays its fall in Combat
+## (`Combat.take_fall`), is protected for `HoleRules.RETURN_PROTECTION` and tells `body_returned`;
+## anything else dies of it through Combat (`Combat.die_of_fall`, its killer whoever last hit or
+## pulled it as it fell, `fell_by`). A boss never falls: a move that leaves it over a hole puts it on
+## the nearest ground instead. A body downed over a hole falls too, and comes back still down. All of
+## it is state, so Feel draws the fall from it (`fall_share`) on a machine that joins mid-fall.
+##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
 ## health (times `stat_scale`, the room's scale, and by the players in play, `players`), walking speed, contact damage, staff, cards and
 ## mana. Data with no staff or no cards leaves the actor without a caster (an enemy that only chases).
@@ -81,7 +96,7 @@ extends Node2D
 ## start (no time passing), so the stop shows the moment of the hit.
 ##
 ## Down and out: `is_down()` is true while a Downed component (gameplay/player, G7) holds the actor
-## down (`set_down`); `die(killer)` sends the local `died` and frees the actor. When its Health is
+## down (`set_down`, `is_downed`) or while it falls (`is_falling`); `die(killer)` sends the local `died` and frees the actor. When its Health is
 ## used up the actor dies, unless something downs it instead (`downable`).
 ##
 ## Services are the autoloads (`Events`, `Combat`, `Projectiles`, `Spells`, `Actors`), found by
@@ -223,6 +238,14 @@ var _down: bool = false
 var _dying: bool = false
 ## True from the moment it starts leaving the tree until it is back.
 var _leaving: bool = false
+## Its fall (hub rework HR-H2, see the class doc): seconds of it left (0: not falling), and whom it is
+## put down to (Combat's `fall_blame` as it fell).
+var fall_left: float = 0.0
+var fell_by: int = ActorsScript.NONE
+## Its last ground: where it last stood with no hole within `HoleRules.GROUND_MARGIN` of its circle,
+## and whether it has stood on any since it was placed.
+var ground: Vector2 = Vector2.ZERO
+var has_ground: bool = false
 
 
 func _enter_tree() -> void:
@@ -276,10 +299,11 @@ func tick_step(delta: float) -> void:
 	move(delta)
 
 
-## True while no controller drives it and it has no Mover (props W2; see the class doc): the Tick
-## does not step it.
+## True while no controller drives it, it has no Mover and it keeps no time (props W2; see the
+## class doc): the Tick does not step it. A prop with a `timer` row keeps time
+## (`PropStateTriggers.keeps_time`): it is stepped, so its clock runs and its pools refill.
 func is_still() -> bool:
-	return controller == null and mover == null
+	return controller == null and mover == null and (state_triggers == null or not state_triggers.keeps_time())
 
 
 ## The body as a few values for the state hash while it rests (props W2; see the class doc): still,
@@ -288,7 +312,7 @@ func is_still() -> bool:
 ## are what may differ between two bodies made alike: where it stands and aims, its size, the staff
 ## on show, its health and whether hits take any.
 func rest_leaf() -> Variant:
-	if _down or _dying or _leaving or not is_still() or possessed_by != null or phases != null:
+	if _down or _dying or _leaving or fall_left > 0.0 or not is_still() or possessed_by != null or phases != null:
 		return null
 	# What a step it took while driven may have left (a possession that ended).
 	if _hold_shown or velocity != Vector2.ZERO or intent.pressed_bits != 0 or intent.held_bits != 0:
@@ -312,7 +336,9 @@ func move(delta: float) -> void:
 	var from: Vector2 = global_position
 	var unhindered: Vector2 = from + velocity * delta
 	var to: Vector2 = unhindered
-	if projectiles != null and projectiles.has_holes():
+	var holes: bool = projectiles != null and projectiles.has_holes()
+	var crossed: bool = mover.crossing != Vector2.ZERO
+	if holes:
 		to = _move_over_holes(from, delta)
 	elif projectiles != null:
 		to = projectiles.slide_body(from, velocity * delta, wall_radius())
@@ -322,8 +348,97 @@ func move(delta: float) -> void:
 		# A dash held up head on by what it slides on ends there (`Mover.held_up`, boss plan OB10).
 		mover.held_up(velocity * delta, to - from)
 		velocity = (to - from) / delta
+	if holes:
+		_check_ground(crossed)
 	if actors != null and not actors.touch_ids.is_empty():
 		_touch()
+
+
+## After a move in a room with holes (hub rework HR-H2, see the class doc): a body whose centre ends
+## over a hole with nothing crossing (`crossed`: this move had a share that crosses; a move of its
+## Mover with time left; a local stop holding it) falls, or, a boss, is put on the nearest ground;
+## one standing clear of every hole keeps the place as its last ground.
+func _check_ground(crossed: bool) -> void:
+	if fall_left > 0.0 or _dying or _leaving:
+		return
+	var at: Vector2 = global_position
+	if projectiles.is_hole(at):
+		if crossed or _hold_shown or mover.is_moving():
+			return
+		if never_falls():
+			global_position = projectiles.nearest_ground(at, wall_radius())
+			return
+		_fall()
+	elif not projectiles.touches_hole(at, wall_radius() + HoleRules.GROUND_MARGIN):
+		ground = at
+		has_ground = true
+
+
+## True for a body that never falls (a boss, question 10): its walk stops at a lip, and whatever else
+## leaves it over a hole puts it on the nearest ground.
+func never_falls() -> bool:
+	return data != null and data.boss
+
+
+## True for a body that comes back from a fall (a wizard: a seat's own body); anything else dies of it.
+func returns_from_falls() -> bool:
+	return home_controller != null and home_controller.seat >= 0
+
+
+## It falls now (see the class doc): whom to put it down to, its moves ended where it is, still.
+func _fall() -> void:
+	fell_by = combat.fall_blame(self) if combat != null else ActorsScript.NONE
+	fall_left = HoleRules.FALL_SECONDS
+	velocity = Vector2.ZERO
+	mover.stop()
+	if events != null:
+		events.body_fell.emit(id)
+
+
+## Its fall is over (see the class doc): its hurt shape back first (Combat needs its row), then a
+## wizard is back on its last ground, pays the fall and is protected; anything else dies of it.
+func _land() -> void:
+	fall_left = 0.0
+	if hurtbox != null and hurtbox.registered == (_down or not hurtbox.enabled):
+		hurtbox.step()
+	if not returns_from_falls():
+		if combat == null or not combat.die_of_fall(self, fell_by):
+			die(fell_by)
+		return
+	var at: Vector2 = ground
+	if not has_ground:
+		at = projectiles.nearest_ground(global_position, wall_radius()) if projectiles != null else global_position
+	global_position = at
+	fell_by = ActorsScript.NONE
+	if combat != null:
+		combat.take_fall(self)
+	if health != null and not _down and not _dying:
+		health.protect(HoleRules.RETURN_PROTECTION)
+	if events != null and not _dying:
+		events.body_returned.emit(id, at)
+
+
+## True while it falls (see the class doc).
+func is_falling() -> bool:
+	return fall_left > 0.0
+
+
+## How far through its fall it is, 0 as it starts to 1 as it ends (0 while not falling): what Feel
+## draws the fall by.
+func fall_share() -> float:
+	return clampf(1.0 - fall_left / HoleRules.FALL_SECONDS, 0.0, 1.0) if fall_left > 0.0 else 0.0
+
+
+## The body was placed anew (a room starts, `Flow._bring_in`): its moves end quietly, a fall it was
+## in is over with no landing, and it has no last ground until it stands somewhere.
+func placed() -> void:
+	velocity = Vector2.ZERO
+	if mover != null:
+		mover.drop()
+	fall_left = 0.0
+	fell_by = ActorsScript.NONE
+	has_ground = false
+	ground = Vector2.ZERO
 
 
 ## Where the body's move by `velocity` over `delta` ends in a room with holes (hub rework HR-H1,
@@ -364,7 +479,7 @@ func _move_over_holes(from: Vector2, delta: float) -> Vector2:
 ## leaving touches nothing. Each tick it overlaps, so a prop that should hear it once leaves its
 ## `touched` state (content/props/README.md).
 func _touch() -> void:
-	if id == ActorsScript.NONE or _down or _dying or _leaving:
+	if id == ActorsScript.NONE or is_down() or _dying or _leaving:
 		return
 	var found: int = actors.touching(global_position, wall_radius(), _touching)
 	for i in found:
@@ -404,6 +519,12 @@ func step(delta: float) -> void:
 	intent.pressed_bits = 0
 	if health != null and health.protecting:
 		health.step(delta)
+	if fall_left > 0.0:
+		fall_left -= delta
+		if fall_left <= 0.0:
+			_land()
+			if _dying:
+				return
 	if phases != null:
 		phases.step(delta)
 	if possessed_by != null:
@@ -414,6 +535,10 @@ func step(delta: float) -> void:
 		intent.clear()
 	if intent.aim != Vector2.ZERO:
 		aim = intent.aim.normalized()
+	if state_triggers != null:
+		# A prop's state clock (its `timer` rows), before its caster steps, as a controller's press;
+		# slowed as a wind-up is (a chill stretches it, a freeze holds it).
+		state_triggers.step(delta * (combat.own_pace(self, id) if combat != null else 1.0))
 	if caster != null:
 		caster.step(delta)
 	if mover != null:
@@ -425,7 +550,7 @@ func step(delta: float) -> void:
 			mover.crossing *= delta / full
 	else:
 		velocity = Vector2.ZERO
-	if hurtbox != null and hurtbox.registered == (_down or not hurtbox.enabled):
+	if hurtbox != null and hurtbox.registered == (is_down() or not hurtbox.enabled):
 		hurtbox.step()
 	for look in _looks:
 		look.step(delta)
@@ -535,9 +660,10 @@ func close_caster_number() -> void:
 	_caster_number = -1
 
 
-## True while the actor is down (a Downed component holds it; G7).
+## True while the actor is down (a Downed component holds it; G7) or falls (hub rework HR-H2): out
+## of play to everything that asks.
 func is_down() -> bool:
-	return _down
+	return _down or fall_left > 0.0
 
 
 ## Down (`on`) or standing again. Called by the Downed component.
@@ -545,8 +671,8 @@ func set_down(on: bool) -> void:
 	_down = on
 
 
-## The name the old wizard slots asked by (`is_down`); the AI's target check and the bots still
-## ask it.
+## True while a Downed component holds it down (G7), falling or not: what a revive asks (a fall alone
+## is no down to revive).
 func is_downed() -> bool:
 	return _down
 

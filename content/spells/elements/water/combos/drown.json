@@ -1,0 +1,13 @@
+{
+	"id": "drown",
+	"name": "Drown",
+	"does": "A water bolt soaks the imp; a void bolt drags the water down with it for extra damage.",
+	"casts": [
+		{"staff": 0, "cards": ["water", "bolt"]},
+		{"staff": 1, "cards": ["void", "bolt"], "at": 0.3}
+	],
+	"imps": [[100, 0]],
+	"seconds": 2.0,
+	"needs": "water",
+	"checks": [{"kind": "reaction", "reaction": "drown"}]
+}

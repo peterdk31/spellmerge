@@ -311,6 +311,15 @@ signal boss_health_changed(actor: int, health: float, max_health: float)
 signal boss_hidden(actor: int)
 ## Sender: combat. `enemy` died; the actor `killer` landed the last hit (or NO_PLAYER). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal enemy_died(killer: int, enemy: Node, position: Vector2, shot: int)
+## Sender: actor (hub rework HR-H2, docs/milestones/hub-rework.md, "Holes" 4). The actor `actor` (its
+## id) ended a move over a hole and falls now, for `HoleRules.FALL_SECONDS` (`Actor.fall_left`); while
+## it falls it is down to everything that asks. Heard by nobody in the game yet (Feel draws a fall from
+## the body's state, `FallLook`, so a machine that joins mid-fall draws it); tests hear it.
+signal body_fell(actor: int)
+## Sender: actor (HR-H2). The wizard `actor` (its id) came back from a fall at `at` (its last ground),
+## having paid its fall's cost (Combat). Anything else that falls dies instead (`enemy_died` for a
+## foe). Heard by nobody in the game yet; tests hear it.
+signal body_returned(actor: int, at: Vector2)
 
 ## Sender: combat. A barrier on the actor `actor` (shield charges from the card with `tag`) stopped a hit at `position`. Heard by core/spells and feel.
 signal shield_blocked(actor: int, position: Vector2, tag: int)

@@ -12,7 +12,7 @@ extends RefCounted
 const NAMES: Array[StringName] = [
 	&"plain", &"embers", &"flecks", &"gusts", &"pull", &"sparks", &"motes", &"glints", &"streaks",
 	&"burst", &"orbiters", &"weave", &"glitter", &"hops", &"wake", &"weight", &"ripple", &"curl",
-	&"zig", &"double", &"converge", &"drift",
+	&"zig", &"double", &"converge", &"drift", &"drops",
 ]
 
 

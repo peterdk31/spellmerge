@@ -182,7 +182,7 @@ func setup(owner_actor: Actor) -> void:
 
 func step(delta: float) -> void:
 	_time += delta
-	var down: bool = actor.is_down()
+	var down: bool = actor.is_downed()
 	var moving: bool = not down and actor.mover != null and actor.mover.is_moving()
 	if moving and not _dash_look:
 		# The ghosts start on the staff and grow out behind as the move goes on.
@@ -220,7 +220,7 @@ func is_poofing() -> bool:
 ## turned by it, so a swinging body steps through the columns while the swing's trail follows the
 ## true arc (down: flat, the way the staff faced).
 func direction() -> int:
-	if actor.is_down():
+	if actor.is_downed():
 		return DIRECTIONS / 2 if _faces_left else 0
 	var dir: Vector2 = pose_dir()
 	if not dir.is_zero_approx():
@@ -299,7 +299,7 @@ func _place_body(time: float) -> void:
 	elif actor.aim.x > 0.01:
 		_faces_left = false
 	var at: Vector2 = Vector2(0.0, -DOWN_LIFT)
-	if not actor.is_down():
+	if not actor.is_downed():
 		var phase: float = time * HOVER_RATE + float(maxi(actor.ramp, 0)) * HOVER_PHASE
 		at = _landed(actor.hand_offset + Vector2(0.0, roundf(sin(phase) * HOVER_BOB)) + pose_offset(_time))
 	if _sprite != null:
@@ -567,7 +567,7 @@ func _draw_shadow() -> void:
 func _draw() -> void:
 	if actor == null:
 		return
-	if actor.is_down():
+	if actor.is_downed():
 		_draw_revive_ring()
 		return
 	if actor.aim == Vector2.ZERO:

@@ -76,6 +76,12 @@ func at_rest() -> bool:
 	return true
 
 
+## The box round it with the body's feet at `feet` (the box, else the circle's), in the same space.
+func rect_at(feet: Vector2) -> Rect2:
+	var half: Vector2 = size * 0.5 if size.x > 0.0 and size.y > 0.0 else Vector2(radius, radius)
+	return Rect2(feet + offset - half, half * 2.0)
+
+
 ## Lay it where the body stands (a body that cannot move, in the tree with an id), or nothing.
 func _lay() -> void:
 	if actor == null or actor.mover != null or actor.projectiles == null or actor.id == ActorsScript.NONE or not actor.is_inside_tree():

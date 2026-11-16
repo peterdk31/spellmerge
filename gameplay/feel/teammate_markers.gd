@@ -91,7 +91,7 @@ func step(table: ActorsScript, seats_here: int, picture: Rect2, zoom: float, clo
 			_at[count] = middle + to * minf(reach, 1.0)
 			_way[count] = to.normalized()
 			_colour[count] = ProjectileManagerScript.ramp_color(table.ramp_of(id))
-			_down[count] = 1 if body is Actor and (body as Actor).is_down() else 0
+			_down[count] = 1 if body is Actor and (body as Actor).is_downed() else 0
 			count += 1
 	if count > 0 or before > 0:
 		queue_redraw()

@@ -17,9 +17,14 @@ const PROP_FOLDER: StringName = &"props"
 
 ## State as who they point at (core/sim/README.md).
 const REFS: Array[StringName] = [&"bodies"]
+## Not state: what was wrong with the room's laying, for Flow to tell (`problems`).
+const DERIVED: Array[StringName] = [&"problems"]
 
 ## The bodies standing, a slot a placement in `RoomPlaces.placed`'s order (null: none or it went).
 var bodies: Array[Node] = []
+## What was wrong as the room was laid (`stand`): a body whose footprint reaches over a hole (hub
+## rework HR-H2), one line each.
+var problems: PackedStringArray = PackedStringArray()
 
 
 ## A new body for the placed data `data` (not yet in the tree; its position is the caller's): a
@@ -87,6 +92,7 @@ func stand_in_role_zones(world: Node2D, places: RoomPlaces, registry: RegistrySc
 			continue
 		body.position = places.zone_rects[at].get_center().floor()
 		world.add_child(body)
+		_check_ground(body, places)
 		bodies.append(body)
 
 
@@ -154,6 +160,7 @@ func forget_gone() -> void:
 ## Nothing stands (the world they stood in goes with them).
 func clear() -> void:
 	bodies.clear()
+	problems.clear()
 
 
 func _stand(world: Node2D, places: RoomPlaces, i: int) -> Node:
@@ -162,7 +169,19 @@ func _stand(world: Node2D, places: RoomPlaces, i: int) -> Node:
 		return null
 	body.position = places.placed_at[i]
 	world.add_child(body)
+	_check_ground(body, places)
 	return body
+
+
+## A body stood whose footprint reaches over a hole of `places` is a problem (hub rework HR-H2): it is
+## kept in `problems` (Flow tells it) and the body stands as placed.
+func _check_ground(body: Node2D, places: RoomPlaces) -> void:
+	var actor := body as Actor
+	if actor == null or actor.footprint == null or places.holes.is_empty():
+		return
+	var hole: Rect2 = places.hole_under(actor.footprint.rect_at(body.position))
+	if hole.has_area():
+		problems.append("%s at %s stands over the hole %s: move it onto the ground." % [body.name, body.position, hole])
 
 
 ## What a standing body was made from: a prop's data, else an enemy's.

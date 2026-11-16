@@ -92,3 +92,12 @@ func test_frost_puts_a_burning_web_out() -> void:
 	_kit.touch(&"frost", _kit.middle(cell))
 	_kit.steps(1)
 	check_equal(_kit.state_of(cell), &"rest", "back to a web")
+
+
+func test_water_puts_a_burning_web_out() -> void:
+	var cell: int = _kit.cell(10, 4)
+	_kit.touch(&"fire", _kit.middle(cell))
+	_kit.steps(1)
+	_kit.touch(&"water", _kit.middle(cell))
+	_kit.steps(1)
+	check_equal(_kit.state_of(cell), &"rest", "back to a web")

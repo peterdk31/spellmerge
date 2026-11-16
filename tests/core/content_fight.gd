@@ -56,6 +56,8 @@ const WIZARDS_AT: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(0.0, 60.0), Vecto
 const FOES_AT: Array[Vector2] = [Vector2(150.0, 10.0), Vector2(190.0, 70.0)]
 ## The fight's shot cap: room for every shot its casts make (a burst, a split on a scatter).
 const SHOT_CAP: int = 512
+## The room of a fight with holes (`holes`): round every place its bodies stand, the void past it.
+const HOLES_BOUNDS: Rect2 = Rect2(-320.0, -240.0, 960.0, 600.0)
 
 
 ## A player that reads nothing of the game, by the fight's tick (`tick`, set before each frame).
@@ -96,6 +98,8 @@ var wizard_casts: int = 0
 var enemy_casts: int = 0
 ## Casts of seat 0's RT: the staff an item fight took.
 var item_casts: int = 0
+## Bodies that fell into a hole (`body_fell`, hub rework HR-H2).
+var falls: int = 0
 var fight: AIFixture
 var entities: EntitiesScript
 ## The fight's Items area (what lies on the ground; every fight has one).
@@ -129,8 +133,10 @@ static func staff_for(card: SpellComponent) -> Array[StringName]:
 
 ## The fight of `content` (a card's or an enemy's resource), as `kind` says, built fresh under a
 ## world of its own in `root` (`world`), with `wizards` scripted wizards (2 to 4; those past seat 1
-## cast plain bolts as seat 1's does).
-func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int = 2) -> void:
+## cast plain bolts as seat 1's does). With `holes` (hub rework HR-H2: a crypt room with a pit), the
+## fight's room is HOLES_BOUNDS with those holes in it, so bodies walk round them, are pushed and dash
+## over them and fall in.
+func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int = 2, holes: Array[Rect2] = []) -> void:
 	# Everything under a world of its own, named as in every fight, so a snapshot's parents (by path
 	# under the world: Entities, for the decoys) are found again in a fresh one.
 	world = Node2D.new()
@@ -142,6 +148,9 @@ func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int 
 	fight = AIFixture.new(world, 0)
 	# Room for every shot a fight makes; the hash walks every slot of the cap each tick.
 	fight.projectiles.set_cap(SHOT_CAP)
+	if not holes.is_empty():
+		fight.projectiles.set_bounds(HOLES_BOUNDS)
+		fight.projectiles.set_holes(holes)
 	entities = EntitiesScript.new()
 	entities.name = "Entities"
 	entities.events = fight.bus
@@ -180,6 +189,7 @@ func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int 
 	world.add_child(cover)
 	_lay_cover()
 	fight.bus.connect(&"staff_cast", _on_staff_cast)
+	fight.bus.connect(&"body_fell", func(_actor: int) -> void: falls += 1)
 	var cards: Array[StringName] = [PLAIN]
 	if kind == CARD:
 		cards = staff_for(resource as SpellComponent)

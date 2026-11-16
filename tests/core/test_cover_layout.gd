@@ -386,3 +386,25 @@ func test_walls_and_edges_block_whole_cells() -> void:
 		check_equal(cover.blocked[cover.cell_of(at)], CoverLayout.BLOCKED_WALL, "a wall over part of the cell at %s blocks it" % at)
 	check_equal(cover.blocked[cover.cell_of(Vector2(50, 105))], 0, "the cell beside it is open")
 	check(cover.kind_at(cover.cell_of(Vector2(4, 300))) == null and cover.kind_at(cover.cell_of(Vector2(20, 300))) != null, "the room's edge is kept from as a wall (wall_gap 1)")
+
+
+## Hub rework HR-H2: a hole blocks the cover as a wall does, so no cover grows over one and a kind
+## keeps its `wall_gap` from a crack's lip.
+func test_no_cover_grows_over_a_hole() -> void:
+	var layout := own(Node2D.new()) as Node2D
+	var holes := StaticBody2D.new()
+	holes.collision_layer = RoomBase.HOLE_LAYER
+	layout.add_child(holes)
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(32, 360)
+	shape.shape = rect
+	shape.position = Vector2(316, 180)
+	holes.add_child(shape)
+	var cover: CoverLayout = CoverLayout.of(layout, _room(&"holes"), [_grass(&"test_meadow", 1.0, 2, 1, 0)] as Array[CoverKind])
+	for cell in cover.cells.size():
+		if cover.cell_rect(cell).intersects(Rect2(300, 0, 32, 360)):
+			check_equal(cover.blocked[cell], CoverLayout.BLOCKED_WALL, "a cell over the hole is blocked: %d" % cell)
+			check(cover.kind_at(cell) == null, "and uncovered: %d" % cell)
+	check(cover.kind_at(cover.cell_of(Vector2(280, 100))) == null, "a cell from its lip is kept clear (wall_gap 1)")
+	check(cover.kind_at(cover.cell_of(Vector2(200, 100))) != null, "farther off, grass")

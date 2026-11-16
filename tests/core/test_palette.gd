@@ -41,7 +41,7 @@ func test_the_palette_is_the_style_guides() -> void:
 			shades.append("#" + shade.to_html(false))
 		check_equal(shades, guide[name], "%s's shadow, base and light" % name)
 	check_equal(Palette.MATERIALS.size(), guide.size() - 1, "no material the guide lacks")
-	check_equal(Palette.hex_colours().size(), 49, "49 colours, as the guide says")
+	check_equal(Palette.hex_colours().size(), 52, "52 colours, as the guide says")
 
 
 func test_a_ramp_is_white_hot_then_light_base_shadow() -> void:

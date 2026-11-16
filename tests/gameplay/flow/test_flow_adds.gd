@@ -220,6 +220,19 @@ func test_each_call_turns_the_ring_so_a_wave_stands_apart() -> void:
 		check(imp.position.distance_to(wave[0].position) > 1.0, "the wave's add stands apart from the burst's")
 
 
+## Hub rework HR-H2: a spot on the ring over a hole takes the nearest ground, so no add stands over one.
+func test_an_add_whose_ring_spot_is_over_a_hole_stands_at_the_nearest_ground() -> void:
+	_start(1)
+	var boss: Actor = _boss()
+	var below := Rect2(boss.global_position + Vector2(-120.0, 8.0), Vector2(240.0, 64.0))
+	projectiles.call("set_holes", [below] as Array[Rect2])
+	boss.phases.begin(0)
+	var stood: Array[Actor] = _imps()
+	check(stood.size() >= 2, "its burst stands")
+	for imp: Actor in stood:
+		check(not projectiles.call("touches_hole", imp.global_position, imp.wall_radius()), "an add stands on the ground: %s" % imp.global_position)
+
+
 ## An add freed with no death told (it left the room some other way) is forgotten: it counts no more
 ## against the cap, and the room is cleared all the same once the boss is down.
 func test_an_add_gone_without_a_death_is_forgotten() -> void:

@@ -637,3 +637,79 @@ func test_a_snapshot_rolls_a_prop_back_to_its_state() -> void:
 	check(exploding_barrel.caster.is_winding(FUSE), "its fuse burns again")
 	_world.run(FUSE_STEPS)
 	check_equal(_state(exploding_barrel), &"broken", "and it blows as it did")
+
+
+# --- Timers -------------------------------------------------------------------------
+
+## A row that goes to `then` every `seconds` it stays in its state.
+func _timer(seconds: float, then: StringName = &"", cast: int = 0) -> PropTrigger:
+	var row: PropTrigger = PropTrigger.make(PropTrigger.When.TIMER, cast, then)
+	row.seconds = seconds
+	return row
+
+
+func test_a_timer_row_fires_every_its_seconds_on_the_tick() -> void:
+	# Each tick goes to `tock` and back (a timer of 0.25 s, four steps of the fixture's 1/16 s).
+	var data: PropBase = _made([PropState.make(&"tick", [_timer(0.25, &"tock")] as Array[PropTrigger]), PropState.make(&"tock", [_timer(0.25, &"tick")] as Array[PropTrigger])], 10.0, true)
+	var body: Actor = _prop(data)
+	check(body.state_triggers.keeps_time(), "a prop with a timer row keeps time")
+	check(not body.is_still(), "so it is stepped, not still")
+	body.step(Fixture.STEP)
+	body.step(Fixture.STEP)
+	body.step(Fixture.STEP)
+	check_equal(_state(body), &"tick", "not yet at three steps")
+	check_equal(body.state_triggers.clock, 3.0 * Fixture.STEP, "its clock counts")
+	body.step(Fixture.STEP)
+	check_equal(_state(body), &"tock", "at the fourth")
+	check_equal(body.state_triggers.clock, 0.0, "a state entered starts its clock at 0")
+	for i in 8:
+		body.step(Fixture.STEP)
+	check_equal(_changes.size(), 3, "tick, tock, tick: once each 0.25 s")
+
+
+func test_a_timer_row_that_only_casts_casts_every_its_seconds() -> void:
+	# (A second apart: the barrel's blast keeps its staff busy for over half a second after it.)
+	var data: PropBase = _made([PropState.make(&"idle", [_timer(1.0, &"", 2)] as Array[PropTrigger])], 10.0, true)
+	var body: Actor = _prop(data)
+	_world.run(16 * 2 + 8)
+	check_equal(_blasts(body, 1), 2, "two casts in two and a half seconds")
+	check_equal(_state(body), &"idle", "with no state change")
+
+
+func test_a_prop_with_no_timer_row_stays_still() -> void:
+	var body: Actor = _prop(EXPLODING_BARREL)
+	check(not body.state_triggers.keeps_time(), "the barrel keeps no time")
+	check(body.is_still(), "so it is still")
+
+
+func test_a_timer_row_needs_seconds() -> void:
+	var row: PropTrigger = _timer(0.0, &"idle")
+	var found: PackedStringArray = row.problems(1, PackedStringArray(["idle"]))
+	check(found.size() == 1 and found[0].contains("seconds"), "a timer of no seconds is a problem: %s" % [found])
+	check(_timer(1.0, &"idle").problems(1, PackedStringArray(["idle"])).is_empty(), "one of a second is fine")
+	check(_timer(1.0).heard(PropTrigger.When.TIMER, &"", 2.0, 1.99), "it fires as its clock passes a whole second")
+	check(not _timer(1.0).heard(PropTrigger.When.TIMER, &"", 1.5, 1.01), "not between")
+	check(_timer(1.0).heard(PropTrigger.When.TIMER, &"", 1.0, 0.9375), "and at exactly the second")
+
+
+func test_a_timer_row_fires_on_its_tick_at_the_games_step() -> void:
+	# 144 steps of 1/60 s sum a hair under 2.4 in floats: the row still fires on the 144th.
+	var data: PropBase = _made([PropState.make(&"idle", [_timer(2.4, &"rang")] as Array[PropTrigger]), PropState.make(&"rang")], 10.0, true)
+	var body: Actor = _prop(data)
+	for i in 143:
+		body.step(1.0 / 60.0)
+	check_equal(_state(body), &"idle", "not at 143 steps")
+	body.step(1.0 / 60.0)
+	check_equal(_state(body), &"rang", "at the 144th, 2.4 s")
+
+
+func test_a_frozen_props_clock_stands_still() -> void:
+	var data: PropBase = _made([PropState.make(&"idle", [_timer(1.0, &"rang")] as Array[PropTrigger]), PropState.make(&"rang")], 10.0, true)
+	var body: Actor = _prop(data)
+	_world.combat.apply_status(-1, body, &"chill", 3.0, 40.0)
+	_world.combat.apply_status(-1, body, &"chill", 3.0, 40.0)
+	_world.combat.apply_status(-1, body, &"chill", 3.0, 40.0)
+	check(_world.combat.has_status(body, &"freeze"), "frozen")
+	for i in 8:
+		body.step(Fixture.STEP)
+	check_equal(body.state_triggers.clock, 0.0, "its clock does not run while it is frozen")

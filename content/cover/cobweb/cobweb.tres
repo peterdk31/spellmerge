@@ -18,6 +18,12 @@ when = 0
 element = &"frost"
 then = &"rest"
 
+[sub_resource type="Resource" id="burning_water"]
+script = ExtResource("3_trigger")
+when = 0
+element = &"water"
+then = &"rest"
+
 [sub_resource type="Resource" id="burning_after"]
 script = ExtResource("3_trigger")
 when = 1
@@ -57,7 +63,7 @@ bend = 0.0
 motes = Array[ExtResource("4_motes")]([SubResource("burning_embers")])
 spreads = &"fire"
 spread_chance = 1.0
-triggers = Array[ExtResource("3_trigger")]([SubResource("burning_frost"), SubResource("burning_after")])
+triggers = Array[ExtResource("3_trigger")]([SubResource("burning_frost"), SubResource("burning_water"), SubResource("burning_after")])
 
 [sub_resource type="Resource" id="gone"]
 script = ExtResource("2_state")

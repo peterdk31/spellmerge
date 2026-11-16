@@ -17,7 +17,8 @@ extends RefCounted
 ##    deciding the cells whose middles lie in its rectangle: its kind with the chance of its
 ##    `density`, else none (a field of no kind clears them).
 ##
-## No source ever covers a cell under a wall (one a wall's rectangle overlaps) or
+## No source ever covers a cell under a wall or a hole (one a wall's or a hole's rectangle overlaps;
+## a hole is blocked as a wall, `BLOCKED_WALL`, hub rework HR-H2) or
 ## the cell of a door, a spawn or a placement. The chances come from `hash4`, keyed by the room's id,
 ## the kind's id, the cell and what the roll is for (`ROLL_*`); never `sim.chance`.
 
@@ -67,7 +68,11 @@ static func of(layout_root: Node, room: RoomBase, all_kinds: Array[CoverKind]) -
 	made.rows = ceili(places.size.y / float(CELL))
 	made.cells.resize(made.columns * made.rows)
 	made.blocked.resize(made.columns * made.rows)
-	made._block(RoomPlaces.wall_rects(layout_root), places)
+	# A hole is blocked as a wall is (hub rework HR-H2): no cover grows over one, and a kind keeps its
+	# `wall_gap` from a crack's lip as from a wall.
+	var blocking: Array[Rect2] = RoomPlaces.wall_rects(layout_root)
+	blocking.append_array(RoomPlaces.hole_rects(layout_root))
+	made._block(blocking, places)
 	made.room_key = name_hash(room.id) if room != null else 0
 	if room != null and room.cover_fill and room.biome != &"":
 		made._fill(made.room_key, room.biome)

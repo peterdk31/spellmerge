@@ -82,27 +82,31 @@ const FREEZE: StringName = &"freeze"
 const GUST: StringName = &"gust"
 const HEX: StringName = &"hex"
 const STATIC: StringName = &"static"
+const SOAK: StringName = &"soak"
 ## Every status by its index (`ST_*`): a row keeps each one's seconds left and power in
 ## `_status_left` and `_status_power`, at `row * STATUS_COUNT + ST_*`. A plain status (gust, hex,
 ## static) is only its name, its index and its row in each table below; burn and chill have rules of
 ## their own, in the few places that name them (`_apply_status_row`, `_extend`, `_remove_status`,
-## `_tick`). What a status does to a hit is where the hit is dealt (`_hit`, `_apply_spell`, `_pace`).
-const STATUSES: Array[StringName] = [BURN, CHILL, FREEZE, GUST, HEX, STATIC]
+## `_tick`), and soak (water's) two: a soaked body takes no burn and a soak puts a burn out
+## (`_apply_status_row`), and heals on it are its power in per cent stronger (`_heal`). What a status
+## does to a hit is where the hit is dealt (`_hit`, `_apply_spell`, `_pace`).
+const STATUSES: Array[StringName] = [BURN, CHILL, FREEZE, GUST, HEX, STATIC, SOAK]
 const ST_BURN: int = 0
 const ST_CHILL: int = 1
 const ST_FREEZE: int = 2
 const ST_GUST: int = 3
 const ST_HEX: int = 4
 const ST_STATIC: int = 5
-const STATUS_COUNT: int = 6
+const ST_SOAK: int = 6
+const STATUS_COUNT: int = 7
 ## A status's index by its name.
-const STATUS_AT: Dictionary[StringName, int] = {BURN: ST_BURN, CHILL: ST_CHILL, FREEZE: ST_FREEZE, GUST: ST_GUST, HEX: ST_HEX, STATIC: ST_STATIC}
+const STATUS_AT: Dictionary[StringName, int] = {BURN: ST_BURN, CHILL: ST_CHILL, FREEZE: ST_FREEZE, GUST: ST_GUST, HEX: ST_HEX, STATIC: ST_STATIC, SOAK: ST_SOAK}
 ## By ST_*: whether `apply_status` puts it on (freeze only comes from chill).
-const STATUS_APPLIED: Array[bool] = [true, true, false, true, true, true]
+const STATUS_APPLIED: Array[bool] = [true, true, false, true, true, true, true]
 ## By ST_*: what `apply_status`'s strength is in its power (its power is the strength over this):
-## burn's damage a second, chill's share of speed (its strength a percent), gust's, hex's and
-## static's percent; freeze has none.
-const STATUS_STRENGTH_PER_POWER: Array[float] = [1.0, 100.0, 0.0, 1.0, 1.0, 1.0]
+## burn's damage a second, chill's share of speed (its strength a percent), gust's, hex's,
+## static's and soak's percent (soak's: how much more a heal on it heals); freeze has none.
+const STATUS_STRENGTH_PER_POWER: Array[float] = [1.0, 100.0, 0.0, 1.0, 1.0, 1.0, 1.0]
 ## The id a discharge is announced with on `reaction_triggered`, at each actor it hits.
 const DISCHARGE: StringName = &"discharge"
 
@@ -123,6 +127,9 @@ const KIND_BURST: StringName = &"burst"
 const KIND_REACTION: StringName = &"reaction"
 const KIND_STATUS: StringName = &"status"
 const KIND_HEAL: StringName = &"heal"
+## A fall's cost (hub rework HR-H2, `take_fall`), and a pull's mark on who moved a body last (`pull`).
+const KIND_FALL: StringName = &"fall"
+const KIND_PULL: StringName = &"pull"
 
 ## What "downed by your own ..." calls a hit when its spell has no name of its own.
 const KIND_NAMES: Dictionary = {
@@ -132,6 +139,8 @@ const KIND_NAMES: Dictionary = {
 	KIND_BURST: "Blast",
 	KIND_REACTION: "Reaction",
 	KIND_STATUS: "Burn",
+	KIND_FALL: "fall",
+	KIND_PULL: "Pull",
 }
 
 ## How many rows there are: one per actor id.
@@ -168,7 +177,7 @@ const STATIC_RANGE: float = 96.0
 ## The statuses a reaction can start from, in the order they are looked at: a hit reacts with the
 ## first the target has that has a row for the hit's element (a frozen target counts as chilled).
 ## The one list of that order (`_status_bits`).
-const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, GUST, HEX, STATIC]
+const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, GUST, HEX, STATIC, SOAK]
 ## `_hit`'s `team` when its caller has not read the row's team (it reads it then).
 const TEAM_UNREAD: int = -2
 ## A consume reaction does this many times its damage to a frozen actor.
@@ -275,6 +284,10 @@ var _slam_tag: PackedInt32Array = PackedInt32Array()
 var _last_by: PackedInt32Array = PackedInt32Array()
 var _last_kind: Array[StringName] = []
 var _last_name: PackedStringArray = PackedStringArray()
+
+## The share of a wizard's most health a fall costs in the room it is in (hub rework HR-H2: set as a
+## room is entered, `room_entered`; 0 where the room's falls are free, `RoomBase.falls_free`).
+var fall_cost: float = HoleRules.FALL_COST
 
 ## True while a discharge is being dealt, so nothing it causes can start another.
 var _discharging: bool = false
@@ -419,6 +432,8 @@ func setup() -> void:
 		events.carry_ended.connect(_on_carry_ended)
 	if not events.crumble_requested.is_connected(_on_crumble_requested):
 		events.crumble_requested.connect(_on_crumble_requested)
+	if not events.room_entered.is_connected(_on_room_entered):
+		events.room_entered.connect(_on_room_entered)
 	# The moments of other areas that hold bodies (online-ready N4, `hit_stop.gd`).
 	if not events.shot_blocked.is_connected(_on_shot_blocked):
 		events.shot_blocked.connect(_on_shot_blocked)
@@ -616,6 +631,11 @@ func _apply_status_row(caster: int, row: int, status_id: StringName, duration: f
 	if duration <= 0.0:
 		return false
 	var at: int = row * STATUS_COUNT
+	# Soak (water's): a soaked body does not catch fire, and a soak puts a burn out.
+	if st == ST_BURN and _status_left[at + ST_SOAK] > 0.0:
+		return false
+	if st == ST_SOAK:
+		_remove_status(row, BURN)
 	var power: float = strength / STATUS_STRENGTH_PER_POWER[st]
 	var froze: bool = false
 	# A fresh status starts from its own strength; one still on keeps the stronger.
@@ -657,7 +677,7 @@ func _tell_status(by: int, node: Node2D, status_id: StringName) -> void:
 		(node as Actor).status_gained.emit(by, status_id)
 
 
-## Seconds left of `status_id` (burn, chill, freeze, gust, hex or static) on `actor`; 0 when
+## Seconds left of `status_id` (burn, chill, freeze, gust, hex, static or soak) on `actor`; 0 when
 ## it is off or the actor is not registered.
 func status_left(actor: Variant, status_id: StringName) -> float:
 	var row: int = _row_of(actor)
@@ -768,6 +788,10 @@ func pull(caster: int, position: Vector2, radius: float, strength: float, foes_o
 		var toward: Vector2 = (Geometry2D.get_closest_point_to_segment(body, position, end) - body).normalized()
 		_knock[row] = toward * strength / _mass(row)
 		_slam[row] = 0
+		# Who moved it last (hub rework HR-H2: a body pulled into a hole is the puller's kill).
+		_last_by[row] = caster
+		_last_kind[row] = KIND_PULL
+		_last_name[row] = ""
 		# A body caught by a pull it was not in lately: the moment's cue (S6, item 13).
 		if _pulled_at[row] < _steps - PULL_GAP_STEPS and events != null:
 			events.cue_shown.emit(caster, PULL_CUE, body, toward, 0.0, Color.WHITE, 0)
@@ -962,11 +986,92 @@ func _on_crumble_requested(actor: int) -> void:
 	crumble(actor)
 
 
+# --- Falls (hub rework HR-H2, docs/milestones/hub-rework.md, "Holes" 4, question 10) -----------
+
+## Whom a fall of `target` (an actor id or its node) is put down to: whoever last hit or pulled it
+## (`_last_by`), NO_PLAYER for nobody or a body that is not registered. The actor asks as it starts
+## to fall, while its row is still there (a falling body's hurtbox is off).
+func fall_blame(target: Variant) -> int:
+	var row: int = _row_of(target)
+	return _last_by[row] if row != ActorsScript.NONE else EventsScript.NO_PLAYER
+
+
+## A wizard `target` back from a fall pays for it: `fall_cost` of its most health, taken whole (no
+## barrier, hex or charge has a say, nor protection: it is no hit, `Health.lose`), told as damage of
+## KIND_FALL by nobody. At 0 it is downed as by any hit. Nothing where falls are free, for a body down,
+## dying or not registered.
+func take_fall(target: Variant) -> void:
+	var row: int = _row_of(target)
+	if row == ActorsScript.NONE or fall_cost <= 0.0 or _body[row] != BODY_ACTOR:
+		return
+	var kit: Actor = _nodes[row] as Actor
+	if kit.health == null or kit.is_down() or kit.is_dying() or kit.health.is_depleted():
+		return
+	var amount: float = kit.health.max_health * fall_cost
+	var where: Vector2 = _position_of(kit)
+	var team: int = _team(row)
+	_last_by[row] = EventsScript.NO_PLAYER
+	_last_kind[row] = KIND_FALL
+	_last_name[row] = ""
+	kit.health.lose(amount, EventsScript.NO_PLAYER)
+	var left: float = kit.health.health
+	if events != null:
+		events.hit_landed.emit(EventsScript.NO_PLAYER, kit, amount, where, KIND_FALL, -1)
+		events.damage_dealt.emit(EventsScript.NO_PLAYER, kit, amount, where)
+		kit.damaged.emit(EventsScript.NO_PLAYER, amount, &"")
+	if left == 0.0 and _same(row, kit):
+		_die(row, EventsScript.NO_PLAYER, where, team)
+
+
+## The body `target` does not come back from its fall: it dies of it, killed by `by` (its
+## `fall_blame`), told as any death (`enemy_died` for a foe of the wizards, so a room can be cleared
+## by sweeping strays into a crack), with no hit; protection and `invincible` do not keep it. A body
+## something else ends at 0 health (`downable`: a decoy, a prop's death triggers) is emptied
+## (`Health.empty`) and ended that way. A kit Actor with no row (no hurt shape, or one switched off) is
+## registered for its death, so a foe's is still told. Returns true if it died or was ended; false for
+## a body that is no kit Actor or is dying already.
+func die_of_fall(target: Variant, by: int) -> bool:
+	var row: int = _row_of(target)
+	if row == ActorsScript.NONE and target is Actor:
+		row = register_actor(target as Actor, 1.0, 0.0)
+	if row == ActorsScript.NONE or _body[row] != BODY_ACTOR:
+		return false
+	var kit: Actor = _nodes[row] as Actor
+	if kit.is_dying() or kit.is_leaving():
+		return false
+	if kit.downable and kit.health != null:
+		kit.health.empty(by)
+		return true
+	var team: int = _team(row)
+	var where: Vector2 = _position_of(kit)
+	if kit.health != null:
+		kit.health.reset(0.0)
+	var saved_tag: int = _tag
+	var saved_slot: int = _slot
+	_tag = 0
+	_slot = -1
+	_die(row, by, where, team)
+	_tag = saved_tag
+	_slot = saved_slot
+	return true
+
+
+## A room is entered: what a fall costs there (`RoomBase.falls_free`; HoleRules.FALL_COST, the
+## default, for a room the registry does not know).
+func _on_room_entered(room_id: StringName) -> void:
+	var room: RoomBase = registry.get_resource(&"rooms", room_id) as RoomBase if registry != null else null
+	fall_cost = 0.0 if room != null and room.falls_free else HoleRules.FALL_COST
+
+
 ## A heal hit: `amount` health for the row `row` from `by`'s spell. A down or dead actor is not
 ## healed. A wizard's own code adds it (`heal_dealt`).
 func _heal(by: int, row: int, amount: float) -> bool:
 	if amount <= 0.0 or not _can_heal(row):
 		return false
+	# A soaked body is healed its soak's power in per cent more (water and mend).
+	var at: int = row * STATUS_COUNT
+	if _status_left[at + ST_SOAK] > 0.0:
+		amount += amount * _status_power[at + ST_SOAK] / 100.0
 	var node: Node2D = _nodes[row]
 	match _body[row]:
 		BODY_ACTOR:
@@ -1268,6 +1373,14 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 			_extend(by, row, reaction)
 		ReactionRow.Effect.SPREAD:
 			_spread(by, row, centre, reaction)
+		ReactionRow.Effect.REMOVE:
+			_remove_status(row, reaction.status_id)
+		ReactionRow.Effect.FREEZE:
+			_remove_status(row, reaction.status_id)
+			_freeze(by, row, reaction.duration)
+		ReactionRow.Effect.CONDUCT:
+			_remove_status(row, reaction.status_id)
+			_conduct(by, row, centre, reaction)
 	_tag = spell_tag
 	_tell_reacted(by, node, reaction.reaction_id)
 
@@ -1309,17 +1422,55 @@ func _extend(by: int, row: int, reaction: ReactionRow) -> void:
 		return
 	var at: int = row * STATUS_COUNT
 	if st == ST_CHILL:
-		var newly: bool = _status_left[at + ST_FREEZE] <= 0.0
-		_status_left[at + ST_CHILL] = 0.0
-		_status_power[at + ST_CHILL] = 0.0
-		_chill_stacks[row] = 0
-		# The body's resist shortens what a reaction adds too (boss plan OB7), a freeze as a chill.
-		_status_left[at + ST_FREEZE] += reaction.duration * (1.0 - _resist(row, ST_FREEZE))
-		if newly and _status_left[at + ST_FREEZE] > 0.0:
-			_tell_status(by, _nodes[row], FREEZE)
+		_freeze(by, row, reaction.duration)
 		return
 	_status_left[at + st] += reaction.duration * (1.0 - _resist(row, st))
 	_status_power[at + st] += reaction.strength
+
+
+## The row `row` freezes for `seconds` more (EXTEND on a chill, FREEZE): its chill and stacks go, and
+## a body not frozen yet is told it froze. The body's resist shortens it (boss plan OB7), a freeze
+## as a chill.
+func _freeze(by: int, row: int, seconds: float) -> void:
+	var at: int = row * STATUS_COUNT
+	var newly: bool = _status_left[at + ST_FREEZE] <= 0.0
+	_status_left[at + ST_CHILL] = 0.0
+	_status_power[at + ST_CHILL] = 0.0
+	_chill_stacks[row] = 0
+	_status_left[at + ST_FREEZE] += seconds * (1.0 - _resist(row, ST_FREEZE))
+	if newly and _status_left[at + ST_FREEZE] > 0.0:
+		_tell_status(by, _nodes[row], FREEZE)
+
+
+## CONDUCT: `reaction.damage` to the struck row and to every other soaked body within the circle,
+## each losing its soak, with an arc from the struck body to each (Feel draws a discharge's).
+## Reaction damage, so it sets off no reaction (a charged body it strikes still discharges, static's
+## rule, as a burst's strike does); the soaked bodies of every team, as a hit's.
+func _conduct(by: int, row: int, centre: Vector2, reaction: ReactionRow) -> void:
+	var node: Node2D = _nodes[row]
+	if projectiles != null:
+		var near: Array[Node2D] = _take_scratch()
+		var count: int = projectiles.targets_in(centre, reaction.radius, ProjectileManagerScript.ACTOR_LAYERS, near)
+		for i in count:
+			var other_node: Node2D = near[i]
+			if other_node == node or not is_instance_valid(other_node):
+				continue
+			var other: int = _row_of_node(other_node)
+			if other == ActorsScript.NONE or _status_left[other * STATUS_COUNT + ST_SOAK] <= 0.0:
+				continue
+			_remove_status(other, SOAK)
+			if events != null:
+				var zapped: Vector2 = _position_of(other_node) + _hurt_offset[other]
+				events.reaction_triggered.emit(by, reaction.reaction_id, zapped, _slot)
+				hit_stop.reaction(by, reaction.reaction_id, _slot)
+				events.discharge_arc.emit(by, centre, zapped)
+				# A listener may have changed the registrations.
+				other = _row_of_node(other_node)
+			if other != ActorsScript.NONE:
+				_hit(by, other, reaction.damage, Vector2.ZERO, 0.0, KIND_REACTION, null, false)
+		_give_scratch()
+	if _same(row, node):
+		_hit(by, row, reaction.damage, Vector2.ZERO, 0.0, KIND_REACTION, null, false)
 
 
 ## SPREAD: the status, as it is now, goes on every other actor in the circle.

@@ -1,4 +1,4 @@
-extends SceneTree
+extends Node
 ## Base class for small, isolated unit tests.
 ##
 ## A test script extends this file and holds one method per behaviour, named `test_*`. Each
@@ -17,26 +17,55 @@ extends SceneTree
 ##   func test_something_holds() -> void:
 ##       check(1 + 1 == 2, "arithmetic works")
 ##
-## godot --headless --path . --script res://tests/<area>/test_<name>.gd
+## A suite is not a program of its own: the host (tests/support/run.gd) runs one or several, one
+## after another in one process, each on a fresh game (a Godot start compiles the whole game,
+## seconds, so the runner hands it several files; ci/build/unit_tests.sh):
+##
+##   godot --headless --path . --script res://tests/support/run.gd -- res://tests/<area>/test_<name>.gd
+##
+## The suite reads the tree as a SceneTree script would: `root`, `process_frame`, `physics_frame`,
+## `paused`, `current_scene` and `call_group` are the host's tree's.
 ##
 ## A long test file can be run in several processes side by side: a line `# unit-test-shards: N`
-## in it makes the runner (ci/build/unit_tests.sh) start it N times, with the user argument
-## `--shard=K/N` (K from 0), and each process runs every Nth test method (by name), from the Kth.
-## A long matrix is split into several methods for it (tests/core/test_card_rules.gd).
+## in it makes the runner start it N times, with the user argument `--shard=K/N` (K from 0), and each
+## process runs every Nth test method (by name), from the Kth. A long matrix is split into several
+## methods for it (tests/core/test_card_rules.gd). A file that needs a process of its own (one that
+## takes many seconds, or times the machine) says `# unit-test-alone`.
 ##
-##   godot --headless --path . --script res://tests/core/test_card_rules.gd -- --shard=0/6
+##   godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_card_rules.gd --shard=0/6
 
 const _SUITE_FRAMES := preload("res://core/sim/frames.gd")
 const _SUITE_TICK := preload("res://core/sim/tick.gd")
 
+## The host's tree's root window, and its frame signals (set by `run_in`).
+var root: Window
+var process_frame: Signal
+var physics_frame: Signal
+## The host's tree's pause and current scene.
+var paused: bool:
+	get:
+		return _tree.paused
+	set(value):
+		_tree.paused = value
+var current_scene: Node:
+	get:
+		return _tree.current_scene
+	set(value):
+		_tree.current_scene = value
+
+var _tree: SceneTree
 var _failures: Array[String] = []
 var _current: String = ""
 var _owned: Array[Object] = []
 
 
-func _initialize() -> void:
-	# The root joins the scene tree only after _initialize returns: wait one frame.
-	await process_frame
+## Runs every `test_*` method (of the shard the user arguments ask for) on `tree`; returns the
+## failures, each "test_name: what was wrong" (empty when all passed).
+func run_in(tree: SceneTree) -> Array[String]:
+	_tree = tree
+	root = tree.root
+	process_frame = tree.process_frame
+	physics_frame = tree.physics_frame
 	var names: Array[String] = []
 	for method: Dictionary in get_method_list():
 		var method_name: String = method["name"]
@@ -63,11 +92,15 @@ func _initialize() -> void:
 		print("TEST TIME: %s %d ms" % [method_name, Time.get_ticks_msec() - started])
 	if _failures.is_empty():
 		print("TEST OK: %s (%d tests)" % [label, names.size()])
-		quit(0)
 	else:
 		for failure in _failures:
 			printerr("TEST FAILED: " + failure)
-		quit(1)
+	return _failures
+
+
+## The host's tree's `call_group`.
+func call_group(group: StringName, method: StringName, ...args: Array) -> void:
+	_tree.call_group.callv([group, method] + args)
 
 
 ## The shard a run's user arguments ask for, as (K, N) from `--shard=K/N`; (0, 1) (the whole file)

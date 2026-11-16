@@ -1,7 +1,5 @@
 extends "res://tests/support/card_rig.gd"
 ## The Bolt card (content/spells/carriers/bolt/, M2 part 10): one shot that flies straight and hits, and ends after its lifetime.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/carriers/bolt/test_bolt.gd
 func test_the_card_is_a_bolt() -> void:
 	_check_card(&"bolt", 1)
 	check_equal(_carrier_card(&"bolt").carrier, &"atom", "bolt flies (a bigger atom)")

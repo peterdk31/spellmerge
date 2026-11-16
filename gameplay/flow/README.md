@@ -40,7 +40,7 @@ Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
-`gameplay/flow/flow.gd` and its test `tests/gameplay/flow/test_flow.gd` (run with `godot --headless --path . --script res://tests/gameplay/flow/test_flow.gd`). The test runs on the real autoloads, drives time through `Flow.step(delta)` and covers 1, 2 and 4 players.
+`gameplay/flow/flow.gd` and its test `tests/gameplay/flow/test_flow.gd`. The test runs on the real autoloads, drives time through `Flow.step(delta)` and covers 1, 2 and 4 players.
 
 ## Validate
 

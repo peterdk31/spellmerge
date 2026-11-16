@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## Spray carrier (`spray`, a held hose). It telegraphs first (its lane widening to the cone's width:
 ## docs/DESIGN.md, "Fair difficulty"), then holds the spray down for a moment, turning slowly after
 ## its target, and keeps to its spray's short range. It is in the crypt's enemy pool.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/enemies/spitter/test_spitter.gd
 const AiFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const SPITTER: EnemyBase = preload("res://content/enemies/spitter/spitter.tres")
 const SPRAY: CarrierCard = preload("res://content/spells/carriers/spray/spray.tres")

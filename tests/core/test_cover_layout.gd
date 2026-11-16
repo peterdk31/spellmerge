@@ -6,8 +6,6 @@ extends "res://tests/support/suite.gd"
 ## gaps; a field overrides the fill and one of no kind clears it; a room with the fill off or with no
 ## biome has only its fields. The cover kinds are a test grass (tests/core/fixtures/cover_content),
 ## made to fill the real rooms' biomes, so the rooms are covered whether or not the game has cover yet.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_cover_layout.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 const FIXTURE_ROOT: String = "res://tests/core/fixtures/cover_content"
 const GRASS: CoverKind = preload("res://tests/core/fixtures/cover_content/cover/test_grass/test_grass.tres")

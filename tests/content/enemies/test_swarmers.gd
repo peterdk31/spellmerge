@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## stray Face, no staff, no cards and no mana, so it has no Caster and no Telegraph: it only
 ## chases and hurts by touch (the enemy AI with nothing to cast, by the `swarmer` profile). The mite is small, fast and dies to two plain bolts; the husk is
 ## slow, tough and hits harder. Both die like any enemy (`enemy_died`).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/enemies/test_swarmers.gd
 const AiFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const MiteData: EnemyBase = preload("res://content/enemies/crypt_mite/crypt_mite.tres")
 const HuskData: EnemyBase = preload("res://content/enemies/bone_husk/bone_husk.tres")

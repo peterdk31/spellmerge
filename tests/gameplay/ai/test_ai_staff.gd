@@ -7,8 +7,6 @@ extends "res://tests/support/suite.gd"
 ## cast is ready (so a telegraph always comes true), shows the next cast's reach, compiles its
 ## staff once per enemy type, and closes its actor when it leaves. A world of its own (bus, an
 ## actor table, projectiles, spells with cards built in code, combat, one wizard), stepped by hand.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_staff.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")

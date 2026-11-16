@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## never installed; every change is counted and said; its player loadout (items I4) and a wizard
 ## made from one; its bags' capacities from the run's rules; every actor has one, and a body with no
 ## Caster has no hands (items I8).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_inventory.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 
 const CARDS: StringName = &"cards"

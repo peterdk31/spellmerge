@@ -8,8 +8,6 @@ extends "res://tests/support/suite.gd"
 ## of every card (tests/core/test_state_walked.gd). Every change to a BY_ACTOR table either changes
 ## its caster's part or is named by `actor_part_problems`; a table with no case here fails. A desync
 ## report names the caster.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_parts.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 

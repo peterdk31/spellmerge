@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## fire cap, the held spell's origin, direction and exclusion, chain, `hit_profile`, and
 ## four players with a rebuild mid-flight. It runs a real projectile manager and event bus,
 ## stepped by hand, with components built in code and a stand-in registry.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_cast.gd
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

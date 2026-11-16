@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## bit; the writers refuse what the decoder would; the decoder refuses every cut, bad id, bad name
 ## and count out of range, changing nothing; a replay's header carries it (since format 8), and the
 ## frames service gives the replay's on the deck, else the game's.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_ground_loadout.gd
 const FramesScript := preload("res://core/sim/frames.gd")
 
 

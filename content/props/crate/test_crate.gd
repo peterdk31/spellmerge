@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The crate (props W9c, content/props/crate): a plank crate of 30 health that stands in the way and
 ## casts nothing. A hit below half its health cracks it (a split plank, grit trickling); its death
 ## breaks it to rubble that nothing bumps into or hits, dust rising for its first seconds.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/props/crate/test_crate.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")

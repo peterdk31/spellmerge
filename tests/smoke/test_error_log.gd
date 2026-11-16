@@ -6,8 +6,6 @@ extends "res://tests/support/suite.gd"
 ## real `push_error` would also print an `ERROR:` line, which `build.sh` counts as a failure of
 ## this very test. The smoke test itself shows the engine reaches the logger only when it fails
 ## for real.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/smoke/test_error_log.gd
 
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 

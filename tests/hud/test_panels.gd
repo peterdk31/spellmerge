@@ -10,8 +10,6 @@ extends "res://tests/support/suite.gd"
 ## The theme tests read the theme alone, the panel tests make one player panel, and the HUD tests
 ## make the panels scene (hud/panels/panels.tscn) on a bus, UI focus and save of their own; all of
 ## it is freed after each test.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_panels.gd
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")

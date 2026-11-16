@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## the frame gets slower still: at Godot's default of 8 a frame, the desktop stress scene sat at
 ## 8 steps and 343 ms a frame. With a few at most, a frame that slow plays in slow motion instead
 ## and comes back as soon as the load drops.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_physics_settings.gd
 func test_few_catch_up_steps() -> void:
 	var steps: int = ProjectSettings.get_setting("physics/common/max_physics_steps_per_frame", 8)
 	check(steps >= 2 and steps <= 4, "at most a few physics steps a frame (real time down to 15-30 FPS): %d" % steps)

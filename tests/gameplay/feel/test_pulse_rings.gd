@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## live ring's edge, none past a wall on its line from the centre (owner, 2026-11-12: "the ring
 ## should be 'individual' motes, that can be blocked individually") where its segment stopped; and
 ## its trail (owner, 2026-11-13), tail motes over the band its edge swept since the last frame.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_pulse_rings.gd
 const RingsScript := preload("res://gameplay/feel/pulse_rings.gd")
 const BirthsScript := preload("res://gameplay/feel/births.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")

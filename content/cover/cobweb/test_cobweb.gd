@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## sparsely, one web a cell; whoever walks through them is chilled (slowed) while in them, and never
 ## frozen by them alone; fire burns them away fast, for good (the crypt's cover never grows back),
 ## with embers as they go; frost on a burning web puts it out.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/cover/cobweb/test_cobweb.gd
 const Kit := preload("res://tests/gameplay/cover/cover_kit.gd")
 const WEB: CoverKind = preload("res://content/cover/cobweb/cobweb.tres")
 

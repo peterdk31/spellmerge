@@ -1,8 +1,6 @@
 extends "res://tests/support/card_rig.gd"
 ## The Faster card (content/spells/modifiers/faster/, M2 part 12): a quicker shot that arrives sooner; cards
 ## multiply. It leaves the cast time alone: that is Faster Casting's (docs/milestones/cast-timing.md, T9).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/faster/test_faster.gd
 func test_the_card_is_faster() -> void:
 	_check_card(&"faster", 1)
 	check_equal(_modifier(&"faster").behaviour, ModifierBase.Behaviour.NONE, "numbers only")

@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## stands 100 px away and stings it once a second, so a guarding staff is called for too. A
 ## combo's `allies` stand by it as its teammates, hurt by the combo's `hurt` (out of MATE_HEALTH),
 ## so a staff that only heals has someone to heal (the Heal ally behaviour, L2).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_combos.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

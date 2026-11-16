@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## R1b, docs/milestones/M2-rules.md, rules 2 and 6): homing, bounce, ghost, spiral, linger,
 ## growth, sticky, return, shield, pierce, arc, magnet and its trigger ride on, one jump fewer,
 ## and it flies as far as its carrier would.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_chain_jump_cards.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 

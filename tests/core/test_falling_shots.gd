@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## Part 2): a shot falling onto its floor line touches nothing in the air, is an ordinary shot within
 ## FALL_BAND of the line, and ends at the line as at the end of its life, at any speed, with the
 ## native kernel and without it (the kernel hands every falling shot to `_hit_slot`).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_falling_shots.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

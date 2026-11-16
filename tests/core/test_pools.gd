@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## is refused for what the pool does not hand out; the hooks run once per hand-out and take-back;
 ## an object freed from outside is skipped and forgotten; `clear` frees them all. Each test makes
 ## its own pool (`_pool`, counting the factory's calls) and clears it after.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_pools.gd
 
 const PoolScript := preload("res://core/pools/pool.gd")
 

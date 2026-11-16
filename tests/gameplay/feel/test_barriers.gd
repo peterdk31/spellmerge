@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## as dense on every size of body (a boss's shell is bigger and has more), that follows its body; a block knocks that charge's share off on the
 ## side the hit came from into the mote pool, the rest closing the gap; the last charge bursts it;
 ## a barrier that runs out fades, then goes. Played through Feel, as the game does.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_barriers.gd
 const BarriersScript := preload("res://gameplay/feel/barriers.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const EventsScript := preload("res://core/events/events.gd")

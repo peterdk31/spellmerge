@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## a decoy or familiar appearing), `carrier_ended` its `end_cue` where a carrier with no
 ## shot ends (a teleport landing, a slam's strike, a decoy going). The cues use the
 ## columns of light (`rise`, `fall`) drawn by `shot_flash.gdshader`.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_feel_carrier_cues.gd
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")

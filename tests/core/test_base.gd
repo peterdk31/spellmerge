@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## `_add_piece` for a piece of scene that carries its own places) and checks one rule of
 ## `RoomPlaces.read`, `problems` or `strip`. A zone read by name, a zone with no name being a
 ## problem and `strip` taking the zones out are tests/content/rooms/test_room_places.gd's.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_base.gd
 
 const SAVED: String = "user://test_base_resource.tres"
 

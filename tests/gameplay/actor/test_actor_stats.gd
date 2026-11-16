@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## a reused id is never read; mass divides a shove; resist shortens a status (a freeze as a chill)
 ## and a possession; spell scale is built into the body's spells, a swing's reach too. Test
 ## numbers only: no content's stats are named here (decision 28).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_actor_stats.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 

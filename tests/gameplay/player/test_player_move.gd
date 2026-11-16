@@ -8,8 +8,6 @@ extends "res://tests/support/suite.gd"
 ## world each (wizard_fixture.gd: wizards from the real scene in the tree, the stand-in spell
 ## runtime, input through the world's own input manager's virtual devices), stepped by fixed
 ## deltas. The step and the timings are binary fractions, so the timers add up exactly.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/player/test_player_move.gd
 
 const WizardFixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")

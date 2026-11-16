@@ -13,8 +13,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## The last test times the machine (a budget in wall time), so the runner runs this file in a
 ## process of its own (`# unit-test-alone`; ci/build/unit_tests.sh, TIMED_TESTS).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_kit.gd
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")

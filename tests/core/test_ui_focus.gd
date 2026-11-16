@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## extras (alternate, paging, a navigator, a jump). Each test gets a UIFocus, an input manager and
 ## a bus of its own (never the autoloads), four players on the manager's virtual devices and four
 ## panels of three buttons (`buttons[player][i]`); input goes through the real virtual devices.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_ui_focus.gd
 
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")

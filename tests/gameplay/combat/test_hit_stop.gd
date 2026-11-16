@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## player, another enemy and an unrelated shot run on. A plain hit does not hold a body that still
 ## rests from its last hold. Only a downed player and a boss kill stand the whole game still, for a
 ## number of ticks (`Sim.hold`). No Feel here: the holds are the same without it.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/combat/test_hit_stop.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

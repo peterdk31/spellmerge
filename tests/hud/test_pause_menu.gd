@@ -19,8 +19,6 @@ extends "res://tests/support/suite.gd"
 ## manager (virtual devices), UI focus and save of its own, and a stand-in for the main menu scene.
 ## After each test it is all freed, the save file is removed, the tree is unpaused and the current
 ## scene is the one before.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_pause_menu.gd
 
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")

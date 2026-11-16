@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## resting on it, Hold, or pushing further out, Depth, unwraps the kind's cards). Real wizards,
 ## registry and spell runtime, as in test_radial_builder.gd; every real card is found by the
 ## registry's own scan.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_radial_rings.gd
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")

@@ -10,8 +10,6 @@ extends "res://tests/support/suite.gd"
 ## runtime, input through the world's own input manager's virtual devices), stepped by fixed deltas
 ## without moving the bodies. The mouse-aim flag itself (a brush is not aiming, the cast key leaves
 ## it) is the input manager's, tested in tests/core/test_input.gd.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/player/test_player_aim.gd
 
 const WizardFixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")

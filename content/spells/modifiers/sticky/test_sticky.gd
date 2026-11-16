@@ -1,8 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The Sticky card (content/spells/modifiers/sticky/, staffs C): the next shot sticks to what it hits and ends there. Each of its combos does
 ## what it promises with the card and fails without it.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/sticky/test_sticky.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

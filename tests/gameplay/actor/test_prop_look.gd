@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## `MoteSource`s (a mask reading its layer), a light spot, and its cue as a state is entered. The
 ## exploding barrel (content/props/exploding_barrel, its art by tools/pixel_grid.py) idle, lit and broken; a snapshot giving a state back; an animated layer;
 ## Feel's source motes reading a prop's sources; the looks' problems.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_prop_look.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")

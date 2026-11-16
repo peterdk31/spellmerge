@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The cards' looks (staffs C0, C0b): every modifier gives off a particle style, no modifier
 ## shares one with an infusion, the first six modifiers never share with each other, and the
 ## later ones share only the kinds docs/DECISIONS.md allows, so a shot shows which cards are on it.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/spells/test_original_looks.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 const RegistryScript := preload("res://core/registry/registry.gd")

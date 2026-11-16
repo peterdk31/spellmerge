@@ -6,8 +6,6 @@ extends "res://tests/support/suite.gd"
 ## prop is on the seat's team while it lasts and the world's after, and the prop's death ends the
 ## possession and the seat goes home. Real wizard scene, real Spells and registry (the `possess`
 ## card); a stand-in prop (`ActorFixture.prop_body`).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_possess_prop.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")

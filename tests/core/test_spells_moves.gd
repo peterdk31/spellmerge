@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## teleport or a pull whose hit spent its shot is the carrier's end point (blast, on expire); blast asks combat for an area hit where a shot or beam
 ## ends; siphon refunds mana per hit. It runs a real projectile manager and event bus, stepped by
 ## hand, with cards built in code.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_moves.gd
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

@@ -8,8 +8,6 @@ extends "res://tests/support/suite.gd"
 ## is its constant, and one real runner is made (not added) through the real path.
 ##
 ## Each test gets a menu of its own (its own event bus), freed after it with any runner it added.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_main_menu.gd
 
 const MENU_SCENE_PATH: String = "res://hud/menus/main_menu/main_menu.tscn"
 const EventsScript := preload("res://core/events/events.gd")

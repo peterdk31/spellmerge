@@ -6,8 +6,6 @@ extends "res://tests/support/suite.gd"
 ## `join_as`) or told (`set_own_seats`), leave, an unplugged pad that keeps its seat and waits, a
 ## virtual device for every player index, moves, aims, the menu's sticks, rumble, mouse aim, the
 ## bindings, and per-player state that never leaks between players.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_input.gd
 
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")

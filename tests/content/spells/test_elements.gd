@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## Every element card the registry finds (content/spells/elements/): the status each names is one
 ## that combat knows, and no two share a status or a tint, so an infusion reads by its colour. A
 ## new element folder is checked with no edit here; each element's own test is in its folder.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/spells/test_elements.gd
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 

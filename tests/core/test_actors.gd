@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## unseated actors, a node lookup that forgets freed nodes, safe answers for bad ids, and the
 ## spell runtime leaving the table to the bodies (actors G3b: Spells opens no actor; it asks the
 ## table for a seat's own body), and a seat's home body, kept while another actor holds the seat. Each test makes its own table.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_actors.gd
 const ActorsScript := preload("res://core/actors/actors.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 

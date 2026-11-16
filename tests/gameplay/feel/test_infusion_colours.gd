@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## gives each infusion's colour by its look layer, from the cards; the shaders read it as a global
 ## uniform and weave a look of several (shot_look.gdshaderinc); the motes of a spell of several take
 ## their own infusion's colours, or its infusions in turn (`Motes.set_infusions`).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_infusion_colours.gd
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")

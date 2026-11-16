@@ -1,8 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## `core/save` (`SaveFile`): flags and settings are written at once, and two saves on the same
 ## path do not wipe out each other's writes (the pause menu and Flow each hold one).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_save_file.gd
 const SAVE_PATH: String = "user://test_save_file.cfg"
 
 

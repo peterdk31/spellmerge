@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## Inventory.DEV_COPIES times when none was given; every builder request counted (a card put in
 ## takes a copy, one taken out gives it back, a card with none left is refused); the inventory's
 ## events (`bag_changed`, `owned_staff_changed`, `hands_changed`) for the seat.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/player/test_player_card_bag.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 

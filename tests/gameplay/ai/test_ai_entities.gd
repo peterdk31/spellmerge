@@ -7,8 +7,6 @@ extends "res://tests/support/suite.gd"
 ## owner's actor id (actors G3b): the enemy's `caster`, the wizard's `id`, and whether a seat
 ## drives the owner sorts it into the seats' rows or the others'. The same world as
 ## test_ai_moves.gd (with its actor table), plus Entities.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_entities.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")

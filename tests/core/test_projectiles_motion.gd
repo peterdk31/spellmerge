@@ -9,8 +9,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## Each test gets a fresh manager with an event bus and a table of four wizards at ids 0-3
 ## (`before_each`); the manager is stepped by hand.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_motion.gd
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")

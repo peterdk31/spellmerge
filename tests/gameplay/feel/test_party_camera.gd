@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## the ones of this machine's seats, each seat's own body and the actor it drives, and everyone's
 ## when no seat here has a body. How it zooms and eases with a whole party is checked in the game
 ## (tests/gameplay/coop/test_coop.gd).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_party_camera.gd
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 

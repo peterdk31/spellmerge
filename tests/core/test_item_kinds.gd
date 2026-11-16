@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## Tests for the kinds of item (items I3, core/items/item_kinds.gd): every row answers every
 ## question, every bag is one kind's, and every content folder a row names is a folder of the
 ## content root whose resources of the row's class the registry finds (cards and staffs: some).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_item_kinds.gd
 ## The questions every row answers.
 const KEYS: Array[String] = ["bag", "stacks", "content", "type", "actions", "premade"]
 ## What can be done with one held, every action a row may name.

@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## with intensity, all drawn only (gameplay/feel: `sounds.gd`, `music.gd`). Sound files do not exist
 ## yet, so a registry of the test's own answers every sound id it knows with a silent stream, and
 ## knows the test's own cues and rooms; nothing here names a boss of the game.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_feel_sounds.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SoundsScript := preload("res://gameplay/feel/sounds.gd")

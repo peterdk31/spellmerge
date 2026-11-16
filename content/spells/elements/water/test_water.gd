@@ -6,8 +6,6 @@ extends "res://tests/support/suite.gd"
 ## (lightning on a soaked body runs through every soaked body near), Squall (storm blows the soak
 ## onto the bodies round it; water spreads a gust) and Drown (void or water on the other's status:
 ## bonus damage). Its combos show each reaction in play.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/elements/water/test_water.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 

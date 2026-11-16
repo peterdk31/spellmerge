@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## Growth is size only (owner, 2026-10-27): a grown shot hits wider, as its radius is its hit
 ## circle, and for its card's damage, however much it grew; damage boosts are overcharge's. Real
 ## manager and event bus, cards built in code.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_spells_growth.gd
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

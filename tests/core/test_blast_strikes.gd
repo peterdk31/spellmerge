@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## `on hit`, chain, siphon and the rest work on it, its caster's own body is caught too, and a hit
 ## of a blast does not blast again. A strike keeps what relay took on and what an echo hits with.
 ## It runs a real projectile manager and event bus, stepped by hand, with cards built in code.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_blast_strikes.gd
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

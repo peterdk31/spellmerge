@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Scatter card (content/spells/multicasts/scatter/, staffs C): the next group gets three
 ## carriers, each sent in its own random direction, seeded per cast. The engine side is tested in
 ## `tests/core/test_spells_multicast.gd`; here the card's data and its combos.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/multicasts/scatter/test_scatter.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

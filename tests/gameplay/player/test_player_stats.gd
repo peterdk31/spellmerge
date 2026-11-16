@@ -6,8 +6,6 @@ extends "res://tests/support/suite.gd"
 ## `staff_mana_changed`. The seat (the wizard's PlayerController) sends it for the wizard it drives
 ## (actors G7). Each test gets a fresh world (wizard_fixture.gd, the stand-in spell runtime) and
 ## the events it heard.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/player/test_player_stats.gd
 
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 

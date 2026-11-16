@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## What an AI dodges (enemy AI AI3, docs/milestones/M2-enemy-ai.md): `Projectiles.threat` finds
 ## the shot of another team that will come within a radius of a point soonest, and the way off
 ## its line. Enemies at ids 0-6, wizards at 7-10, as in test_projectiles_actors.gd.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_threat.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

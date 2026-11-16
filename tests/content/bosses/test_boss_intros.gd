@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## three 96×96 frames, at most three lines, an accent that is a palette ramp and cues the game has
 ## (content/cues); and each kind of mistake named. Its lines' words are the story check's
 ## (tests/content/story/test_lore.gd).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/bosses/test_boss_intros.gd
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 

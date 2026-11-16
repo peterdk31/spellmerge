@@ -7,8 +7,6 @@ extends "res://tests/support/suite.gd"
 ## bolt's head, MESH_HEAD). A shot whose motion is not written as its body's mesh draws plain, and
 ## a body's nodes keep the first batches' draw order. The manager is stepped by hand.
 ## (docs/milestones/card-looks.md, phase 1.)
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectile_bodies.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")

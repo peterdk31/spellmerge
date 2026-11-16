@@ -1,7 +1,5 @@
 extends "res://tests/support/card_rig.gd"
 ## The Beam card (content/spells/carriers/beam/, M2 part 10): a ray that hits along its line up to its reach, at once and every tick of its life; held, it stays on.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/carriers/beam/test_beam.gd
 const ShaderSource := preload("res://tests/support/shader_source.gd")
 
 

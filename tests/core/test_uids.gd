@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## an invalid UID). The validator's own tests come first, one rejected form each; then the scan
 ## finds the files it must, and every file found is checked for a valid UID and for one no other
 ## file has.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_uids.gd
 
 const ALPHABET: String = "abcdefghijklmnopqrstuvwxy012345678"
 ## Files that must always be found, so a broken scan cannot pass by finding nothing.

@@ -1,8 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The Spiral card (content/spells/modifiers/spiral/, staffs C): the next shot weaves from side to side as it flies. Each of its combos does
 ## what it promises with the card and fails without it.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/spiral/test_spiral.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

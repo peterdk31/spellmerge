@@ -10,8 +10,6 @@ extends "res://tests/support/suite.gd"
 ## layer was handed must be equal byte for byte.
 ##
 ## Without the native module the test only says so (SPELLMERGE_NATIVE=required fails it).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_native_motes.gd
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
 const NativeScript := preload("res://core/native/native.gd")

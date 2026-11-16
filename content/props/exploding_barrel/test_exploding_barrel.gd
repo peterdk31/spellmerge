@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## wind-up and `wind_cue`), then it blows (Fire · Blast · Pulse) and lies as rubble; shot apart, lit
 ## or not, it blows at once and its fuse is over. Every path, possession and chains:
 ## tests/gameplay/actor/test_prop_state_triggers.gd, which plays this barrel.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/props/exploding_barrel/test_exploding_barrel.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")

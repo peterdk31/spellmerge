@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## first whatever the budget; over a flight a budget of one hits the very bodies no budget does; and
 ## in a full crowd at the desktop cap no shot waits more than one step. Each runs on the GDScript
 ## and on the native kernel (when built), which must agree.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_hit_budget.gd
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

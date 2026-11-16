@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## A body that crumbles (boss plan OB13: an add whose caller died, `crumble_requested`): Combat takes
 ## its health and tells its death as any other, nobody's kill, with no hit; protection does not keep
 ## it; a body something downs instead (a wizard) and one not registered are left alone.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/combat/test_combat_crumble.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 
 var fx: Fixture

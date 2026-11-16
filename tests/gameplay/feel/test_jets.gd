@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## over its seconds instead of thrown at once, from where its cue played, each frame's share thrown
 ## by the spectacle's motes player (here a stand-in that counts what it is handed). The owner,
 ## 2026-11-16: "I really like the jet animation".
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_jets.gd
 const JetsScript := preload("res://gameplay/feel/jets.gd")
 const MotesPartScript := preload("res://gameplay/feel/motes_part.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")

@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## the aim stops following the target, measured against the wind-up its cast has left, so a chill
 ## moves it; a beat on the lane as it locks) and turns (`AIProfile.turns`: after an attack it turns
 ## to the foe it aimed at longest ago).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_aim_lock.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 
 var fx: Fixture

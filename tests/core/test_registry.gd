@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## test's own fixture, sounds by id (`null` for an unknown one), a rescan and missing roots, and an
 ## export's `.remap` and `.import` names (on empty files the test writes under user:// and takes
 ## out after).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_registry.gd
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 const FIXTURE: String = "res://tests/core/fixtures/registry"

@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The crypt's moss (ground cover GC8, content/cover/crypt_moss, decision 3): look only. It fills the
 ## crypt by itself, sways a little, bends and is trampled, and plays no part: fire and frost leave
 ## it as it is and it harms nobody.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/cover/crypt_moss/test_crypt_moss.gd
 const Kit := preload("res://tests/gameplay/cover/cover_kit.gd")
 const MOSS: CoverKind = preload("res://content/cover/crypt_moss/crypt_moss.tres")
 

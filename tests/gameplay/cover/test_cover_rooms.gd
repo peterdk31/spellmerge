@@ -6,8 +6,6 @@ extends "res://tests/support/suite.gd"
 ## does) and Feel draws it; a restore into the room shown keeps it too. The rooms are copies of the
 ## crypt arena under a stand-in grass that fills its biome (tests/support/stand_in_grass.gd), pinned
 ## as a run of known shape (tests/support/pinned_run.gd).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/cover/test_cover_rooms.gd
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const CoverScript := preload("res://gameplay/cover/cover.gd")

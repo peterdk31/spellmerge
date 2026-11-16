@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## and shows the window's own state; it follows `fullscreen_changed`, so F11 or Alt+Enter show
 ## too. Without a Display (no autoload) the button is hidden. The display is a stand-in: headless
 ## has no window.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_main_menu_fullscreen.gd
 const MENU_SCENE_PATH: String = "res://hud/menus/main_menu/main_menu.tscn"
 
 

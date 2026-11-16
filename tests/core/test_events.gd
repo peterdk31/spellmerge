@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## id (`caster`, `actor`, `killer`) first exactly when it is per-player or per-actor; NO_PLAYER is
 ## outside the seats; and signals reach listeners for all four player indices (on a bus of its
 ## own, freed after each test).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_events.gd
 
 const EventsScript := preload("res://core/events/events.gd")
 

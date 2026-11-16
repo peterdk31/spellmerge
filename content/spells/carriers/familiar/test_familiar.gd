@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## `tests/core/test_spells_entity_carriers.gd` and `tests/gameplay/ai/test_entities.gd`; here the
 ## card's data and the entity it asks for. The combo arena has no `ai`, so its combos only check
 ## the cast asks for a familiar and what the wizard's other staffs do beside it.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/carriers/familiar/test_familiar.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

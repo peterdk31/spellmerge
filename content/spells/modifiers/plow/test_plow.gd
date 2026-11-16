@@ -7,8 +7,6 @@ extends "res://tests/support/suite.gd"
 ## nothing. The carrying itself is held by tests/gameplay/actor/test_plow_carry.gd. Its combos
 ## (`combos/`, each with `needs: plow`) are held with and without it by
 ## tests/content/spells/test_combos.gd.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/plow/test_plow.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Mend card (content/spells/elements/mend/, staffs C): an infusion whose hits heal whatever
 ## they hit, friend or foe, and do no damage (owner 2026-11-12: heal only). Each of its combos does what it promises with the card and
 ## fails without it.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/elements/mend/test_mend.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 const ALLY_HURT: int = 40

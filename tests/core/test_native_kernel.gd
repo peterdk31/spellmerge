@@ -30,8 +30,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## Without the native module every test only says so (SPELLMERGE_NATIVE=required fails them, as
 ## in ci/build/build.sh).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_native_kernel.gd
 # unit-test-shards: 2
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

@@ -8,8 +8,6 @@ extends "res://tests/support/suite.gd"
 ## where a room starts in play (`room_entered`), never by a `room_built`; the view is told each tick's
 ## changes and, after a room built or a restore, the cells not at rest; a room with no cover keeps no
 ## state; a resting room is arrays of zeros.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/cover/test_cover.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const CoverScript := preload("res://gameplay/cover/cover.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")

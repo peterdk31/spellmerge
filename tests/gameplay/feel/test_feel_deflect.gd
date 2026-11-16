@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## deflected shot flashes big and white where it turned, in its new caster's colours, bigger than
 ## a hit's; a swing's block (a parry) shows a big four-point star in Spark gold and holds the
 ## parrying actor alone for a moment; another carrier's block shows neither.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_feel_deflect.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")

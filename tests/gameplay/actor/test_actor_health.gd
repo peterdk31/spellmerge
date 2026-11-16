@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## `changed` on every change and `depleted` once at 0; Combat takes and heals through it (actors
 ## G5), and the bus's `damage_dealt` and `heal_dealt` are not its way in. Contact and Hurtbox hand
 ## the actor's circle and touch damage to Combat.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_actor_health.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 
 var _world: Fixture

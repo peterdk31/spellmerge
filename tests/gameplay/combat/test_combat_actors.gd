@@ -4,8 +4,6 @@ extends "res://tests/support/suite.gd"
 ## body with no id gets one Combat opens and gives back; an id and a node find the same row;
 ## death, being downed instead, contact by team, and rows freed in any order. The world is the
 ## actor kit's test world (its own bus, projectile manager, Spells, Combat and actor table).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/combat/test_combat_actors.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")

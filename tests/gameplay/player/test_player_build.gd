@@ -11,8 +11,6 @@ extends "res://tests/support/suite.gd"
 ## gives it back. It runs the real `Spells`, projectile
 ## manager and event bus, with cards built in code behind a stand-in registry, and the real
 ## wizard scene.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/player/test_player_build.gd
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")

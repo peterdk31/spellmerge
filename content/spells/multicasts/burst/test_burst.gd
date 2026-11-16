@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Burst card (content/spells/multicasts/burst/, staffs C): the next group fires three times,
 ## 0.1 s apart, for the mana of one cast. The engine side is tested in
 ## `tests/core/test_spells_multicast.gd`; here the card's data and its combos.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/multicasts/burst/test_burst.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

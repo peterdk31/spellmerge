@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## bumps into and no hit lands on, dark until the exits' rules light it (`ExitRules.LIT`, once the
 ## room is cleared and the run's map leads on from it); lit, its carvings glow, give off glimmers
 ## and light, and its cue plays. Where it is stood on is its own area.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/props/room_exit/test_room_exit.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const EXIT: PropBase = preload("res://content/props/room_exit/room_exit.tres")
 

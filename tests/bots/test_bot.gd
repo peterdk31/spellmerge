@@ -11,8 +11,6 @@ extends "res://tests/support/suite.gd"
 ## On the real autoloads (Events, PlayerInput, Flow, Frames), as the bots play. Only the fighter
 ## tests start a run (two fighters, `play_requested`); after each test every bot leaves, any run is
 ## stopped and the seats' leaves are applied.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/bots/test_bot.gd
 
 const BotScript := preload("res://tests/bots/bot.gd")
 

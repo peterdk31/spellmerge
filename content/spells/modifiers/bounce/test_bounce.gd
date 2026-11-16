@@ -1,8 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The Bounce card (content/spells/modifiers/bounce/, staffs C): the next shot bounces off walls, three times. Each of its combos does
 ## what it promises with the card and fails without it.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/modifiers/bounce/test_bounce.gd
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

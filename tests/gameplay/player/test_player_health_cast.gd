@@ -11,8 +11,6 @@ extends "res://tests/support/suite.gd"
 ## wizard's actor id) of every cast. The registry is never scanned: it knows no sounds. Input goes
 ## through virtual devices; time moves by fixed binary-fraction deltas. Health's own clamping and
 ## protection are tested on a bare actor in tests/gameplay/actor/test_actor_health.gd.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/player/test_player_health_cast.gd
 
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 

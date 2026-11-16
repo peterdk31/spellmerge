@@ -5,8 +5,6 @@ extends "res://tests/support/suite.gd"
 ## export_path. A new option added to one must be added to both. The web pair alone also excludes
 ## addons/* (the WebRTC extension is the desktop builds'). Each test checks one of those rules on
 ## all three pairs of export_presets.cfg, read afresh before each test.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/smoke/test_export_presets.gd
 
 const PRESETS_PATH: String = "res://export_presets.cfg"
 const DIFFERENT: Array[String] = ["name", "runnable", "exclude_filter", "export_path"]

@@ -7,8 +7,6 @@ extends "res://tests/support/suite.gd"
 ## carries; a flying shot with Plow is a battering ram the bodies it carries do not spend. Real
 ## actors (a Hurtbox and a Mover each) and the real cards, moved against the walls as the game moves
 ## them.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/actor/test_plow_carry.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 

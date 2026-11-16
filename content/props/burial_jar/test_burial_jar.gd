@@ -3,8 +3,6 @@ extends "res://tests/support/suite.gd"
 ## seeping from its seal. A thaw on it (frost, then fire: Combat's reaction) or its death shatters
 ## it, and what was sealed in comes out: it casts Void · Pulse round itself. Its shards are walked
 ## over and never hit.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/props/burial_jar/test_burial_jar.gd
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")

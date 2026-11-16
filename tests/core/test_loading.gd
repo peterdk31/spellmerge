@@ -2,8 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The loading service (core/loading): `run` does its tasks one unit a frame after the screen is
 ## up, says how far it is, then calls `done`; one load at a time; `cancel` ends it without `done`.
 ## A fresh service with fake tasks, stepped by hand.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_loading.gd
 const LoadingScript := preload("res://core/loading/loading.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const LoadTask := preload("res://core/loading/load_task.gd")

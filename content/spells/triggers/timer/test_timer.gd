@@ -1,7 +1,5 @@
 extends "res://tests/support/card_rig.gd"
 ## The Timer card (content/spells/triggers/timer/, M2 part 13): the held spell fires every half second from where its shot is, while the shot lives.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://content/spells/triggers/timer/test_timer.gd
 func before_each() -> void:
 	super()
 	_seat_wizards()

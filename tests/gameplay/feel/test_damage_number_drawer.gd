@@ -6,8 +6,6 @@ extends "res://tests/support/suite.gd"
 ## colour for a heal; a hit that took nothing is struck through. The "Damage numbers" setting
 ## hides them all. A storm of hits on 200 actors makes no object and no node per frame. The actors'
 ## side is tests/gameplay/actor/test_damage_numbers.gd.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/feel/test_damage_number_drawer.gd
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")

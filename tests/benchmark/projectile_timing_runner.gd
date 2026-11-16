@@ -24,8 +24,6 @@ extends Node
 ## the game is started with the user argument `--projectile-timing` and this file is in the
 ## build (the `Linux Test` and `Web Test` exports keep tests/); an exported binary can't run
 ## a SceneTree script. In the web export the timings are the WASM numbers M1 left open.
-##
-## godot --headless --path . --script res://tests/benchmark/test_projectile_timing.gd
 ## build/linux-test/Spellmerge.x86_64 --headless -- --projectile-timing
 ##
 ## The timings are of the native kernel when the module is loaded (native/README.md); with `compare`

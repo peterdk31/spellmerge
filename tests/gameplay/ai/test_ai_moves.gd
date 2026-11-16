@@ -6,8 +6,6 @@ extends "res://tests/support/suite.gd"
 ## goes off there. Moves are asked and answered under its actor id (`caster`, actors G3b); moves
 ## for another actor (an enemy or a wizard) are not its own. The same world as test_ai_staff.gd:
 ## bus, an actor table, projectiles, spells with cards built in code, combat, one wizard.
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/ai/test_ai_moves.gd
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")

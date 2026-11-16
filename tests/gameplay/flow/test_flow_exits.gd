@@ -8,8 +8,6 @@ extends "res://tests/support/suite.gd"
 ## the run; everyone down in a cleared room still ends it; and a snapshot's later room is laid out
 ## again on a machine that built the first (`rebuild_derived`). The rooms are copies of the crypt
 ## arena (two exits), pinned as runs of known shape (tests/support/pinned_run.gd).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/gameplay/flow/test_flow_exits.gd
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const DownedScript := preload("res://gameplay/player/downed.gd")

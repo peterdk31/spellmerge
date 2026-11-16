@@ -64,8 +64,6 @@ extends "res://tests/support/suite.gd"
 ## native test only says so; with SPELLMERGE_NATIVE=required in the environment (ci/build/build.sh
 ## sets it after building the module) its absence fails it. `--record` and `--full` print the
 ## GDScript's run (with `--native` as well: the native kernel's).
-##
-## godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_projectiles_step_exact.gd
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")

@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The hub's grass (ground cover GC8, content/cover/hub_grass, docs/milestones/ground-cover.md decision
-## 2): it fills the hub by itself; fire lights it (catching, then burning: 1.2 s in all), it burns
-## its standers and spreads fire, smoulders, goes to ash and grows back after 30 s; frost puts it out; its burning gives off embers and smoke; its
-## sheet holds every frame its states draw, trampled too.
+## 2): it fills the hub by itself; fire lights it, catching then burning (1.2 s in all), burning its
+## standers and spreading fire, then it smoulders, goes to ash and grows back after 30 s; frost puts
+## it out; its fire gives off embers and smoke; its sheet holds every frame its states draw.
 ##
 ## godot --headless --path . --script res://content/cover/hub_grass/test_hub_grass.gd
 
@@ -34,11 +34,14 @@ func test_it_is_sound_and_fills_the_hub() -> void:
 	check_equal(_kit.problems(), PackedStringArray(), "its data")
 	check(GRASS.fills(&"hub"), "the hub's biome")
 	check(not GRASS.fills(&"crypt"), "not the crypt's")
-	check_equal(GRASS.frame_count(), 15, "fifteen frames: three at rest, two burning, ash, two trampled, three more at rest, two catching, two smouldering")
+	check_equal(GRASS.frame_count(), 27, "twenty-seven frames: six tufts at rest, ash, two trampled, and each tuft catching, burning and smouldering")
 	var rest: CoverState = GRASS.states[0]
 	check_equal(rest.state_id, &"rest", "it starts at rest")
 	check_equal(rest.frames, PackedInt32Array([0, 1, 2, 8, 9, 10]), "six tufts at rest, curved and leaning, so the grass is never a row of straight blades")
 	check(not rest.trampled_frames.is_empty(), "it draws trampled frames (GC4)")
+	for state_id: StringName in [&"catching", &"burning", &"smouldering"]:
+		var fire: CoverState = GRASS.states[GRASS.state_at(state_id)]
+		check_equal(fire.frames.size(), rest.frames.size(), "%s draws a frame for each tuft at rest, in their order, so a tuft keeps its blades as it burns (a tuft picks the same place in each list: CoverTufts.frame)" % state_id)
 	check(GRASS.trample_hold >= 4.0, "a trail through it stays flat a good while after the last body left (the owner, 2026-11-16: it sprang back far too soon), got %.1f s" % GRASS.trample_hold)
 	check(GRASS.trample_spring >= 2.0, "and grows back slowly, not at once, got %.1f s" % GRASS.trample_spring)
 	check(GRASS.tufts_per_cell >= 5, "dense: at least five tufts a cell (the owner, 2026-11-16)")

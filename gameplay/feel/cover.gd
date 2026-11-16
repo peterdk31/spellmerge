@@ -159,6 +159,11 @@ func lay(laid: CoverLayout) -> void:
 		if batch != null:
 			batch.multimesh.instance_count = 0
 			batch.visible = false
+			# A spare holds none of this room's arrays or grid (so they stay written in place).
+			var spare_material := batch.material as ShaderMaterial
+			spare_material.set_shader_parameter(&"bodies", PackedVector2Array())
+			spare_material.set_shader_parameter(&"body_count", 0)
+			spare_material.set_shader_parameter(&"trampled", null)
 			_spare.append(batch)
 	_batches.clear()
 	_rows.clear()
@@ -208,6 +213,14 @@ func batches() -> Array[MultiMeshInstance2D]:
 ## The state cell `cell` shows (its index in its kind's states; 0 at rest).
 func shown_state(cell: int) -> int:
 	return _shown[cell] if cell >= 0 and cell < _shown.size() else 0
+
+
+## The cell of the layout's grid the shader reads a tuft's walk from, for its foot `foot` (room
+## pixels): the cell it stands in, a foot on a cell's bottom edge its own (`CoverTufts.foot` puts
+## a foot 1 to `CELL` pixels below its cell's top). The shader's expression, mirrored.
+static func foot_cell(foot: Vector2) -> Vector2i:
+	var at: Vector2 = foot / float(CoverLayout.CELL) - Vector2(0.0, 0.001)
+	return Vector2i(floori(at.x), floori(at.y))
 
 
 ## When cell `cell` was last walked through (Feel's clock; `NEVER` for never, or no such cell).

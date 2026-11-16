@@ -155,7 +155,8 @@ func test_a_states_trampled_frames_ride_in_its_rows() -> void:
 	check_equal(plain, cover.layout.kinds[0].tufts_per_cell, "a state with no trampled frames is pressed flat instead (code 0)")
 
 
-## A frame of it, bodies moving through the grass, makes no object and allocates no row.
+## A frame of it, bodies moving through the grass, makes no object. (A packed array copied on
+## write is no object: the two arrays the bodies go in, in turn, are not caught here.)
 func test_a_frame_allocates_nothing() -> void:
 	var cover: CoverScript = _cover()
 	var places := PackedVector2Array()
@@ -199,3 +200,24 @@ func test_the_shader_compiles_with_its_uniforms() -> void:
 		names.append(String(uniform[&"name"]))
 	for wanted: String in ["view_time", "frame_size", "sheet_size", "bodies", "body_count", "bend_reach", "bend_pixels", "trample_hold", "trample_spring", "flatten", "trampled"]:
 		check(names.has(wanted), "the cover shader compiles and has '%s' (got %s)" % [wanted, names])
+
+
+## The shader reads each tuft's walk from the cell it was scattered in (`Cover.foot_cell`, the
+## shader's expression mirrored), a foot on its cell's bottom edge included.
+func test_every_tuft_reads_its_own_cells_walk() -> void:
+	var cover: CoverScript = _cover()
+	var laid: CoverLayout = cover.layout
+	var kind: CoverKind = laid.kinds[0]
+	var key: int = CoverLayout.name_hash(kind.id)
+	var checked: int = 0
+	for cell in laid.cells.size():
+		if laid.cells[cell] == 0:
+			continue
+		for tuft in kind.tufts_per_cell:
+			var foot: Vector2 = CoverTufts.foot(laid, cell, tuft, kind.tufts_per_cell, CoverTufts.roll(laid, key, cell, tuft))
+			check_equal(CoverScript.foot_cell(foot), Vector2i(cell % laid.columns, cell / laid.columns), "a tuft of cell %d at %s" % [cell, foot])
+			checked += 1
+	check(checked > 0, "tufts checked")
+	var corner: Vector2 = laid.cell_rect(laid.columns + 1).position
+	check_equal(CoverScript.foot_cell(corner + Vector2(1.0, float(CoverLayout.CELL))), Vector2i(1, 1), "a foot on its cell's bottom edge is its own cell's")
+	check_equal(CoverScript.foot_cell(corner + Vector2(1.0, 1.0)), Vector2i(1, 1), "and one a pixel below its top")

@@ -5,7 +5,7 @@ extends "res://tests/support/suite.gd"
 ## character, a cell wide each, at whole-number scales only; the theme's `TitleLabel` draws it at
 ## 2×; and every boss's shown name has a glyph for each of its characters.
 ##
-## godot --headless --path . --script res://tests/hud/test_title_type.gd
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/hud/test_title_type.gd
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellmergeTheme := preload("res://hud/theme/spellmerge_theme.tres")

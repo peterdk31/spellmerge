@@ -4,7 +4,7 @@ extends "res://tests/support/suite.gd"
 ## (content/cues); and each kind of mistake named. Its lines' words are the story check's
 ## (tests/content/story/test_lore.gd).
 ##
-## godot --headless --path . --script res://tests/content/bosses/test_boss_intros.gd
+## godot --headless --path . --script res://tests/support/run.gd -- res://tests/content/bosses/test_boss_intros.gd
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 

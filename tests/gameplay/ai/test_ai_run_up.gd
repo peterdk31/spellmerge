@@ -151,3 +151,57 @@ func test_a_teleport_never_runs_up() -> void:
 	var sense: CastSense = body.caster.next_cast_sense(0)
 	check(sense.moves_caster and not sense.moves_along, "a teleport moves its caster, not along")
 	check(_behaviour("run up").want(Fixture.ai(body).brain) <= 0.0, "no run-up")
+
+
+func test_a_target_on_its_own_ground_is_in_line() -> void:
+	# Review of OB14: a body that cannot move lays its ground under its own feet; that ground never
+	# stands between an AI and it (else a dummy could never be shot at).
+	fx.players[0].position = Vector2(400.0, 200.0)
+	fx.projectiles.set_footprint(fx.players[0].id, Vector2(400.0, 200.0), Vector2(24.0, 24.0), 0.0)
+	var body: Actor = fx.staffed_enemy([[&"bolt"]], Vector2(300.0, 200.0))
+	var brain: AIBrain = Fixture.ai(body).brain
+	_walk(body, 2)
+	check(brain.ground_clear and brain.line_clear, "its own ground is not in the way")
+	var cast: bool = false
+	for i in int(2.0 / Fixture.STEP):
+		_walk(body, 1)
+		cast = cast or body.caster.is_winding(0)
+	check(cast, "so it fights it")
+
+
+func test_flanking_a_pillar_keeps_its_way_round() -> void:
+	# Review of OB14: the walk round ended at once when only ground blocked, and it decided again
+	# every step, its way flipping. It keeps a way for its REPOSITION_TIME and gets round.
+	fx.projectiles.set_footprint(PILLAR, Vector2(250.0, 200.0), Vector2(48.0, 48.0), 0.0)
+	fx.players[0].position = Vector2(330.0, 200.0)
+	var body: Actor = fx.staffed_enemy([[&"bolt"]], Vector2(170.0, 200.0))
+	var brain: AIBrain = Fixture.ai(body).brain
+	var changes: int = 0
+	var steps: int = 0
+	var way: Vector2 = Vector2.ZERO
+	var cast: bool = false
+	for i in int(4.0 / Fixture.STEP):
+		_walk(body, 1)
+		if body.caster.is_winding(0):
+			cast = true
+			break
+		if brain.state == AIBrain.State.REPOSITION:
+			steps += 1
+			if brain.plan_way != way:
+				changes += 1
+			way = brain.plan_way
+	check(steps > 0, "it walks round")
+	check(changes * 8 <= steps + 8, "keeping each way a while, not choosing again every step (%d ways in %d steps)" % [changes, steps])
+	check(cast, "and it gets a clear line and casts")
+
+
+func test_a_run_up_gives_up_after_a_while() -> void:
+	fx.players[0].position = Vector2(400.0, 200.0)
+	var body: Actor = fx.imp(Vector2(400.0, 60.0), _dasher([&"reach", &"reach", &"lumber", &"dash"]))
+	var brain: AIBrain = Fixture.ai(body).brain
+	_walk(body, 1)
+	var run_up: AIBehaviour = _behaviour("run up")
+	check(run_up.want(brain) > 0.0 and brain.run_up_point != Vector2.INF, "it would run up")
+	run_up.act(brain)
+	brain.run_up_since = brain.clock - 7.0
+	check(run_up.want(brain) > 0.0 and brain.run_up_point == Vector2.INF, "after long enough it casts from where it stands")

@@ -105,6 +105,8 @@ const SLOT_TURN: float = deg_to_rad(50.0)
 const SPREAD_BONUS: float = 0.1
 ## Turns (boss plan OB14): how many foes it remembers aiming at, and when.
 const TURN_MEMORY: int = 8
+## Pixels past a target's own ground a walk at it heads for (`_walk_goal`): a wall cell and more.
+const GROUND_MARGIN: float = 12.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the team board is
 ## Entities' (hashed there), handed over by the controller.
@@ -172,6 +174,8 @@ var plan_point: Vector2 = Vector2.ZERO
 ## Where the run-up (boss plan OB14) found to start its move, between its `want` and its `act`
 ## (Vector2.INF: cast it from here).
 var run_up_point: Vector2 = Vector2.INF
+## When (its `clock`) the run-up under way started.
+var run_up_since: float = 0.0
 var plan_urgent: bool = false
 ## What the planned staff is aimed at when not `target` (a teammate to heal); null for `target`.
 var plan_target: Node2D = null
@@ -200,8 +204,8 @@ var _aim_locked: bool = false
 ## Turns: the keys of the foes it aimed at (0: a free row) and when (its `clock`), whether it turns
 ## after the attack under way, and the foe it turned to (null: none), kept its target until its
 ## next attack.
-var _aimed_keys: PackedInt64Array = PackedInt64Array([0, 0, 0, 0, 0, 0, 0, 0])
-var _aimed_at: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0])
+var _aimed_keys: PackedInt64Array = PackedInt64Array()
+var _aimed_at: PackedFloat32Array = PackedFloat32Array()
 var _turn_due: bool = false
 var _turn_to: Node2D = null
 ## Scratch: the open actors' ids, read when it turns.
@@ -263,7 +267,10 @@ func reset() -> void:
 	_grudge_left = 0.0
 	_turn_due = false
 	_turn_to = null
+	_aimed_keys.resize(TURN_MEMORY)
+	_aimed_at.resize(TURN_MEMORY)
 	_aimed_keys.fill(0)
+	_aimed_at.fill(0.0)
 	_state_left = 0.0
 	_looked = false
 	_retarget_left = _retarget_offset
@@ -330,10 +337,10 @@ func think(delta: float, intent: ActorIntent) -> void:
 				if threat_time >= 0.0 and threat_time < URGENT_TIME * 2.0:
 					_state_left = 0.0
 			if _state_left <= 0.0:
-				_to_chase()
+				_attack_over()
 		State.REPOSITION:
 			_state_left -= delta
-			if target == null or _state_left <= 0.0 or _line_clear():
+			if target == null or _state_left <= 0.0 or (_ground_clear_now() and _line_clear()):
 				_to_chase()
 				_perceive()
 				_decide()
@@ -568,7 +575,7 @@ func take_item(item: int) -> void:
 ## Behaviours ask: walk round the wall in the line for a while (REPOSITION).
 func reposition() -> void:
 	plan_move = Move.WAY
-	plan_way = AISight.detour(actor.projectiles, actor.global_position, target.global_position, DETOUR_PROBE)
+	plan_way = AISight.detour(actor.projectiles, actor.global_position, _walk_goal(), DETOUR_PROBE)
 	state = State.REPOSITION
 	_state_left = REPOSITION_TIME
 
@@ -613,7 +620,7 @@ func _perceive() -> void:
 	if target != null:
 		to_target = target.global_position - actor.global_position
 		distance = to_target.length()
-		ground_clear = AISight.ground_clear(actor.projectiles, actor.global_position, target.global_position)
+		ground_clear = _ground_clear_now()
 		line_clear = ground_clear and _line_clear()
 		_note_attack()
 	else:
@@ -742,7 +749,7 @@ func _steer() -> void:
 		return
 	var goal: Vector2 = Vector2.INF
 	if plan_move == Move.TOWARD and not ground_clear:
-		goal = target.global_position
+		goal = _walk_goal()
 	elif plan_move == Move.POINT and not AISight.ground_clear(actor.projectiles, actor.global_position, plan_point):
 		goal = plan_point
 	if goal == Vector2.INF:
@@ -881,7 +888,7 @@ func _release(intent: ActorIntent) -> void:
 		return
 	if recover_time <= 0.0:
 		# No rest (rest_scale 0): it goes on at once.
-		_to_chase()
+		_attack_over()
 		return
 	state = State.RECOVER
 	_state_left = recover_time
@@ -925,8 +932,14 @@ func _in_lane(sense: CastSense, now: Vector2, radius: float) -> bool:
 func _to_chase() -> void:
 	state = State.CHASE
 	_decide_now = true
+
+
+## The attack is over (its rest, or none): back to CHASE, and if it rolled a turn (`AIProfile.turns`)
+## it turns to the foe it aimed at longest ago. Only here: a stand, a call or a detour ending turns
+## nobody.
+func _attack_over() -> void:
+	_to_chase()
 	if _turn_due:
-		# The attack is over: it turns to the foe it aimed at longest ago (`AIProfile.turns`).
 		_turn_due = false
 		_turn_to = _longest_ago_foe()
 		_retarget_left = 0.0
@@ -1074,6 +1087,35 @@ func _aim_node() -> Node2D:
 			return plan_target
 		plan_target = null
 	return target
+
+
+## No blocking body's ground between its feet and the target's (`AISight.ground_clear`), up to the
+## edge of the target's own ground when it stands on some (a body that cannot move lays it under its
+## own feet: `_walk_goal`).
+func _ground_clear_now() -> bool:
+	if target == null:
+		return true
+	var goal: Vector2 = _walk_goal()
+	if goal.distance_squared_to(actor.global_position) <= 1.0:
+		return true
+	return AISight.ground_clear(actor.projectiles, actor.global_position, goal)
+
+
+## Where a walk at the target heads: its feet, or for a target standing on its own ground (a body
+## with no Mover, a training dummy) the point on the way to them just outside that ground, so its
+## own footprint never stands between the two.
+func _walk_goal() -> Vector2:
+	var feet: Vector2 = target.global_position
+	if _target_actor == null or actor.projectiles == null or _target_actor.id < 0:
+		return feet
+	var box: Rect2 = actor.projectiles.footprint_of(_target_actor.id)
+	if not box.has_area() or not box.has_point(feet):
+		return feet
+	var back: Vector2 = actor.global_position - feet
+	if back == Vector2.ZERO:
+		return feet
+	var out: float = box.size.length() * 0.5 + GROUND_MARGIN
+	return feet + back.normalized() * minf(out, back.length())
 
 
 ## True when no wall stands between the actor's body and its target's (`AISight`).

@@ -137,3 +137,19 @@ func test_without_turns_it_keeps_to_the_nearest() -> void:
 	check(targets.size() >= 4, "it attacked a few times (%d)" % targets.size())
 	for target: Actor in targets:
 		check(target == fx.players[0], "always the nearest")
+
+
+func test_a_turn_waits_for_the_attack_to_end() -> void:
+	# Review of OB14: a stand (a phase's transition) ending turns nobody; only an attack over does.
+	fx.players[0].position = Vector2(80.0, 0.0)
+	fx.players[1].position = Vector2(0.0, 120.0)
+	var body: Actor = fx.staffed_enemy([[&"bolt"]], Vector2.ZERO, _profile(0.0, 1.0))
+	var brain: AIBrain = Fixture.ai(body).brain
+	for i in 8:
+		fx.run(body, 1)
+		if brain.state == AIBrain.State.WINDUP:
+			break
+	check(brain.state == AIBrain.State.WINDUP and brain.target == fx.players[0], "it attacks the nearest")
+	brain.transition(0.25, null)
+	fx.run(body, int(1.0 / Fixture.STEP))
+	check(brain.target == fx.players[0], "a transition over: no turn, still the nearest")

@@ -6,7 +6,8 @@ extends AIBehaviour
 ## it from there. Every dashing enemy has it; a short dash's line is almost always long enough, so
 ## it is mostly a long one's (a boss's Big Sweep). Keener than a fight, so the long move is not cast
 ## from a poor place meanwhile; once there (or with no better place to go), it casts the move it ran
-## up for. Its memo is the staff it is running up for (-INF for none, and again once that staff is
+## up for, and after GIVE_UP seconds of running up it casts it from where it stands. Its memo is
+## the staff it is running up for (-INF for none, and again once that staff is
 ## not ready: its move left); where it walks to is the
 ## brain's `run_up_point` (Vector2.INF: cast now).
 
@@ -20,6 +21,9 @@ const GAIN: float = 0.2
 const GAIN_LEAST: float = 24.0
 ## Nearer its start than this (pixels) it is there.
 const THERE: float = 12.0
+## Seconds it runs up at most (a target that keeps moving, a start it cannot reach): then it casts
+## from where it stands.
+const GIVE_UP: float = 6.0
 
 
 func name() -> String:
@@ -47,6 +51,9 @@ func want(brain: AIBrain) -> float:
 	if best < 0:
 		return 0.0
 	var sense: CastSense = brain.senses[best]
+	if running and brain.clock - brain.run_up_since > GIVE_UP:
+		# It ran up long enough: from here, whatever its line.
+		return _cast_now(brain, best)
 	var here: float = brain.run_here(sense)
 	if here >= sense.move_reach * LONG_ENOUGH:
 		# Long enough here: cast it if it ran up for it; else a fight may cast it as any.
@@ -70,6 +77,8 @@ func act(brain: AIBrain) -> void:
 		brain.plan_staff = at
 		brain.plan_move = AIBrain.Move.STAND
 		return
+	if brain.memo[index] != float(at):
+		brain.run_up_since = brain.clock
 	brain.memo[index] = float(at)
 	brain.plan_move = AIBrain.Move.POINT
 	brain.plan_point = brain.run_up_point

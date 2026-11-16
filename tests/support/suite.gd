@@ -1,4 +1,4 @@
-extends SceneTree
+extends Node
 ## Base class for small, isolated unit tests.
 ##
 ## A test script extends this file and holds one method per behaviour, named `test_*`. Each
@@ -17,26 +17,57 @@ extends SceneTree
 ##   func test_something_holds() -> void:
 ##       check(1 + 1 == 2, "arithmetic works")
 ##
-## godot --headless --path . --script res://tests/<area>/test_<name>.gd
+## A suite is not a program of its own: the host (tests/support/run.gd) runs one or several, one
+## after another in one process, each on a fresh game (a Godot start compiles the whole game,
+## seconds, so the runner hands it several files; ci/build/unit_tests.sh):
+##
+##   godot --headless --path . --script res://tests/support/run.gd -- res://tests/<area>/test_<name>.gd
+##
+## The suite reads the tree as a SceneTree script would: `root`, `process_frame`, `physics_frame`,
+## `paused`, `current_scene` and `call_group` are the host's tree's (`tree`: hand it to a helper that
+## takes the SceneTree).
 ##
 ## A long test file can be run in several processes side by side: a line `# unit-test-shards: N`
-## in it makes the runner (ci/build/unit_tests.sh) start it N times, with the user argument
-## `--shard=K/N` (K from 0), and each process runs every Nth test method (by name), from the Kth.
-## A long matrix is split into several methods for it (tests/core/test_card_rules.gd).
+## in it makes the runner start it N times, with the user argument `--shard=K/N` (K from 0), and each
+## process runs every Nth test method (by name), from the Kth. A long matrix is split into several
+## methods for it (tests/core/test_card_rules.gd). A file that needs a process of its own (one that
+## takes many seconds, or times the machine) says `# unit-test-alone`.
 ##
-##   godot --headless --path . --script res://tests/core/test_card_rules.gd -- --shard=0/6
+##   godot --headless --path . --script res://tests/support/run.gd -- res://tests/core/test_card_rules.gd --shard=0/6
 
 const _SUITE_FRAMES := preload("res://core/sim/frames.gd")
 const _SUITE_TICK := preload("res://core/sim/tick.gd")
+
+## The host's tree (a helper that takes the SceneTree takes this), its root window and its frame
+## signals (set by `run_in`).
+var tree: SceneTree
+var root: Window
+var process_frame: Signal
+var physics_frame: Signal
+## The host's tree's pause and current scene.
+var paused: bool:
+	get:
+		return tree.paused
+	set(value):
+		tree.paused = value
+var current_scene: Node:
+	get:
+		return tree.current_scene
+	set(value):
+		tree.current_scene = value
 
 var _failures: Array[String] = []
 var _current: String = ""
 var _owned: Array[Object] = []
 
 
-func _initialize() -> void:
-	# The root joins the scene tree only after _initialize returns: wait one frame.
-	await process_frame
+## Runs every `test_*` method (of the shard the user arguments ask for) on `tree`; returns the
+## failures, each "test_name: what was wrong" (empty when all passed).
+func run_in(host: SceneTree) -> Array[String]:
+	tree = host
+	root = host.root
+	process_frame = host.process_frame
+	physics_frame = host.physics_frame
 	var names: Array[String] = []
 	for method: Dictionary in get_method_list():
 		var method_name: String = method["name"]
@@ -63,11 +94,15 @@ func _initialize() -> void:
 		print("TEST TIME: %s %d ms" % [method_name, Time.get_ticks_msec() - started])
 	if _failures.is_empty():
 		print("TEST OK: %s (%d tests)" % [label, names.size()])
-		quit(0)
 	else:
 		for failure in _failures:
 			printerr("TEST FAILED: " + failure)
-		quit(1)
+	return _failures
+
+
+## The host's tree's `call_group`.
+func call_group(group: StringName, method: StringName, ...args: Array) -> void:
+	tree.call_group.callv([group, method] + args)
 
 
 ## The shard a run's user arguments ask for, as (K, N) from `--shard=K/N`; (0, 1) (the whole file)
@@ -98,11 +133,12 @@ static func of_shard(names: Array[String], shard: Vector2i) -> Array[String]:
 ## an earlier test started dealt the game's sim a random seed, and whatever this test makes rolls
 ## from that sim unless it hands its own. The machine's session rules start as its defaults too
 ## (core/sim/session_rules.gd, online-ready N11), whatever an earlier test set, and no replay deals.
-## And the game goes (online-ready N4): no stop or hold an earlier test left on the game's sim stands
-## this one still. No boss's intro stops a run a test starts (docs/milestones/boss-intro.md, rule 4:
+## And the game goes (online-ready N4): no stop or hold an earlier test left on the game's sim, or on
+## the sim shared by nodes out of the tree (`Sim.found`), stands this one still. No boss's intro stops a run a test starts (docs/milestones/boss-intro.md, rule 4:
 ## off for automation); a test of the intro turns `boss_intros` on in this machine's rules.
 func _still_chance() -> void:
 	SessionRules.reset_machine()
+	Sim.forget_out_of_tree()
 	SessionRules.machine().boss_intros = 0
 	var frames: _SUITE_FRAMES = root.get_node_or_null(^"Frames") as _SUITE_FRAMES
 	if frames != null:

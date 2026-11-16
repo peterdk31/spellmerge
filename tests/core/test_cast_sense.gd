@@ -1,9 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## What a cast does, for an AI (`CastSense`, docs/milestones/M2-enemy-ai.md, AI2): the summary the
 ## compiler makes of every cast, read with `Spells.next_cast_sense`. Real cards from the registry.
-##
-## godot --headless --path . --script res://tests/core/test_cast_sense.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

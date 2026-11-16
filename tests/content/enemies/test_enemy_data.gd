@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## Enemy data (enemy AI AI4, docs/milestones/M2-enemy-ai.md): 1-4 staffs of cards, a profile and a
 ## boss's phases on `EnemyBase`, checked by `problems()`. Every enemy and boss in the registry is sound, and
 ## an actor holds every staff its data names.
-##
-## godot --headless --path . --script res://tests/content/enemies/test_enemy_data.gd
-
 const RegistryScript := preload("res://core/registry/registry.gd")
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const ImpData: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")

@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## one state, of the role the hub's rules read (`HubRules.ROLE_START_LECTERN`); standing at it is its
 ## area, in front of it. The hub stands it in its zone of that name (`RoomContents`), so deleting
 ## this folder leaves the hub whole.
-##
-## godot --headless --path . --script res://content/props/start_lectern/test_start_lectern.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const LECTERN: PropBase = preload("res://content/props/start_lectern/start_lectern.tres")
 

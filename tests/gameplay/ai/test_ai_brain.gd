@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The brain (enemy AI AI5, docs/milestones/M2-enemy-ai.md): an enemy plays whatever staffs it
 ## holds by what each casts next. Real cards from the registry, enemies from the imp's scene with
 ## staffs made here, stepped by hand.
-##
-## godot --headless --path . --script res://tests/gameplay/ai/test_ai_brain.gd
-
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 
 var fx: Fixture

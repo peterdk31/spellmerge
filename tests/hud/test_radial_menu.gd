@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## places and widths with the first entry at the top, picking with the stick and its hysteresis,
 ## the layers (enter, back), the hint row's glyphs and verbs, and that it knows no input it was not
 ## given. The radial builder on it is tested in test_radial_builder.gd and test_radial_rings.gd.
-##
-## godot --headless --path . --script res://tests/hud/test_radial_menu.gd
-
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")

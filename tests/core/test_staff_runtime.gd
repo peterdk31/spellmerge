@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## sustained (`hold`) carriers that reserve mana until switched off; and four players with four
 ## staffs each, rebuilt mid-flight. A real projectile manager and event bus, stepped by
 ## hand; cards built in code behind a stand-in registry.
-##
-## godot --headless --path . --script res://tests/core/test_staff_runtime.gd
-
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")

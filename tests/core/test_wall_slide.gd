@@ -9,9 +9,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## Without the native module the GDScript is still checked (SPELLMERGE_NATIVE=required fails the
 ## comparison instead).
-##
-## godot --headless --path . --script res://tests/core/test_wall_slide.gd
-
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 const CELL: float = 8.0

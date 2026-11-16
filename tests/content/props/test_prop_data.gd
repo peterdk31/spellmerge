@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## shared scene, and every cast its triggers make it can pay from a full pool (a still prop's pools
 ## never refill). Found by folder (`content/props/<id>/<id>.tres`), so a new prop is checked too; the
 ## test exploding barrel (tests/gameplay/actor/fixtures) stands in for the casts until the first props (W9).
-##
-## godot --headless --path . --script res://tests/content/props/test_prop_data.gd
-
 const MoteKinds := preload("res://tests/content/mote_kinds.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")

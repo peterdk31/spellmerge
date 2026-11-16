@@ -3,8 +3,6 @@ extends SceneTree
 ## (projectile_timing_runner.gd, which has the timings and what they check) to the root;
 ## the runner quits with 0 or 1.
 ##
-## godot --headless --path . --script res://tests/benchmark/test_projectile_timing.gd
-##
 ## The unit test runner plays its rounds (native and GDScript, each at both caps) in processes of
 ## their own (`--shard=K/N`, as tests/support/suite.gd takes it; `part` and `parts` of the runner):
 # unit-test-shards: 4

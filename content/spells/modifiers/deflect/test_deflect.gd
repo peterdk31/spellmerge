@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## `tests/core/test_spells_deflect.gd`; here the card's data and how it plays with other cards,
 ## from every seat. The combos with the card are in its folder's combos/ (test_combos.gd plays
 ## them).
-##
-## godot --headless --path . --script res://content/spells/modifiers/deflect/test_deflect.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

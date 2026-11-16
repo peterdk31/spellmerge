@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## group read after its carrier from the target when the carrier's hit sets off a reaction. Its
 ## combos do what they promise with the card and fail without it, and when nothing sets up the
 ## reaction.
-##
-## godot --headless --path . --script res://content/spells/triggers/on_reaction/test_on_reaction.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

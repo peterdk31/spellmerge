@@ -6,9 +6,6 @@ extends "res://tests/support/suite.gd"
 ## a move's speed curve, OB10), still its whole way in its time; a bolt's flight keeps its own
 ## curve. Its combos (`combos/`, each with
 ## `needs: lumber`) are held with and without it by tests/content/spells/test_combos.gd.
-##
-## godot --headless --path . --script res://content/spells/modifiers/lumber/test_lumber.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

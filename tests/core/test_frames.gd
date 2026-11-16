@@ -410,14 +410,14 @@ func test_back_to_the_menu_ends_the_recording_and_the_replay_and_forgets_a_resta
 		_frames.tick(DT)
 	_frames.restart(&"hub_requested", 0)
 	_bus.pause_requested.emit(0, 0)
-	var paused: Array = []
-	_bus.listen(&"pause_requested", func(seat: int, on: int) -> void: paused.append([seat, on]))
+	var pauses: Array = []
+	_bus.listen(&"pause_requested", func(seat: int, on: int) -> void: pauses.append([seat, on]))
 	_bus.main_menu_requested.emit(0)
 	check(not _frames.is_recording() and replay.tick_count() == 4, "the recording ended where it was")
 	_frames.begin_step(DT)
 	_frames.tick(DT)
 	check_equal(starts, [0], "the run asked for again never starts")
-	check_equal(paused, [[0, 0]], "the waiting command still applies")
+	check_equal(pauses, [[0, 0]], "the waiting command still applies")
 	check(_frames.play(replay), "a replay plays")
 	_bus.main_menu_requested.emit(0)
 	check(not _frames.is_playing(), "and ends at once on the way back to the menu")

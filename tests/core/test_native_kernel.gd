@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/support/suite.gd"
 ## The native kernel against its GDScript (native/README.md): two projectile managers, one with
 ## the native `ShotKernel` and one without (`Projectiles.native`), are given the same seeded scene
 ## and stepped side by side. After every step every packed array of the two must be equal byte
@@ -19,15 +19,18 @@ extends SceneTree
 ## handlers that spawn shots (which spare the body hit), remove a target, register one again
 ## larger and make a shot further on a ghost now and then.
 ##
-## The scene runs twice: the native kernel on one thread, then on four (shot scale H5, rule T2).
-## Both are compared with the GDScript to the bit, so one thread and several give the same bits
-## too. A scene of its own grows targets mid-pass: a cell the pass already took keeps its count
-## and box until the next filling, in both.
+## The tests: the kernel's own checks of the manager's constants and members, one per test; the
+## scene stepped with the native kernel on one thread, and (a test of its own) on four (shot scale
+## H5, rule T2), each compared with the GDScript to the bit, so one thread and several give the
+## same bits too, each ending with checks that the scene reached what it is meant to compare (a
+## scene run takes seconds, so the comparison and those checks share one run); and a scene of its
+## own that grows targets mid-pass: both step alike through it, and a cell the pass already took
+## keeps its count and box until the next filling. Each test builds and frees its own managers.
+## The file runs as two processes (`unit-test-shards`), the two scene runs in different ones.
 ##
-## Without the native module the test only says so (SPELLMERGE_NATIVE=required fails it, as in
-## ci/build/build.sh).
-##
-## godot --headless --path . --script res://tests/core/test_native_kernel.gd
+## Without the native module every test only says so (SPELLMERGE_NATIVE=required fails them, as
+## in ci/build/build.sh).
+# unit-test-shards: 2
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -52,11 +55,8 @@ const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads",
 		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
 
-var _failures: Array[String] = []
 ## Per manager (0 the GDScript, 1 the native): its bus, actor table, targets and what it sent.
 var _mgrs: Array[ManagerScript] = []
-var _buses: Array[EventsScript] = []
-var _tables: Array[Node] = []
 var _targets: Array = [[], []]
 ## The most instances each batch (BATCH_*) drew at once, so every batch is seen compared.
 var _batch_seen: PackedInt32Array = PackedInt32Array()
@@ -86,99 +86,162 @@ var _turned_back: bool = false
 var _circled_quad: bool = false
 ## The box bodies the native side hit, by name (props and box enemies).
 var _box_hits: Array[String] = []
+## How many differences the running test found: a scene stops at the ninth (the rest follow).
+var _differences: int = 0
+
+## The card bodies of the scene: plain canvas-item shaders, made once per file.
+const SCENE_BODIES: int = 6
+var _bodies: Array[Shader] = []
 
 
-func _initialize() -> void:
-	await process_frame
-	if not NativeScript.loaded():
-		if OS.get_environment("SPELLMERGE_NATIVE") == "required":
-			printerr("TEST FAILED: SPELLMERGE_NATIVE=required, but the native module is not loaded (ci/build/native.sh)")
-			quit(1)
-			return
-		print("NOTE: the native module is not built; nothing to compare")
-		print("TEST OK: native kernel (skipped)")
-		quit(0)
-		return
-	_test_the_constants_are_checked()
-	for threads: int in THREADS:
-		_test_both_step_alike(threads)
-		_teardown()
-	_test_a_target_grown_mid_pass()
-	_teardown()
-	if _failures.is_empty():
-		print("TEST OK: native kernel")
-		quit(0)
-	else:
-		for failure in _failures:
-			printerr("TEST FAILED: " + failure)
-		quit(1)
-
-
-func _check(condition: bool, message: String) -> void:
-	if not condition:
-		_failures.append(message)
-
-
-func _teardown() -> void:
-	for side in 2:
-		for node: Node in _targets[side] + _wizards[side]:
-			if is_instance_valid(node):
-				node.free()
-		(_targets[side] as Array).clear()
-		(_wizards[side] as Array).clear()
-	for node: Node in _mgrs + _buses + _tables + _holders:
-		if is_instance_valid(node):
-			node.free()
-	_mgrs.clear()
-	_buses.clear()
-	_tables.clear()
-	_holders.clear()
+func before_each() -> void:
+	_mgrs = []
+	_targets = [[], []]
+	_wizards = [[], []]
 	_events = [[], []]
+	_prop_nodes = [[], []]
+	_holders = []
+	_props = PackedInt32Array()
+	_imp = -1
+	_batch_seen = PackedInt32Array()
+	_tails_laid = 0
+	_tails_capped = false
+	_turned_back = false
+	_circled_quad = false
+	_box_hits = []
+	_differences = 0
 
 
-## A kernel built against other constants or members is refused, and the manager runs its GDScript:
-## the kernel names every constant and member that does not match.
-func _test_the_constants_are_checked() -> void:
-	var kernel: Object = NativeScript.shot_kernel()
-	_check(kernel != null, "the module makes a ShotKernel")
-	if kernel == null:
+## Whether the native module is here to compare; without it a test only says so, and fails when
+## SPELLMERGE_NATIVE=required (ci/build/build.sh).
+func _native_loaded() -> bool:
+	if NativeScript.loaded():
+		return true
+	check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "SPELLMERGE_NATIVE=required, but the native module is not loaded (ci/build/native.sh)")
+	print("NOTE: the native module is not built; nothing to compare")
+	return false
+
+
+## Records a difference between the two sides.
+func _differ(message: String) -> void:
+	_differences += 1
+	check(false, message)
+
+
+func _body_shaders() -> Array[Shader]:
+	if _bodies.is_empty():
+		for n in SCENE_BODIES:
+			var shader := Shader.new()
+			shader.code = "shader_type canvas_item;\n// body %d\n" % n
+			_bodies.append(shader)
+	return _bodies
+
+
+## A manager for `side` (1 the native kernel) on `threads` threads, in the tree, with its own bus,
+## actor table (wizards at 0-3) and holder for its bodies; all freed after the test.
+func _manager(side: int, threads: int, cap: int, table: ActorSeats.ActorsScript) -> ManagerScript:
+	var bus: EventsScript = own(EventsScript.new()) as EventsScript
+	own(table)
+	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
+	mgr.native_threads = threads
+	mgr.native = side == 1
+	mgr.actors = table
+	mgr.events = bus
+	root.add_child(mgr)
+	mgr.set_cap(cap)
+	mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
+	_mgrs.append(mgr)
+	var holder: Node2D = own(Node2D.new()) as Node2D
+	root.add_child(holder)
+	_holders.append(holder)
+	return mgr
+
+
+# --- The kernel's checks of the manager -------------------------------------
+# A kernel built against other constants or members is refused, and the manager runs its GDScript:
+# the kernel names every constant and member that does not match.
+
+func test_the_module_makes_a_shot_kernel() -> void:
+	if not _native_loaded():
 		return
-	var mgr := ManagerScript.new()
-	var constants: Dictionary = mgr.native_constants()
-	_check((kernel.call(&"check", constants) as PackedStringArray).is_empty(), "the manager's constants match the kernel's")
-	_check((kernel.call(&"check_fields", mgr) as PackedStringArray).is_empty(), "the manager has every member the kernel reads")
-	var changed: Dictionary = constants.duplicate()
+	check(NativeScript.shot_kernel() != null, "the module makes a ShotKernel")
+
+
+func test_the_managers_constants_match_the_kernels() -> void:
+	if not _native_loaded():
+		return
+	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
+	var kernel: Object = NativeScript.shot_kernel()
+	check((kernel.call(&"check", mgr.native_constants()) as PackedStringArray).is_empty(), "the manager's constants match the kernel's")
+
+
+func test_the_manager_has_every_member_the_kernel_reads() -> void:
+	if not _native_loaded():
+		return
+	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
+	var kernel: Object = NativeScript.shot_kernel()
+	check((kernel.call(&"check_fields", mgr) as PackedStringArray).is_empty(), "the manager has every member the kernel reads")
+
+
+func test_every_mismatched_constant_is_named() -> void:
+	if not _native_loaded():
+		return
+	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
+	var changed: Dictionary = mgr.native_constants().duplicate()
 	changed["EMITTING_MASK"] = int(changed["EMITTING_MASK"]) + 1
 	changed.erase("S_DONE")
-	var wrong: String = ", ".join(kernel.call(&"check", changed) as PackedStringArray)
-	_check("EMITTING_MASK" in wrong and "S_DONE" in wrong, "a changed and a missing constant are named (%s)" % wrong)
-	var stranger := Node2D.new()
-	_check("_pos" in ", ".join(kernel.call(&"check_fields", stranger) as PackedStringArray), "a missing member is named")
-	stranger.free()
-	_check(mgr.is_native(), "a new manager runs the native kernel")
+	var wrong: String = ", ".join(NativeScript.shot_kernel().call(&"check", changed) as PackedStringArray)
+	check("EMITTING_MASK" in wrong and "S_DONE" in wrong, "a changed and a missing constant are named (%s)" % wrong)
+
+
+func test_a_missing_member_is_named() -> void:
+	if not _native_loaded():
+		return
+	var stranger: Node2D = own(Node2D.new()) as Node2D
+	check("_pos" in ", ".join(NativeScript.shot_kernel().call(&"check_fields", stranger) as PackedStringArray), "a missing member is named")
+
+
+func test_a_new_manager_runs_the_native_kernel() -> void:
+	if not _native_loaded():
+		return
+	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
+	check(mgr.is_native(), "a new manager runs the native kernel")
+
+
+func test_the_native_switch_picks_the_gdscript_or_the_kernel() -> void:
+	if not _native_loaded():
+		return
+	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
 	mgr.native = false
-	_check(not mgr.is_native(), "native off runs the GDScript")
+	check(not mgr.is_native(), "native off runs the GDScript")
 	mgr.native = true
-	_check(mgr.is_native(), "and on again the kernel")
-	mgr.free()
+	check(mgr.is_native(), "and on again the kernel")
 
 
-func _test_both_step_alike(threads: int) -> void:
+# --- The scene, stepped side by side ----------------------------------------
+
+func test_one_thread_steps_like_the_gdscript() -> void:
+	if not _native_loaded():
+		return
+	_step_the_scene_alike(1)
+
+
+func test_several_threads_step_like_the_gdscript() -> void:
+	if not _native_loaded():
+		return
+	_step_the_scene_alike(THREADS[THREADS.size() - 1])
+
+
+## Builds the scene on both sides, the native one on `threads` threads, and steps it STEPS times,
+## comparing after each step; then checks the scene reached what it is meant to compare.
+func _step_the_scene_alike(threads: int) -> void:
 	for side in 2:
-		var bus := EventsScript.new()
 		var table: ActorSeats.ActorsScript = ActorSeats.table()
 		_imp = ActorSeats.enemy(table)
 		_props.clear()
 		for at in PROP_AT:
 			_props.append(table.open(ActorSeats.ActorsScript.TEAM_WORLD, ActorSeats.ActorsScript.RAMP_ENEMY))
-		var mgr := ManagerScript.new()
-		mgr.native_threads = threads
-		mgr.native = side == 1
-		mgr.actors = table
-		mgr.events = bus
-		root.add_child(mgr)
-		mgr.set_cap(1500)
-		mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
+		var mgr: ManagerScript = _manager(side, threads, 1500, table)
 		# Every card body's pair of batches (`register_body`): quad bodies and head bodies in turn
 		# (card-looks phase 1). The shots below take them in turn, still and flying alike, so some
 		# draw in their body's pair and some, whose motion is not written as their body's mesh, plain.
@@ -191,37 +254,25 @@ func _test_both_step_alike(threads: int) -> void:
 		mgr._spark_rng.seed = 11
 		mgr.set_walls([Rect2(0, 0, 960, 24), Rect2(0, 516, 960, 24), Rect2(0, 0, 24, 540), Rect2(936, 0, 24, 540),
 				Rect2(300, 200, 40, 40), Rect2(620, 300, 40, 40), Rect2(500, 150, 24, 24)] as Array[Rect2])
-		_mgrs.append(mgr)
-		_buses.append(bus)
-		_tables.append(table)
-		var holder := Node2D.new()
-		root.add_child(holder)
-		_holders.append(holder)
 		for i in 60:
 			var at: Vector2 = Vector2(480.0, 270.0) + Vector2(float(i % 10) * 18.0 - 90.0, float(i / 10) * 18.0 - 45.0)
-			var owner: int = _imp if i % 7 == 0 else EventsScript.NO_PLAYER
+			var owner_id: int = _imp if i % 7 == 0 else EventsScript.NO_PLAYER
 			var half: Vector2 = ENEMY_HALF if i % BOX_EVERY == 3 else Vector2.ZERO
-			(_targets[side] as Array).append(_add_body(side, "enemy%d" % i, at, 7.0 + float(i % 4) if half == Vector2.ZERO else 2.0, ManagerScript.LAYER_ENEMY, owner, half))
+			(_targets[side] as Array).append(_add_body(side, "enemy%d" % i, at, 7.0 + float(i % 4) if half == Vector2.ZERO else 2.0, ManagerScript.LAYER_ENEMY, owner_id, half))
 		for seat in 4:
 			(_wizards[side] as Array).append(_add_body(side, "wizard%d" % seat, Vector2(160.0 + float(seat) * 200.0, 440.0), 8.0, ManagerScript.LAYER_PLAYER, seat))
-		(_prop_nodes[side] as Array).clear()
 		for n in _props.size():
 			(_prop_nodes[side] as Array).append(_add_body(side, "prop%d" % n, PROP_AT[n], PROP_RADIUS[n], ManagerScript.LAYER_ENEMY, _props[n], PROP_HALF[n]))
-		bus.projectile_hit.connect(_on_hit.bind(side))
-		bus.projectile_expired.connect(_on_expired.bind(side))
-	_check(_mgrs[1].is_native() and not _mgrs[0].is_native(), "one native manager, one GDScript")
+		mgr.events.projectile_hit.connect(_on_hit.bind(side))
+		mgr.events.projectile_expired.connect(_on_expired.bind(side))
+	check(_mgrs[1].is_native() and not _mgrs[0].is_native(), "one native manager, one GDScript")
 	# A build without threads (the web's) runs every loop on one.
 	var running: int = _mgrs[1].native_thread_count()
-	_check(running == threads or running == 1, "the native kernel runs on %d threads (%d)" % [threads, running])
+	check(running == threads or running == 1, "the native kernel runs on %d threads (%d)" % [threads, running])
 	if running < threads:
 		print("NOTE: this build of the native module has no threads; %d asked, 1 runs" % threads)
 	_batch_seen.resize(_mgrs[1].batch_count())
 	_batch_seen.fill(0)
-	_tails_laid = 0
-	_tails_capped = false
-	_turned_back = false
-	_circled_quad = false
-	_box_hits.clear()
 	var queries := RandomNumberGenerator.new()
 	queries.seed = 7
 	for step in STEPS:
@@ -231,7 +282,7 @@ func _test_both_step_alike(threads: int) -> void:
 			_events[side].clear()
 			_mgrs[side].step(DT)
 		if _events[0] != _events[1]:
-			_failures.append("step %d: the same events (%s)" % [step, _first_difference(_events[0], _events[1]) + " / " + _first_difference(_events[1], _events[0])])
+			_differ("step %d: the same events (%s)" % [step, _first_difference(_events[0], _events[1]) + " / " + _first_difference(_events[1], _events[0])])
 		_compare_arrays(step)
 		var fraction: float = float(step % 7) / 7.0
 		for side in 2:
@@ -251,70 +302,46 @@ func _test_both_step_alike(threads: int) -> void:
 			var point := Vector2(queries.randf_range(30.0, 930.0), queries.randf_range(30.0, 510.0))
 			var radius: float = queries.randf_range(4.0, 40.0)
 			var team: int = [-1, 0, 1][queries.randi() % 3]
-			var own: int = queries.randi_range(-1, 5)
+			var own_id: int = queries.randi_range(-1, 5)
 			var horizon: float = queries.randf_range(0.1, 1.5)
-			var a: float = _mgrs[0].threat(point, radius, team, own, horizon)
-			var b: float = _mgrs[1].threat(point, radius, team, own, horizon)
-			_check(var_to_bytes(a) == var_to_bytes(b) and _mgrs[0].threat_slot == _mgrs[1].threat_slot
-					and var_to_bytes(_mgrs[0].threat_away) == var_to_bytes(_mgrs[1].threat_away),
-					"step %d ask %d: the same threat (%s %d %s / %s %d %s)" % [step, n, a, _mgrs[0].threat_slot, _mgrs[0].threat_away, b, _mgrs[1].threat_slot, _mgrs[1].threat_away])
+			var a: float = _mgrs[0].threat(point, radius, team, own_id, horizon)
+			var b: float = _mgrs[1].threat(point, radius, team, own_id, horizon)
+			if not (var_to_bytes(a) == var_to_bytes(b) and _mgrs[0].threat_slot == _mgrs[1].threat_slot
+					and var_to_bytes(_mgrs[0].threat_away) == var_to_bytes(_mgrs[1].threat_away)):
+				_differ("step %d ask %d: the same threat (%s %d %s / %s %d %s)" % [step, n, a, _mgrs[0].threat_slot, _mgrs[0].threat_away, b, _mgrs[1].threat_slot, _mgrs[1].threat_away])
 		_compare_arrays(step)
-		if _failures.size() > 8:
+		if _differences > 8:
 			return
-	_check(_mgrs[1].get_count() > 400, "the scene keeps hundreds of shots (%d)" % _mgrs[1].get_count())
+	# The scene reached what it is meant to compare.
+	check(_mgrs[1].get_count() > 400, "the scene keeps hundreds of shots (%d)" % _mgrs[1].get_count())
 	for batch in _mgrs[1].batch_count():
-		_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
-	_check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
-	_check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
-	_check(_turned_back, "a circling shot bounced and went round backwards")
-	_check(_circled_quad, "a still body circled, drawn as its quad")
+		check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
+	check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
+	check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
+	check(_turned_back, "a circling shot bounced and went round backwards")
+	check(_circled_quad, "a still body circled, drawn as its quad")
 	var boxes_hit: int = _box_hits.filter(func(n: String) -> bool: return n.begins_with("prop")).size()
-	_check(boxes_hit > 0 and _box_hits.size() > boxes_hit, "shots hit the boxes, props (%d) and enemies (%d)" % [boxes_hit, _box_hits.size() - boxes_hit])
+	check(boxes_hit > 0 and _box_hits.size() > boxes_hit, "shots hit the boxes, props (%d) and enemies (%d)" % [boxes_hit, _box_hits.size() - boxes_hit])
 
 
+# --- Targets grown mid-pass -------------------------------------------------
+# A hit that grows targets mid-pass: the shots after it in the pass must see each target's cell as
+# the GDScript does. It keeps a cell's count and box once taken in a filling (`_cell_info`), so a
+# shot passing the grown `near` (whose cell an earlier shot of the pass took) still sees its old
+# box and misses it, and one passing the grown `far` (whose cell nothing took yet) sees the new
+# one and hits it.
 
-## The card bodies of the scene: plain canvas-item shaders, made once.
-const SCENE_BODIES: int = 6
-static var _bodies: Array[Shader] = []
-
-
-static func _body_shaders() -> Array[Shader]:
-	if _bodies.is_empty():
-		for n in SCENE_BODIES:
-			var shader := Shader.new()
-			shader.code = "shader_type canvas_item;\n// body %d\n" % n
-			_bodies.append(shader)
-	return _bodies
-
-
-## A hit that grows targets mid-pass: the shots after it in the pass must see each target's cell as
-## the GDScript does. It keeps a cell's count and box once taken in a filling (`_cell_info`), so a
-## shot passing the grown `near` (whose cell an earlier shot of the pass took) still sees its old
-## box and misses it, and one passing the grown `far` (whose cell nothing took yet) sees the new
-## one and hits it.
-func _test_a_target_grown_mid_pass() -> void:
+## Builds the scene on both sides and steps it three times, comparing each step; returns the
+## GDScript side's events of the first step.
+func _step_targets_grown_mid_pass() -> Array:
+	var first_step: Array = []
 	for side in 2:
-		var bus := EventsScript.new()
-		var table: ActorSeats.ActorsScript = ActorSeats.table()
-		var mgr := ManagerScript.new()
-		mgr.native_threads = THREADS[THREADS.size() - 1]
-		mgr.native = side == 1
-		mgr.actors = table
-		mgr.events = bus
-		root.add_child(mgr)
-		mgr.set_cap(600)
-		mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
-		_mgrs.append(mgr)
-		_buses.append(bus)
-		_tables.append(table)
-		var holder := Node2D.new()
-		root.add_child(holder)
-		_holders.append(holder)
+		var mgr: ManagerScript = _manager(side, THREADS[THREADS.size() - 1], 600, ActorSeats.table())
 		var first: Node2D = _add_body(side, "first", Vector2(100.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
 		var near: Node2D = _add_body(side, "near", Vector2(500.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
 		var far: Node2D = _add_body(side, "far", Vector2(800.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
 		(_targets[side] as Array).append_array([first, near, far])
-		bus.projectile_hit.connect(_on_grow_hit.bind(side, first, [near, far]))
+		mgr.events.projectile_hit.connect(_on_grow_hit.bind(side, first, [near, far]))
 		# First in the pass: a shot past `near` (its cell is taken, its box as it is), then one into `first`.
 		mgr.spawn(0, Vector2(440.0, 300.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY)
 		mgr.spawn(0, Vector2(85.0, 270.0), Vector2(900.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY)
@@ -327,12 +354,26 @@ func _test_a_target_grown_mid_pass() -> void:
 			_events[side].clear()
 			_mgrs[side].step(DT)
 		if _events[0] != _events[1]:
-			_failures.append("grown mid-pass, step %d: the same events (%s)" % [step, _first_difference(_events[0], _events[1]) + " / " + _first_difference(_events[1], _events[0])])
+			_differ("grown mid-pass, step %d: the same events (%s)" % [step, _first_difference(_events[0], _events[1]) + " / " + _first_difference(_events[1], _events[0])])
 		_compare_arrays(step)
 		if step == 0:
-			var on_near: int = _events[0].filter(func(e: String) -> bool: return " near " in e).size()
-			var on_far: int = _events[0].filter(func(e: String) -> bool: return " far " in e).size()
-			_check(on_near == 0 and on_far > 100, "after the hit, the shots miss the grown near (%d hits) and hit the grown far (%d)" % [on_near, on_far])
+			first_step = _events[0].duplicate()
+	return first_step
+
+
+func test_targets_grown_mid_pass_step_like_the_gdscript() -> void:
+	if not _native_loaded():
+		return
+	_step_targets_grown_mid_pass()
+
+
+func test_a_cell_the_pass_took_keeps_its_box_until_the_next_filling() -> void:
+	if not _native_loaded():
+		return
+	var events: Array = _step_targets_grown_mid_pass()
+	var on_near: int = events.filter(func(e: String) -> bool: return " near " in e).size()
+	var on_far: int = events.filter(func(e: String) -> bool: return " far " in e).size()
+	check(on_near == 0 and on_far > 100, "after the hit, the shots miss the grown near (%d hits) and hit the grown far (%d)" % [on_near, on_far])
 
 
 func _on_grow_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int, first: Node2D, grown: Array) -> void:
@@ -342,12 +383,12 @@ func _on_grow_hit(caster: int, target: Node, position: Vector2, tag: int, shot: 
 			_mgrs[side].add_target(node, 60.0)
 
 
-func _add_body(side: int, name: String, at: Vector2, radius: float, layer: int, owner: int, half: Vector2 = Vector2.ZERO) -> Node2D:
+func _add_body(side: int, body_name: String, at: Vector2, radius: float, layer: int, owner_id: int, half: Vector2 = Vector2.ZERO) -> Node2D:
 	var node := Node2D.new()
-	node.name = name
+	node.name = body_name
 	_holders[side].add_child(node)
 	node.global_position = at
-	_mgrs[side].add_target(node, radius, layer, owner, Vector2.ZERO, 0, half)
+	_mgrs[side].add_target(node, radius, layer, owner_id, Vector2.ZERO, 0, half)
 	if half != Vector2.ZERO:
 		node.set_meta(&"box", true)
 	return node
@@ -402,7 +443,7 @@ func _drive(side: int, step: int) -> void:
 			var still: bool = own_speed == Vector2.ZERO and step % 2 == 0
 			slot = m.spawn(who, m.get_anchor(who), own_speed, rng.randf_range(0.5, 2.0), rng.randf_range(1.5, 6.0), ManagerScript.LAYER_ENEMY, 1000, 1, ManagerScript.MOTION_STILL if still else ManagerScript.MOTION_STRAIGHT)
 			if slot >= 0 and not m.set_orbit(slot, round_radius, angle, drift):
-				_failures.append("step %d: set_orbit refused a live straight shot" % step)
+				_differ("step %d: set_orbit refused a live straight shot" % step)
 			if slot >= 0 and slot % 2 == 0:
 				# Some bounce: a wall across the circle (the block by the imp's anchor) turns them back round.
 				m.set_bounce(slot, 3)
@@ -495,16 +536,16 @@ func _on_expired(caster: int, position: Vector2, tag: int, shot: int, side: int)
 ## Every packed array (and int and float) member of the two managers, byte for byte.
 func _compare_arrays(step: int) -> void:
 	for prop: Dictionary in _mgrs[0].get_property_list():
-		var name: StringName = prop["name"]
+		var member: StringName = prop["name"]
 		var type: int = prop["type"]
-		if (prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0 or name in OWN_BUFFERS or name in NOT_COMPARED:
+		if (prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0 or member in OWN_BUFFERS or member in NOT_COMPARED:
 			continue
 		if type < TYPE_PACKED_BYTE_ARRAY and type != TYPE_INT and type != TYPE_FLOAT and type != TYPE_VECTOR2:
 			continue
-		var a: Variant = _mgrs[0].get(name)
-		var b: Variant = _mgrs[1].get(name)
+		var a: Variant = _mgrs[0].get(member)
+		var b: Variant = _mgrs[1].get(member)
 		if var_to_bytes(a) != var_to_bytes(b):
-			_failures.append("step %d: %s differs (GDScript %s, native %s)" % [step, name, _first_difference(a, b), _first_difference(b, a)])
+			_differ("step %d: %s differs (GDScript %s, native %s)" % [step, member, _first_difference(a, b), _first_difference(b, a)])
 
 
 func _first_difference(a: Variant, b: Variant) -> String:
@@ -522,20 +563,22 @@ func _first_difference(a: Variant, b: Variant) -> String:
 func _compare_draw(step: int) -> void:
 	var a: ManagerScript = _mgrs[0]
 	var b: ManagerScript = _mgrs[1]
-	_check(a.drawn == b.drawn and a.drawn_enemy == b.drawn_enemy,
-			"step %d: the same drawn counts (%d %d / %d %d)" % [step, a.drawn, a.drawn_enemy, b.drawn, b.drawn_enemy])
-	_check(a.particle_demand == b.particle_demand, "step %d: the same demand" % step)
+	if a.drawn != b.drawn or a.drawn_enemy != b.drawn_enemy:
+		_differ("step %d: the same drawn counts (%d %d / %d %d)" % [step, a.drawn, a.drawn_enemy, b.drawn, b.drawn_enemy])
+	if a.particle_demand != b.particle_demand:
+		_differ("step %d: the same demand" % step)
 	for batch in b.batch_count():
 		var count_a: int = a._nodes[batch].multimesh.visible_instance_count
 		var count_b: int = b._nodes[batch].multimesh.visible_instance_count
-		_check(count_a == count_b, "step %d batch %d: the same instances (%d / %d)" % [step, batch, count_a, count_b])
+		if count_a != count_b:
+			_differ("step %d batch %d: the same instances (%d / %d)" % [step, batch, count_a, count_b])
 		_batch_seen[batch] = maxi(_batch_seen[batch], count_a)
 		var buffer_a: PackedFloat32Array = a._buffers[batch]
 		# The native side drew into the kernel's buffers, or into its own while a solid shot lived.
 		var buffer_b: PackedFloat32Array = b._kernel.call(&"buffer", batch) if not b._any_solid else b._buffers[batch]
 		var floats: int = mini(count_a, count_b) * ManagerScript.DRAW_STRIDE
 		if buffer_a.size() < floats or buffer_b.size() < floats:
-			_failures.append("step %d batch %d: a buffer too small" % [step, batch])
+			_differ("step %d batch %d: a buffer too small" % [step, batch])
 			continue
 		if var_to_bytes(buffer_a.slice(0, floats)) != var_to_bytes(buffer_b.slice(0, floats)):
-			_failures.append("step %d batch %d: the instances differ (%s / %s)" % [step, batch, _first_difference(buffer_a.slice(0, floats), buffer_b.slice(0, floats)), _first_difference(buffer_b.slice(0, floats), buffer_a.slice(0, floats))])
+			_differ("step %d batch %d: the instances differ (%s / %s)" % [step, batch, _first_difference(buffer_a.slice(0, floats), buffer_b.slice(0, floats)), _first_difference(buffer_b.slice(0, floats), buffer_a.slice(0, floats))])

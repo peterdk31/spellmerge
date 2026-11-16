@@ -5,9 +5,6 @@ extends "res://tests/support/suite.gd"
 ## own with the changes the run's unlocks hold applied in order, never the registry's; and a change
 ## that names nothing, or leaves rules that make no map, is named by the validator. On made-up
 ## content.
-##
-## godot --headless --path . --script res://tests/core/test_run_rule_changes.gd
-
 const MadeUpRoom := preload("res://tests/support/made_up_room.gd")
 
 const BIOME: StringName = &"cellar"

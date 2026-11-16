@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Hold card (content/spells/modifiers/hold/, staffs C): the next carrier stays until its
 ## staff is cast again, and keeps its mana reserved while it does. Its combos hurt what they
 ## promise, outlive an unheld carrier, and end with the next cast.
-##
-## godot --headless --path . --script res://content/spells/modifiers/hold/test_hold.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 

@@ -1,13 +1,24 @@
-extends SceneTree
+extends "res://tests/support/suite.gd"
 ## Tests for the pause menu (hud/menus/pause) and the buttons that open menus (owner,
-## 2026-10-26): `pause` (Start) opens it for the player who pressed it and stops the game for
-## everyone; only that player works it; Resume, `back` on the main page and `pause` again close
-## it and the game goes on; Sandbox shows only in the sandbox and its page sends the sandbox
-## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen, Effect slots, Particles, Floor marks, Max shots, Screen shake, Damage numbers and Show FPS; `back` (B)
-## opens the builder in play, but not from inside a menu nor while paused; `pause` closes an
-## open builder; the menu's stop is a reason of its own (online-ready N4). Input goes through the real input manager's virtual devices.
+## 2026-10-26), one behaviour per test: `pause` (Start) opens it for the player who pressed it and
+## stops the game for everyone; only that player works it; Resume, `back` on the main page and
+## `pause` again close it and the game goes on; Sandbox shows only in the sandbox and its page sends
+## the sandbox actions and switches the builder and where the staff rows show the reload; the Map
+## page shows the run's map; Settings has Fullscreen, Effect slots, Particles, Particle amount,
+## Floor marks, Spell light, Tailless motes, Max shots, Screen shake, Damage numbers and Show FPS;
+## `back` (B) opens the builder in play, but not from inside a menu nor while paused; `pause` closes
+## an open builder; A on the hub's lit stone, by an item and on the altar, in that order; Main menu
+## and Leave game let the game go first; a seat waiting for its unplugged gamepad is named and can
+## be let go. The menu's stop is a reason of its own (online-ready N4).
 ##
-## godot --headless --path . --script res://tests/hud/test_pause_menu.gd
+## The settings' switches (Screen shake, Damage numbers, Floor marks, Spell light) and sliders
+## (Effect slots, Particles, Particle amount, Max shots, Tailless motes) behave alike, so each of
+## those behaviours is one test over every switch or every slider (`_switches()`, `_sliders()`).
+##
+## Each test builds what it needs with `_setup`: the HUD (hud/panels/panels.tscn) on a bus, input
+## manager (virtual devices), UI focus and save of its own, and a stand-in for the main menu scene.
+## After each test it is all freed, the save file is removed, the tree is unpaused and the current
+## scene is the one before.
 
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -21,81 +32,58 @@ const RingZoomScript := preload("res://hud/builder/rings/ring_zoom.gd")
 const RingKindsScript := preload("res://hud/builder/rings/ring_kinds.gd")
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 
-var _failures: Array[String] = []
+const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
+## The main page out of the sandbox and out of a run of rooms.
+const MAIN_PAGE: Array[String] = ["Resume", "Settings", "LeaveGame", "MainMenu"]
+## The name of the stand-in the HUD shows for the main menu.
+const MENU_STAND_IN: String = "MenuStandIn"
+## The settings' signals, by row: what each row's moves send (feel, the projectile manager).
+const SIGNAL_OF: Dictionary = {
+	"EffectSlots": &"effect_slots_changed",
+	"MoteCap": &"mote_cap_changed",
+	"MoteDensity": &"mote_density_changed",
+	"ShotCap": &"projectile_cap_changed",
+	"TaillessMotes": &"tailless_motes_changed",
+	"ScreenShake": &"screen_shake_changed",
+	"DamageNumbers": &"damage_numbers_changed",
+	"FloorMarks": &"floor_marks_changed",
+	"SpellLight": &"spell_light_changed",
+}
+
 ## Whether the menu's last `pause_requested` asked the game to stop.
 var _stops: bool = false
 var _bus: EventsScript
 var _input: InputManagerScript
 var _focus: UIFocusScript
 var _hud: HudScript
+## Every `sandbox_action_requested` as [player, action].
 var _actions: Array[Array] = []
-var _slots: Array[int] = []
-## Every `screen_shake_changed` the bus sent, from before the Hud binds.
-var _shakes: Array[bool] = []
-## Every `damage_numbers_changed` the bus sent, from before the Hud binds.
-var _numbers: Array[bool] = []
-## Every `projectile_cap_changed` the bus sent, from before the Hud binds.
-var _caps: Array[int] = []
 ## Every `shot_cap_requested` the bus sent, as [player, cap] (online-ready N11: the run's cap).
 var _cap_requests: Array[Array] = []
-## Every `mote_cap_changed` the bus sent, from before the Hud binds.
-var _mote_caps: Array[int] = []
-var _densities: Array[float] = []
-## Every `floor_marks_changed` the bus sent, from before the Hud binds.
-var _floor_marks: Array[bool] = []
-var _lights: Array[bool] = []
-var _tailless: Array[int] = []
-
-const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
+## What each settings row's signal sent, by row name (SIGNAL_OF), from before the Hud binds.
+var _heard: Dictionary = {}
+## The current scene before the test (the main menu's stand-in may take its place).
+var _scene_before: Node
 
 
-func _initialize() -> void:
-	await process_frame
-	_test_start_opens_it_and_pauses_everyone()
-	_test_only_the_opener_works_it()
-	_test_resume_back_and_start_close_it()
-	_test_sandbox_entry_and_actions()
-	_test_the_map_page()
-	_test_the_settings_page()
-	_test_the_fullscreen_switch()
-	_test_the_effect_slots_slider()
-	_test_the_screen_shake_switch()
-	_test_the_damage_numbers_switch()
-	_test_the_max_shots_slider()
-	_test_the_particles_slider()
-	_test_the_particle_amount_slider()
-	_test_the_floor_marks_switch()
-	_test_the_spell_light_switch()
-	_test_the_tailless_motes_slider()
-	_test_the_show_fps_switch()
-	_test_the_sandbox_switches_the_builder()
-	_test_the_sandbox_switches_the_reload()
-	_test_the_enemy_arena()
-	_test_b_opens_the_builder_in_play_only()
-	_test_start_closes_the_builder()
-	_test_a_on_the_lit_stone_starts_the_run()
-	_test_a_on_the_altar_asks_to_open_the_room()
-	_test_a_by_an_item_takes_it_after_the_stone_and_before_the_altar()
-	_test_the_run_ending_closes_it()
-	_test_main_menu_leaves_for_the_main_menu()
-	await _test_leave_game_lets_the_seat_go()
-	await _test_a_waiting_seat_is_named_and_can_be_let_go()
+func before_each() -> void:
+	_scene_before = current_scene
+	DirAccess.remove_absolute(SAVE_PATH)
+
+
+func after_each() -> void:
 	_teardown()
-	if _failures.is_empty():
-		print("TEST OK: hud/menus pause menu")
-		quit(0)
-	else:
-		for failure in _failures:
-			printerr("TEST FAILED: " + failure)
-		quit(1)
+	paused = false
+	var shown: Node = current_scene
+	if shown != _scene_before and shown != null and is_instance_valid(shown):
+		shown.free()
+	current_scene = _scene_before
+	DirAccess.remove_absolute(SAVE_PATH)
 
 
-func _check(condition: bool, message: String) -> void:
-	if not condition:
-		_failures.append(message)
-
-
-func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
+## The HUD for `count` seats on virtual devices, in a room, in the sandbox when `sandbox`; it reads
+## and writes the test's own save (empty unless a test wrote it).
+func _setup(count: int, sandbox: bool = false) -> void:
 	_teardown()
 	_bus = EventsScript.new()
 	_input = InputManagerScript.new()
@@ -105,16 +93,10 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_focus.events = _bus
 	_focus._ready()
 	_bus.sandbox_action_requested.connect(func(player: int, action: StringName) -> void: _actions.append([player, action]))
-	_bus.effect_slots_changed.connect(func(slots: int) -> void: _slots.append(slots))
-	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: _shakes.append(enabled))
-	_bus.damage_numbers_changed.connect(func(on: bool) -> void: _numbers.append(on))
-	_bus.projectile_cap_changed.connect(func(cap: int) -> void: _caps.append(cap))
 	_bus.shot_cap_requested.connect(func(player: int, cap: int) -> void: _cap_requests.append([player, cap]))
-	_bus.mote_cap_changed.connect(func(cap: int) -> void: _mote_caps.append(cap))
-	_bus.mote_density_changed.connect(func(density: float) -> void: _densities.append(density))
-	_bus.floor_marks_changed.connect(func(on: bool) -> void: _floor_marks.append(on))
-	_bus.spell_light_changed.connect(func(on: bool) -> void: _lights.append(on))
-	_bus.tailless_motes_changed.connect(func(pool: int) -> void: _tailless.append(pool))
+	for row: String in SIGNAL_OF:
+		_heard[row] = []
+		_bus.connect(SIGNAL_OF[row], func(value: Variant) -> void: (_heard[row] as Array).append(value))
 	# The menu's pause is a command (online-ready N4): the stop it asks for, last heard.
 	_stops = false
 	_bus.pause_requested.connect(func(_player: int, on: int) -> void: _stops = on != 0)
@@ -125,7 +107,8 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_hud.ui_focus = _focus
 	_hud.input = _input
 	# Tests never touch the real save: an empty one of their own.
-	_hud.save = save if save != null else SaveFile.new(SAVE_PATH)
+	_hud.save = SaveFile.new(SAVE_PATH)
+	_hud.main_menu = _stand_in()
 	root.add_child(_hud)
 	for index in count:
 		_bus.player_joined.emit(index)
@@ -133,22 +116,25 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.sandbox_changed.emit(sandbox)
 
 
+## A scene of one plain node named MENU_STAND_IN, for the main menu.
+func _stand_in() -> PackedScene:
+	var scene := PackedScene.new()
+	var made := Node.new()
+	made.name = MENU_STAND_IN
+	scene.pack(made)
+	made.free()
+	return scene
+
+
 func _teardown() -> void:
-	paused = false
 	_stops = false
 	_actions.clear()
-	_slots.clear()
-	_shakes.clear()
-	_numbers.clear()
-	_caps.clear()
 	_cap_requests.clear()
-	_mote_caps.clear()
-	_densities.clear()
-	_floor_marks.clear()
-	_lights.clear()
-	_tailless.clear()
+	_heard.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
-		if node != null:
+		if node != null and is_instance_valid(node):
+			if node.is_inside_tree():
+				node.get_parent().remove_child(node)
 			node.free()
 	_hud = null
 	_focus = null
@@ -172,6 +158,12 @@ func _frame() -> void:
 	_focus.poll()
 
 
+## `action` tapped by `player`, then a frame.
+func _do(player: int, action: StringName) -> void:
+	_tap(player, action)
+	_frame()
+
+
 func _menu() -> PauseMenuScript:
 	return _hud.get_pause_menu()
 
@@ -190,491 +182,486 @@ func _press(player: int, button_name: String) -> void:
 	_frame()
 
 
-# --- Tests ------------------------------------------------------------------
-
-func _test_start_opens_it_and_pauses_everyone() -> void:
-	_setup(2)
-	_check(not _menu().visible and not _stops, "closed and running at the start")
-	_tap(1, &"pause")
-	_frame()
-	_check(_menu().is_open() and _menu().visible, "Start opens the pause menu")
-	_check(_menu().owner_player == 1, "for the player who pressed it")
-	_check(_stops, "the game stops for everyone (the command pause_requested)")
-	_check(_names() == ["Resume", "Settings", "LeaveGame", "MainMenu"], "the main page out of the sandbox, got %s" % [_names()])
-	_check(_menu().button("Resume").text.begins_with("> "), "the focus is marked with text")
+func _focused(button_name: String) -> bool:
+	return _menu().button(button_name).text.begins_with("> ")
 
 
-func _test_only_the_opener_works_it() -> void:
-	_setup(2)
-	_tap(0, &"pause")
-	_frame()
-	_tap(1, &"accept")
-	_tap(1, &"pause")
-	_frame()
-	_check(_menu().is_open() and _menu().owner_player == 0, "another player's buttons do nothing to it")
-	_tap(1, &"back")
-	_frame()
-	_check(not _hud.get_radial(1).is_open(), "nobody opens a builder while the game is paused")
+func _text_of(button_name: String) -> String:
+	return _menu().button(button_name).text
 
 
-func _test_resume_back_and_start_close_it() -> void:
+## `player` opens the menu.
+func _open(player: int = 0) -> void:
+	_do(player, &"pause")
+
+
+## One seat with the Settings page open.
+func _settings() -> void:
 	_setup(1)
+	_open()
+	_press(0, "Settings")
+
+
+## Two values that may be an int and a float (a stop, as sent, saved or held).
+func _same(a: Variant, b: Variant) -> bool:
+	return a != null and b != null and is_equal_approx(float(a), float(b))
+
+
+# --- Opening and closing -----------------------------------------------------------------------
+
+
+func test_closed_and_running_at_the_start() -> void:
+	_setup(2)
+	check(not _menu().visible and not _stops, "closed and running at the start")
+
+
+func test_start_opens_the_pause_menu() -> void:
+	_setup(2)
+	_open(1)
+	check(_menu().is_open() and _menu().visible, "Start opens the pause menu")
+
+
+func test_the_menu_is_for_the_player_who_pressed_start() -> void:
+	_setup(2)
+	_open(1)
+	check_equal(_menu().owner_player, 1, "for the player who pressed it")
+
+
+func test_start_stops_the_game_for_everyone() -> void:
+	_setup(2)
+	_open(1)
+	check(_stops, "the game stops for everyone (the command pause_requested)")
+
+
+func test_the_main_page_out_of_the_sandbox() -> void:
+	_setup(2)
+	_open(1)
+	check_equal(_names(), MAIN_PAGE, "the main page out of the sandbox")
+
+
+func test_the_focus_is_marked_with_text() -> void:
+	_setup(2)
+	_open(1)
+	check(_focused("Resume"), "the focus is marked with text")
+
+
+func test_another_players_buttons_do_nothing_to_it() -> void:
+	_setup(2)
+	_open(0)
+	_tap(1, &"accept")
+	_do(1, &"pause")
+	check(_menu().is_open() and _menu().owner_player == 0, "another player's buttons do nothing to it")
+
+
+func test_nobody_opens_a_builder_while_the_game_is_paused() -> void:
+	_setup(2)
+	_open(0)
+	_do(1, &"back")
+	check(not _hud.get_radial(1).is_open(), "nobody opens a builder while the game is paused")
+
+
+## The menu opened by the one seat, then `way` tapped (accept lands on Resume, the first button).
+func _closed_with(way: StringName) -> void:
+	_setup(1)
+	_open()
+	check(_menu().is_open() and _stops, "%s: open" % way)
+	_do(0, way)
+
+
+func test_resume_closes_it() -> void:
+	_closed_with(&"accept")
+	check(not _menu().is_open() and not _menu().visible, "Resume closes the menu")
+
+
+func test_b_on_the_main_page_closes_it() -> void:
+	_closed_with(&"back")
+	check(not _menu().is_open() and not _menu().visible, "B closes the menu")
+
+
+func test_start_again_closes_it() -> void:
+	_closed_with(&"pause")
+	check(not _menu().is_open() and not _menu().visible, "Start closes the menu")
+
+
+func test_closing_it_lets_the_game_go() -> void:
 	for way: StringName in [&"accept", &"back", &"pause"]:
-		_tap(0, &"pause")
-		_frame()
-		_check(_menu().is_open() and _stops, "%s: open" % way)
-		_tap(0, way)  # accept lands on Resume, the first button.
-		_frame()
-		_check(not _menu().is_open() and not _menu().visible, "%s closes the menu" % way)
-		_check(not _stops, "%s: the game goes on" % way)
-		_check(not _hud.get_radial(0).is_open(), "%s: closing with B does not open the builder" % way)
+		_closed_with(way)
+		check(not _stops, "%s: the game goes on" % way)
 
 
-func _test_sandbox_entry_and_actions() -> void:
+func test_closing_it_with_b_opens_no_builder() -> void:
+	_closed_with(&"back")
+	check(not _hud.get_radial(0).is_open(), "closing with B does not open the builder")
+
+
+func test_a_run_ending_closes_it() -> void:
+	_setup(1)
+	_open()
+	_bus.run_ended.emit(false)
+	check(not _menu().is_open(), "a run ending closes the menu")
+
+
+func test_a_run_ending_lets_the_game_go() -> void:
+	_setup(1)
+	_open()
+	_bus.run_ended.emit(false)
+	check(not _stops, "a run ending lets the game go")
+
+
+# --- The sandbox page --------------------------------------------------------------------------
+
+
+## Two seats in the sandbox, seat `player` on its Sandbox page.
+func _sandbox_page(player: int = 1) -> void:
 	_setup(2, true)
-	_tap(1, &"pause")
-	_frame()
-	_check(_names() == ["Resume", "Sandbox", "Settings", "LeaveGame", "MainMenu"], "in the sandbox the main page has Sandbox, got %s" % [_names()])
-	_press(1, "Sandbox")
-	_check(_names() == ["ResetDummies", "ArenaEnemy", "ArenaCount", "ArenaSpawn", "ArenaClear", "AIView", "RingStyle", "PutStyle", "ReloadStyle", "SandboxBack"], "the sandbox page, got %s" % [_names()])
+	_open(player)
+	_press(player, "Sandbox")
+
+
+func test_in_the_sandbox_the_main_page_has_sandbox() -> void:
+	_setup(2, true)
+	_open(1)
+	check_equal(_names(), ["Resume", "Sandbox", "Settings", "LeaveGame", "MainMenu"] as Array[String], "in the sandbox the main page has Sandbox")
+
+
+func test_the_sandbox_page_rows() -> void:
+	_sandbox_page()
+	check_equal(_names(), ["ResetDummies", "ArenaEnemy", "ArenaCount", "ArenaSpawn", "ArenaClear", "AIView", "RingStyle", "PutStyle", "ReloadStyle", "SandboxBack"] as Array[String], "the sandbox page")
+
+
+func test_sandbox_actions_go_out_with_the_openers_index() -> void:
+	_sandbox_page()
 	_press(1, "ResetDummies")
 	_press(1, "ArenaClear")
-	_check(_actions == [[1, &"reset_dummies"], [1, &"clear_enemies"]], "the actions go out with the opener's index, got %s" % [_actions])
-	_check(_menu().is_open() and _menu().page == PauseMenuScript.Page.SANDBOX, "the page stays for another press")
-	_tap(1, &"back")
-	_frame()
-	_check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
+	check(_actions == [[1, &"reset_dummies"], [1, &"clear_enemies"]], "the actions go out with the opener's index, got %s" % [_actions])
+
+
+func test_the_sandbox_page_stays_after_each_of_its_rows() -> void:
+	for row: String in ["ResetDummies", "ArenaEnemy", "ArenaCount", "ArenaSpawn", "ArenaClear", "AIView", "RingStyle", "PutStyle", "ReloadStyle"]:
+		_sandbox_page()
+		_press(1, row)
+		check(_menu().is_open() and _menu().page == PauseMenuScript.Page.SANDBOX, "the page stays after %s, for another press" % row)
+
+
+func test_b_on_the_sandbox_page_goes_back_to_the_main_page() -> void:
+	_sandbox_page()
+	_do(1, &"back")
+	check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
+
+
+func test_out_of_the_sandbox_the_entry_goes() -> void:
+	_sandbox_page()
+	_do(1, &"back")
 	_bus.sandbox_changed.emit(false)
-	_check(_names() == ["Resume", "Settings", "LeaveGame", "MainMenu"], "out of the sandbox the entry goes")
+	check_equal(_names(), MAIN_PAGE, "out of the sandbox the entry goes")
 
 
-## Run generation RG8: in a run of rooms (a map told, `run_map_changed`) the main page has Map, whose
-## page shows the run's map, its kinds named by the registry, and Back; the map gone, the row goes
-## and a Map page shown goes back to the main page.
-func _test_the_map_page() -> void:
-	_setup(1)
-	var links: Array[PackedInt32Array] = [PackedInt32Array([1]), PackedInt32Array()]
-	_bus.run_map_changed.emit(PackedInt32Array([0, 1]), [&"fight", &"boss"] as Array[StringName], links, 0)
-	_tap(0, &"pause")
-	_frame()
-	_check(_names() == ["Resume", "Map", "Settings", "LeaveGame", "MainMenu"], "in a run of rooms the main page has Map, got %s" % [_names()])
-	var view: Control = _menu().map_view()
-	_check(not view.visible, "the map shows on its page only")
-	_press(0, "Map")
-	_check(_menu().page == PauseMenuScript.Page.MAP and _names() == ["MapBack"], "the Map page: the map and Back, got %s" % [_names()])
-	_check(view.visible and view.call("has_map"), "the map shows")
-	_check(String(view.call("kinds_line")) == "F Fight  B Boss", "the kinds by the registry's names, got %s" % view.call("kinds_line"))
-	_check(_menu().button("MapBack").text.begins_with("> "), "Back is focused")
-	_press(0, "MapBack")
-	_check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "Back goes to the main page")
-	_press(0, "Map")
-	_tap(0, &"back")
-	_frame()
-	_check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
-	# A room entered while the page shows (the pause not yet in effect online): it stays, on Back.
-	_press(0, "Map")
-	_bus.run_map_changed.emit(PackedInt32Array([0, 1]), [&"fight", &"boss"] as Array[StringName], links, 1)
-	_check(_menu().page == PauseMenuScript.Page.MAP and _menu().button("MapBack").text.begins_with("> "), "a new map keeps the page, Back focused")
-	_check(int(view.get("at")) == 1, "and shows where the party is now")
-	_bus.run_map_changed.emit(PackedInt32Array(), [] as Array[StringName], [] as Array[PackedInt32Array], -1)
-	_check(_menu().page == PauseMenuScript.Page.MAIN and _names() == ["Resume", "Settings", "LeaveGame", "MainMenu"], "the map gone: back to the main page, with no Map, got %s" % [_names()])
-	_check(_menu().button("Resume").text.begins_with("> "), "and its first row focused")
-	# A map arriving while the main page shows: the row comes and the focus stays where it was.
-	_focus.focus(0, _menu().button("Settings"))
-	_frame()
-	_bus.run_map_changed.emit(PackedInt32Array([0, 1]), [&"fight", &"boss"] as Array[StringName], links, 0)
-	_check(_names() == ["Resume", "Map", "Settings", "LeaveGame", "MainMenu"], "the Map row comes, got %s" % [_names()])
-	_check(_menu().button("Settings").text.begins_with("> "), "the focus stays on Settings")
-	# The Map row focused when the map goes: the first row is.
-	_focus.focus(0, _menu().button("Map"))
-	_frame()
-	_bus.run_map_changed.emit(PackedInt32Array(), [] as Array[StringName], [] as Array[PackedInt32Array], -1)
-	_check(_menu().is_open() and _menu().button("Resume").text.begins_with("> "), "the Map row gone: Resume is focused")
+# --- The enemy arena (sandbox) -----------------------------------------------------------------
 
 
-func _test_the_enemy_arena() -> void:
-	_setup(1, true)
-	var spawns: Array = []
-	var views: Array[bool] = []
-	_bus.sandbox_spawn_requested.connect(func(player: int, id: StringName, count: int) -> void: spawns.append([player, id, count]))
-	_bus.ai_view_changed.connect(func(on: bool) -> void: views.append(on))
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Sandbox")
-	var menu: PauseMenuScript = _menu()
-	_check(menu.arena_ids.size() >= 7, "every enemy of the registry is listed, got %s" % [menu.arena_ids])
-	_check(menu.arena_names.has("Cinder Rod"), "by its name")
-	var first: StringName = menu.arena_ids[0]
-	_check(menu.button("ArenaEnemy").text.ends_with("Enemy: " + menu.arena_names[0]), "the first is picked")
+func test_the_arena_lists_every_enemy_of_the_registry() -> void:
+	_sandbox_page(0)
+	var registry: Node = root.get_node("Registry")
+	for folder: StringName in EnemyBase.FOLDERS:
+		for item: Variant in registry.call("get_all", folder):
+			var data := item as EnemyBase
+			if data != null and data.scene != null:
+				check(_menu().arena_ids.has(data.id), "%s is listed" % data.id)
+	check(not _menu().arena_ids.is_empty(), "the arena lists enemies")
+
+
+func test_the_arena_names_its_enemies() -> void:
+	_sandbox_page(0)
+	check(_menu().arena_names.has("Cinder Rod"), "by its name: %s" % [_menu().arena_names])
+
+
+func test_the_arena_picks_the_first_enemy() -> void:
+	_sandbox_page(0)
+	check(_text_of("ArenaEnemy").ends_with("Enemy: " + _menu().arena_names[0]), "the first is picked: %s" % _text_of("ArenaEnemy"))
+
+
+func test_accept_on_the_enemy_row_picks_the_next() -> void:
+	_sandbox_page(0)
 	_press(0, "ArenaEnemy")
-	_check(menu.arena_pick == 1, "accept picks the next")
+	check_equal(_menu().arena_pick, 1, "accept picks the next")
+
+
+func test_accept_on_the_count_row_steps_the_count_up() -> void:
+	_sandbox_page(0)
 	_press(0, "ArenaCount")
 	_press(0, "ArenaCount")
-	_check(menu.button("ArenaCount").text.ends_with("Count: 3"), "the count steps up")
+	check(_text_of("ArenaCount").ends_with("Count: 3"), "the count steps up: %s" % _text_of("ArenaCount"))
+
+
+func test_spawn_asks_for_the_count_of_the_picked_enemy() -> void:
+	_sandbox_page(0)
+	var spawns: Array = []
+	_bus.sandbox_spawn_requested.connect(func(player: int, id: StringName, count: int) -> void: spawns.append([player, id, count]))
+	_press(0, "ArenaEnemy")
+	_press(0, "ArenaCount")
+	_press(0, "ArenaCount")
 	_press(0, "ArenaSpawn")
-	_check(spawns == [[0, menu.arena_ids[1], 3]], "spawn asks for three of the picked enemy, got %s" % [spawns])
+	check(spawns == [[0, _menu().arena_ids[1], 3]], "spawn asks for three of the picked enemy, got %s" % [spawns])
+
+
+func test_clear_asks_flow_to_clear_the_enemies() -> void:
+	_sandbox_page(0)
 	_press(0, "ArenaClear")
-	_check(_actions.has([0, &"clear_enemies"]), "clear asks flow to clear the enemies, got %s" % [_actions])
-	_press(0, "AIView")
-	_press(0, "AIView")
-	_check(views == [true, false], "the AI view flips on and off, got %s" % [views])
-	_check(first != &"", "an id")
-	_check(menu.page == PauseMenuScript.Page.SANDBOX, "the page stays")
+	check(_actions.has([0, &"clear_enemies"]), "clear asks flow to clear the enemies, got %s" % [_actions])
 
 
-func _test_the_sandbox_switches_the_reload() -> void:
-	_setup(2, true)
-	var sent: Array[bool] = []
-	_menu().reload_style_changed.connect(func(on_button: bool) -> void: sent.append(on_button))
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Sandbox")
-	_check(_menu().button("ReloadStyle").text.ends_with("Reload: Button"), "the reload is on the button by default")
-	_check(_hud.get_panel(1).staff_row(0).style == StaffRowScript.Style.BUTTON, "and the rows draw it there")
+func test_the_ai_view_flips_on_and_off() -> void:
+	_sandbox_page(0)
+	var views: Array[bool] = []
+	_bus.ai_view_changed.connect(func(on: bool) -> void: views.append(on))
+	_press(0, "AIView")
+	_press(0, "AIView")
+	check_equal(views, [true, false] as Array[bool], "the AI view flips on and off")
+
+
+# --- The reload's place (sandbox) --------------------------------------------------------------
+
+
+func test_the_reload_is_on_the_button_by_default() -> void:
+	_sandbox_page(0)
+	check(_text_of("ReloadStyle").ends_with("Reload: Button"), "the reload is on the button by default")
+
+
+func test_the_staff_rows_draw_the_reload_on_the_button_by_default() -> void:
+	_sandbox_page(0)
+	check_equal(_hud.get_panel(1).staff_row(0).style, StaffRowScript.Style.BUTTON, "the rows draw it there")
+
+
+func test_the_reload_flips_to_the_next_cast() -> void:
+	_sandbox_page(0)
 	_press(0, "ReloadStyle")
-	_check(_menu().button("ReloadStyle").text.ends_with("Reload: Next cast"), "it flips to the next cast")
+	check(_text_of("ReloadStyle").ends_with("Reload: Next cast"), "it flips to the next cast")
+
+
+func test_every_staff_row_of_every_panel_follows_the_reload() -> void:
+	_sandbox_page(0)
+	_press(0, "ReloadStyle")
 	for player in 4:
 		for staff in 4:
-			_check(_hud.get_panel(player).staff_row(staff).style == StaffRowScript.Style.NEXT_CAST, "every row of every panel follows (P%d staff %d)" % [player + 1, staff + 1])
+			check(_hud.get_panel(player).staff_row(staff).style == StaffRowScript.Style.NEXT_CAST, "every row of every panel follows (P%d staff %d)" % [player + 1, staff + 1])
+
+
+func test_each_reload_flip_goes_out() -> void:
+	_sandbox_page(0)
+	var sent: Array[bool] = []
+	_menu().reload_style_changed.connect(func(on_button: bool) -> void: sent.append(on_button))
 	_press(0, "ReloadStyle")
-	_check(sent == [false, true], "each flip goes out, got %s" % [sent])
-	_check(_hud.get_panel(0).staff_row(2).style == StaffRowScript.Style.BUTTON, "and back on the button")
-	_check(_menu().page == PauseMenuScript.Page.SANDBOX, "the page stays")
+	_press(0, "ReloadStyle")
+	check_equal(sent, [false, true] as Array[bool], "each flip goes out")
 
 
-func _test_the_sandbox_switches_the_builder() -> void:
-	_setup(1, true)
+func test_the_reload_flips_back_on_the_button() -> void:
+	_sandbox_page(0)
+	_press(0, "ReloadStyle")
+	_press(0, "ReloadStyle")
+	check_equal(_hud.get_panel(0).staff_row(2).style, StaffRowScript.Style.BUTTON, "back on the button")
+
+
+# --- The builder's options (sandbox) -----------------------------------------------------------
+
+
+func test_there_is_no_switch_to_another_builder() -> void:
+	_sandbox_page(0)
+	check(_menu().button("BuilderStyle") == null, "no switch to another builder: the list builder is gone")
+
+
+func test_a_full_slot_pushes_right_by_default() -> void:
+	_sandbox_page(0)
+	check(_text_of("PutStyle").ends_with("Full slot: Push right"), "a full slot pushes right by default")
+
+
+func test_each_builder_option_flip_goes_out() -> void:
+	_sandbox_page(0)
 	var options: Array = []
 	_menu().builder_options_changed.connect(func(ring: int, push: bool) -> void: options.append([ring, push]))
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Sandbox")
-	_check(_menu().button("BuilderStyle") == null, "no switch to another builder: the list builder is gone")
-	_check(_menu().button("PutStyle").text.ends_with("Full slot: Push right"), "a full slot pushes right by default")
 	_press(0, "RingStyle")
 	_press(0, "PutStyle")
-	_check(options == [[1, true], [1, false]], "each flip goes out, got %s" % [options])
-	_check(_hud.get_radial(0).layout == RadialScript.Layout.KIND, "the ring shows one kind at a time")
-	_check(_hud.get_radial(0).put == RadialScript.Put.REPLACE, "a full slot is replaced")
-	# The ring styles to try (owner, 2026-10-30), then round to the first again.
+	check(options == [[1, true], [1, false]], "each flip goes out, got %s" % [options])
+
+
+func test_the_second_ring_style_shows_one_kind_at_a_time() -> void:
+	_sandbox_page(0)
+	_press(0, "RingStyle")
+	check_equal(_hud.get_radial(0).layout, RadialScript.Layout.KIND, "the ring shows one kind at a time")
+
+
+func test_the_full_slot_flip_replaces_a_full_slot() -> void:
+	_sandbox_page(0)
+	_press(0, "PutStyle")
+	check_equal(_hud.get_radial(0).put, RadialScript.Put.REPLACE, "a full slot is replaced")
+
+
+## The ring styles to try (owner, 2026-10-30), then round to the first again: the words shown
+## and the radial's ring picker after each of the four presses after the first.
+func _ring_styles() -> Array:
+	_sandbox_page(0)
+	_press(0, "RingStyle")
 	var words: Array[String] = []
 	var styles: Array = []
 	for _step in 4:
 		_press(0, "RingStyle")
-		words.append(_menu().button("RingStyle").text.get_slice("Ring: ", 1))
+		words.append(_text_of("RingStyle").get_slice("Ring: ", 1))
 		styles.append(_hud.get_radial(0).ring_picker.get_script() if _hud.get_radial(0).ring_picker != null else null)
-	_check(words == ["Zoom", "Kinds: hold", "Kinds: depth", "Every card"], "the ring steps through the styles, got %s" % [words])
-	_check(styles == [RingZoomScript, RingKindsScript, RingKindsScript, null], "and the radial gets each style")
-	_check(_hud.get_radial(0).layout == RadialScript.Layout.ALL, "every card again")
-	_check(_menu().page == PauseMenuScript.Page.SANDBOX, "the page stays")
-	_tap(0, &"pause")
-	_frame()
-	_tap(0, &"back")
-	_frame()
-	_check(_hud.get_radial(0).is_open(), "B opens the radial builder")
-	_tap(0, &"back")
-	_frame()
-	_check(not _hud.get_radial(0).is_open(), "B closes it again")
-	_frame()
-	_check(not _hud.get_radial(0).is_open(), "and it stays closed")
-	_tap(0, &"back")
-	_frame()
-	_tap(0, &"pause")
-	_frame()
-	_check(not _hud.get_radial(0).is_open() and not _menu().is_open(), "Start closes it rather than pausing")
+	return [words, styles]
 
 
-## Settings holds Fullscreen and Effect slots; the Gameplay page and its Friendly fire and Enemy
-## fire rows are gone (actors G3c: every spell hits everything, always).
-func _test_the_settings_page() -> void:
+func test_the_ring_steps_through_its_styles() -> void:
+	var words: Array = _ring_styles()[0]
+	check(words == ["Zoom", "Kinds: hold", "Kinds: depth", "Every card"], "the ring steps through the styles, got %s" % [words])
+
+
+func test_the_radial_gets_each_ring_style() -> void:
+	var styles: Array = _ring_styles()[1]
+	check(styles == [RingZoomScript, RingKindsScript, RingKindsScript, null], "the radial gets each style")
+
+
+func test_the_ring_styles_come_round_to_every_card() -> void:
+	_ring_styles()
+	check_equal(_hud.get_radial(0).layout, RadialScript.Layout.ALL, "every card again")
+
+
+# --- The Map page (run generation RG8) ---------------------------------------------------------
+# In a run of rooms (a map told, `run_map_changed`) the main page has Map, whose page shows the
+# run's map, its kinds named by the registry, and Back; the map gone, the row goes and a Map page
+# shown goes back to the main page.
+
+
+const MAP_PAGE: Array[String] = ["Resume", "Map", "Settings", "LeaveGame", "MainMenu"]
+
+
+## Tell the HUD a map of two rooms (a fight, then the boss), the party at `at`.
+func _tell_map(at: int = 0) -> void:
+	var links: Array[PackedInt32Array] = [PackedInt32Array([1]), PackedInt32Array()]
+	_bus.run_map_changed.emit(PackedInt32Array([0, 1]), [&"fight", &"boss"] as Array[StringName], links, at)
+
+
+func _tell_no_map() -> void:
+	_bus.run_map_changed.emit(PackedInt32Array(), [] as Array[StringName], [] as Array[PackedInt32Array], -1)
+
+
+## One seat in a run of rooms with the menu open; on the Map page when `on_map`.
+func _map_menu(on_map: bool = true) -> void:
 	_setup(1)
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "TaillessMotes", "ShotCap", "ScreenShake", "DamageNumbers", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
-	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
-	_tap(0, &"back")
-	_frame()
-	_check(_menu().page == PauseMenuScript.Page.MAIN, "B goes up to the main page")
+	_tell_map()
+	_open()
+	if on_map:
+		_press(0, "Map")
 
 
-## Screen shake is on by default, flips on accept, tells feel, and is kept in the save: a menu
-## bound to the same save later starts with it off and tells feel.
-func _test_the_screen_shake_switch() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	var sent: Array[bool] = _shakes
-	_check(sent.is_empty(), "nothing is sent while shake is on")
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	_check(_menu().button("ScreenShake").text.ends_with("Screen shake: On"), "shake is on by default")
-	_press(0, "ScreenShake")
-	_check(_menu().button("ScreenShake").text.ends_with("Screen shake: Off"), "it flips off")
-	_check(sent == [false], "and feel is told, got %s" % [sent])
-	_check(SaveFile.new(SAVE_PATH).get_setting(&"screen_shake", true) == false, "the save remembers it")
-	_press(0, "ScreenShake")
-	_check(sent == [false, true] and SaveFile.new(SAVE_PATH).get_setting(&"screen_shake", false) == true, "and flips back on, saved")
-	_press(0, "ScreenShake")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(not _menu().screen_shake, "a later menu starts with it off")
-	_check(_shakes == [false], "and tells feel when the Hud binds, got %s" % [_shakes])
-	_teardown()
-	DirAccess.remove_absolute(SAVE_PATH)
+func test_in_a_run_of_rooms_the_main_page_has_map() -> void:
+	_map_menu(false)
+	check_equal(_names(), MAP_PAGE, "in a run of rooms the main page has Map")
 
 
-## Damage numbers (props W5) are on by default and send nothing; accept flips them and tells feel,
-## and the choice is saved: a menu bound to the same save later starts with them off and tells feel.
-func _test_the_damage_numbers_switch() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_numbers.is_empty(), "nothing is sent while the numbers are on")
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	_check(_menu().button("DamageNumbers").text.ends_with("Damage numbers: On"), "on by default")
-	_press(0, "DamageNumbers")
-	_check(_menu().button("DamageNumbers").text.ends_with("Damage numbers: Off"), "it flips off")
-	_check(_numbers == [false], "and feel is told, got %s" % [_numbers])
-	_check(SaveFile.new(SAVE_PATH).get_setting(&"damage_numbers", true) == false, "the save remembers it")
-	_press(0, "DamageNumbers")
-	_check(_numbers == [false, true] and SaveFile.new(SAVE_PATH).get_setting(&"damage_numbers", false) == true, "and flips back on, saved")
-	_press(0, "DamageNumbers")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(not _menu().damage_numbers, "a later menu starts with them off")
-	_check(_numbers == [false], "and tells feel when the Hud binds, got %s" % [_numbers])
-	_teardown()
-	DirAccess.remove_absolute(SAVE_PATH)
+func test_the_map_shows_on_its_page_only() -> void:
+	_map_menu(false)
+	check(not _menu().map_view().visible, "the map shows on its page only")
 
 
-## Floor marks (spell spectacle P2a) starts at the platform's default and sends nothing; accept
-## flips it and tells feel, and the choice is saved: a menu bound to the same save later starts
-## with it and tells feel.
-func _test_the_floor_marks_switch() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	var start: bool = FloorMarks.default_on()
-	var word: Callable = func(on: bool) -> String: return "Floor marks: %s" % ("On" if on else "Off")
-	_check(_floor_marks.is_empty(), "nothing is sent at the platform's default")
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	_check(_menu().button("FloorMarks").text.ends_with(word.call(start)), "the platform's default at the start")
-	_press(0, "FloorMarks")
-	_check(_menu().button("FloorMarks").text.ends_with(word.call(not start)), "it flips")
-	_check(_floor_marks == [not start], "and feel is told, got %s" % [_floor_marks])
-	_check(SaveFile.new(SAVE_PATH).get_setting(&"floor_marks", start) == (not start), "the save remembers it")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_menu().floor_marks == (not start), "a later menu starts with it")
-	_check(_floor_marks == [not start], "and tells feel when the Hud binds, got %s" % [_floor_marks])
+func test_the_map_page_holds_the_map_and_back() -> void:
+	_map_menu()
+	check(_menu().page == PauseMenuScript.Page.MAP and _names() == ["MapBack"], "the Map page: the map and Back, got %s" % [_names()])
+	check(_menu().map_view().visible and _menu().map_view().call("has_map"), "the map shows")
 
 
-## Spell light (spell spectacle P3a) starts at the platform's default and sends nothing; accept
-## flips it and tells feel, and the choice is saved: a menu bound to the same save later starts
-## with it and tells feel.
-func _test_the_spell_light_switch() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_lights.is_empty(), "nothing is sent at the platform's default")
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	var start: bool = SpellLightSetting.default_on()
-	var word: String = "On" if start else "Off"
-	_check(_menu().button("SpellLight").text.ends_with("Spell light: %s" % word), "the default at the start")
-	_press(0, "SpellLight")
-	_check(_menu().spell_light == not start and _lights == [not start], "accept flips it and tells feel, got %s" % [_lights])
-	_check(bool(SaveFile.new(SAVE_PATH).get_setting(&"spell_light", start)) == not start, "the save remembers it")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_menu().spell_light == not start, "a later menu starts with the saved choice")
-	_check(_lights == [not start], "and tells feel when the Hud binds, got %s" % [_lights])
-	_teardown()
-	DirAccess.remove_absolute(SAVE_PATH)
+func test_the_map_names_its_kinds_by_the_registry() -> void:
+	_map_menu()
+	check_equal(String(_menu().map_view().call("kinds_line")), "F Fight  B Boss", "the kinds by the registry's names")
 
 
-## Tailless motes (S5 step 4: a dev slider) starts at the default pool and sends nothing; left
-## and right step through the stops and tell the manager and feel, accept steps up and wraps, and
-## the choice is saved: a menu bound to the same save later starts with it and tells them.
-func _test_the_tailless_motes_slider() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_tailless.is_empty(), "nothing is sent at the default")
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	var row: Button = _menu().button("TaillessMotes")
-	var bar: HSlider = row.get_node("Bar") as HSlider
-	_check(row.text.ends_with("Tailless motes: 2048") and is_equal_approx(bar.value, 0.0), "2048 at the start, in words and on the bar")
-	_focus.focus(0, row)
-	_tap(0, &"move_right")
-	_frame()
-	_check(_menu().tailless_motes == 4096 and _tailless == [4096], "right asks for 4096, got %s" % [_tailless])
-	_check(row.text.ends_with("Tailless motes: 4096") and is_equal_approx(bar.value, 1.0), "and shows it")
-	_check(_focus.focused(0) == row, "the focus stays on the slider")
-	_tap(0, &"move_right")
-	_frame()
-	_tap(0, &"move_right")
-	_frame()
-	_check(_menu().tailless_motes == 8192 and _tailless == [4096, 8192], "right stops at the top, got %s" % [_tailless])
-	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"tailless_motes", -1)) == 8192, "the save remembers it")
-	_press(0, "TaillessMotes")
-	_check(_menu().tailless_motes == 2048, "accept at the top wraps to the default")
-	_press(0, "TaillessMotes")
-	_check(_menu().tailless_motes == 4096, "accept steps up")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_menu().tailless_motes == 4096 and _tailless == [4096], "a later menu starts with the saved pool and tells them, got %s" % [_tailless])
-	_teardown()
-	DirAccess.remove_absolute(SAVE_PATH)
+func test_back_is_focused_on_the_map_page() -> void:
+	_map_menu()
+	check(_focused("MapBack"), "Back is focused")
 
 
-## Particles (spell spectacle P1a) starts at the platform's cap and sends nothing; left and right
-## step through Minimal, Low, Medium and High (no Off since S3) and tell feel, accept steps up and wraps, and the choice
-## is saved: a menu bound to the same save later starts with it and tells feel.
-func _test_the_particles_slider() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_mote_caps.is_empty(), "nothing is sent at the platform's cap")
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	var row: Button = _menu().button("MoteCap")
-	var bar: HSlider = row.get_node("Bar") as HSlider
-	var at: int = MoteCap.index_of(MoteCap.default_cap())
-	_check(MoteCap.STOPS[at] == MoteCap.default_cap() and at > 0, "the platform's cap is a stop above Minimal")
-	_check(row.text.ends_with("Particles: %s" % MoteCap.WORDS[at]) and is_equal_approx(bar.value, float(at)), "the platform's cap at the start, in words and on the bar")
-	_focus.focus(0, row)
-	for i in MoteCap.STOPS.size():
-		_tap(0, &"move_left")
-		_frame()
-	_check(_menu().mote_cap == MoteCap.STOPS[0] and _mote_caps.back() == MoteCap.STOPS[0], "left goes down to Minimal, got %s" % [_mote_caps])
-	_check(row.text.ends_with("Particles: Minimal") and is_equal_approx(bar.value, 0.0), "and shows it")
-	_check(_focus.focused(0) == row, "the focus stays on the slider")
-	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"mote_cap", -1)) == MoteCap.STOPS[0], "the save remembers it")
-	var sent: int = _mote_caps.size()
-	_tap(0, &"move_left")
-	_frame()
-	_check(_mote_caps.size() == sent, "past the end nothing is sent")
-	_press(0, "MoteCap")
-	_check(_menu().mote_cap == MoteCap.STOPS[1] and _mote_caps.back() == MoteCap.STOPS[1], "accept steps up")
-	_menu().mote_cap = MoteCap.STOPS[-1]
-	_press(0, "MoteCap")
-	_check(_menu().mote_cap == MoteCap.STOPS[0], "accept at the top wraps to Minimal")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_menu().mote_cap == MoteCap.STOPS[0], "a later menu starts with the saved cap")
-	_check(_mote_caps == [MoteCap.STOPS[0]], "and tells feel when the Hud binds, got %s" % [_mote_caps])
-	_teardown()
-	# A cap saved as Off before S3 (0) loads as Minimal.
-	var old: SaveFile = SaveFile.new(SAVE_PATH)
-	old.set_setting(&"mote_cap", 0)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_menu().mote_cap == MoteCap.STOPS[0] and _mote_caps.back() == MoteCap.STOPS[0], "a saved Off loads as Minimal, got %s" % [_mote_caps])
-	_teardown()
-	DirAccess.remove_absolute(SAVE_PATH)
+func test_back_goes_from_the_map_to_the_main_page() -> void:
+	_map_menu()
+	_press(0, "MapBack")
+	check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "Back goes to the main page")
 
 
-## Particle amount (spell spectacle P1b) starts at Full and sends nothing; left and right step
-## through None, Half, Full and Double and tell feel, accept steps up and wraps, and the choice is
-## saved: a menu bound to the same save later starts with it and tells feel.
-func _test_the_particle_amount_slider() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_densities.is_empty(), "nothing is sent at the default")
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	var row: Button = _menu().button("MoteDensity")
-	var bar: HSlider = row.get_node("Bar") as HSlider
-	var at: int = MoteDensity.index_of(MoteDensity.DEFAULT)
-	_check(row.text.ends_with("Particle amount: Full") and is_equal_approx(bar.value, float(at)), "Full at the start, in words and on the bar")
-	_focus.focus(0, row)
-	_tap(0, &"move_right")
-	_frame()
-	_check(is_equal_approx(_menu().mote_density, 2.0) and _densities == [2.0], "right asks for Double, got %s" % [_densities])
-	_check(row.text.ends_with("Particle amount: Double") and is_equal_approx(bar.value, float(at + 1)), "and shows it")
-	_check(_focus.focused(0) == row, "the focus stays on the slider")
-	for i in MoteDensity.STOPS.size():
-		_tap(0, &"move_left")
-		_frame()
-	_check(_menu().mote_density == 0.0 and _densities.back() == 0.0, "left goes down to None")
-	_check(is_equal_approx(float(SaveFile.new(SAVE_PATH).get_setting(&"mote_density", -1.0)), 0.0), "the save remembers it")
-	_press(0, "MoteDensity")
-	_check(is_equal_approx(_menu().mote_density, 0.5), "accept steps up")
-	_menu().mote_density = MoteDensity.STOPS[-1]
-	_press(0, "MoteDensity")
-	_check(_menu().mote_density == 0.0, "accept at the top wraps to None")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_menu().mote_density == 0.0 and _densities == [0.0], "a later menu starts with the saved amount and tells feel, got %s" % [_densities])
-	_teardown()
-	DirAccess.remove_absolute(SAVE_PATH)
+func test_b_goes_from_the_map_to_the_main_page() -> void:
+	_map_menu()
+	_do(0, &"back")
+	check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
 
 
-## Max shots starts at the platform's cap and sends nothing; left and right step through the
-## stops and tell the projectile manager, accept steps up and wraps, and the choice is saved: a
-## menu bound to the same save later starts with it and tells the manager.
-func _test_the_max_shots_slider() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_caps.is_empty(), "nothing is sent at the platform's cap")
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	var row: Button = _menu().button("ShotCap")
-	var bar: HSlider = row.get_node("Bar") as HSlider
-	var start: int = ShotCap.default_cap()
-	var at: int = ShotCap.index_of(start)
-	_check(ShotCap.STOPS[at] == start, "the platform's cap is a stop")
-	_check(row.text.ends_with("Max shots: %d" % start) and is_equal_approx(bar.value, float(at)), "the platform's cap at the start, in words and on the bar")
-	_focus.focus(0, row)
-	_tap(0, &"move_left")
-	_frame()
-	_check(_caps == [ShotCap.STOPS[at - 1]], "left asks for the stop below, got %s" % [_caps])
-	_check(_cap_requests == [[0, ShotCap.STOPS[at - 1]]], "and asks for it in the run, as the seat that opened the menu, got %s" % [_cap_requests])
-	_check(row.text.ends_with("Max shots: %d" % ShotCap.STOPS[at - 1]) and is_equal_approx(bar.value, float(at - 1)), "and shows it")
-	_check(_focus.focused(0) == row, "the focus stays on the slider")
-	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"projectile_cap", 0)) == ShotCap.STOPS[at - 1], "the save remembers it")
-	for i in ShotCap.STOPS.size():
-		_tap(0, &"move_right")
-		_frame()
-	_check(_menu().shot_cap == ShotCap.STOPS[-1] and _caps.back() == ShotCap.STOPS[-1], "it stops at the top")
-	var sent: int = _caps.size()
-	_tap(0, &"move_right")
-	_frame()
-	_check(_caps.size() == sent, "past the end nothing is sent")
-	_press(0, "ShotCap")
-	_check(_menu().shot_cap == ShotCap.STOPS[0], "accept at the top wraps to the bottom")
-	_press(0, "ShotCap")
-	_check(_menu().shot_cap == ShotCap.STOPS[1], "accept steps up")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_menu().shot_cap == ShotCap.STOPS[1], "a later menu starts with the saved cap")
-	_check(_caps == [ShotCap.STOPS[1]], "and tells the manager when the Hud binds, got %s" % [_caps])
-	_teardown()
-	DirAccess.remove_absolute(SAVE_PATH)
+func test_a_new_map_keeps_the_map_page_with_back_focused() -> void:
+	# A room entered while the page shows (the pause not yet in effect online): it stays, on Back.
+	_map_menu()
+	_tell_map(1)
+	check(_menu().page == PauseMenuScript.Page.MAP and _focused("MapBack"), "a new map keeps the page, Back focused")
 
 
-## Show FPS is off by default (the readout hidden), flips on accept, shows the readout, and is
-## kept in the save: a Hud bound to the same save later shows it from the start.
-func _test_the_show_fps_switch() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	var fps: Label = _hud.get_fps_counter()
-	_check(fps != null and not fps.visible, "the readout is hidden by default")
-	_tap(0, &"pause")
+func test_a_new_map_shows_where_the_party_is_now() -> void:
+	_map_menu()
+	_tell_map(1)
+	check_equal(int(_menu().map_view().get("at")), 1, "the map shows where the party is now")
+
+
+func test_the_map_gone_its_page_goes_back_to_the_main_page_without_map() -> void:
+	_map_menu()
+	_tell_no_map()
+	check(_menu().page == PauseMenuScript.Page.MAIN and _names() == MAIN_PAGE, "the map gone: back to the main page, with no Map, got %s" % [_names()])
+
+
+func test_the_map_gone_from_its_page_the_first_row_is_focused() -> void:
+	_map_menu()
+	_tell_no_map()
+	check(_focused("Resume"), "the main page's first row is focused")
+
+
+func test_a_map_arriving_on_the_main_page_adds_its_row() -> void:
+	_setup(1)
+	_open()
+	_tell_map()
+	check_equal(_names(), MAP_PAGE, "the Map row comes")
+
+
+func test_a_map_arriving_keeps_the_focus_where_it_was() -> void:
+	_setup(1)
+	_open()
+	_focus.focus(0, _menu().button("Settings"))
 	_frame()
-	_press(0, "Settings")
-	_check(_menu().button("ShowFps").text.ends_with("Show FPS: Off"), "the switch says Off")
-	_press(0, "ShowFps")
-	_check(_menu().button("ShowFps").text.ends_with("Show FPS: On") and fps.visible, "it flips on and shows the readout")
-	_check(fps.text.ends_with(" FPS"), "the readout reads 'N FPS', got '%s'" % fps.text)
-	_check(bool(SaveFile.new(SAVE_PATH).get_setting(&"show_fps", false)), "the save remembers it")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_menu().show_fps and _hud.get_fps_counter().visible, "a later Hud shows it from the start")
-	_tap(0, &"pause")
+	_tell_map()
+	check(_focused("Settings"), "the focus stays on Settings")
+
+
+func test_the_map_row_focused_when_the_map_goes_focuses_resume() -> void:
+	_map_menu(false)
+	_focus.focus(0, _menu().button("Map"))
 	_frame()
-	_press(0, "Settings")
-	_press(0, "ShowFps")
-	_check(not _hud.get_fps_counter().visible and not bool(SaveFile.new(SAVE_PATH).get_setting(&"show_fps", true)), "and flips back off, saved")
-	_teardown()
-	DirAccess.remove_absolute(SAVE_PATH)
+	_tell_no_map()
+	check(_menu().is_open() and _focused("Resume"), "the Map row gone: Resume is focused")
+
+
+# --- The Settings page -------------------------------------------------------------------------
+
+
+func test_the_settings_page_rows() -> void:
+	_settings()
+	check_equal(_names(), ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "TaillessMotes", "ShotCap", "ScreenShake", "DamageNumbers", "ShowFps", "SettingsBack"] as Array[String], "Settings")
+
+
+func test_settings_has_no_fire_settings() -> void:
+	# The Gameplay page and its Friendly fire and Enemy fire rows are gone (actors G3c: every spell
+	# hits everything, always).
+	_settings()
+	check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
+
+
+func test_b_goes_up_from_settings_to_the_main_page() -> void:
+	_settings()
+	_do(0, &"back")
+	check_equal(_menu().page, PauseMenuScript.Page.MAIN, "B goes up to the main page")
+
+
+# --- Fullscreen --------------------------------------------------------------------------------
 
 
 ## A stand-in for `core/display` (headless has no window to fill).
@@ -691,134 +678,581 @@ class FakeDisplay:
 		toggles += 1
 
 
-func _test_the_fullscreen_switch() -> void:
+## The Settings page on a stand-in display, freed after the test.
+func _fullscreen_settings() -> FakeDisplay:
 	_setup(1)
-	var display := FakeDisplay.new()
+	var display := own(FakeDisplay.new()) as FakeDisplay
 	_menu().display = display
-	_tap(0, &"pause")
-	_frame()
+	_open()
 	_press(0, "Settings")
-	_check(_menu().button("Fullscreen").text.ends_with("Fullscreen: Off"), "off in a window")
+	return display
+
+
+func test_fullscreen_says_off_in_a_window() -> void:
+	_fullscreen_settings()
+	check(_text_of("Fullscreen").ends_with("Fullscreen: Off"), "off in a window")
+
+
+func test_fullscreen_asks_display_to_fill_the_screen() -> void:
+	var display: FakeDisplay = _fullscreen_settings()
 	_press(0, "Fullscreen")
-	_check(display.toggles == 1 and display.on, "it asks Display to fill the screen")
-	_check(_menu().button("Fullscreen").text.ends_with("Fullscreen: On"), "and shows On")
-	_check(_menu().page == PauseMenuScript.Page.SETTINGS, "it stays on the page")
+	check(display.toggles == 1 and display.on, "it asks Display to fill the screen")
+
+
+func test_fullscreen_then_shows_on() -> void:
+	_fullscreen_settings()
+	_press(0, "Fullscreen")
+	check(_text_of("Fullscreen").ends_with("Fullscreen: On"), "and shows On")
+
+
+func test_fullscreen_stays_on_the_settings_page() -> void:
+	_fullscreen_settings()
+	_press(0, "Fullscreen")
+	check_equal(_menu().page, PauseMenuScript.Page.SETTINGS, "it stays on the page")
+
+
+func test_fullscreen_shows_the_windows_own_state_when_shown_again() -> void:
 	# The browser leaves fullscreen on its own (Escape): the word follows the window when shown again.
+	var display: FakeDisplay = _fullscreen_settings()
+	_press(0, "Fullscreen")
 	display.on = false
-	_tap(0, &"back")
-	_frame()
+	_do(0, &"back")
 	_press(0, "Settings")
-	_check(_menu().button("Fullscreen").text.ends_with("Fullscreen: Off"), "the window's own state shows")
-	display.free()
+	check(_text_of("Fullscreen").ends_with("Fullscreen: Off"), "the window's own state shows")
 
 
-## Settings > Effect slots is a slider: left and right move it a step and keep the focus on it,
-## accept steps up and wraps, up and down leave it; each move tells feel, the ends do not move.
-func _test_the_effect_slots_slider() -> void:
+# --- The switches ------------------------------------------------------------------------------
+# Screen shake and Damage numbers (props W5) are on by default; Floor marks (spell spectacle P2a)
+# and Spell light (P3a) start at the platform's default. None sends anything at its default; accept
+# flips it and tells feel, and the choice is saved: a menu bound to the same save later starts with
+# it and tells feel.
+
+
+## Each switch: its row, the words before ": On", its setting, its menu field and its default.
+func _switches() -> Array[Dictionary]:
+	return [
+		{"row": "ScreenShake", "words": "Screen shake", "key": &"screen_shake", "field": "screen_shake", "start": true},
+		{"row": "DamageNumbers", "words": "Damage numbers", "key": &"damage_numbers", "field": "damage_numbers", "start": true},
+		{"row": "FloorMarks", "words": "Floor marks", "key": &"floor_marks", "field": "floor_marks", "start": FloorMarks.default_on()},
+		{"row": "SpellLight", "words": "Spell light", "key": &"spell_light", "field": "spell_light", "start": SpellLightSetting.default_on()},
+	]
+
+
+func _switch_text(switch: Dictionary, on: bool) -> String:
+	return "%s: %s" % [switch["words"], "On" if on else "Off"]
+
+
+## A fresh menu (on a fresh save) with `switch` pressed `presses` times on the Settings page.
+func _flipped(switch: Dictionary, presses: int = 1) -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_settings()
+	for i in presses:
+		_press(0, switch["row"])
+
+
+## `switch` flipped once, then a later menu bound to the same save.
+func _later_menu_after_flipping(switch: Dictionary) -> void:
+	_flipped(switch)
 	_setup(1)
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	var row: Button = _menu().button("EffectSlots")
-	var bar: HSlider = row.get_node("Bar") as HSlider
-	_check(row.text.ends_with("Effect slots: 256") and is_equal_approx(bar.value, 256.0), "256 at the start, shown in words and on the bar")
-	_focus.focus(0, row)
-	_tap(0, &"move_right")
-	_frame()
-	_check(_slots == [320], "right asks for a step more, got %s" % [_slots])
-	_check(row.text.ends_with("Effect slots: 320") and is_equal_approx(bar.value, 320.0), "and shows it")
-	_check(_focus.focused(0) == row, "the focus stays on the slider")
-	_tap(0, &"move_left")
-	_frame()
-	_tap(0, &"move_left")
-	_frame()
-	_check(_slots == [320, 256, 192], "left steps down, got %s" % [_slots])
-	for i in 10:
-		_tap(0, &"move_left")
-		_frame()
-	_check(_menu().effect_slots == EffectSlots.MIN and _slots.back() == EffectSlots.MIN, "it stops at the bottom")
-	var sent: int = _slots.size()
-	_tap(0, &"move_left")
-	_frame()
-	_check(_slots.size() == sent, "past the end nothing is sent")
-	_menu().effect_slots = EffectSlots.MAX
-	_press(0, "EffectSlots")
-	_check(_menu().effect_slots == EffectSlots.MIN, "accept at the top wraps to the bottom")
-	_press(0, "EffectSlots")
-	_check(_menu().effect_slots == EffectSlots.MIN + EffectSlots.STEP, "accept steps up")
-	_focus.focus(0, row)
-	_tap(0, &"move_down")
-	_frame()
-	_check(_focus.focused(0) == _menu().button("MoteCap"), "down leaves the slider")
-	_check(_menu().page == PauseMenuScript.Page.SETTINGS, "all on the Settings page")
 
 
-func _test_b_opens_the_builder_in_play_only() -> void:
+func test_no_switch_sends_anything_at_its_default() -> void:
+	for switch in _switches():
+		_setup(1)
+		check((_heard[switch["row"]] as Array).is_empty(), "%s: nothing is sent at its default" % switch["row"])
+
+
+func test_every_switch_shows_its_default() -> void:
+	for switch in _switches():
+		_settings()
+		check(_text_of(switch["row"]).ends_with(_switch_text(switch, switch["start"])), "%s: the default at the start: %s" % [switch["row"], _text_of(switch["row"])])
+
+
+func test_accept_flips_a_switch() -> void:
+	for switch in _switches():
+		_flipped(switch)
+		check(_text_of(switch["row"]).ends_with(_switch_text(switch, not switch["start"])), "%s: it flips: %s" % [switch["row"], _text_of(switch["row"])])
+		check_equal(bool(_menu().get(switch["field"])), not switch["start"], "%s: the menu holds it" % switch["row"])
+
+
+func test_a_flipped_switch_tells_feel() -> void:
+	for switch in _switches():
+		_flipped(switch)
+		check(_heard[switch["row"]] == [not switch["start"]], "%s: feel is told, got %s" % [switch["row"], _heard[switch["row"]]])
+
+
+func test_the_save_remembers_a_flipped_switch() -> void:
+	for switch in _switches():
+		_flipped(switch)
+		check_equal(bool(SaveFile.new(SAVE_PATH).get_setting(switch["key"], switch["start"])), not switch["start"], "%s: the save remembers it" % switch["row"])
+
+
+func test_a_switch_flipped_back_tells_feel() -> void:
+	for switch in _switches():
+		_flipped(switch, 2)
+		check(_heard[switch["row"]] == [not switch["start"], switch["start"]], "%s: it flips back, feel told, got %s" % [switch["row"], _heard[switch["row"]]])
+
+
+func test_a_switch_flipped_back_is_saved() -> void:
+	for switch in _switches():
+		_flipped(switch, 2)
+		check_equal(bool(SaveFile.new(SAVE_PATH).get_setting(switch["key"], not switch["start"])), switch["start"], "%s: flipped back, saved" % switch["row"])
+
+
+func test_a_later_menu_starts_with_a_saved_switch() -> void:
+	for switch in _switches():
+		_later_menu_after_flipping(switch)
+		check_equal(bool(_menu().get(switch["field"])), not switch["start"], "%s: a later menu starts with the saved choice" % switch["row"])
+
+
+func test_a_later_menu_tells_feel_a_saved_switch_when_the_hud_binds() -> void:
+	for switch in _switches():
+		_later_menu_after_flipping(switch)
+		check(_heard[switch["row"]] == [not switch["start"]], "%s: feel is told when the Hud binds, got %s" % [switch["row"], _heard[switch["row"]]])
+
+
+# --- Show FPS ----------------------------------------------------------------------------------
+# Off by default (the readout hidden), flips on accept, shows the readout, and is kept in the save:
+# a Hud bound to the same save later shows it from the start.
+
+
+func test_the_fps_readout_is_hidden_by_default() -> void:
+	_setup(1)
+	var fps: Label = _hud.get_fps_counter()
+	check(fps != null and not fps.visible, "the readout is hidden by default")
+
+
+func test_the_show_fps_switch_says_off_by_default() -> void:
+	_settings()
+	check(_text_of("ShowFps").ends_with("Show FPS: Off"), "the switch says Off")
+
+
+func test_show_fps_shows_the_readout() -> void:
+	_settings()
+	_press(0, "ShowFps")
+	check(_text_of("ShowFps").ends_with("Show FPS: On"), "it flips on")
+	check(_hud.get_fps_counter().visible, "and shows the readout")
+
+
+func test_the_fps_readout_reads_n_fps() -> void:
+	_settings()
+	_press(0, "ShowFps")
+	check(_hud.get_fps_counter().text.ends_with(" FPS"), "the readout reads 'N FPS', got '%s'" % _hud.get_fps_counter().text)
+
+
+func test_the_save_remembers_show_fps() -> void:
+	_settings()
+	_press(0, "ShowFps")
+	check(bool(SaveFile.new(SAVE_PATH).get_setting(&"show_fps", false)), "the save remembers it")
+
+
+func test_a_later_hud_shows_the_fps_readout_from_the_start() -> void:
+	_settings()
+	_press(0, "ShowFps")
+	_setup(1)
+	check(_menu().show_fps and _hud.get_fps_counter().visible, "a later Hud shows it from the start")
+
+
+func test_show_fps_flips_back_off_saved() -> void:
+	_settings()
+	_press(0, "ShowFps")
+	_settings()
+	_press(0, "ShowFps")
+	check(not _hud.get_fps_counter().visible, "the readout hides again")
+	check(not bool(SaveFile.new(SAVE_PATH).get_setting(&"show_fps", true)), "off, saved")
+
+
+# --- The sliders -------------------------------------------------------------------------------
+# Effect slots, Particles (spell spectacle P1a: Minimal to High, no Off since S3), Particle amount
+# (P1b: None to Double), Max shots and Tailless motes (S5 step 4: a dev slider) start at their
+# default (the platform's cap for Particles and Max shots) and send nothing; left and right step
+# through the stops, keep the focus and tell feel or the projectile manager, the ends do not move;
+# accept steps up and wraps; and every one but Effect slots is saved: a menu bound to the same
+# save later starts with it and tells them.
+
+
+## Each slider: its row, its stops, its default, its menu field, its setting (none for Effect
+## slots, which is not saved), its words for a stop and its bar's value for a stop.
+func _sliders() -> Array[Dictionary]:
+	var slots: Array = []
+	for value in range(EffectSlots.MIN, EffectSlots.MAX + 1, EffectSlots.STEP):
+		slots.append(value)
+	return [
+		{"row": "EffectSlots", "stops": slots, "start": EffectSlots.DEFAULT, "field": "effect_slots", "key": &"",
+			"text": func(v: Variant) -> String: return "Effect slots: %d" % int(v), "bar": func(v: Variant) -> float: return float(v)},
+		{"row": "MoteCap", "stops": Array(MoteCap.STOPS), "start": MoteCap.default_cap(), "field": "mote_cap", "key": &"mote_cap",
+			"text": func(v: Variant) -> String: return "Particles: %s" % MoteCap.word_of(int(v)), "bar": func(v: Variant) -> float: return float(MoteCap.index_of(int(v)))},
+		{"row": "MoteDensity", "stops": Array(MoteDensity.STOPS), "start": MoteDensity.DEFAULT, "field": "mote_density", "key": &"mote_density",
+			"text": func(v: Variant) -> String: return "Particle amount: %s" % MoteDensity.word_of(float(v)), "bar": func(v: Variant) -> float: return float(MoteDensity.index_of(float(v)))},
+		{"row": "ShotCap", "stops": Array(ShotCap.STOPS), "start": ShotCap.default_cap(), "field": "shot_cap", "key": &"projectile_cap",
+			"text": func(v: Variant) -> String: return "Max shots: %d" % int(v), "bar": func(v: Variant) -> float: return float(ShotCap.index_of(int(v)))},
+		{"row": "TaillessMotes", "stops": Array(TaillessMotes.STOPS), "start": TaillessMotes.DEFAULT, "field": "tailless_motes", "key": &"tailless_motes",
+			"text": func(v: Variant) -> String: return "Tailless motes: %d" % int(v), "bar": func(v: Variant) -> float: return float(TaillessMotes.index_of(int(v)))},
+	]
+
+
+func _saved_sliders() -> Array[Dictionary]:
+	return _sliders().filter(func(slider: Dictionary) -> bool: return slider["key"] != &"")
+
+
+func _index_of(slider: Dictionary, value: Variant) -> int:
+	var stops: Array = slider["stops"]
+	for at in stops.size():
+		if _same(stops[at], value):
+			return at
+	return -1
+
+
+## The move that steps `slider` from its default to a stop next to it: right, or left at the top.
+func _away(slider: Dictionary) -> StringName:
+	return &"move_right" if _index_of(slider, slider["start"]) < (slider["stops"] as Array).size() - 1 else &"move_left"
+
+
+## The stop `_away` steps `slider` to.
+func _next_to_start(slider: Dictionary) -> Variant:
+	var at: int = _index_of(slider, slider["start"])
+	return slider["stops"][at + 1 if _away(slider) == &"move_right" else at - 1]
+
+
+## A fresh menu (on a fresh save) on the Settings page with the focus on `slider`'s row.
+func _on_slider(slider: Dictionary) -> Button:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_settings()
+	var row: Button = _menu().button(slider["row"])
+	_focus.focus(0, row)
+	return row
+
+
+## `slider` moved `times` times by `move`.
+func _move(slider: Dictionary, move: StringName, times: int = 1) -> void:
+	for i in times:
+		_do(0, move)
+
+
+func _heard_of(slider: Dictionary) -> Array:
+	return _heard[slider["row"]]
+
+
+func _value_of(slider: Dictionary) -> Variant:
+	return _menu().get(slider["field"])
+
+
+func test_no_slider_sends_anything_at_its_default() -> void:
+	for slider in _sliders():
+		_setup(1)
+		check(_heard_of(slider).is_empty(), "%s: nothing is sent at the default" % slider["row"])
+
+
+func test_every_slider_shows_its_default_in_words_and_on_the_bar() -> void:
+	for slider in _sliders():
+		var row: Button = _on_slider(slider)
+		var bar: HSlider = row.get_node("Bar") as HSlider
+		check(row.text.ends_with((slider["text"] as Callable).call(slider["start"])), "%s: the default in words: %s" % [slider["row"], row.text])
+		check(is_equal_approx(bar.value, (slider["bar"] as Callable).call(slider["start"])), "%s: the default on the bar: %s" % [slider["row"], bar.value])
+
+
+func test_a_slider_step_asks_for_the_next_stop() -> void:
+	for slider in _sliders():
+		_on_slider(slider)
+		_move(slider, _away(slider))
+		check(_heard_of(slider).size() == 1 and _same(_heard_of(slider)[0], _next_to_start(slider)), "%s: a step asks for %s, got %s" % [slider["row"], _next_to_start(slider), _heard_of(slider)])
+
+
+func test_a_slider_step_shows_the_new_stop() -> void:
+	for slider in _sliders():
+		var row: Button = _on_slider(slider)
+		_move(slider, _away(slider))
+		var bar: HSlider = row.get_node("Bar") as HSlider
+		check(row.text.ends_with((slider["text"] as Callable).call(_next_to_start(slider))), "%s: the new stop in words: %s" % [slider["row"], row.text])
+		check(is_equal_approx(bar.value, (slider["bar"] as Callable).call(_next_to_start(slider))), "%s: the new stop on the bar: %s" % [slider["row"], bar.value])
+
+
+func test_the_focus_stays_on_a_slider_after_a_step() -> void:
+	for slider in _sliders():
+		var row: Button = _on_slider(slider)
+		_move(slider, _away(slider))
+		check(_focus.focused(0) == row, "%s: the focus stays on the slider" % slider["row"])
+		check_equal(_menu().page, PauseMenuScript.Page.SETTINGS, "%s: on the Settings page" % slider["row"])
+
+
+func test_left_steps_a_slider_down_to_its_bottom() -> void:
+	for slider in _sliders():
+		_on_slider(slider)
+		_move(slider, &"move_left", (slider["stops"] as Array).size() + 1)
+		var bottom: Variant = slider["stops"][0]
+		check(_same(_value_of(slider), bottom), "%s: it stops at the bottom, at %s" % [slider["row"], _value_of(slider)])
+		check(_heard_of(slider).is_empty() or _same(_heard_of(slider).back(), bottom), "%s: the bottom is the last sent, got %s" % [slider["row"], _heard_of(slider)])
+
+
+func test_right_steps_a_slider_up_to_its_top() -> void:
+	for slider in _sliders():
+		_on_slider(slider)
+		_move(slider, &"move_right", (slider["stops"] as Array).size() + 1)
+		var top: Variant = (slider["stops"] as Array).back()
+		check(_same(_value_of(slider), top), "%s: it stops at the top, at %s" % [slider["row"], _value_of(slider)])
+		check(_heard_of(slider).is_empty() or _same(_heard_of(slider).back(), top), "%s: the top is the last sent, got %s" % [slider["row"], _heard_of(slider)])
+
+
+func test_past_a_sliders_end_nothing_is_sent() -> void:
+	for slider in _sliders():
+		for move: StringName in [&"move_left", &"move_right"]:
+			_on_slider(slider)
+			_move(slider, move, (slider["stops"] as Array).size())
+			var sent: int = _heard_of(slider).size()
+			_move(slider, move)
+			check_equal(_heard_of(slider).size(), sent, "%s: past the end of %s nothing is sent" % [slider["row"], move])
+
+
+func test_accept_steps_a_slider_up() -> void:
+	for slider in _sliders():
+		_on_slider(slider)
+		_move(slider, &"move_left", (slider["stops"] as Array).size())
+		_press(0, slider["row"])
+		check(_same(_value_of(slider), slider["stops"][1]), "%s: accept steps up, to %s" % [slider["row"], _value_of(slider)])
+		check(_same(_heard_of(slider).back(), slider["stops"][1]), "%s: and sends it, got %s" % [slider["row"], _heard_of(slider)])
+
+
+func test_accept_at_a_sliders_top_wraps_to_the_bottom() -> void:
+	for slider in _sliders():
+		_on_slider(slider)
+		_menu().set(slider["field"], (slider["stops"] as Array).back())
+		_press(0, slider["row"])
+		check(_same(_value_of(slider), slider["stops"][0]), "%s: accept at the top wraps to the bottom, at %s" % [slider["row"], _value_of(slider)])
+
+
+func test_down_leaves_a_slider() -> void:
+	var slider: Dictionary = _sliders()[0]
+	_on_slider(slider)
+	_do(0, &"move_down")
+	check(_focus.focused(0) == _menu().button("MoteCap"), "down leaves the Effect slots slider for the row below")
+
+
+func test_the_save_remembers_a_slider_step() -> void:
+	for slider in _saved_sliders():
+		_on_slider(slider)
+		_move(slider, _away(slider))
+		var saved: Variant = SaveFile.new(SAVE_PATH).get_setting(slider["key"], null)
+		check(_same(saved, _next_to_start(slider)), "%s: the save remembers it, got %s" % [slider["row"], saved])
+
+
+func test_a_later_menu_starts_with_a_saved_slider_stop() -> void:
+	for slider in _saved_sliders():
+		_on_slider(slider)
+		_move(slider, _away(slider))
+		_setup(1)
+		check(_same(_value_of(slider), _next_to_start(slider)), "%s: a later menu starts with the saved stop, at %s" % [slider["row"], _value_of(slider)])
+
+
+func test_a_later_menu_tells_them_a_saved_slider_stop_when_the_hud_binds() -> void:
+	for slider in _saved_sliders():
+		_on_slider(slider)
+		_move(slider, _away(slider))
+		_setup(1)
+		check(_heard_of(slider).size() == 1 and _same(_heard_of(slider)[0], _next_to_start(slider)), "%s: told once when the Hud binds, got %s" % [slider["row"], _heard_of(slider)])
+
+
+func test_the_platforms_particle_cap_is_a_stop_above_minimal() -> void:
+	var at: int = MoteCap.index_of(MoteCap.default_cap())
+	check(MoteCap.STOPS[at] == MoteCap.default_cap() and at > 0, "the platform's cap is a stop above Minimal")
+
+
+func test_the_platforms_shot_cap_is_a_stop() -> void:
+	check_equal(ShotCap.STOPS[ShotCap.index_of(ShotCap.default_cap())], ShotCap.default_cap(), "the platform's cap is a stop")
+
+
+func test_a_max_shots_step_is_asked_for_in_the_run_by_the_seat_that_opened_the_menu() -> void:
+	var slider: Dictionary = _sliders()[3]
+	_on_slider(slider)
+	_move(slider, &"move_left")
+	var below: int = ShotCap.STOPS[ShotCap.index_of(ShotCap.default_cap()) - 1]
+	check(_cap_requests == [[0, below]], "asked for in the run, as the seat that opened the menu, got %s" % [_cap_requests])
+
+
+func test_a_particle_cap_saved_as_off_loads_as_minimal() -> void:
+	# A cap saved as Off before S3 (0).
+	SaveFile.new(SAVE_PATH).set_setting(&"mote_cap", 0)
+	_setup(1)
+	check(_menu().mote_cap == MoteCap.STOPS[0], "a saved Off loads as Minimal, at %d" % _menu().mote_cap)
+	check(not (_heard["MoteCap"] as Array).is_empty() and (_heard["MoteCap"] as Array).back() == MoteCap.STOPS[0], "and feel is told Minimal, got %s" % [_heard["MoteCap"]])
+
+
+# --- The builder from play ---------------------------------------------------------------------
+
+
+func test_b_opens_the_builder_in_play() -> void:
 	_setup(2)
-	_tap(1, &"back")
+	_do(1, &"back")
+	check(_hud.get_radial(1).is_open(), "B opens the builder in play")
+
+
+func test_b_opens_only_the_pressers_builder() -> void:
+	_setup(2)
+	_do(1, &"back")
+	check(not _hud.get_radial(0).is_open(), "only the presser's")
+
+
+func test_the_builder_never_pauses() -> void:
+	_setup(2)
+	_do(1, &"back")
+	check(not paused and not _stops, "the builder never pauses")
+
+
+func test_b_closes_the_builder_again() -> void:
+	_setup(2)
+	_do(1, &"back")
+	_do(1, &"back")
+	check(not _hud.get_radial(1).is_open(), "B closes it again")
+
+
+func test_a_builder_closed_with_b_stays_closed() -> void:
+	_setup(2)
+	_do(1, &"back")
+	_do(1, &"back")
 	_frame()
-	_check(_hud.get_radial(1).is_open(), "B opens the builder in play")
-	_check(not _hud.get_radial(0).is_open(), "only the presser's")
-	_check(not paused, "the builder never pauses")
-	_tap(1, &"back")
-	_frame()
-	_check(not _hud.get_radial(1).is_open(), "B closes it again")
-	_frame()
-	_check(not _hud.get_radial(1).is_open(), "and it stays closed")
+	check(not _hud.get_radial(1).is_open(), "and it stays closed")
+
+
+func test_no_builder_outside_a_room() -> void:
+	_setup(2)
 	_bus.room_cleared.emit(&"test_room")
 	_bus.run_ended.emit(false)
-	_tap(0, &"back")
-	_frame()
-	_check(not _hud.get_radial(0).is_open(), "no builder outside a room")
+	_do(0, &"back")
+	check(not _hud.get_radial(0).is_open(), "no builder outside a room")
+
+
+func test_start_closes_an_open_builder() -> void:
+	_setup(1)
+	_do(0, &"back")
+	_do(0, &"pause")
+	check(not _hud.get_radial(0).is_open(), "Start closes an open builder")
+
+
+func test_start_on_an_open_builder_does_not_pause() -> void:
+	_setup(1)
+	_do(0, &"back")
+	_do(0, &"pause")
+	check(not _menu().is_open(), "rather than pausing on top of it")
+
+
+# --- A on the hub's stone, by an item and on the altar -----------------------------------------
+# The hub's stone (online-lobby L1): A (`accept`) sends `run_requested` for its player only while
+# the stone is lit and that player has no menu open; never while the pause menu is open.
+
+
+## Two seats; every `run_requested` heard.
+func _stone_hud() -> Array[int]:
+	_setup(2)
+	var asked: Array[int] = []
+	_bus.run_requested.connect(func(player: int) -> void: asked.append(player))
+	return asked
+
+
+func _light_stone() -> void:
+	_bus.start_stone_changed.emit(2, 2, true)
+
+
+func _put_out_stone() -> void:
+	_bus.start_stone_changed.emit(0, 2, false)
+
+
+func test_a_with_no_stone_lit_asks_nothing() -> void:
+	var asked: Array[int] = _stone_hud()
+	_do(1, &"accept")
+	check(asked.is_empty(), "A with no stone lit asks nothing")
+
+
+func test_a_on_the_lit_stone_asks_for_the_run_for_its_player() -> void:
+	var asked: Array[int] = _stone_hud()
+	_light_stone()
+	_do(1, &"accept")
+	check_equal(asked, [1] as Array[int], "A on the lit stone asks for the run, for its player")
+
+
+func test_a_inside_a_builder_by_the_lit_stone_is_the_builders() -> void:
+	var asked: Array[int] = _stone_hud()
+	_light_stone()
+	_do(0, &"back")
+	_do(0, &"accept")
+	check(asked.is_empty(), "A inside a builder is the builder's: %s" % [asked])
+
+
+func test_a_while_paused_does_not_ask_for_the_run() -> void:
+	var asked: Array[int] = _stone_hud()
+	_light_stone()
+	_open(1)
+	_do(1, &"accept")
+	check(asked.is_empty(), "A while paused asks nothing: %s" % [asked])
+
+
+func test_a_once_the_stone_is_out_asks_nothing() -> void:
+	var asked: Array[int] = _stone_hud()
+	_light_stone()
+	_bus.start_stone_changed.emit(1, 2, false)
+	_do(1, &"accept")
+	check(asked.is_empty(), "A once the stone is out asks nothing: %s" % [asked])
 
 
 ## The hub's altar (online-lobby L2): A (`accept`) sends `online_open_requested` for a player
 ## whose wizard stands on it (`altar_changed`), with no menu open; the lit stone's A comes first.
-func _test_a_on_the_altar_asks_to_open_the_room() -> void:
+## Two seats, seat 1 on the altar when `on_altar`; every `online_open_requested` and
+## `run_requested` heard, as [asked, runs].
+func _altar_hud(on_altar: bool = true) -> Array:
 	_setup(2)
 	var asked: Array[int] = []
 	var runs: Array[int] = []
 	_bus.online_open_requested.connect(func(player: int) -> void: asked.append(player))
 	_bus.run_requested.connect(func(player: int) -> void: runs.append(player))
-	_tap(1, &"accept")
-	_frame()
-	_check(asked.is_empty(), "A away from the altar asks nothing")
-	_bus.altar_changed.emit(0b0010)
-	_tap(0, &"accept")
-	_frame()
-	_check(asked.is_empty(), "A by a player who is not on the altar asks nothing")
-	_tap(1, &"accept")
-	_frame()
-	_check((asked.size() == 1 and asked[0] == 1), "A on the altar asks to open the room, for its player: %s" % [asked])
-	_tap(1, &"back")
-	_frame()
-	_tap(1, &"accept")
-	_frame()
-	_check((asked.size() == 1 and asked[0] == 1), "A inside a builder is the builder's: %s" % [asked])
-	_tap(1, &"back")
-	_frame()
-	if _hud.get_radial(1).is_open():
-		_hud.get_radial(1).close()
-	_frame()
-	_frame()
-	_check(not _hud.get_radial(1).is_open(), "its builder is closed again")
-	_bus.start_stone_changed.emit(2, 2, true)
-	_tap(1, &"accept")
-	_frame()
-	_check((asked.size() == 1 and asked[0] == 1) and (runs.size() == 1 and runs[0] == 1), "on the lit stone A starts the run, not the room: %s %s" % [asked, runs])
-	_bus.start_stone_changed.emit(0, 2, false)
+	if on_altar:
+		_bus.altar_changed.emit(0b0010)
+	return [asked, runs]
+
+
+func test_a_away_from_the_altar_asks_nothing() -> void:
+	var heard: Array = _altar_hud(false)
+	_do(1, &"accept")
+	check((heard[0] as Array).is_empty(), "A away from the altar asks nothing")
+
+
+func test_a_by_a_player_not_on_the_altar_asks_nothing() -> void:
+	var heard: Array = _altar_hud()
+	_do(0, &"accept")
+	check((heard[0] as Array).is_empty(), "A by a player who is not on the altar asks nothing")
+
+
+func test_a_on_the_altar_asks_to_open_the_room_for_its_player() -> void:
+	var heard: Array = _altar_hud()
+	_do(1, &"accept")
+	check(heard[0] == [1], "A on the altar asks to open the room, for its player: %s" % [heard[0]])
+
+
+func test_a_inside_a_builder_on_the_altar_is_the_builders() -> void:
+	var heard: Array = _altar_hud()
+	_do(1, &"back")
+	_do(1, &"accept")
+	check((heard[0] as Array).is_empty(), "A inside a builder is the builder's: %s" % [heard[0]])
+
+
+func test_on_the_lit_stone_a_starts_the_run_not_the_room() -> void:
+	var heard: Array = _altar_hud()
+	_light_stone()
+	_do(1, &"accept")
+	check((heard[0] as Array).is_empty() and heard[1] == [1], "on the lit stone A starts the run, not the room: %s %s" % [heard[0], heard[1]])
+
+
+func test_a_once_off_the_altar_asks_nothing() -> void:
+	var heard: Array = _altar_hud()
 	_bus.altar_changed.emit(0)
-	_tap(1, &"accept")
-	_frame()
-	_check((asked.size() == 1 and asked[0] == 1), "A once off the altar asks nothing: %s" % [asked])
+	_do(1, &"accept")
+	check((heard[0] as Array).is_empty(), "A once off the altar asks nothing: %s" % [heard[0]])
 
 
 ## Items I6: A (`take`; never `accept` alone, Space on the keyboard, which casts) with an item in
 ## reach (`item_near_changed`) sends `item_take_requested` for its player and that item, with no
-## menu open; the lit stone's A comes first, the altar's after.
-## The hint shows over the item while it is in reach, hides while its player has a menu open, and
-## shakes red on `item_refused`.
-func _test_a_by_an_item_takes_it_after_the_stone_and_before_the_altar() -> void:
+## menu open; the lit stone's A comes first, the altar's after. The hint shows over the item while
+## it is in reach, hides while its player has a menu open, and shakes red on `item_refused`.
+## Two seats, seat 1 on the altar with item 7 (a staff) in reach; every `item_take_requested`,
+## `run_requested` and `online_open_requested` heard, as [takes, runs, rooms].
+func _item_hud() -> Array:
 	_setup(2)
 	var takes: Array = []
 	var runs: Array[int] = []
@@ -826,116 +1260,106 @@ func _test_a_by_an_item_takes_it_after_the_stone_and_before_the_altar() -> void:
 	_bus.item_take_requested.connect(func(player: int, item: int) -> void: takes.append([player, item]))
 	_bus.run_requested.connect(func(player: int) -> void: runs.append(player))
 	_bus.online_open_requested.connect(func(player: int) -> void: rooms.append(player))
-	var hints: Control = _hud.get_item_hints()
 	_bus.altar_changed.emit(0b0010)
 	_bus.item_near_changed.emit(1, 7, Vector2(40, 40), {"kind": &"staff", "id": &"star", "name": "Wild star", "slots": 4, "cooldown": 0.15, "max_mana": 100.0, "cards": [&"bolt"]})
 	_hud.step_hints(0.016)
-	var hint: Control = hints.call("hint_of", 1)
-	_check(hint.visible, "the hint shows over the item")
-	_check(String(hint.call("title")) == "Take Wild star", "it names the item: %s" % hint.call("title"))
-	_check(String(hint.call("line")).begins_with("4 slots"), "a staff's numbers: %s" % hint.call("line"))
+	return [takes, runs, rooms]
+
+
+func _hint() -> Control:
+	return _hud.get_item_hints().call("hint_of", 1) as Control
+
+
+func test_the_item_hint_shows_over_the_item() -> void:
+	_item_hud()
+	check(_hint().visible, "the hint shows over the item")
+
+
+func test_the_item_hint_names_the_item() -> void:
+	_item_hud()
+	check_equal(String(_hint().call("title")), "Take Wild star", "it names the item")
+
+
+func test_the_item_hint_shows_a_staffs_numbers() -> void:
+	_item_hud()
+	check(String(_hint().call("line")).begins_with("4 slots"), "a staff's numbers: %s" % _hint().call("line"))
+
+
+func test_accept_alone_takes_no_item() -> void:
+	var heard: Array = _item_hud()
 	_bus.altar_changed.emit(0)
-	_tap(1, &"accept")
-	_frame()
-	_check(takes.is_empty(), "accept alone (Space on the keyboard, which casts) takes nothing: %s" % [takes])
-	_bus.altar_changed.emit(0b0010)
+	_do(1, &"accept")
+	check((heard[0] as Array).is_empty(), "accept alone (Space on the keyboard, which casts) takes nothing: %s" % [heard[0]])
+
+
+func test_a_takes_the_item_not_the_altars_room() -> void:
+	var heard: Array = _item_hud()
 	_tap_a(1)
 	_frame()
-	_check(takes == [[1, 7]] and rooms.is_empty(), "A (take) takes the item, not the altar's room: %s %s" % [takes, rooms])
+	check(heard[0] == [[1, 7]] and (heard[2] as Array).is_empty(), "A (take) takes the item, not the altar's room: %s %s" % [heard[0], heard[2]])
+
+
+func test_a_refused_take_shakes_the_hint_red() -> void:
+	_item_hud()
 	_bus.item_refused.emit(1, 7)
-	_check(bool(hint.call("is_refused")), "a refused take shakes it red")
+	check(bool(_hint().call("is_refused")), "a refused take shakes it red")
+
+
+func test_the_refused_shake_lasts_a_moment() -> void:
+	_item_hud()
+	_bus.item_refused.emit(1, 7)
 	_hud.step_hints(1.0)
-	_check(not bool(hint.call("is_refused")), "for a moment")
-	_bus.start_stone_changed.emit(2, 2, true)
+	check(not bool(_hint().call("is_refused")), "for a moment")
+
+
+func test_on_the_lit_stone_a_starts_the_run_not_the_take() -> void:
+	var heard: Array = _item_hud()
+	_light_stone()
 	_tap_a(1)
 	_frame()
-	_check(takes.size() == 1 and runs == [1], "on the lit stone A starts the run: %s %s" % [takes, runs])
-	_bus.start_stone_changed.emit(0, 2, false)
-	_tap(1, &"back")
-	_frame()
+	check((heard[0] as Array).is_empty() and heard[1] == [1], "on the lit stone A starts the run: %s %s" % [heard[0], heard[1]])
+
+
+func test_the_item_hint_hides_while_its_players_builder_is_open() -> void:
+	_item_hud()
+	_do(1, &"back")
 	_hud.step_hints(0.016)
-	_check(not hint.visible, "hidden while its player's builder is open")
+	check(not _hint().visible, "hidden while its player's builder is open")
+
+
+func test_a_inside_the_builder_takes_no_item() -> void:
+	var heard: Array = _item_hud()
+	_do(1, &"back")
 	_tap_a(1)
 	_frame()
-	_check(takes.size() == 1, "and A inside the builder is the builder's: %s" % [takes])
-	if _hud.get_radial(1).is_open():
-		_hud.get_radial(1).close_builder()
-	_frame()
-	_frame()
+	check((heard[0] as Array).is_empty(), "A inside the builder is the builder's: %s" % [heard[0]])
+
+
+func test_the_item_hint_hides_with_nothing_in_reach() -> void:
+	_item_hud()
 	_bus.item_near_changed.emit(1, -1, Vector2.ZERO, {})
 	_hud.step_hints(0.016)
-	_check(not hint.visible, "hidden with nothing in reach")
+	check(not _hint().visible, "hidden with nothing in reach")
+
+
+func test_with_nothing_in_reach_a_on_the_altar_opens_the_room() -> void:
+	var heard: Array = _item_hud()
+	_bus.item_near_changed.emit(1, -1, Vector2.ZERO, {})
+	_hud.step_hints(0.016)
 	_tap_a(1)
 	_frame()
-	_check(takes.size() == 1 and rooms == [1], "then A on the altar opens the room: %s %s" % [takes, rooms])
-	_bus.altar_changed.emit(0)
+	check((heard[0] as Array).is_empty() and heard[2] == [1], "then A on the altar opens the room: %s %s" % [heard[0], heard[2]])
 
 
-## The hub's stone (online-lobby L1): A (`accept`) sends `run_requested` for its player only while
-## the stone is lit and that player has no menu open; never while the pause menu is open.
-func _test_a_on_the_lit_stone_starts_the_run() -> void:
-	_setup(2)
-	var asked: Array[int] = []
-	_bus.run_requested.connect(func(player: int) -> void: asked.append(player))
-	_tap(1, &"accept")
-	_frame()
-	_check(asked.is_empty(), "A with no stone lit asks nothing")
-	_bus.start_stone_changed.emit(2, 2, true)
-	_tap(1, &"accept")
-	_frame()
-	_check(asked.size() == 1 and asked[0] == 1, "A on the lit stone asks for the run, for its player: %s" % [asked])
-	_tap(0, &"back")
-	_frame()
-	_tap(0, &"accept")
-	_frame()
-	_check(asked.size() == 1 and asked[0] == 1, "A inside a builder is the builder's: %s" % [asked])
-	_tap(0, &"pause")
-	_frame()
-	_tap(1, &"pause")
-	_frame()
-	_tap(1, &"accept")
-	_frame()
-	_check(asked.size() == 1 and asked[0] == 1, "A while paused asks nothing: %s" % [asked])
-	# That A worked the menu (its focused Resume may have closed it): close it if it is still open.
-	if _menu().is_open():
-		_tap(1, &"pause")
-		_frame()
-	_check(not _menu().is_open() and not _hud.get_radial(0).is_open(), "no menu open now")
-	_bus.start_stone_changed.emit(1, 2, false)
-	_tap(1, &"accept")
-	_frame()
-	_check(asked.size() == 1 and asked[0] == 1, "A once the stone is out asks nothing: %s" % [asked])
-
-
-func _test_start_closes_the_builder() -> void:
-	_setup(1)
-	_tap(0, &"back")
-	_frame()
-	_tap(0, &"pause")
-	_frame()
-	_check(not _hud.get_radial(0).is_open(), "Start closes an open builder")
-	_check(not _menu().is_open(), "rather than pausing on top of it")
-
-
-func _test_the_run_ending_closes_it() -> void:
-	_setup(1)
-	_tap(0, &"pause")
-	_frame()
-	_bus.run_ended.emit(false)
-	_check(not _menu().is_open() and not _stops, "a run ending closes the menu and lets the game go")
+# --- Main menu and Leave game ------------------------------------------------------------------
 
 
 ## "Main menu" (online lobby: a machine whose host left joins another room from the menu): the
 ## menu closes and lets the game go first, then `main_menu_requested` asks this machine to leave,
-## and the HUD itself shows the main menu again with no panel or menu over it.
-func _test_main_menu_leaves_for_the_main_menu() -> void:
+## and the HUD itself shows the main menu again with no panel or menu over it. Two seats, seat 1
+## pressed it; what the bus said in order.
+func _main_menu_pressed() -> Array[String]:
 	_setup(2)
-	var stand_in := PackedScene.new()
-	var made := Node.new()
-	made.name = "MenuStandIn"
-	stand_in.pack(made)
-	made.free()
-	_hud.main_menu = stand_in
 	var heard: Array[String] = []
 	_bus.pause_requested.connect(func(player: int, on: int) -> void: heard.append("pause %d %d" % [player, on]))
 	# Heard before the HUD's own handler (which closes every menu too), so the order is the menu's.
@@ -943,25 +1367,39 @@ func _test_main_menu_leaves_for_the_main_menu() -> void:
 	_bus.main_menu_requested.disconnect(hud_heard)
 	_bus.main_menu_requested.connect(func(player: int) -> void: heard.append("menu %d" % player))
 	_bus.main_menu_requested.connect(hud_heard)
-	_tap(1, &"pause")
-	_frame()
+	_open(1)
 	heard.clear()
 	_press(1, "MainMenu")
-	_check(not _menu().is_open() and not _stops, "Main menu closes the menu and lets the game go")
+	return heard
+
+
+func test_main_menu_closes_the_pause_menu() -> void:
+	_main_menu_pressed()
+	check(not _menu().is_open() and not _stops, "Main menu closes the menu and lets the game go")
+
+
+func test_main_menu_lets_the_game_go_before_this_machine_leaves() -> void:
 	# First: while a replay file plays the menu's closing unpauses the tree itself, which it no
 	# longer does once the replay has ended on the way out.
-	_check(heard == ["pause 1 0", "menu 1"], "first the game is let go, then this machine leaves, got %s" % [heard])
+	check_equal(_main_menu_pressed(), ["pause 1 0", "menu 1"] as Array[String], "first the game is let go, then this machine leaves")
+
+
+func test_main_menu_shows_the_main_menu_as_the_current_scene() -> void:
+	_main_menu_pressed()
 	var shown: Node = current_scene
-	_check(shown != null and shown.name == "MenuStandIn" and shown.get_parent() == root, "the main menu is the current scene")
-	_check(not _hud.get_panel(0).visible and not _hud.get_panel(1).visible, "and no panel is left over it")
-	if shown != null and shown.name == "MenuStandIn":
-		shown.free()
+	check(shown != null and shown.name == MENU_STAND_IN and shown.get_parent() == root, "the main menu is the current scene")
+
+
+func test_main_menu_leaves_no_panel_over_it() -> void:
+	_main_menu_pressed()
+	check(not _hud.get_panel(0).visible and not _hud.get_panel(1).visible, "no panel is left over it")
 
 
 ## "Leave game" (items I2, in place of the `leave` action): the menu closes and lets the game go
 ## first, then `seat_leave_requested` for the seat that opened it, whose device the input layer lets
-## go (`device_left`: the seat's LEAVE in its next frame); the other seat plays on.
-func _test_leave_game_lets_the_seat_go() -> void:
+## go (`device_left`: the seat's LEAVE in its next frame); the other seat plays on. Two seats, seat
+## 1 pressed it; what the bus said in order.
+func _left_game() -> Array[String]:
 	_setup(2)
 	var heard: Array[String] = []
 	_bus.pause_requested.connect(func(player: int, on: int) -> void: heard.append("pause %d %d" % [player, on]))
@@ -971,66 +1409,137 @@ func _test_leave_game_lets_the_seat_go() -> void:
 	root.add_child(_input)
 	await process_frame
 	_bus.device_left.connect(func(player: int, _device: int) -> void: heard.append("gone %d" % player))
-	_tap(1, &"pause")
-	_frame()
+	_open(1)
 	heard.clear()
 	_press(1, "LeaveGame")
-	_check(not _menu().is_open() and not _stops, "Leave game closes the menu and lets the game go")
-	_check(heard == ["pause 1 0", "leave 1", "gone 1"], "first the game is let go, then the seat leaves, got %s" % [heard])
-	_check(not _input.is_joined(1), "the seat that opened the menu is gone")
-	_check(_input.is_joined(0), "the other seat plays on")
+	return heard
 
 
-## The owner, 2026-11-13: while the game waits for a seat's unplugged gamepad, the HUD says whose
-## controller is gone (the pad line, from co-op's `pad_wait_changed`), the waiting seat's own pause
-## menu closes, and the menu another player opens lets the waiting seat leave.
-func _test_a_waiting_seat_is_named_and_can_be_let_go() -> void:
+func test_leave_game_closes_the_pause_menu() -> void:
+	await _left_game()
+	check(not _menu().is_open() and not _stops, "Leave game closes the menu and lets the game go")
+
+
+func test_leave_game_lets_the_game_go_before_the_seat_leaves() -> void:
+	check_equal(await _left_game(), ["pause 1 0", "leave 1", "gone 1"] as Array[String], "first the game is let go, then the seat leaves")
+
+
+func test_leave_game_lets_the_seat_that_opened_the_menu_go() -> void:
+	await _left_game()
+	check(not _input.is_joined(1), "the seat that opened the menu is gone")
+
+
+func test_leave_game_leaves_the_other_seat_playing() -> void:
+	await _left_game()
+	check(_input.is_joined(0), "the other seat plays on")
+
+
+# --- A seat waiting for its gamepad ------------------------------------------------------------
+# The owner, 2026-11-13: while the game waits for a seat's unplugged gamepad, the HUD says whose
+# controller is gone (the pad line, from co-op's `pad_wait_changed`), the waiting seat's own pause
+# menu closes, and the menu another player opens lets the waiting seat leave.
+
+
+## Seat 0 on a virtual device, seat 1 on a real gamepad (device 3), the input layer in the tree.
+func _pad_seats() -> void:
 	_setup(1)
 	root.add_child(_input)
 	await process_frame
-	# Seat 1 is a real gamepad (device 3).
 	var join := InputEventJoypadButton.new()
 	join.device = 3
 	join.button_index = JOY_BUTTON_A
 	join.pressed = true
 	_input.handle_event(join)
 	_bus.player_joined.emit(1)
-	_check(_input.player_of(3) == 1, "the gamepad sits on seat 1")
-	var line: Label = _hud.get_pad_line()
-	_check(not line.visible, "no line while every seat has its device")
-	# Its own pause menu is open when the gamepad goes.
+	check_equal(_input.player_of(3), 1, "the gamepad sits on seat 1")
+
+
+## `_pad_seats` with seat 1's pause menu open, then its gamepad gone and co-op saying seat 1 waits.
+func _seat_one_waits() -> void:
+	await _pad_seats()
 	var start := InputEventJoypadButton.new()
 	start.device = 3
 	start.button_index = JOY_BUTTON_START
 	start.pressed = true
 	_input.handle_event(start)
 	_frame()
-	_check(_menu().owner_player == 1, "seat 1 opened the pause menu")
+	check_equal(_menu().owner_player, 1, "seat 1 opened the pause menu")
 	_input._on_joy_connection_changed(3, false)
 	# Co-op's part, done here: the waiting seats said.
 	_bus.pad_wait_changed.emit(1 << 1)
-	_check(not _menu().is_open(), "the waiting seat's menu closes: it cannot work it")
-	_check(line.visible and line.text.contains("P2:") and not line.text.contains("P1:"), "the line names the seat: %s" % line.text)
-	# Another player's menu offers to let it go.
-	_tap(0, &"pause")
-	_frame()
-	_check(_menu().owner_player == 0 and _names().has("LeaveWaiting"), "the menu offers the waiting seat's leave: %s" % [_names()])
-	_check(_menu().button("LeaveWaiting").text.contains("P2"), "naming the seat: %s" % _menu().button("LeaveWaiting").text)
+
+
+## `_seat_one_waits` with seat 0's menu open.
+func _other_menu_while_seat_one_waits() -> void:
+	await _seat_one_waits()
+	_open(0)
+
+
+func test_no_pad_line_while_every_seat_has_its_device() -> void:
+	await _pad_seats()
+	check(not _hud.get_pad_line().visible, "no line while every seat has its device")
+
+
+func test_a_waiting_seats_own_menu_closes() -> void:
+	await _seat_one_waits()
+	check(not _menu().is_open(), "the waiting seat's menu closes: it cannot work it")
+
+
+func test_the_pad_line_names_the_waiting_seat() -> void:
+	await _seat_one_waits()
+	var line: Label = _hud.get_pad_line()
+	check(line.visible and line.text.contains("P2:") and not line.text.contains("P1:"), "the line names the seat: %s" % line.text)
+
+
+func test_another_players_menu_offers_the_waiting_seats_leave() -> void:
+	await _other_menu_while_seat_one_waits()
+	check(_menu().owner_player == 0 and _names().has("LeaveWaiting"), "the menu offers the waiting seat's leave: %s" % [_names()])
+	check(_text_of("LeaveWaiting").contains("P2"), "naming the seat: %s" % _text_of("LeaveWaiting"))
+
+
+func test_leave_waiting_lets_only_the_waiting_seat_go() -> void:
+	await _other_menu_while_seat_one_waits()
 	_press(0, "LeaveWaiting")
-	_check(not _input.is_joined(1) and _input.is_joined(0), "only the waiting seat left")
-	_check(_menu().is_open(), "the menu stays open")
-	_check(not _names().has("LeaveWaiting"), "the row goes at once, so a second press asks nothing")
+	check(not _input.is_joined(1) and _input.is_joined(0), "only the waiting seat left")
+
+
+func test_the_menu_stays_open_after_leave_waiting() -> void:
+	await _other_menu_while_seat_one_waits()
+	_press(0, "LeaveWaiting")
+	check(_menu().is_open(), "the menu stays open")
+
+
+func test_the_leave_waiting_row_goes_at_once() -> void:
+	await _other_menu_while_seat_one_waits()
+	_press(0, "LeaveWaiting")
+	check(not _names().has("LeaveWaiting"), "the row goes at once, so a second press asks nothing")
+
+
+func test_with_nobody_waiting_no_line_and_no_row_show() -> void:
+	await _other_menu_while_seat_one_waits()
 	_bus.pad_wait_changed.emit(0)
-	_check(not line.visible and not _names().has("LeaveWaiting"), "nobody waits: no line, no row: %s" % [_names()])
+	check(not _hud.get_pad_line().visible and not _names().has("LeaveWaiting"), "nobody waits: no line, no row: %s" % [_names()])
+
+
+func test_another_machines_waiting_seat_is_named_not_offered() -> void:
 	# A seat that waits on another machine is not this menu's to let go.
+	await _other_menu_while_seat_one_waits()
 	_bus.pad_wait_changed.emit(1 << 2)
-	_check(line.visible and line.text.contains("P3") and not _names().has("LeaveWaiting"), "another machine's waiting seat is named, not offered")
+	var line: Label = _hud.get_pad_line()
+	check(line.visible and line.text.contains("P3"), "another machine's waiting seat is named: %s" % line.text)
+	check(not _names().has("LeaveWaiting"), "not offered: %s" % [_names()])
+
+
+func test_back_at_the_main_menu_no_pad_line_stays() -> void:
+	await _seat_one_waits()
 	_bus.main_menu_requested.emit(0)
-	_check(not line.visible, "back at the main menu no line stays")
-	# A waiting seat's builder closes too, as when a device left.
+	check(not _hud.get_pad_line().visible, "back at the main menu no line stays")
+
+
+func test_a_waiting_seats_builder_closes() -> void:
+	# As when a device left: the builder closes and frees the seat.
 	_setup(2)
-	_bus.room_entered.emit(&"test_room")
 	_hud.get_radial(1).open_builder()
-	_check(_hud.get_radial(1).is_open(), "seat 1's builder is open")
+	check(_hud.get_radial(1).is_open(), "seat 1's builder is open")
 	_bus.pad_wait_changed.emit(1 << 1)
-	_check(not _hud.get_radial(1).is_open() and not _input.is_captured(1), "a waiting seat's builder closes and frees it")
+	check(not _hud.get_radial(1).is_open() and not _input.is_captured(1), "a waiting seat's builder closes and frees it")

@@ -1,98 +1,41 @@
-extends SceneTree
-## Tests for the 4-bot hook in the main menu: the user argument `--four-bot` adds
-## exactly one runner node to the root (never a second one), and no argument, or
-## an unrelated one, adds none. The runner is a stub from `runner_factory` (the
-## real one would play a whole run); a factory that returns nothing stands for a
-## build without tests/, which must warn and add nothing.
+extends "res://tests/support/suite.gd"
+## Tests for the main menu's test-runner hooks, one behaviour per test: the user argument
+## `--four-bot` adds exactly one runner node to the root (never a second one), and no argument, or
+## an unrelated one, adds none. The stress run (`--stress`) and the projectile timings
+## (`--projectile-timing`) start the same way, each under its own name. The runner is a stub from
+## `runner_factory` (the real one would play a whole run); a factory that returns nothing stands
+## for a build without tests/, which must warn and add nothing. Each runner's literal `load` path
+## is its constant, and one real runner is made (not added) through the real path.
 ##
-## godot --headless --path . --script res://tests/hud/test_main_menu.gd
+## Each test gets a menu of its own (its own event bus), freed after it with any runner it added.
 
 const MENU_SCENE_PATH: String = "res://hud/menus/main_menu/main_menu.tscn"
+const EventsScript := preload("res://core/events/events.gd")
 const RUNNER_NODE: String = "FourBotRunner"
+const RUNNER_NAMES: Array[String] = ["FourBotRunner", "StressRunner", "ProjectileTimingRunner", "SandboxStormRunner", "ReplayHashesRunner", "OnlineRunner"]
+const FOUR_BOT: PackedStringArray = ["--four-bot"]
+const STRESS: PackedStringArray = ["--stress"]
+const TIMING: PackedStringArray = ["--projectile-timing"]
 
-var _failures: Array[String] = []
 var _built: int = 0
+var _menu: Control
 
 
-func _initialize() -> void:
+func before_each() -> void:
+	_built = 0
+	var bus := own(EventsScript.new()) as EventsScript
+	_menu = (load(MENU_SCENE_PATH) as PackedScene).instantiate() as Control
+	_menu.set("events", bus)
+	_menu.set("runner_factory", _make_stub)
+	root.add_child(own(_menu))
 	await process_frame
-	var menu: Control = (load(MENU_SCENE_PATH) as PackedScene).instantiate() as Control
-	menu.set("runner_factory", Callable(self, "_make_stub"))
-	root.add_child(menu)
-	await process_frame
-	_expect(_built == 0 and _count_runners() == 0, "the menu without the argument added a runner")
 
-	_expect(not bool(menu.call("_start_four_bot_test", PackedStringArray())), "no arguments started the test")
-	_expect(not bool(menu.call("_start_four_bot_test", PackedStringArray(["--other", "four-bot"]))), "an unrelated argument started the test")
-	await process_frame
-	_expect(_built == 0 and _count_runners() == 0, "no argument still added a runner")
 
-	_expect(bool(menu.call("_start_four_bot_test", PackedStringArray(["--four-bot"]))), "--four-bot did not start the test")
-	await process_frame
-	_expect(_count_runners() == 1, "--four-bot added %d runners, expected 1" % _count_runners())
-
-	# The menu entered again, or the argument handled twice in a frame: still one.
-	menu.call("_start_four_bot_test", PackedStringArray(["--four-bot"]))
-	menu.call("_start_four_bot_test", PackedStringArray(["--four-bot"]))
-	await process_frame
-	_expect(_count_runners() == 1, "a repeated start left %d runners, expected 1" % _count_runners())
-
-	# The warning path: no runner can be made (the script is not in the build).
-	root.get_node(RUNNER_NODE).free()
-	menu.set("runner_factory", Callable(self, "_make_nothing"))
-	_expect(not bool(menu.call("_start_four_bot_test", PackedStringArray(["--four-bot"]))), "a missing runner reported success")
-	await process_frame
-	_expect(_count_runners() == 0, "a missing runner still added a node")
-
-	# The stress run and the projectile timings start the same way, each under its own
-	# name, and an argument of one never starts another.
-	menu.set("runner_factory", Callable(self, "_make_stub"))
-	var stress: PackedStringArray = PackedStringArray(["--stress"])
-	var timing: PackedStringArray = PackedStringArray(["--projectile-timing"])
-	_expect(not bool(menu.call("_start_stress_test", timing)), "--projectile-timing started the stress run")
-	_expect(not bool(menu.call("_start_timing_test", stress)), "--stress started the timings")
-	_expect(bool(menu.call("_start_stress_test", stress)), "--stress did not start the run")
-	_expect(bool(menu.call("_start_timing_test", timing)), "--projectile-timing did not start the timings")
-	menu.call("_start_stress_test", stress)
-	await process_frame
-	_expect(root.has_node("StressRunner") and root.has_node("ProjectileTimingRunner"), "a benchmark runner is missing from the root")
-	_expect(_count_named("StressRunner") == 1 and _count_named("ProjectileTimingRunner") == 1, "a repeated start left a second benchmark runner")
-	_expect(root.get_node("StressRunner").get_class() == "Node", "the stub was not used for the stress run")
-	root.get_node("StressRunner").free()
-	root.get_node("ProjectileTimingRunner").free()
-	for constant in ["STRESS_RUNNER", "TIMING_RUNNER", "STORM_RUNNER", "REPLAY_HASHES_RUNNER", "ONLINE_RUNNER"]:
-		_expect(ResourceLoader.exists(String(menu.get(constant))), "%s does not exist" % constant)
-	_expect(menu.call("_make_runner", "Nothing") == null, "an unknown runner name made a node")
-	# Each literal path in the menu is its constant (the real runners are not made here).
-	for pair in [["StressRunner", "STRESS_RUNNER"], ["ProjectileTimingRunner", "TIMING_RUNNER"], ["SandboxStormRunner", "STORM_RUNNER"], ["ReplayHashesRunner", "REPLAY_HASHES_RUNNER"], ["OnlineRunner", "ONLINE_RUNNER"], [RUNNER_NODE, "FOUR_BOT_RUNNER"]]:
-		var script: GDScript = menu.call("_runner_script", pair[0]) as GDScript
-		_expect(script != null and script.resource_path == String(menu.get(pair[1])), "%s does not load %s" % [pair[0], pair[1]])
-
-	# One real runner through the real path, freed before it enters the tree (it starts its
-	# work only once added), so a typo in a `load` literal fails here.
-	var real: Node = menu.call("_make_runner", "ProjectileTimingRunner") as Node
-	_expect(real != null, "the real timing runner was not made")
-	if real != null:
-		real.free()
-
-	# `_ready` is the only caller of the command line lookup, which merges the user
-	# arguments (after "--") with the plain ones (the web page `args`). The test run
-	# has the script path and no `--four-bot`, so the merge must hold the former only.
-	var merged: PackedStringArray = menu.call("_cmdline_arguments") as PackedStringArray
-	var expected: int = OS.get_cmdline_user_args().size() + OS.get_cmdline_args().size()
-	_expect(merged.size() == expected, "the command line lookup lost arguments")
-	_expect(not menu.get("FOUR_BOT_ARGUMENT") in merged, "the test run saw --four-bot")
-
-	# The constant names a file that exists in this build, and the stub-free path loads it.
-	_expect(ResourceLoader.exists(String(menu.get("FOUR_BOT_RUNNER"))), "FOUR_BOT_RUNNER does not exist")
-	menu.free()
-	if _failures.is_empty():
-		print("TEST OK: hud/menus main menu 4-bot hook")
-		quit(0)
-	else:
-		for failure in _failures:
-			printerr("TEST FAILED: " + failure)
-		quit(1)
+func after_each() -> void:
+	for node_name in RUNNER_NAMES:
+		var runner: Node = root.get_node_or_null(NodePath(node_name))
+		if runner != null:
+			runner.free()
 
 
 func _make_stub() -> Node:
@@ -104,8 +47,8 @@ func _make_nothing() -> Node:
 	return null
 
 
-func _count_runners() -> int:
-	return _count_named(RUNNER_NODE)
+func _start(method: StringName, args: PackedStringArray) -> bool:
+	return bool(_menu.call(method, args))
 
 
 func _count_named(node_name: String) -> int:
@@ -116,6 +59,97 @@ func _count_named(node_name: String) -> int:
 	return count
 
 
-func _expect(condition: bool, message: String) -> void:
-	if not condition:
-		_failures.append(message)
+func test_entering_the_menu_without_the_argument_adds_no_runner() -> void:
+	check_equal(_built, 0, "no runner was made")
+	check_equal(_count_named(RUNNER_NODE), 0, "no runner on the root")
+
+
+func test_no_arguments_start_no_runner() -> void:
+	check(not _start(&"_start_four_bot_test", PackedStringArray()), "no arguments started the test")
+	await process_frame
+	check(_built == 0 and _count_named(RUNNER_NODE) == 0, "no argument still added a runner")
+
+
+func test_an_unrelated_argument_starts_no_runner() -> void:
+	check(not _start(&"_start_four_bot_test", PackedStringArray(["--other", "four-bot"])), "an unrelated argument started the test")
+	await process_frame
+	check(_built == 0 and _count_named(RUNNER_NODE) == 0, "an unrelated argument still added a runner")
+
+
+func test_four_bot_adds_one_runner_to_the_root() -> void:
+	check(_start(&"_start_four_bot_test", FOUR_BOT), "--four-bot did not start the test")
+	await process_frame
+	check_equal(_count_named(RUNNER_NODE), 1, "--four-bot adds one runner")
+
+
+func test_a_repeated_four_bot_start_leaves_one_runner() -> void:
+	# The menu entered again, or the argument handled twice in a frame: still one.
+	_start(&"_start_four_bot_test", FOUR_BOT)
+	await process_frame
+	_start(&"_start_four_bot_test", FOUR_BOT)
+	_start(&"_start_four_bot_test", FOUR_BOT)
+	await process_frame
+	check_equal(_count_named(RUNNER_NODE), 1, "a repeated start leaves one runner")
+
+
+func test_a_build_without_the_runner_ignores_the_argument() -> void:
+	# The warning path: no runner can be made (the script is not in the build).
+	_menu.set("runner_factory", _make_nothing)
+	check(not _start(&"_start_four_bot_test", FOUR_BOT), "a missing runner reported success")
+	await process_frame
+	check_equal(_count_named(RUNNER_NODE), 0, "a missing runner still added a node")
+
+
+func test_an_argument_of_one_benchmark_never_starts_another() -> void:
+	check(not _start(&"_start_stress_test", TIMING), "--projectile-timing started the stress run")
+	check(not _start(&"_start_timing_test", STRESS), "--stress started the timings")
+
+
+func test_each_benchmark_argument_adds_its_runner_under_its_own_name() -> void:
+	check(_start(&"_start_stress_test", STRESS), "--stress did not start the run")
+	check(_start(&"_start_timing_test", TIMING), "--projectile-timing did not start the timings")
+	await process_frame
+	check(root.has_node("StressRunner"), "the stress runner is on the root")
+	check(root.has_node("ProjectileTimingRunner"), "the timing runner is on the root")
+	check(root.has_node("StressRunner") and root.get_node("StressRunner").get_class() == "Node", "the stub was used for the stress run")
+
+
+func test_a_repeated_benchmark_start_leaves_one_runner() -> void:
+	_start(&"_start_stress_test", STRESS)
+	_start(&"_start_stress_test", STRESS)
+	await process_frame
+	check_equal(_count_named("StressRunner"), 1, "a repeated start leaves one stress runner")
+
+
+func test_every_runner_constant_names_a_file_in_the_build() -> void:
+	for constant: String in ["FOUR_BOT_RUNNER", "STRESS_RUNNER", "TIMING_RUNNER", "STORM_RUNNER", "REPLAY_HASHES_RUNNER", "ONLINE_RUNNER"]:
+		check(ResourceLoader.exists(String(_menu.get(constant))), "%s does not exist" % constant)
+
+
+func test_an_unknown_runner_name_makes_nothing() -> void:
+	check(_menu.call("_make_runner", "Nothing") == null, "an unknown runner name made a node")
+
+
+func test_each_runner_loads_the_file_its_constant_names() -> void:
+	# Each literal path in the menu is its constant (the real runners are not made here).
+	for pair: Array in [["StressRunner", "STRESS_RUNNER"], ["ProjectileTimingRunner", "TIMING_RUNNER"], ["SandboxStormRunner", "STORM_RUNNER"], ["ReplayHashesRunner", "REPLAY_HASHES_RUNNER"], ["OnlineRunner", "ONLINE_RUNNER"], [RUNNER_NODE, "FOUR_BOT_RUNNER"]]:
+		var script: GDScript = _menu.call("_runner_script", pair[0]) as GDScript
+		check(script != null and script.resource_path == String(_menu.get(pair[1])), "%s does not load %s" % [pair[0], pair[1]])
+
+
+func test_a_real_runner_is_made_through_the_real_path() -> void:
+	# Freed before it enters the tree (it starts its work only once added), so a typo in a `load`
+	# literal fails here.
+	var real: Node = _menu.call("_make_runner", "ProjectileTimingRunner") as Node
+	check(real != null, "the real timing runner was not made")
+	if real != null:
+		real.free()
+
+
+func test_the_command_line_lookup_holds_the_user_and_the_plain_arguments() -> void:
+	# `_ready` is the only caller of the lookup, which merges the user arguments (after "--") with
+	# the plain ones (the web page `args`). The test run has no `--four-bot`, so the merge must not
+	# hold one.
+	var merged: PackedStringArray = _menu.call("_cmdline_arguments") as PackedStringArray
+	check_equal(merged.size(), OS.get_cmdline_user_args().size() + OS.get_cmdline_args().size(), "the lookup holds every argument")
+	check(not _menu.get("FOUR_BOT_ARGUMENT") in merged, "the test run saw --four-bot")

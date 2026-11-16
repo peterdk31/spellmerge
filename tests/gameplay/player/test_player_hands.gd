@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## a gap between its staffs. The staffs it holds cast from their own buttons; an empty hand casts
 ## nothing, holds no mana, is never put on show and refuses the builder; the panel hears an empty
 ## plan for it; a snapshot keeps it. The real spell runtime and registry, the real wizard scene.
-##
-## godot --headless --path . --script res://tests/gameplay/player/test_player_hands.gd
-
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 
 ## RB empty, RT a staff, LB empty, LT a staff: a gap at the start and between.

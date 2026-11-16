@@ -9,9 +9,6 @@ extends "res://tests/support/suite.gd"
 ## aim at other teams only, and `on hurt` fires on the hurt actor's `actor_hurt`. A four-player
 ## staff (wizards at ids 0-3) is unchanged. A real projectile manager and event bus, stepped by
 ## hand, with cards built in code and a stand-in registry.
-##
-## godot --headless --path . --script res://tests/core/test_spells_actors.gd
-
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")

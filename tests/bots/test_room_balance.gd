@@ -13,8 +13,6 @@ extends SceneTree
 ## run to run and a gate on it could break the daily build. The time is the game's (each frame's
 ## delta), so a busy machine takes longer, not fewer game seconds.
 ## The numbers are in docs/LOG.md.
-##
-## godot --headless --path . --script res://tests/bots/test_room_balance.gd
 
 const BotScript := preload("res://tests/bots/bot.gd")
 

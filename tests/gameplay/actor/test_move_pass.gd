@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## SpellLimits.PASS_REACH), `bigger` and the body's spell scale widen it, and a dash stopped by a
 ## wall head on strikes no more there once its move is over. Real actors (a Hurtbox each) and the
 ## real dash card, moved against the walls as the game moves them.
-##
-## godot --headless --path . --script res://tests/gameplay/actor/test_move_pass.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 

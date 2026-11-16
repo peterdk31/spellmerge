@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## Feel gave its flash, hold and sound (the same actor, attacker and kind, with no physics frame
 ## and no Feel step between) does not do them again; its spray and shake still come. Any of
 ## those differing, the hit is a hit of its own.
-##
-## godot --headless --path . --script res://tests/gameplay/feel/test_feel_repeat_hits.gd
-
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")

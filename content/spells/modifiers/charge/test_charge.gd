@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The Charge card (content/spells/modifiers/charge/, cast timing T7; docs/milestones/
 ## cast-timing.md): the next carrier winds up two seconds longer, then hits four times as hard.
 ## Its wind-up is a cost, never an effect, so on a carrier that hits nothing it is wasted.
-##
-## godot --headless --path . --script res://content/spells/modifiers/charge/test_charge.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

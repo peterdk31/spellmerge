@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## change (`drive`, `release`) moves the team and the seat in the table; the step reads the
 ## controller's intent (no controller: the body stands and keeps its aim); an enemy's data goes to
 ## its components; Health used up kills it (unless it can be downed); a step makes no objects.
-##
-## godot --headless --path . --script res://tests/gameplay/actor/test_actor.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")

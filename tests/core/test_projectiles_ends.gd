@@ -2,9 +2,6 @@ extends "res://tests/support/suite.gd"
 ## Tests for what core/projectiles gives the spell runtime (M2 part 6): the `shot_ended`
 ## signal for every way a shot can end, `remove_by_tag`, each event's `shot` and the per-slot
 ## readers, and `exclude`. The manager is stepped by hand.
-##
-## godot --headless --path . --script res://tests/core/test_projectiles_ends.gd
-
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

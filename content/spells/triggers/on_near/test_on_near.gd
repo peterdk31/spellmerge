@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## from the carrier, toward that foe, and again after the payload's wind-up while one is still
 ## near. A proximity fuse on a bolt, a mine on a rune. Its combos are in its folder's combos/
 ## (test_combos.gd plays them).
-##
-## godot --headless --path . --script res://content/spells/triggers/on_near/test_on_near.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 

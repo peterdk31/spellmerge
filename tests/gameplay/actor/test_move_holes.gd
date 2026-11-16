@@ -6,9 +6,6 @@ extends "res://tests/support/suite.gd"
 ## the room's bounds over a hole. The step is slid in two parts (`Actor.move`), so a body is never
 ## walked into a hole while it is pushed. Falling is HR-H2's: here a body over a hole stays there.
 ## Real actors (a Mover each, the default footprint's 6 px circle), moved as the game moves them.
-##
-## godot --headless --path . --script res://tests/gameplay/actor/test_move_holes.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")

@@ -3,9 +3,6 @@ extends "res://tests/support/suite.gd"
 ## bumps into and no hit lands on, dark until the hub's rules light it (`HubRules.LIT` as every wizard
 ## stands on it, `HubRules.UNLIT` as one steps off); lit, its runes glow, give off glimmers and light,
 ## and the stone's cue plays.
-##
-## godot --headless --path . --script res://content/props/hub_stone/test_hub_stone.gd
-
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const STONE: PropBase = preload("res://content/props/hub_stone/hub_stone.tres")
 

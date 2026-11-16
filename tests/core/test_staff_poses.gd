@@ -4,9 +4,6 @@ extends "res://tests/support/suite.gd"
 ## every channel, the strike ending with the carrier's last shot, a new cast starting from where
 ## the staff is, and the aim it turns from. Every real carrier has one. Cards are made in code and
 ## played in the combo arena with the real runtime.
-##
-## godot --headless --path . --script res://tests/core/test_staff_poses.gd
-
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 var arena: ArenaScript

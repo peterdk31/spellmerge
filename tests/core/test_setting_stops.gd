@@ -2,10 +2,6 @@ extends "res://tests/support/suite.gd"
 ## The stepped settings' one helper (`SettingStops`, core/settings; docs/milestones/
 ## spell-spectacle-2.md, S1): the stop nearest a value, the lower one on a tie, for the "Particles",
 ## "Particle amount" and "Max shots" settings alike.
-##
-## godot --headless --path . --script res://tests/core/test_setting_stops.gd
-
-
 func test_the_nearest_stop_and_the_lower_on_a_tie() -> void:
 	var stops: Array[int] = [0, 10, 20]
 	check_equal(SettingStops.nearest(stops, -5.0), 0, "below the first")

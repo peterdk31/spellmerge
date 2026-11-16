@@ -7,9 +7,6 @@ extends "res://tests/support/suite.gd"
 ## share and what RT would change, and one layout for every quarter (bars, card info, the corner
 ## panel hidden while it is open). The wizards are real (the real registry and spell
 ## runtime, the 20-slot dev staff), so every request is answered as in the game.
-##
-## godot --headless --path . --script res://tests/hud/test_radial_builder.gd
-
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -691,17 +688,17 @@ func test_the_marked_card_is_marked_in_the_tree_and_a_tile_marks_its_slot() -> v
 	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit on_expire bolt fire atom frost atom"), _world.body_key(0))
 	_tap(0, &"extra")
 	_frame()
-	var tree: TreeViewScript = radial.tree_view()
+	var view: TreeViewScript = radial.tree_view()
 	radial.mark_slot(4)
 	_frame()
-	check_equal(Array(tree.marked_rows()), [1], "the fire atom's row is marked for the atom")
+	check_equal(Array(view.marked_rows()), [1], "the fire atom's row is marked for the atom")
 	radial.mark_slot(1)
 	_frame()
-	check_equal(Array(tree.marked_rows()), [2], "on expire's own row for its trigger card")
-	var at: Vector2 = tree.tile_center(6)
+	check_equal(Array(view.marked_rows()), [2], "on expire's own row for its trigger card")
+	var at: Vector2 = view.tile_center(6)
 	check(at.x >= 0.0, "the last atom has a tile")
-	check_equal(tree.slot_at(at), 6, "the tile under a point is found, as P1's click finds it")
-	check_equal(tree.slot_at(tree.position - Vector2(5.0, 5.0)), -1, "outside the tree is no tile")
+	check_equal(view.slot_at(at), 6, "the tile under a point is found, as P1's click finds it")
+	check_equal(view.slot_at(view.position - Vector2(5.0, 5.0)), -1, "outside the tree is no tile")
 
 
 func test_rt_puts_nothing_in_from_the_tree() -> void:
@@ -728,23 +725,23 @@ func test_a_tall_tree_scrolls_and_follows_the_marker() -> void:
 	_bus.staff_cards_requested.emit(0, 1, many, _world.body_key(0))
 	_tap(0, &"extra")
 	_frame()
-	var tree: TreeViewScript = radial.tree_view()
-	check_equal(tree.rows().size(), 20, "a cast a bolt")
-	check(tree.max_scroll() > 0.0, "taller than its space")
+	var view: TreeViewScript = radial.tree_view()
+	check_equal(view.rows().size(), 20, "a cast a bolt")
+	check(view.max_scroll() > 0.0, "taller than its space")
 	radial.mark_slot(0)
 	_frame()
-	check_equal(tree.scroll(), 0.0, "the first row shows at the top")
+	check_equal(view.scroll(), 0.0, "the first row shows at the top")
 	_input.send_virtual_aim(0, Vector2.DOWN)
 	for _i in 4:
 		_frame()
-	check(tree.scroll() > 0.0, "the right stick scrolls down: %s" % tree.scroll())
+	check(view.scroll() > 0.0, "the right stick scrolls down: %s" % view.scroll())
 	_input.send_virtual_aim(0, Vector2.ZERO)
 	_frame()
-	tree.wheel(-100)
-	check_equal(tree.scroll(), 0.0, "the wheel scrolls back up, no further than the top")
+	view.wheel(-100)
+	check_equal(view.scroll(), 0.0, "the wheel scrolls back up, no further than the top")
 	radial.mark_slot(19)
 	_frame()
-	check(is_equal_approx(tree.scroll(), tree.max_scroll()), "the marker on the last bolt scrolls its row into view")
+	check(is_equal_approx(view.scroll(), view.max_scroll()), "the marker on the last bolt scrolls its row into view")
 
 
 func test_the_replay_steps_through_the_rows_and_loops() -> void:
@@ -753,10 +750,10 @@ func test_the_replay_steps_through_the_rows_and_loops() -> void:
 	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit bolt atom"), _world.body_key(0))
 	_tap(0, &"extra")
 	_frame()
-	var tree: TreeViewScript = radial.tree_view()
-	check_equal(tree.rows().size(), 2, "the bolt and its on hit")
-	var seen: Array[int] = [tree.replay_row()]
+	var view: TreeViewScript = radial.tree_view()
+	check_equal(view.rows().size(), 2, "the bolt and its on hit")
+	var seen: Array[int] = [view.replay_row()]
 	for _beat in 3:
-		tree.step(TreeViewScript.TREE_BEAT, 0.0)
-		seen.append(tree.replay_row())
+		view.step(TreeViewScript.TREE_BEAT, 0.0)
+		seen.append(view.replay_row())
 	check_equal(seen, [0, 1, 0, 1], "a row a beat, round and round")

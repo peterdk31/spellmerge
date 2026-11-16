@@ -16,10 +16,15 @@ its art, in `art/grounds/<room>/` (art lives under art/; a room's folder holds i
   is a `Sprite2D` of it named `Floor` (the room instances it under that name, so everything that
   reads a room's `Floor` sprite reads it), at `RoomBase.FLOOR_Z`.
 - `<room>_ground_under.png`: the rock face under every edge that faces down, hanging into the
-  void (a sprite on the walls' body, so a hit on the edge sheds its colours).
+  void (a sprite on the walls' body where the void is wall, so a hit on the edge sheds its colours;
+  on the root where it is a hole, which no shot hits).
 - `<room>_ground_glow.png`: the edges' glow, at half size, added over what lies below it.
-- the walls, as rectangles of whole 8 px cells on the wall layer: a cell is wall when the pixel
-  at its middle is clear in the floor art, so the art and the walls never disagree;
+- the walls and the holes, as rectangles of whole 8 px cells: a cell is open (not ground) when the
+  pixel at its middle is clear in the floor art, so the art and the grid never disagree. An open
+  cell in a crack is a hole (`Holes`, on the hole layer: a body may dash, be pushed or teleport over
+  it, and falls in; docs/milestones/hub-rework.md, "Holes"); an open cell outside the outlines is
+  the shape's `void`: `"hole"` (an island in the void, the hub: the same void as in the cracks) or
+  `"wall"` (the default: a floor's edge inside walls, on the wall layer, `Walls`);
 - the edges' motes: a hidden closed `Line2D` round every outline (`Rim`, `Rim2`, ...) and an open
   one under each run of rock face (`Drip1`, ...), each a `MoteSource` of the edge style's kinds;
   a rim's colours run in bands along it (`MoteSource.band_length`), the same bands the edge's seam
@@ -52,7 +57,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 # Bump when what the generator draws changes, so every room's `--check` asks for a new run.
-VERSION = 1
+VERSION = 2
 PALETTE = ROOT / "core/base/palette.gd"
 EDGES = ROOT / "content/edges"
 GROUNDS = ROOT / "content/grounds"
@@ -62,8 +67,9 @@ CELL = 8
 # cover's z, so it is drawn by tree order among them, before them: it is the room's).
 FLOOR_Z = -2
 GLOW_Z = -1
-# `RoomBase.WALL_LAYER`.
+# `RoomBase.WALL_LAYER` and `RoomBase.HOLE_LAYER`.
 WALL_LAYER = 1
+HOLE_LAYER = 2
 # The most bytes a file may be (AGENTS.md, hard rule 3: 1 MB an image).
 MOST_BYTES = 1024 * 1024
 
@@ -470,7 +476,7 @@ class Drawing:
         self._draw_edges()
         self._draw_under()
         self.glow_w, self.glow_h, self.glow = self._draw_glow()
-        self.walls = self._wall_rects()
+        self.walls, self.holes = self._grid_rects()
 
     def _drop_slivers(self) -> None:
         """Clear every piece of ground that holds no open cell (no cell whose middle is ground): a
@@ -822,11 +828,31 @@ class Drawing:
             image[q * 4 + 3] = round(a * 255)
         return gw, gh, image
 
-    def _wall_rects(self) -> list[tuple[int, int, int, int]]:
-        """The walls: every cell whose middle pixel is not solid, merged into rectangles (runs along
-        a row, then runs of the same span down the rows), as (x, y, w, h) in pixels."""
+    def _grid_rects(self) -> tuple[list[tuple[int, int, int, int]], list[tuple[int, int, int, int]]]:
+        """The walls and the holes: every cell whose middle pixel is not solid is open; an open cell
+        in a crack, or any open cell where the shape's `void` is `"hole"`, is a hole, the rest walls.
+        Each merged into rectangles (`_merge`)."""
         cols, rows = self.w // CELL, self.h // CELL
-        wall = [[not self.solid[(r * CELL + CELL // 2) * self.w + c * CELL + CELL // 2] for c in range(cols)] for r in range(rows)]
+        void_holes = self.ground.shape.get("void", "wall") == "hole"
+        walls = [[False] * cols for _ in range(rows)]
+        holes = [[False] * cols for _ in range(rows)]
+        for r in range(rows):
+            for c in range(cols):
+                middle = (r * CELL + CELL // 2) * self.w + c * CELL + CELL // 2
+                if self.solid[middle]:
+                    continue
+                if void_holes or self.ground.crack[middle] > 0.0:
+                    holes[r][c] = True
+                else:
+                    walls[r][c] = True
+        return self._merge(walls), self._merge(holes)
+
+    @staticmethod
+    def _merge(wall: list[list[bool]]) -> list[tuple[int, int, int, int]]:
+        """The cells marked in `wall` merged into rectangles (runs along a row, then runs of the same
+        span down the rows), as (x, y, w, h) in pixels."""
+        rows = len(wall)
+        cols = len(wall[0]) if rows else 0
         open_runs: dict[tuple[int, int], list[int]] = {}
         rects: list[tuple[int, int, int, int]] = []
         for r in range(rows + 1):
@@ -945,7 +971,7 @@ def scene_text(drawing: Drawing, outs: dict[str, Path], digest: str) -> str:
     rim = style["rim"]
     drip = style["drip"]
     colours = ", ".join(f'&"{c}"' for c in style["seam"]["colours"])
-    sizes = sorted({(w, h) for _, _, w, h in drawing.walls})
+    sizes = sorted({(w, h) for _, _, w, h in drawing.walls + drawing.holes})
     shape_ids = {size: f"Box_{size[0]}x{size[1]}" for size in sizes}
     lines = [f"[gd_scene load_steps={5 + len(drawing.rims) + len(drawing.drips) + len(sizes)} format=3]", ""]
     lines.append(f'[ext_resource type="Texture2D" path="{res_path(outs["floor"])}" id="1_floor"]')
@@ -970,11 +996,19 @@ def scene_text(drawing: Drawing, outs: dict[str, Path], digest: str) -> str:
               "centered = false", f'metadata/ground_inputs = "{digest}"', ""]
     lines += ['[node name="Glow" type="Sprite2D" parent="."]', 'material = SubResource("GlowAdd")', "z_as_relative = false",
               f"z_index = {GLOW_Z}", "texture_filter = 2", "scale = Vector2(2, 2)", 'texture = ExtResource("3_glow")', "centered = false", ""]
-    lines += ['[node name="Walls" type="StaticBody2D" parent="."]', f"collision_layer = {WALL_LAYER}", "collision_mask = 0", ""]
-    lines += ['[node name="Underside" type="Sprite2D" parent="Walls"]', "z_as_relative = false", f"z_index = {FLOOR_Z}",
+    if drawing.walls:
+        lines += ['[node name="Walls" type="StaticBody2D" parent="."]', f"collision_layer = {WALL_LAYER}", "collision_mask = 0", ""]
+    # The rock face hangs into the void: on the walls' body where the void is wall (a hit sheds it).
+    under_parent = "Walls" if drawing.ground.shape.get("void", "wall") != "hole" and drawing.walls else "."
+    lines += [f'[node name="Underside" type="Sprite2D" parent="{under_parent}"]', "z_as_relative = false", f"z_index = {FLOOR_Z}",
               "texture_filter = 1", 'texture = ExtResource("2_under")', "centered = false", ""]
     for i, (x, y, w, h) in enumerate(drawing.walls):
         lines += [f'[node name="W{i + 1}" type="CollisionShape2D" parent="Walls"]', f"position = Vector2({_num(x + w / 2)}, {_num(y + h / 2)})",
+                  f'shape = SubResource("{shape_ids[(w, h)]}")', ""]
+    if drawing.holes:
+        lines += ['[node name="Holes" type="StaticBody2D" parent="."]', f"collision_layer = {HOLE_LAYER}", "collision_mask = 0", ""]
+    for i, (x, y, w, h) in enumerate(drawing.holes):
+        lines += [f'[node name="H{i + 1}" type="CollisionShape2D" parent="Holes"]', f"position = Vector2({_num(x + w / 2)}, {_num(y + h / 2)})",
                   f'shape = SubResource("{shape_ids[(w, h)]}")', ""]
     for i, points in enumerate(drawing.rims):
         name = "Rim" if i == 0 else f"Rim{i + 1}"

@@ -1,6 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The hub room (content/rooms/hub, docs/milestones/online-lobby.md, L1): a large island floating
-## in the void (its ground drawn from a shape: hub rework HR2), the void round it all wall, the teleporter stone in the middle, three dummies
+## in the void (its ground drawn from a shape: hub rework HR2), the void round it and its cracks all
+## holes (HR-H2: a body falls in; a fall there costs nothing), the teleporter stone in the middle, three dummies
 ## together off to one side and the multiplayer altar, both props (props W8: content/props/hub_stone,
 ## hub_altar), and the prop yard, all placed in its scene (props W8a: `RoomPlaces`). No scripts;
 ## the stone's art lies on the stone in both its states; nothing starts on the stone or in a wall;
@@ -24,6 +25,14 @@ func _room() -> RoomBase:
 	return RoomData as RoomBase
 
 
+## The void's rectangles: the room's holes (the void round the island and its cracks, HR-H2) and any
+## walls (none: the island has no wall).
+func _void_rects() -> Array[Rect2]:
+	var found: Array[Rect2] = RoomScan.wall_rects(room_root)
+	found.append_array(RoomPlaces.hole_rects(room_root))
+	return found
+
+
 ## A body standing at `point`.
 func _body(point: Vector2) -> Rect2:
 	return Rect2(point - Vector2.ONE * BODY_RADIUS, Vector2.ONE * BODY_RADIUS * 2.0)
@@ -37,6 +46,7 @@ func test_resource_is_the_hub_where_a_fall_costs_nothing() -> void:
 	check_equal(room.places().placed_at_of(EnemyBase).size(), 3, "three dummies")
 	check(room.places().enemy_spawns.is_empty(), "no enemy spawns: no fight there")
 	check(room.stand_up_after > 0.0, "a downed wizard stands up by itself in the hub")
+	check(room.falls_free, "a fall into a hole costs nothing in the hub (HR-H2)")
 	check(HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).has_area(), "it has a teleporter stone")
 	for dummy: EnemyBase in room.places().placed_of(EnemyBase):
 		check_equal(dummy.id, &"training_dummy", "a training dummy")
@@ -111,7 +121,7 @@ func test_the_prop_yard_is_open_floor() -> void:
 	var yard: Rect2 = room.places().zone(FlowScript.ZONE_PROP_YARD)
 	check(yard.has_area(), "the hub has a prop yard")
 	check(yard.size.x >= 256.0 and yard.size.y >= 96.0, "room for a row of props and to try spells: %s" % yard)
-	for wall: Rect2 in RoomScan.wall_rects(room_root):
+	for wall: Rect2 in _void_rects():
 		check(not wall.intersects(yard), "clear of the wall %s" % wall)
 	check(not yard.intersects(HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).grow(32.0)), "clear of the stone")
 	check(not yard.intersects(HubRules.area_of(room.places(), HubRules.ROLE_PARTY_ALTAR).grow(32.0)), "clear of the altar")
@@ -134,7 +144,7 @@ func test_the_lecterns_place_is_open_floor() -> void:
 	var feet: Vector2 = zone.get_center().floor()
 	var taken: Rect2 = lectern.extent().merge(lectern.area_rect())
 	taken.position += feet
-	for wall: Rect2 in RoomScan.wall_rects(room_root):
+	for wall: Rect2 in _void_rects():
 		check(not wall.intersects(taken), "clear of the wall %s" % wall)
 	check(not taken.intersects(HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).grow(16.0)), "clear of the stone")
 	check(not taken.intersects(HubRules.area_of(room.places(), HubRules.ROLE_PARTY_ALTAR).grow(16.0)), "clear of the altar")
@@ -174,7 +184,7 @@ func _wall_cells(walls: Array[Rect2]) -> Dictionary:
 	return cells
 
 
-func test_the_room_is_large_and_the_void_round_the_island_is_wall() -> void:
+func test_the_room_is_large_and_the_void_round_the_island_is_holes() -> void:
 	var size: Vector2 = RoomPlaces.read(room_root).size
 	check(size.x >= 1280.0 and size.y >= 800.0, "a large room: %s" % size)
 	var floor_sprite := room_root.get_node_or_null("Floor") as Sprite2D
@@ -184,15 +194,19 @@ func test_the_room_is_large_and_the_void_round_the_island_is_wall() -> void:
 	check_equal(floor_sprite.z_index, RoomBase.FLOOR_Z, "its floor under the marks")
 	check_equal(floor_sprite.texture.get_size(), size, "the ground's art is the whole room")
 	var image: Image = _floor_image()
-	var cells: Dictionary = _wall_cells(RoomScan.wall_rects(room_root))
-	# Every 8-pixel cell of the room is floor or wall, never both, never neither: no way off the island.
+	check_equal(RoomScan.wall_rects(room_root).size(), 0, "no wall: the void is holes, the same void as in the cracks (question 9)")
+	var walls: Dictionary = _wall_cells(RoomScan.wall_rects(room_root))
+	var holes: Dictionary = _wall_cells(RoomPlaces.hole_rects(room_root))
+	check(holes.size() > 1000, "the void and the cracks are holes (%d cells)" % holes.size())
+	# Every 8-pixel cell of the room is floor, wall or hole, exactly one: the way off the island is a fall.
 	var bad: int = 0
 	for cy in int(size.y / 8.0):
 		for cx in int(size.x / 8.0):
-			var on_floor: bool = _ground_at(image, Vector2(cx * 8 + 4, cy * 8 + 4))
-			if on_floor == cells.has(Vector2i(cx, cy)):
+			var cell := Vector2i(cx, cy)
+			var kinds: int = (1 if _ground_at(image, Vector2(cx * 8 + 4, cy * 8 + 4)) else 0) + (1 if walls.has(cell) else 0) + (1 if holes.has(cell) else 0)
+			if kinds != 1:
 				bad += 1
-	check_equal(bad, 0, "cells that are both floor and wall, or neither")
+	check_equal(bad, 0, "cells that are not exactly one of floor, wall or hole")
 
 
 func test_a_rooms_size_follows_nested_walls() -> void:
@@ -215,7 +229,7 @@ func test_a_rooms_size_follows_nested_walls() -> void:
 
 
 func test_nothing_starts_in_a_wall_or_on_the_stone() -> void:
-	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
+	var walls: Array[Rect2] = _void_rects()
 	var stone: Rect2 = HubRules.area_of(_room().places(), HubRules.ROLE_RUN_START)
 	for point: Vector2 in _room().places().player_spawns:
 		check(not stone.intersects(_body(point)), "player spawn %s is off the stone, so a joiner puts it out" % point)
@@ -288,7 +302,7 @@ func test_the_altar_stands_on_the_island() -> void:
 	var area: Rect2 = _layer_rect(altar.look_of(altar.states.list[0].state_id).layers[0], _prop_at(&"hub_altar"))
 	check(not area.intersects(HubRules.area_of(_room().places(), HubRules.ROLE_RUN_START)), "the altar is not the stone")
 	check_equal(area, HubRules.area_of(_room().places(), HubRules.ROLE_PARTY_ALTAR), "the altar's art covers the altar (where A opens the room)")
-	for wall: Rect2 in RoomScan.wall_rects(room_root):
+	for wall: Rect2 in _void_rects():
 		check(not wall.intersects(area), "the altar is clear of the wall %s" % wall)
 
 
@@ -298,7 +312,7 @@ func test_the_altar_stands_on_the_island() -> void:
 func test_joiners_arrive_beside_the_altar() -> void:
 	var room: RoomBase = _room()
 	check_equal(room.places().joiner_spawns.size(), 4, "one for each seat")
-	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
+	var walls: Array[Rect2] = _void_rects()
 	for i in room.places().joiner_spawns.size():
 		var point: Vector2 = room.places().joiner_spawns[i]
 		check(not HubRules.area_of(room.places(), HubRules.ROLE_PARTY_ALTAR).intersects(_body(point)), "joiner spawn %s is off the altar" % point)

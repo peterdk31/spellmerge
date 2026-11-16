@@ -6,7 +6,11 @@ extends RefCounted
 ## walls and every live solid shot (a Wall card's, whoever cast it): the same grid shots stop on,
 ## so "clear" means a shot along the line would get through. A walk also asks of the ground of the
 ## bodies that cannot move (a pillar's footprint; boss plan OB14, decision 36: `walk_clear`), so
-## the ways round (`detour`, `cover`) go round a blocking prop as round a wall. Static, nothing
+## the ways round (`detour`, `cover`) go round a blocking prop as round a wall. Two checks are kept
+## apart (hub rework HR-H2, docs/milestones/hub-rework.md, "Holes" 6): **walking** sees a room's
+## holes as it sees a prop's ground (`walk_clear`, `detour`, the run-up), so an AI walks round a
+## crack; **the line of fire and cover** do not (`line_clear`, `ground_clear`, `shot_clear`, and
+## `cover`'s wall), so it shoots across a crack and never hides behind one. Static, nothing
 ## allocated per call.
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -41,9 +45,21 @@ static func ground_clear(projectiles: ProjectilesScript, from: Vector2, to: Vect
 	return projectiles == null or projectiles.ground_clear(from, to)
 
 
-## True when a body could walk from `from` to `to` in a line: no wall (room or spell) and no ground
-## of a body that cannot move on it.
+## True when a body could walk from `from` to `to` in a line: no wall (room or spell), no ground
+## of a body that cannot move and no hole (HR-H2) on it.
 static func walk_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector2) -> bool:
+	return projectiles == null or (projectiles.line_clear(from, to) and projectiles.walk_clear(from, to))
+
+
+## True when a walk's feet from `from` to `to` meet no ground of a body that cannot move and no hole
+## (HR-H2), walls aside: `ground_clear` for walking.
+static func feet_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector2) -> bool:
+	return projectiles == null or projectiles.walk_clear(from, to)
+
+
+## True when nothing a shot would stop at lies from `from` to `to`: no wall and no blocking body's
+## ground; a hole is no cover (HR-H2). What `cover` looks for between an end and the threat.
+static func shot_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector2) -> bool:
 	return projectiles == null or (projectiles.line_clear(from, to) and projectiles.ground_clear(from, to))
 
 
@@ -74,7 +90,7 @@ static func run_up_spot(projectiles: ProjectilesScript, from: Vector2, target: V
 		if back <= radius:
 			continue
 		var spot: Vector2 = target + way * back
-		if projectiles.circle_blocked(spot, radius):
+		if projectiles.circle_blocked(spot, radius, true):
 			continue
 		var run: float = minf(back + run_along(projectiles, target, -way, reach, radius), reach)
 		var walk: float = from.distance_to(spot)
@@ -122,7 +138,7 @@ static func cover(projectiles: ProjectilesScript, from: Vector2, threat: Vector2
 	var best_distance: float = -1.0
 	for way: Vector2 in DIRECTIONS:
 		var end: Vector2 = from + way * probe
-		if not walk_clear(projectiles, from, end) or walk_clear(projectiles, end, threat):
+		if not walk_clear(projectiles, from, end) or shot_clear(projectiles, end, threat):
 			continue
 		var distance: float = end.distance_squared_to(threat)
 		if distance > best_distance:

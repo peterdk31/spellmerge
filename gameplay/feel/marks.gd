@@ -24,8 +24,9 @@ extends Node2D
 ## floor's are the room's own art (`set_floor_colors`, from `RoomBase.floor_colors`), a spell's the
 ## shot's own ramp, picked in the shader as the motes pick theirs (`Motes.spell_source`).
 ##
-## **Off the walls:** the stamp shader is clipped by the walls (`floor_mask`, one texel a wall
-## cell of the projectile manager's grid, `set_walls`), built once a room.
+## **Off the walls:** the stamp shader is clipped by the walls and the holes (`floor_mask`, one texel a
+## wall cell of the projectile manager's grid, `set_walls`, and its holes, hub rework HR-H2: no mark
+## over a hole), built once a room.
 ##
 ## **Settled motes** (P2b): a mote of a kind that settles (`MoteKind.settles`) is handed over when
 ## it is thrown, with where and when it comes to rest (`settle`, from `Motes.mote_land`). It waits

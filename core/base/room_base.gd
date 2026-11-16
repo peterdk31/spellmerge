@@ -25,6 +25,9 @@ extends Resource
 ## but a fall costs nothing; owner, 2026-11-13). Below 0 (the default): never by itself, only by a
 ## teammate's revive or the restart. In such a room everyone down starts no restart.
 @export var stand_up_after: float = -1.0
+## True where a fall into a hole costs a wizard nothing (hub rework HR-H2, question 10: the hub);
+## elsewhere it costs `HoleRules.FALL_COST` of its most health (Combat, as the room is entered).
+@export var falls_free: bool = false
 ## The colours of what its walls shed when struck (Feel's surface motes: chips), lightest first:
 ## light, base, shadow. Empty (the default): sampled from the room's own art (`surface_colors`),
 ## so new tiles change the chips with no edit here; set it only when the sample looks wrong.

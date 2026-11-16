@@ -617,6 +617,8 @@ const TINT_STRENGTH: float = 0.45
 ## Wall grid cell size in pixels. Walls are rounded out to whole cells, so they are
 ## exact when their edges are multiples of it (room tiles are 32 px).
 const WALL_CELL: float = 8.0
+## How many rings of cells `nearest_ground` looks out (12 cells: 96 px).
+const NEAREST_GROUND_RINGS: int = 12
 ## A room wall's mark in the wall grid; the bits below it count the solid shots on a cell.
 const ROOM_CELL: int = 128
 ## Spatial grid cell size in pixels.
@@ -1907,11 +1909,12 @@ func bounds() -> Rect2:
 ## The room's walls as an image (FORMAT_L8), one pixel a WALL_CELL square from the corner of
 ## `bounds()`: white for a room wall, black for open (solid shots are left out). Made each call,
 ## for what is built once a room (Feel's floor marks).
-func wall_image() -> Image:
+## With `holes`, a hole is white too (hub rework HR-H2: Feel lays no floor mark over a hole).
+func wall_image(holes: bool = false) -> Image:
 	var bytes := PackedByteArray()
 	bytes.resize(_wall_w * _wall_h)
 	for i in mini(bytes.size(), _wall_cells.size()):
-		bytes[i] = 255 if (_wall_cells[i] & ROOM_CELL) != 0 else 0
+		bytes[i] = 255 if (_wall_cells[i] & ROOM_CELL) != 0 or (holes and _has_holes and _hole_cells[i] != 0) else 0
 	return Image.create_from_data(_wall_w, _wall_h, false, Image.FORMAT_L8, bytes)
 
 
@@ -2008,15 +2011,31 @@ func _add_hole(rect: Rect2) -> void:
 			_has_holes = true
 
 
+## Make every cell of the grid whose middle lies outside `room` a hole, in a room with holes (hub
+## rework HR-H2, docs/milestones/hub-rework.md, question 9: outside the room is the void, so a long
+## dash off the edge falls). Nothing in a room with no holes. Flow calls it after laying the room's
+## holes; the margin round the room the bounds keep for shots is the void too.
+func set_holes_outside(room: Rect2) -> void:
+	if not _has_holes:
+		return
+	for cy in _wall_h:
+		for cx in _wall_w:
+			var middle: Vector2 = _bounds.position + (Vector2(cx, cy) + Vector2(0.5, 0.5)) * WALL_CELL
+			if not room.has_point(middle):
+				_hole_cells[cy * _wall_w + cx] = 1
+				_walk_cells[cy * _wall_w + cx] = 1
+
+
 ## True when the room has a hole (`set_holes`) at `point` that no wall covers (a wall over a hole
-## wins: a Wall card's stones over a crack are a wall while they stand). Outside the grid: false.
+## wins: a Wall card's stones over a crack are a wall while they stand). Outside the grid: a hole in
+## a room with holes (question 9: the void goes on), none in a room with none.
 func is_hole(point: Vector2) -> bool:
 	if not _has_holes:
 		return false
 	var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
 	var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
 	if cx < 0 or cx >= _wall_w or cy < 0 or cy >= _wall_h:
-		return false
+		return true
 	var cell: int = cy * _wall_w + cx
 	return _hole_cells[cell] != 0 and _wall_cells[cell] == 0
 
@@ -2234,21 +2253,64 @@ func clear_run(from: Vector2, way: Vector2, most: float) -> float:
 
 ## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell or
 ## the ground of a body that cannot move (checked at the centre and eight points on its rim, each
-## in its 8-pixel cell): where a body could not stand (a teleport checks the body with it).
-func circle_blocked(center: Vector2, radius: float) -> bool:
+## in its 8-pixel cell): where a body could not stand (a teleport checks the body with it). With
+## `holes` a hole cell blocks too (hub rework HR-H2: where a body could not stand without falling, the
+## AI's run-up, an item laid; a teleport's back-off never minds holes).
+func circle_blocked(center: Vector2, radius: float, holes: bool = false) -> bool:
+	var with_holes: bool = holes and _has_holes
+	var ground: PackedByteArray = _walk_cells if with_holes else _ground_cells
 	for n in 9:
 		var point: Vector2 = center
 		if n > 0:
 			point += DMath.from_angle(float(n - 1) * TAU / 8.0) * radius
 		if not _bounds.has_point(point):
 			return true
-		if not _has_walls and _footprints_laid == 0:
+		if not _has_walls and _footprints_laid == 0 and not with_holes:
 			continue
 		var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
 		var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
-		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and (_wall_cells[cy * _wall_w + cx] != 0 or _ground_cells[cy * _wall_w + cx] != 0):
+		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and (_wall_cells[cy * _wall_w + cx] != 0 or ground[cy * _wall_w + cx] != 0):
 			return true
 	return false
+
+
+## The nearest place to `point` where a circle of `radius` stands on the ground (hub rework HR-H2):
+## `point` itself when the circle is clear there (`circle_blocked` with holes on), else the middle of
+## the nearest cell, ring by ring of cells out to NEAREST_GROUND_RINGS, the first clear one in a
+## fixed order (the same on every machine); past them, the nearest clear cell of the whole grid (a
+## body far over the void); `point` when there is none. What is put back on the ground
+## asks it: the boss its jump left over a hole, an add's spot on a ring, an item dropped over one, a
+## body back from a fall with no ground of its own yet.
+func nearest_ground(point: Vector2, radius: float) -> Vector2:
+	if not circle_blocked(point, radius, true):
+		return point
+	var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
+	var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
+	for ring in range(1, NEAREST_GROUND_RINGS + 1):
+		var best: Vector2 = Vector2.INF
+		var best_distance: float = INF
+		for dy in range(-ring, ring + 1):
+			for dx in range(-ring, ring + 1):
+				if maxi(absi(dx), absi(dy)) != ring:
+					continue
+				var middle: Vector2 = _bounds.position + (Vector2(cx + dx, cy + dy) + Vector2(0.5, 0.5)) * WALL_CELL
+				var distance: float = middle.distance_squared_to(point)
+				if distance < best_distance and not circle_blocked(middle, radius, true):
+					best_distance = distance
+					best = middle
+		if best != Vector2.INF:
+			return best
+	# Nothing near (a body far over the void): the nearest clear cell of the whole grid.
+	var far: Vector2 = point
+	var far_distance: float = INF
+	for y in _wall_h:
+		for x in _wall_w:
+			var middle: Vector2 = _bounds.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * WALL_CELL
+			var distance: float = middle.distance_squared_to(point)
+			if distance < far_distance and not circle_blocked(middle, radius, true):
+				far_distance = distance
+				far = middle
+	return far
 
 
 ## Where a body (a circle of `radius` at `from`) ends when it moves by `motion`, sliding along the

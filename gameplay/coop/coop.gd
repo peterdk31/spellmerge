@@ -223,7 +223,7 @@ func _nearest_reviver(body: Node2D) -> int:
 		if other == body or not is_instance_valid(other) or not other.is_inside_tree():
 			continue
 		var teammate: DownedScript = _downs[at]
-		if teammate == null or teammate.is_down():
+		if teammate == null or not teammate.stands():
 			continue
 		var distance: float = other.global_position.distance_to(body.global_position)
 		if distance <= best_distance:

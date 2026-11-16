@@ -66,7 +66,7 @@ var sim: Sim = null
 var layout: CoverLayout = null
 ## Its kinds' moves as tables (`cover_moves.gd`), worked out with it.
 var _moves: CoverMoves = null
-## True when a kind of the layout gives a status at rest (cobwebs), so a room all at rest still has
+## True when a kind with cells in the room gives a status at rest (cobwebs), so a room all at rest still has
 ## bodies to look at; false, a step with no cell out of rest and nobody harmed looks at none.
 var _rest_harms: bool = false
 ## Kinds given instead of the registry's (`use_kinds`: tests, before the game has cover of its own).
@@ -199,9 +199,10 @@ func _on_room_built(room_id: StringName, layout_root: Node) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	layout = CoverLayout.of(layout_root, room, kinds())
 	_moves = CoverMoves.of(layout.kinds)
+	# Only a kind with a cell in this room counts (the layout holds every kind given, whatever its biome).
 	_rest_harms = false
 	for kind in layout.kinds:
-		if kind.states[0].status != &"":
+		if not kind.states.is_empty() and kind.states[0] != null and kind.states[0].status != &"" and layout.count(kind.id) > 0:
 			_rest_harms = true
 	if _state.is_empty():
 		_size_at_rest()

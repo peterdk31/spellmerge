@@ -15,6 +15,10 @@ extends RefCounted
 ##
 ## A kind is its index in the layout's `kinds` (a cell's `CoverLayout.cells` value less one); an
 ## element its index in `elements`.
+##
+## The cover area's two hot loops (`cover.gd`'s `_apply_touches` and `_step_cells`) read the tables
+## directly, with `moved_to`'s index and `after`'s scan written out there: change the layout or the
+## rules here and change them there (tests/gameplay/cover/test_cover.gd plays them).
 
 ## Every element a trigger or a spread of the kinds names, in the order first met.
 var elements: Array[StringName] = []

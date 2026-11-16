@@ -163,6 +163,14 @@ static func _held(biome: StringName) -> CoverKind:
 
 
 func _run() -> void:
+	# A throwaway pass first, so the first scene measured is not the cold one.
+	_cover.use_kinds([] as Array[CoverKind])
+	_feel.cover().use_kinds([] as Array[CoverKind])
+	if await _start():
+		_stand()
+		for i in ticks:
+			_one_tick()
+		_clear()
 	for scene in scenes:
 		var kinds: Array[CoverKind] = []
 		if scene == "rest" or scene == "front":
@@ -313,7 +321,7 @@ func _catch() -> void:
 	for cell in _cover.active_cells():
 		look.call(&"show_state", cell, BURNING)
 	var told: int = Time.get_ticks_usec() - start
-	print("BENCH: cover burning: the tick it all catches %.3f ms (%d cells lit; Feel's tufts told in it %.3f ms of it), the frame after %.3f ms" % [float(took[0]) / 1000.0, _cover.active_cells().size(), float(told) / 1000.0, float(took[1]) / 1000.0])
+	print("BENCH: cover burning: the tick it all catches %.3f ms (%d cells lit; Feel's tufts told, a second pass after it as an estimate of its share, %.3f ms), the frame after %.3f ms" % [float(took[0]) / 1000.0, _cover.active_cells().size(), float(told) / 1000.0, float(took[1]) / 1000.0])
 
 
 ## A fire lit at the middle cell, spreading by the run's chance until it burns out or FRONT_TICKS.
@@ -352,7 +360,8 @@ func _front() -> void:
 	var walk := StateWalk.new()
 	walk.with_paths = false
 	# The area's hash after the front: the same on two checkouts that burn the same (seed SEED).
-	print("BENCH: cover front: %d ticks until it burnt out, at most %d cells burning (tick %d), %d of %d cells not at rest after, %d rolls, the Cover area's hash %d" % [ran, most_burning, most_at, burnt, layout.count(), _cover.rolls(), SimHash.area(walk, "Cover", _cover)])
+	var ended: String = "it burnt out" if ran < FRONT_TICKS else "the cap, still burning"
+	print("BENCH: cover front: %d ticks (%s), at most %d cells burning (tick %d), %d of %d cells not at rest after, %d rolls, the Cover area's hash %d" % [ran, ended, most_burning, most_at, burnt, layout.count(), _cover.rolls(), SimHash.area(walk, "Cover", _cover)])
 	_print_times("front", "tick", tick_times)
 	_print_times("front", "frame (Feel's step)", frame_times)
 	if most_burning < 2:

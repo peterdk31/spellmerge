@@ -458,3 +458,22 @@ func test_cover_harmful_at_rest_harms_with_nothing_burning() -> void:
 	_steps(1)
 	check(_cover.active_cells().is_empty(), "put out: every cell at rest")
 	check(_cover.harmed().is_empty(), "and the body dropped")
+
+
+func test_only_cover_in_the_room_counts_as_harmful_at_rest() -> void:
+	# Regression (GC6 review): the layout holds every kind given, whatever its biome or field, so a
+	# kind harmful at rest with no cell in the room (cobwebs elsewhere) must not keep the bodies'
+	# step looking every tick.
+	var webs := GRASS.duplicate(true) as CoverKind
+	webs.id = &"z_webs"
+	webs.biomes = [] as Array[StringName]
+	webs.states[0].status = &"chill"
+	_cover.free()
+	_cover = _make_cover(7, [GRASS, webs])
+	check_equal(_cover.layout.count(webs.id), 0, "the webs have no cell here")
+	check(not _cover.get(&"_rest_harms"), "so nothing here harms at rest")
+	var here := GRASS.duplicate(true) as CoverKind
+	here.states[0].status = &"chill"
+	_cover.free()
+	_cover = _make_cover(7, [here])
+	check(_cover.get(&"_rest_harms"), "cover in the room harmful at rest counts")

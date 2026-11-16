@@ -24,6 +24,13 @@ extends Resource
 ## one line of at most `StoryValidator.MAX_LORE_CHARS` characters, checked with the other words of the
 ## game (`Registry.validate_story`). A boss has one; a stray may leave it empty.
 @export var lore: String = ""
+## Its music while it lives (boss plan OB15, `MusicTrack`; null: the room's plays on): it overrides
+## the room's (`RoomBase.music`), and its phases raise its intensity (`EnemyPhase.intensity`). A
+## sub-resource of its data, so the music comes with the boss (decision 17).
+@export var music: MusicTrack = null
+## The sound its death plays in place of its death cue's (`enemy_death`, `boss_death`; empty: the
+## cue's own), so a boss splinters as only it does while the cue stays everyone's.
+@export var death_sound: StringName = &""
 
 ## The body's scale (1: as drawn); a boss is bigger.
 @export var size: float = 1.0
@@ -105,6 +112,8 @@ func problems() -> PackedStringArray:
 	if stats != null:
 		for line: String in stats.problems():
 			found.append("%s: stats: %s" % [id, line])
+	if music != null:
+		found.append_array(music.problems(String(id)))
 	if not is_finite(health_per_player) or health_per_player < 0.0:
 		found.append("%s: its health_per_player is %s; 0 or more." % [id, health_per_player])
 	if cost < 1:

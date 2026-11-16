@@ -24,6 +24,17 @@ extends Resource
 ## barrel's fuse), in place of its carrier card's `wind_cue`; empty: the card's (a tree's slam staff
 ## winds up with the slam's).
 @export var wind_cue: StringName = &""
+## Cues of this staff's own moments (boss plan OB15; `CueBase`, content/cues; empty: none), each
+## played besides what its cards show, so a boss's Sweep sounds as only it does while the dash card
+## stays everyone's: `cast_cue` as a cast of it leaves (`cast_left`: from where the caster holds it,
+## along its aim), `move_cue` as each move of it sets off (`carrier_shown` of a carrier that runs its
+## caster along, `CarrierTraits.MOVES_ALONG`: a dash, a payload's dash too; its `held` parts last
+## until that move ends, `carrier_ended`, as a `stream` part does) and `wall_cue` where a
+## move of it is stopped by a wall (`caster_move_finished` walled, boss plan OB12). Feel plays them
+## (drawn only).
+@export var cast_cue: StringName = &""
+@export var move_cue: StringName = &""
+@export var wall_cue: StringName = &""
 ## Seconds the staff waits after the last cast of its cycle, after that cast's wind-down, before
 ## it starts over (docs/milestones/cast-timing.md).
 @export var cooldown: float = 0.5

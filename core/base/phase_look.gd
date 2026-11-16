@@ -21,3 +21,10 @@ extends Resource
 ## sparks), from the part named `motes_on` (empty: the body's `Sprite`); null keeps the last.
 @export var motes: MoteSource = null
 @export var motes_on: StringName = &""
+## A sound held while this phase lasts (boss plan OB15: the burning bristles' loop), looping from
+## the body as it goes, until the next phase or the body is gone (Feel; empty: none, and the last
+## phase's ends).
+@export var sound: StringName = &""
+## The cue played from the body as this phase starts (boss plan OB15: the broom's ignition; Feel,
+## drawn only; empty: none).
+@export var cue: StringName = &""

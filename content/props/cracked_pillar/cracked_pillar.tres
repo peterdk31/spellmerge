@@ -36,6 +36,7 @@ motes = Array[ExtResource("7")]([SubResource("cracked_0_motes_0")])
 [sub_resource type="Resource" id="cracked_look"]
 script = ExtResource("5")
 state_id = &"cracked"
+cue = &"pillar_crack"
 layers = Array[ExtResource("4")]([SubResource("cracked_layer_0")])
 
 [sub_resource type="Resource" id="rubble_0_motes_0"]
@@ -58,6 +59,7 @@ motes = Array[ExtResource("7")]([SubResource("rubble_0_motes_0")])
 [sub_resource type="Resource" id="rubble_look"]
 script = ExtResource("5")
 state_id = &"rubble"
+cue = &"pillar_break"
 layers = Array[ExtResource("4")]([SubResource("rubble_layer_0")])
 
 [resource]

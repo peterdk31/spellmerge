@@ -13,6 +13,10 @@ Shared sound used by more than one thing: music (`music/`) and sound effects (`s
 - Names are original. No ripped game audio, no samples of other works.
 - Audio is CC-BY-SA-4.0 by default. A file may instead declare CC0-1.0 or CC-BY-4.0 with a `<file>.license` file (AGENTS.md, hard rules).
 
+## Sound ids
+
+A sound's id is its file's name (`zap` for `audio/sfx/zap.ogg`; the registry finds it anywhere under `audio/`). Cues (`content/cues`: a cue's `sound`, a `held` part's), enemy data (`death_sound`, its phases' held `sound`) and music tracks (`MusicTrack.layers`, as a room's or an enemy's `music`) name them; an id with no file is silent, so the game names its sounds before they are made (boss plan OB15). A held sound loops while its moment lasts (the player restarts it), and a music track's layers start together, so make the layers of one track the same length. The Old Broom fight's ids are the boss plan's sound sheet (docs/milestones/boss-old-broom.md, "Sound").
+
 ## Allowed files
 
 `.ogg` audio, plus Godot's `.import` files, `.license` files and the manifest. Limits: **5 MB per `.ogg`**, 1 MB for anything else.

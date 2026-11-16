@@ -9,6 +9,9 @@ extends "res://tests/support/suite.gd"
 ## both heads, and an impatient tap standing. Its Big Sweep (boss plan OB14): a long Sweep it runs up
 ## to a wall's foot for, about every 20 s, not its first move but phase 2's; phase 1 locks its aim as
 ## its wind-up starts, phase 2 for its last 0.25 s, and both turn to the player swept longest ago.
+## Its sounds (boss plan OB15): every sound id of the plan's sound sheet named in its cue or data,
+## its wind-ups' scrapes held with their lanes, its swish held while it sweeps, its burning held for
+## phase 2, and its music two stacked layers, phase 2 one step up.
 ##
 ## This test is the broom's own: deleting its folder deletes it (decision 28).
 ##
@@ -289,3 +292,53 @@ func test_its_own_face_and_drawn_poses() -> void:
 	check_equal(drawn, [1, 2, 3, 4], "drawn frames for the wind-up, the wall hit, the swat and the phase change")
 	check(head.tap > 0.0, "it taps the floor standing")
 	fx.free_all()
+
+
+## The sound sheet (boss plan OB15, "Sound"): each moment's cue or data names its sound id. Silent
+## until the audio pass adds the files.
+func test_its_sounds() -> void:
+	var registry: Node = root.get_node("Registry")
+	var sweep: StaffBase = BROOM.staffs[0].staff
+	var swat: StaffBase = BROOM.staffs[2].staff
+	var big: StaffBase = BROOM.staffs[3].staff
+	var double: StaffBase = BROOM.phases[0].staffs[0].staff
+	var cues: Dictionary = {}
+	for id: StringName in [sweep.wind_cue, big.wind_cue, sweep.move_cue, sweep.wall_cue, swat.cast_cue, BROOM.phases[0].look.cue]:
+		var cue: CueBase = registry.get_resource(&"cues", id) as CueBase
+		check(cue != null, "its cue %s exists in content/cues" % id)
+		if cue != null:
+			check_equal(cue.problems(), PackedStringArray(), "%s is sound" % id)
+			cues[id] = cue
+	check_equal(_held_of(cues.get(sweep.wind_cue)), &"broom_scrape", "the Sweep winds up with a held scrape")
+	check_equal(_held_of(cues.get(big.wind_cue)), &"broom_big_scrape", "the Big Sweep with its own, louder one")
+	check(float(_part_of(cues.get(big.wind_cue), &"held").get("volume", 0.0)) > float(_part_of(cues.get(sweep.wind_cue), &"held").get("volume", 0.0)), "known without looking: louder")
+	for id: StringName in [sweep.wind_cue, big.wind_cue]:
+		check(not _part_of(cues.get(id), &"lane").is_empty(), "%s keeps the telegraph's lane" % id)
+	for staff: StaffBase in [sweep, big, double]:
+		check_equal(staff.move_cue, sweep.move_cue, "%s swishes as it sweeps" % staff.display_name)
+		check_equal(staff.wall_cue, sweep.wall_cue, "%s crunches into a wall" % staff.display_name)
+	check_equal(double.wind_cue, sweep.wind_cue, "the double Sweep scrapes as the Sweep does")
+	check_equal(_held_of(cues.get(sweep.move_cue)), &"broom_swish", "the swish is held while it moves")
+	check_equal((cues.get(sweep.wall_cue) as CueBase).sound, &"broom_crunch", "the wall hit's crunch")
+	check_equal((cues.get(swat.cast_cue) as CueBase).sound, &"broom_swat", "the swat")
+	check_equal((cues.get(BROOM.phases[0].look.cue) as CueBase).sound, &"broom_ignite", "the phase change's ignition")
+	check_equal(BROOM.phases[0].look.sound, &"broom_burning", "the bristles burn, held through phase 2")
+	check_equal(BROOM.death_sound, &"broom_splinter", "it dies splintering, in place of the boss death's own")
+	var layers: Array[StringName] = [&"boss_broom", &"boss_broom_fire"]
+	check(BROOM.music != null and BROOM.music.layers == layers, "its music: its track and a fiercer layer")
+	check(BROOM.music != null and BROOM.music.stacked, "stacked: phase 2 adds the second over the first")
+	check_equal(BROOM.phases[0].intensity, 0, "phase 2 is one step up")
+	for prop: StringName in [&"cracked_pillar", &"dust_heap"]:
+		check(registry.get_resource(&"props", prop) != null, "the arena's %s is there" % prop)
+
+
+static func _part_of(cue: Variant, type: StringName) -> Dictionary:
+	if cue is CueBase:
+		for part: Dictionary in (cue as CueBase).parts:
+			if StringName(part.get("part", "flash")) == type:
+				return part
+	return {}
+
+
+static func _held_of(cue: Variant) -> StringName:
+	return StringName(_part_of(cue, &"held").get("sound", ""))

@@ -87,7 +87,10 @@ func test_a_blast_touches_with_its_radius_once() -> void:
 func test_a_pool_touches_as_it_lies_and_on_each_tick() -> void:
 	_cast([&"fire", &"pool"])
 	_world.run(1)
-	check_equal(_touched.size(), 1, "as it lies")
+	check_equal(_touched.size(), 0, "not while it is in the air")
+	# The fixture's step is a sixteenth of a second: it lands after POOL_LAND.
+	_world.run(int(ceil(SpellLimits.POOL_LAND / Fixture.STEP)) + 1)
+	check_equal(_touched.size(), 1, "as it lands")
 	var at: Vector2 = _touched[0][2]
 	# The fixture's step is a sixteenth of a second: the pool's half-second tick is 8 of them.
 	_world.run(int(ceil(SpellLimits.POOL_TICK / Fixture.STEP)) + 1)
@@ -117,7 +120,7 @@ func test_a_returning_pulse_touches_once_where_it_turns_home() -> void:
 
 func test_a_pools_end_touches_where_it_lay() -> void:
 	_cast([&"fire", &"pool"])
-	_world.run(1)
+	_world.run(int(ceil(SpellLimits.POOL_LAND / Fixture.STEP)) + 1)
 	var at: Vector2 = _touched[0][2]
 	_world.run(200)
 	check(_world.spells.carrier(&"pool").call(&"pool_count") == 0, "it ran out")

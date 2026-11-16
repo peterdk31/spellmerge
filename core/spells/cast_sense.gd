@@ -20,7 +20,7 @@ var reach: float = 0.0
 ## How near the target must be for a cast that is not aimed to touch it (a nova's ring, an orbit,
 ## a swing or slam's length); for an aimed cast its `reach`.
 var close_reach: float = 0.0
-## The hit width of its first carrier (pixels).
+## The hit width of its first carrier either side of its aim (pixels; `Carrier.lane_radius`: a spray's cone is wider).
 var radius: float = 0.0
 ## What the whole cast may deal: every carrier's hit times its shots, times the group's repeats;
 ## 0 when it hurts nobody.
@@ -131,7 +131,7 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	if ways > 1 or spell.has_trait(CarrierTraits.AOE):
 		spell_reach = 0.0
 	if first:
-		radius = spell.radius
+		radius = carrier.lane_radius(spell)
 		speed = spell.speed if spell_reach > 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES) else 0.0
 	reach = maxf(reach, spell_reach)
 	lasts = maxf(lasts, spell.lifetime)
@@ -157,7 +157,7 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		opens = true
 	if spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0:
 		sustained = true
-	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.LINE):
+	if carrier.ai_holds():
 		repeats_held = true
 	var ring: bool = spell.has_trait(CarrierTraits.AOE) or falls or circles or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.OUTWARD)
 	if ring:

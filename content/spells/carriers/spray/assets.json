@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/spray/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (a character grid, icon.grid.json, made into SVG rects by tools/pixel_grid.py)",
+			"prompt": "A 16x16 icon for the Spray card: a wooden staff from the bottom left with its tip at the middle, a widening cone of Ice-shaded droplets spraying out of the tip to the top right, a 1 px outline round the staff. Palette colours from docs/STYLE.md."
+		}
+	]
+}

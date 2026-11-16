@@ -114,14 +114,37 @@ func test_without_homing_it_rings_its_caster_aimed_in() -> void:
 
 
 ## The ring turns (owner, 2026-11-06: "rotate continuously"): casts in a row stand where it has
-## turned to, SpellLimits.PENTA_TURN a second, not at a new random angle; the same on every run.
+## turned to, SpellLimits.PENTA_TURN a second, and a step on (SpellLimits.RING_STEP of the gap
+## between two copies: owner, 2026-11-16), not at a new random angle; the same on every run.
 func test_casts_in_a_row_stand_where_the_ring_has_turned_to() -> void:
 	var first: Array[float] = _ring_turns()
 	check_equal(first.size(), 2, "two casts")
 	var gap: float = fposmod(first[1] - first[0], TAU / 5.0)
-	var want: float = fposmod(SpellLimits.PENTA_TURN * 1.5, TAU / 5.0)
-	check(absf(gap - want) < 0.02, "the second stands 1.5 s of turning on (%s, want %s)" % [gap, want])
+	var want: float = fposmod(SpellLimits.PENTA_TURN * 1.5 + SpellLimits.RING_STEP * TAU / 5.0, TAU / 5.0)
+	check(absf(gap - want) < 0.02, "the second stands 1.5 s of turning and a step on (%s, want %s)" % [gap, want])
 	check_equal(_ring_turns(), first, "and the same casts stand the same")
+
+
+## A steady rhythm of casts (owner, 2026-11-16: "I also think Penta should do this"): each cast
+## turns back what the last turned, so without the step every other cast stood on the same points.
+## Four casts the same time apart stand on four sets of points.
+func test_a_steady_rhythm_of_casts_never_stands_the_same() -> void:
+	_arena = ArenaScript.new(root)
+	_arena.install_cards(0, 0, ["penta", "bolt"])
+	var turns: Array[float] = []
+	for n in 4:
+		var before: Array[int] = _shots()
+		check(_arena.cast(0, 0), "cast %d" % n)
+		var least: float = TAU
+		for slot in _shots():
+			if not before.has(slot):
+				least = minf(least, fposmod(_arena.projectiles.get_position_of(slot).angle(), TAU / 5.0))
+		turns.append(least)
+		_arena.run(1.0)
+	for n in turns.size():
+		for m in n:
+			var apart: float = fposmod(turns[n] - turns[m], TAU / 5.0)
+			check(minf(apart, TAU / 5.0 - apart) > 0.05, "cast %d stands apart from cast %d (%s, %s)" % [n, m, turns[n], turns[m]])
 
 
 ## Where the ring of each of two casts 1.5 s apart stood: the least angle of its bolts, within a

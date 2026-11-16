@@ -45,6 +45,7 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 | `dust` | none (named by the `dash_start` cue) | kicked up off the floor where a dash leaves, in the room's colours; drifts and settles | a pixel |
 | `ash` | none (named by the `fireball` cue) | drifts up, sways and settles slowly, light at first and cooling grey, in the colours of what burned | a pixel, or two on a slant |
 | `glob` | none (named by the `pool_throw` cue) | a blob of liquid thrown in an arc, no drag, landing as its life ends (where the pool it was thrown at splashes in), in the spell's colours | a 2x2 or 2-pixel blob turning with its flight, or a pixel |
+| `drain` | none (named by the `siphon_drain` cue) | mana pulled back into a staff: no drag, rising a little (so it never lands), a slight sway, glowing, reaching the staff tip as its life ends, in the colour its cue gives | a streak along its flight that shortens over its life (`##o`, `#o`, `o`) |
 | `tail` | none (`tail`, A) | a shot's tail as single pixels, as the tail shader drew it: a thin line that cools where the shot was | a pixel |
 | `tail_streak` | none (`tail`, B, the default) | a shot's tail as short streaks along its way, overlapping into one line | a line along its way that shortens over its life (`###`, `##`, `#`) |
 | `tail_long` | none (`tail`, C) | a longer, smoky tail: lives twice as long, drifts up and sways | a pixel |

@@ -150,6 +150,9 @@ const PIERCE_ALL: int = 1 << 30
 const RAY_CARD: StringName = &"beam"
 ## The look of a zap and its sparks (Feel draws lightning for it).
 const ZAP_CARD: StringName = &"zap"
+## The look of a siphon's mana coming back (`carrier_shown` names the Siphon card, whose `cue`
+## Feel plays): from the hit to the caster's staff tip.
+const SIPHON_CARD: StringName = &"siphon"
 ## Bodies a zap shot remembers rolling for (`_rec_zapped`), and the won zaps it can keep waiting
 ## (`_rec_due_body`; past that it makes the zap at once).
 const ZAP_MEMORY: int = 32
@@ -3140,6 +3143,7 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
 	if refund > 0.0:
 		_refund(actor, SpellTag.staff_of(tag), refund)
+		_show_siphon(spell, actor, position)
 	var possess: float = spell.behaviour(ModifierBase.Behaviour.POSSESS)
 	if possess > 0.0:
 		_possess(actor, target, possess, tag)
@@ -3803,6 +3807,20 @@ func _next_carrier(actor: int, staff: int, mana: float = INF) -> CompiledSpell:
 func _refund(actor: int, staff: int, amount: float) -> void:
 	if events != null and actor >= 0 and actor < ACTORS:
 		events.mana_refund_requested.emit(actor, staff, amount)
+
+
+## Siphon's look (the owner, 2026-11-16: the jet run backwards): the mana a hit at `at` gives back
+## streams from there into the actor `actor`'s staff tip (its aim's origin, else its anchor), told
+## as `carrier_shown` of SIPHON_CARD, along the way and as far: for looks only.
+func _show_siphon(spell: CompiledSpell, actor: int, at: Vector2) -> void:
+	if events == null or actor < 0 or actor >= ACTORS or not at.is_finite():
+		return
+	var tip: Vector2 = aim_origin_of(actor)
+	if not tip.is_finite() and projectiles != null:
+		tip = projectiles.get_anchor(actor)
+	if not tip.is_finite() or at.distance_squared_to(tip) < 1.0:
+		return
+	events.carrier_shown.emit(actor, SIPHON_CARD, at, at.direction_to(tip), at.distance_to(tip), spell.tint, spell.look)
 
 
 ## The node of the actor `body`'s body (null for -1, an actor with none, or no table).

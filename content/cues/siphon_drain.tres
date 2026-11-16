@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"siphon_drain"
+parts = Array[Dictionary]([{"part": &"motes", "kind": &"drain", "count": 24, "for": 0.25, "reach": 1.0, "spread": 8.0, "way": &"aim", "color": Color(0.949, 0.761, 0.188, 1)}, {"part": &"motes", "kind": &"spell", "count": 6, "for": 0.2, "reach": 0.5, "spread": 20.0, "way": &"aim"}])
+every = 0.04

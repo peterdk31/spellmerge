@@ -779,7 +779,7 @@
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "good",
+      "tier": "placeholder",
       "tool": "Claude (tools/pixel_grid.py from title.grid.json, 2026-11-16; the glyphs drawn on a 5x8 grid, doubled with Scale2x, made heavy by a one-pixel smear and worn by up to two nicks each)",
       "prompt": "The title type (docs/milestones/boss-intro.md, rule 7): an original bitmap face for boss names, every printable ASCII character on a 12x16 cell, 16 a row in six rows, heavy and a little worn, in Bone light, drawn at 2x. Imported as an image font (font_data_image)."
     }

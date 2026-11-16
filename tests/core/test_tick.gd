@@ -479,3 +479,25 @@ func test_every_simulation_autoload_joins_the_tick_and_starts_each_run_fresh_or_
 	check(state.has(String(TickScript.ACTORS)), "the actor table is part of the state hash")
 	for name: StringName in TickScript.RUN_ORDER:
 		check(autoloads.has(name), "Tick.RUN_ORDER lists %s, which is no autoload (renamed?)" % name)
+
+
+## A benchmark times each step (`profile_steps`, with a clock of its own: the Tick reads none, and
+## none at all until asked): one sum a step, in the order and under the names of `step_names`.
+func test_a_profile_times_each_step_with_the_clock_it_is_handed() -> void:
+	_body("a")
+	_tick.run(TickScript.DT)
+	check(_tick.step_profile.is_empty(), "nothing is timed unless a benchmark asks")
+	check_equal(_tick.step_names(), PackedStringArray(["Projectiles.Projectiles", "Spells.Spells", "Combat.Combat", "Entities.Entities", "bodies", "Flow.Flow", "Coop.Coop"]), "the steps' names in their order")
+	# A clock that goes on 10 us each time it is read: every step takes 10 us.
+	var now: Array[int] = [0]
+	_tick.profile_steps(func() -> int:
+		now[0] += 10
+		return now[0])
+	for i in 3:
+		_tick.run(TickScript.DT)
+	check_equal(_tick.step_profile, PackedInt64Array([30, 30, 30, 30, 30, 30, 30]), "each step's sum over three ticks")
+	# A step added since starts the sums again, so none names the wrong step.
+	_join("Items").steps(&"Items", _stand_in("Items").step).fresh_because("a stand-in")
+	_tick.run(TickScript.DT)
+	check_equal(_tick.step_profile.size(), 8, "a sum for the step added")
+	check_equal(_tick.step_profile[0], 10, "the sums started again")

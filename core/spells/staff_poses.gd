@@ -5,6 +5,11 @@ extends RefCounted
 ## strike short when the carrier's last shot ends, and `staff_pose` and the other getters (read
 ## through `Spells.poses`) give the body's look where the staff is now.
 
+## Not state: memos of what the state says (the pose worked out last, `_pose_out*`, and which
+## animations are over, `_pose_ended`), cleared wherever the state they follow is written and after a
+## restore (`rebuild_derived`).
+const DERIVED: Array[StringName] = [&"_pose_out", &"_pose_out_mood", &"_pose_out_actor", &"_pose_out_clock", &"_pose_ended"]
+
 ## actor -> its body's last staff animation (`staff_pose`): when it began (INF for none), the
 ## carrier's wind-up and strike in seconds (its strike ends early when its last shot does: the tag
 ## it plays for), the aim locked at the cast, which way it turns (a swing's side), its keys
@@ -42,6 +47,11 @@ var _pose_out: PackedFloat32Array = PackedFloat32Array()
 var _pose_out_mood: int = 0
 var _pose_out_actor: int = -1
 var _pose_out_clock: float = -1.0
+## 1 once the animation that began at `_pose_start` is past its last key (`_pose_now`). It stays
+## over as the clock goes on, so it is not worked out again: a body that cast once is asked for its
+## pose by its looks every step, and each answer walked the keys. Cleared when a new one starts or
+## its strike is cut, and after a snapshot (the clock may be earlier).
+var _pose_ended: PackedByteArray = PackedByteArray()
 ## Numbers a pose has: CarrierCard.POSE_CHANNELS (turn, lift, push, glow, stretch, shake, land, hammer).
 const POSE_CHANNELS: int = 8
 ## What `staff_infusions` answers with no spell (never written).
@@ -72,6 +82,7 @@ func _init(runtime_kit: CarrierKit) -> void:
 	_pose_lead.resize(SpellRuntime.ACTORS)
 	_pose_from.resize(SpellRuntime.ACTORS * POSE_CHANNELS)
 	_pose_out.resize(POSE_CHANNELS)
+	_pose_ended.resize(SpellRuntime.ACTORS)
 	clear()
 
 
@@ -80,12 +91,27 @@ func clear() -> void:
 	_pose_start.fill(INF)
 	_pose_spell.fill(null)
 	_pose_turned.fill(0.0)
+	_forget_worked_out()
+
+
+## After a snapshot gave the state back: nothing is known worked out (the clock may be earlier).
+func rebuild_derived() -> void:
+	_forget_worked_out()
+
+
+## The memos (DERIVED) forgotten: the next ask works the pose out from the state.
+func _forget_worked_out() -> void:
+	_pose_out_actor = -1
+	_pose_out_clock = -1.0
+	_pose_ended.resize(SpellRuntime.ACTORS)
+	_pose_ended.fill(0)
 
 
 ## `actor`'s staff does not move (a caster opened or closed under its id).
 func reset_actor(actor: int) -> void:
 	_pose_start[actor] = INF
 	_pose_turned[actor] = 0.0
+	_pose_ended[actor] = 0
 
 
 ## When `actor`'s last staff animation began (INF for none): one cast's carriers start one.
@@ -117,6 +143,7 @@ func start(actor: int, spell: CompiledSpell, tag: int, wind: float, strike: floa
 		_pose_from[at] = rad_to_deg(angle_difference(DMath.angle(dir), heading)) * side
 	_pose_out_actor = -1
 	_pose_turned[actor] = 0.0
+	_pose_ended[actor] = 0
 	if spell.staff_pose.is_empty():
 		_pose_start[actor] = INF
 		return
@@ -196,6 +223,9 @@ func end_strike(tag: int) -> void:
 	if into < _pose_strike[actor]:
 		_pose_strike[actor] = into
 		_pose_out_actor = -1
+		# A shorter strike only ends it sooner; cleared all the same, so every write of an
+		# animation's numbers forgets what was worked out from them.
+		_pose_ended[actor] = 0
 
 
 ## Where `actor`'s staff is in its animation now (its carrier's `staff_pose`), for its look: x the
@@ -302,7 +332,7 @@ func staff_pose_dir(actor: int) -> Vector2:
 ## the staff was at the cast; "hold" keys repeat, each round from the last of them, while the
 ## strike lasts. Allocation-free.
 func _pose_now(actor: int) -> bool:
-	if actor < 0 or actor >= SpellRuntime.ACTORS or not is_finite(_pose_start[actor]):
+	if actor < 0 or actor >= SpellRuntime.ACTORS or not is_finite(_pose_start[actor]) or _pose_ended[actor] != 0:
 		return false
 	if _pose_out_actor == actor and _pose_out_clock == kit.clock():
 		return _pose_out_mood >= 0
@@ -360,6 +390,7 @@ func _pose_now(actor: int) -> bool:
 		mood = _mood_of(keys, k, mood)
 		k += 1
 	_pose_out_mood = -1
+	_pose_ended[actor] = 1
 	return false
 
 

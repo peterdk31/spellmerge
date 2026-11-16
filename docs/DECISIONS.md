@@ -2,6 +2,18 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-16: the stress run timed tick by tick, and the first fixes it found (performance)
+
+- **The owner:** "optimize the game some more. It should be able to handle more projectiles without losing frames."
+- **Measured first.** The Tick times each step when a benchmark hands it a clock (`Tick.profile_steps`; it reads none in the game), and the stress run prints it with the projectile manager's own parts (`BENCH: stress <scenario> tick parts`, `projectile parts`; `-- --only=desktop` runs one scenario). At the desktop budget (200 enemies, 6,000 shots) a tick cost 33.1 ms on the cloud machine (4 cores, headless): the bodies 17.3 ms (about 85 us a body), the projectile manager 14.2 ms (its hit pass 12.2, of it the kernel 2.3 and about 330 hand-backs to GDScript with their listeners), everything else under 2 ms. So past the shots' own hits, what holds a crowded frame is the bodies' step, which grows with the enemies, not the shots.
+- **Fixed, the same results:**
+  - **A finished staff animation is known to be over** (`StaffPoses._pose_ended`, DERIVED with the one-slot `_pose_out*` memo, both forgotten in `clear` and `rebuild_derived`): every look asked its body's pose several times a step, and for a body that had cast once each answer walked the animation's keys to find it over. A first version kept `_pose_out*` as state and let the memo skip writing it, so a run resumed from a snapshot parted from the original in Spells one tick on (found by the review and by `test_content_determinism.gd` and `test_snapshot_game.gd`).
+  - **A look reads the pose once a step** (`ActorLook.pose_offset`, `pose_scale` and `apply_pose` take the `pose_dir` read; `show_pose` does both at once while no animation plays and none is left on the sprite). The creature look went from about 15 to 11 us a body.
+  - **Cover's danger look skips rows with no fire** (`Cover._harming_rows`, kept with `_harming`): while grass burns each moving enemy's look scanned its 9 by 9 window every tick.
+  - **A shot's impact asks HitStop once per card** whether its impact cue holds anything (`HitStop._impact_cues`): 2.6 to 0.9 us an impact, on every one.
+- **Numbers** (the same machine, before and after): a tick at the desktop budget 33.1 to 30.5 ms (bodies 17.3 to 16.1), at the web budget 13.4 to 12.1 ms; `ai_step.gd` 58.5-62.4 to 56.2-56.6 us an enemy. Frame times swing by a third between runs on this shared machine, so the tick sums are the measure. Every hit and damage path is unchanged.
+- **Left, by size** (per body a tick in the stress crowd): the AI's think about 30 us (perceive 8, chase 7), the Caster about 10 (its mana loop and its anchor sent again whenever the body moved), the Face about 7, the Mover and the move about 5 each; on the shots' side Feel's `projectile_impact` about 6 us on each of about 500 impacts a tick. None of the budgets is met yet.
+
 ## 2026-11-16: the fountain, a prop on a timer (props, owner request)
 
 - **The owner** (earlier session, PR #777): a fountain prop that sprays water in bursts, readable, on the simulation's clock.

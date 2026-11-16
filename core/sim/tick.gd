@@ -104,6 +104,12 @@ var _ids: PackedInt32Array = PackedInt32Array()
 ## Each body's name in `state_areas` by actor id ("actor 3"), made once (the spread hash asks for
 ## the areas every tick).
 var _body_names: PackedStringArray = PackedStringArray()
+## Each step's time, summed over the ticks run since it was sized (microseconds; by `step_names()`
+## index, the bodies' step among them). Empty in the game, where a tick reads no clock and pays one
+## check. A benchmark hands the clock (`profile_clock`, microseconds) and calls `profile_steps`: the
+## Tick never reads real time itself (core/sim/README.md), as the projectile manager's `step_profile`.
+var step_profile: PackedInt64Array = PackedInt64Array()
+var profile_clock: Callable = Callable()
 
 
 func _init() -> void:
@@ -192,14 +198,43 @@ func run(delta: float) -> void:
 func _run_steps(delta: float, stopped: bool) -> void:
 	if _steps_seen != _steps_known():
 		_build_order()
+	var timed: bool = not step_profile.is_empty()
+	var since: int = 0
 	for i in _order.size():
 		var step: SimArea.Step = _order[i]
 		if stopped and not step.runs_through(sim.stops):
 			continue
+		if timed:
+			since = profile_clock.call()
 		if step.key == BODIES:
 			_step_bodies(delta)
 		elif _order_area[i].is_stepped(stopped) and step.call.is_valid():
 			step.call.call(delta)
+		if timed and i < step_profile.size():
+			step_profile[i] += int(profile_clock.call()) - since
+
+
+## Starts timing each step with `clock` (microseconds; a benchmark's, never the game's): the sums
+## in `step_profile` from 0, one a step of `step_names()`.
+func profile_steps(clock: Callable) -> void:
+	if _steps_seen != _steps_known():
+		_build_order()
+	profile_clock = clock
+	step_profile = PackedInt64Array()
+	step_profile.resize(_order.size())
+
+
+## Each step's name, in the order it runs (and `step_profile`'s): "area.key", or BODIES.
+func step_names() -> PackedStringArray:
+	if _steps_seen != _steps_known():
+		_build_order()
+	var names := PackedStringArray()
+	for i in _order.size():
+		if _order[i].key == BODIES:
+			names.append(String(BODIES))
+		else:
+			names.append("%s.%s" % [_order_area[i].name, _order[i].key])
+	return names
 
 
 ## The steps in STEPS' order: each area's under its key, in the order the areas joined; BODIES once,
@@ -225,6 +260,10 @@ func _build_order() -> void:
 			if not STEPS.has(step.key) or step.key == BODIES:
 				push_error("Tick: %s's step %s is not one of Tick.STEPS, so it is never run (core/sim/tick.gd)" % [name, step.key])
 	_steps_seen = _steps_known()
+	if not step_profile.is_empty():
+		# The order was made again under a profile: its sums could name the wrong steps, so they restart.
+		step_profile.resize(_order.size())
+		step_profile.fill(0)
 
 
 func _steps_known() -> int:

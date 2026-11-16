@@ -62,7 +62,7 @@ const SMALL_SIZE: int = 8
 const LINE_SIZE: int = 12
 ## The gap under the name and under the lore line.
 const GAP: float = 6.0
-## The dialog box: its size, its left edge, and how far it reaches over the bottom bar's top edge.
+## The dialog box: its size (narrower on a narrow view, never under the portrait), its left edge, and how far it reaches over the bottom bar's top edge.
 const BOX_SIZE: Vector2 = Vector2(352.0, 56.0)
 const BOX_LEFT: float = 32.0
 const BOX_OVER: float = 16.0
@@ -402,7 +402,7 @@ func typed_lore() -> String:
 
 ## Whether the A glyph shows (blinking: true on its lit half) and whether "Fight" shows.
 func is_glyph_lit() -> bool:
-	return _glyph.visible or _fight_glyph.visible
+	return _glyph.visible or (_fight.visible and _fight_glyph.visible)
 
 
 func is_fight_shown() -> bool:
@@ -426,6 +426,8 @@ func _apply() -> void:
 	_eyes.position = at
 	_eyes.size = _portrait.size
 	var revealed: bool = is_revealed()
+	var frame: float = float(BossIntro.MEAN if revealed else BossIntro.REST)
+	_material.set_shader_parameter(&"frame_x", Vector2(frame, frame + 1.0) / BossIntro.FRAMES)
 	_material.set_shader_parameter(&"reveal", 1.0 if revealed else 0.0)
 	_material.set_shader_parameter(&"rim", 0.0 if revealed else 1.0)
 	_material.set_shader_parameter(&"flash", 1.0 if is_flashing() else 0.0)
@@ -443,9 +445,9 @@ func _apply() -> void:
 	_lore_label.visible = _lore != "" and _time >= name_done_at()
 	_lore_label.modulate.a = fade
 	var lines_shown: bool = _time >= BossIntro.LINES_AT
-	var box := Rect2(Vector2(BOX_LEFT, view.y - BAR - BOX_SIZE.y + BOX_OVER), BOX_SIZE)
+	var box: Rect2 = _box()
 	_line.position = box.position + Vector2(BOX_PAD, BOX_PAD - 2.0)
-	_line.size = Vector2(BOX_SIZE.x - BOX_PAD * 2.0, 0.0)
+	_line.size = Vector2(box.size.x - BOX_PAD * 2.0, 0.0)
 	_line.visible = lines_shown and _has_lines()
 	_line.visible_characters = -1 if _line_done else _typed()
 	_line.modulate.a = fade
@@ -495,7 +497,7 @@ func _draw_stage() -> void:
 		_stage.draw_colored_polygon(_slash_points, colour)
 	# The dialog box, over the bottom bar's top edge.
 	if _line.visible:
-		var box := Rect2(Vector2(BOX_LEFT, view.y - BAR - BOX_SIZE.y + BOX_OVER), BOX_SIZE)
+		var box: Rect2 = _box()
 		var fade: float = 1.0 - _closing_share()
 		_stage.draw_rect(box, Color(Palette.OUTLINE, 0.92 * fade))
 		var edge: Color = _accent[2]
@@ -549,6 +551,18 @@ func _draw_name() -> void:
 			colour.a = alpha
 			_name_view.draw_char(_font, baseline, _letters[i], font_size, colour)
 		x += advance
+
+
+## The dialog box on this view: BOX_SIZE, narrowed to end before the portrait on a narrow view.
+func _box() -> Rect2:
+	var room: float = size.x - PORTRAIT_RIGHT - BossIntro.FRAME * SCALE - BOX_LEFT - GAP
+	var wide: float = clampf(room, BOX_PAD * 4.0, BOX_SIZE.x)
+	return Rect2(Vector2(BOX_LEFT, size.y - BAR - BOX_SIZE.y + BOX_OVER), Vector2(wide, BOX_SIZE.y))
+
+
+## The dialog box's rect now (for tests).
+func box_rect() -> Rect2:
+	return _box()
 
 
 func _name_height() -> float:

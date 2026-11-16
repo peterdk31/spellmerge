@@ -21,7 +21,8 @@ const EventsScript := preload("res://core/events/events.gd")
 
 ## The registry the cues and their sounds are asked of (Feel's).
 var registry: Node = null
-## The cues it played, in order, and the last one (for tests).
+## The cues the intro playing played, in order (two at most; a fresh open starts it again), and the
+## last one (for tests).
 var played: Array[StringName] = []
 var last: StringName = &""
 
@@ -83,6 +84,7 @@ func _on_opened(_actor: int, _boss_name: String, _lore: String, intro: BossIntro
 	if not fresh or intro == null:
 		return
 	stop()
+	played.clear()
 	_intro = intro
 	_time = 0.0
 

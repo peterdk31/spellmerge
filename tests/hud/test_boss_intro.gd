@@ -356,7 +356,6 @@ func test_feels_cues_play_at_their_moments_while_the_tree_is_paused() -> void:
 	paused = false
 	check_equal(sound.played, [&"test_dark", &"test_reveal"] as Array[StringName], "the dark cue, then the reveal's, with the tree paused")
 	sound.stop()
-	sound.played.clear()
 	bus.boss_intro_opened.emit(BOSS, IntroBoss.NAME, IntroBoss.LORE, data, 0, true)
 	sound.step(BossIntro.DARK_AT - 0.01)
 	check(sound.played.is_empty(), "nothing before DARK_AT")
@@ -402,3 +401,34 @@ func test_feel_plays_no_entrance_cue_for_a_boss_whose_intro_plays() -> void:
 func _tap(seat: int, action: StringName) -> void:
 	input.send_virtual(seat, action, 1.0)
 	input.send_virtual(seat, action, 0.0)
+
+
+func test_a_second_boss_with_an_intro_waits_for_the_first_ones_close() -> void:
+	# Review of BI4: the hold opens only the first boss's intro; the other's bar must not show under it.
+	bus.boss_shown.emit(BOSS, IntroBoss.NAME, IntroBoss.LORE, PackedFloat32Array(), true)
+	bus.boss_shown.emit(BOSS + 1, "The Other", "", PackedFloat32Array(), true)
+	_open()
+	(hud as Node).call("_process", DT)
+	check(not hud.get_boss_bar().visible, "no bar under the open intro, for either boss")
+	check(not hud.get_boss_banner().visible, "nor a banner")
+	bus.boss_intro_closed.emit(BOSS)
+	check_equal(hud.get_boss_bar().shown_boss(), BOSS, "the first boss's bar as it closes")
+	(hud as Node).call("_process", DT)
+	check(hud.get_boss_bar().is_held(BOSS + 1) == false, "the other released at that frame's end")
+	check(hud.get_boss_banner().visible and hud.get_boss_banner().shown_name() == "The Other", "its banner then: no intro played for it")
+
+
+func test_the_dialog_box_keeps_clear_of_the_portrait_on_a_narrow_view() -> void:
+	_open()
+	_to(BossIntro.LINES_AT + DT)
+	check_equal(intro.box_rect().size.x, BossIntroScript.BOX_SIZE.x, "its full width at 640")
+	intro.size = Vector2(480.0, 360.0)
+	var portrait_left: float = 480.0 - BossIntroScript.PORTRAIT_RIGHT - BossIntro.FRAME * BossIntroScript.SCALE
+	check(intro.box_rect().end.x <= portrait_left, "narrower, ending before the portrait")
+
+
+func test_the_fight_glyph_is_not_lit_before_fight_shows() -> void:
+	_open([] as Array[String])
+	for i in 30:
+		intro.step(DT)
+		check(not intro.is_glyph_lit(), "no glyph before LINES_AT")

@@ -7,7 +7,8 @@ extends RefCounted
 ## A boss shown with no intro (`boss_shown`'s `has_intro` false) never waits: its bar, banner and cue
 ## come at once. One with an intro waits: for its intro's close (`boss_intro_closed`), when its intro
 ## opened (`boss_intro_opened`, before or after it was shown), or else for the end of the frame it was
-## shown on (`settle`, called once a frame by its owner): an intro opens on the room's tick, in the
+## shown on (`settle`, called once a frame by its owner; while another's intro is open, the end of
+## the frame that one closes on): an intro opens on the room's tick, in the
 ## same call as its body is shown, so one that has not opened by then does not open (the run's rule
 ## off for automation, `SessionRules.boss_intros`; a boss the sandbox spawned or a phase called). Then
 ## it is `released`: `played` true when its intro played (no banner and no entrance cue: the overlay was
@@ -89,8 +90,12 @@ func hidden(actor: int) -> void:
 
 
 ## The end of a frame: every boss still waiting with no intro open for it is released, unplayed.
+## While an intro is open the others wait on (a second boss with an intro in the room: the hold
+## opens only the first's), and are released, unplayed, at the end of the frame it closed on.
 ## Allocates nothing when none waits.
 func settle() -> void:
+	if _open != ActorsScript.NONE:
+		return
 	while not _waiting.is_empty():
 		var actor: int = _waiting[0]
 		_waiting.remove_at(0)

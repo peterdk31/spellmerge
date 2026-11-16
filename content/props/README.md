@@ -45,7 +45,7 @@ Built in W6 (states and their triggers; the component and rows were named `React
 
 ```
 staffs   1: fire · blast · pulse, wind-up 1.0 s (the fuse)    2: fire · blast · pulse, no wind-up
-idle     element_hit fire     → then fusing
+idle     status burn          → then fusing                  (a burn lights it: a fire hit, burning grass; a soaked barrel takes none)
          death                → cast 2, then broken          (shot apart: blows at once)
          cast 1, cast 2       → then broken                  (possessed: 1 lights the fuse the long way, 2 blows)
 fusing   entered              → cast 1                       (the fuse burns, then it blows)

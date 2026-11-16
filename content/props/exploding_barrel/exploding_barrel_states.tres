@@ -6,7 +6,8 @@
 
 [sub_resource type="Resource" id="idle_element_hit_0"]
 script = ExtResource("1")
-element = &"fire"
+when = 1
+status = &"burn"
 then = &"fusing"
 
 [sub_resource type="Resource" id="idle_death_1"]

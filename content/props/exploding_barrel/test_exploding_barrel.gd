@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The exploding barrel (props W9c, content/props/exploding_barrel): a powder keg of 10 health. A
-## fire hit lights its fuse (sparks off its tip, a ring closing in for its second: its fuse staff's
+## burn put on it (a fire hit's, burning grass's) lights its fuse (sparks off its tip, a ring closing in for its second: its fuse staff's
 ## wind-up and `wind_cue`), then it blows (Fire · Blast · Pulse) and lies as rubble; shot apart, lit
 ## or not, it blows at once and its fuse is over. Every path, possession and chains:
 ## tests/gameplay/actor/test_prop_state_triggers.gd, which plays this barrel.
@@ -87,3 +87,15 @@ func test_water_douses_a_lit_fuse() -> void:
 	_world.run(FUSE_STEPS)
 	check_equal(_left.count(barrel.caster_number()), 0, "and it never blows")
 	check_equal(barrel.state_triggers.state_id(), &"idle", "it stands, cold")
+
+
+## The owner, 2026-11-16: a soaked barrel does not light. Its fuse hears a burn put on it, which a
+## soaked body never takes; a fire hit on it dries it instead (douse).
+func test_a_soaked_barrel_does_not_light_and_a_burn_lights_it() -> void:
+	var barrel: Actor = _barrel()
+	_world.combat.apply_status(-1, barrel, &"soak", 30.0, 50.0)
+	check_equal(_world.shoot(barrel, &"fire").slice(0, 1), [&"fire"] as Array[StringName], "a fire hit on a soaked barrel")
+	check_equal(barrel.state_triggers.state_id(), &"idle", "does not light it")
+	check(not _world.combat.has_status(barrel, &"soak"), "it dried it")
+	_world.combat.apply_status(-1, barrel, &"burn", 3.0, 1.0)
+	check_equal(barrel.state_triggers.state_id(), &"fusing", "a burn put on it (burning grass) lights it")

@@ -10,7 +10,8 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **The fountain** (`content/props/fountain`): invincible and blocking, two staffs: `water · nova · spray` winding up 0.6 s (its `wind_area` ring and its `welling` look, the water bulging out of its bowl with droplets: the telegraph), then eight jets round it; and `water · pulse` cast as the jets leave, a ring whose end wets the floor (`touch_floor`: the hub's grass goes wet). `still` → 2.4 s → `welling` → the burst → `still`: a burst every 3 s; `welling` goes back to `still` after 3 s should its burst never leave (a fallback row). Its stats cast at a quarter of their power (`ActorStats.power` 0.25), so it soaks, shoves and douses far more than it hurts (a burst does well under a point to what stands by it); everything still hurts everything.
 - **Placed in the hub's prop yard** (no role), as every new prop; no crypt room places it yet: where a fountain belongs in a run's rooms is the owner's call (the room editor's prop list has it, `PropStandIn`).
 - **Water on props:** a lit exploding barrel hit by water is doused (`fusing` −water→ `idle`); a lit fire pit goes out as with frost.
-- **Open, for the owner:** a soaked barrel still lights on a fire hit (its fuse hears the hit's element, not a burn; the soak only stops the burn status); whether a wet barrel should refuse to light is a small data change (`status burn` instead of `element_hit fire`) with its own trade-offs. The fountain's pace (2.4 s + 0.6 s), reach (80 px jets) and power are a first pick.
+- **A barrel lights on a burn, not a fire hit** (the owner, asked whether a soaked barrel should still light: "Yes do that"): its `idle` row is `status burn` (was `element_hit fire`). So a soaked barrel does not light (a soaked body takes no burn), and neither does a fire hit that reacts instead of burning (a chilled barrel thaws, a hexed one kindles); a barrel standing in burning grass now lights, as the grass's burn is put on it. Its shot-apart and possessed rows are unchanged.
+- **Answered by the owner (2026-11-16):** the fountain's small damage in the hub is fine ("its fine"); the hub's yard only, for now ("Fine for now"); its pace (2.4 s + 0.6 s), reach (80 px jets) and power, and the reactions' numbers and colours, stay as first picked ("Ok").
 
 ## 2026-11-16: Water, the seventh element (owner request)
 
@@ -28,7 +29,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **The reaction colours** (each at least 0.45 apart from every other, `test_feel_reactions.gd`): with nine already taken the free ones are few and dark or loud: douse a dull magenta, rime violet, current electric green, squall olive green, drown deep blue. Sounds: none yet, as every reaction (silent until an `.ogg` exists).
 - **Ground cover:** water wets the hub's grass (`wet`, 8 s: it does not light, glints with drips and soaks whoever stands in it; water on burning grass puts it out into `wet`), and puts a burning cobweb out.
 - **Native:** the shot kernel's `EMITTING_MASK` covers the new kind (it mirrors the manager's to the bit).
-- **Not done (docs/DESIGN.md is the owner's):** its starting cards' infusions list (fire, frost, storm, void, lightning, mend) does not name water; whether Water is a starting card or a found one is the owner's to write there.
+- **A starting card** (the owner: "Just start with it for now - like everything else during development"): docs/DESIGN.md's starting infusions name water, which the owner asked Claude to add.
 
 ## 2026-11-16: Nova and Penta rings turn on with every cast; a shot leaving its caster spares them (owner)
 

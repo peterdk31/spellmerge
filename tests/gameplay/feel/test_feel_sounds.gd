@@ -335,6 +335,20 @@ func test_a_body_dies_with_its_own_sound() -> void:
 	check_equal(feel.sounds().last, &"enemy_death", "another's with the cue's own")
 
 
+func test_a_boss_enters_with_its_intro_and_a_stray_with_none() -> void:
+	var feel: FeelScript = _world()
+	_know([&"boss_intro"])
+	var started: int = feel.sounds().started
+	fx.imp(Vector2(40, 0), Fixture.staffed([[&"bolt"]]))
+	check_equal(feel.sounds().started, started, "a stray enters with no sound")
+	var data: EnemyBase = Fixture.staffed([[&"bolt"]])
+	data.id = &"test_boss"
+	data.boss = true
+	fx.imp(Vector2.ZERO, data)
+	check_equal(feel.sounds().last, &"boss_intro", "a boss enters with the `boss_intro` cue, under its banner (boss plan OB16)")
+	check_equal(feel.sounds().started, started + 1, "once")
+
+
 # --- Phases and music ------------------------------------------------------------------------
 
 ## A boss of the test's own: its music (two stacked layers), a phase that burns (a held sound, an

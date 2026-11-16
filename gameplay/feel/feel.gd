@@ -307,6 +307,8 @@ const MAX_KICK_PIXELS: float = 4.0
 ## `possess_ended`; content/cues).
 const POSSESS_START: StringName = &"possess_start"
 const POSSESS_END: StringName = &"possess_end"
+## The cue of a boss's entrance, on its body as its banner shows (`boss_shown`, boss plan OB16).
+const BOSS_INTRO: StringName = &"boss_intro"
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -789,6 +791,7 @@ func _ready() -> void:
 	events.staff_shown.connect(_on_staff_shown)
 	events.possess_started.connect(_on_possess_started)
 	events.possess_ended.connect(_on_possess_ended)
+	events.boss_shown.connect(_on_boss_shown)
 	events.projectile_impact.connect(_on_projectile_impact)
 	events.carrier_shown.connect(_on_carrier_shown)
 	events.cast_winding.connect(_on_cast_winding)
@@ -3068,6 +3071,11 @@ func _on_possess_started(caster: int, actor: int) -> void:
 ## out in the driver's ramp).
 func _on_possess_ended(caster: int, actor: int) -> void:
 	_cue_on_body(POSSESS_END, caster, actor)
+
+
+## A boss entered play (boss plan OB16): its entrance cue on its body, under the HUD's banner.
+func _on_boss_shown(actor: int, _name: String, _lore: String, _marks: PackedFloat32Array) -> void:
+	_cue_on_body(BOSS_INTRO, actor, actor)
 
 
 ## Play the cue `id` of `caster` at the drawn body of `actor` (its `body_offset`), following the

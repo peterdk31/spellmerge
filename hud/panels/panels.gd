@@ -30,6 +30,11 @@ extends CanvasLayer
 ## The loading screen (`loading/`, node Root/Loading, over everything) shows from
 ## `loading_started` to `loading_finished`, while flow compiles the shaders before the first room.
 ##
+## The boss bar (`boss/boss_bar.gd`, node Root/BossBar, at the top middle) and the entrance banner
+## (`boss/boss_banner.gd`, node Root/BossBanner, over the world, under the panels) show what
+## `boss_shown`, `boss_health_changed` and `boss_hidden` say (boss plan OB16); a run starting or
+## ending clears them.
+##
 ## A red vignette (`vignette/`, node Root/Vignette, behind the panels) glows when a
 ## wizard's health falls, strongest toward that wizard's corner and fading in under
 ## half a second. It is read from `player_stats_changed` alone (a drop in health),
@@ -104,6 +109,8 @@ const StoneLineScript := preload("res://hud/widgets/stone_line.gd")
 const PadLineScript := preload("res://hud/widgets/pad_line.gd")
 const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
 const LecternMenuScript := preload("res://hud/menus/lectern/lectern_menu.gd")
+const BossBarScript := preload("res://hud/panels/boss/boss_bar.gd")
+const BossBannerScript := preload("res://hud/panels/boss/boss_banner.gd")
 
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
@@ -122,6 +129,9 @@ const STONE_LINE_DROP: float = 12.0
 ## How far below the top the pad line sits: under the stone line and its second line (where the
 ## run starts, run generation RG7).
 const PAD_LINE_DROP: float = 36.0
+## How far below the top the boss bar sits: under the online line (the stone line, which it would
+## share the place with, shows only in the hub, where no boss stands).
+const BOSS_BAR_DROP: float = 12.0
 
 ## The event bus, the UI focus service, the input manager and the spell runtime (the
 ## radials ask it for names and icons). Only tests set these, before adding the
@@ -174,6 +184,9 @@ var _stone_line: StoneLineScript = null
 var _item_hints: ItemHintsScript = null
 var _hint_menus: Array[bool] = [false, false, false, false]
 var _pad_line: PadLineScript = null
+## The boss bar (top middle) and the entrance banner (upper middle), boss plan OB16.
+var _boss_bar: BossBarScript = null
+var _boss_banner: BossBannerScript = null
 
 
 func _ready() -> void:
@@ -274,6 +287,19 @@ func _ready() -> void:
 	_pad_line.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, int(EDGE_MARGIN + PAD_LINE_DROP))
 	_pad_line.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_pad_line.bind(events)
+	# The boss bar: at the top middle, under the online line, while a boss is in play (boss plan OB16).
+	_boss_bar = BossBarScript.new()
+	_boss_bar.name = "BossBar"
+	root_control.add_child(_boss_bar)
+	_boss_bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, int(EDGE_MARGIN + BOSS_BAR_DROP))
+	_boss_bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_boss_bar.bind(events)
+	# The entrance banner: over play, under the panels and the menus (just over the vignette).
+	_boss_banner = BossBannerScript.new()
+	_boss_banner.name = "BossBanner"
+	root_control.add_child(_boss_banner)
+	root_control.move_child(_boss_banner, 1)
+	_boss_banner.bind(events)
 	# The item hints: in the world's picture, under the panels and the builders.
 	_item_hints = ItemHintsScript.new()
 	_item_hints.name = "ItemHints"
@@ -307,6 +333,7 @@ func _process(delta: float) -> void:
 	poll()
 	step_hints(delta)
 	_vignette.step(delta)
+	_boss_banner.step(delta)
 	step_staffs()
 
 
@@ -510,6 +537,15 @@ func get_fps_counter() -> FpsCounterScript:
 	return _fps
 
 
+## The boss bar and the entrance banner (for tests).
+func get_boss_bar() -> BossBarScript:
+	return _boss_bar
+
+
+func get_boss_banner() -> BossBannerScript:
+	return _boss_banner
+
+
 ## The red vignette (for tests).
 func get_vignette() -> VignetteScript:
 	return _vignette
@@ -631,6 +667,8 @@ func _on_main_menu_requested(_player: int) -> void:
 func _reset_all() -> void:
 	_in_room = false
 	_vignette.clear()
+	_boss_bar.clear()
+	_boss_banner.clear()
 	_pause_menu.close_menu()
 	for player in PLAYER_COUNT:
 		_radials[player].close_builder()

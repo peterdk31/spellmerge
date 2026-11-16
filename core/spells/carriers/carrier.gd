@@ -389,7 +389,7 @@ func scale_size(spell: CompiledSpell, factor: float) -> void:
 
 
 ## Whether an enemy's AI holds its button down for it (`CastSense.repeats_held`): a carrier cast
-## anew when held (`REPEATS_HELD`: a swing) or a line that stays on (`LINE`: a beam); a spray too.
+## anew when held (`REPEATS_HELD`: a swing, a spray) or a line that stays on (`LINE`: a beam).
 func ai_holds() -> bool:
 	return has(REPEATS_HELD) or has(LINE)
 

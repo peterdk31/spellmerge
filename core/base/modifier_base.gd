@@ -143,7 +143,9 @@ const RULES: Dictionary = {
 	Behaviour.CHAIN: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
 	Behaviour.SHIELD: {"needs": {"any": CarrierTraits.MEETS_SHOTS}},
 	Behaviour.BLAST: {},
-	Behaviour.HOLD: {"needs": {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER}},
+	# Kept on: a carrier that lasts, or one cast anew while held (a spray pours on; the owner,
+	# 2026-11-16: "Hold should work like for a beam").
+	Behaviour.HOLD: {"needs": {"any": CarrierTraits.LASTS | CarrierTraits.REPEATS_HELD, "not": CarrierTraits.MOVES_CASTER}},
 	# It pushes what casts the carrier back: a body or a shot (at runtime; a point has nothing to push).
 	Behaviour.RECOIL: {},
 	Behaviour.BOUNCE: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}},

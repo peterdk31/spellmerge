@@ -4,8 +4,10 @@ extends Carrier
 ## spell poured out of the staff, striking every body in a narrow cone along its heading out to its
 ## `ray_length` past the staff tip (a wall hides what is behind it), pushed outward from the hand.
 ## Over at once, and cast again each time the staff is ready while its button is held (the
-## caster's hold; an enemy's AI holds it too, `ai_holds`), so held it pours on, paying its mana
-## as it goes. Where its jet ends (short of a wall) is its end point: its `blast` and `on expire`
+## caster's hold; an enemy's AI holds it too), so held it pours on, paying its mana as it goes.
+## With `hold` it is switched on by one press and pours on by itself, its cast's mana reserved, until
+## pressed again (as a beam is; the owner, 2026-11-16): cast anew every `wind_up` + `lifetime`
+## (`REPEATS_HELD`, as a held swing sweeps back). Where its jet ends (short of a wall) is its end point: its `blast` and `on expire`
 ## payload go off there (a pool there paints the floor where it is pointed). Its look is told for
 ## Feel (`carrier_shown` with its card's id, from the staff tip along its heading as far as it
 ## reaches, as its spell's cue tag: its card's `shown_cue`, a jet of its cards' motes).
@@ -31,15 +33,11 @@ func look_drawer() -> int:
 	return LOOK_NONE
 
 
-## It hits, reach lengthens it, it is held by the hand that casts it (never hitting that body), and
-## a launch's shots fan out and turn by the staff's spread.
+## It hits, reach lengthens it, it is held by the hand that casts it (never hitting that body), a
+## launch's shots fan out and turn by the staff's spread, and held it is cast anew (`hold` keeps it
+## on; an enemy's AI holds it, `ai_holds`).
 func traits() -> int:
-	return HITS | REACHES | MELEE | SHOTS | SPREAD
-
-
-## Held, it pours on (the staff casts it again as it is ready): an enemy's AI holds it.
-func ai_holds() -> bool:
-	return true
+	return HITS | REACHES | MELEE | SHOTS | SPREAD | REPEATS_HELD
 
 
 func required_fields() -> Dictionary:

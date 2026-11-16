@@ -111,7 +111,7 @@ func test_an_enemy_holds_it_and_knows_its_cone() -> void:
 	spell.arc = 24.0
 	spell.radius = 4.0
 	var spray: Carrier = Carriers.of(&"spray")
-	check(spray.ai_holds(), "an enemy holds it down, so it pours on")
+	check(spray.ai_holds() and spray.has(Carrier.REPEATS_HELD), "held, it is cast anew: an enemy holds it down, so it pours on")
 	var lane: float = spray.lane_radius(spell)
 	check(lane > 16.0 and lane < 30.0, "its lane is its cone's width at its reach (%s px)" % lane)
 	spell.radius = 8.0
@@ -142,3 +142,27 @@ func test_two_cones_of_a_split_spray_each_strike() -> void:
 	var out: Array = _cast(["split", "spray"], [Vector2(50.0, -22.0), Vector2(50.0, 22.0)])
 	var lost: Array[int] = out[0]
 	check(lost[0] > 0 and lost[1] > 0, "a cone either way, each striking its imp (%s)" % [lost])
+
+
+func test_hold_keeps_it_pouring_like_a_beam() -> void:
+	# The owner, 2026-11-16: "Hold should work like for a beam": one press switches it on, it pours
+	# on by itself with its cast's mana reserved, and a second press switches it off.
+	var arena := ArenaScript.new(root)
+	var imp: Node2D = arena.add_imp(Vector2(50.0, 0.0))
+	arena.install_cards(0, 0, ["hold", "spray"])
+	check(arena.cast(0, 0), "one press switches it on")
+	arena.run(0.1)
+	var first: int = arena.lost(imp)
+	check(arena.spells.is_holding(0, 0), "it is kept on")
+	check(arena.spells.reserved_mana(0, 0) > 0.0, "its cast's mana reserved while it pours")
+	arena.run(1.0)
+	var poured: int = arena.lost(imp)
+	check(poured >= first + 4, "it pours on without another press (%d, then %d)" % [first, poured])
+	arena.cast(0, 0)
+	arena.run(0.1)
+	var off: int = arena.lost(imp)
+	arena.run(0.6)
+	check(not arena.spells.is_holding(0, 0), "a second press switches it off")
+	check_equal(arena.lost(imp), off, "and it pours no more")
+	check_equal(arena.spells.reserved_mana(0, 0), 0.0, "its mana let go")
+	arena.free_all()

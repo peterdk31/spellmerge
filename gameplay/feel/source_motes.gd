@@ -261,12 +261,18 @@ func _throw(source: Source, k: int, pool: MotesScript) -> void:
 	var look: MoteSource = source.look
 	var place: MotePlaces.Place = source.place
 	place.pick(_rng, look)
-	var ramp: int = source.sources[_rng.randi() % source.sources.size()]
+	var ramp: int = source.sources[band_of(look, place.along, source.sources.size()) if look.band_length > 0.0 and not look.colours.is_empty() else _rng.randi() % source.sources.size()]
 	var height: float = look.height if look.height > 0.0 else -1.0
 	var at: Vector2 = place.at + source.moved
 	var shown: Vector2 = at - Vector2(0.0, look.height) if look.height > 0.0 else at
 	pool.throw_part(k, shown, place.way, ramp, Color.WHITE, 1, look.reach, look.spread, 1.0, false, true, Vector2.ZERO, 1.0, 0, height)
 	given += 1
+
+
+## Which of `count` colours a mote `along` pixels along a banded line takes (`MoteSource.band_length`):
+## the bands in the order its colours are named, round again.
+static func band_of(look: MoteSource, along: float, count: int) -> int:
+	return posmod(floori(along / look.band_length), count)
 
 
 ## A standing mask: a mote of kind `k` on every lit pixel of `source`, `since` seconds after it

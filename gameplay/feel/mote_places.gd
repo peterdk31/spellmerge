@@ -18,6 +18,8 @@ class Place:
 	## The last pick: where a mote leaves from and the way it goes, in the world.
 	var at: Vector2 = Vector2.ZERO
 	var way: Vector2 = Vector2.UP
+	## How far along its line the last pick lies, in pixels (a line's; 0 for the others).
+	var along: float = 0.0
 	## The world box its motes leave from (before what they fly).
 	var bounds: Rect2 = Rect2()
 	## Its middle in the world, its half-size there, and the way its source throws.
@@ -113,12 +115,13 @@ class LinePlace extends Place:
 		return true
 
 	func pick(rng: RandomNumberGenerator, look: MoteSource) -> void:
-		var along: float = clampf(on_grid(rng.randf() * _length, 0.0, look.spacing), 0.0, _length)
-		# The segment `along` falls in: the last point whose running length is at most it.
-		var i: int = clampi(_running.bsearch(along, true) - 1, 0, _points.size() - 2)
+		var run: float = clampf(on_grid(rng.randf() * _length, 0.0, look.spacing), 0.0, _length)
+		# The segment `run` falls in: the last point whose running length is at most it.
+		var i: int = clampi(_running.bsearch(run, true) - 1, 0, _points.size() - 2)
 		var on: Vector2 = (_points[i + 1] - _points[i]).normalized()
+		along = run
 		way = Vector2(on.y, -on.x)
-		at = _points[i] + on * (along - _running[i]) + way * rng.randf_range(-JITTER, JITTER)
+		at = _points[i] + on * (run - _running[i]) + way * rng.randf_range(-JITTER, JITTER)
 
 
 ## Anywhere in a box `size` across round `at`, on the world's grid of `spacing`.

@@ -928,12 +928,12 @@ struct HitPass {
 		if (near <= 0.0) {
 			return false;
 		}
+		const double within = reach + near;
 		const double ahead = (double)to_centre.dot(way);
-		if (ahead <= 0.0) {
+		if (ahead <= 0.0 || apart_sq > within * within) {
 			return false;
 		}
 		// The square of how far the body's shape stands off the shot's line.
-		const double within = reach + near;
 		if (box == Vector2()) {
 			return apart_sq - ahead * ahead / (double)way.length_squared() <= within * within;
 		}

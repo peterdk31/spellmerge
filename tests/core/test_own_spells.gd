@@ -62,12 +62,28 @@ func test_a_nova_spares_a_moving_caster() -> void:
 				check_equal(_nova_lost(carrier, off, walk), 0, "a %s nova cast %d px off a caster walking %s never hits them" % [carrier, int(off), walk])
 
 
-## Health the caster loses to three casts of `nova · carrier` toward +x from `off` px ahead of their
-## body, the body walking at `walk` px a second the while.
-func _nova_lost(carrier: String, off: float, walk: Vector2) -> int:
+## The same walks with a body that is not the caster's (an imp) in the wizard's place: the copies
+## do cross it, so the test above would see a hit if the caster were not spared.
+func test_the_copies_do_reach_a_body_in_the_casters_place() -> void:
+	for carrier: String in ["bolt", "atom"]:
+		for walk: Vector2 in [Vector2.ZERO, Vector2(-90.0, 0.0), Vector2(90.0, 0.0)]:
+			check(_nova_lost(carrier, 14.0, walk, false) > 0, "a %s nova hits an imp walking %s where the caster would be" % [carrier, walk])
+
+
+## A caster who moves ahead of their own shot (owner, 2026-11-06: their own spells hurt them once
+## they have left them): a bolt and a teleport along its aim in one cast, the bolt flying on into
+## the wizard where they landed, hits them.
+func test_a_bolt_hits_its_caster_who_teleported_ahead_of_it() -> void:
+	check(_self_lost(["double", "bolt", "teleport"]) > 0, "the bolt catches up with the wizard who blinked ahead of it")
+
+
+## Health the caster (or, with `own` false, an imp in their place) loses to three casts of `nova ·
+## carrier` toward +x from `off` px ahead of the body, the body walking at `walk` px a second the
+## while.
+func _nova_lost(carrier: String, off: float, walk: Vector2, own: bool = true) -> int:
 	var arena := ArenaScript.new(root)
 	arena.answer_moves()
-	var body: Node2D = arena.add_guard(0, Vector2(-off, 0.0))
+	var body: Node2D = arena.add_guard(0, Vector2(-off, 0.0)) if own else arena.add_imp(Vector2(-off, 0.0))
 	arena.install_cards(0, 0, ["nova", carrier])
 	for n in 3:
 		arena.place_caster(0, body.global_position + Vector2(off, 0.0))

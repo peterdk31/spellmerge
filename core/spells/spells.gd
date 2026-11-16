@@ -367,6 +367,9 @@ var _pending_free: Array[PendingLaunch] = []
 var _clock: float = 0.0
 ## actor * STAFFS + staff -> casts made, which names the next cast's scatter and staff spread.
 var _cast_count: PackedInt32Array = PackedInt32Array()
+## actor * STAFFS + staff -> how far the novas of its latest cast stand turned off their aim, as a
+## share of the gap between two ways (`_nova_share`): SpellLimits.RING_STEP more each cast.
+var _cast_turn: PackedFloat32Array = PackedFloat32Array()
 ## The scatter and spread rolls of the cast or later firing being launched: its key (the cast's
 ## actor, staff and count; a later firing's from it) and the rolls made by it so far (`_scatter_roll`).
 var _scatter_key: int = 0
@@ -419,9 +422,6 @@ var _ring_turn: float = 0.0
 ## Each Penta card's last ring, by its tag (`_penta`): the angle it stood at, the clock then, and
 ## how fast and which way it turns (the next cast of that card turns the other way).
 var _penta_rings: Dictionary = {}
-## Each Nova card's last turn, by its tag (`_nova_share`): how far its ways stood turned off the aim,
-## as a share of the gap between two ways.
-var _nova_turns: Dictionary = {}
 
 ## The ray being sent (`RayHit`): what a hit with no shot slot is (a beam's, a swing's, a slam's, a
 ## dash's, a zap, a jump). `_rays[0]` is the empty one (no ray out, tag 0); every
@@ -525,6 +525,7 @@ func _init() -> void:
 	_cursor.resize(ACTORS * SpellLimits.STAFFS)
 	_hold_mana.resize(ACTORS * SpellLimits.STAFFS)
 	_cast_count.resize(ACTORS * SpellLimits.STAFFS)
+	_cast_turn.resize(ACTORS * SpellLimits.STAFFS)
 	for i in ACTORS * SpellLimits.STAFFS:
 		_hold_tags.append(PackedInt64Array())
 		_last_carrier_card.append(&"")
@@ -1301,6 +1302,7 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 		# seeded, so a cast a listener makes now does not take this one's.
 		events.cast_left.emit(actor, staff)
 	_scatter_from(hash(Vector3i(actor, staff, _cast_count[index])))
+	_cast_turn[index] = fposmod(float(_cast_count[index]) * SpellLimits.RING_STEP, 1.0)
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:
 		return false
 	_cast_count[index] += 1
@@ -1756,14 +1758,12 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool, again: bool = false) -> int:
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
 	_echo_spell = spell if echoed else null
-	var share: float = _nova_share(spell, tag)
+	var share: float = _nova_share(spell, actor, staff)
 	var spin: float = share * TAU / float(spell.nova_ways()) if share > 0.0 else 0.0
 	var launched: int = _cast_nova(spell, tag, actor, origin, heading, source, spin)
 	if launched > 0 and spell.mirrors():
 		# The same cast again, its aim reversed: every card it has does what it did the first time.
 		launched += _cast_nova(spell, tag, actor, origin, -heading, source, spin)
-	if launched > 0 and spell.nova_ways() > 1:
-		_nova_turns[tag] = share
 	_echo_spell = null
 	if launched > 0 and _holds(spell, tag):
 		_start_hold(tag)
@@ -1783,15 +1783,17 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	return launched
 
 
-## How far the ways of this firing of a nova `spell` stand turned off its aim, as a share of the gap
-## between two ways (0 for no nova). Each firing of the card that launches turns on from the last by
-## SpellLimits.RING_STEP of a gap (owner, 2026-11-16: "Can the nova rotate for each cast?"), the
-## first along the aim (owner, 2026-11-09), so no way keeps flying the same way; the same on every
-## machine (`_nova_turns`, kept by `_fire_spell` once the firing launched).
-func _nova_share(spell: CompiledSpell, tag: int) -> float:
-	if spell.nova_ways() <= 1 or not _nova_turns.has(tag):
+## How far the ways of a nova `spell` that `actor`'s staff `staff` fires stand turned off its aim,
+## as a share of the gap between two ways (0 for no nova): its latest cast's turn (`_cast_turn`,
+## SpellLimits.RING_STEP of a gap more for each cast the staff has made; owner, 2026-11-16: "Can
+## the nova rotate for each cast?"), so its first cast goes along the aim (owner, 2026-11-09),
+## every nova of one cast (its mirror, its echo, its payloads') shares a turn, and the next cast
+## turns on; the same on every machine.
+func _nova_share(spell: CompiledSpell, actor: int, staff: int) -> float:
+	var index: int = actor * SpellLimits.STAFFS + staff
+	if spell.nova_ways() <= 1 or actor < 0 or staff < 0 or index >= _cast_turn.size():
 		return 0.0
-	return fposmod(float(_nova_turns[tag]) + SpellLimits.RING_STEP, 1.0)
+	return _cast_turn[index]
 
 
 ## One firing of `spell` along `heading`, as a nova when it has one (owner, 2026-11-09): the cast
@@ -3534,12 +3536,12 @@ func clear() -> void:
 		_release_launch(launch)
 	_pending.clear()
 	_penta_rings.clear()
-	_nova_turns.clear()
 	_ring.fill(-1)
 	_open_ring.fill(-1)
 	_open_builds.fill(0)
 	_last_carrier_card.fill(&"")
 	_cast_count.fill(0)
+	_cast_turn.fill(0.0)
 	_lc_count = 0
 	_zapper_count = 0
 	_magnet_count = 0
@@ -3904,6 +3906,7 @@ func _reset_caster(caster: int) -> void:
 		_cooldown[index] = 0.0
 		_cursor[index] = 0
 		_cast_count[index] = 0
+		_cast_turn[index] = 0.0
 		_hold_mana[index] = 0.0
 		_last_carrier_card[index] = &""
 	_moves.reset_actor(caster)

@@ -19,11 +19,14 @@ class SoundRegistry:
 	extends RegistryScript
 	var base: RegistryScript = null
 	var stream: AudioStreamWAV = AudioStreamWAV.new()
+	var long: AudioStreamWAV = null
 	var known: Dictionary = {}
 	var extra: Dictionary = {}
 
 	func get_sound(id: StringName) -> AudioStream:
-		return stream if known.has(id) else null
+		if not known.has(id):
+			return null
+		return long if int(known[id]) == 2 else stream
 
 	func get_resource(folder: StringName, id: StringName) -> Resource:
 		var mine: Resource = (extra.get(folder, {}) as Dictionary).get(id) as Resource
@@ -69,6 +72,18 @@ func after_each() -> void:
 func _know(ids: Array) -> void:
 	for id: Variant in ids:
 		reg.known[StringName(str(id))] = true
+
+
+## A sound `id` a second long (one that would be cut short).
+func _know_long(id: StringName) -> void:
+	if reg.long == null:
+		reg.long = AudioStreamWAV.new()
+		reg.long.format = AudioStreamWAV.FORMAT_8_BITS
+		reg.long.mix_rate = 8000
+		var data := PackedByteArray()
+		data.resize(8000)
+		reg.long.data = data
+	reg.known[id] = 2
 
 
 func _cue(id: StringName, parts: Array[Dictionary], sound: StringName = &"") -> CueBase:
@@ -122,6 +137,22 @@ func test_one_sound_has_at_most_its_voices_and_the_oldest_starts_again() -> void
 	sounds.step(SoundsScript.MIN_SECONDS * 2.0)
 	check_equal(sounds.voices_of(&"knock"), 0, "once over they hold no voice")
 	check(first >= 0, "the first played")
+
+
+func test_a_long_sound_is_not_cut_short_while_a_voice_is_done() -> void:
+	var sounds: SoundsScript = _sounds()
+	_know_long(&"splinter")
+	_know([&"tick"])
+	sounds.play(&"splinter")
+	for round in 3:
+		for i in SoundsScript.PER_SOUND:
+			sounds.play(&"tick", Vector2(float(i), 0.0))
+		sounds.step(SoundsScript.MIN_SECONDS * 2.0)
+	check_equal(sounds.voices_of(&"splinter"), 1, "a second-long sound plays on while short ones come and go")
+	for i in SoundsScript.VOICES + 1:
+		_know([StringName("other_%d" % i)])
+		sounds.play(StringName("other_%d" % i))
+	check_equal(sounds.voices_of(&"splinter"), 0, "with every voice busy the one that started first gives way")
 
 
 func test_a_held_sound_follows_its_body_until_its_carrier_ends() -> void:
@@ -178,10 +209,10 @@ func test_a_held_sound_is_taken_over_and_let_go_by_kind() -> void:
 	sounds.release(4, SoundsScript.Until.PHASE)
 	check(not sounds.is_held(4, &"roar") and sounds.is_held(4, &"swish"), "letting go of a phase's lets go of that kind only")
 	check(sounds.hold(&"nothing", SoundsScript.Until.SECONDS, 4, 0, null, Vector2.ZERO, 1.0) < 0, "a sound with no file holds nothing")
-	for i in SoundsScript.HELD_MOST + 4:
+	for i in SoundsScript.HELD_SLOTS + 4:
 		_know([StringName("loop_%d" % i)])
 		sounds.hold(StringName("loop_%d" % i), SoundsScript.Until.SECONDS, i, 0, null, Vector2.ZERO, 1.0 + float(i))
-	check_equal(sounds.held_count, SoundsScript.HELD_MOST, "at most HELD_MOST held at once")
+	check_equal(sounds.held_count, SoundsScript.HELD_SLOTS, "at most HELD_SLOTS held at once")
 	sounds.clear()
 	check_equal(sounds.held_count, 0, "a new room stops them all")
 
@@ -207,10 +238,10 @@ func _moments_body() -> Actor:
 	_cue(&"test_swish", [{"part": &"held", "sound": &"swish"}] as Array[Dictionary])
 	_cue(&"test_crunch", [] as Array[Dictionary], &"crunch")
 	_cue(&"test_thump", [] as Array[Dictionary], &"thump")
-	var data: EnemyBase = Fixture.staffed([[&"dash"], [&"swing"]])
+	var data: EnemyBase = Fixture.staffed([[&"on_wall", &"dash", &"pulse"], [&"swing"]])
 	var dash: StaffBase = data.staffs[0].staff
 	dash.wind_cue = &"test_scrape"
-	dash.shown_cue = &"test_swish"
+	dash.move_cue = &"test_swish"
 	dash.wall_cue = &"test_crunch"
 	data.staffs[1].staff.cast_cue = &"test_thump"
 	data.staffs[1].staff.wind_up = 0.0
@@ -242,10 +273,12 @@ func test_a_staffs_dash_swishes_until_it_lands() -> void:
 	var feel: FeelScript = _world()
 	var body: Actor = _moments_body()
 	var sounds: SoundsScript = feel.sounds()
-	var tag: int = SpellTag.make(body.id, 0, 0, 0)
+	var tag: int = _tag_of(body, &"dash")
+	var pulse: int = _tag_of(body, &"pulse")
+	check(tag != 0 and pulse != 0, "its staff's dash and its on-wall pulse")
 	fx.spells.set(&"cue_tag", tag)
 	fx.bus.carrier_shown.emit(body.id, &"dash", body.global_position, Vector2.RIGHT, 80.0, Color.WHITE, 0)
-	check(sounds.is_held(body.id, &"swish"), "its staff's shown cue holds the swish as the dash sets off")
+	check(sounds.is_held(body.id, &"swish"), "its staff's move cue holds the swish as the dash sets off")
 	fx.spells.set(&"cue_tag", SpellTag.make(fx.players[0].id, 0, 0, 0))
 	fx.bus.carrier_shown.emit(fx.players[0].id, &"dash", Vector2.ZERO, Vector2.RIGHT, 80.0, Color.WHITE, 0)
 	check(not sounds.is_held(fx.players[0].id, &"swish"), "a dash of another staff is the card's alone")
@@ -254,15 +287,29 @@ func test_a_staffs_dash_swishes_until_it_lands() -> void:
 	feel.step(0.05)
 	check(sounds.held_at(body.id, &"swish").is_equal_approx(body.global_position), "it goes with the body")
 	fx.bus.carrier_ended.emit(body.id, &"dash", body.global_position, Vector2.RIGHT, 8.0, Color.WHITE, 0)
-	fx.spells.set(&"cue_tag", 0)
 	check(not sounds.is_held(body.id, &"swish"), "it lands: the swish is let go")
+	# Then its `on wall` pulse shows itself: a carrier of the same staff that sends no end.
+	fx.spells.set(&"cue_tag", pulse)
+	fx.bus.carrier_shown.emit(body.id, &"pulse", body.global_position, Vector2.RIGHT, 0.0, Color.WHITE, 0)
+	fx.spells.set(&"cue_tag", 0)
+	check(not sounds.is_held(body.id, &"swish"), "the pulse it sets off at the wall does not swish again")
+
+
+## The tag of the spell of `body`'s first staff whose carrier card is `card` (0: none).
+func _tag_of(body: Actor, card: StringName) -> int:
+	for node in 8:
+		var tag: int = int(fx.spells.call(&"current_tag", body.id, 0, node))
+		var spell: CompiledSpell = fx.spells.call(&"profile", tag) as CompiledSpell
+		if spell != null and spell.carrier_card_id == card:
+			return tag
+	return 0
 
 
 func test_a_wall_crunches_and_a_cast_thumps() -> void:
 	var feel: FeelScript = _world()
 	var body: Actor = _moments_body()
 	var sounds: SoundsScript = feel.sounds()
-	var tag: int = SpellTag.make(body.id, 0, 0, 0)
+	var tag: int = _tag_of(body, &"dash")
 	var before: int = sounds.started
 	fx.bus.caster_move_finished.emit(body.id, &"dash", Vector2(50, 0), tag, false)
 	check_equal(sounds.started, before, "a dash that ends in the open crunches nothing")
@@ -434,5 +481,13 @@ func test_music_changes_fade_and_silence_stops() -> void:
 	check(is_equal_approx(music.fading_level(), 0.5), "the last track fades out from where it was")
 	music.step(1.0)
 	check_equal(music.fading_level(), 0.0, "and is gone after its fade")
+	var stacked := MusicTrack.new()
+	stacked.layers = [&"a", &"b"] as Array[StringName]
+	music.play(stacked, 1)
+	for i in 40:
+		music.step(0.05)
+	music.play(one, 1)
+	check(music.fading_level_of(0) > 0.9, "a stacked track's heard layer fades out from full")
+	check_equal(music.fading_level_of(1), 0.0, "and its silent layer stays silent as it goes")
 	music.stop()
 	check(music.track() == null and music.stream_of(0) == null, "silence")

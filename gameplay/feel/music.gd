@@ -16,8 +16,10 @@ var _then: Array[AudioStreamPlayer] = []
 ## Each layer's level now (0-1) and whether it is to be heard, for the track playing.
 var _level: PackedFloat32Array = PackedFloat32Array()
 var _want: PackedByteArray = PackedByteArray()
-## The level of the track fading out (0-1), and its fade's seconds.
+## The level of the track fading out (0-1, its whole), each of its layers' level as it began to
+## fade, and its fade's seconds.
 var _then_level: float = 0.0
+var _then_layers: PackedFloat32Array = PackedFloat32Array()
 var _then_fade: float = 0.0
 
 ## The registry the layers' sounds are asked of (`get_sound`).
@@ -32,6 +34,7 @@ func _ready() -> void:
 		_now.append(_player())
 		_then.append(_player())
 	_level.resize(MusicTrack.LAYERS_MOST)
+	_then_layers.resize(MusicTrack.LAYERS_MOST)
 	_want.resize(MusicTrack.LAYERS_MOST)
 
 
@@ -50,16 +53,16 @@ func play(track: MusicTrack, intensity: int) -> void:
 			_intensity = intensity
 			track.audible(intensity, _want)
 		return
-	# The track playing fades out as a whole, from the loudest of its layers.
-	var loudest: float = 0.0
+	# The track playing fades out as a whole, each layer from where it was (a silent one stays
+	# silent); one still fading out before it stops at once.
 	for i in MusicTrack.LAYERS_MOST:
-		loudest = maxf(loudest, _level[i])
 		_then[i].stop()
 		_then[i].stream = null
+		_then_layers[i] = _level[i]
 	var swap: Array[AudioStreamPlayer] = _then
 	_then = _now
 	_now = swap
-	_then_level = loudest
+	_then_level = 1.0
 	_then_fade = _track.fade if _track != null else 0.0
 	_track = track
 	_intensity = intensity
@@ -81,8 +84,9 @@ func play(track: MusicTrack, intensity: int) -> void:
 func step(delta: float) -> void:
 	if _then_level > 0.0:
 		_then_level = maxf(_then_level - (delta / _then_fade if _then_fade > 0.0 else 1.0), 0.0)
-		for player in _then:
-			player.volume_db = linear_to_db(_then_level)
+		for i in MusicTrack.LAYERS_MOST:
+			var player: AudioStreamPlayer = _then[i]
+			player.volume_db = linear_to_db(_then_level * _then_layers[i])
 			if _then_level == 0.0:
 				player.stop()
 				player.stream = null
@@ -98,7 +102,7 @@ func step(delta: float) -> void:
 		_start_all()
 
 
-## Silence at once (the game leaving play).
+## Silence at once (tests; in play a room with no music fades to silence).
 func stop() -> void:
 	play(null, 0)
 	_then_level = 0.0
@@ -130,9 +134,17 @@ func stream_of(layer: int) -> AudioStream:
 	return _now[layer].stream if layer >= 0 and layer < MusicTrack.LAYERS_MOST else null
 
 
-## The level of the track fading out (0-1).
+## How loud the track fading out is now (0-1: its loudest layer).
 func fading_level() -> float:
-	return _then_level
+	var loudest: float = 0.0
+	for i in MusicTrack.LAYERS_MOST:
+		loudest = maxf(loudest, _then_layers[i])
+	return _then_level * loudest
+
+
+## How loud layer `layer` of the track fading out is now (0-1).
+func fading_level_of(layer: int) -> float:
+	return _then_level * _then_layers[layer] if layer >= 0 and layer < MusicTrack.LAYERS_MOST else 0.0
 
 
 func _start_all() -> void:

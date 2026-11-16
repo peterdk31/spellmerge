@@ -1,4 +1,4 @@
-extends Node2D
+extends Node
 ## Feel's sounds (boss plan OB15, docs/milestones/boss-old-broom.md, "Sound"): every sound the game
 ## plays but its music (`music.gd`), drawn only like the rest of Feel, never fed back into the game.
 ## Feel owns one and steps it once a frame; it lives under Feel (world space), never in the scene.
@@ -6,9 +6,10 @@ extends Node2D
 ## **One-shots** (`play`): a sound id from the registry (nothing on `null`: silent until an `.ogg`
 ## exists), on one of VOICES voices, where it happens in the room (`AudioStreamPlayer2D`: panned and
 ## quieter from the middle of the picture, heard up to HEARD pixels away, so a telegraph off screen
-## is still heard). At most PER_SOUND voices play one id at once: one more starts again on the
-## oldest of them rather than cutting short another sound (with a cue's `every`, how a sound that
-## comes by the hundred stays a few).
+## is still heard). A new one takes a voice that is done, else the one that started first; at most
+## PER_SOUND voices play one id at once: one more starts again on the oldest of them rather than
+## cutting short another sound (with a cue's `every`, how a sound that comes by the hundred stays a
+## few).
 ##
 ## **Held sounds** (`hold`): a sound that lasts while its moment lasts (a cue's `held` part;
 ## `CueBase`): it loops from the body it follows (or where it started, with none) until it is let go
@@ -22,7 +23,7 @@ extends Node2D
 const VOICES: int = 8
 const PER_SOUND: int = 3
 ## Held sounds at once; one more takes the place of the one with the least time left.
-const HELD_MOST: int = 16
+const HELD_SLOTS: int = 16
 ## Pixels from the middle of the picture a sound is heard to, and how steeply it falls off.
 const HEARD: float = 1600.0
 const ATTENUATION: float = 0.7
@@ -75,21 +76,20 @@ var _h_volume: PackedFloat32Array = PackedFloat32Array()
 
 
 func _ready() -> void:
-	top_level = true
 	for i in VOICES:
 		_voices.append(_voice())
 		_voice_id.append(&"")
 	_voice_until.resize(VOICES)
 	_voice_from.resize(VOICES)
 	_voice_until.fill(-INF)
-	_h_until.resize(HELD_MOST)
-	_h_caster.resize(HELD_MOST)
-	_h_key.resize(HELD_MOST)
-	_h_followed.resize(HELD_MOST)
-	_h_left.resize(HELD_MOST)
-	_h_fade.resize(HELD_MOST)
-	_h_volume.resize(HELD_MOST)
-	for i in HELD_MOST:
+	_h_until.resize(HELD_SLOTS)
+	_h_caster.resize(HELD_SLOTS)
+	_h_key.resize(HELD_SLOTS)
+	_h_followed.resize(HELD_SLOTS)
+	_h_left.resize(HELD_SLOTS)
+	_h_fade.resize(HELD_SLOTS)
+	_h_volume.resize(HELD_SLOTS)
+	for i in HELD_SLOTS:
 		_held.append(_voice())
 		_h_id.append(&"")
 		_h_follow.append(null)
@@ -161,7 +161,7 @@ func hold(id: StringName, until: int, caster: int, key: int, follow: Node2D, at:
 			slot = i
 			break
 	if slot < 0:
-		if held_count < HELD_MOST:
+		if held_count < HELD_SLOTS:
 			slot = held_count
 			held_count += 1
 		else:
@@ -266,21 +266,28 @@ func clear() -> void:
 		_remove(held_count - 1)
 
 
-## The voice a new one-shot of `id` takes: past PER_SOUND of it playing, the oldest of them; else the
-## next in turn.
+## The voice a new one-shot of `id` takes: past PER_SOUND of it playing, the oldest of them; else
+## a voice that is done (looked for from the next in turn), else the one that started first.
 func _voice_for(id: StringName) -> int:
 	var same: int = 0
-	var oldest: int = -1
+	var oldest_same: int = -1
+	var oldest: int = 0
 	for i in VOICES:
-		if _voice_id[i] == id and _clock < _voice_until[i]:
-			same += 1
-			if oldest < 0 or _voice_from[i] < _voice_from[oldest]:
+		if _clock < _voice_until[i]:
+			if _voice_from[i] < _voice_from[oldest]:
 				oldest = i
+			if _voice_id[i] == id:
+				same += 1
+				if oldest_same < 0 or _voice_from[i] < _voice_from[oldest_same]:
+					oldest_same = i
 	if same >= PER_SOUND:
-		return oldest
-	var used: int = _next_voice
-	_next_voice = (_next_voice + 1) % VOICES
-	return used
+		return oldest_same
+	for n in VOICES:
+		var i: int = (_next_voice + n) % VOICES
+		if _clock >= _voice_until[i]:
+			_next_voice = (i + 1) % VOICES
+			return i
+	return oldest
 
 
 func _sound(id: StringName) -> AudioStream:

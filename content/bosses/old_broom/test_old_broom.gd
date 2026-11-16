@@ -303,7 +303,7 @@ func test_its_sounds() -> void:
 	var big: StaffBase = BROOM.staffs[3].staff
 	var double: StaffBase = BROOM.phases[0].staffs[0].staff
 	var cues: Dictionary = {}
-	for id: StringName in [sweep.wind_cue, big.wind_cue, sweep.shown_cue, sweep.wall_cue, swat.cast_cue, BROOM.phases[0].look.cue]:
+	for id: StringName in [sweep.wind_cue, big.wind_cue, sweep.move_cue, sweep.wall_cue, swat.cast_cue, BROOM.phases[0].look.cue]:
 		var cue: CueBase = registry.get_resource(&"cues", id) as CueBase
 		check(cue != null, "its cue %s exists in content/cues" % id)
 		if cue != null:
@@ -315,10 +315,10 @@ func test_its_sounds() -> void:
 	for id: StringName in [sweep.wind_cue, big.wind_cue]:
 		check(not _part_of(cues.get(id), &"lane").is_empty(), "%s keeps the telegraph's lane" % id)
 	for staff: StaffBase in [sweep, big, double]:
-		check_equal(staff.shown_cue, sweep.shown_cue, "%s swishes as it sweeps" % staff.display_name)
+		check_equal(staff.move_cue, sweep.move_cue, "%s swishes as it sweeps" % staff.display_name)
 		check_equal(staff.wall_cue, sweep.wall_cue, "%s crunches into a wall" % staff.display_name)
 	check_equal(double.wind_cue, sweep.wind_cue, "the double Sweep scrapes as the Sweep does")
-	check_equal(_held_of(cues.get(sweep.shown_cue)), &"broom_swish", "the swish is held while it moves")
+	check_equal(_held_of(cues.get(sweep.move_cue)), &"broom_swish", "the swish is held while it moves")
 	check_equal((cues.get(sweep.wall_cue) as CueBase).sound, &"broom_crunch", "the wall hit's crunch")
 	check_equal((cues.get(swat.cast_cue) as CueBase).sound, &"broom_swat", "the swat")
 	check_equal((cues.get(BROOM.phases[0].look.cue) as CueBase).sound, &"broom_ignite", "the phase change's ignition")

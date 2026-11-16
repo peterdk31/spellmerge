@@ -23,12 +23,12 @@ extends Resource
 ## A `held` part (boss plan OB15) is a sound that lasts while its moment lasts, the `stream` part's
 ## counterpart: looping from its caster's body as it goes (or where it was played, with none) until
 ## the moment ends: a wind-up cue's until the cast leaves or is cancelled (`Spells.is_winding`), a
-## carrier's (a staff's `shown_cue`, a dash setting off) until that carrier ends (`carrier_ended`),
-## or its `seconds` (4 when not given), whichever comes first; the body gone ends it too. Its keys:
+## move's (a staff's `move_cue`, a dash setting off) until that move ends (`carrier_ended`), any
+## other cue's after its `seconds` (4 when not given), whichever comes first; the body gone ends it. Its keys:
 ##   `sound`      its sound id (required; silent until an `.ogg` exists)
 ##   `seconds`    the most it lasts
 ##   `volume`     decibels on top of the sound's own (0 when not given; a louder scrape, +4)
-## A new held part of the same cue for the same caster takes over. Feel plays it
+## A held sound the same caster already holds is taken over (its end and seconds the new part's). Feel plays it
 ## (`gameplay/feel/sounds.gd`).
 ##
 ## A part with no `part` (or `"part": "flash"`) is a flash Feel draws:
@@ -180,7 +180,7 @@ const STREAM_KEYS: Array[String] = ["part", "kind", "rate", "side", "ahead", "fe
 const LANE_KEYS: Array[String] = ["part", "reach"]
 const HELD_KEYS: Array[String] = ["part", "sound", "seconds", "volume"]
 ## The most seconds a `held` part lasts, and its volume's range in decibels.
-const HELD_MOST: float = 30.0
+const HELD_SECONDS: float = 30.0
 const HELD_VOLUME: float = 24.0
 ## The part types a cue may have (a part's `part`; none is `flash`), each with the keys it may have.
 const PART_TYPES: Dictionary = {&"flash": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS, &"stream": STREAM_KEYS, &"lane": LANE_KEYS, &"held": HELD_KEYS}
@@ -282,8 +282,8 @@ func _held_problems(i: int, part: Dictionary) -> PackedStringArray:
 	if StringName(part.get("sound", "")) == &"":
 		found.append("%s: held part %d names no sound" % [id, i])
 	var seconds: float = float(part.get("seconds", 4.0))
-	if seconds <= 0.0 or seconds > HELD_MOST:
-		found.append("%s: held part %d's seconds are not over 0 and at most %s" % [id, i, HELD_MOST])
+	if seconds <= 0.0 or seconds > HELD_SECONDS:
+		found.append("%s: held part %d's seconds are not over 0 and at most %s" % [id, i, HELD_SECONDS])
 	if absf(float(part.get("volume", 0.0))) > HELD_VOLUME:
 		found.append("%s: held part %d's volume is not within %s dB" % [id, i, HELD_VOLUME])
 	return found

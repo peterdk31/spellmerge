@@ -21,7 +21,7 @@ New tests extend `tests/support/suite.gd` (`extends "res://tests/support/suite.g
 - **Check behaviour, not looks or numbers.** Don't assert a pixel colour, a sprite's exact size, a child's position, a count of decorations or a tuning number (a speed, a damage) unless that is the contract. Check what has to stay true: the shot comes when the telegraph ends, the floor covers the room, a spawn can be reached. Then an art or balance change does not break a test.
 - **Look rules are checked once, for every file,** by a data-driven test (`test_svg_art.gd` for SVGs), so a new asset is covered without a new test.
 - **Don't test one thing in two places.** If a bigger test already covers it, split the big one instead of adding a copy.
-- Old test files (one `_initialize` that runs every check) still work; when you touch one, move the part you touch to the suite (`docs/BACKLOG.md`).
+- Every unit test is a suite; only the runners that are not unit tests (`benchmark/`, `smoke/test_four_bot_smoke.gd`, `bots/test_room_balance.gd`) are `SceneTree` scripts of their own.
 
 ## How the tests run
 

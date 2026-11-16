@@ -11,9 +11,9 @@ render_mode blend_premul_alpha;
 // outline is the smooth union of all their outlines (a bridge of liquid between two near ones) and
 // each pixel is drawn by the pool nearest it, in its colours, so no pixel is drawn twice.
 //
-// Its liquid, in depth from the outline (pixels): a rim one pixel wide (lit along its far edge,
-// catching the light, in shadow along its near one, its base at its sides), shallows its base you see the floor
-// through, then its base, deepening by a dither into its shadow in the middle. Over the liquid,
+// Its liquid lies flat on the floor (the owner, 2026-11-16: "it should look more flat"): a thin
+// film the floor shows through, an even edge of its base thinning into the floor by a dither (no
+// lit or shaded lip, which made it read as thick), a little thicker and darker in its middle. Over the liquid,
 // in world space so they run on across merged pools: light lines slowly shifting (a warped noise,
 // in its other infusions in turn by a slow noise: the first's with one), ripples spreading and
 // fading (flattened by the slant) and glints of white-hot twinkling. It splashes in while it is new
@@ -64,6 +64,11 @@ const float SPILL = 0.35;
 const float MELD = 6.0;
 // Pixels from its outline: its shallows end, and where its deep begins (a part of its depth).
 const float SHALLOWS = 3.0;
+// How much of the floor it hides: its edge, its film, its middle, its light lines.
+const float FLAT_EDGE = 0.75;
+const float FLAT_FILM = 0.4;
+const float FLAT_DEEP = 0.55;
+const float FLAT_LINE = 0.8;
 const float DEEP = 0.5;
 // Its ripples: one at most in a cell of this many pixels, flattened by the slant.
 const float RIPPLE_CELL = 18.0;
@@ -211,39 +216,36 @@ vec4 liquid(vec2 q, float depth, float deep) {
 	vec3 light = palette_turn(pal, 0, 2, hi);
 	vec3 base = palette_turn(pal, 0, 1, mid);
 	vec3 shade = palette_turn(pal, 0, 0, lo);
-	if (depth < 1.0) {
-		// Its rim: lit along its far edge, in shadow along its near one (it lies in a dip of the
-		// floor), its base between; which by where it is from its pool's middle (one look-up of
-		// the merged outline a pixel: a loop's every call is compiled again).
-		float up = (q.y - me.y) / max(length(q - me.xy), 1.0);
-		return vec4(up < -0.35 ? light : (up > 0.35 ? shade : base), 1.0);
-	}
 	vec2 wp = floor(q);
+	float checker = mod(wp.x + wp.y, 2.0);
+	// Its edge: one even line of its base, no lit or shaded lip, then a pixel of every other
+	// pixel, so it thins into the floor instead of standing on it.
+	if (depth < 1.0) {
+		return vec4(base * FLAT_EDGE, FLAT_EDGE);
+	}
+	if (depth < 2.0 && checker < 1.0) {
+		return vec4(0.0);
+	}
 	float t = sim_time;
-	if (world_hash(vec3(wp, floor(t * 3.0 + world_hash(vec3(wp, 5.0)) * 3.0))) < 0.004) {
+	if (world_hash(vec3(wp, floor(t * 3.0 + world_hash(vec3(wp, 5.0)) * 3.0))) < 0.003) {
 		// A glint.
-		return vec4(hot, 1.0);
+		return vec4(hot * 0.9, 0.9);
 	}
-	if (depth < SHALLOWS) {
-		// The shallows: the floor shows through.
-		return vec4(base * 0.7, 0.7);
-	}
-	if (ripple(q)) {
-		return vec4(light, 1.0);
+	if (depth >= SHALLOWS && ripple(q)) {
+		return vec4(light * FLAT_LINE, FLAT_LINE);
 	}
 	// Light lines through it, each in an infusion of its palette past the first.
 	float n = noise(vec2(q.x * 0.11 + t * 0.12, q.y * 0.17 - t * 0.08));
 	float v = abs(noise(vec2(q.x * 0.09 + n * 1.6, q.y * 0.14 + t * 0.18)) - 0.5);
 	float others = max(palette_count(pal) - 1.0, 1.0);
 	int line = 1 + int(min(floor(noise(q * 0.05 + vec2(t * 0.05, 7.0)) * others), others - 1.0));
-	bool in_deep = depth > deep || (depth > deep - 1.5 && mod(wp.x + wp.y, 2.0) < 1.0);
-	if (v < 0.022) {
-		return vec4(palette_turn(pal, line, 2, light), 1.0);
+	if (depth >= SHALLOWS && v < 0.02) {
+		return vec4(palette_turn(pal, line, 2, light) * FLAT_LINE, FLAT_LINE);
 	}
-	if (in_deep && v < 0.045) {
-		return vec4(palette_turn(pal, line, 1, base), 1.0);
-	}
-	return vec4(in_deep ? shade : base, 1.0);
+	// A thin film the floor shows through, a little thicker and darker in its middle.
+	bool in_deep = depth > deep || (depth > deep - 1.5 && checker < 1.0);
+	float a = in_deep ? FLAT_DEEP : FLAT_FILM;
+	return vec4((in_deep ? mix(base, shade, 0.5) : base) * a, a);
 }
 
 vec4 body_look(vec2 uv) {

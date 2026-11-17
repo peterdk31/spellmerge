@@ -56,6 +56,7 @@ const EVENTS: Dictionary = {
 	&"item_drop_requested": [["actor", TYPE_INT], ["stack", TYPE_OBJECT]],
 	&"ground_looked": [["actor", TYPE_INT], ["feet", TYPE_VECTOR2], ["reach", TYPE_FLOAT], ["sight", TYPE_OBJECT]],
 	&"cover_danger_looked": [["actor", TYPE_INT], ["at", TYPE_VECTOR2], ["reach", TYPE_FLOAT], ["sight", TYPE_OBJECT]],
+	&"hit_room_asked": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["tag", TYPE_INT], ["shot", TYPE_INT], ["room", TYPE_OBJECT]],
 	&"actor_take_requested": [["actor", TYPE_INT], ["item", TYPE_INT]],
 	&"ground_item_changed": [["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
 	&"item_near_changed": [["player", TYPE_INT], ["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],

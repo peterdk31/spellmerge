@@ -448,6 +448,37 @@ func setup() -> void:
 		events.cue_shown.connect(_on_cue_shown)
 	if not events.projectile_impact.is_connected(_on_projectile_impact):
 		events.projectile_impact.connect(_on_projectile_impact)
+	if not events.hit_room_asked.is_connected(_on_hit_room_asked):
+		events.hit_room_asked.connect(_on_hit_room_asked)
+
+
+## How much `target` can still take from hits of the spell `tag` (shot `shot`), for the projectile
+## manager's merged hits (`hit_room_asked`): its health, with each barrier charge a hit it takes whole,
+## and one hit's damage as `_strike` deals it before reactions (a reaction's extra damage is not
+## foreseen, so a body may still take a shot or two after it dies). A body it cannot hurt, or a heal,
+## leaves the room unknown (INF): every shot hits as it comes.
+func _on_hit_room_asked(_caster: int, target: Node, tag: int, shot: int, room: HitRoom) -> void:
+	if room == null or target == null or not is_instance_valid(target) or spells == null:
+		return
+	var row: int = _row_of_node(target)
+	if row == ActorsScript.NONE or not _can_hurt(row):
+		return
+	var profile: HitProfile = spells.hit_profile(tag, shot)
+	if profile == null or profile.heal > 0:
+		return
+	var health: float = health_of(target)
+	if health < 0.0:
+		return
+	var damage: float = profile.damage * _power_of(tag)
+	var at: int = row * STATUS_COUNT
+	if _status_left[at + ST_HEX] > 0.0:
+		damage += damage * _status_power[at + ST_HEX] / 100.0
+	if damage <= 0.0:
+		return
+	room.damage = damage
+	room.health = health
+	if _blocks(row):
+		room.health += float(_shield[row]) * damage
 
 
 ## A swing's block (the projectile manager's `impact_carrier` while it is sent, no shot of its own)
@@ -1147,7 +1178,7 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 	var node: Node2D = _nodes[row]
 	# The caster's power (boss plan OB7), read now from its body: its hit, its slam and its burn.
 	var power: float = _power_of(_tag)
-	var damage: float = profile.damage * power * float(_hit_count)
+	var damage: float = profile.damage * power
 	var strength: float = profile.knockback
 	# Away from the hit, measured to the hurt circle's centre (shots, beams and swings strike it at
 	# hand height), not the feet: a swing up at a body pushes it up, not down onto the caster. A
@@ -1173,6 +1204,13 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 	var push: float = strength
 	if carried:
 		strength = 0.0
+	# A merged hit (`_hit_count`): a barrier takes each of its hits whole, one charge each, as it
+	# would have one by one; the rest land as one hit of their damage together.
+	var landing: int = _hit_count
+	while landing > 1 and _blocks(row):
+		_hit(by, row, damage, direction, strength, kind, profile, false, team)
+		landing -= 1
+	damage *= float(landing)
 	if not _hit(by, row, damage, direction, strength, kind, profile, false, team):
 		if carried and _same(row, node):
 			# A barrier took the hit whole: nothing of it carries the body either.

@@ -665,7 +665,7 @@ signal still_shots_drawn(view: StillShotView)
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_merging", &"merge_hits", &"_mh_first", &"_mh_next", &"_mh_caster", &"_mh_target", &"_mh_tag", &"_mh_slot", &"_mh_at", &"_mh_heading", &"_mh_count", &"_mh_card", &"_mh_body", &"_mh_core", &"_mh_look", &"_mh_n", &"_mh_ended", &"_mh_ended_spare", &"_mh_freed", &"_mh_seq", &"_freeing_now", &"merges_hits"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_merging", &"merge_hits", &"_mh_first", &"_mh_next", &"_mh_caster", &"_mh_target", &"_mh_tag", &"_mh_slot", &"_mh_at", &"_mh_heading", &"_mh_count", &"_mh_card", &"_mh_body", &"_mh_core", &"_mh_look", &"_mh_n", &"_mh_ended", &"_mh_ended_spare", &"_mh_freed", &"_mh_seq", &"_freeing_now", &"_mh_damage", &"_mh_left", &"_mh_left_pass", &"_mh_pass", &"_room", &"merges_hits"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -752,6 +752,15 @@ var _mh_seq: PackedInt64Array = PackedInt64Array()
 var _mh_ended_spare: PackedInt64Array = PackedInt64Array()
 ## True while `_drop_one` makes room at the cap: that slot is freed at once, merging or not.
 var _freeing_now: bool = false
+## No shot is spent on a body the pass has already killed (owner, 2026-11-17): each entry's damage a
+## hit (`HitRoom`, asked of Combat through `hit_room_asked` at its first hit), and by target the
+## health it has left after the pass's hits so far, written in pass `_mh_pass` (`_mh_left_pass`). A
+## shot meets a body with none left as if it were not there, and flies on.
+var _mh_damage: PackedFloat64Array = PackedFloat64Array()
+var _mh_left: PackedFloat64Array = PackedFloat64Array()
+var _mh_left_pass: PackedInt32Array = PackedInt32Array()
+var _mh_pass: int = 0
+var _room: HitRoom = HitRoom.new()
 ## The way the shot was flying, while a `projectile_expired` is sent (with `impact_carrier_card`,
 ## `impact_core` and `impact_look`, so Feel can show where its life ran out).
 var impact_heading: Vector2 = Vector2.ZERO
@@ -4017,6 +4026,11 @@ func _pass_hits(top: int, delta: float) -> void:
 	_starved_at = -1
 	var n: int = 0
 	_merging = merge_hits and events != null
+	if _merging:
+		_mh_pass += 1
+		if _mh_left.size() < _targets.size():
+			_mh_left.resize(_targets.size())
+			_mh_left_pass.resize(_targets.size())
 	if _kernel != null and not _any_solid:
 		n = _pass_hits_native(top, delta, limit, resume)
 	# Every shot the kernel did not reach (all of them without it).
@@ -7050,6 +7064,9 @@ func _hit_candidates(slot: int, found: int) -> bool:
 		var t: int = _cand_target[n]
 		if _target_layer[t] == 0 or not is_instance_valid(_targets[t]):
 			continue
+		if _merging and _killed_this_pass(t):
+			# Its merged hits so far kill it: the shot is not spent on it.
+			continue
 		_work_left -= HIT_WORK
 		hit = true
 		_register_hit(slot, t, _cand_point[n])
@@ -7300,6 +7317,7 @@ func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, head
 	while entry >= 0:
 		if not alone and _mh_tag[entry] == tag and (_flags[_mh_slot[entry]] & F_ALONE) == 0:
 			_mh_count[entry] += 1
+			_spend_room(target, entry)
 			return
 		last = entry
 		entry = _mh_next[entry]
@@ -7324,6 +7342,25 @@ func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, head
 	_mh_body[entry] = _kind_of(slot)
 	_mh_core[entry] = _core[slot]
 	_mh_look[entry] = _look[slot]
+	# What one hit of this caster's spell takes off the body, and what it has (asked once a pass).
+	_room.clear()
+	events.hit_room_asked.emit(caster, _targets[target], tag, slot, _room)
+	_mh_damage[entry] = _room.damage
+	if target < _mh_left.size() and _mh_left_pass[target] != _mh_pass:
+		_mh_left_pass[target] = _mh_pass
+		_mh_left[target] = _room.health
+	_spend_room(target, entry)
+
+
+## The health `target` has left in this pass, less one hit of `entry`'s.
+func _spend_room(target: int, entry: int) -> void:
+	if target < _mh_left.size() and _mh_left_pass[target] == _mh_pass:
+		_mh_left[target] -= _mh_damage[entry]
+
+
+## True when the pass's merged hits so far leave `target` no health (`_mh_left`).
+func _killed_this_pass(target: int) -> bool:
+	return target < _mh_left.size() and _mh_left_pass[target] == _mh_pass and _mh_left[target] <= 0.0
 
 
 func _grow_merged(size: int) -> void:
@@ -7333,6 +7370,7 @@ func _grow_merged(size: int) -> void:
 	_mh_tag.resize(size)
 	_mh_slot.resize(size)
 	_mh_seq.resize(size)
+	_mh_damage.resize(size)
 	_mh_at.resize(size)
 	_mh_heading.resize(size)
 	_mh_count.resize(size)

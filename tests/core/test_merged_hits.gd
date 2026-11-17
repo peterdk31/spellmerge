@@ -166,5 +166,80 @@ func test_a_shot_that_hits_alone_is_never_merged() -> void:
 	check_equal(hits, [[0, body, 11, 2], [0, body, 11, 1]], "the two plain shots merged, the other alone")
 
 
+## A body the pass's merged hits have killed (`hit_room_asked`: its health, one hit's damage) takes
+## no more of the pass's shots: they are not spent on it, and fly on to the body behind it.
+func test_no_shot_is_spent_on_a_body_the_pass_has_killed() -> void:
+	var front: Node2D = _target(Vector2(200.0, 100.0))
+	var behind: Node2D = _target(Vector2(260.0, 100.0))
+	var asked: Array[Node] = []
+	bus.hit_room_asked.connect(func(_caster: int, target: Node, _tag: int, _shot: int, room: HitRoom) -> void:
+		asked.append(target)
+		if target == front:
+			room.health = 25.0
+			room.damage = 10.0)
+	# Its death, as Combat's would be: it is no target from then on.
+	bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void:
+		if target == front:
+			mgr.remove_target(front))
+	_volley(0, 11, front.global_position, 5)
+	mgr.step(DT)
+	check_equal(hits, [[0, front, 11, 3]], "three hits of 10 kill 25: the front body takes three")
+	check_equal(asked, [front] as Array[Node], "asked once, at its first hit")
+	check_equal(mgr.get_count(), 2, "the other two are not spent")
+	for i in 10:
+		mgr.step(DT)
+	check_equal(hits.size(), 2, "they fly on")
+	check_equal(hits[1], [0, behind, 11, 2], "and hit the body behind")
+
+
+## A fan whose first shots kill a body spends the shots one by one would, no more, and the same damage.
+func _fan_kill(merged: bool) -> Vector3i:
+	var arena := ArenaScript.new(root)
+	arena.projectiles.merge_hits = merged
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	var imp: Node2D = arena.add_imp(Vector2(14.0, 0.0), 4.0)
+	arena.install_cards(0, 0, [&"penta", &"bolt"])
+	check(arena.cast(0, 0), "the fan is cast")
+	arena.run(0.2)
+	var out := Vector3i(arena.projectiles.get_count(), 1 if arena.died(imp) else 0, 0)
+	arena.free_all()
+	return out
+
+
+func test_a_fan_into_a_body_it_kills_spends_only_the_shots_that_kill() -> void:
+	var one_by_one: Vector3i = _fan_kill(false)
+	var merged: Vector3i = _fan_kill(true)
+	check_equal(one_by_one.y, 1, "the body dies")
+	check(one_by_one.x > 0, "some shots fly on past it (%d)" % one_by_one.x)
+	check_equal(merged, one_by_one, "merged, the same shots fly on and it dies the same")
+
+
+## A barrier takes each of a merged hit's shots whole, one charge each, as it did one by one.
+func _fan_into_barrier(merged: bool) -> int:
+	var arena := ArenaScript.new(root)
+	arena.projectiles.merge_hits = merged
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	var imp: Node2D = arena.add_imp(Vector2(14.0, 0.0))
+	# Four charges: the fan's last two shots land together as one merged hit, on the last charge.
+	arena.combat.give_barrier(imp, 4, 10.0, 0)
+	var counts: Array[int] = []
+	arena.bus.projectile_hit.connect(func(_c: int, _t: Node, _a: Vector2, _tag: int, _s: int) -> void: counts.append(arena.projectiles.impact_count))
+	arena.install_cards(0, 0, [&"penta", &"bolt"])
+	check(arena.cast(0, 0), "the fan is cast")
+	arena.run(1.0)
+	var lost: int = arena.lost(imp)
+	if merged:
+		check(counts.max() > 1, "the fan's shots merged (%s)" % [counts])
+	arena.free_all()
+	return lost
+
+
+func test_a_barrier_takes_a_merged_hits_shots_one_charge_each() -> void:
+	var one_by_one: int = _fan_into_barrier(false)
+	var merged: int = _fan_into_barrier(true)
+	check(one_by_one > 0, "the shots past the barrier's charges hurt (%d)" % one_by_one)
+	check_equal(merged, one_by_one, "merged, the same damage gets through")
+
+
 func after_each() -> void:
 	ManagerScript.merges_hits = true

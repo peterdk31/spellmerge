@@ -241,8 +241,8 @@ class GroundShapeTest(unittest.TestCase):
         self.assertIn(f"const FLOOR_Z: int = {gs.FLOOR_Z}", base)
         self.assertIn(f"const WALL_LAYER: int = {gs.WALL_LAYER}", base)
         self.assertIn(f"const HOLE_LAYER: int = {gs.HOLE_LAYER}", base)
-        manager = (gs.ROOT / "core/projectiles/projectile_manager.gd").read_text(encoding="utf-8")
-        self.assertIn(f"const WALL_CELL: float = {float(gs.CELL)}", manager)
+        grid = (gs.ROOT / "core/projectiles/room_grid.gd").read_text(encoding="utf-8")
+        self.assertIn(f"const WALL_CELL: float = {float(gs.CELL)}", grid)
 
     def test_the_hubs_mark_colours_are_its_turfs(self) -> None:
         # The hub names its floor-mark colours (its art is too large to sample): they must be its turf's.

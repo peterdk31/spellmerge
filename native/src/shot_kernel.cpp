@@ -195,10 +195,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(cand_target, "_cand_target", PACKED_INT32_ARRAY) \
 	X(cand_along, "_cand_along", PACKED_FLOAT32_ARRAY) \
 	X(cand_point, "_cand_point", PACKED_VECTOR2_ARRAY) \
-	X(wall_cells, "_wall_cells", PACKED_BYTE_ARRAY) \
-	X(wall_w, "_wall_w", INT) \
-	X(wall_h, "_wall_h", INT) \
-	X(has_walls, "_has_walls", BOOL) \
+	X(room_grid, "_room_grid", OBJECT) \
 	X(bounds, "_bounds", RECT2) \
 	X(grid_x, "_grid_x", FLOAT) \
 	X(grid_y, "_grid_y", FLOAT) \
@@ -317,13 +314,24 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(targets, "_targets", ARRAY) \
 	X(target_team, "_target_team", PACKED_INT32_ARRAY)
 
+// Every member of the manager's room grid (`RoomGrid`, `_room_grid`) the hit pass reads: its wall
+// cells and their size, and the area they cover (hit batch B1). Checked on the grid by `check_fields`.
+#define GRID_FIELDS(X) \
+	X(wall_cells, "_wall_cells", PACKED_BYTE_ARRAY) \
+	X(wall_w, "_wall_w", INT) \
+	X(wall_h, "_wall_h", INT) \
+	X(has_walls, "_has_walls", BOOL) \
+	X(wall_bounds, "_bounds", RECT2)
+
 struct Names {
 #define SM_DECLARE(id, gd, type) StringName id;
 	MANAGER_FIELDS(SM_DECLARE)
+	GRID_FIELDS(SM_DECLARE)
 #undef SM_DECLARE
 	Names() {
 #define SM_INIT(id, gd, type) id = StringName(gd);
 		MANAGER_FIELDS(SM_INIT)
+		GRID_FIELDS(SM_INIT)
 #undef SM_INIT
 	}
 };
@@ -466,6 +474,8 @@ struct HitPass {
 	int64_t work_left = 0, starved_at = 0, mark_stamp = 0, mem_free = 0;
 	bool has_walls = false;
 	Rect2 bounds;
+	// Where the room grid's first cell starts (its `_bounds`, the same area as the manager's).
+	Vector2 wall_origin;
 	double grid_x = 0.0, grid_y = 0.0, max_target_reach = 0.0;
 
 	bool targets_loaded = false;
@@ -582,19 +592,24 @@ struct HitPass {
 		merging = m->get(k.merging);
 		state.load(m, k.state);
 		motion.load(m, k.motion);
-		wall_cells.load(m, k.wall_cells);
 		pos.load(m, k.pos);
 		prev.load(m, k.prev);
 		flags.load(m, k.flags);
 		layers.load(m, k.layers);
 		target_id.load(m, k.target_id);
 		target_key.load(m, k.target_key);
-		wall_w = m->get(k.wall_w);
-		wall_h = m->get(k.wall_h);
 		work_left = m->get(k.work_left);
 		starved_at = m->get(k.starved_at);
-		has_walls = m->get(k.has_walls);
 		bounds = m->get(k.bounds);
+		// The room grid's walls, read from the grid (hit batch B1), last: with no grid (which
+		// `check_fields` refuses before any pass) the pass sees no walls, its other arrays loaded.
+		Object *grid = m->get(k.room_grid);
+		ERR_FAIL_NULL(grid);
+		wall_cells.load(grid, k.wall_cells);
+		wall_w = grid->get(k.wall_w);
+		wall_h = grid->get(k.wall_h);
+		has_walls = grid->get(k.has_walls);
+		wall_origin = ((Rect2)grid->get(k.wall_bounds)).position;
 	}
 
 	void load_untested(Object *m) {
@@ -811,12 +826,12 @@ struct HitPass {
 		}
 	}
 
-	// `_wall_hit` with its default visits.
+	// `RoomGrid.wall_hit` with its default visits.
 	double wall_hit(const Vector2 &from, const Vector2 &to) {
 		if (!has_walls) {
 			return -1.0;
 		}
-		const Vector2 start = (from - bounds.position) / (real_t)WALL_CELL;
+		const Vector2 start = (from - wall_origin) / (real_t)WALL_CELL;
 		const Vector2 delta = (to - from) / (real_t)WALL_CELL;
 		int64_t cx = floori(start.x);
 		int64_t cy = floori(start.y);
@@ -1291,6 +1306,18 @@ PackedStringArray ShotKernel::check_fields(Object *manager) const {
 	}
 	MANAGER_FIELDS(SM_CHECK)
 #undef SM_CHECK
+	// The room grid's, on the grid (hit batch B1).
+	Object *grid = manager->get(names->room_grid);
+	if (grid == nullptr) {
+		wrong.push_back(String("member _room_grid missing or empty"));
+		return wrong;
+	}
+#define SM_GRID_CHECK(id, gd, type)                                     \
+	if (grid->get(names->id).get_type() != Variant::type) {             \
+		wrong.push_back(String("room grid member ") + gd + " missing or not " #type); \
+	}
+	GRID_FIELDS(SM_GRID_CHECK)
+#undef SM_GRID_CHECK
 	return wrong;
 }
 

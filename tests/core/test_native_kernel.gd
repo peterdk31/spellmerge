@@ -213,6 +213,17 @@ func test_a_missing_member_is_named() -> void:
 	check("_pos" in ", ".join(NativeScript.shot_kernel().call(&"check_fields", stranger) as PackedStringArray), "a missing member is named")
 
 
+## The hit pass reads the room grid's walls from the grid (`RoomGrid`, hit batch B1): a manager
+## without one is named, and a real one's grid has every member the kernel reads.
+func test_the_room_grid_the_kernel_reads_is_checked() -> void:
+	if not _native_loaded():
+		return
+	var stranger: Node2D = own(Node2D.new()) as Node2D
+	check("_room_grid" in ", ".join(NativeScript.shot_kernel().call(&"check_fields", stranger) as PackedStringArray), "a manager without a room grid is named")
+	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
+	check_equal(NativeScript.shot_kernel().call(&"check_fields", mgr) as PackedStringArray, PackedStringArray(), "a real manager and its grid have every member")
+
+
 func test_a_new_manager_runs_the_native_kernel() -> void:
 	if not _native_loaded():
 		return
@@ -609,6 +620,15 @@ func _compare_arrays(step: int) -> void:
 		var b: Variant = _mgrs[1].get(member)
 		if var_to_bytes(a) != var_to_bytes(b):
 			_differ("step %d: %s differs (GDScript %s, native %s)" % [step, member, _first_difference(a, b), _first_difference(b, a)])
+	# The room grid's too (the walls and the solid shots' stones on them; hit batch B1).
+	for prop: Dictionary in _mgrs[0].grid().get_property_list():
+		var member: StringName = prop["name"]
+		if (prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0:
+			continue
+		var a: Variant = _mgrs[0].grid().get(member)
+		var b: Variant = _mgrs[1].grid().get(member)
+		if var_to_bytes(a) != var_to_bytes(b):
+			_differ("step %d: the room grid's %s differs" % [step, member])
 
 
 func _first_difference(a: Variant, b: Variant) -> String:

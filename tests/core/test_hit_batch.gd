@@ -24,10 +24,11 @@ func before_each() -> void:
 func _first(t: int, who: int, spell: int, shot: int, health: float, damage: float, charges: int = 0) -> int:
 	var entry: int = batch.add(t, 4, who, spell, shot, 100 + shot, Vector2(shot, 0.0), Vector2.RIGHT, &"bolt", 0, Color.WHITE, 0)
 	batch.room.clear()
+	batch.room.known = true
 	batch.room.health = health
-	batch.room.damage = damage
 	batch.room.charges = charges
-	batch.take_room(entry)
+	batch.keep_room(t, 0)
+	batch.take_room(entry, damage)
 	return entry
 
 

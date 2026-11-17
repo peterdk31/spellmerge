@@ -292,14 +292,21 @@ func _check_the_kernel_merged() -> void:
 	check_equal(_mgrs[0].merged_turns, 0, "the GDScript side counts none")
 
 
-## A merged scene's answer to `hit_room_asked`, the same on both sides: a body's health by its name,
-## a hit's damage by its tag, so some bodies die in a pass and the shots after pass them.
-func _on_room_asked(_caster: int, target: Node, tag: int, _shot: int, room: HitRoom) -> void:
+## A merged scene's answers to `hit_room_asked` and `hit_damage_asked`, the same on both sides: a
+## body's health by its name, a hit's damage by its tag, so some bodies die in a pass and the shots
+## after pass them.
+func _on_room_asked(target: Node, room: HitRoom) -> void:
+	room.known = true
 	room.health = 15.0 + float(String(target.name).hash() % 4) * 10.0
-	room.damage = 5.0 + float(tag % 3) * 5.0
-	# A barrier on some bodies that one of the two spells meets: its charges take that spell's first
-	# hits whole (hit batch A1).
-	room.charges = 2 if tag == 1 and String(target.name).hash() % 3 == 0 else 0
+	# A barrier on some bodies that spares one of the two spells: its charges take the other's
+	# first hits whole (hit batch A1).
+	if String(target.name).hash() % 3 == 0:
+		room.charges = 2
+		room.spares = 2
+
+
+func _on_damage_asked(tag: int, _shot: int, answer: HitDamage) -> void:
+	answer.damage = 5.0 + float(tag % 3) * 5.0
 
 
 ## Builds the scene on both sides, the native one on `threads` threads, and steps it STEPS times,
@@ -337,6 +344,7 @@ func _step_the_scene_alike(threads: int) -> void:
 		mgr.events.projectile_expired.connect(_on_expired.bind(side))
 		if _merged:
 			mgr.events.hit_room_asked.connect(_on_room_asked)
+			mgr.events.hit_damage_asked.connect(_on_damage_asked)
 			mgr.shot_ended.connect(func(tag: int) -> void: _events[side].append("ended %d" % tag))
 	check(_mgrs[1].is_native() and not _mgrs[0].is_native(), "one native manager, one GDScript")
 	# A build without threads (the web's) runs every loop on one.

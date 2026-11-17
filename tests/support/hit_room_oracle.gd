@@ -11,8 +11,22 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 
 
-## Fill `room` (cleared first) as Combat answered `hit_room_asked(caster, target, tag, shot, room)`.
-static func answer(combat: CombatScript, target: Node, tag: int, shot: int, room: HitRoom) -> void:
+## Today's answer, as `HitRoom` held it before A2: the body's health (INF: unknown), one hit's
+## damage of the spell, and the barrier's charges that spell meets.
+class Answer:
+	var health: float = INF
+	var damage: float = 0.0
+	var charges: int = 0
+
+	func clear() -> void:
+		health = INF
+		damage = 0.0
+		charges = 0
+
+
+## Fill `room` (cleared first) as Combat answered `hit_room_asked(caster, target, tag, shot, room)`
+## before A2 (then a `HitRoom` of these three fields).
+static func answer(combat: CombatScript, target: Node, tag: int, shot: int, room: Answer) -> void:
 	if room == null:
 		return
 	room.clear()

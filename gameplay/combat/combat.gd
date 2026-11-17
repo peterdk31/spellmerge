@@ -455,16 +455,17 @@ func setup() -> void:
 		events.projectile_impact.connect(_on_projectile_impact)
 	if not events.hit_room_asked.is_connected(_on_hit_room_asked):
 		events.hit_room_asked.connect(_on_hit_room_asked)
+	if not events.hit_damage_asked.is_connected(_on_hit_damage_asked):
+		events.hit_damage_asked.connect(_on_hit_damage_asked)
 
 
-## How much `target` can still take from hits of the spell `tag` (shot `shot`), for the projectile
-## manager's merged hits (`hit_room_asked`): its health, with each barrier charge a hit it takes whole,
-## and one hit's damage as `_strike` deals it before reactions (a reaction's extra damage is not
-## foreseen, so a body may still take a shot or two after it dies), and its barrier's charges for
-## this spell. The health is the body's whatever the spell; a heal's or a harmless spell's damage is 0.
-## A body it cannot hurt, or whose health no hit takes (invincible), leaves the room unknown (INF):
-## every shot hits as it comes.
-func _on_hit_room_asked(_caster: int, target: Node, tag: int, shot: int, room: HitRoom) -> void:
+## What `target` can still take from hits, for the projectile manager's merged hits
+## (`hit_room_asked`, hit batch A2): its health, its hex and its barrier (charges and the spell it
+## spares), whatever spell hits it; a spell's damage a hit is `_on_hit_damage_asked`'s. A reaction's
+## extra damage is not foreseen, so a body may still take a shot or two after it dies. A body it
+## cannot hurt, or whose health no hit takes (invincible), leaves the room unknown: every shot hits
+## as it comes.
+func _on_hit_room_asked(target: Node, room: HitRoom) -> void:
 	if room == null or target == null or not is_instance_valid(target) or spells == null:
 		return
 	var row: int = _row_of_node(target)
@@ -477,24 +478,28 @@ func _on_hit_room_asked(_caster: int, target: Node, tag: int, shot: int, room: H
 	var health: float = health_of(target)
 	if health < 0.0:
 		return
-	# Its health whatever the spell (a heal's ask too: the body's other spells' hits count off it).
+	room.known = true
 	room.health = health
+	var at: int = row * STATUS_COUNT
+	if _status_left[at + ST_HEX] > 0.0:
+		room.hexed = true
+		room.hex = _status_power[at + ST_HEX]
+	# Its barrier's charges, each a hit it takes whole, and the spell they let through (`_blocks`).
+	if _shield[row] > 0 and _shield_left[row] > 0.0:
+		room.charges = _shield[row]
+		room.spares = _shield_spares[row]
+
+
+## One hit's damage of the spell `tag` (shot `shot`, for a shot with a hit profile of its own) before
+## the body's hex, as `_strike` deals it before reactions, for the manager's merged hits
+## (`hit_damage_asked`, hit batch A2): 0 for a heal or a spell with no profile.
+func _on_hit_damage_asked(tag: int, shot: int, answer: HitDamage) -> void:
+	if answer == null or spells == null:
+		return
 	var profile: HitProfile = spells.hit_profile(tag, shot)
 	if profile == null or profile.heal > 0:
 		return
-	var damage: float = profile.damage * _power_of(tag)
-	var at: int = row * STATUS_COUNT
-	if _status_left[at + ST_HEX] > 0.0:
-		damage += damage * _status_power[at + ST_HEX] / 100.0
-	if damage <= 0.0:
-		return
-	room.damage = damage
-	# Its barrier's charges, each a hit it takes whole (as `_blocks` reads them for this spell).
-	var spell_before: int = _hit_spell
-	_hit_spell = tag
-	if _blocks(row):
-		room.charges = _shield[row]
-	_hit_spell = spell_before
+	answer.damage = profile.damage * _power_of(tag)
 
 
 ## A swing's block (the projectile manager's `impact_carrier` while it is sent, no shot of its own)

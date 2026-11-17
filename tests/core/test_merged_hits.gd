@@ -225,17 +225,19 @@ func test_a_shot_that_hits_alone_is_never_merged() -> void:
 	check_equal(hits, [[0, body, 11, 2], [0, body, 11, 1]], "the two plain shots merged, the other alone")
 
 
-## A body the pass's merged hits have killed (`hit_room_asked`: its health, one hit's damage) takes
-## no more of the pass's shots: they are not spent on it, and fly on to the body behind it.
+## A body the pass's merged hits have killed (`hit_room_asked`: its health; `hit_damage_asked`: one
+## hit's damage) takes no more of the pass's shots: they are not spent on it, and fly on to the body
+## behind it.
 func test_no_shot_is_spent_on_a_body_the_pass_has_killed() -> void:
 	var front: Node2D = _target(Vector2(200.0, 100.0))
 	var behind: Node2D = _target(Vector2(260.0, 100.0))
 	var asked: Array[Node] = []
-	bus.hit_room_asked.connect(func(_caster: int, target: Node, _tag: int, _shot: int, room: HitRoom) -> void:
+	bus.hit_room_asked.connect(func(target: Node, room: HitRoom) -> void:
 		asked.append(target)
 		if target == front:
-			room.health = 25.0
-			room.damage = 10.0)
+			room.known = true
+			room.health = 25.0)
+	bus.hit_damage_asked.connect(func(_tag: int, _shot: int, answer: HitDamage) -> void: answer.damage = 10.0)
 	# Its death, as Combat's would be: it is no target from then on.
 	bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void:
 		if target == front:
@@ -254,11 +256,12 @@ func test_no_shot_is_spent_on_a_body_the_pass_has_killed() -> void:
 ## A body hit by several spells in one pass: every spell's hits count off its one health, and a
 ## heal's hit first (no damage) does not keep the body from being counted dead.
 func _two_spells_on(front: Node2D, first_tag: int, first_damage: float) -> void:
-	bus.hit_room_asked.connect(func(_caster: int, target: Node, tag: int, _shot: int, room: HitRoom) -> void:
-		if target != front:
-			return
-		room.health = 25.0
-		room.damage = first_damage if tag == first_tag else 10.0)
+	bus.hit_room_asked.connect(func(target: Node, room: HitRoom) -> void:
+		if target == front:
+			room.known = true
+			room.health = 25.0)
+	bus.hit_damage_asked.connect(func(tag: int, _shot: int, answer: HitDamage) -> void:
+		answer.damage = first_damage if tag == first_tag else 10.0)
 	bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void:
 		if target == front:
 			mgr.remove_target(front))
@@ -284,15 +287,18 @@ func test_a_heal_first_does_not_keep_a_body_from_dying() -> void:
 	check_equal(mgr.get_count(), 2, "the last two are not spent")
 
 
-## Combat tells a body's health whatever the spell asked about: one that deals no damage (a heal, no
-## profile) has damage 0, not an unknown room, so the body's other spells still count off it.
+## Combat tells a body's health whatever spell hits it, and a spell that deals no damage (a heal, no
+## profile) as damage 0, so the body's other spells still count off its health.
 func test_combat_tells_the_health_for_a_spell_that_deals_none() -> void:
 	var arena := ArenaScript.new(root)
 	var imp: Node2D = arena.add_imp(Vector2(40.0, 0.0), 30.0)
 	var room := HitRoom.new()
-	arena.bus.hit_room_asked.emit(0, imp, 0, -1, room)
+	arena.bus.hit_room_asked.emit(imp, room)
+	check(room.known, "its room is known")
 	check_equal(room.health, 30.0, "its health")
-	check_equal(room.damage, 0.0, "and no damage")
+	var answer := HitDamage.new()
+	arena.bus.hit_damage_asked.emit(0, -1, answer)
+	check_equal(answer.damage, 0.0, "and a spell of no profile deals none")
 	arena.free_all()
 
 
@@ -301,10 +307,12 @@ func test_combat_tells_the_health_for_a_spell_that_deals_none() -> void:
 ## the body lives and every shot hits it.
 func test_a_barriers_charges_count_once_whatever_spells_hit() -> void:
 	var front: Node2D = _target(Vector2(200.0, 100.0))
-	bus.hit_room_asked.connect(func(_caster: int, _target: Node, tag: int, _shot: int, room: HitRoom) -> void:
+	bus.hit_room_asked.connect(func(_target: Node, room: HitRoom) -> void:
+		room.known = true
 		room.health = 20.0
-		room.damage = 10.0 if tag == 11 else 1.0
 		room.charges = 3)
+	bus.hit_damage_asked.connect(func(tag: int, _shot: int, answer: HitDamage) -> void:
+		answer.damage = 10.0 if tag == 11 else 1.0)
 	_volley(0, 11, front.global_position, 2)
 	_volley(0, 12, front.global_position, 5)
 	mgr.step(DT)
@@ -317,12 +325,12 @@ func test_combat_tells_an_invincible_body_as_unknown() -> void:
 	var world := ActorFixture.new(root)
 	var body: Actor = world.actor(Vector2(40.0, 0.0), [&"health", &"hurtbox"] as Array[StringName], ActorFixture.Scripted.new())
 	var room := HitRoom.new()
-	world.bus.hit_room_asked.emit(0, body, 0, -1, room)
-	check(room.health < INF, "a plain body tells its health (%s)" % room.health)
+	world.bus.hit_room_asked.emit(body, room)
+	check(room.known and room.health < INF, "a plain body tells its health (%s)" % room.health)
 	body.health.invincible = true
 	room.clear()
-	world.bus.hit_room_asked.emit(0, body, 0, -1, room)
-	check_equal(room.health, INF, "an invincible one is never counted dead")
+	world.bus.hit_room_asked.emit(body, room)
+	check(not room.known and room.health == INF, "an invincible one is never counted dead")
 	world.free_all()
 
 

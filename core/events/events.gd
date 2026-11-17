@@ -195,12 +195,18 @@ signal staff_shown(caster: int, actor: Node, staff: int)
 signal projectile_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int)
 ## Sender: core/projectiles. Where and which way a projectile struck, for looks only (sparks, dust). `target` is the node it hit, sent just before `projectile_hit` for the same hit, or `null` when it ended on a wall or pillar. `caster` is the actor who fired it (NO_PLAYER for a shot of no actor), `position` the point it stopped at and `direction` the unit vector it was flying.
 signal projectile_impact(caster: int, target: Node, position: Vector2, direction: Vector2)
-## Sender: core/projectiles, while it merges a step's shot hits (`merge_hits`). A shot of the actor
-## `caster`, tagged `tag` (slot `shot`), is the first of its spell to hit `target` in this hit pass:
-## Combat fills `room` at once (`HitRoom`: the health the body has left, the damage one such hit
-## deals), so the manager stops spending shots on a body its pass has already killed. Heard by
-## combat; heard by nobody, `room` stays INF (every shot hits as it comes). An ask with its answer.
-signal hit_room_asked(caster: int, target: Node, tag: int, shot: int, room: HitRoom)
+## Sender: core/projectiles, while it merges a step's shot hits (`merge_hits`; hit batch A2). A shot
+## hit `target`, and the pass has not asked of it since its last event: Combat fills `room` at once
+## (`HitRoom`: whether hits take its health, how much it has, its hex, its barrier's charges and the
+## spell it spares), so the manager stops spending shots on a body its pass has already killed.
+## Heard by combat; heard by nobody, `room` stays unknown (every shot hits as it comes). An ask with
+## its answer.
+signal hit_room_asked(target: Node, room: HitRoom)
+## Sender: core/projectiles, with `hit_room_asked` (hit batch A2). A shot tagged `tag` (slot `shot`)
+## hit a body, and the pass has not asked of its spell since its last event (a shot that hits alone
+## asks for itself): Combat fills `answer` at once (`HitDamage`: one hit's damage before the body's
+## hex). Heard by combat; heard by nobody, it stays 0. An ask with its answer.
+signal hit_damage_asked(tag: int, shot: int, answer: HitDamage)
 ## Sender: core/projectiles. A projectile fired by the actor `caster` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`. Heard by core/spells (on expire) and feel (a small pop where a life ran out). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal projectile_expired(caster: int, position: Vector2, tag: int, shot: int)
 ## Sender: core/spells. A carrier of the actor `caster` just showed itself, for looks only (they have no shot to draw). `carrier_card` names the carrier card whose looks show (Feel plays its `shown_cue` here): `&"beam"` (`length` is how far it got, along `direction`) or `&"dash"` (the wizard dashes from `origin` along `direction` for `length` pixels, as far as the walls let it) or `&"slam"` (its strike at `origin`, `length` its ring) or a teleport's card (it leaves `origin` along `direction` for `length` pixels), a swap's (one end of its trade, at `origin`, the other `length` pixels along `direction`; sent for each end), a decoy's or a familiar's (it appears at `origin`); or a modifier that shows itself, named by its card in the same place: a zap (`Spells.ZAP_CARD`, the Zap modifier's id; `length` its arc), or a siphon's mana coming back (`Spells.SIPHON_CARD`: from a hit at `origin` along `direction` to its caster's staff tip, `length` pixels away). `tint` is the colour of the spell's element (white for plain arcane) and `look` its packed look kinds (`CompiledSpell.look`), so the cue shows its cards.

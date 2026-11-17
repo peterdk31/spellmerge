@@ -665,7 +665,7 @@ signal still_shots_drawn(view: StillShotView)
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_merging", &"merge_hits", &"_hit_batch", &"merged_turns", &"_freeing_now", &"merges_hits"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_merging", &"merge_hits", &"_hit_batch", &"merged_turns", &"_freeing_now", &"_sent", &"merges_hits"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -733,6 +733,9 @@ var _hit_batch: HitBatch = HitBatch.new()
 var merged_turns: int = 0
 ## True while `_drop_one` makes room at the cap: that slot is freed at once, merging or not.
 var _freeing_now: bool = false
+## Every event the manager sends counts one (before it goes out): a room or a spell's damage the hit
+## batch was told before the count moved is asked again, since a handler may have changed it.
+var _sent: int = 0
 ## The way the shot was flying, while a `projectile_expired` is sent (with `impact_carrier_card`,
 ## `impact_core` and `impact_look`, so Feel can show where its life ran out).
 var impact_heading: Vector2 = Vector2.ZERO
@@ -2177,6 +2180,7 @@ func clear() -> void:
 	_hit_batch.empty()
 	for slot in _high:
 		if _alive[slot] != 0 and _tag[slot] != 0:
+			_sent += 1
 			shot_ended.emit(_tag[slot])
 	for slot: int in _solids.keys():
 		_drop_solid(slot)
@@ -3043,6 +3047,7 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 	if events != null:
 		var outer_slot: int = _event_slot
 		_event_slot = slot
+		_sent += 1
 		events.shot_deflected.emit(by, _pos[slot], by_tag, slot)
 		_event_slot = outer_slot
 	return true
@@ -3064,6 +3069,7 @@ func block_shot(slot: int, by: int, by_tag: int, carrier: StringName = &"") -> b
 		var outer_slot: int = _event_slot
 		impact_carrier = carrier
 		_event_slot = -1
+		_sent += 1
 		events.shot_blocked.emit(by, at, by_tag, -1)
 		_event_slot = outer_slot
 		impact_carrier = outer_carrier
@@ -4222,6 +4228,7 @@ func _wall_end(slot: int) -> void:
 	# Last: a handler's payload may take this slot over (a cap drop).
 	var outer_slot: int = _event_slot
 	_event_slot = slot
+	_sent += 1
 	wall_met.emit(_actor[slot], at, _vel[slot].normalized(), _tag[slot], slot)
 	_event_slot = outer_slot
 
@@ -4300,6 +4307,7 @@ func _guard_meets(slot: int, other: int, normal: Vector2) -> void:
 	_kill(other)
 	if events != null:
 		_event_slot = slot
+		_sent += 1
 		events.shot_blocked.emit(_actor[slot], at, _tag[slot], slot)
 		_event_slot = -1
 
@@ -4888,11 +4896,13 @@ func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: in
 	impact_core = Color.WHITE
 	impact_look = 0
 	impact_tag = 0
+	_sent += 1
 	events.projectile_impact.emit(caster, target, point, heading)
 	impact_carrier_card = &""
 	# One hit, whatever merged hit's handler struck it (`impact_count`).
 	var outer_count: int = impact_count
 	impact_count = 1
+	_sent += 1
 	events.projectile_hit.emit(caster, target, point, tag, -1)
 	impact_count = outer_count
 	_ray_depth -= 1
@@ -5109,6 +5119,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_core = Color.WHITE
 			impact_look = 0
 			impact_tag = 0
+			_sent += 1
 			events.projectile_impact.emit(caster, node, points[i], heads[i])
 			impact_carrier_card = &""
 			impact_core = Color.WHITE
@@ -5116,6 +5127,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			# One hit, whatever merged hit's handler fired the ray (`impact_count`).
 			var outer_count: int = impact_count
 			impact_count = 1
+			_sent += 1
 			events.projectile_hit.emit(caster, node, points[i], tag, -1)
 			impact_count = outer_count
 		nodes[i] = null
@@ -5131,6 +5143,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_core = Color.WHITE
 			impact_look = 0
 			impact_tag = 0
+			_sent += 1
 			events.projectile_impact.emit(caster, null, turn, (walk[n - 1] as Vector2).direction_to(turn))
 			impact_carrier_card = &""
 			impact_core = Color.WHITE
@@ -5140,6 +5153,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		impact_core = Color.WHITE
 		impact_look = 0
 		impact_tag = 0
+		_sent += 1
 		events.projectile_impact.emit(caster, null, end, end_heading)
 		impact_carrier_card = &""
 		impact_core = Color.WHITE
@@ -5149,8 +5163,10 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		if n >= walked - 1:
 			break
 		var turn: Vector2 = walk[n]
+		_sent += 1
 		wall_met.emit(caster, turn, turn.direction_to(walk[n + 1]), tag, -1)
 	if walled:
+		_sent += 1
 		wall_met.emit(caster, end - end_heading * 0.5, end_heading, tag, -1)
 	_ray_depth -= 1
 	_event_slot = outer_slot
@@ -6037,6 +6053,7 @@ func _kill(slot: int, announce: bool = true) -> void:
 		if _merging:
 			_hit_batch.keep_end(_tag[slot])
 		else:
+			_sent += 1
 			shot_ended.emit(_tag[slot])
 	if _kinds[slot] != 0:
 		_leave_all(slot)
@@ -6080,6 +6097,7 @@ func _expire(slot: int) -> void:
 		impact_look = _look[slot]
 		impact_tag = tag
 		impact_heading = _vel[slot].normalized()
+		_sent += 1
 		events.projectile_expired.emit(caster, at, tag, slot)
 		impact_carrier_card = &""
 		impact_body = 0
@@ -6094,6 +6112,7 @@ func _expire(slot: int) -> void:
 			# comes after its hits' handlers).
 			_hit_batch.keep_end(tag)
 		else:
+			_sent += 1
 			shot_ended.emit(tag)
 
 
@@ -6805,6 +6824,7 @@ func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 		impact_core = _core[slot]
 		impact_look = _look[slot]
 		impact_tag = _tag[slot]
+		_sent += 1
 		events.projectile_impact.emit(_actor[slot], null, _pos[slot], velocity.normalized())
 		impact_carrier_card = &""
 		impact_body = 0
@@ -6868,6 +6888,7 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		else:
 			_send_hit(caster, node, at, heading, tag, slot, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot], 1)
 	if spent and tag != 0:
+		_sent += 1
 		shot_ended.emit(tag)
 
 
@@ -6880,6 +6901,7 @@ func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: i
 	impact_look = look
 	impact_tag = tag
 	impact_count = count
+	_sent += 1
 	events.projectile_impact.emit(caster, node, at, heading)
 	impact_carrier_card = &""
 	impact_body = 0
@@ -6887,6 +6909,7 @@ func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: i
 	impact_look = 0
 	impact_tag = 0
 	_event_slot = slot
+	_sent += 1
 	events.projectile_hit.emit(caster, node, at, tag, slot)
 	_event_slot = -1
 	impact_count = 1
@@ -6898,10 +6921,24 @@ func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: i
 func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, heading: Vector2) -> void:
 	if _hit_batch.add_to(target, caster, tag, (_flags[slot] & F_ALONE) != 0, _flags, F_ALONE) >= 0:
 		return
-	var entry: int = _hit_batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot])
-	_hit_batch.room.clear()
-	events.hit_room_asked.emit(caster, _targets[target], tag, slot, _hit_batch.room)
-	_hit_batch.take_room(entry)
+	var batch: HitBatch = _hit_batch
+	var entry: int = batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot])
+	# The body's room and the spell's damage, each asked once a pass, and again after any event
+	# (its handlers may have changed them; hit batch A2). A shot that hits alone asks for itself.
+	if not batch.room_fresh(target, _sent):
+		batch.room.clear()
+		events.hit_room_asked.emit(_targets[target], batch.room)
+		batch.keep_room(target, _sent)
+	var alone: bool = (_flags[slot] & F_ALONE) != 0
+	var kept: int = -1 if alone else batch.damage_slot(tag, _sent)
+	if kept >= 0:
+		batch.take_room(entry, batch.damage_at(kept))
+		return
+	batch.damage.clear()
+	events.hit_damage_asked.emit(tag, slot, batch.damage)
+	if not alone:
+		batch.keep_damage(tag, _sent)
+	batch.take_room(entry, batch.damage.damage)
 
 
 ## The shots the pass's hits spent, ended in the order they were (their tails where they were spent;
@@ -6988,6 +7025,7 @@ func _send_merged() -> void:
 	# A handler's end meanwhile is sent at once (merging is off by now), so nothing joins this list.
 	var i: int = 0
 	while i < batch.ended_count():
+		_sent += 1
 		shot_ended.emit(batch.ended_tag(i))
 		i += 1
 	batch.forget_ended()

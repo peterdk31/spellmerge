@@ -34,8 +34,9 @@ var card: Array[StringName] = []
 var body: PackedInt32Array = PackedInt32Array()
 var core: PackedColorArray = PackedColorArray()
 var look: PackedInt32Array = PackedInt32Array()
-## What Combat is asked to fill at an entry's first hit (`hit_room_asked`), one for every ask.
+## What Combat is asked to fill (`hit_room_asked`, `hit_damage_asked`), one of each for every ask.
 var room: HitRoom = HitRoom.new()
+var damage: HitDamage = HitDamage.new()
 
 ## Each entry's next on its target (-1 for the last), its damage a hit and whether its spell meets
 ## the target's barrier.
@@ -52,6 +53,26 @@ var _health: PackedFloat64Array = PackedFloat64Array()
 var _spent: PackedFloat64Array = PackedFloat64Array()
 var _charges: PackedInt32Array = PackedInt32Array()
 var _charges_used: PackedInt32Array = PackedInt32Array()
+## By target, the body's room as Combat last told it in this pass (hit batch A2): asked in pass
+## `_room_pass`, at the manager's count of events sent `_room_at` (a room asked before an event
+## since is asked again: its handlers may have changed it), and what it said (`HitRoom`).
+var _room_pass: PackedInt32Array = PackedInt32Array()
+var _room_at: PackedInt32Array = PackedInt32Array()
+var _room_known: PackedByteArray = PackedByteArray()
+var _room_health: PackedFloat64Array = PackedFloat64Array()
+var _room_hexed: PackedByteArray = PackedByteArray()
+var _room_hex: PackedFloat64Array = PackedFloat64Array()
+var _room_charges: PackedInt32Array = PackedInt32Array()
+var _room_spares: PackedInt64Array = PackedInt64Array()
+## The spells' damage a hit as Combat last told it in this pass (`HitDamage`), by tag: an open
+## table (`SPELLS_FIRST` slots to start, doubled when half full), a slot in use while its
+## `_spell_pass` is this pass, asked at the count of events sent `_spell_at` (as `_room_at`).
+const SPELLS_FIRST: int = 64
+var _spell_key: PackedInt64Array = PackedInt64Array()
+var _spell_pass: PackedInt32Array = PackedInt32Array()
+var _spell_at: PackedInt32Array = PackedInt32Array()
+var _spell_damage: PackedFloat64Array = PackedFloat64Array()
+var _spells_n: int = 0
 ## The shots the pass's hits spent, in order, and where each was spent; sized for the pass's shots.
 var _used: PackedInt32Array = PackedInt32Array()
 var _used_at: PackedVector2Array = PackedVector2Array()
@@ -67,6 +88,7 @@ var _ended_n: int = 0
 ## A pass of `shots` shots over `targets` targets begins: the tallies of the last are forgotten.
 func open(targets: int, shots: int) -> void:
 	_pass += 1
+	_spells_n = 0
 	fit_targets(targets)
 	if _used.size() < shots:
 		_used.resize(shots)
@@ -90,6 +112,14 @@ func fit_targets(targets: int) -> void:
 		_charges.resize(targets)
 		_charges_used.resize(targets)
 		_target_pass.resize(targets)
+		_room_pass.resize(targets)
+		_room_at.resize(targets)
+		_room_known.resize(targets)
+		_room_health.resize(targets)
+		_room_hexed.resize(targets)
+		_room_hex.resize(targets)
+		_room_charges.resize(targets)
+		_room_spares.resize(targets)
 
 
 ## False when the damage the pass's hits counted off `t`, every spell's, reaches its health.
@@ -161,16 +191,77 @@ func add(t: int, targets: int, who: int, spell: int, shot: int, shot_seq: int, p
 	return entry
 
 
-## `room` as Combat filled it for `entry`'s first hit: its damage a hit, the target's health (the
-## latest ask's, whichever spell asked) and the barrier's charges as a spell they meet says; then
-## that first hit counted.
-func take_room(entry: int) -> void:
+## Whether target `t`'s room was told in this pass with no event sent since (`sent`: the manager's
+## count of events sent).
+func room_fresh(t: int, sent: int) -> bool:
+	return t < _room_pass.size() and _room_pass[t] == _pass and _room_at[t] == sent
+
+
+## `room` as Combat filled it for target `t`, kept for the pass at the count of events `sent`.
+func keep_room(t: int, sent: int) -> void:
+	_room_pass[t] = _pass
+	_room_at[t] = sent
+	_room_known[t] = 1 if room.known else 0
+	_room_health[t] = room.health
+	_room_hexed[t] = 1 if room.hexed else 0
+	_room_hex[t] = room.hex
+	_room_charges[t] = room.charges
+	_room_spares[t] = room.spares
+
+
+## The slot of the spell `spell`'s damage told in this pass with no event sent since (`sent`), or
+## -1 (`damage_at` reads it).
+func damage_slot(spell: int, sent: int) -> int:
+	if _spell_key.is_empty():
+		return -1
+	var i: int = _spell_find(spell)
+	return i if _spell_pass[i] == _pass and _spell_at[i] == sent else -1
+
+
+func damage_at(i: int) -> float:
+	return _spell_damage[i]
+
+
+## `damage` as Combat filled it for the spell `spell`, kept for the pass at the count of events
+## `sent`.
+func keep_damage(spell: int, sent: int) -> void:
+	if _spells_n * 2 >= _spell_key.size():
+		_spell_grow(maxi(SPELLS_FIRST, _spell_key.size() * 2))
+	var i: int = _spell_find(spell)
+	if _spell_pass[i] != _pass:
+		_spell_pass[i] = _pass
+		_spell_key[i] = spell
+		_spells_n += 1
+	_spell_at[i] = sent
+	_spell_damage[i] = damage.damage
+
+
+## `entry`'s first hit, from its target's room (`keep_room`) and `spell_damage`, its spell's damage
+## a hit before the hex, as Combat answered one ask for both before hit batch A2 (the oracle,
+## tests/support/hit_room_oracle.gd): a body whose room is unknown takes nothing and is never dead;
+## else its health counts, its hex grows the damage, a spell that deals none meets no barrier, and
+## the barrier's charges count for a spell it does not spare. Then that first hit is counted.
+func take_room(entry: int, spell_damage: float) -> void:
 	var t: int = target[entry]
-	_damage[entry] = room.damage
-	_health[t] = room.health
-	_blocks[entry] = 1 if room.charges > 0 else 0
-	if room.charges > 0:
-		_charges[t] = room.charges
+	if _room_known[t] == 0:
+		_damage[entry] = 0.0
+		_health[t] = INF
+		_blocks[entry] = 0
+	else:
+		_health[t] = _room_health[t]
+		var d: float = spell_damage
+		if _room_hexed[t] != 0:
+			d += d * _room_hex[t] / 100.0
+		if d <= 0.0:
+			_damage[entry] = 0.0
+			_blocks[entry] = 0
+		else:
+			_damage[entry] = d
+			var spares: int = _room_spares[t]
+			var meets: bool = _room_charges[t] > 0 and (spares == 0 or spares != tag[entry])
+			_blocks[entry] = 1 if meets else 0
+			if meets:
+				_charges[t] = _room_charges[t]
 	_spend_room(t, entry)
 
 
@@ -268,6 +359,37 @@ func _spend_room(t: int, entry: int) -> void:
 		_charges_used[t] += 1
 	else:
 		_spent[t] += _damage[entry]
+
+
+## The slot of `spell` in the spells' table, or the empty one it would take.
+func _spell_find(spell: int) -> int:
+	var mask: int = _spell_key.size() - 1
+	var i: int = ((spell * -7046029254386353131) >> 32) & mask
+	while _spell_pass[i] == _pass and _spell_key[i] != spell:
+		i = (i + 1) & mask
+	return i
+
+
+func _spell_grow(size: int) -> void:
+	var keys: PackedInt64Array = _spell_key
+	var passes: PackedInt32Array = _spell_pass
+	var ats: PackedInt32Array = _spell_at
+	var damages: PackedFloat64Array = _spell_damage
+	_spell_key = PackedInt64Array()
+	_spell_key.resize(size)
+	_spell_pass = PackedInt32Array()
+	_spell_pass.resize(size)
+	_spell_at = PackedInt32Array()
+	_spell_at.resize(size)
+	_spell_damage = PackedFloat64Array()
+	_spell_damage.resize(size)
+	for j in keys.size():
+		if passes[j] == _pass:
+			var i: int = _spell_find(keys[j])
+			_spell_pass[i] = _pass
+			_spell_key[i] = keys[j]
+			_spell_at[i] = ats[j]
+			_spell_damage[i] = damages[j]
 
 
 func _grow(size: int) -> void:

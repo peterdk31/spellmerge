@@ -1,50 +1,28 @@
 extends "res://tests/support/suite.gd"
-## The oracle of a body's room (tests/support/hit_room_oracle.gd, hit batch A0) answers every
-## `hit_room_asked` as Combat does, to the bit. A real fight (piercing bolt fans, a fire bolt and a
-## mending fan on imps, one hexed, one shielded, one barriered by the fire bolt's own spell, a weak
-## one that dies) asks it at the bodies' first hits; and the kit's bodies are asked straight away in
-## every state Combat reads: plain, hexed, shielded, barriered sparing the spell asked about or
-## another, a caster of power 2, protected, invincible, depleted, down, with no Health, a plain body
-## (Combat's own, not an actor), a body Combat does not know, and spells with no profile
-## and a heal. A2 holds its new answers to this oracle. A shot with a hit profile of its own (`F_ALONE`) is A2's own test.
+## The hit batch's room of a body (hit batch A2: Combat's two answers, a body's room and a spell's
+## damage, each asked once a pass and again after any event) gives at every entry what Combat's one
+## answer before A2 gave (the oracle, tests/support/hit_room_oracle.gd), to the bit: health, damage
+## and the barrier's charges. A real fight holds it at every entry (tests/support/checked_batch.gd):
+## piercing bolt fans, a fire bolt, Plow bolts, a fan of mending bolts and Blast bolts that burst where they end,
+## during the pass, so a body's room changes between two entries of one pass; one imp hexed, one
+## shielded, one barriered by the fire bolt's own spell, a weak one that dies. And the kit's bodies
+## are held to it straight away in every state Combat reads: plain, hexed, shielded, barriered
+## sparing the spell or another, a caster of power 2, protected, invincible, depleted, down, with
+## no Health, a plain body (Combat's own, not an actor), a body Combat does not know, and spells
+## with no profile and a heal. A shot with a hit profile of its own asks for itself (the manager).
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const Oracle := preload("res://tests/support/hit_room_oracle.gd")
+const CheckedBatch := preload("res://tests/support/checked_batch.gd")
 const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
-
-var _asks: int = 0
-var _differ: Array[String] = []
-var _health_told: int = 0
-var _damage_told: int = 0
-var _charges_told: int = 0
+const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 
-func before_each() -> void:
-	_asks = 0
-	_differ.clear()
-	_health_told = 0
-	_damage_told = 0
-	_charges_told = 0
-
-
-## Listened after Combat's own answer: the oracle fills a room of its own for the same ask.
-func _watch(arena: ArenaScript) -> void:
-	var mine := HitRoom.new()
-	arena.bus.hit_room_asked.connect(func(_caster: int, target: Node, tag: int, shot: int, room: HitRoom) -> void:
-		_asks += 1
-		Oracle.answer(arena.combat, target, tag, shot, mine)
-		if room.health < INF:
-			_health_told += 1
-		if room.damage > 0.0:
-			_damage_told += 1
-		if room.charges > 0:
-			_charges_told += 1
-		if mine.health != room.health or mine.damage != room.damage or mine.charges != room.charges:
-			_differ.append("ask %d, tag %d: Combat %s/%s/%d, oracle %s/%s/%d" % [_asks, tag, room.health, room.damage, room.charges, mine.health, mine.damage, mine.charges]))
-
-
-func test_the_oracle_answers_every_ask_of_a_fight_as_combat_does() -> void:
+func test_every_entry_of_a_fight_has_the_room_the_oracle_gives() -> void:
 	var arena := ArenaScript.new(root)
-	_watch(arena)
+	var batch := CheckedBatch.new()
+	batch.combat = arena.combat
+	batch.manager = arena.projectiles
+	arena.projectiles._hit_batch = batch
 	var imps: Array[Node2D] = []
 	for k in 6:
 		imps.append(arena.add_imp(Vector2(60.0 + 12.0 * float(k), -20.0 + 8.0 * float(k)), 40.0 + 15.0 * float(k)))
@@ -53,37 +31,54 @@ func test_the_oracle_answers_every_ask_of_a_fight_as_combat_does() -> void:
 	arena.combat.apply_status(1, imps[1], arena.combat.HEX, 5.0, 40.0)
 	arena.combat.apply_status(1, imps[4], arena.combat.HEX, 5.0, 25.0)
 	arena.combat.give_shield(imps[2], 2, 5.0)
-	var fan: CompiledStaff = arena.install_cards(0, 0, [&"triple", &"pierce", &"bolt"])
-	check(fan != null, "a fan of piercing bolts")
-	var spared: CompiledStaff = arena.install_cards(0, 1, [&"fire", &"bolt"])
-	check(spared != null, "a fire bolt")
-	var mend: CompiledStaff = arena.install_cards(1, 0, [&"mend", &"triple", &"bolt"])
-	check(mend != null, "a fan of mending bolts")
+	check(arena.install_cards(0, 0, [&"triple", &"pierce", &"bolt"]) != null, "a fan of piercing bolts")
+	check(arena.install_cards(0, 1, [&"fire", &"bolt"]) != null, "a fire bolt")
+	check(arena.install_cards(1, 0, [&"mend", &"triple", &"bolt"]) != null, "a fan of mending bolts")
+	check(arena.install_cards(1, 1, [&"blast", &"triple", &"bolt"]) != null, "a fan of Blast bolts")
+	# Plow (docs/milestones/hit-batch.md, A2, "Plow"): a body a shot carries is not hurt by it, which
+	# neither the oracle nor the batch knows; its entries are held to the oracle all the same.
+	check(arena.install_cards(0, 2, [&"plow", &"bolt"]) != null, "a Plow bolt")
 	arena.place_caster(1, Vector2(0.0, 10.0))
-	for round in 6:
+	var carried: bool = false
+	for round in 8:
 		if round == 2:
 			# A barrier that spares the fire bolt's own spell: its charges are not told for it.
 			arena.combat.give_barrier(imps[3], 3, 5.0, arena.spells.current_tag(0, 1))
 		arena.cast(0, 0)
 		arena.cast(0, 1, Vector2(1.0, 0.2).normalized())
 		arena.cast(1, 0, Vector2(1.0, -0.1).normalized())
-		arena.run(0.6)
-	check(_asks > 20, "the fight asked often (%d)" % _asks)
-	check(_damage_told > 0 and _charges_told > 0 and _health_told > _damage_told, "damage, charges and a heal's health-only answer all came up (%d, %d, %d)" % [_damage_told, _charges_told, _health_told])
+		arena.cast(1, 1, Vector2(1.0, 0.05).normalized())
+		arena.cast(0, 2, Vector2(1.0, 0.1).normalized())
+		for step in 36:
+			arena.run(1.0 / 60.0)
+			for imp: Node2D in imps:
+				if is_instance_valid(imp) and arena.spells._plow.carrying(arena.combat.actor_of(imp), arena.spells.current_tag(0, 2)):
+					carried = true
+	check(batch.checked > 20, "the fight opened many entries (%d)" % batch.checked)
+	for shape: String in ["health only", "damage", "charges"]:
+		check(int(batch.shapes.get(shape, 0)) > 0, "an entry of %s came up (%s)" % [shape, batch.shapes])
 	check(arena.combat.health_of(imps[1]) < 55.0, "the hexed imp was hurt (%s)" % arena.combat.health_of(imps[1]))
 	check(arena.died(weak), "the weak imp died in the fight")
-	check_equal(_differ, [] as Array[String], "the oracle and Combat agree at every ask")
+	check(carried, "a Plow bolt carried an imp")
+	check_equal(batch.differ, [] as Array[String], "the batch's room and the oracle's agree at every entry")
 	arena.free_all()
 
 
-## Combat's answer and the oracle's for one ask, compared; the answer's shape is counted in `shapes`.
+## One entry of `tag` on `target`, its room worked out by a hit batch from Combat's two answers, and
+## the oracle's for it, compared; the oracle's answer's shape is counted in `shapes`.
 func _ask(world: ActorFixture, target: Node, tag: int, shapes: Dictionary, what: String) -> void:
-	var room := HitRoom.new()
-	var mine := HitRoom.new()
-	world.bus.hit_room_asked.emit(0, target, tag, -1, room)
-	Oracle.answer(world.combat, target, tag, -1, mine)
-	check_equal([mine.health, mine.damage, mine.charges], [room.health, room.damage, room.charges], what + ": the oracle as Combat")
-	var shape: String = "unknown" if room.health == INF else ("health only" if room.damage <= 0.0 else ("charges" if room.charges > 0 else "damage"))
+	var batch := HitBatch.new()
+	batch.open(1, 1)
+	var entry: int = batch.add(0, 1, 0, tag, 0, 0, Vector2.ZERO, Vector2.RIGHT, &"bolt", 0, Color.WHITE, 0)
+	world.bus.hit_room_asked.emit(target, batch.room)
+	batch.keep_room(0, 0)
+	world.bus.hit_damage_asked.emit(tag, -1, batch.damage)
+	batch.take_room(entry, batch.damage.damage)
+	var told := Oracle.Answer.new()
+	Oracle.answer(world.combat, target, tag, -1, told)
+	var charges: int = batch._charges[0] if batch._blocks[entry] != 0 else 0
+	check_equal([batch._health[0], batch._damage[entry], charges], [told.health, told.damage, told.charges], what + ": the batch's room as the oracle's")
+	var shape: String = "unknown" if told.health == INF else ("health only" if told.damage <= 0.0 else ("charges" if told.charges > 0 else "damage"))
 	shapes[shape] = int(shapes.get(shape, 0)) + 1
 
 
@@ -100,7 +95,7 @@ func test_the_oracle_answers_every_state_of_a_body_as_combat_does() -> void:
 	_ask(world, body, bolt, shapes, "plain")
 	_ask(world, body, 0, shapes, "no spell")
 	_ask(world, body, mend, shapes, "a heal")
-	var plain := HitRoom.new()
+	var plain := Oracle.Answer.new()
 	Oracle.answer(world.combat, body, bolt, -1, plain)
 	damages.append(plain.damage)
 	wizard.stats.power = 2.0
@@ -144,4 +139,43 @@ func test_the_oracle_answers_every_state_of_a_body_as_combat_does() -> void:
 	_ask(world, own(Node2D.new()) as Node2D, bolt, shapes, "a stranger")
 	for shape: String in ["unknown", "health only", "damage", "charges"]:
 		check(int(shapes.get(shape, 0)) > 0, "an answer of %s came up (%s)" % [shape, shapes])
+	world.free_all()
+
+
+## A room and a spell's damage told before an event of the pass are asked again: in one pass shot A
+## hits X (its room and its spell's damage told), shot B ends on a wall and its handler hurts X and
+## doubles the caster's power, then shot C of another spell hits X and shot D of A's spell hits Y.
+## C's entry must see X's health after the hurt, and D's the doubled damage, as the oracle does.
+func test_a_room_and_a_damage_told_before_an_event_are_asked_again() -> void:
+	var world := ActorFixture.new(root)
+	var wizard: Actor = world.actor(Vector2.ZERO, [&"health", &"hurtbox", &"caster"] as Array[StringName], ActorFixture.Scripted.new(), [[&"bolt"], [&"fire", &"bolt"]])
+	var kinds: Array[StringName] = [&"health", &"hurtbox"]
+	var x: Actor = world.actor(Vector2(200.0, 0.0), kinds, ActorFixture.Scripted.new())
+	var y: Actor = world.actor(Vector2(200.0, 120.0), kinds, ActorFixture.Scripted.new())
+	var batch := CheckedBatch.new()
+	batch.combat = world.combat
+	batch.manager = world.projectiles
+	world.projectiles._hit_batch = batch
+	world.projectiles.set_walls([Rect2(400.0, 200.0, 40.0, 40.0)] as Array[Rect2])
+	var bolt: int = world.tag_of(wizard, 0)
+	var fire: int = world.tag_of(wizard, 1)
+	var asked: Array[String] = []
+	world.bus.hit_room_asked.connect(func(target: Node, _room: HitRoom) -> void: asked.append("room " + target.name))
+	world.bus.hit_damage_asked.connect(func(tag: int, _shot: int, _answer: HitDamage) -> void: asked.append("damage %s" % ("bolt" if tag == bolt else "fire")))
+	world.bus.projectile_expired.connect(func(_caster: int, _at: Vector2, _tag: int, _shot: int) -> void:
+		asked.append("wall")
+		world.combat.hit(-1, x, 7)
+		wizard.stats.power = 2.0)
+	var mgr: ManagerScript = world.projectiles
+	var into: Vector2 = Vector2(600.0, 0.0)
+	var shots: Array[int] = []
+	shots.append(mgr.spawn(wizard.id, x.global_position + x.body_offset - Vector2(6.0, 0.0), into, 1.0, 3.0, ManagerScript.ACTOR_LAYERS, 0, bolt))
+	shots.append(mgr.spawn(wizard.id, Vector2(394.0, 220.0), into, 1.0, 3.0, ManagerScript.ACTOR_LAYERS, 0, 0))
+	shots.append(mgr.spawn(wizard.id, x.global_position + x.body_offset - Vector2(6.0, 2.0), into, 1.0, 3.0, ManagerScript.ACTOR_LAYERS, 0, fire))
+	shots.append(mgr.spawn(wizard.id, y.global_position + y.body_offset - Vector2(6.0, 0.0), into, 1.0, 3.0, ManagerScript.ACTOR_LAYERS, 0, bolt))
+	check(shots[0] < shots[1] and shots[1] < shots[2] and shots[2] < shots[3], "the pass meets the shots in that order (%s)" % [shots])
+	mgr.step(1.0 / 60.0)
+	check_equal(asked, ["room " + x.name, "damage bolt", "wall", "room " + x.name, "damage fire", "room " + y.name, "damage bolt"] as Array[String], "asked once each, and again after the wall's event")
+	check_equal(batch.checked, 3, "three entries")
+	check_equal(batch.differ, [] as Array[String], "each as the oracle tells it at its first hit")
 	world.free_all()

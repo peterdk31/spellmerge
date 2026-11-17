@@ -9,6 +9,8 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 ## Clearance a spawn needs around it (a wizard is about 12 px wide).
 const SPAWN_RADIUS: float = 12.0
 const TILE: float = 32.0
+## The part of an exit's area a wizard walks into, from its bottom: a wizard's height and a half.
+const EXIT_FOOT: float = 24.0
 ## The walls' grid (the projectile manager's `WALL_CELL`), on which the reach is flooded.
 const CELL: float = 8.0
 const STEPS: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
@@ -102,8 +104,11 @@ func test_doors_lie_on_the_border() -> void:
 			check(on_border, "%s: door %s lies on the border" % [room.id, door])
 
 
-## Where each exit is stood on (`room_exit` props, run generation RG4): open floor, clear of every
-## wall and spawn, so a wizard can step in and nobody starts in a way on.
+## Where each exit is stood on (a prop of the role `room_exit`, run generation RG4): its foot (the
+## lowest `EXIT_FOOT` pixels of its area, where a wizard walks in) open floor clear of every wall,
+## its whole area inside the room and clear of every spawn, so a wizard can step in and nobody
+## starts in a way on. Above its foot an exit may rise over the edge: a crypt gate stands against a
+## floating room's north edge, its arch over the dark (crypt rework CR-G).
 func test_exits_are_open_floor_clear_of_spawns() -> void:
 	for room in templates:
 		var places: RoomPlaces = room.places()
@@ -116,8 +121,9 @@ func test_exits_are_open_floor_clear_of_spawns() -> void:
 			var area: Rect2 = prop.area_rect()
 			area.position += at[i]
 			check(_bounds(room).encloses(area), "%s: the exit at %s is inside the room" % [room.id, at[i]])
+			var foot: Rect2 = Rect2(area.position.x, area.end.y - EXIT_FOOT, area.size.x, minf(EXIT_FOOT, area.size.y))
 			for wall in _walls(room):
-				check(not wall.intersects(area), "%s: the exit at %s is clear of the wall %s" % [room.id, at[i], wall])
+				check(not wall.intersects(foot), "%s: the exit at %s is walked into from open floor, clear of the wall %s" % [room.id, at[i], wall])
 			for point in _spawns(room):
 				check(not area.grow(SPAWN_RADIUS).has_point(point), "%s: the spawn %s is clear of the exit at %s" % [room.id, point, at[i]])
 

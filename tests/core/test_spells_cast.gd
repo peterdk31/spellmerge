@@ -654,9 +654,10 @@ func _timer_entries(slot: int) -> int:
 
 
 func test_a_shot_replaced_in_its_slot_is_timed_once() -> void:
-	# Hits one by one: merged, a spent shot's slot is held until its hit is sent, so the jump never
-	# takes it (the hit batch's held slots, `HitBatch.hold`).
-	_mgr.merge_hits = false
+	# A spent shot's slot is held until its merged hit is sent (`HitBatch.hold`); at the cap, the
+	# jump's spawn takes it back (`_take_back_slot`), so the jump's shot takes the slot of the shot
+	# that hit, in the same step.
+	_mgr.set_cap(1)
 	_target(Vector2(60, 0))
 	_target(Vector2(110, 0))
 	_build(0, 0, {"carrier": &"bolt", "modifiers": [&"chain"], "trigger": &"timer", "held": {"carrier": &"short"}})

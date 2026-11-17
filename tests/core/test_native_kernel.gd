@@ -88,9 +88,8 @@ var _circled_quad: bool = false
 var _box_hits: Array[String] = []
 ## How many differences the running test found: a scene stops at the ninth (the rest follow).
 var _differences: int = 0
-## Whether the scene's managers merge their hits (`merge_hits`; the merged tests), the native side's
-## hand-backs counted over the steps, and the hits sent (each merged hit counts its shots).
-var _merged: bool = false
+## The native side's hand-backs counted over the steps, and the hits sent (each merged hit counts
+## its shots).
 var _handbacks: int = 0
 var _hits_sent: int = 0
 
@@ -100,10 +99,6 @@ var _bodies: Array[Shader] = []
 
 
 func before_each() -> void:
-	# These tests are of the hits one by one (`ProjectileManager.merges_hits`, put back after), but
-	# for the merged ones, which set `_merged`.
-	ManagerScript.merges_hits = false
-	_merged = false
 	_handbacks = 0
 	_hits_sent = 0
 	_mgrs = []
@@ -156,7 +151,6 @@ func _manager(side: int, threads: int, cap: int, table: ActorSeats.ActorsScript)
 	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
 	mgr.native_threads = threads
 	mgr.native = side == 1
-	mgr.merge_hits = _merged
 	mgr.actors = table
 	mgr.events = bus
 	root.add_child(mgr)
@@ -253,33 +247,19 @@ func test_the_native_switch_picks_the_gdscript_or_the_kernel() -> void:
 
 # --- The scene, stepped side by side ----------------------------------------
 
+## The scene, its hits merged: the kernel takes each shot whose hits only add to merged hits of the
+## pass (`HitPass::merge_hits`), with bodies the pass kills passed over (`hit_room_asked`,
+## `hit_damage_asked`, answered alike on both sides), to the bit as the GDScript does.
 func test_one_thread_steps_like_the_gdscript() -> void:
 	if not _native_loaded():
 		return
 	_step_the_scene_alike(1)
+	_check_the_kernel_merged()
 
 
 func test_several_threads_step_like_the_gdscript() -> void:
 	if not _native_loaded():
 		return
-	_step_the_scene_alike(THREADS[THREADS.size() - 1])
-
-
-## The same scene with its hits merged (`merge_hits`): the kernel takes each shot whose hits only add
-## to merged hits of the pass (`HitPass::merge_hits`), with bodies the pass kills passed over
-## (`hit_room_asked`, answered alike on both sides), to the bit as the GDScript does.
-func test_one_thread_steps_like_the_gdscript_with_hits_merged() -> void:
-	if not _native_loaded():
-		return
-	_merged = true
-	_step_the_scene_alike(1)
-	_check_the_kernel_merged()
-
-
-func test_several_threads_step_like_the_gdscript_with_hits_merged() -> void:
-	if not _native_loaded():
-		return
-	_merged = true
 	_step_the_scene_alike(THREADS[THREADS.size() - 1])
 	_check_the_kernel_merged()
 
@@ -342,10 +322,9 @@ func _step_the_scene_alike(threads: int) -> void:
 			(_prop_nodes[side] as Array).append(_add_body(side, "prop%d" % n, PROP_AT[n], PROP_RADIUS[n], ManagerScript.LAYER_ENEMY, _props[n], PROP_HALF[n]))
 		mgr.events.projectile_hit.connect(_on_hit.bind(side))
 		mgr.events.projectile_expired.connect(_on_expired.bind(side))
-		if _merged:
-			mgr.events.hit_room_asked.connect(_on_room_asked)
-			mgr.events.hit_damage_asked.connect(_on_damage_asked)
-			mgr.shot_ended.connect(func(tag: int) -> void: _events[side].append("ended %d" % tag))
+		mgr.events.hit_room_asked.connect(_on_room_asked)
+		mgr.events.hit_damage_asked.connect(_on_damage_asked)
+		mgr.shot_ended.connect(func(tag: int) -> void: _events[side].append("ended %d" % tag))
 	check(_mgrs[1].is_native() and not _mgrs[0].is_native(), "one native manager, one GDScript")
 	# A build without threads (the web's) runs every loop on one.
 	var running: int = _mgrs[1].native_thread_count()
@@ -359,20 +338,19 @@ func _step_the_scene_alike(threads: int) -> void:
 	for step in STEPS:
 		for side in 2:
 			_drive(side, step)
-		if _merged and step % 10 == 4:
+		if step % 10 == 4:
 			# Some shots hit alone (a relay's own profile, `set_hits_alone`), alike on both sides.
 			for side in 2:
 				for slot in range(step % 11, _mgrs[side]._high, 11):
 					_mgrs[side].set_hits_alone(slot)
-		if _merged and _mgrs[1].step_profile.is_empty():
+		if _mgrs[1].step_profile.is_empty():
 			# The native side counts its hand-backs (`step_profile`, which plays as the plain step).
 			_mgrs[1].step_profile.resize(ManagerScript.PROF_PARTS)
 			_mgrs[1].profile_clock = Time.get_ticks_usec
 		for side in 2:
 			_events[side].clear()
 			_mgrs[side].step(DT)
-		if _merged:
-			_handbacks += _mgrs[1].step_profile[ManagerScript.PROF_HANDBACKS]
+		_handbacks += _mgrs[1].step_profile[ManagerScript.PROF_HANDBACKS]
 		if _events[0] != _events[1]:
 			_differ("step %d: the same events (%s)" % [step, _first_difference(_events[0], _events[1]) + " / " + _first_difference(_events[1], _events[0])])
 		_compare_arrays(step)
@@ -417,8 +395,9 @@ func _step_the_scene_alike(threads: int) -> void:
 
 
 # --- Targets grown mid-pass -------------------------------------------------
-# A hit that grows targets mid-pass: the shots after it in the pass must see each target's cell as
-# the GDScript does. It keeps a cell's count and box once taken in a filling (`_cell_info`), so a
+# An event that grows targets mid-pass (a shot ending on a wall: its `projectile_expired` goes out
+# during the pass, while the merged hits wait for its end): the shots after it in the pass must see
+# each target's cell as the GDScript does. It keeps a cell's count and box once taken in a filling (`_cell_info`), so a
 # shot passing the grown `near` (whose cell an earlier shot of the pass took) still sees its old
 # box and misses it, and one passing the grown `far` (whose cell nothing took yet) sees the new
 # one and hits it.
@@ -429,12 +408,13 @@ func _step_targets_grown_mid_pass() -> Array:
 	var first_step: Array = []
 	for side in 2:
 		var mgr: ManagerScript = _manager(side, THREADS[THREADS.size() - 1], 600, ActorSeats.table())
-		var first: Node2D = _add_body(side, "first", Vector2(100.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+		mgr.set_walls([Rect2(96.0, 250.0, 16.0, 40.0)] as Array[Rect2])
 		var near: Node2D = _add_body(side, "near", Vector2(500.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
 		var far: Node2D = _add_body(side, "far", Vector2(800.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
-		(_targets[side] as Array).append_array([first, near, far])
-		mgr.events.projectile_hit.connect(_on_grow_hit.bind(side, first, [near, far]))
-		# First in the pass: a shot past `near` (its cell is taken, its box as it is), then one into `first`.
+		(_targets[side] as Array).append_array([near, far])
+		mgr.events.projectile_hit.connect(_on_grow_hit.bind(side))
+		mgr.events.projectile_expired.connect(_on_grow_wall.bind(side, [near, far]))
+		# First in the pass: a shot past `near` (its cell is taken, its box as it is), then one into the wall.
 		mgr.spawn(0, Vector2(440.0, 300.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY)
 		mgr.spawn(0, Vector2(85.0, 270.0), Vector2(900.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY)
 		# Then shots 40 px off `near` and `far`: only a grown one reaches them.
@@ -463,16 +443,26 @@ func test_a_cell_the_pass_took_keeps_its_box_until_the_next_filling() -> void:
 	if not _native_loaded():
 		return
 	var events: Array = _step_targets_grown_mid_pass()
-	var on_near: int = events.filter(func(e: String) -> bool: return " near " in e).size()
-	var on_far: int = events.filter(func(e: String) -> bool: return " far " in e).size()
+	# Each merged hit's count is its event's last word (`x` and the hits it stands for).
+	var on_near: int = 0
+	var on_far: int = 0
+	for e: String in events:
+		var count: int = int(e.get_slice(" x", 1)) if " x" in e else 0
+		if " near " in e:
+			on_near += count
+		elif " far " in e:
+			on_far += count
 	check(on_near == 0 and on_far > 100, "after the hit, the shots miss the grown near (%d hits) and hit the grown far (%d)" % [on_near, on_far])
 
 
-func _on_grow_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int, first: Node2D, grown: Array) -> void:
-	_events[side].append("hit %d %s %s %d %d" % [caster, (target as Node).name, var_to_str(position), tag, shot])
-	if target == first:
-		for node: Node2D in grown:
-			_mgrs[side].add_target(node, 60.0)
+func _on_grow_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int) -> void:
+	_events[side].append("hit %d %s %s %d %d x%d" % [caster, (target as Node).name, var_to_str(position), tag, shot, _mgrs[side].impact_count])
+
+
+func _on_grow_wall(caster: int, position: Vector2, tag: int, shot: int, side: int, grown: Array) -> void:
+	_events[side].append("wall %d %s %d %d" % [caster, var_to_str(position), tag, shot])
+	for node: Node2D in grown:
+		_mgrs[side].add_target(node, 60.0)
 
 
 func _add_body(side: int, body_name: String, at: Vector2, radius: float, layer: int, owner_id: int, half: Vector2 = Vector2.ZERO) -> Node2D:
@@ -704,6 +694,3 @@ func _compare_draw(step: int) -> void:
 		if var_to_bytes(buffer_a.slice(0, floats)) != var_to_bytes(buffer_b.slice(0, floats)):
 			_differ("step %d batch %d: the instances differ (%s / %s)" % [step, batch, _first_difference(buffer_a.slice(0, floats), buffer_b.slice(0, floats)), _first_difference(buffer_b.slice(0, floats), buffer_a.slice(0, floats))])
 
-
-func after_each() -> void:
-	ManagerScript.merges_hits = true

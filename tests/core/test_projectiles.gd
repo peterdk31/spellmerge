@@ -36,8 +36,6 @@ var expired: Array = []
 
 
 func before_each() -> void:
-	# These tests are of the hits one by one (`ProjectileManager.merges_hits`, put back after).
-	ManagerScript.merges_hits = false
 	bus = own(EventsScript.new()) as EventsScript
 	mgr = own(ManagerScript.new()) as ManagerScript
 	table = own(ActorSeats.table()) as ActorSeats.ActorsScript
@@ -47,7 +45,10 @@ func before_each() -> void:
 	hits.clear()
 	expired.clear()
 	bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int, _shot: int) -> void: expired.append([caster, position, tag]))
-	bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int, _shot: int) -> void: hits.append([caster, target, position, tag]))
+	# One row a hit: a merged hit (a step's hits of one spell on one body) stands for `impact_count`.
+	bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int, _shot: int) -> void:
+		for n in mgr.impact_count:
+			hits.append([caster, target, position, tag]))
 
 
 ## A target in the tree at `position`.
@@ -1605,7 +1606,3 @@ func test_random_queries_agree_with_a_brute_force_search() -> void:
 		if mgr.nearest_target(point, reach, ManagerScript.LAYER_ENEMY) != best:
 			wrong += 1
 	check(wrong == 0, "200 random queries agree with a brute-force search (%d differ)" % wrong)
-
-
-func after_each() -> void:
-	ManagerScript.merges_hits = true

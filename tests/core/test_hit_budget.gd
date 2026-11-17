@@ -106,12 +106,10 @@ func test_a_budget_delays_hits_and_loses_none() -> void:
 			scene.mgr.work_per_step = work
 			for i in 12:
 				_body(scene, Vector2(20.0 + 12.0 * float(i), float(i % 3) * 6.0 - 6.0), 8.0)
-			var velocities := PackedVector2Array()
+			# Each shot a spell (tag) of its own, so each one's hits are its own merged hits and the
+			# bodies it hit are told by its slot.
 			for i in 400:
-				velocities.append(Vector2(300.0, float(i % 21) - 10.0))
-			var slots := PackedInt32Array()
-			slots.resize(velocities.size())
-			scene.mgr.spawn_batch(_caster(scene), Vector2(-20.0, 0.0), velocities, 2.0, 3.0, ManagerScript.LAYER_ENEMY, 1, 0, slots)
+				scene.mgr.spawn(_caster(scene), Vector2(-20.0, 0.0), Vector2(300.0, float(i % 21) - 10.0), 2.0, 3.0, ManagerScript.LAYER_ENEMY, 1, i + 1)
 			# Until every shot has left the bounds or ended.
 			for i in 130:
 				scene.mgr.step(DT)
@@ -246,12 +244,3 @@ func _free(scene: Scene) -> void:
 	scene.mgr.free()
 	scene.table.free()
 	scene.bus.free()
-
-
-func before_each() -> void:
-	# These tests are of the hits one by one (`ProjectileManager.merges_hits`, put back after).
-	ManagerScript.merges_hits = false
-
-
-func after_each() -> void:
-	ManagerScript.merges_hits = true

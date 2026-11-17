@@ -285,12 +285,15 @@ const MOVES_START: int = 64
 ## in a later step, losing no damage (see the class doc). A fixed number, never
 ## measured at run time (rule T1). Sized once (shot scale H2, 2026-11-05) for a
 ## full crowd at the desktop cap: it asks about 93,500 a step (some 200 hits) in
-## the median step and more in a busy one, and at 150,000 no shot there waits more
-## than one step (tests/core/test_hit_budget.gd; at 120,000 thousands do). Normal
+## the median step and more in a busy one, and at 150,000 no shot there waited more
+## than one step (tests/core/test_hit_budget.gd; at 120,000 thousands do). With the
+## hits merged (hit batch A3a, the owner, 2026-11-17) a pass frees its slots in
+## another order, so the shots the budget reaches first differ, and at 150,000 a few
+## hundred waited two steps; at 157,500 (5% more) none waits more than one. Normal
 ## play uses a tiny part of it. No lost damage means the hits a step average what
 ## the shots make whatever the budget, so the budget only spreads a burst of them:
 ## the caps bound the cost.
-const WORK_PER_STEP: int = 150000
+const WORK_PER_STEP: int = 157500
 ## The parts of `step_profile` (shot scale H0): microseconds of `step()`'s passes in its order, the
 ## native kernel's own share of the hit pass, the hand-backs to GDScript (native `hits` calls) and
 ## the shots the hit-work budget left for a later step.

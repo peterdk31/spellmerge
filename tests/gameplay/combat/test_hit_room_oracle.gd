@@ -71,6 +71,7 @@ func _ask(world: ActorFixture, target: Node, tag: int, shapes: Dictionary, what:
 	var batch := HitBatch.new()
 	batch.open(1, 1)
 	var entry: int = batch.add(0, 1, 0, tag, 0, 0, Vector2.ZERO, Vector2.RIGHT, &"bolt", 0, Color.WHITE, 0, false, 0)
+	check_equal(batch.asks, HitBatch.ASK_ROOM | HitBatch.ASK_DAMAGE, what + ": a fresh batch asks both")
 	world.bus.hit_room_asked.emit(target, batch.room)
 	world.bus.hit_damage_asked.emit(tag, -1, batch.damage)
 	batch.take_room(entry)

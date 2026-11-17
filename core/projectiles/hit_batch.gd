@@ -7,11 +7,12 @@ extends RefCounted
 ## (its health as Combat last told it, `HitRoom`, the damage the pass's hits counted off it, its
 ## barrier's charges and those used), so no shot is spent on a body the pass has killed; the shots
 ## the pass's hits spent (ended at its end, their tails where they were spent); the slots of shots
-## ended during the pass (held until its hits are sent: a hit names its shot's slot); and the tags of
-## the ends kept for after the hits.
+## ended during the pass (held until its hits are sent: a hit names its shot's slot); the tags of
+## the ends kept for after the hits; and Combat's answers kept for the pass (hit batch A2): each
+## body's room by target and each spell's damage by tag, asked again after any event.
 ##
-## The manager ends the shots, frees and takes back slots, asks Combat (with `room`) and sends the
-## entries; the batch never calls it. The native hit pass (`ShotKernel`, `BATCH_FIELDS`) reads and
+## The manager ends the shots, frees and takes back slots, asks Combat what `add` says to ask
+## (`asks`, into `room` and `damage`) and sends the entries; the batch never calls it. The native hit pass (`ShotKernel`, `BATCH_FIELDS`) reads and
 ## writes the entries' counts, the tallies and the spent list in place, so they are packed arrays,
 ## sized before the pass (the kernel never grows one), and it counts a hit as `count_hit` does.
 ##

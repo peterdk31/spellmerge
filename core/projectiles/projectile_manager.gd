@@ -6927,9 +6927,8 @@ func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, head
 	if _hit_batch.add_to(target, caster, tag, (_flags[slot] & F_ALONE) != 0, _flags, F_ALONE) >= 0:
 		return
 	var batch: HitBatch = _hit_batch
-	# The body's room and the spell's damage, each asked once a pass, and again after any event
-	# (its handlers may have changed them; hit batch A2). A shot that hits alone asks for itself.
 	var entry: int = batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot], (_flags[slot] & F_ALONE) != 0, _sent)
+	# What the batch has not been told since the pass's last event (`add`).
 	var asks: int = batch.asks
 	if (asks & ASK_ROOM) != 0:
 		events.hit_room_asked.emit(_targets[target], batch.room)

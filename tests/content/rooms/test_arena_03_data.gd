@@ -14,6 +14,8 @@ const BonePile := preload("res://art/tilesets/crypt/bone_pile.svg")
 ## The slab's edge line on the sides (the frame's inset) and the old way's width beside a side pillar.
 const EDGE: float = 32.0
 const WAY: float = 32.0
+## The old pillar box's width (one tile).
+const TILE: float = 32.0
 
 var room_root: Node
 
@@ -91,23 +93,27 @@ func test_it_has_no_pit() -> void:
 	check(RoomPlaces.hole_rects(room_root).is_empty(), "no holes")
 
 
-## Rule 2: between `Pillar1` and the slab's west edge, and `Pillar2` and its east edge, the way is
-## the old 32 px (from the edge line to the old pillar box): open floor all of it, and the slab's
-## invisible wall right at the line, pinned, so it is no narrower and no wider.
+## Rule 2: the ways between `Pillar1` and the slab's west edge, and `Pillar2` and its east edge, stay
+## the crypt's narrowest: the slab's invisible wall pinned right at the 32 px line beside each (the
+## old way was 32 px from that line to the old pillar box), and from it to the pillar prop's ground
+## open floor all the way, as wide as from the line to the old box at the least and no wider than
+## that and the prop's narrower ground.
 func test_its_side_ways_stay_the_narrowest() -> void:
 	var width: float = (RoomData as RoomBase).places().size.x
 	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
 	for pair in [["Pillar1", true], ["Pillar2", false]]:
-		var pillar: Node2D = room_root.get_node_or_null("Props/%s" % pair[0]) as Node2D
-		check(pillar != null, "%s stands" % pair[0])
-		if pillar == null:
+		var stand_in: Node2D = room_root.get_node_or_null("Props/%s" % pair[0]) as Node2D
+		check(stand_in != null, "%s stands" % pair[0])
+		if stand_in == null:
 			continue
+		var prop: PropBase = stand_in.get("prop") as PropBase
+		var ground: Rect2 = Rect2(stand_in.position + prop.footprint_offset - prop.footprint_size * 0.5, prop.footprint_size)
 		var west: bool = pair[1]
 		var line: float = EDGE if west else width - EDGE
-		check_equal(absf(pillar.position.x - line), WAY + 16.0, "%s stands its old way from the edge" % pair[0])
-		var y0: float = pillar.position.y - 32.0
-		var way: Rect2 = Rect2(line if west else line - WAY, y0, WAY, 40.0)
-		var edge: Rect2 = Rect2(line - 8.0 if west else line, y0, 8.0, 40.0)
+		var gap: float = ground.position.x - line if west else line - ground.end.x
+		check(gap >= WAY and gap <= WAY + (TILE - prop.footprint_size.x) * 0.5 + 0.5, "the way beside %s is the old way's width: %.1f px" % [pair[0], gap])
+		var way: Rect2 = Rect2(line if west else ground.end.x, ground.position.y - 16.0, gap, ground.size.y + 32.0)
+		var edge: Rect2 = Rect2(line - 8.0 if west else line, way.position.y, 8.0, way.size.y)
 		var open: bool = true
 		var held: float = 0.0
 		for wall in walls:

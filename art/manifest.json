@@ -889,7 +889,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (tools/pixel_grid.py from bone_pile.grid.json, 2026-11-17)",
-      "prompt": "A 32x16 floor decal of bones piled at the foot of an ossuary's wall (crypt rework CR5): a skull on two long bones lying across each other and the ends of two more, Bone shadow and Stone light so they stay quieter than the fight; dark Outline, lit from the upper left. Palette colours from docs/STYLE.md."
+      "prompt": "A 32x16 floor decal of bones piled at the foot of an ossuary's wall (crypt rework CR5): a skull on two long bones lying across each other and the ends of two more, mostly Bone shadow and Stone light, the skull in Bone base as the crypt's skull decal, so they stay quieter than the fight; dark Outline, lit from the upper left. Palette colours from docs/STYLE.md."
     },
     {
       "path": "art/grounds/arena_02/arena_02_ground_floor.png",
@@ -917,6 +917,33 @@
       "tier": "placeholder",
       "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
       "prompt": "The nave's glow layer, drawn by tools/ground_shape.py: the pit's still, faint cold glow in Mana (content/edges/crypt_pit)."
+    },
+    {
+      "path": "art/grounds/arena_03/arena_03_ground_floor.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The ossuary court's floor (crypt rework CR5), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_03.shape.json: a floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge), held straight beside the side pillars; clear wherever a body may not stand."
+    },
+    {
+      "path": "art/grounds/arena_03/arena_03_ground_under.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The rock of the ossuary court slab's underside, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge)."
+    },
+    {
+      "path": "art/grounds/arena_03/arena_03_ground_glow.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The ossuary court's glow layer, drawn by tools/ground_shape.py: empty, as the room has no pit and crypt_edge no glow (content/edges/crypt_edge)."
     }
   ]
 }

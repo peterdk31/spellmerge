@@ -8,8 +8,8 @@ extends "res://tests/support/suite.gd"
 ## open spot round its pits (`_spots_round_pits`: where a fight is pushed to its lip), in the room's
 ## own walls, holes and standing props: a crypt mite (the crypt's swarmer, which has no staff and must
 ## walk all the way to touch) starts at the spawn, and the test fails if it does not come within its
-## reach of the wizard in ten seconds (a far spot round a pit: in the time its way round takes,
-## `WAY_ROUND`). It never falls on the way. A new room is covered by its folder.
+## reach of the wizard in ten seconds (a far target: in the time its way round takes, `WAY_ROUND`
+## times its straight walk). It never falls on the way. A new room is covered by its folder.
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")

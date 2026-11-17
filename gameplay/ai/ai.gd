@@ -40,9 +40,10 @@ const THINK_EVERY: int = 3
 ## to script its reactions step by step (tests/gameplay/ai/ai_fixture.gd), and set it back.
 static var think_every: int = THINK_EVERY
 
-## Not state: the Entities service and its team board (hashed with Entities), and `target` and `grudge`,
+## Not state: the Entities service and its team board (hashed with Entities), the test switch
+## `think_every`, and `target` and `grudge`,
 ## getters of the brain's REFS (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"entities", &"board", &"target", &"grudge"]
+const DERIVED: Array[StringName] = [&"entities", &"board", &"target", &"grudge", &"think_every"]
 ## State as who it points at: the actor it drives, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_actor"]
 

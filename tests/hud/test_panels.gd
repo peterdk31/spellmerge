@@ -112,7 +112,7 @@ func test_the_theme_fonts_are_no_smaller_than_designed() -> void:
 
 func test_the_project_uses_the_single_hud_theme() -> void:
 	var path := str(ProjectSettings.get_setting("gui/theme/custom", ""))
-	check_equal(path, "res://hud/theme/spellmerge_theme.tres", "the project theme is the single HUD theme")
+	check_equal(path, "res://hud/theme/spellmerge_theme.tres", "the project theme is the HUD's theme")
 
 
 func test_the_hud_is_an_autoload() -> void:

@@ -6956,10 +6956,10 @@ func _end_spent_at(i: int) -> bool:
 ## The pass's merged hits sent, in the order of their first hits, then its spent shots' ends. A
 ## handler may hit or spawn again: it is sent at once (`_merging` is off by now).
 func _send_merged() -> void:
-	# Each read anew, so a handler's `clear()` (every count to 0) stops what is left.
 	var batch: HitBatch = _hit_batch
-	# The entries' arrays read once (a member of another object costs a lookup at each read): no entry
-	# is added or changed while they are sent, merging being off.
+	# The entries' arrays read once (a member of another object costs a lookup at each read): each
+	# local is the batch's own array, not a copy, and no entry is added while they are sent (merging
+	# is off). Their number is read anew, so a handler's `clear()` (`entries` to 0) stops what is left.
 	var targets: PackedInt32Array = batch.target
 	var slots: PackedInt32Array = batch.slot
 	var seqs: PackedInt64Array = batch.seq

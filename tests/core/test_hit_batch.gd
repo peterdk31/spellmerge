@@ -7,7 +7,7 @@ extends "res://tests/support/suite.gd"
 const ALONE: int = 1024
 
 var batch: HitBatch
-## The manager's shot flags, as `entry_of` reads them: slot 3's shot hits alone.
+## The manager's shot flags, as `add_to` reads them: slot 3's shot hits alone.
 var flags: PackedInt32Array = PackedInt32Array()
 
 
@@ -53,11 +53,11 @@ func test_a_shot_alone_is_never_merged() -> void:
 
 
 func test_a_body_is_killed_when_the_counted_damage_reaches_its_health() -> void:
-	var a: int = _first(2, 0, 11, 0, 25.0, 10.0)
+	_first(2, 0, 11, 0, 25.0, 10.0)
 	check(batch.takes(2), "10 of 25")
-	batch.count_hit(a)
-	check(batch.takes(2), "20 of 25")
-	batch.count_hit(a)
+	batch.add_to(2, 0, 11, false, flags, ALONE)
+	check(batch.takes(2), "20 of 25: a hit added to its entry counts off the body")
+	batch.add_to(2, 0, 11, false, flags, ALONE)
 	check(not batch.takes(2), "30 of 25: the pass has killed it")
 	check(batch.takes(1), "a body with no entry takes hits")
 	check(batch.takes(9), "so does one past the tables")

@@ -668,7 +668,7 @@ signal still_shots_drawn(view: StillShotView)
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"_freeing_now", &"_sent"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -729,6 +729,9 @@ var _hit_batch: HitBatch = HitBatch.new()
 ## The shot turns the native hit pass merged itself, every hit of them adding to a merged hit the
 ## pass already had (no hand-back to GDScript). A count for benchmarks and tests; nothing reads it.
 var merged_turns: int = 0
+## The merged hits the native hit pass opened itself (hit batch A4: a body's room and its spell's
+## damage told in the pass, so it asks nothing). A count for benchmarks and tests; nothing reads it.
+var merged_opens: int = 0
 ## True while `_drop_one` makes room at the cap: that slot is freed at once, inside a pass or not.
 var _freeing_now: bool = false
 ## The hit batch's asks, as constants of the manager's own (a constant of another class is looked up
@@ -1341,7 +1344,11 @@ func native_constants() -> Dictionary:
 	while script != null:
 		constants.merge(script.get_script_constant_map())
 		script = script.get_base_script()
+	# The hit batch's mix in two halves, each exact as a double (a typed value, shifted at run time:
+	# GDScript refuses to fold a shift of a negative constant).
+	var mix: int = HitBatch.SPELL_MIX
 	constants.merge({"PI": PI, "TAU": TAU, "HOMING_DRIFT": SpellLimits.HOMING_DRIFT,
+			"SPELL_MIX_HIGH": (mix >> 32) & 0xFFFFFFFF, "SPELL_MIX_LOW": mix & 0xFFFFFFFF,
 			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE, "TEAM_WORLD": ActorsScript.TEAM_WORLD})
 	return constants
 
@@ -3647,6 +3654,8 @@ func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int
 		_fit_hit_scratch()
 		var at: int = profile_clock.call() if timing else 0
 		var handed: int = _kernel.call(&"hits", self, n, top, resume, limit, delta)
+		if _hit_batch.looked < _hit_batch.entries:
+			_look_kernel_entries()
 		if timing:
 			step_profile[PROF_KERNEL] += profile_clock.call() - at
 			step_profile[PROF_HANDBACKS] += 1
@@ -3667,6 +3676,19 @@ func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int
 			_hit_slot(_wrapped(n + resume, top), delta, limit)
 			n += 1
 	return top
+
+
+## The look of each entry the native hit pass opened (hit batch A4: it keeps no `StringName`),
+## from its shot's slot, before any handler can change the slot.
+func _look_kernel_entries() -> void:
+	var batch: HitBatch = _hit_batch
+	for entry in range(batch.looked, batch.entries):
+		var slot: int = batch.slot[entry]
+		batch.card[entry] = _carrier_card_of(slot)
+		batch.body[entry] = _kind_of(slot)
+		batch.core[entry] = _core[slot]
+		batch.look[entry] = _look[slot]
+	batch.looked = batch.entries
 
 
 ## `n` wrapped round `top` once (the hit pass starts at `_resume`).

@@ -23,6 +23,9 @@ extends RefCounted
 ## and how many hits it stands for, and its first shot's look (carrier card, body, core, look bits).
 ## Read by the manager to send them; written by the batch (and the kernel, as `count_hit`).
 var entries: int = 0
+## How many of the entries have their look (card, body, core, look bits): `add` writes it, the
+## native hit pass, which opens entries too (hit batch A4), leaves it to the manager when it returns.
+var looked: int = 0
 var caster: PackedInt32Array = PackedInt32Array()
 var target: PackedInt32Array = PackedInt32Array()
 var tag: PackedInt64Array = PackedInt64Array()
@@ -111,6 +114,7 @@ func open(targets: int, shots: int) -> void:
 ## Every list emptied (a pass's end, or the manager's `clear`, which a handler may call mid-pass).
 func empty() -> void:
 	entries = 0
+	looked = 0
 	_used_n = 0
 	_held_n = 0
 	_ended_n = 0
@@ -205,6 +209,7 @@ func add(t: int, targets: int, who: int, spell: int, shot: int, shot_seq: int, p
 	body[entry] = kind
 	core[entry] = colour
 	look[entry] = look_bits
+	looked = entries
 	_asked_at = sent
 	_asked_alone = alone
 	asks = 0
@@ -368,6 +373,7 @@ func ended_tag(i: int) -> int:
 ## The entries emptied (sent).
 func forget_entries() -> void:
 	entries = 0
+	looked = 0
 
 
 ## The kept ends emptied (sent).

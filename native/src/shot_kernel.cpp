@@ -70,6 +70,8 @@ constexpr int F_SPENT = 2048;
 constexpr int F_STUCK = 16;
 // A hit's share of the hit-work budget (`HIT_WORK`).
 constexpr int64_t HIT_WORK = 400;
+// `HitBatch.SPELL_MIX`: the multiplier that spreads tags over the batch's table of spells' damage.
+constexpr int64_t SPELL_MIX = -7046029254386353131LL;
 constexpr int CASTER_BODY = -1;
 constexpr int CASTER_POINT = -2;
 constexpr double SPIRAL_PERIOD = 0.5;
@@ -240,7 +242,9 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(pierce, "_pierce", PACKED_INT32_ARRAY) \
 	X(stick, "_stick", PACKED_FLOAT32_ARRAY) \
 	X(batch, "_hit_batch", OBJECT) \
+	X(sent, "_sent", INT) \
 	X(merged_turns, "merged_turns", INT) \
+	X(merged_opens, "merged_opens", INT) \
 	X(spark_births, "spark_births", PACKED_FLOAT32_ARRAY) \
 	X(tail_births_on, "tail_births_on", BOOL) \
 	X(tail_births_cap, "tail_births_cap", INT) \
@@ -327,7 +331,24 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(mh_charges_used, "_charges_used", PACKED_INT32_ARRAY) \
 	X(mh_used, "_used", PACKED_INT32_ARRAY) \
 	X(mh_used_at, "_used_at", PACKED_VECTOR2_ARRAY) \
-	X(mh_used_n, "_used_n", INT)
+	X(mh_used_n, "_used_n", INT) \
+	X(mh_target, "target", PACKED_INT32_ARRAY) \
+	X(mh_seq, "seq", PACKED_INT64_ARRAY) \
+	X(mh_at, "at", PACKED_VECTOR2_ARRAY) \
+	X(mh_heading, "heading", PACKED_VECTOR2_ARRAY) \
+	X(mh_entries, "entries", INT) \
+	X(room_pass, "_room_pass", PACKED_INT32_ARRAY) \
+	X(room_at, "_room_at", PACKED_INT64_ARRAY) \
+	X(room_known, "_room_known", PACKED_BYTE_ARRAY) \
+	X(room_health, "_room_health", PACKED_FLOAT64_ARRAY) \
+	X(room_hexed, "_room_hexed", PACKED_BYTE_ARRAY) \
+	X(room_hex, "_room_hex", PACKED_FLOAT64_ARRAY) \
+	X(room_charges, "_room_charges", PACKED_INT32_ARRAY) \
+	X(room_spares, "_room_spares", PACKED_INT64_ARRAY) \
+	X(spell_key, "_spell_key", PACKED_INT64_ARRAY) \
+	X(spell_pass, "_spell_pass", PACKED_INT32_ARRAY) \
+	X(spell_at, "_spell_at", PACKED_INT64_ARRAY) \
+	X(spell_damage, "_spell_damage", PACKED_FLOAT64_ARRAY)
 
 struct Names {
 #define SM_DECLARE(id, gd, type) StringName id;
@@ -496,6 +517,16 @@ struct HitPass {
 	Arr<PackedFloat64Array> mh_damage, mh_health, mh_spent;
 	Arr<PackedVector2Array> mh_used_at;
 	int64_t mh_pass = 0, mh_used_n = 0, merged_turns = 0;
+	// What opening an entry reads and writes (hit batch A4): the entries' other fields, the shots'
+	// way and sequence, the bodies' rooms and the spells' damage as the pass was told them, and the
+	// manager's count of events (a room or a damage told before the count moved is asked again).
+	Arr<PackedInt32Array> mh_target, room_pass, room_charges, spell_pass;
+	Arr<PackedInt64Array> mh_seq, room_at, room_spares, spell_key, spell_at, shot_seq;
+	Arr<PackedVector2Array> mh_at, mh_heading, shot_vel;
+	Arr<PackedByteArray> room_known, room_hexed;
+	Arr<PackedFloat64Array> room_health, room_hex, spell_damage;
+	int64_t mh_entries = 0, sent = 0, merged_opens = 0;
+	bool opened = false;
 	// The manager's hit batch, whose arrays the merge reads (`load_merge`).
 	Object *batch = nullptr;
 	// `_untested`, read only for a deferred shot (`defer`, `scan`).
@@ -685,6 +716,7 @@ struct HitPass {
 		stick.load(m, k.stick);
 		tag.load(m, k.tag);
 		merged_turns = m->get(k.merged_turns);
+		merged_opens = m->get(k.merged_opens);
 		// The hit batch's, read from the batch (hit batch A1).
 		Object *b = m->get(k.batch);
 		ERR_FAIL_NULL(b);
@@ -706,6 +738,26 @@ struct HitPass {
 		mh_used_at.load(b, k.mh_used_at);
 		mh_pass = b->get(k.mh_pass);
 		mh_used_n = b->get(k.mh_used_n);
+		mh_target.load(b, k.mh_target);
+		mh_seq.load(b, k.mh_seq);
+		mh_at.load(b, k.mh_at);
+		mh_heading.load(b, k.mh_heading);
+		mh_entries = b->get(k.mh_entries);
+		room_pass.load(b, k.room_pass);
+		room_at.load(b, k.room_at);
+		room_known.load(b, k.room_known);
+		room_health.load(b, k.room_health);
+		room_hexed.load(b, k.room_hexed);
+		room_hex.load(b, k.room_hex);
+		room_charges.load(b, k.room_charges);
+		room_spares.load(b, k.room_spares);
+		spell_key.load(b, k.spell_key);
+		spell_pass.load(b, k.spell_pass);
+		spell_at.load(b, k.spell_at);
+		spell_damage.load(b, k.spell_damage);
+		shot_vel.load(m, k.vel);
+		shot_seq.load(m, k.seq);
+		sent = m->get(k.sent);
 	}
 
 	// `is_instance_valid(_targets[t])`: the node of the id kept beside it still exists.
@@ -719,7 +771,7 @@ struct HitPass {
 	}
 
 	// The merged hit `_merge_hit` would add the shot in `slot`'s hit on `t` to, or -1 when it would
-	// make a new one (GDScript's: it asks Combat).
+	// make a new one (`HitBatch.add_to`).
 	int64_t merged_entry(int64_t slot, int64_t t) {
 		if (t >= mh_target_pass.n || mh_target_pass[t] != mh_pass || (flags[slot] & F_ALONE) != 0) {
 			return -1;
@@ -734,11 +786,105 @@ struct HitPass {
 		return -1;
 	}
 
+	// The slot of the spell `spell`'s damage told in this pass with no event since, or -1: the probe
+	// of `HitBatch.add` (the same mix, the same walk).
+	int64_t kept_damage(int64_t spell) {
+		if (spell_key.n == 0) {
+			return -1;
+		}
+		const int64_t mask = spell_key.n - 1;
+		int64_t i = ((int64_t)((uint64_t)spell * (uint64_t)SPELL_MIX) >> 32) & mask;
+		while (spell_pass[i] == mh_pass && spell_key[i] != spell) {
+			i = (i + 1) & mask;
+		}
+		return spell_pass[i] == mh_pass && spell_at[i] == sent ? i : -1;
+	}
+
+	// Whether the kernel may open the entry `_merge_hit` would open for the shot in `slot`'s hit on
+	// `t` (hit batch A4): the body's room and the spell's damage told in this pass with no event
+	// since, so `add` would ask nothing; never for a shot alone (it asks for itself).
+	bool can_open(int64_t slot, int64_t t) {
+		if ((flags[slot] & F_ALONE) != 0 || t >= room_pass.n || t >= mh_target_pass.n) {
+			return false;
+		}
+		if (room_pass[t] != mh_pass || room_at[t] != sent || mh_target_pass[t] != mh_pass) {
+			return false;
+		}
+		return kept_damage(tag[slot]) >= 0;
+	}
+
+	// `_merge_hit`'s new entry for an opening `can_open` allowed, at `point`, as `HitBatch.add` and
+	// `take_room` write it, but its look (carrier card, body, core, look bits), which GDScript
+	// fills from the slot when the call returns (`_look_kernel_entries`).
+	void open_entry(int64_t slot, int64_t t, const Vector2 &point) {
+		Vector2 way = shot_vel[slot].normalized();
+		if (way == Vector2()) {
+			way = (target_pos[t] - point).normalized();
+			if (way == Vector2()) {
+				way = Vector2(1, 0);
+			}
+		}
+		const int64_t entry = mh_entries;
+		mh_entries += 1;
+		opened = true;
+		merged_opens += 1;
+		int64_t last = mh_head[t];
+		while (mh_next[last] >= 0) {
+			last = mh_next[last];
+		}
+		mh_next[last] = (int32_t)entry;
+		mh_next[entry] = -1;
+		mh_caster[entry] = actor[slot];
+		mh_target[entry] = (int32_t)t;
+		mh_tag[entry] = tag[slot];
+		mh_slot[entry] = (int32_t)slot;
+		mh_seq[entry] = shot_seq[slot];
+		mh_at[entry] = point;
+		mh_heading[entry] = way;
+		mh_count[entry] = 1;
+		// `take_room`, with the room and the damage kept.
+		const double spell_damage_now = spell_damage[kept_damage(tag[slot])];
+		if (room_known[t] == 0) {
+			mh_damage[entry] = 0.0;
+			mh_health[t] = INFINITY;
+			mh_blocks[entry] = 0;
+		} else {
+			mh_health[t] = room_health[t];
+			double d = spell_damage_now;
+			if (room_hexed[t] != 0) {
+				d += d * room_hex[t] / 100.0;
+			}
+			if (d <= 0.0) {
+				mh_damage[entry] = 0.0;
+				mh_blocks[entry] = 0;
+			} else {
+				mh_damage[entry] = d;
+				const int64_t spares = room_spares[t];
+				const bool meets = room_charges[t] > 0 && (spares == 0 || spares != mh_tag[entry]);
+				mh_blocks[entry] = meets ? 1 : 0;
+				if (meets) {
+					mh_charges[t] = room_charges[t];
+				}
+			}
+		}
+		spend_room(t, entry);
+	}
+
+	// `HitBatch._spend_room`: one hit of `e` on `t`, a barrier's charge, else its damage.
+	void spend_room(int64_t t, int64_t e) {
+		if (mh_blocks[e] != 0 && mh_charges_used[t] < mh_charges[t]) {
+			mh_charges_used[t] += 1;
+		} else {
+			mh_spent[t] += mh_damage[e];
+		}
+	}
+
 	// `_hit_found` of a shot whose `found` hits, as `_hit_candidates` takes them, each add to a merged
-	// hit the pass already has (no event, nothing GDScript must do): the budget, the pierce, the hit
-	// memory, the spent mark, the merged counts and the bodies' tallies, exactly as GDScript writes
-	// them. False, changing nothing, for any other (a new merged hit, a stick, a shot alone, no
-	// memory left without growing it): GDScript takes it.
+	// hit the pass already has or open one `can_open` allows (no event, nothing GDScript must do): the
+	// budget, the pierce, the hit memory, the spent mark, the merged counts, the new entries and the
+	// bodies' tallies, exactly as GDScript writes them. False, changing nothing, for any other (an
+	// entry that would ask Combat, a stick, a shot alone, no memory or entry left without growing):
+	// GDScript takes it.
 	bool merge_hits(int64_t slot, int64_t found) {
 		if (stick[slot] > 0.0f) {
 			return false;
@@ -746,6 +892,7 @@ struct HitPass {
 		// The dry run: the same turns of the loop, written nowhere.
 		int64_t left = pierce[slot];
 		int64_t remembers = 0;
+		int64_t opens = 0;
 		bool spent = false;
 		for (int64_t c = 0; c < found; c++) {
 			if (spent) {
@@ -756,7 +903,10 @@ struct HitPass {
 				continue;
 			}
 			if (merged_entry(slot, t) < 0) {
-				return false;
+				if (!can_open(slot, t)) {
+					return false;
+				}
+				opens += 1;
 			}
 			if (left > 0) {
 				left -= 1;
@@ -766,6 +916,10 @@ struct HitPass {
 			}
 		}
 		if (spent && mh_used_n >= mh_used.n) {
+			return false;
+		}
+		// The batch never grows here: an entry the arrays have no room for is GDScript's to open.
+		if (mh_entries + opens > mh_caster.n) {
 			return false;
 		}
 		// `_remember` grows the memory when its free list runs out: GDScript's to do.
@@ -803,12 +957,12 @@ struct HitPass {
 				mh_used_at[mh_used_n] = cand_point[c];
 				mh_used_n += 1;
 			}
-			// `_merge_hit` of a hit on a merged one, `HitBatch.count_hit`: a barrier's charge, else its damage.
-			mh_count[e] += 1;
-			if (mh_blocks[e] != 0 && mh_charges_used[t] < mh_charges[t]) {
-				mh_charges_used[t] += 1;
+			if (e >= 0) {
+				// `HitBatch.add_to`: a hit on a merged one.
+				mh_count[e] += 1;
+				spend_room(t, e);
 			} else {
-				mh_spent[t] += mh_damage[e];
+				open_entry(slot, t, cand_point[c]);
 			}
 		}
 		if ((flags[slot] & F_SPENT) == 0) {
@@ -827,8 +981,12 @@ struct HitPass {
 		if (merge_loaded) {
 			if (batch != nullptr) {
 				batch->set(k.mh_used_n, mh_used_n);
+				if (opened) {
+					batch->set(k.mh_entries, mh_entries);
+				}
 			}
 			m->set(k.merged_turns, merged_turns);
+			m->set(k.merged_opens, merged_opens);
 		}
 		if (targets_loaded) {
 			m->set(k.work_left, work_left);
@@ -1216,6 +1374,9 @@ const Constant CONSTANTS[] = {
 	{ "F_SPENT", (double)F_SPENT },
 	{ "F_STUCK", (double)F_STUCK },
 	{ "HIT_WORK", (double)HIT_WORK },
+	// In halves, each exact as a double (the manager's map has them, `native_constants`).
+	{ "SPELL_MIX_HIGH", (double)(int64_t)((uint64_t)SPELL_MIX >> 32) },
+	{ "SPELL_MIX_LOW", (double)(int64_t)((uint64_t)SPELL_MIX & 0xFFFFFFFFull) },
 	{ "F_FALLING", (double)F_FALLING },
 	{ "S_IDLE", (double)S_IDLE },
 	{ "S_MOVING", (double)S_MOVING },

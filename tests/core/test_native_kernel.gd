@@ -54,7 +54,7 @@ const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 ## catch-up's one-shot list and the GDScript drawing's sum of the tail asked for and count of the
 ## thinned groups' tail births (the native keeps them in locals; the sum is handed out as
 ## `tail_demand`, which is compared, and the births themselves are compared).
-const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads", &"step_profile", &"profile_clock", &"merged_turns",
+const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads", &"step_profile", &"profile_clock", &"merged_turns", &"merged_opens",
 		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
 
 ## Per manager (0 the GDScript, 1 the native): its bus, actor table, targets and what it sent.
@@ -272,23 +272,36 @@ func _check_the_kernel_merged() -> void:
 	check(_hits_sent > 0, "shots hit (%d)" % _hits_sent)
 	check(_mgrs[1].merged_turns > 100, "the kernel merged shots' hits itself (%d turns; %d hand-backs)" % [_mgrs[1].merged_turns, _handbacks])
 	check_equal(_mgrs[0].merged_turns, 0, "the GDScript side counts none")
+	check(_mgrs[1].merged_opens > 0, "the kernel opened merged hits itself (%d), each a body and a spell the pass had asked of" % _mgrs[1].merged_opens)
 
 
 ## A merged scene's answers to `hit_room_asked` and `hit_damage_asked`, the same on both sides: a
 ## body's health by its name, a hit's damage by its tag, so some bodies die in a pass and the shots
 ## after pass them.
 func _on_room_asked(target: Node, room: HitRoom) -> void:
+	var kind: int = String(target.name).hash()
+	# Some bodies no hit takes health from (unknown: never dead in the pass).
+	if kind % 7 == 0:
+		return
 	room.known = true
-	room.health = 15.0 + float(String(target.name).hash() % 4) * 10.0
+	room.health = 15.0 + float(kind % 4) * 10.0
 	# A barrier on some bodies that spares one of the two spells: its charges take the other's
 	# first hits whole (hit batch A1).
-	if String(target.name).hash() % 3 == 0:
+	if kind % 3 == 0:
 		room.charges = 2
 		room.spares = 2
+	# A hex on some (30: a hit of 3 or 6 grows by an amount whose sum's order shows in the last bit),
+	# and on some one that takes a hit's damage to 0 (-100: it deals none, and meets no barrier).
+	if kind % 5 == 1:
+		room.hexed = true
+		room.hex = 30.0
+	elif kind % 5 == 3:
+		room.hexed = true
+		room.hex = -100.0
 
 
 func _on_damage_asked(tag: int, _shot: int, answer: HitDamage) -> void:
-	answer.damage = 5.0 + float(tag % 3) * 5.0
+	answer.damage = 3.0 * float(tag % 3)
 
 
 ## Builds the scene on both sides, the native one on `threads` threads, and steps it STEPS times,
@@ -661,12 +674,17 @@ func _compare_arrays(step: int) -> void:
 	_compare_batch(step, _mgrs[0]._hit_batch, _mgrs[1]._hit_batch)
 
 
+## The hit batch's scratch of its last `add` (what it asked, at which count, the damage slot kept):
+## an entry the native hit pass opens does not go through `add` (hit batch A4).
+const BATCH_SCRATCH: Array[StringName] = [&"asks", &"_asked_at", &"_asked_alone", &"_kept"]
+
+
 ## Every packed array, int and float member of the two managers' hit batches, byte for byte.
 func _compare_batch(step: int, first: HitBatch, second: HitBatch) -> void:
 	for prop: Dictionary in first.get_property_list():
 		var member: StringName = prop["name"]
 		var type: int = prop["type"]
-		if (prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0:
+		if (prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0 or member in BATCH_SCRATCH:
 			continue
 		if type < TYPE_PACKED_BYTE_ARRAY and type != TYPE_INT and type != TYPE_FLOAT and type != TYPE_VECTOR2:
 			continue

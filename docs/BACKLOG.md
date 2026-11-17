@@ -163,7 +163,6 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 - **Wall hit sound and bot dodging.** A shot that ends on a wall now shows chips and a spark (`projectile_impact`) but still makes no sound; add one when the audio ids exist. The wave bots (`tests/bots/bot.gd`) now check the line of sight and strafe around pillars, but still never dodge, so the `BALANCE:` lines for 1 and 2 players often end in a loss.
 
 - **A hit right after a revive is lost (found 2026-11-16, splitting the player tests).** `Combat.hit` on a wizard revived after Combat's last step returns false until its next step, so a hit landing in that window does nothing (`tests/gameplay/player/test_player_health_cast.gd`, `test_a_revived_wizard_can_be_hurt_again`, steps once on purpose). Decide whether the delay is meant (a moment's grace after a revive) and, if so, say it in Combat; if not, register the revived body at once.
-- **Pillar tops are 60% opaque.** `PillarTops` is drawn translucent so a wizard standing behind a pillar still shows through, but a head under a half-transparent capital can look like a rendering fault and weakens the 2.5D look. After a human playtest, revisit: for example fade the top only while a character overlaps it, and draw it fully opaque otherwise.
 - **Telegraph dash on the lane.** The dash texture is a plain 8×8 tile; if the owner wants a different look (a pulsing ring at the end, an animated dash), it needs art with more frames, not code.
 
 ## From M2 part 18 (quick view walkthrough)

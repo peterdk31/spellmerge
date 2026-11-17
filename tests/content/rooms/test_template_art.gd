@@ -119,12 +119,6 @@ func test_every_collision_shape_has_a_wall_sprite() -> void:
 		for child in _own_walls(layout):
 			if child is Sprite2D:
 				drawn.append(RoomScan.sprite_rect(child as Sprite2D))
-		# A pillar is drawn in two parts outside `Walls` (see test_template_pillars.gd); its base sits on the shape.
-		var pillars: Node = layout.get_node_or_null("Pillars")
-		if pillars != null:
-			for child in pillars.get_children():
-				if child is Sprite2D:
-					drawn.append(RoomScan.sprite_rect(child as Sprite2D))
 		# A ground drawn from a shape (tools/ground_shape.py) draws its own walls: its `WallArt`,
 		# opaque over every wall cell of its `Walls` body (tools/test_ground_shape.py checks that per
 		# pixel); here, at the middle of each of its rectangles.

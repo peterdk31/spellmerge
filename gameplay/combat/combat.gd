@@ -302,6 +302,11 @@ var _hit_spell: int = 0
 ## The shot that hit (the projectile manager's slot from `projectile_hit`), -1 for none: what the
 ## hit sets off names it as its `shot`, as `_tag` its tag.
 var _slot: int = -1
+## How many of a step's shot hits the spell hit being dealt stands for (the projectile manager's
+## `impact_count`, merged hits; 1 for any other): its damage and its heal are that many times one's;
+## its push, statuses, reactions and everything else the hit sets off (payloads, chains, siphon) one
+## hit's.
+var _hit_count: int = 1
 
 # Burn damage due this step, sent after the status loop (hits can free rows): body, who, points.
 var _due_node: Array[Node2D] = []
@@ -1107,13 +1112,16 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 	var saved_tag: int = _tag
 	var saved_slot: int = _slot
 	var saved_spell: int = _hit_spell
+	var saved_count: int = _hit_count
 	_tag = tag
 	_slot = shot
 	_hit_spell = tag
+	_hit_count = maxi(projectiles.impact_count, 1) if projectiles != null else 1
 	_apply_spell(caster, row, position, profile, profile.kind)
 	_tag = saved_tag
 	_slot = saved_slot
 	_hit_spell = saved_spell
+	_hit_count = saved_count
 
 
 ## A spell's hit on the row `row`, struck at `position`: a mend heals whatever it hits, of any
@@ -1123,7 +1131,7 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kind: StringName) -> void:
 	var node: Node2D = _nodes[row]
 	if profile.heal > 0:
-		_heal(by, row, profile.heal)
+		_heal(by, row, profile.heal * _hit_count)
 	else:
 		_strike(by, row, position, profile, kind)
 	if profile.barrier > 0 and _same(row, node):
@@ -1139,7 +1147,7 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 	var node: Node2D = _nodes[row]
 	# The caster's power (boss plan OB7), read now from its body: its hit, its slam and its burn.
 	var power: float = _power_of(_tag)
-	var damage: float = profile.damage * power
+	var damage: float = profile.damage * power * float(_hit_count)
 	var strength: float = profile.knockback
 	# Away from the hit, measured to the hurt circle's centre (shots, beams and swings strike it at
 	# hand height), not the feet: a swing up at a body pushes it up, not down onto the caster. A

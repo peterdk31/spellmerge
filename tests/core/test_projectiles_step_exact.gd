@@ -439,3 +439,12 @@ func _log_step(step: int) -> void:
 		if line.begins_with("hit "):
 			hits += 1
 	_log.append("step %d: %d events, %d hits, %d live, %s" % [step, _events.size(), hits, m.get_count(), (events + "\n" + state).md5_text()])
+
+
+func before_each() -> void:
+	# These tests are of the hits one by one (`ProjectileManager.merges_hits`, put back after).
+	ManagerScript.merges_hits = false
+
+
+func after_each() -> void:
+	ManagerScript.merges_hits = true

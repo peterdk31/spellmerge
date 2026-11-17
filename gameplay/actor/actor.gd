@@ -547,6 +547,11 @@ func step(delta: float) -> void:
 				# What stopped it (a hit, a slam's impact) came after its own step, so its looks
 				# catch up once: the stop shows that moment, not the step before.
 				_hold_shown = true
+				# Looks left for the frame play the ticks before the stop first.
+				if _look_time > 0.0:
+					for look in _looks:
+						look.step(_look_time)
+					_look_time = 0.0
 				for look in _looks:
 					look.step(0.0)
 			return

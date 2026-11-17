@@ -654,6 +654,9 @@ func _timer_entries(slot: int) -> int:
 
 
 func test_a_shot_replaced_in_its_slot_is_timed_once() -> void:
+	# Hits one by one: merged, a spent shot's slot is held until its hit is sent, so the jump never
+	# takes it (`ProjectileManager._mh_freed`).
+	_mgr.merge_hits = false
 	_target(Vector2(60, 0))
 	_target(Vector2(110, 0))
 	_build(0, 0, {"carrier": &"bolt", "modifiers": [&"chain"], "trigger": &"timer", "held": {"carrier": &"short"}})

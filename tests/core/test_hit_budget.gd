@@ -246,3 +246,12 @@ func _free(scene: Scene) -> void:
 	scene.mgr.free()
 	scene.table.free()
 	scene.bus.free()
+
+
+func before_each() -> void:
+	# These tests are of the hits one by one (`ProjectileManager.merges_hits`, put back after).
+	ManagerScript.merges_hits = false
+
+
+func after_each() -> void:
+	ManagerScript.merges_hits = true

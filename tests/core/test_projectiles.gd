@@ -36,6 +36,8 @@ var expired: Array = []
 
 
 func before_each() -> void:
+	# These tests are of the hits one by one (`ProjectileManager.merges_hits`, put back after).
+	ManagerScript.merges_hits = false
 	bus = own(EventsScript.new()) as EventsScript
 	mgr = own(ManagerScript.new()) as ManagerScript
 	table = own(ActorSeats.table()) as ActorSeats.ActorsScript
@@ -1603,3 +1605,7 @@ func test_random_queries_agree_with_a_brute_force_search() -> void:
 		if mgr.nearest_target(point, reach, ManagerScript.LAYER_ENEMY) != best:
 			wrong += 1
 	check(wrong == 0, "200 random queries agree with a brute-force search (%d differ)" % wrong)
+
+
+func after_each() -> void:
+	ManagerScript.merges_hits = true

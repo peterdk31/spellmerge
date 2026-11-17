@@ -95,6 +95,8 @@ var _bodies: Array[Shader] = []
 
 
 func before_each() -> void:
+	# These tests are of the hits one by one (`ProjectileManager.merges_hits`, put back after).
+	ManagerScript.merges_hits = false
 	_mgrs = []
 	_targets = [[], []]
 	_wizards = [[], []]
@@ -582,3 +584,7 @@ func _compare_draw(step: int) -> void:
 			continue
 		if var_to_bytes(buffer_a.slice(0, floats)) != var_to_bytes(buffer_b.slice(0, floats)):
 			_differ("step %d batch %d: the instances differ (%s / %s)" % [step, batch, _first_difference(buffer_a.slice(0, floats), buffer_b.slice(0, floats)), _first_difference(buffer_b.slice(0, floats), buffer_a.slice(0, floats))])
+
+
+func after_each() -> void:
+	ManagerScript.merges_hits = true

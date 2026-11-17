@@ -60,7 +60,7 @@ import ground_walls
 
 ROOT = Path(__file__).resolve().parent.parent
 # Bump when what the generator draws changes, so every room's `--check` asks for a new run.
-VERSION = 4
+VERSION = 5
 # How far round a trimmed ledge cell's middle its floor is cleared (`Drawing._trim_to_reach`).
 TRIM_ROUND = 5
 PALETTE = ROOT / "core/base/palette.gd"

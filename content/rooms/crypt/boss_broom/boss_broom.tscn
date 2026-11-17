@@ -3,7 +3,7 @@
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/void.svg" id="1_void"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/boss_broom/boss_broom_ground.tscn" id="2_ground"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/candles.tscn" id="3_candles"]
-[ext_resource type="PackedScene" path="res://content/rooms/decor/beam_wide.tscn" id="4_beam"]
+[ext_resource type="PackedScene" path="res://content/rooms/decor/beam.tscn" id="4_beam"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="6_rubble"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="7_skull"]
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="8_prop_stand_in"]
@@ -85,7 +85,7 @@ texture = ExtResource("7_skull")
 centered = false
 
 [node name="Candles1" parent="Decor" instance=ExtResource("3_candles")]
-position = Vector2(132, 52)
+position = Vector2(132, 68)
 
 [node name="Core" parent="Decor/Candles1" index="1"]
 speed_scale = 1.1
@@ -96,7 +96,7 @@ speed_scale = 1.1
 frame = 7
 
 [node name="Candles2" parent="Decor" instance=ExtResource("3_candles")]
-position = Vector2(336, 44)
+position = Vector2(336, 58)
 
 [node name="Core" parent="Decor/Candles2" index="1"]
 speed_scale = 0.9
@@ -107,7 +107,7 @@ speed_scale = 0.9
 frame = 4
 
 [node name="Candles3" parent="Decor" instance=ExtResource("3_candles")]
-position = Vector2(464, 44)
+position = Vector2(464, 58)
 
 [node name="Core" parent="Decor/Candles3" index="1"]
 speed_scale = 1.2
@@ -118,7 +118,7 @@ speed_scale = 1.2
 frame = 1
 
 [node name="Candles4" parent="Decor" instance=ExtResource("3_candles")]
-position = Vector2(668, 52)
+position = Vector2(668, 68)
 
 [node name="Core" parent="Decor/Candles4" index="1"]
 speed_scale = 1.0
@@ -129,7 +129,7 @@ speed_scale = 1.0
 frame = 6
 
 [node name="Candles5" parent="Decor" instance=ExtResource("3_candles")]
-position = Vector2(44, 148)
+position = Vector2(72, 148)
 
 [node name="Core" parent="Decor/Candles5" index="1"]
 speed_scale = 0.85
@@ -140,7 +140,7 @@ speed_scale = 0.85
 frame = 3
 
 [node name="Candles6" parent="Decor" instance=ExtResource("3_candles")]
-position = Vector2(44, 328)
+position = Vector2(72, 328)
 
 [node name="Core" parent="Decor/Candles6" index="1"]
 speed_scale = 1.15
@@ -151,7 +151,7 @@ speed_scale = 1.15
 frame = 0
 
 [node name="Candles7" parent="Decor" instance=ExtResource("3_candles")]
-position = Vector2(756, 148)
+position = Vector2(728, 148)
 
 [node name="Core" parent="Decor/Candles7" index="1"]
 speed_scale = 0.95
@@ -162,7 +162,7 @@ speed_scale = 0.95
 frame = 5
 
 [node name="Candles8" parent="Decor" instance=ExtResource("3_candles")]
-position = Vector2(756, 328)
+position = Vector2(728, 328)
 
 [node name="Core" parent="Decor/Candles8" index="1"]
 speed_scale = 1.05
@@ -173,7 +173,7 @@ speed_scale = 1.05
 frame = 2
 
 [node name="Candles9" parent="Decor" instance=ExtResource("3_candles")]
-position = Vector2(136, 424)
+position = Vector2(136, 412)
 
 [node name="Core" parent="Decor/Candles9" index="1"]
 speed_scale = 1.25
@@ -184,7 +184,7 @@ speed_scale = 1.25
 frame = 7
 
 [node name="Candles10" parent="Decor" instance=ExtResource("3_candles")]
-position = Vector2(664, 424)
+position = Vector2(664, 412)
 
 [node name="Core" parent="Decor/Candles10" index="1"]
 speed_scale = 0.8

@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## falls); its landmark the swept ring: its ground's areas `dust` over the whole hall, then `swept`
 ## (clean stone with the strokes of a broom) round its middle, the pillars standing in the ring and
 ## everything pushed out of it (the dust heaps, the rubble and the skulls lie in the drifts round it);
-## a wide shaft on its middle; and lit by candles where its ten wall torches hung.
+## the crypt's shaft of light on its middle; and lit by candles where its ten wall torches hung.
 
 const HallData := preload("res://content/rooms/crypt/boss_broom/boss_broom.tres")
 ## Its shape (tools/ground_shape.py draws its ground from it) and the swept ring's material.
@@ -14,7 +14,7 @@ const Shape := preload("res://content/rooms/crypt/boss_broom/boss_broom.shape.js
 const Swept := preload("res://content/grounds/swept/ground.json")
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
-const SharedBeam := preload("res://content/rooms/decor/beam.tscn")
+const Beam := preload("res://content/rooms/decor/beam.tscn")
 const Candles := preload("res://content/rooms/crypt/decals/candles.tscn")
 const Torch := preload("res://content/rooms/crypt/decals/torch.tscn")
 const Rubble := preload("res://art/tilesets/crypt/rubble.svg")
@@ -105,11 +105,8 @@ func test_its_landmark_is_the_swept_ring() -> void:
 				check(false, "%s: the ring is swept, yet %s grows at %s" % [room.id, cover.kind_at(cell).id, at])
 
 
-## A wide shaft of light on the middle: a light shaft, its pool wider than the shared beam's, lighting
-## the floor.
-func test_a_wide_shaft_falls_on_its_middle() -> void:
-	var narrow: Node = own(SharedBeam.instantiate()) as Node
-	var narrow_width: float = (narrow.get_node("Pool") as Sprite2D).texture.get_width()
+## The crypt's shaft of light (the shared beam) falls on the middle of the ring, lighting the floor.
+func test_the_shaft_falls_on_its_middle() -> void:
 	for room in halls:
 		var root: Node = own(room.scene.instantiate()) as Node
 		var beam: Node2D = root.get_node_or_null("Decor/Beam") as Node2D
@@ -117,8 +114,7 @@ func test_a_wide_shaft_falls_on_its_middle() -> void:
 		if beam == null:
 			continue
 		check(beam.position.distance_to(room.places().size * 0.5) <= MIDDLE, "%s: on its middle: %s" % [room.id, beam.position])
-		var pool: Sprite2D = beam.get_node_or_null("Pool") as Sprite2D
-		check(pool != null and pool.texture.get_width() > narrow_width, "%s: wider than the shared shaft" % room.id)
+		check_equal(beam.scene_file_path, Beam.resource_path, "%s: the crypt's shaft of light" % room.id)
 		check(beam.get_node("Light").is_in_group(&"light_spot"), "%s: it lights the floor" % room.id)
 
 

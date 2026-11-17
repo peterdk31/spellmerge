@@ -1,118 +1,134 @@
 # Hit batch and the room grid: two refactors after the performance pass
 
-**Status: proposed on 2026-11-17, waiting for the owner.** Asked by the owner on 2026-11-17 ("Consider if a refactor is worth doing. Maybe something is much too cluttered now. Can we think of a better architecture?"), after the performance pass of 2026-11-16 and 2026-11-17 (docs/DECISIONS.md, the entries of those days). Two parts, each its own PRs: **A, the hit batch** (one hit model, out of the projectile manager) and **B, the room grid** (walls, holes and footprints as a core service of their own). Neither changes what a player sees or how a hit lands beyond what the merged hits already do; both make the code smaller where today's bugs came from. The decisions they need are at the end ("For the owner").
+**Status: proposed on 2026-11-17, waiting for the owner; revised the same day after its review.** Asked by the owner on 2026-11-17 ("Consider if a refactor is worth doing. Maybe something is much too cluttered now. Can we think of a better architecture?"), after the performance pass of 2026-11-16 and 2026-11-17 (docs/DECISIONS.md, the entries of those days). Two parts, each its own PRs: **A, the hit batch** (one hit model, its state out of the projectile manager) and **B, the room grid** (walls, holes, footprints and their queries as a class of their own). Part A starts only once the owner has answered Q1 and Q2 ("For the owner"); part B needs no decision and may start at once.
 
 ## Why
 
 Facts from the branch of the performance pass (2026-11-17):
 
-- **The hit path has two modes.** The merged hits (`ProjectileManager.merge_hits`) were added on top of a model where every hit sends its events at once and the listeners change the world in the middle of the pass. Making that model batch took the hit-work budget, the merge table, spent shots ended at the pass's end (`F_SPENT`, `_end_spent`), slots held until their hits are sent (`_mh_freed`, `_take_back_slot`), the health ask (`hit_room_asked`) and the native fast path (`HitPass::merge_hits`). The merge's state is named 162 times in `projectile_manager.gd` and reaches 15 of its functions, `_kill`, `_expire`, `_spawn_row`, `_drop_one` and `_caster_position` among them.
-- **Most of the reviews' findings were there.** Of the defects the reviews of that day found, about fifteen were in that machinery (the free list at the cap, an end before its hit, the count leaking into nested hits, relay profiles, barriers, invincible bodies, a clear mid-send). A design that needs that many guards is fighting its own model.
-- **Two modes, two sets of tests.** The game merges; the recordings (`test_projectiles_step_exact.gd`, `test_projectiles_targets.gd`) and the tests of the hits one by one run unmerged (`merges_hits`, a test switch). So part of the suite tests a mode the game no longer plays.
-- **The health ask is a hand-back.** The first hit of a spell on a body each pass goes back to GDScript to ask Combat (`hit_room_asked`): about 84 of the 169 hand-backs a tick in the desktop stress run. The rest are the shots' ends, which send events and stay GDScript.
-- **The projectile manager is 7,519 lines and 340 members**, mirrored by a 2,429-line kernel. One part of it is not about shots at all: the grid of walls, holes and footprints that bodies slide on (`slide_body`), the AI looks through (`line_clear`, `ground_clear`, `walk_clear`, `clear_run`), items and Flow place things on (`nearest_ground`, `circle_blocked`), and Feel and the casters clip to (`clip_to_walls`, 19 callers outside the manager). Every one of those areas depends on the projectile manager to see a wall.
+- **The hit path has two modes.** The merged hits (`ProjectileManager.merge_hits`) were added on top of a model where every hit sends its events at once and the listeners change the world in the middle of the pass. Making that model merge took the hit-work budget, the merge table, spent shots ended at the pass's end (`F_SPENT`, `_end_spent`), slots held until their hits are sent (`_mh_freed`, `_take_back_slot`), the health ask (`hit_room_asked`) and the native fast path (`HitPass::merge_hits`). The merge's state (`_mh_*`, `_merging`, `merge_hits`, `F_SPENT`, `_room`, `_freeing_now`) is named about 260 times in `projectile_manager.gd`, in about 22 of its functions.
+- **Most of the reviews' findings were there.** Of the defects the reviews of that day found, about fifteen were in that machinery (the free list at the cap, an end sent before its hit, the hit count leaking into nested hits, relay profiles, barriers, invincible bodies, a clear while hits are sent). A design that needs that many guards is fighting its own model.
+- **Two modes, two sets of tests.** The game merges; the recordings (`test_projectiles_step_exact.gd`, `test_projectiles_targets.gd`) and most of `test_projectiles.gd`, `test_native_kernel.gd`'s main scene, `test_hit_budget.gd`, `test_step_profile.gd` and a test of `test_spells_cast.gd` run unmerged (the test switch `merges_hits`, or `merge_hits = false`). So much of the suite tests a mode the game no longer plays, and the kernel keeps an unmerged path for them.
+- **The health ask is a hand-back.** The first hit of each caster's spell on each body in a pass goes back to GDScript to ask Combat (`hit_room_asked`): about 84 of the 155-169 hand-backs a tick of the desktop stress run (two runs after the native merge). The others are the shots' ends and walls (which send events and stay GDScript), sticks, shots alone, falling shots, shots out of bounds or waiting, and a hit memory that must grow.
+- **The projectile manager is 7,519 lines and 340 members**, mirrored by a 2,429-line kernel. One part of it is not about shots: the grid of walls, holes and footprints that bodies slide on (`slide_body`), the AI looks through (`line_clear`, `ground_clear`, `walk_clear`, `clear_run`), items and Flow place things on (`nearest_ground`, `circle_blocked`), and Spells and its carriers, Combat, the AI's brain, the Mover, the Caster and the staff poses clip to (`clip_to_walls`, 19 call lines). Every one of those areas depends on the projectile manager to see a wall.
+
+## Words used here
+
+- **A merged hit (an entry):** the hits of one caster's spell (one tag) on one body in one hit pass, sent as one `projectile_hit` with `impact_count` (a shot alone is an entry of its own).
+- **A shot alone** (`F_ALONE`, set by `Spells._set_relay`): a shot with a hit profile of its own, not its tag's: an echo's copy, a flying chain jump, a shot infused in flight, a relay.
+- **Spent:** a shot its hit used up (no pierce left), marked `F_SPENT` and ended at the pass's end.
+- **Held slot:** a slot of a shot ended during the pass, given back to the pool only after the pass's hits are sent, so no new shot takes the slot a hit still names. **Take-back:** a spawn at the cap with no free slot takes a held slot back (or ends a spent shot early for its slot) before it drops a living shot.
+- **A body's room:** what decides whether a body is dead in the pass: its health, whether hits take any, its barrier's charges and the spell it spares, its hex.
+- **Hand-back:** the native hit pass stops and GDScript takes the shot's turn.
 
 ## Goals
 
-- **One hit model:** a pass's shot hits are found, each shot is spent, pierces and ends as it hits, and the hits go out merged after the pass. No mode, no switch, no second path.
-- **The batch is one class.** Everything the merge keeps between a hit and its event lives in `HitBatch` (`core/projectiles/hit_batch.gd`), not in the manager's members, and the manager tells it only "shot S hit target T at point P".
-- **No hand-back for a hit the kernel can resolve:** what decides whether a body is dead in the pass (health, barrier charges, a hit's damage) is handed to the batch before the pass, so the native hit pass resolves every hit but those of shots alone (relays) and hands back only ends, walls and sticks.
-- **The grid of the room is its own core service**, read by shots, bodies, the AI, items and Flow alike, with the same answers to the bit.
-- **The native contract holds** (native/README.md): every kernel method has its GDScript twin, compared byte for byte; the editor runs without the module.
+- **One hit model:** a pass's shot hits are found, each shot is spent, pierces and ends as it hits, and the hits go out merged after the pass. No mode, no switch, no second path in GDScript or the kernel.
+- **The batch's data in one class.** The merge table, the bodies' tallies and the pass's lists live in `HitBatch` (`core/projectiles/hit_batch.gd`); the shots' lifecycle and the sending stay the manager's (below, "The seam").
+- **Fewer hand-backs:** a body's room is asked once a body, not once a spell and body, and the native hit pass resolves a hit on a body whose room it has.
+- **The room grid is a class of its own** (`RoomGrid`, `core/projectiles/room_grid.gd`), read by shots, bodies, the AI, items and Flow alike, with the same answers to the bit.
+- **The native contract holds** (native/README.md, changed where this plan says): every kernel method has its GDScript twin, compared byte for byte; the editor runs without the module.
 - **The determinism rules hold** (T1-T5, docs/milestones/shot-scale.md, "Determinism"; core/sim/README.md).
 
 ## Not goals
 
-- No gameplay change beyond today's merged hits. The game already merges; A removes the unmerged mode. What a player sees and what a hit deals is today's merged game's, checked by the damage hashes.
-- The other prototypes of 2026-11-17 (the staggered think, looks once a drawn frame) are not part of this plan; keeping or dropping them is a decision of its own (DECISIONS, 2026-11-17).
-- Not the body table (hot per-body data in packed arrays, for an enemy step kernel): it is larger, touches most of `gameplay/`, and waits for real-hardware numbers (below, "Later").
+- No gameplay change beyond today's merged hits. The game already merges; A removes the unmerged mode and holds every part to today's merged game (below, "A0").
+- The other prototypes of 2026-11-17 (the staggered think, looks once a drawn frame) are not part of this plan (Q3).
+- Not the body table (below, "Later").
 
 ## A: the hit batch
 
-### The model
+### The model (today's merged game, kept)
 
 A pass's hits in three phases, each over the whole pass, in slot order:
 
-1. **Find** (the hit pass, GDScript or the kernel): each shot flies its path, meets walls and ends as today, and for each body its path meets (`_cand_*`, nearest first) asks the batch whether the body still takes a hit (`HitBatch.takes(target)`: not dead in this pass). If it does, the shot is spent or pierces and the hit is counted (`HitBatch.add(slot, target, at, heading)`). A spent shot is marked and handed to the batch.
-2. **End** (GDScript): the batch ends its spent shots in the order they were spent (their tails where they were spent), their slots held for their hits.
-3. **Send** (GDScript): one `projectile_impact` and one `projectile_hit` for each caster, body and spell (a shot alone: its own), in the order of their first hits, with `impact_count`; then the slots freed and the ends sent (`shot_ended`).
+1. **Find** (the hit pass, GDScript or the kernel): each shot flies its path, meets walls and ends as today; for each body its path meets (`_cand_*`, nearest first), unless the body's room says the pass has killed it, the shot is spent or pierces and the hit is counted into its entry. Events of the shots' ends and walls (`projectile_expired`, `wall_met`, a wall's `projectile_impact`) still go out during this phase, and their handlers may deal damage, heal, hex, give barriers, spawn, block or remove shots (an expiring Blast, a payload on expiry or on a wall).
+2. **End** (GDScript): the spent shots end in the order they were spent (their tails where they were spent), their slots held.
+3. **Send** (GDScript): one `projectile_impact` and one `projectile_hit` an entry, in the order of the entries' first hits, with `impact_count`; then the held slots are freed and the ends sent (`shot_ended`).
 
-Nothing a listener does reaches the pass's own hits: phase 1 sends no event of a hit. Events of the shots' ends and walls (`projectile_expired`, `wall_met`, a wall's `projectile_impact`) still go out during phase 1, as today; their handlers can spawn, block or remove shots, which the batch already guards (held slots, the take-back at the cap, a spent shot a handler ended).
+### The seam
 
-### What moves where
+`HitBatch` (RefCounted, the manager's, DERIVED: emptied within a step) keeps the data and the logic that only reads and writes it:
 
-- **Into `HitBatch` (RefCounted, owned by the manager, DERIVED: emptied within a step):** the merge table by target (`_mh_head`, `_mh_next`, and each entry's caster, tag, slot, sequence, point, heading, count, look), the per-target tallies (health, damage counted, charges and charges used), the spent shots (`_mh_used`), the held slots (`_mh_freed`), the ends kept (`_mh_ended`), and the functions that read them (`_merge_hit`, `_spend_room`, `_killed_this_pass`, `_end_spent`, `_take_back_slot`, `_send_merged`). About 30 members and 400 lines leave the manager.
-- **Stays in the manager:** the shots (their arrays, the pool, the free list), the hit test, the passes, `_kill` and `_expire`. `_kill` asks the batch whether to hold a slot (`HitBatch.hold(slot)`), the one place the manager knows a batch exists besides `_pass_hits`.
-- **Gone:** `merge_hits`, `merges_hits` (the switches), the unmerged branches of `_register_hit`, `_kill`, `_expire`, `_hit_slot`, `_hit_candidates` and `_test_deferred`, and `_merging` (the batch is open for the pass, and only the pass adds to it).
+- the merge table by target (each target's first entry and each entry's next; each entry's caster, tag, slot, the slot's sequence, point, heading, count, and its look: carrier card, body, core, look bits), the bodies' rooms and tallies (health, damage counted, charges and charges used), the spells' damage (below), the pass's spent shots, held slots and kept ends;
+- `takes(target) -> bool` (not dead in the pass), `add(slot, target, at, heading, look...)` (count it, or open an entry), `hold(slot)`, `keep_end(tag)`, and their sizing.
 
-### The rooms, asked once a pass
+The manager keeps the shots' lifecycle and the sending: it ends the spent shots (`_end_tail`, `_kill`), does the take-back (its free list), sends the entries through `_send_hit` (which sets the `impact_*` members Combat and Feel read), and hands the batch to the kernel. Where the manager talks to the batch: `_pass_hits` and `_pass_hits_native` (open, close, hand to the kernel), `_hit_candidates` (`takes`), `_register_hit` (`add`, the spent mark), `_kill` and `_expire` (`hold`, `keep_end`), `_spawn_row` (the take-back reads the held slots), `_drop_one` (passes over spent shots), `clear` (empties the batch). The batch never calls the manager.
 
-Today Combat answers `hit_room_asked` at the first hit of each spell on each body. A hit's damage depends on the spell (its profile, the caster's power) and the body (a hex adds to it; a Barrier card spares one spell), so the answer splits in two, both asked before or outside the hit pass:
+About 30 members and 250 lines leave the manager. Gone with A3: `merge_hits`, `merges_hits`, `_merging`, and the unmerged branches of `_pass_hits`, `_kill`, `_expire`, `_hit_candidates`, `_register_hit` and the kernel's (`HitPass::merging`). The `F_SPENT` checks of `_hit_slot`, `_test_deferred`, `_hit_found`, `_caster_position` and `caster_shot_of` stay: spent shots still live until the pass's end.
 
-- **The bodies' rooms, once a pass** (`hit_rooms_asked(rooms: HitRooms)`, Combat's): for every target of the pass, by the manager's target index, the health left, whether hits take any (an invincible body never dies by them), the barrier's charges and the spell it spares, and the hex's extra share. Packed arrays the batch holds and the kernel reads. A body Combat does not know keeps an unknown room (INF), as today.
-- **A spell's damage, once a pass per spell** (`hit_damage_asked(caster, tag, shot, answer)`): one hit's damage before the body's share, at the first hit of that spell in the pass (the `shot` for a profile of its own: a shot alone asks for itself). The kernel hands back that first hit only; every hit after it, on any body, is the kernel's.
-- **Then a hit counts** `damage × (1 + hex share)` off the body's health, or one charge when the spell meets its barrier, as `_spend_room` does today.
+### A body's room, asked once a body (A2)
 
-Cost to check in A2: filling the rooms for every target once a pass is about one call a target (200 in the desktop stress run); today's asks are about 84 hand-backs a tick at about 10 us each. If filling every target costs more than it saves, the rooms are filled at a body's first hit instead (one hand-back a body a pass, not one a spell and body).
+Today Combat answers `hit_room_asked` at each new entry (each caster's spell's first hit on a body), and the batch takes the health from the latest answer, so what a handler did meanwhile counts. A2 splits the answer in two, each asked where it changes, and keeps that rule:
 
-### Native
+- **The body's room** (`HitRooms`, `core/base/hit_rooms.gd`, filled by Combat for one body at a time through `hit_room_asked(target, rooms)`): the health left; whether hits take any (no: a body down, dying, depleted, protected, invincible, a plain body at 0, or no body Combat knows: the room is unknown, INF, never dead; never 0); the barrier's charges and the spell it spares; the hex's power. Asked at the body's first hit in the pass, and again at its next hit after any handler ran in phase 1 (a counter of events sent in phase 1, `events_sent`, kept by the manager, against the one the room was asked at). A target a handler added during the pass is asked at its first hit like any other.
+- **A spell's hit, once a spell** (`hit_damage_asked(caster, tag, shot, answer)`): one hit's damage before the body's hex, `profile.damage * _power_of(tag)`, at the spell's first hit in the pass, and again after any handler ran (power reads the caster's body, which a handler may end); a shot alone asks for itself. A heal or a harmless spell answers 0 (it takes no charge and counts no damage, as today).
+- **A hit then counts**, in this order, in GDScript and C++ alike: if the spell meets the barrier (charges and not spared) and charges are left, one charge; else its damage `d = spell_damage; d += d * hex_power / 100.0` (today's rounding, `Combat._strike`) off the body's health.
 
-The kernel's fast path (`HitPass::merge_hits`) grows to the whole of phase 1 for a shot: it adds a new entry to the batch (no ask: the rooms and the spell's damage are there), counts the damage with the body's hex share, and spends charges. It hands back a shot only for its end, a wall, a stick, a shot alone, a spell's first hit of the pass (its damage) and a hit memory that must grow. It reads the batch's arrays from the batch (`HitBatch`, handed by the manager), with its own field table (`BATCH_FIELDS`, checked by `check_fields` as `MANAGER_FIELDS` is).
+Equal to today's answer at every entry: each input (health, hex, barrier, invincible, power) is read no earlier than today reads it unless no handler ran since, and then it has not changed. A0's oracle holds A2 to it (below, "Tests"). The saving is a hand-back a body (and a spell) a pass instead of one a spell and body: in the stress run's crowd most bodies take one or two spells a pass, so A2 alone is expected to save little; its worth is that A4's kernel can then take a body's later hits whatever spell they are.
 
-### The recordings
+**Plow (today's behaviour, kept and noted):** neither today's answer nor A2 knows that a body a shot carries is not hurt by it (`Plow.rides_on`): its hit counts in the tally while Combat deals nothing, so the pass may pass over a body that is not dead; and an entry names only its first shot, so a carrying first shot drops the whole entry's damage. A test records it (below); fixing it is a change of its own.
 
-`test_projectiles_step_exact.gd` and `test_projectiles_targets.gd` hold the shots to recordings made one by one. With one model they are recorded again, once, on the reference GDScript of the merged model at the commit before A3 (their own rule: never from the code under test), and the PR lists every changed trace with its reason. What they guard (the passes' order, the grid's answers) is unchanged.
+### Native (A4)
+
+The kernel's fast path grows to open entries itself: for a body whose room is fresh and a spell whose hit is asked, it adds a new entry (its caster, tag, slot, sequence, point, heading as `_register_hit` works it out: `_vel.normalized()`, else the way to the target, else right; its look as `_carrier_card_of` and `_kind_of` give it, kept in the batch as numbers: the carrier card by an index into a list the batch keeps, since the kernel cannot write an `Array[StringName]`), counts the hit and spends charges as above. The spells' hits are packed arrays in the batch, found by (caster, tag), and a shot alone's by its slot. It hands back a shot for its end, a wall, a stick, a falling shot, one out of bounds or waiting, a body whose room is not fresh, a spell's hit not asked, a full merge table or a hit memory that must grow (the kernel never grows an array), and a target without a row in the batch's tables. It reads the batch's arrays from the batch, handed by the manager, with a field table of its own (`BATCH_FIELDS`, checked by `check_fields` as `MANAGER_FIELDS` is).
+
+native/README.md changes with A4: a kernel method may read the arrays of more than one object (the manager and its batch), each with its own field table; neither object may keep its own copy of an array the kernel shares. "Hand back what needs GDScript" changes with A2, A3 and A4.
 
 ### Parts
 
 | # | Part | Delivers |
 |---|---|---|
-| A1 | **`HitBatch`, extracted** | The merge's members and functions move into the class; the manager calls it. Byte for byte the same (the native side-by-side test, the merged tests, every recording as today). The unmerged mode is still there. |
-| A2 | **The rooms once a pass** | `hit_rooms_asked` and `hit_damage_asked` replace `hit_room_asked`; Combat answers both. The same hits, damage and order as A1 (the stress run's and shot scale's damage hashes, `test_merged_hits.gd`). Measured: the hand-backs a tick and the tick. |
-| A3 | **One model** | The unmerged mode, its branches and the switches are gone; the two recordings recorded again (owner's word, Q2); the tests of the hits one by one become tests of the merged model where they test something it keeps, and go where they test the unmerged order. |
-| A4 | **The kernel takes new hits** | The native fast path adds entries itself; the side-by-side test steps its scene with spells hitting many bodies and shots alone; a mutated line fails it. Measured: hand-backs a tick (expected: about the ends alone, 85 of 169 at the desktop stress run) and the tick. |
+| A0 | **The merged game recorded** | Merged recordings of `test_projectiles_step_exact.gd` and `test_projectiles_targets.gd`, made from today's merged GDScript before any other part (the owner's word, Q2); a `DAMAGE:` line in the stress run (each body's damage taken, as shot scale prints it); a test-only copy of today's `Combat._on_hit_room_asked`, the oracle for A2. Every later part is held to these. |
+| A1 | **`HitBatch`, extracted** | The batch's data and logic move into the class, at the seam above; the manager calls it. The same to the bit: the merged recordings, the native side-by-side tests merged, `test_merged_hits.gd`, the damage hashes. The unmerged mode still there. |
+| A2 | **A body's room once a body** | `hit_room_asked(target, rooms)` and `hit_damage_asked` replace today's ask; Combat answers both. At every entry the oracle and the new answers give the same health, damage and charges, to the bit, in the merged scenes and `test_content_determinism.gd`'s fights. Measured: hand-backs a tick, the tick. |
+| A3a | **The tests move to the merged model** | Each test of the hits one by one (`test_projectiles.gd`, `test_native_kernel.gd`'s main scene, `test_hit_budget.gd`, `test_step_profile.gd`, `test_spells_cast.gd`) becomes a test of the merged model where it tests something the model keeps, or goes, with its reason in the PR; the side-by-side scene runs merged. |
+| A3b | **One model** | The unmerged mode, its branches, the switches and the kernel's unmerged path are gone; shot-scale.md (H3b), native/README.md and DECISIONS say so. |
+| A4 | **The kernel opens entries** | As above; the side-by-side scene has spells hitting many bodies, hexed and barriered bodies, shots alone, a Blast on expiry (a handler mid-pass) and a target added mid-pass, so every new branch runs; a mutated line of the C++ fails it. Measured: hand-backs a tick (expected: the ends, walls and the rest of the list, about half of today's) and the tick. |
 
 ## B: the room grid
 
 ### What moves
 
-The grid of the room's cells (`WALL_CELL`, 8 px): the room's walls (`set_walls`, `add_wall_body`, `clear_walls`), its holes (`set_holes`, `add_hole_body`, `set_holes_outside`, `is_hole`, `touches_hole`, `has_holes`), the bodies' footprints (`set_footprint`, `footprint_of`), the solid shots' stones (the Wall card's, marked by the manager), and the queries (`clip_to_walls`, `line_clear`, `ground_clear`, `walk_clear`, `clear_run`, `circle_blocked`, `nearest_ground`, `slide_body`, `wall_image`, and the manager's own `_wall_hit` and `_way_hit`).
+Into `RoomGrid` (`core/projectiles/room_grid.gd`, a simulation folder: the state rules and their tests cover it): the cells of the room (`WALL_CELL`, 8 px) and their size and corner, which come from the room's bounds (`set_bounds` sets the grid's; the shots keep their own `_bounds` for their limits, drawing and spans); the room's walls (`set_walls`, `add_wall_body`, `clear_walls`, `wall_image`); its holes (`set_holes`, `add_hole_body`, `set_holes_outside`, `is_hole`, `touches_hole`, `has_holes`); the bodies' footprints (`set_footprint`, `footprint_of`); the solid shots' stones (marked by the manager through it, `mark_solid`); and the queries (`clip_to_walls`, `line_clear`, `ground_clear`, `walk_clear`, `clear_run`, `circle_blocked`, `nearest_ground`, `slide_body`, and the manager's `_wall_hit` and `_way_hit`).
+
+**Every member keeps its list** (state, DERIVED, VIEW) as today. `_wall_cells` is state today (the room's walls and the solid stones in one count array), and stays so: splitting walls from stones would be a change of its own.
 
 ### Where to
 
-A core service of its own, `core/room_grid/` (`RoomGrid`), made by the projectile manager and handed to who asks (`Projectiles.grid()`) in B1, an autoload of its own in B2 (Q4). Its state (holes, footprints, the solid stones) is state as today, walked and restored by the snapshot under its own name; the cells worked out from the room are DERIVED and set up again in `rebuild_derived`. Shots mark their stones through it (`mark_solid`, `lift_solid`). The kernels read its arrays from it: `ShotKernel` (the hit pass's walls) with a field table of its own, `BodyKernel` as today (handed the arrays).
+A member of the projectile manager (`Projectiles.grid()`), walked and restored by the snapshot under the manager's path, as today; the manager takes its grid as it takes its actor table (a test may hand its own; none: its own). An autoload of its own (Q4) would also need: a place before Projectiles, Combat, Entities and Flow in `project.godot`; a run's start (`renewed_by` in `Tick.RUN_ORDER`, or `fresh_because`); a name in `Tick.state_areas`; and a way for the hundreds of tests that make their own manager to keep their own grid. The kernels read the grid's arrays from the grid: `ShotKernel`'s hit pass with a field table of its own (`GRID_FIELDS`), `BodyKernel` as today (handed the arrays); native/README.md changes with B1 as for A4.
 
 ### Parts
 
 | # | Part | Delivers |
 |---|---|---|
-| B1 | **`RoomGrid`, extracted** | The cells, walls, holes, footprints and queries move into the class; the manager keeps one-line forwards, so no caller changes. Byte for byte the same (every test as it is, the native side-by-side tests with the kernel reading the grid). |
-| B2 | **The callers ask the grid** | Bodies, the AI, items, Flow and Feel ask the room grid, not the manager (about 70 call sites outside the manager, tests included); the forwards go. An autoload (`RoomGrid`) if the owner agrees (Q4); else the manager's `grid()`. |
+| B1 | **`RoomGrid`, extracted** | The cells, walls, holes, footprints and queries move into the class; the manager keeps one-line forwards (holding no copy of a grid array), so no caller changes. Not only mechanical: the kernel reads a second object. The same to the bit: every test as it is, the native side-by-side tests (with Wall-card stones), `test_wall_slide.gd`; `check_fields` fails on a renamed grid member; a snapshot taken with a Wall card's stones, holes and footprints laid restores them (`test_snapshot_game.gd` in every room, and a test of its own). |
+| B2 | **The callers ask the grid** | The game's callers (about 76 lines in Spells and its carriers, Combat, the AI, the Mover, the Caster, the staff poses, items and Flow) ask the grid; the tests' (about 310 lines, `set_walls` most) keep the forwards or move file by file. |
 
 ## Order
 
-B1 first (it is mechanical and changes no result), then A1, A2, A3, A4, then B2. Each part is one PR, measured before and after with the stress run's tick parts and the shot scale crowd, with an independent review. A1 and B1 can be reviewed side by side: neither changes a result, and the tests say so.
+B1 first (no decision needed), then, once Q1 and Q2 are answered, A0, A1, A2, A3a, A3b, A4, then B2. One part at a time, since A1 and B1 both change the manager and the kernel's field tables. Each part is one PR, measured before and after with the stress run's tick parts and damage line and the shot scale crowd (`--cards=` runs with Blast, a hexing card, Barrier, Mend, echo, chain and Plow), with an independent review.
 
 ## Tests
 
-- **Same results, where nothing should change** (A1, B1, B2, A2): the full suite, the native side-by-side tests merged on one and four threads, `test_merged_hits.gd`, the determinism and snapshot suites, and the damage hashes of the stress run and shot scale (`DAMAGE:`), compared before and after.
-- **A2:** a body hit by two spells, one hexed and one barriered, counted dead by the rooms as by today's asks; an invincible body never dead; a body a handler adds during the pass (no room: unknown).
-- **A3:** the recordings recorded again with their reasons; every test of the hits one by one kept as a merged test or removed with its reason in the PR.
-- **A4:** the side-by-side scene with spells hitting many bodies, hexed and barriered bodies and shots alone, so every new branch runs; a mutated line of the C++ fails it.
-- **B1:** a test that every query of the grid answers as the manager did, over the rooms of `test_wall_slide.gd`.
+- **Same results** (A1, A2, A3a, A4 against A0's recordings and damage lines; B1, B2 against today's): the full suite, the native side-by-side tests on one and four threads, `test_merged_hits.gd`, the determinism and snapshot suites, the damage lines before and after.
+- **A2:** the oracle at every entry; a body hit by two spells, one hexed and one barriered; a body a Blast on expiry hurts and one a Mend on expiry heals during the pass (each counted as today's ask counts it); an invincible body never dead; a target a handler adds during the pass; Plow's carried body and another spell on it, as today.
+- **A3a:** every test of the hits one by one kept as a merged test or removed with its reason.
+- **A4:** every new branch reached in the side-by-side scene and a mutated line failing it, as above.
+- **Kept throughout:** a handler's `clear()` while the hits are sent stops the rest (`test_a_clear_while_the_hits_are_sent_stops_the_rest`); every new signal in `test_events.gd`'s table.
 
 ## Numbers to beat
 
-The desktop stress run after the performance pass (2026-11-17, the cloud machine): a tick of about 16.8 ms, of it the projectile manager about 7 ms and 169 hand-backs a tick. A4 is expected to bring the hand-backs to about the ends and the tick down by about 1 ms; A1, A3, B1 and B2 by nothing (they are cleaner code, not faster). Each PR prints its numbers; a part that is slower by more than the machine's noise (about 15%) is looked at before it merges.
+The desktop stress run after the performance pass (2026-11-17, the cloud machine, after the native merge and the wall-spot cap): a tick of about 16.8 ms, of it the projectile manager about 7 ms and 155-169 hand-backs a tick. A2 and A4 together are expected to bring the hand-backs to about half and the tick down by about 1 ms; A0, A1, A3, B1 and B2 by nothing (they are cleaner code, not faster). Each PR prints its numbers; a part slower by more than the machine's noise (about 15%) is looked at before it merges.
 
 ## For the owner
 
-- **Q1: one hit model.** The game would only merge hits, as it does now; the unmerged mode goes. This finally replaces the decision of 2026-11-07 against bundled hits (DECISIONS), already reversed in practice by the prototype of 2026-11-17. If the owner wants hits one by one back instead, A is not done and the merge is removed.
-- **Q2: the recordings.** May the two recordings be recorded again once, on the merged model's reference GDScript before A3?
+- **Q1: one hit model.** The game would only merge hits, as it does now; the unmerged mode goes. This replaces the decision of 2026-11-07 against bundled hits (DECISIONS; shot-scale.md, H3b), already reversed in practice by the prototype of 2026-11-17. It touches DESIGN's "Game feel from day 1: every hit has hit-stop, screen shake, knockback, particles and sound": a step's hits of one spell on one body get one hit-stop, one knockback, one look and one sound. If the owner wants hits one by one back instead, A is not done and the merge is removed.
+- **Q2: the recordings.** May the two recordings be recorded again once, on today's merged GDScript (A0), before any other part of A?
 - **Q3: the prototypes.** The staggered think and the looks once a drawn frame are separate from this plan: keep, change or drop each.
-- **Q4: an autoload for the room grid**, or keep it reached through the projectile manager?
+- **Q4: the room grid as an autoload of its own**, with what that needs (above), or kept as the projectile manager's member (this plan's default).
 
 ## Later
 
-- **The body table** (hot per-body data in packed arrays in `core/actors`, a field at a time, aim and position first), which makes an enemy step kernel and the AI's perception in one batch clean (about 3 to 4 ms a tick at the desktop stress run, estimated). Only if real-hardware numbers (the Web Test export's `--stress` and `--storm` in a browser, the desktop build on the target PC) show the frame still needs it.
+- **The body table** (hot per-body data in packed arrays in `core/actors`, a field at a time, aim and position first), which would make an enemy step kernel and the AI's perception in one batch clean (about 3 to 4 ms a tick at the desktop stress run, estimated). Only if real-hardware numbers (the Web Test export's `--stress` and `--storm` in a browser, the desktop build on the target PC) show the frame still needs it.
 - **30 ticks a second**, the largest single lever, only if the budget is still missed.

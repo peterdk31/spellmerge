@@ -874,6 +874,24 @@
       "prompt": "A 64x32 sarcophagus seen from above with its front face to the camera (crypt rework CR4, the nave's landmark): a Stone lid lit from the upper left with a carved figure lying on it, head to the west, a hooded head with closed eyes, hands folded on the hilt of a sword laid along its robe, its feet at the east end; the chest's front face below the lid's dark lip in panels; its corners chipped inside its box, a chip broken off the lid; dark Outline. Palette colours from docs/STYLE.md."
     },
     {
+      "path": "art/tilesets/crypt/ossuary_wall.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/pixel_grid.py from ossuary_wall.grid.json, 2026-11-17)",
+      "prompt": "A 128x32 low wall built of bones seen from above with its front face to the camera (crypt rework CR5, the ossuary court's landmark): its top long bones laid along it in three staggered courses on a dark bed, two skulls lying on them; below a dark lip, its face the ends of stacked bones in courses with three arched skull niches, a skull looking out of each; a dark foot, its corners chipped inside its box, a chip broken off the lip; dark Outline. Palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/bone_pile.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/pixel_grid.py from bone_pile.grid.json, 2026-11-17)",
+      "prompt": "A 32x16 floor decal of bones piled at the foot of an ossuary's wall (crypt rework CR5): a skull on two long bones lying across each other and the ends of two more, Bone shadow and Stone light so they stay quieter than the fight; dark Outline, lit from the upper left. Palette colours from docs/STYLE.md."
+    },
+    {
       "path": "art/grounds/arena_02/arena_02_ground_floor.png",
       "origin": "ai",
       "author": "Claude",

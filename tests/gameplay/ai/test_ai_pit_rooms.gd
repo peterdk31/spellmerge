@@ -1,13 +1,15 @@
 extends "res://tests/support/suite.gd"
-## A room with a pit never pins an enemy (crypt rework, docs/milestones/crypt-rework.md, rule 1). The
-## AI has no pathfinder: it steers with `AISight.detour` and `walk_clear` (gameplay/ai/README.md), so
-## a pit beside a pillar or against a room's edge is where steering could hold an enemy against its
-## lip for good. For every room template the registry finds that has holes, each of its enemy spawns
-## is played against a wizard standing at each of its player spawns and at each open spot round its
-## pits (`_spots_round_pits`: where a fight is pushed to its lip), in the room's own walls, holes and
-## standing props: a crypt mite (the crypt's swarmer, which has no staff and must walk all the way
-## to touch) starts at the spawn, and the test fails if it does not come within its reach of the
-## wizard in ten seconds (a far spot round a pit: in the time its way round takes, `WAY_ROUND`). It never falls on the way. A new room with a pit is covered by its folder.
+## A room with a pit never pins an enemy (crypt rework, docs/milestones/crypt-rework.md, rule 1), and
+## no room's low walls pin one at the fight's start (CR5). The AI has no pathfinder: it steers with
+## `AISight.detour` and `walk_clear` (gameplay/ai/README.md), so a pit beside a pillar or against a
+## room's edge, or a long low wall straight between an enemy and a wizard, is where steering could
+## hold an enemy for good. For every room template the registry finds, each of its enemy spawns is
+## played against a wizard standing at each of its player spawns and, in a room with holes, at each
+## open spot round its pits (`_spots_round_pits`: where a fight is pushed to its lip), in the room's
+## own walls, holes and standing props: a crypt mite (the crypt's swarmer, which has no staff and must
+## walk all the way to touch) starts at the spawn, and the test fails if it does not come within its
+## reach of the wizard in ten seconds (a far spot round a pit: in the time its way round takes,
+## `WAY_ROUND`). It never falls on the way. A new room is covered by its folder.
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
@@ -42,8 +44,10 @@ func test_the_rooms_with_a_pit_are_found() -> void:
 		check(_spots_round_pits(room).size() >= 2, "%s: a wizard is stood round its pits (%d spots)" % [room.id, _spots_round_pits(room).size()])
 
 
-func test_no_enemy_is_pinned_in_a_room_with_a_pit() -> void:
-	for room: RoomBase in _pit_rooms():
+func test_no_enemy_is_pinned_in_any_room() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	for room: RoomBase in RoomScan.templates(registry):
 		var places: RoomPlaces = room.places()
 		var pinned: PackedStringArray = PackedStringArray()
 		var targets: PackedVector2Array = places.player_spawns + _spots_round_pits(room)

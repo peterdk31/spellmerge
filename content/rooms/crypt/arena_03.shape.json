@@ -1,0 +1,19 @@
+{
+	"about": "The ossuary court (docs/milestones/crypt-rework.md, CR5): a floating slab of the crypt's flagstones hanging in the dark, its edge a broken lip (crypt_edge) and an invisible wall (its void a wall); its four low walls built of bones are the room's own walls, drawn in its scene. The slab's sides are pinned to the plain 32 px line beside Pillar1 and Pillar2, so the way between each and the edge stays the crypt's narrowest (rule 2); two bays where the slab runs out; the floor pushed out round every spawn, gate, pillar and decal. tools/ground_shape.py draws arena_03_ground.tscn and its art from this.",
+	"size": [640, 448],
+	"seed": 13,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [10, 14],
+		"rough": [46, 17, 6],
+		"seed": 6,
+		"pins": [[0, 212, 34, 276], [606, 212, 640, 276]],
+		"bays": [[36, 136, 20], [604, 344, 22]],
+		"clear": {"round": 28, "of": ["PlayerSpawns", "EnemySpawns", "Exits", "Props", "Decor"]}
+	}
+}

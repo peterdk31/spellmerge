@@ -6916,8 +6916,9 @@ func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: i
 
 
 ## The hit of the shot in `slot` on target `target`, kept for the end of the pass (`_hit_batch`): added
-## to the caster's hits on it with the same tag, or the first of them, for which Combat is asked
-## what one hit of the spell takes off the body and what it has (once a pass).
+## to the caster's hits on it with the same tag, or the first of them, whose room is worked out from
+## the body's room and the spell's damage, each asked of Combat once a pass and again after any event
+## (a shot that hits alone asks its damage for itself; hit batch A2).
 func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, heading: Vector2) -> void:
 	if _hit_batch.add_to(target, caster, tag, (_flags[slot] & F_ALONE) != 0, _flags, F_ALONE) >= 0:
 		return

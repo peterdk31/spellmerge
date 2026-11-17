@@ -200,12 +200,12 @@ signal projectile_impact(caster: int, target: Node, position: Vector2, direction
 ## (`HitRoom`: whether hits take its health, how much it has, its hex, its barrier's charges and the
 ## spell it spares), so the manager stops spending shots on a body its pass has already killed.
 ## Heard by combat; heard by nobody, `room` stays unknown (every shot hits as it comes). An ask with
-## its answer.
+## its answer: its handlers only read (the manager keeps the answer until its next event).
 signal hit_room_asked(target: Node, room: HitRoom)
 ## Sender: core/projectiles, with `hit_room_asked` (hit batch A2). A shot tagged `tag` (slot `shot`)
 ## hit a body, and the pass has not asked of its spell since its last event (a shot that hits alone
 ## asks for itself): Combat fills `answer` at once (`HitDamage`: one hit's damage before the body's
-## hex). Heard by combat; heard by nobody, it stays 0. An ask with its answer.
+## hex). Heard by combat; heard by nobody, it stays 0. An ask with its answer: its handlers only read.
 signal hit_damage_asked(tag: int, shot: int, answer: HitDamage)
 ## Sender: core/projectiles. A projectile fired by the actor `caster` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`. Heard by core/spells (on expire) and feel (a small pop where a life ran out). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal projectile_expired(caster: int, position: Vector2, tag: int, shot: int)

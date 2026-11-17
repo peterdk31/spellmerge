@@ -43,9 +43,10 @@ var damage: HitDamage = HitDamage.new()
 var _next: PackedInt32Array = PackedInt32Array()
 var _damage: PackedFloat64Array = PackedFloat64Array()
 var _blocks: PackedByteArray = PackedByteArray()
-## By target, while `_target_pass` is this pass (`_pass`): its first entry, the health the last ask
-## told (whichever spell asked, so damage dealt outside the batch meanwhile counts), the damage the
-## pass's hits counted off it, and its barrier's charges and those the pass's hits took.
+## By target, while `_target_pass` is this pass (`_pass`): its first entry, its health as its room
+## told it at the pass's latest new entry on it (so damage dealt outside the batch meanwhile counts),
+## the damage the pass's hits counted off it, and its barrier's charges and those the pass's hits
+## took.
 var _pass: int = 0
 var _target_pass: PackedInt32Array = PackedInt32Array()
 var _head: PackedInt32Array = PackedInt32Array()
@@ -57,7 +58,7 @@ var _charges_used: PackedInt32Array = PackedInt32Array()
 ## `_room_pass`, at the manager's count of events sent `_room_at` (a room asked before an event
 ## since is asked again: its handlers may have changed it), and what it said (`HitRoom`).
 var _room_pass: PackedInt32Array = PackedInt32Array()
-var _room_at: PackedInt32Array = PackedInt32Array()
+var _room_at: PackedInt64Array = PackedInt64Array()
 var _room_known: PackedByteArray = PackedByteArray()
 var _room_health: PackedFloat64Array = PackedFloat64Array()
 var _room_hexed: PackedByteArray = PackedByteArray()
@@ -70,7 +71,7 @@ var _room_spares: PackedInt64Array = PackedInt64Array()
 const SPELLS_FIRST: int = 64
 var _spell_key: PackedInt64Array = PackedInt64Array()
 var _spell_pass: PackedInt32Array = PackedInt32Array()
-var _spell_at: PackedInt32Array = PackedInt32Array()
+var _spell_at: PackedInt64Array = PackedInt64Array()
 var _spell_damage: PackedFloat64Array = PackedFloat64Array()
 var _spells_n: int = 0
 ## The shots the pass's hits spent, in order, and where each was spent; sized for the pass's shots.
@@ -373,13 +374,13 @@ func _spell_find(spell: int) -> int:
 func _spell_grow(size: int) -> void:
 	var keys: PackedInt64Array = _spell_key
 	var passes: PackedInt32Array = _spell_pass
-	var ats: PackedInt32Array = _spell_at
+	var ats: PackedInt64Array = _spell_at
 	var damages: PackedFloat64Array = _spell_damage
 	_spell_key = PackedInt64Array()
 	_spell_key.resize(size)
 	_spell_pass = PackedInt32Array()
 	_spell_pass.resize(size)
-	_spell_at = PackedInt32Array()
+	_spell_at = PackedInt64Array()
 	_spell_at.resize(size)
 	_spell_damage = PackedFloat64Array()
 	_spell_damage.resize(size)

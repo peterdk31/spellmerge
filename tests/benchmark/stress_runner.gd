@@ -168,6 +168,8 @@ var _reactions: int = 0
 var _merged_hits: int = 0
 var _hits_counted: int = 0
 var _damage: float = 0.0
+## And Combat's answers asked by the merged hits (`hit_room_asked`, `hit_damage_asked`; hit batch A2).
+var _asks: int = 0
 var _refused: int = 0
 ## The projectile manager's `dropped` and the spell runtime's `fires_waited` when the measured
 ## window began: what the cap dropped and what the fire pacing held back while measured.
@@ -224,6 +226,8 @@ func _ready() -> void:
 	_events.connect("projectile_hit", _on_projectile_hit)
 	_events.connect("reaction_triggered", _on_reaction_triggered)
 	_events.connect("damage_dealt", _on_damage_dealt)
+	_events.connect("hit_room_asked", _on_room_asked)
+	_events.connect("hit_damage_asked", _on_damage_asked)
 	_next_scenario()
 
 
@@ -278,6 +282,7 @@ func _next_scenario() -> void:
 	_merged_hits = 0
 	_hits_counted = 0
 	_damage = 0.0
+	_asks = 0
 	_elapsed = 0.0
 	_measuring = false
 	_enemy_step_usec = 0
@@ -528,6 +533,14 @@ func _on_damage_dealt(_caster: int, _target: Node, amount: float, _position: Vec
 	_damage += amount
 
 
+func _on_room_asked(_target: Node, _room: HitRoom) -> void:
+	_asks += 1
+
+
+func _on_damage_asked(_tag: int, _shot: int, _answer: HitDamage) -> void:
+	_asks += 1
+
+
 func _on_reaction_triggered(_caster: int, _reaction_id: StringName, _position: Vector2, _shot: int) -> void:
 	_reactions += 1
 
@@ -625,7 +638,7 @@ func _report_damage(label: String) -> void:
 	if tick == null:
 		return
 	var ticks: float = maxf(1.0, float(tick.count - _profile_ticks_at))
-	print("DAMAGE: stress %s: %.1f damage a tick, %.1f shot hits a tick (fillers too) in %.1f merged hits, over %d ticks" % [label, _damage / ticks, float(_hits_counted) / ticks, float(_merged_hits) / ticks, int(ticks)])
+	print("DAMAGE: stress %s: %.1f damage a tick, %.1f shot hits a tick (fillers too) in %.1f merged hits, %.1f asks of Combat a tick, over %d ticks" % [label, _damage / ticks, float(_hits_counted) / ticks, float(_merged_hits) / ticks, float(_asks) / ticks, int(ticks)])
 
 
 ## One `BENCH:` line for the Tick's steps and one for the manager's parts: milliseconds a tick,

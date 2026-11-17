@@ -733,6 +733,10 @@ var _hit_batch: HitBatch = HitBatch.new()
 var merged_turns: int = 0
 ## True while `_drop_one` makes room at the cap: that slot is freed at once, merging or not.
 var _freeing_now: bool = false
+## The hit batch's asks, as constants of the manager's own (a constant of another class is looked up
+## at each use).
+const ASK_ROOM: int = HitBatch.ASK_ROOM
+const ASK_DAMAGE: int = HitBatch.ASK_DAMAGE
 ## Every event the manager sends counts one (before it goes out): a room or a spell's damage the hit
 ## batch was told before the count moved is asked again, since a handler may have changed it.
 var _sent: int = 0
@@ -6927,9 +6931,9 @@ func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, head
 	# (its handlers may have changed them; hit batch A2). A shot that hits alone asks for itself.
 	var entry: int = batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot], (_flags[slot] & F_ALONE) != 0, _sent)
 	var asks: int = batch.asks
-	if (asks & HitBatch.ASK_ROOM) != 0:
+	if (asks & ASK_ROOM) != 0:
 		events.hit_room_asked.emit(_targets[target], batch.room)
-	if (asks & HitBatch.ASK_DAMAGE) != 0:
+	if (asks & ASK_DAMAGE) != 0:
 		events.hit_damage_asked.emit(tag, slot, batch.damage)
 	batch.take_room(entry)
 

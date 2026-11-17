@@ -23,21 +23,13 @@ var shapes: Dictionary = {}
 var _told: Oracle.Answer = Oracle.Answer.new()
 
 
-func _keep_room(t: int, sent: int) -> void:
-	if _room_pass[t] == _pass:
-		asked_again += 1
-	super(t, sent)
-
-
-func _keep_damage(spell: int, sent: int) -> void:
-	if not _spell_key.is_empty() and _spell_pass[_spell_find(spell)] == _pass:
-		asked_again += 1
-	super(spell, sent)
-
-
 func take_room(entry: int) -> void:
-	super(entry)
 	var t: int = target[entry]
+	if (asks & ASK_ROOM) != 0 and _room_pass[t] == _pass:
+		asked_again += 1
+	if (asks & ASK_DAMAGE) != 0 and not _asked_alone and not _spell_key.is_empty() and _spell_pass[_spell_find(tag[entry])] == _pass:
+		asked_again += 1
+	super(entry)
 	Oracle.answer(combat, manager._targets[t], tag[entry], slot[entry], _told)
 	checked += 1
 	var shape: String = "unknown" if _told.health == INF else ("health only" if _told.damage <= 0.0 else ("charges" if _told.charges > 0 else "damage"))

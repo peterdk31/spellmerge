@@ -78,6 +78,8 @@ var _room_spares: PackedInt64Array = PackedInt64Array()
 ## table (`SPELLS_FIRST` slots to start, doubled when half full), a slot in use while its
 ## `_spell_pass` is this pass, asked at the count of events sent `_spell_at` (as `_room_at`).
 const SPELLS_FIRST: int = 64
+## The multiplier that spreads tags over the table (2^64 over the golden ratio, as a signed int).
+const SPELL_MIX: int = -7046029254386353131
 var _spell_key: PackedInt64Array = PackedInt64Array()
 var _spell_pass: PackedInt32Array = PackedInt32Array()
 var _spell_at: PackedInt64Array = PackedInt64Array()
@@ -205,41 +207,23 @@ func add(t: int, targets: int, who: int, spell: int, shot: int, shot_seq: int, p
 	_asked_at = sent
 	_asked_alone = alone
 	asks = 0
-	if not _room_fresh(t, sent):
-		asks |= ASK_ROOM
+	# The room is fresh when told in this pass with no event since; the spell's damage likewise, by
+	# its slot in the spells' table (written out here: on the hot path a call costs more than this).
+	if _room_pass[t] != _pass or _room_at[t] != sent:
+		asks = ASK_ROOM
 		room.clear()
-	_kept = -1 if alone else _damage_slot(spell, sent)
+	_kept = -1
+	if not alone and not _spell_key.is_empty():
+		var mask: int = _spell_key.size() - 1
+		var i: int = ((spell * SPELL_MIX) >> 32) & mask
+		while _spell_pass[i] == _pass and _spell_key[i] != spell:
+			i = (i + 1) & mask
+		if _spell_pass[i] == _pass and _spell_at[i] == sent:
+			_kept = i
 	if _kept < 0:
 		asks |= ASK_DAMAGE
 		damage.clear()
 	return entry
-
-
-## Whether target `t`'s room was told in this pass with no event sent since (`sent`: the manager's
-## count of events sent).
-func _room_fresh(t: int, sent: int) -> bool:
-	return t < _room_pass.size() and _room_pass[t] == _pass and _room_at[t] == sent
-
-
-## `room` as Combat filled it for target `t`, kept for the pass at the count of events `sent`.
-func _keep_room(t: int, sent: int) -> void:
-	_room_pass[t] = _pass
-	_room_at[t] = sent
-	_room_known[t] = 1 if room.known else 0
-	_room_health[t] = room.health
-	_room_hexed[t] = 1 if room.hexed else 0
-	_room_hex[t] = room.hex
-	_room_charges[t] = room.charges
-	_room_spares[t] = room.spares
-
-
-## The slot of the spell `spell`'s damage told in this pass with no event sent since (`sent`), or
-## -1.
-func _damage_slot(spell: int, sent: int) -> int:
-	if _spell_key.is_empty():
-		return -1
-	var i: int = _spell_find(spell)
-	return i if _spell_pass[i] == _pass and _spell_at[i] == sent else -1
 
 
 ## `damage` as Combat filled it for the spell `spell`, kept for the pass at the count of events
@@ -265,7 +249,15 @@ func _keep_damage(spell: int, sent: int) -> void:
 func take_room(entry: int) -> void:
 	var t: int = target[entry]
 	if (asks & ASK_ROOM) != 0:
-		_keep_room(t, _asked_at)
+		# The room as Combat told it, kept for the pass at the count of events of the ask.
+		_room_pass[t] = _pass
+		_room_at[t] = _asked_at
+		_room_known[t] = 1 if room.known else 0
+		_room_health[t] = room.health
+		_room_hexed[t] = 1 if room.hexed else 0
+		_room_hex[t] = room.hex
+		_room_charges[t] = room.charges
+		_room_spares[t] = room.spares
 	var spell_damage: float
 	if (asks & ASK_DAMAGE) != 0:
 		spell_damage = damage.damage
@@ -394,7 +386,7 @@ func _spend_room(t: int, entry: int) -> void:
 ## The slot of `spell` in the spells' table, or the empty one it would take.
 func _spell_find(spell: int) -> int:
 	var mask: int = _spell_key.size() - 1
-	var i: int = ((spell * -7046029254386353131) >> 32) & mask
+	var i: int = ((spell * SPELL_MIX) >> 32) & mask
 	while _spell_pass[i] == _pass and _spell_key[i] != spell:
 		i = (i + 1) & mask
 	return i

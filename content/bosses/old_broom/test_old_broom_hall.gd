@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## falls); its landmark the swept ring: its ground's areas `dust` over the whole hall, then `swept`
 ## (clean stone with the strokes of a broom) round its middle, the pillars standing in the ring and
 ## everything pushed out of it (the dust heaps, the rubble and the skulls lie in the drifts round it);
-## a wide shaft on its middle; and lit by candles where its ten wall torches hung.
+## no shaft of light (the owner's); and lit by candles where its ten wall torches hung.
 
 const HallData := preload("res://content/rooms/crypt/boss_broom/boss_broom.tres")
 ## Its shape (tools/ground_shape.py draws its ground from it) and the swept ring's material.
@@ -14,13 +14,13 @@ const Shape := preload("res://content/rooms/crypt/boss_broom/boss_broom.shape.js
 const Swept := preload("res://content/grounds/swept/ground.json")
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
-const SharedBeam := preload("res://content/rooms/decor/beam.tscn")
+const Beam := preload("res://content/rooms/decor/beam.tscn")
 const Candles := preload("res://content/rooms/crypt/decals/candles.tscn")
 const Torch := preload("res://content/rooms/crypt/decals/torch.tscn")
 const Rubble := preload("res://art/tilesets/crypt/rubble.svg")
 const Skull := preload("res://art/tilesets/crypt/skull.svg")
 
-## How near the room's middle the ring's centre and the shaft stand.
+## How near the room's middle the ring's centre stands.
 const MIDDLE: float = 24.0
 ## The candle clusters lighting the hall, one where each of its ten wall torches hung.
 const CANDLES: int = 10
@@ -105,21 +105,13 @@ func test_its_landmark_is_the_swept_ring() -> void:
 				check(false, "%s: the ring is swept, yet %s grows at %s" % [room.id, cover.kind_at(cell).id, at])
 
 
-## A wide shaft of light on the middle: a light shaft, its pool wider than the shared beam's, lighting
-## the floor.
-func test_a_wide_shaft_falls_on_its_middle() -> void:
-	var narrow: Node = own(SharedBeam.instantiate()) as Node
-	var narrow_width: float = (narrow.get_node("Pool") as Sprite2D).texture.get_width()
+## No shaft of light falls in it (the owner, 2026-11-17: "Remove the center light column"): its
+## candles light it.
+func test_no_shaft_falls_in_it() -> void:
 	for room in halls:
 		var root: Node = own(room.scene.instantiate()) as Node
-		var beam: Node2D = root.get_node_or_null("Decor/Beam") as Node2D
-		check(beam != null, "%s: a shaft of light" % room.id)
-		if beam == null:
-			continue
-		check(beam.position.distance_to(room.places().size * 0.5) <= MIDDLE, "%s: on its middle: %s" % [room.id, beam.position])
-		var pool: Sprite2D = beam.get_node_or_null("Pool") as Sprite2D
-		check(pool != null and pool.texture.get_width() > narrow_width, "%s: wider than the shared shaft" % room.id)
-		check(beam.get_node("Light").is_in_group(&"light_spot"), "%s: it lights the floor" % room.id)
+		for child in root.get_node("Decor").get_children():
+			check(child.scene_file_path != Beam.resource_path, "%s: no shaft of light, %s" % [room.id, child.name])
 
 
 ## Lit as a floating room is: by candle clusters standing on the slab (no wall to hang a torch on),

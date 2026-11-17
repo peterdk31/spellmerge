@@ -1,7 +1,7 @@
 {
-	"about": "Dust and grit lying thick (docs/milestones/crypt-rework.md): the drifts the Old Broom sweeps out of its ring, heaped up against its hall's edge. A pale, quiet grey thick enough to hide the stone, in soft patches, grit in it here and there; thicker and paler toward the floor's edge. An area's material.",
-	"base": "#504b63",
-	"patches": {"colour": "#56516a", "scales": [22, 8], "above": 0.5},
-	"toward_edge": {"colour": "#625c72", "reach": 30, "most": 0.7, "scales": [12, 5]},
-	"speckle": [["stone.shadow", 0.004], ["#625c72", 0.004], ["bone.shadow", 0.0015]]
+	"about": "Dust and grit lying thick (docs/milestones/crypt-rework.md): the drifts the Old Broom sweeps out of its ring, heaped up against its hall's edge. A quiet grey a shade off the stone, thick enough to hide it, in soft patches, grit in it here and there; thicker and a little paler toward the floor's edge. An area's material.",
+	"base": "#48435e",
+	"patches": {"colour": "#4b4661", "scales": [22, 8], "above": 0.5},
+	"toward_edge": {"colour": "#524c67", "reach": 30, "most": 0.7, "scales": [12, 5]},
+	"speckle": [["stone.shadow", 0.004], ["#524c67", 0.004], ["bone.shadow", 0.0015]]
 }

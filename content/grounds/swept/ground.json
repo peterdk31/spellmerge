@@ -1,17 +1,17 @@
 {
-	"about": "Flagstones swept clean (docs/milestones/crypt-rework.md): the Old Broom's ring, the crypt's own flagstones with no dust on them, the long strokes of its bristles round the ring's middle in a lighter shade. An area's material.",
+	"about": "Flagstones swept clean (docs/milestones/crypt-rework.md): the Old Broom's ring, the crypt's own flagstones with no dust on them, the faint broken arcs its bristles left going round and round the ring's middle, in a lighter shade. An area's material.",
 	"base": "stone.base",
 	"slabs": {
 		"size": 30,
 		"jitter": 0.85,
 		"squash": 0.8,
-		"tone": "#524e6e",
+		"tone": "#565273",
 		"vary": 0.8,
 		"joint": "#2b2840",
 		"joint_width": 1.1,
 		"light": "#57537a",
 		"light_width": 1.0
 	},
-	"strokes": {"colour": "#58547a", "count": 46, "share": 0.1, "inner": 40},
+	"strokes": {"colour": "#58547a", "spacing": 9, "share": 0.45, "inner": 30},
 	"speckle": [["stone.shadow", 0.003]]
 }

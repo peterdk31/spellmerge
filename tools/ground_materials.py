@@ -12,8 +12,9 @@ A material (`content/grounds/<id>/ground.json`) is a `base` colour and, each opt
   joints' colour and width (`joint`, `joint_width`), and a lit upper edge (`light`, `light_width`);
 - `toward_edge`: a colour mixed in by noise, more of it the nearer the floor's edge (dust and grit at
   a wall's foot: a material, not a shadow), within `reach` pixels, at most `most` of a pixel's share;
-- `strokes`: long faint arcs round the area's middle in a colour (a broom's sweeping): `count`
-  round, `share` of the pixels on one, from `inner` pixels out.
+- `strokes`: faint broken arcs round the area's middle in a colour (a broom's sweeping): rings
+  `spacing` pixels apart, wavering, `share` of each ring drawn in long pieces, from `inner` pixels
+  out.
 
 Python 3.10 and the standard library only (tools/README.md); the same inputs give the same pixels.
 """
@@ -76,8 +77,8 @@ class Material:
         self.strokes = strokes
         if strokes is not None:
             self.stroke_colour = colour(strokes["colour"])
-            self.stroke_count = int(strokes.get("count", 40))
-            self.stroke_share = float(strokes.get("share", 0.12))
+            self.stroke_spacing = float(strokes.get("spacing", 10.0))
+            self.stroke_share = float(strokes.get("share", 0.4))
             self.stroke_inner = float(strokes.get("inner", 24.0))
             self.centre = centre
 
@@ -143,16 +144,23 @@ class Material:
         return rgb
 
     def _stroke(self, x: int, y: int, rgb: Colour) -> Colour:
+        """On a stroke: a ring round the centre every `stroke_spacing` pixels, one pixel wide, its
+        radius wavering slowly with the angle, broken into pieces about 40 px long of which
+        `stroke_share` are drawn (each ring its own)."""
         cx, cy = self.centre
         dx, dy = x + 0.5 - cx, y + 0.5 - cy
         r = math.hypot(dx, dy)
         if r < self.stroke_inner:
             return rgb
-        a = math.atan2(dy, dx)
-        wave = math.sin(a * self.stroke_count + r * 0.045 + self.noise.noise1(r / 23.0, self.seed + 5) * 3.0)
-        if wave > 1.0 - 2.0 * self.stroke_share:
-            return _mix(rgb, self.stroke_colour, 0.55)
-        return rgb
+        turn = (math.atan2(dy, dx) / math.tau) % 1.0
+        r += (self.noise.noise1(turn * 6.0, self.seed + 9, 6) - 0.5) * self.stroke_spacing * 0.8
+        ring = math.floor(r / self.stroke_spacing + 0.5)
+        if abs(r - ring * self.stroke_spacing) >= 0.5:
+            return rgb
+        pieces = max(3, round(math.tau * ring * self.stroke_spacing / 40.0))
+        if self.noise.noise1(turn * pieces, self.seed + 31 * ring, pieces) < 1.0 - self.stroke_share:
+            return rgb
+        return _mix(rgb, self.stroke_colour, 0.5)
 
 
 class Noise:

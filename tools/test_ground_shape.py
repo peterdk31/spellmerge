@@ -415,6 +415,35 @@ class HallTest(unittest.TestCase):
         self.assertNotEqual(rows[0], rows[1], "no row repeats a slab's size lower")
         self.assertNotEqual(rows[1], rows[2])
 
+    def test_strokes_go_round_the_middle_not_out_from_it(self) -> None:
+        import ground_materials as gm
+        mats = gs.materials()
+        spec = {"base": "#433f5b", "strokes": {"colour": "#8a86aa", "spacing": 9, "share": 0.5, "inner": 20}}
+        m = gm.Material(spec, 0, 1, (240, 240), (120.0, 120.0), lambda c: gs.colour(c, mats), gm.Noise(gs.unit, gs.noise1, gs.fbm2))
+        base = gs.colour("#433f5b", mats)
+
+        def on(x: float, y: float) -> bool:
+            return m.at(int(x), int(y)) != base
+
+        # Out from the middle, a stroke is crossed in a pixel or two at a time: rings, never spokes.
+        longest_out = 0
+        for k in range(16):
+            a = k / 16 * math.tau
+            run = 0
+            for r in range(24, 110):
+                run = run + 1 if on(120 + math.cos(a) * r, 120 + math.sin(a) * r) else 0
+                longest_out = max(longest_out, run)
+        self.assertLessEqual(longest_out, 3, "a stroke is crossed going out")
+        # Round the middle, a stroke runs on for a long way.
+        longest_round = 0
+        for r in range(30, 100):
+            run = 0
+            for k in range(720):
+                a = k / 720 * math.tau
+                run = run + 1 if on(120 + math.cos(a) * r, 120 + math.sin(a) * r) else 0
+                longest_round = max(longest_round, run)
+        self.assertGreater(longest_round, 30, "a stroke runs round the middle, a long way (a spoke is crossed in a few)")
+
     def test_the_inputs_hash_reads_every_edge_style(self) -> None:
         import json
         import tempfile

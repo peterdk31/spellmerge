@@ -2,13 +2,19 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-17: The crypt rework is done
+
+The crypt rework (docs/milestones/crypt-rework.md, the owner's "Redesign the crypt", approved 2026-11-16) is done, every step built and merged one session at a time: CR-S took out the sandbox (its showcase staffs went to the hub's rack); CR2 built the generator's pieces (pinned and cleared frames, wall art and faces, pits and their cracks, slabs, grit toward the edge, strokes, the crypt's edge styles and ground materials); CR-G the crypt gate and the crumbling crypt pillar, with `crypt_edge` for the owner's floating rooms; CR3 to CR7 drew the five rooms again as floating slabs, each with its landmark and its light: the antechamber's fallen column under the shaft, the nave's sarcophagus ringed by candles and its first pit, the ossuary court's walls of bones, the crossing's ring round a fallen-in floor, and the broom's swept ring. Along the way: the light shaft and the wide shaft, the candles, the rule-1 AI test playing every room's spawns, and the template tests reading shaped rooms. No crypt room is tiled now; the old tiles stay as the tests' and the style guide's references.
+
+Left for the owner: `.github/workflows/platforms.yml` (owner-only) still passes `SCENES: sandbox,wave`; it should be `hub,room`. The crypt pillar's longer-lasting cover in the broom's hall is written into the boss plan for OB17's playtests.
+
 ## 2026-11-17: Crypt rework CR7: the broom's hall
 
 The last reworked crypt room (docs/milestones/crypt-rework.md, CR7). **The broom's hall** (boss_broom) is a floating slab drawn from its shape (`boss_broom/boss_broom.shape.json`, `crypt_edge`), with its own dark behind it, no pit (the boss never falls) and no gate (cleared, the run is won); its four pillars are crypt pillars, its dust heaps where they stood. Its landmark is the swept ring: dust over the whole hall, then a ring of clean flagstones with the strokes of a broom round its middle, the dust lying in drifts round it and heaped paler against the slab's edge, the rubble, skulls and heaps out in the drifts, its own cover fields keeping the cobwebs out of the ring. Its light is a wide shaft on its middle (`content/rooms/decor/beam_wide.tscn`, new, shared) and ten candle clusters where the ten wall torches hung. The `dust` and `swept` materials were tuned (quieter dust, clean stone in the ring); `RoomScan.floating_room_problems` takes a room's number of gates; the boss-fit check keeps a boss clear of holes too. The crypt pillar's 60 health (against the cracked pillar's 32) lets the hall's cover last about twice as long; written into the boss plan for OB17's playtests. Its test, `content/bosses/old_broom/test_old_broom_hall.gd`, lives in the boss's folder (the hall is the boss's, decision 28, which now also lists its ground art). The rule-1 AI test passes from every spawn; the fight shots looked at.
 
 Reviewed by a fresh-context agent; changed after it: the hall's test moved from a kind-based test in `tests/` into the boss's folder (no general rule tuned to the broom), the deletion list given the hall's ground art and manifest lines, the ring checked inside the dust at all four corners, ten candles and no torch checked by scene, the docs' sizes and the dust's wording corrected.
 
-Left for the owner: `.github/workflows/platforms.yml` (owner-only) still passes `SCENES: sandbox,wave`; it should be `hub,room`. Next: the crypt rework's closing entry.
+Left for the owner: `.github/workflows/platforms.yml` (owner-only) still passes `SCENES: sandbox,wave`; it should be `hub,room`. Next: the crypt rework is done (below).
 
 ## 2026-11-17: Crypt rework CR6: the crossing
 

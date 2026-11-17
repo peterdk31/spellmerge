@@ -13,7 +13,9 @@ extends Node
 ##    targets (every shot hits both, actors G3c), with fast shots (200-400 px/s) fired through them:
 ##    the shots are refilled before each timed step, so every step does fresh hits
 ##    and sends `projectile_hit` (the first-hit path),
-##  - the hit test alone (`_hit_test` for every live slot) on the same fresh state,
+##  - the hit test of every live slot (`_hit_test`) on the same fresh state, inside a pass as the
+##    game runs it: with the spent shots ended and the merged hits sent (since hit batch A3b; not
+##    comparable with earlier runs, which sent each hit at once),
 ##  - the steady state: the same shots stepped again, most targets remembered.
 ## The hit-test scene is hostile on purpose: the whole cap starts inside the crowd,
 ## the shots pierce, and every hit sends the signal (a counter listens). Positions
@@ -216,7 +218,7 @@ func _run_cap(cap: int) -> void:
 		_mgr._finding = false
 		_mgr._send_merged()
 		hit_us += float(Time.get_ticks_usec() - start)
-	_log("_hit_test with fresh hits (%d calls, with the signal)" % cap, hit_us / float(REPEATS), cap, "per call")
+	_log("_hit_test with fresh hits (%d calls, the merged hits sent)" % cap, hit_us / float(REPEATS), cap, "per call")
 
 	# The steady state: the same shots stepped again, most targets remembered.
 	_fill_hostile(cap)

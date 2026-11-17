@@ -1251,7 +1251,7 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 			_carried_by[row] = spells.plow().carrier_body_of(row)
 		elif strength > 0.0:
 			# A push replaces the knockback, so it replaces the slam too.
-			# One hit's slam, merged or not (one by one, each hit set it anew).
+			# One hit's slam, whatever its count (each of its hits would set it anew).
 			_slam[row] = _slam_of(profile, one_hit, gust, power)
 			_slam_by[row] = by
 			_slam_tag[row] = _hit_spell

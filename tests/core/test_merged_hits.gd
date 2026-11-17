@@ -391,3 +391,25 @@ func _fan_into_barrier() -> int:
 
 func test_a_barrier_takes_a_merged_hits_shots_one_charge_each() -> void:
 	check_equal(_fan_into_barrier(), 2, "the damage that got through one by one")
+
+
+## A manager with no event bus merges too (hit batch A3b): it sends no hit and asks nothing, and a
+## shot its hit spends ends at the pass's end, its slot freed and its `shot_ended` sent once.
+func test_a_manager_with_no_bus_ends_a_spent_shot_after_the_pass() -> void:
+	var lone := own(ManagerScript.new()) as ManagerScript
+	lone.actors = table
+	lone.events = null
+	lone.set_bounds(Rect2(-100.0, -100.0, 800.0, 600.0))
+	lone.set_cap(1)
+	var node := own(Node2D.new()) as Node2D
+	root.add_child(node)
+	node.global_position = Vector2(200.0, 100.0)
+	lone.add_target(node, 10.0, ManagerScript.LAYER_ENEMY)
+	var ends: Array[int] = []
+	lone.shot_ended.connect(func(tag: int) -> void: ends.append(tag))
+	lone.spawn(0, Vector2(188.0, 100.0), Vector2(600.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 11)
+	lone.step(DT)
+	check_equal(lone.get_count(), 0, "the shot that hit is spent and gone")
+	check_equal(ends, [11] as Array[int], "its end sent once")
+	var dropped: int = lone.dropped
+	check(lone.spawn(0, Vector2.ZERO, Vector2.RIGHT, 1.0) >= 0 and lone.dropped == dropped, "and its slot, the pool's one, free again")

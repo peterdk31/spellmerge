@@ -5,6 +5,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 ## 2026-11-17: the hits one by one are gone (hit batch A3b; owner, Q1)
 
 - **What went:** the projectile manager's switch (`merge_hits`, the test switch `merges_hits`), the hit pass's branch that ended a spent shot and sent its hit at once, and the native hit pass's gate (`merging`): a pass always merges its hits (`_finding` while it finds them; with no event bus it sends nothing). It replaces the decision of 2026-11-07 against bundled hits (below), as the owner's Q1 answer said.
+- **A manager with no event bus** (tests, benchmarks) merges too: its spent shots end, and their `shot_ended` goes out, at the pass's end, not as they hit.
 - **Tests:** the ones that compared the merged hits with the hits one by one keep the one-by-one results as numbers (recorded on the last commit with the mode, 3b917b6): a fan's damage 10 in 5 hits, 3 shots flying on past a body it kills, 2 damage through a barrier. The projectile timing benchmark's `_hit_test` row runs its hit tests inside a pass, as the game does.
 
 ## 2026-11-17: the hit-work budget 5% more for the merged hits (owner)
@@ -404,7 +405,7 @@ Measured with `tests/benchmark/cover_cost.gd` (new; headless, a shared cloud mac
 - **Looks:** a body shows the looks (spray, impact, sparks, squash, sound) of at most `BodyLooks.PER_BODY` (3) hits of one staff a frame (`gameplay/feel/body_looks.gd`); the hits after that show nothing. Each staff counts apart, so a lone cast hitting a body inside another staff's storm still shows (2026-11-05). A hit's damage follows its impact's answer. The frame's flash and mote shares are then spread over the bodies being hit instead of spent on the one in front. Drawn only (T5): no damage or game state changes.
 - **Shake:** a shake raises the screen's to its own and never adds (`Feel._shake`), for hits and cues alike (a crowd's deaths and reactions piled up the same way): a stream of small shakes holds at one's, a blast or a swing still shakes more. A single hit's shake is as the preset always meant it (a swing about 2 px).
 
-## 2026-11-07: Bundled hit events dropped: one event per hit (shot scale H3b, owner session)
+## 2026-11-07: Bundled hit events dropped: one event per hit (shot scale H3b, owner session; replaced 2026-11-17 by the merged hits, above)
 
 - **Asked:** the owner, after H3b's first two parts were built and measured on a branch (never merged): "I'm very worried that all of these changes will make it extremely difficult to add new features to the game later on. It needs to be easy to add new features", then, of dropping it: "Yes do option 1. And make sure that the code is written using good software architecture and is easy to maintain in the future".
 - **Reverses "bundled hit events allowed" (2026-11-04, below) for hits.** A hit stays one `projectile_hit` (with its `projectile_impact` just before it), from every sender: shots, rays, sweeps, blasts. There is no second way for a hit to arrive and no phases, so a new feature that hears hits writes one handler and sees each hit's state as it lands.

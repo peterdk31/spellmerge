@@ -713,7 +713,7 @@ var impact_look: int = 0
 ## be its spell's cards' (spell-spectacle-2.md, S2). For looks only.
 var impact_tag: int = 0
 ## How many hits the `projectile_impact` and `projectile_hit` being sent stand for (1 outside them):
-## a step's hits of one spell's shots on one body go out as one (`_finding`). For Combat's damage.
+## a step's hits of one spell's shots on one body go out as one (`_send_merged`, the hit batch's entries). For Combat's damage.
 var impact_count: int = 1
 ## While the hit pass finds its hits (`_pass_hits`, before it sends them). A step's hits are merged
 ## (the one hit model, the owner, 2026-11-17; hit batch A3b): in the pass the shots that hit are
@@ -729,7 +729,7 @@ var _hit_batch: HitBatch = HitBatch.new()
 ## The shot turns the native hit pass merged itself, every hit of them adding to a merged hit the
 ## pass already had (no hand-back to GDScript). A count for benchmarks and tests; nothing reads it.
 var merged_turns: int = 0
-## True while `_drop_one` makes room at the cap: that slot is freed at once, merging or not.
+## True while `_drop_one` makes room at the cap: that slot is freed at once, inside a pass or not.
 var _freeing_now: bool = false
 ## The hit batch's asks, as constants of the manager's own (a constant of another class is looked up
 ## at each use).
@@ -2530,7 +2530,7 @@ func _caster_position(slot: int) -> Vector2:
 	if caster == CASTER_BODY:
 		return _anchors[_actor[slot]] if _actor[slot] >= 0 else Vector2.INF
 	if caster >= 0:
-		# A caster shot its hits spent this pass (merging) is as gone as one they ended.
+		# A caster shot its hits spent this pass is as gone as one they ended.
 		if _alive[caster] != 0 and _seq[caster] == _caster_seq[slot] and (_flags[caster] & F_SPENT) == 0:
 			# Mid-step, a caster shot whose turn in the hit pass has not come is where it was before
 			# the step (the passes moved it already; see `step`).
@@ -3759,7 +3759,7 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 			_forget_left(slot)
 	# A shot that stuck to a target this step stays stuck, even at a wall. One that met a
 	# guarding solid shot is turned or stopped by it instead (`_solid_guard`). One its hits spent
-	# (merging) meets no wall: it ends with the pass's spent shots.
+	# meets no wall: it ends with the pass's spent shots.
 	if walled and _alive[slot] != 0 and (_flags[slot] & (F_STUCK | F_SPENT)) == 0 and not (_any_solid and _solid_guard(slot)):
 		_wall_end(slot)
 	elif landed and _alive[slot] != 0 and _seq[slot] == seq_now and (_flags[slot] & (F_STUCK | F_SPENT)) == 0:
@@ -3803,7 +3803,7 @@ func _test_deferred(slot: int) -> bool:
 		return true
 	var seq: int = _seq[slot]
 	_hit_test(slot)
-	# One its hits spent (merging) ends with the pass's spent shots, not here.
+	# One its hits spent ends with the pass's spent shots, not here.
 	return _alive[slot] != 0 and _seq[slot] == seq and (_flags[slot] & F_SPENT) == 0
 
 
@@ -6296,7 +6296,7 @@ func _drop_one() -> void:
 	for i in ActorsScript.SHARED:
 		if _owned[i] > _owned[richest]:
 			richest = i
-	# Its oldest living shot: one its hits spent this pass (merging) ends anyway, and its slot is held
+	# Its oldest living shot: one its hits spent this pass ends anyway, and its slot is held
 	# for its hit (`_take_back_slot` gave up the ones it could).
 	var slot: int = _own_head[richest]
 	while slot >= 0 and (_flags[slot] & F_SPENT) != 0 and _own_next[slot] >= 0:
@@ -6923,7 +6923,7 @@ func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, head
 
 
 ## The shots the pass's hits spent, ended in the order they were (their tails where they were spent;
-## their slots held and their `shot_ended` kept for after the hits, as the pass still merges).
+## their slots held and their `shot_ended` kept for after the hits, as the pass still finds them, `_finding`).
 func _end_spent() -> void:
 	for i in _hit_batch.spent_count():
 		_end_spent_at(i)
@@ -6956,7 +6956,7 @@ func _take_back_slot() -> bool:
 
 
 ## The spent shot `i` of the batch's list ended (its tail where it was spent; its slot held and its
-## end kept for after the hits, as the pass still merges), unless a handler ended it meanwhile or its
+## end kept for after the hits, as the pass still finds them), unless a handler ended it meanwhile or its
 ## slot holds another shot now (a new shot's flags have no F_SPENT). True when it ended it.
 func _end_spent_at(i: int) -> bool:
 	var slot: int = _hit_batch.spent_slot(i)
@@ -6976,8 +6976,8 @@ func _end_spent_at(i: int) -> bool:
 func _send_merged() -> void:
 	var batch: HitBatch = _hit_batch
 	# The entries' arrays read once (a member of another object costs a lookup at each read): each
-	# local is the batch's own array, not a copy, and no entry is added while they are sent (merging
-	# is off). Their number is read anew, so a handler's `clear()` (`entries` to 0) stops what is left.
+	# local is the batch's own array, not a copy, and no entry is added while they are sent
+	# (`_finding` is off). Their number is read anew, so a handler's `clear()` (`entries` to 0) stops what is left.
 	var targets: PackedInt32Array = batch.target
 	var slots: PackedInt32Array = batch.slot
 	var seqs: PackedInt64Array = batch.seq
@@ -7003,7 +7003,7 @@ func _send_merged() -> void:
 		_free_slots[_free_count] = batch.held_slot(i)
 		_free_count += 1
 	batch.forget_held()
-	# A handler's end meanwhile is sent at once (merging is off by now), so nothing joins this list.
+	# A handler's end meanwhile is sent at once (`_finding` is off by now), so nothing joins this list.
 	var i: int = 0
 	while i < batch.ended_count():
 		_sent += 1

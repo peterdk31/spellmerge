@@ -86,6 +86,19 @@ native/README.md changes with A4: a kernel method may read the arrays of more th
 | A3b | **One model** | The unmerged mode, its branches, the switches and the kernel's unmerged path are gone; shot-scale.md (H3b), native/README.md and DECISIONS say so. |
 | A4 | **The kernel opens entries** | As above; the side-by-side scene has spells hitting many bodies, hexed and barriered bodies, shots alone, a Blast on expiry (a handler mid-pass) and a target added mid-pass, so every new branch runs; a mutated line of the C++ fails it. Measured: hand-backs a tick (expected: the ends, walls and the rest of the list, about half of today's) and the tick. |
 
+**A0 done (2026-11-17).** The two recordings are made again on the merged hits (`test_projectiles_step_exact.gd`'s fixture, each hit line with its count, `n`: 1,522 merged hits standing for 2,896, 795 of them for 2 to 8; `test_projectiles_targets.gd`'s fingerprint, 14,374 hits, hash 899385074), the GDScript and the native kernel giving the same. The stress run prints its `DAMAGE:` line (a rate). The oracle is `tests/support/hit_room_oracle.gd`, held to Combat's live answer by `tests/gameplay/combat/test_hit_room_oracle.gd` (a fight, and the kit's bodies in every state Combat reads; a broken hex sum or charge count fails it). Shot scale's damage lines on this code, the baseline every later part of A is held to to the bit (`tests/benchmark/shot_scale.gd -- --cards=<cards>`, native, three of its twelve scenes shown; run on commit b129640 for the rest; a second run of `echo,bolt` gave the same twelve). Barrier, echo and Plow change nothing in these scenes (each line the plain bolt's) and Mend deals none, so they hold A to nothing here: A2's barriered, alone and Plow cases are held by its unit tests and the oracle instead:
+
+| Cards | storm 30000 | crowd 30000 | crowd_all 100000 |
+|---|---|---|---|
+| `bolt` | 101595.0, hash 2628197950 | 568595.0, hash 1619857485 | 4693395.0, hash 1371841102 |
+| `blast,bolt` | 109010.0, hash 1821673410 | 1418480.0, hash 961061622 | 5992425.0, hash 2868993179 |
+| `void,bolt` | 126023.8, hash 2894651530 | 709216.2, hash 1944637646 | 5785937.5, hash 959886028 |
+| `barrier,bolt` | 101595.0, hash 2628197950 | 568595.0, hash 1619857485 | 4693395.0, hash 1371841102 |
+| `mend,bolt` | 0.0, hash 1006843195 | 0.0, hash 1051368495 | 0.0, hash 1051368495 |
+| `echo,bolt` | 101595.0, hash 2628197950 | 568595.0, hash 1619857485 | 4693395.0, hash 1371841102 |
+| `chain,bolt` | 91620.0, hash 2699208108 | 489756.0, hash 32592625 | 3826152.0, hash 353108005 |
+| `plow,bolt` | 101595.0, hash 2628197950 | 568595.0, hash 1619857485 | 4693395.0, hash 1371841102 |
+
 ## B: the room grid
 
 ### What moves

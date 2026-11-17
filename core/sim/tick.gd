@@ -110,6 +110,13 @@ var _body_names: PackedStringArray = PackedStringArray()
 ## Tick never reads real time itself (core/sim/README.md), as the projectile manager's `step_profile`.
 var step_profile: PackedInt64Array = PackedInt64Array()
 var profile_clock: Callable = Callable()
+## The bodies' looks are stepped once a drawn frame, after its ticks (`_process`,
+## `Actor.step_looks_due`), not in every tick (performance, 2026-11-17: a slow frame runs several
+## ticks, and each one's look was drawn over by the next). Off: in every tick, as a body stepped by
+## hand. The view's, never the game's: no tick reads it.
+var looks_per_frame: bool = true
+## The open actor ids for `_process` (reused).
+var _view_ids: PackedInt32Array = PackedInt32Array()
 
 
 func _init() -> void:
@@ -159,6 +166,17 @@ func set_ticking(node: Node, on: bool) -> bool:
 			joined.ticking = on
 			return true
 	return false
+
+
+## The drawn frame (view): every body's looks, once, for the ticks since they last were.
+func _process(_delta: float) -> void:
+	if not looks_per_frame or actors == null:
+		return
+	var n: int = actors.open_ids(_view_ids)
+	for i in n:
+		var body: Actor = actors.node_of(_view_ids[i]) as Actor
+		if body != null and body.is_inside_tree():
+			body.step_looks_due()
 
 
 func _physics_process(_delta: float) -> void:
@@ -379,4 +397,4 @@ func _step_bodies(delta: float) -> void:
 			continue
 		var body: Actor = actors.node_of(_ids[i]) as Actor
 		if body != null and body.ticking and body.is_inside_tree() and body.can_process():
-			body.tick_step(delta)
+			body.tick_step(delta, looks_per_frame)

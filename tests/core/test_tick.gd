@@ -99,7 +99,7 @@ class Body:
 	func _exit_tree() -> void:
 		pass
 
-	func tick_step(delta: float) -> void:
+	func tick_step(delta: float, _looks_later: bool = false) -> void:
 		calls.append(["body %s" % name, delta])
 
 

@@ -136,11 +136,16 @@ signal touched(by: int)
 ## The touch areas it overlapped after its last move (`_touch`), scratch.
 const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim", &"_components", &"_touching"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"_looks", &"damage_numbers"]
+const VIEW: Array[StringName] = [&"_looks", &"damage_numbers", &"_look_time", &"_looks_later", &"step_looks_due", &"_on_screen"]
 ## State as who it points at: the controller driving it now, which may be another body's (a
 ## possessor's, `possession.gd`). Its own controller's state is walked through `home_controller`,
 ## and who drives what is the controller's `driving`.
 const REFS: Array[StringName] = [&"controller"]
+## The most seconds of ticks its looks catch up at once (`step_looks_due`): a body back on screen
+## after a long while off it plays a moment, not all of it.
+const LOOK_TIME_MOST: float = 0.25
+## How far off screen (pixels) a body's looks are still stepped: a body walking in is drawn as it is.
+const ON_SCREEN_MARGIN: float = 96.0
 
 ## The colour ramp of its spells: 0-3 the hat colours, 4 the enemy ramp.
 @export var ramp: int = ActorsScript.RAMP_ENEMY
@@ -228,6 +233,10 @@ var size: float = 1.0
 var _looks: Array[ActorLook] = []
 ## True once the looks have shown the start of the local stop the body is in (see `step`).
 var _hold_shown: bool = false
+## While the Tick steps it, its looks are stepped once a drawn frame (`step_looks_due`), not every
+## tick (performance, 2026-11-17): the seconds of the ticks since, and whether this step leaves them.
+var _look_time: float = 0.0
+var _looks_later: bool = false
 ## Scratch of `_touch`: the actors whose touch area it overlaps.
 var _touching: PackedInt32Array = PackedInt32Array()
 ## Whether the Tick steps this body (core/sim/tick.gd, by actor id): off for a body another
@@ -294,9 +303,35 @@ func _exit_tree() -> void:
 
 
 ## One tick of the body (core/sim/tick.gd steps every actor's body by id): its step, then its move.
-func tick_step(delta: float) -> void:
+## With `looks_later` (the Tick's), its looks are left for `step_looks_due`, once a drawn frame.
+func tick_step(delta: float, looks_later: bool = false) -> void:
+	_looks_later = looks_later
 	step(delta)
+	_looks_later = false
 	move(delta)
+
+
+## The looks' share of the drawn frame (the Tick's `_process`, after the frame's ticks): its looks
+## stepped once for every tick since they last were, unless the body is off screen, where they
+## wait (at most LOOK_TIME_MOST seconds of them) until it is back. View: nothing the game plays by.
+func step_looks_due() -> void:
+	if _look_time <= 0.0:
+		return
+	_look_time = minf(_look_time, LOOK_TIME_MOST)
+	if not _on_screen():
+		return
+	var seconds: float = _look_time
+	_look_time = 0.0
+	for look in _looks:
+		look.step(seconds)
+
+
+## True when the body's feet are on screen or within ON_SCREEN_MARGIN pixels of it.
+func _on_screen() -> bool:
+	var viewport: Viewport = get_viewport()
+	if viewport == null:
+		return true
+	return viewport.get_visible_rect().grow(ON_SCREEN_MARGIN).has_point(get_global_transform_with_canvas().origin)
 
 
 ## True while no controller drives it, it has no Mover and it keeps no time (props W2; see the
@@ -552,8 +587,11 @@ func step(delta: float) -> void:
 		velocity = Vector2.ZERO
 	if hurtbox != null and hurtbox.registered == (is_down() or not hurtbox.enabled):
 		hurtbox.step()
-	for look in _looks:
-		look.step(delta)
+	if _looks_later:
+		_look_time += delta
+	else:
+		for look in _looks:
+			look.step(delta)
 	if home_controller != null and home_controller != controller:
 		# Its own controller is away (it drives another actor, or another drives this one): it
 		# still watches its body (a seat set aside shows its own wizard on its panel).

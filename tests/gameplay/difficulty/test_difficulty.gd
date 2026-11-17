@@ -7,6 +7,7 @@ extends "res://tests/support/suite.gd"
 ## is the run's state, 1 again at every run's start, so the hub scales nothing; and in
 ## play, a pinned run of copies of the crypt arena (tests/support/pinned_run.gd) scaled by depth and
 ## players stands each room's enemies at the room's scale, deeper rooms harder.
+const Arrivals := preload("res://tests/support/arrivals.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
@@ -93,7 +94,9 @@ func _play_scaled(depth: int, players: int) -> void:
 
 
 ## Every enemy standing in the room has its data's health times `scale`, and all of it.
+## The enemies are stepped past their arrival first (enemy arrivals EA3): one arriving is not in Combat.
 func _check_enemies_at(scale: float, label: String) -> void:
+	Arrivals.land(flow)
 	var enemies: Array = flow.get(&"_enemies")
 	check(not enemies.is_empty(), "%s: enemies stand" % label)
 	for enemy: Actor in enemies:

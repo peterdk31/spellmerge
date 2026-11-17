@@ -171,6 +171,8 @@ func test_the_game_stops_on_the_rooms_tick_with_the_boss_open() -> void:
 	check(boss != null, "the boss stands")
 	if boss == null:
 		return
+	# Enemy arrivals EA3: a boss stands at once, so its intro opens on a body that is there and drawn.
+	check(not boss.is_arriving() and boss.hurtbox.registered, "the boss stands at once, with no arrival")
 	check(_stopped(), "stopped for the intro as the room starts, on its tick")
 	check_equal(_of(&"opened").size(), 1, "opened once")
 	var opened: Array = _of(&"opened")[0]

@@ -462,6 +462,9 @@ func arrive(seconds: float) -> void:
 	arrive_seconds = seconds
 	velocity = Vector2.ZERO
 	intent.clear()
+	if actors != null and id != ActorsScript.NONE:
+		# Already in play: the Tick steps it until it lands, still or not.
+		actors.set_still(id, is_still())
 
 
 ## True while it arrives (see the class doc).

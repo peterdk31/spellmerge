@@ -4,14 +4,18 @@ extends Node2D
 ## first a mark grows on the floor where the body will stand, then the body rises out of it. It is
 ## drawn from the body's state alone (`Actor.arrive_share`), never from a moment it was told of, so a
 ## machine that joins mid-arrival or a snapshot restored mid-arrival shows it where it is. Feel steps
-## it once a frame (`step`) over the actor table's open bodies, as it does `FallLook`.
+## it once a frame (`step`: the marks and the cues) over the actor table's open bodies, as it does
+## `FallLook`; the bodies are cut just before the frame is drawn (`cut`, on
+## `RenderingServer.frame_pre_draw`), after every `_process` and deferred call, so a body added
+## after Feel's step (a run started as a load ends) is never drawn whole for a frame.
 ##
 ## - **0 to MARK_END, the mark:** a disc on the floor at the body's feet, as wide as its footprint, in
 ##   the room's floor colours (`RoomBase.floor_colors`: its shadow, darkened, with its light shade
 ##   as a rim; `use_room`), growing from a dot in MARK_FRAMES frames. The body is not drawn yet.
 ## - **MARK_END to 1, the rise:** the body comes up out of the mark, drawn shifted down by whole pixels
-##   from its full height (`body_height`) to 0 and cut off at its feet's line, so what is still under
-##   the floor is not drawn. Its own sprite and pose all the way: no fade, no blur, no scale. As the
+##   from its full height (`body_height`, and the rows its art has under its feet, `body_bottom`) to 0
+##   and cut off at the line of its lowest row, so what is still under the floor is not drawn and
+##   nothing of it appears in one jump as it lands. Its own sprite and pose all the way: no fade, no blur, no scale. As the
 ##   rise starts the cue `enemy_arrive` plays at its feet (dust off the mark, a soft sound): its sound
 ##   at most every SOUND_EVERY seconds, so a group does not stack it (the cue is played unweighted
 ##   in between: its dust only). From CLOSE_FROM the mark closes in CLOSE_FRAMES frames as the feet
@@ -19,7 +23,7 @@ extends Node2D
 ##
 ## The cut (checked against the world's y-sort and the light pass on a virtual display before it was
 ## built, EA2): the body's root is made a clip parent (`CanvasItem.clip_children`) whose own canvas
-## item draws one rect, above its feet's line, as the mask, and each of its direct drawn children
+## item draws one rect, above that line, as the mask, and each of its direct drawn children
 ## (its sprite, its face, its look; not a top-level one) is drawn shifted down by the rise
 ## (`RenderingServer.canvas_item_set_transform`, re-set every frame), so a part's own parts go with
 ## it. That is one cut for any body, layered (`BodyPart`) or not. The root itself is never moved: the
@@ -30,7 +34,8 @@ extends Node2D
 ## gone) gets its children's own transforms back and is no clip parent any more.
 ##
 ## View only. Nothing here allocates while bodies arrive: its scratch of ids and marks is made once,
-## and the dictionary of the bodies it drew grows only when a body first arrives.
+## and the dictionaries of the bodies it cut and whose cue it played grow only when a body first
+## arrives (and are walked only as one is done).
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 
@@ -41,7 +46,7 @@ const MARK_END: float = 0.4
 ## The frames the mark grows in, from a dot to the footprint's width.
 const MARK_FRAMES: int = 4
 ## Where the mark starts to close (share of the arrival), and the frames it closes in.
-const CLOSE_FROM: float = 0.85
+const CLOSE_FROM: float = 0.92
 const CLOSE_FRAMES: int = 3
 ## The least height a body rises by, in pixels (so a rise is never fewer than this many frames).
 const MIN_HEIGHT: float = 8.0
@@ -63,8 +68,12 @@ var play_cue: Callable = Callable()
 
 ## The open ids, scratch.
 var _ids: PackedInt32Array = PackedInt32Array()
-## The bodies drawn arriving (by instance id), and whether the cue of each one's rise was played.
-var _drawn: Dictionary[int, bool] = {}
+## The table `step` was last given (Feel's actor table), read again by `cut`.
+var _table: ActorsScript = null
+## The bodies cut (by instance id) and how far below their place each was drawn at its last cut, in
+## pixels; and the bodies whose rise's cue was played.
+var _drawn: Dictionary[int, float] = {}
+var _risen: Dictionary[int, bool] = {}
 ## This frame's marks: where (whole pixels) and how wide; `_marks` of them are in use.
 var _mark_at: PackedVector2Array = PackedVector2Array()
 var _mark_radius: PackedInt32Array = PackedInt32Array()
@@ -87,6 +96,16 @@ func _init() -> void:
 
 func _ready() -> void:
 	top_level = true
+
+
+func _enter_tree() -> void:
+	if not RenderingServer.frame_pre_draw.is_connected(cut):
+		RenderingServer.frame_pre_draw.connect(cut)
+
+
+func _exit_tree() -> void:
+	if RenderingServer.frame_pre_draw.is_connected(cut):
+		RenderingServer.frame_pre_draw.disconnect(cut)
 
 
 ## The room played in now (null for none): the mark takes its floor's colours.
@@ -125,7 +144,8 @@ static func mark_radius(radius: float, share: float) -> int:
 
 ## How tall `body` is drawn, in pixels from its feet (its size counted): the highest of its body
 ## sprite's top (`Sprite`, drawn at the body's scale), its hurt shape's top and twice its body's
-## centre (both kept in pixels at its size, `Actor.set_size`), and a margin.
+## centre (both kept in pixels at its size, `Actor.set_size`), and a margin. (A layered body's art is
+## in its `BodyPart`s, not its `Sprite`: only bosses are layered today, and they never arrive.)
 static func body_height(body: Actor) -> float:
 	var top: float = -2.0 * body.body_offset.y
 	if body.hurtbox != null:
@@ -136,50 +156,81 @@ static func body_height(body: Actor) -> float:
 	return maxf(ceilf(top + HEIGHT_MARGIN), MIN_HEIGHT)
 
 
-## Draw every arriving body of `table` as far through its arrival as it is, and put back the bodies
-## done. `real_delta` is the frame's real seconds (the cue's sound is spaced by them).
+## How far below its feet `body`'s body sprite reaches, in whole pixels (0 for none above them): the
+## rows a frame has under the feet's line (a spitter's), which the cut keeps and the rise lifts.
+static func body_bottom(body: Actor) -> float:
+	var sprite := body.get_node_or_null(^"Sprite") as Sprite2D
+	if sprite == null:
+		return 0.0
+	return maxf(ceilf((sprite.position.y + sprite.get_rect().end.y * absf(sprite.scale.y)) * absf(body.size)), 0.0)
+
+
+## Lay out every arriving body of `table`'s mark, and play each one's rise cue once, as far through
+## its arrival as it is; the cut itself is `cut`, just before the frame is drawn. `real_delta` is the
+## frame's real seconds (the cue's sound is spaced by them).
 func step(table: ActorsScript, real_delta: float) -> void:
+	_table = table
 	_clock += real_delta
 	_marks = 0
-	var arriving: int = 0
+	var rising: int = 0
 	if table != null:
 		var count: int = table.open_ids(_ids)
 		for n in count:
 			var body := table.node_of(_ids[n]) as Actor
 			if body == null or not body.is_arriving() or not body.is_inside_tree():
 				continue
-			arriving += 1
-			_draw_body(body)
-	if _drawn.size() > arriving:
-		_put_back()
+			var share: float = body.arrive_share()
+			if share >= MARK_END:
+				rising += 1
+				var key: int = body.get_instance_id()
+				if not _risen.has(key):
+					_risen[key] = true
+					_play_rise_cue(body.global_position)
+			var radius: int = mark_radius(body.wall_radius(), share)
+			if radius > 0 and _marks < _mark_at.size():
+				_mark_at[_marks] = body.global_position.round()
+				_mark_radius[_marks] = radius
+				_marks += 1
+	if _risen.size() > rising:
+		_forget_risen()
 	if _marks > 0 or _drawn_marks > 0:
 		queue_redraw()
 
 
-## One arriving body: its cut and shift, its mark, and its rise's cue once.
-func _draw_body(body: Actor) -> void:
+## Cut every arriving body of the table `step` was last given, and put back the bodies done. Called
+## just before every frame is drawn (`RenderingServer.frame_pre_draw`), after every `_process` and
+## deferred call, so a body added after Feel's step (a run started as a load ends) is never drawn
+## whole for a frame; tests call it by hand.
+func cut() -> void:
+	var arriving: int = 0
+	if _table != null and is_instance_valid(_table):
+		var count: int = _table.open_ids(_ids)
+		for n in count:
+			var body := _table.node_of(_ids[n]) as Actor
+			if body == null or not body.is_arriving() or not body.is_inside_tree():
+				continue
+			arriving += 1
+			_cut_body(body)
+	if _drawn.size() > arriving:
+		_put_back()
+
+
+## One arriving body cut at its feet's line (the lowest row of its art) and its parts shifted by its rise.
+func _cut_body(body: Actor) -> void:
 	var key: int = body.get_instance_id()
 	if not _drawn.has(key):
-		_drawn[key] = false
 		body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
-	var share: float = body.arrive_share()
 	var size: float = maxf(absf(body.size), 0.01)
-	_shift_parts(body, rise_shift(body_height(body), share) / size)
+	var bottom: float = body_bottom(body)
+	var shift: float = rise_shift(body_height(body) + bottom, body.arrive_share())
+	_drawn[key] = shift
+	_shift_parts(body, shift / size)
 	var item: RID = body.get_canvas_item()
 	RenderingServer.canvas_item_clear(item)
-	# The mask: everything above the feet's line (in the body's own pixels). Always drawn: a clip
-	# parent that draws nothing clips nothing. Through the mark the parts are shifted their whole
-	# height, so all of them are under the line.
-	RenderingServer.canvas_item_add_rect(item, Rect2(-MASK_HALF_WIDTH, -MASK_TALL, 2.0 * MASK_HALF_WIDTH, MASK_TALL), Color.WHITE)
-	if share >= MARK_END:
-		if not _drawn[key]:
-			_drawn[key] = true
-			_play_rise_cue(body.global_position)
-	var radius: int = mark_radius(body.wall_radius(), share)
-	if radius > 0 and _marks < _mark_at.size():
-		_mark_at[_marks] = body.global_position.round()
-		_mark_radius[_marks] = radius
-		_marks += 1
+	# The mask: everything above the line (in the body's own pixels). Always drawn, every frame: a
+	# clip parent that draws nothing clips nothing. Through the mark the parts are shifted their whole
+	# height and more, so all of them are under the line.
+	RenderingServer.canvas_item_add_rect(item, Rect2(-MASK_HALF_WIDTH, -MASK_TALL, 2.0 * MASK_HALF_WIDTH, MASK_TALL + bottom / size), Color.WHITE)
 
 
 ## Each direct drawn child of `body` (a Node2D that is not top level) drawn `by` of the body's own
@@ -202,8 +253,16 @@ func _play_rise_cue(at: Vector2) -> void:
 	play_cue.call(at, weighted)
 
 
-## Every body drawn arriving that arrives no more (or went) has its parts' own transforms back and is
-## no clip parent any more.
+## The bodies whose rise cue played that rise no more (or went) are forgotten.
+func _forget_risen() -> void:
+	for key: int in _risen.keys():
+		var body := instance_from_id(key) as Actor
+		if body == null or not body.is_arriving() or not body.is_inside_tree():
+			_risen.erase(key)
+
+
+## Every body cut that arrives no more (or went) has its parts' own transforms back and is no clip
+## parent any more.
 func _put_back() -> void:
 	for key: int in _drawn.keys():
 		var body := instance_from_id(key) as Actor
@@ -239,9 +298,14 @@ func _draw_mark(at: Vector2, radius: int) -> void:
 		draw_rect(Rect2(at.x + float(half), y, 1.0, 1.0), _rim)
 
 
-## How many bodies it draws arriving now, and how many marks it drew this frame (tests).
+## How many bodies it cuts now, and how many marks it lays this frame (tests).
 func drawn() -> int:
 	return _drawn.size()
+
+
+## How far below its place `body` was drawn at its last cut, in pixels (-1: not cut; tests).
+func shift_of(body: Actor) -> float:
+	return _drawn.get(body.get_instance_id(), -1.0)
 
 
 func marks() -> int:

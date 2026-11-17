@@ -38,6 +38,12 @@ func _arriving(at: Vector2, share: float) -> Actor:
 	return body
 
 
+## One frame as the game draws it: Feel's step, then the cut just before the frame is drawn.
+func _frame(delta: float) -> void:
+	_look.step(_world.table, delta)
+	_look.cut()
+
+
 func _set_share(body: Actor, share: float) -> void:
 	body.arrive_left = Actor.ARRIVE_SECONDS * (1.0 - share)
 
@@ -100,7 +106,7 @@ func test_it_is_drawn_from_its_state_alone_and_put_back_once_it_stands() -> void
 	var rising: Actor = _arriving(Vector2(200.5, 140.0), 0.6)
 	var standing := Actor.new()
 	_world.add(standing, Vector2(300.0, 100.0))
-	_look.step(_world.table, 0.016)
+	_frame(0.016)
 	check_equal(_look.drawn(), 2, "the two arriving bodies are drawn arriving")
 	check_equal(marking.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "a body still under the floor is cut")
 	check_equal(rising.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "a rising one is cut at its feet")
@@ -112,21 +118,26 @@ func test_it_is_drawn_from_its_state_alone_and_put_back_once_it_stands() -> void
 	check_equal(int(first.z), ArriveLook.mark_radius(marking.wall_radius(), marking.arrive_share()), "as wide as its share says")
 	check_equal(Vector2(second.x, second.y), Vector2(201.0, 140.0), "on whole pixels")
 	check_equal(marking.global_position, Vector2(100.0, 100.0), "its place untouched")
+	check_equal(_look.shift_of(marking), ArriveLook.rise_shift(ArriveLook.body_height(marking), marking.arrive_share()), "still under the floor: shifted its whole height")
+	check_equal(_look.shift_of(rising), ArriveLook.rise_shift(ArriveLook.body_height(rising), rising.arrive_share()), "rising: shifted as far as its share says")
+	check(_look.shift_of(rising) > 0.0 and _look.shift_of(rising) < ArriveLook.body_height(rising), "part way up: %s" % _look.shift_of(rising))
+	check_equal(_look.shift_of(standing), -1.0, "a standing body is not shifted")
 	check_equal(_cues.size(), 1, "the rising body's cue played once")
 	check_equal(_cues[0], [rising.global_position, true], "at its feet, with its sound")
-	_look.step(_world.table, 0.016)
+	_frame(0.016)
 	check_equal(_cues.size(), 1, "and not again")
 	_set_share(marking, 0.5)
-	_look.step(_world.table, 0.2)
+	_frame(0.2)
 	check_equal(_cues.size(), 2, "the other's as it starts to rise")
 	check_equal(_cues[1][1], true, "its sound too: more than 0.1 s after the first")
 	rising.arrive_left = 0.0
-	_look.step(_world.table, 0.016)
+	_frame(0.016)
 	check_equal(_look.drawn(), 1, "a body that stands is no longer drawn arriving")
 	check_equal(rising.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED, "its own drawing back")
+	check_equal(_look.shift_of(rising), -1.0, "no longer shifted")
 	_world.actors.erase(marking)
 	marking.free()
-	_look.step(_world.table, 0.016)
+	_frame(0.016)
 	check_equal(_look.drawn(), 0, "a body gone is forgotten")
 	check_equal(_look.marks(), 0, "no marks")
 
@@ -134,7 +145,7 @@ func test_it_is_drawn_from_its_state_alone_and_put_back_once_it_stands() -> void
 func test_a_group_rising_together_sounds_once() -> void:
 	for n in 4:
 		_arriving(Vector2(100.0 + 30.0 * n, 100.0), 0.5)
-	_look.step(_world.table, 0.016)
+	_frame(0.016)
 	check_equal(_cues.size(), 4, "a cue for each body's dust")
 	var weighted: int = 0
 	for cue: Array in _cues:
@@ -146,13 +157,13 @@ func test_a_frame_allocates_nothing() -> void:
 	var bodies: Array[Actor] = []
 	for n in 12:
 		bodies.append(_arriving(Vector2(60.0 + 40.0 * (n % 6), 100.0 + 60.0 * (n / 6)), float(n) / 12.0))
-	_look.step(_world.table, 0.016)
-	_look.step(_world.table, 0.016)
+	_frame(0.016)
+	_frame(0.016)
 	var objects: float = Performance.get_monitor(Performance.OBJECT_COUNT)
 	for frame in 100:
 		for body in bodies:
 			_set_share(body, fmod(body.arrive_share() + 0.005, 0.99))
-		_look.step(_world.table, 0.016)
+		_frame(0.016)
 	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "100 frames of twelve bodies arriving make no object")
 
 
@@ -170,3 +181,37 @@ func test_feel_steps_it_and_its_cue_is_there() -> void:
 	if cue != null:
 		check_equal(cue.sound, &"enemy_arrive", "its soft sound")
 		check_equal(cue.problems(), PackedStringArray(), "no problems")
+
+
+## The rows of a body's art under its feet (a spitter's frame reaches 2 px below them) are kept by the
+## cut and lifted by the rise, so nothing of it appears in one jump as it lands.
+func test_art_under_its_feet_rises_with_it() -> void:
+	var body := Actor.new()
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	var art := PlaceholderTexture2D.new()
+	art.size = Vector2(16.0, 32.0)
+	sprite.texture = art
+	sprite.position = Vector2(0.0, -14.0)
+	body.add_child(sprite)
+	body.arrive(Actor.ARRIVE_SECONDS)
+	_world.add(body, Vector2(100.0, 100.0))
+	check_equal(ArriveLook.body_bottom(body), 2.0, "its frame reaches 2 px under its feet")
+	_set_share(body, 0.1)
+	_frame(0.016)
+	check_equal(_look.shift_of(body), ArriveLook.body_height(body) + 2.0, "through the mark it is under the line, those rows too")
+	_set_share(body, 0.999)
+	_frame(0.016)
+	check_equal(_look.shift_of(body), 0.0, "all of it up by the end of the rise")
+
+
+## A body added after Feel's step (a run that starts as a load ends, in a later `_process`) is cut
+## before the frame is drawn: never drawn whole for a frame.
+func test_a_body_added_after_the_step_is_cut_before_the_draw() -> void:
+	_look.step(_world.table, 0.016)
+	var late: Actor = _arriving(Vector2(100.0, 100.0), 0.0)
+	check_equal(late.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED, "not cut yet")
+	_look.cut()
+	check_equal(late.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "cut just before the draw")
+	check_equal(_look.shift_of(late), ArriveLook.body_height(late), "all of it under the floor")
+	check(RenderingServer.frame_pre_draw.is_connected(_look.cut), "the cut runs before every frame is drawn")

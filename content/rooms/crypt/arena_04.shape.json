@@ -1,0 +1,24 @@
+{
+	"about": "The crossing (docs/milestones/crypt-rework.md, CR6): a floating slab of the crypt's flagstones hanging in the dark, its edge a broken lip (crypt_edge) and an invisible wall (its void a wall); its four sarcophagi the room's own walls, drawn in its scene. In the middle, inside the ring of four pillars, the floor has fallen in: a round pit (crypt_pit), ringed by floor and small enough to dash over, two cracks running out of it between the pillars; bays where the slab runs out; the floor pushed out round every spawn, gate, pillar and decal. tools/ground_shape.py draws arena_04_ground.tscn and its art from this.",
+	"size": [704, 448],
+	"seed": 14,
+	"edge": "crypt_edge",
+	"pit_edge": "crypt_pit",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [10, 14],
+		"rough": [46, 17, 6],
+		"seed": 7,
+		"bays": [[36, 176, 20], [668, 336, 20], [560, 414, 18]],
+		"clear": {"round": 28, "of": ["PlayerSpawns", "EnemySpawns", "Exits", "Props", "Decor"]}
+	},
+	"pits": [{"centre": [352, 234], "radii": [30, 22], "rough": [[30, 0.12], [10, 0.05]], "seed": 11}],
+	"cracks": [
+		{"pit": 0, "angle": 0.02, "width": 7, "length": 80, "seed": 4},
+		{"pit": 0, "angle": 0.5, "width": 6, "length": 70, "seed": 8}
+	]
+}

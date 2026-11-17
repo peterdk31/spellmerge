@@ -944,6 +944,33 @@
       "tier": "placeholder",
       "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
       "prompt": "The ossuary court's glow layer, drawn by tools/ground_shape.py: empty, as the room has no pit and crypt_edge no glow (content/edges/crypt_edge)."
+    },
+    {
+      "path": "art/grounds/arena_04/arena_04_ground_floor.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The crossing's floor (crypt rework CR6), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/arena_04.shape.json: a floating slab of large irregular flagstones of one quiet Stone, softly jointed with a lit upper edge, grit gathering toward its edge (content/grounds/flagstone), its edge a broken lip with stones and grit fallen along it (content/edges/crypt_edge); in its middle a round pit with broken flagstone teeth on its lip and a faint cold seam, two cracks running out of it (content/edges/crypt_pit); clear wherever a body may not stand."
+    },
+    {
+      "path": "art/grounds/arena_04/arena_04_ground_under.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The rock of the crossing slab's underside and of its pit's shaft, drawn per pixel by tools/ground_shape.py: banded stone hanging under every edge that faces down and under the pit's north lip, deep by noise along it, with Outline strata and Wood roots (content/edges/crypt_edge, crypt_pit)."
+    },
+    {
+      "path": "art/grounds/arena_04/arena_04_ground_glow.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "The crossing's glow layer, drawn by tools/ground_shape.py: the pit's still, faint cold glow in Mana (content/edges/crypt_pit)."
     }
   ]
 }

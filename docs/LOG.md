@@ -2,6 +2,14 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-17: Crypt rework CR6: the crossing
+
+The fourth reworked crypt room (docs/milestones/crypt-rework.md, CR6). **The crossing** (arena_04) is a floating slab of flagstones drawn from its shape (`arena_04.shape.json`, `crypt_edge`), with its own dark behind it; its four pillars are crypt pillars in a ring round the middle, its exits crypt gates. Its landmark is the ring where the floor fell in: a round pit inside it (`crypt_pit`, its cold glow and dust falling in), small enough to dash over, two cracks running out between the pillars, the shaft of light falling into it. The four sarcophagi stay low walls, drawn with the nave's sarcophagus art, a candle cluster at each end of each. The rule-1 AI test found two enemy spawns level with the pit's bottom lip, where a mite chasing across the pit was held; they moved down. With the last tiled pillar gone, `test_template_pillars.gd` went. `test_arena_04_data.gd`.
+
+Reviewed by a fresh-context agent; changed after it: the room's test checks the ring from the pillars' feet (no enemy in it, the pit enclosed by it), a candle at each end of each sarcophagus and each crack's heading between the pillars; the docs name the pit's lip lines; the stale backlog item on pillar tops closed.
+
+Left for the owner: `.github/workflows/platforms.yml` (owner-only) still passes `SCENES: sandbox,wave`; it should be `hub,room`. Next: CR7, the broom's hall (boss_broom), in a session of its own.
+
 ## 2026-11-17: Crypt rework CR5: the ossuary court
 
 The third reworked crypt room (docs/milestones/crypt-rework.md, CR5). **The ossuary court** (arena_03) is a floating slab of flagstones drawn from its shape (`arena_03.shape.json`, `crypt_edge`), with its own dark behind it, its sides held straight beside the side pillars so the way past each stays the crypt's narrowest; its four pillars are crypt pillars, its exits crypt gates. Its landmark is its four low walls, now built of bones (`ossuary_wall.svg`: bones along the top, skulls looking out of niches in the face), with bones piled at their feet; candles stand low beside them and a shaft of light falls on the court. No pit. The AI test of rule 1 now chases in every room: it found a mite held behind the middle of a lower wall chasing the party at its spawns, so the lower walls moved apart and the party starts in the gap, facing the court. `test_arena_03_data.gd` checks the room.

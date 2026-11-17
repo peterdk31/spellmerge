@@ -14,6 +14,7 @@ const FlowScript := preload("res://gameplay/flow/flow.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const Arrivals := preload("res://tests/support/arrivals.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 ## The arena's floor, wall border included.
 const INNER := Rect2(Vector2.ZERO, Vector2(640.0, 384.0))
@@ -78,8 +79,11 @@ func _join(count: int) -> void:
 		input.add_virtual_device(index)
 
 
+## Play pressed, and the room's enemies stepped past their arrival (enemy arrivals EA3), so a test
+## hits bodies that are there.
 func _play(requester: int = 0) -> void:
 	events.emit_signal("play_requested", requester)
+	Arrivals.land(flow)
 
 
 ## `count` players joined, and Play pressed.
@@ -254,6 +258,23 @@ func test_the_rooms_enemies_stand() -> void:
 func test_combat_knows_every_enemy_and_wizard() -> void:
 	_playing(4)
 	check_equal(combat.call("actor_count"), _room_count() + 4 + _props_in_combat(), "every enemy, wizard and breakable prop is registered with combat")
+
+
+## Every enemy of the room arrives as it starts (enemy arrivals EA3): set to arrive before it entered
+## the tree, so none is in Combat yet, and none is a boss; the room is not cleared while they arrive.
+func test_the_rooms_enemies_arrive_as_it_starts() -> void:
+	_join(1)
+	events.emit_signal("play_requested", 0)
+	check(not flow._enemies.is_empty(), "the room has enemies")
+	for enemy: Node in flow._enemies:
+		var body := enemy as Actor
+		check(body.is_arriving() and is_equal_approx(body.arrive_seconds, Actor.ARRIVE_SECONDS), "%s arrives" % body.name)
+		check(not body.hurtbox.registered, "%s is not in Combat while it arrives" % body.name)
+	check_equal(combat.call("actor_count"), 1 + _props_in_combat(), "Combat knows the wizard and the props alone")
+	check_equal(flow.enemies_left(), _room_count(), "the arriving enemies count as the room's")
+	check(cleared.is_empty(), "the room is not cleared while they arrive")
+	Arrivals.land(flow)
+	check_equal(combat.call("actor_count"), _room_count() + 1 + _props_in_combat(), "landed, every enemy is in Combat")
 
 
 ## Every enemy the room lists stands inside it and clear of the walls.
@@ -591,6 +612,7 @@ func test_a_restart_leaves_no_old_enemy_in_combat() -> void:
 	_playing(1)
 	_down(_wizard(0))
 	flow.step(FlowScript.RESTART_DELAY)
+	Arrivals.land(flow)
 	check_equal(combat.call("actor_count"), _room_count() + 1 + _props_in_combat(), "combat knows only the room's new enemies, props and the wizard")
 
 
@@ -686,10 +708,12 @@ func test_each_players_shot_stops_on_the_border() -> void:
 	# Shots are cast by actor id: each wizard's own (actors G3b).
 	var casters: Array[int] = [_wizard(0).id, _wizard(1).id]
 	for index in 2:
-		projectiles.call("spawn", casters[index], Vector2(100.0 + 20.0 * index, 100.0), Vector2(0.0, -300.0), 5.0, 2.0, 0)
+		# Over open floor, under the top border: no enemy of the room's spawns in the way.
+		projectiles.call("spawn", casters[index], Vector2(300.0 + 20.0 * index, 100.0), Vector2(0.0, -300.0), 5.0, 2.0, 0)
 	check(projectiles.call("get_count_for", casters[0]) == 1 and projectiles.call("get_count_for", casters[1]) == 1, "each player has a shot in the air")
 	projectiles.call("step", 0.25)
-	check_equal(projectiles.call("get_count"), 0, "both players' shots ended on the border")
+	# The wizards' own shots: an enemy that has landed may have cast in its first step.
+	check_equal(projectiles.call("get_count_for", casters[0]) + projectiles.call("get_count_for", casters[1]), 0, "both players' shots ended on the border")
 
 
 # --- The main menu ---------------------------------------------------------------------------

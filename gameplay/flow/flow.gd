@@ -32,8 +32,8 @@ extends Node
 ## cost, the cost standing that calls the next, the seconds between a group's bodies): the first group
 ## starts in the room's setup, once its walls and holes are laid; the next only once the cost of the
 ## room's enemies standing or arriving drops to the refill, never by a timer. A group stands at the
-## spawns farthest from every standing wizard (none over a hole), stacked where one is used again
-## (`stacked_position`). An id that cannot stand is dropped, so the room is never stuck. An enemy still
+## spawns farthest from every standing wizard (none over a hole nor within `RoomArrivals.NEAR` of
+## one), stacked where one is used again (`stacked_position`) and kept on clear ground. An id that cannot stand is dropped, so the room is never stuck. An enemy still
 ## arriving or still to come is one of the room's (`enemies_left`): when the queue is empty and the
 ## last is down, `room_cleared`. A room the run puts nothing in is cleared as it starts.
 ##
@@ -1376,8 +1376,9 @@ func stand_all_now() -> void:
 
 
 ## The queued enemy `id` starts arriving at the spawn its group takes (`RoomArrivals.spawn_for`: the
-## farthest from every standing wizard first, none over a hole). An id with no enemy, or a room with
-## no spawns, stands nothing: it is dropped (it was taken off the queue).
+## farthest from every standing wizard first, none over a hole nor within `RoomArrivals.NEAR` of a
+## wizard), stacked where one is used again and moved to the nearest clear ground. An id with no
+## enemy, or a room with no spawns, stands nothing: it is dropped (it was taken off the queue).
 func _stand_queued(id: StringName) -> void:
 	var data: EnemyBase = _enemy_data_of(id)
 	var spawns: PackedVector2Array = _places.enemy_spawns
@@ -1389,6 +1390,10 @@ func _stand_queued(id: StringName) -> void:
 	if projectiles != null and projectiles.has_holes():
 		on_hole = func(at: Vector2) -> bool: return projectiles.touches_hole(world.to_global(at), radius)
 	var at: Vector2 = arrivals.spawn_for(spawns, _standing_wizard_places(), on_hole, stacked_position)
+	if projectiles != null:
+		# A body stacked beside its spawn may reach a wall or a hole's edge: the nearest clear ground
+		# (the spot itself when it is clear; hub rework HR-H2).
+		at = world.to_local(projectiles.nearest_ground(world.to_global(at), radius))
 	_stand_enemy(world, data, at, true)
 
 

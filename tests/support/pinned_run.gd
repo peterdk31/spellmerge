@@ -52,8 +52,8 @@ static func pin(registry: Node, room: RoomBase, biome: StringName = &"", fill: S
 
 
 ## The id of the copy of `room` a pinned run of `depth` rows `width` wide plays (and of its kind and
-## its run); with `arrivals`, ids of that pace's own (its numbers in hundredths), so two paces never
-## share a pinned run.
+## its run); with `arrivals`, ids of that pace's own (its numbers in hundredths: two paces closer than
+## that share one, and the first pinned is kept).
 static func room_id(room: RoomBase, depth: int = 1, width: int = 1, arrivals: ArrivalRules = null) -> StringName:
 	var id: String = PREFIX + String(room.id)
 	if depth != 1 or width != 1:

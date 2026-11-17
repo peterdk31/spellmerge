@@ -19,8 +19,9 @@ var _run: ReplayRun
 ## What the snapshot caught: ids still to come, and bodies arriving.
 var _left: int = -1
 var _arriving: int = -1
-## Ids still to come at the recorded run's end.
+## Ids still to come at the recorded run's end, and at the restored run's.
 var _left_after: int = -1
+var _left_restored: int = -1
 
 
 func before_each() -> void:
@@ -59,12 +60,14 @@ func test_a_snapshot_mid_arrival_with_groups_to_come_plays_on_the_same() -> void
 	check(_left > 0, "the snapshot caught groups still to come: %d" % _left)
 	check(_arriving > 0, "and a body arriving: %d" % _arriving)
 	check(_left_after >= 0 and _left_after < _left, "the group's ripple went on after it: %d then %d to come" % [_left, _left_after])
+	check_equal(_left_restored, _left_after, "in the restored game too")
 
 
 func test_a_snapshot_between_groups_plays_on_the_same() -> void:
 	await _check_resumed(120)
 	check(_left > 0, "the snapshot caught groups still to come: %d" % _left)
 	check_equal(_left_after, _left, "the next group held to the end, as nothing was killed")
+	check_equal(_left_restored, _left, "in the restored game too")
 
 
 ## The run recorded with a snapshot after tick `at`, resumed from it in a fresh game: the two agree.
@@ -81,6 +84,7 @@ func _check_resumed(at: int) -> void:
 	recorded.hashes = recorded.hashes.slice(at + 1)
 	var resumed := Desync.new()
 	await _run.resume(replay, _run.snapshot, at, 0, resumed)
+	_left_restored = int((root.get_node("Flow").get(&"arrivals") as RoomArrivals).left())
 	for problem in _run.problems:
 		check(false, problem)
 	_run.problems.clear()

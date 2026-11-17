@@ -179,6 +179,9 @@ func test_a_group_never_starts_over_a_hole() -> void:
 		check(false, "a wizard and spawns")
 		return
 	var ranked: PackedInt32Array = RoomArrivals.rank(spawns, PackedVector2Array([wizard.position]), Callable())
+	if ranked.size() < 2:
+		check(false, "two spawns away from the wizard")
+		return
 	var far: Vector2 = spawns[ranked[0]]
 	var projectiles: Node = root.get_node("Projectiles")
 	projectiles.call("set_holes", [Rect2(flow.world.to_global(far) - Vector2(24, 24), Vector2(48, 48))] as Array[Rect2])
@@ -191,6 +194,35 @@ func test_a_group_never_starts_over_a_hole() -> void:
 		var at: Vector2 = (flow._enemies[0] as Actor).position
 		check(at != far, "not over the hole: %s" % at)
 		check_equal(at, spawns[ranked[1]], "at the next farthest spawn")
+
+
+## A body stacked beside a spawn is put on the nearest clear ground: a hole laid just beside the far
+## spawn, where the group's body past the spawns' count would stack, holds no body.
+func test_a_stacked_body_stands_clear_of_a_hole() -> void:
+	_start()
+	_steps(60)
+	_kill_standing()
+	var wizard: Node2D = flow.get_wizard(0)
+	var spawns: PackedVector2Array = flow._places.enemy_spawns
+	var ranked: PackedInt32Array = RoomArrivals.rank(spawns, PackedVector2Array([wizard.position]), Callable())
+	var far: Vector2 = spawns[ranked[0]]
+	var stacked: Vector2 = FlowScript.stacked_position(far, 1)
+	var projectiles: Node = root.get_node("Projectiles")
+	projectiles.call("set_holes", [Rect2(flow.world.to_global(far) + Vector2(20, 20), Vector2(32, 32))] as Array[Rect2])
+	check(bool(projectiles.call("touches_hole", flow.world.to_global(stacked), 8.0)), "the stacked spot touches the hole")
+	check(not bool(projectiles.call("touches_hole", flow.world.to_global(far), 8.0)), "the spawn itself does not")
+	var ids: Array[StringName] = []
+	var costs := PackedInt32Array()
+	for at in ranked.size() + 1:
+		ids.append(&"crypt_mite")
+		costs.append(1)
+	flow.arrivals.take_all()
+	flow.arrivals.begin(ids, costs, 0, 0, 0.0)
+	_steps(1)
+	check_equal(flow._enemies.size(), ids.size(), "the whole group at once")
+	if flow._enemies.size() == ids.size():
+		var last: Actor = flow._enemies[ids.size() - 1] as Actor
+		check(not bool(projectiles.call("touches_hole", last.global_position, last.wall_radius())), "the stacked body is clear of the hole: %s" % last.position)
 
 
 ## Tests call the rest of the queue at once (`stand_all_now`, the shared helper's).

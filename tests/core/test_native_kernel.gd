@@ -92,8 +92,13 @@ var _box_hits: Array[String] = []
 var _differences: int = 0
 ## The native side's hand-backs counted over the steps, and the hits sent (each merged hit counts
 ## its shots).
+## How many new bodies each side's end handlers brought in.
+var _added: Array[int] = [0, 0]
 var _handbacks: int = 0
 var _hits_sent: int = 0
+
+## Carrier cards some of the scene's shots name (their merged hits' look; &"" for none).
+const CARDS: Array[StringName] = [&"", &"spray", &"pulse", &""]
 
 ## The card bodies of the scene: plain canvas-item shaders, made once per file.
 const SCENE_BODIES: int = 6
@@ -102,6 +107,7 @@ var _bodies: Array[Shader] = []
 
 func before_each() -> void:
 	_handbacks = 0
+	_added = [0, 0]
 	_hits_sent = 0
 	_mgrs = []
 	_targets = [[], []]
@@ -584,8 +590,9 @@ func _drive(side: int, step: int) -> void:
 		else:
 			slot = m.spawn(caster, from, velocity, rng.randf_range(0.3, 2.5), rng.randf_range(1.0, 9.0), ManagerScript.ACTOR_LAYERS, rng.randi() % 4, 1 if kind != 9 else 2)
 			if slot >= 0 and kind == 8:
-				# A flying shot of a card body (a bolt's own head): a head body's pair, or plain.
-				m.set_carrier_card(slot, &"", slot % (SCENE_BODIES + 1))
+				# A flying shot of a card body (a bolt's own head): a head body's pair, or plain; some
+				# with a carrier card of their own, the merged hits' look (hit batch A4).
+				m.set_carrier_card(slot, CARDS[slot % CARDS.size()], slot % (SCENE_BODIES + 1))
 		if slot < 0:
 			continue
 		if prop >= 0:
@@ -674,6 +681,10 @@ func _on_expired(caster: int, position: Vector2, tag: int, shot: int, side: int)
 	var body: Node2D = enemies[(shot * 7) % enemies.size()] as Node2D
 	if shot % 23 == 4 and body.name.begins_with("enemy"):
 		m.remove_target(body)
+	elif shot % 29 == 6 and _added[side] < 24:
+		# Or brings a new body in, a target row of its own (the hit batch's tables grow for it).
+		_added[side] += 1
+		_add_body(side, "new%d" % _added[side], body.global_position + Vector2(14.0, 9.0), 6.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
 	elif shot % 19 == 9 and body.name.begins_with("enemy"):
 		m.add_target(body, 60.0)
 	if shot % 11 == 2:
@@ -726,6 +737,9 @@ func _compare_batch(step: int, first: HitBatch, second: HitBatch) -> void:
 		var b: Variant = second.get(member)
 		if var_to_bytes(a) != var_to_bytes(b):
 			_differ("step %d: the hit batch's %s differs (GDScript %s, native %s)" % [step, member, _first_difference(a, b), _first_difference(b, a)])
+	# The entries' carrier cards (an Array, the look the manager fills for the kernel's entries).
+	if var_to_bytes(first.card) != var_to_bytes(second.card):
+		_differ("step %d: the hit batch's card differs (GDScript %s, native %s)" % [step, _first_difference(first.card, second.card), _first_difference(second.card, first.card)])
 
 
 func _first_difference(a: Variant, b: Variant) -> String:

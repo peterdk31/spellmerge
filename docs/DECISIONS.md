@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-17: one impact look a spot of wall per staff a frame (Feel, performance)
+
+- **Measured first** (stress desktop, a probe per branch of Feel's `projectile_impact`): shots ending on walls were its costliest part, about 51 a tick at 17 us each, uncapped, against bodies' about 41 shown at 12 us and 42 capped at 2 us (one look per body and staff a frame, 2026-11-08).
+- **Now:** a wall impact shows its look (burst, motes, wall chips, sound) only for a staff's first shot to end on a spot of the wall (`Feel.WALL_SPOT`, 16 px) in a frame, by the same table as the bodies (`_body_looks`, the spot as a key below zero). View only (T5): no hit, damage or hold changes.
+- **Numbers** (profiled stress desktop, back to back): Feel's impact listener 6.96 to 4.39 ms a frame, 13.3 to 8.9 us a call; in two separate runs each, 10.0-10.7 to 8.2-8.4 us a call. Most of a crowd's wall impacts are on spots of their own, so the cap takes about a third of the listener's time, not all of the walls'.
+
 ## 2026-11-17: the native hit pass merges hits itself (owner: "keep both, so it runs in the Godot editor as well")
 
 - **What moved to C++:** while a pass merges, a shot whose every hit adds to a merged hit the pass already has is taken by `ShotKernel.hits` itself (native/README.md): no hand-back to GDScript. The first hit of a spell on a body still goes to GDScript, which asks Combat (`hit_room_asked`). The GDScript stays the reference and the fallback; the side-by-side test steps its scene merged too, to the bit.

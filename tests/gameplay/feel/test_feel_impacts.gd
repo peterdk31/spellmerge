@@ -201,6 +201,21 @@ func test_wall_flashes_are_limited_and_end() -> void:
 	check_equal(feel.live_flashes(), 0, "they end")
 
 
+## A staff's shots ending on one spot of a wall in a frame show one impact there (`_wall_impact`,
+## WALL_SPOT); another spot, another staff and the next frame each show their own.
+func test_a_volley_into_one_spot_of_wall_shows_one_impact_a_staff_a_frame() -> void:
+	for i in 6:
+		bus.projectile_impact.emit(0, null, Vector2(3.0 + float(i), 5.0), Vector2.UP)
+	check_equal(feel.flashes_of(&"burst", 0), 1, "six shots into one spot: one burst")
+	bus.projectile_impact.emit(0, null, Vector2(3.0 + FeelScript.WALL_SPOT, 5.0), Vector2.UP)
+	check_equal(feel.flashes_of(&"burst", 0), 2, "the next spot along shows its own")
+	bus.projectile_impact.emit(1, null, Vector2(3.0, 5.0), Vector2.UP)
+	check_equal(feel.flashes_of(&"burst", 1), 1, "another staff on the same spot shows its own")
+	feel.step(STEP)
+	bus.projectile_impact.emit(0, null, Vector2(3.0, 5.0), Vector2.UP)
+	check(feel.flashes_of(&"burst", 0) >= 2, "and the next frame the spot shows again")
+
+
 func test_an_impact_without_damage_is_not_kept_for_a_later_hit() -> void:
 	var target: Node2D = _enemy()
 	bus.projectile_impact.emit(0, target, Vector2.ZERO, Vector2.RIGHT)

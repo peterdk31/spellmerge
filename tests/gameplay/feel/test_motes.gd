@@ -471,7 +471,8 @@ func test_a_wall_hit_sheds_the_shots_motes_and_the_walls() -> void:
 		check(motes.row_data(row)[MotesScript.ROW_VX] < 0.0, "mote %d flies back off the wall" % row)
 	bus.room_entered.emit(ARENA)
 	var before: int = motes.next_row()
-	bus.projectile_impact.emit(1, null, Vector2(96.0, 100.0), Vector2.RIGHT)
+	# A spot further along (a staff shows one impact a spot of wall a frame, `Feel.WALL_SPOT`).
+	bus.projectile_impact.emit(1, null, Vector2(96.0, 100.0 + FeelScript.WALL_SPOT), Vector2.RIGHT)
 	var kinds: Array[StringName] = _kinds_of_rows(motes, before, motes.next_row())
 	check(kinds.has(&"ember") and kinds.has(&"chip"), "in a room: the shot's and the wall's, got %s" % [kinds])
 	# A chip's row (the wall's chips come before the strike's sparks).

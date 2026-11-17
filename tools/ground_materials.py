@@ -157,10 +157,11 @@ class Material:
         ring = math.floor(r / self.stroke_spacing + 0.5)
         if abs(r - ring * self.stroke_spacing) >= 0.5:
             return rgb
-        pieces = max(3, round(math.tau * r / 40.0))
+        pieces = max(3, round(math.tau * ring * self.stroke_spacing / 40.0))
         if self.noise.noise1(turn * pieces, self.seed + 31 * ring, pieces) < 1.0 - self.stroke_share:
             return rgb
         return _mix(rgb, self.stroke_colour, 0.5)
+
 
 class Noise:
     """The generator's hashes and noise, handed in so this module keeps one definition of them."""

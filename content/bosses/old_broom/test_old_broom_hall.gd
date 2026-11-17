@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## falls); its landmark the swept ring: its ground's areas `dust` over the whole hall, then `swept`
 ## (clean stone with the strokes of a broom) round its middle, the pillars standing in the ring and
 ## everything pushed out of it (the dust heaps, the rubble and the skulls lie in the drifts round it);
-## the crypt's shaft of light on its middle; and lit by candles where its ten wall torches hung.
+## no shaft of light (the owner's); and lit by candles where its ten wall torches hung.
 
 const HallData := preload("res://content/rooms/crypt/boss_broom/boss_broom.tres")
 ## Its shape (tools/ground_shape.py draws its ground from it) and the swept ring's material.
@@ -20,7 +20,7 @@ const Torch := preload("res://content/rooms/crypt/decals/torch.tscn")
 const Rubble := preload("res://art/tilesets/crypt/rubble.svg")
 const Skull := preload("res://art/tilesets/crypt/skull.svg")
 
-## How near the room's middle the ring's centre and the shaft stand.
+## How near the room's middle the ring's centre stands.
 const MIDDLE: float = 24.0
 ## The candle clusters lighting the hall, one where each of its ten wall torches hung.
 const CANDLES: int = 10
@@ -105,17 +105,13 @@ func test_its_landmark_is_the_swept_ring() -> void:
 				check(false, "%s: the ring is swept, yet %s grows at %s" % [room.id, cover.kind_at(cell).id, at])
 
 
-## The crypt's shaft of light (the shared beam) falls on the middle of the ring, lighting the floor.
-func test_the_shaft_falls_on_its_middle() -> void:
+## No shaft of light falls in it (the owner, 2026-11-17: "Remove the center light column"): its
+## candles light it.
+func test_no_shaft_falls_in_it() -> void:
 	for room in halls:
 		var root: Node = own(room.scene.instantiate()) as Node
-		var beam: Node2D = root.get_node_or_null("Decor/Beam") as Node2D
-		check(beam != null, "%s: a shaft of light" % room.id)
-		if beam == null:
-			continue
-		check(beam.position.distance_to(room.places().size * 0.5) <= MIDDLE, "%s: on its middle: %s" % [room.id, beam.position])
-		check_equal(beam.scene_file_path, Beam.resource_path, "%s: the crypt's shaft of light" % room.id)
-		check(beam.get_node("Light").is_in_group(&"light_spot"), "%s: it lights the floor" % room.id)
+		for child in root.get_node("Decor").get_children():
+			check(child.scene_file_path != Beam.resource_path, "%s: no shaft of light, %s" % [room.id, child.name])
 
 
 ## Lit as a floating room is: by candle clusters standing on the slab (no wall to hang a torch on),

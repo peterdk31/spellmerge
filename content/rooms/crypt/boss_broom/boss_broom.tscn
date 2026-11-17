@@ -1,9 +1,8 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/void.svg" id="1_void"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/boss_broom/boss_broom_ground.tscn" id="2_ground"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/candles.tscn" id="3_candles"]
-[ext_resource type="PackedScene" path="res://content/rooms/decor/beam.tscn" id="4_beam"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="6_rubble"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="7_skull"]
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="8_prop_stand_in"]
@@ -26,9 +25,6 @@ region_rect = Rect2(0, 0, 832, 512)
 [node name="Floor" parent="." instance=ExtResource("2_ground")]
 
 [node name="Decor" type="Node2D" parent="."]
-
-[node name="Beam" parent="Decor" instance=ExtResource("4_beam")]
-position = Vector2(416, 262)
 
 [node name="Rubble1" type="Sprite2D" parent="Decor"]
 texture_filter = 1

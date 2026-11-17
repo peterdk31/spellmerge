@@ -192,6 +192,51 @@ func test_no_shot_is_spent_on_a_body_the_pass_has_killed() -> void:
 	check_equal(hits[1], [0, behind, 11, 2], "and hit the body behind")
 
 
+## A body hit by several spells in one pass: every spell's hits count off its one health, and a
+## heal's hit first (no damage) does not keep the body from being counted dead.
+func _two_spells_on(front: Node2D, first_tag: int, first_damage: float) -> void:
+	bus.hit_room_asked.connect(func(_caster: int, target: Node, tag: int, _shot: int, room: HitRoom) -> void:
+		if target != front:
+			return
+		room.health = 25.0
+		room.damage = first_damage if tag == first_tag else 10.0)
+	bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void:
+		if target == front:
+			mgr.remove_target(front))
+
+
+func test_every_spells_hits_count_off_one_health() -> void:
+	var front: Node2D = _target(Vector2(200.0, 100.0))
+	_two_spells_on(front, 11, 10.0)
+	_volley(0, 11, front.global_position, 2)
+	_volley(0, 12, front.global_position, 3)
+	mgr.step(DT)
+	check_equal(hits, [[0, front, 11, 2], [0, front, 12, 1]], "two of one spell and one of the other kill 25")
+	check_equal(mgr.get_count(), 2, "the last two are not spent")
+
+
+func test_a_heal_first_does_not_keep_a_body_from_dying() -> void:
+	var front: Node2D = _target(Vector2(200.0, 100.0))
+	_two_spells_on(front, 13, 0.0)
+	_volley(0, 13, front.global_position, 1)
+	_volley(0, 12, front.global_position, 5)
+	mgr.step(DT)
+	check_equal(hits, [[0, front, 13, 1], [0, front, 12, 3]], "the heal, then three hits of 10 kill 25")
+	check_equal(mgr.get_count(), 2, "the last two are not spent")
+
+
+## Combat tells a body's health whatever the spell asked about: one that deals no damage (a heal, no
+## profile) has damage 0, not an unknown room, so the body's other spells still count off it.
+func test_combat_tells_the_health_for_a_spell_that_deals_none() -> void:
+	var arena := ArenaScript.new(root)
+	var imp: Node2D = arena.add_imp(Vector2(40.0, 0.0), 30.0)
+	var room := HitRoom.new()
+	arena.bus.hit_room_asked.emit(0, imp, 0, -1, room)
+	check_equal(room.health, 30.0, "its health")
+	check_equal(room.damage, 0.0, "and no damage")
+	arena.free_all()
+
+
 ## A fan whose first shots kill a body spends the shots one by one would, no more, and the same damage.
 func _fan_kill(merged: bool) -> Vector3i:
 	var arena := ArenaScript.new(root)

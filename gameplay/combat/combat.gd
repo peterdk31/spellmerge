@@ -455,19 +455,22 @@ func setup() -> void:
 ## How much `target` can still take from hits of the spell `tag` (shot `shot`), for the projectile
 ## manager's merged hits (`hit_room_asked`): its health, with each barrier charge a hit it takes whole,
 ## and one hit's damage as `_strike` deals it before reactions (a reaction's extra damage is not
-## foreseen, so a body may still take a shot or two after it dies). A body it cannot hurt, or a heal,
-## leaves the room unknown (INF): every shot hits as it comes.
+## foreseen, so a body may still take a shot or two after it dies). The health is the body's whatever
+## the spell; a heal's or a harmless spell's damage is 0. A body it cannot hurt leaves the room
+## unknown (INF): every shot hits as it comes.
 func _on_hit_room_asked(_caster: int, target: Node, tag: int, shot: int, room: HitRoom) -> void:
 	if room == null or target == null or not is_instance_valid(target) or spells == null:
 		return
 	var row: int = _row_of_node(target)
 	if row == ActorsScript.NONE or not _can_hurt(row):
 		return
-	var profile: HitProfile = spells.hit_profile(tag, shot)
-	if profile == null or profile.heal > 0:
-		return
 	var health: float = health_of(target)
 	if health < 0.0:
+		return
+	# Its health whatever the spell (a heal's ask too: the body's other spells' hits count off it).
+	room.health = health
+	var profile: HitProfile = spells.hit_profile(tag, shot)
+	if profile == null or profile.heal > 0:
 		return
 	var damage: float = profile.damage * _power_of(tag)
 	var at: int = row * STATUS_COUNT
@@ -476,7 +479,6 @@ func _on_hit_room_asked(_caster: int, target: Node, tag: int, shot: int, room: H
 	if damage <= 0.0:
 		return
 	room.damage = damage
-	room.health = health
 	if _blocks(row):
 		room.health += float(_shield[row]) * damage
 

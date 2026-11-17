@@ -34,9 +34,12 @@ const BUDGET: int = 80000
 ## Recorded again for online-ready N7 (2026-11-07), when the manager's homing and return turns became
 ## `DMath`'s (the same on every platform): the same 14,375 hits on the same bodies at the same steps
 ## (compared hit by hit with main's manager, the native kernel off), 19 hit points differing in the
-## last digit of a float.
-const RECORDED_HITS: int = 14375
-const RECORDED_HASH: int = 3228771069
+## last digit of a float. Recorded again for the hit batch A0 (2026-11-17, the owner's word, Q2 of
+## docs/milestones/hit-batch.md), on the merged hits, the game's one hit model: a step's hits of one
+## caster's spell on one body are one `projectile_hit`, its `impact_count` folded in and counted:
+## 14,374 hits where there were 14,375 (the GDScript and the native kernel give the same hash).
+const RECORDED_HITS: int = 14374
+const RECORDED_HASH: int = 899385074
 
 var _bus: EventsScript
 var _mgr: ManagerScript
@@ -56,8 +59,6 @@ var _near: Array[Node2D] = []
 
 
 func before_each() -> void:
-	# The recording is of the hits one by one (`ProjectileManager.merges_hits`, put back after).
-	ManagerScript.merges_hits = false
 	_bus = own(EventsScript.new()) as EventsScript
 	_actors = own(ActorsScript.new()) as ActorsScript
 	_casters = ActorSeats.seat_wizards(_actors, 4)
@@ -169,8 +170,8 @@ func _top_up() -> void:
 
 
 func _on_hit(caster: int, target: Node, point: Vector2, tag: int, _slot: int) -> void:
-	_hits += 1
-	_hash = hash([_hash, _step_no, caster, _index_of.get(target.get_instance_id(), -99), tag, point])
+	_hits += _mgr.impact_count
+	_hash = hash([_hash, _step_no, caster, _index_of.get(target.get_instance_id(), -99), tag, point, _mgr.impact_count])
 
 
 ## The queries every step, folded into the fingerprint: the nearest target of another team and
@@ -314,6 +315,3 @@ func test_kept_targets_keep_the_order_of_a_drop_then_fill() -> void:
 	check_equal(kept.size(), ids.size() - gone.size(), "the dropped ones are gone")
 	check(kept == expected, "the rest keep the indices a drop pass would leave")
 
-
-func after_each() -> void:
-	ManagerScript.merges_hits = true

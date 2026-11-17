@@ -33,7 +33,11 @@ extends "res://tests/support/suite.gd"
 ## 2026-11-16, when a shot cast from its own caster's body came to spare that body as long as it is
 ## coming at it (owner: a moving wizard, and an atom crossing it in one step, were hit by their own
 ## nova): the same to step 38; at 39 a payload a wizard's own hit cast from that wizard's body no
-## longer hits it on its way out, so that shot lives on and the slots, hits and work after it differ).
+## longer hits it on its way out, so that shot lives on and the slots, hits and work after it differ;
+## and again for the hit batch A0, 2026-11-17, on the merged hits, the game's one hit model (the
+## owner's word, Q2 of docs/milestones/hit-batch.md): a step's hits of one caster's spell on one body
+## are one `projectile_hit` (its line says how many, `n`, and the twelfth hit counts them), sent after
+## the pass, and the spent shots end there).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),
@@ -355,15 +359,16 @@ func _spawn_kit() -> void:
 
 func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int = -1) -> void:
 	var slot: int = shot
-	_events.append("hit c%d %s %s t%d slot%d seq%d v%s g%s" % [caster, _name_of(target), _v(position), tag, slot, _mgr.get_seq_of(slot), _v(_mgr.get_velocity_of(slot)), _f(_mgr.get_growth_of(slot))])
+	_events.append("hit c%d %s %s t%d slot%d seq%d v%s g%s n%d" % [caster, _name_of(target), _v(position), tag, slot, _mgr.get_seq_of(slot), _v(_mgr.get_velocity_of(slot)), _f(_mgr.get_growth_of(slot)), _mgr.impact_count])
 	# Combat pushes what it hits a little (a stuck shot rides along), and some enemies are gone
 	# after their twelfth hit.
 	var node := target as Node2D
 	if node != null and is_instance_valid(node):
 		node.global_position += position.direction_to(node.global_position) * 1.5
-		var count: int = int(_hits_on.get(node.name, 0)) + 1
+		var before: int = int(_hits_on.get(node.name, 0))
+		var count: int = before + _mgr.impact_count
 		_hits_on[node.name] = count
-		if count == 12 and node.name.begins_with("enemy") and (node.name.ends_with("0") or node.name.ends_with("5")):
+		if before < 12 and count >= 12 and node.name.begins_with("enemy") and (node.name.ends_with("0") or node.name.ends_with("5")):
 			_mgr.remove_target(node)
 	if tag == TAG_SPLITS and _children < 120:
 		# A payload: two children from the hit point that skip the target until clear of it.
@@ -440,11 +445,3 @@ func _log_step(step: int) -> void:
 			hits += 1
 	_log.append("step %d: %d events, %d hits, %d live, %s" % [step, _events.size(), hits, m.get_count(), (events + "\n" + state).md5_text()])
 
-
-func before_each() -> void:
-	# These tests are of the hits one by one (`ProjectileManager.merges_hits`, put back after).
-	ManagerScript.merges_hits = false
-
-
-func after_each() -> void:
-	ManagerScript.merges_hits = true

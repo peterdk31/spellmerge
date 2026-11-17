@@ -162,6 +162,11 @@ var _shot_sum: int = 0
 var _shot_samples: int = 0
 var _hits: int = 0
 var _reactions: int = 0
+## Since the scenario's start (the ticks its tick parts count): the spell hits' merged hits and the
+## hits they stand for (`impact_count`), and the damage Combat dealt, for the `DAMAGE:` line.
+var _merged_hits: int = 0
+var _hits_counted: int = 0
+var _damage: float = 0.0
 var _refused: int = 0
 ## The projectile manager's `dropped` and the spell runtime's `fires_waited` when the measured
 ## window began: what the cap dropped and what the fire pacing held back while measured.
@@ -217,6 +222,7 @@ func _ready() -> void:
 	_events.connect("build_refused", _on_build_refused)
 	_events.connect("projectile_hit", _on_projectile_hit)
 	_events.connect("reaction_triggered", _on_reaction_triggered)
+	_events.connect("damage_dealt", _on_damage_dealt)
 	_next_scenario()
 
 
@@ -268,6 +274,9 @@ func _next_scenario() -> void:
 	_shot_samples = 0
 	_hits = 0
 	_reactions = 0
+	_merged_hits = 0
+	_hits_counted = 0
+	_damage = 0.0
 	_elapsed = 0.0
 	_measuring = false
 	_enemy_step_usec = 0
@@ -510,6 +519,12 @@ func _on_spell_cast(player: int, _spell_id: StringName, _origin: Vector2, _direc
 func _on_projectile_hit(_caster: int, _target: Node, _position: Vector2, tag: int, _shot: int) -> void:
 	if tag != 0:
 		_hits += 1
+	_merged_hits += 1
+	_hits_counted += int(_projectiles.get(&"impact_count"))
+
+
+func _on_damage_dealt(_caster: int, _target: Node, amount: float, _position: Vector2) -> void:
+	_damage += amount
 
 
 func _on_reaction_triggered(_caster: int, _reaction_id: StringName, _position: Vector2, _shot: int) -> void:
@@ -530,6 +545,7 @@ func _end_scenario() -> void:
 		_probe.call("report")
 		_warn_when_slow(label)
 		_report_parts()
+		_report_damage(label)
 		_report_tick_parts(label)
 		_report_state_hash(label)
 		if _tree_profile != null:
@@ -598,6 +614,17 @@ func _add_projectile_parts() -> void:
 		return
 	for i in prof.size():
 		_projectile_sums[i] += prof[i]
+
+
+## The `DAMAGE:` line (hit batch A0, docs/milestones/hit-batch.md): the damage Combat dealt and the
+## hits the shots made, a tick, since the scenario's start. The run follows frame timing, so it is a
+## rate to compare versions by, not a fingerprint (shot scale's `DAMAGE:` lines are, to the bit).
+func _report_damage(label: String) -> void:
+	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
+	if tick == null:
+		return
+	var ticks: float = maxf(1.0, float(tick.count - _profile_ticks_at))
+	print("DAMAGE: stress %s: %.1f damage a tick, %.1f hits a tick in %.1f merged hits, over %d ticks" % [label, _damage / ticks, float(_hits_counted) / ticks, float(_merged_hits) / ticks, int(ticks)])
 
 
 ## One `BENCH:` line for the Tick's steps and one for the manager's parts: milliseconds a tick,

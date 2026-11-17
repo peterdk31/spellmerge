@@ -7,8 +7,9 @@ extends RefCounted
 ## (`circle_blocked`, `nearest_ground`) or walks (`ground_clear`, `walk_clear`, `clear_run`), and
 ## where it would fall (`is_hole`, `touches_hole`). The projectile manager's (hit batch B1,
 ## docs/milestones/hit-batch.md): it sizes the grid with its bounds (`size_to`), lays the walls and
-## holes of a room as Flow hands them, and marks its solid shots' cells (`lay_solid`, `mark_cells`);
-## everyone else asks through the manager's forwards, which say the same as before.
+## holes of a room as Flow hands them (`set_walls`, `add_wall_body`, `add_hole_body`, `set_holes_outside`),
+## and marks its solid shots' cells (`lay_solid`, `mark_cells`). The game asks the grid itself, through
+## `grid()` (hit batch B2); the manager's one-line forwards of the same names are kept for the tests.
 ##
 ## State, as it was the manager's (walked and restored with it, under its member): the walls, the
 ## holes and the footprints are laid as rooms are entered and changed, never worked out again. The

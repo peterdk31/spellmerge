@@ -520,7 +520,7 @@ func _beam_follow(at: int, delta: float) -> void:
 				var hand: Vector2 = kit.aim_pivot(holder)
 				if hand.is_finite():
 					var tip: Vector2 = hand + DMath.rotated(_bm_origin[at] - hand, _bm_swept[at])
-					_bm_origin[at] = kit.projectiles.clip_to_walls(hand, tip)
+					_bm_origin[at] = kit.projectiles.grid().clip_to_walls(hand, tip)
 				kit.turn_staff(holder, _bm_swept[at])
 		elif kit.aim_seen(holder):
 			_end_beam(at, false)
@@ -866,7 +866,7 @@ func _leg_follow(at: int) -> void:
 		way = kit.projectiles.gate_face(out)
 	way = way.normalized()
 	var centre: Vector2 = kit.projectiles.gate_position(out)
-	_bm_origin[at] = kit.projectiles.clip_to_walls(centre, centre + way * (kit.projectiles.gate_radius(out) + 1.0))
+	_bm_origin[at] = kit.projectiles.grid().clip_to_walls(centre, centre + way * (kit.projectiles.gate_radius(out) + 1.0))
 	_bm_dir[at] = way
 	_bm_length[at] = _bm_gate_left[parent]
 

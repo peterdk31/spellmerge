@@ -1533,7 +1533,7 @@ func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> v
 	var at_spawns: bool = entry.at == EnemyAdds.At.SPAWNS and not spawns.is_empty()
 	var centre: Vector2 = world.to_local(caller.global_position)
 	var reach: float = caller.hurtbox.outer_radius() if caller.hurtbox != null else caller.wall_radius()
-	var slide: Callable = projectiles.slide_body if projectiles != null else Callable()
+	var slide: Callable = projectiles.grid().slide_body if projectiles != null else Callable()
 	var radius: float = _body_radius_of(data)
 	var turn: int = adds.stood
 	for n: int in count:
@@ -1542,9 +1542,9 @@ func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> v
 			at = stacked_position(spawns[adds.stood % spawns.size()], adds.stood / spawns.size())
 		else:
 			at = RoomAdds.ring(centre, reach, radius, n, count, slide, turn)
-			if projectiles != null and projectiles.touches_hole(world.to_global(at), radius):
+			if projectiles != null and projectiles.grid().touches_hole(world.to_global(at), radius):
 				# A spot on the ring over a hole takes the nearest ground (hub rework HR-H2).
-				at = world.to_local(projectiles.nearest_ground(world.to_global(at), radius))
+				at = world.to_local(projectiles.grid().nearest_ground(world.to_global(at), radius))
 		var add: Actor = _stand_enemy(world, data, at)
 		if add != null:
 			adds.track(add, caller, key)

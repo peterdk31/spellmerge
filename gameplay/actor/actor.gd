@@ -65,7 +65,7 @@ extends Node2D
 ##
 ## The move (online-ready N6): `move(delta)` slides the body, its footprint's circle (`wall_radius`),
 ## along the walls (the room's, the solid shots' and the footprints', the projectile manager's
-## wall grid, `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
+## wall grid, `RoomGrid.slide_body`), the same to the bit on every machine; `velocity` is then what it
 ## moved by over the step, so a body against a wall keeps only its slide. Actors walk through each
 ## other (Combat's push parts them); spells find them by their hurt circles. No physics engine.
 ## Where the move left it, its circle tells every actor whose touch area it overlaps (`touched`,
@@ -371,12 +371,12 @@ func move(delta: float) -> void:
 	var from: Vector2 = global_position
 	var unhindered: Vector2 = from + velocity * delta
 	var to: Vector2 = unhindered
-	var holes: bool = projectiles != null and projectiles.has_holes()
+	var holes: bool = projectiles != null and projectiles.grid().has_holes()
 	var crossed: bool = mover.crossing != Vector2.ZERO
 	if holes:
 		to = _move_over_holes(from, delta)
 	elif projectiles != null:
-		to = projectiles.slide_body(from, velocity * delta, wall_radius())
+		to = projectiles.grid().slide_body(from, velocity * delta, wall_radius())
 	mover.crossing = Vector2.ZERO
 	global_position = to
 	if to != unhindered:
@@ -397,14 +397,15 @@ func _check_ground(crossed: bool) -> void:
 	if fall_left > 0.0 or _dying or _leaving:
 		return
 	var at: Vector2 = global_position
-	if projectiles.is_hole(at):
+	var grid: RoomGrid = projectiles.grid()
+	if grid.is_hole(at):
 		if crossed or _hold_shown or mover.is_moving():
 			return
 		if never_falls():
-			global_position = projectiles.nearest_ground(at, wall_radius())
+			global_position = grid.nearest_ground(at, wall_radius())
 			return
 		_fall()
-	elif not projectiles.touches_hole(at, wall_radius() + HoleRules.GROUND_MARGIN):
+	elif not grid.touches_hole(at, wall_radius() + HoleRules.GROUND_MARGIN):
 		ground = at
 		has_ground = true
 
@@ -442,7 +443,7 @@ func _land() -> void:
 		return
 	var at: Vector2 = ground
 	if not has_ground:
-		at = projectiles.nearest_ground(global_position, wall_radius()) if projectiles != null else global_position
+		at = projectiles.grid().nearest_ground(global_position, wall_radius()) if projectiles != null else global_position
 	global_position = at
 	fell_by = ActorsScript.NONE
 	if combat != null:
@@ -495,18 +496,19 @@ func _move_over_holes(from: Vector2, delta: float) -> Vector2:
 	var radius: float = wall_radius()
 	var motion: Vector2 = velocity * delta
 	var crossed: Vector2 = mover.crossing * delta
+	var grid: RoomGrid = projectiles.grid()
 	var at: Vector2 = from
 	if crossed != Vector2.ZERO:
-		at = projectiles.slide_body(from, crossed, radius, true)
+		at = grid.slide_body(from, crossed, radius, true)
 	var walk: Vector2 = motion - crossed
 	if walk == Vector2.ZERO and crossed != Vector2.ZERO:
 		return at
-	if projectiles.is_hole(at):
-		return projectiles.slide_body(at, walk, radius, true)
-	if crossed != Vector2.ZERO and projectiles.touches_hole(at, radius):
-		var walked: Vector2 = projectiles.slide_body(at, walk, radius, true)
-		return at if projectiles.is_hole(walked) else walked
-	return projectiles.slide_body(at, walk, radius)
+	if grid.is_hole(at):
+		return grid.slide_body(at, walk, radius, true)
+	if crossed != Vector2.ZERO and grid.touches_hole(at, radius):
+		var walked: Vector2 = grid.slide_body(at, walk, radius, true)
+		return at if grid.is_hole(walked) else walked
+	return grid.slide_body(at, walk, radius)
 
 
 ## Tell every actor whose touch area this body overlaps where its move left it (its circle against

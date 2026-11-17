@@ -69,7 +69,7 @@ func lane_radius(spell: CompiledSpell) -> float:
 func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, source: Node, _lifetime: float, chain: int, prev: int) -> int:
 	if not origin.is_finite() or not heading.is_finite() or heading.is_zero_approx():
 		return 0
-	var end: Vector2 = kit.projectiles.clip_to_walls(origin, origin + heading * spell.ray_length)
+	var end: Vector2 = kit.projectiles.grid().clip_to_walls(origin, origin + heading * spell.ray_length)
 	var got: float = origin.distance_to(end)
 	if kit.events != null:
 		# Its cue throws its spell's cards' motes (`Spells.cue_tag`).

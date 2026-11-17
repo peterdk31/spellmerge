@@ -1703,7 +1703,7 @@ func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, o
 func _placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vector2:
 	var ahead: Vector2 = origin + heading * spell.radius * 2.0
 	# Skyfall: while something falls, it is placed on its floor line.
-	return _skyfall.on_floor(spell, ahead if projectiles.clip_to_walls(origin, ahead) == ahead else origin)
+	return _skyfall.on_floor(spell, ahead if projectiles.grid().clip_to_walls(origin, ahead) == ahead else origin)
 
 
 ## Hand a shot the behaviours of its cards that the projectile manager runs (staffs B1): a bolt,
@@ -1969,7 +1969,7 @@ static func penta_start(tag: int) -> float:
 ## The point at `angle` on the ring of `radius` round `centre`, stopped short of a wall.
 static func ring_point(manager: ProjectilesScript, centre: Vector2, radius: float, angle: float) -> Vector2:
 	var point: Vector2 = centre + DMath.from_angle(angle) * radius
-	return manager.clip_to_walls(centre, point) if manager != null else point
+	return manager.grid().clip_to_walls(centre, point) if manager != null else point
 
 
 ## `recoil`: the caster is pushed back from a firing along `heading` (a firing the other way

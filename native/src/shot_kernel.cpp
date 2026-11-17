@@ -254,6 +254,9 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(mh_damage, "_mh_damage", PACKED_FLOAT64_ARRAY) \
 	X(mh_health, "_mh_health", PACKED_FLOAT64_ARRAY) \
 	X(mh_spent, "_mh_spent", PACKED_FLOAT64_ARRAY) \
+	X(mh_blocks, "_mh_blocks", PACKED_BYTE_ARRAY) \
+	X(mh_charges, "_mh_charges", PACKED_INT32_ARRAY) \
+	X(mh_charges_used, "_mh_charges_used", PACKED_INT32_ARRAY) \
 	X(mh_used, "_mh_used", PACKED_INT32_ARRAY) \
 	X(mh_used_at, "_mh_used_at", PACKED_VECTOR2_ARRAY) \
 	X(mh_used_n, "_mh_used_n", INT) \
@@ -469,7 +472,8 @@ struct HitPass {
 	// The merged hits (`merge_hits`), read the first time a shot found hits while the pass merges.
 	bool merging = false;
 	bool merge_loaded = false;
-	Arr<PackedInt32Array> pierce, mh_head, mh_target_pass, mh_next, mh_caster, mh_slot, mh_count, mh_used;
+	Arr<PackedInt32Array> pierce, mh_head, mh_target_pass, mh_next, mh_caster, mh_slot, mh_count, mh_used, mh_charges, mh_charges_used;
+	Arr<PackedByteArray> mh_blocks;
 	Arr<PackedFloat32Array> stick;
 	Arr<PackedInt64Array> tag, mh_tag;
 	Arr<PackedFloat64Array> mh_damage, mh_health, mh_spent;
@@ -667,6 +671,9 @@ struct HitPass {
 		mh_damage.load(m, k.mh_damage);
 		mh_health.load(m, k.mh_health);
 		mh_spent.load(m, k.mh_spent);
+		mh_blocks.load(m, k.mh_blocks);
+		mh_charges.load(m, k.mh_charges);
+		mh_charges_used.load(m, k.mh_charges_used);
 		mh_used.load(m, k.mh_used);
 		mh_used_at.load(m, k.mh_used_at);
 		mh_pass = m->get(k.mh_pass);
@@ -769,9 +776,13 @@ struct HitPass {
 				mh_used_at[mh_used_n] = cand_point[c];
 				mh_used_n += 1;
 			}
-			// `_merge_hit` of a hit on a merged one, `_spend_room`.
+			// `_merge_hit` of a hit on a merged one, `_spend_room`: a barrier's charge, else its damage.
 			mh_count[e] += 1;
-			mh_spent[t] += mh_damage[e];
+			if (mh_blocks[e] != 0 && mh_charges_used[t] < mh_charges[t]) {
+				mh_charges_used[t] += 1;
+			} else {
+				mh_spent[t] += mh_damage[e];
+			}
 		}
 		if ((flags[slot] & F_SPENT) == 0) {
 			forget_left(slot);

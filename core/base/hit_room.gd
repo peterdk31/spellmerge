@@ -12,8 +12,11 @@ extends RefCounted
 var health: float = INF
 ## The damage one hit of the spell asked about deals it (0: none, a heal).
 var damage: float = 0.0
+## The charges of its barrier that spell's hits meet: each takes one hit whole, no damage.
+var charges: int = 0
 
 
 func clear() -> void:
 	health = INF
 	damage = 0.0
+	charges = 0

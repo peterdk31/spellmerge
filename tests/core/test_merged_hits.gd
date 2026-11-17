@@ -7,6 +7,7 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
+const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 
 const DT: float = 1.0 / 60.0
 
@@ -293,6 +294,65 @@ func test_combat_tells_the_health_for_a_spell_that_deals_none() -> void:
 	check_equal(room.health, 30.0, "its health")
 	check_equal(room.damage, 0.0, "and no damage")
 	arena.free_all()
+
+
+## A barrier's charges count against every spell's hits on the body, one hit each, before damage:
+## 3 charges take spell A's two hits and spell B's first, and B's last two deal 2 of 20 health, so
+## the body lives and every shot hits it.
+func test_a_barriers_charges_count_once_whatever_spells_hit() -> void:
+	var front: Node2D = _target(Vector2(200.0, 100.0))
+	bus.hit_room_asked.connect(func(_caster: int, _target: Node, tag: int, _shot: int, room: HitRoom) -> void:
+		room.health = 20.0
+		room.damage = 10.0 if tag == 11 else 1.0
+		room.charges = 3)
+	_volley(0, 11, front.global_position, 2)
+	_volley(0, 12, front.global_position, 5)
+	mgr.step(DT)
+	check_equal(hits, [[0, front, 11, 2], [0, front, 12, 5]], "every shot hits: the barrier ate three, 4 damage landed")
+
+
+## Combat tells a body no hit can take health from (an invincible prop) as unknown: the pass never
+## counts it dead, and every shot stops on it.
+func test_combat_tells_an_invincible_body_as_unknown() -> void:
+	var world := ActorFixture.new(root)
+	var body: Actor = world.actor(Vector2(40.0, 0.0), [&"health", &"hurtbox"] as Array[StringName], ActorFixture.Scripted.new())
+	var room := HitRoom.new()
+	world.bus.hit_room_asked.emit(0, body, 0, -1, room)
+	check(room.health < INF, "a plain body tells its health (%s)" % room.health)
+	body.health.invincible = true
+	room.clear()
+	world.bus.hit_room_asked.emit(0, body, 0, -1, room)
+	check_equal(room.health, INF, "an invincible one is never counted dead")
+	world.free_all()
+
+
+## A handler that clears the manager while the merged hits are sent stops the rest.
+func test_a_clear_while_the_hits_are_sent_stops_the_rest() -> void:
+	var front: Node2D = _target(Vector2(200.0, 100.0))
+	var other: Node2D = _target(Vector2(200.0, 200.0))
+	bus.projectile_hit.connect(func(_caster: int, _target: Node, _at: Vector2, _tag: int, _shot: int) -> void: mgr.clear())
+	_volley(0, 11, front.global_position, 2)
+	_volley(0, 11, other.global_position, 2)
+	mgr.step(DT)
+	check_equal(hits.size(), 1, "the first hit is sent, then nothing after the clear")
+
+
+## At the cap, a spawn in the pass never takes the slot of a spent shot that hits alone (its merged
+## hit, still to send, reads its profile by its slot): its hit names its shot.
+func test_a_spawn_at_the_cap_leaves_a_shot_that_hits_alone_its_slot() -> void:
+	mgr.set_cap(2)
+	var body: Node2D = _target(Vector2(200.0, 100.0))
+	mgr.set_walls([Rect2(400.0, 0.0, 32.0, 300.0)] as Array[Rect2])
+	var alone: int = mgr.spawn(0, body.global_position + Vector2(-12.0, 0.0), Vector2(600.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 11)
+	mgr.set_hits_alone(alone)
+	var bouncer: int = mgr.spawn(0, Vector2(395.0, 250.0), Vector2(600.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 12)
+	mgr.set_bounce(bouncer, 2)
+	mgr.wall_met.connect(func(_caster: int, at: Vector2, _heading: Vector2, _tag: int, _shot: int) -> void:
+		mgr.spawn(0, at + Vector2(-20.0, 0.0), Vector2(-5.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 14))
+	var shots: Array[int] = []
+	bus.projectile_hit.connect(func(_caster: int, _target: Node, _at: Vector2, _tag: int, shot: int) -> void: shots.append(shot))
+	mgr.step(DT)
+	check_equal(shots, [alone] as Array[int], "the alone shot's hit names its own slot")
 
 
 ## A fan whose first shots kill a body spends the shots one by one would, no more, and the same damage.

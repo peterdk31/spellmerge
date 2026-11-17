@@ -37,7 +37,9 @@ const BUDGET: int = 80000
 ## last digit of a float. Recorded again for the hit batch A0 (2026-11-17, the owner's word, Q2 of
 ## docs/milestones/hit-batch.md), on the merged hits, the game's one hit model: a step's hits of one
 ## caster's spell on one body are one `projectile_hit`, its `impact_count` folded in and counted:
-## 14,374 hits where there were 14,375 (the GDScript and the native kernel give the same hash).
+## 14,374 hits where there were 14,375 (no body dies in this scene, so the one less comes from the
+## spent shots ending at the pass's end; not traced further). The test runs the native kernel when it
+## is loaded; the GDScript gave the same hash, checked by hand when it was recorded.
 const RECORDED_HITS: int = 14374
 const RECORDED_HASH: int = 899385074
 

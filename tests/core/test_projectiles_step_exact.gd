@@ -37,7 +37,7 @@ extends "res://tests/support/suite.gd"
 ## and again for the hit batch A0, 2026-11-17, on the merged hits, the game's one hit model (the
 ## owner's word, Q2 of docs/milestones/hit-batch.md): a step's hits of one caster's spell on one body
 ## are one `projectile_hit` (its line says how many, `n`, and the twelfth hit counts them), sent after
-## the pass, and the spent shots end there).
+## the pass, and the spent shots end there; the handlers' push and payloads run once a merged hit).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),
@@ -53,7 +53,7 @@ extends "res://tests/support/suite.gd"
 ## positions written in full float precision) and every live shot's state after the step
 ## (position, previous position, velocity, life, radius, pierce, flags, its moves and more) with
 ## the manager's counters. The recording keeps one line a step: the number of
-## events and hits, the live shots, and a digest of all of it. A changed number anywhere fails the
+## events and of merged hits (`hit` events; each says how many hits it stands for), the live shots, and a digest of all of it. A changed number anywhere fails the
 ## test at the first step that differs.
 ##
 ## A change that is meant to change what shots do records the scene again and says why in its PR:

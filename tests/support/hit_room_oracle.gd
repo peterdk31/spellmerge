@@ -4,7 +4,8 @@ extends RefCounted
 ## (`Combat._on_hit_room_asked`), before A2 splits it into a body's room and a spell's damage. A2's
 ## new answers are held to it: at every entry, the same health, damage and charges, to the bit.
 ##
-## It reads Combat's own members, as the copy it is; never change it to follow Combat. Its own test,
+## It reads Combat's own members, as the copy it is: a rename of one of them may follow Combat here,
+## never a change of what it does. Its own test,
 ## tests/gameplay/combat/test_hit_room_oracle.gd, checks it against Combat's live answer until A2.
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")

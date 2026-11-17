@@ -162,8 +162,9 @@ var _shot_sum: int = 0
 var _shot_samples: int = 0
 var _hits: int = 0
 var _reactions: int = 0
-## Since the scenario's start (the ticks its tick parts count): the spell hits' merged hits and the
-## hits they stand for (`impact_count`), and the damage Combat dealt, for the `DAMAGE:` line.
+## Since the scenario's start (the ticks its tick parts count): every shot hit's merged hits (the
+## fillers' too) and the hits they stand for (`impact_count`), and all the damage Combat dealt, for
+## the `DAMAGE:` line.
 var _merged_hits: int = 0
 var _hits_counted: int = 0
 var _damage: float = 0.0
@@ -616,15 +617,15 @@ func _add_projectile_parts() -> void:
 		_projectile_sums[i] += prof[i]
 
 
-## The `DAMAGE:` line (hit batch A0, docs/milestones/hit-batch.md): the damage Combat dealt and the
-## hits the shots made, a tick, since the scenario's start. The run follows frame timing, so it is a
+## The `DAMAGE:` line (hit batch A0, docs/milestones/hit-batch.md): all the damage Combat dealt and
+## all the hits the shots made (the fillers' too), a tick, since the scenario's start. The run follows frame timing, so it is a
 ## rate to compare versions by, not a fingerprint (shot scale's `DAMAGE:` lines are, to the bit).
 func _report_damage(label: String) -> void:
 	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
 	if tick == null:
 		return
 	var ticks: float = maxf(1.0, float(tick.count - _profile_ticks_at))
-	print("DAMAGE: stress %s: %.1f damage a tick, %.1f hits a tick in %.1f merged hits, over %d ticks" % [label, _damage / ticks, float(_hits_counted) / ticks, float(_merged_hits) / ticks, int(ticks)])
+	print("DAMAGE: stress %s: %.1f damage a tick, %.1f shot hits a tick (fillers too) in %.1f merged hits, over %d ticks" % [label, _damage / ticks, float(_hits_counted) / ticks, float(_merged_hits) / ticks, int(ticks)])
 
 
 ## One `BENCH:` line for the Tick's steps and one for the manager's parts: milliseconds a tick,

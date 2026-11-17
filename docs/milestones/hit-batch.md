@@ -1,6 +1,6 @@
 # Hit batch and the room grid: two refactors after the performance pass
 
-**Status: approved by the owner on 2026-11-17 (Q1: merged hits only; Q2: record again; Q3: both prototypes kept; Q4: the grid stays the manager's member; docs/DECISIONS.md). B1 and B2 done; part A in progress.** Proposed on 2026-11-17 and revised the same day after its review. Asked by the owner on 2026-11-17 ("Consider if a refactor is worth doing. Maybe something is much too cluttered now. Can we think of a better architecture?"), after the performance pass of 2026-11-16 and 2026-11-17 (docs/DECISIONS.md, the entries of those days). Two parts, each its own PRs: **A, the hit batch** (one hit model, its state out of the projectile manager) and **B, the room grid** (walls, holes, footprints and their queries as a class of their own). Part A starts only once the owner has answered Q1 and Q2 ("For the owner"); part B needs no decision and may start at once.
+**Status: approved by the owner on 2026-11-17 (Q1: merged hits only; Q2: record again; Q3: both prototypes kept; Q4: the grid stays the manager's member; docs/DECISIONS.md). B1, B2 and A0 done; A1 next.** Proposed on 2026-11-17 and revised the same day after its review. Asked by the owner on 2026-11-17 ("Consider if a refactor is worth doing. Maybe something is much too cluttered now. Can we think of a better architecture?"), after the performance pass of 2026-11-16 and 2026-11-17 (docs/DECISIONS.md, the entries of those days). Two parts, each its own PRs: **A, the hit batch** (one hit model, its state out of the projectile manager) and **B, the room grid** (walls, holes, footprints and their queries as a class of their own). Part A starts only once the owner has answered Q1 and Q2 ("For the owner"); part B needs no decision and may start at once.
 
 ## Why
 
@@ -79,7 +79,7 @@ native/README.md changes with A4: a kernel method may read the arrays of more th
 
 | # | Part | Delivers |
 |---|---|---|
-| A0 | **The merged game recorded** | Merged recordings of `test_projectiles_step_exact.gd` and `test_projectiles_targets.gd`, made from today's merged GDScript before any other part (the owner's word, Q2); a `DAMAGE:` line in the stress run (each body's damage taken, as shot scale prints it); a test-only copy of today's `Combat._on_hit_room_asked`, the oracle for A2. Every later part is held to these. |
+| A0 | **The merged game recorded** | Merged recordings of `test_projectiles_step_exact.gd` and `test_projectiles_targets.gd`, made from today's merged GDScript before any other part (the owner's word, Q2); a `DAMAGE:` line in the stress run (its damage and hits a tick: the run follows frame timing, so a rate compared within the machine's noise; shot scale's `DAMAGE:` lines, each body's damage taken, are the ones compared to the bit); a test-only copy of today's `Combat._on_hit_room_asked`, the oracle for A2. Every later part is held to these. |
 | A1 | **`HitBatch`, extracted** | The batch's data and logic move into the class, at the seam above; the manager calls it. The same to the bit: the merged recordings, the native side-by-side tests merged, `test_merged_hits.gd`, the damage hashes. The unmerged mode still there. |
 | A2 | **A body's room once a body** | `hit_room_asked(target, rooms)` and `hit_damage_asked` replace today's ask; Combat answers both. At every entry the oracle and the new answers give the same health, damage and charges, to the bit, in the merged scenes and `test_content_determinism.gd`'s fights. Measured: hand-backs a tick, the tick. |
 | A3a | **The tests move to the merged model** | Each test of the hits one by one (`test_projectiles.gd`, `test_native_kernel.gd`'s main scene, `test_hit_budget.gd`, `test_step_profile.gd`, `test_spells_cast.gd`) becomes a test of the merged model where it tests something the model keeps, or goes, with its reason in the PR; the side-by-side scene runs merged. |
@@ -115,7 +115,7 @@ B1 first (no decision needed), then, once Q1 and Q2 are answered, A0, A1, A2, A3
 
 ## Tests
 
-- **Same results** (A1, A2, A3a, A4 against A0's recordings and damage lines; B1, B2 against today's): the full suite, the native side-by-side tests on one and four threads, `test_merged_hits.gd`, the determinism and snapshot suites, the damage lines before and after.
+- **Same results** (A1, A2, A3a, A4 against A0's recordings and shot scale's damage lines, the stress run's within noise; B1, B2 against today's): the full suite, the native side-by-side tests on one and four threads, `test_merged_hits.gd`, the determinism and snapshot suites, the damage lines before and after.
 - **A2:** the oracle at every entry; a body hit by two spells, one hexed and one barriered; a body a Blast on expiry hurts and one a Mend on expiry heals during the pass (each counted as today's ask counts it); an invincible body never dead; a target a handler adds during the pass; Plow's carried body and another spell on it, as today.
 - **A3a:** every test of the hits one by one kept as a merged test or removed with its reason.
 - **A4:** every new branch reached in the side-by-side scene and a mutated line failing it, as above.

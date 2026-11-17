@@ -1,8 +1,12 @@
 extends "res://tests/support/suite.gd"
 ## The oracle of a body's room (tests/support/hit_room_oracle.gd, hit batch A0) answers every
-## `hit_room_asked` of a real fight as Combat does, to the bit: plain, hexed, barriered (a barrier
-## of another spell, and one sparing the spell that hits), healed and dying bodies, an invincible
-## one, and a spell that deals none. A2 holds its new answers to this oracle.
+## `hit_room_asked` as Combat does, to the bit. A real fight (piercing bolt fans, a fire bolt and a
+## mending fan on imps, one hexed, one shielded, one barriered by the fire bolt's own spell, a weak
+## one that dies) asks it at the bodies' first hits; and the kit's bodies are asked straight away in
+## every state Combat reads: plain, hexed, shielded, barriered sparing the spell asked about or
+## another, a caster of power 2, protected, invincible, depleted, down, with no Health, a plain body
+## (Combat's own, not an actor), a body Combat does not know, and spells with no profile
+## and a heal. A2 holds its new answers to this oracle. A shot with a hit profile of its own (`F_ALONE`) is A2's own test.
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const Oracle := preload("res://tests/support/hit_room_oracle.gd")
 const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
@@ -44,6 +48,8 @@ func test_the_oracle_answers_every_ask_of_a_fight_as_combat_does() -> void:
 	var imps: Array[Node2D] = []
 	for k in 6:
 		imps.append(arena.add_imp(Vector2(60.0 + 12.0 * float(k), -20.0 + 8.0 * float(k)), 40.0 + 15.0 * float(k)))
+	# A weak imp in the fans' line: later spells' first hits ask about a dying or dead body.
+	var weak: Node2D = arena.add_imp(Vector2(70.0, -6.0), 3.0)
 	arena.combat.apply_status(1, imps[1], arena.combat.HEX, 5.0, 40.0)
 	arena.combat.apply_status(1, imps[4], arena.combat.HEX, 5.0, 25.0)
 	arena.combat.give_shield(imps[2], 2, 5.0)
@@ -64,26 +70,78 @@ func test_the_oracle_answers_every_ask_of_a_fight_as_combat_does() -> void:
 		arena.run(0.6)
 	check(_asks > 20, "the fight asked often (%d)" % _asks)
 	check(_damage_told > 0 and _charges_told > 0 and _health_told > _damage_told, "damage, charges and a heal's health-only answer all came up (%d, %d, %d)" % [_damage_told, _charges_told, _health_told])
-	check(arena.died(imps[0]) or arena.lost(imps[0]) > 0, "the first imp was hurt")
+	check(arena.combat.health_of(imps[1]) < 55.0, "the hexed imp was hurt (%s)" % arena.combat.health_of(imps[1]))
+	check(arena.died(weak), "the weak imp died in the fight")
 	check_equal(_differ, [] as Array[String], "the oracle and Combat agree at every ask")
 	arena.free_all()
 
 
-func test_the_oracle_tells_an_invincible_body_and_a_stranger_as_unknown() -> void:
-	var world := ActorFixture.new(root)
-	var body: Actor = world.actor(Vector2(40.0, 0.0), [&"health", &"hurtbox"] as Array[StringName], ActorFixture.Scripted.new())
+## Combat's answer and the oracle's for one ask, compared; the answer's shape is counted in `shapes`.
+func _ask(world: ActorFixture, target: Node, tag: int, shapes: Dictionary, what: String) -> void:
 	var room := HitRoom.new()
 	var mine := HitRoom.new()
-	world.bus.hit_room_asked.emit(0, body, 0, -1, room)
-	Oracle.answer(world.combat, body, 0, -1, mine)
-	check(mine.health < INF and mine.health == room.health, "a plain body: its health (%s, %s)" % [mine.health, room.health])
-	body.health.invincible = true
-	room.clear()
-	world.bus.hit_room_asked.emit(0, body, 0, -1, room)
-	Oracle.answer(world.combat, body, 0, -1, mine)
-	check_equal(mine.health, INF, "an invincible one: unknown")
-	check_equal(room.health, mine.health, "as Combat tells it")
-	var stranger := own(Node2D.new()) as Node2D
-	Oracle.answer(world.combat, stranger, 0, -1, mine)
-	check_equal([mine.health, mine.damage, mine.charges], [INF, 0.0, 0], "a body Combat does not know: unknown")
+	world.bus.hit_room_asked.emit(0, target, tag, -1, room)
+	Oracle.answer(world.combat, target, tag, -1, mine)
+	check_equal([mine.health, mine.damage, mine.charges], [room.health, room.damage, room.charges], what + ": the oracle as Combat")
+	var shape: String = "unknown" if room.health == INF else ("health only" if room.damage <= 0.0 else ("charges" if room.charges > 0 else "damage"))
+	shapes[shape] = int(shapes.get(shape, 0)) + 1
+
+
+func test_the_oracle_answers_every_state_of_a_body_as_combat_does() -> void:
+	var world := ActorFixture.new(root)
+	var wizard: Actor = world.actor(Vector2.ZERO, [&"health", &"hurtbox", &"caster"] as Array[StringName], ActorFixture.Scripted.new(), [[&"bolt"], [&"mend", &"bolt"]])
+	var bolt: int = world.spells.current_tag(wizard.id, 0)
+	var mend: int = world.spells.current_tag(wizard.id, 1)
+	check(bolt != 0 and mend != 0, "the wizard's two spells have tags (%d, %d)" % [bolt, mend])
+	var kinds: Array[StringName] = [&"health", &"hurtbox"]
+	var shapes: Dictionary = {}
+	var damages: Array[float] = []
+	var body: Actor = world.actor(Vector2(40.0, 0.0), kinds, ActorFixture.Scripted.new())
+	_ask(world, body, bolt, shapes, "plain")
+	_ask(world, body, 0, shapes, "no spell")
+	_ask(world, body, mend, shapes, "a heal")
+	var plain := HitRoom.new()
+	Oracle.answer(world.combat, body, bolt, -1, plain)
+	damages.append(plain.damage)
+	wizard.stats.power = 2.0
+	_ask(world, body, bolt, shapes, "a caster of power 2")
+	Oracle.answer(world.combat, body, bolt, -1, plain)
+	damages.append(plain.damage)
+	wizard.stats.power = 1.0
+	var hexed: Actor = world.actor(Vector2(80.0, 0.0), kinds, ActorFixture.Scripted.new())
+	world.combat.apply_status(wizard.id, hexed, world.combat.HEX, 5.0, 40.0)
+	_ask(world, hexed, bolt, shapes, "hexed")
+	Oracle.answer(world.combat, hexed, bolt, -1, plain)
+	damages.append(plain.damage)
+	check(damages[1] == damages[0] * 2.0 and damages[2] > damages[0], "power and the hex change the damage told (%s)" % [damages])
+	var shielded: Actor = world.actor(Vector2(120.0, 0.0), kinds, ActorFixture.Scripted.new())
+	world.combat.give_shield(shielded, 2, 5.0)
+	_ask(world, shielded, bolt, shapes, "shielded")
+	var spares: Actor = world.actor(Vector2(160.0, 0.0), kinds, ActorFixture.Scripted.new())
+	world.combat.give_barrier(spares, 3, 5.0, bolt)
+	_ask(world, spares, bolt, shapes, "a barrier sparing the spell asked about")
+	var other: Actor = world.actor(Vector2(200.0, 0.0), kinds, ActorFixture.Scripted.new())
+	world.combat.give_barrier(other, 3, 5.0, mend)
+	_ask(world, other, bolt, shapes, "a barrier sparing another spell")
+	var protected: Actor = world.actor(Vector2(240.0, 0.0), kinds, ActorFixture.Scripted.new())
+	protected.health.protect(5.0)
+	_ask(world, protected, bolt, shapes, "protected")
+	var invincible: Actor = world.actor(Vector2(280.0, 0.0), kinds, ActorFixture.Scripted.new())
+	invincible.health.invincible = true
+	_ask(world, invincible, bolt, shapes, "invincible")
+	var depleted: Actor = world.actor(Vector2(320.0, 0.0), kinds, ActorFixture.Scripted.new())
+	depleted.health.lose(depleted.health.health)
+	_ask(world, depleted, bolt, shapes, "depleted")
+	var down: Actor = world.actor(Vector2(360.0, 0.0), kinds, ActorFixture.Scripted.new())
+	down.set_down(true)
+	_ask(world, down, bolt, shapes, "down (%s)" % down.is_down())
+	var no_health: Actor = world.actor(Vector2(400.0, 0.0), [&"hurtbox"] as Array[StringName], ActorFixture.Scripted.new())
+	_ask(world, no_health, bolt, shapes, "no Health")
+	var stone := own(Node2D.new()) as Node2D
+	root.add_child(stone)
+	world.combat.register_actor(stone, 20.0)
+	_ask(world, stone, bolt, shapes, "a plain body")
+	_ask(world, own(Node2D.new()) as Node2D, bolt, shapes, "a stranger")
+	for shape: String in ["unknown", "health only", "damage", "charges"]:
+		check(int(shapes.get(shape, 0)) > 0, "an answer of %s came up (%s)" % [shape, shapes])
 	world.free_all()

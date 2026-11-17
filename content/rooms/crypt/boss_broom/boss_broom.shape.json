@@ -1,0 +1,22 @@
+{
+	"about": "The broom's hall (docs/milestones/crypt-rework.md, CR7): a floating slab of the crypt's flagstones hanging in the dark, its edge a broken lip (crypt_edge) and an invisible wall (its void a wall). The Old Broom keeps the middle of its hall swept: dust over the whole hall, then a swept ring of clean stone with the strokes of its bristles round the middle, the dust left lying in drifts round it and against the slab's edge; no pit (the boss never falls); bays where the slab runs out; the floor pushed out round every spawn, pillar, heap and decal. tools/ground_shape.py draws boss_broom_ground.tscn and its art from this.",
+	"size": [832, 512],
+	"seed": 21,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 48,
+		"wander": [10, 14],
+		"rough": [52, 19, 6],
+		"seed": 5,
+		"bays": [[36, 248, 22], [796, 140, 20], [560, 476, 20], [252, 36, 18]],
+		"clear": {"round": 28, "of": ["PlayerSpawns", "EnemySpawns", "Props", "Decor"]}
+	},
+	"areas": [
+		{"ground": "dust", "centre": [416, 256], "radii": [600, 400], "seed": 3},
+		{"ground": "swept", "centre": [416, 262], "radii": [258, 150], "rough": [[80, 0.06], [26, 0.05], [9, 0.025]], "seed": 6}
+	]
+}

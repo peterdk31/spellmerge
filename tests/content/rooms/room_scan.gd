@@ -81,8 +81,10 @@ static func scripts_below(node: Node) -> int:
 ## docs/milestones/crypt-rework.md, the owner's second round), one line each: its floor the ground
 ## drawn from its shape with no wall art (its edge an invisible wall over the dark), its own `Void`
 ## behind the slab, a crypt room's `ambient` (rule 6), its floor-mark and debris colours named (rule
-## 9), at least `pillars` `crypt_pillar` props, its two exits `crypt_gate` props and no old exit.
-static func floating_room_problems(room: RoomBase, root: Node, pillars: int) -> PackedStringArray:
+## 9), at least `pillars` `crypt_pillar` props, its exits `gates` `crypt_gate` props (a fight room's
+## two; none in a room that leads nowhere, as a boss's hall: cleared, the run is won) and no old exit.
+## Its other props (a boss hall's dust heaps) are its own.
+static func floating_room_problems(room: RoomBase, root: Node, pillars: int, gates: int = 2) -> PackedStringArray:
 	var problems: PackedStringArray = PackedStringArray()
 	var ground: Node = root.get_node_or_null("Floor")
 	if ground == null or not ground.has_meta(&"ground_inputs"):
@@ -102,8 +104,8 @@ static func floating_room_problems(room: RoomBase, root: Node, pillars: int) -> 
 		ids[id] = ids.get(id, 0) + 1
 	if ids.get(&"crypt_pillar", 0) < pillars:
 		problems.append("%d crypt_pillar props, not at least %d" % [ids.get(&"crypt_pillar", 0), pillars])
-	if ids.get(&"crypt_gate", 0) != 2:
-		problems.append("%d crypt gates, not its two exits" % ids.get(&"crypt_gate", 0))
+	if ids.get(&"crypt_gate", 0) != gates:
+		problems.append("%d crypt gates, not its %d exits" % [ids.get(&"crypt_gate", 0), gates])
 	if ids.get(&"room_exit", 0) != 0:
 		problems.append("an old exit stands in it")
 	return problems

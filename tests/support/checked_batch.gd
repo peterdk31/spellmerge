@@ -14,11 +14,25 @@ var combat: CombatScript
 var manager: ManagerScript
 ## Entries checked, and each one that differed.
 var checked: int = 0
+## Rooms and spells' damage asked again within a pass, after an event moved the count.
+var asked_again: int = 0
 var differ: Array[String] = []
 ## How many entries the oracle answered with each shape: unknown, health only (no damage), damage,
 ## charges.
 var shapes: Dictionary = {}
 var _told: Oracle.Answer = Oracle.Answer.new()
+
+
+func keep_room(t: int, sent: int) -> void:
+	if _room_pass[t] == _pass:
+		asked_again += 1
+	super(t, sent)
+
+
+func keep_damage(spell: int, sent: int) -> void:
+	if not _spell_key.is_empty() and _spell_pass[_spell_find(spell)] == _pass:
+		asked_again += 1
+	super(spell, sent)
 
 
 func take_room(entry: int, spell_damage: float) -> void:

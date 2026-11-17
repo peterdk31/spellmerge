@@ -82,6 +82,17 @@ func test_a_spell_that_does_not_meet_the_barrier_counts_damage_at_once() -> void
 	check(not batch.takes(2), "the spared spell's two hits dealt 20 of 15")
 
 
+## The barrier's charges are taken from the room only for a spell that meets them: a spared spell's
+## entry, its room telling no charges, leaves them, so the first spell's next hit still takes one.
+func test_a_spared_spells_entry_leaves_the_barriers_charges() -> void:
+	var a: int = _first(2, 0, 11, 0, 15.0, 10.0, 2)
+	_first(2, 0, 12, 1, 15.0, 10.0, 0)
+	check(batch.takes(2), "a charge took the first hit, the spared spell's dealt 10 of 15")
+	batch.add_to(2, 0, 11, false, flags, ALONE)
+	check(batch.takes(2), "the first spell's second hit took the second charge")
+	check(a == 0 and batch.takes(2), "still alive")
+
+
 func test_a_new_pass_forgets_the_last_ones_tallies() -> void:
 	var a: int = _first(2, 0, 11, 0, 5.0, 10.0)
 	check(not batch.takes(2), "killed in this pass")

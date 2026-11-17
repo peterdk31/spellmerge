@@ -144,5 +144,12 @@ func test_a_room_without_a_yard_stands_none() -> void:
 	root.get_node("Events").emit_signal("play_requested", 0)
 	check(flow.mode == FlowScript.MODE_RUN and flow.world != null, "a run of rooms")
 	check(flow.yard_props().is_empty(), "no yard there")
+	# The room's own props are its placements (a crypt room's pillars have no role since crypt rework
+	# CR3/CR4), so each one standing is one of its own, never a yard's extra.
+	var room: RoomBase = _registry.get_resource(&"rooms", flow.room_id) as RoomBase
+	var own_ids: Array[StringName] = []
+	for prop: Resource in room.places().placed_of(PropBase):
+		own_ids.append((prop as PropBase).id)
+	check_equal(flow.room_props().size(), own_ids.size(), "%s stands its own props and no more" % flow.room_id)
 	for body: Node in flow.room_props():
-		check((body as Actor).prop.role != &"", "only the room's own props (%s), none of the yard's" % (body as Actor).prop.id)
+		check(own_ids.has((body as Actor).prop.id), "only the room's own props (%s), none of the yard's" % (body as Actor).prop.id)

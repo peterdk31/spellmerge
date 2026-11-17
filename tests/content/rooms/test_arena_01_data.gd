@@ -32,26 +32,10 @@ func test_spawn_groups_hold_only_markers() -> void:
 		check(RoomScan.only_markers(room_root, group), "%s holds only Marker2D nodes" % group)
 
 
+## A floating room drawn from its shape, its own Void behind the slab, its five pillars props and its
+## exits gates (`RoomScan.floating_room_problems`).
 func test_it_is_a_floating_room_drawn_from_its_shape() -> void:
-	var room: RoomBase = RoomData
-	var ground: Node = room_root.get_node_or_null("Floor")
-	check(ground != null and ground.has_meta(&"ground_inputs"), "its floor is the ground drawn from arena_01.shape.json")
-	check(ground != null and ground.get_node_or_null("Walls/WallArt") == null, "no wall art: its edge is an invisible wall over the dark")
-	var void_art: Sprite2D = room_root.get_node_or_null("Void") as Sprite2D
-	check(void_art != null and ground != null and void_art.z_index < (ground as CanvasItem).z_index, "its own Void is drawn behind the slab")
-	check_equal(room.ambient, 0.8, "a crypt room's ambient (rule 6)")
-	check(room.floor_mark_colors.size() > 0 and room.debris_colors.size() > 0, "it names its floor-mark and debris colours (rule 9)")
-
-
-func test_its_pillars_are_props_and_its_exits_gates() -> void:
-	var places: RoomPlaces = (RoomData as RoomBase).places()
-	var ids: Dictionary[StringName, int] = {}
-	for prop: Resource in places.placed_of(PropBase):
-		var id: StringName = (prop as PropBase).id
-		ids[id] = ids.get(id, 0) + 1
-	check(ids.get(&"crypt_pillar", 0) >= 4, "its pillars are crypt_pillar props (%d)" % ids.get(&"crypt_pillar", 0))
-	check_equal(ids.get(&"crypt_gate", 0), 2, "its two exits are crypt gates")
-	check_equal(ids.get(&"room_exit", 0), 0, "no old exit stands in it")
+	check_equal(RoomScan.floating_room_problems(RoomData as RoomBase, room_root, 4), PackedStringArray(), "a floating room")
 
 
 func test_its_landmark_stands_under_the_shaft() -> void:

@@ -33,23 +33,23 @@ func _first(t: int, who: int, spell: int, shot: int, health: float, damage: floa
 
 func test_a_spells_hits_on_a_body_are_one_entry_and_each_caster_and_spell_its_own() -> void:
 	var a: int = _first(1, 0, 11, 0, 100.0, 1.0)
-	check_equal(batch.entry_of(1, 0, 11, false, flags, ALONE), a, "the same caster and spell adds to it")
-	check_equal(batch.entry_of(1, 0, 12, false, flags, ALONE), -1, "another spell is a new one")
-	check_equal(batch.entry_of(1, 1, 11, false, flags, ALONE), -1, "another caster is a new one")
-	check_equal(batch.entry_of(2, 0, 11, false, flags, ALONE), -1, "another body is a new one")
+	check_equal(batch.add_to(1, 0, 11, false, flags, ALONE), a, "the same caster and spell adds to it")
+	check_equal(batch.add_to(1, 0, 12, false, flags, ALONE), -1, "another spell is a new one")
+	check_equal(batch.add_to(1, 1, 11, false, flags, ALONE), -1, "another caster is a new one")
+	check_equal(batch.add_to(2, 0, 11, false, flags, ALONE), -1, "another body is a new one")
 	batch.count_hit(a)
 	var b: int = _first(1, 0, 12, 1, 100.0, 1.0)
-	check_equal(batch.entry_of(1, 0, 12, false, flags, ALONE), b, "the second entry on the body is found down its chain")
-	check_equal([batch.entries, batch.count[a], batch.count[b], batch.target[b], batch.seq[b]], [2, 2, 1, 1, 101], "two entries, the first standing for two hits")
+	check_equal(batch.add_to(1, 0, 12, false, flags, ALONE), b, "the second entry on the body is found down its chain")
+	check_equal([batch.entries, batch.count[a], batch.count[b], batch.target[b], batch.seq[b]], [2, 3, 2, 1, 101], "two entries: the hits added and counted to each, none to a miss")
 
 
 func test_a_shot_alone_is_never_merged() -> void:
 	var alone: int = _first(1, 0, 11, 3, 100.0, 1.0)
-	check_equal(batch.entry_of(1, 0, 11, false, flags, ALONE), -1, "no hit adds to a shot alone's entry")
-	check_equal(batch.entry_of(1, 0, 11, true, flags, ALONE), -1, "nor does a shot alone add to any")
+	check_equal(batch.add_to(1, 0, 11, false, flags, ALONE), -1, "no hit adds to a shot alone's entry")
+	check_equal(batch.add_to(1, 0, 11, true, flags, ALONE), -1, "nor does a shot alone add to any")
 	var other: int = _first(1, 0, 11, 0, 100.0, 1.0)
 	check(other != alone, "a shot of the same spell opens its own entry beside it")
-	check_equal(batch.entry_of(1, 0, 11, false, flags, ALONE), other, "and the spell's later hits add to that one")
+	check_equal(batch.add_to(1, 0, 11, false, flags, ALONE), other, "and the spell's later hits add to that one")
 
 
 func test_a_body_is_killed_when_the_counted_damage_reaches_its_health() -> void:
@@ -87,7 +87,7 @@ func test_a_new_pass_forgets_the_last_ones_tallies() -> void:
 	batch.empty()
 	batch.open(4, 8)
 	check(batch.takes(2), "a new pass: alive again")
-	check_equal(batch.entry_of(2, 0, 11, false, flags, ALONE), -1, "and its entries are gone")
+	check_equal(batch.add_to(2, 0, 11, false, flags, ALONE), -1, "and its entries are gone")
 	check(a == 0 and batch.entries == 0, "the entries start again from 0")
 
 
@@ -110,6 +110,6 @@ func test_the_tables_grow_past_their_first_size() -> void:
 	for n in 70:
 		_first(n % 4, n, 11, 0, 100.0, 1.0)
 	check_equal(batch.entries, 70, "seventy entries")
-	check_equal(batch.entry_of(1, 69, 11, false, flags, ALONE), 69, "the last found on its body's chain")
+	check_equal(batch.add_to(1, 69, 11, false, flags, ALONE), 69, "the last found on its body's chain")
 	batch.fit_targets(6)
 	check(batch.takes(5), "a target added during the pass has a row")

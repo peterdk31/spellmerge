@@ -6896,11 +6896,9 @@ func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: i
 ## to the caster's hits on it with the same tag, or the first of them, for which Combat is asked
 ## what one hit of the spell takes off the body and what it has (once a pass).
 func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, heading: Vector2) -> void:
-	var entry: int = _hit_batch.entry_of(target, caster, tag, (_flags[slot] & F_ALONE) != 0, _flags, F_ALONE)
-	if entry >= 0:
-		_hit_batch.count_hit(entry)
+	if _hit_batch.add_to(target, caster, tag, (_flags[slot] & F_ALONE) != 0, _flags, F_ALONE) >= 0:
 		return
-	entry = _hit_batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot])
+	var entry: int = _hit_batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot])
 	_hit_batch.room.clear()
 	events.hit_room_asked.emit(caster, _targets[target], tag, slot, _hit_batch.room)
 	_hit_batch.take_room(entry)
@@ -6960,13 +6958,27 @@ func _end_spent_at(i: int) -> bool:
 func _send_merged() -> void:
 	# Each read anew, so a handler's `clear()` (every count to 0) stops what is left.
 	var batch: HitBatch = _hit_batch
+	# The entries' arrays read once (a member of another object costs a lookup at each read): no entry
+	# is added or changed while they are sent, merging being off.
+	var targets: PackedInt32Array = batch.target
+	var slots: PackedInt32Array = batch.slot
+	var seqs: PackedInt64Array = batch.seq
+	var casters: PackedInt32Array = batch.caster
+	var points: PackedVector2Array = batch.at
+	var headings: PackedVector2Array = batch.heading
+	var tags: PackedInt64Array = batch.tag
+	var cards: Array[StringName] = batch.card
+	var bodies: PackedInt32Array = batch.body
+	var cores: PackedColorArray = batch.core
+	var looks: PackedInt32Array = batch.look
+	var counts: PackedInt32Array = batch.count
 	var entry: int = 0
 	while entry < batch.entries:
-		var target: int = batch.target[entry]
+		var target: int = targets[entry]
 		var node: Variant = _targets[target] if target < _targets.size() else null
 		if events != null and node != null and is_instance_valid(node):
-			var shot: int = batch.slot[entry] if _seq[batch.slot[entry]] == batch.seq[entry] else -1
-			_send_hit(batch.caster[entry], node, batch.at[entry], batch.heading[entry], batch.tag[entry], shot, batch.card[entry], batch.body[entry], batch.core[entry], batch.look[entry], batch.count[entry])
+			var shot: int = slots[entry] if _seq[slots[entry]] == seqs[entry] else -1
+			_send_hit(casters[entry], node, points[entry], headings[entry], tags[entry], shot, cards[entry], bodies[entry], cores[entry], looks[entry], counts[entry])
 		entry += 1
 	batch.forget_entries()
 	for i in batch.held_count():

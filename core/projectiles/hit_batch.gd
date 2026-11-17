@@ -97,22 +97,27 @@ func takes(t: int) -> bool:
 	return not (t < _target_pass.size() and _target_pass[t] == _pass and _spent[t] >= _health[t])
 
 
-## The entry of `who`'s spell `spell` on target `t` a hit of a shot adds to, or -1 for a new one.
-## A shot that hits alone (`alone`), and an entry whose shot does (`flags` of its slot, the
+## A hit of `who`'s spell `spell` on target `t` added to its entry of the pass (one more hit,
+## counted off the target's room: `count_hit`), which is returned; -1, counting nothing, when it has
+## none yet. A shot that hits alone (`alone`), and an entry whose shot does (`flags` of its slot, the
 ## manager's shot flags, `alone_flag` the bit), add to none. The slot's flags are read now, as the
 ## kernel reads them, not kept at `add`: a slot taken back at the cap may hold another shot by now.
-func entry_of(t: int, who: int, spell: int, alone: bool, flags: PackedInt32Array, alone_flag: int) -> int:
+## One call a hit, the lookup and the count in it (the hit pass's hottest call).
+func add_to(t: int, who: int, spell: int, alone: bool, flags: PackedInt32Array, alone_flag: int) -> int:
 	if alone or t >= _target_pass.size() or _target_pass[t] != _pass:
 		return -1
 	var entry: int = _head[t]
 	while entry >= 0:
 		if caster[entry] == who and tag[entry] == spell and (flags[slot[entry]] & alone_flag) == 0:
+			count[entry] += 1
+			_spend_room(t, entry)
 			return entry
 		entry = _next[entry]
 	return -1
 
 
-## One more hit of `entry` on its target, counted off the target's room.
+## One more hit of `entry` on its target, counted off the target's room: what `add_to` does to the
+## entry it finds, and the kernel to an entry it adds a hit to.
 func count_hit(entry: int) -> void:
 	count[entry] += 1
 	_spend_room(target[entry], entry)

@@ -54,7 +54,7 @@ Chosen by the owner on 2026-11-04, so online co-op can be added ([docs/milestone
 
 ## What makes it fun
 
-- **Game feel from day 1:** every hit has hit-stop, screen shake, knockback, particles and sound.
+- **Game feel from day 1:** every hit has hit-stop, screen shake, knockback, particles and sound. A step's hits of one spell on one body are one hit, with one of each (the owner, 2026-11-17).
 - **Meaningful choices:** every reward offers 3 options with trade-offs.
 - **Surprising combos:** components interact across systems; every new component needs at least 2 interesting interactions.
 - **Growing power fantasy:** weak at the start, overpowered by the end.

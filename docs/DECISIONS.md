@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-17: the owner's answers on the hit batch and the prototypes (owner)
+
+- **Q1, one hit model: merged hits only.** A step's shot hits of one caster's spell on one body are one hit (`impact_count` the hits): one hit-stop, one knockback, one look, one sound. This replaces the decision of 2026-11-07 against bundled hits (shot-scale.md, H3b) and DESIGN's "every hit has hit-stop..." now says a merged hit is one hit. Part A of docs/milestones/hit-batch.md goes ahead: the unmerged mode, its switches and the kernel's unmerged path go (A3b).
+- **Q2, the recordings: recorded again once**, on today's merged GDScript (A0), before any other part of A; every later part is held to them.
+- **Q3, the prototypes: both kept.** Enemies think every third tick, staggered (`AIController.THINK_EVERY`), and bodies' looks are stepped once a drawn frame and not off screen (`Tick.looks_per_frame`). They stay in the game as they are.
+- **Q4, the room grid stays the projectile manager's member** (`Projectiles.grid()`), not an autoload.
+
 ## 2026-11-17: one impact look a spot of wall per staff a frame (Feel, performance)
 
 - **Measured first** (stress desktop, a probe per branch of Feel's `projectile_impact`): shots ending on walls were its costliest part, about 51 a tick at 17 us each, uncapped, against bodies' about 41 shown at 12 us and 42 capped at 2 us (one look per body and staff a frame, 2026-11-08).

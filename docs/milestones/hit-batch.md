@@ -1,6 +1,6 @@
 # Hit batch and the room grid: two refactors after the performance pass
 
-**Status: proposed on 2026-11-17, waiting for the owner; revised the same day after its review.** Asked by the owner on 2026-11-17 ("Consider if a refactor is worth doing. Maybe something is much too cluttered now. Can we think of a better architecture?"), after the performance pass of 2026-11-16 and 2026-11-17 (docs/DECISIONS.md, the entries of those days). Two parts, each its own PRs: **A, the hit batch** (one hit model, its state out of the projectile manager) and **B, the room grid** (walls, holes, footprints and their queries as a class of their own). Part A starts only once the owner has answered Q1 and Q2 ("For the owner"); part B needs no decision and may start at once.
+**Status: approved by the owner on 2026-11-17 (Q1: merged hits only; Q2: record again; Q3: both prototypes kept; Q4: the grid stays the manager's member; docs/DECISIONS.md). B1 and B2 done; part A in progress.** Proposed on 2026-11-17 and revised the same day after its review. Asked by the owner on 2026-11-17 ("Consider if a refactor is worth doing. Maybe something is much too cluttered now. Can we think of a better architecture?"), after the performance pass of 2026-11-16 and 2026-11-17 (docs/DECISIONS.md, the entries of those days). Two parts, each its own PRs: **A, the hit batch** (one hit model, its state out of the projectile manager) and **B, the room grid** (walls, holes, footprints and their queries as a class of their own). Part A starts only once the owner has answered Q1 and Q2 ("For the owner"); part B needs no decision and may start at once.
 
 ## Why
 
@@ -125,7 +125,9 @@ B1 first (no decision needed), then, once Q1 and Q2 are answered, A0, A1, A2, A3
 
 The desktop stress run after the performance pass (2026-11-17, the cloud machine, after the native merge and the wall-spot cap): a tick of about 16.8 ms, of it the projectile manager about 7 ms and 155-169 hand-backs a tick. A2 and A4 together are expected to bring the hand-backs to about half and the tick down by about 1 ms; A0, A1, A3, B1 and B2 by nothing (they are cleaner code, not faster). Each PR prints its numbers; a part slower by more than the machine's noise (about 15%) is looked at before it merges.
 
-## For the owner
+## For the owner (answered 2026-11-17)
+
+The owner's answers: Q1 merged hits only; Q2 yes, record again at A0; Q3 keep both prototypes; Q4 the grid stays the manager's member. The questions as they were asked:
 
 - **Q1: one hit model.** The game would only merge hits, as it does now; the unmerged mode goes. This replaces the decision of 2026-11-07 against bundled hits (DECISIONS; shot-scale.md, H3b), already reversed in practice by the prototype of 2026-11-17. It touches DESIGN's "Game feel from day 1: every hit has hit-stop, screen shake, knockback, particles and sound": a step's hits of one spell on one body get one hit-stop, one knockback, one look and one sound. If the owner wants hits one by one back instead, A is not done and the merge is removed.
 - **Q2: the recordings.** May the two recordings be recorded again once, on today's merged GDScript (A0), before any other part of A?

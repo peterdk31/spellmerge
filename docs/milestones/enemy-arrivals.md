@@ -1,6 +1,6 @@
 # Enemy arrivals: a room's enemies come in groups, and each one is seen coming
 
-**Status (2026-11-17): a plan, waiting for the owner's answers to the questions at the end.** The owner asked: "A room should not spawn every enemy at once. And we need an animation when an enemy spawns in."
+**Status (2026-11-17): a plan; the owner answered its four questions (the end of this document).** The owner asked: "A room should not spawn every enemy at once. And we need an animation when an enemy spawns in."
 
 This changes one line of decision 30 (docs/milestones/boss-old-broom.md: "A room starts with its enemies standing"). The rest of decision 30 stays: there are still no waves. A room still holds a fixed list of enemies that the run's map picks, and it is cleared when the last of them is down. The only change is that they come in over the fight instead of all standing at the start. Nothing grows, and nothing comes after the list is used up.
 
@@ -8,7 +8,7 @@ This changes one line of decision 30 (docs/milestones/boss-old-broom.md: "A room
 
 - **Readable chaos (pillar 4).** With `room_budget = 16` in the crypt (content/runs/crypt.tres, then scaled up by depth and players), a deep room can have a dozen bodies standing at its spawns in the first frame. Groups keep the number on screen readable, and the arrival look gives each new body a short warning before it can act.
 - **Smooth (docs/STYLE.md, "Smooth").** Today an enemy pops in, which the Smooth rule doesn't allow: "nothing on screen changes its look in one jump". Its arrival plays frames (at least 3 a stage, by whole pixels, with no fade).
-- **Nobody waits (pillar 2).** The next group comes when the room gets quiet **or** when a timer runs out, whichever is first. A party that fights slowly isn't punished by a flood, and a fast party never stands in an empty room waiting.
+- **Nobody waits (pillar 2).** The next group comes as soon as the room gets quiet (the owner, 2026-11-17: only then, no timer). A party that fights slowly isn't punished by a flood, and a fast party never stands in an empty room waiting: the next group is already rising as the last bodies fall.
 
 ## How it plays
 
@@ -20,11 +20,9 @@ This changes one line of decision 30 (docs/milestones/boss-old-broom.md: "A room
    - spells pass through it.
 
    It does count as one of the room's enemies, so the room can't be cleared while it is arriving.
-3. **The next group** starts arriving when either of these happens first:
-   - the cost of the enemies still standing (or arriving) drops to `refill_at` or below, or
-   - `gap` seconds have passed since the last group started.
+3. **The next group** starts arriving when the cost of the enemies still standing (or arriving) drops to `refill_at` or below. There is no timer (the owner, 2026-11-17).
 
-   A group takes enemies from the front of the list until its cost reaches `group`. It always takes at least one enemy, so an enemy that costs more than a group still comes. (With these two triggers, at most `refill_at + group` of cost is on the floor from the quiet trigger, so a separate cap only matters for the timer: question 1.)
+   A group takes enemies from the front of the list until its cost reaches `group`. It always takes at least one enemy, so an enemy that costs more than a group still comes. This also caps the floor: at most `refill_at + group` of cost stands at once (plus one enemy past the group's cost), so no separate cap is needed.
 4. **Where:** at the room's enemy spawns, as now (`stacked_position`), but a group uses the spawns **farthest from every standing wizard** first. A body never starts arriving on top of a player. If a wizard walks onto the mark, the body still lands there, and the mark is the warning (contact damage starts only once it has landed).
 5. **Cleared:** when the list is used up and nothing is standing or arriving. The exits light as today.
 
@@ -49,11 +47,10 @@ Three pieces, one area each. They talk through `core/` events and the actor's st
   | --- | --- | --- |
   | `group_share` | 0.35 | the cost of one group, as a share of the room's scaled budget |
   | `refill_share` | 0.15 | the cost still standing that calls the next group, as a share of the room's scaled budget |
-  | `gap` | 8 s | the longest time between two groups |
-  | `stagger` | 0.15 s | the time between two bodies of one group starting to arrive, so a group ripples in instead of all popping at once (clamped below `gap`) |
+  | `stagger` | 0.15 s | the time between two bodies of one group starting to arrive, so a group ripples in instead of all popping at once |
 
-  It has `problems()`, as `EnemyAdds` does: shares outside 0 to 1, a non-finite or negative time, or a refill share not below the group share. The run definition's validator reports them (RG1's validators).
-- **The run hands Flow plain numbers**, not the Resource. A new event, `run_room_paced(group: int, refill_at: int, gap: float, stagger: float)` (core/events), is sent by the run just before `run_room_chosen`, the same way `run_room_scaled` already is. The run works out `group` and `refill_at` in cost from the shares and the room's scaled budget. Flow keeps them as its own numbers. Nothing in Flow reads the run's map, and no sub-resource sits in state.
+  It has `problems()`, as `EnemyAdds` does: shares outside 0 to 1, a non-finite or negative `stagger`, or a refill share not below the group share. The run definition's validator reports them (RG1's validators).
+- **The run hands Flow plain numbers**, not the Resource. A new event, `run_room_paced(group: int, refill_at: int, stagger: float)` (core/events), is sent by the run just before `run_room_chosen`, the same way `run_room_scaled` already is. The run works out `group` and `refill_at` in cost from the shares and the room's scaled budget. Flow keeps them as its own numbers. Nothing in Flow reads the run's map, and no sub-resource sits in state.
 
 ### 2. The simulation: arriving is a state of the actor (gameplay/actor)
 
@@ -77,8 +74,8 @@ This stays on `Actor` instead of becoming a component so that it sits right next
 
 - **State** (all saved in snapshots):
   - `waiting: Array[StringName]`: the ids not yet called, with their costs;
-  - `group`, `refill_at`, `gap`, `stagger`: the numbers from `run_room_paced`;
-  - `gap_left`, `stagger_left`, `group_left`: the timers, and the bodies of the current group still to start;
+  - `group`, `refill_at`, `stagger`: the numbers from `run_room_paced`;
+  - `stagger_left`, `group_left`: the time to the group's next body, and the bodies of the current group still to start;
   - `placed: int`: the spawn counter, which today is a local in `_stand_room_enemies`.
 - `begin(ids, costs, ...)`; `next(delta, standing_cost) -> StringName` (the next id to stand this tick, or `&""`); `is_done()`; `clear()`.
 - `static pick_spawn(spawns, wizards, placed, touches_hole) -> Vector2`: the spawn farthest from every wizard, ties broken by index, then `stacked_position` for a spawn used again. It uses state only, so it gives the same answer on every machine.
@@ -112,7 +109,7 @@ Later, an enemy could pick its own look (`EnemyBase.arrival`, for example an imp
 | EA2 | **The look:** `ArriveLook` in Feel (the y-sort and light check first), the mark and the rise, motes, the cue. Tests: at least 3 frames per stage, whole pixels, drawn from state alone (a restored snapshot mid-arrival), nothing allocated per frame | gameplay/feel, audio, tests |
 | EA3 | **Every non-boss enemy arrives:** `_stand_enemy(..., arrive)`, room enemies and adds arrive (still all at once), bosses don't. This removes the pop before the pacing lands. Tests: the boss stands at once and its intro opens (test_boss_intro_hold.gd); the flow tests step past the arrival | gameplay/flow, tests |
 | EA4 | **The rules:** `ArrivalRules`, `MapRules.arrivals`, `problems()` and the run validator, `run_room_paced` sent by the run, the crypt's numbers | core/base, core/events, gameplay/run, content/runs, tests |
-| EA5 | **Groups:** `RoomArrivals`, Flow's queue, the far-spawn pick, room cleared only when the queue is empty, a failed id dropped. Tests: group sizes by cost and scale, the quiet and timer triggers, an expensive enemy still comes, snapshot between groups and mid-arrival, cleared only at the end, never stuck | gameplay/flow, tests |
+| EA5 | **Groups:** `RoomArrivals`, Flow's queue, the far-spawn pick, room cleared only when the queue is empty, a failed id dropped. Tests: group sizes by cost and scale, the quiet trigger (and no group while the floor is busy, however long), an expensive enemy still comes, snapshot between groups and mid-arrival, cleared only at the end, never stuck | gameplay/flow, tests |
 | EA6 | **Tune** in the owner's playtest: the numbers in content/runs/crypt.tres only | content/runs |
 
 EA1 to EA3 can ship as one PR (the look, with no pacing change). EA4 and EA5 are a second PR. Each step updates the README of its area (gameplay/actor, gameplay/feel, gameplay/flow, gameplay/run, content/runs, core/events) and Flow's class doc.
@@ -124,9 +121,9 @@ EA1 to EA3 can ship as one PR (the look, with no pacing change). EA4 and EA5 are
 - `test_content_determinism.gd` plays every enemy twice. It should pass as it is, because the arrival is deterministic state.
 - The online bots (`tools/online_*.sh`) clear rooms by playing them. They only take longer.
 
-## Questions for the owner
+## The owner's answers (2026-11-17)
 
-1. **The pace:** the next group comes when the room gets quiet *or* after `gap` seconds (8 s), whichever is first (recommended). Or only when the room gets quiet? If the timer stays, should it also be capped (no new group while more than some share of the budget is standing)? Recommended: no cap for now, and tune `gap` first.
-2. **Groups by cost or by count?** By cost (recommended): an imp counts for more than a mite, the same measure the room's budget already uses. By count is simpler to read in the data.
-3. **Adds and the arrival:** should a boss's phase adds play the arrival too (recommended: yes, so nothing pops)? Or should they stand at once, as a burst?
-4. **The look:** a mark on the floor, then the body rising out of it (recommended, it fits the crypt). Or something else you have in mind, such as a crack, a summoning circle or a drop from above?
+1. **The pace:** only when the room gets quiet. No timer.
+2. **Group size:** by cost, the measure the room's budget already uses.
+3. **Boss adds:** they play the arrival too, so nothing pops in.
+4. **The look:** a mark on the floor, then the body rising out of it.

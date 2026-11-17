@@ -143,6 +143,7 @@ const EVENTS: Dictionary = {
 	&"run_ended": [["victory", TYPE_BOOL]],
 	&"run_begun": [["run_id", TYPE_STRING_NAME], ["players", TYPE_INT], ["start_depth", TYPE_INT]],
 	&"run_room_scaled": [["scale", TYPE_FLOAT]],
+	&"run_room_paced": [["group", TYPE_INT], ["refill_at", TYPE_INT], ["stagger", TYPE_FLOAT]],
 	&"run_room_chosen": [["room_id", TYPE_STRING_NAME], ["enemies", TYPE_ARRAY], ["ways", TYPE_ARRAY]],
 	&"run_way_taken": [["way", TYPE_INT]],
 	&"run_map_changed": [["rows", TYPE_PACKED_INT32_ARRAY], ["kinds", TYPE_ARRAY], ["links", TYPE_ARRAY], ["at", TYPE_INT]],
@@ -173,7 +174,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"run_begun", &"run_room_scaled", &"run_room_chosen", &"run_way_taken", &"run_map_changed", &"room_left", &"room_exits_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"lectern_changed", &"start_depth_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
+	&"run_started", &"run_ended", &"run_begun", &"run_room_scaled", &"run_room_paced", &"run_room_chosen", &"run_way_taken", &"run_map_changed", &"room_left", &"room_exits_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"lectern_changed", &"start_depth_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"loading_started", &"loading_progressed", &"loading_finished",
 	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",

@@ -370,13 +370,20 @@ signal run_ended(victory: bool)
 ## start, the same on every machine and in every replay; RG5), starting at `start_depth` (the hub's
 ## lectern, run generation RG7: 0 for the map's first room; the run definition's `start_depths()`
 ## less one for its last row; `RunMap.start_at`). Heard by run, which makes the run's map and answers
-## with `run_room_scaled` and `run_room_chosen` for the room the party enters.
+## with `run_room_scaled`, `run_room_paced` and `run_room_chosen` for the room the party enters.
 signal run_begun(run_id: StringName, players: int, start_depth: int)
 ## Sender: run. The room of the run's map the party enters is `scale` times harder than the run's
 ## first room with one player (run generation RG5: its depth and the run's players, the run
 ## definition's `scaling`), sent before `run_room_chosen`. Heard by difficulty, which scales every
 ## enemy and boss that stands in it (`enemy_standing`).
 signal run_room_scaled(scale: float)
+## Sender: run. How the enemies of the room the party enters come in (enemy arrivals EA4,
+## docs/milestones/enemy-arrivals.md): in groups of `group` cost (0: the whole list at once), the
+## next when the cost still standing or arriving drops to `refill_at` or below, the bodies of a group
+## `stagger` seconds apart. Plain costs: the run works them out from its biome's `ArrivalRules`
+## shares and the room's scaled budget. Sent after `run_room_scaled`, before `run_room_chosen`.
+## Heard by flow (`RoomArrivals`).
+signal run_room_paced(group: int, refill_at: int, stagger: float)
 ## Sender: run. The room of the run's map the party enters: the room template `room_id`
 ## (content/rooms), what stands in it (`enemies`: enemy and boss ids, one per body) and the kinds of
 ## the rooms it leads to (`ways`: `RoomKind` ids, left to right as the map's links; none for the

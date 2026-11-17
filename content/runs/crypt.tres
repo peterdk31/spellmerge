@@ -1,10 +1,11 @@
-[gd_resource type="Resource" script_class="RunDefinition" load_steps=10 format=3]
+[gd_resource type="Resource" script_class="RunDefinition" load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://core/base/run_definition.gd" id="1_run"]
 [ext_resource type="Script" path="res://core/base/map_rules.gd" id="2_rules"]
 [ext_resource type="Script" path="res://core/base/kind_rule.gd" id="3_kind"]
 [ext_resource type="Script" path="res://core/base/run_scaling.gd" id="4_scaling"]
 [ext_resource type="Script" path="res://core/base/scale_curve.gd" id="5_curve"]
+[ext_resource type="Script" path="res://core/base/arrival_rules.gd" id="6_arrivals"]
 
 [sub_resource type="Resource" id="fights"]
 script = ExtResource("3_kind")
@@ -21,6 +22,12 @@ max_per_row = 1
 max_per_run = 1
 required = false
 
+[sub_resource type="Resource" id="arrivals"]
+script = ExtResource("6_arrivals")
+group_share = 0.35
+refill_share = 0.15
+stagger = 0.15
+
 [sub_resource type="Resource" id="crypt"]
 script = ExtResource("2_rules")
 biome = &"crypt"
@@ -31,6 +38,7 @@ width_max = 3
 branches_min = 1
 branches_max = 2
 room_budget = 16
+arrivals = SubResource("arrivals")
 kinds = Array[ExtResource("3_kind")]([SubResource("fights"), SubResource("boss")])
 
 [sub_resource type="Resource" id="per_depth"]

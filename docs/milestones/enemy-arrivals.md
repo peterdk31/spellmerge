@@ -1,6 +1,6 @@
 # Enemy arrivals: a room's enemies come in groups, and each one is seen coming
 
-**Status (2026-11-17): EA1–EA3 done (every non-boss enemy arrives, all at once: a mark, then the body rises out of it); EA4–EA6 to come. The owner answered its four questions (the end of this document).** The owner asked: "A room should not spawn every enemy at once. And we need an animation when an enemy spawns in."
+**Status (2026-11-17): EA1–EA5 done (every non-boss enemy arrives, a mark, then the body rising out of it; a room's enemies come in groups by cost as the room gets quiet, at the crypt's starting numbers). EA6, tuning the numbers in the owner's playtest, is to come. The owner answered its four questions (the end of this document).** The owner asked: "A room should not spawn every enemy at once. And we need an animation when an enemy spawns in."
 
 This changes one line of decision 30 (docs/milestones/boss-old-broom.md: "A room starts with its enemies standing"). The rest of decision 30 stays: there are still no waves. A room still holds a fixed list of enemies that the run's map picks, and it is cleared when the last of them is down. The only change is that they come in over the fight instead of all standing at the start. Nothing grows, and nothing comes after the list is used up.
 
@@ -50,7 +50,7 @@ Three pieces, one area each. They talk through `core/` events and the actor's st
   | `stagger` | 0.15 s | the time between two bodies of one group starting to arrive, so a group ripples in instead of all popping at once |
 
   It has `problems()`, as `EnemyAdds` does: shares outside 0 to 1, a non-finite or negative `stagger`, or a refill share not below the group share. The run definition's validator reports them (RG1's validators).
-- **The run hands Flow plain numbers**, not the Resource. A new event, `run_room_paced(group: int, refill_at: int, stagger: float)` (core/events), is sent by the run just before `run_room_chosen`, the same way `run_room_scaled` already is. The run works out `group` and `refill_at` in cost from the shares and the room's scaled budget. Flow keeps them as its own numbers. Nothing in Flow reads the run's map, and no sub-resource sits in state.
+- **The run hands Flow plain numbers**, not the Resource. A new event, `run_room_paced(group: int, refill_at: int, stagger: float)` (core/events), is sent by the run just before `run_room_chosen`, the same way `run_room_scaled` already is. The run works out `group` and `refill_at` in cost from the shares and the room's scaled budget. Flow keeps them as its own numbers. Nothing in Flow reads the run's map, and no sub-resource sits in state. As built (EA4): the generator works each room's numbers out as it fills the room, where it already has the scaled budget (`RunGenerator._pace`), and keeps them on the room's map node (`RunNode.group`, `refill_at`, `stagger`, plain state like its `scale`); the run sends them as the party enters the room, after `run_room_scaled`. The costs are `ArrivalRules.group_cost(budget)` (rounded, 1 at least) and `refill_cost(budget)` (rounded, and clamped below the group's cost, so rounding in a small room can never make a group call the next at once). With no arrivals all three are 0, which Flow reads as the whole list at once.
 
 ### 2. The simulation: arriving is a state of the actor (gameplay/actor)
 
@@ -77,18 +77,19 @@ This stays on `Actor` instead of becoming a component so that it sits right next
   - `waiting: Array[StringName]`: the ids not yet called, with their costs;
   - `group`, `refill_at`, `stagger`: the numbers from `run_room_paced`;
   - `stagger_left`, `group_left`: the time to the group's next body, and the bodies of the current group still to start;
-  - `placed: int`: the spawn counter, which today is a local in `_stand_room_enemies`.
-- `begin(ids, costs, ...)`; `next(delta, standing_cost) -> StringName` (the next id to stand this tick, or `&""`); `is_done()`; `clear()`.
-- `static pick_spawn(spawns, wizards, placed, touches_hole) -> Vector2`: the spawn farthest from every wizard, ties broken by index, then `stacked_position` for a spawn used again. It uses state only, so it gives the same answer on every machine.
+  - `placed: int`, `order`: as built, the spawn counter is the current group's (reset as each group starts), and `order` the spawns in the order the group takes them.
+- `begin(ids, costs, ...)`; `next(delta, standing_cost) -> StringName` (the next id to stand this tick, or `&""`); `is_done()`; `left()`; `take_all()` (for `stand_all_now`); `clear()`.
+- As built, the plan's `pick_spawn` is two parts: `static rank(spawns, wizards, touches_hole) -> PackedInt32Array`, the spawns farthest from every wizard first, ties broken by index, those over a hole left out (unless every one is), and `spawn_for(spawns, wizards, touches_hole, stack)`, which ranks them as a group's first body is placed and gives each body of the group the next in turn, stacked (`stacked_position`) where one is used again within the group. Ranking once a group keeps the bodies of one group off each other's spawn as the wizards move during its ripple. Places only, so it gives the same answer on every machine.
 
 In Flow:
 
-- `_stand_room_enemies` stands the bosses at once (as today, no arrival). It hands the rest to `arrivals.begin(...)` and calls `arrivals.next(0, ...)` until it returns `&""`, so the first group starts in the room's setup, before `_open_boss_intro` and `_check_room_won`.
-- `step` calls `arrivals.next(delta, _standing_cost())` each tick and stands what it returns with `_stand_enemy(..., arrive = true)`. **Then it calls `_check_room_won()` every tick the queue is open.** An id that fails to stand (no data for it in the registry, or no spawns) is dropped from the queue, so a room can't get stuck uncleared.
+- `_stand_room_enemies` stands the bosses at once (as today, no arrival). It hands the rest to `arrivals.begin(...)` and calls `arrivals.next(0, ...)` until it returns `&""`, so the first group starts in the room's setup, before `_open_boss_intro` and `_check_room_won`. As built: the first group's bodies are stood just after the room's walls and holes reach the projectile manager (`_set_walls`, then `_call_arrivals(0)`), still in the room's setup and the same tick, because the spawn pick's hole check needs the room's own holes, which used to be laid after the enemies stood.
+- `step` calls `arrivals.next(delta, _standing_cost())` each tick and stands what it returns with `_stand_enemy(..., arrive = true)`. `_standing_cost()` is the cost of every one of the room's enemies standing or arriving, a phase's adds too. **Then it calls `_check_room_won()` every tick the queue is open.** An id that fails to stand (no data for it in the registry, or no spawns) is dropped from the queue, so a room can't get stuck uncleared.
 - `_check_room_won` also requires `arrivals.is_done()`.
 - `_on_adds_requested` stands adds with `arrive = true` (unless question 3 says otherwise).
 - `_forget_enemies` calls `arrivals.clear()`. The `arrivals` member is Flow's state, not `DERIVED`.
 - `enemies_left()` counts the queue too, so callers keep its meaning: enemies still to beat.
+- `stand_all_now()` (for tests) calls the rest of the queue at once; the shared helper's `Arrivals.land(flow)` calls it before landing the bodies.
 
 ### 4. The look: `ArriveLook` (gameplay/feel, new)
 
@@ -113,7 +114,9 @@ Later, an enemy could pick its own look (`EnemyBase.arrival`, for example an imp
 | EA5 | **Groups:** `RoomArrivals`, Flow's queue, the far-spawn pick, room cleared only when the queue is empty, a failed id dropped. Tests: group sizes by cost and scale, the quiet trigger (and no group while the floor is busy, however long), an expensive enemy still comes, snapshot between groups and mid-arrival, cleared only at the end, never stuck | gameplay/flow, tests |
 | EA6 | **Tune** in the owner's playtest: the numbers in content/runs/crypt.tres only | content/runs |
 
-EA1 to EA3 can ship as one PR (the look, with no pacing change). EA4 and EA5 are a second PR. Each step updates the README of its area (gameplay/actor, gameplay/feel, gameplay/flow, gameplay/run, content/runs, core/events) and Flow's class doc.
+EA1 to EA3 can ship as one PR (the look, with no pacing change). EA4 and EA5 are a second PR.
+
+**As built (EA4–EA5):** tests `tests/core/test_arrival_rules.gd` (the costs, every problem, the map rules reporting and copying them, the crypt's), `tests/gameplay/run/test_run.gd` (the pace told between the scale and the room, bigger for four players), `tests/gameplay/flow/test_room_arrivals.gd` (the pure rules: group sizes by cost, an enemy dearer than a group, the quiet trigger and ten minutes of a busy room with no group, the stagger, a group waiting for the one before to start, a pace of 0, the far-spawn rank with holes), `tests/gameplay/flow/test_flow_arrivals.gd` (on the real autoloads: the first group in the setup, no group in a busy room, cleared only after the last group, a dropped id, the far spawn as a wizard moves, `stand_all_now`) and `tests/core/test_snapshot_arrivals.gd` (a paced arena snapshotted mid-arrival with groups to come, and between groups, resumed in a fresh game: every tick agrees; it fails when the queue is left out of state). A frame-time check on a virtual display (software GL, so only relative): with sixteen bodies arriving at once over the room's own, about 21 ms a frame against 16 ms once they landed; groups keep far fewer clipping at once than EA3's whole room. Each step updates the README of its area (gameplay/actor, gameplay/feel, gameplay/flow, gameplay/run, content/runs, core/events) and Flow's class doc.
 
 ## Tests that need a look
 

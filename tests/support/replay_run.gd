@@ -80,6 +80,11 @@ var snapshot: Snapshot = null
 ## (tests/support/pinned_run.gd, `Flow.run_id_to_play`), pinned again in every fresh game. The
 ## snapshot test plays every run's room template by it (online-ready N12, run generation RG3).
 var room: RoomBase = null
+## The pace that room's enemies come in at (enemy arrivals EA5; null: all at once), pinned with it.
+var arrivals: ArrivalRules = null
+## Called right after the snapshot is taken (with nothing), so a test can check what the snapshot
+## caught (a body mid-arrival, groups still to come).
+var at_snapshot: Callable = Callable()
 ## True: each run starts from a fresh game (every autoload made again). False: in the same game,
 ## after whatever ran before, as a player starts one run after another (N3b: the run starts from
 ## a fresh game's state all the same).
@@ -221,6 +226,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		_capture(into)
 		if i == snapshot_at:
 			snapshot = Snapshot.take(areas(), _root)
+			if at_snapshot.is_valid():
+				at_snapshot.call()
 		if scripted > 0 and i == REBUILD_AT:
 			# As the radial builder sends it: applied at the next tick's start, and recorded there.
 			var standing: Actor = _flow.call("get_wizard", bots) as Actor
@@ -252,8 +259,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		var item := _root.get_node("Registry").call("get_resource", &"items", rack_item) as StaffItem
 		if taker == null or item == null or taker.caster.cards_of(2).slice(0, item.cards.size()) != item.cards:
 			problems.append("%s: the scripted player did not take %s onto LB" % [start, rack_item])
-	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room):
-		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room)])
+	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room, 1, 1, arrivals != null):
+		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room, 1, 1, arrivals != null)])
 	_check_settings(start)
 	for bot in players:
 		bot.leave()
@@ -482,7 +489,7 @@ func _find() -> void:
 	_flow.set(&"loading_enabled", false)
 	_flow.set(&"intro_enabled", false)
 	if room != null:
-		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room))
+		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room, &"", RoomKind.FILL_ENEMIES, 16, 1, 1, arrivals))
 	var kinds: Variant = cover if not cover.is_empty() else null
 	_root.get_node("Cover").call(&"use_kinds", kinds)
 	_feel.cover().use_kinds(kinds)

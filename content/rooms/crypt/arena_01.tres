@@ -6,7 +6,10 @@
 [resource]
 script = ExtResource("1_base")
 id = &"arena_01"
-display_name = "Crypt arena"
+display_name = "Crypt antechamber"
 biome = &"crypt"
 kinds = Array[StringName]([&"fight"])
 scene = ExtResource("2_scene")
+ambient = 0.8
+floor_mark_colors = PackedColorArray(0.341177, 0.325491, 0.478432, 1, 0.290197, 0.274510, 0.388236, 1, 0.168628, 0.156863, 0.250981, 1)
+debris_colors = PackedColorArray(0.639216, 0.623530, 0.721569, 1, 0.478432, 0.462746, 0.580393, 1, 0.168628, 0.156863, 0.250981, 1)

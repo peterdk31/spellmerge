@@ -141,17 +141,55 @@ func _kill_room() -> void:
 		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
 
 
-## The arena's walls, as rectangles.
+## The arena's walls, as rectangles, as the game reads them (a floating room's are its ground's: crypt
+## rework CR3).
 func _arena_walls() -> Array[Rect2]:
 	var scene: Node = ARENA.scene.instantiate()
-	var walls: Array[Rect2] = []
-	for child in scene.get_node("Walls").get_children():
-		var shape_node := child as CollisionShape2D
-		if shape_node != null and shape_node.shape is RectangleShape2D:
-			var size: Vector2 = (shape_node.shape as RectangleShape2D).size
-			walls.append(Rect2(shape_node.position - size * 0.5, size))
+	var walls: Array[Rect2] = RoomPlaces.wall_rects(scene)
 	scene.free()
 	return walls
+
+
+## The room's breakable props, from its data (the antechamber's pillars; crypt rework CR3): each is
+## a body combat knows.
+func _breakable_props() -> int:
+	var count: int = 0
+	for prop: Resource in ARENA.places().placed_of(PropBase):
+		if not (prop as PropBase).invincible:
+			count += 1
+	return count
+
+
+## The room's props combat knows, checked against its data's breakable ones.
+func _props_in_combat() -> int:
+	var count: int = 0
+	for prop: Node in flow.room_props():
+		if combat.call("is_registered", prop):
+			count += 1
+	check_equal(count, _breakable_props(), "combat knows each of the room's breakable props, and only those")
+	return _breakable_props()
+
+
+## Where a straight path from `from` to `to` first meets one of the arena's walls (`to` if none),
+## to the 8 px wall grid the projectile manager clips on.
+func _first_wall(from: Vector2, to: Vector2) -> Vector2:
+	var hit: Vector2 = to
+	for wall in _arena_walls():
+		var near: Variant = _enter(wall, from, to)
+		if near != null and from.distance_to(near as Vector2) < from.distance_to(hit):
+			hit = near as Vector2
+	return hit
+
+
+## Where an axis-aligned path from `from` to `to` enters `wall`, or null.
+func _enter(wall: Rect2, from: Vector2, to: Vector2) -> Variant:
+	if from.x == to.x and wall.position.x <= from.x and from.x < wall.end.x:
+		var y: float = wall.end.y if to.y < from.y else wall.position.y
+		return Vector2(from.x, y) if minf(from.y, to.y) <= y and y <= maxf(from.y, to.y) else null
+	if from.y == to.y and wall.position.y <= from.y and from.y < wall.end.y:
+		var x: float = wall.end.x if to.x < from.x else wall.position.x
+		return Vector2(x, from.y) if minf(from.x, to.x) <= x and x <= maxf(from.x, to.x) else null
+	return null
 
 
 # --- Play ------------------------------------------------------------------------------------
@@ -215,7 +253,7 @@ func test_the_rooms_enemies_stand() -> void:
 
 func test_combat_knows_every_enemy_and_wizard() -> void:
 	_playing(4)
-	check_equal(combat.call("actor_count"), _room_count() + 4, "every enemy and wizard is registered with combat")
+	check_equal(combat.call("actor_count"), _room_count() + 4 + _props_in_combat(), "every enemy, wizard and breakable prop is registered with combat")
 
 
 ## Every enemy the room lists stands inside it and clear of the walls.
@@ -553,7 +591,7 @@ func test_a_restart_leaves_no_old_enemy_in_combat() -> void:
 	_playing(1)
 	_down(_wizard(0))
 	flow.step(FlowScript.RESTART_DELAY)
-	check_equal(combat.call("actor_count"), _room_count() + 1, "combat knows only the room's new enemies and the wizard")
+	check_equal(combat.call("actor_count"), _room_count() + 1 + _props_in_combat(), "combat knows only the room's new enemies, props and the wizard")
 
 
 func test_no_restart_while_one_of_four_stands() -> void:
@@ -622,9 +660,11 @@ func test_play_starts_again_after_a_failed_restart() -> void:
 func _check_arena_walls(when: String) -> void:
 	var projectiles: Node = root.get_node("Projectiles")
 	var top: Vector2 = projectiles.call("clip_to_walls", Vector2(100.0, 100.0), Vector2(100.0, -10.0))
-	check(top.is_equal_approx(Vector2(100.0, 32.0)), "%s: a path up ends on the top border at y 32, got %s" % [when, top])
-	var pillar: Vector2 = projectiles.call("clip_to_walls", Vector2(100.0, 144.0), Vector2(300.0, 144.0))
-	check(pillar.is_equal_approx(Vector2(160.0, 144.0)), "%s: a path right ends on the pillar at x 160, got %s" % [when, pillar])
+	var want_top: Vector2 = _first_wall(Vector2(100.0, 100.0), Vector2(100.0, -10.0))
+	check(want_top.y > 0.0 and top.is_equal_approx(want_top), "%s: a path up ends on the room's top edge at %s, got %s" % [when, want_top, top])
+	var side: Vector2 = projectiles.call("clip_to_walls", Vector2(320.0, 144.0), Vector2(-10.0, 144.0))
+	var want_side: Vector2 = _first_wall(Vector2(320.0, 144.0), Vector2(-10.0, 144.0))
+	check(want_side.x > 0.0 and side.is_equal_approx(want_side), "%s: a path left ends on the room's left edge at %s, got %s" % [when, want_side, side])
 
 
 func test_the_walls_reach_the_projectile_manager_at_the_start() -> void:

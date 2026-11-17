@@ -60,7 +60,9 @@ import ground_walls
 
 ROOT = Path(__file__).resolve().parent.parent
 # Bump when what the generator draws changes, so every room's `--check` asks for a new run.
-VERSION = 3
+VERSION = 4
+# How far round a trimmed ledge cell's middle its floor is cleared (`Drawing._trim_to_reach`).
+TRIM_ROUND = 5
 PALETTE = ROOT / "core/base/palette.gd"
 EDGES = ROOT / "content/edges"
 GROUNDS = ROOT / "content/grounds"
@@ -568,6 +570,9 @@ class Drawing:
             if g.land[p] or 0.0 < g.crack[p] < CELL:
                 self.solid[p] = 1
         self._drop_slivers()
+        if "frame" in shape:
+            self._trim_to_reach()
+            self._drop_slivers()
         # t: how much of the whole edge a place has, from the nearest crack's width (1 away from
         # cracks, on the coast and in a crack's wide mouth; toward 0 where a crack narrows).
         near = array.array("f", bytes(4 * n))
@@ -665,6 +670,38 @@ class Drawing:
                 for q in piece:
                     self.solid[q] = 0
                     g.land[q] = 0
+
+    def _trim_to_reach(self) -> None:
+        """A hall's floor where no wizard can stand beside it goes (crypt rework CR3): an open cell
+        (its middle solid) that lies in no block of 3x3 open cells is a ledge too narrow to stand on
+        and out of reach of anyone standing, so an enemy pushed there could never be reached
+        (tests/content/rooms/test_template_layout.gd). Its floor round its middle is cleared, which
+        leaves its corners to the cells beside it, so the edge stays rough; again until none is left."""
+        cols, rows = self.w // CELL, self.h // CELL
+        r2 = TRIM_ROUND * TRIM_ROUND
+        while True:
+            open_ = [[bool(self.solid[(r * CELL + CELL // 2) * self.w + c * CELL + CELL // 2]) for c in range(cols)] for r in range(rows)]
+
+            def block(r: int, c: int) -> bool:
+                return all(0 <= r + dr < rows and 0 <= c + dc < cols and open_[r + dr][c + dc]
+                           for dr in (-1, 0, 1) for dc in (-1, 0, 1))
+            fits = [[block(r, c) for c in range(cols)] for r in range(rows)]
+            trimmed = 0
+            for r in range(rows):
+                for c in range(cols):
+                    if not open_[r][c] or any(0 <= r + dr < rows and 0 <= c + dc < cols and fits[r + dr][c + dc]
+                                              for dr in (-1, 0, 1) for dc in (-1, 0, 1)):
+                        continue
+                    trimmed += 1
+                    mx, my = c * CELL + CELL // 2, r * CELL + CELL // 2
+                    for y in range(max(0, my - TRIM_ROUND), min(self.h, my + TRIM_ROUND + 1)):
+                        for x in range(max(0, mx - TRIM_ROUND), min(self.w, mx + TRIM_ROUND + 1)):
+                            if (x - mx) ** 2 + (y - my) ** 2 <= r2:
+                                q = y * self.w + x
+                                self.solid[q] = 0
+                                self.ground.land[q] = 0
+            if trimmed == 0:
+                return
 
     # -- the floor and its edges --
 

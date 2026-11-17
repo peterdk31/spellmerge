@@ -297,6 +297,20 @@ class HallTest(unittest.TestCase):
         d = self.drawing
         return not d.solid[(y + gs.CELL // 2) * d.w + x + gs.CELL // 2]
 
+    def test_no_ledge_is_too_narrow_to_stand_beside(self) -> None:
+        # Every open cell of a hall lies in a block of 3x3 open cells or beside one: a ledge too
+        # narrow for a wizard is trimmed off, so nothing pushed there is out of reach (CR3).
+        rough = {**HALL, "frame": {**HALL["frame"], "rough": [20, 7, 3], "wander": [16, 22]}}
+        for d in (self.drawing, gs.Drawing(rough, [], HALL_CLEAR)):
+            cols, rows = d.w // gs.CELL, d.h // gs.CELL
+            open_ = {(c, r) for r in range(rows) for c in range(cols)
+                     if d.solid[(r * gs.CELL + gs.CELL // 2) * d.w + c * gs.CELL + gs.CELL // 2]}
+            fits = {(c, r) for c, r in open_ if all((c + dc, r + dr) in open_ for dc in (-1, 0, 1) for dr in (-1, 0, 1))}
+            for c, r in open_:
+                self.assertTrue(any((c + dc, r + dr) in fits for dc in (-1, 0, 1) for dr in (-1, 0, 1)),
+                                f"the floor at {c * gs.CELL},{r * gs.CELL} lies beside room to stand")
+            self.assertGreater(len(fits), len(open_) // 2, "the hall is still mostly floor")
+
     def test_the_frame_wanders_but_its_border_cell_is_always_wall(self) -> None:
         d = self.drawing
         for x in range(0, d.w, gs.CELL):

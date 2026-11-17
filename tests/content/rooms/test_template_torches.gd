@@ -1,8 +1,10 @@
 extends "res://tests/support/suite.gd"
-## Every room template's torches (content/rooms: every room a run's map can pick, found by folder)
-## move: a looping flame of at least three frames and a flickering light, out of step with the
-## others in its room, from one shared set of frames each. No script runs them, so they cost the
-## engine's own animation and nothing more.
+## Every room template's torches and candles (content/rooms: every room a run's map can pick, found
+## by folder; `content/rooms/crypt/decals/`, crypt rework CR3) move: a looping flame of at least three
+## frames and a flickering light, out of step with the others in its room, every one of a kind from
+## one shared set of frames. No script runs them, so they cost the engine's own animation and nothing
+## more. Here "torch" is either: a room lit by candles alone (a floating crypt room, whose torches
+## had no wall to hang on) is lit all the same.
 
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
@@ -25,7 +27,7 @@ func before_each() -> void:
 		root.add_child(layout)
 		var found: Array[Node] = []
 		for child in layout.get_node("Decor").get_children():
-			if String(child.name).begins_with("Torch"):
+			if String(child.name).begins_with("Torch") or String(child.name).begins_with("Candles"):
 				found.append(child)
 		by_room[room.id] = found
 		for torch in found:
@@ -88,12 +90,16 @@ func test_the_torches_do_not_flicker_in_step() -> void:
 		check(speeds.size() >= 3, "%s: the flames run at several speeds (%d)" % [id, speeds.size()])
 
 
+## Every torch of a kind (an instance of one decal scene) draws from that kind's one set of frames.
 func test_the_torches_share_their_frames() -> void:
-	var first: AnimatedSprite2D = _flame(torches[0])
-	var first_core: AnimatedSprite2D = _core(torches[0])
+	var first_of: Dictionary[String, Node] = {}
 	for torch in torches:
-		check(_flame(torch).sprite_frames == first.sprite_frames, "%s shares the flame frames" % _named(torch))
-		check(_core(torch).sprite_frames == first_core.sprite_frames, "%s shares the glow frames" % _named(torch))
+		check(torch.scene_file_path != "", "%s is an instance of a decal" % _named(torch))
+		if not first_of.has(torch.scene_file_path):
+			first_of[torch.scene_file_path] = torch
+		var first: Node = first_of[torch.scene_file_path]
+		check(_flame(torch).sprite_frames == _flame(first).sprite_frames, "%s shares the flame frames" % _named(torch))
+		check(_core(torch).sprite_frames == _core(first).sprite_frames, "%s shares the glow frames" % _named(torch))
 
 
 func test_the_flames_move_on_by_themselves() -> void:

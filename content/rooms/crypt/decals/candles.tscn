@@ -1,0 +1,42 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/candles.svg" id="1_wax"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/torch_glow.svg" id="2_glow"]
+[ext_resource type="SpriteFrames" path="res://content/rooms/crypt/decals/candle_flame_frames.tres" id="3_flame"]
+[ext_resource type="SpriteFrames" path="res://content/rooms/crypt/decals/torch_glow_frames.tres" id="4_core"]
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_add"]
+blend_mode = 1
+
+[node name="Candles" type="Node2D"]
+
+[node name="Glow" type="Sprite2D" parent="." groups=["painted_light"]]
+modulate = Color(1, 1, 1, 0.12)
+material = SubResource("CanvasItemMaterial_add")
+texture_filter = 1
+position = Vector2(16, 20)
+texture = ExtResource("2_glow")
+
+[node name="Core" type="AnimatedSprite2D" parent="." groups=["painted_light"]]
+modulate = Color(1, 1, 1, 0.2)
+material = SubResource("CanvasItemMaterial_add")
+texture_filter = 1
+position = Vector2(16, 18)
+sprite_frames = ExtResource("4_core")
+autoplay = "default"
+
+[node name="Wax" type="Sprite2D" parent="."]
+texture_filter = 1
+texture = ExtResource("1_wax")
+centered = false
+
+[node name="Flame" type="AnimatedSprite2D" parent="."]
+texture_filter = 1
+sprite_frames = ExtResource("3_flame")
+autoplay = "default"
+centered = false
+
+[node name="Light" type="Marker2D" parent="." groups=["light_spot"]]
+position = Vector2(16, 18)
+metadata/light_art = NodePath("../Flame")
+metadata/light_reach = 48.0

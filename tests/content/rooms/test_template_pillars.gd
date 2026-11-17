@@ -27,7 +27,11 @@ func before_each() -> void:
 
 func _footprints(layout: Node) -> Array[Rect2]:
 	var found: Array[Rect2] = []
-	for child in layout.get_node("Walls").get_children():
+	var walls: Node = layout.get_node_or_null("Walls")
+	if walls == null:
+		# A floating room (crypt rework CR3): its pillars are props, not wall tiles.
+		return found
+	for child in walls.get_children():
 		if String(child.name).begins_with("Pillar") and child is CollisionShape2D:
 			found.append(Rect2((child as CollisionShape2D).position - FOOTPRINT * 0.5, FOOTPRINT))
 	return found

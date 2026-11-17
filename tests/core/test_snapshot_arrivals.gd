@@ -1,10 +1,13 @@
 extends "res://tests/support/suite.gd"
 ## A room whose enemies come in groups, snapshotted and resumed (enemy arrivals EA5,
-## docs/milestones/enemy-arrivals.md, "Tests that need a look"): a run of the arena paced in small
-## groups (tests/support/replay_run.gd, pinned with `arrivals`), recorded with a snapshot early, while
-## the first group is still arriving and later groups wait, and later, between groups; a fresh game
-## restores the snapshot and plays the replay on from the next tick, and every tick from there agrees
-## with the recorded run's (Flow's queue, `RoomArrivals`, is state saved in snapshots).
+## docs/milestones/enemy-arrivals.md, "Tests that need a look"): a run of the arena paced in groups of
+## half its budget (tests/support/replay_run.gd, pinned with `arrivals`), recorded with a snapshot
+## early, while the first group is still rippling in (the restored queue starts its next bodies) and
+## later groups wait, and later, between groups (the first group in, the next held: the scripted
+## player kills nothing, so the restored queue must keep holding it); a fresh game restores the
+## snapshot and plays the replay on from the next tick, and every tick from there agrees with the
+## recorded run's (Flow's queue, `RoomArrivals`, is state saved in snapshots). A group's start from
+## a quiet room is the pure rules' and the flow tests' (test_room_arrivals.gd, test_flow_arrivals.gd).
 # unit-test-shards: 2
 
 const ReplayRun := preload("res://tests/support/replay_run.gd")
@@ -13,9 +16,11 @@ const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 const TICKS: int = 200
 
 var _run: ReplayRun
-## What the snapshot caught: groups still to come, and bodies arriving.
+## What the snapshot caught: ids still to come, and bodies arriving.
 var _left: int = -1
 var _arriving: int = -1
+## Ids still to come at the recorded run's end.
+var _left_after: int = -1
 
 
 func before_each() -> void:
@@ -23,7 +28,7 @@ func before_each() -> void:
 	_run.ticks = TICKS
 	_run.run_seed = 0x5eed
 	var pace := ArrivalRules.new()
-	pace.group_share = 0.15
+	pace.group_share = 0.5
 	pace.refill_share = 0.0
 	pace.stagger = 0.3
 	_run.room = ARENA
@@ -53,11 +58,13 @@ func test_a_snapshot_mid_arrival_with_groups_to_come_plays_on_the_same() -> void
 	await _check_resumed(4)
 	check(_left > 0, "the snapshot caught groups still to come: %d" % _left)
 	check(_arriving > 0, "and a body arriving: %d" % _arriving)
+	check(_left_after >= 0 and _left_after < _left, "the group's ripple went on after it: %d then %d to come" % [_left, _left_after])
 
 
 func test_a_snapshot_between_groups_plays_on_the_same() -> void:
 	await _check_resumed(120)
 	check(_left > 0, "the snapshot caught groups still to come: %d" % _left)
+	check_equal(_left_after, _left, "the next group held to the end, as nothing was killed")
 
 
 ## The run recorded with a snapshot after tick `at`, resumed from it in a fresh game: the two agree.
@@ -65,6 +72,7 @@ func _check_resumed(at: int) -> void:
 	var recorded := Desync.new()
 	_run.snapshot_at = at
 	var replay: Replay = await _run.record(&"play_requested", 0, 1, recorded)
+	_left_after = int((root.get_node("Flow").get(&"arrivals") as RoomArrivals).left())
 	check(replay != null and _run.snapshot != null, "recorded with its snapshot")
 	if replay == null or _run.snapshot == null:
 		return

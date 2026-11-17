@@ -120,13 +120,15 @@ func test_take_all_and_clear_empty_the_queue() -> void:
 
 func test_the_spawns_farthest_from_every_wizard_come_first() -> void:
 	var spawns := PackedVector2Array([Vector2(0, 0), Vector2(100, 0), Vector2(200, 0), Vector2(300, 0)])
-	check_equal(RoomArrivals.rank(spawns, PackedVector2Array([Vector2(0, 0)]), Callable()), PackedInt32Array([3, 2, 1, 0]), "a wizard at the left: from the right")
-	check_equal(RoomArrivals.rank(spawns, PackedVector2Array([Vector2(0, 0), Vector2(300, 0)]), Callable()), PackedInt32Array([1, 2, 0, 3]), "one each end: the middle first, ties by index")
+	check_equal(RoomArrivals.rank(spawns, PackedVector2Array([Vector2(0, 0)]), Callable()), PackedInt32Array([3, 2, 1]), "a wizard at the left: from the right, never on the wizard")
+	check_equal(RoomArrivals.rank(spawns, PackedVector2Array([Vector2(0, 0), Vector2(300, 0)]), Callable()), PackedInt32Array([1, 2]), "one each end: the middle, ties by index, none on a wizard")
 	check_equal(RoomArrivals.rank(spawns, PackedVector2Array(), Callable()), PackedInt32Array([0, 1, 2, 3]), "no wizard standing: in their order")
 	var hole := func(at: Vector2) -> bool: return at.x >= 250.0
-	check_equal(RoomArrivals.rank(spawns, PackedVector2Array([Vector2(0, 0)]), hole), PackedInt32Array([2, 1, 0]), "a spawn over a hole is left out")
+	check_equal(RoomArrivals.rank(spawns, PackedVector2Array([Vector2(0, 0)]), hole), PackedInt32Array([2, 1]), "a spawn over a hole is left out")
 	var all_holes := func(_at: Vector2) -> bool: return true
-	check_equal(RoomArrivals.rank(spawns, PackedVector2Array([Vector2(0, 0)]), all_holes), PackedInt32Array([3, 2, 1, 0]), "unless every one is")
+	check_equal(RoomArrivals.rank(spawns, PackedVector2Array([Vector2(0, 0)]), all_holes), PackedInt32Array([3, 2, 1]), "unless every one is")
+	var crowded := PackedVector2Array([Vector2(0, 0), Vector2(40, 0)])
+	check_equal(RoomArrivals.rank(crowded, PackedVector2Array([Vector2(0, 0)]), Callable()), PackedInt32Array([1]), "every spawn near a wizard: the farthest alone")
 
 
 ## A group's bodies take the ranked spawns in turn, stacked where one is used again within the group;
@@ -140,6 +142,6 @@ func test_a_group_takes_the_ranked_spawns_in_turn() -> void:
 	var placed: Array[Vector2] = []
 	for id: StringName in _all_now(arrivals, 0.0, 0):
 		placed.append(arrivals.spawn_for(spawns, left, Callable(), stack))
-	check_equal(placed, [Vector2(100, 0), Vector2(0, 0), Vector2(100, 10)] as Array[Vector2], "far first, then near, then far stacked")
+	check_equal(placed, [Vector2(100, 0), Vector2(100, 10), Vector2(100, 20)] as Array[Vector2], "the far spawn, stacked: never the one the wizard stands on")
 	check_equal(_all_now(arrivals, 0.0, 0).size(), 1, "the next group")
 	check_equal(arrivals.spawn_for(spawns, PackedVector2Array([Vector2(100, 0)]), Callable(), stack), Vector2(0, 0), "ranked again: the wizard moved right")

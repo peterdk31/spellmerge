@@ -12,8 +12,13 @@ extends RefCounted
 ##   current one has all started and the cost standing or arriving drops to `refill_at` or below.
 ## - **Its bodies** start `stagger` seconds apart (the first at once), so a group ripples in.
 ## - **Where:** a group's bodies take the spawns farthest from every standing wizard first (`rank`,
-##   worked out as the group's first body stands), skipping a spawn over a hole, round them in turn,
-##   stacked where a spawn is used again within the group (`Flow.stacked_position`).
+##   worked out as the group's first body stands), skipping a spawn over a hole and one within
+##   `NEAR` of a wizard (a body never starts arriving on a player), round them in turn, stacked where
+##   a spawn is used again within the group (`Flow.stacked_position`).
+
+## Pixels from a standing wizard within which a spawn is not used (unless every spawn is that near:
+## then the farthest alone).
+const NEAR: float = 64.0
 
 ## The ids not yet called, in the run's order, and what each costs (`EnemyBase.cost`).
 var waiting: Array[StringName] = []
@@ -112,7 +117,8 @@ func spawn_for(spawns: PackedVector2Array, wizards: PackedVector2Array, touches_
 
 ## The spawns of `spawns` by how far they are from the nearest of `wizards`, farthest first (ties by
 ## their index; with no wizards, in their order), leaving out those `touches_hole` (a spawn's place to
-## true) says are over a hole, unless every one is. The same on every machine: places only.
+## true) says are over a hole, unless every one is, and those within `NEAR` of a wizard, unless every
+## one left is (then the farthest alone). The same on every machine: places only.
 static func rank(spawns: PackedVector2Array, wizards: PackedVector2Array, touches_hole: Callable) -> PackedInt32Array:
 	var kept := PackedInt32Array()
 	for i in spawns.size():
@@ -121,7 +127,7 @@ static func rank(spawns: PackedVector2Array, wizards: PackedVector2Array, touche
 	if kept.is_empty():
 		for i in spawns.size():
 			kept.append(i)
-	var gaps := PackedFloat32Array()
+	var gaps := PackedFloat64Array()
 	gaps.resize(spawns.size())
 	for i: int in kept:
 		var gap: float = INF
@@ -136,7 +142,13 @@ static func rank(spawns: PackedVector2Array, wizards: PackedVector2Array, touche
 			kept[back + 1] = kept[back]
 			back -= 1
 		kept[back + 1] = spawn
-	return kept
+	var far := PackedInt32Array()
+	for spawn: int in kept:
+		if gaps[spawn] > NEAR * NEAR:
+			far.append(spawn)
+	if far.is_empty():
+		far.append(kept[0])
+	return far
 
 
 ## The next group starts: as many ids from the front as reach `group` in cost (one at least; all with

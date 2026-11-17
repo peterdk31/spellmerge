@@ -542,8 +542,8 @@ func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0)
 	_show_world(new_world)
 	_set_walls(new_world)
 	# The first group starts in the room's setup, once its walls and holes are known (its spawns
-	# over a hole are left out).
-	_call_arrivals(0.0)
+	# over a hole are left out); the room is checked at the setup's end, after it is announced.
+	_call_arrivals(0.0, false)
 	_announce_room(room)
 	if events != null and mode == MODE_RUN:
 		_show_room_start()
@@ -712,7 +712,7 @@ func _enter_next_room(room: RoomBase) -> void:
 	room_id = room.id
 	state = State.RUNNING
 	_set_walls(world)
-	_call_arrivals(0.0)
+	_call_arrivals(0.0, false)
 	_announce_room(room)
 	if events != null:
 		_show_room_start()
@@ -1324,8 +1324,8 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 	_wizards.append(wizard)
 
 
-## The enemies the run puts in the room (`enemies`: ids, one per body): a boss stands at once at the
-## enemy spawns (no arrival, so its intro opens on a body that is there), and the rest are handed to
+## The enemies the run puts in the room (`enemies`: ids, one per body): a boss stands at once in
+## `parent` (the world being built) at the enemy spawns (no arrival, so its intro opens on a body that is there), and the rest are handed to
 ## `arrivals` at the run's pace (`_chosen_group`, ...), whose first group starts once the room's walls
 ## are laid (`_call_arrivals`). An id the registry has no enemy or boss for is dropped (a warning).
 func _stand_room_enemies(parent: Node2D, room: RoomBase, enemies: Array[StringName]) -> void:
@@ -1351,16 +1351,18 @@ func _stand_room_enemies(parent: Node2D, room: RoomBase, enemies: Array[StringNa
 
 
 ## The room's queue `delta` seconds on (`RoomArrivals.next`): each id it calls now stands, arriving
-## (`_stand_queued`); then the room is checked, so a queue that emptied by ids that could not stand
-## leaves no room stuck uncleared.
-func _call_arrivals(delta: float) -> void:
+## (`_stand_queued`); then, with `check` (every tick but the room's setup, which checks at its own end,
+## after the room is announced), the room is checked, so a queue that emptied by ids that could not
+## stand leaves no room stuck uncleared.
+func _call_arrivals(delta: float, check: bool = true) -> void:
 	if arrivals.is_done() or world == null:
 		return
 	var id: StringName = arrivals.next(delta, _standing_cost())
 	while id != &"":
 		_stand_queued(id)
 		id = arrivals.next(0.0, _standing_cost())
-	_check_room_won()
+	if check:
+		_check_room_won()
 
 
 ## Every enemy still waiting in the room's queue starts arriving now, as if each group had come (for
@@ -1406,8 +1408,10 @@ func _standing_cost() -> int:
 func _standing_wizard_places() -> PackedVector2Array:
 	var places := PackedVector2Array()
 	for wizard: Node2D in _wizards:
+		if not is_instance_valid(wizard):
+			continue
 		var actor := wizard as Actor
-		if actor != null and is_instance_valid(actor) and not actor.is_down():
+		if actor != null and not actor.is_down():
 			places.append(actor.position)
 	return places
 

@@ -169,6 +169,30 @@ func test_a_group_starts_far_from_the_wizards() -> void:
 		check_equal(at, spot, "at the spawn farthest from where it stands now")
 
 
+## A spawn over a hole is never used: with a hole laid over the spawn farthest from the wizard, the
+## next group starts at the farthest of the others.
+func test_a_group_never_starts_over_a_hole() -> void:
+	_start()
+	var wizard: Node2D = flow.get_wizard(0)
+	var spawns: PackedVector2Array = flow._places.enemy_spawns
+	if wizard == null or spawns.size() < 2:
+		check(false, "a wizard and spawns")
+		return
+	var ranked: PackedInt32Array = RoomArrivals.rank(spawns, PackedVector2Array([wizard.position]), Callable())
+	var far: Vector2 = spawns[ranked[0]]
+	var projectiles: Node = root.get_node("Projectiles")
+	projectiles.call("set_holes", [Rect2(flow.world.to_global(far) - Vector2(24, 24), Vector2(48, 48))] as Array[Rect2])
+	check(bool(projectiles.call("touches_hole", flow.world.to_global(far), 8.0)), "the hole is under the far spawn")
+	_steps(60)
+	_kill_standing()
+	_steps(1)
+	check(not flow._enemies.is_empty(), "the next group")
+	if not flow._enemies.is_empty():
+		var at: Vector2 = (flow._enemies[0] as Actor).position
+		check(at != far, "not over the hole: %s" % at)
+		check_equal(at, spawns[ranked[1]], "at the next farthest spawn")
+
+
 ## Tests call the rest of the queue at once (`stand_all_now`, the shared helper's).
 func test_stand_all_now_calls_every_group() -> void:
 	_start()

@@ -23,7 +23,7 @@ const PREFIX: String = "pinned_"
 ## Registry autoload, or one of a test's), and its id. `biome` empty: the room's own (a room of no
 ## biome needs one whose enemies fill it). Pinned again, the same ids (nothing is added twice).
 static func pin(registry: Node, room: RoomBase, biome: StringName = &"", fill: StringName = RoomKind.FILL_ENEMIES, budget: int = 16, depth: int = 1, width: int = 1, arrivals: ArrivalRules = null) -> StringName:
-	var id: StringName = room_id(room, depth, width, arrivals != null)
+	var id: StringName = room_id(room, depth, width, arrivals)
 	var kind := RoomKind.new()
 	kind.id = id
 	kind.fill = fill
@@ -52,11 +52,12 @@ static func pin(registry: Node, room: RoomBase, biome: StringName = &"", fill: S
 
 
 ## The id of the copy of `room` a pinned run of `depth` rows `width` wide plays (and of its kind and
-## its run); `paced` for one pinned with arrivals (its own ids: the first pace pinned is kept).
-static func room_id(room: RoomBase, depth: int = 1, width: int = 1, paced: bool = false) -> StringName:
+## its run); with `arrivals`, ids of that pace's own (its numbers in hundredths), so two paces never
+## share a pinned run.
+static func room_id(room: RoomBase, depth: int = 1, width: int = 1, arrivals: ArrivalRules = null) -> StringName:
 	var id: String = PREFIX + String(room.id)
 	if depth != 1 or width != 1:
 		id += "_%dx%d" % [depth, width]
-	if paced:
-		id += "_paced"
+	if arrivals != null:
+		id += "_paced_%d_%d_%d" % [roundi(arrivals.group_share * 100.0), roundi(arrivals.refill_share * 100.0), roundi(arrivals.stagger * 100.0)]
 	return StringName(id)

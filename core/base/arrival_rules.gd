@@ -17,7 +17,7 @@ extends Resource
 ## budget: at it or below, the next group comes. Below `group_share`.
 @export_range(0.0, 1.0, 0.01) var refill_share: float = 0.15
 ## Seconds between two bodies of one group starting to arrive, so a group ripples in.
-@export_range(0.0, 2.0, 0.01) var stagger: float = 0.15
+@export_range(0.0, 2.0, 0.01, "or_greater") var stagger: float = 0.15
 
 
 ## The cost of one group in a room of scaled budget `budget`: rounded, 1 at least.

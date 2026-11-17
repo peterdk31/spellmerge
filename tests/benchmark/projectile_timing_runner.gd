@@ -206,8 +206,15 @@ func _run_cap(cap: int) -> void:
 		_fill_hostile(cap)
 		_advance_paths(cap)
 		start = Time.get_ticks_usec()
+		# As the hit pass runs them: its hits found into the batch, then the spent shots ended and
+		# the merged hits sent (hit batch A3b: a hit is only ever found in a pass).
+		_mgr._hit_batch.open(_mgr._targets.size(), _mgr._high)
+		_mgr._finding = true
 		for slot in cap:
 			_mgr._hit_test(slot)
+		_mgr._end_spent()
+		_mgr._finding = false
+		_mgr._send_merged()
 		hit_us += float(Time.get_ticks_usec() - start)
 	_log("_hit_test with fresh hits (%d calls, with the signal)" % cap, hit_us / float(REPEATS), cap, "per call")
 

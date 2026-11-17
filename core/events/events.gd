@@ -191,11 +191,11 @@ signal actor_cast(caster: int, actor: Node)
 signal staff_shown(caster: int, actor: Node, staff: int)
 ## Sender: core/projectiles. A projectile fired by the actor `caster` touched `target`.
 ## `tag` is the value given to `Projectiles.spawn()`, for looking up the damage. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
-## Every hit, of every sender (shots, rays, sweeps, blasts), is this one event, sent as it lands: there is no batched path. A listener that wants to share work across a frame's hits keeps what each asks for and does it once in its own step (owner, 2026-11-07: DECISIONS, "Bundled hit events dropped").
+## Every hit, of every sender (shots, rays, sweeps, blasts), is this one event. A shot's hits are merged (the one hit model, the owner, 2026-11-17; hit batch A3b): a step's hits of one caster's spell on one body go out after the projectile manager's hit pass as one `projectile_hit`, its `impact_count` the hits it stands for (a shot with a hit profile of its own alone); a ray's, a sweep's or a strike's are sent as they land. A listener that wants to share work across a frame's hits keeps what each asks for and does it once in its own step.
 signal projectile_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int)
 ## Sender: core/projectiles. Where and which way a projectile struck, for looks only (sparks, dust). `target` is the node it hit, sent just before `projectile_hit` for the same hit, or `null` when it ended on a wall or pillar. `caster` is the actor who fired it (NO_PLAYER for a shot of no actor), `position` the point it stopped at and `direction` the unit vector it was flying.
 signal projectile_impact(caster: int, target: Node, position: Vector2, direction: Vector2)
-## Sender: core/projectiles, while it merges a step's shot hits (`merge_hits`; hit batch A2). A shot
+## Sender: core/projectiles, while its hit pass merges a step's shot hits (hit batch A2). A shot
 ## hit `target`, and the pass has not asked of it since its last event: Combat fills `room` at once
 ## (`HitRoom`: whether hits take its health, how much it has, its hex, its barrier's charges and the
 ## spell it spares), so the manager stops spending shots on a body its pass has already killed.

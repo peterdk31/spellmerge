@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## A step's hits merged (`ProjectileManager.merge_hits`, performance prototype 2026-11-17): the shots
+## A step's hits merged (the one hit model, the owner, 2026-11-17; hit batch A3b): the shots
 ## of one caster and one spell tag that hit one body in a step send one `projectile_impact` and one
 ## `projectile_hit`, `impact_count` the hits, in the order of their first hits; each shot is spent,
 ## pierces and ends as it hits; its `shot_ended` comes after the hits; Combat deals the hits' damage.
@@ -20,7 +20,6 @@ var heard: Array[String] = []
 
 
 func before_each() -> void:
-	ManagerScript.merges_hits = true
 	bus = own(EventsScript.new()) as EventsScript
 	mgr = own(ManagerScript.new()) as ManagerScript
 	table = own(ActorSeats.table()) as ActorSeats.ActorsScript
@@ -71,20 +70,11 @@ func test_each_caster_and_each_spell_is_its_own_hit_in_the_order_of_their_first(
 	check_equal(hits, [[1, body, 21, 2], [0, body, 11, 3], [0, body, 12, 1], [0, other, 11, 2]], "by caster, spell and body, in the order the shots hit")
 
 
-func test_merging_off_sends_every_hit_at_once() -> void:
-	mgr.merge_hits = false
-	var body: Node2D = _target(Vector2(200.0, 100.0))
-	_volley(0, 11, body.global_position, 3)
-	mgr.step(DT)
-	check_equal(hits, [[0, body, 11, 1], [0, body, 11, 1], [0, body, 11, 1]], "three hits of one")
-	check_equal(heard.slice(0, 3), ["impact 1", "hit", "ended 11"] as Array[String], "each shot's end right after its hit")
-
-
-## The damage a five-shot fan (`penta · bolt`) deals a body close by, with its hits merged or not,
-## and the hit events it took.
-func _fan_damage(merged: bool) -> Vector2i:
+## The damage a five-shot fan (`penta · bolt`) deals a body close by, and the hit events it took.
+## The fans below are held to what they did with the hits one by one, before the mode went (hit
+## batch A3b, recorded on commit 3b917b6): this fan dealt 10 in 5 hits.
+func _fan_damage() -> Vector2i:
 	var arena := ArenaScript.new(root)
-	arena.projectiles.merge_hits = merged
 	var events: Array[int] = [0]
 	arena.bus.projectile_hit.connect(func(_c: int, _t: Node, _a: Vector2, _tag: int, _s: int) -> void: events[0] += 1)
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
@@ -98,11 +88,9 @@ func _fan_damage(merged: bool) -> Vector2i:
 
 
 func test_combat_deals_the_merged_hits_damage() -> void:
-	var one_by_one: Vector2i = _fan_damage(false)
-	var merged: Vector2i = _fan_damage(true)
-	check(one_by_one.x > 0, "the fan hurts the body (%d)" % one_by_one.x)
-	check_equal(merged.x, one_by_one.x, "merged, the same damage")
-	check(merged.y < one_by_one.y, "in fewer hits (%d against %d)" % [merged.y, one_by_one.y])
+	var merged: Vector2i = _fan_damage()
+	check_equal(merged.x, 10, "merged, the damage the hits one by one dealt")
+	check(merged.y < 5, "in fewer hits than its five shots (%d)" % merged.y)
 
 
 ## At the cap, a shot spawned in the pass (an expired shot's payload) while every free slot is held
@@ -363,10 +351,10 @@ func test_a_spawn_at_the_cap_leaves_a_shot_that_hits_alone_its_slot() -> void:
 	check_equal(shots, [alone] as Array[int], "the alone shot's hit names its own slot")
 
 
-## A fan whose first shots kill a body spends the shots one by one would, no more, and the same damage.
-func _fan_kill(merged: bool) -> Vector3i:
+## A fan whose first shots kill a body spends the shots one by one would, no more (one by one, 3 of
+## its 5 flew on past the body, which died).
+func _fan_kill() -> Vector3i:
 	var arena := ArenaScript.new(root)
-	arena.projectiles.merge_hits = merged
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
 	var imp: Node2D = arena.add_imp(Vector2(14.0, 0.0), 4.0)
 	arena.install_cards(0, 0, [&"penta", &"bolt"])
@@ -378,17 +366,14 @@ func _fan_kill(merged: bool) -> Vector3i:
 
 
 func test_a_fan_into_a_body_it_kills_spends_only_the_shots_that_kill() -> void:
-	var one_by_one: Vector3i = _fan_kill(false)
-	var merged: Vector3i = _fan_kill(true)
-	check_equal(one_by_one.y, 1, "the body dies")
-	check(one_by_one.x > 0, "some shots fly on past it (%d)" % one_by_one.x)
-	check_equal(merged, one_by_one, "merged, the same shots fly on and it dies the same")
+	var merged: Vector3i = _fan_kill()
+	check_equal(merged, Vector3i(3, 1, 0), "the body dies, and the three shots one by one sent on fly on")
 
 
-## A barrier takes each of a merged hit's shots whole, one charge each, as it did one by one.
-func _fan_into_barrier(merged: bool) -> int:
+## A barrier takes each of a merged hit's shots whole, one charge each, as it did one by one (2 got
+## through).
+func _fan_into_barrier() -> int:
 	var arena := ArenaScript.new(root)
-	arena.projectiles.merge_hits = merged
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
 	var imp: Node2D = arena.add_imp(Vector2(14.0, 0.0))
 	# Four charges: the fan's last two shots land together as one merged hit, on the last charge.
@@ -399,18 +384,10 @@ func _fan_into_barrier(merged: bool) -> int:
 	check(arena.cast(0, 0), "the fan is cast")
 	arena.run(1.0)
 	var lost: int = arena.lost(imp)
-	if merged:
-		check(counts.max() > 1, "the fan's shots merged (%s)" % [counts])
+	check(counts.max() > 1, "the fan's shots merged (%s)" % [counts])
 	arena.free_all()
 	return lost
 
 
 func test_a_barrier_takes_a_merged_hits_shots_one_charge_each() -> void:
-	var one_by_one: int = _fan_into_barrier(false)
-	var merged: int = _fan_into_barrier(true)
-	check(one_by_one > 0, "the shots past the barrier's charges hurt (%d)" % one_by_one)
-	check_equal(merged, one_by_one, "merged, the same damage gets through")
-
-
-func after_each() -> void:
-	ManagerScript.merges_hits = true
+	check_equal(_fan_into_barrier(), 2, "the damage that got through one by one")

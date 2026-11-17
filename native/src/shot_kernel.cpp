@@ -239,7 +239,6 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(tag, "_tag", PACKED_INT64_ARRAY) \
 	X(pierce, "_pierce", PACKED_INT32_ARRAY) \
 	X(stick, "_stick", PACKED_FLOAT32_ARRAY) \
-	X(merging, "_merging", BOOL) \
 	X(batch, "_hit_batch", OBJECT) \
 	X(merged_turns, "merged_turns", INT) \
 	X(spark_births, "spark_births", PACKED_FLOAT32_ARRAY) \
@@ -488,8 +487,7 @@ struct HitPass {
 	double grid_x = 0.0, grid_y = 0.0, max_target_reach = 0.0;
 
 	bool targets_loaded = false;
-	// The merged hits (`merge_hits`), read the first time a shot found hits while the pass merges.
-	bool merging = false;
+	// The merged hits (the hit batch's, `HitPass::merge_hits`), read the first time a shot found hits.
 	bool merge_loaded = false;
 	Arr<PackedInt32Array> pierce, mh_head, mh_target_pass, mh_next, mh_caster, mh_slot, mh_count, mh_used, mh_charges, mh_charges_used;
 	Arr<PackedByteArray> mh_blocks;
@@ -600,7 +598,6 @@ struct HitPass {
 	// What every shot's turn reads (a turn handed back to GDScript reads no more).
 	void load(Object *m) {
 		const Names &k = *names;
-		merging = m->get(k.merging);
 		state.load(m, k.state);
 		motion.load(m, k.motion);
 		pos.load(m, k.pos);
@@ -1460,13 +1457,11 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 			const int64_t found = h.scan(slot);
 			if (found > 0) {
 				// Hits that only add to merged ones are taken here; any other goes to GDScript.
-				if (h.merging) {
-					if (!h.merge_loaded) {
-						h.load_merge(m);
-					}
-					if (h.merge_hits(slot, found)) {
-						continue;
-					}
+				if (!h.merge_loaded) {
+					h.load_merge(m);
+				}
+				if (h.merge_hits(slot, found)) {
+					continue;
 				}
 				h.save(m, found, starved_before);
 				return n * 2 + YIELD_FOUND;

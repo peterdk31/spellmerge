@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-17: the hits one by one are gone (hit batch A3b; owner, Q1)
+
+- **What went:** the projectile manager's switch (`merge_hits`, the test switch `merges_hits`), the hit pass's branch that ended a spent shot and sent its hit at once, and the native hit pass's gate (`merging`): a pass always merges its hits (`_finding` while it finds them; with no event bus it sends nothing). It replaces the decision of 2026-11-07 against bundled hits (below), as the owner's Q1 answer said.
+- **Tests:** the ones that compared the merged hits with the hits one by one keep the one-by-one results as numbers (recorded on the last commit with the mode, 3b917b6): a fan's damage 10 in 5 hits, 3 shots flying on past a body it kills, 2 damage through a barrier. The projectile timing benchmark's `_hit_test` row runs its hit tests inside a pass, as the game does.
+
 ## 2026-11-17: the hit-work budget 5% more for the merged hits (owner)
 
 - **Found in hit batch A3a** (docs/milestones/hit-batch.md): with the hits merged, `tests/core/test_hit_budget.gd`'s full crowd at the desktop cap had 239 shots wait two steps for their hit test, where none did one by one (the test had run unmerged until A3a, so the game, merged since the prototype, already missed it). No hit is lost and the budget spent is the same; a merged pass frees its slots in another order (the shots that end during it first, its spent shots at its end), so the next step's shots take other slots, and when the budget runs out it reaches other shots first: the shortage then lasted 11 steps instead of 3.

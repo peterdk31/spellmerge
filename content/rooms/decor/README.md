@@ -13,7 +13,7 @@ Decals any room may place, whatever its biome: scenes with no script and no coll
 
 | Decal | What it is |
 |---|---|
-| `beam.tscn` | **The light shaft:** a column of pale light falling from the top of the screen onto the floor (`Column`, additive, drawn over the bodies at z 4; its top lies 212 px above the decal's foot, so a room places it at least that far down), its pool on the floor (`Pool`, painted light), a `light_spot` in its pale colour, and dust drifting down through it (`Dust`, an area `MoteSource` of `falling_dust`). The crypt's shafts ("Home is up", seen from below; docs/STORY.md, the Vaults) and the hub's landing |
+| `beam.tscn` | **The light shaft:** a column of pale light falling from the top of the screen onto the floor (`Column`, additive, drawn over the bodies at z 4; its top lies 212 px above the decal's foot, so a room places it at least that far down), its pool on the floor (`Pool`, painted light; the column is not, so it shows with spell light on, which draws the pool's light but not a column), a `light_spot` in its pale colour, and dust drifting down through it (`Dust`, an area `MoteSource` of `falling_dust`). The crypt's shafts ("Home is up", seen from below; docs/STORY.md, the Vaults) and the hub's landing |
 
 ## Allowed files
 

@@ -5,7 +5,7 @@ extends "res://tests/support/screenshot.gd"
 ##
 ## Shots: `room_<id>`, one a template, just after its run starts; `room_<id>_fight` a few seconds into
 ## its fight, the four wizards casting up into it, with spell light on, and `room_<id>_fight_plain`
-## the same moment with spell light off (crypt rework, docs/milestones/crypt-rework.md, rule 6: shots,
+## half a second on (each shot settles first) with spell light off (crypt rework, docs/milestones/crypt-rework.md, rule 6: shots,
 ## enemies and wizards read first, the dark stays out of the fight).
 
 ## How long the wizards cast before the fight's shots, in frames.

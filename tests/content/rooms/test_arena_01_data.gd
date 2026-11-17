@@ -38,7 +38,7 @@ func test_it_is_a_floating_room_drawn_from_its_shape() -> void:
 	check(ground != null and ground.has_meta(&"ground_inputs"), "its floor is the ground drawn from arena_01.shape.json")
 	check(ground != null and ground.get_node_or_null("Walls/WallArt") == null, "no wall art: its edge is an invisible wall over the dark")
 	var void_art: Sprite2D = room_root.get_node_or_null("Void") as Sprite2D
-	check(void_art != null and void_art.z_index < (ground as CanvasItem).z_index, "its own Void is drawn behind the slab")
+	check(void_art != null and ground != null and void_art.z_index < (ground as CanvasItem).z_index, "its own Void is drawn behind the slab")
 	check_equal(room.ambient, 0.8, "a crypt room's ambient (rule 6)")
 	check(room.floor_mark_colors.size() > 0 and room.debris_colors.size() > 0, "it names its floor-mark and debris colours (rule 9)")
 

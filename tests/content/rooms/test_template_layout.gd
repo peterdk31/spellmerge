@@ -121,11 +121,41 @@ func test_exits_are_open_floor_clear_of_spawns() -> void:
 			var area: Rect2 = prop.area_rect()
 			area.position += at[i]
 			check(_bounds(room).encloses(area), "%s: the exit at %s is inside the room" % [room.id, at[i]])
-			var foot: Rect2 = Rect2(area.position.x, area.end.y - EXIT_FOOT, area.size.x, minf(EXIT_FOOT, area.size.y))
+			# A tiled room's exit stands whole on its floor; only a ground's (a floating room's) may
+			# rise over its edge.
+			var foot: Rect2 = area
+			if _has_ground(room):
+				foot = Rect2(area.position.x, area.end.y - EXIT_FOOT, area.size.x, minf(EXIT_FOOT, area.size.y))
 			for wall in _walls(room):
 				check(not wall.intersects(foot), "%s: the exit at %s is walked into from open floor, clear of the wall %s" % [room.id, at[i], wall])
 			for point in _spawns(room):
 				check(not area.grow(SPAWN_RADIUS).has_point(point), "%s: the spawn %s is clear of the exit at %s" % [room.id, point, at[i]])
+
+
+## True when the room's floor is a ground drawn from a shape (tools/ground_shape.py).
+func _has_ground(room: RoomBase) -> bool:
+	var ground: Node = layouts[room.id].get_node_or_null("Floor")
+	return ground != null and ground.has_meta(&"ground_inputs")
+
+
+## Every prop the room stands (a pillar, a heap; not an exit, whose arch may rise over a floating
+## room's edge) has its ground, where it blocks and is stood, on open floor: clear of every wall and
+## hole, so a floating room's pillar never hangs over its edge (crypt rework CR3).
+func test_props_stand_on_open_floor() -> void:
+	for room in templates:
+		var places: RoomPlaces = room.places()
+		var props: Array[Resource] = places.placed_of(PropBase)
+		var at: PackedVector2Array = places.placed_at_of(PropBase)
+		var blocked: Array[Rect2] = _walls(room) + RoomPlaces.hole_rects(layouts[room.id])
+		for i in props.size():
+			var prop: PropBase = props[i] as PropBase
+			if prop.role == RoomBase.EXIT_ROLE:
+				continue
+			# Its own ground, or (none set: the kit fits one under its hurt box) its whole extent.
+			var ground: Rect2 = prop.ground_rect() if prop.has_footprint() else prop.extent()
+			ground.position += at[i]
+			for rect in blocked:
+				check(not rect.intersects(ground), "%s: the %s at %s stands clear of %s" % [room.id, prop.id, at[i], rect])
 
 
 ## No one starts in a prop: every spawn is clear of every prop the room stands (its hurt shape, its

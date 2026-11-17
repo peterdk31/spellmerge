@@ -150,13 +150,24 @@ func _arena_walls() -> Array[Rect2]:
 	return walls
 
 
-## The room's props combat knows (a breakable one, as the antechamber's pillars; crypt rework CR3).
+## The room's breakable props, from its data (the antechamber's pillars; crypt rework CR3): each is
+## a body combat knows.
+func _breakable_props() -> int:
+	var count: int = 0
+	for prop: Resource in ARENA.places().placed_of(PropBase):
+		if not (prop as PropBase).invincible:
+			count += 1
+	return count
+
+
+## The room's props combat knows, checked against its data's breakable ones.
 func _props_in_combat() -> int:
 	var count: int = 0
 	for prop: Node in flow.room_props():
 		if combat.call("is_registered", prop):
 			count += 1
-	return count
+	check_equal(count, _breakable_props(), "combat knows each of the room's breakable props, and only those")
+	return _breakable_props()
 
 
 ## Where a straight path from `from` to `to` first meets one of the arena's walls (`to` if none),

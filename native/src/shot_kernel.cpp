@@ -240,23 +240,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(pierce, "_pierce", PACKED_INT32_ARRAY) \
 	X(stick, "_stick", PACKED_FLOAT32_ARRAY) \
 	X(merging, "_merging", BOOL) \
-	X(mh_pass, "_mh_pass", INT) \
-	X(mh_head, "_mh_head", PACKED_INT32_ARRAY) \
-	X(mh_target_pass, "_mh_target_pass", PACKED_INT32_ARRAY) \
-	X(mh_next, "_mh_next", PACKED_INT32_ARRAY) \
-	X(mh_caster, "_mh_caster", PACKED_INT32_ARRAY) \
-	X(mh_tag, "_mh_tag", PACKED_INT64_ARRAY) \
-	X(mh_slot, "_mh_slot", PACKED_INT32_ARRAY) \
-	X(mh_count, "_mh_count", PACKED_INT32_ARRAY) \
-	X(mh_damage, "_mh_damage", PACKED_FLOAT64_ARRAY) \
-	X(mh_health, "_mh_health", PACKED_FLOAT64_ARRAY) \
-	X(mh_spent, "_mh_spent", PACKED_FLOAT64_ARRAY) \
-	X(mh_blocks, "_mh_blocks", PACKED_BYTE_ARRAY) \
-	X(mh_charges, "_mh_charges", PACKED_INT32_ARRAY) \
-	X(mh_charges_used, "_mh_charges_used", PACKED_INT32_ARRAY) \
-	X(mh_used, "_mh_used", PACKED_INT32_ARRAY) \
-	X(mh_used_at, "_mh_used_at", PACKED_VECTOR2_ARRAY) \
-	X(mh_used_n, "_mh_used_n", INT) \
+	X(batch, "_batch", OBJECT) \
 	X(merged_turns, "merged_turns", INT) \
 	X(spark_births, "spark_births", PACKED_FLOAT32_ARRAY) \
 	X(tail_births_on, "tail_births_on", BOOL) \
@@ -323,15 +307,40 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(has_walls, "_has_walls", BOOL) \
 	X(wall_bounds, "_bounds", RECT2)
 
+// Every member of the manager's hit batch (`HitBatch`, `_batch`) the hit pass reads: its entries
+// (each one's next on its target, caster, tag, shot, count, damage a hit, whether it meets the
+// barrier), the bodies' tallies in pass `_pass`, and the spent shots' list (hit batch A1). Checked on
+// the batch by `check_fields`.
+#define BATCH_FIELDS(X) \
+	X(mh_pass, "_pass", INT) \
+	X(mh_head, "_head", PACKED_INT32_ARRAY) \
+	X(mh_target_pass, "_target_pass", PACKED_INT32_ARRAY) \
+	X(mh_next, "_next", PACKED_INT32_ARRAY) \
+	X(mh_caster, "caster", PACKED_INT32_ARRAY) \
+	X(mh_tag, "tag", PACKED_INT64_ARRAY) \
+	X(mh_slot, "slot", PACKED_INT32_ARRAY) \
+	X(mh_count, "count", PACKED_INT32_ARRAY) \
+	X(mh_damage, "_damage", PACKED_FLOAT64_ARRAY) \
+	X(mh_health, "_health", PACKED_FLOAT64_ARRAY) \
+	X(mh_spent, "_spent", PACKED_FLOAT64_ARRAY) \
+	X(mh_blocks, "_blocks", PACKED_BYTE_ARRAY) \
+	X(mh_charges, "_charges", PACKED_INT32_ARRAY) \
+	X(mh_charges_used, "_charges_used", PACKED_INT32_ARRAY) \
+	X(mh_used, "_used", PACKED_INT32_ARRAY) \
+	X(mh_used_at, "_used_at", PACKED_VECTOR2_ARRAY) \
+	X(mh_used_n, "_used_n", INT)
+
 struct Names {
 #define SM_DECLARE(id, gd, type) StringName id;
 	MANAGER_FIELDS(SM_DECLARE)
 	GRID_FIELDS(SM_DECLARE)
+	BATCH_FIELDS(SM_DECLARE)
 #undef SM_DECLARE
 	Names() {
 #define SM_INIT(id, gd, type) id = StringName(gd);
 		MANAGER_FIELDS(SM_INIT)
 		GRID_FIELDS(SM_INIT)
+		BATCH_FIELDS(SM_INIT)
 #undef SM_INIT
 	}
 };
@@ -489,6 +498,8 @@ struct HitPass {
 	Arr<PackedFloat64Array> mh_damage, mh_health, mh_spent;
 	Arr<PackedVector2Array> mh_used_at;
 	int64_t mh_pass = 0, mh_used_n = 0, merged_turns = 0;
+	// The manager's hit batch, whose arrays the merge reads (`load_merge`).
+	Object *batch = nullptr;
 	// `_untested`, read only for a deferred shot (`defer`, `scan`).
 	bool untested_loaded = false;
 	// For catching up a waiting homing shot (`load_homing`).
@@ -676,24 +687,28 @@ struct HitPass {
 		pierce.load(m, k.pierce);
 		stick.load(m, k.stick);
 		tag.load(m, k.tag);
-		mh_head.load(m, k.mh_head);
-		mh_target_pass.load(m, k.mh_target_pass);
-		mh_next.load(m, k.mh_next);
-		mh_caster.load(m, k.mh_caster);
-		mh_tag.load(m, k.mh_tag);
-		mh_slot.load(m, k.mh_slot);
-		mh_count.load(m, k.mh_count);
-		mh_damage.load(m, k.mh_damage);
-		mh_health.load(m, k.mh_health);
-		mh_spent.load(m, k.mh_spent);
-		mh_blocks.load(m, k.mh_blocks);
-		mh_charges.load(m, k.mh_charges);
-		mh_charges_used.load(m, k.mh_charges_used);
-		mh_used.load(m, k.mh_used);
-		mh_used_at.load(m, k.mh_used_at);
-		mh_pass = m->get(k.mh_pass);
-		mh_used_n = m->get(k.mh_used_n);
 		merged_turns = m->get(k.merged_turns);
+		// The hit batch's, read from the batch (hit batch A1).
+		Object *b = m->get(k.batch);
+		ERR_FAIL_NULL(b);
+		batch = b;
+		mh_head.load(b, k.mh_head);
+		mh_target_pass.load(b, k.mh_target_pass);
+		mh_next.load(b, k.mh_next);
+		mh_caster.load(b, k.mh_caster);
+		mh_tag.load(b, k.mh_tag);
+		mh_slot.load(b, k.mh_slot);
+		mh_count.load(b, k.mh_count);
+		mh_damage.load(b, k.mh_damage);
+		mh_health.load(b, k.mh_health);
+		mh_spent.load(b, k.mh_spent);
+		mh_blocks.load(b, k.mh_blocks);
+		mh_charges.load(b, k.mh_charges);
+		mh_charges_used.load(b, k.mh_charges_used);
+		mh_used.load(b, k.mh_used);
+		mh_used_at.load(b, k.mh_used_at);
+		mh_pass = b->get(k.mh_pass);
+		mh_used_n = b->get(k.mh_used_n);
 	}
 
 	// `is_instance_valid(_targets[t])`: the node of the id kept beside it still exists.
@@ -813,7 +828,9 @@ struct HitPass {
 			m->set(k.starved_at, starved_at);
 		}
 		if (merge_loaded) {
-			m->set(k.mh_used_n, mh_used_n);
+			if (batch != nullptr) {
+				batch->set(k.mh_used_n, mh_used_n);
+			}
 			m->set(k.merged_turns, merged_turns);
 		}
 		if (targets_loaded) {
@@ -1318,6 +1335,18 @@ PackedStringArray ShotKernel::check_fields(Object *manager) const {
 	}
 	GRID_FIELDS(SM_GRID_CHECK)
 #undef SM_GRID_CHECK
+	// The hit batch's, on the batch (hit batch A1).
+	Object *batch = manager->get(names->batch);
+	if (batch == nullptr) {
+		wrong.push_back(String("member _batch missing or empty"));
+		return wrong;
+	}
+#define SM_BATCH_CHECK(id, gd, type)                                     \
+	if (batch->get(names->id).get_type() != Variant::type) {             \
+		wrong.push_back(String("hit batch member ") + gd + " missing or not " #type); \
+	}
+	BATCH_FIELDS(SM_BATCH_CHECK)
+#undef SM_BATCH_CHECK
 	return wrong;
 }
 

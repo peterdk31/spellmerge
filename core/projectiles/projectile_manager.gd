@@ -665,7 +665,7 @@ signal still_shots_drawn(view: StillShotView)
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_merging", &"merge_hits", &"_mh_head", &"_mh_used", &"_mh_used_at", &"_mh_used_n", &"merged_turns", &"_mh_next", &"_mh_caster", &"_mh_target", &"_mh_tag", &"_mh_slot", &"_mh_at", &"_mh_heading", &"_mh_count", &"_mh_card", &"_mh_body", &"_mh_core", &"_mh_look", &"_mh_n", &"_mh_ended", &"_mh_ended_n", &"_mh_freed", &"_mh_freed_n", &"_mh_blocks", &"_mh_charges", &"_mh_charges_used", &"_mh_seq", &"_freeing_now", &"_mh_damage", &"_mh_health", &"_mh_spent", &"_mh_target_pass", &"_mh_pass", &"_room", &"merges_hits"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_merging", &"merge_hits", &"_batch", &"merged_turns", &"_freeing_now", &"merges_hits"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -722,64 +722,17 @@ var merge_hits: bool = merges_hits
 ## What a new manager's `merge_hits` starts as. A test switch: the tests of the hits one by one
 ## (their order, their counts, a handler's change seen by the next shot) set it off, and back.
 static var merges_hits: bool = true
-## While the hit pass merges (`_pass_hits`), and its merged hits (scratch, emptied by `_send_merged`):
-## by target its first entry (`_mh_head`, while `_mh_target_pass` is this pass) and each entry's next
-## on that target, and each entry's hit. Packed arrays, so the native hit pass reads them too.
+## While the hit pass merges (`_pass_hits`; the kernel reads it).
 var _merging: bool = false
-var _mh_head: PackedInt32Array = PackedInt32Array()
-var _mh_next: PackedInt32Array = PackedInt32Array()
-var _mh_caster: PackedInt32Array = PackedInt32Array()
-var _mh_target: PackedInt32Array = PackedInt32Array()
-var _mh_tag: PackedInt64Array = PackedInt64Array()
-var _mh_slot: PackedInt32Array = PackedInt32Array()
-var _mh_at: PackedVector2Array = PackedVector2Array()
-var _mh_heading: PackedVector2Array = PackedVector2Array()
-var _mh_count: PackedInt32Array = PackedInt32Array()
-var _mh_card: Array[StringName] = []
-var _mh_body: PackedInt32Array = PackedInt32Array()
-var _mh_core: PackedColorArray = PackedColorArray()
-var _mh_look: PackedInt32Array = PackedInt32Array()
-var _mh_n: int = 0
-## The tags of the shots the pass spent, in order (their `shot_ended`, after the hits).
-var _mh_ended: PackedInt64Array = PackedInt64Array()
-var _mh_ended_n: int = 0
-## The shots the pass's hits spent (`F_SPENT`), in the order they were, and where each was spent
-## (its tail ends there): ended together at the pass's end (`_end_spent`). Sized for the pass's
-## shots before it, so the native hit pass writes them too.
-var _mh_used: PackedInt32Array = PackedInt32Array()
-var _mh_used_at: PackedVector2Array = PackedVector2Array()
-var _mh_used_n: int = 0
+## The pass's merged hits, the bodies' tallies and its spent shots, held slots and kept ends
+## (`HitBatch`, hit batch A1): emptied within the step (`_send_merged`). The native hit pass reads
+## and writes its arrays (`BATCH_FIELDS`).
+var _batch: HitBatch = HitBatch.new()
 ## The shot turns the native hit pass merged itself, every hit of them adding to a merged hit the
 ## pass already had (no hand-back to GDScript). A count for benchmarks and tests; nothing reads it.
 var merged_turns: int = 0
-## The slots of the shots ended while the pass merges, freed only once its hits are sent: a hit
-## names its shot's slot (`projectile_hit`'s `shot`, which Spells reads its records by), so none may
-## be taken by a shot a handler spawns before that hit is sent.
-var _mh_freed: PackedInt32Array = PackedInt32Array()
-var _mh_freed_n: int = 0
-## A barrier's charges in the pass's tallies: by entry whether its spell's hits meet the barrier
-## (`HitRoom.charges` above 0), and by target its charges as the last ask that met them said, and
-## how many of the pass's hits they took (each whole, no damage).
-var _mh_blocks: PackedByteArray = PackedByteArray()
-var _mh_charges: PackedInt32Array = PackedInt32Array()
-var _mh_charges_used: PackedInt32Array = PackedInt32Array()
-## Each entry's shot's `_seq` when it hit: a shot dropped at the cap while the hits are sent, its slot
-## taken, is no longer the one that hit (the hit then names no shot).
-var _mh_seq: PackedInt64Array = PackedInt64Array()
 ## True while `_drop_one` makes room at the cap: that slot is freed at once, merging or not.
 var _freeing_now: bool = false
-## No shot is spent on a body the pass has already killed (owner, 2026-11-17): each entry's damage a
-## hit (`HitRoom`, asked of Combat through `hit_room_asked` at the first hit of each caster's spell
-## on the body), and by target, in pass `_mh_pass` (`_mh_target_pass`), the health the last ask said
-## (so damage dealt meanwhile outside the merge counts) and the damage of every spell's hits counted
-## so far. A shot meets a body whose counted damage reaches its health as if it were not there, and
-## flies on.
-var _mh_damage: PackedFloat64Array = PackedFloat64Array()
-var _mh_health: PackedFloat64Array = PackedFloat64Array()
-var _mh_spent: PackedFloat64Array = PackedFloat64Array()
-var _mh_target_pass: PackedInt32Array = PackedInt32Array()
-var _mh_pass: int = 0
-var _room: HitRoom = HitRoom.new()
 ## The way the shot was flying, while a `projectile_expired` is sent (with `impact_carrier_card`,
 ## `impact_core` and `impact_look`, so Feel can show where its life ran out).
 var impact_heading: Vector2 = Vector2.ZERO
@@ -2221,10 +2174,7 @@ func _fit_draw_bounds() -> void:
 func clear() -> void:
 	# What a pass merged and holds (never set between steps; a handler may clear mid-pass).
 	_merging = false
-	_mh_n = 0
-	_mh_used_n = 0
-	_mh_freed_n = 0
-	_mh_ended_n = 0
+	_batch.empty()
 	for slot in _high:
 		if _alive[slot] != 0 and _tag[slot] != 0:
 			shot_ended.emit(_tag[slot])
@@ -3662,11 +3612,7 @@ func _pass_hits(top: int, delta: float) -> void:
 	var n: int = 0
 	_merging = merge_hits and events != null
 	if _merging:
-		_mh_pass += 1
-		_fit_merged_targets()
-		if _mh_used.size() < top:
-			_mh_used.resize(top)
-			_mh_used_at.resize(top)
+		_batch.open(_targets.size(), top)
 	if _kernel != null and not _any_solid:
 		n = _pass_hits_native(top, delta, limit, resume)
 	# Every shot the kernel did not reach (all of them without it).
@@ -6089,7 +6035,7 @@ func _kill(slot: int, announce: bool = true) -> void:
 	_drop_moves(slot)
 	if announce and _tag[slot] != 0:
 		if _merging:
-			_keep_end(_tag[slot])
+			_batch.keep_end(_tag[slot])
 		else:
 			shot_ended.emit(_tag[slot])
 	if _kinds[slot] != 0:
@@ -6098,10 +6044,7 @@ func _kill(slot: int, announce: bool = true) -> void:
 	_state[slot] = S_IDLE
 	_leave_group(slot)
 	if _merging and not _freeing_now:
-		if _mh_freed_n == _mh_freed.size():
-			_mh_freed.resize(maxi(64, _mh_freed_n * 2))
-		_mh_freed[_mh_freed_n] = slot
-		_mh_freed_n += 1
+		_batch.hold(slot)
 	else:
 		_free_slots[_free_count] = slot
 		_free_count += 1
@@ -6149,7 +6092,7 @@ func _expire(slot: int) -> void:
 		if _merging:
 			# After its hits of this pass, merged and still to send (spells.gd: a shot's end
 			# comes after its hits' handlers).
-			_keep_end(tag)
+			_batch.keep_end(tag)
 		else:
 			shot_ended.emit(tag)
 
@@ -6706,7 +6649,7 @@ func _hit_candidates(slot: int, found: int) -> bool:
 		var t: int = _cand_target[n]
 		if _target_layer[t] == 0 or not is_instance_valid(_targets[t]):
 			continue
-		if _merging and _killed_this_pass(t):
+		if _merging and not _batch.takes(t):
 			# Its merged hits so far kill it: the shot is not spent on it.
 			continue
 		_work_left -= HIT_WORK
@@ -6914,9 +6857,7 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	elif _merging:
 		# Ended with the pass's other spent shots, after its hits (`_end_spent`).
 		_flags[slot] |= F_SPENT
-		_mh_used[_mh_used_n] = slot
-		_mh_used_at[_mh_used_n] = at
-		_mh_used_n += 1
+		_batch.spend(slot, at)
 	else:
 		spent = true
 		_end_tail(slot, at)
@@ -6951,182 +6892,90 @@ func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: i
 	impact_count = 1
 
 
-## The hit of the shot in `slot` on target `target`, kept for the end of the pass: added to the
-## caster's hits on it with the same tag, or the first of them.
+## The hit of the shot in `slot` on target `target`, kept for the end of the pass (`_batch`): added
+## to the caster's hits on it with the same tag, or the first of them, for which Combat is asked
+## what one hit of the spell takes off the body and what it has (once a pass).
 func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, heading: Vector2) -> void:
-	var entry: int = _mh_head[target] if target < _mh_target_pass.size() and _mh_target_pass[target] == _mh_pass else -1
-	var last: int = -1
-	var alone: bool = (_flags[slot] & F_ALONE) != 0
-	while entry >= 0:
-		if not alone and _mh_caster[entry] == caster and _mh_tag[entry] == tag and (_flags[_mh_slot[entry]] & F_ALONE) == 0:
-			_mh_count[entry] += 1
-			_spend_room(target, entry)
-			return
-		last = entry
-		entry = _mh_next[entry]
-	if _mh_n == _mh_caster.size():
-		_grow_merged(maxi(64, _mh_n * 2))
-	# A target a handler added during the pass has no row yet.
-	_fit_merged_targets()
-	entry = _mh_n
-	_mh_n += 1
-	if last >= 0:
-		_mh_next[last] = entry
-	else:
-		# The target's first entry of the pass: its tally starts.
-		_mh_target_pass[target] = _mh_pass
-		_mh_head[target] = entry
-		_mh_spent[target] = 0.0
-		_mh_charges[target] = 0
-		_mh_charges_used[target] = 0
-	_mh_next[entry] = -1
-	_mh_caster[entry] = caster
-	_mh_target[entry] = target
-	_mh_tag[entry] = tag
-	_mh_slot[entry] = slot
-	_mh_seq[entry] = _seq[slot]
-	_mh_at[entry] = at
-	_mh_heading[entry] = heading
-	_mh_count[entry] = 1
-	_mh_card[entry] = _carrier_card_of(slot)
-	_mh_body[entry] = _kind_of(slot)
-	_mh_core[entry] = _core[slot]
-	_mh_look[entry] = _look[slot]
-	# What one hit of this caster's spell takes off the body, and what it has (asked once a pass).
-	_room.clear()
-	events.hit_room_asked.emit(caster, _targets[target], tag, slot, _room)
-	_mh_damage[entry] = _room.damage
-	# The latest ask's health, whichever spell asked; the barrier's charges as a spell they meet says.
-	_mh_health[target] = _room.health
-	_mh_blocks[entry] = 1 if _room.charges > 0 else 0
-	if _room.charges > 0:
-		_mh_charges[target] = _room.charges
-	_spend_room(target, entry)
-
-
-## One hit of `entry`'s counted on `target` in this pass: a charge of its barrier, if its spell meets
-## one with charges left, else its damage.
-func _spend_room(target: int, entry: int) -> void:
-	if _mh_blocks[entry] != 0 and _mh_charges_used[target] < _mh_charges[target]:
-		_mh_charges_used[target] += 1
-	else:
-		_mh_spent[target] += _mh_damage[entry]
-
-
-## True when the damage of the pass's merged hits on `target`, every spell's, reaches its health.
-func _killed_this_pass(target: int) -> bool:
-	return target < _mh_target_pass.size() and _mh_target_pass[target] == _mh_pass and _mh_spent[target] >= _mh_health[target]
-
-
-## The per-target tables sized for every target (one a hit handler added during the pass too).
-func _fit_merged_targets() -> void:
-	var targets: int = _targets.size()
-	if _mh_target_pass.size() < targets:
-		_mh_head.resize(targets)
-		_mh_health.resize(targets)
-		_mh_spent.resize(targets)
-		_mh_charges.resize(targets)
-		_mh_charges_used.resize(targets)
-		_mh_target_pass.resize(targets)
+	var entry: int = _batch.entry_of(target, caster, tag, (_flags[slot] & F_ALONE) != 0, _flags, F_ALONE)
+	if entry >= 0:
+		_batch.count_hit(entry)
+		return
+	entry = _batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot])
+	_batch.room.clear()
+	events.hit_room_asked.emit(caster, _targets[target], tag, slot, _batch.room)
+	_batch.take_room(entry)
 
 
 ## The shots the pass's hits spent, ended in the order they were (their tails where they were spent;
 ## their slots held and their `shot_ended` kept for after the hits, as the pass still merges).
 func _end_spent() -> void:
-	for i in _mh_used_n:
+	for i in _batch.spent_count():
 		_end_spent_at(i)
-	_mh_used_n = 0
+	_batch.forget_spent()
 
 
 ## A held slot handed back to the free list now (`_spawn_row` at the cap, no slot free): the last
 ## held one, else a spent shot's, ended at once; never one of a shot that hits alone (its merged hit,
-## still to send, reads its own profile by its slot). The hit sent later names no shot (`_mh_seq`).
-## False for none.
+## still to send, reads its own profile by its slot). The hit sent later names no shot (its entry's
+## `seq`). False for none.
 func _take_back_slot() -> bool:
-	var i: int = _mh_freed_n - 1
+	var i: int = _batch.held_count() - 1
 	while i >= 0:
-		var slot: int = _mh_freed[i]
+		var slot: int = _batch.held_slot(i)
 		if (_flags[slot] & F_ALONE) == 0:
-			_mh_freed_n -= 1
-			_mh_freed[i] = _mh_freed[_mh_freed_n]
+			_batch.drop_held(i)
 			_free_slots[_free_count] = slot
 			_free_count += 1
 			return true
 		i -= 1
-	i = _mh_used_n - 1
+	i = _batch.spent_count() - 1
 	while i >= 0:
-		var spent: int = _mh_used[i]
+		var spent: int = _batch.spent_slot(i)
 		if (_flags[spent] & F_ALONE) == 0 and _end_spent_at(i):
 			# Out of the list (the last takes its place), and its slot, held by its end, back now.
-			_mh_used_n -= 1
-			_mh_used[i] = _mh_used[_mh_used_n]
-			_mh_used_at[i] = _mh_used_at[_mh_used_n]
+			_batch.drop_spent(i)
 			return _free_count > 0 or _take_back_slot()
 		i -= 1
 	return false
 
 
-## A spent shot's tag kept for its `shot_ended` after the pass's hits.
-func _keep_end(tag: int) -> void:
-	if _mh_ended_n == _mh_ended.size():
-		_mh_ended.resize(maxi(64, _mh_ended_n * 2))
-	_mh_ended[_mh_ended_n] = tag
-	_mh_ended_n += 1
-
-
-## The spent shot `i` of the list ended (its tail where it was spent; its slot held and its end kept
-## for after the hits, as the pass still merges), unless a handler ended it meanwhile or its slot
-## holds another shot now (a new shot's flags have no F_SPENT). True when it ended it.
+## The spent shot `i` of the batch's list ended (its tail where it was spent; its slot held and its
+## end kept for after the hits, as the pass still merges), unless a handler ended it meanwhile or its
+## slot holds another shot now (a new shot's flags have no F_SPENT). True when it ended it.
 func _end_spent_at(i: int) -> bool:
-	var slot: int = _mh_used[i]
+	var slot: int = _batch.spent_slot(i)
 	if _alive[slot] == 0 or (_flags[slot] & F_SPENT) == 0:
 		return false
 	_flags[slot] &= ~F_SPENT
 	var tag: int = _tag[slot]
-	_end_tail(slot, _mh_used_at[i])
+	_end_tail(slot, _batch.spent_at(i))
 	_kill(slot, false)
 	if tag != 0:
-		_keep_end(tag)
+		_batch.keep_end(tag)
 	return true
-
-
-func _grow_merged(size: int) -> void:
-	_mh_next.resize(size)
-	_mh_caster.resize(size)
-	_mh_target.resize(size)
-	_mh_tag.resize(size)
-	_mh_slot.resize(size)
-	_mh_seq.resize(size)
-	_mh_damage.resize(size)
-	_mh_blocks.resize(size)
-	_mh_at.resize(size)
-	_mh_heading.resize(size)
-	_mh_count.resize(size)
-	_mh_card.resize(size)
-	_mh_body.resize(size)
-	_mh_core.resize(size)
-	_mh_look.resize(size)
 
 
 ## The pass's merged hits sent, in the order of their first hits, then its spent shots' ends. A
 ## handler may hit or spawn again: it is sent at once (`_merging` is off by now).
 func _send_merged() -> void:
 	# Each read anew, so a handler's `clear()` (every count to 0) stops what is left.
+	var batch: HitBatch = _batch
 	var entry: int = 0
-	while entry < _mh_n:
-		var node: Variant = _targets[_mh_target[entry]] if _mh_target[entry] < _targets.size() else null
+	while entry < batch.entries:
+		var target: int = batch.target[entry]
+		var node: Variant = _targets[target] if target < _targets.size() else null
 		if events != null and node != null and is_instance_valid(node):
-			var shot: int = _mh_slot[entry] if _seq[_mh_slot[entry]] == _mh_seq[entry] else -1
-			_send_hit(_mh_caster[entry], node, _mh_at[entry], _mh_heading[entry], _mh_tag[entry], shot, _mh_card[entry], _mh_body[entry], _mh_core[entry], _mh_look[entry], _mh_count[entry])
+			var shot: int = batch.slot[entry] if _seq[batch.slot[entry]] == batch.seq[entry] else -1
+			_send_hit(batch.caster[entry], node, batch.at[entry], batch.heading[entry], batch.tag[entry], shot, batch.card[entry], batch.body[entry], batch.core[entry], batch.look[entry], batch.count[entry])
 		entry += 1
-	_mh_n = 0
-	for i in _mh_freed_n:
-		_free_slots[_free_count] = _mh_freed[i]
+	batch.entries = 0
+	for i in batch.held_count():
+		_free_slots[_free_count] = batch.held_slot(i)
 		_free_count += 1
-	_mh_freed_n = 0
+	batch.forget_held()
 	# A handler's end meanwhile is sent at once (merging is off by now), so nothing joins this list.
 	var i: int = 0
-	while i < _mh_ended_n:
-		shot_ended.emit(_mh_ended[i])
+	while i < batch.ended_count():
+		shot_ended.emit(batch.ended_tag(i))
 		i += 1
-	_mh_ended_n = 0
+	batch.forget_ended()

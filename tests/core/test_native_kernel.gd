@@ -224,6 +224,16 @@ func test_the_room_grid_the_kernel_reads_is_checked() -> void:
 	check_equal(NativeScript.shot_kernel().call(&"check_fields", mgr) as PackedStringArray, PackedStringArray(), "a real manager and its grid have every member")
 
 
+## The hit pass reads the merged hits from the hit batch (`HitBatch`, hit batch A1): a manager without
+## one is named.
+func test_the_hit_batch_the_kernel_reads_is_checked() -> void:
+	if not _native_loaded():
+		return
+	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
+	mgr._batch = null
+	check("_batch" in ", ".join(NativeScript.shot_kernel().call(&"check_fields", mgr) as PackedStringArray), "a manager without a hit batch is named")
+
+
 func test_a_new_manager_runs_the_native_kernel() -> void:
 	if not _native_loaded():
 		return
@@ -629,6 +639,23 @@ func _compare_arrays(step: int) -> void:
 		var b: Variant = _mgrs[1].grid().get(member)
 		if var_to_bytes(a) != var_to_bytes(b):
 			_differ("step %d: the room grid's %s differs" % [step, member])
+	# The hit batch's (its entries, the bodies' tallies, the spent shots; hit batch A1).
+	_compare_batch(step, _mgrs[0]._batch, _mgrs[1]._batch)
+
+
+## Every packed array, int and float member of the two managers' hit batches, byte for byte.
+func _compare_batch(step: int, first: HitBatch, second: HitBatch) -> void:
+	for prop: Dictionary in first.get_property_list():
+		var member: StringName = prop["name"]
+		var type: int = prop["type"]
+		if (prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0:
+			continue
+		if type < TYPE_PACKED_BYTE_ARRAY and type != TYPE_INT and type != TYPE_FLOAT and type != TYPE_VECTOR2:
+			continue
+		var a: Variant = first.get(member)
+		var b: Variant = second.get(member)
+		if var_to_bytes(a) != var_to_bytes(b):
+			_differ("step %d: the hit batch's %s differs (GDScript %s, native %s)" % [step, member, _first_difference(a, b), _first_difference(b, a)])
 
 
 func _first_difference(a: Variant, b: Variant) -> String:

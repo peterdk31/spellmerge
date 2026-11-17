@@ -215,3 +215,61 @@ func test_a_body_added_after_the_step_is_cut_before_the_draw() -> void:
 	check_equal(late.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "cut just before the draw")
 	check_equal(_look.shift_of(late), ArriveLook.body_height(late), "all of it under the floor")
 	check(RenderingServer.frame_pre_draw.is_connected(_look.cut), "the cut runs before every frame is drawn")
+
+
+## A body with a sprite whose frame reaches 2 px under its feet (a spitter's), arriving at `at`.
+func _arriving_with_art(at: Vector2, share: float) -> Actor:
+	var body := Actor.new()
+	body.add_child(Hurtbox.new())
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	var art := PlaceholderTexture2D.new()
+	art.size = Vector2(16.0, 32.0)
+	sprite.texture = art
+	sprite.position = Vector2(0.0, -14.0)
+	body.add_child(sprite)
+	body.arrive(Actor.ARRIVE_SECONDS)
+	_world.add(body, at)
+	_set_share(body, share)
+	return body
+
+
+## A body's height and bottom are worked out when it is first cut, kept while it arrives, worked out
+## again if its size changes mid-arrival, and forgotten once it lands or goes; its shift and its
+## mask are what a fresh count of them gives.
+func test_its_height_and_bottom_are_worked_out_once_and_forgotten_with_it() -> void:
+	var body: Actor = _arriving_with_art(Vector2(100.0, 100.0), 0.6)
+	var other: Actor = _arriving_with_art(Vector2(200.0, 100.0), 0.3)
+	check_equal(_look.measure_of(body), Vector2(-1.0, -1.0), "not counted before its first cut")
+	_frame(0.016)
+	var height: float = ArriveLook.body_height(body)
+	var bottom: float = ArriveLook.body_bottom(body)
+	check_equal(bottom, 2.0, "its frame reaches 2 px under its feet")
+	check_equal(_look.measure_of(body), Vector2(height, bottom), "kept as a fresh count gives them")
+	check_equal(_look.shift_of(body), ArriveLook.rise_shift(height + bottom, body.arrive_share()), "shifted by them")
+	check_equal(_look.mask_of(body), Rect2(-ArriveLook.MASK_HALF_WIDTH, -ArriveLook.MASK_TALL, 2.0 * ArriveLook.MASK_HALF_WIDTH, ArriveLook.MASK_TALL + 2.0), "its mask ends at its lowest row")
+	# Not counted again each frame: a change the arrival never makes (its art moved) is not seen.
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	sprite.position.y -= 4.0
+	_frame(0.016)
+	check_equal(_look.measure_of(body), Vector2(height, bottom), "the same, not counted again")
+	sprite.position.y += 4.0
+	_set_share(body, 0.7)
+	_frame(0.016)
+	check_equal(_look.shift_of(body), ArriveLook.rise_shift(height + bottom, 0.7), "further up by its share alone")
+	body.set_size(1.5)
+	_frame(0.016)
+	var grown: Vector2 = Vector2(ArriveLook.body_height(body), ArriveLook.body_bottom(body))
+	check(grown != Vector2(height, bottom), "its size changes them: %s" % grown)
+	check_equal(_look.measure_of(body), grown, "counted again at its new size")
+	check_equal(_look.shift_of(body), ArriveLook.rise_shift(grown.x + grown.y, body.arrive_share()), "shifted as a fresh count says")
+	check_equal(_look.mask_of(body), ArriveLook.mask_rect(grown.y, 1.5), "its mask at its new size")
+	check_equal(_look.mask_of(body).end.y, grown.y / 1.5, "still ending at its lowest row, in its own pixels")
+	body.arrive_left = 0.0
+	_frame(0.016)
+	check_equal(_look.measure_of(body), Vector2(-1.0, -1.0), "forgotten once it lands")
+	check_equal(_look.measured(), 1, "only the other is kept")
+	_world.actors.erase(other)
+	other.free()
+	_frame(0.016)
+	check_equal(_look.measured(), 0, "a body gone is forgotten")

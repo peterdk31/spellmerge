@@ -40,6 +40,9 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const SHADER: Shader = preload("res://hud/panels/boss/silhouette.gdshader")
+## The title type's look (`TitleLabel`), a theme of its own: the project theme is loaded before the
+## first import, so it names no imported file (hud/README.md, "The theme").
+const TITLE_THEME: Theme = preload("res://hud/theme/title_theme.tres")
 
 ## The black bars' height, top and bottom, and how dark the world under them goes (0.6: to 40%).
 const BAR: float = 36.0
@@ -135,6 +138,7 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	visible = false
+	theme = TITLE_THEME
 	_stage = _control("Stage")
 	_stage.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_stage.draw.connect(_draw_stage)

@@ -2,11 +2,14 @@ extends "res://tests/support/suite.gd"
 ## The title type (docs/milestones/boss-intro.md, rule 7; BI3): `art/ui/fonts/title.svg`, a
 ## bitmap face on a 12×16 grid drawn from `title.grid.json` by tools/pixel_grid.py and imported
 ## by Godot's image font importer, loads as a font with a glyph for every printable ASCII
-## character, a cell wide each, at whole-number scales only; the theme's `TitleLabel` draws it at
-## 2×; and every boss's shown name has a glyph for each of its characters.
+## character, a cell wide each, at whole-number scales only; the title theme's `TitleLabel` draws it
+## at 2×, and the boss intro wears that theme; every boss's shown name has a glyph for each of its
+## characters; and the project theme names no file at all, as it is loaded before the first import.
 
 const RegistryScript := preload("res://core/registry/registry.gd")
-const SpellmergeTheme := preload("res://hud/theme/spellmerge_theme.tres")
+const TitleTheme := preload("res://hud/theme/title_theme.tres")
+const BossIntroScript := preload("res://hud/panels/boss/boss_intro.gd")
+const PROJECT_THEME_PATH: String = "res://hud/theme/spellmerge_theme.tres"
 const TITLE_FONT_PATH: String = "res://art/ui/fonts/title.svg"
 ## The face's cell (rule 7) and the scale a boss's name is drawn at.
 const CELL := Vector2i(12, 16)
@@ -51,7 +54,7 @@ func test_every_printable_ascii_character_has_a_glyph_a_cell_wide() -> void:
 
 
 func test_title_label_draws_it_at_twice_its_size() -> void:
-	var theme: Theme = SpellmergeTheme
+	var theme: Theme = TitleTheme
 	check_equal(theme.get_type_variation_base(&"TitleLabel"), &"Label", "TitleLabel is a Label's look")
 	check(theme.get_font(&"font", &"TitleLabel") == _title_font(), "TitleLabel uses the title type")
 	check_equal(theme.get_font_size(&"font_size", &"TitleLabel"), CELL.y * NAME_SCALE, "a boss's name at 2×")
@@ -62,6 +65,21 @@ func test_title_label_draws_it_at_twice_its_size() -> void:
 	label.text = "Broom"
 	root.add_child(label)
 	check_equal(label.get_minimum_size().x, float(CELL.x * NAME_SCALE * label.text.length()), "five letters, each a doubled cell")
+
+
+func test_the_boss_intro_draws_the_name_in_the_title_type() -> void:
+	var intro := own(BossIntroScript.new()) as BossIntroScript
+	root.add_child(intro)
+	check(intro.get_theme_font(&"font", &"TitleLabel") == _title_font(), "the intro finds TitleLabel's font through its own theme")
+	check(intro.get_theme_font(&"font", &"Label") != _title_font(), "its other text keeps the project theme's font")
+
+
+## Regression (the preview build, from BI3 on): the engine loads the project theme at its start,
+## before the first scan, so on a fresh checkout an imported file it names is not there yet and the
+## import step logs errors. A look that needs one (the title type) is a theme of its own.
+func test_the_project_theme_names_no_file() -> void:
+	check_equal(ProjectSettings.get_setting("gui/theme/custom"), PROJECT_THEME_PATH, "the project theme is the one checked here")
+	check_equal(ResourceLoader.get_dependencies(PROJECT_THEME_PATH), PackedStringArray(), "the project theme depends on nothing: it loads before any import")
 
 
 func test_every_boss_name_has_its_glyphs() -> void:

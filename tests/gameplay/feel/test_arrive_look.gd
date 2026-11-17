@@ -217,10 +217,14 @@ func test_a_body_added_after_the_step_is_cut_before_the_draw() -> void:
 	check(RenderingServer.frame_pre_draw.is_connected(_look.cut), "the cut runs before every frame is drawn")
 
 
-## A body with a sprite whose frame reaches 2 px under its feet (a spitter's), arriving at `at`.
-func _arriving_with_art(at: Vector2, share: float) -> Actor:
+## A body with a sprite whose frame reaches 2 px under its feet (a spitter's), arriving at `at`; with
+## `hurt_radius`, its hurt shape that wide (20: its top above the sprite's).
+func _arriving_with_art(at: Vector2, share: float, hurt_radius: float = -1.0) -> Actor:
 	var body := Actor.new()
-	body.add_child(Hurtbox.new())
+	var hurtbox := Hurtbox.new()
+	if hurt_radius > 0.0:
+		hurtbox.radius = hurt_radius
+	body.add_child(hurtbox)
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	var art := PlaceholderTexture2D.new()
@@ -240,10 +244,13 @@ func _arriving_with_art(at: Vector2, share: float) -> Actor:
 ## look's bob (its art moved while it arrives) is followed; its shift and its mask are what a fresh
 ## count gives.
 func test_the_part_of_its_height_its_size_moves_is_worked_out_once() -> void:
-	var body: Actor = _arriving_with_art(Vector2(100.0, 100.0), 0.6)
+	# Its hurt shape the tallest of it, so its shift follows the part kept.
+	var body: Actor = _arriving_with_art(Vector2(100.0, 100.0), 0.6, 20.0)
 	var other: Actor = _arriving_with_art(Vector2(200.0, 100.0), 0.3)
 	check(is_nan(_look.size_top_kept(body)), "nothing kept before its first cut")
 	_frame(0.016)
+	check(ArriveLook.size_top(body) + ArriveLook.HEIGHT_MARGIN > ArriveLook.body_height(other), "its hurt shape stands above its art: %s" % ArriveLook.size_top(body))
+	check_equal(ArriveLook.body_height(body), ceilf(ArriveLook.size_top(body) + ArriveLook.HEIGHT_MARGIN), "its height is its hurt shape's")
 	check_equal(_look.size_top_kept(body), ArriveLook.size_top(body), "kept as a fresh count gives it")
 	check_equal(_look.size_tops_kept(), 2, "one for each body cut")
 	check_equal(ArriveLook.body_bottom(body), 2.0, "its frame reaches 2 px under its feet")
@@ -280,4 +287,6 @@ func test_the_part_of_its_height_its_size_moves_is_worked_out_once() -> void:
 func _check_fresh(body: Actor, when: String) -> void:
 	var bottom: float = ArriveLook.body_bottom(body)
 	check_equal(_look.bottom_of(body), bottom, "%s: its mask at its lowest row" % when)
+	var size: float = absf(body.size)
+	check_equal(ArriveLook.mask_rect(bottom, size), Rect2(-ArriveLook.MASK_HALF_WIDTH, -ArriveLook.MASK_TALL, 2.0 * ArriveLook.MASK_HALF_WIDTH, ArriveLook.MASK_TALL + bottom / size), "%s: everything above that line, in its own pixels" % when)
 	check_equal(_look.shift_of(body), ArriveLook.rise_shift(ArriveLook.body_height(body) + bottom, body.arrive_share()), "%s: shifted as a fresh count says" % when)

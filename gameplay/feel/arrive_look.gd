@@ -35,7 +35,7 @@ extends Node2D
 ##
 ## View only. Nothing here allocates while bodies arrive: its scratch of ids and marks is made once,
 ## and the dictionaries of the bodies it cut (with the part of each one's height that follows its
-## size, worked out once) and whose cue it played grow only when a body first arrives (and are walked
+## size, worked out when it is first cut and again only if its size changes) and whose cue it played grow only when a body first arrives (and are walked
 ## only as one is done).
 
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -81,7 +81,7 @@ var _drawn: Dictionary[int, Vector2] = {}
 ## with the body in `_drawn`. Its sprite's terms are read every cut: its look's bob moves its art
 ## while it arrives (`CreatureLook`, the sprite's offset).
 var _size_top: Dictionary[int, float] = {}
-var _size_top_at: Dictionary[int, float] = {}
+var _size_top_measured_at: Dictionary[int, float] = {}
 var _risen: Dictionary[int, bool] = {}
 ## This frame's marks: where (whole pixels) and how wide; `_marks` of them are in use.
 var _mark_at: PackedVector2Array = PackedVector2Array()
@@ -156,11 +156,13 @@ static func mark_radius(radius: float, share: float) -> int:
 ## centre (both kept in pixels at its size, `Actor.set_size`), and a margin. (A layered body's art is
 ## in its `BodyPart`s, not its `Sprite`: only bosses are layered today, and they never arrive.)
 static func body_height(body: Actor) -> float:
-	return _height_over(body, size_top(body))
+	return _height_from(body, size_top(body))
 
 
 ## The top of `body` from its body's centre and its hurt shape alone, in pixels from its feet: the
-## part of `body_height` that only its size moves (`Actor.set_size`).
+## part of `body_height` that, once it is in play, only its size moves (`Actor.set_size`; a prop's
+## or a decoy's are set before it is added). A cut keeps it while the body arrives, so anything
+## that moved these mid-arrival without its size would have to be counted here (gameplay/feel/README.md).
 static func size_top(body: Actor) -> float:
 	var top: float = -2.0 * body.body_offset.y
 	if body.hurtbox != null:
@@ -169,7 +171,7 @@ static func size_top(body: Actor) -> float:
 
 
 ## `body_height` from its `size_top` and its body sprite as it is now.
-static func _height_over(body: Actor, top_of_size: float) -> float:
+static func _height_from(body: Actor, top_of_size: float) -> float:
 	var top: float = top_of_size
 	var sprite := body.get_node_or_null(^"Sprite") as Sprite2D
 	if sprite != null:
@@ -243,7 +245,7 @@ func _cut_body(body: Actor) -> void:
 		body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
 	var size: float = maxf(absf(body.size), 0.01)
 	var bottom: float = body_bottom(body)
-	var shift: float = rise_shift(_height_over(body, _size_top_of(body, key)) + bottom, body.arrive_share())
+	var shift: float = rise_shift(_height_from(body, _size_top_of(body, key)) + bottom, body.arrive_share())
 	_drawn[key] = Vector2(shift, bottom)
 	_shift_parts(body, shift / size)
 	var item: RID = body.get_canvas_item()
@@ -263,11 +265,11 @@ static func mask_rect(bottom: float, size: float) -> Rect2:
 ## `body`'s `size_top`, as kept for `key` (its instance id): worked out the first time and whenever
 ## its size is not the one it was worked out at.
 func _size_top_of(body: Actor, key: int) -> float:
-	if _size_top_at.get(key, NAN) == body.size:
+	if _size_top_measured_at.get(key, NAN) == body.size:
 		return _size_top[key]
 	var top: float = size_top(body)
 	_size_top[key] = top
-	_size_top_at[key] = body.size
+	_size_top_measured_at[key] = body.size
 	return top
 
 
@@ -312,7 +314,7 @@ func _put_back() -> void:
 			_shift_parts(body, 0.0)
 		_drawn.erase(key)
 		_size_top.erase(key)
-		_size_top_at.erase(key)
+		_size_top_measured_at.erase(key)
 
 
 func _draw() -> void:

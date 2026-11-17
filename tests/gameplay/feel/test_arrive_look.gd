@@ -215,3 +215,78 @@ func test_a_body_added_after_the_step_is_cut_before_the_draw() -> void:
 	check_equal(late.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "cut just before the draw")
 	check_equal(_look.shift_of(late), ArriveLook.body_height(late), "all of it under the floor")
 	check(RenderingServer.frame_pre_draw.is_connected(_look.cut), "the cut runs before every frame is drawn")
+
+
+## A body with a sprite whose frame reaches 2 px under its feet (a spitter's), arriving at `at`; with
+## `hurt_radius`, its hurt shape that wide (20: its top above the sprite's).
+func _arriving_with_art(at: Vector2, share: float, hurt_radius: float = -1.0) -> Actor:
+	var body := Actor.new()
+	var hurtbox := Hurtbox.new()
+	if hurt_radius > 0.0:
+		hurtbox.radius = hurt_radius
+	body.add_child(hurtbox)
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	var art := PlaceholderTexture2D.new()
+	art.size = Vector2(16.0, 32.0)
+	sprite.texture = art
+	sprite.position = Vector2(0.0, -14.0)
+	body.add_child(sprite)
+	body.arrive(Actor.ARRIVE_SECONDS)
+	_world.add(body, at)
+	_set_share(body, share)
+	return body
+
+
+## The part of a body's height its size moves (its body's centre, its hurt shape: `size_top`) is
+## worked out when it is first cut, kept while it arrives, worked out again if its size changes
+## mid-arrival and forgotten once it lands or goes; its sprite's terms are read at every cut, so its
+## look's bob (its art moved while it arrives) is followed; its shift and its mask are what a fresh
+## count gives.
+func test_the_part_of_its_height_its_size_moves_is_worked_out_once() -> void:
+	# Its hurt shape the tallest of it, so its shift follows the part kept.
+	var body: Actor = _arriving_with_art(Vector2(100.0, 100.0), 0.6, 20.0)
+	var other: Actor = _arriving_with_art(Vector2(200.0, 100.0), 0.3)
+	check(is_nan(_look.size_top_kept(body)), "nothing kept before its first cut")
+	_frame(0.016)
+	check(ArriveLook.size_top(body) + ArriveLook.HEIGHT_MARGIN > ArriveLook.body_height(other), "its hurt shape stands above its art: %s" % ArriveLook.size_top(body))
+	check_equal(ArriveLook.body_height(body), ceilf(ArriveLook.size_top(body) + ArriveLook.HEIGHT_MARGIN), "its height is its hurt shape's")
+	check_equal(_look.size_top_kept(body), ArriveLook.size_top(body), "kept as a fresh count gives it")
+	check_equal(_look.size_tops_kept(), 2, "one for each body cut")
+	check_equal(ArriveLook.body_bottom(body), 2.0, "its frame reaches 2 px under its feet")
+	_check_fresh(body, "first cut")
+	# Its look's bob: its art 1 px up (the sprite's offset), as CreatureLook lifts it while it arrives.
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	sprite.offset.y -= 1.0
+	_set_share(body, 0.7)
+	_frame(0.016)
+	check_equal(_look.bottom_of(body), 1.0, "its mask follows its art up")
+	_check_fresh(body, "bobbed")
+	# Not counted again each frame: its hurt shape's top is only ever moved by its size.
+	var kept: float = _look.size_top_kept(body)
+	body.hurtbox.offset.y -= 50.0
+	_frame(0.016)
+	check_equal(_look.size_top_kept(body), kept, "the same, not counted again")
+	body.hurtbox.offset.y += 50.0
+	body.set_size(1.5)
+	_frame(0.016)
+	check(_look.size_top_kept(body) != kept, "its size moves it: %s" % _look.size_top_kept(body))
+	check_equal(_look.size_top_kept(body), ArriveLook.size_top(body), "counted again at its new size")
+	_check_fresh(body, "grown")
+	body.arrive_left = 0.0
+	_frame(0.016)
+	check(is_nan(_look.size_top_kept(body)), "forgotten once it lands")
+	check_equal(_look.size_tops_kept(), 1, "only the other is kept")
+	_world.actors.erase(other)
+	other.free()
+	_frame(0.016)
+	check_equal(_look.size_tops_kept(), 0, "a body gone is forgotten")
+
+
+## `body`'s shift and mask at its last cut are what a fresh `body_height` and `body_bottom` give.
+func _check_fresh(body: Actor, when: String) -> void:
+	var bottom: float = ArriveLook.body_bottom(body)
+	check_equal(_look.bottom_of(body), bottom, "%s: its mask at its lowest row" % when)
+	var size: float = absf(body.size)
+	check_equal(ArriveLook.mask_rect(bottom, size), Rect2(-ArriveLook.MASK_HALF_WIDTH, -ArriveLook.MASK_TALL, 2.0 * ArriveLook.MASK_HALF_WIDTH, ArriveLook.MASK_TALL + bottom / size), "%s: everything above that line, in its own pixels" % when)
+	check_equal(_look.shift_of(body), ArriveLook.rise_shift(ArriveLook.body_height(body) + bottom, body.arrive_share()), "%s: shifted as a fresh count says" % when)

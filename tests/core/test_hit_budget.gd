@@ -27,6 +27,8 @@ class Scene:
 	var bodies: Array[Node2D] = []
 	## The bodies each shot hit, in order, by its slot.
 	var hit_by_shot: Dictionary = {}
+	## The hits on each body (by its index), a merged hit counting what it stands for.
+	var by_body: Dictionary = {}
 	var hits: int = 0
 
 
@@ -124,6 +126,39 @@ func test_a_budget_delays_hits_and_loses_none() -> void:
 		check_equal(results[1], results[0], "native and GDScript hit alike")
 
 
+## The same flight with every shot one spell's: its hits merge, and a budget of one, which tests
+## the shots over more steps and so merges them otherwise, lands the very hits on each body.
+func test_a_budget_loses_none_of_one_spells_merged_hits() -> void:
+	var results: Array = []
+	for native: bool in _modes():
+		var by_budget: Array[Dictionary] = []
+		var events: Array[int] = []
+		for work: int in [UNBUDGETED, 1]:
+			var scene := _scene(native, Rect2(-400.0, -400.0, 800.0, 800.0))
+			scene.mgr.work_per_step = work
+			for i in 12:
+				_body(scene, Vector2(20.0 + 12.0 * float(i), float(i % 3) * 6.0 - 6.0), 8.0)
+			var velocities := PackedVector2Array()
+			for i in 400:
+				velocities.append(Vector2(300.0, float(i % 21) - 10.0))
+			var slots := PackedInt32Array()
+			slots.resize(velocities.size())
+			scene.mgr.spawn_batch(_caster(scene), Vector2(-20.0, 0.0), velocities, 2.0, 3.0, ManagerScript.LAYER_ENEMY, 1, 7, slots)
+			for i in 130:
+				scene.mgr.step(DT)
+			check_equal(scene.mgr.get_count(), 0, "%s, budget %d: every shot ended" % [_label(scene), work])
+			by_budget.append(scene.by_body)
+			events.append(scene.hits)
+			_free(scene)
+		var label: String = "native" if native else "GDScript"
+		check(not by_budget[0].is_empty(), "%s: the shots hit the bodies" % label)
+		check(events[1] > events[0], "%s: the budget splits the merged hits over more steps (%d events against %d)" % [label, events[1], events[0]])
+		check_equal(by_budget[1], by_budget[0], "%s: with a budget of one each body took the hits it took with none" % label)
+		results.append(by_budget[1])
+	if results.size() == 2:
+		check_equal(results[1], results[0], "native and GDScript hit alike")
+
+
 ## The game's budget (WORK_PER_STEP) is sized for a full crowd at the desktop cap: there, no shot
 ## waits more than one step for its test.
 func test_no_shot_waits_more_than_one_step_in_a_full_crowd() -> void:
@@ -209,7 +244,9 @@ func _scene(native: bool, bounds: Rect2) -> Scene:
 	scene.bus.projectile_hit.connect(func(_caster: int, target: Node, _point: Vector2, _tag: int, shot: int) -> void:
 		scene.hits += 1
 		var list: Array = scene.hit_by_shot.get(shot, [])
-		list.append(scene.bodies.find(target as Node2D))
+		var index: int = scene.bodies.find(target as Node2D)
+		scene.by_body[index] = int(scene.by_body.get(index, 0)) + scene.mgr.impact_count
+		list.append(index)
 		scene.hit_by_shot[shot] = list)
 	return scene
 

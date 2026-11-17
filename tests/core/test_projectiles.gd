@@ -944,7 +944,7 @@ func _hits_that_remove_their_targets() -> void:
 
 func test_a_removal_in_a_hit_handler_waits_for_the_next_step() -> void:
 	_hits_that_remove_their_targets()
-	check_equal(hits.size(), 2, "both targets were hit despite one removal mid-step")
+	check_equal(hits.size(), 2, "both targets were hit (the merged hits, and their handlers, come after the pass)")
 	check_equal(mgr.get_target_count(), 2, "removal inside a step waits for the next one")
 
 
@@ -964,6 +964,41 @@ func test_a_spawn_in_a_hit_handler_waits_a_step() -> void:
 	if spawned.size() == 1:
 		var at: Vector2 = mgr.get_position_of(spawned[0])
 		check(at.x > 19.0 and at.x < 21.0, "it did not move in the step that made it (%s)" % str(at))
+
+
+
+## The same during the pass: a shot's end on a wall goes out in the pass (a hit's waits for its end),
+## and what its handler spawns does not move in the step that made it either.
+func test_a_spawn_in_an_end_handler_during_the_pass_waits_a_step() -> void:
+	mgr.set_walls([Rect2(20.0, -20.0, 8.0, 40.0)] as Array[Rect2])
+	var spawned: Array[int] = []
+	var made_at: Array[Vector2] = []
+	bus.projectile_expired.connect(func(_p: int, at: Vector2, _tag: int, _shot: int) -> void:
+		made_at.append(at - Vector2(4.0, 0.0))
+		spawned.append(mgr.spawn(0, made_at[0], Vector2(-600.0, 0.0), 1.0)))
+	mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
+	var before: int = mgr.wall_hits
+	mgr.step(DT)
+	check_equal(mgr.wall_hits, before + 1, "the shot ended on the wall in the pass")
+	check(spawned.size() == 1 and mgr.get_count() == 1, "a spawn from its end handler is kept")
+	if spawned.size() == 1:
+		check_equal(mgr.get_position_of(spawned[0]), made_at[0], "it did not move in the step that made it")
+
+
+## A target taken away by a handler during the pass (a shot's end on a wall, before a later shot of
+## the pass reaches it) is met by no later shot of the pass, and is swept at the next step.
+func test_a_target_removed_during_the_pass_is_met_by_no_later_shot() -> void:
+	mgr.set_walls([Rect2(20.0, -20.0, 8.0, 40.0)] as Array[Rect2])
+	var gone: Node2D = _target(Vector2(30.0, 300.0))
+	bus.projectile_expired.connect(func(_p: int, _at: Vector2, _tag: int, _shot: int) -> void: mgr.remove_target(gone))
+	var first: int = mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
+	var later: int = mgr.spawn(1, Vector2(0.0, 300.0), Vector2(1200.0, 0.0), 1.0)
+	check(first < later, "the shot that ends comes first in the pass")
+	mgr.step(DT)
+	check_equal(hits.size(), 0, "the later shot passes where the target was")
+	check_equal(mgr.get_target_count(), 1, "the removal is swept at the next step")
+	mgr.step(DT)
+	check_equal(mgr.get_target_count(), 0, "and then it is gone")
 
 
 func test_a_shot_far_outside_the_bounds_is_removed() -> void:

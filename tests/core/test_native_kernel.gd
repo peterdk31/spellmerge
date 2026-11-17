@@ -17,7 +17,9 @@ extends "res://tests/support/suite.gd"
 ## shots frozen by a local stop, orbits round another shot, and now and then a solid rune (a wall:
 ## while one lives the hit pass and the drawing run in GDScript, so the two switch mid-run); hit
 ## handlers that spawn shots (which spare the body hit), remove a target, register one again
-## larger and make a shot further on a ghost now and then.
+## larger and make a later shot a ghost now and then, after the pass (the merged hits are sent at
+## its end); and expiry handlers that do the same during it (a shot's end goes out in the pass), so
+## the kernel resumes after a target is taken away or grown, or a later shot changed, mid-pass.
 ##
 ## The tests: the kernel's own checks of the manager's constants and members, one per test; the
 ## scene stepped with the native kernel on one thread, and (a test of its own) on four (shot scale
@@ -396,11 +398,11 @@ func _step_the_scene_alike(threads: int) -> void:
 
 # --- Targets grown mid-pass -------------------------------------------------
 # An event that grows targets mid-pass (a shot ending on a wall: its `projectile_expired` goes out
-# during the pass, while the merged hits wait for its end): the shots after it in the pass must see
-# each target's cell as the GDScript does. It keeps a cell's count and box once taken in a filling (`_cell_info`), so a
-# shot passing the grown `near` (whose cell an earlier shot of the pass took) still sees its old
-# box and misses it, and one passing the grown `far` (whose cell nothing took yet) sees the new
-# one and hits it.
+# during the pass, while the merged hits wait for the pass's end): the shots after it in the pass
+# must see each target's cell as the GDScript does. It keeps a cell's count and box once taken in a
+# filling (`_cell_info`), so a shot passing the grown `near` (whose cell an earlier shot of the pass
+# took) still sees its old box and misses it, and one passing the grown `far` (whose cell nothing
+# took yet) sees the new one and hits it.
 
 ## Builds the scene on both sides and steps it three times, comparing each step; returns the
 ## GDScript side's events of the first step.
@@ -605,10 +607,10 @@ func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, 
 		# Now and then a hit takes its target away (it died).
 		m.remove_target(target as Node2D)
 	elif shot % 89 == 7 and target.name.begins_with("enemy"):
-		# Or makes it much larger (registered again) for the shots after it.
+		# Or makes it much larger (registered again) for the next pass.
 		m.add_target(target as Node2D, 60.0)
 	if shot % 13 == 5:
-		# Or changes a shot further on in the pass (a ghost now, pulled a little, as a pull would).
+		# Or changes another shot (a ghost now, pulled a little, as a pull would).
 		var later: int = (shot + 31) % m.get_cap()
 		if m.set_ghost(later):
 			m._pos[later] += Vector2(6.0, -4.0)
@@ -616,6 +618,21 @@ func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, 
 
 func _on_expired(caster: int, position: Vector2, tag: int, shot: int, side: int) -> void:
 	_events[side].append("expired %d %s %d %d" % [caster, var_to_str(position), tag, shot])
+	# During the pass, alike on both sides: now and then an end takes an enemy away, makes one much
+	# larger (registered again), or makes a shot later in the pass a ghost and pulls it a little.
+	var m: ManagerScript = _mgrs[side]
+	var enemies: Array = _targets[side]
+	if enemies.is_empty():
+		return
+	var body: Node2D = enemies[(shot * 7) % enemies.size()] as Node2D
+	if shot % 23 == 4 and body.name.begins_with("enemy"):
+		m.remove_target(body)
+	elif shot % 19 == 9 and body.name.begins_with("enemy"):
+		m.add_target(body, 60.0)
+	if shot % 11 == 2:
+		var later: int = (shot + 17) % m.get_cap()
+		if m.set_ghost(later):
+			m._pos[later] += Vector2(6.0, -4.0)
 
 
 ## Every packed array (and int and float) member of the two managers, byte for byte.

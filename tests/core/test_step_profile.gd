@@ -20,7 +20,7 @@ class Scene:
 	var table: Node
 	var mgr: ManagerScript
 	var bodies: Array[Node2D] = []
-	## Every hit, in order: caster, which body, the point.
+	## Every merged hit, in order: caster, which body, the point, the hits it stands for.
 	var hits: Array = []
 
 

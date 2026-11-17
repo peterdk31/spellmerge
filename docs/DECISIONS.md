@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-17: the hit-work budget 5% more for the merged hits (owner)
+
+- **Found in hit batch A3a** (docs/milestones/hit-batch.md): with the hits merged, `tests/core/test_hit_budget.gd`'s full crowd at the desktop cap had 239 shots wait two steps for their hit test, where none did one by one (the test had run unmerged until A3a, so the game, merged since the prototype, already missed it). No hit is lost and the budget spent is the same; a merged pass frees its slots in another order (the shots that end during it first, its spent shots at its end), so the next step's shots take other slots, and when the budget runs out it reaches other shots first: the shortage then lasted 11 steps instead of 3.
+- **The owner's choice** (of raising the budget, relaxing the test, or freeing the slots in the old order, which would have changed both recordings): `WORK_PER_STEP` 150,000 to 157,500 (5% more), at which none waits more than one step (at most 914 wait one). It costs at most 5% more hit-test work in a saturated step. `SessionRules.hit_work` follows the constant; shot scale's crowd scenes, which spend the budget, change with it (the plan's A3a note).
+
 ## 2026-11-17: the owner's answers on the hit batch and the prototypes (owner)
 
 - **Q1, one hit model: merged hits only.** A step's shot hits of one caster's spell on one body are one hit (`impact_count` the hits): one hit-stop, one knockback, one look, one sound. This replaces the decision of 2026-11-07 against bundled hits (shot-scale.md, H3b) and DESIGN's "every hit has hit-stop..." now says a merged hit is one hit. Part A of docs/milestones/hit-batch.md goes ahead: the unmerged mode, its switches and the kernel's unmerged path go (A3b).

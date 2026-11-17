@@ -1,7 +1,7 @@
 extends "res://tests/support/screenshot.gd"
 ## Screenshots of spell light in a room (gameplay/feel/spell_light.gd; docs/milestones/
 ## spell-spectacle.md, P3b), for the owner's two picks: a room's ambient and the light's steps.
-## The same still fight in a crypt room (the nave, arena_02), its torches lit: the four players' bolts, a fire, a
+## The same still fight in a crypt room (the nave, arena_02), its candles and shaft lit (crypt rework CR4): the four players' bolts, a fire, a
 ## frost and a lightning bolt, an enemy's bolt, a burst and a blast going off. Taken at the
 ## ambients `spell_light_room_ambient_100`, `_085` (the owner's pick of 2026-11-04 for
 ## the room that had it) and `_070`, all in three steps (bands 3), and `spell_light_room_smooth_085` at
@@ -55,7 +55,7 @@ func take() -> void:
 		fail("the shots are not drawn, got %d" % int(_shots.get("drawn")))
 		return
 	if int(light.call("spot_count")) < 4:
-		fail("the room's torches do not light, got %d" % int(light.call("spot_count")))
+		fail("the room's candles and shaft do not light, got %d" % int(light.call("spot_count")))
 		return
 	light.call("set_bands", 3)
 	for ambient: float in [1.0, 0.85, 0.7]:

@@ -90,6 +90,9 @@ var _root: Node
 ## must be in the tree to be hit).
 func _init(root: Node, player_count: int = 1) -> void:
 	_root = root
+	# The AI's tests script its reactions step by step: every enemy thinks every tick (the game's
+	# rate, `AIController.THINK_EVERY`, is put back by `free_all`).
+	AIController.think_every = 1
 	bus = EventsScript.new()
 	projectiles = ProjectileManagerScript.new()
 	projectiles.events = bus
@@ -287,6 +290,7 @@ func run_all(count: int) -> void:
 
 
 func free_all() -> void:
+	AIController.think_every = AIController.THINK_EVERY
 	for body in enemies:
 		if is_instance_valid(body):
 			body.free()

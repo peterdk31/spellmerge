@@ -27,6 +27,7 @@ func before_each() -> void:
 
 func after_each() -> void:
 	projectiles.call("clear")
+	AIController.think_every = AIController.THINK_EVERY
 
 
 func _training() -> Actor:
@@ -155,6 +156,8 @@ func test_the_shooting_dummy_fires_slow_telegraphed_shots_at_the_nearest_wizard(
 	root.add_child(own(dummy))
 	dummy.ticking = false
 	var ai := dummy.get_node("AIController") as AIController
+	# Stepped by hand, one decision a step (the AI's tests' rate; `after_each` puts the game's back).
+	AIController.think_every = 1
 	dummy.step(0.05)
 	check(ai.is_telegraphing(), "a wizard 200 px away is in range: the telegraph shows")
 	check(dummy.aim.is_equal_approx(Vector2.DOWN), "it aims at the nearest wizard")

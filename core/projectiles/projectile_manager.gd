@@ -665,7 +665,7 @@ signal still_shots_drawn(view: StillShotView)
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_merging", &"merge_hits", &"_batch", &"merged_turns", &"_freeing_now", &"merges_hits"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_merging", &"merge_hits", &"_hit_batch", &"merged_turns", &"_freeing_now", &"merges_hits"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -727,7 +727,7 @@ var _merging: bool = false
 ## The pass's merged hits, the bodies' tallies and its spent shots, held slots and kept ends
 ## (`HitBatch`, hit batch A1): emptied within the step (`_send_merged`). The native hit pass reads
 ## and writes its arrays (`BATCH_FIELDS`).
-var _batch: HitBatch = HitBatch.new()
+var _hit_batch: HitBatch = HitBatch.new()
 ## The shot turns the native hit pass merged itself, every hit of them adding to a merged hit the
 ## pass already had (no hand-back to GDScript). A count for benchmarks and tests; nothing reads it.
 var merged_turns: int = 0
@@ -2174,7 +2174,7 @@ func _fit_draw_bounds() -> void:
 func clear() -> void:
 	# What a pass merged and holds (never set between steps; a handler may clear mid-pass).
 	_merging = false
-	_batch.empty()
+	_hit_batch.empty()
 	for slot in _high:
 		if _alive[slot] != 0 and _tag[slot] != 0:
 			shot_ended.emit(_tag[slot])
@@ -3612,7 +3612,7 @@ func _pass_hits(top: int, delta: float) -> void:
 	var n: int = 0
 	_merging = merge_hits and events != null
 	if _merging:
-		_batch.open(_targets.size(), top)
+		_hit_batch.open(_targets.size(), top)
 	if _kernel != null and not _any_solid:
 		n = _pass_hits_native(top, delta, limit, resume)
 	# Every shot the kernel did not reach (all of them without it).
@@ -6035,7 +6035,7 @@ func _kill(slot: int, announce: bool = true) -> void:
 	_drop_moves(slot)
 	if announce and _tag[slot] != 0:
 		if _merging:
-			_batch.keep_end(_tag[slot])
+			_hit_batch.keep_end(_tag[slot])
 		else:
 			shot_ended.emit(_tag[slot])
 	if _kinds[slot] != 0:
@@ -6044,7 +6044,7 @@ func _kill(slot: int, announce: bool = true) -> void:
 	_state[slot] = S_IDLE
 	_leave_group(slot)
 	if _merging and not _freeing_now:
-		_batch.hold(slot)
+		_hit_batch.hold(slot)
 	else:
 		_free_slots[_free_count] = slot
 		_free_count += 1
@@ -6092,7 +6092,7 @@ func _expire(slot: int) -> void:
 		if _merging:
 			# After its hits of this pass, merged and still to send (spells.gd: a shot's end
 			# comes after its hits' handlers).
-			_batch.keep_end(tag)
+			_hit_batch.keep_end(tag)
 		else:
 			shot_ended.emit(tag)
 
@@ -6649,7 +6649,7 @@ func _hit_candidates(slot: int, found: int) -> bool:
 		var t: int = _cand_target[n]
 		if _target_layer[t] == 0 or not is_instance_valid(_targets[t]):
 			continue
-		if _merging and not _batch.takes(t):
+		if _merging and not _hit_batch.takes(t):
 			# Its merged hits so far kill it: the shot is not spent on it.
 			continue
 		_work_left -= HIT_WORK
@@ -6857,7 +6857,7 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	elif _merging:
 		# Ended with the pass's other spent shots, after its hits (`_end_spent`).
 		_flags[slot] |= F_SPENT
-		_batch.spend(slot, at)
+		_hit_batch.spend(slot, at)
 	else:
 		spent = true
 		_end_tail(slot, at)
@@ -6892,26 +6892,26 @@ func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: i
 	impact_count = 1
 
 
-## The hit of the shot in `slot` on target `target`, kept for the end of the pass (`_batch`): added
+## The hit of the shot in `slot` on target `target`, kept for the end of the pass (`_hit_batch`): added
 ## to the caster's hits on it with the same tag, or the first of them, for which Combat is asked
 ## what one hit of the spell takes off the body and what it has (once a pass).
 func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, heading: Vector2) -> void:
-	var entry: int = _batch.entry_of(target, caster, tag, (_flags[slot] & F_ALONE) != 0, _flags, F_ALONE)
+	var entry: int = _hit_batch.entry_of(target, caster, tag, (_flags[slot] & F_ALONE) != 0, _flags, F_ALONE)
 	if entry >= 0:
-		_batch.count_hit(entry)
+		_hit_batch.count_hit(entry)
 		return
-	entry = _batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot])
-	_batch.room.clear()
-	events.hit_room_asked.emit(caster, _targets[target], tag, slot, _batch.room)
-	_batch.take_room(entry)
+	entry = _hit_batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot])
+	_hit_batch.room.clear()
+	events.hit_room_asked.emit(caster, _targets[target], tag, slot, _hit_batch.room)
+	_hit_batch.take_room(entry)
 
 
 ## The shots the pass's hits spent, ended in the order they were (their tails where they were spent;
 ## their slots held and their `shot_ended` kept for after the hits, as the pass still merges).
 func _end_spent() -> void:
-	for i in _batch.spent_count():
+	for i in _hit_batch.spent_count():
 		_end_spent_at(i)
-	_batch.forget_spent()
+	_hit_batch.forget_spent()
 
 
 ## A held slot handed back to the free list now (`_spawn_row` at the cap, no slot free): the last
@@ -6919,21 +6919,21 @@ func _end_spent() -> void:
 ## still to send, reads its own profile by its slot). The hit sent later names no shot (its entry's
 ## `seq`). False for none.
 func _take_back_slot() -> bool:
-	var i: int = _batch.held_count() - 1
+	var i: int = _hit_batch.held_count() - 1
 	while i >= 0:
-		var slot: int = _batch.held_slot(i)
+		var slot: int = _hit_batch.held_slot(i)
 		if (_flags[slot] & F_ALONE) == 0:
-			_batch.drop_held(i)
+			_hit_batch.drop_held(i)
 			_free_slots[_free_count] = slot
 			_free_count += 1
 			return true
 		i -= 1
-	i = _batch.spent_count() - 1
+	i = _hit_batch.spent_count() - 1
 	while i >= 0:
-		var spent: int = _batch.spent_slot(i)
+		var spent: int = _hit_batch.spent_slot(i)
 		if (_flags[spent] & F_ALONE) == 0 and _end_spent_at(i):
 			# Out of the list (the last takes its place), and its slot, held by its end, back now.
-			_batch.drop_spent(i)
+			_hit_batch.drop_spent(i)
 			return _free_count > 0 or _take_back_slot()
 		i -= 1
 	return false
@@ -6943,15 +6943,15 @@ func _take_back_slot() -> bool:
 ## end kept for after the hits, as the pass still merges), unless a handler ended it meanwhile or its
 ## slot holds another shot now (a new shot's flags have no F_SPENT). True when it ended it.
 func _end_spent_at(i: int) -> bool:
-	var slot: int = _batch.spent_slot(i)
+	var slot: int = _hit_batch.spent_slot(i)
 	if _alive[slot] == 0 or (_flags[slot] & F_SPENT) == 0:
 		return false
 	_flags[slot] &= ~F_SPENT
 	var tag: int = _tag[slot]
-	_end_tail(slot, _batch.spent_at(i))
+	_end_tail(slot, _hit_batch.spent_at(i))
 	_kill(slot, false)
 	if tag != 0:
-		_batch.keep_end(tag)
+		_hit_batch.keep_end(tag)
 	return true
 
 
@@ -6959,7 +6959,7 @@ func _end_spent_at(i: int) -> bool:
 ## handler may hit or spawn again: it is sent at once (`_merging` is off by now).
 func _send_merged() -> void:
 	# Each read anew, so a handler's `clear()` (every count to 0) stops what is left.
-	var batch: HitBatch = _batch
+	var batch: HitBatch = _hit_batch
 	var entry: int = 0
 	while entry < batch.entries:
 		var target: int = batch.target[entry]
@@ -6968,7 +6968,7 @@ func _send_merged() -> void:
 			var shot: int = batch.slot[entry] if _seq[batch.slot[entry]] == batch.seq[entry] else -1
 			_send_hit(batch.caster[entry], node, batch.at[entry], batch.heading[entry], batch.tag[entry], shot, batch.card[entry], batch.body[entry], batch.core[entry], batch.look[entry], batch.count[entry])
 		entry += 1
-	batch.entries = 0
+	batch.forget_entries()
 	for i in batch.held_count():
 		_free_slots[_free_count] = batch.held_slot(i)
 		_free_count += 1

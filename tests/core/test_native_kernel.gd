@@ -230,8 +230,8 @@ func test_the_hit_batch_the_kernel_reads_is_checked() -> void:
 	if not _native_loaded():
 		return
 	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
-	mgr._batch = null
-	check("_batch" in ", ".join(NativeScript.shot_kernel().call(&"check_fields", mgr) as PackedStringArray), "a manager without a hit batch is named")
+	mgr._hit_batch = null
+	check("_hit_batch" in ", ".join(NativeScript.shot_kernel().call(&"check_fields", mgr) as PackedStringArray), "a manager without a hit batch is named")
 
 
 func test_a_new_manager_runs_the_native_kernel() -> void:
@@ -297,6 +297,9 @@ func _check_the_kernel_merged() -> void:
 func _on_room_asked(_caster: int, target: Node, tag: int, _shot: int, room: HitRoom) -> void:
 	room.health = 15.0 + float(String(target.name).hash() % 4) * 10.0
 	room.damage = 5.0 + float(tag % 3) * 5.0
+	# A barrier on some bodies that one of the two spells meets: its charges take that spell's first
+	# hits whole (hit batch A1).
+	room.charges = 2 if tag == 1 and String(target.name).hash() % 3 == 0 else 0
 
 
 ## Builds the scene on both sides, the native one on `threads` threads, and steps it STEPS times,
@@ -640,7 +643,7 @@ func _compare_arrays(step: int) -> void:
 		if var_to_bytes(a) != var_to_bytes(b):
 			_differ("step %d: the room grid's %s differs" % [step, member])
 	# The hit batch's (its entries, the bodies' tallies, the spent shots; hit batch A1).
-	_compare_batch(step, _mgrs[0]._batch, _mgrs[1]._batch)
+	_compare_batch(step, _mgrs[0]._hit_batch, _mgrs[1]._hit_batch)
 
 
 ## Every packed array, int and float member of the two managers' hit batches, byte for byte.

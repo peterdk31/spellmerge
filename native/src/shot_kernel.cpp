@@ -240,7 +240,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(pierce, "_pierce", PACKED_INT32_ARRAY) \
 	X(stick, "_stick", PACKED_FLOAT32_ARRAY) \
 	X(merging, "_merging", BOOL) \
-	X(batch, "_batch", OBJECT) \
+	X(batch, "_hit_batch", OBJECT) \
 	X(merged_turns, "merged_turns", INT) \
 	X(spark_births, "spark_births", PACKED_FLOAT32_ARRAY) \
 	X(tail_births_on, "tail_births_on", BOOL) \
@@ -307,7 +307,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(has_walls, "_has_walls", BOOL) \
 	X(wall_bounds, "_bounds", RECT2)
 
-// Every member of the manager's hit batch (`HitBatch`, `_batch`) the hit pass reads: its entries
+// Every member of the manager's hit batch (`HitBatch`, `_hit_batch`) the hit pass reads: its entries
 // (each one's next on its target, caster, tag, shot, count, damage a hit, whether it meets the
 // barrier), the bodies' tallies in pass `_pass`, and the spent shots' list (hit batch A1). Checked on
 // the batch by `check_fields`.
@@ -716,7 +716,7 @@ struct HitPass {
 		return ::godot::gdextension_interface::object_get_instance_from_id((GDObjectInstanceID)target_id[t]) != nullptr;
 	}
 
-	// `_killed_this_pass`.
+	// `HitBatch.takes`, negated.
 	bool killed_this_pass(int64_t t) {
 		return t < mh_target_pass.n && mh_target_pass[t] == mh_pass && mh_spent[t] >= mh_health[t];
 	}
@@ -806,7 +806,7 @@ struct HitPass {
 				mh_used_at[mh_used_n] = cand_point[c];
 				mh_used_n += 1;
 			}
-			// `_merge_hit` of a hit on a merged one, `_spend_room`: a barrier's charge, else its damage.
+			// `_merge_hit` of a hit on a merged one, `HitBatch.count_hit`: a barrier's charge, else its damage.
 			mh_count[e] += 1;
 			if (mh_blocks[e] != 0 && mh_charges_used[t] < mh_charges[t]) {
 				mh_charges_used[t] += 1;
@@ -1338,7 +1338,7 @@ PackedStringArray ShotKernel::check_fields(Object *manager) const {
 	// The hit batch's, on the batch (hit batch A1).
 	Object *batch = manager->get(names->batch);
 	if (batch == nullptr) {
-		wrong.push_back(String("member _batch missing or empty"));
+		wrong.push_back(String("member _hit_batch missing or empty"));
 		return wrong;
 	}
 #define SM_BATCH_CHECK(id, gd, type)                                     \

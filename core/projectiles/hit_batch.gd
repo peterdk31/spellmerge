@@ -13,14 +13,14 @@ extends RefCounted
 ## The manager ends the shots, frees and takes back slots, asks Combat (with `room`) and sends the
 ## entries; the batch never calls it. The native hit pass (`ShotKernel`, `BATCH_FIELDS`) reads and
 ## writes the entries' counts, the tallies and the spent list in place, so they are packed arrays,
-## sized before the pass (the kernel never grows one), and it counts a hit as `count` does.
+## sized before the pass (the kernel never grows one), and it counts a hit as `count_hit` does.
 ##
-## Not state: emptied within a step (the manager's DERIVED `_batch`).
+## Not state: emptied within a step (the manager's DERIVED `_hit_batch`).
 
 ## The entries, `entries` of them: each one's caster, target (an index of the manager's targets),
 ## tag, shot (`slot`, and its `seq` when it hit: a slot taken since names no shot), point, heading
 ## and how many hits it stands for, and its first shot's look (carrier card, body, core, look bits).
-## Read by the manager to send them; written by the batch (and the kernel's `count`).
+## Read by the manager to send them; written by the batch (and the kernel, as `count_hit`).
 var entries: int = 0
 var caster: PackedInt32Array = PackedInt32Array()
 var target: PackedInt32Array = PackedInt32Array()
@@ -99,7 +99,8 @@ func takes(t: int) -> bool:
 
 ## The entry of `who`'s spell `spell` on target `t` a hit of a shot adds to, or -1 for a new one.
 ## A shot that hits alone (`alone`), and an entry whose shot does (`flags` of its slot, the
-## manager's shot flags, `alone_flag` the bit), add to none.
+## manager's shot flags, `alone_flag` the bit), add to none. The slot's flags are read now, as the
+## kernel reads them, not kept at `add`: a slot taken back at the cap may hold another shot by now.
 func entry_of(t: int, who: int, spell: int, alone: bool, flags: PackedInt32Array, alone_flag: int) -> int:
 	if alone or t >= _target_pass.size() or _target_pass[t] != _pass:
 		return -1
@@ -243,6 +244,11 @@ func ended_count() -> int:
 
 func ended_tag(i: int) -> int:
 	return _ended[i]
+
+
+## The entries emptied (sent).
+func forget_entries() -> void:
+	entries = 0
 
 
 ## The kept ends emptied (sent).

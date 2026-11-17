@@ -165,7 +165,9 @@ func test_flow_builds_the_room_the_map_names() -> void:
 	if node == null:
 		return
 	check_equal(flow.room_id, node.room, "Flow is in the map's first room")
-	check_equal(flow.enemies_left(), node.enemies.size(), "every enemy the map puts there stands")
+	check_equal(flow.enemies_left(), node.enemies.size(), "every enemy the map puts there is to beat")
+	# The rest of the room's groups called now (enemy arrivals EA5: they come as the room gets quiet).
+	flow.stand_all_now()
 	var standing: Array[StringName] = []
 	for body: Node in flow.world.get_children():
 		var enemy := body as Actor
@@ -292,6 +294,42 @@ func test_the_map_is_made_for_the_run_s_players_and_each_room_s_scale_told_first
 		check_equal(heard, [[&"scaled", now.scale], [&"chosen", now.room]], "the next room's the same way")
 		check(now.scale > map.first().scale, "a row deeper, harder: %s after %s" % [now.scale, map.first().scale])
 	events.disconnect("run_room_scaled", on_scaled)
+	events.disconnect("run_room_chosen", on_chosen)
+
+
+## Enemy arrivals EA4: as the party enters a room, the run tells its pace (`run_room_paced`) after its
+## scale and before the room: plain costs, the crypt's `ArrivalRules` shares of the room's scaled
+## budget, so a bigger party's room has bigger groups; the room's map node keeps them.
+func test_each_room_s_pace_is_told_between_its_scale_and_the_room() -> void:
+	var heard: Array = []
+	var on_scaled := func(_scale: float) -> void: heard.append(&"scaled")
+	var on_paced := func(group: int, refill_at: int, stagger: float) -> void: heard.append([group, refill_at, stagger])
+	var on_chosen := func(_room: StringName, _enemies: Array[StringName], _ways: Array[StringName]) -> void: heard.append(&"chosen")
+	events.connect("run_room_scaled", on_scaled)
+	events.connect("run_room_paced", on_paced)
+	events.connect("run_room_chosen", on_chosen)
+	var definition := root.get_node("Registry").call("get_resource", &"runs", &"crypt") as RunDefinition
+	var rules: MapRules = definition.biomes[0]
+	check(rules.arrivals != null, "the crypt paces its rooms")
+	var groups: Array[int] = []
+	for players: int in [1, 4]:
+		heard.clear()
+		tick.begin_run()
+		tick.sim.run_seed = 23
+		events.emit_signal("run_begun", &"crypt", players, 0)
+		var node: RunNode = run.call("room_now") as RunNode
+		if node == null or rules.arrivals == null:
+			check(false, "%d players: a room" % players)
+			continue
+		var budget: int = RunScaling.scaled_budget(rules.room_budget, node.scale)
+		var paced: Array = [rules.arrivals.group_cost(budget), rules.arrivals.refill_cost(budget), rules.arrivals.stagger]
+		check_equal(heard, [&"scaled", paced, &"chosen"], "%d players: the scale, the pace, then the room" % players)
+		check_equal([node.group, node.refill_at, node.stagger], paced, "%d players: the map's room keeps its pace" % players)
+		check(node.refill_at < node.group, "%d players: the next group is called below a group's cost" % players)
+		groups.append(node.group)
+	check(groups.size() == 2 and groups[1] > groups[0], "four players' groups are bigger: %s" % [groups])
+	events.disconnect("run_room_scaled", on_scaled)
+	events.disconnect("run_room_paced", on_paced)
 	events.disconnect("run_room_chosen", on_chosen)
 
 

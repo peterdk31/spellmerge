@@ -279,18 +279,32 @@ static func _pick_templates(map: RunMap, content: RunContent, dice: Dice) -> Str
 	return ""
 
 
-## Step 4: each room its scale (its depth, the run's players), and filled as its kind's `fill`
-## says: a fight by its budget at that scale.
+## Step 4: each room its scale (its depth, the run's players), its pace (`_pace`), and filled as
+## its kind's `fill` says: a fight by its budget at that scale.
 static func _fill(map: RunMap, definition: RunDefinition, rules: MapRules, content: RunContent, dice: Dice) -> void:
 	for node: RunNode in map.nodes:
 		node.scale = definition.room_scale(rules, node.depth, map.players)
+		var budget: int = RunScaling.scaled_budget(rules.room_budget, node.scale)
+		_pace(node, rules.arrivals, budget)
 		match content.kind(node.kind).fill:
 			RoomKind.FILL_ENEMIES:
-				var budget: int = RunScaling.scaled_budget(rules.room_budget, node.scale)
 				node.enemies = _spend(content.enemy_pool(map.biome, node.depth), budget, dice)
 			RoomKind.FILL_BOSS:
 				var bosses: Array[EnemyBase] = content.boss_pool(map.biome, node.depth)
 				node.enemies = [bosses[dice.below(Step.FILL, bosses.size())].id] as Array[StringName]
+
+
+## How `node`'s enemies come in (enemy arrivals EA4): `arrivals`' shares of its scaled budget
+## `budget`, as costs; with no arrivals, the whole list at once (a group of 0).
+static func _pace(node: RunNode, arrivals: ArrivalRules, budget: int) -> void:
+	if arrivals == null:
+		node.group = 0
+		node.refill_at = 0
+		node.stagger = 0.0
+		return
+	node.group = arrivals.group_cost(budget)
+	node.refill_at = arrivals.refill_cost(budget)
+	node.stagger = arrivals.stagger
 
 
 ## Enemies of `pool` by chance until `budget` is spent: one of the whole pool first (a room always

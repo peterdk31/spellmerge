@@ -70,11 +70,10 @@ func test_every_entry_of_a_fight_has_the_room_the_oracle_gives() -> void:
 func _ask(world: ActorFixture, target: Node, tag: int, shapes: Dictionary, what: String) -> void:
 	var batch := HitBatch.new()
 	batch.open(1, 1)
-	var entry: int = batch.add(0, 1, 0, tag, 0, 0, Vector2.ZERO, Vector2.RIGHT, &"bolt", 0, Color.WHITE, 0)
+	var entry: int = batch.add(0, 1, 0, tag, 0, 0, Vector2.ZERO, Vector2.RIGHT, &"bolt", 0, Color.WHITE, 0, false, 0)
 	world.bus.hit_room_asked.emit(target, batch.room)
-	batch.keep_room(0, 0)
 	world.bus.hit_damage_asked.emit(tag, -1, batch.damage)
-	batch.take_room(entry, batch.damage.damage)
+	batch.take_room(entry)
 	var told := Oracle.Answer.new()
 	Oracle.answer(world.combat, target, tag, -1, told)
 	var charges: int = batch._charges[0] if batch._blocks[entry] != 0 else 0

@@ -37,6 +37,15 @@ var look: PackedInt32Array = PackedInt32Array()
 ## What Combat is asked to fill (`hit_room_asked`, `hit_damage_asked`), one of each for every ask.
 var room: HitRoom = HitRoom.new()
 var damage: HitDamage = HitDamage.new()
+## What the last `add` needs asked before its `take_room` (bits of `ASK_ROOM`, `ASK_DAMAGE`).
+const ASK_ROOM: int = 1
+const ASK_DAMAGE: int = 2
+var asks: int = 0
+## The last `add`'s count of events, whether its shot hits alone, and its spell's kept damage slot
+## (-1 when asked).
+var _asked_at: int = 0
+var _asked_alone: bool = false
+var _kept: int = -1
 
 ## Each entry's next on its target (-1 for the last), its damage a hit and whether its spell meets
 ## the target's barrier.
@@ -155,8 +164,12 @@ func count_hit(entry: int) -> void:
 
 
 ## A new entry: the first hit of `who`'s spell `spell` on target `t` (of `targets`) in this pass, by
-## the shot in `shot` (`shot_seq`), with that shot's look. Its room is `take_room`'s, next.
-func add(t: int, targets: int, who: int, spell: int, shot: int, shot_seq: int, point: Vector2, way: Vector2, carrier_card: StringName, kind: int, colour: Color, look_bits: int) -> int:
+## the shot in `shot` (`shot_seq`; `alone`: it hits alone), with that shot's look, at the manager's
+## count of events `sent`. What the manager must ask of Combat before `take_room` is left in `asks`
+## (`ASK_ROOM`: the body's room, into `room`; `ASK_DAMAGE`: the spell's damage, into `damage`; each
+## cleared for the answer): what this pass has not been told since its last event (a shot alone
+## always asks its damage). One call, with `take_room`, a new entry (the hit pass's hot path).
+func add(t: int, targets: int, who: int, spell: int, shot: int, shot_seq: int, point: Vector2, way: Vector2, carrier_card: StringName, kind: int, colour: Color, look_bits: int, alone: bool, sent: int) -> int:
 	if entries == caster.size():
 		_grow(maxi(64, entries * 2))
 	fit_targets(targets)
@@ -189,17 +202,27 @@ func add(t: int, targets: int, who: int, spell: int, shot: int, shot_seq: int, p
 	body[entry] = kind
 	core[entry] = colour
 	look[entry] = look_bits
+	_asked_at = sent
+	_asked_alone = alone
+	asks = 0
+	if not _room_fresh(t, sent):
+		asks |= ASK_ROOM
+		room.clear()
+	_kept = -1 if alone else _damage_slot(spell, sent)
+	if _kept < 0:
+		asks |= ASK_DAMAGE
+		damage.clear()
 	return entry
 
 
 ## Whether target `t`'s room was told in this pass with no event sent since (`sent`: the manager's
 ## count of events sent).
-func room_fresh(t: int, sent: int) -> bool:
+func _room_fresh(t: int, sent: int) -> bool:
 	return t < _room_pass.size() and _room_pass[t] == _pass and _room_at[t] == sent
 
 
 ## `room` as Combat filled it for target `t`, kept for the pass at the count of events `sent`.
-func keep_room(t: int, sent: int) -> void:
+func _keep_room(t: int, sent: int) -> void:
 	_room_pass[t] = _pass
 	_room_at[t] = sent
 	_room_known[t] = 1 if room.known else 0
@@ -211,21 +234,17 @@ func keep_room(t: int, sent: int) -> void:
 
 
 ## The slot of the spell `spell`'s damage told in this pass with no event sent since (`sent`), or
-## -1 (`damage_at` reads it).
-func damage_slot(spell: int, sent: int) -> int:
+## -1.
+func _damage_slot(spell: int, sent: int) -> int:
 	if _spell_key.is_empty():
 		return -1
 	var i: int = _spell_find(spell)
 	return i if _spell_pass[i] == _pass and _spell_at[i] == sent else -1
 
 
-func damage_at(i: int) -> float:
-	return _spell_damage[i]
-
-
 ## `damage` as Combat filled it for the spell `spell`, kept for the pass at the count of events
 ## `sent`.
-func keep_damage(spell: int, sent: int) -> void:
+func _keep_damage(spell: int, sent: int) -> void:
 	if _spells_n * 2 >= _spell_key.size():
 		_spell_grow(maxi(SPELLS_FIRST, _spell_key.size() * 2))
 	var i: int = _spell_find(spell)
@@ -237,13 +256,23 @@ func keep_damage(spell: int, sent: int) -> void:
 	_spell_damage[i] = damage.damage
 
 
-## `entry`'s first hit, from its target's room (`keep_room`) and `spell_damage`, its spell's damage
-## a hit before the hex, as Combat answered one ask for both before hit batch A2 (the oracle,
+## `entry`'s first hit (the entry `add` just made), from Combat's answers to what `asks` named (kept
+## for the pass) or the ones kept: its target's room and its spell's damage a hit before the hex,
+## as Combat answered one ask for both before hit batch A2 (the oracle,
 ## tests/support/hit_room_oracle.gd): a body whose room is unknown takes nothing and is never dead;
 ## else its health counts, its hex grows the damage, a spell that deals none meets no barrier, and
 ## the barrier's charges count for a spell it does not spare. Then that first hit is counted.
-func take_room(entry: int, spell_damage: float) -> void:
+func take_room(entry: int) -> void:
 	var t: int = target[entry]
+	if (asks & ASK_ROOM) != 0:
+		_keep_room(t, _asked_at)
+	var spell_damage: float
+	if (asks & ASK_DAMAGE) != 0:
+		spell_damage = damage.damage
+		if not _asked_alone:
+			_keep_damage(tag[entry], _asked_at)
+	else:
+		spell_damage = _spell_damage[_kept]
 	if _room_known[t] == 0:
 		_damage[entry] = 0.0
 		_health[t] = INF

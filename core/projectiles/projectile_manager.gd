@@ -6923,23 +6923,15 @@ func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, head
 	if _hit_batch.add_to(target, caster, tag, (_flags[slot] & F_ALONE) != 0, _flags, F_ALONE) >= 0:
 		return
 	var batch: HitBatch = _hit_batch
-	var entry: int = batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot])
 	# The body's room and the spell's damage, each asked once a pass, and again after any event
 	# (its handlers may have changed them; hit batch A2). A shot that hits alone asks for itself.
-	if not batch.room_fresh(target, _sent):
-		batch.room.clear()
+	var entry: int = batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot], (_flags[slot] & F_ALONE) != 0, _sent)
+	var asks: int = batch.asks
+	if (asks & HitBatch.ASK_ROOM) != 0:
 		events.hit_room_asked.emit(_targets[target], batch.room)
-		batch.keep_room(target, _sent)
-	var alone: bool = (_flags[slot] & F_ALONE) != 0
-	var kept: int = -1 if alone else batch.damage_slot(tag, _sent)
-	if kept >= 0:
-		batch.take_room(entry, batch.damage_at(kept))
-		return
-	batch.damage.clear()
-	events.hit_damage_asked.emit(tag, slot, batch.damage)
-	if not alone:
-		batch.keep_damage(tag, _sent)
-	batch.take_room(entry, batch.damage.damage)
+	if (asks & HitBatch.ASK_DAMAGE) != 0:
+		events.hit_damage_asked.emit(tag, slot, batch.damage)
+	batch.take_room(entry)
 
 
 ## The shots the pass's hits spent, ended in the order they were (their tails where they were spent;

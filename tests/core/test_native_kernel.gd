@@ -52,7 +52,7 @@ const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 ## catch-up's one-shot list and the GDScript drawing's sum of the tail asked for and count of the
 ## thinned groups' tail births (the native keeps them in locals; the sum is handed out as
 ## `tail_demand`, which is compared, and the births themselves are compared).
-const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads",
+const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads", &"step_profile", &"profile_clock", &"merged_turns",
 		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
 
 ## Per manager (0 the GDScript, 1 the native): its bus, actor table, targets and what it sent.
@@ -88,6 +88,11 @@ var _circled_quad: bool = false
 var _box_hits: Array[String] = []
 ## How many differences the running test found: a scene stops at the ninth (the rest follow).
 var _differences: int = 0
+## Whether the scene's managers merge their hits (`merge_hits`; the merged tests), the native side's
+## hand-backs counted over the steps, and the hits sent (each merged hit counts its shots).
+var _merged: bool = false
+var _handbacks: int = 0
+var _hits_sent: int = 0
 
 ## The card bodies of the scene: plain canvas-item shaders, made once per file.
 const SCENE_BODIES: int = 6
@@ -95,8 +100,12 @@ var _bodies: Array[Shader] = []
 
 
 func before_each() -> void:
-	# These tests are of the hits one by one (`ProjectileManager.merges_hits`, put back after).
+	# These tests are of the hits one by one (`ProjectileManager.merges_hits`, put back after), but
+	# for the merged ones, which set `_merged`.
 	ManagerScript.merges_hits = false
+	_merged = false
+	_handbacks = 0
+	_hits_sent = 0
 	_mgrs = []
 	_targets = [[], []]
 	_wizards = [[], []]
@@ -147,6 +156,7 @@ func _manager(side: int, threads: int, cap: int, table: ActorSeats.ActorsScript)
 	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
 	mgr.native_threads = threads
 	mgr.native = side == 1
+	mgr.merge_hits = _merged
 	mgr.actors = table
 	mgr.events = bus
 	root.add_child(mgr)
@@ -234,6 +244,40 @@ func test_several_threads_step_like_the_gdscript() -> void:
 	_step_the_scene_alike(THREADS[THREADS.size() - 1])
 
 
+## The same scene with its hits merged (`merge_hits`): the kernel takes each shot whose hits only add
+## to merged hits of the pass (`HitPass::merge_hits`), with bodies the pass kills passed over
+## (`hit_room_asked`, answered alike on both sides), to the bit as the GDScript does.
+func test_one_thread_steps_like_the_gdscript_with_hits_merged() -> void:
+	if not _native_loaded():
+		return
+	_merged = true
+	_step_the_scene_alike(1)
+	_check_the_kernel_merged()
+
+
+func test_several_threads_step_like_the_gdscript_with_hits_merged() -> void:
+	if not _native_loaded():
+		return
+	_merged = true
+	_step_the_scene_alike(THREADS[THREADS.size() - 1])
+	_check_the_kernel_merged()
+
+
+## The merged scene reached the kernel's own merging: shots whose hits it merged itself, among the
+## ones handed back to GDScript.
+func _check_the_kernel_merged() -> void:
+	check(_hits_sent > 0, "shots hit (%d)" % _hits_sent)
+	check(_mgrs[1].merged_turns > 100, "the kernel merged shots' hits itself (%d turns; %d hand-backs)" % [_mgrs[1].merged_turns, _handbacks])
+	check_equal(_mgrs[0].merged_turns, 0, "the GDScript side counts none")
+
+
+## A merged scene's answer to `hit_room_asked`, the same on both sides: a body's health by its name,
+## a hit's damage by its tag, so some bodies die in a pass and the shots after pass them.
+func _on_room_asked(_caster: int, target: Node, tag: int, _shot: int, room: HitRoom) -> void:
+	room.health = 15.0 + float(String(target.name).hash() % 4) * 10.0
+	room.damage = 5.0 + float(tag % 3) * 5.0
+
+
 ## Builds the scene on both sides, the native one on `threads` threads, and steps it STEPS times,
 ## comparing after each step; then checks the scene reached what it is meant to compare.
 func _step_the_scene_alike(threads: int) -> void:
@@ -267,6 +311,9 @@ func _step_the_scene_alike(threads: int) -> void:
 			(_prop_nodes[side] as Array).append(_add_body(side, "prop%d" % n, PROP_AT[n], PROP_RADIUS[n], ManagerScript.LAYER_ENEMY, _props[n], PROP_HALF[n]))
 		mgr.events.projectile_hit.connect(_on_hit.bind(side))
 		mgr.events.projectile_expired.connect(_on_expired.bind(side))
+		if _merged:
+			mgr.events.hit_room_asked.connect(_on_room_asked)
+			mgr.shot_ended.connect(func(tag: int) -> void: _events[side].append("ended %d" % tag))
 	check(_mgrs[1].is_native() and not _mgrs[0].is_native(), "one native manager, one GDScript")
 	# A build without threads (the web's) runs every loop on one.
 	var running: int = _mgrs[1].native_thread_count()
@@ -280,9 +327,20 @@ func _step_the_scene_alike(threads: int) -> void:
 	for step in STEPS:
 		for side in 2:
 			_drive(side, step)
+		if _merged and step % 10 == 4:
+			# Some shots hit alone (a relay's own profile, `set_hits_alone`), alike on both sides.
+			for side in 2:
+				for slot in range(step % 11, _mgrs[side]._high, 11):
+					_mgrs[side].set_hits_alone(slot)
+		if _merged and _mgrs[1].step_profile.is_empty():
+			# The native side counts its hand-backs (`step_profile`, which plays as the plain step).
+			_mgrs[1].step_profile.resize(ManagerScript.PROF_PARTS)
+			_mgrs[1].profile_clock = Time.get_ticks_usec
 		for side in 2:
 			_events[side].clear()
 			_mgrs[side].step(DT)
+		if _merged:
+			_handbacks += _mgrs[1].step_profile[ManagerScript.PROF_HANDBACKS]
 		if _events[0] != _events[1]:
 			_differ("step %d: the same events (%s)" % [step, _first_difference(_events[0], _events[1]) + " / " + _first_difference(_events[1], _events[0])])
 		_compare_arrays(step)
@@ -508,7 +566,10 @@ func _drive(side: int, step: int) -> void:
 
 
 func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int) -> void:
-	_events[side].append("hit %d %s %s %d %d" % [caster, (target as Node).name, var_to_str(position), tag, shot])
+	var m_hit: ManagerScript = _mgrs[side]
+	_events[side].append("hit %d %s %s %d %d x%d" % [caster, (target as Node).name, var_to_str(position), tag, shot, m_hit.impact_count])
+	if side == 1:
+		_hits_sent += m_hit.impact_count
 	if side == 1 and target.has_meta(&"box"):
 		_box_hits.append(String(target.name))
 	var m: ManagerScript = _mgrs[side]

@@ -144,6 +144,64 @@ func test_a_shot_that_hits_and_ends_on_a_wall_in_one_step_ends_after_its_hit() -
 	check(heard.find("hit") >= 0 and heard.find("hit") < heard.find("ended 11"), "and ended after (%s)" % [heard])
 
 
+## A shot its hit spends (no pierce) meets no wall after it in the same step: one hit, one end, no
+## bounce off the wall behind the body.
+func test_a_spent_shot_meets_no_wall_after_its_hit() -> void:
+	var body: Node2D = _target(Vector2(200.0, 100.0))
+	var walls: Array[Rect2] = [Rect2(206.0, 0.0, 32.0, 300.0)]
+	mgr.set_walls(walls)
+	var slot: int = mgr.spawn(0, body.global_position + Vector2(-12.0, 0.0), Vector2(1500.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 11)
+	mgr.set_bounce(slot, 3)
+	mgr.step(DT)
+	mgr.step(DT)
+	check_equal(heard, ["impact 1", "hit", "ended 11"] as Array[String], "its hit, its end, and nothing at the wall (%s)" % [heard])
+	check_equal(mgr.get_count(), 0, "it is gone")
+
+
+## At the cap, a shot spawned in the pass (a bounce's payload) while no slot is free takes the slot of
+## a shot the pass's hits spent (ended at once), not a living shot's: none is dropped, the spent shot
+## ends once, and the new one is not ended in its place.
+func test_a_spawn_at_the_cap_takes_a_spent_shots_slot_not_a_living_ones() -> void:
+	mgr.set_cap(3)
+	var body: Node2D = _target(Vector2(200.0, 100.0))
+	mgr.set_walls([Rect2(400.0, 0.0, 32.0, 300.0)] as Array[Rect2])
+	# Spent on the body this step (first in the pass), a bounce off the wall after it, and one far off.
+	mgr.spawn(0, body.global_position + Vector2(-12.0, 0.0), Vector2(600.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 11)
+	var bouncer: int = mgr.spawn(0, Vector2(395.0, 250.0), Vector2(600.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 12)
+	mgr.set_bounce(bouncer, 2)
+	var far: int = mgr.spawn(0, Vector2(50.0, 280.0), Vector2(1.0, 0.0), 5.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 13)
+	var made: Array[int] = []
+	mgr.wall_met.connect(func(_caster: int, at: Vector2, _heading: Vector2, _tag: int, _shot: int) -> void:
+		made.append(mgr.spawn(0, at + Vector2(-20.0, 0.0), Vector2(-5.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 14)))
+	mgr.step(DT)
+	check_equal(made.size(), 1, "the bounce spawned one")
+	check_equal(mgr.dropped, 0, "no living shot was dropped for it")
+	check(mgr.is_alive(far) and mgr.is_alive(bouncer) and mgr.is_alive(made[0]), "the far shot, the bouncer and the new one fly")
+	check_equal(heard.count("ended 11"), 1, "the spent shot ended once")
+	check_equal(heard.count("ended 14"), 0, "the new one is not ended in its place")
+	check_equal(hits, [[0, body, 11, 1]], "and its hit was sent")
+
+
+## A handler that ends a spent shot during the pass (a bounce's handler removing a spell's shots):
+## the pass does not end it again, and the pool stays whole.
+func test_a_spent_shot_ended_by_a_handler_is_not_ended_twice() -> void:
+	mgr.set_cap(4)
+	var body: Node2D = _target(Vector2(200.0, 100.0))
+	mgr.set_walls([Rect2(400.0, 0.0, 32.0, 300.0)] as Array[Rect2])
+	mgr.spawn(0, body.global_position + Vector2(-12.0, 0.0), Vector2(600.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 11)
+	var bouncer: int = mgr.spawn(0, Vector2(395.0, 250.0), Vector2(600.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 12)
+	mgr.set_bounce(bouncer, 2)
+	mgr.wall_met.connect(func(_caster: int, _at: Vector2, _heading: Vector2, _tag: int, _shot: int) -> void: mgr.remove_by_tag(11))
+	mgr.step(DT)
+	check_equal(mgr.get_count(), 1, "only the bouncer is left")
+	var slots: Dictionary = {}
+	for i in 3:
+		slots[mgr.spawn(0, Vector2(50.0, 280.0), Vector2(1.0, 0.0), 5.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 15)] = true
+	check_equal(mgr.get_count(), 4, "the pool fills to its cap")
+	check_equal(slots.size(), 3, "each in a slot of its own")
+	check_equal(mgr.dropped, 0, "none dropped")
+
+
 ## A handler of a merged hit that strikes (a payload's ray, a swing) sends a hit of one.
 func test_a_hit_a_merged_hits_handler_makes_is_one() -> void:
 	var body: Node2D = _target(Vector2(200.0, 100.0))

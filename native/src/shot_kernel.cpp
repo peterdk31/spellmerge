@@ -65,6 +65,11 @@ constexpr int F_WAVE = 128;
 constexpr int F_DEFERRED = 256;
 // The manager's F_QUAD: a shot of a still body (a rune's, a stone's), whatever its motion.
 constexpr int F_QUAD = 512;
+constexpr int F_ALONE = 1024;
+constexpr int F_SPENT = 2048;
+constexpr int F_STUCK = 16;
+// A hit's share of the hit-work budget (`HIT_WORK`).
+constexpr int64_t HIT_WORK = 400;
 constexpr int CASTER_BODY = -1;
 constexpr int CASTER_POINT = -2;
 constexpr double SPIRAL_PERIOD = 0.5;
@@ -235,6 +240,24 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(tail_carry, "_tail_carry", PACKED_FLOAT32_ARRAY) \
 	X(tail_n, "_tail_n", PACKED_INT32_ARRAY) \
 	X(tag, "_tag", PACKED_INT64_ARRAY) \
+	X(pierce, "_pierce", PACKED_INT32_ARRAY) \
+	X(stick, "_stick", PACKED_FLOAT32_ARRAY) \
+	X(merging, "_merging", BOOL) \
+	X(mh_pass, "_mh_pass", INT) \
+	X(mh_head, "_mh_head", PACKED_INT32_ARRAY) \
+	X(mh_target_pass, "_mh_target_pass", PACKED_INT32_ARRAY) \
+	X(mh_next, "_mh_next", PACKED_INT32_ARRAY) \
+	X(mh_caster, "_mh_caster", PACKED_INT32_ARRAY) \
+	X(mh_tag, "_mh_tag", PACKED_INT64_ARRAY) \
+	X(mh_slot, "_mh_slot", PACKED_INT32_ARRAY) \
+	X(mh_count, "_mh_count", PACKED_INT32_ARRAY) \
+	X(mh_damage, "_mh_damage", PACKED_FLOAT64_ARRAY) \
+	X(mh_health, "_mh_health", PACKED_FLOAT64_ARRAY) \
+	X(mh_spent, "_mh_spent", PACKED_FLOAT64_ARRAY) \
+	X(mh_used, "_mh_used", PACKED_INT32_ARRAY) \
+	X(mh_used_at, "_mh_used_at", PACKED_VECTOR2_ARRAY) \
+	X(mh_used_n, "_mh_used_n", INT) \
+	X(merged_turns, "merged_turns", INT) \
 	X(spark_births, "spark_births", PACKED_FLOAT32_ARRAY) \
 	X(tail_births_on, "tail_births_on", BOOL) \
 	X(tail_births_cap, "tail_births_cap", INT) \
@@ -443,6 +466,15 @@ struct HitPass {
 	double grid_x = 0.0, grid_y = 0.0, max_target_reach = 0.0;
 
 	bool targets_loaded = false;
+	// The merged hits (`merge_hits`), read the first time a shot found hits while the pass merges.
+	bool merging = false;
+	bool merge_loaded = false;
+	Arr<PackedInt32Array> pierce, mh_head, mh_target_pass, mh_next, mh_caster, mh_slot, mh_count, mh_used;
+	Arr<PackedFloat32Array> stick;
+	Arr<PackedInt64Array> tag, mh_tag;
+	Arr<PackedFloat64Array> mh_damage, mh_health, mh_spent;
+	Arr<PackedVector2Array> mh_used_at;
+	int64_t mh_pass = 0, mh_used_n = 0, merged_turns = 0;
 	// `_untested`, read only for a deferred shot (`defer`, `scan`).
 	bool untested_loaded = false;
 	// For catching up a waiting homing shot (`load_homing`).
@@ -543,6 +575,7 @@ struct HitPass {
 	// What every shot's turn reads (a turn handed back to GDScript reads no more).
 	void load(Object *m) {
 		const Names &k = *names;
+		merging = m->get(k.merging);
 		state.load(m, k.state);
 		motion.load(m, k.motion);
 		wall_cells.load(m, k.wall_cells);
@@ -618,11 +651,144 @@ struct HitPass {
 		max_target_reach = m->get(k.max_target_reach);
 	}
 
+	void load_merge(Object *m) {
+		const Names &k = *names;
+		merge_loaded = true;
+		pierce.load(m, k.pierce);
+		stick.load(m, k.stick);
+		tag.load(m, k.tag);
+		mh_head.load(m, k.mh_head);
+		mh_target_pass.load(m, k.mh_target_pass);
+		mh_next.load(m, k.mh_next);
+		mh_caster.load(m, k.mh_caster);
+		mh_tag.load(m, k.mh_tag);
+		mh_slot.load(m, k.mh_slot);
+		mh_count.load(m, k.mh_count);
+		mh_damage.load(m, k.mh_damage);
+		mh_health.load(m, k.mh_health);
+		mh_spent.load(m, k.mh_spent);
+		mh_used.load(m, k.mh_used);
+		mh_used_at.load(m, k.mh_used_at);
+		mh_pass = m->get(k.mh_pass);
+		mh_used_n = m->get(k.mh_used_n);
+		merged_turns = m->get(k.merged_turns);
+	}
+
+	// `is_instance_valid(_targets[t])`: the node of the id kept beside it still exists.
+	bool target_valid(int64_t t) {
+		return ::godot::gdextension_interface::object_get_instance_from_id((GDObjectInstanceID)target_id[t]) != nullptr;
+	}
+
+	// `_killed_this_pass`.
+	bool killed_this_pass(int64_t t) {
+		return t < mh_target_pass.n && mh_target_pass[t] == mh_pass && mh_spent[t] >= mh_health[t];
+	}
+
+	// The merged hit `_merge_hit` would add the shot in `slot`'s hit on `t` to, or -1 when it would
+	// make a new one (GDScript's: it asks Combat).
+	int64_t merged_entry(int64_t slot, int64_t t) {
+		if (t >= mh_target_pass.n || mh_target_pass[t] != mh_pass || (flags[slot] & F_ALONE) != 0) {
+			return -1;
+		}
+		const int64_t caster = actor[slot];
+		const int64_t tg = tag[slot];
+		for (int64_t e = mh_head[t]; e >= 0; e = mh_next[e]) {
+			if (mh_caster[e] == caster && mh_tag[e] == tg && (flags[mh_slot[e]] & F_ALONE) == 0) {
+				return e;
+			}
+		}
+		return -1;
+	}
+
+	// `_hit_found` of a shot whose `found` hits, as `_hit_candidates` takes them, each add to a merged
+	// hit the pass already has (no event, nothing GDScript must do): the budget, the pierce, the hit
+	// memory, the spent mark, the merged counts and the bodies' tallies, exactly as GDScript writes
+	// them. False, changing nothing, for any other (a new merged hit, a stick, a shot alone, no
+	// memory left without growing it): GDScript takes it.
+	bool merge_hits(int64_t slot, int64_t found) {
+		if (stick[slot] > 0.0f) {
+			return false;
+		}
+		// The dry run: the same turns of the loop, written nowhere.
+		int64_t left = pierce[slot];
+		int64_t remembers = 0;
+		bool spent = false;
+		for (int64_t c = 0; c < found; c++) {
+			if (spent) {
+				break;
+			}
+			const int64_t t = cand_target[c];
+			if (target_layer[t] == 0 || !target_valid(t) || killed_this_pass(t)) {
+				continue;
+			}
+			if (merged_entry(slot, t) < 0) {
+				return false;
+			}
+			if (left > 0) {
+				left -= 1;
+				remembers += 1;
+			} else {
+				spent = true;
+			}
+		}
+		if (spent && mh_used_n >= mh_used.n) {
+			return false;
+		}
+		// `_remember` grows the memory when its free list runs out: GDScript's to do.
+		int64_t free_at = mem_free;
+		for (int64_t r = 0; r < remembers; r++) {
+			if (free_at < 0) {
+				return false;
+			}
+			free_at = mem_next[free_at];
+		}
+		// The turns again, written.
+		for (int64_t c = 0; c < found; c++) {
+			if ((flags[slot] & (F_STUCK | F_SPENT)) != 0) {
+				break;
+			}
+			const int64_t t = cand_target[c];
+			if (target_layer[t] == 0 || !target_valid(t) || killed_this_pass(t)) {
+				continue;
+			}
+			work_left -= HIT_WORK;
+			const int64_t e = merged_entry(slot, t);
+			if (pierce[slot] > 0) {
+				pierce[slot] -= 1;
+				// `_remember`.
+				const int64_t at = mem_free;
+				mem_free = mem_next[at];
+				mem_id[at] = target_key[t];
+				mem_target[at] = (int32_t)t;
+				mem_seen[at] = (int32_t)mem_step;
+				mem_next[at] = mem_head[slot];
+				mem_head[slot] = (int32_t)at;
+			} else {
+				flags[slot] = flags[slot] | F_SPENT;
+				mh_used[mh_used_n] = (int32_t)slot;
+				mh_used_at[mh_used_n] = cand_point[c];
+				mh_used_n += 1;
+			}
+			// `_merge_hit` of a hit on a merged one, `_spend_room`.
+			mh_count[e] += 1;
+			mh_spent[t] += mh_damage[e];
+		}
+		if ((flags[slot] & F_SPENT) == 0) {
+			forget_left(slot);
+		}
+		merged_turns += 1;
+		return true;
+	}
+
 	// The counters back to the manager (only what this call could have changed).
 	void save(Object *m, int64_t found, int64_t starved_before) const {
 		const Names &k = *names;
 		if (starved_at != starved_before) {
 			m->set(k.starved_at, starved_at);
+		}
+		if (merge_loaded) {
+			m->set(k.mh_used_n, mh_used_n);
+			m->set(k.merged_turns, merged_turns);
 		}
 		if (targets_loaded) {
 			m->set(k.work_left, work_left);
@@ -1006,6 +1172,10 @@ const Constant CONSTANTS[] = {
 	{ "LIGHT_REACH_FLOAT", (double)LIGHT_REACH_FLOAT },
 	{ "LIGHT_INTENSITY_FLOAT", (double)LIGHT_INTENSITY_FLOAT },
 	{ "F_GHOST", (double)F_GHOST },
+	{ "F_ALONE", (double)F_ALONE },
+	{ "F_SPENT", (double)F_SPENT },
+	{ "F_STUCK", (double)F_STUCK },
+	{ "HIT_WORK", (double)HIT_WORK },
 	{ "F_FALLING", (double)F_FALLING },
 	{ "S_IDLE", (double)S_IDLE },
 	{ "S_MOVING", (double)S_MOVING },
@@ -1222,6 +1392,15 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 			}
 			const int64_t found = h.scan(slot);
 			if (found > 0) {
+				// Hits that only add to merged ones are taken here; any other goes to GDScript.
+				if (h.merging) {
+					if (!h.merge_loaded) {
+						h.load_merge(m);
+					}
+					if (h.merge_hits(slot, found)) {
+						continue;
+					}
+				}
 				h.save(m, found, starved_before);
 				return n * 2 + YIELD_FOUND;
 			}

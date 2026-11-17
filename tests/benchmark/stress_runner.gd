@@ -183,6 +183,8 @@ var _tree_profile: Node = null
 var _profile_ticks_at: int = 0
 ## The projectile manager's step parts summed over the measured window (`_add_projectile_parts`).
 var _projectile_sums: PackedInt64Array = PackedInt64Array()
+## The projectile manager's `merged_turns` when the profile started.
+var _merged_turns_at: int = 0
 
 
 func _ready() -> void:
@@ -584,6 +586,7 @@ func _start_tick_profile() -> void:
 	_projectiles.set(&"profile_clock", Time.get_ticks_usec)
 	_projectile_sums = PackedInt64Array()
 	_projectile_sums.resize(ProjectileManagerScript.PROF_PARTS)
+	_merged_turns_at = int(_projectiles.get(&"merged_turns"))
 	if not tick.ticked.is_connected(_add_projectile_parts):
 		tick.ticked.connect(_add_projectile_parts)
 
@@ -626,6 +629,7 @@ func _report_tick_parts(label: String) -> void:
 				shown.append("%s %.1f" % [PROJECTILE_PARTS[i], float(prof[i]) / ticks])
 			elif not PROJECTILE_PARTS[i].is_empty():
 				shown.append("%s %.3f" % [PROJECTILE_PARTS[i], float(prof[i]) / ticks / 1000.0])
+		shown.append("shots the kernel merged a tick %.1f" % (float(int(_projectiles.get(&"merged_turns")) - _merged_turns_at) / ticks))
 		print("BENCH: stress %s projectile parts (ms a tick): %s" % [label, ", ".join(shown)])
 	tick.step_profile = PackedInt64Array()
 	_projectiles.set(&"step_profile", PackedInt64Array())

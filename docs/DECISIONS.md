@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-17: the native hit pass merges hits itself (owner: "keep both, so it runs in the Godot editor as well")
+
+- **What moved to C++:** while a pass merges, a shot whose every hit adds to a merged hit the pass already has is taken by `ShotKernel.hits` itself (native/README.md): no hand-back to GDScript. The first hit of a spell on a body still goes to GDScript, which asks Combat (`hit_room_asked`). The GDScript stays the reference and the fallback; the side-by-side test steps its scene merged too, to the bit.
+- **What changed for it, in both:** a shot its hit spends while merging is marked (`F_SPENT`) and ended with the pass's other spent shots at the pass's end (`_end_spent`), since the kernel cannot end a shot; until then it takes no hit, meets no wall, and counts as gone to a shot that follows it. A spawn at the cap with no free slot takes a spent shot's (ended at once) before dropping a living one; a spent shot a handler ended meanwhile is not ended again (found by the review). The merge table is packed arrays by target (`_mh_head`), read by the kernel. `test_projectiles_targets.gd`'s recording, made one by one, runs one by one, as the step-exact one does: a spent shot now leaves the pool at the pass's end, so one cap drop of its crowd picks another shot.
+- **Numbers** (stress desktop, two runs): hand-backs 296 to 155 a tick, 137 shot turns a tick merged by the kernel; the projectile manager 8.6 to 7.1-7.3 ms a tick, the tick 18.7 to 16.7-17.5 ms.
+
 ## 2026-11-17: three prototypes that change the game for speed (performance; for the owner to decide)
 
 - **The owner:** "Can you think of something else that could increase performance a lot? Think outside the project rules! It might be worth doing, even if it changes the gameplay some." Three were prototyped on the branch, one commit each, each a switch the tests can turn off. None is decided: each changes a rule written elsewhere, which the owner keeps or drops.

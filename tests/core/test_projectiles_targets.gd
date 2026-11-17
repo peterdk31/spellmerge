@@ -56,6 +56,8 @@ var _near: Array[Node2D] = []
 
 
 func before_each() -> void:
+	# The recording is of the hits one by one (`ProjectileManager.merges_hits`, put back after).
+	ManagerScript.merges_hits = false
 	_bus = own(EventsScript.new()) as EventsScript
 	_actors = own(ActorsScript.new()) as ActorsScript
 	_casters = ActorSeats.seat_wizards(_actors, 4)
@@ -311,3 +313,7 @@ func test_kept_targets_keep_the_order_of_a_drop_then_fill() -> void:
 		kept.append((_mgr._targets[t] as Node).get_instance_id())
 	check_equal(kept.size(), ids.size() - gone.size(), "the dropped ones are gone")
 	check(kept == expected, "the rest keep the indices a drop pass would leave")
+
+
+func after_each() -> void:
+	ManagerScript.merges_hits = true

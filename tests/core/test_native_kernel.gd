@@ -470,6 +470,40 @@ func test_a_cell_the_pass_took_keeps_its_box_until_the_next_filling() -> void:
 	check(on_near == 0 and on_far > 100, "after the hit, the shots miss the grown near (%d hits) and hit the grown far (%d)" % [on_near, on_far])
 
 
+## A merged hit the kernel opens on a barriered body for a spell the barrier spares (hit batch A4):
+## shot 1 (spell 1) hits B, so GDScript asks B's room (a barrier of 5 sparing spell 2); shot 2
+## (spell 2) hits C, so it asks spell 2's damage; shot 3 (spell 2) hits B with both told: the kernel
+## opens that entry itself, and it meets no barrier (its damage counts; the charges stay for spell
+## 1), as the GDScript's does.
+func test_the_kernel_opens_a_spared_spells_hit_as_the_gdscript() -> void:
+	if not _native_loaded():
+		return
+	for side in 2:
+		var mgr: ManagerScript = _manager(side, 1, 64, ActorSeats.table())
+		var b: Node2D = _add_body(side, "b", Vector2(200.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+		_add_body(side, "c", Vector2(200.0, 300.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+		mgr.events.hit_room_asked.connect(func(target: Node, room: HitRoom) -> void:
+			room.known = true
+			room.health = 1000.0
+			if target == b:
+				room.charges = 5
+				room.spares = 2)
+		mgr.events.hit_damage_asked.connect(func(tag: int, _shot: int, answer: HitDamage) -> void: answer.damage = 4.0 if tag == 1 else 7.0)
+		mgr.events.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int, _shot: int) -> void:
+			_events[side].append("hit %d %s %d x%d" % [caster, target.name, tag, mgr.impact_count]))
+		mgr.spawn(0, Vector2(190.0, 100.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 1)
+		mgr.spawn(0, Vector2(190.0, 300.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 2)
+		mgr.spawn(0, Vector2(190.0, 102.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 2)
+	for side in 2:
+		_events[side].clear()
+		_mgrs[side].step(DT)
+	check_equal(_events[1], _events[0], "the same hits")
+	_compare_arrays(0)
+	check_equal(_mgrs[1].merged_opens, 1, "the kernel opened the spared spell's entry on B")
+	var batch: HitBatch = _mgrs[1]._hit_batch
+	check_equal([batch._charges_used[0], batch._spent[0]], [1, 7.0], "spell 1's hit took a charge, spell 2's damage counted")
+
+
 func _on_grow_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int) -> void:
 	_events[side].append("hit %d %s %s %d %d x%d" % [caster, (target as Node).name, var_to_str(position), tag, shot, _mgrs[side].impact_count])
 

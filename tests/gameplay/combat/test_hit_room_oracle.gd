@@ -24,6 +24,9 @@ func test_every_entry_of_a_fight_has_the_room_the_oracle_gives() -> void:
 	batch.combat = arena.combat
 	batch.manager = arena.projectiles
 	arena.projectiles._hit_batch = batch
+	# The GDScript's entries, each held to the oracle here; the native hit pass's (it opens some
+	# itself, hit batch A4) are held to the GDScript's by tests/core/test_native_kernel.gd.
+	arena.projectiles.native = false
 	var imps: Array[Node2D] = []
 	for k in 6:
 		imps.append(arena.add_imp(Vector2(60.0 + 12.0 * float(k), -20.0 + 8.0 * float(k)), 40.0 + 15.0 * float(k)))
@@ -165,6 +168,7 @@ func test_a_room_and_a_damage_told_before_an_event_are_asked_again() -> void:
 	batch.combat = world.combat
 	batch.manager = world.projectiles
 	world.projectiles._hit_batch = batch
+	world.projectiles.native = false
 	world.projectiles.set_walls([Rect2(400.0, 300.0, 40.0, 40.0)] as Array[Rect2])
 	var bolt: int = world.tag_of(wizard, 0)
 	var fire: int = world.tag_of(wizard, 1)

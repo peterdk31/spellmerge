@@ -17,14 +17,17 @@ extends Node2D
 ##   in between: its dust only). From CLOSE_FROM the mark closes in CLOSE_FRAMES frames as the feet
 ##   land, down to a dot, so the rise ends where standing begins (docs/STYLE.md, "Smooth").
 ##
-## The cut (checked against the world's y-sort and the light pass before it was built, EA2): the
-## body's root is made a clip parent (`CanvasItem.clip_children`) whose own canvas item draws one
-## rect, above the feet's line, as the mask, and its canvas item is drawn shifted down by the rise
-## (`RenderingServer.canvas_item_set_transform`, re-set every frame). That is one cut for any body,
-## layered (`BodyPart`) or not, with no work per part; the body keeps its place in the y-sort, and
-## the light pass, drawn over the world, lights it as any body. Nothing in the simulation reads
-## either: its position and its parts are untouched. A body whose arrival is over (or that is gone)
-## gets its own transform back and is no clip parent any more.
+## The cut (checked against the world's y-sort and the light pass on a virtual display before it was
+## built, EA2): the body's root is made a clip parent (`CanvasItem.clip_children`) whose own canvas
+## item draws one rect, above its feet's line, as the mask, and each of its direct drawn children
+## (its sprite, its face, its look; not a top-level one) is drawn shifted down by the rise
+## (`RenderingServer.canvas_item_set_transform`, re-set every frame), so a part's own parts go with
+## it. That is one cut for any body, layered (`BodyPart`) or not. The root itself is never moved: the
+## world's y-sort orders it by its own place, so a rising body stays behind a wizard standing just in
+## front of its mark (a shifted root would sort as if its feet were lower and draw over that wizard),
+## and the light pass, drawn over the world, lights it as any body. Nothing in the simulation reads
+## any of it: its position and its parts' are untouched. A body whose arrival is over (or that is
+## gone) gets its children's own transforms back and is no clip parent any more.
 ##
 ## View only. Nothing here allocates while bodies arrive: its scratch of ids and marks is made once,
 ## and the dictionary of the bodies it drew grows only when a body first arrives.
@@ -160,14 +163,15 @@ func _draw_body(body: Actor) -> void:
 		_drawn[key] = false
 		body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
 	var share: float = body.arrive_share()
-	var shift: float = rise_shift(body_height(body), share)
+	var size: float = maxf(absf(body.size), 0.01)
+	_shift_parts(body, rise_shift(body_height(body), share) / size)
 	var item: RID = body.get_canvas_item()
-	RenderingServer.canvas_item_set_transform(item, body.get_transform().translated(Vector2(0.0, shift)))
 	RenderingServer.canvas_item_clear(item)
+	# The mask: everything above the feet's line (in the body's own pixels). Always drawn: a clip
+	# parent that draws nothing clips nothing. Through the mark the parts are shifted their whole
+	# height, so all of them are under the line.
+	RenderingServer.canvas_item_add_rect(item, Rect2(-MASK_HALF_WIDTH, -MASK_TALL, 2.0 * MASK_HALF_WIDTH, MASK_TALL), Color.WHITE)
 	if share >= MARK_END:
-		var size: float = maxf(absf(body.size), 0.01)
-		var line: float = -shift / size
-		RenderingServer.canvas_item_add_rect(item, Rect2(-MASK_HALF_WIDTH, -MASK_TALL, 2.0 * MASK_HALF_WIDTH, MASK_TALL + line), Color.WHITE)
 		if not _drawn[key]:
 			_drawn[key] = true
 			_play_rise_cue(body.global_position)
@@ -176,6 +180,17 @@ func _draw_body(body: Actor) -> void:
 		_mark_at[_marks] = body.global_position.round()
 		_mark_radius[_marks] = radius
 		_marks += 1
+
+
+## Each direct drawn child of `body` (a Node2D that is not top level) drawn `by` of the body's own
+## pixels below where it is (0: where it is). Its node is untouched; only its canvas item is moved.
+static func _shift_parts(body: Actor, by: float) -> void:
+	for i in body.get_child_count():
+		var part := body.get_child(i) as Node2D
+		if part == null or part.top_level:
+			continue
+		var place: Transform2D = part.get_transform()
+		RenderingServer.canvas_item_set_transform(part.get_canvas_item(), place.translated(Vector2(0.0, by)) if by != 0.0 else place)
 
 
 func _play_rise_cue(at: Vector2) -> void:
@@ -187,8 +202,8 @@ func _play_rise_cue(at: Vector2) -> void:
 	play_cue.call(at, weighted)
 
 
-## Every body drawn arriving that arrives no more (or went) has its own transform back and is no clip
-## parent any more.
+## Every body drawn arriving that arrives no more (or went) has its parts' own transforms back and is
+## no clip parent any more.
 func _put_back() -> void:
 	for key: int in _drawn.keys():
 		var body := instance_from_id(key) as Actor
@@ -196,9 +211,8 @@ func _put_back() -> void:
 			continue
 		if body != null:
 			body.clip_children = CanvasItem.CLIP_CHILDREN_DISABLED
-			var item: RID = body.get_canvas_item()
-			RenderingServer.canvas_item_clear(item)
-			RenderingServer.canvas_item_set_transform(item, body.get_transform())
+			RenderingServer.canvas_item_clear(body.get_canvas_item())
+			_shift_parts(body, 0.0)
 		_drawn.erase(key)
 
 

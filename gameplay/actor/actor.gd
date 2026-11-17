@@ -321,9 +321,10 @@ func tick_step(delta: float) -> void:
 
 ## True while no controller drives it, it has no Mover and it keeps no time (props W2; see the
 ## class doc): the Tick does not step it. A prop with a `timer` row keeps time
-## (`PropStateTriggers.keeps_time`): it is stepped, so its clock runs and its pools refill.
+## (`PropStateTriggers.keeps_time`): it is stepped, so its clock runs and its pools refill; so does a
+## body that arrives (its timer runs, or it would never land).
 func is_still() -> bool:
-	return controller == null and mover == null and (state_triggers == null or not state_triggers.keeps_time())
+	return controller == null and mover == null and arrive_left <= 0.0 and (state_triggers == null or not state_triggers.keeps_time())
 
 
 ## The body as a few values for the state hash while it rests (props W2; see the class doc): still,
@@ -582,8 +583,11 @@ func step(delta: float) -> void:
 		if arrive_left > 0.0:
 			_hold_arriving(delta)
 			return
-		# Landed: it steps as a standing body from this tick on (its hurt shape registers below).
+		# Landed: it steps as a standing body from this tick on (its hurt shape registers below), and
+		# the actor table hears whether it is still now (it was not while it arrived).
 		arrive_left = 0.0
+		if actors != null and id != ActorsScript.NONE:
+			actors.set_still(id, is_still())
 	if fall_left > 0.0:
 		fall_left -= delta
 		if fall_left <= 0.0:

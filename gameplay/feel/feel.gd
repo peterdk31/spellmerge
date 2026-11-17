@@ -1423,13 +1423,13 @@ func _status_motes(real_delta: float) -> void:
 			_spectacle.status_motes(card[ElementBase.STATUS_LOOK_CARD] as StringName, card[ElementBase.STATUS_LOOK_LAYER] as int, enemy.global_position, 4.0 * STATUS_ZOOM, status_color(id), count)
 
 
-## A falling body's motes (`FallLook`): `count` of them round `at`, the void's, drifting.
 ## An enemy starts to rise out of its mark (`ArriveLook`): its cue at its feet, as no actor's; unweighted
 ## (its dust only, no sound) when another arrival sounded just before.
 func _play_arrive_cue(at: Vector2, weighted: bool) -> void:
 	play_cue(ArriveLook.CUE, ActorsScript.NONE, at, Vector2.ZERO, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, weighted)
 
 
+## A falling body's motes (`FallLook`): `count` of them round `at`, the void's, drifting.
 func _throw_fall_motes(at: Vector2, count: int) -> void:
 	_spectacle.status_motes(&"", LookNames.layer_of(&"drift"), at, 6.0, FallLook.MOTE_COLOUR, count)
 

@@ -79,6 +79,7 @@ func test_it_is_down_unhittable_and_unpossessable_while_it_arrives() -> void:
 	check(body.is_arriving() and body.is_down() and not body.is_downed(), "arriving: down to everything, but not downed")
 	check(not body.hurtbox.registered, "its hurt shape was never registered, not even on its first tick")
 	check(not Possession.can_start(body), "it can't be possessed")
+	check(not AIBrain.can_target(body), "nothing targets it")
 	check_equal(_world.shoot(body, &""), [] as Array[StringName], "a bolt passes through it")
 	check_equal(body.health.health, 50.0, "unhurt")
 	check(body.is_arriving(), "still arriving")
@@ -87,6 +88,7 @@ func test_it_is_down_unhittable_and_unpossessable_while_it_arrives() -> void:
 	check(not body.is_arriving() and not body.is_down(), "landed")
 	check(body.hurtbox.registered, "its hurt shape registered as it landed")
 	check(Possession.can_start(body), "it can be possessed now")
+	check(AIBrain.can_target(body), "and targeted")
 	check_equal(_world.shoot(body, &"").size(), 1, "a bolt hits it now")
 
 
@@ -243,3 +245,16 @@ func _areas() -> Dictionary:
 		if is_instance_valid(body) and body.is_inside_tree() and body.id != ActorsScript.NONE:
 			areas["actor %d" % body.id] = body
 	return areas
+
+
+## A body that would be still (no controller, no Mover) is stepped while it arrives, so it lands.
+func test_a_body_with_nothing_to_drive_it_is_not_still_while_it_arrives() -> void:
+	var body := Actor.new()
+	body.add_child(Hurtbox.new())
+	body.arrive(Actor.ARRIVE_SECONDS)
+	_world.add(body, START)
+	check(not body.is_still(), "not still while it arrives")
+	check(not _world.table.is_still(body.id), "the actor table steps it")
+	_run(ARRIVE_TICKS)
+	check(not body.is_arriving() and body.is_still(), "landed, it is still")
+	check(_world.table.is_still(body.id), "and the actor table says so")

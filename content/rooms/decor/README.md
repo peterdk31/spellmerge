@@ -14,6 +14,7 @@ Decals any room may place, whatever its biome: scenes with no script and no coll
 | Decal | What it is |
 |---|---|
 | `beam.tscn` | **The light shaft:** a column of pale light falling from the top of the screen onto the floor (`Column`, additive, drawn over the bodies at z 4; its top lies 212 px above the decal's foot, so a room places it at least that far down), its pool on the floor (`Pool`, painted light; the column is not, so it shows with spell light on, which draws the pool's light but not a column), a `light_spot` in its pale colour, and dust drifting down through it (`Dust`, an area `MoteSource` of `falling_dust`). The crypt's shafts ("Home is up", seen from below; docs/STORY.md, the Vaults) and the hub's landing |
+| `beam_wide.tscn` | **The wide light shaft:** the light shaft's own parts (column, pool, `light_spot`, falling dust) drawn wider (a 112 px column, 1.75 times the beam's; a 128×56 px pool, 1.6 times as wide and 1.75 times as deep), its light reaching 120 px and its dust falling over a 40 px wide area; its column is 96 px taller, its top 308 px above its foot, so it reaches above a room 512 px tall as well. A great hall's shaft: the broom's hall (crypt rework CR7) |
 
 ## Allowed files
 

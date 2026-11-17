@@ -23,7 +23,7 @@ A colour is a palette material's shade (`leaf.shadow`) or `#rrggbb`; the hub's g
 | `turf` | the hub's floor | dark turf, a meadow at night, in soft patches, flecked with Leaf |
 | `earth` | areas (clearings, paths) | trodden earth in Wood's shades, flecked with pebbles |
 | `flagstone` | the crypt's floor | large irregular flagstones of one cool, quiet Stone, softly jointed, grit toward the floor's edges |
-| `dust` | areas (drifts) | dust and grit lying thick, in patches |
+| `dust` | areas (drifts) | dust and grit lying thick enough to hide the stone, in soft patches, heaped paler toward the floor's edge (`toward_edge`) |
 | `swept` | areas (the broom's ring) | flagstones swept clean, the strokes of a broom round the area's middle |
 
 How a material is drawn is `tools/ground_materials.py`. Areas are drawn in order, a later one over an earlier one (the broom's ring: `dust` over the hall, then `swept` inside it).

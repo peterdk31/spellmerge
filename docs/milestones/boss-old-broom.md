@@ -75,7 +75,7 @@ Card lists are written in slot order (docs/milestones/M2-staffs.md, "Reading a s
     - The Sandbox's enemy arena lists bosses too.
 28. **The boss can be deleted by deleting its folder and files** (owner, 2026-11-15: "Yes!"), as a spell card is:
     - `content/bosses/old_broom/`: its data, scene, art and `assets.json`, and inside its `.tres` as sub-resources (as every enemy's staffs are, content/enemies/README.md) its staffs, its phases' profiles (never in the shared `content/enemies/profiles/`) and looks, its lore line and its music's layer data;
-    - its arena, `content/rooms/crypt/boss_broom/`;
+    - its arena, `content/rooms/crypt/boss_broom/`, and its ground's art, `art/grounds/boss_broom/`, with its lines in `art/manifest.json` (crypt rework CR7);
     - its cues, `content/cues/broom_*.tres` (cues must stay in `content/cues`: the registry files a resource under the top content folder it sits in, so Feel finds cues only there);
     - once they exist, its sounds and its track in `audio/` and their lines in `audio/manifest.json`;
     - its lines in docs/STORY.md;
@@ -349,7 +349,7 @@ Caught, carried and pinned costs about 8 + 8 (contact) + 16 = 32; slipping off s
 
 ## The arena and its props
 
-`content/rooms/crypt/boss_broom/`: about 1.7× a crypt room, an open middle, walls all round, four **cracked pillars** in a loose diamond, a few **dust heaps**, the broom listed in its `enemies` (decision 31), following the crypt's rooms (`follows`, decision 32), and no exit: cleared, the run is won. It is the broom's best room, not its only one: the fight works in any room with whatever cover it has (decision 17).
+`content/rooms/crypt/boss_broom/`: about 1.7× a crypt room, an open middle, walls all round, four **cracked pillars** in a loose diamond, a few **dust heaps**, the broom listed in its `enemies` (decision 31), following the crypt's rooms (`follows`, decision 32), and no exit: cleared, the run is won. It is the broom's best room, not its only one: the fight works in any room with whatever cover it has (decision 17). **Since crypt rework CR7** (docs/milestones/crypt-rework.md) it is the broom's hall, a floating room drawn from its shape with no walls but its invisible edge, its landmark the swept ring (the dust in drifts round it, the heaps standing in them), and its four pillars are the crypt's own `crypt_pillar` props: 60 health in four stages, about four of the Sweep's wall hits where the cracked pillar's 32 were two, so its cover lasts longer; OB17's playtests judge it (the cracked pillar stays an ordinary prop).
 
 - **Cracked pillar** (`content/props/cracked_pillar`, built in OB5): intact, cracked (shown at half health), then gone (rubble that no longer blocks and is not hit). Its health is two of the Sweep's wall hits (the pass and the ring, it is a body like any other); spells chip it. Data and art only.
 - **Dust heap** (`content/props/dust_heap`): a body passing through it scatters it (a state that no longer blocks and stays where it is); fire on the heap or the scattered dust makes it explode (a blast cast), hurting everything near, the broom included. **It needs one new prop trigger, `touched`** (a body overlaps its area; `PropTrigger` has none today), built with it in OB5 (done: the heap's area reaches past its ground, so a body stopped at its edge touches it).

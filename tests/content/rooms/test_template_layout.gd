@@ -173,8 +173,8 @@ func test_spawns_are_clear_of_props() -> void:
 
 ## A room that hosts a boss stands it at its first enemy spawn (Flow, in turn): every boss of the
 ## room's biome at any depth (found by folder; none, nothing to check) fits there, its
-## body (hurt shape and ground, at its data's `size`) inside the room and clear of every wall and
-## every prop it stands.
+## body (hurt shape and ground, at its data's `size`) inside the room and clear of every wall, every
+## hole (crypt rework, "Tests that change") and every prop it stands.
 func test_a_boss_room_holds_its_biomes_bosses_at_its_first_enemy_spawn() -> void:
 	var content: RunContent = registry.run_content()
 	for room in templates:
@@ -192,6 +192,8 @@ func test_a_boss_room_holds_its_biomes_bosses_at_its_first_enemy_spawn() -> void
 			check(_bounds(room).grow(-TILE).encloses(body), "%s: %s at %s is inside the walls" % [room.id, boss.id, places.enemy_spawns[0]])
 			for wall in _walls(room):
 				check(not wall.intersects(body), "%s: %s at %s is clear of the wall %s" % [room.id, boss.id, places.enemy_spawns[0], wall])
+			for hole in RoomPlaces.hole_rects(layouts[room.id]):
+				check(not hole.intersects(body), "%s: %s at %s is clear of the hole %s" % [room.id, boss.id, places.enemy_spawns[0], hole])
 			for i in props.size():
 				var box: Rect2 = _prop_box(props[i] as PropBase, props_at[i])
 				check(not box.intersects(body), "%s: %s at %s is clear of the %s at %s" % [room.id, boss.id, places.enemy_spawns[0], (props[i] as PropBase).id, props_at[i]])

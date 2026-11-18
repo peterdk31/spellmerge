@@ -15,6 +15,10 @@
 // colours), hot = light halfway to white, glow = base toward light, additive glow with
 // premultiplied alpha. Subtle (the owner, 2026-11-18): a faint wash between its dotted edges, its
 // dashes and arrowhead in the ramp's own shades, hot only in the last part and at a lock's beat.
+// It fades in from its caster's end (the owner, 2026-11-18: "a gradient"): nothing at the caster,
+// whole after `FADE_SHARE` of its length (`FADE_MOST` pixels at most), in `FADE_STEPS` even steps
+// (whole pixels' bands, no smooth blend: docs/STYLE.md), so it reads as where the cast goes, not
+// as a block on its caster.
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
@@ -31,6 +35,12 @@ uniform float telegraph_beat = 0.0;
 
 // The widest a lane is drawn either side (pixels; `lanes.gd` makes its sprite tall enough).
 const float LANE_MOST = 72.0;
+
+// The lane fades in over this share of its length from its caster's end, at most this many pixels,
+// in this many steps.
+const float FADE_SHARE = 0.5;
+const float FADE_MOST = 96.0;
+const float FADE_STEPS = 6.0;
 
 float falloff(float x, float reach) {
 	float k = max(1.0 - x / reach, 0.0);
@@ -51,6 +61,7 @@ void fragment() {
 	float far = clamp(max(telegraph_lane_end, near), near, LANE_MOST);
 	float lane = round(mix(near, far, clamp(at / len, 0.0, 1.0)));
 	float beat = clamp(telegraph_beat, 0.0, 1.0);
+	float fade = clamp(floor(at / min(len * FADE_SHARE, FADE_MOST) * FADE_STEPS) / FADE_STEPS, 0.0, 1.0);
 	// The arrowhead at the far end, growing as the cast nears.
 	float head = round(mix(3.0, 7.0, p));
 	float back = len - at;
@@ -61,13 +72,13 @@ void fragment() {
 		COLOR = vec4(0.0);
 	} else if ((y == 0.0 || y == -1.0) && mod(at - floor(p * 24.0), 8.0) < 4.0 && back > head) {
 		// Dashes down the middle, marching toward the tip as the windup runs.
-		COLOR = vec4(last ? hi : mid, 1.0);
+		COLOR = vec4((last ? hi : mid) * fade, fade);
 	} else if (side == lane + 0.5 && mod(at, 3.0) < 1.0) {
 		// The lane's edges, dotted, so the hit width reads.
-		COLOR = vec4(beat > 0.0 ? hot : mid, 1.0);
+		COLOR = vec4((beat > 0.0 ? hot : mid) * fade, fade);
 	} else {
 		float inside = side <= lane + 0.5 ? 1.0 : falloff(side - lane, 3.0);
 		float lit = inside * (0.05 + 0.1 * p + 0.4 * beat) + 0.15 * p * falloff(side, 2.0);
-		COLOR = vec4(glow * lit, 0.0);
+		COLOR = vec4(glow * lit * fade, 0.0);
 	}
 }

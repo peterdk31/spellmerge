@@ -41,7 +41,7 @@ Three pieces, one area each. They talk through `core/` events and the actor's st
 
 ### 1. The data and how it reaches Flow (core/base, gameplay/run)
 
-- `core/base/spawn_rules.gd`, a `Resource`. A biome's `MapRules` gets an `spawns: SpawnRules` field, so each biome of a run sets its own pace in content/runs/*.tres. If it is null, the whole list spawns in at once (with the look), which is today's pace without the pop.
+- `core/base/spawn_rules.gd`, a `Resource`. A biome's `MapRules` gets a `spawning: SpawnRules` field, so each biome of a run sets its own pace in content/runs/*.tres. If it is null, the whole list spawns in at once (with the look), which is today's pace without the pop.
 
   | Field | Starting value | Meaning |
   | --- | --- | --- |
@@ -83,11 +83,11 @@ This stays on `Actor` instead of becoming a component so that it sits right next
 
 In Flow:
 
-- `_stand_room_enemies` stands the bosses at once (as today, no spawn). It hands the rest to `spawning.begin(...)` and calls `spawning.next(0, ...)` until it returns `&""`, so the first group starts in the room's setup, before `_open_boss_intro` and `_check_room_won`. As built: the first group's bodies are stood just after the room's walls and holes reach the projectile manager (`_set_walls`, then `_call_spawning(0)`), still in the room's setup and the same tick, because the spawn pick's hole check needs the room's own holes, which used to be laid after the enemies stood.
-- `step` calls `spawning.next(delta, _standing_cost())` each tick and stands what it returns with `_stand_enemy(..., spawn in = true)`. `_standing_cost()` is the cost of every one of the room's enemies standing or spawning, a phase's adds too. **Then it calls `_check_room_won()` every tick the queue is open.** An id that fails to stand (no data for it in the registry, or no spawns) is dropped from the queue, so a room can't get stuck uncleared.
+- `_stand_room_enemies` stands the bosses at once (as today, it does not spawn in). It hands the rest to `spawn_queue.begin(...)` and calls `spawning.next(0, ...)` until it returns `&""`, so the first group starts in the room's setup, before `_open_boss_intro` and `_check_room_won`. As built: the first group's bodies are stood just after the room's walls and holes reach the projectile manager (`_set_walls`, then `_call_spawning(0)`), still in the room's setup and the same tick, because the spawn pick's hole check needs the room's own holes, which used to be laid after the enemies stood.
+- `step` calls `spawning.next(delta, _standing_cost())` each tick and stands what it returns with `_stand_enemy(..., spawn_in = true)`. `_standing_cost()` is the cost of every one of the room's enemies standing or spawning, a phase's adds too. **Then it calls `_check_room_won()` every tick the queue is open.** An id that fails to stand (no data for it in the registry, or no spawns) is dropped from the queue, so a room can't get stuck uncleared.
 - `_check_room_won` also requires `spawning.is_done()`.
-- `_on_adds_requested` stands adds with `spawn in = true` (unless question 3 says otherwise).
-- `_forget_enemies` calls `spawning.clear()`. The `spawns` member is Flow's state, not `DERIVED`.
+- `_on_adds_requested` stands adds with `spawn_in = true` (unless question 3 says otherwise).
+- `_forget_enemies` calls `spawn_queue.clear()`. The `spawn_queue` member is Flow's state, not `DERIVED`.
 - `enemies_left()` counts the queue too, so callers keep its meaning: enemies still to beat.
 - `stand_all_now()` (for tests) calls the rest of the queue at once; the shared helper's `Spawning.land(flow)` calls it before landing the bodies.
 
@@ -101,7 +101,7 @@ In Flow:
 - A sound cue `enemy_spawn` (soft, played no more than every 0.1 s, so a group doesn't stack it), through the existing cue plan. As built: the cue (content/cues/enemy_spawn.tres) holds the dust motes too and plays for every body as its rise starts; between two sounds it is played unweighted (dust only).
 - **Risk, checked first in EA2:** the clip has to work with the body's draw order in the world (y-sort) and the room's light pass. If a clip parent breaks y-sort, the fallback is a per-sprite `region_rect` cut, done in the look (each sprite's own rows, still whole pixels). Checked on a virtual display with the game's renderer (compatibility): a clipped body whose parts are shifted keeps its place among y-sorted siblings (behind one standing just in front of it), and a screen-reading pass drawn over the world (the light pass's way) shades it like any body, so the fallback was not needed.
 
-Later, an enemy could pick its own look (`EnemyBase.spawn`, for example an imp that drops in from above). That is out of scope here: v1 has one look for every enemy.
+Later, an enemy could pick its own look (`EnemyBase.spawn_style`, for example an imp that drops in from above). That is out of scope here: v1 has one look for every enemy.
 
 ## Steps
 
@@ -109,7 +109,7 @@ Later, an enemy could pick its own look (`EnemyBase.spawn`, for example an imp t
 | --- | --- | --- |
 | EA1 | **Spawning as a state:** `Actor.spawn`, `spawn_left`, `is_spawning`, `spawn_share`, `is_down` while spawning, the step and the move held, touches both ways. Tests: can't be hurt, targeted, touched or possessed; doesn't think, cast, move or call its phases' adds; contact damage only after landing; ends on time; snapshot mid-spawn; determinism | gameplay/actor, tests |
 | EA2 | **The look:** `SpawnLook` in Feel (the y-sort and light check first), the mark and the rise, motes, the cue. Tests: at least 3 frames per stage, whole pixels, drawn from state alone (a restored snapshot mid-spawn), nothing allocated per frame | gameplay/feel, audio, tests |
-| EA3 | **Every non-boss enemy spawns in:** `_stand_enemy(..., spawn in)`, room enemies and adds spawn in (still all at once), bosses don't. This removes the pop before the pacing lands. Tests: the boss stands at once and its intro opens (test_boss_intro_hold.gd); the flow tests step past the spawn (the shared helper `tests/support/spawning.gd`) | gameplay/flow, tests |
+| EA3 | **Every non-boss enemy spawns in:** `_stand_enemy(..., spawn_in)`, room enemies and adds spawn in (still all at once), bosses don't. This removes the pop before the pacing lands. Tests: the boss stands at once and its intro opens (test_boss_intro_hold.gd); the flow tests step past the spawn (the shared helper `tests/support/spawning.gd`) | gameplay/flow, tests |
 | EA4 | **The rules:** `SpawnRules`, `MapRules.spawning`, `problems()` and the run validator, `run_room_paced` sent by the run, the crypt's numbers | core/base, core/events, gameplay/run, content/runs, tests |
 | EA5 | **Groups:** `RoomSpawning`, Flow's queue, the far-spawn pick, room cleared only when the queue is empty, a failed id dropped. Tests: group sizes by cost and scale, the quiet trigger (and no group while the floor is busy, however long), an expensive enemy still comes, snapshot between groups and mid-spawn, cleared only at the end, never stuck | gameplay/flow, tests |
 | EA6 | **Tune** in the owner's playtest: the numbers in content/runs/crypt.tres only | content/runs |

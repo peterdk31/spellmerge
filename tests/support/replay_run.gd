@@ -288,7 +288,7 @@ func play(replay: Replay, bots: int, into: Desync) -> void:
 
 
 ## `replay` played live from a fresh game (netcode spike S1: as the online client plays the host's
-## run while it spawns in, `Frames.play_live`), no bot watching: its header first, then its tick `k`
+## run while it arrives, `Frames.play_live`), no bot watching: its header first, then its tick `k`
 ## added at the physics step `arrive_at[k]` (counted from 0 at the play's start; never earlier than
 ## the tick before). Seat 0, the run's own player, is this machine's here (the client's): its frames
 ## come from `Contrary` and are sent to the feed, never played. At the start of every step (the

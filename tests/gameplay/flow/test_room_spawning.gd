@@ -18,7 +18,7 @@ func _ids(count: int) -> Array[StringName]:
 	return ids
 
 
-## `spawns` begun on ids e0, e1, ... costing `costs`, at the pace given.
+## `spawning` begun on ids e0, e1, ... costing `costs`, at the pace given.
 func _begin(spawning: RoomSpawning, costs: Array[int], group: int, refill: int, stagger: float) -> void:
 	_cost.clear()
 	var ids: Array[StringName] = _ids(costs.size())
@@ -27,7 +27,7 @@ func _begin(spawning: RoomSpawning, costs: Array[int], group: int, refill: int, 
 	spawning.begin(ids, PackedInt32Array(costs), group, refill, stagger)
 
 
-## Every id `spawns` gives at once with `standing` cost standing, as Flow asks (`delta`, then 0s),
+## Every id `spawning` gives at once with `standing` cost standing, as Flow asks (`delta`, then 0s),
 ## each one stood adding its cost to what stands.
 func _all_now(spawning: RoomSpawning, delta: float, standing: int) -> Array[StringName]:
 	var got: Array[StringName] = []

@@ -12,7 +12,7 @@ extends Node2D
 ##
 ## **A style says the numbers** (`SpawnStyle`, content/spawn_styles/): where the stages hand over, the
 ## mark's frames and the cue. Feel hands the look a lookup of the styles by id (`style_of`, the
-## registry's `spawns`); a style it cannot find is drawn as `SpawnStyle.DEFAULT` (`rise`'s
+## registry's `spawn_styles`); a style it cannot find is drawn as `SpawnStyle.DEFAULT` (`rise`'s
 ## numbers). Every body spawns in as `rise` today (spawn styles AS1); which style a body has is AS2.
 ## **A motion draws the body** (`MOTIONS`, gameplay/feel/spawn_motions/: one object each, keyed by
 ## the names of `SpawnStyle.MOTIONS`; a test holds the two lists together): a motion it does not
@@ -54,7 +54,7 @@ const NO_FLOOR: PackedColorArray = [Color(0.55, 0.55, 0.6), Color(0.35, 0.35, 0.
 ## Plays a cue: (cue: StringName, at: Vector2, weighted: bool). Set by Feel; none plays nothing.
 var play_cue: Callable = Callable()
 ## Finds a style by its id: (id: StringName) -> SpawnStyle, null for none. Set by Feel (the
-## registry's `spawns`); none, or a style it does not find, is `SpawnStyle.DEFAULT`. Setting it
+## registry's `spawn_styles`); none, or a style it does not find, is `SpawnStyle.DEFAULT`. Setting it
 ## forgets the styles looked up.
 var style_of: Callable = Callable():
 	set(value):

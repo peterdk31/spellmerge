@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## A room whose enemies come in groups, snapshotted and resumed (enemy spawning EA5,
 ## docs/milestones/enemy-spawning.md, "Tests that need a look"): a run of the arena paced in groups of
-## half its budget (tests/support/replay_run.gd, pinned with `spawns`), recorded with a snapshot
+## half its budget (tests/support/replay_run.gd, pinned with `spawning`), recorded with a snapshot
 ## early, while the first group is still rippling in (the restored queue starts its next bodies) and
 ## later groups wait, and later, between groups (the first group in, the next held: the scripted
 ## player kills nothing, so the restored queue must keep holding it); a fresh game restores the
@@ -48,7 +48,7 @@ func after_each() -> void:
 
 func _caught() -> void:
 	var flow: Node = root.get_node("Flow")
-	_left = int((flow.get(&"spawning") as RoomSpawning).left())
+	_left = int((flow.get(&"spawn_queue") as RoomSpawning).left())
 	_spawning = 0
 	for enemy: Node in flow.get(&"_enemies") as Array[Node]:
 		if is_instance_valid(enemy) and (enemy as Actor).is_spawning():
@@ -75,7 +75,7 @@ func _check_resumed(at: int) -> void:
 	var recorded := Desync.new()
 	_run.snapshot_at = at
 	var replay: Replay = await _run.record(&"play_requested", 0, 1, recorded)
-	_left_after = int((root.get_node("Flow").get(&"spawning") as RoomSpawning).left())
+	_left_after = int((root.get_node("Flow").get(&"spawn_queue") as RoomSpawning).left())
 	check(replay != null and _run.snapshot != null, "recorded with its snapshot")
 	if replay == null or _run.snapshot == null:
 		return
@@ -84,7 +84,7 @@ func _check_resumed(at: int) -> void:
 	recorded.hashes = recorded.hashes.slice(at + 1)
 	var resumed := Desync.new()
 	await _run.resume(replay, _run.snapshot, at, 0, resumed)
-	_left_restored = int((root.get_node("Flow").get(&"spawning") as RoomSpawning).left())
+	_left_restored = int((root.get_node("Flow").get(&"spawn_queue") as RoomSpawning).left())
 	for problem in _run.problems:
 		check(false, problem)
 	_run.problems.clear()

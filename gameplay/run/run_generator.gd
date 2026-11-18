@@ -294,8 +294,8 @@ static func _fill(map: RunMap, definition: RunDefinition, rules: MapRules, conte
 				node.enemies = [bosses[dice.below(Step.FILL, bosses.size())].id] as Array[StringName]
 
 
-## How `node`'s enemies come in (enemy spawning EA4): `spawns`' shares of its scaled budget
-## `budget`, as costs; with no spawns, the whole list at once (a group of 0).
+## How `node`'s enemies come in (enemy spawning EA4): `spawning`'s shares of its scaled budget
+## `budget`, as costs; with no `SpawnRules`, the whole list at once (a group of 0).
 static func _pace(node: RunNode, spawning: SpawnRules, budget: int) -> void:
 	if spawning == null:
 		node.group = 0

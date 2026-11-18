@@ -2,7 +2,7 @@ extends "res://tests/support/screenshot.gd"
 ## An enemy spawning as the game draws it (enemy spawning EA2, docs/milestones/enemy-spawning.md,
 ## "The look"; gameplay/feel/spawn_look.gd): the pinned crypt arena started, and the lowest of its
 ## enemies cropped at 3x as it spawns in, left to right: the mark growing on the floor, the body rising
-## out of it cut at its feet, the mark closing, the body standing. `spawns` is the filmstrip; each
+## out of it cut at its feet, the mark closing, the body standing. `spawning` is the filmstrip; each
 ## frame's share of the spawn is printed.
 
 ## The shares of the spawn the strip shows (the last, past 1, standing).

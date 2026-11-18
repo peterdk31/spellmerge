@@ -52,7 +52,7 @@ static func pin(registry: Node, room: RoomBase, biome: StringName = &"", fill: S
 
 
 ## The id of the copy of `room` a pinned run of `depth` rows `width` wide plays (and of its kind and
-## its run); with `spawns`, ids of that pace's own (its numbers in hundredths: two paces closer than
+## its run); with `spawning`, ids of that pace's own (its numbers in hundredths: two paces closer than
 ## that share one, and the first pinned is kept).
 static func room_id(room: RoomBase, depth: int = 1, width: int = 1, spawning: SpawnRules = null) -> StringName:
 	var id: String = PREFIX + String(room.id)

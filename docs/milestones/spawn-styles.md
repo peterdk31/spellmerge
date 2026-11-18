@@ -38,7 +38,7 @@ This plan makes the look **data a biome or an enemy names**, as cards name their
 Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as `run_problems` does across runs), so no style wins silently by sort order. A test checks every style file and the set. No registration is needed: the registry's scan finds `content/spawn_styles/`.
 
 **Which style an enemy gets** (`SpawnStyle.pick(registry, enemy, biome)`, a pure static function):
-1. the enemy's own (`EnemyBase.spawn`, a style id, empty by default: the storm fork that always materializes, AS3);
+1. the enemy's own (`EnemyBase.spawn_style`, a style id, empty by default: the storm fork that always materializes, AS3);
 2. else the first style by id that names the room's biome (`RoomBase.biome`);
 3. else `rise`, the default.
 
@@ -73,8 +73,8 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
 | Step | What | Areas |
 | --- | --- | --- |
 | AS1 | **The data, with no change on screen:** `SpawnStyle`, `MOTIONS`, `DEFAULT`, `content/spawn_styles/rise/` with today's numbers, `SpawnLook` reading the style's timings and cue instead of its constants, the `rise` motion moved into `spawn_motions/`, the validator and its test. The look's static helpers (`rise_shift`, `mark_radius`) take the style's numbers, so the 21 references in test_spawn_look.gd, test_spawn.gd, test_flow.gd and test_bot.gd are updated | core/base, content/spawn_styles, gameplay/feel, tests |
-| AS2 | **Picked per body:** `SpawnStyle.pick`, `EnemyBase.spawn`, `Actor.spawn(seconds, style)` and `spawn_style` as state, Flow picking as it stands a body; tests for the picker, snapshots and determinism | core/base, gameplay/actor, gameplay/flow, tests |
-| AS3 | **A second motion, to prove it:** `materialize`, with its own style `content/spawn_styles/materialize/`, its cue (sparks and a sound id) and `EnemyBase.spawn = &"materialize"` on the storm fork, so it shows in the crypt today (one line to move it to another enemy or a biome); the every-style-on-every-enemy test | gameplay/feel, content/spawn_styles, content/cues, tests |
+| AS2 | **Picked per body:** `SpawnStyle.pick`, `EnemyBase.spawn_style`, `Actor.spawn(seconds, style)` and `spawn_style` as state, Flow picking as it stands a body; tests for the picker, snapshots and determinism | core/base, gameplay/actor, gameplay/flow, tests |
+| AS3 | **A second motion, to prove it:** `materialize`, with its own style `content/spawn_styles/materialize/`, its cue (sparks and a sound id) and `EnemyBase.spawn_style = &"materialize"` on the storm fork, so it shows in the crypt today (one line to move it to another enemy or a biome); the every-style-on-every-enemy test | gameplay/feel, content/spawn_styles, content/cues, tests |
 | AS4 | **Art strips for the mark** (question 2) | gameplay/feel, content/spawn_styles, tests |
 
 **As built (AS1):**
@@ -86,7 +86,7 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
 - `all_problems(styles, known_cue)` adds the one-style-a-biome check. The look doesn't read `colours` yet: every style is `floor`'s until AS3 draws the first that isn't.
 - `content/spawn_styles/rise/rise.tres` writes every number out. It has no art, so no `assets.json`. `content/spawn_styles/README.md` is the guide.
 - **`Actor.SPAWN_SECONDS` went in AS1, not AS2.** Flow's `spawn_seconds()` is the `rise` style's `seconds` from the registry, or `DEFAULT`'s with none. Every body still spawns in as `rise`, and AS2 replaces it with `pick`. `Actor.spawn(seconds)` is unchanged; `spawn_style` is AS2's.
-- The registry's folder is `SpawnStyle.FOLDER` (`spawns`), named once in core for Flow, Feel and the tests.
+- The registry's folder is `SpawnStyle.FOLDER` (`spawn_styles`), named once in core for Flow, Feel and the tests.
 - **Feel.**
   - The motions are `SpawnLook.MOTIONS`, a constant table from each name to its script in `gameplay/feel/spawn_motions/`, and the look holds one object of each. There is no separate table file.
   - The base class `spawn_motion.gd` holds the measures every motion needs, moved from the look: `body_height`, `size_top`, `body_bottom`, the margin, and each body's kept `size_top`.
@@ -98,9 +98,9 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
   - `tests/core/test_spawn_style.gd` covers every style file and the set, holds `rise` to `DEFAULT`, and names each problem.
   - `tests/gameplay/feel/test_spawn_look.gd` adds three tests: Feel's motions are `SpawnStyle.MOTIONS`, the look draws by the style its lookup gives (marks, motion and cue, looked up once, and the default when none is found), and a motion it lacks is drawn as `rise`.
   - The helpers' references in test_spawn_look.gd, test_spawn.gd, test_flow.gd and test_bot.gd now take the style, its numbers or `Flow.spawn_seconds()`.
-- **"Spawn", not "arrival"** (the owner, 2026-11-18, while AS1 was built: "Can we please call it spawn instead of arrival?"; everything, in this PR). This plan was `arrival-styles.md` and enemy-spawning.md `enemy-arrivals.md`. The names are now: `SpawnStyle` (`core/base/spawn_style.gd`), the folder `content/spawn_styles/` (the registry's `spawn_styles`, `SpawnStyle.FOLDER`), `SpawnLook` (`gameplay/feel/spawn_look.gd`) and `gameplay/feel/spawn_motions/`. The shipped system is renamed too:
+- **"Spawn", not "arrival"** (the owner, 2026-11-18, while AS1 was built: "Can we please call it spawn instead of arrival?"; everything, in this PR). This plan was `arrival-styles.md`, and enemy-spawning.md was `enemy-arrivals.md`. The names are now: `SpawnStyle` (`core/base/spawn_style.gd`), the folder `content/spawn_styles/` (the registry's `spawn_styles`, `SpawnStyle.FOLDER`), `SpawnLook` (`gameplay/feel/spawn_look.gd`) and `gameplay/feel/spawn_motions/`. The shipped system is renamed too:
   - the actor's `spawn(seconds)`, `spawn_left`, `spawn_seconds`, `is_spawning()` and `spawn_share()` (state members, so snapshots and the state hash read the new names);
-  - Flow's `spawn_seconds()`, its `spawning` queue (`RoomSpawning`, `room_spawning.gd`) and `_call_spawning`;
+  - Flow's `spawn_seconds()`, its `spawn_queue` (`RoomSpawning`, `room_spawning.gd`) and `_call_spawning`;
   - `SpawnRules` (`spawn_rules.gd`) and `MapRules.spawning` (content/runs/crypt.tres);
   - the cue and sound id `enemy_spawn`;
   - the tests' helper `tests/support/spawning.gd` (`Spawning.land`), and the tests and the screenshot (`shot_spawning.gd`) named after them.

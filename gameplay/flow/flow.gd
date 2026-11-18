@@ -29,7 +29,7 @@ extends Node
 ## styles AS1) before it enters the tree, so it
 ## is not there yet (no hurt shape, no touch, no step of its own) while Feel draws a mark and its body
 ## rising out of it; a phase's adds spawn in too. They come **in groups as the room gets quiet** (EA5:
-## `spawns`, `RoomSpawning`), at the pace the run tells with the room (`run_room_paced`: a group's
+## `spawn_queue`, `RoomSpawning`), at the pace the run tells with the room (`run_room_paced`: a group's
 ## cost, the cost standing that calls the next, the seconds between a group's bodies): the first group
 ## starts in the room's setup, once its walls and holes are laid; the next only once the cost of the
 ## room's enemies standing or spawning drops to the refill, never by a timer. A group stands at the
@@ -273,7 +273,7 @@ var exits: ExitRules = ExitRules.new()
 var adds: RoomAdds = RoomAdds.new()
 ## How the room's enemies come in: the queue of those still to come, in groups (enemy spawning EA5,
 ## `RoomSpawning`).
-var spawning: RoomSpawning = RoomSpawning.new()
+var spawn_queue: RoomSpawning = RoomSpawning.new()
 ## The boss's intro of the room (docs/milestones/boss-intro.md, `BossIntroHold`).
 var boss_intro: BossIntroHold = BossIntroHold.new()
 ## The room's layout in the world, and the room it is of (a joining machine built the room the run
@@ -289,7 +289,7 @@ var _chosen_room: StringName = &""
 var _chosen_enemies: Array[StringName] = []
 var _chosen_ways: Array[StringName] = []
 ## Scratch, as above: the run's pace for the room (`run_room_paced`, enemy spawning EA4), handed to
-## `spawns` as its enemies are stood; 0s (the whole list at once) when the run sent none.
+## `spawn_queue` as its enemies are stood; 0s (the whole list at once) when the run sent none.
 var _chosen_group: int = 0
 var _chosen_refill: int = 0
 var _chosen_stagger: float = 0.0
@@ -358,7 +358,7 @@ func step(delta: float) -> void:
 	if world != null and state != State.IDLE:
 		yard.tend(delta, world, registry)
 		_crumble_orphans()
-	if mode == MODE_RUN and state == State.RUNNING and not spawning.is_done():
+	if mode == MODE_RUN and state == State.RUNNING and not spawn_queue.is_done():
 		_call_spawning(delta)
 	_count_stand_ups(delta)
 	if mode == MODE_HUB and state == State.RUNNING:
@@ -419,9 +419,9 @@ static func stacked_position(spawn: Vector2, times: int) -> Vector2:
 
 
 ## Enemies of the room's fight still to beat: those alive (those still spawning too) and those still
-## to come (`spawns`' queue); never its dummies.
+## to come (`spawn_queue`); never its dummies.
 func enemies_left() -> int:
-	return _enemies.size() + spawning.left()
+	return _enemies.size() + spawn_queue.left()
 
 
 ## The dummies of the room (the hub's) still standing.
@@ -1036,7 +1036,7 @@ func _count_stone() -> void:
 
 
 ## Add the wizard of a player who joined mid-run: at the room's spawn for joiners when it has them
-## (the hub: beside the altar, where a joining machine's wizards spawn in), else at the player spawn
+## (the hub: beside the altar, where a joining machine's wizards arrive), else at the player spawn
 ## farthest from danger. Ignored while no run is up, and for a slot that already has a wizard.
 func _on_player_joined(player: int) -> void:
 	if state == State.IDLE or world == null or _room == null or player < 0 or player >= PLAYER_SLOTS:
@@ -1093,12 +1093,12 @@ func _on_enemy_died(_player: int, enemy: Node, _position: Vector2, _shot: int) -
 	_check_room_won()
 
 
-## A run's room with no enemy left, standing, spawning or still to come (`spawns`), is cleared
+## A run's room with no enemy left, standing, spawning or still to come (`spawn_queue`), is cleared
 ## (decision 30): `room_cleared`. Its exits light, one a
 ## way on (run generation RG4); the run's last room (no way on) wins the run, which ends
 ## RUN_WON_DELAY seconds later, as a lost one does.
 func _check_room_won() -> void:
-	if not _enemies.is_empty() or not spawning.is_done() or state != State.RUNNING or mode != MODE_RUN:
+	if not _enemies.is_empty() or not spawn_queue.is_done() or state != State.RUNNING or mode != MODE_RUN:
 		return
 	state = State.CLEARED
 	var last: bool = exits.ways.is_empty()
@@ -1326,8 +1326,8 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 
 
 ## The enemies the run puts in the room (`enemies`: ids, one per body): a boss stands at once in
-## `parent` (the world being built) at the enemy spawns (no spawn, so its intro opens on a body that is there), and the rest are handed to
-## `spawns` at the run's pace (`_chosen_group`, ...), whose first group starts once the room's walls
+## `parent` (the world being built) at the enemy spawns (it does not spawn in, so its intro opens on a body that is there), and the rest are handed to
+## `spawn_queue` at the run's pace (`_chosen_group`, ...), whose first group starts once the room's walls
 ## are laid (`_call_spawning`). An id the registry has no enemy or boss for is dropped (a warning).
 func _stand_room_enemies(parent: Node2D, room: RoomBase, enemies: Array[StringName]) -> void:
 	_forget_enemies()
@@ -1348,7 +1348,7 @@ func _stand_room_enemies(parent: Node2D, room: RoomBase, enemies: Array[StringNa
 		else:
 			queued.append(id)
 			queued_costs.append(data.cost)
-	spawning.begin(queued, queued_costs, _chosen_group, _chosen_refill, _chosen_stagger)
+	spawn_queue.begin(queued, queued_costs, _chosen_group, _chosen_refill, _chosen_stagger)
 
 
 ## The room's queue `delta` seconds on (`RoomSpawning.next`): each id it calls now stands, spawning
@@ -1356,12 +1356,12 @@ func _stand_room_enemies(parent: Node2D, room: RoomBase, enemies: Array[StringNa
 ## after the room is announced), the room is checked, so a queue that emptied by ids that could not
 ## stand leaves no room stuck uncleared.
 func _call_spawning(delta: float, check: bool = true) -> void:
-	if spawning.is_done() or world == null:
+	if spawn_queue.is_done() or world == null:
 		return
-	var id: StringName = spawning.next(delta, _standing_cost())
+	var id: StringName = spawn_queue.next(delta, _standing_cost())
 	while id != &"":
 		_stand_queued(id)
-		id = spawning.next(0.0, _standing_cost())
+		id = spawn_queue.next(0.0, _standing_cost())
 	if check:
 		_check_room_won()
 
@@ -1371,7 +1371,7 @@ func _call_spawning(delta: float, check: bool = true) -> void:
 func stand_all_now() -> void:
 	if world == null:
 		return
-	for id: StringName in spawning.take_all():
+	for id: StringName in spawn_queue.take_all():
 		_stand_queued(id)
 	_check_room_won()
 
@@ -1390,7 +1390,7 @@ func _stand_queued(id: StringName) -> void:
 	var on_hole: Callable = Callable()
 	if projectiles != null and projectiles.has_holes():
 		on_hole = func(at: Vector2) -> bool: return projectiles.touches_hole(world.to_global(at), radius)
-	var at: Vector2 = spawning.spawn_for(spawns, _standing_wizard_places(), on_hole, stacked_position)
+	var at: Vector2 = spawn_queue.spawn_for(spawns, _standing_wizard_places(), on_hole, stacked_position)
 	if projectiles != null:
 		# A body stacked beside its spawn may reach a wall or a hole's edge: the nearest clear ground
 		# (the spot itself when it is clear; hub rework HR-H2).
@@ -1481,7 +1481,7 @@ func spawn_seconds() -> float:
 func _forget_enemies() -> void:
 	_enemies.clear()
 	adds.clear()
-	spawning.clear()
+	spawn_queue.clear()
 	var was_open: bool = boss_intro.opened
 	boss_intro.clear(Sim.found(self))
 	if was_open:

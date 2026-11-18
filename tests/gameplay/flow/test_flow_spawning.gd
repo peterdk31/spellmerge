@@ -90,7 +90,7 @@ func test_the_first_group_starts_in_the_room_s_setup_and_ripples_in() -> void:
 	check_equal(flow._enemies.size(), 1, "the first body starts with the room")
 	check((flow._enemies[0] as Actor).is_spawning(), "and spawns")
 	check_equal(flow.enemies_left(), node.enemies.size(), "the queue counts as enemies left")
-	check(not flow.spawning.is_done(), "the rest are still to come")
+	check(not flow.spawn_queue.is_done(), "the rest are still to come")
 	_steps(60)
 	var first: Array[Node] = flow._enemies.duplicate()
 	var cost: int = _cost_of(first)
@@ -121,7 +121,7 @@ func test_the_room_is_cleared_only_when_every_group_is_down() -> void:
 	var killed: int = 0
 	var groups: int = 0
 	for round in 60:
-		if flow.spawning.is_done() and flow._enemies.is_empty():
+		if flow.spawn_queue.is_done() and flow._enemies.is_empty():
 			break
 		_steps(60)
 		check_equal(cleared, 0, "group %d: not cleared yet" % groups)
@@ -137,12 +137,12 @@ func test_the_room_is_cleared_only_when_every_group_is_down() -> void:
 ## An id the registry has no enemy for is dropped from the queue, so the room is cleared all the same.
 func test_an_id_that_cannot_stand_is_dropped() -> void:
 	_start()
-	flow.spawning.take_all()
-	flow.spawning.begin([&"no_such_enemy", &"no_such_enemy"] as Array[StringName], PackedInt32Array([1, 1]), 1, 0, 0.1)
+	flow.spawn_queue.take_all()
+	flow.spawn_queue.begin([&"no_such_enemy", &"no_such_enemy"] as Array[StringName], PackedInt32Array([1, 1]), 1, 0, 0.1)
 	_kill_standing()
 	check_equal(cleared, 0, "two still to come")
 	_steps(30)
-	check(flow.spawning.is_done(), "both dropped")
+	check(flow.spawn_queue.is_done(), "both dropped")
 	check_equal(cleared, 1, "the room is cleared, not stuck")
 
 
@@ -216,8 +216,8 @@ func test_a_stacked_body_stands_clear_of_a_hole() -> void:
 	for at in ranked.size() + 1:
 		ids.append(&"crypt_mite")
 		costs.append(1)
-	flow.spawning.take_all()
-	flow.spawning.begin(ids, costs, 0, 0, 0.0)
+	flow.spawn_queue.take_all()
+	flow.spawn_queue.begin(ids, costs, 0, 0, 0.0)
 	_steps(1)
 	check_equal(flow._enemies.size(), ids.size(), "the whole group at once")
 	if flow._enemies.size() == ids.size():
@@ -230,7 +230,7 @@ func test_stand_all_now_calls_every_group() -> void:
 	_start()
 	var node: RunNode = _node()
 	Spawning.land(flow)
-	check(flow.spawning.is_done(), "nothing still to come")
+	check(flow.spawn_queue.is_done(), "nothing still to come")
 	check_equal(flow._enemies.size(), node.enemies.size() if node != null else -1, "every enemy stands")
 	for enemy: Node in flow._enemies:
 		check(not (enemy as Actor).is_spawning(), "landed")

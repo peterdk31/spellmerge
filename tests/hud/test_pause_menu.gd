@@ -2,13 +2,15 @@ extends "res://tests/support/suite.gd"
 ## Tests for the pause menu (hud/menus/pause) and the buttons that open menus (owner,
 ## 2026-10-26), one behaviour per test: `pause` (Start) opens it for the player who pressed it and
 ## stops the game for everyone; only that player works it; Resume, `back` on the main page and
-## `pause` again close it and the game goes on; the Map page shows the run's map; Settings has a
-## row a page: Graphics (Fullscreen, Dynamic lighting, Shadows, Fog, Ambient particles, Environment
-## interaction, Floor marks), Performance (Effect slots, Particles, Particle amount, Tailless motes,
-## Max shots), Audio (Ambience volume) and Interface (Screen shake, Damage numbers, Show FPS, and the
-## switches of the builder and of where the staff rows show the reload), each fitting the view, its
-## Back and `back` going up to Settings on its own row; the rows that need Dynamic lighting greyed
-## and skipped while it is off;
+## `pause` again close it and the game goes on; the Map page shows the run's map; Settings is one
+## page of tabs (owner, 2026-11-18): Graphics (Fullscreen, Dynamic lighting, Shadows, Fog, Ambient
+## particles, Environment interaction, Floor marks), Performance (Effect slots, Particles, Particle
+## amount, Tailless motes, Max shots), Audio (Ambience volume) and Interface (Screen shake, Damage
+## numbers, Show FPS, and the switches of the builder and of where the staff rows show the reload),
+## LB and RB (Z and C) paging them round from either end with their glyphs at the row's ends, a switch
+## focusing the tab's first row, the box sliding and the rows stepping in by whole pixels, the panel
+## one size on every tab and inside the view, no Back row and `back` going up to the main page on
+## Settings; the rows that need Dynamic lighting greyed and skipped while it is off;
 ## `back` (B) opens the builder in play, but not from inside a menu nor while paused; `pause` closes
 ## an open builder; A on the hub's lit stone, by an item and on the altar, in that order; Main menu
 ## and Leave game let the game go first; a seat waiting for its unplugged gamepad is named and can
@@ -32,6 +34,8 @@ const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const HudScript := preload("res://hud/panels/panels.gd")
 const PauseMenuScript := preload("res://hud/menus/pause/pause_menu.gd")
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
+const MenuTabsScript := preload("res://hud/widgets/menu_tabs.gd")
+const GlyphsScript := preload("res://core/input/input_glyphs.gd")
 const RingZoomScript := preload("res://hud/builder/rings/ring_zoom.gd")
 const RingKindsScript := preload("res://hud/builder/rings/ring_kinds.gd")
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
@@ -58,15 +62,17 @@ const SIGNAL_OF: Dictionary = {
 	"EnvironmentInteraction": &"environment_interaction_changed",
 	"AmbienceVolume": &"ambience_volume_changed",
 }
-## The pages of settings and their rows, in order.
-const PAGE_ROWS: Dictionary = {
-	"Graphics": ["Fullscreen", "SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks", "GraphicsBack"],
-	"Performance": ["EffectSlots", "MoteCap", "MoteDensity", "TaillessMotes", "ShotCap", "PerformanceBack"],
-	"Audio": ["AmbienceVolume", "AudioBack"],
-	"Interface": ["ScreenShake", "DamageNumbers", "ShowFps", "RingStyle", "PutStyle", "ReloadStyle", "InterfaceBack"],
+## The Settings tabs, left to right.
+const TAB_ORDER: Array[String] = ["Graphics", "Performance", "Audio", "Interface"]
+## Each Settings tab's rows, in order.
+const TAB_ROWS: Dictionary = {
+	"Graphics": ["Fullscreen", "SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks"],
+	"Performance": ["EffectSlots", "MoteCap", "MoteDensity", "TaillessMotes", "ShotCap"],
+	"Audio": ["AmbienceVolume"],
+	"Interface": ["ScreenShake", "DamageNumbers", "ShowFps", "RingStyle", "PutStyle", "ReloadStyle"],
 }
 ## The game's view (project.godot), which every page fits in.
-const VIEW_HEIGHT: float = 360.0
+const VIEW: Vector2 = Vector2(640.0, 360.0)
 
 ## Whether the menu's last `pause_requested` asked the game to stop.
 var _stops: bool = false
@@ -188,8 +194,8 @@ func _names() -> Array[String]:
 	return names
 
 
-## Press `button_name` on the menu as `player` (on a page of settings, reached first through the
-## Settings page as a player would: `_reach`).
+## Press `button_name` on the menu as `player` (a row of Settings reached first as a player would:
+## `_reach`).
 func _press(player: int, button_name: String) -> void:
 	_reach(player, button_name)
 	_focus.focus(player, _menu().button(button_name))
@@ -205,18 +211,22 @@ func _text_of(button_name: String) -> String:
 	return _menu().button(button_name).text
 
 
-## The page of settings holding `button_name` shown, if it is not: up from another page of settings
-## (`back`), then its row on the Settings page pressed, all as `player`.
+## The Settings tab holding `button_name` shown, if it is not: Settings opened from the main page
+## (up to it first from another page), then RB until the tab shows, all as `player`.
 func _reach(player: int, button_name: String) -> void:
-	var on: PauseMenuScript.Page = _menu().page_of(_menu().button(button_name))
-	var row: Button = _menu().page_row(on)
-	if row == null or _menu().page == on:
+	var on: int = _menu().tab_of(_menu().button(button_name))
+	if on < 0:
 		return
 	if _menu().page != PauseMenuScript.Page.SETTINGS:
-		_do(player, &"back")
-	_focus.focus(player, row)
-	_tap(player, &"accept")
-	_frame()
+		if _menu().page != PauseMenuScript.Page.MAIN:
+			_do(player, &"back")
+		_focus.focus(player, _menu().button("Settings"))
+		_tap(player, &"accept")
+		_frame()
+	for _tab in PauseMenuScript.Tab.size():
+		if _menu().tab == on:
+			return
+		_do(player, &"page_next")
 
 
 ## `player` opens the menu.
@@ -351,7 +361,7 @@ func test_the_settings_page_stays_after_each_builder_switch() -> void:
 	for row: String in ["RingStyle", "PutStyle", "ReloadStyle"]:
 		_switches_page()
 		_press(1, row)
-		check(_menu().is_open() and _menu().page == PauseMenuScript.Page.INTERFACE, "the page stays after %s, for another press" % row)
+		check(_menu().is_open() and _menu().page == PauseMenuScript.Page.SETTINGS and _menu().tab == PauseMenuScript.Tab.INTERFACE, "the tab stays after %s, for another press" % row)
 
 
 # --- The reload's place (Settings) -------------------------------------------------------------
@@ -575,66 +585,365 @@ func test_the_map_row_focused_when_the_map_goes_focuses_resume() -> void:
 	check(_menu().is_open() and _focused("Resume"), "the Map row gone: Resume is focused")
 
 
-# --- The Settings page -------------------------------------------------------------------------
+# --- The Settings page: its tabs -----------------------------------------------------------------
+# One page with a row of tabs (owner, 2026-11-18): Graphics, Performance, Audio, Interface; LB and RB
+# (Z and C) page them, round from the ends; the glyphs at the row's ends; a switch focuses the tab's
+# first row; B goes up to the main page on Settings; no Back row; the panel the same size on every
+# tab, inside the view.
 
 
-func test_the_settings_page_rows() -> void:
+## The tab shown, by name.
+func _tab_name() -> String:
+	return PauseMenuScript.TAB_NAMES[_menu().tab]
+
+
+## `player` on the main page, then on Settings.
+func _open_settings(player: int = 0) -> void:
+	_focus.focus(player, _menu().button("Settings"))
+	_tap(player, &"accept")
+	_frame()
+
+
+func test_settings_opens_on_graphics_with_its_first_row_focused() -> void:
 	_settings()
-	check_equal(_names(), ["Graphics", "Performance", "Audio", "Interface", "SettingsBack"] as Array[String], "Settings")
+	check(_menu().page == PauseMenuScript.Page.SETTINGS and _tab_name() == "Graphics", "Settings opens on Graphics, got %s" % _tab_name())
+	check(_focused("Fullscreen"), "its first row focused")
+	check_equal(_menu().get_node("Rows/Title").text, "P1 SETTINGS", "the title")
 
 
-func test_each_page_of_settings_has_its_rows() -> void:
-	for row: String in PAGE_ROWS:
-		_settings()
-		_press(0, row)
-		check_equal(_names(), Array(PAGE_ROWS[row], TYPE_STRING, &"", null), "%s's rows" % row)
+func test_the_tabs_in_order() -> void:
+	_settings()
+	check_equal(_menu().tabs().names(), Array(TAB_ORDER, TYPE_STRING, &"", null), "the tabs, left to right")
 
 
-func test_each_page_of_settings_opens_on_its_first_row() -> void:
-	for row: String in PAGE_ROWS:
-		_settings()
-		_press(0, row)
-		check(_focused(PAGE_ROWS[row][0]), "%s opens on %s" % [row, PAGE_ROWS[row][0]])
-		check_equal(_menu().get_node("Rows/Title").text, "P1 " + row.to_upper(), "%s's title" % row)
+func test_each_tab_has_its_rows() -> void:
+	_settings()
+	for at in TAB_ORDER.size():
+		check_equal(_names(), Array(TAB_ROWS[TAB_ORDER[at]], TYPE_STRING, &"", null), "%s's rows" % TAB_ORDER[at])
+		_do(0, &"page_next")
 
 
-func test_a_pages_back_goes_up_to_settings_on_its_row() -> void:
-	for row: String in PAGE_ROWS:
-		_settings()
-		_press(0, row)
-		_press(0, (PAGE_ROWS[row] as Array).back())
-		check(_menu().page == PauseMenuScript.Page.SETTINGS and _focused(row), "%s's Back: up to Settings on %s" % [row, row])
+func test_rb_goes_to_the_next_tab_from_each_and_round() -> void:
+	_settings()
+	for at in TAB_ORDER.size():
+		var next: String = TAB_ORDER[(at + 1) % TAB_ORDER.size()]
+		_do(0, &"page_next")
+		check_equal(_tab_name(), next, "RB from %s" % TAB_ORDER[at])
+		check(_menu().tabs().selected() == _menu().tab, "the tab row selects %s too" % next)
 
 
-func test_b_on_a_page_of_settings_goes_up_to_settings_on_its_row() -> void:
-	for row: String in PAGE_ROWS:
-		_settings()
-		_press(0, row)
-		_do(0, &"back")
-		check(_menu().page == PauseMenuScript.Page.SETTINGS and _focused(row), "B on %s: up to Settings on %s" % [row, row])
+func test_lb_goes_to_the_previous_tab_from_each_and_round() -> void:
+	_settings()
+	for at in range(TAB_ORDER.size(), 0, -1):
+		var from: String = TAB_ORDER[at % TAB_ORDER.size()]
+		_do(0, &"page_prev")
+		check_equal(_tab_name(), TAB_ORDER[at - 1], "LB from %s" % from)
 
 
-func test_down_goes_through_every_row_of_a_page_and_round() -> void:
-	for row: String in PAGE_ROWS:
-		_settings()
-		_press(0, row)
-		var rows: Array = PAGE_ROWS[row]
+func test_lb_from_graphics_wraps_round_to_interface() -> void:
+	_settings()
+	_do(0, &"page_prev")
+	check_equal(_tab_name(), "Interface", "LB on the first tab goes round to the last")
+
+
+func test_rb_from_interface_wraps_round_to_graphics() -> void:
+	_settings()
+	_do(0, &"page_prev")
+	_do(0, &"page_next")
+	check_equal(_tab_name(), "Graphics", "RB on the last tab goes round to the first")
+
+
+func test_a_switch_focuses_the_tabs_first_row() -> void:
+	_settings()
+	_do(0, &"move_down")
+	_do(0, &"move_down")
+	for at in range(1, TAB_ORDER.size() + 1):
+		_do(0, &"page_next")
+		var first: String = TAB_ROWS[TAB_ORDER[at % TAB_ORDER.size()]][0]
+		check(_focused(first), "%s opens on %s" % [_tab_name(), first])
+
+
+func test_down_goes_through_every_row_of_a_tab_and_round() -> void:
+	_settings()
+	for tab_name: String in TAB_ORDER:
+		var rows: Array = TAB_ROWS[tab_name]
 		for at in rows.size():
-			check(_focused(rows[at]), "%s: down reaches %s" % [row, rows[at]])
+			check(_focused(rows[at]), "%s: down reaches %s" % [tab_name, rows[at]])
 			_do(0, &"move_down")
-		check(_focused(rows[0]), "%s: down from Back comes round to %s" % [row, rows[0]])
+		check(_focused(rows[0]), "%s: down from its last row comes round to %s" % [tab_name, rows[0]])
+		_do(0, &"page_next")
 
 
-func test_every_page_fits_the_view() -> void:
+func test_paging_does_nothing_off_the_settings_page() -> void:
+	_setup(1)
+	_open()
+	_do(0, &"page_next")
+	check(_menu().page == PauseMenuScript.Page.MAIN and _focused("Resume"), "RB on the main page changes nothing")
+
+
+func test_another_players_rb_does_not_page_the_tabs() -> void:
+	_setup(2)
+	_open(1)
+	_open_settings(1)
+	_do(0, &"page_next")
+	check_equal(_tab_name(), "Graphics", "P1's RB leaves P2's Settings on Graphics")
+
+
+func test_b_from_each_tab_goes_up_to_the_main_page_on_settings() -> void:
+	for at in TAB_ORDER.size():
+		_settings()
+		for _step in at:
+			_do(0, &"page_next")
+		_do(0, &"back")
+		check(_menu().is_open() and _menu().page == PauseMenuScript.Page.MAIN and _focused("Settings"), "B on %s: the main page, on Settings" % TAB_ORDER[at])
+
+
+func test_settings_opens_on_graphics_again_after_b() -> void:
 	_settings()
-	var pages: Array[String] = ["Settings"]
-	pages.append_array(PAGE_ROWS.keys())
-	for row: String in pages:
-		if row != "Settings":
-			_settings()
-			_press(0, row)
-		var tall: float = _menu().get_combined_minimum_size().y
-		check(tall <= VIEW_HEIGHT, "%s is %s px tall, the view %s" % [row, tall, VIEW_HEIGHT])
+	_do(0, &"page_next")
+	_do(0, &"back")
+	_open_settings()
+	check(_tab_name() == "Graphics" and _focused("Fullscreen"), "Settings opens on Graphics again")
+
+
+func test_there_is_no_back_row_in_settings() -> void:
+	for row: String in ["SettingsBack", "GraphicsBack", "PerformanceBack", "AudioBack", "InterfaceBack", "Graphics", "Performance", "Audio", "Interface"]:
+		_settings()
+		check(_menu().button(row) == null, "no %s row" % row)
+
+
+func test_the_hint_shows_the_back_button() -> void:
+	_settings()
+	check_equal(_menu().hint_glyph().current_glyph()["label"], "B", "the B glyph beside Back")
+	check(_menu().hint_glyph().is_visible_in_tree(), "shown on Settings")
+	_do(0, &"back")
+	check(not _menu().hint_glyph().is_visible_in_tree(), "not on the main page")
+
+
+func test_the_tab_row_shows_lb_and_rb_on_a_pad() -> void:
+	_settings()
+	check_equal(_menu().tabs().prev_glyph().current_glyph()["label"], "LB", "LB at the left end")
+	check_equal(_menu().tabs().next_glyph().current_glyph()["label"], "RB", "RB at the right end")
+
+
+func test_the_glyphs_sit_at_the_tab_rows_ends() -> void:
+	_settings()
+	var tabs: MenuTabsScript = _menu().tabs()
+	var first: Rect2 = tabs.tab_rect(0)
+	var last: Rect2 = tabs.tab_rect(TAB_ORDER.size() - 1)
+	check(tabs.prev_glyph().position.x + tabs.prev_glyph().size.x <= first.position.x, "LB left of the first tab")
+	check(tabs.next_glyph().position.x >= last.end.x, "RB right of the last tab")
+	check(tabs.next_glyph().position.x + tabs.next_glyph().size.x <= tabs.size.x, "RB inside the row")
+
+
+func test_the_tab_row_follows_the_device_of_the_player_working_it() -> void:
+	# P1 on a plain pad (LB, RB), P2 on a PlayStation pad (L1, R1): P2 opens Settings.
+	await _pad_seats("PS5 Controller")
+	_seat_one_settings()
+	check(_menu().owner_player == 1 and _menu().page == PauseMenuScript.Page.SETTINGS, "P2 has Settings open")
+	check_equal(_menu().tabs().prev_glyph().current_glyph()["label"], "L1", "P2's L1 at the left end")
+	check_equal(_menu().tabs().next_glyph().current_glyph()["label"], "R1", "P2's R1 at the right end")
+	check_equal(_menu().hint_glyph().current_glyph()["label"], "circle", "P2's circle beside Back")
+
+
+## Seat 1 (on its real pad, device 3) opens the pause menu with Start, then Settings.
+func _seat_one_settings() -> void:
+	var start := InputEventJoypadButton.new()
+	start.device = 3
+	start.button_index = JOY_BUTTON_START
+	start.pressed = true
+	_input.handle_event(start)
+	_frame()
+	_focus.focus(1, _menu().button("Settings"))
+	_focus.activate(1)
+	_frame()
+
+
+func test_the_glyphs_follow_a_device_change_while_settings_is_open() -> void:
+	_settings()
+	var least: Vector2 = _menu().get_combined_minimum_size()
+	_input._pad_kind[0] = GlyphsScript.Kind.PLAYSTATION
+	_input.glyph_kind_changed.emit(0)
+	check(_menu().tabs().prev_glyph().current_glyph()["label"] == "L1" and _menu().tabs().next_glyph().current_glyph()["label"] == "R1", "the tab row's glyphs follow")
+	check_equal(_menu().hint_glyph().current_glyph()["label"], "circle", "and the hint's")
+	check_equal(_menu().get_combined_minimum_size(), least, "the panel keeps its size")
+
+
+func test_the_owners_pad_gone_on_another_tab_then_another_player_opens_settings_on_graphics() -> void:
+	await _pad_seats()
+	_seat_one_settings()
+	_focus.paged.emit(1, 1)
+	check_equal(_tab_name(), "Performance", "P2 on Performance")
+	_input._on_joy_connection_changed(3, false)
+	_bus.pad_wait_changed.emit(1 << 1)
+	check(not _menu().is_open(), "P2's menu closed with its pad gone")
+	_open(0)
+	_open_settings(0)
+	check(_tab_name() == "Graphics" and _focused("Fullscreen"), "P1's Settings opens on Graphics, on its first row")
+	check(not _menu().tabs().is_sliding() and _rows_x() == PauseMenuScript.ROW_SHIFT, "still, the rows in place")
+
+
+## One seat on this machine's keyboard, the pause menu open by Escape, on Settings.
+func _keyboard_settings() -> void:
+	_setup(0)
+	_input.join(InputManagerScript.KEYBOARD)
+	_bus.player_joined.emit(0)
+	_bus.room_entered.emit(&"test_room")
+	_key(KEY_ESCAPE)
+	_focus.focus(0, _menu().button("Settings"))
+	_focus.activate(0)
+	_frame()
+
+
+## A key pressed and let go on the keyboard, then a frame.
+func _key(code: Key) -> void:
+	for down: bool in [true, false]:
+		var event := InputEventKey.new()
+		event.physical_keycode = code
+		event.pressed = down
+		_input.handle_event(event)
+	_frame()
+
+
+func test_on_the_keyboard_z_and_c_page_the_tabs() -> void:
+	_keyboard_settings()
+	check(_menu().is_open() and _menu().page == PauseMenuScript.Page.SETTINGS, "Escape opened the menu, on Settings")
+	_key(KEY_C)
+	check_equal(_tab_name(), "Performance", "C: the next tab")
+	_key(KEY_Z)
+	_key(KEY_Z)
+	check_equal(_tab_name(), "Interface", "Z twice: back round to the last")
+
+
+func test_on_the_keyboard_the_tab_row_shows_z_and_c() -> void:
+	_keyboard_settings()
+	check_equal(_menu().tabs().prev_glyph().current_glyph()["label"], "Z", "Z at the left end")
+	check_equal(_menu().tabs().next_glyph().current_glyph()["label"], "C", "C at the right end")
+	check_equal(_menu().hint_glyph().current_glyph()["label"], "E", "E beside Back")
+
+
+func test_on_the_keyboard_e_goes_back_to_the_main_page() -> void:
+	_keyboard_settings()
+	_key(KEY_E)
+	check(_menu().page == PauseMenuScript.Page.MAIN and _focused("Settings"), "E: the main page, on Settings")
+
+
+func test_the_panel_is_the_same_size_on_every_tab_and_fits_the_view() -> void:
+	_settings()
+	var first: Vector2 = _menu().get_combined_minimum_size()
+	for tab_name: String in TAB_ORDER:
+		var shown: Vector2 = _menu().get_combined_minimum_size()
+		check_equal(shown, first, "the panel on %s" % tab_name)
+		check(shown.y <= VIEW.y and shown.x <= VIEW.x, "%s: %s fits the %s view" % [tab_name, shown, VIEW])
+		_do(0, &"page_next")
+
+
+func test_the_panels_size_holds_as_the_focus_moves_and_switches_flip() -> void:
+	_settings()
+	var least: Vector2 = _menu().get_combined_minimum_size()
+	for tab_name: String in TAB_ORDER:
+		for at in (TAB_ROWS[tab_name] as Array).size():
+			_do(0, &"move_down")
+			check_equal(_menu().get_combined_minimum_size(), least, "%s: the same with the focus on its row %d" % [tab_name, at + 1])
+		_do(0, &"page_next")
+	for switch: String in ["SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks", "ScreenShake", "ShowFps", "RingStyle", "PutStyle", "ReloadStyle"]:
+		_settings()
+		_press(0, switch)
+		check_equal(_menu().get_combined_minimum_size(), least, "the same with %s flipped" % switch)
+
+
+func test_every_row_of_every_tab_is_as_wide() -> void:
+	_settings()
+	var wide: float = _menu().button("Fullscreen").custom_minimum_size.x
+	for tab_name: String in TAB_ORDER:
+		for row: String in TAB_ROWS[tab_name]:
+			check_equal(_menu().button(row).custom_minimum_size.x, wide, "%s as wide as the rest" % row)
+
+
+func test_every_setting_row_is_reached_by_paging_and_moving() -> void:
+	_settings()
+	for tab_name: String in TAB_ORDER:
+		for row: String in TAB_ROWS[tab_name]:
+			check(_focused(row) and _menu().button(row).is_visible_in_tree(), "%s reached on %s" % [row, tab_name])
+			_do(0, &"move_down")
+		_do(0, &"page_next")
+
+
+## Where the Settings rows stand in their box (ROW_SHIFT when in place).
+func _rows_x() -> float:
+	return (_menu().tab_body().get_node("TabRows") as Control).position.x
+
+
+func test_a_switch_slides_the_box_and_steps_the_rows_in_by_whole_pixels() -> void:
+	_settings()
+	var tabs: MenuTabsScript = _menu().tabs()
+	var from: float = tabs.box().position.x
+	_do(0, &"page_next")
+	var rows: Control = _menu().tab_body().get_node("TabRows") as Control
+	var body: Control = _menu().tab_body()
+	check_equal(rows.position.x, 2.0 * PauseMenuScript.ROW_SHIFT, "the rows start to the right, toward the tab paged to")
+	var boxes: Array[float] = [from]
+	var shifts: Array[float] = [rows.position.x]
+	for _frame_at in 12:
+		tabs.step(1.0 / 60.0)
+		if tabs.box().position.x != boxes.back():
+			boxes.append(tabs.box().position.x)
+		if rows.position.x != shifts.back():
+			shifts.append(rows.position.x)
+		check(rows.position.x >= 0.0 and rows.position.x + rows.size.x <= body.custom_minimum_size.x, "the rows inside their box, never cut: at %s" % rows.position.x)
+	check(boxes.size() >= 5, "the box passes at least 3 places between the tabs: %s" % [boxes])
+	check(shifts.size() >= 4, "the rows at least 3 steps in: %s" % [shifts])
+	for x: float in boxes + shifts:
+		check_equal(x, roundf(x), "whole pixels")
+	check(boxes.back() == tabs.tab_rect(1).position.x and rows.position.x == PauseMenuScript.ROW_SHIFT, "both end in place")
+
+
+func test_lb_steps_the_rows_in_from_the_left() -> void:
+	_settings()
+	_do(0, &"page_next")
+	_menu().tabs().step(1.0)
+	_do(0, &"page_prev")
+	check_equal(_rows_x(), 0.0, "from the left, as the box goes left")
+
+
+func test_on_a_wrap_the_rows_step_in_from_the_side_the_box_goes() -> void:
+	_settings()
+	_do(0, &"page_prev")
+	check_equal(_menu().tabs().travel_side(), 1, "LB on Graphics: the box goes right, round to Interface")
+	check_equal(_rows_x(), 2.0 * PauseMenuScript.ROW_SHIFT, "the rows from the right too")
+	_menu().tabs().step(1.0)
+	_do(0, &"page_next")
+	check(_menu().tabs().travel_side() == -1 and _rows_x() == 0.0, "RB on Interface: both from the left")
+
+
+func test_paging_twice_within_a_slide_ends_on_the_last_tab_in_place() -> void:
+	_settings()
+	_do(0, &"page_next")
+	_menu().tabs().step(1.0 / 60.0)
+	_do(0, &"page_next")
+	for _frame_at in 12:
+		_menu().tabs().step(1.0 / 60.0)
+	check(_tab_name() == "Audio" and _focused("AmbienceVolume"), "on Audio, its first row focused")
+	check(not _menu().tabs().is_sliding() and _rows_x() == PauseMenuScript.ROW_SHIFT, "the rows in place")
+	check(_menu().tabs().box() == _menu().tabs().tab_rect(PauseMenuScript.Tab.AUDIO), "the box on Audio")
+
+
+func test_closed_mid_slide_settings_opens_still_again() -> void:
+	_settings()
+	_do(0, &"page_next")
+	_menu().tabs().step(1.0 / 60.0)
+	_do(0, &"pause")
+	check(not _menu().is_open(), "closed mid-slide")
+	_open()
+	_open_settings()
+	check(_tab_name() == "Graphics" and not _menu().tabs().is_sliding() and _rows_x() == PauseMenuScript.ROW_SHIFT, "Settings opens still, on Graphics")
+	check(_menu().tabs().box() == _menu().tabs().tab_rect(0), "the box on Graphics")
+
+
+func test_settings_opens_still() -> void:
+	_settings()
+	check(not _menu().tabs().is_sliding() and _rows_x() == PauseMenuScript.ROW_SHIFT, "nothing slides as Settings opens")
+
 
 
 # --- The rows that need Dynamic lighting ---------------------------------------------------------
@@ -646,7 +955,6 @@ const NEED_LIGHT: Array[String] = ["Shadows", "Fog", "AmbientParticles"]
 
 func test_the_rows_that_need_the_light_work_while_it_is_on() -> void:
 	_settings()
-	_press(0, "Graphics")
 	for row in NEED_LIGHT:
 		check(not _menu().button(row).disabled, "%s works with the light on" % row)
 
@@ -664,6 +972,18 @@ func test_the_focus_skips_the_greyed_rows() -> void:
 	_press(0, "SpellLight")
 	_do(0, &"move_down")
 	check(_focused("EnvironmentInteraction"), "down from Dynamic lighting skips to Environment interaction")
+
+
+func test_the_greyed_rows_stay_greyed_and_skipped_after_a_tab_switch() -> void:
+	_settings()
+	_press(0, "SpellLight")
+	_do(0, &"page_next")
+	_do(0, &"page_prev")
+	for row in NEED_LIGHT:
+		check(_menu().button(row).disabled, "%s still greyed back on Graphics" % row)
+	_do(0, &"move_down")
+	_do(0, &"move_down")
+	check(_focused("EnvironmentInteraction"), "down from Dynamic lighting still skips them")
 
 
 func test_dynamic_lighting_on_again_lets_them_work() -> void:
@@ -696,34 +1016,6 @@ func test_settings_has_no_fire_settings() -> void:
 	_settings()
 	check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 
-
-func test_b_goes_up_from_settings_to_the_main_page() -> void:
-	_settings()
-	_do(0, &"back")
-	check_equal(_menu().page, PauseMenuScript.Page.MAIN, "B goes up to the main page")
-	check(_focused("Settings"), "on its Settings row, as a page of settings goes up on its own")
-
-
-func test_settings_back_goes_up_to_the_main_page_on_its_row() -> void:
-	_settings()
-	_press(0, "SettingsBack")
-	check(_menu().page == PauseMenuScript.Page.MAIN and _focused("Settings"), "Back: the main page, on Settings")
-
-
-func test_a_pages_width_holds_as_the_focus_moves_and_switches_flip() -> void:
-	for row: String in PAGE_ROWS:
-		_settings()
-		_press(0, row)
-		var wide: float = _menu().get_combined_minimum_size().x
-		for at in (PAGE_ROWS[row] as Array).size():
-			_do(0, &"move_down")
-			check_equal(_menu().get_combined_minimum_size().x, wide, "%s: as wide with the focus on its row %d" % [row, at + 1])
-	for switch in ["SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks"]:
-		_settings()
-		_press(0, "Graphics")
-		var wide: float = _menu().get_combined_minimum_size().x
-		_press(0, switch)
-		check_equal(_menu().get_combined_minimum_size().x, wide, "Graphics as wide with %s flipped" % switch)
 
 
 # --- Fullscreen --------------------------------------------------------------------------------
@@ -773,7 +1065,7 @@ func test_fullscreen_then_shows_on() -> void:
 func test_fullscreen_stays_on_the_settings_page() -> void:
 	_fullscreen_settings()
 	_press(0, "Fullscreen")
-	check_equal(_menu().page, PauseMenuScript.Page.GRAPHICS, "it stays on the page")
+	check(_menu().page == PauseMenuScript.Page.SETTINGS and _menu().tab == PauseMenuScript.Tab.GRAPHICS, "it stays on the tab")
 
 
 func test_fullscreen_shows_the_windows_own_state_when_shown_again() -> void:
@@ -782,8 +1074,17 @@ func test_fullscreen_shows_the_windows_own_state_when_shown_again() -> void:
 	_press(0, "Fullscreen")
 	display.on = false
 	_do(0, &"back")
-	_press(0, "Graphics")
-	check(_text_of("Fullscreen").ends_with("Fullscreen: Off"), "the window's own state shows")
+	_reach(0, "Fullscreen")
+	check(_text_of("Fullscreen").ends_with("Fullscreen: Off"), "the window's own state shows when Settings opens again")
+
+
+func test_fullscreen_shows_the_windows_own_state_when_its_tab_is_paged_to() -> void:
+	var display: FakeDisplay = _fullscreen_settings()
+	_press(0, "Fullscreen")
+	_do(0, &"page_next")
+	display.on = false
+	_do(0, &"page_prev")
+	check(_text_of("Fullscreen").ends_with("Fullscreen: Off"), "the window's own state shows back on Graphics")
 
 
 # --- The switches ------------------------------------------------------------------------------
@@ -1517,9 +1818,12 @@ func test_leave_game_leaves_the_other_seat_playing() -> void:
 # menu closes, and the menu another player opens lets the waiting seat leave.
 
 
-## Seat 0 on a virtual device, seat 1 on a real gamepad (device 3), the input layer in the tree.
-func _pad_seats() -> void:
+## Seat 0 on a virtual device, seat 1 on a real gamepad (device 3, named `pad_name` by the system),
+## the input layer in the tree.
+func _pad_seats(pad_name: String = "") -> void:
 	_setup(1)
+	if pad_name != "":
+		_input.joy_name_provider = func(_device: int) -> String: return pad_name
 	root.add_child(_input)
 	await process_frame
 	var join := InputEventJoypadButton.new()

@@ -262,7 +262,7 @@ func _ready() -> void:
 			_seen_start[player] = input.get_press_count(player, START_ACTION)
 			_seen_take[player] = input.get_press_count(player, TAKE_ACTION)
 	_pause_menu.save = save
-	_pause_menu.bind(events, ui_focus)
+	_pause_menu.bind(events, ui_focus, input)
 	for radial in _radials:
 		radial.bind(events, ui_focus, spells, input)
 	for inventory in _inventories:

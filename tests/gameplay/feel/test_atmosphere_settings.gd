@@ -353,6 +353,13 @@ func test_flipping_every_switch_leaves_nothing_over() -> void:
 	var spectacle: SpectacleScript = feel.spectacle()
 	bus.spell_light_changed.emit(true)
 	_enter(bus, MIST_ROOM)
+	# Its ambience's sounds loaded first: an accent first heard in a later round (its gap is the
+	# dice's) would load its file then, a cache filled once, not an object left over.
+	var room := registry.get_resource(&"rooms", MIST_ROOM) as RoomBase
+	if room.ambience != null:
+		for accent: AmbienceAccent in room.ambience.accents:
+			for id: StringName in accent.sounds:
+				registry.get_sound(id)
 	_frames(feel, 4)
 	var children: int = spectacle.get_child_count()
 	var objects: float = 0.0

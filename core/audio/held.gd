@@ -147,8 +147,9 @@ func step(delta: float) -> void:
 			i += 1
 			continue
 		_left[i] -= delta
-		var follow: Node2D = _follow[i]
-		var gone: bool = _followed[i] == 1 and (follow == null or not is_instance_valid(follow) or not follow.is_inside_tree())
+		# A freed node is let go of here, never read as a node (`_valid`).
+		var follow: Node2D = _valid(i)
+		var gone: bool = _followed[i] == 1 and (follow == null or not follow.is_inside_tree())
 		if gone or _left[i] <= 0.0:
 			_fade[i] = FADE
 			i += 1
@@ -164,6 +165,16 @@ func step(delta: float) -> void:
 func clear() -> void:
 	while held_count > 0:
 		_remove(held_count - 1)
+
+
+## The node held sound `i` follows, or null for none or one that was freed (which it lets go of).
+func _valid(i: int) -> Node2D:
+	if _follow[i] == null:
+		return null
+	if not is_instance_valid(_follow[i]):
+		_follow[i] = null
+		return null
+	return _follow[i]
 
 
 func _slot_of(handle: int) -> int:
@@ -185,7 +196,10 @@ func _remove(i: int) -> void:
 		_voices[i] = _voices[last]
 		_voices[last] = gone
 		_handle[i] = _handle[last]
-		_follow[i] = _follow[last]
+		# The last one's node may have been freed since it was last stepped (a body that died this
+		# frame): a freed node cannot be put into the list, so it moves as none, and its sound ends
+		# at its next step as any whose node is gone.
+		_follow[i] = _valid(last)
 		_followed[i] = _followed[last]
 		_left[i] = _left[last]
 		_fade[i] = _fade[last]

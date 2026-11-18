@@ -123,6 +123,25 @@ func test_a_held_sound_ends_with_its_seconds_or_its_body() -> void:
 	check(not audio.is_held(roar), "until its body is gone")
 
 
+func test_a_held_sound_whose_body_was_freed_moves_slots_without_an_error() -> void:
+	# The boss recording failed now and then (2026-11-18): a held sound ended while the last one's
+	# body had just been freed, and moving that freed node into the gone one's slot was an engine
+	# error (the test runner fails a test whose log has one).
+	book.know([&"hum", &"roar"])
+	var hum: int = audio.hold(&"hum", null, Vector2(4, 4), INF)
+	var body := Node2D.new()
+	root.add_child(body)
+	var roar: int = audio.hold(&"roar", body, Vector2.ZERO, INF)
+	audio.release(hum)
+	body.free()
+	# The first fades out and goes; the last, its body freed and not yet stepped, takes its slot.
+	audio.step_world(HeldScript.FADE + 0.01)
+	check(not audio.has_held(hum), "the first is gone")
+	check(audio.has_held(roar) and not audio.is_held(roar), "the one whose body was freed fades out")
+	audio.step_world(HeldScript.FADE + 0.01)
+	check_equal(audio.held.held_count, 0, "then it is gone too")
+
+
 func test_a_held_sound_taken_over_goes_on_and_the_slots_are_capped() -> void:
 	book.know([&"roar"])
 	var first: int = audio.hold(&"roar", null, Vector2.ZERO, INF)

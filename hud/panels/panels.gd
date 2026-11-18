@@ -201,6 +201,8 @@ var _boss_banner: BossBannerScript = null
 ## The boss intro's overlay, and what keeps a boss with an intro off the bar and the banner meanwhile.
 var _boss_intro: BossIntroScript = null
 var _intro_wait: BossIntroWait = BossIntroWait.new()
+## The menus' focus sounds (sound plan AU8; `widgets/ui_sounds.gd`).
+var _ui_sounds: UiSounds = null
 
 
 func _ready() -> void:
@@ -261,6 +263,12 @@ func _ready() -> void:
 			_seen_inventory[player] = input.get_press_count(player, INVENTORY_ACTION)
 			_seen_start[player] = input.get_press_count(player, START_ACTION)
 			_seen_take[player] = input.get_press_count(player, TAKE_ACTION)
+	# The menus' focus moves and backs, heard before any menu hears UIFocus, so it knows a press
+	# was a choice or a back before that menu moves the focus in answer (ui_sounds.gd).
+	_ui_sounds = UiSounds.new()
+	_ui_sounds.name = "UiSounds"
+	add_child(_ui_sounds)
+	_ui_sounds.bind(events, ui_focus)
 	_pause_menu.save = save
 	_pause_menu.bind(events, ui_focus, input)
 	for radial in _radials:
@@ -384,6 +392,11 @@ func step_hints(delta: float) -> void:
 ## The item hints (for tests and screenshots).
 func get_item_hints() -> ItemHintsScript:
 	return _item_hints
+
+
+## The menus' focus sounds (for tests).
+func get_ui_sounds() -> UiSounds:
+	return _ui_sounds
 
 
 ## Read every joined player's `pause`, `back` and `accept` presses since the last poll (several

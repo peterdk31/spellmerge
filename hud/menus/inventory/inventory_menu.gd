@@ -420,6 +420,7 @@ func _step_round(way: int) -> void:
 	_aimed = false
 	if _menu.point_at(places[next], _clock):
 		_rumble(RUMBLE_POINT)
+		_sound(UiSounds.MOVE)
 		_changed()
 
 
@@ -439,12 +440,20 @@ func _poll_pointer() -> void:
 	if _menu.point_at(picked, _clock):
 		if picked != NONE:
 			_rumble(RUMBLE_POINT)
+			_sound(UiSounds.MOVE)
 		_changed()
 
 
 func _rumble(motors: Vector3) -> void:
 	if _input != null:
 		_input.rumble(index, motors.x, motors.y, motors.z)
+
+
+## The menu sound `id` (`UiSounds`, sound plan AU8), only while the inventory is open: a refusal
+## that comes back after it closed says nothing.
+func _sound(id: StringName) -> void:
+	if _open:
+		UiSounds.send(_events, id)
 
 
 # --- What the buttons do ----------------------------------------------------------------
@@ -460,6 +469,7 @@ func enter_pointed() -> void:
 		_kind = entry["kind"]
 	_menu.enter(_menu.pointed)
 	_aimed = false
+	_sound(UiSounds.CHOOSE)
 	_show_layer()
 	_changed()
 
@@ -488,6 +498,7 @@ func put_on_hand(hand: int) -> void:
 	if _layer != Layer.STAFFS or entry.is_empty() or _events == null:
 		return
 	var number: int = entry["staff"]
+	_sound(UiSounds.CHOOSE)
 	_events.staff_hand_requested.emit(index, number, NONE if _mirror.hand_of(number) == hand else hand, _mirror.body)
 
 
@@ -496,6 +507,8 @@ func drop_pointed() -> void:
 	var entry: Dictionary = pointed()
 	if entry.is_empty() or _events == null:
 		return
+	if _layer == Layer.STAFFS or _layer == Layer.CARDS:
+		_sound(UiSounds.CHOOSE)
 	if _layer == Layer.STAFFS:
 		var base: StaffBase = _mirror.base_of(entry["staff"])
 		_events.bag_drop_requested.emit(index, _bag, base.id if base != null else &"", int(entry["staff"]), _mirror.body)
@@ -538,6 +551,7 @@ func _on_inventory_refused(player: int, reason: String) -> void:
 		return
 	_note = reason
 	_note_left = NOTE_TIME
+	_sound(UiSounds.DENY)
 	_changed()
 
 

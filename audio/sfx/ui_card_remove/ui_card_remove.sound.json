@@ -1,0 +1,14 @@
+{
+	"version": 1,
+	"kind": "ui",
+	"family": "ui",
+	"seconds": 0.1,
+	"vary": {"pitch": 0.03, "time": 0.04, "seed": 806},
+	"layers": [
+		{"source": "noise", "filter": {"type": "band", "from": 1200, "to": 3800, "q": 2.0},
+		 "amp": {"attack": 0.01, "shape": "arch", "power": 1.5}, "gain": -4},
+		{"source": "sine", "pitch": {"from": 520, "to": 880}, "length": 0.07,
+		 "amp": {"attack": 0.004, "shape": "perc", "power": 2.0}, "gain": -4}
+	],
+	"notes": "A card lifted out of a slot: a short rising swish and a soft tone sliding up, the place's tap turned round."
+}

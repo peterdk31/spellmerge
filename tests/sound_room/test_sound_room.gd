@@ -281,3 +281,17 @@ func test_stop_all_lets_go_of_every_held_row_and_track() -> void:
 	room.stop_all()
 	check_equal(room.row_of[&"room_hum"].handle, 0, "no row held")
 	check(room.audio.music.call(&"track") == null, "no music")
+
+
+func test_the_menus_sounds_are_rows_played_on_the_ui_bus() -> void:
+	_open()
+	for id: StringName in UiSounds.IDS:
+		var row: SoundRoomScript.Row = room.row_of.get(id) as SoundRoomScript.Row
+		check(row != null and row.kind == SoundNames.Kind.UI, "the HUD's %s is a UI row" % id)
+		check(row != null and row.state != SoundRoomScript.State.UNNAMED and row.state != SoundRoomScript.State.MISSING, "%s is named and has its file" % id)
+	room.press(UiSounds.CHOOSE)
+	check_equal(room.audio.ui.voices_of(UiSounds.CHOOSE), 1, "one UI voice plays it")
+	for i in AudioScript.UI_VOICES:
+		var voice: Node = room.audio.ui.player(i)
+		if voice.get(&"stream") == room.audio.sound(UiSounds.CHOOSE):
+			check_equal(voice.get(&"bus"), AudioScript.BUS_UI, "on the UI bus")

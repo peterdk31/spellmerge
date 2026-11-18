@@ -5,8 +5,8 @@ extends RefCounted
 ## by the pause menu (`SaveFile.set_setting`) under its key here and sent as its own
 ## `*_volume_changed` event (core/events, in percent), which Audio applies to its bus. All four are
 ## made as the "Ambience volume" was first: `AmbienceVolume`'s stops (0 to 100% by 10, 100% by
-## default) on its perceptual curve (`share_of`). The menu shows Ambience's now and the other three
-## from AU8. Its numbers live in core, so the menu (hud) and Audio (core) read the same ones.
+## default) on its perceptual curve (`share_of`). The pause menu's Audio tab shows all four (sound
+## plan AU8). Its numbers live in core, so the menu (hud) and Audio (core) read the same ones.
 
 ## The saved keys. Ambience's keeps the name and saved value it had.
 const MUSIC_KEY: StringName = &"music_volume"

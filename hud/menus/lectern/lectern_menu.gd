@@ -159,6 +159,7 @@ func _on_activated(player: int, control: Control) -> void:
 	var depth: int = _buttons.find(control as Button)
 	if depth < 0:
 		return
+	UiSounds.send(_events, UiSounds.CHOOSE)
 	if _events != null:
 		_events.start_depth_picked.emit(index, depth)
 	close_menu()

@@ -1,0 +1,41 @@
+{
+	"version": 1,
+	"kind": "ui",
+	"family": "ui",
+	"seconds": 0.1,
+	"vary": {
+		"pitch": 0.02,
+		"time": 0.04,
+		"seed": 803
+	},
+	"layers": [
+		{
+			"source": "triangle",
+			"pitch": {
+				"from": 1180,
+				"to": 660
+			},
+			"amp": {
+				"attack": 0.003,
+				"shape": "perc",
+				"power": 1.1
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 3000,
+				"to": 1200,
+				"q": 1.5
+			},
+			"length": 0.05,
+			"amp": {
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -16
+		}
+	],
+	"notes": "Going back a page or closing a menu: a soft tone gliding down with a short falling whisper, the choice's step undone."
+}

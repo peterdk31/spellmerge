@@ -163,3 +163,19 @@ func test_play_has_the_focus_and_takes_everyone_to_the_hub() -> void:
 	(_menu.get("events") as EventsScript).hub_requested.connect(func(player: int) -> void: asked.append(player))
 	play.pressed.emit()
 	check_equal(asked, [0] as Array[int], "Play sends hub_requested(0)")
+
+
+func test_its_sounds_a_move_a_choice_and_cancel_a_back() -> void:
+	var sounds: Array[StringName] = []
+	(_menu.get("events") as EventsScript).ui_sound_requested.connect(func(id: StringName) -> void: sounds.append(id))
+	await process_frame
+	(_menu.get_node("%Join") as Button).grab_focus()
+	check_equal(sounds, [UiSounds.MOVE], "the focus moving to Join is a move")
+	sounds.clear()
+	await process_frame
+	(_menu.get_node("%Join") as Button).pressed.emit()
+	check_equal(sounds, [UiSounds.CHOOSE], "Join pressed is a choice, and the box it focuses no move")
+	sounds.clear()
+	await process_frame
+	(_menu.get_node("%Cancel") as Button).pressed.emit()
+	check_equal(sounds, [UiSounds.BACK], "Cancel is a back, and Host's focus after it no move")

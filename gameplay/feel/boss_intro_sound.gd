@@ -81,9 +81,9 @@ func stop() -> void:
 	_time = -1.0
 	if audio != null:
 		if _dark >= 0:
-			audio.over.stop(_dark)
+			audio.stop_over(_dark)
 		if _reveal >= 0:
-			audio.over.stop(_reveal)
+			audio.stop_over(_reveal)
 	_dark = -1
 	_reveal = -1
 

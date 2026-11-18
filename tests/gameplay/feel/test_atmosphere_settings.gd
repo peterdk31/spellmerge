@@ -429,5 +429,6 @@ func test_saved_choices_reach_feel_when_the_hud_binds() -> void:
 	check_equal(spectacle.ambient_particles, not AmbientParticles.default_on(), "Ambient particles reached Feel")
 	check_equal(spectacle.environment_interaction, not EnvironmentInteraction.default_on(), "Environment interaction reached Feel")
 	check(is_equal_approx(audio.buses.volume(AudioScript.BUS_AMBIENCE), AmbienceVolume.share_of(40)), "Ambience volume reached Audio")
+	audio.buses.reset()
 	root.remove_child(hud)
 	DirAccess.remove_absolute(SAVE_PATH)

@@ -39,6 +39,24 @@ func _db_of(name: StringName) -> float:
 
 # --- The buses ------------------------------------------------------------------------------------
 
+func test_a_new_audio_starts_every_bus_full_and_puts_them_back_as_it_goes() -> void:
+	bus.music_volume_changed.emit(0)
+	audio.duck(-12.0, 5.0)
+	for frame in 30:
+		audio.step(FRAME)
+	check(AudioServer.is_bus_mute(AudioServer.get_bus_index(AudioScript.BUS_MUSIC)), "the music muted")
+	var other: AudioScript = AudioScript.new()
+	other.registry = book
+	root.add_child(other)
+	check(not AudioServer.is_bus_mute(AudioServer.get_bus_index(AudioScript.BUS_MUSIC)), "a new Audio starts the music bus full")
+	check(is_equal_approx(_db_of(AudioScript.BUS_MUSIC_DUCK), 0.0), "and no duck")
+	bus.sound_volume_changed.emit(0)
+	for frame in 30:
+		audio.step(FRAME)
+	other.free()
+	check(not AudioServer.is_bus_mute(AudioServer.get_bus_index(AudioScript.BUS_SFX)), "an Audio leaving puts the buses back")
+
+
 func test_the_layout_has_every_bus_and_the_duck_under_the_music() -> void:
 	for name: StringName in [AudioScript.BUS_MUSIC, AudioScript.BUS_MUSIC_DUCK, AudioScript.BUS_SFX, AudioScript.BUS_AMBIENCE, AudioScript.BUS_UI]:
 		check(AudioServer.get_bus_index(name) > 0, "the bus %s exists" % name)
@@ -150,10 +168,14 @@ func test_the_ui_plays_one_of_an_id_a_frame_on_its_bus() -> void:
 	audio.step(FRAME)
 	bus.ui_sound_requested.emit(&"move")
 	check_equal(audio.ui.started, 3, "the next frame's move plays")
+	audio.step(FRAME)
+	var played: int = 0
 	for i in AudioScript.UI_VOICES + 3:
 		book.know([StringName("ui_%d" % i)])
-		audio.play_ui(StringName("ui_%d" % i))
-	check(audio.ui.voices_with_stream() <= AudioScript.UI_VOICES, "at most UI_VOICES voices")
+		if audio.play_ui(StringName("ui_%d" % i)) >= 0:
+			played += 1
+	check_equal(played, AudioScript.UI_VOICES, "at most UI_VOICES plays a frame")
+	check(audio.play_ui(&"ui_0") < 0, "and still one of an id")
 	check_equal((audio.ui.player(0) as AudioStreamPlayer).bus, AudioScript.BUS_UI, "on the UI bus")
 	check(audio.ui.get_parent().process_mode == Node.PROCESS_MODE_ALWAYS, "on the over lane: heard over the pause menu")
 	bus.ui_sound_requested.emit(&"no_such")

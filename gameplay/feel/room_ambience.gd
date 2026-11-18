@@ -88,7 +88,7 @@ func stop() -> void:
 	_ambience = null
 	_next_at.fill(INF)
 	if audio != null:
-		audio.ambience.stop()
+		audio.stop_bed()
 
 
 ## The ambience it chose (null: none).

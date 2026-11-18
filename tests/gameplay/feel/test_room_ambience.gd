@@ -350,7 +350,7 @@ func test_a_frame_makes_no_object() -> void:
 	_tick(player, FRAME)
 	var objects: float = Performance.get_monitor(Performance.OBJECT_COUNT)
 	for frame in 300:
-		player.step(FRAME, Vector2(10.0, 10.0))
+		_tick(player, FRAME, Vector2(10.0, 10.0))
 	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "300 frames of a fade make no object")
 
 

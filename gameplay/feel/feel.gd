@@ -686,6 +686,15 @@ var _cue_every_at: Dictionary = {}
 var _cue_next_at: PackedFloat32Array = PackedFloat32Array()
 
 
+## Leaving the tree (a test's Feel freed, the game quitting): what it started on Audio stops, so
+## nothing it held outlives it on a shared Audio.
+func _exit_tree() -> void:
+	if audio != null and is_instance_valid(audio):
+		audio.silence()
+	if _held != null:
+		_held.clear()
+
+
 func _ready() -> void:
 	_rng.seed = 1
 	_juiced_frame.resize(ActorsScript.ACTORS)

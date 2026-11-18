@@ -17,6 +17,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const HudScript := preload("res://hud/panels/panels.gd")
 const BossIntroScript := preload("res://hud/panels/boss/boss_intro.gd")
 const BossIntroSoundScript := preload("res://gameplay/feel/boss_intro_sound.gd")
+const AudioScript := preload("res://core/audio/audio.gd")
 const IntroBoss := preload("res://tests/support/intro_boss.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 ## Loaded when needed, not preloaded: the scene is also the "Hud" autoload (see test_panels.gd).
@@ -337,8 +338,12 @@ func test_feels_cues_play_at_their_moments_while_the_tree_is_paused() -> void:
 	var registry: CueRegistry = own(CueRegistry.new()) as CueRegistry
 	registry.know(&"test_dark")
 	registry.know(&"test_reveal")
+	var audio: AudioScript = own(AudioScript.new()) as AudioScript
+	audio.registry = registry
+	root.add_child(audio)
 	var sound: BossIntroSoundScript = own(BossIntroSoundScript.new()) as BossIntroSoundScript
 	sound.registry = registry
+	sound.audio = audio
 	root.add_child(sound)
 	sound.bind(bus)
 	var data: BossIntro = IntroBoss.intro()
@@ -355,7 +360,10 @@ func test_feels_cues_play_at_their_moments_while_the_tree_is_paused() -> void:
 		frames_waited += 1
 	paused = false
 	check_equal(sound.played, [&"test_dark", &"test_reveal"] as Array[StringName], "the dark cue, then the reveal's, with the tree paused")
+	check(sound.dark_voice() >= 0 and sound.reveal_voice() >= 0, "each on a voice of Audio's over lane")
+	check_equal(audio.over.last, &"test_reveal", "the reveal cue's sound played there last")
 	sound.stop()
+	check(sound.dark_voice() < 0 and audio.over.voices_of(&"test_reveal") == 0, "stopped: its voices let go")
 	bus.boss_intro_opened.emit(BOSS, IntroBoss.NAME, IntroBoss.LORE, data, 0, true)
 	sound.step(BossIntro.DARK_AT - 0.01)
 	check(sound.played.is_empty(), "nothing before DARK_AT")

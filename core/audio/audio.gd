@@ -21,7 +21,7 @@ extends Node
 ## setting's. **Volumes** (`AudioVolumes`, core/settings): it hears `music_volume_changed`,
 ## `sound_volume_changed`, `ambience_volume_changed` and `ui_volume_changed` and eases its bus to the
 ## setting's share (`buses.gd`). **The duck:** `duck(decibels, seconds)`, the most asked for wins,
-## a ramp both ways. **UI sounds:** UI_VOICES voices, at most one play per id a frame. **Variants:** a
+## a ramp both ways. **UI sounds:** UI_VOICES voices, at most one play per id a frame and UI_VOICES a frame. **Variants:** a
 ## sound may be an `AudioStreamRandomizer` (`<id>.tres`), which picks a variant and jitters it on every
 ## play by itself; a voice is held for its longest variant (`AudioLength.of`).
 ##
@@ -134,6 +134,9 @@ func _ready() -> void:
 	ui = _voices(UI_VOICES, UI_VOICES, false, BUS_UI, "UiVoices", lane)
 	_ui_played.resize(UI_VOICES)
 	buses = BusesScript.new([BUS_MUSIC, BUS_SFX, BUS_AMBIENCE, BUS_UI] as Array[StringName], BUS_MUSIC_DUCK)
+	# The buses are the engine's, shared by every Audio: each starts at its full level, whatever an
+	# earlier one (a test's) left.
+	buses.reset()
 	audible = hears
 	if events != null:
 		events.music_volume_changed.connect(_on_volume.bind(BUS_MUSIC))
@@ -155,6 +158,12 @@ func _voices(count: int, per_sound: int, positional: bool, bus: StringName, labe
 	made.pan = PAN
 	parent.add_child(made)
 	return made
+
+
+## Leaving the tree (the game quitting, a test's Audio freed): every bus back at its full level.
+func _exit_tree() -> void:
+	if buses != null:
+		buses.reset()
 
 
 func _process(delta: float) -> void:
@@ -269,6 +278,20 @@ func clear_world() -> void:
 	held.clear()
 
 
+## The room's bed and its accents stop at once (no fade).
+func stop_bed() -> void:
+	ambience.stop()
+
+
+## Every sound stops at once: the world's, the music, the bed and the over lane (its caller going: a
+## Feel leaving the tree lets go of what it started).
+func silence() -> void:
+	clear_world()
+	music.stop()
+	ambience.stop()
+	over.clear()
+
+
 # --- The over lane --------------------------------------------------------------------------------
 
 ## Plays the sound `id` on the over lane (heard while the tree is paused: a boss intro's cues),
@@ -280,23 +303,27 @@ func play_over(id: StringName, volume: float = 0.0, bus: StringName = BUS_SFX) -
 	return over.play(id, stream, Vector2.ZERO, volume, bus)
 
 
-## Stops every sound of the over lane (a boss intro closed).
-func stop_over() -> void:
-	over.clear()
+## Stops the over lane's voice `voice` (-1: every one of them).
+func stop_over(voice: int = -1) -> void:
+	if voice < 0:
+		over.clear()
+	else:
+		over.stop(voice)
 
 
-## Plays the UI's sound `id` (`ui_sound_requested`): at most one play of an id a frame; the voice
-## used, or -1 for none.
+## Plays the UI's sound `id` (`ui_sound_requested`): at most one play of an id a frame, and at most
+## UI_VOICES plays a frame (more at once is noise); the voice used, or -1 for none.
 func play_ui(id: StringName) -> int:
+	if _ui_count >= UI_VOICES:
+		return -1
 	for i in _ui_count:
 		if _ui_played[i] == id:
 			return -1
 	var stream: AudioStream = sound(id)
 	if stream == null:
 		return -1
-	if _ui_count < UI_VOICES:
-		_ui_played[_ui_count] = id
-		_ui_count += 1
+	_ui_played[_ui_count] = id
+	_ui_count += 1
 	return ui.play(id, stream, Vector2.ZERO, 0.0, BUS_UI)
 
 

@@ -209,6 +209,12 @@ func test_a_content_items_sounds_are_found_and_loaded_only_when_asked() -> void:
 	check(fresh.get_ids(&"props") == ([&"heap"] as Array[StringName]), "and is no content id")
 
 
+func test_sound_ids_are_every_sound_with_a_file_in_id_order() -> void:
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(SOUNDS_FIXTURE + "/content", SOUNDS_FIXTURE + "/audio")
+	check_equal(fresh.sound_ids(), [&"thud", &"whoosh"] as Array[StringName], "audio's and a content item's, no variant")
+
+
 func test_an_ogg_and_a_tres_of_one_id_clash() -> void:
 	DirAccess.make_dir_recursive_absolute(CLASH_ROOT + "/audio/sfx/bang/variants")
 	for file_name: String in ["audio/sfx/bang.ogg", "audio/sfx/bang/bang.tres", "audio/sfx/bang/variants/1.ogg"]:

@@ -752,7 +752,9 @@ func _ready() -> void:
 	_lanes = LanesScript.new()
 	_lanes.name = "Lanes"
 	# Over the shots and every flash: a telegraph is the brightest thing on screen (docs/STYLE.md).
+	# But a move's (a dash's pass): painted on the floor, under every body (`Lanes.floor_z`).
 	_lanes.z_index = SHOWN_BEAM_Z + 2
+	_lanes.floor_z = MARK_Z
 	add_child(_lanes)
 	_remnants = RemnantsScript.new()
 	_remnants.name = "Remnants"

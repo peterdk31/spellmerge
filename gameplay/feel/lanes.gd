@@ -42,6 +42,10 @@ const BEAT_TIME: float = 0.2
 
 ## The spell runtime (`Spells`), read only.
 var spells: Node = null
+## The z a lane of a body's pass (a dash's) is drawn at: on the floor, under every body, as if
+## painted on the ground its caster will cross (the owner, 2026-11-18). Feel sets it (its marks'
+## z). Any other lane, a shot's, is drawn at this node's own z, over the bodies.
+var floor_z: int = 0
 
 ## The lanes under way: the first `count` of each list.
 var count: int = 0
@@ -114,6 +118,9 @@ func play(caster: int, tag: int, seconds: float, tint: Color, reach: float) -> v
 	if wide > 0.0:
 		near = minf(wide + LANE_MARGIN * 0.5, LANE_MOST)
 		far = near
+	# The sprites change places as lanes go (`_remove`), so each lane sets its own.
+	sprite.z_as_relative = wide <= 0.0
+	sprite.z_index = floor_z if wide > 0.0 else 0
 	# Tall enough for its widest end and its glow, its middle kept on the texture's middle row.
 	var high: float = HEIGHT if far <= NEAR_MOST else maxf(HEIGHT, 2.0 * ceilf(minf(far, LANE_MOST) + GLOW))
 	sprite.offset = Vector2(START, -high * 0.5)

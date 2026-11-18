@@ -228,6 +228,8 @@ func _check_lane(at: int) -> void:
 		var long: float = float(fx.lanes().call("reach_of", body.id))
 		check(move > 200.0 and is_equal_approx(long, move + wide), "and it ends where its front does: its way of %.1f px and its body's width (%.1f)" % [move, long])
 		check(lane.offset.x + lane.region_rect.size.x >= move, "drawn all along its way")
+		# The owner, 2026-11-18: under the broom, as if painted on the ground.
+		check(not lane.z_as_relative and lane.z_index < body.z_index, "on the floor, under its body (z %d)" % lane.z_index)
 	fx.free_all()
 
 

@@ -35,6 +35,10 @@ var cleared: Array[StringName] = []
 var room_cues: Array[int] = []
 ## [signal, callable] of every listener the test connected to the game's bus.
 var _listening: Array[Array] = []
+## Spawn styles a test added to the game's registry (taken out in `after_each`), and the registry
+## Flow had before a test swapped in its own (put back in `after_each`; null: none swapped).
+var _added_styles: Array[StringName] = []
+var _kept_registry: RegistryScript = null
 
 
 func before_each() -> void:
@@ -59,6 +63,15 @@ func before_each() -> void:
 
 func after_each() -> void:
 	flow.stop_run()
+	if _kept_registry != null:
+		var swapped: Node = flow.registry
+		flow.registry = _kept_registry
+		_kept_registry = null
+		if swapped != registry:
+			swapped.free()
+	for id: StringName in _added_styles:
+		registry.call("remove", SpawnStyle.FOLDER, id)
+	_added_styles.clear()
 	flow.run_id_to_play = FlowScript.DEFAULT_RUN_ID
 	for index in InputManagerScript.MAX_PLAYERS:
 		input.leave(index)
@@ -267,7 +280,7 @@ func test_an_enemys_spawn_style_is_picked_by_the_enemy_then_the_rooms_biome() ->
 	_playing(1)
 	var biome: StringName = flow._room.biome
 	check(biome != &"", "the room has a biome")
-	var kept: RegistryScript = flow.registry
+	_kept_registry = flow.registry
 	var fixture := RegistryScript.new()
 	flow.registry = fixture
 	var plain := EnemyBase.new()
@@ -288,9 +301,10 @@ func test_an_enemys_spawn_style_is_picked_by_the_enemy_then_the_rooms_biome() ->
 	owned.id = &"fixture_own"
 	fixture.add(SpawnStyle.FOLDER, owned)
 	check_equal(flow.spawn_style_for(own), owned, "the enemy's own")
-	flow.registry = kept
+	flow.registry = _kept_registry
+	_kept_registry = null
 	fixture.free()
-	check_equal(flow.spawn_style_for(plain), kept.get_resource(SpawnStyle.FOLDER, &"rise"), "the game's: rise in the crypt (no style names a biome yet)")
+	check_equal(flow.spawn_style_for(plain), flow.registry.get_resource(SpawnStyle.FOLDER, &"rise"), "the game's: rise in the crypt (no style names a biome yet)")
 	_stop()
 
 
@@ -298,15 +312,14 @@ func test_an_enemys_spawn_style_is_picked_by_the_enemy_then_the_rooms_biome() ->
 ## biome, added to the game's registry for the test, so every one of them (none names its own).
 func test_the_rooms_enemies_spawn_in_their_picked_style() -> void:
 	_join(1)
-	events.emit_signal("play_requested", 0)
-	var biome: StringName = flow._room.biome
-	flow.stop_run()
 	var style := SpawnStyle.from_default()
 	style.id = &"fixture_room_style"
 	style.seconds = 1.3
-	style.biomes = [biome] as Array[StringName]
+	style.biomes = [ARENA.biome] as Array[StringName]
 	check(flow.registry.add(SpawnStyle.FOLDER, style), "added")
+	_added_styles.append(style.id)
 	events.emit_signal("play_requested", 0)
+	check_equal(flow._room.biome, ARENA.biome, "the pinned arena's biome")
 	flow.stand_all_now()
 	check(not flow._enemies.is_empty(), "the room has enemies")
 	for enemy: Node in flow._enemies:
@@ -314,7 +327,6 @@ func test_the_rooms_enemies_spawn_in_their_picked_style() -> void:
 		check(body.is_spawning(), "%s spawns" % body.name)
 		check_equal(body.spawn_style, style.id, "%s in the biome's style" % body.name)
 		check(is_equal_approx(body.spawn_seconds, style.seconds), "%s for its seconds" % body.name)
-	check(flow.registry.remove(SpawnStyle.FOLDER, style.id), "removed")
 	_stop()
 
 

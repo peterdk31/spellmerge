@@ -292,9 +292,10 @@ func _fighters_who_walked() -> Array:
 	return [wizard, before]
 
 
-## The longest spawn of the room's enemies, in seconds (each spawns in in its own style).
+## The longest spawn of the room's enemies, in seconds (each spawns in in its own style), and never
+## less than the style a body of no enemy's own picks (a body still to stand of the first group).
 func _longest_spawn() -> float:
-	var longest: float = 0.0
+	var longest: float = (_flow.call("spawn_style_for", null) as SpawnStyle).seconds
 	for enemy: Node in _flow.get("_enemies") as Array[Node]:
 		if is_instance_valid(enemy):
 			longest = maxf(longest, (enemy as Actor).spawn_seconds)

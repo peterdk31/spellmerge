@@ -6,7 +6,6 @@ extends "res://tests/support/suite.gd"
 ## each body's style as it stands it (`SpawnStyle.pick`), so the room spawns in both; the run recorded with a
 ## snapshot mid-spawn and resumed from it in a fresh game agrees tick for tick (`Actor.spawn_style` is
 ## state, saved in snapshots and hashed), and the game the snapshot restored had both styles in it.
-# unit-test-shards: 1
 
 const ReplayRun := preload("res://tests/support/replay_run.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")

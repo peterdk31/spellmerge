@@ -24,6 +24,8 @@ var cleared: int = 0
 var deaths: Array[int] = []
 var boss_data: EnemyBase
 var adds: EnemyAdds
+## Spawn styles a test added to the game's registry, taken out in `after_each`.
+var added_styles: Array[StringName] = []
 
 
 func before_each() -> void:
@@ -54,6 +56,9 @@ func after_each() -> void:
 	flow.stop_run()
 	flow.world_parent = null
 	flow.run_id_to_play = was_run
+	for id: StringName in added_styles:
+		registry.call("remove", SpawnStyle.FOLDER, id)
+	added_styles.clear()
 	for index in 4:
 		input.leave(index)
 	# The seats' leaves are commands: applied here, so the next test starts clean.
@@ -313,6 +318,7 @@ func test_the_adds_spawn_in_their_picked_style() -> void:
 	style.seconds = 1.4
 	style.biomes = [flow._room.biome] as Array[StringName]
 	check(registry.call("add", SpawnStyle.FOLDER, style), "added")
+	added_styles.append(style.id)
 	_boss().phases.begin(0)
 	var imps: Array[Actor] = _imps()
 	check(not imps.is_empty(), "its adds stood")
@@ -320,4 +326,3 @@ func test_the_adds_spawn_in_their_picked_style() -> void:
 		check(imp.is_spawning(), "an add spawns")
 		check_equal(imp.spawn_style, style.id, "in the biome's style")
 		check(is_equal_approx(imp.spawn_seconds, style.seconds), "for its seconds")
-	check(registry.call("remove", SpawnStyle.FOLDER, style.id), "removed")

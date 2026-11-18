@@ -101,7 +101,7 @@ In Flow:
 - A sound cue `enemy_spawn` (soft, played no more than every 0.1 s, so a group doesn't stack it), through the existing cue plan. As built: the cue (content/cues/enemy_spawn.tres) holds the dust motes too and plays for every body as its rise starts; between two sounds it is played unweighted (dust only).
 - **Risk, checked first in EA2:** the clip has to work with the body's draw order in the world (y-sort) and the room's light pass. If a clip parent breaks y-sort, the fallback is a per-sprite `region_rect` cut, done in the look (each sprite's own rows, still whole pixels). Checked on a virtual display with the game's renderer (compatibility): a clipped body whose parts are shifted keeps its place among y-sorted siblings (behind one standing just in front of it), and a screen-reading pass drawn over the world (the light pass's way) shades it like any body, so the fallback was not needed.
 
-Later, an enemy could pick its own look (`EnemyBase.spawn_style`, for example an imp that drops in from above). That is out of scope here: v1 has one look for every enemy.
+Later, an enemy could pick its own look (`EnemyBase.spawn_style`, for example an imp that drops in from above). That is out of scope here: v1 has one look for every enemy. (It came later: `EnemyBase.spawn_style` and the biome's style are spawn styles AS2, docs/milestones/spawn-styles.md.)
 
 ## Steps
 

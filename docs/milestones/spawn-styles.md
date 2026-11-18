@@ -116,7 +116,8 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
 - `Actor.spawn(seconds, style)`: `spawn_style` is state next to `spawn_seconds`, and like it is kept once the body lands. A spawn of 0 seconds (or not a number) clears it. Nothing in the simulation reads it.
 - Flow picks in `_stand_enemy`, for a room's enemies and a phase's adds alike, through `spawn_style_for(data)`: `pick` with the registry, the enemy and the room's biome. It replaces AS1's `Flow.spawn_seconds()`. The bot test now waits for the longest `Actor.spawn_seconds` of the room's enemies.
 - `SpawnLook.style_for(body)` reads `body.spawn_style`. An id the lookup does not find is drawn as the lookup's `rise` (the registry's), and only with no `rise` as `DEFAULT`, so an unknown id always draws as the game's rise.
-- `Registry.remove(folder, id)` undoes a test's `add` on the game's registry, so a fixture style does not leak into the next suite.
+- `Registry.remove(folder, id)` undoes a test's `add` on the game's registry (in its `after_each`), so a fixture style does not leak into the next test. The replay tests need no `remove`: `ReplayRun.spawn_styles` adds its styles to each fresh game's registry, and the next fresh game has none.
+- Feel's look keeps each style it looked up until its registry is set again (`forget_styles`); a style added to or taken out of the same registry in place is not noticed. The game never does that, and the tests use ids of their own.
 - **Tests.**
   - test_spawn_style.gd: the picker's order, two styles naming one biome (first by id, and a problem of the set), an enemy override, a missing style, no rise and no registry, and every enemy's style a style.
   - test_spawn.gd: a snapshot mid-spawn restores the style, a look drawing from the restored state draws its own style's mark and motion, and the state hash holds the style.

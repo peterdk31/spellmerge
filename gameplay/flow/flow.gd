@@ -25,7 +25,8 @@ extends Node
 ## (`run_room_chosen`, ids of `EnemyBase.FOLDERS`: enemies and bosses; rooms hold layout only). A boss
 ## stands at its enemy spawns as the room starts, so its intro opens on a body that is there and
 ## drawn. Every other one **arrives** (enemy arrivals EA3, docs/milestones/enemy-arrivals.md):
-## `_stand_enemy` sets it to `Actor.arrive` for `Actor.ARRIVE_SECONDS` before it enters the tree, so it
+## `_stand_enemy` sets it to `Actor.arrive` for its style's seconds (`arrival_seconds`: `rise`'s, arrival
+## styles AS1) before it enters the tree, so it
 ## is not there yet (no hurt shape, no touch, no step of its own) while Feel draws a mark and its body
 ## rising out of it; a phase's adds arrive too. They come **in groups as the room gets quiet** (EA5:
 ## `arrivals`, `RoomArrivals`), at the pace the run tells with the room (`run_room_paced`: a group's
@@ -155,6 +156,8 @@ const PLAYER_SLOTS: int = 4
 const ROOM_FOLDER: StringName = &"rooms"
 ## The registry folder of the run definitions (content/runs).
 const RUN_FOLDER: StringName = &"runs"
+## The registry folder of the arrival styles (content/arrivals).
+const ARRIVALS: StringName = &"arrivals"
 ## The run a run of rooms is unless `run_id_to_play` says otherwise (a run definition's id,
 ## content/runs).
 const DEFAULT_RUN_ID: StringName = &"crypt"
@@ -1459,12 +1462,20 @@ func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, arrive: bool = f
 	enemy.position = at
 	enemy.players = _players_in_play()
 	if arrive:
-		enemy.arrive(Actor.ARRIVE_SECONDS)
+		enemy.arrive(arrival_seconds())
 	if events != null:
 		events.enemy_standing.emit(enemy)
 	parent.add_child(enemy)
 	_enemies.append(enemy)
 	return enemy
+
+
+## How long an enemy's arrival lasts: the seconds of the style `rise` (content/arrivals/rise/; arrival
+## styles AS1: every body arrives as `rise` until AS2 picks a style per body), or
+## `ArrivalStyle.DEFAULT`'s when the registry has none.
+func arrival_seconds() -> float:
+	var style: ArrivalStyle = registry.get_resource(ARRIVALS, ArrivalStyle.DEFAULT["id"]) as ArrivalStyle if registry != null else null
+	return style.seconds if style != null else float(ArrivalStyle.DEFAULT["seconds"])
 
 
 ## The room's enemies are forgotten (they went with the room), those still to come,

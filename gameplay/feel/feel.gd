@@ -330,6 +330,8 @@ var registry: RegistryScript = null:
 			_numbers.registry = value
 		if _intro_sound != null:
 			_intro_sound.registry = value
+		if _arrive_look != null:
+			_arrive_look.forget_styles()
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
 ## shot's end reads them; performance, 2026-11-02).
 var projectiles: ProjectileManagerScript = null:
@@ -723,6 +725,7 @@ func _ready() -> void:
 	_arrive_look.name = "ArriveLook"
 	_arrive_look.z_index = MARK_Z
 	_arrive_look.play_cue = _play_arrive_cue
+	_arrive_look.style_of = _arrival_style
 	add_child(_arrive_look)
 	_lanes = LanesScript.new()
 	_lanes.name = "Lanes"
@@ -1423,10 +1426,15 @@ func _status_motes(real_delta: float) -> void:
 			_spectacle.status_motes(card[ElementBase.STATUS_LOOK_CARD] as StringName, card[ElementBase.STATUS_LOOK_LAYER] as int, enemy.global_position, 4.0 * STATUS_ZOOM, status_color(id), count)
 
 
-## An enemy starts to rise out of its mark (`ArriveLook`): its cue at its feet, as no actor's; unweighted
-## (its dust only, no sound) when another arrival sounded just before.
-func _play_arrive_cue(at: Vector2, weighted: bool) -> void:
-	play_cue(ArriveLook.CUE, ActorsScript.NONE, at, Vector2.ZERO, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, weighted)
+## An enemy starts to come out of its mark (`ArriveLook`): its style's cue `cue` at its feet, as no
+## actor's; unweighted (its dust only, no sound) when another arrival sounded just before.
+func _play_arrive_cue(cue: StringName, at: Vector2, weighted: bool) -> void:
+	play_cue(cue, ActorsScript.NONE, at, Vector2.ZERO, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, weighted)
+
+
+## The arrival style of id `id` (content/arrivals), null for none: `ArriveLook`'s lookup.
+func _arrival_style(id: StringName) -> ArrivalStyle:
+	return registry.get_resource(&"arrivals", id) as ArrivalStyle if registry != null else null
 
 
 ## A falling body's motes (`FallLook`): `count` of them round `at`, the void's, drifting.

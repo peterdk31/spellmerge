@@ -268,7 +268,7 @@ func test_the_rooms_enemies_arrive_as_it_starts() -> void:
 	check(not flow._enemies.is_empty(), "the room has enemies")
 	for enemy: Node in flow._enemies:
 		var body := enemy as Actor
-		check(body.is_arriving() and is_equal_approx(body.arrive_seconds, Actor.ARRIVE_SECONDS), "%s arrives" % body.name)
+		check(body.is_arriving() and is_equal_approx(body.arrive_seconds, flow.arrival_seconds()), "%s arrives" % body.name)
 		check(not body.hurtbox.registered, "%s is not in Combat while it arrives" % body.name)
 	check_equal(combat.call("actor_count"), 1 + _props_in_combat(), "Combat knows the wizard and the props alone")
 	check_equal(flow.enemies_left(), _room_count(), "the arriving enemies count as the room's")

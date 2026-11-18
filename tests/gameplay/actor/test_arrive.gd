@@ -11,8 +11,9 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const Snapshot := preload("res://core/sim/snapshot.gd")
 
 const START: Vector2 = Vector2(150.0, 100.0)
-## Ticks an arrival of `Actor.ARRIVE_SECONDS` takes at the fixture's step (0.8 / 0.0625 = 12.8: it
+## How long the arrivals here last (the style `rise`'s seconds), and the ticks one takes at the fixture's step (0.8 / 0.0625 = 12.8: it
 ## lands on the 13th).
+const SECONDS: float = 0.8
 const ARRIVE_TICKS: int = 13
 
 var _world: Fixture
@@ -48,7 +49,7 @@ func _arriving(at: Vector2 = START, data: EnemyBase = null, controlled: bool = t
 		controller.move = Vector2.RIGHT
 		body.add_child(controller)
 	body.data = data
-	body.arrive(Actor.ARRIVE_SECONDS)
+	body.arrive(SECONDS)
 	return _world.add(body, at)
 
 
@@ -126,7 +127,7 @@ func test_it_casts_nothing_while_it_arrives() -> void:
 	# A press waits for its first think: none while it arrives.
 	controller.presses = [0] as Array[int]
 	body.add_child(controller)
-	body.arrive(Actor.ARRIVE_SECONDS)
+	body.arrive(SECONDS)
 	_world.add(body, START)
 	_run(ARRIVE_TICKS - 1)
 	check_equal(_world.projectiles.get_count(), 0, "no shot while it arrives")
@@ -215,7 +216,7 @@ func test_a_snapshot_mid_arrival_is_restored_and_drawn() -> void:
 	check_equal(snapshot.restore(_areas(), root, _world.prepare), PackedStringArray(), "restored")
 	check_equal(_world.table.node_of(id), body, "the same body")
 	check(body.is_arriving() and is_equal_approx(body.arrive_left, left), "mid-arrival again: %s" % body.arrive_left)
-	check(is_equal_approx(body.arrive_seconds, Actor.ARRIVE_SECONDS), "with its whole arrival's seconds")
+	check(is_equal_approx(body.arrive_seconds, SECONDS), "with its whole arrival's seconds")
 	check(not body.hurtbox.registered, "its hurt shape still off")
 	# Feel's look reads the state alone: a machine that joins mid-arrival draws it.
 	var look := ArriveLook.new()
@@ -253,7 +254,7 @@ func _areas() -> Dictionary:
 func test_a_body_with_nothing_to_drive_it_is_not_still_while_it_arrives() -> void:
 	var body := Actor.new()
 	body.add_child(Hurtbox.new())
-	body.arrive(Actor.ARRIVE_SECONDS)
+	body.arrive(SECONDS)
 	_world.add(body, START)
 	check(not body.is_still(), "not still while it arrives")
 	check(not _world.table.is_still(body.id), "the actor table steps it")

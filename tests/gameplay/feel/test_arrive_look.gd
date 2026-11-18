@@ -8,11 +8,16 @@ extends "res://tests/support/suite.gd"
 ## `SOUND_EVERY`; a frame of it allocates nothing; and the game's Feel steps it.
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const Motion := preload("res://gameplay/feel/arrive_motions/arrive_motion.gd")
+const Rise := preload("res://gameplay/feel/arrive_motions/rise.gd")
 
 var _world: Fixture
 var _look: ArriveLook
-## Every cue the look played, as [at, weighted].
+## The style the look draws when it has no lookup: `rise`'s numbers (`ArrivalStyle.DEFAULT`).
+var _style: ArrivalStyle = ArrivalStyle.from_default()
+## Every cue the look played, as [at, weighted], and the cues' ids.
 var _cues: Array = []
+var _cue_ids: Array[StringName] = []
 
 
 func before_each() -> void:
@@ -20,7 +25,10 @@ func before_each() -> void:
 	_look = ArriveLook.new()
 	root.add_child(_look)
 	_cues.clear()
-	_look.play_cue = func(at: Vector2, weighted: bool) -> void: _cues.append([at, weighted])
+	_cue_ids.clear()
+	_look.play_cue = func(cue: StringName, at: Vector2, weighted: bool) -> void:
+		_cues.append([at, weighted])
+		_cue_ids.append(cue)
 
 
 func after_each() -> void:
@@ -32,7 +40,7 @@ func after_each() -> void:
 func _arriving(at: Vector2, share: float) -> Actor:
 	var body := Actor.new()
 	body.add_child(Hurtbox.new())
-	body.arrive(Actor.ARRIVE_SECONDS)
+	body.arrive(_style.seconds)
 	_world.add(body, at)
 	_set_share(body, share)
 	return body
@@ -45,7 +53,7 @@ func _frame(delta: float) -> void:
 
 
 func _set_share(body: Actor, share: float) -> void:
-	body.arrive_left = Actor.ARRIVE_SECONDS * (1.0 - share)
+	body.arrive_left = _style.seconds * (1.0 - share)
 
 
 ## The distinct values `value(share)` takes over the shares `from` to `to` in 200 steps, in order.
@@ -59,27 +67,27 @@ func _frames(value: Callable, from: float, to: float) -> Array:
 
 
 func test_the_mark_grows_in_four_frames_from_a_dot_and_closes_in_three() -> void:
-	var grow: Array = _frames(func(share: float) -> int: return ArriveLook.mark_radius(7.0, share), 0.0, ArriveLook.MARK_END - 0.001)
+	var grow: Array = _frames(func(share: float) -> int: return ArriveLook.mark_radius(7.0, share, _style), 0.0, _style.mark_end - 0.001)
 	check_equal(grow, [1, 3, 5, 7], "from a dot to the footprint's width, by whole pixels")
-	check_equal(ArriveLook.mark_radius(7.0, ArriveLook.MARK_END), 7, "held as the rise begins: the mark ends where the rise starts")
-	var close: Array = _frames(func(share: float) -> int: return ArriveLook.mark_radius(7.0, share), ArriveLook.CLOSE_FROM - 0.01, 0.999)
+	check_equal(ArriveLook.mark_radius(7.0, _style.mark_end, _style), 7, "held as the rise begins: the mark ends where the rise starts")
+	var close: Array = _frames(func(share: float) -> int: return ArriveLook.mark_radius(7.0, share, _style), _style.close_from - 0.01, 0.999)
 	check_equal(close, [7, 5, 3, 1], "closing in three frames, down to a dot")
-	check_equal(ArriveLook.mark_radius(7.0, 1.0), 0, "none once it stands")
-	check(ArriveLook.MARK_FRAMES >= 3 and ArriveLook.CLOSE_FRAMES >= 3, "at least 3 frames a stage")
+	check_equal(ArriveLook.mark_radius(7.0, 1.0, _style), 0, "none once it stands")
+	check(_style.mark_frames >= 3 and _style.close_frames >= 3, "at least 3 frames a stage")
 
 
 func test_the_body_rises_by_whole_pixels_from_its_height_to_its_feet() -> void:
 	var height: float = 26.0
-	check_equal(ArriveLook.rise_shift(height, 0.0), height, "all under the floor through the mark")
-	check_equal(ArriveLook.rise_shift(height, ArriveLook.MARK_END), height, "the rise starts where the mark left it")
-	var rise: Array = _frames(func(share: float) -> float: return ArriveLook.rise_shift(height, share), ArriveLook.MARK_END, 1.0)
+	check_equal(Rise.shift(height, 0.0, _style), height, "all under the floor through the mark")
+	check_equal(Rise.shift(height, _style.mark_end, _style), height, "the rise starts where the mark left it")
+	var rise: Array = _frames(func(share: float) -> float: return Rise.shift(height, share, _style), _style.mark_end, 1.0)
 	check(rise.size() >= 5, "at least 5 frames: %d" % rise.size())
 	for n in rise.size():
 		check_equal(rise[n], roundf(rise[n]), "whole pixels")
 		if n > 0:
 			check(rise[n] < rise[n - 1] and rise[n - 1] - rise[n] <= 1.0, "up a pixel at a time")
 	check_equal(rise[-1], 0.0, "standing at the end")
-	check(ArriveLook.rise_shift(4.0, 0.7) <= 4.0, "a small body too")
+	check(Rise.shift(4.0, 0.7, _style) <= 4.0, "a small body too")
 
 
 func test_its_height_counts_its_sprite_its_hurt_shape_and_its_size() -> void:
@@ -96,9 +104,9 @@ func test_its_height_counts_its_sprite_its_hurt_shape_and_its_size() -> void:
 	sprite.position = Vector2(0.0, -14.0)
 	body.add_child(sprite)
 	_world.add(body, Vector2(100.0, 100.0))
-	check_equal(ArriveLook.body_height(body), 34.0 + ArriveLook.HEIGHT_MARGIN, "its sprite's top (14 + 20) and the margin")
+	check_equal(Motion.body_height(body), 34.0 + Motion.HEIGHT_MARGIN, "its sprite's top (14 + 20) and the margin")
 	body.set_size(2.0)
-	check_equal(ArriveLook.body_height(body), 68.0 + ArriveLook.HEIGHT_MARGIN, "twice as tall at twice its size")
+	check_equal(Motion.body_height(body), 68.0 + Motion.HEIGHT_MARGIN, "twice as tall at twice its size")
 
 
 func test_it_is_drawn_from_its_state_alone_and_put_back_once_it_stands() -> void:
@@ -115,15 +123,16 @@ func test_it_is_drawn_from_its_state_alone_and_put_back_once_it_stands() -> void
 	var first: Vector3 = _look.mark(0)
 	var second: Vector3 = _look.mark(1)
 	check_equal(Vector2(first.x, first.y), Vector2(100.0, 100.0), "at its feet")
-	check_equal(int(first.z), ArriveLook.mark_radius(marking.wall_radius(), marking.arrive_share()), "as wide as its share says")
+	check_equal(int(first.z), ArriveLook.mark_radius(marking.wall_radius(), marking.arrive_share(), _style), "as wide as its share says")
 	check_equal(Vector2(second.x, second.y), Vector2(201.0, 140.0), "on whole pixels")
 	check_equal(marking.global_position, Vector2(100.0, 100.0), "its place untouched")
-	check_equal(_look.shift_of(marking), ArriveLook.rise_shift(ArriveLook.body_height(marking), marking.arrive_share()), "still under the floor: shifted its whole height")
-	check_equal(_look.shift_of(rising), ArriveLook.rise_shift(ArriveLook.body_height(rising), rising.arrive_share()), "rising: shifted as far as its share says")
-	check(_look.shift_of(rising) > 0.0 and _look.shift_of(rising) < ArriveLook.body_height(rising), "part way up: %s" % _look.shift_of(rising))
+	check_equal(_look.shift_of(marking), Rise.shift(Motion.body_height(marking), marking.arrive_share(), _style), "still under the floor: shifted its whole height")
+	check_equal(_look.shift_of(rising), Rise.shift(Motion.body_height(rising), rising.arrive_share(), _style), "rising: shifted as far as its share says")
+	check(_look.shift_of(rising) > 0.0 and _look.shift_of(rising) < Motion.body_height(rising), "part way up: %s" % _look.shift_of(rising))
 	check_equal(_look.shift_of(standing), -1.0, "a standing body is not shifted")
 	check_equal(_cues.size(), 1, "the rising body's cue played once")
 	check_equal(_cues[0], [rising.global_position, true], "at its feet, with its sound")
+	check_equal(_cue_ids[0], &"enemy_arrive", "the style's cue")
 	_frame(0.016)
 	check_equal(_cues.size(), 1, "and not again")
 	_set_share(marking, 0.5)
@@ -176,7 +185,11 @@ func test_feel_steps_it_and_its_cue_is_there() -> void:
 	var look := feel.get("_arrive_look") as ArriveLook
 	check(look != null and look.get_parent() == feel, "Feel holds an arrival look")
 	check(look.play_cue.is_valid(), "and plays its cue")
-	var cue := root.get_node("Registry").call("get_resource", &"cues", ArriveLook.CUE) as CueBase
+	check(look.style_of.is_valid(), "and looks its styles up")
+	var rise: ArrivalStyle = look.style_of.call(&"rise") as ArrivalStyle
+	check(rise != null and rise.resource_path == "res://content/arrivals/rise/rise.tres", "in the registry: content/arrivals/rise")
+	check(look.style_of.call(&"no_such_style") == null, "and none for an id there is none of")
+	var cue := root.get_node("Registry").call("get_resource", &"cues", _style.cue) as CueBase
 	check(cue != null, "the cue enemy_arrive is in the registry")
 	if cue != null:
 		check_equal(cue.sound, &"enemy_arrive", "its soft sound")
@@ -194,12 +207,12 @@ func test_art_under_its_feet_rises_with_it() -> void:
 	sprite.texture = art
 	sprite.position = Vector2(0.0, -14.0)
 	body.add_child(sprite)
-	body.arrive(Actor.ARRIVE_SECONDS)
+	body.arrive(_style.seconds)
 	_world.add(body, Vector2(100.0, 100.0))
-	check_equal(ArriveLook.body_bottom(body), 2.0, "its frame reaches 2 px under its feet")
+	check_equal(Motion.body_bottom(body), 2.0, "its frame reaches 2 px under its feet")
 	_set_share(body, 0.1)
 	_frame(0.016)
-	check_equal(_look.shift_of(body), ArriveLook.body_height(body) + 2.0, "through the mark it is under the line, those rows too")
+	check_equal(_look.shift_of(body), Motion.body_height(body) + 2.0, "through the mark it is under the line, those rows too")
 	_set_share(body, 0.999)
 	_frame(0.016)
 	check_equal(_look.shift_of(body), 0.0, "all of it up by the end of the rise")
@@ -213,7 +226,7 @@ func test_a_body_added_after_the_step_is_cut_before_the_draw() -> void:
 	check_equal(late.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED, "not cut yet")
 	_look.cut()
 	check_equal(late.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "cut just before the draw")
-	check_equal(_look.shift_of(late), ArriveLook.body_height(late), "all of it under the floor")
+	check_equal(_look.shift_of(late), Motion.body_height(late), "all of it under the floor")
 	check(RenderingServer.frame_pre_draw.is_connected(_look.cut), "the cut runs before every frame is drawn")
 
 
@@ -232,7 +245,7 @@ func _arriving_with_art(at: Vector2, share: float, hurt_radius: float = -1.0) ->
 	sprite.texture = art
 	sprite.position = Vector2(0.0, -14.0)
 	body.add_child(sprite)
-	body.arrive(Actor.ARRIVE_SECONDS)
+	body.arrive(_style.seconds)
 	_world.add(body, at)
 	_set_share(body, share)
 	return body
@@ -249,11 +262,11 @@ func test_the_part_of_its_height_its_size_moves_is_worked_out_once() -> void:
 	var other: Actor = _arriving_with_art(Vector2(200.0, 100.0), 0.3)
 	check(is_nan(_look.size_top_kept(body)), "nothing kept before its first cut")
 	_frame(0.016)
-	check(ArriveLook.size_top(body) + ArriveLook.HEIGHT_MARGIN > ArriveLook.body_height(other), "its hurt shape stands above its art: %s" % ArriveLook.size_top(body))
-	check_equal(ArriveLook.body_height(body), ceilf(ArriveLook.size_top(body) + ArriveLook.HEIGHT_MARGIN), "its height is its hurt shape's")
-	check_equal(_look.size_top_kept(body), ArriveLook.size_top(body), "kept as a fresh count gives it")
+	check(Motion.size_top(body) + Motion.HEIGHT_MARGIN > Motion.body_height(other), "its hurt shape stands above its art: %s" % Motion.size_top(body))
+	check_equal(Motion.body_height(body), ceilf(Motion.size_top(body) + Motion.HEIGHT_MARGIN), "its height is its hurt shape's")
+	check_equal(_look.size_top_kept(body), Motion.size_top(body), "kept as a fresh count gives it")
 	check_equal(_look.size_tops_kept(), 2, "one for each body cut")
-	check_equal(ArriveLook.body_bottom(body), 2.0, "its frame reaches 2 px under its feet")
+	check_equal(Motion.body_bottom(body), 2.0, "its frame reaches 2 px under its feet")
 	_check_fresh(body, "first cut")
 	# Its look's bob: its art 1 px up (the sprite's offset), as CreatureLook lifts it while it arrives.
 	var sprite := body.get_node(^"Sprite") as Sprite2D
@@ -271,7 +284,7 @@ func test_the_part_of_its_height_its_size_moves_is_worked_out_once() -> void:
 	body.set_size(1.5)
 	_frame(0.016)
 	check(_look.size_top_kept(body) != kept, "its size moves it: %s" % _look.size_top_kept(body))
-	check_equal(_look.size_top_kept(body), ArriveLook.size_top(body), "counted again at its new size")
+	check_equal(_look.size_top_kept(body), Motion.size_top(body), "counted again at its new size")
 	_check_fresh(body, "grown")
 	body.arrive_left = 0.0
 	_frame(0.016)
@@ -285,8 +298,66 @@ func test_the_part_of_its_height_its_size_moves_is_worked_out_once() -> void:
 
 ## `body`'s shift and mask at its last cut are what a fresh `body_height` and `body_bottom` give.
 func _check_fresh(body: Actor, when: String) -> void:
-	var bottom: float = ArriveLook.body_bottom(body)
+	var bottom: float = Motion.body_bottom(body)
 	check_equal(_look.bottom_of(body), bottom, "%s: its mask at its lowest row" % when)
 	var size: float = absf(body.size)
-	check_equal(ArriveLook.mask_rect(bottom, size), Rect2(-ArriveLook.MASK_HALF_WIDTH, -ArriveLook.MASK_TALL, 2.0 * ArriveLook.MASK_HALF_WIDTH, ArriveLook.MASK_TALL + bottom / size), "%s: everything above that line, in its own pixels" % when)
-	check_equal(_look.shift_of(body), ArriveLook.rise_shift(ArriveLook.body_height(body) + bottom, body.arrive_share()), "%s: shifted as a fresh count says" % when)
+	check_equal(Rise.mask_rect(bottom, size), Rect2(-Rise.MASK_HALF_WIDTH, -Rise.MASK_TALL, 2.0 * Rise.MASK_HALF_WIDTH, Rise.MASK_TALL + bottom / size), "%s: everything above that line, in its own pixels" % when)
+	check_equal(_look.shift_of(body), Rise.shift(Motion.body_height(body) + bottom, body.arrive_share(), _style), "%s: shifted as a fresh count says" % when)
+
+
+## Feel draws every motion a style may name, and no other (`ArrivalStyle.MOTIONS` is the list in core,
+## `ArriveLook.MOTIONS` the code for each, as `ModifierBase.RULES` and its kits are split).
+func test_its_motions_are_the_styles_motions() -> void:
+	var names: Array[StringName] = []
+	names.assign(ArriveLook.MOTIONS.keys())
+	names.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
+	var listed: Array[StringName] = ArrivalStyle.MOTIONS.duplicate()
+	listed.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
+	check_equal(names, listed, "the same names")
+	check(ArriveLook.MOTIONS.has(ArriveLook.FALLBACK_MOTION), "and the one a motion it lacks is drawn by")
+	for motion: StringName in ArriveLook.MOTIONS:
+		check(_look.motion_named(motion) != null, "it holds one %s" % motion)
+
+
+## The look draws by the style its lookup gives: the style's stages and frames for the mark and the
+## motion, and its cue; a style it does not find is the default's numbers.
+func test_it_draws_by_the_style_it_looks_up() -> void:
+	var slow: ArrivalStyle = ArrivalStyle.from_default()
+	slow.mark_end = 0.6
+	slow.close_from = 0.8
+	slow.cue = &"fixture_cue"
+	var asked: Array[StringName] = []
+	_look.style_of = func(id: StringName) -> ArrivalStyle:
+		asked.append(id)
+		return slow
+	var body: Actor = _arriving(Vector2(100.0, 100.0), 0.5)
+	_frame(0.016)
+	check_equal(asked, [&"rise"] as Array[StringName], "it asked for rise, the style of every body today, once")
+	check_equal(int(_look.mark(0).z), ArriveLook.mark_radius(body.wall_radius(), 0.5, slow), "its mark by the style's frames")
+	check_equal(_look.shift_of(body), Motion.body_height(body), "at 0.5 still under the floor: its mark ends at 0.6")
+	check(_cues.is_empty(), "no cue before its motion starts")
+	_set_share(body, 0.7)
+	_frame(0.016)
+	check_equal(_look.shift_of(body), Rise.shift(Motion.body_height(body), 0.7, slow), "rising by the style's numbers")
+	check_equal(_cue_ids, [&"fixture_cue"] as Array[StringName], "the style's cue, as the motion starts")
+	_frame(0.016)
+	check_equal(asked.size(), 1, "looked up once, not every frame")
+	_set_share(body, 0.85)
+	_frame(0.016)
+	check(int(_look.mark(0).z) < roundi(body.wall_radius()), "closing from the style's 0.8")
+	_look.style_of = func(_id: StringName) -> ArrivalStyle: return null
+	_frame(0.016)
+	check_equal(_look.shift_of(body), Rise.shift(Motion.body_height(body), 0.85, _style), "a style not found: the default's numbers")
+
+
+## A style whose motion the look does not have (a newer machine's) is drawn as `rise`, so the body is
+## never drawn whole mid-arrival.
+func test_a_motion_it_does_not_have_is_drawn_as_rise() -> void:
+	var odd: ArrivalStyle = ArrivalStyle.from_default()
+	odd.motion = &"no_such_motion"
+	_look.style_of = func(_id: StringName) -> ArrivalStyle: return odd
+	var body: Actor = _arriving(Vector2(100.0, 100.0), 0.2)
+	_frame(0.016)
+	check_equal(body.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "cut")
+	check_equal(_look.shift_of(body), Motion.body_height(body), "under the floor through the mark, as rise draws it")
+	check_equal(_look.drawn(), 1, "one body drawn")

@@ -1,6 +1,6 @@
 # Arrival styles: each biome (or enemy) names how its enemies arrive
 
-**Status (2026-11-18): approved; the owner answered its questions (the end of this document) and asked for it to be built now.** The owner asked whether it is easy to change the arrival animation or add new ones in other biomes, then asked for this plan.
+**Status (2026-11-18): approved; the owner answered its questions (the end of this document) and asked for it to be built now. AS1 done (the data, with no change on screen; "As built (AS1)" below); AS2 to AS4 to come.** The owner asked whether it is easy to change the arrival animation or add new ones in other biomes, then asked for this plan.
 
 Today (enemy arrivals EA1–EA5, docs/milestones/enemy-arrivals.md) the arrival has one look. A mark grows on the floor, then the body rises out of it. The look is written in `gameplay/feel/arrive_look.gd`:
 - its timing is constants there (`MARK_END`, `CLOSE_FROM`, the frame counts);
@@ -76,6 +76,28 @@ Across all styles, no two may name the same biome (`ArrivalStyle.all_problems`, 
 | AS2 | **Picked per body:** `ArrivalStyle.pick`, `EnemyBase.arrival`, `Actor.arrive(seconds, style)` and `arrive_style` as state, Flow picking as it stands a body; tests for the picker, snapshots and determinism | core/base, gameplay/actor, gameplay/flow, tests |
 | AS3 | **A second motion, to prove it:** `materialize`, with its own style `content/arrivals/materialize/`, its cue (sparks and a sound id) and `EnemyBase.arrival = &"materialize"` on the storm fork, so it shows in the crypt today (one line to move it to another enemy or a biome); the every-style-on-every-enemy test | gameplay/feel, content/arrivals, content/cues, tests |
 | AS4 | **Art strips for the mark** (question 2) | gameplay/feel, content/arrivals, tests |
+
+**As built (AS1):**
+- `ArrivalStyle` (core/base/arrival_style.gd) has the fields above. `DEFAULT` is a constant dictionary of `rise`'s numbers, since a constant can't be a Resource. Every field's default is read from it, so a style file only writes what it changes. `from_default()` makes a style of those numbers, which the look draws when it finds no style. `MOTIONS` is `[rise]` until AS3 adds `materialize`. `CHECK_FPS` is 60 and `MIN_FRAMES` 3.
+- `problems(known_cue)` takes a cue lookup, as `BossIntro.problems` does. Three things differ from the plan's list:
+  - An empty cue is no problem: none plays.
+  - There is no separate check of the motion's stage. It holds the close's stage, so a close long enough is a motion long enough.
+  - A `mark_strip` is reported as not drawn until AS4, so no style names art it doesn't show. AS4 replaces that line with the strip's real checks.
+- `all_problems(styles, known_cue)` adds the one-style-a-biome check. The look doesn't read `colours` yet: every style is `floor`'s until AS3 draws the first that isn't.
+- `content/arrivals/rise/rise.tres` writes every number out. It has no art, so no `assets.json`. `content/arrivals/README.md` is the guide.
+- **`Actor.ARRIVE_SECONDS` went in AS1, not AS2.** Flow's `arrival_seconds()` is the `rise` style's `seconds` from the registry, or `DEFAULT`'s with none. Every body still arrives as `rise`, and AS2 replaces it with `pick`. `Actor.arrive(seconds)` is unchanged; `arrive_style` is AS2's.
+- **Feel.**
+  - The motions are `ArriveLook.MOTIONS`, a constant table from each name to its script in `gameplay/feel/arrive_motions/`, and the look holds one object of each. There is no separate table file.
+  - The base class `arrive_motion.gd` holds the measures every motion needs, moved from the look: `body_height`, `size_top`, `body_bottom`, the margin, and each body's kept `size_top`.
+  - A motion answers `apply(body, share, style)` and `put_back(key, body)`, where `body` is null when it is gone, so the motion can still forget it.
+  - `rise.gd` is EA2's cut, moved unchanged. `rise_shift` became `rise.gd`'s `shift(height, share, style)`, and `ArriveLook.mark_radius(radius, share, style)` takes the style.
+  - The look's `style_of` is the lookup: Feel's `_arrival_style`, the registry's `arrivals`. Each id is looked up once and kept, and forgotten when Feel's registry changes. `style_for(body)` is `rise` for every body until AS2 reads `arrive_style`.
+  - `play_cue(cue, at, weighted)` plays the style's cue. Its sound is spaced across every style.
+- **Tests.**
+  - `tests/core/test_arrival_style.gd` covers every style file and the set, holds `rise` to `DEFAULT`, and names each problem.
+  - `tests/gameplay/feel/test_arrive_look.gd` adds three tests: Feel's motions are `ArrivalStyle.MOTIONS`, the look draws by the style its lookup gives (marks, motion and cue, looked up once, and the default when none is found), and a motion it lacks is drawn as `rise`.
+  - The helpers' references in test_arrive_look.gd, test_arrive.gd, test_flow.gd and test_bot.gd now take the style, its numbers or `Flow.arrival_seconds()`.
+- **No change on screen.** `tests/screenshots/shot_arrivals.gd`'s strip was compared before and after, with the global seed pinned and particles off: identical to the pixel. The dust motes follow Feel's real clock and the run's enemies its random seed, so an unpinned strip differs between any two runs, on main too.
 
 Each step updates the README of the areas it touches, and `content/arrivals/README.md` (new) is the guide: copy `rise/`, change the numbers, name your biome.
 

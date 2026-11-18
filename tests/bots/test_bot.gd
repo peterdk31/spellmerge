@@ -16,9 +16,9 @@ const BotScript := preload("res://tests/bots/bot.gd")
 
 ## Physics frames a fighter is given to walk (the bots think at each tick's start).
 const WALK_FRAMES: int = 20
-## The physics frames the room's enemies take to arrive (enemy arrivals EA3: a bot walks toward the
-## enemies there are, and one still arriving is not there yet), and two more.
-const ARRIVE_FRAMES: int = ceili(Actor.ARRIVE_SECONDS * 60.0) + 2
+## The physics frames past the room's enemies' arrival (enemy arrivals EA3: a bot walks toward the
+## enemies there are, and one still arriving is not there yet; `Flow.arrival_seconds`), and two more.
+const ARRIVE_EXTRA_FRAMES: int = 2
 
 var _input: Node
 var _flow: Node
@@ -283,7 +283,7 @@ func _fighters_who_walked() -> Array:
 	var wizard: Node2D = await _fighters_in_a_run()
 	if wizard == null:
 		return []
-	for i in ARRIVE_FRAMES:
+	for i in ceili(float(_flow.call("arrival_seconds")) * 60.0) + ARRIVE_EXTRA_FRAMES:
 		await physics_frame
 	var before: Vector2 = wizard.global_position
 	for i in WALK_FRAMES:

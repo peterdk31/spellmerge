@@ -118,9 +118,6 @@ const EventsScript := preload("res://core/events/events.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-## How long an enemy's arrival takes (enemy arrivals EA1: a mark on the floor, then the body rising
-## out of it; `ArriveLook`): what Flow hands `arrive`.
-const ARRIVE_SECONDS: float = 0.8
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 
 ## The actor died (`die`); `killer` is who landed the last hit (an event's player, or -1).

@@ -36,6 +36,12 @@ extends Node2D
 ## written), writes the grid's walked cells into its image and hands that over only when one was,
 ## and hands over the changed rows (`step`).
 ##
+## **It sways in the world's stirs** (docs/milestones/atmosphere.md, E): a tuft leans with the air the
+## shots drag past it and is pushed out by a blast's wave and sways back (`cover.gdshader`, from the
+## spectacle's `stirs.gd`, handed to every batch by `step`'s `hand_stirs` whenever their version
+## changes; the cover knows nothing else of them), as far as
+## its state bends, eased on Feel's clock.
+##
 ## **A burning cell gives off embers and smoke** (GC8): a state's `motes`, given off by
 ## `cover_motes.gd` from every cell showing it (`show_state` tells it), into the spectacle's pool.
 ##
@@ -69,6 +75,10 @@ const FOOTPRINT: PackedVector2Array = [Vector2(-6.0, -4.0), Vector2(6.0, -4.0), 
 ## Flat, a tuft with no trampled frame is pressed down by this much of its height (how long a walked
 ## cell lies flat and springs back is its kind's: `CoverKind.trample_hold`, `trample_spring`).
 const FLATTEN: float = 0.5
+## How far the shots' wake and a blast's push lean a tuft's tip at their fullest, px (the shader's
+## STIR_SHOT_PIXELS and STIR_BLAST_PIXELS), times its state's bend.
+const STIR_SHOT_PIXELS: float = 2.5
+const STIR_BLAST_PIXELS: float = 10.0
 ## When a cell never walked through was walked (long before any clock).
 const NEVER: float = -1.0e6
 
@@ -120,6 +130,8 @@ var _times_texture: ImageTexture = null
 var _times_dirty: bool = false
 ## Feel's clock at the last `step`: when a change heard since began to show.
 var _now: float = 0.0
+## The stirs' `version` last handed to the batches (-1: hand them over at the next step).
+var _stirs_version: int = -1
 
 
 ## Cover drawn at `z` (Feel's MARK_Z).
@@ -210,6 +222,7 @@ func lay(laid: CoverLayout) -> void:
 	_times_texture = ImageTexture.create_from_image(_times)
 	_times_dirty = false
 	_sent_count = -1
+	_stirs_version = -1
 	for index in laid.kinds.size():
 		_rows.append(PackedFloat32Array())
 		_slot_row.append(PackedInt32Array())
@@ -313,8 +326,10 @@ func body_count() -> int:
 ## handed to the shader, and the cells they stand in walked; and the rows of each kind changed since
 ## the last frame handed to its batch; and the motes of the states that give some off, into `pool`
 ## (Feel's spectacle's; null: the particles are off) from the cells near `view` (the camera's
-## picture; empty: everywhere).
-func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, pool: MotesScript = null, view: Rect2 = Rect2()) -> void:
+## picture; empty: everywhere); and the world's stirs handed to the batches by `hand_stirs` (taking a
+## ShaderMaterial; the spectacle's `Stirs.hand_to`; none: not handed) whenever their `stirs_version`
+## is not the one handed last.
+func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
 	_now = now
 	if layout != null:
 		_find_bodies(table, focus)
@@ -323,6 +338,9 @@ func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, 
 		_times_dirty = false
 		_times_texture.update(_times)
 	motes.give_off(now, pool, view)
+	var stirred: bool = hand_stirs.is_valid() and stirs_version != _stirs_version
+	if stirred:
+		_stirs_version = stirs_version
 	var moved: bool = _bodies_moved()
 	if moved:
 		_sent = 1 - _sent
@@ -339,6 +357,8 @@ func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, 
 			continue
 		var material := batch.material as ShaderMaterial
 		material.set_shader_parameter(&"view_time", now)
+		if stirred:
+			hand_stirs.call(material)
 		if moved:
 			material.set_shader_parameter(&"bodies", _send[_sent])
 			material.set_shader_parameter(&"body_count", _sent_count)

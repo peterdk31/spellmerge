@@ -526,3 +526,42 @@ func test_music_changes_fade_and_silence_stops() -> void:
 	check_equal(music.fading_level_of(1), 0.0, "and its silent layer stays silent as it goes")
 	music.stop()
 	check(music.track() == null and music.stream_of(0) == null, "silence")
+
+
+func test_a_track_change_inside_a_fade_never_cuts_the_louder() -> void:
+	_know([&"a", &"b", &"c"])
+	var music: MusicScript = own(MusicScript.new()) as MusicScript
+	music.registry = reg
+	root.add_child(music)
+	var tracks: Array[MusicTrack] = []
+	for id: StringName in [&"a", &"b", &"c"]:
+		var track := MusicTrack.new()
+		track.layers = [id] as Array[StringName]
+		track.fade = 1.0
+		tracks.append(track)
+	music.play(tracks[0], 1)
+	music.step(1.0)
+	music.play(tracks[1], 1)
+	music.step(0.3)
+	var b_in: float = music.level_of(0)
+	var a_out: float = music.fading_level()
+	music.play(tracks[0], 1)
+	check(music.track() == tracks[0] and music.fading_track() == tracks[1], "A, B, A: the sets swap")
+	check(is_equal_approx(music.level_of(0), a_out) and is_equal_approx(music.fading_level(), b_in), "each going on from where it was")
+	var last: float = music.level_of(0) + music.fading_level()
+	var largest: float = 0.0
+	for i in 60:
+		music.step(1.0 / 60.0)
+		var now: float = music.level_of(0) + music.fading_level()
+		largest = maxf(largest, last - now)
+		last = now
+	check(largest <= 1.0 / 60.0 + 0.0001, "no frame's summed level drops more than a frame's share")
+	music.play(tracks[1], 1)
+	music.step(0.6)
+	var louder_level: float = maxf(music.level_of(0), music.fading_level())
+	var louder: MusicTrack = tracks[1] if music.level_of(0) >= music.fading_level() else tracks[0]
+	music.play(tracks[2], 1)
+	check(music.track() == tracks[2] and music.fading_track() == louder, "A, B, C: the louder goes on fading out")
+	check(is_equal_approx(music.fading_level(), louder_level), "from where it was")
+	music.stop()
+

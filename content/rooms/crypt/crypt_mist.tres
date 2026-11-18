@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="RoomMist" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/room_mist.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+colour = Color(0.7, 0.76, 0.94, 1)
+thickness = 0.5
+middle = 0.1
+edge_reach = 96.0
+pit_reach = 64.0
+pit_share = 1.0
+spill = 14.0
+patchy = 0.6
+scale = 96.0
+drift = Vector2(4, 1.5)
+in_dark = 1.0
+lit = 0.6

@@ -52,6 +52,20 @@ var look_layers: PackedInt32Array:
 ## rest, in its own colours, once it lies still (docs/milestones/spell-spectacle.md, P2b: settled
 ## motes); empty for none. Only a kind that falls (gravity above 0) comes to rest.
 @export var settles: StringName = &""
+## Drawn only where light falls (docs/milestones/atmosphere.md, B: a room's dust in the air): its
+## motes read the spell light's light buffer under them, unseen in the dark and a shade brighter
+## each step brighter the light is (the steps are the spell light's own, `SpellLight.lit_steps`), in
+## the light's hue; it comes and goes through its shades over its life (dim, its brightest at the
+## middle, dim) instead of cooling, and is only ever gone from its shadow shade, so it never pops
+## (`Motes.lit_shade`). Its highlights ("o") are drawn as its body: a hotter pixel would skip a
+## shade. With the "Dynamic lighting" setting off it is not drawn at all. It neither glows (the light is
+## its glow) nor settles.
+@export var lit_only: bool = false
+## How much the world's stirs move it (docs/milestones/atmosphere.md, E; 0 not at all, 1 fully):
+## its motes are dragged along by the air a shot pulls past them and pushed out by a blast's wave,
+## then drift back to their own way, eased on Feel's clock (gameplay/feel/stirs.gd). For the dust in
+## a room's air and in its light shafts.
+@export_range(0.0, 1.0, 0.05) var stirred: float = 0.0
 
 @export_group("Flight")
 ## Down the fake height, in px/s/s; below 0 it rises (an ember), 0 it keeps its height.
@@ -183,6 +197,10 @@ func problems() -> PackedStringArray:
 	for look in look_ids:
 		if not LookNames.known(look):
 			found.append("%s: %s is not a look (%s)" % [id, look, ", ".join(LookNames.NAMES)])
+	if lit_only and glow > 0.0:
+		found.append("%s: a lit-only kind does not glow (glow 0): the light under it is its glow" % id)
+	if lit_only and settles != &"":
+		found.append("%s: a lit-only kind leaves no mark: it is seen only in the light, a mark everywhere" % id)
 	if settles != &"" and gravity <= 0.0:
 		found.append("%s: only a kind that falls comes to rest, so one that rises leaves no mark" % id)
 	if speed.x > speed.y or up.x > up.y or life.x > life.y:

@@ -156,6 +156,8 @@ func setup(owner_actor: Actor) -> void:
 	if _shadow == null:
 		_shadow = Node2D.new()
 		_shadow.name = "Shadow"
+		# Feel's cast shadows take its place while spell light is on (LightSpot.DRAWN_SHADOW).
+		_shadow.add_to_group(LightSpot.DRAWN_SHADOW)
 		_shadow.draw.connect(_draw_shadow)
 		actor.add_child(_shadow)
 		actor.move_child(_shadow, _sprite.get_index() if _sprite != null else 0)

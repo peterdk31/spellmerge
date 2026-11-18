@@ -2,17 +2,21 @@ extends "res://tests/support/suite.gd"
 ## Tests for the pause menu (hud/menus/pause) and the buttons that open menus (owner,
 ## 2026-10-26), one behaviour per test: `pause` (Start) opens it for the player who pressed it and
 ## stops the game for everyone; only that player works it; Resume, `back` on the main page and
-## `pause` again close it and the game goes on; the Map page shows the run's map; Settings has
-## Fullscreen, Effect slots, Particles, Particle amount, Floor marks, Spell light, Tailless motes,
-## Max shots, Screen shake, Damage numbers and Show FPS, and the switches of the builder and of where
-## the staff rows show the reload;
+## `pause` again close it and the game goes on; the Map page shows the run's map; Settings has a
+## row a page: Graphics (Fullscreen, Dynamic lighting, Shadows, Fog, Ambient particles, Environment
+## interaction, Floor marks), Performance (Effect slots, Particles, Particle amount, Tailless motes,
+## Max shots), Audio (Ambience volume) and Interface (Screen shake, Damage numbers, Show FPS, and the
+## switches of the builder and of where the staff rows show the reload), each fitting the view, its
+## Back and `back` going up to Settings on its own row; the rows that need Dynamic lighting greyed
+## and skipped while it is off;
 ## `back` (B) opens the builder in play, but not from inside a menu nor while paused; `pause` closes
 ## an open builder; A on the hub's lit stone, by an item and on the altar, in that order; Main menu
 ## and Leave game let the game go first; a seat waiting for its unplugged gamepad is named and can
 ## be let go. The menu's stop is a reason of its own (online-ready N4).
 ##
-## The settings' switches (Screen shake, Damage numbers, Floor marks, Spell light) and sliders
-## (Effect slots, Particles, Particle amount, Max shots, Tailless motes) behave alike, so each of
+## The settings' switches (Screen shake, Damage numbers, Floor marks, Dynamic lighting, Shadows, Fog,
+## Ambient particles, Environment interaction) and sliders (Effect slots, Particles, Particle amount,
+## Max shots, Tailless motes, Ambience volume) behave alike, so each of
 ## those behaviours is one test over every switch or every slider (`_switches()`, `_sliders()`).
 ##
 ## Each test builds what it needs with `_setup`: the HUD (hud/panels/panels.tscn) on a bus, input
@@ -48,7 +52,21 @@ const SIGNAL_OF: Dictionary = {
 	"DamageNumbers": &"damage_numbers_changed",
 	"FloorMarks": &"floor_marks_changed",
 	"SpellLight": &"spell_light_changed",
+	"Shadows": &"shadows_changed",
+	"Fog": &"fog_changed",
+	"AmbientParticles": &"ambient_particles_changed",
+	"EnvironmentInteraction": &"environment_interaction_changed",
+	"AmbienceVolume": &"ambience_volume_changed",
 }
+## The pages of settings and their rows, in order.
+const PAGE_ROWS: Dictionary = {
+	"Graphics": ["Fullscreen", "SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks", "GraphicsBack"],
+	"Performance": ["EffectSlots", "MoteCap", "MoteDensity", "TaillessMotes", "ShotCap", "PerformanceBack"],
+	"Audio": ["AmbienceVolume", "AudioBack"],
+	"Interface": ["ScreenShake", "DamageNumbers", "ShowFps", "RingStyle", "PutStyle", "ReloadStyle", "InterfaceBack"],
+}
+## The game's view (project.godot), which every page fits in.
+const VIEW_HEIGHT: float = 360.0
 
 ## Whether the menu's last `pause_requested` asked the game to stop.
 var _stops: bool = false
@@ -170,8 +188,10 @@ func _names() -> Array[String]:
 	return names
 
 
-## Press `button_name` on the menu as `player`.
+## Press `button_name` on the menu as `player` (on a page of settings, reached first through the
+## Settings page as a player would: `_reach`).
 func _press(player: int, button_name: String) -> void:
+	_reach(player, button_name)
 	_focus.focus(player, _menu().button(button_name))
 	_tap(player, &"accept")
 	_frame()
@@ -183,6 +203,20 @@ func _focused(button_name: String) -> bool:
 
 func _text_of(button_name: String) -> String:
 	return _menu().button(button_name).text
+
+
+## The page of settings holding `button_name` shown, if it is not: up from another page of settings
+## (`back`), then its row on the Settings page pressed, all as `player`.
+func _reach(player: int, button_name: String) -> void:
+	var on: PauseMenuScript.Page = _menu().page_of(_menu().button(button_name))
+	var row: Button = _menu().page_row(on)
+	if row == null or _menu().page == on:
+		return
+	if _menu().page != PauseMenuScript.Page.SETTINGS:
+		_do(player, &"back")
+	_focus.focus(player, row)
+	_tap(player, &"accept")
+	_frame()
 
 
 ## `player` opens the menu.
@@ -317,7 +351,7 @@ func test_the_settings_page_stays_after_each_builder_switch() -> void:
 	for row: String in ["RingStyle", "PutStyle", "ReloadStyle"]:
 		_switches_page()
 		_press(1, row)
-		check(_menu().is_open() and _menu().page == PauseMenuScript.Page.SETTINGS, "the page stays after %s, for another press" % row)
+		check(_menu().is_open() and _menu().page == PauseMenuScript.Page.INTERFACE, "the page stays after %s, for another press" % row)
 
 
 # --- The reload's place (Settings) -------------------------------------------------------------
@@ -546,7 +580,114 @@ func test_the_map_row_focused_when_the_map_goes_focuses_resume() -> void:
 
 func test_the_settings_page_rows() -> void:
 	_settings()
-	check_equal(_names(), ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "TaillessMotes", "ShotCap", "ScreenShake", "DamageNumbers", "ShowFps", "RingStyle", "PutStyle", "ReloadStyle", "SettingsBack"] as Array[String], "Settings")
+	check_equal(_names(), ["Graphics", "Performance", "Audio", "Interface", "SettingsBack"] as Array[String], "Settings")
+
+
+func test_each_page_of_settings_has_its_rows() -> void:
+	for row: String in PAGE_ROWS:
+		_settings()
+		_press(0, row)
+		check_equal(_names(), Array(PAGE_ROWS[row], TYPE_STRING, &"", null), "%s's rows" % row)
+
+
+func test_each_page_of_settings_opens_on_its_first_row() -> void:
+	for row: String in PAGE_ROWS:
+		_settings()
+		_press(0, row)
+		check(_focused(PAGE_ROWS[row][0]), "%s opens on %s" % [row, PAGE_ROWS[row][0]])
+		check_equal(_menu().get_node("Rows/Title").text, "P1 " + row.to_upper(), "%s's title" % row)
+
+
+func test_a_pages_back_goes_up_to_settings_on_its_row() -> void:
+	for row: String in PAGE_ROWS:
+		_settings()
+		_press(0, row)
+		_press(0, (PAGE_ROWS[row] as Array).back())
+		check(_menu().page == PauseMenuScript.Page.SETTINGS and _focused(row), "%s's Back: up to Settings on %s" % [row, row])
+
+
+func test_b_on_a_page_of_settings_goes_up_to_settings_on_its_row() -> void:
+	for row: String in PAGE_ROWS:
+		_settings()
+		_press(0, row)
+		_do(0, &"back")
+		check(_menu().page == PauseMenuScript.Page.SETTINGS and _focused(row), "B on %s: up to Settings on %s" % [row, row])
+
+
+func test_down_goes_through_every_row_of_a_page_and_round() -> void:
+	for row: String in PAGE_ROWS:
+		_settings()
+		_press(0, row)
+		var rows: Array = PAGE_ROWS[row]
+		for at in rows.size():
+			check(_focused(rows[at]), "%s: down reaches %s" % [row, rows[at]])
+			_do(0, &"move_down")
+		check(_focused(rows[0]), "%s: down from Back comes round to %s" % [row, rows[0]])
+
+
+func test_every_page_fits_the_view() -> void:
+	_settings()
+	var pages: Array[String] = ["Settings"]
+	pages.append_array(PAGE_ROWS.keys())
+	for row: String in pages:
+		if row != "Settings":
+			_settings()
+			_press(0, row)
+		var tall: float = _menu().get_combined_minimum_size().y
+		check(tall <= VIEW_HEIGHT, "%s is %s px tall, the view %s" % [row, tall, VIEW_HEIGHT])
+
+
+# --- The rows that need Dynamic lighting ---------------------------------------------------------
+# Shadows, Fog and Ambient particles need the light: with Dynamic lighting off they show their
+# choice greyed, the focus skips them and they change nothing; on again, they work.
+
+const NEED_LIGHT: Array[String] = ["Shadows", "Fog", "AmbientParticles"]
+
+
+func test_the_rows_that_need_the_light_work_while_it_is_on() -> void:
+	_settings()
+	_press(0, "Graphics")
+	for row in NEED_LIGHT:
+		check(not _menu().button(row).disabled, "%s works with the light on" % row)
+
+
+func test_dynamic_lighting_off_greys_the_rows_that_need_it() -> void:
+	_settings()
+	_press(0, "SpellLight")
+	for row in NEED_LIGHT:
+		check(_menu().button(row).disabled and _text_of(row).ends_with(": On"), "%s greyed, its choice kept: %s" % [row, _text_of(row)])
+	check(not _menu().button("EnvironmentInteraction").disabled and not _menu().button("FloorMarks").disabled, "the others work")
+
+
+func test_the_focus_skips_the_greyed_rows() -> void:
+	_settings()
+	_press(0, "SpellLight")
+	_do(0, &"move_down")
+	check(_focused("EnvironmentInteraction"), "down from Dynamic lighting skips to Environment interaction")
+
+
+func test_dynamic_lighting_on_again_lets_them_work() -> void:
+	_settings()
+	_press(0, "SpellLight")
+	_press(0, "SpellLight")
+	for row in NEED_LIGHT:
+		check(not _menu().button(row).disabled, "%s works again" % row)
+
+
+func test_a_saved_dynamic_lighting_off_greys_them_from_the_start() -> void:
+	_settings()
+	_press(0, "SpellLight")
+	_setup(1)
+	for row in NEED_LIGHT:
+		check(_menu().button(row).disabled, "%s greyed in a later menu" % row)
+
+
+func test_a_spell_light_saved_before_the_rename_carries_over() -> void:
+	# The row was "Spell light"; its save key is kept.
+	var old := SaveFile.new(SAVE_PATH)
+	old.set_setting(&"spell_light", not SpellLightSetting.default_on())
+	_settings()
+	check(_text_of("SpellLight").ends_with("Dynamic lighting: %s" % ("On" if not SpellLightSetting.default_on() else "Off")), "the saved choice shows: %s" % _text_of("SpellLight"))
 
 
 func test_settings_has_no_fire_settings() -> void:
@@ -560,6 +701,29 @@ func test_b_goes_up_from_settings_to_the_main_page() -> void:
 	_settings()
 	_do(0, &"back")
 	check_equal(_menu().page, PauseMenuScript.Page.MAIN, "B goes up to the main page")
+	check(_focused("Settings"), "on its Settings row, as a page of settings goes up on its own")
+
+
+func test_settings_back_goes_up_to_the_main_page_on_its_row() -> void:
+	_settings()
+	_press(0, "SettingsBack")
+	check(_menu().page == PauseMenuScript.Page.MAIN and _focused("Settings"), "Back: the main page, on Settings")
+
+
+func test_a_pages_width_holds_as_the_focus_moves_and_switches_flip() -> void:
+	for row: String in PAGE_ROWS:
+		_settings()
+		_press(0, row)
+		var wide: float = _menu().get_combined_minimum_size().x
+		for at in (PAGE_ROWS[row] as Array).size():
+			_do(0, &"move_down")
+			check_equal(_menu().get_combined_minimum_size().x, wide, "%s: as wide with the focus on its row %d" % [row, at + 1])
+	for switch in ["SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks"]:
+		_settings()
+		_press(0, "Graphics")
+		var wide: float = _menu().get_combined_minimum_size().x
+		_press(0, switch)
+		check_equal(_menu().get_combined_minimum_size().x, wide, "Graphics as wide with %s flipped" % switch)
 
 
 # --- Fullscreen --------------------------------------------------------------------------------
@@ -609,7 +773,7 @@ func test_fullscreen_then_shows_on() -> void:
 func test_fullscreen_stays_on_the_settings_page() -> void:
 	_fullscreen_settings()
 	_press(0, "Fullscreen")
-	check_equal(_menu().page, PauseMenuScript.Page.SETTINGS, "it stays on the page")
+	check_equal(_menu().page, PauseMenuScript.Page.GRAPHICS, "it stays on the page")
 
 
 func test_fullscreen_shows_the_windows_own_state_when_shown_again() -> void:
@@ -618,13 +782,14 @@ func test_fullscreen_shows_the_windows_own_state_when_shown_again() -> void:
 	_press(0, "Fullscreen")
 	display.on = false
 	_do(0, &"back")
-	_press(0, "Settings")
+	_press(0, "Graphics")
 	check(_text_of("Fullscreen").ends_with("Fullscreen: Off"), "the window's own state shows")
 
 
 # --- The switches ------------------------------------------------------------------------------
-# Screen shake and Damage numbers (props W5) are on by default; Floor marks (spell spectacle P2a)
-# and Spell light (P3a) start at the platform's default. None sends anything at its default; accept
+# Screen shake and Damage numbers (props W5) are on by default; Floor marks (spell spectacle P2a),
+# Dynamic lighting (P3a's "Spell light") and the atmosphere's switches start at the platform's
+# default. None sends anything at its default; accept
 # flips it and tells feel, and the choice is saved: a menu bound to the same save later starts with
 # it and tells feel.
 
@@ -635,7 +800,11 @@ func _switches() -> Array[Dictionary]:
 		{"row": "ScreenShake", "words": "Screen shake", "key": &"screen_shake", "field": "screen_shake", "start": true},
 		{"row": "DamageNumbers", "words": "Damage numbers", "key": &"damage_numbers", "field": "damage_numbers", "start": true},
 		{"row": "FloorMarks", "words": "Floor marks", "key": &"floor_marks", "field": "floor_marks", "start": FloorMarks.default_on()},
-		{"row": "SpellLight", "words": "Spell light", "key": &"spell_light", "field": "spell_light", "start": SpellLightSetting.default_on()},
+		{"row": "SpellLight", "words": "Dynamic lighting", "key": &"spell_light", "field": "spell_light", "start": SpellLightSetting.default_on()},
+		{"row": "Shadows", "words": "Shadows", "key": &"shadows", "field": "shadows", "start": ShadowsSetting.default_on()},
+		{"row": "Fog", "words": "Fog", "key": &"fog", "field": "fog", "start": FogSetting.default_on()},
+		{"row": "AmbientParticles", "words": "Ambient particles", "key": &"ambient_particles", "field": "ambient_particles", "start": AmbientParticles.default_on()},
+		{"row": "EnvironmentInteraction", "words": "Environment interaction", "key": &"environment_interaction", "field": "environment_interaction", "start": EnvironmentInteraction.default_on()},
 	]
 
 
@@ -765,7 +934,8 @@ func test_show_fps_flips_back_off_saved() -> void:
 
 # --- The sliders -------------------------------------------------------------------------------
 # Effect slots, Particles (spell spectacle P1a: Minimal to High, no Off since S3), Particle amount
-# (P1b: None to Double), Max shots and Tailless motes (S5 step 4: a dev slider) start at their
+# (P1b: None to Double), Max shots, Tailless motes (S5 step 4: a dev slider) and Ambience volume
+# (atmosphere, "Settings": 0% to 100%) start at their
 # default (the platform's cap for Particles and Max shots) and send nothing; left and right step
 # through the stops, keep the focus and tell feel or the projectile manager, the ends do not move;
 # accept steps up and wraps; and every one but Effect slots is saved: a menu bound to the same
@@ -778,6 +948,9 @@ func _sliders() -> Array[Dictionary]:
 	var slots: Array = []
 	for value in range(EffectSlots.MIN, EffectSlots.MAX + 1, EffectSlots.STEP):
 		slots.append(value)
+	var volumes: Array = []
+	for value in range(AmbienceVolume.MIN, AmbienceVolume.MAX + 1, AmbienceVolume.STEP):
+		volumes.append(value)
 	return [
 		{"row": "EffectSlots", "stops": slots, "start": EffectSlots.DEFAULT, "field": "effect_slots", "key": &"",
 			"text": func(v: Variant) -> String: return "Effect slots: %d" % int(v), "bar": func(v: Variant) -> float: return float(v)},
@@ -789,6 +962,8 @@ func _sliders() -> Array[Dictionary]:
 			"text": func(v: Variant) -> String: return "Max shots: %d" % int(v), "bar": func(v: Variant) -> float: return float(ShotCap.index_of(int(v)))},
 		{"row": "TaillessMotes", "stops": Array(TaillessMotes.STOPS), "start": TaillessMotes.DEFAULT, "field": "tailless_motes", "key": &"tailless_motes",
 			"text": func(v: Variant) -> String: return "Tailless motes: %d" % int(v), "bar": func(v: Variant) -> float: return float(TaillessMotes.index_of(int(v)))},
+		{"row": "AmbienceVolume", "stops": volumes, "start": AmbienceVolume.DEFAULT, "field": "ambience_volume", "key": &"ambience_volume",
+			"text": func(v: Variant) -> String: return "Ambience volume: %d%%" % int(v), "bar": func(v: Variant) -> float: return float(v)},
 	]
 
 
@@ -819,6 +994,7 @@ func _next_to_start(slider: Dictionary) -> Variant:
 func _on_slider(slider: Dictionary) -> Button:
 	DirAccess.remove_absolute(SAVE_PATH)
 	_settings()
+	_reach(0, slider["row"])
 	var row: Button = _menu().button(slider["row"])
 	_focus.focus(0, row)
 	return row
@@ -873,7 +1049,7 @@ func test_the_focus_stays_on_a_slider_after_a_step() -> void:
 		var row: Button = _on_slider(slider)
 		_move(slider, _away(slider))
 		check(_focus.focused(0) == row, "%s: the focus stays on the slider" % slider["row"])
-		check_equal(_menu().page, PauseMenuScript.Page.SETTINGS, "%s: on the Settings page" % slider["row"])
+		check_equal(_menu().page, _menu().page_of(row), "%s: on its page" % slider["row"])
 
 
 func test_left_steps_a_slider_down_to_its_bottom() -> void:

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"air_dust"
+lit_only = true
+stirred = 1.0
+gravity = 0.0
+drag = 0.3
+bounce = 0.0
+wobble = 1.5
+wobble_rate = 0.9
+glow = 0.0
+shade_from = 1
+shape = "
+#
+"
+shape_play = "life"
+shape_rate = 1.0
+shape_turns = false
+count = 1
+speed = Vector2(1.0, 4.0)
+spread = 360.0
+up = Vector2(-1.0, 2.0)
+life = Vector2(3.0, 4.0)
+height = 12.0

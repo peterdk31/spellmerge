@@ -2,8 +2,9 @@ extends Node
 ## The spectacle: everything Feel draws that is drawn only (docs/milestones/spell-spectacle.md and
 ## spell-spectacle-2.md, S1): the motes (`mote.gd`), the floor marks (`marks.gd`), spell light
 ## (`spell_light.gd`) and the ramp table the motes and marks share (`ramp_table.gd`). A child of
-## Feel, made once; it owns their settings ("Particles", "Particle amount", "Floor marks", "Spell
-## light", each through its event) and the room they are in (`room_entered`: the walls' colours and
+## Feel, made once; it owns their settings ("Particles", "Particle amount", "Floor marks", "Dynamic
+## lighting", "Shadows", "Ambient particles", "Fog" and "Environment interaction", each through its
+## event; docs/milestones/atmosphere.md, "Settings") and the room they are in (`room_entered`: the walls' colours and
 ## the mark layer's fit), and plays a cue's `motes`, `mark`, `light` and `stream` parts (`cue_parts`,
 ## which Feel adds to its table of part players).
 ##
@@ -38,6 +39,13 @@ const BarriersScript := preload("res://gameplay/feel/barriers.gd")
 const StillMotesScript := preload("res://gameplay/feel/still_motes.gd")
 const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")
 const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
+const CarriedLightsScript := preload("res://gameplay/feel/carried_lights.gd")
+const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
+const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
+const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
+const StirsScript := preload("res://gameplay/feel/stirs.gd")
+const SpotStirsScript := preload("res://gameplay/feel/spot_stirs.gd")
+const MistScript := preload("res://gameplay/feel/mist.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's SHOWN_BEAM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -47,6 +55,9 @@ const MARK_Z: int = RoomBase.FLOOR_Z + 1
 ## Spell light is applied just under the motes: above the room and every body (a body layer is
 ## at most a few), under every spell, flash and telegraph (`spell_light.gd`; P3a).
 const LIGHT_Z: int = MOTE_Z - 1
+## How long a switched layer ("Shadows", "Fog") takes to ease from none to full or back (s: 15
+## frames at 60, docs/STYLE.md "Smooth": at least 3). Dynamic lighting itself comes and goes at once.
+const LAYER_FADE_SECONDS: float = 0.25
 ## The folders of the mote kinds, the mark kinds and the rooms in the registry, and a mark part's
 ## radius with no size to go by.
 const MOTE_FOLDER: StringName = &"motes"
@@ -75,6 +86,8 @@ var registry: RegistryScript = null:
 		registry = value
 		cards.registry = value
 		cards.clear()
+		if shadows != null:
+			shadows.style_of = _spawn_style_of
 		if pool != null:
 			pool.set_infusions(InfusionTable.of_registry(value))
 ## The spell runtime, which a shot's tag gives its spell from (`profile`; null for none: every
@@ -122,16 +135,67 @@ var light: SpellLightScript = null
 ## the motes and drawn with their material.
 var barriers: BarriersScript = null
 var spell_light: bool = SpellLightSetting.default_on()
+## The atmosphere's settings (docs/milestones/atmosphere.md, "Settings"): the light blocked and the
+## bodies' shadows (C), the room's air dust (B) and its mist (F), each only while spell light is on,
+## and the world's stirs (E). Read only: set through `set_shadows`, `set_ambient_particles`,
+## `set_fog` and `set_environment_interaction`.
+var shadows_on: bool = ShadowsSetting.default_on()
+var ambient_particles: bool = AmbientParticles.default_on()
+var fog: bool = FogSetting.default_on()
+var environment_interaction: bool = EnvironmentInteraction.default_on()
+## How far the shadows and the mist have come in (0 to 1; `_fade_layers`). Read only.
+var _shadows_share: float = 0.0
+var _mist_share: float = 0.0
 ## The room's light where nothing lights it (`RoomBase.ambient`, from `room_entered`; P3b), kept
 ## for a light made later. Read only.
 var ambient: float = 1.0
+## The colour of the room's dark (`RoomBase.shade`; atmosphere A), kept with the ambient. Read only.
+var shade: Color = Color.WHITE
+## The lights the wizards carry at their staff tips (atmosphere A), written each frame while the
+## light is on. Read only.
+var carried_lights: CarriedLightsScript = CarriedLightsScript.new()
+## What blocks the light (atmosphere C): the room's standing walls (from `room_built`) and the props
+## that block light, handed to the spell light whenever they change while it is on. Read only.
+var blockers: LightBlockersScript = LightBlockersScript.new()
+## The bodies' shadows (atmosphere C; null with spell light off, or "Shadows" off once faded out),
+## under every body. Read only.
+var shadows: BodyShadowsScript = null
 
+## The world's stirs (atmosphere E): the shots' wake and the blasts' push, worked out once a frame
+## (`step_stirs`) for what takes notice of them: the room's lights (`spot_stirs`), the ground cover
+## (Feel hands them to it) and the stirred motes (handed to the pool's material). Read only.
+var stirs: StirsScript = StirsScript.new()
+## The room's lights' duck and lean (atmosphere E), stepped while spell light is on. Read only.
+var spot_stirs: SpotStirsScript = SpotStirsScript.new()
+
+## The room's low floor mist (atmosphere F; null with spell light off, or "Fog" off once faded out),
+## over the floor, the marks and the bodies' shadows and under every body. Read only.
+var mist: MistScript = null
+
+## The room's mist (`RoomBase.mist`, from `use_room`), the room laid's size, walls and holes (from
+## `room_built`, read only when it names a mist), and the bodies' feet Feel hands over each frame
+## (`hand_bodies`: the ground cover's), for a mist made later.
+var _mist_data: RoomMist = null
+var _room_size: Vector2 = Vector2.ZERO
+var _room_walls: Array[Rect2] = []
+var _room_holes: Array[Rect2] = []
+var _feet: PackedVector2Array = PackedVector2Array()
+var _feet_count: int = 0
+## The pool's material the stirs were last handed to, and their `version` then.
+var _stirred_material: ShaderMaterial = null
+var _stirred_version: int = -1
+## No owners for a light's rows (the room's spots: nobody carries them).
+var _no_owners: PackedInt32Array = PackedInt32Array()
 ## The ramp table the motes and the floor marks share: a surface's colours and a body's art, one
 ## row each, so a mote and the mark it leaves read the same colours.
 var _ramp_table: RampTableScript = RampTableScript.new()
 ## What the world's things give off as their art (`source_motes.gd`, `MoteSource`: the hub's island
 ## edge, a prop's embers and glimmers; props W7), and the standing motes of its masks.
 var source_motes: SourceMotesScript = SourceMotesScript.new(_ramp_table)
+## What drifts in the room's air (`air_motes.gd`, `RoomBase.air`; atmosphere B), given off while
+## motes are thrown, spell light is on (its dust is lit only: with no light it would be unseen) and
+## "Ambient particles" is on.
+var air: AirMotesScript = AirMotesScript.new(_ramp_table)
 var _standing: PlacedMotesScript = null
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
 ## and their source in the ramp table (-1 for none).
@@ -164,6 +228,8 @@ func _ready() -> void:
 	ShaderWarmupScript.want(SpellLightScript.LIGHT_SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
 	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
+	ShaderWarmupScript.want(BodyShadowsScript.SHADER, ShaderWarmupScript.BATCH)
+	ShaderWarmupScript.want(MistScript.SHADER, ShaderWarmupScript.RECT)
 	_make_motes(mote_cap)
 	barriers = BarriersScript.new(MOTE_Z)
 	barriers.name = "Barriers"
@@ -179,8 +245,13 @@ func _ready() -> void:
 	events.mote_density_changed.connect(set_mote_density)
 	events.tailless_motes_changed.connect(set_tailless_motes)
 	events.spell_light_changed.connect(set_spell_light)
+	events.shadows_changed.connect(set_shadows)
+	events.ambient_particles_changed.connect(set_ambient_particles)
+	events.fog_changed.connect(set_fog)
+	events.environment_interaction_changed.connect(set_environment_interaction)
 	events.room_entered.connect(_on_room_entered)
 	events.room_entered.connect(_fit_marks)
+	events.room_built.connect(_on_room_built)
 	events.floor_marks_changed.connect(set_floor_marks)
 	events.projectile_impact.connect(_on_impact)
 
@@ -217,11 +288,28 @@ func _on_batches_grown(_count: int) -> void:
 	still_motes.attach(projectiles, spells as SpellRuntime)
 
 
+## Once a frame, at Feel's clock `now`, before anything reads them: the world's stirs (atmosphere E)
+## stepped with the shots' births the projectile manager drew last and the view `view` (the
+## camera's picture; empty: the viewport's).
+func step_stirs(now: float, view: Rect2 = Rect2()) -> void:
+	var births: PackedFloat32Array = projectiles.spark_births if projectiles != null else PackedFloat32Array()
+	var count: int = projectiles.spark_birth_count if projectiles != null else 0
+	stirs.step(now, births, count, view if view.has_area() else view_rect())
+
+
+## A blast at `at` of `radius` px at Feel's clock `now` (an explosion's part): the world's stirs push
+## out from it (atmosphere E).
+func blast(at: Vector2, radius: float, now: float) -> void:
+	stirs.blast(at, radius, now)
+
+
 ## Once a frame, at Feel's clock `now`: the trails' particles thrown, the streams', the world's mote sources' and Feel's own
 ## drawings' given off, the barriers' shells drawn where their actors are (`table`, the actor
 ## table), then the motes and the marks stepped.
 func step(now: float, table: ActorsScript = null) -> void:
+	var delta: float = clampf(now - _clock, 0.0, 0.25)
 	_clock = now
+	_fade_layers(delta)
 	cards.new_frame()
 	_trail_motes()
 	streams.step(now, projectiles, births, motes_on())
@@ -231,15 +319,48 @@ func step(now: float, table: ActorsScript = null) -> void:
 	else:
 		jets.clear()
 	_drawn_motes()
-	source_motes.give_off(now, pool if motes_on() else null, view_rect(), _standing)
+	var view: Rect2 = view_rect()
+	source_motes.give_off(now, pool if motes_on() else null, view, _standing)
+	air.give_off(now, pool if motes_on() and light != null and ambient_particles else null, view, projectiles.bounds() if projectiles != null else Rect2())
 	if barriers != null:
 		barriers.step(now, pool if motes_on() else null, table, projectiles)
 	if pool != null:
+		var drawn: ShaderMaterial = pool.draw_material()
+		if drawn != _stirred_material or stirs.version != _stirred_version:
+			_stirred_material = drawn
+			_stirred_version = stirs.version
+			stirs.hand_to(drawn)
 		pool.step(now)
 	if marks != null:
 		marks.step(now)
 	if light != null:
 		light.step_cues(now)
+		carried_lights.step(table, now)
+		light.light_carried(carried_lights.rows, carried_lights.count)
+		# With "Shadows" off the light is handed no blockers (`set_shadows`) and none are read.
+		if shadows != null and blockers.step(table, now):
+			light.set_blockers(blockers.boxes, blockers.bodies, blockers.count)
+		spot_stirs.step(light, stirs, now)
+	if shadows != null:
+		shadows.begin_lights()
+		shadows.add_lights(light.spot_rows(), light.spot_count(), SpellLightScript.SPOT_ROW_STRENGTH, _no_owners)
+		shadows.add_lights(carried_lights.rows, carried_lights.count, SpellLightScript.SPOT_ROW_STRENGTH, carried_lights.owners)
+		shadows.step(table, now, view, blockers)
+	if mist != null:
+		mist.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
+	_free_faded()
+
+
+## The bodies' feet that part the mist this frame (atmosphere F): the first `count` of `feet` (world
+## px; Feel hands the ground cover's, `Cover.bodies`, the bodies nearest the camera's middle). Copied
+## into the spectacle's own buffer (grown when more come, never shrunk), so whoever handed them may
+## write theirs again before the next `step` reads them.
+func hand_bodies(feet: PackedVector2Array, count: int) -> void:
+	_feet_count = clampi(count, 0, feet.size())
+	if _feet.size() < _feet_count:
+		_feet.resize(_feet_count)
+	for k in _feet_count:
+		_feet[k] = feet[k]
 
 
 ## The barrier on `actor` changed (combat's `barrier_changed`; `ramp` the actor's): its shell, in
@@ -776,6 +897,8 @@ func use_motes(motes: MotesScript) -> void:
 		pool.settle_into(marks)
 		# A spell's motes in each of its infusions' colours (`Motes.set_infusions`).
 		pool.set_infusions(InfusionTable.of_registry(registry))
+		# Its lit-only kinds read the spell light's buffer (atmosphere B).
+		pool.set_light(light.buffer() if light != null else null, SpellLightScript.lit_steps())
 	cards.use_motes(pool)
 	if pool != null:
 		pool.use_cards(cards if pool.has_card_kinds() else null)
@@ -837,6 +960,7 @@ func set_floor_marks(on: bool) -> void:
 		marks.name = "Marks"
 		marks.set_ramp_table(_ramp_table.texture())
 		add_child(marks)
+		_keep_mist_last()
 		if _mark_room != &"":
 			_fit_marks(_mark_room)
 	elif not on and marks != null:
@@ -848,7 +972,7 @@ func set_floor_marks(on: bool) -> void:
 		pool.settle_into(marks)
 
 
-## The "Spell light" setting: on makes the light buffer and its rect, off frees them (no nodes).
+## The "Dynamic lighting" setting (once "Spell light"): on makes the light buffer and its rect, off frees them (no nodes).
 ## Returns the setting.
 func set_spell_light(on: bool) -> bool:
 	if on != spell_light or (light == null) == on:
@@ -863,11 +987,138 @@ func _make_light(on: bool) -> void:
 		remove_child(light)
 		light.queue_free()
 		light = null
+	# A light made anew starts with its spots at rest.
+	spot_stirs = SpotStirsScript.new()
 	if on and projectiles != null:
 		light = SpellLightScript.new(projectiles, LIGHT_Z)
 		light.name = "SpellLight"
-		light.set_ambient(ambient)
+		light.set_ambient(ambient, shade)
 		add_child(light)
+		# What blocks it is handed over at the next step while "Shadows" is on (atmosphere C).
+		blockers.refresh()
+	# The shadows and the mist come and go with it, at once (atmosphere C, F), each by its own
+	# setting too.
+	_fit_shadows(true)
+	_fit_mist(true)
+	# The motes' lit-only kinds read the light buffer, or with none are not drawn (atmosphere B).
+	if pool != null:
+		pool.set_light(light.buffer() if light != null else null, SpellLightScript.lit_steps())
+
+
+## The "Shadows" setting (atmosphere C): on, while spell light is on, the light is blocked by the
+## room's standing walls and pillars and the bodies cast shadows. A flip eases the layer in or out
+## over LAYER_FADE_SECONDS (`_fade_layers`: the boxes' strength and the bodies' casts and shapes by
+## whole pixels); faded out, the shadows' batch is freed (a body's own drawn shadow shows again) and
+## the light is handed no blockers. With spell light off it only keeps the choice. Returns the
+## setting.
+func set_shadows(on: bool) -> bool:
+	shadows_on = on
+	_fit_shadows(false)
+	return shadows_on
+
+
+## The bodies' shadows made while spell light and "Shadows" are on (eased in from none, or at full
+## with a light made at once, `at_once`); with the light gone, freed with it. One switched off fades
+## out in `_fade_layers` (at once with `at_once`). The light is handed the blockers anew at the next
+## step (`refresh`: what crumbled meanwhile is rubble already).
+func _fit_shadows(at_once: bool) -> void:
+	if shadows != null and (light == null or (at_once and not shadows_on)):
+		_free_shadows()
+	elif shadows == null and light != null and shadows_on:
+		_shadows_share = 1.0 if at_once else 0.0
+		blockers.refresh()
+		blockers.set_share(_shadows_share)
+		shadows = BodyShadowsScript.new(MARK_Z)
+		shadows.share = _shadows_share
+		shadows.style_of = _spawn_style_of
+		add_child(shadows)
+		_keep_mist_last()
+	elif shadows != null and not shadows_on:
+		# Fading out: the bodies with a drawn shadow keep their shape to hand over to it.
+		shadows.find_drawn_owners()
+
+
+func _free_shadows() -> void:
+	remove_child(shadows)
+	shadows.queue_free()
+	shadows = null
+	_shadows_share = 0.0
+	if light != null:
+		light.set_blockers(blockers.boxes, blockers.bodies, 0)
+
+
+## The "Fog" setting (atmosphere F): on, while spell light is on, the room's mist is drawn. A flip
+## eases it in or out over LAYER_FADE_SECONDS (its thickness); faded out, it is freed. Returns the
+## setting.
+func set_fog(on: bool) -> bool:
+	fog = on
+	_fit_mist(false)
+	return fog
+
+
+## The mist made while spell light and "Fog" are on (it glows by the light, and lies over the
+## shadows; eased in from none, or at full with a light made at once), freed with the light; one
+## switched off fades out in `_fade_layers` (at once with `at_once`).
+func _fit_mist(at_once: bool) -> void:
+	if mist != null and (light == null or (at_once and not fog)):
+		_free_mist()
+	elif mist == null and light != null and fog:
+		_mist_share = 1.0 if at_once else 0.0
+		mist = MistScript.new(MARK_Z)
+		mist.set_share(_mist_share)
+		add_child(mist)
+		mist.lay(_room_size, _room_walls, _room_holes)
+		mist.use(_mist_data)
+		_keep_mist_last()
+	if mist != null:
+		# The light's buffer, again when the light was made anew under it.
+		mist.use_light(light.buffer())
+
+
+func _free_mist() -> void:
+	remove_child(mist)
+	mist.queue_free()
+	mist = null
+	_mist_share = 0.0
+
+
+## The shadows and the mist eased toward their settings, `delta` seconds on (a whole layer from none
+## to full over LAYER_FADE_SECONDS); before the blockers are stepped, so a changed share is handed to
+## the light this frame.
+func _fade_layers(delta: float) -> void:
+	var most: float = delta / LAYER_FADE_SECONDS
+	if shadows != null:
+		_shadows_share = move_toward(_shadows_share, 1.0 if shadows_on else 0.0, most)
+		shadows.share = _shadows_share
+		blockers.set_share(_shadows_share)
+	if mist != null:
+		_mist_share = move_toward(_mist_share, 1.0 if fog else 0.0, most)
+		mist.set_share(_mist_share)
+
+
+## The layers faded out all the way are freed (after the frame's step: the light was handed no
+## blockers by it).
+func _free_faded() -> void:
+	if shadows != null and not shadows_on and _shadows_share <= 0.0:
+		_free_shadows()
+	if mist != null and not fog and _mist_share <= 0.0:
+		_free_mist()
+
+
+## The "Ambient particles" setting (atmosphere B): whether the room's air gives off its dust (while
+## spell light is on; the dust in the air lives out its short life). Returns the setting.
+func set_ambient_particles(on: bool) -> bool:
+	ambient_particles = on
+	return ambient_particles
+
+
+## The "Environment interaction" setting (atmosphere E): off, the world's stirs read no shot and
+## start no blast, so the lights, the cover, the dust and the mist ease back to rest and are then
+## handed a still field. Returns the setting.
+func set_environment_interaction(on: bool) -> bool:
+	environment_interaction = on
+	stirs.enabled = on
+	return environment_interaction
 
 
 ## Feel's flash rows, just uploaded (the flares', the explosions' and the arcs'; `slots` rows
@@ -901,16 +1152,45 @@ func view_rect() -> Rect2:
 
 # --- The room ------------------------------------------------------------------------------------
 
-## A new room: its colours for its walls' motes (`RoomBase.surface_colors`) and its ambient light
-## (`RoomBase.ambient`, P3b).
+## A room was laid out (`room_built`; atmosphere C): its standing walls block the light from now on.
+func _on_room_built(room_id: StringName, layout_root: Node) -> void:
+	var walls: Array[Rect2] = RoomPlaces.wall_rects(layout_root)
+	blockers.use_walls(walls)
+	# The mist's room (atmosphere F), read only when the room names a mist.
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
+	if room != null and room.mist != null:
+		var places: RoomPlaces = RoomPlaces.read(layout_root)
+		lay_mist(places.size, walls, places.holes)
+	else:
+		lay_mist(Vector2.ZERO, [] as Array[Rect2], [] as Array[Rect2])
+
+
+## The room the mist lies in (atmosphere F): its size (px, from the origin), walls and holes (world
+## px); a zero size: none (`room_built` calls this; tests too).
+func lay_mist(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) -> void:
+	_room_size = size
+	_room_walls = walls
+	_room_holes = holes
+	if mist != null:
+		mist.lay(size, walls, holes)
+
+
+## The mist is the last of the children at the marks' z, so it lies over the marks and the shadows.
+func _keep_mist_last() -> void:
+	if mist != null and mist.get_parent() == self:
+		move_child(mist, -1)
+
+
+## A new room: its colours for its walls' motes (`RoomBase.surface_colors`), its ambient light
+## (`RoomBase.ambient`, P3b; and its dark's colour, `RoomBase.shade`) and its air (`RoomBase.air`).
 func _on_room_entered(room_id: StringName) -> void:
 	use_room(registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null)
 	# The room's world is in the tree by now: its mote sources are read again (each from now).
 	source_motes.take(get_tree() if is_inside_tree() else null)
 
 
-## The room `room` (null for none) is the one played in now: its walls' colours and motes, and its
-## ambient light (`room_entered` calls this; tests too).
+## The room `room` (null for none) is the one played in now: its walls' colours and motes, its
+## ambient light and its air (`room_entered` calls this; tests too).
 func use_room(room: RoomBase) -> void:
 	# A jet poured in the room before ends with it.
 	jets.clear()
@@ -918,8 +1198,15 @@ func use_room(room: RoomBase) -> void:
 	_surface_ids = room.surface_kinds if room != null else ([] as Array[StringName])
 	_take_surface_kinds()
 	ambient = room.ambient if room != null else 1.0
+	shade = room.shade if room != null else Color.WHITE
+	air.use(room.air if room != null else null)
+	_mist_data = room.mist if room != null else null
+	if mist != null:
+		mist.use(_mist_data)
+	# The last room's wake and blasts are not this one's.
+	stirs.clear()
 	if light != null:
-		light.set_ambient(ambient)
+		light.set_ambient(ambient, shade)
 	_surface_source = _ramp_table.source(_surface_colors)
 
 
@@ -949,3 +1236,8 @@ func _fit_marks(room_id: StringName) -> void:
 	# Its holes are masked as its walls are (hub rework HR-H2): no mark is laid over a hole.
 	marks.enter(bounds, projectiles.grid().wall_image(true) if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
 	marks.set_floor_colors(room.floor_colors() if room != null else PackedColorArray())
+
+
+## The spawn style of id `id` from the registry (null: none), for the bodies' shadows (`BodyShadows.style_of`).
+func _spawn_style_of(id: StringName) -> SpawnStyle:
+	return registry.get_resource(SpawnStyle.FOLDER, id) as SpawnStyle if registry != null else null

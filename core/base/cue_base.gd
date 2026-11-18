@@ -116,7 +116,7 @@ extends Resource
 ##   `cards`      true: the marks of the cue's cards instead when they have any (a frost blast
 ##                leaves frost where a plain one leaves its scorch); with no `mark`, only theirs
 ##                (a frost dash's landing leaves frost, a plain one nothing)
-## A part with `"part": "light"` lights the room round the cue's point while the "Spell light" setting
+## A part with `"part": "light"` lights the room round the cue's point while the "Dynamic lighting" setting
 ## is on (S6, item 4; gameplay/feel/spell_light.gd), fading to nothing over its seconds. Its keys
 ## (LIGHT_KEYS):
 ##   `strength`   how bright at first (1 when not given; 2 at the most)

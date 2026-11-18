@@ -142,11 +142,12 @@ func test_a_saved_room_keeps_its_values() -> void:
 	room.id = &"start_room"
 	room.stand_up_after = 2.5
 	room.ambient = 0.8
+	room.shade = Color(0.8, 0.9, 1.0)
 	var loaded: RoomBase = _saved_and_loaded(room) as RoomBase
 	check(loaded != null, "room loads back as RoomBase")
 	if loaded != null:
 		check_equal(loaded.id, &"start_room", "room keeps its id")
-		check(is_equal_approx(loaded.stand_up_after, 2.5) and is_equal_approx(loaded.ambient, 0.8), "room keeps its rules")
+		check(is_equal_approx(loaded.stand_up_after, 2.5) and is_equal_approx(loaded.ambient, 0.8) and loaded.shade.is_equal_approx(Color(0.8, 0.9, 1.0)), "room keeps its rules")
 
 
 func test_a_saved_enemy_keeps_its_values() -> void:

@@ -96,7 +96,7 @@ const SHADE_KEYS: Array[String] = ["at", "shade"]
 ## Pixels a step of its zoom is: a cue part's `reach` (the cue's size times it, in pixels) is that
 ## many steps (a ring's radius, a flare's half width, the cracks' reach, an explosion's radius).
 @export_range(0.5, 64.0, 0.5) var step: float = 12.0
-## How much it lights the room at its start, while "Spell light" is on (0: not at all), fading
+## How much it lights the room at its start, while "Dynamic lighting" is on (0: not at all), fading
 ## over its life; a cue with a `light` part lights by that instead.
 @export_range(0.0, 2.0, 0.05) var room_light: float = 0.0
 ## Drawn under the bodies, on the floor (the cracks), instead of over everything.

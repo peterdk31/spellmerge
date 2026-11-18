@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="Ambience" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://core/base/ambience.gd" id="1_ambience"]
+[ext_resource type="Script" path="res://core/base/ambience_layer.gd" id="2_layer"]
+[ext_resource type="Script" path="res://core/base/ambience_accent.gd" id="3_accent"]
+
+[sub_resource type="Resource" id="Resource_wind"]
+script = ExtResource("2_layer")
+sound = &"amb_hub_wind"
+volume = 0.0
+
+[sub_resource type="Resource" id="Resource_void"]
+script = ExtResource("2_layer")
+sound = &"amb_hub_void"
+volume = -3.0
+
+[sub_resource type="Resource" id="Resource_gust"]
+script = ExtResource("3_accent")
+sounds = Array[StringName]([&"amb_hub_gust"])
+volume = -3.0
+volume_spread = 3.0
+pitch_spread = 0.15
+gap_min = 10.0
+gap_max = 26.0
+wide = 320.0
+
+[resource]
+script = ExtResource("1_ambience")
+layers = Array[ExtResource("2_layer")]([SubResource("Resource_wind"), SubResource("Resource_void")])
+accents = Array[ExtResource("3_accent")]([SubResource("Resource_gust")])
+volume = -8.0
+fade = 2.0

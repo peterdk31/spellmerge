@@ -1,9 +1,10 @@
-[gd_resource type="Resource" script_class="RoomBase" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="RoomBase" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://core/base/room_base.gd" id="1_base"]
 [ext_resource type="PackedScene" path="res://content/rooms/hub/hub.tscn" id="2_scene"]
 [ext_resource type="Resource" path="res://content/rooms/hub/hub_air.tres" id="9_air"]
 [ext_resource type="Resource" path="res://content/rooms/hub/hub_ambience.tres" id="10_ambience"]
+[ext_resource type="Resource" path="res://content/rooms/hub/hub_music.tres" id="12_music"]
 
 [resource]
 script = ExtResource("1_base")
@@ -15,5 +16,6 @@ falls_free = true
 ambient = 1.0
 air = ExtResource("9_air")
 ambience = ExtResource("10_ambience")
+music = ExtResource("12_music")
 floor_mark_colors = PackedColorArray(0.2275, 0.3098, 0.1569, 1, 0.1843, 0.2588, 0.1373, 1, 0.149, 0.2118, 0.1137, 1)
 debris_colors = PackedColorArray(0.4784, 0.4627, 0.5804, 1, 0.2902, 0.2745, 0.3882, 1, 0.1686, 0.1569, 0.251, 1)

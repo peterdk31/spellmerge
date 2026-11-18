@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "audio/music/hub_island/hub_island.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/music/hub_island/hub_island.score.json",
+			"recipe_hash": "sha256:13b7fe54712c814107ceae192930a867d2200823667c2c3511ada0e3e69a4846",
+			"audio_hash": "sha256:99f9af458265b06c78cd8ebffe220b0e416b40eda347480c87191eb4a394d607",
+			"loudness": -25.0,
+			"peak": -8.8
+		}
+	]
+}

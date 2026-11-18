@@ -2262,12 +2262,21 @@ func begin_run() -> void:
 	clear()
 	# The target table's nodes are kept (DERIVED) and its numbers renewed: a body still registered
 	# would lose its row. The last run's bodies have left by now (Flow's world, and Entities' decoys:
-	# Tick renews Entities first), so none is.
+	# Tick renews Entities first), so none is. A body freed since the last step (an enemy killed in
+	# the frame the run ended) has left too, though its row waits for the next step to drop it: it is
+	# dropped here, or the renewed rows would be shorter than the table and every later step would
+	# read past them (found by the split-view stress run, connected biomes CB1).
+	for i in range(_targets.size() - 1, -1, -1):
+		if _target_layer[i] == 0 or not is_instance_valid(_targets[i]):
+			_remove_target_at(i)
 	if not _targets.is_empty():
 		var names: PackedStringArray = PackedStringArray()
 		for target in _targets:
 			names.append(str(target.get_path()) if is_instance_valid(target) and target.is_inside_tree() else str(target))
 		push_error("ProjectileManager.begin_run: %d targets are still registered (%s); the last run's bodies must leave before a run starts" % [_targets.size(), ", ".join(names)])
+		# Dropped all the same: their numbers are renewed below and the rows would be left short.
+		for i in range(_targets.size() - 1, -1, -1):
+			_remove_target_at(i)
 	var bounds: Rect2 = _bounds
 	# The blank's arrays as big as this one's: the cap is kept (RUN_KEEPS).
 	SimFresh.renew(self, func(blank: Object) -> void: blank.call(&"set_cap", _cap))

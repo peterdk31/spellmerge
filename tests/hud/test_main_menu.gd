@@ -123,7 +123,7 @@ func test_a_repeated_benchmark_start_leaves_one_runner() -> void:
 
 
 func test_every_runner_constant_names_a_file_in_the_build() -> void:
-	for constant: String in ["FOUR_BOT_RUNNER", "STRESS_RUNNER", "TIMING_RUNNER", "STORM_RUNNER", "REPLAY_HASHES_RUNNER", "ONLINE_RUNNER"]:
+	for constant: String in ["FOUR_BOT_RUNNER", "STRESS_RUNNER", "TIMING_RUNNER", "STORM_RUNNER", "SPLIT_VIEWS_RUNNER", "REPLAY_HASHES_RUNNER", "ONLINE_RUNNER"]:
 		check(ResourceLoader.exists(String(_menu.get(constant))), "%s does not exist" % constant)
 
 
@@ -133,7 +133,7 @@ func test_an_unknown_runner_name_makes_nothing() -> void:
 
 func test_each_runner_loads_the_file_its_constant_names() -> void:
 	# Each literal path in the menu is its constant (the real runners are not made here).
-	for pair: Array in [["StressRunner", "STRESS_RUNNER"], ["ProjectileTimingRunner", "TIMING_RUNNER"], ["HubStormRunner", "STORM_RUNNER"], ["ReplayHashesRunner", "REPLAY_HASHES_RUNNER"], ["OnlineRunner", "ONLINE_RUNNER"], [RUNNER_NODE, "FOUR_BOT_RUNNER"]]:
+	for pair: Array in [["StressRunner", "STRESS_RUNNER"], ["ProjectileTimingRunner", "TIMING_RUNNER"], ["HubStormRunner", "STORM_RUNNER"], ["SplitViewsRunner", "SPLIT_VIEWS_RUNNER"], ["ReplayHashesRunner", "REPLAY_HASHES_RUNNER"], ["OnlineRunner", "ONLINE_RUNNER"], [RUNNER_NODE, "FOUR_BOT_RUNNER"]]:
 		var script: GDScript = _menu.call("_runner_script", pair[0]) as GDScript
 		check(script != null and script.resource_path == String(_menu.get(pair[1])), "%s does not load %s" % [pair[0], pair[1]])
 

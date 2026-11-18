@@ -1641,3 +1641,21 @@ func test_random_queries_agree_with_a_brute_force_search() -> void:
 		if mgr.nearest_target(point, reach, ManagerScript.LAYER_ENEMY) != best:
 			wrong += 1
 	check(wrong == 0, "200 random queries agree with a brute-force search (%d differ)" % wrong)
+
+
+## A body freed since the last step (an enemy killed in the frame a run ended) has left the run: a
+## new run starts with no error, its table empty, and steps on with a new target (connected biomes
+## CB1: the rows were renewed short of the stale one, and every later step read past them).
+func test_a_run_begins_cleanly_after_a_target_was_freed_unstepped() -> void:
+	var gone := Node2D.new()
+	root.add_child(gone)
+	mgr.add_target(gone, 10.0)
+	mgr.step(DT)
+	gone.free()
+	mgr.begin_run()
+	check_equal(mgr.get_target_count(), 0, "the freed body's row is dropped as the run begins")
+	var next: Node2D = _target(Vector2(100.0, 100.0))
+	mgr.spawn(0, Vector2(60.0, 100.0), Vector2(600.0, 0.0), 1.0)
+	_run(10)
+	check_equal(mgr.get_target_count(), 1, "the new run's body is the one target")
+	check(not hits.is_empty(), "and the new run's shot hits it")

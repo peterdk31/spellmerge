@@ -40,7 +40,7 @@ func test_every_layer_with_a_file_loops_and_a_tracks_layers_are_of_one_length() 
 				length = ogg.get_length()
 			check(absf(ogg.get_length() - length) <= LENGTH_SLACK,
 					"%s: its layer %s is %.3f s, the first %.3f s; a track's layers are of one length" % [owner, id, ogg.get_length(), length])
-	check(files >= 3, "the boss's two layers and the crypt's track have files (%d)" % files)
+	check(files >= 4, "the boss's two layers and the crypt's and the hub's tracks have files (%d)" % files)
 
 
 func test_a_bosss_phases_bring_in_every_layer_of_its_music() -> void:
@@ -68,6 +68,16 @@ func test_the_crypts_fight_rooms_name_their_music() -> void:
 		if room == null or room.biome != &"crypt" or not room.hosts(&"fight"):
 			continue
 		check(room.music != null and not room.music.layers.is_empty(), "%s has music" % room.id)
+
+
+func test_the_hub_names_its_music_and_its_file_is_there() -> void:
+	var hub := registry.get_resource(&"rooms", &"hub") as RoomBase
+	check(hub != null and hub.music != null, "the hub has music")
+	if hub == null or hub.music == null:
+		return
+	check_equal(hub.music.layers.size(), 1, "one layer")
+	for id: StringName in hub.music.layers:
+		check(registry.get_sound(id) != null, "the hub's layer %s has its file" % id)
 
 
 ## Every room's and enemy's music, by who names it.

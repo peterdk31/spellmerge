@@ -50,7 +50,7 @@
 			"strings": "F#3 - - - D#3 - - -"},
 		"em_fall": {"pad": "E3+G3+B3 - - - - - - -", "low": "E2 - - - - - - -", "glass": "E5 . . . B4 . . .",
 			"strings": "G3 - - - - - - -"},
-		"em_d": {"pad": "E3+G3+B3 - - - - - - -", "low": "D2 - - - - - - -", "glass": "D5 . . . B4 . . .",
+		"em_d": {"pad": "D3+F#3+B3 - - - - - - -", "low": "D2 - - - - - - -", "glass": "D5 . . . B4 . . .",
 			"strings": "F#3 - - - - - - -"},
 		"c_fall": {"pad": "E3+G3+C4 - - - - - - -", "low": "C2 - - - - - - -", "glass": "C5 . . . G4 . . .",
 			"strings": "E3 - - - - - - -"},
@@ -73,5 +73,5 @@
 	],
 	"fx": {"reverb": {"mix": 0.36, "size": 2.0}, "lowpass": 6000},
 	"gain": -2,
-	"notes": "The hub's music (the owner, 2026-11-18: a somewhat sad piece of background music playing in the hub), one layer: E minor at 66 beats a minute, 32 bars (116 s) round, in four eights. Em C Am B, the bells alone, a falling tune that ends each line on a held note; then G D Em C and Am Em C B, the low strings taking the tune under a bell or two; the first tune again with the strings holding under it; and a last walk down, Em over E and D, C, B, then Am Em B and a bar of Em standing still before it comes round. The bells are far back (the owner, 2026-11-18, after hearing them up front: way more subtle), 13 dB under where they were, so the pad and the strings carry the piece. A wide room, nothing above 6 kHz, and 2 dB under the music's level (gain -2): the hub is where a player rests and reads, over the island's wind."
+	"notes": "The hub's music (the owner, 2026-11-18: a somewhat sad piece of background music playing in the hub), one layer: E minor at 66 beats a minute, 32 bars (116 s) round, in four eights. Em C Am B, the bells alone, a falling tune that ends each line on a held note; then G D Em C and Am Em C B, the low strings taking the tune under a bell or two; the first tune again with the strings holding under it; and a last walk down, Em, Bm over D, C, B, then Am Em B and a bar of Em standing still before it comes round. The bells are far back (the owner, 2026-11-18, after hearing them up front: way more subtle), 13 dB under where they were, so the pad and the strings carry the piece. A wide room, nothing above 6 kHz, and 2 dB under the music's level (gain -2): the hub is where a player rests and reads, over the island's wind."
 }

@@ -38,6 +38,8 @@ A seventeenth, planned with the owner on 2026-11-16 and approved the same day: *
 
 An eighteenth, planned with the owner on 2026-11-18: **atmosphere**, more drawn layers in Feel: darker rooms with a coloured dark and wizards that carry their own light, lit dust in the air, shadows from walls and bodies, a room's sound, a world that notices the spells, and soft mist ([atmosphere.md](milestones/atmosphere.md), phase A to F). It changes no rule, damage or cap.
 
+A nineteenth, planned with the owner on 2026-11-18: **sound**, a generator for every sound the game asks for: Python recipes in `tools/` baked into committed `.ogg` files in a modern synthesised style (effects with variants the game jitters, seamless held loops, music from a pattern sequencer with layers of one length), a view-only `core/audio` service for buses, volumes, ducking and UI sounds, loudness targets in docs/STYLE.md, a hash check that every sound matches its recipe, and a sound room to audition them ([sound.md](milestones/sound.md), phase AU). It fills the 45 silent ids the game already names, the core combat set first. Waiting for the owner's approval.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

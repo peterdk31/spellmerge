@@ -141,13 +141,57 @@ class BakeTest(unittest.TestCase):
         self.assertIn("true peak", str(caught.exception))
         self.assertIn("audio/sfx/blip/blip.sound.json variant 1", str(caught.exception))
 
-    def test_gain_places_the_level_and_needs_a_reason(self) -> None:
-        with self.assertRaises(sound.BakeError) as caught:
-            self.bake(self.write(dict(BLIP, gain=-3)))
-        self.assertIn("notes", str(caught.exception))
+    def test_gain_places_the_level_off_the_target(self) -> None:
         self.bake(self.write(dict(BLIP, gain=-3, notes="a blip, quieter: it is heard under every step")))
         for entry in self.entries("audio/sfx/blip").values():
             self.assertAlmostEqual(entry["loudness"], -23.0, delta=1.0)
+
+    def test_a_variant_unlike_the_others_fails(self) -> None:
+        # Each variant a quarter of the one before: far apart in level, though silent at both ends.
+        with mock.patch.object(sound.sound_synth, "render", side_effect=lambda data, i: [0.0] + [0.5 / i ** 2] * 4000 + [0.0]):
+            with self.assertRaises(sound.BakeError) as caught:
+                self.bake(self.write(BLIP))
+        self.assertIn("LU from the others", str(caught.exception))
+
+    def test_variants_default_to_the_familys_count(self) -> None:
+        recipe = dict(BLIP)
+        del recipe["variants"]
+        self.bake(self.write(recipe))
+        self.assertEqual(len(self.entries("audio/sfx/blip")), 4, "combat's four")
+
+    def test_a_short_loop_is_measured_as_it_plays(self) -> None:
+        self.bake(self.write(dict(HUM, seconds=0.1), "hum"))
+        entry = self.entries("audio/sfx/hum")["audio/sfx/hum/hum.ogg"]
+        self.assertAlmostEqual(entry["loudness"], -24.0, delta=0.5)
+        samples = sound.render_placed(sound.read_recipe(Path("audio/sfx/hum/hum.sound.json"), self.root),
+                                      sound.sound_synth.validate(dict(HUM, seconds=0.1)), sound.families()["held"])[0][0]
+        tiled = sound.sound_meter.integrated(samples * 40, RATE)
+        self.assertAlmostEqual(tiled, -24.0, delta=0.5, msg="looped round, it is on its target")
+
+    def test_another_encoder_rewrites_nothing_and_demotes_nothing(self) -> None:
+        recipe = self.write(BLIP)
+        self.bake(recipe)
+        path = self.root / "audio/sfx/blip/assets.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for entry in data["assets"]:
+            entry["tier"] = "final"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        written = sound.bake(recipe, self.root, lambda samples: b"other encoder " + sound.wav_bytes(samples),
+                             say=self.said.append)
+        self.assertNotIn(Path("audio/sfx/blip/variants/1.ogg"), written)
+        self.assertEqual({e["tier"] for e in self.entries("audio/sfx/blip").values()}, {"final"})
+
+    def test_the_manifest_is_tab_indented_like_the_others(self) -> None:
+        self.bake(self.write(BLIP))
+        self.assertTrue((self.root / "audio/sfx/blip/assets.json").read_text(encoding="utf-8").startswith('{\n\t"assets"'))
+
+    def test_a_recipe_outside_the_repository_is_not_baked(self) -> None:
+        outside = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, outside, True)
+        (outside / "blip").mkdir()
+        (outside / "blip/blip.sound.json").write_text(json.dumps(BLIP), encoding="utf-8")
+        with self.assertRaises(sound.BakeError):
+            self.bake(sound.read_recipe(outside / "blip/blip.sound.json", self.root))
 
     def test_a_kind_and_its_family_agree(self) -> None:
         with self.assertRaises(sound.BakeError):
@@ -189,8 +233,27 @@ class SheetTest(unittest.TestCase):
         self.assertLessEqual(max(abs(v) for v in out), 0.99, "never clips")
 
     def test_the_sheet_is_never_written_in_the_repository(self) -> None:
-        with mock.patch("sys.stderr"):
-            self.assertEqual(sound.main(["sheet", "anything", "--out", str(sound.ROOT / "build/sheet")]), 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            recipe = Path(tmp) / "blip/blip.sound.json"
+            recipe.parent.mkdir()
+            recipe.write_text(json.dumps(BLIP), encoding="utf-8")
+            with mock.patch.object(sound, "sheet") as sheet, mock.patch("sys.stderr"):
+                self.assertEqual(sound.main(["sheet", str(recipe), "--out", str(sound.ROOT / "build/sheet")]), 1)
+                sheet.assert_not_called()
+            with mock.patch.object(sound, "sheet", return_value=[]) as sheet:
+                self.assertEqual(sound.main(["sheet", str(recipe), "--out", str(Path(tmp) / "out")]), 0)
+                sheet.assert_called_once()
+
+    @unittest.skipUnless(shutil.which("ffmpeg"), "the sheet needs ffmpeg")
+    def test_the_sheet_writes_its_ogg_and_mp4(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            recipe = Path(tmp) / "blip/blip.sound.json"
+            recipe.parent.mkdir()
+            recipe.write_text(json.dumps(BLIP), encoding="utf-8")
+            found = sound.sheet([sound.read_recipe(recipe)] * 2, Path(tmp) / "out")
+            self.assertEqual([p.name for p in found], ["sheet.ogg", "sheet.mp4"])
+            self.assertTrue(all(p.stat().st_size > 1000 for p in found))
+            self.assertEqual(sorted(p.name for p in (Path(tmp) / "out").iterdir()), ["sheet.mp4", "sheet.ogg"])
 
 
 if __name__ == "__main__":

@@ -160,6 +160,19 @@ class RenderTest(unittest.TestCase):
         self.assertLessEqual(abs(x[0] - x[-1]), typical, "the end runs on into the start like any other step")
         self.assertGreater(abs(x[0]), sound.EDGE, "a loop does not fade to silence at its seam")
 
+    def test_a_held_tone_keeps_its_level_through_the_fold(self) -> None:
+        # Two tones that do not fit the loop in whole cycles as written: one would swell where the
+        # tail is folded over the start, the other would cancel itself there.
+        for pitch in (997.0, 101.25):
+            recipe = {"version": 1, "kind": "held", "family": "held", "seconds": 2.0,
+                      "layers": [{"source": "sine", "pitch": pitch}], "notes": "a tone"}
+            x = sound_synth.render(sound_synth.validate(recipe), 1)
+            window = RATE // 50
+            peaks = [max(abs(v) for v in x[i:i + window]) for i in range(0, len(x) - window, window)]
+            self.assertGreater(min(peaks), 0.97, pitch)
+            self.assertLess(max(peaks), 1.03, pitch)
+            self.assertLessEqual(abs(x[0] - x[-1]), 2 * math.pi * pitch / RATE * 1.05, "no step at the seam")
+
     def test_the_time_and_pitch_of_a_variant_stay_within_vary(self) -> None:
         recipe = SAMPLES["whoosh"]
         for i in range(1, 9):
@@ -238,6 +251,11 @@ class ValidateTest(unittest.TestCase):
         with self.assertRaises(SoundError) as caught:
             sound_synth.validate(ui)
         self.assertEqual(caught.exception.where, "fx.reverb")
+
+    def test_white_noise_has_no_pitch_and_an_adsr_no_power(self) -> None:
+        self.assertEqual(self.broken({"pitch": 400}, ("layers", 0)).where, "layers[0].pitch")
+        self.assertEqual(self.broken({"amp": {"attack": 0.01, "sustain": 0.5, "power": 2}}, ("layers", 0)).where,
+                         "layers[0].amp")
 
     def test_an_exp_curve_needs_positive_ends(self) -> None:
         self.assertEqual(self.broken({"index": {"from": 0, "to": 2, "curve": "exp"}}, ("layers", 2)).where,

@@ -41,6 +41,16 @@ class MeterTest(unittest.TestCase):
         self.assertAlmostEqual(sound_meter.integrated(x, RATE), -23.01, delta=0.8)
         self.assertEqual(sound_meter.integrated([0.0] * RATE, RATE), sound_meter.SILENCE)
 
+    def test_a_quiet_passage_is_gated_relative_to_the_rest(self) -> None:
+        # 2 s at -20 dBFS and 2 s at -40: the quiet part is 20 LU under, past the -10 LU gate, so it
+        # is left out (ungated, the mean would be about 2.9 dB lower).
+        x = tone(997.0, -20.0, 2.0) + tone(997.0, -40.0, 2.0)
+        self.assertAlmostEqual(sound_meter.integrated(x, RATE), -23.01, delta=0.4)
+
+    def test_a_sound_under_the_absolute_gate_reads_as_silence(self) -> None:
+        self.assertEqual(sound_meter.integrated(tone(997.0, -75.0, 1.0), RATE), sound_meter.SILENCE)
+        self.assertAlmostEqual(sound_meter.integrated(tone(997.0, -60.0, 1.0), RATE), -63.01, delta=0.1)
+
     def test_momentary_is_the_loudest_window(self) -> None:
         x = tone(997.0, -30.0, 2.0) + tone(997.0, -10.0, 0.5) + tone(997.0, -30.0, 2.0)
         self.assertAlmostEqual(sound_meter.momentary_max(x, RATE), -13.01, delta=0.1)

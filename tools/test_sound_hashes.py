@@ -14,6 +14,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sound  # noqa: E402
@@ -77,13 +78,61 @@ class CheckTest(unittest.TestCase):
         (patches / "tone.patch.json").write_text(json.dumps(patch), encoding="utf-8")
         self.assertIn("stale", sound.check(self.root)[0])
         recipe = sound.find_recipes(self.root)[0]
-        before = sound.recipe_hash(recipe.data, sound.load_patches(self.root))
+        family = sound.families(self.root)["combat"]
+        before = sound.recipe_hash(recipe.data, sound.load_patches(self.root), family)
         old = sound.sound_synth.GENERATOR
         sound.sound_synth.GENERATOR = old + 1
         try:
-            self.assertNotEqual(sound.recipe_hash(recipe.data, sound.load_patches(self.root)), before)
+            self.assertNotEqual(sound.recipe_hash(recipe.data, sound.load_patches(self.root), family), before)
         finally:
             sound.sound_synth.GENERATOR = old
+
+    def test_a_changed_family_row_in_the_style_guide_is_stale(self) -> None:
+        self.bake()
+        style = self.root / sound.STYLE
+        text = style.read_text(encoding="utf-8")
+        row = "| `combat` (cast, hit, small effects) | -20 momentary |"
+        self.assertIn(row, text)
+        style.write_text(text.replace(row, "| `combat` (cast, hit, small effects) | -14 momentary |"), encoding="utf-8")
+        self.assertIn("docs/STYLE.md", sound.check(self.root)[0])
+
+    def test_variants_left_behind_by_a_deleted_recipe_are_named(self) -> None:
+        self.bake()
+        (self.folder / "blip.sound.json").unlink()
+        problems = sound.check(self.root)
+        self.assertEqual(len(problems), 2, problems)
+        self.assertIn("audio/sfx/blip/variants/1.ogg: no recipe makes it", problems[0])
+
+    def test_a_kind_change_names_the_files_of_the_old_kind(self) -> None:
+        self.bake()
+        self.write(dict(RECIPE, kind="held", family="held", variants=1))
+        self.assertIn("audio/sfx/blip/blip.tres: left from when it was a one-shot", "\n".join(sound.check(self.root)))
+        self.bake()
+        self.assertEqual(sound.check(self.root), [])
+        self.assertFalse((self.folder / "blip.tres").exists())
+        self.assertFalse((self.folder / "variants/1.ogg").exists())
+        self.write(RECIPE)
+        self.assertIn("audio/sfx/blip/blip.ogg: left from when it was a held sound", "\n".join(sound.check(self.root)))
+        self.bake()
+        self.assertEqual(sound.check(self.root), [])
+        self.assertFalse((self.folder / "blip.ogg").exists())
+
+    def test_a_recipe_in_a_content_items_own_folder_is_refused(self) -> None:
+        folder = self.root / "content/spells/carriers/atom"
+        folder.mkdir(parents=True)
+        (folder / "atom.sound.json").write_text(json.dumps(RECIPE), encoding="utf-8")
+        problems = sound.check(self.root)
+        self.assertTrue(any("content item's sounds/atom/" in p for p in problems), problems)
+
+    def test_an_ambience_file_with_a_recipe_must_leave_unreciped(self) -> None:
+        ambience = Path(sound.UNRECIPED[0])
+        sound_id = ambience.stem
+        recipe = dict(RECIPE, kind="held", family="held", variants=1)
+        folder = self.root / ambience.parent / sound_id
+        self.write(recipe, folder, sound_id)
+        with mock.patch.object(sound, "UNRECIPED", (f"{ambience.parent}/{sound_id}/{sound_id}.ogg",)):
+            self.bake(sound_id)
+            self.assertIn("take it off tools/sound.py's UNRECIPED", "\n".join(sound.check(self.root)))
 
     def test_a_missing_file_or_entry_is_named(self) -> None:
         self.bake()

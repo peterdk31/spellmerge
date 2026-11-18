@@ -49,15 +49,16 @@ The manifest drives the Steam AI disclosure and the list of placeholders still t
 
 ### Generated sound
 
-A sound made by `tools/sound.py` (tools/README.md) has a folder of its own: `sfx/<id>/` holds its recipe `<id>.sound.json`, and the bake writes beside it `variants/1.ogg` ... `n.ogg` and `<id>.tres` (a one-shot), or `<id>.ogg` (a held loop), and `assets.json`, one entry a file, so parallel PRs never edit one list. Never write these by hand: change the recipe and run `tools/sound.py bake <id>`. Its entries add `recipe_hash` (what `tools/sound.py check` and its test compare with the recipe), `loudness` (LUFS) and `peak` (dBTP), and `prompt` is the recipe's path, which is the whole input:
+A sound made by `tools/sound.py` (tools/README.md) has a folder of its own: `sfx/<id>/` (or any folder of its own under `audio/`, or a content item's `sounds/<id>/`) holds its recipe `<id>.sound.json`, and the bake writes beside it `variants/1.ogg` ... `n.ogg` and `<id>.tres` (a one-shot), or `<id>.ogg` (a held loop), and `assets.json`, one entry a file, so parallel PRs never edit one list. Never write these by hand: change the recipe and run `tools/sound.py bake <id>`. Its entries add `recipe_hash` (of the recipe, its patches and its family's row in docs/STYLE.md: what `tools/sound.py check` and its test compare), `audio_hash` (of its samples), `loudness` (LUFS) and `peak` (dBTP), and `prompt` is the recipe's path, which is the whole input:
 
 ```json
 {"path": "audio/sfx/cast/variants/1.ogg", "origin": "ai", "author": "Claude", "license": "CC-BY-SA-4.0",
  "tier": "good", "tool": "tools/sound.py (procedural synthesis, generator 1)",
- "prompt": "audio/sfx/cast/cast.sound.json", "recipe_hash": "sha256:...", "loudness": -20.1, "peak": -6.2}
+ "prompt": "audio/sfx/cast/cast.sound.json", "recipe_hash": "sha256:...", "audio_hash": "sha256:...",
+ "loudness": -20.1, "peak": -6.2}
 ```
 
-A rebake keeps a file's `tier` while its audio stays the same; one that changes it sets `final` back to `good`, because the owner promoted the sound they heard. Hear a sound before a PR with `tools/sound.py sheet <id> --out <a folder outside the repository>`, and attach or link the sheet's `.mp4`.
+A rebake keeps a file's `tier` while its audio (`audio_hash`) stays the same; one that changes it sets `final` back to `good`, because the owner promoted the sound they heard. Hear a sound before a PR with `tools/sound.py sheet <id> --out <a folder outside the repository>`, and attach or link the sheet's `.mp4`.
 
 ## Steps
 

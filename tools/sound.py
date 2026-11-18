@@ -40,7 +40,7 @@ import subprocess
 import sys
 import tempfile
 import wave
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Sequence
 
@@ -62,6 +62,7 @@ LICENSE = "CC-BY-SA-4.0"
 WINDOW = 1.0  # LU either side of a family's target
 PEAK_MARGIN = 1.0  # dB under the family's true peak limit, for Vorbis's overshoot
 EDGE = 1e-3  # how near zero a one-shot's first and last samples must be
+LOOP_MEASURE = 3.0  # seconds of a loop, played round, that its loudness is measured over
 # Sounds with no recipe yet, made before the tool by a generator kept out of the repository
 # (atmosphere D). AU6 remakes them as recipes, and then this list is empty and stays so.
 UNRECIPED = (
@@ -91,7 +92,11 @@ class Family:
     pitch: float  # the jitter as a share (0.04 for ±4%)
     volume: float  # the jitter in dB
 
-    def level_of(self, samples: Sequence[float]) -> float:
+    def level_of(self, samples: Sequence[float], loop: bool = False) -> float:
+        """Its loudness by the family's measure; a loop is measured as it plays, over and over
+        (at least LOOP_MEASURE seconds of it), not as if silence followed it."""
+        if loop and samples:
+            samples = list(samples) * max(1, math.ceil(LOOP_MEASURE * RATE / len(samples)))
         if self.measure == "integrated":
             return sound_meter.integrated(samples, RATE)
         return sound_meter.momentary_max(samples, RATE)
@@ -125,20 +130,37 @@ def canonical(value: object) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
+def read_json(path: Path) -> dict:
+    """A JSON object from a file, or a BakeError naming the file."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise BakeError(f"{path}: not JSON ({error})") from error
+    if not isinstance(data, dict):
+        raise BakeError(f"{path}: must be a JSON object")
+    return data
+
+
 def load_patches(root: Path = ROOT) -> dict[str, dict]:
     found: dict[str, dict] = {}
     folder = root / PATCHES
     if folder.is_dir():
         for path in sorted(folder.glob("*" + PATCH_SUFFIX)):
-            found[path.name[: -len(PATCH_SUFFIX)]] = json.loads(path.read_text(encoding="utf-8"))
+            found[path.name[: -len(PATCH_SUFFIX)]] = read_json(path)
     return found
 
 
-def recipe_hash(recipe: dict, patches: dict[str, dict]) -> str:
-    """sha256 of the recipe, every patch it names and the synth's GENERATOR."""
+def recipe_hash(recipe: dict, patches: dict[str, dict], family: Family | None) -> str:
+    """sha256 of the recipe, every patch it names, its family's row of docs/STYLE.md (its target,
+    peak and jitter are baked in too) and the synth's GENERATOR."""
     named = {name: patches.get(name) for name in sound_synth.patches_named(recipe)}
-    return "sha256:" + hashlib.sha256(canonical({"generator": sound_synth.GENERATOR, "recipe": recipe,
-                                                 "patches": named})).hexdigest()
+    return "sha256:" + hashlib.sha256(canonical({"generator": sound_synth.GENERATOR, "recipe": recipe, "patches": named,
+                                                 "family": asdict(family) if family else None})).hexdigest()
+
+
+def audio_hash(samples: Sequence[float]) -> str:
+    """sha256 of the 16-bit samples: what says a rebake's audio is the same, whatever encoder."""
+    return "sha256:" + hashlib.sha256(pcm16(samples)).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -160,7 +182,9 @@ class Recipe:
 
 
 def read_recipe(path: Path, root: Path = ROOT) -> Recipe:
-    """A recipe file, its path kept from the repository root (or whole, for one outside it)."""
+    """A recipe file, its path kept from the repository root (or whole, for one outside it, which
+    only the sheet takes). In the repository a recipe is in a folder of its own named for its id,
+    under audio/ or a content item's sounds/, so a bake never writes over a content item's files."""
     full = (path if path.is_absolute() else root / path).resolve()
     try:
         rel = full.relative_to(root.resolve())
@@ -172,11 +196,9 @@ def read_recipe(path: Path, root: Path = ROOT) -> Recipe:
     sound_id = name[: -len(SUFFIX)]
     if rel.parent.name != sound_id:
         raise BakeError(f"{rel}: a recipe lives in a folder of its own named {sound_id}/")
-    try:
-        data = json.loads((root / rel).read_text(encoding="utf-8"))
-    except json.JSONDecodeError as error:
-        raise BakeError(f"{rel}: not JSON ({error})") from error
-    return Recipe(rel, sound_id, data)
+    if not rel.is_absolute() and rel.parts[0] != "audio" and (rel.parts[0] != "content" or rel.parent.parent.name != "sounds"):
+        raise BakeError(f"{rel}: a recipe lives under audio/ or in a content item's sounds/{sound_id}/")
+    return Recipe(rel, sound_id, read_json(root / rel))
 
 
 def find_recipes(root: Path = ROOT) -> list[Recipe]:
@@ -197,8 +219,6 @@ def checked(recipe: Recipe, patches: dict[str, dict], fams: dict[str, Family]) -
         kind = data["kind"]
         if (kind == "held") != (family.name == "held") or (kind == "ui") != (family.name == "ui"):
             raise SoundError("family", f"a {kind} sound is not in the {family.name} family")
-        if "gain" in data and len(data["notes"].split()) < 4:
-            raise SoundError("notes", "a recipe that places its level with gain says why in its notes")
     except SoundError as error:
         raise BakeError(f"{recipe.path}: {error}") from error
     return data, family
@@ -212,7 +232,7 @@ def manifest_entries(root: Path = ROOT) -> dict[str, dict]:
     files = [root / MANIFEST] + [p for top in SCAN if (root / top).is_dir() for p in sorted((root / top).rglob("assets.json"))]
     for path in files:
         if path.is_file():
-            for entry in json.loads(path.read_text(encoding="utf-8")).get("assets", []):
+            for entry in read_json(path).get("assets", []):
                 if isinstance(entry, dict) and isinstance(entry.get("path"), str):
                     found[entry["path"]] = entry
     return found
@@ -228,18 +248,20 @@ def check(root: Path = ROOT) -> list[str]:
     fams = families(root)
     entries = manifest_entries(root)
     made: set[str] = set()
+    recipe_folders: set[str] = set()
     try:
         recipes = find_recipes(root)
     except BakeError as error:
         return [str(error)]
     for recipe in recipes:
         bake_cmd = f"run: tools/sound.py bake {recipe.path}"
+        recipe_folders.add(recipe.folder.as_posix())
         try:
             _, family = checked(recipe, patches, fams)
         except BakeError as error:
             problems.append(str(error))
             continue
-        want = recipe_hash(recipe.data, patches)
+        want = recipe_hash(recipe.data, patches, family)
         outputs = recipe.outputs(family)
         made.update(p.as_posix() for p in outputs)
         for out in outputs:
@@ -249,21 +271,32 @@ def check(root: Path = ROOT) -> list[str]:
             elif entry is None:
                 problems.append(f"{out}: no entry in {recipe.folder / 'assets.json'}; {bake_cmd}")
             elif entry.get("recipe_hash") != want:
-                problems.append(f"{out}: stale, its recipe or a patch it names changed since it was baked; {bake_cmd}")
-        if recipe.data.get("kind") != "held" and not (root / recipe.folder / f"{recipe.id}.tres").is_file():
-            problems.append(f"{recipe.folder / (recipe.id + '.tres')}: missing; {bake_cmd}")
+                problems.append(f"{out}: stale, its recipe, a patch it names or its family's row in docs/STYLE.md "
+                                f"changed since it was baked; {bake_cmd}")
+        tres = recipe.folder / f"{recipe.id}.tres"
+        held = recipe.data.get("kind") == "held"
+        if not held and not (root / tres).is_file():
+            problems.append(f"{tres}: missing; {bake_cmd}")
+        if held and (root / tres).is_file():
+            problems.append(f"{tres}: left from when it was a one-shot; {bake_cmd}")
         variants = root / recipe.folder / "variants"
         if variants.is_dir():
             for extra in sorted(variants.glob("*.ogg")):
                 if extra.relative_to(root).as_posix() not in made:
                     problems.append(f"{extra.relative_to(root)}: a variant the recipe no longer has; {bake_cmd}")
+        loop = recipe.folder / f"{recipe.id}.ogg"
+        if not held and (root / loop).is_file():
+            made.add(loop.as_posix())
+            problems.append(f"{loop}: left from when it was a held sound; {bake_cmd}")
     for top in SCAN:
         if not (root / top).is_dir():
             continue
         for ogg in sorted((root / top).rglob("*.ogg")):
             rel = ogg.relative_to(root).as_posix()
-            if rel in made or rel in UNRECIPED or "/variants/" in rel:
+            if rel in made or rel in UNRECIPED:
                 continue
+            if ogg.parent.name == "variants" and ogg.parent.parent.relative_to(root).as_posix() in recipe_folders:
+                continue  # named above as a variant its recipe no longer has
             if entries.get(rel, {}).get("origin") != "human":
                 problems.append(f"{rel}: no recipe makes it; write one beside it ({SUFFIX}), or give it a manifest "
                                 "entry with origin human if it was made by hand")
@@ -278,10 +311,11 @@ def check(root: Path = ROOT) -> list[str]:
 Encoder = Callable[[Sequence[float]], bytes]
 
 
-def place(samples: list[list[float]], family: Family, gain: float) -> tuple[list[list[float]], list[float], list[float]]:
+def place(samples: list[list[float]], family: Family, gain: float,
+          loop: bool = False) -> tuple[list[list[float]], list[float], list[float]]:
     """The variants scaled together onto the family's target plus `gain`, with each one's level
     and true peak after; one scale for all, so they keep their own small differences."""
-    levels = [family.level_of(s) for s in samples]
+    levels = [family.level_of(s, loop) for s in samples]
     target = family.loudness + gain
     if min(levels) <= sound_meter.SILENCE:
         raise BakeError("a variant is silent")
@@ -296,7 +330,7 @@ def render_placed(recipe: Recipe, data: dict, family: Family) -> list[tuple[list
     count = 1 if data["kind"] == "held" else data.get("variants", family.variants)
     raw = [sound_synth.render(data, i) for i in range(1, count + 1)]
     try:
-        placed, levels, peaks = place(raw, family, data.get("gain", 0.0))
+        placed, levels, peaks = place(raw, family, data.get("gain", 0.0), data["kind"] == "held")
     except BakeError as error:
         raise BakeError(f"{recipe.path}: {error}") from error
     target = family.loudness + data.get("gain", 0.0)
@@ -315,13 +349,17 @@ def render_placed(recipe: Recipe, data: dict, family: Family) -> list[tuple[list
     return list(zip(placed, levels, peaks))
 
 
+def pcm16(samples: Sequence[float]) -> bytes:
+    return b"".join(struct.pack("<h", max(-32767, min(32767, round(v * 32767)))) for v in samples)
+
+
 def wav_bytes(samples: Sequence[float]) -> bytes:
     buffer = io.BytesIO()
     with wave.open(buffer, "wb") as out:
         out.setnchannels(1)
         out.setsampwidth(2)
         out.setframerate(RATE)
-        out.writeframes(b"".join(struct.pack("<h", max(-32767, min(32767, round(v * 32767)))) for v in samples))
+        out.writeframes(pcm16(samples))
     return buffer.getvalue()
 
 
@@ -366,53 +404,73 @@ def _write_if_changed(path: Path, data: bytes) -> bool:
     return True
 
 
+IMPORT_LOOP = '[remap]\n\nimporter="oggvorbisstr"\ntype="AudioStreamOggVorbis"\n\n[params]\n\nloop=true\n'
+
+
+def _remove(root: Path, rel: Path, say: Callable[[str], None], why: str) -> None:
+    for path in (root / rel, root / (rel.as_posix() + ".import")):
+        path.unlink(missing_ok=True)
+    say(f"{rel}: removed, {why}")
+
+
 def bake(recipe: Recipe, root: Path = ROOT, encode: Encoder = ffmpeg_encode,
          say: Callable[[str], None] = print) -> list[Path]:
-    """Bake one recipe; returns the files it wrote (from the repository root)."""
+    """Bake one recipe; returns the files it wrote (from the repository root). A file is rewritten
+    only when its audio changed (its `audio_hash`), so another machine's encoder rewrites nothing."""
+    if recipe.path.is_absolute():
+        raise BakeError(f"{recipe.path}: only a recipe in the repository is baked (the sheet takes any)")
     patches = load_patches(root)
     data, family = checked(recipe, patches, families(root))
     rendered = render_placed(recipe, data, family)
     outputs = recipe.outputs(family)
     folder = root / recipe.folder
+    held = data["kind"] == "held"
     written: list[Path] = []
     entries_path = folder / "assets.json"
-    old = {e["path"]: e for e in json.loads(entries_path.read_text(encoding="utf-8")).get("assets", [])} if entries_path.is_file() else {}
-    want = recipe_hash(recipe.data, patches)
+    old = {e["path"]: e for e in read_json(entries_path).get("assets", [])
+           if isinstance(e, dict) and isinstance(e.get("path"), str)} if entries_path.is_file() else {}
+    want = recipe_hash(recipe.data, patches, family)
     entries: list[dict] = []
     for out, (samples, level, peak) in zip(outputs, rendered):
-        changed = _write_if_changed(root / out, encode(samples))
-        if changed:
-            written.append(out)
         key = out.as_posix()
-        tier = old.get(key, {}).get("tier", "good")
+        before = old.get(key, {})
+        heard = audio_hash(samples)
+        changed = before.get("audio_hash") != heard or not (root / out).is_file()
+        if changed:
+            (root / out).parent.mkdir(parents=True, exist_ok=True)
+            (root / out).write_bytes(encode(samples))
+            written.append(out)
+        tier = before.get("tier", "good")
         if changed and tier == "final":
             tier = "good"
             say(f"{out}: its audio changed, so it is back to tier good (the owner promoted the old one)")
         entries.append({"path": key, "origin": "ai", "author": AUTHOR, "license": LICENSE, "tier": tier,
-                        "tool": TOOL, "prompt": recipe.path.as_posix(), "recipe_hash": want,
+                        "tool": TOOL, "prompt": recipe.path.as_posix(), "recipe_hash": want, "audio_hash": heard,
                         "loudness": round(level, 1), "peak": round(peak, 1)})
-        importer = root / (key + ".import")
-        if data["kind"] == "held" and not importer.exists():
-            importer.write_text('[remap]\n\nimporter="oggvorbisstr"\ntype="AudioStreamOggVorbis"\n\n[params]\n\nloop=true\n',
-                                encoding="utf-8")
+        if held and not (root / (key + ".import")).exists():
+            (root / (key + ".import")).write_text(IMPORT_LOOP, encoding="utf-8")
             written.append(Path(key + ".import"))
-    # Variants the recipe no longer has go, with their .import.
+    # What the recipe no longer makes goes: variants it has fewer of, and the files of its other kind.
     made = {o.as_posix() for o in outputs}
     if (folder / "variants").is_dir():
         for extra in sorted((folder / "variants").glob("*.ogg")):
-            if extra.relative_to(root).as_posix() not in made:
-                extra.unlink()
-                Path(str(extra) + ".import").unlink(missing_ok=True)
-                old.pop(extra.relative_to(root).as_posix(), None)
-                say(f"{extra.relative_to(root)}: removed, the recipe has fewer variants")
+            rel = extra.relative_to(root)
+            if rel.as_posix() not in made:
+                _remove(root, rel, say, "the recipe makes no such variant now")
+                old.pop(rel.as_posix(), None)
+    tres = recipe.folder / f"{recipe.id}.tres"
+    loop = recipe.folder / f"{recipe.id}.ogg"
+    if held and (root / tres).is_file():
+        _remove(root, tres, say, "the sound is held now")
+    if not held and (root / loop).is_file():
+        _remove(root, loop, say, "the sound is a one-shot now")
+        old.pop(loop.as_posix(), None)
     kept = [e for path, e in old.items() if path not in made and (root / path).is_file()]  # hand-written entries
     manifest = {"assets": sorted(entries + kept, key=lambda e: e["path"])}
-    if _write_if_changed(entries_path, (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")):
+    if _write_if_changed(entries_path, (json.dumps(manifest, indent="\t", ensure_ascii=False) + "\n").encode("utf-8")):
         written.append(recipe.folder / "assets.json")
-    if data["kind"] != "held":
-        tres = recipe.folder / f"{recipe.id}.tres"
-        if _write_if_changed(root / tres, randomizer_tres(recipe, family, outputs).encode("utf-8")):
-            written.append(tres)
+    if not held and _write_if_changed(root / tres, randomizer_tres(recipe, family, outputs).encode("utf-8")):
+        written.append(tres)
     return written
 
 
@@ -489,7 +547,8 @@ def sheet(recipes: list[Recipe], out_dir: Path, root: Path = ROOT) -> list[Path]
     patches = load_patches(root)
     fams = families(root)
     sounds = []
-    for recipe in recipes:
+    unique = list({r.path: r for r in recipes}.values())  # a sound named twice is heard once
+    for recipe in unique:
         data, family = checked(recipe, patches, fams)
         sounds.append((recipe.id, [s for s, _, _ in render_placed(recipe, data, family)]))
     audio = sheet_timeline(sounds)
@@ -550,6 +609,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except (BakeError, SoundError) as error:
         print(f"sound: {error}", file=sys.stderr)
+        return 1
+    except subprocess.CalledProcessError as error:
+        print(f"sound: {error.cmd[0]} failed (exit {error.returncode}); its message is above", file=sys.stderr)
         return 1
 
 

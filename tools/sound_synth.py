@@ -194,15 +194,18 @@ def validate(recipe: Any, patches: dict[str, dict] | None = None) -> dict:
             raise SoundError(where, "must be an object")
         if "patch" in layer:
             name = layer["patch"]
-            if name not in patches:
+            if not isinstance(name, str) or name not in patches:
                 raise SoundError(f"{where}.patch", f"no patch {name!r} (audio/patches/{name}.patch.json)")
             check_patch(patches[name], f"patch {name}")
             layer = _merge(patches[name]["layer"], {k: v for k, v in layer.items() if k != "patch"})
         source = layer.get("source")
         _choice(SOURCES)(source, f"{where}.source")
         _keys(layer, where, {**LAYER, **SOURCE_KEYS[source]}, ("source",) + SOURCE_NEEDS[source])
-        if "shape" in layer.get("amp", {}) and any(k in layer["amp"] for k in ("decay", "sustain", "release")):
+        amp = layer.get("amp", {})
+        if any(k in amp for k in ("decay", "sustain", "release")) and ("shape" in amp or "power" in amp):
             raise SoundError(f"{where}.amp", "a shape takes attack and power; decay, sustain and release are an ADSR's")
+        if source == "noise" and "pitch" in layer and layer.get("color", "white") == "white":
+            raise SoundError(f"{where}.pitch", "white noise has no pitch (a stepped noise's pitch is its rate)")
         out["layers"].append(layer)
     kind = recipe["kind"]
     if kind == "held":
@@ -211,8 +214,8 @@ def validate(recipe: Any, patches: dict[str, dict] | None = None) -> dict:
         if recipe.get("vary"):
             raise SoundError("vary", "a held sound has one variant, so nothing to vary")
     if kind == "ui":
-        if recipe["seconds"] > UI_SECONDS:
-            raise SoundError("seconds", f"a ui sound is under {UI_SECONDS} s")
+        if recipe["seconds"] * (1.0 + recipe.get("vary", {}).get("time", 0.0)) > UI_SECONDS:
+            raise SoundError("seconds", f"a ui sound is under {UI_SECONDS} s, its longest variant too")
         if "reverb" in recipe.get("fx", {}):
             raise SoundError("fx.reverb", "a ui sound is never reverberant")
     for i, layer in enumerate(out["layers"]):
@@ -290,7 +293,17 @@ def _blep(t: float, dt: float) -> float:
     return 0.0
 
 
-def _source(layer: dict, n: int, pitch_scale: float, rng: random.Random) -> list[float]:
+def _snap(f: float, period: int) -> float:
+    """`f` moved to the nearest frequency with a whole number of cycles in `period` samples (a
+    held loop's length), so a steady tone ends in the phase it starts in; 0 leaves it."""
+    if period <= 0:
+        return f
+    return max(1, round(f * period / RATE)) * RATE / period
+
+
+def _source(layer: dict, n: int, pitch_scale: float, time_scale: float, rng: random.Random, period: int) -> list[float]:
+    """The layer's raw source. In a held loop (`period` its length) a steady pitch, its
+    partials and its FM modulator are snapped to whole cycles of the loop."""
     source = layer["source"]
     out = [0.0] * n
     last = max(n - 1, 1)
@@ -306,16 +319,18 @@ def _source(layer: dict, n: int, pitch_scale: float, rng: random.Random) -> list
             out[i] = held
         return out
     pitch = layer["pitch"]
+    steady = not isinstance(pitch, dict)
     if source == "partials":
         partials = layer["partials"]
         base = [_along(pitch, i / last, "exp") * pitch_scale for i in range(n)]
         for partial in partials:
             ratio = partial["ratio"]
             level = 10.0 ** (partial.get("gain", 0.0) / 20.0)
-            rate = 6.907755 / (partial.get("decay", 1.0) * RATE)  # -60 dB at `decay`
+            rate = 6.907755 / (partial.get("decay", 1.0) * time_scale * RATE)  # -60 dB at `decay`
             phase = rng.random()
+            fixed = _snap(base[0] * ratio, period) if steady else 0.0
             for i in range(n):
-                f = base[i] * ratio
+                f = fixed or base[i] * ratio
                 if f < RATE * 0.45:
                     out[i] += level * math.exp(-rate * i) * math.sin(2.0 * math.pi * phase)
                 phase += f / RATE
@@ -323,9 +338,11 @@ def _source(layer: dict, n: int, pitch_scale: float, rng: random.Random) -> list
     phase = 0.0
     mod_phase = 0.0
     duty = layer.get("duty", 0.5)
+    fixed = _snap(float(pitch) * pitch_scale, period) if steady else 0.0
+    mod_dt = _snap(fixed * layer.get("ratio", 1.0), period) / RATE if steady else 0.0
     for i in range(n):
         u = i / last
-        f = _along(pitch, u, "exp") * pitch_scale
+        f = fixed or _along(pitch, u, "exp") * pitch_scale
         dt = f / RATE
         if source == "sine":
             v = math.sin(2.0 * math.pi * phase)
@@ -338,7 +355,7 @@ def _source(layer: dict, n: int, pitch_scale: float, rng: random.Random) -> list
         else:  # fm
             index = _along(layer["index"], u, "linear")
             v = math.sin(2.0 * math.pi * phase + index * math.sin(2.0 * math.pi * mod_phase))
-            mod_phase = (mod_phase + dt * layer["ratio"]) % 1.0
+            mod_phase = (mod_phase + (mod_dt or dt * layer["ratio"])) % 1.0
         out[i] = v
         phase = (phase + dt) % 1.0
     return out
@@ -365,8 +382,9 @@ def _filter(x: list[float], kind: str, cutoff: Callable[[float], float], q: floa
     return out
 
 
-def _layer(layer: dict, n: int, pitch_scale: float, time_scale: float, rng: random.Random) -> list[float]:
-    x = _source(layer, n, pitch_scale, rng)
+def _layer(layer: dict, n: int, pitch_scale: float, time_scale: float, rng: random.Random,
+           period: int = 0) -> list[float]:
+    x = _source(layer, n, pitch_scale, time_scale, rng, period)
     if "filter" in layer:
         f = layer["filter"]
         sweep = {"from": f["from"], "to": f.get("to", f["from"]), "curve": f.get("curve", "exp")}
@@ -459,7 +477,7 @@ def render(recipe: dict, variant: int = 1) -> list[float]:
         else:
             size = round(recipe["seconds"] * time_scale * RATE) + tail - start
         size = max(1, min(size, total - start))
-        for i, v in enumerate(_layer(layer, size, pitch_scale, time_scale, rng)):
+        for i, v in enumerate(_layer(layer, size, pitch_scale, time_scale, rng, n if tail else 0)):
             mix[start + i] += v
     fx = recipe.get("fx", {})
     if "reverb" in fx:
@@ -481,10 +499,19 @@ def render(recipe: dict, variant: int = 1) -> list[float]:
 
 
 def _fold(x: list[float], n: int, tail: int) -> list[float]:
-    """A loop of `n` samples: the tail past `n` crossfaded (equal power) over the start, so the
-    end runs on into the start with no step."""
+    """A loop of `n` samples: the tail past `n` crossfaded over the start, so the end runs on into
+    the start with no step. The fade keeps the power steady for how alike the two parts are
+    (equal power for unlike noise, near equal gain for a tone that runs on in phase)."""
     out = x[:n]
-    for i in range(min(tail, n)):
-        a = 0.5 * math.pi * i / tail
-        out[i] = x[i] * math.sin(a) + x[n + i] * math.cos(a)
+    tail = min(tail, n)
+    if tail <= 0:
+        return out
+    a, b = x[:tail], x[n:n + tail]
+    norm = math.sqrt(sum(v * v for v in a) * sum(v * v for v in b))
+    alike = max(-0.5, sum(p * q for p, q in zip(a, b)) / norm) if norm > 0.0 else 0.0
+    for i in range(tail):
+        angle = 0.5 * math.pi * i / tail
+        fade_in, fade_out = math.sin(angle), math.cos(angle)
+        gain = 1.0 / math.sqrt(1.0 + 2.0 * alike * fade_in * fade_out)
+        out[i] = (a[i] * fade_in + b[i] * fade_out) * gain
     return out

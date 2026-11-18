@@ -86,7 +86,7 @@ func _tracks() -> Dictionary:
 
 
 ## The music's intensity before its first phase and in each phase: 1, then each phase's own
-## `intensity`, or one more than the phase before (gameplay/feel/body_sounds.gd, `intensity_of`).
+## `intensity`, or one more than the phase before (`intensity_of` in gameplay/feel/body_sounds.gd).
 func _intensities(boss: EnemyBase) -> Array[int]:
 	var out: Array[int] = [1]
 	for phase: EnemyPhase in boss.phases:

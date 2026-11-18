@@ -4,7 +4,8 @@
 	"instruments": {
 		"pad": {"patch": "warm_pad", "gain": -16, "ring": 0.8, "amp": {"attack": 0.9}},
 		"low": {"patch": "sub_bass", "gain": -19, "ring": 0.6},
-		"glass": {"patch": "glass_pluck", "gain": -2, "ring": 1.4, "velocity": [1, 0.6, 0.8, 0.6]},
+		"glass": {"patch": "glass_pluck", "gain": -6, "ring": 1.4, "velocity": [1, 0.6, 0.8, 0.6],
+			"partials": [{"ratio": 1, "decay": 1.1}, {"ratio": 2.76, "gain": -16, "decay": 0.4}], "amp": {"attack": 0.01, "shape": "flat"}},
 		"brush": {"patch": "brush", "gain": -8, "velocity": [0.7, 0.35]},
 		"kick": {"patch": "soft_kick", "gain": -10, "ring": 0.2},
 		"strings": {"patch": "low_strings", "gain": -16, "ring": 0.3}
@@ -77,7 +78,7 @@
 		{"id": "crypt_halls", "play": ["am_still", "am", "f", "f2", "dm", "dm2", "e", "e2", "am", "am2", "f", "f2", "dm", "e", "am_still", "e2",
 			"b_f", "b_c", "b_g", "b_am", "b_f2", "b_c2", "b_e", "b_e7",
 			"b_am2", "b_dm", "b_f3", "b_e2", "b_dm2", "b_am3", "b_e3", "b_e7_home"],
-			"notes": "The crypt's fight rooms: a slow, low-lit walk of glass bells over a soft pad and a low drone, a quiet heartbeat kick and a brushed tick; then the bells thin out and a slow line of low strings takes the tune, the drums coming back under it."}
+			"notes": "The crypt's fight rooms: a slow, low-lit walk of soft glass bells (the owner, 2026-11-18: the soft bells of the hub and the Old Broom here too) over a soft pad and a low drone, a quiet heartbeat kick and a brushed tick; then the bells thin out and a slow line of low strings takes the tune, the drums coming back under it."}
 	],
 	"fx": {"reverb": {"mix": 0.32, "size": 1.8}, "lowpass": 8000},
 	"notes": "The crypt rooms' music, one layer: A minor at 80 beats a minute, 32 bars (96 s) round, in two halves. The first is Am F Dm E, its chords held whole bars with a sevenths' colour, a wide room. The second (the owner's second listen, 2026-11-18: make it better) opens out to F C G Am and comes home through Am Dm F E and Dm Am E: the bells fall to a note or two a bar and low strings carry a slow tune, four bars with no drums, four with the brush alone, then the heartbeat again, so the loop has a breath in it and comes round half as often. Calm enough to hear for a whole run, under the effects and over the crypt's own air."

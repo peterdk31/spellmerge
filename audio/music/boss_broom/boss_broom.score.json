@@ -4,7 +4,8 @@
 	"instruments": {
 		"pad": {"patch": "warm_pad", "gain": -18, "ring": 0.8},
 		"bass": {"patch": "fm_bass", "gain": -8, "ring": 0.06},
-		"glass": {"patch": "glass_pluck", "gain": -4, "ring": 1.2, "velocity": [1, 0.75]},
+		"glass": {"patch": "glass_pluck", "gain": -8, "ring": 1.2, "velocity": [1, 0.75],
+			"partials": [{"ratio": 1, "decay": 1.1}, {"ratio": 2.76, "gain": -16, "decay": 0.4}], "amp": {"attack": 0.01, "shape": "flat"}},
 		"brush": {"patch": "brush", "gain": -9, "velocity": [0.9, 0.35, 0.6, 0.35]},
 		"kick": {"patch": "soft_kick", "gain": -7, "ring": 0.15},
 		"snare": {"patch": "soft_snare", "gain": 4, "ring": 0.1},
@@ -66,7 +67,7 @@
 	"layers": [
 		{"id": "boss_broom", "play": ["dm", "bb", "gm", "a", "dm2", "bb2", "gm2", "a2", "gm", "dm", "eb", "a", "dm2", "bb", "gm2", "a2",
 			"dm_bare", "c_bare", "bb_bare", "a_rise", "dm2", "c2", "bb2", "a2", "gm", "dm", "eb", "a", "dm", "c", "bb", "a2"],
-			"notes": "The Old Broom's fight: a steady sweep of brushed ticks over a round bass that rocks back and forth, a warm pad and a glass bell tune. Halfway round the drums fall out for three bars over a falling Dm C Bb A and build back in on the fourth."},
+			"notes": "The Old Broom's fight: a steady sweep of brushed ticks over a round bass that rocks back and forth, a warm pad and a tune on soft glass bells (the owner, 2026-11-18, after the first bells and a piano in their place: bells, more subtle than before; their upper partials cut down, a slower strike, and about 4.5 LU under where they first were). Halfway round the drums fall out for three bars over a falling Dm C Bb A and build back in on the fourth."},
 		{"id": "boss_broom_fire", "play": ["dm_fire", "bb_fire", "gm_fire", "a_fire", "dm_fire", "bb_fire", "gm_fire", "a_fire", "gm_fire", "dm_fire", "eb_fire", "a_fire", "dm_fire", "bb_fire", "gm_fire", "a_fire",
 			"dm_fall_bare", "c_fall_bare", "bb_fall_bare", "a_fire_rise", "dm_fire", "c_fire", "bb_fire", "a_fire", "gm_fire", "dm_fire", "eb_fire", "a_fire", "dm_fall", "c_fall", "bb_fall", "a_fire"],
 			"notes": "Phase 2, the broom's head on fire: a snare, more kicks and a hot running arpeggio (no crackle of embers: the owner heard it as a scratched disc, 2026-11-18, and the broom's own burning loop is the fire) over the first layer, in step with it."}

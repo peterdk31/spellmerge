@@ -1,0 +1,42 @@
+{
+	"version": 1,
+	"layer": {
+		"source": "partials",
+		"partials": [
+			{
+				"ratio": 1,
+				"decay": 2.4
+			},
+			{
+				"ratio": 2.003,
+				"gain": -9,
+				"decay": 1.7
+			},
+			{
+				"ratio": 3.01,
+				"gain": -17,
+				"decay": 1.1
+			},
+			{
+				"ratio": 4.02,
+				"gain": -24,
+				"decay": 0.7
+			},
+			{
+				"ratio": 5.04,
+				"gain": -30,
+				"decay": 0.45
+			}
+		],
+		"filter": {
+			"type": "low",
+			"from": 1800,
+			"q": 0.7
+		},
+		"amp": {
+			"attack": 0.008,
+			"shape": "flat"
+		}
+	},
+	"notes": "A soft piano: a struck string's harmonics, each a hair sharp of the one below as a real string's are and dying sooner, behind a low pass at 1.8 kHz and a soft 8 ms hammer, like a felted upright played quietly in the next room. Music only."
+}

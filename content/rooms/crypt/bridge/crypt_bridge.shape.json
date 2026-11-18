@@ -1,0 +1,9 @@
+{
+	"about": "The crypt's bridge (docs/milestones/connected-biomes.md, CB2): a walkway of the crypt's flagstones across the dark between two rooms' sockets, west to east, its floor a 64 px band (a mouth's width) from end to end, its sides a broken lip (crypt_edge) and an invisible wall (its void a wall). Its ends run to the template's edge, where its two sockets are. A stand-in until the bridges' own art (CB12). tools/ground_shape.py draws crypt_bridge_ground.tscn and its art from this.",
+	"size": [128, 128],
+	"seed": 21,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"outlines": [{"centre": [64, 64], "radii": [4000, 32], "seed": 5}]
+}

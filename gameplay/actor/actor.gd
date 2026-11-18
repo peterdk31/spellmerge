@@ -68,7 +68,8 @@ extends Node2D
 ## wall grid, `RoomGrid.slide_body`), the same to the bit on every machine; `velocity` is then what it
 ## moved by over the step, so a body against a wall keeps only its slide. Actors walk through each
 ## other (Combat's push parts them); spells find them by their hurt circles. No physics engine.
-## Where the move left it, its circle tells every actor whose touch area it overlaps (`touched`,
+## A bridge's mouth (connected biomes CB2) stops a body as a wall unless a wizard drives it
+## (`passes_mouths`). Where the move left it, its circle tells every actor whose touch area it overlaps (`touched`,
 ## `Actors.touching`: a dust heap walked into, boss plan OB5). In a room with holes the move is slid
 ## in two parts (hub rework HR-H1, `_move_over_holes`): what crosses holes, then its own walk, which
 ## stops at a hole's lip.
@@ -399,7 +400,7 @@ func move(delta: float) -> void:
 	if holes:
 		to = _move_over_holes(from, delta)
 	elif projectiles != null:
-		to = projectiles.grid().slide_body(from, velocity * delta, wall_radius())
+		to = projectiles.grid().slide_body(from, velocity * delta, wall_radius(), false, passes_mouths())
 	mover.crossing = Vector2.ZERO
 	global_position = to
 	if to != unhindered:
@@ -437,6 +438,14 @@ func _check_ground(crossed: bool) -> void:
 ## leaves it over a hole puts it on the nearest ground.
 func never_falls() -> bool:
 	return data != null and data.boss
+
+
+## True while a wizard drives it (connected biomes CB2, docs/milestones/connected-biomes.md, "Who
+## passes a mouth"): its controller now is a seat's, its own body's or a body it possesses. Its move
+## then walks through a bridge's mouth (`RoomGrid.MOUTH_CELL`); any other body's stops there as at a
+## wall. By who drives it, never by its team.
+func passes_mouths() -> bool:
+	return controller != null and controller.seat >= 0
 
 
 ## True for a body that comes back from a fall (a wizard: a seat's own body); anything else dies of it.
@@ -564,18 +573,19 @@ func _move_over_holes(from: Vector2, delta: float) -> Vector2:
 	var motion: Vector2 = velocity * delta
 	var crossed: Vector2 = mover.crossing * delta
 	var grid: RoomGrid = projectiles.grid()
+	var through: bool = passes_mouths()
 	var at: Vector2 = from
 	if crossed != Vector2.ZERO:
-		at = grid.slide_body(from, crossed, radius, true)
+		at = grid.slide_body(from, crossed, radius, true, through)
 	var walk: Vector2 = motion - crossed
 	if walk == Vector2.ZERO and crossed != Vector2.ZERO:
 		return at
 	if grid.is_hole(at):
-		return grid.slide_body(at, walk, radius, true)
+		return grid.slide_body(at, walk, radius, true, through)
 	if crossed != Vector2.ZERO and grid.touches_hole(at, radius):
-		var walked: Vector2 = grid.slide_body(at, walk, radius, true)
+		var walked: Vector2 = grid.slide_body(at, walk, radius, true, through)
 		return at if grid.is_hole(walked) else walked
-	return grid.slide_body(at, walk, radius)
+	return grid.slide_body(at, walk, radius, false, through)
 
 
 ## Tell every actor whose touch area this body overlaps where its move left it (its circle against

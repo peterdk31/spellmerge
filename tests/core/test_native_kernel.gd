@@ -333,6 +333,9 @@ func _step_the_scene_alike(threads: int) -> void:
 		mgr._spark_rng.seed = 11
 		mgr.set_walls([Rect2(0, 0, 960, 24), Rect2(0, 516, 960, 24), Rect2(0, 0, 24, 540), Rect2(936, 0, 24, 540),
 				Rect2(300, 200, 40, 40), Rect2(620, 300, 40, 40), Rect2(500, 150, 24, 24)] as Array[Rect2])
+		# A bridge's mouth (connected biomes CB2): a wall to every shot, read by the hit pass on
+		# both sides as the wall grid's byte.
+		mgr.grid().add_mouth(Rect2(720, 24, 8, 220))
 		for i in 60:
 			var at: Vector2 = Vector2(480.0, 270.0) + Vector2(float(i % 10) * 18.0 - 90.0, float(i / 10) * 18.0 - 45.0)
 			var owner_id: int = _imp if i % 7 == 0 else EventsScript.NO_PLAYER

@@ -259,19 +259,19 @@ func test_a_room_with_no_holes_moves_a_body_as_one_slide() -> void:
 
 
 
-func test_a_snapshot_restores_the_holes_and_a_walk_stops_at_them_again() -> void:
-	# The hole grid is state (not DERIVED): a snapshot taken with the crack and restored after it was
-	# cleared lays it again, and a walk stops at its lip as before.
+func test_a_snapshot_keeps_the_holes_and_a_walk_stops_at_them_again() -> void:
+	# The hole grid is the room's (connected biomes CB2: the grid's room layers are DERIVED, laid by
+	# whoever lays the room): a restore leaves it as the room lies, and the walking grid worked out
+	# from it is set up again, so a walk stops at the lip as before.
 	var areas: Dictionary = {"Projectiles": _world.projectiles}
-	var snapshot := Snapshot.take(areas, root)
-	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
-	_world.projectiles.clear_walls()
 	var body: Actor = _walker()
 	_controller(body).move = Vector2.RIGHT
+	var snapshot := Snapshot.take(areas, root)
+	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
 	_run(40)
-	check(body.global_position.x > LIP + 10.0, "with the crack cleared it walks on: %s" % body.global_position)
+	check(absf(body.global_position.x - LIP) < 0.01, "a walk stops at the lip: %s" % body.global_position)
 	check_equal(snapshot.restore(areas, root), PackedStringArray(), "restored without problems")
-	check(_world.projectiles.has_holes() and _world.projectiles.is_hole(Vector2(216.0, 100.0)), "the crack is back")
+	check(_world.projectiles.has_holes() and _world.projectiles.is_hole(Vector2(216.0, 100.0)), "the crack is there")
 	body.position = START
 	_run(40)
 	check(absf(body.global_position.x - LIP) < 0.01, "and a walk stops at its lip again: %s" % body.global_position)

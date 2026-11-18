@@ -11,7 +11,9 @@ extends RefCounted
 ## - what stands in it: every `RoomPlacement` (a prop's `PropStandIn`, an enemy's `EnemyStandIn`,
 ##   tools/), its data (`placed()`) and its position, the feet of what stands there;
 ## - its zones: every `RoomZone`, a name, a rectangle and its data (`RoomZone.data()`: a cover
-##   field's `CoverPatch`, ground cover GC2; null for a plain zone).
+##   field's `CoverPatch`, ground cover GC2; null for a plain zone);
+## - its sockets: every `RoomSocket`, its place and the way it faces (connected biomes CB2: where a
+##   bridge may meet it in a biome; `PieceShape`).
 ##
 ## **Places are whole translations:** a position is the sum of the positions up the tree, never
 ## through a rotation, skew or scale (those go through the engine's trigonometry, which differs
@@ -40,6 +42,10 @@ var placed_at: PackedVector2Array = PackedVector2Array()
 var zone_names: Array[StringName] = []
 var zone_rects: Array[Rect2] = []
 var zone_data: Array[Resource] = []
+## Its sockets (`RoomSocket`, connected biomes CB2): where each is and the way it faces
+## (`RoomSocket.Facing`), in the tree's order.
+var socket_at: PackedVector2Array = PackedVector2Array()
+var socket_facing: PackedInt32Array = PackedInt32Array()
 ## Its size in pixels from (0, 0) (`size_of`).
 var size: Vector2 = Vector2.ZERO
 ## Its holes' rectangles (`hole_rects`, hub rework HR-H2): a spawn, a door or a placement over one is
@@ -134,11 +140,11 @@ func problems() -> PackedStringArray:
 	return _problems
 
 
-## Take every placement, zone and preview (`RoomPreview`) out of `layout`, a room the game is about
-## to show (not yet in the tree), wherever they are: they are freed at once.
+## Take every placement, zone, socket and preview (`RoomPreview`) out of `layout`, a room the game is
+## about to show (not yet in the tree), wherever they are: they are freed at once.
 static func strip(layout: Node) -> void:
 	for child in layout.get_children():
-		if child is RoomPlacement or child is RoomZone or child is RoomPreview:
+		if child is RoomPlacement or child is RoomZone or child is RoomSocket or child is RoomPreview:
 			layout.remove_child(child)
 			child.free()
 		else:
@@ -160,7 +166,7 @@ func _walk(node: Node, at: Vector2, path: String, bent: String) -> void:
 			if below == "" and (moved.rotation != 0.0 or moved.skew != 0.0 or moved.scale != Vector2.ONE):
 				below = named
 			here = at + moved.position
-		if below != "" and (child is RoomPlacement or child is RoomZone or (child is Marker2D and StringName(node.name) in POINT_HOLDERS)):
+		if below != "" and (child is RoomPlacement or child is RoomZone or child is RoomSocket or (child is Marker2D and StringName(node.name) in POINT_HOLDERS)):
 			_problems.append("%s lies under %s, which is rotated, skewed or scaled: places are whole translations; undo it." % [named, below])
 		if child is RoomPlacement:
 			var data: Resource = (child as RoomPlacement).placed()
@@ -169,6 +175,10 @@ func _walk(node: Node, at: Vector2, path: String, bent: String) -> void:
 			else:
 				placed.append(data)
 				placed_at.append(here)
+			continue
+		if child is RoomSocket:
+			socket_at.append(here)
+			socket_facing.append((child as RoomSocket).facing)
 			continue
 		if child is RoomZone:
 			var zone_node := child as RoomZone

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // BodyKernel (online-ready N6): a body's move against the wall grid and the ground grid (props W4:
-// the ground of the bodies that cannot move; a cell is a wall when either is not 0), a circle
+// the ground of the bodies that cannot move; a cell is a wall when either is not 0, the wall grid read
+// through a mask of the bits the body minds: connected biomes CB2, a mouth), a circle
 // sliding along the walls it meets, the same to the bit on every platform. It stands for `WallSlide.gd_slide`
 // (core/projectiles/wall_slide.gd); `WallSlide.slide` calls it when the module is loaded, and
 // tests/core/test_wall_slide.gd compares the two to the bit. The grid is handed in with each call
@@ -24,9 +25,11 @@ class BodyKernel : public RefCounted {
 public:
 	// WallSlide's numbers ({"ITERATIONS": ..., "MIN_STRIDE": ...}); false when one is missing.
 	bool configure(const Dictionary &config);
-	// `WallSlide.gd_slide(cells, ground, w, h, cell, origin, from, motion, radius)`.
+	// `WallSlide.gd_slide(cells, ground, w, h, cell, origin, from, motion, radius, mask)`: a cell is a
+	// wall where its bits in `mask` are set in `cells` (connected biomes CB2: a wizard's walk minds
+	// all but a mouth's), or it is not 0 in `ground`.
 	Vector2 slide(const PackedByteArray &cells, const PackedByteArray &ground, int64_t w, int64_t h, double cell, const Vector2 &origin,
-			const Vector2 &from, const Vector2 &motion, double radius) const;
+			const Vector2 &from, const Vector2 &motion, double radius, int64_t mask) const;
 
 protected:
 	static void _bind_methods();

@@ -1,0 +1,6 @@
+{
+	"version": 1,
+	"layer": {"source": "noise", "filter": {"type": "band", "from": 1900, "to": 1300, "q": 0.8}, "drive": 0.8,
+		"amp": {"attack": 0.002, "shape": "perc", "power": 4}},
+	"notes": "A soft snare: a band of noise falling 1900 to 1300 Hz, short and dry, its room from the score."
+}

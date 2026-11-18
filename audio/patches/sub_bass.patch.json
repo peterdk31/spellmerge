@@ -1,0 +1,6 @@
+{
+	"version": 1,
+	"layer": {"source": "triangle", "filter": {"type": "low", "from": 300, "q": 0.7},
+		"amp": {"attack": 0.25, "decay": 0.5, "sustain": 0.8, "release": 0.6}},
+	"notes": "A soft low drone: a triangle low-passed at 300 Hz, swelling in, for a calm floor under a track."
+}

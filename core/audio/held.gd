@@ -169,8 +169,7 @@ func clear() -> void:
 
 ## The node held sound `i` follows, or null for none or one that was freed (which it lets go of).
 func _valid(i: int) -> Node2D:
-	if _follow[i] == null:
-		return null
+	# Not valid: none, or freed.
 	if not is_instance_valid(_follow[i]):
 		_follow[i] = null
 		return null

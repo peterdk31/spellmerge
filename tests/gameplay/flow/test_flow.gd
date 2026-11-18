@@ -15,6 +15,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
 const Arrivals := preload("res://tests/support/arrivals.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 ## The arena's floor, wall border included.
 const INNER := Rect2(Vector2.ZERO, Vector2(640.0, 384.0))
@@ -258,6 +259,22 @@ func test_the_rooms_enemies_stand() -> void:
 func test_combat_knows_every_enemy_and_wizard() -> void:
 	_playing(4)
 	check_equal(combat.call("actor_count"), _room_count() + 4 + _props_in_combat(), "every enemy, wizard and breakable prop is registered with combat")
+
+
+## An arrival lasts the seconds of the registry's style `rise` (arrival styles AS1), or
+## `ArrivalStyle.DEFAULT`'s when the registry has none.
+func test_an_arrival_lasts_the_rise_styles_seconds() -> void:
+	var kept: RegistryScript = flow.registry
+	var fixture := RegistryScript.new()
+	flow.registry = fixture
+	check_equal(flow.arrival_seconds(), float(ArrivalStyle.DEFAULT["seconds"]), "no style: the default's")
+	var slow := ArrivalStyle.from_default()
+	slow.seconds = 1.2
+	fixture.add(ArrivalStyle.FOLDER, slow)
+	check_equal(flow.arrival_seconds(), 1.2, "the registry's rise")
+	flow.registry = kept
+	fixture.free()
+	check_equal(flow.arrival_seconds(), (kept.get_resource(ArrivalStyle.FOLDER, &"rise") as ArrivalStyle).seconds, "the game's rise")
 
 
 ## Every enemy of the room arrives as it starts (enemy arrivals EA3): set to arrive before it entered

@@ -86,6 +86,7 @@ Across all styles, no two may name the same biome (`ArrivalStyle.all_problems`, 
 - `all_problems(styles, known_cue)` adds the one-style-a-biome check. The look doesn't read `colours` yet: every style is `floor`'s until AS3 draws the first that isn't.
 - `content/arrivals/rise/rise.tres` writes every number out. It has no art, so no `assets.json`. `content/arrivals/README.md` is the guide.
 - **`Actor.ARRIVE_SECONDS` went in AS1, not AS2.** Flow's `arrival_seconds()` is the `rise` style's `seconds` from the registry, or `DEFAULT`'s with none. Every body still arrives as `rise`, and AS2 replaces it with `pick`. `Actor.arrive(seconds)` is unchanged; `arrive_style` is AS2's.
+- The registry's folder is `ArrivalStyle.FOLDER` (`arrivals`), named once in core for Flow, Feel and the tests.
 - **Feel.**
   - The motions are `ArriveLook.MOTIONS`, a constant table from each name to its script in `gameplay/feel/arrive_motions/`, and the look holds one object of each. There is no separate table file.
   - The base class `arrive_motion.gd` holds the measures every motion needs, moved from the look: `body_height`, `size_top`, `body_bottom`, the margin, and each body's kept `size_top`.

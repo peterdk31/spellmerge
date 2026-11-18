@@ -11,8 +11,8 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const Snapshot := preload("res://core/sim/snapshot.gd")
 
 const START: Vector2 = Vector2(150.0, 100.0)
-## How long the arrivals here last (the style `rise`'s seconds), and the ticks one takes at the fixture's step (0.8 / 0.0625 = 12.8: it
-## lands on the 13th).
+## How long the arrivals here last (any length: today's `rise`'s), and the ticks one takes at the
+## fixture's step (0.8 / 0.0625 = 12.8: it lands on the 13th).
 const SECONDS: float = 0.8
 const ARRIVE_TICKS: int = 13
 

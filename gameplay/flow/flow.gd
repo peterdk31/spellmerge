@@ -156,8 +156,6 @@ const PLAYER_SLOTS: int = 4
 const ROOM_FOLDER: StringName = &"rooms"
 ## The registry folder of the run definitions (content/runs).
 const RUN_FOLDER: StringName = &"runs"
-## The registry folder of the arrival styles (content/arrivals).
-const ARRIVALS: StringName = &"arrivals"
 ## The run a run of rooms is unless `run_id_to_play` says otherwise (a run definition's id,
 ## content/runs).
 const DEFAULT_RUN_ID: StringName = &"crypt"
@@ -1474,7 +1472,7 @@ func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, arrive: bool = f
 ## styles AS1: every body arrives as `rise` until AS2 picks a style per body), or
 ## `ArrivalStyle.DEFAULT`'s when the registry has none.
 func arrival_seconds() -> float:
-	var style: ArrivalStyle = registry.get_resource(ARRIVALS, ArrivalStyle.DEFAULT["id"]) as ArrivalStyle if registry != null else null
+	var style: ArrivalStyle = registry.get_resource(ArrivalStyle.FOLDER, ArrivalStyle.DEFAULT["id"]) as ArrivalStyle if registry != null else null
 	return style.seconds if style != null else float(ArrivalStyle.DEFAULT["seconds"])
 
 

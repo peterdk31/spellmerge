@@ -20,6 +20,8 @@ extends Resource
 ## id another machine does not have): a test holds them to content/arrivals/rise/rise.tres. A field's
 ## default is its number in `DEFAULT`, so a style file only writes what it changes.
 
+## The registry's folder of the styles (content/arrivals), which Flow and Feel find them in.
+const FOLDER: StringName = &"arrivals"
 ## The motions a style may name: the kinds of motion Feel draws (`ArriveLook.MOTIONS` has code for
 ## each). `rise`: out of the floor, through the mark (enemy arrivals EA2's look).
 const MOTIONS: Array[StringName] = [&"rise"]

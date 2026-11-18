@@ -1434,7 +1434,7 @@ func _play_arrive_cue(cue: StringName, at: Vector2, weighted: bool) -> void:
 
 ## The arrival style of id `id` (content/arrivals), null for none: `ArriveLook`'s lookup.
 func _arrival_style(id: StringName) -> ArrivalStyle:
-	return registry.get_resource(&"arrivals", id) as ArrivalStyle if registry != null else null
+	return registry.get_resource(ArrivalStyle.FOLDER, id) as ArrivalStyle if registry != null else null
 
 
 ## A falling body's motes (`FallLook`): `count` of them round `at`, the void's, drifting.

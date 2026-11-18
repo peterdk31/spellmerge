@@ -119,7 +119,8 @@ func use_room(room: RoomBase) -> void:
 	_fill = colours[mini(2, colours.size() - 1)].darkened(MARK_DARKEN)
 
 
-## Forget the styles looked up, so each is looked up again (the registry changed).
+## Forget the styles looked up, so each is looked up again: Feel calls it when its registry is set
+## (a registry rescanned in place, `Registry.scan` or `add`, is not noticed; the game never does).
 func forget_styles() -> void:
 	_styles.clear()
 

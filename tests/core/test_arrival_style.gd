@@ -4,7 +4,7 @@ extends "res://tests/support/suite.gd"
 ## (no two styles name one biome); `rise` is `ArrivalStyle.DEFAULT`'s numbers, and a field left out
 ## takes them; each problem `problems()` and `all_problems()` know is named.
 
-const FOLDER: StringName = &"arrivals"
+const FOLDER: StringName = ArrivalStyle.FOLDER
 
 
 ## Whether the game has a cue of id `cue`.
@@ -15,7 +15,9 @@ func _known_cue(cue: StringName) -> bool:
 func _styles() -> Array[ArrivalStyle]:
 	var found: Array[ArrivalStyle] = []
 	for style: Resource in root.get_node("Registry").call("get_all", FOLDER):
-		found.append(style as ArrivalStyle)
+		check(style is ArrivalStyle, "%s is a style" % style.resource_path)
+		if style is ArrivalStyle:
+			found.append(style as ArrivalStyle)
 	return found
 
 
@@ -37,9 +39,6 @@ func test_every_style_file_has_no_problems() -> void:
 	var styles: Array[ArrivalStyle] = _styles()
 	check(not styles.is_empty(), "the registry finds the styles in content/arrivals")
 	for style in styles:
-		check(style != null, "every resource there is a style")
-		if style == null:
-			continue
 		check_equal(style.problems(_known_cue), PackedStringArray(), "%s has no problems" % style.resource_path)
 		check(style.resource_path.begins_with("res://content/arrivals/%s/" % style.id), "%s is in its own folder" % style.id)
 	check_equal(ArrivalStyle.all_problems(styles, _known_cue), PackedStringArray(), "and the set has none")

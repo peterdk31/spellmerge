@@ -17,8 +17,8 @@ extends RefCounted
 ## (`PieceShape.GRID`, decision 2); every template known, a room's no walkway and a bridge's one,
 ## each keeping its own rules (`PieceShape.problems`) in its mirroring; a bridge's sockets meet the
 ## room sockets it names at the same point, facing each other; no socket joined twice; no two rooms
-## overlap, and a bridge overlaps only the two rooms it joins; and every room is reached from the
-## start room.
+## overlap, nor two bridges, and a bridge joins two rooms and overlaps only those; every mirroring
+## one of the four; every room reached from the start room; and its depths worked out.
 
 ## How many numbers a bridge's `bridge_ends` row holds: room a, its socket, room b, its socket.
 const END_FIELDS: int = 4
@@ -145,6 +145,14 @@ func problems(shapes: Dictionary) -> PackedStringArray:
 	if room_places.size() != rooms() or room_mirrors.size() != rooms() or room_kinds.size() != rooms() or bridge_places.size() != bridges() or bridge_mirrors.size() != bridges() or bridge_ends.size() != bridges() * END_FIELDS:
 		found.append("the map's rows are not of one length: make it with add_room and add_bridge.")
 		return found
+	for room in rooms():
+		if room_mirrors[room] > (PieceShape.MIRROR_X | PieceShape.MIRROR_Y):
+			found.append("room %d's mirroring %d is none of the four (0 to 3)." % [room, room_mirrors[room]])
+			return found
+	for bridge in bridges():
+		if bridge_mirrors[bridge] > (PieceShape.MIRROR_X | PieceShape.MIRROR_Y):
+			found.append("bridge %d's mirroring %d is none of the four (0 to 3)." % [bridge, bridge_mirrors[bridge]])
+			return found
 	var room_rects: Array[Rect2] = []
 	var room_shapes: Array[PieceShape] = []
 	for room in rooms():
@@ -164,6 +172,7 @@ func problems(shapes: Dictionary) -> PackedStringArray:
 			if room_rects[a].intersects(room_rects[b]):
 				found.append("rooms %d and %d overlap: move them apart." % [a, b])
 	var used: Dictionary = {}
+	var bridge_rects: Array[Rect2] = []
 	for bridge in bridges():
 		var shape: PieceShape = bridge_shape(bridge, shapes)
 		var what: String = "bridge %d (%s)" % [bridge, bridge_templates[bridge]]
@@ -178,6 +187,12 @@ func problems(shapes: Dictionary) -> PackedStringArray:
 			found.append("%s has %d sockets: a bridge has two, one at each end." % [what, shape.sockets()])
 			continue
 		var rect: Rect2 = shape.rect_at(bridge_places[bridge])
+		for other in bridge_rects.size():
+			if bridge_rects[other].intersects(rect):
+				found.append("bridges %d and %d overlap: move them apart." % [other, bridge])
+		bridge_rects.append(rect)
+		if end_room(bridge, 0) == end_room(bridge, 1):
+			found.append("%s joins room %d to itself: a bridge joins two rooms." % [what, end_room(bridge, 0)])
 		var ends: Array[int] = []
 		for end in 2:
 			var room: int = end_room(bridge, end)
@@ -204,6 +219,8 @@ func problems(shapes: Dictionary) -> PackedStringArray:
 	for room in rooms():
 		if reach.depths[room] < 0:
 			found.append("room %d cannot be reached from the start room: join it with a bridge." % room)
+	if reach.depths != depths:
+		found.append("its depths are not its bridges' (%s, worked out %s): call work_out_depths once it is made." % [depths, reach.depths])
 	return found
 
 

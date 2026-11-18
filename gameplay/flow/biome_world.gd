@@ -17,7 +17,9 @@ extends RefCounted
 ## **Not state but the map** (connected biomes CB2, "The wall grid"): the nodes and the grid's layers
 ## are laid again from the map, never saved. After a snapshot (`rebuild_derived`) a world whose map
 ## differs from the one it laid (a joining machine, a snapshot of another biome) lays the restored
-## map; the same map is left as it lies (the grid's layers are the restored world's own, `RoomGrid`).
+## map over the restored bounds, touching no state; the same map is left as it lies (the grid's layers
+## are the restored world's own, `RoomGrid`). A map with problems is not laid (`lay`), and the grid
+## keeps whatever was laid before.
 ##
 ## **Mirroring** (decision 6) is the map's and the collision's: a mirrored piece's walls, holes and
 ## sockets are mirrored in whole cells. Its art is shown flipped as a stand-in until the ground is
@@ -61,7 +63,7 @@ func lay(into: Node2D, new_map: BiomeMap) -> PackedStringArray:
 		clear()
 		return problems
 	map = new_map
-	_lay_now()
+	_lay_now(false)
 	return problems
 
 
@@ -71,7 +73,7 @@ func clear() -> void:
 		if is_instance_valid(layout):
 			if layout.get_parent() != null:
 				layout.get_parent().remove_child(layout)
-			layout.queue_free()
+			layout.free()
 	_layouts.clear()
 	_laid = null
 	map = null
@@ -87,7 +89,7 @@ func rebuild_derived() -> void:
 			clear()
 		return
 	if _laid == null or not _laid.same_as(map):
-		_lay_now()
+		_lay_now(true)
 
 
 ## The layout node of room `room` (null when none is laid).
@@ -135,13 +137,14 @@ func bounds() -> Rect2:
 	return whole.grow(MARGIN)
 
 
-## Lay the map's pieces and the grid (the class doc).
-func _lay_now() -> void:
+## Lay the map's pieces and the grid (the class doc); `restored`: after a snapshot, over the bounds
+## and the state it restored (see `_lay_grid`).
+func _lay_now(restored: bool) -> void:
 	for layout: Node in _layouts:
 		if is_instance_valid(layout):
 			if layout.get_parent() != null:
 				layout.get_parent().remove_child(layout)
-			layout.queue_free()
+			layout.free()
 	_layouts.clear()
 	shapes_of(map)
 	var at: int = 0
@@ -151,7 +154,7 @@ func _lay_now() -> void:
 	for bridge in map.bridges():
 		_layouts.append(_place(BRIDGE_NODE % bridge, map.bridge_templates[bridge], map.bridge_places[bridge], map.bridge_mirrors[bridge], at))
 		at += 1
-	_lay_grid()
+	_lay_grid(restored)
 	_laid = map.copy()
 
 
@@ -178,12 +181,19 @@ func _place(named: String, template: StringName, place: Vector2, mirror: int, in
 	return layout
 
 
-## Lay the grid from the map (the class doc), over the biome's bounds.
-func _lay_grid() -> void:
+## Lay the grid from the map (the class doc), over the biome's bounds. A first lay sets the projectile
+## manager's bounds (its shots' area and target grid; its solid shots lay themselves again). After a
+## snapshot (`restored`) the manager's bounds and its solid shots' cells are the snapshot's state,
+## the biome's already: only the grid's layers are laid again over them, the footprints and the solid
+## shots' stones put back (`RoomGrid.size_to`, `relay_solids`), and no state is touched.
+func _lay_grid(restored: bool) -> void:
 	if projectiles == null:
 		return
-	projectiles.set_bounds(bounds())
 	var grid: RoomGrid = projectiles.grid()
+	if restored:
+		grid.size_to(projectiles.bounds())
+	else:
+		projectiles.set_bounds(bounds())
 	var pieces: Array[Rect2] = []
 	for room in map.rooms():
 		var shape: PieceShape = map.room_shape(room, _shapes)
@@ -204,6 +214,8 @@ func _lay_grid() -> void:
 			var room: int = map.end_room(bridge, end)
 			var shape: PieceShape = map.room_shape(room, _shapes)
 			grid.add_mouth(_moved(shape.mouth_rect(map.end_socket(bridge, end)), map.room_places[room]))
+	if restored:
+		projectiles.relay_solids()
 
 
 func _lay_piece(grid: RoomGrid, shape: PieceShape, place: Vector2) -> void:

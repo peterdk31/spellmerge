@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## A bridge's mouth in the room grid (connected biomes CB2, docs/milestones/connected-biomes.md,
 ## "Cells"; `RoomGrid.MOUTH_CELL`): shots stop at it, on the GDScript's hit pass and the native
-## kernel's alike; sight sees through it; a wizard's walk goes through it and any other body's stops
+## kernel's alike, so an AI's line of fire is not clear through it; sight sees through it; a wizard's walk goes through it and any other body's stops
 ## there, by who drives the body, never its team; what stands or runs up stops at it; a cut opens a
 ## room's lip and the dark between pieces is a wall. Real actors for the walks (the actor fixture).
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -55,14 +55,19 @@ func test_a_shot_stops_at_a_mouth_on_either_side() -> void:
 		check_equal(mgr.wall_hits, 1, "native %s: as at a wall" % native)
 
 
-func test_sight_sees_through_a_mouth_and_a_wall_still_blocks_it() -> void:
+func test_sight_sees_through_a_mouth_and_a_line_of_fire_does_not() -> void:
 	var mgr: ManagerScript = _manager()
 	var grid: RoomGrid = mgr.grid()
 	check(grid.wall_hit(Vector2(100.0, 100.0), Vector2(250.0, 100.0)) >= 0.0, "a shot's way meets the mouth")
-	check(grid.line_clear(Vector2(100.0, 100.0), Vector2(250.0, 100.0)), "sight goes through it")
+	check(not grid.line_clear(Vector2(100.0, 100.0), Vector2(250.0, 100.0)), "so an AI's line of fire is not clear through it")
+	check(grid.sight_clear(Vector2(100.0, 100.0), Vector2(250.0, 100.0)), "sight goes through it")
 	grid.add_wall(Rect2(200.0, 80.0, 8.0, 40.0))
-	check(not grid.line_clear(Vector2(100.0, 100.0), Vector2(250.0, 100.0)), "a wall beyond it still blocks sight")
-	check(grid.line_clear(Vector2(100.0, 40.0), Vector2(250.0, 40.0)), "past the wall it sees on")
+	check(not grid.sight_clear(Vector2(100.0, 100.0), Vector2(250.0, 100.0)), "a wall beyond it still blocks sight")
+	check(grid.sight_clear(Vector2(100.0, 40.0), Vector2(250.0, 40.0)), "past the wall it sees on")
+	var plain: RoomGrid = RoomGrid.new()
+	plain.size_to(ROOM)
+	plain.add_wall(Rect2(200.0, 80.0, 8.0, 40.0))
+	check_equal(plain.sight_clear(Vector2(100.0, 100.0), Vector2(250.0, 100.0)), plain.line_clear(Vector2(100.0, 100.0), Vector2(250.0, 100.0)), "with no mouths sight is the line of fire")
 
 
 func test_what_stands_or_runs_up_stops_at_a_mouth() -> void:

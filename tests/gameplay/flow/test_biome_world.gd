@@ -107,7 +107,8 @@ func test_a_shot_stops_at_a_mouth_and_sight_sees_through_it() -> void:
 		mgr.step(Fixture.STEP)
 	check(not mgr.is_alive(shot), "the shot ended")
 	check(mgr.wall_hits >= 1, "on a wall: the mouth")
-	check(mgr.grid().line_clear(START, joint + Vector2(60.0, 0.0)), "sight goes on over the bridge")
+	check(not mgr.grid().line_clear(START, joint + Vector2(60.0, 0.0)), "no line of fire over the bridge")
+	check(mgr.grid().sight_clear(START, joint + Vector2(60.0, 0.0)), "sight goes on over it")
 
 
 ## The grid's layers are not state: what a snapshot holds of the biome is its map, a few hundred
@@ -115,7 +116,7 @@ func test_a_shot_stops_at_a_mouth_and_sight_sees_through_it() -> void:
 ## byte as the host's.
 func test_a_world_restored_lays_the_restored_map_again() -> void:
 	var grid_bytes: Dictionary = _grid_bytes(_world.projectiles.grid())
-	var snapshot := Snapshot.take({"Biome": _biome})
+	var snapshot := Snapshot.take({"Projectiles": _world.projectiles, "Biome": _biome})
 	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
 	# Another world, with another biome laid (one room): the joining machine's, or a rollback across.
 	var other_into := Node2D.new()
@@ -128,7 +129,7 @@ func test_a_world_restored_lays_the_restored_map_again() -> void:
 	one.work_out_depths()
 	check_equal(other.lay(other_into, one), PackedStringArray(), "a one-room biome laid")
 	check(_grid_bytes(_world.projectiles.grid()) != grid_bytes, "its grid differs")
-	check_equal(snapshot.restore({"Biome": other}), PackedStringArray(), "restored without problems")
+	check_equal(snapshot.restore({"Projectiles": _world.projectiles, "Biome": other}), PackedStringArray(), "restored without problems")
 	check(other.map.same_as(_biome.map), "the map is the snapshot's")
 	check_equal(other_into.get_child_count(), 5, "its pieces laid again")
 	check_equal(_grid_bytes(_world.projectiles.grid()), grid_bytes, "the grid laid again, the same to the byte")

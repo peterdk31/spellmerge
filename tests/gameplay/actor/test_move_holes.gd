@@ -256,22 +256,3 @@ func test_a_room_with_no_holes_moves_a_body_as_one_slide() -> void:
 	var pull: Vector2 = Vector2(0.1, 0.3) / 0.7
 	var share: Vector2 = pull * Fixture.STEP / Fixture.STEP
 	check_equal(pulled.velocity, share + Vector2(0.6, 0.8).limit_length(1.0) * pulled.mover.speed * 1.0 + _combat.push, "moves, then the walk, then the push")
-
-
-
-func test_a_snapshot_keeps_the_holes_and_a_walk_stops_at_them_again() -> void:
-	# The hole grid is the room's (connected biomes CB2: the grid's room layers are DERIVED, laid by
-	# whoever lays the room): a restore leaves it as the room lies, and the walking grid worked out
-	# from it is set up again, so a walk stops at the lip as before.
-	var areas: Dictionary = {"Projectiles": _world.projectiles}
-	var body: Actor = _walker()
-	_controller(body).move = Vector2.RIGHT
-	var snapshot := Snapshot.take(areas, root)
-	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
-	_run(40)
-	check(absf(body.global_position.x - LIP) < 0.01, "a walk stops at the lip: %s" % body.global_position)
-	check_equal(snapshot.restore(areas, root), PackedStringArray(), "restored without problems")
-	check(_world.projectiles.has_holes() and _world.projectiles.is_hole(Vector2(216.0, 100.0)), "the crack is there")
-	body.position = START
-	_run(40)
-	check(absf(body.global_position.x - LIP) < 0.01, "and a walk stops at its lip again: %s" % body.global_position)

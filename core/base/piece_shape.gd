@@ -9,7 +9,7 @@ extends RefCounted
 ## - **Sockets on the lip:** in front of a socket, the LANDING strip inside it as wide as its mouth
 ##   is open floor; a room's socket has the slab end just past it (a wall or a hole within LANDING
 ##   out from it: the lip wanders), and a walkway's (`RoomBase.walkway`: a bridge) lies on its own edge, at an end.
-## - **Every socket reaches every other** over the piece's open cells.
+## - **Every socket reaches every other** over the piece's open floor, by ways WAY cells wide.
 ##
 ## Where a biome joins a socket, the piece is cut open from the socket to its edge (`cut_rect`: a
 ## room's lip, so the bridge's floor goes on) and a mouth is laid just outside the socket
@@ -26,6 +26,9 @@ const LANDING: float = 16.0
 ## How deep a mouth is, out from its socket, in pixels (one wall cell: shots and walks are walked
 ## cell by cell, so one is enough to stop them).
 const MOUTH_DEPTH: float = 8.0
+## How many cells across a way between two sockets is at least (`problems`): 16 px, wider than a
+## wizard (its footprint's circle is 12 px across).
+const WAY: int = 2
 ## The mirror bits (decision 6): across (x) and up and down (y).
 const MIRROR_X: int = 1
 const MIRROR_Y: int = 2
@@ -233,11 +236,23 @@ func _any(cells: PackedByteArray, w: int, h: int, rect: Rect2) -> bool:
 	return false
 
 
-## Every socket reaching every other over open cells (a flood from the first socket's landing).
-func _reach_problems(blocked: PackedByteArray, w: int, h: int, named: String) -> PackedStringArray:
+## Every socket reaches every other over open floor a wizard fits through: a flood from the first
+## socket's landing over the cells whose square of WAY cells is open (WAY cells is wider than any
+## wizard's body, so a one-cell gap is no way).
+func _reach_problems(cells: PackedByteArray, w: int, h: int, named: String) -> PackedStringArray:
 	var found := PackedStringArray()
 	if sockets() < 2:
 		return found
+	var blocked := PackedByteArray()
+	blocked.resize(w * h)
+	for cy in h:
+		for cx in w:
+			var shut: int = 0
+			for dy in WAY:
+				for dx in WAY:
+					if cx + dx >= w or cy + dy >= h or cells[(cy + dy) * w + cx + dx] != 0:
+						shut = 1
+			blocked[cy * w + cx] = shut
 	var seen := PackedByteArray()
 	seen.resize(w * h)
 	var queue := PackedInt32Array()

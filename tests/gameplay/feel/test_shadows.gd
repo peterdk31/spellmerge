@@ -19,6 +19,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const CarriedLightsScript := preload("res://gameplay/feel/carried_lights.gd")
 const PILLAR: PropBase = preload("res://content/props/crypt_pillar/crypt_pillar.tres")
 const CRACKED_PILLAR: PropBase = preload("res://content/props/cracked_pillar/cracked_pillar.tres")
 
@@ -116,8 +117,9 @@ func test_a_pillar_blocks_by_its_ground_with_its_shaft_over_it() -> void:
 	check_equal(blockers.bodies[0].w, 1.0, "at full strength")
 	var ground: Rect2 = pillar.footprint.rect_at(pillar.global_position)
 	check_equal(blockers.boxes[1], Vector4(ground.position.x, ground.position.y, ground.end.x, ground.end.y), "the pillar blocks by its ground")
-	var top: float = pillar.global_position.y + PILLAR.offset.y - PILLAR.size.y * 0.5
-	check_equal(blockers.bodies[1], Vector4(minf(ground.position.x, 100.0 - PILLAR.size.x * 0.5), top, maxf(ground.end.x, 100.0 + PILLAR.size.x * 0.5), 1.0), "its shaft is its hurt box, at full strength as it comes")
+	var top: float = pillar.global_position.y + PILLAR.shaft_offset.y - PILLAR.shaft_size.y * 0.5
+	check_equal(top, 100.0 - 61.0, "its shaft reaches its capital (its art's top, not its hurt box's)")
+	check_equal(blockers.bodies[1], Vector4(100.0 - PILLAR.shaft_size.x * 0.5, top, 100.0 + PILLAR.shaft_size.x * 0.5, 1.0), "its shaft is its art's box, at full strength as it comes")
 	_clock += FRAME
 	check(not blockers.step(_world.table, _clock), "nothing changed: nothing to hand over")
 
@@ -171,7 +173,16 @@ func test_the_shader_has_the_picks_numbers() -> void:
 	check(code.contains("const int MAX_BLOCKERS = %d;" % LightBlockersScript.MAX), "the shader's MAX_BLOCKERS is the blockers' MAX")
 	check(code.contains("uniform vec4 blocker_box[%d];" % LightBlockersScript.MAX), "and its arrays that long")
 	check_equal(SpellLightScript.MAX_BLOCKERS, LightBlockersScript.MAX, "the spell light hands over as many")
-	check(code.contains("p.y >= body.y && p.y <= box.w") and code.contains("box.w + 0.5"), "a shaft lit from before its base, as `lit_as`")
+	# The pick's tests, by their text (headless runs draw nothing): each line the GDScript mirrors.
+	for line: String in [
+			"if (body.w > 0.0 && body.y < box.y && p.x >= body.x && p.x <= body.z && p.y >= body.y && p.y <= box.w) {",
+			"return k >= 0 ? vec2(p.x, blocker_box[k].w + 0.5) : p;",
+			"at = vec2(p.x, blocker_box[own].w + 0.5);",
+			"if (l.y < blocker_box[own].y) {",
+			"if (strength <= shade || holds(box, at) || holds(box, l)) {",
+			"if (crosses(at, l, box)) {",
+			"COLOR = vec4(lamp * f * f * open, 1.0);"]:
+		check(code.contains(line), "the shader's pick has `%s`, as light_blockers.gd's" % line)
 
 
 func test_the_spell_light_hands_its_lights_the_boxes_but_not_its_shots() -> void:
@@ -368,3 +379,119 @@ func test_feel_blocks_light_by_the_room_and_draws_shadows_only_with_spell_light(
 	bus.spell_light_changed.emit(true)
 	feel._process(FRAME)
 	check_equal((spectacle.get("light") as SpellLightScript).blocker_count(), 4, "a light made again is handed the boxes")
+
+
+func test_a_new_pillar_under_an_old_id_comes_as_it_stands() -> void:
+	var pillar: Actor = _pillar(Vector2(100.0, 100.0))
+	var id: int = pillar.id
+	var blockers := LightBlockersScript.new()
+	blockers.step(_world.table, _clock)
+	pillar.footprint.set_solid(false)
+	for frame in 60:
+		_clock += FRAME
+		blockers.step(_world.table, _clock)
+	check_equal(blockers.count, 0, "crumbled and eased out")
+	_world.actors.erase(pillar)
+	pillar.free()
+	_clock += FRAME
+	blockers.step(_world.table, _clock)
+	var again: Actor = _pillar(Vector2(100.0, 100.0))
+	check_equal(again.id, id, "the next body takes the id")
+	_clock += FRAME
+	blockers.step(_world.table, _clock)
+	check_equal(blockers.count, 1, "the new pillar blocks")
+	check_equal(blockers.bodies[0].w, 1.0, "at full strength at once, not easing in from the rubble's 0")
+
+
+func test_a_light_made_anew_takes_the_boxes_as_they_stand() -> void:
+	var pillar: Actor = _pillar(Vector2(100.0, 100.0))
+	var blockers := LightBlockersScript.new()
+	blockers.step(_world.table, _clock)
+	# Crumbled while spell light was off (no steps), then the light comes back.
+	pillar.footprint.set_solid(false)
+	blockers.refresh()
+	_clock += FRAME
+	check(blockers.step(_world.table, _clock), "handed over again")
+	check_equal(blockers.count, 0, "rubble already: no shadow fading over it")
+
+
+func test_a_room_built_forgets_the_last_rooms_props() -> void:
+	var pillar: Actor = _pillar(Vector2(100.0, 100.0))
+	var blockers := LightBlockersScript.new()
+	blockers.step(_world.table, _clock)
+	pillar.footprint.set_solid(false)
+	_clock += FRAME
+	blockers.step(_world.table, _clock)
+	check(blockers.strength[pillar.id] > 0.0 and blockers.strength[pillar.id] < 1.0, "easing out")
+	blockers.use_walls([] as Array[Rect2])
+	check_equal(blockers.strength[pillar.id], -1.0, "a new room: its props come as new")
+
+
+func test_a_wizard_behind_a_pillar_lights_round_itself() -> void:
+	# A pillar's base and shaft, a wizard standing behind it: its staff tip is on the shaft's screen
+	# box, its feet behind the base. Its light is blocked by where it stands (its feet), never moved in
+	# front of the pillar.
+	var boxes := PackedVector4Array([Vector4(87.0, 88.0, 113.0, 100.0)])
+	var bodies := PackedVector4Array([Vector4(84.0, 39.0, 116.0, 1.0)])
+	var feet := Vector2(100.0, 76.0)
+	var shade := LightBlockersScript.shade_between
+	check_equal(shade.call(Vector2(80.0, 70.0), feet, boxes, bodies, 1), 0.0, "the floor beside it, behind the pillar, is lit")
+	check_equal(shade.call(Vector2(100.0, 130.0), feet, boxes, bodies, 1), 1.0, "the floor in front of the pillar is not")
+	var wizard: Actor = _walker(feet)
+	var lights := CarriedLightsScript.new()
+	_world.table.set_home(wizard.id, 0)
+	for frame in 3:
+		lights.step(_world.table, _clock)
+		_clock += FRAME
+	var rows: PackedFloat32Array = lights.rows
+	var tip := Vector2(rows[SpellLightScript.ROW_X], rows[SpellLightScript.ROW_Y])
+	var ground := Vector2(rows[SpellLightScript.SPOT_ROW_GROUND], rows[SpellLightScript.SPOT_ROW_GROUND + 1])
+	check_equal(tip + ground, wizard.global_position, "a carried light stands on its body's feet")
+	var code: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
+	check(code.contains("lamp_at = rows == ROWS_SPOT ? centre + ground : lit_as(centre);"), "the shader lights a spot row from where it stands, only a flash or a cue moved off a shaft")
+
+
+func test_a_staff_tip_over_a_wall_does_not_open_it() -> void:
+	# A low wall; a wizard standing just south of it, its staff tip over the wall's box.
+	var boxes := PackedVector4Array([Vector4(0.0, 0.0, 128.0, 32.0)])
+	var bodies := PackedVector4Array([Vector4(0.0, 0.0, 128.0, 1.0)])
+	var feet := Vector2(64.0, 40.0)
+	var tip := Vector2(64.0, 20.0)
+	var shade := LightBlockersScript.shade_between
+	check_equal(shade.call(Vector2(64.0, -10.0), tip, boxes, bodies, 1), 0.0, "lit from the tip, the wall would let it through")
+	check_equal(shade.call(Vector2(64.0, -10.0), feet, boxes, bodies, 1), 1.0, "lit from where it stands, the wall blocks the far side")
+
+
+func test_an_arriving_body_s_shadow_rises_with_it() -> void:
+	var walker: Actor = _walker(Vector2(100.0, 100.0))
+	walker.arrive_seconds = 1.0
+	walker.arrive_left = 0.9
+	var shadows: BodyShadowsScript = _shadows()
+	_shade_frames(shadows, _rows([]), 1)
+	check_equal(shadows.count, 0, "under the floor (the arrival's mark is drawn): no shadow")
+	walker.arrive_left = 0.3
+	_shade_frames(shadows, _rows([]), 1)
+	var full: float = walker.footprint.radius + BodyShadowsScript.RADIUS_PAD
+	check(shadows.count == 1 and shadows.multimesh.buffer[14] < full, "rising: part of it")
+	walker.arrive_left = 0.0
+	_shade_frames(shadows, _rows([]), 1)
+	check_equal(shadows.multimesh.buffer[14], full, "landed: all of it")
+
+
+func test_a_gone_body_s_shadow_shrinks_away_where_it_was() -> void:
+	var walker: Actor = _walker(Vector2(100.0, 100.0))
+	var shadows: BodyShadowsScript = _shadows()
+	_shade_frames(shadows, _rows([]), 2)
+	walker.visible = false
+	var sizes: Array[float] = []
+	for frame in 12:
+		_shade_frames(shadows, _rows([]), 1)
+		sizes.append(shadows.multimesh.buffer[14] if shadows.count > 0 else 0.0)
+		if shadows.count > 0:
+			check_equal(Vector2(shadows.multimesh.buffer[3], shadows.multimesh.buffer[7]), Vector2(100.0, 102.0), "where it was")
+	check_equal(sizes[-1], 0.0, "gone in the end")
+	var shown: int = 0
+	for size in sizes:
+		if size > 0.0:
+			shown += 1
+	check(shown >= 3, "over at least 3 frames, got %s" % [sizes])

@@ -29,7 +29,8 @@ render_mode blend_add, world_vertex_coords;
 //               INSTANCE_CUSTOM.a how bright it is now (it fades over its seconds).
 //   ROWS_SPOT   the room's light spots (core/base/light_spot.gd), written by spell_light.gd: a
 //               transform scaled by the reach, COLOR its colour and strength, INSTANCE_CUSTOM.x
-//               its flicker and .y a seed.
+//               its flicker, .y a seed and .zw where it stands on the floor from its middle (0: on
+//               it; a carried light's staff tip is over its body's feet), what blocking goes by.
 // A shot's or a flash's colour is its glow (`look_of` in shot_look.gdshaderinc: its ramp, the
 // enemies' for an enemy shot). The light's shape is soft; light_apply.gdshader cuts what it adds
 // to the world into steps.
@@ -41,8 +42,10 @@ render_mode blend_add, world_vertex_coords;
 // end (a wall's own face, a light standing in a prop). A box may have a column drawn over it (a
 // pillar's shaft, `blocker_body`): a pixel there is lit as the floor just in front of the box's
 // base, so the shaft's face is lit by a light before or beside it and not by one behind it (its own
-// box blocks only a light past its back edge); a light whose middle is there (a blast on the shaft)
-// is lit from in front of the base too. How much a box blocks is its strength (it eases out as a
+// box blocks only a light past its back edge). Where a light is lit from: a spot row from where it
+// stands on the floor (its middle, or a carried light's body's feet: a wizard behind a pillar lights
+// round itself, and its staff tip over a wall does not open the wall); a flash's or a cue's from its
+// middle, moved in front of the base when it is on a shaft (a blast on the pillar's face). How much a box blocks is its strength (it eases out as a
 // pillar crumbles). The vertex stage marks which boxes come near the light (`near`), so a
 // light near none does no more work than before.
 
@@ -94,27 +97,11 @@ uniform vec4 blocker_body[32];
 // Where in the light the pixel is (-1 to 1 across), and the light's colour.
 varying vec2 spot;
 varying flat vec3 lamp;
-// The pixel in the world, where the light is lit from (its middle, moved out of a column), and the
-// boxes near the light (a bit each).
+// The pixel in the world, where the light is lit from (a spot row: where it stands on the floor; a
+// flash or a cue: its middle, moved out of a column), and the boxes near the light (a bit each).
 varying vec2 world;
 varying flat vec2 lamp_at;
 varying flat uint near;
-
-// Where `p` is lit as: in front of the base of a box whose column it is in, else itself
-// (light_blockers.gd's `lit_as`).
-vec2 lit_as(vec2 p) {
-	for (int k = 0; k < MAX_BLOCKERS; k++) {
-		if (k >= blocker_count) {
-			break;
-		}
-		vec4 box = blocker_box[k];
-		vec4 body = blocker_body[k];
-		if (body.w > 0.0 && body.y < box.y && p.x >= body.x && p.x <= body.z && p.y >= body.y && p.y <= box.w) {
-			return vec2(p.x, box.w + 0.5);
-		}
-	}
-	return p;
-}
 
 bool holds(vec4 box, vec2 p) {
 	return p.x >= box.x && p.x <= box.z && p.y >= box.y && p.y <= box.w;
@@ -162,6 +149,13 @@ int column_of(vec2 p) {
 	return -1;
 }
 
+// Where `p` is lit as: in front of the base of a box whose column it is in, else itself
+// (light_blockers.gd's `lit_as`).
+vec2 lit_as(vec2 p) {
+	int k = column_of(p);
+	return k >= 0 ? vec2(p.x, blocker_box[k].w + 0.5) : p;
+}
+
 // How much of the light at `l` (where it is lit from) is blocked on its way to the pixel `p` (0 to
 // 1; light_blockers.gd's `shade_between`): the strongest box near it that the way crosses and that
 // holds neither end. A pixel in a column is lit as the floor in front of its base (`lit_as`), and
@@ -204,6 +198,8 @@ void vertex() {
 	vec2 half_size = vec2(0.0);
 	vec2 way = vec2(1.0, 0.0);
 	vec3 colour = vec3(0.0);
+	// Where a spot row stands on the floor, from its middle.
+	vec2 ground = vec2(0.0);
 	if (rows == ROWS_RUNE) {
 		// Its card's light reach and intensity (`look_light_reach`, `look_light_intensity`) in the
 		// row's free floats (LIGHT_REACH, LIGHT_INTENSITY; 1 for a plain shot).
@@ -228,6 +224,7 @@ void vertex() {
 		float dip = INSTANCE_CUSTOM.x * fract(sin(step_of * 12.9898 + INSTANCE_CUSTOM.y * 78.233) * 43758.5453);
 		half_size = vec2(reach);
 		colour = COLOR.rgb * COLOR.a * (1.0 - dip);
+		ground = INSTANCE_CUSTOM.zw;
 	} else {
 		// Every live shot lights (tails are motes since the owner's pick of 2026-11-05: the shot
 		// batches hold only live shots, each with HF_LIVE).
@@ -251,10 +248,10 @@ void vertex() {
 		vec2 across = vec2(-way.y, way.x);
 		VERTEX = centre + way * corner.x * half_size.x + across * corner.y * half_size.y;
 		if (blocker_count > 0) {
-			lamp_at = lit_as(centre);
-			// The boxes (with their columns) that meet the light's square, or hold where it is lit from.
+			lamp_at = rows == ROWS_SPOT ? centre + ground : lit_as(centre);
+			// The boxes (with their columns) that meet the light's square, grown to where it is lit from.
 			float r = length(half_size);
-			vec4 lit = vec4(centre - vec2(r), centre + vec2(r));
+			vec4 lit = vec4(min(centre - vec2(r), lamp_at), max(centre + vec2(r), lamp_at));
 			for (int k = 0; k < MAX_BLOCKERS; k++) {
 				if (k >= blocker_count) {
 					break;

@@ -48,12 +48,23 @@ var walls: Array[Rect2] = []
 var strength: PackedFloat32Array = PackedFloat32Array()
 var _base: PackedVector4Array = PackedVector4Array()
 var _column: PackedVector3Array = PackedVector3Array()
-## The props seen this frame and the last (ids), and the open ids' buffer.
+## Whose each slot is: the actor's key (`Actors.key_of`: its id and birth, so a new body under an old
+## id starts afresh) and its node's instance (a body made again from a snapshot takes its state as it
+## rests, never easing to it).
+var _key: PackedInt64Array = PackedInt64Array()
+var _node: PackedInt64Array = PackedInt64Array()
+## The props seen this step and the step before (ids; swapped each step), and the open ids' buffer.
 var _props: PackedInt32Array = PackedInt32Array()
+var _prev: PackedInt32Array = PackedInt32Array()
 var _prop_count: int = 0
 var _ids: PackedInt32Array = PackedInt32Array()
-## The boxes changed since they were last handed over (`step`), and Feel's clock at the last step.
+## The step each actor's prop was last seen in, and the steps so far.
+var _seen: PackedInt32Array = PackedInt32Array()
+var _steps: int = 0
+## The boxes changed since they were last handed over (`step`); every strength to be taken as it
+## rests at the next step (`refresh`); and Feel's clock at the last step.
 var _dirty: bool = true
+var _snap: bool = false
 var _last: float = -1.0
 
 
@@ -64,19 +75,29 @@ func _init() -> void:
 	strength.fill(-1.0)
 	_base.resize(ActorsScript.ACTORS)
 	_column.resize(ActorsScript.ACTORS)
+	_key.resize(ActorsScript.ACTORS)
+	_node.resize(ActorsScript.ACTORS)
+	_seen.resize(ActorsScript.ACTORS)
+	_seen.fill(-1)
 	_props.resize(MAX)
+	_prev.resize(MAX)
 
 
 ## A room was laid out: its walls (`RoomPlaces.wall_rects` of its layout, room pixels), of which the
 ## standing ones block light from now on. Its props are found as they come (`step`).
 func use_walls(rects: Array[Rect2]) -> void:
 	walls = standing(rects)
+	# The last room's props are forgotten: the new room's come as they stand.
+	strength.fill(-1.0)
+	_prop_count = 0
 	_dirty = true
 
 
-## The boxes are handed over again at the next step (a spell light made anew).
+## The boxes are handed over again at the next step, each prop's as it stands (a spell light made
+## anew: what crumbled while it was off is rubble already, never a shadow fading over it).
 func refresh() -> void:
 	_dirty = true
+	_snap = true
 
 
 ## The walls of `rects` that stand inside the room: those not joined to the edge of the box round
@@ -115,6 +136,12 @@ func step(table: ActorsScript, now: float) -> bool:
 	var delta: float = clampf(now - _last, 0.0, 0.25) if _last >= 0.0 else 0.0
 	_last = now
 	var most: float = delta / FADE_SECONDS
+	_steps += 1
+	# Last step's props are `_prev` now; this step's are written into `_props`.
+	var swap: PackedInt32Array = _prev
+	_prev = _props
+	_props = swap
+	var before: int = _prop_count
 	var seen: int = 0
 	var open: int = table.open_ids(_ids) if table != null else 0
 	for at in open:
@@ -127,13 +154,17 @@ func step(table: ActorsScript, now: float) -> bool:
 		var feet: Vector2 = body.global_position
 		var box: Rect2 = body.footprint.rect_at(feet)
 		var base := Vector4(box.position.x, box.position.y, box.end.x, box.end.y)
-		var column: Vector3 = _column_of(body.prop, feet, base)
+		var column: Vector3 = column_of_prop(body.prop, feet, base)
 		var want: float = 1.0 if body.footprint.solid else 0.0
+		var key: int = table.key_of(id)
+		var node: int = body.get_instance_id()
 		var now_strength: float = strength[id]
-		if now_strength < 0.0:
-			# Come with the room: as it stands, no ease in.
+		if now_strength < 0.0 or _key[id] != key or _node[id] != node or _snap:
+			# Come with the room, a new body under an old id, a body made again from a snapshot, or
+			# the light made anew: as it stands, no ease.
+			if now_strength != want:
+				_dirty = true
 			now_strength = want
-			_dirty = true
 		elif now_strength != want:
 			now_strength = move_toward(now_strength, want, most)
 			_dirty = true
@@ -142,17 +173,21 @@ func step(table: ActorsScript, now: float) -> bool:
 		strength[id] = now_strength
 		_base[id] = base
 		_column[id] = column
-		if seen >= _prop_count or _props[seen] != id:
+		_key[id] = key
+		_node[id] = node
+		_seen[id] = _steps
+		if seen >= before or _prev[seen] != id:
 			_dirty = true
 		_props[seen] = id
 		seen += 1
-	# A prop gone from the table (a room left) is forgotten: it comes again as new.
-	for at in range(seen, _prop_count):
-		var gone: int = _props[at]
-		if not _holds(_props, seen, gone):
+	# A prop gone from the table (a room left, a body freed) is forgotten: it comes again as new.
+	for at in before:
+		var gone: int = _prev[at]
+		if _seen[gone] != _steps:
 			strength[gone] = -1.0
-		_dirty = true
+			_dirty = true
 	_prop_count = seen
+	_snap = false
 	if not _dirty:
 		return false
 	_dirty = false
@@ -160,19 +195,12 @@ func step(table: ActorsScript, now: float) -> bool:
 	return true
 
 
-## Whether `ids` holds `id` among its first `n`.
-static func _holds(ids: PackedInt32Array, n: int, id: int) -> bool:
-	for at in n:
-		if ids[at] == id:
-			return true
-	return false
-
-
-## The column drawn over a prop's base (its hurt shape's box: x0, top, x1) at `feet`, or none (its
-## top at the base's top).
-static func _column_of(prop: PropBase, feet: Vector2, base: Vector4) -> Vector3:
-	var half: Vector2 = prop.size * 0.5 if prop.size != Vector2.ZERO else Vector2(prop.radius, prop.radius)
-	var centre: Vector2 = feet + prop.offset
+## The column drawn over a prop's base at `feet` (x0, top, x1): its art's box (`PropBase.shaft_size`,
+## `shaft_offset`), else its hurt shape's, never narrower or lower than the base.
+static func column_of_prop(prop: PropBase, feet: Vector2, base: Vector4) -> Vector3:
+	var size: Vector2 = prop.shaft_size if prop.shaft_size != Vector2.ZERO else prop.size
+	var half: Vector2 = size * 0.5 if size != Vector2.ZERO else Vector2(prop.radius, prop.radius)
+	var centre: Vector2 = feet + (prop.shaft_offset if prop.shaft_size != Vector2.ZERO else prop.offset)
 	var top: float = minf(centre.y - half.y, base.y)
 	return Vector3(minf(centre.x - half.x, base.x), top, maxf(centre.x + half.x, base.z))
 
@@ -204,12 +232,8 @@ func _write() -> void:
 ## Where `p` is lit as: just in front of the base of the first box whose column holds it, else
 ## itself (light.gdshader's `lit_as`).
 static func lit_as(p: Vector2, box_list: PackedVector4Array, body_list: PackedVector4Array, n: int) -> Vector2:
-	for k in mini(n, MAX):
-		var box: Vector4 = box_list[k]
-		var body: Vector4 = body_list[k]
-		if body.w > 0.0 and body.y < box.y and p.x >= body.x and p.x <= body.z and p.y >= body.y and p.y <= box.w:
-			return Vector2(p.x, box.w + 0.5)
-	return p
+	var k: int = column_of(p, box_list, body_list, n)
+	return Vector2(p.x, box_list[k].w + 0.5) if k >= 0 else p
 
 
 ## The first box whose column holds `p` (-1: none; light.gdshader's `column_of`).
@@ -249,17 +273,13 @@ static func shade_between(p: Vector2, l: Vector2, box_list: PackedVector4Array, 
 
 
 ## This frame's boxes' `shade_between` from a point on the floor at `p` (a body's feet: behind a
-## pillar is behind it, though its shaft is drawn there) to a light whose middle is at `l`: the
-## bodies' shadows ask it.
-func shade(p: Vector2, l: Vector2) -> float:
+## pillar is behind it, though its shaft is drawn there) to a light standing on the floor at `from`
+## (a spot row's ground: its middle, or a carried light's body's feet), testing only the boxes
+## `near_bits` names (`near` of the light, worked out once a frame; -1 every one): the bodies'
+## shadows ask it.
+func shade_from(p: Vector2, from: Vector2, near_bits: int = -1) -> float:
 	if count == 0:
 		return 0.0
-	return shade_from(p, lit_as(l, boxes, bodies, count))
-
-
-## `shade` from a light already lit from `from` (its `lit_as`), testing only the boxes `near_bits`
-## names (`near` of the light; both worked out once a frame).
-func shade_from(p: Vector2, from: Vector2, near_bits: int = -1) -> float:
 	return shade_between(p, from, boxes, bodies, count, true, near_bits)
 
 

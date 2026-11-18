@@ -28,14 +28,14 @@ extends MultiMeshInstance2D
 const ActorsScript := preload("res://core/actors/actors.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
+const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
+const ArriveLookScript := preload("res://gameplay/feel/arrive_look.gd")
 const SHADER: Shader = preload("res://gameplay/feel/body_shadow.gdshader")
 
-## Floats a row holds (a 2D MultiMesh row with colours and custom data).
-const STRIDE: int = 16
-## Where a light row holds its reach and its middle (`SpellLight.write_spot_row`'s layout).
-const ROW_REACH: int = 0
-const ROW_X: int = 3
-const ROW_Y: int = 7
+## Floats a row holds (a 2D MultiMesh row with colours and custom data; the light rows' too).
+const STRIDE: int = SpellLightScript.STRIDE
+## How long a gone body's shadow takes to shrink away where it last was (s): 6 frames.
+const GONE_SECONDS: float = 0.1
 ## The most light rows a frame looks at (the room's spots and four carried lights are far fewer).
 const LIGHTS: int = 128
 ## How far a shadow is cast at most (px), and from how much light at the feet (a light's strength
@@ -62,11 +62,22 @@ const VIEW_MARGIN: float = 32.0
 
 ## How many shadows are drawn. Read only.
 var count: int = 0
-## Each actor's cast as drawn (px, before rounding), and the step it last had a shadow in (one that
-## had none the step before takes its cast at once). Read only.
+## Each actor's cast as drawn (px, before rounding), and the step it last had a shadow in and whose
+## it was (`Actors.key_of`): one that had none the step before, or a new body under an old id, takes
+## its cast at once. Read only.
 var cast: PackedVector2Array = PackedVector2Array()
 var _stamp: PackedInt32Array = PackedInt32Array()
+var _key: PackedInt64Array = PackedInt64Array()
 var _steps: int = 0
+## Each actor's shadow as last drawn (its feet and radius) and how much of it is left once its body
+## is gone (1 while it stands; it shrinks away where it was over GONE_SECONDS), and the ids drawn
+## this step and the last (swapped each step), `_shown_count` of them.
+var _last_feet: PackedVector2Array = PackedVector2Array()
+var _last_radius: PackedFloat32Array = PackedFloat32Array()
+var _left: PackedFloat32Array = PackedFloat32Array()
+var _shown: PackedInt32Array = PackedInt32Array()
+var _shown_prev: PackedInt32Array = PackedInt32Array()
+var _shown_count: int = 0
 ## The rows (grown, never shrunk) and the open ids' buffer.
 var _rows: PackedFloat32Array = PackedFloat32Array()
 var _ids: PackedInt32Array = PackedInt32Array()
@@ -75,8 +86,8 @@ var _light_at: PackedVector2Array = PackedVector2Array()
 var _light_reach: PackedFloat32Array = PackedFloat32Array()
 var _light_strength: PackedFloat32Array = PackedFloat32Array()
 var _light_owner: PackedInt32Array = PackedInt32Array()
-## Where each is lit from (`LightBlockers.lit_as`) and the boxes that come near it (a bit each; none:
-## it is never blocked), worked out once a step.
+## Where each stands on the floor (its row's ground: what it is cast away from and blocked by) and the
+## boxes that come near it (a bit each; none: it is never blocked), worked out once a step.
 var _light_from: PackedVector2Array = PackedVector2Array()
 var _light_near: PackedInt32Array = PackedInt32Array()
 var _light_count: int = 0
@@ -90,6 +101,12 @@ func _init(z: int) -> void:
 	cast.resize(ActorsScript.ACTORS)
 	_stamp.resize(ActorsScript.ACTORS)
 	_stamp.fill(-1)
+	_key.resize(ActorsScript.ACTORS)
+	_last_feet.resize(ActorsScript.ACTORS)
+	_last_radius.resize(ActorsScript.ACTORS)
+	_left.resize(ActorsScript.ACTORS)
+	_shown.resize(ActorsScript.ACTORS)
+	_shown_prev.resize(ActorsScript.ACTORS)
 	_light_at.resize(LIGHTS)
 	_light_reach.resize(LIGHTS)
 	_light_strength.resize(LIGHTS)
@@ -146,8 +163,8 @@ func begin_lights() -> void:
 	_light_count = 0
 
 
-## `n` light rows of `rows` (STRIDE floats each, in the spot rows' layout: reach, middle), each as
-## bright as its float `strength_at` says; `owners`, when not empty, the actor carrying each (its
+## `n` light rows of `rows` (STRIDE floats each, in the spot rows' layout: reach, middle, where it
+## stands on the floor, `SpellLight.write_spot_row`), each as bright as its float `strength_at` says; `owners`, when not empty, the actor carrying each (its
 ## shadow is not cast by it). Read, not kept.
 func add_lights(rows: PackedFloat32Array, n: int, strength_at: int, owners: PackedInt32Array) -> void:
 	for at in mini(n, rows.size() / STRIDE):
@@ -155,10 +172,12 @@ func add_lights(rows: PackedFloat32Array, n: int, strength_at: int, owners: Pack
 			return
 		var i: int = at * STRIDE
 		var strength: float = rows[i + strength_at]
-		var reach: float = rows[i + ROW_REACH]
+		var reach: float = rows[i + SpellLightScript.ROW_REACH]
 		if strength <= 0.0 or reach <= 0.0:
 			continue
-		_light_at[_light_count] = Vector2(rows[i + ROW_X], rows[i + ROW_Y])
+		var middle := Vector2(rows[i + SpellLightScript.ROW_X], rows[i + SpellLightScript.ROW_Y])
+		_light_at[_light_count] = middle
+		_light_from[_light_count] = middle + Vector2(rows[i + SpellLightScript.SPOT_ROW_GROUND], rows[i + SpellLightScript.SPOT_ROW_GROUND + 1])
 		_light_reach[_light_count] = reach
 		_light_strength[_light_count] = strength
 		_light_owner[_light_count] = owners[at] if at < owners.size() else ActorsScript.NONE
@@ -174,12 +193,16 @@ func step(table: ActorsScript, now: float, view: Rect2, blockers: LightBlockersS
 	var most: float = LENGTH * delta / EASE_SECONDS
 	var near: Rect2 = view.grow(VIEW_MARGIN)
 	for k in _light_count:
-		_light_near[k] = blockers.near(_light_at[k], _light_reach[k]) if blockers != null and blockers.count > 0 else 0
-		if _light_near[k] != 0:
-			_light_from[k] = LightBlockersScript.lit_as(_light_at[k], blockers.boxes, blockers.bodies, blockers.count)
+		var span: float = _light_reach[k] + _light_at[k].distance_to(_light_from[k])
+		_light_near[k] = blockers.near(_light_at[k], span) if blockers != null and blockers.count > 0 else 0
 	var open: int = table.open_ids(_ids) if table != null else 0
 	var out: int = 0
 	_steps += 1
+	var swap: PackedInt32Array = _shown_prev
+	_shown_prev = _shown
+	_shown = swap
+	var before: int = _shown_count
+	_shown_count = 0
 	for at in open:
 		var id: int = _ids[at]
 		var body := table.node_of(id) as Actor
@@ -188,21 +211,51 @@ func step(table: ActorsScript, now: float, view: Rect2, blockers: LightBlockersS
 		var feet: Vector2 = body.global_position + Vector2(0.0, DROP)
 		if view.has_area() and not near.has_point(feet):
 			continue
+		var key: int = table.key_of(id)
 		var want: Vector2 = _cast_from(feet, id, blockers)
-		if _stamp[id] != _steps - 1:
+		if _stamp[id] != _steps - 1 or _key[id] != key:
 			cast[id] = want
 		else:
 			cast[id] = cast[id].move_toward(want, most)
 		_stamp[id] = _steps
-		var radius: float = (body.footprint.radius + RADIUS_PAD) * (1.0 - body.fall_share())
+		_key[id] = key
+		var radius: float = (body.footprint.radius + RADIUS_PAD) * (1.0 - body.fall_share()) * rise_share(body.arrive_share())
+		_last_feet[id] = feet.round()
+		_last_radius[id] = radius
+		_left[id] = 1.0
+		_shown[_shown_count] = id
+		_shown_count += 1
 		if radius < SMALLEST:
 			continue
 		_write_row(out, feet.round(), cast[id].round(), radius)
+		out += 1
+	# A body gone since the last step (dead, freed, hidden, out of view): its shadow shrinks away
+	# where it was, never vanishing in one frame.
+	for at in before:
+		var id: int = _shown_prev[at]
+		if _stamp[id] == _steps:
+			continue
+		_left[id] = maxf(_left[id] - delta / GONE_SECONDS, 0.0)
+		var radius: float = _last_radius[id] * _left[id]
+		if radius < SMALLEST:
+			continue
+		_shown[_shown_count] = id
+		_shown_count += 1
+		_write_row(out, _last_feet[id], cast[id].round(), radius)
 		out += 1
 	count = out
 	multimesh.visible_instance_count = out
 	if out > 0:
 		multimesh.buffer = _rows
+
+
+## How much of a body's shadow shows at `share` of its arrival (`Actor.arrive_share`; 1 standing):
+## none while it is under the floor (Feel's arrival mark is drawn there instead, ArriveLook.MARK_END),
+## then growing with it as it rises.
+static func rise_share(share: float) -> float:
+	if share >= 1.0:
+		return 1.0
+	return clampf((share - ArriveLookScript.MARK_END) / (1.0 - ArriveLookScript.MARK_END), 0.0, 1.0)
 
 
 ## Where the shadow of a body with its feet at `feet` (and the id `id`) should be cast this frame
@@ -213,19 +266,22 @@ func _cast_from(feet: Vector2, id: int, blockers: LightBlockersScript) -> Vector
 	for k in _light_count:
 		if _light_owner[k] == id:
 			continue
-		var away: Vector2 = feet - _light_at[k]
 		var reach: float = _light_reach[k]
-		var far_sq: float = away.length_squared()
-		if far_sq >= reach * reach or far_sq < 0.25:
+		var far_sq: float = feet.distance_squared_to(_light_at[k])
+		if far_sq >= reach * reach:
 			continue
-		var far: float = sqrt(far_sq)
-		var fall: float = 1.0 - far / reach
+		# Cast away from where the light stands on the floor (a carried light: its body's feet).
+		var away: Vector2 = feet - _light_from[k]
+		var along: float = away.length()
+		if along < 0.5:
+			continue
+		var fall: float = 1.0 - sqrt(far_sq) / reach
 		var light: float = _light_strength[k] * fall * fall
 		if light < FAINT:
 			continue
 		if blockers != null and _light_near[k] != 0:
 			light *= 1.0 - blockers.shade_from(feet, _light_from[k], _light_near[k])
-		pull += away / far * light
+		pull += away / along * light
 	var strength: float = pull.length()
 	if strength < FAINT:
 		return Vector2.ZERO

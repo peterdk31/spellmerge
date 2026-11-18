@@ -99,6 +99,8 @@ const ROW_REACH: int = 0
 const ROW_X: int = 3
 const ROW_Y: int = 7
 const SPOT_ROW_STRENGTH: int = 11
+## Where a spot row holds where its light stands on the floor, from its middle (x, y).
+const SPOT_ROW_GROUND: int = 14
 ## The most boxes that block light (light.gdshader's MAX_BLOCKERS).
 const MAX_BLOCKERS: int = 32
 ## Whether the shots' and runes' lights are blocked too. Not: there are thousands of them, and
@@ -554,9 +556,11 @@ func draw_spots() -> void:
 
 ## Write row `at` of `buffer` (STRIDE floats a row) as a spot row (ROWS_SPOT, light.gdshader): a
 ## light at `where` reaching `reach` px, in `colour`, `strength` bright at its middle, its strength
-## dropping by up to `flicker` a step a few times a second from `seed` (0 to 1). The rows' one
-## writer: the room's spots and the carried lights.
-static func write_spot_row(buffer: PackedFloat32Array, at: int, where: Vector2, reach: float, colour: Color, strength: float, flicker: float, seed: float) -> void:
+## dropping by up to `flicker` a step a few times a second from `seed` (0 to 1), standing on the
+## floor `ground` from `where` (zero: right there; a carried light over its body's feet), which is
+## what blocking goes by (docs/milestones/atmosphere.md, C). The rows' one writer: the room's spots
+## and the carried lights.
+static func write_spot_row(buffer: PackedFloat32Array, at: int, where: Vector2, reach: float, colour: Color, strength: float, flicker: float, seed: float, ground: Vector2 = Vector2.ZERO) -> void:
 	var i: int = at * STRIDE
 	buffer[i] = reach
 	buffer[i + 1] = 0.0
@@ -572,8 +576,8 @@ static func write_spot_row(buffer: PackedFloat32Array, at: int, where: Vector2, 
 	buffer[i + 11] = clampf(strength, 0.0, 1.0)
 	buffer[i + 12] = clampf(flicker, 0.0, 1.0)
 	buffer[i + 13] = seed
-	buffer[i + 14] = 0.0
-	buffer[i + 15] = 0.0
+	buffer[i + 14] = ground.x
+	buffer[i + 15] = ground.y
 
 
 ## The room's spots' rows (`spot_count` of them; ROWS_SPOT, `write_spot_row`), read only: what the

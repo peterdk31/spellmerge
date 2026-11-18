@@ -40,6 +40,8 @@ var owners: PackedInt32Array = PackedInt32Array()
 ## whose body is gone fades where it stood). Read only.
 var strength: PackedFloat32Array = PackedFloat32Array()
 var _at: PackedVector2Array = PackedVector2Array()
+## Where each light stands on the floor from its tip: its body's feet (what blocking goes by).
+var _ground: PackedVector2Array = PackedVector2Array()
 var _colour: PackedColorArray = PackedColorArray()
 ## Feel's clock at the last step (-1: none yet), for the ease's time.
 var _last: float = -1.0
@@ -50,6 +52,7 @@ func _init() -> void:
 	strength.resize(ActorsScript.SEATS)
 	owners.resize(ActorsScript.SEATS)
 	_at.resize(ActorsScript.SEATS)
+	_ground.resize(ActorsScript.SEATS)
 	_colour.resize(ActorsScript.SEATS)
 
 
@@ -67,6 +70,7 @@ func step(table: ActorsScript, now: float) -> void:
 		if body != null:
 			want = CARRIED_STRENGTH * (DOWNED_SHARE if body.is_downed() else 1.0) * (1.0 - body.fall_share())
 			_at[seat] = body.muzzle_position()
+			_ground[seat] = body.global_position - _at[seat]
 			_colour[seat] = ProjectileManagerScript.ramp_light(table.ramp_of(table.home_of_seat(seat)))
 			if strength[seat] <= OUT and delta <= 0.0:
 				# The very first frame (nothing to ease from): no light yet, it eases in from the next.
@@ -76,7 +80,7 @@ func step(table: ActorsScript, now: float) -> void:
 			continue
 		# Each seat's own seed, so four staffs do not flicker together.
 		var seed: float = (float(seat) + 0.5) / float(ActorsScript.SEATS)
-		SpellLightScript.write_spot_row(rows, count, _at[seat], CARRIED_REACH, _colour[seat], strength[seat], CARRIED_FLICKER, seed)
+		SpellLightScript.write_spot_row(rows, count, _at[seat], CARRIED_REACH, _colour[seat], strength[seat], CARRIED_FLICKER, seed, _ground[seat])
 		owners[count] = owner
 		count += 1
 

@@ -8,6 +8,14 @@ extends Resource
 ##
 ## Rows count from 0, the map's first room; a negative row counts from the end of the map, so -1
 ## is its last row whatever its depth (the boss's), -2 the one before.
+##
+## **On a biome's map** (connected biomes CB5, docs/milestones/connected-biomes.md, decision 1;
+## `BiomeGenerator`) a row is a depth, the fewest bridges from the start room (0), and -1 the
+## deepest: the line that takes only it (`stands_deepest`, the boss) is the way's end, and every
+## other room stands shallower. A biome holds `least` rooms of a line (its fixed kinds), each room
+## past those up to `max_per_run` by `chance` (its chance kinds), and the rest of its rooms are the
+## lines with no `max_per_run`, by `weight`. A `dead_end` line's rooms are reached by one bridge and
+## lead nowhere (a secret room, the boss). `max_per_row` means nothing there.
 
 ## The most its weight and limits may be (the editor's ranges; a rule change, run generation RG6,
 ## may not pass them either).
@@ -34,6 +42,16 @@ const MOST_PER_RUN: int = 64
 ## out, and a row only it could take is left out of the map (the crypt's boss: until a boss names
 ## the crypt, the run ends at its deepest fight).
 @export var required: bool = true
+## How many rooms of it every biome's map holds (connected biomes CB5: the fixed kinds, decision 1;
+## the row map ignores it). At most `max_per_run` where that is set.
+@export_range(0, 64) var least: int = 0
+## The chance of each room of it past `least`, up to `max_per_run`, on a biome's map (the chance
+## kinds, decision 1: a fountain, a second secret room). 0: none past `least`; a line with no
+## `max_per_run` fills by `weight` instead.
+@export_range(0.0, 1.0, 0.01) var chance: float = 0.0
+## True when a room of it on a biome's map is a dead end: one bridge leads to it and none on (a
+## secret room, the boss).
+@export var dead_end: bool = false
 
 
 ## Rule `kind` from `first` to `last` (rows; below 0 from the end) at `of_weight`.
@@ -64,6 +82,12 @@ func takes_row(row: int, depth: int) -> bool:
 	return row >= 0 and row < depth and row >= row_at(first_row, depth) and row <= row_at(last_row, depth)
 
 
+## True when it stands only at the deepest of a map (its first and last row -1): on a biome's map,
+## the way's end (the boss).
+func stands_deepest() -> bool:
+	return first_row == -1 and last_row == -1
+
+
 ## True when a room of it may be led to from a room of kind `before`.
 func may_follow(before: StringName) -> bool:
 	return not not_after.has(before)
@@ -85,6 +109,10 @@ func problems(known: Array[StringName]) -> PackedStringArray:
 		found.append("Kind rule '%s': a limit below 0 (0 is no limit)." % kind)
 	if max_per_row > MOST_PER_ROW or max_per_run > MOST_PER_RUN:
 		found.append("Kind rule '%s': limits %d a row and %d a run; %d and %d at most." % [kind, max_per_row, max_per_run, MOST_PER_ROW, MOST_PER_RUN])
+	if least < 0 or least > MOST_PER_RUN or (max_per_run > 0 and least > max_per_run):
+		found.append("Kind rule '%s': least %d; 0 to %d, and max_per_run (%d) at most where that is set." % [kind, least, MOST_PER_RUN, max_per_run])
+	if not (chance >= 0.0 and chance <= 1.0):
+		found.append("Kind rule '%s': its chance is %s; 0 to 1." % [kind, chance])
 	for before: StringName in not_after:
 		if not known.has(before):
 			found.append("Kind rule '%s': not_after names '%s', no room kind of that id." % [kind, before])

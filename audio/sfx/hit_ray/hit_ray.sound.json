@@ -13,9 +13,9 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 3600,
-				"to": 1800,
-				"q": 1.6
+				"from": 1100,
+				"to": 520,
+				"q": 1.4
 			},
 			"amp": {
 				"attack": 0.008,
@@ -26,21 +26,21 @@
 		{
 			"source": "sine",
 			"pitch": {
-				"from": 700,
-				"to": 420
+				"from": 300,
+				"to": 170
 			},
 			"length": 0.06,
-			"gain": -10,
+			"gain": -8,
 			"amp": {
-				"attack": 0.002,
+				"attack": 0.003,
 				"shape": "perc",
 				"power": 2.0
 			}
 		}
 	],
 	"fx": {
-		"lowpass": 7000
+		"lowpass": 2600
 	},
 	"gain": -5,
-	"notes": "A ray touching a body: a light sizzle with a tiny falling tick. A ray hits many times a second, so it sits 5 dB under the family's level (gain -5) and is the softest of the hits."
+	"notes": "A ray touching a body: a soft, low fizz with a tiny falling tick. A ray hits many times a second, so it sits 5 dB under the family's level (gain -5) and is the softest of the hits."
 }

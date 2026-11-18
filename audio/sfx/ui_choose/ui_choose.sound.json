@@ -3,13 +3,53 @@
 	"kind": "ui",
 	"family": "ui",
 	"seconds": 0.12,
-	"vary": {"pitch": 0.02, "time": 0.04, "seed": 802},
+	"vary": {
+		"pitch": 0.02,
+		"time": 0.04,
+		"seed": 802
+	},
 	"layers": [
-		{"source": "fm", "pitch": 880, "ratio": 2.0, "index": {"from": 1.5, "to": 0.2}, "length": 0.06,
-		 "amp": {"attack": 0.003, "shape": "perc", "power": 2.0}},
-		{"source": "partials", "pitch": 1320, "start": 0.04,
-		 "partials": [{"ratio": 1, "gain": 0, "decay": 0.25}, {"ratio": 2.0, "gain": -12, "decay": 0.12}, {"ratio": 3.01, "gain": -20, "decay": 0.06}],
-		 "amp": {"attack": 0.003}, "gain": -2}
+		{
+			"source": "fm",
+			"pitch": 587,
+			"ratio": 2.0,
+			"index": {
+				"from": 1.5,
+				"to": 0.2
+			},
+			"length": 0.06,
+			"amp": {
+				"attack": 0.003,
+				"shape": "perc",
+				"power": 2.0
+			}
+		},
+		{
+			"source": "partials",
+			"pitch": 880,
+			"start": 0.04,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.25
+				},
+				{
+					"ratio": 2.0,
+					"gain": -12,
+					"decay": 0.12
+				},
+				{
+					"ratio": 3.01,
+					"gain": -20,
+					"decay": 0.06
+				}
+			],
+			"amp": {
+				"attack": 0.003
+			},
+			"gain": -2
+		}
 	],
 	"notes": "A row chosen: two soft notes rising a fifth, the second a short bell, so a choice reads as a step forward."
 }

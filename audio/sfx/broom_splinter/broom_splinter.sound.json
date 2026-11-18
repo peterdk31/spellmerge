@@ -12,9 +12,9 @@
 		{
 			"source": "noise",
 			"filter": {
-				"type": "high",
-				"from": 2200,
-				"q": 0.8
+				"type": "band",
+				"from": 1100,
+				"q": 0.9
 			},
 			"length": 0.12,
 			"drive": 2.4,
@@ -50,7 +50,7 @@
 			},
 			"filter": {
 				"type": "band",
-				"from": 1700,
+				"from": 1000,
 				"q": 1.2
 			},
 			"start": 0.004,
@@ -87,8 +87,8 @@
 		{
 			"patch": "storm_gust",
 			"filter": {
-				"from": 500,
-				"to": 1800
+				"from": 400,
+				"to": 1300
 			},
 			"start": 0.3,
 			"length": 1.2,
@@ -101,5 +101,5 @@
 			"size": 1.6
 		}
 	},
-	"notes": "The broom's death: a sharp crack and a deep thud as its handle splits, wood splintering apart, then bits of handle and straw clattering down and a last sigh of air."
+	"notes": "The broom's death: a dull crack and a deep thud as its handle splits, wood splintering apart, then bits of handle and straw clattering down and a last sigh of air."
 }

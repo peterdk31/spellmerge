@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/ui_back/ui_back.sound.json",
-			"recipe_hash": "sha256:45bd72f8db86d9edec473519dcf752918d4c6a7f94f70f881a36eaa40754909d",
-			"audio_hash": "sha256:b27227f1b9214e4a11275ba3fe0359251903f7fa0af4e6fdaff2ccd98a26d422",
+			"recipe_hash": "sha256:1c600c7124b9fff8efee548988d2476f4f94b412a11cdb29c7275ea47a1ad34d",
+			"audio_hash": "sha256:de56ffa176a0bd9d7d03131be10ed519cc8b1b36b6e17755b95eb4676463abd7",
 			"loudness": -23.9,
-			"peak": -8.3
+			"peak": -7.6
 		},
 		{
 			"path": "audio/sfx/ui_back/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/ui_back/ui_back.sound.json",
-			"recipe_hash": "sha256:45bd72f8db86d9edec473519dcf752918d4c6a7f94f70f881a36eaa40754909d",
-			"audio_hash": "sha256:9a910de392f22c0b36be1f4375b7058f4f751d35d38dc801ae7467531c645da8",
+			"recipe_hash": "sha256:1c600c7124b9fff8efee548988d2476f4f94b412a11cdb29c7275ea47a1ad34d",
+			"audio_hash": "sha256:bf5a806ad4a49c7e0b4707908e17300bc75d219a046f26fc32ca72b6903c9665",
 			"loudness": -24.1,
-			"peak": -8.0
+			"peak": -7.6
 		}
 	]
 }

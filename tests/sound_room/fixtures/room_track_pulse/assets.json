@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/sound_fixtures.py TRACK['pulse']",
-			"recipe_hash": "sha256:f15d6289040f2db1a523cd684fed51ff56c90fa68c67217ac453f821d6747758",
+			"recipe_hash": "sha256:5d2f633de768c03838e14dd4bce7b1064cb2c9db47ac5a2b4ce81d5b94fc6ff6",
 			"audio_hash": "sha256:beb8baa55b41a1cb5ee625181faf2c7a336bbe91e93d23bcf012ae324655908b",
 			"loudness": -24.0,
 			"peak": -8.7

@@ -6,7 +6,7 @@
 	"vary": {
 		"pitch": 0.03,
 		"time": 0.06,
-		"seed": 43
+		"seed": 143
 	},
 	"layers": [
 		{
@@ -16,7 +16,7 @@
 		},
 		{
 			"patch": "frost_glass",
-			"pitch": 1040,
+			"pitch": 660,
 			"start": 0.1
 		}
 	],
@@ -26,5 +26,5 @@
 			"size": 1.2
 		}
 	},
-	"notes": "Rime (water and frost): a wash of water caught short by a glass ping as it freezes."
+	"notes": "Rime (water and frost): a wash of water caught short by a low glass ping as it freezes."
 }

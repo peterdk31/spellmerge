@@ -11,7 +11,7 @@
 	"layers": [
 		{
 			"patch": "frost_glass",
-			"pitch": 1320
+			"pitch": 700
 		},
 		{
 			"patch": "lightning_crackle",
@@ -23,7 +23,9 @@
 		"reverb": {
 			"mix": 0.3,
 			"size": 1.2
-		}
+		},
+		"lowpass": 3000
 	},
-	"notes": "Superconduct (frost and lightning): a clear glass ping with a quick spit of sparks."
+	"notes": "Superconduct (frost and lightning): a clear, low glass ping with a quick spit of sparks. It sits 1 dB under the family's level (gain -1) so the ping's strike stays under the peak.",
+	"gain": -1
 }

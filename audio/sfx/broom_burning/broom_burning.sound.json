@@ -7,8 +7,8 @@
 		{
 			"patch": "fire_roar",
 			"filter": {
-				"from": 520,
-				"to": 820,
+				"from": 380,
+				"to": 600,
 				"curve": "arch",
 				"q": 0.9
 			},
@@ -32,7 +32,10 @@
 				"attack": 0.0,
 				"release": 0.0
 			},
-			"gain": -6
+			"gain": -9,
+			"filter": {
+				"from": 900
+			}
 		},
 		{
 			"patch": "fire_crackle",
@@ -48,7 +51,8 @@
 		"reverb": {
 			"mix": 0.15,
 			"size": 0.9
-		}
+		},
+		"lowpass": 1500
 	},
 	"notes": "The broom's head burning all through its second phase: a steady roar of flame breathing slowly, a low rumble under it and crackles of embers on top."
 }

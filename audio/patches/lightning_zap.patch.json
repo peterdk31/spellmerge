@@ -3,14 +3,14 @@
 	"layer": {
 		"source": "saw",
 		"pitch": {
-			"from": 1400,
-			"to": 180
+			"from": 620,
+			"to": 90
 		},
-		"crush": 6,
+		"crush": 7,
 		"filter": {
 			"type": "band",
-			"from": 2600,
-			"to": 900,
+			"from": 1300,
+			"to": 420,
 			"q": 1.2
 		},
 		"amp": {
@@ -19,5 +19,5 @@
 			"power": 3.0
 		}
 	},
-	"notes": "Lightning's zap: a crushed saw falling fast through a band, a short electric snap."
+	"notes": "Lightning's zap: a crushed saw falling fast from 620 Hz through a low band, a short electric thud more than a snap."
 }

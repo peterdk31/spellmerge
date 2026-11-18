@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/possess/possess.sound.json",
-			"recipe_hash": "sha256:f4a462e04895414410136e5aec456b7beb8bbcfdefb940a0d2df05888978a25d",
+			"recipe_hash": "sha256:f936f037b894443a1c6ecbd8f64399991baff559ccbe2322117d1c80051c36e4",
 			"audio_hash": "sha256:ddcb97518b52f90017d7219c9bd0236068b60cbdaf9ac8b72879f60e23fcbe3e",
 			"loudness": -17.2,
 			"peak": -6.2
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/possess/possess.sound.json",
-			"recipe_hash": "sha256:f4a462e04895414410136e5aec456b7beb8bbcfdefb940a0d2df05888978a25d",
+			"recipe_hash": "sha256:f936f037b894443a1c6ecbd8f64399991baff559ccbe2322117d1c80051c36e4",
 			"audio_hash": "sha256:7b5fea04afbd3b6efebf0aed4f909c0201308fcdd21df8f26c4778a5393f8f33",
 			"loudness": -16.9,
 			"peak": -5.5
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/possess/possess.sound.json",
-			"recipe_hash": "sha256:f4a462e04895414410136e5aec456b7beb8bbcfdefb940a0d2df05888978a25d",
+			"recipe_hash": "sha256:f936f037b894443a1c6ecbd8f64399991baff559ccbe2322117d1c80051c36e4",
 			"audio_hash": "sha256:c1568fb03992646aceb20197cc94c418c354231f8ac01a1a58550b239e6f0ce1",
 			"loudness": -16.9,
 			"peak": -5.3

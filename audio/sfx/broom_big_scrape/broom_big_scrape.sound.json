@@ -8,10 +8,10 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 1100,
-				"to": 1900,
-				"curve": "arch",
-				"q": 1.2
+				"from": 420,
+				"to": 720,
+				"q": 1.2,
+				"curve": "arch"
 			},
 			"drive": 1.2
 		},
@@ -21,7 +21,7 @@
 			"pitch": 120,
 			"filter": {
 				"type": "band",
-				"from": 2600,
+				"from": 1000,
 				"q": 1.2
 			},
 			"gain": -8
@@ -47,7 +47,8 @@
 		"reverb": {
 			"mix": 0.2,
 			"size": 1.0
-		}
+		},
+		"lowpass": 1600
 	},
 	"gain": 2,
 	"notes": "The Big Sweep winding up: a heavier, lower drag of the bristles over stone, slower back and forth, with a deep grinding rumble under it, so it is known without looking. 2 dB over the family's level (gain 2), a telegraph; its cue adds 4 dB more."

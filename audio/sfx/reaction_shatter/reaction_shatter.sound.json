@@ -11,19 +11,20 @@
 	"layers": [
 		{
 			"patch": "frost_glass",
-			"pitch": 1480
+			"pitch": 740
 		},
 		{
 			"patch": "frost_glass",
-			"pitch": 1960,
+			"pitch": 988,
 			"start": 0.03,
 			"gain": -6
 		},
 		{
 			"source": "noise",
 			"filter": {
-				"type": "high",
-				"from": 3500,
+				"type": "band",
+				"from": 1600,
+				"to": 700,
 				"q": 0.8
 			},
 			"length": 0.12,
@@ -33,7 +34,7 @@
 				"shape": "perc",
 				"power": 2.0
 			},
-			"gain": -4
+			"gain": -7
 		},
 		{
 			"patch": "storm_gust",
@@ -47,5 +48,5 @@
 			"size": 1.2
 		}
 	},
-	"notes": "Shatter (frost and storm): ice breaking, two high glass strikes on a sharp crash of noise, blown off by a short gust."
+	"notes": "Shatter (frost and storm): ice breaking, two glass strikes a fourth apart on a dull crash of noise, blown off by a short gust."
 }

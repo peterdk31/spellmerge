@@ -15,8 +15,8 @@
 		{
 			"patch": "water_wash",
 			"filter": {
-				"from": 700,
-				"to": 2400
+				"from": 360,
+				"to": 850
 			},
 			"gain": -3
 		}
@@ -25,7 +25,8 @@
 		"reverb": {
 			"mix": 0.3,
 			"size": 1.2
-		}
+		},
+		"lowpass": 1500
 	},
-	"notes": "Squall (water and storm): a gust driving rain, wind over a bright wash."
+	"notes": "Squall (water and storm): a gust driving rain, wind over a wash."
 }

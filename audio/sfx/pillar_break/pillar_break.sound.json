@@ -12,9 +12,9 @@
 		{
 			"source": "noise",
 			"filter": {
-				"type": "high",
-				"from": 1800,
-				"q": 0.8
+				"type": "band",
+				"from": 1000,
+				"q": 0.9
 			},
 			"length": 0.12,
 			"drive": 2.6,
@@ -50,7 +50,7 @@
 			},
 			"filter": {
 				"type": "band",
-				"from": 1200,
+				"from": 900,
 				"q": 1.0
 			},
 			"start": 0.015,

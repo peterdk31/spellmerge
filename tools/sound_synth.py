@@ -178,6 +178,34 @@ def check_patch(patch: Any, where: str) -> None:
         raise SoundError(f"{where}.layer", "must be a layer object that names no patch")
 
 
+def merge_patch(layer: Any, where: str, patches: dict[str, dict]) -> dict:
+    """The layer with its patch (if it names one) merged under its own keys; not yet checked."""
+    if not isinstance(layer, dict):
+        raise SoundError(where, "must be an object")
+    if "patch" not in layer:
+        return layer
+    name = layer["patch"]
+    if not isinstance(name, str) or name not in patches:
+        raise SoundError(f"{where}.patch", f"no patch {name!r} (audio/patches/{name}.patch.json)")
+    check_patch(patches[name], f"patch {name}")
+    return _merge(patches[name]["layer"], {k: v for k, v in layer.items() if k != "patch"})
+
+
+def validate_layer(layer: Any, where: str, patches: dict[str, dict] | None = None) -> dict:
+    """One layer checked, its patch merged in (the patch's layer under the layer's keys); `where`
+    names it in an error. Raises SoundError."""
+    layer = merge_patch(layer, where, patches or {})
+    source = layer.get("source")
+    _choice(SOURCES)(source, f"{where}.source")
+    _keys(layer, where, {**LAYER, **SOURCE_KEYS[source]}, ("source",) + SOURCE_NEEDS[source])
+    amp = layer.get("amp", {})
+    if any(k in amp for k in ("decay", "sustain", "release")) and ("shape" in amp or "power" in amp):
+        raise SoundError(f"{where}.amp", "a shape takes attack and power; decay, sustain and release are an ADSR's")
+    if source == "noise" and "pitch" in layer and layer.get("color", "white") == "white":
+        raise SoundError(f"{where}.pitch", "white noise has no pitch (a stepped noise's pitch is its rate)")
+    return layer
+
+
 def validate(recipe: Any, patches: dict[str, dict] | None = None) -> dict:
     """The recipe checked, with every layer's patch merged in (the patch's layer under the
     recipe's keys). `patches` is a patch's name to its file's object. Raises SoundError."""
@@ -187,26 +215,7 @@ def validate(recipe: Any, patches: dict[str, dict] | None = None) -> dict:
     if not isinstance(layers, list) or not 1 <= len(layers) <= 16:
         raise SoundError("layers", "must be a list of 1 to 16 layers")
     out = copy.deepcopy(recipe)
-    out["layers"] = []
-    for i, layer in enumerate(layers):
-        where = f"layers[{i}]"
-        if not isinstance(layer, dict):
-            raise SoundError(where, "must be an object")
-        if "patch" in layer:
-            name = layer["patch"]
-            if not isinstance(name, str) or name not in patches:
-                raise SoundError(f"{where}.patch", f"no patch {name!r} (audio/patches/{name}.patch.json)")
-            check_patch(patches[name], f"patch {name}")
-            layer = _merge(patches[name]["layer"], {k: v for k, v in layer.items() if k != "patch"})
-        source = layer.get("source")
-        _choice(SOURCES)(source, f"{where}.source")
-        _keys(layer, where, {**LAYER, **SOURCE_KEYS[source]}, ("source",) + SOURCE_NEEDS[source])
-        amp = layer.get("amp", {})
-        if any(k in amp for k in ("decay", "sustain", "release")) and ("shape" in amp or "power" in amp):
-            raise SoundError(f"{where}.amp", "a shape takes attack and power; decay, sustain and release are an ADSR's")
-        if source == "noise" and "pitch" in layer and layer.get("color", "white") == "white":
-            raise SoundError(f"{where}.pitch", "white noise has no pitch (a stepped noise's pitch is its rate)")
-        out["layers"].append(layer)
+    out["layers"] = [validate_layer(layer, f"layers[{i}]", patches) for i, layer in enumerate(layers)]
     kind = recipe["kind"]
     if kind == "held":
         if recipe.get("variants", 1) != 1:
@@ -401,6 +410,21 @@ def _layer(layer: dict, n: int, pitch_scale: float, time_scale: float, rng: rand
     return [v * e * level for v, e in zip(x, env)]
 
 
+def render_layer(layer: dict, samples: int, seed: int) -> list[float]:
+    """One validated layer (`validate_layer`'s result) alone, `samples` long, its noise and phases
+    from `seed`: a note of the sequencer (tools/sound_score.py)."""
+    return _layer(layer, max(1, samples), 1.0, 1.0, random.Random(seed))
+
+
+def apply_fx(x: list[float], fx: dict) -> list[float]:
+    """A sound's `fx` (its reverb, then its low pass) on `x`."""
+    if "reverb" in fx:
+        x = _reverb(x, fx["reverb"]["mix"], fx["reverb"].get("size", 1.0))
+    if "lowpass" in fx:
+        x = _filter(x, "low", lambda u: fx["lowpass"], 0.707)
+    return x
+
+
 COMBS = (1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617)
 ALLPASSES = (556, 441, 341, 225)
 
@@ -480,10 +504,7 @@ def render(recipe: dict, variant: int = 1) -> list[float]:
         for i, v in enumerate(_layer(layer, size, pitch_scale, time_scale, rng, n if tail else 0)):
             mix[start + i] += v
     fx = recipe.get("fx", {})
-    if "reverb" in fx:
-        mix = _reverb(mix, fx["reverb"]["mix"], fx["reverb"].get("size", 1.0))
-    if "lowpass" in fx:
-        mix = _filter(mix, "low", lambda u: fx["lowpass"], 0.707)
+    mix = apply_fx(mix, fx)
     if recipe["kind"] == "held":
         return _fold(mix, n, tail)
     if "reverb" in fx:  # the tail fades out over its last part, so a long room is never cut

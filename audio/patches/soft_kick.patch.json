@@ -1,0 +1,6 @@
+{
+	"version": 1,
+	"layer": {"source": "sine", "pitch": {"from": 120, "to": 42}, "drive": 1.4,
+		"amp": {"attack": 0.002, "shape": "perc", "power": 3}},
+	"notes": "A soft round kick: a sine falling from 120 to 42 Hz, a little driven, gone in a breath. Music only."
+}

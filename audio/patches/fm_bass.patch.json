@@ -1,0 +1,6 @@
+{
+	"version": 1,
+	"layer": {"source": "fm", "ratio": 1, "index": {"from": 2.4, "to": 0.5}, "filter": {"type": "low", "from": 900, "q": 0.8},
+		"amp": {"attack": 0.005, "decay": 0.15, "sustain": 0.6, "release": 0.06}},
+	"notes": "A round FM bass: a sine bright at the start of each note (its index falling 2.4 to 0.5), low-passed at 900 Hz."
+}

@@ -1,0 +1,6 @@
+{
+	"version": 1,
+	"layer": {"source": "noise", "filter": {"type": "band", "from": 6500, "to": 4800, "q": 0.9},
+		"amp": {"attack": 0.004, "shape": "perc", "power": 2.5}},
+	"notes": "A brushed tick: a short band of high noise, like bristles over stone. The music's hi-hat."
+}

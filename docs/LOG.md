@@ -5,6 +5,9 @@ What each run did, newest first. Claude appends a short entry after each develop
 ## 2026-11-18: Sound AU5: the core combat set
 
 The sound plan's first sounds (docs/milestones/sound.md, AU5): 24 recipes in `audio/sfx/<id>/`, baked with `tools/sound.py`, tier `good`: the cast (the owner's whoosh, shorter and darker), `hit` and the four hit kinds' sounds (ray, swing, burst, reaction), `enemy_death`, `player_downed`, `revive`, `heal` and the fourteen reactions, each mixing its two elements' voices from eight element patches in `audio/patches/` (`fire_roar`, `fire_crackle`, `frost_glass`, `storm_gust`, `void_swell`, `water_wash`, `lightning_zap`, `lightning_crackle`). The most heard sit under their family's level by a noted `gain`. The sound room's test plays every one. Audio now starts its players in a run recorded with Godot's movie maker, so a four-bot fight was recorded with sound. Plan fixes: the four hit kinds are AU5's, and lightning (not storm) is the crackle and the zap.
+## 2026-11-18: Sound AU7: music
+
+The sound plan's music (docs/milestones/sound.md, AU7): a pattern sequencer, `tools/sound_score.py`, turns a score (`<track>.score.json`: instruments from shared patches, one-bar patterns of notes, chords, hits and holds, and layers of patterns) into a loop a layer, every layer of a track exactly its bars long and seamless round its end (rings and the room's tail wrap to the start). `tools/sound.py` bakes, checks and sheets scores; a track's layers are placed together on the music target, now -23 LUFS integrated (docs/STYLE.md; -18 sat over the effects). Baked: the Old Broom's `boss_broom` and `boss_broom_fire` (D minor, 100 bpm, 38.4 s; phase 2 adds a snare, kicks, embers and a hot arpeggio) and `crypt_halls` (A minor, 80 bpm, 48 s), now the four crypt fight rooms' music. Balanced by measurement; the owner listens.
 
 ## 2026-11-18: Sound AU2: the sound tool
 

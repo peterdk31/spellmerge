@@ -3,7 +3,8 @@ extends RefCounted
 ## from its data, never from a list kept here: the cues' `sound` and their `held` parts', an enemy's
 ## `death_sound`, its phases' held `look.sound` and its music, a room's music and its ambience's
 ## layers and accents, and the ids Feel names itself (`feel_names`: its preset's `hit_sound` and each
-## hit kind's `kind_looks` sound, and the cast sound), which the room hands to `read`. Each id has the
+## hit kind's `kind_looks` sound, and the cast sound) and the HUD's menu sounds (`UiSounds.IDS`, played
+## on the UI bus; sound plan AU8), which the room hands to `read`. Each id has the
 ## kind it is played as (the first that names it wins) and every place it is named; every music track
 ## and ambience is kept too, with its owner.
 ##
@@ -14,8 +15,8 @@ extends RefCounted
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 
 ## How a sound is played: a one-shot (SFX), held while its moment lasts (SFX), a layer of a music
-## track (MusicDuck), a room's bed loop or one of its accents (Ambience).
-enum Kind { ONE_SHOT, HELD, MUSIC, BED, ACCENT }
+## track (MusicDuck), a room's bed loop or one of its accents (Ambience), or a menu's sound (UI).
+enum Kind { ONE_SHOT, HELD, MUSIC, BED, ACCENT, UI }
 
 ## Each named id's kind, and where it is named (lines such as "cue hit_spark").
 var kinds: Dictionary[StringName, Kind] = {}
@@ -41,9 +42,9 @@ static func feel_names(preset: FeelPresetScript, cast: StringName) -> Array:
 	return found
 
 
-## Reads every folder of `registry` (`get_folders`, `get_all`), and `feel`'s own ids: pairs of
-## [id, where] (`feel_names`).
-func read(registry: Node, feel: Array) -> void:
+## Reads every folder of `registry` (`get_folders`, `get_all`), `feel`'s own ids: pairs of
+## [id, where] (`feel_names`), and the menus' sounds `ui` (`UiSounds.IDS`).
+func read(registry: Node, feel: Array, ui: Array[StringName] = []) -> void:
 	kinds.clear()
 	where.clear()
 	tracks.clear()
@@ -52,6 +53,8 @@ func read(registry: Node, feel: Array) -> void:
 	bed_owners.clear()
 	for pair: Array in feel:
 		note(pair[0] as StringName, Kind.ONE_SHOT, pair[1] as String)
+	for id: StringName in ui:
+		note(id, Kind.UI, "the HUD's menu sound (UiSounds)")
 	var folders: Array[StringName] = registry.call(&"get_folders")
 	for folder: StringName in folders:
 		var all: Array[Resource] = registry.call(&"get_all", folder)

@@ -1,0 +1,148 @@
+extends "res://tests/support/suite.gd"
+## The split screen drawn (connected biomes CB6, gameplay/feel/split_screen.gd; decisions 27, 28):
+## while split, a view a group draws the world through its own transform and is shown in its cell;
+## the root draws only what is on its canvas layers (the HUD's corner panels stay where they are,
+## drawn once over the views); the views are published for what reads the picture by the screen;
+## the spell light has a buffer a view and tells each reader every view's transform. Merged again,
+## all of it is put back.
+const SplitScreenScript := preload("res://gameplay/feel/split_screen.gd")
+const SplitCameraScript := preload("res://gameplay/feel/split_camera.gd")
+const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
+const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
+const ScreenViewsScript := preload("res://core/display/screen_views.gd")
+const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
+
+const FRAME: float = 1.0 / 60.0
+
+var _table: ActorsScript
+var _holder: SubViewport
+var _camera: Camera2D
+var _party: PartyCameraScript
+var _split: SplitScreenScript
+var _mask: int = 0
+
+
+func before_each() -> void:
+	_mask = root.canvas_cull_mask
+	_table = own(ActorsScript.new()) as ActorsScript
+	root.add_child(_table)
+	_holder = own(SubViewport.new()) as SubViewport
+	_holder.size = Vector2i(root.get_visible_rect().size)
+	_holder.disable_3d = true
+	root.add_child(_holder)
+	_camera = Camera2D.new()
+	_camera.limit_left = -4000
+	_camera.limit_top = -4000
+	_camera.limit_right = 8000
+	_camera.limit_bottom = 4000
+	_holder.add_child(_camera)
+	_camera.make_current()
+	_party = PartyCameraScript.new()
+	_party.follow(_camera)
+	_split = own(SplitScreenScript.new()) as SplitScreenScript
+	root.add_child(_split)
+
+
+func after_each() -> void:
+	if is_instance_valid(_split) and _split.is_inside_tree():
+		root.remove_child(_split)
+	root.canvas_cull_mask = _mask
+
+
+func _wizard(seat: int, at: Vector2) -> Node2D:
+	var node := own(Node2D.new()) as Node2D
+	root.add_child(node)
+	node.global_position = at
+	var id: int = _table.open(ActorsScript.TEAM_WIZARDS, seat, seat)
+	_table.set_node(id, node)
+	_table.set_home(id, seat)
+	return node
+
+
+func _frames(count: int) -> void:
+	for i in count:
+		_party.look(_table, 0)
+		_party.step(FRAME)
+		_split.step(FRAME, _table, 0, _camera)
+
+
+func test_a_split_draws_the_world_in_views_and_the_hud_on_the_root() -> void:
+	# A panel in the screen's corner before the split, and one made during it.
+	var hud := own(CanvasLayer.new()) as CanvasLayer
+	hud.layer = 10
+	root.add_child(hud)
+	var corner := Control.new()
+	corner.position = Vector2(4.0, 4.0)
+	hud.add_child(corner)
+	_wizard(0, Vector2(0.0, 0.0))
+	var far: Node2D = _wizard(1, Vector2(3000.0, 0.0))
+	_frames(60)
+	check(_split.is_drawing(), "split: the views draw the world")
+	check_equal(_split.views().size(), 2, "two views")
+	check(root.canvas_cull_mask & SplitScreenScript.WORLD_LAYER == 0, "the root draws no world")
+	check(root.canvas_cull_mask & SplitScreenScript.SCREEN_LAYER != 0, "but the screen's layer")
+	check(corner.visibility_layer & SplitScreenScript.SCREEN_LAYER != 0, "a panel made before is drawn by the root")
+	var later := Control.new()
+	hud.add_child(later)
+	check(later.visibility_layer & SplitScreenScript.SCREEN_LAYER != 0, "and one made during the split")
+	check_equal(corner.position, Vector2(4.0, 4.0), "the corner panel stays in its corner")
+	var laid: ScreenViewsScript = _split.camera.views
+	check(ScreenViewsScript.on(root) == laid, "the views are published on the root")
+	for view in laid.count:
+		var shown: SubViewport = _split.views()[view] as SubViewport
+		check(shown.world_2d == root.world_2d, "view %d draws the root's world" % view)
+		check_equal(shown.canvas_transform, laid.to_screen[view], "view %d draws through its own transform" % view)
+		check_equal(shown.canvas_cull_mask, SplitScreenScript.WORLD_LAYER, "view %d draws the world's layer" % view)
+	# Merged again: everything put back.
+	far.global_position = Vector2(60.0, 0.0)
+	_frames(400)
+	check(not _split.is_drawing(), "together again: the root draws the world")
+	check_equal(root.canvas_cull_mask, _mask, "its cull mask as it was")
+	check(ScreenViewsScript.on(root) == null, "nothing published")
+	check(_split.views().is_empty(), "no view")
+
+
+func test_the_light_has_a_buffer_a_view_and_tells_its_readers_each_view() -> void:
+	var light := own(SpellLightScript.new(null, 0)) as SpellLightScript
+	root.add_child(light)
+	var reader := ShaderMaterial.new()
+	reader.shader = preload("res://gameplay/feel/mote.gdshader")
+	light.read_by(&"motes", reader)
+	_wizard(0, Vector2(0.0, 0.0))
+	_wizard(1, Vector2(3000.0, 0.0))
+	_frames(60)
+	light.use_views(_split.views())
+	check_equal(light.view_count(), 2, "a buffer a view")
+	check(light.view_buffer(1).world_2d == light.viewport.world_2d, "the second buffer draws the same lights")
+	check(light.view_buffer(1).get_parent() == light, "it is the light's")
+	var apply := light.apply.material as ShaderMaterial
+	check_equal(int(apply.get_shader_parameter(&"light_view_count")), 2, "the apply rect reads two views")
+	check_equal(int(reader.get_shader_parameter(&"light_view_count")), 2, "and so does a reader")
+	check(reader.get_shader_parameter(&"light_buffer_1") == light.view_buffer(1).get_texture(), "the reader has the second view's buffer")
+	var drawn: Transform2D = _split.camera.views.to_screen[1]
+	var named: Vector4 = apply.get_shader_parameter(&"light_view_1")
+	check(named.is_equal_approx(Vector4(drawn.x.x, drawn.origin.x, drawn.origin.y, 0.0)), "the second view's transform is named (%s)" % named)
+	var expected: Transform2D = Transform2D(0.0, Vector2.ONE / SpellLightScript.DOWNSCALE, 0.0, Vector2.ZERO) * drawn
+	check(light.view_buffer(1).canvas_transform.is_equal_approx(expected), "the second buffer follows the second view, scaled down")
+	light.use_views([] as Array[Viewport])
+	check_equal(light.view_count(), 0, "one picture again")
+	check_equal(int(apply.get_shader_parameter(&"light_view_count")), 0, "the apply rect reads the one buffer")
+	light.release()
+
+
+func test_each_players_item_hint_follows_its_own_view() -> void:
+	var hints := own(ItemHintsScript.new()) as ItemHintsScript
+	root.add_child(hints)
+	var views := ScreenViewsScript.new()
+	views.screen = Vector2(640.0, 360.0)
+	views.count = 2
+	views.set_view(0, 0b01, Transform2D(0.0, Vector2.ONE, 0.0, Vector2(160.0, 180.0)), Vector2(160.0, 180.0))
+	views.set_view(1, 0b10, Transform2D(0.0, Vector2.ONE, 0.0, Vector2(480.0, 180.0) - Vector2(1000.0, 0.0)), Vector2(480.0, 180.0))
+	preload("res://gameplay/feel/voronoi_cells.gd").new().fill(views)
+	hints._on_item_near_changed(1, 7, Vector2(1010.0, 20.0), {"name": "Wild star"})
+	hints._on_item_near_changed(0, 8, Vector2(1010.0, 20.0), {"name": "Wild star"})
+	var menus: Array[bool] = [false, false, false, false]
+	hints.step(0.0, menus, Transform2D.IDENTITY, views)
+	check(hints.hint_of(1).visible, "player 1's item is in their own view: its hint shows")
+	check(not hints.hint_of(0).visible, "player 0's view does not show that item: no hint")

@@ -735,7 +735,8 @@ func test_feel_marks_the_teammate_out_of_the_picture_at_its_edge() -> void:
 	var markers: Node = feel.call("teammate_markers") as Node
 	check(markers != null and int(markers.get("count")) == 1 and int(markers.call("seat_of", 0)) == 1, "Feel marks the teammate out of the picture, and nobody else")
 	if markers != null and int(markers.get("count")) == 1:
-		check(party.visible_rect().has_point(markers.call("position_of", 0) as Vector2), "the marker is in the picture")
+		var screen: Vector2 = party.visible_rect().size * party.camera.zoom.x
+		check(Rect2(Vector2.ZERO, screen).has_point(markers.call("position_of", 0) as Vector2), "the marker is on the screen (screen pixels)")
 
 
 func test_with_no_seat_played_here_feels_camera_holds_whoever_is_left() -> void:

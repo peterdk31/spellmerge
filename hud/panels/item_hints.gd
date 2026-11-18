@@ -55,18 +55,30 @@ func clear() -> void:
 
 
 ## A frame: `menus` holds, by player, whether they have a menu open; `to_screen` turns room pixels
-## into this layer's (the camera now). Real time for the shakes.
-func step(delta: float, menus: Array[bool], to_screen: Transform2D) -> void:
+## into this layer's (the camera now). While the screen is split (`views`, connected biomes CB6)
+## each player's hint is put where that player's own view shows the item instead (`layer` turns the
+## screen's pixels into this layer's), and hides while the item is outside that view's cell. Real
+## time for the shakes.
+func step(delta: float, menus: Array[bool], to_screen: Transform2D, views: ScreenViews = null, layer: Transform2D = Transform2D.IDENTITY) -> void:
+	var split: bool = views != null and views.is_split()
 	for player in PLAYER_COUNT:
 		var hint: ItemHintScript = _hints[player]
 		hint.visible = hint.item() >= 0 and not menus[player]
 		if not hint.visible:
 			continue
+		var place: Vector2 = to_screen * _at[player]
+		if split:
+			var view: int = views.view_of_seat(player)
+			var on_screen: Vector2 = views.to_screen[view] * _at[player] if view >= 0 else Vector2.INF
+			hint.visible = view >= 0 and views.cell_holds(view, on_screen, 0.0)
+			if not hint.visible:
+				continue
+			place = layer * on_screen
 		var below: int = 0
 		for other in player:
 			if _hints[other].visible and _hints[other].item() == hint.item():
 				below += 1
-		hint.place_over(to_screen * _at[player], below)
+		hint.place_over(place, below)
 		hint.step(delta)
 
 

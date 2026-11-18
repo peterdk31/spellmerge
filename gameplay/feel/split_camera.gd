@@ -1,0 +1,486 @@
+extends RefCounted
+## The Voronoi split's views, worked out each drawn frame (connected biomes CB6,
+## docs/milestones/connected-biomes.md, decision 27; the drawing is `split_screen.gd`'s). Pure: it
+## reads the actor table and the world camera's state, and writes `views` (core's ScreenViews). View
+## only, on real time: nothing in the simulation reads it.
+##
+## - **One view while everyone fits.** While the box round this machine's wizards fits in the
+##   picture at the party camera's widest zoom (PartyCamera.MIN_ZOOM, its margin kept), there is no
+##   view here: the world's camera draws the one picture (`party_camera.gd`). Past that the screen
+##   splits; it merges again once the box fits with MERGE_ROOM to spare (so it does not flicker).
+## - **Groups, a view each** (up to four). Wizards in one place share a view: two seats are in one
+##   group while they stand within JOIN_REACH of each other (LEAVE_REACH once together), through any
+##   chain of them. With one group and no fit, each seat is its own.
+## - **Each view leans toward the others.** The groups' middles are laid on the screen as they stand
+##   (the party's middle at the screen's middle, one scale both ways, the farthest SITE_MARGIN from
+##   an edge); a view looks where its group is drawn at its own place, at SPLIT_ZOOM, kept to the
+##   camera's limits. The screen is cut along the bisectors between where the groups are drawn
+##   (`VoronoiCells.fill`): cells that cover it without overlap, each holding its own group.
+## - **No jump** (docs/STYLE.md, "Smooth"). Every view eases to its place and zoom (the party
+##   camera's FOLLOW_SPEED). A new view starts as the picture it splits from (the world camera's, or
+##   the view that held its seats), so at first both sides of the line show the same picture; and a
+##   view merging into another (or back into the one picture) eases onto it and goes only once the
+##   two are the same to SETTLED of a pixel. The only thing that changes at once is the divider,
+##   which grows in a whole pixel a drawn frame (DIVIDER_WIDTH of them) and shrinks out the same
+##   way once the pictures meet.
+##
+## A view keeps its slot (0 to VIEWS_MOST - 1) while it lives, so its drawing is the same node
+## frame to frame (`slot_of`). Nothing is allocated after it is made.
+
+const ActorsScript := preload("res://core/actors/actors.gd")
+const ScreenViewsScript := preload("res://core/display/screen_views.gd")
+const VoronoiCellsScript := preload("res://gameplay/feel/voronoi_cells.gd")
+const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
+
+const VIEWS_MOST: int = ScreenViewsScript.VIEWS_MOST
+## A split view's zoom (1: the world at its own size, as one player sees it). The owner's to tune.
+const SPLIT_ZOOM: float = 1.0
+## Split views merge again once the box round the wizards fits at the widest zoom this many times
+## over (each way), so a party at the edge does not split and merge frame by frame.
+const MERGE_ROOM: float = 1.1
+## Two wizards share a view within this far of each other (world pixels), and keep sharing it until
+## this far apart.
+const JOIN_REACH: float = 160.0
+const LEAVE_REACH: float = 224.0
+## The farthest group is drawn this far from the screen's edge (screen pixels).
+const SITE_MARGIN: float = 96.0
+## The divider's full width (whole screen pixels; it grows or shrinks one a drawn frame).
+const DIVIDER_WIDTH: int = 3
+## Two pictures are the same when they are this close (screen pixels): a merging view goes.
+const SETTLED: float = 0.05
+## A merging view's divider shrinks once its picture is this close to the one it merges into.
+const SHRINK_FROM: float = 1.0
+
+## A slot: free, a live view (its group's), or a view merging into another.
+const FREE: int = 0
+const LIVE: int = 1
+const MERGING: int = 2
+
+## The views as last laid out (count, cells, transforms, anchors, seats). Read only.
+var views: ScreenViewsScript = ScreenViewsScript.new()
+## True while the screen is split (it merges once everyone fits again with room to spare).
+var split: bool = false
+
+## By slot: FREE, LIVE or MERGING; the seats it holds; where it looks (the camera's centre, its
+## shake left out) and its zoom; its divider's width (whole pixels).
+var _state: PackedInt32Array = PackedInt32Array()
+var _members: PackedInt32Array = PackedInt32Array()
+var _centre: PackedVector2Array = PackedVector2Array()
+var _zoom: PackedFloat32Array = PackedFloat32Array()
+var _stage: PackedInt32Array = PackedInt32Array()
+## By slot: the slot it split from (while its divider grows in) or merges into (-1: the world
+## camera's picture, or none). Only the line between a view and its kin grows or shrinks; its other
+## lines were its kin's, drawn already.
+var _kin: PackedInt32Array = PackedInt32Array()
+## By view (as laid out in `views`): its slot.
+var _slot_of: PackedInt32Array = PackedInt32Array()
+## By seat: its box's middle and its box (each seat's own body and the actor it drives).
+var _point: PackedVector2Array = PackedVector2Array()
+var _box: Array[Rect2] = []
+## The seats with a body this frame (a bit a seat).
+var _present: int = 0
+## Groups this frame: by seat, its group's lowest seat (-1: none); by group (lowest seat), its
+## seats, its middle and its place on the screen.
+var _group_of: PackedInt32Array = PackedInt32Array()
+var _group_seats: PackedInt32Array = PackedInt32Array()
+var _group_middle: PackedVector2Array = PackedVector2Array()
+var _group_site: PackedVector2Array = PackedVector2Array()
+## By group (lowest seat): the slot that shows it.
+var _group_slot: PackedInt32Array = PackedInt32Array()
+var _cells: VoronoiCellsScript = VoronoiCellsScript.new()
+
+
+func _init() -> void:
+	_state.resize(VIEWS_MOST)
+	_members.resize(VIEWS_MOST)
+	_centre.resize(VIEWS_MOST)
+	_zoom.resize(VIEWS_MOST)
+	_stage.resize(VIEWS_MOST)
+	_kin.resize(VIEWS_MOST)
+	_kin.fill(-1)
+	_slot_of.resize(VIEWS_MOST)
+	_point.resize(ActorsScript.SEATS)
+	_box.resize(ActorsScript.SEATS)
+	_group_of.resize(ActorsScript.SEATS)
+	_group_seats.resize(ActorsScript.SEATS)
+	_group_middle.resize(ActorsScript.SEATS)
+	_group_site.resize(ActorsScript.SEATS)
+	_group_slot.resize(ActorsScript.SEATS)
+
+
+## Every view gone at once (a new room: the world's camera jumps to it, and splits again from there).
+func reset() -> void:
+	for slot in VIEWS_MOST:
+		_state[slot] = FREE
+		_members[slot] = 0
+		_stage[slot] = 0
+		_kin[slot] = -1
+	split = false
+	views.count = 0
+
+
+## The slot of view `view` (0 to `views.count` - 1).
+func slot_of(view: int) -> int:
+	return _slot_of[view]
+
+
+## The divider's width round view `view` now (whole pixels).
+func stage_of(view: int) -> int:
+	return _stage[_slot_of[view]]
+
+
+## The divider's width between views `a` and `b` (whole pixels): the narrower of theirs where one
+## is the other's kin (split from it, or merging into it) or neither has kin (both split from or
+## merging into the one picture), so a line grows in with the newer view and shrinks out with the
+## one merging; any other line was there already, at its full width.
+func divider_between(a: int, b: int) -> int:
+	var slot_a: int = _slot_of[a]
+	var slot_b: int = _slot_of[b]
+	if _kin[slot_a] == slot_b or _kin[slot_b] == slot_a or (_kin[slot_a] < 0 and _kin[slot_b] < 0):
+		return mini(_stage[slot_a], _stage[slot_b])
+	return DIVIDER_WIDTH
+
+
+## A drawn frame, `delta` real seconds on: find this machine's wizards in `table` (`seats`, a bit a
+## seat; none of them in the world: everyone, as the party camera does), and lay the views out on a
+## screen of `screen` pixels from the world camera `camera` (its place, zoom, limits and shake).
+## With no camera nothing is split.
+func step(delta: float, table: ActorsScript, seats: int, camera: Camera2D, screen: Vector2) -> void:
+	views.screen = screen
+	if camera == null or not is_instance_valid(camera) or table == null or screen.x <= 0.0 or screen.y <= 0.0:
+		reset()
+		return
+	_find(table, seats)
+	if _present == 0 and seats != 0:
+		_find(table, 0)
+	var limits := Rect2(Vector2(camera.limit_left, camera.limit_top), Vector2(camera.limit_right - camera.limit_left, camera.limit_bottom - camera.limit_top))
+	var root_zoom: float = camera.zoom.x
+	var root_centre: Vector2 = _clamp(camera.position, root_zoom, limits, screen)
+	if camera.is_inside_tree():
+		# The picture the world's camera draws now (Godot's own clamp to its limits), its shake
+		# taken off: what a new view starts as and what views merging back ease onto.
+		var drawn: Transform2D = camera.get_viewport().get_canvas_transform()
+		root_zoom = drawn.x.x
+		if root_zoom > 0.0:
+			root_centre = (screen * 0.5 - drawn.origin) / root_zoom - camera.offset
+	split = _wants_split(screen)
+	if split:
+		_group()
+		_lay_sites(screen)
+		_match(root_centre, root_zoom)
+	else:
+		for slot in VIEWS_MOST:
+			if _state[slot] != FREE:
+				_state[slot] = MERGING
+	_ease(delta, root_centre, root_zoom, limits, screen)
+	_publish(camera.offset, screen)
+
+
+## Each seat's box (its own body and the actor it drives) and its middle, for `seats` (0: all).
+func _find(table: ActorsScript, seats: int) -> void:
+	_present = 0
+	for seat in ActorsScript.SEATS:
+		if seats != 0 and seats & (1 << seat) == 0:
+			continue
+		var box: Rect2 = PartyCameraScript.party_box(table, 1 << seat)
+		if box.size.x < 0.0:
+			continue
+		_box[seat] = box
+		_point[seat] = box.get_center()
+		_present |= 1 << seat
+	for slot in VIEWS_MOST:
+		_members[slot] &= _present
+
+
+## Whether the box round every present seat no longer fits at the widest zoom (or, while split,
+## does not fit with MERGE_ROOM to spare).
+func _wants_split(screen: Vector2) -> bool:
+	if _present & (_present - 1) == 0:
+		return false
+	var party := Rect2()
+	var first: bool = true
+	for seat in ActorsScript.SEATS:
+		if _present & (1 << seat) == 0:
+			continue
+		party = _box[seat] if first else party.merge(_box[seat])
+		first = false
+	var need: Vector2 = party.size + Vector2.ONE * (PartyCameraScript.CAMERA_MARGIN * 2.0)
+	var fit: float = minf(screen.x / need.x, screen.y / need.y)
+	return fit < PartyCameraScript.MIN_ZOOM * (MERGE_ROOM if split else 1.0)
+
+
+## Group the present seats: joined while within JOIN_REACH (LEAVE_REACH for two a live view holds
+## together), through any chain; one group alone splits into a group a seat.
+func _group() -> void:
+	for seat in ActorsScript.SEATS:
+		_group_of[seat] = seat if _present & (1 << seat) != 0 else -1
+	for a in ActorsScript.SEATS:
+		if _group_of[a] < 0:
+			continue
+		for b in range(a + 1, ActorsScript.SEATS):
+			if _group_of[b] < 0:
+				continue
+			var reach: float = LEAVE_REACH if _together(a, b) else JOIN_REACH
+			if _point[a].distance_to(_point[b]) < reach:
+				_join(_group_of[a], _group_of[b])
+	var groups: int = 0
+	for seat in ActorsScript.SEATS:
+		if _group_of[seat] == seat:
+			groups += 1
+	if groups == 1:
+		for seat in ActorsScript.SEATS:
+			if _group_of[seat] >= 0:
+				_group_of[seat] = seat
+	for seat in ActorsScript.SEATS:
+		_group_seats[seat] = 0
+	for seat in ActorsScript.SEATS:
+		if _group_of[seat] >= 0:
+			_group_seats[_group_of[seat]] |= 1 << seat
+	for seat in ActorsScript.SEATS:
+		if _group_seats[seat] != 0:
+			_group_middle[seat] = _middle_of(_group_seats[seat])
+
+
+## Seats `a` and `b` are held by one live view.
+func _together(a: int, b: int) -> bool:
+	var both: int = (1 << a) | (1 << b)
+	for slot in VIEWS_MOST:
+		if _state[slot] == LIVE and _members[slot] & both == both:
+			return true
+	return false
+
+
+## Groups `x` and `y` (lowest seats) are one, under the lower.
+func _join(x: int, y: int) -> void:
+	var keep: int = mini(x, y)
+	var drop: int = maxi(x, y)
+	if keep == drop:
+		return
+	for seat in ActorsScript.SEATS:
+		if _group_of[seat] == drop:
+			_group_of[seat] = keep
+
+
+## The middle of the box round the seats `held` (world pixels).
+func _middle_of(held: int) -> Vector2:
+	var box := Rect2()
+	var first: bool = true
+	for seat in ActorsScript.SEATS:
+		if held & (1 << seat) == 0 or _present & (1 << seat) == 0:
+			continue
+		box = _box[seat] if first else box.merge(_box[seat])
+		first = false
+	return box.get_center()
+
+
+## Each group's place on the screen: the groups' middles about the screen's middle, scaled by one
+## factor (at most SPLIT_ZOOM) until the farthest is SITE_MARGIN from an edge.
+func _lay_sites(screen: Vector2) -> void:
+	var low := Vector2.INF
+	var high := -Vector2.INF
+	for seat in ActorsScript.SEATS:
+		if _group_seats[seat] != 0:
+			low = low.min(_group_middle[seat])
+			high = high.max(_group_middle[seat])
+	var mid: Vector2 = (low + high) * 0.5
+	var reach: Vector2 = (high - low) * 0.5
+	var room: Vector2 = (screen * 0.5 - Vector2.ONE * SITE_MARGIN).max(Vector2.ONE)
+	var scale: float = SPLIT_ZOOM
+	if reach.x > VoronoiCellsScript.EPSILON:
+		scale = minf(scale, room.x / reach.x)
+	if reach.y > VoronoiCellsScript.EPSILON:
+		scale = minf(scale, room.y / reach.y)
+	for seat in ActorsScript.SEATS:
+		if _group_seats[seat] != 0:
+			_group_site[seat] = screen * 0.5 + (_group_middle[seat] - mid) * scale
+
+
+## Give each group a slot: the one holding most of its seats (a live one before a merging one),
+## else a new one, starting as the picture its seats were in (the world camera's with none). A
+## live slot no group took merges into the one that holds its first seat now.
+func _match(root_centre: Vector2, root_zoom: float) -> void:
+	var taken: int = 0
+	for seat in ActorsScript.SEATS:
+		_group_slot[seat] = -1
+		var held: int = _group_seats[seat]
+		if held == 0:
+			continue
+		var best: int = -1
+		var best_score: int = 0
+		for slot in VIEWS_MOST:
+			if _state[slot] == FREE or taken & (1 << slot) != 0:
+				continue
+			var score: int = _bits(_members[slot] & held) * 2 + (1 if _state[slot] == LIVE else 0)
+			if _members[slot] & held != 0 and score > best_score:
+				best = slot
+				best_score = score
+		if best < 0:
+			best = _open_slot(held, root_centre, root_zoom)
+		if best < 0:
+			continue
+		taken |= 1 << best
+		_group_slot[seat] = best
+		_state[best] = LIVE
+		_members[best] = held
+	for slot in VIEWS_MOST:
+		if _state[slot] == LIVE and taken & (1 << slot) == 0:
+			_state[slot] = MERGING
+
+
+## A free slot for a new view of the seats `held`, started as the picture they were in: the slot
+## that held most of them, else the world camera's. With none free, the merging view nearest done
+## gives its slot up. -1 when there is none.
+func _open_slot(held: int, root_centre: Vector2, root_zoom: float) -> int:
+	var free: int = -1
+	for slot in VIEWS_MOST:
+		if _state[slot] == FREE:
+			free = slot
+			break
+	if free < 0:
+		var nearest: float = INF
+		for slot in VIEWS_MOST:
+			if _state[slot] == MERGING and _gap(slot) < nearest:
+				nearest = _gap(slot)
+				free = slot
+	if free < 0:
+		return -1
+	var from: int = -1
+	var most: int = 0
+	for slot in VIEWS_MOST:
+		if slot != free and _state[slot] != FREE and _bits(_members[slot] & held) > most:
+			most = _bits(_members[slot] & held)
+			from = slot
+	_centre[free] = _centre[from] if from >= 0 else root_centre
+	_zoom[free] = _zoom[from] if from >= 0 else root_zoom
+	_stage[free] = 0
+	_kin[free] = from
+	_members[free] = held
+	_state[free] = LIVE
+	return free
+
+
+## Ease every view on: a live one to where its group is drawn at its place (SPLIT_ZOOM), a merging
+## one onto the view now holding its first seat (or the world camera's picture); dividers grow or
+## shrink a pixel; a merging view whose picture is the same as its target's, its divider gone, goes.
+func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, screen: Vector2) -> void:
+	var weight: float = 1.0 - exp(-PartyCameraScript.FOLLOW_SPEED * maxf(delta, 0.0))
+	for slot in VIEWS_MOST:
+		if _state[slot] != LIVE:
+			continue
+		var group: int = _group_holding(slot)
+		var aim_zoom: float = lerpf(_zoom[slot], SPLIT_ZOOM, weight)
+		var aim: Vector2 = _centre[slot]
+		if group >= 0:
+			aim = _group_middle[group] - (_group_site[group] - screen * 0.5) / aim_zoom
+		_zoom[slot] = aim_zoom
+		_centre[slot] = _clamp(_centre[slot].lerp(aim, weight), aim_zoom, limits, screen)
+		_stage[slot] = mini(_stage[slot] + 1, DIVIDER_WIDTH)
+		if _stage[slot] == DIVIDER_WIDTH:
+			_kin[slot] = -1
+	for slot in VIEWS_MOST:
+		if _state[slot] != MERGING:
+			continue
+		var into: int = _merge_target(slot)
+		_kin[slot] = into
+		var to_centre: Vector2 = _centre[into] if into >= 0 else root_centre
+		var to_zoom: float = _zoom[into] if into >= 0 else root_zoom
+		_zoom[slot] = lerpf(_zoom[slot], to_zoom, weight)
+		_centre[slot] = _clamp(_centre[slot].lerp(to_centre, weight), _zoom[slot], limits, screen)
+		var gap: float = _picture_gap(_centre[slot], _zoom[slot], to_centre, to_zoom, screen)
+		if gap < SHRINK_FROM:
+			_stage[slot] = maxi(_stage[slot] - 1, 0)
+		if _stage[slot] == 0 and gap < SETTLED:
+			_state[slot] = FREE
+			_members[slot] = 0
+			_kin[slot] = -1
+
+
+## The group (lowest seat) live slot `slot` shows, or -1.
+func _group_holding(slot: int) -> int:
+	for seat in ActorsScript.SEATS:
+		if _group_seats[seat] != 0 and _group_slot[seat] == slot:
+			return seat
+	return -1
+
+
+## The live slot merging slot `slot` eases onto (the one holding its first seat), or -1: the world
+## camera's picture.
+func _merge_target(slot: int) -> int:
+	if not split:
+		return -1
+	var held: int = _members[slot]
+	for seat in ActorsScript.SEATS:
+		if held & (1 << seat) == 0:
+			continue
+		for other in VIEWS_MOST:
+			if other != slot and _state[other] == LIVE and _members[other] & (1 << seat) != 0:
+				return other
+	return -1
+
+
+## How far merging slot `slot`'s picture is from its target's (screen pixels; 0 for a slot not merging).
+func _gap(slot: int) -> float:
+	var into: int = _merge_target(slot)
+	if into < 0:
+		return 0.0
+	return _picture_gap(_centre[slot], _zoom[slot], _centre[into], _zoom[into], views.screen)
+
+
+## How far apart two pictures are on screen (pixels): their centres apart, and their zooms' gap at
+## the screen's corner.
+static func _picture_gap(a: Vector2, a_zoom: float, b: Vector2, b_zoom: float, screen: Vector2) -> float:
+	return a.distance_to(b) * maxf(a_zoom, b_zoom) + absf(a_zoom - b_zoom) / maxf(minf(a_zoom, b_zoom), 0.0001) * screen.length() * 0.5
+
+
+## Write `views`: a view a used slot (in slot order), its transform (the shake `offset` added), its
+## anchor (where its seats' middle is drawn, the shake left out; pushed MIN_GAP apart) and its cell.
+func _publish(offset: Vector2, screen: Vector2) -> void:
+	var count: int = 0
+	for slot in VIEWS_MOST:
+		if _state[slot] == FREE:
+			continue
+		var zoom: float = _zoom[slot]
+		var transform := Transform2D(0.0, Vector2(zoom, zoom), 0.0, screen * 0.5 - (_centre[slot] + offset) * zoom)
+		var held: int = _members[slot]
+		var at: Vector2 = screen * 0.5
+		if held != 0:
+			at = screen * 0.5 + (_middle_of(held) - _centre[slot]) * zoom
+		views.set_view(count, held, transform, at)
+		_slot_of[count] = slot
+		count += 1
+	views.count = count
+	_apart(count)
+	_cells.fill(views)
+
+
+## Anchors closer than MIN_GAP to an earlier one moved off it, each toward its own side.
+func _apart(count: int) -> void:
+	for i in count:
+		var away := Vector2.from_angle(TAU * float(i) / float(maxi(count, 1))) * VoronoiCellsScript.MIN_GAP
+		var tries: int = 0
+		var moved: bool = true
+		while moved and tries < count * 4:
+			moved = false
+			tries += 1
+			for j in i:
+				if views.anchor[i].distance_to(views.anchor[j]) < VoronoiCellsScript.MIN_GAP:
+					views.set_view(i, views.seats[i], views.to_screen[i], views.anchor[i] + away)
+					moved = true
+
+
+## `centre` moved so a picture at `zoom` stays inside `limits` (as the party camera keeps it).
+static func _clamp(centre: Vector2, zoom: float, limits: Rect2, screen: Vector2) -> Vector2:
+	var half: Vector2 = screen * (0.5 / maxf(zoom, 0.0001))
+	var low: Vector2 = limits.position + half
+	var high: Vector2 = limits.end - half
+	var x: float = clampf(centre.x, low.x, high.x) if low.x <= high.x else limits.get_center().x
+	var y: float = clampf(centre.y, low.y, high.y) if low.y <= high.y else limits.get_center().y
+	return Vector2(x, y)
+
+
+static func _bits(mask: int) -> int:
+	var n: int = 0
+	while mask != 0:
+		mask &= mask - 1
+		n += 1
+	return n

@@ -124,6 +124,13 @@ var pool: MotesScript = null
 var mote_cap: int = MoteCap.default_cap()
 ## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
 var mote_density: float = MoteDensity.DEFAULT
+## While the screen is split, every burst's count is times this too (`set_split`; the split's
+## fallback of fewer motes a view, connected biomes CB6; 1: as many).
+var split_share: float = 1.0
+## The views the light follows while the screen is split (`set_split`; empty: one picture), and
+## how much smaller their buffers past the first are.
+var _split_views: Array[Viewport] = []
+var _split_downscale: int = SpellLightScript.DOWNSCALE
 ## The "Tailless motes" dev setting (`TaillessMotes`): the motes' rows a frame follow its pool.
 var tailless_motes: int = TaillessMotes.DEFAULT
 ## The floor marks (null with the "Floor marks" setting off), and the setting. Read only.
@@ -890,7 +897,7 @@ func use_motes(motes: MotesScript) -> void:
 	mote_cap = motes.cap() if motes != null else 0
 	if motes != null:
 		pool.name = "Motes"
-		pool.density = mote_density
+		pool.density = mote_density * split_share
 		pool.frame_rows = TaillessMotes.frame_rows_of(tailless_motes)
 		add_child(pool)
 		pool.step(_clock)
@@ -899,6 +906,8 @@ func use_motes(motes: MotesScript) -> void:
 		pool.set_infusions(InfusionTable.of_registry(registry))
 		# Its lit-only kinds read the spell light's buffer (atmosphere B).
 		pool.set_light(light.buffer() if light != null else null, SpellLightScript.lit_steps())
+		if light != null:
+			light.read_by(&"motes", pool.draw_material())
 	cards.use_motes(pool)
 	if pool != null:
 		pool.use_cards(cards if pool.has_card_kinds() else null)
@@ -931,8 +940,24 @@ func _mote_kinds() -> Array[MoteKind]:
 func set_mote_density(density: float) -> float:
 	mote_density = MoteDensity.snap(density)
 	if pool != null:
-		pool.density = mote_density
+		pool.density = mote_density * split_share
 	return mote_density
+
+
+## The screen split into `views` (their viewports, in the split screen's order; empty: one
+## picture): the light follows each (a buffer a view; `extra_downscale` how much smaller those past
+## the first are), and the motes throw `share` of their count (the split's fallbacks; 1 and
+## SpellLight.DOWNSCALE: none). Called every drawn frame; nothing changes while it is the same.
+func set_split(views: Array[Viewport], share: float = 1.0, extra_downscale: int = SpellLightScript.DOWNSCALE) -> void:
+	var next_share: float = clampf(share, 0.0, 1.0) if views.size() > 1 else 1.0
+	if next_share != split_share:
+		split_share = next_share
+		if pool != null:
+			pool.density = mote_density * split_share
+	_split_views = views
+	_split_downscale = extra_downscale
+	if light != null:
+		light.use_views(views, extra_downscale)
 
 
 ## The "Tailless motes" dev setting: the motes may write `TaillessMotes.frame_rows_of(births)`
@@ -994,6 +1019,7 @@ func _make_light(on: bool) -> void:
 		light.name = "SpellLight"
 		light.set_ambient(ambient, shade)
 		add_child(light)
+		light.use_views(_split_views, _split_downscale)
 		# What blocks it is handed over at the next step while "Shadows" is on (atmosphere C).
 		blockers.refresh()
 	# The shadows and the mist come and go with it, at once (atmosphere C, F), each by its own
@@ -1003,6 +1029,8 @@ func _make_light(on: bool) -> void:
 	# The motes' lit-only kinds read the light buffer, or with none are not drawn (atmosphere B).
 	if pool != null:
 		pool.set_light(light.buffer() if light != null else null, SpellLightScript.lit_steps())
+		if light != null:
+			light.read_by(&"motes", pool.draw_material())
 
 
 ## The "Shadows" setting (atmosphere C): on, while spell light is on, the light is blocked by the
@@ -1073,6 +1101,7 @@ func _fit_mist(at_once: bool) -> void:
 	if mist != null:
 		# The light's buffer, again when the light was made anew under it.
 		mist.use_light(light.buffer())
+		light.read_by(&"mist", mist.material as ShaderMaterial)
 
 
 func _free_mist() -> void:
@@ -1147,6 +1176,10 @@ func view_rect() -> Rect2:
 	var view: Viewport = get_viewport() if is_inside_tree() else null
 	if view == null:
 		return Rect2()
+	# While the screen is split (CB6): the box round what every view shows.
+	var split: ScreenViews = ScreenViews.on(view)
+	if split != null and split.is_split():
+		return split.world_box()
 	return view.get_canvas_transform().affine_inverse() * view.get_visible_rect()
 
 

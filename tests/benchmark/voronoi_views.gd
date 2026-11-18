@@ -26,7 +26,7 @@ extends Node
 ## With a count of 0 nothing is split: the root draws the world as in play, and only the times are
 ## counted (the baseline).
 
-const CellsScript := preload("res://tests/benchmark/voronoi_cells.gd")
+const CellsScript := preload("res://gameplay/feel/voronoi_cells.gd")
 
 ## The visibility layer of the world's canvas items (the default) and the one the root keeps.
 const WORLD_LAYER: int = 1

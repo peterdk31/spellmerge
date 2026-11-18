@@ -608,7 +608,14 @@ func _mouse_world() -> Vector2:
 	if not is_inside_tree():
 		return Vector2.INF
 	var viewport: Viewport = get_viewport()
-	return viewport.get_canvas_transform().affine_inverse() * viewport.get_mouse_position()
+	var mouse: Vector2 = viewport.get_mouse_position()
+	# While the screen is split (connected biomes CB6): through the view the mouse is over.
+	var views: ScreenViews = ScreenViews.on(viewport)
+	if views != null and views.is_split():
+		var view: int = views.view_at(mouse)
+		if view >= 0:
+			return views.to_screen[view].affine_inverse() * mouse
+	return viewport.get_canvas_transform().affine_inverse() * mouse
 
 
 ## The replay's next tick, read and applied: one a tick. Where the recording stood stopped or held,

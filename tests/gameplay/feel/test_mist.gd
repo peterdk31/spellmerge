@@ -101,13 +101,62 @@ func test_the_mask_thickens_toward_the_edge_and_the_pit_not_a_low_wall() -> void
 	check(by_edge.r < inside.r, "nearer the room's edge is nearer (red %.2f < %.2f)" % [by_edge.r, inside.r])
 	var by_low_wall: Color = _texel(image, Vector2(160, 92))
 	check(by_low_wall.r > by_edge.r * 2.0, "a low wall standing in the room is no edge: thin over the fight")
+	check(_texel(image, Vector2(160, 80)).r > by_edge.r * 2.0, "nor its own cells")
 	check_equal(_texel(image, Vector2(250, 80)).g, 0.0, "over the pit itself it is thickest")
 	check(_texel(image, Vector2(228, 80)).g < _texel(image, Vector2(80, 80)).g, "nearer the pit, thicker")
 	var in_wall: Color = _texel(image, Vector2(80, 24))
-	check(in_wall.b > 0.0 and in_wall.r == 0.0, "a wall: none of it but its spill")
+	check(in_wall.b > 0.0, "a wall: none of it but its spill")
 	var outer: Color = _texel(image, Vector2(4, 4))
 	check(outer.b > in_wall.b, "the void outside the walls is wall, deeper still: no mist over the dark")
 	check_equal(_texel(image, Vector2(80, 64)).b, 0.0, "open floor holds no spill")
+
+
+func test_a_low_walls_rim_is_read_as_thin_as_the_floor_round_it() -> void:
+	var image: Image = MistMaskScript.build(SIZE, _walls(), _holes())
+	var cell: float = MistMaskScript.cell_of(SIZE)
+	# The low wall's top edge cell and the open cell above it: the shader reads between them.
+	var in_block: Color = image.get_pixel(floori(160.0 / cell), floori(72.0 / cell))
+	var above: Color = image.get_pixel(floori(160.0 / cell), floori(72.0 / cell) - 1)
+	var between: float = (in_block.r + above.r) * 0.5
+	check(in_block.r > 0.0, "a low wall's own cells hold how far they are from the edge, not 0")
+	check(between > above.r * 0.85, "read between the wall and the floor it is as thin as the floor (%.2f, %.2f)" % [between, above.r])
+	check_equal(_texel(image, Vector2(4, 4)).r, 0.0, "the void is the edge itself")
+
+
+func test_the_hubs_sea_of_holes_is_void_not_a_pit() -> void:
+	# An island in a sea of holes (the hub's), with a pit inside it.
+	var sea: Array[Rect2] = [Rect2(0, 0, 320, 24), Rect2(0, 136, 320, 24), Rect2(0, 0, 24, 160), Rect2(296, 0, 24, 160), Rect2(150, 70, 20, 20)]
+	var image: Image = MistMaskScript.build(SIZE, [] as Array[Rect2], sea)
+	var over_sea: Color = _texel(image, Vector2(8, 80))
+	check(over_sea.b > 0.0, "the sea round the island is void: none of the mist but its spill")
+	check(over_sea.g > 0.0, "and no pit for the mist to pour into")
+	check_equal(_texel(image, Vector2(160, 80)).g, 0.0, "a pit inside the island stays a pit")
+	check(_texel(image, Vector2(32, 80)).r < _texel(image, Vector2(80, 80)).r, "the island's edge is its edge")
+
+
+func test_every_crypt_room_and_the_hub_have_a_void_round_them() -> void:
+	var rooms: Array[StringName] = CRYPT_ROOMS.duplicate()
+	rooms.append(&"hub")
+	for id in rooms:
+		var room := registry.get_resource(&"rooms", id) as RoomBase
+		var layout: Node = own(room.build(null)) as Node
+		var places: RoomPlaces = RoomPlaces.read(layout)
+		var image: Image = MistMaskScript.build(places.size, RoomPlaces.wall_rects(layout), places.holes)
+		check(image.get_pixel(0, 0).b > 0.0, "%s: the dark outside its slab is void (the flood ran)" % id)
+		var deepest: float = 0.0
+		for y in image.get_height():
+			for x in image.get_width():
+				var texel: Color = image.get_pixel(x, y)
+				if texel.b > 0.0:
+					deepest = maxf(deepest, texel.r)
+		if id in [&"arena_02", &"arena_03", &"arena_04"]:
+			check(deepest > 0.3, "%s: its low walls are no edge (%.2f from it)" % [id, deepest])
+		if id in [&"arena_02", &"arena_04"]:
+			var box: Rect2 = places.holes[0]
+			for hole in places.holes:
+				box = box.merge(hole)
+			var cell: float = MistMaskScript.cell_of(places.size)
+			check_equal(image.get_pixel(floori(box.get_center().x / cell), floori(box.get_center().y / cell)).g, 0.0, "%s: its pit stays a pit" % id)
 
 
 func test_the_mask_of_a_room_open_to_its_edge_measures_from_the_edge() -> void:
@@ -291,5 +340,17 @@ func test_feel_hands_the_covers_bodies_to_the_spectacle() -> void:
 	var spectacle: SpectacleScript = feel.spectacle()
 	spectacle.hand_bodies(PackedVector2Array([Vector2(1, 2)]), 1)
 	feel._process(FRAME)
-	check_equal(spectacle._feet, feel.cover().bodies(), "one gathering of bodies, the cover's, read by the mist too")
-	check_equal(spectacle._feet_count, feel.cover().body_count(), "as many as the cover found")
+	check_equal(spectacle._feet_count, feel.cover().body_count(), "one gathering of bodies, the cover's, read by the mist too")
+	for k in spectacle._feet_count:
+		check_equal(spectacle._feet[k], feel.cover().bodies()[k], "body %d the cover's" % k)
+
+
+func test_the_bodies_handed_over_are_copied() -> void:
+	var spectacle: SpectacleScript = own(SpectacleScript.new()) as SpectacleScript
+	var feet := PackedVector2Array([Vector2(10, 20), Vector2(30, 40)])
+	spectacle.hand_bodies(feet, 2)
+	feet[0] = Vector2(99, 99)
+	check_equal(spectacle._feet[0], Vector2(10, 20), "written again by whoever handed them, the spectacle's are as handed")
+	check_equal(spectacle._feet_count, 2, "")
+	spectacle.hand_bodies(feet, 5)
+	check_equal(spectacle._feet_count, 2, "never more than were handed")

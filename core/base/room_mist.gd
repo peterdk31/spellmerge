@@ -25,8 +25,9 @@ const DRIFT_MOST: float = 24.0
 @export_range(0.0, 0.6, 0.01) var thickness: float = 0.3
 ## How thick it is over the room's open middle, a share of `thickness` (rule 6: thin over the fight).
 @export_range(0.0, 1.0, 0.01) var middle: float = 0.25
-## How far from a wall (a floating room's edge, a low wall) and from a pit it thickens (px, at most
-## REACH_MOST), and how much thicker a pit makes it than a wall (a share: 1 as thick as at a wall).
+## How far from the room's edge (the void round a floating room's slab or the hub's island; a low wall
+## standing in the room is no edge: thin over the fight) and from a pit inside it it thickens (px, at
+## most REACH_MOST), and how much thicker a pit makes it than the edge (a share: 1 as thick).
 @export_range(0.0, 128.0, 1.0) var edge_reach: float = 72.0
 @export_range(0.0, 128.0, 1.0) var pit_reach: float = 64.0
 @export_range(0.0, 1.0, 0.01) var pit_share: float = 1.0

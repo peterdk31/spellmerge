@@ -10,7 +10,9 @@ extends ColorRect
 ##   there, so it lies over the floor, the cover, the marks and the bodies' shadows (a shadow is on the
 ##   floor and the mist over it; the bodies part the mist round their feet, so their own shadows show
 ##   clear) and under every body (z 0), and under the spell light's apply rect, which darkens it with
-##   the room's dark and lights it by the floor's bands.
+##   the room's dark and lights it by the floor's bands. A room's own art at that z (a pit's `Glow`
+##   in its ground, a light shaft's `Pool`) is in the world's tree, after Feel's, so it draws over the
+##   mist: a pit's rim keeps its cold glow crisp, the mist pooled in the hole inside it.
 ## - **Thin over the middle** (crypt rework rule 6): thicker toward the walls and the pits, by the
 ##   room's mask (`mist_mask.gd`, built once a room from the walls and holes as laid: `lay`).
 ## - **Pushed and parted:** the world's stirs (the shots' wake, the blasts' push: `stirs.gd`, handed
@@ -114,7 +116,7 @@ func _refresh() -> void:
 	var shading := material as ShaderMaterial
 	if _stale or mask == null:
 		_stale = false
-		var image: Image = MistMaskScript.build(room_size, _walls, _holes)
+		var image: Image = MistMaskScript.build(room_size, _walls, _holes, true)
 		mask = ImageTexture.create_from_image(image)
 		var cell: float = MistMaskScript.cell_of(room_size)
 		shading.set_shader_parameter(&"mask", mask)

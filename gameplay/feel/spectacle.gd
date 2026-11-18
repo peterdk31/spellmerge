@@ -325,11 +325,15 @@ func step(now: float, table: ActorsScript = null) -> void:
 
 
 ## The bodies' feet that part the mist this frame (atmosphere F): the first `count` of `feet` (world
-## px; Feel hands the ground cover's, `Cover.bodies`, the bodies nearest the camera's middle). Kept,
-## not copied: read at the next `step`.
+## px; Feel hands the ground cover's, `Cover.bodies`, the bodies nearest the camera's middle). Copied
+## into the spectacle's own buffer (grown when more come, never shrunk), so whoever handed them may
+## write theirs again before the next `step` reads them.
 func hand_bodies(feet: PackedVector2Array, count: int) -> void:
-	_feet = feet
 	_feet_count = clampi(count, 0, feet.size())
+	if _feet.size() < _feet_count:
+		_feet.resize(_feet_count)
+	for k in _feet_count:
+		_feet[k] = feet[k]
 
 
 ## The barrier on `actor` changed (combat's `barrier_changed`; `ramp` the actor's): its shell, in

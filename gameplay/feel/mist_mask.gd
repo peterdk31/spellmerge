@@ -4,15 +4,18 @@ extends RefCounted
 ## and its holes as the layout was built (`RoomPlaces.wall_rects`, `hole_rects`), read by
 ## `mist.gdshader` with bilinear filtering (RGBA8: filtered on every renderer, WebGL 2 included).
 ##
-## - **red:** how far an open cell is from the room's edge (the void round a floating room's slab or
-##   the hub's island, or with no void round it, the nearest wall), over REACH (1 at REACH or further):
-##   a low wall standing in the room is no edge (rule 6: thin over the fight). The mist thickens toward
-##   the edge within its `edge_reach`.
-## - **green:** how far a cell is from the nearest pit (a hole), over REACH. It thickens toward a pit
+## - **red:** how far a cell is from the room's edge, over REACH (1 at REACH or further): the void
+##   round it (`outside`: a floating room's dark round its slab, flooded in from the grid's edge
+##   through open cells; the hub's sea, holes joined to the grid's edge, flooded through too), or with
+##   no void round it, the nearest wall. It is written in every cell but the void's (0), a low wall's
+##   too, so a low wall standing in the room is no edge even where the texture is read between its
+##   cells and the floor's (rule 6: thin over the fight). The mist thickens toward the edge within its
+##   `edge_reach`.
+## - **green:** how far a cell is from the nearest pit (a hole inside the room: one joined to the
+##   grid's edge is the void, above), over REACH. It thickens toward a pit
 ##   within its `pit_reach`; over the pit itself (0) it lies thickest, pouring in.
 ## - **blue:** how deep a wall cell lies in its wall, over SPILL (0 on open floor and over pits). The
-##   mist spills its `spill` px over a wall's edge, then is gone. The void outside the room's walls
-##   (open cells joined to the grid's edge) counts as wall.
+##   mist spills its `spill` px over a wall's edge, then is gone. The void counts as wall.
 ##
 ## Distances are a chamfer's (straight steps 1, diagonal steps 1.414 cells) between cell middles: a
 ## few px off a true distance, which soft mist does not show. Built once a room: its arrays are made
@@ -31,7 +34,9 @@ const DIAGONAL: float = 1.41421356
 
 ## The mask of a room of `size` (px, from the origin) with `walls` and `holes` (world px): an
 ## RGBA8 image (see the top), and how many px each of its texels covers (`cell_of` it).
-static func build(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) -> Image:
+## With `warn`, a room with no void round it (walled to the grid's edge, or open floor running to it)
+## is warned of: its edge is measured from every wall instead, low walls included.
+static func build(size: Vector2, walls: Array[Rect2], holes: Array[Rect2], warn: bool = false) -> Image:
 	var cell: float = cell_of(size)
 	var w: int = maxi(ceili(size.x / cell), 1)
 	var h: int = maxi(ceili(size.y / cell), 1)
@@ -46,6 +51,8 @@ static func build(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) -> Im
 		if wall[i] != 0:
 			hole[i] = 0
 	var outside: PackedByteArray = _wall_outside(wall, hole, w, h)
+	if outside.is_empty() and warn:
+		push_warning("MistMask: the room (%s px) has no void round it: its mist thickens toward every wall, the low walls in it too" % size)
 	var open := PackedByteArray()
 	open.resize(w * h)
 	for i in w * h:
@@ -59,7 +66,7 @@ static func build(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) -> Im
 	bytes.resize(w * h * 4)
 	for i in w * h:
 		var near_hole: float = to_hole[i] if hole[i] == 0 else 0.0
-		bytes[i * 4] = _byte(to_wall[i] * cell / REACH if wall[i] == 0 else 0.0)
+		bytes[i * 4] = _byte(to_wall[i] * cell / REACH)
 		bytes[i * 4 + 1] = _byte(near_hole * cell / REACH)
 		bytes[i * 4 + 2] = _byte(into_wall[i] * cell / SPILL if wall[i] != 0 else 0.0)
 		bytes[i * 4 + 3] = 255
@@ -121,11 +128,13 @@ static func distances(marked: PackedByteArray, w: int, h: int, edge: bool) -> Pa
 	return out
 
 
-## The void outside a room's walls is wall too: open cells joined to the grid's edge through open
-## cells (a floating room's dark round its slab's edge walls, the hub's void round its island) are
-## set in `wall`, so no mist lies out over the dark; returned (empty for none). A room whose floor runs
-## to its edge with no wall round it (most of its open floor joined to the edge), or that is walled to
-## its edge, is left as it is.
+## The void outside a room's walls is wall too: open cells and holes joined to the grid's edge through
+## open cells and holes, never from a hole onto open floor (a floating room's dark round its slab's
+## edge walls; the hub's sea, holes round its island, and the cracks running in from it) are set in
+## `wall` and taken out of `hole`, so no mist lies out over the dark and none pours into the sea as
+## into a pit; returned (empty for none). A room
+## whose floor runs to its edge with no wall or hole round it (most of its open floor joined to the
+## edge), or that is walled to its edge, is left as it is.
 static func _wall_outside(wall: PackedByteArray, hole: PackedByteArray, w: int, h: int) -> PackedByteArray:
 	var outside := PackedByteArray()
 	outside.resize(w * h)
@@ -135,7 +144,7 @@ static func _wall_outside(wall: PackedByteArray, hole: PackedByteArray, w: int, 
 	for i in w * h:
 		var x: int = i % w
 		var y: int = i / w
-		if (x == 0 or y == 0 or x == w - 1 or y == h - 1) and wall[i] == 0 and hole[i] == 0:
+		if (x == 0 or y == 0 or x == w - 1 or y == h - 1) and wall[i] == 0:
 			outside[i] = 1
 			queue[count] = i
 			count += 1
@@ -146,19 +155,25 @@ static func _wall_outside(wall: PackedByteArray, hole: PackedByteArray, w: int, 
 		var x: int = i % w
 		var y: int = i / w
 		for next: int in [i - 1 if x > 0 else -1, i + 1 if x < w - 1 else -1, i - w if y > 0 else -1, i + w if y < h - 1 else -1]:
-			if next >= 0 and outside[next] == 0 and wall[next] == 0 and hole[next] == 0:
+			# From a hole only into a hole: the sea's edge is the island's lip, not a way onto it.
+			if next >= 0 and outside[next] == 0 and wall[next] == 0 and (hole[i] == 0 or hole[next] != 0):
 				outside[next] = 1
 				queue[count] = next
 				count += 1
+	# Open floor joined to the edge, not counting holes (a sea round an island is a void however big).
 	var open: int = 0
+	var open_out: int = 0
 	for i in w * h:
-		if wall[i] == 0:
+		if wall[i] == 0 and hole[i] == 0:
 			open += 1
-	if count == 0 or count * 10 > open * 9:
+			if outside[i] != 0:
+				open_out += 1
+	if count == 0 or open_out * 10 > open * 9:
 		return PackedByteArray()
 	for i in w * h:
 		if outside[i] != 0:
 			wall[i] = 1
+			hole[i] = 0
 	return outside
 
 

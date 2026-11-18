@@ -13,8 +13,10 @@ extends RefCounted
 ##
 ## The manager ends the shots, frees and takes back slots, asks Combat what `add` says to ask
 ## (`asks`, into `room` and `damage`) and sends the entries; the batch never calls it. The native hit pass (`ShotKernel`, `BATCH_FIELDS`) reads and
-## writes the entries' counts, the tallies and the spent list in place, so they are packed arrays,
-## sized before the pass (the kernel never grows one), and it counts a hit as `count_hit` does.
+## writes the entries' counts, the tallies and the spent list in place, and opens entries where the
+## pass holds the body's room and the spell's damage told with no event since (hit batch A4, as
+## `add` and `take_room` with nothing to ask; the manager then gives them their look, `set_look`),
+## so they are packed arrays, sized before the pass (the kernel never grows one).
 ##
 ## Not state: emptied within a step (the manager's DERIVED `_hit_batch`).
 
@@ -368,6 +370,22 @@ func ended_count() -> int:
 
 func ended_tag(i: int) -> int:
 	return _ended[i]
+
+
+## The look of `entry`, which the native hit pass opened (it keeps no `StringName`; hit batch A4):
+## its first shot's carrier card, body, core and look bits, as `add` keeps them.
+func set_look(entry: int, carrier_card: StringName, kind: int, colour: Color, look_bits: int) -> void:
+	card[entry] = carrier_card
+	body[entry] = kind
+	core[entry] = colour
+	look[entry] = look_bits
+
+
+## Every entry the native hit pass opened has its look (`set_look`), and the per-target tables are
+## sized for `targets` targets, as `add` sizes them (a target a handler added during the pass).
+func kernel_entries_looked(targets: int) -> void:
+	fit_targets(targets)
+	looked = entries
 
 
 ## The entries emptied (sent).

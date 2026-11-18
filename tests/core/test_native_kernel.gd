@@ -50,7 +50,8 @@ const ROOM: Vector2 = Vector2(960.0, 540.0)
 const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 ## Not compared: node instance ids (each side has its own nodes; what a shot keeps of a target is
 ## its key, which is compared: online-ready N5), the hit test's scratch (the native
-## pass sizes it for every target at once), what only the native drawing writes, the GDScript
+## pass sizes it for every target at once), the native side's counts of what it merged and opened
+## itself (`merged_turns`, `merged_opens`), what only the native drawing writes, the GDScript
 ## catch-up's one-shot list and the GDScript drawing's sum of the tail asked for and count of the
 ## thinned groups' tail births (the native keeps them in locals; the sum is handed out as
 ## `tail_demand`, which is compared, and the births themselves are compared).
@@ -278,7 +279,7 @@ func _check_the_kernel_merged() -> void:
 	check(_hits_sent > 0, "shots hit (%d)" % _hits_sent)
 	check(_mgrs[1].merged_turns > 100, "the kernel merged shots' hits itself (%d turns; %d hand-backs)" % [_mgrs[1].merged_turns, _handbacks])
 	check_equal(_mgrs[0].merged_turns, 0, "the GDScript side counts none")
-	check(_mgrs[1].merged_opens > 0, "the kernel opened merged hits itself (%d), each a body and a spell the pass had asked of" % _mgrs[1].merged_opens)
+	check(_mgrs[1].merged_opens >= 15, "the kernel opened merged hits itself (%d, 23 when written), each a body and a spell the pass had asked of" % _mgrs[1].merged_opens)
 
 
 ## A merged scene's answers to `hit_room_asked` and `hit_damage_asked`, the same on both sides: a

@@ -311,8 +311,9 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(wall_bounds, "_bounds", RECT2)
 
 // Every member of the manager's hit batch (`HitBatch`, `_hit_batch`) the hit pass reads: its entries
-// (each one's next on its target, caster, tag, shot, count, damage a hit, whether it meets the
-// barrier), the bodies' tallies in pass `_pass`, and the spent shots' list (hit batch A1). Checked on
+// (each one's next on its target, caster, target, tag, shot and its sequence, point, heading, count,
+// damage a hit, whether it meets the barrier), the bodies' tallies in pass `_pass`, the spent
+// shots' list (hit batch A1), and the rooms and spells' damage the pass was told (A4). Checked on
 // the batch by `check_fields`.
 #define BATCH_FIELDS(X) \
 	X(mh_pass, "_pass", INT) \

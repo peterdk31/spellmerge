@@ -727,7 +727,7 @@ var _finding: bool = false
 ## and writes its arrays (`BATCH_FIELDS`).
 var _hit_batch: HitBatch = HitBatch.new()
 ## The shot turns the native hit pass merged itself, every hit of them adding to a merged hit the
-## pass already had (no hand-back to GDScript). A count for benchmarks and tests; nothing reads it.
+## pass already had or opening one it may (no hand-back to GDScript). A count for benchmarks and tests; nothing reads it.
 var merged_turns: int = 0
 ## The merged hits the native hit pass opened itself (hit batch A4: a body's room and its spell's
 ## damage told in the pass, so it asks nothing). A count for benchmarks and tests; nothing reads it.
@@ -3654,11 +3654,11 @@ func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int
 		_fit_hit_scratch()
 		var at: int = profile_clock.call() if timing else 0
 		var handed: int = _kernel.call(&"hits", self, n, top, resume, limit, delta)
-		if _hit_batch.looked < _hit_batch.entries:
-			_look_kernel_entries()
 		if timing:
 			step_profile[PROF_KERNEL] += profile_clock.call() - at
 			step_profile[PROF_HANDBACKS] += 1
+		if _hit_batch.looked < _hit_batch.entries:
+			_look_kernel_entries()
 		if handed == -1:
 			return top
 		if handed < -1:
@@ -3684,11 +3684,8 @@ func _look_kernel_entries() -> void:
 	var batch: HitBatch = _hit_batch
 	for entry in range(batch.looked, batch.entries):
 		var slot: int = batch.slot[entry]
-		batch.card[entry] = _carrier_card_of(slot)
-		batch.body[entry] = _kind_of(slot)
-		batch.core[entry] = _core[slot]
-		batch.look[entry] = _look[slot]
-	batch.looked = batch.entries
+		batch.set_look(entry, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot])
+	batch.kernel_entries_looked(_targets.size())
 
 
 ## `n` wrapped round `top` once (the hit pass starts at `_resume`).

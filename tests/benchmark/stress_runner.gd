@@ -193,6 +193,7 @@ var _profile_ticks_at: int = 0
 var _projectile_sums: PackedInt64Array = PackedInt64Array()
 ## The projectile manager's `merged_turns` when the profile started.
 var _merged_turns_at: int = 0
+## And its `merged_opens` (the merged hits the kernel opened itself).
 var _merged_opens_at: int = 0
 
 

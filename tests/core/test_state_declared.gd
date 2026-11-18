@@ -23,6 +23,9 @@ extends "res://tests/support/suite.gd"
 ## saved").
 
 const SimSource := preload("res://tests/support/sim_source.gd")
+const BiomeMaps := preload("res://tests/support/biome_maps.gd")
+const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 func test_every_listed_name_is_a_member() -> void:
 	for entry in SimSource.scripts():
@@ -159,3 +162,33 @@ static func _cannot_be(name: String, classes: Dictionary[String, String]) -> Str
 
 static func _is_node(native: StringName) -> bool:
 	return ClassDB.class_exists(native) and (native == &"Node" or ClassDB.is_parent_class(native, &"Node"))
+
+
+## The hash's cost of a biome (connected biomes CB2, docs/milestones/connected-biomes.md, "The wall
+## grid"): with a twelve-room biome laid, the biome's state is its map, about a kilobyte, while the
+## grid's room layers (DERIVED: laid again from the map) are hundreds of kilobytes the hash never
+## reads. What still grows with the biome's area is the projectile manager's target grid (`_cell_*`,
+## `_shot_head`: 32 bytes a 64 px cell, state, filled as the snapshot's), named here so its cost is
+## seen: about 6 KB for this row of rooms, about 190 KB for a 6000 x 4000 px biome.
+## The projectile manager's target grid's bytes a cell (`_cell_head`, `_cell_count`, `_cell_box`,
+## `_cell_filled`, `_shot_head`).
+const TARGET_GRID_BYTES: int = 32
+
+
+func test_a_twelve_room_biome_costs_the_hash_its_map_not_its_grid() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var mgr := own(ProjectileManagerScript.new()) as ProjectileManagerScript
+	var empty: int = BiomeMaps.state_bytes({"Projectiles": mgr})
+	var into := own(Node2D.new()) as Node2D
+	var biome: BiomeWorld = BiomeMaps.laid(registry, mgr, into)
+	var grid_layers: int = BiomeMaps.grid_layer_bytes(mgr.grid())
+	var shots: int = BiomeMaps.state_bytes({"Projectiles": mgr}) - empty
+	var map: int = BiomeMaps.state_bytes({"Biome": biome})
+	print("CB2 hash cost of a 12-room biome (%s px): the map %d bytes, the projectile manager %+d bytes (its target grid); the grid's layers, not hashed, %d bytes" % [mgr.bounds().size, map, shots, grid_layers])
+	check(map < 4096, "the map is a few kilobytes: %d bytes" % map)
+	var cells: int = ceili(mgr.bounds().size.x / ProjectileManagerScript.GRID_CELL) * ceili(mgr.bounds().size.y / ProjectileManagerScript.GRID_CELL)
+	check(shots <= TARGET_GRID_BYTES * cells, "the projectile manager grows by its target grid alone, %d bytes a cell: %+d bytes for %d cells" % [TARGET_GRID_BYTES, shots, cells])
+	check(grid_layers > 100 * map, "what is left out is the grid's layers: %d bytes" % grid_layers)
+	for member: String in ["_wall_cells", "_hole_cells", "_walk_cells", "_ground_cells"]:
+		check(StateWalk.listed(RoomGrid, "DERIVED").has(member), "the grid's %s is DERIVED" % member)

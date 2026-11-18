@@ -1,20 +1,35 @@
 class_name RoomGrid
 extends RefCounted
 ## The grid of the room's cells (WALL_CELL pixels a side, over the projectile manager's bounds): the
-## room's walls and the solid shots' stones on them, its holes, and the ground of the bodies that
-## cannot move (their footprints); and what is asked of them: where a shot meets a wall
-## (`wall_hit`, `clip_to_walls`, `line_clear`), where a body slides (`slide_body`), stands
-## (`circle_blocked`, `nearest_ground`) or walks (`ground_clear`, `walk_clear`, `clear_run`), and
-## where it would fall (`is_hole`, `touches_hole`). The projectile manager's (hit batch B1,
-## docs/milestones/hit-batch.md): it sizes the grid with its bounds (`size_to`), lays the walls and
-## holes of a room as Flow hands them (`set_walls`, `add_wall_body`, `add_hole_body`, `set_holes_outside`),
-## and marks its solid shots' cells (`lay_solid`, `mark_cells`). The game asks the grid itself, through
-## `grid()` (hit batch B2); the manager's one-line forwards of the same names are kept for the tests.
+## room's walls and the solid shots' stones on them, its mouths (connected biomes CB2, below), its
+## holes, and the ground of the bodies that cannot move (their footprints); and what is asked of them:
+## where a shot meets a wall (`wall_hit`, `clip_to_walls`, `line_clear`), what is in sight (`sight_clear`), where a
+## body slides (`slide_body`), stands (`circle_blocked`, `nearest_ground`) or walks (`ground_clear`,
+## `walk_clear`, `clear_run`), and where it would fall (`is_hole`, `touches_hole`). The projectile
+## manager's (hit batch B1, docs/milestones/hit-batch.md): it sizes the grid with its bounds
+## (`size_to`), lays the walls and holes of a room as Flow hands them (`set_walls`, `add_wall_body`,
+## `add_hole_body`, `set_holes_outside`; a biome's pieces as `BiomeWorld` lays them: `add_wall`,
+## `add_hole`, `cut`, `add_mouth`, `wall_outside`), and marks its solid shots' cells (`lay_solid`,
+## `mark_cells`). The game asks the grid itself, through `grid()` (hit batch B2); the manager's
+## one-line forwards of the same names are kept for the tests.
 ##
-## State, as it was the manager's (walked and restored with it, under its member): the walls, the
-## holes and the footprints are laid as rooms are entered and changed, never worked out again. The
-## native hit pass reads its wall cells (`ShotKernel`, `GRID_FIELDS`), and `WallSlide` is handed
-## them for a body's move.
+## **A mouth** (connected biomes CB2, docs/milestones/connected-biomes.md, "Cells"): the doorway
+## where a bridge meets a room, MOUTH_CELL in the wall grid. It is a wall to shots (`wall_hit`, and
+## the native hit pass, which reads any byte but 0 as a wall), to a body not driven by a wizard and
+## to whatever stands, lands or runs up (`circle_blocked`, `clear_run`) and to an AI's line of fire
+## (`line_clear`: a shot ends there); it is open to a wizard's walk (`slide_body`'s
+## `through_mouths`) and to sight (`sight_clear`).
+##
+## **The room's layers are not state** (connected biomes CB2, "The wall grid"): a biome-wide grid
+## would put megabytes into every hash and snapshot. The walls, mouths and holes are laid from the
+## room or the biome map, which are state, by whoever lays them (Flow, `BiomeWorld`), and laid again
+## by them after a snapshot where the place differs; so they are DERIVED, with the grids worked out
+## from the state (the walking grid, the footprints' counts). What changes in play is state: each
+## footprint (`set_footprint`) and each solid shot's cells (the manager's `Solid.cells`). After a
+## restore `rebuild_derived` takes the solid shots' counts out of the wall grid and lays the
+## footprints again, and the manager lays its solid shots' cells back (`relay_solid`). The native
+## hit pass reads its wall cells (`ShotKernel`, `GRID_FIELDS`), and `WallSlide` is handed them for a
+## body's move.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 
@@ -24,8 +39,20 @@ const ACTORS: int = ActorsScript.ACTORS
 const WALL_CELL: float = 8.0
 ## How many rings of cells `nearest_ground` looks out (12 cells: 96 px).
 const NEAREST_GROUND_RINGS: int = 12
-## A room wall's mark in the wall grid; the bits below it count the solid shots on a cell.
+## A room wall's mark in the wall grid.
 const ROOM_CELL: int = 128
+## A mouth's mark in the wall grid (connected biomes CB2): a wall to shots and to bodies no wizard
+## drives, open to a wizard's walk and to sight.
+const MOUTH_CELL: int = 64
+## The bits below the two marks count the solid shots on a cell, up to this many.
+const SOLID_MOST: int = 63
+## The bits a wizard's walk and sight see as walls: all but the mouth's.
+const PAST_MOUTHS: int = 255 & ~MOUTH_CELL
+
+## Not state: the room's layers (its bounds, walls, mouths and holes), laid from the room or the biome
+## map by whoever lays them, and the grids worked out from the state (the footprints' counts, the
+## walking grid), set up again in `rebuild_derived` (see the class doc).
+const DERIVED: Array[StringName] = [&"_bounds", &"_wall_w", &"_wall_h", &"_wall_cells", &"_has_walls", &"_has_mouths", &"_ground_cells", &"_footprint_missed", &"_hole_cells", &"_has_holes", &"_walk_cells"]
 
 ## The area the grid covers: the projectile manager's bounds (`size_to`).
 var _bounds: Rect2 = Rect2(-1024.0, -1024.0, 2048.0, 2048.0)
@@ -35,6 +62,8 @@ var _wall_w: int = 1
 var _wall_h: int = 1
 var _wall_cells: PackedByteArray = PackedByteArray()
 var _has_walls: bool = false
+## True while a mouth lies in the wall grid (`add_mouth`).
+var _has_mouths: bool = false
 ## The ground (`set_footprint`): per wall cell, how many footprints lie on it; per actor, its
 ## footprint's centre and half its size (a circle: its radius twice, and `_footprint_round` 1;
 ## nothing laid: no size); how many are laid (the walk asks it first); and the cells a footprint
@@ -91,7 +120,41 @@ func size_to(rect: Rect2) -> void:
 func clear_walls() -> void:
 	_wall_cells.fill(0)
 	_has_walls = false
+	_has_mouths = false
 	_drop_holes()
+
+
+## After a snapshot was restored (core/sim/README.md, "Snapshots"): the grids worked out from the
+## state set up again. The solid shots' counts are taken out of the wall grid (the manager lays its
+## solid shots' cells back after, `relay_solid`), and the footprints' ground and the walking grid are
+## laid again from the footprints. The room's layers are the restored world's own, laid by whoever
+## lays the room (the same room: as they were).
+func rebuild_derived() -> void:
+	if _wall_cells.size() != _wall_w * _wall_h:
+		size_to(_bounds)
+	var marks: int = ROOM_CELL | MOUTH_CELL
+	for cell in _wall_cells.size():
+		_wall_cells[cell] &= marks
+	_ground_cells.fill(0)
+	_footprint_missed.clear()
+	for cell in _walk_cells.size():
+		_walk_cells[cell] = _hole_cells[cell]
+	for actor in ACTORS:
+		if _footprint_laid(actor):
+			_lay_footprint(actor)
+
+
+## Lay a solid shot's `cells` back after a restore (`rebuild_derived`): one more on each. Cells this
+## grid does not have (a world still sized for another room, which whoever lays it sizes again and
+## relays: `BiomeWorld`) are left out.
+func relay_solid(cells: PackedInt32Array) -> void:
+	if cells.is_empty():
+		return
+	var size: int = _wall_cells.size()
+	for cell in cells:
+		if cell >= 0 and cell < size:
+			_wall_cells[cell] += 1
+	_has_walls = true
 
 
 ## True while anything lies in the wall grid (a room wall, a solid shot's stone).
@@ -111,7 +174,7 @@ func lay_solid(a: Vector2, b: Vector2, reach: float, cells: PackedInt32Array) ->
 			if Geometry2D.get_closest_point_to_segment(centre, a, b).distance_squared_to(centre) > reach * reach:
 				continue
 			var cell: int = y * _wall_w + x
-			if (_wall_cells[cell] & (ROOM_CELL - 1)) < ROOM_CELL - 1:
+			if (_wall_cells[cell] & SOLID_MOST) < SOLID_MOST:
 				_wall_cells[cell] += 1
 				cells.append(cell)
 	_has_walls = _has_walls or not cells.is_empty()
@@ -230,6 +293,68 @@ func add_wall(rect: Rect2) -> void:
 			_has_walls = true
 
 
+## The world rectangle `rect` a mouth (connected biomes CB2; parts outside the grid ignored): a wall
+## to shots and to bodies no wizard drives, open to a wizard's walk and to sight (see the class doc).
+func add_mouth(rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / WALL_CELL), 0)
+	var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / WALL_CELL), 0)
+	var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / WALL_CELL), _wall_w)
+	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
+	for y in range(y0, y1):
+		for x in range(x0, x1):
+			_wall_cells[y * _wall_w + x] |= MOUTH_CELL
+			_has_walls = true
+			_has_mouths = true
+
+
+## True while a mouth lies in the grid (`add_mouth`).
+func has_mouths() -> bool:
+	return _has_mouths
+
+
+## True when the cell at `point` is a mouth (`add_mouth`; outside the grid: no).
+func is_mouth(point: Vector2) -> bool:
+	return (cell_at(point) & MOUTH_CELL) != 0
+
+
+## Open the world rectangle `rect` (connected biomes CB2: a room's lip where a bridge meets it, laid
+## before the bridge): its room walls, mouths and holes taken out, the cells whose any part it covers
+## (parts outside the grid ignored). Solid shots' stones and footprints stay.
+func cut(rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / WALL_CELL), 0)
+	var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / WALL_CELL), 0)
+	var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / WALL_CELL), _wall_w)
+	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
+	for y in range(y0, y1):
+		for x in range(x0, x1):
+			var cell: int = y * _wall_w + x
+			_wall_cells[cell] &= SOLID_MOST
+			_hole_cells[cell] = 0
+			_walk_cells[cell] = 1 if _ground_cells[cell] != 0 else 0
+
+
+## Make every cell of the grid whose middle lies in none of `pieces` (world rectangles) a room wall
+## (connected biomes CB2: the dark between a biome's rooms and bridges, where nothing stands or flies).
+func wall_outside(pieces: Array[Rect2]) -> void:
+	var inside := PackedByteArray()
+	inside.resize(_wall_w * _wall_h)
+	for piece: Rect2 in pieces:
+		# The cells whose middle lies in it: from ceil(low - 0.5) to ceil(high - 0.5), not with it.
+		var low: Vector2 = (piece.position - _bounds.position) / WALL_CELL
+		var high: Vector2 = (piece.end - _bounds.position) / WALL_CELL
+		for cy in range(maxi(ceili(low.y - 0.5), 0), mini(ceili(high.y - 0.5), _wall_h)):
+			for cx in range(maxi(ceili(low.x - 0.5), 0), mini(ceili(high.x - 0.5), _wall_w)):
+				inside[cy * _wall_w + cx] = 1
+	for cell in inside.size():
+		if inside[cell] == 0:
+			_wall_cells[cell] |= ROOM_CELL
+			_has_walls = true
+
+
 ## The room's walls as an image (FORMAT_L8), one pixel a WALL_CELL square from the corner of
 ## `bounds()`: white for a room wall, black for open (solid shots are left out). Made each call,
 ## for what is built once a room (Feel's floor marks).
@@ -251,18 +376,28 @@ func clip_to_walls(from: Vector2, to: Vector2) -> Vector2:
 	return from.lerp(to, t)
 
 
-## True when nothing in the wall grid lies on the segment from `from` to `to`: no room wall and
-## no solid shot (a Wall card's, whoever cast it), as a shot along it would find. Walks the whole
-## segment, however long (an AI's line of fire, `gameplay/ai/sight.gd`).
+## True when nothing in the wall grid lies on the segment from `from` to `to`: no room wall, no
+## mouth and no solid shot (a Wall card's, whoever cast it), as a shot along it would find. Walks the
+## whole segment, however long (an AI's line of fire, `gameplay/ai/sight.gd`: a shot ends at a mouth,
+## so the AI fires through none).
 func line_clear(from: Vector2, to: Vector2) -> bool:
 	return wall_hit(from, to) < 0.0
+
+
+## True when nothing but a mouth in the wall grid lies on the segment from `from` to `to` (connected
+## biomes CB2, "Cells": sight sees through a doorway, though no shot crosses it): for what only looks
+## (a room seen past a mouth, CB3's), never a line of fire. As `line_clear` where there are no mouths.
+func sight_clear(from: Vector2, to: Vector2) -> bool:
+	if not _has_mouths:
+		return wall_hit(from, to) < 0.0
+	return _way_hit(from, to, PAST_MOUTHS, false, false) < 0.0
 
 
 ## True when no ground of a body that cannot move (`set_footprint`: a pillar's) lies on the segment
 ## from `from` to `to`: where a body walking along it would not be held up by one (boss plan OB14,
 ## decision 36: an AI walks round a blocking prop). Walks the whole segment.
 func ground_clear(from: Vector2, to: Vector2) -> bool:
-	return _footprints_laid == 0 or _way_hit(from, to, false, false) < 0.0
+	return _footprints_laid == 0 or _way_hit(from, to, 0, true, false) < 0.0
 
 
 ## True when neither the ground of a body that cannot move nor a hole (`set_holes`) lies on the
@@ -270,7 +405,7 @@ func ground_clear(from: Vector2, to: Vector2) -> bool:
 ## (hub rework HR-H1; the AI's walking checks take it in HR-H2, its line of fire never). Walks the
 ## whole segment.
 func walk_clear(from: Vector2, to: Vector2) -> bool:
-	return _way_hit(from, to, false, true) < 0.0
+	return _way_hit(from, to, 0, true, true) < 0.0
 
 
 ## How far (pixels, at most `most`) a walk from `from` along `way` goes before the first cell of a
@@ -279,7 +414,7 @@ func walk_clear(from: Vector2, to: Vector2) -> bool:
 func clear_run(from: Vector2, way: Vector2, most: float) -> float:
 	if way == Vector2.ZERO or most <= 0.0:
 		return 0.0
-	var t: float = _way_hit(from, from + way.normalized() * most, true, false)
+	var t: float = _way_hit(from, from + way.normalized() * most, 255, true, false)
 	return most if t < 0.0 else t * most
 
 
@@ -349,13 +484,16 @@ func nearest_ground(point: Vector2, radius: float) -> Vector2:
 ## walls it meets, the room's and the solid shots', and the ground of the bodies that cannot move
 ## (online-ready N6: the actors' move, in place of the engine's physics; `WallSlide`), and, unless
 ## the move is `crossing` (a dash, or a move done to the body: hub rework HR-H1, `Actor.move`), the
-## room's holes, whose lip a walk stops at. The kernel is handed the walls and one other grid: the
-## ground and the holes merged for a walk (`_walk_cells`), the ground alone for a crossing.
-func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = false) -> Vector2:
+## room's holes, whose lip a walk stops at; and, unless it goes `through_mouths` (a body a wizard
+## drives: connected biomes CB2, `Actor.passes_mouths`), the mouths. The kernel is handed the walls,
+## the bits of them it minds, and one other grid: the ground and the holes merged for a walk
+## (`_walk_cells`), the ground alone for a crossing.
+func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = false, through_mouths: bool = false) -> Vector2:
 	var holes: bool = _has_holes and not crossing
 	if not _has_walls and _footprints_laid == 0 and not holes:
 		return from + motion
-	return WallSlide.slide(_wall_cells, _walk_cells if holes else _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
+	var minded: int = PAST_MOUTHS if through_mouths and _has_mouths else 255
+	return WallSlide.slide(_wall_cells, _walk_cells if holes else _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius, minded)
 
 
 ## The body of the actor `actor` cannot move, and stands on this ground from now on (props W4: its
@@ -496,16 +634,19 @@ func wall_hit(from: Vector2, to: Vector2) -> float:
 	return -1.0
 
 
-## The first cell of the ground (`set_footprint`), with `walls` of the wall grid too and with
-## `holes` of the holes (`set_holes`), on the path from `from` to `to`, as `wall_hit` finds a wall:
-## t in [0, 1] where the path enters it, -1 when there is none. Not a shot's (shots hit a blocking
-## body, they do not stop on its ground): an AI's walk (`ground_clear`, `walk_clear`, `clear_run`),
-## so it has none of `wall_hit`'s fast paths, and the native kernels have no copy of it.
-func _way_hit(from: Vector2, to: Vector2, walls: bool, holes: bool) -> float:
+## The first cell of the ground (`set_footprint`) when `ground`, of the wall grid's bits in
+## `wall_mask` (0: none; 255: every wall, a mouth too; PAST_MOUTHS: sight's) and with `holes` of the
+## holes (`set_holes`), on the path from `from` to `to`, as `wall_hit` finds a wall: t in [0, 1] where
+## the path enters it, -1 when there is none. Not a shot's (shots hit a blocking body, they do not stop
+## on its ground): an AI's walk and sight (`ground_clear`, `walk_clear`, `clear_run`, `sight_clear` past
+## a mouth), so it has none of `wall_hit`'s fast paths, and the native kernels have no copy of it.
+func _way_hit(from: Vector2, to: Vector2, wall_mask: int, ground: bool, holes: bool) -> float:
 	var with_holes: bool = holes and _has_holes
-	if (not walls or not _has_walls) and _footprints_laid == 0 and not with_holes:
+	var walls: bool = wall_mask != 0 and _has_walls
+	var with_ground: bool = with_holes or (ground and _footprints_laid > 0)
+	if not walls and not with_ground:
 		return -1.0
-	var ground: PackedByteArray = _walk_cells if with_holes else _ground_cells
+	var grid: PackedByteArray = _walk_cells if with_holes else _ground_cells
 	var start: Vector2 = (from - _bounds.position) / WALL_CELL
 	var delta: Vector2 = (to - from) / WALL_CELL
 	var cx: int = floori(start.x)
@@ -527,7 +668,7 @@ func _way_hit(from: Vector2, to: Vector2, walls: bool, holes: bool) -> float:
 	for _n in full:
 		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h:
 			var cell: int = cy * _wall_w + cx
-			if ground[cell] != 0 or (walls and _wall_cells[cell] != 0):
+			if (with_ground and grid[cell] != 0) or (walls and (_wall_cells[cell] & wall_mask) != 0):
 				return t
 		if next_x < next_y:
 			t = next_x

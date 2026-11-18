@@ -9,8 +9,14 @@ extends "res://tests/support/screenshot.gd"
 ##   frame every `MATERIALIZE_EVERY` from the pad's first look to standing: the pad of light with its
 ##   rim running round, the scan line sweeping up with the rows interlaced behind it and the glitch,
 ##   the line going out and the body whole. Two rows of frames.
+## - `spawning_strip`: a bone husk stood beside the wizard in a fixture style with a mark strip (spawn
+##   styles AS4; no style of the game's has one yet: `tests/support/mark_strips.gd`, four frames of a
+##   growing square in four shades), a frame every `MATERIALIZE_EVERY`: the strip's frames in order,
+##   held under the rise, then three of them backwards as it closes.
 ##
 ## Each frame's share of the spawn is printed.
+
+const MarkStrips := preload("res://tests/support/mark_strips.gd")
 
 ## The shares of the spawn the `rise` strip shows (the last, past 1, standing).
 const SHARES: Array[float] = [0.05, 0.15, 0.3, 0.45, 0.6, 0.75, 0.88, 0.95, 1.2]
@@ -50,6 +56,7 @@ func take() -> void:
 		frames.append(await _crop(body, "SPAWN"))
 	save(_sheet(frames, frames.size()), "spawning")
 	await _materialize(flow)
+	await _strip(flow)
 
 
 ## A storm fork stood beside the wizard in the style Flow picks for it (its own: `materialize`), a
@@ -81,6 +88,35 @@ func _materialize(flow: Node) -> void:
 			await physics_frame
 	save(_sheet(frames, MATERIALIZE_ROW), "spawning_materialize")
 	body.queue_free()
+
+
+## A bone husk stood beside the wizard in a fixture style of `rise`'s numbers with a mark strip, a
+## frame every `MATERIALIZE_EVERY` until it stands.
+func _strip(flow: Node) -> void:
+	var registry: Node = root.get_node("Registry")
+	var data := registry.call("get_resource", &"enemies", &"bone_husk") as EnemyBase
+	var wizards: Array = flow.get(&"_wizards")
+	if data == null or wizards.is_empty():
+		fail("no bone husk or no wizard")
+		return
+	var style: SpawnStyle = MarkStrips.style(&"shot_strip", MarkStrips.strip(16, 4))
+	registry.call("add", SpawnStyle.FOLDER, style)
+	var body := RoomContents.make_body(data) as Actor
+	body.position = (wizards[0] as Node2D).global_position + STORM_FORK_AT
+	body.spawn(style.seconds, style.id)
+	(wizards[0] as Node2D).get_parent().add_child(body)
+	var frames: Array[Image] = []
+	while is_instance_valid(body) and body.is_spawning():
+		frames.append(await _crop(body, "STRIP"))
+		for n in MATERIALIZE_EVERY - 1:
+			await physics_frame
+	registry.call("remove", SpawnStyle.FOLDER, style.id)
+	if frames.is_empty():
+		fail("the bone husk did not spawn in")
+		return
+	save(_sheet(frames, MATERIALIZE_ROW), "spawning_strip")
+	if is_instance_valid(body):
+		body.queue_free()
 
 
 ## The screen round `body`'s feet this frame, at `ZOOM`, its share printed.

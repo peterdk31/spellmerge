@@ -55,6 +55,13 @@ const MIN_SECONDS: float = 0.3
 const MAX_SECONDS: float = 2.0
 ## The `colours` that takes the room's floor's (`RoomBase.floor_colors`), as a floor mark's `floor`.
 const FLOOR: StringName = &"floor"
+## The largest side of a mark strip's frame, in pixels (`problems`): a mark lies under one body's
+## feet, and content/ is open to contributors.
+const MAX_STRIP_SIDE: int = 64
+## The most times a strip's frame is drawn its own size (`strip_scale`): whole numbers only.
+const MAX_STRIP_SCALE: int = 4
+## The file beside a style's art that lists it (art/README.md, "The origin manifest").
+const ASSETS_FILE: String = "assets.json"
 
 ## The style's id, which the registry keys it by; its folder's name.
 @export var id: StringName = &""
@@ -70,9 +77,14 @@ const FLOOR: StringName = &"floor"
 ## The frames the mark grows in (from a dot to the footprint's width), and closes in.
 @export_range(3, 16) var mark_frames: int = DEFAULT["mark_frames"]
 @export_range(3, 16) var close_frames: int = DEFAULT["close_frames"]
-## The mark's look: none for the ring drawn in its colours (today's look), or an art strip played
-## over the mark stage (spawn styles AS4, to come: until then a strip is a problem, so a style
-## never names art it does not show).
+## The mark's look: none for the ring drawn in its colours (today's look), or an art strip (spawn
+## styles AS4): one row of square frames side by side (its frame count is its width over its height,
+## `strip_frames`), in the style's folder and listed in its `assets.json`. Its frames play in order over
+## the mark stage (all of them, so `mark_frames` is the ring's only), the last held until
+## `close_from`, then `close_frames` of them backwards down to its first as the mark closes
+## (`strip_frame`), so it ends where standing begins. Its first frame is the smallest look (a dot,
+## a crack), as the ring's dot. Drawn in its own colours (`colours` is not read for it), at whole
+## pixels centred on the body's feet, at a whole-number scale that fits the footprint (`strip_scale`).
 @export var mark_strip: Texture2D = null
 ## Where the mark's colours come from: `floor` (the room's floor's, today's ring) or a material of
 ## the game's palette by name (`Palette`; never a player's nor Blight, docs/STYLE.md): the mark's
@@ -130,12 +142,49 @@ func motion_stage_frames() -> float:
 	return (1.0 - mark_end) * seconds * CHECK_FPS
 
 
+## The frames of `strip` (its width over its height), or 0 when they are not square (its width not a
+## whole number of its height, or none).
+static func strip_frames(strip: Texture2D) -> int:
+	if strip == null:
+		return 0
+	var side: int = strip.get_height()
+	var wide: int = strip.get_width()
+	if side <= 0 or wide < side or wide % side != 0:
+		return 0
+	return wide / side
+
+
+## The frame of a strip of `frames` frames shown at `share` of a spawn as `style` times it (-1: none,
+## before it starts or once it stands): frame 0 to the last over the mark stage, each an equal share
+## of it; the last held to `close_from`; then `close_frames` frames backwards, the first already a
+## step down and the last frame 0, so it closes as the ring does (`SpawnLook.mark_radius`).
+static func strip_frame(frames: int, share: float, style: SpawnStyle) -> int:
+	if frames <= 0 or share >= 1.0 or share < 0.0:
+		return -1
+	if share < style.mark_end:
+		return mini(floori(share / style.mark_end * frames), frames - 1)
+	if share < style.close_from:
+		return frames - 1
+	var steps: int = maxi(style.close_frames, 1)
+	var j: int = mini(floori((share - style.close_from) / (1.0 - style.close_from) * steps), steps - 1)
+	return roundi(float(frames - 1) * float(steps - 1 - j) / float(steps))
+
+
+## How many times its own size a strip frame `side` pixels square is drawn under a body whose
+## footprint is `radius` pixels (`Actor.wall_radius`): the whole number nearest the footprint's width
+## over the side, 1 to `MAX_STRIP_SCALE`.
+static func strip_scale(side: int, radius: float) -> int:
+	if side <= 0:
+		return 1
+	return clampi(roundi(2.0 * radius / float(side)), 1, MAX_STRIP_SCALE)
+
+
 ## What is wrong with it, one line each (empty when it is fine): an id that is not its folder's name
 ## (a style read from a file), a motion `MOTIONS` does not have, `seconds` outside `MIN_SECONDS` to
 ## `MAX_SECONDS`, shares out of order (0 < `mark_end` < `close_from` < 1), a stage shorter than its
 ## frames at `CHECK_FPS` or drawn in fewer than `MIN_FRAMES`, a motion's stage shorter than its
-## motion needs (`MOTION_FRAMES`), colours that are neither the floor's
-## nor a world material of the palette, a mark strip (not drawn before AS4), a biome named twice, and
+## motion needs (`MOTION_FRAMES`), colours that are neither the floor's nor a world material of
+## the palette, a mark strip that is wrong (`_strip_problems`), a biome named twice, and
 ## given `known_cue` (a cue id to whether the game has it: the registry's), a cue it does not know.
 func problems(known_cue: Callable = Callable()) -> PackedStringArray:
 	var found := PackedStringArray()
@@ -160,7 +209,7 @@ func problems(known_cue: Callable = Callable()) -> PackedStringArray:
 		for line: String in Palette.world_problems([colours] as Array[StringName], "%s: colours" % name):
 			found.append(line + "; or 'floor'.")
 	if mark_strip != null:
-		found.append("%s: it names a mark strip, which is not drawn yet (spawn styles AS4)." % name)
+		_strip_problems(found, name)
 	for at in biomes.size():
 		if biomes.find(biomes[at]) != at:
 			found.append("%s: it names the biome '%s' twice." % [name, biomes[at]])
@@ -176,6 +225,38 @@ static func _check_stage(found: PackedStringArray, name: String, stage: String, 
 		found.append("%s: %s is %d; %d at least (docs/STYLE.md, \"Smooth\")." % [name, field, frames, MIN_FRAMES])
 	elif has < float(frames):
 		found.append("%s: %s stage lasts %.1f frames at %d fps, too short for its %d; make the spawn longer or the stage wider." % [name, stage, has, roundi(CHECK_FPS), frames])
+
+
+## A mark strip's problems, in `found`: frames that are not square, fewer than `MIN_FRAMES` (and
+## than `close_frames` + 1, so each frame of the close is another), a side over `MAX_STRIP_SIDE`, a
+## mark stage too short to show each frame at `CHECK_FPS`, and, for a style read from a file, a strip
+## that is not a file of its folder listed in the folder's `assets.json`.
+func _strip_problems(found: PackedStringArray, name: String) -> void:
+	var frames: int = strip_frames(mark_strip)
+	if frames == 0:
+		found.append("%s: its mark strip is %dx%d, not a row of square frames (its width a whole number of its height)." % [name, mark_strip.get_width(), mark_strip.get_height()])
+	else:
+		var least: int = maxi(MIN_FRAMES, close_frames + 1)
+		if frames < least:
+			found.append("%s: its mark strip has %d frames; %d at least (%d a stage, and close_frames + 1 so each frame of the close is another; docs/STYLE.md, \"Smooth\")." % [name, frames, least, MIN_FRAMES])
+		elif mark_end > 0.0 and mark_end < close_from and mark_stage_frames() < float(frames):
+			found.append("%s: the mark's stage lasts %.1f frames at %d fps, too short for its strip's %d; make the spawn longer, mark_end later or the strip shorter." % [name, mark_stage_frames(), roundi(CHECK_FPS), frames])
+		if mark_strip.get_height() > MAX_STRIP_SIDE:
+			found.append("%s: its mark strip's frames are %d px; %d at most." % [name, mark_strip.get_height(), MAX_STRIP_SIDE])
+	if resource_path == "":
+		return
+	var folder: String = resource_path.get_base_dir()
+	var art: String = mark_strip.resource_path
+	if art == "" or art.get_base_dir() != folder:
+		found.append("%s: its mark strip is not a file in its folder (%s)." % [name, folder])
+	elif not listed_in(folder.path_join(ASSETS_FILE), art):
+		found.append("%s: its mark strip %s is not listed in %s (path, origin, author, license; art/README.md)." % [name, art.get_file(), folder.path_join(ASSETS_FILE)])
+
+
+## Whether the assets file `file` (`{"assets": [{"path": ...}]}`, art/README.md) lists the file at
+## `path` (its path from the repository root, as an assets file writes it).
+static func listed_in(file: String, path: String) -> bool:
+	return SpellValidator.load_manifest(file, [] as Array[String]).has(path.trim_prefix("res://"))
 
 
 ## What is wrong with `styles` (every style the game has), one line each: each style's own

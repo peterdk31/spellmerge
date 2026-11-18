@@ -2,7 +2,7 @@ class_name RoomSocket
 extends Node2D
 ## A socket on a template's lip (connected biomes CB2, docs/milestones/connected-biomes.md, decision
 ## 2): where a bridge (or another walkway) may meet the template in a biome. Add one to a room's scene
-## (Add Child Node, "RoomSocket"; the crypt's rooms keep them under `Sockets`) at the middle of its
+## (Add Child Node, "RoomSocket"; a room keeps them at its scene's top level, `SocketEast` and so on, so `tools/ground_shape.py`, which keeps cracks clear of every node under a group, draws its ground as before; the bridge keeps them under `Sockets`) at the middle of its
 ## mouth on the slab's lip, on the 32 px grid (`PieceShape.GRID`), and pick the way it faces: out of
 ## the slab, the way a bridge leaves it. Its mouth is MOUTH pixels wide across that way. A walkway
 ## (`RoomBase.walkway`) has its sockets on its own edge, at its ends.

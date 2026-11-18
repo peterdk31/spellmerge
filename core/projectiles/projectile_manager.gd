@@ -1932,6 +1932,14 @@ func clear_walls() -> void:
 	_forget_solid_cells()
 
 
+## Lay every solid shot's cells (state) back into the room grid (`RoomGrid.relay_solid`): after a
+## restore, and by whoever lays the room's layers again over the same bounds (`BiomeWorld`), so the
+## stones stand where the snapshot says without a step.
+func relay_solids() -> void:
+	for slot: int in _solids:
+		_room_grid.relay_solid((_solids[slot] as Solid).cells)
+
+
 ## The room grid's walls are gone: the solid shots lie on no cell, and lay themselves again at their
 ## next step.
 func _forget_solid_cells() -> void:
@@ -2175,8 +2183,8 @@ func nearest_ground(point: Vector2, radius: float) -> Vector2:
 
 
 ## As `RoomGrid.slide_body` (the room grid, `grid()`).
-func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = false) -> Vector2:
-	return _room_grid.slide_body(from, motion, radius, crossing)
+func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = false, through_mouths: bool = false) -> Vector2:
+	return _room_grid.slide_body(from, motion, radius, crossing, through_mouths)
 
 
 ## As `RoomGrid.set_footprint` (the room grid, `grid()`).
@@ -2299,8 +2307,7 @@ func actor_table() -> ActorsScript:
 ## The room grid's layers are not state (connected biomes CB2, `RoomGrid`): the grid, restored first,
 ## took the solid shots' counts out, and each solid shot's cells (state) are laid back in it here.
 func rebuild_derived() -> void:
-	for slot: int in _solids:
-		_room_grid.relay_solid((_solids[slot] as Solid).cells)
+	relay_solids()
 	var table: ActorsScript = actor_table()
 	var rows: int = _target_key.size()
 	_targets.resize(rows)

@@ -230,7 +230,8 @@ static func _layer_rects(layout: Node, holes: bool) -> Array[Rect2]:
 			continue
 		for child: Node in body.get_children():
 			var shape := child as CollisionShape2D
-			var box := shape.shape as RectangleShape2D if shape != null else null
+			# A shape switched off is no wall, as the projectile manager reads a body (`_body_rects`).
+			var box := shape.shape as RectangleShape2D if shape != null and not shape.disabled else null
 			if box == null:
 				continue
 			# The layout may not be in the tree yet: its transform is walked by hand.

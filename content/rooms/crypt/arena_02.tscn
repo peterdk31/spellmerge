@@ -317,14 +317,12 @@ density = 0.5
 [node name="CoverPreview" type="Node2D" parent="."]
 script = ExtResource("gc_preview")
 
-[node name="Sockets" type="Node2D" parent="."]
-
-[node name="West" type="Node2D" parent="Sockets"]
+[node name="SocketWest" type="Node2D" parent="."]
 position = Vector2(32, 192)
 script = ExtResource("cb_socket")
 facing = 3
 
-[node name="East" type="Node2D" parent="Sockets"]
+[node name="SocketEast" type="Node2D" parent="."]
 position = Vector2(736, 192)
 script = ExtResource("cb_socket")
 facing = 1

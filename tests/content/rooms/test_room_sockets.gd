@@ -72,6 +72,12 @@ func test_a_room_off_the_grid_or_with_a_socket_off_its_lip_breaks_the_rules() ->
 	shape.socket_facing = PackedInt32Array([RoomSocket.Facing.EAST, RoomSocket.Facing.WEST])
 	shape.walls.append(Rect2(160.0, 0.0, 32.0, 192.0))
 	check("cannot be walked to" in "".join(shape.problems()), "a socket cut off from the others is named")
+	# A one-cell gap in the dividing wall: no wizard fits through it.
+	shape.walls[4] = Rect2(160.0, 0.0, 32.0, 96.0)
+	shape.walls.append(Rect2(160.0, 104.0, 32.0, 88.0))
+	check("cannot be walked to" in "".join(shape.problems()), "an 8 px gap is no way")
+	shape.walls[5] = Rect2(160.0, 112.0, 32.0, 80.0)
+	check_equal(shape.problems(), PackedStringArray(), "a 16 px gap is")
 
 
 func test_mirroring_moves_sockets_walls_and_holes_in_whole_cells() -> void:
@@ -120,7 +126,7 @@ func test_the_socket_preview_reads_its_scene() -> void:
 		check_equal(preview.shape.sockets(), 2, "%s: both sockets read" % id)
 		check_equal(preview.broken, PackedInt32Array(), "%s: none broken" % id)
 		check_equal(preview.shape.walkway, id == &"crypt_bridge", "%s: a walkway only for the bridge" % id)
-		(layout.get_node("Sockets").get_child(0) as Node2D).position += Vector2(8.0, 0.0)
+		(layout.find_children("*", "RoomSocket", true, false)[0] as Node2D).position += Vector2(8.0, 0.0)
 		preview.mirror = PieceShape.MIRROR_Y
 		check_equal(preview.broken, PackedInt32Array([0]), "%s: a socket moved off the grid is broken" % id)
 		layout.free()

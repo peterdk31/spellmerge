@@ -55,6 +55,10 @@ func test_every_rule_is_named_when_broken() -> void:
 	_broken(func(map: BiomeMap) -> void: map.room_mirrors[0] = PieceShape.MIRROR_X, "face each other")
 	_broken(func(map: BiomeMap) -> void: map.add_bridge(BiomeMaps.BRIDGE, map.bridge_places[0], 0, 0, 0, 1, 0), "joined twice")
 	_broken(func(map: BiomeMap) -> void: map.room_kinds.append(&"fight"), "not of one length")
+	_broken(func(map: BiomeMap) -> void: map.room_mirrors[1] = 4, "none of the four")
+	_broken(func(map: BiomeMap) -> void: map.bridge_ends[6] = 1, "to itself")
+	_broken(func(map: BiomeMap) -> void: map.depths[2] = 1, "call work_out_depths")
+	_broken(func(map: BiomeMap) -> void: map.add_bridge(BiomeMaps.BRIDGE, map.bridge_places[0] + Vector2(32.0, 0.0), 0, 0, 0, 1, 0), "bridges 0 and 2 overlap")
 
 
 func test_a_copy_is_the_same_map_and_a_change_parts_them() -> void:

@@ -463,8 +463,15 @@ func test_a_twelve_room_biome_costs_the_snapshot_its_map() -> void:
 	var empty: int = BiomeMaps.state_bytes({"Projectiles": mgr})
 	var into := own(Node2D.new()) as Node2D
 	var biome: BiomeWorld = BiomeMaps.laid(registry, mgr, into)
+	# A Wall card's stones standing in the nave: play's state in the grid.
+	var stone: int = mgr.spawn(0, biome.room_rect(1).get_center() + Vector2(0.0, 40.0), Vector2.ZERO, 5.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, 1, ProjectileManagerScript.MOTION_STILL)
+	check(mgr.set_solid(stone, Vector2.RIGHT, 3, 8.0), "a solid stone shot")
+	mgr.step(1.0 / 60.0)
 	var areas: Dictionary = {"Projectiles": mgr, "Biome": biome}
 	var grid: RoomGrid = mgr.grid()
+	var walk := StateWalk.new()
+	walk.with_paths = false
+	var hashes: Dictionary = SimHash.areas(areas, walk)
 	var laid: PackedByteArray = var_to_bytes([grid._wall_cells, grid._walk_cells, grid._bounds])
 	var started: int = Time.get_ticks_usec()
 	var snapshot := Snapshot.take(areas)
@@ -482,7 +489,10 @@ func test_a_twelve_room_biome_costs_the_snapshot_its_map() -> void:
 	started = Time.get_ticks_usec()
 	check_equal(snapshot.restore({"Projectiles": mgr, "Biome": other}), PackedStringArray(), "restored across without problems")
 	var across_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
-	check_equal(var_to_bytes([grid._wall_cells, grid._walk_cells, grid._bounds]), laid, "the grid laid again from the map, the same to the byte")
+	check_equal(var_to_bytes([grid._wall_cells, grid._walk_cells, grid._bounds]), laid, "the grid laid again from the map, the stones in it, the same to the byte")
+	var again := StateWalk.new()
+	again.with_paths = false
+	check_equal(SimHash.areas({"Projectiles": mgr, "Biome": other}, again), hashes, "and the state hashes as the snapshot's: nothing laid again touched it")
 	check_equal(other_into.get_child_count(), 23, "its pieces laid")
 	print("CB2 snapshot cost of a 12-room biome: adds %d bytes; taken in %.1f ms, restored in place in %.1f ms, across (laid again) in %.1f ms" % [held, take_ms, restore_ms, across_ms])
 	check(held < 8192, "the biome adds a few kilobytes to the snapshot: %d bytes" % held)

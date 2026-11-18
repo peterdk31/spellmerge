@@ -68,7 +68,7 @@ A rebake keeps a file's `tier` while its audio (`audio_hash`) stays the same; on
 
 ## Example to copy
 
-The first audio is the rooms' ambience (atmosphere D), all in `audio/ambience/` and each with its entry in `audio/manifest.json`: the crypt's `amb_crypt_air.ogg` (a 12 s stereo loop, imported to loop), `amb_crypt_drip.ogg`, `amb_crypt_drip_double.ogg` and `amb_crypt_rumble.ogg` (one-shot accents), named by `content/rooms/crypt/crypt_ambience.tres`; the hub's `amb_hub_wind.ogg` and `amb_hub_void.ogg` (loops) and `amb_hub_gust.ogg` (an accent), named by `content/rooms/hub/hub_ambience.tres`. Ambience ids start `amb_`. They are made by procedural synthesis and listed as `placeholder` until someone has listened to them in play.
+The first audio is the rooms' ambience (atmosphere D), all in `audio/ambience/` and each with its entry in `audio/manifest.json`: the crypt's `amb_crypt_air.ogg` (a 12 s stereo loop, imported to loop), `amb_crypt_drip.ogg`, `amb_crypt_drip_double.ogg` and `amb_crypt_rumble.ogg` (one-shot accents), named by `content/rooms/crypt/crypt_ambience.tres`; the hub's `amb_hub_wind.ogg` and `amb_hub_void.ogg` (loops) and `amb_hub_gust.ogg` (an accent), named by `content/rooms/hub/hub_ambience.tres`. Ambience ids start `amb_`. They are made by procedural synthesis and listed as `placeholder` until someone has listened to them in play. The first generated sounds are the menus' (sound plan AU8): `sfx/ui_move/` and its five siblings (`ui_choose`, `ui_back`, `ui_deny`, `ui_card_place`, `ui_card_remove`), each its recipe, its `variants/`, its `.tres` and its `assets.json`; copy one of those folders for a new generated sound.
 
 ## Validate
 

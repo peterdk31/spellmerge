@@ -20,6 +20,9 @@ extends Control
 ## hands over what it held before, and the browser may first ask the player to allow it), so there
 ## the box is filled when the text has arrived: it is asked for at once and read again
 ## PASTE_CHECKS times, PASTE_WAIT apart.
+## **Sounds** (sound plan AU8; `hud/widgets/ui_sounds.gd`): the focus moving is `ui_move`, a button
+## pressed `ui_choose` (Cancel `ui_back`), sent as `ui_sound_requested`; a focus the menu moves itself
+## in answer to a press (Join's box, Cancel's Host) makes no second sound.
 
 const EventsScript := preload("res://core/events/events.gd")
 const OnlineWords := preload("res://hud/widgets/online_words.gd")
@@ -111,6 +114,9 @@ var _hosting: bool = false
 var clipboard_reader: Callable = DisplayServer.clipboard_get
 ## Whether the clipboard arrives a moment after it is asked for (a browser; tests may set it).
 var clipboard_is_late: bool = OS.has_feature("web")
+## The frame a button was last pressed in (`_chose`): a focus moved in that frame is the press's
+## answer, not a move.
+var _chose_frame: int = -1
 ## Clipboard reads still to make after a paste, and the seconds to the next.
 var _paste_checks: int = 0
 var _paste_wait: float = 0.0
@@ -123,6 +129,10 @@ func _ready() -> void:
 	_version.text = BuildInfo.describe()
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
+	# The sounds first, so a press is marked before its handler moves the focus.
+	for chosen: Button in [_play, _fullscreen, _host, _join, _copy, _paste, _connect]:
+		chosen.pressed.connect(_chose.bind(UiSounds.CHOOSE))
+	_cancel.pressed.connect(_chose.bind(UiSounds.BACK))
 	_play.pressed.connect(_on_play_pressed)
 	if display == null:
 		display = get_node_or_null(^"/root/Display")
@@ -144,6 +154,7 @@ func _ready() -> void:
 	if events != null:
 		events.online_changed.connect(_on_online_changed)
 	_play.grab_focus()
+	get_viewport().gui_focus_changed.connect(_on_gui_focus_changed)
 	print("Spellmerge %s: main menu ready" % BuildInfo.describe())
 	var args: PackedStringArray = _cmdline_arguments()
 	_start_four_bot_test(args)
@@ -243,6 +254,18 @@ func _add_runner(runner: Node) -> void:
 		runner.free()
 		return
 	root.add_child(runner)
+
+
+## A button pressed: its sound, and the frame marked.
+func _chose(id: StringName) -> void:
+	_chose_frame = Engine.get_process_frames()
+	UiSounds.send(events, id)
+
+
+## The focus moved to `control`: the move's sound, unless a press this frame moved it.
+func _on_gui_focus_changed(_control: Control) -> void:
+	if _chose_frame != Engine.get_process_frames():
+		UiSounds.send(events, UiSounds.MOVE)
 
 
 func _on_play_pressed() -> void:

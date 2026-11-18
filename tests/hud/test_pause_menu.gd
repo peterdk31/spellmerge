@@ -5,7 +5,7 @@ extends "res://tests/support/suite.gd"
 ## `pause` again close it and the game goes on; the Map page shows the run's map; Settings is one
 ## page of tabs (owner, 2026-11-18): Graphics (Fullscreen, Dynamic lighting, Shadows, Fog, Ambient
 ## particles, Environment interaction, Floor marks), Performance (Effect slots, Particles, Particle
-## amount, Tailless motes, Max shots), Audio (Ambience volume) and Interface (Screen shake, Damage
+## amount, Tailless motes, Max shots), Audio (Music, Sound, Ambience and UI volume) and Interface (Screen shake, Damage
 ## numbers, Show FPS, and the switches of the builder and of where the staff rows show the reload),
 ## LB and RB (Z and C) paging them round from either end with their glyphs at the row's ends, a switch
 ## focusing the tab's first row, the box sliding and the rows stepping in by whole pixels, the panel
@@ -18,7 +18,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## The settings' switches (Screen shake, Damage numbers, Floor marks, Dynamic lighting, Shadows, Fog,
 ## Ambient particles, Environment interaction) and sliders (Effect slots, Particles, Particle amount,
-## Max shots, Tailless motes, Ambience volume) behave alike, so each of
+## Max shots, Tailless motes, and the four volumes) behave alike, so each of
 ## those behaviours is one test over every switch or every slider (`_switches()`, `_sliders()`).
 ##
 ## Each test builds what it needs with `_setup`: the HUD (hud/panels/panels.tscn) on a bus, input
@@ -60,7 +60,10 @@ const SIGNAL_OF: Dictionary = {
 	"Fog": &"fog_changed",
 	"AmbientParticles": &"ambient_particles_changed",
 	"EnvironmentInteraction": &"environment_interaction_changed",
+	"MusicVolume": &"music_volume_changed",
+	"SoundVolume": &"sound_volume_changed",
 	"AmbienceVolume": &"ambience_volume_changed",
+	"UiVolume": &"ui_volume_changed",
 }
 ## The Settings tabs, left to right.
 const TAB_ORDER: Array[String] = ["Graphics", "Performance", "Audio", "Interface"]
@@ -68,7 +71,7 @@ const TAB_ORDER: Array[String] = ["Graphics", "Performance", "Audio", "Interface
 const TAB_ROWS: Dictionary = {
 	"Graphics": ["Fullscreen", "SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks"],
 	"Performance": ["EffectSlots", "MoteCap", "MoteDensity", "TaillessMotes", "ShotCap"],
-	"Audio": ["AmbienceVolume"],
+	"Audio": ["MusicVolume", "SoundVolume", "AmbienceVolume", "UiVolume"],
 	"Interface": ["ScreenShake", "DamageNumbers", "ShowFps", "RingStyle", "PutStyle", "ReloadStyle"],
 }
 ## The game's view (project.godot), which every page fits in.
@@ -923,7 +926,7 @@ func test_paging_twice_within_a_slide_ends_on_the_last_tab_in_place() -> void:
 	_do(0, &"page_next")
 	for _frame_at in 12:
 		_menu().tabs().step(1.0 / 60.0)
-	check(_tab_name() == "Audio" and _focused("AmbienceVolume"), "on Audio, its first row focused")
+	check(_tab_name() == "Audio" and _focused("MusicVolume"), "on Audio, its first row focused")
 	check(not _menu().tabs().is_sliding() and _rows_x() == PauseMenuScript.ROW_SHIFT, "the rows in place")
 	check(_menu().tabs().box() == _menu().tabs().tab_rect(PauseMenuScript.Tab.AUDIO), "the box on Audio")
 
@@ -1263,8 +1266,14 @@ func _sliders() -> Array[Dictionary]:
 			"text": func(v: Variant) -> String: return "Max shots: %d" % int(v), "bar": func(v: Variant) -> float: return float(ShotCap.index_of(int(v)))},
 		{"row": "TaillessMotes", "stops": Array(TaillessMotes.STOPS), "start": TaillessMotes.DEFAULT, "field": "tailless_motes", "key": &"tailless_motes",
 			"text": func(v: Variant) -> String: return "Tailless motes: %d" % int(v), "bar": func(v: Variant) -> float: return float(TaillessMotes.index_of(int(v)))},
-		{"row": "AmbienceVolume", "stops": volumes, "start": AmbienceVolume.DEFAULT, "field": "ambience_volume", "key": &"ambience_volume",
+		{"row": "MusicVolume", "stops": volumes, "start": AmbienceVolume.DEFAULT, "volume": PauseMenuScript.Volume.MUSIC, "key": &"music_volume",
+			"text": func(v: Variant) -> String: return "Music volume: %d%%" % int(v), "bar": func(v: Variant) -> float: return float(v)},
+		{"row": "SoundVolume", "stops": volumes, "start": AmbienceVolume.DEFAULT, "volume": PauseMenuScript.Volume.SOUND, "key": &"sound_volume",
+			"text": func(v: Variant) -> String: return "Sound volume: %d%%" % int(v), "bar": func(v: Variant) -> float: return float(v)},
+		{"row": "AmbienceVolume", "stops": volumes, "start": AmbienceVolume.DEFAULT, "volume": PauseMenuScript.Volume.AMBIENCE, "key": &"ambience_volume",
 			"text": func(v: Variant) -> String: return "Ambience volume: %d%%" % int(v), "bar": func(v: Variant) -> float: return float(v)},
+		{"row": "UiVolume", "stops": volumes, "start": AmbienceVolume.DEFAULT, "volume": PauseMenuScript.Volume.UI, "key": &"ui_volume",
+			"text": func(v: Variant) -> String: return "UI volume: %d%%" % int(v), "bar": func(v: Variant) -> float: return float(v)},
 	]
 
 
@@ -1311,8 +1320,19 @@ func _heard_of(slider: Dictionary) -> Array:
 	return _heard[slider["row"]]
 
 
+## The menu's value of `slider` (a volume's from the menu's `volumes`).
 func _value_of(slider: Dictionary) -> Variant:
+	if slider.has("volume"):
+		return _menu().volume(slider["volume"])
 	return _menu().get(slider["field"])
+
+
+## Set the menu's value of `slider` to `value`, as a test's starting point.
+func _set_value(slider: Dictionary, value: Variant) -> void:
+	if slider.has("volume"):
+		_menu().volumes[slider["volume"]] = int(value)
+	else:
+		_menu().set(slider["field"], value)
 
 
 func test_no_slider_sends_anything_at_its_default() -> void:
@@ -1393,7 +1413,7 @@ func test_accept_steps_a_slider_up() -> void:
 func test_accept_at_a_sliders_top_wraps_to_the_bottom() -> void:
 	for slider in _sliders():
 		_on_slider(slider)
-		_menu().set(slider["field"], (slider["stops"] as Array).back())
+		_set_value(slider, (slider["stops"] as Array).back())
 		_press(0, slider["row"])
 		check(_same(_value_of(slider), slider["stops"][0]), "%s: accept at the top wraps to the bottom, at %s" % [slider["row"], _value_of(slider)])
 

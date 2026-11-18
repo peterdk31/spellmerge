@@ -79,13 +79,13 @@ signal fog_changed(on: bool)
 signal environment_interaction_changed(on: bool)
 ## Sender: hud. The "Ambience volume" slider in the pause menu (Settings, Audio) moved, or a saved choice was loaded when the menu was bound: how loud the room's sound is, in percent (`AmbienceVolume`, `AudioVolumes` in core/settings; atmosphere D). Heard by core/audio, which eases its `Ambience` bus to it.
 signal ambience_volume_changed(percent: int)
-## Sender: hud (its slider is AU8's, docs/milestones/sound.md). The "Music volume" setting changed, in percent (`AudioVolumes` in core/settings). Heard by core/audio, which eases its `Music` bus to it.
+## Sender: hud. The "Music volume" slider in the pause menu (Settings, Audio; sound plan AU8) moved, or a saved choice was loaded when the menu was bound, in percent (`AudioVolumes` in core/settings). Heard by core/audio, which eases its `Music` bus to it.
 signal music_volume_changed(percent: int)
-## Sender: hud (AU8). The "Sound volume" setting changed, in percent (`AudioVolumes`). Heard by core/audio, which eases its `SFX` bus to it.
+## Sender: hud. The "Sound volume" slider in the pause menu (Settings, Audio) moved, or a saved choice was loaded when the menu was bound, in percent (`AudioVolumes`). Heard by core/audio, which eases its `SFX` bus to it.
 signal sound_volume_changed(percent: int)
-## Sender: hud (AU8). The "UI volume" setting changed, in percent (`AudioVolumes`). Heard by core/audio, which eases its `UI` bus to it.
+## Sender: hud. The "UI volume" slider in the pause menu (Settings, Audio) moved, or a saved choice was loaded when the menu was bound, in percent (`AudioVolumes`). Heard by core/audio, which eases its `UI` bus to it.
 signal ui_volume_changed(percent: int)
-## Sender: hud (its sounds are AU8's, docs/milestones/sound.md). A menu wants its sound `id` heard (a move, a choice, back, a refusal): the HUD never plays a sound itself. Heard by core/audio, which plays it on its UI voices, at most once an id a frame.
+## Sender: hud (sound plan AU8; the ids are `UiSounds`', hud/widgets/ui_sounds.gd). A menu wants its sound `id` heard (a move, a choice, back, a refusal, a card placed or removed): the HUD never plays a sound itself. Heard by core/audio, which plays it on its UI voices, at most once an id a frame.
 signal ui_sound_requested(id: StringName)
 ## Sender: hud. The "Tailless motes" dev slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: the spark pool the shots' births share while the tails are off (`TaillessMotes` in core/settings; S5 step 4). Heard by core/projectiles (`tailless_particle_cap`) and feel (`Motes.frame_rows`, `TaillessMotes.frame_rows_of`).
 signal tailless_motes_changed(pool: int)

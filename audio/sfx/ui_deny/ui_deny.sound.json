@@ -1,0 +1,14 @@
+{
+	"version": 1,
+	"kind": "ui",
+	"family": "ui",
+	"seconds": 0.13,
+	"vary": {"pitch": 0.02, "time": 0.03, "seed": 804},
+	"layers": [
+		{"source": "square", "pitch": 233, "duty": 0.35, "length": 0.05, "filter": {"type": "low", "from": 1400, "to": 700, "q": 0.8},
+		 "amp": {"attack": 0.003, "shape": "perc", "power": 1.4}},
+		{"source": "square", "pitch": 208, "duty": 0.35, "start": 0.065, "filter": {"type": "low", "from": 1200, "to": 600, "q": 0.8},
+		 "amp": {"attack": 0.003, "shape": "perc", "power": 1.4}}
+	],
+	"notes": "A refusal (a full staff, a pick not allowed): two low muffled buzzes stepping down, plainly a no without being harsh."
+}

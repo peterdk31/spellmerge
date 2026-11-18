@@ -66,11 +66,13 @@ extends PanelContainer
 ##   2026-11-02) steps through `ShotCap.STOPS` from the platform's cap (`ShotCap.default_cap()`),
 ##   sends `projectile_cap_changed`, which the projectile manager applies at once (the shots in the
 ##   air end), asks for it in the run playing (`shot_cap_requested`) and is saved (`projectile_cap`).
-## - **Audio** tab: "Ambience volume: 100%", a slider like those, from `AmbienceVolume.MIN` to MAX
-##   by its STEP (0% to 100% by 10%; `AmbienceVolume.DEFAULT`, 100%), sending
-##   `ambience_volume_changed`, which Audio eases its `Ambience` bus to (atmosphere D; heard on
-##   `AmbienceVolume.share_of`'s curve, 0% silent),
-##   and saved (`ambience_volume`).
+## - **Audio** tab: "Music volume: 100%", "Sound volume: 100%", "Ambience volume: 100%" and "UI
+##   volume: 100%" (sound plan AU8, docs/milestones/sound.md, section 5), sliders like those, each
+##   from `AmbienceVolume.MIN` to MAX by its STEP (0% to 100% by 10%; `AmbienceVolume.DEFAULT`,
+##   100%), made from one table (VOLUME_ROWS): each is saved under its `AudioVolumes` key (the
+##   ambience's keeps `ambience_volume`) and sent as its own event (`music_volume_changed`,
+##   `sound_volume_changed`, `ambience_volume_changed`, `ui_volume_changed`), which Audio eases its
+##   bus to (`Music`, `SFX`, `Ambience`, `UI`; heard on `AudioVolumes.share_of`'s curve, 0% silent).
 ## - **Interface** tab: "Screen shake: On" (or Off; melee I6: `screen_shake_changed`, saved as
 ##   `screen_shake`), "Damage numbers: On" (or Off; props W5: `damage_numbers_changed`, which feel
 ##   applies to every actor's numbers, saved as `damage_numbers`), "Show FPS: Off" (or On; owner,
@@ -173,8 +175,12 @@ const AIR_TEXT: String = "Ambient particles: %s"
 const AIR_SETTING: StringName = &"ambient_particles"
 const STIRS_TEXT: String = "Environment interaction: %s"
 const STIRS_SETTING: StringName = &"environment_interaction"
-const AMBIENCE_TEXT: String = "Ambience volume: %s"
-const AMBIENCE_SETTING: StringName = &"ambience_volume"
+## The Audio tab's volume sliders, top to bottom (see the top): each row's node name, words and
+## saved key (`AudioVolumes`); its event is `_volume_event`'s.
+enum Volume { MUSIC, SOUND, AMBIENCE, UI }
+const VOLUME_ROWS: Array[String] = ["MusicVolume", "SoundVolume", "AmbienceVolume", "UiVolume"]
+const VOLUME_TEXTS: Array[String] = ["Music volume: %s", "Sound volume: %s", "Ambience volume: %s", "UI volume: %s"]
+const VOLUME_KEYS: Array[StringName] = [AudioVolumes.MUSIC_KEY, AudioVolumes.SOUND_KEY, AudioVolumes.AMBIENCE_KEY, AudioVolumes.UI_KEY]
 const TAILLESS_TEXT: String = "Tailless motes: %s"
 const TAILLESS_SETTING: StringName = &"tailless_motes"
 const FPS_TEXT: String = "Show FPS: %s"
@@ -231,12 +237,13 @@ var floor_marks: bool = FloorMarks.default_on()
 var show_fps: bool = false
 ## The "Dynamic lighting" setting (once "Spell light"; see the top): the platform's default.
 var spell_light: bool = SpellLightSetting.default_on()
-## The atmosphere's switches and the ambience's volume (see the top): their platforms' defaults.
+## The atmosphere's switches (see the top): their platforms' defaults.
 var shadows: bool = ShadowsSetting.default_on()
 var fog: bool = FogSetting.default_on()
 var ambient_particles: bool = AmbientParticles.default_on()
 var environment_interaction: bool = EnvironmentInteraction.default_on()
-var ambience_volume: int = AmbienceVolume.DEFAULT
+## The Audio tab's volumes in percent, by `Volume` (see the top): 100% by default.
+var volumes: Array[int] = [AmbienceVolume.DEFAULT, AmbienceVolume.DEFAULT, AmbienceVolume.DEFAULT, AmbienceVolume.DEFAULT]
 ## The "Tailless motes" dev setting (see the top): `TaillessMotes.DEFAULT` by default.
 var tailless_motes: int = TaillessMotes.DEFAULT
 ## The save that keeps settings; made when the menu is bound, unless a test set its own first.
@@ -277,8 +284,9 @@ var registry: Node = null
 @onready var _tailless_bar: HSlider = _add_slider(_tailless, 0, TaillessMotes.STOPS.size() - 1, 1, TaillessMotes.index_of(tailless_motes), TAILLESS_TEXT % TaillessMotes.STOPS[-1])
 @onready var _shots: Button = _add_setting(Tab.PERFORMANCE, "ShotCap", SHOT_CAP_TEXT % shot_cap)
 @onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
-@onready var _ambience: Button = _add_setting(Tab.AUDIO, "AmbienceVolume", AMBIENCE_TEXT % AmbienceVolume.word_of(ambience_volume))
-@onready var _ambience_bar: HSlider = _add_slider(_ambience, AmbienceVolume.MIN, AmbienceVolume.MAX, AmbienceVolume.STEP, ambience_volume, AMBIENCE_TEXT % AmbienceVolume.word_of(AmbienceVolume.MAX))
+## The Audio tab's volume rows and their bars, by `Volume`.
+var _volume_bars: Array[HSlider] = []
+@onready var _volume_rows: Array[Button] = _add_volumes()
 @onready var _shake: Button = _add_setting(Tab.INTERFACE, "ScreenShake", SHAKE_TEXT % "On")
 @onready var _numbers: Button = _add_setting(Tab.INTERFACE, "DamageNumbers", NUMBERS_TEXT % "On")
 @onready var _fps: Button = _add_setting(Tab.INTERFACE, "ShowFps", FPS_TEXT % "Off")
@@ -386,7 +394,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, input: InputManagerScri
 	_load_floor_marks()
 	_load_light()
 	_load_atmosphere()
-	_load_ambience_volume()
+	_load_volumes()
 	_load_tailless_motes()
 	_load_fps()
 	_map.name_of = _kind_name
@@ -600,8 +608,18 @@ func _add_slider(row: Button, low: int, high: int, step: int, value: int, longes
 
 
 ## The menu's navigator for UIFocus: left and right on the slider move it and keep the focus
-## there; any other move goes on as usual (null).
+## there, with the move's sound (UIFocus sends none: the focus stays); any other move goes on as
+## usual (null).
 func _navigate(control: Control, direction: Vector2i) -> Control:
+	var slider: Control = _step_slider(control, direction)
+	if slider != null:
+		UiSounds.send(_events, UiSounds.MOVE)
+	return slider
+
+
+## Left and right on a slider step it; the slider, or null when `control` is none or the move is up
+## or down.
+func _step_slider(control: Control, direction: Vector2i) -> Control:
 	if control == _effects and direction.x != 0:
 		_set_effect_slots(effect_slots + direction.x * EffectSlots.STEP)
 		return _effects
@@ -617,9 +635,10 @@ func _navigate(control: Control, direction: Vector2i) -> Control:
 		var pick: int = clampi(TaillessMotes.index_of(tailless_motes) + direction.x, 0, TaillessMotes.STOPS.size() - 1)
 		_set_tailless_motes(TaillessMotes.STOPS[pick])
 		return _tailless
-	if control == _ambience and direction.x != 0:
-		_set_ambience_volume(ambience_volume + direction.x * AmbienceVolume.STEP)
-		return _ambience
+	var volume_at: int = _volume_rows.find(control)
+	if volume_at >= 0 and direction.x != 0:
+		_set_volume(volume_at, volumes[volume_at] + direction.x * AmbienceVolume.STEP)
+		return control
 	if control == _shots and direction.x != 0:
 		var at: int = clampi(ShotCap.index_of(shot_cap) + direction.x, 0, ShotCap.STOPS.size() - 1)
 		_set_shot_cap(ShotCap.STOPS[at])
@@ -682,6 +701,7 @@ func _on_slide_stepped(left: float) -> void:
 func _on_paged(player: int, step: int) -> void:
 	if player != owner_player or page != Page.SETTINGS or step == 0:
 		return
+	UiSounds.send(_events, UiSounds.MOVE)
 	_show_tab(posmod(tab + signi(step), Tab.size()) as Tab, signi(step))
 
 
@@ -785,6 +805,8 @@ func _on_focus_changed(player: int, control: Control) -> void:
 func _on_activated(player: int, control: Control) -> void:
 	if player != owner_player:
 		return
+	# Every row does something on `accept` (sound plan AU8; `UiSounds`).
+	UiSounds.send(_events, UiSounds.CHOOSE)
 	if control == _resume:
 		close_menu()
 	elif control == _map_row:
@@ -842,8 +864,9 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_ambient_particles(not ambient_particles)
 	elif control == _stirs:
 		_set_environment_interaction(not environment_interaction)
-	elif control == _ambience:
-		_set_ambience_volume(AmbienceVolume.MIN if ambience_volume >= AmbienceVolume.MAX else ambience_volume + AmbienceVolume.STEP)
+	elif _volume_rows.has(control):
+		var at: int = _volume_rows.find(control)
+		_set_volume(at, AmbienceVolume.MIN if volumes[at] >= AmbienceVolume.MAX else volumes[at] + AmbienceVolume.STEP)
 	elif control == _tailless:
 		_set_tailless_motes(TaillessMotes.STOPS[(TaillessMotes.index_of(tailless_motes) + 1) % TaillessMotes.STOPS.size()])
 	elif control == _shake:
@@ -977,30 +1000,62 @@ func _set_environment_interaction(on: bool) -> void:
 	_flip_switch(_stirs, STIRS_TEXT, STIRS_SETTING, on, _events.environment_interaction_changed if _events != null else Signal())
 
 
-## Read the saved "Ambience volume" and show it; feel is told only when it is not the default.
-func _load_ambience_volume() -> void:
-	var saved: int = AmbienceVolume.snap(int(save.get_setting(AMBIENCE_SETTING, AmbienceVolume.DEFAULT)))
-	_show_ambience_volume(saved)
-	if saved != AmbienceVolume.DEFAULT and _events != null:
-		_events.ambience_volume_changed.emit(saved)
+## The Audio tab's volume rows, each with its slider (VOLUME_ROWS, in order).
+func _add_volumes() -> Array[Button]:
+	var rows: Array[Button] = []
+	for at in VOLUME_ROWS.size():
+		var row: Button = _add_setting(Tab.AUDIO, VOLUME_ROWS[at], VOLUME_TEXTS[at] % AmbienceVolume.word_of(volumes[at]))
+		_volume_bars.append(_add_slider(row, AmbienceVolume.MIN, AmbienceVolume.MAX, AmbienceVolume.STEP, volumes[at], VOLUME_TEXTS[at] % AmbienceVolume.word_of(AmbienceVolume.MAX)))
+		rows.append(row)
+	return rows
 
 
-## Move the "Ambience volume" slider to `percent` (snapped inside its range): show it, save it and
-## tell feel.
-func _set_ambience_volume(percent: int) -> void:
+## The volume `which` (a `Volume`) is set to, in percent.
+func volume(which: Volume) -> int:
+	return volumes[which]
+
+
+## The event volume `at` (a `Volume`) is sent on; null with no bus.
+func _volume_event(at: int) -> Signal:
+	if _events == null:
+		return Signal()
+	match at:
+		Volume.MUSIC:
+			return _events.music_volume_changed
+		Volume.SOUND:
+			return _events.sound_volume_changed
+		Volume.AMBIENCE:
+			return _events.ambience_volume_changed
+	return _events.ui_volume_changed
+
+
+## Read the saved volumes and show them; Audio is told of each only when it is not the default.
+func _load_volumes() -> void:
+	for at in VOLUME_ROWS.size():
+		var saved: int = AmbienceVolume.snap(int(save.get_setting(VOLUME_KEYS[at], AmbienceVolume.DEFAULT)))
+		_show_volume(at, saved)
+		var changed: Signal = _volume_event(at)
+		if saved != AmbienceVolume.DEFAULT and not changed.is_null():
+			changed.emit(saved)
+
+
+## Move volume `at`'s slider to `percent` (snapped inside its range): show it, save it and tell
+## Audio.
+func _set_volume(at: int, percent: int) -> void:
 	var next: int = AmbienceVolume.snap(percent)
-	if next == ambience_volume:
+	if next == volumes[at]:
 		return
-	_show_ambience_volume(next)
-	save.set_setting(AMBIENCE_SETTING, next)
-	if _events != null:
-		_events.ambience_volume_changed.emit(next)
+	_show_volume(at, next)
+	save.set_setting(VOLUME_KEYS[at], next)
+	var changed: Signal = _volume_event(at)
+	if not changed.is_null():
+		changed.emit(next)
 
 
-func _show_ambience_volume(percent: int) -> void:
-	ambience_volume = percent
-	_ambience.set_meta(BASE_TEXT_META, AMBIENCE_TEXT % AmbienceVolume.word_of(percent))
-	_ambience_bar.value = percent
+func _show_volume(at: int, percent: int) -> void:
+	volumes[at] = percent
+	_volume_rows[at].set_meta(BASE_TEXT_META, VOLUME_TEXTS[at] % AmbienceVolume.word_of(percent))
+	_volume_bars[at].value = percent
 	_mark_focus()
 
 

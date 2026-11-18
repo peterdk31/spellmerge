@@ -5,7 +5,7 @@ extends Node2D
 ## as wide as it hits (widening to its cone's width at its far end for a cone, a spray's:
 ## `Spells.carrier_lane`; as wide as its caster's body strikes and that much longer for a move
 ## that strikes what its body meets, a dash's pass: `Spells.carrier_pass`, the owner 2026-11-18),
-## in the cast's tint: its dashes march toward the tip, its arrowhead grows and
+## in the cast's tint: its arrowhead grows and
 ## the lane brightens as the wind-up runs out (`telegraph.gdshader`). It ends the step the cast
 ## leaves or is cancelled (`Spells.is_winding`), so it always shows a cast that comes. A carrier
 ## that is not aimed (a nova, an orbit) shows none. When its caster's AI locks its aim (`beat`,

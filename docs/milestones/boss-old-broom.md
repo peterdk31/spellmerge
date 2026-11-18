@@ -114,7 +114,7 @@ The owner: "The old broom boss' sweep attack is very hard to read. It feels unfa
 39. **The lane is exactly the hit, only the front strikes, and lanes are subtle** (owner, later on 2026-11-18, told the lane was 4 px wider than the pass and that the pass also struck behind the broom: "Let's try that. But we also need to make the lanes (in general) more subtle").
     - **A move's lane has no margin:** its dotted edge is where its pass strikes (a shot's lane keeps its 4 px).
     - **Only a pass's front half strikes** (`CarrierDash._pass_step`): a body level with its mover's middle or ahead of it, never one wholly behind as it sets off. For every dash; with Plow, nothing is brought round from behind any more.
-    - **Every lane is subtle** (`telegraph.gdshader`, docs/STYLE.md): a faint wash (about a third of its light), its dashes and arrowhead in the ramp's own shades, bright only in the last fifth of the wind-up and at a lock's beat; and it fades in from its caster's end over half its length (96 px at most) in six steps (the owner: "more faded out in the beginning? So a gradient?").
+    - **Every lane is subtle** (`telegraph.gdshader`, docs/STYLE.md): a faint wash (about a third of its light), no dashed line down its middle (the owner: "I don't think a telegraph even needs the dashed center line"), its arrowhead in the ramp's own shades, bright only in the last fifth of the wind-up and at a lock's beat; and it fades in from its caster's end over half its length (96 px at most), smoothly (the owner: "more faded out in the beginning? So a gradient?", then "And I want it smooth").
 
 ## The run's rooms (owner, 2026-11-15, after OB2's first build)
 

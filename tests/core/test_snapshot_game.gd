@@ -20,6 +20,7 @@ extends "res://tests/support/suite.gd"
 const ReplayRun := preload("res://tests/support/replay_run.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const StandInGrass := preload("res://tests/support/stand_in_grass.gd")
+const BiomeMaps := preload("res://tests/support/biome_maps.gd")
 
 ## Ticks recorded, and the tick the snapshot is taken after (past the scripted player's rebuild and
 ## pause in the hub, so the frames after it hold neither).
@@ -94,6 +95,43 @@ func test_the_hub_restored_starts_its_run_on_the_same_tick() -> void:
 	await _check_resumed(&"hub_requested", 0, 1)
 	_run.stone_press_at = -1
 	check_equal(root.get_node("Flow").get(&"mode"), &"run", "the resumed game started the run from the stone")
+
+
+## A biome on the real game (connected biomes CB2, docs/milestones/connected-biomes.md, "The wall
+## grid"): a twelve-room biome laid over the real projectile manager costs the whole game's hash and
+## snapshot its map, a few kilobytes, never the grid's layers (DERIVED: laid again from the map); a
+## snapshot of every area with it restores to the same hashes and the same grid.
+func test_a_twelve_room_biome_costs_the_games_hash_and_snapshot_its_map() -> void:
+	var tick: Node = root.get_node("Tick")
+	var projectiles: Node = root.get_node("Projectiles")
+	var before: int = BiomeMaps.state_bytes(tick.call(&"state_areas"))
+	var into := Node2D.new()
+	root.add_child(into)
+	var biome: BiomeWorld = BiomeMaps.laid(root.get_node("Registry"), projectiles, into)
+	var areas: Dictionary = tick.call(&"state_areas")
+	areas["Biome"] = biome
+	var grid_layers: int = BiomeMaps.grid_layer_bytes(projectiles.call(&"grid"))
+	var walk := StateWalk.new()
+	walk.with_paths = false
+	var started: int = Time.get_ticks_usec()
+	var hashes: Dictionary = SimHash.areas(areas, walk)
+	var hash_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
+	check_equal(walk.problems, PackedStringArray(), "the state walks without problems")
+	var grown: int = BiomeMaps.state_bytes(areas) - before
+	started = Time.get_ticks_usec()
+	var snapshot := Snapshot.take(areas, root)
+	var take_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
+	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
+	started = Time.get_ticks_usec()
+	check_equal(snapshot.restore(areas, root), PackedStringArray(), "restored without problems")
+	var restore_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
+	var again := StateWalk.new()
+	again.with_paths = false
+	check_equal(SimHash.areas(areas, again), hashes, "every area hashes as it did")
+	print("CB2 a 12-room biome on the real game: the state grows by %d bytes (the grid's layers, not hashed: %d bytes); the whole hash %.1f ms, the snapshot taken in %.1f ms and restored in %.1f ms" % [grown, grid_layers, hash_ms, take_ms, restore_ms])
+	check(grown < 8192, "the game's state grows by the map's few kilobytes: %d bytes" % grown)
+	biome.clear()
+	into.free()
 
 
 ## A run started by `start` with `bots` fighter bots and `scripted` scripted players, recorded with a

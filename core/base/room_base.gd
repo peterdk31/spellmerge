@@ -21,6 +21,10 @@ extends Resource
 ## The room kinds it can host (`RoomKind` ids: `fight`, `boss`), as a template a run's map picks for
 ## a room of that kind. Empty: it is offered for no run (the hub).
 @export var kinds: Array[StringName] = []
+## True for a walkway (connected biomes CB2, docs/milestones/connected-biomes.md, decision 2): a
+## template that spans the dark between two rooms' sockets in a biome (a bridge), its own sockets
+## (`RoomSocket`) on its edge at its ends. It hosts no room kind and is no room of a run's map.
+@export var walkway: bool = false
 ## Seconds after which a downed wizard stands up by itself at full health (the hub: hits hurt there,
 ## but a fall costs nothing; owner, 2026-11-13). Below 0 (the default): never by itself, only by a
 ## teammate's revive or the restart. In such a room everyone down starts no restart.

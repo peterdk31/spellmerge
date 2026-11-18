@@ -5,7 +5,8 @@ extends "res://tests/support/suite.gd"
 ## leaves a wall it stands in by the open side. The ground of a body that cannot move (props W4, a
 ## grid of its own) is a wall to it as the walls are. The native kernel gives the GDScript's bits on every
 ## case and on a seeded spread of rooms. The actor moves by it (`Actor.move`), and its velocity is
-## then what it moved by.
+## then what it moved by. A mouth (connected biomes CB2, `RoomGrid.MOUTH_CELL`) is a wall to a body
+## whose mask minds its bit and open to one whose mask leaves it out (a wizard's walk), on both sides.
 ##
 ## Without the native module the GDScript is still checked (SPELLMERGE_NATIVE=required fails the
 ## comparison instead).
@@ -33,11 +34,11 @@ func after_each() -> void:
 	super.after_each()
 
 
-## Make the cells from (`x0`, `y0`) to (`x1`, `y1`), both included, walls.
-func _wall(x0: int, y0: int, x1: int, y1: int) -> void:
+## Make the cells from (`x0`, `y0`) to (`x1`, `y1`), both included, walls (or `mark`: a mouth's).
+func _wall(x0: int, y0: int, x1: int, y1: int, mark: int = 128) -> void:
 	for y in range(y0, y1 + 1):
 		for x in range(x0, x1 + 1):
-			_cells[y * W + x] = 128
+			_cells[y * W + x] = mark
 
 
 ## The behaviour is the GDScript's (the reference); the native kernel is held to it below.
@@ -137,6 +138,20 @@ func test_outside_the_grid_is_open() -> void:
 	check_equal(_slide(Vector2(-50.0, 40.0), Vector2(-30.0, 0.0)), Vector2(-80.0, 40.0), "beyond the grid it walks free")
 
 
+func test_a_mouth_stops_a_body_that_minds_it_and_lets_a_wizard_through() -> void:
+	_wall(10, 0, 10, H - 1, RoomGrid.MOUTH_CELL)  # x 80 to 88
+	var stopped: Vector2 = WallSlide.gd_slide(_cells, _ground, W, H, CELL, Vector2.ZERO, Vector2(50.0, 100.0), Vector2(60.0, 0.0), 6.0)
+	check_equal(stopped, Vector2(74.0, 100.0), "a body that minds every bit stops at the mouth as at a wall")
+	var through: Vector2 = WallSlide.gd_slide(_cells, _ground, W, H, CELL, Vector2.ZERO, Vector2(50.0, 100.0), Vector2(60.0, 0.0), 6.0, RoomGrid.PAST_MOUTHS)
+	check_equal(through, Vector2(110.0, 100.0), "a wizard's walk goes through it")
+	_cells[15 * W + 10] = RoomGrid.MOUTH_CELL | 1
+	check_equal(WallSlide.gd_slide(_cells, _ground, W, H, CELL, Vector2.ZERO, Vector2(50.0, 124.0), Vector2(60.0, 0.0), 6.0, RoomGrid.PAST_MOUTHS), Vector2(74.0, 124.0), "a Wall card's stone on a mouth stops the wizard too")
+	if not _native():
+		return
+	check_equal(WallSlide.slide(_cells, _ground, W, H, CELL, Vector2.ZERO, Vector2(50.0, 100.0), Vector2(60.0, 0.0), 6.0), stopped, "the native kernel stops it the same")
+	check_equal(WallSlide.slide(_cells, _ground, W, H, CELL, Vector2.ZERO, Vector2(50.0, 100.0), Vector2(60.0, 0.0), 6.0, RoomGrid.PAST_MOUTHS), through, "and lets the wizard through the same")
+
+
 func test_the_native_kernel_gives_the_same_bits() -> void:
 	if not _native():
 		return
@@ -152,7 +167,8 @@ func test_the_native_kernel_gives_the_same_bits() -> void:
 			for block in rng.randi_range(0, 12):
 				var x0: int = rng.randi_range(0, W - 1)
 				var y0: int = rng.randi_range(0, H - 1)
-				_wall(x0, y0, mini(x0 + rng.randi_range(0, 6), W - 1), mini(y0 + rng.randi_range(0, 6), H - 1))
+				# Every third a mouth's cells (connected biomes CB2), a wall or not by the mask.
+				_wall(x0, y0, mini(x0 + rng.randi_range(0, 6), W - 1), mini(y0 + rng.randi_range(0, 6), H - 1), RoomGrid.MOUTH_CELL if block % 3 == 2 else RoomGrid.ROOM_CELL)
 		else:
 			# Scattered cells: corners everywhere (a Wall card's stones are laid as such).
 			for i in W * H:
@@ -160,6 +176,8 @@ func test_the_native_kernel_gives_the_same_bits() -> void:
 					# Some of them ground (props W4): the two grids are one to a body.
 					if i % 3 == 0:
 						_ground[i] = 1
+					elif i % 5 == 1:
+						_cells[i] = RoomGrid.MOUTH_CELL | (i % 2)
 					else:
 						_cells[i] = 1
 		var origin: Vector2 = Vector2(rng.randf_range(-40.0, 40.0), rng.randf_range(-40.0, 40.0))
@@ -169,8 +187,10 @@ func test_the_native_kernel_gives_the_same_bits() -> void:
 			if n % 7 == 0:
 				motion *= 20.0
 			var radius: float = [0.0, 0.7, 3.0, 5.0, 6.0, 7.0, 12.0, 20.0][n % 8]
-			var gd: Vector2 = WallSlide.gd_slide(_cells, _ground, W, H, CELL, origin, from, motion, radius)
-			var native: Vector2 = WallSlide.slide(_cells, _ground, W, H, CELL, origin, from, motion, radius)
+			# Every other move a wizard's, past the mouths (connected biomes CB2).
+			var mask: int = RoomGrid.PAST_MOUTHS if n % 2 == 1 else 255
+			var gd: Vector2 = WallSlide.gd_slide(_cells, _ground, W, H, CELL, origin, from, motion, radius, mask)
+			var native: Vector2 = WallSlide.slide(_cells, _ground, W, H, CELL, origin, from, motion, radius, mask)
 			cases += 1
 			if gd != from + motion:
 				pushed += 1

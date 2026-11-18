@@ -13,6 +13,9 @@ const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const DecoyCard := preload("res://content/spells/carriers/decoy/decoy.tres")
 const PoolCard := preload("res://content/spells/carriers/pool/pool.tres")
 const BoltCard := preload("res://content/spells/carriers/bolt/bolt.tres")
+const BiomeMaps := preload("res://tests/support/biome_maps.gd")
+const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## Ticks played before the snapshot, and after it.
 const BEFORE: int = 70
@@ -446,3 +449,43 @@ func test_a_body_s_changed_stats_are_restored() -> void:
 	check_equal(Desync.first_parting(first, second), -1, "and the fight plays on the same")
 	played.free_all()
 	restored.free_all()
+
+
+## A snapshot's cost of a biome (connected biomes CB2, docs/milestones/connected-biomes.md, "The wall
+## grid"): a twelve-room biome adds its map and the projectile manager's target grid to a snapshot, a
+## few kilobytes (test_state_declared.gd names the target grid's share); a
+## restore into the same world lays nothing again and leaves the grid as it was, and a restore into a
+## world with another biome lays the restored one, the same to the byte, in well under a second.
+func test_a_twelve_room_biome_costs_the_snapshot_its_map() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var mgr := own(ProjectileManagerScript.new()) as ProjectileManagerScript
+	var empty: int = BiomeMaps.state_bytes({"Projectiles": mgr})
+	var into := own(Node2D.new()) as Node2D
+	var biome: BiomeWorld = BiomeMaps.laid(registry, mgr, into)
+	var areas: Dictionary = {"Projectiles": mgr, "Biome": biome}
+	var grid: RoomGrid = mgr.grid()
+	var laid: PackedByteArray = var_to_bytes([grid._wall_cells, grid._walk_cells, grid._bounds])
+	var started: int = Time.get_ticks_usec()
+	var snapshot := Snapshot.take(areas)
+	var take_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
+	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
+	var held: int = BiomeMaps.state_bytes(areas) - empty
+	started = Time.get_ticks_usec()
+	check_equal(snapshot.restore(areas), PackedStringArray(), "restored in place without problems")
+	var restore_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
+	check_equal(var_to_bytes([grid._wall_cells, grid._walk_cells, grid._bounds]), laid, "the grid as it was")
+	check_equal(into.get_child_count(), 23, "nothing laid again: twelve rooms and eleven bridges")
+	# Into a world that laid another biome (a joining machine's): the restored map is laid.
+	var other_into := own(Node2D.new()) as Node2D
+	var other: BiomeWorld = BiomeMaps.laid(registry, mgr, other_into, BiomeMaps.walk_through(registry))
+	started = Time.get_ticks_usec()
+	check_equal(snapshot.restore({"Projectiles": mgr, "Biome": other}), PackedStringArray(), "restored across without problems")
+	var across_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
+	check_equal(var_to_bytes([grid._wall_cells, grid._walk_cells, grid._bounds]), laid, "the grid laid again from the map, the same to the byte")
+	check_equal(other_into.get_child_count(), 23, "its pieces laid")
+	print("CB2 snapshot cost of a 12-room biome: adds %d bytes; taken in %.1f ms, restored in place in %.1f ms, across (laid again) in %.1f ms" % [held, take_ms, restore_ms, across_ms])
+	check(held < 8192, "the biome adds a few kilobytes to the snapshot: %d bytes" % held)
+	check(across_ms < 1000.0, "laid again in under a second: %.1f ms" % across_ms)
+	biome.clear()
+	other.clear()

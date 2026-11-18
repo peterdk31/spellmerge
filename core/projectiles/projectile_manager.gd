@@ -2296,7 +2296,11 @@ func actor_table() -> ActorsScript:
 ## by its key (an actor's, `Actors.id_of_key`, as Combat registers it), with its instance id; the
 ## hit test's scratch is sized to the table again (the grid is state, filled as the snapshot's).
 ## A target of a minted key (a test's plain node) names no node, so it is dropped at its next filling.
+## The room grid's layers are not state (connected biomes CB2, `RoomGrid`): the grid, restored first,
+## took the solid shots' counts out, and each solid shot's cells (state) are laid back in it here.
 func rebuild_derived() -> void:
+	for slot: int in _solids:
+		_room_grid.relay_solid((_solids[slot] as Solid).cells)
 	var table: ActorsScript = actor_table()
 	var rows: int = _target_key.size()
 	_targets.resize(rows)

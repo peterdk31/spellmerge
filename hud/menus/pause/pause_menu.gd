@@ -16,62 +16,84 @@ extends PanelContainer
 ## - **Map** (run generation RG8): the run's map (`hud/widgets/run_map_view.gd`, told by the run
 ##   area's `run_map_changed`: its rows, links and kinds, and where the party is), view only, and
 ##   Back. It goes back to the main page by itself if the map goes while it shows.
-## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Floor marks: On", "Spell light: On", "Tails: On", "Max shots: 6000", "Screen shake: On", "Damage numbers: On",
-##   "Show FPS: Off", the builder switches, Back. The switch asks
-##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
-##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
-##   Off again. "Effect slots" is a slider (the owner, 2026-10-27): left and right move it a step
-##   (`EffectSlots` in core/settings: its STEP, from MIN to MAX), `accept` a step up (from the
-##   top back to the bottom), up and down leave it; each move sends `effect_slots_changed`, which
-##   feel applies. It is kept in memory only: it is not saved yet (`core/save` has settings now).
-##   "Particles" (docs/milestones/spell-spectacle.md, P1a) is a slider like "Max shots" through
-##   `MoteCap.STOPS` (core/settings: Minimal, Low, Medium, High), from the platform's cap
-##   (`MoteCap.default_cap()`); each move sends `mote_cap_changed`, which feel applies (its motes
-##   in the air end), and is saved (`mote_cap`); a saved cap other than the default is sent again
-##   when the menu is bound. "Particle amount" (P1b) is a slider the same way through
+## - **Settings** (the owner, 2026-11-18: "move the different settings groups ... into tabs instead
+##   of fold out entries. Tabs can be moved through with RB, LB"): one page with a row of tabs across
+##   its top (`hud/widgets/menu_tabs.gd`), "Graphics", "Performance", "Audio", "Interface", named as
+##   games name them, and under them the selected tab's rows. LB and RB (`page_prev`, `page_next`
+##   through UIFocus `paged`; Z and C on the keyboard) go to the previous and the next tab, wrapping
+##   round from the last to the first and back, as most games' tabs do; their glyphs are drawn at the
+##   tab row's ends for the device of the player working the menu. A switch focuses the tab's first
+##   row that is not greyed, and the selected tab's box slides there while the rows step in 6 px from
+##   the side it goes toward (a wrap too), by whole pixels, never cut (Smooth). Settings opens on Graphics. There is no Back row:
+##   `back` (B; E) goes up to the main page on its Settings row (the Map page's on its Map row), as
+##   the hint under the rows says with the `back` glyph; the menu takes no mouse anywhere. Every row
+##   of every tab is as wide as the widest words of any tab focused, either way (`_fit_widths`), and
+##   the rows' box is as tall as the tallest tab, so the panel keeps its size as the focus moves, a
+##   switch flips and the tab changes. Every saved
+##   setting below is read when the menu is bound and sent again only when it is not its default
+##   (each default lives in core/settings, which feel reads too, so neither reads the other).
+## - **Graphics** tab: "Fullscreen: Off" (or On), "Dynamic lighting: On", "Shadows: On", "Fog: On",
+##   "Ambient particles: On", "Environment interaction: On", "Floor marks: On".
+##   "Fullscreen" asks `Display` (core) to fill the screen or not and stays on the tab; its word
+##   follows the window itself, read each time the tab is shown, so leaving fullscreen with the
+##   browser's Escape shows Off again. The others are switches flipping on `accept` from the
+##   platform's default, each saved and sent on its core event, which feel applies
+##   (docs/milestones/atmosphere.md, "Settings"). "Dynamic lighting" (`SpellLightSetting`; P3a's
+##   spell light and atmosphere A: the light buffer, the room's dark and tint, the wizards' carried
+##   lights) was "Spell light" and keeps its save key (`spell_light`) and event
+##   (`spell_light_changed`), so a saved choice carries over. "Shadows" (`ShadowsSetting`, saved as
+##   `shadows`, `shadows_changed`; atmosphere C: light blocked by walls and pillars, the bodies'
+##   shadows), "Fog" (`FogSetting`, `fog`, `fog_changed`; F, the floor mist) and "Ambient particles"
+##   (`AmbientParticles`, `ambient_particles`, `ambient_particles_changed`; B, the air's dust) need
+##   the light: while "Dynamic lighting" is off they show their choice greyed (`disabled`, which
+##   UIFocus skips) and change nothing. "Environment interaction" (`EnvironmentInteraction`,
+##   `environment_interaction`, `environment_interaction_changed`; E: the lights, the cover, the dust
+##   and the mist pushed by shots and blasts). "Floor marks" (`FloorMarks`, `floor_marks`,
+##   `floor_marks_changed`; spell spectacle P2a: off frees the room's marks).
+## - **Performance** tab: "Effect slots: 256", "Particles: High", "Particle amount: Full", "Tailless
+##   motes: 2048", "Max shots: 6000": sliders. Left and right move one a step and keep the
+##   focus, `accept` steps it up (from the top back to the bottom), up and down leave it.
+##   "Effect slots" (the owner, 2026-10-27; `EffectSlots` in core/settings: its STEP, from MIN to
+##   MAX) sends `effect_slots_changed`, which feel applies; it is kept in memory only, not saved.
+##   "Particles" (docs/milestones/spell-spectacle.md, P1a) steps through `MoteCap.STOPS` (Minimal,
+##   Low, Medium, High) from the platform's cap (`MoteCap.default_cap()`), sends `mote_cap_changed`
+##   (feel's motes in the air end) and is saved (`mote_cap`). "Particle amount" (P1b) steps through
 ##   `MoteDensity.STOPS` (None, Half, Full, Double: the share of its count every burst of motes
-##   throws), from `MoteDensity.DEFAULT`; each move sends `mote_density_changed`, which feel
-##   applies, and is saved (`mote_density`), sent again when bound if it is not the default.
-##   "Floor marks: On" (or Off; spell spectacle P2a) flips on `accept`
-##   from the platform's default (`FloorMarks.default_on()` in core/settings), is saved
-##   (`floor_marks`) and sends `floor_marks_changed`, which feel applies (off frees the room's
-##   marks); a saved choice other than the default is sent again when the menu is bound.
-##   "Spell light: On" (or Off; P3a) flips on `accept`, from the
-##   platform's default (`SpellLightSetting.default_on()`), sends `spell_light_changed`, which feel
-##   applies, and is saved (`spell_light`); a saved choice other than the default is sent again
-##   when the menu is bound. (The "Tails" and "Tail motes" dev switches went when the owner picked
-##   tails as motes, every shot in one of the tail kinds, 2026-11-05.)
-##   "Tailless motes" (a dev slider, S5 step 4: "no tails, more motes") steps the same
-##   way as "Particle amount" through `TaillessMotes.STOPS` (2048, 4096, 8192: the births' pool
-##   with the tails off), from `TaillessMotes.DEFAULT`; each move sends `tailless_motes_changed`,
-##   which the projectile manager and feel apply, and is saved (`tailless_motes`), sent again when
-##   bound if it is not the default.
-##   "Screen shake: On" (or Off), the
-##   last switch above Back (melee I6): `accept` flips it, it sends `screen_shake_changed`, which
-##   feel applies, and the choice is saved (`SaveFile` setting `screen_shake`) and read again
-##   when the menu is bound, so it holds between plays. "Damage numbers: On" (or Off; props W5)
-##   below it flips the same way: it sends `damage_numbers_changed`, which feel applies to every
-##   actor's numbers, and is saved (`damage_numbers`); only Off is sent again when bound. "Max shots" (owner, 2026-11-02) is a
-##   slider like "Effect slots" through `ShotCap.STOPS` (core/settings), from the platform's cap
-##   (`ShotCap.default_cap()`); each move sends `projectile_cap_changed`, which the projectile
-##   manager applies at once (the shots in the air end), and is saved (`projectile_cap`); a saved
-##   cap other than the default is sent again when the menu is bound. "Show FPS: Off" (or On;
-##   owner, 2026-11-02) flips on `accept`, is saved (`show_fps`) and sends `show_fps_changed`,
-##   which `hud/panels` applies to its frame rate readout (`hud/widgets/fps_counter.gd`); panels
-##   reads `show_fps` once after binding the menu. (The Gameplay page, with
-##   "Friendly fire" and "Enemy fire", went in actors G3c: every spell hits everything, always.)
-##   The builder switches (owner, 2026-10-26; on this page since crypt rework CR-S), each flipping on `accept` and staying on the page:
-##   "Ring:" ("Every card", "One kind", or the ring styles to try, owner 2026-10-30: "Zoom",
-##   "Kinds: hold", "Kinds: depth"; `accept` steps to the next, `Ring`) and "Full slot: Push right"
-##   or "Replace" (the radial builder's options); each flip sends `builder_options_changed`, which
-##   `hud/panels` applies to every player's builder. "Reload: Button" (the default) or "Next cast"
-##   (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay; each flip sends
-##   `reload_style_changed`, which `hud/panels` applies to every panel. They are not saved.
+##   throws), sends `mote_density_changed` and is saved (`mote_density`). "Tailless motes" (a dev
+##   slider, S5 step 4: "no tails, more motes") steps through `TaillessMotes.STOPS` (2048, 4096,
+##   8192: the births' pool with the tails off), sends `tailless_motes_changed`, which the
+##   projectile manager and feel apply, and is saved (`tailless_motes`). "Max shots" (owner,
+##   2026-11-02) steps through `ShotCap.STOPS` from the platform's cap (`ShotCap.default_cap()`),
+##   sends `projectile_cap_changed`, which the projectile manager applies at once (the shots in the
+##   air end), asks for it in the run playing (`shot_cap_requested`) and is saved (`projectile_cap`).
+## - **Audio** tab: "Ambience volume: 100%", a slider like those, from `AmbienceVolume.MIN` to MAX
+##   by its STEP (0% to 100% by 10%; `AmbienceVolume.DEFAULT`, 100%), sending
+##   `ambience_volume_changed`, which feel hands to the room's sound (atmosphere D; heard on
+##   `AmbienceVolume.share_of`'s curve, 0% silent),
+##   and saved (`ambience_volume`).
+## - **Interface** tab: "Screen shake: On" (or Off; melee I6: `screen_shake_changed`, saved as
+##   `screen_shake`), "Damage numbers: On" (or Off; props W5: `damage_numbers_changed`, which feel
+##   applies to every actor's numbers, saved as `damage_numbers`), "Show FPS: Off" (or On; owner,
+##   2026-11-02: saved as `show_fps`, sending `show_fps_changed`, which `hud/panels` applies to its
+##   frame rate readout, `hud/widgets/fps_counter.gd`, and reads once after binding the menu), the
+##   builder switches (owner, 2026-10-26; flipping on `accept`, not saved): "Ring:" ("Every card",
+##   "One kind", or the ring styles to try, owner 2026-10-30: "Zoom", "Kinds: hold", "Kinds:
+##   depth"; `accept` steps to the next, `Ring`) and "Full slot: Push right" or "Replace" (the radial
+##   builder's options), each sending `builder_options_changed`, which `hud/panels` applies to every
+##   player's builder; "Reload: Button" (the default) or "Next cast" (owner, 2026-10-27): where the
+##   corner panels' staff rows show a staff's delay, sending `reload_style_changed`. (The
+##   Gameplay page, with "Friendly fire" and "Enemy fire", went in actors G3c: every spell hits
+##   everything, always. The "Tails" and "Tail motes" dev switches went when the owner picked tails
+##   as motes, 2026-11-05.)
+## No other tab: every setting there is fits one of these four (a Gameplay or Controls tab would
+## stand empty, or take one row from where players look for it), and a tab is added only with
+## settings of its own.
 ##
 ## Only the player who opened it works it, through `core/ui_focus`: up/left and down/right move,
-## `accept` (A) activates, `back` (B) goes up a page and closes it from the main page; `pause`
-## again closes it (panels.gd). Every button of every page is in one UIFocus list and the
-## buttons of the other pages are hidden, so UIFocus skips them. The focused button is marked
+## `accept` (A) activates, `back` (B) goes up a page and closes it from the main page, LB and RB
+## page the Settings tabs; `pause` again closes it (panels.gd). Every button of every page and tab
+## is in one UIFocus list and the buttons of the other pages and tabs are hidden, so UIFocus skips
+## them. The focused button is marked
 ## with "> ", never by colour alone. Opening it stops the game and closing it (or its player's
 ## device leaving) lets it go: the command `pause_requested` (online-ready N4: a stop is the game's
 ## state, `Sim.stop`, one reason of its own, so another stop stands apart and the game goes on
@@ -82,29 +104,42 @@ const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 const RunMapViewScript := preload("res://hud/widgets/run_map_view.gd")
+const MenuTabsScript := preload("res://hud/widgets/menu_tabs.gd")
+const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
+const InputManagerScript := preload("res://core/input/input_manager.gd")
 
 const PLAYER_COUNT: int = 4
 enum Page { MAIN, SETTINGS, MAP }
+## The Settings page's tabs, left to right.
+enum Tab { GRAPHICS, PERFORMANCE, AUDIO, INTERFACE }
+## The name each tab shows.
+const TAB_NAMES: Array[String] = ["Graphics", "Performance", "Audio", "Interface"]
+## How far the rows of a tab switched to start to the side the tabs' box goes toward, in pixels; they
+## step in with it (`MenuTabs.remaining`). The rows' box is this much wider on each side than the rows,
+## so a row stepping in is never cut.
+const ROW_SHIFT: float = 6.0
+## The words beside the `back` glyph under the Settings rows.
+const BACK_HINT: String = "Back"
 ## The radial builder's ring (see the top): the plain one with every card or one kind at a time,
 ## or a ring style from `hud/builder/rings/`.
 enum Ring { EVERY_CARD, ONE_KIND, ZOOM, KINDS_HOLD, KINDS_DEPTH }
 ## The title of each page.
-const TITLES: Dictionary = {
-	Page.MAIN: "PAUSED", Page.SETTINGS: "SETTINGS", Page.MAP: "MAP",
-}
+const TITLES: Dictionary = {Page.MAIN: "PAUSED", Page.SETTINGS: "SETTINGS", Page.MAP: "MAP"}
 const FOCUS_MARK: String = "> "
 ## The meta key that keeps a button's text without the focus mark.
 const BASE_TEXT_META: StringName = &"base_text"
+## The words a switch shows, either way.
+const ON_OFF: Array[String] = ["On", "Off"]
 
 ## The menu closed (resumed). Carries the player who had it.
 signal closed_menu(player: int)
-## A builder switch on the Settings page flipped: the radial builder's ring, a full slot pushed
+## A builder switch on the Interface page flipped: the radial builder's ring, a full slot pushed
 ## right or replaced.
 signal builder_options_changed(ring: Ring, push: bool)
-## The reload switch on the Settings page flipped: the staff rows show the delay on the button
+## The reload switch on the Interface page flipped: the staff rows show the delay on the button
 ## glyph, or on the next cast.
 signal reload_style_changed(on_button: bool)
-## The "Show FPS" switch on the Settings page flipped.
+## The "Show FPS" switch on the Interface page flipped.
 signal show_fps_changed(on: bool)
 
 const RING_TEXT: String = "Ring: %s"
@@ -127,8 +162,19 @@ const MOTE_DENSITY_TEXT: String = "Particle amount: %s"
 const MOTE_DENSITY_SETTING: StringName = &"mote_density"
 const MARKS_TEXT: String = "Floor marks: %s"
 const MARKS_SETTING: StringName = &"floor_marks"
-const LIGHT_TEXT: String = "Spell light: %s"
+## "Dynamic lighting" (once "Spell light": its save key kept, so a saved choice carries over).
+const LIGHT_TEXT: String = "Dynamic lighting: %s"
 const LIGHT_SETTING: StringName = &"spell_light"
+const SHADOWS_TEXT: String = "Shadows: %s"
+const SHADOWS_SETTING: StringName = &"shadows"
+const FOG_TEXT: String = "Fog: %s"
+const FOG_SETTING: StringName = &"fog"
+const AIR_TEXT: String = "Ambient particles: %s"
+const AIR_SETTING: StringName = &"ambient_particles"
+const STIRS_TEXT: String = "Environment interaction: %s"
+const STIRS_SETTING: StringName = &"environment_interaction"
+const AMBIENCE_TEXT: String = "Ambience volume: %s"
+const AMBIENCE_SETTING: StringName = &"ambience_volume"
 const TAILLESS_TEXT: String = "Tailless motes: %s"
 const TAILLESS_SETTING: StringName = &"tailless_motes"
 const FPS_TEXT: String = "Show FPS: %s"
@@ -140,6 +186,8 @@ const SLIDER_WIDTH: float = 64.0
 var owner_player: int = -1
 ## The page shown.
 var page: Page = Page.MAIN
+## The Settings tab shown (Graphics when Settings opens).
+var tab: Tab = Tab.GRAPHICS
 
 var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
@@ -149,8 +197,17 @@ var _waiting_seats: int = 0
 var _closing_player: int = 0
 var _focused: Control = null
 var _controls: Array[Control] = []
-## Page -> its buttons, in order.
+## Page -> its buttons, in order (Settings: every tab's).
 var _pages: Dictionary = {}
+## Tab -> its buttons, in order.
+var _tab_rows: Dictionary = {}
+## Button name -> the button, every page's.
+var _by_name: Dictionary = {}
+## Which side the rows of the tab switched to step in from: +1 the right, -1 the left (the way the
+## tabs' box goes, `MenuTabs.travel_side`).
+var _shift_side: float = 0.0
+## The hint under the Settings rows: the `back` glyph and its words.
+var _hint_row: HBoxContainer = null
 ## The builder switches (see the top).
 var ring: Ring = Ring.EVERY_CARD
 var put_push: bool = true
@@ -172,8 +229,14 @@ var mote_density: float = MoteDensity.DEFAULT
 var floor_marks: bool = FloorMarks.default_on()
 ## The "Show FPS" setting (see the top): off by default.
 var show_fps: bool = false
-## The "Spell light" setting (see the top): the platform's default.
+## The "Dynamic lighting" setting (once "Spell light"; see the top): the platform's default.
 var spell_light: bool = SpellLightSetting.default_on()
+## The atmosphere's switches and the ambience's volume (see the top): their platforms' defaults.
+var shadows: bool = ShadowsSetting.default_on()
+var fog: bool = FogSetting.default_on()
+var ambient_particles: bool = AmbientParticles.default_on()
+var environment_interaction: bool = EnvironmentInteraction.default_on()
+var ambience_volume: int = AmbienceVolume.DEFAULT
 ## The "Tailless motes" dev setting (see the top): `TaillessMotes.DEFAULT` by default.
 var tailless_motes: int = TaillessMotes.DEFAULT
 ## The save that keeps settings; made when the menu is bound, unless a test set its own first.
@@ -192,26 +255,37 @@ var registry: Node = null
 @onready var _leave: Button = _add(Page.MAIN, "LeaveGame", "Leave game")
 @onready var _leave_waiting: Button = _add(Page.MAIN, "LeaveWaiting", LEAVE_WAITING_TEXT % 1)
 @onready var _main_menu: Button = _add(Page.MAIN, "MainMenu", "Main menu")
-@onready var _fullscreen: Button = _add(Page.SETTINGS, "Fullscreen", FULLSCREEN_TEXT % "Off")
-@onready var _effects: Button = _add(Page.SETTINGS, "EffectSlots", EFFECT_SLOTS_TEXT % EffectSlots.DEFAULT)
+## The Settings page: its tabs, the box the tab's rows stand in (clipped as they step in), the rows
+## and the hint under them.
+@onready var _tabs: MenuTabsScript = _add_tabs()
+@onready var _body: Control = _add_body()
+@onready var _tab_box: VBoxContainer = _add_tab_box()
+@onready var _fullscreen: Button = _add_setting(Tab.GRAPHICS, "Fullscreen", FULLSCREEN_TEXT % "Off")
+@onready var _light: Button = _add_setting(Tab.GRAPHICS, "SpellLight", LIGHT_TEXT % _word(spell_light))
+@onready var _shadows: Button = _add_setting(Tab.GRAPHICS, "Shadows", SHADOWS_TEXT % _word(shadows))
+@onready var _fog: Button = _add_setting(Tab.GRAPHICS, "Fog", FOG_TEXT % _word(fog))
+@onready var _air: Button = _add_setting(Tab.GRAPHICS, "AmbientParticles", AIR_TEXT % _word(ambient_particles))
+@onready var _stirs: Button = _add_setting(Tab.GRAPHICS, "EnvironmentInteraction", STIRS_TEXT % _word(environment_interaction))
+@onready var _marks: Button = _add_setting(Tab.GRAPHICS, "FloorMarks", MARKS_TEXT % _word(floor_marks))
+@onready var _effects: Button = _add_setting(Tab.PERFORMANCE, "EffectSlots", EFFECT_SLOTS_TEXT % EffectSlots.DEFAULT)
 @onready var _effects_bar: HSlider = _add_slider(_effects, EffectSlots.MIN, EffectSlots.MAX, EffectSlots.STEP, effect_slots, EFFECT_SLOTS_TEXT % EffectSlots.MAX)
-@onready var _motes: Button = _add(Page.SETTINGS, "MoteCap", MOTE_CAP_TEXT % MoteCap.word_of(mote_cap))
+@onready var _motes: Button = _add_setting(Tab.PERFORMANCE, "MoteCap", MOTE_CAP_TEXT % MoteCap.word_of(mote_cap))
 @onready var _motes_bar: HSlider = _add_slider(_motes, 0, MoteCap.STOPS.size() - 1, 1, MoteCap.index_of(mote_cap), MOTE_CAP_TEXT % "Medium")
-@onready var _density: Button = _add(Page.SETTINGS, "MoteDensity", MOTE_DENSITY_TEXT % MoteDensity.word_of(mote_density))
+@onready var _density: Button = _add_setting(Tab.PERFORMANCE, "MoteDensity", MOTE_DENSITY_TEXT % MoteDensity.word_of(mote_density))
 @onready var _density_bar: HSlider = _add_slider(_density, 0, MoteDensity.STOPS.size() - 1, 1, MoteDensity.index_of(mote_density), MOTE_DENSITY_TEXT % "Double")
-@onready var _marks: Button = _add(Page.SETTINGS, "FloorMarks", MARKS_TEXT % ("On" if floor_marks else "Off"))
-@onready var _light: Button = _add(Page.SETTINGS, "SpellLight", LIGHT_TEXT % ("On" if spell_light else "Off"))
-@onready var _tailless: Button = _add(Page.SETTINGS, "TaillessMotes", TAILLESS_TEXT % TaillessMotes.word_of(tailless_motes))
+@onready var _tailless: Button = _add_setting(Tab.PERFORMANCE, "TaillessMotes", TAILLESS_TEXT % TaillessMotes.word_of(tailless_motes))
 @onready var _tailless_bar: HSlider = _add_slider(_tailless, 0, TaillessMotes.STOPS.size() - 1, 1, TaillessMotes.index_of(tailless_motes), TAILLESS_TEXT % TaillessMotes.STOPS[-1])
-@onready var _shots: Button = _add(Page.SETTINGS, "ShotCap", SHOT_CAP_TEXT % shot_cap)
+@onready var _shots: Button = _add_setting(Tab.PERFORMANCE, "ShotCap", SHOT_CAP_TEXT % shot_cap)
 @onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
-@onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
-@onready var _numbers: Button = _add(Page.SETTINGS, "DamageNumbers", NUMBERS_TEXT % "On")
-@onready var _fps: Button = _add(Page.SETTINGS, "ShowFps", FPS_TEXT % "Off")
-@onready var _ring_style: Button = _add(Page.SETTINGS, "RingStyle", RING_TEXT % "Every card")
-@onready var _put_style: Button = _add(Page.SETTINGS, "PutStyle", PUT_TEXT % "Push right")
-@onready var _reload_style: Button = _add(Page.SETTINGS, "ReloadStyle", RELOAD_TEXT % "Button")
-@onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
+@onready var _ambience: Button = _add_setting(Tab.AUDIO, "AmbienceVolume", AMBIENCE_TEXT % AmbienceVolume.word_of(ambience_volume))
+@onready var _ambience_bar: HSlider = _add_slider(_ambience, AmbienceVolume.MIN, AmbienceVolume.MAX, AmbienceVolume.STEP, ambience_volume, AMBIENCE_TEXT % AmbienceVolume.word_of(AmbienceVolume.MAX))
+@onready var _shake: Button = _add_setting(Tab.INTERFACE, "ScreenShake", SHAKE_TEXT % "On")
+@onready var _numbers: Button = _add_setting(Tab.INTERFACE, "DamageNumbers", NUMBERS_TEXT % "On")
+@onready var _fps: Button = _add_setting(Tab.INTERFACE, "ShowFps", FPS_TEXT % "Off")
+@onready var _ring_style: Button = _add_setting(Tab.INTERFACE, "RingStyle", RING_TEXT % "Every card")
+@onready var _put_style: Button = _add_setting(Tab.INTERFACE, "PutStyle", PUT_TEXT % "Push right")
+@onready var _reload_style: Button = _add_setting(Tab.INTERFACE, "ReloadStyle", RELOAD_TEXT % "Button")
+@onready var _hint_glyph: ActionGlyphScript = _add_hint()
 ## The Map page's map (not a button: UIFocus never stops on it), over its Back.
 @onready var _map: RunMapViewScript = _add_map()
 @onready var _map_back: Button = _add(Page.MAP, "MapBack", "Back")
@@ -223,13 +297,85 @@ func _ready() -> void:
 	if display == null:
 		display = get_node_or_null(^"/root/Display")
 	visible = false
+	_fit_widths()
 	_show_page(Page.MAIN)
 
 
-## Connect to the event bus and the focus service (called once by `panels.gd`).
-func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
+## Every row of a page as wide as the page's widest: its focus mark and its longest words either way
+## (a switch's On and Off, a builder switch's every word) or its slider, so the panel keeps its width
+## as the focus moves and a switch flips.
+func _fit_widths() -> void:
+	var needs: Dictionary = {}
+	for row: Button in _controls:
+		needs[row] = maxf(row.custom_minimum_size.x, _width_of(row, [str(row.get_meta(BASE_TEXT_META, ""))]))
+	var switches: Dictionary = {
+		_fullscreen: FULLSCREEN_TEXT, _light: LIGHT_TEXT, _shadows: SHADOWS_TEXT, _fog: FOG_TEXT,
+		_air: AIR_TEXT, _stirs: STIRS_TEXT, _marks: MARKS_TEXT, _shake: SHAKE_TEXT,
+		_numbers: NUMBERS_TEXT, _fps: FPS_TEXT,
+	}
+	for row: Button in switches:
+		needs[row] = maxf(needs[row], _width_of(row, _worded(switches[row], ON_OFF)))
+	needs[_ring_style] = maxf(needs[_ring_style], _width_of(_ring_style, _worded(RING_TEXT, RING_WORDS)))
+	needs[_put_style] = maxf(needs[_put_style], _width_of(_put_style, _worded(PUT_TEXT, ["Push right", "Replace"])))
+	needs[_reload_style] = maxf(needs[_reload_style], _width_of(_reload_style, _worded(RELOAD_TEXT, ["Button", "Next cast"])))
+	for on_page: int in _pages:
+		var widest: float = 0.0
+		if on_page == Page.SETTINGS:
+			widest = _tabs.get_combined_minimum_size().x - 2.0 * ROW_SHIFT
+		for row: Button in _pages[on_page]:
+			widest = maxf(widest, needs[row])
+		if on_page == Page.SETTINGS:
+			# An even width, so the panel centred in the view stands on whole pixels.
+			widest = ceilf(widest / 2.0) * 2.0
+		for row: Button in _pages[on_page]:
+			row.custom_minimum_size.x = widest
+	_fit_body()
+
+
+## The box the Settings rows stand in as wide as they are and as tall as the tallest tab, so the
+## panel keeps its size whichever tab shows.
+func _fit_body() -> void:
+	var gap: float = float(_tab_box.get_theme_constant(&"separation"))
+	var tallest: float = 0.0
+	var wide: float = 0.0
+	for on_tab: int in _tab_rows:
+		var tall: float = 0.0
+		for row: Button in _tab_rows[on_tab]:
+			var least: Vector2 = row.get_combined_minimum_size()
+			tall += least.y + (gap if tall > 0.0 else 0.0)
+			wide = maxf(wide, least.x)
+		tallest = maxf(tallest, tall)
+	_body.custom_minimum_size = Vector2(wide + 2.0 * ROW_SHIFT, tallest)
+	_tab_box.size = Vector2(wide, tallest)
+	_on_slide_stepped(0.0)
+
+
+## `format` with each of `words`.
+static func _worded(format: String, words: Array) -> Array[String]:
+	var texts: Array[String] = []
+	for word: Variant in words:
+		texts.append(format % word)
+	return texts
+
+
+## How wide `row` must be for the longest of `texts`, focused (its style's margins included).
+func _width_of(row: Button, texts: Array[String]) -> float:
+	var font: Font = row.get_theme_font(&"font")
+	var font_size: int = row.get_theme_font_size(&"font_size")
+	var widest: float = 0.0
+	for text in texts:
+		widest = maxf(widest, font.get_string_size(FOCUS_MARK + text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x)
+	var style: StyleBox = row.get_theme_stylebox(&"normal")
+	return ceilf(widest + (style.get_minimum_size().x if style != null else 0.0))
+
+
+## Connect to the event bus, the focus service and the input manager the glyphs follow (null: the
+## "PlayerInput" autoload) (called once by `panels.gd`).
+func bind(events: EventsScript, ui_focus: UIFocusScript, input: InputManagerScript = null) -> void:
 	_events = events
 	_ui_focus = ui_focus
+	_tabs.bind(input)
+	_hint_glyph.bind(input)
 	if save == null:
 		save = SaveFile.new()
 	_load_shake()
@@ -239,6 +385,8 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_load_mote_density()
 	_load_floor_marks()
 	_load_light()
+	_load_atmosphere()
+	_load_ambience_volume()
 	_load_tailless_motes()
 	_load_fps()
 	_map.name_of = _kind_name
@@ -249,6 +397,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 		_ui_focus.activated.connect(_on_activated)
 		_ui_focus.cancelled.connect(_on_cancelled)
 		_ui_focus.focus_changed.connect(_on_focus_changed)
+		_ui_focus.paged.connect(_on_paged)
 
 
 func is_open() -> bool:
@@ -265,6 +414,8 @@ func open_menu(player: int) -> bool:
 	owner_player = player
 	_title.theme_type_variation = StringName("PlayerLabel%d" % (player + 1))
 	theme_type_variation = StringName("PlayerPanel%d" % (player + 1))
+	_tabs.show_for(player)
+	_hint_glyph.show_action(player, &"back")
 	_show_page(Page.MAIN)
 	visible = true
 	if not _ui_focus.open(player, _controls):
@@ -287,31 +438,127 @@ func close_menu() -> bool:
 
 ## The button of a page by its node name (for tests and screenshots), or null.
 func button(button_name: String) -> Button:
-	return _rows.get_node_or_null(button_name) as Button
+	return _by_name.get(button_name) as Button
 
 
-## The buttons of the page shown, in order.
+## The page `control` (a button) is on (MAIN for none).
+func page_of(control: Control) -> Page:
+	for on_page: int in _pages:
+		if (_pages[on_page] as Array).has(control):
+			return on_page as Page
+	return Page.MAIN
+
+
+## The Settings tab `control` (a button) is on, or -1 for a button on no tab.
+func tab_of(control: Control) -> int:
+	for on_tab: int in _tab_rows:
+		if (_tab_rows[on_tab] as Array).has(control):
+			return on_tab
+	return -1
+
+
+## The Settings page's tab row (for tests and screenshots).
+func tabs() -> MenuTabsScript:
+	return _tabs
+
+
+## The box the Settings rows stand in (for tests and screenshots).
+func tab_body() -> Control:
+	return _body
+
+
+## The `back` glyph of the hint under the Settings rows (for tests and screenshots).
+func hint_glyph() -> ActionGlyphScript:
+	return _hint_glyph
+
+
+## "On" or "Off".
+static func _word(on: bool) -> String:
+	return "On" if on else "Off"
+
+
+## The buttons of the page shown (on Settings, of the tab shown), in order.
 func shown_buttons() -> Array[Button]:
 	var shown: Array[Button] = []
-	for control: Button in _pages[page]:
+	var rows: Array = _tab_rows[tab] if page == Page.SETTINGS else _pages[page]
+	for control: Button in rows:
 		if control.visible:
 			shown.append(control)
 	return shown
 
 
-func _add(on_page: Page, node_name: String, text: String) -> Button:
+func _add(on_page: Page, node_name: String, text: String, parent: Control = null) -> Button:
 	var made := Button.new()
 	made.name = node_name
 	made.focus_mode = Control.FOCUS_NONE
 	made.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	made.set_meta(BASE_TEXT_META, text)
 	made.text = text
-	_rows.add_child(made)
+	(parent if parent != null else _rows).add_child(made)
 	_controls.append(made)
+	_by_name[node_name] = made
 	if not _pages.has(on_page):
 		_pages[on_page] = []
 	(_pages[on_page] as Array).append(made)
 	return made
+
+
+## A row of the Settings page, on tab `on_tab`.
+func _add_setting(on_tab: Tab, node_name: String, text: String) -> Button:
+	var made: Button = _add(Page.SETTINGS, node_name, text, _tab_box)
+	if not _tab_rows.has(on_tab):
+		_tab_rows[on_tab] = []
+	(_tab_rows[on_tab] as Array).append(made)
+	return made
+
+
+## The Settings page's tab row, under the title.
+func _add_tabs() -> MenuTabsScript:
+	var made := MenuTabsScript.new()
+	made.name = "Tabs"
+	made.set_tabs(TAB_NAMES)
+	made.slide_stepped.connect(_on_slide_stepped)
+	_rows.add_child(made)
+	return made
+
+
+## The box the Settings rows stand in, ROW_SHIFT wider than them on each side (clipped to it).
+func _add_body() -> Control:
+	var made := Control.new()
+	made.name = "TabBody"
+	made.clip_contents = true
+	made.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_rows.add_child(made)
+	return made
+
+
+## The rows of the Settings tabs, a column placed by hand in the box (so it can step in).
+func _add_tab_box() -> VBoxContainer:
+	var made := VBoxContainer.new()
+	made.name = "TabRows"
+	made.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	made.add_theme_constant_override(&"separation", _rows.get_theme_constant(&"separation"))
+	_body.add_child(made)
+	return made
+
+
+## The hint under the Settings rows: the `back` glyph, "Back". Returns the glyph.
+func _add_hint() -> ActionGlyphScript:
+	_hint_row = HBoxContainer.new()
+	_hint_row.name = "Hint"
+	_hint_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_hint_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hint_row.add_theme_constant_override(&"separation", 4)
+	var glyph := ActionGlyphScript.new()
+	glyph.name = "BackGlyph"
+	glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_hint_row.add_child(glyph)
+	var words := Label.new()
+	words.name = "BackWords"
+	words.text = BACK_HINT
+	_hint_row.add_child(words)
+	_rows.add_child(_hint_row)
+	return glyph
 
 
 ## The Map page's map, in the rows after the buttons made before it (shown on that page only).
@@ -370,6 +617,9 @@ func _navigate(control: Control, direction: Vector2i) -> Control:
 		var pick: int = clampi(TaillessMotes.index_of(tailless_motes) + direction.x, 0, TaillessMotes.STOPS.size() - 1)
 		_set_tailless_motes(TaillessMotes.STOPS[pick])
 		return _tailless
+	if control == _ambience and direction.x != 0:
+		_set_ambience_volume(ambience_volume + direction.x * AmbienceVolume.STEP)
+		return _ambience
 	if control == _shots and direction.x != 0:
 		var at: int = clampi(ShotCap.index_of(shot_cap) + direction.x, 0, ShotCap.STOPS.size() - 1)
 		_set_shot_cap(ShotCap.STOPS[at])
@@ -395,27 +645,62 @@ func _show_page(next: Page) -> void:
 	_title.text = TITLES[next] if owner_player < 0 else "P%d %s" % [owner_player + 1, TITLES[next]]
 	for on_page: int in _pages:
 		for control: Button in _pages[on_page]:
-			control.visible = on_page == next
+			control.visible = on_page == next and (on_page != Page.SETTINGS or tab_of(control) == tab)
+	for settings_part: Control in [_tabs, _body, _hint_row]:
+		settings_part.visible = next == Page.SETTINGS
 	_map_row.visible = next == Page.MAIN and _map.has_map()
 	_map.visible = next == Page.MAP
 	_leave_waiting.visible = next == Page.MAIN and _waiting_seats != 0
 	_leave_waiting.set_meta(BASE_TEXT_META, LEAVE_WAITING_TEXT % (waiting_seat() + 1))
-	if next == Page.SETTINGS:
-		_show_fullscreen()
 	_mark_focus()
 
 
-func _go(next: Page) -> void:
+## Show the Settings page on tab `next`, its first row that is not greyed focused. `side` is the way
+## the player paged (+1 to the next tab, -1 to the previous): the tabs' box slides and the rows step
+## in from the side it goes toward (on a wrap, the far end); 0 shows it at once (Settings opening).
+func _show_tab(next: Tab, side: int = 0) -> void:
+	tab = next
+	_tabs.select(next)
+	# The way the box goes (on a wrap, the other way from the paging), so rows and box agree.
+	_shift_side = float(_tabs.travel_side())
+	if side == 0:
+		_tabs.snap()
+	else:
+		_on_slide_stepped(_tabs.remaining())
+	_show_page(Page.SETTINGS)
+	if next == Tab.GRAPHICS:
+		_show_fullscreen()
+	_focus_first()
+
+
+## The rows follow the tabs' box: `left` of the slide to go (eased, 1 to 0), by whole pixels.
+func _on_slide_stepped(left: float) -> void:
+	_tab_box.position = Vector2(ROW_SHIFT + roundf(_shift_side * ROW_SHIFT * left), 0.0)
+
+
+## LB or RB on the Settings page: the previous or the next tab, round from the ends.
+func _on_paged(player: int, step: int) -> void:
+	if player != owner_player or page != Page.SETTINGS or step == 0:
+		return
+	_show_tab(posmod(tab + signi(step), Tab.size()) as Tab, signi(step))
+
+
+## Show the page `next` with its first row focused, or `focused` when given (a row of it).
+func _go(next: Page, focused: Button = null) -> void:
 	_show_page(next)
 	_focus_first()
+	if focused != null and _ui_focus != null and is_open():
+		_ui_focus.focus(owner_player, focused)
+		_focused = _ui_focus.focused(owner_player)
+		_mark_focus()
 
 
 func _focus_first() -> void:
 	if _ui_focus == null or not is_open():
 		return
-	var shown: Array[Button] = shown_buttons()
-	if not shown.is_empty():
-		_ui_focus.focus(owner_player, shown[0])
+	for row: Button in shown_buttons():
+		if not row.disabled and _ui_focus.focus(owner_player, row):
+			break
 	_focused = _ui_focus.focused(owner_player)
 	_mark_focus()
 
@@ -505,7 +790,7 @@ func _on_activated(player: int, control: Control) -> void:
 	elif control == _map_row:
 		_go(Page.MAP)
 	elif control == _settings:
-		_go(Page.SETTINGS)
+		_show_tab(Tab.GRAPHICS)
 	elif control == _leave:
 		# Closed first, so the game is let go before the seat leaves it.
 		close_menu()
@@ -549,6 +834,16 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_floor_marks(not floor_marks)
 	elif control == _light:
 		_set_light(not spell_light)
+	elif control == _shadows:
+		_set_shadows(not shadows)
+	elif control == _fog:
+		_set_fog(not fog)
+	elif control == _air:
+		_set_ambient_particles(not ambient_particles)
+	elif control == _stirs:
+		_set_environment_interaction(not environment_interaction)
+	elif control == _ambience:
+		_set_ambience_volume(AmbienceVolume.MIN if ambience_volume >= AmbienceVolume.MAX else ambience_volume + AmbienceVolume.STEP)
 	elif control == _tailless:
 		_set_tailless_motes(TaillessMotes.STOPS[(TaillessMotes.index_of(tailless_motes) + 1) % TaillessMotes.STOPS.size()])
 	elif control == _shake:
@@ -557,8 +852,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_numbers(not damage_numbers)
 	elif control == _fps:
 		_set_fps(not show_fps)
-	elif control == _settings_back or control == _map_back:
-		_go(Page.MAIN)
+	elif control == _map_back:
+		_go(Page.MAIN, _map_row)
 
 
 ## `back` goes up a page; on the main page it resumes.
@@ -568,8 +863,11 @@ func _on_cancelled(player: int) -> void:
 	match page:
 		Page.MAIN:
 			close_menu()
-		_:
-			_go(Page.MAIN)
+		Page.SETTINGS:
+			# Up to the main page on its Settings row (no Back row: `back` is the way up).
+			_go(Page.MAIN, _settings)
+		Page.MAP:
+			_go(Page.MAIN, _map_row)
 
 
 ## Read the saved choice and show it; feel is told only when it is off (on is feel's own default).
@@ -601,23 +899,109 @@ func _set_numbers(on: bool) -> void:
 		_events.damage_numbers_changed.emit(on)
 
 
-## Read the saved "Spell light" choice and show it; feel is told only when it is not the default.
+## Read the saved "Dynamic lighting" choice and show it; feel is told only when it is not the
+## default.
 func _load_light() -> void:
 	spell_light = bool(save.get_setting(LIGHT_SETTING, SpellLightSetting.default_on()))
-	_light.set_meta(BASE_TEXT_META, LIGHT_TEXT % ("On" if spell_light else "Off"))
-	_mark_focus()
+	_light.set_meta(BASE_TEXT_META, LIGHT_TEXT % _word(spell_light))
+	_show_needs_light()
 	if spell_light != SpellLightSetting.default_on() and _events != null:
 		_events.spell_light_changed.emit(spell_light)
 
 
-## Flip the "Spell light" switch: show it, save it and tell feel.
+## Flip the "Dynamic lighting" switch: show it, save it and tell feel.
 func _set_light(on: bool) -> void:
 	spell_light = on
-	_light.set_meta(BASE_TEXT_META, LIGHT_TEXT % ("On" if on else "Off"))
-	_mark_focus()
+	_light.set_meta(BASE_TEXT_META, LIGHT_TEXT % _word(on))
+	_show_needs_light()
 	save.set_setting(LIGHT_SETTING, on)
 	if _events != null:
 		_events.spell_light_changed.emit(on)
+
+
+## The rows that need the light ("Shadows", "Fog", "Ambient particles") greyed while it is off: they
+## keep their choice, and UIFocus skips them.
+func _show_needs_light() -> void:
+	for row: Button in [_shadows, _fog, _air]:
+		row.disabled = not spell_light
+	_mark_focus()
+
+
+## Read the saved atmosphere switches ("Shadows", "Fog", "Ambient particles", "Environment
+## interaction") and show them; feel is told of each only when it is not the platform's default.
+func _load_atmosphere() -> void:
+	shadows = _load_switch(_shadows, SHADOWS_TEXT, SHADOWS_SETTING, ShadowsSetting.default_on(), _events.shadows_changed if _events != null else Signal())
+	fog = _load_switch(_fog, FOG_TEXT, FOG_SETTING, FogSetting.default_on(), _events.fog_changed if _events != null else Signal())
+	ambient_particles = _load_switch(_air, AIR_TEXT, AIR_SETTING, AmbientParticles.default_on(), _events.ambient_particles_changed if _events != null else Signal())
+	environment_interaction = _load_switch(_stirs, STIRS_TEXT, STIRS_SETTING, EnvironmentInteraction.default_on(), _events.environment_interaction_changed if _events != null else Signal())
+
+
+## A saved switch read (`key`; `default` when none) and shown on `row` in `words`; `changed` (the
+## bus's event; null with no bus) is sent it when it is not `default`. Returns it.
+func _load_switch(row: Button, words: String, key: StringName, default: bool, changed: Signal) -> bool:
+	var on: bool = bool(save.get_setting(key, default))
+	row.set_meta(BASE_TEXT_META, words % _word(on))
+	_mark_focus()
+	if on != default and not changed.is_null():
+		changed.emit(on)
+	return on
+
+
+## A switch flipped to `on`: shown on `row` in `words`, saved (`key`) and sent on `changed` (the
+## bus's event; null with no bus).
+func _flip_switch(row: Button, words: String, key: StringName, on: bool, changed: Signal) -> void:
+	row.set_meta(BASE_TEXT_META, words % _word(on))
+	_mark_focus()
+	save.set_setting(key, on)
+	if not changed.is_null():
+		changed.emit(on)
+
+
+func _set_shadows(on: bool) -> void:
+	shadows = on
+	_flip_switch(_shadows, SHADOWS_TEXT, SHADOWS_SETTING, on, _events.shadows_changed if _events != null else Signal())
+
+
+func _set_fog(on: bool) -> void:
+	fog = on
+	_flip_switch(_fog, FOG_TEXT, FOG_SETTING, on, _events.fog_changed if _events != null else Signal())
+
+
+func _set_ambient_particles(on: bool) -> void:
+	ambient_particles = on
+	_flip_switch(_air, AIR_TEXT, AIR_SETTING, on, _events.ambient_particles_changed if _events != null else Signal())
+
+
+func _set_environment_interaction(on: bool) -> void:
+	environment_interaction = on
+	_flip_switch(_stirs, STIRS_TEXT, STIRS_SETTING, on, _events.environment_interaction_changed if _events != null else Signal())
+
+
+## Read the saved "Ambience volume" and show it; feel is told only when it is not the default.
+func _load_ambience_volume() -> void:
+	var saved: int = AmbienceVolume.snap(int(save.get_setting(AMBIENCE_SETTING, AmbienceVolume.DEFAULT)))
+	_show_ambience_volume(saved)
+	if saved != AmbienceVolume.DEFAULT and _events != null:
+		_events.ambience_volume_changed.emit(saved)
+
+
+## Move the "Ambience volume" slider to `percent` (snapped inside its range): show it, save it and
+## tell feel.
+func _set_ambience_volume(percent: int) -> void:
+	var next: int = AmbienceVolume.snap(percent)
+	if next == ambience_volume:
+		return
+	_show_ambience_volume(next)
+	save.set_setting(AMBIENCE_SETTING, next)
+	if _events != null:
+		_events.ambience_volume_changed.emit(next)
+
+
+func _show_ambience_volume(percent: int) -> void:
+	ambience_volume = percent
+	_ambience.set_meta(BASE_TEXT_META, AMBIENCE_TEXT % AmbienceVolume.word_of(percent))
+	_ambience_bar.value = percent
+	_mark_focus()
 
 
 ## Flip the switch: show it, save it and tell feel.

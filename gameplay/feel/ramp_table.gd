@@ -18,6 +18,9 @@ const TABLE_SOURCE: int = 16
 var _image: Image = null
 var _texture: ImageTexture = null
 var _rows: Dictionary = {}
+## Rows written, all told: a holder of sources that sees it change asks for them again (`source`),
+## since a row may have been given to new colours (the oldest goes when all ROWS are taken).
+var writes: int = 0
 var _next: int = 0
 
 
@@ -45,6 +48,7 @@ func source(colours: PackedColorArray) -> int:
 		if int(_rows[key]) == row:
 			_rows.erase(key)
 	_rows[shades] = row
+	writes += 1
 	for shade in SHADES:
 		_image.set_pixel(shade, row, shades[mini(shade, shades.size() - 1)])
 	_texture.update(_image)

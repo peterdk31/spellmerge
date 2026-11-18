@@ -41,6 +41,17 @@ extends Node2D
 ## (P2b): a kind that names a floor mark (`MoteKind.settles`) leaves it where each of its motes
 ## comes to rest, at that time (`settle_into` names the mark layer; `Marks.settle` keeps it until
 ## then; SETTLE_ROWS a frame in a flood).
+##
+## **Lit-only kinds** (`MoteKind.lit_only`; docs/milestones/atmosphere.md, B: a room's dust in the
+## air) are drawn only where light falls: the shader reads the light buffer it is handed
+## (`set_light`, the spell light's, from the spectacle) under each of their pixels, and with none
+## (spell light off) does not draw them.
+##
+## **Stirred kinds** (`MoteKind.stirred`; docs/milestones/atmosphere.md, E: the dust in the air and
+## in the shafts): the shader moves each of their motes by the world's stirs where it is (the
+## spectacle hands them to `draw_material`, `Stirs.hand_to`): dragged along by the shots' wake up to
+## STIR_SHOT_PIXELS, pushed out by a blast's wave up to STIR_BLAST_PIXELS, times the kind's share,
+## easing back to its own way. Drawn only: its flight (`flight`, and where it lands) is as it was.
 
 const SHADER: Shader = preload("res://gameplay/feel/mote.gdshader")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
@@ -111,9 +122,20 @@ const SETTLE_ROWS: int = 24
 const SETTLE_MOST: int = 128
 ## The most kinds the shader holds (rows of its `kind_table`), and the table's texels a row: the
 ## motion (gravity, drag, bounce, glow), the sway (sway, its rate, first shade, reach) and the
-## shape (frames, play, rate, turns).
+## shape (frames, play, rate, turns) and the light (1 for a lit-only kind, `MoteKind.lit_only`; and
+## how much the world's stirs move it, `MoteKind.stirred`).
 const MAX_KINDS: int = 256
-const KIND_COLUMNS: int = 3
+const KIND_COLUMNS: int = 4
+## A lit-only mote's shade in the dark (`lit_shade`): not drawn. The steps it is lit by until it is
+## handed the spell light's (`set_light`; the shader's default), and how much quicker than its half
+## life it comes into its first shade (the shader's RISE_SPEED).
+const NOT_DRAWN: int = 4
+## How far the world's stirs move a stirred mote at their fullest, px (the shader's STIR_SHOT_PIXELS
+## and STIR_BLAST_PIXELS), times its kind's `stirred`.
+const STIR_SHOT_PIXELS: float = 5.0
+const STIR_BLAST_PIXELS: float = 8.0
+const DEFAULT_LIT_STEPS: Vector4 = Vector4(0.12, 0.16, 0.305, 0.45)
+const RISE_SPEED: float = 2.0
 ## Rows of the ramp table (colours other than a spell's), and its shades a row.
 const RAMPS: int = RampTableScript.ROWS
 const SHADES: int = RampTableScript.SHADES
@@ -231,6 +253,9 @@ var _settle_marks: PackedInt32Array = PackedInt32Array()
 var _shape_image: Image = null
 var _kind_image: Image = null
 var _material: ShaderMaterial = null
+## The light buffer lit-only kinds read (`set_light`; null: none), and the light's steps. Read only.
+var _light: Texture2D = null
+var lit_steps: Vector4 = DEFAULT_LIT_STEPS
 var _mesh: ArrayMesh = null
 var _z: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -396,6 +421,44 @@ func _turns_of(present: int, own_layers: int) -> int:
 ## How many motes the ring holds.
 func cap() -> int:
 	return _cap
+
+
+## The light buffer the lit-only kinds (`MoteKind.lit_only`) read (the spell light's, handed over
+## by the spectacle; docs/milestones/atmosphere.md, B) and the light's brightest channel from which
+## they show in their shadow, base, light and white-hot shade (`SpellLight.lit_steps`, from the
+## same numbers its apply rect lights the floor by), or a null buffer with spell light off: then
+## they are not drawn.
+func set_light(buffer: Texture2D, steps: Vector4 = DEFAULT_LIT_STEPS) -> void:
+	_light = buffer
+	lit_steps = steps
+	_material.set_shader_parameter(&"light_buffer", buffer)
+	_material.set_shader_parameter(&"light_on", buffer != null)
+	_material.set_shader_parameter(&"lit_steps", steps)
+
+
+## The shade (0 white-hot ... 3 shadow) a lit-only mote is drawn in, under a light whose brightest
+## channel is `most`, its life allowing no hotter than `life_shade` (`lit_life_shade`), with the
+## light's steps `steps` (`set_light`); NOT_DRAWN in the dark. The shader's pick, line for line
+## (`mote.gdshader`, the lit-only fragment): its light's shade and its life's, the dimmer winning,
+## so each changes it a shade at a time and it is only gone from its shadow shade (Smooth).
+static func lit_shade(most: float, life_shade: int, steps: Vector4) -> int:
+	if most < steps.x:
+		return NOT_DRAWN
+	var step_of: int = 0 if most >= steps.w else (1 if most >= steps.z else (2 if most >= steps.y else 3))
+	return maxi(step_of, life_shade)
+
+
+## The hottest shade a lit-only mote of a kind starting at `shade_from` is allowed `t` seconds into
+## its life of `life` seconds: in through its shades, its first from a quarter of its life to three
+## quarters (RISE_SPEED), and out again. The shader's, line for line.
+static func lit_life_shade(t: float, life: float, shade_from: int) -> int:
+	var rise: float = minf((1.0 - absf(2.0 * t / life - 1.0)) * RISE_SPEED, 1.0)
+	return clampi(3 - floori(rise * float(4 - shade_from)), shade_from, 3)
+
+
+## The light buffer the lit-only kinds read (null: none, they are not drawn; for tests).
+func light() -> Texture2D:
+	return _light
 
 
 ## The kinds, in the order the rows name them.
@@ -1080,6 +1143,7 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 		_kind_image.set_pixel(0, k, Color(kind.gravity, kind.drag, kind.bounce, kind.glow))
 		_kind_image.set_pixel(1, k, Color(kind.wobble, kind.wobble_rate, float(kind.shade_from), float(reach_of(kind))))
 		_kind_image.set_pixel(2, k, Color(float(frames), float(MoteKind.SHAPE_PLAYS.find(kind.shape_play)), kind.shape_rate, 1.0 if kind.shape_turns else 0.0))
+		_kind_image.set_pixel(3, k, Color(1.0 if kind.lit_only else 0.0, clampf(kind.stirred, 0.0, 1.0), 0.0, 0.0))
 		for frame in frames:
 			var pixels: PackedByteArray = kind.shape_pixels(frame)
 			for y in size:
@@ -1103,8 +1167,8 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 	_fit_tail_codes()
 
 
-## Kind `k`'s numbers as the shader reads them (`kind_table`): its motion, its sway and its shape
-## (for tests).
+## Kind `k`'s numbers as the shader reads them (`kind_table`, KIND_COLUMNS of them): its motion,
+## its sway, its shape and its light (for tests).
 func kind_numbers(k: int) -> Array[Vector4]:
 	var numbers: Array[Vector4] = []
 	for column in KIND_COLUMNS:

@@ -104,6 +104,9 @@ const LanesScript := preload("res://gameplay/feel/lanes.gd")
 const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
 const SoundsScript := preload("res://gameplay/feel/sounds.gd")
 const MusicScript := preload("res://gameplay/feel/music.gd")
+const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
+## Godot's audio driver with no device (headless runs').
+const DUMMY_AUDIO_DRIVER: String = "Dummy"
 const BodySoundsScript := preload("res://gameplay/feel/body_sounds.gd")
 const BossIntroSoundScript := preload("res://gameplay/feel/boss_intro_sound.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
@@ -319,6 +322,11 @@ const BOSS_INTRO: StringName = &"boss_intro"
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null
+## Whether Feel's players are started at all (`hears_audio()`, read in `_ready`), handed to its
+## sounds, music, room sound and the boss intro's sounds: not on the audio driver with no device
+## (every headless run), where nothing hears them and a loop still playing as the run quits is left
+## with the engine's audio thread (a leak the test runner fails on).
+var audible: bool = true
 ## The registry and the projectile manager are handed on to the spectacle whenever they change.
 var registry: RegistryScript = null:
 	set(value):
@@ -332,6 +340,8 @@ var registry: RegistryScript = null:
 			_numbers.registry = value
 		if _intro_sound != null:
 			_intro_sound.registry = value
+		if _ambience != null:
+			_ambience.registry = value
 		if _spawn_look != null:
 			_spawn_look.forget_styles()
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
@@ -400,6 +410,8 @@ var _hit_voice: int = -1
 ## (`music.gd`), boss plan OB15.
 var _sounds: SoundsScript = null
 var _music: MusicScript = null
+## The room in play's sound under the music (atmosphere D, `room_ambience.gd`).
+var _ambience: RoomAmbienceScript = null
 ## What the bodies sound of their own: their phases' held sounds and cues, and the music they and the
 ## room ask for (`body_sounds.gd`).
 var _body_sounds: BodySoundsScript = null
@@ -745,6 +757,15 @@ func _ready() -> void:
 	_music.name = "Music"
 	_music.registry = registry
 	add_child(_music)
+	audible = hears_audio()
+	_sounds.audible = audible
+	_music.audible = audible
+	_ambience = RoomAmbienceScript.new()
+	_ambience.name = "RoomAmbience"
+	_ambience.events = events
+	_ambience.registry = registry
+	_ambience.audible = audible
+	add_child(_ambience)
 	_body_sounds = BodySoundsScript.new()
 	_body_sounds.sounds = _sounds
 	_body_sounds.music = _music
@@ -752,6 +773,7 @@ func _ready() -> void:
 	_intro_sound = BossIntroSoundScript.new()
 	_intro_sound.name = "BossIntroSound"
 	_intro_sound.registry = registry
+	_intro_sound.audible = audible
 	add_child(_intro_sound)
 	add_cue_part(&"held", _play_held)
 	_numbers = DamageNumberDrawerScript.new()
@@ -842,10 +864,12 @@ func _ready() -> void:
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
+	events.ambience_volume_changed.connect(_on_ambience_volume_changed)
 	events.projectile_expired.connect(_on_projectile_expired)
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
 	events.room_entered.connect(_on_room_entered)
+	events.main_menu_requested.connect(_on_main_menu_requested)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
@@ -925,7 +949,11 @@ func step(real_delta: float) -> void:
 	if _spawn_look != null:
 		_spawn_look.step(_actor_table(), real_delta)
 	var picture: Rect2 = party_camera.visible_rect()
-	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture)
+	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
+	_spectacle.step_stirs(_clock, picture)
+	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
+	# The bodies the cover found part the mist (atmosphere F): one gathering, read by both.
+	_spectacle.hand_bodies(_cover.bodies(), _cover.body_count())
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells
@@ -936,6 +964,8 @@ func step(real_delta: float) -> void:
 		_sounds.step(real_delta)
 	if _body_sounds != null:
 		_body_sounds.step(real_delta, _actor_table(), registry)
+	if _ambience != null:
+		_ambience.step(real_delta, picture.get_center() if picture.has_area() else Vector2.INF)
 	_step_labels(real_delta)
 	if _remnants != null:
 		_remnants.step(real_delta)
@@ -1090,6 +1120,19 @@ func _on_room_entered(room_id: StringName) -> void:
 	_juiced_body.fill(0)
 	_juiced_by.fill(0)
 	_juiced_kind.fill(&"")
+
+
+## Back to the main menu (`main_menu_requested`): no room follows, so the room's music fades out under
+## the menu (the room's sound hears it itself, `room_ambience.gd`).
+func _on_main_menu_requested(_player: int) -> void:
+	if _body_sounds != null:
+		_body_sounds.room_entered(null)
+
+
+## Whether this machine can hear Feel's players: not on Godot's audio driver with no device
+## (`DUMMY_AUDIO_DRIVER`, every headless run).
+static func hears_audio() -> bool:
+	return AudioServer.get_driver_name() != DUMMY_AUDIO_DRIVER
 
 
 ## A bit per seat played on this machine (`Frames.seats_here`): whose wizards the party camera
@@ -2295,9 +2338,36 @@ func set_floor_marks(on: bool) -> void:
 	_spectacle.set_floor_marks(on)
 
 
-## The "Spell light" setting (`Spectacle.set_spell_light`). Returns the setting.
+## The "Dynamic lighting" setting (once "Spell light"; `Spectacle.set_spell_light`). Returns the
+## setting.
 func set_spell_light(on: bool) -> bool:
 	return _spectacle.set_spell_light(on)
+
+
+## The atmosphere's switches (docs/milestones/atmosphere.md, "Settings"; the spectacle hears their
+## events itself): "Shadows", "Ambient particles", "Fog" and "Environment interaction". Each returns
+## the setting.
+func set_shadows(on: bool) -> bool:
+	return _spectacle.set_shadows(on)
+
+
+func set_ambient_particles(on: bool) -> bool:
+	return _spectacle.set_ambient_particles(on)
+
+
+func set_fog(on: bool) -> bool:
+	return _spectacle.set_fog(on)
+
+
+func set_environment_interaction(on: bool) -> bool:
+	return _spectacle.set_environment_interaction(on)
+
+
+## The "Ambience volume" setting (`ambience_volume_changed`, in percent): the room's sound at that
+## share of its loudness (`RoomAmbience.set_volume`).
+func _on_ambience_volume_changed(percent: int) -> void:
+	if _ambience != null:
+		_ambience.set_volume(AmbienceVolume.share_of(percent))
 
 
 func _on_screen_shake_changed(enabled: bool) -> void:
@@ -2350,6 +2420,10 @@ func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_flash_lasts_wind[slot] = 0
 	_flash_floor[slot] = 0
 	_flash_light[slot] = 0.0 if _cue_unlit else float(_code_light.get(kind, 0.0))
+	if (kind == KIND_SHELL or kind == KIND_FIREBALL) and _spectacle != null:
+		# An explosion's part: the world's stirs push out from it (atmosphere E; its radius is its
+		# zoom x 2).
+		_spectacle.blast(_flash_at[slot], float(_flash_zoom[slot]) * 2.0, _clock)
 	if kind == KIND_ARC:
 		var steps: int = maxi(roundi(length / 4.0), 1)
 		_flash_zoom[slot] = steps
@@ -2751,6 +2825,11 @@ func sounds() -> SoundsScript:
 
 func music() -> MusicScript:
 	return _music
+
+
+## The room's sound under the music (for tests).
+func ambience() -> RoomAmbienceScript:
+	return _ambience
 
 
 ## A cue's `held` part (`CueBase`, boss plan OB15): its sound held while its moment lasts, from its

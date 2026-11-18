@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"air_glimmer"
+lit_only = true
+stirred = 1.0
+gravity = -2.0
+drag = 0.4
+bounce = 0.0
+wobble = 2.0
+wobble_rate = 1.4
+glow = 0.0
+shade_from = 0
+shape = "
+#
+"
+shape_play = "life"
+shape_rate = 1.0
+shape_turns = false
+count = 1
+speed = Vector2(1.0, 5.0)
+spread = 360.0
+up = Vector2(0.0, 3.0)
+life = Vector2(3.0, 4.0)
+height = 16.0

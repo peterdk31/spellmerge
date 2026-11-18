@@ -17,6 +17,9 @@ extends Node
 ## the telegraph lanes read it), its seconds run out or its body is gone; then it fades out over
 ## FADE. One held sound a caster and id: a new one takes the old one's place.
 ##
+## Only `audible` starts a voice (Feel's: none on the audio driver with no device); not audible
+## everything else is the same.
+##
 ## Nothing is allocated while playing: the voices are made once.
 
 ## One-shot voices, and how many may play one sound id at once.
@@ -48,6 +51,8 @@ enum Until {
 ## The registry the sounds are asked of (`get_sound`), and the spell runtime a wind-up is read from.
 var registry: Node = null
 var spells: Node = null
+## Whether its voices are started (Feel's `audible`).
+var audible: bool = true
 
 var _voices: Array[AudioStreamPlayer2D] = []
 var _voice_id: Array[StringName] = []
@@ -114,7 +119,8 @@ func play(id: StringName, at: Vector2 = Vector2.INF, volume: float = 0.0) -> int
 	voice.stream = sound
 	voice.volume_db = volume
 	voice.global_position = at if at.is_finite() else _middle()
-	voice.play()
+	if audible:
+		voice.play()
 	_voice_id[used] = id
 	_voice_from[used] = _clock
 	_voice_until[used] = _clock + maxf(sound.get_length(), MIN_SECONDS)
@@ -185,7 +191,8 @@ func hold(id: StringName, until: int, caster: int, key: int, follow: Node2D, at:
 	voice.global_position = follow.global_position if followed else (at if at.is_finite() else _middle())
 	if again:
 		voice.stream = sound
-		voice.play()
+		if audible:
+			voice.play()
 	return slot
 
 
@@ -251,7 +258,7 @@ func step(delta: float) -> void:
 			continue
 		if _h_followed[i] == 1:
 			voice.global_position = follow.global_position
-		if not voice.playing:
+		if audible and not voice.playing:
 			voice.play()
 		i += 1
 

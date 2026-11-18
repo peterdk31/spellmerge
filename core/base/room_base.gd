@@ -42,9 +42,22 @@ extends Resource
 @export var floor_mark_colors: PackedColorArray = PackedColorArray()
 ## The room's light where no spell or torch lights it (Feel's spell light, docs/milestones/
 ## spell-spectacle.md, P3b): 1.0 (the default) is the room as its art is drawn, below it darker,
-## so spells and torches read as the light in it. Only drawn while the "Spell light" setting is
+## so spells and torches read as the light in it. Only drawn while the "Dynamic lighting" setting is
 ## on; at most 1.0 (light only brightens past it).
 @export_range(0.3, 1.0, 0.05) var ambient: float = 1.0
+## The colour of the room's dark (docs/milestones/atmosphere.md, A): where no spell or torch lights
+## it, a pixel is its art times `ambient` times this, channel by channel, so warm light falls on a
+## cool dark. White (the default) is an even dark, as `ambient` alone. Drawn only with spell light.
+@export var shade: Color = Color.WHITE
+## What drifts in the room's air (docs/milestones/atmosphere.md, B): a `MoteSource` given off over
+## the whole room by Feel (gameplay/feel/air_motes.gd), its `rate` the motes a second for every
+## AIR_AREA square pixels of the room in view, from anywhere in it, each shown `height` px over a
+## point of the floor, thrown its `way` within its `spread`, in its `colours`; its `from`, `at`,
+## `size` and the rest of where a source leaves from are neither read nor checked
+## (`problems_of_air`). Its kind is usually lit only (`MoteKind.lit_only`: the crypt's dust, seen
+## only in a candle's pool, a wizard's light or a passing spell's). Null (the default): nothing
+## drifts, the room is as it was. Drawn only.
+@export var air: MoteSource = null
 ## Whether its biome's cover kinds fill its open floor by themselves (ground cover GC2,
 ## `CoverLayout.of`: each `CoverKind` whose `biomes` names its `biome`). Off: only its fields
 ## (`CoverField`) put cover in it.
@@ -53,6 +66,17 @@ extends Resource
 ## unless an enemy with music of its own lives (`EnemyBase.music`). Rooms of one biome may share a
 ## track's file (a `.tres` beside them) or each hold their own.
 @export var music: MusicTrack = null
+## Its sound under the music (docs/milestones/atmosphere.md, D; `Ambience`): looping layers and
+## sounds heard now and then (the crypt's drips and a far rumble, the hub's wind), played quietly
+## while the room is in play and faded in and out with it by Feel (gameplay/feel/room_ambience.gd).
+## Rooms of one biome share a file beside them. Null (the default): silent, as before. Heard only.
+@export var ambience: Ambience = null
+## Its low floor mist (docs/milestones/atmosphere.md, F; `RoomMist`): soft and see-through, thin over
+## the middle and thicker toward its edges and pits, drifting, parted by bodies and pushed by shots and
+## blasts, lit by the spell light (drawn only while the "Dynamic lighting" setting is on: Feel's
+## gameplay/feel/mist.gd). Rooms of one biome share a file beside them. Null (the default): no mist,
+## the room is as it was. Drawn only.
+@export var mist: RoomMist = null
 
 ## The share of the most common colour a floor's colour needs to count (a wall's is the art rule's,
 ## `ArtPixels.MIN_SHARE`): a floor is mostly one colour, its seams and highlights a few pixels in a
@@ -73,6 +97,8 @@ const HOLE_LAYER: int = 2
 ## The z of a layout's `Floor` sprite: under Feel's floor marks (one above it) and under the
 ## bodies (0), so a mark lies on the floor and never over anyone.
 const FLOOR_Z: int = -2
+## The floor `air`'s rate is for: a second's motes for every 100 x 100 px of the room in view.
+const AIR_AREA: float = 10000.0
 
 ## `surface_colors()`, `floor_colors()` and `places()` once worked out (empty until then).
 var _surface: PackedColorArray = PackedColorArray()
@@ -103,6 +129,32 @@ func template_problems(known: Array[StringName]) -> PackedStringArray:
 			found.append("%s: kind '%s' is no room kind." % [id, kinds[at]])
 	if music != null:
 		found.append_array(music.problems(String(id)))
+	if ambience != null:
+		found.append_array(ambience.problems(String(id)))
+	found.append_array(air_problems())
+	if mist != null:
+		found.append_array(mist.problems(String(id)))
+	return found
+
+
+## What is wrong with its `air`, one line each (empty when it is fine or there is none).
+func air_problems() -> PackedStringArray:
+	var found := PackedStringArray()
+	for problem in problems_of_air(air):
+		found.append("%s's air: %s" % [id, problem])
+	return found
+
+
+## What is wrong with `source` as a room's air (empty when it is fine or null): what it gives off
+## (`MoteSource.stream_problems`, with no art to take colours from), never where a source leaves
+## from, which the air does not read; and its motes are given off, never standing.
+static func problems_of_air(source: MoteSource) -> PackedStringArray:
+	var found := PackedStringArray()
+	if source == null:
+		return found
+	found.append_array(source.stream_problems(false))
+	if source.stand:
+		found.append("the air's motes are given off, never standing")
 	return found
 
 

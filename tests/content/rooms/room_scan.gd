@@ -4,6 +4,10 @@ extends RefCounted
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
+## A crypt room's light where nothing lights it, and the colour of its dark: cool, so the candles'
+## warm light reads against it (crypt rework rule 6, darker since docs/milestones/atmosphere.md, A).
+const CRYPT_AMBIENT: float = 0.65
+const CRYPT_SHADE: Color = Color(0.82, 0.88, 1.0, 1.0)
 
 
 ## Every room template a run's map can pick (a room that hosts a kind, content/rooms/README.md), by
@@ -80,7 +84,7 @@ static func scripts_below(node: Node) -> int:
 ## What keeps `room` (its layout instanced as `root`) from being a floating crypt room (crypt rework,
 ## docs/milestones/crypt-rework.md, the owner's second round), one line each: its floor the ground
 ## drawn from its shape with no wall art (its edge an invisible wall over the dark), its own `Void`
-## behind the slab, a crypt room's `ambient` (rule 6), its floor-mark and debris colours named (rule
+## behind the slab, a crypt room's `ambient` and `shade` (rule 6; docs/milestones/atmosphere.md, A), its floor-mark and debris colours named (rule
 ## 9), at least `pillars` `crypt_pillar` props, its exits `gates` `crypt_gate` props (a fight room's
 ## two; none in a room that leads nowhere, as a boss's hall: cleared, the run is won) and no old exit.
 ## Its other props (a boss hall's dust heaps) are its own.
@@ -94,8 +98,10 @@ static func floating_room_problems(room: RoomBase, root: Node, pillars: int, gat
 	var void_art: Sprite2D = root.get_node_or_null("Void") as Sprite2D
 	if void_art == null or ground == null or void_art.z_index >= (ground as CanvasItem).z_index:
 		problems.append("its own Void is not drawn behind the slab")
-	if room.ambient != 0.8:
-		problems.append("its ambient is %.2f, not a crypt room's 0.8 (rule 6)" % room.ambient)
+	if not is_equal_approx(room.ambient, CRYPT_AMBIENT):
+		problems.append("its ambient is %.2f, not a crypt room's %.2f (rule 6; atmosphere A)" % [room.ambient, CRYPT_AMBIENT])
+	if not room.shade.is_equal_approx(CRYPT_SHADE):
+		problems.append("its dark is %s, not a crypt room's cool %s (rule 6; atmosphere A)" % [room.shade, CRYPT_SHADE])
 	if room.floor_mark_colors.is_empty() or room.debris_colors.is_empty():
 		problems.append("it does not name its floor-mark and debris colours (rule 9)")
 	var ids: Dictionary[StringName, int] = {}

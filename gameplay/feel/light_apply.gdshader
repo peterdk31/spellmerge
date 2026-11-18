@@ -19,9 +19,12 @@ shader_type canvas_item;
 // edge is cut at the world's pixels, not the buffer's.
 uniform sampler2D light_buffer : filter_linear, repeat_disable;
 uniform sampler2D screen : hint_screen_texture, filter_nearest, repeat_disable;
-// The room's light where no spell lights it (1.0: as it is).
+// The room's light where no spell lights it (1.0: as it is), and the colour of its dark
+// (`RoomBase.shade`; white: an even dark), multiplied together.
 uniform float ambient = 1.0;
-// From how bright a light the world is lit, and bright; and how much each step adds.
+uniform vec3 shade = vec3(1.0);
+// From how bright a light the world is lit, and bright (set from SpellLight.LIT_FROM and
+// BRIGHT_FROM, which the lit-only motes' steps come from too); and how much each step adds.
 uniform float lit_from = 0.16;
 uniform float bright_from = 0.45;
 uniform float lit_gain = 0.22;
@@ -55,10 +58,11 @@ void fragment() {
 	vec3 shine = texture(light_buffer, SCREEN_UV).rgb;
 	float most = max(shine.r, max(shine.g, shine.b));
 	float gain = gain_of(most);
-	if (gain < 0.004 && ambient >= 1.0) {
+	vec3 dark = vec3(ambient) * shade;
+	if (gain < 0.004 && min(dark.r, min(dark.g, dark.b)) >= 1.0) {
 		discard;
 	}
 	vec3 hue = gain > 0.0 && most > 0.0 ? shine / most : vec3(0.0);
 	vec3 under = texture(screen, SCREEN_UV).rgb;
-	COLOR = vec4(under * (vec3(ambient) + hue * gain), 1.0);
+	COLOR = vec4(under * (dark + hue * gain), 1.0);
 }

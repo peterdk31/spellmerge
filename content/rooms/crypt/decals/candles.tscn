@@ -38,5 +38,5 @@ centered = false
 
 [node name="Light" type="Marker2D" parent="." groups=["light_spot"]]
 position = Vector2(16, 18)
-metadata/light_art = NodePath("../Flame")
+metadata/light_tint = Color(1, 0.635, 0.235, 1)
 metadata/light_reach = 48.0

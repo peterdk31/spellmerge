@@ -130,11 +130,7 @@ static func art_of(node: Node) -> Sprite2D:
 ## What is wrong with it, in words (empty when nothing). `has_art`: its node names art to read
 ## (`mote_art`), which a mask needs, and colours stand in for empty `ramps`.
 func problems(has_art: bool = true) -> PackedStringArray:
-	var found := PackedStringArray()
-	if kind == &"":
-		found.append("a mote source names no mote kind")
-	if not stand and (rate <= 0.0 or rate > MOST_RATE):
-		found.append("a mote source gives off %s a second: above 0, at most %s" % [rate, MOST_RATE])
+	var found: PackedStringArray = stream_problems(has_art)
 	if stand and from != From.MASK:
 		found.append("only a mask's motes stand")
 	if from == From.MASK and not has_art:
@@ -143,10 +139,22 @@ func problems(has_art: bool = true) -> PackedStringArray:
 		found.append("an area or a rim needs a size")
 	if way.is_zero_approx() and from != From.LINE and from != From.RIM:
 		found.append("a mote source has no way to throw")
-	if stop > 0.0 and stop <= start:
-		found.append("a mote source stops at %s s, before it starts at %s s" % [stop, start])
 	if band_length < 0.0 or (band_length > 0.0 and from != From.LINE):
 		found.append("only a line's colours run in bands (band_length %s)" % band_length)
+	return found
+
+
+## What is wrong with what it gives off, leaving out where it leaves from (`from` and its places,
+## `way`, `stand`, `band_length`), in words: what a stream read elsewhere than from its node needs
+## (a room's air, `RoomBase.air`). `has_art` as `problems`.
+func stream_problems(has_art: bool = false) -> PackedStringArray:
+	var found := PackedStringArray()
+	if kind == &"":
+		found.append("a mote source names no mote kind")
+	if not stand and (rate <= 0.0 or rate > MOST_RATE):
+		found.append("a mote source gives off %s a second: above 0, at most %s" % [rate, MOST_RATE])
+	if stop > 0.0 and stop <= start:
+		found.append("a mote source stops at %s s, before it starts at %s s" % [stop, start])
 	if colours.is_empty() and not has_art:
 		found.append("a mote source has no colours (name palette materials, or give it art to take them from)")
 	found.append_array(Palette.world_problems(colours, "a mote source"))

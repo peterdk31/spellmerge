@@ -24,6 +24,12 @@ render_mode blend_mix, world_vertex_coords;
 // more than half flat, one with none is pressed down by whole pixels. How far a tuft bends (its
 // state's `bend`) scales both; a state that does not bend is never trampled.
 //
+// The world takes notice (docs/milestones/atmosphere.md, E): a tuft leans with the air the shots
+// drag past it (`stir_wake`, at most STIR_SHOT_PIXELS at its tip) and is pushed out by a blast's
+// wave and sways back (`stir_blasts_at`, at most STIR_BLAST_PIXELS), on top of the wind and the
+// bodies' bend, as far as its state bends; both ease on Feel's clock (gameplay/feel/stirs.gd), and
+// the tip still moves by whole pixels.
+//
 // A row (Cover.STRIDE floats):
 //   MODEL_MATRIX[0].x   1, or -1 for a tuft drawn mirrored
 //   MODEL_MATRIX[3].xy  its foot, in world pixels
@@ -64,6 +70,11 @@ const float ROLL_FAST = 0.027;
 // CoverLayout.CELL: a cell's side in pixels; Cover.BODIES.
 const float CELL = 16.0;
 const int BODIES = 32;
+// Cover.STIR_SHOT_PIXELS, STIR_BLAST_PIXELS: how far the shots' wake and a blast lean a tuft's tip.
+const float STIR_SHOT_PIXELS = 2.5;
+const float STIR_BLAST_PIXELS = 10.0;
+
+#include "res://gameplay/feel/stir.gdshaderinc"
 
 void vertex() {
 	vec2 foot = MODEL_MATRIX[3].xy;
@@ -95,6 +106,7 @@ void vertex() {
 		}
 		float pushed = min(length(push), 1.0) * bend;
 		vec2 lean = pushed > 0.0 ? normalize(push) * pushed * bend_pixels : vec2(0.0);
+		lean += (stir_wake(foot) * STIR_SHOT_PIXELS + stir_blasts_at(foot, view_time) * STIR_BLAST_PIXELS) * bend;
 		vec2 times = texelFetch(cell_times, ivec2(floor(foot / CELL - vec2(0.0, 0.001))), 0).rg;
 		// Animated: its frame now, from when its cell began to show its state.
 		float count = floor(COLOR.g * 255.0 + 0.5);

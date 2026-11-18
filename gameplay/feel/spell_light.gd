@@ -1,7 +1,7 @@
 extends Node
 ## Spell light (docs/milestones/spell-spectacle.md, P3a, P3b): shots, flashes, beams and the
 ## room's own lights light the floor, the walls and the bodies round them. A child of the
-## spectacle (gameplay/feel/spectacle.gd, under Feel), made only while the "Spell light" setting is on (`SpellLightSetting`, `spell_light_changed`); with
+## spectacle (gameplay/feel/spectacle.gd, under Feel), made only while the "Dynamic lighting" setting is on (`SpellLightSetting`, `spell_light_changed`); with
 ## it off none of these nodes exist.
 ##
 ## - **The light buffer:** a SubViewport a DOWNSCALE-th of the view each way, cleared to black
@@ -30,10 +30,25 @@ extends Node
 ##   into the art (the group `LightSpot.PAINTED`: a torch's glow sprites) is hidden while this node
 ##   is in the tree, and shown again when it leaves (the setting turned off), so a torch lights
 ##   once (S6, item 12).
+## - **The room's lights take notice** (docs/milestones/atmosphere.md, E): their rows as drawn may be
+##   moved each frame (`show_spots`: a shot passing close makes one duck and lean away, worked out by
+##   gameplay/feel/spot_stirs.gd, each moved with `move_spot_row`); the rows as placed stay
+##   `spot_rows` (what the bodies' shadows fall away from), and `spots_written` counts each new set.
+## - **Carried lights** (docs/milestones/atmosphere.md, A): the lights that move with a body (a
+##   wizard's staff tip), spot rows its owner writes each frame (gameplay/feel/carried_lights.gd)
+##   and hands over (`light_carried`); this node knows nothing of who carries them.
+## - **Light blocked** (docs/milestones/atmosphere.md, C): every light drawn by `light.gdshader`
+##   but the shots' and runes' (SHOTS_BLOCKED: flashes, cues, the room's spots, carried lights) is stopped by up to MAX_BLOCKERS
+##   boxes handed over by `set_blockers` (the room's standing walls and the props that block light,
+##   worked out by gameplay/feel/light_blockers.gd); this node knows nothing of what they are. A
+##   beam's light is not blocked (a band along a path).
+## - **What draws by the light** (docs/milestones/atmosphere.md, B): `buffer` hands the light
+##   buffer's texture over (the spectacle gives it to the motes, whose lit-only kinds read it);
+##   this node knows nothing of what reads it.
 ## - **Applying it:** one rect over the whole world at `z` (Feel's LIGHT_Z: above the room and the
 ##   bodies, under the motes, beams, flashes, telegraphs and shots), drawn by
 ##   `light_apply.gdshader`: what is under it, times the room's `ambient` (`RoomBase.ambient`,
-##   `set_ambient`) plus the light, cut into the steps `bands` sets (`set_bands`: 3 steps by
+##   `set_ambient`, times its `shade`, the colour of its dark) plus the light, cut into the steps `bands` sets (`set_bands`: 3 steps by
 ##   default, 0 smooth).
 
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -58,6 +73,14 @@ const CUE_LIGHTS: int = 64
 ## The steps the light comes in by default (`light_apply.gdshader`'s `bands`): 3 (dim, lit,
 ## bright); 0 is smooth. The owner's choice between them is open (2026-11-04).
 const DEFAULT_BANDS: int = 3
+## From how bright a light (its brightest channel in the buffer) the floor is lit, and bright: the
+## apply rect's steps (`light_apply.gdshader`'s `lit_from`, `bright_from`), set from here. What
+## else draws by the light takes its steps from the same numbers (`lit_steps`), so they stay in
+## step when these are tuned.
+const LIT_FROM: float = 0.16
+const BRIGHT_FROM: float = 0.45
+## A lit-only mote's faint first step, a share of LIT_FROM (`lit_steps`): just inside a pool's edge.
+const FAINT_SHARE: float = 0.75
 ## A flash's light reaches this many times its square's half size, plus FLASH_PAD (px); an
 ## explosion's square is already BLAST_SPAN radii, so it reaches about that far.
 const FLASH_REACH: float = 1.6
@@ -75,6 +98,21 @@ const BEAM_REACH: float = 24.0
 const BEAM_STRENGTH: float = 0.8
 ## Floats a 2D MultiMesh row holds with colours and custom data.
 const STRIDE: int = 16
+## Where a spot row (`write_spot_row`) holds its light's reach, its middle's x and y, and its strength.
+const ROW_REACH: int = 0
+const ROW_X: int = 3
+const ROW_Y: int = 7
+const SPOT_ROW_STRENGTH: int = 11
+## Where a spot row holds where its light stands on the floor, from its middle (x, y).
+const SPOT_ROW_GROUND: int = 14
+## The most boxes that block light (light.gdshader's MAX_BLOCKERS).
+const MAX_BLOCKERS: int = 32
+## Whether the shots' and runes' lights are blocked too. Not: there are thousands of them, and
+## blocking tripled the light buffer's time for 3,000 shots among a crypt room's boxes on llvmpipe
+## (`tests/benchmark/shot_gpu.gd -- --light --blockers`); a shot's light is small and moves on, its
+## glow passes over a pillar as the shot itself is drawn over it. Flashes, cues, spots and carried
+## lights are blocked.
+const SHOTS_BLOCKED: bool = false
 
 ## The light buffer, its shot batches (by BATCH_*), flash batches (FLASHES_*), beams, the spots'
 ## batch and the rect that applies it. Read only.
@@ -83,11 +121,14 @@ var batches: Array[MultiMeshInstance2D] = []
 var flashes: Array[MultiMeshInstance2D] = []
 var beams: Array[MeshInstance2D] = []
 var spots: MultiMeshInstance2D = null
+## The carried lights' batch (ROWS_SPOT rows, `light_carried`). Read only.
+var carried: MultiMeshInstance2D = null
 ## The cues' lights' batch (ROWS_CUE). Read only.
 var cue_lights: MultiMeshInstance2D = null
 var apply: ColorRect = null
-## The room's light (`set_ambient`) and the steps (`set_bands`). Read only.
+## The room's light and the colour of its dark (`set_ambient`) and the steps (`set_bands`). Read only.
 var ambient: float = 1.0
+var shade: Color = Color.WHITE
 var bands: int = DEFAULT_BANDS
 var _projectiles: ProjectileManagerScript = null
 var _quad: QuadMesh = null
@@ -95,6 +136,8 @@ static var _beam_mesh: ArrayMesh = null
 ## The spots need redrawing (one came or went), and their rows.
 var _spots_dirty: bool = true
 var _spot_buffer: PackedFloat32Array = PackedFloat32Array()
+## How many times the spots' rows were written anew (`draw_spots`), for what moves them.
+var spots_written: int = 0
 ## A spot's colour by the texture it is read from (read once per texture).
 var _art_colours: Dictionary = {}
 ## The cue lights, by slot (CUE_LIGHTS of them, the next one `_next_cue`): where, how far they reach,
@@ -110,6 +153,10 @@ var _cue_core: PackedColorArray = PackedColorArray()
 var _next_cue: int = 0
 var _cue_live: int = 0
 var _cue_buffer: PackedFloat32Array = PackedFloat32Array()
+## The boxes that block light (`set_blockers`), given to every light batch made later too.
+var _blocker_boxes: PackedVector4Array = PackedVector4Array()
+var _blocker_bodies: PackedVector4Array = PackedVector4Array()
+var _blocker_count: int = 0
 
 
 ## Light for `projectiles`' shots (null: the buffer and the rect only), applied at `z`.
@@ -139,6 +186,8 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 		flashes.append(node)
 	spots = _light_batch(ROWS_SPOT)
 	spots.name = "Spots"
+	carried = _light_batch(ROWS_SPOT)
+	carried.name = "Carried"
 	cue_lights = _light_batch(ROWS_CUE)
 	cue_lights.name = "CueLights"
 	cue_lights.multimesh.instance_count = CUE_LIGHTS
@@ -157,11 +206,13 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 	apply.position = Vector2(-REACH, -REACH)
 	apply.size = Vector2(REACH, REACH) * 2.0
 	apply.z_index = z
-	var shade := ShaderMaterial.new()
-	shade.shader = APPLY_SHADER
-	shade.set_shader_parameter(&"light_buffer", viewport.get_texture())
-	shade.set_shader_parameter(&"bands", bands)
-	apply.material = shade
+	var material := ShaderMaterial.new()
+	material.shader = APPLY_SHADER
+	material.set_shader_parameter(&"light_buffer", viewport.get_texture())
+	material.set_shader_parameter(&"bands", bands)
+	material.set_shader_parameter(&"lit_from", LIT_FROM)
+	material.set_shader_parameter(&"bright_from", BRIGHT_FROM)
+	apply.material = material
 	add_child(apply)
 
 
@@ -178,9 +229,40 @@ func _light_batch(rows: int) -> MultiMeshInstance2D:
 	var material := ShaderMaterial.new()
 	material.shader = LIGHT_SHADER
 	material.set_shader_parameter(&"rows", rows)
+	if rows != ROWS_SHOT and rows != ROWS_RUNE or SHOTS_BLOCKED:
+		_block(material)
 	node.material = material
 	viewport.add_child(node)
 	return node
+
+
+## The boxes that stop light from now on (docs/milestones/atmosphere.md, C): `count` of `boxes`
+## (each base: x0, y0, x1, y1, world px) and `bodies` (the column over each: x0, top, x1, and how much
+## it blocks, 0 to 1), at most MAX_BLOCKERS; every light batch draws with them.
+func set_blockers(boxes: PackedVector4Array, bodies: PackedVector4Array, count: int) -> void:
+	_blocker_boxes = boxes
+	_blocker_bodies = bodies
+	_blocker_count = clampi(count, 0, mini(MAX_BLOCKERS, mini(boxes.size(), bodies.size())))
+	if SHOTS_BLOCKED:
+		for node in batches:
+			_block(node.material as ShaderMaterial)
+	for node in flashes:
+		_block(node.material as ShaderMaterial)
+	_block(spots.material as ShaderMaterial)
+	_block(carried.material as ShaderMaterial)
+	_block(cue_lights.material as ShaderMaterial)
+
+
+## How many boxes block light (for tests).
+func blocker_count() -> int:
+	return _blocker_count
+
+
+func _block(material: ShaderMaterial) -> void:
+	material.set_shader_parameter(&"blocker_count", _blocker_count)
+	if _blocker_count > 0:
+		material.set_shader_parameter(&"blocker_box", _blocker_boxes)
+		material.set_shader_parameter(&"blocker_body", _blocker_bodies)
 
 
 
@@ -265,10 +347,39 @@ func follow() -> void:
 	viewport.canvas_transform = Transform2D(0.0, scale, 0.0, Vector2.ZERO) * view.global_canvas_transform * view.canvas_transform
 
 
-## The room's light where nothing lights it (`RoomBase.ambient`; 1.0 the room as it is).
-func set_ambient(to: float) -> void:
+## The light buffer's texture (the light round everything this frame, the view a DOWNSCALE-th
+## the size), for what draws by the light (the motes' lit-only kinds; docs/milestones/atmosphere.md,
+## B): handed over, nothing asked of them.
+func buffer() -> Texture2D:
+	return viewport.get_texture()
+
+
+## The light's brightest channel from which a lit-only mote (`MoteKind.lit_only`) shows in its
+## shadow, base, light and white-hot shade: faint just inside where the floor is lit (FAINT_SHARE of
+## LIT_FROM), then at LIT_FROM, halfway to BRIGHT_FROM and at BRIGHT_FROM, the apply rect's steps.
+static func lit_steps() -> Vector4:
+	return Vector4(LIT_FROM * FAINT_SHARE, LIT_FROM, (LIT_FROM + BRIGHT_FROM) * 0.5, BRIGHT_FROM)
+
+
+## The room's light where nothing lights it (`RoomBase.ambient`; 1.0 the room as it is), and the
+## colour of its dark (`RoomBase.shade`; white an even dark).
+func set_ambient(to: float, dark: Color = Color.WHITE) -> void:
 	ambient = clampf(to, 0.0, 1.0)
-	(apply.material as ShaderMaterial).set_shader_parameter(&"ambient", ambient)
+	shade = Color(clampf(dark.r, 0.0, 1.0), clampf(dark.g, 0.0, 1.0), clampf(dark.b, 0.0, 1.0))
+	var material := apply.material as ShaderMaterial
+	material.set_shader_parameter(&"ambient", ambient)
+	material.set_shader_parameter(&"shade", Vector3(shade.r, shade.g, shade.b))
+
+
+## The carried lights this frame: `count` spot rows (ROWS_SPOT, STRIDE floats each) of `rows`,
+## whose length is the batch's room for them (its instances never shrink, so nothing is allocated).
+func light_carried(rows: PackedFloat32Array, count: int) -> void:
+	_hand(carried.multimesh, rows, count, rows.size() / STRIDE)
+
+
+## How many carried lights are lit (for tests).
+func carried_count() -> int:
+	return carried.multimesh.visible_instance_count
 
 
 ## The steps the light comes in: 0 smooth, 2 or more that many (dim counted); DEFAULT_BANDS 3.
@@ -385,15 +496,15 @@ func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look
 		viewport.add_child(node)
 		beams.append(node)
 	var beam: MeshInstance2D = beams[i]
-	var shade: ShaderMaterial = beam.material as ShaderMaterial
-	shade.set_shader_parameter(&"beam_path", path)
-	shade.set_shader_parameter(&"beam_points", mini(points, BEAM_POINTS))
-	shade.set_shader_parameter(&"beam_player", player)
-	shade.set_shader_parameter(&"beam_look", look)
-	shade.set_shader_parameter(&"core_override", Color(core.r, core.g, core.b, 1.0))
-	shade.set_shader_parameter(&"beam_fade", fade)
-	shade.set_shader_parameter(&"beam_strength", BEAM_STRENGTH * intensity)
-	shade.set_shader_parameter(&"beam_reach", BEAM_REACH * reach)
+	var beam_material: ShaderMaterial = beam.material as ShaderMaterial
+	beam_material.set_shader_parameter(&"beam_path", path)
+	beam_material.set_shader_parameter(&"beam_points", mini(points, BEAM_POINTS))
+	beam_material.set_shader_parameter(&"beam_player", player)
+	beam_material.set_shader_parameter(&"beam_look", look)
+	beam_material.set_shader_parameter(&"core_override", Color(core.r, core.g, core.b, 1.0))
+	beam_material.set_shader_parameter(&"beam_fade", fade)
+	beam_material.set_shader_parameter(&"beam_strength", BEAM_STRENGTH * intensity)
+	beam_material.set_shader_parameter(&"beam_reach", BEAM_REACH * reach)
 	beam.visible = true
 
 
@@ -437,26 +548,12 @@ func draw_spots() -> void:
 		var reach: float = LightSpot.reach_of(spot)
 		var colour: Color = _colour_of(spot)
 		var where: Vector2 = spot.global_position
-		var i: int = at * STRIDE
-		_spot_buffer[i] = reach
-		_spot_buffer[i + 1] = 0.0
-		_spot_buffer[i + 2] = 0.0
-		_spot_buffer[i + 3] = where.x
-		_spot_buffer[i + 4] = 0.0
-		_spot_buffer[i + 5] = reach
-		_spot_buffer[i + 6] = 0.0
-		_spot_buffer[i + 7] = where.y
-		_spot_buffer[i + 8] = colour.r
-		_spot_buffer[i + 9] = colour.g
-		_spot_buffer[i + 10] = colour.b
-		_spot_buffer[i + 11] = clampf(LightSpot.strength_of(spot), 0.0, 1.0)
-		_spot_buffer[i + 12] = clampf(LightSpot.flicker_of(spot), 0.0, 1.0)
 		# A seed from where it is, so two torches flicker out of step and a run is the same.
-		_spot_buffer[i + 13] = fposmod(where.x * 0.137 + where.y * 0.311, 1.0)
-		_spot_buffer[i + 14] = 0.0
-		_spot_buffer[i + 15] = 0.0
+		var seed: float = fposmod(where.x * 0.137 + where.y * 0.311, 1.0)
+		write_spot_row(_spot_buffer, at, where, reach, colour, LightSpot.strength_of(spot), LightSpot.flicker_of(spot), seed)
 		at += 1
 	_spot_buffer.resize(at * STRIDE)
+	spots_written += 1
 	var multimesh: MultiMesh = spots.multimesh
 	multimesh.instance_count = at
 	multimesh.visible_instance_count = at
@@ -464,7 +561,64 @@ func draw_spots() -> void:
 		multimesh.buffer = _spot_buffer
 
 
-## How many spots are lit (for tests).
+## Write row `at` of `buffer` (STRIDE floats a row) as a spot row (ROWS_SPOT, light.gdshader): a
+## light at `where` reaching `reach` px, in `colour`, `strength` bright at its middle, its strength
+## dropping by up to `flicker` a step a few times a second from `seed` (0 to 1), standing on the
+## floor `ground` from `where` (zero: right there; a carried light over its body's feet), which is
+## what blocking goes by (docs/milestones/atmosphere.md, C). The rows' one writer: the room's spots
+## and the carried lights.
+static func write_spot_row(buffer: PackedFloat32Array, at: int, where: Vector2, reach: float, colour: Color, strength: float, flicker: float, seed: float, ground: Vector2 = Vector2.ZERO) -> void:
+	var i: int = at * STRIDE
+	buffer[i] = reach
+	buffer[i + 1] = 0.0
+	buffer[i + 2] = 0.0
+	buffer[i + 3] = where.x
+	buffer[i + 4] = 0.0
+	buffer[i + 5] = reach
+	buffer[i + 6] = 0.0
+	buffer[i + 7] = where.y
+	buffer[i + 8] = colour.r
+	buffer[i + 9] = colour.g
+	buffer[i + 10] = colour.b
+	buffer[i + 11] = clampf(strength, 0.0, 1.0)
+	buffer[i + 12] = clampf(flicker, 0.0, 1.0)
+	buffer[i + 13] = seed
+	buffer[i + 14] = ground.x
+	buffer[i + 15] = ground.y
+
+
+## Spot row `at` of `buffer` (as `write_spot_row` wrote it) moved by the world's stirs: its middle
+## leaned `lean` px (where it stands on the floor kept, so what blocks it stays), and its strength
+## `duck` (0 to 1) less, a share of `strength`, the row's as written.
+static func move_spot_row(buffer: PackedFloat32Array, at: int, lean: Vector2, duck: float, strength: float) -> void:
+	var i: int = at * STRIDE
+	buffer[i + ROW_X] += lean.x
+	buffer[i + ROW_Y] += lean.y
+	buffer[i + SPOT_ROW_STRENGTH] = clampf(strength * (1.0 - clampf(duck, 0.0, 1.0)), 0.0, 1.0)
+	buffer[i + SPOT_ROW_GROUND] -= lean.x
+	buffer[i + SPOT_ROW_GROUND + 1] -= lean.y
+
+
+## Draw the room's spots from `rows` this frame (`spot_count` rows in `spot_rows`' layout: those rows
+## moved, `spot_stirs.gd`), or from the rows as placed again with `rows` empty.
+func show_spots(rows: PackedFloat32Array) -> void:
+	var multimesh: MultiMesh = spots.multimesh
+	var count: int = multimesh.instance_count
+	if count == 0:
+		return
+	if rows.size() == count * STRIDE:
+		multimesh.buffer = rows
+	elif _spot_buffer.size() == count * STRIDE:
+		multimesh.buffer = _spot_buffer
+
+
+## The room's spots' rows (`spot_count` of them; ROWS_SPOT, `write_spot_row`) as placed, read only:
+## what the bodies' shadows fall away from.
+func spot_rows() -> PackedFloat32Array:
+	return _spot_buffer
+
+
+## How many spots are lit (also how many rows of `spot_rows` are).
 func spot_count() -> int:
 	return spots.multimesh.visible_instance_count
 

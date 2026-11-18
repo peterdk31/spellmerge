@@ -42,6 +42,8 @@ const CarriedLightsScript := preload("res://gameplay/feel/carried_lights.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
+const StirsScript := preload("res://gameplay/feel/stirs.gd")
+const SpotStirsScript := preload("res://gameplay/feel/spot_stirs.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's SHOWN_BEAM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -140,6 +142,16 @@ var blockers: LightBlockersScript = LightBlockersScript.new()
 ## The bodies' shadows (atmosphere C; null with spell light off), under every body. Read only.
 var shadows: BodyShadowsScript = null
 
+## The world's stirs (atmosphere E): the shots' wake and the blasts' push, worked out once a frame
+## (`step_stirs`) for what takes notice of them: the room's lights (`spot_stirs`), the ground cover
+## (Feel hands them to it) and the stirred motes (handed to the pool's material). Read only.
+var stirs: StirsScript = StirsScript.new()
+## The room's lights' duck and lean (atmosphere E), stepped while spell light is on. Read only.
+var spot_stirs: SpotStirsScript = SpotStirsScript.new()
+
+## The pool's material the stirs were last handed to, and their `version` then.
+var _stirred_material: ShaderMaterial = null
+var _stirred_version: int = -1
 ## No owners for a light's rows (the room's spots: nobody carries them).
 var _no_owners: PackedInt32Array = PackedInt32Array()
 ## The ramp table the motes and the floor marks share: a surface's colours and a body's art, one
@@ -238,6 +250,21 @@ func _on_batches_grown(_count: int) -> void:
 	still_motes.attach(projectiles, spells as SpellRuntime)
 
 
+## Once a frame, at Feel's clock `now`, before anything reads them: the world's stirs (atmosphere E)
+## stepped with the shots' births the projectile manager drew last and the view `view` (the
+## camera's picture; empty: the viewport's).
+func step_stirs(now: float, view: Rect2 = Rect2()) -> void:
+	var births: PackedFloat32Array = projectiles.spark_births if projectiles != null else PackedFloat32Array()
+	var count: int = projectiles.spark_birth_count if projectiles != null else 0
+	stirs.step(now, births, count, view if view.has_area() else view_rect())
+
+
+## A blast at `at` of `radius` px at Feel's clock `now` (an explosion's part): the world's stirs push
+## out from it (atmosphere E).
+func blast(at: Vector2, radius: float, now: float) -> void:
+	stirs.blast(at, radius, now)
+
+
 ## Once a frame, at Feel's clock `now`: the trails' particles thrown, the streams', the world's mote sources' and Feel's own
 ## drawings' given off, the barriers' shells drawn where their actors are (`table`, the actor
 ## table), then the motes and the marks stepped.
@@ -258,6 +285,11 @@ func step(now: float, table: ActorsScript = null) -> void:
 	if barriers != null:
 		barriers.step(now, pool if motes_on() else null, table, projectiles)
 	if pool != null:
+		var drawn: ShaderMaterial = pool.draw_material()
+		if drawn != _stirred_material or stirs.version != _stirred_version:
+			_stirred_material = drawn
+			_stirred_version = stirs.version
+			stirs.hand_to(drawn)
 		pool.step(now)
 	if marks != null:
 		marks.step(now)
@@ -267,6 +299,7 @@ func step(now: float, table: ActorsScript = null) -> void:
 		light.light_carried(carried_lights.rows, carried_lights.count)
 		if blockers.step(table, now):
 			light.set_blockers(blockers.boxes, blockers.bodies, blockers.count)
+		spot_stirs.step(light, stirs, now)
 	if shadows != null and light != null:
 		shadows.begin_lights()
 		shadows.add_lights(light.spot_rows(), light.spot_count(), SpellLightScript.SPOT_ROW_STRENGTH, _no_owners)
@@ -901,6 +934,8 @@ func _make_light(on: bool) -> void:
 		remove_child(shadows)
 		shadows.queue_free()
 		shadows = null
+	# A light made anew starts with its spots at rest.
+	spot_stirs = SpotStirsScript.new()
 	if on and projectiles != null:
 		light = SpellLightScript.new(projectiles, LIGHT_Z)
 		light.name = "SpellLight"

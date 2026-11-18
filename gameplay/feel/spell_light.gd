@@ -30,6 +30,10 @@ extends Node
 ##   into the art (the group `LightSpot.PAINTED`: a torch's glow sprites) is hidden while this node
 ##   is in the tree, and shown again when it leaves (the setting turned off), so a torch lights
 ##   once (S6, item 12).
+## - **The room's lights take notice** (docs/milestones/atmosphere.md, E): their rows as drawn may be
+##   moved each frame (`show_spots`: a shot passing close makes one duck and lean away, worked out by
+##   gameplay/feel/spot_stirs.gd, each moved with `move_spot_row`); the rows as placed stay
+##   `spot_rows` (what the bodies' shadows fall away from), and `spots_written` counts each new set.
 ## - **Carried lights** (docs/milestones/atmosphere.md, A): the lights that move with a body (a
 ##   wizard's staff tip), spot rows its owner writes each frame (gameplay/feel/carried_lights.gd)
 ##   and hands over (`light_carried`); this node knows nothing of who carries them.
@@ -132,6 +136,8 @@ static var _beam_mesh: ArrayMesh = null
 ## The spots need redrawing (one came or went), and their rows.
 var _spots_dirty: bool = true
 var _spot_buffer: PackedFloat32Array = PackedFloat32Array()
+## How many times the spots' rows were written anew (`draw_spots`), for what moves them.
+var spots_written: int = 0
 ## A spot's colour by the texture it is read from (read once per texture).
 var _art_colours: Dictionary = {}
 ## The cue lights, by slot (CUE_LIGHTS of them, the next one `_next_cue`): where, how far they reach,
@@ -547,6 +553,7 @@ func draw_spots() -> void:
 		write_spot_row(_spot_buffer, at, where, reach, colour, LightSpot.strength_of(spot), LightSpot.flicker_of(spot), seed)
 		at += 1
 	_spot_buffer.resize(at * STRIDE)
+	spots_written += 1
 	var multimesh: MultiMesh = spots.multimesh
 	multimesh.instance_count = at
 	multimesh.visible_instance_count = at
@@ -580,8 +587,33 @@ static func write_spot_row(buffer: PackedFloat32Array, at: int, where: Vector2, 
 	buffer[i + 15] = ground.y
 
 
-## The room's spots' rows (`spot_count` of them; ROWS_SPOT, `write_spot_row`), read only: what the
-## bodies' shadows fall away from.
+## Spot row `at` of `buffer` (as `write_spot_row` wrote it) moved by the world's stirs: its middle
+## leaned `lean` px (where it stands on the floor kept, so what blocks it stays), and its strength
+## `duck` (0 to 1) less, a share of `strength`, the row's as written.
+static func move_spot_row(buffer: PackedFloat32Array, at: int, lean: Vector2, duck: float, strength: float) -> void:
+	var i: int = at * STRIDE
+	buffer[i + ROW_X] += lean.x
+	buffer[i + ROW_Y] += lean.y
+	buffer[i + SPOT_ROW_STRENGTH] = clampf(strength * (1.0 - clampf(duck, 0.0, 1.0)), 0.0, 1.0)
+	buffer[i + SPOT_ROW_GROUND] -= lean.x
+	buffer[i + SPOT_ROW_GROUND + 1] -= lean.y
+
+
+## Draw the room's spots from `rows` this frame (`spot_count` rows in `spot_rows`' layout: those rows
+## moved, `spot_stirs.gd`), or from the rows as placed again with `rows` empty.
+func show_spots(rows: PackedFloat32Array) -> void:
+	var multimesh: MultiMesh = spots.multimesh
+	var count: int = multimesh.instance_count
+	if count == 0:
+		return
+	if rows.size() == count * STRIDE:
+		multimesh.buffer = rows
+	elif _spot_buffer.size() == count * STRIDE:
+		multimesh.buffer = _spot_buffer
+
+
+## The room's spots' rows (`spot_count` of them; ROWS_SPOT, `write_spot_row`) as placed, read only:
+## what the bodies' shadows fall away from.
 func spot_rows() -> PackedFloat32Array:
 	return _spot_buffer
 

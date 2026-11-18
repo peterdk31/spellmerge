@@ -61,6 +61,11 @@ var look_layers: PackedInt32Array:
 ## shade. With the "Spell light" setting off it is not drawn at all. It neither glows (the light is
 ## its glow) nor settles.
 @export var lit_only: bool = false
+## How much the world's stirs move it (docs/milestones/atmosphere.md, E; 0 not at all, 1 fully):
+## its motes are dragged along by the air a shot pulls past them and pushed out by a blast's wave,
+## then drift back to their own way, eased on Feel's clock (gameplay/feel/stirs.gd). For the dust in
+## a room's air and in its light shafts.
+@export_range(0.0, 1.0, 0.05) var stirred: float = 0.0
 
 @export_group("Flight")
 ## Down the fake height, in px/s/s; below 0 it rises (an ember), 0 it keeps its height.

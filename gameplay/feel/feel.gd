@@ -943,7 +943,9 @@ func step(real_delta: float) -> void:
 	if _arrive_look != null:
 		_arrive_look.step(_actor_table(), real_delta)
 	var picture: Rect2 = party_camera.visible_rect()
-	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture)
+	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
+	_spectacle.step_stirs(_clock, picture)
+	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs)
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells
@@ -2365,6 +2367,10 @@ func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_flash_lasts_wind[slot] = 0
 	_flash_floor[slot] = 0
 	_flash_light[slot] = 0.0 if _cue_unlit else float(_code_light.get(kind, 0.0))
+	if (kind == KIND_SHELL or kind == KIND_FIREBALL) and _spectacle != null:
+		# An explosion's part: the world's stirs push out from it (atmosphere E; its radius is its
+		# zoom x 2).
+		_spectacle.blast(_flash_at[slot], float(_flash_zoom[slot]) * 2.0, _clock)
 	if kind == KIND_ARC:
 		var steps: int = maxi(roundi(length / 4.0), 1)
 		_flash_zoom[slot] = steps

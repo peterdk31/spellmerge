@@ -46,6 +46,12 @@ extends Node2D
 ## air) are drawn only where light falls: the shader reads the light buffer it is handed
 ## (`set_light`, the spell light's, from the spectacle) under each of their pixels, and with none
 ## (spell light off) does not draw them.
+##
+## **Stirred kinds** (`MoteKind.stirred`; docs/milestones/atmosphere.md, E: the dust in the air and
+## in the shafts): the shader moves each of their motes by the world's stirs where it is (the
+## spectacle hands them to `draw_material`, `Stirs.hand_to`): dragged along by the shots' wake up to
+## STIR_SHOT_PIXELS, pushed out by a blast's wave up to STIR_BLAST_PIXELS, times the kind's share,
+## easing back to its own way. Drawn only: its flight (`flight`, and where it lands) is as it was.
 
 const SHADER: Shader = preload("res://gameplay/feel/mote.gdshader")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
@@ -116,13 +122,18 @@ const SETTLE_ROWS: int = 24
 const SETTLE_MOST: int = 128
 ## The most kinds the shader holds (rows of its `kind_table`), and the table's texels a row: the
 ## motion (gravity, drag, bounce, glow), the sway (sway, its rate, first shade, reach) and the
-## shape (frames, play, rate, turns) and the light (1 for a lit-only kind, `MoteKind.lit_only`).
+## shape (frames, play, rate, turns) and the light (1 for a lit-only kind, `MoteKind.lit_only`; and
+## how much the world's stirs move it, `MoteKind.stirred`).
 const MAX_KINDS: int = 256
 const KIND_COLUMNS: int = 4
 ## A lit-only mote's shade in the dark (`lit_shade`): not drawn. The steps it is lit by until it is
 ## handed the spell light's (`set_light`; the shader's default), and how much quicker than its half
 ## life it comes into its first shade (the shader's RISE_SPEED).
 const NOT_DRAWN: int = 4
+## How far the world's stirs move a stirred mote at their fullest, px (the shader's STIR_SHOT_PIXELS
+## and STIR_BLAST_PIXELS), times its kind's `stirred`.
+const STIR_SHOT_PIXELS: float = 5.0
+const STIR_BLAST_PIXELS: float = 8.0
 const DEFAULT_LIT_STEPS: Vector4 = Vector4(0.12, 0.16, 0.305, 0.45)
 const RISE_SPEED: float = 2.0
 ## Rows of the ramp table (colours other than a spell's), and its shades a row.
@@ -1132,7 +1143,7 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 		_kind_image.set_pixel(0, k, Color(kind.gravity, kind.drag, kind.bounce, kind.glow))
 		_kind_image.set_pixel(1, k, Color(kind.wobble, kind.wobble_rate, float(kind.shade_from), float(reach_of(kind))))
 		_kind_image.set_pixel(2, k, Color(float(frames), float(MoteKind.SHAPE_PLAYS.find(kind.shape_play)), kind.shape_rate, 1.0 if kind.shape_turns else 0.0))
-		_kind_image.set_pixel(3, k, Color(1.0 if kind.lit_only else 0.0, 0.0, 0.0, 0.0))
+		_kind_image.set_pixel(3, k, Color(1.0 if kind.lit_only else 0.0, clampf(kind.stirred, 0.0, 1.0), 0.0, 0.0))
 		for frame in frames:
 			var pixels: PackedByteArray = kind.shape_pixels(frame)
 			for y in size:

@@ -17,7 +17,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 //   bounce, glow), its sway (sway, its rate, first shade, how far its shape reaches from its pixel
 //   in any frame and any way it turns: `Motes.reach_of`), its shape (frames, how they play: 0
 //   life, 1 loop, 2 pick; frames a second; 1 when it turns with its flight) and its light (x: 1
-//   for a kind drawn only where light falls, `MoteKind.lit_only`), and their shapes as
+//   for a kind drawn only where light falls, `MoteKind.lit_only`; y: how much the world's stirs
+//   move it, `MoteKind.stirred`), and their shapes as
 //   `shape_atlas`: SHAPE_SIZE squares, a kind's frames along its row, each pixel 0 none, 0.5 its
 //   shade, 1 the shade hotter;
 // - a spell's ramp is the shot's own, picked by the shot shaders' `look_of` from its core colour
@@ -54,6 +55,12 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // A mote is in one infusion's colours (`Motes.set_infusions` picks it): its look is never woven.
 #define LOOK_OWN_INFUSIONS
 #include "res://core/projectiles/shot_look.gdshaderinc"
+// The world's stirs (gameplay/feel/stirs.gd; docs/milestones/atmosphere.md, E): a stirred kind's
+// mote is drawn moved by the shots' wake (up to STIR_SHOT_PIXELS) and a blast's push (up to
+// STIR_BLAST_PIXELS) where it is, times its kind's share; its flight is its own.
+#include "res://gameplay/feel/stir.gdshaderinc"
+const float STIR_SHOT_PIXELS = 5.0;
+const float STIR_BLAST_PIXELS = 8.0;
 
 uniform sampler2D kind_table : filter_nearest;
 uniform sampler2D ramp_table : filter_nearest;
@@ -177,6 +184,9 @@ void vertex() {
 		vec4 sway = texelFetch(kind_table, ivec2(1, k), 0);
 		vec4 shape = texelFetch(kind_table, ivec2(2, k), 0);
 		vec3 at = mote_flight(from, vel, h0, vz, t, motion, sway, s);
+		if (light_of.y > 0.0) {
+			at.xy += (stir_wake(at.xy) * STIR_SHOT_PIXELS + stir_blasts_at(at.xy, sim_time) * STIR_BLAST_PIXELS) * light_of.y;
+		}
 		vec2 seen = at.xy - vec2(0.0, at.z);
 		vec2 pixel = floor(seen);
 		// Cooling: evenly from its first shade down to shadow over its life.

@@ -14,6 +14,9 @@ Steps: a note (`D4`, `F#3`, `Bb2`), a chord (`D3+F3+A3`), `x` (a hit at the inst
 pitch), `.` (a rest) and `-` (holds the note before it, across a bar too). A line's steps share
 its bar evenly, so a bar of 8 is eighths in 4/4 and of 16 sixteenths.
 
+A score is a stacked track (`MusicTrack.stacked`, the default): intensity n plays its first n
+layers together, which is how the bake places and checks them and the sheet plays them.
+
 Every layer is `bars × beats × 60 / tempo` seconds, exactly that many samples, so the layers of a
 track start and stay together. It loops with no seam: a note ringing past the loop's end is heard
 at its start (each note is added round the loop), and the `fx` (reverb, a low pass) run over the
@@ -37,7 +40,7 @@ from sound_synth import RATE, SoundError
 # The sequencer's version: raised by hand whenever a change here changes what a score sounds like.
 # It is in every score's hash (tools/sound.py), as GENERATOR is.
 VERSION = 1
-LAYERS_MOST = 4  # MusicTrack.LAYERS_MOST (core/base/music_track.gd)
+LAYERS_MOST = 4  # MusicTrack.LAYERS_MOST (core/base/music_track.gd; test_sound_score.py holds them together)
 STEPS = (1, 2, 3, 4, 6, 8, 12, 16, 24, 32)  # a line's steps in a bar; any other count is a typo
 RING_MOST = 8.0
 NOTE = re.compile(r"^([A-G])([#b]?)(-?\d)$")
@@ -106,6 +109,9 @@ def _instrument(value: Any, where: str, patches: dict[str, dict]) -> dict:
     for key, item in own.items():
         INSTRUMENT_KEYS[key](item, f"{where}.{key}")
     layer = sound_synth.merge_patch({k: v for k, v in value.items() if k not in own}, where, patches)
+    for key in ("start", "length"):
+        if key in layer:
+            raise SoundError(f"{where}.{key}", "a note's start and length are the score's (its step, holds and ring)")
     pitched = "pitch" in layer
     probe = layer if pitched or layer.get("source") == "noise" else {**layer, "pitch": 440.0}
     sound_synth.validate_layer(probe, where)
@@ -171,6 +177,8 @@ def validate(score: Any, patches: dict[str, dict] | None = None) -> dict:
                 if isinstance(s, list) and instruments[inst]["layer"]["source"] == "noise" \
                         and instruments[inst]["layer"].get("color", "white") == "white":
                     raise SoundError(at, f"{inst} is white noise, which has no pitch: play it with x")
+                for freq in s if isinstance(s, list) else []:  # the note as the synth plays it: its pitch in range
+                    sound_synth.validate_layer(_note_layer(instruments[inst], freq), at)
     out["patterns"] = parsed
     layers = score["layers"]
     if not isinstance(layers, list) or not 1 <= len(layers) <= LAYERS_MOST:
@@ -187,7 +195,7 @@ def validate(score: Any, patches: dict[str, dict] | None = None) -> dict:
             raise SoundError(f"{where}.play", f"must name {score['bars']} patterns, one a bar (bars), "
                                               f"not {len(play) if isinstance(play, list) else play!r}")
         for j, name in enumerate(play):
-            if name not in parsed:
+            if not isinstance(name, str) or name not in parsed:
                 raise SoundError(f"{where}.play[{j}]", f"no pattern {name!r}")
         events = _events(out, layer)
         if not events:

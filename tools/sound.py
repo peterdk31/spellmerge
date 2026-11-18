@@ -419,8 +419,8 @@ def place(samples: list[list[float]], family: Family, gain: float,
 def render_score_placed(score: Score, data: dict, family: Family) -> list[tuple[str, list[float], float, float]]:
     """Every layer of a score rendered and placed: all of them by one scale, so the layers played
     together are on the music family's target (plus the score's `gain`) and keep their balance;
-    (layer id, samples, its own level, its own peak). Raises BakeError for a peak over the limit,
-    a layer's or all of them together."""
+    (layer id, samples, its own level, its own peak). Raises BakeError for a peak over the limit at
+    any intensity of the stacked track (its first n layers together) or of a layer alone."""
     layers = sound_score.render(data)
     together = sound_score.mixed(list(layers.values()))
     level = family.level_of(together, loop=True)
@@ -429,11 +429,17 @@ def render_score_placed(score: Score, data: dict, family: Family) -> list[tuple[
     target = family.loudness + data.get("gain", 0.0)
     scale = 10.0 ** ((target - level) / 20.0)
     limit = family.peak - PEAK_MARGIN
-    peak = sound_meter.true_peak(together) + 20.0 * math.log10(scale)
-    if peak > limit:
-        raise BakeError(f"{score.path}: its layers together peak at {peak:.1f} dBTP at {target:.1f} LUFS, over "
-                        f"{limit:.1f} (the music limit {family.peak} less {PEAK_MARGIN} for Vorbis); soften its "
-                        "hits or lower the loudest layer's gain")
+    shift = 20.0 * math.log10(scale)
+    raw = list(layers.values())
+    heard = {f"its first {n} layers together" if n > 1 else "its first layer": sound_score.mixed(raw[:n])
+             for n in range(1, len(raw) + 1)}
+    heard.update({f"its layer {layer_id} alone": samples for layer_id, samples in list(layers.items())[1:]})
+    for what, samples in heard.items():
+        peak = sound_meter.true_peak(samples) + shift
+        if peak > limit:
+            raise BakeError(f"{score.path}: {what} peak at {peak:.1f} dBTP with the track at {target:.1f} LUFS, over "
+                            f"{limit:.1f} (the music limit {family.peak} less {PEAK_MARGIN} for Vorbis); soften its "
+                            "hits or lower the loudest layer's gain")
     placed = []
     for layer_id, samples in layers.items():
         scaled = [v * scale for v in samples]
@@ -749,7 +755,8 @@ def sheet(sources: list[Source], out_dir: Path, root: Path = ROOT) -> list[Path]
             placed = render_score_placed(source, data, family)
             music.append(music_timeline([s for _, s, _, _ in placed]))
             ids = [layer_id for layer_id, _, _, _ in placed]
-            lines.append(f"{source.id} (music): " + ", then + ".join(ids) + f"; each twice round")
+            lines.append(f"{source.id} (music): " + ", then ".join(" + ".join(ids[:n]) for n in range(1, len(ids) + 1))
+                         + "; each twice round")
             continue
         data, family = checked(source, patches, fams)
         sounds.append((source.id, [s for s, _, _ in render_placed(source, data, family)]))

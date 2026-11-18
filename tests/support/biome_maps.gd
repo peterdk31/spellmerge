@@ -17,6 +17,30 @@ static func walk_through(registry: Object) -> BiomeMap:
 	return _row(registry, [FIRST, MIDDLE, LAST] as Array[StringName], [0, 0, 0] as Array[int])
 
 
+## CB3's split map: the nave the start room (room 0), the antechamber west of it (room 1) and the
+## ossuary court east of it (room 2), each joined to the nave by a bridge, so a party can split to two
+## fights at once.
+static func split(registry: Object) -> BiomeMap:
+	var row: BiomeMap = walk_through(registry)
+	var map := BiomeMap.new()
+	map.biome = row.biome
+	# The row's room 1 (the nave) first, then its rooms 0 and 2.
+	var order: Array[int] = [1, 0, 2]
+	for room: int in order:
+		map.add_room(row.room_templates[room], row.room_places[room], row.room_mirrors[room], &"start" if room == 1 else &"fight")
+	for bridge in row.bridges():
+		map.add_bridge(row.bridge_templates[bridge], row.bridge_places[bridge], row.bridge_mirrors[bridge], order.find(row.end_room(bridge, 0)), row.end_socket(bridge, 0), order.find(row.end_room(bridge, 1)), row.end_socket(bridge, 1))
+	map.work_out_depths()
+	return map
+
+
+## The world point where room `room`'s socket facing `facing` is, in `map` (its rooms' shapes read
+## from `registry`).
+static func socket_point(registry: Object, map: BiomeMap, room: int, facing: int) -> Vector2:
+	var room_shape: PieceShape = shape(registry, map.room_templates[room]).mirrored(map.room_mirrors[room])
+	return map.room_places[room] + room_shape.socket_at[room_shape.socket_facing.find(facing)]
+
+
 ## Twelve rooms in a row, eleven bridges.
 static func twelve_rooms(registry: Object) -> BiomeMap:
 	var templates: Array[StringName] = [FIRST]

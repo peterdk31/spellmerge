@@ -61,11 +61,11 @@ func after_each() -> void:
 	tick.begin_run()
 
 
-func _on_entered(room: StringName) -> void:
+func _on_entered(room: StringName, _number: int) -> void:
 	entered.append(room)
 
 
-func _on_built(room: StringName, layout: Node) -> void:
+func _on_built(room: StringName, _number: int, layout: Node) -> void:
 	built.append([room, RoomPlaces.read(layout).placed.size(), layout.is_inside_tree(), layout.find_children("*", "RoomZone", true, false).size()])
 
 
@@ -294,8 +294,8 @@ func test_a_snapshot_taken_in_a_later_room_restores_into_the_first() -> void:
 ## it is entered, its placements and zones still in it and not yet in the tree.
 func test_each_room_laid_out_is_told_before_it_is_entered() -> void:
 	var order: Array[String] = []
-	var told_built := func(room: StringName, _layout: Node) -> void: order.append("built " + String(room))
-	var told_entered := func(room: StringName) -> void: order.append("entered " + String(room))
+	var told_built := func(room: StringName, _number: int, _layout: Node) -> void: order.append("built " + String(room))
+	var told_entered := func(room: StringName, _number: int) -> void: order.append("entered " + String(room))
 	events.connect("room_built", told_built)
 	events.connect("room_entered", told_entered)
 	_play(2, 1)
@@ -348,7 +348,7 @@ func test_a_joiner_in_a_cleared_room_holds_the_restart_off() -> void:
 
 func test_the_room_left_is_told_before_it_goes() -> void:
 	var left: Array[int] = []
-	var told := func() -> void: left.append(entered.size())
+	var told := func(_room: int) -> void: left.append(entered.size())
 	events.connect("room_left", told)
 	_play(2, 1)
 	_clear_room()

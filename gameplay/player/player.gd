@@ -410,6 +410,9 @@ func think(actor: Actor, delta: float) -> void:
 		# not held against the player after a revive.
 		intent.clear()
 		forget_presses()
+		if frame != null and actor.mover != null and actor.mover.can_crawl():
+			# Downed in a biome it crawls (connected biomes CB3, decision 13): the walk alone.
+			intent.move = frame.move_vector()
 		return
 	if frame.captured and actor.mover != null and actor.mover.is_moving():
 		# An overlay opened: freeze, and end a dash in progress.

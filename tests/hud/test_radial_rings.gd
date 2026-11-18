@@ -67,7 +67,7 @@ func _open(ring: PauseMenuScript.Ring) -> RadialScript:
 	var player := own(_world.wizard(0, Vector2.ZERO, START, _registry.get_resource(&"wizard", &"dev") as StaffBase)) as Actor
 	_players.append(player)
 	_bus.player_joined.emit(0)
-	_bus.room_entered.emit(&"test_room")
+	_bus.room_entered.emit(&"test_room", 0)
 	_input.send_virtual(0, &"back", 1.0)
 	_input.send_virtual(0, &"back", 0.0)
 	_frame()

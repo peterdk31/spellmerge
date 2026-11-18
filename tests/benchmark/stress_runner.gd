@@ -317,7 +317,7 @@ func _next_scenario() -> void:
 	_start_measuring(scenario)
 
 
-func _on_loaded(_room_id: StringName) -> void:
+func _on_loaded(_room_id: StringName, _room: int) -> void:
 	_start_measuring(SCENARIOS[scenarios[_current]])
 
 

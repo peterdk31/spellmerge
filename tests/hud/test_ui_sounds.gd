@@ -43,7 +43,7 @@ func before_each() -> void:
 	_hud.save = SaveFile.new(SAVE_PATH)
 	root.add_child(_hud)
 	_bus.player_joined.emit(0)
-	_bus.room_entered.emit(&"test_room")
+	_bus.room_entered.emit(&"test_room", 0)
 
 
 func after_each() -> void:

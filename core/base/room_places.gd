@@ -68,6 +68,50 @@ static func read(layout: Node) -> RoomPlaces:
 	return places
 
 
+## These places as a biome stands its room (connected biomes CB3): mirrored by `mirror`
+## (`PieceShape.MIRROR_X`, `MIRROR_Y`) within `extent` (its template's shape's size, whose cells the
+## collision mirrors), then moved to `at` (its place in the world). A new set; its size stays and its
+## problems are this one's.
+func placed_in(at: Vector2, mirror: int, extent: Vector2) -> RoomPlaces:
+	var out := RoomPlaces.new()
+	out.size = size
+	out._problems = _problems.duplicate()
+	for point in player_spawns:
+		out.player_spawns.append(_flip(point, mirror, extent) + at)
+	for point in enemy_spawns:
+		out.enemy_spawns.append(_flip(point, mirror, extent) + at)
+	for point in doors:
+		out.doors.append(_flip(point, mirror, extent) + at)
+	for point in joiner_spawns:
+		out.joiner_spawns.append(_flip(point, mirror, extent) + at)
+	out.placed = placed.duplicate()
+	for point in placed_at:
+		out.placed_at.append(_flip(point, mirror, extent) + at)
+	out.zone_names = zone_names.duplicate()
+	out.zone_data = zone_data.duplicate()
+	for rect: Rect2 in zone_rects:
+		out.zone_rects.append(_flip_box(rect, mirror, extent, at))
+	for rect: Rect2 in holes:
+		out.holes.append(_flip_box(rect, mirror, extent, at))
+	for i in socket_at.size():
+		out.socket_at.append(_flip(socket_at[i], mirror, extent) + at)
+		out.socket_facing.append(RoomSocket.mirrored(socket_facing[i], mirror))
+	return out
+
+
+static func _flip(point: Vector2, mirror: int, extent: Vector2) -> Vector2:
+	return Vector2(extent.x - point.x if (mirror & PieceShape.MIRROR_X) != 0 else point.x, extent.y - point.y if (mirror & PieceShape.MIRROR_Y) != 0 else point.y)
+
+
+static func _flip_box(rect: Rect2, mirror: int, extent: Vector2, at: Vector2) -> Rect2:
+	var corner: Vector2 = rect.position
+	if (mirror & PieceShape.MIRROR_X) != 0:
+		corner.x = extent.x - rect.end.x
+	if (mirror & PieceShape.MIRROR_Y) != 0:
+		corner.y = extent.y - rect.end.y
+	return Rect2(corner + at, rect.size)
+
+
 ## The hole `rect` overlaps, or an empty rectangle (hub rework HR-H2).
 func hole_under(rect: Rect2) -> Rect2:
 	for hole: Rect2 in holes:

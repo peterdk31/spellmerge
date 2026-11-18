@@ -128,7 +128,7 @@ func test_the_bar_fits_between_the_top_corner_panels_and_over_the_pad_line() -> 
 	var bar: BossBarScript = hud.get_boss_bar()
 	for player in 4:
 		bus.player_joined.emit(player)
-	bus.room_entered.emit(&"arena_01")
+	bus.room_entered.emit(&"arena_01", 0)
 	bus.boss_shown.emit(7, "The Test Boss", "", MARKS, false)
 	await process_frame
 	await process_frame

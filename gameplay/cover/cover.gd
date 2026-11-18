@@ -234,7 +234,11 @@ func look(at: Vector2, reach: float, sight: CoverSight) -> void:
 
 ## A room was laid out: its cover worked out from its layout. The state is only sized, at rest, when
 ## it is empty; then the view is told every cell not at rest.
-func _on_room_built(room_id: StringName, layout_root: Node) -> void:
+func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void:
+	# One room's cover is played: the world's first room's (a biome's start room's, connected biomes
+	# CB3: a biome's others wait for a cover a room; never the whole biome at once).
+	if number != EventsScript.FIRST_ROOM:
+		return
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	layout = CoverLayout.of(layout_root, room, kinds())
 	_moves = CoverMoves.of(layout.kinds)
@@ -254,7 +258,9 @@ func _on_room_built(room_id: StringName, layout_root: Node) -> void:
 
 ## A room starts in play (a run's start, each room the party goes on into; never a restore): every
 ## cell at rest, nothing queued and nobody harmed.
-func _on_room_entered(_room_id: StringName) -> void:
+func _on_room_entered(_room_id: StringName, number: int) -> void:
+	if number != EventsScript.FIRST_ROOM:
+		return
 	_size_at_rest()
 	_active.resize(0)
 	_clear_touches()

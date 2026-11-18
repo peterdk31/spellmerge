@@ -511,7 +511,7 @@ func _hud() -> HudScript:
 	root.add_child(hud)
 	own(hud)
 	_world.bus.player_joined.emit(0)
-	_world.bus.room_entered.emit(&"arena_01")
+	_world.bus.room_entered.emit(&"arena_01", 0)
 	return hud
 
 

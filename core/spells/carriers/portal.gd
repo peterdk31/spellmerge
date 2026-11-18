@@ -268,6 +268,10 @@ func _pass_shots() -> void:
 			var way: Vector2 = kit.projectiles.gate_turn(gate, to, velocity)
 			var out_at: Vector2 = _out_point(to, way, radius)
 			var moved: int = -1
+			if not kit.projectiles.grid().may_cross(into, out_at):
+				# Never out of a sealed fight (connected biomes CB3, decision 12): a portal opened into
+				# one from outside carries shots in, never out; the shot flies on where it is.
+				continue
 			if to == first:
 				if kit.projectiles.pass_shot(slot, out_at, way):
 					moved = slot

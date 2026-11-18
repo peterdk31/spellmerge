@@ -667,8 +667,11 @@ signal still_shots_drawn(view: StillShotView)
 ## node by instance id, a lookup from the node (equality only: a target's identity is its key, N5);
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
-## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent"]
+## N3c's stress runs). The target grid (`_cell_head`, `_target_next`, the cells' counts and boxes) and
+## the shots' grid of a step (`_shot_head`, `_shot_next`, `_shot_reach`, `_scan_step`): filled again
+## from the state before they are read (connected biomes CB3: they grow with a biome's area, about
+## 190 KB for a full one), linked again by `rebuild_derived`.
+const DERIVED: Array[StringName] = [&"_cell_head", &"_target_next", &"_cell_count", &"_cell_box", &"_cell_filled", &"_shot_head", &"_shot_next", &"_shot_reach", &"_scan_step", &"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -767,6 +770,8 @@ var sim_time: float = 0.0
 var _high: int = 0
 var _next_seq: int = 0
 var _bounds: Rect2 = Rect2(-1024.0, -1024.0, 2048.0, 2048.0)
+## What a growing shot grows to at most, set apart from the bounds (`set_room_size`; 0: the bounds').
+var _room_size: float = 0.0
 
 # One row per slot.
 var _pos: PackedVector2Array = PackedVector2Array()
@@ -1876,6 +1881,7 @@ func set_tailless_pool(pool: int) -> void:
 ## The area the projectiles live in. Also sizes the target grid.
 func set_bounds(rect: Rect2) -> void:
 	_bounds = rect
+	_room_size = 0.0
 	_threat_step = -1
 	_fit_draw_bounds()
 	_grid_x = rect.position.x
@@ -1897,9 +1903,17 @@ func set_bounds(rect: Rect2) -> void:
 	_forget_solid_cells()
 
 
-## The longer side of the room (`set_bounds`): what a growing shot or beam grows to at most.
+## The longer side of the room (`set_bounds`, or `set_room_size`: a biome's biggest room): what a
+## growing shot or beam grows to at most.
 func room_size() -> float:
-	return maxf(_bounds.size.x, _bounds.size.y)
+	return _room_size if _room_size > 0.0 else maxf(_bounds.size.x, _bounds.size.y)
+
+
+## What a growing shot grows to at most from now on, in place of the bounds' longer side (connected
+## biomes CB3: a biome's bounds are the whole biome, its rooms a screen or two): `size` pixels; 0
+## (as `set_bounds` leaves it): the bounds' again.
+func set_room_size(size: float) -> void:
+	_room_size = maxf(size, 0.0)
 
 
 ## The room grid (`RoomGrid`): its walls, holes and footprints, for who asks it directly.
@@ -2320,6 +2334,38 @@ func rebuild_derived() -> void:
 	_target_entry.resize(rows)
 	# No mark of another timeline may match a stamp to come (`_mark_stamp` is state; stamps start at 1).
 	_target_mark.fill(0)
+	_relink_targets()
+
+
+## After a restore: the target grid's chains linked again from the targets' places as the last
+## filling read them (`_target_pos`, state; a target out of the tree then is in no chain), in the
+## order `_refresh_targets` links them, so a query before the next filling finds what the machine
+## that took the snapshot found. The cells' counts and boxes are taken again when first needed, and
+## the shots' grid at its next use.
+func _relink_targets() -> void:
+	var cells: int = _grid_w * _grid_h
+	_cell_head.resize(cells)
+	_cell_head.fill(-1)
+	_cell_count.resize(cells)
+	_cell_count.fill(0)
+	_cell_box.resize(cells)
+	_cell_filled.resize(cells)
+	_cell_filled.fill(-1)
+	_shot_head.resize(cells)
+	_shot_head.fill(-1)
+	_shot_next.resize(_cap)
+	_shot_reach = 0.0
+	_scan_step = -1
+	var rows: int = _target_pos.size()
+	_target_next.resize(rows)
+	for i in rows:
+		var centre: Vector2 = _target_pos[i]
+		if not centre.is_finite():
+			_target_next[i] = -1
+			continue
+		var cell: int = clampi(floori((centre.y - _grid_y) / GRID_CELL), 0, _grid_h - 1) * _grid_w + clampi(floori((centre.x - _grid_x) / GRID_CELL), 0, _grid_w - 1)
+		_target_next[i] = _cell_head[cell]
+		_cell_head[cell] = i
 
 
 ## The team `caster` aims for (NONE for no actor).
@@ -4736,6 +4782,24 @@ func shots_into_gates() -> int:
 		gate_shot_gates[found] = gate_hit
 		found += 1
 	return found
+
+
+## Mark in `out` (one byte a place of `grid`, sized to them) each place a live shot is in now
+## (connected biomes CB3: a shot keeps a room awake, and wakes one it comes into). Allocates nothing
+## once `out` is sized.
+func shot_places(grid: RoomGrid, out: PackedByteArray) -> void:
+	var count: int = grid.places()
+	if out.size() != count:
+		out.resize(count)
+	out.fill(0)
+	if count == 0:
+		return
+	for slot in _high:
+		if _alive[slot] == 0:
+			continue
+		var place: int = grid.place_at(_pos[slot])
+		if place >= 0:
+			out[place] = 1
 
 
 ## Puts the shot in `slot` at `at` at once, flying `velocity` (a shot that came out of a gate): no

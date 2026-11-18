@@ -92,6 +92,10 @@ var resting_count: int = 0
 ## (a prop; a possession gives it a driver, and it is stepped while that lasts). Set by the body when
 ## its id opens and whenever its driver changes (`set_still`); state, like its team. Read only.
 var still: PackedByteArray = PackedByteArray()
+## Per actor, 1 while the place it is in sleeps (connected biomes CB3, "Room life": nothing acts in
+## that room or bridge, Flow's room life, `set_asleep`): the Tick does not step it and Combat counts
+## none of its statuses down, the same on every machine, until the place wakes. State. Read only.
+var asleep: PackedByteArray = PackedByteArray()
 ## No id below this is free: where `open` starts looking.
 var _lowest_free: int = 0
 var _count: int = 0
@@ -114,6 +118,7 @@ func _init() -> void:
 	_held.resize(ACTORS)
 	_rest.resize(ACTORS)
 	still.resize(ACTORS)
+	asleep.resize(ACTORS)
 	_seat_actor.resize(SEATS)
 	_home_seat.resize(ACTORS)
 	_seat_home.resize(SEATS)
@@ -139,6 +144,7 @@ func open(team: int, ramp: int, seat: int = NONE) -> int:
 	_home_seat[id] = NONE
 	_node[id] = 0
 	still[id] = 0
+	asleep[id] = 0
 	_births += 1
 	_birth[id] = _births
 	_release_hold(id)
@@ -159,6 +165,7 @@ func close(id: int) -> void:
 	# Hashed with the closed ids too: a closed body leaves nothing of its own behind, so a run plays
 	# the same after any other (a still prop's flag was left, and a hub after a hub parted at tick 0).
 	still[id] = 0
+	asleep[id] = 0
 	_team[id] = NONE
 	_ramp[id] = NONE
 	_node[id] = 0
@@ -345,6 +352,13 @@ func hold(id: int, seconds: float, rest: float = 0.0, plain: bool = false) -> bo
 		held_count += 1
 	_held[id] = maxf(_held[id], seconds)
 	return true
+
+
+## Whether the body of `id` sleeps with its place (`asleep`, connected biomes CB3): the Tick does
+## not step it, Combat counts none of its statuses down.
+func set_asleep(id: int, on: bool) -> void:
+	if id >= 0 and id < ACTORS:
+		asleep[id] = 1 if on else 0
 
 
 ## Whether the body of `id` is still (`still`): the Tick does not step it.

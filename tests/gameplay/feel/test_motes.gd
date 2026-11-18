@@ -473,7 +473,7 @@ func test_a_wall_hit_sheds_the_shots_motes_and_the_walls() -> void:
 	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [&"ember", &"spark"], "before any room: only the shot's own, and its burst's sparks")
 	for row in motes.next_row():
 		check(motes.row_data(row)[MotesScript.ROW_VX] < 0.0, "mote %d flies back off the wall" % row)
-	bus.room_entered.emit(ARENA)
+	bus.room_entered.emit(ARENA, 0)
 	var before: int = motes.next_row()
 	# A spot further along (a staff shows one impact a spot of wall a frame, `Feel.WALL_SPOT`).
 	bus.projectile_impact.emit(1, null, Vector2(96.0, 100.0 + FeelScript.WALL_SPOT), Vector2.RIGHT)
@@ -498,7 +498,7 @@ func test_particles_has_no_off_its_least_is_a_minimal_ring() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
-	bus.room_entered.emit(ARENA)
+	bus.room_entered.emit(ARENA, 0)
 	check_equal(MoteCap.STOPS[0], 2048, "the Minimal stop")
 	check_equal(MoteCap.word_of(0), "Minimal", "a saved 0 reads as Minimal")
 	bus.mote_cap_changed.emit(0)
@@ -520,7 +520,7 @@ func test_feel_takes_a_pool_handed_to_it() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
-	bus.room_entered.emit(ARENA)
+	bus.room_entered.emit(ARENA, 0)
 	var timed: MotesScript = TimedMotesScript.new(MoteCap.STOPS[1], FeelScript.MOTE_Z, feel.motes().kinds())
 	feel.use_motes(timed)
 	check(feel.motes() == timed and feel.find_child("Motes", true, false) == timed, "the pool handed is Feel's motes")
@@ -748,7 +748,7 @@ func test_the_dense_cues_throw_their_kinds() -> void:
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
 	var motes: MotesScript = feel.motes()
-	bus.room_entered.emit(ARENA)
+	bus.room_entered.emit(ARENA, 0)
 	for id: StringName in [&"blast", &"fireball", &"slam", &"quake", &"nova", &"enemy_death", &"boss_death"]:
 		var before: int = motes.next_row()
 		feel.play_cue(id, 0, Vector2(100.0, 100.0), Vector2.RIGHT, 48.0, Color.WHITE, FIRE_LOOK)

@@ -651,7 +651,7 @@ func _on_start_stone_changed(_standing: int, _wizards: int, lit: bool) -> void:
 	_stone_lit = lit
 
 
-func _on_room_entered(_room_id: StringName) -> void:
+func _on_room_entered(_room_id: StringName, _room: int) -> void:
 	_in_room = true
 	for player in PLAYER_COUNT:
 		_refresh(player)

@@ -525,7 +525,11 @@ func _on_end_requested(caster: int, tag: int) -> void:
 			_end(row, true)
 
 
-func _on_room_entered(_room_id: StringName) -> void:
+## A new world's room (`room_entered` of FIRST_ROOM): its decoys and familiars and the board go with
+## the last world; a biome's later rooms keep them (connected biomes CB3).
+func _on_room_entered(_room_id: StringName, room: int) -> void:
+	if room != EventsScript.FIRST_ROOM:
+		return
 	board.clear()
 	clear()
 

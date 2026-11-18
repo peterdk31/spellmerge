@@ -725,7 +725,7 @@ func test_plugging_in_a_gamepad_does_not_join_it() -> void:
 func test_a_waiting_seat_asks_again_in_a_new_room() -> void:
 	# A room entered while it waits (a run's start let the stop go): asked again.
 	_unplug_pad_2()
-	manager._on_room_entered(&"room")
+	manager._on_room_entered(&"room", 0)
 	check_equal(waits, [[2, 1], [2, 1]], "a waiting seat asks again in a new room")
 
 
@@ -753,7 +753,7 @@ func test_a_new_room_asks_nothing_when_nobody_waits() -> void:
 	_unplug_pad_2()
 	manager._on_joy_connection_changed(2, true)
 	var count: int = waits.size()
-	manager._on_room_entered(&"room")
+	manager._on_room_entered(&"room", 0)
 	check_equal(waits.size(), count, "nobody waits, so a new room asks nothing")
 
 

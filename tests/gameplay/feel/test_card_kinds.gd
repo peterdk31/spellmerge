@@ -395,6 +395,6 @@ func _feel() -> Array:
 	feel.drive_engine = false
 	feel.preset = preset
 	root.add_child(feel)
-	bus.room_entered.emit(ARENA)
+	bus.room_entered.emit(ARENA, 0)
 	feel.step(1.0 / 60.0)
 	return [bus, feel, spells]

@@ -20,6 +20,15 @@ extends RefCounted
 ## (`line_clear`: a shot ends there); it is open to a wizard's walk (`slide_body`'s
 ## `through_mouths`) and to sight (`sight_clear`).
 ##
+## **Places and seals** (connected biomes CB3, "Room life"): a biome's rooms and bridges are its
+## places (`add_place`, by number: the rooms first, then the bridges, as `BiomeWorld` lays them), so
+## what stands or flies anywhere knows which place it is in (`place_at`; -1 outside them all, and
+## everywhere in a world with none: a row run's room). A place may be sealed (`set_sealed`: a fight
+## under way in a room, Flow's state, told here again after a restore): nothing leaves a sealed place,
+## a wizard's walk neither (`Actor.passes_mouths`), nor a movement spell, a swap or a portal
+## (`may_cross`); from outside, a wizard still walks in (the seal is one way). A move across a mouth
+## goes along a way a body could walk (`walk_way_clear`: no wall but mouths on its segment).
+##
 ## **The room's layers are not state** (connected biomes CB2, "The wall grid"): a biome-wide grid
 ## would put megabytes into every hash and snapshot. The walls, mouths and holes are laid from the
 ## room or the biome map, which are state, by whoever lays them (Flow, `BiomeWorld`), and laid again
@@ -52,7 +61,14 @@ const PAST_MOUTHS: int = 255 & ~MOUTH_CELL
 ## Not state: the room's layers (its bounds, walls, mouths and holes), laid from the room or the biome
 ## map by whoever lays them, and the grids worked out from the state (the footprints' counts, the
 ## walking grid), set up again in `rebuild_derived` (see the class doc).
-const DERIVED: Array[StringName] = [&"_bounds", &"_wall_w", &"_wall_h", &"_wall_cells", &"_has_walls", &"_has_mouths", &"_ground_cells", &"_footprint_missed", &"_hole_cells", &"_has_holes", &"_walk_cells"]
+## The places and their seals too (`add_place`, `set_sealed`): laid from the biome map and Flow's
+## room state by whoever lays them.
+const DERIVED: Array[StringName] = [&"_bounds", &"_wall_w", &"_wall_h", &"_wall_cells", &"_has_walls", &"_has_mouths", &"_ground_cells", &"_footprint_missed", &"_hole_cells", &"_has_holes", &"_walk_cells", &"_place_rects", &"_sealed", &"_place_w", &"_place_h", &"_place_cells"]
+## What `place_at` answers outside every place (and everywhere in a world with none).
+const NO_PLACE: int = -1
+## The side of a cell of the places' lookup (`place_at`), in pixels: a biome's pieces stand on the
+## 32 px grid (`PieceShape.GRID`), so nearly every cell lies in one place.
+const PLACE_CELL: float = 32.0
 
 ## The area the grid covers: the projectile manager's bounds (`size_to`).
 var _bounds: Rect2 = Rect2(-1024.0, -1024.0, 2048.0, 2048.0)
@@ -84,6 +100,14 @@ var _footprint_missed: Dictionary = {}
 var _hole_cells: PackedByteArray = PackedByteArray()
 var _has_holes: bool = false
 var _walk_cells: PackedByteArray = PackedByteArray()
+## The places (`add_place`): each one's world rectangle, by number, and 1 where it is sealed.
+var _place_rects: Array[Rect2] = []
+var _sealed: PackedByteArray = PackedByteArray()
+## The places by PLACE_CELL square over the bounds (its middle's place, plus one; 0 for none), so
+## `place_at` asks one cell (a body's move, every shot of a tick) and only checks that place.
+var _place_w: int = 0
+var _place_h: int = 0
+var _place_cells: PackedByteArray = PackedByteArray()
 
 func _init() -> void:
 	_footprint_at.resize(ACTORS)
@@ -103,6 +127,7 @@ func size_to(rect: Rect2) -> void:
 	_hole_cells.fill(0)
 	_has_holes = false
 	_walk_cells.resize(_wall_w * _wall_h)
+	clear_places()
 	clear_walls()
 	_ground_cells.resize(_wall_w * _wall_h)
 	_ground_cells.fill(0)
@@ -121,6 +146,7 @@ func clear_walls() -> void:
 	_wall_cells.fill(0)
 	_has_walls = false
 	_has_mouths = false
+	clear_places()
 	_drop_holes()
 
 
@@ -365,6 +391,105 @@ func wall_image(holes: bool = false) -> Image:
 	for i in mini(bytes.size(), _wall_cells.size()):
 		bytes[i] = 255 if (_wall_cells[i] & ROOM_CELL) != 0 or (holes and _has_holes and _hole_cells[i] != 0) else 0
 	return Image.create_from_data(_wall_w, _wall_h, false, Image.FORMAT_L8, bytes)
+
+
+## Place number `place` (the next one: places are added in order) is the world rectangle `rect`
+## (connected biomes CB3; see the class doc), unsealed. Returns its number.
+func add_place(rect: Rect2) -> int:
+	_place_rects.append(rect)
+	_sealed.append(0)
+	var number: int = _place_rects.size() - 1
+	if _place_cells.is_empty():
+		_place_w = maxi(ceili(_bounds.size.x / PLACE_CELL), 1)
+		_place_h = maxi(ceili(_bounds.size.y / PLACE_CELL), 1)
+		_place_cells.resize(_place_w * _place_h)
+		_place_cells.fill(0)
+	if number < 255:
+		var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / PLACE_CELL), 0)
+		var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / PLACE_CELL), 0)
+		var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / PLACE_CELL), _place_w)
+		var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / PLACE_CELL), _place_h)
+		for y in range(y0, y1):
+			for x in range(x0, x1):
+				var middle: Vector2 = _bounds.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * PLACE_CELL
+				if rect.has_point(middle) and _place_cells[y * _place_w + x] == 0:
+					_place_cells[y * _place_w + x] = number + 1
+	return number
+
+
+## Every place gone (a row run's room has none): `place_at` is NO_PLACE everywhere.
+func clear_places() -> void:
+	_place_rects.clear()
+	_sealed.resize(0)
+	_place_cells.resize(0)
+	_place_w = 0
+	_place_h = 0
+
+
+## How many places are laid (0 in a world with none).
+func places() -> int:
+	return _place_rects.size()
+
+
+## The world rectangle of place `place` (empty for none).
+func place_rect(place: int) -> Rect2:
+	return _place_rects[place] if place >= 0 and place < _place_rects.size() else Rect2()
+
+
+## The place `point` is in (the first whose rectangle holds it), or NO_PLACE.
+func place_at(point: Vector2) -> int:
+	if _place_rects.is_empty():
+		return NO_PLACE
+	var x: int = floori((point.x - _bounds.position.x) / PLACE_CELL)
+	var y: int = floori((point.y - _bounds.position.y) / PLACE_CELL)
+	if x >= 0 and x < _place_w and y >= 0 and y < _place_h:
+		var guess: int = _place_cells[y * _place_w + x] - 1
+		if guess >= 0 and _place_rects[guess].has_point(point):
+			return guess
+	for place in _place_rects.size():
+		if _place_rects[place].has_point(point):
+			return place
+	return NO_PLACE
+
+
+## Seal place `place` or open it (Flow's room state: a fight under way; see the class doc).
+func set_sealed(place: int, on: bool) -> void:
+	if place >= 0 and place < _sealed.size():
+		_sealed[place] = 1 if on else 0
+
+
+## True while place `place` is sealed.
+func is_sealed(place: int) -> bool:
+	return place >= 0 and place < _sealed.size() and _sealed[place] != 0
+
+
+## True when `point` is in a sealed place: nothing there leaves it.
+func sealed_at(point: Vector2) -> bool:
+	return is_sealed(place_at(point))
+
+
+## True when something at `from` may be put at `to` (a teleport, a swap, a portal's exit; connected
+## biomes CB3, decision 11): always within one place and in a world with no places; across places
+## only out of a place that is not sealed (into a sealed one is allowed: the seal is one way).
+func may_cross(from: Vector2, to: Vector2) -> bool:
+	if _place_rects.is_empty():
+		return true
+	var start: int = place_at(from)
+	return start == place_at(to) or not is_sealed(start)
+
+
+## True when the segment from `from` to `to` meets no wall but mouths (a way a body could walk
+## across a doorway, decision 11: no wall, no void and no solid shot's stone on it; the ground of
+## bodies that cannot move and holes are not minded, as a dash crosses them).
+func walk_way_clear(from: Vector2, to: Vector2) -> bool:
+	return _way_hit(from, to, PAST_MOUTHS, false, false) < 0.0
+
+
+## The point where the segment from `from` to `to` first meets a wall that is no mouth (as
+## `clip_to_walls`, past doorways: a teleport a wizard drives across a mouth), or `to`.
+func clip_past_mouths(from: Vector2, to: Vector2) -> Vector2:
+	var t: float = _way_hit(from, to, PAST_MOUTHS, false, false)
+	return to if t < 0.0 else from.lerp(to, t)
 
 
 ## The point where the segment from `from` to `to` first meets a wall, or `to` when

@@ -27,7 +27,14 @@ extends RefCounted
 ## the pieces are announced to the view with CB3's room events, so until then a mirrored piece shows
 ## its template's baked art. The art never reaches the simulation.
 ##
-## Rooms' contents (props, enemies, items), room state and room events are room life's (CB3).
+## **Room life** (connected biomes CB3): each piece is announced to whoever draws or reads its layout
+## as it is laid (`built`, Flow's `room_built`: its template, its number, rooms first and then the
+## bridges after them, and the layout at its place, its placements and zones still in it), so Feel
+## draws a mirrored piece's ground from its shape. What is where in each room is read before the
+## placements go, mirrored and moved to its place (`room_places`), for Flow to stand its bodies and
+## fights. The grid gets every piece as a place (`RoomGrid.add_place`, the same numbers), where a
+## seal holds (`RoomGrid.set_sealed`, Flow's), and the projectile manager the biggest room's side
+## as what a growing shot grows to (`set_room_size`). Room state is Flow's (`RoomLife`).
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -43,16 +50,21 @@ const BRIDGE_NODE: String = "Bridge%d"
 
 ## Not state: services, the world laid into, the nodes laid and the map they were laid from (a copy),
 ## and the templates' shapes (a cache), all laid again from the map (see the class doc).
-const DERIVED: Array[StringName] = [&"registry", &"projectiles", &"_into", &"_layouts", &"_laid", &"_shapes"]
+const DERIVED: Array[StringName] = [&"registry", &"projectiles", &"built", &"_into", &"_layouts", &"_laid", &"_shapes", &"_room_places"]
 
 var registry: RegistryScript = null
 var projectiles: ProjectileManagerScript = null
+## Told each piece as it is laid (connected biomes CB3): `built.call(template, number, layout)`,
+## before its placements and zones are taken out (Flow sends `room_built`). Unset: nobody is told.
+var built: Callable = Callable()
 ## The biome's map (null: none laid). The state.
 var map: BiomeMap = null
 var _into: Node2D = null
 var _layouts: Array[Node] = []
 var _laid: BiomeMap = null
 var _shapes: Dictionary = {}
+## What is where in each room laid, in the world (`room_places`).
+var _room_places: Array[RoomPlaces] = []
 
 
 ## Lay `new_map` into `into` (the world), replacing any biome laid before: the map is kept as the
@@ -77,8 +89,18 @@ func clear() -> void:
 				layout.get_parent().remove_child(layout)
 			layout.free()
 	_layouts.clear()
+	_room_places.clear()
 	_laid = null
 	map = null
+
+
+## Lay into `into` from now on, with these services and telling `on_built` each piece (Flow's, as a
+## biome starts and after a restore into a world that laid none).
+func attach(into: Node2D, with_registry: RegistryScript, with_projectiles: ProjectileManagerScript, on_built: Callable) -> void:
+	_into = into
+	registry = with_registry
+	projectiles = with_projectiles
+	built = on_built
 
 
 ## After a snapshot was restored (core/sim/README.md, "Snapshots"): a world that laid another map, or
@@ -97,6 +119,17 @@ func rebuild_derived() -> void:
 ## The layout node of room `room` (null when none is laid).
 func room_layout(room: int) -> Node:
 	return _layouts[room] if map != null and room >= 0 and room < map.rooms() and room < _layouts.size() else null
+
+
+## What is where in room `room` (spawns, placements, zones, holes), mirrored and at its place in
+## the world (`RoomPlaces.placed_in`); null when none is laid.
+func room_places(room: int) -> RoomPlaces:
+	return _room_places[room] if room >= 0 and room < _room_places.size() else null
+
+
+## How many places the biome has: its rooms, then its bridges (the grid's, `RoomGrid.add_place`).
+func places() -> int:
+	return map.rooms() + map.bridges() if map != null else 0
 
 
 ## The unmirrored shape of every template `of_map` names (template id to `PieceShape`), from the
@@ -148,26 +181,31 @@ func _lay_now(restored: bool) -> void:
 				layout.get_parent().remove_child(layout)
 			layout.free()
 	_layouts.clear()
+	_room_places.clear()
 	shapes_of(map)
 	var at: int = 0
 	for room in map.rooms():
-		_layouts.append(_place(ROOM_NODE % room, map.room_templates[room], map.room_places[room], map.room_mirrors[room], at))
+		_layouts.append(_place(ROOM_NODE % room, map.room_templates[room], map.room_places[room], map.room_mirrors[room], at, room))
 		at += 1
 	for bridge in map.bridges():
-		_layouts.append(_place(BRIDGE_NODE % bridge, map.bridge_templates[bridge], map.bridge_places[bridge], map.bridge_mirrors[bridge], at))
+		_layouts.append(_place(BRIDGE_NODE % bridge, map.bridge_templates[bridge], map.bridge_places[bridge], map.bridge_mirrors[bridge], at, map.rooms() + bridge))
 		at += 1
 	_lay_grid(restored)
 	_laid = map.copy()
 
 
-## One piece's layout, at `place` in the world, as the `index`-th child (null when its template is
-## missing: the map's problems name it).
-func _place(named: String, template: StringName, place: Vector2, mirror: int, index: int) -> Node:
+## One piece's layout, at `place` in the world, as the `index`-th child, piece `number` of the biome
+## (a room's, else a bridge's after the rooms); null when its template is missing (the map's problems
+## name it). A room's places are read first (`room_places`), and the piece is told (`built`).
+func _place(named: String, template: StringName, place: Vector2, mirror: int, index: int, number: int) -> Node:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, template) as RoomBase if registry != null else null
 	var layout: Node = room.build() if room != null else null
+	if number < map.rooms():
+		var shape: PieceShape = _shapes.get(template) as PieceShape
+		var read: RoomPlaces = RoomPlaces.read(layout) if layout != null else RoomPlaces.new()
+		_room_places.append(read.placed_in(place, mirror, shape.size if shape != null else read.size))
 	if layout == null:
 		return null
-	RoomPlaces.strip(layout)
 	layout.name = named
 	# How it is placed, for the view: Feel draws a room's ground mirrored from its shape as it hears
 	# the room built (connected biomes CB4, `GroundShape.MIRROR_META`). The node is never flipped.
@@ -175,6 +213,9 @@ func _place(named: String, template: StringName, place: Vector2, mirror: int, in
 	var piece := layout as Node2D
 	if piece != null:
 		piece.position = place
+	if built.is_valid():
+		built.call(template, number, layout)
+	RoomPlaces.strip(layout)
 	if _into != null:
 		_into.add_child(layout)
 		_into.move_child(layout, mini(index, _into.get_child_count() - 1))
@@ -214,6 +255,15 @@ func _lay_grid(restored: bool) -> void:
 			var room: int = map.end_room(bridge, end)
 			var shape: PieceShape = map.room_shape(room, _shapes)
 			grid.add_mouth(_moved(shape.mouth_rect(map.end_socket(bridge, end)), map.room_places[room]))
+	# Every piece a place, rooms first (connected biomes CB3); the seals are Flow's to set again.
+	var biggest: float = 0.0
+	for room in map.rooms():
+		grid.add_place(room_rect(room))
+		biggest = maxf(biggest, maxf(room_rect(room).size.x, room_rect(room).size.y))
+	for bridge in map.bridges():
+		grid.add_place(bridge_rect(bridge))
+	if not restored:
+		projectiles.set_room_size(biggest)
 	if restored:
 		projectiles.relay_solids()
 

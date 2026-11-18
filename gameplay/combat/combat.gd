@@ -1117,7 +1117,10 @@ func die_of_fall(target: Variant, by: int) -> bool:
 
 ## A room is entered: what a fall costs there (`RoomBase.falls_free`; HoleRules.FALL_COST, the
 ## default, for a room the registry does not know).
-func _on_room_entered(room_id: StringName) -> void:
+func _on_room_entered(room_id: StringName, number: int) -> void:
+	# A world's fall cost is its first room's (a biome's start room's; connected biomes CB3).
+	if number != EventsScript.FIRST_ROOM:
+		return
 	var room: RoomBase = registry.get_resource(&"rooms", room_id) as RoomBase if registry != null else null
 	fall_cost = 0.0 if room != null and room.falls_free else HoleRules.FALL_COST
 
@@ -1646,8 +1649,12 @@ func step(delta: float) -> void:
 	# step): the table's own array, so it is always current; read only.
 	var table: ActorsScript = _table()
 	_teams = table.teams() if table != null else PackedInt32Array()
+	var asleep: PackedByteArray = table.asleep if table != null else PackedByteArray()
 	for i in _live.size():
 		var row: int = _live[i]
+		if row < asleep.size() and asleep[row] != 0:
+			# Its place sleeps (connected biomes CB3): nothing of it counts down until it wakes.
+			continue
 		_tick(row, delta)
 		if _slam[row] > 0:
 			_check_slam(row)

@@ -87,7 +87,7 @@ func test_it_is_heard_on_room_built() -> void:
 	part._ready()
 	var room: RoomBase = _crypt_rooms()[0]
 	var layout: Node = room.build()
-	events.room_built.emit(room.id, layout)
+	events.room_built.emit(room.id, 0, layout)
 	check(part.drawn == 1, "a room laid out is drawn")
 	check((layout.get_node("Floor") as Sprite2D).texture is ImageTexture, "its floor is the drawn one")
 	layout.free()

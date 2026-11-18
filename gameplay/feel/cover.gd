@@ -181,7 +181,10 @@ func kinds() -> Array[CoverKind]:
 
 
 ## A room was laid out (`room_built`): its cover, from its layout as built.
-func _on_room_built(room_id: StringName, layout_root: Node) -> void:
+func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void:
+	# The cover the cover area plays: the world's first room's (connected biomes CB3).
+	if number != EventsScript.FIRST_ROOM:
+		return
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	lay(CoverLayout.of(layout_root, room, kinds()))
 

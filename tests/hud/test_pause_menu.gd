@@ -136,7 +136,7 @@ func _setup(count: int) -> void:
 	root.add_child(_hud)
 	for index in count:
 		_bus.player_joined.emit(index)
-	_bus.room_entered.emit(&"test_room")
+	_bus.room_entered.emit(&"test_room", 0)
 
 
 ## A scene of one plain node named MENU_STAND_IN, for the main menu.
@@ -791,7 +791,7 @@ func _keyboard_settings() -> void:
 	_setup(0)
 	_input.join(InputManagerScript.KEYBOARD)
 	_bus.player_joined.emit(0)
-	_bus.room_entered.emit(&"test_room")
+	_bus.room_entered.emit(&"test_room", 0)
 	_key(KEY_ESCAPE)
 	_focus.focus(0, _menu().button("Settings"))
 	_focus.activate(0)
@@ -1512,7 +1512,7 @@ func test_a_builder_closed_with_b_stays_closed() -> void:
 
 func test_no_builder_outside_a_room() -> void:
 	_setup(2)
-	_bus.room_cleared.emit(&"test_room")
+	_bus.room_cleared.emit(&"test_room", 0)
 	_bus.run_ended.emit(false)
 	_do(0, &"back")
 	check(not _hud.get_radial(0).is_open(), "no builder outside a room")

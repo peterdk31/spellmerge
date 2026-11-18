@@ -55,7 +55,7 @@ func _make_hud(joined: Array[int] = [], room: bool = false) -> HudScript:
 	for player in joined:
 		_bus.player_joined.emit(player)
 	if room:
-		_bus.room_entered.emit(&"arena_01")
+		_bus.room_entered.emit(&"arena_01", 0)
 	return _hud
 
 
@@ -287,7 +287,7 @@ func test_joined_players_panels_return_in_the_next_run() -> void:
 	var hud: HudScript = _make_hud([0, 3], true)
 	_bus.run_ended.emit(false)
 	_bus.run_started.emit(2)
-	_bus.room_entered.emit(&"arena_01")
+	_bus.room_entered.emit(&"arena_01", 0)
 	check(hud.get_panel(0).visible and hud.get_panel(3).visible, "joined players' panels return in the next run")
 
 
@@ -408,7 +408,7 @@ func test_four_wizards_under_fire_do_not_keep_the_vignette_at_its_limit() -> voi
 	for player in 4:
 		_bus.player_joined.emit(player)
 		_bus.player_stats_changed.emit(player, 100, 100, 5.0, 100.0)
-	_bus.room_entered.emit(&"arena_01")
+	_bus.room_entered.emit(&"arena_01", 0)
 	# Eight seconds of a fight: each wizard loses 10 of 100 health every half second.
 	var peak: float = 0.0
 	for tick in 64:
@@ -452,7 +452,7 @@ func _seats_hud(online: bool) -> HudScript:
 	input.add_virtual_device(1)
 	_bus.player_joined.emit(0)
 	_bus.player_joined.emit(1)
-	_bus.room_entered.emit(&"hub")
+	_bus.room_entered.emit(&"hub", 0)
 	if online:
 		_bus.online_changed.emit(EventsScript.ONLINE_PLAYING, "", &"", {})
 	hud.poll()

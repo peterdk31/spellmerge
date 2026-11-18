@@ -39,10 +39,10 @@ cards = Array[StringName]([&"on_wall", &"bigger", &"lumber", &"plow", &"dash", &
 script = ExtResource("3_staff")
 id = &"old_broom"
 display_name = "Dust flick"
-slots = 7
+slots = 4
 draw = 1
 wind_up = 0.5
-cooldown = 2.0
+cooldown = 1.2
 spread = 10.0
 max_mana = 100.0
 mana_regen = 40.0
@@ -50,7 +50,7 @@ mana_regen = 40.0
 [sub_resource type="Resource" id="Resource_flick"]
 script = ExtResource("4_entry")
 staff = SubResource("Resource_flick_staff")
-cards = Array[StringName]([&"triple", &"slow", &"bolt", &"slow", &"bolt", &"slow", &"bolt"])
+cards = Array[StringName]([&"triple", &"bolt", &"bolt", &"bolt"])
 
 [sub_resource type="Resource" id="Resource_swat_staff"]
 script = ExtResource("3_staff")
@@ -74,7 +74,7 @@ cards = Array[StringName]([&"bigger", &"heavy", &"swing"])
 script = ExtResource("3_staff")
 id = &"old_broom"
 display_name = "Big Sweep"
-slots = 9
+slots = 8
 draw = 1
 wind_up = 1.2
 wind_cue = &"broom_big_scrape"
@@ -89,7 +89,7 @@ mana_regen = 20.0
 [sub_resource type="Resource" id="Resource_big_sweep"]
 script = ExtResource("4_entry")
 staff = SubResource("Resource_big_sweep_staff")
-cards = Array[StringName]([&"on_wall", &"reach", &"reach", &"bigger", &"bigger", &"lumber", &"plow", &"dash", &"pulse"])
+cards = Array[StringName]([&"on_wall", &"reach", &"reach", &"bigger", &"lumber", &"plow", &"dash", &"pulse"])
 
 [sub_resource type="Resource" id="Resource_tidying"]
 script = ExtResource("5_profile")

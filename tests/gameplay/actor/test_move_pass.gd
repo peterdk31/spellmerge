@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## A dash's pass is as wide as its body (boss plan OB10, `CarrierDash._pass_reach`): a big body's
 ## dash strikes what the body meets, a wizard-sized one only what it passes close by (never under
-## SpellLimits.PASS_REACH), `bigger` and the body's spell scale widen it, and a dash stopped by a
+## SpellLimits.PASS_REACH), `bigger` widens it but the body's spell scale does not (its pass is its
+## body already: the owner, 2026-11-18), and a dash stopped by a
 ## wall head on strikes no more there once its move is over. Real actors (a Hurtbox each) and the
 ## real dash card, moved against the walls as the game moves them.
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
@@ -20,8 +21,9 @@ func after_each() -> void:
 	_world.free_all()
 
 
-## A dasher at `at` of hurt radius `radius`, its staff `cards`, aiming right.
-func _dasher(at: Vector2, radius: float, cards: Array[StringName]) -> Actor:
+## A dasher at `at` of hurt radius `radius`, its staff `cards`, aiming right, its spells built at
+## `spell_scale` (its `Stats`').
+func _dasher(at: Vector2, radius: float, cards: Array[StringName], spell_scale: float = 1.0) -> Actor:
 	var controller := Fixture.Scripted.new()
 	controller.team = ActorsScript.TEAM_WIZARDS
 	controller.aim = Vector2.RIGHT
@@ -31,6 +33,9 @@ func _dasher(at: Vector2, radius: float, cards: Array[StringName]) -> Actor:
 	hurtbox.set_enabled(false)
 	hurtbox.radius = radius
 	hurtbox.set_enabled(true)
+	if spell_scale != 1.0:
+		body.stats.spell_scale = spell_scale
+		body.caster.rebuild()
 	return body
 
 
@@ -62,8 +67,8 @@ func _walk(count: int) -> void:
 
 
 ## The dasher's body centre's way runs along y = its centre's; a target `aside` px off it, 40 px ahead.
-func _passes(radius: float, cards: Array[StringName], aside: float) -> bool:
-	var dasher: Actor = _dasher(START, radius, cards)
+func _passes(radius: float, cards: Array[StringName], aside: float, spell_scale: float = 1.0) -> bool:
+	var dasher: Actor = _dasher(START, radius, cards, spell_scale)
 	_walk(1)
 	var centre: Vector2 = dasher.global_position + dasher.body_offset
 	var target: Actor = _target(Vector2(0.0, 400.0))
@@ -94,6 +99,34 @@ func test_bigger_widens_the_pass() -> void:
 	# Bigger's radius (1.6x) on a 12 px body: 19 px, so a target's circle 25 px off is in reach.
 	check(not _passes(12.0, [&"dash"], 25.0), "plain, a 12 px body passes it")
 	check(_passes(12.0, [&"bigger", &"dash"], 25.0), "bigger, it strikes it")
+
+
+func test_a_bodys_spell_scale_does_not_widen_the_pass() -> void:
+	# The owner, 2026-11-18: a big body's Sweep scooped players up well outside what was seen. Its
+	# hurt shape was grown by its spell scale too, which is there to make its spells as big as its
+	# body: a 26 px body of spell scale 1.5 with `bigger` struck 62 px round it, not 42.
+	var scaled: Actor = _dasher(Vector2(0.0, -300.0), 26.0, [&"bolt"], 1.5)
+	check(is_equal_approx(_world.spells.carrier_radius(SpellTag.make(scaled.id, 0, 0, _world.spells._current[scaled.id * SpellLimits.STAFFS])), 7.5), "the scale is its spells': a bolt of 5 px is 7.5")
+	_world.actors.erase(scaled)
+	scaled.free()
+	check(_passes(26.0, [&"bigger", &"dash"], 45.0, 1.5), "what its body (and bigger) meets is struck: 26 x 1.6 = 42 px, and the target's 8")
+	check(not _passes(26.0, [&"bigger", &"dash"], 55.0, 1.5), "a body past that is passed, whatever its spell scale")
+	check(not _passes(26.0, [&"dash"], 40.0, 2.0), "plain, a 26 px body of spell scale 2 passes a body 40 px aside")
+
+
+func test_only_its_front_half_strikes() -> void:
+	# The owner, 2026-11-18: a body behind a big body as it sets off is not in its lane, so not struck.
+	var dasher: Actor = _dasher(START, 26.0, [&"dash"])
+	_walk(1)
+	var centre: Vector2 = dasher.global_position + dasher.body_offset
+	var behind: Actor = _target(Vector2(0.0, 400.0))
+	behind.global_position = centre + Vector2(-20.0, 0.0) - _hurtbox(behind).offset
+	var beside: Actor = _target(Vector2(0.0, 500.0))
+	beside.global_position = centre + Vector2(6.0, 28.0) - _hurtbox(beside).offset
+	check(dasher.caster.cast(0), "it dashes")
+	_walk(30)
+	check(not _hurt(behind), "a body wholly behind its middle as it sets off (well inside 26 px) is not struck")
+	check(_hurt(beside), "one beside it, just ahead of its middle, is")
 
 
 func test_a_dash_stopped_at_a_wall_strikes_no_more_there() -> void:

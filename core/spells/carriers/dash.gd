@@ -25,6 +25,10 @@ class MovePass:
 	## Where the mover was at the last step (where it started, before the first), and the seconds left.
 	var last: Vector2 = Vector2.INF
 	var left: float = 0.0
+	## The way it faces: its own way as it set off, then the way its mover goes while that keeps
+	## ahead of it (a homing dash turns), never the way something else moves its mover (a shove, a
+	## carry, a slide along a wall). Its front half strikes (`_pass_step`).
+	var way: Vector2 = Vector2.RIGHT
 	## How far round its mover's way it strikes (`_pass_reach`, at its start).
 	var reach: float = SpellLimits.PASS_REACH
 	## The chain jumps its hits carry, the body before them, and what it hits with when not its
@@ -33,6 +37,9 @@ class MovePass:
 	var prev: int = 0
 	var hit: HitProfile = null
 	var struck: Array[Node] = []
+## A pass turns its front to the way its mover went in a step only when it went this far (pixels).
+const FACES_LEAST: float = 1.0
+
 ## Per actor, the homing of its body's last dash; the body steers with it (`move_homing`).
 var _dash_homing: Array[Homing] = []
 ## Per actor, the speed curve of its body's last dash (`MoveCurve`; `move_curve`).
@@ -99,19 +106,19 @@ func _move_body(spell: CompiledSpell, tag: int, actor: int, body: int, origin: V
 	kit.set_cue_tag(tag)
 	kit.events.carrier_shown.emit(actor, &"dash", origin, way, reach, spell.tint, spell.look)
 	kit.set_cue_tag(0)
-	_start_pass(spell, tag, actor, body, -1, seconds, chain, prev)
+	_start_pass(spell, tag, actor, body, -1, way, seconds, chain, prev)
 	kit.live_join(spell, tag, SpellRuntime.LC_ACTOR, body, 0, false, seconds, origin, way)
 
 
-func _moved_shot(spell: CompiledSpell, tag: int, actor: int, shot: int, seconds: float, chain: int, prev: int) -> void:
-	_start_pass(spell, tag, actor, -1, shot, seconds, chain, prev)
+func _moved_shot(spell: CompiledSpell, tag: int, actor: int, shot: int, way: Vector2, seconds: float, chain: int, prev: int) -> void:
+	_start_pass(spell, tag, actor, -1, shot, way, seconds, chain, prev)
 
 
 ## A dash under way (rules R4c): for its `seconds` (and SpellLimits.PASS_GRACE more, as its mover
 ## is moved and told a step later) it strikes every body its mover passes, once each, with its hit
 ## (`_pass_step`): the body of `body` (its anchor) or the shot it moves (`body` -1). A new dash of
 ## the same body or shot ends the one before (its mover replaces the move). Its echo hits as an echo.
-func _start_pass(spell: CompiledSpell, tag: int, actor: int, body: int, shot: int, seconds: float, chain: int, prev: int) -> void:
+func _start_pass(spell: CompiledSpell, tag: int, actor: int, body: int, shot: int, way: Vector2, seconds: float, chain: int, prev: int) -> void:
 	for other in _passes:
 		if other.body == body and other.shot == shot:
 			other.left = 0.0
@@ -129,6 +136,7 @@ func _start_pass(spell: CompiledSpell, tag: int, actor: int, body: int, shot: in
 	dash.last = kit.projectiles.get_anchor(body) if shot < 0 else kit.projectiles.get_position_of(shot)
 	dash.left = seconds + SpellLimits.PASS_GRACE
 	dash.reach = _pass_reach(spell, body, shot)
+	dash.way = way if way.is_finite() and not way.is_zero_approx() else Vector2.RIGHT
 	dash.chain = chain
 	dash.prev = prev
 	dash.hit = spell.echo_hit if kit.is_echo(spell) else null
@@ -173,10 +181,11 @@ func step(delta: float) -> void:
 
 ## How far round its mover's way a dash of `spell` strikes (boss plan OB10: a move's pass is as wide
 ## as its body): a body's hurt shape (the radius it is rounded by and the larger half of its box)
-## times the cards' and the body's growth (`radius_scale`: `bigger`, its spell scale), a shot's hit
-## radius (its cards' already); never under SpellLimits.PASS_REACH. A wizard's dash hardly changes,
-## a big body's strikes what the body meets, and with `bigger` or a spell scale past it, as those grow
-## its other spells.
+## times its cards' growth (`card_scale`: `bigger`), a shot's hit radius (its cards' already); never
+## under SpellLimits.PASS_REACH. A wizard's dash hardly changes, a big body's strikes what the body
+## meets, and with `bigger` past it. Never times the body's spell scale (the owner, 2026-11-18: a
+## pass must not strike past what is seen): that makes a big body's spells as big as it is, and its
+## pass is its body already.
 func _pass_reach(spell: CompiledSpell, body: int, shot: int) -> float:
 	var reach: float = 0.0
 	if shot >= 0:
@@ -184,8 +193,18 @@ func _pass_reach(spell: CompiledSpell, body: int, shot: int) -> float:
 	else:
 		var node: Node = kit.body_node(body)
 		var half: Vector2 = kit.projectiles.target_half(node)
-		reach = (kit.projectiles.target_round(node) + maxf(half.x, half.y)) * spell.radius_scale
+		reach = (kit.projectiles.target_round(node) + maxf(half.x, half.y)) * spell.card_scale
 	return maxf(reach, SpellLimits.PASS_REACH) if is_finite(reach) else SpellLimits.PASS_REACH
+
+
+## A dash's telegraph is as wide as its pass (`Carrier.pass_radius`): what `body`'s dash of `spell`
+## will strike, either side of its way and past its end.
+func pass_radius(spell: CompiledSpell, body: int) -> float:
+	return _pass_reach(spell, body, -1)
+
+
+func pass_length(spell: CompiledSpell) -> float:
+	return CasterMoves.move_distance(spell.ray_length, spell.speed, spell.lifetime)
 
 
 ## How far round its mover a body this dash's pass struck reaches, for Plow (`Carrier.carry_reach`):
@@ -198,12 +217,19 @@ func carry_reach(spell: CompiledSpell, actor: int, _slot: int) -> float:
 
 
 ## The dash `dash` moved from `from` to `to`: it strikes each body within its reach (`_pass_reach`) of
-## that way that it has not struck yet (`Projectiles.sweep` all round points its reach apart, so a
+## that way that it has not struck yet (`Projectiles.sweep` round points its reach apart, so a
 ## fast dash misses nothing), and with `deflect` turns the shots within MOVE_GUARD_REACH of it.
+## Only its front half strikes (the owner, 2026-11-18): a body level with its mover's middle or
+## ahead of it, never one wholly behind, which its lane on the floor does not show. Each is struck
+## from the mover's middle outward, as a whole circle strikes.
 func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
 	var spell: CompiledSpell = dash.spell
 	var reach: float = dash.reach
-	var way: Vector2 = from.direction_to(to) if not from.is_equal_approx(to) else kit.moves().move_heading[dash.body if dash.body >= 0 else dash.actor]
+	# It turns with its mover only while that goes on ahead (FACES_LEAST px or more, not back or aside).
+	var went: Vector2 = to - from
+	if went.length_squared() >= FACES_LEAST * FACES_LEAST and went.dot(dash.way) > 0.0:
+		dash.way = went.normalized()
+	var way: Vector2 = dash.way
 	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
 		kit.guard(kit.projectiles.shots_on_segment(dash.actor, from, to, SpellLimits.MOVE_GUARD_REACH), dash.actor, dash.tag, true, 0, from, to, id())
 	var samples: int = maxi(ceili(from.distance_to(to) / reach), 1)
@@ -211,7 +237,13 @@ func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
 	var spare: Node = kit.spared(spell, kit.body_node(dash.body))
 	for n in samples:
 		var point: Vector2 = from.lerp(to, float(n + 1) / samples)
-		var found: int = kit.projectiles.sweep(dash.actor, point, way, 1, -PI, PI, reach, SpellRuntime.HITS, spare)
+		var found: int = kit.projectiles.sweep(dash.actor, point, way, 1, -PI * 0.5, PI * 0.5, reach, SpellRuntime.HITS, spare)
+		for i in found:
+			# A wedge answers where it meets the body and the way it turns there: a pass strikes from
+			# its middle, outward (the way to the body: its turn's way turned back).
+			var turned: Vector2 = kit.projectiles.sweep_heads[i]
+			kit.projectiles.sweep_heads[i] = Vector2(turned.y, -turned.x)
+			kit.projectiles.sweep_points[i] = point
 		if found > 0:
 			var took: HitProfile = kit.strike(spell, dash.tag, dash.actor, found, dash.struck, point, dash.chain, dash.prev, dash.hit)
 			if dash.left <= 0.0 or dash.spell != spell:

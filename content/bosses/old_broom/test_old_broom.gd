@@ -77,10 +77,10 @@ func test_the_sweep_is_a_telegraphed_charge() -> void:
 
 
 func test_the_big_sweep() -> void:
-	# Boss plan OB14, "The broom's data": on wall · reach · reach · bigger · bigger · lumber · plow ·
+	# Boss plan OB14, "The broom's data": on wall · reach · reach · bigger · lumber · plow ·
 	# dash · pulse, about 610 px long, every 20-25 s, first when phase 2 starts.
 	var big: StaffCards = BROOM.staffs[3]
-	check_equal(big.cards, [&"on_wall", &"reach", &"reach", &"bigger", &"bigger", &"lumber", &"plow", &"dash", &"pulse"] as Array[StringName], "the Sweep, twice as far and wider")
+	check_equal(big.cards, [&"on_wall", &"reach", &"reach", &"bigger", &"lumber", &"plow", &"dash", &"pulse"] as Array[StringName], "the Sweep, more than twice as far and no wider: its body's width (the owner, 2026-11-18)")
 	check(big.staff.cooldown >= 18.0 and big.staff.cooldown <= 25.0, "its long cooldown gives its pace (%s s)" % big.staff.cooldown)
 	check(big.staff.first_wait > 0.0, "not its first move as it enters (%s s)" % big.staff.first_wait)
 	check(big.staff.wind_up >= BROOM.staffs[0].staff.wind_up, "winding up no quicker than the Sweep")
@@ -144,10 +144,14 @@ func test_its_aim_locks_and_turns() -> void:
 
 
 func test_the_dust_flick_goes_where_its_lane_shows() -> void:
-	# Decision 34 (OB10): three slow bolts aimed at the player, a little spread, not scattered.
+	# Decision 34 (OB10): three bolts aimed at the player, a little spread, not scattered. Since the
+	# owner's playtest of 2026-11-18 ("It can fire faster bullets more often"): plain bolts, not slow
+	# ones, about every 1.2 s.
 	var flick: StaffCards = BROOM.staffs[1]
 	check(not flick.cards.has(&"scatter"), "no scatter: it ignored the aim")
-	check(flick.cards.has(&"triple") and flick.cards.count(&"bolt") == 3 and flick.cards.count(&"slow") == 3, "a Triple of slow bolts")
+	check(flick.cards.has(&"triple") and flick.cards.count(&"bolt") == 3 and not flick.cards.has(&"slow"), "a Triple of bolts at their full speed")
+	check(flick.staff.cooldown <= 1.2 and flick.staff.wind_up >= 0.5, "often, and still telegraphed (every %s s, a %s s wind-up)" % [flick.staff.cooldown, flick.staff.wind_up])
+	check(BROOM.phases[0].staffs.has(flick), "phase 2 keeps the same flick")
 	check(flick.staff.spread > 0.0 and flick.staff.spread <= 15.0, "a small spread between them (%s degrees)" % flick.staff.spread)
 	var fx := Fixture.new(root)
 	fx.players[0].position = Vector2(200.0, 0.0)
@@ -168,6 +172,64 @@ func test_the_dust_flick_goes_where_its_lane_shows() -> void:
 	for shot: Vector2 in shots:
 		var angle: float = rad_to_deg(absf(shot.angle()))
 		check(angle <= flick.staff.spread + 0.01, "each along the aim, within its spread (%.1f degrees)" % angle)
+	fx.free_all()
+
+
+## The owner's playtest of 2026-11-18: the Sweep "scoops players up way outside its visual
+## appearance". Every Sweep of both phases strikes no farther from its middle than its bristles
+## reach (half its head's frame). (What a pass of that width strikes: tests/gameplay/actor/test_move_pass.gd.)
+func test_a_sweep_is_no_wider_than_its_bristles() -> void:
+	var fx := Fixture.new(root)
+	fx.players[0].position = Vector2(200.0, 0.0)
+	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
+	var bristles: float = (body.get_node("Sprite/Head") as BodyPart).texture.get_width() / float((body.get_node("Sprite/Head") as BodyPart).hframes) * 0.5
+	for phase in 2:
+		if phase == 1:
+			fx.combat.hit(fx.players[0].id, body, BROOM.max_health * 0.5)
+			fx.run(body, 1)
+			check_equal(body.phases.current, 0, "spring cleaning")
+			# Its transition over and its casts done, so each Sweep can be cast by hand.
+			fx.run(body, int(BROOM.phases[0].transition / Fixture.STEP) + 2)
+		for at: int in [0, 3]:
+			var name: String = "phase %d, %s" % [phase + 1, body.caster.staff_of(at).display_name]
+			var tag: int = SpellTag.make(body.id, at, 0, int(fx.spells.get("_current")[body.id * SpellLimits.STAFFS + at]))
+			var wide: float = float(fx.spells.call("carrier_pass", tag, body.id))
+			check(wide > 26.0 and wide <= bristles, "%s strikes its body's width: %.1f px either side, its bristles %.1f" % [name, wide, bristles])
+	fx.free_all()
+
+
+## Before, a Sweep had no lane at all (a dash reaches nowhere from its caster, so its lane had no
+## length): only its ring and its scrape warned of it.
+func test_the_sweeps_lane_is_as_wide_and_as_long_as_it_strikes() -> void:
+	for at: int in [0, 3]:
+		_check_lane(at)
+
+
+func _check_lane(at: int) -> void:
+	var fx := Fixture.new(root)
+	fx.with_feel()
+	fx.players[0].position = Vector2(200.0, 0.0)
+	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
+	body.aim = Vector2.RIGHT
+	var move: float = body.caster.next_cast_sense(at).move_reach
+	fx.spells.call("ready_staff", body.id, at)
+	check(body.caster.cast(at), "it winds up staff %d" % at)
+	fx.run(body, 1)
+	var lane: Sprite2D = fx.lanes().call("sprite_of", body.id) as Sprite2D
+	check(lane != null and lane.visible, "staff %d: its lane shows" % at)
+	if lane != null:
+		var tag: int = SpellTag.make(body.id, at, 0, int(fx.spells.get("_current")[body.id * SpellLimits.STAFFS + at]))
+		var wide: float = float(fx.spells.call("carrier_pass", tag, body.id))
+		var material: ShaderMaterial = lane.material as ShaderMaterial
+		var near: float = float(material.get_shader_parameter(&"telegraph_lane"))
+		check(is_equal_approx(near, wide), "exactly as wide as it strikes either side, no margin (%.1f for %.1f)" % [near, wide])
+		check_equal(material.get_shader_parameter(&"telegraph_lane_end"), material.get_shader_parameter(&"telegraph_lane"), "all along: no cone")
+		check(lane.region_rect.size.y >= 2.0 * near, "its sprite tall enough for it (%s)" % lane.region_rect.size.y)
+		var long: float = float(fx.lanes().call("reach_of", body.id))
+		check(move > 200.0 and is_equal_approx(long, move + wide), "and it ends where its front does: its way of %.1f px and its body's width (%.1f)" % [move, long])
+		check(lane.offset.x + lane.region_rect.size.x >= move, "drawn all along its way")
+		# The owner, 2026-11-18: under the broom, as if painted on the ground.
+		check(not lane.z_as_relative and lane.z_index < body.z_index, "on the floor, under its body (z %d)" % lane.z_index)
 	fx.free_all()
 
 

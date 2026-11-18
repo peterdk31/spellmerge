@@ -504,6 +504,7 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 	spell.pose_wind_up *= wind_up_mult
 	spell.speed = speed
 	spell.radius = radius
+	spell.card_scale = spell.radius_scale
 	if _spell_scale != 1.0:
 		# The body's own size, after the cards' (boss plan OB7): as `bigger`'s radius, no damage or speed.
 		carrier.scale_size(spell, _spell_scale)

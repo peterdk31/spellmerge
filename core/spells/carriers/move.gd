@@ -59,7 +59,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	if not kit.projectiles.move_shot(shot, offset, seconds, turn, spell.homing_range, curve):
 		return 0
 	kit.moves().shield(spell, tag, -1, shot, seconds)
-	_moved_shot(spell, tag, actor, shot, seconds, chain, prev)
+	_moved_shot(spell, tag, actor, shot, way, seconds, chain, prev)
 	kit.moves().track(shot, tag, seconds, way)
 	kit.live_join(spell, tag, SpellRuntime.LC_SLOT, shot, kit.projectiles.get_seq_of(shot), false, seconds, kit.projectiles.get_position_of(shot), way)
 	return 1
@@ -90,7 +90,7 @@ func _move_body(_spell: CompiledSpell, _tag: int, _actor: int, _body: int, _orig
 
 
 ## What starts with a move of the shot `shot` that cast it.
-func _moved_shot(_spell: CompiledSpell, _tag: int, _actor: int, _shot: int, _seconds: float, _chain: int, _prev: int) -> void:
+func _moved_shot(_spell: CompiledSpell, _tag: int, _actor: int, _shot: int, _way: Vector2, _seconds: float, _chain: int, _prev: int) -> void:
 	pass
 
 

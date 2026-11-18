@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="RoomBase" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="RoomBase" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://core/base/room_base.gd" id="1_base"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/arena_01.tscn" id="2_scene"]
 [ext_resource type="Resource" path="res://content/rooms/crypt/crypt_air.tres" id="9_air"]
+[ext_resource type="Resource" path="res://content/rooms/crypt/crypt_ambience.tres" id="10_ambience"]
 
 [resource]
 script = ExtResource("1_base")
@@ -14,5 +15,6 @@ scene = ExtResource("2_scene")
 ambient = 0.65
 shade = Color(0.82, 0.88, 1, 1)
 air = ExtResource("9_air")
+ambience = ExtResource("10_ambience")
 floor_mark_colors = PackedColorArray(0.341177, 0.325491, 0.478432, 1, 0.290197, 0.274510, 0.388236, 1, 0.168628, 0.156863, 0.250981, 1)
 debris_colors = PackedColorArray(0.639216, 0.623530, 0.721569, 1, 0.478432, 0.462746, 0.580393, 1, 0.168628, 0.156863, 0.250981, 1)

@@ -66,6 +66,11 @@ extends Resource
 ## unless an enemy with music of its own lives (`EnemyBase.music`). Rooms of one biome may share a
 ## track's file (a `.tres` beside them) or each hold their own.
 @export var music: MusicTrack = null
+## Its sound under the music (docs/milestones/atmosphere.md, D; `Ambience`): looping layers and
+## sounds heard now and then (the crypt's drips and a far rumble, the hub's wind), played quietly
+## while the room is in play and faded in and out with it by Feel (gameplay/feel/room_ambience.gd).
+## Rooms of one biome share a file beside them. Null (the default): silent, as before. Heard only.
+@export var ambience: Ambience = null
 
 ## The share of the most common colour a floor's colour needs to count (a wall's is the art rule's,
 ## `ArtPixels.MIN_SHARE`): a floor is mostly one colour, its seams and highlights a few pixels in a
@@ -118,6 +123,8 @@ func template_problems(known: Array[StringName]) -> PackedStringArray:
 			found.append("%s: kind '%s' is no room kind." % [id, kinds[at]])
 	if music != null:
 		found.append_array(music.problems(String(id)))
+	if ambience != null:
+		found.append_array(ambience.problems(String(id)))
 	found.append_array(air_problems())
 	return found
 

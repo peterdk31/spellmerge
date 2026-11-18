@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Shared sound used by more than one thing: music (`music/`) and sound effects (`sfx/`). Sound that belongs to a single item (a spell's cast sound) lives in that item's folder under `content/`, not here.
+Shared sound used by more than one thing: music (`music/`), sound effects (`sfx/`) and the rooms' sound under the music (`ambience/`: the loops and accents an `Ambience` names, docs/milestones/atmosphere.md, D). Sound that belongs to a single item (a spell's cast sound) lives in that item's folder under `content/`, not here.
 
 ## Contract
 
 - Audio depends on nothing. It holds files only, no logic.
 - **`.ogg` only.** No `.wav`, `.mp3` or other formats.
 - Every asset has an entry in `audio/manifest.json` (see below), or, for the sounds of one content folder, in an `assets.json` in that folder in the same shape.
-- Loop music must loop without a click. Keep sound effects short and balanced in volume with the others.
+- Loop music and ambience loops must loop without a click, and are imported to loop (`loop=true` in their `.import`). An ambience accent (a drip, a gust) starts and ends at silence and is not imported to loop. Keep sound effects short and balanced in volume with the others.
 - Names are original. No ripped game audio, no samples of other works.
 - Audio is CC-BY-SA-4.0 by default. A file may instead declare CC0-1.0 or CC-BY-4.0 with a `<file>.license` file (AGENTS.md, hard rules).
 
@@ -49,13 +49,13 @@ The manifest drives the Steam AI disclosure and the list of placeholders still t
 
 ## Steps
 
-1. Add the `.ogg` in `sfx/` or `music/`.
+1. Add the `.ogg` in `sfx/`, `music/` or `ambience/`.
 2. Add its entry to `audio/manifest.json`.
 3. Run the checks below, then open a PR using the template.
 
 ## Example to copy
 
-Arrives with Claude's first audio in M1; this README is updated then with its path. Do not guess its layout before then.
+The first audio is the rooms' ambience (atmosphere D): `audio/ambience/amb_crypt_air.ogg` (a 12 s stereo loop, imported to loop) and `amb_crypt_drip.ogg` (a one-shot accent), named by `content/rooms/crypt/crypt_ambience.tres`, each with its entry in `audio/manifest.json`. Ambience ids start `amb_`. They are made by procedural synthesis and listed as `placeholder` until someone has listened to them in play.
 
 ## Validate
 

@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="Ambience" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://core/base/ambience.gd" id="1_ambience"]
+[ext_resource type="Script" path="res://core/base/ambience_layer.gd" id="2_layer"]
+[ext_resource type="Script" path="res://core/base/ambience_accent.gd" id="3_accent"]
+
+[sub_resource type="Resource" id="Resource_air"]
+script = ExtResource("2_layer")
+sound = &"amb_crypt_air"
+volume = 0.0
+
+[sub_resource type="Resource" id="Resource_drips"]
+script = ExtResource("3_accent")
+sounds = Array[StringName]([&"amb_crypt_drip", &"amb_crypt_drip", &"amb_crypt_drip_double"])
+volume = -4.0
+volume_spread = 3.0
+pitch_spread = 0.12
+gap_min = 4.0
+gap_max = 13.0
+wide = 280.0
+
+[sub_resource type="Resource" id="Resource_rumble"]
+script = ExtResource("3_accent")
+sounds = Array[StringName]([&"amb_crypt_rumble"])
+volume = -3.0
+volume_spread = 3.0
+pitch_spread = 0.08
+gap_min = 30.0
+gap_max = 75.0
+wide = 120.0
+
+[resource]
+script = ExtResource("1_ambience")
+layers = Array[ExtResource("2_layer")]([SubResource("Resource_air")])
+accents = Array[ExtResource("3_accent")]([SubResource("Resource_drips"), SubResource("Resource_rumble")])
+volume = -8.0
+fade = 2.0

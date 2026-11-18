@@ -169,8 +169,9 @@ func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
 		if shadows != null and item == shadows:
 			check(_drawn_z(item) < at, "the bodies' shadows (z %d) lie under the light, with the floor" % _drawn_z(item))
 			continue
-		# The sounds' 2D voices (boss plan OB15) are where a sound plays, and draw nothing.
-		if feel.sounds().is_ancestor_of(item):
+		# The sounds' 2D voices (boss plan OB15) and the room's sound's accents (atmosphere D) are
+		# where a sound plays, and draw nothing.
+		if feel.sounds().is_ancestor_of(item) or feel.ambience().is_ancestor_of(item):
 			continue
 		if item != feel and item != light.apply and item != feel._floor_node:
 			check(_drawn_z(item) > at, "Feel's %s (z %d) is over the light" % [feel.get_path_to(item), _drawn_z(item)])

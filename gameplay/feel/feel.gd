@@ -104,6 +104,7 @@ const LanesScript := preload("res://gameplay/feel/lanes.gd")
 const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
 const SoundsScript := preload("res://gameplay/feel/sounds.gd")
 const MusicScript := preload("res://gameplay/feel/music.gd")
+const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
 const BodySoundsScript := preload("res://gameplay/feel/body_sounds.gd")
 const BossIntroSoundScript := preload("res://gameplay/feel/boss_intro_sound.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
@@ -396,6 +397,8 @@ var _hit_voice: int = -1
 ## (`music.gd`), boss plan OB15.
 var _sounds: SoundsScript = null
 var _music: MusicScript = null
+## The room in play's sound under the music (atmosphere D, `room_ambience.gd`).
+var _ambience: RoomAmbienceScript = null
 ## What the bodies sound of their own: their phases' held sounds and cues, and the music they and the
 ## room ask for (`body_sounds.gd`).
 var _body_sounds: BodySoundsScript = null
@@ -740,6 +743,9 @@ func _ready() -> void:
 	_music.name = "Music"
 	_music.registry = registry
 	add_child(_music)
+	_ambience = RoomAmbienceScript.new()
+	_ambience.name = "RoomAmbience"
+	add_child(_ambience)
 	_body_sounds = BodySoundsScript.new()
 	_body_sounds.sounds = _sounds
 	_body_sounds.music = _music
@@ -931,6 +937,8 @@ func step(real_delta: float) -> void:
 		_sounds.step(real_delta)
 	if _body_sounds != null:
 		_body_sounds.step(real_delta, _actor_table(), registry)
+	if _ambience != null:
+		_ambience.step(real_delta, picture.get_center() if picture.has_area() else Vector2.INF)
 	_step_labels(real_delta)
 	if _remnants != null:
 		_remnants.step(real_delta)
@@ -1075,6 +1083,9 @@ func _on_room_entered(room_id: StringName) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if _body_sounds != null:
 		_body_sounds.room_entered(room.music if room != null else null)
+	if _ambience != null:
+		_ambience.registry = registry
+		_ambience.use(room.ambience if room != null else null)
 	if _arrive_look != null:
 		_arrive_look.use_room(room)
 	if _remnants != null:
@@ -2728,6 +2739,11 @@ func sounds() -> SoundsScript:
 
 func music() -> MusicScript:
 	return _music
+
+
+## The room's sound under the music (for tests).
+func ambience() -> RoomAmbienceScript:
+	return _ambience
 
 
 ## A cue's `held` part (`CueBase`, boss plan OB15): its sound held while its moment lasts, from its

@@ -318,6 +318,12 @@ func test_its_motions_are_the_styles_motions() -> void:
 	check(SpawnLook.MOTIONS.has(SpawnLook.FALLBACK_MOTION), "and the one a motion it lacks is drawn by")
 	for motion: StringName in SpawnLook.MOTIONS:
 		check(_look.motion_named(motion) != null, "it holds one %s" % motion)
+		if _look.motion_named(motion) != null:
+			check_equal(_look.motion_named(motion).least_frames(), SpawnStyle.MOTION_FRAMES.get(motion, -1), "%s's least frames are the style's check's (SpawnStyle.MOTION_FRAMES)" % motion)
+	var checked: Array[StringName] = []
+	checked.assign(SpawnStyle.MOTION_FRAMES.keys())
+	checked.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
+	check_equal(checked, listed, "and SpawnStyle.MOTION_FRAMES names every motion")
 
 
 ## The look draws by the style its lookup gives: the style's stages and frames for the mark and the

@@ -91,6 +91,7 @@ func test_each_problem_is_named() -> void:
 		["a mark too short for its frames (0.2 x 0.8 s x 60 = 9.6)", {"mark_frames": 16, "mark_end": 0.2}],
 		["a mark in 2 frames", {"mark_frames": 2}],
 		["a close in 2 frames", {"close_frames": 2}],
+		["a motion's stage too short for materialize (0.3 x 0.8 s x 60 = 14.4 < 17)", {"motion": &"materialize", "mark_end": 0.7, "close_from": 0.9}],
 		["colours that are no palette material", {"colours": &"teal"}],
 		["a player's colours", {"colours": &"player_1"}],
 		["a mark strip (not drawn before AS4)", {"mark_strip": PlaceholderTexture2D.new()}],

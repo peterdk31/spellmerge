@@ -50,6 +50,10 @@ var _sound_paths: Dictionary = {}
 var _sounds: Dictionary = {}
 ## One line for each sound id found twice (`sound_clashes`).
 var _sound_clashes: PackedStringArray = PackedStringArray()
+## path -> the parsed data of a content item's JSON file (`get_data`).
+var _data: Dictionary = {}
+## A plain name: what an id or a data file's name may be (`get_data`).
+var _plain: RegEx = RegEx.create_from_string("^[a-z0-9_]+$")
 
 ## The folder a content item keeps its sounds in, and a sound's folder of baked variants: never ids.
 const SOUNDS_FOLDER: String = "sounds"
@@ -280,6 +284,24 @@ func warn_run_problems() -> int:
 func get_resource(folder: StringName, id: StringName) -> Resource:
 	var found: Dictionary = _resources.get(folder, {})
 	return found.get(id) as Resource
+
+
+## The data of a content item kept as JSON rather than a `.tres` (connected biomes CB4: an edge style,
+## `content/edges/<id>/edge.json`; a ground material, `content/grounds/<id>/ground.json`): the file
+## `file_name` in the folder `id` of `folder`, parsed, read once and kept. Empty, with a warning, when
+## there is none, or for an id or file name that is not one plain name.
+func get_data(folder: StringName, id: StringName, file_name: String) -> Dictionary:
+	if not _plain.search(String(id)) or not _plain.search(file_name.get_basename()) or file_name.get_extension() != "json":
+		push_warning("Registry: '%s' / '%s' is not a content item's JSON file." % [id, file_name])
+		return {}
+	var path: String = _content_root.path_join(String(folder)).path_join(String(id)).path_join(file_name)
+	if not _data.has(path):
+		var found: JSON = ResourceLoader.load(path) as JSON if ResourceLoader.exists(path) else null
+		if found == null or not (found.data is Dictionary):
+			push_warning("Registry: no data at %s." % path)
+			return {}
+		_data[path] = found.data
+	return _data[path]
 
 
 ## Register `resource` under its `id` in `folder`, as a scan would have found it there (tests: a

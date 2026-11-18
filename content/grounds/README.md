@@ -1,6 +1,6 @@
 # content/grounds: ground materials
 
-What the floor of a room's ground is made of, as data (hub rework, [docs/milestones/hub-rework.md](../../docs/milestones/hub-rework.md), "Built for every room"): turf, trodden earth, later flagstones and stepping stones. One folder a material, `content/grounds/<id>/`, holding `ground.json`. A room's shape file names the material of its floor (`"ground": "turf"`) and of each area in it (`"areas": [{"ground": "earth", ...}]`), and `tools/ground_shape.py` draws them (content/rooms/README.md, "A room's ground from a shape"). The game never reads these files.
+What the floor of a room's ground is made of, as data (hub rework, [docs/milestones/hub-rework.md](../../docs/milestones/hub-rework.md), "Built for every room"): turf, trodden earth, later flagstones and stepping stones. One folder a material, `content/grounds/<id>/`, holding `ground.json`. A room's shape file names the material of its floor (`"ground": "turf"`) and of each area in it (`"areas": [{"ground": "earth", ...}]`), and `tools/ground_shape.py` draws them (content/rooms/README.md, "A room's ground from a shape"). Since connected biomes CB4 the game reads them too, through the registry (`Registry.get_data`), to draw a room's ground again as it is laid out (gameplay/feel/README.md, "The ground, drawn as a room is laid out").
 
 ## Contract
 

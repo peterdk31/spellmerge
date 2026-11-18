@@ -38,6 +38,9 @@ public:
 	// `Motes.give_off(given, count)`, with the kinds of pair p at `_pair_kinds[_pair_from[p]]`, of
 	// `_pair_size[p]`. Returns how many settles it handed back in `_settle_out`.
 	int64_t give_off(Object *motes, const PackedFloat32Array &given, int64_t count, bool has_marks);
+	// A room's ground drawn from its shape (connected biomes CB4): `GroundDrawing.draw(spec)`, by
+	// ground_kernel.cpp. Here because MoteKernel is the view's kernel; it keeps nothing of the pool's.
+	Dictionary draw_ground(const Dictionary &spec) const;
 	// At the module's end (register_types.cpp).
 	static void free_names();
 

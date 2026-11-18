@@ -41,7 +41,8 @@ static func body_kernel() -> Object:
 	return ClassDB.instantiate(&"BodyKernel")
 
 
-## A new `MoteKernel` (the motes' trail births), or null when the module is not loaded.
+## A new `MoteKernel` (the motes' trail births, and the ground drawn at layout: `draw_ground`), or
+## null when the module is not loaded.
 static func mote_kernel() -> Object:
 	if not _loaded_or_tell():
 		return null

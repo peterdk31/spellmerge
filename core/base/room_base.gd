@@ -15,6 +15,11 @@ extends Resource
 @export var display_name: String = ""
 ## The layout scene: its art and walls, and what is where (`RoomPlaces`). No scripts.
 @export var scene: PackedScene
+## The shape its ground is drawn from when it is laid out (connected biomes CB4: its `<room>.shape.json`,
+## content/rooms/README.md, "A room's ground from a shape"): Feel draws its floor, rock face, glow,
+## wall art and edge motes again from it as placed, mirrored or not, over its `Floor`'s baked art
+## (gameplay/feel/ground/). Null (the hub): the baked art stays. Drawn only.
+@export var ground_shape: JSON = null
 ## The biome it is a room of (run generation RG1): a run's map of that biome may use it
 ## (`MapRules.biome`). Empty: no biome's.
 @export var biome: StringName = &""

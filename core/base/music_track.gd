@@ -10,7 +10,7 @@ extends Resource
 ## then drums over it); **not stacked**, it plays the nth alone (a second, more intense entry;
 ## decision 25: whoever makes the music chooses). One plain track is one layer. Every layer starts
 ## together and keeps playing silent until its intensity comes, so they never drift apart; a change
-## fades over `fade` seconds. Feel plays it (`gameplay/feel/music.gd`), drawn only: nothing in the
+## fades over `fade` seconds. Feel picks it and Audio plays it (`core/audio/music.gd`), drawn only: nothing in the
 ## game reads it.
 
 ## The most layers a track has.

@@ -1,6 +1,6 @@
 # Sound: a generator for every sound the game asks for
 
-**Status (2026-11-18): written with the owner, waiting for approval.** AU1 (this document) is up for review. Written with the owner in an owner session on 2026-11-18, after an interview and three style samples. Reviewed by a fresh-context agent against the code the same day. Its findings are written into the plan: the 45 ids, the cast sound on `staff_cast`, the sound room under `tests/`, ffmpeg in the tools' contract, a sound folder's own `assets.json`, the duck's own bus, momentary loudness and the peak margin, Godot's own `.import` files, the golden fingerprint, `random_pitch` as a scale, and content randomizers loaded lazily.
+**Status (2026-11-18): written with the owner, waiting for approval.** AU1 (this document) is up for review. **AU3 done (the Audio service; "Built (AU3)" below).** Written with the owner in an owner session on 2026-11-18, after an interview and three style samples. Reviewed by a fresh-context agent against the code the same day. Its findings are written into the plan: the 45 ids, the cast sound on `staff_cast`, the sound room under `tests/`, ffmpeg in the tools' contract, a sound folder's own `assets.json`, the duck's own bus, momentary loudness and the peak margin, Godot's own `.import` files, the golden fingerprint, `random_pitch` as a scale, and content randomizers loaded lazily.
 
 **The owner (2026-11-18):** "We need to design a sound generator for the game."
 
@@ -201,6 +201,22 @@ The tool writes `<id>.tres`, an `AudioStreamRandomizer` naming `variants/1.ogg` 
 | **AU7** | **Music:** `tools/sound_score.py`, then `boss_broom` + `boss_broom_fire`, and one crypt room track. | Layers are of one length (tested), loop with no click, and play through intensity in the sound room and in the fight. The owner listens. |
 | **AU8** | **UI sounds and volumes:** the HUD's move, choose, back and deny sounds, the builder's card place and remove, the Music, Sound and UI sliders in the pause menu's Audio tab. | The HUD sends only `ui_sound_requested`, and a test opens the menus and counts the requests. |
 | **AU9** | **The owner's playtest** with sound, and promotion to `final` of what passes. | The owner's notes are done or in the backlog. |
+
+## Built (AU3)
+
+The choices the plan left open, as built (2026-11-18):
+
+- **The move first, then the additions.** `gameplay/feel/sounds.gd` is gone: its voices are `core/audio/voices.gd` and its held slots `core/audio/held.gd`; `music.gd` moved to `core/audio/` unchanged but for its bus; the room ambience's bed and accent voices are `core/audio/ambience.gd`. Every case of the old tests is kept, checking the same things, and split: the machinery's in `tests/core/audio/` (`test_audio_voices.gd`, `test_audio_music.gd`, `test_audio_buses.gd`), Feel's decisions in `tests/gameplay/feel/test_feel_sounds.gd` and `test_room_ambience.gd`.
+- **The over lane is its own call,** `Audio.play_over(id, volume, bus)`, not `play(..., bus = BUS_SFX)` as section 5 had it: a bus does not say whether a voice pauses, so the lane is named by the function. The UI's voices are on the same unpaused lane.
+- **Handles.** `hold` returns a number never given twice (0 for none), and takes an earlier handle (`take`) to go on in its slot with no restart: Feel's `held_sounds.gd` keeps (caster, id, `Until`, key) to a handle, so "one held sound a caster and id" is still Feel's rule and Audio knows no caster. An entry lasts while its handle has a slot (held or fading), so a sound taken over while it fades goes on, as before.
+- **Audio steps itself** (`_process`, its `World` child only while the tree is not paused); Feel no longer steps any player. Tests step it by hand (`step`, `step_world`).
+- **The cast sound** is a world voice from where the cast left (`staff_cast`'s origin), where the player's was a plain player heard the same everywhere: the only change in what is heard, and the plan's own (every other sound is placed). The id is Feel's `CAST_SOUND`.
+- **Volumes.** The four settings' saved keys are `AudioVolumes` (core/settings); they share `AmbienceVolume`'s stops and curve, so no second curve exists. Each bus eases at 4 shares a second (the ambience's old `VOLUME_RATE`), is written only while it moves (a test's own Audio is never fought), and is muted at 0% in place of stopping its players. The events exist and Audio hears them; only the ambience has a slider until AU8.
+- **The duck** keeps up to 8 ducks; the deepest under way wins, the music coming down over 0.05 s and back up over 0.3 s from wherever it is. A cue's `duck` is checked from -24 to 0 dB, and Feel asks it for the cue's sound's length (`Audio.length_of`), so a cue whose sound has no file ducks nothing.
+- **Panning:** every world voice's `panning_strength` is `Audio.PAN`, 1.0 (Godot's own default for a player, so nothing heard changed); the owner tunes it by ear.
+- **Godot 4.7, checked:** `AudioStreamRandomizer.get_length()` is 0 (`AudioLength.of` is tested against it), and 4.7 has both `random_pitch` and `random_pitch_semitones`. docs/STYLE.md gives pitch jitter in percent, so AU2's `.tres` uses `random_pitch` (1.04 for ±4%).
+- **The registry** reads `.ogg` and `.tres` sounds under `audio/` and under any content item's `sounds/` folder (audio's first, then content's, each in path order), never a file under `variants/`; the content scan of `.tres` skips `sounds/` folders. A clash is a warning and a line of `Registry.sound_clashes()`, and `tests/core/test_registry.gd` fails on any in the game's files.
+- **`test_sim_rules`** names any `Audio`, `AudioServer` or `AudioStreamPlayer` on a line of a simulation script.
 
 ## Rules for every step
 

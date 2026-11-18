@@ -4,8 +4,8 @@ extends "res://tests/support/suite.gd"
 ## as wished. "Shadows" (C: the light's blockers and the bodies' shadows, the staff's drawn shadow
 ## back with them off), "Fog" (F: the mist) and "Ambient particles" (B: the air's dust) need
 ## "Dynamic lighting" (the spell light); "Environment interaction" (E) off reads no shot and starts no
-## blast, the wake easing out to a still field; "Ambience volume" (D) scales the room's sound and at
-## 0 stops its players.
+## blast, the wake easing out to a still field; "Ambience volume" (D) reaches Audio from the saved
+## choice (its bus and its easing are tests/core/audio/test_audio_buses.gd's).
 
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
@@ -18,7 +18,7 @@ const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const StirsScript := preload("res://gameplay/feel/stirs.gd")
 const SpotStirsScript := preload("res://gameplay/feel/spot_stirs.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
-const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
+const AudioScript := preload("res://core/audio/audio.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const FRAME: float = 1.0 / 60.0
@@ -45,7 +45,12 @@ func _feel() -> Array:
 	manager.events = bus
 	manager.actors = table
 	root.add_child(manager)
+	var audio: AudioScript = own(AudioScript.new()) as AudioScript
+	audio.events = bus
+	audio.registry = registry
+	root.add_child(audio)
 	var feel: FeelScript = own(FeelScript.new()) as FeelScript
+	feel.audio = audio
 	var preset := FeelPresetScript.new()
 	preset.hit_sound = &""
 	feel.events = bus
@@ -55,7 +60,7 @@ func _feel() -> Array:
 	feel.drive_engine = false
 	feel.preset = preset
 	root.add_child(feel)
-	return [bus, feel]
+	return [bus, feel, audio]
 
 
 ## The room `id` built and entered.
@@ -73,13 +78,15 @@ func _frames(feel: FeelScript, count: int) -> void:
 # --- The defaults ---------------------------------------------------------------------------------
 
 func test_feel_starts_at_the_settings_defaults() -> void:
-	var feel: FeelScript = _feel()[1]
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var audio: AudioScript = made[2]
 	var spectacle: SpectacleScript = feel.spectacle()
 	check_equal(spectacle.shadows_on, ShadowsSetting.default_on(), "Shadows")
 	check_equal(spectacle.fog, FogSetting.default_on(), "Fog")
 	check_equal(spectacle.ambient_particles, AmbientParticles.default_on(), "Ambient particles")
 	check_equal(spectacle.environment_interaction, EnvironmentInteraction.default_on(), "Environment interaction")
-	check(is_equal_approx(feel.ambience().volume(), AmbienceVolume.share_of(AmbienceVolume.DEFAULT)), "Ambience volume")
+	check(is_equal_approx(audio.buses.volume(AudioScript.BUS_AMBIENCE), AmbienceVolume.share_of(AmbienceVolume.DEFAULT)), "Ambience volume")
 
 
 # --- Shadows --------------------------------------------------------------------------------------
@@ -337,131 +344,6 @@ func test_feel_with_interaction_off_pushes_nothing_and_its_lights_rest() -> void
 # --- Ambience volume ------------------------------------------------------------------------------
 
 ## A silent 8 kHz looping stream.
-func _wav() -> AudioStreamWAV:
-	var wav := AudioStreamWAV.new()
-	wav.format = AudioStreamWAV.FORMAT_8_BITS
-	wav.mix_rate = 8000
-	var data := PackedByteArray()
-	data.resize(800)
-	wav.data = data
-	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	wav.loop_end = 800
-	return wav
-
-
-## A registry answering every sound with `stream`.
-class SoundRegistry:
-	extends Node
-	var stream: AudioStream = null
-
-	func get_sound(_id: StringName) -> AudioStream:
-		return stream
-
-
-## A room sound playing an ambience of one layer at `layer_db` (no fade), audible or not.
-func _ambience_player(audible: bool, layer_db: float) -> RoomAmbienceScript:
-	var sounds := own(SoundRegistry.new()) as SoundRegistry
-	sounds.stream = _wav()
-	var player: RoomAmbienceScript = own(RoomAmbienceScript.new()) as RoomAmbienceScript
-	player.registry = sounds
-	player.audible = audible
-	root.add_child(player)
-	var layer := AmbienceLayer.new()
-	layer.sound = &"t_air"
-	layer.volume = layer_db
-	var drip := AmbienceAccent.new()
-	drip.sounds = [&"t_drip"] as Array[StringName]
-	drip.gap_min = 0.5
-	drip.gap_max = 0.5
-	var ambience := Ambience.new()
-	ambience.layers = [layer] as Array[AmbienceLayer]
-	ambience.accents = [drip] as Array[AmbienceAccent]
-	ambience.fade = 0.0
-	ambience.volume = -8.0
-	player.use(ambience)
-	return player
-
-
-func test_the_volume_scales_the_bed_in_db_easing_to_it() -> void:
-	var player: RoomAmbienceScript = _ambience_player(false, -2.0)
-	player.step(FRAME)
-	check(is_equal_approx(player.volume_of(0), -10.0), "at 100%%: the room's own level, got %s" % player.volume_of(0))
-	var half: float = AmbienceVolume.share_of(50)
-	check(is_equal_approx(player.set_volume(half), half), "the share taken")
-	var biggest: float = 0.0
-	var last: float = player.heard()
-	for frame in 60:
-		player.step(FRAME)
-		biggest = maxf(biggest, absf(player.heard() - last))
-		last = player.heard()
-	check(biggest <= RoomAmbienceScript.VOLUME_RATE * FRAME + 0.0001, "eased a frame's share at a time, the biggest %s" % biggest)
-	check(is_equal_approx(player.volume_of(0), -10.0 + linear_to_db(half)), "50%%: the curve's level, got %s" % player.volume_of(0))
-	player.stop()
-
-
-func test_the_volume_at_zero_is_silent_and_stops_its_players_then_plays_again() -> void:
-	var player: RoomAmbienceScript = _ambience_player(true, 0.0)
-	var bed: AudioStreamPlayer = player.bed_player(0)
-	check(bed.playing, "the bed plays at 100%")
-	player.set_volume(0.0)
-	var frames: int = 0
-	while player.heard() > 0.0 and frames < 60:
-		player.step(FRAME)
-		frames += 1
-	check(player.heard() == 0.0 and bed.playing and is_inf(player.volume_of(0)), "the step it falls silent: silenced, still playing (no click)")
-	player.step(FRAME)
-	check(not bed.playing, "the step after: the bed's player stops")
-	for frame in 60:
-		player.step(FRAME)
-	check(player.heard() == 0.0 and not bed.playing, "0%: the bed's player stays stopped")
-	check(is_inf(player.volume_of(0)) and player.volume_of(0) < 0.0, "and is silent")
-	var played: int = player.accents_played
-	for frame in 60:
-		player.step(FRAME)
-	check(player.accents_played > played and (player.accent_voice() == null or not player.accent_voice().playing), "an accent is picked but not heard")
-	check(not bed.playing, "the bed stays stopped")
-	player.set_volume(1.0)
-	player.step(FRAME)
-	check(bed.playing, "back up: the bed plays again")
-	player.stop()
-
-
-func test_the_volume_curve_is_even_in_db_from_minus_40_to_0() -> void:
-	check_equal(AmbienceVolume.share_of(0), 0.0, "0% silent")
-	check(is_equal_approx(linear_to_db(AmbienceVolume.share_of(10)), AmbienceVolume.QUIETEST_DB), "10%%: %s dB" % AmbienceVolume.QUIETEST_DB)
-	check(is_equal_approx(AmbienceVolume.share_of(100), 1.0), "100%: the room's own level")
-	var step: float = linear_to_db(AmbienceVolume.share_of(20)) - linear_to_db(AmbienceVolume.share_of(10))
-	for percent in range(20, 101, 10):
-		var rise: float = linear_to_db(AmbienceVolume.share_of(percent)) - linear_to_db(AmbienceVolume.share_of(percent - 10))
-		check(absf(rise - step) < 0.01, "%d%%: an even %s dB louder, got %s" % [percent, step, rise])
-
-
-func test_a_ringing_accent_follows_the_volume() -> void:
-	var player: RoomAmbienceScript = _ambience_player(false, 0.0)
-	for frame in int(0.6 / FRAME):
-		player.step(FRAME)
-	var voice: AudioStreamPlayer2D = player.accent_voice()
-	check(voice != null, "an accent played")
-	var played: float = voice.volume_db
-	player.set_volume(AmbienceVolume.share_of(50))
-	for frame in 30:
-		player.step(FRAME)
-	check(is_equal_approx(voice.volume_db, played + linear_to_db(AmbienceVolume.share_of(50))), "the ringing accent is turned down with the rest, %s to %s" % [played, voice.volume_db])
-	player.stop()
-
-
-func test_feel_hands_the_volume_to_its_room_sound() -> void:
-	var made: Array = _feel()
-	var bus: EventsScript = made[0]
-	var feel: FeelScript = made[1]
-	bus.ambience_volume_changed.emit(30)
-	check(is_equal_approx(feel.ambience().volume(), AmbienceVolume.share_of(30)), "30%% heard on the curve, got %s" % feel.ambience().volume())
-	bus.ambience_volume_changed.emit(0)
-	check_equal(feel.ambience().volume(), 0.0, "0% silent")
-	bus.ambience_volume_changed.emit(100)
-	check_equal(feel.ambience().volume(), 1.0, "100% full")
-
-
 # --- Nothing left over ----------------------------------------------------------------------------
 
 func test_flipping_every_switch_leaves_nothing_over() -> void:
@@ -528,6 +410,7 @@ func test_saved_choices_reach_feel_when_the_hud_binds() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
+	var audio: AudioScript = made[2]
 	var input: InputManagerScript = own(InputManagerScript.new()) as InputManagerScript
 	input.events = bus
 	var focus: UIFocusScript = own(UIFocusScript.new()) as UIFocusScript
@@ -545,6 +428,6 @@ func test_saved_choices_reach_feel_when_the_hud_binds() -> void:
 	check_equal(spectacle.fog, not FogSetting.default_on(), "Fog reached Feel")
 	check_equal(spectacle.ambient_particles, not AmbientParticles.default_on(), "Ambient particles reached Feel")
 	check_equal(spectacle.environment_interaction, not EnvironmentInteraction.default_on(), "Environment interaction reached Feel")
-	check(is_equal_approx(feel.ambience().volume(), AmbienceVolume.share_of(40)), "Ambience volume reached Feel")
+	check(is_equal_approx(audio.buses.volume(AudioScript.BUS_AMBIENCE), AmbienceVolume.share_of(40)), "Ambience volume reached Audio")
 	root.remove_child(hud)
 	DirAccess.remove_absolute(SAVE_PATH)

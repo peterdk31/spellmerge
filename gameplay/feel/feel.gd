@@ -19,7 +19,8 @@ extends Node
 ##   gone is skipped).
 ## - a white-hot ring where an enemy dies, and its body breaks into motes of its own art's
 ##   colours that fall and settle (S3, `Spectacle.break_body`; the enemy itself is freed at once).
-## - a sound from `core/registry` by id; nothing plays on `null`.
+## - a sound from `core/registry` by id, played on Audio (core/audio: Feel decides what plays and
+##   when, Audio how); nothing plays on `null`. A seat's every cast (`staff_cast`) sounds `cast`.
 ##
 ## Every actor's damage numbers (props W5) are drawn by one child, `damage_number_drawer.gd`: each
 ## actor's `DamageNumbers` look tells its hits on the bus (`damage_number_shown`), and the
@@ -71,7 +72,8 @@ extends Node
 ## parts, each handed the part and the cue's `CueContext` (one kept per depth, so a cue allocates
 ## nothing). A new kind of part is a player added to the table and a row in `CueBase.PART_TYPES`.
 ##
-## Nothing is allocated while playing: the flash batch and sound players are made once.
+## Nothing is allocated while playing: the flash batch is made once, and the sounds' players are
+## Audio's.
 ## They live under this autoload (top level, so in world space), never under the scene:
 ## Flow frees the world on every Play and restart.
 
@@ -102,11 +104,9 @@ const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const LanesScript := preload("res://gameplay/feel/lanes.gd")
 const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
-const SoundsScript := preload("res://gameplay/feel/sounds.gd")
-const MusicScript := preload("res://gameplay/feel/music.gd")
+const AudioScript := preload("res://core/audio/audio.gd")
+const HeldSoundsScript := preload("res://gameplay/feel/held_sounds.gd")
 const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
-## Godot's audio driver with no device (headless runs').
-const DUMMY_AUDIO_DRIVER: String = "Dummy"
 const BodySoundsScript := preload("res://gameplay/feel/body_sounds.gd")
 const BossIntroSoundScript := preload("res://gameplay/feel/boss_intro_sound.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
@@ -177,8 +177,8 @@ const BEAM_PARTICLES_MOST: int = 12
 
 ## The registry folder of the rooms (a room's music).
 const ROOM_FOLDER: StringName = &"rooms"
-## One-shot sounds that can play at once (`sounds.gd`).
-const SOUND_VOICES: int = SoundsScript.VOICES
+## One-shot sounds that can play at once (Audio's world voices, core/audio).
+const SOUND_VOICES: int = AudioScript.VOICES
 ## How often the bodies' phases and the music are looked at (s; `body_sounds.gd`).
 const MUSIC_POLL: float = BodySoundsScript.POLL
 ## The share of the effect slots a frame's hit flashes leave to the rest (casts, kills,
@@ -318,15 +318,16 @@ const POSSESS_END: StringName = &"possess_end"
 ## docs/milestones/boss-intro.md, rule 8), and this cue only when no intro played for it (the run's
 ## rule off, a boss a phase called: `BossIntroWait`).
 const BOSS_INTRO: StringName = &"boss_intro"
+## The sound of a seat's every cast (`staff_cast`).
+const CAST_SOUND: StringName = &"cast"
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null
-## Whether Feel's players are started at all (`hears_audio()`, read in `_ready`), handed to its
-## sounds, music, room sound and the boss intro's sounds: not on the audio driver with no device
-## (every headless run), where nothing hears them and a loop still playing as the run quits is left
-## with the engine's audio thread (a leak the test runner fails on).
-var audible: bool = true
+## The Audio service every sound plays on (core/audio; docs/milestones/sound.md, section 5): Feel
+## decides what plays and when, Audio how. Only tests set it, before adding the node; otherwise the
+## `Audio` autoload is used.
+var audio: AudioScript = null
 ## The registry and the projectile manager are handed on to the spectacle whenever they change.
 var registry: RegistryScript = null:
 	set(value):
@@ -406,11 +407,9 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _hit_slot: int = -1
 var _hit_position: Vector2 = Vector2.INF
 var _hit_voice: int = -1
-## Every sound but the music (`sounds.gd`: one-shots where they happen, held sounds), and the music
-## (`music.gd`), boss plan OB15.
-var _sounds: SoundsScript = null
-var _music: MusicScript = null
-## The room in play's sound under the music (atmosphere D, `room_ambience.gd`).
+## What each held sound is for and when it ends (`held_sounds.gd`, boss plan OB15); Audio plays them.
+var _held: HeldSoundsScript = null
+## The room in play's sound under the music (atmosphere D, `room_ambience.gd`): which, and its accents.
 var _ambience: RoomAmbienceScript = null
 ## What the bodies sound of their own: their phases' held sounds and cues, and the music they and the
 ## room ask for (`body_sounds.gd`).
@@ -749,31 +748,24 @@ func _ready() -> void:
 	_remnants = RemnantsScript.new()
 	_remnants.name = "Remnants"
 	add_child(_remnants)
-	_sounds = SoundsScript.new()
-	_sounds.name = "Sounds"
-	_sounds.registry = registry
-	add_child(_sounds)
-	_music = MusicScript.new()
-	_music.name = "Music"
-	_music.registry = registry
-	add_child(_music)
-	audible = hears_audio()
-	_sounds.audible = audible
-	_music.audible = audible
+	if audio == null:
+		audio = get_node_or_null("/root/Audio") as AudioScript
+	_held = HeldSoundsScript.new()
+	_held.audio = audio
 	_ambience = RoomAmbienceScript.new()
 	_ambience.name = "RoomAmbience"
 	_ambience.events = events
 	_ambience.registry = registry
-	_ambience.audible = audible
+	_ambience.audio = audio
 	add_child(_ambience)
 	_body_sounds = BodySoundsScript.new()
-	_body_sounds.sounds = _sounds
-	_body_sounds.music = _music
+	_body_sounds.held = _held
+	_body_sounds.audio = audio
 	_body_sounds.play_cue = _play_body_cue
 	_intro_sound = BossIntroSoundScript.new()
 	_intro_sound.name = "BossIntroSound"
 	_intro_sound.registry = registry
-	_intro_sound.audible = audible
+	_intro_sound.audio = audio
 	add_child(_intro_sound)
 	add_cue_part(&"held", _play_held)
 	_numbers = DamageNumberDrawerScript.new()
@@ -864,7 +856,7 @@ func _ready() -> void:
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
-	events.ambience_volume_changed.connect(_on_ambience_volume_changed)
+	events.staff_cast.connect(_on_staff_cast)
 	events.projectile_expired.connect(_on_projectile_expired)
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
@@ -958,12 +950,11 @@ func step(real_delta: float) -> void:
 	if _lanes != null:
 		_lanes.spells = spells
 		_lanes.step(real_delta)
-	if _sounds != null:
-		_sounds.registry = registry
-		_sounds.spells = spells
-		_sounds.step(real_delta)
+	if _held != null:
+		_held.spells = spells
+		_held.step()
 	if _body_sounds != null:
-		_body_sounds.step(real_delta, _actor_table(), registry)
+		_body_sounds.step(real_delta, _actor_table())
 	if _ambience != null:
 		_ambience.step(real_delta, picture.get_center() if picture.has_area() else Vector2.INF)
 	_step_labels(real_delta)
@@ -1105,8 +1096,10 @@ func _grow_reactions(size: int) -> void:
 func _on_room_entered(room_id: StringName) -> void:
 	party_camera.room_entered()
 	# What held a sound is gone with the last room; the music is the new room's (`body_sounds.gd`).
-	if _sounds != null:
-		_sounds.clear()
+	if audio != null:
+		audio.clear_world()
+	if _held != null:
+		_held.clear()
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if _body_sounds != null:
 		_body_sounds.room_entered(room.music if room != null else null)
@@ -1127,12 +1120,6 @@ func _on_room_entered(room_id: StringName) -> void:
 func _on_main_menu_requested(_player: int) -> void:
 	if _body_sounds != null:
 		_body_sounds.room_entered(null)
-
-
-## Whether this machine can hear Feel's players: not on Godot's audio driver with no device
-## (`DUMMY_AUDIO_DRIVER`, every headless run).
-static func hears_audio() -> bool:
-	return AudioServer.get_driver_name() != DUMMY_AUDIO_DRIVER
 
 
 ## A bit per seat played on this machine (`Frames.seats_here`): whose wizards the party camera
@@ -1771,7 +1758,10 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 			if body != null and body.global_position.distance_to(at) > 1.0:
 				way = body.global_position.direction_to(at)
 		_kick = (_kick + way * cue.kick * power).limit_length(MAX_KICK_PIXELS)
-	_play(instead if instead != &"" else cue.sound, at)
+	var sound: StringName = instead if instead != &"" else cue.sound
+	if _play(sound, at) >= 0 and cue.duck < 0.0:
+		# The music gives way for as long as the sound plays (Audio's duck: the deepest wins).
+		audio.duck(cue.duck, audio.length_of(sound))
 
 
 ## Whether `plan`, played as the look of the hit being shown, would show nothing: each of its parts
@@ -1969,8 +1959,8 @@ func _on_carrier_ended(caster: int, carrier_card: StringName, at: Vector2, direc
 	var tag: int = _cue_tag()
 	if _spectacle != null:
 		_spectacle.end_streams(caster, tag)
-	if _sounds != null:
-		_sounds.end_carrier(caster, tag)
+	if _held != null:
+		_held.end_carrier(caster, tag)
 	var cue: StringName = _carrier_card_cues_of(carrier_card)[CUE_END] as StringName
 	if cue != &"":
 		play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, tag)
@@ -2363,11 +2353,10 @@ func set_environment_interaction(on: bool) -> bool:
 	return _spectacle.set_environment_interaction(on)
 
 
-## The "Ambience volume" setting (`ambience_volume_changed`, in percent): the room's sound at that
-## share of its loudness (`RoomAmbience.set_volume`).
-func _on_ambience_volume_changed(percent: int) -> void:
-	if _ambience != null:
-		_ambience.set_volume(AmbienceVolume.share_of(percent))
+## A seat's staff was cast (`staff_cast`, every cast, a carrier card or none): the cast sound from
+## where it left (docs/milestones/sound.md, section 5: it was the player's, in the simulation).
+func _on_staff_cast(_player: int, _staff: int, origin: Vector2, _direction: Vector2) -> void:
+	_play(CAST_SOUND, origin)
 
 
 func _on_screen_shake_changed(enabled: bool) -> void:
@@ -2688,7 +2677,8 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 		_spectacle.break_body(body, _rest_transform(body, enemy), preset.death_mote_kind, preset.death_mote_share, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
 	# The hit that killed it (its flash still showing here) is silenced for the death's sound.
 	if _hit_voice >= 0 and _hit_slot >= 0 and _hit_position == position and _flash_seconds[_hit_slot] > 0.0:
-		_sounds.stop(_hit_voice)
+		if audio != null:
+			audio.stop(_hit_voice)
 	# Its motes: the killing shot's cards' kinds (read while the event is sent), and the surface
 	# kinds in the colours of the body's own art.
 	var look: int = 0
@@ -2818,13 +2808,9 @@ func lanes() -> LanesScript:
 	return _lanes
 
 
-## The sounds and the music (for tests).
-func sounds() -> SoundsScript:
-	return _sounds
-
-
-func music() -> MusicScript:
-	return _music
+## Feel's held sounds (for tests).
+func held_sounds() -> HeldSoundsScript:
+	return _held
 
 
 ## The room's sound under the music (for tests).
@@ -2833,27 +2819,26 @@ func ambience() -> RoomAmbienceScript:
 
 
 ## A cue's `held` part (`CueBase`, boss plan OB15): its sound held while its moment lasts, from its
-## caster's body: a wind-up cue's until the cast leaves (`Sounds.Until.WIND`), a move's (a staff's
+## caster's body: a wind-up cue's until the cast leaves (`HeldSounds.Until.WIND`), a move's (a staff's
 ## `move_cue`) until that move ends (`CARRIER`), any other cue's for its seconds where it was played.
 func _play_held(part: Variant, cue: CueContextScript) -> void:
-	if _sounds == null or not part is Dictionary:
+	if _held == null or not part is Dictionary:
 		return
 	var held: Dictionary = part as Dictionary
-	var until: int = SoundsScript.Until.SECONDS
+	var until: int = HeldSoundsScript.Until.SECONDS
 	var key: int = 0
 	if _cue_wind >= 0:
-		until = SoundsScript.Until.WIND
+		until = HeldSoundsScript.Until.WIND
 		key = _cue_wind
 	elif _cue_move != 0:
-		until = SoundsScript.Until.CARRIER
+		until = HeldSoundsScript.Until.CARRIER
 		key = _cue_move
 	var follow: Node2D = cue.follow
-	if follow == null and until != SoundsScript.Until.SECONDS:
+	if follow == null and until != HeldSoundsScript.Until.SECONDS:
 		var table: ActorsScript = _actor_table()
 		follow = table.node_of(cue.caster) as Node2D if table != null and table.is_open(cue.caster) else null
-	_sounds.registry = registry
-	_sounds.spells = spells
-	_sounds.hold(StringName(held.get("sound", "")), until, cue.caster, key, follow, cue.at, float(held.get("seconds", 4.0)), float(held.get("volume", 0.0)))
+	_held.spells = spells
+	_held.hold(StringName(held.get("sound", "")), until, cue.caster, key, follow, cue.at, float(held.get("seconds", 4.0)), float(held.get("volume", 0.0)))
 
 
 ## Whether the carrier of the spell tagged `tag` runs its caster along (a dash: `MOVES_ALONG`), so it
@@ -3321,10 +3306,9 @@ func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = V
 ## Plays a sound where it happens (`at`; INF: the middle of the picture); returns the voice used, or
 ## -1 for none.
 func _play(id: StringName, at: Vector2 = Vector2.INF) -> int:
-	if _sounds == null:
+	if audio == null:
 		return -1
-	_sounds.registry = registry
-	return _sounds.play(id, at)
+	return audio.play(id, at)
 
 
 ## True for the death of a boss: an enemy whose data says `boss`.

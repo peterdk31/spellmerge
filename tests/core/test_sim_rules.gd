@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The simulation/view line (online-ready N9, core/sim/README.md, "The line"): simulation code runs on
 ## the tick, the same on every machine, so it reads no clock, rolls no dice of the engine's, calls
-## none of the engine's maths, reads no device, mouse, camera or window, and keeps no instance id.
+## none of the engine's maths, reads no device, mouse, camera or window, plays no sound (Audio,
+## its players and buses are view only), and keeps no instance id.
 ## This reads every simulation script's code (tests/support/sim_source.gd: StateWalk.FOLDERS but
 ## StateWalk.VIEW_FOLDERS; a look that says `VIEW_ONLY` is skipped) against one table, RULES.
 ##
@@ -59,6 +60,10 @@ const RULES: Array[Dictionary] = [
 		"fix": "take the seat's frame (`frames.frame_of(seat)`), and the joined seats from the frames service"},
 	{"pattern": "get_(global|local)_mouse_position\\(", "does": "reads the mouse",
 		"fix": "take the seat's aim from its frame"},
+	# Sound (docs/milestones/sound.md, section 5): the simulation never plays one.
+	{"pattern": "(^|[^\\w])(Audio|AudioScript|AudioServer|AudioStreamPlayer(2D|3D)?)([^\\w]|$)",
+		"does": "plays or drives a sound, which is view only",
+		"fix": "send the moment's event and let Feel ask Audio for its sound (core/audio, gameplay/feel)"},
 	# The picture.
 	{"pattern": "(get_viewport|get_visible_rect|get_camera_2d)\\(|(^|[^\\w])Camera2D([^\\w]|$)",
 		"does": "reads the picture (the window, a camera), which differs between machines",
@@ -105,6 +110,8 @@ func test_the_rules_find_what_they_are_for() -> void:
 		"var a: float = sin(t)": true, "var a: float = DMath.sin(t)": false, "v = v.rotated(0.5)": true,
 		"v = DMath.rotated(v, 0.5)": false, "var r: float = randf()": true, "var r: float = sim.chance(&\"x\", 1, 2)": false,
 		"var f: float = Engine.get_physics_interpolation_fraction()": true, "var tree := Engine.get_main_loop()": false,
+		"var voice := AudioStreamPlayer.new()": true, "Audio.play(&\"cast\", at)": true, "var stream: AudioStream = null": false,
+		"AudioServer.set_bus_volume_db(1, 0.0)": true, "var audio_left: float = 0.0": false,
 	}
 	var patterns: Array[RegEx] = []
 	for rule: Dictionary in RULES:

@@ -23,8 +23,15 @@ extends Node
 ## runs' (`validate_runs()`), and pushes one warning per problem, so broken spell or run content
 ## shows up on the first run.
 ##
-## Sounds are `.ogg` files anywhere under the audio root; the id is the file
-## name without extension. An unknown id returns `null`, never an error.
+## Sounds (docs/milestones/sound.md, section 3) are `.ogg` files and `.tres` files (an
+## `AudioStreamRandomizer` of a sound's baked variants: `<id>.tres` naming `variants/1.ogg` ...)
+## anywhere under the audio root, and under any `sounds/` folder of a content item (a single item's
+## sound lives in its own folder, `content/<...>/sounds/<id>/`); the id is the file name without
+## extension. Nothing under a `variants/` folder is an id of its own. The content scan of `.tres`
+## files skips `sounds/` folders, so a sound loads only when it is first asked for. An `.ogg` and a
+## `.tres` of one id, or two files of one id anywhere, is a warning naming both (the audio root's
+## first, then the content's, each in path order: the first is kept), listed by `sound_clashes()`, which a test fails on for the game's files. An
+## unknown id returns `null`, never an error.
 
 const DEFAULT_CONTENT_ROOT: String = "res://content"
 const DEFAULT_AUDIO_ROOT: String = "res://audio"
@@ -41,6 +48,14 @@ var _ids: Dictionary = {}
 var _sound_paths: Dictionary = {}
 ## sound id -> AudioStream already loaded
 var _sounds: Dictionary = {}
+## One line for each sound id found twice (`sound_clashes`).
+var _sound_clashes: PackedStringArray = PackedStringArray()
+
+## The folder a content item keeps its sounds in, and a sound's folder of baked variants: never ids.
+const SOUNDS_FOLDER: String = "sounds"
+const VARIANTS_FOLDER: String = "variants"
+## What a sound file may be.
+const SOUND_EXTENSIONS: PackedStringArray = ["ogg", "tres"]
 
 
 func _ready() -> void:
@@ -53,13 +68,14 @@ func _ready() -> void:
 
 ## Reads the content and audio folders again. The roots can be changed so
 ## tests can scan a fixture folder; `sound_extensions` is for tests as well.
-func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFAULT_AUDIO_ROOT, sound_extensions: PackedStringArray = PackedStringArray(["ogg"])) -> void:
+func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFAULT_AUDIO_ROOT, sound_extensions: PackedStringArray = SOUND_EXTENSIONS) -> void:
 	_content_root = content_root
 	_duplicates.clear()
 	_resources.clear()
 	_ids.clear()
 	_sound_paths.clear()
 	_sounds.clear()
+	_sound_clashes.clear()
 	for folder_name: String in _list_dir(content_root, true):
 		var folder: StringName = StringName(folder_name)
 		var duplicates: Array[String] = []
@@ -73,12 +89,38 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 				ids.append(id)
 			ids.sort_custom(_name_less)
 			_ids[folder] = ids
-	for path: String in _find_files(audio_root, sound_extensions):
+	var sound_files: PackedStringArray = PackedStringArray()
+	_collect_sounds(audio_root, sound_extensions, true, sound_files)
+	var content_sounds: PackedStringArray = PackedStringArray()
+	_collect_sounds(content_root, sound_extensions, false, content_sounds)
+	content_sounds.sort()
+	sound_files.sort()
+	sound_files.append_array(content_sounds)
+	for path: String in sound_files:
 		var sound_id: StringName = StringName(path.get_file().get_basename())
 		if _sound_paths.has(sound_id):
 			push_warning("Registry: duplicate sound '%s' in %s (kept %s)" % [sound_id, path, _sound_paths[sound_id]])
+			_sound_clashes.append("'%s' in %s and %s" % [sound_id, _sound_paths[sound_id], path])
 			continue
 		_sound_paths[sound_id] = path
+
+
+## Every sound id found twice in the last scan, one line each naming both files (empty: none).
+func sound_clashes() -> PackedStringArray:
+	return _sound_clashes
+
+
+## Every sound file below `root`: with `inside` (the audio root, or below a content item's
+## `sounds/` folder) each file of one of `extensions`; never one below a `variants/` folder.
+static func _collect_sounds(root: String, extensions: PackedStringArray, inside: bool, found: PackedStringArray) -> void:
+	if inside:
+		for file_name: String in _list_dir(root, false):
+			if extensions.has(file_name.get_extension()):
+				found.append(root.path_join(file_name))
+	for sub: String in _list_dir(root, true):
+		if sub == VARIANTS_FOLDER:
+			continue
+		_collect_sounds(root.path_join(sub), extensions, inside or sub == SOUNDS_FOLDER, found)
 
 
 ## Every resource of the content folder `folder` (`cover`) under `content_root`, in id order, read
@@ -101,7 +143,7 @@ static func scan_folder(folder: StringName, content_root: String = DEFAULT_CONTE
 ## duplicate, with a warning, and a line in `duplicates`).
 static func _read_folder(folder_path: String, duplicates: Array[String]) -> Dictionary:
 	var found: Dictionary = {}
-	for path: String in _find_files(folder_path, PackedStringArray(["tres"])):
+	for path: String in _find_files(folder_path, PackedStringArray(["tres"]), SOUNDS_FOLDER):
 		var res: Resource = ResourceLoader.load(path)
 		if res == null or not ("id" in res):
 			continue
@@ -325,16 +367,19 @@ static func _list_dir(path: String, directories: bool) -> PackedStringArray:
 
 
 ## Every file with one of the extensions below `root`, in full-path sorted order.
-static func _find_files(root: String, extensions: PackedStringArray) -> PackedStringArray:
+## A folder named `skip` (a content item's `sounds/`) is not looked in.
+static func _find_files(root: String, extensions: PackedStringArray, skip: String = "") -> PackedStringArray:
 	var found: PackedStringArray = PackedStringArray()
-	_collect_files(root, extensions, found)
+	_collect_files(root, extensions, found, skip)
 	found.sort()
 	return found
 
 
-static func _collect_files(root: String, extensions: PackedStringArray, found: PackedStringArray) -> void:
+static func _collect_files(root: String, extensions: PackedStringArray, found: PackedStringArray, skip: String = "") -> void:
 	for file_name: String in _list_dir(root, false):
 		if extensions.has(file_name.get_extension()):
 			found.append(root.path_join(file_name))
 	for sub: String in _list_dir(root, true):
-		_collect_files(root.path_join(sub), extensions, found)
+		if skip != "" and sub == skip:
+			continue
+		_collect_files(root.path_join(sub), extensions, found, skip)

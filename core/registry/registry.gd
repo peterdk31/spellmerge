@@ -105,6 +105,15 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 		_sound_paths[sound_id] = path
 
 
+## Every sound id with a file, in id order (the sound room lists them, tests/sound_room).
+func sound_ids() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for id: StringName in _sound_paths:
+		ids.append(id)
+	ids.sort_custom(_name_less)
+	return ids
+
+
 ## Every sound id found twice in the last scan, one line each naming both files (empty: none).
 func sound_clashes() -> PackedStringArray:
 	return _sound_clashes

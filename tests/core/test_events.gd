@@ -30,6 +30,11 @@ const EVENTS: Dictionary = {
 	&"mote_density_changed": [["density", TYPE_FLOAT]],
 	&"floor_marks_changed": [["on", TYPE_BOOL]],
 	&"spell_light_changed": [["on", TYPE_BOOL]],
+	&"shadows_changed": [["on", TYPE_BOOL]],
+	&"ambient_particles_changed": [["on", TYPE_BOOL]],
+	&"fog_changed": [["on", TYPE_BOOL]],
+	&"environment_interaction_changed": [["on", TYPE_BOOL]],
+	&"ambience_volume_changed": [["percent", TYPE_INT]],
 	&"tailless_motes_changed": [["pool", TYPE_INT]],
 	# Playing online.
 	&"online_host_requested": [["player", TYPE_INT]],
@@ -177,7 +182,7 @@ const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"run_begun", &"run_room_scaled", &"run_room_paced", &"run_room_chosen", &"run_way_taken", &"run_map_changed", &"room_left", &"room_exits_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"lectern_changed", &"start_depth_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"loading_started", &"loading_progressed", &"loading_finished",
-	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"shadows_changed", &"ambient_particles_changed", &"fog_changed", &"environment_interaction_changed", &"ambience_volume_changed", &"tailless_motes_changed", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).

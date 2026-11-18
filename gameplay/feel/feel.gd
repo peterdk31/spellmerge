@@ -859,6 +859,7 @@ func _ready() -> void:
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
+	events.ambience_volume_changed.connect(_on_ambience_volume_changed)
 	events.projectile_expired.connect(_on_projectile_expired)
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
@@ -2314,9 +2315,36 @@ func set_floor_marks(on: bool) -> void:
 	_spectacle.set_floor_marks(on)
 
 
-## The "Spell light" setting (`Spectacle.set_spell_light`). Returns the setting.
+## The "Dynamic lighting" setting (once "Spell light"; `Spectacle.set_spell_light`). Returns the
+## setting.
 func set_spell_light(on: bool) -> bool:
 	return _spectacle.set_spell_light(on)
+
+
+## The atmosphere's switches (docs/milestones/atmosphere.md, "Settings"; the spectacle hears their
+## events itself): "Shadows", "Ambient particles", "Fog" and "Environment interaction". Each returns
+## the setting.
+func set_shadows(on: bool) -> bool:
+	return _spectacle.set_shadows(on)
+
+
+func set_ambient_particles(on: bool) -> bool:
+	return _spectacle.set_ambient_particles(on)
+
+
+func set_fog(on: bool) -> bool:
+	return _spectacle.set_fog(on)
+
+
+func set_environment_interaction(on: bool) -> bool:
+	return _spectacle.set_environment_interaction(on)
+
+
+## The "Ambience volume" setting (`ambience_volume_changed`, in percent): the room's sound at that
+## share of its loudness (`RoomAmbience.set_volume`).
+func _on_ambience_volume_changed(percent: int) -> void:
+	if _ambience != null:
+		_ambience.set_volume(AmbienceVolume.share_of(percent))
 
 
 func _on_screen_shake_changed(enabled: bool) -> void:

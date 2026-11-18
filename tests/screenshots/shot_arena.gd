@@ -49,9 +49,12 @@ func take() -> void:
 		fail("the pause menu is not open, or the game is not paused, in hud_pause_menu")
 		return
 	await shot("hud_pause_menu")
-	# The Settings page, with the Effect slots slider moved a step right and focused.
+	# The Performance page of Settings, with the Effect slots slider moved a step right and focused.
 	var ui_focus: Node = root.get_node("UIFocus")
 	ui_focus.call("focus", 1, pause_menu.call("button", "Settings"))
+	tap(1, &"accept")
+	await settle()
+	ui_focus.call("focus", 1, pause_menu.call("button", "Performance"))
 	tap(1, &"accept")
 	await settle()
 	ui_focus.call("focus", 1, pause_menu.call("button", "EffectSlots"))

@@ -67,8 +67,18 @@ signal mote_cap_changed(cap: int)
 signal mote_density_changed(density: float)
 ## Sender: hud. The "Floor marks" switch in the pause menu (Settings) flipped, or a saved choice was loaded when the menu was bound: whether the room keeps its floor marks (`FloorMarks` in core/settings). Heard by feel, which makes or frees its mark layer (the marks so far go).
 signal floor_marks_changed(on: bool)
-## Sender: hud. The "Spell light" switch in the pause menu (Settings) flipped, or a saved choice was loaded when the menu was bound: whether shots light the world round them (`SpellLightSetting` in core/settings). Heard by feel, which makes or frees its light buffer.
+## Sender: hud. The "Dynamic lighting" switch in the pause menu (Settings, Graphics; "Spell light" before the atmosphere's settings, the name kept here and in the save) flipped, or a saved choice was loaded when the menu was bound: whether shots and the room's lights light the world round them (`SpellLightSetting` in core/settings). Heard by feel, which makes or frees its light buffer (and with it the shadows and the mist).
 signal spell_light_changed(on: bool)
+## Sender: hud. The "Shadows" switch in the pause menu (Settings, Graphics) flipped, or a saved choice was loaded when the menu was bound: whether walls and pillars block the light and bodies cast shadows (`ShadowsSetting` in core/settings; atmosphere C; only while the light is on). Heard by feel, which makes or frees its shadow batch and hands the light its blockers or none.
+signal shadows_changed(on: bool)
+## Sender: hud. The "Ambient particles" switch in the pause menu (Settings, Graphics) flipped, or a saved choice was loaded when the menu was bound: whether a room's air gives off its dust (`AmbientParticles` in core/settings; atmosphere B; only while the light is on). Heard by feel.
+signal ambient_particles_changed(on: bool)
+## Sender: hud. The "Fog" switch in the pause menu (Settings, Graphics) flipped, or a saved choice was loaded when the menu was bound: whether a room's floor mist is drawn (`FogSetting` in core/settings; atmosphere F; only while the light is on). Heard by feel, which makes or frees its mist.
+signal fog_changed(on: bool)
+## Sender: hud. The "Environment interaction" switch in the pause menu (Settings, Graphics) flipped, or a saved choice was loaded when the menu was bound: whether the room's lights, cover, dust and mist take notice of the shots and blasts (`EnvironmentInteraction` in core/settings; atmosphere E). Heard by feel, which turns its stirs on or off (off: what was stirred eases back to rest).
+signal environment_interaction_changed(on: bool)
+## Sender: hud. The "Ambience volume" slider in the pause menu (Settings, Audio) moved, or a saved choice was loaded when the menu was bound: how loud the room's sound is, in percent (`AmbienceVolume` in core/settings; atmosphere D). Heard by feel, which hands it to its room sound.
+signal ambience_volume_changed(percent: int)
 ## Sender: hud. The "Tailless motes" dev slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: the spark pool the shots' births share while the tails are off (`TaillessMotes` in core/settings; S5 step 4). Heard by core/projectiles (`tailless_particle_cap`) and feel (`Motes.frame_rows`, `TaillessMotes.frame_rows_of`).
 signal tailless_motes_changed(pool: int)
 ## Sender: hud. The main menu's Play was pressed: everyone goes to the hub, the island where players

@@ -26,6 +26,13 @@ extends Node
 ## stand still with the tree as the music does (the pause menu, a boss's intro), and go on where
 ## they were after.
 ##
+## **The "Ambience volume" setting** (`set_volume`, Feel hands it from `ambience_volume_changed`;
+## `AmbienceVolume` in core/settings): a share of the room's own loudness, times every bed's and
+## accent's amplitude (in decibels `linear_to_db` of it). A new share is eased to at most
+## VOLUME_RATE a second, so a step of the slider is never a jump; at 0 every bed's player stops
+## and no accent is heard (they are still picked and placed), and the beds start again as it
+## comes back up. Set while the pause menu stops the tree, it is heard after it, easing in.
+##
 ## **Only `audible` starts a player:** Feel hands it its own (`Feel.hears_audio`: false on the audio
 ## driver with no device, every headless run, so nothing is left playing as a headless run quits).
 ## Not audible it works out all of the above (streams, levels, accents picked and placed) and starts
@@ -43,6 +50,8 @@ const BUS: StringName = &"Master"
 const ACCENT_VOICES: int = 4
 ## Where the rooms are in the registry.
 const ROOM_FOLDER: StringName = &"rooms"
+## How fast the share heard follows the "Ambience volume" setting (a second; 1 is all of it).
+const VOLUME_RATE: float = 4.0
 
 ## The bus it hears rooms on (Feel's; null in a test that hands it ambiences itself), set before it
 ## enters the tree, and the registry the rooms and sounds are asked of.
@@ -74,6 +83,9 @@ var _next_voice: int = 0
 var _clock: float = 0.0
 var _next_at: PackedFloat64Array = PackedFloat64Array()
 var _ambience: Ambience = null
+## The "Ambience volume" setting's share (`set_volume`), and the share heard now, easing to it.
+var _volume: float = 1.0
+var _heard: float = 1.0
 
 
 func _ready() -> void:
@@ -152,7 +164,7 @@ func use(ambience: Ambience) -> void:
 		var player: AudioStreamPlayer = _now[i]
 		player.stream = _sound(layer.sound if layer != null else &"")
 		_now_db[i] = ambience.volume + (layer.volume if layer != null else 0.0)
-		if audible and player.stream != null:
+		if audible and player.stream != null and _heard > 0.0:
 			player.play()
 	_schedule()
 	if ambience.fade <= 0.0:
@@ -164,6 +176,7 @@ func use(ambience: Ambience) -> void:
 ## origin): the bed fades, the last ambience goes out, and each accent due is heard.
 func step(delta: float, middle: Vector2 = Vector2.INF) -> void:
 	_clock += delta
+	_ease_volume(delta)
 	if _then_level > 0.0:
 		_then_level = maxf(_then_level - (delta / _then_fade if _then_fade > 0.0 else 1.0), 0.0)
 		if _then_level == 0.0:
@@ -172,7 +185,7 @@ func step(delta: float, middle: Vector2 = Vector2.INF) -> void:
 	if _ambience != null:
 		_level = minf(_level + (delta / _ambience.fade if _ambience.fade > 0.0 else 1.0), 1.0)
 		for player in _now:
-			if audible and player.stream != null and not player.playing:
+			if audible and player.stream != null and not player.playing and _heard > 0.0:
 				player.play()
 		for i in mini(_ambience.accents.size(), Ambience.ACCENTS_MOST):
 			if _clock >= _next_at[i]:
@@ -280,11 +293,43 @@ func _schedule() -> void:
 		_next_at[i] = _clock + _gap(_ambience.accents[i])
 
 
-## The ambience's volumes times each set's fade, set on the bed's players.
+## The ambience's volumes times each set's fade and the share heard, set on the bed's players.
 func _apply() -> void:
 	for i in Ambience.LAYERS_MOST:
-		_now[i].volume_db = _now_db[i] + linear_to_db(_level)
-		_then[i].volume_db = _then_db[i] + linear_to_db(_then_level)
+		_now[i].volume_db = _now_db[i] + linear_to_db(_level * _heard)
+		_then[i].volume_db = _then_db[i] + linear_to_db(_then_level * _heard)
+
+
+## The "Ambience volume" setting: `share` of the room's own loudness (0 to 1; `AmbienceVolume.
+## share_of`), eased to by `step` (see the top). Returns the share taken.
+func set_volume(share: float) -> float:
+	_volume = clampf(share, 0.0, 1.0)
+	return _volume
+
+
+## The share the setting asks for, and the share heard now (for tests).
+func volume() -> float:
+	return _volume
+
+
+func heard() -> float:
+	return _heard
+
+
+## The share heard eased toward the setting's, `delta` seconds on; once silent every bed's player
+## stops, and every accent's voice (each bed keeps its stream, so the beds start again as the share
+## comes back).
+func _ease_volume(delta: float) -> void:
+	if _heard == _volume:
+		return
+	_heard = move_toward(_heard, _volume, VOLUME_RATE * delta)
+	if _heard <= 0.0:
+		for player in _now:
+			player.stop()
+		for player in _then:
+			player.stop()
+		for voice in _voices:
+			voice.stop()
 
 
 func _play_accent(accent: AmbienceAccent, middle: Vector2) -> void:
@@ -301,7 +346,8 @@ func _play_accent(accent: AmbienceAccent, middle: Vector2) -> void:
 	voice.pitch_scale = 1.0 + rng.randf_range(-accent.pitch_spread, accent.pitch_spread)
 	var from: Vector2 = middle if middle.is_finite() else Vector2.ZERO
 	voice.global_position = from + Vector2(rng.randf_range(-accent.wide, accent.wide), 0.0)
-	if audible:
+	voice.volume_db += linear_to_db(_heard)
+	if audible and _heard > 0.0:
 		voice.play()
 	accents_played += 1
 	last_accent = id

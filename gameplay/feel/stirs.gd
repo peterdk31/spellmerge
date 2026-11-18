@@ -24,6 +24,10 @@ extends RefCounted
 ## - **The shots near a point** (`shots_near`): the births read this frame, filed by cell, so the
 ##   room's few lights find the shots passing close (and which side) without looking at every shot.
 ##
+## **Off** (`enabled`, the "Environment interaction" setting): no shot is read and no blast starts,
+## so what was stirred eases back to rest as it would with no shots (a frame's share at a time, the
+## blasts under way running out) and every reader is then handed a still field.
+##
 ## Nothing is allocated a frame: every array is sized once. The texture's image is written only
 ## where a cell changed, and handed over only when one did.
 
@@ -67,6 +71,9 @@ var origin: Vector2 = Vector2.ZERO
 var version: int = 0
 ## How many births were read last frame (for tests and the benchmark).
 var read: int = 0
+## Whether the shots and the blasts stir anything (the "Environment interaction" setting; see the
+## top). Off, `step` reads no birth and `blast` starts nothing.
+var enabled: bool = true
 
 ## The window's corner cell, and its image.
 var _corner: Vector2i = Vector2i.ZERO
@@ -141,7 +148,7 @@ func _init() -> void:
 ## it no stronger, only as big as the bigger. With all BLASTS pushing, a new one is let go: taking a
 ## live one's slot would snap its push back.
 func blast(at: Vector2, radius: float, now: float) -> void:
-	if not at.is_finite() or not (radius > 0.0):
+	if not enabled or not at.is_finite() or not (radius > 0.0):
 		return
 	var reach: float = radius * BLAST_REACH + BLAST_PAD
 	var strength: float = clampf(radius / BLAST_FULL, BLAST_LEAST, 1.0)
@@ -212,7 +219,7 @@ func step(now: float, births: PackedFloat32Array, count: int, view: Rect2) -> vo
 	_now = now
 	if view.has_area():
 		_follow(view)
-	_read(births, count)
+	_read(births, count if enabled else 0)
 	_ease(delta)
 	for slot in BLASTS:
 		if _blast_strength[slot] > 0.0 and now - _blasts[slot].w >= blast_seconds(_blasts[slot].z):

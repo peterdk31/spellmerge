@@ -222,7 +222,7 @@ func _check_lane(at: int) -> void:
 		var wide: float = float(fx.spells.call("carrier_pass", tag, body.id))
 		var material: ShaderMaterial = lane.material as ShaderMaterial
 		var near: float = float(material.get_shader_parameter(&"telegraph_lane"))
-		check(near >= wide and near <= wide + 8.0, "as wide as it strikes either side (%.1f for %.1f)" % [near, wide])
+		check(is_equal_approx(near, wide), "exactly as wide as it strikes either side, no margin (%.1f for %.1f)" % [near, wide])
 		check_equal(material.get_shader_parameter(&"telegraph_lane_end"), material.get_shader_parameter(&"telegraph_lane"), "all along: no cone")
 		check(lane.region_rect.size.y >= 2.0 * near, "its sprite tall enough for it (%s)" % lane.region_rect.size.y)
 		var long: float = float(fx.lanes().call("reach_of", body.id))

@@ -5,15 +5,16 @@
 // but for a body's pass, a dash's), widening evenly to
 // `telegraph_lane_end` at the far end (a cone: a spray's; as wide as at the start for any other,
 // `Carrier.lane_radius`). `telegraph_progress` runs 0 to 1 over the
-// windup: the dashes march toward the tip, the arrowhead grows, the lane brightens, and the last
-// part is white-hot.
+// windup: the dashes march toward the tip, the arrowhead grows, the lane brightens a little, and in
+// the last part the arrowhead is white-hot.
 //
 // Its own small shader, not a mode of a shot shader: with a crowd winding up at once the
 // shot shader's size made every telegraph pixel cost as much as a shot's, and the web build (and
 // the stress run in the software renderer CI uses) went over its frame budget. The look is the
 // shot shader's beam look: the ramp of a material (docs/STYLE.md: enemy telegraphs use Fire
-// colours and are brighter than anything else on screen), hot = light halfway to white, glow =
-// base toward light, additive glow with premultiplied alpha.
+// colours), hot = light halfway to white, glow = base toward light, additive glow with
+// premultiplied alpha. Subtle (the owner, 2026-11-18): a faint wash between its dotted edges, its
+// dashes and arrowhead in the ramp's own shades, hot only in the last part and at a lock's beat.
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
@@ -55,18 +56,18 @@ void fragment() {
 	float back = len - at;
 	float side = abs(y + 0.5);
 	if (back >= 0.0 && back <= head && side <= back * 0.9 + 0.5) {
-		COLOR = vec4(last || back < 1.5 ? hot : hi, 1.0);
+		COLOR = vec4(last ? hot : (back < 1.5 ? hi : mid), 1.0);
 	} else if (at < 0.0 || at > len) {
 		COLOR = vec4(0.0);
 	} else if ((y == 0.0 || y == -1.0) && mod(at - floor(p * 24.0), 8.0) < 4.0 && back > head) {
 		// Dashes down the middle, marching toward the tip as the windup runs.
-		COLOR = vec4(last ? hot : hi, 1.0);
+		COLOR = vec4(last ? hi : mid, 1.0);
 	} else if (side == lane + 0.5 && mod(at, 3.0) < 1.0) {
 		// The lane's edges, dotted, so the hit width reads.
 		COLOR = vec4(beat > 0.0 ? hot : mid, 1.0);
 	} else {
 		float inside = side <= lane + 0.5 ? 1.0 : falloff(side - lane, 3.0);
-		float lit = inside * (0.14 + 0.3 * p + 0.5 * beat) + 0.4 * p * falloff(side, 2.0);
+		float lit = inside * (0.05 + 0.1 * p + 0.4 * beat) + 0.15 * p * falloff(side, 2.0);
 		COLOR = vec4(glow * lit, 0.0);
 	}
 }

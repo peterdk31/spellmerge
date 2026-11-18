@@ -116,7 +116,8 @@ func play(caster: int, tag: int, seconds: float, tint: Color, reach: float) -> v
 	# Only a cone widens (its lane wider than its hit radius); any other lane is as wide all along.
 	var far: float = maxf(lane + LANE_MARGIN * 0.5, near) if lane > radius else near
 	if wide > 0.0:
-		near = minf(wide + LANE_MARGIN * 0.5, LANE_MOST)
+		# Exactly its pass, no margin: its dotted edge is where it strikes.
+		near = minf(wide, LANE_MOST)
 		far = near
 	# The sprites change places as lanes go (`_remove`), so each lane sets its own.
 	sprite.z_as_relative = wide <= 0.0

@@ -114,6 +114,21 @@ func test_a_bodys_spell_scale_does_not_widen_the_pass() -> void:
 	check(not _passes(26.0, [&"dash"], 40.0, 2.0), "plain, a 26 px body of spell scale 2 passes a body 40 px aside")
 
 
+func test_only_its_front_half_strikes() -> void:
+	# The owner, 2026-11-18: a body behind a big body as it sets off is not in its lane, so not struck.
+	var dasher: Actor = _dasher(START, 26.0, [&"dash"])
+	_walk(1)
+	var centre: Vector2 = dasher.global_position + dasher.body_offset
+	var behind: Actor = _target(Vector2(0.0, 400.0))
+	behind.global_position = centre + Vector2(-20.0, 0.0) - _hurtbox(behind).offset
+	var beside: Actor = _target(Vector2(0.0, 500.0))
+	beside.global_position = centre + Vector2(6.0, 28.0) - _hurtbox(beside).offset
+	check(dasher.caster.cast(0), "it dashes")
+	_walk(30)
+	check(not _hurt(behind), "a body wholly behind its middle as it sets off (well inside 26 px) is not struck")
+	check(_hurt(beside), "one beside it, just ahead of its middle, is")
+
+
 func test_a_dash_stopped_at_a_wall_strikes_no_more_there() -> void:
 	_world.projectiles.set_walls([Rect2(40.0, -200.0, 40.0, 400.0)] as Array[Rect2])
 	# A slow dash: 80 px over about 0.9 s, the wall met after about 0.45 s.

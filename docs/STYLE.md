@@ -80,7 +80,7 @@ The player colours belong to the players: enemies, props and tiles don't use the
 ## Readability
 
 - A silhouette must read at 1× in solid black. Check it before adding detail.
-- Enemy telegraphs use Fire colours and are larger and brighter than anything else on screen.
+- Enemy telegraphs use Fire colours and are subtle (the owner, 2026-11-18; first "larger and brighter than anything else on screen"): a faint wash between dotted edges, brightening only as the cast is about to leave.
 - Colour is never the only signal for who a player is; the HUD adds a number or a shape next to the colour.
 - Player sprites differ only in the player colour ramp. The ramp covers the staff's head (the curl's gem, the star, the crescent, the crystal; and the panel and markers) and nothing else: the shaft is Wood with a Spark grip wrap for every player, the eyes are Bone. Each head sheet has one row per player ramp (`content/wizard/staffs/<head>/head.svg`).
 - The four player base colours (`#3b73c9`, `#d9477a`, `#3f8f4f`, `#8a4fc4`) are the comparison set: any two must differ clearly in hue, and nothing else on screen may use a colour close to one of them.

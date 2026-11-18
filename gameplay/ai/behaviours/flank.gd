@@ -1,6 +1,7 @@
 extends AIBehaviour
 ## A staff's aimed cast reaches the target but a wall stands in the line (a room's or a Wall
-## card's, `AISight`): walk round it (`AISight.detour`) rather than shoot the wall.
+## card's, or a prop's body, a pillar's: `AISight.fire_clear`): walk to where the shot is clear
+## (`AISight.flank`, else round it, `AISight.detour`) rather than shoot the wall.
 
 
 func name() -> String:

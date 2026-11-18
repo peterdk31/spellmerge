@@ -79,6 +79,8 @@ const LOOKS: Array[float] = [160.0, 480.0, SIGHT]
 const CLOSE_ENOUGH: float = 1.0
 ## How far ahead (pixels) a way round a wall, or to cover, is probed.
 const DETOUR_PROBE: float = 40.0
+## The widest its line of fire is taken either side (pixels; `_fire_width`).
+const FIRE_WIDTH_MOST: float = 8.0
 const COVER_PROBE: float = 48.0
 ## Seconds it walks one way round a wall before it looks again.
 const REPOSITION_TIME: float = 0.4
@@ -149,7 +151,8 @@ var grudge: Node2D = null
 ## From its body to the target's, and how far.
 var to_target: Vector2 = Vector2.ZERO
 var distance: float = 0.0
-## No wall between its body and the target's, and no blocking body's ground between their feet.
+## No wall and no prop's body (a pillar's) between its body and the target's, and no blocking
+## body's ground between their feet: an aimed shot would reach it.
 var line_clear: bool = true
 ## No blocking body's ground (a pillar's) nor a hole (hub rework HR-H2) between its feet and the
 ## target's: a walk at it is not held up by one (boss plan OB14).
@@ -499,7 +502,8 @@ func hurt_mate(sense: CastSense) -> Actor:
 		var share: float = health_of(mate)
 		if share >= lowest or not reaches(sense, mate):
 			continue
-		if sense.reach > 0.0 and not AISight.line_clear(actor.projectiles, actor.global_position + actor.body_offset, mate.global_position + mate.body_offset):
+		var width: float = minf(sense.radius, FIRE_WIDTH_MOST)
+		if sense.reach > 0.0 and not AISight.fire_clear(actor.projectiles, actor.global_position + actor.body_offset, mate.global_position + mate.body_offset, width, _fire_short(mate, width)):
 			continue
 		best = mate
 		lowest = share
@@ -612,10 +616,16 @@ func take_item(item: int) -> void:
 		actor.events.actor_take_requested.emit(actor.id, item)
 
 
-## Behaviours ask: walk round the wall in the line for a while (REPOSITION).
+## Behaviours ask: walk round the wall or prop in the line for a while (REPOSITION): to a step
+## near from which a shot would reach the target (`AISight.flank`), else round the way at it
+## (`AISight.detour`).
 func reposition() -> void:
 	plan_move = Move.WAY
-	plan_way = AISight.detour(actor.projectiles, actor.global_position, _walk_goal(), DETOUR_PROBE)
+	plan_way = Vector2.ZERO
+	if target != null:
+		plan_way = AISight.flank(actor.projectiles, actor.global_position, _walk_goal(), _target_body(), actor.body_offset, DETOUR_PROBE, _fire_width(), _fire_short(target))
+	if plan_way == Vector2.ZERO:
+		plan_way = AISight.detour(actor.projectiles, actor.global_position, _walk_goal(), DETOUR_PROBE)
 	state = State.REPOSITION
 	_state_left = REPOSITION_TIME
 
@@ -657,6 +667,8 @@ func _key_of(body: Node2D) -> int:
 func _perceive() -> void:
 	_decide_left = _reaction()
 	_decide_now = false
+	# Its staffs first: the line of fire is as wide as its shots (`_fire_width`).
+	_read_staffs()
 	if target != null:
 		to_target = target.global_position - actor.global_position
 		distance = to_target.length()
@@ -673,7 +685,6 @@ func _perceive() -> void:
 	health_fraction = health_of(actor)
 	if board != null:
 		_report_slot = board.report(actor.team(), actor.id, actor.global_position, health_fraction, _report_slot)
-	_read_staffs()
 	_perceive_threat()
 	_perceive_harm()
 
@@ -1250,14 +1261,43 @@ func _walk_goal() -> Vector2:
 	return feet + back.normalized() * minf(out, back.length())
 
 
-## True when no wall stands between the actor's body and its target's (`AISight`).
+## True when a shot from the actor's body would reach its target's: no wall and no prop's body (a
+## pillar's) in the way, minding its shots' width (`AISight.fire_clear`).
 func _line_clear() -> bool:
 	if target == null:
 		return true
+	return AISight.fire_clear(actor.projectiles, actor.global_position + actor.body_offset, _target_body(), _fire_width(), _fire_short(target))
+
+
+## How wide its line of fire is either side: the widest hit width of its aimed staffs that hurt
+## (`CastSense.radius`, as last read), at most FIRE_WIDTH_MOST (a spray's cone is wide, and a few of
+## its drops on a pillar are no waste). A shot that grazes a pillar is spent on it.
+func _fire_width() -> float:
+	var width: float = 0.0
+	for at in staff_count:
+		var sense: CastSense = senses[at]
+		if sense != null and not sense.empty and sense.harms() and sense.reach > 0.0:
+			width = maxf(width, sense.radius)
+	return minf(width, FIRE_WIDTH_MOST)
+
+
+## How far short of `body`'s centre a shot `width` either side (`_fire_width` when negative) meets
+## it: its hit shape's reach (`HitShape.outer_radius`) plus the width. A prop past that point
+## is no cover (`AISight.fire_clear`).
+func _fire_short(body: Node2D, width: float = -1.0) -> float:
+	if width < 0.0:
+		width = _fire_width()
+	if actor.projectiles == null or body == null:
+		return width
+	return HitShape.outer_radius(actor.projectiles.target_half(body), actor.projectiles.target_round(body)) + width
+
+
+## Where the target's body is (its feet and its body offset): what a shot at it aims for.
+func _target_body() -> Vector2:
 	var to: Vector2 = target.global_position
 	if _target_actor != null:
 		to += _target_actor.body_offset
-	return AISight.line_clear(actor.projectiles, actor.global_position + actor.body_offset, to)
+	return to
 
 
 ## The grudge, else the nearest standing actor of another team.

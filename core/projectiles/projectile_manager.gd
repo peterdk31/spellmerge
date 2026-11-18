@@ -942,6 +942,8 @@ var _grid_y: float = 0.0
 var _grid_w: int = 1
 var _grid_h: int = 1
 var _cell_head: PackedInt32Array = PackedInt32Array()
+## The rows of the world's targets (props), in row order, filled with the grid (`props_clear`).
+var _world_rows: PackedInt32Array = PackedInt32Array()
 ## How many targets each cell holds, and the box round their hit shapes (min x, min y, max x,
 ## max y), so a hit test passes a cell its path cannot touch without a look at each target. Taken
 ## for a cell only when a hit test first reaches it after a filling (`_cell_info`; most cells of a
@@ -2232,6 +2234,23 @@ func line_clear(from: Vector2, to: Vector2) -> bool:
 ## decision 36: an AI walks round a blocking prop). Walks the whole segment.
 func ground_clear(from: Vector2, to: Vector2) -> bool:
 	return _footprints_laid == 0 or _way_hit(from, to, false, false) < 0.0
+
+
+## True when no hit shape of the world's (a prop's: a pillar's whole body, a crate) lies within
+## `width` of the segment from `from` to `to`: where a shot that wide along it would not be spent on
+## a prop first. A hit lands on every team, the world's too (Actors), so a pillar stops a shot by its
+## tall hurt box, not only by its ground (`ground_clear`): what an AI's line of fire asks. Only the
+## world's rows are looked at (`_world_rows`, filled with the grid: props are few, whatever the
+## number of bodies); nothing is allocated.
+func props_clear(from: Vector2, to: Vector2, width: float = 0.0) -> bool:
+	if not from.is_finite() or not to.is_finite():
+		return true
+	_query_ready()
+	for n in _world_rows.size():
+		var t: int = _world_rows[n]
+		if t < _targets.size() and _target_pos[t].is_finite() and _query_match(t, _nearest_on_line(t, from, to), width, ~0, -1):
+			return false
+	return true
 
 
 ## True when neither the ground of a body that cannot move nor a hole (`set_holes`) lies on the
@@ -6626,6 +6645,7 @@ func _remove_target_at(at: int) -> void:
 ## Drop freed targets, read the positions of the rest and fill the grid.
 func _refresh_targets() -> void:
 	_cell_head.fill(-1)
+	_world_rows.resize(0)
 	_grid_stale = false
 	# A new filling: every cell's count and box are taken again when first needed (`_cell_info`).
 	_grid_fill += 1
@@ -6657,6 +6677,8 @@ func _refresh_targets() -> void:
 		if team == ActorsScript.NONE:
 			team = ActorsScript.TEAM_WIZARDS if (_target_layer[i] & LAYER_PLAYER) != 0 else ActorsScript.TEAM_ENEMIES
 		_target_team[i] = team
+		if team == ActorsScript.TEAM_WORLD:
+			_world_rows.append(i)
 		if not node.is_inside_tree():
 			_target_pos[i] = Vector2.INF
 			_target_next[i] = -1

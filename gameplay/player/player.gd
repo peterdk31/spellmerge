@@ -38,8 +38,8 @@ extends ActorController
 ##   bag (its ids, counts and capacity), `owned_staff_changed` for each staff it owns, by its number
 ##   (`Inventory.plan_of`, empty once it went), and `hands_changed` (which number is on which hand).
 ## - **The cast events** (from the actor it drives now, whose staffs its buttons cast): `spell_cast`
-##   (the carrier, `Caster.last_carrier_card`) and `staff_cast` on every cast (Feel hears it and
-##   plays the cast sound; the controller has no player of its own).
+##   (the carrier, `Caster.last_carrier_card`) and `staff_cast` on every cast (the controller has
+##   no player of its own: Feel sounds every actor's cast on `cast_left`).
 ## - **The builder** (`staff_change_requested` and `staff_cards_requested`, each for this seat
 ##   only and naming a staff by its number; commands, heard at the tick's start: core/events
 ##   `listen`) builds the shown body's staffs through its inventory (`Inventory.set_card`,

@@ -35,7 +35,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `inventory_refused` | `player` | `hud` (the inventory's note) |
 | `inventory_announced` | `player` (before a wizard's whole inventory is said anew) | `hud` (the builder, the inventory forget the earlier wizard's staffs) |
 | `staff_changed` | `player` | `hud` (the builders) |
-| `staff_cast` | `player` | `hud` (the corner panel) |
+| `staff_cast` | `player` | nobody now (Feel sounds every cast on `cast_left`) |
 | `caster_move_requested` | `core/spells` | `actor` (the Mover), each for its own actor id |
 | `mana_reserved` | `core/spells` (to the seat that drives the caster) | none (the Caster reads `Spells.reserved_mana`, actors G7) |
 | `mana_refund_requested` | `core/spells` (for every actor) | `actor` (the Caster), each for its own actor id |
@@ -55,7 +55,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `discharge_arc` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `ai` (`DummyLook` only; an actor's own components hear its `Actor.damaged`, which Combat sends with it) |
 | `status_applied` | `combat` | `feel` (an actor's own components hear its `Actor.status_gained`, and a reaction on it its `Actor.reacted`, which Combat sends with them) |
-| `cast_left` | `core/spells` (a cast leaving, before its shots) | `actor` (a prop's `PropStateTriggers`, for its `cast` triggers) |
+| `cast_left` | `core/spells` (a cast leaving, before its shots) | `actor` (a prop's `PropStateTriggers`, for its `cast` triggers), `feel` (the staff's cast cue, the cast's carrier sounds and infusion hints) |
 | `prop_state_changed` | `actor` (a prop's `PropStateTriggers`, props W6) | none yet (tests; a prop's own look hears its component directly) |
 | `enemy_died` | `combat` (every foe of the players, never a prop: `Actors.is_foe`) | `feel`, `flow` |
 | `player_downed` | `player` (Downed) | `combat`, `feel`, `flow`, `run` |

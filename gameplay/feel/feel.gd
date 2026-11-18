@@ -1739,7 +1739,8 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	context.tag = tag if tag != 0 or shot < 0 or projectiles == null else projectiles.get_tag_of(shot)
 	context.color = plan.color
 	context.power = plan.power
-	context.grow = CueSizeScript.factor(plan.cue.size_ref, size)
+	var grow: float = CueSizeScript.factor(plan.cue.size_ref, size)
+	context.grow = grow
 	_cue_depth += 1
 	# A cue with a `light` part lights by it alone: the flashes it shows light nothing (S6, item 4).
 	var unlit_before: bool = _cue_unlit
@@ -1765,8 +1766,7 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 		return
 	var cue: CueBase = plan.cue
 	var power: float = plan.power
-	# A cue played bigger than it is made shakes, kicks and sounds bigger (`CueBase.size_ref`).
-	var grow: float = CueSizeScript.factor(cue.size_ref, size)
+	# A cue played bigger than it is made shakes, kicks and sounds bigger (`CueBase.size_ref`: `grow`).
 	# Its holds and game-wide stop are the game's (`HitStop`, online-ready N4), not drawn here.
 	var table: ActorsScript = _actor_table() if cue.kick_way == &"away" else null
 	if shake_enabled and (cue.shake > 0.0 or cue.kick > 0.0) and _in_picture(at):
@@ -1785,9 +1785,11 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 				way = body.global_position.direction_to(at)
 		_kick = (_kick + way * cue.kick * power * CueSizeScript.shake(grow)).limit_length(MAX_KICK_PIXELS)
 	var sound: StringName = instead if instead != &"" else cue.sound
-	if _play(sound, at, CueSizeScript.volume(grow), CueSizeScript.pitch(grow)) >= 0 and cue.duck < 0.0:
-		# The music gives way for as long as the sound plays (Audio's duck: the deepest wins).
-		audio.duck(cue.duck, audio.length_of(sound))
+	var pitch: float = CueSizeScript.pitch(grow)
+	if _play(sound, at, CueSizeScript.volume(grow), pitch) >= 0 and cue.duck < 0.0:
+		# The music gives way for as long as the sound plays (Audio's duck: the deepest wins), a
+		# deeper one longer.
+		audio.duck(cue.duck, audio.length_of(sound) / pitch)
 
 
 ## Whether `plan`, played as the look of the hit being shown, would show nothing: each of its parts
@@ -2885,8 +2887,10 @@ func _on_cast_left(caster: int, staff: int) -> void:
 	if spells == null or not spells.has_method(&"staff_of"):
 		return
 	var own: StaffBase = spells.call(&"staff_of", caster, staff) as StaffBase
+	if own == null or not _cue_sounds(own.cast_cue):
+		# A staff's cue with no sound of its own (a spitter's acid jet) is a look on the cast's sound.
+		_sound_cast(caster, staff)
 	if own == null or own.cast_cue == &"":
-		_sound_cast(caster)
 		return
 	var origin: Vector2 = spells.call(&"aim_origin_of", caster)
 	var way: Vector2 = spells.call(&"aim_of", caster)
@@ -2902,7 +2906,7 @@ func _on_cast_left(caster: int, staff: int) -> void:
 ## The sounds of the cast leaving now (`Spells.leaving_cast`) of `caster`, from its staff tip: its
 ## carriers' own and its infusions' hints (`cast_sounds.gd`), an enemy's ENEMY_CAST_VOLUME quieter;
 ## nothing for a prop's (the world's: its moments are its states' cues).
-func _sound_cast(caster: int) -> void:
+func _sound_cast(caster: int, staff: int) -> void:
 	if _cast_sounds == null or not spells.has_method(&"leaving_cast"):
 		return
 	var cast: CompiledCast = spells.call(&"leaving_cast") as CompiledCast
@@ -2916,7 +2920,17 @@ func _sound_cast(caster: int) -> void:
 	if not origin.is_finite() and table != null and table.is_open(caster):
 		var body: Node2D = table.node_of(caster) as Node2D
 		origin = body.global_position if body != null else Vector2.INF
-	_cast_sounds.play(cast, origin, ENEMY_CAST_VOLUME if team == ActorsScript.TEAM_ENEMIES else 0.0)
+	_cast_sounds.play(cast, origin, ENEMY_CAST_VOLUME if team == ActorsScript.TEAM_ENEMIES else 0.0, caster * SpellLimits.STAFFS + staff, _clock)
+
+
+## Whether the cue `id` has a sound of its own (an unknown cue, or none, has not).
+func _cue_sounds(id: StringName) -> bool:
+	if id == &"":
+		return false
+	var plan: CuePlanScript = _cue_plans.get(id) as CuePlanScript
+	if plan == null:
+		plan = _plan_of(id)
+	return plan != null and plan.cue.sound != &""
 
 
 ## The cast sounds (for tests).

@@ -37,3 +37,22 @@ var description: String = ""
 ## What the cast does, for an AI (`CastSense`, docs/milestones/M2-enemy-ai.md): made by the
 ## compiler once the cast is read.
 var sense: CastSense = null
+## The carrier cards of its own group's spells, and the infusion cards they carry, each once in
+## the order they come (Feel's cast sounds, `gameplay/feel/cast_sounds.gd`: what a cast sounds of,
+## read without its spells' fields). Made by the compiler with `sense`.
+var carrier_cards: Array[StringName] = []
+var infusion_cards: Array[StringName] = []
+
+
+## Fills `carrier_cards` and `infusion_cards` from its group (the compiler, once).
+func list_cards() -> void:
+	carrier_cards.clear()
+	infusion_cards.clear()
+	if group == null:
+		return
+	for spell: CompiledSpell in group.spells:
+		if not carrier_cards.has(spell.carrier_card_id):
+			carrier_cards.append(spell.carrier_card_id)
+		for element: StringName in spell.element_ids:
+			if not infusion_cards.has(element):
+				infusion_cards.append(element)

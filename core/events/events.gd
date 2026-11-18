@@ -239,7 +239,7 @@ signal owned_staff_changed(player: int, staff: int, plan: Dictionary)
 signal hands_changed(player: int, hands: PackedInt32Array)
 ## Sender: player. The staff on hand `staff` (0-3: RB, RT, LB, LT) of `player`'s own wizard was built or changed (never another actor's the seat drives). `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them; empty for an empty hand. Heard by hud (the corner panel).
 signal staff_changed(player: int, staff: int, plan: Dictionary)
-## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by hud (the corner panel); Feel sounds every actor's cast on `cast_left` instead.
+## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by nobody now: Feel sounds every actor's cast on `cast_left` instead.
 signal staff_cast(player: int, staff: int, origin: Vector2, direction: Vector2)
 ## Sender: core/spells. A card of the actor `caster` moves it: `mode` is `&"dash"`, `&"teleport"`, `&"pull"`, `&"swap"` or `&"recoil"`; `move` is the way and the distance (the body stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player (a wizard's actor) and ai (an enemy's), each for its own actor id, which answer each with `caster_move_finished`. Every move adds up (rules R4 F1): several requests in one step (a scatter, a burst, `mirror`) or while one runs all move the body, each over its own time.
 signal caster_move_requested(caster: int, mode: StringName, move: Vector2, seconds: float, tag: int)

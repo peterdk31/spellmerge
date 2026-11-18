@@ -1371,9 +1371,12 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 		# Before its shots start (props W6): a caster that becomes something else as its cast leaves
 		# (a barrel's fuse burns out into rubble) is that when they meet it. Before the scatter is
 		# seeded, so a cast a listener makes now does not take this one's.
+		# A listener may make a cast of its own as this one leaves (a prop's `cast` trigger): the
+		# outer cast is the leaving one again once it is told.
+		var outer: CompiledCast = _leaving
 		_leaving = cast
 		events.cast_left.emit(actor, staff)
-		_leaving = null
+		_leaving = outer
 	_scatter_from(hash(Vector3i(actor, staff, _cast_count[index])))
 	_cast_turn[index] = fposmod(float(_cast_count[index]) * SpellLimits.RING_STEP, 1.0)
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:

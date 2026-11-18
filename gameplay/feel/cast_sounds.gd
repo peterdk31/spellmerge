@@ -8,7 +8,9 @@ extends RefCounted
 ## Feel decides who is heard and how loud (`play`'s `volume`: an enemy's cast is quieter, a prop's
 ## and a staff's with a cast cue of its own are not played here); this plays one cast: its carriers'
 ## sounds, each once (a Triple's three bolts are one bolt's sound), then its infusions' hints, each
-## once, at most MOST_HINTS. Each card's sound is read from the registry once, then kept: a cast
+## once, at most MOST_HINTS, and a staff's hints at most every HINT_EVERY seconds (a spray pouring
+## every 0.15 s would otherwise hold every voice with its hints, struck again before they ring out).
+## Each card's sound is read from the registry once, then kept: a cast
 ## allocates nothing.
 
 const AudioScript := preload("res://core/audio/audio.gd")
@@ -21,6 +23,9 @@ const HINT_VOLUME: float = -6.0
 const MOST_SOUNDS: int = 5
 ## The most hints one cast plays.
 const MOST_HINTS: int = 3
+## The least seconds between two casts' hints of one staff (a hint's length: a pour's next casts
+## sound their carrier alone until it has rung out).
+const HINT_EVERY: float = 0.45
 ## The registry folder the cards are in.
 const SPELL_FOLDER: StringName = &"spells"
 
@@ -37,6 +42,8 @@ var _sound_of: Dictionary[StringName, StringName] = {}
 ## The sounds the cast being played has played so far (the first `_played_count`).
 var _played: Array[StringName] = []
 var _played_count: int = 0
+## When each staff (its key, `play`'s `staff`) may sound its hints again.
+var _hints_due: Dictionary[int, float] = {}
 
 
 func _init() -> void:
@@ -44,24 +51,32 @@ func _init() -> void:
 
 
 ## Plays the cast `cast` (a `CompiledCast`) leaving from `at`, `volume` decibels on top of its
-## sounds' own: its carriers' sounds, then its infusions' hints. Returns how many sounds it started.
-func play(cast: CompiledCast, at: Vector2, volume: float = 0.0) -> int:
-	if audio == null or cast == null or cast.group == null:
+## sounds' own: its carriers' sounds, then its infusions' hints unless the staff `staff` (any key,
+## one a caster's staff) sounded its hints less than HINT_EVERY before `now` (seconds, any clock).
+## Returns how many sounds it started.
+func play(cast: CompiledCast, at: Vector2, volume: float = 0.0, staff: int = -1, now: float = 0.0) -> int:
+	if audio == null or cast == null:
 		return 0
 	_played_count = 0
 	var started: int = 0
-	for spell: CompiledSpell in cast.group.spells:
-		var sound: StringName = carrier_sound(spell.carrier_card_id)
-		if _play_once(sound, at, volume):
+	for card: StringName in cast.carrier_cards:
+		if _play_once(carrier_sound(card), at, volume):
 			started += 1
+	if cast.carrier_cards.is_empty() and _play_once(FALLBACK, at, volume):
+		started += 1
+	var due: float = float(_hints_due.get(staff, -INF)) if staff >= 0 else -INF
+	# A due time further off than HINT_EVERY is a clock that started again: it holds nothing back.
+	if now < due and due - now <= HINT_EVERY:
+		return started
 	var hints: int = 0
-	for spell: CompiledSpell in cast.group.spells:
-		for element: StringName in spell.element_ids:
-			if hints >= MOST_HINTS:
-				return started
-			if _play_once(hint_sound(element), at, volume + HINT_VOLUME):
-				started += 1
-				hints += 1
+	for element: StringName in cast.infusion_cards:
+		if hints >= MOST_HINTS:
+			break
+		if _play_once(hint_sound(element), at, volume + HINT_VOLUME):
+			started += 1
+			hints += 1
+	if hints > 0 and staff >= 0:
+		_hints_due[staff] = now + HINT_EVERY
 	return started
 
 

@@ -91,7 +91,6 @@ motes = Array[ExtResource("7")]([SubResource("burnt_0_motes_0")])
 [sub_resource type="Resource" id="burnt_look"]
 script = ExtResource("8")
 state_id = &"burnt"
-cue = &"dust_explode"
 layers = Array[ExtResource("6")]([SubResource("burnt_layer_0")])
 
 [resource]

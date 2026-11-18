@@ -494,6 +494,36 @@ func test_an_enemys_cast_sounds_quieter_and_a_props_not_at_all() -> void:
 	check_equal(_voices().started, before, "a prop's cast is its states' moments: no carrier sound")
 
 
+func test_a_staffs_cue_with_no_sound_of_its_own_plays_over_the_casts_sounds() -> void:
+	_world()
+	_know([&"bolt_cast"])
+	_cue(&"test_jet", [] as Array[Dictionary])
+	var data: EnemyBase = Fixture.staffed([[&"bolt"]])
+	data.staffs[0].staff.wind_up = 0.0
+	data.staffs[0].staff.cast_cue = &"test_jet"
+	var body: Actor = fx.imp(Vector2(40, 0), data)
+	fx.spells.call(&"cast_staff", body.id, 0, body.global_position, Vector2.RIGHT, 1000.0)
+	check_equal(_voices().voices_of(&"bolt_cast"), 1, "a look of its own (a spitter's jet) does not silence the cast (review finding)")
+
+
+func test_a_pours_hints_wait_until_the_last_have_rung_out() -> void:
+	var sounds: CastSoundsScript = CastSoundsScript.new()
+	sounds.registry = reg
+	sounds.audio = AudioScript.new()
+	sounds.audio.registry = reg
+	root.add_child(sounds.audio)
+	_know([&"spray_cast", &"fire_hint"])
+	var arena_cast := CompiledCast.new()
+	arena_cast.carrier_cards = [&"spray"] as Array[StringName]
+	arena_cast.infusion_cards = [&"fire"] as Array[StringName]
+	check_equal(sounds.play(arena_cast, Vector2.ZERO, 0.0, 3, 10.0), 2, "the first pour: the spray and its hint")
+	check_equal(sounds.play(arena_cast, Vector2.ZERO, 0.0, 3, 10.15), 1, "the next pour of the same staff: the spray alone (review finding: the hints held every voice)")
+	check_equal(sounds.play(arena_cast, Vector2.ZERO, 0.0, 4, 10.15), 2, "another staff's cast has its own")
+	check_equal(sounds.play(arena_cast, Vector2.ZERO, 0.0, 3, 10.0 + CastSoundsScript.HINT_EVERY), 2, "once rung out, its hint again")
+	check_equal(sounds.play(arena_cast, Vector2.ZERO, 0.0, 3, 0.0), 2, "a clock that started again holds nothing back")
+	sounds.audio.free()
+
+
 func test_a_carrier_card_with_no_sound_of_its_own_sounds_the_shared_cast() -> void:
 	_world()
 	var sounds: CastSoundsScript = CastSoundsScript.new()

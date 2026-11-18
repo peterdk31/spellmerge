@@ -8,7 +8,7 @@ Shared sound used by more than one thing: music (`music/`), sound effects (`sfx/
 
 - Audio depends on nothing. It holds files only, no logic.
 - **`.ogg` only.** No `.wav`, `.mp3` or other formats.
-- Every asset has an entry in `audio/manifest.json` (see below), or, for the sounds of one content folder, in an `assets.json` in that folder in the same shape.
+- Every asset has an entry in `audio/manifest.json` (see below), or, for the sounds of one content folder, in an `assets.json` in that folder in the same shape. A generated sound's entries are in an `assets.json` in its own folder, written by the tool (below).
 - Loop music and ambience loops must loop without a click, and are imported to loop (`loop=true` in their `.import`). An ambience accent (a drip, a gust) starts and ends at silence and is not imported to loop. Keep sound effects short and balanced in volume with the others.
 - Names are original. No ripped game audio, no samples of other works.
 - Audio is CC-BY-SA-4.0 by default. A file may instead declare CC0-1.0 or CC-BY-4.0 with a `<file>.license` file (AGENTS.md, hard rules).
@@ -19,7 +19,7 @@ A sound's id is its file's name (`zap` for `audio/sfx/zap.ogg`; the registry fin
 
 ## Allowed files
 
-`.ogg` audio, plus Godot's `.import` files, `.license` files and the manifest. Limits: **5 MB per `.ogg`**, 1 MB for anything else.
+`.ogg` audio, plus Godot's `.import` files, `.license` files and the manifest; and for generated sound (sound plan, docs/milestones/sound.md) a sound's recipe (`<id>.sound.json`), the `AudioStreamRandomizer` of its variants (`<id>.tres`), a sound folder's `assets.json`, shared instruments (`patches/<name>.patch.json`) and a music track's score (`<track>.score.json`). Limits: **5 MB per `.ogg`**, 1 MB for anything else.
 
 ## The origin manifest
 
@@ -46,6 +46,19 @@ A sound's id is its file's name (`zap` for `audio/sfx/zap.ogg`; the registry fin
 - Optional: `github` and `source`. A `quarantined` field marks an asset taken out after a copyright report; don't touch it.
 
 The manifest drives the Steam AI disclosure and the list of placeholders still to replace.
+
+### Generated sound
+
+A sound made by `tools/sound.py` (tools/README.md) has a folder of its own: `sfx/<id>/` (or any folder of its own under `audio/`, or a content item's `sounds/<id>/`) holds its recipe `<id>.sound.json`, and the bake writes beside it `variants/1.ogg` ... `n.ogg` and `<id>.tres` (a one-shot), or `<id>.ogg` (a held loop), and `assets.json`, one entry a file, so parallel PRs never edit one list. Never write these by hand: change the recipe and run `tools/sound.py bake <id>`. Its entries add `recipe_hash` (of the recipe, its patches and its family's row in docs/STYLE.md: what `tools/sound.py check` and its test compare), `audio_hash` (of its samples), `loudness` (LUFS) and `peak` (dBTP), and `prompt` is the recipe's path, which is the whole input:
+
+```json
+{"path": "audio/sfx/cast/variants/1.ogg", "origin": "ai", "author": "Claude", "license": "CC-BY-SA-4.0",
+ "tier": "good", "tool": "tools/sound.py (procedural synthesis, generator 1)",
+ "prompt": "audio/sfx/cast/cast.sound.json", "recipe_hash": "sha256:...", "audio_hash": "sha256:...",
+ "loudness": -20.1, "peak": -6.2}
+```
+
+A rebake keeps a file's `tier` while its audio (`audio_hash`) stays the same; one that changes it sets `final` back to `good`, because the owner promoted the sound they heard. Hear a sound before a PR with `tools/sound.py sheet <id> --out <a folder outside the repository>`, and attach or link the sheet's `.mp4`.
 
 ## Steps
 

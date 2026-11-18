@@ -148,7 +148,7 @@ The game's sound is synthesised from code in a modern style (the owner, 2026-11-
 | `ui` | -24 momentary | -6 dBTP | 2 | ±2% | none |
 | `music` (all layers together) | -18 integrated | -1 dBTP | 1 | none | none |
 
-Momentary is the loudest 400 ms window (most sounds here are shorter than short-term's 3 s); integrated is the whole file, gated (BS.1770). Peaks are held 1 dB under the limit before encoding, as Vorbis can overshoot. The bake fails a sound more than 1 LU outside its family's target unless its recipe places it with `gain` and a note. These numbers are a first tuning; the owner changes them by ear.
+Momentary is the loudest 400 ms window (most sounds here are shorter than short-term's 3 s); integrated is the whole file, gated (BS.1770). Peaks are held 1 dB under the limit before encoding, as Vorbis can overshoot. The bake places each sound on its family's target (a recipe's `gain`, with a note, places it off it), measuring a loop as it plays round, and fails a variant more than 1 LU from it. These numbers are a first tuning; the owner changes them by ear.
 
 ## File formats
 

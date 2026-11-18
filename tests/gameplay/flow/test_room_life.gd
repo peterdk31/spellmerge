@@ -14,6 +14,7 @@ const TickScript := preload("res://core/sim/tick.gd")
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
 const DT: float = 1.0 / 60.0
 const IMP: StringName = &"ember_imp"
+const NativeScript := preload("res://core/native/native.gd")
 
 var flow: FlowScript
 var events: Node
@@ -139,6 +140,22 @@ func test_the_start_room_is_entered_and_every_piece_built_and_placed() -> void:
 	var camera: Camera2D = flow.world.find_children("*", "Camera2D", true, false)[0] as Camera2D
 	check_equal(camera.limit_right, ceili(projectiles.call(&"bounds").end.x), "the camera's limits are the biome's")
 	check(float(projectiles.call(&"room_size")) < (projectiles.call(&"bounds") as Rect2).size.x, "a growing shot grows to a room's side, not the biome's")
+
+
+func test_every_piece_is_announced_so_a_mirrored_one_is_drawn_mirrored() -> void:
+	var ground: Node = root.get_node("Feel").get_node_or_null("Ground")
+	if ground == null or not NativeScript.loaded():
+		push_warning("SKIP: the ground is drawn at layout by the native module only")
+		return
+	var map: BiomeMap = BiomeMaps.split(registry, [0, PieceShape.MIRROR_X | PieceShape.MIRROR_Y, 0] as Array[int])
+	check_equal(map.problems(BiomeMaps.shapes(registry, map)), PackedStringArray(), "the nave mirrored both ways makes a sound map")
+	var before: int = int(ground.get(&"drawn"))
+	input.add_virtual_device(0)
+	check(flow.start_biome(0, map, [] as Array[RoomFight]), "the biome starts")
+	check_equal(int(ground.get(&"drawn")) - before, 5, "every room's and bridge's ground is drawn as it is laid")
+	var nave: Node = flow.biome.room_layout(0)
+	check_equal(nave.get_meta(PieceShape.GROUND_MIRROR_META), Vector2i(1, 1), "the nave says it is mirrored")
+	check((nave.get_node("Floor") as Sprite2D).texture is ImageTexture, "and its floor is the one drawn mirrored")
 
 
 func test_a_fight_starts_past_a_mouth_and_seals_one_way() -> void:

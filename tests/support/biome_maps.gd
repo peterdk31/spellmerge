@@ -19,9 +19,9 @@ static func walk_through(registry: Object) -> BiomeMap:
 
 ## CB3's split map: the nave the start room (room 0), the antechamber west of it (room 1) and the
 ## ossuary court east of it (room 2), each joined to the nave by a bridge, so a party can split to two
-## fights at once.
-static func split(registry: Object) -> BiomeMap:
-	var row: BiomeMap = walk_through(registry)
+## fights at once. `mirrors`: the antechamber's, the nave's and the court's mirrorings.
+static func split(registry: Object, mirrors: Array[int] = [0, 0, 0]) -> BiomeMap:
+	var row: BiomeMap = _row(registry, [FIRST, MIDDLE, LAST] as Array[StringName], mirrors)
 	var map := BiomeMap.new()
 	map.biome = row.biome
 	# The row's room 1 (the nave) first, then its rooms 0 and 2.
@@ -32,6 +32,14 @@ static func split(registry: Object) -> BiomeMap:
 		map.add_bridge(row.bridge_templates[bridge], row.bridge_places[bridge], row.bridge_mirrors[bridge], order.find(row.end_room(bridge, 0)), row.end_socket(bridge, 0), order.find(row.end_room(bridge, 1)), row.end_socket(bridge, 1))
 	map.work_out_depths()
 	return map
+
+
+## Every template `map` names, unmirrored (template id to `PieceShape`), as `BiomeMap.problems` takes them.
+static func shapes(registry: Object, map: BiomeMap) -> Dictionary:
+	var out: Dictionary = {}
+	for id: StringName in map.room_templates + map.bridge_templates:
+		out[id] = shape(registry, id)
+	return out
 
 
 ## The world point where room `room`'s socket facing `facing` is, in `map` (its rooms' shapes read

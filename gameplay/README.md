@@ -73,8 +73,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `crumble_requested` | `flow` (an add whose caller died; boss plan OB13) | `combat` (it dies with no hit, nobody's kill) |
 | `run_way_taken` | `flow` (every standing wizard in a lit exit) | `run` (moves on through the map) |
 | `room_exits_shown` | `flow` (the lit exits of a cleared room, and the kind behind each) | `feel` (the kind's name over each) |
-| `room_left` | `flow` (the party goes on to the next room of the run) | `core/spells` (what was cast in the room ends quietly) |
-| `room_entered` | `flow` | `ai`, `coop`, `difficulty`, `hud`, `feel` (its walls' colours for motes; the party camera jumps to the new room) |
+| `room_left` | `flow` (the party goes on to the next room of the run; a biome's world goes, `Events.ALL_ROOMS`) | `core/spells` (what was cast in the room ends quietly) |
+| `room_entered` | `flow` (by room number: a biome's each room the first time; `Events.FIRST_ROOM` is a new world, connected biomes CB3) | `ai`, `coop`, `difficulty`, `hud`, `feel` (its walls' colours for motes; the party camera jumps to the new room) |
 | `room_built` | `flow` | `feel` (ground cover GC3: the cover's look, `cover.gd`) and `cover` (GC5): the room's cover worked out from its layout, `CoverLayout.of` |
 | `floor_touched` | `core/spells` (a blast, a pulse's ring, a pool lying and on its ticks, a shot's end; ground cover GC5) | `cover` (the `element` triggers of the cells inside its circle, at its next step) |
 | `cover_changed` | `cover` (each tick's changes; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look) |

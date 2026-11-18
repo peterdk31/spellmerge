@@ -1,44 +1,44 @@
-class_name ArriveLook
+class_name SpawnLook
 extends Node2D
-## The look of an enemy arriving (enemy arrivals EA2, docs/milestones/enemy-arrivals.md, "The look";
-## arrival styles, docs/milestones/arrival-styles.md): first a mark grows on the floor where the body
+## The look of an enemy spawning (enemy spawning EA2, docs/milestones/enemy-spawning.md, "The look";
+## spawn styles, docs/milestones/spawn-styles.md): first a mark grows on the floor where the body
 ## will stand, then the body comes out of it as its style's motion draws it. It is drawn from the
-## body's state alone (`Actor.arrive_share`), never from a moment it was told of, so a machine that
-## joins mid-arrival or a snapshot restored mid-arrival shows it where it is. Feel steps it once a
+## body's state alone (`Actor.spawn_share`), never from a moment it was told of, so a machine that
+## joins mid-spawn or a snapshot restored mid-spawn shows it where it is. Feel steps it once a
 ## frame (`step`: the marks and the cues) over the actor table's open bodies, as it does `FallLook`;
 ## the bodies are drawn by their motions just before the frame is drawn (`cut`, on
 ## `RenderingServer.frame_pre_draw`), after every `_process` and deferred call, so a body added
 ## after Feel's step (a run started as a load ends) is never drawn whole for a frame.
 ##
-## **A style says the numbers** (`ArrivalStyle`, content/arrivals/): where the stages hand over, the
+## **A style says the numbers** (`SpawnStyle`, content/spawn_styles/): where the stages hand over, the
 ## mark's frames and the cue. Feel hands the look a lookup of the styles by id (`style_of`, the
-## registry's `arrivals`); a style it cannot find is drawn as `ArrivalStyle.DEFAULT` (`rise`'s
-## numbers). Every body arrives as `rise` today (arrival styles AS1); which style a body has is AS2.
-## **A motion draws the body** (`MOTIONS`, gameplay/feel/arrive_motions/: one object each, keyed by
-## the names of `ArrivalStyle.MOTIONS`; a test holds the two lists together): a motion it does not
-## have is drawn as `rise`, so a body is never drawn whole mid-arrival. What every style shares is here:
+## registry's `spawns`); a style it cannot find is drawn as `SpawnStyle.DEFAULT` (`rise`'s
+## numbers). Every body spawns in as `rise` today (spawn styles AS1); which style a body has is AS2.
+## **A motion draws the body** (`MOTIONS`, gameplay/feel/spawn_motions/: one object each, keyed by
+## the names of `SpawnStyle.MOTIONS`; a test holds the two lists together): a motion it does not
+## have is drawn as `rise`, so a body is never drawn whole mid-spawn. What every style shares is here:
 ##
 ## - **0 to `mark_end`, the mark:** a disc on the floor at the body's feet, as wide as its footprint,
 ##   in the room's floor colours (`RoomBase.floor_colors`: its shadow, darkened, with its light shade
 ##   as a rim; `use_room`), growing from a dot in `mark_frames` frames. The body is not drawn yet.
 ## - **`mark_end` to 1, the motion** (`rise`: the body comes up out of the mark, cut at its feet's
-##   line; arrive_motions/rise.gd). As it starts the style's cue plays at the body's feet (`rise`'s
-##   `enemy_arrive`: dust off the mark, a soft sound): its sound at most every SOUND_EVERY seconds,
+##   line; spawn_motions/rise.gd). As it starts the style's cue plays at the body's feet (`rise`'s
+##   `enemy_spawn`: dust off the mark, a soft sound): its sound at most every SOUND_EVERY seconds,
 ##   so a group does not stack it (the cue is played unweighted in between: its dust only). From
 ##   `close_from` the mark closes in `close_frames` frames as the feet land, down to a dot, so the
 ##   motion ends where standing begins (docs/STYLE.md, "Smooth").
 ##
-## View only. Nothing here allocates while bodies arrive: its scratch of ids and marks is made once,
+## View only. Nothing here allocates while bodies spawn in: its scratch of ids and marks is made once,
 ## and the dictionaries of the bodies it drew, whose cue it played and the styles it looked up grow
 ## only when a body or a style is first seen (and are walked only as one is done).
 
 const ActorsScript := preload("res://core/actors/actors.gd")
-const ArriveMotionScript := preload("res://gameplay/feel/arrive_motions/arrive_motion.gd")
-const RiseScript := preload("res://gameplay/feel/arrive_motions/rise.gd")
+const SpawnMotionScript := preload("res://gameplay/feel/spawn_motions/spawn_motion.gd")
+const RiseScript := preload("res://gameplay/feel/spawn_motions/rise.gd")
 
 const VIEW_ONLY: bool = true
 
-## The motions it draws, by the names of `ArrivalStyle.MOTIONS` (the same names: a test checks).
+## The motions it draws, by the names of `SpawnStyle.MOTIONS` (the same names: a test checks).
 const MOTIONS: Dictionary[StringName, Script] = {
 	&"rise": RiseScript,
 }
@@ -53,8 +53,8 @@ const NO_FLOOR: PackedColorArray = [Color(0.55, 0.55, 0.6), Color(0.35, 0.35, 0.
 
 ## Plays a cue: (cue: StringName, at: Vector2, weighted: bool). Set by Feel; none plays nothing.
 var play_cue: Callable = Callable()
-## Finds a style by its id: (id: StringName) -> ArrivalStyle, null for none. Set by Feel (the
-## registry's `arrivals`); none, or a style it does not find, is `ArrivalStyle.DEFAULT`. Setting it
+## Finds a style by its id: (id: StringName) -> SpawnStyle, null for none. Set by Feel (the
+## registry's `spawns`); none, or a style it does not find, is `SpawnStyle.DEFAULT`. Setting it
 ## forgets the styles looked up.
 var style_of: Callable = Callable():
 	set(value):
@@ -66,14 +66,14 @@ var _ids: PackedInt32Array = PackedInt32Array()
 ## The table `step` was last given (Feel's actor table), read again by `cut`.
 var _table: ActorsScript = null
 ## One of each motion, by name.
-var _motions: Dictionary[StringName, ArriveMotionScript] = {}
+var _motions: Dictionary[StringName, SpawnMotionScript] = {}
 ## The bodies drawn (by instance id), and the motion that drew each; and the bodies whose motion's
 ## cue was played.
-var _cut: Dictionary[int, ArriveMotionScript] = {}
+var _cut: Dictionary[int, SpawnMotionScript] = {}
 var _risen: Dictionary[int, bool] = {}
 ## The styles looked up, by id (a style not found is kept as the default), and the default.
-var _styles: Dictionary[StringName, ArrivalStyle] = {}
-var _default_style: ArrivalStyle = ArrivalStyle.from_default()
+var _styles: Dictionary[StringName, SpawnStyle] = {}
+var _default_style: SpawnStyle = SpawnStyle.from_default()
 ## This frame's marks: where (whole pixels) and how wide; `_marks` of them are in use.
 var _mark_at: PackedVector2Array = PackedVector2Array()
 var _mark_radius: PackedInt32Array = PackedInt32Array()
@@ -93,7 +93,7 @@ func _init() -> void:
 	_mark_at.resize(ActorsScript.ACTORS)
 	_mark_radius.resize(ActorsScript.ACTORS)
 	for motion: StringName in MOTIONS:
-		_motions[motion] = MOTIONS[motion].new() as ArriveMotionScript
+		_motions[motion] = MOTIONS[motion].new() as SpawnMotionScript
 
 
 func _ready() -> void:
@@ -125,18 +125,18 @@ func forget_styles() -> void:
 	_styles.clear()
 
 
-## The style `body` arrives in: today always `rise` (arrival styles AS2 reads the body's own).
-func style_for(_body: Actor) -> ArrivalStyle:
-	return _style(ArrivalStyle.DEFAULT["id"])
+## The style `body` spawns in in: today always `rise` (spawn styles AS2 reads the body's own).
+func style_for(_body: Actor) -> SpawnStyle:
+	return _style(SpawnStyle.DEFAULT["id"])
 
 
 ## The style of id `id`, looked up once (`style_of`); the default when there is none.
-func _style(id: StringName) -> ArrivalStyle:
-	var style: ArrivalStyle = _styles.get(id)
+func _style(id: StringName) -> SpawnStyle:
+	var style: SpawnStyle = _styles.get(id)
 	if style != null:
 		return style
 	if style_of.is_valid():
-		style = style_of.call(id) as ArrivalStyle
+		style = style_of.call(id) as SpawnStyle
 	if style == null:
 		style = _default_style
 	_styles[id] = style
@@ -144,15 +144,15 @@ func _style(id: StringName) -> ArrivalStyle:
 
 
 ## The motion `style` is drawn by (`rise` for one it does not have).
-func _motion_of(style: ArrivalStyle) -> ArriveMotionScript:
-	var motion: ArriveMotionScript = _motions.get(style.motion)
+func _motion_of(style: SpawnStyle) -> SpawnMotionScript:
+	var motion: SpawnMotionScript = _motions.get(style.motion)
 	return motion if motion != null else _motions[FALLBACK_MOTION]
 
 
-## How wide the mark under a body whose footprint is `radius` pixels is at `share` of its arrival as
+## How wide the mark under a body whose footprint is `radius` pixels is at `share` of its spawn as
 ## `style` times it, in whole pixels (0: none): growing from a dot in its `mark_frames` frames by its
 ## `mark_end`, held, then closing from its `close_from` in its `close_frames` frames down to a dot.
-static func mark_radius(radius: float, share: float, style: ArrivalStyle) -> int:
+static func mark_radius(radius: float, share: float, style: SpawnStyle) -> int:
 	if share >= 1.0 or share < 0.0:
 		return 0
 	var full: int = maxi(roundi(radius), 2)
@@ -165,8 +165,8 @@ static func mark_radius(radius: float, share: float, style: ArrivalStyle) -> int
 	return maxi(roundi(lerpf(float(full), 1.0, float(j + 1) / float(style.close_frames))), 1)
 
 
-## Lay out every arriving body of `table`'s mark, and play each one's style's cue once as its motion
-## starts, as far through its arrival as it is; the bodies themselves are drawn by `cut`, just before
+## Lay out every spawning body of `table`'s mark, and play each one's style's cue once as its motion
+## starts, as far through its spawn as it is; the bodies themselves are drawn by `cut`, just before
 ## the frame is drawn. `real_delta` is the frame's real seconds (the cue's sound is spaced by them).
 func step(table: ActorsScript, real_delta: float) -> void:
 	_table = table
@@ -177,10 +177,10 @@ func step(table: ActorsScript, real_delta: float) -> void:
 		var count: int = table.open_ids(_ids)
 		for n in count:
 			var body := table.node_of(_ids[n]) as Actor
-			if body == null or not body.is_arriving() or not body.is_inside_tree():
+			if body == null or not body.is_spawning() or not body.is_inside_tree():
 				continue
-			var style: ArrivalStyle = style_for(body)
-			var share: float = body.arrive_share()
+			var style: SpawnStyle = style_for(body)
+			var share: float = body.spawn_share()
 			if share >= style.mark_end:
 				rising += 1
 				var key: int = body.get_instance_id()
@@ -198,29 +198,29 @@ func step(table: ActorsScript, real_delta: float) -> void:
 		queue_redraw()
 
 
-## Draw every arriving body of the table `step` was last given by its style's motion, and put back
+## Draw every spawning body of the table `step` was last given by its style's motion, and put back
 ## the bodies done. Called just before every frame is drawn (`RenderingServer.frame_pre_draw`), after
 ## every `_process` and deferred call, so a body added after Feel's step (a run started as a load
 ## ends) is never drawn whole for a frame; tests call it by hand.
 func cut() -> void:
-	var arriving: int = 0
+	var spawning: int = 0
 	if _table != null and is_instance_valid(_table):
 		var count: int = _table.open_ids(_ids)
 		for n in count:
 			var body := _table.node_of(_ids[n]) as Actor
-			if body == null or not body.is_arriving() or not body.is_inside_tree():
+			if body == null or not body.is_spawning() or not body.is_inside_tree():
 				continue
-			arriving += 1
-			var style: ArrivalStyle = style_for(body)
-			var motion: ArriveMotionScript = _motion_of(style)
+			spawning += 1
+			var style: SpawnStyle = style_for(body)
+			var motion: SpawnMotionScript = _motion_of(style)
 			var key: int = body.get_instance_id()
-			var before: ArriveMotionScript = _cut.get(key)
+			var before: SpawnMotionScript = _cut.get(key)
 			if before != motion:
 				if before != null:
 					before.put_back(key, body)
 				_cut[key] = motion
-			motion.apply(body, body.arrive_share(), style)
-	if _cut.size() > arriving:
+			motion.apply(body, body.spawn_share(), style)
+	if _cut.size() > spawning:
 		_put_back()
 
 
@@ -233,19 +233,19 @@ func _play_rise_cue(cue: StringName, at: Vector2) -> void:
 	play_cue.call(cue, at, weighted)
 
 
-## The bodies whose cue played that arrive no more (or went) are forgotten.
+## The bodies whose cue played that spawn in no more (or went) are forgotten.
 func _forget_risen() -> void:
 	for key: int in _risen.keys():
 		var body := instance_from_id(key) as Actor
-		if body == null or not body.is_arriving() or not body.is_inside_tree():
+		if body == null or not body.is_spawning() or not body.is_inside_tree():
 			_risen.erase(key)
 
 
-## Every body drawn that arrives no more (or went) is handed back to its motion to put back.
+## Every body drawn that spawns in no more (or went) is handed back to its motion to put back.
 func _put_back() -> void:
 	for key: int in _cut.keys():
 		var body := instance_from_id(key) as Actor
-		if body != null and body.is_arriving() and body.is_inside_tree():
+		if body != null and body.is_spawning() and body.is_inside_tree():
 			continue
 		_cut[key].put_back(key, body)
 		_cut.erase(key)
@@ -280,7 +280,7 @@ func drawn() -> int:
 
 
 ## The motion of name `motion` it draws by (tests).
-func motion_named(motion_name: StringName) -> ArriveMotionScript:
+func motion_named(motion_name: StringName) -> SpawnMotionScript:
 	return _motions.get(motion_name)
 
 

@@ -1,9 +1,9 @@
-extends "res://gameplay/feel/arrive_motions/arrive_motion.gd"
-## The motion `rise` (enemy arrivals EA2's look, docs/milestones/enemy-arrivals.md, "The look"; arrival
-## styles: its code moved here unchanged, docs/milestones/arrival-styles.md): through the mark the
+extends "res://gameplay/feel/spawn_motions/spawn_motion.gd"
+## The motion `rise` (enemy spawning EA2's look, docs/milestones/enemy-spawning.md, "The look"; spawn
+## styles: its code moved here unchanged, docs/milestones/spawn-styles.md): through the mark the
 ## body is all under the floor, then it comes up out of the mark, drawn shifted down by whole pixels
 ## from its full height (`body_height`, and the rows its art has under its feet, `body_bottom`) to 0
-## at the end of its arrival, and cut off at the line of its lowest row, so what is still under the
+## at the end of its spawn, and cut off at the line of its lowest row, so what is still under the
 ## floor is not drawn and nothing of it appears in one jump as it lands. Its own sprite and pose all
 ## the way: no fade, no blur, no scale.
 ##
@@ -19,8 +19,8 @@ extends "res://gameplay/feel/arrive_motions/arrive_motion.gd"
 ## any of it: its position and its parts' are untouched. A body put back gets its children's own
 ## transforms back and is no clip parent any more.
 ##
-## Nothing here allocates while bodies arrive: the dictionaries of the bodies it cut grow only when a
-## body first arrives.
+## Nothing here allocates while bodies spawn in: the dictionaries of the bodies it cut grow only when a
+## body first spawns in.
 
 ## The mask's reach each way from the feet and up (a body's own pixels, at its size 1).
 const MASK_HALF_WIDTH: float = 96.0
@@ -31,17 +31,17 @@ const MASK_TALL: float = 192.0
 var _drawn: Dictionary[int, Vector2] = {}
 
 
-## How far below its place a body `height` pixels tall is drawn at `share` of its arrival as `style`
+## How far below its place a body `height` pixels tall is drawn at `share` of its spawn as `style`
 ## times it, in whole pixels: all of it under the floor through the mark, then up to 0 as it lands.
-static func shift(height: float, share: float, style: ArrivalStyle) -> float:
+static func shift(height: float, share: float, style: SpawnStyle) -> float:
 	if share < style.mark_end:
 		return height
 	var t: float = clampf((share - style.mark_end) / (1.0 - style.mark_end), 0.0, 1.0)
 	return roundf(height * (1.0 - t))
 
 
-## One arriving body cut at its feet's line (the lowest row of its art) and its parts shifted by its rise.
-func apply(body: Actor, share: float, style: ArrivalStyle) -> void:
+## One spawning body cut at its feet's line (the lowest row of its art) and its parts shifted by its rise.
+func apply(body: Actor, share: float, style: SpawnStyle) -> void:
 	var key: int = body.get_instance_id()
 	if not _drawn.has(key):
 		body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
@@ -58,7 +58,7 @@ func apply(body: Actor, share: float, style: ArrivalStyle) -> void:
 	RenderingServer.canvas_item_add_rect(item, mask_rect(bottom, size), Color.WHITE)
 
 
-## The body arrives no more (or went): its parts' own transforms back, and no clip parent any more.
+## The body spawns in no more (or went): its parts' own transforms back, and no clip parent any more.
 func put_back(key: int, body: Actor) -> void:
 	if body != null:
 		body.clip_children = CanvasItem.CLIP_CHILDREN_DISABLED

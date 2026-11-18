@@ -1,10 +1,10 @@
 extends "res://tests/support/suite.gd"
-## Arrival styles as data (arrival styles AS1, docs/milestones/arrival-styles.md): every style file in
-## content/arrivals has no problems (its id its folder's, its cue a cue of the game's) and the set none
-## (no two styles name one biome); `rise` is `ArrivalStyle.DEFAULT`'s numbers, and a field left out
+## Spawn styles as data (spawn styles AS1, docs/milestones/spawn-styles.md): every style file in
+## content/spawn_styles has no problems (its id its folder's, its cue a cue of the game's) and the set none
+## (no two styles name one biome); `rise` is `SpawnStyle.DEFAULT`'s numbers, and a field left out
 ## takes them; each problem `problems()` and `all_problems()` know is named.
 
-const FOLDER: StringName = ArrivalStyle.FOLDER
+const FOLDER: StringName = SpawnStyle.FOLDER
 
 
 ## Whether the game has a cue of id `cue`.
@@ -12,12 +12,12 @@ func _known_cue(cue: StringName) -> bool:
 	return root.get_node("Registry").call("get_resource", &"cues", cue) != null
 
 
-func _styles() -> Array[ArrivalStyle]:
-	var found: Array[ArrivalStyle] = []
+func _styles() -> Array[SpawnStyle]:
+	var found: Array[SpawnStyle] = []
 	for style: Resource in root.get_node("Registry").call("get_all", FOLDER):
-		check(style is ArrivalStyle, "%s is a style" % style.resource_path)
-		if style is ArrivalStyle:
-			found.append(style as ArrivalStyle)
+		check(style is SpawnStyle, "%s is a style" % style.resource_path)
+		if style is SpawnStyle:
+			found.append(style as SpawnStyle)
 	return found
 
 
@@ -26,46 +26,46 @@ var _paths: int = 0
 
 
 ## A style of `rise`'s numbers, its id `id`, as if read from its folder `folder` (none: made in code).
-func _style(id: StringName = &"rise", folder: String = "") -> ArrivalStyle:
-	var style := ArrivalStyle.from_default()
+func _style(id: StringName = &"rise", folder: String = "") -> SpawnStyle:
+	var style := SpawnStyle.from_default()
 	style.id = id
 	if folder != "":
 		_paths += 1
-		style.resource_path = "res://content/arrivals/%s/%s_%d.tres" % [folder, id, _paths]
+		style.resource_path = "res://content/spawn_styles/%s/%s_%d.tres" % [folder, id, _paths]
 	return style
 
 
 func test_every_style_file_has_no_problems() -> void:
-	var styles: Array[ArrivalStyle] = _styles()
-	check(not styles.is_empty(), "the registry finds the styles in content/arrivals")
+	var styles: Array[SpawnStyle] = _styles()
+	check(not styles.is_empty(), "the registry finds the styles in content/spawn_styles")
 	for style in styles:
 		check_equal(style.problems(_known_cue), PackedStringArray(), "%s has no problems" % style.resource_path)
-		check(style.resource_path.begins_with("res://content/arrivals/%s/" % style.id), "%s is in its own folder" % style.id)
-	check_equal(ArrivalStyle.all_problems(styles, _known_cue), PackedStringArray(), "and the set has none")
+		check(style.resource_path.begins_with("res://content/spawn_styles/%s/" % style.id), "%s is in its own folder" % style.id)
+	check_equal(SpawnStyle.all_problems(styles, _known_cue), PackedStringArray(), "and the set has none")
 
 
 ## `rise` is today's look: `DEFAULT`'s numbers, each written out in its file; a style made in code
 ## (a field left out) takes them too.
 func test_rise_is_the_default() -> void:
-	var rise := root.get_node("Registry").call("get_resource", FOLDER, ArrivalStyle.DEFAULT["id"]) as ArrivalStyle
-	check(rise != null, "content/arrivals/rise is there")
+	var rise := root.get_node("Registry").call("get_resource", FOLDER, SpawnStyle.DEFAULT["id"]) as SpawnStyle
+	check(rise != null, "content/spawn_styles/rise is there")
 	if rise == null:
 		return
-	var made := ArrivalStyle.new()
-	for field: String in ArrivalStyle.DEFAULT:
-		check_equal(rise.get(field), ArrivalStyle.DEFAULT[field], "rise's %s is DEFAULT's" % field)
+	var made := SpawnStyle.new()
+	for field: String in SpawnStyle.DEFAULT:
+		check_equal(rise.get(field), SpawnStyle.DEFAULT[field], "rise's %s is DEFAULT's" % field)
 		if field != "id":
-			check_equal(made.get(field), ArrivalStyle.DEFAULT[field], "a new style's %s is DEFAULT's" % field)
-	check_equal(ArrivalStyle.from_default().id, &"rise", "the default is rise")
-	check_equal(rise.biomes, [] as Array[StringName], "rise names no biome: every biome no style names arrives as it")
+			check_equal(made.get(field), SpawnStyle.DEFAULT[field], "a new style's %s is DEFAULT's" % field)
+	check_equal(SpawnStyle.from_default().id, &"rise", "the default is rise")
+	check_equal(rise.biomes, [] as Array[StringName], "rise names no biome: every biome no style names spawns as it")
 	check(rise.mark_strip == null, "and draws the ring, no strip")
-	check(ArrivalStyle.MOTIONS.has(rise.motion), "its motion is one of the motions")
+	check(SpawnStyle.MOTIONS.has(rise.motion), "its motion is one of the motions")
 
 
 func test_a_sound_style_has_no_problems() -> void:
 	check_equal(_style(&"fixture", "fixture").problems(_known_cue), PackedStringArray(), "rise's numbers in a folder of its id")
 	check_equal(_style().problems(), PackedStringArray(), "made in code, with no folder")
-	var slow: ArrivalStyle = _style()
+	var slow: SpawnStyle = _style()
 	slow.seconds = 2.0
 	slow.colours = &"stone"
 	slow.biomes = [&"crypt"] as Array[StringName]
@@ -75,7 +75,7 @@ func test_a_sound_style_has_no_problems() -> void:
 func test_each_problem_is_named() -> void:
 	# Each case: what is wrong, and the fields set to make it so (on a sound style in its folder).
 	var cases: Array = [
-		["an id that is not its folder's", {"resource_path": "res://content/arrivals/frost/fixture_frost.tres"}],
+		["an id that is not its folder's", {"resource_path": "res://content/spawn_styles/frost/fixture_frost.tres"}],
 		["no id", {"id": &""}],
 		["a motion there is none of", {"motion": &"drop"}],
 		["too short", {"seconds": 0.2, "close_from": 0.6}],
@@ -95,27 +95,27 @@ func test_each_problem_is_named() -> void:
 		["a cue there is none of", {"cue": &"no_such_cue"}],
 	]
 	for case: Array in cases:
-		var style: ArrivalStyle = _style(&"fixture", "fixture")
+		var style: SpawnStyle = _style(&"fixture", "fixture")
 		var fields: Dictionary = case[1]
 		for field: String in fields:
 			style.set(field, fields[field])
 		var found: PackedStringArray = style.problems(_known_cue)
 		check_equal(found.size(), 1, "%s: %s" % [case[0], found])
-	var silent: ArrivalStyle = _style()
+	var silent: SpawnStyle = _style()
 	silent.cue = &""
 	check_equal(silent.problems(_known_cue), PackedStringArray(), "no cue is no problem: none plays")
 
 
 ## Across the styles: no two name one biome, so none wins by the order they are read in.
 func test_two_styles_naming_one_biome_is_a_problem() -> void:
-	var frost: ArrivalStyle = _style(&"frost")
+	var frost: SpawnStyle = _style(&"frost")
 	frost.biomes = [&"crypt", &"glacier"] as Array[StringName]
-	var rime: ArrivalStyle = _style(&"rime")
+	var rime: SpawnStyle = _style(&"rime")
 	rime.biomes = [&"glacier"] as Array[StringName]
-	var found: PackedStringArray = ArrivalStyle.all_problems([frost, rime] as Array[ArrivalStyle])
+	var found: PackedStringArray = SpawnStyle.all_problems([frost, rime] as Array[SpawnStyle])
 	check_equal(found.size(), 1, "one line: %s" % found)
 	check(found.size() == 1 and found[0].contains("glacier") and found[0].contains("frost") and found[0].contains("rime"), "naming the biome and both styles")
 	rime.biomes = [&"swamp"] as Array[StringName]
-	check_equal(ArrivalStyle.all_problems([frost, rime] as Array[ArrivalStyle]), PackedStringArray(), "a biome each is fine")
+	check_equal(SpawnStyle.all_problems([frost, rime] as Array[SpawnStyle]), PackedStringArray(), "a biome each is fine")
 	rime.seconds = 9.0
-	check_equal(ArrivalStyle.all_problems([frost, rime] as Array[ArrivalStyle]).size(), 1, "each style's own problems too")
+	check_equal(SpawnStyle.all_problems([frost, rime] as Array[SpawnStyle]).size(), 1, "each style's own problems too")

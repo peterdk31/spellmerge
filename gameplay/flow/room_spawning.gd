@@ -1,6 +1,6 @@
-class_name RoomArrivals
+class_name RoomSpawning
 extends RefCounted
-## How a room's enemies come in (enemy arrivals EA5, docs/milestones/enemy-arrivals.md, "Pacing"): the
+## How a room's enemies come in (enemy spawning EA5, docs/milestones/enemy-spawning.md, "Pacing"): the
 ## run's list for the room, split into groups by cost, the next group only when the room gets quiet
 ## (the owner, 2026-11-17: no timer). Pure rules, no nodes: Flow holds one, asks it each tick which id
 ## to stand next (`next`) and where (`spawn_for`), and stands it. Flow's state (all of it is saved in
@@ -9,11 +9,11 @@ extends RefCounted
 ## - **A group** takes ids from the front of the list until its cost reaches `group` (always one at
 ##   least, so an enemy that costs more than a group still comes); with `group` 0, the whole list.
 ## - **The first group** starts as the list is handed over (`begin`); **the next** only once the
-##   current one has all started and the cost standing or arriving drops to `refill_at` or below.
+##   current one has all started and the cost standing or spawning drops to `refill_at` or below.
 ## - **Its bodies** start `stagger` seconds apart (the first at once), so a group ripples in.
 ## - **Where:** a group's bodies take the spawns farthest from every standing wizard first (`rank`,
 ##   worked out as the group's first body stands), skipping a spawn over a hole and one within
-##   `NEAR` of a wizard (a body never starts arriving on a player), round them in turn, stacked where
+##   `NEAR` of a wizard (a body never starts spawning on a player), round them in turn, stacked where
 ##   a spawn is used again within the group (`Flow.stacked_position`).
 
 ## Pixels from a standing wizard within which a spawn is not used (unless every spawn is that near:
@@ -51,7 +51,7 @@ func begin(ids: Array[StringName], cost_of: PackedInt32Array, group_cost: int, r
 
 
 ## The id to stand now, `delta` seconds on, with `standing_cost` of the room's enemies standing or
-## arriving (Flow's count); &"" for none this time. Call it again with `delta` 0 until it gives &"":
+## spawning (Flow's count); &"" for none this time. Call it again with `delta` 0 until it gives &"":
 ## a group with no stagger stands all at once.
 func next(delta: float, standing_cost: int) -> StringName:
 	if waiting.is_empty():

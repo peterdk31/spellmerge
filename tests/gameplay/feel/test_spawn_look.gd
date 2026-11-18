@@ -1,20 +1,20 @@
 extends "res://tests/support/suite.gd"
-## The look of an enemy arriving (enemy arrivals EA2, docs/milestones/enemy-arrivals.md, "The look"):
+## The look of an enemy spawning (enemy spawning EA2, docs/milestones/enemy-spawning.md, "The look"):
 ## a mark grows on the floor in at least 3 frames, the body rises out of it by whole pixels in at
 ## least 3, and the mark closes in at least 3 as it lands, each stage ending where the next begins
-## (docs/STYLE.md, "Smooth"); it is drawn from the body's state alone (a body set mid-arrival by hand,
+## (docs/STYLE.md, "Smooth"); it is drawn from the body's state alone (a body set mid-spawn by hand,
 ## as a restored snapshot is, is drawn where it is), cut at its feet while it rises and given its own
-## drawing back once it stands; its rise plays the cue `enemy_arrive` once, its sound at most every
+## drawing back once it stands; its rise plays the cue `enemy_spawn` once, its sound at most every
 ## `SOUND_EVERY`; a frame of it allocates nothing; and the game's Feel steps it.
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-const Motion := preload("res://gameplay/feel/arrive_motions/arrive_motion.gd")
-const Rise := preload("res://gameplay/feel/arrive_motions/rise.gd")
+const Motion := preload("res://gameplay/feel/spawn_motions/spawn_motion.gd")
+const Rise := preload("res://gameplay/feel/spawn_motions/rise.gd")
 
 var _world: Fixture
-var _look: ArriveLook
-## The style the look draws when it has no lookup: `rise`'s numbers (`ArrivalStyle.DEFAULT`).
-var _style: ArrivalStyle = ArrivalStyle.from_default()
+var _look: SpawnLook
+## The style the look draws when it has no lookup: `rise`'s numbers (`SpawnStyle.DEFAULT`).
+var _style: SpawnStyle = SpawnStyle.from_default()
 ## Every cue the look played, as [at, weighted], and the cues' ids.
 var _cues: Array = []
 var _cue_ids: Array[StringName] = []
@@ -22,7 +22,7 @@ var _cue_ids: Array[StringName] = []
 
 func before_each() -> void:
 	_world = Fixture.new(root)
-	_look = ArriveLook.new()
+	_look = SpawnLook.new()
 	root.add_child(_look)
 	_cues.clear()
 	_cue_ids.clear()
@@ -36,11 +36,11 @@ func after_each() -> void:
 	_world.free_all()
 
 
-## An enemy at `at` (a hurt circle 12 high), arriving `share` of the way through (set by hand).
-func _arriving(at: Vector2, share: float) -> Actor:
+## An enemy at `at` (a hurt circle 12 high), spawning `share` of the way through (set by hand).
+func _spawning(at: Vector2, share: float) -> Actor:
 	var body := Actor.new()
 	body.add_child(Hurtbox.new())
-	body.arrive(_style.seconds)
+	body.spawn(_style.seconds)
 	_world.add(body, at)
 	_set_share(body, share)
 	return body
@@ -53,7 +53,7 @@ func _frame(delta: float) -> void:
 
 
 func _set_share(body: Actor, share: float) -> void:
-	body.arrive_left = _style.seconds * (1.0 - share)
+	body.spawn_left = _style.seconds * (1.0 - share)
 
 
 ## The distinct values `value(share)` takes over the shares `from` to `to` in 200 steps, in order.
@@ -67,12 +67,12 @@ func _frames(value: Callable, from: float, to: float) -> Array:
 
 
 func test_the_mark_grows_in_four_frames_from_a_dot_and_closes_in_three() -> void:
-	var grow: Array = _frames(func(share: float) -> int: return ArriveLook.mark_radius(7.0, share, _style), 0.0, _style.mark_end - 0.001)
+	var grow: Array = _frames(func(share: float) -> int: return SpawnLook.mark_radius(7.0, share, _style), 0.0, _style.mark_end - 0.001)
 	check_equal(grow, [1, 3, 5, 7], "from a dot to the footprint's width, by whole pixels")
-	check_equal(ArriveLook.mark_radius(7.0, _style.mark_end, _style), 7, "held as the rise begins: the mark ends where the rise starts")
-	var close: Array = _frames(func(share: float) -> int: return ArriveLook.mark_radius(7.0, share, _style), _style.close_from - 0.01, 0.999)
+	check_equal(SpawnLook.mark_radius(7.0, _style.mark_end, _style), 7, "held as the rise begins: the mark ends where the rise starts")
+	var close: Array = _frames(func(share: float) -> int: return SpawnLook.mark_radius(7.0, share, _style), _style.close_from - 0.01, 0.999)
 	check_equal(close, [7, 5, 3, 1], "closing in three frames, down to a dot")
-	check_equal(ArriveLook.mark_radius(7.0, 1.0, _style), 0, "none once it stands")
+	check_equal(SpawnLook.mark_radius(7.0, 1.0, _style), 0, "none once it stands")
 	check(_style.mark_frames >= 3 and _style.close_frames >= 3, "at least 3 frames a stage")
 
 
@@ -110,12 +110,12 @@ func test_its_height_counts_its_sprite_its_hurt_shape_and_its_size() -> void:
 
 
 func test_it_is_drawn_from_its_state_alone_and_put_back_once_it_stands() -> void:
-	var marking: Actor = _arriving(Vector2(100.0, 100.0), 0.25)
-	var rising: Actor = _arriving(Vector2(200.5, 140.0), 0.6)
+	var marking: Actor = _spawning(Vector2(100.0, 100.0), 0.25)
+	var rising: Actor = _spawning(Vector2(200.5, 140.0), 0.6)
 	var standing := Actor.new()
 	_world.add(standing, Vector2(300.0, 100.0))
 	_frame(0.016)
-	check_equal(_look.drawn(), 2, "the two arriving bodies are drawn arriving")
+	check_equal(_look.drawn(), 2, "the two spawning bodies are drawn spawning")
 	check_equal(marking.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "a body still under the floor is cut")
 	check_equal(rising.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "a rising one is cut at its feet")
 	check_equal(standing.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED, "a standing body is left alone")
@@ -123,25 +123,25 @@ func test_it_is_drawn_from_its_state_alone_and_put_back_once_it_stands() -> void
 	var first: Vector3 = _look.mark(0)
 	var second: Vector3 = _look.mark(1)
 	check_equal(Vector2(first.x, first.y), Vector2(100.0, 100.0), "at its feet")
-	check_equal(int(first.z), ArriveLook.mark_radius(marking.wall_radius(), marking.arrive_share(), _style), "as wide as its share says")
+	check_equal(int(first.z), SpawnLook.mark_radius(marking.wall_radius(), marking.spawn_share(), _style), "as wide as its share says")
 	check_equal(Vector2(second.x, second.y), Vector2(201.0, 140.0), "on whole pixels")
 	check_equal(marking.global_position, Vector2(100.0, 100.0), "its place untouched")
-	check_equal(_look.shift_of(marking), Rise.shift(Motion.body_height(marking), marking.arrive_share(), _style), "still under the floor: shifted its whole height")
-	check_equal(_look.shift_of(rising), Rise.shift(Motion.body_height(rising), rising.arrive_share(), _style), "rising: shifted as far as its share says")
+	check_equal(_look.shift_of(marking), Rise.shift(Motion.body_height(marking), marking.spawn_share(), _style), "still under the floor: shifted its whole height")
+	check_equal(_look.shift_of(rising), Rise.shift(Motion.body_height(rising), rising.spawn_share(), _style), "rising: shifted as far as its share says")
 	check(_look.shift_of(rising) > 0.0 and _look.shift_of(rising) < Motion.body_height(rising), "part way up: %s" % _look.shift_of(rising))
 	check_equal(_look.shift_of(standing), -1.0, "a standing body is not shifted")
 	check_equal(_cues.size(), 1, "the rising body's cue played once")
 	check_equal(_cues[0], [rising.global_position, true], "at its feet, with its sound")
-	check_equal(_cue_ids[0], &"enemy_arrive", "the style's cue")
+	check_equal(_cue_ids[0], &"enemy_spawn", "the style's cue")
 	_frame(0.016)
 	check_equal(_cues.size(), 1, "and not again")
 	_set_share(marking, 0.5)
 	_frame(0.2)
 	check_equal(_cues.size(), 2, "the other's as it starts to rise")
 	check_equal(_cues[1][1], true, "its sound too: more than 0.1 s after the first")
-	rising.arrive_left = 0.0
+	rising.spawn_left = 0.0
 	_frame(0.016)
-	check_equal(_look.drawn(), 1, "a body that stands is no longer drawn arriving")
+	check_equal(_look.drawn(), 1, "a body that stands is no longer drawn spawning")
 	check_equal(rising.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED, "its own drawing back")
 	check_equal(_look.shift_of(rising), -1.0, "no longer shifted")
 	_world.actors.erase(marking)
@@ -153,7 +153,7 @@ func test_it_is_drawn_from_its_state_alone_and_put_back_once_it_stands() -> void
 
 func test_a_group_rising_together_sounds_once() -> void:
 	for n in 4:
-		_arriving(Vector2(100.0 + 30.0 * n, 100.0), 0.5)
+		_spawning(Vector2(100.0 + 30.0 * n, 100.0), 0.5)
 	_frame(0.016)
 	check_equal(_cues.size(), 4, "a cue for each body's dust")
 	var weighted: int = 0
@@ -165,15 +165,15 @@ func test_a_group_rising_together_sounds_once() -> void:
 func test_a_frame_allocates_nothing() -> void:
 	var bodies: Array[Actor] = []
 	for n in 12:
-		bodies.append(_arriving(Vector2(60.0 + 40.0 * (n % 6), 100.0 + 60.0 * (n / 6)), float(n) / 12.0))
+		bodies.append(_spawning(Vector2(60.0 + 40.0 * (n % 6), 100.0 + 60.0 * (n / 6)), float(n) / 12.0))
 	_frame(0.016)
 	_frame(0.016)
 	var objects: float = Performance.get_monitor(Performance.OBJECT_COUNT)
 	for frame in 100:
 		for body in bodies:
-			_set_share(body, fmod(body.arrive_share() + 0.005, 0.99))
+			_set_share(body, fmod(body.spawn_share() + 0.005, 0.99))
 		_frame(0.016)
-	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "100 frames of twelve bodies arriving make no object")
+	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "100 frames of twelve bodies spawning make no object")
 
 
 ## The game's Feel holds the look and steps it, and the cue it plays is in the registry, sound named.
@@ -182,17 +182,17 @@ func test_feel_steps_it_and_its_cue_is_there() -> void:
 	check(feel != null, "the game's Feel")
 	if feel == null:
 		return
-	var look := feel.get("_arrive_look") as ArriveLook
-	check(look != null and look.get_parent() == feel, "Feel holds an arrival look")
+	var look := feel.get("_spawn_look") as SpawnLook
+	check(look != null and look.get_parent() == feel, "Feel holds a spawn look")
 	check(look.play_cue.is_valid(), "and plays its cue")
 	check(look.style_of.is_valid(), "and looks its styles up")
-	var rise: ArrivalStyle = look.style_of.call(&"rise") as ArrivalStyle
-	check(rise != null and rise.resource_path == "res://content/arrivals/rise/rise.tres", "in the registry: content/arrivals/rise")
+	var rise: SpawnStyle = look.style_of.call(&"rise") as SpawnStyle
+	check(rise != null and rise.resource_path == "res://content/spawn_styles/rise/rise.tres", "in the registry: content/spawn_styles/rise")
 	check(look.style_of.call(&"no_such_style") == null, "and none for an id there is none of")
 	var cue := root.get_node("Registry").call("get_resource", &"cues", _style.cue) as CueBase
-	check(cue != null, "the cue enemy_arrive is in the registry")
+	check(cue != null, "the cue enemy_spawn is in the registry")
 	if cue != null:
-		check_equal(cue.sound, &"enemy_arrive", "its soft sound")
+		check_equal(cue.sound, &"enemy_spawn", "its soft sound")
 		check_equal(cue.problems(), PackedStringArray(), "no problems")
 
 
@@ -207,7 +207,7 @@ func test_art_under_its_feet_rises_with_it() -> void:
 	sprite.texture = art
 	sprite.position = Vector2(0.0, -14.0)
 	body.add_child(sprite)
-	body.arrive(_style.seconds)
+	body.spawn(_style.seconds)
 	_world.add(body, Vector2(100.0, 100.0))
 	check_equal(Motion.body_bottom(body), 2.0, "its frame reaches 2 px under its feet")
 	_set_share(body, 0.1)
@@ -222,7 +222,7 @@ func test_art_under_its_feet_rises_with_it() -> void:
 ## before the frame is drawn: never drawn whole for a frame.
 func test_a_body_added_after_the_step_is_cut_before_the_draw() -> void:
 	_look.step(_world.table, 0.016)
-	var late: Actor = _arriving(Vector2(100.0, 100.0), 0.0)
+	var late: Actor = _spawning(Vector2(100.0, 100.0), 0.0)
 	check_equal(late.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED, "not cut yet")
 	_look.cut()
 	check_equal(late.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "cut just before the draw")
@@ -230,9 +230,9 @@ func test_a_body_added_after_the_step_is_cut_before_the_draw() -> void:
 	check(RenderingServer.frame_pre_draw.is_connected(_look.cut), "the cut runs before every frame is drawn")
 
 
-## A body with a sprite whose frame reaches 2 px under its feet (a spitter's), arriving at `at`; with
+## A body with a sprite whose frame reaches 2 px under its feet (a spitter's), spawning at `at`; with
 ## `hurt_radius`, its hurt shape that wide (20: its top above the sprite's).
-func _arriving_with_art(at: Vector2, share: float, hurt_radius: float = -1.0) -> Actor:
+func _spawning_with_art(at: Vector2, share: float, hurt_radius: float = -1.0) -> Actor:
 	var body := Actor.new()
 	var hurtbox := Hurtbox.new()
 	if hurt_radius > 0.0:
@@ -245,21 +245,21 @@ func _arriving_with_art(at: Vector2, share: float, hurt_radius: float = -1.0) ->
 	sprite.texture = art
 	sprite.position = Vector2(0.0, -14.0)
 	body.add_child(sprite)
-	body.arrive(_style.seconds)
+	body.spawn(_style.seconds)
 	_world.add(body, at)
 	_set_share(body, share)
 	return body
 
 
 ## The part of a body's height its size moves (its body's centre, its hurt shape: `size_top`) is
-## worked out when it is first cut, kept while it arrives, worked out again if its size changes
-## mid-arrival and forgotten once it lands or goes; its sprite's terms are read at every cut, so its
-## look's bob (its art moved while it arrives) is followed; its shift and its mask are what a fresh
+## worked out when it is first cut, kept while it spawns in, worked out again if its size changes
+## mid-spawn and forgotten once it lands or goes; its sprite's terms are read at every cut, so its
+## look's bob (its art moved while it spawns in) is followed; its shift and its mask are what a fresh
 ## count gives.
 func test_the_part_of_its_height_its_size_moves_is_worked_out_once() -> void:
 	# Its hurt shape the tallest of it, so its shift follows the part kept.
-	var body: Actor = _arriving_with_art(Vector2(100.0, 100.0), 0.6, 20.0)
-	var other: Actor = _arriving_with_art(Vector2(200.0, 100.0), 0.3)
+	var body: Actor = _spawning_with_art(Vector2(100.0, 100.0), 0.6, 20.0)
+	var other: Actor = _spawning_with_art(Vector2(200.0, 100.0), 0.3)
 	check(is_nan(_look.size_top_kept(body)), "nothing kept before its first cut")
 	_frame(0.016)
 	check(Motion.size_top(body) + Motion.HEIGHT_MARGIN > Motion.body_height(other), "its hurt shape stands above its art: %s" % Motion.size_top(body))
@@ -268,7 +268,7 @@ func test_the_part_of_its_height_its_size_moves_is_worked_out_once() -> void:
 	check_equal(_look.size_tops_kept(), 2, "one for each body cut")
 	check_equal(Motion.body_bottom(body), 2.0, "its frame reaches 2 px under its feet")
 	_check_fresh(body, "first cut")
-	# Its look's bob: its art 1 px up (the sprite's offset), as CreatureLook lifts it while it arrives.
+	# Its look's bob: its art 1 px up (the sprite's offset), as CreatureLook lifts it while it spawns in.
 	var sprite := body.get_node(^"Sprite") as Sprite2D
 	sprite.offset.y -= 1.0
 	_set_share(body, 0.7)
@@ -286,7 +286,7 @@ func test_the_part_of_its_height_its_size_moves_is_worked_out_once() -> void:
 	check(_look.size_top_kept(body) != kept, "its size moves it: %s" % _look.size_top_kept(body))
 	check_equal(_look.size_top_kept(body), Motion.size_top(body), "counted again at its new size")
 	_check_fresh(body, "grown")
-	body.arrive_left = 0.0
+	body.spawn_left = 0.0
 	_frame(0.016)
 	check(is_nan(_look.size_top_kept(body)), "forgotten once it lands")
 	check_equal(_look.size_tops_kept(), 1, "only the other is kept")
@@ -302,38 +302,38 @@ func _check_fresh(body: Actor, when: String) -> void:
 	check_equal(_look.bottom_of(body), bottom, "%s: its mask at its lowest row" % when)
 	var size: float = absf(body.size)
 	check_equal(Rise.mask_rect(bottom, size), Rect2(-Rise.MASK_HALF_WIDTH, -Rise.MASK_TALL, 2.0 * Rise.MASK_HALF_WIDTH, Rise.MASK_TALL + bottom / size), "%s: everything above that line, in its own pixels" % when)
-	check_equal(_look.shift_of(body), Rise.shift(Motion.body_height(body) + bottom, body.arrive_share(), _style), "%s: shifted as a fresh count says" % when)
+	check_equal(_look.shift_of(body), Rise.shift(Motion.body_height(body) + bottom, body.spawn_share(), _style), "%s: shifted as a fresh count says" % when)
 
 
-## Feel draws every motion a style may name, and no other (`ArrivalStyle.MOTIONS` is the list in core,
-## `ArriveLook.MOTIONS` the code for each, as `ModifierBase.RULES` and its kits are split).
+## Feel draws every motion a style may name, and no other (`SpawnStyle.MOTIONS` is the list in core,
+## `SpawnLook.MOTIONS` the code for each, as `ModifierBase.RULES` and its kits are split).
 func test_its_motions_are_the_styles_motions() -> void:
 	var names: Array[StringName] = []
-	names.assign(ArriveLook.MOTIONS.keys())
+	names.assign(SpawnLook.MOTIONS.keys())
 	names.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
-	var listed: Array[StringName] = ArrivalStyle.MOTIONS.duplicate()
+	var listed: Array[StringName] = SpawnStyle.MOTIONS.duplicate()
 	listed.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
 	check_equal(names, listed, "the same names")
-	check(ArriveLook.MOTIONS.has(ArriveLook.FALLBACK_MOTION), "and the one a motion it lacks is drawn by")
-	for motion: StringName in ArriveLook.MOTIONS:
+	check(SpawnLook.MOTIONS.has(SpawnLook.FALLBACK_MOTION), "and the one a motion it lacks is drawn by")
+	for motion: StringName in SpawnLook.MOTIONS:
 		check(_look.motion_named(motion) != null, "it holds one %s" % motion)
 
 
 ## The look draws by the style its lookup gives: the style's stages and frames for the mark and the
 ## motion, and its cue; a style it does not find is the default's numbers.
 func test_it_draws_by_the_style_it_looks_up() -> void:
-	var slow: ArrivalStyle = ArrivalStyle.from_default()
+	var slow: SpawnStyle = SpawnStyle.from_default()
 	slow.mark_end = 0.6
 	slow.close_from = 0.8
 	slow.cue = &"fixture_cue"
 	var asked: Array[StringName] = []
-	_look.style_of = func(id: StringName) -> ArrivalStyle:
+	_look.style_of = func(id: StringName) -> SpawnStyle:
 		asked.append(id)
 		return slow
-	var body: Actor = _arriving(Vector2(100.0, 100.0), 0.5)
+	var body: Actor = _spawning(Vector2(100.0, 100.0), 0.5)
 	_frame(0.016)
 	check_equal(asked, [&"rise"] as Array[StringName], "it asked for rise, the style of every body today, once")
-	check_equal(int(_look.mark(0).z), ArriveLook.mark_radius(body.wall_radius(), 0.5, slow), "its mark by the style's frames")
+	check_equal(int(_look.mark(0).z), SpawnLook.mark_radius(body.wall_radius(), 0.5, slow), "its mark by the style's frames")
 	check_equal(_look.shift_of(body), Motion.body_height(body), "at 0.5 still under the floor: its mark ends at 0.6")
 	check(_cues.is_empty(), "no cue before its motion starts")
 	_set_share(body, 0.7)
@@ -345,18 +345,18 @@ func test_it_draws_by_the_style_it_looks_up() -> void:
 	_set_share(body, 0.85)
 	_frame(0.016)
 	check(int(_look.mark(0).z) < roundi(body.wall_radius()), "closing from the style's 0.8")
-	_look.style_of = func(_id: StringName) -> ArrivalStyle: return null
+	_look.style_of = func(_id: StringName) -> SpawnStyle: return null
 	_frame(0.016)
 	check_equal(_look.shift_of(body), Rise.shift(Motion.body_height(body), 0.85, _style), "a style not found: the default's numbers")
 
 
 ## A style whose motion the look does not have (a newer machine's) is drawn as `rise`, so the body is
-## never drawn whole mid-arrival.
+## never drawn whole mid-spawn.
 func test_a_motion_it_does_not_have_is_drawn_as_rise() -> void:
-	var odd: ArrivalStyle = ArrivalStyle.from_default()
+	var odd: SpawnStyle = SpawnStyle.from_default()
 	odd.motion = &"no_such_motion"
-	_look.style_of = func(_id: StringName) -> ArrivalStyle: return odd
-	var body: Actor = _arriving(Vector2(100.0, 100.0), 0.2)
+	_look.style_of = func(_id: StringName) -> SpawnStyle: return odd
+	var body: Actor = _spawning(Vector2(100.0, 100.0), 0.2)
 	_frame(0.016)
 	check_equal(body.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "cut")
 	check_equal(_look.shift_of(body), Motion.body_height(body), "under the floor through the mark, as rise draws it")

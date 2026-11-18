@@ -1,29 +1,29 @@
-class_name ArrivalStyle
+class_name SpawnStyle
 extends Resource
-## How an enemy arrives (arrival styles, docs/milestones/arrival-styles.md): the look of a body coming
+## How an enemy spawns in (spawn styles, docs/milestones/spawn-styles.md): the look of a body coming
 ## into a room as data a biome or an enemy names, as a card names its behaviour. One folder a style,
-## `content/arrivals/<id>/`: its `.tres` (its `id` is the folder's name), its art if any, and an
-## `assets.json` for that art; the registry finds it under `arrivals`, so a new style is a new folder
-## and no list is edited (content/arrivals/README.md is the guide).
+## `content/spawn_styles/<id>/`: its `.tres` (its `id` is the folder's name), its art if any, and an
+## `assets.json` for that art; the registry finds it under `spawn_styles`, so a new style is a new folder
+## and no list is edited (content/spawn_styles/README.md is the guide).
 ##
-## A style is the numbers of one arrival: how long it lasts, where its stages hand over, the frames
+## A style is the numbers of one spawn: how long it lasts, where its stages hand over, the frames
 ## each stage of the mark is drawn in, the mark's colours and art, and the cue played as the body
 ## starts to move. What the body does is its `motion`, one of `MOTIONS`: a name here, and code in
-## Feel (`ArriveLook.MOTIONS`, gameplay/feel/arrive_motions/; a test holds the two lists together),
+## Feel (`SpawnLook.MOTIONS`, gameplay/feel/spawn_motions/; a test holds the two lists together),
 ## as a card's behaviour is a row of `ModifierBase.RULES` and the kit that runs it.
 ##
 ## The simulation knows only a style's `seconds` (the body can't be hurt and can't act for so long)
-## and its id; everything else is drawn (gameplay/feel/arrive_look.gd). Today every body arrives as
-## `rise` (content/arrivals/rise/); which style a body gets is AS2 (`pick`, to come).
+## and its id; everything else is drawn (gameplay/feel/spawn_look.gd). Today every body spawns in as
+## `rise` (content/spawn_styles/rise/); which style a body gets is AS2 (`pick`, to come).
 ##
 ## `DEFAULT` is `rise`'s numbers, kept here for when no style is found (the `rise` folder deleted, an
-## id another machine does not have): a test holds them to content/arrivals/rise/rise.tres. A field's
+## id another machine does not have): a test holds them to content/spawn_styles/rise/rise.tres. A field's
 ## default is its number in `DEFAULT`, so a style file only writes what it changes.
 
-## The registry's folder of the styles (content/arrivals), which Flow and Feel find them in.
-const FOLDER: StringName = &"arrivals"
-## The motions a style may name: the kinds of motion Feel draws (`ArriveLook.MOTIONS` has code for
-## each). `rise`: out of the floor, through the mark (enemy arrivals EA2's look).
+## The registry's folder of the styles (content/spawn_styles), which Flow and Feel find them in.
+const FOLDER: StringName = &"spawn_styles"
+## The motions a style may name: the kinds of motion Feel draws (`SpawnLook.MOTIONS` has code for
+## each). `rise`: out of the floor, through the mark (enemy spawning EA2's look).
 const MOTIONS: Array[StringName] = [&"rise"]
 ## `rise`'s numbers: every field's default, and the style drawn when none is found.
 const DEFAULT: Dictionary[String, Variant] = {
@@ -35,13 +35,13 @@ const DEFAULT: Dictionary[String, Variant] = {
 	"mark_frames": 4,
 	"close_frames": 3,
 	"colours": &"floor",
-	"cue": &"enemy_arrive",
+	"cue": &"enemy_spawn",
 }
 ## The frame rate a stage's frames are checked at (`problems`): each frame shows for one frame at
 ## least. A stage is drawn in `MIN_FRAMES` frames at least (docs/STYLE.md, "Smooth").
 const CHECK_FPS: float = 60.0
 const MIN_FRAMES: int = 3
-## The least and most seconds an arrival lasts. The length is how long a body can't be hurt, and
+## The least and most seconds a spawn lasts. The length is how long a body can't be hurt, and
 ## content/ is open to contributors, so it is bounded above too.
 const MIN_SECONDS: float = 0.3
 const MAX_SECONDS: float = 2.0
@@ -52,18 +52,18 @@ const FLOOR: StringName = &"floor"
 @export var id: StringName = &""
 ## The kind of motion (one of `MOTIONS`).
 @export var motion: StringName = DEFAULT["motion"]
-## How long the arrival lasts, in seconds (`MIN_SECONDS` to `MAX_SECONDS`): the simulation's one
+## How long the spawn lasts, in seconds (`MIN_SECONDS` to `MAX_SECONDS`): the simulation's one
 ## number of it (the body can't be hurt and can't act for this long).
 @export_range(0.3, 2.0, 0.01) var seconds: float = DEFAULT["seconds"]
-## Where the mark stage ends and the motion begins, as a share of the arrival.
+## Where the mark stage ends and the motion begins, as a share of the spawn.
 @export_range(0.0, 1.0, 0.01) var mark_end: float = DEFAULT["mark_end"]
-## Where the mark starts to close, as a share of the arrival (after `mark_end`).
+## Where the mark starts to close, as a share of the spawn (after `mark_end`).
 @export_range(0.0, 1.0, 0.01) var close_from: float = DEFAULT["close_from"]
 ## The frames the mark grows in (from a dot to the footprint's width), and closes in.
 @export_range(3, 16) var mark_frames: int = DEFAULT["mark_frames"]
 @export_range(3, 16) var close_frames: int = DEFAULT["close_frames"]
 ## The mark's look: none for the ring drawn in its colours (today's look), or an art strip played
-## over the mark stage (arrival styles AS4, to come: until then a strip is a problem, so a style
+## over the mark stage (spawn styles AS4, to come: until then a strip is a problem, so a style
 ## never names art it does not show).
 @export var mark_strip: Texture2D = null
 ## Where the mark's colours come from: `floor` (the room's floor's, today's ring) or a material of
@@ -72,14 +72,14 @@ const FLOOR: StringName = &"floor"
 @export var colours: StringName = DEFAULT["colours"]
 ## The cue played as the body starts to move (content/cues): its dust and sound. Empty: none.
 @export var cue: StringName = DEFAULT["cue"]
-## The biomes it is the arrival of (`RoomBase.biome`, as an enemy names its `biomes`). No two styles
+## The biomes it is the spawn of (`RoomBase.biome`, as an enemy names its `biomes`). No two styles
 ## name one biome (`all_problems`). Empty: no biome's (`rise`, the default, is every other biome's).
 @export var biomes: Array[StringName] = []
 
 
 ## A style of `DEFAULT`'s numbers, made now: what is drawn when no style is found.
-static func from_default() -> ArrivalStyle:
-	var style := ArrivalStyle.new()
+static func from_default() -> SpawnStyle:
+	var style := SpawnStyle.new()
 	style.id = DEFAULT["id"]
 	return style
 
@@ -120,7 +120,7 @@ func problems(known_cue: Callable = Callable()) -> PackedStringArray:
 		for line: String in Palette.world_problems([colours] as Array[StringName], "%s: colours" % name):
 			found.append(line + "; or 'floor'.")
 	if mark_strip != null:
-		found.append("%s: it names a mark strip, which is not drawn yet (arrival styles AS4)." % name)
+		found.append("%s: it names a mark strip, which is not drawn yet (spawn styles AS4)." % name)
 	for at in biomes.size():
 		if biomes.find(biomes[at]) != at:
 			found.append("%s: it names the biome '%s' twice." % [name, biomes[at]])
@@ -135,13 +135,13 @@ static func _check_stage(found: PackedStringArray, name: String, stage: String, 
 	if frames < MIN_FRAMES:
 		found.append("%s: %s is %d; %d at least (docs/STYLE.md, \"Smooth\")." % [name, field, frames, MIN_FRAMES])
 	elif has < float(frames):
-		found.append("%s: %s stage lasts %.1f frames at %d fps, too short for its %d; make the arrival longer or the stage wider." % [name, stage, has, roundi(CHECK_FPS), frames])
+		found.append("%s: %s stage lasts %.1f frames at %d fps, too short for its %d; make the spawn longer or the stage wider." % [name, stage, has, roundi(CHECK_FPS), frames])
 
 
 ## What is wrong with `styles` (every style the game has), one line each: each style's own
 ## `problems(known_cue)`, and two styles that name one biome (no style may win a biome silently by
 ## the order they are read in).
-static func all_problems(styles: Array[ArrivalStyle], known_cue: Callable = Callable()) -> PackedStringArray:
+static func all_problems(styles: Array[SpawnStyle], known_cue: Callable = Callable()) -> PackedStringArray:
 	var found := PackedStringArray()
 	var biome_of: Dictionary[StringName, StringName] = {}
 	for style in styles:

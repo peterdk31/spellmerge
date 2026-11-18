@@ -4,6 +4,6 @@
 
 [resource]
 script = ExtResource("1_base")
-id = &"enemy_arrive"
+id = &"enemy_spawn"
 parts = Array[Dictionary]([{"part": &"motes", "kind": &"dust", "colours": &"surface", "count": 10, "radius": 10.0, "spread": 360.0, "up": 0.6}])
-sound = &"enemy_arrive"
+sound = &"enemy_spawn"

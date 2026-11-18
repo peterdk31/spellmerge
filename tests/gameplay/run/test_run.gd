@@ -166,7 +166,7 @@ func test_flow_builds_the_room_the_map_names() -> void:
 		return
 	check_equal(flow.room_id, node.room, "Flow is in the map's first room")
 	check_equal(flow.enemies_left(), node.enemies.size(), "every enemy the map puts there is to beat")
-	# The rest of the room's groups called now (enemy arrivals EA5: they come as the room gets quiet).
+	# The rest of the room's groups called now (enemy spawning EA5: they come as the room gets quiet).
 	flow.stand_all_now()
 	var standing: Array[StringName] = []
 	for body: Node in flow.world.get_children():
@@ -297,8 +297,8 @@ func test_the_map_is_made_for_the_run_s_players_and_each_room_s_scale_told_first
 	events.disconnect("run_room_chosen", on_chosen)
 
 
-## Enemy arrivals EA4: as the party enters a room, the run tells its pace (`run_room_paced`) after its
-## scale and before the room: plain costs, the crypt's `ArrivalRules` shares of the room's scaled
+## Enemy spawning EA4: as the party enters a room, the run tells its pace (`run_room_paced`) after its
+## scale and before the room: plain costs, the crypt's `SpawnRules` shares of the room's scaled
 ## budget, so a bigger party's room has bigger groups; the room's map node keeps them.
 func test_each_room_s_pace_is_told_between_its_scale_and_the_room() -> void:
 	var heard: Array = []
@@ -310,7 +310,7 @@ func test_each_room_s_pace_is_told_between_its_scale_and_the_room() -> void:
 	events.connect("run_room_chosen", on_chosen)
 	var definition := root.get_node("Registry").call("get_resource", &"runs", &"crypt") as RunDefinition
 	var rules: MapRules = definition.biomes[0]
-	check(rules.arrivals != null, "the crypt paces its rooms")
+	check(rules.spawning != null, "the crypt paces its rooms")
 	var groups: Array[int] = []
 	for players: int in [1, 4]:
 		heard.clear()
@@ -318,11 +318,11 @@ func test_each_room_s_pace_is_told_between_its_scale_and_the_room() -> void:
 		tick.sim.run_seed = 23
 		events.emit_signal("run_begun", &"crypt", players, 0)
 		var node: RunNode = run.call("room_now") as RunNode
-		if node == null or rules.arrivals == null:
+		if node == null or rules.spawning == null:
 			check(false, "%d players: a room" % players)
 			continue
 		var budget: int = RunScaling.scaled_budget(rules.room_budget, node.scale)
-		var paced: Array = [rules.arrivals.group_cost(budget), rules.arrivals.refill_cost(budget), rules.arrivals.stagger]
+		var paced: Array = [rules.spawning.group_cost(budget), rules.spawning.refill_cost(budget), rules.spawning.stagger]
 		check_equal(heard, [&"scaled", paced, &"chosen"], "%d players: the scale, the pace, then the room" % players)
 		check_equal([node.group, node.refill_at, node.stagger], paced, "%d players: the map's room keeps its pace" % players)
 		check(node.refill_at < node.group, "%d players: the next group is called below a group's cost" % players)

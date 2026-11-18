@@ -14,7 +14,7 @@ const FlowScript := preload("res://gameplay/flow/flow.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
-const Arrivals := preload("res://tests/support/arrivals.gd")
+const Spawning := preload("res://tests/support/spawning.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 ## The arena's floor, wall border included.
@@ -80,11 +80,11 @@ func _join(count: int) -> void:
 		input.add_virtual_device(index)
 
 
-## Play pressed, and the room's enemies stepped past their arrival (enemy arrivals EA3), so a test
+## Play pressed, and the room's enemies stepped past their spawn (enemy spawning EA3), so a test
 ## hits bodies that are there.
 func _play(requester: int = 0) -> void:
 	events.emit_signal("play_requested", requester)
-	Arrivals.land(flow)
+	Spawning.land(flow)
 
 
 ## `count` players joined, and Play pressed.
@@ -261,36 +261,36 @@ func test_combat_knows_every_enemy_and_wizard() -> void:
 	check_equal(combat.call("actor_count"), _room_count() + 4 + _props_in_combat(), "every enemy, wizard and breakable prop is registered with combat")
 
 
-## An arrival lasts the seconds of the registry's style `rise` (arrival styles AS1), or
-## `ArrivalStyle.DEFAULT`'s when the registry has none.
-func test_an_arrival_lasts_the_rise_styles_seconds() -> void:
+## A spawn lasts the seconds of the registry's style `rise` (spawn styles AS1), or
+## `SpawnStyle.DEFAULT`'s when the registry has none.
+func test_an_spawn_lasts_the_rise_styles_seconds() -> void:
 	var kept: RegistryScript = flow.registry
 	var fixture := RegistryScript.new()
 	flow.registry = fixture
-	check_equal(flow.arrival_seconds(), float(ArrivalStyle.DEFAULT["seconds"]), "no style: the default's")
-	var slow := ArrivalStyle.from_default()
+	check_equal(flow.spawn_seconds(), float(SpawnStyle.DEFAULT["seconds"]), "no style: the default's")
+	var slow := SpawnStyle.from_default()
 	slow.seconds = 1.2
-	fixture.add(ArrivalStyle.FOLDER, slow)
-	check_equal(flow.arrival_seconds(), 1.2, "the registry's rise")
+	fixture.add(SpawnStyle.FOLDER, slow)
+	check_equal(flow.spawn_seconds(), 1.2, "the registry's rise")
 	flow.registry = kept
 	fixture.free()
-	check_equal(flow.arrival_seconds(), (kept.get_resource(ArrivalStyle.FOLDER, &"rise") as ArrivalStyle).seconds, "the game's rise")
+	check_equal(flow.spawn_seconds(), (kept.get_resource(SpawnStyle.FOLDER, &"rise") as SpawnStyle).seconds, "the game's rise")
 
 
-## Every enemy of the room arrives as it starts (enemy arrivals EA3): set to arrive before it entered
-## the tree, so none is in Combat yet, and none is a boss; the room is not cleared while they arrive.
-func test_the_rooms_enemies_arrive_as_it_starts() -> void:
+## Every enemy of the room spawns in as it starts (enemy spawning EA3): set to spawn in before it entered
+## the tree, so none is in Combat yet, and none is a boss; the room is not cleared while they spawn in.
+func test_the_rooms_enemies_spawn_as_it_starts() -> void:
 	_join(1)
 	events.emit_signal("play_requested", 0)
 	check(not flow._enemies.is_empty(), "the room has enemies")
 	for enemy: Node in flow._enemies:
 		var body := enemy as Actor
-		check(body.is_arriving() and is_equal_approx(body.arrive_seconds, flow.arrival_seconds()), "%s arrives" % body.name)
-		check(not body.hurtbox.registered, "%s is not in Combat while it arrives" % body.name)
+		check(body.is_spawning() and is_equal_approx(body.spawn_seconds, flow.spawn_seconds()), "%s spawns" % body.name)
+		check(not body.hurtbox.registered, "%s is not in Combat while it spawns" % body.name)
 	check_equal(combat.call("actor_count"), 1 + _props_in_combat(), "Combat knows the wizard and the props alone")
-	check_equal(flow.enemies_left(), _room_count(), "the arriving enemies count as the room's")
-	check(cleared.is_empty(), "the room is not cleared while they arrive")
-	Arrivals.land(flow)
+	check_equal(flow.enemies_left(), _room_count(), "the spawning enemies count as the room's")
+	check(cleared.is_empty(), "the room is not cleared while they spawn")
+	Spawning.land(flow)
 	check_equal(combat.call("actor_count"), _room_count() + 1 + _props_in_combat(), "landed, every enemy is in Combat")
 
 
@@ -629,7 +629,7 @@ func test_a_restart_leaves_no_old_enemy_in_combat() -> void:
 	_playing(1)
 	_down(_wizard(0))
 	flow.step(FlowScript.RESTART_DELAY)
-	Arrivals.land(flow)
+	Spawning.land(flow)
 	check_equal(combat.call("actor_count"), _room_count() + 1 + _props_in_combat(), "combat knows only the room's new enemies, props and the wizard")
 
 

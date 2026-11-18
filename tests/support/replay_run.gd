@@ -80,10 +80,10 @@ var snapshot: Snapshot = null
 ## (tests/support/pinned_run.gd, `Flow.run_id_to_play`), pinned again in every fresh game. The
 ## snapshot test plays every run's room template by it (online-ready N12, run generation RG3).
 var room: RoomBase = null
-## The pace that room's enemies come in at (enemy arrivals EA5; null: all at once), pinned with it.
-var arrivals: ArrivalRules = null
+## The pace that room's enemies come in at (enemy spawning EA5; null: all at once), pinned with it.
+var spawning: SpawnRules = null
 ## Called right after the snapshot is taken (with nothing), so a test can check what the snapshot
-## caught (a body mid-arrival, groups still to come).
+## caught (a body mid-spawn, groups still to come).
 var at_snapshot: Callable = Callable()
 ## True: each run starts from a fresh game (every autoload made again). False: in the same game,
 ## after whatever ran before, as a player starts one run after another (N3b: the run starts from
@@ -259,8 +259,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		var item := _root.get_node("Registry").call("get_resource", &"items", rack_item) as StaffItem
 		if taker == null or item == null or taker.caster.cards_of(2).slice(0, item.cards.size()) != item.cards:
 			problems.append("%s: the scripted player did not take %s onto LB" % [start, rack_item])
-	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room, 1, 1, arrivals):
-		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room, 1, 1, arrivals)])
+	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room, 1, 1, spawning):
+		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room, 1, 1, spawning)])
 	_check_settings(start)
 	for bot in players:
 		bot.leave()
@@ -288,7 +288,7 @@ func play(replay: Replay, bots: int, into: Desync) -> void:
 
 
 ## `replay` played live from a fresh game (netcode spike S1: as the online client plays the host's
-## run while it arrives, `Frames.play_live`), no bot watching: its header first, then its tick `k`
+## run while it spawns in, `Frames.play_live`), no bot watching: its header first, then its tick `k`
 ## added at the physics step `arrive_at[k]` (counted from 0 at the play's start; never earlier than
 ## the tick before). Seat 0, the run's own player, is this machine's here (the client's): its frames
 ## come from `Contrary` and are sent to the feed, never played. At the start of every step (the
@@ -489,7 +489,7 @@ func _find() -> void:
 	_flow.set(&"loading_enabled", false)
 	_flow.set(&"intro_enabled", false)
 	if room != null:
-		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room, &"", RoomKind.FILL_ENEMIES, 16, 1, 1, arrivals))
+		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room, &"", RoomKind.FILL_ENEMIES, 16, 1, 1, spawning))
 	var kinds: Variant = cover if not cover.is_empty() else null
 	_root.get_node("Cover").call(&"use_kinds", kinds)
 	_feel.cover().use_kinds(kinds)

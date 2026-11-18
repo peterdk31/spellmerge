@@ -8,7 +8,7 @@ extends "res://tests/support/suite.gd"
 ## follows the wizards joining and leaving, keeping its share. 1, 2 and 4 players.
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
-const Arrivals := preload("res://tests/support/arrivals.gd")
+const Spawning := preload("res://tests/support/spawning.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 const BOSS_ID: StringName = &"test_adds_boss"
 const LAIR: StringName = &"test_adds_lair"
@@ -98,7 +98,7 @@ func _start(count: int) -> void:
 	for index in count:
 		input.add_virtual_device(index)
 	events.emit_signal("play_requested", 0)
-	Arrivals.land(flow)
+	Spawning.land(flow)
 
 
 func _boss() -> Actor:
@@ -147,7 +147,7 @@ func test_waves_stand_under_the_cap_of_those_alive() -> void:
 	check_equal(_imps().size(), 3, "a wave of one")
 	boss.phases.step(1.0)
 	check_equal(_imps().size(), 3, "never past the cap of 3 alive")
-	Arrivals.land(flow)
+	Spawning.land(flow)
 	combat.call("hit", -1, _imps()[0], 1000.0)
 	check_equal(_imps().size(), 2, "one is killed")
 	boss.phases.step(1.0)
@@ -160,7 +160,7 @@ func test_the_adds_crumble_when_the_boss_dies_and_the_room_is_cleared_after() ->
 	boss.phases.begin(0)
 	var imps: int = _imps().size()
 	check(imps > 0, "its adds stand")
-	Arrivals.land(flow)
+	Spawning.land(flow)
 	combat.call("hit", -1, boss, 10000.0)
 	check_equal(_imps().size(), imps, "they stand the moment the boss dies")
 	check_equal(cleared, 0, "the room is not cleared while they stand")
@@ -240,7 +240,7 @@ func test_an_add_gone_without_a_death_is_forgotten() -> void:
 	_start(1)
 	var boss: Actor = _boss()
 	boss.phases.begin(0)
-	Arrivals.land(flow)
+	Spawning.land(flow)
 	var gone: Actor = _imps()[0]
 	gone.get_parent().remove_child(gone)
 	gone.free()
@@ -265,7 +265,7 @@ func test_adds_without_a_caller_restored_still_crumble() -> void:
 	_start(1)
 	var boss: Actor = _boss()
 	boss.phases.begin(0)
-	Arrivals.land(flow)
+	Spawning.land(flow)
 	var imps: int = _imps().size()
 	combat.call("hit", -1, boss, 10000.0)
 	var tick: Node = root.get_node("Tick")
@@ -282,22 +282,22 @@ func test_adds_without_a_caller_restored_still_crumble() -> void:
 	check_equal(cleared, 2, "and the room is cleared again")
 
 
-## Adds still arriving as their caller dies (enemy arrivals EA3) crumble once they have landed, each
+## Adds still spawning as their caller dies (enemy spawning EA3) crumble once they have landed, each
 ## death told: none leaves mid-rise in one jump, and the room is cleared after the last.
-func test_adds_still_arriving_when_the_boss_dies_crumble_once_they_land() -> void:
+func test_adds_still_spawning_when_the_boss_dies_crumble_once_they_land() -> void:
 	_start(1)
 	var boss: Actor = _boss()
-	check(not boss.is_arriving(), "a boss stands at once")
+	check(not boss.is_spawning(), "a boss stands at once")
 	boss.phases.begin(0)
 	var imps: Array[Actor] = _imps()
-	check(imps.size() > 0 and imps.all(func(imp: Actor) -> bool: return imp.is_arriving()), "its adds arrive")
+	check(imps.size() > 0 and imps.all(func(imp: Actor) -> bool: return imp.is_spawning()), "its adds spawn")
 	combat.call("hit", -1, boss, 10000.0)
 	deaths.clear()
 	flow.step(0.01)
-	check_equal(_imps().size(), imps.size(), "they wait while they arrive")
+	check_equal(_imps().size(), imps.size(), "they wait while they spawn")
 	check(imps.all(func(imp: Actor) -> bool: return is_instance_valid(imp) and imp.is_inside_tree()), "still in the room, rising")
 	check_equal(cleared, 0, "the room is not cleared yet")
-	Arrivals.land_bodies(imps)
+	Spawning.land_bodies(imps)
 	flow.step(0.01)
 	check_equal(flow.enemies_left(), 0, "landed, they crumbled")
 	check_equal(deaths.size(), imps.size(), "each death told")

@@ -173,10 +173,11 @@ func step(delta: float) -> void:
 
 ## How far round its mover's way a dash of `spell` strikes (boss plan OB10: a move's pass is as wide
 ## as its body): a body's hurt shape (the radius it is rounded by and the larger half of its box)
-## times the cards' and the body's growth (`radius_scale`: `bigger`, its spell scale), a shot's hit
-## radius (its cards' already); never under SpellLimits.PASS_REACH. A wizard's dash hardly changes,
-## a big body's strikes what the body meets, and with `bigger` or a spell scale past it, as those grow
-## its other spells.
+## times its cards' growth (`card_scale`: `bigger`), a shot's hit radius (its cards' already); never
+## under SpellLimits.PASS_REACH. A wizard's dash hardly changes, a big body's strikes what the body
+## meets, and with `bigger` past it. Never times the body's spell scale (the owner, 2026-11-18: a
+## pass must not strike past what is seen): that makes a big body's spells as big as it is, and its
+## pass is its body already.
 func _pass_reach(spell: CompiledSpell, body: int, shot: int) -> float:
 	var reach: float = 0.0
 	if shot >= 0:
@@ -184,8 +185,14 @@ func _pass_reach(spell: CompiledSpell, body: int, shot: int) -> float:
 	else:
 		var node: Node = kit.body_node(body)
 		var half: Vector2 = kit.projectiles.target_half(node)
-		reach = (kit.projectiles.target_round(node) + maxf(half.x, half.y)) * spell.radius_scale
+		reach = (kit.projectiles.target_round(node) + maxf(half.x, half.y)) * spell.card_scale
 	return maxf(reach, SpellLimits.PASS_REACH) if is_finite(reach) else SpellLimits.PASS_REACH
+
+
+## A dash's telegraph is as wide as its pass (`Carrier.pass_radius`): what `body`'s dash of `spell`
+## will strike, either side of its way and past its end.
+func pass_radius(spell: CompiledSpell, body: int) -> float:
+	return _pass_reach(spell, body, -1)
 
 
 ## How far round its mover a body this dash's pass struck reaches, for Plow (`Carrier.carry_reach`):

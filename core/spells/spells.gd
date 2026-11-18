@@ -1187,6 +1187,16 @@ func carrier_lane(tag: int) -> float:
 	return _carrier_of(spell).lane_radius(spell) if spell != null else 0.0
 
 
+## How wide the cast `tag` of `actor`'s body strikes either side of its way when that is its body's
+## width (`Carrier.pass_radius`: a dash's pass), all along it and as far past its end; 0 for a cast
+## as wide as its spell. A telegraph lane is drawn that wide and that much longer.
+func carrier_pass(tag: int, actor: int) -> float:
+	var spell: CompiledSpell = _profiles.get(tag) as CompiledSpell
+	if spell == null or actor < 0 or actor >= ACTORS:
+		return 0.0
+	return _carrier_of(spell).pass_radius(spell, actor)
+
+
 ## Where `actor` holds its staff's tip and the way it aims (`set_aim`), INF while it has none: what a
 ## telegraph lane follows while the cast winds up.
 func aim_origin_of(actor: int) -> Vector2:

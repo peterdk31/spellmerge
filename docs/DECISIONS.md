@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-18: a Sweep strikes what the broom's body meets, and the flick is faster (owner's playtest)
+
+- **The owner:** "The old broom boss' sweep attack is very hard to read. It feels unfair, since it scoops players up way outside its visual appearance (it seems). It can fire faster bullets more often also."
+- **Found:** a dash's pass was its mover's hurt shape × its cards' `radius_mult` × its body's spell scale, so the broom's Sweep (26 px, `bigger`, scale 1.5) struck 62 px round its middle and its Big Sweep (`bigger` twice) 100 px, with bristles 44 px either side; and its telegraph lane was as wide as the dash card's 1 px radius (about 13 px), since a lane knew only its spell's radius.
+- **Now** (docs/milestones/boss-old-broom.md, decisions 37 and 38; the owner picked "Body width" and "Full speed, every 1.2 s"): a pass is never grown by its body's spell scale (that scale makes a body's spells as big as the body; its pass is the body already), for every body; the Big Sweep has one `bigger`; a move's lane is as wide as its pass and as much longer (`Carrier.pass_radius`); the dust flick is `triple · bolt · bolt · bolt` every 1.2 s.
+- **Do not** grow a pass past what its body's art shows without also drawing what strikes (a lane ends as the cast leaves; nothing else shows a pass while it moves).
+
 ## 2026-11-17: the hits one by one are gone (hit batch A3b; owner, Q1)
 
 - **What went:** the projectile manager's switch (`merge_hits`, the test switch `merges_hits`), the hit pass's branch that ended a spent shot and sent its hit at once, and the native hit pass's gate (`merging`): a pass always merges its hits (`_finding` while it finds them; with no event bus it sends nothing). It replaces the decision of 2026-11-07 against bundled hits (below), as the owner's Q1 answer said.

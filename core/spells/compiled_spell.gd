@@ -36,6 +36,9 @@ var radius: float = 4.0
 ## How many times its cards grew its `radius` (the modifiers' `radius_mult`, multiplied: 1 for
 ## none, 1.6 with a bigger card), for a look that draws its carrier bigger as it grows.
 var radius_scale: float = 1.0
+## `radius_scale` by its cards alone, before its caster's spell scale (`Carrier.scale_size`): what
+## grows a size that is already the body's own (a dash's pass, `CarrierDash._pass_reach`).
+var card_scale: float = 1.0
 ## Shots one cast of this carrier makes, after split and the carrier card's own count.
 var shots: int = 1
 ## Degrees the shots fan over.

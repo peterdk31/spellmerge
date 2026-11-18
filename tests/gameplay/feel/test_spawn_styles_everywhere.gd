@@ -5,9 +5,9 @@ extends "res://tests/support/suite.gd"
 ## boss's phase calls as an add: bosses themselves stand at once), makes each enemy's real body
 ## (`RoomContents.make_body`) and spawns it in each style, stepped as the tick steps it, with the look
 ## Feel draws it by. Each cell must: land on the tick its style's seconds run out; draw each of its
-## motion's stages in at least `SpawnStyle.MIN_FRAMES` looks (docs/STYLE.md, "Smooth"; the mark's
-## width and every number of the motion's look whole pixels); be drawn the same by a fresh look at
-## any frame (from its state alone, as after a snapshot); and be put back once it stands. Each failing
+## motion's stages in at least `SpawnStyle.MIN_FRAMES` looks (docs/STYLE.md, "Smooth"); be cut
+## while it spawns and drawn the same by a fresh look at any frame (from its state alone, as after a
+## snapshot); and be put back once it stands. Each failing
 ## cell is named, and the test fails. A new style or enemy is checked the day it lands.
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const Motion := preload("res://gameplay/feel/spawn_motions/spawn_motion.gd")
@@ -111,8 +111,8 @@ func _play(data: EnemyBase, style: SpawnStyle) -> PackedStringArray:
 		_look.cut()
 		var radius: float = _mark_radius(_look)
 		var seen: Array = [radius, motion.look_of(body)]
-		if motion.look_of(body).is_empty():
-			found.append("not drawn at %.2f" % share)
+		if motion.look_of(body).is_empty() or body.clip_children != CanvasItem.CLIP_CHILDREN_ONLY:
+			found.append("not drawn or not cut at %.2f" % share)
 			break
 		for s in looks.size():
 			if share >= stages[s] and share < stages[s + 1] and not looks[s].has(seen):
@@ -123,7 +123,7 @@ func _play(data: EnemyBase, style: SpawnStyle) -> PackedStringArray:
 			var fresh_motion: Motion = _fresh.motion_named(style.motion)
 			if fresh_motion.look_of(body) != motion.look_of(body) or _mark_radius(_fresh) != radius:
 				found.append("a fresh look draws it otherwise at %.2f: %s, not %s" % [share, fresh_motion.look_of(body), motion.look_of(body)])
-			_fresh_put_back(fresh_motion, body)
+			_fresh_again()
 		body.tick_step(STEP)
 		ticks += 1
 	if absi(ticks - due) > 1:
@@ -146,10 +146,9 @@ static func _mark_radius(look: SpawnLook) -> float:
 	return look.mark(0).z if look.marks() > 0 else 0.0
 
 
-## The fresh look's motion puts `body` back (the game's look draws it again before the next frame), and
-## a new fresh look is made, so each check is a first sight.
-func _fresh_put_back(fresh_motion: Motion, body: Actor) -> void:
-	fresh_motion.put_back(body.get_instance_id(), body)
+## A new fresh look (the old one, freed, puts back what it drew; the game's look draws it again
+## before the next frame), so each check is a first sight.
+func _fresh_again() -> void:
 	_fresh.free()
 	_fresh = SpawnLook.new()
 	root.add_child(_fresh)

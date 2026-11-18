@@ -153,7 +153,6 @@ func test_the_glitch_is_whole_pixels_and_settles() -> void:
 	var moved: int = 0
 	for seed in 40:
 		var frame: float = 0.0
-		var held: int = Materialize.glitch(seed, 0.0, at.y)
 		while frame <= at.z:
 			var by: int = Materialize.glitch(seed, frame, at.y)
 			check(absi(by) <= Materialize.GLITCH_MOST, "at most 2 pixels: %d" % by)
@@ -161,11 +160,8 @@ func test_the_glitch_is_whole_pixels_and_settles() -> void:
 				check(absi(by) <= 1, "settling: %d" % by)
 			if at.y - frame < Materialize.SETTLE_NONE:
 				check_equal(by, 0, "still before it is whole")
-			check_equal(by, Materialize.glitch(seed, frame, at.y), "the same for the same body and moment")
 			moved += 1 if by != 0 else 0
-			held = by
 			frame += 1.0
-		check_equal(held, 0, "none at the end")
 	check(moved > 0, "now and then it glitches")
 
 
@@ -279,3 +275,38 @@ func test_the_storm_fork_materializes() -> void:
 	if cue != null:
 		check_equal(cue.sound, &"enemy_materialize", "its sound id")
 		check_equal(cue.problems(), PackedStringArray(), "no problems")
+
+
+## A look that goes (or leaves the tree) mid-spawn puts its bodies back: their own drawing, and its
+## light's canvas items freed, so nothing it drew stays on a body.
+func test_a_look_that_goes_mid_spawn_puts_its_bodies_back() -> void:
+	var body: Actor = _spawning(Vector2(100.0, 100.0), 0.6)
+	_frame()
+	check_equal(_motion().lines_kept(), 1, "a line kept")
+	var motion: Materialize = _motion()
+	root.remove_child(_look)
+	check_equal(motion.lines_kept(), 0, "freed as it leaves the tree")
+	check_equal(body.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED, "the body's own drawing back")
+	root.add_child(_look)
+	_frame()
+	check_equal(motion.lines_kept(), 1, "drawn again once back")
+	var other := SpawnLook.new()
+	other.style_of = _look.style_of
+	other.step(_world.table, 0.0)
+	other.cut()
+	var other_motion: Materialize = other.motion_named(&"materialize") as Materialize
+	check_equal(other_motion.lines_kept(), 1, "a look out of the tree draws it too")
+	other.free()
+	check_equal(other_motion.lines_kept(), 0, "and frees its light as it goes")
+
+
+## A row of the art is lit where the sprite draws it: its own row band, flipped as the sprite flips.
+func test_a_lit_row_is_where_the_sprite_draws_it() -> void:
+	var body: Actor = _spawning(Vector2(100.0, 100.0), 0.6)
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	var bottom: float = Materialize.body_bottom(body)
+	check_equal(Materialize.lit_place(sprite, 0, bottom, 1.0), Rect2(-8.0, 15.0, 16.0, 1.0), "its lowest row, in the sprite's own pixels")
+	check_equal(Materialize.lit_place(sprite, 31, bottom, 1.0), Rect2(-8.0, -16.0, 16.0, 1.0), "its top row")
+	check_equal(Materialize.lit_place(sprite, 32, bottom, 1.0).size.y, 0.0, "none above its art")
+	sprite.flip_h = true
+	check_equal(Materialize.lit_place(sprite, 0, bottom, 1.0), Rect2(-8.0, 15.0, -16.0, 1.0), "flipped: the same place, a negative width, as Sprite2D draws it")

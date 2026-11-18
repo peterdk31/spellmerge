@@ -197,8 +197,9 @@ func apply(body: Actor, share: float, style: SpawnStyle) -> void:
 	var item: RID = body.get_canvas_item()
 	var line: RID = _line.get(key, RID())
 	var lit_rows: RID = _lit.get(key, RID())
+	# Every frame: another look putting the body back (a fresh look's) must not leave it uncut.
+	body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
 	if not line.is_valid():
-		body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
 		line = _light_item(item)
 		lit_rows = _light_item(item)
 		_line[key] = line
@@ -238,7 +239,7 @@ func apply(body: Actor, share: float, style: SpawnStyle) -> void:
 		for row in rows + 1:
 			var stride: int = row_stride(row, rows, frame, at.x) if row < rows else 0
 			var in_set: bool = stride > 0 and row % stride == 0
-			if row < rows and (row == lit or in_set):
+			if row < rows and in_set:
 				shown += 1
 				hashed = (hashed * 31 + row + 1) & 0x7fffffff
 				if run_from < 0:
@@ -249,6 +250,9 @@ func apply(body: Actor, share: float, style: SpawnStyle) -> void:
 			elif run_from >= 0:
 				_add_rows(item, run_from, row, bottom, size)
 				run_from = -1
+			if row == lit and not in_set:
+				shown += 1
+				hashed = (hashed * 31 + row + 1) & 0x7fffffff
 	var width: int = 0
 	if lit >= 0:
 		var full: int = maxi(roundi(body.wall_radius()), 2)
@@ -256,7 +260,11 @@ func apply(body: Actor, share: float, style: SpawnStyle) -> void:
 		if width > 0:
 			var left: float = float(-full) + floorf(float(2 * full + 1 - width) / 2.0)
 			var y: float = bottom - float(lit) - 1.0
-			RenderingServer.canvas_item_add_rect(line, Rect2(left / size, y / size, float(width) / size, 1.0 / size), shade[0])
+			var bar := Rect2(left / size, y / size, float(width) / size, 1.0 / size)
+			RenderingServer.canvas_item_add_rect(line, bar, shade[0])
+			# The line's row is in the mask only as wide as the line, so no art shows past its ends.
+			if not row_shown(lit, rows, frame, at.x):
+				RenderingServer.canvas_item_add_rect(item, bar, Color.WHITE)
 	_drawn[key] = Vector4i(lit if width > 0 else -1, width, shift, shown)
 	_rows_hash[key] = hashed
 
@@ -281,6 +289,23 @@ static func _add_rows(item: RID, from: int, to: int, bottom: float, size: float)
 ## frame as it is drawn now, in `colour`, flat, into `light` (drawn where the sprite is: its
 ## transform), when the sprite has that row.
 static func _light_row(light: RID, sprite: Sprite2D, row: int, bottom: float, size: float, colour: Color) -> void:
+	var place: Rect2 = lit_place(sprite, row, bottom, size)
+	if place.size.y <= 0.0:
+		return
+	var rect: Rect2 = sprite.get_rect()
+	var source := Rect2(Vector2.ZERO, sprite.texture.get_size())
+	if sprite.region_enabled:
+		source = sprite.region_rect
+	var frame_size: Vector2 = source.size / Vector2(maxi(sprite.hframes, 1), maxi(sprite.vframes, 1))
+	var frame_at: Vector2 = source.position + frame_size * Vector2(sprite.frame_coords)
+	var cut := Rect2(frame_at.x, frame_at.y + place.position.y - rect.position.y, frame_size.x, place.size.y)
+	RenderingServer.canvas_item_add_texture_rect_region(light, place, sprite.texture.get_rid(), cut, colour)
+
+
+## Where row `row` of `sprite`'s frame is drawn, in the sprite's own pixels (no height: it has no such
+## row). A flipped sprite's has a negative width at the same place, as Sprite2D draws one (the
+## renderer flips the texture).
+static func lit_place(sprite: Sprite2D, row: int, bottom: float, size: float) -> Rect2:
 	var rect: Rect2 = sprite.get_rect()
 	var down: float = sprite.scale.y if sprite.scale.y != 0.0 else 1.0
 	# The row's top and bottom in the sprite's own pixels.
@@ -289,17 +314,11 @@ static func _light_row(light: RID, sprite: Sprite2D, row: int, bottom: float, si
 	var from: float = maxf(minf(top, foot), rect.position.y)
 	var to: float = minf(maxf(top, foot), rect.end.y)
 	if to <= from:
-		return
-	var source := Rect2(Vector2.ZERO, sprite.texture.get_size())
-	if sprite.region_enabled:
-		source = sprite.region_rect
-	var frame_size: Vector2 = source.size / Vector2(maxi(sprite.hframes, 1), maxi(sprite.vframes, 1))
-	var frame_at: Vector2 = source.position + frame_size * Vector2(sprite.frame_coords)
-	var cut := Rect2(frame_at.x, frame_at.y + from - rect.position.y, frame_size.x, to - from)
+		return Rect2()
 	var place := Rect2(rect.position.x, from, rect.size.x, to - from)
 	if sprite.flip_h:
-		place = Rect2(rect.end.x, from, -rect.size.x, to - from)
-	RenderingServer.canvas_item_add_texture_rect_region(light, place, sprite.texture.get_rid(), cut, colour)
+		place.size.x = -place.size.x
+	return place
 
 
 ## The body spawns in no more (or went): its parts' own transforms back, no clip parent any more, and

@@ -144,7 +144,8 @@ func test_materialize_plays_and_draws_the_same_through_a_snapshot() -> void:
 
 
 ## Every enemy of the game's Flow mid-spawn in materialize, drawn once by a fresh look over Feel's
-## actor table with the registry's styles: its motion's look, by its actor id, into `into`.
+## actor table with the registry's styles: its motion's look, by its actor id, into `into` (the look,
+## freed, puts back what it drew; Feel's own draws them again before the frame).
 func _draw_materializing(into: Dictionary[int, PackedInt32Array]) -> void:
 	var registry: Node = root.get_node("Registry")
 	var look := SpawnLook.new()
@@ -156,8 +157,4 @@ func _draw_materializing(into: Dictionary[int, PackedInt32Array]) -> void:
 		var body := enemy as Actor
 		if is_instance_valid(body) and body.is_spawning() and body.spawn_style == &"materialize" and body.spawn_share() >= 0.3:
 			into[body.id] = look.motion_named(&"materialize").look_of(body)
-	for enemy: Node in root.get_node("Flow").get(&"_enemies") as Array[Node]:
-		if is_instance_valid(enemy):
-			look.motion_named(&"materialize").put_back(enemy.get_instance_id(), enemy as Actor)
-			look.motion_named(&"rise").put_back(enemy.get_instance_id(), enemy as Actor)
 	look.free()

@@ -149,6 +149,12 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
   - `tests/gameplay/feel/test_spawn_styles_everywhere.gd` plays every style on every enemy that spawns in and every boss's add, as `test_card_rules.gd` plays its cards. Each cell must land on time, draw its motion's `stages` in 3 looks at least, be drawn alike by a fresh look, and be put back.
   - `tests/core/test_snapshot_spawn_styles.gd` runs the bone husk in `materialize` through a snapshot: tick for tick, and its bodies drawn alike before the snapshot and once it is restored (`ReplayRun.at_restore`, new).
   - `tests/core/test_spawn_style.gd` names a motion's stage too short.
+- **What it leaves out, for now:**
+  - Only the body sprite (`Sprite`) is lit. Its other drawn parts (a face's eyes) show in their own colours in the rows as they are shown. Lighting them would need each part drawn into the light.
+  - The sparks play at the body's feet, as every spawn cue does, thrown up all round it, not from its outline.
+  - Their colour is the cue's own (Arc's light shade), not the style's `colours`. A style in another colour gives itself a cue of its own (content/spawn_styles/README.md).
+  - At a size that is not whole, or a turned sprite, a row of the world is not a row of the art, so its lit rows cut the art's rows a little.
+- **Kept clean.** The look puts back every body it draws as it leaves the tree or goes (`put_back_all`), so a motion's canvas items never outlive it. Each motion sets the clip every frame, so another look putting a body back never leaves it uncut. The line's row is in the mask only as wide as the line.
 - A motion's `look_of(body)` (what it drew, in whole numbers) and `stages(style)` serve the tests; `rise.gd`'s mask and the parts' shift moved to the base class (`mask_rect`, `shift_parts`), as `materialize` uses them too.
 
 Each step updates the README of the areas it touches, and `content/spawn_styles/README.md` (new) is the guide: copy `rise/`, change the numbers, name your biome.

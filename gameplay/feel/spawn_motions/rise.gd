@@ -39,8 +39,8 @@ static func shift(height: float, share: float, style: SpawnStyle) -> float:
 ## One spawning body cut at its feet's line (the lowest row of its art) and its parts shifted by its rise.
 func apply(body: Actor, share: float, style: SpawnStyle) -> void:
 	var key: int = body.get_instance_id()
-	if not _drawn.has(key):
-		body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	# Every frame: another look putting the body back (a fresh look's) must not leave it uncut.
+	body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
 	var size: float = maxf(absf(body.size), 0.01)
 	var bottom: float = body_bottom(body)
 	var by: float = shift(height_of(body, key) + bottom, share, style)

@@ -126,6 +126,20 @@ func _enter_tree() -> void:
 func _exit_tree() -> void:
 	if RenderingServer.frame_pre_draw.is_connected(cut):
 		RenderingServer.frame_pre_draw.disconnect(cut)
+	put_back_all()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		put_back_all()
+
+
+## Every body it draws is put back by its motion now (the look leaves the tree or goes, mid-spawn):
+## its own drawing back, and a motion's own canvas items freed.
+func put_back_all() -> void:
+	for key: int in _cut.keys():
+		_cut[key].put_back(key, instance_from_id(key) as Actor)
+	_cut.clear()
 
 
 ## The room played in now (null for none): a style of `floor` colours takes its floor's.

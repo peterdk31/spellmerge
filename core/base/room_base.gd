@@ -71,6 +71,12 @@ extends Resource
 ## while the room is in play and faded in and out with it by Feel (gameplay/feel/room_ambience.gd).
 ## Rooms of one biome share a file beside them. Null (the default): silent, as before. Heard only.
 @export var ambience: Ambience = null
+## Its low floor mist (docs/milestones/atmosphere.md, F; `RoomMist`): soft and see-through, thin over
+## the middle and thicker toward its edges and pits, drifting, parted by bodies and pushed by shots and
+## blasts, lit by the spell light (drawn only while the "Spell light" setting is on: Feel's
+## gameplay/feel/mist.gd). Rooms of one biome share a file beside them. Null (the default): no mist,
+## the room is as it was. Drawn only.
+@export var mist: RoomMist = null
 
 ## The share of the most common colour a floor's colour needs to count (a wall's is the art rule's,
 ## `ArtPixels.MIN_SHARE`): a floor is mostly one colour, its seams and highlights a few pixels in a
@@ -126,6 +132,8 @@ func template_problems(known: Array[StringName]) -> PackedStringArray:
 	if ambience != null:
 		found.append_array(ambience.problems(String(id)))
 	found.append_array(air_problems())
+	if mist != null:
+		found.append_array(mist.problems(String(id)))
 	return found
 
 

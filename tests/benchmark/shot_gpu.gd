@@ -16,6 +16,9 @@ extends SceneTree
 ##   ... -- --blockers                with --light: a crypt room's boxes that block light (atmosphere C:
 ##                                    BLOCKER_WALLS and BLOCKER_PILLARS, `SpellLight.set_blockers`),
 ##                                    so the lights near them test them
+##   ... -- --mist                    with --light: the crypt's floor mist over the view (atmosphere F,
+##                                    gameplay/feel/mist.gd; a crypt room's walls round it), so the
+##                                    frame's GPU time holds its pass
 ##   ... -- --motes                   the mote scenes instead (P1c; `_mote_scene`): no shots, and
 ##                                    the mote ring full of motes in flight (none, the web's
 ##                                    default, the desktop's)
@@ -47,6 +50,7 @@ const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
+const MistScript := preload("res://gameplay/feel/mist.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 ## Where motes are drawn (Feel's MOTE_Z), and the pool's rows (the desktop default).
 const MOTE_Z: int = 16
@@ -94,6 +98,8 @@ var _only: String = ""
 var _timed: int = TIMED_FRAMES
 var _light: bool = false
 var _blockers: bool = false
+var _use_mist: bool = false
+var _mist: MistScript = null
 var _spell_light: SpellLightScript = null
 var _motes_only: bool = false
 var _marks_only: bool = false
@@ -118,6 +124,8 @@ func _initialize() -> void:
 			_light = true
 		elif arg == "--blockers":
 			_blockers = true
+		elif arg == "--mist":
+			_use_mist = true
 		elif arg == "--motes":
 			_motes_only = true
 		elif arg == "--marks":
@@ -163,6 +171,9 @@ func _teardown() -> void:
 	if _motes != null:
 		_motes.free()
 		_motes = null
+	if _mist != null:
+		_mist.free()
+		_mist = null
 	for node: Node in [_mgr, _bus, _table]:
 		if node != null and is_instance_valid(node):
 			node.free()
@@ -205,6 +216,14 @@ func _scenario(scenario: Dictionary) -> void:
 		RenderingServer.viewport_set_measure_render_time(_spell_light.viewport.get_viewport_rid(), true)
 		if _blockers:
 			_block_light()
+		if _use_mist:
+			_mist = MistScript.new(-1)
+			root.add_child(_mist)
+			_mist.use_light(_spell_light.buffer())
+			var walls: Array[Rect2] = BLOCKER_WALLS.duplicate()
+			walls.append_array([Rect2(0.0, 0.0, 640.0, 24.0), Rect2(0.0, 336.0, 640.0, 24.0)] as Array[Rect2])
+			_mist.lay(ROOM.size, walls, [] as Array[Rect2])
+			_mist.use(load("res://content/rooms/crypt/crypt_mist.tres") as RoomMist)
 	if _use_motes:
 		_motes = MotesScript.new(MOTE_CAP, MOTE_Z, _mote_kinds)
 		root.add_child(_motes)
@@ -237,6 +256,8 @@ func _scenario(scenario: Dictionary) -> void:
 	for f in _timed if _time else 0:
 		var stepped: int = Time.get_ticks_usec()
 		_step(shots)
+		if _mist != null:
+			_mist.step(float(f) * DT, PackedVector2Array(), 0)
 		step_times.append(float(Time.get_ticks_usec() - stepped) / 1000.0)
 		var before: int = Time.get_ticks_usec()
 		_mgr.update_draw(1.0)

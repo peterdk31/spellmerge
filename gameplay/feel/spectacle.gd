@@ -44,6 +44,7 @@ const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
 const StirsScript := preload("res://gameplay/feel/stirs.gd")
 const SpotStirsScript := preload("res://gameplay/feel/spot_stirs.gd")
+const MistScript := preload("res://gameplay/feel/mist.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's SHOWN_BEAM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -149,6 +150,19 @@ var stirs: StirsScript = StirsScript.new()
 ## The room's lights' duck and lean (atmosphere E), stepped while spell light is on. Read only.
 var spot_stirs: SpotStirsScript = SpotStirsScript.new()
 
+## The room's low floor mist (atmosphere F; null with spell light off), over the floor, the marks and
+## the bodies' shadows and under every body. Read only.
+var mist: MistScript = null
+
+## The room's mist (`RoomBase.mist`, from `use_room`), the room laid's size, walls and holes (from
+## `room_built`, read only when it names a mist), and the bodies' feet Feel hands over each frame
+## (`hand_bodies`: the ground cover's), for a mist made later.
+var _mist_data: RoomMist = null
+var _room_size: Vector2 = Vector2.ZERO
+var _room_walls: Array[Rect2] = []
+var _room_holes: Array[Rect2] = []
+var _feet: PackedVector2Array = PackedVector2Array()
+var _feet_count: int = 0
 ## The pool's material the stirs were last handed to, and their `version` then.
 var _stirred_material: ShaderMaterial = null
 var _stirred_version: int = -1
@@ -196,6 +210,7 @@ func _ready() -> void:
 	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
 	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
 	ShaderWarmupScript.want(BodyShadowsScript.SHADER, ShaderWarmupScript.BATCH)
+	ShaderWarmupScript.want(MistScript.SHADER, ShaderWarmupScript.RECT)
 	_make_motes(mote_cap)
 	barriers = BarriersScript.new(MOTE_Z)
 	barriers.name = "Barriers"
@@ -305,6 +320,16 @@ func step(now: float, table: ActorsScript = null) -> void:
 		shadows.add_lights(light.spot_rows(), light.spot_count(), SpellLightScript.SPOT_ROW_STRENGTH, _no_owners)
 		shadows.add_lights(carried_lights.rows, carried_lights.count, SpellLightScript.SPOT_ROW_STRENGTH, carried_lights.owners)
 		shadows.step(table, now, view, blockers)
+	if mist != null:
+		mist.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
+
+
+## The bodies' feet that part the mist this frame (atmosphere F): the first `count` of `feet` (world
+## px; Feel hands the ground cover's, `Cover.bodies`, the bodies nearest the camera's middle). Kept,
+## not copied: read at the next `step`.
+func hand_bodies(feet: PackedVector2Array, count: int) -> void:
+	_feet = feet
+	_feet_count = clampi(count, 0, feet.size())
 
 
 ## The barrier on `actor` changed (combat's `barrier_changed`; `ramp` the actor's): its shell, in
@@ -904,6 +929,7 @@ func set_floor_marks(on: bool) -> void:
 		marks.name = "Marks"
 		marks.set_ramp_table(_ramp_table.texture())
 		add_child(marks)
+		_keep_mist_last()
 		if _mark_room != &"":
 			_fit_marks(_mark_room)
 	elif not on and marks != null:
@@ -934,6 +960,10 @@ func _make_light(on: bool) -> void:
 		remove_child(shadows)
 		shadows.queue_free()
 		shadows = null
+	if mist != null:
+		remove_child(mist)
+		mist.queue_free()
+		mist = null
 	# A light made anew starts with its spots at rest.
 	spot_stirs = SpotStirsScript.new()
 	if on and projectiles != null:
@@ -946,6 +976,13 @@ func _make_light(on: bool) -> void:
 		blockers.refresh()
 		shadows = BodyShadowsScript.new(MARK_Z)
 		add_child(shadows)
+		# The mist with it (atmosphere F): it glows by the light, and lies over the shadows.
+		mist = MistScript.new(MARK_Z)
+		add_child(mist)
+		mist.use_light(light.buffer())
+		mist.lay(_room_size, _room_walls, _room_holes)
+		mist.use(_mist_data)
+		_keep_mist_last()
 	# The motes' lit-only kinds read the light buffer, or with none are not drawn (atmosphere B).
 	if pool != null:
 		pool.set_light(light.buffer() if light != null else null, SpellLightScript.lit_steps())
@@ -983,8 +1020,32 @@ func view_rect() -> Rect2:
 # --- The room ------------------------------------------------------------------------------------
 
 ## A room was laid out (`room_built`; atmosphere C): its standing walls block the light from now on.
-func _on_room_built(_room_id: StringName, layout_root: Node) -> void:
-	blockers.use_walls(RoomPlaces.wall_rects(layout_root))
+func _on_room_built(room_id: StringName, layout_root: Node) -> void:
+	var walls: Array[Rect2] = RoomPlaces.wall_rects(layout_root)
+	blockers.use_walls(walls)
+	# The mist's room (atmosphere F), read only when the room names a mist.
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
+	if room != null and room.mist != null:
+		var places: RoomPlaces = RoomPlaces.read(layout_root)
+		lay_mist(places.size, walls, places.holes)
+	else:
+		lay_mist(Vector2.ZERO, [] as Array[Rect2], [] as Array[Rect2])
+
+
+## The room the mist lies in (atmosphere F): its size (px, from the origin), walls and holes (world
+## px); a zero size: none (`room_built` calls this; tests too).
+func lay_mist(size: Vector2, walls: Array[Rect2], holes: Array[Rect2]) -> void:
+	_room_size = size
+	_room_walls = walls
+	_room_holes = holes
+	if mist != null:
+		mist.lay(size, walls, holes)
+
+
+## The mist is the last of the children at the marks' z, so it lies over the marks and the shadows.
+func _keep_mist_last() -> void:
+	if mist != null and mist.get_parent() == self:
+		move_child(mist, -1)
 
 
 ## A new room: its colours for its walls' motes (`RoomBase.surface_colors`), its ambient light
@@ -1006,6 +1067,9 @@ func use_room(room: RoomBase) -> void:
 	ambient = room.ambient if room != null else 1.0
 	shade = room.shade if room != null else Color.WHITE
 	air.use(room.air if room != null else null)
+	_mist_data = room.mist if room != null else null
+	if mist != null:
+		mist.use(_mist_data)
 	# The last room's wake and blasts are not this one's.
 	stirs.clear()
 	if light != null:

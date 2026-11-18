@@ -946,6 +946,8 @@ func step(real_delta: float) -> void:
 	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
 	_spectacle.step_stirs(_clock, picture)
 	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
+	# The bodies the cover found part the mist (atmosphere F): one gathering, read by both.
+	_spectacle.hand_bodies(_cover.bodies(), _cover.body_count())
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells

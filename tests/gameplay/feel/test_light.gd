@@ -169,6 +169,11 @@ func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
 		if shadows != null and item == shadows:
 			check(_drawn_z(item) < at, "the bodies' shadows (z %d) lie under the light, with the floor" % _drawn_z(item))
 			continue
+		# The mist lies on the floor under the bodies (atmosphere F), darkened and lit as the floor.
+		var mist: CanvasItem = feel.spectacle().mist
+		if mist != null and item == mist:
+			check(_drawn_z(item) < at, "the mist (z %d) lies under the light, with the floor" % _drawn_z(item))
+			continue
 		# The sounds' 2D voices (boss plan OB15) and the room's sound's accents (atmosphere D) are
 		# where a sound plays, and draw nothing.
 		if feel.sounds().is_ancestor_of(item) or feel.ambience().is_ancestor_of(item):

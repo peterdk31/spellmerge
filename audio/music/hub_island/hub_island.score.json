@@ -4,7 +4,7 @@
 	"instruments": {
 		"pad": {"patch": "warm_pad", "gain": -16, "ring": 0.8, "amp": {"attack": 0.9}},
 		"low": {"patch": "sub_bass", "gain": -19, "ring": 0.6},
-		"glass": {"patch": "glass_pluck", "gain": -5, "ring": 1.6, "velocity": [1, 0.6, 0.8, 0.6]},
+		"glass": {"patch": "glass_pluck", "gain": -18, "ring": 2.0, "velocity": [1, 0.6, 0.8, 0.6]},
 		"strings": {"patch": "low_strings", "gain": -15, "ring": 0.3}
 	},
 	"patterns": {
@@ -69,9 +69,9 @@
 			"g", "d", "em_low", "c_low", "am_low", "em_rest", "c_rise", "b_low",
 			"em_s", "c_s", "am_s", "b_s", "em_s2", "c_s2", "am_s2", "b7_s",
 			"em_fall", "em_d", "c_fall", "b_fall", "am_last", "em_last", "b_last", "em_still"],
-			"notes": "The hub, the island between runs: a slow, somewhat sad tune of a few glass bells falling over a soft pad and a low drone, answered by low strings. No drums: nothing here hurries."}
+			"notes": "The hub, the island between runs: a slow, somewhat sad bed of a soft pad and a low drone, low strings answering, and a few glass bells far off in the room, more heard than listened to. No drums: nothing here hurries."}
 	],
 	"fx": {"reverb": {"mix": 0.36, "size": 2.0}, "lowpass": 6000},
 	"gain": -2,
-	"notes": "The hub's music (the owner, 2026-11-18: a somewhat sad piece of background music playing in the hub), one layer: E minor at 66 beats a minute, 32 bars (116 s) round, in four eights. Em C Am B, the bells alone, a falling tune that ends each line on a held note; then G D Em C and Am Em C B, the low strings taking the tune under a bell or two; the first tune again with the strings holding under it; and a last walk down, Em over E and D, C, B, then Am Em B and a bar of Em standing still before it comes round. A wide room, nothing above 6 kHz, and 2 dB under the music's level (gain -2): the hub is where a player rests and reads, over the island's wind."
+	"notes": "The hub's music (the owner, 2026-11-18: a somewhat sad piece of background music playing in the hub), one layer: E minor at 66 beats a minute, 32 bars (116 s) round, in four eights. Em C Am B, the bells alone, a falling tune that ends each line on a held note; then G D Em C and Am Em C B, the low strings taking the tune under a bell or two; the first tune again with the strings holding under it; and a last walk down, Em over E and D, C, B, then Am Em B and a bar of Em standing still before it comes round. The bells are far back (the owner, 2026-11-18, after hearing them up front: way more subtle), 13 dB under where they were, so the pad and the strings carry the piece. A wide room, nothing above 6 kHz, and 2 dB under the music's level (gain -2): the hub is where a player rests and reads, over the island's wind."
 }

@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/ambience/amb_crypt_rumble/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/ambience/amb_crypt_rumble/amb_crypt_rumble.sound.json",
+			"recipe_hash": "sha256:6acee3cbc58e9ef45ab1e5587972880f2e89653fe0883d8e8a8a1e503ed77df3",
+			"audio_hash": "sha256:82f1312e4e5b8477da834bf9430506b1d6dcbea62b5ce99c9965cc5cf5bdaa2a",
+			"loudness": -20.2,
+			"peak": -9.3
+		},
+		{
+			"path": "audio/ambience/amb_crypt_rumble/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/ambience/amb_crypt_rumble/amb_crypt_rumble.sound.json",
+			"recipe_hash": "sha256:6acee3cbc58e9ef45ab1e5587972880f2e89653fe0883d8e8a8a1e503ed77df3",
+			"audio_hash": "sha256:f6d5aa42eb197363be4136fe258cd01ae46b24a5c31489e7f78610aab59141d7",
+			"loudness": -21.2,
+			"peak": -10.0
+		},
+		{
+			"path": "audio/ambience/amb_crypt_rumble/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/ambience/amb_crypt_rumble/amb_crypt_rumble.sound.json",
+			"recipe_hash": "sha256:6acee3cbc58e9ef45ab1e5587972880f2e89653fe0883d8e8a8a1e503ed77df3",
+			"audio_hash": "sha256:1f14f3f278b6509da2f756b29a05d7a8be9799aa3646393ce265ebde18d2c9bc",
+			"loudness": -21.6,
+			"peak": -10.3
+		}
+	]
+}

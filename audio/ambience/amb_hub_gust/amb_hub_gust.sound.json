@@ -1,0 +1,37 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "ambience",
+	"seconds": 3.6,
+	"vary": {
+		"pitch": 0.06,
+		"time": 0.1,
+		"seed": 74
+	},
+	"layers": [
+		{
+			"patch": "storm_gust",
+			"filter": {
+				"from": 380,
+				"to": 1000,
+				"q": 2.0
+			},
+			"length": 3.4,
+			"amp": {
+				"power": 1.4
+			}
+		},
+		{
+			"patch": "storm_gust",
+			"filter": {
+				"from": 700,
+				"to": 1900,
+				"q": 3.0
+			},
+			"start": 0.5,
+			"length": 2.6,
+			"gain": -10
+		}
+	],
+	"notes": "A gust of wind over the island: a band of air rising and falling as it swells in and out, a thinner whistle of it on top. Storm's own voice (storm_gust). Remade from the first ambience file of the same id (atmosphere D); the room's accent adds its own pitch and volume spread."
+}

@@ -1,0 +1,85 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 12.0,
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 330,
+				"to": 520,
+				"curve": "arch",
+				"q": 0.7
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 176,
+				"q": 8.0
+			},
+			"gain": -8
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 263,
+				"q": 8.0
+			},
+			"gain": -11
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "high",
+				"from": 1800,
+				"q": 0.8
+			},
+			"gain": -30
+		},
+		{
+			"source": "sine",
+			"pitch": 55,
+			"gain": -20
+		},
+		{
+			"source": "sine",
+			"pitch": 55.25,
+			"gain": -20
+		},
+		{
+			"source": "sine",
+			"pitch": 82.5,
+			"gain": -25
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 260,
+				"to": 420,
+				"curve": "arch",
+				"q": 0.8
+			},
+			"start": 2.0,
+			"length": 7.0,
+			"amp": {
+				"shape": "arch",
+				"power": 1.6
+			},
+			"gain": -6
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.25,
+			"size": 1.6
+		}
+	},
+	"gain": -5.4,
+	"notes": "A crypt's low room tone: dark noise rolled off above a few hundred hertz, breathing on a slow swell, with two hollow stone resonances in it, a faint hiss and a very soft beating drone. Remade from the first ambience file of the same id (atmosphere D), at its level: 5.4 dB under the family's (gain -5.4), since the bed is under everything."
+}

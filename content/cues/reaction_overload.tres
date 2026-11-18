@@ -10,5 +10,6 @@ shake = 0.2
 hold = 0.09
 hold_shot = true
 sound = &"reaction_overload"
+duck = -3.0
 color = Color(1, 0.4196078, 0.627451, 1)
 power = 1.1

@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/parry/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/parry/parry.sound.json",
+			"recipe_hash": "sha256:1221338e1ea8340a09a848699a7fe140bcd79f9a40bab0aeca66afd65d7d7b26",
+			"audio_hash": "sha256:d4f4be59d628aeef8865bc5f3605198cecec4f2432f132f938f8b80a11063d6c",
+			"loudness": -17.1,
+			"peak": -4.2
+		},
+		{
+			"path": "audio/sfx/parry/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/parry/parry.sound.json",
+			"recipe_hash": "sha256:1221338e1ea8340a09a848699a7fe140bcd79f9a40bab0aeca66afd65d7d7b26",
+			"audio_hash": "sha256:c0e922ec9286acf8e72e433c7118ad89019352d07f006744ca8a1edd7abfb870",
+			"loudness": -17.6,
+			"peak": -3.7
+		},
+		{
+			"path": "audio/sfx/parry/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/parry/parry.sound.json",
+			"recipe_hash": "sha256:1221338e1ea8340a09a848699a7fe140bcd79f9a40bab0aeca66afd65d7d7b26",
+			"audio_hash": "sha256:2366375a795598695f8d5d628284a6395a74ae557f7120e7be6ef103f5a572d3",
+			"loudness": -16.3,
+			"peak": -4.4
+		}
+	]
+}

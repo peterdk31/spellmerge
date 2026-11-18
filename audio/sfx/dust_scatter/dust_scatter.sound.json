@@ -1,0 +1,72 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.42,
+	"vary": {
+		"pitch": 0.04,
+		"time": 0.08,
+		"seed": 83
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 1300,
+				"to": 380,
+				"q": 0.7
+			},
+			"length": 0.32,
+			"amp": {
+				"attack": 0.012,
+				"shape": "perc",
+				"power": 1.4
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 3200,
+				"to": 1300,
+				"q": 1.2
+			},
+			"length": 0.38,
+			"amp": {
+				"shape": "arch",
+				"power": 1.6,
+				"attack": 0.01
+			},
+			"gain": -8
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 140,
+				"to": 20
+			},
+			"filter": {
+				"type": "band",
+				"from": 2600,
+				"q": 1.0
+			},
+			"length": 0.4,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.1
+			},
+			"gain": -12
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.15,
+			"size": 0.8
+		}
+	},
+	"gain": -2,
+	"notes": "A dust heap walked into: a soft puff and a dry hiss of dust spreading over the floor. 2 dB under the family's level (gain -2): it is soft, and several heaps may go at once."
+}

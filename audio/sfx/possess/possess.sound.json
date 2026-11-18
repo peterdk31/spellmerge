@@ -1,0 +1,63 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.48,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 88
+	},
+	"layers": [
+		{
+			"patch": "void_swell",
+			"pitch": {
+				"from": 120,
+				"to": 72
+			},
+			"length": 0.46
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1900,
+				"to": 600,
+				"q": 2.0
+			},
+			"length": 0.44,
+			"amp": {
+				"shape": "swell",
+				"power": 1.6,
+				"attack": 0.02
+			},
+			"gain": -9
+		},
+		{
+			"source": "fm",
+			"pitch": {
+				"from": 440,
+				"to": 220
+			},
+			"ratio": 1.5,
+			"index": {
+				"from": 0.4,
+				"to": 1.4
+			},
+			"length": 0.4,
+			"amp": {
+				"shape": "arch",
+				"power": 1.4,
+				"attack": 0.02
+			},
+			"gain": -12
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 0.6
+		}
+	},
+	"notes": "A body taken over: a low, hollow swell sinking into it, a whisper of air drawn in backwards and a tone sliding down an octave, eerie, soft and under half a second, plainly apart from a cast or a hit."
+}

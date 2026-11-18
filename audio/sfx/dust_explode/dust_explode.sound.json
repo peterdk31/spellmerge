@@ -1,0 +1,52 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.9,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 84
+	},
+	"layers": [
+		{
+			"patch": "fire_roar",
+			"filter": {
+				"from": 1900,
+				"to": 260
+			},
+			"length": 0.7,
+			"amp": {
+				"attack": 0.006,
+				"power": 1.4
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 85,
+				"to": 30
+			},
+			"length": 0.45,
+			"drive": 2.6,
+			"amp": {
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -3
+		},
+		{
+			"patch": "fire_crackle",
+			"start": 0.05,
+			"length": 0.8
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.4
+		}
+	},
+	"notes": "A dust heap catching fire and blowing up: a whumping burst of flame with a deep boom under it and crackles burning out. Fire's own voices (fire_roar, fire_crackle)."
+}

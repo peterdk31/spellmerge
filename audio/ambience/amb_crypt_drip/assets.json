@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/ambience/amb_crypt_drip/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/ambience/amb_crypt_drip/amb_crypt_drip.sound.json",
+			"recipe_hash": "sha256:9793172eba9f7be091e2320697ff43e9078e556ea41ee569a79b7239dd6194a5",
+			"audio_hash": "sha256:62e5e4006650965b825815bdd9ddd239e612da62184259b7bdff212bd66667b2",
+			"loudness": -21.2,
+			"peak": -9.0
+		},
+		{
+			"path": "audio/ambience/amb_crypt_drip/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/ambience/amb_crypt_drip/amb_crypt_drip.sound.json",
+			"recipe_hash": "sha256:9793172eba9f7be091e2320697ff43e9078e556ea41ee569a79b7239dd6194a5",
+			"audio_hash": "sha256:136f3348885b7cca4be14dc0b02ad379d23fa62003aab476290a54ee3634eb0a",
+			"loudness": -20.6,
+			"peak": -8.8
+		},
+		{
+			"path": "audio/ambience/amb_crypt_drip/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/ambience/amb_crypt_drip/amb_crypt_drip.sound.json",
+			"recipe_hash": "sha256:9793172eba9f7be091e2320697ff43e9078e556ea41ee569a79b7239dd6194a5",
+			"audio_hash": "sha256:40ab124ddcf4081f79e3d08c15a2e721e0855f462e3fdf86c66596dc3fed580f",
+			"loudness": -21.3,
+			"peak": -8.7
+		}
+	]
+}

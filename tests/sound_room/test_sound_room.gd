@@ -189,6 +189,48 @@ func test_every_filed_game_one_shot_plays_its_variants_on_sfx() -> void:
 	check(played >= 24, "the combat set's one-shots all play: %d" % played)
 
 
+## Every id the game names has its file, and every file of the game is named (AU6: the sound room
+## shows none red).
+func test_the_game_names_no_sound_without_a_file() -> void:
+	_open()
+	var red: Array[StringName] = []
+	for row: SoundRoomScript.Row in room.rows:
+		if row.state == SoundRoomScript.State.MISSING or row.state == SoundRoomScript.State.UNNAMED:
+			red.append(row.id)
+	check(red.is_empty(), "no row is red: %s" % [red])
+	check(room.count_of(SoundRoomScript.State.HEARD) >= 63, "the game's sounds are listed: %d" % room.count_of(SoundRoomScript.State.HEARD))
+
+
+## Every held loop and bed layer the game names (AU6) is a Vorbis file imported to loop, and plays
+## on in the room as the game plays it for 30 s: a held sound held on SFX, a bed's layers on Ambience.
+func test_every_game_loop_plays_on_for_thirty_seconds() -> void:
+	_open()
+	var looped: int = 0
+	for row: SoundRoomScript.Row in room.rows:
+		if row.state != SoundRoomScript.State.HEARD or (row.kind != SoundNames.Kind.HELD and row.kind != SoundNames.Kind.BED):
+			continue
+		var stream := room.audio.sound(row.id) as AudioStreamOggVorbis
+		check(stream != null and stream.loop, "%s is a Vorbis loop" % row.id)
+		room.press(row.id)
+		var handle: int = row.handle
+		for i in 30 * 10:
+			room.audio.step(0.1)
+		if row.kind == SoundNames.Kind.HELD:
+			check(handle != 0 and room.audio.is_held(handle), "%s is still held 30 s on" % row.id)
+			check_equal(room.audio.held.voice_of(handle).bus, AudioScript.BUS_SFX, "%s on SFX" % row.id)
+		else:
+			var layers: int = room.audio.ambience.ambience().layers.size()
+			var playing: int = 0
+			for layer in layers:
+				var player: AudioStreamPlayer = room.audio.ambience.bed_player(layer)
+				if player.stream is AudioStreamOggVorbis and (player.stream as AudioStreamOggVorbis).loop and player.bus == AudioScript.BUS_AMBIENCE:
+					playing += 1
+			check_equal(playing, layers, "%s's bed: every layer a loop on Ambience 30 s on" % row.id)
+		room.press(row.id)
+		looped += 1
+	check(looped >= 7, "the broom's four held sounds and the three beds' layers: %d" % looped)
+
+
 func test_an_accent_plays_on_the_ambience_bus() -> void:
 	_open(_game())
 	room.press(&"cave_drip")

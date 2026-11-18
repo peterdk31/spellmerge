@@ -1,0 +1,54 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 1.6,
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1100,
+				"to": 1900,
+				"curve": "arch",
+				"q": 1.2
+			},
+			"drive": 1.2
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": 120,
+			"filter": {
+				"type": "band",
+				"from": 2600,
+				"q": 1.2
+			},
+			"gain": -8
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 170,
+				"to": 240,
+				"curve": "arch",
+				"q": 0.7
+			},
+			"gain": -3
+		},
+		{
+			"source": "sine",
+			"pitch": 55,
+			"gain": -16
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.2,
+			"size": 1.0
+		}
+	},
+	"gain": 2,
+	"notes": "The Big Sweep winding up: a heavier, lower drag of the bristles over stone, slower back and forth, with a deep grinding rumble under it, so it is known without looking. 2 dB over the family's level (gain 2), a telegraph; its cue adds 4 dB more."
+}

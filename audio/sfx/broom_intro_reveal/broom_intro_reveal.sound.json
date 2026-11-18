@@ -1,0 +1,115 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "boss",
+	"seconds": 1.6,
+	"vary": {
+		"pitch": 0.02,
+		"time": 0.03,
+		"seed": 66
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 80,
+				"to": 33
+			},
+			"length": 0.7,
+			"drive": 3.0,
+			"amp": {
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 1.8
+			},
+			"gain": -3
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 3200,
+				"to": 380,
+				"q": 0.9
+			},
+			"length": 0.5,
+			"drive": 1.6,
+			"amp": {
+				"attack": 0.003,
+				"shape": "perc",
+				"power": 1.6
+			},
+			"gain": -4
+		},
+		{
+			"source": "fm",
+			"pitch": 146.83,
+			"ratio": 1,
+			"index": {
+				"from": 3.2,
+				"to": 0.4
+			},
+			"filter": {
+				"type": "low",
+				"from": 2600,
+				"q": 0.7
+			},
+			"length": 1.5,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.4
+			},
+			"gain": -4
+		},
+		{
+			"source": "fm",
+			"pitch": 220.0,
+			"ratio": 1,
+			"index": {
+				"from": 2.6,
+				"to": 0.3
+			},
+			"filter": {
+				"type": "low",
+				"from": 2600,
+				"q": 0.7
+			},
+			"length": 1.4,
+			"amp": {
+				"attack": 0.012,
+				"shape": "perc",
+				"power": 1.5
+			},
+			"gain": -8
+		},
+		{
+			"source": "fm",
+			"pitch": 73.42,
+			"ratio": 2,
+			"index": {
+				"from": 1.8,
+				"to": 0.2
+			},
+			"filter": {
+				"type": "low",
+				"from": 600,
+				"q": 0.7
+			},
+			"length": 1.5,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.2
+			},
+			"gain": -8
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.35,
+			"size": 1.8
+		}
+	},
+	"notes": "The sting as the broom's name slams in: a deep boom and a burst of noise under a bright, brassy stab on D and A (the fight's key), ringing out in a large room."
+}

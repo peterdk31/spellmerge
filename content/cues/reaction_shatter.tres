@@ -10,5 +10,6 @@ shake = 0.2
 hold = 0.09
 hold_shot = true
 sound = &"reaction_shatter"
+duck = -3.0
 color = Color(0.9098039, 0.9843137, 1, 1)
 power = 1.3

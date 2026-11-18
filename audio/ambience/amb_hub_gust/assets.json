@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/ambience/amb_hub_gust/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/ambience/amb_hub_gust/amb_hub_gust.sound.json",
+			"recipe_hash": "sha256:044ab65ed9548c22ff31d0def6ce8642bfe6e3196dee6637bb2b5b0e0e08440e",
+			"audio_hash": "sha256:7504f9c9fd32be059ed852371e513b2049cca338565c8fffdcc56866e6084131",
+			"loudness": -20.9,
+			"peak": -9.8
+		},
+		{
+			"path": "audio/ambience/amb_hub_gust/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/ambience/amb_hub_gust/amb_hub_gust.sound.json",
+			"recipe_hash": "sha256:044ab65ed9548c22ff31d0def6ce8642bfe6e3196dee6637bb2b5b0e0e08440e",
+			"audio_hash": "sha256:17834bcc5ab04eb3812c06bba7c4c4fd4dd524e3d43ed6469f8df60025160a16",
+			"loudness": -20.7,
+			"peak": -10.0
+		},
+		{
+			"path": "audio/ambience/amb_hub_gust/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/ambience/amb_hub_gust/amb_hub_gust.sound.json",
+			"recipe_hash": "sha256:044ab65ed9548c22ff31d0def6ce8642bfe6e3196dee6637bb2b5b0e0e08440e",
+			"audio_hash": "sha256:14c5f0538a16bcd34a056475acc8aff8b97d3b19f996f8b89614b86470b4d745",
+			"loudness": -21.3,
+			"peak": -10.5
+		}
+	]
+}

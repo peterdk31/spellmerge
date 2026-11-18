@@ -1,0 +1,78 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.55,
+	"vary": {
+		"pitch": 0.04,
+		"time": 0.08,
+		"seed": 90
+	},
+	"layers": [
+		{
+			"source": "fm",
+			"pitch": {
+				"from": 600,
+				"to": 1200
+			},
+			"ratio": 2.5,
+			"index": {
+				"from": 1.5,
+				"to": 0.3
+			},
+			"length": 0.42,
+			"amp": {
+				"shape": "swell",
+				"power": 1.3,
+				"attack": 0.02
+			},
+			"gain": -4
+		},
+		{
+			"source": "partials",
+			"pitch": 1800,
+			"start": 0.4,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.3
+				},
+				{
+					"ratio": 2.76,
+					"gain": -8,
+					"decay": 0.15
+				}
+			],
+			"amp": {
+				"attack": 0.002
+			},
+			"gain": -6
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": 220,
+			"filter": {
+				"type": "band",
+				"from": 5000,
+				"q": 1.2
+			},
+			"length": 0.45,
+			"amp": {
+				"shape": "swell",
+				"power": 1.2,
+				"attack": 0.02
+			},
+			"gain": -14
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		}
+	},
+	"gain": -2,
+	"notes": "An enemy appearing out of bright bits: a shimmering tone rising with a sparkle, ending on a small glassy tick. 2 dB under the family's level (gain -2): many may appear at once."
+}

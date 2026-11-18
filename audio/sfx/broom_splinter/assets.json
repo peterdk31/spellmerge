@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/broom_splinter/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_splinter/broom_splinter.sound.json",
+			"recipe_hash": "sha256:a2a7a019901e140022cec7279dfbb65051d3912c3f23026c51e694cef532e5d5",
+			"audio_hash": "sha256:9cd7ffc41846d55b6bed0d4d38b3f660a9321302fe859b668673bb00bb4ba59f",
+			"loudness": -14.9,
+			"peak": -2.9
+		},
+		{
+			"path": "audio/sfx/broom_splinter/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_splinter/broom_splinter.sound.json",
+			"recipe_hash": "sha256:a2a7a019901e140022cec7279dfbb65051d3912c3f23026c51e694cef532e5d5",
+			"audio_hash": "sha256:ec7aeb0e09a11c1a7ebd032f0486bf4524ad650b0cbf8fab11715102ed77e015",
+			"loudness": -15.1,
+			"peak": -3.1
+		},
+		{
+			"path": "audio/sfx/broom_splinter/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_splinter/broom_splinter.sound.json",
+			"recipe_hash": "sha256:a2a7a019901e140022cec7279dfbb65051d3912c3f23026c51e694cef532e5d5",
+			"audio_hash": "sha256:e0d307afeadfe6d3d5e37bfb39a5c8dbbfaab6e6121a3376fe96c85454923f12",
+			"loudness": -15.0,
+			"peak": -2.8
+		}
+	]
+}

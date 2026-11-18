@@ -1,0 +1,64 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "ambience",
+	"seconds": 1.0,
+	"vary": {
+		"pitch": 0.08,
+		"time": 0.1,
+		"seed": 72
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 820,
+				"to": 1390
+			},
+			"length": 0.055,
+			"amp": {
+				"attack": 0.001,
+				"shape": "perc",
+				"power": 1.6
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 1035,
+				"to": 1700
+			},
+			"start": 0.18,
+			"length": 0.045,
+			"amp": {
+				"attack": 0.001,
+				"shape": "perc",
+				"power": 1.6
+			},
+			"gain": -5
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "high",
+				"from": 5000,
+				"q": 0.8
+			},
+			"length": 0.008,
+			"amp": {
+				"attack": 0.001,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -14
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.65,
+			"size": 1.8
+		},
+		"lowpass": 5200
+	},
+	"notes": "A far double drip: a lower bubbling ping and a softer one a third higher just after it, through the same stone room. Remade from the first ambience file of the same id (atmosphere D); the room's accent adds its own pitch and volume spread."
+}

@@ -6,3 +6,4 @@
 script = ExtResource("1_base")
 id = &"boss_intro"
 sound = &"boss_intro"
+duck = -4.0

@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "audio/ambience/amb_hub_void/amb_hub_void.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/ambience/amb_hub_void/amb_hub_void.sound.json",
+			"recipe_hash": "sha256:7da0f4fdfe6e9ec121479ad3180a6f46fdba2a053e98318c6d9536966265467e",
+			"audio_hash": "sha256:68b7a61ced2615273d4217e4611775c0b1cbc3d5e6a32065c2a01be2343cf348",
+			"loudness": -29.6,
+			"peak": -18.7
+		}
+	]
+}

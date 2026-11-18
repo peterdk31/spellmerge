@@ -1,0 +1,50 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 0.72,
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 800,
+				"q": 0.9
+			},
+			"gain": -16
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 650,
+				"to": 3200,
+				"curve": "arch",
+				"q": 2.4
+			},
+			"length": 0.36,
+			"amp": {
+				"shape": "arch",
+				"power": 1.4
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 560,
+				"to": 2600,
+				"curve": "arch",
+				"q": 2.4
+			},
+			"start": 0.36,
+			"length": 0.36,
+			"amp": {
+				"shape": "arch",
+				"power": 1.4
+			},
+			"gain": -2
+		}
+	],
+	"notes": "The broom's Sweep moving: a swish of bristles through the air and a slightly lower one after it, over and over, the rhythm of the sweep."
+}

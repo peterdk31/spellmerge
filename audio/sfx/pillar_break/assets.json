@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/pillar_break/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pillar_break/pillar_break.sound.json",
+			"recipe_hash": "sha256:0dd357b134b99129b57e66421f9590276b8d9ce0d68e507181364120d03c0ae8",
+			"audio_hash": "sha256:b4b3d6cc8bded8c6a14b2b0c3cd73566a36512592b032e7ee43e235df738ffbc",
+			"loudness": -17.1,
+			"peak": -5.1
+		},
+		{
+			"path": "audio/sfx/pillar_break/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pillar_break/pillar_break.sound.json",
+			"recipe_hash": "sha256:0dd357b134b99129b57e66421f9590276b8d9ce0d68e507181364120d03c0ae8",
+			"audio_hash": "sha256:78c8316f3189bf550c58b753878e4701404402b9fee4d116b2ef6332963c8794",
+			"loudness": -17.1,
+			"peak": -4.6
+		},
+		{
+			"path": "audio/sfx/pillar_break/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/pillar_break/pillar_break.sound.json",
+			"recipe_hash": "sha256:0dd357b134b99129b57e66421f9590276b8d9ce0d68e507181364120d03c0ae8",
+			"audio_hash": "sha256:2edac46d3dc7310b9167befd1edd7e0df598cdc3c6478f88c8196bf7b9caebd9",
+			"loudness": -16.8,
+			"peak": -3.3
+		}
+	]
+}

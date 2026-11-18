@@ -1,0 +1,75 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "boss",
+	"seconds": 0.45,
+	"vary": {
+		"pitch": 0.02,
+		"time": 0.05,
+		"seed": 61
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 95,
+				"to": 34
+			},
+			"length": 0.36,
+			"drive": 2.6,
+			"amp": {
+				"attack": 0.012,
+				"shape": "perc",
+				"power": 1.6
+			},
+			"gain": -2
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1800,
+				"to": 320,
+				"q": 1.1
+			},
+			"start": 0.004,
+			"length": 0.4,
+			"drive": 2.6,
+			"amp": {
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 1.0
+			},
+			"gain": -6
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 700,
+				"to": 90
+			},
+			"filter": {
+				"type": "band",
+				"from": 1500,
+				"q": 1.3
+			},
+			"start": 0.015,
+			"length": 0.42,
+			"drive": 1.8,
+			"amp": {
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 0.9
+			},
+			"gain": -9
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.25,
+			"size": 1.1
+		}
+	},
+	"notes": "The broom slamming into a wall: a heavy low thump with a dry crunch of wood and straw splintering on it, and grit rattling off after."
+}

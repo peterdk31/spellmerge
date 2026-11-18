@@ -123,7 +123,7 @@ Not kept here any more: each question is an issue labelled `owner-question` (doc
 
 Sounds the game asks for by id and does not have yet. A missing sound is silent (`Registry.get_sound` returns `null`), never an error. Claude makes each one itself (synthesised from code) or the owner commissions it; a player's suggestion for one comes in through the intake. Files are `.ogg` in `audio/`, listed in `audio/manifest.json`; the id is the file name without the extension.
 
-- **`possess`** (actors G9). A possession starting: Feel plays it on `possess_started` (the `possess_start` cue's sound), and the `possess` card names it; silent until the `.ogg` exists. A short, eerie swell or reversed whoosh, under 0.5 s, that says "someone else drives this body now", clearly apart from `cast` and `hit`. Rare (a dear card, one possession per cast), so it may stand out more than the cast sound.
+None today: every id the game names has its file (sound plan AU6, docs/milestones/sound.md). A new id ships with its sound.
 
 ## Foundation
 

@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/enemy_materialize/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
+			"recipe_hash": "sha256:451c47484b208f7c85cdaea74318fa768f9218578c6c892f2d54523057e35135",
+			"audio_hash": "sha256:f16043480500c895df88fdfe64b10ed3b93ed3b9a009976ba0725941fe7703f2",
+			"loudness": -21.9,
+			"peak": -9.4
+		},
+		{
+			"path": "audio/sfx/enemy_materialize/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
+			"recipe_hash": "sha256:451c47484b208f7c85cdaea74318fa768f9218578c6c892f2d54523057e35135",
+			"audio_hash": "sha256:c6f06ac15566edf6836e7c7b1461eedbf3c9e78541f6cff5df65c337d9d05860",
+			"loudness": -21.8,
+			"peak": -8.9
+		},
+		{
+			"path": "audio/sfx/enemy_materialize/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
+			"recipe_hash": "sha256:451c47484b208f7c85cdaea74318fa768f9218578c6c892f2d54523057e35135",
+			"audio_hash": "sha256:986f1518e402b7f980489a19dd9b465b83484790d7e86ca584437bc5d02f7c47",
+			"loudness": -22.2,
+			"peak": -9.3
+		},
+		{
+			"path": "audio/sfx/enemy_materialize/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
+			"recipe_hash": "sha256:451c47484b208f7c85cdaea74318fa768f9218578c6c892f2d54523057e35135",
+			"audio_hash": "sha256:1519df7d8340d24f6308898ef0b3f86cfd655d9f6680acf0cd33e040079a668d",
+			"loudness": -22.1,
+			"peak": -9.3
+		}
+	]
+}

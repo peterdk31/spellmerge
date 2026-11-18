@@ -17,8 +17,9 @@
 9. **A hash check:** a test flags an `.ogg` whose recipe changed without a rebake.
 10. **Auditioning:** an in-game sound room, and a contact-sheet `.ogg` on each PR.
 11. **A new `core/audio` service** for what is shared (buses, ducking, volumes, UI sounds, variants).
-12. **The first batch is the core combat set:** `cast`, `hit`, `enemy_death`, `player_downed`, `revive`, `heal` and the fourteen reactions.
-13. **Tier `good`** in the manifest; the owner promotes a sound to `final` after listening.
+12. **One central place:** every player and all playback machinery are in `core/audio`; Feel only decides what plays (section 5).
+13. **The first batch is the core combat set:** `cast`, `hit`, `enemy_death`, `player_downed`, `revive`, `heal` and the fourteen reactions.
+14. **Tier `good`** in the manifest; the owner promotes a sound to `final` after listening.
 
 The steps are **AU1 to AU9** (AU for audio). Each is one PR with its tests, in order.
 
@@ -51,7 +52,7 @@ audio/sfx/<id>/             a sound: <id>.sound.json, <id>.tres, variants/1.ogg 
 audio/music/<track>/        a track: <track>.score.json, one .ogg per layer
 content/<...>/sounds/<id>/  a sound of one content item, the same shape, listed in that folder's assets.json
 
-core/audio/                 the Audio service (AU3): buses, volumes, ducking, UI sounds
+core/audio/                 the Audio service (AU3): every voice, held sound and music player, buses, volumes, ducking
 default_bus_layout.tres     Master > Music, SFX (> Boss), UI
 ```
 
@@ -123,16 +124,39 @@ The tool writes `<id>.tres`, an `AudioStreamRandomizer` naming `variants/1.ogg` 
 - **Notes:** note names with octaves, `.` for a rest, `-` to hold, `x` for a hit. A pattern is one bar per eight steps by default, or `steps` sets it. Velocity and swing are optional keys. The sequencer is small on purpose; anything more is a patch.
 - The plan's honest limit stands (docs/PLAN.md, "Art and music"): this music is `good` until the owner says otherwise, and a commissioned soundtrack may replace it, id for id.
 
-### 5. The Audio service (`core/audio`)
+### 5. The Audio service (`core/audio`): every way of playing a sound
 
-`core/audio/audio.gd`, autoload `Audio`, is view only, has no tick and is not hashed. It holds what more than one area needs:
+**The owner (2026-11-18):** "You should move Feel's audio stuff into the new Audio service. One central place for all audio related functions."
 
-- **Buses:** `default_bus_layout.tres` (project root, set in `project.godot`), Master > `Music`, `SFX` > `Boss`, and `UI`. `Audio.BUS_MUSIC`, `BUS_SFX`, `BUS_BOSS` and `BUS_UI` are the names, so nobody writes a bus as a string. Feel's `Sounds` puts its voices on `SFX` (a cue may say `bus: boss`), `Music` its players on `Music`, and the boss intro's sound on `Boss`.
-- **Volumes:** three machine settings, Music, SFX and UI (0 to 100%, plus mute), in `core/settings` beside the others and saved with them. They are a machine's, not a run's rules: they change nothing in the simulation. The pause menu's settings page shows them (AU8).
-- **Ducking:** `Events.music_duck_requested(decibels, seconds)` (core/events, new). Audio lowers the Music bus by the most asked for, and lets it back up over 0.3 s once the seconds are out. A cue asks for it with a new key, `duck: -6.0`, read by Feel when it plays the cue's sound, so a reaction or a boss's slam ducks the music through data. No sound names the music.
-- **UI sounds:** `Events.ui_sound_requested(id)` (new). Audio plays it on the UI bus on one of four `AudioStreamPlayer` voices (not placed, not paused with the tree), at most one per id per frame. The HUD sends the event and never touches a player.
-- **Panning:** a gentle pan by place, set as `audio/general/2d_panning_strength` (0.5) in `project.godot`, so a sound at the screen's edge is mostly, never wholly, on one side. Feel's voices keep their attenuation by distance.
-- Feel keeps its world voices, held sounds and music. They are the world's (placed at bodies, paused with the tree), and moving them is a refactor with no gain. Audio gives them their buses and the variant length. The two areas meet only through core (constants and events).
+`core/audio/` (autoload `Audio`) is view only, has no tick and is not hashed. It is the only code in the game that makes or drives an `AudioStreamPlayer`. Everything else asks it. The line between it and Feel is **how against what**:
+
+- **Audio knows how to play.** That means voices, caps, held slots and fades, music layers, buses, volumes, ducking, variants and panning. It knows nothing of bodies, spells, cues, phases or rooms: a held sound follows a `Node2D` it is handed, and ends when it is told to, when its seconds run out or when that node leaves the tree.
+- **Feel decides what to play and when.** It reads a hit's or a cue's sound and its `duck`, caps a frame's hit sounds, picks the body to follow, lets a held sound go when its wind-up or carrier ends (`Spells.is_winding`, `end_carrier`; read by Feel each frame), and picks the boss's music from its phase (`body_sounds.gd`). These are gameplay facts, and core never depends on gameplay.
+
+**What moves (AU3):**
+
+| Now | In `core/audio/` |
+| --- | --- |
+| `gameplay/feel/sounds.gd`: the one-shot voices, `PER_SOUND`, oldest-first stealing | `voices.gd`: `play(id, at, volume, bus) -> int`, `stop(voice)` |
+| `sounds.gd`: the held slots, follow, fade, `HELD_SLOTS` | `held.gd`: `hold(id, follow, at, seconds, volume, bus) -> int` (a handle), `release(handle)`, `release_all()`. The `Until` kinds, `end_carrier` and `release(caster, until)` stay in Feel, as a small `held_sounds.gd` that maps a caster and key to Audio's handles. |
+| `gameplay/feel/music.gd`: layers, intensity, crossfade | `music.gd`: `play_track(track, intensity)`, unchanged in behaviour |
+| `gameplay/feel/boss_intro_sound.gd`'s own players | Audio's **unpaused lane**: `play(..., bus = BUS_BOSS)` on voices that keep playing while the tree is paused. Feel's node keeps the timing (the dark and reveal cues), with no player of its own. |
+| `gameplay/player/player.gd`'s `_sound_player` (the cast sound, in a simulation area) | Feel hears `spell_cast` and calls `Audio.play(&"cast", ...)`, so the player has no player. |
+| `tests/gameplay/feel/test_feel_sounds.gd` | split into `tests/core/audio/` (the machinery) and a Feel test for the decisions (`Until`, the hit cap, the body followed) |
+
+**Two lanes.** World sounds (one-shots, held sounds, music) are paused with the tree, as now, under a pausable child of Audio. The **over** lane (UI sounds, the boss intro) never pauses. A world voice is an `AudioStreamPlayer2D`, so it pans and falls off by its place from the picture's middle, as now. An over voice is a plain `AudioStreamPlayer`. Feel calls `Audio.clear_world()` where it clears its own sounds now (a room's or a run's end).
+
+**How it is reached.** Feel and the sound room are handed Audio as Feel is handed the registry now (`audio: Node`, set where Feel is made), so tests can use their own. The HUD never calls it: it sends `Events.ui_sound_requested(id)` (core/events, new), and Audio hears it. The simulation never reaches it, and `test_sim_rules` gains a line that names any `Audio` or `AudioStreamPlayer` in a simulation folder.
+
+**What Audio adds:**
+
+- **Buses:** `default_bus_layout.tres` (project root, named in `project.godot`): Master > `Music`, `SFX` > `Boss`, and `UI`. `Audio.BUS_MUSIC`, `BUS_SFX`, `BUS_BOSS` and `BUS_UI` are the names, so no other script writes a bus name. A cue may say `bus: boss`.
+- **Volumes:** three machine settings, Music, SFX and UI (0 to 100%, plus mute), in `core/settings` beside the others and saved with them. They are the machine's, not a run's rules, because they change nothing in the simulation. The pause menu's settings page shows them (AU8).
+- **Ducking:** `Audio.duck(decibels, seconds)`. It lowers the Music bus by the most asked for, and lets it back up over 0.3 s once the seconds are out. A cue asks for it with a new key, `duck: -6.0`, which Feel passes on when it plays the cue's sound. A reaction or a boss's slam ducks the music through data.
+- **UI sounds:** four over-lane voices on the UI bus, at most one per id per frame.
+- **Variants:** `Audio.length(stream)` is a randomizer's longest variant, which the voices use to hold a voice (section 3).
+- **Panning:** a gentle pan by place, set as `audio/general/2d_panning_strength` (0.5) in `project.godot`, so a sound at the screen's edge is mostly, never wholly, on one side.
+- **Nothing is allocated per play:** every voice is made in `_ready`, as Feel's are now.
 
 ### 6. Loudness and the manifest
 
@@ -151,7 +175,7 @@ The tool writes `<id>.tres`, an `AudioStreamRandomizer` naming `variants/1.ogg` 
 ### 7. Auditioning
 
 - **The contact sheet:** `tools/sound.py sheet <ids or a family>` writes one `.ogg` into the scratchpad (never committed): each sound's variants in turn with a gap, then four of it at once (four players), then the family together. It is attached to the PR, and the owner listens there.
-- **The sound room** (`tools/sound_room.tscn`, run with `godot --path . res://tools/sound_room.tscn`, a `tools/` scene, never in a build): every sound id the game names (read from the cues, the enemies, `MusicTrack`s and `preset.hit_sound` through the registry) beside every id that has a file. Missing ones are shown red, and so are ids with a file that nothing names. A row plays the sound (each press a new variant) on its bus, or loops a held sound. A music track has a slider for its intensity, through the real `music.gd`. The bus volumes and a duck button are on the side. It is a check of the real game path, not a second synth.
+- **The sound room** (`tools/sound_room.tscn`, run with `godot --path . res://tools/sound_room.tscn`, a `tools/` scene, never in a build): every sound id the game names (read from the cues, the enemies, `MusicTrack`s and `preset.hit_sound` through the registry) beside every id that has a file. Missing ones are shown red, and so are ids with a file that nothing names. A row plays the sound (each press a new variant) on its bus, or loops a held sound. A music track has a slider for its intensity, through Audio's real `music.gd`. The bus volumes and a duck button are on the side. It is a check of the real game path, not a second synth.
 
 ## Steps
 
@@ -159,7 +183,7 @@ The tool writes `<id>.tres`, an `AudioStreamRandomizer` naming `variants/1.ogg` 
 | --- | --- | --- |
 | **AU1** | This document; docs/STYLE.md "Sound" (targets, families, jitter); the ROADMAP line. | The owner approves. |
 | **AU2** | **The tool.** `tools/sound.py` (`bake`, `sheet`, `check`), `sound_synth.py`, `sound_meter.py`, the recipe validator, the manifest writer and the hash test. Golden examples: the AU1 interview's three modern-synth samples remade as recipes (a whoosh, a fire hit, a glass ping), the meter against reference tones, a held loop's seam, a recipe's unknown key. `tools/README.md` is updated. | `python3 -m unittest discover -s tools` passes, and the three recipes bake and sound as the samples did. |
-| **AU3** | **The game's side.** `core/audio` (buses, volumes, ducking, UI sounds, `length`), `default_bus_layout.tres`, the panning setting, `Registry` `.tres` sounds and `variants/`, Feel's voices and music on buses, a cue's `duck`, and the cast sound moved from `gameplay/player` to Feel. `audio/README.md` (the new shape, its example) and `core/README.md` are updated. | Tests: buses and volumes, the duck's most-wins and let-up, the UI voice cap, the registry with variants and the clash, a randomizer's length in `Sounds`, the cast sound on `spell_cast` from Feel and none from player.gd (`test_sim_rules` still clean). |
+| **AU3** | **The Audio service.** `core/audio` with Feel's voices, held slots and music moved into it (section 5's table), the boss intro's and the player's players gone, two lanes, buses (`default_bus_layout.tres`), volumes, `duck`, UI sounds, `length`, the panning setting, `Registry` `.tres` sounds, content `sounds/` and `variants/`, and a cue's `duck` and `bus`. A move first, with no change in what is heard, then the additions. `audio/README.md` (the new shape, its example), `core/README.md` and `gameplay/feel/README.md` are updated. | `test_feel_sounds.gd`'s cases pass, split between `tests/core/audio/` and Feel. New tests: buses and volumes, the duck's most-wins and let-up, the UI voice cap, the over lane playing while paused, the registry with variants and the clash, a randomizer's length, the cast sound coming from Feel on `spell_cast`, and `test_sim_rules` naming audio in a simulation folder. |
 | **AU4** | **The sound room.** | It lists all 38 named ids red, then plays AU2's examples on the right buses. |
 | **AU5** | **The core combat set:** `cast`, `hit`, `enemy_death`, `player_downed`, `revive`, `heal`, and `reaction_` + `current`, `discharge`, `douse`, `drown`, `flare`, `kindle`, `overload`, `rift`, `rime`, `shatter`, `squall`, `stillness`, `superconduct`, `thaw`. Patches shared by element (fire, frost, storm, void, water). | The contact sheet is on the PR, the owner has listened to it, and their changes are made. A four-player bot fight is recorded with sound. |
 | **AU6** | **The rest of the effects, and held loops:** the Old Broom's sheet (docs/milestones/boss-old-broom.md, "Sound"), props (`pillar_*`, `dust_*`), `parry`, `deflect`, `shield_block`, `possess`, `enemy_spawn`/`materialize`, `room_start`, `self_hit`, `boss_intro`, and the held loops. | As AU5, and every held loop is heard looping in the sound room for 30 s with no click. |
@@ -170,7 +194,7 @@ The tool writes `<id>.tres`, an `AudioStreamRandomizer` naming `variants/1.ogg` 
 ## Rules for every step
 
 - **View only.** Nothing under `core/audio`, the tool or Feel's sounds is read by the simulation. Sound never waits on anything and never makes anything wait.
-- **No allocation per play.** Voices are made once (Audio's four UI voices, Feel's as now). A play sets a stream and plays.
+- **No allocation per play.** Every voice is Audio's, made once. A play sets a stream and plays.
 - **Names are ours.** A recipe's `notes` describe the sound in plain words. No recipe, patch or note names another work, artist or franchise.
 - **Smooth sound:** no click at a start, an end, a loop or a duck. Every change of level is a ramp (docs/STYLE.md, "Smooth", for the ear).
 - **Every id the game names has a file by AU7's end,** and the sound room shows none red. After that, a new id ships with its sound.

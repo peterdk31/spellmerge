@@ -36,6 +36,8 @@ A sixteenth, planned with the owner on 2026-11-16: **the boss intro**, a screen-
 
 A seventeenth, planned with the owner on 2026-11-16 and approved the same day: **the crypt rework**, the Vaults: every crypt room a floating slab of quiet cool flagstones in the dark, drawn from a shape as the hub is, with warm light against the dark, a landmark a room, pits (holes), gates for exits and pillars as props that crumble ([crypt-rework.md](milestones/crypt-rework.md), phase CR). The sandbox goes with it, its showcase staffs on the hub's rack. One session a step, each merged before the next. **Done 2026-11-17:** all five rooms are floating slabs (CR3 to CR7), the gate and the crypt pillar built (CR-G), the sandbox gone (CR-S).
 
+An eighteenth, planned with the owner on 2026-11-18: **sound**, a generator for every sound the game asks for: Python recipes in `tools/` baked into committed `.ogg` files in a modern synthesised style (effects with variants the game jitters, seamless held loops, music from a pattern sequencer with layers of one length), a view-only `core/audio` service for buses, volumes, ducking and UI sounds, loudness targets in docs/STYLE.md, a hash check that every sound matches its recipe, and a sound room to audition them ([sound.md](milestones/sound.md), phase AU). It fills the 38 silent ids the game already names, the core combat set first. Waiting for the owner's approval.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

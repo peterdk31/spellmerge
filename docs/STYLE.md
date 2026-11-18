@@ -129,6 +129,26 @@ Everything should look smooth (the owner, 2026-11-16). Nothing on screen changes
 
 The art only shows timing; it doesn't set it. The telegraph's length and the moment damage lands are set by the AI and the scene (the telegraph frames can be held longer there; 0.25 s is only the shortest), never by the animation.
 
+## Sound
+
+The game's sound is synthesised from code in a modern style (the owner, 2026-11-18; docs/milestones/sound.md): filtered-noise whooshes, roaring fire with crackles, bell-like inharmonic glass, FM shimmer, a little room reverb. It is never thin 8-bit beeps, and never imitates a recording of a real thing.
+
+- **Format:** `.ogg` (Vorbis), 44.1 kHz, mono for effects and UI, mono or stereo for music, at most 5 MB.
+- **No clicks:** every sound starts and ends at silence (a 2 ms ramp at least). A loop folds its tail over its start, and a duck ramps.
+- **Pleasant on the hundredth listen.** A sound heard every few seconds (cast, hit) is short, soft at the top and has its variants. It never sounds like one file four times when four players do the same thing.
+- **Each element has a voice,** shared through patches (`audio/patches/`): fire roars and crackles, frost is glass, storm is a crackle and a zap, void is a low, hollow swell, water is a soft wash. A reaction mixes its two elements' voices.
+
+| Family | Loudness (LUFS) | True peak | Variants | Pitch jitter | Volume jitter |
+| --- | --- | --- | --- | --- | --- |
+| `combat` (cast, hit, small effects) | -20 short-term | -3 dBTP | 4 | ±4% | ±1.5 dB |
+| `big` (reactions, deaths, downed, revive) | -17 short-term | -2 dBTP | 3 | ±3% | ±1 dB |
+| `boss` (the boss's moves, intro, slams) | -15 short-term | -1 dBTP | 3 | ±2% | ±1 dB |
+| `held` (loops) | -24 integrated | -6 dBTP | 1 | none | none |
+| `ui` | -24 short-term | -6 dBTP | 2 | ±2% | none |
+| `music` (all layers together) | -18 integrated | -1 dBTP | 1 | none | none |
+
+Short-term is the loudest 400 ms; integrated is the whole file, gated (BS.1770). The bake fails a sound more than 1 LU outside its family's target unless its recipe places it with `gain` and a note. These numbers are a first tuning; the owner changes them by ear.
+
 ## File formats
 
 - Art is `.png` or `.svg` (`AGENTS.md`, hard rule 2), at most 1 MB.

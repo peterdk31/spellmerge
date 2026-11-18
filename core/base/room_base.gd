@@ -49,6 +49,14 @@ extends Resource
 ## it, a pixel is its art times `ambient` times this, channel by channel, so warm light falls on a
 ## cool dark. White (the default) is an even dark, as `ambient` alone. Drawn only with spell light.
 @export var shade: Color = Color.WHITE
+## What drifts in the room's air (docs/milestones/atmosphere.md, B): a `MoteSource` given off over
+## the whole room by Feel (gameplay/feel/air_motes.gd), its `rate` the motes a second for every
+## AIR_AREA square pixels of the room in view, from anywhere in it, each shown `height` px over a
+## point of the floor, thrown its `way` within its `spread`, in its `colours`; its `from`, `at`,
+## `size` and the rest of where a source leaves from are not read. Its kind is usually lit only
+## (`MoteKind.lit_only`: the crypt's dust, seen only in a candle's pool, a wizard's light or a
+## passing spell's). Null (the default): nothing drifts, the room is as it was. Drawn only.
+@export var air: MoteSource = null
 ## Whether its biome's cover kinds fill its open floor by themselves (ground cover GC2,
 ## `CoverLayout.of`: each `CoverKind` whose `biomes` names its `biome`). Off: only its fields
 ## (`CoverField`) put cover in it.
@@ -77,6 +85,8 @@ const HOLE_LAYER: int = 2
 ## The z of a layout's `Floor` sprite: under Feel's floor marks (one above it) and under the
 ## bodies (0), so a mark lies on the floor and never over anyone.
 const FLOOR_Z: int = -2
+## The floor `air`'s rate is for: a second's motes for every 100 x 100 px of the room in view.
+const AIR_AREA: float = 10000.0
 
 ## `surface_colors()`, `floor_colors()` and `places()` once worked out (empty until then).
 var _surface: PackedColorArray = PackedColorArray()
@@ -107,6 +117,20 @@ func template_problems(known: Array[StringName]) -> PackedStringArray:
 			found.append("%s: kind '%s' is no room kind." % [id, kinds[at]])
 	if music != null:
 		found.append_array(music.problems(String(id)))
+	found.append_array(air_problems())
+	return found
+
+
+## What is wrong with its `air`, one line each (empty when it is fine or there is none): a source's
+## own problems, with no art to take colours from.
+func air_problems() -> PackedStringArray:
+	var found := PackedStringArray()
+	if air == null:
+		return found
+	for problem in air.problems(false):
+		found.append("%s's air: %s" % [id, problem])
+	if air.stand:
+		found.append("%s's air: the air's motes are given off, never standing" % id)
 	return found
 
 

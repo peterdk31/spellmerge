@@ -33,6 +33,9 @@ extends Node
 ## - **Carried lights** (docs/milestones/atmosphere.md, A): the lights that move with a body (a
 ##   wizard's staff tip), spot rows its owner writes each frame (gameplay/feel/carried_lights.gd)
 ##   and hands over (`light_carried`); this node knows nothing of who carries them.
+## - **What draws by the light** (docs/milestones/atmosphere.md, B): `buffer` hands the light
+##   buffer's texture over (the spectacle gives it to the motes, whose lit-only kinds read it);
+##   this node knows nothing of what reads it.
 ## - **Applying it:** one rect over the whole world at `z` (Feel's LIGHT_Z: above the room and the
 ##   bodies, under the motes, beams, flashes, telegraphs and shots), drawn by
 ##   `light_apply.gdshader`: what is under it, times the room's `ambient` (`RoomBase.ambient`,
@@ -271,6 +274,13 @@ func follow() -> void:
 		viewport.size = wanted
 	var scale := Vector2(float(wanted.x) / maxf(size.x, 1.0), float(wanted.y) / maxf(size.y, 1.0))
 	viewport.canvas_transform = Transform2D(0.0, scale, 0.0, Vector2.ZERO) * view.global_canvas_transform * view.canvas_transform
+
+
+## The light buffer's texture (the light round everything this frame, the view a DOWNSCALE-th
+## the size), for what draws by the light (the motes' lit-only kinds; docs/milestones/atmosphere.md,
+## B): handed over, nothing asked of them.
+func buffer() -> Texture2D:
+	return viewport.get_texture()
 
 
 ## The room's light where nothing lights it (`RoomBase.ambient`; 1.0 the room as it is), and the

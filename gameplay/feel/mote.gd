@@ -41,6 +41,11 @@ extends Node2D
 ## (P2b): a kind that names a floor mark (`MoteKind.settles`) leaves it where each of its motes
 ## comes to rest, at that time (`settle_into` names the mark layer; `Marks.settle` keeps it until
 ## then; SETTLE_ROWS a frame in a flood).
+##
+## **Lit-only kinds** (`MoteKind.lit_only`; docs/milestones/atmosphere.md, B: a room's dust in the
+## air) are drawn only where light falls: the shader reads the light buffer it is handed
+## (`set_light`, the spell light's, from the spectacle) under each of their pixels, and with none
+## (spell light off) does not draw them.
 
 const SHADER: Shader = preload("res://gameplay/feel/mote.gdshader")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
@@ -111,9 +116,10 @@ const SETTLE_ROWS: int = 24
 const SETTLE_MOST: int = 128
 ## The most kinds the shader holds (rows of its `kind_table`), and the table's texels a row: the
 ## motion (gravity, drag, bounce, glow), the sway (sway, its rate, first shade, reach) and the
-## shape (frames, play, rate, turns).
+## shape (frames, play, rate, turns) and the light (1 for a lit-only kind, `MoteKind.lit_only`, and
+## its darkest shade drawn, `lit_darkest`).
 const MAX_KINDS: int = 256
-const KIND_COLUMNS: int = 3
+const KIND_COLUMNS: int = 4
 ## Rows of the ramp table (colours other than a spell's), and its shades a row.
 const RAMPS: int = RampTableScript.ROWS
 const SHADES: int = RampTableScript.SHADES
@@ -231,6 +237,8 @@ var _settle_marks: PackedInt32Array = PackedInt32Array()
 var _shape_image: Image = null
 var _kind_image: Image = null
 var _material: ShaderMaterial = null
+## The light buffer lit-only kinds read (`set_light`; null: none).
+var _light: Texture2D = null
 var _mesh: ArrayMesh = null
 var _z: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -396,6 +404,20 @@ func _turns_of(present: int, own_layers: int) -> int:
 ## How many motes the ring holds.
 func cap() -> int:
 	return _cap
+
+
+## The light buffer the lit-only kinds (`MoteKind.lit_only`) read (the spell light's, handed over
+## by the spectacle; docs/milestones/atmosphere.md, B), or null with spell light off: then they
+## are not drawn.
+func set_light(buffer: Texture2D) -> void:
+	_light = buffer
+	_material.set_shader_parameter(&"light_buffer", buffer)
+	_material.set_shader_parameter(&"light_on", buffer != null)
+
+
+## The light buffer the lit-only kinds read (null: none, they are not drawn; for tests).
+func light() -> Texture2D:
+	return _light
 
 
 ## The kinds, in the order the rows name them.
@@ -1080,6 +1102,7 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 		_kind_image.set_pixel(0, k, Color(kind.gravity, kind.drag, kind.bounce, kind.glow))
 		_kind_image.set_pixel(1, k, Color(kind.wobble, kind.wobble_rate, float(kind.shade_from), float(reach_of(kind))))
 		_kind_image.set_pixel(2, k, Color(float(frames), float(MoteKind.SHAPE_PLAYS.find(kind.shape_play)), kind.shape_rate, 1.0 if kind.shape_turns else 0.0))
+		_kind_image.set_pixel(3, k, Color(1.0 if kind.lit_only else 0.0, float(kind.lit_darkest), 0.0, 0.0))
 		for frame in frames:
 			var pixels: PackedByteArray = kind.shape_pixels(frame)
 			for y in size:

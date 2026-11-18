@@ -39,6 +39,7 @@ const StillMotesScript := preload("res://gameplay/feel/still_motes.gd")
 const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")
 const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 const CarriedLightsScript := preload("res://gameplay/feel/carried_lights.gd")
+const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's SHOWN_BEAM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -138,6 +139,9 @@ var _ramp_table: RampTableScript = RampTableScript.new()
 ## What the world's things give off as their art (`source_motes.gd`, `MoteSource`: the hub's island
 ## edge, a prop's embers and glimmers; props W7), and the standing motes of its masks.
 var source_motes: SourceMotesScript = SourceMotesScript.new(_ramp_table)
+## What drifts in the room's air (`air_motes.gd`, `RoomBase.air`; atmosphere B), given off while
+## motes are thrown and spell light is on (its dust is lit only: with no light it would be unseen).
+var air: AirMotesScript = AirMotesScript.new(_ramp_table)
 var _standing: PlacedMotesScript = null
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
 ## and their source in the ramp table (-1 for none).
@@ -237,7 +241,9 @@ func step(now: float, table: ActorsScript = null) -> void:
 	else:
 		jets.clear()
 	_drawn_motes()
-	source_motes.give_off(now, pool if motes_on() else null, view_rect(), _standing)
+	var view: Rect2 = view_rect()
+	source_motes.give_off(now, pool if motes_on() else null, view, _standing)
+	air.give_off(now, pool if motes_on() and light != null else null, view, projectiles.bounds() if projectiles != null else Rect2())
 	if barriers != null:
 		barriers.step(now, pool if motes_on() else null, table, projectiles)
 	if pool != null:
@@ -784,6 +790,8 @@ func use_motes(motes: MotesScript) -> void:
 		pool.settle_into(marks)
 		# A spell's motes in each of its infusions' colours (`Motes.set_infusions`).
 		pool.set_infusions(InfusionTable.of_registry(registry))
+		# Its lit-only kinds read the spell light's buffer (atmosphere B).
+		pool.set_light(light.buffer() if light != null else null)
 	cards.use_motes(pool)
 	if pool != null:
 		pool.use_cards(cards if pool.has_card_kinds() else null)
@@ -876,6 +884,9 @@ func _make_light(on: bool) -> void:
 		light.name = "SpellLight"
 		light.set_ambient(ambient, shade)
 		add_child(light)
+	# The motes' lit-only kinds read the light buffer, or with none are not drawn (atmosphere B).
+	if pool != null:
+		pool.set_light(light.buffer() if light != null else null)
 
 
 ## Feel's flash rows, just uploaded (the flares', the explosions' and the arcs'; `slots` rows
@@ -909,16 +920,16 @@ func view_rect() -> Rect2:
 
 # --- The room ------------------------------------------------------------------------------------
 
-## A new room: its colours for its walls' motes (`RoomBase.surface_colors`) and its ambient light
-## (`RoomBase.ambient`, P3b; and its dark's colour, `RoomBase.shade`).
+## A new room: its colours for its walls' motes (`RoomBase.surface_colors`), its ambient light
+## (`RoomBase.ambient`, P3b; and its dark's colour, `RoomBase.shade`) and its air (`RoomBase.air`).
 func _on_room_entered(room_id: StringName) -> void:
 	use_room(registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null)
 	# The room's world is in the tree by now: its mote sources are read again (each from now).
 	source_motes.take(get_tree() if is_inside_tree() else null)
 
 
-## The room `room` (null for none) is the one played in now: its walls' colours and motes, and its
-## ambient light (`room_entered` calls this; tests too).
+## The room `room` (null for none) is the one played in now: its walls' colours and motes, its
+## ambient light and its air (`room_entered` calls this; tests too).
 func use_room(room: RoomBase) -> void:
 	# A jet poured in the room before ends with it.
 	jets.clear()
@@ -927,6 +938,7 @@ func use_room(room: RoomBase) -> void:
 	_take_surface_kinds()
 	ambient = room.ambient if room != null else 1.0
 	shade = room.shade if room != null else Color.WHITE
+	air.use(room.air if room != null else null)
 	if light != null:
 		light.set_ambient(ambient, shade)
 	_surface_source = _ramp_table.source(_surface_colors)

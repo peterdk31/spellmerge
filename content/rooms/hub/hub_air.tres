@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MoteSource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+kind = &"air_glimmer"
+rate = 3.0
+way = Vector2(0, -1)
+spread = 360.0
+reach = 0.0
+height = 16.0
+colours = Array[StringName]([&"ice", &"bone"])

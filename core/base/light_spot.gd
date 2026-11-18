@@ -30,6 +30,10 @@ extends RefCounted
 const GROUP: StringName = &"light_spot"
 ## The group of the light painted into a room's art, which the spots' light takes the place of.
 const PAINTED: StringName = &"painted_light"
+## The group of a shadow a body's own look draws under it (a staff's soft shadow), which the bodies'
+## cast shadows take the place of while spell light is on (docs/milestones/atmosphere.md, C;
+## gameplay/feel/body_shadows.gd), as the spots' light takes the painted light's.
+const DRAWN_SHADOW: StringName = &"drawn_shadow"
 ## The metadata keys and what each is when it is missing.
 const REACH: StringName = &"light_reach"
 const STRENGTH: StringName = &"light_strength"

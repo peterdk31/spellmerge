@@ -40,6 +40,8 @@ const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")
 const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 const CarriedLightsScript := preload("res://gameplay/feel/carried_lights.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
+const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
+const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's SHOWN_BEAM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -132,7 +134,14 @@ var shade: Color = Color.WHITE
 ## The lights the wizards carry at their staff tips (atmosphere A), written each frame while the
 ## light is on. Read only.
 var carried_lights: CarriedLightsScript = CarriedLightsScript.new()
+## What blocks the light (atmosphere C): the room's standing walls (from `room_built`) and the props
+## that block light, handed to the spell light whenever they change while it is on. Read only.
+var blockers: LightBlockersScript = LightBlockersScript.new()
+## The bodies' shadows (atmosphere C; null with spell light off), under every body. Read only.
+var shadows: BodyShadowsScript = null
 
+## No owners for a light's rows (the room's spots: nobody carries them).
+var _no_owners: PackedInt32Array = PackedInt32Array()
 ## The ramp table the motes and the floor marks share: a surface's colours and a body's art, one
 ## row each, so a mote and the mark it leaves read the same colours.
 var _ramp_table: RampTableScript = RampTableScript.new()
@@ -174,6 +183,7 @@ func _ready() -> void:
 	ShaderWarmupScript.want(SpellLightScript.LIGHT_SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
 	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
+	ShaderWarmupScript.want(BodyShadowsScript.SHADER, ShaderWarmupScript.BATCH)
 	_make_motes(mote_cap)
 	barriers = BarriersScript.new(MOTE_Z)
 	barriers.name = "Barriers"
@@ -191,6 +201,7 @@ func _ready() -> void:
 	events.spell_light_changed.connect(set_spell_light)
 	events.room_entered.connect(_on_room_entered)
 	events.room_entered.connect(_fit_marks)
+	events.room_built.connect(_on_room_built)
 	events.floor_marks_changed.connect(set_floor_marks)
 	events.projectile_impact.connect(_on_impact)
 
@@ -254,6 +265,13 @@ func step(now: float, table: ActorsScript = null) -> void:
 		light.step_cues(now)
 		carried_lights.step(table, now)
 		light.light_carried(carried_lights.rows, carried_lights.count)
+		if blockers.step(table, now):
+			light.set_blockers(blockers.boxes, blockers.bodies, blockers.count)
+	if shadows != null and light != null:
+		shadows.begin_lights()
+		shadows.add_lights(light.spot_rows(), light.spot_count(), SpellLightScript.SPOT_ROW_STRENGTH, _no_owners)
+		shadows.add_lights(carried_lights.rows, carried_lights.count, SpellLightScript.SPOT_ROW_STRENGTH, carried_lights.owners)
+		shadows.step(table, now, view, blockers)
 
 
 ## The barrier on `actor` changed (combat's `barrier_changed`; `ramp` the actor's): its shell, in
@@ -879,11 +897,20 @@ func _make_light(on: bool) -> void:
 		remove_child(light)
 		light.queue_free()
 		light = null
+	if shadows != null:
+		remove_child(shadows)
+		shadows.queue_free()
+		shadows = null
 	if on and projectiles != null:
 		light = SpellLightScript.new(projectiles, LIGHT_Z)
 		light.name = "SpellLight"
 		light.set_ambient(ambient, shade)
 		add_child(light)
+		# What blocks it is handed over at the next step (atmosphere C), and the bodies' shadows come
+		# with it, under every body.
+		blockers.refresh()
+		shadows = BodyShadowsScript.new(MARK_Z)
+		add_child(shadows)
 	# The motes' lit-only kinds read the light buffer, or with none are not drawn (atmosphere B).
 	if pool != null:
 		pool.set_light(light.buffer() if light != null else null, SpellLightScript.lit_steps())
@@ -919,6 +946,11 @@ func view_rect() -> Rect2:
 
 
 # --- The room ------------------------------------------------------------------------------------
+
+## A room was laid out (`room_built`; atmosphere C): its standing walls block the light from now on.
+func _on_room_built(_room_id: StringName, layout_root: Node) -> void:
+	blockers.use_walls(RoomPlaces.wall_rects(layout_root))
+
 
 ## A new room: its colours for its walls' motes (`RoomBase.surface_colors`), its ambient light
 ## (`RoomBase.ambient`, P3b; and its dark's colour, `RoomBase.shade`) and its air (`RoomBase.air`).

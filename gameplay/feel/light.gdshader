@@ -33,6 +33,18 @@ render_mode blend_add, world_vertex_coords;
 // A shot's or a flash's colour is its glow (`look_of` in shot_look.gdshaderinc: its ramp, the
 // enemies' for an enemy shot). The light's shape is soft; light_apply.gdshader cuts what it adds
 // to the world into steps.
+//
+// Light is blocked (docs/milestones/atmosphere.md, C): up to MAX_BLOCKERS boxes, the room's
+// standing walls and the props that block light, handed over by spell_light.gd (`set_blockers`,
+// worked out by gameplay/feel/light_blockers.gd, whose `shade_between` and `lit_as` are this pick in
+// GDScript). A box stops the light between a pixel and the light's middle, unless it holds either
+// end (a wall's own face, a light standing in a prop). A box may have a column drawn over it (a
+// pillar's shaft, `blocker_body`): a pixel there is lit as the floor just in front of the box's
+// base, so the shaft's face is lit by a light before or beside it and not by one behind it (its own
+// box blocks only a light past its back edge); a light whose middle is there (a blast on the shaft)
+// is lit from in front of the base too. How much a box blocks is its strength (it eases out as a
+// pillar crumbles). The vertex stage marks which boxes come near the light (`near`), so a
+// light near none does no more work than before.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
@@ -71,9 +83,118 @@ const float FLASH_SPAN = 0.42;
 // A light spot's flicker: steps a second.
 const float SPOT_RATE = 7.0;
 
+// The boxes that block light (spell_light.gd's `set_blockers`; light_blockers.gd's MAX): each base
+// as x0, y0, x1, y1 (world px), and the column drawn over it as x0, top, x1 and how much it blocks
+// (0 to 1; a top at y0 is no column).
+const int MAX_BLOCKERS = 32;
+uniform int blocker_count = 0;
+uniform vec4 blocker_box[32];
+uniform vec4 blocker_body[32];
+
 // Where in the light the pixel is (-1 to 1 across), and the light's colour.
 varying vec2 spot;
 varying flat vec3 lamp;
+// The pixel in the world, where the light is lit from (its middle, moved out of a column), and the
+// boxes near the light (a bit each).
+varying vec2 world;
+varying flat vec2 lamp_at;
+varying flat uint near;
+
+// Where `p` is lit as: in front of the base of a box whose column it is in, else itself
+// (light_blockers.gd's `lit_as`).
+vec2 lit_as(vec2 p) {
+	for (int k = 0; k < MAX_BLOCKERS; k++) {
+		if (k >= blocker_count) {
+			break;
+		}
+		vec4 box = blocker_box[k];
+		vec4 body = blocker_body[k];
+		if (body.w > 0.0 && body.y < box.y && p.x >= body.x && p.x <= body.z && p.y >= body.y && p.y <= box.w) {
+			return vec2(p.x, box.w + 0.5);
+		}
+	}
+	return p;
+}
+
+bool holds(vec4 box, vec2 p) {
+	return p.x >= box.x && p.x <= box.z && p.y >= box.y && p.y <= box.w;
+}
+
+// Whether the way from `a` to `b` crosses `box` (the slab test).
+bool crosses(vec2 a, vec2 b, vec4 box) {
+	vec2 d = b - a;
+	float t0 = 0.0;
+	float t1 = 1.0;
+	for (int axis = 0; axis < 2; axis++) {
+		float from = axis == 0 ? a.x : a.y;
+		float way = axis == 0 ? d.x : d.y;
+		float low = axis == 0 ? box.x : box.y;
+		float high = axis == 0 ? box.z : box.w;
+		if (abs(way) < 0.0001) {
+			if (from < low || from > high) {
+				return false;
+			}
+		} else {
+			float ta = (low - from) / way;
+			float tb = (high - from) / way;
+			t0 = max(t0, min(ta, tb));
+			t1 = min(t1, max(ta, tb));
+			if (t0 > t1) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+// The box whose column holds `p` (-1: none).
+int column_of(vec2 p) {
+	for (int k = 0; k < MAX_BLOCKERS; k++) {
+		if (k >= blocker_count) {
+			break;
+		}
+		vec4 box = blocker_box[k];
+		vec4 body = blocker_body[k];
+		if (body.w > 0.0 && body.y < box.y && p.x >= body.x && p.x <= body.z && p.y >= body.y && p.y <= box.w) {
+			return k;
+		}
+	}
+	return -1;
+}
+
+// How much of the light at `l` (where it is lit from) is blocked on its way to the pixel `p` (0 to
+// 1; light_blockers.gd's `shade_between`): the strongest box near it that the way crosses and that
+// holds neither end. A pixel in a column is lit as the floor in front of its base (`lit_as`), and
+// its own box blocks only a light behind it (past its base's back edge): the shaft's face is lit
+// from before and beside it, not from behind.
+float shade_between(vec2 p, vec2 l, uint near_bits) {
+	float shade = 0.0;
+	int own = column_of(p);
+	vec2 at = p;
+	if (own >= 0) {
+		at = vec2(p.x, blocker_box[own].w + 0.5);
+		if (l.y < blocker_box[own].y) {
+			shade = blocker_body[own].w;
+		}
+	}
+	for (int k = 0; k < MAX_BLOCKERS; k++) {
+		if (k >= blocker_count) {
+			break;
+		}
+		if (k == own || ((near_bits >> uint(k)) & 1u) == 0u) {
+			continue;
+		}
+		vec4 box = blocker_box[k];
+		float strength = blocker_body[k].w;
+		if (strength <= shade || holds(box, at) || holds(box, l)) {
+			continue;
+		}
+		if (crosses(at, l, box)) {
+			shade = strength;
+		}
+	}
+	return shade;
+}
 
 void vertex() {
 	vec2 corner = UV * 2.0 - 1.0;
@@ -119,6 +240,8 @@ void vertex() {
 			colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * shot_strength * LIGHT_INTENSITY;
 		}
 	}
+	near = 0u;
+	lamp_at = centre;
 	if (half_size.x <= 0.0 || dot(colour, colour) <= 0.0) {
 		// Folded away: no light.
 		VERTEX = vec2(0.0);
@@ -127,10 +250,31 @@ void vertex() {
 		lamp = colour;
 		vec2 across = vec2(-way.y, way.x);
 		VERTEX = centre + way * corner.x * half_size.x + across * corner.y * half_size.y;
+		if (blocker_count > 0) {
+			lamp_at = lit_as(centre);
+			// The boxes (with their columns) that meet the light's square, or hold where it is lit from.
+			float r = length(half_size);
+			vec4 lit = vec4(centre - vec2(r), centre + vec2(r));
+			for (int k = 0; k < MAX_BLOCKERS; k++) {
+				if (k >= blocker_count) {
+					break;
+				}
+				vec4 box = blocker_box[k];
+				vec4 all = vec4(min(box.x, blocker_body[k].x), min(box.y, blocker_body[k].y), max(box.z, blocker_body[k].z), box.w);
+				if (blocker_body[k].w > 0.0 && all.x <= lit.z && all.z >= lit.x && all.y <= lit.w && all.w >= lit.y) {
+					near |= 1u << uint(k);
+				}
+			}
+		}
 	}
+	world = VERTEX;
 }
 
 void fragment() {
 	float f = clamp(1.0 - length(spot), 0.0, 1.0);
-	COLOR = vec4(lamp * f * f, 1.0);
+	float open = 1.0;
+	if (near != 0u && f > 0.0) {
+		open = 1.0 - shade_between(world, lamp_at, near);
+	}
+	COLOR = vec4(lamp * f * f * open, 1.0);
 }

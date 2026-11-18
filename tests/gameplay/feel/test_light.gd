@@ -164,6 +164,11 @@ func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
 		if item == feel.remnants() or feel.remnants().is_ancestor_of(item):
 			check(_drawn_z(item) < at, "a remnant's %s (z %d) is under the light, as a body is" % [feel.get_path_to(item), _drawn_z(item)])
 			continue
+		# The bodies' shadows lie on the floor under the bodies (atmosphere C), lit as the floor.
+		var shadows: CanvasItem = feel.spectacle().shadows
+		if shadows != null and item == shadows:
+			check(_drawn_z(item) < at, "the bodies' shadows (z %d) lie under the light, with the floor" % _drawn_z(item))
+			continue
 		# The sounds' 2D voices (boss plan OB15) are where a sound plays, and draw nothing.
 		if feel.sounds().is_ancestor_of(item):
 			continue

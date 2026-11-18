@@ -47,6 +47,11 @@ extends Resource
 @export var footprint_radius: float = 0.0
 @export var footprint_size: Vector2 = Vector2.ZERO
 @export var footprint_offset: Vector2 = Vector2.ZERO
+## Whether it stops spell light while its ground blocks (docs/milestones/atmosphere.md, C: a tall
+## thing, the crypt's pillars): its ground's box blocks the light and its hurt box is the column drawn
+## over it (gameplay/feel/light_blockers.gd). False: light passes it (most props, low enough to see
+## over). View only.
+@export var blocks_light: bool = false
 
 ## Its staffs (1-4, as an enemy's: `EnemyBase.staffs`), the cards its triggers and a possessor
 ## cast; a trigger names one by number (1-4). A staff's wind-up is a fuse. Empty: it casts nothing.

@@ -13,6 +13,9 @@ extends SceneTree
 ##   ... -- --timed=N                 time N frames (TIMED_FRAMES; the first quarter left out)
 ##   ... -- --light                   with spell light (gameplay/feel/spell_light.gd, P3a) on the
 ##                                    shots: its light buffer's GPU time is printed too
+##   ... -- --blockers                with --light: a crypt room's boxes that block light (atmosphere C:
+##                                    BLOCKER_WALLS and BLOCKER_PILLARS, `SpellLight.set_blockers`),
+##                                    so the lights near them test them
 ##   ... -- --motes                   the mote scenes instead (P1c; `_mote_scene`): no shots, and
 ##                                    the mote ring full of motes in flight (none, the web's
 ##                                    default, the desktop's)
@@ -62,6 +65,10 @@ const SCENARIOS: Array[Dictionary] = [
 	{"label": "some", "shots": 400},
 	{"label": "many", "shots": 3000},
 ]
+## The boxes that block light with `--blockers` (atmosphere C): a crypt room's, over the view: four
+## low walls (128 x 32) and eight pillars (a 26 x 12 base with a 22 x 52 shaft over it).
+const BLOCKER_WALLS: Array[Rect2] = [Rect2(96.0, 80.0, 128.0, 32.0), Rect2(416.0, 80.0, 128.0, 32.0), Rect2(96.0, 260.0, 128.0, 32.0), Rect2(416.0, 260.0, 128.0, 32.0)]
+const BLOCKER_PILLARS: Array[Vector2] = [Vector2(80.0, 200.0), Vector2(200.0, 200.0), Vector2(320.0, 200.0), Vector2(440.0, 200.0), Vector2(560.0, 200.0), Vector2(260.0, 150.0), Vector2(380.0, 150.0), Vector2(320.0, 330.0)]
 ## The mote scenes (`--motes`): the ring's size, each row a mote in flight.
 const MOTE_SCENES: Array[Dictionary] = [
 	{"label": "no motes", "motes": 0},
@@ -86,6 +93,7 @@ var _time: bool = true
 var _only: String = ""
 var _timed: int = TIMED_FRAMES
 var _light: bool = false
+var _blockers: bool = false
 var _spell_light: SpellLightScript = null
 var _motes_only: bool = false
 var _marks_only: bool = false
@@ -108,6 +116,8 @@ func _initialize() -> void:
 			_only = arg.substr(7)
 		elif arg == "--light":
 			_light = true
+		elif arg == "--blockers":
+			_blockers = true
 		elif arg == "--motes":
 			_motes_only = true
 		elif arg == "--marks":
@@ -161,6 +171,20 @@ func _teardown() -> void:
 	_table = null
 
 
+## Hand the spell light BLOCKER_WALLS and BLOCKER_PILLARS (pillars as `light_blockers.gd` writes a
+## crypt pillar: its ground's box, its hurt box as the shaft).
+func _block_light() -> void:
+	var boxes := PackedVector4Array()
+	var bodies := PackedVector4Array()
+	for wall in BLOCKER_WALLS:
+		boxes.append(Vector4(wall.position.x, wall.position.y, wall.end.x, wall.end.y))
+		bodies.append(Vector4(wall.position.x, wall.position.y, wall.end.x, 1.0))
+	for feet in BLOCKER_PILLARS:
+		boxes.append(Vector4(feet.x - 13.0, feet.y - 12.0, feet.x + 13.0, feet.y))
+		bodies.append(Vector4(feet.x - 13.0, feet.y - 54.0, feet.x + 13.0, 1.0))
+	_spell_light.set_blockers(boxes, bodies, boxes.size())
+
+
 func _scenario(scenario: Dictionary) -> void:
 	_teardown()
 	_rng.seed = 20261102
@@ -179,6 +203,8 @@ func _scenario(scenario: Dictionary) -> void:
 		_spell_light = SpellLightScript.new(_mgr, LIGHT_Z)
 		root.add_child(_spell_light)
 		RenderingServer.viewport_set_measure_render_time(_spell_light.viewport.get_viewport_rid(), true)
+		if _blockers:
+			_block_light()
 	if _use_motes:
 		_motes = MotesScript.new(MOTE_CAP, MOTE_Z, _mote_kinds)
 		root.add_child(_motes)

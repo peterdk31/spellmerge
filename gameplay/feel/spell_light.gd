@@ -33,6 +33,11 @@ extends Node
 ## - **Carried lights** (docs/milestones/atmosphere.md, A): the lights that move with a body (a
 ##   wizard's staff tip), spot rows its owner writes each frame (gameplay/feel/carried_lights.gd)
 ##   and hands over (`light_carried`); this node knows nothing of who carries them.
+## - **Light blocked** (docs/milestones/atmosphere.md, C): every light drawn by `light.gdshader`
+##   but the shots' and runes' (SHOTS_BLOCKED: flashes, cues, the room's spots, carried lights) is stopped by up to MAX_BLOCKERS
+##   boxes handed over by `set_blockers` (the room's standing walls and the props that block light,
+##   worked out by gameplay/feel/light_blockers.gd); this node knows nothing of what they are. A
+##   beam's light is not blocked (a band along a path).
 ## - **What draws by the light** (docs/milestones/atmosphere.md, B): `buffer` hands the light
 ##   buffer's texture over (the spectacle gives it to the motes, whose lit-only kinds read it);
 ##   this node knows nothing of what reads it.
@@ -89,6 +94,19 @@ const BEAM_REACH: float = 24.0
 const BEAM_STRENGTH: float = 0.8
 ## Floats a 2D MultiMesh row holds with colours and custom data.
 const STRIDE: int = 16
+## Where a spot row (`write_spot_row`) holds its light's reach, its middle's x and y, and its strength.
+const ROW_REACH: int = 0
+const ROW_X: int = 3
+const ROW_Y: int = 7
+const SPOT_ROW_STRENGTH: int = 11
+## The most boxes that block light (light.gdshader's MAX_BLOCKERS).
+const MAX_BLOCKERS: int = 32
+## Whether the shots' and runes' lights are blocked too. Not: there are thousands of them, and
+## blocking tripled the light buffer's time for 3,000 shots among a crypt room's boxes on llvmpipe
+## (`tests/benchmark/shot_gpu.gd -- --light --blockers`); a shot's light is small and moves on, its
+## glow passes over a pillar as the shot itself is drawn over it. Flashes, cues, spots and carried
+## lights are blocked.
+const SHOTS_BLOCKED: bool = false
 
 ## The light buffer, its shot batches (by BATCH_*), flash batches (FLASHES_*), beams, the spots'
 ## batch and the rect that applies it. Read only.
@@ -127,6 +145,10 @@ var _cue_core: PackedColorArray = PackedColorArray()
 var _next_cue: int = 0
 var _cue_live: int = 0
 var _cue_buffer: PackedFloat32Array = PackedFloat32Array()
+## The boxes that block light (`set_blockers`), given to every light batch made later too.
+var _blocker_boxes: PackedVector4Array = PackedVector4Array()
+var _blocker_bodies: PackedVector4Array = PackedVector4Array()
+var _blocker_count: int = 0
 
 
 ## Light for `projectiles`' shots (null: the buffer and the rect only), applied at `z`.
@@ -199,9 +221,40 @@ func _light_batch(rows: int) -> MultiMeshInstance2D:
 	var material := ShaderMaterial.new()
 	material.shader = LIGHT_SHADER
 	material.set_shader_parameter(&"rows", rows)
+	if rows != ROWS_SHOT and rows != ROWS_RUNE or SHOTS_BLOCKED:
+		_block(material)
 	node.material = material
 	viewport.add_child(node)
 	return node
+
+
+## The boxes that stop light from now on (docs/milestones/atmosphere.md, C): `count` of `boxes`
+## (each base: x0, y0, x1, y1, world px) and `bodies` (the column over each: x0, top, x1, and how much
+## it blocks, 0 to 1), at most MAX_BLOCKERS; every light batch draws with them.
+func set_blockers(boxes: PackedVector4Array, bodies: PackedVector4Array, count: int) -> void:
+	_blocker_boxes = boxes
+	_blocker_bodies = bodies
+	_blocker_count = clampi(count, 0, mini(MAX_BLOCKERS, mini(boxes.size(), bodies.size())))
+	if SHOTS_BLOCKED:
+		for node in batches:
+			_block(node.material as ShaderMaterial)
+	for node in flashes:
+		_block(node.material as ShaderMaterial)
+	_block(spots.material as ShaderMaterial)
+	_block(carried.material as ShaderMaterial)
+	_block(cue_lights.material as ShaderMaterial)
+
+
+## How many boxes block light (for tests).
+func blocker_count() -> int:
+	return _blocker_count
+
+
+func _block(material: ShaderMaterial) -> void:
+	material.set_shader_parameter(&"blocker_count", _blocker_count)
+	if _blocker_count > 0:
+		material.set_shader_parameter(&"blocker_box", _blocker_boxes)
+		material.set_shader_parameter(&"blocker_body", _blocker_bodies)
 
 
 
@@ -523,7 +576,13 @@ static func write_spot_row(buffer: PackedFloat32Array, at: int, where: Vector2, 
 	buffer[i + 15] = 0.0
 
 
-## How many spots are lit (for tests).
+## The room's spots' rows (`spot_count` of them; ROWS_SPOT, `write_spot_row`), read only: what the
+## bodies' shadows fall away from.
+func spot_rows() -> PackedFloat32Array:
+	return _spot_buffer
+
+
+## How many spots are lit (also how many rows of `spot_rows` are).
 func spot_count() -> int:
 	return spots.multimesh.visible_instance_count
 

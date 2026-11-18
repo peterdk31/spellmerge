@@ -102,5 +102,6 @@ size = Vector2(22, 52)
 offset = Vector2(0, -28)
 footprint_size = Vector2(26, 12)
 footprint_offset = Vector2(0, -6)
+blocks_light = true
 states = ExtResource("2")
 looks = Array[ExtResource("5")]([SubResource("intact_look"), SubResource("cracked_look"), SubResource("split_look"), SubResource("rubble_look")])

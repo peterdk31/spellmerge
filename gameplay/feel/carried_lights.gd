@@ -33,6 +33,9 @@ const OUT: float = 0.002
 ## The rows (ActorsScript.SEATS of them, made once) and how many are written this frame. Read only.
 var rows: PackedFloat32Array = PackedFloat32Array()
 var count: int = 0
+## The actor carrying each row's light (the body its seat drives; NONE once that body is gone), so
+## a body's shadow is not cast by its own light (atmosphere C, `body_shadows.gd`). Read only.
+var owners: PackedInt32Array = PackedInt32Array()
 ## Each seat's light as drawn: its strength now, where it was last and its colour (kept so a light
 ## whose body is gone fades where it stood). Read only.
 var strength: PackedFloat32Array = PackedFloat32Array()
@@ -45,6 +48,7 @@ var _last: float = -1.0
 func _init() -> void:
 	rows.resize(ActorsScript.SEATS * SpellLightScript.STRIDE)
 	strength.resize(ActorsScript.SEATS)
+	owners.resize(ActorsScript.SEATS)
 	_at.resize(ActorsScript.SEATS)
 	_colour.resize(ActorsScript.SEATS)
 
@@ -59,6 +63,7 @@ func step(table: ActorsScript, now: float) -> void:
 	for seat in ActorsScript.SEATS:
 		var want: float = 0.0
 		var body: Actor = _body_of(table, seat)
+		var owner: int = body.id if body != null else ActorsScript.NONE
 		if body != null:
 			want = CARRIED_STRENGTH * (DOWNED_SHARE if body.is_downed() else 1.0) * (1.0 - body.fall_share())
 			_at[seat] = body.muzzle_position()
@@ -72,6 +77,7 @@ func step(table: ActorsScript, now: float) -> void:
 		# Each seat's own seed, so four staffs do not flicker together.
 		var seed: float = (float(seat) + 0.5) / float(ActorsScript.SEATS)
 		SpellLightScript.write_spot_row(rows, count, _at[seat], CARRIED_REACH, _colour[seat], strength[seat], CARRIED_FLICKER, seed)
+		owners[count] = owner
 		count += 1
 
 

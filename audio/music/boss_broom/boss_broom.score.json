@@ -1,0 +1,53 @@
+{
+	"version": 1,
+	"tempo": 100, "beats": 4, "bars": 16, "key": "D minor",
+	"instruments": {
+		"pad": {"patch": "warm_pad", "gain": -18, "ring": 0.8},
+		"bass": {"patch": "fm_bass", "gain": -8, "ring": 0.06},
+		"glass": {"patch": "glass_pluck", "gain": -4, "ring": 1.2, "velocity": [1, 0.75]},
+		"brush": {"patch": "brush", "gain": -9, "velocity": [0.9, 0.35, 0.6, 0.35]},
+		"kick": {"patch": "soft_kick", "gain": -7, "ring": 0.15},
+		"snare": {"patch": "soft_snare", "gain": 4, "ring": 0.1},
+		"kick2": {"patch": "soft_kick", "gain": -8, "ring": 0.15},
+		"lead": {"patch": "fire_lead", "gain": -8, "ring": 0.04, "velocity": [1, 0.55, 0.75, 0.55]},
+		"embers": {"patch": "ember_crackle", "gain": 0, "ring": 0.3}
+	},
+	"patterns": {
+		"dm": {"pad": "F3+A3+D4 - - - - - - -", "bass": "D2 . D2 A2 . D2 C3 A2", "glass": "D5 . F5 A5 . . G5 F5",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"bb": {"pad": "F3+Bb3+D4 - - - - - - -", "bass": "Bb1 . Bb1 F2 . Bb1 D2 F2", "glass": "F5 . D5 . . . . .",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"gm": {"pad": "G3+Bb3+D4 - - - - - - -", "bass": "G1 . G1 D2 . G1 Bb1 D2", "glass": "G5 . Bb5 . A5 . G5 .",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"a": {"pad": "E3+A3+C#4 - - - - - - -", "bass": "A1 . A1 E2 . A1 C#2 E2", "glass": "E5 . C#5 . A4 . . .",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"dm2": {"pad": "F3+A3+D4 - - - - - - -", "bass": "D2 . D2 A2 . D2 C3 A2", "glass": "A5 . . F5 . D5 E5 F5",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"bb2": {"pad": "F3+Bb3+D4 - - - - - - -", "bass": "Bb1 . Bb1 F2 . Bb1 D2 F2", "glass": "D5 . . . F5 . D5 .",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"gm2": {"pad": "G3+Bb3+D4 - - - - - - -", "bass": "G1 . G1 D2 . G1 Bb1 D2", "glass": "Bb5 . A5 . G5 . D5 .",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"a2": {"pad": "E3+A3+C#4 - - - - - - -", "bass": "A1 . A1 E2 . A1 C#2 E2", "glass": "C#5 . E5 . A5 . . .",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"eb": {"pad": "G3+Bb3+Eb4 - - - - - - -", "bass": "Eb2 . Eb2 Bb2 . Eb2 G2 Bb2", "glass": "G5 . . . Eb5 . . .",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"dm_fire": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
+			"lead": "D4 A4 F4 A4 D5 A4 F4 A4 D4 A4 F4 A4 D5 A4 F4 A4"},
+		"bb_fire": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
+			"lead": "Bb3 F4 D4 F4 Bb4 F4 D4 F4 Bb3 F4 D4 F4 Bb4 F4 D4 F4"},
+		"gm_fire": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
+			"lead": "G3 D4 Bb3 D4 G4 D4 Bb3 D4 G3 D4 Bb3 D4 G4 D4 Bb3 D4"},
+		"a_fire": {"snare": ". . x . . . x x", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
+			"lead": "A3 E4 C#4 E4 A4 E4 C#4 E4 A3 E4 C#4 E4 A4 C#5 E5 A5"},
+		"eb_fire": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
+			"lead": "Eb4 Bb4 G4 Bb4 Eb5 Bb4 G4 Bb4 Eb4 Bb4 G4 Bb4 Eb5 Bb4 G4 Bb4"}
+	},
+	"layers": [
+		{"id": "boss_broom", "play": ["dm", "bb", "gm", "a", "dm2", "bb2", "gm2", "a2", "gm", "dm", "eb", "a", "dm2", "bb", "gm2", "a2"],
+			"notes": "The Old Broom's fight: a steady sweep of brushed ticks over a round bass that rocks back and forth, a warm pad and a glass bell tune."},
+		{"id": "boss_broom_fire", "play": ["dm_fire", "bb_fire", "gm_fire", "a_fire", "dm_fire", "bb_fire", "gm_fire", "a_fire", "gm_fire", "dm_fire", "eb_fire", "a_fire", "dm_fire", "bb_fire", "gm_fire", "a_fire"],
+			"notes": "Phase 2, the broom's head on fire: a snare, more kicks, a quiet crackle of embers and a hot running arpeggio over the first layer, in step with it."}
+	],
+	"fx": {"reverb": {"mix": 0.22, "size": 1.2}, "lowpass": 11000},
+	"notes": "The Old Broom's music, two stacked layers (its MusicTrack plays the first in phase 1 and both in phase 2). D minor at 100 beats a minute, 16 bars (38.4 s) round: Dm Bb Gm A twice, then Gm Dm Eb A and Dm Bb Gm A. Kept under the effects: soft attacks, nothing bright for long."
+}

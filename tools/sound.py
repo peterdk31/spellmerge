@@ -4,9 +4,9 @@
 """The sound tool (sound plan AU2, docs/milestones/sound.md): bake recipes into `.ogg`, hear them
 on a contact sheet, and check that every generated sound is up to date.
 
-    tools/sound.py bake [recipe or id ...]      # every recipe when none is named
-    tools/sound.py sheet <recipe, id or family ...> --out DIR
-    tools/sound.py check                        # no audio read, no ffmpeg: what the hash test runs
+    tools/sound.py bake [recipe, score or id ...]   # every recipe and score when none is named
+    tools/sound.py sheet <recipe, score, id or family ...> --out DIR
+    tools/sound.py check                            # no audio read, no ffmpeg: what the hash test runs
 
 A recipe is `<id>.sound.json` in a folder of its own named `<id>` (`audio/sfx/<id>/`, or a
 content item's `sounds/<id>/`). The bake renders each variant (tools/sound_synth.py), places its
@@ -17,6 +17,11 @@ with `ffmpeg -c:a libvorbis -q:a 6` and writes, in the recipe's folder only:
   `AudioStreamRandomizer` of them with the family's pitch and volume jitter;
 - a `held` sound: `<id>.ogg`, a loop (its new `.import` says `loop=true`);
 - `assets.json`: one manifest entry a file, with the recipe's hash, loudness and peak.
+
+A music score is `<track>.score.json` in a folder of its own named `<track>` under `audio/`
+(`audio/music/<track>/`). The sequencer (tools/sound_score.py) renders its layers, each exactly one
+loop long; the bake places them together on the music family's target and writes beside it a loop
+`<layer id>.ogg` a layer (its new `.import` says `loop=true`) and the folder's `assets.json`.
 
 A file whose audio is the same is not rewritten. Then it runs Godot's import, which completes the
 `.import` files (`uid`, `dest_files`); an existing `.import` is never rewritten.
@@ -46,6 +51,7 @@ from typing import Callable, Iterable, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sound_meter  # noqa: E402
+import sound_score  # noqa: E402
 import sound_synth  # noqa: E402
 from sound_synth import RATE, SoundError  # noqa: E402
 
@@ -55,6 +61,7 @@ PATCHES = Path("audio/patches")
 SCAN = ("audio", "content")  # where sounds and their manifests are
 MANIFEST = Path("audio/manifest.json")
 SUFFIX = ".sound.json"
+SCORE_SUFFIX = ".score.json"
 PATCH_SUFFIX = ".patch.json"
 TOOL = f"tools/sound.py (procedural synthesis, generator {sound_synth.GENERATOR})"
 AUTHOR = "Claude"
@@ -158,6 +165,15 @@ def recipe_hash(recipe: dict, patches: dict[str, dict], family: Family | None) -
                                                  "family": asdict(family) if family else None})).hexdigest()
 
 
+def score_hash(score: dict, patches: dict[str, dict], family: Family | None) -> str:
+    """sha256 of the score, every patch its instruments name, the music family's row, the synth's
+    GENERATOR and the sequencer's VERSION."""
+    named = {name: patches.get(name) for name in sound_score.patches_named(score)}
+    return "sha256:" + hashlib.sha256(canonical({"generator": sound_synth.GENERATOR, "sequencer": sound_score.VERSION,
+                                                 "score": score, "patches": named,
+                                                 "family": asdict(family) if family else None})).hexdigest()
+
+
 def audio_hash(samples: Sequence[float]) -> str:
     """sha256 of the 16-bit samples: what says a rebake's audio is the same, whatever encoder."""
     return "sha256:" + hashlib.sha256(pcm16(samples)).hexdigest()
@@ -201,6 +217,50 @@ def read_recipe(path: Path, root: Path = ROOT) -> Recipe:
     return Recipe(rel, sound_id, read_json(root / rel))
 
 
+@dataclass(frozen=True)
+class Score:
+    path: Path  # from the repository root
+    id: str  # the track's
+    data: dict  # as written
+
+    @property
+    def folder(self) -> Path:
+        return self.path.parent
+
+    def outputs(self, family: Family | None = None) -> list[Path]:
+        """A loop a layer, `<layer id>.ogg`, from the repository root."""
+        layers = self.data.get("layers")
+        return [self.folder / f"{layer['id']}.ogg" for layer in (layers if isinstance(layers, list) else [])
+                if isinstance(layer, dict) and isinstance(layer.get("id"), str)]
+
+
+def read_score(path: Path, root: Path = ROOT) -> Score:
+    """A score file, in a folder of its own named for its track under audio/ (or whole, outside the
+    repository, for the sheet)."""
+    full = (path if path.is_absolute() else root / path).resolve()
+    try:
+        rel = full.relative_to(root.resolve())
+    except ValueError:
+        rel = full
+    name = rel.name
+    if not name.endswith(SCORE_SUFFIX):
+        raise BakeError(f"{rel}: a score is named <track>{SCORE_SUFFIX}")
+    track = name[: -len(SCORE_SUFFIX)]
+    if rel.parent.name != track:
+        raise BakeError(f"{rel}: a score lives in a folder of its own named {track}/")
+    if not rel.is_absolute() and rel.parts[0] != "audio":
+        raise BakeError(f"{rel}: a score lives under audio/ (audio/music/{track}/)")
+    return Score(rel, track, read_json(root / rel))
+
+
+def find_scores(root: Path = ROOT) -> list[Score]:
+    found: list[Score] = []
+    for top in SCAN:
+        if (root / top).is_dir():
+            found += [read_score(p.relative_to(root), root) for p in sorted((root / top).rglob("*" + SCORE_SUFFIX))]
+    return found
+
+
 def find_recipes(root: Path = ROOT) -> list[Recipe]:
     found: list[Recipe] = []
     for top in SCAN:
@@ -222,6 +282,17 @@ def checked(recipe: Recipe, patches: dict[str, dict], fams: dict[str, Family]) -
     except SoundError as error:
         raise BakeError(f"{recipe.path}: {error}") from error
     return data, family
+
+
+def checked_score(score: Score, patches: dict[str, dict], fams: dict[str, Family]) -> tuple[dict, Family]:
+    """The score validated and the music family; raises BakeError naming the file."""
+    try:
+        data = sound_score.validate(score.data, patches)
+    except SoundError as error:
+        raise BakeError(f"{score.path}: {error}") from error
+    if "music" not in fams:
+        raise BakeError(f"{STYLE}: its Sound table has no music row")
+    return data, fams["music"]
 
 
 # --- Manifests ---------------------------------------------------------------------------------
@@ -251,8 +322,27 @@ def check(root: Path = ROOT) -> list[str]:
     recipe_folders: set[str] = set()
     try:
         recipes = find_recipes(root)
+        scores = find_scores(root)
     except BakeError as error:
         return [str(error)]
+    for score in scores:
+        bake_cmd = f"run: tools/sound.py bake {score.path}"
+        try:
+            _, family = checked_score(score, patches, fams)
+        except BakeError as error:
+            problems.append(str(error))
+            continue
+        want = score_hash(score.data, patches, family)
+        for out in score.outputs():
+            made.add(out.as_posix())
+            entry = entries.get(out.as_posix())
+            if not (root / out).is_file():
+                problems.append(f"{out}: missing; {bake_cmd}")
+            elif entry is None:
+                problems.append(f"{out}: no entry in {score.folder / 'assets.json'}; {bake_cmd}")
+            elif entry.get("recipe_hash") != want:
+                problems.append(f"{out}: stale, its score, a patch it names or the music row in docs/STYLE.md "
+                                f"changed since it was baked; {bake_cmd}")
     for recipe in recipes:
         bake_cmd = f"run: tools/sound.py bake {recipe.path}"
         recipe_folders.add(recipe.folder.as_posix())
@@ -298,8 +388,9 @@ def check(root: Path = ROOT) -> list[str]:
             if ogg.parent.name == "variants" and ogg.parent.parent.relative_to(root).as_posix() in recipe_folders:
                 continue  # named above as a variant its recipe no longer has
             if entries.get(rel, {}).get("origin") != "human":
-                problems.append(f"{rel}: no recipe makes it; write one beside it ({SUFFIX}), or give it a manifest "
-                                "entry with origin human if it was made by hand")
+                problems.append(f"{rel}: no recipe or score makes it; write one beside it ({SUFFIX}, or "
+                                f"{SCORE_SUFFIX} for music), or give it a manifest entry with origin human if it was "
+                                "made by hand")
     for rel in UNRECIPED:
         if rel in made:
             problems.append(f"{rel}: has a recipe now; take it off tools/sound.py's UNRECIPED")
@@ -323,6 +414,81 @@ def place(samples: list[list[float]], family: Family, gain: float,
     placed = [[v * scale for v in s] for s in samples]
     shift = 20.0 * math.log10(scale)
     return placed, [lvl + shift for lvl in levels], [sound_meter.true_peak(s) for s in placed]
+
+
+def render_score_placed(score: Score, data: dict, family: Family) -> list[tuple[str, list[float], float, float]]:
+    """Every layer of a score rendered and placed: all of them by one scale, so the layers played
+    together are on the music family's target (plus the score's `gain`) and keep their balance;
+    (layer id, samples, its own level, its own peak). Raises BakeError for a peak over the limit,
+    a layer's or all of them together."""
+    layers = sound_score.render(data)
+    together = sound_score.mixed(list(layers.values()))
+    level = family.level_of(together, loop=True)
+    if level <= sound_meter.SILENCE:
+        raise BakeError(f"{score.path}: its layers are silent")
+    target = family.loudness + data.get("gain", 0.0)
+    scale = 10.0 ** ((target - level) / 20.0)
+    limit = family.peak - PEAK_MARGIN
+    peak = sound_meter.true_peak(together) + 20.0 * math.log10(scale)
+    if peak > limit:
+        raise BakeError(f"{score.path}: its layers together peak at {peak:.1f} dBTP at {target:.1f} LUFS, over "
+                        f"{limit:.1f} (the music limit {family.peak} less {PEAK_MARGIN} for Vorbis); soften its "
+                        "hits or lower the loudest layer's gain")
+    placed = []
+    for layer_id, samples in layers.items():
+        scaled = [v * scale for v in samples]
+        own_peak = sound_meter.true_peak(scaled)
+        placed.append((layer_id, scaled, family.level_of(scaled, loop=True), own_peak))
+    return placed
+
+
+def bake_score(score: Score, root: Path = ROOT, encode: Encoder | None = None,
+               say: Callable[[str], None] = print) -> list[Path]:
+    """Bake one score: a loop a layer and the folder's assets.json; returns the files it wrote. A
+    file is rewritten only when its audio changed (its `audio_hash`)."""
+    encode = encode or ffmpeg_encode
+    if score.path.is_absolute():
+        raise BakeError(f"{score.path}: only a score in the repository is baked (the sheet takes any)")
+    patches = load_patches(root)
+    data, family = checked_score(score, patches, families(root))
+    folder = root / score.folder
+    entries_path = folder / "assets.json"
+    old = {e["path"]: e for e in read_json(entries_path).get("assets", [])
+           if isinstance(e, dict) and isinstance(e.get("path"), str)} if entries_path.is_file() else {}
+    want = score_hash(score.data, patches, family)
+    written: list[Path] = []
+    entries: list[dict] = []
+    made: set[str] = set()
+    for layer_id, samples, level, peak in render_score_placed(score, data, family):
+        out = score.folder / f"{layer_id}.ogg"
+        key = out.as_posix()
+        made.add(key)
+        before = old.get(key, {})
+        heard = audio_hash(samples)
+        changed = before.get("audio_hash") != heard or not (root / out).is_file()
+        if changed:
+            (root / out).write_bytes(encode(samples))
+            written.append(out)
+        tier = before.get("tier", "good")
+        if changed and tier == "final":
+            tier = "good"
+            say(f"{out}: its audio changed, so it is back to tier good (the owner promoted the old one)")
+        entries.append({"path": key, "origin": "ai", "author": AUTHOR, "license": LICENSE, "tier": tier,
+                        "tool": TOOL, "prompt": score.path.as_posix(), "recipe_hash": want, "audio_hash": heard,
+                        "loudness": round(level, 1), "peak": round(peak, 1)})
+        if not (root / (key + ".import")).exists():
+            (root / (key + ".import")).write_text(IMPORT_LOOP, encoding="utf-8")
+            written.append(Path(key + ".import"))
+    for extra in sorted(folder.glob("*.ogg")):  # a layer the score no longer has
+        rel = extra.relative_to(root)
+        if rel.as_posix() not in made and old.get(rel.as_posix(), {}).get("prompt") == score.path.as_posix():
+            _remove(root, rel, say, "the score has no such layer now")
+            old.pop(rel.as_posix(), None)
+    kept = [e for path, e in old.items() if path not in made and (root / path).is_file()]
+    manifest = {"assets": sorted(entries + kept, key=lambda e: e["path"])}
+    if _write_if_changed(entries_path, (json.dumps(manifest, indent="\t", ensure_ascii=False) + "\n").encode("utf-8")):
+        written.append(score.folder / "assets.json")
+    return written
 
 
 def render_placed(recipe: Recipe, data: dict, family: Family) -> list[tuple[list[float], float, float]]:
@@ -492,20 +658,32 @@ def godot_import(root: Path = ROOT) -> None:
     subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
 
 
-def resolve(names: Iterable[str], root: Path = ROOT) -> list[Recipe]:
-    """Recipe paths, ids, or family names into recipes."""
-    every = None
-    found: list[Recipe] = []
+Source = Recipe | Score
+
+
+def resolve(names: Iterable[str], root: Path = ROOT) -> list[Source]:
+    """Recipe or score paths, sound or track ids (a layer's id names its score), or family names
+    (`music` for every score) into recipes and scores."""
+    every: list[Source] | None = None
+    found: list[Source] = []
     for name in names:
         if name.endswith(SUFFIX):
             found.append(read_recipe(Path(name).resolve(), root))
             continue
-        every = every if every is not None else find_recipes(root)
-        hits = [r for r in every if r.id == name or r.data.get("family") == name]
+        if name.endswith(SCORE_SUFFIX):
+            found.append(read_score(Path(name).resolve(), root))
+            continue
+        every = every if every is not None else [*find_recipes(root), *find_scores(root)]
+        hits = [r for r in every if r.id == name or (isinstance(r, Recipe) and r.data.get("family") == name)
+                or (isinstance(r, Score) and (name == "music" or name in {o.stem for o in r.outputs()}))]
         if not hits:
-            raise BakeError(f"{name}: no recipe with that id or family")
+            raise BakeError(f"{name}: no recipe or score with that id or family")
         found += hits
     return found
+
+
+def bake_any(source: Source, root: Path = ROOT, say: Callable[[str], None] = print) -> list[Path]:
+    return bake_score(source, root, say=say) if isinstance(source, Score) else bake(source, root, say=say)
 
 
 # --- The contact sheet -------------------------------------------------------------------------
@@ -514,9 +692,22 @@ GAP = 0.4  # seconds between the sheet's parts
 CROWD = (0.0, 0.023, 0.051, 0.080)  # four players casting at once, a frame or so apart
 
 
-def sheet_timeline(sounds: list[tuple[str, list[list[float]]]]) -> list[float]:
+MUSIC_ROUNDS = 2  # a music intensity on the sheet is heard round its loop this many times
+
+
+def music_timeline(layers: list[list[float]]) -> list[float]:
+    """A track on the sheet: its first layer, then the first two together, and so on (its intensities
+    as a stacked MusicTrack plays them), each round its loop MUSIC_ROUNDS times."""
+    out: list[float] = []
+    for n in range(1, len(layers) + 1):
+        out += sound_score.mixed(layers[:n]) * MUSIC_ROUNDS + [0.0] * round(GAP * RATE)
+    return out
+
+
+def sheet_timeline(sounds: list[tuple[str, list[list[float]]]], music: list[list[float]] | None = None) -> list[float]:
     """The sheet's audio: each sound's variants in turn with a gap, then four of it at once, then
-    every sound together; scaled down only if the sum would clip."""
+    every sound together, then each track's intensities in turn (`music`, a track's timeline
+    each); scaled down only if the sum would clip."""
     gap = [0.0] * round(GAP * RATE)
     out: list[float] = []
 
@@ -535,23 +726,34 @@ def sheet_timeline(sounds: list[tuple[str, list[list[float]]]]) -> list[float]:
         out += mix(crowd) + gap + gap
     if len(sounds) > 1:
         out += mix([(0, variants[0]) for _, variants in sounds]) + gap
+    for track in music or []:
+        out += track + gap
     peak = max((abs(v) for v in out), default=0.0)
     if peak > 0.99:
         out = [v * 0.99 / peak for v in out]
     return out
 
 
-def sheet(recipes: list[Recipe], out_dir: Path, root: Path = ROOT) -> list[Path]:
+def sheet(sources: list[Source], out_dir: Path, root: Path = ROOT) -> list[Path]:
     """`sheet.ogg` and `sheet.mp4` (the same audio over a still card of the ids) in `out_dir`."""
     ffmpeg = need_ffmpeg()
     patches = load_patches(root)
     fams = families(root)
     sounds = []
-    unique = list({r.path: r for r in recipes}.values())  # a sound named twice is heard once
-    for recipe in unique:
-        data, family = checked(recipe, patches, fams)
-        sounds.append((recipe.id, [s for s, _, _ in render_placed(recipe, data, family)]))
-    audio = sheet_timeline(sounds)
+    music: list[list[float]] = []
+    lines: list[str] = []
+    unique = list({r.path: r for r in sources}.values())  # a sound named twice is heard once
+    for source in unique:
+        if isinstance(source, Score):
+            data, family = checked_score(source, patches, fams)
+            placed = render_score_placed(source, data, family)
+            music.append(music_timeline([s for _, s, _, _ in placed]))
+            ids = [layer_id for layer_id, _, _, _ in placed]
+            lines.append(f"{source.id} (music): " + ", then + ".join(ids) + f"; each twice round")
+            continue
+        data, family = checked(source, patches, fams)
+        sounds.append((source.id, [s for s, _, _ in render_placed(source, data, family)]))
+    audio = sheet_timeline(sounds, music)
     out_dir.mkdir(parents=True, exist_ok=True)
     ogg, mp4 = out_dir / "sheet.ogg", out_dir / "sheet.mp4"
     with tempfile.TemporaryDirectory() as tmp:
@@ -560,7 +762,8 @@ def sheet(recipes: list[Recipe], out_dir: Path, root: Path = ROOT) -> list[Path]
         subprocess.run([ffmpeg, "-v", "error", "-y", "-i", str(wav), "-c:a", "libvorbis", "-q:a", "6", str(ogg)], check=True)
         card.write_text("Spellmerge sound sheet\n\n" + "\n".join(
             f"{i}. {sid}: variants, then four at once" for i, (sid, _) in enumerate(sounds, 1))
-            + ("\n\nthen all together" if len(sounds) > 1 else "") + "\n", encoding="utf-8")
+            + ("\n\nthen all together" if len(sounds) > 1 else "")
+            + "".join(f"\n\n{line}" for line in lines) + "\n", encoding="utf-8")
         draw = f"drawtext=textfile='{card}':fontcolor=0xf4f1ea:fontsize=28:x=60:y=60:line_spacing=12"
         command = [ffmpeg, "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=0x14121f:s=1280x720:r=2", "-i", str(wav),
                    "-vf", draw, "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
@@ -577,10 +780,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     b = sub.add_parser("bake", help="bake recipes into .ogg (every recipe when none is named)")
-    b.add_argument("names", nargs="*", help="recipe files or sound ids")
+    b.add_argument("names", nargs="*", help="recipe or score files, sound or track ids")
     b.add_argument("--no-import", action="store_true", help="skip Godot's import")
     s = sub.add_parser("sheet", help="a contact sheet (.ogg and .mp4) outside the repository")
-    s.add_argument("names", nargs="+", help="recipe files, sound ids or a family")
+    s.add_argument("names", nargs="+", help="recipe or score files, sound or track ids, or a family (music)")
     s.add_argument("--out", required=True, type=Path)
     sub.add_parser("check", help="every generated sound up to date (reads no audio)")
     args = parser.parse_args(argv)
@@ -592,12 +795,12 @@ def main(argv: list[str] | None = None) -> int:
             print("sound check: " + (f"{len(problems)} problem(s)" if problems else "every generated sound is up to date"))
             return 1 if problems else 0
         if args.command == "bake":
-            recipes = resolve(args.names) if args.names else find_recipes()
+            sources: list[Source] = resolve(args.names) if args.names else [*find_recipes(), *find_scores()]
             written: list[Path] = []
-            for recipe in recipes:
-                files = bake(recipe)
+            for source in sources:
+                files = bake_any(source)
                 written += files
-                print(f"{recipe.path}: " + (", ".join(str(f) for f in files) if files else "up to date"))
+                print(f"{source.path}: " + (", ".join(str(f) for f in files) if files else "up to date"))
             if written and not args.no_import:
                 godot_import()
             return 0

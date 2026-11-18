@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="MusicTrack" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/music_track.gd" id="1_music"]
+
+[resource]
+script = ExtResource("1_music")
+layers = Array[StringName]([&"crypt_halls"])
+stacked = true
+fade = 2.0

@@ -1,0 +1,6 @@
+{
+	"version": 1,
+	"layer": {"source": "noise", "color": "stepped", "pitch": 28, "filter": {"type": "band", "from": 3200, "q": 2.5},
+		"amp": {"attack": 0.2, "decay": 0.1, "sustain": 1, "release": 0.3}},
+	"notes": "Embers: stepped noise about 28 times a second through a band at 3.2 kHz, a steady crackle of fire under music."
+}

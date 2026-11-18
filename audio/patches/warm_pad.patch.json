@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"layer": {"source": "partials", "filter": {"type": "low", "from": 1600, "q": 0.7},
+		"partials": [{"ratio": 1, "decay": 20}, {"ratio": 1.005, "gain": -1, "decay": 20},
+			{"ratio": 2, "gain": -6, "decay": 14}, {"ratio": 2.996, "gain": -12, "decay": 10},
+			{"ratio": 4, "gain": -18, "decay": 8}, {"ratio": 5.01, "gain": -22, "decay": 6}],
+		"amp": {"attack": 0.5, "decay": 0.6, "sustain": 0.8, "release": 0.8}},
+	"notes": "A warm pad: a few soft harmonics, the first two a hair apart so they beat slowly, low-passed, swelling in over half a second."
+}

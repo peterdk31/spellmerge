@@ -1,0 +1,8 @@
+{
+	"version": 1,
+	"layer": {"source": "partials",
+		"partials": [{"ratio": 1, "decay": 1.1}, {"ratio": 2.76, "gain": -9, "decay": 0.45},
+			{"ratio": 5.4, "gain": -17, "decay": 0.2}],
+		"amp": {"attack": 0.003, "shape": "flat"}},
+	"notes": "A glass pluck: a struck bell of glass (partials 1, 2.76 and 5.4, the higher ones quieter and shorter), the game's frost voice made an instrument."
+}

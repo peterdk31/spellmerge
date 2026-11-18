@@ -122,7 +122,7 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
   - test_spawn.gd: a snapshot mid-spawn restores the style, a look drawing from the restored state draws its own style's mark and motion, and the state hash holds the style.
   - test_spawn_look.gd: each body is drawn by its own style, with an unknown id as the lookup's rise, and `cut()` hands a body from one motion to another when its style's motion changes mid-spawn (a recording fixture motion; AS1 left that path untested).
   - test_flow.gd and test_flow_adds.gd: room enemies and adds spawn in the style Flow picks, for its seconds.
-  - tests/core/test_snapshot_spawn_styles.gd: the arena with two fixture styles (a biome's and an enemy's own, of other lengths), played with a snapshot mid-spawn and resumed in a fresh game, agrees tick for tick.
+  - tests/core/test_snapshot_spawn_styles.gd: the arena with two fixture styles (the biome's, and the bone husk's own, of other lengths; `ReplayRun.spawn_styles` adds them to every fresh game's registry), played with a snapshot mid-spawn and resumed in a fresh game, agrees tick for tick.
 
 Each step updates the README of the areas it touches, and `content/spawn_styles/README.md` (new) is the guide: copy `rise/`, change the numbers, name your biome.
 

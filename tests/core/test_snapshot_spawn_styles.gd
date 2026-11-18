@@ -1,9 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## Two spawn styles in one room, played twice and through a snapshot (spawn styles AS2,
 ## docs/milestones/spawn-styles.md, "Tests"): the arena paced in groups (as test_snapshot_spawning.gd),
-## with a style naming the room's biome and every other enemy of the registry naming a style of its
-## own, each of another length, added to the game's registry for the test. Flow picks each body's
-## style as it stands it (`SpawnStyle.pick`), so the room spawns in both; the run recorded with a
+## with a style naming the room's biome and one enemy (the bone husk) naming a style of its own, each
+## of another length, added to the registry of every fresh game (`ReplayRun.spawn_styles`). Flow picks
+## each body's style as it stands it (`SpawnStyle.pick`), so the room spawns in both; the run recorded with a
 ## snapshot mid-spawn and resumed from it in a fresh game agrees tick for tick (`Actor.spawn_style` is
 ## state, saved in snapshots and hashed), and the game the snapshot restored had both styles in it.
 # unit-test-shards: 1
@@ -12,20 +12,21 @@ const ReplayRun := preload("res://tests/support/replay_run.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 const TICKS: int = 160
-const SNAPSHOT_AT: int = 30
+const SNAPSHOT_AT: int = 70
 const BIOME_STYLE: StringName = &"fixture_biome_spawn"
 const OWN_STYLE: StringName = &"fixture_own_spawn"
+## The enemy given the style of its own: the seeded run's first group has it beside crypt mites.
+const OWNER: StringName = &"bone_husk"
 
 var _run: ReplayRun
-var _registry: Node
 ## The enemies given a style of their own (to be given theirs back), and the styles each body spawned
 ## in that the snapshot caught.
-var _owned: Array[EnemyBase] = []
+var _given_own: Array[EnemyBase] = []
 var _caught_styles: Dictionary[StringName, int] = {}
+var _caught_spawning: int = 0
 
 
 func before_each() -> void:
-	_registry = root.get_node("Registry")
 	var biome_style := SpawnStyle.from_default()
 	biome_style.id = BIOME_STYLE
 	biome_style.seconds = 1.2
@@ -34,19 +35,13 @@ func before_each() -> void:
 	own_style.id = OWN_STYLE
 	own_style.seconds = 0.5
 	own_style.mark_end = 0.2
-	check(_registry.call("add", SpawnStyle.FOLDER, biome_style), "the biome's style added")
-	check(_registry.call("add", SpawnStyle.FOLDER, own_style), "the enemies' own added")
-	_owned.clear()
-	var every_other: bool = false
-	for item: Resource in _registry.call("get_all", &"enemies"):
-		var enemy := item as EnemyBase
-		if enemy == null or not enemy.biomes.has(ARENA.biome):
-			continue
-		if every_other:
-			check_equal(enemy.spawn_style, &"", "%s names no style of its own" % enemy.id)
-			enemy.spawn_style = OWN_STYLE
-			_owned.append(enemy)
-		every_other = not every_other
+	_given_own.clear()
+	var owner := root.get_node("Registry").call("get_resource", &"enemies", OWNER) as EnemyBase
+	check(owner != null and owner.biomes.has(ARENA.biome), "%s fights in the arena's biome" % OWNER)
+	if owner != null:
+		check_equal(owner.spawn_style, &"", "%s names no style of its own" % OWNER)
+		owner.spawn_style = OWN_STYLE
+		_given_own.append(owner)
 	_run = ReplayRun.new(tree)
 	_run.ticks = TICKS
 	_run.run_seed = 0x5eed
@@ -57,15 +52,16 @@ func before_each() -> void:
 	_run.room = ARENA
 	_run.spawning = pace
 	_run.at_snapshot = _caught
+	_run.spawn_styles = [biome_style, own_style] as Array[SpawnStyle]
 	_caught_styles.clear()
+	_caught_spawning = 0
 
 
 func after_each() -> void:
-	for enemy in _owned:
+	for enemy in _given_own:
 		enemy.spawn_style = &""
-	_owned.clear()
-	_registry.call("remove", SpawnStyle.FOLDER, BIOME_STYLE)
-	_registry.call("remove", SpawnStyle.FOLDER, OWN_STYLE)
+	_given_own.clear()
+	_run.spawn_styles = [] as Array[SpawnStyle]
 	_run.room = null
 	_run.spawning = null
 	_run.at_snapshot = Callable()
@@ -77,10 +73,11 @@ func _caught() -> void:
 		if is_instance_valid(enemy):
 			var style: StringName = (enemy as Actor).spawn_style
 			_caught_styles[style] = int(_caught_styles.get(style, 0)) + 1
+			if (enemy as Actor).is_spawning():
+				_caught_spawning += 1
 
 
 func test_a_room_of_two_styles_plays_the_same_through_a_snapshot() -> void:
-	check(not _owned.is_empty(), "an enemy of the arena's biome names its own style")
 	var recorded := Desync.new()
 	_run.snapshot_at = SNAPSHOT_AT
 	var replay: Replay = await _run.record(&"play_requested", 0, 1, recorded)
@@ -91,6 +88,7 @@ func test_a_room_of_two_styles_plays_the_same_through_a_snapshot() -> void:
 		check(false, "the snapshot: %s" % problem)
 	check(_caught_styles.has(BIOME_STYLE) and _caught_styles.has(OWN_STYLE), "the snapshot caught bodies of both styles: %s" % _caught_styles)
 	check(not _caught_styles.has(SpawnStyle.DEFAULT["id"]), "and none in rise: %s" % _caught_styles)
+	check(_caught_spawning > 0, "with a body mid-spawn: %d" % _caught_spawning)
 	recorded.hashes = recorded.hashes.slice(SNAPSHOT_AT + 1)
 	var resumed := Desync.new()
 	await _run.resume(replay, _run.snapshot, SNAPSHOT_AT, 0, resumed)

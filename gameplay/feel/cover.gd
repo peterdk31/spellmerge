@@ -38,7 +38,8 @@ extends Node2D
 ##
 ## **It sways in the world's stirs** (docs/milestones/atmosphere.md, E): a tuft leans with the air the
 ## shots drag past it and is pushed out by a blast's wave and sways back (`cover.gdshader`, from the
-## spectacle's `stirs.gd`, handed to every batch whenever it changes: `step`'s `stirs`), as far as
+## spectacle's `stirs.gd`, handed to every batch by `step`'s `hand_stirs` whenever their version
+## changes; the cover knows nothing else of them), as far as
 ## its state bends, eased on Feel's clock.
 ##
 ## **A burning cell gives off embers and smoke** (GC8): a state's `motes`, given off by
@@ -55,7 +56,6 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const CoverMotesScript := preload("res://gameplay/feel/cover_motes.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
-const StirsScript := preload("res://gameplay/feel/stirs.gd")
 
 const ROOM_FOLDER: StringName = &"rooms"
 const COVER_FOLDER: StringName = &"cover"
@@ -326,9 +326,10 @@ func body_count() -> int:
 ## handed to the shader, and the cells they stand in walked; and the rows of each kind changed since
 ## the last frame handed to its batch; and the motes of the states that give some off, into `pool`
 ## (Feel's spectacle's; null: the particles are off) from the cells near `view` (the camera's
-## picture; empty: everywhere); and the world's stirs `stirs` (the spectacle's; null: none) handed to
-## the batches when they changed.
-func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, pool: MotesScript = null, view: Rect2 = Rect2(), stirs: StirsScript = null) -> void:
+## picture; empty: everywhere); and the world's stirs handed to the batches by `hand_stirs` (taking a
+## ShaderMaterial; the spectacle's `Stirs.hand_to`; none: not handed) whenever their `stirs_version`
+## is not the one handed last.
+func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
 	_now = now
 	if layout != null:
 		_find_bodies(table, focus)
@@ -337,9 +338,9 @@ func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, 
 		_times_dirty = false
 		_times_texture.update(_times)
 	motes.give_off(now, pool, view)
-	var stirred: bool = stirs != null and stirs.version != _stirs_version
+	var stirred: bool = hand_stirs.is_valid() and stirs_version != _stirs_version
 	if stirred:
-		_stirs_version = stirs.version
+		_stirs_version = stirs_version
 	var moved: bool = _bodies_moved()
 	if moved:
 		_sent = 1 - _sent
@@ -357,7 +358,7 @@ func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, 
 		var material := batch.material as ShaderMaterial
 		material.set_shader_parameter(&"view_time", now)
 		if stirred:
-			stirs.hand_to(material)
+			hand_stirs.call(material)
 		if moved:
 			material.set_shader_parameter(&"bodies", _send[_sent])
 			material.set_shader_parameter(&"body_count", _sent_count)

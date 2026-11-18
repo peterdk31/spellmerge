@@ -945,7 +945,7 @@ func step(real_delta: float) -> void:
 	var picture: Rect2 = party_camera.visible_rect()
 	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
 	_spectacle.step_stirs(_clock, picture)
-	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs)
+	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells

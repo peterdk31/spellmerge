@@ -10,14 +10,14 @@
 //                  clock); stir_strength how strongly (0: no blast in the slot).
 // `stir_wake` and `stir_blasts_at` are Stirs.wake_at and Stirs.blast_push, line for line.
 
-uniform sampler2D stir_field : filter_linear, repeat_disable;
+uniform sampler2D stir_field : hint_default_black, filter_linear, repeat_disable;
 uniform vec2 stir_origin = vec2(0.0);
 uniform vec4 stir_blasts[16];
 uniform float stir_strength[16];
 
 // Stirs.CELL, FIELD_W, FIELD_H, BLASTS, WAVE_SPEED, RISE, FALL.
 const float STIR_CELL = 16.0;
-const vec2 STIR_CELLS = vec2(48.0, 32.0);
+const vec2 STIR_CELLS = vec2(96.0, 64.0);
 const int STIR_BLASTS = 16;
 const float STIR_WAVE_SPEED = 260.0;
 const float STIR_RISE = 0.08;
@@ -45,7 +45,7 @@ float stir_envelope(float age) {
 	return (1.0 - t) * (1.0 - t) * cos(t * 3.14159265 * 1.5);
 }
 
-// The blasts' push at `p` at Feel's clock `now`: out from each that reaches it, added.
+// The blasts' push at `p` at Feel's clock `now`: out from each that reaches it, added, at most 1 long.
 vec2 stir_blasts_at(vec2 p, float now) {
 	vec2 push = vec2(0.0);
 	for (int k = 0; k < STIR_BLASTS; k++) {
@@ -62,5 +62,6 @@ vec2 stir_blasts_at(vec2 p, float now) {
 		float age = now - b.w - far / STIR_WAVE_SPEED;
 		push += away / far * (strength * (1.0 - far / b.z) * stir_envelope(age));
 	}
-	return push;
+	float most = length(push);
+	return most > 1.0 ? push / most : push;
 }

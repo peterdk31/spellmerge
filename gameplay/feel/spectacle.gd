@@ -1006,6 +1006,8 @@ func use_room(room: RoomBase) -> void:
 	ambient = room.ambient if room != null else 1.0
 	shade = room.shade if room != null else Color.WHITE
 	air.use(room.air if room != null else null)
+	# The last room's wake and blasts are not this one's.
+	stirs.clear()
 	if light != null:
 		light.set_ambient(ambient, shade)
 	_surface_source = _ramp_table.source(_surface_colors)

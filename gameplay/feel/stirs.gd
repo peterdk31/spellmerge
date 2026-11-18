@@ -29,11 +29,12 @@ extends RefCounted
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 
-## A cell of the wake, in world px, and the window's cells (768 x 512 px: the 640 x 360 view and a
-## margin round it, so a shot just off screen still drags what is on it).
+## A cell of the wake, in world px, and the window's cells (1,536 x 1,024 px: the widest view, the
+## party camera zoomed out to its MIN_ZOOM 0.5, 1,280 x 720, and a margin round it, so a shot just off
+## screen still drags what is on it and no cell on screen is let go as the window moves).
 const CELL: float = 16.0
-const FIELD_W: int = 48
-const FIELD_H: int = 32
+const FIELD_W: int = 96
+const FIELD_H: int = 64
 ## The most births read a frame (past it, every few: `stride`), and how much each drags its cell
 ## (times the births it stands for).
 const BIRTHS_READ: int = 256
@@ -54,9 +55,10 @@ const RISE: float = 0.08
 const FALL: float = 0.6
 const BLAST_FULL: float = 24.0
 const BLAST_LEAST: float = 0.4
-## Two blasts this near (px) and this close in time (s) are one (an explosion's shell and fireball).
+## Two blasts this near (px) and in the same frame (s apart at most) are one (an explosion's shell and
+## fireball, shown together).
 const SAME_PLACE: float = 6.0
-const SAME_TIME: float = 0.05
+const SAME_TIME: float = 0.001
 
 ## The wake's texture (FIELD_W x FIELD_H, red and green the way a cell is dragged), its window's
 ## corner in world px, and how many times anything handed to a shader changed (`hand_to`). Read only.
@@ -93,7 +95,13 @@ var _points: int = 0
 ## it pushes (0: none in the slot).
 var _blasts: PackedVector4Array = PackedVector4Array()
 var _blast_strength: PackedFloat32Array = PackedFloat32Array()
-var _next_blast: int = 0
+## The two pairs of copies the blasts are handed to the shaders in, in turn (`_sent` the one handed
+## last, copied at the `version` `_sent_version`), so the working arrays are never held by a material
+## and a write never copies one (as cover.gd's bodies).
+var _send_blasts: Array[PackedVector4Array] = []
+var _send_strength: Array[PackedFloat32Array] = []
+var _sent: int = 0
+var _sent_version: int = -1
 ## Feel's clock at the last step.
 var _now: float = 0.0
 
@@ -115,13 +123,23 @@ func _init() -> void:
 	_point_cell.resize(BIRTHS_READ)
 	_blasts.resize(BLASTS)
 	_blast_strength.resize(BLASTS)
-	_image = Image.create_empty(FIELD_W, FIELD_H, false, Image.FORMAT_RGF)
+	for pair in 2:
+		var blasts := PackedVector4Array()
+		blasts.resize(BLASTS)
+		_send_blasts.append(blasts)
+		var strength := PackedFloat32Array()
+		strength.resize(BLASTS)
+		_send_strength.append(strength)
+	# Half floats: filtered on every renderer (32-bit float textures need an extension to filter on
+	# WebGL 2 and GLES 3).
+	_image = Image.create_empty(FIELD_W, FIELD_H, false, Image.FORMAT_RGH)
 	texture = ImageTexture.create_from_image(_image)
 
 
 ## A blast at `at` of `radius` px (an explosion's part; Feel's `show_flash`), at Feel's clock `now`:
 ## its push wave runs out from there. A second part of the same explosion (as near, as soon) makes
-## it no stronger, only as big as the bigger.
+## it no stronger, only as big as the bigger. With all BLASTS pushing, a new one is let go: taking a
+## live one's slot would snap its push back.
 func blast(at: Vector2, radius: float, now: float) -> void:
 	if not at.is_finite() or not (radius > 0.0):
 		return
@@ -134,14 +152,14 @@ func blast(at: Vector2, radius: float, now: float) -> void:
 			_blast_strength[slot] = maxf(_blast_strength[slot], strength)
 			version += 1
 			return
-	# A slot whose blast is over, else the oldest.
-	var slot: int = _next_blast
-	for n in BLASTS:
-		var k: int = (_next_blast + n) % BLASTS
+	# A slot whose blast is over; none: the new one is let go.
+	var slot: int = -1
+	for k in BLASTS:
 		if _blast_strength[k] <= 0.0 or now - _blasts[k].w >= blast_seconds(_blasts[k].z):
 			slot = k
 			break
-	_next_blast = (slot + 1) % BLASTS
+	if slot < 0:
+		return
 	_blasts[slot] = Vector4(at.x, at.y, reach, now)
 	_blast_strength[slot] = strength
 	version += 1
@@ -166,8 +184,8 @@ static func blast_envelope(age: float) -> float:
 
 
 ## The blasts' push at `point` at Feel's clock `now`: the way out from each blast that reaches it,
-## as strong as it is there (nearer its middle more), added (each at most 1 long). The shader's
-## `stir_blasts`, line for line.
+## as strong as it is there (nearer its middle more), added, the sum at most 1 long (blasts side by
+## side push no further than one). The shader's `stir_blasts_at`, line for line.
 func blast_push(point: Vector2, now: float) -> Vector2:
 	var push := Vector2.ZERO
 	for slot in BLASTS:
@@ -181,7 +199,8 @@ func blast_push(point: Vector2, now: float) -> Vector2:
 			continue
 		var age: float = now - held.w - far / WAVE_SPEED
 		push += away / far * (strength * (1.0 - far / held.z) * blast_envelope(age))
-	return push
+	var most: float = push.length()
+	return push / most if most > 1.0 else push
 
 
 ## Once a frame, at Feel's clock `now`, with the view `view` (world px; empty: left where it is): the
@@ -380,8 +399,21 @@ func hand_to(material: ShaderMaterial) -> void:
 		return
 	material.set_shader_parameter(&"stir_field", texture)
 	material.set_shader_parameter(&"stir_origin", origin)
-	material.set_shader_parameter(&"stir_blasts", _blasts)
-	material.set_shader_parameter(&"stir_strength", _blast_strength)
+	if _sent_version != version:
+		_sent_version = version
+		_sent = 1 - _sent
+		var blasts: PackedVector4Array = _send_blasts[_sent]
+		var strength: PackedFloat32Array = _send_strength[_sent]
+		# Taken out while they are written, so the writes are in place.
+		_send_blasts[_sent] = PackedVector4Array()
+		_send_strength[_sent] = PackedFloat32Array()
+		for slot in BLASTS:
+			blasts[slot] = _blasts[slot]
+			strength[slot] = _blast_strength[slot]
+		_send_blasts[_sent] = blasts
+		_send_strength[_sent] = strength
+	material.set_shader_parameter(&"stir_blasts", _send_blasts[_sent])
+	material.set_shader_parameter(&"stir_strength", _send_strength[_sent])
 
 
 ## How many cells are not still (for tests).
@@ -398,7 +430,7 @@ func blast_count() -> int:
 	return live
 
 
-## Everything still again: no wake, no blasts (a room left, the light made anew).
+## Everything still again: no wake, no blasts (a new room: `Spectacle.use_room`).
 func clear() -> void:
 	_wake.fill(Vector2.ZERO)
 	_shown.fill(Vector2.ZERO)

@@ -183,14 +183,67 @@ func test_a_blast_pushes_out_as_its_wave_passes_and_sways_back_to_rest() -> void
 func test_an_explosions_two_parts_are_one_blast_and_old_ones_go() -> void:
 	var stirs := StirsScript.new()
 	stirs.blast(Vector2(100.0, 100.0), 16.0, 1.0)
-	stirs.blast(Vector2(102.0, 100.0), 30.0, 1.01)
+	stirs.blast(Vector2(102.0, 100.0), 30.0, 1.0)
 	check_equal(stirs.blast_count(), 1, "the shell and the fireball are one blast")
 	for k in StirsScript.BLASTS + 4:
-		stirs.blast(Vector2(20.0 * float(k), 300.0), 16.0, 1.0 + 0.2 * float(k))
+		stirs.blast(Vector2(20.0 * float(k), 300.0), 16.0, 1.1)
 	check_equal(stirs.blast_count(), StirsScript.BLASTS, "never more than BLASTS")
 	_clock = 20.0
 	stirs.step(_clock, _births, 0, VIEW)
 	check_equal(stirs.blast_count(), 0, "every one over is let go")
+
+
+func test_with_every_blast_pushing_a_new_one_cuts_none_short() -> void:
+	var stirs := StirsScript.new()
+	# Sixteen blasts far enough apart that each point is pushed by one.
+	var places := PackedVector2Array()
+	for k in StirsScript.BLASTS:
+		places.append(Vector2(200.0 * float(k % 4), 200.0 * float(k / 4)))
+		stirs.blast(places[k], 24.0, 0.0)
+	var points := PackedVector2Array()
+	for at in places:
+		points.append(at + Vector2(20.0, 0.0))
+	var last := PackedVector2Array()
+	last.resize(points.size())
+	var t: float = 0.0
+	for frame in 40:
+		if frame == 3:
+			stirs.blast(places[0] + Vector2(30.0, 0.0), 24.0, t)
+		for n in points.size():
+			var push: Vector2 = stirs.blast_push(points[n], t)
+			check(push.distance_to(last[n]) <= 1.5 * FRAME / StirsScript.RISE + 0.01, "no point's push jumps (point %d, frame %d)" % [n, frame])
+			last[n] = push
+		t += FRAME
+	check_equal(stirs.blast_count(), StirsScript.BLASTS, "the seventeenth was let go")
+
+
+func test_blasts_side_by_side_push_no_further_than_one() -> void:
+	var stirs := StirsScript.new()
+	for k in 5:
+		stirs.blast(Vector2(100.0 + 20.0 * float(k), 100.0), 30.0, 0.0)
+	var most: float = 0.0
+	var t: float = 0.0
+	while t < 1.5:
+		for x in range(40, 260, 10):
+			most = maxf(most, stirs.blast_push(Vector2(float(x), 130.0), t).length())
+		t += FRAME
+	check(most > 0.5 and most <= 1.0 + 0.0001, "the sum is at most 1 long (%.3f)" % most)
+
+
+func test_the_widest_view_is_covered_and_the_texture_is_half_floats() -> void:
+	var stirs := StirsScript.new()
+	var wide := Rect2(0.0, 0.0, 1280.0, 720.0)
+	for frame in 10:
+		_shot(Vector2(1270.0, 712.0), Vector2.LEFT)
+		_shot(Vector2(8.0, 6.0), Vector2.RIGHT)
+		_clock += FRAME
+		stirs.step(_clock, _births, _count, wide)
+		_count = 0
+	check(stirs.wake_at(Vector2(1270.0, 712.0)).x < 0.0, "a shot in the zoomed-out view's corner drags its wake")
+	check(stirs.wake_at(Vector2(8.0, 6.0)).x > 0.0, "and in the opposite corner")
+	var window := Rect2(stirs.origin, Vector2(StirsScript.FIELD_W, StirsScript.FIELD_H) * StirsScript.CELL)
+	check(window.encloses(wide.grow(64.0)), "the window holds the widest view and a margin")
+	check_equal(stirs.texture.get_format(), Image.FORMAT_RGH, "half floats: filtered on WebGL 2 and GLES 3")
 
 
 # --- The room's lights ----------------------------------------------------------------------------
@@ -301,6 +354,22 @@ func test_the_shaders_read_the_stirs_by_the_same_numbers() -> void:
 	check(include.contains("const int STIR_BLASTS = %d;" % StirsScript.BLASTS) and include.contains("stir_blasts[%d]" % StirsScript.BLASTS), "the blasts")
 	check(include.contains("const float STIR_WAVE_SPEED = %.1f;" % StirsScript.WAVE_SPEED), "the wave's speed")
 	check(include.contains("const float STIR_RISE = %s;" % str(StirsScript.RISE)) and include.contains("const float STIR_FALL = %s;" % str(StirsScript.FALL)), "the push's rise and fall")
+	check(include.contains("uniform sampler2D stir_field : hint_default_black, filter_linear, repeat_disable;"), "the wake reads black with none handed over")
+	# The functions' bodies, line for line with the GDScript.
+	var script: String = FileAccess.get_file_as_string("res://gameplay/feel/stirs.gd")
+	for pair: Array in [
+		["return r * r * (3.0 - 2.0 * r);", "return r * r * (3.0 - 2.0 * r)"],
+		["float t = min((age - STIR_RISE) / STIR_FALL, 1.0);", "var t: float = minf((age - RISE) / FALL, 1.0)"],
+		["return (1.0 - t) * (1.0 - t) * cos(t * 3.14159265 * 1.5);", "return (1.0 - t) * (1.0 - t) * cos(t * PI * 1.5)"],
+		["if (far >= b.z || far < 0.5) {", "if far >= held.z or far < 0.5:"],
+		["float age = now - b.w - far / STIR_WAVE_SPEED;", "var age: float = now - held.w - far / WAVE_SPEED"],
+		["push += away / far * (strength * (1.0 - far / b.z) * stir_envelope(age));", "push += away / far * (strength * (1.0 - far / held.z) * blast_envelope(age))"],
+		["return most > 1.0 ? push / most : push;", "return push / most if most > 1.0 else push"],
+		["vec2 at = (p - stir_origin) / STIR_CELL;", "var at: Vector2 = (point - origin) / CELL - Vector2(0.5, 0.5)"],
+		["if (at.x < 0.0 || at.y < 0.0 || at.x > STIR_CELLS.x || at.y > STIR_CELLS.y) {", "if at.x < -0.5 or at.y < -0.5 or at.x > float(FIELD_W) - 0.5 or at.y > float(FIELD_H) - 0.5:"],
+		["return textureLod(stir_field, at / STIR_CELLS, 0.0).rg;", "return top.lerp(bottom, fy)"],
+	]:
+		check(include.contains(pair[0]) and script.contains(pair[1]), "the shader and Stirs agree: %s" % pair[0])
 	var cover: String = FileAccess.get_file_as_string("res://gameplay/feel/cover.gdshader")
 	check(cover.contains("#include \"res://gameplay/feel/stir.gdshaderinc\""), "the cover reads the stirs")
 	check(cover.contains("const float STIR_SHOT_PIXELS = %s;" % str(CoverScript.STIR_SHOT_PIXELS)) and cover.contains("const float STIR_BLAST_PIXELS = %s;" % str(CoverScript.STIR_BLAST_PIXELS)), "by Cover's numbers")
@@ -332,7 +401,7 @@ func test_the_cover_is_handed_the_stirs_when_they_change() -> void:
 	cover.lay(CoverLayout.of(layout, room, [kind] as Array[CoverKind]))
 	var stirs := StirsScript.new()
 	stirs.blast(Vector2(10.0, 10.0), 20.0, 0.0)
-	cover.step(0.0, null, Vector2.INF, null, Rect2(), stirs)
+	cover.step(0.0, null, Vector2.INF, null, Rect2(), stirs.version, stirs.hand_to)
 	var batch: MultiMeshInstance2D = cover.batch_of(kind.id)
 	check(batch != null, "a batch")
 	if batch == null:
@@ -341,7 +410,7 @@ func test_the_cover_is_handed_the_stirs_when_they_change() -> void:
 	check(material.get_shader_parameter(&"stir_field") == stirs.texture, "the wake's texture")
 	check_equal((material.get_shader_parameter(&"stir_blasts") as PackedVector4Array)[0], Vector4(10.0, 10.0, 20.0 * StirsScript.BLAST_REACH + StirsScript.BLAST_PAD, 0.0), "the blast")
 	stirs.blast(Vector2(50.0, 10.0), 20.0, 0.5)
-	cover.step(0.5, null, Vector2.INF, null, Rect2(), stirs)
+	cover.step(0.5, null, Vector2.INF, null, Rect2(), stirs.version, stirs.hand_to)
 	check_equal((material.get_shader_parameter(&"stir_blasts") as PackedVector4Array)[1].x, 50.0, "a new blast is handed over")
 
 

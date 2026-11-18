@@ -62,6 +62,8 @@ const MAX_STRIP_SIDE: int = 64
 const MAX_STRIP_SCALE: int = 4
 ## The file beside a style's art that lists it (art/README.md, "The origin manifest").
 const ASSETS_FILE: String = "assets.json"
+## The kinds of file a mark strip may be (art/README.md, "Allowed files").
+const STRIP_FILES: PackedStringArray = ["png", "svg"]
 
 ## The style's id, which the registry keys it by; its folder's name.
 @export var id: StringName = &""
@@ -186,7 +188,10 @@ static func strip_scale(side: int, radius: float) -> int:
 ## motion needs (`MOTION_FRAMES`), colours that are neither the floor's nor a world material of
 ## the palette, a mark strip that is wrong (`_strip_problems`), a biome named twice, and
 ## given `known_cue` (a cue id to whether the game has it: the registry's), a cue it does not know.
-func problems(known_cue: Callable = Callable()) -> PackedStringArray:
+## Given `listed` ((assets_file: String, path: String) -> bool: whether that assets file lists the
+## file at `path`; the content tests read it), a strip its folder's `assets.json` does not list.
+## Pure: it reads no file itself.
+func problems(known_cue: Callable = Callable(), listed: Callable = Callable()) -> PackedStringArray:
 	var found := PackedStringArray()
 	var name: String = String(id) if id != &"" else resource_path
 	if id == &"":
@@ -209,7 +214,7 @@ func problems(known_cue: Callable = Callable()) -> PackedStringArray:
 		for line: String in Palette.world_problems([colours] as Array[StringName], "%s: colours" % name):
 			found.append(line + "; or 'floor'.")
 	if mark_strip != null:
-		_strip_problems(found, name)
+		_strip_problems(found, name, listed)
 	for at in biomes.size():
 		if biomes.find(biomes[at]) != at:
 			found.append("%s: it names the biome '%s' twice." % [name, biomes[at]])
@@ -230,8 +235,9 @@ static func _check_stage(found: PackedStringArray, name: String, stage: String, 
 ## A mark strip's problems, in `found`: frames that are not square, fewer than `MIN_FRAMES` (and
 ## than `close_frames` + 1, so each frame of the close is another), a side over `MAX_STRIP_SIDE`, a
 ## mark stage too short to show each frame at `CHECK_FPS`, and, for a style read from a file, a strip
-## that is not a file of its folder listed in the folder's `assets.json`.
-func _strip_problems(found: PackedStringArray, name: String) -> void:
+## that is not an image file of its folder (a `.png` or `.svg`, not a texture saved in a `.tres` or
+## embedded in one), or, given `listed`, one its folder's `assets.json` does not list.
+func _strip_problems(found: PackedStringArray, name: String, listed: Callable) -> void:
 	var frames: int = strip_frames(mark_strip)
 	if frames == 0:
 		found.append("%s: its mark strip is %dx%d, not a row of square frames (its width a whole number of its height)." % [name, mark_strip.get_width(), mark_strip.get_height()])
@@ -247,26 +253,20 @@ func _strip_problems(found: PackedStringArray, name: String) -> void:
 		return
 	var folder: String = resource_path.get_base_dir()
 	var art: String = mark_strip.resource_path
-	if art == "" or art.get_base_dir() != folder:
-		found.append("%s: its mark strip is not a file in its folder (%s)." % [name, folder])
-	elif not listed_in(folder.path_join(ASSETS_FILE), art):
+	if art == "" or art.contains("::") or art.get_base_dir() != folder or not STRIP_FILES.has(art.get_extension()):
+		found.append("%s: its mark strip is not a .png or .svg file in its folder (%s)." % [name, folder])
+	elif listed.is_valid() and not listed.call(folder.path_join(ASSETS_FILE), art):
 		found.append("%s: its mark strip %s is not listed in %s (path, origin, author, license; art/README.md)." % [name, art.get_file(), folder.path_join(ASSETS_FILE)])
 
 
-## Whether the assets file `file` (`{"assets": [{"path": ...}]}`, art/README.md) lists the file at
-## `path` (its path from the repository root, as an assets file writes it).
-static func listed_in(file: String, path: String) -> bool:
-	return SpellValidator.load_manifest(file, [] as Array[String]).has(path.trim_prefix("res://"))
-
-
 ## What is wrong with `styles` (every style the game has), one line each: each style's own
-## `problems(known_cue)`, and two styles that name one biome (no style may win a biome silently by
+## `problems(known_cue, listed)`, and two styles that name one biome (no style may win a biome silently by
 ## the order they are read in).
-static func all_problems(styles: Array[SpawnStyle], known_cue: Callable = Callable()) -> PackedStringArray:
+static func all_problems(styles: Array[SpawnStyle], known_cue: Callable = Callable(), listed: Callable = Callable()) -> PackedStringArray:
 	var found := PackedStringArray()
 	var biome_of: Dictionary[StringName, StringName] = {}
 	for style in styles:
-		found.append_array(style.problems(known_cue))
+		found.append_array(style.problems(known_cue, listed))
 		for biome: StringName in style.biomes:
 			if biome_of.has(biome) and biome_of[biome] != style.id:
 				found.append("%s and %s both name the biome '%s'; one style a biome." % [biome_of[biome], style.id, biome])

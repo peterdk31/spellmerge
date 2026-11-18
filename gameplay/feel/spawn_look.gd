@@ -304,6 +304,7 @@ func _lay_mark(body: Actor, share: float, style: SpawnStyle, motion: SpawnMotion
 		_mark_rim_share[_marks] = motion.rim_share(share, style)
 		_mark_strip[_marks] = null
 		_mark_frame[_marks] = -1
+		_mark_scale[_marks] = 0
 	_mark_at[_marks] = body.global_position.round()
 	_marks += 1
 

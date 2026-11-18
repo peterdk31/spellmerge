@@ -45,9 +45,9 @@ func test_every_style_file_has_no_problems() -> void:
 	var styles: Array[SpawnStyle] = _styles()
 	check(not styles.is_empty(), "the registry finds the styles in content/spawn_styles")
 	for style in styles:
-		check_equal(style.problems(_known_cue), PackedStringArray(), "%s has no problems" % style.resource_path)
+		check_equal(style.problems(_known_cue, MarkStrips.listed), PackedStringArray(), "%s has no problems" % style.resource_path)
 		check(style.resource_path.begins_with("res://content/spawn_styles/%s/" % style.id), "%s is in its own folder" % style.id)
-	check_equal(SpawnStyle.all_problems(styles, _known_cue), PackedStringArray(), "and the set has none")
+	check_equal(SpawnStyle.all_problems(styles, _known_cue, MarkStrips.listed), PackedStringArray(), "and the set has none")
 
 
 ## `rise` is today's look: `DEFAULT`'s numbers, each written out in its file; a style made in code
@@ -126,15 +126,15 @@ func after_each() -> void:
 func test_each_strip_problem_is_named() -> void:
 	check_equal(MarkStrips.style(&"rooted", MarkStrips.strip(16, 4)).problems(), PackedStringArray(), "four frames of 16 in rise's numbers")
 	check_equal(MarkStrips.style(&"rooted", MarkStrips.strip(SpawnStyle.MAX_STRIP_SIDE, 4)).problems(), PackedStringArray(), "frames as big as allowed")
-	# Each case: what is wrong, the strip, and the fields set.
+	# Each case: what is wrong, the strip, the fields set, and a word of the line it is named by.
 	var cases: Array = [
-		["frames that are not square (50 wide, 16 high)", MarkStrips.strip(16, 3, 50, 16), {}],
-		["a strip narrower than it is high", MarkStrips.strip(16, 1, 8, 16), {}],
-		["two frames", MarkStrips.strip(16, 2), {}],
-		["three frames and rise's close of 3: the close would show one frame twice", MarkStrips.strip(16, 3), {}],
-		["no more frames than close_frames (4 frames, a close of 4)", MarkStrips.strip(16, 4), {"close_frames": 4, "seconds": 1.2}],
-		["a mark stage too short for its frames (0.4 x 0.8 s x 60 = 19.2 < 24)", MarkStrips.strip(8, 24), {}],
-		["frames over 64 px", MarkStrips.strip(80, 4), {}],
+		["frames that are not square (50 wide, 16 high)", MarkStrips.strip(16, 3, 50, 16), {}, "square"],
+		["a strip narrower than it is high", MarkStrips.strip(16, 1, 8, 16), {}, "square"],
+		["two frames", MarkStrips.strip(16, 2), {}, "has 2 frames"],
+		["three frames and rise's close of 3: the close would show one frame twice", MarkStrips.strip(16, 3), {}, "has 3 frames"],
+		["no more frames than close_frames (4 frames, a close of 4)", MarkStrips.strip(16, 4), {"close_frames": 4, "seconds": 1.2}, "has 4 frames"],
+		["a mark stage too short for its frames (0.4 x 0.8 s x 60 = 19.2 < 24)", MarkStrips.strip(8, 24), {}, "too short for its strip"],
+		["frames over 64 px", MarkStrips.strip(80, 4), {}, "80 px"],
 	]
 	for case: Array in cases:
 		var style: SpawnStyle = MarkStrips.style(&"rooted", case[1])
@@ -142,7 +142,7 @@ func test_each_strip_problem_is_named() -> void:
 		for field: String in fields:
 			style.set(field, fields[field])
 		var found: PackedStringArray = style.problems()
-		check_equal(found.size(), 1, "%s: %s" % [case[0], found])
+		check(found.size() == 1 and found[0].contains(case[3]), "%s: %s" % [case[0], found])
 	var slow: SpawnStyle = MarkStrips.style(&"rooted", MarkStrips.strip(8, 24))
 	slow.seconds = 1.0
 	check_equal(slow.problems(), PackedStringArray(), "24 frames fit a mark stage of 0.4 x 1 s x 60 = 24")
@@ -151,20 +151,32 @@ func test_each_strip_problem_is_named() -> void:
 ## A style read from a file names a strip in its own folder, listed in the folder's assets.json.
 func test_a_strip_must_be_a_listed_file_of_its_folder() -> void:
 	var listed: SpawnStyle = _strip_in_folder("listed", true)
-	check_equal(listed.problems(), PackedStringArray(), "in its folder and listed")
+	check_equal(listed.problems(Callable(), MarkStrips.listed), PackedStringArray(), "in its folder and listed")
 	var unlisted: SpawnStyle = _strip_in_folder("unlisted", false)
-	var found: PackedStringArray = unlisted.problems()
+	var found: PackedStringArray = unlisted.problems(Callable(), MarkStrips.listed)
 	check(found.size() == 1 and found[0].contains("not listed") and found[0].contains("assets.json"), "not listed: %s" % [found])
+	check_equal(unlisted.problems(), PackedStringArray(), "with no lookup, no listing is asked for: problems() reads no file")
 	var elsewhere: SpawnStyle = _strip_in_folder("elsewhere", true)
 	elsewhere.resource_path = STRIP_ROOT.path_join("other/other.tres")
-	found = elsewhere.problems()
-	check(found.size() == 1 and found[0].contains("not a file in its folder"), "a strip of another folder: %s" % [found])
-	var made: SpawnStyle = MarkStrips.style(&"made", MarkStrips.strip(16, 4))
-	made.resource_path = STRIP_ROOT.path_join("made/made.tres")
-	found = made.problems()
-	check(found.size() == 1 and found[0].contains("not a file in its folder"), "a strip made in code, in a style of a file: %s" % [found])
-	check(SpawnStyle.listed_in(STRIP_ROOT.path_join("listed/assets.json"), STRIP_ROOT.path_join("listed/mark.png")), "listed_in reads the folder's list")
-	check(not SpawnStyle.listed_in(STRIP_ROOT.path_join("none/assets.json"), STRIP_ROOT.path_join("none/mark.png")), "and no list lists nothing")
+	found = elsewhere.problems(Callable(), MarkStrips.listed)
+	check(found.size() == 1 and found[0].contains("not a .png or .svg file in its folder"), "a strip of another folder: %s" % [found])
+	# Each: a strip whose path is not an image file of the style's folder.
+	for path: String in ["", "made/made.tres::ImageTexture_x", "made/mark.tres", "made/mark.webp"]:
+		var made: SpawnStyle = MarkStrips.style(&"made", MarkStrips.strip(16, 4))
+		made.resource_path = STRIP_ROOT.path_join("made/made.tres")
+		if path != "":
+			made.mark_strip.resource_path = STRIP_ROOT.path_join(path)
+		found = made.problems(Callable(), func(_file: String, _path: String) -> bool: return true)
+		check(found.size() == 1 and found[0].contains("not a .png or .svg file in its folder"), "a strip at '%s' (made in code, embedded, a .tres, a .webp), even listed: %s" % [path, found])
+	# The lookup the content test uses, on a repository path as an assets file writes it.
+	var list: String = STRIP_ROOT.path_join("repo/assets.json")
+	DirAccess.make_dir_recursive_absolute(list.get_base_dir())
+	var file := FileAccess.open(list, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"assets": [{"path": "content/spawn_styles/roots/mark.png"}]}))
+	file.close()
+	check(MarkStrips.listed(list, "res://content/spawn_styles/roots/mark.png"), "a res:// strip is found by its path from the repository root")
+	check(not MarkStrips.listed(list, "res://content/spawn_styles/roots/other.png"), "and another file is not")
+	check(not MarkStrips.listed(STRIP_ROOT.path_join("none/assets.json"), "res://content/spawn_styles/none/mark.png"), "no list lists nothing")
 
 
 ## A style in the folder `name` under `STRIP_ROOT`, as if read from its file there, its strip's png

@@ -55,6 +55,13 @@ static func write_folder(folder: String, mark: ImageTexture, listed: bool) -> St
 	return path
 
 
+## Whether the assets file `file` lists the file at `path` (a `res://` path as the repository root's
+## path, as an assets file writes it): the `listed` lookup `SpawnStyle.problems` takes, read with the
+## reader the art tests use (`SpellValidator.load_manifest`).
+static func listed(file: String, path: String) -> bool:
+	return SpellValidator.load_manifest(file, [] as Array[String]).has(path.trim_prefix("res://"))
+
+
 ## Remove a folder `write_folder` wrote.
 static func remove_folder(folder: String) -> void:
 	for name: String in DirAccess.get_files_at(folder):

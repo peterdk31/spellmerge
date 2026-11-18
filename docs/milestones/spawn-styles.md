@@ -170,7 +170,7 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
   - at least `MIN_FRAMES`, and one more than `close_frames`, so each frame of the close is another;
   - frames at most `MAX_STRIP_SIDE` (64 px);
   - a mark stage long enough at `CHECK_FPS` for every frame;
-  - for a style read from a file, the strip a file of its folder, listed in the folder's `assets.json`. `SpawnStyle.listed_in` reads it with `SpellValidator.load_manifest`, the reader the art tests use.
+  - for a style read from a file, the strip a `.png` or `.svg` file of its folder (not a texture in a `.tres`, nor one embedded in the style), listed in the folder's `assets.json`. `problems()` reads no file: as with `known_cue`, the caller hands in a lookup, `listed(assets_file, path)`. The content test's (`MarkStrips.listed`, tests/support/mark_strips.gd) reads the file with `SpellValidator.load_manifest`, the reader the art tests use, so core/base takes on neither file reads nor the spells validator.
 - **Drawing.** `SpawnLook` keeps each mark's strip, frame (-1: the ring) and scale in arrays sized once in `_init`, beside the ring's fill and rim (`_lay_mark`), and `_draw` draws a strip frame (`draw_texture_rect_region`) or the ring. Nothing is allocated per frame.
 - **No game style has a strip yet.** None fits today's content well enough: the crypt is the one biome, and its ring is the owner's default. content/spawn_styles/README.md has the steps, with an example (roots for a forest biome).
 - **Tests.**

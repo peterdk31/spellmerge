@@ -54,6 +54,19 @@ class CheckTest(unittest.TestCase):
         problems = sound_fixtures.check(self.root)
         self.assertTrue(any("older" in p for p in problems), problems)
 
+    def test_a_second_bake_writes_nothing(self) -> None:
+        self.assertEqual(sound_fixtures.bake(self.root, sound.wav_bytes, lambda _: None), [])
+
+    def test_a_held_fixture_without_its_import_is_named(self) -> None:
+        (self.root / sound_fixtures.FOLDER / "room_hum/room_hum.ogg.import").unlink()
+        problems = sound_fixtures.check(self.root)
+        self.assertTrue(any(".import: missing" in p for p in problems), problems)
+
+    def test_a_folder_no_fixture_names_is_named(self) -> None:
+        (self.root / sound_fixtures.FOLDER / "room_gone").mkdir()
+        problems = sound_fixtures.check(self.root)
+        self.assertTrue(any("room_gone" in p for p in problems), problems)
+
     def test_a_missing_file_is_named(self) -> None:
         (self.root / sound_fixtures.FOLDER / "room_hum/room_hum.ogg").unlink()
         problems = sound_fixtures.check(self.root)

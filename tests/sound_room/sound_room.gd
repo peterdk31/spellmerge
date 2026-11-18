@@ -8,9 +8,10 @@ extends Control
 ##
 ## **Rows.** An id named with no file is red (missing), and so is a file that nothing names (unnamed).
 ## A row plays its sound as the game would, on its bus: a one-shot through `Audio.play` (each press a
-## new variant: a randomizer picks one), a held sound or a room's bed loop through `Audio.hold` until
-## pressed again, an accent as a one-shot on the Ambience bus, and a music layer by playing its track
-## up to that layer. The fixtures (`fixtures/`, baked by `tools/sound_fixtures.py`: AU2's three
+## new variant: a randomizer picks one), a held sound through `Audio.hold` until pressed again, a
+## room's bed layer by playing its whole bed (`Audio.play_bed`, its layers at their levels) until
+## pressed again, an accent through `Audio.play_accent` at its bed's and its own level, and a music
+## layer by playing its track up to that layer. The fixtures (`fixtures/`, baked by `tools/sound_fixtures.py`: AU2's three
 ## samples, a held loop and a two-layer track, `room_track.tres`) are rows of their own, so the room
 ## is heard working before any game sound exists.
 ##
@@ -93,16 +94,16 @@ func _ready() -> void:
 		audio.registry = sounds
 		add_child(audio)
 	_names = SoundNames.new()
-	_names.read(registry, [[PRESET.hit_sound, "Feel's hit sound (its preset)"], [FeelScript.CAST_SOUND, "Feel's cast sound (staff_cast)"]])
+	_names.read(registry, SoundNames.feel_names(PRESET, FeelScript.CAST_SOUND))
 	_list()
 	_build()
 	print("SOUND ROOM: %d named, %d missing, %d unnamed, %d fixtures" % [_names.kinds.size(), count_of(State.MISSING), count_of(State.UNNAMED), count_of(State.FIXTURE)])
 
 
-func _exit_tree() -> void:
-	if _made_fixtures and is_instance_valid(fixtures):
+## Freed with the room (not on leaving the tree, so a room moved elsewhere keeps its fixtures).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _made_fixtures and is_instance_valid(fixtures):
 		fixtures.free()
-		fixtures = null
 
 
 ## How many rows are in `state`.
@@ -125,14 +126,18 @@ func press(id: StringName) -> void:
 		SoundNames.Kind.ONE_SHOT:
 			audio.play(id)
 		SoundNames.Kind.ACCENT:
-			audio.play(id, Vector2.INF, 0.0, AudioScript.BUS_AMBIENCE)
-		SoundNames.Kind.HELD, SoundNames.Kind.BED:
+			audio.play_accent(id, Vector2.ZERO, SoundNames.accent_volume(_names.bed_of(id), id), 1.0)
+		SoundNames.Kind.BED:
+			var bed: Ambience = _names.bed_of(id)
+			audio.play_bed(null if audio.ambience.ambience() == bed else bed)
+			for each: Row in rows:
+				_label(each)
+		SoundNames.Kind.HELD:
 			if row.handle != 0 and audio.is_held(row.handle):
 				audio.release(row.handle)
 				row.handle = 0
 			else:
-				var bus: StringName = AudioScript.BUS_AMBIENCE if row.kind == SoundNames.Kind.BED else AudioScript.BUS_SFX
-				row.handle = audio.hold(id, null, Vector2.INF, INF, 0.0, bus)
+				row.handle = audio.hold(id, null, Vector2.INF, INF, 0.0, AudioScript.BUS_SFX)
 			_label(row)
 		SoundNames.Kind.MUSIC:
 			for i in tracks.size():
@@ -282,10 +287,12 @@ func _row_view(row: Row) -> Control:
 func _label(row: Row) -> void:
 	if row.button == null:
 		return
-	var looping: bool = row.handle != 0
 	match row.kind:
-		SoundNames.Kind.HELD, SoundNames.Kind.BED:
-			row.button.text = "Stop" if looping else "Loop"
+		SoundNames.Kind.HELD:
+			row.button.text = "Stop" if row.handle != 0 else "Loop"
+		SoundNames.Kind.BED:
+			var bed: Ambience = _names.bed_of(row.id)
+			row.button.text = "Stop" if bed != null and audio.ambience.ambience() == bed else "Loop"
 		_:
 			row.button.text = "Play"
 

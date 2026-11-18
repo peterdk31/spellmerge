@@ -64,14 +64,18 @@ def bake(root: Path = sound.ROOT, encode: sound.Encoder = sound.ffmpeg_encode,
     written: list[Path] = []
     for sound_id, (source, _) in FIXTURES.items():
         made = recipe(sound_id)
-        written += sound.bake(made, root, encode, say)
         entries = root / made.folder / "assets.json"
+        before = entries.read_bytes() if entries.is_file() else None
+        files = sound.bake(made, root, encode, say)
         manifest = sound.read_json(entries)
         for entry in manifest["assets"]:
             entry["prompt"] = source
-        text = json.dumps(manifest, indent="\t", ensure_ascii=False) + "\n"
-        if entries.read_text(encoding="utf-8") != text:
-            entries.write_text(text, encoding="utf-8")
+        text = (json.dumps(manifest, indent="\t", ensure_ascii=False) + "\n").encode("utf-8")
+        entries.write_bytes(text)
+        if text == before:
+            # The bake wrote it with its own prompt; with the recipe named again it is as it was.
+            files = [f for f in files if f != made.folder / "assets.json"]
+        written += files
     return written
 
 
@@ -87,7 +91,9 @@ def check(root: Path = sound.ROOT) -> list[str]:
         want = sound.recipe_hash(made.data, patches, family)
         entries_path = root / made.folder / "assets.json"
         entries = {e["path"]: e for e in sound.read_json(entries_path).get("assets", [])} if entries_path.is_file() else {}
-        outputs = made.outputs(family) + ([] if made.data["kind"] == "held" else [made.folder / f"{sound_id}.tres"])
+        held = made.data["kind"] == "held"
+        outputs = made.outputs(family) + ([Path(o.as_posix() + ".import") for o in made.outputs(family)] if held
+                                          else [made.folder / f"{sound_id}.tres"])
         for out in outputs:
             if not (root / out).is_file():
                 problems.append(f"{out}: missing; run tools/sound_fixtures.py bake")
@@ -99,6 +105,10 @@ def check(root: Path = sound.ROOT) -> list[str]:
                 problems.append(f"{out}: baked from an older {source}; run tools/sound_fixtures.py bake")
             elif entry.get("prompt") != source:
                 problems.append(f"{out}: its manifest names {entry.get('prompt')!r}, not {source!r}")
+    if (root / FOLDER).is_dir():
+        for folder in sorted(p for p in (root / FOLDER).iterdir() if p.is_dir()):
+            if folder.name not in FIXTURES:
+                problems.append(f"{folder.relative_to(root)}: no fixture is named {folder.name} now; remove the folder")
     return problems
 
 

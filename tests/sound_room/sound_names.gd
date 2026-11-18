@@ -2,13 +2,16 @@ extends RefCounted
 ## The sound room's list (docs/milestones/sound.md, section 7): every sound id the game names, read
 ## from its data, never from a list kept here: the cues' `sound` and their `held` parts', an enemy's
 ## `death_sound`, its phases' held `look.sound` and its music, a room's music and its ambience's
-## layers and accents, and the ids Feel names itself (its preset's `hit_sound`, the cast sound),
-## which the room hands to `read`. Each id has the kind it is played as (the first that names it
-## wins) and where it is named; every music track is kept too, with its owner.
+## layers and accents, and the ids Feel names itself (`feel_names`: its preset's `hit_sound` and each
+## hit kind's `kind_looks` sound, and the cast sound), which the room hands to `read`. Each id has the
+## kind it is played as (the first that names it wins) and every place it is named; every music track
+## and ambience is kept too, with its owner.
 ##
 ##     var names := SoundNames.new()
-##     names.read(registry, [[&"hit", "Feel's hit"]])
+##     names.read(registry, SoundNames.feel_names(preset, &"cast"))
 ##     for id: StringName in names.ids(): ...
+
+const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 
 ## How a sound is played: a one-shot (SFX), held while its moment lasts (SFX), a layer of a music
 ## track (MusicDuck), a room's bed loop or one of its accents (Ambience).
@@ -17,22 +20,39 @@ enum Kind { ONE_SHOT, HELD, MUSIC, BED, ACCENT }
 ## Each named id's kind, and where it is named (lines such as "cue hit_spark").
 var kinds: Dictionary[StringName, Kind] = {}
 var where: Dictionary[StringName, PackedStringArray] = {}
-## Every music track the data names (each once), and its owner's name, by index.
+## Every music track the data names (each once), and its first owner's name, by index.
 var tracks: Array[MusicTrack] = []
 var track_owners: PackedStringArray = PackedStringArray()
+## Every ambience the data names (each once), and its first owner's name, by index.
+var beds: Array[Ambience] = []
+var bed_owners: PackedStringArray = PackedStringArray()
+
+
+## The ids Feel names itself, as [id, where] pairs for `read`: `preset`'s `hit_sound`, each hit kind's
+## sound (`kind_looks`, in kind order), and `cast` (Feel's `CAST_SOUND`).
+static func feel_names(preset: FeelPresetScript, cast: StringName) -> Array:
+	var found: Array = [[preset.hit_sound, "Feel's hit sound (its preset)"]]
+	var kinds_named: Array = preset.kind_looks.keys()
+	kinds_named.sort_custom(func(a: Variant, b: Variant) -> bool: return str(a) < str(b))
+	for kind: Variant in kinds_named:
+		var look: Dictionary = preset.kind_looks[kind]
+		found.append([StringName(look.get("sound", "")), "Feel's %s hit (its preset's kind_looks)" % kind])
+	found.append([cast, "Feel's cast sound (staff_cast)"])
+	return found
 
 
 ## Reads every folder of `registry` (`get_folders`, `get_all`), and `feel`'s own ids: pairs of
-## [id, where].
+## [id, where] (`feel_names`).
 func read(registry: Node, feel: Array) -> void:
 	kinds.clear()
 	where.clear()
 	tracks.clear()
 	track_owners.clear()
+	beds.clear()
+	bed_owners.clear()
 	for pair: Array in feel:
 		note(pair[0] as StringName, Kind.ONE_SHOT, pair[1] as String)
 	var folders: Array[StringName] = registry.call(&"get_folders")
-	var seen_beds: Array[Ambience] = []
 	for folder: StringName in folders:
 		var all: Array[Resource] = registry.call(&"get_all", folder)
 		for resource: Resource in all:
@@ -43,9 +63,7 @@ func read(registry: Node, feel: Array) -> void:
 			elif resource is RoomBase:
 				var room := resource as RoomBase
 				_read_track(room.music, "room %s" % room.id)
-				if room.ambience != null and not seen_beds.has(room.ambience):
-					seen_beds.append(room.ambience)
-					_read_bed(room.ambience, "room %s" % room.id)
+				_read_bed(room.ambience, "room %s" % room.id)
 
 
 ## Every named id, in id order.
@@ -68,13 +86,26 @@ func note(id: StringName, kind: Kind, place: String) -> void:
 		where[id].append(place)
 
 
-## The track that plays `id` as a layer, and that layer's place in it ([track, layer]; [] for none).
-func track_of(id: StringName) -> Array:
-	for track: MusicTrack in tracks:
-		var at: int = track.layers.find(id)
-		if at >= 0:
-			return [track, at]
-	return []
+## The ambience whose layer or accent `id` is (null: none).
+func bed_of(id: StringName) -> Ambience:
+	for bed: Ambience in beds:
+		for layer: AmbienceLayer in bed.layers:
+			if layer != null and layer.sound == id:
+				return bed
+		for accent: AmbienceAccent in bed.accents:
+			if accent != null and accent.sounds.has(id):
+				return bed
+	return null
+
+
+## The decibels the accent `id` plays at in `bed` (the bed's and the accent's own; 0: none).
+static func accent_volume(bed: Ambience, id: StringName) -> float:
+	if bed == null:
+		return 0.0
+	for accent: AmbienceAccent in bed.accents:
+		if accent != null and accent.sounds.has(id):
+			return bed.volume + accent.volume
+	return 0.0
 
 
 func _read_cue(cue: CueBase) -> void:
@@ -104,6 +135,11 @@ func _read_track(track: MusicTrack, owner: String) -> void:
 
 
 func _read_bed(bed: Ambience, owner: String) -> void:
+	if bed == null:
+		return
+	if not beds.has(bed):
+		beds.append(bed)
+		bed_owners.append(owner)
 	for layer: AmbienceLayer in bed.layers:
 		if layer != null:
 			note(layer.sound, Kind.BED, "ambience of %s" % owner)

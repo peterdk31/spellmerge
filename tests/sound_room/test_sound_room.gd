@@ -55,10 +55,11 @@ func _game() -> StandInGame:
 	var accent := AmbienceAccent.new()
 	accent.sounds = [&"cave_drip"] as Array[StringName]
 	bed.accents = [accent] as Array[AmbienceAccent]
-	var place := RoomBase.new()
-	place.id = &"cave"
-	place.ambience = bed
-	game.put(&"rooms", place)
+	for room_id: StringName in [&"cave", &"cave_deep"]:
+		var place := RoomBase.new()
+		place.id = room_id
+		place.ambience = bed
+		game.put(&"rooms", place)
 	game.file(&"slam_hit")
 	game.file(&"slam_scrape", true)
 	game.file(&"cave_air", true)
@@ -97,6 +98,24 @@ func test_a_named_id_with_no_file_is_missing_and_cannot_be_played() -> void:
 func test_a_file_nothing_names_is_unnamed() -> void:
 	_open(_game())
 	check_equal(room.row_of[&"stray_noise"].state, SoundRoomScript.State.UNNAMED, "a file nothing names (red)")
+
+
+func test_a_bed_shared_by_two_rooms_names_both() -> void:
+	_open(_game())
+	var where: String = room.row_of[&"cave_air"].where
+	check(where.contains("room cave,") or where.ends_with("room cave"), "the first room: %s" % where)
+	check(where.contains("room cave_deep"), "and the second: %s" % where)
+
+
+func test_every_hit_kinds_sound_of_feels_preset_is_a_row() -> void:
+	_open(_game())
+	var kinds_found: int = 0
+	for kind: Variant in SoundRoomScript.PRESET.kind_looks:
+		var id := StringName((SoundRoomScript.PRESET.kind_looks[kind] as Dictionary).get("sound", ""))
+		if id != &"":
+			kinds_found += 1
+			check(room.row_of.has(id), "%s's hit sound %s is a row" % [kind, id])
+	check(kinds_found >= 2, "the preset names its hit kinds' sounds")
 
 
 func test_the_games_own_data_is_listed() -> void:
@@ -140,11 +159,10 @@ func test_a_one_shot_plays_a_voice_on_sfx() -> void:
 func test_an_accent_plays_on_the_ambience_bus() -> void:
 	_open(_game())
 	room.press(&"cave_drip")
-	check_equal(room.audio.voices.last, &"cave_drip", "it plays")
-	for i in AudioScript.VOICES:
-		var voice := room.audio.voices.player(i) as AudioStreamPlayer2D
-		if voice.stream == room.audio.sound(&"cave_drip"):
-			check_equal(voice.bus, AudioScript.BUS_AMBIENCE, "on Ambience")
+	var voice: AudioStreamPlayer2D = room.audio.ambience.accent_voice()
+	check(voice != null and voice.stream == room.audio.sound(&"cave_drip"), "on the bed's accent voices")
+	if voice != null:
+		check_equal(voice.bus, AudioScript.BUS_AMBIENCE, "on Ambience")
 
 
 func test_a_held_sound_loops_until_pressed_again() -> void:
@@ -163,12 +181,17 @@ func test_a_held_sound_loops_until_pressed_again() -> void:
 	check_equal(row.button.text, "Loop", "its button loops it again")
 
 
-func test_a_bed_loops_on_the_ambience_bus() -> void:
-	_open(_game())
+func test_a_bed_layer_plays_its_whole_bed_on_the_ambience_bus_until_pressed_again() -> void:
+	var game := _game()
+	_open(game)
 	room.press(&"cave_air")
-	var row: SoundRoomScript.Row = room.row_of[&"cave_air"]
-	check(room.audio.is_held(row.handle), "it is held")
-	check_equal(room.audio.held.voice_of(row.handle).bus, AudioScript.BUS_AMBIENCE, "on Ambience")
+	var bed: Ambience = (game.folders[&"rooms"][0] as RoomBase).ambience
+	check(room.audio.ambience.ambience() == bed, "its bed plays, as a room's does")
+	check(room.audio.ambience.stream_of(0) == room.audio.sound(&"cave_air"), "its layer's sound")
+	check_equal(room.audio.ambience.bed_player(0).bus, AudioScript.BUS_AMBIENCE, "on Ambience")
+	check_equal(room.row_of[&"cave_air"].button.text, "Stop", "its button stops it")
+	room.press(&"cave_air")
+	check(room.audio.ambience.ambience() == null, "pressed again, the bed goes")
 
 
 func test_the_fixture_track_steps_through_its_intensity() -> void:
@@ -180,6 +203,8 @@ func test_the_fixture_track_steps_through_its_intensity() -> void:
 	check(music.call(&"track") == SoundRoomScript.FIXTURE_TRACK, "it plays")
 	check(music.call(&"stream_of", 0) == room.audio.sound(&"room_track_calm"), "its first layer's sound")
 	check(music.call(&"is_heard", 0) and not music.call(&"is_heard", 1), "intensity 1: the calm layer alone")
+	for node: Node in music.get_children():
+		check_equal((node as AudioStreamPlayer).bus, AudioScript.BUS_MUSIC_DUCK, "every music player on MusicDuck")
 	room.set_intensity(at, 2)
 	check(music.call(&"is_heard", 0) and music.call(&"is_heard", 1), "intensity 2: both layers")
 	for i in 120:
@@ -202,10 +227,11 @@ func test_the_duck_lowers_the_music_and_lets_it_back() -> void:
 	room.duck()
 	for i in 10:
 		room.audio.step(FRAME)
-	check(room.audio.buses.ducked() < -1.0, "the music is lowered: %s dB" % room.audio.buses.ducked())
+	var duck_bus: int = AudioServer.get_bus_index(AudioScript.BUS_MUSIC_DUCK)
+	check(AudioServer.get_bus_volume_db(duck_bus) < -1.0, "the MusicDuck bus is lowered: %s dB" % AudioServer.get_bus_volume_db(duck_bus))
 	for i in 180:
 		room.audio.step(FRAME)
-	check(is_equal_approx(room.audio.buses.ducked(), 0.0), "and back up once its seconds are out")
+	check(is_equal_approx(AudioServer.get_bus_volume_db(duck_bus), 0.0), "and back up once its seconds are out")
 
 
 func test_a_bus_slider_sets_its_volume() -> void:

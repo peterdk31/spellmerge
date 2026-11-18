@@ -10,7 +10,9 @@ extends RefCounted
 ## apart (hub rework HR-H2, docs/milestones/hub-rework.md, "Holes" 6): **walking** sees a room's
 ## holes as it sees a prop's ground (`walk_clear`, `detour`, the run-up), so an AI walks round a
 ## crack; **the line of fire and cover** do not (`line_clear`, `ground_clear`, `shot_clear`, and
-## `cover`'s wall), so it shoots across a crack and never hides behind one. Static, nothing
+## `cover`'s wall), so it shoots across a crack and never hides behind one. The line of fire
+## (`fire_clear`) also minds a prop's whole hit shape, which a shot stops on: a pillar's tall body
+## hides a wizard behind it from a shot that would pass over its ground. Static, nothing
 ## allocated per call.
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -21,6 +23,8 @@ const DIRECTIONS: Array[Vector2] = [
 	Vector2(-1, 0), Vector2(-0.70710678, -0.70710678), Vector2(0, -1), Vector2(0.70710678, -0.70710678)]
 ## A probe end the goal is in view from beats any end it is not, whatever the distance.
 const IN_VIEW_BONUS: float = 100000.0
+## How many probes out a flank looks (`flank`): its probe, then twice it.
+const FLANK_REACH: int = 2
 ## The run-up (boss plan OB14): the ways round its target a start is looked for along, and how far
 ## clear of the wall behind it the body stands there (pixels past its own radius).
 const RUN_UP_WAYS: int = 16
@@ -37,6 +41,22 @@ const RUN_UP_WALK_COST: float = 0.5
 ## nothing blocks.
 static func line_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector2) -> bool:
 	return projectiles == null or projectiles.grid().line_clear(from, to)
+
+
+## True when a shot from `from` to `to` (body to body) would get there: no wall (room or spell) and
+## no prop's hit shape (a pillar's whole body, not only its ground: a shot is spent on it) within
+## `width` of the line (its shot's hit width either side) before the shot meets its target, `short`
+## pixels before `to` (the target's reach plus `width`: a wizard hugging a pillar is still hit by a
+## shot from its open side). What an AI's line of fire asks before an aimed cast. Without a
+## projectile manager nothing blocks.
+static func fire_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector2, width: float = 0.0, short: float = 0.0) -> bool:
+	if projectiles == null:
+		return true
+	var length: float = from.distance_to(to)
+	var end: Vector2 = to
+	if short > 0.0 and length > 0.0:
+		end = from + (to - from) * maxf(1.0 - short / length, 0.0)
+	return projectiles.line_clear(from, end) and projectiles.props_clear(from, end, width)
 
 
 ## True when no ground of a body that cannot move (a pillar's footprint) lies between `from` and
@@ -125,6 +145,34 @@ static func detour(projectiles: ProjectilesScript, from: Vector2, goal: Vector2,
 			best_score = score
 			best = way
 	return best
+
+
+## The way (unit length) to a place its target can be shot from: of the eight ways whose first
+## `probe` pixels can be walked, one from whose end a shot `width` either side would reach `aim` (the
+## target's body, `short` of it; `fire_clear`, from the end's body, `eye` above its feet) and no blocking body's
+## ground lies on to `goal` (the target's feet; `ground_clear`), as the brain's line of fire asks;
+## the end whose distance to `aim` is nearest its own now (a step round, not a walk past the prop
+## into the target). With none, the same `FLANK_REACH` times as far (a wizard right behind a pillar
+## is hidden in a wide shadow); ZERO when none is near, or with no projectile manager.
+static func flank(projectiles: ProjectilesScript, from: Vector2, goal: Vector2, aim: Vector2, eye: Vector2, probe: float, width: float = 0.0, short: float = 0.0) -> Vector2:
+	if projectiles == null:
+		return Vector2.ZERO
+	var now: float = (from + eye).distance_to(aim)
+	for ring in FLANK_REACH:
+		var length: float = probe * float(ring + 1)
+		var best: Vector2 = Vector2.ZERO
+		var best_change: float = INF
+		for way: Vector2 in DIRECTIONS:
+			var end: Vector2 = from + way * length
+			if not walk_clear(projectiles, from, end) or not ground_clear(projectiles, end, goal) or not fire_clear(projectiles, end + eye, aim, width, short):
+				continue
+			var change: float = absf((end + eye).distance_to(aim) - now)
+			if change < best_change:
+				best_change = change
+				best = way
+		if best != Vector2.ZERO:
+			return best
+	return Vector2.ZERO
 
 
 ## The way (unit length) to cover from `threat`: of the eight ways whose first `probe` pixels can

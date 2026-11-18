@@ -1,6 +1,6 @@
 # Spawn styles: each biome (or enemy) names how its enemies spawn in
 
-**Status (2026-11-18): approved; the owner answered its questions (the end of this document) and asked for it to be built now. AS1 done (the data, with no change on screen; "As built (AS1)" below); AS2 to AS4 to come.** The owner asked whether it is easy to change the spawn animation or add new ones in other biomes, then asked for this plan.
+**Status (2026-11-18): approved; the owner answered its questions (the end of this document) and asked for it to be built now. AS1 done (the data, with no change on screen; "As built (AS1)" below); AS2 done (a style picked per body; "As built (AS2)"); AS3 and AS4 to come.** The owner asked whether it is easy to change the spawn animation or add new ones in other biomes, then asked for this plan.
 
 Today (enemy spawning EA1–EA5, docs/milestones/enemy-spawning.md) the spawn has one look. A mark grows on the floor, then the body rises out of it. The look is written in `gameplay/feel/spawn_look.gd`:
 - its timing is constants there (`MARK_END`, `CLOSE_FROM`, the frame counts);
@@ -107,6 +107,22 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
 
   The step ids (EA1 to EA6, AS1 to AS4) and `run_room_paced` stay. A body's spawn points are still "spawns" (`enemy_spawns`); the act is "spawning".
 - **No change on screen.** `tests/screenshots/shot_spawning.gd`'s strip was compared before and after, with the global seed pinned and particles off: identical to the pixel. The dust motes follow Feel's real clock and the run's enemies its random seed, so an unpinned strip differs between any two runs, on main too.
+
+**As built (AS2):**
+- `SpawnStyle.pick(registry, enemy, biome)` (core/base) is pure and never names Feel. Its order is the plan's, with two choices the code needed:
+  - an id the registry lacks (the enemy's own misnamed, or deleted) is passed over to the next step, never an error. `tests/core/test_spawn_style.gd` checks that every style an enemy or boss names is one of the registry's, so a typo is not silent;
+  - with no `rise` (or no registry) it returns `from_default()`, a style made of `DEFAULT`'s numbers.
+- `EnemyBase.spawn_style` (empty by default). No content sets it yet: AS3 gives the storm fork `materialize`.
+- `Actor.spawn(seconds, style)`: `spawn_style` is state next to `spawn_seconds`, and like it is kept once the body lands. A spawn of 0 seconds (or not a number) clears it. Nothing in the simulation reads it.
+- Flow picks in `_stand_enemy`, for a room's enemies and a phase's adds alike, through `spawn_style_for(data)`: `pick` with the registry, the enemy and the room's biome. It replaces AS1's `Flow.spawn_seconds()`. The bot test now waits for the longest `Actor.spawn_seconds` of the room's enemies.
+- `SpawnLook.style_for(body)` reads `body.spawn_style`. An id the lookup does not find is drawn as the lookup's `rise` (the registry's), and only with no `rise` as `DEFAULT`, so an unknown id always draws as the game's rise.
+- `Registry.remove(folder, id)` undoes a test's `add` on the game's registry, so a fixture style does not leak into the next suite.
+- **Tests.**
+  - test_spawn_style.gd: the picker's order, two styles naming one biome (first by id, and a problem of the set), an enemy override, a missing style, no rise and no registry, and every enemy's style a style.
+  - test_spawn.gd: a snapshot mid-spawn restores the style, a look drawing from the restored state draws its own style's mark and motion, and the state hash holds the style.
+  - test_spawn_look.gd: each body is drawn by its own style, with an unknown id as the lookup's rise, and `cut()` hands a body from one motion to another when its style's motion changes mid-spawn (a recording fixture motion; AS1 left that path untested).
+  - test_flow.gd and test_flow_adds.gd: room enemies and adds spawn in the style Flow picks, for its seconds.
+  - tests/core/test_snapshot_spawn_styles.gd: the arena with two fixture styles (a biome's and an enemy's own, of other lengths), played with a snapshot mid-spawn and resumed in a fresh game, agrees tick for tick.
 
 Each step updates the README of the areas it touches, and `content/spawn_styles/README.md` (new) is the guide: copy `rise/`, change the numbers, name your biome.
 

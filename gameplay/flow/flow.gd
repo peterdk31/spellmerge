@@ -25,8 +25,9 @@ extends Node
 ## (`run_room_chosen`, ids of `EnemyBase.FOLDERS`: enemies and bosses; rooms hold layout only). A boss
 ## stands at its enemy spawns as the room starts, so its intro opens on a body that is there and
 ## drawn. Every other one **spawns in** (enemy spawning EA3, docs/milestones/enemy-spawning.md):
-## `_stand_enemy` sets it to `Actor.spawn` for its style's seconds (`spawn_seconds`: `rise`'s, spawn
-## styles AS1) before it enters the tree, so it
+## `_stand_enemy` picks its style (`SpawnStyle.pick`: the enemy's own, else the room's biome's, else
+## `rise`; spawn styles AS2) and sets it to `Actor.spawn` for that style's seconds and id before it
+## enters the tree, so it
 ## is not there yet (no hurt shape, no touch, no step of its own) while Feel draws a mark and its body
 ## rising out of it; a phase's adds spawn in too. They come **in groups as the room gets quiet** (EA5:
 ## `spawn_queue`, `RoomSpawning`), at the pace the run tells with the room (`run_room_paced`: a group's
@@ -1452,7 +1453,7 @@ func _spawn_enemies(parent: Node2D, data: EnemyBase, count: int, first: int, spa
 ## play (`Actor.players`, boss plan OB13) and told to difficulty (`enemy_standing`: scaled to the
 ## room, run generation RG5), both before its data is applied. With `spawn_in` it spawns in (enemy
 ## spawning EA3: `Actor.spawn`, set before it enters the tree, so its hurt shape is never registered
-## while it spawns in). Null when no body could be made.
+## while it spawns in), in the style `spawn_style_for` picks. Null when no body could be made.
 func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, spawn_in: bool = false) -> Actor:
 	var enemy := RoomContents.make_body(data) as Actor
 	if enemy == null:
@@ -1460,7 +1461,8 @@ func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, spawn_in: bool =
 	enemy.position = at
 	enemy.players = _players_in_play()
 	if spawn_in:
-		enemy.spawn(spawn_seconds())
+		var style: SpawnStyle = spawn_style_for(data)
+		enemy.spawn(style.seconds, style.id)
 	if events != null:
 		events.enemy_standing.emit(enemy)
 	parent.add_child(enemy)
@@ -1468,12 +1470,10 @@ func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, spawn_in: bool =
 	return enemy
 
 
-## How long an enemy's spawn lasts: the seconds of the style `rise` (content/spawn_styles/rise/; spawn
-## styles AS1: every body spawns in as `rise` until AS2 picks a style per body), or
-## `SpawnStyle.DEFAULT`'s when the registry has none.
-func spawn_seconds() -> float:
-	var style: SpawnStyle = registry.get_resource(SpawnStyle.FOLDER, SpawnStyle.DEFAULT["id"]) as SpawnStyle if registry != null else null
-	return style.seconds if style != null else float(SpawnStyle.DEFAULT["seconds"])
+## The style an enemy of `data` spawns in in, in the room played now (spawn styles AS2): `SpawnStyle.pick`
+## from the registry, the enemy and the room's biome (none with no room).
+func spawn_style_for(data: EnemyBase) -> SpawnStyle:
+	return SpawnStyle.pick(registry, data, _room.biome if _room != null else &"")
 
 
 ## The room's enemies are forgotten (they went with the room), those still to come,

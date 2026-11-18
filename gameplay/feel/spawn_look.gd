@@ -12,8 +12,9 @@ extends Node2D
 ##
 ## **A style says the numbers** (`SpawnStyle`, content/spawn_styles/): where the stages hand over, the
 ## mark's frames and the cue. Feel hands the look a lookup of the styles by id (`style_of`, the
-## registry's `spawn_styles`); a style it cannot find is drawn as `SpawnStyle.DEFAULT` (`rise`'s
-## numbers). Every body spawns in as `rise` today (spawn styles AS1); which style a body has is AS2.
+## registry's `spawn_styles`), and draws each body by its own (`Actor.spawn_style`, state, which Flow
+## picked: `SpawnStyle.pick`, spawn styles AS2). An id it cannot find (a style missing on this machine,
+## an old snapshot, a deleted folder) is drawn as `rise`, and with no `rise` as `SpawnStyle.DEFAULT`.
 ## **A motion draws the body** (`MOTIONS`, gameplay/feel/spawn_motions/: one object each, keyed by
 ## the names of `SpawnStyle.MOTIONS`; a test holds the two lists together): a motion it does not
 ## have is drawn as `rise`, so a body is never drawn whole mid-spawn. What every style shares is here:
@@ -54,8 +55,8 @@ const NO_FLOOR: PackedColorArray = [Color(0.55, 0.55, 0.6), Color(0.35, 0.35, 0.
 ## Plays a cue: (cue: StringName, at: Vector2, weighted: bool). Set by Feel; none plays nothing.
 var play_cue: Callable = Callable()
 ## Finds a style by its id: (id: StringName) -> SpawnStyle, null for none. Set by Feel (the
-## registry's `spawn_styles`); none, or a style it does not find, is `SpawnStyle.DEFAULT`. Setting it
-## forgets the styles looked up.
+## registry's `spawn_styles`); a style it does not find is `rise`'s, and with none of those (or no
+## lookup) `SpawnStyle.DEFAULT`. Setting it forgets the styles looked up.
 var style_of: Callable = Callable():
 	set(value):
 		style_of = value
@@ -71,7 +72,7 @@ var _motions: Dictionary[StringName, SpawnMotionScript] = {}
 ## cue was played.
 var _cut: Dictionary[int, SpawnMotionScript] = {}
 var _risen: Dictionary[int, bool] = {}
-## The styles looked up, by id (a style not found is kept as the default), and the default.
+## The styles looked up, by id (a style not found is kept as `rise`'s or the default), and the default.
 var _styles: Dictionary[StringName, SpawnStyle] = {}
 var _default_style: SpawnStyle = SpawnStyle.from_default()
 ## This frame's marks: where (whole pixels) and how wide; `_marks` of them are in use.
@@ -125,18 +126,21 @@ func forget_styles() -> void:
 	_styles.clear()
 
 
-## The style `body` spawns in in: today always `rise` (spawn styles AS2 reads the body's own).
-func style_for(_body: Actor) -> SpawnStyle:
-	return _style(SpawnStyle.DEFAULT["id"])
+## The style `body` spawns in in: its own (`Actor.spawn_style`), or `rise` for an id not found.
+func style_for(body: Actor) -> SpawnStyle:
+	return _style(body.spawn_style)
 
 
-## The style of id `id`, looked up once (`style_of`); the default when there is none.
+## The style of id `id`, looked up once (`style_of`); `rise` when there is none, and the default when
+## there is no `rise` either.
 func _style(id: StringName) -> SpawnStyle:
 	var style: SpawnStyle = _styles.get(id)
 	if style != null:
 		return style
 	if style_of.is_valid():
 		style = style_of.call(id) as SpawnStyle
+		if style == null and id != SpawnStyle.DEFAULT["id"]:
+			style = _style(SpawnStyle.DEFAULT["id"])
 	if style == null:
 		style = _default_style
 	_styles[id] = style

@@ -302,3 +302,22 @@ func test_adds_still_spawning_when_the_boss_dies_crumble_once_they_land() -> voi
 	check_equal(flow.enemies_left(), 0, "landed, they crumbled")
 	check_equal(deaths.size(), imps.size(), "each death told")
 	check_equal(cleared, 1, "the room is cleared once, after the last")
+
+
+## A phase's adds spawn in the style Flow picks for them, as a room's enemies do (spawn styles AS2):
+## here a style naming the room's biome, added to the game's registry for the test.
+func test_the_adds_spawn_in_their_picked_style() -> void:
+	_start(1)
+	var style := SpawnStyle.from_default()
+	style.id = &"fixture_adds_style"
+	style.seconds = 1.4
+	style.biomes = [flow._room.biome] as Array[StringName]
+	check(registry.call("add", SpawnStyle.FOLDER, style), "added")
+	_boss().phases.begin(0)
+	var imps: Array[Actor] = _imps()
+	check(not imps.is_empty(), "its adds stood")
+	for imp: Actor in imps:
+		check(imp.is_spawning(), "an add spawns")
+		check_equal(imp.spawn_style, style.id, "in the biome's style")
+		check(is_equal_approx(imp.spawn_seconds, style.seconds), "for its seconds")
+	check(registry.call("remove", SpawnStyle.FOLDER, style.id), "removed")

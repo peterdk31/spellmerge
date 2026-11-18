@@ -261,20 +261,61 @@ func test_combat_knows_every_enemy_and_wizard() -> void:
 	check_equal(combat.call("actor_count"), _room_count() + 4 + _props_in_combat(), "every enemy, wizard and breakable prop is registered with combat")
 
 
-## A spawn lasts the seconds of the registry's style `rise` (spawn styles AS1), or
-## `SpawnStyle.DEFAULT`'s when the registry has none.
-func test_an_spawn_lasts_the_rise_styles_seconds() -> void:
+## The style an enemy spawns in is `SpawnStyle.pick`'s from Flow's registry, the enemy and the room's
+## biome (spawn styles AS2): the enemy's own, else the biome's, else rise, else `DEFAULT`'s.
+func test_an_enemys_spawn_style_is_picked_by_the_enemy_then_the_rooms_biome() -> void:
+	_playing(1)
+	var biome: StringName = flow._room.biome
+	check(biome != &"", "the room has a biome")
 	var kept: RegistryScript = flow.registry
 	var fixture := RegistryScript.new()
 	flow.registry = fixture
-	check_equal(flow.spawn_seconds(), float(SpawnStyle.DEFAULT["seconds"]), "no style: the default's")
+	var plain := EnemyBase.new()
+	var own := EnemyBase.new()
+	own.spawn_style = &"fixture_own"
+	check_equal(flow.spawn_style_for(plain).seconds, float(SpawnStyle.DEFAULT["seconds"]), "no style: the default's")
 	var slow := SpawnStyle.from_default()
 	slow.seconds = 1.2
 	fixture.add(SpawnStyle.FOLDER, slow)
-	check_equal(flow.spawn_seconds(), 1.2, "the registry's rise")
+	check_equal(flow.spawn_style_for(plain), slow, "the registry's rise")
+	var biomes := SpawnStyle.from_default()
+	biomes.id = &"fixture_biome"
+	biomes.biomes = [biome] as Array[StringName]
+	fixture.add(SpawnStyle.FOLDER, biomes)
+	check_equal(flow.spawn_style_for(plain), biomes, "the room's biome's")
+	check_equal(flow.spawn_style_for(own), biomes, "an enemy's own the registry lacks: the biome's")
+	var owned := SpawnStyle.from_default()
+	owned.id = &"fixture_own"
+	fixture.add(SpawnStyle.FOLDER, owned)
+	check_equal(flow.spawn_style_for(own), owned, "the enemy's own")
 	flow.registry = kept
 	fixture.free()
-	check_equal(flow.spawn_seconds(), (kept.get_resource(SpawnStyle.FOLDER, &"rise") as SpawnStyle).seconds, "the game's rise")
+	check_equal(flow.spawn_style_for(plain), kept.get_resource(SpawnStyle.FOLDER, &"rise"), "the game's: rise in the crypt (no style names a biome yet)")
+	_stop()
+
+
+## Every room enemy spawns in the style Flow picks, with its seconds: here a style naming the room's
+## biome, added to the game's registry for the test, so every one of them (none names its own).
+func test_the_rooms_enemies_spawn_in_their_picked_style() -> void:
+	_join(1)
+	events.emit_signal("play_requested", 0)
+	var biome: StringName = flow._room.biome
+	flow.stop_run()
+	var style := SpawnStyle.from_default()
+	style.id = &"fixture_room_style"
+	style.seconds = 1.3
+	style.biomes = [biome] as Array[StringName]
+	check(flow.registry.add(SpawnStyle.FOLDER, style), "added")
+	events.emit_signal("play_requested", 0)
+	flow.stand_all_now()
+	check(not flow._enemies.is_empty(), "the room has enemies")
+	for enemy: Node in flow._enemies:
+		var body := enemy as Actor
+		check(body.is_spawning(), "%s spawns" % body.name)
+		check_equal(body.spawn_style, style.id, "%s in the biome's style" % body.name)
+		check(is_equal_approx(body.spawn_seconds, style.seconds), "%s for its seconds" % body.name)
+	check(flow.registry.remove(SpawnStyle.FOLDER, style.id), "removed")
+	_stop()
 
 
 ## Every enemy of the room spawns in as it starts (enemy spawning EA3): set to spawn in before it entered
@@ -285,7 +326,7 @@ func test_the_rooms_enemies_spawn_as_it_starts() -> void:
 	check(not flow._enemies.is_empty(), "the room has enemies")
 	for enemy: Node in flow._enemies:
 		var body := enemy as Actor
-		check(body.is_spawning() and is_equal_approx(body.spawn_seconds, flow.spawn_seconds()), "%s spawns" % body.name)
+		check(body.is_spawning() and is_equal_approx(body.spawn_seconds, flow.spawn_style_for(body.data).seconds), "%s spawns" % body.name)
 		check(not body.hurtbox.registered, "%s is not in Combat while it spawns" % body.name)
 	check_equal(combat.call("actor_count"), 1 + _props_in_combat(), "Combat knows the wizard and the props alone")
 	check_equal(flow.enemies_left(), _room_count(), "the spawning enemies count as the room's")

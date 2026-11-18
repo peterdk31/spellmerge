@@ -88,15 +88,15 @@ extends Node2D
 ## it is state, so Feel draws the fall from it (`fall_share`) on a machine that joins mid-fall.
 ##
 ## Spawning (enemy spawning EA1, docs/milestones/enemy-spawning.md, "The simulation"): a body Flow
-## stands with `spawn(seconds)` (set before it is added to the tree) is not there yet for
+## stands with `spawn(seconds, style)` (set before it is added to the tree) is not there yet for
 ## `spawn_left` seconds: it is down to everything that asks (`is_down`: its hurt shape is never
 ## registered, so it can't be hurt, targeted or possessed, and its contact damage starts only once it
 ## has landed), it neither touches nor is touched (`_touch`, both ways), and its step holds it: the
 ## timer counts down and the hurt shape follows, then it returns before its phases, possession,
 ## controller, caster and mover (its intent cleared, `velocity` zero), and the tick does not `move` it
 ## (no slide, no ground check, so a spawn never turns into a fall). The tick its timer runs out it
-## steps as a standing body. All of it is state (`spawn_left`, `spawn_seconds`), so Feel draws the
-## spawn from it (`spawn_share`, `SpawnLook`) on a machine that joins mid-spawn.
+## steps as a standing body. All of it is state (`spawn_left`, `spawn_seconds`, `spawn_style`), so Feel
+## draws the spawn from it (`spawn_share`, `SpawnLook.style_for`) on a machine that joins mid-spawn.
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
 ## health (times `stat_scale`, the room's scale, and by the players in play, `players`), walking speed, contact damage, staff, cards and
@@ -266,10 +266,15 @@ var fell_by: int = ActorsScript.NONE
 ## and whether it has stood on any since it was placed.
 var ground: Vector2 = Vector2.ZERO
 var has_ground: bool = false
-## Its spawn (enemy spawning EA1, see the class doc): seconds of it left (0: standing), and how long
-## the whole spawn was (what `spawn_share` is counted against).
+## Its spawn (enemy spawning EA1, see the class doc): seconds of it left (0: standing), how long
+## the whole spawn was (what `spawn_share` is counted against), and the id of the style it spawns in
+## in (spawn styles AS2: `SpawnStyle.pick`'s, which Feel draws it by; empty for a body never set to
+## spawn, kept once it lands as `spawn_seconds` is). State, so
+## every machine, a snapshot and a player who joins mid-spawn draw the same style; nothing in the
+## simulation reads the id.
 var spawn_left: float = 0.0
 var spawn_seconds: float = 0.0
+var spawn_style: StringName = &""
 
 
 func _enter_tree() -> void:
@@ -483,16 +488,19 @@ func _hold_spawning(delta: float) -> void:
 		look.step(delta)
 
 
-## It spawns in for `seconds` from now (enemy spawning EA1, see the class doc): Flow calls it before
-## the body is added to the tree, so its hurt shape is never registered while it spawns in. 0 or less
-## (or not finite) stands it at once.
-func spawn(seconds: float) -> void:
+## It spawns in for `seconds` from now in the style of id `style` (enemy spawning EA1, see the class
+## doc; spawn styles AS2): Flow calls it before the body is added to the tree, with the style it picked
+## (`SpawnStyle.pick`), so its hurt shape is never registered while it spawns in. 0 or less (or not
+## finite) stands it at once.
+func spawn(seconds: float, style: StringName) -> void:
 	if not is_finite(seconds) or seconds <= 0.0:
 		spawn_left = 0.0
 		spawn_seconds = 0.0
+		spawn_style = &""
 		return
 	spawn_left = seconds
 	spawn_seconds = seconds
+	spawn_style = style
 	velocity = Vector2.ZERO
 	intent.clear()
 	if actors != null and id != ActorsScript.NONE:

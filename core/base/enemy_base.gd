@@ -66,6 +66,9 @@ const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 
 ## The biomes it fights in (`RoomBase.biome`). Empty: no run's (the dummies).
 @export var biomes: Array[StringName] = []
+## How it spawns in (spawn styles AS2, docs/milestones/spawn-styles.md): a style's id
+## (content/spawn_styles), which wins over its room's biome's (`SpawnStyle.pick`). Empty: its room's.
+@export var spawn_style: StringName = &""
 ## What it costs of a room's enemy budget (at least 1): the tougher, the more.
 @export_range(1, 100) var cost: int = 1
 ## The first row of a run's map it may stand in (0: the first room on).

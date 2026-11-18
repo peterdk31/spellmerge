@@ -3,12 +3,13 @@ extends "res://tests/support/suite.gd"
 ## `spawn` before it is added is not there yet for its seconds. It can't be hurt (its hurt shape is
 ## never registered), targeted or possessed (`is_down`); it neither touches nor is touched; it doesn't
 ## think, cast, move or step its phases (no adds called); its contact damage starts only once it has
-## landed; it lands on time; a snapshot mid-spawn is restored with it, and Feel's look draws it
-## from that state alone; the state hash holds it. Real actors in the actor fixture's world, real
+## landed; it lands on time; a snapshot mid-spawn is restored with it (its style too, spawn styles
+## AS2), and Feel's look draws it from that state alone, in its own style; the state hash holds it. Real actors in the actor fixture's world, real
 ## Combat.
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const Snapshot := preload("res://core/sim/snapshot.gd")
+const Motion := preload("res://gameplay/feel/spawn_motions/spawn_motion.gd")
 
 const START: Vector2 = Vector2(150.0, 100.0)
 ## How long the spawns here last (any length: today's `rise`'s), and the ticks one takes at the
@@ -31,8 +32,8 @@ func after_each() -> void:
 
 ## An enemy (health, a hurt circle, contact damage 10, a Mover) driven by a scripted controller that
 ## walks right (none unless `controlled`), set to spawn in before it is added (as Flow does), at `at`.
-## `data` (optional) is applied as an enemy's.
-func _spawning(at: Vector2 = START, data: EnemyBase = null, controlled: bool = true) -> Actor:
+## `data` (optional) is applied as an enemy's. It spawns in the style of id `style`.
+func _spawning(at: Vector2 = START, data: EnemyBase = null, controlled: bool = true, style: StringName = SpawnStyle.DEFAULT["id"]) -> Actor:
 	var body := Actor.new()
 	body.name = "Spawning"
 	var health := Health.new()
@@ -49,7 +50,7 @@ func _spawning(at: Vector2 = START, data: EnemyBase = null, controlled: bool = t
 		controller.move = Vector2.RIGHT
 		body.add_child(controller)
 	body.data = data
-	body.spawn(SECONDS)
+	body.spawn(SECONDS, style)
 	return _world.add(body, at)
 
 
@@ -76,7 +77,7 @@ func _run(count: int) -> void:
 func test_it_is_down_unhittable_and_unpossessable_while_it_spawns() -> void:
 	var body: Actor = _spawning()
 	# Long enough to outlast the shot's flight (the fixture's `shoot` steps the world).
-	body.spawn(5.0)
+	body.spawn(5.0, SpawnStyle.DEFAULT["id"])
 	check(body.is_spawning() and body.is_down() and not body.is_downed(), "spawning: down to everything, but not downed")
 	check(not body.hurtbox.registered, "its hurt shape was never registered, not even on its first tick")
 	check(not Possession.can_start(body), "it can't be possessed")
@@ -127,7 +128,7 @@ func test_it_casts_nothing_while_it_spawns() -> void:
 	# A press waits for its first think: none while it spawns in.
 	controller.presses = [0] as Array[int]
 	body.add_child(controller)
-	body.spawn(SECONDS)
+	body.spawn(SECONDS, SpawnStyle.DEFAULT["id"])
 	_world.add(body, START)
 	_run(SPAWN_TICKS - 1)
 	check_equal(_world.projectiles.get_count(), 0, "no shot while it spawns")
@@ -194,17 +195,21 @@ func test_its_phases_and_their_adds_wait_until_it_lands() -> void:
 func test_spawn_with_no_time_stands_at_once() -> void:
 	var body := Actor.new()
 	body.add_child(Hurtbox.new())
-	body.spawn(0.0)
+	body.spawn(0.0, SpawnStyle.DEFAULT["id"])
 	_world.add(body, START)
 	check(not body.is_spawning() and not body.is_down(), "0 seconds: standing")
 	check(body.hurtbox.registered, "registered as it was added")
-	body.spawn(NAN)
+	check_equal(body.spawn_style, &"", "in no style")
+	body.spawn(NAN, SpawnStyle.DEFAULT["id"])
 	check(not body.is_spawning(), "not a number: standing")
+	check_equal(body.spawn_style, &"", "in no style either")
 
 
 func test_a_snapshot_mid_spawn_is_restored_and_drawn() -> void:
-	# A body with no controller of a test's own, so the snapshot takes it whole.
-	var body: Actor = _spawning(START, null, false)
+	# A body with no controller of a test's own, so the snapshot takes it whole, in a style of its
+	# own whose mark lasts longer than rise's (spawn styles AS2).
+	var body: Actor = _spawning(START, null, false, &"fixture_slow")
+	check_equal(body.spawn_style, &"fixture_slow", "it spawns in the style it was given")
 	_run(8)
 	var left: float = body.spawn_left
 	var id: int = body.id
@@ -213,19 +218,28 @@ func test_a_snapshot_mid_spawn_is_restored_and_drawn() -> void:
 	_run(1)
 	body.spawn_left = 0.0
 	body.spawn_seconds = 0.0
+	body.spawn_style = &"rise"
 	check_equal(snapshot.restore(_areas(), root, _world.prepare), PackedStringArray(), "restored")
 	check_equal(_world.table.node_of(id), body, "the same body")
 	check(body.is_spawning() and is_equal_approx(body.spawn_left, left), "mid-spawn again: %s" % body.spawn_left)
 	check(is_equal_approx(body.spawn_seconds, SECONDS), "with its whole spawn's seconds")
+	check_equal(body.spawn_style, &"fixture_slow", "and its style")
 	check(not body.hurtbox.registered, "its hurt shape still off")
-	# Feel's look reads the state alone: a machine that joins mid-spawn draws it.
+	# Feel's look reads the state alone: a machine that joins mid-spawn draws it, in its style.
+	var slow := SpawnStyle.from_default()
+	slow.id = &"fixture_slow"
+	slow.mark_end = 0.8
 	var look := SpawnLook.new()
+	look.style_of = func(style_id: StringName) -> SpawnStyle: return slow if style_id == slow.id else null
 	root.add_child(look)
 	look.step(_world.table, 0.0)
 	look.cut()
 	check_equal(look.drawn(), 1, "drawn spawning")
 	check_equal(body.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "cut at its feet")
 	check_equal(look.marks(), 1, "its mark on the floor")
+	check(body.spawn_share() > SpawnStyle.DEFAULT["mark_end"] and body.spawn_share() < slow.mark_end, "past rise's mark, inside its own: %s" % body.spawn_share())
+	check_equal(int(look.mark(0).z), SpawnLook.mark_radius(body.wall_radius(), body.spawn_share(), slow), "its mark by its style's frames")
+	check_equal(look.shift_of(body), Motion.body_height(body), "still all under the floor, as its style says (rise's would be rising)")
 	_run(SPAWN_TICKS)
 	look.step(_world.table, 0.0)
 	look.cut()
@@ -239,7 +253,10 @@ func test_the_state_hash_holds_the_spawn() -> void:
 	_run(3)
 	var before: int = SimHash.area(StateWalk.new(), "body", body)
 	body.spawn_left -= 0.0625
-	check(SimHash.area(StateWalk.new(), "body", body) != before, "a spawn further on hashes otherwise")
+	var further: int = SimHash.area(StateWalk.new(), "body", body)
+	check(further != before, "a spawn further on hashes otherwise")
+	body.spawn_style = &"fixture_other"
+	check(SimHash.area(StateWalk.new(), "body", body) != further, "and one in another style")
 
 
 func _areas() -> Dictionary:
@@ -254,7 +271,7 @@ func _areas() -> Dictionary:
 func test_a_body_with_nothing_to_drive_it_is_not_still_while_it_spawns() -> void:
 	var body := Actor.new()
 	body.add_child(Hurtbox.new())
-	body.spawn(SECONDS)
+	body.spawn(SECONDS, SpawnStyle.DEFAULT["id"])
 	_world.add(body, START)
 	check(not body.is_still(), "not still while it spawns")
 	check(not _world.table.is_still(body.id), "the actor table steps it")

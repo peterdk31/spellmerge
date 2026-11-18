@@ -13,12 +13,15 @@ extends Resource
 ## as a card's behaviour is a row of `ModifierBase.RULES` and the kit that runs it.
 ##
 ## The simulation knows only a style's `seconds` (the body can't be hurt and can't act for so long)
-## and its id; everything else is drawn (gameplay/feel/spawn_look.gd). Today every body spawns in as
-## `rise` (content/spawn_styles/rise/); which style a body gets is AS2 (`pick`, to come).
+## and its id; everything else is drawn (gameplay/feel/spawn_look.gd). Which style a body gets is
+## `pick` (spawn styles AS2): the enemy's own, else its room's biome's, else `rise`. Flow picks it as it
+## stands the body and hands the actor its seconds and id (`Actor.spawn`).
 ##
 ## `DEFAULT` is `rise`'s numbers, kept here for when no style is found (the `rise` folder deleted, an
 ## id another machine does not have): a test holds them to content/spawn_styles/rise/rise.tres. A field's
 ## default is its number in `DEFAULT`, so a style file only writes what it changes.
+
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## The registry's folder of the styles (content/spawn_styles), which Flow and Feel find them in.
 const FOLDER: StringName = &"spawn_styles"
@@ -75,6 +78,30 @@ const FLOOR: StringName = &"floor"
 ## The biomes it is the spawn of (`RoomBase.biome`, as an enemy names its `biomes`). No two styles
 ## name one biome (`all_problems`). Empty: no biome's (`rise`, the default, is every other biome's).
 @export var biomes: Array[StringName] = []
+
+
+## The style an enemy of `enemy` spawns in in, in a room of biome `biome`, from `registry`'s styles
+## (spawn styles AS2): the enemy's own (`EnemyBase.spawn_style`), else the first style by id that
+## names `biome` (`all_problems` makes it the only one), else `rise`, else (no `rise` found: its folder
+## deleted, or no registry) a style of `DEFAULT`'s numbers. An id the registry does not have (the
+## enemy's own, or a biome's style named wrong) is passed over, never an error: the content's tests
+## name it. Pure: it reads the registry and the data, and never names Feel, so Flow picking a style
+## does not tie Flow to the look.
+static func pick(registry: RegistryScript, enemy: EnemyBase, biome: StringName) -> SpawnStyle:
+	if registry != null:
+		if enemy != null and enemy.spawn_style != &"":
+			var own := registry.get_resource(FOLDER, enemy.spawn_style) as SpawnStyle
+			if own != null:
+				return own
+		if biome != &"":
+			for item: Resource in registry.get_all(FOLDER):
+				var style := item as SpawnStyle
+				if style != null and style.biomes.has(biome):
+					return style
+		var rise := registry.get_resource(FOLDER, DEFAULT["id"]) as SpawnStyle
+		if rise != null:
+			return rise
+	return from_default()
 
 
 ## A style of `DEFAULT`'s numbers, made now: what is drawn when no style is found.

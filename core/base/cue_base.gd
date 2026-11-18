@@ -29,7 +29,7 @@ extends Resource
 ##   `seconds`    the most it lasts
 ##   `volume`     decibels on top of the sound's own (0 when not given; a louder scrape, +4)
 ## A held sound the same caster already holds is taken over (its end and seconds the new part's). Feel plays it
-## (`gameplay/feel/sounds.gd`).
+## (`gameplay/feel/held_sounds.gd`, on core/audio).
 ##
 ## A part with no `part` (or `"part": "flash"`) is a flash Feel draws:
 ##   `flash`      a flash kind's id (required; content/flashes, `FlashKind`)
@@ -151,6 +151,9 @@ extends Resource
 ## `hold_target` on the target (each held alone; nobody else waits), `hold_shot` to hold the shot
 ## being sent too, `stop_game` seconds of the game-wide stop (only a downed player and a boss's
 ## death: melee I7), and the `sound` id asked from the registry (silent until an `.ogg` exists).
+## `duck` (decibels, DUCK_MOST to 0; 0, the default, none) lowers the music while its sound plays, so
+## a reaction or a boss's slam is heard over it (docs/milestones/sound.md, section 5: Feel asks
+## Audio's `duck` for the sound's length when it plays it; a cue with no sound file ducks nothing).
 ## The holds and the game-wide stop are the game's: `gameplay/combat/hit_stop.gd` plays them where
 ## the simulation's moments happen (online-ready N4), Feel only the rest.
 ##
@@ -192,6 +195,8 @@ const HELD_KEYS: Array[String] = ["part", "sound", "seconds", "volume"]
 ## The most seconds a `held` part lasts, and its volume's range in decibels.
 const HELD_SECONDS: float = 30.0
 const HELD_VOLUME: float = 24.0
+## The deepest `duck` (decibels; core/audio's buses hold the same).
+const DUCK_MOST: float = -24.0
 ## The part types a cue may have (a part's `part`; none is `flash`), each with the keys it may have.
 const PART_TYPES: Dictionary = {&"flash": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS, &"stream": STREAM_KEYS, &"lane": LANE_KEYS, &"held": HELD_KEYS}
 ## What a `stream` part gives off (its `kind`).
@@ -211,6 +216,8 @@ const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
 @export var hold_shot: bool = false
 @export_range(0.0, 0.5, 0.01) var stop_game: float = 0.0
 @export var sound: StringName = &""
+## How far the music is lowered while its sound plays (see above; 0: not at all).
+@export_range(-24.0, 0.0, 0.5) var duck: float = 0.0
 ## Its own colour (none while its alpha is 0), and how strong it plays (see above).
 @export var color: Color = Color(0.0, 0.0, 0.0, 0.0)
 @export_range(0.1, 4.0, 0.05) var power: float = 1.0
@@ -247,6 +254,8 @@ func problems() -> PackedStringArray:
 		found.append("%s: power %s is 0 or less" % [id, power])
 	if every < 0.0:
 		found.append("%s: every %s is below 0" % [id, every])
+	if duck > 0.0 or duck < DUCK_MOST:
+		found.append("%s: duck %s is not from %s to 0 decibels" % [id, duck, DUCK_MOST])
 	if not KICK_WAYS.has(kick_way):
 		found.append("%s: kick_way '%s' is not one of %s" % [id, kick_way, KICK_WAYS])
 	for i in parts.size():

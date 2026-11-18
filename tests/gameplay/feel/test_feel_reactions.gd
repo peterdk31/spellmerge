@@ -4,6 +4,7 @@ extends "res://tests/support/suite.gd"
 ## than the fixed pools hold.
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
+const AudioScript := preload("res://core/audio/audio.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
@@ -41,6 +42,11 @@ func before_each() -> void:
 	_feel = own(FeelScript.new()) as FeelScript
 	_feel.events = _bus
 	_feel.registry = _registry
+	# Its sounds are asked of its Audio's registry: the same asking one.
+	var audio: AudioScript = own(AudioScript.new()) as AudioScript
+	audio.registry = _registry
+	root.add_child(audio)
+	_feel.audio = audio
 	_feel.drive_engine = false
 	_feel.preset = FeelPresetScript.new()
 	root.add_child(_feel)

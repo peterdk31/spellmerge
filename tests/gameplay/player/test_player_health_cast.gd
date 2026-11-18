@@ -512,11 +512,12 @@ func test_a_press_that_fired_while_held_leaves_no_buffered_cast() -> void:
 
 
 # --- The cast sound ----------------------------------------------------------------------------
+# Feel plays it on `staff_cast` (tests/gameplay/feel/test_feel_sounds.gd); the seat has no player.
 
 
 func test_a_cast_with_no_cast_sound_is_still_sent() -> void:
 	var wizard: Actor = _wizards(1)
-	check(_world.registry.get_sound(PlayerController.CAST_SOUND_ID) == null, "the test registry has no cast sound")
+	check(_world.registry.get_sound(&"cast") == null, "the test registry has no cast sound")
 	_arm(wizard, 1.0, 0.0)
 	check(wizard.caster.cast(0), "a cast with no sound still fires")
 	check_equal(_casts.size(), 1, "the seat still sends it")
@@ -530,17 +531,11 @@ func test_a_cast_with_no_registry_is_still_sent() -> void:
 	check_equal(_casts.size(), 1, "the seat still sends it")
 
 
-func test_inside_the_tree_the_seat_has_a_sound_player() -> void:
-	# The fixture's wizards are in the tree.
-	check(Fixture.controller(_wizards(1))._sound_player != null, "inside the tree the seat has a sound player")
-
-
-func test_a_missing_cast_sound_plays_nothing() -> void:
-	var wizard: Actor = _wizards(1)
-	var seat: PlayerController = Fixture.controller(wizard)
-	_arm(wizard, 1.0, 0.0)
-	check(wizard.caster.cast(0), "a cast with the sound player but no sound fires")
-	check(seat._sound_player != null and not seat._sound_player.playing, "and plays nothing")
+func test_the_seat_has_no_sound_player_of_its_own() -> void:
+	# The simulation plays no sound (docs/milestones/sound.md, section 5).
+	var seat: PlayerController = Fixture.controller(_wizards(1))
+	for child in seat.get_children():
+		check(not (child is AudioStreamPlayer or child is AudioStreamPlayer2D), "no player under the seat: %s" % child.name)
 
 
 # --- Several players ---------------------------------------------------------------------------

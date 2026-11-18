@@ -68,7 +68,7 @@ extends PanelContainer
 ##   air end), asks for it in the run playing (`shot_cap_requested`) and is saved (`projectile_cap`).
 ## - **Audio** tab: "Ambience volume: 100%", a slider like those, from `AmbienceVolume.MIN` to MAX
 ##   by its STEP (0% to 100% by 10%; `AmbienceVolume.DEFAULT`, 100%), sending
-##   `ambience_volume_changed`, which feel hands to the room's sound (atmosphere D; heard on
+##   `ambience_volume_changed`, which Audio eases its `Ambience` bus to (atmosphere D; heard on
 ##   `AmbienceVolume.share_of`'s curve, 0% silent),
 ##   and saved (`ambience_volume`).
 ## - **Interface** tab: "Screen shake: On" (or Off; melee I6: `screen_shake_changed`, saved as

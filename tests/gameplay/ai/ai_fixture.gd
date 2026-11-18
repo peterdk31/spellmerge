@@ -10,6 +10,7 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
+const AudioScript := preload("res://core/audio/audio.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
@@ -83,6 +84,8 @@ var players: Array[Actor] = []
 ## Feel, for the telegraph lanes (`with_feel`; docs/milestones/cast-timing.md, T6b); null until
 ## asked, then stepped with the world.
 var feel: Node = null
+## Feel's own Audio (`with_feel`), on the fixture's bus and registry, freed with it.
+var audio: AudioScript = null
 var _root: Node
 
 
@@ -244,7 +247,12 @@ static func look(body: Actor) -> CreatureLook:
 ## with it: what draws an enemy's telegraph lane (`Feel.lanes()`). Made once.
 func with_feel() -> Node:
 	if feel == null:
+		audio = AudioScript.new()
+		audio.events = bus as EventsScript
+		audio.registry = registry
+		_root.add_child(audio)
 		feel = FeelScript.new()
+		feel.set("audio", audio)
 		feel.set("events", bus)
 		feel.set("actors", actors)
 		feel.set("drive_engine", false)
@@ -302,6 +310,13 @@ func free_all() -> void:
 	if feel != null and is_instance_valid(feel):
 		feel.free()
 	feel = null
+	if audio != null and is_instance_valid(audio):
+		audio.clear_world()
+		audio.music.stop()
+		audio.ambience.stop()
+		audio.buses.reset()
+		audio.free()
+	audio = null
 	for node: Node in [combat, spells, registry, projectiles, actors, bus]:
 		if node != null and is_instance_valid(node):
 			node.free()

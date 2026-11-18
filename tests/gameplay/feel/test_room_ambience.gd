@@ -1,13 +1,17 @@
 extends "res://tests/support/suite.gd"
 ## Atmosphere D (docs/milestones/atmosphere.md): a room's sound under its music, heard only
-## (`Ambience`, core/base; `gameplay/feel/room_ambience.gd`). The data and its problems, the game's
-## rooms and their files, silence with none, the fade in and out across a room change, the bus, the
-## accents' gaps and spreads, and a frame making no object. A registry of the test's own answers the
-## test's sound ids with a looping silent stream and knows the test's own rooms.
+## (`Ambience`, core/base). Feel's room sound (`gameplay/feel/room_ambience.gd`) picks the room's
+## ambience and times its accents; Audio plays the bed and the accents (core/audio `ambience.gd`,
+## docs/milestones/sound.md, section 5). The data and its problems, the game's rooms and their
+## files, silence with none, the fade in and out across a room change, the bus, the accents' gaps and
+## spreads, and a frame making no object. A registry of the test's own answers the test's sound ids
+## with a looping silent stream and knows the test's own rooms; each room sound plays on an Audio of
+## the test's own.
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
-const MusicScript := preload("res://gameplay/feel/music.gd")
+const AudioScript := preload("res://core/audio/audio.gd")
+const BedScript := preload("res://core/audio/ambience.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 
 const FRAME: float = 1.0 / 60.0
@@ -62,18 +66,36 @@ func before_each() -> void:
 
 func after_each() -> void:
 	if fx != null:
-		if fx.feel != null and is_instance_valid(fx.feel):
-			(fx.feel as FeelScript).ambience().stop()
-			(fx.feel as FeelScript).music().stop()
 		fx.free_all()
 
 
 func _player() -> RoomAmbienceScript:
+	var audio: AudioScript = own(AudioScript.new()) as AudioScript
+	audio.registry = reg
+	root.add_child(audio)
 	var player: RoomAmbienceScript = own(RoomAmbienceScript.new()) as RoomAmbienceScript
 	player.registry = reg
+	player.audio = audio
 	root.add_child(player)
 	player.rng.seed = 7
 	return player
+
+
+## The bed Audio plays for `player`.
+func _bed(player: RoomAmbienceScript) -> BedScript:
+	return player.audio.ambience
+
+
+## `player` and its Audio's world `delta` seconds on (Audio steps itself in the game).
+func _tick(player: RoomAmbienceScript, delta: float, middle: Vector2 = Vector2.INF) -> void:
+	player.step(delta, middle)
+	player.audio.step_world(delta)
+
+
+## Feel and its Audio `delta` seconds on.
+func _fstep(feel: FeelScript, delta: float) -> void:
+	feel.step(delta)
+	fx.audio.step_world(delta)
 
 
 func _layer(sound: StringName, volume: float = 0.0) -> AmbienceLayer:
@@ -109,6 +131,7 @@ func _world() -> FeelScript:
 	fx = Fixture.new(root, 1)
 	var feel: FeelScript = fx.with_feel() as FeelScript
 	feel.registry = reg
+	fx.audio.registry = reg
 	return feel
 
 
@@ -186,15 +209,15 @@ func test_no_ambience_is_silent() -> void:
 	var player: RoomAmbienceScript = _player()
 	player.use(null)
 	for i in 600:
-		player.step(FRAME)
+		_tick(player, FRAME)
 	for i in Ambience.LAYERS_MOST:
-		check(player.stream_of(i) == null, "no bed")
+		check(_bed(player).stream_of(i) == null, "no bed")
 	check_equal(player.accents_played, 0, "no accent")
 	var feel: FeelScript = _world()
 	_enter(&"test_bare", null)
 	for i in 120:
-		feel.step(FRAME)
-	check(feel.ambience().ambience() == null and feel.ambience().stream_of(0) == null, "a room naming none is silent in Feel")
+		_fstep(feel, FRAME)
+	check(feel.ambience().ambience() == null and _bed(feel.ambience()).stream_of(0) == null, "a room naming none is silent in Feel")
 	check_equal(feel.ambience().accents_played, 0, "and has no accent")
 
 
@@ -205,53 +228,52 @@ func test_the_bed_fades_in_and_out_with_the_room_and_plays_on_through_the_same()
 	_enter(&"test_crypt", crypt)
 	var player: RoomAmbienceScript = feel.ambience()
 	check(player.ambience() == crypt, "the room's ambience")
-	check(player.stream_of(0) != null and player.stream_of(1) != null, "its layers playing")
-	check_equal(player.level(), 0.0, "from silence")
+	check(_bed(player).stream_of(0) != null and _bed(player).stream_of(1) != null, "its layers playing")
+	check_equal(_bed(player).level(), 0.0, "from silence")
 	var last: float = 0.0
 	var largest: float = 0.0
 	for i in 90:
-		feel.step(FRAME)
-		largest = maxf(largest, player.level() - last)
-		check(player.level() >= last, "only ever comes in")
-		last = player.level()
+		_fstep(feel, FRAME)
+		largest = maxf(largest, _bed(player).level() - last)
+		check(_bed(player).level() >= last, "only ever comes in")
+		last = _bed(player).level()
 	check(largest <= FRAME / crypt.fade + 0.0001, "a frame's share of its fade at most: no jump")
-	check(player.level() > 0.7 and player.level() < 0.8, "1.5 s of its 2 s fade")
+	check(_bed(player).level() > 0.7 and _bed(player).level() < 0.8, "1.5 s of its 2 s fade")
 	for i in 60:
-		feel.step(FRAME)
-	check(is_equal_approx(player.level(), 1.0), "in after its fade")
-	check(is_equal_approx(player.volume_of(0), -8.0) and is_equal_approx(player.volume_of(1), -11.0), "each layer at the ambience's volume and its own")
+		_fstep(feel, FRAME)
+	check(is_equal_approx(_bed(player).level(), 1.0), "in after its fade")
+	check(is_equal_approx(_bed(player).volume_of(0), -8.0) and is_equal_approx(_bed(player).volume_of(1), -11.0), "each layer at the ambience's volume and its own")
 	_enter(&"test_crypt_2", crypt)
-	check(is_equal_approx(player.level(), 1.0) and player.fading_level() == 0.0, "the same ambience in the next room plays on")
+	check(is_equal_approx(_bed(player).level(), 1.0) and _bed(player).fading_level() == 0.0, "the same ambience in the next room plays on")
 	_enter(&"test_hub", hub)
-	check(player.ambience() == hub and player.level() == 0.0, "a new room's comes in from silence")
-	check(is_equal_approx(player.fading_level(), 1.0), "while the last goes out from where it was")
-	feel.step(1.0)
-	check(is_equal_approx(player.fading_level(), 0.5), "over its own fade")
-	check(is_equal_approx(player.level(), 1.0), "the new one in over its own")
-	feel.step(1.0)
-	check_equal(player.fading_level(), 0.0, "the last is gone")
+	check(player.ambience() == hub and _bed(player).level() == 0.0, "a new room's comes in from silence")
+	check(is_equal_approx(_bed(player).fading_level(), 1.0), "while the last goes out from where it was")
+	_fstep(feel, 1.0)
+	check(is_equal_approx(_bed(player).fading_level(), 0.5), "over its own fade")
+	check(is_equal_approx(_bed(player).level(), 1.0), "the new one in over its own")
+	_fstep(feel, 1.0)
+	check_equal(_bed(player).fading_level(), 0.0, "the last is gone")
 	_enter(&"test_bare", null)
-	check(player.ambience() == null and is_equal_approx(player.fading_level(), 1.0), "a room with none: the last fades out, no cut")
+	check(player.ambience() == null and is_equal_approx(_bed(player).fading_level(), 1.0), "a room with none: the last fades out, no cut")
 
 
-func test_every_player_is_on_the_bus_the_music_plays_on() -> void:
+func test_every_player_is_on_the_ambience_bus() -> void:
 	var feel: FeelScript = _world()
 	var player: RoomAmbienceScript = feel.ambience()
-	check(AudioServer.get_bus_index(RoomAmbienceScript.BUS) >= 0, "the bus exists")
-	var music_bus: StringName = ((feel.music() as Node).get_child(0) as AudioStreamPlayer).bus
-	check_equal(RoomAmbienceScript.BUS, music_bus, "the music's bus")
+	check(player.audio == fx.audio, "Feel hands its room sound its Audio")
+	check(AudioServer.get_bus_index(AudioScript.BUS_AMBIENCE) >= 0, "the bus exists (default_bus_layout.tres)")
 	var players: int = 0
-	for node in player.players():
+	for node in _bed(player).players():
 		if node is AudioStreamPlayer:
-			check_equal((node as AudioStreamPlayer).bus, RoomAmbienceScript.BUS, "a bed's player on the bus")
+			check_equal((node as AudioStreamPlayer).bus, AudioScript.BUS_AMBIENCE, "a bed's player on the bus")
 			players += 1
 		elif node is AudioStreamPlayer2D:
-			check_equal((node as AudioStreamPlayer2D).bus, RoomAmbienceScript.BUS, "an accent's voice on the bus")
+			check_equal((node as AudioStreamPlayer2D).bus, AudioScript.BUS_AMBIENCE, "an accent's voice on the bus")
 			players += 1
-	check_equal(players, Ambience.LAYERS_MOST * 2 + RoomAmbienceScript.ACCENT_VOICES, "every player")
-	check_equal(player.audible, FeelScript.hears_audio(), "Feel hands it whether this machine hears")
-	check_equal(feel.sounds().audible, player.audible, "the same as its sounds'")
-	check_equal(feel.music().audible, player.audible, "and its music's")
+	check_equal(players, Ambience.LAYERS_MOST * 2 + BedScript.ACCENT_VOICES, "every player")
+	check_equal(fx.audio.audible, AudioScript.hears_audio(), "Audio knows whether this machine hears")
+	check_equal(_bed(player).audible, fx.audio.audible, "the bed the same")
+	check_equal(fx.audio.music.audible, fx.audio.audible, "and its music")
 
 
 func test_accents_come_within_their_gaps_and_spreads() -> void:
@@ -277,7 +299,7 @@ func test_accents_come_within_their_gaps_and_spreads() -> void:
 	var gap_most: float = 0.0
 	var played: int = 0
 	for frame in int(600.0 / FRAME):
-		player.step(FRAME, middle)
+		_tick(player, FRAME, middle)
 		clock += FRAME
 		if player.accents_played == played:
 			continue
@@ -291,7 +313,7 @@ func test_accents_come_within_their_gaps_and_spreads() -> void:
 		last_drip = clock
 		gap_least = minf(gap_least, gap)
 		gap_most = maxf(gap_most, gap)
-		var voice: AudioStreamPlayer2D = player.accent_voice()
+		var voice: AudioStreamPlayer2D = _bed(player).accent_voice()
 		if voice != null:
 			check(voice.volume_db >= -8.0 - 4.0 - 3.0 - 0.001 and voice.volume_db <= -8.0 - 4.0 + 3.0 + 0.001, "a drip's volume within its spread")
 			check(voice.pitch_scale >= 0.9 - 0.0001 and voice.pitch_scale <= 1.1 + 0.0001, "its pitch within its spread")
@@ -309,15 +331,15 @@ func test_an_accent_follows_the_fade_and_none_comes_without_its_file() -> void:
 	reg.known.erase(&"t_ghost")
 	player.use(_ambience([] as Array[AmbienceLayer], [ghost] as Array[AmbienceAccent]))
 	for i in int(5.0 / FRAME):
-		player.step(FRAME)
+		_tick(player, FRAME)
 	check_equal(player.accents_played, 0, "an accent whose file does not exist is silent")
 	check(player.accent_in(0) <= 1.0, "and still comes round again")
 	var soft: AmbienceAccent = _accent([&"t_drip"] as Array[StringName], 0.5, 0.5)
 	player.use(_ambience([] as Array[AmbienceLayer], [soft] as Array[AmbienceAccent], 2.0))
 	for i in int(0.52 / FRAME):
-		player.step(FRAME)
+		_tick(player, FRAME)
 	check_equal(player.accents_played, 1, "heard as its room fades in")
-	var voice: AudioStreamPlayer2D = player.accent_voice()
+	var voice: AudioStreamPlayer2D = _bed(player).accent_voice()
 	check(voice != null and voice.volume_db < -8.0 - 10.0, "as soft as the fade has come (a quarter in: -12 dB)")
 
 
@@ -325,10 +347,10 @@ func test_a_frame_makes_no_object() -> void:
 	var player: RoomAmbienceScript = _player()
 	var drips: AmbienceAccent = _accent([&"t_drip"] as Array[StringName], 30.0, 30.0)
 	player.use(_ambience([_layer(&"t_air"), _layer(&"t_deep")] as Array[AmbienceLayer], [drips] as Array[AmbienceAccent]))
-	player.step(FRAME)
+	_tick(player, FRAME)
 	var objects: float = Performance.get_monitor(Performance.OBJECT_COUNT)
 	for frame in 300:
-		player.step(FRAME, Vector2(10.0, 10.0))
+		_tick(player, FRAME, Vector2(10.0, 10.0))
 	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "300 frames of a fade make no object")
 
 
@@ -337,25 +359,25 @@ func test_leaving_the_tree_lets_go_of_every_stream() -> void:
 	var drips: AmbienceAccent = _accent([&"t_drip"] as Array[StringName], 0.5, 0.5)
 	player.use(_ambience([_layer(&"t_air")] as Array[AmbienceLayer], [drips] as Array[AmbienceAccent], 0.0))
 	for i in int(1.0 / FRAME):
-		player.step(FRAME)
-	check(player.stream_of(0) != null and player.accents_played > 0, "playing a bed and an accent")
-	root.remove_child(player)
-	for node in player.players():
+		_tick(player, FRAME)
+	check(_bed(player).stream_of(0) != null and player.accents_played > 0, "playing a bed and an accent")
+	root.remove_child(player.audio)
+	for node in _bed(player).players():
 		var bed := node as AudioStreamPlayer
 		var voice := node as AudioStreamPlayer2D
 		check((bed == null or bed.stream == null) and (voice == null or voice.stream == null), "no stream held once out of the tree (none left with the audio server at exit)")
-	root.add_child(player)
+	root.add_child(player.audio)
 
 
 func test_with_no_device_nothing_is_started() -> void:
 	var player: RoomAmbienceScript = _player()
-	player.audible = false
+	player.audio.audible = false
 	var drips: AmbienceAccent = _accent([&"t_drip"] as Array[StringName], 0.5, 0.5)
 	player.use(_ambience([_layer(&"t_air")] as Array[AmbienceLayer], [drips] as Array[AmbienceAccent], 0.0))
 	for i in int(1.0 / FRAME):
-		player.step(FRAME)
-	check(player.stream_of(0) != null and player.accents_played > 0, "its streams and accents are worked out")
-	for node in player.players():
+		_tick(player, FRAME)
+	check(_bed(player).stream_of(0) != null and player.accents_played > 0, "its streams and accents are worked out")
+	for node in _bed(player).players():
 		var bed := node as AudioStreamPlayer
 		var voice := node as AudioStreamPlayer2D
 		check((bed == null or not bed.playing) and (voice == null or not voice.playing), "but no player is started (none left playing as a headless run quits)")
@@ -377,20 +399,20 @@ func _wav(samples: int, loops: bool) -> AudioStreamWAV:
 
 func test_audible_it_plays_restarts_a_layer_run_out_and_stops_clean() -> void:
 	var player: RoomAmbienceScript = _player()
-	player.audible = true
+	player.audio.audible = true
 	reg.stream = _wav(800, false)
 	var drips: AmbienceAccent = _accent([&"t_drip"] as Array[StringName], 0.5, 0.5)
 	player.use(_ambience([_layer(&"t_air")] as Array[AmbienceLayer], [drips] as Array[AmbienceAccent]))
-	var bed: AudioStreamPlayer = player.bed_player(0)
+	var bed: AudioStreamPlayer = _bed(player).bed_player(0)
 	check(bed.playing, "the bed plays as its room comes")
 	bed.stop()
-	player.step(FRAME)
+	_tick(player, FRAME)
 	check(bed.playing, "a layer not imported to loop is started again when it runs out")
 	for i in int(0.6 / FRAME):
-		player.step(FRAME)
-	check(player.accent_voice() != null and player.accent_voice().playing, "an accent plays")
+		_tick(player, FRAME)
+	check(_bed(player).accent_voice() != null and _bed(player).accent_voice().playing, "an accent plays")
 	player.stop()
-	for node in player.players():
+	for node in _bed(player).players():
 		var a := node as AudioStreamPlayer
 		var b := node as AudioStreamPlayer2D
 		check((a == null or (not a.playing and a.stream == null)) and (b == null or (not b.playing and b.stream == null)), "stop leaves nothing playing")
@@ -398,10 +420,10 @@ func test_audible_it_plays_restarts_a_layer_run_out_and_stops_clean() -> void:
 
 func test_it_stands_still_with_the_tree() -> void:
 	var player: RoomAmbienceScript = _player()
-	player.audible = true
+	player.audio.audible = true
 	reg.stream = _wav(800, true)
 	player.use(_ambience([_layer(&"t_air")] as Array[AmbienceLayer]))
-	var bed: AudioStreamPlayer = player.bed_player(0)
+	var bed: AudioStreamPlayer = _bed(player).bed_player(0)
 	check(bed.playing and not bed.stream_paused, "playing")
 	paused = true
 	var stood: bool = bed.stream_paused and not bed.playing
@@ -424,28 +446,28 @@ func test_back_to_the_menu_the_ambience_and_the_music_fade_out() -> void:
 	reg.extra[&"rooms"] = {room.id: room}
 	fx.bus.room_entered.emit(room.id)
 	for i in int(3.0 / FRAME):
-		feel.step(FRAME)
+		_fstep(feel, FRAME)
 	var player: RoomAmbienceScript = feel.ambience()
-	check(is_equal_approx(player.level(), 1.0) and feel.music().track() == track, "the crypt's bed and music in")
+	check(is_equal_approx(_bed(player).level(), 1.0) and fx.audio.music.track() == track, "the crypt's bed and music in")
 	fx.bus.main_menu_requested.emit(0)
 	check(player.ambience() == null, "the menu: no ambience")
-	check(is_equal_approx(player.fading_level(), 1.0), "the crypt's goes out from where it was, no cut")
-	var last: float = player.fading_level()
+	check(is_equal_approx(_bed(player).fading_level(), 1.0), "the crypt's goes out from where it was, no cut")
+	var last: float = _bed(player).fading_level()
 	for i in int(3.0 / FRAME):
-		feel.step(FRAME)
-		check(last - player.fading_level() <= FRAME / crypt.fade + 0.0001, "a frame's share at a time")
-		last = player.fading_level()
-	check_equal(player.fading_level(), 0.0, "silent under the menu")
-	check(feel.music().track() == null and feel.music().fading_level() == 0.0, "the room's music faded out too")
+		_fstep(feel, FRAME)
+		check(last - _bed(player).fading_level() <= FRAME / crypt.fade + 0.0001, "a frame's share at a time")
+		last = _bed(player).fading_level()
+	check_equal(_bed(player).fading_level(), 0.0, "silent under the menu")
+	check(fx.audio.music.track() == null and fx.audio.music.fading_level() == 0.0, "the room's music faded out too")
 
 
 ## The level of both sets summed, frame by frame for `seconds`: the most it dropped in a frame.
 func _largest_drop(player: RoomAmbienceScript, seconds: float) -> float:
 	var largest: float = 0.0
-	var last: float = player.level() + player.fading_level()
+	var last: float = _bed(player).level() + _bed(player).fading_level()
 	for i in int(seconds / FRAME):
-		player.step(FRAME)
-		var now: float = player.level() + player.fading_level()
+		_tick(player, FRAME)
+		var now: float = _bed(player).level() + _bed(player).fading_level()
 		largest = maxf(largest, last - now)
 		last = now
 	return largest
@@ -460,23 +482,23 @@ func test_a_change_inside_a_fade_never_cuts_the_louder() -> void:
 	_largest_drop(player, 3.0)
 	player.use(b)
 	_largest_drop(player, 0.8)
-	var b_in: float = player.level()
-	var a_out: float = player.fading_level()
+	var b_in: float = _bed(player).level()
+	var a_out: float = _bed(player).fading_level()
 	player.use(a)
-	check(player.ambience() == a and player.fading_ambience() == b, "A, B, A: the sets swap")
-	check(is_equal_approx(player.level(), a_out) and is_equal_approx(player.fading_level(), b_in), "each going on from where it was")
-	check(player.stream_of(0) == reg.get_sound(&"t_a"), "A's bed playing on")
+	check(player.ambience() == a and _bed(player).fading_ambience() == b, "A, B, A: the sets swap")
+	check(is_equal_approx(_bed(player).level(), a_out) and is_equal_approx(_bed(player).fading_level(), b_in), "each going on from where it was")
+	check(_bed(player).stream_of(0) == reg.get_sound(&"t_a"), "A's bed playing on")
 	var share: float = FRAME / a.fade + 0.0001
 	check(_largest_drop(player, 3.0) <= share, "no frame's summed level drops more than a frame's share")
 	player.use(null)
 	_largest_drop(player, 0.6)
-	var a_left: float = player.fading_level()
+	var a_left: float = _bed(player).fading_level()
 	player.use(b)
-	check(player.fading_ambience() == a and is_equal_approx(player.fading_level(), a_left), "A, none, B: A goes on going out")
+	check(_bed(player).fading_ambience() == a and is_equal_approx(_bed(player).fading_level(), a_left), "A, none, B: A goes on going out")
 	check(_largest_drop(player, 0.2) <= share, "nothing cut")
 	_largest_drop(player, 0.6)
-	var louder: Ambience = b if player.level() >= player.fading_level() else a
-	var louder_level: float = maxf(player.level(), player.fading_level())
+	var louder: Ambience = b if _bed(player).level() >= _bed(player).fading_level() else a
+	var louder_level: float = maxf(_bed(player).level(), _bed(player).fading_level())
 	player.use(c)
-	check(player.ambience() == c and player.fading_ambience() == louder, "A, B, C: the louder goes on going out")
-	check(is_equal_approx(player.fading_level(), louder_level), "from where it was; only the quieter is let go")
+	check(player.ambience() == c and _bed(player).fading_ambience() == louder, "A, B, C: the louder goes on going out")
+	check(is_equal_approx(_bed(player).fading_level(), louder_level), "from where it was; only the quieter is let go")

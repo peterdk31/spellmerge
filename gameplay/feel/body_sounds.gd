@@ -5,19 +5,20 @@ extends RefCounted
 ## latest look up to it, is held while it lasts, the last phase's let go) and the music: the first
 ## living body in actor order whose data has `music`, at its phase's intensity (1, then each phase's
 ## `intensity` or one more), else the room's (`room_music`, set by Feel as a room is entered). Feel
-## owns one and steps it once a frame; it plays a cue through Feel (`play_cue`).
+## owns one and steps it once a frame; it plays a cue through Feel (`play_cue`), holds a phase's
+## sound through Feel's held sounds and asks Audio for the music (`Audio.play_track`).
 
 const ActorsScript := preload("res://core/actors/actors.gd")
-const SoundsScript := preload("res://gameplay/feel/sounds.gd")
-const MusicScript := preload("res://gameplay/feel/music.gd")
+const HeldSoundsScript := preload("res://gameplay/feel/held_sounds.gd")
+const AudioScript := preload("res://core/audio/audio.gd")
 
 ## How often the bodies are looked at (s).
 const POLL: float = 0.1
 
-## The held sounds and the music played to, and how a cue is played (`Feel.play_cue`'s arguments:
-## the cue's id, the actor, where, and the body it follows).
-var sounds: SoundsScript = null
-var music: MusicScript = null
+## Feel's held sounds and the Audio service the music is played on, and how a cue is played
+## (`Feel.play_cue`'s arguments: the cue's id, the actor, where, and the body it follows).
+var held: HeldSoundsScript = null
+var audio: AudioScript = null
 var play_cue: Callable = Callable()
 ## The room in play's music (`RoomBase.music`; null: none).
 var room_music: MusicTrack = null
@@ -45,9 +46,9 @@ func room_entered(track: MusicTrack) -> void:
 	_body.fill(0)
 
 
-## `delta` real seconds on: the bodies of `table` looked at when due, then the music steps.
-func step(delta: float, table: ActorsScript, registry: Node) -> void:
-	if music == null:
+## `delta` real seconds on: the bodies of `table` looked at when due, and the music asked for.
+func step(delta: float, table: ActorsScript) -> void:
+	if audio == null:
 		return
 	_wait -= delta
 	if _wait <= 0.0:
@@ -62,14 +63,12 @@ func step(delta: float, table: ActorsScript, registry: Node) -> void:
 			if body == null or not is_instance_valid(body) or body.data == null:
 				continue
 			if body.phases != null:
-				_look_at_phase(id, body, registry)
+				_look_at_phase(id, body)
 			if not found and body.data.music != null and not body.is_dying():
 				found = true
 				track = body.data.music
 				intensity = intensity_of(body)
-		music.registry = registry
-		music.play(track, intensity)
-	music.step(delta)
+		audio.play_track(track, intensity)
 
 
 ## The music's intensity for `body`: 1 before its first phase, then each phase's `intensity`, or one
@@ -93,7 +92,7 @@ static func phase_look(body: Actor, phase: int) -> PhaseLook:
 	return null
 
 
-func _look_at_phase(id: int, body: Actor, registry: Node) -> void:
+func _look_at_phase(id: int, body: Actor) -> void:
 	var phase: int = body.phases.current
 	var first: bool = _body[id] != body.get_instance_id()
 	if not first and _seen[id] == phase:
@@ -104,12 +103,11 @@ func _look_at_phase(id: int, body: Actor, registry: Node) -> void:
 	var look: PhaseLook = phase_look(body, phase)
 	if not first and phase > was and phase >= 0 and look != null and body.phases.list[phase].look == look and look.cue != &"" and play_cue.is_valid():
 		play_cue.call(look.cue, id, body.global_position, body)
-	if sounds == null:
+	if held == null:
 		return
 	var sound: StringName = look.sound if look != null else &""
-	if sound != &"" and sounds.held_of(id, SoundsScript.Until.PHASE) == sound:
+	if sound != &"" and held.held_of(id, HeldSoundsScript.Until.PHASE) == sound:
 		return
-	sounds.release(id, SoundsScript.Until.PHASE)
+	held.release(id, HeldSoundsScript.Until.PHASE)
 	if sound != &"":
-		sounds.registry = registry
-		sounds.hold(sound, SoundsScript.Until.PHASE, id, phase, body, body.global_position, INF)
+		held.hold(sound, HeldSoundsScript.Until.PHASE, id, phase, body, body.global_position, INF)

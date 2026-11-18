@@ -9,20 +9,22 @@ extends Node
 ## `BossIntro.DARK_AT` and its reveal cue (`reveal_cue_or_shared`: its own, else the shared
 ## `boss_intro`) at `BossIntro.REVEAL_AT`, each the sound its cue names (`CueBase.sound`; the cue's
 ## other parts are the world's, which stands still). `boss_intro_closed` stops both. Nothing here names
-## a boss: all of it is the intro's data (rule 9). Its own players, made once; it allocates nothing
-## while playing.
+## a boss: all of it is the intro's data (rule 9). It keeps the timing only, and has no player of its
+## own: the cues play on Audio's over lane (`Audio.play_over`, docs/milestones/sound.md, section 5),
+## which keeps playing while the tree is paused. It allocates nothing while playing.
 ##
 ##     var sound := BossIntroSound.new()
 ##     sound.registry = registry
+##     sound.audio = audio
 ##     add_child(sound)
 ##     sound.bind(events)
 
 const EventsScript := preload("res://core/events/events.gd")
+const AudioScript := preload("res://core/audio/audio.gd")
 
-## The registry the cues and their sounds are asked of (Feel's).
+## The registry the cues are asked of (Feel's), and the Audio service they play on.
 var registry: Node = null
-## Whether its players are started (Feel's `audible`: none on the audio driver with no device).
-var audible: bool = true
+var audio: AudioScript = null
 ## The cues the intro playing played, in order (two at most; a fresh open starts it again), and the
 ## last one (for tests).
 var played: Array[StringName] = []
@@ -31,18 +33,13 @@ var last: StringName = &""
 ## The intro playing (null: none) and the seconds since it opened.
 var _intro: BossIntro = null
 var _time: float = -1.0
-var _dark: AudioStreamPlayer = null
-var _reveal: AudioStreamPlayer = null
+## The over lane's voices its two cues play on (-1: none).
+var _dark: int = -1
+var _reveal: int = -1
 
 
 func _init() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_dark = AudioStreamPlayer.new()
-	_dark.name = "Dark"
-	add_child(_dark)
-	_reveal = AudioStreamPlayer.new()
-	_reveal.name = "Reveal"
-	add_child(_reveal)
 
 
 func bind(events: EventsScript) -> void:
@@ -62,24 +59,33 @@ func step(delta: float) -> void:
 	var before: float = _time
 	_time += delta
 	if _crossed(before, BossIntro.DARK_AT) and _intro.dark_cue != &"":
-		_play(_dark, _intro.dark_cue)
+		_dark = _play(_intro.dark_cue)
 	if _crossed(before, BossIntro.REVEAL_AT):
-		_play(_reveal, _intro.reveal_cue_or_shared())
+		_reveal = _play(_intro.reveal_cue_or_shared())
 		# Nothing more to play: it waits for the close only to stop what plays.
 		_intro = null
 
 
-## True while a cue of the intro plays (for tests).
-func is_playing() -> bool:
-	return _dark.playing or _reveal.playing
+## The over lane's voice the dark cue and the reveal cue last played on (-1: none; for tests).
+func dark_voice() -> int:
+	return _dark
+
+
+func reveal_voice() -> int:
+	return _reveal
 
 
 ## Stop at once (the intro closed, a run ended).
 func stop() -> void:
 	_intro = null
 	_time = -1.0
-	_dark.stop()
-	_reveal.stop()
+	if audio != null:
+		if _dark >= 0:
+			audio.stop_over(_dark)
+		if _reveal >= 0:
+			audio.stop_over(_reveal)
+	_dark = -1
+	_reveal = -1
 
 
 func _on_opened(_actor: int, _boss_name: String, _lore: String, intro: BossIntro, _page: int, fresh: bool) -> void:
@@ -99,17 +105,12 @@ func _crossed(before: float, moment: float) -> bool:
 	return before < moment and _time >= moment
 
 
-func _play(player: AudioStreamPlayer, cue_id: StringName) -> void:
+func _play(cue_id: StringName) -> int:
 	played.append(cue_id)
 	last = cue_id
-	if registry == null:
-		return
+	if registry == null or audio == null:
+		return -1
 	var cue: CueBase = registry.call(&"get_resource", &"cues", cue_id) as CueBase
 	if cue == null or cue.sound == &"":
-		return
-	var stream: AudioStream = registry.call(&"get_sound", cue.sound) as AudioStream
-	if stream == null:
-		return
-	player.stream = stream
-	if audible:
-		player.play()
+		return -1
+	return audio.play_over(cue.sound)

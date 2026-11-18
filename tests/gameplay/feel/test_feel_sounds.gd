@@ -1,12 +1,16 @@
 extends "res://tests/support/suite.gd"
-## Boss plan OB15: held sounds, sounds where they happen, the voices a sound may have, and music
-## with intensity, all drawn only (gameplay/feel: `sounds.gd`, `music.gd`). Sound files do not exist
-## yet, so a registry of the test's own answers every sound id it knows with a silent stream, and
-## knows the test's own cues and rooms; nothing here names a boss of the game.
+## Boss plan OB15 and docs/milestones/sound.md, section 5: what Feel decides of its sounds (what
+## each held sound is for and when it ends, `held_sounds.gd`; a staff's moments, a death's sound, a
+## boss's entrance, a phase's held sound and the music it picks, the cast sound on `staff_cast`, a
+## cue's duck), heard only. How they play is core/audio's (tests/core/audio). Sound files do not
+## exist yet, so a registry of the test's own answers every sound id it knows with a silent stream,
+## and knows the test's own cues and rooms; nothing here names a boss of the game.
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
-const SoundsScript := preload("res://gameplay/feel/sounds.gd")
-const MusicScript := preload("res://gameplay/feel/music.gd")
+const HeldSoundsScript := preload("res://gameplay/feel/held_sounds.gd")
+const AudioScript := preload("res://core/audio/audio.gd")
+const MusicScript := preload("res://core/audio/music.gd")
+const VoicesScript := preload("res://core/audio/voices.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 
 
@@ -60,9 +64,6 @@ func before_each() -> void:
 
 func after_each() -> void:
 	if fx != null:
-		if fx.feel != null and is_instance_valid(fx.feel):
-			(fx.feel as FeelScript).sounds().clear()
-			(fx.feel as FeelScript).music().stop()
 		fx.free_all()
 
 
@@ -95,126 +96,27 @@ func _cue(id: StringName, parts: Array[Dictionary], sound: StringName = &"") -> 
 	return cue
 
 
-func _sounds() -> SoundsScript:
-	var sounds: SoundsScript = own(SoundsScript.new()) as SoundsScript
-	sounds.registry = reg
-	root.add_child(sounds)
-	return sounds
-
-
 ## A world with Feel on the test's registry.
 func _world(players: int = 1) -> FeelScript:
 	fx = Fixture.new(root, players)
 	var feel: FeelScript = fx.with_feel() as FeelScript
 	feel.registry = reg
+	fx.audio.registry = reg
 	return feel
 
 
+## Feel and its Audio `delta` real seconds on (Audio steps itself in the game).
+func _step(feel: FeelScript, delta: float) -> void:
+	feel.step(delta)
+	fx.audio.step_world(delta)
+
+
+## The world's one-shot voices (`started`, `last`).
+func _voices() -> VoicesScript:
+	return fx.audio.voices
+
+
 # --- The sounds -----------------------------------------------------------------------------
-
-func test_a_sound_plays_where_it_happens_and_a_missing_one_is_silent() -> void:
-	var sounds: SoundsScript = _sounds()
-	_know([&"knock"])
-	check_equal(sounds.play(&"nothing", Vector2(5, 5)), -1, "a sound with no file plays nothing")
-	var voice: int = sounds.play(&"knock", Vector2(120, -40))
-	check(voice >= 0, "a known sound plays")
-	check(sounds.get_child(voice).global_position.is_equal_approx(Vector2(120, -40)), "from where it happens in the room")
-	check((sounds.get_child(voice) as AudioStreamPlayer2D).max_distance >= 1000.0, "heard well off the picture (a telegraph)")
-
-
-func test_one_sound_has_at_most_its_voices_and_the_oldest_starts_again() -> void:
-	var sounds: SoundsScript = _sounds()
-	_know([&"knock", &"bell"])
-	var first: int = sounds.play(&"knock")
-	for i in SoundsScript.PER_SOUND + 3:
-		sounds.play(&"knock")
-	check_equal(sounds.voices_of(&"knock"), SoundsScript.PER_SOUND, "one sound plays on PER_SOUND voices at most")
-	check(sounds.play(&"bell") >= 0 and sounds.voices_of(&"bell") == 1, "another sound still has its voice")
-	check_equal(sounds.voices_of(&"knock"), SoundsScript.PER_SOUND, "it took no voice of the knock's")
-	sounds.step(SoundsScript.MIN_SECONDS * 2.0)
-	check_equal(sounds.voices_of(&"knock"), 0, "once over they hold no voice")
-	check(first >= 0, "the first played")
-
-
-func test_a_long_sound_is_not_cut_short_while_a_voice_is_done() -> void:
-	var sounds: SoundsScript = _sounds()
-	_know_long(&"splinter")
-	_know([&"tick"])
-	sounds.play(&"splinter")
-	for round in 3:
-		for i in SoundsScript.PER_SOUND:
-			sounds.play(&"tick", Vector2(float(i), 0.0))
-		sounds.step(SoundsScript.MIN_SECONDS * 2.0)
-	check_equal(sounds.voices_of(&"splinter"), 1, "a second-long sound plays on while short ones come and go")
-	for i in SoundsScript.VOICES + 1:
-		_know([StringName("other_%d" % i)])
-		sounds.play(StringName("other_%d" % i))
-	check_equal(sounds.voices_of(&"splinter"), 0, "with every voice busy the one that started first gives way")
-
-
-func test_a_held_sound_follows_its_body_until_its_carrier_ends() -> void:
-	var sounds: SoundsScript = _sounds()
-	_know([&"swish"])
-	var body: Node2D = own(Node2D.new()) as Node2D
-	root.add_child(body)
-	body.position = Vector2(10, 0)
-	check(sounds.hold(&"swish", SoundsScript.Until.CARRIER, 3, 77, body, Vector2.INF, 4.0) >= 0, "held")
-	body.position = Vector2(60, 20)
-	sounds.step(0.05)
-	check(sounds.held_at(3, &"swish").is_equal_approx(Vector2(60, 20)), "it goes with its body")
-	sounds.end_carrier(3, 76)
-	check(sounds.is_held(3, &"swish"), "another carrier's end lets nothing go")
-	sounds.end_carrier(3, 77)
-	check(not sounds.is_held(3, &"swish"), "its own carrier's end lets it go")
-	check_equal(sounds.held_count, 1, "it fades out first")
-	sounds.step(SoundsScript.FADE + 0.01)
-	check_equal(sounds.held_count, 0, "then it is gone")
-
-
-func test_a_held_sound_ends_with_its_seconds_its_body_or_its_wind_up() -> void:
-	var sounds: SoundsScript = _sounds()
-	_know([&"hum", &"scrape", &"roar"])
-	sounds.hold(&"hum", SoundsScript.Until.SECONDS, 1, 0, null, Vector2(4, 4), 0.5)
-	check(sounds.held_at(1, &"hum").is_equal_approx(Vector2(4, 4)), "with no body it stays where it started")
-	var winding: Winding = own(Winding.new()) as Winding
-	sounds.spells = winding
-	sounds.hold(&"scrape", SoundsScript.Until.WIND, 2, 0, null, Vector2.ZERO, 10.0)
-	var body: Node2D = own(Node2D.new()) as Node2D
-	root.add_child(body)
-	sounds.hold(&"roar", SoundsScript.Until.PHASE, 5, 1, body, Vector2.ZERO, INF)
-	sounds.step(0.25)
-	check(sounds.is_held(1, &"hum") and sounds.is_held(2, &"scrape") and sounds.is_held(5, &"roar"), "all held a while")
-	sounds.step(0.3)
-	check(not sounds.is_held(1, &"hum"), "its seconds ran out")
-	winding.on = false
-	sounds.step(0.01)
-	check(not sounds.is_held(2, &"scrape"), "the wind-up it lasts for is over")
-	check(sounds.is_held(5, &"roar"), "a phase's lasts on")
-	root.remove_child(body)
-	sounds.step(0.01)
-	check(not sounds.is_held(5, &"roar"), "until its body is gone")
-
-
-func test_a_held_sound_is_taken_over_and_let_go_by_kind() -> void:
-	var sounds: SoundsScript = _sounds()
-	_know([&"roar", &"swish"])
-	sounds.hold(&"roar", SoundsScript.Until.PHASE, 4, 1, null, Vector2.ZERO, INF)
-	sounds.hold(&"roar", SoundsScript.Until.PHASE, 4, 2, null, Vector2.ZERO, INF)
-	check_equal(sounds.held_count, 1, "the same caster's same sound is taken over, not doubled")
-	sounds.hold(&"swish", SoundsScript.Until.CARRIER, 4, 9, null, Vector2.ZERO, 3.0)
-	check_equal(sounds.held_of(4, SoundsScript.Until.PHASE), &"roar", "its phase's sound")
-	sounds.release(4, SoundsScript.Until.PHASE)
-	check(not sounds.is_held(4, &"roar") and sounds.is_held(4, &"swish"), "letting go of a phase's lets go of that kind only")
-	check(sounds.hold(&"nothing", SoundsScript.Until.SECONDS, 4, 0, null, Vector2.ZERO, 1.0) < 0, "a sound with no file holds nothing")
-	for i in SoundsScript.HELD_SLOTS + 4:
-		_know([StringName("loop_%d" % i)])
-		sounds.hold(StringName("loop_%d" % i), SoundsScript.Until.SECONDS, i, 0, null, Vector2.ZERO, 1.0 + float(i))
-	check_equal(sounds.held_count, SoundsScript.HELD_SLOTS, "at most HELD_SLOTS held at once")
-	sounds.clear()
-	check_equal(sounds.held_count, 0, "a new room stops them all")
-
-
-# --- Cues and staffs' moments ----------------------------------------------------------------
 
 func test_a_cues_held_part_is_checked() -> void:
 	var cue := CueBase.new()
@@ -251,7 +153,7 @@ func test_a_wind_up_holds_its_scrape_until_the_cast_leaves() -> void:
 	var feel: FeelScript = _world()
 	var body: Actor = _moments_body()
 	fx.players[0].position = Vector2(120.0, 0.0)
-	var sounds: SoundsScript = feel.sounds()
+	var sounds: HeldSoundsScript = feel.held_sounds()
 	var held: bool = false
 	for i in 12:
 		fx.run(body, 1)
@@ -269,7 +171,7 @@ func test_a_wind_up_holds_its_scrape_until_the_cast_leaves() -> void:
 func test_a_staffs_dash_swishes_until_it_lands() -> void:
 	var feel: FeelScript = _world()
 	var body: Actor = _moments_body()
-	var sounds: SoundsScript = feel.sounds()
+	var sounds: HeldSoundsScript = feel.held_sounds()
 	var tag: int = _tag_of(body, &"dash")
 	var pulse: int = _tag_of(body, &"pulse")
 	check(tag != 0 and pulse != 0, "its staff's dash and its on-wall pulse")
@@ -281,7 +183,7 @@ func test_a_staffs_dash_swishes_until_it_lands() -> void:
 	check(not sounds.is_held(fx.players[0].id, &"swish"), "a dash of another staff is the card's alone")
 	fx.spells.set(&"cue_tag", tag)
 	body.position = Vector2(40.0, 0.0)
-	feel.step(0.05)
+	_step(feel, 0.05)
 	check(sounds.held_at(body.id, &"swish").is_equal_approx(body.global_position), "it goes with the body")
 	fx.bus.carrier_ended.emit(body.id, &"dash", body.global_position, Vector2.RIGHT, 8.0, Color.WHITE, 0)
 	check(not sounds.is_held(body.id, &"swish"), "it lands: the swish is let go")
@@ -305,18 +207,17 @@ func _tag_of(body: Actor, card: StringName) -> int:
 func test_a_wall_crunches_and_a_cast_thumps() -> void:
 	var feel: FeelScript = _world()
 	var body: Actor = _moments_body()
-	var sounds: SoundsScript = feel.sounds()
 	var tag: int = _tag_of(body, &"dash")
-	var before: int = sounds.started
+	var before: int = _voices().started
 	fx.bus.caster_move_finished.emit(body.id, &"dash", Vector2(50, 0), tag, false)
-	check_equal(sounds.started, before, "a dash that ends in the open crunches nothing")
+	check_equal(_voices().started, before, "a dash that ends in the open crunches nothing")
 	fx.bus.caster_move_finished.emit(body.id, &"dash", Vector2(50, 0), tag, true)
-	check_equal(sounds.last, &"crunch", "one a wall stopped plays its staff's wall cue")
+	check_equal(_voices().last, &"crunch", "one a wall stopped plays its staff's wall cue")
 	fx.bus.cast_left.emit(body.id, 1)
-	check_equal(sounds.last, &"thump", "a cast leaving plays its staff's cast cue")
-	before = sounds.started
+	check_equal(_voices().last, &"thump", "a cast leaving plays its staff's cast cue")
+	before = _voices().started
 	fx.bus.cast_left.emit(body.id, 0)
-	check_equal(sounds.started, before, "a staff with none plays nothing")
+	check_equal(_voices().started, before, "a staff with none plays nothing")
 
 
 func test_a_body_dies_with_its_own_sound() -> void:
@@ -326,24 +227,24 @@ func test_a_body_dies_with_its_own_sound() -> void:
 	data.death_sound = &"splinter"
 	var body: Actor = fx.imp(Vector2.ZERO, data)
 	fx.bus.enemy_died.emit(fx.players[0].id, body, body.global_position, -1)
-	check_equal(feel.sounds().last, &"splinter", "its death sounds as its data says, in place of the cue's")
+	check_equal(_voices().last, &"splinter", "its death sounds as its data says, in place of the cue's")
 	var plain: Actor = fx.imp(Vector2(40, 0), Fixture.staffed([[&"bolt"]]))
 	fx.bus.enemy_died.emit(fx.players[0].id, plain, plain.global_position, -1)
-	check_equal(feel.sounds().last, &"enemy_death", "another's with the cue's own")
+	check_equal(_voices().last, &"enemy_death", "another's with the cue's own")
 
 
 func test_a_boss_enters_with_its_intro_and_a_stray_with_none() -> void:
 	var feel: FeelScript = _world()
 	_know([&"boss_intro"])
-	var started: int = feel.sounds().started
+	var started: int = _voices().started
 	fx.imp(Vector2(40, 0), Fixture.staffed([[&"bolt"]]))
-	check_equal(feel.sounds().started, started, "a stray enters with no sound")
+	check_equal(_voices().started, started, "a stray enters with no sound")
 	var data: EnemyBase = Fixture.staffed([[&"bolt"]])
 	data.id = &"test_boss"
 	data.boss = true
 	fx.imp(Vector2.ZERO, data)
-	check_equal(feel.sounds().last, &"boss_intro", "a boss enters with the `boss_intro` cue, under its banner (boss plan OB16)")
-	check_equal(feel.sounds().started, started + 1, "once")
+	check_equal(_voices().last, &"boss_intro", "a boss enters with the `boss_intro` cue, under its banner (boss plan OB16)")
+	check_equal(_voices().started, started + 1, "once")
 
 
 func test_a_boss_with_an_intro_enters_with_its_cue_only_when_no_intro_plays() -> void:
@@ -354,19 +255,19 @@ func test_a_boss_with_an_intro_enters_with_its_cue_only_when_no_intro_plays() ->
 	data.id = &"test_boss"
 	data.boss = true
 	data.boss_intro = BossIntro.new()
-	var started: int = feel.sounds().started
+	var started: int = _voices().started
 	var boss: Actor = fx.imp(Vector2.ZERO, data)
 	fx.bus.boss_intro_opened.emit(boss.id, "", "", data.boss_intro, 0, true)
 	feel.step(1.0 / 60.0)
-	check_equal(feel.sounds().started, started, "its intro opened: no entrance cue under the overlay")
+	check_equal(_voices().started, started, "its intro opened: no entrance cue under the overlay")
 	fx.bus.boss_intro_closed.emit(boss.id)
 	feel.step(1.0 / 60.0)
-	check_equal(feel.sounds().started, started, "nor as it closes")
+	check_equal(_voices().started, started, "nor as it closes")
 	var stray: Actor = fx.imp(Vector2(60, 0), data)
-	check_equal(feel.sounds().started, started, "a boss with an intro waits for the frame's end")
+	check_equal(_voices().started, started, "a boss with an intro waits for the frame's end")
 	feel.step(1.0 / 60.0)
-	check_equal(feel.sounds().last, &"boss_intro", "none opened for it (the rule off): the entrance cue")
-	check_equal(feel.sounds().started, started + 1, "once")
+	check_equal(_voices().last, &"boss_intro", "none opened for it (the rule off): the entrance cue")
+	check_equal(_voices().started, started + 1, "once")
 	check(stray != null, "the second boss stands")
 
 
@@ -407,29 +308,29 @@ func _room(music: MusicTrack) -> void:
 
 
 func _poll(feel: FeelScript) -> void:
-	feel.step(FeelScript.MUSIC_POLL + 0.01)
+	_step(feel, FeelScript.MUSIC_POLL + 0.01)
 
 
 func test_a_phase_holds_its_sound_and_plays_its_cue_as_it_starts() -> void:
 	var feel: FeelScript = _world()
 	var body: Actor = _boss()
-	var sounds: SoundsScript = feel.sounds()
+	var sounds: HeldSoundsScript = feel.held_sounds()
 	_poll(feel)
 	check(not sounds.is_held(body.id, &"burning"), "nothing held before its phase")
-	var started: int = sounds.started
+	var started: int = _voices().started
 	body.phases.begin(0)
 	_poll(feel)
 	check(sounds.is_held(body.id, &"burning"), "its phase's sound is held")
-	check_equal(sounds.last, &"ignite", "and its look's cue played as it started")
-	check_equal(sounds.started, started + 1, "once")
+	check_equal(_voices().last, &"ignite", "and its look's cue played as it started")
+	check_equal(_voices().started, started + 1, "once")
 	_poll(feel)
-	check_equal(sounds.started, started + 1, "not again while the phase lasts")
+	check_equal(_voices().started, started + 1, "not again while the phase lasts")
 	body.phases.begin(1)
 	_poll(feel)
 	check(sounds.is_held(body.id, &"burning"), "a phase with no look of its own keeps the last one's sound")
 	var id: int = body.id
 	body.free()
-	feel.step(0.01)
+	_step(feel, 0.01)
 	check(not sounds.is_held(id, &"burning"), "the body gone, it ends")
 
 
@@ -437,10 +338,10 @@ func test_a_body_first_seen_in_its_phase_burns_with_no_cue() -> void:
 	var feel: FeelScript = _world()
 	var body: Actor = _boss()
 	body.phases.begin(0)
-	var started: int = feel.sounds().started
+	var started: int = _voices().started
 	_poll(feel)
-	check(feel.sounds().is_held(body.id, &"burning"), "a body seen already in its phase holds its sound (a snapshot, a late join)")
-	check_equal(feel.sounds().started, started, "but its start was not seen: no cue")
+	check(feel.held_sounds().is_held(body.id, &"burning"), "a body seen already in its phase holds its sound (a snapshot, a late join)")
+	check_equal(_voices().started, started, "but its start was not seen: no cue")
 
 
 func test_the_music_is_the_rooms_until_an_enemy_with_music_lives() -> void:
@@ -450,11 +351,11 @@ func test_the_music_is_the_rooms_until_an_enemy_with_music_lives() -> void:
 	room_track.layers = [&"crypt_air"] as Array[StringName]
 	_room(room_track)
 	_poll(feel)
-	var music: MusicScript = feel.music()
+	var music: MusicScript = fx.audio.music
 	check(music.track() == room_track, "the room's music")
 	check(music.stream_of(0) != null, "its layer playing")
 	for i in 40:
-		feel.step(0.05)
+		_step(feel, 0.05)
 	var body: Actor = _boss()
 	_poll(feel)
 	check(music.track() == body.data.music, "a living enemy's music overrides the room's")
@@ -466,7 +367,7 @@ func test_the_music_is_the_rooms_until_an_enemy_with_music_lives() -> void:
 	check_equal(music.intensity(), 2, "its phase raises it one step")
 	check(music.is_heard(0) and music.is_heard(1) and not music.is_heard(2), "stacked: two layers together")
 	for i in 40:
-		feel.step(0.05)
+		_step(feel, 0.05)
 	check(is_equal_approx(music.level_of(1), 1.0), "faded in over the track's fade")
 	body.phases.begin(1)
 	_poll(feel)
@@ -477,91 +378,97 @@ func test_the_music_is_the_rooms_until_an_enemy_with_music_lives() -> void:
 	check(music.track() == room_track, "it died: the room's music again")
 
 
-func test_a_track_of_entries_plays_one_at_a_time() -> void:
-	var track := MusicTrack.new()
-	track.layers = [&"a", &"b", &"c"] as Array[StringName]
-	track.stacked = false
-	var heard := PackedByteArray()
-	track.audible(2, heard)
-	check_equal(heard, PackedByteArray([0, 1, 0]), "entries: intensity 2 is the second alone")
-	track.stacked = true
-	track.audible(2, heard)
-	check_equal(heard, PackedByteArray([1, 1, 0]), "stacked: the first two")
-	track.audible(9, heard)
-	check_equal(heard, PackedByteArray([1, 1, 1]), "past the last, all")
-	check(MusicTrack.new().problems("x").size() == 1, "a track needs a layer")
-	var long := MusicTrack.new()
-	long.layers = [&"a", &"", &"c", &"d", &"e"] as Array[StringName]
-	check_equal(long.problems("x").size(), 2, "at most LAYERS_MOST, none empty")
-	var data := EnemyBase.new()
-	data.id = &"x"
-	data.music = MusicTrack.new()
-	check("\n".join(data.problems()).contains("music"), "an enemy's music is checked with its data")
+# --- What each held sound is for (held_sounds.gd) -------------------------------------------------
+
+## Feel's held sounds on an Audio of their own (no world): `spells` answers whether a staff winds up.
+func _held() -> HeldSoundsScript:
+	var audio: AudioScript = own(AudioScript.new()) as AudioScript
+	audio.registry = reg
+	root.add_child(audio)
+	var held := HeldSoundsScript.new()
+	held.audio = audio
+	return held
 
 
-func test_music_changes_fade_and_silence_stops() -> void:
-	_know([&"a", &"b"])
-	var music: MusicScript = own(MusicScript.new()) as MusicScript
-	music.registry = reg
-	root.add_child(music)
-	var one := MusicTrack.new()
-	one.layers = [&"a"] as Array[StringName]
-	one.fade = 1.0
-	music.play(one, 1)
-	music.step(0.5)
-	check(is_equal_approx(music.level_of(0), 0.5), "a layer fades in over the fade")
-	var two := MusicTrack.new()
-	two.layers = [&"b"] as Array[StringName]
-	music.play(two, 1)
-	check(is_equal_approx(music.fading_level(), 0.5), "the last track fades out from where it was")
-	music.step(1.0)
-	check_equal(music.fading_level(), 0.0, "and is gone after its fade")
-	var stacked := MusicTrack.new()
-	stacked.layers = [&"a", &"b"] as Array[StringName]
-	music.play(stacked, 1)
-	for i in 40:
-		music.step(0.05)
-	music.play(one, 1)
-	check(music.fading_level_of(0) > 0.9, "a stacked track's heard layer fades out from full")
-	check_equal(music.fading_level_of(1), 0.0, "and its silent layer stays silent as it goes")
-	music.stop()
-	check(music.track() == null and music.stream_of(0) == null, "silence")
+func test_a_held_sound_ends_by_its_kind_and_is_one_a_caster_and_id() -> void:
+	var held: HeldSoundsScript = _held()
+	_know([&"swish", &"roar", &"scrape", &"hum"])
+	var winding: Winding = own(Winding.new()) as Winding
+	held.spells = winding
+	held.hold(&"swish", HeldSoundsScript.Until.CARRIER, 3, 77, null, Vector2.ZERO, 4.0)
+	held.end_carrier(3, 76)
+	check(held.is_held(3, &"swish"), "another carrier's end lets nothing go")
+	held.end_carrier(4, 77)
+	check(held.is_held(3, &"swish"), "nor another caster's")
+	held.end_carrier(3, 77)
+	check(not held.is_held(3, &"swish"), "its own carrier's end lets it go")
+	held.hold(&"roar", HeldSoundsScript.Until.PHASE, 4, 1, null, Vector2.ZERO, INF)
+	var first: int = held.audio.held.held_count
+	held.hold(&"roar", HeldSoundsScript.Until.PHASE, 4, 2, null, Vector2.ZERO, INF)
+	check_equal(held.audio.held.held_count, first, "the same caster's same sound is taken over, not doubled")
+	held.hold(&"swish", HeldSoundsScript.Until.CARRIER, 4, 9, null, Vector2.ZERO, 3.0)
+	check_equal(held.held_of(4, HeldSoundsScript.Until.PHASE), &"roar", "its phase's sound")
+	held.release(4, HeldSoundsScript.Until.PHASE)
+	check(not held.is_held(4, &"roar") and held.is_held(4, &"swish"), "letting go of a phase's lets go of that kind only")
+	held.hold(&"scrape", HeldSoundsScript.Until.WIND, 2, 0, null, Vector2.ZERO, 10.0)
+	held.step()
+	check(held.is_held(2, &"scrape"), "held while its staff winds up")
+	winding.on = false
+	held.step()
+	check(not held.is_held(2, &"scrape"), "the wind-up it lasts for is over")
+	check_equal(held.hold(&"nothing", HeldSoundsScript.Until.SECONDS, 4, 0, null, Vector2.ZERO, 1.0), 0, "a sound with no file holds nothing")
+	held.audio.clear_world()
+	held.step()
+	check_equal(held.count, 0, "Audio's world cleared: every entry dropped")
 
 
-func test_a_track_change_inside_a_fade_never_cuts_the_louder() -> void:
-	_know([&"a", &"b", &"c"])
-	var music: MusicScript = own(MusicScript.new()) as MusicScript
-	music.registry = reg
-	root.add_child(music)
-	var tracks: Array[MusicTrack] = []
-	for id: StringName in [&"a", &"b", &"c"]:
-		var track := MusicTrack.new()
-		track.layers = [id] as Array[StringName]
-		track.fade = 1.0
-		tracks.append(track)
-	music.play(tracks[0], 1)
-	music.step(1.0)
-	music.play(tracks[1], 1)
-	music.step(0.3)
-	var b_in: float = music.level_of(0)
-	var a_out: float = music.fading_level()
-	music.play(tracks[0], 1)
-	check(music.track() == tracks[0] and music.fading_track() == tracks[1], "A, B, A: the sets swap")
-	check(is_equal_approx(music.level_of(0), a_out) and is_equal_approx(music.fading_level(), b_in), "each going on from where it was")
-	var last: float = music.level_of(0) + music.fading_level()
-	var largest: float = 0.0
-	for i in 60:
-		music.step(1.0 / 60.0)
-		var now: float = music.level_of(0) + music.fading_level()
-		largest = maxf(largest, last - now)
-		last = now
-	check(largest <= 1.0 / 60.0 + 0.0001, "no frame's summed level drops more than a frame's share")
-	music.play(tracks[1], 1)
-	music.step(0.6)
-	var louder_level: float = maxf(music.level_of(0), music.fading_level())
-	var louder: MusicTrack = tracks[1] if music.level_of(0) >= music.fading_level() else tracks[0]
-	music.play(tracks[2], 1)
-	check(music.track() == tracks[2] and music.fading_track() == louder, "A, B, C: the louder goes on fading out")
-	check(is_equal_approx(music.fading_level(), louder_level), "from where it was")
-	music.stop()
+func test_more_held_sounds_than_slots_stay_within_them() -> void:
+	var held: HeldSoundsScript = _held()
+	for i in HeldSoundsScript.SLOTS + 4:
+		_know([StringName("loop_%d" % i)])
+		held.hold(StringName("loop_%d" % i), HeldSoundsScript.Until.SECONDS, i, 0, null, Vector2.ZERO, 1.0 + float(i))
+	check(held.count <= HeldSoundsScript.SLOTS, "at most SLOTS entries (%d)" % held.count)
+	check_equal(held.audio.held.held_count, HeldSoundsScript.SLOTS, "and Audio's slots full")
+	check(held.is_held(HeldSoundsScript.SLOTS + 3, StringName("loop_%d" % (HeldSoundsScript.SLOTS + 3))), "the newest is held")
+
+
+# --- The cast sound and a cue's duck --------------------------------------------------------------
+
+func test_every_cast_sounds_from_feel_a_carrier_card_or_none() -> void:
+	_world()
+	_know([&"cast"])
+	var before: int = _voices().started
+	fx.bus.staff_cast.emit(0, 1, Vector2(30, 10), Vector2.RIGHT)
+	check_equal(_voices().started, before + 1, "a staff's cast with no carrier card (no `spell_cast`) still sounds")
+	check_equal(_voices().last, &"cast", "the cast sound")
+	var voice: AudioStreamPlayer2D = _voices().player(0) as AudioStreamPlayer2D
+	check(voice != null and voice.global_position.is_equal_approx(Vector2(30, 10)), "from where it left")
+	fx.bus.spell_cast.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT)
+	check_equal(_voices().started, before + 1, "`spell_cast` alone sounds no second cast")
+
+
+func test_a_cue_with_a_duck_lowers_the_music_while_its_sound_plays() -> void:
+	var feel: FeelScript = _world()
+	fx.audio.buses.reset()
+	_know([&"quiet"])
+	_know_long(&"slam")
+	var slam: CueBase = _cue(&"test_slam", [] as Array[Dictionary], &"slam")
+	slam.duck = -6.0
+	_cue(&"test_quiet", [] as Array[Dictionary], &"quiet")
+	feel.play_cue(&"test_quiet", -1, Vector2.ZERO)
+	fx.audio.step(0.1)
+	check_equal(fx.audio.buses.ducked(), 0.0, "a cue with no duck leaves the music be")
+	feel.play_cue(&"test_slam", -1, Vector2.ZERO)
+	fx.audio.step(0.05)
+	check(is_equal_approx(fx.audio.buses.ducked(), -6.0), "its duck comes in over 0.05 s (%s)" % fx.audio.buses.ducked())
+	fx.audio.step(0.5)
+	check(is_equal_approx(fx.audio.buses.ducked(), -6.0), "held while its second-long sound plays")
+	for i in 50:
+		fx.audio.step(0.02)
+	check_equal(fx.audio.buses.ducked(), 0.0, "and lets up once its sound is over")
+	var bad := CueBase.new()
+	bad.id = &"bad"
+	bad.duck = 3.0
+	check("\n".join(bad.problems()).contains("duck"), "a duck above 0 is a problem")
+	fx.audio.buses.reset()
 

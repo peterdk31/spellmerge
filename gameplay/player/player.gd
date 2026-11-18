@@ -38,8 +38,8 @@ extends ActorController
 ##   bag (its ids, counts and capacity), `owned_staff_changed` for each staff it owns, by its number
 ##   (`Inventory.plan_of`, empty once it went), and `hands_changed` (which number is on which hand).
 ## - **The cast events** (from the actor it drives now, whose staffs its buttons cast): `spell_cast`
-##   (the carrier, `Caster.last_carrier_card`) and `staff_cast` on every cast (with the cast sound `cast`
-##   from `core/registry`, nothing on null).
+##   (the carrier, `Caster.last_carrier_card`) and `staff_cast` on every cast (Feel hears it and
+##   plays the cast sound; the controller has no player of its own).
 ## - **The builder** (`staff_change_requested` and `staff_cards_requested`, each for this seat
 ##   only and naming a staff by its number; commands, heard at the tick's start: core/events
 ##   `listen`) builds the shown body's staffs through its inventory (`Inventory.set_card`,
@@ -104,18 +104,14 @@ const REFUSALS: Dictionary = {
 	Inventory.Refusal.NO_CARD: NO_CARD, Inventory.Refusal.NO_HAND: NO_HAND,
 	Inventory.Refusal.NO_ROOM: NO_ROOM, Inventory.Refusal.NO_ITEM: NO_ITEM,
 }
-## Id of the cast sound (looked up in core/registry; a missing sound is silent).
-const CAST_SOUND_ID: StringName = &"cast"
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"registry", &"frames", &"_watched", &"_sent_health", &"_sent_mana", &"_sent_shown", &"_sent_staff_mana", &"_sent_staff_max"]
 ## State as who they point at: the actor it drives and its home body, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_actor", &"_home"]
-## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"_sound_player"]
 
 ## The frames service (core/sim/frames.gd: this seat's input frame each tick) and the registry (a
-## card bag nobody gave, the cast sound). Only tests set these, before adding the node; otherwise the "Frames" and
+## card bag nobody gave). Only tests set these, before adding the node; otherwise the "Frames" and
 ## "Registry" autoloads are used. The frames service is the seat's only input (online-ready N9): a
 ## test feeds a seat through one of its own (tests/gameplay/player/wizard_fixture.gd), and one set
 ## to null later gives no input at all.
@@ -128,7 +124,6 @@ var _actor: Actor = null
 var _home: Actor = null
 ## Per staff: the seconds left in which a remembered press still counts (0 = none remembered).
 var _buffer_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
-var _sound_player: AudioStreamPlayer = null
 ## What the last `player_stats_changed` said, to send it only on a change: what this machine's HUD
 ## was told, not state (a restore sends everything again, `rebuild_derived`).
 var _sent_health: float = -1.0
@@ -155,9 +150,6 @@ func _ready() -> void:
 			push_warning("PlayerController %d: the Frames autoload is missing, so this seat cannot move." % seat)
 	if registry == null:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
-	if _sound_player == null:
-		_sound_player = AudioStreamPlayer.new()
-		add_child(_sound_player)
 
 
 ## Get `body` (a wizard scene, not yet in the tree) ready for seat `seat_index`: its controller's
@@ -482,8 +474,8 @@ func _on_health_changed(_health: float, _max_health: float) -> void:
 	announce_stats()
 
 
-## A staff of the driven actor was cast: the seat's cast events, the sound, the mana spent (the
-## shown body's), and the buffered press is used up.
+## A staff of the driven actor was cast: the seat's cast events (Feel sounds the cast on
+## `staff_cast`), the mana spent (the shown body's), and the buffered press is used up.
 func _on_cast_done(at: int, origin: Vector2, direction: Vector2) -> void:
 	if at >= 0 and at < STAFF_COUNT:
 		_buffer_left[at] = 0.0
@@ -496,7 +488,6 @@ func _on_cast_done(at: int, origin: Vector2, direction: Vector2) -> void:
 		if carrier_card != &"":
 			bus.spell_cast.emit(seat, carrier_card, origin, direction)
 		bus.staff_cast.emit(seat, at, origin, direction)
-	_play_cast_sound()
 
 
 ## A staff of the shown body was built: the panel and the builder see its plain view (empty for a
@@ -505,16 +496,6 @@ func _on_staff_built(at: int) -> void:
 	var body: Actor = shown()
 	if body != null and body.events != null:
 		body.events.staff_changed.emit(seat, at, body.caster.plan_of(at) if body.caster != null else {})
-
-
-func _play_cast_sound() -> void:
-	if registry == null or _sound_player == null or not _sound_player.is_inside_tree():
-		return
-	var stream: AudioStream = registry.get_sound(CAST_SOUND_ID)
-	if stream == null:
-		return
-	_sound_player.stream = stream
-	_sound_player.play()
 
 
 ## Fill `inventory`'s card bag nobody gave: Inventory.DEV_COPIES of every card in the registry.

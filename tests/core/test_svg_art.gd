@@ -235,14 +235,16 @@ func test_every_svg_is_in_the_manifest() -> void:
 
 
 ## How many spell component files (`.tres` other than the reaction table) are under ICON_ROOT,
-## so the icon count needs no change when a card is added.
+## so the icon count needs no change when a card is added. A card's `sounds/` folder (its sounds'
+## `.tres`, docs/milestones/sound.md) holds no component and is not counted.
 func _component_files() -> int:
 	var count: int = 0
 	var folders: Array[String] = [ICON_ROOT]
 	while not folders.is_empty():
 		var folder: String = folders.pop_back()
 		for sub: String in DirAccess.get_directories_at(folder):
-			folders.append(folder.path_join(sub))
+			if sub != "sounds":
+				folders.append(folder.path_join(sub))
 		for file_name: String in DirAccess.get_files_at(folder):
 			if file_name.get_extension() == "tres" and file_name != "reactions.tres":
 				count += 1

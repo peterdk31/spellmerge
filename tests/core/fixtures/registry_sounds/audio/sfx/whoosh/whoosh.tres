@@ -1,0 +1,11 @@
+[gd_resource type="AudioStreamRandomizer" load_steps=3 format=3]
+
+[ext_resource type="AudioStream" path="res://tests/core/fixtures/registry_sounds/audio/sfx/whoosh/variants/1.tres" id="1"]
+[ext_resource type="AudioStream" path="res://tests/core/fixtures/registry_sounds/audio/sfx/whoosh/variants/2.tres" id="2"]
+
+[resource]
+random_pitch = 1.04
+random_volume_offset_db = 1.5
+streams_count = 2
+stream_0/stream = ExtResource("1")
+stream_1/stream = ExtResource("2")

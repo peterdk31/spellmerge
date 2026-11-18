@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/revive/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/revive/revive.sound.json",
+			"recipe_hash": "sha256:b5722ada1c51c3a3ccb17801058707c8c145aa1193dee416a84ceeba31a2bcc7",
+			"audio_hash": "sha256:27613e11aecb6e84285eab2476400618dc1d8bda5fb2729eb6237f4b85352ced",
+			"loudness": -18.5,
+			"peak": -7.2
+		},
+		{
+			"path": "audio/sfx/revive/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/revive/revive.sound.json",
+			"recipe_hash": "sha256:b5722ada1c51c3a3ccb17801058707c8c145aa1193dee416a84ceeba31a2bcc7",
+			"audio_hash": "sha256:eae733fd94f56b07089b6174316754c2bbd3f421ef7f19982a2cf411a06bb06d",
+			"loudness": -17.3,
+			"peak": -5.5
+		},
+		{
+			"path": "audio/sfx/revive/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/revive/revive.sound.json",
+			"recipe_hash": "sha256:b5722ada1c51c3a3ccb17801058707c8c145aa1193dee416a84ceeba31a2bcc7",
+			"audio_hash": "sha256:6f8c5f14e637eeb13dd350cedbc5481351a01a865e480e8bc02d61ce40146dbb",
+			"loudness": -18.2,
+			"peak": -5.1
+		}
+	]
+}

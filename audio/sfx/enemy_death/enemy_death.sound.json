@@ -1,0 +1,69 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.5,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 21
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 120,
+				"to": 40
+			},
+			"length": 0.22,
+			"drive": 2.2,
+			"gain": -5,
+			"amp": {
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 2.0
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 2400,
+				"to": 250,
+				"q": 1.2
+			},
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.3
+			},
+			"drive": 2.0
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 160,
+				"to": 20
+			},
+			"filter": {
+				"type": "high",
+				"from": 2000,
+				"q": 0.8
+			},
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.3
+			},
+			"gain": -13
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.2,
+			"size": 0.9
+		}
+	},
+	"notes": "An enemy dying: a burst that falls from a bright crack to a low thud, and a fizz of sparks thinning out after it; plainly bigger than a hit."
+}

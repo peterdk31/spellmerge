@@ -1,0 +1,41 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.65,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 36
+	},
+	"layers": [
+		{
+			"patch": "void_swell",
+			"pitch": {
+				"from": 96,
+				"to": 58
+			}
+		},
+		{
+			"patch": "storm_gust",
+			"filter": {
+				"from": 3600,
+				"to": 500,
+				"curve": "exp"
+			},
+			"amp": {
+				"shape": "perc",
+				"power": 1.4,
+				"attack": 0.03
+			},
+			"gain": -6
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		}
+	},
+	"notes": "Rift (storm and void): air torn open, a gust sucked down into a low, hollow swell."
+}

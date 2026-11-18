@@ -137,7 +137,7 @@ The game's sound is synthesised from code in a modern style (the owner, 2026-11-
 - **Format:** `.ogg` (Vorbis), 44.1 kHz, mono for effects and UI, mono or stereo for music, at most 5 MB.
 - **No clicks:** every sound starts and ends at silence (a 2 ms ramp at least). A loop folds its tail over its start, and a duck ramps.
 - **Pleasant on the hundredth listen.** A sound heard every few seconds (cast, hit) is short, soft at the top and has its variants. It never sounds like one file four times when four players do the same thing.
-- **Each element has a voice,** shared through patches (`audio/patches/`): fire roars and crackles, frost is glass, storm is a crackle and a zap, void is a low, hollow swell, water is a soft wash. A reaction mixes its two elements' voices.
+- **Each element has a voice,** shared through patches (`audio/patches/`): fire roars and crackles, frost is glass, storm is a gust of wind, lightning is a crackle and a zap, void is a low, hollow swell, water is a soft wash (`fire_roar`, `frost_glass`, `storm_gust` and the others, named by element). A reaction mixes its two elements' voices.
 
 | Family | Loudness (LUFS) | True peak | Variants | Pitch jitter | Volume jitter |
 | --- | --- | --- | --- | --- | --- |

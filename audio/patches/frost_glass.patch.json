@@ -1,0 +1,33 @@
+{
+	"version": 1,
+	"layer": {
+		"source": "partials",
+		"pitch": 1180,
+		"partials": [
+			{
+				"ratio": 1,
+				"gain": 0,
+				"decay": 1.1
+			},
+			{
+				"ratio": 2.76,
+				"gain": -5,
+				"decay": 0.8
+			},
+			{
+				"ratio": 5.4,
+				"gain": -10,
+				"decay": 0.45
+			},
+			{
+				"ratio": 8.9,
+				"gain": -15,
+				"decay": 0.25
+			}
+		],
+		"amp": {
+			"attack": 0.001
+		}
+	},
+	"notes": "Frost's glass: a struck bell of inharmonic partials 1, 2.76, 5.4 and 8.9."
+}

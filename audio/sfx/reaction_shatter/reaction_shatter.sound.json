@@ -1,0 +1,51 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.7,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 31
+	},
+	"layers": [
+		{
+			"patch": "frost_glass",
+			"pitch": 1480
+		},
+		{
+			"patch": "frost_glass",
+			"pitch": 1960,
+			"start": 0.03,
+			"gain": -6
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "high",
+				"from": 3500,
+				"q": 0.8
+			},
+			"length": 0.12,
+			"drive": 1.5,
+			"amp": {
+				"attack": 0.001,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -4
+		},
+		{
+			"patch": "storm_gust",
+			"length": 0.3,
+			"gain": -12
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		}
+	},
+	"notes": "Shatter (frost and storm): ice breaking, two high glass strikes on a sharp crash of noise, blown off by a short gust."
+}

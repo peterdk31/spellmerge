@@ -1,0 +1,26 @@
+{
+	"version": 1,
+	"layer": {
+		"source": "fm",
+		"pitch": {
+			"from": 82,
+			"to": 62
+		},
+		"ratio": 1.5,
+		"index": {
+			"from": 0.4,
+			"to": 2.6
+		},
+		"filter": {
+			"type": "low",
+			"from": 700,
+			"q": 0.8
+		},
+		"amp": {
+			"attack": 0.08,
+			"shape": "arch",
+			"power": 1.4
+		}
+	},
+	"notes": "Void's swell: a low, hollow FM tone sinking as it opens up, under a low pass."
+}

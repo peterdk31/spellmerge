@@ -1,0 +1,68 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.34,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 11
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 700,
+				"to": 3400,
+				"q": 3,
+				"curve": "arch"
+			},
+			"amp": {
+				"shape": "arch",
+				"power": 1.5
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 900,
+				"to": 2200,
+				"curve": "arch",
+				"q": 0.7
+			},
+			"amp": {
+				"shape": "arch",
+				"power": 2.0
+			},
+			"gain": -8
+		},
+		{
+			"source": "fm",
+			"pitch": {
+				"from": 520,
+				"to": 1250
+			},
+			"ratio": 3.5,
+			"index": {
+				"from": 2.2,
+				"to": 0.4
+			},
+			"amp": {
+				"attack": 0.04,
+				"shape": "arch",
+				"power": 2.0
+			},
+			"gain": -18
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.0
+		},
+		"lowpass": 7000
+	},
+	"notes": "A wizard releasing a spell: the owner's chosen whoosh (a band of noise swept up and back, a soft low wash under it, a faint FM shimmer), a little shorter and darker at the top so four players casting fast blur into one breath rather than a hiss."
+}

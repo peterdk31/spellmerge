@@ -156,6 +156,39 @@ func test_a_one_shot_plays_a_voice_on_sfx() -> void:
 	check(played >= 0, "a voice has its stream")
 
 
+## Every one-shot the game names and has a file of (the combat set since AU5) plays in the room as
+## the game plays it: its variants, each there, held for its longest, on SFX, and let go after.
+func test_every_filed_game_one_shot_plays_its_variants_on_sfx() -> void:
+	_open()
+	var played: int = 0
+	for row: SoundRoomScript.Row in room.rows:
+		if row.state != SoundRoomScript.State.HEARD or row.kind != SoundNames.Kind.ONE_SHOT:
+			continue
+		var stream: AudioStream = room.audio.sound(row.id)
+		check(stream != null, "%s loads" % row.id)
+		check(stream is AudioStreamRandomizer, "%s is its baked variants" % row.id)
+		var variants := stream as AudioStreamRandomizer
+		if variants != null:
+			check(variants.streams_count >= 2, "%s has its variants" % row.id)
+			for i in variants.streams_count:
+				check(variants.get_stream(i) is AudioStreamOggVorbis, "%s's variant %d is there" % [row.id, i + 1])
+		var seconds: float = room.audio.length_of(row.id)
+		check(seconds > 0.05 and seconds < 3.0, "%s is held for its length: %s s" % [row.id, seconds])
+		room.press(row.id)
+		check_equal(room.audio.voices.voices_of(row.id), 1, "%s plays a voice" % row.id)
+		var on_sfx: int = 0
+		for i in AudioScript.VOICES:
+			var voice := room.audio.voices.player(i) as AudioStreamPlayer2D
+			if voice.stream == stream and voice.bus == AudioScript.BUS_SFX:
+				on_sfx += 1
+		check_equal(on_sfx, 1, "%s plays on SFX" % row.id)
+		for i in ceili(seconds / FRAME) + 2:
+			room.audio.step(FRAME)
+		check_equal(room.audio.voices.voices_of(row.id), 0, "%s's voice is let go after its length" % row.id)
+		played += 1
+	check(played >= 24, "the combat set's one-shots all play: %d" % played)
+
+
 func test_an_accent_plays_on_the_ambience_bus() -> void:
 	_open(_game())
 	room.press(&"cave_drip")

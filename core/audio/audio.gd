@@ -27,7 +27,8 @@ extends Node
 ##
 ## Sounds are asked of `registry` by id (`get_sound`; a missing one is silent). Only `audible` starts
 ## a player (`hears_audio()`: not on the audio driver with no device, every headless run, where a loop
-## still playing as the run quits is left with the engine's audio thread). Every player is made once
+## still playing as the run quits is left with the engine's audio thread; but in a run recorded with
+## `--write-movie`, whose driver that is too). Every player is made once
 ## in `_ready`: nothing is allocated per play. It steps itself once a frame (`_process`), the world
 ## only while it is not paused.
 ##
@@ -66,6 +67,8 @@ const ATTENUATION: float = 0.7
 const PAN: float = 1.0
 ## Godot's audio driver with no device (headless runs').
 const DUMMY_AUDIO_DRIVER: String = "Dummy"
+## The feature a run recorded by Godot's movie maker has (`--write-movie`).
+const MOVIE_FEATURE: String = "movie"
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads are used.
 var registry: Node = null
@@ -190,9 +193,15 @@ func step_world(delta: float) -> void:
 
 
 ## Whether this machine can hear the players: not on Godot's audio driver with no device
-## (`DUMMY_AUDIO_DRIVER`, every headless run).
+## (`DUMMY_AUDIO_DRIVER`, every headless run), unless the run is recorded (`--write-movie`, whose
+## driver is that one too, and which records what the players mix: a fight recorded with sound).
 static func hears_audio() -> bool:
-	return AudioServer.get_driver_name() != DUMMY_AUDIO_DRIVER
+	return hears_on(AudioServer.get_driver_name(), OS.has_feature(MOVIE_FEATURE))
+
+
+## `hears_audio` for an audio driver's name and whether the run is being recorded.
+static func hears_on(driver: String, recorded: bool) -> bool:
+	return recorded or driver != DUMMY_AUDIO_DRIVER
 
 
 ## The sound `id` (null: none, or no registry).

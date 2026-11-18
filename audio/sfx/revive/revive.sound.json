@@ -1,0 +1,86 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.9,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 23
+	},
+	"layers": [
+		{
+			"source": "fm",
+			"pitch": {
+				"from": 330,
+				"to": 660
+			},
+			"ratio": 2,
+			"index": {
+				"from": 0.3,
+				"to": 1.6
+			},
+			"amp": {
+				"attack": 0.05,
+				"shape": "swell",
+				"power": 1.5
+			},
+			"length": 0.45,
+			"gain": -2
+		},
+		{
+			"source": "partials",
+			"pitch": 660,
+			"start": 0.42,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.5
+				},
+				{
+					"ratio": 1.5,
+					"gain": -6,
+					"decay": 0.45
+				},
+				{
+					"ratio": 2,
+					"gain": -9,
+					"decay": 0.35
+				},
+				{
+					"ratio": 3,
+					"gain": -16,
+					"decay": 0.2
+				}
+			],
+			"amp": {
+				"attack": 0.012
+			},
+			"gain": -4
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1500,
+				"to": 5000,
+				"q": 2.0
+			},
+			"length": 0.45,
+			"amp": {
+				"shape": "swell",
+				"power": 2.0
+			},
+			"gain": -14
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.35,
+			"size": 1.4
+		}
+	},
+	"gain": -1,
+	"notes": "A wizard brought back: a rising shimmer and breath that lands on a warm, open chime (a fifth and an octave over its note). It sits 1 dB under the family's level (gain -1) so the chime's strike stays under the peak."
+}

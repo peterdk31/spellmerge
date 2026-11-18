@@ -1,13 +1,18 @@
 extends Node
 ## Feel's room sound (docs/milestones/atmosphere.md, D): plays the `Ambience` of the room in play
-## (`RoomBase.ambience`) quietly under the music, heard only (nothing in the game reads it). Feel
-## says which (`use`, as a room is entered) and steps it once a frame by real time.
+## (`RoomBase.ambience`) quietly under the music, heard only (nothing in the game reads it). It hears
+## the room itself (`room_entered`, the room read from the registry, as the cover does) and leaving
+## for the main menu (`main_menu_requested`: no room follows, so it fades to silence); Feel only
+## makes it and steps it once a frame by real time.
 ##
 ## **The bed:** every layer starts together and loops (a file not imported to loop is started again
 ## when it runs out). It comes in over its ambience's `fade` from silence as its room comes, and a
 ## new room's ambience comes in while the last one goes out from where it was on a second set of
 ## players, so a room change never cuts it; the same ambience in the next room plays on. Each fade
-## is even in loudness's share (as the music's), never a jump: Smooth for sound.
+## is even in loudness's share (as the music's), never a jump: Smooth for sound. **Changes inside a
+## fade:** back to the ambience still going out (A, B, A), the two sets swap and each goes on from
+## where it was; a third (A, B, C) needs a set, so the quieter of the two is let go and the louder
+## goes on going out.
 ##
 ## **Accents:** each of its ambience's accents is heard after a gap of `gap_min` to `gap_max`
 ## seconds (the first as long after its room came), one of its sounds at random, from up to its
@@ -16,31 +21,34 @@ extends Node
 ## takes the next in turn, the one that started first); one already ringing when the room changes
 ## rings out. The dice are its own (`rng`) and the clock is its own: view only, never the game's.
 ##
-## **Where it is heard:** on BUS, the bus the music and every sound of Feel play on, so a volume set
-## on it reaches the ambience too. Its players are Feel's children and stand still with the tree
-## as the music does (the pause menu, a boss's intro), and go on where they were after.
+## **Where it is heard:** every player on this script's BUS, the bus the music and every sound of
+## Feel play on, so a volume set on it reaches the ambience too. Its players are Feel's children and
+## stand still with the tree as the music does (the pause menu, a boss's intro), and go on where
+## they were after.
 ##
-## **No device, no playback:** on the audio driver with no device (`DUMMY_DRIVER`: every headless
-## run, the tests among them) it does all of the above (streams, levels, accents picked and placed)
-## but starts no player (`audible`), since nothing is there to hear it, and a loop still playing as a
-## headless run quits is left behind by the engine's audio thread when busy (a leak the test
-## runner fails on).
+## **Only `audible` starts a player:** Feel hands it its own (`Feel.hears_audio`: false on the audio
+## driver with no device, every headless run, so nothing is left playing as a headless run quits).
+## Not audible it works out all of the above (streams, levels, accents picked and placed) and starts
+## nothing.
 ##
 ## Nothing is allocated while playing: the players are made once.
 
 const SoundsScript := preload("res://gameplay/feel/sounds.gd")
+const EventsScript := preload("res://core/events/events.gd")
 
 ## The bus every player of it plays on (the music's and the sounds': the game has one).
 const BUS: StringName = &"Master"
-## The audio driver that has no device (Godot's headless runs').
-const DUMMY_DRIVER: String = "Dummy"
 ## The voices the accents play on (heard as Feel's sounds are: from its `wide` px aside an accent
 ## is panned and hardly quieter).
 const ACCENT_VOICES: int = 4
+## Where the rooms are in the registry.
+const ROOM_FOLDER: StringName = &"rooms"
 
-## The registry the sounds are asked of (`get_sound`).
+## The bus it hears rooms on (Feel's; null in a test that hands it ambiences itself), set before it
+## enters the tree, and the registry the rooms and sounds are asked of.
+var events: EventsScript = null
 var registry: Node = null
-## Whether its players are started (false on DUMMY_DRIVER: nothing to hear; set in `_ready`).
+## Whether its players are started (Feel's `audible`).
 var audible: bool = true
 ## Its own dice (view only; a test seeds it).
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -54,11 +62,12 @@ var _then: Array[AudioStreamPlayer] = []
 ## Each layer's loudness at full (decibels), for the ambience playing and the one going out.
 var _now_db: PackedFloat32Array = PackedFloat32Array()
 var _then_db: PackedFloat32Array = PackedFloat32Array()
-## How far in the ambience playing has come (0-1), and how far the one going out still is, and its
-## fade's seconds.
+## How far in the ambience playing has come (0-1), and how far the one going out still is, its
+## fade's seconds and which it is (null: none going out).
 var _level: float = 0.0
 var _then_level: float = 0.0
 var _then_fade: float = 0.0
+var _then_ambience: Ambience = null
 var _voices: Array[AudioStreamPlayer2D] = []
 var _next_voice: int = 0
 ## Feel's real seconds since it was made, and when each accent is next heard.
@@ -69,7 +78,6 @@ var _ambience: Ambience = null
 
 func _ready() -> void:
 	rng.randomize()
-	audible = AudioServer.get_driver_name() != DUMMY_DRIVER
 	for i in Ambience.LAYERS_MOST:
 		_now.append(_bed_player())
 		_then.append(_bed_player())
@@ -84,10 +92,12 @@ func _ready() -> void:
 		voice.attenuation = SoundsScript.ATTENUATION
 		add_child(voice)
 		_voices.append(voice)
+	if events != null and not events.room_entered.is_connected(_on_room_entered):
+		events.room_entered.connect(_on_room_entered)
+		events.main_menu_requested.connect(_on_main_menu_requested)
 
 
-## Leaving the tree (Feel freed with its world): every player stops and lets go of its stream, so
-## no playback is left with the audio server.
+## Leaving the tree (Feel going with the game): every player stops and lets go of its stream.
 func _exit_tree() -> void:
 	stop()
 
@@ -100,27 +110,41 @@ func _bed_player() -> AudioStreamPlayer:
 	return player
 
 
+func _on_room_entered(room_id: StringName) -> void:
+	var room: RoomBase = registry.call(&"get_resource", ROOM_FOLDER, room_id) as RoomBase if registry != null else null
+	use(room.ambience if room != null else null)
+
+
+## Back to the main menu: no room follows, so the ambience fades out under the menu.
+func _on_main_menu_requested(_player: int) -> void:
+	use(null)
+
+
 ## The room in play's ambience is `ambience` (null: silence): a new one comes in over its fade and
-## the last goes out over its own; the same one plays on.
+## the last goes out over its own; the same one plays on; the one going out comes back from where
+## it was.
 func use(ambience: Ambience) -> void:
 	if ambience == _ambience:
 		return
-	# The ambience playing goes out as a whole from where it was; one still going out stops.
-	for player in _then:
-		player.stop()
-		player.stream = null
-	var swap: Array[AudioStreamPlayer] = _then
-	_then = _now
-	_now = swap
-	var swap_db: PackedFloat32Array = _then_db
-	_then_db = _now_db
-	_now_db = swap_db
-	_then_level = _level
-	_then_fade = _ambience.fade if _ambience != null else 0.0
+	if ambience != null and ambience == _then_ambience:
+		_swap_back()
+		return
+	if _level >= _then_level:
+		# The ambience playing is the louder: it goes out from where it was, the one going out before
+		# it is let go.
+		_let_go(_then)
+		_swap_sets()
+		_then_level = _level
+		_then_fade = _ambience.fade if _ambience != null else 0.0
+		_then_ambience = _ambience
+	else:
+		# The one going out is the louder: it goes on going out, the one coming in is let go.
+		_let_go(_now)
 	_ambience = ambience
 	_level = 0.0
 	_next_at.fill(INF)
 	if ambience == null:
+		_apply()
 		return
 	var layers: int = mini(ambience.layers.size(), Ambience.LAYERS_MOST)
 	for i in layers:
@@ -128,11 +152,9 @@ func use(ambience: Ambience) -> void:
 		var player: AudioStreamPlayer = _now[i]
 		player.stream = _sound(layer.sound if layer != null else &"")
 		_now_db[i] = ambience.volume + (layer.volume if layer != null else 0.0)
-		player.volume_db = linear_to_db(0.0)
 		if audible and player.stream != null:
 			player.play()
-	for i in mini(ambience.accents.size(), Ambience.ACCENTS_MOST):
-		_next_at[i] = _clock + _gap(ambience.accents[i])
+	_schedule()
 	if ambience.fade <= 0.0:
 		_level = 1.0
 	_apply()
@@ -145,9 +167,8 @@ func step(delta: float, middle: Vector2 = Vector2.INF) -> void:
 	if _then_level > 0.0:
 		_then_level = maxf(_then_level - (delta / _then_fade if _then_fade > 0.0 else 1.0), 0.0)
 		if _then_level == 0.0:
-			for player in _then:
-				player.stop()
-				player.stream = null
+			_let_go(_then)
+			_then_ambience = null
 	if _ambience != null:
 		_level = minf(_level + (delta / _ambience.fade if _ambience.fade > 0.0 else 1.0), 1.0)
 		for player in _now:
@@ -160,21 +181,28 @@ func step(delta: float, middle: Vector2 = Vector2.INF) -> void:
 	_apply()
 
 
-## Silence at once (tests; in play the next room's ambience, or none, takes over by fading).
+## Silence at once (tests, leaving the tree; in play the next room's ambience, or none, takes over
+## by fading).
 func stop() -> void:
-	use(null)
+	_let_go(_now)
+	_let_go(_then)
+	_ambience = null
+	_then_ambience = null
+	_level = 0.0
 	_then_level = 0.0
-	for player in _then:
-		player.stop()
-		player.stream = null
+	_next_at.fill(INF)
 	for voice in _voices:
 		voice.stop()
 		voice.stream = null
 
 
-## The ambience playing (null: none).
+## The ambience playing (null: none), and the one going out.
 func ambience() -> Ambience:
 	return _ambience
+
+
+func fading_ambience() -> Ambience:
+	return _then_ambience
 
 
 ## How far in the ambience playing has come (0-1), and how loud the one going out still is.
@@ -196,6 +224,11 @@ func volume_of(layer: int) -> float:
 	return _now[layer].volume_db if layer >= 0 and layer < Ambience.LAYERS_MOST else linear_to_db(0.0)
 
 
+## The bed's player of layer `layer` of the ambience playing (for tests).
+func bed_player(layer: int) -> AudioStreamPlayer:
+	return _now[layer] if layer >= 0 and layer < Ambience.LAYERS_MOST else null
+
+
 ## Seconds until accent `accent` of the ambience playing is next heard (INF: never).
 func accent_in(accent: int) -> float:
 	return _next_at[accent] - _clock if accent >= 0 and accent < Ambience.ACCENTS_MOST else INF
@@ -209,6 +242,42 @@ func accent_voice() -> AudioStreamPlayer2D:
 ## Every player it has (for tests: the bus).
 func players() -> Array[Node]:
 	return get_children()
+
+
+## Back to the ambience going out: the two sets swap, each going on from where it was.
+func _swap_back() -> void:
+	_swap_sets()
+	var coming: float = _then_level
+	_then_level = _level
+	_level = coming
+	var going: Ambience = _ambience
+	_ambience = _then_ambience
+	_then_ambience = going
+	_then_fade = going.fade if going != null else 0.0
+	_schedule()
+	_apply()
+
+
+func _swap_sets() -> void:
+	var swap: Array[AudioStreamPlayer] = _then
+	_then = _now
+	_now = swap
+	var swap_db: PackedFloat32Array = _then_db
+	_then_db = _now_db
+	_now_db = swap_db
+
+
+func _let_go(players: Array[AudioStreamPlayer]) -> void:
+	for player in players:
+		player.stop()
+		player.stream = null
+		player.volume_db = linear_to_db(0.0)
+
+
+func _schedule() -> void:
+	_next_at.fill(INF)
+	for i in mini(_ambience.accents.size(), Ambience.ACCENTS_MOST):
+		_next_at[i] = _clock + _gap(_ambience.accents[i])
 
 
 ## The ambience's volumes times each set's fade, set on the bed's players.

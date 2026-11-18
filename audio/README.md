@@ -55,7 +55,7 @@ The manifest drives the Steam AI disclosure and the list of placeholders still t
 
 ## Example to copy
 
-The first audio is the rooms' ambience (atmosphere D): `audio/ambience/amb_crypt_air.ogg` (a 12 s stereo loop, imported to loop) and `amb_crypt_drip.ogg` (a one-shot accent), named by `content/rooms/crypt/crypt_ambience.tres`, each with its entry in `audio/manifest.json`. Ambience ids start `amb_`. They are made by procedural synthesis and listed as `placeholder` until someone has listened to them in play.
+The first audio is the rooms' ambience (atmosphere D), all in `audio/ambience/` and each with its entry in `audio/manifest.json`: the crypt's `amb_crypt_air.ogg` (a 12 s stereo loop, imported to loop), `amb_crypt_drip.ogg`, `amb_crypt_drip_double.ogg` and `amb_crypt_rumble.ogg` (one-shot accents), named by `content/rooms/crypt/crypt_ambience.tres`; the hub's `amb_hub_wind.ogg` and `amb_hub_void.ogg` (loops) and `amb_hub_gust.ogg` (an accent), named by `content/rooms/hub/hub_ambience.tres`. Ambience ids start `amb_`. They are made by procedural synthesis and listed as `placeholder` until someone has listened to them in play.
 
 ## Validate
 

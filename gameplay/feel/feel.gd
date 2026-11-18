@@ -105,6 +105,8 @@ const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
 const SoundsScript := preload("res://gameplay/feel/sounds.gd")
 const MusicScript := preload("res://gameplay/feel/music.gd")
 const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
+## Godot's audio driver with no device (headless runs').
+const DUMMY_AUDIO_DRIVER: String = "Dummy"
 const BodySoundsScript := preload("res://gameplay/feel/body_sounds.gd")
 const BossIntroSoundScript := preload("res://gameplay/feel/boss_intro_sound.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
@@ -318,6 +320,11 @@ const BOSS_INTRO: StringName = &"boss_intro"
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null
+## Whether Feel's players are started at all (`hears_audio()`, read in `_ready`), handed to its
+## sounds, music, room sound and the boss intro's sounds: not on the audio driver with no device
+## (every headless run), where nothing hears them and a loop still playing as the run quits is left
+## with the engine's audio thread (a leak the test runner fails on).
+var audible: bool = true
 ## The registry and the projectile manager are handed on to the spectacle whenever they change.
 var registry: RegistryScript = null:
 	set(value):
@@ -331,6 +338,8 @@ var registry: RegistryScript = null:
 			_numbers.registry = value
 		if _intro_sound != null:
 			_intro_sound.registry = value
+		if _ambience != null:
+			_ambience.registry = value
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
 ## shot's end reads them; performance, 2026-11-02).
 var projectiles: ProjectileManagerScript = null:
@@ -743,8 +752,14 @@ func _ready() -> void:
 	_music.name = "Music"
 	_music.registry = registry
 	add_child(_music)
+	audible = hears_audio()
+	_sounds.audible = audible
+	_music.audible = audible
 	_ambience = RoomAmbienceScript.new()
 	_ambience.name = "RoomAmbience"
+	_ambience.events = events
+	_ambience.registry = registry
+	_ambience.audible = audible
 	add_child(_ambience)
 	_body_sounds = BodySoundsScript.new()
 	_body_sounds.sounds = _sounds
@@ -753,6 +768,7 @@ func _ready() -> void:
 	_intro_sound = BossIntroSoundScript.new()
 	_intro_sound.name = "BossIntroSound"
 	_intro_sound.registry = registry
+	_intro_sound.audible = audible
 	add_child(_intro_sound)
 	add_cue_part(&"held", _play_held)
 	_numbers = DamageNumberDrawerScript.new()
@@ -847,6 +863,7 @@ func _ready() -> void:
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
 	events.room_entered.connect(_on_room_entered)
+	events.main_menu_requested.connect(_on_main_menu_requested)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
@@ -1083,9 +1100,6 @@ func _on_room_entered(room_id: StringName) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if _body_sounds != null:
 		_body_sounds.room_entered(room.music if room != null else null)
-	if _ambience != null:
-		_ambience.registry = registry
-		_ambience.use(room.ambience if room != null else null)
 	if _arrive_look != null:
 		_arrive_look.use_room(room)
 	if _remnants != null:
@@ -1096,6 +1110,19 @@ func _on_room_entered(room_id: StringName) -> void:
 	_juiced_body.fill(0)
 	_juiced_by.fill(0)
 	_juiced_kind.fill(&"")
+
+
+## Back to the main menu (`main_menu_requested`): no room follows, so the room's music fades out under
+## the menu (the room's sound hears it itself, `room_ambience.gd`).
+func _on_main_menu_requested(_player: int) -> void:
+	if _body_sounds != null:
+		_body_sounds.room_entered(null)
+
+
+## Whether this machine can hear Feel's players: not on Godot's audio driver with no device
+## (`DUMMY_AUDIO_DRIVER`, every headless run).
+static func hears_audio() -> bool:
+	return AudioServer.get_driver_name() != DUMMY_AUDIO_DRIVER
 
 
 ## A bit per seat played on this machine (`Frames.seats_here`): whose wizards the party camera

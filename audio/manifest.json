@@ -7,7 +7,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "procedural synthesis (numpy), written by Claude",
-      "prompt": "A 12 s stereo loop of a crypt's low room tone: brown-tilted noise (rolled off above 420 Hz, high-passed at 28 Hz, part shared and part its own on each side), two narrow hollow stone modes of noise at 176 and 263 Hz, a faint hiss above 1.8 kHz, a very soft drone of sines at 55, 55.25 and 82.5 Hz, the air breathing on a slow whole-cycle swell. Every noise is shaped in the frequency domain over exactly the loop's length and every tone and swell has whole cycles in it, so the loop is periodic and has no seam. RMS -27 dBFS, peak -14 dBFS."
+      "prompt": "A 12 s stereo loop of a crypt's low room tone: brown-tilted noise (rolled off above 420 Hz, high-passed at 28 Hz, part shared and part its own on each side), two narrow hollow stone modes of noise at 176 and 263 Hz, a faint hiss above 1.8 kHz, a very soft drone of sines at 55, 55.25 and 82.5 Hz, the air breathing on a slow whole-cycle swell. Every noise is shaped in the frequency domain over exactly the loop's length and every tone and swell has whole cycles in it, so the loop is periodic and has no seam. RMS -27 dBFS, peak -14 dBFS. The file starts at the point of the loop (a rotation of it) where its Vorbis seam decodes as smoothly as the rest: the step and the curvature across it below the 80th percentile of the decoded loop's own."
     },
     {
       "path": "audio/ambience/amb_crypt_drip.ogg",
@@ -16,7 +16,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "procedural synthesis (numpy), written by Claude",
-      "prompt": "A 1.9 s mono far water drip: a sine ping at 1150 Hz whose pitch rises 55% over 45 ms (a bubble's), decaying over 30 ms, with a soft high tick, convolved with a synthetic crypt reverb (exponentially decaying band-limited noise, RT60 1.5 s, 12 ms pre-delay) mixed wetter than dry, its top dulled above 5.2 kHz, faded to silence. Peak -9 dBFS."
+      "prompt": "A 1.9 s mono far water drip: a sine ping at 1150 Hz whose pitch rises 55% over 45 ms (a bubble's), decaying over 30 ms, with a soft high tick, convolved with a synthetic crypt reverb (exponentially decaying band-limited noise, RT60 1.5 s, 12 ms pre-delay) mixed wetter than dry, its top dulled above 5.2 kHz, faded to silence. Rendered at peak -9 dBFS; the encoded file peaks at -10.4 dBFS, RMS -29 dBFS."
     },
     {
       "path": "audio/ambience/amb_crypt_drip_double.ogg",
@@ -25,7 +25,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "procedural synthesis (numpy), written by Claude",
-      "prompt": "A 1.9 s mono far double drip: as the single drip, a lower ping at 820 Hz rising 70%, a second softer ping a third higher 180 ms after it, through the same kind of synthetic crypt reverb, faded to silence. Peak -9 dBFS."
+      "prompt": "A 1.9 s mono far double drip: as the single drip, a lower ping at 820 Hz rising 70%, a second softer ping a third higher 180 ms after it, through the same kind of synthetic crypt reverb, faded to silence. Rendered at peak -9 dBFS; the encoded file peaks at -8.8 dBFS, RMS -27.9 dBFS."
     },
     {
       "path": "audio/ambience/amb_crypt_rumble.ogg",
@@ -52,7 +52,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "procedural synthesis (numpy), written by Claude",
-      "prompt": "A 12 s stereo loop of the void under the floating island: a low hum of sines at 110 Hz and 110.25 Hz (a slow beat) with soft overtones at 165, 220.5 and 330 Hz, under two far swells a loop like surf on a distant coast (noise between 90 and 700 Hz, with a hiss on each crest). Periodic by construction (whole cycles of every tone and swell, noise shaped over the loop's length), so it has no seam. RMS -29 dBFS, peak -13 dBFS."
+      "prompt": "A 12 s stereo loop of the void under the floating island: a low hum of sines at 110 Hz and 110.25 Hz (a slow beat) with soft overtones at 165, 220.5 and 330 Hz, under two far swells a loop like surf on a distant coast (noise between 90 and 700 Hz, with a hiss on each crest). Periodic by construction (whole cycles of every tone and swell, noise shaped over the loop's length), so it has no seam. RMS -29 dBFS, peak -13 dBFS. The file starts at the point of the loop (a rotation of it) where its Vorbis seam decodes as smoothly as the rest: the step and the curvature across it below the 80th percentile of the decoded loop's own."
     },
     {
       "path": "audio/ambience/amb_hub_wind.ogg",
@@ -61,7 +61,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "procedural synthesis (numpy), written by Claude",
-      "prompt": "A 16 s stereo loop of wind over the island: three bands of noise (around 260, 620 and 1500 Hz, each rolled off above it) and a faint whistle at 930 Hz, each gusting on its own slow wander of whole-cycle sines, each side its own. Periodic by construction, so it has no seam. RMS -27 dBFS, peak -12.5 dBFS."
+      "prompt": "A 16 s stereo loop of wind over the island: three bands of noise (around 260, 620 and 1500 Hz, each rolled off above it) and a faint whistle at 930 Hz, each gusting on its own slow wander of whole-cycle sines, each side its own. Periodic by construction, so it has no seam. RMS -27 dBFS, peak -12.5 dBFS. The file starts at the point of the loop (a rotation of it) where its Vorbis seam decodes as smoothly as the rest: the step and the curvature across it below the 80th percentile of the decoded loop's own."
     }
   ]
 }

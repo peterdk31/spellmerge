@@ -21,6 +21,8 @@ const EventsScript := preload("res://core/events/events.gd")
 
 ## The registry the cues and their sounds are asked of (Feel's).
 var registry: Node = null
+## Whether its players are started (Feel's `audible`: none on the audio driver with no device).
+var audible: bool = true
 ## The cues the intro playing played, in order (two at most; a fresh open starts it again), and the
 ## last one (for tests).
 var played: Array[StringName] = []
@@ -109,4 +111,5 @@ func _play(player: AudioStreamPlayer, cue_id: StringName) -> void:
 	if stream == null:
 		return
 	player.stream = stream
-	player.play()
+	if audible:
+		player.play()

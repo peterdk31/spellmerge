@@ -10,10 +10,17 @@
 	},
 	"layers": [
 		{
-			"patch": "storm_gust",
+			"source": "noise",
 			"filter": {
+				"type": "band",
 				"from": 700,
-				"to": 3400
+				"to": 3400,
+				"q": 3,
+				"curve": "arch"
+			},
+			"amp": {
+				"shape": "arch",
+				"power": 1.5
 			}
 		},
 		{

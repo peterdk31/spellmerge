@@ -166,8 +166,9 @@ func test_every_filed_game_one_shot_plays_its_variants_on_sfx() -> void:
 			continue
 		var stream: AudioStream = room.audio.sound(row.id)
 		check(stream != null, "%s loads" % row.id)
-		if stream is AudioStreamRandomizer:
-			var variants := stream as AudioStreamRandomizer
+		check(stream is AudioStreamRandomizer, "%s is its baked variants" % row.id)
+		var variants := stream as AudioStreamRandomizer
+		if variants != null:
 			check(variants.streams_count >= 2, "%s has its variants" % row.id)
 			for i in variants.streams_count:
 				check(variants.get_stream(i) is AudioStreamOggVorbis, "%s's variant %d is there" % [row.id, i + 1])
@@ -175,10 +176,12 @@ func test_every_filed_game_one_shot_plays_its_variants_on_sfx() -> void:
 		check(seconds > 0.05 and seconds < 3.0, "%s is held for its length: %s s" % [row.id, seconds])
 		room.press(row.id)
 		check_equal(room.audio.voices.voices_of(row.id), 1, "%s plays a voice" % row.id)
+		var on_sfx: int = 0
 		for i in AudioScript.VOICES:
 			var voice := room.audio.voices.player(i) as AudioStreamPlayer2D
-			if voice.stream == stream:
-				check_equal(voice.bus, AudioScript.BUS_SFX, "%s on SFX" % row.id)
+			if voice.stream == stream and voice.bus == AudioScript.BUS_SFX:
+				on_sfx += 1
+		check_equal(on_sfx, 1, "%s plays on SFX" % row.id)
 		for i in ceili(seconds / FRAME) + 2:
 			room.audio.step(FRAME)
 		check_equal(room.audio.voices.voices_of(row.id), 0, "%s's voice is let go after its length" % row.id)

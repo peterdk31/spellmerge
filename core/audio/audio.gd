@@ -27,7 +27,8 @@ extends Node
 ##
 ## Sounds are asked of `registry` by id (`get_sound`; a missing one is silent). Only `audible` starts
 ## a player (`hears_audio()`: not on the audio driver with no device, every headless run, where a loop
-## still playing as the run quits is left with the engine's audio thread). Every player is made once
+## still playing as the run quits is left with the engine's audio thread; but in a run recorded with
+## `--write-movie`, whose driver that is too). Every player is made once
 ## in `_ready`: nothing is allocated per play. It steps itself once a frame (`_process`), the world
 ## only while it is not paused.
 ##

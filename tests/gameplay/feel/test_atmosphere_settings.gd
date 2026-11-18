@@ -13,6 +13,7 @@ const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
+const MistScript := preload("res://gameplay/feel/mist.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const StirsScript := preload("res://gameplay/feel/stirs.gd")
 const SpotStirsScript := preload("res://gameplay/feel/spot_stirs.gd")
@@ -83,7 +84,7 @@ func test_feel_starts_at_the_settings_defaults() -> void:
 
 # --- Shadows --------------------------------------------------------------------------------------
 
-func test_shadows_off_frees_the_shadows_and_unblocks_the_light_mid_room() -> void:
+func test_shadows_off_eases_out_then_frees_the_shadows_mid_room() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
@@ -95,16 +96,37 @@ func test_shadows_off_frees_the_shadows_and_unblocks_the_light_mid_room() -> voi
 	var children: int = spectacle.get_child_count()
 	for flip in 3:
 		bus.shadows_changed.emit(false)
-		check(spectacle.shadows == null, "off: no shadows node")
+		check(spectacle.shadows != null, "off: kept while it eases out")
+		var frames: int = _fade_out(feel, func() -> bool: return spectacle.shadows == null, func() -> float: return spectacle.blockers.share)
+		check(frames >= 3, "eased out over %d frames (at least 3)" % frames)
 		check_equal(spectacle.light.blocker_count(), 0, "off: nothing blocks the light")
 		check_equal(spectacle.get_child_count(), children - 1, "off: only the shadows' node is gone")
-		_frames(feel, 2)
-		check_equal(spectacle.light.blocker_count(), 0, "off: a step hands no blockers either")
 		bus.shadows_changed.emit(true)
-		check(spectacle.shadows != null and spectacle.shadows.is_inside_tree(), "on again: made")
+		check(spectacle.shadows != null and spectacle.shadows.share == 0.0, "on again: made, from none")
 		_frames(feel, 1)
-		check_equal(spectacle.light.blocker_count(), WALLS, "on again: the walls handed over at the next step")
+		check_equal(spectacle.light.blocker_count(), WALLS, "the walls handed over at the next step")
+		check(spectacle.blockers.bodies[0].w < 1.0, "easing in (the boxes' strength, %s)" % spectacle.blockers.bodies[0].w)
+		_frames(feel, 30)
+		check(spectacle.shadows.share == 1.0 and is_equal_approx(spectacle.blockers.bodies[0].w, 1.0), "eased all the way in")
 		check_equal(spectacle.get_child_count(), children, "on again: as many children as before")
+
+
+## Frames of Feel until `gone` says the layer is gone (at most 60), each frame's step of `share`
+## (0 to 1) at most a frame's share of LAYER_FADE_SECONDS; the frames taken.
+func _fade_out(feel: FeelScript, gone: Callable, share: Callable) -> int:
+	var last: float = share.call()
+	var most: float = FRAME / SpectacleScript.LAYER_FADE_SECONDS + 0.0001
+	var frames: int = 0
+	while not gone.call() and frames < 60:
+		feel._process(FRAME)
+		frames += 1
+		if gone.call():
+			break
+		var now: float = share.call()
+		check(last - now <= most, "a frame eases at most its share (%s to %s)" % [last, now])
+		last = now
+	check(gone.call(), "gone once faded out")
+	return frames
 
 
 func test_with_shadows_off_the_staffs_own_shadow_shows_again() -> void:
@@ -117,7 +139,9 @@ func test_with_shadows_off_the_staffs_own_shadow_shows_again() -> void:
 	bus.spell_light_changed.emit(true)
 	check(not drawn.visible, "the cast shadows take the drawn one's place")
 	bus.shadows_changed.emit(false)
-	check(drawn.visible, "shadows off: the drawn shadow shows again")
+	check(not drawn.visible, "shadows off: hidden while the cast shadows ease out")
+	_frames(feel, 30)
+	check(drawn.visible, "faded out: the drawn shadow shows again")
 	bus.shadows_changed.emit(true)
 	check(not drawn.visible, "on again: hidden again")
 	bus.spell_light_changed.emit(false)
@@ -142,11 +166,14 @@ func test_shadows_need_dynamic_lighting() -> void:
 	_enter(bus, WALLED_ROOM)
 	_frames(feel, 2)
 	check_equal(spectacle.light.blocker_count(), 0, "and blocks nothing")
+	bus.shadows_changed.emit(true)
+	_frames(feel, 30)
+	check_equal(spectacle.light.blocker_count(), WALLS, "shadows on again under that light: the walls block it")
 
 
 # --- Fog ------------------------------------------------------------------------------------------
 
-func test_fog_off_frees_the_mist_and_on_makes_it_again_with_the_room() -> void:
+func test_fog_off_eases_out_then_frees_the_mist_and_on_eases_it_in_with_the_room() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
@@ -154,17 +181,22 @@ func test_fog_off_frees_the_mist_and_on_makes_it_again_with_the_room() -> void:
 	bus.spell_light_changed.emit(true)
 	_enter(bus, MIST_ROOM)
 	var room := registry.get_resource(&"rooms", MIST_ROOM) as RoomBase
-	check(spectacle.mist != null, "on: the mist is made")
+	check(spectacle.mist != null and spectacle.mist.share == 1.0, "on: the mist is made, at full")
 	var children: int = spectacle.get_child_count()
 	for flip in 3:
 		bus.fog_changed.emit(false)
-		check(spectacle.mist == null and spectacle.get_child_count() == children - 1, "off: the mist node is gone")
-		_frames(feel, 2)
+		check(spectacle.mist != null, "off: kept while it eases out")
+		var mist: MistScript = spectacle.mist
+		var frames: int = _fade_out(feel, func() -> bool: return spectacle.mist == null, func() -> float: return mist.share)
+		check(frames >= 3, "thinned out over %d frames" % frames)
+		check_equal(spectacle.get_child_count(), children - 1, "off: the mist node is gone")
 		bus.fog_changed.emit(true)
 		check(spectacle.mist != null and spectacle.mist.mist == room.mist and spectacle.mist.room_size == room.places().size, "on again: with the room's mist and room")
+		check(is_zero_approx(float((spectacle.mist.material as ShaderMaterial).get_shader_parameter(&"thickness"))), "from nothing")
 		check(spectacle.get_children().back() == spectacle.mist, "and last at its z, over the shadows and the marks")
 		check((spectacle.mist.material as ShaderMaterial).get_shader_parameter(&"light_buffer") == spectacle.light.buffer(), "lit by the light's buffer")
-		_frames(feel, 2)
+		_frames(feel, 30)
+		check(is_equal_approx(float((spectacle.mist.material as ShaderMaterial).get_shader_parameter(&"thickness")), room.mist.thickness), "eased in to the room's thickness")
 
 
 func test_fog_needs_dynamic_lighting_and_stays_over_shadows_made_later() -> void:
@@ -185,6 +217,10 @@ func test_fog_needs_dynamic_lighting_and_stays_over_shadows_made_later() -> void
 	bus.spell_light_changed.emit(false)
 	bus.spell_light_changed.emit(true)
 	check(spectacle.mist == null, "fog off: the light made anew comes without it")
+	bus.fog_changed.emit(true)
+	bus.spell_light_changed.emit(false)
+	bus.spell_light_changed.emit(true)
+	check(spectacle.mist != null and spectacle.mist.share == 1.0, "fog on: a light made anew brings it at full, as it comes at once")
 	_frames(feel, 2)
 
 
@@ -350,7 +386,8 @@ func test_the_volume_scales_the_bed_in_db_easing_to_it() -> void:
 	var player: RoomAmbienceScript = _ambience_player(false, -2.0)
 	player.step(FRAME)
 	check(is_equal_approx(player.volume_of(0), -10.0), "at 100%%: the room's own level, got %s" % player.volume_of(0))
-	check(is_equal_approx(player.set_volume(AmbienceVolume.share_of(50)), 0.5), "50% is half the amplitude")
+	var half: float = AmbienceVolume.share_of(50)
+	check(is_equal_approx(player.set_volume(half), half), "the share taken")
 	var biggest: float = 0.0
 	var last: float = player.heard()
 	for frame in 60:
@@ -358,7 +395,7 @@ func test_the_volume_scales_the_bed_in_db_easing_to_it() -> void:
 		biggest = maxf(biggest, absf(player.heard() - last))
 		last = player.heard()
 	check(biggest <= RoomAmbienceScript.VOLUME_RATE * FRAME + 0.0001, "eased a frame's share at a time, the biggest %s" % biggest)
-	check(is_equal_approx(player.volume_of(0), -10.0 + linear_to_db(0.5)), "50%%: about 6 dB down, got %s" % player.volume_of(0))
+	check(is_equal_approx(player.volume_of(0), -10.0 + linear_to_db(half)), "50%%: the curve's level, got %s" % player.volume_of(0))
 	player.stop()
 
 
@@ -367,9 +404,16 @@ func test_the_volume_at_zero_is_silent_and_stops_its_players_then_plays_again() 
 	var bed: AudioStreamPlayer = player.bed_player(0)
 	check(bed.playing, "the bed plays at 100%")
 	player.set_volume(0.0)
+	var frames: int = 0
+	while player.heard() > 0.0 and frames < 60:
+		player.step(FRAME)
+		frames += 1
+	check(player.heard() == 0.0 and bed.playing and is_inf(player.volume_of(0)), "the step it falls silent: silenced, still playing (no click)")
+	player.step(FRAME)
+	check(not bed.playing, "the step after: the bed's player stops")
 	for frame in 60:
 		player.step(FRAME)
-	check(player.heard() == 0.0 and not bed.playing, "0%: the bed's player stops")
+	check(player.heard() == 0.0 and not bed.playing, "0%: the bed's player stays stopped")
 	check(is_inf(player.volume_of(0)) and player.volume_of(0) < 0.0, "and is silent")
 	var played: int = player.accents_played
 	for frame in 60:
@@ -382,12 +426,36 @@ func test_the_volume_at_zero_is_silent_and_stops_its_players_then_plays_again() 
 	player.stop()
 
 
+func test_the_volume_curve_is_even_in_db_from_minus_40_to_0() -> void:
+	check_equal(AmbienceVolume.share_of(0), 0.0, "0% silent")
+	check(is_equal_approx(linear_to_db(AmbienceVolume.share_of(10)), AmbienceVolume.QUIETEST_DB), "10%%: %s dB" % AmbienceVolume.QUIETEST_DB)
+	check(is_equal_approx(AmbienceVolume.share_of(100), 1.0), "100%: the room's own level")
+	var step: float = linear_to_db(AmbienceVolume.share_of(20)) - linear_to_db(AmbienceVolume.share_of(10))
+	for percent in range(20, 101, 10):
+		var rise: float = linear_to_db(AmbienceVolume.share_of(percent)) - linear_to_db(AmbienceVolume.share_of(percent - 10))
+		check(absf(rise - step) < 0.01, "%d%%: an even %s dB louder, got %s" % [percent, step, rise])
+
+
+func test_a_ringing_accent_follows_the_volume() -> void:
+	var player: RoomAmbienceScript = _ambience_player(false, 0.0)
+	for frame in int(0.6 / FRAME):
+		player.step(FRAME)
+	var voice: AudioStreamPlayer2D = player.accent_voice()
+	check(voice != null, "an accent played")
+	var played: float = voice.volume_db
+	player.set_volume(AmbienceVolume.share_of(50))
+	for frame in 30:
+		player.step(FRAME)
+	check(is_equal_approx(voice.volume_db, played + linear_to_db(AmbienceVolume.share_of(50))), "the ringing accent is turned down with the rest, %s to %s" % [played, voice.volume_db])
+	player.stop()
+
+
 func test_feel_hands_the_volume_to_its_room_sound() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
 	bus.ambience_volume_changed.emit(30)
-	check(is_equal_approx(feel.ambience().volume(), 0.3), "30%% heard as 0.3, got %s" % feel.ambience().volume())
+	check(is_equal_approx(feel.ambience().volume(), AmbienceVolume.share_of(30)), "30%% heard on the curve, got %s" % feel.ambience().volume())
 	bus.ambience_volume_changed.emit(0)
 	check_equal(feel.ambience().volume(), 0.0, "0% silent")
 	bus.ambience_volume_changed.emit(100)
@@ -411,12 +479,24 @@ func test_flipping_every_switch_leaves_nothing_over() -> void:
 		bus.fog_changed.emit(false)
 		bus.ambient_particles_changed.emit(false)
 		bus.environment_interaction_changed.emit(false)
+		_frames(feel, 30)
+		bus.spell_light_changed.emit(false)
 		_frames(feel, 4)
 		bus.shadows_changed.emit(true)
 		bus.fog_changed.emit(true)
 		bus.ambient_particles_changed.emit(true)
 		bus.environment_interaction_changed.emit(true)
+		bus.spell_light_changed.emit(true)
 		_frames(feel, 4)
+		# Off and on again mid-fade, and the light flipped while a layer eases.
+		bus.shadows_changed.emit(false)
+		bus.fog_changed.emit(false)
+		_frames(feel, 5)
+		bus.spell_light_changed.emit(false)
+		bus.spell_light_changed.emit(true)
+		bus.shadows_changed.emit(true)
+		bus.fog_changed.emit(true)
+		_frames(feel, 30)
 		# The freed nodes go at the frame's end.
 		await process_frame
 		# Counted from the second round (the first fills a cache once).
@@ -424,3 +504,47 @@ func test_flipping_every_switch_leaves_nothing_over() -> void:
 			objects = Performance.get_monitor(Performance.OBJECT_COUNT)
 	check_equal(spectacle.get_child_count(), children, "as many children as before")
 	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "each round of flips leaves no object over")
+
+
+# --- From the save to Feel ------------------------------------------------------------------------
+# At boot the Hud (its pause menu) binds after Feel (project.godot's autoload order: Feel before Hud)
+# and sends each saved choice that is not its default. The same here, with the real Hud scene and
+# Feel on one bus of their own and a save of the test's own (the autoloads have booted already).
+
+const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
+const InputManagerScript := preload("res://core/input/input_manager.gd")
+const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
+const SAVE_PATH: String = "user://test_atmosphere_settings_save.cfg"
+
+
+func test_saved_choices_reach_feel_when_the_hud_binds() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	var saved := SaveFile.new(SAVE_PATH)
+	saved.set_setting(&"shadows", not ShadowsSetting.default_on())
+	saved.set_setting(&"fog", not FogSetting.default_on())
+	saved.set_setting(&"ambient_particles", not AmbientParticles.default_on())
+	saved.set_setting(&"environment_interaction", not EnvironmentInteraction.default_on())
+	saved.set_setting(&"ambience_volume", 40)
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var input: InputManagerScript = own(InputManagerScript.new()) as InputManagerScript
+	input.events = bus
+	var focus: UIFocusScript = own(UIFocusScript.new()) as UIFocusScript
+	focus.input = input
+	focus.events = bus
+	focus._ready()
+	var hud: Node = own((load(HUD_SCENE_PATH) as PackedScene).instantiate()) as Node
+	hud.set(&"events", bus)
+	hud.set(&"ui_focus", focus)
+	hud.set(&"input", input)
+	hud.set(&"save", SaveFile.new(SAVE_PATH))
+	root.add_child(hud)
+	var spectacle: SpectacleScript = feel.spectacle()
+	check_equal(spectacle.shadows_on, not ShadowsSetting.default_on(), "Shadows reached Feel")
+	check_equal(spectacle.fog, not FogSetting.default_on(), "Fog reached Feel")
+	check_equal(spectacle.ambient_particles, not AmbientParticles.default_on(), "Ambient particles reached Feel")
+	check_equal(spectacle.environment_interaction, not EnvironmentInteraction.default_on(), "Environment interaction reached Feel")
+	check(is_equal_approx(feel.ambience().volume(), AmbienceVolume.share_of(40)), "Ambience volume reached Feel")
+	root.remove_child(hud)
+	DirAccess.remove_absolute(SAVE_PATH)

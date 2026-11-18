@@ -18,7 +18,10 @@ extends PanelContainer
 ##   Back. It goes back to the main page by itself if the map goes while it shows.
 ## - **Settings:** a row for each page of settings, named as games name them, and Back (every row on
 ##   one page no longer fit the 360 px view): "Graphics", "Performance", "Audio", "Interface". A
-##   page's own Back (and `back`) goes up to Settings with that page's row focused. Every saved
+##   page's own Back (and `back`) goes up to Settings with that page's row focused, and Settings'
+##   own up to the main page on its Settings row (the Map page's on its Map row). Every row of a
+##   page is as wide as the page's widest words focused, either way (`_fit_widths`), so the panel
+##   keeps its width as the focus moves and a switch flips. Every saved
 ##   setting below is read when the menu is bound and sent again only when it is not its default
 ##   (each default lives in core/settings, which feel reads too, so neither reads the other).
 ## - **Graphics:** "Fullscreen: Off" (or On), "Dynamic lighting: On", "Shadows: On", "Fog: On",
@@ -57,7 +60,8 @@ extends PanelContainer
 ##   air end), asks for it in the run playing (`shot_cap_requested`) and is saved (`projectile_cap`).
 ## - **Audio:** "Ambience volume: 100%", Back: a slider like those, from `AmbienceVolume.MIN` to MAX
 ##   by its STEP (0% to 100% by 10%; `AmbienceVolume.DEFAULT`, 100%), sending
-##   `ambience_volume_changed`, which feel hands to the room's sound (atmosphere D; 0% is silent),
+##   `ambience_volume_changed`, which feel hands to the room's sound (atmosphere D; heard on
+##   `AmbienceVolume.share_of`'s curve, 0% silent),
 ##   and saved (`ambience_volume`).
 ## - **Interface:** "Screen shake: On" (or Off; melee I6: `screen_shake_changed`, saved as
 ##   `screen_shake`), "Damage numbers: On" (or Off; props W5: `damage_numbers_changed`, which feel
@@ -102,16 +106,18 @@ const TITLES: Dictionary = {
 const FOCUS_MARK: String = "> "
 ## The meta key that keeps a button's text without the focus mark.
 const BASE_TEXT_META: StringName = &"base_text"
+## The words a switch shows, either way.
+const ON_OFF: Array[String] = ["On", "Off"]
 
 ## The menu closed (resumed). Carries the player who had it.
 signal closed_menu(player: int)
-## A builder switch on the Settings page flipped: the radial builder's ring, a full slot pushed
+## A builder switch on the Interface page flipped: the radial builder's ring, a full slot pushed
 ## right or replaced.
 signal builder_options_changed(ring: Ring, push: bool)
-## The reload switch on the Settings page flipped: the staff rows show the delay on the button
+## The reload switch on the Interface page flipped: the staff rows show the delay on the button
 ## glyph, or on the next cast.
 signal reload_style_changed(on_button: bool)
-## The "Show FPS" switch on the Settings page flipped.
+## The "Show FPS" switch on the Interface page flipped.
 signal show_fps_changed(on: bool)
 
 const RING_TEXT: String = "Ring: %s"
@@ -261,7 +267,52 @@ func _ready() -> void:
 	if display == null:
 		display = get_node_or_null(^"/root/Display")
 	visible = false
+	_fit_widths()
 	_show_page(Page.MAIN)
+
+
+## Every row of a page as wide as the page's widest: its focus mark and its longest words either way
+## (a switch's On and Off, a builder switch's every word) or its slider, so the panel keeps its width
+## as the focus moves and a switch flips.
+func _fit_widths() -> void:
+	var needs: Dictionary = {}
+	for row: Button in _controls:
+		needs[row] = maxf(row.custom_minimum_size.x, _width_of(row, [str(row.get_meta(BASE_TEXT_META, ""))]))
+	var switches: Dictionary = {
+		_fullscreen: FULLSCREEN_TEXT, _light: LIGHT_TEXT, _shadows: SHADOWS_TEXT, _fog: FOG_TEXT,
+		_air: AIR_TEXT, _stirs: STIRS_TEXT, _marks: MARKS_TEXT, _shake: SHAKE_TEXT,
+		_numbers: NUMBERS_TEXT, _fps: FPS_TEXT,
+	}
+	for row: Button in switches:
+		needs[row] = maxf(needs[row], _width_of(row, _worded(switches[row], ON_OFF)))
+	needs[_ring_style] = maxf(needs[_ring_style], _width_of(_ring_style, _worded(RING_TEXT, RING_WORDS)))
+	needs[_put_style] = maxf(needs[_put_style], _width_of(_put_style, _worded(PUT_TEXT, ["Push right", "Replace"])))
+	needs[_reload_style] = maxf(needs[_reload_style], _width_of(_reload_style, _worded(RELOAD_TEXT, ["Button", "Next cast"])))
+	for on_page: int in _pages:
+		var widest: float = 0.0
+		for row: Button in _pages[on_page]:
+			widest = maxf(widest, needs[row])
+		for row: Button in _pages[on_page]:
+			row.custom_minimum_size.x = widest
+
+
+## `format` with each of `words`.
+static func _worded(format: String, words: Array) -> Array[String]:
+	var texts: Array[String] = []
+	for word: Variant in words:
+		texts.append(format % word)
+	return texts
+
+
+## How wide `row` must be for the longest of `texts`, focused (its style's margins included).
+func _width_of(row: Button, texts: Array[String]) -> float:
+	var font: Font = row.get_theme_font(&"font")
+	var font_size: int = row.get_theme_font_size(&"font_size")
+	var widest: float = 0.0
+	for text in texts:
+		widest = maxf(widest, font.get_string_size(FOCUS_MARK + text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x)
+	var style: StyleBox = row.get_theme_stylebox(&"normal")
+	return ceilf(widest + (style.get_minimum_size().x if style != null else 0.0))
 
 
 ## Connect to the event bus and the focus service (called once by `panels.gd`).
@@ -650,8 +701,10 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_numbers(not damage_numbers)
 	elif control == _fps:
 		_set_fps(not show_fps)
-	elif control == _settings_back or control == _map_back:
-		_go(Page.MAIN)
+	elif control == _settings_back:
+		_go(Page.MAIN, _settings)
+	elif control == _map_back:
+		_go(Page.MAIN, _map_row)
 	elif control == _graphics_back or control == _performance_back or control == _audio_back or control == _interface_back:
 		_go(Page.SETTINGS, page_row(page))
 
@@ -663,8 +716,11 @@ func _on_cancelled(player: int) -> void:
 	match page:
 		Page.MAIN:
 			close_menu()
-		Page.SETTINGS, Page.MAP:
-			_go(Page.MAIN)
+		Page.SETTINGS:
+			# Up to the main page on its Settings row, as a page of settings goes up on its own.
+			_go(Page.MAIN, _settings)
+		Page.MAP:
+			_go(Page.MAIN, _map_row)
 		_:
 			# A page of settings goes up to Settings, its own row focused.
 			_go(Page.SETTINGS, page_row(page))
@@ -730,51 +786,51 @@ func _show_needs_light() -> void:
 ## Read the saved atmosphere switches ("Shadows", "Fog", "Ambient particles", "Environment
 ## interaction") and show them; feel is told of each only when it is not the platform's default.
 func _load_atmosphere() -> void:
-	shadows = _load_switch(_shadows, SHADOWS_TEXT, SHADOWS_SETTING, ShadowsSetting.default_on(), &"shadows_changed")
-	fog = _load_switch(_fog, FOG_TEXT, FOG_SETTING, FogSetting.default_on(), &"fog_changed")
-	ambient_particles = _load_switch(_air, AIR_TEXT, AIR_SETTING, AmbientParticles.default_on(), &"ambient_particles_changed")
-	environment_interaction = _load_switch(_stirs, STIRS_TEXT, STIRS_SETTING, EnvironmentInteraction.default_on(), &"environment_interaction_changed")
+	shadows = _load_switch(_shadows, SHADOWS_TEXT, SHADOWS_SETTING, ShadowsSetting.default_on(), _events.shadows_changed if _events != null else Signal())
+	fog = _load_switch(_fog, FOG_TEXT, FOG_SETTING, FogSetting.default_on(), _events.fog_changed if _events != null else Signal())
+	ambient_particles = _load_switch(_air, AIR_TEXT, AIR_SETTING, AmbientParticles.default_on(), _events.ambient_particles_changed if _events != null else Signal())
+	environment_interaction = _load_switch(_stirs, STIRS_TEXT, STIRS_SETTING, EnvironmentInteraction.default_on(), _events.environment_interaction_changed if _events != null else Signal())
 
 
-## A saved switch read (`key`; `default` when none) and shown on `row` in `words`; the bus's
-## `changed` is sent it when it is not `default`. Returns it.
-func _load_switch(row: Button, words: String, key: StringName, default: bool, changed: StringName) -> bool:
+## A saved switch read (`key`; `default` when none) and shown on `row` in `words`; `changed` (the
+## bus's event; null with no bus) is sent it when it is not `default`. Returns it.
+func _load_switch(row: Button, words: String, key: StringName, default: bool, changed: Signal) -> bool:
 	var on: bool = bool(save.get_setting(key, default))
 	row.set_meta(BASE_TEXT_META, words % _word(on))
 	_mark_focus()
-	if on != default and _events != null:
-		_events.emit_signal(changed, on)
+	if on != default and not changed.is_null():
+		changed.emit(on)
 	return on
 
 
-## A switch flipped to `on`: shown on `row` in `words`, saved (`key`) and sent on the bus's
-## `changed`.
-func _flip_switch(row: Button, words: String, key: StringName, on: bool, changed: StringName) -> void:
+## A switch flipped to `on`: shown on `row` in `words`, saved (`key`) and sent on `changed` (the
+## bus's event; null with no bus).
+func _flip_switch(row: Button, words: String, key: StringName, on: bool, changed: Signal) -> void:
 	row.set_meta(BASE_TEXT_META, words % _word(on))
 	_mark_focus()
 	save.set_setting(key, on)
-	if _events != null:
-		_events.emit_signal(changed, on)
+	if not changed.is_null():
+		changed.emit(on)
 
 
 func _set_shadows(on: bool) -> void:
 	shadows = on
-	_flip_switch(_shadows, SHADOWS_TEXT, SHADOWS_SETTING, on, &"shadows_changed")
+	_flip_switch(_shadows, SHADOWS_TEXT, SHADOWS_SETTING, on, _events.shadows_changed if _events != null else Signal())
 
 
 func _set_fog(on: bool) -> void:
 	fog = on
-	_flip_switch(_fog, FOG_TEXT, FOG_SETTING, on, &"fog_changed")
+	_flip_switch(_fog, FOG_TEXT, FOG_SETTING, on, _events.fog_changed if _events != null else Signal())
 
 
 func _set_ambient_particles(on: bool) -> void:
 	ambient_particles = on
-	_flip_switch(_air, AIR_TEXT, AIR_SETTING, on, &"ambient_particles_changed")
+	_flip_switch(_air, AIR_TEXT, AIR_SETTING, on, _events.ambient_particles_changed if _events != null else Signal())
 
 
 func _set_environment_interaction(on: bool) -> void:
 	environment_interaction = on
-	_flip_switch(_stirs, STIRS_TEXT, STIRS_SETTING, on, &"environment_interaction_changed")
+	_flip_switch(_stirs, STIRS_TEXT, STIRS_SETTING, on, _events.environment_interaction_changed if _events != null else Signal())
 
 
 ## Read the saved "Ambience volume" and show it; feel is told only when it is not the default.

@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## too), Feel hands its flash rows and beam paths over, a torch is a light spot coloured by its
 ## art, a room sets the ambient, the steps are a switch, the rect sits above every body and under
 ## every spell, flash and telegraph, the buffer follows the view at a quarter of its size, the
-## shaders are warmed, and with the "Spell light" setting off no node of it exists. How it looks is
+## shaders are warmed, and with the "Dynamic lighting" setting off no node of it exists. How it looks is
 ## checked by eye (tests/screenshots/shot_spell_light.gd): headless runs draw nothing.
 
 const EventsScript := preload("res://core/events/events.gd")

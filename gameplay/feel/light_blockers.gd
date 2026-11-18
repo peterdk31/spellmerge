@@ -66,6 +66,9 @@ var _steps: int = 0
 var _dirty: bool = true
 var _snap: bool = false
 var _last: float = -1.0
+## How much of the whole layer blocks (0 to 1; the "Shadows" setting easing it in or out, Spectacle):
+## every box's strength times this, a prop's column coming down with it. Set by `set_share`.
+var share: float = 1.0
 
 
 func _init() -> void:
@@ -81,6 +84,14 @@ func _init() -> void:
 	_seen.fill(-1)
 	_props.resize(MAX)
 	_prev.resize(MAX)
+
+
+## The whole layer's share (`share`): the boxes are written again at the next step when it changed.
+func set_share(next: float) -> void:
+	next = clampf(next, 0.0, 1.0)
+	if next != share:
+		share = next
+		_dirty = true
 
 
 ## A room was laid out: its walls (`RoomPlaces.wall_rects` of its layout, room pixels), of which the
@@ -209,21 +220,23 @@ static func column_of_prop(prop: PropBase, feet: Vector2, base: Vector4) -> Vect
 ## coming down to its base as its strength goes.
 func _write() -> void:
 	count = 0
+	if share <= OUT:
+		return
 	for wall in walls:
 		if count >= MAX:
 			return
 		boxes[count] = Vector4(wall.position.x, wall.position.y, wall.end.x, wall.end.y)
-		bodies[count] = Vector4(wall.position.x, wall.position.y, wall.end.x, 1.0)
+		bodies[count] = Vector4(wall.position.x, wall.position.y, wall.end.x, share)
 		count += 1
 	for at in _prop_count:
 		var id: int = _props[at]
-		var share: float = strength[id]
-		if share <= OUT or count >= MAX:
+		var left: float = strength[id] * share
+		if left <= OUT or count >= MAX:
 			continue
 		var base: Vector4 = _base[id]
 		var column: Vector3 = _column[id]
 		boxes[count] = base
-		bodies[count] = Vector4(column.x, lerpf(base.y, column.y, share), column.z, share)
+		bodies[count] = Vector4(column.x, lerpf(base.y, column.y, left), column.z, left)
 		count += 1
 
 

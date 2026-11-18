@@ -4,7 +4,8 @@ extends MultiMeshInstance2D
 ## near it, so a lit room has depth and a body reads as standing on the floor. One batch (made by
 ## `Batches.multimesh()`), one row a body, drawn by `body_shadow.gdshader` under every body (the
 ## spectacle's MARK_Z, after the floor marks). The spectacle's, made and freed with the spell light
-## (only while the "Spell light" setting is on).
+## (only while the "Dynamic lighting" and "Shadows" settings are on, easing in and out with
+## "Shadows": `share`).
 ##
 ## - **Where the light is** is handed over each frame (`begin_lights`, `add_lights`: rows in the spot
 ##   rows' layout, `SpellLight.write_spot_row`: the room's spots and the carried lights); this knows
@@ -93,6 +94,15 @@ var _light_near: PackedInt32Array = PackedInt32Array()
 var _light_count: int = 0
 ## Feel's clock at the last step (-1: none yet).
 var _last: float = -1.0
+## How much of the layer shows (0 to 1; the "Shadows" setting easing it in or out, the spectacle
+## sets it each frame): Smooth in two halves by whole pixels. From 1 to 0.5 every cast comes in to the
+## body's feet, leaving the contact shape a body's own drawn shadow has; from 0.5 to 0 the contact
+## shape of a body with no drawn shadow (an enemy) shrinks away, while one with a drawn shadow keeps
+## it, so the drawn one takes its place unchanged when this node leaves. Fading in, the reverse.
+var share: float = 1.0
+## The bodies with a drawn shadow of their own (their node's instance id: true), found as this node
+## enters the tree or a drawn shadow is added, and again by `find_drawn_owners`.
+var _drawn_owners: Dictionary = {}
 
 
 func _init(z: int) -> void:
@@ -145,11 +155,36 @@ func _exit_tree() -> void:
 func _on_node_added(node: Node) -> void:
 	if node.is_in_group(LightSpot.DRAWN_SHADOW):
 		_show_node(node, false)
+		_own_drawn(node)
+
+
+## The bodies with a drawn shadow of their own found again (a fade out starting: those made since
+## are known, and the gone ones forgotten).
+func find_drawn_owners() -> void:
+	_drawn_owners.clear()
+	if is_inside_tree():
+		for node: Node in get_tree().get_nodes_in_group(LightSpot.DRAWN_SHADOW):
+			_own_drawn(node)
+
+
+## Whether the body `body` has a drawn shadow of its own.
+func has_drawn(body: Node) -> bool:
+	return _drawn_owners.has(body.get_instance_id())
+
+
+func _own_drawn(node: Node) -> void:
+	var owner_body: Node = node.get_parent()
+	if owner_body != null:
+		_drawn_owners[owner_body.get_instance_id()] = true
 
 
 func _show_drawn(tree: SceneTree, shown: bool) -> void:
+	if not shown:
+		_drawn_owners.clear()
 	for node: Node in tree.get_nodes_in_group(LightSpot.DRAWN_SHADOW):
 		_show_node(node, shown)
+		if not shown:
+			_own_drawn(node)
 
 
 func _show_node(node: Node, shown: bool) -> void:
@@ -191,6 +226,9 @@ func step(table: ActorsScript, now: float, view: Rect2, blockers: LightBlockersS
 	var delta: float = clampf(now - _last, 0.0, 0.25) if _last >= 0.0 else 0.0
 	_last = now
 	var most: float = LENGTH * delta / EASE_SECONDS
+	# The layer's share (see `share`): the casts in the upper half, the contact shapes in the lower.
+	var cast_share: float = clampf(share * 2.0 - 1.0, 0.0, 1.0)
+	var size_share: float = clampf(share * 2.0, 0.0, 1.0)
 	var near: Rect2 = view.grow(VIEW_MARGIN)
 	for k in _light_count:
 		var span: float = _light_reach[k] + _light_at[k].distance_to(_light_from[k])
@@ -220,6 +258,8 @@ func step(table: ActorsScript, now: float, view: Rect2, blockers: LightBlockersS
 		_stamp[id] = _steps
 		_key[id] = key
 		var radius: float = (body.footprint.radius + RADIUS_PAD) * (1.0 - body.fall_share()) * rise_share(body.arrive_share())
+		if size_share < 1.0 and not has_drawn(body):
+			radius *= size_share
 		_last_feet[id] = feet.round()
 		_last_radius[id] = radius
 		_left[id] = 1.0
@@ -227,7 +267,7 @@ func step(table: ActorsScript, now: float, view: Rect2, blockers: LightBlockersS
 		_shown_count += 1
 		if radius < SMALLEST:
 			continue
-		_write_row(out, feet.round(), cast[id].round(), radius)
+		_write_row(out, feet.round(), (cast[id] * cast_share).round(), radius)
 		out += 1
 	# A body gone since the last step (dead, freed, hidden, out of view): its shadow shrinks away
 	# where it was, never vanishing in one frame.
@@ -241,7 +281,7 @@ func step(table: ActorsScript, now: float, view: Rect2, blockers: LightBlockersS
 			continue
 		_shown[_shown_count] = id
 		_shown_count += 1
-		_write_row(out, _last_feet[id], cast[id].round(), radius)
+		_write_row(out, _last_feet[id], (cast[id] * cast_share).round(), radius)
 		out += 1
 	count = out
 	multimesh.visible_instance_count = out

@@ -55,6 +55,9 @@ const MARK_Z: int = RoomBase.FLOOR_Z + 1
 ## Spell light is applied just under the motes: above the room and every body (a body layer is
 ## at most a few), under every spell, flash and telegraph (`spell_light.gd`; P3a).
 const LIGHT_Z: int = MOTE_Z - 1
+## How long a switched layer ("Shadows", "Fog") takes to ease from none to full or back (s: 15
+## frames at 60, docs/STYLE.md "Smooth": at least 3). Dynamic lighting itself comes and goes at once.
+const LAYER_FADE_SECONDS: float = 0.25
 ## The folders of the mote kinds, the mark kinds and the rooms in the registry, and a mark part's
 ## radius with no size to go by.
 const MOTE_FOLDER: StringName = &"motes"
@@ -138,6 +141,9 @@ var shadows_on: bool = ShadowsSetting.default_on()
 var ambient_particles: bool = AmbientParticles.default_on()
 var fog: bool = FogSetting.default_on()
 var environment_interaction: bool = EnvironmentInteraction.default_on()
+## How far the shadows and the mist have come in (0 to 1; `_fade_layers`). Read only.
+var _shadows_share: float = 0.0
+var _mist_share: float = 0.0
 ## The room's light where nothing lights it (`RoomBase.ambient`, from `room_entered`; P3b), kept
 ## for a light made later. Read only.
 var ambient: float = 1.0
@@ -149,8 +155,8 @@ var carried_lights: CarriedLightsScript = CarriedLightsScript.new()
 ## What blocks the light (atmosphere C): the room's standing walls (from `room_built`) and the props
 ## that block light, handed to the spell light whenever they change while it is on. Read only.
 var blockers: LightBlockersScript = LightBlockersScript.new()
-## The bodies' shadows (atmosphere C; null with spell light or "Shadows" off), under every body. Read
-## only.
+## The bodies' shadows (atmosphere C; null with spell light off, or "Shadows" off once faded out),
+## under every body. Read only.
 var shadows: BodyShadowsScript = null
 
 ## The world's stirs (atmosphere E): the shots' wake and the blasts' push, worked out once a frame
@@ -160,8 +166,8 @@ var stirs: StirsScript = StirsScript.new()
 ## The room's lights' duck and lean (atmosphere E), stepped while spell light is on. Read only.
 var spot_stirs: SpotStirsScript = SpotStirsScript.new()
 
-## The room's low floor mist (atmosphere F; null with spell light or "Fog" off), over the floor, the marks and
-## the bodies' shadows and under every body. Read only.
+## The room's low floor mist (atmosphere F; null with spell light off, or "Fog" off once faded out),
+## over the floor, the marks and the bodies' shadows and under every body. Read only.
 var mist: MistScript = null
 
 ## The room's mist (`RoomBase.mist`, from `use_room`), the room laid's size, walls and holes (from
@@ -299,7 +305,9 @@ func blast(at: Vector2, radius: float, now: float) -> void:
 ## drawings' given off, the barriers' shells drawn where their actors are (`table`, the actor
 ## table), then the motes and the marks stepped.
 func step(now: float, table: ActorsScript = null) -> void:
+	var delta: float = clampf(now - _clock, 0.0, 0.25)
 	_clock = now
+	_fade_layers(delta)
 	cards.new_frame()
 	_trail_motes()
 	streams.step(now, projectiles, births, motes_on())
@@ -338,6 +346,7 @@ func step(now: float, table: ActorsScript = null) -> void:
 		shadows.step(table, now, view, blockers)
 	if mist != null:
 		mist.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
+	_free_faded()
 
 
 ## The bodies' feet that part the mist this frame (atmosphere F): the first `count` of `feet` (world
@@ -961,7 +970,7 @@ func set_floor_marks(on: bool) -> void:
 		pool.settle_into(marks)
 
 
-## The "Spell light" setting: on makes the light buffer and its rect, off frees them (no nodes).
+## The "Dynamic lighting" setting (once "Spell light"): on makes the light buffer and its rect, off frees them (no nodes).
 ## Returns the setting.
 func set_spell_light(on: bool) -> bool:
 	if on != spell_light or (light == null) == on:
@@ -985,60 +994,75 @@ func _make_light(on: bool) -> void:
 		add_child(light)
 		# What blocks it is handed over at the next step while "Shadows" is on (atmosphere C).
 		blockers.refresh()
-	# The shadows and the mist come and go with it (atmosphere C, F), each by its own setting too.
-	_fit_shadows()
-	_fit_mist()
+	# The shadows and the mist come and go with it, at once (atmosphere C, F), each by its own
+	# setting too.
+	_fit_shadows(true)
+	_fit_mist(true)
 	# The motes' lit-only kinds read the light buffer, or with none are not drawn (atmosphere B).
 	if pool != null:
 		pool.set_light(light.buffer() if light != null else null, SpellLightScript.lit_steps())
 
 
 ## The "Shadows" setting (atmosphere C): on, while spell light is on, the light is blocked by the
-## room's standing walls and pillars and the bodies cast shadows; off frees the shadows' batch (a
-## body's own drawn shadow shows again) and hands the light no blockers. With spell light off it
-## only keeps the choice. Returns the setting.
+## room's standing walls and pillars and the bodies cast shadows. A flip eases the layer in or out
+## over LAYER_FADE_SECONDS (`_fade_layers`: the boxes' strength and the bodies' casts and shapes by
+## whole pixels); faded out, the shadows' batch is freed (a body's own drawn shadow shows again) and
+## the light is handed no blockers. With spell light off it only keeps the choice. Returns the
+## setting.
 func set_shadows(on: bool) -> bool:
 	shadows_on = on
-	_fit_shadows()
+	_fit_shadows(false)
 	return shadows_on
 
 
-## The bodies' shadows made while spell light and "Shadows" are on, freed otherwise; the light is
-## handed the blockers anew at the next step (`refresh`: what crumbled meanwhile is rubble already),
-## or none at once.
-func _fit_shadows() -> void:
-	var wanted: bool = light != null and shadows_on
-	if shadows != null and not wanted:
-		remove_child(shadows)
-		shadows.queue_free()
-		shadows = null
-		if light != null:
-			light.set_blockers(blockers.boxes, blockers.bodies, 0)
-	elif shadows == null and wanted:
+## The bodies' shadows made while spell light and "Shadows" are on (eased in from none, or at full
+## with a light made at once, `at_once`); with the light gone, freed with it. One switched off fades
+## out in `_fade_layers` (at once with `at_once`). The light is handed the blockers anew at the next
+## step (`refresh`: what crumbled meanwhile is rubble already).
+func _fit_shadows(at_once: bool) -> void:
+	if shadows != null and (light == null or (at_once and not shadows_on)):
+		_free_shadows()
+	elif shadows == null and light != null and shadows_on:
+		_shadows_share = 1.0 if at_once else 0.0
 		blockers.refresh()
+		blockers.set_share(_shadows_share)
 		shadows = BodyShadowsScript.new(MARK_Z)
+		shadows.share = _shadows_share
 		add_child(shadows)
 		_keep_mist_last()
+	elif shadows != null and not shadows_on:
+		# Fading out: the bodies with a drawn shadow keep their shape to hand over to it.
+		shadows.find_drawn_owners()
 
 
-## The "Fog" setting (atmosphere F): on, while spell light is on, the room's mist is drawn; off frees
-## it. Returns the setting.
+func _free_shadows() -> void:
+	remove_child(shadows)
+	shadows.queue_free()
+	shadows = null
+	_shadows_share = 0.0
+	if light != null:
+		light.set_blockers(blockers.boxes, blockers.bodies, 0)
+
+
+## The "Fog" setting (atmosphere F): on, while spell light is on, the room's mist is drawn. A flip
+## eases it in or out over LAYER_FADE_SECONDS (its thickness); faded out, it is freed. Returns the
+## setting.
 func set_fog(on: bool) -> bool:
 	fog = on
-	_fit_mist()
+	_fit_mist(false)
 	return fog
 
 
 ## The mist made while spell light and "Fog" are on (it glows by the light, and lies over the
-## shadows), freed otherwise.
-func _fit_mist() -> void:
-	var wanted: bool = light != null and fog
-	if mist != null and not wanted:
-		remove_child(mist)
-		mist.queue_free()
-		mist = null
-	elif mist == null and wanted:
+## shadows; eased in from none, or at full with a light made at once), freed with the light; one
+## switched off fades out in `_fade_layers` (at once with `at_once`).
+func _fit_mist(at_once: bool) -> void:
+	if mist != null and (light == null or (at_once and not fog)):
+		_free_mist()
+	elif mist == null and light != null and fog:
+		_mist_share = 1.0 if at_once else 0.0
 		mist = MistScript.new(MARK_Z)
+		mist.set_share(_mist_share)
 		add_child(mist)
 		mist.lay(_room_size, _room_walls, _room_holes)
 		mist.use(_mist_data)
@@ -1046,6 +1070,36 @@ func _fit_mist() -> void:
 	if mist != null:
 		# The light's buffer, again when the light was made anew under it.
 		mist.use_light(light.buffer())
+
+
+func _free_mist() -> void:
+	remove_child(mist)
+	mist.queue_free()
+	mist = null
+	_mist_share = 0.0
+
+
+## The shadows and the mist eased toward their settings, `delta` seconds on (a whole layer from none
+## to full over LAYER_FADE_SECONDS); before the blockers are stepped, so a changed share is handed to
+## the light this frame.
+func _fade_layers(delta: float) -> void:
+	var most: float = delta / LAYER_FADE_SECONDS
+	if shadows != null:
+		_shadows_share = move_toward(_shadows_share, 1.0 if shadows_on else 0.0, most)
+		shadows.share = _shadows_share
+		blockers.set_share(_shadows_share)
+	if mist != null:
+		_mist_share = move_toward(_mist_share, 1.0 if fog else 0.0, most)
+		mist.set_share(_mist_share)
+
+
+## The layers faded out all the way are freed (after the frame's step: the light was handed no
+## blockers by it).
+func _free_faded() -> void:
+	if shadows != null and not shadows_on and _shadows_share <= 0.0:
+		_free_shadows()
+	if mist != null and not fog and _mist_share <= 0.0:
+		_free_mist()
 
 
 ## The "Ambient particles" setting (atmosphere B): whether the room's air gives off its dust (while

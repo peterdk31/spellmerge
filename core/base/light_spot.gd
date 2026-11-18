@@ -10,7 +10,7 @@ extends RefCounted
 ##     metadata/light_art = NodePath("../Flame")
 ##     metadata/light_reach = 56.0
 ##
-## While the "Spell light" setting is on, Feel's spell light draws every such node in the tree into
+## While the "Dynamic lighting" setting is on, Feel's spell light draws every such node in the tree into
 ## its light buffer like a shot's light (gameplay/feel/spell_light.gd), so it lights the floor,
 ## the walls and the bodies round it in the same steps. Nothing reads it for the game.
 ##

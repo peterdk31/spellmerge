@@ -27,10 +27,11 @@ extends Node
 ## they were after.
 ##
 ## **The "Ambience volume" setting** (`set_volume`, Feel hands it from `ambience_volume_changed`;
-## `AmbienceVolume` in core/settings): a share of the room's own loudness, times every bed's and
-## accent's amplitude (in decibels `linear_to_db` of it). A new share is eased to at most
-## VOLUME_RATE a second, so a step of the slider is never a jump; at 0 every bed's player stops
-## and no accent is heard (they are still picked and placed), and the beds start again as it
+## `AmbienceVolume` in core/settings, whose `share_of` gives the share on a perceptual curve): a
+## share of the room's own amplitude, times every bed's and accent's (a ringing accent's too; in
+## decibels `linear_to_db` of it). A new share is eased to at most VOLUME_RATE a second, so a step of
+## the slider is never a jump; a step after it falls silent every bed's player and accent voice
+## stops and no accent is heard (they are still picked and placed), and the beds start again as it
 ## comes back up. Set while the pause menu stops the tree, it is heard after it, easing in.
 ##
 ## **Only `audible` starts a player:** Feel hands it its own (`Feel.hears_audio`: false on the audio
@@ -86,6 +87,11 @@ var _ambience: Ambience = null
 ## The "Ambience volume" setting's share (`set_volume`), and the share heard now, easing to it.
 var _volume: float = 1.0
 var _heard: float = 1.0
+## The players were stopped for silence (`_ease_volume`).
+var _stopped: bool = false
+## Each accent voice's loudness as played (decibels, before the share heard), so a change of the
+## setting reaches an accent already ringing.
+var _voice_db: PackedFloat32Array = PackedFloat32Array()
 
 
 func _ready() -> void:
@@ -97,6 +103,7 @@ func _ready() -> void:
 	_then_db.resize(Ambience.LAYERS_MOST)
 	_next_at.resize(Ambience.ACCENTS_MOST)
 	_next_at.fill(INF)
+	_voice_db.resize(ACCENT_VOICES)
 	for i in ACCENT_VOICES:
 		var voice := AudioStreamPlayer2D.new()
 		voice.bus = BUS
@@ -293,11 +300,14 @@ func _schedule() -> void:
 		_next_at[i] = _clock + _gap(_ambience.accents[i])
 
 
-## The ambience's volumes times each set's fade and the share heard, set on the bed's players.
+## The ambience's volumes times each set's fade and the share heard, set on the bed's players, and
+## the share heard on each accent voice (one already ringing follows the setting too).
 func _apply() -> void:
 	for i in Ambience.LAYERS_MOST:
 		_now[i].volume_db = _now_db[i] + linear_to_db(_level * _heard)
 		_then[i].volume_db = _then_db[i] + linear_to_db(_then_level * _heard)
+	for i in ACCENT_VOICES:
+		_voices[i].volume_db = _voice_db[i] + linear_to_db(_heard)
 
 
 ## The "Ambience volume" setting: `share` of the room's own loudness (0 to 1; `AmbienceVolume.
@@ -316,14 +326,19 @@ func heard() -> float:
 	return _heard
 
 
-## The share heard eased toward the setting's, `delta` seconds on; once silent every bed's player
-## stops, and every accent's voice (each bed keeps its stream, so the beds start again as the share
-## comes back).
+## The share heard eased toward the setting's, `delta` seconds on; a step after it fell silent every
+## bed's player stops, and every accent's voice (each bed keeps its stream, so the beds start again
+## as the share comes back).
 func _ease_volume(delta: float) -> void:
-	if _heard == _volume:
-		return
-	_heard = move_toward(_heard, _volume, VOLUME_RATE * delta)
-	if _heard <= 0.0:
+	# Silent since the last step: its players were already set to silence (`_apply`), so stopping
+	# them now cuts nothing that is heard (stopped in the step that reaches 0 would click).
+	var was_silent: bool = _heard <= 0.0
+	if _heard != _volume:
+		_heard = move_toward(_heard, _volume, VOLUME_RATE * delta)
+	if _heard > 0.0:
+		_stopped = false
+	elif was_silent and not _stopped:
+		_stopped = true
 		for player in _now:
 			player.stop()
 		for player in _then:
@@ -339,14 +354,15 @@ func _play_accent(accent: AmbienceAccent, middle: Vector2) -> void:
 	var sound: AudioStream = _sound(id)
 	if sound == null:
 		return
-	var voice: AudioStreamPlayer2D = _voices[_next_voice]
+	var at: int = _next_voice
+	var voice: AudioStreamPlayer2D = _voices[at]
 	_next_voice = (_next_voice + 1) % ACCENT_VOICES
 	voice.stream = sound
-	voice.volume_db = _ambience.volume + accent.volume + rng.randf_range(-accent.volume_spread, accent.volume_spread) + linear_to_db(_level)
+	_voice_db[at] = _ambience.volume + accent.volume + rng.randf_range(-accent.volume_spread, accent.volume_spread) + linear_to_db(_level)
 	voice.pitch_scale = 1.0 + rng.randf_range(-accent.pitch_spread, accent.pitch_spread)
 	var from: Vector2 = middle if middle.is_finite() else Vector2.ZERO
 	voice.global_position = from + Vector2(rng.randf_range(-accent.wide, accent.wide), 0.0)
-	voice.volume_db += linear_to_db(_heard)
+	voice.volume_db = _voice_db[at] + linear_to_db(_heard)
 	if audible and _heard > 0.0:
 		voice.play()
 	accents_played += 1

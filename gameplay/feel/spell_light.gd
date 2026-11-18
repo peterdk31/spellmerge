@@ -1,7 +1,7 @@
 extends Node
 ## Spell light (docs/milestones/spell-spectacle.md, P3a, P3b): shots, flashes, beams and the
 ## room's own lights light the floor, the walls and the bodies round them. A child of the
-## spectacle (gameplay/feel/spectacle.gd, under Feel), made only while the "Spell light" setting is on (`SpellLightSetting`, `spell_light_changed`); with
+## spectacle (gameplay/feel/spectacle.gd, under Feel), made only while the "Dynamic lighting" setting is on (`SpellLightSetting`, `spell_light_changed`); with
 ## it off none of these nodes exist.
 ##
 ## - **The light buffer:** a SubViewport a DOWNSCALE-th of the view each way, cleared to black

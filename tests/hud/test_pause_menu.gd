@@ -701,6 +701,29 @@ func test_b_goes_up_from_settings_to_the_main_page() -> void:
 	_settings()
 	_do(0, &"back")
 	check_equal(_menu().page, PauseMenuScript.Page.MAIN, "B goes up to the main page")
+	check(_focused("Settings"), "on its Settings row, as a page of settings goes up on its own")
+
+
+func test_settings_back_goes_up_to_the_main_page_on_its_row() -> void:
+	_settings()
+	_press(0, "SettingsBack")
+	check(_menu().page == PauseMenuScript.Page.MAIN and _focused("Settings"), "Back: the main page, on Settings")
+
+
+func test_a_pages_width_holds_as_the_focus_moves_and_switches_flip() -> void:
+	for row: String in PAGE_ROWS:
+		_settings()
+		_press(0, row)
+		var wide: float = _menu().get_combined_minimum_size().x
+		for at in (PAGE_ROWS[row] as Array).size():
+			_do(0, &"move_down")
+			check_equal(_menu().get_combined_minimum_size().x, wide, "%s: as wide with the focus on its row %d" % [row, at + 1])
+	for switch in ["SpellLight", "Shadows", "Fog", "AmbientParticles", "EnvironmentInteraction", "FloorMarks"]:
+		_settings()
+		_press(0, "Graphics")
+		var wide: float = _menu().get_combined_minimum_size().x
+		_press(0, switch)
+		check_equal(_menu().get_combined_minimum_size().x, wide, "Graphics as wide with %s flipped" % switch)
 
 
 # --- Fullscreen --------------------------------------------------------------------------------

@@ -58,7 +58,7 @@ var look_layers: PackedInt32Array:
 ## the light's hue; it comes and goes through its shades over its life (dim, its brightest at the
 ## middle, dim) instead of cooling, and is only ever gone from its shadow shade, so it never pops
 ## (`Motes.lit_shade`). Its highlights ("o") are drawn as its body: a hotter pixel would skip a
-## shade. With the "Spell light" setting off it is not drawn at all. It neither glows (the light is
+## shade. With the "Dynamic lighting" setting off it is not drawn at all. It neither glows (the light is
 ## its glow) nor settles.
 @export var lit_only: bool = false
 ## How much the world's stirs move it (docs/milestones/atmosphere.md, E; 0 not at all, 1 fully):

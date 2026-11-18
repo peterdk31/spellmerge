@@ -2,9 +2,9 @@ extends ColorRect
 ## A room's low floor mist (docs/milestones/atmosphere.md, F; the room's `RoomBase.mist`, a
 ## `RoomMist`): one rect over the room drawn by `mist.gdshader`, soft and see-through (the owner's
 ## exception to the pixel rules, 2026-11-18, docs/STYLE.md), drifting slowly on Feel's clock. The
-## spectacle's, made and freed with the spell light (only while the "Spell light" setting is on: the
-## mist reads the light buffer to glow in the light, and without the light's dark round it, it would be
-## a flat veil over the room).
+## spectacle's, made and freed with the spell light (only while the "Dynamic lighting" and "Fog"
+## settings are on, easing in and out with "Fog": `share`; the mist reads the light buffer to glow in
+## the light, and without the light's dark round it, it would be a flat veil over the room).
 ##
 ## - **Where:** at the floor marks' z (the spectacle's MARK_Z), the last of the spectacle's children
 ##   there, so it lies over the floor, the cover, the marks and the bodies' shadows (a shadow is on the
@@ -46,6 +46,9 @@ var room_size: Vector2 = Vector2.ZERO
 var parting: MistPartingScript = MistPartingScript.new()
 ## The mask of the room laid (null before one). Read only.
 var mask: ImageTexture = null
+## How much of it shows (0 to 1; the "Fog" setting easing it in or out, the spectacle sets it each
+## frame through `set_share`): its thickness times this. Read only.
+var share: float = 1.0
 
 var _walls: Array[Rect2] = []
 var _holes: Array[Rect2] = []
@@ -85,7 +88,7 @@ func use(given: RoomMist) -> void:
 	var shading := material as ShaderMaterial
 	if mist != null:
 		shading.set_shader_parameter(&"colour", Vector3(mist.colour.r, mist.colour.g, mist.colour.b))
-		shading.set_shader_parameter(&"thickness", mist.thickness)
+		shading.set_shader_parameter(&"thickness", mist.thickness * share)
 		shading.set_shader_parameter(&"middle", mist.middle)
 		shading.set_shader_parameter(&"edge_reach", mist.edge_reach / MistMaskScript.REACH)
 		shading.set_shader_parameter(&"pit_reach", mist.pit_reach / MistMaskScript.REACH)
@@ -98,6 +101,16 @@ func use(given: RoomMist) -> void:
 		shading.set_shader_parameter(&"lit", mist.lit)
 	parting.clear()
 	_refresh()
+
+
+## How much of it shows (`share`): the mist thins to nothing at 0 (soft, as the mist alone may be).
+func set_share(next: float) -> void:
+	next = clampf(next, 0.0, 1.0)
+	if next == share:
+		return
+	share = next
+	if mist != null:
+		(material as ShaderMaterial).set_shader_parameter(&"thickness", mist.thickness * share)
 
 
 ## The spell light's buffer it glows by (SpellLight.buffer).

@@ -42,7 +42,7 @@ extends Resource
 @export var floor_mark_colors: PackedColorArray = PackedColorArray()
 ## The room's light where no spell or torch lights it (Feel's spell light, docs/milestones/
 ## spell-spectacle.md, P3b): 1.0 (the default) is the room as its art is drawn, below it darker,
-## so spells and torches read as the light in it. Only drawn while the "Spell light" setting is
+## so spells and torches read as the light in it. Only drawn while the "Dynamic lighting" setting is
 ## on; at most 1.0 (light only brightens past it).
 @export_range(0.3, 1.0, 0.05) var ambient: float = 1.0
 ## The colour of the room's dark (docs/milestones/atmosphere.md, A): where no spell or torch lights
@@ -73,7 +73,7 @@ extends Resource
 @export var ambience: Ambience = null
 ## Its low floor mist (docs/milestones/atmosphere.md, F; `RoomMist`): soft and see-through, thin over
 ## the middle and thicker toward its edges and pits, drifting, parted by bodies and pushed by shots and
-## blasts, lit by the spell light (drawn only while the "Spell light" setting is on: Feel's
+## blasts, lit by the spell light (drawn only while the "Dynamic lighting" setting is on: Feel's
 ## gameplay/feel/mist.gd). Rooms of one biome share a file beside them. Null (the default): no mist,
 ## the room is as it was. Drawn only.
 @export var mist: RoomMist = null

@@ -140,14 +140,14 @@ The game's sound is synthesised from code in a modern style (the owner, 2026-11-
 
 | Family | Loudness (LUFS) | True peak | Variants | Pitch jitter | Volume jitter |
 | --- | --- | --- | --- | --- | --- |
-| `combat` (cast, hit, small effects) | -20 short-term | -3 dBTP | 4 | ±4% | ±1.5 dB |
-| `big` (reactions, deaths, downed, revive) | -17 short-term | -2 dBTP | 3 | ±3% | ±1 dB |
-| `boss` (the boss's moves, intro, slams) | -15 short-term | -1 dBTP | 3 | ±2% | ±1 dB |
+| `combat` (cast, hit, small effects) | -20 momentary | -3 dBTP | 4 | ±4% | ±1.5 dB |
+| `big` (reactions, deaths, downed, revive) | -17 momentary | -2 dBTP | 3 | ±3% | ±1 dB |
+| `boss` (the boss's moves, intro, slams) | -15 momentary | -1 dBTP | 3 | ±2% | ±1 dB |
 | `held` (loops) | -24 integrated | -6 dBTP | 1 | none | none |
-| `ui` | -24 short-term | -6 dBTP | 2 | ±2% | none |
+| `ui` | -24 momentary | -6 dBTP | 2 | ±2% | none |
 | `music` (all layers together) | -18 integrated | -1 dBTP | 1 | none | none |
 
-Short-term is the loudest 400 ms; integrated is the whole file, gated (BS.1770). The bake fails a sound more than 1 LU outside its family's target unless its recipe places it with `gain` and a note. These numbers are a first tuning; the owner changes them by ear.
+Momentary is the loudest 400 ms window (most sounds here are shorter than short-term's 3 s); integrated is the whole file, gated (BS.1770). Peaks are held 1 dB under the limit before encoding, as Vorbis can overshoot. The bake fails a sound more than 1 LU outside its family's target unless its recipe places it with `gain` and a note. These numbers are a first tuning; the owner changes them by ear.
 
 ## File formats
 

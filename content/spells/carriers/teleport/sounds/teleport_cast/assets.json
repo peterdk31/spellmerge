@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/teleport/sounds/teleport_cast/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/teleport/sounds/teleport_cast/teleport_cast.sound.json",
+			"recipe_hash": "sha256:be82496c990cdd26c37c12145c29203d62f44376a09f71d5ddb88fdfff097864",
+			"audio_hash": "sha256:0f3b544583a306fe9306405f70c59b1b821bd2b90a49cb417cf695b55e5b1a4d",
+			"loudness": -22.7,
+			"peak": -12.9
+		},
+		{
+			"path": "content/spells/carriers/teleport/sounds/teleport_cast/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/teleport/sounds/teleport_cast/teleport_cast.sound.json",
+			"recipe_hash": "sha256:be82496c990cdd26c37c12145c29203d62f44376a09f71d5ddb88fdfff097864",
+			"audio_hash": "sha256:94d0fbebf30c6ef3a66f65cad69e3bd934642e009f0be56ff4787b1ad32bde4d",
+			"loudness": -22.8,
+			"peak": -13.0
+		},
+		{
+			"path": "content/spells/carriers/teleport/sounds/teleport_cast/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/teleport/sounds/teleport_cast/teleport_cast.sound.json",
+			"recipe_hash": "sha256:be82496c990cdd26c37c12145c29203d62f44376a09f71d5ddb88fdfff097864",
+			"audio_hash": "sha256:c4f3f48d5fe8a5bfa7fd6b8095b9d2bf190533c70fa89bff339a7638d009c6af",
+			"loudness": -23.2,
+			"peak": -13.9
+		},
+		{
+			"path": "content/spells/carriers/teleport/sounds/teleport_cast/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/teleport/sounds/teleport_cast/teleport_cast.sound.json",
+			"recipe_hash": "sha256:be82496c990cdd26c37c12145c29203d62f44376a09f71d5ddb88fdfff097864",
+			"audio_hash": "sha256:88cede32c7698e1952c23160bc402eb63e28dc258acf950aa1ee353e1efa7368",
+			"loudness": -23.3,
+			"peak": -13.2
+		}
+	]
+}

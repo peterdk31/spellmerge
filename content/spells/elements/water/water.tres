@@ -16,3 +16,4 @@ status_strength = 50.0
 damage_scale = 0.8
 tint = Color(0.11764706, 0.6117647, 0.54901963, 1)
 look_id = &"drops"
+cast_hint = &"water_hint"

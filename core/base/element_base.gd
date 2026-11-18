@@ -19,6 +19,11 @@ extends SpellComponent
 ## A hit of this element heals whatever it hits, friend or foe, and does nothing else: no damage,
 ## push or status (mend; owner 2026-11-12).
 @export var heals: bool = false
+## Its faint hint on a cast (a sound id; empty: none): played softly over the carrier's own cast
+## sound whenever a cast carrying this infusion leaves (Feel's cast sounds, `gameplay/feel/cast_sounds.gd`),
+## so a fire bolt sounds a bolt with a breath of flame. Its recipe is in the card's own
+## `sounds/<id>/` folder (audio/README.md).
+@export var cast_hint: StringName = &""
 
 # --- Look (staffs B6a) ----------------------------------------------------------------
 

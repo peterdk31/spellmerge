@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/familiar/sounds/familiar_cast/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/familiar/sounds/familiar_cast/familiar_cast.sound.json",
+			"recipe_hash": "sha256:646b078096c7b2c24c5265caf1c2c50de131245068c1cc090a0507f76f91ac39",
+			"audio_hash": "sha256:794807f021a9d16c3a38367bd6baf4d37f6092cd51a32f17a48daad6a743b9d0",
+			"loudness": -23.1,
+			"peak": -6.3
+		},
+		{
+			"path": "content/spells/carriers/familiar/sounds/familiar_cast/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/familiar/sounds/familiar_cast/familiar_cast.sound.json",
+			"recipe_hash": "sha256:646b078096c7b2c24c5265caf1c2c50de131245068c1cc090a0507f76f91ac39",
+			"audio_hash": "sha256:fb1763b834439dd9486a64400c3909fdc2e7e083b8d41a9a14927f4018e00bbc",
+			"loudness": -23.0,
+			"peak": -6.5
+		},
+		{
+			"path": "content/spells/carriers/familiar/sounds/familiar_cast/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/familiar/sounds/familiar_cast/familiar_cast.sound.json",
+			"recipe_hash": "sha256:646b078096c7b2c24c5265caf1c2c50de131245068c1cc090a0507f76f91ac39",
+			"audio_hash": "sha256:9b86729bfe7122f62b86fa965f7ef3c4f11009d0abbb6a6af762b07c2a28aae4",
+			"loudness": -23.1,
+			"peak": -6.1
+		},
+		{
+			"path": "content/spells/carriers/familiar/sounds/familiar_cast/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/familiar/sounds/familiar_cast/familiar_cast.sound.json",
+			"recipe_hash": "sha256:646b078096c7b2c24c5265caf1c2c50de131245068c1cc090a0507f76f91ac39",
+			"audio_hash": "sha256:fce5e365a8f798bf4af4e053ac3e55b93b7f9062a7f2402b8226cc05feb0a49d",
+			"loudness": -22.8,
+			"peak": -6.7
+		}
+	]
+}

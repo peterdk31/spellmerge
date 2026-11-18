@@ -164,6 +164,12 @@ extends Resource
 ## far they fly, every mark's radius and every light's reach, its holds, shake and punch; never a part's seconds, nor an
 ## arc's length (where it runs). A reaction's cues differ in their colour and power only.
 ##
+## Its size (the owner, 2026-11-18: a blast sounds and looks as big as it is): `size_ref` is the size
+## in pixels it is made at (0, the default: none). Played at another `size`, its motes' counts, its
+## flashes' seconds, its shake and kick and its sound (deeper and louder when bigger) grow by how
+## many times that it is, besides what its parts' `reach` already grows by its size (one rule,
+## `gameplay/feel/cue_size.gd`). The blast's `fireball` is made at a Blast card's own radius.
+##
 ## How often (S6, item 13): `every` seconds is the least time between two plays of the cue for the
 ## same actor (the one it is of; none counts as one more), so a moment that comes by the hundred (a
 ## body caught by a pull, every step) shows a few times a second; a play sooner is left out whole, parts and
@@ -223,6 +229,8 @@ const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
 @export_range(0.1, 4.0, 0.05) var power: float = 1.0
 ## The least seconds between two plays for the same actor (see above); 0 every time.
 @export_range(0.0, 5.0, 0.01) var every: float = 0.0
+## The size it is made at, in pixels (see above); 0 for none.
+@export_range(0.0, 400.0, 1.0) var size_ref: float = 0.0
 
 
 ## Whether 0 for not yet known, then 1 or 2: the cue has a `light` part (`lights`).
@@ -254,6 +262,8 @@ func problems() -> PackedStringArray:
 		found.append("%s: power %s is 0 or less" % [id, power])
 	if every < 0.0:
 		found.append("%s: every %s is below 0" % [id, every])
+	if size_ref < 0.0:
+		found.append("%s: size_ref %s is below 0" % [id, size_ref])
 	if duck > 0.0 or duck < DUCK_MOST:
 		found.append("%s: duck %s is not from %s to 0 decibels" % [id, duck, DUCK_MOST])
 	if not KICK_WAYS.has(kick_way):

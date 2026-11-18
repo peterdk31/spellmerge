@@ -1,0 +1,74 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.45,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 116
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 320,
+				"to": 220,
+				"q": 2.0
+			},
+			"length": 0.4,
+			"amp": {
+				"attack": 0.02,
+				"shape": "perc",
+				"power": 1.2
+			},
+			"gain": 0,
+			"color": "stepped",
+			"pitch": {
+				"from": 140,
+				"to": 40
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 75,
+				"to": 50
+			},
+			"length": 0.3,
+			"amp": {
+				"attack": 0.02,
+				"shape": "perc",
+				"power": 1.4
+			},
+			"gain": -14,
+			"drive": 2.0
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 200,
+				"to": 150,
+				"q": 4.0
+			},
+			"length": 0.18,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.6
+			},
+			"gain": -6
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A wall's cast: stone grinding up out of the floor, a low rumble of stepped noise thinning out over a deep sine. 4 dB under the family's level (gain -4), which keeps the deep sine's peak under the limit.",
+	"gain": -4
+}

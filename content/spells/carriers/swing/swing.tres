@@ -28,3 +28,4 @@ knockback = 240.0
 staff_pose = Array[Dictionary]([{"phase": "wind", "at": 1.0, "turn": -67.5, "ease": "out"}, {"phase": "strike", "at": 1.0, "turn": 67.5}, {"phase": "after", "at": 0.08, "turn": 67.5}, {"phase": "after", "at": 0.38}])
 cast_cue = &"cast_swing"
 look_shader = ExtResource("9_look")
+cast_sound = &"swing_cast"

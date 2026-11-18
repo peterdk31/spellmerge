@@ -1,0 +1,69 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.2,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 101
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 260,
+				"to": 120
+			},
+			"length": 0.09,
+			"amp": {
+				"attack": 0.004,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -14,
+			"drive": 2.0
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 720,
+				"to": 480,
+				"q": 4.0
+			},
+			"length": 0.1,
+			"amp": {
+				"attack": 0.004,
+				"shape": "perc",
+				"power": 2.2
+			},
+			"gain": 0
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 380,
+				"to": 300,
+				"q": 5.0
+			},
+			"length": 0.12,
+			"amp": {
+				"attack": 0.005,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -4
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "An atom's cast: a small, quick pop out of a narrow tube, the cast's thoomp made short and a little higher (a ring falling from 720 Hz, a sine from 260 to 120 Hz), so a stream of atoms is a soft patter. 5 dB under the family's level (gain -5): heard often, and short, so its peak stays under the limit.",
+	"gain": -5
+}

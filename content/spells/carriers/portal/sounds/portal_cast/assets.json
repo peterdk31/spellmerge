@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/portal/sounds/portal_cast/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/portal/sounds/portal_cast/portal_cast.sound.json",
+			"recipe_hash": "sha256:086287cf2264c77f2a3a022b05f54ae6a0b6bd6549c91e8ee71638552bcb5eae",
+			"audio_hash": "sha256:25ac54cc3f2e94ea5681473092bbc2963b74534f8e63ef1060df8569d59ffc59",
+			"loudness": -22.9,
+			"peak": -12.4
+		},
+		{
+			"path": "content/spells/carriers/portal/sounds/portal_cast/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/portal/sounds/portal_cast/portal_cast.sound.json",
+			"recipe_hash": "sha256:086287cf2264c77f2a3a022b05f54ae6a0b6bd6549c91e8ee71638552bcb5eae",
+			"audio_hash": "sha256:fecbb28d34694316dfa3f7a2d3b93ee7e14aafcbe349c6344fc4c3f67dc8c9de",
+			"loudness": -23.1,
+			"peak": -12.6
+		},
+		{
+			"path": "content/spells/carriers/portal/sounds/portal_cast/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/portal/sounds/portal_cast/portal_cast.sound.json",
+			"recipe_hash": "sha256:086287cf2264c77f2a3a022b05f54ae6a0b6bd6549c91e8ee71638552bcb5eae",
+			"audio_hash": "sha256:fe5d7ba1b21da83d17528d61f847ce9770961f66dd39a35466285cfa10d571a5",
+			"loudness": -23.1,
+			"peak": -13.0
+		},
+		{
+			"path": "content/spells/carriers/portal/sounds/portal_cast/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/portal/sounds/portal_cast/portal_cast.sound.json",
+			"recipe_hash": "sha256:086287cf2264c77f2a3a022b05f54ae6a0b6bd6549c91e8ee71638552bcb5eae",
+			"audio_hash": "sha256:141334ef54fa9af027316d3f4f3a69a1b57a2cdea2a6f280689471522c8c433d",
+			"loudness": -22.9,
+			"peak": -12.8
+		}
+	]
+}

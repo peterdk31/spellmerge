@@ -17,6 +17,9 @@ extends Node
 ## The least seconds a one-shot counts as playing (a sound of no length still holds its voice for
 ## this long, so the per-sound limit holds within a frame).
 const MIN_SECONDS: float = 0.05
+## The pitch a one-shot may be played at, times its own.
+const MIN_PITCH: float = 0.25
+const MAX_PITCH: float = 4.0
 
 ## How many voices, how many may play one id at once, whether they are placed, their bus, and (placed)
 ## how far they are heard, how steeply they fall off and how far they pan. Set before `_ready`.
@@ -70,8 +73,9 @@ func _exit_tree() -> void:
 
 
 ## Plays `stream` (the sound `id`) at `at` (placed voices only), `volume` decibels on top of its own,
-## on `on_bus` (empty: its own bus); the voice used, or -1 for none (no stream).
-func play(id: StringName, stream: AudioStream, at: Vector2, volume: float, on_bus: StringName = &"") -> int:
+## on `on_bus` (empty: its own bus), at `pitch` times its own pitch (a big blast deeper; 1 as made);
+## the voice used, or -1 for none (no stream).
+func play(id: StringName, stream: AudioStream, at: Vector2, volume: float, on_bus: StringName = &"", pitch: float = 1.0) -> int:
 	if stream == null:
 		return -1
 	var used: int = _voice_for(id)
@@ -80,6 +84,7 @@ func play(id: StringName, stream: AudioStream, at: Vector2, volume: float, on_bu
 		var voice: AudioStreamPlayer2D = _placed[used]
 		voice.stream = stream
 		voice.volume_db = volume
+		voice.pitch_scale = clampf(pitch, MIN_PITCH, MAX_PITCH)
 		voice.bus = to
 		voice.global_position = at
 		if audible:
@@ -88,12 +93,13 @@ func play(id: StringName, stream: AudioStream, at: Vector2, volume: float, on_bu
 		var flat: AudioStreamPlayer = _flat[used]
 		flat.stream = stream
 		flat.volume_db = volume
+		flat.pitch_scale = clampf(pitch, MIN_PITCH, MAX_PITCH)
 		flat.bus = to
 		if audible:
 			flat.play()
 	_voice_id[used] = id
 	_from[used] = _clock
-	_until[used] = _clock + maxf(AudioLength.of(stream), MIN_SECONDS)
+	_until[used] = _clock + maxf(AudioLength.of(stream) / clampf(pitch, MIN_PITCH, MAX_PITCH), MIN_SECONDS)
 	started += 1
 	last = id
 	return used

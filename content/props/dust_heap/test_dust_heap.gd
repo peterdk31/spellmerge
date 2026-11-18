@@ -155,5 +155,4 @@ func test_its_sounds() -> void:
 	var registry: Node = root.get_node("Registry")
 	var scattered: CueBase = registry.get_resource(&"cues", HEAP.look_of(&"scattered").cue) as CueBase
 	check(scattered != null and scattered.sound == &"dust_scatter", "its scattered state sounds dust_scatter as it is entered (boss plan OB15)")
-	var burnt: CueBase = registry.get_resource(&"cues", HEAP.look_of(&"burnt").cue) as CueBase
-	check(burnt != null and burnt.sound == &"dust_explode", "its burnt state sounds dust_explode as it is entered (boss plan OB15)")
+	check_equal(HEAP.look_of(&"burnt").cue, &"", "its burnt state plays no cue of its own: its blast's fireball booms (the owner, 2026-11-18: one explosion sound, the blast's)")

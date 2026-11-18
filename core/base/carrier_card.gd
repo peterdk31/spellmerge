@@ -109,6 +109,11 @@ var _pose_packed: bool = false
 ## Empty plays nothing there. A new carrier names its cues in its own `.tres`; Feel's preset has none
 ## of them.
 @export var cast_cue: StringName = &"cast"
+## Its own cast sound (a sound id): what any actor's cast of it sounds as it leaves the staff (Feel's
+## cast sounds, `gameplay/feel/cast_sounds.gd`; the infusions it carries add their faint
+## `ElementBase.cast_hint`s over it). Empty: the shared `cast`. Its recipe is in the card's own
+## `sounds/<id>/` folder (audio/README.md).
+@export var cast_sound: StringName = &""
 @export var shown_cue: StringName = &""
 @export var impact_cue: StringName = &"impact"
 @export var end_cue: StringName = &""

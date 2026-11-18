@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/elements/frost/sounds/frost_hint/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/frost/sounds/frost_hint/frost_hint.sound.json",
+			"recipe_hash": "sha256:d69106df918984200353fd1954461bd6839e7f3d87544ca5c0268a523282ca4a",
+			"audio_hash": "sha256:a347312d529e069573c47b6ef5321ab15aa781707de820b26c22d5cace1515f1",
+			"loudness": -24.0,
+			"peak": -12.1
+		},
+		{
+			"path": "content/spells/elements/frost/sounds/frost_hint/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/frost/sounds/frost_hint/frost_hint.sound.json",
+			"recipe_hash": "sha256:d69106df918984200353fd1954461bd6839e7f3d87544ca5c0268a523282ca4a",
+			"audio_hash": "sha256:bdedf54f2df1deb2f9310458fab5832800982356c0baf41a918b21afe26d1da4",
+			"loudness": -23.6,
+			"peak": -12.2
+		},
+		{
+			"path": "content/spells/elements/frost/sounds/frost_hint/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/frost/sounds/frost_hint/frost_hint.sound.json",
+			"recipe_hash": "sha256:d69106df918984200353fd1954461bd6839e7f3d87544ca5c0268a523282ca4a",
+			"audio_hash": "sha256:a820c2adba97d1c537a9910f0d6837be16660aa76ba15411b8e7b6f1880c4b98",
+			"loudness": -24.7,
+			"peak": -12.3
+		},
+		{
+			"path": "content/spells/elements/frost/sounds/frost_hint/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/elements/frost/sounds/frost_hint/frost_hint.sound.json",
+			"recipe_hash": "sha256:d69106df918984200353fd1954461bd6839e7f3d87544ca5c0268a523282ca4a",
+			"audio_hash": "sha256:bec9224c0570f51efc80c2a9db0ced1e2a7c887023fae441dc36ff95340c745a",
+			"loudness": -23.7,
+			"peak": -12.1
+		}
+	]
+}

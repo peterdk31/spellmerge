@@ -28,8 +28,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 3200,
-				"to": 380,
+				"from": 1600,
+				"to": 300,
 				"q": 0.9
 			},
 			"length": 0.5,
@@ -51,7 +51,7 @@
 			},
 			"filter": {
 				"type": "low",
-				"from": 2600,
+				"from": 1600,
 				"q": 0.7
 			},
 			"length": 1.5,
@@ -72,7 +72,7 @@
 			},
 			"filter": {
 				"type": "low",
-				"from": 2600,
+				"from": 1600,
 				"q": 0.7
 			},
 			"length": 1.4,
@@ -111,5 +111,5 @@
 			"size": 1.8
 		}
 	},
-	"notes": "The sting as the broom's name slams in: a deep boom and a burst of noise under a bright, brassy stab on D and A (the fight's key), ringing out in a large room."
+	"notes": "The sting as the broom's name slams in: a deep boom and a burst of noise under a dark, brassy stab on D and A (the fight's key), ringing out in a large room."
 }

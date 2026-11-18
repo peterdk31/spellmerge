@@ -2,7 +2,7 @@
 	"version": 1,
 	"layer": {
 		"source": "partials",
-		"pitch": 1180,
+		"pitch": 660,
 		"partials": [
 			{
 				"ratio": 1,
@@ -11,23 +11,18 @@
 			},
 			{
 				"ratio": 2.76,
-				"gain": -5,
-				"decay": 0.8
+				"gain": -8,
+				"decay": 0.7
 			},
 			{
 				"ratio": 5.4,
-				"gain": -10,
-				"decay": 0.45
-			},
-			{
-				"ratio": 8.9,
-				"gain": -15,
-				"decay": 0.25
+				"gain": -18,
+				"decay": 0.3
 			}
 		],
 		"amp": {
 			"attack": 0.001
 		}
 	},
-	"notes": "Frost's glass: a struck bell of inharmonic partials 1, 2.76, 5.4 and 8.9."
+	"notes": "Frost's glass: a low struck bell of inharmonic partials 1, 2.76 and 5.4, the upper ones quiet and short so it rings without piercing."
 }

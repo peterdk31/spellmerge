@@ -13,8 +13,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "low",
-				"from": 1300,
-				"to": 380,
+				"from": 1000,
+				"to": 300,
 				"q": 0.7
 			},
 			"length": 0.32,
@@ -28,8 +28,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 3200,
-				"to": 1300,
+				"from": 1300,
+				"to": 520,
 				"q": 1.2
 			},
 			"length": 0.38,
@@ -49,7 +49,7 @@
 			},
 			"filter": {
 				"type": "band",
-				"from": 2600,
+				"from": 1100,
 				"q": 1.0
 			},
 			"length": 0.4,
@@ -58,15 +58,16 @@
 				"shape": "perc",
 				"power": 1.1
 			},
-			"gain": -12
+			"gain": -14
 		}
 	],
 	"fx": {
 		"reverb": {
 			"mix": 0.15,
 			"size": 0.8
-		}
+		},
+		"lowpass": 2400
 	},
 	"gain": -2,
-	"notes": "A dust heap walked into: a soft puff and a dry hiss of dust spreading over the floor. 2 dB under the family's level (gain -2): it is soft, and several heaps may go at once."
+	"notes": "A dust heap walked into: a soft puff and a dry, dull rustle of dust spreading over the floor. 2 dB under the family's level (gain -2): it is soft, and several heaps may go at once."
 }

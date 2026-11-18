@@ -4,8 +4,8 @@
 		"source": "noise",
 		"filter": {
 			"type": "band",
-			"from": 1100,
-			"to": 380,
+			"from": 900,
+			"to": 300,
 			"q": 1.4
 		},
 		"amp": {
@@ -15,5 +15,5 @@
 		},
 		"drive": 2.0
 	},
-	"notes": "Fire's roar: a driven band of noise falling from 1100 to 380 Hz, struck and dying away."
+	"notes": "Fire's roar: a driven band of noise falling from 900 to 300 Hz, struck and dying away."
 }

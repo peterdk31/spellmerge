@@ -18,7 +18,7 @@
 			},
 			"filter": {
 				"type": "band",
-				"from": 1500,
+				"from": 800,
 				"q": 2.0
 			},
 			"length": 0.85,
@@ -39,7 +39,7 @@
 			},
 			"filter": {
 				"type": "band",
-				"from": 700,
+				"from": 450,
 				"q": 2.5
 			},
 			"length": 0.85,
@@ -53,8 +53,8 @@
 		{
 			"patch": "fire_roar",
 			"filter": {
-				"from": 280,
-				"to": 1500,
+				"from": 220,
+				"to": 900,
 				"curve": "arch",
 				"q": 1.0
 			},
@@ -93,7 +93,8 @@
 		"reverb": {
 			"mix": 0.3,
 			"size": 1.4
-		}
+		},
+		"lowpass": 2400
 	},
 	"notes": "The broom catching fire as its second phase starts: its straw rattles faster and faster, then bursts into a roaring whoosh of flame with crackles running on."
 }

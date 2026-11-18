@@ -12,8 +12,8 @@
 		{
 			"source": "fm",
 			"pitch": {
-				"from": 330,
-				"to": 660
+				"from": 220,
+				"to": 440
 			},
 			"ratio": 2,
 			"index": {
@@ -30,7 +30,7 @@
 		},
 		{
 			"source": "partials",
-			"pitch": 660,
+			"pitch": 440,
 			"start": 0.42,
 			"partials": [
 				{
@@ -63,8 +63,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 1500,
-				"to": 5000,
+				"from": 600,
+				"to": 1600,
 				"q": 2.0
 			},
 			"length": 0.45,
@@ -72,7 +72,7 @@
 				"shape": "swell",
 				"power": 2.0
 			},
-			"gain": -14
+			"gain": -16
 		}
 	],
 	"fx": {
@@ -82,5 +82,5 @@
 		}
 	},
 	"gain": -1,
-	"notes": "A wizard brought back: a rising shimmer and breath that lands on a warm, open chime (a fifth and an octave over its note). It sits 1 dB under the family's level (gain -1) so the chime's strike stays under the peak."
+	"notes": "A wizard brought back: a rising, warm swell and breath that lands on an open chime on A (a fifth and an octave over its note). It sits 1 dB under the family's level (gain -1) so the chime's strike stays under the peak."
 }

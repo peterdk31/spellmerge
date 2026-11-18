@@ -8,10 +8,10 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 1700,
-				"to": 2700,
-				"curve": "arch",
-				"q": 1.4
+				"from": 420,
+				"to": 700,
+				"q": 1.4,
+				"curve": "arch"
 			}
 		},
 		{
@@ -20,10 +20,10 @@
 			"pitch": 190,
 			"filter": {
 				"type": "band",
-				"from": 3600,
+				"from": 900,
 				"q": 1.2
 			},
-			"gain": -9
+			"gain": -10
 		},
 		{
 			"source": "noise",
@@ -39,8 +39,9 @@
 		"reverb": {
 			"mix": 0.15,
 			"size": 0.8
-		}
+		},
+		"lowpass": 1600
 	},
 	"gain": 2,
-	"notes": "The broom's Sweep winding up: stiff bristles dragged over stone, a scratchy hiss pushed back and forth with a low rasp under it. 2 dB over the family's level (gain 2): it is a telegraph, heard off screen."
+	"notes": "The broom's Sweep winding up: stiff bristles dragged over stone, a low, rough rasp pushed back and forth with a scratch of grit on it. 2 dB over the family's level (gain 2): it is a telegraph, heard off screen."
 }

@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py HELD",
-			"recipe_hash": "sha256:f7ed91ca1f7e623662ede7bc3eb6e25dd43f3c3720a083138528742a99097091",
+			"recipe_hash": "sha256:7bdfcf4c54ef2cb0e05daef3d0dcba7b9e3be7b27a1a29226039190c2fa709c5",
 			"audio_hash": "sha256:0c43ce196c6100e37dbeba3f39bbfb65826823459f4310413eb7da2805c12645",
 			"loudness": -24.0,
 			"peak": -15.4

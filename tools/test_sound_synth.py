@@ -19,9 +19,12 @@ import sound_synth  # noqa: E402
 from sound_synth import RATE, SoundError  # noqa: E402
 
 # The three samples the owner chose (2026-11-18): a cast, a fire hit and a glassy reaction ping.
+# They are brighter than the game's sounds became after the owner's first
+# listen (docs/STYLE.md, "Sound": deep, never piercing); as the synth's samples and the sound
+# room's fixtures they stay as they were, each under a ceiling of its own (`top`).
 SAMPLES = {
     "whoosh": {
-        "version": 1, "kind": "sfx", "family": "combat", "seconds": 0.4, "variants": 4,
+        "version": 1, "kind": "sfx", "family": "combat", "seconds": 0.4, "variants": 4, "top": 0.0,
         "vary": {"pitch": 0.06, "time": 0.08, "seed": 1},
         "layers": [
             {"source": "noise", "filter": {"type": "band", "from": 600, "to": 4100, "q": 3, "curve": "arch"},
@@ -35,7 +38,7 @@ SAMPLES = {
         "notes": "A wizard releasing a spell: a soft filtered-noise whoosh with an FM shimmer, heard every cast from four players.",
     },
     "fire_hit": {
-        "version": 1, "kind": "sfx", "family": "combat", "seconds": 0.6, "variants": 4,
+        "version": 1, "kind": "sfx", "family": "combat", "seconds": 0.6, "variants": 4, "top": 0.0,
         "vary": {"pitch": 0.05, "time": 0.1, "seed": 2},
         "layers": [
             {"source": "sine", "pitch": {"from": 150, "to": 45}, "length": 0.25, "drive": 1.5, "gain": -6,
@@ -50,7 +53,7 @@ SAMPLES = {
         "notes": "Fire striking: a low thump under a roaring band of noise that falls, and crackles that thin out.",
     },
     "glass_ping": {
-        "version": 1, "kind": "sfx", "family": "big", "seconds": 1.2, "variants": 3,
+        "version": 1, "kind": "sfx", "family": "big", "seconds": 1.2, "variants": 3, "top": 0.0,
         "vary": {"pitch": 0.03, "time": 0.05, "seed": 3},
         "layers": [
             {"source": "partials", "pitch": 1180,

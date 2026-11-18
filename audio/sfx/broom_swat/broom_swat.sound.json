@@ -13,10 +13,10 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 700,
-				"to": 3200,
-				"curve": "exp",
-				"q": 2.2
+				"from": 400,
+				"to": 1500,
+				"q": 2.2,
+				"curve": "exp"
 			},
 			"length": 0.14,
 			"amp": {
@@ -63,9 +63,9 @@
 		{
 			"source": "noise",
 			"filter": {
-				"type": "high",
-				"from": 4200,
-				"q": 0.8
+				"type": "band",
+				"from": 1600,
+				"q": 0.9
 			},
 			"start": 0.124,
 			"length": 0.1,

@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/broom_burning/broom_burning.sound.json",
-			"recipe_hash": "sha256:2cef31c719d520f1b293c1f8fa9f6a6651b106ab4cb47a79e524601eb4a5aca8",
-			"audio_hash": "sha256:64c4756c8860c78ecc4e26b94db8c21d908daf64841b0ee603532a396de189a9",
+			"recipe_hash": "sha256:aa3649fbd3ba51ad471dd0650f738bdbccdfffb975984a420c550366f6fb93a3",
+			"audio_hash": "sha256:16f2b0d53d7cab4722ffc09d7e495dbd00ccc268acbe318c89fbe4d6956662ca",
 			"loudness": -24.0,
-			"peak": -13.8
+			"peak": -12.7
 		}
 	]
 }

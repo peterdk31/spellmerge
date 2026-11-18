@@ -12,10 +12,10 @@
 		{
 			"source": "fm",
 			"pitch": {
-				"from": 600,
-				"to": 1200
+				"from": 260,
+				"to": 520
 			},
-			"ratio": 2.5,
+			"ratio": 2.0,
 			"index": {
 				"from": 1.5,
 				"to": 0.3
@@ -30,7 +30,7 @@
 		},
 		{
 			"source": "partials",
-			"pitch": 1800,
+			"pitch": 780,
 			"start": 0.4,
 			"partials": [
 				{
@@ -55,7 +55,7 @@
 			"pitch": 220,
 			"filter": {
 				"type": "band",
-				"from": 5000,
+				"from": 1400,
 				"q": 1.2
 			},
 			"length": 0.45,
@@ -64,7 +64,7 @@
 				"power": 1.2,
 				"attack": 0.02
 			},
-			"gain": -14
+			"gain": -16
 		}
 	],
 	"fx": {
@@ -74,5 +74,5 @@
 		}
 	},
 	"gain": -2,
-	"notes": "An enemy appearing out of bright bits: a shimmering tone rising with a sparkle, ending on a small glassy tick. 2 dB under the family's level (gain -2): many may appear at once."
+	"notes": "An enemy appearing out of bright bits: a warm tone rising an octave with a soft, dull crackle, ending on a small, low bell tick. 2 dB under the family's level (gain -2): many may appear at once."
 }

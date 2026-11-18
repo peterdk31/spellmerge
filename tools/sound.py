@@ -10,7 +10,8 @@ on a contact sheet, and check that every generated sound is up to date.
 
 A recipe is `<id>.sound.json` in a folder of its own named `<id>` (`audio/sfx/<id>/`, or a
 content item's `sounds/<id>/`). The bake renders each variant (tools/sound_synth.py), places its
-loudness on its family's target (docs/STYLE.md, "Sound"), checks the peak and the ends, encodes it
+loudness on its family's target (docs/STYLE.md, "Sound"), checks the peak, the top (how loud its
+part above 2 kHz is) and the ends, encodes it
 with `ffmpeg -c:a libvorbis -q:a 6` and writes, in the recipe's folder only:
 
 - a one-shot (`sfx`, `ui`): `variants/1.ogg` ... `n.ogg` and `<id>.tres`, an
@@ -91,6 +92,13 @@ class Family:
     variants: int
     pitch: float  # the jitter as a share (0.04 for ±4%)
     volume: float  # the jitter in dB
+    top: float | None = None  # how far under a sound's level its top must be, in LU (-10.0); None for no ceiling
+    top_hz: float = 2000.0  # a sound's top is its part above this, from the table's header ("above 2 kHz")
+
+    def top_of(self, samples: Sequence[float], loop: bool = False) -> float:
+        """How loud the sound's top (its part above `top_hz`) is by the family's measure, in LU from
+        the whole sound's level: -10 is a top 10 LU under the sound."""
+        return self.level_of(sound_meter.above(samples, RATE, self.top_hz), loop) - self.level_of(samples, loop)
 
     def level_of(self, samples: Sequence[float], loop: bool = False) -> float:
         """Its loudness by the family's measure; a loop is measured as it plays, over and over
@@ -109,16 +117,29 @@ def families(root: Path = ROOT) -> dict[str, Family]:
     end = text.find("\n## ", start + 1)
     found: dict[str, Family] = {}
     row = re.compile(r"^\|\s*`(\w+)`[^|]*\|\s*(-?[\d.]+)\s+(momentary|integrated)\s*\|\s*(-?[\d.]+)\s*dBTP\s*\|"
-                     r"\s*(\d+)\s*\|\s*([^|]+)\|\s*([^|]+)\|")
-    for line in text[start:end].splitlines():
+                     r"\s*(\d+)\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|")
+    section = text[start:end]
+    header = re.search(r"Top \(above ([\d.]+) kHz\)", section)
+    if not header:
+        raise ValueError(f"{STYLE}: its Sound table has no column 'Top (above N kHz)'")
+    top_hz = float(header.group(1)) * 1000.0
+    for line in section.splitlines():
         m = row.match(line)
         if not m:
+            if line.startswith("| `"):  # a family's row that does not read: never dropped in silence
+                raise ValueError(f"{STYLE}: the Sound table's row {line.split('|')[1].strip()} does not read (loudness, "
+                                 "peak, variants, the two jitters and the top, a column each)")
             continue
         pitch = re.search(r"([\d.]+)\s*%", m.group(6))
         volume = re.search(r"([\d.]+)\s*dB", m.group(7))
+        top = re.fullmatch(r"\s*(-[\d.]+)\s*LU\s*", m.group(8))
+        if not top and m.group(8).strip() != "none":
+            raise ValueError(f"{STYLE}: the {m.group(1)} row's top is {m.group(8).strip()!r}; write LU under the "
+                             "sound's level (-10 LU) or none")
         found[m.group(1)] = Family(m.group(1), float(m.group(2)), m.group(3), float(m.group(4)), int(m.group(5)),
                                    float(pitch.group(1)) / 100.0 if pitch else 0.0,
-                                   float(volume.group(1)) if volume else 0.0)
+                                   float(volume.group(1)) if volume else 0.0,
+                                   float(top.group(1)) if top else None, top_hz)
     if not found:
         raise ValueError(f"{STYLE}: no families in its Sound table")
     return found
@@ -285,6 +306,9 @@ def checked_score(score: Score, patches: dict[str, dict], fams: dict[str, Family
         raise BakeError(f"{score.path}: {error}") from error
     if "music" not in fams:
         raise BakeError(f"{STYLE}: its Sound table has no music row")
+    if fams["music"].top is not None:
+        raise BakeError(f"{STYLE}: the music row has a top, which no bake checks (a track's layers are placed "
+                        "together); write none")
     return data, fams["music"]
 
 
@@ -491,7 +515,8 @@ def bake_score(score: Score, root: Path = ROOT, encode: Encoder | None = None,
 
 
 def render_placed(recipe: Recipe, data: dict, family: Family) -> list[tuple[list[float], float, float]]:
-    """Every variant rendered, placed and checked: (samples, level, peak). Raises BakeError."""
+    """Every variant rendered, placed and checked (its level, its peak, its top and its ends):
+    (samples, level, peak). Raises BakeError."""
     count = 1 if data["kind"] == "held" else data.get("variants", family.variants)
     raw = [sound_synth.render(data, i) for i in range(1, count + 1)]
     try:
@@ -500,6 +525,7 @@ def render_placed(recipe: Recipe, data: dict, family: Family) -> list[tuple[list
         raise BakeError(f"{recipe.path}: {error}") from error
     target = family.loudness + data.get("gain", 0.0)
     limit = family.peak - PEAK_MARGIN
+    ceiling = data.get("top", family.top)
     for i, (s, level, peak) in enumerate(zip(placed, levels, peaks), 1):
         name = f"{recipe.path} variant {i}"
         if abs(level - target) > WINDOW:
@@ -509,6 +535,12 @@ def render_placed(recipe: Recipe, data: dict, family: Family) -> list[tuple[list
             raise BakeError(f"{name}: true peak {peak:.1f} dBTP at {target:.1f} LUFS, over {limit:.1f} (the "
                             f"{family.name} limit {family.peak} less {PEAK_MARGIN} for Vorbis); soften its attack "
                             "or drive, or set gain lower with a note saying why")
+        if ceiling is not None:
+            top = family.top_of(s, data["kind"] == "held")
+            if top > ceiling:
+                raise BakeError(f"{name}: its top (above {family.top_hz:.0f} Hz) is {top:.1f} LU from its level, over the "
+                                f"{family.name} ceiling of {ceiling:.1f}, so it cuts through; lower its high layers' "
+                                "pitches, filters or gains (or fx.lowpass), or set top with a note saying why")
         if data["kind"] != "held" and (abs(s[0]) > EDGE or abs(s[-1]) > EDGE):
             raise BakeError(f"{name}: does not start and end at silence (a click)")
     return list(zip(placed, levels, peaks))

@@ -1,0 +1,18 @@
+{
+	"version": 1,
+	"layer": {
+		"source": "saw",
+		"filter": {
+			"type": "low",
+			"from": 650,
+			"q": 0.8
+		},
+		"amp": {
+			"attack": 0.18,
+			"decay": 0.3,
+			"sustain": 0.85,
+			"release": 0.35
+		}
+	},
+	"notes": "Low strings: a saw low-passed at 650 Hz that swells in over a fifth of a second and holds, a slow bowed line under a track. Music only."
+}

@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/cast/cast.sound.json",
-			"recipe_hash": "sha256:025fc19a630d967c910a627777092e7ad830a75ffc78da950f3e06ccd064f646",
-			"audio_hash": "sha256:362aa24f1d6e290e40e82e02c31a772cd66b7dbbf3cbcbf8c9c9dc9403d110de",
-			"loudness": -20.4,
-			"peak": -7.7
+			"recipe_hash": "sha256:c1ac9fba6c1ec6ce9a65dd57433cd4a8a5721dfb9e10529f3f289ec89985bf38",
+			"audio_hash": "sha256:4ceecad5d24f0400e2effecd40fec405301f520bb5dcab3f9e52039144c5ba64",
+			"loudness": -23.4,
+			"peak": -7.3
 		},
 		{
 			"path": "audio/sfx/cast/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/cast/cast.sound.json",
-			"recipe_hash": "sha256:025fc19a630d967c910a627777092e7ad830a75ffc78da950f3e06ccd064f646",
-			"audio_hash": "sha256:46a8ca55fe0f27fedc60a0387848959864e9ad605e84d3677105465f77d34325",
-			"loudness": -19.9,
-			"peak": -6.7
+			"recipe_hash": "sha256:c1ac9fba6c1ec6ce9a65dd57433cd4a8a5721dfb9e10529f3f289ec89985bf38",
+			"audio_hash": "sha256:9d42272693ef0db7cfde95e96ef2516bc89df9da633f9141bfc8f808d16e241f",
+			"loudness": -23.2,
+			"peak": -6.4
 		},
 		{
 			"path": "audio/sfx/cast/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/cast/cast.sound.json",
-			"recipe_hash": "sha256:025fc19a630d967c910a627777092e7ad830a75ffc78da950f3e06ccd064f646",
-			"audio_hash": "sha256:2b1fc7746856cc9281e2e4d4c53c5b7ebf397ef7409b1ecd9bd049d935db1b43",
-			"loudness": -19.8,
-			"peak": -6.2
+			"recipe_hash": "sha256:c1ac9fba6c1ec6ce9a65dd57433cd4a8a5721dfb9e10529f3f289ec89985bf38",
+			"audio_hash": "sha256:b9447c9d015685cea22bc038ac36593941a1d4367a29bb42e44a3d64c9e1622a",
+			"loudness": -22.4,
+			"peak": -4.5
 		},
 		{
 			"path": "audio/sfx/cast/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/cast/cast.sound.json",
-			"recipe_hash": "sha256:025fc19a630d967c910a627777092e7ad830a75ffc78da950f3e06ccd064f646",
-			"audio_hash": "sha256:966decc62c60eaf054786d599a5476b5275d10740cc68a70bfb0570a5b65dda5",
-			"loudness": -19.8,
-			"peak": -6.8
+			"recipe_hash": "sha256:c1ac9fba6c1ec6ce9a65dd57433cd4a8a5721dfb9e10529f3f289ec89985bf38",
+			"audio_hash": "sha256:a40c52c811ae082336f2ffbd73ec94cfeeff80b47078e5b30813b03c3ba3451c",
+			"loudness": -23.0,
+			"peak": -5.7
 		}
 	]
 }

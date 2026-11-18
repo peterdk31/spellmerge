@@ -34,6 +34,15 @@ class MeterTest(unittest.TestCase):
         self.assertAlmostEqual(sound_meter.integrated(tone(4000.0, -20.0, 1.0), RATE) - mid, 3.4, delta=0.5)
         self.assertLess(sound_meter.integrated(tone(30.0, -20.0, 1.0), RATE) - mid, -1.0)
 
+    def test_above_keeps_what_is_over_the_frequency_and_drops_what_is_under(self) -> None:
+        def kept(freq: float) -> float:  # how much of a tone is left above 2 kHz, in dB
+            x = tone(freq, -20.0, 0.5)
+            return sound_meter.integrated(sound_meter.above(x, RATE, 2000.0), RATE) - sound_meter.integrated(x, RATE)
+        self.assertAlmostEqual(kept(8000.0), 0.0, delta=0.2)
+        self.assertAlmostEqual(kept(2000.0), -3.0, delta=0.3, msg="a Butterworth is 3 dB down at its corner")
+        self.assertAlmostEqual(kept(1000.0), -24.0, delta=1.0, msg="24 dB an octave")
+        self.assertLess(kept(250.0), -60.0)
+
     def test_silence_around_a_tone_is_gated_out(self) -> None:
         x = [0.0] * RATE * 3 + tone(997.0, -20.0, 2.0) + [0.0] * RATE * 3
         # Ungated, 6 s of silence would pull it 6 dB down; gated, only the windows that straddle the

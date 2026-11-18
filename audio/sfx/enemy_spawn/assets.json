@@ -8,9 +8,9 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_spawn/enemy_spawn.sound.json",
-			"recipe_hash": "sha256:6d0d1461c27e2bca800996bf60944e3abb341634db04fb17b830063ab5c6575d",
-			"audio_hash": "sha256:956d5c78f8643d759daa083a29ed67a556ff56dbd8911b587e58ab0cd1563b5e",
-			"loudness": -22.2,
+			"recipe_hash": "sha256:0a7d567336dab2d66d191bffdf5d2a6df1f0223ce88e9d7ce2025e48c657c49d",
+			"audio_hash": "sha256:f390ea3e847b1bb080493590eeabd0a3b87556e0a86701f928e808d5b3852f12",
+			"loudness": -22.4,
 			"peak": -7.7
 		},
 		{
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_spawn/enemy_spawn.sound.json",
-			"recipe_hash": "sha256:6d0d1461c27e2bca800996bf60944e3abb341634db04fb17b830063ab5c6575d",
-			"audio_hash": "sha256:c9e8b893b51cf65cecf29c54cf13f914825e045c00b56cdc66fb3fcb14262741",
+			"recipe_hash": "sha256:0a7d567336dab2d66d191bffdf5d2a6df1f0223ce88e9d7ce2025e48c657c49d",
+			"audio_hash": "sha256:4fdae3bff3a209d1358fd7bcc8903fe08aeb09264c297d62583240581d42a89f",
 			"loudness": -22.0,
-			"peak": -7.4
+			"peak": -7.9
 		},
 		{
 			"path": "audio/sfx/enemy_spawn/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_spawn/enemy_spawn.sound.json",
-			"recipe_hash": "sha256:6d0d1461c27e2bca800996bf60944e3abb341634db04fb17b830063ab5c6575d",
-			"audio_hash": "sha256:0488420bcda788efb29c49a14d679d10bc164894c4549b9fead8f71c5df0e5f3",
+			"recipe_hash": "sha256:0a7d567336dab2d66d191bffdf5d2a6df1f0223ce88e9d7ce2025e48c657c49d",
+			"audio_hash": "sha256:ce8d861e4ee92f99a27afbfc66321f2e29f7d25c88e8680cd35a10d5ed5faa5b",
 			"loudness": -21.9,
-			"peak": -7.6
+			"peak": -7.4
 		},
 		{
 			"path": "audio/sfx/enemy_spawn/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_spawn/enemy_spawn.sound.json",
-			"recipe_hash": "sha256:6d0d1461c27e2bca800996bf60944e3abb341634db04fb17b830063ab5c6575d",
-			"audio_hash": "sha256:d9f83c984ce1e41de4352f568cb102e7d8c1bcef00b0b94a1ce0b7a307cc7525",
+			"recipe_hash": "sha256:0a7d567336dab2d66d191bffdf5d2a6df1f0223ce88e9d7ce2025e48c657c49d",
+			"audio_hash": "sha256:2f26014ec3e7e2788bdbb2acd705e35e1da9b2e92dc10a9b88920f3f0e6cd40c",
 			"loudness": -21.8,
-			"peak": -8.0
+			"peak": -7.6
 		}
 	]
 }

@@ -6,7 +6,8 @@ ITU-R BS.1770: K-weighting (a high shelf and a high pass, its coefficients worke
 buffer's own rate as libebur128 does), the loudness of a block -0.691 + 10 log10(mean square),
 momentary loudness (the loudest 400 ms window, a window every 100 ms), integrated loudness (400 ms
 blocks overlapping by 75%, gated at -70 LUFS and then 10 LU under the mean of what passed) and
-true peak (4x oversampled by a windowed sinc). Standard library only; a buffer is a sequence of
+true peak (4x oversampled by a windowed sinc). `above(x, rate, hz)` is the part of a buffer over a
+frequency, for measuring how loud a sound's top is on its own (docs/STYLE.md, "Sound": the top). Standard library only; a buffer is a sequence of
 floats, full scale 1.0.
 """
 
@@ -49,6 +50,17 @@ def k_weight(x: Sequence[float], rate: int) -> list[float]:
     k = math.tan(math.pi * fc / rate)
     a0 = 1.0 + k / q + k * k
     return _biquad(shelf, (1.0, -2.0, 1.0), (2.0 * (k * k - 1.0) / a0, (1.0 - k / q + k * k) / a0))
+
+
+def above(x: Sequence[float], rate: int, hz: float) -> list[float]:
+    """The buffer's part above `hz`: a fourth-order Butterworth high pass (24 dB an octave), so
+    what is well under `hz` counts for nothing and what is over it is whole."""
+    out: Sequence[float] = x
+    k = math.tan(math.pi * hz / rate)
+    for q in (0.5411961001461969, 1.3065629648763766):  # a Butterworth's two sections
+        a0 = 1.0 + k / q + k * k
+        out = _biquad(out, (1.0 / a0, -2.0 / a0, 1.0 / a0), (2.0 * (k * k - 1.0) / a0, (1.0 - k / q + k * k) / a0))
+    return list(out)
 
 
 def _lufs(mean_square: float) -> float:

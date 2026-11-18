@@ -525,5 +525,18 @@ class FloatingHallTest(unittest.TestCase):
         self.assertTrue(any(d.under[3::4]), "the rock is drawn")
 
 
+class FixtureHashesTest(unittest.TestCase):
+    """The test shapes the game's drawing is held to this one by (connected biomes CB4,
+    tests/gameplay/feel/test_ground_drawing.gd): their hashes are what this generator draws now."""
+
+    def test_the_fixture_hashes_are_up_to_date(self) -> None:
+        self.assertEqual(gs.FIXTURE_HASHES.read_text(encoding="utf-8"), gs.fixture_text(),
+                         "run python3 tools/ground_shape.py --fixtures")
+
+    def test_a_number_is_read_as_the_game_reads_it(self) -> None:
+        self.assertEqual(gs.single("312.5"), 312.5)
+        self.assertNotEqual(gs.single("312.7"), 312.7)
+
+
 if __name__ == "__main__":
     unittest.main()

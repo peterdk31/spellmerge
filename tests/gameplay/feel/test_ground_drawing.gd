@@ -4,7 +4,8 @@ extends "res://tests/support/suite.gd"
 ## at layout and the hub's, by the native module when it is loaded; one room by the GDScript too), its
 ## rims and drips the baked scene's lines; the native module gives the GDScript's bytes in every
 ## mirroring (two small fixture shapes that reach what no room uses yet, a wall's top and face, an
-## island's outline, cracks from it, patches and strokes, and a room with pits); and a mirrored room
+## island's outline, cracks from it, patches and strokes, and a room with pits), and the GDScript draws
+## those fixtures as the tool does (its hashes, `ground_fixtures.json`); and a mirrored room
 ## is drawn again, not flipped: the floor a body stands on is the exact mirror of the unmirrored
 ## one, its art differs, and its rock face still hangs below its edges.
 ##
@@ -19,6 +20,9 @@ const HubShape := preload("res://content/rooms/hub/hub.shape.json")
 const HubScene := preload("res://content/rooms/hub/hub.tscn")
 const Hall := preload("res://tests/gameplay/feel/fixtures/ground_hall.shape.json")
 const Island := preload("res://tests/gameplay/feel/fixtures/ground_island.shape.json")
+## The fixtures' drawing by tools/ground_shape.py, as hashes (`--fixtures`).
+const FixtureHashes := preload("res://tests/gameplay/feel/fixtures/ground_fixtures.json")
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 const ROOMS: StringName = &"rooms"
 ## The baked art's sprites, by what the drawing calls them.
@@ -26,15 +30,15 @@ const SPRITES: Dictionary = {"floor": ".", "glow": "Glow", "under": "Underside",
 const MIRRORINGS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
 
 
-func _registry() -> Node:
-	return root.get_node("/root/Registry")
+func _registry() -> RegistryScript:
+	return root.get_node("/root/Registry") as RegistryScript
 
 
 ## Every room drawn at layout (a room naming its `ground_shape`), and the hub, whose baked ground
 ## stays: {id, shape, scene}.
 func _rooms() -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
-	for item: Resource in _registry().call(&"get_all", ROOMS):
+	for item: Resource in _registry().get_all(ROOMS):
 		var room := item as RoomBase
 		if room != null and room.ground_shape != null:
 			found.append({"id": room.id, "shape": room.ground_shape.data, "scene": room.scene})
@@ -56,7 +60,7 @@ func _native_or_say() -> bool:
 func test_every_room_drawn_from_a_shape_is_drawn_at_layout() -> void:
 	# A room whose ground was drawn from a shape names that shape, so it is drawn again as it is laid
 	# (the hub keeps its baked art for now, the plan's CB4).
-	for item: Resource in _registry().call(&"get_all", ROOMS):
+	for item: Resource in _registry().get_all(ROOMS):
 		var room := item as RoomBase
 		if room == null or room.scene == null or room.id == &"hub":
 			continue
@@ -64,6 +68,9 @@ func test_every_room_drawn_from_a_shape_is_drawn_at_layout() -> void:
 		var ground: Node = layout.get_node_or_null("Floor")
 		if ground != null and ground.has_meta(&"ground_inputs"):
 			check(room.ground_shape != null, "%s: its ground is drawn from a shape, so its .tres names it (ground_shape)" % room.id)
+			if room.ground_shape != null:
+				check(room.ground_shape.resource_path == room.scene.resource_path.get_basename() + ".shape.json",
+					"%s: it names its own shape, beside its scene" % room.id)
 		layout.free()
 	check(_rooms().size() > 1, "rooms are drawn at layout")
 
@@ -77,7 +84,8 @@ func test_the_native_drawing_is_the_baked_art() -> void:
 
 
 func test_the_gdscript_drawing_is_the_baked_art() -> void:
-	var room: Dictionary = _rooms()[0]
+	var antechamber: RoomBase = _registry().get_resource(ROOMS, &"arena_01")
+	var room: Dictionary = {"id": antechamber.id, "shape": antechamber.ground_shape.data, "scene": antechamber.scene}
 	var spec: Dictionary = _spec(room["shape"], room["scene"])
 	_check_baked(room, spec, ShapeScript.draw(spec, false))
 
@@ -131,6 +139,32 @@ func _lines(ground: Node) -> Array:
 	return found
 
 
+func test_the_fixtures_are_drawn_as_the_tool_draws_them() -> void:
+	# What no room uses yet (a wall's top, face and foot, an outline, a hole void, cracks from an
+	# outline, patches and strokes), held to tools/ground_shape.py by its hashes of the same shapes.
+	var expected: Dictionary = FixtureHashes.data
+	for case: Array in [["ground_hall", Hall], ["ground_island", Island]]:
+		var art: Dictionary = ShapeScript.draw(_spec((case[1] as JSON).data, null), false)
+		var want: Dictionary = expected[case[0]]
+		for kind: String in ["floor", "under", "glow", "wall"]:
+			check_equal(_sha(art[kind]), want[kind], "%s: the %s is the tool's" % [case[0], kind])
+		var lines := PackedStringArray()
+		for points: PackedVector2Array in (art["rims"] as Array) + (art["drips"] as Array):
+			var texts := PackedStringArray()
+			for at: Vector2 in points:
+				texts.append("%.1f,%.1f" % [at.x, at.y])
+			lines.append(";".join(texts))
+		check_equal(_sha("|".join(lines).to_utf8_buffer()), want["lines"], "%s: the rims and drips are the tool's" % case[0])
+
+
+func _sha(data: PackedByteArray) -> String:
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	if not data.is_empty():
+		context.update(data)
+	return context.finish().hex_encode()
+
+
 func test_the_native_drawing_is_the_gdscript_in_every_mirroring() -> void:
 	if not _native_or_say():
 		return
@@ -139,7 +173,7 @@ func test_the_native_drawing_is_the_gdscript_in_every_mirroring() -> void:
 		for case: Dictionary in cases:
 			_check_twins("%s %s" % [case["id"], mirror], _spec(case["shape"], case["scene"], mirror))
 	# A room with pits, cracks from them and two edge styles, mirrored both ways.
-	var room: RoomBase = _registry().call(&"get_resource", ROOMS, &"arena_02")
+	var room: RoomBase = _registry().get_resource(ROOMS, &"arena_02")
 	_check_twins("arena_02 (1, 1)", _spec(room.ground_shape.data, room.scene, Vector2i(1, 1)))
 
 

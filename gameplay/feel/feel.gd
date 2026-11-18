@@ -728,12 +728,12 @@ func _ready() -> void:
 	add_child(_swing_trails)
 	_portal_look = PortalLookScript.new()
 	add_child(_portal_look)
-	# Before the spectacle: at the marks' z the later node draws on top, so the marks lie over the cover.
 	_ground_layout = GroundLayoutScript.new()
 	_ground_layout.name = "Ground"
 	_ground_layout.events = events
 	_ground_layout.registry = registry
 	add_child(_ground_layout)
+	# Before the spectacle: at the marks' z the later node draws on top, so the marks lie over the cover.
 	_cover = CoverScript.new(MARK_Z)
 	_cover.name = "Cover"
 	_cover.events = events

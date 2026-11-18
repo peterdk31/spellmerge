@@ -15,10 +15,12 @@ extends RefCounted
 const NativeScript := preload("res://core/native/native.gd")
 const DrawingScript := preload("res://gameplay/feel/ground/ground_drawing.gd")
 const NoiseScript := preload("res://gameplay/feel/ground/ground_noise.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## The layout root's metadata saying how the room is placed (`Vector2i`: x 1 when it is mirrored left
 ## to right, y 1 when top to bottom; absent: as the template is). Whoever lays a mirrored room sets it
-## before `room_built` (the biome map, connected biomes CB5).
+## before `room_built` (the biome map, connected biomes CB5). It mirrors the art only: the layout's
+## walls, holes and places are its caller's to mirror (until then they and the art disagree).
 const MIRROR_META: StringName = &"ground_mirror"
 ## Where the edge styles and the ground materials are (content/edges, content/grounds).
 const EDGES: StringName = &"edges"
@@ -35,13 +37,13 @@ const WALLS: StringName = &"Walls"
 ## What `GroundDrawing.draw` is handed for `shape` (a shape file's data), laid from the template
 ## `scene` and mirrored as `mirror` says (`MIRROR_META`), its styles and materials from `registry`
 ## (`Registry.get_data`). Empty, with a warning, when a style or material is missing.
-static func spec(shape: Dictionary, scene: PackedScene, registry: Object, mirror: Vector2i = Vector2i.ZERO) -> Dictionary:
-	var edge: Dictionary = registry.call(&"get_data", EDGES, StringName(shape.get("edge", "")), EDGE_FILE)
+static func spec(shape: Dictionary, scene: PackedScene, registry: RegistryScript, mirror: Vector2i = Vector2i.ZERO) -> Dictionary:
+	var edge: Dictionary = registry.get_data(EDGES, StringName(shape.get("edge", "")), EDGE_FILE)
 	var pit_style: bool = shape.has("pit_edge")
-	var pit_edge: Dictionary = registry.call(&"get_data", EDGES, StringName(shape["pit_edge"]), EDGE_FILE) if pit_style else edge
-	var grounds: Array = [registry.call(&"get_data", GROUNDS, StringName(shape.get("ground", "")), GROUND_FILE)]
+	var pit_edge: Dictionary = registry.get_data(EDGES, StringName(shape["pit_edge"]), EDGE_FILE) if pit_style else edge
+	var grounds: Array = [registry.get_data(GROUNDS, StringName(shape.get("ground", "")), GROUND_FILE)]
 	for area: Dictionary in shape.get("areas", []):
-		grounds.append(registry.call(&"get_data", GROUNDS, StringName(area.get("ground", "")), GROUND_FILE))
+		grounds.append(registry.get_data(GROUNDS, StringName(area.get("ground", "")), GROUND_FILE))
 	if edge.is_empty() or pit_edge.is_empty() or grounds.any(func(g: Dictionary) -> bool: return g.is_empty()):
 		push_warning("GroundShape: the shape names an edge style or ground material there is none of, so its ground is not drawn.")
 		return {}
@@ -145,7 +147,11 @@ static func apply(ground: Sprite2D, art: Dictionary, ground_spec: Dictionary) ->
 	ground.texture = _texture(art["floor"], w, h)
 	var glow := ground.get_node_or_null(NodePath(GLOW)) as Sprite2D
 	if glow != null:
-		glow.texture = _texture(art["glow"], art["glow_width"], art["glow_height"])
+		# Filtered (linear), so its clear pixels take their neighbours' colour, as the import does the
+		# baked glow's (`fix_alpha_border`): its fringe is not darkened.
+		var glow_image: Image = Image.create_from_data(art["glow_width"], art["glow_height"], false, Image.FORMAT_RGBA8, art["glow"])
+		glow_image.fix_alpha_edges()
+		glow.texture = ImageTexture.create_from_image(glow_image)
 	var under := ground.find_child(UNDERSIDE, true, false) as Sprite2D
 	if under != null:
 		under.texture = _texture(art["under"], w, h)

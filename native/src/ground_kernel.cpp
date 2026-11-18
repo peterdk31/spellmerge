@@ -269,9 +269,11 @@ struct Geometry {
 	Dictionary shape;
 	std::vector<double> keep_clear;
 	int64_t side = 0;
+	int threads = 1;
 
-	Geometry(const Dictionary &shape_data, const PackedFloat64Array &placed, const PackedFloat64Array &clear) {
+	Geometry(const Dictionary &shape_data, const PackedFloat64Array &placed, const PackedFloat64Array &clear, int width_of_threads) {
 		shape = shape_data;
+		threads = width_of_threads;
 		const Array size = arr(shape, "size");
 		width = (int64_t)at(size, 0);
 		height = (int64_t)at(size, 1);
@@ -361,7 +363,7 @@ struct Geometry {
 		const double *clear_p = clear.ptr();
 		const int64_t clear_n = clear.size();
 		uint8_t *out = land.data();
-		jobs::for_spans(h, ROWS_A_SPAN, jobs::default_width(), [&](int64_t, int64_t y_from, int64_t y_to) {
+		jobs::for_spans(h, ROWS_A_SPAN, threads, [&](int64_t, int64_t y_from, int64_t y_to) {
 			for (int64_t y = y_from; y < y_to; y++) {
 				for (int64_t x = 0; x < w; x++) {
 					const int64_t p = y * w + x;
@@ -866,8 +868,12 @@ struct Drawing {
 	std::vector<std::vector<int64_t>> rim_paths;
 	std::vector<int64_t> rim_every, rim_path_sides;
 	bool mirror_x = false, mirror_y = false;
+	int threads = 1;
 
 	void run(const Dictionary &spec) {
+		// How many threads the per-pixel loops run on: the spec's `threads`, else the machine's (jobs.h).
+		const int64_t asked = spec.has("threads") ? (int64_t)spec["threads"] : 0;
+		threads = asked > 0 ? (int)mini(asked, jobs::MAX_WIDTH) : jobs::default_width();
 		shape = spec["shape"];
 		palette = spec["palette"];
 		const Array given = spec["styles"];
@@ -880,7 +886,7 @@ struct Drawing {
 		grounds = spec["grounds"];
 		const PackedFloat64Array placed = spec.has("placed") ? (PackedFloat64Array)spec["placed"] : PackedFloat64Array();
 		const PackedFloat64Array clear = spec.has("clear") ? (PackedFloat64Array)spec["clear"] : PackedFloat64Array();
-		Geometry geometry(shape, placed, clear);
+		Geometry geometry(shape, placed, clear, threads);
 		w = geometry.width;
 		h = geometry.height;
 		land.swap(geometry.land);
@@ -1167,7 +1173,7 @@ struct Drawing {
 				frontier.swap(next);
 			}
 		}
-		jobs::for_spans(h, ROWS_A_SPAN, jobs::default_width(), [&](int64_t, int64_t y_from, int64_t y_to) {
+		jobs::for_spans(h, ROWS_A_SPAN, threads, [&](int64_t, int64_t y_from, int64_t y_to) {
 			for (int64_t p = y_from * w; p < y_to * w; p++) {
 				if (solid[p] == 0) {
 					continue;

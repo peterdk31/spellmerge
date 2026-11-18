@@ -11,7 +11,9 @@ extends RefCounted
 ## edges, the walls' faces above the floor, the rims and drips) is drawn again on the mirrored
 ## outline, so the light still comes from the upper left. Unmirrored, every pixel is the baked art's
 ## (tests/gameplay/feel/test_ground_drawing.gd); mirrored, the floor a body stands on is the exact
-## mirror of the unmirrored one, pixel for pixel.
+## mirror of the unmirrored one, pixel for pixel. (Which edge style a pixel near a pit takes, `side`, is
+## worked out again on the mirrored outline too: where two open grounds are as near, the walk's first
+## comer wins, so it may differ from the mirror at a tie. A look only.)
 ##
 ## `draw(spec)` is the whole of it, a pure function of `spec` (`GroundShape.spec`): the native twin,
 ## `MoteKernel.draw_ground` (native/src/ground_kernel.cpp), gives the same bytes, and is what the game
@@ -71,7 +73,8 @@ var _mirror_y: bool = false
 
 
 ## The ground `spec` describes (`GroundShape.spec`: the shape, where the room's things stand, its
-## edge styles, ground materials and palette, and its mirroring), as a dictionary of what is drawn:
+## edge styles, ground materials and palette, and its mirroring; `threads`, read by the native twin
+## only, how many threads it draws on, 0 or absent the machine's), as a dictionary of what is drawn:
 ## `width`, `height`, `solid` (1 where a body stands), `floor` and `under` (RGBA, a pixel each),
 ## `glow` (RGBA at half size, `glow_width` by `glow_height`), `wall` (RGBA, empty for none), `rims`
 ## and `drips` (their points), `rim_sides`, `drip_sides` and `drip_colours`.
@@ -309,13 +312,14 @@ func _trim_to_reach() -> void:
 func _draw_floor() -> void:
 	var seed: int = int(shape.get("seed", 0))
 	var size := Vector2i(w, h)
-	var centres: Array[Vector2] = [Vector2(float(w) / 2.0, float(h) / 2.0)]
+	# Each material's middle (its strokes go round it), x then y, as doubles: the room's, then each area's.
+	var centres := PackedFloat64Array([float(w) / 2.0, float(h) / 2.0])
 	for area: Dictionary in shape.get("areas", []):
-		centres.append(_area_centre(area["centre"]))
+		centres.append_array(_area_centre(area["centre"]))
 	var mats: Array[GroundMaterial] = []
 	var reach: int = 0
 	for k in grounds.size():
-		var mat: GroundMaterial = MaterialScript.new(grounds[k], k, seed, size, centres[k], palette)
+		var mat: GroundMaterial = MaterialScript.new(grounds[k], k, seed, size, centres[k * 2], centres[k * 2 + 1], palette)
 		mats.append(mat)
 		if mat.has_edge:
 			reach = maxi(reach, int(mat.edge_reach))
@@ -331,9 +335,10 @@ func _draw_floor() -> void:
 
 
 ## An area's centre as placed (its strokes go round it): mirrored with the room.
-func _area_centre(centre: Array) -> Vector2:
-	var at := Vector2(float(centre[0]), float(centre[1]))
-	return Vector2(float(w) - at.x if _mirror_x else at.x, float(h) - at.y if _mirror_y else at.y)
+func _area_centre(centre: Array) -> PackedFloat64Array:
+	var x: float = float(centre[0])
+	var y: float = float(centre[1])
+	return PackedFloat64Array([float(w) - x if _mirror_x else x, float(h) - y if _mirror_y else y])
 
 
 func _edge_distance(reach: int) -> PackedInt32Array:

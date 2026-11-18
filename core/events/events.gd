@@ -443,7 +443,10 @@ signal room_entered(room_id: StringName)
 ## snapshot restored into another room (`Flow.rebuild_derived`); a restore into the room shown sends
 ## nothing. Heard at once, before the placements and zones are taken out: a listener works out what it
 ## needs from it then (`CoverLayout.of`) and keeps neither the node nor anything in it. It changes no
-## state. Heard by the cover area and feel (GC3, GC5).
+## state. Heard by the cover area and feel (GC3, GC5). One listener draws onto it: Feel's ground
+## (connected biomes CB4, gameplay/feel/ground/ground_layout.gd) puts the ground drawn from the room's
+## shape on its `Floor` (textures) and makes its rims' and drips' mote lines again; so no listener reads
+## the `Floor`'s art or its mote lines here (they read the walls, holes and places, which it leaves).
 signal room_built(room_id: StringName, layout_root: Node)
 ## Sender: core/spells (ground cover GC5, rule 5). An element of a spell touched the floor: `element`
 ## (a card id, &"fire") within `radius` of `at`, by the actor `caster` (NO_PLAYER for none). Sent

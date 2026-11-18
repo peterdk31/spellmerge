@@ -80,6 +80,7 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 	_sound_paths.clear()
 	_sounds.clear()
 	_sound_clashes.clear()
+	_data.clear()
 	for folder_name: String in _list_dir(content_root, true):
 		var folder: StringName = StringName(folder_name)
 		var duplicates: Array[String] = []
@@ -289,7 +290,7 @@ func get_resource(folder: StringName, id: StringName) -> Resource:
 ## The data of a content item kept as JSON rather than a `.tres` (connected biomes CB4: an edge style,
 ## `content/edges/<id>/edge.json`; a ground material, `content/grounds/<id>/ground.json`): the file
 ## `file_name` in the folder `id` of `folder`, parsed, read once and kept. Empty, with a warning, when
-## there is none, or for an id or file name that is not one plain name.
+## there is none, or for an id or file name that is not one plain name. Shared: read it, never change it.
 func get_data(folder: StringName, id: StringName, file_name: String) -> Dictionary:
 	if not _plain.search(String(id)) or not _plain.search(file_name.get_basename()) or file_name.get_extension() != "json":
 		push_warning("Registry: '%s' / '%s' is not a content item's JSON file." % [id, file_name])

@@ -38,6 +38,8 @@ func _init(shape_data: Dictionary, placed: PackedFloat64Array = PackedFloat64Arr
 	var size: Array = shape["size"]
 	width = int(size[0])
 	height = int(size[1])
+	if width % CELL != 0 or height % CELL != 0:
+		push_error("Ground: size %s is not whole %d px cells" % [size, CELL])
 	var n: int = width * height
 	land.resize(n)
 	crack.resize(n)

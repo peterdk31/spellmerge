@@ -44,8 +44,8 @@ var centre_y: float = 0.0
 
 
 ## The material `spec` (a `ground.json`'s data), the `index`th of the shape's (0 its floor's), in a
-## room of `size` seeded `room_seed`; its strokes go round `centre`.
-func _init(spec: Dictionary, index: int, room_seed: int, size: Vector2i, centre: Vector2, palette: Dictionary) -> void:
+## room of `size` seeded `room_seed`; its strokes go round (`middle_x`, `middle_y`).
+func _init(spec: Dictionary, index: int, room_seed: int, size: Vector2i, middle_x: float, middle_y: float, palette: Dictionary) -> void:
 	base = N.colour(spec["base"], palette)
 	cols = size.x / STEP + 2
 	var rows: int = size.y / STEP + 2
@@ -96,8 +96,8 @@ func _init(spec: Dictionary, index: int, room_seed: int, size: Vector2i, centre:
 		stroke_spacing = float(strokes.get("spacing", 10.0))
 		stroke_share = float(strokes.get("share", 0.4))
 		stroke_inner = float(strokes.get("inner", 24.0))
-		centre_x = centre.x
-		centre_y = centre.y
+		centre_x = middle_x
+		centre_y = middle_y
 
 
 ## The colour of this material at pixel (x, y); `edge_distance` is how far the pixel is from the

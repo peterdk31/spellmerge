@@ -9,11 +9,13 @@ extends Node
 ##
 ## No load stall: the native module draws a crypt room in a few tens of milliseconds on the module's
 ## threads (`MoteKernel.draw_ground`); `last_usec` holds how long the last room took, drawing and
-## textures together (tests/gameplay/feel/test_ground_layout.gd reports it).
+## textures together (tests/gameplay/feel/test_ground_layout.gd reports it). Without the module an
+## unmirrored room keeps its baked art, which is what would be drawn, rather than stall for seconds.
 
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ShapeScript := preload("res://gameplay/feel/ground/ground_shape.gd")
+const NativeScript := preload("res://core/native/native.gd")
 
 const ROOM_FOLDER: StringName = &"rooms"
 const FLOOR: StringName = &"Floor"
@@ -49,6 +51,10 @@ func lay(room: RoomBase, layout_root: Node) -> bool:
 		return false
 	var began: int = Time.get_ticks_usec()
 	var mirror: Vector2i = layout_root.get_meta(ShapeScript.MIRROR_META, Vector2i.ZERO)
+	# Without the native module the GDScript would take seconds; an unmirrored room's baked art is what
+	# it would draw, so it stays (a mirrored one is drawn all the same: it has no other art).
+	if mirror == Vector2i.ZERO and not (native and NativeScript.loaded()):
+		return false
 	var spec: Dictionary = ShapeScript.spec(room.ground_shape.data, room.scene, registry, mirror)
 	if spec.is_empty():
 		return false

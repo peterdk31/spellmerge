@@ -41,22 +41,18 @@ func test_an_unknown_run_starts_no_run() -> void:
 
 
 ## One staff file per setup, used as it is (owner, 2026-11-01): Play and the hub hold the first two
-## basic staffs on RB and RT and two empty hands (items I2), the sandbox the dev staff on every
-## button, in every build channel.
+## basic staffs on RB and RT and two empty hands (items I2), in every build channel.
 func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 	var registry: Node = root.get_node("Registry")
-	var dev: StaffBase = registry.call("get_resource", &"wizard", FlowScript.DEV_STAFF) as StaffBase
-	for mode: StringName in [FlowScript.MODE_RUN, FlowScript.MODE_SANDBOX, FlowScript.MODE_HUB]:
+	for mode: StringName in [FlowScript.MODE_RUN, FlowScript.MODE_HUB]:
 		flow.mode = mode
 		var staffs: Array[StaffBase] = flow.staffs_for_mode()
 		check_equal(staffs.size(), 4, "%s: four hands" % mode)
 		if staffs.size() != 4:
 			continue
 		for at in 4:
-			var wanted: StaffBase = dev
-			if mode != FlowScript.MODE_SANDBOX:
-				# Play and the hub (items I2): two staffs, RB and RT; LB and LT empty.
-				wanted = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase if at < FlowScript.START_HANDS else null
+			# Play and the hub (items I2): two staffs, RB and RT; LB and LT empty.
+			var wanted: StaffBase = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase if at < FlowScript.START_HANDS else null
 			check(staffs[at] == wanted, "%s: button %d holds %s" % [mode, at, wanted.id if wanted != null else "nothing"])
 	check_equal(FlowScript.START_HANDS, 2, "players start with two staffs")
 	flow.mode = FlowScript.MODE_RUN
@@ -67,7 +63,7 @@ func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 
 
 ## Each mode's setup (owner, 2026-11-05): a new wizard's card bag is the mode's, counted (items
-## I3). Play: one dash and one bolt; the sandbox and the hub (owner, 2026-11-11 and 2026-11-13):
+## I3). Play: one dash and one bolt; the hub (owner, 2026-11-11 and 2026-11-13):
 ## Inventory.DEV_COPIES of every card, a joiner's too.
 func test_each_mode_gives_its_own_bag() -> void:
 	var registry: Node = root.get_node("Registry")
@@ -77,7 +73,6 @@ func test_each_mode_gives_its_own_bag() -> void:
 			every[id] = Inventory.DEV_COPIES
 	var wanted: Dictionary = {
 		FlowScript.MODE_RUN: {&"dash": 1, &"bolt": 1},
-		FlowScript.MODE_SANDBOX: every,
 		FlowScript.MODE_HUB: every,
 	}
 	for mode: StringName in wanted:
@@ -174,7 +169,7 @@ func test_a_wizard_from_a_loadout_holds_exactly_it() -> void:
 	loadout.add_stack(&"cards", &"bolt", 17)
 	loadout.add_stack(&"cards", &"fire", 1)
 	loadout.add_staff(0, FlowScript.STARTER_HEADS[0], [&"bolt", &"bolt", &"bolt"] as Array[StringName])
-	loadout.add_staff(5, FlowScript.DEV_STAFF, [&"fire"] as Array[StringName])
+	loadout.add_staff(5, &"dev", [&"fire"] as Array[StringName])
 	loadout.set_hands(PackedInt32Array([0, PlayerLoadout.NO_STAFF, PlayerLoadout.NO_STAFF, PlayerLoadout.NO_STAFF]))
 	var party := PartyLoadout.new()
 	party.put(0, loadout)

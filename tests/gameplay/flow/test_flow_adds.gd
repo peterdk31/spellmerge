@@ -8,6 +8,7 @@ extends "res://tests/support/suite.gd"
 ## follows the wizards joining and leaving, keeping its share. 1, 2 and 4 players.
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const Arrivals := preload("res://tests/support/arrivals.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 const BOSS_ID: StringName = &"test_adds_boss"
 const LAIR: StringName = &"test_adds_lair"
@@ -97,6 +98,7 @@ func _start(count: int) -> void:
 	for index in count:
 		input.add_virtual_device(index)
 	events.emit_signal("play_requested", 0)
+	Arrivals.land(flow)
 
 
 func _boss() -> Actor:
@@ -145,6 +147,7 @@ func test_waves_stand_under_the_cap_of_those_alive() -> void:
 	check_equal(_imps().size(), 3, "a wave of one")
 	boss.phases.step(1.0)
 	check_equal(_imps().size(), 3, "never past the cap of 3 alive")
+	Arrivals.land(flow)
 	combat.call("hit", -1, _imps()[0], 1000.0)
 	check_equal(_imps().size(), 2, "one is killed")
 	boss.phases.step(1.0)
@@ -157,6 +160,7 @@ func test_the_adds_crumble_when_the_boss_dies_and_the_room_is_cleared_after() ->
 	boss.phases.begin(0)
 	var imps: int = _imps().size()
 	check(imps > 0, "its adds stand")
+	Arrivals.land(flow)
 	combat.call("hit", -1, boss, 10000.0)
 	check_equal(_imps().size(), imps, "they stand the moment the boss dies")
 	check_equal(cleared, 0, "the room is not cleared while they stand")
@@ -236,6 +240,7 @@ func test_an_add_gone_without_a_death_is_forgotten() -> void:
 	_start(1)
 	var boss: Actor = _boss()
 	boss.phases.begin(0)
+	Arrivals.land(flow)
 	var gone: Actor = _imps()[0]
 	gone.get_parent().remove_child(gone)
 	gone.free()
@@ -254,25 +259,13 @@ func test_the_adds_are_forgotten_with_the_room() -> void:
 	check(flow.adds.adds.is_empty() and flow.adds.stood == 0, "a run's end forgets them")
 
 
-func test_the_sandbox_holds_adds_to_its_most() -> void:
-	for index in 1:
-		input.add_virtual_device(index)
-	events.emit_signal("sandbox_requested", 0)
-	check_equal(flow.spawn_in_sandbox(BOSS_ID, 1), 1, "the boss in the arena")
-	check_equal(flow.spawn_in_sandbox(&"ember_imp", FlowScript.SANDBOX_MAX - 2), FlowScript.SANDBOX_MAX - 2, "the arena nearly full")
-	var boss: Actor = _boss()
-	boss.phases.begin(0)
-	check_equal(flow.enemies_left(), FlowScript.SANDBOX_MAX, "its burst only up to the arena's most")
-	flow.clear_sandbox_enemies()
-	check(flow.adds.adds.is_empty(), "clearing the arena forgets the adds")
-
-
 ## Restored from a snapshot taken between the boss's death and the crumble, its adds are made again
 ## with no caller, and crumble at the next step as they did: the room is cleared.
 func test_adds_without_a_caller_restored_still_crumble() -> void:
 	_start(1)
 	var boss: Actor = _boss()
 	boss.phases.begin(0)
+	Arrivals.land(flow)
 	var imps: int = _imps().size()
 	combat.call("hit", -1, boss, 10000.0)
 	var tick: Node = root.get_node("Tick")
@@ -287,3 +280,25 @@ func test_adds_without_a_caller_restored_still_crumble() -> void:
 	flow.step(0.01)
 	check_equal(flow.enemies_left(), 0, "they crumble again")
 	check_equal(cleared, 2, "and the room is cleared again")
+
+
+## Adds still arriving as their caller dies (enemy arrivals EA3) crumble once they have landed, each
+## death told: none leaves mid-rise in one jump, and the room is cleared after the last.
+func test_adds_still_arriving_when_the_boss_dies_crumble_once_they_land() -> void:
+	_start(1)
+	var boss: Actor = _boss()
+	check(not boss.is_arriving(), "a boss stands at once")
+	boss.phases.begin(0)
+	var imps: Array[Actor] = _imps()
+	check(imps.size() > 0 and imps.all(func(imp: Actor) -> bool: return imp.is_arriving()), "its adds arrive")
+	combat.call("hit", -1, boss, 10000.0)
+	deaths.clear()
+	flow.step(0.01)
+	check_equal(_imps().size(), imps.size(), "they wait while they arrive")
+	check(imps.all(func(imp: Actor) -> bool: return is_instance_valid(imp) and imp.is_inside_tree()), "still in the room, rising")
+	check_equal(cleared, 0, "the room is not cleared yet")
+	Arrivals.land_bodies(imps)
+	flow.step(0.01)
+	check_equal(flow.enemies_left(), 0, "landed, they crumbled")
+	check_equal(deaths.size(), imps.size(), "each death told")
+	check_equal(cleared, 1, "the room is cleared once, after the last")

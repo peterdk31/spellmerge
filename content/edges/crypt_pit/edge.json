@@ -1,0 +1,30 @@
+{
+	"about": "Where the crypt's floor fell in (docs/milestones/crypt-rework.md): broken flagstone teeth on the lip, a faint cold seam of Mana, the shaft's own wall going down into the dark, a still cold glow, and dust falling in off the lip.",
+	"full_width": 12,
+	"deep": "#08070f",
+	"seam": {
+		"colours": ["mana"],
+		"band_length": 400,
+		"reach": 40
+	},
+	"lip": {
+		"width": 2,
+		"shades": ["stone.base", "stone.light"],
+		"rubble": {"every": 5, "sizes": [1, 2], "shades": ["#14121f", "stone.base", "stone.light"]}
+	},
+	"rock": {
+		"depth": [14, 34],
+		"shades": ["#221f33", "stone.shadow"],
+		"strata": "#14121f",
+		"roots": "wood.shadow"
+	},
+	"glow": {
+		"blurs": [[3, 0.9], [8, 0.5]]
+	},
+	"rim": {
+		"kind": "pit_dust",
+		"per_100px": 5,
+		"every": 4,
+		"colours": ["stone", "bone"]
+	}
+}

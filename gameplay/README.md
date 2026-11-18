@@ -66,6 +66,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
 | `run_begun` | `flow` (a run of rooms begins, on its fresh state, with the seats joined at its start) | `run` (makes the run's map for them) |
 | `run_room_scaled` | `run` (how much harder the room the party enters is: its depth and the run's players; before `run_room_chosen`) | `difficulty` (the level) |
+| `run_room_paced` | `run` (how the enemies of the room the party enters come in: a group's cost, the cost standing that calls the next, the seconds between a group's bodies; enemy arrivals EA4; after `run_room_scaled`, before `run_room_chosen`) | `flow` (`RoomArrivals`) |
 | `run_room_chosen` | `run` (the map's room the party enters, what stands in it and the kinds of the rooms it leads to) | `flow` (builds it) |
 | `enemy_standing` | `flow` (an enemy or boss body about to stand, not yet in the tree) | `difficulty` (scales it to the room: `Actor.stat_scale`) |
 | `adds_requested` | `actor` (a body's `Phases`: its phase's burst or a wave of adds; boss plan OB13) | `flow` (stands them, for a body it stood) |
@@ -79,7 +80,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `cover_changed` | `cover` (each tick's changes; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look) |
 | `status_requested` | `core/spells` (a portal's infusion) and `cover` (a status of the cover a body stands in, ground cover GC5 rule 4: asked as any status is) | `combat` |
 | `room_cleared` | `flow` | `rewards`, `run` |
-| `sandbox_changed` | `flow` | `hud` |
 | `door_voted` | `flow` | none yet |
 | `difficulty_changed` | `difficulty` (a difficulty setting's level, M3; never the room's scale, `run_room_scaled`) | none yet (enemy AI AI10: `ai`, the TeamBoard's skill) |
 | `reward_rolled`, `reward_taken` | `rewards` | none yet |
@@ -101,9 +101,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `ground_looked`, `actor_take_requested` | `ai` (a brain whose profile takes items, I9) | `items` (fills the look at once; gives the item to the actor's Inventory) |
 | `ground_item_changed` | `items` | `feel` (the look on the ground) |
 | `item_near_changed`, `item_refused` | `items` | `hud` (the hint, its red shake) |
-| `sandbox_requested`, `sandbox_action_requested`, `sandbox_spawn_requested` | HUD | `flow` |
 | `play_load_requested` | net | `flow` (loads `play_tasks` ahead of a run two machines start together) |
-| `ai_view_changed` | HUD | `ai` (Entities) |
 
 `device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); the frames service turns them into the simulation's `seat_joined` and `seat_left` (offline at once; while a replay plays, only as its frames say), and `coop` turns those into `player_joined` and `player_left`. The rows sent by the HUD are its player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `hub_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the hub and send `room_entered`; `play_requested` starts a run at once (the tests, the bots, the online spike's Host/Join).
 

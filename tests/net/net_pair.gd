@@ -129,7 +129,7 @@ func start(run_seed: int = 0x5e55) -> bool:
 		host.pump()
 		for session in clients:
 			session.pump()
-	return host.start(&"sandbox_requested", 0, run_seed) != null
+	return host.start(&"hub_requested", 0, run_seed) != null
 
 
 ## One physics step of every machine (or some of them: a machine that stalls), the host first.

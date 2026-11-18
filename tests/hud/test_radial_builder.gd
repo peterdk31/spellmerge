@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the radial builder in hud/builder (owner, 2026-10-26): opened with B when the pause
-## menu's Sandbox page picked it, the right stick picks a card on the ring (with a rumble), RT
+## menu's Settings page picked it, the right stick picks a card on the ring (with a rumble), RT
 ## puts it in the marked slot (pushing the rest right, or replacing), LT takes a card out (an
 ## undo past the last card; held, it clears the staff), LB and RB switch staffs, the left stick
 ## moves the marker, the d-pad flips the kind with the one-kind ring, the numbers show the mana
@@ -72,7 +72,7 @@ func before_each() -> void:
 	_hud.input = _input
 	_hud.spells = _spells
 	root.add_child(_hud)
-	# The pause menu's Sandbox page picked every card on the ring, push.
+	# The pause menu's Settings page picked every card on the ring, push.
 	_hud.call("_on_builder_options_changed", 0, true)
 
 

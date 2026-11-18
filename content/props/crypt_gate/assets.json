@@ -1,0 +1,22 @@
+{
+	"assets": [
+		{
+			"path": "content/props/crypt_gate/opening.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (tools/pixel_grid.py from opening.grid.json, its grid by a small generator, 2026-11-16)",
+			"prompt": "Eleven 48x64 frames side by side: a crypt gate (an archway of stone blocks with a keystone, two posts with carved runes, a threshold slab in front, a dark opening) opening. The runes light in Void base from the bottom one up, a veil of Void light rises from the threshold row by row until it fills the arch (Void shadow at its sides, Void light in the middle, Bone light motes), then five frames of its motes rising, looping back to the first full frame. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		},
+		{
+			"path": "content/props/crypt_gate/closing.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (tools/pixel_grid.py from closing.grid.json, its grid by a small generator, 2026-11-16)",
+			"prompt": "Six 48x64 frames side by side: the crypt gate of opening.svg closing: the veil drains down into the threshold row by row and the runes go out from the top, ending dark (the gate's look while the room is not cleared). Its first frame is opening.svg's first full frame. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; 1px Outline, light from the top-left."
+		}
+	]
+}

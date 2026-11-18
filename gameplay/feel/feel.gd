@@ -313,7 +313,7 @@ const POSSESS_END: StringName = &"possess_end"
 ## The cue of a boss's entrance, on its body as its banner shows (`boss_shown`, boss plan OB16). A
 ## boss with an intro has its overlay's sounds instead (`boss_intro_sound.gd`,
 ## docs/milestones/boss-intro.md, rule 8), and this cue only when no intro played for it (the run's
-## rule off, a boss the sandbox spawned: `BossIntroWait`).
+## rule off, a boss a phase called: `BossIntroWait`).
 const BOSS_INTRO: StringName = &"boss_intro"
 
 ## The services. Only tests set these, before adding the node; otherwise the
@@ -374,7 +374,7 @@ var shake_enabled: bool = true:
 ## Another hit with all of them the same (no time has passed for Feel or the game) would only do
 ## them again: the flash is restarted to the same time, the hold is refused for
 ## both bodies (each rests from the first), and the same sound would start on the next voice in the
-## same frame. So it skips them (a crowd of shots on one body: 2026-11-02, "Sandbox storm").
+## same frame. So it skips them (a crowd of shots on one body: docs/DECISIONS.md, 2026-11-02).
 var _juiced_frame: PackedInt64Array = PackedInt64Array()
 var _juiced_step: PackedInt64Array = PackedInt64Array()
 ## Feel's steps so far (`step`).
@@ -455,6 +455,9 @@ var _cover: CoverScript = null
 ## thrower (made once).
 var _fall_look: FallLook = FallLook.new()
 var _fall_motes: Callable = Callable()
+## The look of an enemy arriving (enemy arrivals EA2: a mark on the floor, then the body rising out of
+## it), drawn from the bodies' state; a node at the floor marks' z, under the bodies (made in `_ready`).
+var _arrive_look: ArriveLook = null
 ## The party's camera: it holds this machine's wizards (`Frames.seats_here`), eased as it is drawn.
 var party_camera: PartyCameraScript = PartyCameraScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
@@ -717,6 +720,12 @@ func _ready() -> void:
 	# draws on top, so they come after the spectacle, whose mark layer (made whenever the setting
 	# turns on) is inside it: a new strike shows over the marks earlier ones left.
 	move_child(_floor_node, _spectacle.get_index())
+	# An arrival's mark lies on the floor, over the marks and the cover, under every body.
+	_arrive_look = ArriveLook.new()
+	_arrive_look.name = "ArriveLook"
+	_arrive_look.z_index = MARK_Z
+	_arrive_look.play_cue = _play_arrive_cue
+	add_child(_arrive_look)
 	_lanes = LanesScript.new()
 	_lanes.name = "Lanes"
 	# Over the shots and every flash: a telegraph is the brightest thing on screen (docs/STYLE.md).
@@ -910,6 +919,8 @@ func step(real_delta: float) -> void:
 	if not _fall_motes.is_valid():
 		_fall_motes = _throw_fall_motes
 	_fall_look.step(_actor_table(), real_delta, _fall_motes if _spectacle.motes_on() else Callable())
+	if _arrive_look != null:
+		_arrive_look.step(_actor_table(), real_delta)
 	var picture: Rect2 = party_camera.visible_rect()
 	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture)
 	_spectacle.step(_clock, _actor_table())
@@ -1066,6 +1077,8 @@ func _on_room_entered(room_id: StringName) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if _body_sounds != null:
 		_body_sounds.room_entered(room.music if room != null else null)
+	if _arrive_look != null:
+		_arrive_look.use_room(room)
 	if _remnants != null:
 		_remnants.clear()
 	_reaction_heard.clear()
@@ -1410,6 +1423,12 @@ func _status_motes(real_delta: float) -> void:
 		var count: int = floori(rate * real_delta + _rng.randf())
 		if count > 0:
 			_spectacle.status_motes(card[ElementBase.STATUS_LOOK_CARD] as StringName, card[ElementBase.STATUS_LOOK_LAYER] as int, enemy.global_position, 4.0 * STATUS_ZOOM, status_color(id), count)
+
+
+## An enemy starts to rise out of its mark (`ArriveLook`): its cue at its feet, as no actor's; unweighted
+## (its dust only, no sound) when another arrival sounded just before.
+func _play_arrive_cue(at: Vector2, weighted: bool) -> void:
+	play_cue(ArriveLook.CUE, ActorsScript.NONE, at, Vector2.ZERO, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, weighted)
 
 
 ## A falling body's motes (`FallLook`): `count` of them round `at`, the void's, drifting.

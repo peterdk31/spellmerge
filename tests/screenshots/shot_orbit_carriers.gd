@@ -1,6 +1,6 @@
 extends "res://tests/support/screenshot.gd"
 ## Orbit on every carrier it circles (docs/milestones/carrier-modifiers.md Part 5, 5B step 5): three
-## wizards side by side in the sandbox, fire; fire and frost; frost, void, fire and lightning (the dev staff, for six
+## wizards side by side in the hub, fire; fire and frost; frost, void, fire and lightning (the dev staff, for six
 ## cards), each casting `orbit · <carrier>` to the right, pictured a moment later as it goes round.
 ## One sheet a carrier, at 2x: `orbit_bolt`, `orbit_atom`, `orbit_swap`, `orbit_rune` (armed and
 ## circling), `orbit_pool`, `orbit_wall` (its row turns with its circle) and `orbit_beam` (it sweeps,
@@ -13,10 +13,10 @@ const CARRIERS: Array[StringName] = [&"bolt", &"atom", &"swap", &"rune", &"pool"
 ## Frames after the cast for each carrier: long enough to have gone round a little (a rune arms first).
 const WAIT: Dictionary = {&"rune": 80}
 const DEFAULT_WAIT: int = 30
-## Where each wizard stands: the sandbox room's open floor, clear of its middle pillar and its walls
-## by more than a circle (walls end what circles), and the middle of the picture.
-const PLACES: Array[Vector2] = [Vector2(180.0, 200.0), Vector2(420.0, 200.0), Vector2(540.0, 200.0)]
-const MIDDLE := Vector2(360.0, 200.0)
+## Where each wizard stands: the hub's open floor below the stone, clear of its props and the void by
+## more than a circle, and the middle of the picture.
+const PLACES: Array[Vector2] = [Vector2(580.0, 640.0), Vector2(820.0, 640.0), Vector2(940.0, 640.0)]
+const MIDDLE := Vector2(760.0, 640.0)
 
 var _input: Node = null
 var _spells: Node = null
@@ -36,7 +36,7 @@ func take() -> void:
 	root.get_node("Feel").set("drive_engine", false)
 	for p in 3:
 		_input.call("add_virtual_device", p)
-	flow.set(&"mode", &"sandbox")
+	flow.set(&"mode", &"hub")
 	flow.call("start_run", 0)
 	await settle(30)
 	for p in 3:

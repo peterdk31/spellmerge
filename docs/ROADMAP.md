@@ -34,11 +34,13 @@ A fifteenth, planned with the owner on 2026-11-16 and approved the same day: **t
 
 A sixteenth, planned with the owner on 2026-11-16: **the boss intro**, a screen-wide overlay as a boss's fight starts: the boss a silhouette, then its name in a title type and the boss revealed looking mean, its lines if it has any, and the fight starting on any player's A ([boss-intro.md](milestones/boss-intro.md), phase BI). It replaces the boss plan's entrance banner for a boss with an intro, and is the one stop for everyone beside the pause menu and an unplugged pad (docs/DESIGN.md, no-waiting rule 7). Approved the same day.
 
+A seventeenth, planned with the owner on 2026-11-16 and approved the same day: **the crypt rework**, the Vaults: every crypt room a floating slab of quiet cool flagstones in the dark, drawn from a shape as the hub is, with warm light against the dark, a landmark a room, pits (holes), gates for exits and pillars as props that crumble ([crypt-rework.md](milestones/crypt-rework.md), phase CR). The sandbox goes with it, its showcase staffs on the hub's rack. One session a step, each merged before the next. **Done 2026-11-17:** all five rooms are floating slabs (CR3 to CR7), the gate and the crypt pillar built (CR-G), the sandbox gone (CR-S).
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |
 | M1 | [Core loop prototype](milestones/M1-core-loop.md) | **Closed** on 2026-10-21 by the owner (C1: go, after two iterate rounds); its open owner items carry into M2 | 4-bot smoke test passes on web, plus M0's carried-over dry runs and 3 daily releases in a row |
-| M2 | [Spell system: staffs](milestones/M2-staffs.md) (first design: [M2-spell-system.md](milestones/M2-spell-system.md)) | **In progress**: C2 (#264) answered with pivot on 2026-10-26; the staffs rework is being built | Every staffs part merged, every card in two combos, bots build staffs, the owner's sandbox playtest, then C2 again |
+| M2 | [Spell system: staffs](milestones/M2-staffs.md) (first design: [M2-spell-system.md](milestones/M2-spell-system.md)) | **In progress**: C2 (#264) answered with pivot on 2026-10-26; the staffs rework is being built | Every staffs part merged, every card in two combos, bots build staffs, the owner's playtest, then C2 again |
 | M3 | Run structure | Not started | A full run can be completed |
 | M4 | Polish and variety | Not started | Polished enough to show off |
 | M5 | Meta-progression | Not started | Runs give lasting progression |

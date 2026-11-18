@@ -270,7 +270,7 @@ func test_a_machine_that_joins_a_run_under_way_catches_up_and_agrees_at_every_ti
 	var pair: NetPair = _new_pair(50.0)
 	# Nobody plays the host's second seat until the other machine is given it.
 	pair.host_fight.frames.set_source(NetHost.SEAT, null)
-	var replay: Replay = pair.host_fight.frames.record(&"sandbox_requested", 0, 0x5e55)
+	var replay: Replay = pair.host_fight.frames.record(&"hub_requested", 0, 0x5e55)
 	var alone: int = 900
 	for i in alone:
 		pair.step(true, false)

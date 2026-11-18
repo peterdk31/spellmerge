@@ -5,8 +5,7 @@ extends PanelContainer
 ## (node Root/PauseMenu); it sits in the middle of the view.
 ##
 ## Pages, one list of buttons each:
-## - **Main:** Resume, Map (only while the run has a map, a run of rooms), Sandbox (only while the
-##   run is a sandbox, `sandbox_changed`), Settings, Leave
+## - **Main:** Resume, Map (only while the run has a map, a run of rooms), Settings, Leave
 ##   game (`seat_leave_requested`: the seat that opened the menu lets its device go and its wizard
 ##   leaves, at its tick on every machine; the others play on; items I2, in place of the `leave`
 ##   action; the menu closes first), "Leave game: P2 (no controller)" (only while a seat of this
@@ -17,21 +16,8 @@ extends PanelContainer
 ## - **Map** (run generation RG8): the run's map (`hud/widgets/run_map_view.gd`, told by the run
 ##   area's `run_map_changed`: its rows, links and kinds, and where the party is), view only, and
 ##   Back. It goes back to the main page by itself if the map goes while it shows.
-## - **Sandbox** (staffs B7): Reset dummies (`sandbox_action_requested(player, reset_dummies)`;
-##   it stays on the page); the enemy arena (enemy AI AI8): "Enemy: <name>" (every enemy in the registry, by its
-##   `shown_name()`; left and right or `accept` step through them), "Count: 1" (1-8, the same
-##   way), "Spawn" (`sandbox_spawn_requested(player, enemy id, count)`), "Clear enemies"
-##   (`sandbox_action_requested(player, clear_enemies)`) and "AI view: Off" (`ai_view_changed`: each
-##   enemy shows its AI's behaviour and step); the
-##   builder switches (owner, 2026-10-26), each flipping on `accept` and staying on the page:
-##   "Ring:" ("Every card", "One kind", or the ring
-##   styles to try, owner 2026-10-30: "Zoom", "Kinds: hold", "Kinds: depth"; `accept` steps to the
-##   next, `Ring`) and "Full slot: Push right" or "Replace" (the radial builder's options); each flip sends `builder_options_changed`,
-##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
-##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
-##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
 ## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Floor marks: On", "Spell light: On", "Tails: On", "Max shots: 6000", "Screen shake: On", "Damage numbers: On",
-##   "Show FPS: Off", Back. The switch asks
+##   "Show FPS: Off", the builder switches, Back. The switch asks
 ##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
 ##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
 ##   Off again. "Effect slots" is a slider (the owner, 2026-10-27): left and right move it a step
@@ -74,6 +60,13 @@ extends PanelContainer
 ##   which `hud/panels` applies to its frame rate readout (`hud/widgets/fps_counter.gd`); panels
 ##   reads `show_fps` once after binding the menu. (The Gameplay page, with
 ##   "Friendly fire" and "Enemy fire", went in actors G3c: every spell hits everything, always.)
+##   The builder switches (owner, 2026-10-26; on this page since crypt rework CR-S), each flipping on `accept` and staying on the page:
+##   "Ring:" ("Every card", "One kind", or the ring styles to try, owner 2026-10-30: "Zoom",
+##   "Kinds: hold", "Kinds: depth"; `accept` steps to the next, `Ring`) and "Full slot: Push right"
+##   or "Replace" (the radial builder's options); each flip sends `builder_options_changed`, which
+##   `hud/panels` applies to every player's builder. "Reload: Button" (the default) or "Next cast"
+##   (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay; each flip sends
+##   `reload_style_changed`, which `hud/panels` applies to every panel. They are not saved.
 ##
 ## Only the player who opened it works it, through `core/ui_focus`: up/left and down/right move,
 ## `accept` (A) activates, `back` (B) goes up a page and closes it from the main page; `pause`
@@ -91,26 +84,24 @@ const FramesScript := preload("res://core/sim/frames.gd")
 const RunMapViewScript := preload("res://hud/widgets/run_map_view.gd")
 
 const PLAYER_COUNT: int = 4
-enum Page { MAIN, SANDBOX, SETTINGS, MAP }
+enum Page { MAIN, SETTINGS, MAP }
 ## The radial builder's ring (see the top): the plain one with every card or one kind at a time,
 ## or a ring style from `hud/builder/rings/`.
 enum Ring { EVERY_CARD, ONE_KIND, ZOOM, KINDS_HOLD, KINDS_DEPTH }
 ## The title of each page.
 const TITLES: Dictionary = {
-	Page.MAIN: "PAUSED", Page.SANDBOX: "SANDBOX", Page.SETTINGS: "SETTINGS", Page.MAP: "MAP",
+	Page.MAIN: "PAUSED", Page.SETTINGS: "SETTINGS", Page.MAP: "MAP",
 }
-## The sandbox actions, as flow knows them.
-const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
 const FOCUS_MARK: String = "> "
 ## The meta key that keeps a button's text without the focus mark.
 const BASE_TEXT_META: StringName = &"base_text"
 
 ## The menu closed (resumed). Carries the player who had it.
 signal closed_menu(player: int)
-## A builder switch on the Sandbox page flipped: the radial builder's ring, a full slot pushed
+## A builder switch on the Settings page flipped: the radial builder's ring, a full slot pushed
 ## right or replaced.
 signal builder_options_changed(ring: Ring, push: bool)
-## The reload switch on the Sandbox page flipped: the staff rows show the delay on the button
+## The reload switch on the Settings page flipped: the staff rows show the delay on the button
 ## glyph, or on the next cast.
 signal reload_style_changed(on_button: bool)
 ## The "Show FPS" switch on the Settings page flipped.
@@ -120,12 +111,6 @@ const RING_TEXT: String = "Ring: %s"
 const RING_WORDS: Array[String] = ["Every card", "One kind", "Zoom", "Kinds: hold", "Kinds: depth"]
 const PUT_TEXT: String = "Full slot: %s"
 const RELOAD_TEXT: String = "Reload: %s"
-## The enemy arena's rows (enemy AI AI8).
-const ENEMY_TEXT: String = "Enemy: %s"
-const COUNT_TEXT: String = "Count: %d"
-const AI_VIEW_TEXT: String = "AI view: %s"
-const COUNT_MAX: int = 8
-const ACTION_CLEAR_ENEMIES: StringName = &"clear_enemies"
 const LEAVE_WAITING_TEXT: String = "Leave game: P%d (no controller)"
 const FULLSCREEN_TEXT: String = "Fullscreen: %s"
 const EFFECT_SLOTS_TEXT: String = "Effect slots: %d"
@@ -158,7 +143,6 @@ var page: Page = Page.MAIN
 
 var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
-var _sandbox_on: bool = false
 ## The seats of this machine that wait for their unplugged gamepad, a bit each (`set_waiting_seats`).
 var _waiting_seats: int = 0
 ## The player whose menu is closing, for the command that lets the game go.
@@ -196,36 +180,18 @@ var tailless_motes: int = TaillessMotes.DEFAULT
 var save: SaveFile = null
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
 var display: Node = null
-## The content registry the enemy arena lists enemies from and the Map page names room kinds by;
-## tests may set their own first, else the `Registry` autoload.
+## The content registry the Map page names room kinds by; tests may set their own first, else the
+## `Registry` autoload.
 var registry: Node = null
-## The enemy arena's choice: the enemies' ids (read when the sandbox page opens), the one picked,
-## how many, and whether the AI view is on.
-var arena_ids: Array[StringName] = []
-var arena_names: PackedStringArray = PackedStringArray()
-var arena_pick: int = 0
-var arena_count: int = 1
-var ai_view: bool = false
 
 @onready var _title: Label = %Title
 @onready var _rows: VBoxContainer = %Rows
 @onready var _resume: Button = _add(Page.MAIN, "Resume", "Resume")
 @onready var _map_row: Button = _add(Page.MAIN, "Map", "Map")
-@onready var _sandbox: Button = _add(Page.MAIN, "Sandbox", "Sandbox")
 @onready var _settings: Button = _add(Page.MAIN, "Settings", "Settings")
 @onready var _leave: Button = _add(Page.MAIN, "LeaveGame", "Leave game")
 @onready var _leave_waiting: Button = _add(Page.MAIN, "LeaveWaiting", LEAVE_WAITING_TEXT % 1)
 @onready var _main_menu: Button = _add(Page.MAIN, "MainMenu", "Main menu")
-@onready var _reset: Button = _add(Page.SANDBOX, "ResetDummies", "Reset dummies")
-@onready var _arena_enemy: Button = _add(Page.SANDBOX, "ArenaEnemy", ENEMY_TEXT % "-")
-@onready var _arena_count: Button = _add(Page.SANDBOX, "ArenaCount", COUNT_TEXT % 1)
-@onready var _arena_spawn: Button = _add(Page.SANDBOX, "ArenaSpawn", "Spawn")
-@onready var _arena_clear: Button = _add(Page.SANDBOX, "ArenaClear", "Clear enemies")
-@onready var _ai_view: Button = _add(Page.SANDBOX, "AIView", AI_VIEW_TEXT % "Off")
-@onready var _ring_style: Button = _add(Page.SANDBOX, "RingStyle", RING_TEXT % "Every card")
-@onready var _put_style: Button = _add(Page.SANDBOX, "PutStyle", PUT_TEXT % "Push right")
-@onready var _reload_style: Button = _add(Page.SANDBOX, "ReloadStyle", RELOAD_TEXT % "Button")
-@onready var _sandbox_back: Button = _add(Page.SANDBOX, "SandboxBack", "Back")
 @onready var _fullscreen: Button = _add(Page.SETTINGS, "Fullscreen", FULLSCREEN_TEXT % "Off")
 @onready var _effects: Button = _add(Page.SETTINGS, "EffectSlots", EFFECT_SLOTS_TEXT % EffectSlots.DEFAULT)
 @onready var _effects_bar: HSlider = _add_slider(_effects, EffectSlots.MIN, EffectSlots.MAX, EffectSlots.STEP, effect_slots, EFFECT_SLOTS_TEXT % EffectSlots.MAX)
@@ -242,6 +208,9 @@ var ai_view: bool = false
 @onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
 @onready var _numbers: Button = _add(Page.SETTINGS, "DamageNumbers", NUMBERS_TEXT % "On")
 @onready var _fps: Button = _add(Page.SETTINGS, "ShowFps", FPS_TEXT % "Off")
+@onready var _ring_style: Button = _add(Page.SETTINGS, "RingStyle", RING_TEXT % "Every card")
+@onready var _put_style: Button = _add(Page.SETTINGS, "PutStyle", PUT_TEXT % "Push right")
+@onready var _reload_style: Button = _add(Page.SETTINGS, "ReloadStyle", RELOAD_TEXT % "Button")
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
 ## The Map page's map (not a button: UIFocus never stops on it), over its Back.
 @onready var _map: RunMapViewScript = _add_map()
@@ -272,8 +241,6 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_load_light()
 	_load_tailless_motes()
 	_load_fps()
-	if _events != null:
-		_events.sandbox_changed.connect(_on_sandbox_changed)
 	_map.name_of = _kind_name
 	_map.bind(_events)
 	_map.map_changed.connect(_on_map_changed)
@@ -407,48 +374,7 @@ func _navigate(control: Control, direction: Vector2i) -> Control:
 		var at: int = clampi(ShotCap.index_of(shot_cap) + direction.x, 0, ShotCap.STOPS.size() - 1)
 		_set_shot_cap(ShotCap.STOPS[at])
 		return _shots
-	if control == _arena_enemy and direction.x != 0:
-		_pick_enemy(arena_pick + direction.x)
-		return _arena_enemy
-	if control == _arena_count and direction.x != 0:
-		_set_count(clampi(arena_count + direction.x, 1, COUNT_MAX))
-		return _arena_count
 	return null
-
-
-## The enemy arena: read every enemy, then every boss (boss OB2), from the registry (each time the
-## sandbox page opens, so a new folder shows up), keeping the one picked if it is still there.
-func _read_arena() -> void:
-	var source: Node = registry if registry != null else get_node_or_null(^"/root/Registry")
-	var before: StringName = arena_ids[arena_pick] if arena_pick < arena_ids.size() else &""
-	arena_ids.clear()
-	arena_names.clear()
-	if source != null:
-		for folder: StringName in EnemyBase.FOLDERS:
-			for item: Variant in source.call("get_all", folder):
-				var data := item as EnemyBase
-				if data != null and data.scene != null:
-					arena_ids.append(data.id)
-					arena_names.append(data.shown_name())
-	arena_pick = maxi(arena_ids.find(before), 0)
-	_pick_enemy(arena_pick)
-
-
-## Pick enemy `at` (wrapping round the list) and show it.
-func _pick_enemy(at: int) -> void:
-	if arena_ids.is_empty():
-		arena_pick = 0
-		_arena_enemy.set_meta(BASE_TEXT_META, ENEMY_TEXT % "-")
-	else:
-		arena_pick = posmod(at, arena_ids.size())
-		_arena_enemy.set_meta(BASE_TEXT_META, ENEMY_TEXT % arena_names[arena_pick])
-	_mark_focus()
-
-
-func _set_count(count: int) -> void:
-	arena_count = count
-	_arena_count.set_meta(BASE_TEXT_META, COUNT_TEXT % arena_count)
-	_mark_focus()
 
 
 ## Move the slider to `slots` (inside its range), show it and tell feel.
@@ -470,7 +396,6 @@ func _show_page(next: Page) -> void:
 	for on_page: int in _pages:
 		for control: Button in _pages[on_page]:
 			control.visible = on_page == next
-	_sandbox.visible = next == Page.MAIN and _sandbox_on
 	_map_row.visible = next == Page.MAIN and _map.has_map()
 	_map.visible = next == Page.MAP
 	_leave_waiting.visible = next == Page.MAIN and _waiting_seats != 0
@@ -536,14 +461,6 @@ func waiting_seat() -> int:
 	return -1
 
 
-func _on_sandbox_changed(on: bool) -> void:
-	_sandbox_on = on
-	if not on and page == Page.SANDBOX:
-		_go(Page.MAIN)
-	else:
-		_show_page(page)
-
-
 ## The run's map changed: the Map row follows it, and a Map page whose map went goes back.
 func _on_map_changed() -> void:
 	if not _map.has_map() and page == Page.MAP:
@@ -587,9 +504,6 @@ func _on_activated(player: int, control: Control) -> void:
 		close_menu()
 	elif control == _map_row:
 		_go(Page.MAP)
-	elif control == _sandbox:
-		_read_arena()
-		_go(Page.SANDBOX)
 	elif control == _settings:
 		_go(Page.SETTINGS)
 	elif control == _leave:
@@ -608,23 +522,6 @@ func _on_activated(player: int, control: Control) -> void:
 		close_menu()
 		if _events != null:
 			_events.main_menu_requested.emit(player)
-	elif control == _reset:
-		_send(ACTION_RESET_DUMMIES)
-	elif control == _arena_enemy:
-		_pick_enemy(arena_pick + 1)
-	elif control == _arena_count:
-		_set_count(arena_count % COUNT_MAX + 1)
-	elif control == _arena_spawn:
-		if _events != null and arena_pick < arena_ids.size():
-			_events.sandbox_spawn_requested.emit(owner_player, arena_ids[arena_pick], arena_count)
-	elif control == _arena_clear:
-		_send(ACTION_CLEAR_ENEMIES)
-	elif control == _ai_view:
-		ai_view = not ai_view
-		_ai_view.set_meta(BASE_TEXT_META, AI_VIEW_TEXT % ("On" if ai_view else "Off"))
-		_mark_focus()
-		if _events != null:
-			_events.ai_view_changed.emit(ai_view)
 	elif control == _ring_style:
 		ring = ((ring + 1) % Ring.size()) as Ring
 		_show_builder_options()
@@ -660,7 +557,7 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_numbers(not damage_numbers)
 	elif control == _fps:
 		_set_fps(not show_fps)
-	elif control == _sandbox_back or control == _settings_back or control == _map_back:
+	elif control == _settings_back or control == _map_back:
 		_go(Page.MAIN)
 
 
@@ -890,8 +787,3 @@ func _show_builder_options() -> void:
 	_put_style.set_meta(BASE_TEXT_META, PUT_TEXT % ("Push right" if put_push else "Replace"))
 	_mark_focus()
 	builder_options_changed.emit(ring, put_push)
-
-
-func _send(action: StringName) -> void:
-	if _events != null:
-		_events.sandbox_action_requested.emit(owner_player, action)

@@ -3,9 +3,10 @@ extends "res://tests/support/suite.gd"
 ## in the void (its ground drawn from a shape: hub rework HR2), the void round it and its cracks all
 ## holes (HR-H2: a body falls in; a fall there costs nothing), the teleporter stone in the middle, three dummies
 ## together off to one side and the multiplayer altar, both props (props W8: content/props/hub_stone,
-## hub_altar), and the prop yard, all placed in its scene (props W8a: `RoomPlaces`). No scripts;
-## the stone's art lies on the stone in both its states; nothing starts on the stone or in a wall;
-## the yard is open floor.
+## hub_altar), the prop yard and the rack of premade staffs (items I6; the two showcase
+## builds of crypt rework CR-S among them), all placed in its scene (props W8a: `RoomPlaces`). No
+## scripts; the stone's art lies on the stone in both its states; nothing starts on the stone or in a
+## wall; the yard is open floor; the rack lies on open floor.
 
 const RoomData := preload("res://content/rooms/hub/hub.tres")
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
@@ -54,7 +55,7 @@ func test_resource_is_the_hub_where_a_fall_costs_nothing() -> void:
 
 
 func test_the_other_rooms_have_no_stone_and_down_for_good() -> void:
-	for path: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/sandbox.tres"]:
+	for path: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/arena_02.tres"]:
 		var room: RoomBase = load(path) as RoomBase
 		check(not HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).has_area(), "%s has no stone" % room.id)
 		check(not HubRules.area_of(room.places(), HubRules.ROLE_PARTY_ALTAR).has_area(), "%s has no altar" % room.id)
@@ -128,7 +129,7 @@ func test_the_prop_yard_is_open_floor() -> void:
 	for spawns: PackedVector2Array in [room.places().player_spawns, room.places().joiner_spawns, room.places().placed_at_of(EnemyBase)]:
 		for point: Vector2 in spawns:
 			check(not yard.intersects(_body(point).grow(32.0)), "clear of the spawn %s" % point)
-	for other: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/sandbox.tres"]:
+	for other: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/arena_02.tres"]:
 		check(not (load(other) as RoomBase).places().zone(FlowScript.ZONE_PROP_YARD).has_area(), "%s has none" % other)
 
 
@@ -322,5 +323,34 @@ func test_joiners_arrive_beside_the_altar() -> void:
 			check(not wall.intersects(_body(point)), "joiner spawn %s is clear of the wall %s" % [point, wall])
 		for j in range(i + 1, room.places().joiner_spawns.size()):
 			check(not _body(point).intersects(_body(room.places().joiner_spawns[j])), "joiner spawns %s and %s do not overlap" % [point, room.places().joiner_spawns[j]])
-	for path: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/sandbox.tres"]:
+	for path: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/arena_02.tres"]:
 		check((load(path) as RoomBase).places().joiner_spawns.is_empty(), "%s has none: a joiner comes in away from danger" % path)
+
+
+## The rack (items I6): the Wild star, and under it one row of the premade builds RACK_STEP apart,
+## the two showcase builds of crypt rework CR-S at its ends, each on open floor: a body taking one
+## stands clear of every hole, the stone, the altar and the yard.
+const RACK_STEP: float = 64.0
+const RACK_ROW: Array[StringName] = [&"patient_sentry", &"glacier_engine", &"hammer_of_the_faithless", &"corpse_bloom", &"death_from_every_sky", &"the_mutiny", &"frostfire_cascade"]
+
+
+func test_the_rack_is_one_row_on_open_floor() -> void:
+	var places: RoomPlaces = _room().places()
+	var row: Array[Vector2] = []
+	var ids: Array[StringName] = []
+	for i in places.placed.size():
+		var item := places.placed[i] as StaffItem
+		if item == null:
+			continue
+		var at: Vector2 = places.placed_at[i]
+		for hole: Rect2 in _void_rects():
+			check(not hole.intersects(_body(at)), "%s at %s is clear of the hole %s" % [item.id, at, hole])
+		check(not _body(at).intersects(HubRules.area_of(places, HubRules.ROLE_RUN_START)), "%s is off the stone" % item.id)
+		check(not _body(at).intersects(HubRules.area_of(places, HubRules.ROLE_PARTY_ALTAR)), "%s is off the altar" % item.id)
+		check(not _body(at).intersects(places.zone(FlowScript.ZONE_PROP_YARD)), "%s is out of the yard" % item.id)
+		if RACK_ROW.has(item.id):
+			row.append(at)
+			ids.append(item.id)
+	check_equal(ids, RACK_ROW, "the premade builds lie in one row, in this order")
+	for i in range(1, row.size()):
+		check_equal(row[i] - row[i - 1], Vector2(RACK_STEP, 0.0), "%s lies %d px right of %s" % [ids[i], int(RACK_STEP), ids[i - 1]])

@@ -14,6 +14,7 @@ const FlowScript := preload("res://gameplay/flow/flow.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const Arrivals := preload("res://tests/support/arrivals.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 ## The arena's floor, wall border included.
 const INNER := Rect2(Vector2.ZERO, Vector2(640.0, 384.0))
@@ -78,8 +79,11 @@ func _join(count: int) -> void:
 		input.add_virtual_device(index)
 
 
+## Play pressed, and the room's enemies stepped past their arrival (enemy arrivals EA3), so a test
+## hits bodies that are there.
 func _play(requester: int = 0) -> void:
 	events.emit_signal("play_requested", requester)
+	Arrivals.land(flow)
 
 
 ## `count` players joined, and Play pressed.
@@ -141,17 +145,55 @@ func _kill_room() -> void:
 		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
 
 
-## The arena's walls, as rectangles.
+## The arena's walls, as rectangles, as the game reads them (a floating room's are its ground's: crypt
+## rework CR3).
 func _arena_walls() -> Array[Rect2]:
 	var scene: Node = ARENA.scene.instantiate()
-	var walls: Array[Rect2] = []
-	for child in scene.get_node("Walls").get_children():
-		var shape_node := child as CollisionShape2D
-		if shape_node != null and shape_node.shape is RectangleShape2D:
-			var size: Vector2 = (shape_node.shape as RectangleShape2D).size
-			walls.append(Rect2(shape_node.position - size * 0.5, size))
+	var walls: Array[Rect2] = RoomPlaces.wall_rects(scene)
 	scene.free()
 	return walls
+
+
+## The room's breakable props, from its data (the antechamber's pillars; crypt rework CR3): each is
+## a body combat knows.
+func _breakable_props() -> int:
+	var count: int = 0
+	for prop: Resource in ARENA.places().placed_of(PropBase):
+		if not (prop as PropBase).invincible:
+			count += 1
+	return count
+
+
+## The room's props combat knows, checked against its data's breakable ones.
+func _props_in_combat() -> int:
+	var count: int = 0
+	for prop: Node in flow.room_props():
+		if combat.call("is_registered", prop):
+			count += 1
+	check_equal(count, _breakable_props(), "combat knows each of the room's breakable props, and only those")
+	return _breakable_props()
+
+
+## Where a straight path from `from` to `to` first meets one of the arena's walls (`to` if none),
+## to the 8 px wall grid the projectile manager clips on.
+func _first_wall(from: Vector2, to: Vector2) -> Vector2:
+	var hit: Vector2 = to
+	for wall in _arena_walls():
+		var near: Variant = _enter(wall, from, to)
+		if near != null and from.distance_to(near as Vector2) < from.distance_to(hit):
+			hit = near as Vector2
+	return hit
+
+
+## Where an axis-aligned path from `from` to `to` enters `wall`, or null.
+func _enter(wall: Rect2, from: Vector2, to: Vector2) -> Variant:
+	if from.x == to.x and wall.position.x <= from.x and from.x < wall.end.x:
+		var y: float = wall.end.y if to.y < from.y else wall.position.y
+		return Vector2(from.x, y) if minf(from.y, to.y) <= y and y <= maxf(from.y, to.y) else null
+	if from.y == to.y and wall.position.y <= from.y and from.y < wall.end.y:
+		var x: float = wall.end.x if to.x < from.x else wall.position.x
+		return Vector2(x, from.y) if minf(from.x, to.x) <= x and x <= maxf(from.x, to.x) else null
+	return null
 
 
 # --- Play ------------------------------------------------------------------------------------
@@ -215,7 +257,24 @@ func test_the_rooms_enemies_stand() -> void:
 
 func test_combat_knows_every_enemy_and_wizard() -> void:
 	_playing(4)
-	check_equal(combat.call("actor_count"), _room_count() + 4, "every enemy and wizard is registered with combat")
+	check_equal(combat.call("actor_count"), _room_count() + 4 + _props_in_combat(), "every enemy, wizard and breakable prop is registered with combat")
+
+
+## Every enemy of the room arrives as it starts (enemy arrivals EA3): set to arrive before it entered
+## the tree, so none is in Combat yet, and none is a boss; the room is not cleared while they arrive.
+func test_the_rooms_enemies_arrive_as_it_starts() -> void:
+	_join(1)
+	events.emit_signal("play_requested", 0)
+	check(not flow._enemies.is_empty(), "the room has enemies")
+	for enemy: Node in flow._enemies:
+		var body := enemy as Actor
+		check(body.is_arriving() and is_equal_approx(body.arrive_seconds, Actor.ARRIVE_SECONDS), "%s arrives" % body.name)
+		check(not body.hurtbox.registered, "%s is not in Combat while it arrives" % body.name)
+	check_equal(combat.call("actor_count"), 1 + _props_in_combat(), "Combat knows the wizard and the props alone")
+	check_equal(flow.enemies_left(), _room_count(), "the arriving enemies count as the room's")
+	check(cleared.is_empty(), "the room is not cleared while they arrive")
+	Arrivals.land(flow)
+	check_equal(combat.call("actor_count"), _room_count() + 1 + _props_in_combat(), "landed, every enemy is in Combat")
 
 
 ## Every enemy the room lists stands inside it and clear of the walls.
@@ -230,19 +289,24 @@ func test_the_rooms_enemies_stand_on_the_floor() -> void:
 			check(not wall.intersects(body), "enemy at %s is clear of the wall %s" % [enemy.position, wall])
 
 
-## Even the most the sandbox's arena keeps up (SANDBOX_MAX), placed as a room's fight is, stand on
-## the floor: the stacked spawns stay inside the room and clear of the walls. No run needed.
-func test_a_full_sandbox_arena_stands_on_the_floor() -> void:
+## The most enemies a crypt room's fight stands: its budget (16, content/runs/crypt.tres) grown by
+## its scaling at its deepest row and four players (1.5 and 1.3), each enemy costing at least 1.
+const MOST_IN_A_ROOM: int = 32
+
+
+## Enemies stacked at a room's spawns (`stacked_position`, a fight's and its adds') stand inside the
+## room and clear of its walls, however many the fight stands.
+func test_a_full_room_fight_stands_on_the_floor() -> void:
 	var walls: Array[Rect2] = _arena_walls()
 	var spawns: int = ARENA.places().enemy_spawns.size()
-	for at: int in FlowScript.SANDBOX_MAX:
+	for at: int in MOST_IN_A_ROOM:
 		var spawn: int = at % spawns
 		var times: int = at / spawns
 		var position: Vector2 = FlowScript.stacked_position(ARENA.places().enemy_spawns[spawn], times)
 		var body := Rect2(position - Vector2(12.0, 12.0), Vector2(24.0, 24.0))
-		check(INNER.encloses(body), "enemy %d of a full arena (%s) is inside the room" % [at, position])
+		check(INNER.encloses(body), "enemy %d of a full fight (%s) is inside the room" % [at, position])
 		for wall in walls:
-			check(not wall.intersects(body), "spawn %d (%s) is clear of the wall %s" % [at, position, wall])
+			check(not wall.intersects(body), "enemy %d (%s) is clear of the wall %s" % [at, position, wall])
 
 
 ## As a run's room starts, its cue plays on every wizard, as that wizard's actor.
@@ -548,7 +612,8 @@ func test_a_restart_leaves_no_old_enemy_in_combat() -> void:
 	_playing(1)
 	_down(_wizard(0))
 	flow.step(FlowScript.RESTART_DELAY)
-	check_equal(combat.call("actor_count"), _room_count() + 1, "combat knows only the room's new enemies and the wizard")
+	Arrivals.land(flow)
+	check_equal(combat.call("actor_count"), _room_count() + 1 + _props_in_combat(), "combat knows only the room's new enemies, props and the wizard")
 
 
 func test_no_restart_while_one_of_four_stands() -> void:
@@ -617,9 +682,11 @@ func test_play_starts_again_after_a_failed_restart() -> void:
 func _check_arena_walls(when: String) -> void:
 	var projectiles: Node = root.get_node("Projectiles")
 	var top: Vector2 = projectiles.call("clip_to_walls", Vector2(100.0, 100.0), Vector2(100.0, -10.0))
-	check(top.is_equal_approx(Vector2(100.0, 32.0)), "%s: a path up ends on the top border at y 32, got %s" % [when, top])
-	var pillar: Vector2 = projectiles.call("clip_to_walls", Vector2(100.0, 144.0), Vector2(300.0, 144.0))
-	check(pillar.is_equal_approx(Vector2(160.0, 144.0)), "%s: a path right ends on the pillar at x 160, got %s" % [when, pillar])
+	var want_top: Vector2 = _first_wall(Vector2(100.0, 100.0), Vector2(100.0, -10.0))
+	check(want_top.y > 0.0 and top.is_equal_approx(want_top), "%s: a path up ends on the room's top edge at %s, got %s" % [when, want_top, top])
+	var side: Vector2 = projectiles.call("clip_to_walls", Vector2(320.0, 144.0), Vector2(-10.0, 144.0))
+	var want_side: Vector2 = _first_wall(Vector2(320.0, 144.0), Vector2(-10.0, 144.0))
+	check(want_side.x > 0.0 and side.is_equal_approx(want_side), "%s: a path left ends on the room's left edge at %s, got %s" % [when, want_side, side])
 
 
 func test_the_walls_reach_the_projectile_manager_at_the_start() -> void:
@@ -641,10 +708,12 @@ func test_each_players_shot_stops_on_the_border() -> void:
 	# Shots are cast by actor id: each wizard's own (actors G3b).
 	var casters: Array[int] = [_wizard(0).id, _wizard(1).id]
 	for index in 2:
-		projectiles.call("spawn", casters[index], Vector2(100.0 + 20.0 * index, 100.0), Vector2(0.0, -300.0), 5.0, 2.0, 0)
+		# Over open floor, under the top border: no enemy of the room's spawns in the way.
+		projectiles.call("spawn", casters[index], Vector2(300.0 + 20.0 * index, 100.0), Vector2(0.0, -300.0), 5.0, 2.0, 0)
 	check(projectiles.call("get_count_for", casters[0]) == 1 and projectiles.call("get_count_for", casters[1]) == 1, "each player has a shot in the air")
 	projectiles.call("step", 0.25)
-	check_equal(projectiles.call("get_count"), 0, "both players' shots ended on the border")
+	# The wizards' own shots: an enemy that has landed may have cast in its first step.
+	check_equal(projectiles.call("get_count_for", casters[0]) + projectiles.call("get_count_for", casters[1]), 0, "both players' shots ended on the border")
 
 
 # --- The main menu ---------------------------------------------------------------------------

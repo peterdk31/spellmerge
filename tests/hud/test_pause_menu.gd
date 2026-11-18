@@ -2,10 +2,10 @@ extends "res://tests/support/suite.gd"
 ## Tests for the pause menu (hud/menus/pause) and the buttons that open menus (owner,
 ## 2026-10-26), one behaviour per test: `pause` (Start) opens it for the player who pressed it and
 ## stops the game for everyone; only that player works it; Resume, `back` on the main page and
-## `pause` again close it and the game goes on; Sandbox shows only in the sandbox and its page sends
-## the sandbox actions and switches the builder and where the staff rows show the reload; the Map
-## page shows the run's map; Settings has Fullscreen, Effect slots, Particles, Particle amount,
-## Floor marks, Spell light, Tailless motes, Max shots, Screen shake, Damage numbers and Show FPS;
+## `pause` again close it and the game goes on; the Map page shows the run's map; Settings has
+## Fullscreen, Effect slots, Particles, Particle amount, Floor marks, Spell light, Tailless motes,
+## Max shots, Screen shake, Damage numbers and Show FPS, and the switches of the builder and of where
+## the staff rows show the reload;
 ## `back` (B) opens the builder in play, but not from inside a menu nor while paused; `pause` closes
 ## an open builder; A on the hub's lit stone, by an item and on the altar, in that order; Main menu
 ## and Leave game let the game go first; a seat waiting for its unplugged gamepad is named and can
@@ -33,7 +33,7 @@ const RingKindsScript := preload("res://hud/builder/rings/ring_kinds.gd")
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 
 const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
-## The main page out of the sandbox and out of a run of rooms.
+## The main page out of a run of rooms.
 const MAIN_PAGE: Array[String] = ["Resume", "Settings", "LeaveGame", "MainMenu"]
 ## The name of the stand-in the HUD shows for the main menu.
 const MENU_STAND_IN: String = "MenuStandIn"
@@ -56,8 +56,6 @@ var _bus: EventsScript
 var _input: InputManagerScript
 var _focus: UIFocusScript
 var _hud: HudScript
-## Every `sandbox_action_requested` as [player, action].
-var _actions: Array[Array] = []
 ## Every `shot_cap_requested` the bus sent, as [player, cap] (online-ready N11: the run's cap).
 var _cap_requests: Array[Array] = []
 ## What each settings row's signal sent, by row name (SIGNAL_OF), from before the Hud binds.
@@ -81,9 +79,9 @@ func after_each() -> void:
 	DirAccess.remove_absolute(SAVE_PATH)
 
 
-## The HUD for `count` seats on virtual devices, in a room, in the sandbox when `sandbox`; it reads
-## and writes the test's own save (empty unless a test wrote it).
-func _setup(count: int, sandbox: bool = false) -> void:
+## The HUD for `count` seats on virtual devices, in a room; it reads and writes the test's own save
+## (empty unless a test wrote it).
+func _setup(count: int) -> void:
 	_teardown()
 	_bus = EventsScript.new()
 	_input = InputManagerScript.new()
@@ -92,7 +90,6 @@ func _setup(count: int, sandbox: bool = false) -> void:
 	_focus.input = _input
 	_focus.events = _bus
 	_focus._ready()
-	_bus.sandbox_action_requested.connect(func(player: int, action: StringName) -> void: _actions.append([player, action]))
 	_bus.shot_cap_requested.connect(func(player: int, cap: int) -> void: _cap_requests.append([player, cap]))
 	for row: String in SIGNAL_OF:
 		_heard[row] = []
@@ -113,7 +110,6 @@ func _setup(count: int, sandbox: bool = false) -> void:
 	for index in count:
 		_bus.player_joined.emit(index)
 	_bus.room_entered.emit(&"test_room")
-	_bus.sandbox_changed.emit(sandbox)
 
 
 ## A scene of one plain node named MENU_STAND_IN, for the main menu.
@@ -128,7 +124,6 @@ func _stand_in() -> PackedScene:
 
 func _teardown() -> void:
 	_stops = false
-	_actions.clear()
 	_cap_requests.clear()
 	_heard.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
@@ -233,10 +228,10 @@ func test_start_stops_the_game_for_everyone() -> void:
 	check(_stops, "the game stops for everyone (the command pause_requested)")
 
 
-func test_the_main_page_out_of_the_sandbox() -> void:
+func test_the_main_page_out_of_a_run_of_rooms() -> void:
 	_setup(2)
 	_open(1)
-	check_equal(_names(), MAIN_PAGE, "the main page out of the sandbox")
+	check_equal(_names(), MAIN_PAGE, "the main page out of a run of rooms")
 
 
 func test_the_focus_is_marked_with_text() -> void:
@@ -308,138 +303,44 @@ func test_a_run_ending_lets_the_game_go() -> void:
 	check(not _stops, "a run ending lets the game go")
 
 
-# --- The sandbox page --------------------------------------------------------------------------
+# --- The builder's and the reload's switches (Settings) ---------------------------------------
 
 
-## Two seats in the sandbox, seat `player` on its Sandbox page.
-func _sandbox_page(player: int = 1) -> void:
-	_setup(2, true)
+## Two seats, seat `player` on its Settings page, where the builder's and the reload's switches are.
+func _switches_page(player: int = 1) -> void:
+	_setup(2)
 	_open(player)
-	_press(player, "Sandbox")
+	_press(player, "Settings")
 
 
-func test_in_the_sandbox_the_main_page_has_sandbox() -> void:
-	_setup(2, true)
-	_open(1)
-	check_equal(_names(), ["Resume", "Sandbox", "Settings", "LeaveGame", "MainMenu"] as Array[String], "in the sandbox the main page has Sandbox")
-
-
-func test_the_sandbox_page_rows() -> void:
-	_sandbox_page()
-	check_equal(_names(), ["ResetDummies", "ArenaEnemy", "ArenaCount", "ArenaSpawn", "ArenaClear", "AIView", "RingStyle", "PutStyle", "ReloadStyle", "SandboxBack"] as Array[String], "the sandbox page")
-
-
-func test_sandbox_actions_go_out_with_the_openers_index() -> void:
-	_sandbox_page()
-	_press(1, "ResetDummies")
-	_press(1, "ArenaClear")
-	check(_actions == [[1, &"reset_dummies"], [1, &"clear_enemies"]], "the actions go out with the opener's index, got %s" % [_actions])
-
-
-func test_the_sandbox_page_stays_after_each_of_its_rows() -> void:
-	for row: String in ["ResetDummies", "ArenaEnemy", "ArenaCount", "ArenaSpawn", "ArenaClear", "AIView", "RingStyle", "PutStyle", "ReloadStyle"]:
-		_sandbox_page()
+func test_the_settings_page_stays_after_each_builder_switch() -> void:
+	for row: String in ["RingStyle", "PutStyle", "ReloadStyle"]:
+		_switches_page()
 		_press(1, row)
-		check(_menu().is_open() and _menu().page == PauseMenuScript.Page.SANDBOX, "the page stays after %s, for another press" % row)
+		check(_menu().is_open() and _menu().page == PauseMenuScript.Page.SETTINGS, "the page stays after %s, for another press" % row)
 
 
-func test_b_on_the_sandbox_page_goes_back_to_the_main_page() -> void:
-	_sandbox_page()
-	_do(1, &"back")
-	check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
-
-
-func test_out_of_the_sandbox_the_entry_goes() -> void:
-	_sandbox_page()
-	_do(1, &"back")
-	_bus.sandbox_changed.emit(false)
-	check_equal(_names(), MAIN_PAGE, "out of the sandbox the entry goes")
-
-
-# --- The enemy arena (sandbox) -----------------------------------------------------------------
-
-
-func test_the_arena_lists_every_enemy_of_the_registry() -> void:
-	_sandbox_page(0)
-	var registry: Node = root.get_node("Registry")
-	for folder: StringName in EnemyBase.FOLDERS:
-		for item: Variant in registry.call("get_all", folder):
-			var data := item as EnemyBase
-			if data != null and data.scene != null:
-				check(_menu().arena_ids.has(data.id), "%s is listed" % data.id)
-	check(not _menu().arena_ids.is_empty(), "the arena lists enemies")
-
-
-func test_the_arena_names_its_enemies() -> void:
-	_sandbox_page(0)
-	check(_menu().arena_names.has("Cinder Rod"), "by its name: %s" % [_menu().arena_names])
-
-
-func test_the_arena_picks_the_first_enemy() -> void:
-	_sandbox_page(0)
-	check(_text_of("ArenaEnemy").ends_with("Enemy: " + _menu().arena_names[0]), "the first is picked: %s" % _text_of("ArenaEnemy"))
-
-
-func test_accept_on_the_enemy_row_picks_the_next() -> void:
-	_sandbox_page(0)
-	_press(0, "ArenaEnemy")
-	check_equal(_menu().arena_pick, 1, "accept picks the next")
-
-
-func test_accept_on_the_count_row_steps_the_count_up() -> void:
-	_sandbox_page(0)
-	_press(0, "ArenaCount")
-	_press(0, "ArenaCount")
-	check(_text_of("ArenaCount").ends_with("Count: 3"), "the count steps up: %s" % _text_of("ArenaCount"))
-
-
-func test_spawn_asks_for_the_count_of_the_picked_enemy() -> void:
-	_sandbox_page(0)
-	var spawns: Array = []
-	_bus.sandbox_spawn_requested.connect(func(player: int, id: StringName, count: int) -> void: spawns.append([player, id, count]))
-	_press(0, "ArenaEnemy")
-	_press(0, "ArenaCount")
-	_press(0, "ArenaCount")
-	_press(0, "ArenaSpawn")
-	check(spawns == [[0, _menu().arena_ids[1], 3]], "spawn asks for three of the picked enemy, got %s" % [spawns])
-
-
-func test_clear_asks_flow_to_clear_the_enemies() -> void:
-	_sandbox_page(0)
-	_press(0, "ArenaClear")
-	check(_actions.has([0, &"clear_enemies"]), "clear asks flow to clear the enemies, got %s" % [_actions])
-
-
-func test_the_ai_view_flips_on_and_off() -> void:
-	_sandbox_page(0)
-	var views: Array[bool] = []
-	_bus.ai_view_changed.connect(func(on: bool) -> void: views.append(on))
-	_press(0, "AIView")
-	_press(0, "AIView")
-	check_equal(views, [true, false] as Array[bool], "the AI view flips on and off")
-
-
-# --- The reload's place (sandbox) --------------------------------------------------------------
+# --- The reload's place (Settings) -------------------------------------------------------------
 
 
 func test_the_reload_is_on_the_button_by_default() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	check(_text_of("ReloadStyle").ends_with("Reload: Button"), "the reload is on the button by default")
 
 
 func test_the_staff_rows_draw_the_reload_on_the_button_by_default() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	check_equal(_hud.get_panel(1).staff_row(0).style, StaffRowScript.Style.BUTTON, "the rows draw it there")
 
 
 func test_the_reload_flips_to_the_next_cast() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	_press(0, "ReloadStyle")
 	check(_text_of("ReloadStyle").ends_with("Reload: Next cast"), "it flips to the next cast")
 
 
 func test_every_staff_row_of_every_panel_follows_the_reload() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	_press(0, "ReloadStyle")
 	for player in 4:
 		for staff in 4:
@@ -447,7 +348,7 @@ func test_every_staff_row_of_every_panel_follows_the_reload() -> void:
 
 
 func test_each_reload_flip_goes_out() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	var sent: Array[bool] = []
 	_menu().reload_style_changed.connect(func(on_button: bool) -> void: sent.append(on_button))
 	_press(0, "ReloadStyle")
@@ -456,27 +357,27 @@ func test_each_reload_flip_goes_out() -> void:
 
 
 func test_the_reload_flips_back_on_the_button() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	_press(0, "ReloadStyle")
 	_press(0, "ReloadStyle")
 	check_equal(_hud.get_panel(0).staff_row(2).style, StaffRowScript.Style.BUTTON, "back on the button")
 
 
-# --- The builder's options (sandbox) -----------------------------------------------------------
+# --- The builder's options (Settings) ----------------------------------------------------------
 
 
 func test_there_is_no_switch_to_another_builder() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	check(_menu().button("BuilderStyle") == null, "no switch to another builder: the list builder is gone")
 
 
 func test_a_full_slot_pushes_right_by_default() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	check(_text_of("PutStyle").ends_with("Full slot: Push right"), "a full slot pushes right by default")
 
 
 func test_each_builder_option_flip_goes_out() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	var options: Array = []
 	_menu().builder_options_changed.connect(func(ring: int, push: bool) -> void: options.append([ring, push]))
 	_press(0, "RingStyle")
@@ -485,13 +386,13 @@ func test_each_builder_option_flip_goes_out() -> void:
 
 
 func test_the_second_ring_style_shows_one_kind_at_a_time() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	_press(0, "RingStyle")
 	check_equal(_hud.get_radial(0).layout, RadialScript.Layout.KIND, "the ring shows one kind at a time")
 
 
 func test_the_full_slot_flip_replaces_a_full_slot() -> void:
-	_sandbox_page(0)
+	_switches_page(0)
 	_press(0, "PutStyle")
 	check_equal(_hud.get_radial(0).put, RadialScript.Put.REPLACE, "a full slot is replaced")
 
@@ -499,7 +400,7 @@ func test_the_full_slot_flip_replaces_a_full_slot() -> void:
 ## The ring styles to try (owner, 2026-10-30), then round to the first again: the words shown
 ## and the radial's ring picker after each of the four presses after the first.
 func _ring_styles() -> Array:
-	_sandbox_page(0)
+	_switches_page(0)
 	_press(0, "RingStyle")
 	var words: Array[String] = []
 	var styles: Array = []
@@ -645,7 +546,7 @@ func test_the_map_row_focused_when_the_map_goes_focuses_resume() -> void:
 
 func test_the_settings_page_rows() -> void:
 	_settings()
-	check_equal(_names(), ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "TaillessMotes", "ShotCap", "ScreenShake", "DamageNumbers", "ShowFps", "SettingsBack"] as Array[String], "Settings")
+	check_equal(_names(), ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "TaillessMotes", "ShotCap", "ScreenShake", "DamageNumbers", "ShowFps", "RingStyle", "PutStyle", "ReloadStyle", "SettingsBack"] as Array[String], "Settings")
 
 
 func test_settings_has_no_fire_settings() -> void:

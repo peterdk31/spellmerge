@@ -280,8 +280,11 @@ func test_a_cue_stamps_its_mark_as_big_as_its_reach() -> void:
 	check(marks.shader_parameter(&"mask_size") == Vector2(88.0, 56.0), "with its walls")
 	var floor_ramp: PackedVector3Array = marks.shader_parameter(&"floor_ramp")
 	check_equal(marks.shader_parameter(&"floor_known"), 1.0, "and its floor's colours")
-	var shadow: Color = Color("2b2840") * Color(0.72, 0.7, 0.86)
-	check(Color(floor_ramp[2].x, floor_ramp[2].y, floor_ramp[2].z).is_equal_approx(Color(shadow.r, shadow.g, shadow.b)), "the crypt floor's shadow, sampled from its art and tinted as the floor is: %s" % [floor_ramp[2]])
+	# The antechamber's ground is large art drawn from a shape, so it names its floor's colours
+	# (crypt rework, rule 9; `RoomBase.floor_mark_colors`) instead of having them sampled.
+	var shadow: Color = (registry.get_resource(&"rooms", ARENA) as RoomBase).floor_colors()[2]
+	check(shadow.is_equal_approx(Color("2b2840")), "the crypt floor's shadow is Stone shadow, the joints' colour: %s" % [shadow])
+	check(Color(floor_ramp[2].x, floor_ramp[2].y, floor_ramp[2].z).is_equal_approx(Color(shadow.r, shadow.g, shadow.b)), "the crypt floor's shadow, as the room names it: %s" % [floor_ramp[2]])
 	var blast: CueBase = feel.cue_of(&"blast")
 	var part: Dictionary = {}
 	for p: Dictionary in blast.parts:

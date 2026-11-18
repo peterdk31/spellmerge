@@ -2,7 +2,7 @@ extends "res://hud/builder/rings/ring_picker.gd"
 ## The kinds ring (owner, 2026-10-30): the ring first shows one big sector per kind of card
 ## (carriers, modifiers, ...), easy to hit; a kind, once entered, unwraps: its cards alone spread
 ## over the ring (`SPAN`, centred on the kind's direction, so the stick starts mid-kind) and the
-## stick picks among them. Two ways in, chosen on the pause menu's Sandbox page:
+## stick picks among them. Two ways in, chosen on the pause menu's Settings page:
 ##
 ## - **Hold:** rest the stick (at least half pushed) in a kind's sector for HOLD_TIME seconds;
 ##   the sector fills up as it waits. Letting go of the stick goes back to the kinds.

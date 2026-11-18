@@ -10,7 +10,7 @@ extends RefCounted
 ## shown on (`settle`, called once a frame by its owner; while another's intro is open, the end of
 ## the frame that one closes on): an intro opens on the room's tick, in the
 ## same call as its body is shown, so one that has not opened by then does not open (the run's rule
-## off for automation, `SessionRules.boss_intros`; a boss the sandbox spawned or a phase called). Then
+## off for automation, `SessionRules.boss_intros`; a boss a phase called). Then
 ## it is `released`: `played` true when its intro played (no banner and no entrance cue: the overlay was
 ## the entrance), false when none did (the banner and the cue, as for a boss with no intro).
 ##

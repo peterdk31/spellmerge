@@ -75,7 +75,7 @@ const LIFE_MAX: float = MoteKind.LIFE_MAX
 ## The most motes written between two steps, and of them the rows a shot's hit, end or wall hit
 ## (`shed`, `throw`: hundreds a frame in a storm, a few motes each) leave for the moments
 ## (`throw_part`, `burst`: a cue's or a reaction's, tens or a hundred in one burst, so a blast in a
-## storm still throws its motes). Set from the sandbox storm (P1c, docs/DECISIONS.md): the sheds'
+## storm still throws its motes). Set from the storm benchmark (P1c, docs/DECISIONS.md): the sheds'
 ## rows cost about 2.5 us each, a moment's about 0.5.
 ##
 ## **The frame's rows by class** (the owner, 2026-11-05: what a lone cast shows is never cut for a

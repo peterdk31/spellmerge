@@ -2,9 +2,9 @@ extends SceneTree
 ## Times Combat's own work for a spell's hit (performance, 2026-11-02): `_on_projectile_hit` on
 ## one body, called directly (no signal) many times, with nothing but Combat listening to the
 ## events, so what is timed is Combat's (the hit's listeners, Feel's and the actors' own, are
-## timed by `sandbox_storm.gd -- --profile-signals`). Each scenario is a bolt of one element on a
+## timed by `hub_storm.gd -- --profile-signals`). Each scenario is a bolt of one element on a
 ## body with one status on it, as a storm of shots keeps them: a plain bolt, frost on a frozen
-## body (the sandbox storm's), fire on a burning one, storm on a hexed one. The body never dies.
+## body (the hub storm's), fire on a burning one, storm on a hexed one. The body never dies.
 ## Prints `BENCH: combat hit` lines: the fastest of several passes (the least disturbed), in microseconds a hit.
 ##
 ## godot --headless --path . --script res://tests/benchmark/combat_hit.gd [-- --hits=N]

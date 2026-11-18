@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## The sandbox dummies (staffs B7; actors since G6; on the enemy AI like every enemy, enemy AI
+## The dummies (staffs B7; actors since G6; on the enemy AI like every enemy, enemy AI
 ## AI8). The training dummy (an actor with Health, a Hurtbox, its DummyLook and an AIController
 ## with the `post` profile, no staff and no Mover) never dies or moves and shows damage numbers (every
 ## actor's, props W5), damage

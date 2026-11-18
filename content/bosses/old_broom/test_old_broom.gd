@@ -328,7 +328,7 @@ func test_its_sounds() -> void:
 	check(BROOM.music != null and BROOM.music.layers == layers, "its music: its track and a fiercer layer")
 	check(BROOM.music != null and BROOM.music.stacked, "stacked: phase 2 adds the second over the first")
 	check_equal(BROOM.phases[0].intensity, 0, "phase 2 is one step up")
-	for prop: StringName in [&"cracked_pillar", &"dust_heap"]:
+	for prop: StringName in [&"crypt_pillar", &"dust_heap"]:
 		check(registry.get_resource(&"props", prop) != null, "the arena's %s is there" % prop)
 
 

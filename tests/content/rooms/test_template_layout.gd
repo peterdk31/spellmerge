@@ -9,6 +9,10 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 ## Clearance a spawn needs around it (a wizard is about 12 px wide).
 const SPAWN_RADIUS: float = 12.0
 const TILE: float = 32.0
+## The part of an exit's area a wizard walks into, from its bottom: a wizard's height and a half.
+const EXIT_FOOT: float = 24.0
+## The walls' grid (the projectile manager's `WALL_CELL`), on which the reach is flooded.
+const CELL: float = 8.0
 const STEPS: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
 
 var templates: Array[RoomBase] = []
@@ -100,8 +104,11 @@ func test_doors_lie_on_the_border() -> void:
 			check(on_border, "%s: door %s lies on the border" % [room.id, door])
 
 
-## Where each exit is stood on (`room_exit` props, run generation RG4): open floor, clear of every
-## wall and spawn, so a wizard can step in and nobody starts in a way on.
+## Where each exit is stood on (a prop of the role `room_exit`, run generation RG4): its foot (the
+## lowest `EXIT_FOOT` pixels of its area, where a wizard walks in) open floor clear of every wall,
+## its whole area inside the room and clear of every spawn, so a wizard can step in and nobody
+## starts in a way on. Above its foot an exit may rise over the edge: a crypt gate stands against a
+## floating room's north edge, its arch over the dark (crypt rework CR-G).
 func test_exits_are_open_floor_clear_of_spawns() -> void:
 	for room in templates:
 		var places: RoomPlaces = room.places()
@@ -114,10 +121,41 @@ func test_exits_are_open_floor_clear_of_spawns() -> void:
 			var area: Rect2 = prop.area_rect()
 			area.position += at[i]
 			check(_bounds(room).encloses(area), "%s: the exit at %s is inside the room" % [room.id, at[i]])
+			# A tiled room's exit stands whole on its floor; only a ground's (a floating room's) may
+			# rise over its edge.
+			var foot: Rect2 = area
+			if _has_ground(room):
+				foot = Rect2(area.position.x, area.end.y - EXIT_FOOT, area.size.x, minf(EXIT_FOOT, area.size.y))
 			for wall in _walls(room):
-				check(not wall.intersects(area), "%s: the exit at %s is clear of the wall %s" % [room.id, at[i], wall])
+				check(not wall.intersects(foot), "%s: the exit at %s is walked into from open floor, clear of the wall %s" % [room.id, at[i], wall])
 			for point in _spawns(room):
 				check(not area.grow(SPAWN_RADIUS).has_point(point), "%s: the spawn %s is clear of the exit at %s" % [room.id, point, at[i]])
+
+
+## True when the room's floor is a ground drawn from a shape (tools/ground_shape.py).
+func _has_ground(room: RoomBase) -> bool:
+	var ground: Node = layouts[room.id].get_node_or_null("Floor")
+	return ground != null and ground.has_meta(&"ground_inputs")
+
+
+## Every prop the room stands (a pillar, a heap; not an exit, whose arch may rise over a floating
+## room's edge) has its ground, where it blocks and is stood, on open floor: clear of every wall and
+## hole, so a floating room's pillar never hangs over its edge (crypt rework CR3).
+func test_props_stand_on_open_floor() -> void:
+	for room in templates:
+		var places: RoomPlaces = room.places()
+		var props: Array[Resource] = places.placed_of(PropBase)
+		var at: PackedVector2Array = places.placed_at_of(PropBase)
+		var blocked: Array[Rect2] = _walls(room) + RoomPlaces.hole_rects(layouts[room.id])
+		for i in props.size():
+			var prop: PropBase = props[i] as PropBase
+			if prop.role == RoomBase.EXIT_ROLE:
+				continue
+			# Its own ground, or (none set: the kit fits one under its hurt box) its whole extent.
+			var ground: Rect2 = prop.ground_rect() if prop.has_footprint() else prop.extent()
+			ground.position += at[i]
+			for rect in blocked:
+				check(not rect.intersects(ground), "%s: the %s at %s stands clear of %s" % [room.id, prop.id, at[i], rect])
 
 
 ## No one starts in a prop: every spawn is clear of every prop the room stands (its hurt shape, its
@@ -135,8 +173,8 @@ func test_spawns_are_clear_of_props() -> void:
 
 ## A room that hosts a boss stands it at its first enemy spawn (Flow, in turn): every boss of the
 ## room's biome at any depth (found by folder; none, nothing to check) fits there, its
-## body (hurt shape and ground, at its data's `size`) inside the room and clear of every wall and
-## every prop it stands.
+## body (hurt shape and ground, at its data's `size`) inside the room and clear of every wall, every
+## hole (crypt rework, "Tests that change") and every prop it stands.
 func test_a_boss_room_holds_its_biomes_bosses_at_its_first_enemy_spawn() -> void:
 	var content: RunContent = registry.run_content()
 	for room in templates:
@@ -154,6 +192,8 @@ func test_a_boss_room_holds_its_biomes_bosses_at_its_first_enemy_spawn() -> void
 			check(_bounds(room).grow(-TILE).encloses(body), "%s: %s at %s is inside the walls" % [room.id, boss.id, places.enemy_spawns[0]])
 			for wall in _walls(room):
 				check(not wall.intersects(body), "%s: %s at %s is clear of the wall %s" % [room.id, boss.id, places.enemy_spawns[0], wall])
+			for hole in RoomPlaces.hole_rects(layouts[room.id]):
+				check(not hole.intersects(body), "%s: %s at %s is clear of the hole %s" % [room.id, boss.id, places.enemy_spawns[0], hole])
 			for i in props.size():
 				var box: Rect2 = _prop_box(props[i] as PropBase, props_at[i])
 				check(not box.intersects(body), "%s: %s at %s is clear of the %s at %s" % [room.id, boss.id, places.enemy_spawns[0], (props[i] as PropBase).id, props_at[i]])
@@ -234,30 +274,37 @@ func _leads_on(rules: MapRules, rule: KindRule) -> bool:
 	return false
 
 
-## Flood fill on the 32 px grid from the first player spawn.
+## Flood fill on the 8 px wall grid from the first player spawn, through the cells a wizard fits
+## in (no wall or hole within a cell of it: the walls of a room drawn from a shape are 8 px steps,
+## and a gap narrower than a wizard must not count as a way; crypt rework CR2). So every way a
+## room's party takes is at least three cells (24 px) wide.
 func test_every_spawn_can_be_reached() -> void:
 	for room in templates:
-		var seen: Dictionary = _flood(room, _cell(room.places().player_spawns[0]))
+		var blocked: Dictionary = _blocked_cells(room)
+		var seen: Dictionary = _flood(room, blocked, _cell(room.places().player_spawns[0]))
 		for point in _spawns(room):
 			check(seen.has(_cell(point)), "%s: spawn %s can be reached from the first player spawn" % [room.id, point])
 
 
-## No floor cell is shut off from the party: a pocket nobody can walk into is a place an enemy
-## could be pushed into and never reached.
+## No floor a wizard fits on is shut off from the party: a pocket nobody can walk into is a place an
+## enemy could be pushed into and never reached, and a pit never cuts a room in two.
 func test_every_floor_cell_can_be_reached() -> void:
 	for room in templates:
-		var walls: Array[Rect2] = _walls(room)
-		var seen: Dictionary = _flood(room, _cell(room.places().player_spawns[0]))
+		var blocked: Dictionary = _blocked_cells(room)
+		var seen: Dictionary = _flood(room, blocked, _cell(room.places().player_spawns[0]))
 		var grid: Vector2i = _grid(room)
 		for y in grid.y:
 			for x in grid.x:
 				var cell := Vector2i(x, y)
-				if not _blocked(walls, cell):
-					check(seen.has(cell), "%s: the floor cell %s can be reached" % [room.id, cell])
+				if _fits(blocked, cell):
+					check(seen.has(cell), "%s: the floor at %s can be reached" % [room.id, Vector2(cell) * CELL])
+				elif not blocked.has(cell):
+					# Open floor too narrow to stand in (beside a wall or a pit): a wizard reaching the
+					# cells round it reaches it, so no narrow pocket is left out of the flood.
+					check(_beside(seen, cell), "%s: the narrow floor at %s lies beside floor the party reaches" % [room.id, Vector2(cell) * CELL])
 
 
-func _flood(room: RoomBase, start: Vector2i) -> Dictionary:
-	var walls: Array[Rect2] = _walls(room)
+func _flood(room: RoomBase, blocked: Dictionary, start: Vector2i) -> Dictionary:
 	var grid: Vector2i = _grid(room)
 	var seen: Dictionary = {start: true}
 	var queue: Array[Vector2i] = [start]
@@ -267,24 +314,46 @@ func _flood(room: RoomBase, start: Vector2i) -> Dictionary:
 			var next: Vector2i = cell + step
 			if next.x < 0 or next.y < 0 or next.x >= grid.x or next.y >= grid.y or seen.has(next):
 				continue
-			if not _blocked(walls, next):
+			if _fits(blocked, next):
 				seen[next] = true
 				queue.append(next)
 	return seen
 
 
-func _blocked(walls: Array[Rect2], cell: Vector2i) -> bool:
-	var centre: Vector2 = (Vector2(cell) + Vector2(0.5, 0.5)) * TILE
-	for wall in walls:
-		if wall.has_point(centre):
-			return true
+## The 8 px cells whose middle lies in a wall or a hole.
+func _blocked_cells(room: RoomBase) -> Dictionary:
+	var found: Dictionary = {}
+	var rects: Array[Rect2] = _walls(room) + RoomPlaces.hole_rects(layouts[room.id])
+	for rect in rects:
+		for y in range(floori(rect.position.y / CELL), ceili(rect.end.y / CELL)):
+			for x in range(floori(rect.position.x / CELL), ceili(rect.end.x / CELL)):
+				if rect.has_point((Vector2(x, y) + Vector2(0.5, 0.5)) * CELL):
+					found[Vector2i(x, y)] = true
+	return found
+
+
+## True when a cell round `cell` (or `cell` itself) is in `seen`.
+func _beside(seen: Dictionary, cell: Vector2i) -> bool:
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if seen.has(cell + Vector2i(dx, dy)):
+				return true
 	return false
+
+
+## True when a wizard fits in `cell`: no wall or hole in it or in the cells round it.
+func _fits(blocked: Dictionary, cell: Vector2i) -> bool:
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if blocked.has(cell + Vector2i(dx, dy)):
+				return false
+	return true
 
 
 func _grid(room: RoomBase) -> Vector2i:
 	var size: Vector2 = _bounds(room).end
-	return Vector2i(int(size.x / TILE), int(size.y / TILE))
+	return Vector2i(int(size.x / CELL), int(size.y / CELL))
 
 
 func _cell(point: Vector2) -> Vector2i:
-	return Vector2i(int(point.x / TILE), int(point.y / TILE))
+	return Vector2i(int(point.x / CELL), int(point.y / CELL))

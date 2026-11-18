@@ -1,5 +1,5 @@
 extends "res://gameplay/feel/mote.gd"
-## The mote pool, timing its own calls (P1c, docs/milestones/spell-spectacle.md): the sandbox
+## The mote pool, timing its own calls (P1c, docs/milestones/spell-spectacle.md): the hub
 ## storm hands Feel one (`Feel.use_motes`) to measure what motes cost the CPU in a fight. `usec`
 ## sums the time of every call from outside (a shed, a throw, a burst, the trails' give_off, a step); a call made inside
 ## another is in its caller's time. Not used by the game.

@@ -6,9 +6,10 @@ extends Node
 ## (`RunGenerator.generate`), and answers with the map's first room and what stands in it
 ## (`run_room_chosen`: with the kinds of the rooms it leads to), which Flow builds, and how much
 ## harder it is (`run_room_scaled`, run generation RG5: its depth and the run's players), which
-## difficulty scales its enemies by. When the party
-## takes a lit exit (`run_way_taken(way)`, run generation RG4), it moves on through the map to the
-## room that way links to (`at`, and with it the depth) and names that room the same way. The view
+## difficulty scales its enemies by, and how its enemies come in (`run_room_paced`, enemy arrivals
+## EA4: plain costs worked out from its biome's `MapRules.arrivals`), which Flow paces them by.
+## When the party takes a lit exit (`run_way_taken(way)`, run generation RG4), it moves on through
+## the map to the room that way links to (`at`, and with it the depth) and names that room the same way. The view
 ## hears the map as the party sees it (`run_map_changed`, run generation RG8: every room's row, kind
 ## and links, and where the party is) as it enters each room, empty as a run starts. Areas never
 ## call each other: Flow knows the run by these events only, and this area knows nothing of a world,
@@ -16,7 +17,7 @@ extends Node
 ##
 ## The map is the run's state (`map`, `at`: hashed, saved in snapshots), the same on every machine;
 ## a joining machine gets it from the snapshot. A run's start renews it (`begin_run`): out of a run
-## of rooms (the hub, the sandbox) there is no map.
+## of rooms (the hub) there is no map.
 ##
 ## **Meta progression's hook** (run generation RG6): the map is made by the run definition as the
 ## run's unlocks change it (`RunDefinition.changed_by`: each `RunRuleChange` whose save flag they
@@ -141,7 +142,8 @@ func _on_run_way_taken(way: int) -> void:
 
 
 ## The party enters room `index` of the map: its scale is told (`run_room_scaled`, for difficulty),
-## then what Flow builds (`run_room_chosen`), with the kinds of the rooms it leads to, left to right.
+## its pace (`run_room_paced`, enemy arrivals EA4: how its enemies come in, for Flow), then what Flow
+## builds (`run_room_chosen`), with the kinds of the rooms it leads to, left to right.
 func _enter(index: int) -> void:
 	at = index
 	var node: RunNode = map.node(index)
@@ -150,6 +152,7 @@ func _enter(index: int) -> void:
 		ways.append(map.node(link).kind)
 	_tell_map()
 	events.run_room_scaled.emit(node.scale)
+	events.run_room_paced.emit(node.group, node.refill_at, node.stagger)
 	# A copy: what hears it never holds the map's own list.
 	events.run_room_chosen.emit(node.room, node.enemies.duplicate(), ways)
 

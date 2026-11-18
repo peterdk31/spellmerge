@@ -370,7 +370,7 @@ func test_two_fights_through_the_real_link_agree_at_every_tick() -> void:
 		_pair.host.pump()
 		_pair.client.pump()
 		OS.delay_msec(1)
-	check(_pair.host.start(&"sandbox_requested", 0, 0x5e55) != null, "the host starts")
+	check(_pair.host.start(&"hub_requested", 0, 0x5e55) != null, "the host starts")
 	for i in TICKS:
 		_pair.step()
 		OS.delay_msec(2)

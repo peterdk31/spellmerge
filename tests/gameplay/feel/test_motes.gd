@@ -20,6 +20,8 @@ const MarksScript := preload("res://gameplay/feel/marks.gd")
 ## The settles left after a quiet room's blast of 100 chips (test_settles_are_budgeted_and_take_rows).
 const SETTLE_LEFT_AFTER_100: int = MotesScript.SETTLE_MOST - 100
 const ARENA: StringName = &"arena_01"
+## The least a wall chip's shade differs from the floor's most common colour in luminance.
+const MIN_CHIP_GAP: float = 0.03
 
 ## Look bits of the elements' layers (layer n is bit n - 1).
 const FIRE_LOOK: int = 1 << 0
@@ -424,8 +426,10 @@ func test_a_room_sheds_the_colours_of_its_wall_art() -> void:
 	var floor_texture: Texture2D = (layout.get_node("Floor") as Sprite2D).texture
 	layout.free()
 	var floor_main := Color.hex(ArtPixels.most_common(ArtPixels.count_colours(floor_texture, {})))
+	# Chips stand out on the floor they land on: none a shade of the floor's own (a luminance gap,
+	# not only a different colour: a named colour one step off the floor's would pass inequality).
 	for colour in colours:
-		check(not colour.is_equal_approx(floor_main), "never the floor's own colour %s (%s)" % [floor_main.to_html(false), colour.to_html(false)])
+		check(absf(colour.get_luminance() - floor_main.get_luminance()) >= MIN_CHIP_GAP, "never near the floor's own colour %s (%s)" % [floor_main.to_html(false), colour.to_html(false)])
 	var override := RoomBase.new()
 	override.debris_colors = PackedColorArray([Color.BLACK, Color.WHITE])
 	check_equal(override.surface_colors(), PackedColorArray([Color.WHITE, Color.WHITE, Color.BLACK]), "set colours win, lightest first")

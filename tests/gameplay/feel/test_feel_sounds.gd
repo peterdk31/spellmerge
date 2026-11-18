@@ -365,7 +365,7 @@ func test_a_boss_with_an_intro_enters_with_its_cue_only_when_no_intro_plays() ->
 	var stray: Actor = fx.imp(Vector2(60, 0), data)
 	check_equal(feel.sounds().started, started, "a boss with an intro waits for the frame's end")
 	feel.step(1.0 / 60.0)
-	check_equal(feel.sounds().last, &"boss_intro", "none opened for it (the rule off, a sandbox spawn): the entrance cue")
+	check_equal(feel.sounds().last, &"boss_intro", "none opened for it (the rule off): the entrance cue")
 	check_equal(feel.sounds().started, started + 1, "once")
 	check(stray != null, "the second boss stands")
 

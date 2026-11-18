@@ -5,7 +5,7 @@ extends Resource
 ## `content/enemies/profiles/`; an enemy names one or has its own. It has no `id`, so the registry
 ## does not list it as an enemy.
 
-## A short name for the arena's AI view and the tests.
+## A short name, for the tests.
 @export var name: String = "default"
 ## 0-1: how far inside its reach it fights, and how readily it closes in.
 @export_range(0.0, 1.0) var aggression: float = 0.5

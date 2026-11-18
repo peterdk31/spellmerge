@@ -5,7 +5,7 @@
 #
 # The real game twice (headless), linked over WebRTC with no STUN server, their codes handed over
 # through files (tests/net/online_runner.gd; netcode spike S4, docs/milestones/netcode-spike.md).
-# The host plays `ticks` ticks (600) of a sandbox with the joining process, both seats scripted, and
+# The host plays `ticks` ticks (600) of the hub with the joining process, both seats scripted, and
 # passes when every hash check agreed. Needs the pinned Godot and the WebRTC extension
 # (ci/build/build.sh --quick once). Logs: build/logs/online/.
 set -u

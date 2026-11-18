@@ -22,9 +22,20 @@ extends Node
 ## that slot, or removes it (the run goes on; nobody waits for anyone).
 ##
 ## A room's fight (boss OB2a, decision 31; run generation RG3): the enemies the run's map puts in it
-## (`run_room_chosen`, ids of `EnemyBase.FOLDERS`: enemies and bosses; rooms hold layout only) stand
-## at its enemy spawns as it starts, round the spawns in turn (`stacked_position` when one is used
-## again). When the last is down, `room_cleared`. A room the run puts nothing in is cleared as it starts.
+## (`run_room_chosen`, ids of `EnemyBase.FOLDERS`: enemies and bosses; rooms hold layout only). A boss
+## stands at its enemy spawns as the room starts, so its intro opens on a body that is there and
+## drawn. Every other one **arrives** (enemy arrivals EA3, docs/milestones/enemy-arrivals.md):
+## `_stand_enemy` sets it to `Actor.arrive` for `Actor.ARRIVE_SECONDS` before it enters the tree, so it
+## is not there yet (no hurt shape, no touch, no step of its own) while Feel draws a mark and its body
+## rising out of it; a phase's adds arrive too. They come **in groups as the room gets quiet** (EA5:
+## `arrivals`, `RoomArrivals`), at the pace the run tells with the room (`run_room_paced`: a group's
+## cost, the cost standing that calls the next, the seconds between a group's bodies): the first group
+## starts in the room's setup, once its walls and holes are laid; the next only once the cost of the
+## room's enemies standing or arriving drops to the refill, never by a timer. A group stands at the
+## spawns farthest from every standing wizard (none over a hole nor within `RoomArrivals.NEAR` of
+## one), stacked where one is used again (`stacked_position`) and kept on clear ground. An id that cannot stand is dropped, so the room is never stuck. An enemy still
+## arriving or still to come is one of the room's (`enemies_left`): when the queue is empty and the
+## last is down, `room_cleared`. A room the run puts nothing in is cleared as it starts.
 ##
 ## The way on (run generation RG4): the run names with each room the kinds of the rooms it leads to
 ## (`run_room_chosen`'s `ways`). Cleared, its exits (props of the role `RoomBase.EXIT_ROLE`) light, one
@@ -45,15 +56,14 @@ extends Node
 ## staff file per setup, used as it is): every wizard gets the hands of its run's mode
 ## (`staffs_for_mode`), straight from the registry under `wizard`, never copied or changed: in
 ## Play and the hub the first two basic staffs of STARTER_HEADS on RB and RT (`content/wizard/staffs/`,
-## each its own head; START_HANDS, items I2: the other two hands empty), in the sandbox four times the `dev` staff (DEV_STAFF: 20 slots,
-## no delay, practically infinite mana). The build channel plays no part. With them the mode's
+## each its own head; START_HANDS, items I2: the other two hands empty). The build channel plays no part. With them the mode's
 ## cards (`start_cards_for_mode`; Play's `start_cards`: A `dash`, X `bolt`, Y and B empty),
 ## which the wizard builds itself; flow never touches a spell.
 ##
 ## Each mode's setup (owner, 2026-11-05): a new wizard gets the mode's staffs, start cards and
 ## card bag (the cards it may build with, counted: `bag_for_mode`, card id to copies, handed over
 ## with `seat_wizard`; items I3): Play one `dash` and one `bolt` (PLAY_BAG, `play_bag`: each entry
-## a copy); the sandbox and the hub Inventory.DEV_COPIES of every card (the hub's for now, owner
+## a copy); the hub Inventory.DEV_COPIES of every card (the hub's for now, owner
 ## 2026-11-11: to try combos online until a better way to come by cards comes; owner 2026-11-13:
 ## 20 of each). The start cards come with their staffs, beside the bag.
 ##
@@ -63,7 +73,7 @@ extends Node
 ## It plays only for people: off (`intro_enabled` false) when a test script is the main loop or
 ## the game was started with user arguments (the 4-bot test, the stress run, the timing run).
 ##
-## Loading (owner, 2026-10-29): Play and Sandbox first do the work that must be ready before a
+## Loading (owner, 2026-10-29): Play and the hub first do the work that must be ready before a
 ## room (`play_tasks`, LoadTasks) behind the loading screen (state LOADING), through
 ## `core/loading` (the autoload `Loading`, which sends the events the HUD's screen is drawn from);
 ## then the intro or the run starts. Today that work is the shader warm-up
@@ -75,18 +85,6 @@ extends Node
 ## (`loading_enabled` false) only when a test script is the main loop; the automated runs (the
 ## four-bot and stress runs) load like a player, and wait for `room_entered`.
 ##
-## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
-## main menu's Sandbox button, in every build) starts a run in the sandbox room
-## (`sandbox`): no fight of its own, the dummies its scene stands (`RoomPlaces.dummies`: the training dummy,
-## the shooting dummy, then a group of training dummies to try homing, pierce and spreads on), and `sandbox_changed(true)` so the HUD shows the sandbox page. The page sends
-## `sandbox_action_requested`: `clear_enemies` takes the enemies the arena spawned away,
-## `reset_dummies` puts fresh dummies back; `sandbox_spawn_requested` (the enemy arena, enemy AI AI8)
-## spawns any enemy or boss (`spawn_in_sandbox`, while fewer than SANDBOX_MAX are up). Clearing them ends
-## nothing. When every wizard is down, after RESTART_DELAY they all stand up where they are and
-## keep their staffs, instead of a restart. Its wizards hold four `dev` staffs and start with
-## `sandbox_cards` (SANDBOX_START_CARDS), not `start_cards`: Play's A and X, and two showcase
-## builds on Y (the most shots) and B (a decoy turret).
-##
 ## The hub (docs/milestones/online-lobby.md, L1): `hub_requested` (the main menu's Play) starts a run
 ## in the hub room (`hub`), an island in the void where players join and leave as they like (coop's
 ## `player_joined` / `player_left`, at the room's spawns), try their staffs on the room's dummies,
@@ -94,7 +92,8 @@ extends Node
 ## `RoomBase.stand_up_after` seconds later (owner, 2026-11-13: duels between parties and test builds
 ## without consequences), and everyone down restarts nothing. Its wizards
 ## have Play's staffs (two, RB and RT: START_HANDS; items I2 took the `dev` staff off RT, the
-## rack of items I6 replaces it), Play's start cards, and every card in the bag (above). Its teleporter stone (a
+## rack of items I6 replaces it: its premade staffs are built on the `dev` staff, content/items),
+## Play's start cards, and every card in the bag (above). Its teleporter stone (a
 ## prop of the role `run_start`, stood on where its area is) is lit while every wizard stands on it:
 ## counted each tick and whenever a wizard joins or leaves (`hub`, `HubRules`), told by
 ## `start_stone_changed`, the stone asked to enter `lit` or `unlit` to match, so its look and cue
@@ -123,7 +122,7 @@ extends Node
 ##
 ## A boss's intro (docs/milestones/boss-intro.md): at the end of a run's room's setup (a run's first
 ## room and the next room alike, `_open_boss_intro`), the first boss with an intro among the room's own
-## enemies (`EnemyBase.boss_intro`; never the sandbox's spawns or a phase's adds) stops the game on
+## enemies (`EnemyBase.boss_intro`; never a phase's adds) stops the game on
 ## that tick (`boss_intro`, `BossIntroHold`), when the run's rules have intros on
 ## (`SessionRules.boss_intros`, off for automation where `intro_enabled` is). The command
 ## `boss_intro_next_requested` (any seat's A, from the HUD) turns its pages; past the last the game goes
@@ -132,7 +131,7 @@ extends Node
 ## enemies. Presses made while it stood still, and on the tick it closes, are dropped
 ## (`Frames.drop_presses`), so a staff pressed during it casts nothing as the fight starts.
 ##
-## Modes: `mode` says which run this is: MODE_RUN (a run of rooms), MODE_SANDBOX or MODE_HUB (above).
+## Modes: `mode` says which run this is: MODE_RUN (a run of rooms) or MODE_HUB (above).
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -164,53 +163,26 @@ const DEFAULT_RUN_ID: StringName = &"crypt"
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"bolt"], [], []]
 ## Play's bag: the cards a Play wizard may build with (owner, 2026-11-05), one copy an entry (items I3).
 const PLAY_BAG: Array[StringName] = [&"dash", &"bolt"]
-## The cards a sandbox run starts with (owner, 2026-11-01: two showcase builds of the trigger
-## tree on Y and B, to read in the builder's tree and try on the dummies). A and X as Play's.
-## Y, the most shots: a fire nova of bolts split three times (216 shots) whose every shot, when it
-## ends, fires a frost nova of bolts split three times (216 each): far past the projectile cap (6,000 on
-## desktop), which it holds for a few seconds; 67.5 mana. Two payload levels only: a
-## third would queue a million shots, minutes of backlog at `SpellLimits.FIRE_SHOTS_PER_STEP`.
-## B, a decoy turret: every 0.5 s it fires a homing fire, frost and lightning bolt (the
-## lightning one sets off a chaining lightning atom on hit), and when it is hurt a void nova of
-## bolts; 59.6 mana, every card used.
-const SANDBOX_START_CARDS: Array = [
-	[&"dash"],
-	[&"fire", &"bolt"],
-	[&"on_expire", &"fire", &"split", &"split", &"split", &"nova", &"bolt", &"frost", &"split", &"split", &"split", &"nova", &"bolt"],
-	[&"timer", &"on_hurt", &"decoy", &"triple", &"homing", &"fire", &"bolt", &"homing", &"frost", &"bolt",
-		&"on_hit", &"homing", &"lightning", &"bolt", &"chain", &"lightning", &"atom", &"void", &"nova", &"bolt"],
-]
-## The sandbox room and the hub's (which dummies each stands is its scene's, `RoomPlaces.dummies`).
-const SANDBOX_ROOM_ID: StringName = &"sandbox"
+## The hub's room (which dummies it stands is its scene's, `RoomPlaces.dummies`).
 const HUB_ROOM_ID: StringName = &"hub"
 ## The zone of a room's scene Flow gives a meaning (`RoomPlaces.zone`; a place that is no thing):
 ## the prop yard (props W8).
 const ZONE_PROP_YARD: StringName = &"prop_yard"
-## The run modes (`mode`): a run of rooms, the sandbox, the hub.
+## The run modes (`mode`): a run of rooms, the hub.
 const MODE_RUN: StringName = &"run"
-const MODE_SANDBOX: StringName = &"sandbox"
 const MODE_HUB: StringName = &"hub"
 ## The cue played on every standing wizard as a run's room starts (`_show_room_start`).
 const ROOM_START_CUE: StringName = &"room_start"
-## The actions of `sandbox_action_requested`.
-const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
-## The enemy arena (enemy AI AI8): every enemy the sandbox spawned goes.
-const ACTION_CLEAR_ENEMIES: StringName = &"clear_enemies"
-## The sandbox's staff, on every button, and the four basic staffs of Play by
-## button (RB, RT, LB, LT), by id under `wizard`.
-const DEV_STAFF: StringName = &"dev"
+## The four basic staffs of Play by button (RB, RT, LB, LT), by id under `wizard`.
 const STARTER_HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
 ## How many of STARTER_HEADS a wizard of Play and the hub holds, from RB on: two, RB and RT; the
-## other hands are empty (items I2, owner 2026-11-13: players start with two staffs). The sandbox
-## holds the `dev` staff on every hand.
+## other hands are empty (items I2, owner 2026-11-13: players start with two staffs).
 const START_HANDS: int = 2
 ## Where the enemies stand: round the room's enemy spawns in turn; a spawn used again puts the next
 ## one a step further along the diagonal (SPAWN_STACK_DEPTH steps, then a lap to the side).
 const SPAWN_REPEAT_OFFSET: Vector2 = Vector2(14.0, 14.0)
 const SPAWN_STACK_DEPTH: int = 3
 const SPAWN_LAP_OFFSET: Vector2 = Vector2(-14.0, 14.0)
-## The most enemies the sandbox's enemy arena keeps up.
-const SANDBOX_MAX: int = 24
 ## Seconds from a run's room won until the run ends: the kill seen out.
 const RUN_WON_DELAY: float = 2.0
 ## Seconds from the last wizard going down until the room restarts (under 3).
@@ -225,9 +197,8 @@ const INTRO_SEEN: StringName = &"intro_seen"
 
 enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md); `sandbox`, worked
-## out from `mode` (read only).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_room", &"_chosen_enemies", &"_chosen_ways"]
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_room", &"_chosen_enemies", &"_chosen_ways", &"_chosen_group", &"_chosen_refill", &"_chosen_stagger"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -257,9 +228,6 @@ var run_id_to_play: StringName = DEFAULT_RUN_ID
 var start_cards: Array = DEFAULT_START_CARDS.duplicate(true)
 ## Play's bag (PLAY_BAG unless a test sets another).
 var play_bag: Array[StringName] = PLAY_BAG.duplicate()
-## What the sandbox's wizards start with instead (SANDBOX_START_CARDS unless a test or a
-## screenshot sets other cards).
-var sandbox_cards: Array = SANDBOX_START_CARDS.duplicate(true)
 var wizard_scene: PackedScene = DefaultWizardScene
 ## Whether Play may show the intro (see the class doc), and the save it is remembered in.
 var intro_enabled: bool = true
@@ -278,12 +246,6 @@ var world: Node2D = null
 var room_id: StringName = &""
 ## The mode of the run in progress, or of the next one (MODE_RUN when idle).
 var mode: StringName = MODE_RUN
-## True while the run is in the sandbox (and for its restarts). Read only: set `mode`.
-var sandbox: bool:
-	get:
-		return mode == MODE_SANDBOX
-	set(_value):
-		push_error("Flow: `sandbox` is read only; set `mode`.")
 
 var _starter: int = 0
 var _room: RoomBase = null
@@ -308,6 +270,9 @@ var hub: HubRules = HubRules.new()
 var exits: ExitRules = ExitRules.new()
 ## The adds standing, each with the body that called it (boss plan OB13).
 var adds: RoomAdds = RoomAdds.new()
+## How the room's enemies come in: the queue of those still to come, in groups (enemy arrivals EA5,
+## `RoomArrivals`).
+var arrivals: RoomArrivals = RoomArrivals.new()
 ## The boss's intro of the room (docs/milestones/boss-intro.md, `BossIntroHold`).
 var boss_intro: BossIntroHold = BossIntroHold.new()
 ## The room's layout in the world, and the room it is of (a joining machine built the room the run
@@ -322,6 +287,11 @@ var _asking: bool = false
 var _chosen_room: StringName = &""
 var _chosen_enemies: Array[StringName] = []
 var _chosen_ways: Array[StringName] = []
+## Scratch, as above: the run's pace for the room (`run_room_paced`, enemy arrivals EA4), handed to
+## `arrivals` as its enemies are stood; 0s (the whole list at once) when the run sent none.
+var _chosen_group: int = 0
+var _chosen_refill: int = 0
+var _chosen_stagger: float = 0.0
 ## The party a run from the stone takes back to the hub when its map could not be made after the hub
 ## went (`PartyLoadout` bytes; empty: none): what a run starting now takes along (`_party_now`) until
 ## the hub starts again, so every wizard comes back as it went.
@@ -361,13 +331,10 @@ func _ready() -> void:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
 		return
 	events.play_requested.connect(_on_play_requested)
-	events.sandbox_requested.connect(_on_sandbox_requested)
 	events.hub_requested.connect(_on_hub_requested)
 	events.main_menu_requested.connect(_on_main_menu_requested)
 	events.play_load_requested.connect(_on_play_load_requested)
 	# Commands, heard at the tick's start (core/events, online-ready N2).
-	events.listen(&"sandbox_action_requested", _on_sandbox_action_requested)
-	events.listen(&"sandbox_spawn_requested", _on_sandbox_spawn_requested)
 	events.listen(&"run_requested", _on_run_requested)
 	events.listen(&"start_depth_picked", _on_start_depth_picked)
 	events.listen(&"boss_intro_next_requested", _on_boss_intro_next_requested)
@@ -377,6 +344,7 @@ func _ready() -> void:
 	events.player_joined.connect(_on_player_joined)
 	events.player_left.connect(_on_player_left)
 	events.run_room_chosen.connect(_on_run_room_chosen)
+	events.run_room_paced.connect(_on_run_room_paced)
 	events.adds_requested.connect(_on_adds_requested)
 
 
@@ -389,6 +357,8 @@ func step(delta: float) -> void:
 	if world != null and state != State.IDLE:
 		yard.tend(delta, world, registry)
 		_crumble_orphans()
+	if mode == MODE_RUN and state == State.RUNNING and not arrivals.is_done():
+		_call_arrivals(delta)
 	_count_stand_ups(delta)
 	if mode == MODE_HUB and state == State.RUNNING:
 		_count_stone()
@@ -403,9 +373,7 @@ func step(delta: float) -> void:
 	_restart_left -= delta
 	if _restart_left <= 0.0:
 		_restart_left = -1.0
-		if mode == MODE_SANDBOX:
-			_stand_everyone_up()
-		elif _back_to_hub:
+		if _back_to_hub:
 			# Back in the hub the party is ready for a new run: nothing of the run comes back
 			# with it, its staffs neither (owner, 2026-11-10). The hub is the arsenal the next
 			# run's tools are picked from.
@@ -449,12 +417,13 @@ static func stacked_position(spawn: Vector2, times: int) -> Vector2:
 	return spawn + SPAWN_REPEAT_OFFSET * float(step) + SPAWN_LAP_OFFSET * float(lap)
 
 
-## Enemies of the room's fight (or the sandbox's arena) still alive; never its dummies.
+## Enemies of the room's fight still to beat: those alive (those still arriving too) and those still
+## to come (`arrivals`' queue); never its dummies.
 func enemies_left() -> int:
-	return _enemies.size()
+	return _enemies.size() + arrivals.left()
 
 
-## The dummies of the sandbox or the hub still standing.
+## The dummies of the room (the hub's) still standing.
 func dummies() -> Array[Node]:
 	return contents.of_kind(EnemyBase)
 
@@ -572,11 +541,12 @@ func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0)
 	state = State.RUNNING
 	_show_world(new_world)
 	_set_walls(new_world)
+	# The first group starts in the room's setup, once its walls and holes are known (its spawns
+	# over a hole are left out); the room is checked at the setup's end, after it is announced.
+	_call_arrivals(0.0, false)
 	_announce_room(room)
-	if events != null:
-		events.sandbox_changed.emit(mode == MODE_SANDBOX)
-		if mode == MODE_RUN:
-			_show_room_start()
+	if events != null and mode == MODE_RUN:
+		_show_room_start()
 	_count_stone()
 	_count_exits()
 	_check_room_won()
@@ -623,9 +593,9 @@ func rebuild_derived() -> void:
 	_set_walls(world)
 
 
-## The room the next run of the sandbox or the hub is in (a run of rooms' is its map's).
+## The room the next run of the hub is in (a run of rooms' is its map's).
 func _room_id_for_mode() -> StringName:
-	return SANDBOX_ROOM_ID if mode == MODE_SANDBOX else HUB_ROOM_ID
+	return HUB_ROOM_ID
 
 
 ## A run of rooms begins (on the run's fresh state, after `Tick.begin_run`): the run area makes the
@@ -648,6 +618,9 @@ func _room_asked(ask: Callable) -> RoomBase:
 	_chosen_room = &""
 	_chosen_enemies = [] as Array[StringName]
 	_chosen_ways = [] as Array[StringName]
+	_chosen_group = 0
+	_chosen_refill = 0
+	_chosen_stagger = 0.0
 	if events == null:
 		return null
 	_asking = true
@@ -670,6 +643,16 @@ func _on_run_room_chosen(room: StringName, enemies: Array[StringName], ways: Arr
 	_chosen_room = room
 	_chosen_enemies = enemies.duplicate()
 	_chosen_ways = ways.duplicate()
+
+
+## The run area's pace for the room it names next (`run_room_paced`, sent before `run_room_chosen`):
+## how its enemies come in. Heard only while Flow asks (`_room_asked`).
+func _on_run_room_paced(group: int, refill_at: int, stagger: float) -> void:
+	if not _asking:
+		return
+	_chosen_group = group
+	_chosen_refill = refill_at
+	_chosen_stagger = stagger
 
 
 ## The exits of a run's room counted (`ExitRules.count`): each lit or dark as its way says, the view
@@ -729,6 +712,7 @@ func _enter_next_room(room: RoomBase) -> void:
 	room_id = room.id
 	state = State.RUNNING
 	_set_walls(world)
+	_call_arrivals(0.0, false)
 	_announce_room(room)
 	if events != null:
 		_show_room_start()
@@ -813,10 +797,7 @@ func stop_run() -> void:
 	state = State.IDLE
 	exits.leave()
 	_count_exits()
-	var was: StringName = mode
 	mode = MODE_RUN
-	if was == MODE_SANDBOX and events != null:
-		events.sandbox_changed.emit(false)
 	_count_stone()
 
 
@@ -929,19 +910,6 @@ func _is_automated() -> bool:
 func _on_play_load_requested() -> void:
 	if state == State.IDLE:
 		_load_then(func() -> void: pass)
-
-
-func _on_sandbox_requested(player: int) -> void:
-	if state != State.IDLE:
-		return
-	if not _load_then(_start_sandbox.bind(player)):
-		_start_sandbox(player)
-
-
-func _start_sandbox(player: int) -> void:
-	mode = MODE_SANDBOX
-	if not start_run(player):
-		mode = MODE_RUN
 
 
 func _on_hub_requested(player: int) -> void:
@@ -1066,52 +1034,6 @@ func _count_stone() -> void:
 	hub.count(in_hub, _wizards, contents, events, start_depths() if in_hub else 0)
 
 
-## A sandbox page's action. Ignored out of the sandbox. It changes the room only, never a
-## player's staffs or menus.
-func _on_sandbox_action_requested(player: int, action: StringName) -> void:
-	if mode != MODE_SANDBOX or state == State.IDLE or world == null or _room == null or player < 0 or player >= PLAYER_SLOTS:
-		return
-	match action:
-		ACTION_CLEAR_ENEMIES:
-			clear_sandbox_enemies()
-		ACTION_RESET_DUMMIES:
-			contents.stand_again(world, _places, EnemyBase)
-		_:
-			push_warning("Flow: unknown sandbox action '%s'." % action)
-
-
-## The enemy arena's spawn (enemy AI AI8): `count` enemies of `enemy_id`. Ignored out of the sandbox.
-func _on_sandbox_spawn_requested(player: int, enemy_id: StringName, count: int) -> void:
-	if player < 0 or player >= PLAYER_SLOTS:
-		return
-	spawn_in_sandbox(enemy_id, count)
-
-
-## Put `count` enemies of the registry's `enemy_id` in the sandbox room, at its enemy spawns, while
-## fewer than SANDBOX_MAX are up (the enemy arena: to play against one kind, or tune it; tests use it
-## too). Returns how many came; 0 out of a sandbox run or for an unknown id.
-func spawn_in_sandbox(enemy_id: StringName, count: int) -> int:
-	if mode != MODE_SANDBOX or state == State.IDLE or world == null or _room == null or registry == null:
-		return 0
-	var data: EnemyBase = _enemy_data_of(enemy_id)
-	if data == null or data.scene == null:
-		push_warning("Flow: no enemy '%s' to spawn in the sandbox." % enemy_id)
-		return 0
-	var room_left: int = SANDBOX_MAX - _enemies.size()
-	var wanted: int = clampi(count, 0, room_left)
-	var before: int = _enemies.size()
-	_spawn_enemies(world, data, wanted, before)
-	return _enemies.size() - before
-
-
-## Every enemy the sandbox spawned goes (its dummies stay).
-func clear_sandbox_enemies() -> void:
-	for enemy: Node in _enemies:
-		if is_instance_valid(enemy):
-			_detach(enemy)
-	_forget_enemies()
-
-
 ## Add the wizard of a player who joined mid-run: at the room's spawn for joiners when it has them
 ## (the hub: beside the altar, where a joining machine's wizards arrive), else at the player spawn
 ## farthest from danger. Ignored while no run is up, and for a slot that already has a wizard.
@@ -1170,11 +1092,12 @@ func _on_enemy_died(_player: int, enemy: Node, _position: Vector2, _shot: int) -
 	_check_room_won()
 
 
-## A run's room with no enemy left is cleared (decision 30): `room_cleared`. Its exits light, one a
+## A run's room with no enemy left, standing, arriving or still to come (`arrivals`), is cleared
+## (decision 30): `room_cleared`. Its exits light, one a
 ## way on (run generation RG4); the run's last room (no way on) wins the run, which ends
 ## RUN_WON_DELAY seconds later, as a lost one does.
 func _check_room_won() -> void:
-	if not _enemies.is_empty() or state != State.RUNNING or mode != MODE_RUN:
+	if not _enemies.is_empty() or not arrivals.is_done() or state != State.RUNNING or mode != MODE_RUN:
 		return
 	state = State.CLEARED
 	var last: bool = exits.ways.is_empty()
@@ -1192,26 +1115,6 @@ func _check_room_won() -> void:
 ## lead on from (the last room won ends the run by itself).
 func _can_be_lost() -> bool:
 	return state == State.RUNNING or (state == State.CLEARED and exits.open)
-
-
-## The sandbox's answer to everyone down: they all stand up where they are, protected for a
-## moment, with their staffs as they were; stray shots go.
-func _stand_everyone_up() -> void:
-	if projectiles != null:
-		projectiles.clear()
-	_stand_up_wizards()
-
-
-## Every downed wizard stands up (revived by itself) and every wizard is protected for a moment.
-func _stand_up_wizards() -> void:
-	for wizard: Node2D in _wizards:
-		var hero: DownedScript = DownedScript.of(wizard) if is_instance_valid(wizard) else null
-		if hero == null:
-			continue
-		var seat: int = hero.seat()
-		if hero.revive(seat) and seat >= 0 and seat < PLAYER_SLOTS:
-			_downed[seat] = false
-		hero.protect(DownedScript.JOIN_PROTECTION)
 
 
 func _on_player_downed(player: int) -> void:
@@ -1255,7 +1158,7 @@ func _stand_up(seat: int) -> void:
 	hero.protect(DownedScript.JOIN_PROTECTION)
 
 
-## Seconds from everyone down until the restart (or, in the sandbox, until everyone stands up).
+## Seconds from everyone down until the restart.
 func restart_delay() -> float:
 	return RESTART_DELAY
 
@@ -1363,14 +1266,12 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 
 
 ## The four hands of a wizard of this run's `mode`, by button, as the registry has their staffs:
-## the sandbox's the `dev` staff on every button, Play's and the hub's the first START_HANDS basic
-## staffs (STARTER_HEADS) and null for an empty hand after them. Empty when one is missing.
+## Play's and the hub's the first START_HANDS basic staffs (STARTER_HEADS) and null for an empty hand
+## after them. Empty when one is missing.
 func staffs_for_mode() -> Array[StaffBase]:
 	var ids: Array[StringName] = []
 	for at in STARTER_HEADS.size():
 		ids.append(STARTER_HEADS[at] if at < START_HANDS else &"")
-	if mode == MODE_SANDBOX:
-		ids = [DEV_STAFF, DEV_STAFF, DEV_STAFF, DEV_STAFF]
 	var out: Array[StaffBase] = []
 	if registry == null:
 		return out
@@ -1386,21 +1287,19 @@ func staffs_for_mode() -> Array[StaffBase]:
 	return out
 
 
-## The cards each staff of a new wizard starts with in this run's `mode`: `sandbox_cards` in the
-## sandbox, `start_cards` in Play.
+## The cards each staff of a new wizard starts with in this run's `mode`: `start_cards`, in Play and
+## the hub alike.
 func start_cards_for_mode() -> Array:
-	if mode == MODE_SANDBOX:
-		return sandbox_cards
 	return start_cards
 
 
 ## The card bag a new wizard gets in this run's `mode`, card id to copies (items I3):
-## Inventory.DEV_COPIES of every spell card of the registry in the sandbox and the hub, `play_bag`
-## in Play (an entry a copy).
+## Inventory.DEV_COPIES of every spell card of the registry in the hub, `play_bag` in Play (an entry
+## a copy).
 func bag_for_mode() -> Dictionary:
 	var out: Dictionary = {}
 	match mode:
-		MODE_SANDBOX, MODE_HUB:
+		MODE_HUB:
 			out = Inventory.dev_cards(registry)
 		_:
 			for id: StringName in play_bag:
@@ -1425,21 +1324,101 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 	_wizards.append(wizard)
 
 
-## The enemies the run puts in the room (`enemies`: ids, one per body) stand at its enemy spawns,
-## round them in turn. An id the registry has no enemy or boss for stands nothing (a warning).
+## The enemies the run puts in the room (`enemies`: ids, one per body): a boss stands at once in
+## `parent` (the world being built) at the enemy spawns (no arrival, so its intro opens on a body that is there), and the rest are handed to
+## `arrivals` at the run's pace (`_chosen_group`, ...), whose first group starts once the room's walls
+## are laid (`_call_arrivals`). An id the registry has no enemy or boss for is dropped (a warning).
 func _stand_room_enemies(parent: Node2D, room: RoomBase, enemies: Array[StringName]) -> void:
 	_forget_enemies()
-	var placed: int = 0
 	if not enemies.is_empty() and _places.enemy_spawns.is_empty():
 		push_warning("Flow: the room '%s' has no enemy spawns, so its enemies cannot stand." % room.id)
 		return
+	var queued: Array[StringName] = []
+	var queued_costs := PackedInt32Array()
+	var bosses: int = 0
 	for id: StringName in enemies:
 		var data: EnemyBase = _enemy_data_of(id)
 		if data == null or data.scene == null:
 			push_warning("Flow: the run puts '%s' in the room '%s', which the registry has no enemy or boss for." % [id, room.id])
 			continue
-		_spawn_enemies(parent, data, 1, placed)
-		placed += 1
+		if data.boss:
+			_spawn_enemies(parent, data, 1, bosses, false)
+			bosses += 1
+		else:
+			queued.append(id)
+			queued_costs.append(data.cost)
+	arrivals.begin(queued, queued_costs, _chosen_group, _chosen_refill, _chosen_stagger)
+
+
+## The room's queue `delta` seconds on (`RoomArrivals.next`): each id it calls now stands, arriving
+## (`_stand_queued`); then, with `check` (every tick but the room's setup, which checks at its own end,
+## after the room is announced), the room is checked, so a queue that emptied by ids that could not
+## stand leaves no room stuck uncleared.
+func _call_arrivals(delta: float, check: bool = true) -> void:
+	if arrivals.is_done() or world == null:
+		return
+	var id: StringName = arrivals.next(delta, _standing_cost())
+	while id != &"":
+		_stand_queued(id)
+		id = arrivals.next(0.0, _standing_cost())
+	if check:
+		_check_room_won()
+
+
+## Every enemy still waiting in the room's queue starts arriving now, as if each group had come (for
+## tests: they then land them, tests/support/arrivals.gd).
+func stand_all_now() -> void:
+	if world == null:
+		return
+	for id: StringName in arrivals.take_all():
+		_stand_queued(id)
+	_check_room_won()
+
+
+## The queued enemy `id` starts arriving at the spawn its group takes (`RoomArrivals.spawn_for`: the
+## farthest from every standing wizard first, none over a hole nor within `RoomArrivals.NEAR` of a
+## wizard), stacked where one is used again and moved to the nearest clear ground. An id with no
+## enemy, or a room with no spawns, stands nothing: it is dropped (it was taken off the queue).
+func _stand_queued(id: StringName) -> void:
+	var data: EnemyBase = _enemy_data_of(id)
+	var spawns: PackedVector2Array = _places.enemy_spawns
+	if data == null or data.scene == null or spawns.is_empty():
+		push_warning("Flow: the room's enemy '%s' could not stand, so it is dropped." % id)
+		return
+	var radius: float = _body_radius_of(data)
+	var on_hole: Callable = Callable()
+	if projectiles != null and projectiles.grid().has_holes():
+		on_hole = func(at: Vector2) -> bool: return projectiles.grid().touches_hole(world.to_global(at), radius)
+	var at: Vector2 = arrivals.spawn_for(spawns, _standing_wizard_places(), on_hole, stacked_position)
+	if projectiles != null:
+		# A body stacked beside its spawn may reach a wall or a hole's edge: the nearest clear ground
+		# (the spot itself when it is clear; hub rework HR-H2).
+		at = world.to_local(projectiles.grid().nearest_ground(world.to_global(at), radius))
+	_stand_enemy(world, data, at, true)
+
+
+## What the room's enemies standing or arriving cost together (`EnemyBase.cost`): how busy the room is.
+func _standing_cost() -> int:
+	var cost: int = 0
+	for enemy: Node in _enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var body := enemy as Actor
+		if body != null and body.data != null:
+			cost += body.data.cost
+	return cost
+
+
+## Where the wizards standing (not down) are, in the world.
+func _standing_wizard_places() -> PackedVector2Array:
+	var places := PackedVector2Array()
+	for wizard: Node2D in _wizards:
+		if not is_instance_valid(wizard):
+			continue
+		var actor := wizard as Actor
+		if actor != null and not actor.is_down():
+			places.append(actor.position)
+	return places
 
 
 ## The enemy or boss `enemy_id` (`EnemyBase.FOLDERS`, in turn), or null.
@@ -1455,8 +1434,8 @@ func _enemy_data_of(enemy_id: StringName) -> EnemyBase:
 
 ## Add `count` enemies of `data` to `_enemies`, the first as the `first`-th of the room's fight: each
 ## at the next enemy spawn in turn, stacked where a spawn is used again (`stacked_position`), told
-## to difficulty before it stands (`enemy_standing`: scaled to the room).
-func _spawn_enemies(parent: Node2D, data: EnemyBase, count: int, first: int) -> void:
+## to difficulty before it stands (`enemy_standing`: scaled to the room); each arrives when `arrive`.
+func _spawn_enemies(parent: Node2D, data: EnemyBase, count: int, first: int, arrive: bool = false) -> void:
 	var spawns: PackedVector2Array = _places.enemy_spawns
 	if spawns.is_empty():
 		push_warning("Flow: the room has no enemy spawns, so its enemies cannot stand.")
@@ -1465,18 +1444,22 @@ func _spawn_enemies(parent: Node2D, data: EnemyBase, count: int, first: int) -> 
 		var nth: int = first + at
 		var spawn: int = nth % spawns.size()
 		var times: int = nth / spawns.size()
-		_stand_enemy(parent, data, stacked_position(spawns[spawn], times))
+		_stand_enemy(parent, data, stacked_position(spawns[spawn], times), arrive)
 
 
 ## One enemy of `data` stands at `at` in `parent`, among the room's fight: counted for the wizards in
 ## play (`Actor.players`, boss plan OB13) and told to difficulty (`enemy_standing`: scaled to the
-## room, run generation RG5), both before its data is applied. Null when no body could be made.
-func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2) -> Actor:
+## room, run generation RG5), both before its data is applied. With `arrive` it arrives (enemy
+## arrivals EA3: `Actor.arrive`, set before it enters the tree, so its hurt shape is never registered
+## while it arrives). Null when no body could be made.
+func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, arrive: bool = false) -> Actor:
 	var enemy := RoomContents.make_body(data) as Actor
 	if enemy == null:
 		return null
 	enemy.position = at
 	enemy.players = _players_in_play()
+	if arrive:
+		enemy.arrive(Actor.ARRIVE_SECONDS)
 	if events != null:
 		events.enemy_standing.emit(enemy)
 	parent.add_child(enemy)
@@ -1484,11 +1467,12 @@ func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2) -> Actor:
 	return enemy
 
 
-## The room's enemies are forgotten (they went with the room, or the sandbox's arena was cleared),
+## The room's enemies are forgotten (they went with the room), those still to come,
 ## their adds and the boss's intro too (closed if open: the game goes on).
 func _forget_enemies() -> void:
 	_enemies.clear()
 	adds.clear()
+	arrivals.clear()
 	var was_open: bool = boss_intro.opened
 	boss_intro.clear(Sim.found(self))
 	if was_open:
@@ -1511,8 +1495,8 @@ func _count_players() -> void:
 
 
 ## The body `actor` calls the adds `entry` (its entry `key`; a `wave` or its phase's burst; boss plan
-## OB13): as many as the entry names for the wizards in play, under its cap of those alive (and the
-## sandbox's most), on a ring round the body or at the room's enemy spawns. Only for a body Flow stood,
+## OB13): as many as the entry names for the wizards in play, under its cap of those alive, on a
+## ring round the body or at the room's enemy spawns, each arriving (`_stand_enemy`). Only for a body Flow stood,
 ## while a room is up; an id the registry has no enemy for stands nothing (a warning).
 func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> void:
 	if entry == null or world == null or state == State.IDLE:
@@ -1527,8 +1511,6 @@ func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> v
 	var players: int = _players_in_play()
 	var wanted: int = entry.wave_for(players) if wave else entry.burst_for(players)
 	var count: int = entry.allowed(wanted, adds.alive(caller, key), players)
-	if mode == MODE_SANDBOX:
-		count = mini(count, maxi(SANDBOX_MAX - _enemies.size(), 0))
 	var spawns: PackedVector2Array = _places.enemy_spawns
 	var at_spawns: bool = entry.at == EnemyAdds.At.SPAWNS and not spawns.is_empty()
 	var centre: Vector2 = world.to_local(caller.global_position)
@@ -1545,7 +1527,8 @@ func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> v
 			if projectiles != null and projectiles.grid().touches_hole(world.to_global(at), radius):
 				# A spot on the ring over a hole takes the nearest ground (hub rework HR-H2).
 				at = world.to_local(projectiles.grid().nearest_ground(world.to_global(at), radius))
-		var add: Actor = _stand_enemy(world, data, at)
+		# An add arrives as the room's enemies do (enemy arrivals, the owner's question 3).
+		var add: Actor = _stand_enemy(world, data, at, not data.boss)
 		if add != null:
 			adds.track(add, caller, key)
 
@@ -1585,7 +1568,9 @@ func _crumble_orphans() -> void:
 	var left: int = 0
 	for add: Node in adds.orphans():
 		var actor := add as Actor
-		if actor == null or actor.is_dying():
+		if actor == null or actor.is_dying() or actor.is_arriving():
+			# One still arriving crumbles once it has landed (a later step), its death told, so it
+			# never leaves mid-rise in one jump.
 			continue
 		events.crumble_requested.emit(actor.id)
 		if is_instance_valid(actor) and not actor.is_dying():

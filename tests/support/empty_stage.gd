@@ -18,7 +18,6 @@ extends "res://tests/support/screenshot.gd"
 ## (`wizard.visible = true`) and moves it.
 
 const ROOM: RoomBase = preload("res://tests/support/empty_stage/empty_stage.tres")
-const PinnedRun := preload("res://tests/support/pinned_run.gd")
 
 ## The run's world (bodies stood with `stand` go in it) and seat 0's wizard (hidden).
 var world: Node2D = null

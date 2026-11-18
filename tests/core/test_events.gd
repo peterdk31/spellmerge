@@ -17,7 +17,6 @@ const EVENTS: Dictionary = {
 	&"reward_pick_requested": [["player", TYPE_INT], ["choice", TYPE_INT]],
 	&"door_vote_requested": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"pause_requested": [["player", TYPE_INT], ["on", TYPE_INT]],
-	&"sandbox_requested": [["player", TYPE_INT]],
 	&"hub_requested": [["player", TYPE_INT]],
 	&"main_menu_requested": [["player", TYPE_INT]],
 	&"seat_leave_requested": [["player", TYPE_INT]],
@@ -32,9 +31,6 @@ const EVENTS: Dictionary = {
 	&"floor_marks_changed": [["on", TYPE_BOOL]],
 	&"spell_light_changed": [["on", TYPE_BOOL]],
 	&"tailless_motes_changed": [["pool", TYPE_INT]],
-	&"sandbox_action_requested": [["player", TYPE_INT], ["action", TYPE_STRING_NAME]],
-	&"sandbox_spawn_requested": [["player", TYPE_INT], ["enemy_id", TYPE_STRING_NAME], ["count", TYPE_INT]],
-	&"ai_view_changed": [["on", TYPE_BOOL]],
 	# Playing online.
 	&"online_host_requested": [["player", TYPE_INT]],
 	&"online_join_requested": [["player", TYPE_INT], ["code", TYPE_STRING]],
@@ -149,6 +145,7 @@ const EVENTS: Dictionary = {
 	&"run_ended": [["victory", TYPE_BOOL]],
 	&"run_begun": [["run_id", TYPE_STRING_NAME], ["players", TYPE_INT], ["start_depth", TYPE_INT]],
 	&"run_room_scaled": [["scale", TYPE_FLOAT]],
+	&"run_room_paced": [["group", TYPE_INT], ["refill_at", TYPE_INT], ["stagger", TYPE_FLOAT]],
 	&"run_room_chosen": [["room_id", TYPE_STRING_NAME], ["enemies", TYPE_ARRAY], ["ways", TYPE_ARRAY]],
 	&"run_way_taken": [["way", TYPE_INT]],
 	&"run_map_changed": [["rows", TYPE_PACKED_INT32_ARRAY], ["kinds", TYPE_ARRAY], ["links", TYPE_ARRAY], ["at", TYPE_INT]],
@@ -168,7 +165,6 @@ const EVENTS: Dictionary = {
 	&"altar_placed": [["standing", TYPE_BOOL], ["at", TYPE_VECTOR2]],
 	&"room_exits_shown": [["at", TYPE_PACKED_VECTOR2_ARRAY], ["kinds", TYPE_ARRAY]],
 	&"hub_changed": [["in_hub", TYPE_BOOL]],
-	&"sandbox_changed": [["on", TYPE_BOOL]],
 	&"door_voted": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"difficulty_changed": [["level", TYPE_FLOAT]],
 	# Rewards and progression.
@@ -180,11 +176,11 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"run_begun", &"run_room_scaled", &"run_room_chosen", &"run_way_taken", &"run_map_changed", &"room_left", &"room_exits_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"lectern_changed", &"start_depth_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
+	&"run_started", &"run_ended", &"run_begun", &"run_room_scaled", &"run_room_paced", &"run_room_chosen", &"run_way_taken", &"run_map_changed", &"room_left", &"room_exits_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"lectern_changed", &"start_depth_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",
-	&"play_load_requested", &"online_changed", &"online_line_changed", &"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).

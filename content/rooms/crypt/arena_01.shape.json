@@ -1,0 +1,18 @@
+{
+	"about": "The antechamber (docs/milestones/crypt-rework.md, CR3): a floating slab of the crypt's flagstones hanging in the dark, its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), two bays where the slab runs out, the floor pushed out round every spawn, gate, pillar and decal. tools/ground_shape.py draws arena_01_ground.tscn and its art from this.",
+	"size": [640, 384],
+	"seed": 11,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [10, 14],
+		"rough": [46, 17, 6],
+		"seed": 4,
+		"bays": [[40, 300, 22], [604, 112, 20]],
+		"clear": {"round": 28, "of": ["PlayerSpawns", "EnemySpawns", "Exits", "Props", "Decor"]}
+	}
+}

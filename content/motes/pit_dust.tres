@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"pit_dust"
+gravity = 20.0
+drag = 1.0
+bounce = 0.0
+wobble = 0.3
+wobble_rate = 2.0
+glow = 0.0
+shade_from = 1
+shape = "
+o
+
+#
+
+.
+"
+shape_play = "loop"
+shape_rate = 2.0
+shape_turns = false
+count = 1
+speed = Vector2(0.0, 4.0)
+spread = 30.0
+up = Vector2(0.0, 0.0)
+life = Vector2(1.6, 3.0)
+height = 0.0

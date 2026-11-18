@@ -1,0 +1,24 @@
+{
+	"about": "The nave (docs/milestones/crypt-rework.md, CR4): a long floating slab of the crypt's flagstones hanging in the dark, its edge a broken lip (crypt_edge) and an invisible wall (its void a wall); the floor of its south-west aisle fallen in, a pit (crypt_pit) west of Pillar5's foot, ringed by floor (two bays push the slab out round it, so its lip, glow and rim are its own and never the edge's), its cracks running toward the nave; the floor pushed out round every spawn, gate, pillar and decal. tools/ground_shape.py draws arena_02_ground.tscn and its art from this.",
+	"size": [768, 384],
+	"seed": 12,
+	"edge": "crypt_edge",
+	"pit_edge": "crypt_pit",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [10, 14],
+		"rough": [46, 17, 6],
+		"seed": 5,
+		"bays": [[736, 300, 20], [600, 32, 18], [92, 360, 30], [28, 300, 22]],
+		"clear": {"round": 28, "of": ["PlayerSpawns", "EnemySpawns", "Exits", "Props", "Decor"]}
+	},
+	"pits": [{"centre": [90, 304], "radii": [34, 17], "rough": [[30, 0.12], [10, 0.05]], "seed": 8}],
+	"cracks": [
+		{"pit": 0, "angle": 0.79, "width": 7, "length": 80, "seed": 5},
+		{"pit": 0, "angle": 0.07, "width": 6, "length": 90, "seed": 9}
+	]
+}

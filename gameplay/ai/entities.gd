@@ -222,7 +222,6 @@ func _ready() -> void:
 	events.entity_spawn_requested.connect(_on_spawn_requested)
 	events.entity_end_requested.connect(_on_end_requested)
 	events.room_entered.connect(_on_room_entered)
-	events.ai_view_changed.connect(_on_ai_view_changed)
 	events.run_ended.connect(_on_run_ended)
 
 
@@ -524,11 +523,6 @@ func _on_end_requested(caster: int, tag: int) -> void:
 	for row in POOL_SIZE:
 		if _kind[row] != &"" and _owner[row] == caster and _tag[row] == tag:
 			_end(row, true)
-
-
-## The sandbox's "AI view" switch (enemy AI AI8): every enemy's look shows what its AI does.
-func _on_ai_view_changed(on: bool) -> void:
-	CreatureLook.ai_view = on
 
 
 func _on_room_entered(_room_id: StringName) -> void:

@@ -10,14 +10,17 @@ extends "res://tests/support/suite.gd"
 const PinnedRun := preload("res://tests/support/pinned_run.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
-## The room is 640x384 with a 32 px wall border; a wizard's centre must stay inside it.
-const INSIDE := Rect2(Vector2(32, 32), Vector2(576, 320))
+## The room is 640x384; a wizard's centre must stay inside it and off its walls (a floating room's
+## invisible edge since crypt rework CR3: wall cells of 8 px round its slab, wandering in and out).
+const ROOM := Rect2(Vector2.ZERO, Vector2(640, 384))
 const FRAMES: int = 240
 const DIRECTIONS: Array[Vector2] = [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]
 const ACTIONS: Array[StringName] = [&"move_left", &"move_right", &"move_up", &"move_down", &"dodge"]
 
 var flow: FlowScript
 var input: Node
+## The room's wall rectangles, read from its scene as the game reads them.
+var walls: Array[Rect2] = []
 
 
 func before_each() -> void:
@@ -25,6 +28,7 @@ func before_each() -> void:
 	input = root.get_node("PlayerInput")
 	# A run of arena_01 alone (the crypt run's first room is any of its fight rooms, RG3b).
 	flow.run_id_to_play = PinnedRun.pin(root.get_node("Registry"), ARENA)
+	walls = RoomPlaces.wall_rects(own(ARENA.scene.instantiate()) as Node)
 	for index in 4:
 		input.call("add_virtual_device", index)
 
@@ -58,7 +62,7 @@ func test_four_wizards_walking_and_dodging_into_the_corners_stay_inside_the_room
 		await physics_frame
 		for index in 4:
 			var wizard: Node2D = flow.get_wizard(index) as Node2D
-			if wizard != null and not left[index] and not INSIDE.has_point(wizard.global_position):
+			if wizard != null and not left[index] and not _inside(wizard.global_position):
 				left[index] = true
 				check(false, "wizard %d left the room at %s (frame %d)" % [index + 1, wizard.global_position, frame])
 	for index in 4:
@@ -67,3 +71,8 @@ func test_four_wizards_walking_and_dodging_into_the_corners_stay_inside_the_room
 		if wizard != null:
 			check(wizard.global_position.distance_to(starts[index]) > 64.0,
 				"wizard %d walked away from its spawn (%s to %s)" % [index + 1, starts[index], wizard.global_position])
+
+
+## True when `point` is in the room and on no wall.
+func _inside(point: Vector2) -> bool:
+	return ROOM.has_point(point) and not walls.any(func(wall: Rect2) -> bool: return wall.has_point(point))

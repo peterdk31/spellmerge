@@ -1,9 +1,11 @@
 extends "res://tests/support/screenshot.gd"
 ## Screenshots of the radial builder's tree view (owner, 2026-10-31, docs/milestones/
-## M2-builder-tree.md, part T5), in the sandbox with the radial builder picked: one player with a
+## M2-builder-tree.md, part T5), in the hub (the dev staffs, tests/support/dev_hub.gd) with the radial builder picked: one player with a
 ## nested staff (a held decoy whose timer fires a fire bolt, whose on expire fires a frost nova,
 ## and whose on hurt fires a last bolt) and the marker on a card deep in it (radial_tree), then
 ## all four players with their trees open at once (radial_tree_four_players).
+
+const DevHub := preload("res://tests/support/dev_hub.gd")
 
 const NESTED: Array[StringName] = [&"timer", &"on_hurt", &"hold", &"decoy", &"on_expire", &"fire", &"bolt", &"blast", &"frost", &"nova", &"bolt", &"bolt"]
 const OTHERS: Array = [
@@ -25,9 +27,11 @@ func take() -> void:
 	var events: Node = root.get_node("Events")
 	for index in 4:
 		_input.call("add_virtual_device", index)
-	events.emit_signal("sandbox_requested", 0)
+	if not DevHub.start(flow, root.get_node("Registry")):
+		fail("the hub did not start")
+		return
 	if not await wait_for(func() -> bool: return flow.call("get_wizard", 3) != null):
-		fail("the sandbox did not start with four wizards")
+		fail("the hub did not start with four wizards")
 		return
 	_hud.call("_on_builder_options_changed", 0, true)
 	events.emit_signal("staff_cards_requested", 0, 1, _typed(NESTED), (flow.call("get_wizard", 0) as Actor).key())

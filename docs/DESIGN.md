@@ -32,7 +32,7 @@ Spell rules (chosen on 2026-10-26, the pivot at C2):
 - **Every staff has its own mana pool** (the owner, 2026-11-01; was one pool per player): the staff sets its size and regen, a cast pays from its own staff's pool, and sustained spells reserve part of that pool.
 - **No build limits** beyond what the engine needs to run; limits are added only when measurements ask for them.
 - **Small shots:** a shot is a small core; its cards add its look in layers.
-- **Test builds are a sandbox:** preview builds start in a room with large staffs, every card and a training dummy.
+- **The hub is where builds are tried:** every build starts in the hub, with every card in the bag, premade builds on large staffs on its rack and training dummies (the owner, 2026-11-16: "Remove the sandbox. We have the hub now.").
 
 ## No-waiting co-op rules
 

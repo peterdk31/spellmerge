@@ -1,6 +1,6 @@
 extends "res://tests/support/screenshot.gd"
 ## The call (enemy AI L4, docs/milestones/M2-enemy-ai.md): two strays (Cinder Rods), one above
-## the other, to the right of player 1's wizard in the sandbox. Before its windup one glances at the
+## the other, to the right of player 1's wizard in the hub. Before its windup one glances at the
 ## other, its brows raised, and the other joins in: furious, its telegraph up. `call_6x` is the two
 ## of them enlarged mid-call, `call_1x` the same moment as a player sees it.
 
@@ -16,9 +16,9 @@ func take() -> void:
 		return
 	var flow: Node = root.get_node("Flow")
 	root.get_node("PlayerInput").call("add_virtual_device", 0)
-	root.get_node("Events").emit_signal("sandbox_requested", 0)
-	if not await wait_for(func() -> bool: return flow.get("sandbox") and flow.call("get_wizard", 0) != null):
-		fail("the sandbox did not start")
+	root.get_node("Events").emit_signal("hub_requested", 0)
+	if not await wait_for(func() -> bool: return flow.get("mode") == &"hub" and flow.call("get_wizard", 0) != null):
+		fail("the hub did not start")
 		return
 	var wizard: Actor = flow.call("get_wizard", 0) as Actor
 	await settle(10)
@@ -52,7 +52,7 @@ func take() -> void:
 	save_crop(image, on_screen(middle - Vector2(AWAY * 0.5, 0.0)), "call_1x", Vector2i(160, 90), 1)
 
 
-## A Cinder Rod at `at` in the sandbox room, playing by `profile`.
+## A Cinder Rod at `at` in the hub, playing by `profile`.
 func _stray(at: Vector2, profile: AIProfile) -> Actor:
 	var body := IMP_SCENE.instantiate() as Actor
 	body.data = IMP_DATA

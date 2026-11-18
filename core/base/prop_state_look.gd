@@ -27,6 +27,12 @@ extends Resource
 @export_range(0.0, 1.0, 0.05) var light_flicker: float = LightSpot.DEFAULT_FLICKER
 @export var light_layer: int = 0
 @export var light_tint: Color = Color(0, 0, 0, 0)
+## When its light shines, on the look's clock from when its state is entered: from `light_after`
+## seconds, until `light_until` (0: for as long as the look shows), so a light comes and goes with
+## its art (a gate's veil full, then drained) rather than as the state changes. A look only shown
+## (set up, a snapshot's state given back) is at rest: its light shines unless it has an end.
+@export_range(0.0, 10.0, 0.05) var light_after: float = 0.0
+@export_range(0.0, 10.0, 0.05) var light_until: float = 0.0
 ## The cue (`content/cues/<cue>.tres`) played where the prop stands as the state is entered (not
 ## the state it starts in): a barrel's blast is its staff's, a crate's splinters are its broken
 ## state's. Empty: none.
@@ -56,6 +62,8 @@ func problems(owner: String) -> PackedStringArray:
 	if light_reach > 0.0:
 		if light_strength < 0.0 or light_strength > 1.0 or light_flicker < 0.0 or light_flicker > 1.0:
 			found.append("%s: light_strength and light_flicker are 0 to 1 (%s, %s)." % [name, light_strength, light_flicker])
+		if light_until > 0.0 and light_until <= light_after:
+			found.append("%s: its light ends (%s s) before it starts (%s s)." % [name, light_until, light_after])
 		if light_tint.a <= 0.0 and (light_layer < 0 or light_layer >= layers.size()):
 			found.append("%s: its light takes its colour from layer %d, which it does not have." % [name, light_layer])
 	return found

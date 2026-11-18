@@ -5,7 +5,13 @@ rims run clockwise round the ground with their colour bands, a crack's open cell
 void is wall or holes as the shape says, a crack opens onto the coast, keeps
 clear of what it must and thins out with no step (a fork starts nearly as wide as its parent), a
 crack thinner than a cell is drawn into the floor and is never a wall, the same shape always draws
-the same files, and every room's ground in the repository is up to date with its shape.
+the same files, and every room's ground in the repository is up to date with its shape. A hall
+inside walls (the crypt rework, docs/milestones/crypt-rework.md): its frame wanders, is pinned and
+keeps clear of what stands in the room; its pits are holes with an edge style of their own, their
+rims throwing into the pit and their cracks running outward; its walls have their own art (a face
+over the floor's top edges); its floor is slabbed. A floating crypt room (`crypt_edge`, the owner's
+second round): no wall art, the slab's rock underside hanging under its south edges, dust falling
+off its edge, and its edge still an invisible wall.
 
     python3 -m unittest discover -s tools
 """
@@ -32,6 +38,21 @@ ISLAND = {
     "cracks": [{"angle": 0.3, "width": 14, "length": 60, "seed": 301}],
     "keep_clear": [[120, 100, 28]],
 }
+
+HALL = {
+    "size": [320, 224],
+    "seed": 11,
+    "edge": "crypt_wall",
+    "pit_edge": "crypt_pit",
+    "ground": "flagstone",
+    "frame": {"inset": 32, "corner": 16, "wander": [14, 20], "rough": [48, 18, 7], "seed": 4,
+              "pins": [[144, 0, 176, 34]], "bays": [[40, 180, 22]]},
+    "areas": [{"ground": "swept", "centre": [120, 110], "radii": [40, 30], "seed": 2}],
+    "pits": [{"centre": [220, 130], "radii": [30, 20], "rough": [[30, 0.12], [10, 0.05]], "seed": 8}],
+    "cracks": [{"pit": 0, "angle": 0.5, "width": 9, "length": 40, "seed": 5}],
+}
+# Where the hall's things stand: its frame's floor is pushed out to these.
+HALL_CLEAR = [(60.0, 40.0, 24.0)]
 
 
 class GroundShapeTest(unittest.TestCase):
@@ -263,6 +284,245 @@ class GroundShapeTest(unittest.TestCase):
             outs = gs.outputs_of(path)
             for kind, data in gs.files_of(gs.draw(path), path).items():
                 self.assertEqual(outs[kind].read_bytes(), data, f"{outs[kind].relative_to(gs.ROOT)} is as drawn")
+
+
+class HallTest(unittest.TestCase):
+    """A hall inside walls, its pit and its art (the crypt rework)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.drawing = gs.Drawing(HALL, [], HALL_CLEAR)
+
+    def _cell_open(self, x: int, y: int) -> bool:
+        d = self.drawing
+        return not d.solid[(y + gs.CELL // 2) * d.w + x + gs.CELL // 2]
+
+    def test_no_ledge_is_too_narrow_to_stand_beside(self) -> None:
+        # Every open cell of a hall lies in a block of 3x3 open cells or beside one: a ledge too
+        # narrow for a wizard is trimmed off, so nothing pushed there is out of reach (CR3).
+        rough = {**HALL, "frame": {**HALL["frame"], "rough": [20, 7, 3], "wander": [16, 22]}}
+        for d in (self.drawing, gs.Drawing(rough, [], HALL_CLEAR)):
+            cols, rows = d.w // gs.CELL, d.h // gs.CELL
+            open_ = {(c, r) for r in range(rows) for c in range(cols)
+                     if d.solid[(r * gs.CELL + gs.CELL // 2) * d.w + c * gs.CELL + gs.CELL // 2]}
+            fits = {(c, r) for c, r in open_ if all((c + dc, r + dr) in open_ for dc in (-1, 0, 1) for dr in (-1, 0, 1))}
+            for c, r in open_:
+                self.assertTrue(any((c + dc, r + dr) in fits for dc in (-1, 0, 1) for dr in (-1, 0, 1)),
+                                f"the floor at {c * gs.CELL},{r * gs.CELL} lies beside room to stand")
+            self.assertGreater(len(fits), len(open_) // 2, "the hall is still mostly floor")
+
+    def test_the_frame_wanders_but_its_border_cell_is_always_wall(self) -> None:
+        d = self.drawing
+        for x in range(0, d.w, gs.CELL):
+            self.assertTrue(self._cell_open(x, 0) and self._cell_open(x, d.h - gs.CELL), "the top and bottom border cells are wall")
+        for y in range(0, d.h, gs.CELL):
+            self.assertTrue(self._cell_open(0, y) and self._cell_open(d.w - gs.CELL, y), "the side border cells are wall")
+        depths = set()
+        for x in range(48, d.w - 48):
+            y = 0
+            while y < d.h // 2 and not d.solid[y * d.w + x]:
+                y += 1
+            depths.add(y)
+            self.assertGreaterEqual(y, 32 - 20 - 1, f"column {x}: the wall wanders out no more than the frame's wander")
+            self.assertLessEqual(y, 32 + 14 + 1, f"column {x}: the wall wanders in no more than the frame's wander")
+        self.assertGreater(len(depths), 8, "the top wall's edge wanders, never a straight line")
+
+    def test_a_pin_holds_the_edge_to_the_frames_line(self) -> None:
+        d = self.drawing
+        for x in range(144, 177):
+            self.assertFalse(d.solid[31 * d.w + x], f"column {x}: wall above the line under the pin")
+            self.assertTrue(d.solid[32 * d.w + x], f"column {x}: floor from the line under the pin")
+
+    def test_the_floor_reaches_round_what_stands_in_the_room(self) -> None:
+        d = self.drawing
+        for cx, cy, r in HALL_CLEAR:
+            for y in range(int(cy - r) + 1, int(cy + r)):
+                for x in range(int(cx - r) + 1, int(cx + r)):
+                    if math.hypot(x + 0.5 - cx, y + 0.5 - cy) < r - 1 and x >= gs.CELL and y >= gs.CELL:
+                        self.assertTrue(d.solid[y * d.w + x], f"{x},{y}: floor round a thing that stands there")
+
+    def test_a_pit_is_a_hole_with_its_own_edge_style(self) -> None:
+        d = self.drawing
+        g = d.ground
+        cells: dict = {}
+        GroundShapeTest._cells(d.walls, cells, "wall", self)
+        GroundShapeTest._cells(d.holes, cells, "hole", self)
+        middle = (130 // gs.CELL * gs.CELL, 128 // gs.CELL * gs.CELL)
+        self.assertEqual(cells.get((216, 128)), "hole", "the pit's middle cell is a hole")
+        self.assertNotIn(middle, cells, "the floor beside it is open ground")
+        for (cx, cy), kind in cells.items():
+            p = (cy + gs.CELL // 2) * d.w + cx + gs.CELL // 2
+            self.assertEqual(kind, "hole" if (g.pit[p] or g.crack[p] > 0.0) else "wall", f"cell {cx},{cy}: a hole in the pit or its crack, else wall")
+        self.assertEqual(d.side[130 * d.w + 220], 1, "the pit is the pit's side")
+        self.assertEqual(d.side[112 * d.w + 64], 0, "beside the west wall, the walls' side")
+
+    def test_the_pits_rim_throws_into_the_pit(self) -> None:
+        d = self.drawing
+        self.assertEqual(d.rim_sides, [1], "one rim, round the pit: the walls' style has no motes")
+        rim = d.rims[0]
+        into = 0
+        for i in range(len(rim)):
+            a, b = rim[i], rim[(i + 1) % len(rim)]
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            length = math.hypot(dx, dy) or 1.0
+            x, y = int(a[0] + dy / length * 3), int(a[1] - dx / length * 3)
+            into += not d.solid[y * d.w + x]
+        self.assertGreater(into, len(rim) * 0.9, "the left of the rim's way, where a line throws its motes, is the pit")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        self.assertIn('kind = &"pit_dust"', text)
+        self.assertIn('colours = Array[StringName]([&"stone", &"bone"])', text, "the rim's own colours")
+        self.assertNotIn("band_length", text, "no bands: the rim names its colours")
+
+    def test_a_crack_from_a_pit_runs_outward(self) -> None:
+        g = self.drawing.ground
+        cracked = [p for p in range(g.width * g.height) if g.crack[p] > 0.0]
+        self.assertTrue(cracked, "the crack is carved")
+        for p in cracked:
+            self.assertEqual(g.pit_side[p], 1, "a crack from a pit is the pit's side")
+        self.assertLess(min(p % g.width for p in cracked), 220 - 30 - 10, "it runs out from the pit's west edge, angle 0.5")
+
+    def test_the_walls_have_their_own_art_and_a_face(self) -> None:
+        d = self.drawing
+        g = d.ground
+        self.assertIsNotNone(d.wall_art)
+        for p in range(d.w * d.h):
+            wall = not d.solid[p] and g.crack[p] == 0.0 and not g.pit[p]
+            self.assertEqual(d.wall_art[p * 4 + 3] == 255, wall, f"pixel {p % d.w},{p // d.w}: the wall art covers the walls, only")
+        face = d.style["face"]
+        light = gs.colour(face["light"], d.mats)
+        x = 160
+        y = 32
+        self.assertEqual(tuple(d.wall_art[((y - face["height"]) * d.w + x) * 4:((y - face["height"]) * d.w + x) * 4 + 3]), light,
+                         "the face's lit top row, its height above the floor's top edge")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        self.assertIn('[node name="WallArt" type="Sprite2D" parent="Walls"]', text, "on the walls, which shed it")
+        self.assertIn('[node name="Underside" type="Sprite2D" parent="."]', text, "the pit's shaft on the root, never shed by a wall")
+
+    def test_a_style_without_seam_rock_glow_or_motes(self) -> None:
+        d = gs.Drawing({k: v for k, v in HALL.items() if k not in ("pits", "cracks", "pit_edge")}, [], HALL_CLEAR)
+        self.assertEqual((d.rims, d.drips), ([], []), "no motes")
+        self.assertFalse(any(d.glow[3::4]), "no glow")
+        self.assertFalse(any(d.under[3::4]), "no rock face")
+        self.assertFalse(d.holes, "no holes")
+
+    def test_slabs_never_tile(self) -> None:
+        d = self.drawing
+        joint = gs.colour(gs.load_ground("flagstone")["slabs"]["joint"], d.mats)
+        joints = [p for p in range(d.w * d.h) if d.ground.land[p] and tuple(d.floor[p * 4:p * 4 + 3]) == joint]
+        self.assertGreater(len(joints), 500, "the flagstones' joints are drawn")
+        size = int(gs.load_ground("flagstone")["slabs"]["size"])
+        rows = [bytes(d.floor[(y * d.w + 60) * 4:(y * d.w + 260) * 4]) for y in (80, 80 + size, 80 + 2 * size)]
+        self.assertNotEqual(rows[0], rows[1], "no row repeats a slab's size lower")
+        self.assertNotEqual(rows[1], rows[2])
+
+    def test_strokes_go_round_the_middle_not_out_from_it(self) -> None:
+        import ground_materials as gm
+        mats = gs.materials()
+        spec = {"base": "#433f5b", "strokes": {"colour": "#8a86aa", "spacing": 9, "share": 0.5, "inner": 20}}
+        m = gm.Material(spec, 0, 1, (240, 240), (120.0, 120.0), lambda c: gs.colour(c, mats), gm.Noise(gs.unit, gs.noise1, gs.fbm2))
+        base = gs.colour("#433f5b", mats)
+
+        def on(x: float, y: float) -> bool:
+            return m.at(int(x), int(y)) != base
+
+        # Out from the middle, a stroke is crossed in a pixel or two at a time: rings, never spokes.
+        longest_out = 0
+        for k in range(16):
+            a = k / 16 * math.tau
+            run = 0
+            for r in range(24, 110):
+                run = run + 1 if on(120 + math.cos(a) * r, 120 + math.sin(a) * r) else 0
+                longest_out = max(longest_out, run)
+        self.assertLessEqual(longest_out, 3, "a stroke is crossed going out")
+        # Round the middle, a stroke runs on for a long way.
+        longest_round = 0
+        for r in range(30, 100):
+            run = 0
+            for k in range(720):
+                a = k / 720 * math.tau
+                run = run + 1 if on(120 + math.cos(a) * r, 120 + math.sin(a) * r) else 0
+                longest_round = max(longest_round, run)
+        self.assertGreater(longest_round, 30, "a stroke runs round the middle, a long way (a spoke is crossed in a few)")
+
+    def test_the_inputs_hash_reads_every_edge_style(self) -> None:
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "room.shape.json"
+            path.write_text(json.dumps(HALL), encoding="utf-8")
+            first = gs.inputs_hash(path)
+            path.write_text(json.dumps({**HALL, "pit_edge": "magic"}), encoding="utf-8")
+            self.assertNotEqual(gs.inputs_hash(path), first)
+
+
+class FloatingHallTest(unittest.TestCase):
+    """A floating crypt room (crypt rework CR-G, `crypt_edge`): a slab of floor hanging in the dark,
+    its edge an invisible wall."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.shape = {**HALL, "edge": "crypt_edge"}
+        cls.drawing = gs.Drawing(cls.shape, [], HALL_CLEAR)
+
+    def test_the_edge_is_an_invisible_wall(self) -> None:
+        d = self.drawing
+        g = d.ground
+        self.assertIsNone(d.wall_art, "no wall art: no masonry, no top, no face")
+        cells: dict = {}
+        GroundShapeTest._cells(d.walls, cells, "wall", self)
+        for y in range(0, d.h, gs.CELL):
+            for x in range(0, d.w, gs.CELL):
+                p = (y + gs.CELL // 2) * d.w + x + gs.CELL // 2
+                if not d.solid[p] and not g.pit[p] and g.crack[p] == 0.0:
+                    self.assertEqual(cells.get((x, y)), "wall", f"cell {x},{y}: off the slab, a wall stops a body")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        self.assertNotIn("WallArt", text)
+        self.assertIn('[node name="Walls" type="StaticBody2D"', text)
+
+    def test_the_slabs_underside_hangs_under_its_south_edge(self) -> None:
+        d = self.drawing
+        rock = gs.load_style("crypt_edge")["rock"]
+        hung = 0
+        for x in range(64, d.w - 64):
+            y = d.h - 1
+            while y > 0 and not d.solid[y * d.w + x]:
+                y -= 1
+            # the first pixel under the floor's south edge
+            below = (y + 1) * d.w + x
+            if y + 1 < d.h and d.under[below * 4 + 3] == 255:
+                hung += 1
+        self.assertGreater(hung, (d.w - 128) * 0.9, "the rock hangs under the south edge")
+        self.assertGreaterEqual(rock["depth"][1], 32, "deep enough to read as a slab's underside")
+        self.assertNotIn("glow", gs.load_style("crypt_edge"), "no glow along the slab's edge (only its pit's)")
+
+    def test_dust_falls_off_its_edge(self) -> None:
+        d = self.drawing
+        self.assertEqual(sorted(d.rim_sides), [0, 1], "a rim round the slab and one round its pit")
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        self.assertEqual(text.count('kind = &"pit_dust"'), 2, "dust off the slab's edge and into its pit")
+
+    def test_its_lip_is_broken_stone(self) -> None:
+        d = self.drawing
+        load = gs.load_style
+
+        def bare(edge_id: str) -> dict:
+            style = load(edge_id)
+            if edge_id == "crypt_edge":
+                style["lip"] = {k: v for k, v in style["lip"].items() if k not in ("rubble", "pebbles")}
+            return style
+        gs.load_style = bare
+        try:
+            plain = gs.Drawing(self.shape, [], HALL_CLEAR)
+        finally:
+            gs.load_style = load
+        changed = sum(1 for p in range(d.w * d.h) if d.floor[p * 4:p * 4 + 4] != plain.floor[p * 4:p * 4 + 4])
+        self.assertGreater(changed, 300, "stones and grit lie along its lip")
+
+    def test_a_floating_room_with_no_pit_hangs_its_underside_on_the_walls(self) -> None:
+        d = gs.Drawing({k: v for k, v in self.shape.items() if k not in ("pits", "cracks", "pit_edge")}, [], HALL_CLEAR)
+        text = gs.scene_text(d, {k: gs.ROOT / f"art/{k}.png" for k in ("floor", "under", "glow", "wall")}, "abc")
+        self.assertIn('[node name="Underside" type="Sprite2D" parent="Walls"]', text, "a hit on the edge sheds the rock's colours")
+        self.assertTrue(any(d.under[3::4]), "the rock is drawn")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,448 @@
+extends Node
+## The hub storm: a showcase of how many shots the game holds, and a count of how many of them
+## land. One wizard in the real hub (Flow's MODE_HUB: its room, its dummies and its rack) takes the
+## Frostfire Cascade from the rack (STORM_ITEM, content/items/staffs/frostfire_cascade: the `dev`
+## staff holding a fire nova split three times, 216 shots, whose every shot fires a frost nova split
+## three times when it ends; one of crypt rework CR-S's two showcase builds) as a player does (A by
+## it: the command `item_take_requested`, onto its first free hand, LB), stands among the training
+## dummies and casts it with its button held through the real input path (a virtual device, as a bot
+## holds it), so it casts whenever the staff is ready: about every three seconds, the cast delay its
+## cards add. One cast asks
+## for about 46,000 shots, far past the projectile cap, so the cap and the trigger pacing
+## (`SpellLimits.FIRE_SHOTS_PER_STEP`) decide what flies.
+##
+## What it counts, from the first cast for SECONDS of game time: the casts, the shots made (the
+## projectile manager's spawn sequence), the shots alive (mean and peak, sampled each physics step)
+## against the cap, the shots the cap dropped, the trigger fires that waited for a later step, and
+## for each dummy the shots that hit it (`projectile_hit` on its body) and the damage it took
+## (Combat's health). It prints `BENCH: storm` lines and `STORM OK`, or `STORM FAILED` when the run
+## did not start, nothing was cast, no shot hit a dummy or the log has an error.
+##
+## Run in a window it is the showcase: a line at the top shows the live numbers, and with `--stay`
+## it keeps casting after the report. User arguments: `--seconds=N` (SECONDS), `--cap=N` (the projectile cap; the platform's by default), `--no-native` (the
+## projectile manager's GDScript), `--cards=a,b,c` (another build on the storm's staff, card ids, as
+## the builder sends it, `staff_cards_requested`, from the hub's bag of every card: a beam build, say,
+## whose hits are not shots, so it passes with none; spell spectacle 2, S6 items 10 and 11),
+## `--stay`, `--profile` (the tree profile, tree_profile.gd: each
+## script's time a physics step and a frame) and `--profile-signals` (with it, the time of each
+## listener of the hot events, PROFILED_SIGNALS). It is the benchmark for drawing many shots that
+## hit: the frame's parts and the manager's drawing (`BENCH: storm draw`) are printed beside the
+## counts; in a window (or under xvfb-run) the renderer runs too.
+##
+## On a real GPU in a browser: the Web Test export started with `--storm` (the main menu adds this
+## runner, as it does the stress run's), e.g. the owner's harness `wingpu.sh build/web-test 120
+## "--storm --seconds=10"`; the page's `args` are read like the user arguments. Its frame time is the
+## real one (no `--fixed-fps` there), uncapped when Chrome runs without vsync.
+##
+## The wizard is placed by the rack to take the staff, then among the dummies, and kept up (mana
+## full, revived and protected).
+##
+## Motes (docs/milestones/spell-spectacle.md, P1c): `--motes=N` sets Feel's "Particles" cap (0
+## turns motes off; the platform's default otherwise) and `--mote-density=X` its "Particle amount".
+## Feel is handed a timed pool (`timed_motes.gd`), and the report's `BENCH: storm motes` line
+## gives the motes written, the bursts the frame's FRAME_ROWS cut, the chunks uploaded and the
+## CPU time of the mote pool's calls, each a frame and per 60th of a game second (a frame at
+## 60 FPS; a headless run draws more frames than that).
+
+const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
+const ProbeScript := preload("res://tests/benchmark/probe.gd")
+const TreeProfileScript := preload("res://tests/benchmark/tree_profile.gd")
+const FlowScript := preload("res://gameplay/flow/flow.gd")
+const TimedMotesScript := preload("res://tests/benchmark/timed_motes.gd")
+const FeelScript := preload("res://gameplay/feel/feel.gd")
+
+const PLAYER: int = 0
+## The premade staff the storm is, from the hub's rack, and the hand it is taken onto (LB: a hub
+## wizard holds RB and RT, so LB is its first free hand).
+const STORM_ITEM: StringName = &"frostfire_cascade"
+const STORM_STAFF: int = 2
+const STAFF_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
+## Where the wizard stands: in the middle of the hub's three training dummies.
+const STORM_AT: Vector2 = Vector2(416.0, 544.0)
+## Game seconds counted.
+const SECONDS: float = 12.0
+## The events whose listeners `--profile-signals` times: every event a shot's hit or end sends.
+const PROFILED_SIGNALS: Array[StringName] = [&"projectile_hit", &"projectile_impact", &"projectile_expired", &"damage_dealt", &"hit_landed", &"status_applied", &"reaction_triggered"]
+## Seconds between the updates of the window's line.
+const SHOW_EVERY: float = 0.25
+
+var seconds: float = SECONDS
+var stay: bool = false
+
+var _log: Logger = ErrorLogScript.new()
+var _logging: bool = false
+var _events: Node = null
+var _flow: Node = null
+var _input: Node = null
+var _projectiles: Node = null
+var _combat: Node = null
+var _spells: Node = null
+var _feel: Node = null
+var _motes_written_at: int = 0
+var _motes_cut_at: int = 0
+var _mote_uploads_at: int = 0
+var _mote_usec_at: int = 0
+var _mote_calls_at: int = 0
+var _probe: Node = null
+var _tree_profile: Node = null
+var _draw_usec: int = 0
+var _draw_max_usec: int = 0
+var _draw_frames: int = 0
+var _mote_frames: int = 0
+var _births_at: int = 0
+var _settles_at: int = 0
+var _skipped_at: int = 0
+var _label: Label = null
+var _wizard: Actor = null
+var _downed: Downed = null
+var _dummies: Array[Actor] = []
+var _dummy_hits: PackedInt64Array = PackedInt64Array()
+var _dummy_health: PackedFloat64Array = PackedFloat64Array()
+var _active: bool = false
+var _reported: bool = false
+var _elapsed: float = 0.0
+var _held: bool = false
+var _casts: int = 0
+var _hits: int = 0
+var _seq_at: int = 0
+var _dropped_at: int = 0
+var _waited_at: int = 0
+var _peak_shots: int = 0
+var _shot_sum: int = 0
+var _shot_samples: int = 0
+var _show_left: float = 0.0
+## Whether the storm's staff holds another build (`--cards`), and which.
+var _own_cards: bool = false
+var _cards: Array[StringName] = []
+
+
+func _ready() -> void:
+	OS.add_logger(_log)
+	_logging = true
+	var root: Node = get_tree().root
+	_events = root.get_node_or_null("Events")
+	_flow = root.get_node_or_null("Flow")
+	_input = root.get_node_or_null("PlayerInput")
+	_projectiles = root.get_node_or_null("Projectiles")
+	_combat = root.get_node_or_null("Combat")
+	_spells = root.get_node_or_null("Spells")
+	_feel = root.get_node_or_null("Feel")
+	if _events == null or _flow == null or _input == null or _projectiles == null or _combat == null:
+		_finish(["the Events, Flow, PlayerInput, Projectiles and Combat autoloads must exist"])
+		return
+	var args: PackedStringArray = _arguments()
+	stay = args.has("--stay")
+	for arg in args:
+		if arg.begins_with("--seconds="):
+			seconds = maxf(arg.trim_prefix("--seconds=").to_float(), 1.0)
+		elif arg.begins_with("--cap="):
+			# The run takes this machine's rules at its start (online-ready N11).
+			SessionRules.machine().shot_cap = maxi(arg.trim_prefix("--cap=").to_int(), 1)
+			_projectiles.call("set_cap", SessionRules.machine().shot_cap)
+	if _feel != null:
+		for arg in args:
+			if arg.begins_with("--motes="):
+				_feel.call(&"set_mote_cap", maxi(arg.trim_prefix("--motes=").to_int(), 0))
+			elif arg.begins_with("--mote-density="):
+				_feel.call(&"set_mote_density", arg.trim_prefix("--mote-density=").to_float())
+		var pool: Node = _motes()
+		if pool != null:
+			_feel.call(&"use_motes", TimedMotesScript.new(pool.call(&"cap"), FeelScript.MOTE_Z, pool.call(&"kinds"), _feel.call(&"ramp_table")))
+	if args.has("--no-native"):
+		_projectiles.set(&"native", false)
+	for arg in args:
+		if arg.begins_with("--cards="):
+			# Another build on the storm's staff (a beam or swing build: what Feel draws itself and
+			# its motes; spell spectacle 2, S6 items 10 and 11), comma separated card ids.
+			for id in arg.trim_prefix("--cards=").split(",", false):
+				_cards.append(StringName(id))
+			_own_cards = true
+	if int(_input.call("add_virtual_device", PLAYER)) == int(_input.get("NO_DEVICE")):
+		_finish(["player %d's virtual device is taken" % (PLAYER + 1)])
+		return
+	_events.connect("projectile_hit", _on_projectile_hit)
+	_events.connect("spell_cast", _on_spell_cast)
+	if DisplayServer.get_name() != "headless":
+		var layer := CanvasLayer.new()
+		layer.layer = 100
+		add_child(layer)
+		_label = Label.new()
+		# At the bottom edge, clear of the HUD's panel at the top left.
+		_label.position = Vector2(4.0, 346.0)
+		_label.add_theme_font_size_override(&"font_size", 8)
+		layer.add_child(_label)
+	_events.emit_signal("hub_requested", PLAYER)
+	var loading: Node = root.get_node_or_null("Loading")
+	if loading != null and bool(loading.call("is_loading")):
+		_events.connect("room_entered", _on_loaded, CONNECT_ONE_SHOT)
+		return
+	_start()
+
+
+func _exit_tree() -> void:
+	if _logging:
+		_logging = false
+		OS.remove_logger(_log)
+
+
+func _on_loaded(_room_id: StringName) -> void:
+	_start()
+
+
+func _start() -> void:
+	if _flow.get("mode") != FlowScript.MODE_HUB or _flow.get("world") == null:
+		_finish(["the hub did not start"])
+		return
+	_wizard = _flow.call("get_wizard", PLAYER) as Actor
+	if _wizard == null:
+		_finish(["player %d's wizard is missing" % (PLAYER + 1)])
+		return
+	_downed = Downed.of(_wizard)
+	# Commands apply at the next tick's start: the take, then (`--cards`) the build.
+	var item: GroundItem = _rack_item()
+	if item == null:
+		_finish(["the hub's rack has no %s" % STORM_ITEM])
+		return
+	_wizard.global_position = item.at
+	_events.emit_signal("item_take_requested", PLAYER, item.number)
+	await _ticks(2)
+	if _own_cards:
+		# By the staff's number (the inventory's), as the builder names it: the one on LB.
+		var number: int = PlayerController.loadout_of(_wizard).hands()[STORM_STAFF]
+		_events.emit_signal("staff_cards_requested", PLAYER, number, _cards, _wizard.key())
+		await _ticks(2)
+	if _wizard.caster.staffs.size() <= STORM_STAFF or _wizard.caster.staffs[STORM_STAFF] == null:
+		_finish(["the wizard did not take %s onto LB" % STORM_ITEM])
+		return
+	_wizard.global_position = STORM_AT
+	for node: Node in _flow.call("dummies"):
+		var dummy := node as Actor
+		if dummy != null and is_instance_valid(dummy):
+			_dummies.append(dummy)
+			_dummy_hits.append(0)
+			_dummy_health.append(float(_combat.call("health_of", dummy)))
+	if _dummies.is_empty():
+		_finish(["the hub has no dummies"])
+		return
+	var cards: Array[StringName] = _wizard.caster.cards_of(STORM_STAFF)
+	print("BENCH: storm: the hub's %s staff on %s, held for %.0f s at %s, %d dummies, cap %d, native %s" % [
+		String(_wizard.caster.staffs[STORM_STAFF].id) if _wizard.caster.staffs.size() > STORM_STAFF and _wizard.caster.staffs[STORM_STAFF] != null else "?",
+		" ".join(PackedStringArray(cards)), seconds, STORM_AT, _dummies.size(),
+		int(_projectiles.call("get_cap")), "on" if bool(_projectiles.call("is_native")) else "off"])
+	_seq_at = int(_projectiles.get("_next_seq"))
+	_dropped_at = int(_projectiles.get("dropped"))
+	_waited_at = int(_spells.get("fires_waited")) if _spells != null else 0
+	var motes: Node = _motes()
+	if motes != null:
+		_motes_written_at = int(motes.get(&"written"))
+		_motes_cut_at = int(motes.get(&"cut"))
+		_mote_uploads_at = int(motes.get(&"uploads"))
+		_mote_usec_at = int(motes.get(&"usec"))
+		_mote_calls_at = int(motes.get(&"calls"))
+		_births_at = int(motes.get(&"births"))
+		_settles_at = int(motes.get(&"settles"))
+		_skipped_at = int(motes.get(&"settles_skipped"))
+	_probe = ProbeScript.new()
+	add_child(_probe)
+	var args: PackedStringArray = _arguments()
+	if args.has("--profile") or args.has("--profile-signals"):
+		_tree_profile = TreeProfileScript.new()
+		add_child(_tree_profile)
+		if args.has("--profile-signals"):
+			var names: Array[StringName] = []
+			for name: StringName in PROFILED_SIGNALS:
+				if _events.has_signal(name):
+					names.append(name)
+			_tree_profile.call(&"time_signals", _events, names)
+	_active = true
+
+
+func _physics_process(delta: float) -> void:
+	if not _active:
+		return
+	_keep_wizard_up()
+	var count: int = int(_projectiles.call("get_count"))
+	if not _reported:
+		_peak_shots = maxi(_peak_shots, count)
+		_shot_sum += count
+		_shot_samples += 1
+	_elapsed += delta
+	_show_left -= delta
+	if _label != null and _show_left <= 0.0:
+		_show_left = SHOW_EVERY
+		_label.text = _line(count)
+	if not _reported and _elapsed >= seconds:
+		_report()
+		if not stay:
+			_finish(_failures())
+
+
+## The storm's button: held while the run counts (for good with `--stay`), let go after. While it
+## counts, the manager's drawing is timed once more here (`update_draw` is safe to call again: it
+## writes the same batches), as the manager's own `_process` gives no clock of its own.
+func _process(_delta: float) -> void:
+	if not _active:
+		return
+	if not _reported:
+		var start: int = Time.get_ticks_usec()
+		_projectiles.call(&"update_draw")
+		var usec: int = Time.get_ticks_usec() - start
+		_draw_usec += usec
+		# The births are counted by the motes that took them (Feel's step, before this one): this
+		# second `update_draw` finds no moment past the first's, so it hands out none.
+		if bool(_projectiles.get("spark_motes")):
+			_mote_frames += 1
+		_draw_max_usec = maxi(_draw_max_usec, usec)
+		_draw_frames += 1
+	var hold: bool = stay or _elapsed < seconds
+	if hold != _held:
+		_input.call("send_virtual", PLAYER, STAFF_ACTIONS[STORM_STAFF], 1.0 if hold else 0.0)
+		_held = hold
+
+
+func _keep_wizard_up() -> void:
+	if not is_instance_valid(_wizard):
+		return
+	for at in _wizard.caster.staff_count:
+		_wizard.caster.set_mana(at, _wizard.caster.max_mana_of(at))
+	if _downed != null:
+		_downed.revive(PLAYER)
+		_downed.protect(1.0)
+
+
+func _on_projectile_hit(_caster: int, target: Node, _position: Vector2, _tag: int, _shot: int) -> void:
+	if _reported or target == null:
+		return
+	for i in _dummies.size():
+		var dummy: Actor = _dummies[i]
+		if is_instance_valid(dummy) and (target == dummy or dummy.is_ancestor_of(target)):
+			_dummy_hits[i] += 1
+			_hits += 1
+			return
+
+
+func _on_spell_cast(player: int, _spell_id: StringName, _origin: Vector2, _direction: Vector2) -> void:
+	if player == PLAYER and not _reported:
+		_casts += 1
+
+
+func _shots_made() -> int:
+	return int(_projectiles.get("_next_seq")) - _seq_at
+
+
+func _damage_of(i: int) -> float:
+	var dummy: Actor = _dummies[i]
+	if not is_instance_valid(dummy):
+		return 0.0
+	return maxf(_dummy_health[i] - float(_combat.call("health_of", dummy)), 0.0)
+
+
+## The window's line: what flies now and what has landed.
+func _line(count: int) -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for i in _dummies.size():
+		parts.append(str(_dummy_hits[i]))
+	return "shots %d (peak %d, cap %d)  made %d  casts %d  hits on dummies %d [%s]  %d FPS" % [
+		count, _peak_shots, int(_projectiles.call("get_cap")), _shots_made(), _casts, _hits,
+		" ".join(parts), roundi(Engine.get_frames_per_second())]
+
+
+func _report() -> void:
+	_reported = true
+	var made: int = _shots_made()
+	var mean: float = float(_shot_sum) / maxf(1.0, float(_shot_samples))
+	var waited: int = (int(_spells.get("fires_waited")) if _spells != null else 0) - _waited_at
+	print("BENCH: storm: %d casts, %d shots made (%.0f a second), alive mean %.0f peak %d of cap %d, dropped by the cap %d, trigger fires that waited %d" % [
+		_casts, made, float(made) / seconds, mean, _peak_shots, int(_projectiles.call("get_cap")),
+		int(_projectiles.get("dropped")) - _dropped_at, waited])
+	var damage: float = 0.0
+	for i in _dummies.size():
+		var dummy: Actor = _dummies[i]
+		var id: String = String(dummy.data.id) if is_instance_valid(dummy) and dummy.data != null else "?"
+		var at: Vector2 = dummy.global_position if is_instance_valid(dummy) else Vector2.INF
+		damage += _damage_of(i)
+		print("BENCH: storm: dummy %d (%s at %s): %d hits, %.0f damage" % [i + 1, id, at, _dummy_hits[i], _damage_of(i)])
+	print("BENCH: storm: %d hits on dummies in all (%.0f a second, %.2f%% of the shots made), %.0f damage" % [
+		_hits, float(_hits) / seconds, 100.0 * float(_hits) / maxf(1.0, float(made)), damage])
+	var frames: float = maxf(1.0, float(_draw_frames))
+	print("BENCH: storm draw: the manager's update_draw avg %.3f ms max %.3f ms a frame (%d frames), %d shots drawn at the end" % [
+		float(_draw_usec) / frames / 1000.0, float(_draw_max_usec) / 1000.0, _draw_frames,
+		int(_projectiles.get("drawn"))])
+	var motes: Node = _motes()
+	if motes == null:
+		print("BENCH: storm motes: off")
+	else:
+		var sixtieths: float = seconds * 60.0
+		var written: int = int(motes.get(&"written")) - _motes_written_at
+		var usec: float = float(int(motes.get(&"usec")) - _mote_usec_at)
+		print("BENCH: storm motes: cap %d, density %.1f, FRAME_ROWS %d: %.0f written a frame (%.0f a 60th of a second, %d in all), %.0f bursts cut short by the frame's rows a frame, %.2f chunks uploaded a frame, %d of %d chunks shown at the end" % [
+			int(motes.call(&"cap")), float(motes.get(&"density")), TimedMotesScript.FRAME_ROWS,
+			float(written) / frames, float(written) / sixtieths, written,
+			float(int(motes.get(&"cut")) - _motes_cut_at) / frames,
+			float(int(motes.get(&"uploads")) - _mote_uploads_at) / frames,
+			int(motes.call(&"chunks_shown")), int(motes.call(&"chunks_made"))])
+		if motes.get(&"usec") != null:
+			var calls: float = float(int(motes.get(&"calls")) - _mote_calls_at)
+			print("BENCH: storm motes: CPU %.3f ms a frame, %.3f ms a 60th of a second (%.2f us a mote written), in %.0f calls a frame (the timer's own cost is in it: mote_write.gd)" % [
+				usec / frames / 1000.0, usec / sixtieths / 1000.0, usec / maxf(1.0, float(written)), calls / frames])
+	if motes != null:
+		print("BENCH: storm draw: trail particles as motes in %d of the frames, %.1f births a frame there; %.1f settled motes a frame, %.1f past the frame's SETTLE_ROWS" % [
+			_mote_frames, float(int(motes.get(&"births")) - _births_at) / maxf(1.0, float(_mote_frames)),
+			float(int(motes.get(&"settles")) - _settles_at) / frames, float(int(motes.get(&"settles_skipped")) - _skipped_at) / frames])
+	if _probe != null:
+		_probe.call("report")
+	if _tree_profile != null:
+		_tree_profile.call(&"report")
+
+
+## The run's arguments: the user ones (after "--") and the plain ones, which is how a web page's
+## start config (`args`) hands them over in the Web Test export (`--storm`, the main menu).
+static func _arguments() -> PackedStringArray:
+	return OS.get_cmdline_user_args() + OS.get_cmdline_args()
+
+
+## The rack's STORM_ITEM lying in the hub (null when it lies there no more).
+func _rack_item() -> GroundItem:
+	var items: Node = get_tree().root.get_node_or_null("Items")
+	var data := get_tree().root.get_node("Registry").call("get_resource", &"items", STORM_ITEM) as StaffItem
+	if items == null or data == null:
+		return null
+	for item: GroundItem in items.call("lying"):
+		if item.title == data.shown_name():
+			return item
+	return null
+
+
+## `count` of the game's ticks (physics steps) go by.
+func _ticks(count: int) -> void:
+	for i in count:
+		await get_tree().physics_frame
+
+
+## Feel's motes (null with them off).
+func _motes() -> Node:
+	return _feel.call(&"motes") as Node if _feel != null else null
+
+
+func _failures() -> Array[String]:
+	var found: Array[String] = []
+	if _casts == 0:
+		found.append("the wizard never cast")
+	# Another build (`--cards`) may make no shots at all (a beam's hits are not shots).
+	if _hits == 0 and not _own_cards:
+		found.append("no shot hit a dummy")
+	var lines: Array[String] = _log.call("get_lines")
+	for line in lines:
+		found.append("the log has an error: " + line.trim_prefix("ERROR:").strip_edges())
+	return found
+
+
+func _finish(failed: Array[String]) -> void:
+	_active = false
+	if failed.is_empty():
+		print("STORM OK: %d casts, %d hits on %d dummies" % [_casts, _hits, _dummies.size()])
+		get_tree().quit(0)
+	else:
+		for reason in failed:
+			printerr("STORM FAILED: " + reason)
+		get_tree().quit(1)

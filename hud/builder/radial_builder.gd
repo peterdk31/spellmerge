@@ -197,7 +197,7 @@ const LT_GAP: StringName = &"gap"
 
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
-## Set by `hud/panels` from the pause menu's Sandbox page.
+## Set by `hud/panels` from the pause menu's Settings page.
 var layout: Layout = Layout.ALL:
 	set(value):
 		layout = value
@@ -211,7 +211,7 @@ var put: Put = Put.PUSH:
 		_refresh_preview()
 		_changed()
 ## A ring style that picks and draws the ring its own way (`rings/`, owner 2026-10-30), or null
-## for the plain ring. Set by `hud/panels` from the pause menu's Sandbox page.
+## for the plain ring. Set by `hud/panels` from the pause menu's Settings page.
 var ring_picker: RingPickerScript = null:
 	set(value):
 		ring_picker = value

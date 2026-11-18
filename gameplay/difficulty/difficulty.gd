@@ -12,7 +12,7 @@ extends Node
 ## events only.
 ##
 ## The level is the run's state (hashed, saved in snapshots): a run's start renews it to 1
-## (`begin_run`, `Tick.RUN_ORDER`), so out of a run of rooms (the hub, the sandbox) nothing is
+## (`begin_run`, `Tick.RUN_ORDER`), so out of a run of rooms (the hub) nothing is
 ## scaled. A body already standing keeps the numbers it stood with (a snapshot restores them).
 
 const EventsScript := preload("res://core/events/events.gd")

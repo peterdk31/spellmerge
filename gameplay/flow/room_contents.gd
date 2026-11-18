@@ -108,20 +108,6 @@ static func first_of_role(registry: RegistryScript, role: StringName) -> PropBas
 	return found
 
 
-## Stand fresh bodies for the placements of `places` whose data is of class `kind` (the sandbox's
-## dummies put back): the old ones there go first.
-func stand_again(world: Node2D, places: RoomPlaces, kind: Script) -> void:
-	for i in mini(places.placed.size(), bodies.size()):
-		if not is_instance_of(places.placed[i], kind):
-			continue
-		var old: Node = bodies[i]
-		if old != null and is_instance_valid(old):
-			if old.get_parent() != null:
-				old.get_parent().remove_child(old)
-			old.queue_free()
-		bodies[i] = _stand(world, places, i)
-
-
 ## The bodies standing whose data is of class `kind`, in order.
 func of_kind(kind: Script) -> Array[Node]:
 	var found: Array[Node] = []

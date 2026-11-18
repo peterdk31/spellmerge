@@ -9,7 +9,7 @@ const FlowScript := preload("res://gameplay/flow/flow.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## The yard's props by id (every prop with no role).
-const YARD: Array[StringName] = [&"arc_lodestone", &"burial_jar", &"cracked_pillar", &"crate", &"dust_heap", &"exploding_barrel", &"fire_pit", &"fountain"]
+const YARD: Array[StringName] = [&"arc_lodestone", &"burial_jar", &"cracked_pillar", &"crate", &"crypt_pillar", &"dust_heap", &"exploding_barrel", &"fire_pit", &"fountain"]
 
 const DT: float = 1.0 / 60.0
 
@@ -140,7 +140,16 @@ func test_a_yard_prop_that_goes_stands_again() -> void:
 
 func test_a_room_without_a_yard_stands_none() -> void:
 	input.add_virtual_device(0)
-	root.get_node("Events").emit_signal("sandbox_requested", 0)
-	check_equal(flow.mode, FlowScript.MODE_SANDBOX, "the sandbox")
+	# A run of rooms: the crypt's rooms have no yard.
+	root.get_node("Events").emit_signal("play_requested", 0)
+	check(flow.mode == FlowScript.MODE_RUN and flow.world != null, "a run of rooms")
 	check(flow.yard_props().is_empty(), "no yard there")
-	check(flow.room_props().is_empty(), "and no props")
+	# The room's own props are its placements (a crypt room's pillars have no role since crypt rework
+	# CR3/CR4), so each one standing is one of its own, never a yard's extra.
+	var room: RoomBase = _registry.get_resource(&"rooms", flow.room_id) as RoomBase
+	var own_ids: Array[StringName] = []
+	for prop: Resource in room.places().placed_of(PropBase):
+		own_ids.append((prop as PropBase).id)
+	check_equal(flow.room_props().size(), own_ids.size(), "%s stands its own props and no more" % flow.room_id)
+	for body: Node in flow.room_props():
+		check(own_ids.has((body as Actor).prop.id), "only the room's own props (%s), none of the yard's" % (body as Actor).prop.id)

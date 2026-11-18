@@ -27,6 +27,8 @@ const SHAKE_RATE: Vector2 = Vector2(97.0, 83.0)
 ## this long while the animation says so (it fades right after).
 const POSE_MOODS: Dictionary = {&"raised": Face.Mood.RAISED, &"angry": Face.Mood.ANGRY, &"furious": Face.Mood.FURIOUS, &"worried": Face.Mood.WORRIED}
 const POSE_MOOD_SECONDS: float = 0.08
+## `pose_offset`'s, `pose_scale`'s and `apply_pose`'s `dir` when the caller has not read `pose_dir()`.
+const UNREAD: Vector2 = Vector2.INF
 
 ## View as a whole: the state walk never enters it (core/sim/README.md).
 const VIEW_ONLY: bool = true
@@ -63,20 +65,26 @@ func pose_dir() -> Vector2:
 
 ## How far the animation moves the body now: up by its lift, along the aim by its push and about by
 ## its shake (at `time`, the look's own clock), in whole pixels; zero while it plays none.
-func pose_offset(time: float) -> Vector2:
-	var dir: Vector2 = pose_dir()
+##
+## `dir` is `pose_dir()` when the caller read it already this step (a look asks several of these a
+## step, and each read walks the animation's table: `UNREAD` reads it here).
+func pose_offset(time: float, dir: Vector2 = UNREAD) -> Vector2:
+	if dir == UNREAD:
+		dir = pose_dir()
 	if dir.is_zero_approx():
 		return Vector2.ZERO
-	var pose: Vector3 = actor.spells.poses().staff_pose(actor.id)
-	var shake: float = actor.spells.poses().staff_shake(actor.id)
+	var poses: StaffPoses = actor.spells.poses()
+	var pose: Vector3 = poses.staff_pose(actor.id)
+	var shake: float = poses.staff_shake(actor.id)
 	var jitter: Vector2 = Vector2(sin(time * SHAKE_RATE.x), cos(time * SHAKE_RATE.y)) * shake
 	return (Vector2(0.0, -pose.y) + dir * pose.z + jitter).round()
 
 
 ## The body's scale for the animation's stretch: longer along the axis its aim runs most along,
 ## thinner across (its area kept), squashed for a negative stretch; one while it plays none.
-func pose_scale() -> Vector2:
-	var dir: Vector2 = pose_dir()
+func pose_scale(dir: Vector2 = UNREAD) -> Vector2:
+	if dir == UNREAD:
+		dir = pose_dir()
 	if dir.is_zero_approx():
 		return Vector2.ONE
 	var along: float = maxf(1.0 + actor.spells.poses().staff_stretch(actor.id), 0.2)
@@ -87,11 +95,15 @@ func pose_scale() -> Vector2:
 
 ## Shows the animation's stretch (unless `keep_scale`: another look owns the scale, a dash),
 ## glow and mood on `sprite` and `face` (either may be null). Feel's flash on a hit keeps the
-## sprite while it shows; the glow takes it back after, and gives it up when it ends.
-func apply_pose(sprite: Sprite2D, face: Face, keep_scale: bool) -> void:
-	var posing: bool = not pose_dir().is_zero_approx()
-	if sprite != null and not keep_scale:
-		var scale_now: Vector2 = pose_scale()
+## sprite while it shows; the glow takes it back after, and gives it up when it ends. `dir` as for
+## `pose_offset`.
+func apply_pose(sprite: Sprite2D, face: Face, keep_scale: bool, dir: Vector2 = UNREAD) -> void:
+	if dir == UNREAD:
+		dir = pose_dir()
+	var posing: bool = not dir.is_zero_approx()
+	# While it plays none the scale is one, so only a body it stretched has its scale put back.
+	if sprite != null and not keep_scale and (posing or _pose_stretched):
+		var scale_now: Vector2 = pose_scale(dir)
 		if scale_now != Vector2.ONE or _pose_stretched:
 			_pose_stretched = scale_now != Vector2.ONE
 			sprite.scale = scale_now
@@ -101,6 +113,16 @@ func apply_pose(sprite: Sprite2D, face: Face, keep_scale: bool) -> void:
 		var mood: StringName = actor.spells.poses().staff_mood(actor.id)
 		if POSE_MOODS.has(mood):
 			face.show_mood(POSE_MOODS[mood] as Face.Mood, POSE_MOOD_SECONDS)
+
+
+## `apply_pose` then `pose_offset`, for a look that shows both every step: at once while no
+## animation plays (`dir`, `pose_dir()` read this step, is zero) and none is left on `sprite` to
+## put back (its stretch, its glow).
+func show_pose(sprite: Sprite2D, face: Face, keep_scale: bool, time: float, dir: Vector2) -> Vector2:
+	if dir.is_zero_approx() and not _pose_stretched and not is_glowing(sprite):
+		return Vector2.ZERO
+	apply_pose(sprite, face, keep_scale, dir)
+	return pose_offset(time, dir)
 
 
 ## True while the body glows with its animation.

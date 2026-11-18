@@ -65,6 +65,13 @@ constexpr int F_WAVE = 128;
 constexpr int F_DEFERRED = 256;
 // The manager's F_QUAD: a shot of a still body (a rune's, a stone's), whatever its motion.
 constexpr int F_QUAD = 512;
+constexpr int F_ALONE = 1024;
+constexpr int F_SPENT = 2048;
+constexpr int F_STUCK = 16;
+// A hit's share of the hit-work budget (`HIT_WORK`).
+constexpr int64_t HIT_WORK = 400;
+// `HitBatch.SPELL_MIX`: the multiplier that spreads tags over the batch's table of spells' damage.
+constexpr int64_t SPELL_MIX = -7046029254386353131LL;
 constexpr int CASTER_BODY = -1;
 constexpr int CASTER_POINT = -2;
 constexpr double SPIRAL_PERIOD = 0.5;
@@ -190,10 +197,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(cand_target, "_cand_target", PACKED_INT32_ARRAY) \
 	X(cand_along, "_cand_along", PACKED_FLOAT32_ARRAY) \
 	X(cand_point, "_cand_point", PACKED_VECTOR2_ARRAY) \
-	X(wall_cells, "_wall_cells", PACKED_BYTE_ARRAY) \
-	X(wall_w, "_wall_w", INT) \
-	X(wall_h, "_wall_h", INT) \
-	X(has_walls, "_has_walls", BOOL) \
+	X(room_grid, "_room_grid", OBJECT) \
 	X(bounds, "_bounds", RECT2) \
 	X(grid_x, "_grid_x", FLOAT) \
 	X(grid_y, "_grid_y", FLOAT) \
@@ -235,6 +239,12 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(tail_carry, "_tail_carry", PACKED_FLOAT32_ARRAY) \
 	X(tail_n, "_tail_n", PACKED_INT32_ARRAY) \
 	X(tag, "_tag", PACKED_INT64_ARRAY) \
+	X(pierce, "_pierce", PACKED_INT32_ARRAY) \
+	X(stick, "_stick", PACKED_FLOAT32_ARRAY) \
+	X(batch, "_hit_batch", OBJECT) \
+	X(sent, "_sent", INT) \
+	X(merged_turns, "merged_turns", INT) \
+	X(merged_opens, "merged_opens", INT) \
 	X(spark_births, "spark_births", PACKED_FLOAT32_ARRAY) \
 	X(tail_births_on, "tail_births_on", BOOL) \
 	X(tail_births_cap, "tail_births_cap", INT) \
@@ -291,13 +301,67 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(targets, "_targets", ARRAY) \
 	X(target_team, "_target_team", PACKED_INT32_ARRAY)
 
+// Every member of the manager's room grid (`RoomGrid`, `_room_grid`) the hit pass reads: its wall
+// cells and their size, and the area they cover (hit batch B1). Checked on the grid by `check_fields`.
+#define GRID_FIELDS(X) \
+	X(wall_cells, "_wall_cells", PACKED_BYTE_ARRAY) \
+	X(wall_w, "_wall_w", INT) \
+	X(wall_h, "_wall_h", INT) \
+	X(has_walls, "_has_walls", BOOL) \
+	X(wall_bounds, "_bounds", RECT2)
+
+// Every member of the manager's hit batch (`HitBatch`, `_hit_batch`) the hit pass reads: its entries
+// (each one's next on its target, caster, target, tag, shot and its sequence, point, heading, count,
+// damage a hit, whether it meets the barrier), the bodies' tallies in pass `_pass`, the spent
+// shots' list (hit batch A1), and the rooms and spells' damage the pass was told (A4). Checked on
+// the batch by `check_fields`.
+#define BATCH_FIELDS(X) \
+	X(mh_pass, "_pass", INT) \
+	X(mh_head, "_head", PACKED_INT32_ARRAY) \
+	X(mh_target_pass, "_target_pass", PACKED_INT32_ARRAY) \
+	X(mh_next, "_next", PACKED_INT32_ARRAY) \
+	X(mh_caster, "caster", PACKED_INT32_ARRAY) \
+	X(mh_tag, "tag", PACKED_INT64_ARRAY) \
+	X(mh_slot, "slot", PACKED_INT32_ARRAY) \
+	X(mh_count, "count", PACKED_INT32_ARRAY) \
+	X(mh_damage, "_damage", PACKED_FLOAT64_ARRAY) \
+	X(mh_health, "_health", PACKED_FLOAT64_ARRAY) \
+	X(mh_spent, "_spent", PACKED_FLOAT64_ARRAY) \
+	X(mh_blocks, "_blocks", PACKED_BYTE_ARRAY) \
+	X(mh_charges, "_charges", PACKED_INT32_ARRAY) \
+	X(mh_charges_used, "_charges_used", PACKED_INT32_ARRAY) \
+	X(mh_used, "_used", PACKED_INT32_ARRAY) \
+	X(mh_used_at, "_used_at", PACKED_VECTOR2_ARRAY) \
+	X(mh_used_n, "_used_n", INT) \
+	X(mh_target, "target", PACKED_INT32_ARRAY) \
+	X(mh_seq, "seq", PACKED_INT64_ARRAY) \
+	X(mh_at, "at", PACKED_VECTOR2_ARRAY) \
+	X(mh_heading, "heading", PACKED_VECTOR2_ARRAY) \
+	X(mh_entries, "entries", INT) \
+	X(room_pass, "_room_pass", PACKED_INT32_ARRAY) \
+	X(room_at, "_room_at", PACKED_INT64_ARRAY) \
+	X(room_known, "_room_known", PACKED_BYTE_ARRAY) \
+	X(room_health, "_room_health", PACKED_FLOAT64_ARRAY) \
+	X(room_hexed, "_room_hexed", PACKED_BYTE_ARRAY) \
+	X(room_hex, "_room_hex", PACKED_FLOAT64_ARRAY) \
+	X(room_charges, "_room_charges", PACKED_INT32_ARRAY) \
+	X(room_spares, "_room_spares", PACKED_INT64_ARRAY) \
+	X(spell_key, "_spell_key", PACKED_INT64_ARRAY) \
+	X(spell_pass, "_spell_pass", PACKED_INT32_ARRAY) \
+	X(spell_at, "_spell_at", PACKED_INT64_ARRAY) \
+	X(spell_damage, "_spell_damage", PACKED_FLOAT64_ARRAY)
+
 struct Names {
 #define SM_DECLARE(id, gd, type) StringName id;
 	MANAGER_FIELDS(SM_DECLARE)
+	GRID_FIELDS(SM_DECLARE)
+	BATCH_FIELDS(SM_DECLARE)
 #undef SM_DECLARE
 	Names() {
 #define SM_INIT(id, gd, type) id = StringName(gd);
 		MANAGER_FIELDS(SM_INIT)
+		GRID_FIELDS(SM_INIT)
+		BATCH_FIELDS(SM_INIT)
 #undef SM_INIT
 	}
 };
@@ -440,9 +504,32 @@ struct HitPass {
 	int64_t work_left = 0, starved_at = 0, mark_stamp = 0, mem_free = 0;
 	bool has_walls = false;
 	Rect2 bounds;
+	// Where the room grid's first cell starts (its `_bounds`, the same area as the manager's).
+	Vector2 wall_origin;
 	double grid_x = 0.0, grid_y = 0.0, max_target_reach = 0.0;
 
 	bool targets_loaded = false;
+	// The merged hits (the hit batch's, `HitPass::merge_hits`), read the first time a shot found hits.
+	bool merge_loaded = false;
+	Arr<PackedInt32Array> pierce, mh_head, mh_target_pass, mh_next, mh_caster, mh_slot, mh_count, mh_used, mh_charges, mh_charges_used;
+	Arr<PackedByteArray> mh_blocks;
+	Arr<PackedFloat32Array> stick;
+	Arr<PackedInt64Array> tag, mh_tag;
+	Arr<PackedFloat64Array> mh_damage, mh_health, mh_spent;
+	Arr<PackedVector2Array> mh_used_at;
+	int64_t mh_pass = 0, mh_used_n = 0, merged_turns = 0;
+	// What opening an entry reads and writes (hit batch A4): the entries' other fields, the shots'
+	// way and sequence, the bodies' rooms and the spells' damage as the pass was told them, and the
+	// manager's count of events (a room or a damage told before the count moved is asked again).
+	Arr<PackedInt32Array> mh_target, room_pass, room_charges, spell_pass;
+	Arr<PackedInt64Array> mh_seq, room_at, room_spares, spell_key, spell_at, shot_seq;
+	Arr<PackedVector2Array> mh_at, mh_heading, shot_vel;
+	Arr<PackedByteArray> room_known, room_hexed;
+	Arr<PackedFloat64Array> room_health, room_hex, spell_damage;
+	int64_t mh_entries = 0, sent = 0, merged_opens = 0;
+	bool opened = false;
+	// The manager's hit batch, whose arrays the merge reads (`load_merge`).
+	Object *batch = nullptr;
 	// `_untested`, read only for a deferred shot (`defer`, `scan`).
 	bool untested_loaded = false;
 	// For catching up a waiting homing shot (`load_homing`).
@@ -545,19 +632,24 @@ struct HitPass {
 		const Names &k = *names;
 		state.load(m, k.state);
 		motion.load(m, k.motion);
-		wall_cells.load(m, k.wall_cells);
 		pos.load(m, k.pos);
 		prev.load(m, k.prev);
 		flags.load(m, k.flags);
 		layers.load(m, k.layers);
 		target_id.load(m, k.target_id);
 		target_key.load(m, k.target_key);
-		wall_w = m->get(k.wall_w);
-		wall_h = m->get(k.wall_h);
 		work_left = m->get(k.work_left);
 		starved_at = m->get(k.starved_at);
-		has_walls = m->get(k.has_walls);
 		bounds = m->get(k.bounds);
+		// The room grid's walls, read from the grid (hit batch B1), last: with no grid (which
+		// `check_fields` refuses before any pass) the pass sees no walls, its other arrays loaded.
+		Object *grid = m->get(k.room_grid);
+		ERR_FAIL_NULL(grid);
+		wall_cells.load(grid, k.wall_cells);
+		wall_w = grid->get(k.wall_w);
+		wall_h = grid->get(k.wall_h);
+		has_walls = grid->get(k.has_walls);
+		wall_origin = ((Rect2)grid->get(k.wall_bounds)).position;
 	}
 
 	void load_untested(Object *m) {
@@ -618,11 +710,284 @@ struct HitPass {
 		max_target_reach = m->get(k.max_target_reach);
 	}
 
+	void load_merge(Object *m) {
+		const Names &k = *names;
+		merge_loaded = true;
+		pierce.load(m, k.pierce);
+		stick.load(m, k.stick);
+		tag.load(m, k.tag);
+		merged_turns = m->get(k.merged_turns);
+		merged_opens = m->get(k.merged_opens);
+		// The hit batch's, read from the batch (hit batch A1).
+		Object *b = m->get(k.batch);
+		ERR_FAIL_NULL(b);
+		batch = b;
+		mh_head.load(b, k.mh_head);
+		mh_target_pass.load(b, k.mh_target_pass);
+		mh_next.load(b, k.mh_next);
+		mh_caster.load(b, k.mh_caster);
+		mh_tag.load(b, k.mh_tag);
+		mh_slot.load(b, k.mh_slot);
+		mh_count.load(b, k.mh_count);
+		mh_damage.load(b, k.mh_damage);
+		mh_health.load(b, k.mh_health);
+		mh_spent.load(b, k.mh_spent);
+		mh_blocks.load(b, k.mh_blocks);
+		mh_charges.load(b, k.mh_charges);
+		mh_charges_used.load(b, k.mh_charges_used);
+		mh_used.load(b, k.mh_used);
+		mh_used_at.load(b, k.mh_used_at);
+		mh_pass = b->get(k.mh_pass);
+		mh_used_n = b->get(k.mh_used_n);
+		mh_target.load(b, k.mh_target);
+		mh_seq.load(b, k.mh_seq);
+		mh_at.load(b, k.mh_at);
+		mh_heading.load(b, k.mh_heading);
+		mh_entries = b->get(k.mh_entries);
+		room_pass.load(b, k.room_pass);
+		room_at.load(b, k.room_at);
+		room_known.load(b, k.room_known);
+		room_health.load(b, k.room_health);
+		room_hexed.load(b, k.room_hexed);
+		room_hex.load(b, k.room_hex);
+		room_charges.load(b, k.room_charges);
+		room_spares.load(b, k.room_spares);
+		spell_key.load(b, k.spell_key);
+		spell_pass.load(b, k.spell_pass);
+		spell_at.load(b, k.spell_at);
+		spell_damage.load(b, k.spell_damage);
+		shot_vel.load(m, k.vel);
+		shot_seq.load(m, k.seq);
+		sent = m->get(k.sent);
+	}
+
+	// `is_instance_valid(_targets[t])`: the node of the id kept beside it still exists.
+	bool target_valid(int64_t t) {
+		return ::godot::gdextension_interface::object_get_instance_from_id((GDObjectInstanceID)target_id[t]) != nullptr;
+	}
+
+	// `HitBatch.takes`, negated.
+	bool killed_this_pass(int64_t t) {
+		return t < mh_target_pass.n && mh_target_pass[t] == mh_pass && mh_spent[t] >= mh_health[t];
+	}
+
+	// The merged hit `_merge_hit` would add the shot in `slot`'s hit on `t` to, or -1 when it would
+	// make a new one (`HitBatch.add_to`).
+	int64_t merged_entry(int64_t slot, int64_t t) {
+		if (t >= mh_target_pass.n || mh_target_pass[t] != mh_pass || (flags[slot] & F_ALONE) != 0) {
+			return -1;
+		}
+		const int64_t caster = actor[slot];
+		const int64_t tg = tag[slot];
+		for (int64_t e = mh_head[t]; e >= 0; e = mh_next[e]) {
+			if (mh_caster[e] == caster && mh_tag[e] == tg && (flags[mh_slot[e]] & F_ALONE) == 0) {
+				return e;
+			}
+		}
+		return -1;
+	}
+
+	// The slot of the spell `spell`'s damage told in this pass with no event since, or -1: the probe
+	// of `HitBatch.add` (the same mix, the same walk).
+	int64_t kept_damage(int64_t spell) {
+		if (spell_key.n == 0) {
+			return -1;
+		}
+		const int64_t mask = spell_key.n - 1;
+		int64_t i = ((int64_t)((uint64_t)spell * (uint64_t)SPELL_MIX) >> 32) & mask;
+		while (spell_pass[i] == mh_pass && spell_key[i] != spell) {
+			i = (i + 1) & mask;
+		}
+		return spell_pass[i] == mh_pass && spell_at[i] == sent ? i : -1;
+	}
+
+	// Whether the kernel may open the entry `_merge_hit` would open for the shot in `slot`'s hit on
+	// `t` (hit batch A4): the body's room and the spell's damage told in this pass with no event
+	// since, so `add` would ask nothing; never for a shot alone (it asks for itself).
+	bool can_open(int64_t slot, int64_t t) {
+		if ((flags[slot] & F_ALONE) != 0 || t >= room_pass.n || t >= mh_target_pass.n) {
+			return false;
+		}
+		if (room_pass[t] != mh_pass || room_at[t] != sent || mh_target_pass[t] != mh_pass) {
+			return false;
+		}
+		return kept_damage(tag[slot]) >= 0;
+	}
+
+	// `_merge_hit`'s new entry for an opening `can_open` allowed, at `point`, as `HitBatch.add` and
+	// `take_room` write it, but its look (carrier card, body, core, look bits), which GDScript
+	// fills from the slot when the call returns (`_look_kernel_entries`).
+	void open_entry(int64_t slot, int64_t t, const Vector2 &point) {
+		Vector2 way = shot_vel[slot].normalized();
+		if (way == Vector2()) {
+			way = (target_pos[t] - point).normalized();
+			if (way == Vector2()) {
+				way = Vector2(1, 0);
+			}
+		}
+		const int64_t entry = mh_entries;
+		mh_entries += 1;
+		opened = true;
+		merged_opens += 1;
+		int64_t last = mh_head[t];
+		while (mh_next[last] >= 0) {
+			last = mh_next[last];
+		}
+		mh_next[last] = (int32_t)entry;
+		mh_next[entry] = -1;
+		mh_caster[entry] = actor[slot];
+		mh_target[entry] = (int32_t)t;
+		mh_tag[entry] = tag[slot];
+		mh_slot[entry] = (int32_t)slot;
+		mh_seq[entry] = shot_seq[slot];
+		mh_at[entry] = point;
+		mh_heading[entry] = way;
+		mh_count[entry] = 1;
+		// `take_room`, with the room and the damage kept.
+		const double spell_damage_now = spell_damage[kept_damage(tag[slot])];
+		if (room_known[t] == 0) {
+			mh_damage[entry] = 0.0;
+			mh_health[t] = INFINITY;
+			mh_blocks[entry] = 0;
+		} else {
+			mh_health[t] = room_health[t];
+			double d = spell_damage_now;
+			if (room_hexed[t] != 0) {
+				d += d * room_hex[t] / 100.0;
+			}
+			if (d <= 0.0) {
+				mh_damage[entry] = 0.0;
+				mh_blocks[entry] = 0;
+			} else {
+				mh_damage[entry] = d;
+				const int64_t spares = room_spares[t];
+				const bool meets = room_charges[t] > 0 && (spares == 0 || spares != mh_tag[entry]);
+				mh_blocks[entry] = meets ? 1 : 0;
+				if (meets) {
+					mh_charges[t] = room_charges[t];
+				}
+			}
+		}
+		spend_room(t, entry);
+	}
+
+	// `HitBatch._spend_room`: one hit of `e` on `t`, a barrier's charge, else its damage.
+	void spend_room(int64_t t, int64_t e) {
+		if (mh_blocks[e] != 0 && mh_charges_used[t] < mh_charges[t]) {
+			mh_charges_used[t] += 1;
+		} else {
+			mh_spent[t] += mh_damage[e];
+		}
+	}
+
+	// `_hit_found` of a shot whose `found` hits, as `_hit_candidates` takes them, each add to a merged
+	// hit the pass already has or open one `can_open` allows (no event, nothing GDScript must do): the
+	// budget, the pierce, the hit memory, the spent mark, the merged counts, the new entries and the
+	// bodies' tallies, exactly as GDScript writes them. False, changing nothing, for any other (an
+	// entry that would ask Combat, a stick, a shot alone, no memory or entry left without growing):
+	// GDScript takes it.
+	bool merge_hits(int64_t slot, int64_t found) {
+		if (stick[slot] > 0.0f) {
+			return false;
+		}
+		// The dry run: the same turns of the loop, written nowhere.
+		int64_t left = pierce[slot];
+		int64_t remembers = 0;
+		int64_t opens = 0;
+		bool spent = false;
+		for (int64_t c = 0; c < found; c++) {
+			if (spent) {
+				break;
+			}
+			const int64_t t = cand_target[c];
+			if (target_layer[t] == 0 || !target_valid(t) || killed_this_pass(t)) {
+				continue;
+			}
+			if (merged_entry(slot, t) < 0) {
+				if (!can_open(slot, t)) {
+					return false;
+				}
+				opens += 1;
+			}
+			if (left > 0) {
+				left -= 1;
+				remembers += 1;
+			} else {
+				spent = true;
+			}
+		}
+		if (spent && mh_used_n >= mh_used.n) {
+			return false;
+		}
+		// The batch never grows here: an entry the arrays have no room for is GDScript's to open.
+		if (mh_entries + opens > mh_caster.n) {
+			return false;
+		}
+		// `_remember` grows the memory when its free list runs out: GDScript's to do.
+		int64_t free_at = mem_free;
+		for (int64_t r = 0; r < remembers; r++) {
+			if (free_at < 0) {
+				return false;
+			}
+			free_at = mem_next[free_at];
+		}
+		// The turns again, written.
+		for (int64_t c = 0; c < found; c++) {
+			if ((flags[slot] & (F_STUCK | F_SPENT)) != 0) {
+				break;
+			}
+			const int64_t t = cand_target[c];
+			if (target_layer[t] == 0 || !target_valid(t) || killed_this_pass(t)) {
+				continue;
+			}
+			work_left -= HIT_WORK;
+			const int64_t e = merged_entry(slot, t);
+			if (pierce[slot] > 0) {
+				pierce[slot] -= 1;
+				// `_remember`.
+				const int64_t at = mem_free;
+				mem_free = mem_next[at];
+				mem_id[at] = target_key[t];
+				mem_target[at] = (int32_t)t;
+				mem_seen[at] = (int32_t)mem_step;
+				mem_next[at] = mem_head[slot];
+				mem_head[slot] = (int32_t)at;
+			} else {
+				flags[slot] = flags[slot] | F_SPENT;
+				mh_used[mh_used_n] = (int32_t)slot;
+				mh_used_at[mh_used_n] = cand_point[c];
+				mh_used_n += 1;
+			}
+			if (e >= 0) {
+				// `HitBatch.add_to`: a hit on a merged one.
+				mh_count[e] += 1;
+				spend_room(t, e);
+			} else {
+				open_entry(slot, t, cand_point[c]);
+			}
+		}
+		if ((flags[slot] & F_SPENT) == 0) {
+			forget_left(slot);
+		}
+		merged_turns += 1;
+		return true;
+	}
+
 	// The counters back to the manager (only what this call could have changed).
 	void save(Object *m, int64_t found, int64_t starved_before) const {
 		const Names &k = *names;
 		if (starved_at != starved_before) {
 			m->set(k.starved_at, starved_at);
+		}
+		if (merge_loaded) {
+			if (batch != nullptr) {
+				batch->set(k.mh_used_n, mh_used_n);
+				if (opened) {
+					batch->set(k.mh_entries, mh_entries);
+				}
+			}
+			m->set(k.merged_turns, merged_turns);
+			m->set(k.merged_opens, merged_opens);
 		}
 		if (targets_loaded) {
 			m->set(k.work_left, work_left);
@@ -634,12 +999,12 @@ struct HitPass {
 		}
 	}
 
-	// `_wall_hit` with its default visits.
+	// `RoomGrid.wall_hit` with its default visits.
 	double wall_hit(const Vector2 &from, const Vector2 &to) {
 		if (!has_walls) {
 			return -1.0;
 		}
-		const Vector2 start = (from - bounds.position) / (real_t)WALL_CELL;
+		const Vector2 start = (from - wall_origin) / (real_t)WALL_CELL;
 		const Vector2 delta = (to - from) / (real_t)WALL_CELL;
 		int64_t cx = floori(start.x);
 		int64_t cy = floori(start.y);
@@ -1006,6 +1371,13 @@ const Constant CONSTANTS[] = {
 	{ "LIGHT_REACH_FLOAT", (double)LIGHT_REACH_FLOAT },
 	{ "LIGHT_INTENSITY_FLOAT", (double)LIGHT_INTENSITY_FLOAT },
 	{ "F_GHOST", (double)F_GHOST },
+	{ "F_ALONE", (double)F_ALONE },
+	{ "F_SPENT", (double)F_SPENT },
+	{ "F_STUCK", (double)F_STUCK },
+	{ "HIT_WORK", (double)HIT_WORK },
+	// In halves, each exact as a double (the manager's map has them, `native_constants`).
+	{ "SPELL_MIX_HIGH", (double)(int64_t)((uint64_t)SPELL_MIX >> 32) },
+	{ "SPELL_MIX_LOW", (double)(int64_t)((uint64_t)SPELL_MIX & 0xFFFFFFFFull) },
 	{ "F_FALLING", (double)F_FALLING },
 	{ "S_IDLE", (double)S_IDLE },
 	{ "S_MOVING", (double)S_MOVING },
@@ -1110,6 +1482,30 @@ PackedStringArray ShotKernel::check_fields(Object *manager) const {
 	}
 	MANAGER_FIELDS(SM_CHECK)
 #undef SM_CHECK
+	// The room grid's, on the grid (hit batch B1).
+	Object *grid = manager->get(names->room_grid);
+	if (grid == nullptr) {
+		wrong.push_back(String("member _room_grid missing or empty"));
+		return wrong;
+	}
+#define SM_GRID_CHECK(id, gd, type)                                     \
+	if (grid->get(names->id).get_type() != Variant::type) {             \
+		wrong.push_back(String("room grid member ") + gd + " missing or not " #type); \
+	}
+	GRID_FIELDS(SM_GRID_CHECK)
+#undef SM_GRID_CHECK
+	// The hit batch's, on the batch (hit batch A1).
+	Object *batch = manager->get(names->batch);
+	if (batch == nullptr) {
+		wrong.push_back(String("member _hit_batch missing or empty"));
+		return wrong;
+	}
+#define SM_BATCH_CHECK(id, gd, type)                                     \
+	if (batch->get(names->id).get_type() != Variant::type) {             \
+		wrong.push_back(String("hit batch member ") + gd + " missing or not " #type); \
+	}
+	BATCH_FIELDS(SM_BATCH_CHECK)
+#undef SM_BATCH_CHECK
 	return wrong;
 }
 
@@ -1222,6 +1618,13 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 			}
 			const int64_t found = h.scan(slot);
 			if (found > 0) {
+				// Hits that only add to merged ones are taken here; any other goes to GDScript.
+				if (!h.merge_loaded) {
+					h.load_merge(m);
+				}
+				if (h.merge_hits(slot, found)) {
+					continue;
+				}
 				h.save(m, found, starved_before);
 				return n * 2 + YIELD_FOUND;
 			}

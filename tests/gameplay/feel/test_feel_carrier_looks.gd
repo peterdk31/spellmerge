@@ -70,11 +70,16 @@ func _cast(player: int, carrier_card: StringName) -> void:
 
 ## A shot of `carrier_card` ends on a wall at (50, 50) (the manager names the carrier card, the core colour and
 ## the look while it sends the impact, as it does for a real shot; the carrier card last cast has no say).
-func _impact(player: int, carrier_card: StringName = &"", core: Color = Color.WHITE, look: int = 0, target: Node = null) -> void:
+## The `i`-th spot of wall of a row of them, each a spot apart (`Feel.WALL_SPOT`).
+func _spot(i: int) -> Vector2:
+	return Vector2(8.0 + float(i % 40) * FeelScript.WALL_SPOT, 8.0 + float(i / 40) * FeelScript.WALL_SPOT)
+
+
+func _impact(player: int, carrier_card: StringName = &"", core: Color = Color.WHITE, look: int = 0, target: Node = null, at: Vector2 = Vector2(50, 50)) -> void:
 	projectiles.impact_carrier_card = carrier_card
 	projectiles.impact_core = core
 	projectiles.impact_look = look
-	bus.projectile_impact.emit(player, target, Vector2(50, 50), Vector2.RIGHT)
+	bus.projectile_impact.emit(player, target, at, Vector2.RIGHT)
 	projectiles.impact_carrier_card = &""
 	projectiles.impact_core = Color.WHITE
 	projectiles.impact_look = 0
@@ -234,8 +239,9 @@ func test_a_hit_on_a_character_shows_the_flare_too() -> void:
 
 
 func test_flashes_past_the_slots_take_the_oldest() -> void:
+	# Each on a spot of its own (a staff shows one impact a spot of wall a frame, `Feel.WALL_SPOT`).
 	for i in feel.effect_slots + 20:
-		_impact(i % 4, &"bolt")
+		_impact(i % 4, &"bolt", Color.WHITE, 0, null, _spot(i))
 	check_equal(feel.live_flashes(), feel.effect_slots, "every slot busy, no more")
 
 
@@ -348,7 +354,7 @@ func test_the_effect_slots_setting_sizes_the_batch() -> void:
 	check_equal(feel._flash_node.multimesh.instance_count, 128, "the batch has that room")
 	check_equal(feel.live_flashes(), 0, "the flashes showing end")
 	for i in 200:
-		_impact(i % 4, &"bolt")
+		_impact(i % 4, &"bolt", Color.WHITE, 0, null, _spot(i))
 	check_equal(feel.live_flashes(), 128, "no more than the setting")
 	feel.step(0.01)
 	check_equal(feel._flash_node.multimesh.visible_instance_count, 128, "and all of them drawn")

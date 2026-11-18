@@ -6,8 +6,8 @@ extends RefCounted
 ## walls (room walls and solid shots, which shots see too) and the ground of the bodies that cannot
 ## move (props W4, which only walking bodies see). It replaces Godot's `move_and_slide`, whose solver is the engine's and not
 ## guaranteed the same across platforms and builds. The projectile manager owns the wall grid
-## (room walls and solid shots, one byte a `cell`-pixel square from `origin`, 0 for open) and asks
-## this through `ProjectileManager.slide_body`; it knows nothing of the grid's owner.
+## (room walls and solid shots, one byte a `cell`-pixel square from `origin`, 0 for open) in its room grid
+## (`RoomGrid`), which asks this through `RoomGrid.slide_body`; it knows nothing of the grid's owner.
 ##
 ## **Native:** `slide` runs the native module's `BodyKernel` when it is loaded, else `gd_slide`,
 ## this file's GDScript, which the C++ mirrors line by line (native/README.md), as `DMath` does;

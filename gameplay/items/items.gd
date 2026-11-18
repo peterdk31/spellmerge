@@ -143,9 +143,9 @@ func step(_delta: float) -> void:
 ## Lay `stack` (a copy of it) at `at`, shown as `title` (empty: its content's name); over a hole, at
 ## the nearest ground instead (hub rework HR-H2). Returns its number.
 func lay(stack: ItemStack, at: Vector2, title: String = "") -> int:
-	if projectiles != null and projectiles.touches_hole(at, DROP_RADIUS):
+	if projectiles != null and projectiles.grid().touches_hole(at, DROP_RADIUS):
 		# Nothing lies over a hole (hub rework HR-H2): it lands at the nearest ground.
-		at = projectiles.nearest_ground(at, DROP_RADIUS)
+		at = projectiles.grid().nearest_ground(at, DROP_RADIUS)
 	var row := GroundItem.make(_next_number, at, stack.copy(), title)
 	_next_number += 1
 	_rows.append(row)
@@ -423,4 +423,4 @@ func _free(feet: Vector2, spot: Vector2) -> bool:
 			return false
 	if projectiles == null:
 		return true
-	return not projectiles.circle_blocked(spot, DROP_RADIUS, true) and projectiles.line_clear(feet, spot)
+	return not projectiles.grid().circle_blocked(spot, DROP_RADIUS, true) and projectiles.grid().line_clear(feet, spot)

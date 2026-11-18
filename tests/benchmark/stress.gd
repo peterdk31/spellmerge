@@ -9,6 +9,9 @@ extends SceneTree
 ## `--profile` adds the tree profile (tree_profile.gd) to each measured window and
 ## `--profile-signals` times the hot events' listeners too.
 ##
+## `-- --only=desktop` runs that scenario alone (a label of the runner's SCENARIOS, or several,
+## comma separated).
+##
 ## `-- --no-native` runs the projectile manager's and the bodies' moves' (`WallSlide`) GDScript in
 ## place of the native module.
 ##

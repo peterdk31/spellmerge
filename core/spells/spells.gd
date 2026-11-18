@@ -505,6 +505,15 @@ var _open_builds: PackedInt32Array = PackedInt32Array()
 var _carriers: Dictionary = {}
 ## The carrier that runs nothing (id &""), for a spell whose carrier id no carrier has.
 var _no_carrier: Carrier = Carrier.new()
+## The shot in `slot` hits with `profile` of its own (a relay's, an infusion's, a flying jump's): its
+## hits are never merged with its spell's other shots' (`ProjectileManager.set_hits_alone`), whose
+## profile is the tag's.
+func _set_relay(slot: int, profile: HitProfile) -> void:
+	_rec_relay[slot] = profile
+	if profile != null and projectiles != null:
+		projectiles.set_hits_alone(slot)
+
+
 ## What the carriers (and `_poses`, `_moves`) may ask of this runtime: all they use of it.
 var _kit: CarrierKit = null
 ## Each actor's staff animation, for any carrier with a `staff_pose`.
@@ -1694,7 +1703,7 @@ func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, o
 func _placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vector2:
 	var ahead: Vector2 = origin + heading * spell.radius * 2.0
 	# Skyfall: while something falls, it is placed on its floor line.
-	return _skyfall.on_floor(spell, ahead if projectiles.clip_to_walls(origin, ahead) == ahead else origin)
+	return _skyfall.on_floor(spell, ahead if projectiles.grid().clip_to_walls(origin, ahead) == ahead else origin)
 
 
 ## Hand a shot the behaviours of its cards that the projectile manager runs (staffs B1): a bolt,
@@ -1960,7 +1969,7 @@ static func penta_start(tag: int) -> float:
 ## The point at `angle` on the ring of `radius` round `centre`, stopped short of a wall.
 static func ring_point(manager: ProjectilesScript, centre: Vector2, radius: float, angle: float) -> Vector2:
 	var point: Vector2 = centre + DMath.from_angle(angle) * radius
-	return manager.clip_to_walls(centre, point) if manager != null else point
+	return manager.grid().clip_to_walls(centre, point) if manager != null else point
 
 
 ## `recoil`: the caster is pushed back from a firing along `heading` (a firing the other way
@@ -2243,7 +2252,7 @@ func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: Compi
 		if slot < 0:
 			continue
 		made += 1
-		_rec_relay[slot] = relay
+		_set_relay(slot, relay)
 		_rec_zap[slot] = zap_relay
 		var seq: int = projectiles.get_seq_of(slot)
 		if caster_shot >= 0:
@@ -3273,7 +3282,7 @@ func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target
 		return
 	_apply_travel(slot, spell)
 	_register(slot, tag, spell, chain, struck)
-	_rec_relay[slot] = hit
+	_set_relay(slot, hit)
 	_rec_zap[slot] = zap
 	projectiles.exclude(slot, target)
 
@@ -3464,7 +3473,7 @@ func _relay(spell: CompiledSpell, target: Node, tag: int, shot: int) -> void:
 		return
 	if base.element_id == &"":
 		projectiles.set_core(slot, donor.tint)
-	_rec_relay[slot] = merged
+	_set_relay(slot, merged)
 	_rec_zap[slot] = StaffCompiler.zap_hit(merged) if spell.zap_hit != null else null
 	if slot == _ray.zap_slot:
 		_ray.hit = _rec_zap[slot]
@@ -3501,7 +3510,7 @@ func _infuse_shot(slot: int, donor: HitProfile, tint: Color) -> void:
 		return
 	if base.element_id == &"":
 		projectiles.set_core(slot, tint)
-	_rec_relay[slot] = merged
+	_set_relay(slot, merged)
 	_rec_zap[slot] = StaffCompiler.zap_hit(merged) if spell.zap_hit != null else null
 
 

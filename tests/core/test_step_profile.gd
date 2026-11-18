@@ -20,7 +20,7 @@ class Scene:
 	var table: Node
 	var mgr: ManagerScript
 	var bodies: Array[Node2D] = []
-	## Every hit, in order: caster, which body, the point.
+	## Every merged hit, in order: caster, which body, the point, the hits it stands for.
 	var hits: Array = []
 
 
@@ -108,7 +108,11 @@ func test_the_work_budget_leaves_shots_for_a_later_step_and_counts_them() -> voi
 			for i in 20:
 				scene.mgr.step(DT)
 				most_past = maxi(most_past, scene.mgr.step_profile[ManagerScript.PROF_PAST_BUDGET])
-			results.append([most_past, scene.hits.size()])
+			# Every hit, a merged one standing for `impact_count` of them.
+			var hits: int = 0
+			for hit: Array in scene.hits:
+				hits += int(hit[3])
+			results.append([most_past, hits])
 			_free(scene)
 		var label: String = "native" if native else "GDScript"
 		check_equal(results[0][0], 0, "%s: a lifted budget tests every shot every step" % label)
@@ -134,7 +138,7 @@ func _scene(native: bool) -> Scene:
 		scene.mgr.add_target(body, 8.0)
 		scene.bodies.append(body)
 	scene.bus.projectile_hit.connect(func(caster: int, target: Node, point: Vector2, _tag: int, _shot: int) -> void:
-		scene.hits.append([caster, scene.bodies.find(target as Node2D), point]))
+		scene.hits.append([caster, scene.bodies.find(target as Node2D), point, scene.mgr.impact_count]))
 	var velocities := PackedVector2Array()
 	for i in SHOTS:
 		velocities.append(Vector2(300.0, float(i % 21) - 10.0))

@@ -30,9 +30,20 @@ const GRUDGE_TIME: float = AIBrain.GRUDGE_TIME
 const SIGHT: float = AIBrain.SIGHT
 const CLOSE_ENOUGH: float = AIBrain.CLOSE_ENOUGH
 
-## Not state: the Entities service and its team board (hashed with Entities), and `target` and `grudge`,
+## How often an enemy thinks: every THINK_EVERY ticks (20 times a second), the crowd staggered by
+## actor id, each think given the seconds since its last (performance, 2026-11-17: the think was the
+## largest part of a crowd's tick). Between thinks its intent stands: it walks and aims as it last
+## decided, and a staff it holds stays held. A boss, and a body it drives that is not its own (a
+## possession), think every tick.
+const THINK_EVERY: int = 3
+## The ticks between thinks the game plays by (THINK_EVERY). A test switch: the AI's own tests set 1
+## to script its reactions step by step (tests/gameplay/ai/ai_fixture.gd), and set it back.
+static var think_every: int = THINK_EVERY
+
+## Not state: the Entities service and its team board (hashed with Entities), the test switch
+## `think_every`, and `target` and `grudge`,
 ## getters of the brain's REFS (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"entities", &"board", &"target", &"grudge"]
+const DERIVED: Array[StringName] = [&"entities", &"board", &"target", &"grudge", &"think_every"]
 ## State as who it points at: the actor it drives, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_actor"]
 
@@ -77,6 +88,9 @@ var recover_time: float:
 var _actor: Actor = null
 ## The actor id it named to Entities (`set_enemy`), or -1.
 var _named: int = -1
+## Ticks since the last think, and the seconds they took (`think`).
+var _unthought_ticks: int = 0
+var _unthought: float = 0.0
 
 
 func _enter_tree() -> void:
@@ -93,6 +107,9 @@ func _exit_tree() -> void:
 ## It starts driving `actor` (its home actor's `_ready`, or a possession): a fresh chase.
 func started(actor: Actor) -> void:
 	_actor = actor
+	# The crowd's thinks are spread over the ticks by actor id: the first comes within THINK_EVERY.
+	_unthought_ticks = maxi(actor.id, 0) % think_every
+	_unthought = 0.0
 	# Seeded by the actor id, so a run with the same actors repeats (and a crowd is staggered).
 	brain.setup(actor, _profile_for(actor), maxi(actor.id, 0) * 7919 + 17)
 	brain.entities = _entities()
@@ -133,7 +150,19 @@ func unbind(actor: Actor) -> void:
 func think(actor: Actor, delta: float) -> void:
 	if brain.actor != actor:
 		started(actor)
-	brain.think(delta, actor.intent)
+	_unthought += delta
+	_unthought_ticks += 1
+	if _unthought_ticks < think_every and not _thinks_every_tick(actor):
+		# Its intent of the last think stands; one-step presses are not pressed again.
+		return
+	brain.think(_unthought, actor.intent)
+	_unthought = 0.0
+	_unthought_ticks = 0
+
+
+## A boss, and a body not its own (a possession), think every tick.
+func _thinks_every_tick(actor: Actor) -> bool:
+	return actor != get_parent() or (actor.data != null and actor.data.boss)
 
 
 ## True from the start of the windup until the cast leaves: the attack is coming.

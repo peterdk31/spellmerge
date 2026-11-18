@@ -2,7 +2,7 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.2,
+	"seconds": 0.12,
 	"vary": {
 		"pitch": 0.05,
 		"time": 0.08,
@@ -12,41 +12,56 @@
 		{
 			"source": "sine",
 			"pitch": {
-				"from": 160,
-				"to": 65
+				"from": 150,
+				"to": 120
 			},
-			"length": 0.16,
-			"drive": 2.0,
-			"gain": -11,
+			"length": 0.07,
+			"drive": 1.5,
+			"gain": -16,
 			"amp": {
-				"attack": 0.005,
+				"attack": 0.003,
 				"shape": "perc",
-				"power": 1.8
+				"power": 2.2
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 560,
+				"q": 1.5
+			},
+			"length": 0.06,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 2.0
 			}
 		},
 		{
 			"source": "noise",
 			"filter": {
 				"type": "low",
-				"from": 1100,
-				"to": 300,
+				"from": 900,
+				"to": 400,
 				"q": 0.8
 			},
-			"length": 0.1,
+			"length": 0.09,
 			"amp": {
-				"attack": 0.004,
+				"attack": 0.003,
 				"shape": "perc",
-				"power": 1.8
-			}
+				"power": 2.0
+			},
+			"gain": -6
 		}
 	],
 	"fx": {
 		"reverb": {
-			"mix": 0.1,
-			"size": 0.5
+			"mix": 0.08,
+			"size": 0.4
 		},
 		"lowpass": 2500
 	},
-	"gain": -4,
-	"notes": "A shot landing on a body: a short, dry, low thump with a dull puff of noise in it, under 0.3 s. Heard many times a second in a fight, so it has no ring, no snap and nothing above 2.5 kHz, and sits 4 dB under the family's level (gain -4)."
+	"gain": -8,
+	"notes": "A shot landing on a body: a short, dry knock (a band of noise at 560 Hz, 60 ms) on a small low thud that barely falls, a tenth of a second in all. Heard many times a second in a fight, so it has no ring, no snap and nothing above 2.5 kHz, and sits 8 dB under the family's level (gain -8): it is so short that the meter's 400 ms window reads it low, and the level keeps its knock under the peak. Short and dry in the middle, where a cast is a longer, hollow, falling thoomp."
 }

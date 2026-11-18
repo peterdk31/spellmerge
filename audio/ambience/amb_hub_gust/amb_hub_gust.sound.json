@@ -24,8 +24,8 @@
 		{
 			"patch": "storm_gust",
 			"filter": {
-				"from": 520,
-				"to": 1300,
+				"from": 480,
+				"to": 1000,
 				"q": 3.0
 			},
 			"start": 0.5,
@@ -33,8 +33,8 @@
 			"gain": -12
 		}
 	],
-	"notes": "A gust of wind over the island: a band of air rising and falling as it swells in and out, a thinner whistle of it on top. Storm's own voice (storm_gust). Remade from the first ambience file of the same id (atmosphere D); the room's accent adds its own pitch and volume spread.",
+	"notes": "A gust of wind over the island: a band of air rising and falling as it swells in and out, a narrower band of it over that. Storm's own voice (storm_gust). Remade from the first ambience file of the same id (atmosphere D); the room's accent adds its own pitch and volume spread.",
 	"fx": {
-		"lowpass": 2200
+		"lowpass": 1600
 	}
 }

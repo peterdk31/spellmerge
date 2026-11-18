@@ -69,7 +69,6 @@ AUTHOR = "Claude"
 LICENSE = "CC-BY-SA-4.0"
 WINDOW = 1.0  # LU either side of a family's target
 PEAK_MARGIN = 1.0  # dB under the family's true peak limit, for Vorbis's overshoot
-TOP_HZ = 2000.0  # a sound's top is its part above this (docs/STYLE.md, "Sound": the top)
 EDGE = 1e-3  # how near zero a one-shot's first and last samples must be
 LOOP_MEASURE = 3.0  # seconds of a loop, played round, that its loudness is measured over
 # Sounds with no recipe, made before the tool by a generator kept out of the repository. The
@@ -94,11 +93,12 @@ class Family:
     pitch: float  # the jitter as a share (0.04 for ±4%)
     volume: float  # the jitter in dB
     top: float | None = None  # how far under a sound's level its top must be, in LU (-10.0); None for no ceiling
+    top_hz: float = 2000.0  # a sound's top is its part above this, from the table's header ("above 2 kHz")
 
     def top_of(self, samples: Sequence[float], loop: bool = False) -> float:
-        """How loud the sound's top (its part above TOP_HZ) is by the family's measure, in LU from
+        """How loud the sound's top (its part above `top_hz`) is by the family's measure, in LU from
         the whole sound's level: -10 is a top 10 LU under the sound."""
-        return self.level_of(sound_meter.above(samples, RATE, TOP_HZ), loop) - self.level_of(samples, loop)
+        return self.level_of(sound_meter.above(samples, RATE, self.top_hz), loop) - self.level_of(samples, loop)
 
     def level_of(self, samples: Sequence[float], loop: bool = False) -> float:
         """Its loudness by the family's measure; a loop is measured as it plays, over and over
@@ -118,17 +118,28 @@ def families(root: Path = ROOT) -> dict[str, Family]:
     found: dict[str, Family] = {}
     row = re.compile(r"^\|\s*`(\w+)`[^|]*\|\s*(-?[\d.]+)\s+(momentary|integrated)\s*\|\s*(-?[\d.]+)\s*dBTP\s*\|"
                      r"\s*(\d+)\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|")
-    for line in text[start:end].splitlines():
+    section = text[start:end]
+    header = re.search(r"Top \(above ([\d.]+) kHz\)", section)
+    if not header:
+        raise ValueError(f"{STYLE}: its Sound table has no column 'Top (above N kHz)'")
+    top_hz = float(header.group(1)) * 1000.0
+    for line in section.splitlines():
         m = row.match(line)
         if not m:
+            if line.startswith("| `"):  # a family's row that does not read: never dropped in silence
+                raise ValueError(f"{STYLE}: the Sound table's row {line.split('|')[1].strip()} does not read (loudness, "
+                                 "peak, variants, the two jitters and the top, a column each)")
             continue
         pitch = re.search(r"([\d.]+)\s*%", m.group(6))
         volume = re.search(r"([\d.]+)\s*dB", m.group(7))
-        top = re.search(r"(-?[\d.]+)\s*LU", m.group(8))
+        top = re.fullmatch(r"\s*(-[\d.]+)\s*LU\s*", m.group(8))
+        if not top and m.group(8).strip() != "none":
+            raise ValueError(f"{STYLE}: the {m.group(1)} row's top is {m.group(8).strip()!r}; write LU under the "
+                             "sound's level (-10 LU) or none")
         found[m.group(1)] = Family(m.group(1), float(m.group(2)), m.group(3), float(m.group(4)), int(m.group(5)),
                                    float(pitch.group(1)) / 100.0 if pitch else 0.0,
                                    float(volume.group(1)) if volume else 0.0,
-                                   float(top.group(1)) if top else None)
+                                   float(top.group(1)) if top else None, top_hz)
     if not found:
         raise ValueError(f"{STYLE}: no families in its Sound table")
     return found
@@ -295,6 +306,9 @@ def checked_score(score: Score, patches: dict[str, dict], fams: dict[str, Family
         raise BakeError(f"{score.path}: {error}") from error
     if "music" not in fams:
         raise BakeError(f"{STYLE}: its Sound table has no music row")
+    if fams["music"].top is not None:
+        raise BakeError(f"{STYLE}: the music row has a top, which no bake checks (a track's layers are placed "
+                        "together); write none")
     return data, fams["music"]
 
 
@@ -524,7 +538,7 @@ def render_placed(recipe: Recipe, data: dict, family: Family) -> list[tuple[list
         if ceiling is not None:
             top = family.top_of(s, data["kind"] == "held")
             if top > ceiling:
-                raise BakeError(f"{name}: its top (above {TOP_HZ:.0f} Hz) is {top:.1f} LU from its level, over the "
+                raise BakeError(f"{name}: its top (above {family.top_hz:.0f} Hz) is {top:.1f} LU from its level, over the "
                                 f"{family.name} ceiling of {ceiling:.1f}, so it cuts through; lower its high layers' "
                                 "pitches, filters or gains (or fx.lowpass), or set top with a note saying why")
         if data["kind"] != "held" and (abs(s[0]) > EDGE or abs(s[-1]) > EDGE):

@@ -48,7 +48,7 @@
 			"mix": 0.2,
 			"size": 1.0
 		},
-		"lowpass": 2000
+		"lowpass": 1600
 	},
 	"gain": 2,
 	"notes": "The Big Sweep winding up: a heavier, lower drag of the bristles over stone, slower back and forth, with a deep grinding rumble under it, so it is known without looking. 2 dB over the family's level (gain 2), a telegraph; its cue adds 4 dB more."

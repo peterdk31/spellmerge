@@ -4,8 +4,8 @@
 		"source": "noise",
 		"filter": {
 			"type": "low",
-			"from": 380,
-			"to": 1200,
+			"from": 340,
+			"to": 900,
 			"q": 1.1,
 			"curve": "arch"
 		},
@@ -15,5 +15,5 @@
 			"power": 1.3
 		}
 	},
-	"notes": "Water's wash: soft low-passed noise that opens to 1.2 kHz and closes, a wave sliding in and out."
+	"notes": "Water's wash: soft low-passed noise that opens to 900 Hz and closes, a wave sliding in and out."
 }

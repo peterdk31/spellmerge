@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_death/enemy_death.sound.json",
-			"recipe_hash": "sha256:9cfdce248ec3428ef6662201ec28aeeba4d02ea478a8de6783bbf272ef72e903",
+			"recipe_hash": "sha256:b6c810efea5e8ac6079c5e32259eaf724a356999a4c2d4eb8d97b977ad6a7ddd",
 			"audio_hash": "sha256:f7acf12547bccba59f8d5b7a24671b1866ee111d8247e89ee9cb09cf2bd55176",
 			"loudness": -19.1,
 			"peak": -3.9
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_death/enemy_death.sound.json",
-			"recipe_hash": "sha256:9cfdce248ec3428ef6662201ec28aeeba4d02ea478a8de6783bbf272ef72e903",
+			"recipe_hash": "sha256:b6c810efea5e8ac6079c5e32259eaf724a356999a4c2d4eb8d97b977ad6a7ddd",
 			"audio_hash": "sha256:bf6d6ec2c93e8c5f2024a5a278b5a39e0ea0cabcc13e37aade025173e4696254",
 			"loudness": -18.8,
 			"peak": -4.0
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_death/enemy_death.sound.json",
-			"recipe_hash": "sha256:9cfdce248ec3428ef6662201ec28aeeba4d02ea478a8de6783bbf272ef72e903",
+			"recipe_hash": "sha256:b6c810efea5e8ac6079c5e32259eaf724a356999a4c2d4eb8d97b977ad6a7ddd",
 			"audio_hash": "sha256:1d9a650d1e8ef8083ce68d85b022e9ffd8a1669eb1d5af87c34a08ed9f946593",
 			"loudness": -19.1,
 			"peak": -4.0

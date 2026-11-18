@@ -8,7 +8,7 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 500,
+				"from": 400,
 				"q": 0.9
 			},
 			"gain": -16
@@ -17,8 +17,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 320,
-				"to": 1300,
+				"from": 280,
+				"to": 900,
 				"q": 2.4,
 				"curve": "arch"
 			},
@@ -32,8 +32,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 280,
-				"to": 1050,
+				"from": 240,
+				"to": 750,
 				"q": 2.4,
 				"curve": "arch"
 			},
@@ -48,6 +48,6 @@
 	],
 	"notes": "The broom's Sweep moving: a swish of bristles through the air and a slightly lower one after it, over and over, the rhythm of the sweep.",
 	"fx": {
-		"lowpass": 2200
+		"lowpass": 1500
 	}
 }

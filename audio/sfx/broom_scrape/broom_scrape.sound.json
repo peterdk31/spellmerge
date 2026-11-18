@@ -8,8 +8,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 600,
-				"to": 1000,
+				"from": 420,
+				"to": 700,
 				"q": 1.4,
 				"curve": "arch"
 			}
@@ -20,7 +20,7 @@
 			"pitch": 190,
 			"filter": {
 				"type": "band",
-				"from": 1400,
+				"from": 900,
 				"q": 1.2
 			},
 			"gain": -10
@@ -40,7 +40,7 @@
 			"mix": 0.15,
 			"size": 0.8
 		},
-		"lowpass": 2200
+		"lowpass": 1600
 	},
 	"gain": 2,
 	"notes": "The broom's Sweep winding up: stiff bristles dragged over stone, a low, rough rasp pushed back and forth with a scratch of grit on it. 2 dB over the family's level (gain 2): it is a telegraph, heard off screen."

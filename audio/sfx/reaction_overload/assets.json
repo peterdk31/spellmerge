@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_overload/reaction_overload.sound.json",
-			"recipe_hash": "sha256:52b308c301fc1fa3e32c4141a26f1e16257edeb7c0ee8582d27fdbe01a36f5ac",
+			"recipe_hash": "sha256:58f99be86000106cac57b44d9ed6d36a867f4a14a7d0b1c5015a3a4c3cd15b02",
 			"audio_hash": "sha256:5df081f6019766a82103efbc54a507614104160b3e4e7be7c50d051a6d3415ca",
 			"loudness": -18.0,
 			"peak": -3.8
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_overload/reaction_overload.sound.json",
-			"recipe_hash": "sha256:52b308c301fc1fa3e32c4141a26f1e16257edeb7c0ee8582d27fdbe01a36f5ac",
+			"recipe_hash": "sha256:58f99be86000106cac57b44d9ed6d36a867f4a14a7d0b1c5015a3a4c3cd15b02",
 			"audio_hash": "sha256:79c9213d6ae61cf776546ee20c65d61bb7fd77c9e5c14ea85dd5a1ae1ef05889",
 			"loudness": -18.0,
 			"peak": -3.2
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_overload/reaction_overload.sound.json",
-			"recipe_hash": "sha256:52b308c301fc1fa3e32c4141a26f1e16257edeb7c0ee8582d27fdbe01a36f5ac",
+			"recipe_hash": "sha256:58f99be86000106cac57b44d9ed6d36a867f4a14a7d0b1c5015a3a4c3cd15b02",
 			"audio_hash": "sha256:709b00bdd7daab251e770f0ba2a4e85c945aabfe121542a796de23592cbf9ea4",
 			"loudness": -18.0,
 			"peak": -4.4

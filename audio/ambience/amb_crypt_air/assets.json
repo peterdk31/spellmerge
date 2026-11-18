@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/ambience/amb_crypt_air/amb_crypt_air.sound.json",
-			"recipe_hash": "sha256:e36af26d7d234bf6629d472d71fce9bdc690bc8896f907b21e81e8d276a9a4d0",
+			"recipe_hash": "sha256:da1c67775a59ac50ea804c4974e1dd456865dd1cb728c02d7decc9facb186832",
 			"audio_hash": "sha256:0fa135802c4368538a46ef6bd7029a5eb89d1dd0b7457fb93047484da35f65f5",
 			"loudness": -29.4,
 			"peak": -14.3

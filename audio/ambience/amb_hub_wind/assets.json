@@ -8,8 +8,8 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/ambience/amb_hub_wind/amb_hub_wind.sound.json",
-			"recipe_hash": "sha256:1fd9b1209851822ec855d179d7780bb6837f431daa66d13d1612e624584ea804",
-			"audio_hash": "sha256:fafa271e2ecaccbc4068731e96620c351696e66d9bf065ea4109af8fc5554203",
+			"recipe_hash": "sha256:0dd028a65468760b4c2aaf53f645d8b68efadb2155f5a070aca1161833282ea8",
+			"audio_hash": "sha256:04cf676e11ca948866358bf1c551ed79e36f8416a59d05e191f8d2f1b6b387d7",
 			"loudness": -27.6,
 			"peak": -14.3
 		}

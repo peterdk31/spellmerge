@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/dust_scatter/dust_scatter.sound.json",
-			"recipe_hash": "sha256:69a8b99875048cc328134e9413d5c74bf5e6676dad217600cd5aad1d143efb94",
+			"recipe_hash": "sha256:a6bbffab701b8b75e18a4a1c6e4b103ce212c0aac4bf6df4ef5fe49d19c1d774",
 			"audio_hash": "sha256:0f987602f9de100f1a65bd2f0be07e4c405447f0979994d4da62b260f462fb61",
 			"loudness": -21.9,
 			"peak": -7.2
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/dust_scatter/dust_scatter.sound.json",
-			"recipe_hash": "sha256:69a8b99875048cc328134e9413d5c74bf5e6676dad217600cd5aad1d143efb94",
+			"recipe_hash": "sha256:a6bbffab701b8b75e18a4a1c6e4b103ce212c0aac4bf6df4ef5fe49d19c1d774",
 			"audio_hash": "sha256:18beae01a881d1da9938683a2d250c106699283f7793001e495157344e22830e",
 			"loudness": -22.0,
 			"peak": -4.4
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/dust_scatter/dust_scatter.sound.json",
-			"recipe_hash": "sha256:69a8b99875048cc328134e9413d5c74bf5e6676dad217600cd5aad1d143efb94",
+			"recipe_hash": "sha256:a6bbffab701b8b75e18a4a1c6e4b103ce212c0aac4bf6df4ef5fe49d19c1d774",
 			"audio_hash": "sha256:74ae1adfc1ac207d62adc965e6fd4f05b2d71ccc29b9c43ed1f098281292f51b",
 			"loudness": -21.9,
 			"peak": -7.5
@@ -47,7 +47,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/dust_scatter/dust_scatter.sound.json",
-			"recipe_hash": "sha256:69a8b99875048cc328134e9413d5c74bf5e6676dad217600cd5aad1d143efb94",
+			"recipe_hash": "sha256:a6bbffab701b8b75e18a4a1c6e4b103ce212c0aac4bf6df4ef5fe49d19c1d774",
 			"audio_hash": "sha256:7c5f409c0e1d91c54cca722c97433a5448a719dceb20af99a437de5cf41c6654",
 			"loudness": -22.3,
 			"peak": -6.4

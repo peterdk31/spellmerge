@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/parry/parry.sound.json",
-			"recipe_hash": "sha256:d021a1550b4899a6b1c86c428152830a062a43f67ff4c083b5230c131dae02d9",
+			"recipe_hash": "sha256:5e49530a799450e03b47db5b95fc38317bc03630a415e26eeeaf76b383eb4914",
 			"audio_hash": "sha256:d41e6975990401c698a2d0228faee98443d72a30cdd855a4479c8f37e613566f",
 			"loudness": -19.6,
 			"peak": -4.2
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/parry/parry.sound.json",
-			"recipe_hash": "sha256:d021a1550b4899a6b1c86c428152830a062a43f67ff4c083b5230c131dae02d9",
+			"recipe_hash": "sha256:5e49530a799450e03b47db5b95fc38317bc03630a415e26eeeaf76b383eb4914",
 			"audio_hash": "sha256:7e4afbf514637426066fe0b34fbb753e5373c72db7573a29c3358f41eca5fd7e",
 			"loudness": -19.2,
 			"peak": -3.8
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/parry/parry.sound.json",
-			"recipe_hash": "sha256:d021a1550b4899a6b1c86c428152830a062a43f67ff4c083b5230c131dae02d9",
+			"recipe_hash": "sha256:5e49530a799450e03b47db5b95fc38317bc03630a415e26eeeaf76b383eb4914",
 			"audio_hash": "sha256:bc2d3ba2f8655c3ffd7a0cc244e2c8eedf27a33c0cbf2a88172c30550a19f3f4",
 			"loudness": -18.2,
 			"peak": -5.0

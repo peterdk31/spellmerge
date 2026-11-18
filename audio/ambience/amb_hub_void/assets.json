@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/ambience/amb_hub_void/amb_hub_void.sound.json",
-			"recipe_hash": "sha256:a66634ddd79e278b6774e70f83476f34aef88362110943a637eda0d923fdb70b",
+			"recipe_hash": "sha256:30a2bd03403857867cf21a1ee011aa2795f4ee754851283c9915fd36c8e7f99d",
 			"audio_hash": "sha256:68b7a61ced2615273d4217e4611775c0b1cbc3d5e6a32065c2a01be2343cf348",
 			"loudness": -29.6,
 			"peak": -18.7

@@ -1,12 +1,13 @@
 {
 	"version": 1,
-	"tempo": 80, "beats": 4, "bars": 16, "key": "A minor",
+	"tempo": 80, "beats": 4, "bars": 32, "key": "A minor",
 	"instruments": {
 		"pad": {"patch": "warm_pad", "gain": -16, "ring": 0.8, "amp": {"attack": 0.9}},
 		"low": {"patch": "sub_bass", "gain": -19, "ring": 0.6},
 		"glass": {"patch": "glass_pluck", "gain": -2, "ring": 1.4, "velocity": [1, 0.6, 0.8, 0.6]},
 		"brush": {"patch": "brush", "gain": -8, "velocity": [0.7, 0.35]},
-		"kick": {"patch": "soft_kick", "gain": -10, "ring": 0.2}
+		"kick": {"patch": "soft_kick", "gain": -10, "ring": 0.2},
+		"strings": {"patch": "low_strings", "gain": -16, "ring": 0.3}
 	},
 	"patterns": {
 		"am": {"pad": "A3+C4+E4 - - - - - - -", "low": "A1 - - - - - - -", "glass": "A4 . E5 . C5 . E5 .",
@@ -26,12 +27,58 @@
 		"e2": {"pad": "E3+G#3+B3+D4 - - - - - - -", "low": "E2 - - - - - - -", "glass": "G#4 . B4 . D5 . E5 .",
 			"brush": ". x . x . x . x", "kick": "x . . . . x . ."},
 		"am_still": {"pad": "A3+C4+E4 - - - - - - -", "low": "A1 - - - - - - -", "glass": "E5 . . . . . . .",
-			"brush": ". x . x . x . x"}
+			"brush": ". x . x . x . x"},
+		"b_f": {"pad": "F3+A3+C4+E4 - - - - - - -", "low": "F1 - - - - - - -", "glass": "C5 . . . . . A4 .",
+			"strings": "A2 - - - C3 - - -"},
+		"b_c": {"pad": "E3+G3+C4 - - - - - - -", "low": "C2 - - - - - - -", "glass": "G4 . . . . . . .",
+			"strings": "E3 - - - - - D3 -"},
+		"b_g": {"pad": "D3+G3+B3 - - - - - - -", "low": "G1 - - - - - - -", "glass": "B4 . . . D5 . . .",
+			"strings": "D3 - - - B2 - - -"},
+		"b_am": {"pad": "A3+C4+E4 - - - - - - -", "low": "A1 - - - - - - -", "glass": "E5 . . . . . . .",
+			"strings": "C3 - - - - - - -"},
+		"b_f2": {"pad": "F3+A3+C4+E4 - - - - - - -", "low": "F1 - - - - - - -", "glass": "A4 . . . C5 . . .",
+			"strings": "A2 - - - C3 - - -",
+			"brush": ". x . x . x . x"},
+		"b_c2": {"pad": "E3+G3+C4 - - - - - - -", "low": "C2 - - - - - - -", "glass": "E5 . . . . . G4 .",
+			"strings": "E3 - - - G3 - - -",
+			"brush": ". x . x . x . x"},
+		"b_e": {"pad": "E3+G#3+B3 - - - - - - -", "low": "E2 - - - - - - -", "glass": "B4 . . . . . . .",
+			"strings": "G#3 - - - - - E3 -",
+			"brush": ". x . x . x . x"},
+		"b_e7": {"pad": "E3+G#3+B3+D4 - - - - - - -", "low": "E2 - - - - - - -", "glass": "D5 . . . B4 . . .",
+			"strings": "D3 - - - B2 - - -",
+			"brush": ". x . x . x . x"},
+		"b_dm": {"pad": "D3+F3+A3+E4 - - - - - - -", "low": "D2 - - - - - - -", "glass": "F4 . A4 . D5 . . .",
+			"strings": "A2 - - - D3 - F3 -",
+			"brush": ". x . x . x . x", "kick": "x . . . . x . ."},
+		"b_am2": {"pad": "A3+C4+E4 - - - - - - -", "low": "A1 - - - - - - -", "glass": "C5 . . . E5 . . .",
+			"strings": "E3 - - - - - C3 -",
+			"brush": ". x . x . x . x", "kick": "x . . . . x . ."},
+		"b_f3": {"pad": "F3+A3+C4+E4 - - - - - - -", "low": "F1 - - - - - - -", "glass": "A4 . C5 . . . . .",
+			"strings": "A2 - - - - - C3 -",
+			"brush": ". x . x . x . x", "kick": "x . . . . x . ."},
+		"b_e2": {"pad": "E3+G#3+B3 - - - - - - -", "low": "E2 - - - - - - -", "glass": "G#4 . . . B4 . . .",
+			"strings": "B2 - - - - - - -",
+			"brush": ". x . x . x . x", "kick": "x . . . . x . ."},
+		"b_dm2": {"pad": "D3+F3+A3+E4 - - - - - - -", "low": "D2 - - - - - - -", "glass": "D5 . A4 . F4 . . .",
+			"strings": "D3 - - - F3 - - -",
+			"brush": ". x . x . x . x", "kick": "x . . . . x . ."},
+		"b_am3": {"pad": "A3+C4+E4 - - - - - - -", "low": "A1 - - - - - - -", "glass": "E5 . C5 . A4 . . .",
+			"strings": "E3 - - - C3 - - -",
+			"brush": ". x . x . x . x", "kick": "x . . . . x . ."},
+		"b_e3": {"pad": "E3+G#3+B3 - - - - - - -", "low": "E2 - - - - - - -", "glass": "B4 . . . G#4 . . .",
+			"strings": "B2 - - - E3 - - -",
+			"brush": ". x . x . x . x", "kick": "x . . . . x . ."},
+		"b_e7_home": {"pad": "E3+G#3+B3+D4 - - - - - - -", "low": "E2 - - - - - - -", "glass": "G#4 . B4 . D5 . E5 .",
+			"strings": "D3 - - - - - . .",
+			"brush": ". x . x . x . x", "kick": "x . . . . x . ."}
 	},
 	"layers": [
-		{"id": "crypt_halls", "play": ["am_still", "am", "f", "f2", "dm", "dm2", "e", "e2", "am", "am2", "f", "f2", "dm", "e", "am_still", "e2"],
-			"notes": "The crypt's fight rooms: a slow, low-lit walk of glass bells over a soft pad and a low drone, a quiet heartbeat kick and a brushed tick."}
+		{"id": "crypt_halls", "play": ["am_still", "am", "f", "f2", "dm", "dm2", "e", "e2", "am", "am2", "f", "f2", "dm", "e", "am_still", "e2",
+			"b_f", "b_c", "b_g", "b_am", "b_f2", "b_c2", "b_e", "b_e7",
+			"b_am2", "b_dm", "b_f3", "b_e2", "b_dm2", "b_am3", "b_e3", "b_e7_home"],
+			"notes": "The crypt's fight rooms: a slow, low-lit walk of glass bells over a soft pad and a low drone, a quiet heartbeat kick and a brushed tick; then the bells thin out and a slow line of low strings takes the tune, the drums coming back under it."}
 	],
 	"fx": {"reverb": {"mix": 0.32, "size": 1.8}, "lowpass": 8000},
-	"notes": "The crypt rooms' music, one layer: A minor at 80 beats a minute, 16 bars (48 s) round: Am F Dm E, its chords held whole bars with a sevenths' colour, a wide room. Calm enough to hear for a whole run, under the effects and over the crypt's own air."
+	"notes": "The crypt rooms' music, one layer: A minor at 80 beats a minute, 32 bars (96 s) round, in two halves. The first is Am F Dm E, its chords held whole bars with a sevenths' colour, a wide room. The second (the owner's second listen, 2026-11-18: make it better) opens out to F C G Am and comes home through Am Dm F E and Dm Am E: the bells fall to a note or two a bar and low strings carry a slow tune, four bars with no drums, four with the brush alone, then the heartbeat again, so the loop has a breath in it and comes round half as often. Calm enough to hear for a whole run, under the effects and over the crypt's own air."
 }

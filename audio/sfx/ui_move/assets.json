@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/ui_move/ui_move.sound.json",
-			"recipe_hash": "sha256:1f26df84f9f5ca7d8d40fa154c493ccaa6646cd0375642e503e44570c49a1c29",
+			"recipe_hash": "sha256:2b753538cb4a93b466f915887ede8c51e4c84b256f22f13736bbe5428a7f0d21",
 			"audio_hash": "sha256:6c11a8d7affb588a5832a293dd5880bbfd73dc5b35740b03c1c16e084efdad93",
 			"loudness": -23.9,
 			"peak": -7.2
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/ui_move/ui_move.sound.json",
-			"recipe_hash": "sha256:1f26df84f9f5ca7d8d40fa154c493ccaa6646cd0375642e503e44570c49a1c29",
+			"recipe_hash": "sha256:2b753538cb4a93b466f915887ede8c51e4c84b256f22f13736bbe5428a7f0d21",
 			"audio_hash": "sha256:4918b6b1c9daadc36d5c7841ca65a612d28d5ef6b1b203c0cbf5240a444d4e28",
 			"loudness": -24.1,
 			"peak": -7.2

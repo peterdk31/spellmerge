@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/ambience/amb_crypt_drip_double/amb_crypt_drip_double.sound.json",
-			"recipe_hash": "sha256:69df7bcf5d66b9af79842e577bb04f051229310fc6149746a7d49c656b25af04",
+			"recipe_hash": "sha256:4a63558118df95dddb14bea31bff665ec4bffd213606bb1c4c032e0f24b61ff1",
 			"audio_hash": "sha256:0e8354f6654c182d14ebea4f067a10914f3694d909059abf18f64129bbea606c",
 			"loudness": -21.1,
 			"peak": -9.1
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/ambience/amb_crypt_drip_double/amb_crypt_drip_double.sound.json",
-			"recipe_hash": "sha256:69df7bcf5d66b9af79842e577bb04f051229310fc6149746a7d49c656b25af04",
+			"recipe_hash": "sha256:4a63558118df95dddb14bea31bff665ec4bffd213606bb1c4c032e0f24b61ff1",
 			"audio_hash": "sha256:1015f2aa5b17385638f43e92ca05affd993cacfa5b5bc7f17876440cf913cc1a",
 			"loudness": -20.5,
 			"peak": -8.6
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/ambience/amb_crypt_drip_double/amb_crypt_drip_double.sound.json",
-			"recipe_hash": "sha256:69df7bcf5d66b9af79842e577bb04f051229310fc6149746a7d49c656b25af04",
+			"recipe_hash": "sha256:4a63558118df95dddb14bea31bff665ec4bffd213606bb1c4c032e0f24b61ff1",
 			"audio_hash": "sha256:db6ed14a65b99afb005b492a5ff0500d91139d4cc0af9dd7d03159e72af64935",
 			"loudness": -21.4,
 			"peak": -9.2

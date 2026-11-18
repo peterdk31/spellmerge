@@ -171,6 +171,31 @@ class BakeTest(unittest.TestCase):
         self.assertIsNone(sound.families(self.root)["combat"].top)
         self.bake(self.write(dict(BLIP, layers=[{"source": "sine", "pitch": 5000, "amp": {"shape": "arch"}}])))
 
+    def test_a_held_loops_top_is_checked_as_it_plays(self) -> None:
+        bright = dict(HUM, layers=[{"source": "sine", "pitch": 5000}])
+        with self.assertRaises(sound.BakeError) as caught:
+            self.bake(self.write(bright, "hum"))
+        self.assertIn("the held ceiling of -9.0", str(caught.exception))
+        self.bake(self.write(HUM, "hum"))
+
+    def test_a_family_row_that_does_not_read_is_named(self) -> None:
+        style = self.root / sound.STYLE
+        text = style.read_text(encoding="utf-8")
+        row = next(line for line in text.splitlines() if line.startswith("| `combat`"))
+        for bad, said in ((row.rsplit("|", 2)[0] + "|", "`combat`"),  # the column left out
+                          (row.rsplit("|", 2)[0] + "| 10 LU |", "'10 LU'")):  # a top over the sound itself
+            style.write_text(text.replace(row, bad), encoding="utf-8")
+            with self.assertRaises(ValueError) as caught:
+                sound.families(self.root)
+            self.assertIn(said, str(caught.exception))
+        style.write_text(text.replace("Top (above 2 kHz)", "Top (above 1.5 kHz)"), encoding="utf-8")
+        self.assertEqual(sound.families(self.root)["combat"].top_hz, 1500.0, "the corner is the header's")
+        music = next(line for line in text.splitlines() if line.startswith("| `music`"))
+        style.write_text(text.replace(music, music.rsplit("|", 2)[0] + "| -9 LU |"), encoding="utf-8")
+        with self.assertRaises(sound.BakeError) as caught:
+            sound.checked_score(sound.find_scores()[0], sound.load_patches(), sound.families(self.root))
+        self.assertIn("music row has a top", str(caught.exception))
+
     def test_gain_places_the_level_off_the_target(self) -> None:
         self.bake(self.write(dict(BLIP, gain=-3, notes="a blip, quieter: it is heard under every step")))
         for entry in self.entries("audio/sfx/blip").values():
@@ -252,8 +277,8 @@ class FamiliesTest(unittest.TestCase):
     def test_the_families_are_read_from_the_style_guide(self) -> None:
         fams = sound.families()
         self.assertEqual(set(fams), {"combat", "big", "boss", "held", "ambience", "ui", "music"})
-        self.assertEqual(fams["combat"], sound.Family("combat", -20.0, "momentary", -3.0, 4, 0.04, 1.5, -10.0))
-        self.assertEqual(fams["held"], sound.Family("held", -24.0, "integrated", -6.0, 1, 0.0, 0.0, -9.0))
+        self.assertEqual(fams["combat"], sound.Family("combat", -20.0, "momentary", -3.0, 4, 0.04, 1.5, -10.0, 2000.0))
+        self.assertEqual(fams["held"], sound.Family("held", -24.0, "integrated", -6.0, 1, 0.0, 0.0, -9.0, 2000.0))
         self.assertIsNone(fams["music"].top, "music has no ceiling on its top")
         self.assertEqual(fams["ui"].pitch, 0.02)
         self.assertEqual(fams["ui"].volume, 0.0)

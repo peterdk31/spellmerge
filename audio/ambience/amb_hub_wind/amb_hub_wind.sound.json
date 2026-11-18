@@ -51,8 +51,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 900,
-				"to": 1100,
+				"from": 1150,
+				"to": 1300,
 				"q": 1.6,
 				"curve": "arch"
 			},
@@ -68,8 +68,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 1050,
-				"to": 850,
+				"from": 1250,
+				"to": 1050,
 				"q": 1.6,
 				"curve": "arch"
 			},

@@ -4,8 +4,8 @@
 		"source": "noise",
 		"filter": {
 			"type": "band",
-			"from": 300,
-			"to": 1500,
+			"from": 260,
+			"to": 1000,
 			"q": 2.2,
 			"curve": "arch"
 		},
@@ -14,5 +14,5 @@
 			"power": 1.5
 		}
 	},
-	"notes": "Storm's gust: band-passed noise swept up from 300 Hz to 1.5 kHz and back down, a low rush of wind rather than a hiss."
+	"notes": "Storm's gust: band-passed noise swept up from 260 Hz to 1 kHz and back down, a low rush of wind rather than a hiss."
 }

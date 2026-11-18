@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"tempo": 100, "beats": 4, "bars": 16, "key": "D minor",
+	"tempo": 100, "beats": 4, "bars": 32, "key": "D minor",
 	"instruments": {
 		"pad": {"patch": "warm_pad", "gain": -18, "ring": 0.8},
 		"bass": {"patch": "fm_bass", "gain": -8, "ring": 0.06},
@@ -31,6 +31,15 @@
 			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
 		"eb": {"pad": "G3+Bb3+Eb4 - - - - - - -", "bass": "Eb2 . Eb2 Bb2 . Eb2 G2 Bb2", "glass": "G5 . . . Eb5 . . .",
 			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"dm_bare": {"pad": "F3+A3+D4 - - - - - - -", "bass": "D2 . D2 A2 . D2 C3 A2", "glass": "A4 . . . D5 . . ."},
+		"c_bare": {"pad": "E3+G3+C4 - - - - - - -", "bass": "C2 . C2 G2 . C2 E2 G2", "glass": "G4 . . . E5 . . ."},
+		"bb_bare": {"pad": "F3+Bb3+D4 - - - - - - -", "bass": "Bb1 . Bb1 F2 . Bb1 D2 F2", "glass": "F4 . . . D5 . . ."},
+		"a_rise": {"pad": "E3+A3+C#4 - - - - - - -", "bass": "A1 . A1 E2 . A1 C#2 E2", "glass": "E5 . C#5 . A4 . C#5 E5",
+			"brush": ". . . . . . . . x x x x x x x x", "kick": ". . . . x . x x"},
+		"c": {"pad": "E3+G3+C4 - - - - - - -", "bass": "C2 . C2 G2 . C2 E2 G2", "glass": "E5 . G5 . . . E5 D5",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
+		"c2": {"pad": "E3+G3+C4 - - - - - - -", "bass": "C2 . C2 G2 . C2 E2 G2", "glass": "G5 . E5 . C5 . D5 E5",
+			"brush": "x x x x x x x x x x x x x x x x", "kick": "x . . . x . . ."},
 		"dm_fire": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
 			"lead": "D4 A4 F4 A4 D5 A4 F4 A4 D4 A4 F4 A4 D5 A4 F4 A4"},
 		"bb_fire": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
@@ -40,14 +49,29 @@
 		"a_fire": {"snare": ". . x . . . x x", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
 			"lead": "A3 E4 C#4 E4 A4 E4 C#4 E4 A3 E4 C#4 E4 A4 C#5 E5 A5"},
 		"eb_fire": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
-			"lead": "Eb4 Bb4 G4 Bb4 Eb5 Bb4 G4 Bb4 Eb4 Bb4 G4 Bb4 Eb5 Bb4 G4 Bb4"}
+			"lead": "Eb4 Bb4 G4 Bb4 Eb5 Bb4 G4 Bb4 Eb4 Bb4 G4 Bb4 Eb5 Bb4 G4 Bb4"},
+		"c_fire": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
+			"lead": "C4 G4 E4 G4 C5 G4 E4 G4 C4 G4 E4 G4 C5 G4 E4 G4"},
+		"dm_fall": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
+			"lead": "D5 A4 F4 A4 D4 A4 F4 A4 D5 A4 F4 A4 D4 A4 F4 A4"},
+		"dm_fall_bare": {"embers": "x - - - - - - -", "lead": "D5 A4 F4 A4 D4 A4 F4 A4 D5 A4 F4 A4 D4 A4 F4 A4"},
+		"c_fall_bare": {"embers": "x - - - - - - -", "lead": "C5 G4 E4 G4 C4 G4 E4 G4 C5 G4 E4 G4 C4 G4 E4 G4"},
+		"bb_fall_bare": {"embers": "x - - - - - - -", "lead": "Bb4 F4 D4 F4 Bb3 F4 D4 F4 Bb4 F4 D4 F4 Bb3 F4 D4 F4"},
+		"a_fire_rise": {"snare": ". . . . x . x x", "embers": "x - - - - - - -",
+			"lead": "A3 E4 C#4 E4 A4 E4 C#4 E4 A3 E4 C#4 E4 A4 C#5 E5 A5"},
+		"c_fall": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
+			"lead": "C5 G4 E4 G4 C4 G4 E4 G4 C5 G4 E4 G4 C4 G4 E4 G4"},
+		"bb_fall": {"snare": ". . x . . . x .", "kick2": ". . . x . . . x", "embers": "x - - - - - - -",
+			"lead": "Bb4 F4 D4 F4 Bb3 F4 D4 F4 Bb4 F4 D4 F4 Bb3 F4 D4 F4"}
 	},
 	"layers": [
-		{"id": "boss_broom", "play": ["dm", "bb", "gm", "a", "dm2", "bb2", "gm2", "a2", "gm", "dm", "eb", "a", "dm2", "bb", "gm2", "a2"],
-			"notes": "The Old Broom's fight: a steady sweep of brushed ticks over a round bass that rocks back and forth, a warm pad and a glass bell tune."},
-		{"id": "boss_broom_fire", "play": ["dm_fire", "bb_fire", "gm_fire", "a_fire", "dm_fire", "bb_fire", "gm_fire", "a_fire", "gm_fire", "dm_fire", "eb_fire", "a_fire", "dm_fire", "bb_fire", "gm_fire", "a_fire"],
+		{"id": "boss_broom", "play": ["dm", "bb", "gm", "a", "dm2", "bb2", "gm2", "a2", "gm", "dm", "eb", "a", "dm2", "bb", "gm2", "a2",
+			"dm_bare", "c_bare", "bb_bare", "a_rise", "dm2", "c2", "bb2", "a2", "gm", "dm", "eb", "a", "dm", "c", "bb", "a2"],
+			"notes": "The Old Broom's fight: a steady sweep of brushed ticks over a round bass that rocks back and forth, a warm pad and a glass bell tune. Halfway round the drums fall out for three bars over a falling Dm C Bb A and build back in on the fourth."},
+		{"id": "boss_broom_fire", "play": ["dm_fire", "bb_fire", "gm_fire", "a_fire", "dm_fire", "bb_fire", "gm_fire", "a_fire", "gm_fire", "dm_fire", "eb_fire", "a_fire", "dm_fire", "bb_fire", "gm_fire", "a_fire",
+			"dm_fall_bare", "c_fall_bare", "bb_fall_bare", "a_fire_rise", "dm_fire", "c_fire", "bb_fire", "a_fire", "gm_fire", "dm_fire", "eb_fire", "a_fire", "dm_fall", "c_fall", "bb_fall", "a_fire"],
 			"notes": "Phase 2, the broom's head on fire: a snare, more kicks, a quiet crackle of embers and a hot running arpeggio over the first layer, in step with it."}
 	],
 	"fx": {"reverb": {"mix": 0.22, "size": 1.2}, "lowpass": 11000},
-	"notes": "The Old Broom's music, two stacked layers (its MusicTrack plays the first in phase 1 and both in phase 2). D minor at 100 beats a minute, 16 bars (38.4 s) round: Dm Bb Gm A twice, then Gm Dm Eb A and Dm Bb Gm A. Kept under the effects: soft attacks, nothing bright for long."
+	"notes": "The Old Broom's music, two stacked layers (its MusicTrack plays the first in phase 1 and both in phase 2). D minor at 100 beats a minute, 32 bars (76.8 s) round: Dm Bb Gm A twice, then Gm Dm Eb A and Dm Bb Gm A; then (the owner's second listen, 2026-11-18: make it better) a second half on a falling Dm C Bb A, its first three bars with no drums in the first layer and the fourth building back in, the second layer's arpeggio turned to fall (its snare and kick out with them for those three bars, its snare building in on the fourth), then Gm Dm Eb A and the fall once more, so a long fight hears the loop half as often and has a drop in it. Kept under the effects: soft attacks, nothing bright for long."
 }

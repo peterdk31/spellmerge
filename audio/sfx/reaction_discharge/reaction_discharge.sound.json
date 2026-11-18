@@ -19,8 +19,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 1000,
-				"to": 480,
+				"from": 700,
+				"to": 360,
 				"q": 1.0
 			},
 			"length": 0.3,
@@ -50,7 +50,7 @@
 			"mix": 0.2,
 			"size": 0.9
 		},
-		"lowpass": 1900
+		"lowpass": 1500
 	},
 	"notes": "Discharge (lightning): a crackle of sparks and two quick zaps, the charge jumping on. Heard in every fight with lightning, so it is short and low, a spit and two thuds with no hiss, 2 dB under the family's level (gain -2).",
 	"gain": -2

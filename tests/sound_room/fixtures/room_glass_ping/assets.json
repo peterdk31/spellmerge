@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['glass_ping']",
-			"recipe_hash": "sha256:5cc502c6b9a5f28878345a4d38db8d6063a3b157ffb3d1e74a00b3082cf5793b",
+			"recipe_hash": "sha256:13a2f90c3524f88f754857c38ac7db674f9500a7bea489b1ccf0d72d103dabcf",
 			"audio_hash": "sha256:0b10d1e495b7be9c0a42b97676c2e0d8e307788b80b1ebce3d7330cf22153876",
 			"loudness": -16.9,
 			"peak": -5.2
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['glass_ping']",
-			"recipe_hash": "sha256:5cc502c6b9a5f28878345a4d38db8d6063a3b157ffb3d1e74a00b3082cf5793b",
+			"recipe_hash": "sha256:13a2f90c3524f88f754857c38ac7db674f9500a7bea489b1ccf0d72d103dabcf",
 			"audio_hash": "sha256:8e3d48836f99f7a9dc7e518226bdc6d54669694ea6d80c97b33dc83971c5ab36",
 			"loudness": -17.7,
 			"peak": -4.8
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/test_sound_synth.py SAMPLES['glass_ping']",
-			"recipe_hash": "sha256:5cc502c6b9a5f28878345a4d38db8d6063a3b157ffb3d1e74a00b3082cf5793b",
+			"recipe_hash": "sha256:13a2f90c3524f88f754857c38ac7db674f9500a7bea489b1ccf0d72d103dabcf",
 			"audio_hash": "sha256:8a0b4825f15253f430c47137081a6cf269de4ddd44a11a3f462af5275ec75fa0",
 			"loudness": -16.4,
 			"peak": -4.9

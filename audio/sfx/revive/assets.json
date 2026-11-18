@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/revive/revive.sound.json",
-			"recipe_hash": "sha256:b8eacac75e13b93cf9e4f695edad9cb45c587145fdec876e55550afe305bc89c",
+			"recipe_hash": "sha256:917ff289e1e5ca27b724f8c4b329fcad664cc3a4cbbfa8ac18840ed64814be6d",
 			"audio_hash": "sha256:3bbca6ff269ea37b5e0b7350d4dec2b7233c93ecb5ecd4dd03578f10122989c0",
 			"loudness": -17.8,
 			"peak": -5.0
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/revive/revive.sound.json",
-			"recipe_hash": "sha256:b8eacac75e13b93cf9e4f695edad9cb45c587145fdec876e55550afe305bc89c",
+			"recipe_hash": "sha256:917ff289e1e5ca27b724f8c4b329fcad664cc3a4cbbfa8ac18840ed64814be6d",
 			"audio_hash": "sha256:cdc5463c031a3ec7e32ac0a8d4a474c0e2525fde93ea98197801f5745bdcf58e",
 			"loudness": -17.7,
 			"peak": -5.7
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/revive/revive.sound.json",
-			"recipe_hash": "sha256:b8eacac75e13b93cf9e4f695edad9cb45c587145fdec876e55550afe305bc89c",
+			"recipe_hash": "sha256:917ff289e1e5ca27b724f8c4b329fcad664cc3a4cbbfa8ac18840ed64814be6d",
 			"audio_hash": "sha256:06445ce9a7cfb6dc980b3a6025b1f96360e31807cacb7339195143838014bf0b",
 			"loudness": -18.4,
 			"peak": -8.1

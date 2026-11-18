@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_stillness/reaction_stillness.sound.json",
-			"recipe_hash": "sha256:d43fdb20af06f4d17f28061b55939e85a80f0c2da68b456e50febf96cd99c884",
+			"recipe_hash": "sha256:6ca371b58a0a3d096887db26357b9cc884b0373fec50ec14723624544417bf4f",
 			"audio_hash": "sha256:e8d4462738ec42ada5c1edce913df2590a027930899987d6af8f4ba4f58a2d6f",
 			"loudness": -16.7,
 			"peak": -5.6
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_stillness/reaction_stillness.sound.json",
-			"recipe_hash": "sha256:d43fdb20af06f4d17f28061b55939e85a80f0c2da68b456e50febf96cd99c884",
+			"recipe_hash": "sha256:6ca371b58a0a3d096887db26357b9cc884b0373fec50ec14723624544417bf4f",
 			"audio_hash": "sha256:4414554b782d5f524e6dec77a720a16472f15ec4e95b57fd5e593dd0bf92998e",
 			"loudness": -16.8,
 			"peak": -5.0
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_stillness/reaction_stillness.sound.json",
-			"recipe_hash": "sha256:d43fdb20af06f4d17f28061b55939e85a80f0c2da68b456e50febf96cd99c884",
+			"recipe_hash": "sha256:6ca371b58a0a3d096887db26357b9cc884b0373fec50ec14723624544417bf4f",
 			"audio_hash": "sha256:70b316b6a102e8381471ff88773000ea10478ba6a1dd7d12348bc5b9acf1ec33",
 			"loudness": -17.4,
 			"peak": -6.6

@@ -12,16 +12,16 @@
 		{
 			"patch": "water_wash",
 			"filter": {
-				"from": 450,
-				"to": 1300
+				"from": 380,
+				"to": 900
 			}
 		},
 		{
 			"patch": "fire_roar",
 			"filter": {
 				"type": "band",
-				"from": 1500,
-				"to": 800,
+				"from": 900,
+				"to": 500,
 				"q": 0.8
 			},
 			"amp": {
@@ -36,7 +36,7 @@
 			"mix": 0.3,
 			"size": 1.2
 		},
-		"lowpass": 2000
+		"lowpass": 1500
 	},
-	"notes": "Douse (water and fire): a splash of water over a fire going out in a soft, low hiss of steam."
+	"notes": "Douse (water and fire): a splash of water over a fire going out in a soft, low breath of steam."
 }

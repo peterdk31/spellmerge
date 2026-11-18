@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_rift/reaction_rift.sound.json",
-			"recipe_hash": "sha256:6de02c61958c8f6d97ebad9409c5538cb07ce81ad3be50fee9c3c93b50c3d613",
+			"recipe_hash": "sha256:1402b52a48f60e90a9f5d54c45eacd7bdfc0afafff458740300cd39565e68ca5",
 			"audio_hash": "sha256:6300b103a3a70025cbf002d8d06ba627887d96751ab7b6e74e9dba85364ef06f",
 			"loudness": -17.0,
 			"peak": -7.1
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_rift/reaction_rift.sound.json",
-			"recipe_hash": "sha256:6de02c61958c8f6d97ebad9409c5538cb07ce81ad3be50fee9c3c93b50c3d613",
+			"recipe_hash": "sha256:1402b52a48f60e90a9f5d54c45eacd7bdfc0afafff458740300cd39565e68ca5",
 			"audio_hash": "sha256:846ef212a5619573593a475767fb0f072b13f688e277a3b5156ae1f304550923",
 			"loudness": -17.0,
 			"peak": -6.6
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_rift/reaction_rift.sound.json",
-			"recipe_hash": "sha256:6de02c61958c8f6d97ebad9409c5538cb07ce81ad3be50fee9c3c93b50c3d613",
+			"recipe_hash": "sha256:1402b52a48f60e90a9f5d54c45eacd7bdfc0afafff458740300cd39565e68ca5",
 			"audio_hash": "sha256:d6a034bb881a8e6ee53d7a522250b1bdceba0b77f0562751a86c3b0bd0420cb4",
 			"loudness": -17.0,
 			"peak": -6.9

@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pillar_break/pillar_break.sound.json",
-			"recipe_hash": "sha256:27dc9563ad05143e9e9619702e5e14ba676afe2f12884b4f96943cb4474356bf",
+			"recipe_hash": "sha256:e06c71ba955bd74a75afbc882cfb771fd44340efbe840daf15e7d5f1e600c5c7",
 			"audio_hash": "sha256:4491073c0d8f47fcee36655cca7171a3d3d26fe6bb90d70139ab6f2e4e3ea8c6",
 			"loudness": -17.1,
 			"peak": -5.0
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pillar_break/pillar_break.sound.json",
-			"recipe_hash": "sha256:27dc9563ad05143e9e9619702e5e14ba676afe2f12884b4f96943cb4474356bf",
+			"recipe_hash": "sha256:e06c71ba955bd74a75afbc882cfb771fd44340efbe840daf15e7d5f1e600c5c7",
 			"audio_hash": "sha256:8f6b6e2dfb9eccc883a3dfe8652e1839371e53825089ceb578afc8103e98661e",
 			"loudness": -17.1,
 			"peak": -4.9
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pillar_break/pillar_break.sound.json",
-			"recipe_hash": "sha256:27dc9563ad05143e9e9619702e5e14ba676afe2f12884b4f96943cb4474356bf",
+			"recipe_hash": "sha256:e06c71ba955bd74a75afbc882cfb771fd44340efbe840daf15e7d5f1e600c5c7",
 			"audio_hash": "sha256:9539ebdd16077349ca306c2ac8df21cc6d715bda86adc5d496a956d61a7a5ea5",
 			"loudness": -16.8,
 			"peak": -3.7

@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/broom_creak/broom_creak.sound.json",
-			"recipe_hash": "sha256:b17837735ff35c3ff9c4d42b80a4fac65bdff57ed95fda9e5f7e55765aee1ddc",
+			"recipe_hash": "sha256:eb4c21e9ce8e5aca22d8513cf1c112ac7527996eabbef0ce10f5962113f73e95",
 			"audio_hash": "sha256:21c49406ce5d0f61bf61b1048b938bef92307fa0ce3038787e37c12d6882f7df",
 			"loudness": -20.1,
 			"peak": -4.8
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/broom_creak/broom_creak.sound.json",
-			"recipe_hash": "sha256:b17837735ff35c3ff9c4d42b80a4fac65bdff57ed95fda9e5f7e55765aee1ddc",
+			"recipe_hash": "sha256:eb4c21e9ce8e5aca22d8513cf1c112ac7527996eabbef0ce10f5962113f73e95",
 			"audio_hash": "sha256:b5c45db9fb594b51629d283f37f65a0762dabcc2225d748ce5aed254ec842312",
 			"loudness": -19.8,
 			"peak": -4.7
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/broom_creak/broom_creak.sound.json",
-			"recipe_hash": "sha256:b17837735ff35c3ff9c4d42b80a4fac65bdff57ed95fda9e5f7e55765aee1ddc",
+			"recipe_hash": "sha256:eb4c21e9ce8e5aca22d8513cf1c112ac7527996eabbef0ce10f5962113f73e95",
 			"audio_hash": "sha256:d62d55cd8ba6e78bb7bcf3fe8d96c99ad4bb27878f7ae6c24704c4917d871bd5",
 			"loudness": -20.1,
 			"peak": -5.9

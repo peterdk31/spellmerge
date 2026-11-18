@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/broom_splinter/broom_splinter.sound.json",
-			"recipe_hash": "sha256:f22e7592317e293bda87a907f4561e506f6aa9464a3aa7e4822179be0ceed647",
+			"recipe_hash": "sha256:4c23bb599c1ae47fa09b2ae0d46f2b71c7a450975f61adcc64f13bb89f1ea397",
 			"audio_hash": "sha256:d00e15e3705f3ffa1347de8cd853f385e0aec4b8818382b88a520ab420e67aba",
 			"loudness": -15.0,
 			"peak": -3.9
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/broom_splinter/broom_splinter.sound.json",
-			"recipe_hash": "sha256:f22e7592317e293bda87a907f4561e506f6aa9464a3aa7e4822179be0ceed647",
+			"recipe_hash": "sha256:4c23bb599c1ae47fa09b2ae0d46f2b71c7a450975f61adcc64f13bb89f1ea397",
 			"audio_hash": "sha256:73f12289cc427e0475ee96246fd10308f6184b13f0db94fcdd2add1aa7da70ec",
 			"loudness": -15.1,
 			"peak": -3.5
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/broom_splinter/broom_splinter.sound.json",
-			"recipe_hash": "sha256:f22e7592317e293bda87a907f4561e506f6aa9464a3aa7e4822179be0ceed647",
+			"recipe_hash": "sha256:4c23bb599c1ae47fa09b2ae0d46f2b71c7a450975f61adcc64f13bb89f1ea397",
 			"audio_hash": "sha256:3a75feaa3628aeb50f455195c7c50cf6c00c8f523c2fc99bed650298f266ea12",
 			"loudness": -15.0,
 			"peak": -4.3

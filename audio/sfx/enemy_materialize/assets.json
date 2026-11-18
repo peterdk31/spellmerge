@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
-			"recipe_hash": "sha256:61a2f8b320b97f2720d0ef3861049f6ac17ae58a032e47a8758e825cca20815a",
+			"recipe_hash": "sha256:837823284903f40f8071ea2127f9422de5d28a9fd43baa7c010f7a0f8dc1c88c",
 			"audio_hash": "sha256:a695803ed27de956da4b713ddfca1863dfcee232dadd58b6ca5a35573563e59f",
 			"loudness": -22.0,
 			"peak": -8.3
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
-			"recipe_hash": "sha256:61a2f8b320b97f2720d0ef3861049f6ac17ae58a032e47a8758e825cca20815a",
+			"recipe_hash": "sha256:837823284903f40f8071ea2127f9422de5d28a9fd43baa7c010f7a0f8dc1c88c",
 			"audio_hash": "sha256:b84424ee0f22b70a8e9fbe6fe6a98d5dec52b3956262e8f473eff0a57917fa08",
 			"loudness": -21.8,
 			"peak": -9.8
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
-			"recipe_hash": "sha256:61a2f8b320b97f2720d0ef3861049f6ac17ae58a032e47a8758e825cca20815a",
+			"recipe_hash": "sha256:837823284903f40f8071ea2127f9422de5d28a9fd43baa7c010f7a0f8dc1c88c",
 			"audio_hash": "sha256:3b910ee388ca1751a091f2de16e37a71c93ee4c21253d1a3b0e9d9ee1d42968d",
 			"loudness": -22.1,
 			"peak": -9.1
@@ -47,7 +47,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/enemy_materialize/enemy_materialize.sound.json",
-			"recipe_hash": "sha256:61a2f8b320b97f2720d0ef3861049f6ac17ae58a032e47a8758e825cca20815a",
+			"recipe_hash": "sha256:837823284903f40f8071ea2127f9422de5d28a9fd43baa7c010f7a0f8dc1c88c",
 			"audio_hash": "sha256:81564f4cc70e0b2a91ae5245e7247583b4d41b951cc0f3f63c0df1f90c57a1f0",
 			"loudness": -22.1,
 			"peak": -7.9

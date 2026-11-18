@@ -195,6 +195,10 @@ func pass_radius(spell: CompiledSpell, body: int) -> float:
 	return _pass_reach(spell, body, -1)
 
 
+func pass_length(spell: CompiledSpell) -> float:
+	return CasterMoves.move_distance(spell.ray_length, spell.speed, spell.lifetime)
+
+
 ## How far round its mover a body this dash's pass struck reaches, for Plow (`Carrier.carry_reach`):
 ## its pass's reach, for what it moves now (the cast under way is the hit's).
 func carry_reach(spell: CompiledSpell, actor: int, _slot: int) -> float:

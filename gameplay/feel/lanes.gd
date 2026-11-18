@@ -82,7 +82,9 @@ func play(caster: int, tag: int, seconds: float, tint: Color, reach: float) -> v
 		return
 	# A body's pass (a dash's) strikes as wide as the body all along its way, and as far past its end.
 	var wide: float = float(spells.call("carrier_pass", tag, caster))
-	var length: float = float(spells.call("carrier_reach", tag)) * maxf(reach, 0.0) + wide
+	var length: float = float(spells.call("carrier_reach", tag)) * maxf(reach, 0.0)
+	if wide > 0.0:
+		length = (float(spells.call("carrier_pass_length", tag)) + wide) * maxf(reach, 0.0)
 	if length <= START:
 		return
 	var staff: int = SpellTag.staff_of(tag)

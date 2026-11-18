@@ -105,6 +105,10 @@ func test_a_bodys_spell_scale_does_not_widen_the_pass() -> void:
 	# The owner, 2026-11-18: a big body's Sweep scooped players up well outside what was seen. Its
 	# hurt shape was grown by its spell scale too, which is there to make its spells as big as its
 	# body: a 26 px body of spell scale 1.5 with `bigger` struck 62 px round it, not 42.
+	var scaled: Actor = _dasher(Vector2(0.0, -300.0), 26.0, [&"bolt"], 1.5)
+	check(is_equal_approx(_world.spells.carrier_radius(SpellTag.make(scaled.id, 0, 0, _world.spells._current[scaled.id * SpellLimits.STAFFS])), 7.5), "the scale is its spells': a bolt of 5 px is 7.5")
+	_world.actors.erase(scaled)
+	scaled.free()
 	check(_passes(26.0, [&"bigger", &"dash"], 45.0, 1.5), "what its body (and bigger) meets is struck: 26 x 1.6 = 42 px, and the target's 8")
 	check(not _passes(26.0, [&"bigger", &"dash"], 55.0, 1.5), "a body past that is passed, whatever its spell scale")
 	check(not _passes(26.0, [&"dash"], 40.0, 2.0), "plain, a 26 px body of spell scale 2 passes a body 40 px aside")

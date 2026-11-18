@@ -177,11 +177,9 @@ func test_the_dust_flick_goes_where_its_lane_shows() -> void:
 
 ## The owner's playtest of 2026-11-18: the Sweep "scoops players up way outside its visual
 ## appearance". Every Sweep of both phases strikes no farther from its middle than its bristles
-## reach (half its head's frame), and its lane on the floor is as wide as that and ends where its
-## front does.
-func test_a_sweep_strikes_what_its_body_meets_and_its_lane_shows_it() -> void:
+## reach (half its head's frame). (What a pass of that width strikes: tests/gameplay/actor/test_move_pass.gd.)
+func test_a_sweep_is_no_wider_than_its_bristles() -> void:
 	var fx := Fixture.new(root)
-	fx.with_feel()
 	fx.players[0].position = Vector2(200.0, 0.0)
 	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
 	var bristles: float = (body.get_node("Sprite/Head") as BodyPart).texture.get_width() / float((body.get_node("Sprite/Head") as BodyPart).hframes) * 0.5
@@ -200,26 +198,36 @@ func test_a_sweep_strikes_what_its_body_meets_and_its_lane_shows_it() -> void:
 	fx.free_all()
 
 
+## Before, a Sweep had no lane at all (a dash reaches nowhere from its caster, so its lane had no
+## length): only its ring and its scrape warned of it.
 func test_the_sweeps_lane_is_as_wide_and_as_long_as_it_strikes() -> void:
+	for at: int in [0, 3]:
+		_check_lane(at)
+
+
+func _check_lane(at: int) -> void:
 	var fx := Fixture.new(root)
 	fx.with_feel()
 	fx.players[0].position = Vector2(200.0, 0.0)
 	var body: Actor = fx.enemy(BROOM.scene, BROOM, Vector2.ZERO)
 	body.aim = Vector2.RIGHT
-	check(body.caster.cast(0), "it winds up its Sweep")
+	var move: float = body.caster.next_cast_sense(at).move_reach
+	fx.spells.call("ready_staff", body.id, at)
+	check(body.caster.cast(at), "it winds up staff %d" % at)
 	fx.run(body, 1)
 	var lane: Sprite2D = fx.lanes().call("sprite_of", body.id) as Sprite2D
-	check(lane != null and lane.visible, "its lane shows")
+	check(lane != null and lane.visible, "staff %d: its lane shows" % at)
 	if lane != null:
-		var tag: int = SpellTag.make(body.id, 0, 0, int(fx.spells.get("_current")[body.id * SpellLimits.STAFFS]))
+		var tag: int = SpellTag.make(body.id, at, 0, int(fx.spells.get("_current")[body.id * SpellLimits.STAFFS + at]))
 		var wide: float = float(fx.spells.call("carrier_pass", tag, body.id))
 		var material: ShaderMaterial = lane.material as ShaderMaterial
 		var near: float = float(material.get_shader_parameter(&"telegraph_lane"))
 		check(near >= wide and near <= wide + 8.0, "as wide as it strikes either side (%.1f for %.1f)" % [near, wide])
 		check_equal(material.get_shader_parameter(&"telegraph_lane_end"), material.get_shader_parameter(&"telegraph_lane"), "all along: no cone")
 		check(lane.region_rect.size.y >= 2.0 * near, "its sprite tall enough for it (%s)" % lane.region_rect.size.y)
-		var reach: float = float(fx.spells.call("carrier_reach", tag))
-		check(is_equal_approx(float(fx.lanes().call("reach_of", body.id)), reach + wide), "and it ends where its front does: its way and its body's width (%.1f)" % float(fx.lanes().call("reach_of", body.id)))
+		var long: float = float(fx.lanes().call("reach_of", body.id))
+		check(move > 200.0 and is_equal_approx(long, move + wide), "and it ends where its front does: its way of %.1f px and its body's width (%.1f)" % [move, long])
+		check(lane.offset.x + lane.region_rect.size.x >= move, "drawn all along its way")
 	fx.free_all()
 
 

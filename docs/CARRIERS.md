@@ -200,7 +200,8 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
 | `reach_of` | 0 | atom, beam, swing, slam, spray (for an enemy's telegraph) |
 | `lane_radius` | its hit radius | spray (its cone's half-width at its reach): how wide it strikes either side of its aim, for an enemy's AI (`CastSense.radius`) and its telegraph lane's far end (`Spells.carrier_lane`: the lane widens into the cone) |
-| `pass_radius` | 0 | dash (its pass's reach for the body that casts it): how wide a move strikes either side of its way when that is its body's width, for its telegraph lane (`Spells.carrier_pass`: as wide as the pass all along, and that much longer) |
+| `pass_radius` | 0 | dash (its pass's reach for the body that casts it): how wide a move strikes either side of its way when that is its body's width, for its telegraph lane (`Spells.carrier_pass`: as wide as the pass all along, and that much longer than its way) |
+| `pass_length` | 0 | dash (its distance): how far a move with a `pass_radius` takes its caster, its lane's length (`Spells.carrier_pass_length`) |
 | `pours_held` | false | spray: held on, it pours: a held cast right after its last skips its staff's wind-up (`Spells.cast_staff`), so an enemy telegraphs its spray once and pours while it holds; a new press winds up again (the Spitter, content/enemies/spitter/) |
 | `tip_of` | INF | beam, swing: where a row is, for a `timer` or `on hurt` on it (`LC_ROW`) |
 

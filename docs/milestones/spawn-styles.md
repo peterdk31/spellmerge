@@ -1,6 +1,6 @@
 # Spawn styles: each biome (or enemy) names how its enemies spawn in
 
-**Status (2026-11-18): approved; the owner answered its questions (the end of this document) and asked for it to be built now. AS1 done (the data, with no change on screen; "As built (AS1)" below); AS2 done (a style picked per body; "As built (AS2)"); AS3 done (`materialize`, the storm fork's; "As built (AS3)"); AS4 to come.** The owner asked whether it is easy to change the spawn animation or add new ones in other biomes, then asked for this plan.
+**Status (2026-11-18): done (AS1–AS4). The owner answered its questions (the end of this document) and asked for it to be built now. AS1: the data, with no change on screen ("As built (AS1)" below); AS2: a style picked per body ("As built (AS2)"); AS3: `materialize`, the storm fork's ("As built (AS3)"); AS4: a mark may be an art strip ("As built (AS4)").** The owner asked whether it is easy to change the spawn animation or add new ones in other biomes, then asked for this plan.
 
 Today (enemy spawning EA1–EA5, docs/milestones/enemy-spawning.md) the spawn has one look. A mark grows on the floor, then the body rises out of it. The look is written in `gameplay/feel/spawn_look.gd`:
 - its timing is constants there (`MARK_END`, `CLOSE_FROM`, the frame counts);
@@ -156,6 +156,28 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
   - At a size that is not whole, or a turned sprite, a row of the world is not a row of the art, so its lit rows cut the art's rows a little.
 - **Kept clean.** The look puts back every body it draws as it leaves the tree or goes (`put_back_all`), so a motion's canvas items never outlive it. Each motion sets the clip every frame, so another look putting a body back never leaves it uncut. The line's row is in the mask only as wide as the line.
 - A motion's `look_of(body)` (what it drew, in whole numbers) and `stages(style)` serve the tests; `rise.gd`'s mask and the parts' shift moved to the base class (`mask_rect`, `shift_parts`), as `materialize` uses them too.
+
+**As built (AS4):**
+- **The strip** is `SpawnStyle.mark_strip`: one row of square frames, its count its width over its height (`strip_frames`; no field). Which frame shows is `SpawnStyle.strip_frame(frames, share, style)`, in core next to the numbers it reads:
+  - every frame in order over the mark stage, an equal share each. So `mark_frames` is the ring's only;
+  - the last held until `close_from`;
+  - then `close_frames` of them backwards, the first already a step down and the last frame 0, as the ring closes. A strip of 4 under `rise`'s numbers shows 0, 1, 2, 3, then 2, 1, 0.
+
+  The close picks frames from the strip rather than playing all of it backwards. A close is about 4 frames long at `rise`'s numbers, so playing every frame back would cap a strip at 4.
+- **Its size:** at whole pixels, centred on the feet (`SpawnLook.strip_corner`), at the whole number nearest the footprint's width over the frame's side, 1 to 4 (`SpawnStyle.strip_scale`). A 16 px strip is drawn at its own size under most enemies and grows with a big one. It is drawn in its own colours: the style's `colours` are not read for it, and a motion's `rim_share` has nothing to run round.
+- **The checks** (`problems()`, replacing AS1's "not drawn yet" line, in `_strip_problems`):
+  - square frames;
+  - at least `MIN_FRAMES`, and one more than `close_frames`, so each frame of the close is another;
+  - frames at most `MAX_STRIP_SIDE` (64 px);
+  - a mark stage long enough at `CHECK_FPS` for every frame;
+  - for a style read from a file, the strip a `.png` or `.svg` file of its folder (not a texture in a `.tres`, nor one embedded in the style), listed in the folder's `assets.json`. `problems()` reads no file: as with `known_cue`, the caller hands in a lookup, `listed(assets_file, path)`. The content test's (`MarkStrips.listed`, tests/support/mark_strips.gd) reads the file with `SpellValidator.load_manifest`, the reader the art tests use, so core/base takes on neither file reads nor the spells validator.
+- **Drawing.** `SpawnLook` keeps each mark's strip, frame (-1: the ring) and scale in arrays sized once in `_init`, beside the ring's fill and rim (`_lay_mark`), and `_draw` draws a strip frame (`draw_texture_rect_region`) or the ring. Nothing is allocated per frame.
+- **No game style has a strip yet.** None fits today's content well enough: the crypt is the one biome, and its ring is the owner's default. content/spawn_styles/README.md has the steps, with an example (roots for a forest biome).
+- **Tests.**
+  - `tests/support/mark_strips.gd` makes a strip in the test: frame `n` a square `n + 1` px each way, in its own shade. It can also write the png and an `assets.json` to a user:// folder. No art is committed under tests/.
+  - `tests/core/test_spawn_style.gd`: the frames over a spawn, the hold and the close, the scale, each strip problem, and the listing (listed, not listed, in another folder, made in code).
+  - `tests/gameplay/feel/test_spawn_strip.gd`: the look lays the strip's frames in order, holds and closes; marks are on whole pixels centred on the feet and scaled by the footprint; a fresh look draws the same frame; a style with no strip keeps the ring; no allocation.
+  - `tests/gameplay/feel/test_spawn_styles_everywhere.gd` adds a fixture strip style to the registry, so a strip is played on every enemy; a mark's look there is its width and its frame.
 
 Each step updates the README of the areas it touches, and `content/spawn_styles/README.md` (new) is the guide: copy `rise/`, change the numbers, name your biome.
 

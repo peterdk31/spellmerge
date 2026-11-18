@@ -8,13 +8,18 @@ extends "res://tests/support/suite.gd"
 ## motion's stages in at least `SpawnStyle.MIN_FRAMES` looks (docs/STYLE.md, "Smooth"); be cut
 ## while it spawns and drawn the same by a fresh look at any frame (from its state alone, as after a
 ## snapshot); and be put back once it stands. Each failing
-## cell is named, and the test fails. A new style or enemy is checked the day it lands.
+## cell is named, and the test fails. A new style or enemy is checked the day it lands. No style
+## of the game's has a mark strip yet (spawn styles AS4), so a fixture style with one (`STRIP_STYLE`,
+## made in the test) is added to the registry for the test and taken out after.
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const Motion := preload("res://gameplay/feel/spawn_motions/spawn_motion.gd")
+const MarkStrips := preload("res://tests/support/mark_strips.gd")
 
 const STEP: float = 1.0 / SpawnStyle.CHECK_FPS
 ## Every how many frames a fresh look is asked to draw the same.
 const FRESH_EVERY: int = 7
+## The fixture style with a mark strip, rise's numbers with six frames of 16.
+const STRIP_STYLE: StringName = &"fixture_strip"
 
 var _world: Fixture
 var _look: SpawnLook
@@ -33,9 +38,11 @@ func before_each() -> void:
 	_fresh = SpawnLook.new()
 	root.add_child(_fresh)
 	_fresh.style_of = lookup
+	registry.call("add", SpawnStyle.FOLDER, MarkStrips.style(STRIP_STYLE, MarkStrips.strip(16, 6)))
 
 
 func after_each() -> void:
+	_registry.call("remove", SpawnStyle.FOLDER, STRIP_STYLE)
 	_look.free()
 	_fresh.free()
 	_world.free_all()
@@ -72,7 +79,7 @@ func _styles() -> Array[SpawnStyle]:
 func test_every_style_on_every_enemy() -> void:
 	var styles: Array[SpawnStyle] = _styles()
 	var enemies: Dictionary[StringName, EnemyBase] = _spawners()
-	check(styles.size() >= 2, "rise and materialize at least: %d" % styles.size())
+	check(styles.size() >= 3, "rise, materialize and the strip's at least: %d" % styles.size())
 	check(enemies.size() >= 5, "the enemies that spawn in: %s" % [enemies.keys()])
 	var failed: PackedStringArray = PackedStringArray()
 	var cells: int = 0
@@ -109,8 +116,8 @@ func _play(data: EnemyBase, style: SpawnStyle) -> PackedStringArray:
 		var share: float = body.spawn_share()
 		_look.step(_world.table, STEP)
 		_look.cut()
-		var radius: float = _mark_radius(_look)
-		var seen: Array = [radius, motion.look_of(body)]
+		var mark: Vector2 = _mark_look(_look)
+		var seen: Array = [mark, motion.look_of(body)]
 		if motion.look_of(body).is_empty() or body.clip_children != CanvasItem.CLIP_CHILDREN_ONLY:
 			found.append("not drawn or not cut at %.2f" % share)
 			break
@@ -121,7 +128,7 @@ func _play(data: EnemyBase, style: SpawnStyle) -> PackedStringArray:
 			_fresh.step(_world.table, 0.0)
 			_fresh.cut()
 			var fresh_motion: Motion = _fresh.motion_named(style.motion)
-			if fresh_motion.look_of(body) != motion.look_of(body) or _mark_radius(_fresh) != radius:
+			if fresh_motion.look_of(body) != motion.look_of(body) or _mark_look(_fresh) != mark:
 				found.append("a fresh look draws it otherwise at %.2f: %s, not %s" % [share, fresh_motion.look_of(body), motion.look_of(body)])
 			_fresh_again()
 		body.tick_step(STEP)
@@ -141,9 +148,9 @@ func _play(data: EnemyBase, style: SpawnStyle) -> PackedStringArray:
 	return found
 
 
-## The width of the one mark `look` lays this frame (0 for none).
-static func _mark_radius(look: SpawnLook) -> float:
-	return look.mark(0).z if look.marks() > 0 else 0.0
+## The one mark `look` lays this frame: its width and its strip's frame (-1: the ring; none: 0, -2).
+static func _mark_look(look: SpawnLook) -> Vector2:
+	return Vector2(look.mark(0).z, look.mark_frame(0)) if look.marks() > 0 else Vector2(0.0, -2.0)
 
 
 ## A new fresh look (the old one, freed, puts back what it drew; the game's look draws it again

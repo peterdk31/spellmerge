@@ -8,6 +8,9 @@ extends "res://tests/support/suite.gd"
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 const FOLDER: StringName = SpawnStyle.FOLDER
+const MarkStrips := preload("res://tests/support/mark_strips.gd")
+## Where the strip tests write their fixture folders (each its own, as two resources can't share a path).
+const STRIP_ROOT: String = "user://test_spawn_style_strips"
 
 
 ## Whether the game has a cue of id `cue`.
@@ -42,9 +45,9 @@ func test_every_style_file_has_no_problems() -> void:
 	var styles: Array[SpawnStyle] = _styles()
 	check(not styles.is_empty(), "the registry finds the styles in content/spawn_styles")
 	for style in styles:
-		check_equal(style.problems(_known_cue), PackedStringArray(), "%s has no problems" % style.resource_path)
+		check_equal(style.problems(_known_cue, MarkStrips.listed), PackedStringArray(), "%s has no problems" % style.resource_path)
 		check(style.resource_path.begins_with("res://content/spawn_styles/%s/" % style.id), "%s is in its own folder" % style.id)
-	check_equal(SpawnStyle.all_problems(styles, _known_cue), PackedStringArray(), "and the set has none")
+	check_equal(SpawnStyle.all_problems(styles, _known_cue, MarkStrips.listed), PackedStringArray(), "and the set has none")
 
 
 ## `rise` is today's look: `DEFAULT`'s numbers, each written out in its file; a style made in code
@@ -94,7 +97,7 @@ func test_each_problem_is_named() -> void:
 		["a motion's stage too short for materialize (0.3 x 0.8 s x 60 = 14.4 < 17)", {"motion": &"materialize", "mark_end": 0.7, "close_from": 0.9}],
 		["colours that are no palette material", {"colours": &"teal"}],
 		["a player's colours", {"colours": &"player_1"}],
-		["a mark strip (not drawn before AS4)", {"mark_strip": PlaceholderTexture2D.new()}],
+		["a mark strip that is no file of its folder", {"mark_strip": MarkStrips.strip(16, 4)}],
 		["a biome twice", {"biomes": [&"crypt", &"crypt"] as Array[StringName]}],
 		["a cue there is none of", {"cue": &"no_such_cue"}],
 	]
@@ -108,6 +111,119 @@ func test_each_problem_is_named() -> void:
 	var silent: SpawnStyle = _style()
 	silent.cue = &""
 	check_equal(silent.problems(_known_cue), PackedStringArray(), "no cue is no problem: none plays")
+
+
+func after_each() -> void:
+	if DirAccess.dir_exists_absolute(STRIP_ROOT):
+		for folder: String in DirAccess.get_directories_at(STRIP_ROOT):
+			MarkStrips.remove_folder(STRIP_ROOT.path_join(folder))
+		DirAccess.remove_absolute(STRIP_ROOT)
+
+
+## A mark strip (spawn styles AS4): square frames, at least `MIN_FRAMES` (and one more than
+## `close_frames`), time in the mark stage at `CHECK_FPS` for each, frames `MAX_STRIP_SIDE` at most.
+## Each made in code (no folder, so no listing is asked for).
+func test_each_strip_problem_is_named() -> void:
+	check_equal(MarkStrips.style(&"rooted", MarkStrips.strip(16, 4)).problems(), PackedStringArray(), "four frames of 16 in rise's numbers")
+	check_equal(MarkStrips.style(&"rooted", MarkStrips.strip(SpawnStyle.MAX_STRIP_SIDE, 4)).problems(), PackedStringArray(), "frames as big as allowed")
+	# Each case: what is wrong, the strip, the fields set, and a word of the line it is named by.
+	var cases: Array = [
+		["frames that are not square (50 wide, 16 high)", MarkStrips.strip(16, 3, 50, 16), {}, "square"],
+		["a strip narrower than it is high", MarkStrips.strip(16, 1, 8, 16), {}, "square"],
+		["two frames", MarkStrips.strip(16, 2), {}, "has 2 frames"],
+		["three frames and rise's close of 3: the close would show one frame twice", MarkStrips.strip(16, 3), {}, "has 3 frames"],
+		["no more frames than close_frames (4 frames, a close of 4)", MarkStrips.strip(16, 4), {"close_frames": 4, "seconds": 1.2}, "has 4 frames"],
+		["a mark stage too short for its frames (0.4 x 0.8 s x 60 = 19.2 < 24)", MarkStrips.strip(8, 24), {}, "too short for its strip"],
+		["frames over 64 px", MarkStrips.strip(80, 4), {}, "80 px"],
+	]
+	for case: Array in cases:
+		var style: SpawnStyle = MarkStrips.style(&"rooted", case[1])
+		var fields: Dictionary = case[2]
+		for field: String in fields:
+			style.set(field, fields[field])
+		var found: PackedStringArray = style.problems()
+		check(found.size() == 1 and found[0].contains(case[3]), "%s: %s" % [case[0], found])
+	var slow: SpawnStyle = MarkStrips.style(&"rooted", MarkStrips.strip(8, 24))
+	slow.seconds = 1.0
+	check_equal(slow.problems(), PackedStringArray(), "24 frames fit a mark stage of 0.4 x 1 s x 60 = 24")
+
+
+## A style read from a file names a strip in its own folder, listed in the folder's assets.json.
+func test_a_strip_must_be_a_listed_file_of_its_folder() -> void:
+	var listed: SpawnStyle = _strip_in_folder("listed", true)
+	check_equal(listed.problems(Callable(), MarkStrips.listed), PackedStringArray(), "in its folder and listed")
+	var unlisted: SpawnStyle = _strip_in_folder("unlisted", false)
+	var found: PackedStringArray = unlisted.problems(Callable(), MarkStrips.listed)
+	check(found.size() == 1 and found[0].contains("not listed") and found[0].contains("assets.json"), "not listed: %s" % [found])
+	check_equal(unlisted.problems(), PackedStringArray(), "with no lookup, no listing is asked for: problems() reads no file")
+	var elsewhere: SpawnStyle = _strip_in_folder("elsewhere", true)
+	elsewhere.resource_path = STRIP_ROOT.path_join("other/other.tres")
+	found = elsewhere.problems(Callable(), MarkStrips.listed)
+	check(found.size() == 1 and found[0].contains("not a .png or .svg file in its folder"), "a strip of another folder: %s" % [found])
+	# Each: a strip whose path is not an image file of the style's folder.
+	for path: String in ["", "made/made.tres::ImageTexture_x", "made/mark.tres", "made/mark.webp"]:
+		var made: SpawnStyle = MarkStrips.style(&"made", MarkStrips.strip(16, 4))
+		made.resource_path = STRIP_ROOT.path_join("made/made.tres")
+		if path != "":
+			made.mark_strip.resource_path = STRIP_ROOT.path_join(path)
+		found = made.problems(Callable(), func(_file: String, _path: String) -> bool: return true)
+		check(found.size() == 1 and found[0].contains("not a .png or .svg file in its folder"), "a strip at '%s' (made in code, embedded, a .tres, a .webp), even listed: %s" % [path, found])
+	# The lookup the content test uses, on a repository path as an assets file writes it.
+	var list: String = STRIP_ROOT.path_join("repo/assets.json")
+	DirAccess.make_dir_recursive_absolute(list.get_base_dir())
+	var file := FileAccess.open(list, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"assets": [{"path": "content/spawn_styles/roots/mark.png"}]}))
+	file.close()
+	check(MarkStrips.listed(list, "res://content/spawn_styles/roots/mark.png"), "a res:// strip is found by its path from the repository root")
+	check(not MarkStrips.listed(list, "res://content/spawn_styles/roots/other.png"), "and another file is not")
+	check(not MarkStrips.listed(STRIP_ROOT.path_join("none/assets.json"), "res://content/spawn_styles/none/mark.png"), "no list lists nothing")
+
+
+## A style in the folder `name` under `STRIP_ROOT`, as if read from its file there, its strip's png
+## written there and listed in its assets.json if `listed`.
+func _strip_in_folder(name: String, listed: bool) -> SpawnStyle:
+	var folder: String = STRIP_ROOT.path_join(name)
+	var strip: ImageTexture = MarkStrips.strip(16, 4)
+	MarkStrips.write_folder(folder, strip, listed)
+	var style: SpawnStyle = MarkStrips.style(StringName(name), strip)
+	style.resource_path = folder.path_join("%s.tres" % name)
+	return style
+
+
+## The frames a strip shows over a spawn: each in order over the mark stage, the last held, then the
+## close's frames backwards down to the first; none before or after.
+func test_a_strips_frames_hold_and_close() -> void:
+	var style: SpawnStyle = SpawnStyle.from_default()
+	var seen: Array = []
+	for n in 401:
+		var frame: int = SpawnStyle.strip_frame(4, float(n) / 400.0 * 0.9999, style)
+		if seen.is_empty() or seen[-1] != frame:
+			seen.append(frame)
+	check_equal(seen, [0, 1, 2, 3, 2, 1, 0], "four frames up, three back down: rise's close of 3")
+	check_equal(SpawnStyle.strip_frame(4, style.mark_end - 0.001, style), 3, "the last frame by the mark's end")
+	check_equal(SpawnStyle.strip_frame(4, style.close_from - 0.001, style), 3, "held till the close")
+	check_equal(SpawnStyle.strip_frame(4, style.close_from, style), 2, "the close's first look a step down, as the ring's")
+	check_equal(SpawnStyle.strip_frame(4, 1.0, style), -1, "none once it stands")
+	check_equal(SpawnStyle.strip_frame(4, -0.1, style), -1, "none before")
+	check_equal(SpawnStyle.strip_frame(0, 0.5, style), -1, "none of no strip")
+	var long: Array = []
+	for n in 401:
+		var frame: int = SpawnStyle.strip_frame(8, style.close_from + float(n) / 400.0 * (0.9999 - style.close_from), style)
+		if long.is_empty() or long[-1] != frame:
+			long.append(frame)
+	check_equal(long, [5, 2, 0], "eight frames close in three looks, picked backwards, ending on the first")
+	check_equal(SpawnStyle.strip_frames(MarkStrips.strip(16, 4)), 4, "the frames are its width over its height")
+	check_equal(SpawnStyle.strip_frames(MarkStrips.strip(16, 3, 50, 16)), 0, "not square: none")
+	check_equal(SpawnStyle.strip_frames(null), 0, "no strip: none")
+
+
+## The scale a strip is drawn at: the whole number nearest the footprint's width over its side, 1 to 4.
+func test_a_strips_scale_is_whole_and_fits_the_footprint() -> void:
+	check_equal(SpawnStyle.strip_scale(16, 7.0), 1, "16 px under a footprint 14 wide: its own size")
+	check_equal(SpawnStyle.strip_scale(16, 16.0), 2, "under one 32 wide: twice")
+	check_equal(SpawnStyle.strip_scale(16, 2.0), 1, "never smaller than its own size")
+	check_equal(SpawnStyle.strip_scale(8, 100.0), SpawnStyle.MAX_STRIP_SCALE, "never more than 4 times")
+	check_equal(SpawnStyle.strip_scale(0, 7.0), 1, "no side: 1")
 
 
 ## Across the styles: no two name one biome, so none wins by the order they are read in.

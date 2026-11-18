@@ -23,15 +23,18 @@ extends Node2D
 ##   a hole in the room's floor (`RoomBase.floor_colors`: its shadow, darkened; `use_room`) ringed by
 ##   a rim in the light shade of the style's `colours` (`shades_for`: the floor's own for `floor`,
 ##   else a palette material's, docs/STYLE.md), growing from a dot in `mark_frames` frames; the motion
-##   says how far round its rim is drawn (`rim_share`: `materialize`'s runs round as it grows). The
-##   body is not drawn yet.
+##   says how far round its rim is drawn (`rim_share`: `materialize`'s runs round as it grows). A
+##   style with a `mark_strip` (spawn styles AS4) has its art instead: its frames played in order
+##   over the stage (`SpawnStyle.strip_frame`), drawn at whole pixels centred on the feet at a
+##   whole-number scale that fits the footprint (`SpawnStyle.strip_scale`). The body is not drawn yet.
 ## - **`mark_end` to 1, the motion** (`rise`: the body comes up out of the mark, cut at its feet's
 ##   line, spawn_motions/rise.gd; `materialize`: built up out of light behind a scan line,
 ##   spawn_motions/materialize.gd). When the motion says (`cue_share`: `rise`'s as it starts,
 ##   `materialize`'s as it is whole) the style's cue plays at the body's feet (`rise`'s `enemy_spawn`:
 ##   dust off the mark, a soft sound): its sound at most every SOUND_EVERY seconds, so a group does
 ##   not stack it (the cue is played unweighted in between: its dust only). From `close_from` the mark
-##   closes in `close_frames` frames as the feet land, down to a dot, so the motion ends where
+##   closes in `close_frames` frames as the feet land, down to a dot (a strip: its last frame held
+##   till then, then `close_frames` of its frames backwards to its first), so the motion ends where
 ##   standing begins (docs/STYLE.md, "Smooth").
 ##
 ## View only. Nothing here allocates while bodies spawn in: its scratch of ids and marks is made once,
@@ -83,13 +86,17 @@ var _risen: Dictionary[int, bool] = {}
 ## The styles looked up, by id (a style not found is kept as `rise`'s or the default), and the default.
 var _styles: Dictionary[StringName, SpawnStyle] = {}
 var _default_style: SpawnStyle = SpawnStyle.from_default()
-## This frame's marks: where (whole pixels), how wide, their fill and rim, and how much of the rim is
-## drawn (0 to 1, round from the top); `_marks` of them are in use.
+## This frame's marks: where (whole pixels), how wide (a strip's: half its drawn side), their fill and
+## rim, how much of the rim is drawn (0 to 1, round from the top), and a strip's art, frame (-1: the
+## ring) and scale; `_marks` of them are in use.
 var _mark_at: PackedVector2Array = PackedVector2Array()
 var _mark_radius: PackedInt32Array = PackedInt32Array()
 var _mark_fill: PackedColorArray = PackedColorArray()
 var _mark_rim: PackedColorArray = PackedColorArray()
 var _mark_rim_share: PackedFloat32Array = PackedFloat32Array()
+var _mark_strip: Array[Texture2D] = []
+var _mark_frame: PackedInt32Array = PackedInt32Array()
+var _mark_scale: PackedInt32Array = PackedInt32Array()
 var _marks: int = 0
 ## How many marks the last draw drew (to clear them once when there are none).
 var _drawn_marks: int = 0
@@ -108,6 +115,9 @@ func _init() -> void:
 	_mark_fill.resize(ActorsScript.ACTORS)
 	_mark_rim.resize(ActorsScript.ACTORS)
 	_mark_rim_share.resize(ActorsScript.ACTORS)
+	_mark_strip.resize(ActorsScript.ACTORS)
+	_mark_frame.resize(ActorsScript.ACTORS)
+	_mark_scale.resize(ActorsScript.ACTORS)
 	var shades: Callable = shades_for
 	for motion: StringName in MOTIONS:
 		_motions[motion] = MOTIONS[motion].new() as SpawnMotionScript
@@ -235,15 +245,8 @@ func step(table: ActorsScript, real_delta: float) -> void:
 				if not _risen.has(key):
 					_risen[key] = true
 					_play_rise_cue(style.cue, body.global_position)
-			var radius: int = mark_radius(body.wall_radius(), share, style)
-			if radius > 0 and _marks < _mark_at.size():
-				_mark_at[_marks] = body.global_position.round()
-				_mark_radius[_marks] = radius
-				# A hole in the floor (its shadow darkened), ringed in the light shade of the style's colours.
-				_mark_rim[_marks] = shades_for(style)[0]
-				_mark_fill[_marks] = _floor_shades[2].darkened(MARK_DARKEN)
-				_mark_rim_share[_marks] = motion.rim_share(share, style)
-				_marks += 1
+			if _marks < _mark_at.size():
+				_lay_mark(body, share, style, motion)
 	if _risen.size() > rising:
 		_forget_risen()
 	if _marks > 0 or _drawn_marks > 0:
@@ -276,6 +279,36 @@ func cut() -> void:
 		_put_back()
 
 
+## Lay `body`'s mark at `share` of its spawn as `style` says, if it has one now: its strip's frame,
+## or the ring.
+func _lay_mark(body: Actor, share: float, style: SpawnStyle, motion: SpawnMotionScript) -> void:
+	var strip: Texture2D = style.mark_strip
+	var frames: int = SpawnStyle.strip_frames(strip)
+	if frames > 0:
+		var frame: int = SpawnStyle.strip_frame(frames, share, style)
+		if frame < 0:
+			return
+		var scale: int = SpawnStyle.strip_scale(strip.get_height(), body.wall_radius())
+		_mark_radius[_marks] = strip.get_height() * scale / 2
+		_mark_strip[_marks] = strip
+		_mark_frame[_marks] = frame
+		_mark_scale[_marks] = scale
+	else:
+		var radius: int = mark_radius(body.wall_radius(), share, style)
+		if radius <= 0:
+			return
+		_mark_radius[_marks] = radius
+		# A hole in the floor (its shadow darkened), ringed in the light shade of the style's colours.
+		_mark_rim[_marks] = shades_for(style)[0]
+		_mark_fill[_marks] = _floor_shades[2].darkened(MARK_DARKEN)
+		_mark_rim_share[_marks] = motion.rim_share(share, style)
+		_mark_strip[_marks] = null
+		_mark_frame[_marks] = -1
+		_mark_scale[_marks] = 0
+	_mark_at[_marks] = body.global_position.round()
+	_marks += 1
+
+
 func _play_rise_cue(cue: StringName, at: Vector2) -> void:
 	if not play_cue.is_valid() or cue == &"":
 		return
@@ -306,7 +339,10 @@ func _put_back() -> void:
 func _draw() -> void:
 	_drawn_marks = _marks
 	for m in _marks:
-		_draw_mark(_mark_at[m], _mark_radius[m], _mark_fill[m], _mark_rim[m], _mark_rim_share[m])
+		if _mark_frame[m] >= 0:
+			_draw_strip_mark(_mark_at[m], _mark_strip[m], _mark_frame[m], _mark_scale[m])
+		else:
+			_draw_mark(_mark_at[m], _mark_radius[m], _mark_fill[m], _mark_rim[m], _mark_rim_share[m])
 
 
 ## A mark `radius` pixels wide each way at `at` (radius 1: a dot), half as high (it lies on the floor),
@@ -328,6 +364,22 @@ func _draw_mark(at: Vector2, radius: int, fill: Color, rim: Color, rim_share: fl
 		draw_rect(Rect2(at.x - float(half), y, 1.0, 1.0), rim)
 		draw_rect(Rect2(at.x - float(half) + 1.0, y, width - 2.0, 1.0), fill)
 		draw_rect(Rect2(at.x + float(half), y, 1.0, 1.0), rim)
+
+
+## Frame `frame` of the strip `strip` (square frames side by side) drawn `scale` times its size,
+## its centre on `at` (whole pixels): the top-left corner whole too, so every art pixel is
+## `scale` screen pixels.
+func _draw_strip_mark(at: Vector2, strip: Texture2D, frame: int, scale: int) -> void:
+	var side: int = strip.get_height()
+	var drawn: float = float(side * scale)
+	draw_texture_rect_region(strip, Rect2(strip_corner(at, side, scale), Vector2(drawn, drawn)), Rect2(float(frame * side), 0.0, float(side), float(side)))
+
+
+## The top-left corner of a strip frame `side` pixels square drawn `scale` times its size centred on
+## `at` (whole pixels): whole pixels too, half its drawn side (rounded down) up and left.
+static func strip_corner(at: Vector2, side: int, scale: int) -> Vector2:
+	var half: float = float(side * scale / 2)
+	return at - Vector2(half, half)
 
 
 ## One row of a mark whose rim is drawn only `rim_share` round, pixel by pixel on its edge (`edge`: the
@@ -378,6 +430,19 @@ func marks() -> int:
 ## The mark `n` of this frame: where and how wide (tests).
 func mark(n: int) -> Vector3:
 	return Vector3(_mark_at[n].x, _mark_at[n].y, float(_mark_radius[n]))
+
+
+## The mark `n` of this frame's strip frame (-1: the ring), its scale, and its strip (tests).
+func mark_frame(n: int) -> int:
+	return _mark_frame[n]
+
+
+func mark_scale(n: int) -> int:
+	return _mark_scale[n]
+
+
+func mark_strip(n: int) -> Texture2D:
+	return _mark_strip[n]
 
 
 ## The mark `n` of this frame's fill and rim colours, and how much of its rim is drawn (tests).

@@ -9,7 +9,7 @@ Shared sound used by more than one thing: music (`music/`), sound effects (`sfx/
 - Audio depends on nothing. It holds files only, no logic.
 - **`.ogg` only.** No `.wav`, `.mp3` or other formats.
 - Every asset has an entry in `audio/manifest.json` (see below), or, for the sounds of one content folder, in an `assets.json` in that folder in the same shape. A generated sound's entries are in an `assets.json` in its own folder, written by the tool (below).
-- Loop music and ambience loops must loop without a click, and are imported to loop (`loop=true` in their `.import`). An ambience accent (a drip, a gust) starts and ends at silence and is not imported to loop. Keep sound effects short and balanced in volume with the others.
+- Loop music and ambience loops must loop without a click, and are imported to loop (`loop=true` in their `.import`). An ambience accent (a drip, a gust) starts and ends at silence and is not imported to loop. Keep sound effects short, low (docs/STYLE.md, "Sound": deep, never piercing) and balanced in volume with the others.
 - Names are original. No ripped game audio, no samples of other works.
 - Audio is CC-BY-SA-4.0 by default. A file may instead declare CC0-1.0 or CC-BY-4.0 with a `<file>.license` file (AGENTS.md, hard rules).
 
@@ -58,7 +58,7 @@ A sound made by `tools/sound.py` (tools/README.md) has a folder of its own: `sfx
  "loudness": -20.1, "peak": -6.2}
 ```
 
-A rebake keeps a file's `tier` while its audio (`audio_hash`) stays the same; one that changes it sets `final` back to `good`, because the owner promoted the sound they heard. Hear a sound before a PR with `tools/sound.py sheet <id> --out <a folder outside the repository>`, and attach or link the sheet's `.mp4`.
+A rebake keeps a file's `tier` while its audio (`audio_hash`) stays the same; one that changes it sets `final` back to `good`, because the owner promoted the sound they heard. The bake fails a sound that is off its family's level, over its peak, or too loud above 2 kHz (its top; docs/STYLE.md, "Sound"); the fix it names is the recipe's. Hear a sound before a PR with `tools/sound.py sheet <id> --out <a folder outside the repository>`, and attach or link the sheet's `.mp4`.
 
 Music is made the same way from a score: `music/<track>/<track>.score.json` (sound plan, section 4; tools/README.md) names its instruments (patches from `patches/`), its one-bar patterns and its layers, and `tools/sound.py bake <track>` writes `<layer id>.ogg` a layer beside it, every one a loop of the same length (its `.import` with `loop=true`), and the folder's `assets.json`. A layer's id is the sound id a `MusicTrack` names; the layers of one track are placed together on the music target in docs/STYLE.md.
 
@@ -70,7 +70,7 @@ Music is made the same way from a score: `music/<track>/<track>.score.json` (sou
 
 ## Example to copy
 
-The rooms' ambience (atmosphere D) is in `ambience/`, a folder a sound, generated as the rest (sound plan AU6): the crypt's `amb_crypt_air/` (a 12 s held loop) and its accents `amb_crypt_drip/`, `amb_crypt_drip_double/` and `amb_crypt_rumble/` (one-shots of the `ambience` family, docs/STYLE.md), named by `content/rooms/crypt/crypt_ambience.tres`; the hub's loops `amb_hub_wind/` and `amb_hub_void/` and its accent `amb_hub_gust/`, named by `content/rooms/hub/hub_ambience.tres`. Ambience ids start `amb_`. The menus' sounds (sound plan AU8) are `sfx/ui_move/` and its five siblings (`ui_choose`, `ui_back`, `ui_deny`, `ui_card_place`, `ui_card_remove`), each its recipe, its `variants/`, its `.tres` and its `assets.json`. The first generated sounds are the combat set (sound plan AU5) in `sfx/`: copy `sfx/cast/` (its recipe `cast.sound.json`; the bake made the rest) for a one-shot, and name a shared voice from `patches/` (`fire_roar`, `frost_glass`, `storm_gust`, `void_swell`, `water_wash`, `lightning_zap` ...) as the reactions do.
+The rooms' ambience (atmosphere D) is in `ambience/`, a folder a sound, generated as the rest (sound plan AU6): the crypt's `amb_crypt_air/` (a 12 s held loop) and its accents `amb_crypt_drip/`, `amb_crypt_drip_double/` and `amb_crypt_rumble/` (one-shots of the `ambience` family, docs/STYLE.md), named by `content/rooms/crypt/crypt_ambience.tres`; the hub's loops `amb_hub_wind/` and `amb_hub_void/` and its accent `amb_hub_gust/`, named by `content/rooms/hub/hub_ambience.tres`. Ambience ids start `amb_`. The menus' sounds (sound plan AU8) are `sfx/ui_move/` and its five siblings (`ui_choose`, `ui_back`, `ui_deny`, `ui_card_place`, `ui_card_remove`), each its recipe, its `variants/`, its `.tres` and its `assets.json`. The first generated sounds are the combat set (sound plan AU5) in `sfx/`: copy `sfx/cast/` (its recipe `cast.sound.json`, a Roman candle's deep thoomp; the bake made the rest) for a one-shot, and name a shared voice from `patches/` (`fire_roar`, `frost_glass`, `storm_gust`, `void_swell`, `water_wash`, `lightning_zap` ...) as the reactions do.
 
 The first music is generated (sound plan AU7): `music/boss_broom/boss_broom.score.json` makes the Old Broom's two stacked layers, `boss_broom` and `boss_broom_fire` (named by its `MusicTrack` in `content/bosses/old_broom/old_broom.tres`), and `music/crypt_halls/` the crypt fight rooms' one layer (named by `content/rooms/crypt/crypt_music.tres`). Copy a score's folder, rename it and its layers, and bake.
 
@@ -89,6 +89,6 @@ Add a short video, or a note saying where the sound plays in the game, how loud 
 
 Besides the general review (bugs, edge cases, 1–4 players, performance, clarity, fun):
 
-- Does it fit the game's mood, and is it still pleasant on the hundredth listen?
+- Does it fit the game's mood, and is it still pleasant on the hundredth listen? Does it sit low, under the fight, or does it cut through?
 - Is the volume balanced with the other sounds, and does music loop cleanly?
 - Is the origin recorded honestly in the manifest?

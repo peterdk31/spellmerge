@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pillar_crack/pillar_crack.sound.json",
-			"recipe_hash": "sha256:3a780a600d1654ebeee8e07e0604e15e599377d4765f975cbaa4f4632d387298",
-			"audio_hash": "sha256:99695beb31b0efa102de5c52675a74737b50f0b82d153776615c65db529534d5",
-			"loudness": -20.2,
-			"peak": -5.2
+			"recipe_hash": "sha256:e16a16de785e578c5d31b2af8c7c19fb52ab474b20202ea696a69fb997714b84",
+			"audio_hash": "sha256:39939512f44a11b833515c6d34649f84d0a85fdaec2a311339c887906fa201ea",
+			"loudness": -20.1,
+			"peak": -5.3
 		},
 		{
 			"path": "audio/sfx/pillar_crack/variants/2.ogg",
@@ -21,8 +21,8 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pillar_crack/pillar_crack.sound.json",
-			"recipe_hash": "sha256:3a780a600d1654ebeee8e07e0604e15e599377d4765f975cbaa4f4632d387298",
-			"audio_hash": "sha256:d8447ab71672e748171ef5d81cd5c56295aab330c2154e1926db16ffbc4331f7",
+			"recipe_hash": "sha256:e16a16de785e578c5d31b2af8c7c19fb52ab474b20202ea696a69fb997714b84",
+			"audio_hash": "sha256:68576fdb7c910f17e6dadca5dc3dc2c54a0748f7b57bf7e5ca4839450e3ae315",
 			"loudness": -20.0,
 			"peak": -4.9
 		},
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pillar_crack/pillar_crack.sound.json",
-			"recipe_hash": "sha256:3a780a600d1654ebeee8e07e0604e15e599377d4765f975cbaa4f4632d387298",
-			"audio_hash": "sha256:63f481d76e61f6c573b3c758c13209005a586b060598896b09e6fe66ec699ee9",
+			"recipe_hash": "sha256:e16a16de785e578c5d31b2af8c7c19fb52ab474b20202ea696a69fb997714b84",
+			"audio_hash": "sha256:32063382e107c5267d304a7cf4fd1674af443aaedb148583dddac276ca70b623",
 			"loudness": -20.0,
-			"peak": -4.9
+			"peak": -5.9
 		},
 		{
 			"path": "audio/sfx/pillar_crack/variants/4.ogg",
@@ -47,10 +47,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/pillar_crack/pillar_crack.sound.json",
-			"recipe_hash": "sha256:3a780a600d1654ebeee8e07e0604e15e599377d4765f975cbaa4f4632d387298",
-			"audio_hash": "sha256:480b3fc7b60b4240301390c79ffd5994de7e9d7993b4527234d25ca7ec95c322",
-			"loudness": -19.8,
-			"peak": -4.8
+			"recipe_hash": "sha256:e16a16de785e578c5d31b2af8c7c19fb52ab474b20202ea696a69fb997714b84",
+			"audio_hash": "sha256:acf1e0d268d51d0ea2efeaeed3b337ef93f904dd32d005d1508c5ced134ce15c",
+			"loudness": -19.9,
+			"peak": -5.7
 		}
 	]
 }

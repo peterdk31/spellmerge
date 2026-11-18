@@ -5,7 +5,8 @@
 A recipe (`<id>.sound.json`) is data and this is the only code. `validate(recipe, patches)` checks
 every key and number and returns the recipe with its patches merged in; `render(recipe, variant)`
 renders one variant at 44.1 kHz mono, full scale 1.0. The bake (tools/sound.py) places its
-loudness, measures it and encodes it.
+loudness, measures it and encodes it; a recipe's `gain` and `top` are the bake's (its place off its
+family's level, and its own ceiling for its top in place of its family's).
 
 A layer is a source (`sine`, `triangle`, `saw`, `square`, `noise`, `fm`, `partials`) shaped by an
 amplitude envelope, a pitch curve, a filter, `drive`, `crush`, `gain`, `start` and `length`.
@@ -147,7 +148,7 @@ SOUND = {"version": _number(1, 1, whole=True), "kind": _choice(KINDS), "family":
          "layers": lambda value, where: None,  # checked one by one below
          "fx": _object({"reverb": _object({"mix": _number(0.0, 1.0), "size": _number(0.1, 3.0)}, ("mix",)),
                         "lowpass": _number(200.0, 20000.0)}),
-         "gain": _number(-24.0, 24.0), "notes": _text}
+         "gain": _number(-24.0, 24.0), "top": _number(-60.0, 0.0), "notes": _text}
 
 
 def _merge(base: dict, top: dict) -> dict:

@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/boss_intro/boss_intro.sound.json",
-			"recipe_hash": "sha256:bae839d4cba183072108e077d6df70187bac74879734adc02ad77dfbb4abfe81",
+			"recipe_hash": "sha256:0cb9e4de92298acd1a799bfdda1f0622f85a61f34bf01d229343a7d9a7746df4",
 			"audio_hash": "sha256:b2b182e235cf2fb968bc8ca49586be670819b03800377ae817823b5b79bf457f",
 			"loudness": -15.1,
 			"peak": -4.8
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/boss_intro/boss_intro.sound.json",
-			"recipe_hash": "sha256:bae839d4cba183072108e077d6df70187bac74879734adc02ad77dfbb4abfe81",
+			"recipe_hash": "sha256:0cb9e4de92298acd1a799bfdda1f0622f85a61f34bf01d229343a7d9a7746df4",
 			"audio_hash": "sha256:75077d65e054cfd975977fb6c8ba69cb6211e053f371e3d71cbc00696873ed9a",
 			"loudness": -14.9,
 			"peak": -3.3
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/boss_intro/boss_intro.sound.json",
-			"recipe_hash": "sha256:bae839d4cba183072108e077d6df70187bac74879734adc02ad77dfbb4abfe81",
+			"recipe_hash": "sha256:0cb9e4de92298acd1a799bfdda1f0622f85a61f34bf01d229343a7d9a7746df4",
 			"audio_hash": "sha256:95a17d2b5c6d74e1275e6ef9d7ed428838a3bb44a73c22df5983ca474e471bc9",
 			"loudness": -15.1,
 			"peak": -2.3

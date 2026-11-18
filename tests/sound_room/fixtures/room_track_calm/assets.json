@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "tools/sound_fixtures.py TRACK['calm']",
-			"recipe_hash": "sha256:9fe9d6ad66d16e226913931fbfa0576fd5c5e14354d945da9bb96e17c8ca3d85",
+			"recipe_hash": "sha256:87e76a8845b1d7c4a86caef3dabef48c4b506f2fa663033aa9e74d7032418801",
 			"audio_hash": "sha256:aec9e75800b8c9a909a5d56473b266195086cc96afc998e376de0d72a10c647b",
 			"loudness": -24.0,
 			"peak": -15.9

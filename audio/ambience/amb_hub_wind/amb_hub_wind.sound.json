@@ -51,10 +51,10 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 1400,
-				"to": 1700,
-				"curve": "arch",
-				"q": 1.6
+				"from": 900,
+				"to": 1100,
+				"q": 1.6,
+				"curve": "arch"
 			},
 			"start": 3.0,
 			"length": 8.0,
@@ -68,10 +68,10 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 1600,
-				"to": 1300,
-				"curve": "arch",
-				"q": 1.6
+				"from": 1050,
+				"to": 850,
+				"q": 1.6,
+				"curve": "arch"
 			},
 			"start": 10.0,
 			"length": 7.0,
@@ -100,5 +100,8 @@
 		}
 	],
 	"gain": -3.6,
-	"notes": "Wind over the floating island: three bands of moving air, low, middle and high, each gusting up and down on its own slow wander, and now and then a faint whistle. Remade from the first ambience file of the same id (atmosphere D), at its level: 3.6 dB under the family's (gain -3.6)."
+	"notes": "Wind over the floating island: three bands of moving air, low, middle and high, each gusting up and down on its own slow wander, and now and then a faint whistle. Remade from the first ambience file of the same id (atmosphere D), at its level: 3.6 dB under the family's (gain -3.6).",
+	"fx": {
+		"lowpass": 2200
+	}
 }

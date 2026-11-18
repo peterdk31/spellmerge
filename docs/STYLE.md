@@ -137,19 +137,20 @@ The game's sound is synthesised from code in a modern style (the owner, 2026-11-
 - **Format:** `.ogg` (Vorbis), 44.1 kHz, mono for effects and UI, mono or stereo for music, at most 5 MB.
 - **No clicks:** every sound starts and ends at silence (a 2 ms ramp at least). A loop folds its tail over its start, and a duck ramps.
 - **Pleasant on the hundredth listen.** A sound heard every few seconds (cast, hit) is short, soft at the top and has its variants. It never sounds like one file four times when four players do the same thing.
-- **Each element has a voice,** shared through patches (`audio/patches/`): fire roars and crackles, frost is glass, storm is a gust of wind, lightning is a crackle and a zap, void is a low, hollow swell, water is a soft wash (`fire_roar`, `frost_glass`, `storm_gust` and the others, named by element). A reaction mixes its two elements' voices.
+- **Deep, never piercing** (the owner, 2026-11-18, after the first listen: "the audio cues are too high which makes them go through and take over too much"). A cue sits low and under the fight: its weight is below about 1 kHz, a ring is a low bell and a hiss is a dull rush. A cast is a Roman candle firing, a deep, hollow thoomp out of a tube, never a whoosh or a hiss; a hit is a dry, low thump with no snap. Each family has a ceiling for a sound's **top**, its part above 2 kHz (the table's last column), which the bake measures and fails a sound over; the music has none.
+- **Each element has a voice,** shared through patches (`audio/patches/`): fire roars and crackles, frost is a low bell of glass, storm is a low gust of wind, lightning is a crackle and a zap, void is a low, hollow swell, water is a soft wash (`fire_roar`, `frost_glass`, `storm_gust` and the others, named by element). A reaction mixes its two elements' voices.
 
-| Family | Loudness (LUFS) | True peak | Variants | Pitch jitter | Volume jitter |
-| --- | --- | --- | --- | --- | --- |
-| `combat` (cast, hit, small effects) | -20 momentary | -3 dBTP | 4 | ±4% | ±1.5 dB |
-| `big` (reactions, deaths, downed, revive) | -17 momentary | -2 dBTP | 3 | ±3% | ±1 dB |
-| `boss` (the boss's moves, intro, slams) | -15 momentary | -1 dBTP | 3 | ±2% | ±1 dB |
-| `held` (loops) | -24 integrated | -6 dBTP | 1 | none | none |
-| `ambience` (a room's accents: drips, gusts, rumbles) | -21 momentary | -6 dBTP | 3 | none | none |
-| `ui` | -24 momentary | -6 dBTP | 2 | ±2% | none |
-| `music` (all layers together) | -23 integrated | -1 dBTP | 1 | none | none |
+| Family | Loudness (LUFS) | True peak | Variants | Pitch jitter | Volume jitter | Top (above 2 kHz) |
+| --- | --- | --- | --- | --- | --- | --- |
+| `combat` (cast, hit, small effects) | -20 momentary | -3 dBTP | 4 | ±4% | ±1.5 dB | -10 LU |
+| `big` (reactions, deaths, downed, revive) | -17 momentary | -2 dBTP | 3 | ±3% | ±1 dB | -9 LU |
+| `boss` (the boss's moves, intro, slams) | -15 momentary | -1 dBTP | 3 | ±2% | ±1 dB | -9 LU |
+| `held` (loops) | -24 integrated | -6 dBTP | 1 | none | none | -9 LU |
+| `ambience` (a room's accents: drips, gusts, rumbles) | -21 momentary | -6 dBTP | 3 | none | none | -9 LU |
+| `ui` | -24 momentary | -6 dBTP | 2 | ±2% | none | -9 LU |
+| `music` (all layers together) | -23 integrated | -1 dBTP | 1 | none | none | none |
 
-Momentary is the loudest 400 ms window (most sounds here are shorter than short-term's 3 s); integrated is the whole file, gated (BS.1770). Peaks are held 1 dB under the limit before encoding, as Vorbis can overshoot. The bake places each sound on its family's target (a recipe's `gain`, with a note, places it off it), measuring a loop as it plays round, and fails a variant more than 1 LU from it. These numbers are a first tuning; the owner changes them by ear.
+Momentary is the loudest 400 ms window (most sounds here are shorter than short-term's 3 s); integrated is the whole file, gated (BS.1770). Peaks are held 1 dB under the limit before encoding, as Vorbis can overshoot. The bake places each sound on its family's target (a recipe's `gain`, with a note, places it off it), measuring a loop as it plays round, and fails a variant more than 1 LU from it. The top is the loudness, by the family's measure, of what a sound has above 2 kHz (through a 24 dB an octave high pass), in LU from the whole sound's level: -10 LU is a top 10 LU under the sound, and the bake fails a variant whose top is over its family's (a recipe's `top`, with a note, gives it a ceiling of its own). These numbers are a first tuning; the owner changes them by ear.
 
 ## File formats
 

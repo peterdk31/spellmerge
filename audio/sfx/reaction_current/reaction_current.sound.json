@@ -43,5 +43,6 @@
 			"size": 1.2
 		}
 	},
-	"notes": "Current (water and lightning): a wash of water buzzing with a low electric hum and a zap."
+	"notes": "Current (water and lightning): a wash of water buzzing with a low electric hum and a zap. It sits 1 dB under the family's level (gain -1) so the zap stays under the peak.",
+	"gain": -1
 }

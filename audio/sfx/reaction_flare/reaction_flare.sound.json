@@ -12,8 +12,8 @@
 		{
 			"patch": "storm_gust",
 			"filter": {
-				"from": 500,
-				"to": 2800
+				"from": 320,
+				"to": 1300
 			},
 			"length": 0.4,
 			"gain": -4
@@ -22,8 +22,8 @@
 			"patch": "fire_roar",
 			"start": 0.08,
 			"filter": {
-				"from": 1600,
-				"to": 450
+				"from": 900,
+				"to": 300
 			}
 		},
 		{
@@ -35,7 +35,8 @@
 		"reverb": {
 			"mix": 0.3,
 			"size": 1.2
-		}
+		},
+		"lowpass": 2000
 	},
 	"notes": "Flare (fire and storm): a gust that fans into a roar of fire and its crackles."
 }

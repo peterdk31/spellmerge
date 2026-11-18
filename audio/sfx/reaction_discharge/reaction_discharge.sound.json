@@ -19,8 +19,8 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 4200,
-				"to": 2400,
+				"from": 1000,
+				"to": 480,
 				"q": 1.0
 			},
 			"length": 0.3,
@@ -33,14 +33,14 @@
 		{
 			"patch": "lightning_zap",
 			"start": 0.04,
-			"gain": -11
+			"gain": -13
 		},
 		{
 			"patch": "lightning_zap",
 			"start": 0.13,
 			"pitch": {
-				"from": 1100,
-				"to": 150
+				"from": 500,
+				"to": 80
 			},
 			"gain": -14
 		}
@@ -50,7 +50,8 @@
 			"mix": 0.2,
 			"size": 0.9
 		},
-		"lowpass": 8000
+		"lowpass": 1900
 	},
-	"notes": "Discharge (lightning): a crackle of sparks and two quick zaps, the charge jumping on. Heard in every fight with lightning, so it is short and kept below a hiss."
+	"notes": "Discharge (lightning): a crackle of sparks and two quick zaps, the charge jumping on. Heard in every fight with lightning, so it is short and low, a spit and two thuds with no hiss, 2 dB under the family's level (gain -2).",
+	"gain": -2
 }

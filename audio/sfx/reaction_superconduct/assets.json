@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_superconduct/reaction_superconduct.sound.json",
-			"recipe_hash": "sha256:225614fbb19018bc187ae4050dedc3c9a4b33385ddd1066add5a6e4900873a2e",
-			"audio_hash": "sha256:6f341aa6001252ab2935278ad002cf652a3c3d089669d1a833e897fbcc3566ee",
-			"loudness": -17.4,
-			"peak": -4.2
+			"recipe_hash": "sha256:9eeb7820ab8e89fc140aa74a725880f828b689585c93c5e98195dc6c12a9a815",
+			"audio_hash": "sha256:4d0f339d33c6fb831c8a765b9860cdd24a09449633e2791220768bfd8f97a755",
+			"loudness": -18.6,
+			"peak": -4.3
 		},
 		{
 			"path": "audio/sfx/reaction_superconduct/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_superconduct/reaction_superconduct.sound.json",
-			"recipe_hash": "sha256:225614fbb19018bc187ae4050dedc3c9a4b33385ddd1066add5a6e4900873a2e",
-			"audio_hash": "sha256:499c04f28375bcd35419c20b97824ccf01adc8fef253a118323073c75c6ccbc4",
-			"loudness": -17.4,
-			"peak": -4.7
+			"recipe_hash": "sha256:9eeb7820ab8e89fc140aa74a725880f828b689585c93c5e98195dc6c12a9a815",
+			"audio_hash": "sha256:ee227baba10cb02ec3245c28f0c5dfd39f4f4df0704dc92fe5a1a7d85d954b4c",
+			"loudness": -18.1,
+			"peak": -5.0
 		},
 		{
 			"path": "audio/sfx/reaction_superconduct/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_superconduct/reaction_superconduct.sound.json",
-			"recipe_hash": "sha256:225614fbb19018bc187ae4050dedc3c9a4b33385ddd1066add5a6e4900873a2e",
-			"audio_hash": "sha256:2ef6619d0b07635333ebea913da7e4f11c234ed4a98a8304364bdc9debed7e06",
-			"loudness": -16.2,
-			"peak": -4.5
+			"recipe_hash": "sha256:9eeb7820ab8e89fc140aa74a725880f828b689585c93c5e98195dc6c12a9a815",
+			"audio_hash": "sha256:196077de9324c07cb17f6bd2563174bf67bfca689d14b1366a4055b9d74d8d07",
+			"loudness": -17.3,
+			"peak": -5.5
 		}
 	]
 }

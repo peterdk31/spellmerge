@@ -12,14 +12,14 @@
 		{
 			"source": "sine",
 			"pitch": {
-				"from": 170,
-				"to": 55
+				"from": 160,
+				"to": 65
 			},
 			"length": 0.16,
-			"drive": 2.5,
-			"gain": -4,
+			"drive": 2.0,
+			"gain": -11,
 			"amp": {
-				"attack": 0.004,
+				"attack": 0.005,
 				"shape": "perc",
 				"power": 1.8
 			}
@@ -27,19 +27,17 @@
 		{
 			"source": "noise",
 			"filter": {
-				"type": "band",
-				"from": 2200,
-				"to": 700,
-				"q": 1.3
+				"type": "low",
+				"from": 1100,
+				"to": 300,
+				"q": 0.8
 			},
-			"length": 0.12,
+			"length": 0.1,
 			"amp": {
-				"attack": 0.003,
+				"attack": 0.004,
 				"shape": "perc",
-				"power": 1.6
-			},
-			"drive": 2.0,
-			"gain": -3
+				"power": 1.8
+			}
 		}
 	],
 	"fx": {
@@ -47,8 +45,8 @@
 			"mix": 0.1,
 			"size": 0.5
 		},
-		"lowpass": 6000
+		"lowpass": 2500
 	},
-	"gain": -3,
-	"notes": "A shot landing on a body: a short, dry thump with a soft snap of noise on top, under 0.3 s. Heard many times a second in a fight, so it has no ring and no high edge, and sits 3 dB under the family's level (gain -3)."
+	"gain": -4,
+	"notes": "A shot landing on a body: a short, dry, low thump with a dull puff of noise in it, under 0.3 s. Heard many times a second in a fight, so it has no ring, no snap and nothing above 2.5 kHz, and sits 4 dB under the family's level (gain -4)."
 }

@@ -9,15 +9,15 @@
 		},
 		"filter": {
 			"type": "band",
-			"from": 3200,
-			"q": 0.9
+			"from": 1400,
+			"q": 1.0
 		},
 		"amp": {
 			"attack": 0.02,
 			"shape": "perc",
 			"power": 1.2
 		},
-		"gain": -6
+		"gain": -8
 	},
-	"notes": "Fire's crackle: stepped noise through a band at 3.2 kHz, thinning from 90 to 25 pops a second."
+	"notes": "Fire's crackle: stepped noise through a band at 1.4 kHz, thinning from 90 to 25 pops a second; dull pops of burning wood, not a sizzle."
 }

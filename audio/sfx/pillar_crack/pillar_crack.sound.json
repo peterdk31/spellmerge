@@ -12,12 +12,12 @@
 		{
 			"source": "noise",
 			"filter": {
-				"type": "high",
-				"from": 2400,
-				"q": 0.8
+				"type": "band",
+				"from": 1100,
+				"q": 0.9
 			},
 			"length": 0.07,
-			"drive": 2.4,
+			"drive": 2.0,
 			"amp": {
 				"attack": 0.003,
 				"shape": "perc",
@@ -34,7 +34,7 @@
 			},
 			"filter": {
 				"type": "band",
-				"from": 1800,
+				"from": 900,
 				"q": 1.2
 			},
 			"start": 0.006,
@@ -70,5 +70,5 @@
 			"size": 0.8
 		}
 	},
-	"notes": "A stone pillar cracking under a hit: a sharp snap, a short thump in the stone and grit trickling off it."
+	"notes": "A stone pillar cracking under a hit: a dull snap, a short thump in the stone and grit trickling off it."
 }

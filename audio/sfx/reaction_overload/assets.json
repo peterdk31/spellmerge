@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_overload/reaction_overload.sound.json",
-			"recipe_hash": "sha256:4376dfaf2a8416642d03cbd83d7250379338439fd901d40972e3d6316af21273",
-			"audio_hash": "sha256:3d94c6c89fedfdb323903d794a4471b6ee894af9e39b1846bc0b328f8825028f",
-			"loudness": -17.0,
-			"peak": -3.2
+			"recipe_hash": "sha256:52b308c301fc1fa3e32c4141a26f1e16257edeb7c0ee8582d27fdbe01a36f5ac",
+			"audio_hash": "sha256:5df081f6019766a82103efbc54a507614104160b3e4e7be7c50d051a6d3415ca",
+			"loudness": -18.0,
+			"peak": -3.8
 		},
 		{
 			"path": "audio/sfx/reaction_overload/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_overload/reaction_overload.sound.json",
-			"recipe_hash": "sha256:4376dfaf2a8416642d03cbd83d7250379338439fd901d40972e3d6316af21273",
-			"audio_hash": "sha256:6ed4224ff7ff915c14c0284a0ef87b8ea8b01df9dea4e2c5d50515cc69a84773",
-			"loudness": -17.1,
-			"peak": -3.9
+			"recipe_hash": "sha256:52b308c301fc1fa3e32c4141a26f1e16257edeb7c0ee8582d27fdbe01a36f5ac",
+			"audio_hash": "sha256:79c9213d6ae61cf776546ee20c65d61bb7fd77c9e5c14ea85dd5a1ae1ef05889",
+			"loudness": -18.0,
+			"peak": -3.2
 		},
 		{
 			"path": "audio/sfx/reaction_overload/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_overload/reaction_overload.sound.json",
-			"recipe_hash": "sha256:4376dfaf2a8416642d03cbd83d7250379338439fd901d40972e3d6316af21273",
-			"audio_hash": "sha256:1721f14982ea17a4581f6e83acc68a39338df95f10eb152a757c25a098a3d264",
-			"loudness": -16.9,
-			"peak": -3.3
+			"recipe_hash": "sha256:52b308c301fc1fa3e32c4141a26f1e16257edeb7c0ee8582d27fdbe01a36f5ac",
+			"audio_hash": "sha256:709b00bdd7daab251e770f0ba2a4e85c945aabfe121542a796de23592cbf9ea4",
+			"loudness": -18.0,
+			"peak": -4.4
 		}
 	]
 }

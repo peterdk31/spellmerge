@@ -26,7 +26,7 @@
 		},
 		{
 			"source": "partials",
-			"pitch": 2100,
+			"pitch": 760,
 			"partials": [
 				{
 					"ratio": 1,
@@ -42,7 +42,7 @@
 			"amp": {
 				"attack": 0.001
 			},
-			"gain": -8
+			"gain": -10
 		}
 	],
 	"fx": {
@@ -52,5 +52,5 @@
 		}
 	},
 	"gain": -4,
-	"notes": "A reaction's damage landing: a soft thump with a small glassy tick, so it reads as a hit apart from a shot's. It plays under the reaction's own sound, so it sits 4 dB under the family's level (gain -4)."
+	"notes": "A reaction's damage landing: a soft thump with a small, low glassy tick, so it reads as a hit apart from a shot's. It plays under the reaction's own sound, so it sits 4 dB under the family's level (gain -4)."
 }

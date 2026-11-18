@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/broom_swish/broom_swish.sound.json",
-			"recipe_hash": "sha256:8cd31c44284d73440e8e32698c854ceb4255cb3796184932c05c72f5b4c95b99",
-			"audio_hash": "sha256:6b7bbe4fca709f0c9830aa9a2e3dc35f618c9da461a6763a530119cb8735d1d2",
+			"recipe_hash": "sha256:264a561bb43d8bed4371557d84628b9e1fe6fb5d31549bd21ff9ab98a030fc6f",
+			"audio_hash": "sha256:9331359b5394bceee1af400da6b19902070e6196aa3a4295ce72429676f52ed8",
 			"loudness": -24.0,
-			"peak": -10.9
+			"peak": -7.9
 		}
 	]
 }

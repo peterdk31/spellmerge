@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/room_start/room_start.sound.json",
-			"recipe_hash": "sha256:ae9a2c0ff295216a85aec253866879c087eb1a848f9a13dba9873802e74004f9",
+			"recipe_hash": "sha256:fe27594cf513b97a201530f40cb9c396a357582567855c2fe12d2958ac591687",
 			"audio_hash": "sha256:5bf309193f8283e9a98f9016408c7d04cf77b106318fd99e9602c949df2c0fa9",
 			"loudness": -16.6,
 			"peak": -3.9
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/room_start/room_start.sound.json",
-			"recipe_hash": "sha256:ae9a2c0ff295216a85aec253866879c087eb1a848f9a13dba9873802e74004f9",
+			"recipe_hash": "sha256:fe27594cf513b97a201530f40cb9c396a357582567855c2fe12d2958ac591687",
 			"audio_hash": "sha256:f71a6cdc5df81e13aeb889b9dbcfec476e3123f16954f7a2a64f0b0362d431bd",
 			"loudness": -16.8,
 			"peak": -3.7
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/room_start/room_start.sound.json",
-			"recipe_hash": "sha256:ae9a2c0ff295216a85aec253866879c087eb1a848f9a13dba9873802e74004f9",
+			"recipe_hash": "sha256:fe27594cf513b97a201530f40cb9c396a357582567855c2fe12d2958ac591687",
 			"audio_hash": "sha256:95fbb3353004b3c667ccc189bf8e7fbc35df4852d9e307c0cf85c3ba011a7646",
 			"loudness": -17.6,
 			"peak": -4.3

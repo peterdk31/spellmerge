@@ -40,5 +40,6 @@
 			"size": 1.2
 		}
 	},
-	"notes": "Overload (fire and lightning): a dull, heavy thump of fire with a short electric snap on top."
+	"notes": "Overload (fire and lightning): a dull, heavy thump of fire with a short electric snap on top. It sits 1 dB under the family's level (gain -1) so the thump stays under the peak.",
+	"gain": -1
 }

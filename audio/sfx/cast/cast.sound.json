@@ -2,7 +2,7 @@
 	"version": 1,
 	"kind": "sfx",
 	"family": "combat",
-	"seconds": 0.34,
+	"seconds": 0.3,
 	"vary": {
 		"pitch": 0.05,
 		"time": 0.08,
@@ -10,59 +10,76 @@
 	},
 	"layers": [
 		{
+			"source": "sine",
+			"pitch": {
+				"from": 170,
+				"to": 55
+			},
+			"length": 0.17,
+			"drive": 2.0,
+			"amp": {
+				"attack": 0.005,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -7
+		},
+		{
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 700,
-				"to": 3400,
-				"q": 3,
-				"curve": "arch"
+				"from": 330,
+				"to": 220,
+				"q": 5.0
 			},
+			"length": 0.22,
 			"amp": {
-				"shape": "arch",
+				"attack": 0.004,
+				"shape": "perc",
 				"power": 1.5
-			}
+			},
+			"gain": -3
 		},
 		{
 			"source": "noise",
 			"filter": {
 				"type": "low",
-				"from": 900,
-				"to": 2200,
-				"curve": "arch",
+				"from": 1400,
+				"to": 320,
 				"q": 0.7
 			},
+			"length": 0.2,
 			"amp": {
-				"shape": "arch",
-				"power": 2.0
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 2.2
 			},
-			"gain": -8
+			"gain": -3
 		},
 		{
-			"source": "fm",
-			"pitch": {
-				"from": 520,
-				"to": 1250
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 420,
+				"to": 900,
+				"q": 1.5
 			},
-			"ratio": 3.5,
-			"index": {
-				"from": 2.2,
-				"to": 0.4
-			},
+			"start": 0.04,
 			"amp": {
-				"attack": 0.04,
-				"shape": "arch",
-				"power": 2.0
+				"attack": 0.03,
+				"shape": "perc",
+				"power": 1.4
 			},
-			"gain": -18
+			"gain": -12
 		}
 	],
 	"fx": {
 		"reverb": {
-			"mix": 0.3,
-			"size": 1.0
+			"mix": 0.2,
+			"size": 0.8
 		},
-		"lowpass": 7000
+		"lowpass": 3000
 	},
-	"notes": "A wizard releasing a spell: the owner's chosen whoosh (a band of noise swept up and back, a soft low wash under it, a faint FM shimmer), a little shorter and darker at the top so four players casting fast blur into one breath rather than a hiss."
+	"notes": "A wizard releasing a spell, as a Roman candle fires (the owner, 2026-11-18): a deep, hollow thoomp out of a tube (a sine dropping from 170 to 55 Hz, the tube's own low ring, a dull puff of the charge) and a faint breath of the shot leaving. Nothing above 3 kHz, so four players casting fast are a low patter under the fight, never a hiss over it; 2 dB under the family's level (gain -2), as the sound heard most.",
+	"gain": -2
 }

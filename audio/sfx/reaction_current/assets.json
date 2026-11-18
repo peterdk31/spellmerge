@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_current/reaction_current.sound.json",
-			"recipe_hash": "sha256:d9401fbd1754336fced98b1d7408cfd9470a5240c59e3fede5e1fbc66a1d612b",
-			"audio_hash": "sha256:b3159264316fa968fa579174fa4b436cae6f2985d77038fe9431effaef4cdf77",
-			"loudness": -17.0,
-			"peak": -6.1
+			"recipe_hash": "sha256:8cffda9717ec4daaa9bbea44ce016a58f3d1176a0db32654825ae2abf4025aa3",
+			"audio_hash": "sha256:ee2cea7c1e77819c2edea43862b79888eb3c5dca4e49aafc097a89dc507190a5",
+			"loudness": -18.0,
+			"peak": -6.3
 		},
 		{
 			"path": "audio/sfx/reaction_current/variants/2.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_current/reaction_current.sound.json",
-			"recipe_hash": "sha256:d9401fbd1754336fced98b1d7408cfd9470a5240c59e3fede5e1fbc66a1d612b",
-			"audio_hash": "sha256:cc6313ae4d7995fe115db9c8fc79143596f3eb629dfa217e5b038aeccaf9112a",
-			"loudness": -16.8,
-			"peak": -4.9
+			"recipe_hash": "sha256:8cffda9717ec4daaa9bbea44ce016a58f3d1176a0db32654825ae2abf4025aa3",
+			"audio_hash": "sha256:92614aeff4e7dfcb1a6e659ebe7258c153cc70fb4dc1acb1fc7d544fcf3c611b",
+			"loudness": -17.7,
+			"peak": -5.9
 		},
 		{
 			"path": "audio/sfx/reaction_current/variants/3.ogg",
@@ -34,10 +34,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/reaction_current/reaction_current.sound.json",
-			"recipe_hash": "sha256:d9401fbd1754336fced98b1d7408cfd9470a5240c59e3fede5e1fbc66a1d612b",
-			"audio_hash": "sha256:e15ab768a5b9f8a3bdf6598d13fd17e156141650534cda7a0da7b3da06154355",
-			"loudness": -17.3,
-			"peak": -4.1
+			"recipe_hash": "sha256:8cffda9717ec4daaa9bbea44ce016a58f3d1176a0db32654825ae2abf4025aa3",
+			"audio_hash": "sha256:d8b1f4cb19a44f1114e632acdb425333b807bbcc7886189f5e1dcf2f3526cced",
+			"loudness": -18.2,
+			"peak": -3.7
 		}
 	]
 }

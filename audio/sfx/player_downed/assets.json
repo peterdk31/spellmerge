@@ -8,7 +8,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/player_downed/player_downed.sound.json",
-			"recipe_hash": "sha256:0b0e8b0e1f7a97c85b8ea28b8380235da069780ac4180683cf1a56f6e9509f7a",
+			"recipe_hash": "sha256:89d4ce50ba674adea2f872c218f0262dd1746367ab040f6731d79fddcd2a72cf",
 			"audio_hash": "sha256:1cb45687794ab4ba96884ad9c30f4750acefbc1da79bd660e91ef24b8c7df310",
 			"loudness": -16.8,
 			"peak": -7.0
@@ -21,7 +21,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/player_downed/player_downed.sound.json",
-			"recipe_hash": "sha256:0b0e8b0e1f7a97c85b8ea28b8380235da069780ac4180683cf1a56f6e9509f7a",
+			"recipe_hash": "sha256:89d4ce50ba674adea2f872c218f0262dd1746367ab040f6731d79fddcd2a72cf",
 			"audio_hash": "sha256:12eab90bfb32578688fd6d44c5a3671e7f8a6050bdfa832b02d1bc90fde60fce",
 			"loudness": -17.0,
 			"peak": -7.4
@@ -34,7 +34,7 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/sfx/player_downed/player_downed.sound.json",
-			"recipe_hash": "sha256:0b0e8b0e1f7a97c85b8ea28b8380235da069780ac4180683cf1a56f6e9509f7a",
+			"recipe_hash": "sha256:89d4ce50ba674adea2f872c218f0262dd1746367ab040f6731d79fddcd2a72cf",
 			"audio_hash": "sha256:98c21cc4346d3254baba4e922b3d6d84fedd4caa4373bf77fe9972efd8b367d4",
 			"loudness": -17.2,
 			"peak": -6.8

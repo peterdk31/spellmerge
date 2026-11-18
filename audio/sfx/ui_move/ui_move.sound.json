@@ -11,7 +11,7 @@
 	"layers": [
 		{
 			"source": "fm",
-			"pitch": 1560,
+			"pitch": 780,
 			"ratio": 2.0,
 			"index": {
 				"from": 1.2,
@@ -27,7 +27,7 @@
 			"source": "noise",
 			"filter": {
 				"type": "band",
-				"from": 5200,
+				"from": 1800,
 				"q": 2.0
 			},
 			"length": 0.012,
@@ -38,5 +38,8 @@
 			"gain": -14
 		}
 	],
-	"notes": "The focus moving to another row: a tiny soft FM tick with a breath of high noise, heard many times a second as a player scrolls."
+	"notes": "The focus moving to another row: a tiny, soft, low FM tick with a breath of noise, heard many times a second as a player scrolls.",
+	"fx": {
+		"lowpass": 2600
+	}
 }

@@ -30,7 +30,6 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
-const ArriveLookScript := preload("res://gameplay/feel/arrive_look.gd")
 const SHADER: Shader = preload("res://gameplay/feel/body_shadow.gdshader")
 
 ## Floats a row holds (a 2D MultiMesh row with colours and custom data; the light rows' too).
@@ -100,6 +99,14 @@ var _last: float = -1.0
 ## shape of a body with no drawn shadow (an enemy) shrinks away, while one with a drawn shadow keeps
 ## it, so the drawn one takes its place unchanged when this node leaves. Fading in, the reverse.
 var share: float = 1.0
+## The spawn styles by id (Feel's lookup, the registry's `spawn_styles`; as `SpawnLook.style_of`), so a
+## spawning body's shadow waits for its own style's mark (`SpawnStyle.mark_end`); unset or not found:
+## the default style's. Looked up once an id and kept.
+var style_of: Callable = Callable():
+	set(value):
+		style_of = value
+		_mark_ends.clear()
+var _mark_ends: Dictionary[StringName, float] = {}
 ## The bodies with a drawn shadow of their own (their node's instance id: true), found as this node
 ## enters the tree or a drawn shadow is added, and again by `find_drawn_owners`.
 var _drawn_owners: Dictionary = {}
@@ -257,7 +264,7 @@ func step(table: ActorsScript, now: float, view: Rect2, blockers: LightBlockersS
 			cast[id] = cast[id].move_toward(want, most)
 		_stamp[id] = _steps
 		_key[id] = key
-		var radius: float = (body.footprint.radius + RADIUS_PAD) * (1.0 - body.fall_share()) * rise_share(body.arrive_share())
+		var radius: float = (body.footprint.radius + RADIUS_PAD) * (1.0 - body.fall_share()) * rise_share(body.spawn_share(), _mark_end_of(body.spawn_style))
 		if size_share < 1.0 and not has_drawn(body):
 			radius *= size_share
 		_last_feet[id] = feet.round()
@@ -289,13 +296,26 @@ func step(table: ActorsScript, now: float, view: Rect2, blockers: LightBlockersS
 		multimesh.buffer = _rows
 
 
-## How much of a body's shadow shows at `share` of its arrival (`Actor.arrive_share`; 1 standing):
-## none while it is under the floor (Feel's arrival mark is drawn there instead, ArriveLook.MARK_END),
-## then growing with it as it rises.
-static func rise_share(share: float) -> float:
+## How much of a body's shadow shows at `share` of its spawn (`Actor.spawn_share`; 1 standing): none
+## while it is under its mark (Feel's spawn mark is drawn there instead, to its style's `mark_end`),
+## then growing with it as its motion draws it.
+static func rise_share(share: float, mark_end: float = float(SpawnStyle.DEFAULT["mark_end"])) -> float:
 	if share >= 1.0:
 		return 1.0
-	return clampf((share - ArriveLookScript.MARK_END) / (1.0 - ArriveLookScript.MARK_END), 0.0, 1.0)
+	if mark_end >= 1.0:
+		return 0.0
+	return clampf((share - mark_end) / (1.0 - mark_end), 0.0, 1.0)
+
+
+## The `mark_end` of the spawn style `id` (looked up once; the default style's when none is found).
+func _mark_end_of(id: StringName) -> float:
+	var known: Variant = _mark_ends.get(id)
+	if known != null:
+		return float(known)
+	var style: SpawnStyle = style_of.call(id) as SpawnStyle if style_of.is_valid() else null
+	var end: float = style.mark_end if style != null else float(SpawnStyle.DEFAULT["mark_end"])
+	_mark_ends[id] = end
+	return end
 
 
 ## Where the shadow of a body with its feet at `feet` (and the id `id`) should be cast this frame

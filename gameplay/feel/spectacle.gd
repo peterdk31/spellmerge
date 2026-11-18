@@ -86,6 +86,8 @@ var registry: RegistryScript = null:
 		registry = value
 		cards.registry = value
 		cards.clear()
+		if shadows != null:
+			shadows.style_of = _spawn_style_of
 		if pool != null:
 			pool.set_infusions(InfusionTable.of_registry(value))
 ## The spell runtime, which a shot's tag gives its spell from (`profile`; null for none: every
@@ -1028,6 +1030,7 @@ func _fit_shadows(at_once: bool) -> void:
 		blockers.set_share(_shadows_share)
 		shadows = BodyShadowsScript.new(MARK_Z)
 		shadows.share = _shadows_share
+		shadows.style_of = _spawn_style_of
 		add_child(shadows)
 		_keep_mist_last()
 	elif shadows != null and not shadows_on:
@@ -1231,5 +1234,10 @@ func _fit_marks(room_id: StringName) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	var bounds: Rect2 = projectiles.bounds() if projectiles != null else Rect2()
 	# Its holes are masked as its walls are (hub rework HR-H2): no mark is laid over a hole.
-	marks.enter(bounds, projectiles.wall_image(true) if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
+	marks.enter(bounds, projectiles.grid().wall_image(true) if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
 	marks.set_floor_colors(room.floor_colors() if room != null else PackedColorArray())
+
+
+## The spawn style of id `id` from the registry (null: none), for the bodies' shadows (`BodyShadows.style_of`).
+func _spawn_style_of(id: StringName) -> SpawnStyle:
+	return registry.get_resource(SpawnStyle.FOLDER, id) as SpawnStyle if registry != null else null

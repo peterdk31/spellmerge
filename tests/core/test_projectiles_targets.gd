@@ -34,9 +34,14 @@ const BUDGET: int = 80000
 ## Recorded again for online-ready N7 (2026-11-07), when the manager's homing and return turns became
 ## `DMath`'s (the same on every platform): the same 14,375 hits on the same bodies at the same steps
 ## (compared hit by hit with main's manager, the native kernel off), 19 hit points differing in the
-## last digit of a float.
-const RECORDED_HITS: int = 14375
-const RECORDED_HASH: int = 3228771069
+## last digit of a float. Recorded again for the hit batch A0 (2026-11-17, the owner's word, Q2 of
+## docs/milestones/hit-batch.md), on the merged hits, the game's one hit model: a step's hits of one
+## caster's spell on one body are one `projectile_hit`, its `impact_count` folded in and counted:
+## 14,374 hits where there were 14,375 (no body dies in this scene, so the one less comes from the
+## spent shots ending at the pass's end; not traced further). The test runs the native kernel when it
+## is loaded; the GDScript gave the same hash, checked by hand when it was recorded.
+const RECORDED_HITS: int = 14374
+const RECORDED_HASH: int = 899385074
 
 var _bus: EventsScript
 var _mgr: ManagerScript
@@ -167,8 +172,8 @@ func _top_up() -> void:
 
 
 func _on_hit(caster: int, target: Node, point: Vector2, tag: int, _slot: int) -> void:
-	_hits += 1
-	_hash = hash([_hash, _step_no, caster, _index_of.get(target.get_instance_id(), -99), tag, point])
+	_hits += _mgr.impact_count
+	_hash = hash([_hash, _step_no, caster, _index_of.get(target.get_instance_id(), -99), tag, point, _mgr.impact_count])
 
 
 ## The queries every step, folded into the fingerprint: the nearest target of another team and
@@ -311,3 +316,4 @@ func test_kept_targets_keep_the_order_of_a_drop_then_fill() -> void:
 		kept.append((_mgr._targets[t] as Node).get_instance_id())
 	check_equal(kept.size(), ids.size() - gone.size(), "the dropped ones are gone")
 	check(kept == expected, "the rest keep the indices a drop pass would leave")
+

@@ -6,8 +6,8 @@ extends Node
 ## (`RunGenerator.generate`), and answers with the map's first room and what stands in it
 ## (`run_room_chosen`: with the kinds of the rooms it leads to), which Flow builds, and how much
 ## harder it is (`run_room_scaled`, run generation RG5: its depth and the run's players), which
-## difficulty scales its enemies by, and how its enemies come in (`run_room_paced`, enemy arrivals
-## EA4: plain costs worked out from its biome's `MapRules.arrivals`), which Flow paces them by.
+## difficulty scales its enemies by, and how its enemies come in (`run_room_paced`, enemy spawning
+## EA4: plain costs worked out from its biome's `MapRules.spawning`), which Flow paces them by.
 ## When the party takes a lit exit (`run_way_taken(way)`, run generation RG4), it moves on through
 ## the map to the room that way links to (`at`, and with it the depth) and names that room the same way. The view
 ## hears the map as the party sees it (`run_map_changed`, run generation RG8: every room's row, kind
@@ -142,7 +142,7 @@ func _on_run_way_taken(way: int) -> void:
 
 
 ## The party enters room `index` of the map: its scale is told (`run_room_scaled`, for difficulty),
-## its pace (`run_room_paced`, enemy arrivals EA4: how its enemies come in, for Flow), then what Flow
+## its pace (`run_room_paced`, enemy spawning EA4: how its enemies come in, for Flow), then what Flow
 ## builds (`run_room_chosen`), with the kinds of the rooms it leads to, left to right.
 func _enter(index: int) -> void:
 	at = index

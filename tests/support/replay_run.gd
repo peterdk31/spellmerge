@@ -80,11 +80,14 @@ var snapshot: Snapshot = null
 ## (tests/support/pinned_run.gd, `Flow.run_id_to_play`), pinned again in every fresh game. The
 ## snapshot test plays every run's room template by it (online-ready N12, run generation RG3).
 var room: RoomBase = null
-## The pace that room's enemies come in at (enemy arrivals EA5; null: all at once), pinned with it.
-var arrivals: ArrivalRules = null
+## The pace that room's enemies come in at (enemy spawning EA5; null: all at once), pinned with it.
+var spawning: SpawnRules = null
 ## Called right after the snapshot is taken (with nothing), so a test can check what the snapshot
-## caught (a body mid-arrival, groups still to come).
+## caught (a body mid-spawn, groups still to come).
 var at_snapshot: Callable = Callable()
+## Called right after `resume` restores the snapshot (with nothing), before it plays on, so a test can
+## check the restored game against what `at_snapshot` saw (spawn styles AS3: the spawns drawn alike).
+var at_restore: Callable = Callable()
 ## True: each run starts from a fresh game (every autoload made again). False: in the same game,
 ## after whatever ran before, as a player starts one run after another (N3b: the run starts from
 ## a fresh game's state all the same).
@@ -95,6 +98,9 @@ var rack_item: StringName = STORM_ITEM
 ## Cover kinds the game's cover area and Feel lay instead of the registry's (ground cover GC5; empty:
 ## the registry's), given again in every fresh game. The snapshot test puts cover in its rooms so.
 var cover: Array[CoverKind] = []
+## Spawn styles added to the registry of every fresh game (spawn styles AS2: a room of two styles,
+## tests/core/test_snapshot_spawn_styles.gd); empty: the registry's own.
+var spawn_styles: Array[SpawnStyle] = []
 
 var _tree: SceneTree
 var _root: Window
@@ -259,8 +265,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		var item := _root.get_node("Registry").call("get_resource", &"items", rack_item) as StaffItem
 		if taker == null or item == null or taker.caster.cards_of(2).slice(0, item.cards.size()) != item.cards:
 			problems.append("%s: the scripted player did not take %s onto LB" % [start, rack_item])
-	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room, 1, 1, arrivals):
-		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room, 1, 1, arrivals)])
+	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room, 1, 1, spawning):
+		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room, 1, 1, spawning)])
 	_check_settings(start)
 	for bot in players:
 		bot.leave()
@@ -387,6 +393,8 @@ func resume(replay: Replay, from: Snapshot, tick: int, bots: int, into: Desync) 
 		problems.append("%s: the replay did not play" % replay.start)
 	for problem in from.restore(areas(), _root):
 		problems.append("%s restored: %s" % [replay.start, problem])
+	if at_restore.is_valid():
+		at_restore.call()
 	if not bool(_frames.call("seek", tick + 1)):
 		problems.append("%s: the replay cannot go on from tick %d" % [replay.start, tick + 1])
 	for i in range(tick + 1, replay.tick_count()):
@@ -488,8 +496,10 @@ func _find() -> void:
 	# under a test script.
 	_flow.set(&"loading_enabled", false)
 	_flow.set(&"intro_enabled", false)
+	for style in spawn_styles:
+		_root.get_node("Registry").call("add", SpawnStyle.FOLDER, style)
 	if room != null:
-		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room, &"", RoomKind.FILL_ENEMIES, 16, 1, 1, arrivals))
+		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room, &"", RoomKind.FILL_ENEMIES, 16, 1, 1, spawning))
 	var kinds: Variant = cover if not cover.is_empty() else null
 	_root.get_node("Cover").call(&"use_kinds", kinds)
 	_feel.cover().use_kinds(kinds)

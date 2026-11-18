@@ -65,7 +65,7 @@ extends Node2D
 ##
 ## The move (online-ready N6): `move(delta)` slides the body, its footprint's circle (`wall_radius`),
 ## along the walls (the room's, the solid shots' and the footprints', the projectile manager's
-## wall grid, `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
+## wall grid, `RoomGrid.slide_body`), the same to the bit on every machine; `velocity` is then what it
 ## moved by over the step, so a body against a wall keeps only its slide. Actors walk through each
 ## other (Combat's push parts them); spells find them by their hurt circles. No physics engine.
 ## Where the move left it, its circle tells every actor whose touch area it overlaps (`touched`,
@@ -87,16 +87,16 @@ extends Node2D
 ## the nearest ground instead. A body downed over a hole falls too, and comes back still down. All of
 ## it is state, so Feel draws the fall from it (`fall_share`) on a machine that joins mid-fall.
 ##
-## Arriving (enemy arrivals EA1, docs/milestones/enemy-arrivals.md, "The simulation"): a body Flow
-## stands with `arrive(seconds)` (set before it is added to the tree) is not there yet for
-## `arrive_left` seconds: it is down to everything that asks (`is_down`: its hurt shape is never
+## Spawning (enemy spawning EA1, docs/milestones/enemy-spawning.md, "The simulation"): a body Flow
+## stands with `spawn(seconds, style)` (set before it is added to the tree) is not there yet for
+## `spawn_left` seconds: it is down to everything that asks (`is_down`: its hurt shape is never
 ## registered, so it can't be hurt, targeted or possessed, and its contact damage starts only once it
 ## has landed), it neither touches nor is touched (`_touch`, both ways), and its step holds it: the
 ## timer counts down and the hurt shape follows, then it returns before its phases, possession,
 ## controller, caster and mover (its intent cleared, `velocity` zero), and the tick does not `move` it
-## (no slide, no ground check, so an arrival never turns into a fall). The tick its timer runs out it
-## steps as a standing body. All of it is state (`arrive_left`, `arrive_seconds`), so Feel draws the
-## arrival from it (`arrive_share`, `ArriveLook`) on a machine that joins mid-arrival.
+## (no slide, no ground check, so a spawn never turns into a fall). The tick its timer runs out it
+## steps as a standing body. All of it is state (`spawn_left`, `spawn_seconds`, `spawn_style`), so Feel
+## draws the spawn from it (`spawn_share`, `SpawnLook.style_for`) on a machine that joins mid-spawn.
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
 ## health (times `stat_scale`, the room's scale, and by the players in play, `players`), walking speed, contact damage, staff, cards and
@@ -107,7 +107,7 @@ extends Node2D
 ## start (no time passing), so the stop shows the moment of the hit.
 ##
 ## Down and out: `is_down()` is true while a Downed component (gameplay/player, G7) holds the actor
-## down (`set_down`, `is_downed`), while it falls (`is_falling`) or while it arrives (`is_arriving`); `die(killer)` sends the local `died` and frees the actor. When its Health is
+## down (`set_down`, `is_downed`), while it falls (`is_falling`) or while it spawns in (`is_spawning`); `die(killer)` sends the local `died` and frees the actor. When its Health is
 ## used up the actor dies, unless something downs it instead (`downable`).
 ##
 ## Services are the autoloads (`Events`, `Combat`, `Projectiles`, `Spells`, `Actors`), found by
@@ -118,9 +118,6 @@ const EventsScript := preload("res://core/events/events.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-## How long an enemy's arrival takes (enemy arrivals EA1: a mark on the floor, then the body rising
-## out of it; `ArriveLook`): what Flow hands `arrive`.
-const ARRIVE_SECONDS: float = 0.8
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 
 ## The actor died (`die`); `killer` is who landed the last hit (an event's player, or -1).
@@ -150,11 +147,16 @@ signal touched(by: int)
 ## The touch areas it overlapped after its last move (`_touch`), scratch.
 const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim", &"_components", &"_touching"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"_looks", &"damage_numbers"]
+const VIEW: Array[StringName] = [&"_looks", &"damage_numbers", &"_look_time", &"_looks_later", &"step_looks_due", &"_on_screen"]
 ## State as who it points at: the controller driving it now, which may be another body's (a
 ## possessor's, `possession.gd`). Its own controller's state is walked through `home_controller`,
 ## and who drives what is the controller's `driving`.
 const REFS: Array[StringName] = [&"controller"]
+## The most seconds of ticks its looks catch up at once (`step_looks_due`): a body back on screen
+## after a long while off it plays a moment, not all of it.
+const LOOK_TIME_MOST: float = 0.25
+## How far off screen (pixels) a body's looks are still stepped: a body walking in is drawn as it is.
+const ON_SCREEN_MARGIN: float = 96.0
 
 ## The colour ramp of its spells: 0-3 the hat colours, 4 the enemy ramp.
 @export var ramp: int = ActorsScript.RAMP_ENEMY
@@ -242,6 +244,10 @@ var size: float = 1.0
 var _looks: Array[ActorLook] = []
 ## True once the looks have shown the start of the local stop the body is in (see `step`).
 var _hold_shown: bool = false
+## While the Tick steps it, its looks are stepped once a drawn frame (`step_looks_due`), not every
+## tick (performance, 2026-11-17): the seconds of the ticks since, and whether this step leaves them.
+var _look_time: float = 0.0
+var _looks_later: bool = false
 ## Scratch of `_touch`: the actors whose touch area it overlaps.
 var _touching: PackedInt32Array = PackedInt32Array()
 ## Whether the Tick steps this body (core/sim/tick.gd, by actor id): off for a body another
@@ -260,10 +266,15 @@ var fell_by: int = ActorsScript.NONE
 ## and whether it has stood on any since it was placed.
 var ground: Vector2 = Vector2.ZERO
 var has_ground: bool = false
-## Its arrival (enemy arrivals EA1, see the class doc): seconds of it left (0: standing), and how long
-## the whole arrival was (what `arrive_share` is counted against).
-var arrive_left: float = 0.0
-var arrive_seconds: float = 0.0
+## Its spawn (enemy spawning EA1, see the class doc): seconds of it left (0: standing), how long
+## the whole spawn was (what `spawn_share` is counted against), and the id of the style it spawns in
+## in (spawn styles AS2: `SpawnStyle.pick`'s, which Feel draws it by; empty for a body never set to
+## spawn, kept once it lands as `spawn_seconds` is). State, so
+## every machine, a snapshot and a player who joins mid-spawn draw the same style; nothing in the
+## simulation reads the id.
+var spawn_left: float = 0.0
+var spawn_seconds: float = 0.0
+var spawn_style: StringName = &""
 
 
 func _enter_tree() -> void:
@@ -312,19 +323,45 @@ func _exit_tree() -> void:
 
 
 ## One tick of the body (core/sim/tick.gd steps every actor's body by id): its step, then its move
-## (none while it arrives: it stands where it rises).
-func tick_step(delta: float) -> void:
+## (none while it spawns in: it stands where it rises). With `looks_later` (the Tick's), its looks are
+## left for `step_looks_due`, once a drawn frame.
+func tick_step(delta: float, looks_later: bool = false) -> void:
+	_looks_later = looks_later
 	step(delta)
-	if arrive_left <= 0.0:
+	_looks_later = false
+	if spawn_left <= 0.0:
 		move(delta)
+
+
+## The looks' share of the drawn frame (the Tick's `_process`, after the frame's ticks): its looks
+## stepped once for every tick since they last were, unless the body is off screen, where they
+## wait (at most LOOK_TIME_MOST seconds of them) until it is back. View: nothing the game plays by.
+func step_looks_due() -> void:
+	if _look_time <= 0.0:
+		return
+	_look_time = minf(_look_time, LOOK_TIME_MOST)
+	if not _on_screen():
+		return
+	var seconds: float = _look_time
+	_look_time = 0.0
+	for look in _looks:
+		look.step(seconds)
+
+
+## True when the body's feet are on screen or within ON_SCREEN_MARGIN pixels of it.
+func _on_screen() -> bool:
+	var viewport: Viewport = get_viewport()
+	if viewport == null:
+		return true
+	return viewport.get_visible_rect().grow(ON_SCREEN_MARGIN).has_point(get_global_transform_with_canvas().origin)
 
 
 ## True while no controller drives it, it has no Mover and it keeps no time (props W2; see the
 ## class doc): the Tick does not step it. A prop with a `timer` row keeps time
 ## (`PropStateTriggers.keeps_time`): it is stepped, so its clock runs and its pools refill; so does a
-## body that arrives (its timer runs, or it would never land).
+## body that spawns in (its timer runs, or it would never land).
 func is_still() -> bool:
-	return controller == null and mover == null and arrive_left <= 0.0 and (state_triggers == null or not state_triggers.keeps_time())
+	return controller == null and mover == null and spawn_left <= 0.0 and (state_triggers == null or not state_triggers.keeps_time())
 
 
 ## The body as a few values for the state hash while it rests (props W2; see the class doc): still,
@@ -333,7 +370,7 @@ func is_still() -> bool:
 ## are what may differ between two bodies made alike: where it stands and aims, its size, the staff
 ## on show, its health and whether hits take any.
 func rest_leaf() -> Variant:
-	if _down or _dying or _leaving or fall_left > 0.0 or arrive_left > 0.0 or not is_still() or possessed_by != null or phases != null:
+	if _down or _dying or _leaving or fall_left > 0.0 or spawn_left > 0.0 or not is_still() or possessed_by != null or phases != null:
 		return null
 	# What a step it took while driven may have left (a possession that ended).
 	if _hold_shown or velocity != Vector2.ZERO or intent.pressed_bits != 0 or intent.held_bits != 0:
@@ -357,12 +394,12 @@ func move(delta: float) -> void:
 	var from: Vector2 = global_position
 	var unhindered: Vector2 = from + velocity * delta
 	var to: Vector2 = unhindered
-	var holes: bool = projectiles != null and projectiles.has_holes()
+	var holes: bool = projectiles != null and projectiles.grid().has_holes()
 	var crossed: bool = mover.crossing != Vector2.ZERO
 	if holes:
 		to = _move_over_holes(from, delta)
 	elif projectiles != null:
-		to = projectiles.slide_body(from, velocity * delta, wall_radius())
+		to = projectiles.grid().slide_body(from, velocity * delta, wall_radius())
 	mover.crossing = Vector2.ZERO
 	global_position = to
 	if to != unhindered:
@@ -383,14 +420,15 @@ func _check_ground(crossed: bool) -> void:
 	if fall_left > 0.0 or _dying or _leaving:
 		return
 	var at: Vector2 = global_position
-	if projectiles.is_hole(at):
+	var grid: RoomGrid = projectiles.grid()
+	if grid.is_hole(at):
 		if crossed or _hold_shown or mover.is_moving():
 			return
 		if never_falls():
-			global_position = projectiles.nearest_ground(at, wall_radius())
+			global_position = grid.nearest_ground(at, wall_radius())
 			return
 		_fall()
-	elif not projectiles.touches_hole(at, wall_radius() + HoleRules.GROUND_MARGIN):
+	elif not grid.touches_hole(at, wall_radius() + HoleRules.GROUND_MARGIN):
 		ground = at
 		has_ground = true
 
@@ -428,7 +466,7 @@ func _land() -> void:
 		return
 	var at: Vector2 = ground
 	if not has_ground:
-		at = projectiles.nearest_ground(global_position, wall_radius()) if projectiles != null else global_position
+		at = projectiles.grid().nearest_ground(global_position, wall_radius()) if projectiles != null else global_position
 	global_position = at
 	fell_by = ActorsScript.NONE
 	if combat != null:
@@ -439,9 +477,9 @@ func _land() -> void:
 		events.body_returned.emit(id, at)
 
 
-## The rest of a step while it arrives (see the class doc): it stands, thinks nothing and casts
+## The rest of a step while it spawns in (see the class doc): it stands, thinks nothing and casts
 ## nothing; its hurt shape stays off (it follows `is_down` as in every step) and its looks step.
-func _hold_arriving(delta: float) -> void:
+func _hold_spawning(delta: float) -> void:
 	intent.clear()
 	velocity = Vector2.ZERO
 	if hurtbox != null and hurtbox.registered == (is_down() or not hurtbox.enabled):
@@ -450,16 +488,19 @@ func _hold_arriving(delta: float) -> void:
 		look.step(delta)
 
 
-## It arrives for `seconds` from now (enemy arrivals EA1, see the class doc): Flow calls it before
-## the body is added to the tree, so its hurt shape is never registered while it arrives. 0 or less
-## (or not finite) stands it at once.
-func arrive(seconds: float) -> void:
+## It spawns in for `seconds` from now in the style of id `style` (enemy spawning EA1, see the class
+## doc; spawn styles AS2): Flow calls it before the body is added to the tree, with the style it picked
+## (`SpawnStyle.pick`), so its hurt shape is never registered while it spawns in. 0 or less (or not
+## finite) stands it at once.
+func spawn(seconds: float, style: StringName) -> void:
 	if not is_finite(seconds) or seconds <= 0.0:
-		arrive_left = 0.0
-		arrive_seconds = 0.0
+		spawn_left = 0.0
+		spawn_seconds = 0.0
+		spawn_style = &""
 		return
-	arrive_left = seconds
-	arrive_seconds = seconds
+	spawn_left = seconds
+	spawn_seconds = seconds
+	spawn_style = style
 	velocity = Vector2.ZERO
 	intent.clear()
 	if actors != null and id != ActorsScript.NONE:
@@ -467,17 +508,17 @@ func arrive(seconds: float) -> void:
 		actors.set_still(id, is_still())
 
 
-## True while it arrives (see the class doc).
-func is_arriving() -> bool:
-	return arrive_left > 0.0
+## True while it spawns in (see the class doc).
+func is_spawning() -> bool:
+	return spawn_left > 0.0
 
 
-## How far through its arrival it is, 0 as it starts to 1 as it lands (1 while not arriving: it
-## stands): what Feel draws the arrival by.
-func arrive_share() -> float:
-	if arrive_left <= 0.0 or arrive_seconds <= 0.0:
+## How far through its spawn it is, 0 as it starts to 1 as it lands (1 while not spawning: it
+## stands): what Feel draws the spawn by.
+func spawn_share() -> float:
+	if spawn_left <= 0.0 or spawn_seconds <= 0.0:
 		return 1.0
-	return clampf(1.0 - arrive_left / arrive_seconds, 0.0, 1.0)
+	return clampf(1.0 - spawn_left / spawn_seconds, 0.0, 1.0)
 
 
 ## True while it falls (see the class doc).
@@ -522,23 +563,24 @@ func _move_over_holes(from: Vector2, delta: float) -> Vector2:
 	var radius: float = wall_radius()
 	var motion: Vector2 = velocity * delta
 	var crossed: Vector2 = mover.crossing * delta
+	var grid: RoomGrid = projectiles.grid()
 	var at: Vector2 = from
 	if crossed != Vector2.ZERO:
-		at = projectiles.slide_body(from, crossed, radius, true)
+		at = grid.slide_body(from, crossed, radius, true)
 	var walk: Vector2 = motion - crossed
 	if walk == Vector2.ZERO and crossed != Vector2.ZERO:
 		return at
-	if projectiles.is_hole(at):
-		return projectiles.slide_body(at, walk, radius, true)
-	if crossed != Vector2.ZERO and projectiles.touches_hole(at, radius):
-		var walked: Vector2 = projectiles.slide_body(at, walk, radius, true)
-		return at if projectiles.is_hole(walked) else walked
-	return projectiles.slide_body(at, walk, radius)
+	if grid.is_hole(at):
+		return grid.slide_body(at, walk, radius, true)
+	if crossed != Vector2.ZERO and grid.touches_hole(at, radius):
+		var walked: Vector2 = grid.slide_body(at, walk, radius, true)
+		return at if grid.is_hole(walked) else walked
+	return grid.slide_body(at, walk, radius)
 
 
 ## Tell every actor whose touch area this body overlaps where its move left it (its circle against
-## the walls at its feet; `Actors.touching`), lowest id first: their `touched`. A body down (arriving
-## too), dying or leaving touches nothing, and a body arriving is touched by nothing. Each tick it overlaps, so a prop that should hear it once leaves its
+## the walls at its feet; `Actors.touching`), lowest id first: their `touched`. A body down (spawning
+## too), dying or leaving touches nothing, and a body spawning is touched by nothing. Each tick it overlaps, so a prop that should hear it once leaves its
 ## `touched` state (content/props/README.md).
 func _touch() -> void:
 	if id == ActorsScript.NONE or is_down() or _dying or _leaving:
@@ -549,7 +591,7 @@ func _touch() -> void:
 			# What a touched prop did ended this body (its blast): it touches no more.
 			return
 		var other := actors.node_of(_touching[i]) as Actor
-		if other != null and other != self and not other.is_dying() and not other.is_leaving() and not other.is_arriving():
+		if other != null and other != self and not other.is_dying() and not other.is_leaving() and not other.is_spawning():
 			other.touched.emit(id)
 
 
@@ -574,6 +616,11 @@ func step(delta: float) -> void:
 				# What stopped it (a hit, a slam's impact) came after its own step, so its looks
 				# catch up once: the stop shows that moment, not the step before.
 				_hold_shown = true
+				# Looks left for the frame play the ticks before the stop first.
+				if _look_time > 0.0:
+					for look in _looks:
+						look.step(_look_time)
+					_look_time = 0.0
 				for look in _looks:
 					look.step(0.0)
 			return
@@ -581,14 +628,14 @@ func step(delta: float) -> void:
 	intent.pressed_bits = 0
 	if health != null and health.protecting:
 		health.step(delta)
-	if arrive_left > 0.0:
-		arrive_left -= delta
-		if arrive_left > 0.0:
-			_hold_arriving(delta)
+	if spawn_left > 0.0:
+		spawn_left -= delta
+		if spawn_left > 0.0:
+			_hold_spawning(delta)
 			return
 		# Landed: it steps as a standing body from this tick on (its hurt shape registers below), and
-		# the actor table hears whether it is still now (it was not while it arrived).
-		arrive_left = 0.0
+		# the actor table hears whether it is still now (it was not while it spawned in).
+		spawn_left = 0.0
 		if actors != null and id != ActorsScript.NONE:
 			actors.set_still(id, is_still())
 	if fall_left > 0.0:
@@ -624,8 +671,11 @@ func step(delta: float) -> void:
 		velocity = Vector2.ZERO
 	if hurtbox != null and hurtbox.registered == (is_down() or not hurtbox.enabled):
 		hurtbox.step()
-	for look in _looks:
-		look.step(delta)
+	if _looks_later:
+		_look_time += delta
+	else:
+		for look in _looks:
+			look.step(delta)
 	if home_controller != null and home_controller != controller:
 		# Its own controller is away (it drives another actor, or another drives this one): it
 		# still watches its body (a seat set aside shows its own wizard on its panel).
@@ -733,9 +783,9 @@ func close_caster_number() -> void:
 
 
 ## True while the actor is down (a Downed component holds it; G7), falls (hub rework HR-H2) or
-## arrives (enemy arrivals EA1): out of play to everything that asks.
+## spawns in (enemy spawning EA1): out of play to everything that asks.
 func is_down() -> bool:
-	return _down or fall_left > 0.0 or arrive_left > 0.0
+	return _down or fall_left > 0.0 or spawn_left > 0.0
 
 
 ## Down (`on`) or standing again. Called by the Downed component.

@@ -33,9 +33,9 @@ const MOST_WIDTH: int = 8
 ## What a fight room's enemies cost at most together (`EnemyBase.cost`), before the run's scaling
 ## (RG5) grows it with depth and players: the generator (RG2) spends it on the biome's enemy pool.
 @export_range(1, 200) var room_budget: int = 16
-## How a room's enemies come in (enemy arrivals EA4, `ArrivalRules`): in groups as the room gets
-## quiet, each a share of the room's scaled budget. Null: a room's whole list arrives at once.
-@export var arrivals: ArrivalRules = null
+## How a room's enemies come in (enemy spawning EA4, `SpawnRules`): in groups as the room gets
+## quiet, each a share of the room's scaled budget. Null: a room's whole list spawns in at once.
+@export var spawning: SpawnRules = null
 
 
 ## A copy of its own, its kind rules too (`KindRule.copied`), so changing it changes nothing else
@@ -46,7 +46,7 @@ func copied() -> MapRules:
 	for rule: KindRule in kinds:
 		kinds_made.append(rule.copied() if rule != null else null)
 	made.kinds = kinds_made
-	made.arrivals = arrivals.duplicate(false) as ArrivalRules if arrivals != null else null
+	made.spawning = spawning.duplicate(false) as SpawnRules if spawning != null else null
 	return made
 
 
@@ -70,7 +70,7 @@ func kept_rows(content: RunContent, depth: int) -> Array[int]:
 
 
 ## What is wrong with the rules, one line each (empty when a map can be made from `content` at every
-## depth they allow): ranges out of order, its arrivals' own (`ArrivalRules.problems`), a bad line
+## depth they allow): ranges out of order, its spawns' own (`SpawnRules.problems`), a bad line
 ## of the table, a row no line may take, a required line that takes no row or that the content cannot fill, a kind that leads on with no
 ## template of exits enough for the ways a room may lead (`exit_problems`), and, at each depth, no row
 ## kept, a row whose lines may follow none of the row before's (`not_after`), too few rooms of a
@@ -114,9 +114,9 @@ func _range_problems() -> PackedStringArray:
 		found.append("%s: no kind rules: no room could stand in the map." % biome)
 	if room_budget < 1:
 		found.append("%s: room_budget %d; at least 1." % [biome, room_budget])
-	if arrivals != null:
-		for line: String in arrivals.problems():
-			found.append("%s: arrivals: %s" % [biome, line])
+	if spawning != null:
+		for line: String in spawning.problems():
+			found.append("%s: spawning: %s" % [biome, line])
 	return found
 
 

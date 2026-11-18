@@ -16,9 +16,10 @@ const BotScript := preload("res://tests/bots/bot.gd")
 
 ## Physics frames a fighter is given to walk (the bots think at each tick's start).
 const WALK_FRAMES: int = 20
-## The physics frames the room's enemies take to arrive (enemy arrivals EA3: a bot walks toward the
-## enemies there are, and one still arriving is not there yet), and two more.
-const ARRIVE_FRAMES: int = ceili(Actor.ARRIVE_SECONDS * 60.0) + 2
+## The physics frames past the room's enemies' spawn (enemy spawning EA3: a bot walks toward the
+## enemies there are, and one still spawning is not there yet: the longest `Actor.spawn_seconds` of
+## the room's enemies, each its style's), and two more.
+const SPAWN_EXTRA_FRAMES: int = 2
 
 var _input: Node
 var _flow: Node
@@ -277,18 +278,28 @@ func _fighters_in_a_run() -> Node2D:
 	return wizard
 
 
-## Two fighters in a run that played WALK_FRAMES physics frames once its enemies arrived; bot 1's wizard and where it
+## Two fighters in a run that played WALK_FRAMES physics frames once its enemies spawned in; bot 1's wizard and where it
 ## started, or an empty array when the run had none.
 func _fighters_who_walked() -> Array:
 	var wizard: Node2D = await _fighters_in_a_run()
 	if wizard == null:
 		return []
-	for i in ARRIVE_FRAMES:
+	for i in ceili(_longest_spawn() * 60.0) + SPAWN_EXTRA_FRAMES:
 		await physics_frame
 	var before: Vector2 = wizard.global_position
 	for i in WALK_FRAMES:
 		await physics_frame
 	return [wizard, before]
+
+
+## The longest spawn of the room's enemies, in seconds (each spawns in in its own style), and never
+## less than the style a body of no enemy's own picks (a body still to stand of the first group).
+func _longest_spawn() -> float:
+	var longest: float = (_flow.call("spawn_style_for", null) as SpawnStyle).seconds
+	for enemy: Node in _flow.get("_enemies") as Array[Node]:
+		if is_instance_valid(enemy):
+			longest = maxf(longest, (enemy as Actor).spawn_seconds)
+	return longest
 
 
 func test_the_run_starts_with_a_wizard_for_the_bot() -> void:

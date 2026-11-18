@@ -462,20 +462,42 @@ func test_a_staff_tip_over_a_wall_does_not_open_it() -> void:
 	check_equal(shade.call(Vector2(64.0, -10.0), feet, boxes, bodies, 1), 1.0, "lit from where it stands, the wall blocks the far side")
 
 
-func test_an_arriving_body_s_shadow_rises_with_it() -> void:
+func test_a_spawning_body_s_shadow_rises_with_it() -> void:
 	var walker: Actor = _walker(Vector2(100.0, 100.0))
-	walker.arrive_seconds = 1.0
-	walker.arrive_left = 0.9
+	walker.spawn_seconds = 1.0
+	walker.spawn_left = 0.9
 	var shadows: BodyShadowsScript = _shadows()
 	_shade_frames(shadows, _rows([]), 1)
-	check_equal(shadows.count, 0, "under the floor (the arrival's mark is drawn): no shadow")
-	walker.arrive_left = 0.3
+	check_equal(shadows.count, 0, "under its spawn mark: no shadow")
+	walker.spawn_left = 0.3
 	_shade_frames(shadows, _rows([]), 1)
 	var full: float = walker.footprint.radius + BodyShadowsScript.RADIUS_PAD
 	check(shadows.count == 1 and shadows.multimesh.buffer[14] < full, "rising: part of it")
-	walker.arrive_left = 0.0
+	walker.spawn_left = 0.0
 	_shade_frames(shadows, _rows([]), 1)
 	check_equal(shadows.multimesh.buffer[14], full, "landed: all of it")
+
+
+## Each spawn style's own mark: a style whose mark lasts longer (`SpawnStyle.mark_end`) keeps the
+## shadow back longer (spawn styles; the lookup is the registry's, handed in as `style_of`).
+func test_a_spawning_body_s_shadow_waits_for_its_own_style_s_mark() -> void:
+	check_equal(BodyShadowsScript.rise_share(0.5, 0.4), (0.5 - 0.4) / 0.6, "past the default mark: partly")
+	check_equal(BodyShadowsScript.rise_share(0.5, 0.7), 0.0, "a longer mark: none yet")
+	check_equal(BodyShadowsScript.rise_share(1.0, 0.7), 1.0, "standing: all")
+	var long_mark := SpawnStyle.from_default()
+	long_mark.id = &"test_long_mark"
+	long_mark.mark_end = 0.7
+	var walker: Actor = _walker(Vector2(100.0, 100.0))
+	walker.spawn_style = long_mark.id
+	walker.spawn_seconds = 1.0
+	walker.spawn_left = 0.5
+	var shadows: BodyShadowsScript = _shadows()
+	shadows.style_of = func(id: StringName) -> SpawnStyle: return long_mark if id == long_mark.id else null
+	_shade_frames(shadows, _rows([]), 1)
+	check_equal(shadows.count, 0, "half way through a style whose mark lasts to 0.7: no shadow yet")
+	walker.spawn_style = &"no_such_style"
+	_shade_frames(shadows, _rows([]), 1)
+	check_equal(shadows.count, 1, "an unknown style takes the default's mark (0.4): showing")
 
 
 func test_a_gone_body_s_shadow_shrinks_away_where_it_was() -> void:

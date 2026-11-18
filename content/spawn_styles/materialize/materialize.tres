@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="SpawnStyle" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/spawn_style.gd" id="1_style"]
+
+[resource]
+script = ExtResource("1_style")
+id = &"materialize"
+motion = &"materialize"
+seconds = 1.0
+mark_end = 0.3
+close_from = 0.92
+mark_frames = 6
+close_frames = 3
+colours = &"arc"
+cue = &"enemy_materialize"
+biomes = Array[StringName]([])

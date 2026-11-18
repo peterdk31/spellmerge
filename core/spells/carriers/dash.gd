@@ -95,7 +95,7 @@ func _move_body(spell: CompiledSpell, tag: int, actor: int, body: int, origin: V
 	var curve: Vector3 = MoveCurve.of(spell)
 	_dash_curve[body] = curve if MoveCurve.shapes(curve) else MoveCurve.NONE
 	kit.events.caster_move_requested.emit(body, &"dash", offset, seconds, tag)
-	var reach: float = origin.distance_to(kit.projectiles.clip_to_walls(origin, origin + offset))
+	var reach: float = origin.distance_to(kit.projectiles.grid().clip_to_walls(origin, origin + offset))
 	kit.set_cue_tag(tag)
 	kit.events.carrier_shown.emit(actor, &"dash", origin, way, reach, spell.tint, spell.look)
 	kit.set_cue_tag(0)

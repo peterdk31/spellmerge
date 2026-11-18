@@ -285,7 +285,7 @@ static func _fill(map: RunMap, definition: RunDefinition, rules: MapRules, conte
 	for node: RunNode in map.nodes:
 		node.scale = definition.room_scale(rules, node.depth, map.players)
 		var budget: int = RunScaling.scaled_budget(rules.room_budget, node.scale)
-		_pace(node, rules.arrivals, budget)
+		_pace(node, rules.spawning, budget)
 		match content.kind(node.kind).fill:
 			RoomKind.FILL_ENEMIES:
 				node.enemies = _spend(content.enemy_pool(map.biome, node.depth), budget, dice)
@@ -294,17 +294,17 @@ static func _fill(map: RunMap, definition: RunDefinition, rules: MapRules, conte
 				node.enemies = [bosses[dice.below(Step.FILL, bosses.size())].id] as Array[StringName]
 
 
-## How `node`'s enemies come in (enemy arrivals EA4): `arrivals`' shares of its scaled budget
-## `budget`, as costs; with no arrivals, the whole list at once (a group of 0).
-static func _pace(node: RunNode, arrivals: ArrivalRules, budget: int) -> void:
-	if arrivals == null:
+## How `node`'s enemies come in (enemy spawning EA4): `spawning`'s shares of its scaled budget
+## `budget`, as costs; with no `SpawnRules`, the whole list at once (a group of 0).
+static func _pace(node: RunNode, spawning: SpawnRules, budget: int) -> void:
+	if spawning == null:
 		node.group = 0
 		node.refill_at = 0
 		node.stagger = 0.0
 		return
-	node.group = arrivals.group_cost(budget)
-	node.refill_at = arrivals.refill_cost(budget)
-	node.stagger = arrivals.stagger
+	node.group = spawning.group_cost(budget)
+	node.refill_at = spawning.refill_cost(budget)
+	node.stagger = spawning.stagger
 
 
 ## Enemies of `pool` by chance until `budget` is spent: one of the whole pool first (a room always

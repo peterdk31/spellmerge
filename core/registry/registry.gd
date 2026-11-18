@@ -248,6 +248,19 @@ func add(folder: StringName, resource: Resource) -> bool:
 	return true
 
 
+## Take the resource of id `id` out of `folder` (tests: undo an `add` on the game's registry, so a
+## fixture is not left for the next suite). False when the folder has no such id.
+func remove(folder: StringName, id: StringName) -> bool:
+	var found: Dictionary = _resources.get(folder, {})
+	if not found.has(id):
+		return false
+	found.erase(id)
+	var ids: Array[StringName] = get_ids(folder)
+	ids.erase(id)
+	_ids[folder] = ids
+	return true
+
+
 ## Every id in the folder, sorted. Empty for an unknown folder.
 func get_ids(folder: StringName) -> Array[StringName]:
 	var result: Array[StringName] = []

@@ -298,3 +298,40 @@ func test_no_cast_shown_or_wind_cue_holds() -> void:
 			if cue == null:
 				continue
 			check(cue.hold <= 0.0 and cue.hold_target <= 0.0 and cue.stop_game <= 0.0, "%s's cue %s holds, but nothing plays its hold (gameplay/combat/hit_stop.gd)" % [carrier_card.id, id])
+
+
+## A shot's impact plays its carrier card's `impact_cue` holds (`HitStop.impact`, which keeps for
+## each card the cue only when it holds something): every time, and nothing for a card whose impact
+## cue only shows.
+func test_an_impact_cue_holds_its_caster_each_time_and_a_look_alone_holds_nobody() -> void:
+	var caster: Actor = _body(Vector2.ZERO)
+	var looker: Actor = _body(Vector2(100.0, 0.0))
+	var holds := CueBase.new()
+	holds.hold = 0.05
+	var shows := CueBase.new()
+	# Their content, as the registry would give it.
+	_stop.get(&"_cues")[&"test_holds"] = holds
+	_stop.get(&"_cues")[&"test_shows"] = shows
+	var holding_card: Array[StringName] = [&"test_holds", &""]
+	var showing_card: Array[StringName] = [&"test_shows", &""]
+	_stop.get(&"_carrier_card_cues")[&"test_holding"] = holding_card
+	_stop.get(&"_carrier_card_cues")[&"test_showing"] = showing_card
+	_stop.impact(caster.id, &"test_holding")
+	check(is_equal_approx(_world.table.held_left(caster.id), 0.05), "the impact holds its caster")
+	_stop.impact(looker.id, &"test_showing")
+	check_equal(_world.table.held_left(looker.id), 0.0, "a card whose impact cue only shows holds nobody")
+	_world.table.spend_hold(caster.id, 1.0)
+	check_equal(_world.table.held_left(caster.id), 0.0, "the hold is spent")
+	_stop.impact(caster.id, &"test_holding")
+	check(is_equal_approx(_world.table.held_left(caster.id), 0.05), "a second impact holds it again")
+	_stop.impact(caster.id, &"")
+	_stop.impact(caster.id, &"no_such_card")
+	check(is_equal_approx(_world.table.held_left(caster.id), 0.05), "a shot with no card, or an unknown one, holds nothing more")
+	# A cue that holds no body but stands the game still still plays on an impact.
+	var stops := CueBase.new()
+	stops.stop_game = 0.1
+	_stop.get(&"_cues")[&"test_stops"] = stops
+	var stopping_card: Array[StringName] = [&"test_stops", &""]
+	_stop.get(&"_carrier_card_cues")[&"test_stopping"] = stopping_card
+	_stop.impact(looker.id, &"test_stopping")
+	check_equal(_sim.hold_left, 6, "an impact cue that only stops the game stands it still: 6 ticks")

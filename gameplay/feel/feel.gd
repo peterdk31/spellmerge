@@ -184,6 +184,8 @@ const MUSIC_POLL: float = BodySoundsScript.POLL
 ## The share of the effect slots a frame's hit flashes leave to the rest (casts, kills,
 ## statuses): `effect_slots` / this (`_flashes_shown`).
 const HIT_FLASH_RESERVE: int = 4
+## How big a spot of wall one staff's impact look shows on in a frame (`_wall_impact`), in pixels.
+const WALL_SPOT: float = 16.0
 ## The voices a frame's hit sounds may start (`_hit_sounds`): past them each would only cut short
 ## one of the same frame before it was heard, and the rest stay free for kills, casts and cues.
 const HIT_SOUNDS_PER_FRAME: int = SOUND_VOICES / 2
@@ -340,6 +342,8 @@ var registry: RegistryScript = null:
 			_intro_sound.registry = value
 		if _ambience != null:
 			_ambience.registry = value
+		if _spawn_look != null:
+			_spawn_look.forget_styles()
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
 ## shot's end reads them; performance, 2026-11-02).
 var projectiles: ProjectileManagerScript = null:
@@ -465,9 +469,9 @@ var _cover: CoverScript = null
 ## thrower (made once).
 var _fall_look: FallLook = FallLook.new()
 var _fall_motes: Callable = Callable()
-## The look of an enemy arriving (enemy arrivals EA2: a mark on the floor, then the body rising out of
+## The look of an enemy spawning (enemy spawning EA2: a mark on the floor, then the body rising out of
 ## it), drawn from the bodies' state; a node at the floor marks' z, under the bodies (made in `_ready`).
-var _arrive_look: ArriveLook = null
+var _spawn_look: SpawnLook = null
 ## The party's camera: it holds this machine's wizards (`Frames.seats_here`), eased as it is drawn.
 var party_camera: PartyCameraScript = PartyCameraScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
@@ -730,12 +734,13 @@ func _ready() -> void:
 	# draws on top, so they come after the spectacle, whose mark layer (made whenever the setting
 	# turns on) is inside it: a new strike shows over the marks earlier ones left.
 	move_child(_floor_node, _spectacle.get_index())
-	# An arrival's mark lies on the floor, over the marks and the cover, under every body.
-	_arrive_look = ArriveLook.new()
-	_arrive_look.name = "ArriveLook"
-	_arrive_look.z_index = MARK_Z
-	_arrive_look.play_cue = _play_arrive_cue
-	add_child(_arrive_look)
+	# A spawn's mark lies on the floor, over the marks and the cover, under every body.
+	_spawn_look = SpawnLook.new()
+	_spawn_look.name = "SpawnLook"
+	_spawn_look.z_index = MARK_Z
+	_spawn_look.play_cue = _play_spawn_cue
+	_spawn_look.style_of = _spawn_style
+	add_child(_spawn_look)
 	_lanes = LanesScript.new()
 	_lanes.name = "Lanes"
 	# Over the shots and every flash: a telegraph is the brightest thing on screen (docs/STYLE.md).
@@ -941,8 +946,8 @@ func step(real_delta: float) -> void:
 	if not _fall_motes.is_valid():
 		_fall_motes = _throw_fall_motes
 	_fall_look.step(_actor_table(), real_delta, _fall_motes if _spectacle.motes_on() else Callable())
-	if _arrive_look != null:
-		_arrive_look.step(_actor_table(), real_delta)
+	if _spawn_look != null:
+		_spawn_look.step(_actor_table(), real_delta)
 	var picture: Rect2 = party_camera.visible_rect()
 	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
 	_spectacle.step_stirs(_clock, picture)
@@ -1105,8 +1110,8 @@ func _on_room_entered(room_id: StringName) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if _body_sounds != null:
 		_body_sounds.room_entered(room.music if room != null else null)
-	if _arrive_look != null:
-		_arrive_look.use_room(room)
+	if _spawn_look != null:
+		_spawn_look.use_room(room)
 	if _remnants != null:
 		_remnants.clear()
 	_reaction_heard.clear()
@@ -1466,10 +1471,15 @@ func _status_motes(real_delta: float) -> void:
 			_spectacle.status_motes(card[ElementBase.STATUS_LOOK_CARD] as StringName, card[ElementBase.STATUS_LOOK_LAYER] as int, enemy.global_position, 4.0 * STATUS_ZOOM, status_color(id), count)
 
 
-## An enemy starts to rise out of its mark (`ArriveLook`): its cue at its feet, as no actor's; unweighted
-## (its dust only, no sound) when another arrival sounded just before.
-func _play_arrive_cue(at: Vector2, weighted: bool) -> void:
-	play_cue(ArriveLook.CUE, ActorsScript.NONE, at, Vector2.ZERO, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, weighted)
+## An enemy starts to come out of its mark (`SpawnLook`): its style's cue `cue` at its feet, as no
+## actor's; unweighted (its dust only, no sound) when another spawn sounded just before.
+func _play_spawn_cue(cue: StringName, at: Vector2, weighted: bool) -> void:
+	play_cue(cue, ActorsScript.NONE, at, Vector2.ZERO, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, weighted)
+
+
+## The spawn style of id `id` (content/spawn_styles), null for none: `SpawnLook`'s lookup.
+func _spawn_style(id: StringName) -> SpawnStyle:
+	return registry.get_resource(SpawnStyle.FOLDER, id) as SpawnStyle if registry != null else null
 
 
 ## A falling body's motes (`FallLook`): `count` of them round `at`, the void's, drifting.
@@ -1577,13 +1587,26 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 
 
 ## A shot of `caster`'s (tagged `tag`) ended on a wall or pillar at `position`, flying `direction`:
-## knocked back off the surface, the shot's own motes and the wall's, and its impact.
+## knocked back off the surface, the shot's own motes and the wall's, and its impact. As on a body,
+## only a staff's first shot to end on a spot of the wall (WALL_SPOT pixels a side) shows its look
+## in a frame (`_body_looks`, by the spot): a volley into one wall reads as one burst a spot, not
+## dozens stacked (performance, 2026-11-17: wall impacts were Feel's costliest, uncapped).
 func _wall_impact(caster: int, tag: int, position: Vector2, direction: Vector2) -> void:
+	if not _body_looks.take(_wall_spot(position), SpectacleScript.hit_group(caster, tag)):
+		return
 	var ramp: int = _ramp_of(caster)
 	_spectacle.begin_hit(caster, tag)
 	_spectacle.shed_on_wall(ramp, position, -direction)
 	_show_impact(caster, ramp, position, direction)
 	_spectacle.end_hit()
+
+
+## The key of the wall spot `at` is on for `_body_looks`: below zero, so it is never a body's
+## instance id (those are positive).
+static func _wall_spot(at: Vector2) -> int:
+	var x: int = floori(at.x / WALL_SPOT) & 0xFFFF
+	var y: int = floori(at.y / WALL_SPOT) & 0xFFFF
+	return -1 - (y * 65536 + x)
 
 
 ## A bolt or orbit shot whose life ran out goes off: the cue `expire` (a small pop of its own

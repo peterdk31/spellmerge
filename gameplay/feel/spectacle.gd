@@ -246,7 +246,7 @@ func step(now: float, table: ActorsScript = null) -> void:
 		marks.step(now)
 	if light != null:
 		light.step_cues(now)
-		carried_lights.step(table)
+		carried_lights.step(table, now)
 		light.light_carried(carried_lights.rows, carried_lights.count)
 
 

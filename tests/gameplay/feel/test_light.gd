@@ -521,14 +521,22 @@ func test_feels_frame_lights_the_wizards_staffs() -> void:
 	var feel: FeelScript = made[1]
 	feel._process(1.0 / 60.0)
 	check_equal(feel.light().carried_count(), 0, "no wizard in the tree, no carried light")
-	var wizard := own(Actor.new()) as Actor
+	var wizard := Actor.new()
 	wizard.actors = feel.actors
 	wizard.ticking = false
 	root.add_child(wizard)
 	var table: ActorsScript = feel.actors as ActorsScript
 	table.set_node(table.home_of_seat(0), wizard)
-	feel._process(1.0 / 60.0)
-	check_equal(feel.light().carried_count(), 1, "seat 0's wizard carries its light")
+	for frame in 15:
+		feel._process(1.0 / 60.0)
+	check_equal(feel.light().carried_count(), 1, "seat 0's wizard carries its light, eased in")
+	var row: PackedFloat32Array = feel.light().carried.multimesh.buffer
+	check(Vector2(row[3], row[7]).is_equal_approx(wizard.muzzle_position()), "at its staff tip")
+	table.set_node(table.home_of_seat(0), null)
+	wizard.free()
+	for frame in 15:
+		feel._process(1.0 / 60.0)
+	check_equal(feel.light().carried_count(), 0, "a wizard gone, its light faded out")
 
 
 ## The steps are a switch: 3 by default (dim, lit, bright), 0 smooth; the shader's default too.

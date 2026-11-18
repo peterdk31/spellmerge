@@ -165,11 +165,11 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 	apply.position = Vector2(-REACH, -REACH)
 	apply.size = Vector2(REACH, REACH) * 2.0
 	apply.z_index = z
-	var shade := ShaderMaterial.new()
-	shade.shader = APPLY_SHADER
-	shade.set_shader_parameter(&"light_buffer", viewport.get_texture())
-	shade.set_shader_parameter(&"bands", bands)
-	apply.material = shade
+	var material := ShaderMaterial.new()
+	material.shader = APPLY_SHADER
+	material.set_shader_parameter(&"light_buffer", viewport.get_texture())
+	material.set_shader_parameter(&"bands", bands)
+	apply.material = material
 	add_child(apply)
 
 
@@ -408,15 +408,15 @@ func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look
 		viewport.add_child(node)
 		beams.append(node)
 	var beam: MeshInstance2D = beams[i]
-	var shade: ShaderMaterial = beam.material as ShaderMaterial
-	shade.set_shader_parameter(&"beam_path", path)
-	shade.set_shader_parameter(&"beam_points", mini(points, BEAM_POINTS))
-	shade.set_shader_parameter(&"beam_player", player)
-	shade.set_shader_parameter(&"beam_look", look)
-	shade.set_shader_parameter(&"core_override", Color(core.r, core.g, core.b, 1.0))
-	shade.set_shader_parameter(&"beam_fade", fade)
-	shade.set_shader_parameter(&"beam_strength", BEAM_STRENGTH * intensity)
-	shade.set_shader_parameter(&"beam_reach", BEAM_REACH * reach)
+	var beam_material: ShaderMaterial = beam.material as ShaderMaterial
+	beam_material.set_shader_parameter(&"beam_path", path)
+	beam_material.set_shader_parameter(&"beam_points", mini(points, BEAM_POINTS))
+	beam_material.set_shader_parameter(&"beam_player", player)
+	beam_material.set_shader_parameter(&"beam_look", look)
+	beam_material.set_shader_parameter(&"core_override", Color(core.r, core.g, core.b, 1.0))
+	beam_material.set_shader_parameter(&"beam_fade", fade)
+	beam_material.set_shader_parameter(&"beam_strength", BEAM_STRENGTH * intensity)
+	beam_material.set_shader_parameter(&"beam_reach", BEAM_REACH * reach)
 	beam.visible = true
 
 

@@ -91,8 +91,11 @@ const SEED: int = 24
 ## A scenario passes at this share of its targets.
 const REACH: float = 0.9
 const FRAME_BUDGET_MS: float = 1000.0 / 60.0
+## The projectile manager's step parts, by `PROF_*` index, as `_report_tick_parts` prints them.
+## Hand-backs is a count (native `hits` calls a tick); the slots past budget (the last step's) are left out.
+const PROJECTILE_PARTS: PackedStringArray = ["refresh", "common", "before hits", "hit pass", "of it kernel", "hand-backs a tick", "", "after hits"]
 ## The hot events whose listeners the tree profile times (`--profile-signals`).
-const PROFILED_SIGNALS: Array[StringName] = [&"damage_dealt", &"projectile_hit", &"enemy_died", &"hit_landed", &"status_applied", &"reaction_triggered", &"spell_cast"]
+const PROFILED_SIGNALS: Array[StringName] = [&"damage_dealt", &"projectile_hit", &"projectile_impact", &"projectile_expired", &"enemy_died", &"hit_landed", &"status_applied", &"reaction_triggered", &"spell_cast"]
 
 ## The build of each player: the cards of RT and LB (RB keeps its dash). A Play wizard holds two
 ## staffs (items I2), so the runner hands each wizard three (`Caster.replace_staffs`, every hand it
@@ -159,6 +162,14 @@ var _shot_sum: int = 0
 var _shot_samples: int = 0
 var _hits: int = 0
 var _reactions: int = 0
+## Since the scenario's start (the ticks its tick parts count): every shot hit's merged hits (the
+## fillers' too) and the hits they stand for (`impact_count`), and all the damage Combat dealt, for
+## the `DAMAGE:` line.
+var _merged_hits: int = 0
+var _hits_counted: int = 0
+var _damage: float = 0.0
+## And Combat's answers asked by the merged hits (`hit_room_asked`, `hit_damage_asked`; hit batch A2).
+var _asks: int = 0
 var _refused: int = 0
 ## The projectile manager's `dropped` and the spell runtime's `fires_waited` when the measured
 ## window began: what the cap dropped and what the fire pacing held back while measured.
@@ -176,6 +187,14 @@ var _process_frames: int = 0
 ## changes the order nodes process in).
 var profile: bool = false
 var _tree_profile: Node = null
+## The Tick's count when the step profile started (`_start_tick_profile`).
+var _profile_ticks_at: int = 0
+## The projectile manager's step parts summed over the measured window (`_add_projectile_parts`).
+var _projectile_sums: PackedInt64Array = PackedInt64Array()
+## The projectile manager's `merged_turns` when the profile started.
+var _merged_turns_at: int = 0
+## And its `merged_opens` (the merged hits the kernel opened itself).
+var _merged_opens_at: int = 0
 
 
 func _ready() -> void:
@@ -194,6 +213,10 @@ func _ready() -> void:
 	scenarios = scenarios_for(scenarios, OS.has_feature("web"))
 	var args: PackedStringArray = OS.get_cmdline_user_args() + OS.get_cmdline_args()
 	profile = profile or args.has("--profile")
+	# `--only=desktop` (a scenario's label, or several, comma separated): those scenarios alone.
+	for arg in args:
+		if arg.begins_with("--only="):
+			scenarios = scenarios_named(scenarios, arg.trim_prefix("--only=").split(","))
 	# `--no-native` runs the projectile manager's and WallSlide's GDScript in place of the module
 	# (native/README.md).
 	if args.has("--no-native"):
@@ -204,6 +227,9 @@ func _ready() -> void:
 	_events.connect("build_refused", _on_build_refused)
 	_events.connect("projectile_hit", _on_projectile_hit)
 	_events.connect("reaction_triggered", _on_reaction_triggered)
+	_events.connect("damage_dealt", _on_damage_dealt)
+	_events.connect("hit_room_asked", _on_room_asked)
+	_events.connect("hit_damage_asked", _on_damage_asked)
 	_next_scenario()
 
 
@@ -213,6 +239,15 @@ static func scenarios_for(wanted: Array[int], web: bool) -> Array[int]:
 	var out: Array[int] = []
 	for index in wanted:
 		if not (web and bool(SCENARIOS[index].get("desktop_only", false))):
+			out.append(index)
+	return out
+
+
+## `wanted` with only the scenarios whose label is in `labels`.
+static func scenarios_named(wanted: Array[int], labels: PackedStringArray) -> Array[int]:
+	var out: Array[int] = []
+	for index in wanted:
+		if labels.has(String(SCENARIOS[index]["label"])):
 			out.append(index)
 	return out
 
@@ -246,6 +281,10 @@ func _next_scenario() -> void:
 	_shot_samples = 0
 	_hits = 0
 	_reactions = 0
+	_merged_hits = 0
+	_hits_counted = 0
+	_damage = 0.0
+	_asks = 0
 	_elapsed = 0.0
 	_measuring = false
 	_enemy_step_usec = 0
@@ -312,6 +351,7 @@ func _start_measuring(scenario: Dictionary) -> void:
 				_finish(["the stress staff %d of player %d was refused" % [at + 1, index + 1]])
 				return
 	print("BENCH: stress scenario %s: %d players, %d enemies, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], PLAYERS, _target_enemies, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])
+	_start_tick_profile()
 	_active = true
 
 
@@ -487,6 +527,20 @@ func _on_spell_cast(player: int, _spell_id: StringName, _origin: Vector2, _direc
 func _on_projectile_hit(_caster: int, _target: Node, _position: Vector2, tag: int, _shot: int) -> void:
 	if tag != 0:
 		_hits += 1
+	_merged_hits += 1
+	_hits_counted += int(_projectiles.get(&"impact_count"))
+
+
+func _on_damage_dealt(_caster: int, _target: Node, amount: float, _position: Vector2) -> void:
+	_damage += amount
+
+
+func _on_room_asked(_target: Node, _room: HitRoom) -> void:
+	_asks += 1
+
+
+func _on_damage_asked(_tag: int, _shot: int, _answer: HitDamage) -> void:
+	_asks += 1
 
 
 func _on_reaction_triggered(_caster: int, _reaction_id: StringName, _position: Vector2, _shot: int) -> void:
@@ -507,6 +561,8 @@ func _end_scenario() -> void:
 		_probe.call("report")
 		_warn_when_slow(label)
 		_report_parts()
+		_report_damage(label)
+		_report_tick_parts(label)
 		_report_state_hash(label)
 		if _tree_profile != null:
 			_tree_profile.call(&"report")
@@ -546,6 +602,82 @@ func _report_parts() -> void:
 	print("BENCH: stress parts, enemy step: avg %.3f ms max %.3f ms for one pass over %d enemies (%.1f us each; includes the combat lookups)" % [float(_enemy_step_usec) / frames / 1000.0, float(_enemy_step_max_usec) / 1000.0, _enemies.size(), float(_enemy_step_usec) / frames / crowd])
 	print("BENCH: stress parts, combat status lookups (speed factor and knockback): avg %.3f ms max %.3f ms per pass" % [float(_lookup_usec) / frames / 1000.0, float(_lookup_max_usec) / 1000.0])
 	print("BENCH: stress parts, Feel step (hit particles, flashes, labels; the particles' own work is in the renderer and the particles-off run): avg %.3f ms per pass" % (float(_feel_step_usec) / frames / 1000.0))
+
+
+## Times each of the Tick's steps and the projectile manager's parts over the measured window (the
+## sims' own profiles, handed this clock; they read none themselves).
+func _start_tick_profile() -> void:
+	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
+	if tick == null:
+		return
+	tick.profile_steps(Time.get_ticks_usec)
+	_profile_ticks_at = tick.count
+	var parts := PackedInt64Array()
+	parts.resize(ProjectileManagerScript.PROF_PARTS)
+	_projectiles.set(&"step_profile", parts)
+	_projectiles.set(&"profile_clock", Time.get_ticks_usec)
+	_projectile_sums = PackedInt64Array()
+	_projectile_sums.resize(ProjectileManagerScript.PROF_PARTS)
+	_merged_turns_at = int(_projectiles.get(&"merged_turns"))
+	_merged_opens_at = int(_projectiles.get(&"merged_opens"))
+	if not tick.ticked.is_connected(_add_projectile_parts):
+		tick.ticked.connect(_add_projectile_parts)
+
+
+## The manager's parts are its last step's: summed here after every tick.
+func _add_projectile_parts() -> void:
+	var prof: PackedInt64Array = _projectiles.get(&"step_profile")
+	if prof.size() != _projectile_sums.size():
+		return
+	for i in prof.size():
+		_projectile_sums[i] += prof[i]
+
+
+## The `DAMAGE:` line (hit batch A0, docs/milestones/hit-batch.md): all the damage Combat dealt and
+## all the hits the shots made (the fillers' too), a tick, since the scenario's start. The run follows frame timing, so it is a
+## rate to compare versions by, not a fingerprint (shot scale's `DAMAGE:` lines are, to the bit).
+func _report_damage(label: String) -> void:
+	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
+	if tick == null:
+		return
+	var ticks: float = maxf(1.0, float(tick.count - _profile_ticks_at))
+	print("DAMAGE: stress %s: %.1f damage a tick, %.1f shot hits a tick (fillers too) in %.1f merged hits, %.1f asks of Combat a tick, over %d ticks" % [label, _damage / ticks, float(_hits_counted) / ticks, float(_merged_hits) / ticks, float(_asks) / ticks, int(ticks)])
+
+
+## One `BENCH:` line for the Tick's steps and one for the manager's parts: milliseconds a tick,
+## averaged over the measured window, the largest first; the profiles are then switched off.
+func _report_tick_parts(label: String) -> void:
+	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
+	if tick == null or tick.step_profile.is_empty():
+		return
+	var ticks: float = maxf(1.0, float(tick.count - _profile_ticks_at))
+	var names: PackedStringArray = tick.step_names()
+	var rows: Array[Array] = []
+	var total: int = 0
+	for i in mini(names.size(), tick.step_profile.size()):
+		rows.append([tick.step_profile[i], names[i]])
+		total += tick.step_profile[i]
+	rows.sort_custom(func(a: Array, b: Array) -> bool: return int(a[0]) > int(b[0]))
+	var parts := PackedStringArray()
+	for row in rows:
+		if int(row[0]) > 0:
+			parts.append("%s %.3f" % [row[1], float(row[0]) / ticks / 1000.0])
+	print("BENCH: stress %s tick parts (ms a tick over %d ticks, total %.3f): %s" % [label, int(ticks), float(total) / ticks / 1000.0, ", ".join(parts)])
+	if tick.ticked.is_connected(_add_projectile_parts):
+		tick.ticked.disconnect(_add_projectile_parts)
+	var prof: PackedInt64Array = _projectile_sums
+	if prof.size() == ProjectileManagerScript.PROF_PARTS:
+		var shown := PackedStringArray()
+		for i in PROJECTILE_PARTS.size():
+			if i == ProjectileManagerScript.PROF_HANDBACKS:
+				shown.append("%s %.1f" % [PROJECTILE_PARTS[i], float(prof[i]) / ticks])
+			elif not PROJECTILE_PARTS[i].is_empty():
+				shown.append("%s %.3f" % [PROJECTILE_PARTS[i], float(prof[i]) / ticks / 1000.0])
+		shown.append("shots the kernel merged a tick %.1f" % (float(int(_projectiles.get(&"merged_turns")) - _merged_turns_at) / ticks))
+		shown.append("merged hits it opened a tick %.1f" % (float(int(_projectiles.get(&"merged_opens")) - _merged_opens_at) / ticks))
+		print("BENCH: stress %s projectile parts (ms a tick): %s" % [label, ", ".join(shown)])
+	tick.step_profile = PackedInt64Array()
+	_projectiles.set(&"step_profile", PackedInt64Array())
 
 
 ## The state hash's cost at the scenario's full load (online-ready N3c; core/sim/README.md, "The

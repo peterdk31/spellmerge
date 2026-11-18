@@ -6,11 +6,11 @@ extends ActorComponent
 ##
 ## One rule, by whether the body can move (owner, 2026-11-11):
 ## - **A body that walks** (it has a Mover) slides along the walls as its circle (`Actor.move`,
-##   `ProjectileManager.slide_body`), and lands clear of them as it (a teleport). Bodies that walk
+##   `RoomGrid.slide_body`), and lands clear of them as it (a teleport). Bodies that walk
 ##   part softly (Combat's push), never by their footprints.
 ## - **A body that cannot move** (no Mover: a prop, a training dummy) is solid ground to the bodies
 ##   that walk: it lays its footprint, the box when it has a `size`, else the circle, into the
-##   projectile manager's ground grid (`set_footprint`) while it is in the tree and `solid`
+##   room grid's ground (`RoomGrid.set_footprint`, `Projectiles.grid()`) while it is in the tree and `solid`
 ##   (`set_solid`: a broken crate's rubble is not, W6), where it stands when it enters.
 ##
 ## Nothing else sees it: shots, rays and sight pass over it, and hit the body by its hurt shape
@@ -44,7 +44,7 @@ func attach() -> void:
 
 func detach() -> void:
 	if actor.mover == null and actor.projectiles != null and is_instance_valid(actor.projectiles):
-		actor.projectiles.set_footprint(actor.id, Vector2.ZERO, Vector2.ZERO, 0.0)
+		actor.projectiles.grid().set_footprint(actor.id, Vector2.ZERO, Vector2.ZERO, 0.0)
 
 
 ## Stand on the base of a box `box_size` across centred `box_offset` from the feet (a hurt box):
@@ -87,6 +87,6 @@ func _lay() -> void:
 	if actor == null or actor.mover != null or actor.projectiles == null or actor.id == ActorsScript.NONE or not actor.is_inside_tree():
 		return
 	if solid:
-		actor.projectiles.set_footprint(actor.id, actor.global_position + offset, size, radius)
+		actor.projectiles.grid().set_footprint(actor.id, actor.global_position + offset, size, radius)
 	else:
-		actor.projectiles.set_footprint(actor.id, Vector2.ZERO, Vector2.ZERO, 0.0)
+		actor.projectiles.grid().set_footprint(actor.id, Vector2.ZERO, Vector2.ZERO, 0.0)

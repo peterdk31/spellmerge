@@ -68,7 +68,7 @@ const WALL_LAYER: int = 1
 ## `StaticBody2D` whose `collision_layer` is exactly this, its `RectangleShape2D`s over the cells a
 ## walking body cannot step into and nothing else minds (shots, sight and gates pass over a hole).
 ## A body that is also on the wall layer is a wall; where a wall and a hole cover one cell, the wall
-## wins (`RoomPlaces.hole_rects`, `ProjectileManager.set_holes`).
+## wins (`RoomPlaces.hole_rects`, `RoomGrid.set_holes`).
 const HOLE_LAYER: int = 2
 ## The z of a layout's `Floor` sprite: under Feel's floor marks (one above it) and under the
 ## bodies (0), so a mark lies on the floor and never over anyone.

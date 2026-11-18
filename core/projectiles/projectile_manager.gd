@@ -250,6 +250,11 @@ const F_DEFERRED: int = 256
 ## that body whatever its motion later (Orbit sets it circling: carrier-modifiers 5B). Its drawing,
 ## kind and tail read this, never its motion.
 const F_QUAD: int = 512
+## Its hits are never merged with other shots' (`set_hits_alone`: it hits with a profile of its own).
+const F_ALONE: int = 1024
+## Spent by a hit in the hit pass (`_finding`): it takes no more hits, and is ended with the
+## pass's other spent shots at the pass's end (`_end_spent`), its slot held until its hits are sent.
+const F_SPENT: int = 2048
 
 ## Seconds one sine wave of a spiral shot takes.
 const SPIRAL_PERIOD: float = 0.5
@@ -280,12 +285,15 @@ const MOVES_START: int = 64
 ## in a later step, losing no damage (see the class doc). A fixed number, never
 ## measured at run time (rule T1). Sized once (shot scale H2, 2026-11-05) for a
 ## full crowd at the desktop cap: it asks about 93,500 a step (some 200 hits) in
-## the median step and more in a busy one, and at 150,000 no shot there waits more
-## than one step (tests/core/test_hit_budget.gd; at 120,000 thousands do). Normal
+## the median step and more in a busy one, and at 150,000 no shot there waited more
+## than one step (tests/core/test_hit_budget.gd; at 120,000 thousands do). With the
+## hits merged (hit batch A3a, the owner, 2026-11-17) a pass frees its slots in
+## another order, so the shots the budget reaches first differ, and at 150,000 a few
+## hundred waited two steps; at 157,500 (5% more) none waits more than one. Normal
 ## play uses a tiny part of it. No lost damage means the hits a step average what
 ## the shots make whatever the budget, so the budget only spreads a burst of them:
 ## the caps bound the cost.
-const WORK_PER_STEP: int = 150000
+const WORK_PER_STEP: int = 157500
 ## The parts of `step_profile` (shot scale H0): microseconds of `step()`'s passes in its order, the
 ## native kernel's own share of the hit pass, the hand-backs to GDScript (native `hits` calls) and
 ## the shots the hit-work budget left for a later step.
@@ -614,13 +622,10 @@ const DRAW_SCALE: float = 3.0
 ## How much of the caster's ramp colour tints the art (the rest stays white): a full
 ## multiply turned the orange bolt of a blue wizard nearly black.
 const TINT_STRENGTH: float = 0.45
-## Wall grid cell size in pixels. Walls are rounded out to whole cells, so they are
-## exact when their edges are multiples of it (room tiles are 32 px).
-const WALL_CELL: float = 8.0
-## How many rings of cells `nearest_ground` looks out (12 cells: 96 px).
-const NEAREST_GROUND_RINGS: int = 12
-## A room wall's mark in the wall grid; the bits below it count the solid shots on a cell.
-const ROOM_CELL: int = 128
+## The room grid's cell size (`RoomGrid`; others read it here, and the native kernel checks it here)
+## and a room wall's mark in it (the manager's own checks of a shot born in a wall).
+const WALL_CELL: float = RoomGrid.WALL_CELL
+const ROOM_CELL: int = RoomGrid.ROOM_CELL
 ## Spatial grid cell size in pixels.
 const GRID_CELL: float = 64.0
 ## Projectiles that leave the bounds by more than this are removed.
@@ -663,7 +668,7 @@ signal still_shots_drawn(view: StillShotView)
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads", &"_finding", &"_hit_batch", &"merged_turns", &"merged_opens", &"_freeing_now", &"_sent"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
@@ -707,6 +712,35 @@ var impact_look: int = 0
 ## The tag of that shot (0 for a beam, a strike and outside an impact), so its motes and marks can
 ## be its spell's cards' (spell-spectacle-2.md, S2). For looks only.
 var impact_tag: int = 0
+## How many hits the `projectile_impact` and `projectile_hit` being sent stand for (1 outside them):
+## a step's hits of one spell's shots on one body go out as one (`_send_merged`, the hit batch's entries). For Combat's damage.
+var impact_count: int = 1
+## While the hit pass finds its hits (`_pass_hits`, before it sends them). A step's hits are merged
+## (the one hit model, the owner, 2026-11-17; hit batch A3b): in the pass the shots that hit are
+## spent, pierce and stick at once, but their events wait for its end, one `projectile_impact` and
+## `projectile_hit` for each caster, body and spell tag (at its first hit's point, by its first shot,
+## `impact_count` the hits), in the order of their first hits; then each spent shot's `shot_ended`.
+## A handler sees the pass's every hit made.
+var _finding: bool = false
+## The pass's merged hits, the bodies' tallies and its spent shots, held slots and kept ends
+## (`HitBatch`, hit batch A1): emptied within the step (`_send_merged`). The native hit pass reads
+## and writes its arrays (`BATCH_FIELDS`).
+var _hit_batch: HitBatch = HitBatch.new()
+## The shot turns the native hit pass merged itself, every hit of them adding to a merged hit the
+## pass already had or opening one it may (no hand-back to GDScript). A count for benchmarks and tests; nothing reads it.
+var merged_turns: int = 0
+## The merged hits the native hit pass opened itself (hit batch A4: a body's room and its spell's
+## damage told in the pass, so it asks nothing). A count for benchmarks and tests; nothing reads it.
+var merged_opens: int = 0
+## True while `_drop_one` makes room at the cap: that slot is freed at once, inside a pass or not.
+var _freeing_now: bool = false
+## The hit batch's asks, as constants of the manager's own (a constant of another class is looked up
+## at each use).
+const ASK_ROOM: int = HitBatch.ASK_ROOM
+const ASK_DAMAGE: int = HitBatch.ASK_DAMAGE
+## Every event the manager sends counts one (before it goes out): a room or a spell's damage the hit
+## batch was told before the count moved is asked again, since a handler may have changed it.
+var _sent: int = 0
 ## The way the shot was flying, while a `projectile_expired` is sent (with `impact_carrier_card`,
 ## `impact_core` and `impact_look`, so Feel can show where its life ran out).
 var impact_heading: Vector2 = Vector2.ZERO
@@ -958,36 +992,14 @@ var _max_target_reach: float = 0.0
 ## True when targets were added since the grid was filled (a query refreshes it).
 var _grid_stale: bool = false
 
-## The wall grid over the bounds: one byte per WALL_CELL cell, 0 for open: ROOM_CELL for a room
-## wall, plus one for every solid shot lying on it (`set_solid`).
-var _wall_w: int = 1
-var _wall_h: int = 1
-var _wall_cells: PackedByteArray = PackedByteArray()
-var _has_walls: bool = false
 ## The solid shots (`set_solid`) by slot, and whether there are any (a field: the hot loops ask
 ## it for every shot).
 var _solids: Dictionary = {}
 var _any_solid: bool = false
-## The ground (`set_footprint`): per wall cell, how many footprints lie on it; per actor, its
-## footprint's centre and half its size (a circle: its radius twice, and `_footprint_round` 1;
-## nothing laid: no size); how many are laid (the walk asks it first); and the cells a footprint
-## could not count when it was laid (255 already on them), by actor, so it never takes them out
-## either and the counts stay exact (empty but on a crowded cell).
-var _ground_cells: PackedByteArray = PackedByteArray()
-var _footprint_at: PackedVector2Array = PackedVector2Array()
-var _footprint_half: PackedVector2Array = PackedVector2Array()
-var _footprint_round: PackedByteArray = PackedByteArray()
-var _footprints_laid: int = 0
-var _footprint_missed: Dictionary = {}
-## The holes (`set_holes`, hub rework HR-H1: a room's `RoomBase.HOLE_LAYER` bodies): per wall cell, 1
-## where the room has a hole (a wall over one wins: walking and every move stop at the wall, and
-## `is_hole` says no); whether there are any. And the grid a walk slides on (`slide_body`): per cell,
-## 1 where there is ground (`_ground_cells`) or a hole, kept up to date wherever either changes, so
-## the native kernel is handed one grid of each and stays as it is. All state, as the wall and
-## ground grids are (Flow lays nothing again when a snapshot is restored into the room it is in).
-var _hole_cells: PackedByteArray = PackedByteArray()
-var _has_holes: bool = false
-var _walk_cells: PackedByteArray = PackedByteArray()
+## The room's grid of walls, holes and footprints, and what is asked of it (`RoomGrid`, hit batch B1):
+## state, walked with the manager. The forwards below (`set_walls`, `slide_body`, `line_clear` and the
+## rest) ask it; `grid()` hands it out.
+var _room_grid: RoomGrid = RoomGrid.new()
 ## The shot that cast the next ray (`ray_cast_by`), and its number then; -1 for none.
 var _ray_caster: int = -1
 var _ray_caster_seq: int = -1
@@ -1272,9 +1284,6 @@ func _init() -> void:
 	sweep_heads.resize(SWEEP_START)
 	_anchors.resize(ACTORS)
 	_anchors.fill(Vector2.INF)
-	_footprint_at.resize(ACTORS)
-	_footprint_half.resize(ACTORS)
-	_footprint_round.resize(ACTORS)
 	_group_count.resize(GROUPS)
 	_groups.resize(GROUPS)
 	_group_at.resize(GROUPS)
@@ -1335,7 +1344,11 @@ func native_constants() -> Dictionary:
 	while script != null:
 		constants.merge(script.get_script_constant_map())
 		script = script.get_base_script()
+	# The hit batch's mix in two halves, each exact as a double (a typed value, shifted at run time:
+	# GDScript refuses to fold a shift of a negative constant).
+	var mix: int = HitBatch.SPELL_MIX
 	constants.merge({"PI": PI, "TAU": TAU, "HOMING_DRIFT": SpellLimits.HOMING_DRIFT,
+			"SPELL_MIX_HIGH": (mix >> 32) & 0xFFFFFFFF, "SPELL_MIX_LOW": mix & 0xFFFFFFFF,
 			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE, "TEAM_WORLD": ActorsScript.TEAM_WORLD})
 	return constants
 
@@ -1877,23 +1890,9 @@ func set_bounds(rect: Rect2) -> void:
 	_shot_head.resize(_grid_w * _grid_h)
 	_scan_step = -1
 	_grid_stale = true
-	_wall_w = maxi(ceili(rect.size.x / WALL_CELL), 1)
-	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
-	_wall_cells.resize(_wall_w * _wall_h)
-	_hole_cells.resize(_wall_w * _wall_h)
-	_hole_cells.fill(0)
-	_has_holes = false
-	_walk_cells.resize(_wall_w * _wall_h)
-	clear_walls()
-	# The ground is laid again in the new grid (footprints keep their place in the world).
-	_ground_cells.resize(_wall_w * _wall_h)
-	_ground_cells.fill(0)
-	_walk_cells.fill(0)
-	_footprint_missed.clear()
-	if _footprints_laid > 0:
-		for actor in ACTORS:
-			if _footprint_laid(actor):
-				_lay_footprint(actor)
+	# The room grid over the same area: its walls and holes gone, its footprints laid again.
+	_room_grid.size_to(rect)
+	_forget_solid_cells()
 
 
 ## The longer side of the room (`set_bounds`): what a growing shot or beam grows to at most.
@@ -1901,21 +1900,19 @@ func room_size() -> float:
 	return maxf(_bounds.size.x, _bounds.size.y)
 
 
+## The room grid (`RoomGrid`): its walls, holes and footprints, for who asks it directly.
+func grid() -> RoomGrid:
+	return _room_grid
+
+
 ## The room's bounds (`set_bounds`), in world pixels.
 func bounds() -> Rect2:
 	return _bounds
 
 
-## The room's walls as an image (FORMAT_L8), one pixel a WALL_CELL square from the corner of
-## `bounds()`: white for a room wall, black for open (solid shots are left out). Made each call,
-## for what is built once a room (Feel's floor marks).
-## With `holes`, a hole is white too (hub rework HR-H2: Feel lays no floor mark over a hole).
+## As `RoomGrid.wall_image` (the room grid, `grid()`).
 func wall_image(holes: bool = false) -> Image:
-	var bytes := PackedByteArray()
-	bytes.resize(_wall_w * _wall_h)
-	for i in mini(bytes.size(), _wall_cells.size()):
-		bytes[i] = 255 if (_wall_cells[i] & ROOM_CELL) != 0 or (holes and _has_holes and _hole_cells[i] != 0) else 0
-	return Image.create_from_data(_wall_w, _wall_h, false, Image.FORMAT_L8, bytes)
+	return _room_grid.wall_image(holes)
 
 
 ## Make these world rectangles solid, replacing any walls set before. Parts outside
@@ -1923,15 +1920,19 @@ func wall_image(holes: bool = false) -> Image:
 func set_walls(rects: Array[Rect2]) -> void:
 	clear_walls()
 	for rect in rects:
-		_add_wall(rect)
+		_room_grid.add_wall(rect)
 
 
 ## Remove every wall, and every hole (a room's holes are laid with its walls: `set_holes`). A solid
 ## shot lays itself again at its next step.
 func clear_walls() -> void:
-	_wall_cells.fill(0)
-	_has_walls = false
-	_drop_holes()
+	_room_grid.clear_walls()
+	_forget_solid_cells()
+
+
+## The room grid's walls are gone: the solid shots lie on no cell, and lay themselves again at their
+## next step.
+func _forget_solid_cells() -> void:
 	for slot: int in _solids:
 		var solid: Solid = _solids[slot]
 		solid.cells.clear()
@@ -1943,7 +1944,7 @@ func clear_walls() -> void:
 ## counts as its bounding box.
 func add_wall_body(body: CollisionObject2D) -> void:
 	for rect in _body_rects(body):
-		_add_wall(rect)
+		_room_grid.add_wall(rect)
 
 
 ## The world rectangles of a body's enabled rectangle shapes (each turned one as its bounding box).
@@ -1969,115 +1970,36 @@ static func _body_rects(body: CollisionObject2D) -> Array[Rect2]:
 	return rects
 
 
-## Make these world rectangles holes (hub rework HR-H1, docs/milestones/hub-rework.md, "Holes"),
-## replacing any set before: the cells whose any part they cover, as a wall's. A walk stops at a
-## hole's lip (`slide_body`); a move done to a body or a dash crosses it (`slide_body`'s `crossing`);
-## shots, rays, sight and the walls' checks never see it. Parts outside the bounds are ignored.
-## Call it after `set_walls` or `clear_walls`, which remove the holes.
+## As `RoomGrid.set_holes` (the room grid, `grid()`).
 func set_holes(rects: Array[Rect2]) -> void:
-	_drop_holes()
-	for rect in rects:
-		_add_hole(rect)
-
-
-## Take every hole out: the walking grid is the ground alone again.
-func _drop_holes() -> void:
-	if not _has_holes:
-		return
-	_hole_cells.fill(0)
-	_has_holes = false
-	for cell in _walk_cells.size():
-		_walk_cells[cell] = 1 if _ground_cells[cell] != 0 else 0
+	_room_grid.set_holes(rects)
 
 
 ## Add the rectangle shapes of a body (a room's static body on the hole layer) as holes, as
 ## `add_wall_body` adds a wall's. The body must be in the tree.
 func add_hole_body(body: CollisionObject2D) -> void:
 	for rect in _body_rects(body):
-		_add_hole(rect)
+		_room_grid.add_hole(rect)
 
 
-func _add_hole(rect: Rect2) -> void:
-	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
-		return
-	var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / WALL_CELL), 0)
-	var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / WALL_CELL), 0)
-	var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / WALL_CELL), _wall_w)
-	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
-	for y in range(y0, y1):
-		for x in range(x0, x1):
-			_hole_cells[y * _wall_w + x] = 1
-			_walk_cells[y * _wall_w + x] = 1
-			_has_holes = true
-
-
-## Make every cell of the grid whose middle lies outside `room` a hole, in a room with holes (hub
-## rework HR-H2, docs/milestones/hub-rework.md, question 9: outside the room is the void, so a long
-## dash off the edge falls). Nothing in a room with no holes. Flow calls it after laying the room's
-## holes; the margin round the room the bounds keep for shots is the void too.
+## As `RoomGrid.set_holes_outside` (the room grid, `grid()`).
 func set_holes_outside(room: Rect2) -> void:
-	if not _has_holes:
-		return
-	for cy in _wall_h:
-		for cx in _wall_w:
-			var middle: Vector2 = _bounds.position + (Vector2(cx, cy) + Vector2(0.5, 0.5)) * WALL_CELL
-			if not room.has_point(middle):
-				_hole_cells[cy * _wall_w + cx] = 1
-				_walk_cells[cy * _wall_w + cx] = 1
+	_room_grid.set_holes_outside(room)
 
 
-## True when the room has a hole (`set_holes`) at `point` that no wall covers (a wall over a hole
-## wins: a Wall card's stones over a crack are a wall while they stand). Outside the grid: a hole in
-## a room with holes (question 9: the void goes on), none in a room with none.
+## As `RoomGrid.is_hole` (the room grid, `grid()`).
 func is_hole(point: Vector2) -> bool:
-	if not _has_holes:
-		return false
-	var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
-	var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
-	if cx < 0 or cx >= _wall_w or cy < 0 or cy >= _wall_h:
-		return true
-	var cell: int = cy * _wall_w + cx
-	return _hole_cells[cell] != 0 and _wall_cells[cell] == 0
+	return _room_grid.is_hole(point)
 
 
-## True when a circle of `radius` at `center` reaches over a hole cell no wall covers (`is_hole`): it
-## overlaps the cell, not only touches it, as the walk's slide finds an overlap (`WallSlide`).
+## As `RoomGrid.touches_hole` (the room grid, `grid()`).
 func touches_hole(center: Vector2, radius: float) -> bool:
-	if not _has_holes:
-		return false
-	var r: float = maxf(radius, 0.0)
-	var x0: int = maxi(floori((center.x - r - _bounds.position.x) / WALL_CELL), 0)
-	var x1: int = mini(floori((center.x + r - _bounds.position.x) / WALL_CELL), _wall_w - 1)
-	var y0: int = maxi(floori((center.y - r - _bounds.position.y) / WALL_CELL), 0)
-	var y1: int = mini(floori((center.y + r - _bounds.position.y) / WALL_CELL), _wall_h - 1)
-	for cy in range(y0, y1 + 1):
-		for cx in range(x0, x1 + 1):
-			var cell: int = cy * _wall_w + cx
-			if _hole_cells[cell] == 0 or _wall_cells[cell] != 0:
-				continue
-			var low: Vector2 = _bounds.position + Vector2(cx, cy) * WALL_CELL
-			if center.distance_squared_to(center.clamp(low, low + Vector2(WALL_CELL, WALL_CELL))) < r * r:
-				return true
-	return false
+	return _room_grid.touches_hole(center, radius)
 
 
-## True while the room has holes (`set_holes`): a body's move is then slid in two parts
-## (`Actor.move`).
+## As `RoomGrid.has_holes` (the room grid, `grid()`).
 func has_holes() -> bool:
-	return _has_holes
-
-
-func _add_wall(rect: Rect2) -> void:
-	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
-		return
-	var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / WALL_CELL), 0)
-	var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / WALL_CELL), 0)
-	var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / WALL_CELL), _wall_w)
-	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
-	for y in range(y0, y1):
-		for x in range(x0, x1):
-			_wall_cells[y * _wall_w + x] |= ROOM_CELL
-			_has_walls = true
+	return _room_grid.has_holes()
 
 
 ## The still shot in `slot` was thrown along `facing` (a pool spat out ahead): its quad turns by it,
@@ -2127,7 +2049,7 @@ func _step_solid(slot: int, solid: Solid) -> void:
 	if _pos[slot] == solid.at and _radius[slot] == solid.radius:
 		return
 	_lift_solid(solid)
-	if _pos[slot] != _prev[slot] and _wall_hit(_prev[slot], _pos[slot]) >= 0.0:
+	if _pos[slot] != _prev[slot] and _room_grid.wall_hit(_prev[slot], _pos[slot]) >= 0.0:
 		_place_at(slot, _prev[slot])
 	solid.across = DMath.rotated(solid.across_from, _turned(slot))
 	_lay_solid(slot, solid)
@@ -2142,18 +2064,7 @@ func _lay_solid(slot: int, solid: Solid) -> void:
 	var a: Vector2 = solid.at - half
 	var b: Vector2 = solid.at + half
 	var reach: float = solid.radius + WALL_CELL * 0.5
-	var low: Vector2 = a.min(b) - Vector2(reach, reach) - _bounds.position
-	var high: Vector2 = a.max(b) + Vector2(reach, reach) - _bounds.position
-	for y in range(maxi(floori(low.y / WALL_CELL), 0), mini(ceili(high.y / WALL_CELL), _wall_h)):
-		for x in range(maxi(floori(low.x / WALL_CELL), 0), mini(ceili(high.x / WALL_CELL), _wall_w)):
-			var centre: Vector2 = _bounds.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * WALL_CELL
-			if Geometry2D.get_closest_point_to_segment(centre, a, b).distance_squared_to(centre) > reach * reach:
-				continue
-			var cell: int = y * _wall_w + x
-			if (_wall_cells[cell] & (ROOM_CELL - 1)) < ROOM_CELL - 1:
-				_wall_cells[cell] += 1
-				solid.cells.append(cell)
-	_has_walls = _has_walls or not solid.cells.is_empty()
+	solid.cells = _room_grid.lay_solid(a, b, reach, solid.cells)
 
 
 ## Take a solid shot's cells out of the wall grid.
@@ -2164,8 +2075,7 @@ func _lift_solid(solid: Solid) -> void:
 
 ## Add `by` (1 or -1) to the count of every cell a solid shot lies on.
 func _mark_solid(solid: Solid, by: int) -> void:
-	for cell in solid.cells:
-		_wall_cells[cell] += by
+	_room_grid.mark_cells(solid.cells, by)
 
 
 ## The live solid shot that cast the shot in `slot` (a payload of a wall), or null.
@@ -2173,7 +2083,7 @@ func _own_solid(slot: int) -> Solid:
 	return _solid_of(_caster_slot[slot], _caster_seq[slot])
 
 
-## Where the shot in `slot` meets a wall this step (`cut`, as `_wall_hit` found it) when the
+## Where the shot in `slot` meets a wall this step (`cut`, as `RoomGrid.wall_hit` found it) when the
 ## wall that cast it does not count: a wall's own payloads leave it (its row is lifted while
 ## they look again). Asked only when it met a wall, so a step with none costs nothing.
 func _past_own_solid(slot: int, cut: float) -> float:
@@ -2181,7 +2091,7 @@ func _past_own_solid(slot: int, cut: float) -> float:
 	if own == null:
 		return cut
 	_mark_solid(own, -1)
-	cut = _wall_hit(_prev[slot], _pos[slot])
+	cut = _room_grid.wall_hit(_prev[slot], _pos[slot])
 	_mark_solid(own, 1)
 	return cut
 
@@ -2211,303 +2121,53 @@ func _drop_solid(slot: int) -> void:
 	_lift_solid(solid)
 
 
-## The point where the segment from `from` to `to` first meets a wall, or `to` when
-## it is clear. If `from` is inside a wall, that is `from`.
+## As `RoomGrid.clip_to_walls` (the room grid, `grid()`).
 func clip_to_walls(from: Vector2, to: Vector2) -> Vector2:
-	var t: float = _wall_hit(from, to)
-	if t < 0.0:
-		return to
-	return from.lerp(to, t)
+	return _room_grid.clip_to_walls(from, to)
 
 
-## True when nothing in the wall grid lies on the segment from `from` to `to`: no room wall and
-## no solid shot (a Wall card's, whoever cast it), as a shot along it would find. Walks the whole
-## segment, however long (an AI's line of fire, `gameplay/ai/sight.gd`).
+## As `RoomGrid.line_clear` (the room grid, `grid()`).
 func line_clear(from: Vector2, to: Vector2) -> bool:
-	return _wall_hit(from, to) < 0.0
+	return _room_grid.line_clear(from, to)
 
 
-## True when no ground of a body that cannot move (`set_footprint`: a pillar's) lies on the segment
-## from `from` to `to`: where a body walking along it would not be held up by one (boss plan OB14,
-## decision 36: an AI walks round a blocking prop). Walks the whole segment.
+## As `RoomGrid.ground_clear` (the room grid, `grid()`).
 func ground_clear(from: Vector2, to: Vector2) -> bool:
-	return _footprints_laid == 0 or _way_hit(from, to, false, false) < 0.0
+	return _room_grid.ground_clear(from, to)
 
 
-## True when neither the ground of a body that cannot move nor a hole (`set_holes`) lies on the
-## segment from `from` to `to`: where a walk along it would not stop at a pillar or a hole's lip
-## (hub rework HR-H1; the AI's walking checks take it in HR-H2, its line of fire never). Walks the
-## whole segment.
+## As `RoomGrid.walk_clear` (the room grid, `grid()`).
 func walk_clear(from: Vector2, to: Vector2) -> bool:
-	return _way_hit(from, to, false, true) < 0.0
+	return _room_grid.walk_clear(from, to)
 
 
-## How far (pixels, at most `most`) a walk from `from` along `way` goes before the first cell of a
-## wall, a solid shot or a blocking body's ground (`most` when none), cell by cell: how long a move
-## along that line could run (boss plan OB14, an AI's run-up). ZERO `way`: 0.
+## As `RoomGrid.clear_run` (the room grid, `grid()`).
 func clear_run(from: Vector2, way: Vector2, most: float) -> float:
-	if way == Vector2.ZERO or most <= 0.0:
-		return 0.0
-	var t: float = _way_hit(from, from + way.normalized() * most, true, false)
-	return most if t < 0.0 else t * most
+	return _room_grid.clear_run(from, way, most)
 
-## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell or
-## the ground of a body that cannot move (checked at the centre and eight points on its rim, each
-## in its 8-pixel cell): where a body could not stand (a teleport checks the body with it). With
-## `holes` a hole cell blocks too (hub rework HR-H2: where a body could not stand without falling, the
-## AI's run-up, an item laid; a teleport's back-off never minds holes).
+## As `RoomGrid.circle_blocked` (the room grid, `grid()`).
 func circle_blocked(center: Vector2, radius: float, holes: bool = false) -> bool:
-	var with_holes: bool = holes and _has_holes
-	var ground: PackedByteArray = _walk_cells if with_holes else _ground_cells
-	for n in 9:
-		var point: Vector2 = center
-		if n > 0:
-			point += DMath.from_angle(float(n - 1) * TAU / 8.0) * radius
-		if not _bounds.has_point(point):
-			return true
-		if not _has_walls and _footprints_laid == 0 and not with_holes:
-			continue
-		var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
-		var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
-		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and (_wall_cells[cy * _wall_w + cx] != 0 or ground[cy * _wall_w + cx] != 0):
-			return true
-	return false
+	return _room_grid.circle_blocked(center, radius, holes)
 
 
-## The nearest place to `point` where a circle of `radius` stands on the ground (hub rework HR-H2):
-## `point` itself when the circle is clear there (`circle_blocked` with holes on), else the middle of
-## the nearest cell, ring by ring of cells out to NEAREST_GROUND_RINGS, the first clear one in a
-## fixed order (the same on every machine); past them, the nearest clear cell of the whole grid (a
-## body far over the void); `point` when there is none. What is put back on the ground
-## asks it: the boss its jump left over a hole, an add's spot on a ring, an item dropped over one, a
-## body back from a fall with no ground of its own yet.
+## As `RoomGrid.nearest_ground` (the room grid, `grid()`).
 func nearest_ground(point: Vector2, radius: float) -> Vector2:
-	if not circle_blocked(point, radius, true):
-		return point
-	var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
-	var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
-	for ring in range(1, NEAREST_GROUND_RINGS + 1):
-		var best: Vector2 = Vector2.INF
-		var best_distance: float = INF
-		for dy in range(-ring, ring + 1):
-			for dx in range(-ring, ring + 1):
-				if maxi(absi(dx), absi(dy)) != ring:
-					continue
-				var middle: Vector2 = _bounds.position + (Vector2(cx + dx, cy + dy) + Vector2(0.5, 0.5)) * WALL_CELL
-				var distance: float = middle.distance_squared_to(point)
-				if distance < best_distance and not circle_blocked(middle, radius, true):
-					best_distance = distance
-					best = middle
-		if best != Vector2.INF:
-			return best
-	# Nothing near (a body far over the void): the nearest clear cell of the whole grid.
-	var far: Vector2 = point
-	var far_distance: float = INF
-	for y in _wall_h:
-		for x in _wall_w:
-			var middle: Vector2 = _bounds.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * WALL_CELL
-			var distance: float = middle.distance_squared_to(point)
-			if distance < far_distance and not circle_blocked(middle, radius, true):
-				far_distance = distance
-				far = middle
-	return far
+	return _room_grid.nearest_ground(point, radius)
 
 
-## Where a body (a circle of `radius` at `from`) ends when it moves by `motion`, sliding along the
-## walls it meets, the room's and the solid shots', and the ground of the bodies that cannot move
-## (online-ready N6: the actors' move, in place of the engine's physics; `WallSlide`), and, unless
-## the move is `crossing` (a dash, or a move done to the body: hub rework HR-H1, `Actor.move`), the
-## room's holes, whose lip a walk stops at. The kernel is handed the walls and one other grid: the
-## ground and the holes merged for a walk (`_walk_cells`), the ground alone for a crossing.
+## As `RoomGrid.slide_body` (the room grid, `grid()`).
 func slide_body(from: Vector2, motion: Vector2, radius: float, crossing: bool = false) -> Vector2:
-	var holes: bool = _has_holes and not crossing
-	if not _has_walls and _footprints_laid == 0 and not holes:
-		return from + motion
-	return WallSlide.slide(_wall_cells, _walk_cells if holes else _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
+	return _room_grid.slide_body(from, motion, radius, crossing)
 
 
-## The body of the actor `actor` cannot move, and stands on this ground from now on (props W4: its
-## `Footprint`), in place of any before: a box `size` across round `centre`, or with no size a
-## circle of `radius`; neither: none. The cells laid are those whose centres lie in it. Bodies that
-## walk slide along it (`slide_body`) and cannot stand on it (`circle_blocked`); nothing else sees
-## it. Laying the same again changes nothing (a body made again from a snapshot). Ids outside the
-## table are ignored.
+## As `RoomGrid.set_footprint` (the room grid, `grid()`).
 func set_footprint(actor: int, centre: Vector2, size: Vector2, radius: float) -> void:
-	if actor < 0 or actor >= ACTORS:
-		return
-	if _footprint_laid(actor):
-		_mark_footprint(actor, -1)
-		_footprint_missed.erase(actor)
-		_footprints_laid -= 1
-	var is_round: bool = size == Vector2.ZERO
-	var half: Vector2 = Vector2(radius, radius) if is_round else size.abs() * 0.5
-	if not centre.is_finite() or not half.is_finite() or half.x <= 0.0 or half.y <= 0.0:
-		half = Vector2.ZERO
-	_footprint_at[actor] = centre if half != Vector2.ZERO else Vector2.ZERO
-	_footprint_half[actor] = half
-	_footprint_round[actor] = 1 if is_round and half != Vector2.ZERO else 0
-	if half != Vector2.ZERO:
-		_footprints_laid += 1
-		_lay_footprint(actor)
+	_room_grid.set_footprint(actor, centre, size, radius)
 
 
-## The ground the body of `actor` stands on (`set_footprint`) as the box round it, empty for none.
+## As `RoomGrid.footprint_of` (the room grid, `grid()`).
 func footprint_of(actor: int) -> Rect2:
-	if not _footprint_laid(actor):
-		return Rect2()
-	return Rect2(_footprint_at[actor] - _footprint_half[actor], _footprint_half[actor] * 2.0)
-
-
-## True while the body of `actor` has ground laid.
-func _footprint_laid(actor: int) -> bool:
-	return actor >= 0 and actor < ACTORS and _footprint_half[actor].x > 0.0
-
-
-## Lay the footprint of `actor` (newly set, or in a new grid): one more on each of its cells, those
-## it could not count kept apart (`_footprint_missed`).
-func _lay_footprint(actor: int) -> void:
-	var missed := PackedInt32Array()
-	for cell in _footprint_cells(actor):
-		if _ground_cells[cell] < 255:
-			_ground_cells[cell] += 1
-			_walk_cells[cell] = 1
-		else:
-			missed.append(cell)
-	if not missed.is_empty():
-		_footprint_missed[actor] = missed
-
-
-## Take the footprint of `actor` out (`by` -1) or put it back (1) on the cells it counted.
-func _mark_footprint(actor: int, by: int) -> void:
-	var missed: PackedInt32Array = _footprint_missed.get(actor, PackedInt32Array())
-	for cell in _footprint_cells(actor):
-		if missed.is_empty() or not missed.has(cell):
-			_ground_cells[cell] += by
-			_walk_cells[cell] = 1 if _ground_cells[cell] != 0 or _hole_cells[cell] != 0 else 0
-
-
-## The cells of the footprint of `actor` in the grid as it is now: those whose centres lie in its
-## box, or in its circle. Made each call (a footprint is laid when a body enters or changes, never
-## each step).
-func _footprint_cells(actor: int) -> PackedInt32Array:
-	var cells := PackedInt32Array()
-	var centre: Vector2 = _footprint_at[actor]
-	var half: Vector2 = _footprint_half[actor]
-	var low: Vector2 = (centre - half - _bounds.position) / WALL_CELL
-	var high: Vector2 = (centre + half - _bounds.position) / WALL_CELL
-	# A cell's centre is at its index and a half: in the box from ceil(low - 0.5) on, up to (not
-	# with) ceil(high - 0.5).
-	var is_round: bool = _footprint_round[actor] != 0
-	var radius_sq: float = half.x * half.x
-	for y in range(maxi(ceili(low.y - 0.5), 0), mini(ceili(high.y - 0.5), _wall_h)):
-		for x in range(maxi(ceili(low.x - 0.5), 0), mini(ceili(high.x - 0.5), _wall_w)):
-			if is_round and (_bounds.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * WALL_CELL).distance_squared_to(centre) >= radius_sq:
-				continue
-			cells.append(y * _wall_w + x)
-	return cells
-
-
-## How far along `from`->`to` (0 to 1) the path first enters a solid cell, or -1.0
-## when it does not. Walks the cells the path crosses (Amanatides and Woo), at
-## most |dx| + |dy| + 1 of them, in cells.
-func _wall_hit(from: Vector2, to: Vector2) -> float:
-	if not _has_walls:
-		return -1.0
-	var start: Vector2 = (from - _bounds.position) / WALL_CELL
-	var delta: Vector2 = (to - from) / WALL_CELL
-	var cx: int = floori(start.x)
-	var cy: int = floori(start.y)
-	var end_x: int = floori(start.x + delta.x)
-	var end_y: int = floori(start.y + delta.y)
-	if cx == end_x and cy == end_y:
-		# The usual step stays in one cell.
-		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
-			return 0.0
-		return -1.0
-	if absi(end_x - cx) <= 1 and absi(end_y - cy) <= 1 and mini(cx, end_x) >= 0 and maxi(cx, end_x) < _wall_w and mini(cy, end_y) >= 0 and maxi(cy, end_y) < _wall_h:
-		# A short path (a shot's step, a staff from the feet to its tip) only crosses the up to four
-		# cells of its corners: when none is solid it meets no wall, without the walk below
-		# (performance pass, 2026-10-28).
-		var row0: int = cy * _wall_w
-		var row1: int = end_y * _wall_w
-		if _wall_cells[row0 + cx] == 0 and _wall_cells[row0 + end_x] == 0 and _wall_cells[row1 + cx] == 0 and _wall_cells[row1 + end_x] == 0:
-			return -1.0
-	var step_x: int = 1 if delta.x > 0.0 else -1
-	var step_y: int = 1 if delta.y > 0.0 else -1
-	var next_x: float = INF
-	var next_y: float = INF
-	var per_x: float = INF
-	var per_y: float = INF
-	if delta.x != 0.0:
-		per_x = absf(1.0 / delta.x)
-		next_x = (float(cx + (1 if step_x > 0 else 0)) - start.x) / delta.x
-	if delta.y != 0.0:
-		per_y = absf(1.0 / delta.y)
-		next_y = (float(cy + (1 if step_y > 0 else 0)) - start.y) / delta.y
-	var t: float = 0.0
-	# Every cell the path crosses, however fast the shot (no cap: owner, 2026-11-09): a wall it
-	# reaches is hit, and open air is never taken for one.
-	var full: int = absi(end_x - cx) + absi(end_y - cy) + 1
-	for _n in full:
-		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
-			return t
-		if next_x < next_y:
-			t = next_x
-			next_x += per_x
-			cx += step_x
-		else:
-			t = next_y
-			next_y += per_y
-			cy += step_y
-		if t > 1.0:
-			return -1.0
-	return -1.0
-
-
-## The first cell of the ground (`set_footprint`), with `walls` of the wall grid too and with
-## `holes` of the holes (`set_holes`), on the path from `from` to `to`, as `_wall_hit` finds a wall:
-## t in [0, 1] where the path enters it, -1 when there is none. Not a shot's (shots hit a blocking
-## body, they do not stop on its ground): an AI's walk (`ground_clear`, `walk_clear`, `clear_run`),
-## so it has none of `_wall_hit`'s fast paths, and the native kernels have no copy of it.
-func _way_hit(from: Vector2, to: Vector2, walls: bool, holes: bool) -> float:
-	var with_holes: bool = holes and _has_holes
-	if (not walls or not _has_walls) and _footprints_laid == 0 and not with_holes:
-		return -1.0
-	var ground: PackedByteArray = _walk_cells if with_holes else _ground_cells
-	var start: Vector2 = (from - _bounds.position) / WALL_CELL
-	var delta: Vector2 = (to - from) / WALL_CELL
-	var cx: int = floori(start.x)
-	var cy: int = floori(start.y)
-	var step_x: int = 1 if delta.x > 0.0 else -1
-	var step_y: int = 1 if delta.y > 0.0 else -1
-	var next_x: float = INF
-	var next_y: float = INF
-	var per_x: float = INF
-	var per_y: float = INF
-	if delta.x != 0.0:
-		per_x = absf(1.0 / delta.x)
-		next_x = (float(cx + (1 if step_x > 0 else 0)) - start.x) / delta.x
-	if delta.y != 0.0:
-		per_y = absf(1.0 / delta.y)
-		next_y = (float(cy + (1 if step_y > 0 else 0)) - start.y) / delta.y
-	var t: float = 0.0
-	var full: int = absi(floori(start.x + delta.x) - cx) + absi(floori(start.y + delta.y) - cy) + 1
-	for _n in full:
-		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h:
-			var cell: int = cy * _wall_w + cx
-			if ground[cell] != 0 or (walls and _wall_cells[cell] != 0):
-				return t
-		if next_x < next_y:
-			t = next_x
-			next_x += per_x
-			cx += step_x
-		else:
-			t = next_y
-			next_y += per_y
-			cy += step_y
-		if t > 1.0:
-			return -1.0
-	return -1.0
+	return _room_grid.footprint_of(actor)
 
 
 ## The batch's culling box must cover the whole area. Without it the renderer
@@ -2524,8 +2184,12 @@ func _fit_draw_bounds() -> void:
 
 ## Remove every projectile (targets stay registered).
 func clear() -> void:
+	# What a pass merged and holds (never set between steps; a handler may clear mid-pass).
+	_finding = false
+	_hit_batch.empty()
 	for slot in _high:
 		if _alive[slot] != 0 and _tag[slot] != 0:
+			_sent += 1
 			shot_ended.emit(_tag[slot])
 	for slot: int in _solids.keys():
 		_drop_solid(slot)
@@ -2808,9 +2472,9 @@ func set_anchor(caster: int, position: Vector2) -> void:
 func place_caster(caster: int, anchor: Vector2, from: Vector2, to: Vector2) -> Vector2:
 	if caster >= 0 and caster < ACTORS and anchor.is_finite():
 		_anchors[caster] = anchor
-	if not _has_walls:
+	if not _room_grid.has_walls():
 		return to
-	var t: float = _wall_hit(from, to)
+	var t: float = _room_grid.wall_hit(from, to)
 	return to if t < 0.0 else from.lerp(to, t)
 
 
@@ -2857,7 +2521,7 @@ func caster_shot_of(slot: int) -> int:
 	if slot < 0 or slot >= _cap:
 		return -1
 	var caster: int = _caster_slot[slot]
-	if caster >= 0 and _alive[caster] != 0 and _seq[caster] == _caster_seq[slot]:
+	if caster >= 0 and _alive[caster] != 0 and _seq[caster] == _caster_seq[slot] and (_flags[caster] & F_SPENT) == 0:
 		return caster
 	return -1
 
@@ -2873,7 +2537,8 @@ func _caster_position(slot: int) -> Vector2:
 	if caster == CASTER_BODY:
 		return _anchors[_actor[slot]] if _actor[slot] >= 0 else Vector2.INF
 	if caster >= 0:
-		if _alive[caster] != 0 and _seq[caster] == _caster_seq[slot]:
+		# A caster shot its hits spent this pass is as gone as one they ended.
+		if _alive[caster] != 0 and _seq[caster] == _caster_seq[slot] and (_flags[caster] & F_SPENT) == 0:
 			# Mid-step, a caster shot whose turn in the hit pass has not come is where it was before
 			# the step (the passes moved it already; see `step`).
 			var state: int = _state[caster]
@@ -3178,6 +2843,15 @@ func get_floor_of(slot: int) -> float:
 
 
 ## The shot ignores walls: it neither ends nor bounces on one. Any shot that moves (a circling one too).
+## The shot in `slot` hits with a profile of its own (Spells' relays and infusions): its hits in a step
+## are sent alone, never merged with its spell's other shots'. False for a dead slot.
+func set_hits_alone(slot: int) -> bool:
+	if slot < 0 or slot >= _alive.size() or _alive[slot] == 0:
+		return false
+	_flags[slot] |= F_ALONE
+	return true
+
+
 func set_ghost(slot: int) -> bool:
 	if not _moves(slot):
 		return false
@@ -3382,6 +3056,7 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 	if events != null:
 		var outer_slot: int = _event_slot
 		_event_slot = slot
+		_sent += 1
 		events.shot_deflected.emit(by, _pos[slot], by_tag, slot)
 		_event_slot = outer_slot
 	return true
@@ -3403,6 +3078,7 @@ func block_shot(slot: int, by: int, by_tag: int, carrier: StringName = &"") -> b
 		var outer_slot: int = _event_slot
 		impact_carrier = carrier
 		_event_slot = -1
+		_sent += 1
 		events.shot_blocked.emit(by, at, by_tag, -1)
 		_event_slot = outer_slot
 		impact_carrier = outer_carrier
@@ -3699,13 +3375,13 @@ func _team_now(caster: int) -> int:
 func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, motion: int) -> int:
 	# One born in a solid shot's row is made: it ends on that wall at its first step, unless the
 	# wall cast it (`_own_solid`).
-	if _has_walls and (_cell_at(origin) & ROOM_CELL) != 0:
+	if (_room_grid.cell_at(origin) & ROOM_CELL) != 0:
 		# Born inside a room wall it would end in the next step: count it as ended, but
 		# take no pool slot (at the cap that would evict another shot).
 		# No shot existed, so no impact is shown (the staff tip is inside the wall).
 		wall_hits += 1
 		return -1
-	if _free_count == 0:
+	if _free_count == 0 and not _take_back_slot():
 		_drop_one()
 	_free_count -= 1
 	var slot: int = _free_slots[_free_count]
@@ -3738,7 +3414,7 @@ func spawn_batch(caster: int, origin: Vector2, velocities: PackedVector2Array, l
 		return -1
 	if count > _free_count:
 		return -1
-	if _has_walls and (_cell_at(origin) & ROOM_CELL) != 0:
+	if (_room_grid.cell_at(origin) & ROOM_CELL) != 0:
 		# Born inside a room wall, as `_spawn_row`: each counts as ended, none takes a slot.
 		wall_hits += count
 		for n in count:
@@ -3949,12 +3625,17 @@ func _pass_hits(top: int, delta: float) -> void:
 	var resume: int = _resume if _resume < top else 0
 	_starved_at = -1
 	var n: int = 0
+	_finding = true
+	_hit_batch.open(_targets.size(), top)
 	if _kernel != null and not _any_solid:
 		n = _pass_hits_native(top, delta, limit, resume)
 	# Every shot the kernel did not reach (all of them without it).
 	while n < top:
 		_hit_slot(_wrapped(n + resume, top), delta, limit)
 		n += 1
+	_end_spent()
+	_finding = false
+	_send_merged()
 	if not step_profile.is_empty() and _starved_at >= 0:
 		# The shots from the first starved one round to where the pass began.
 		step_profile[PROF_PAST_BUDGET] = top - ((_starved_at - resume + top) % top)
@@ -3976,6 +3657,8 @@ func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int
 		if timing:
 			step_profile[PROF_KERNEL] += profile_clock.call() - at
 			step_profile[PROF_HANDBACKS] += 1
+		if _hit_batch.looked < _hit_batch.entries:
+			_look_kernel_entries()
 		if handed == -1:
 			return top
 		if handed < -1:
@@ -3993,6 +3676,16 @@ func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int
 			_hit_slot(_wrapped(n + resume, top), delta, limit)
 			n += 1
 	return top
+
+
+## The look of each entry the native hit pass opened (hit batch A4: it keeps no `StringName`),
+## from its shot's slot, before any handler can change the slot.
+func _look_kernel_entries() -> void:
+	var batch: HitBatch = _hit_batch
+	for entry in range(batch.looked, batch.entries):
+		var slot: int = batch.slot[entry]
+		batch.set_look(entry, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot])
+	batch.kernel_entries_looked(_targets.size())
 
 
 ## `n` wrapped round `top` once (the hit pass starts at `_resume`).
@@ -4060,8 +3753,9 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 	var walled: bool = false
 	if _any_solid and _solids.has(slot):
 		_step_solid(slot, _solids[slot])
-	elif _has_walls and (_flags[slot] & F_GHOST) == 0:
-		var cut: float = _wall_hit(_prev[slot], _pos[slot])
+	elif (_flags[slot] & F_GHOST) == 0:
+		# With no walls the grid answers -1 at once (as the check it had before).
+		var cut: float = _room_grid.wall_hit(_prev[slot], _pos[slot])
 		if cut >= 0.0 and _any_solid:
 			cut = _past_own_solid(slot, cut)
 		if cut >= 0.0:
@@ -4079,14 +3773,15 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 		# (it remembers it). A hit handler may end it or even reuse the slot.
 		var seq: int = _seq[slot]
 		_hit_test(slot)
-		# What its path no longer touches it may hit again.
-		if _alive[slot] != 0 and _seq[slot] == seq:
+		# What its path no longer touches it may hit again (a shot its hits spent forgets all as it ends).
+		if _alive[slot] != 0 and _seq[slot] == seq and (_flags[slot] & F_SPENT) == 0:
 			_forget_left(slot)
 	# A shot that stuck to a target this step stays stuck, even at a wall. One that met a
-	# guarding solid shot is turned or stopped by it instead (`_solid_guard`).
-	if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0 and not (_any_solid and _solid_guard(slot)):
+	# guarding solid shot is turned or stopped by it instead (`_solid_guard`). One its hits spent
+	# meets no wall: it ends with the pass's spent shots.
+	if walled and _alive[slot] != 0 and (_flags[slot] & (F_STUCK | F_SPENT)) == 0 and not (_any_solid and _solid_guard(slot)):
 		_wall_end(slot)
-	elif landed and _alive[slot] != 0 and _seq[slot] == seq_now and (_flags[slot] & F_STUCK) == 0:
+	elif landed and _alive[slot] != 0 and _seq[slot] == seq_now and (_flags[slot] & (F_STUCK | F_SPENT)) == 0:
 		_expire(slot)
 
 
@@ -4127,7 +3822,8 @@ func _test_deferred(slot: int) -> bool:
 		return true
 	var seq: int = _seq[slot]
 	_hit_test(slot)
-	return _alive[slot] != 0 and _seq[slot] == seq
+	# One its hits spent ends with the pass's spent shots, not here.
+	return _alive[slot] != 0 and _seq[slot] == seq and (_flags[slot] & F_SPENT) == 0
 
 
 ## The rest of a shot's turn once the native hit pass found `_cand_found` targets on its path (it
@@ -4135,7 +3831,7 @@ func _test_deferred(slot: int) -> bool:
 func _hit_found(slot: int) -> void:
 	var seq: int = _seq[slot]
 	_hit_candidates(slot, _cand_found)
-	if _alive[slot] != 0 and _seq[slot] == seq:
+	if _alive[slot] != 0 and _seq[slot] == seq and (_flags[slot] & F_SPENT) == 0:
 		_forget_left(slot)
 
 
@@ -4551,6 +4247,7 @@ func _wall_end(slot: int) -> void:
 	# Last: a handler's payload may take this slot over (a cap drop).
 	var outer_slot: int = _event_slot
 	_event_slot = slot
+	_sent += 1
 	wall_met.emit(_actor[slot], at, _vel[slot].normalized(), _tag[slot], slot)
 	_event_slot = outer_slot
 
@@ -4569,14 +4266,7 @@ func _bounced(at: Vector2, heading: Vector2, velocity: Vector2) -> Vector2:
 
 
 func _solid_at(point: Vector2) -> bool:
-	return _cell_at(point) != 0
-
-
-## The wall grid's byte at `point` (0 outside the grid).
-func _cell_at(point: Vector2) -> int:
-	var x: int = floori((point.x - _bounds.position.x) / WALL_CELL)
-	var y: int = floori((point.y - _bounds.position.y) / WALL_CELL)
-	return _wall_cells[y * _wall_w + x] if x >= 0 and x < _wall_w and y >= 0 and y < _wall_h else 0
+	return _room_grid.cell_at(point) != 0
 
 
 ## Check a shielded shot against the shots of other teams (aim, actors G3a: a shield stops
@@ -4636,6 +4326,7 @@ func _guard_meets(slot: int, other: int, normal: Vector2) -> void:
 	_kill(other)
 	if events != null:
 		_event_slot = slot
+		_sent += 1
 		events.shot_blocked.emit(_actor[slot], at, _tag[slot], slot)
 		_event_slot = -1
 
@@ -5196,7 +4887,7 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 								low = sides.x if turn > 0.0 else -sides.y
 								high = sides.y if turn > 0.0 else -sides.x
 						var local: float = angle_difference(base, DMath.angle(to)) * turn
-						if local + high >= from_angle and local + low <= to_angle and not (walls and _has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
+						if local + high >= from_angle and local + low <= to_angle and not (walls and _room_grid.wall_hit(origin, _target_pos[t]) >= 0.0):
 							var way: Vector2 = to / distance if distance > 0.0 else direction.normalized()
 							if found == sweep_nodes.size():
 								sweep_nodes.resize(found * 2)
@@ -5224,9 +4915,15 @@ func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: in
 	impact_core = Color.WHITE
 	impact_look = 0
 	impact_tag = 0
+	_sent += 1
 	events.projectile_impact.emit(caster, target, point, heading)
 	impact_carrier_card = &""
+	# One hit, whatever merged hit's handler struck it (`impact_count`).
+	var outer_count: int = impact_count
+	impact_count = 1
+	_sent += 1
 	events.projectile_hit.emit(caster, target, point, tag, -1)
+	impact_count = outer_count
 	_ray_depth -= 1
 	_event_slot = outer_slot
 	return true
@@ -5290,7 +4987,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		# goes on from the other side (`ray_gate`).
 		var gate_at: float = gate_cut(a, b) if gates else -1.0
 		if gate_at >= 0.0:
-			var wall_at: float = _wall_hit(a, b) if _has_walls and not ghost else -1.0
+			var wall_at: float = _room_grid.wall_hit(a, b) if not ghost else -1.0
 			if wall_at < 0.0 or gate_at <= wall_at:
 				var into: Vector2 = a.lerp(b, gate_at)
 				g_gate = gate_hit
@@ -5300,9 +4997,9 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 				_path[at_piece + 1] = into
 				reach += piece * gate_at
 				break
-		if _has_walls and not ghost:
+		if _room_grid.has_walls() and not ghost:
 			# A ray walks every cell it crosses, however long it is.
-			var cut: float = _wall_hit(a, b)
+			var cut: float = _room_grid.wall_hit(a, b)
 			if cut >= 0.0:
 				var at: Vector2 = a.lerp(b, cut)
 				var heading: Vector2 = (b - a) / piece if piece > 0.0 else Vector2.ZERO
@@ -5441,11 +5138,17 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_core = Color.WHITE
 			impact_look = 0
 			impact_tag = 0
+			_sent += 1
 			events.projectile_impact.emit(caster, node, points[i], heads[i])
 			impact_carrier_card = &""
 			impact_core = Color.WHITE
 			impact_look = 0
+			# One hit, whatever merged hit's handler fired the ray (`impact_count`).
+			var outer_count: int = impact_count
+			impact_count = 1
+			_sent += 1
 			events.projectile_hit.emit(caster, node, points[i], tag, -1)
+			impact_count = outer_count
 		nodes[i] = null
 	# A spark at every wall it turned at before it ended, and at the wall it ended on; then
 	# `wall_met` for each (a handler's payload may fire rays: this level's scratch is kept).
@@ -5459,6 +5162,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_core = Color.WHITE
 			impact_look = 0
 			impact_tag = 0
+			_sent += 1
 			events.projectile_impact.emit(caster, null, turn, (walk[n - 1] as Vector2).direction_to(turn))
 			impact_carrier_card = &""
 			impact_core = Color.WHITE
@@ -5468,6 +5172,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		impact_core = Color.WHITE
 		impact_look = 0
 		impact_tag = 0
+		_sent += 1
 		events.projectile_impact.emit(caster, null, end, end_heading)
 		impact_carrier_card = &""
 		impact_core = Color.WHITE
@@ -5477,8 +5182,10 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		if n >= walked - 1:
 			break
 		var turn: Vector2 = walk[n]
+		_sent += 1
 		wall_met.emit(caster, turn, turn.direction_to(walk[n + 1]), tag, -1)
 	if walled:
+		_sent += 1
 		wall_met.emit(caster, end - end_heading * 0.5, end_heading, tag, -1)
 	_ray_depth -= 1
 	_event_slot = outer_slot
@@ -6362,14 +6069,21 @@ func _kill(slot: int, announce: bool = true) -> void:
 		_drop_solid(slot)
 	_drop_moves(slot)
 	if announce and _tag[slot] != 0:
-		shot_ended.emit(_tag[slot])
+		if _finding:
+			_hit_batch.keep_end(_tag[slot])
+		else:
+			_sent += 1
+			shot_ended.emit(_tag[slot])
 	if _kinds[slot] != 0:
 		_leave_all(slot)
 	_alive[slot] = 0
 	_state[slot] = S_IDLE
 	_leave_group(slot)
-	_free_slots[_free_count] = slot
-	_free_count += 1
+	if _finding and not _freeing_now:
+		_hit_batch.hold(slot)
+	else:
+		_free_slots[_free_count] = slot
+		_free_count += 1
 	_count -= 1
 	var owner_index: int = _budget[slot]
 	_owned[owner_index] -= 1
@@ -6402,6 +6116,7 @@ func _expire(slot: int) -> void:
 		impact_look = _look[slot]
 		impact_tag = tag
 		impact_heading = _vel[slot].normalized()
+		_sent += 1
 		events.projectile_expired.emit(caster, at, tag, slot)
 		impact_carrier_card = &""
 		impact_body = 0
@@ -6411,7 +6126,13 @@ func _expire(slot: int) -> void:
 		impact_heading = Vector2.ZERO
 		_event_slot = -1
 	if tag != 0:
-		shot_ended.emit(tag)
+		if _finding:
+			# After its hits of this pass, merged and still to send (spells.gd: a shot's end
+			# comes after its hits' handlers).
+			_hit_batch.keep_end(tag)
+		else:
+			_sent += 1
+			shot_ended.emit(tag)
 
 
 ## Remove, quietly (no event, no `shot_ended`), every shot carrying `tag`. Returns how
@@ -6594,7 +6315,14 @@ func _drop_one() -> void:
 	for i in ActorsScript.SHARED:
 		if _owned[i] > _owned[richest]:
 			richest = i
-	_kill(_own_head[richest])
+	# Its oldest living shot: one its hits spent this pass ends anyway, and its slot is held
+	# for its hit (`_take_back_slot` gave up the ones it could).
+	var slot: int = _own_head[richest]
+	while slot >= 0 and (_flags[slot] & F_SPENT) != 0 and _own_next[slot] >= 0:
+		slot = _own_next[slot]
+	_freeing_now = true
+	_kill(slot)
+	_freeing_now = false
 	dropped += 1
 
 
@@ -6954,10 +6682,13 @@ func _hit_candidates(slot: int, found: int) -> bool:
 	var seq: int = _seq[slot]
 	var hit: bool = false
 	for n in found:
-		if _alive[slot] == 0 or _seq[slot] != seq or (_flags[slot] & F_STUCK) != 0:
+		if _alive[slot] == 0 or _seq[slot] != seq or (_flags[slot] & (F_STUCK | F_SPENT)) != 0:
 			break
 		var t: int = _cand_target[n]
 		if _target_layer[t] == 0 or not is_instance_valid(_targets[t]):
+			continue
+		if not _hit_batch.takes(t):
+			# Its merged hits so far kill it: the shot is not spent on it.
 			continue
 		_work_left -= HIT_WORK
 		hit = true
@@ -7112,6 +6843,7 @@ func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 		impact_core = _core[slot]
 		impact_look = _look[slot]
 		impact_tag = _tag[slot]
+		_sent += 1
 		events.projectile_impact.emit(_actor[slot], null, _pos[slot], velocity.normalized())
 		impact_carrier_card = &""
 		impact_body = 0
@@ -7138,7 +6870,6 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		heading = at.direction_to(_target_pos[target])
 		if heading == Vector2.ZERO:
 			heading = Vector2.RIGHT
-	var spent: bool = false
 	if _stick[slot] > 0.0 and is_instance_valid(node):
 		# Stick to the target: it carries the shot until the stick time is up.
 		_flags[slot] |= F_STUCK
@@ -7162,23 +6893,139 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		_pierce[slot] -= 1
 		_remember(slot, target)
 	else:
-		spent = true
-		_end_tail(slot, at)
-		_kill(slot, false)
+		# Ended with the pass's other spent shots, after its hits (`_end_spent`).
+		_flags[slot] |= F_SPENT
+		_hit_batch.spend(slot, at)
 	if events != null and is_instance_valid(node):
-		impact_carrier_card = _carrier_card_of(slot)
-		impact_body = _kind_of(slot)
-		impact_core = _core[slot]
-		impact_look = _look[slot]
-		impact_tag = tag
-		events.projectile_impact.emit(caster, node, at, heading)
-		impact_carrier_card = &""
-		impact_body = 0
-		impact_core = Color.WHITE
-		impact_look = 0
-		impact_tag = 0
-		_event_slot = slot
-		events.projectile_hit.emit(caster, node, at, tag, slot)
-		_event_slot = -1
-	if spent and tag != 0:
-		shot_ended.emit(tag)
+		_merge_hit(slot, target, caster, tag, at, heading)
+
+
+## A merged hit (`count` hits of one spell's shots on one body) on `node`: its `projectile_impact` with the
+## shot's look, then its `projectile_hit`.
+func _send_hit(caster: int, node: Variant, at: Vector2, heading: Vector2, tag: int, slot: int, card: StringName, body: int, core: Color, look: int, count: int) -> void:
+	impact_carrier_card = card
+	impact_body = body
+	impact_core = core
+	impact_look = look
+	impact_tag = tag
+	impact_count = count
+	_sent += 1
+	events.projectile_impact.emit(caster, node, at, heading)
+	impact_carrier_card = &""
+	impact_body = 0
+	impact_core = Color.WHITE
+	impact_look = 0
+	impact_tag = 0
+	_event_slot = slot
+	_sent += 1
+	events.projectile_hit.emit(caster, node, at, tag, slot)
+	_event_slot = -1
+	impact_count = 1
+
+
+## The hit of the shot in `slot` on target `target`, kept for the end of the pass (`_hit_batch`): added
+## to the caster's hits on it with the same tag, or the first of them, whose room is worked out from
+## the body's room and the spell's damage, each asked of Combat once a pass and again after any event
+## (a shot that hits alone asks its damage for itself; hit batch A2).
+func _merge_hit(slot: int, target: int, caster: int, tag: int, at: Vector2, heading: Vector2) -> void:
+	if _hit_batch.add_to(target, caster, tag, (_flags[slot] & F_ALONE) != 0, _flags, F_ALONE) >= 0:
+		return
+	var batch: HitBatch = _hit_batch
+	var entry: int = batch.add(target, _targets.size(), caster, tag, slot, _seq[slot], at, heading, _carrier_card_of(slot), _kind_of(slot), _core[slot], _look[slot], (_flags[slot] & F_ALONE) != 0, _sent)
+	# What the batch has not been told since the pass's last event (`add`).
+	var asks: int = batch.asks
+	if (asks & ASK_ROOM) != 0:
+		events.hit_room_asked.emit(_targets[target], batch.room)
+	if (asks & ASK_DAMAGE) != 0:
+		events.hit_damage_asked.emit(tag, slot, batch.damage)
+	batch.take_room(entry)
+
+
+## The shots the pass's hits spent, ended in the order they were (their tails where they were spent;
+## their slots held and their `shot_ended` kept for after the hits, as the pass still finds them, `_finding`).
+func _end_spent() -> void:
+	for i in _hit_batch.spent_count():
+		_end_spent_at(i)
+	_hit_batch.forget_spent()
+
+
+## A held slot handed back to the free list now (`_spawn_row` at the cap, no slot free): the last
+## held one, else a spent shot's, ended at once; never one of a shot that hits alone (its merged hit,
+## still to send, reads its own profile by its slot). The hit sent later names no shot (its entry's
+## `seq`). False for none.
+func _take_back_slot() -> bool:
+	var i: int = _hit_batch.held_count() - 1
+	while i >= 0:
+		var slot: int = _hit_batch.held_slot(i)
+		if (_flags[slot] & F_ALONE) == 0:
+			_hit_batch.drop_held(i)
+			_free_slots[_free_count] = slot
+			_free_count += 1
+			return true
+		i -= 1
+	i = _hit_batch.spent_count() - 1
+	while i >= 0:
+		var spent: int = _hit_batch.spent_slot(i)
+		if (_flags[spent] & F_ALONE) == 0 and _end_spent_at(i):
+			# Out of the list (the last takes its place), and its slot, held by its end, back now.
+			_hit_batch.drop_spent(i)
+			return _free_count > 0 or _take_back_slot()
+		i -= 1
+	return false
+
+
+## The spent shot `i` of the batch's list ended (its tail where it was spent; its slot held and its
+## end kept for after the hits, as the pass still finds them), unless a handler ended it meanwhile or its
+## slot holds another shot now (a new shot's flags have no F_SPENT). True when it ended it.
+func _end_spent_at(i: int) -> bool:
+	var slot: int = _hit_batch.spent_slot(i)
+	if _alive[slot] == 0 or (_flags[slot] & F_SPENT) == 0:
+		return false
+	_flags[slot] &= ~F_SPENT
+	var tag: int = _tag[slot]
+	_end_tail(slot, _hit_batch.spent_at(i))
+	_kill(slot, false)
+	if tag != 0:
+		_hit_batch.keep_end(tag)
+	return true
+
+
+## The pass's merged hits sent, in the order of their first hits, then its spent shots' ends. A
+## handler may hit or spawn again: it is sent at once (`_finding` is off by now).
+func _send_merged() -> void:
+	var batch: HitBatch = _hit_batch
+	# The entries' arrays read once (a member of another object costs a lookup at each read): each
+	# local is the batch's own array, not a copy, and no entry is added while they are sent
+	# (`_finding` is off). Their number is read anew, so a handler's `clear()` (`entries` to 0) stops what is left.
+	var targets: PackedInt32Array = batch.target
+	var slots: PackedInt32Array = batch.slot
+	var seqs: PackedInt64Array = batch.seq
+	var casters: PackedInt32Array = batch.caster
+	var points: PackedVector2Array = batch.at
+	var headings: PackedVector2Array = batch.heading
+	var tags: PackedInt64Array = batch.tag
+	var cards: Array[StringName] = batch.card
+	var bodies: PackedInt32Array = batch.body
+	var cores: PackedColorArray = batch.core
+	var looks: PackedInt32Array = batch.look
+	var counts: PackedInt32Array = batch.count
+	var entry: int = 0
+	while entry < batch.entries:
+		var target: int = targets[entry]
+		var node: Variant = _targets[target] if target < _targets.size() else null
+		if events != null and node != null and is_instance_valid(node):
+			var shot: int = slots[entry] if _seq[slots[entry]] == seqs[entry] else -1
+			_send_hit(casters[entry], node, points[entry], headings[entry], tags[entry], shot, cards[entry], bodies[entry], cores[entry], looks[entry], counts[entry])
+		entry += 1
+	batch.forget_entries()
+	for i in batch.held_count():
+		_free_slots[_free_count] = batch.held_slot(i)
+		_free_count += 1
+	batch.forget_held()
+	# A handler's end meanwhile is sent at once (`_finding` is off by now), so nothing joins this list.
+	var i: int = 0
+	while i < batch.ended_count():
+		_sent += 1
+		shot_ended.emit(batch.ended_tag(i))
+		i += 1
+	batch.forget_ended()

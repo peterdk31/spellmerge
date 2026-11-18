@@ -204,7 +204,7 @@ static func wall_rects(layout: Node) -> Array[Rect2]:
 ## The rectangles of `layout`'s holes (hub rework HR-H1), as `wall_rects` reads walls: each rectangle
 ## shape of a static body whose layer is exactly the hole layer (`RoomBase.HOLE_LAYER`; a body also on
 ## the wall layer is a wall). Where one overlaps a wall, the wall wins (the projectile manager's
-## grids, `ProjectileManager.is_hole`). The room's size (`size`) counts them.
+## grids, `RoomGrid.is_hole`). The room's size (`size`) counts them.
 static func hole_rects(layout: Node) -> Array[Rect2]:
 	return _layer_rects(layout, true)
 

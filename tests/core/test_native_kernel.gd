@@ -17,7 +17,9 @@ extends "res://tests/support/suite.gd"
 ## shots frozen by a local stop, orbits round another shot, and now and then a solid rune (a wall:
 ## while one lives the hit pass and the drawing run in GDScript, so the two switch mid-run); hit
 ## handlers that spawn shots (which spare the body hit), remove a target, register one again
-## larger and make a shot further on a ghost now and then.
+## larger and make a later shot a ghost now and then, after the pass (the merged hits are sent at
+## its end); and expiry handlers that do the same during it (a shot's end goes out in the pass), so
+## the kernel resumes after a target is taken away or grown, or a later shot changed, mid-pass.
 ##
 ## The tests: the kernel's own checks of the manager's constants and members, one per test; the
 ## scene stepped with the native kernel on one thread, and (a test of its own) on four (shot scale
@@ -48,11 +50,12 @@ const ROOM: Vector2 = Vector2(960.0, 540.0)
 const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 ## Not compared: node instance ids (each side has its own nodes; what a shot keeps of a target is
 ## its key, which is compared: online-ready N5), the hit test's scratch (the native
-## pass sizes it for every target at once), what only the native drawing writes, the GDScript
+## pass sizes it for every target at once), the native side's counts of what it merged and opened
+## itself (`merged_turns`, `merged_opens`), what only the native drawing writes, the GDScript
 ## catch-up's one-shot list and the GDScript drawing's sum of the tail asked for and count of the
 ## thinned groups' tail births (the native keeps them in locals; the sum is handed out as
 ## `tail_demand`, which is compared, and the births themselves are compared).
-const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads",
+const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads", &"step_profile", &"profile_clock", &"merged_turns", &"merged_opens",
 		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
 
 ## Per manager (0 the GDScript, 1 the native): its bus, actor table, targets and what it sent.
@@ -88,6 +91,15 @@ var _circled_quad: bool = false
 var _box_hits: Array[String] = []
 ## How many differences the running test found: a scene stops at the ninth (the rest follow).
 var _differences: int = 0
+## The native side's hand-backs counted over the steps, and the hits sent (each merged hit counts
+## its shots).
+## How many new bodies each side's end handlers brought in.
+var _added: Array[int] = [0, 0]
+var _handbacks: int = 0
+var _hits_sent: int = 0
+
+## Carrier cards some of the scene's shots name (their merged hits' look; &"" for none).
+const CARDS: Array[StringName] = [&"", &"spray", &"pulse", &""]
 
 ## The card bodies of the scene: plain canvas-item shaders, made once per file.
 const SCENE_BODIES: int = 6
@@ -95,6 +107,9 @@ var _bodies: Array[Shader] = []
 
 
 func before_each() -> void:
+	_handbacks = 0
+	_added = [0, 0]
+	_hits_sent = 0
 	_mgrs = []
 	_targets = [[], []]
 	_wizards = [[], []]
@@ -201,6 +216,27 @@ func test_a_missing_member_is_named() -> void:
 	check("_pos" in ", ".join(NativeScript.shot_kernel().call(&"check_fields", stranger) as PackedStringArray), "a missing member is named")
 
 
+## The hit pass reads the room grid's walls from the grid (`RoomGrid`, hit batch B1): a manager
+## without one is named, and a real one's grid has every member the kernel reads.
+func test_the_room_grid_the_kernel_reads_is_checked() -> void:
+	if not _native_loaded():
+		return
+	var stranger: Node2D = own(Node2D.new()) as Node2D
+	check("_room_grid" in ", ".join(NativeScript.shot_kernel().call(&"check_fields", stranger) as PackedStringArray), "a manager without a room grid is named")
+	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
+	check_equal(NativeScript.shot_kernel().call(&"check_fields", mgr) as PackedStringArray, PackedStringArray(), "a real manager and its grid have every member")
+
+
+## The hit pass reads the merged hits from the hit batch (`HitBatch`, hit batch A1): a manager without
+## one is named.
+func test_the_hit_batch_the_kernel_reads_is_checked() -> void:
+	if not _native_loaded():
+		return
+	var mgr: ManagerScript = own(ManagerScript.new()) as ManagerScript
+	mgr._hit_batch = null
+	check("_hit_batch" in ", ".join(NativeScript.shot_kernel().call(&"check_fields", mgr) as PackedStringArray), "a manager without a hit batch is named")
+
+
 func test_a_new_manager_runs_the_native_kernel() -> void:
 	if not _native_loaded():
 		return
@@ -220,16 +256,59 @@ func test_the_native_switch_picks_the_gdscript_or_the_kernel() -> void:
 
 # --- The scene, stepped side by side ----------------------------------------
 
+## The scene, its hits merged: the kernel takes each shot whose hits only add to merged hits of the
+## pass (`HitPass::merge_hits`), with bodies the pass kills passed over (`hit_room_asked`,
+## `hit_damage_asked`, answered alike on both sides), to the bit as the GDScript does.
 func test_one_thread_steps_like_the_gdscript() -> void:
 	if not _native_loaded():
 		return
 	_step_the_scene_alike(1)
+	_check_the_kernel_merged()
 
 
 func test_several_threads_step_like_the_gdscript() -> void:
 	if not _native_loaded():
 		return
 	_step_the_scene_alike(THREADS[THREADS.size() - 1])
+	_check_the_kernel_merged()
+
+
+## The merged scene reached the kernel's own merging: shots whose hits it merged itself, among the
+## ones handed back to GDScript.
+func _check_the_kernel_merged() -> void:
+	check(_hits_sent > 0, "shots hit (%d)" % _hits_sent)
+	check(_mgrs[1].merged_turns > 100, "the kernel merged shots' hits itself (%d turns; %d hand-backs)" % [_mgrs[1].merged_turns, _handbacks])
+	check_equal(_mgrs[0].merged_turns, 0, "the GDScript side counts none")
+	check(_mgrs[1].merged_opens >= 15, "the kernel opened merged hits itself (%d, 23 when written), each a body and a spell the pass had asked of" % _mgrs[1].merged_opens)
+
+
+## A merged scene's answers to `hit_room_asked` and `hit_damage_asked`, the same on both sides: a
+## body's health by its name, a hit's damage by its tag, so some bodies die in a pass and the shots
+## after pass them.
+func _on_room_asked(target: Node, room: HitRoom) -> void:
+	var kind: int = String(target.name).hash()
+	# Some bodies no hit takes health from (unknown: never dead in the pass).
+	if kind % 7 == 0:
+		return
+	room.known = true
+	room.health = 15.0 + float(kind % 4) * 10.0
+	# A barrier on some bodies that spares one of the two spells: its charges take the other's
+	# first hits whole (hit batch A1).
+	if kind % 3 == 0:
+		room.charges = 2
+		room.spares = 2
+	# A hex on some (30: a hit of 3 or 6 grows by an amount whose sum's order shows in the last bit),
+	# and on some one that takes a hit's damage to 0 (-100: it deals none, and meets no barrier).
+	if kind % 5 == 1:
+		room.hexed = true
+		room.hex = 30.0
+	elif kind % 5 == 3:
+		room.hexed = true
+		room.hex = -100.0
+
+
+func _on_damage_asked(tag: int, _shot: int, answer: HitDamage) -> void:
+	answer.damage = 3.0 * float(tag % 3)
 
 
 ## Builds the scene on both sides, the native one on `threads` threads, and steps it STEPS times,
@@ -265,6 +344,9 @@ func _step_the_scene_alike(threads: int) -> void:
 			(_prop_nodes[side] as Array).append(_add_body(side, "prop%d" % n, PROP_AT[n], PROP_RADIUS[n], ManagerScript.LAYER_ENEMY, _props[n], PROP_HALF[n]))
 		mgr.events.projectile_hit.connect(_on_hit.bind(side))
 		mgr.events.projectile_expired.connect(_on_expired.bind(side))
+		mgr.events.hit_room_asked.connect(_on_room_asked)
+		mgr.events.hit_damage_asked.connect(_on_damage_asked)
+		mgr.shot_ended.connect(func(tag: int) -> void: _events[side].append("ended %d" % tag))
 	check(_mgrs[1].is_native() and not _mgrs[0].is_native(), "one native manager, one GDScript")
 	# A build without threads (the web's) runs every loop on one.
 	var running: int = _mgrs[1].native_thread_count()
@@ -278,9 +360,19 @@ func _step_the_scene_alike(threads: int) -> void:
 	for step in STEPS:
 		for side in 2:
 			_drive(side, step)
+		if step % 10 == 4:
+			# Some shots hit alone (a relay's own profile, `set_hits_alone`), alike on both sides.
+			for side in 2:
+				for slot in range(step % 11, _mgrs[side]._high, 11):
+					_mgrs[side].set_hits_alone(slot)
+		if _mgrs[1].step_profile.is_empty():
+			# The native side counts its hand-backs (`step_profile`, which plays as the plain step).
+			_mgrs[1].step_profile.resize(ManagerScript.PROF_PARTS)
+			_mgrs[1].profile_clock = Time.get_ticks_usec
 		for side in 2:
 			_events[side].clear()
 			_mgrs[side].step(DT)
+		_handbacks += _mgrs[1].step_profile[ManagerScript.PROF_HANDBACKS]
 		if _events[0] != _events[1]:
 			_differ("step %d: the same events (%s)" % [step, _first_difference(_events[0], _events[1]) + " / " + _first_difference(_events[1], _events[0])])
 		_compare_arrays(step)
@@ -325,11 +417,12 @@ func _step_the_scene_alike(threads: int) -> void:
 
 
 # --- Targets grown mid-pass -------------------------------------------------
-# A hit that grows targets mid-pass: the shots after it in the pass must see each target's cell as
-# the GDScript does. It keeps a cell's count and box once taken in a filling (`_cell_info`), so a
-# shot passing the grown `near` (whose cell an earlier shot of the pass took) still sees its old
-# box and misses it, and one passing the grown `far` (whose cell nothing took yet) sees the new
-# one and hits it.
+# An event that grows targets mid-pass (a shot ending on a wall: its `projectile_expired` goes out
+# during the pass, while the merged hits wait for the pass's end): the shots after it in the pass
+# must see each target's cell as the GDScript does. It keeps a cell's count and box once taken in a
+# filling (`_cell_info`), so a shot passing the grown `near` (whose cell an earlier shot of the pass
+# took) still sees its old box and misses it, and one passing the grown `far` (whose cell nothing
+# took yet) sees the new one and hits it.
 
 ## Builds the scene on both sides and steps it three times, comparing each step; returns the
 ## GDScript side's events of the first step.
@@ -337,12 +430,13 @@ func _step_targets_grown_mid_pass() -> Array:
 	var first_step: Array = []
 	for side in 2:
 		var mgr: ManagerScript = _manager(side, THREADS[THREADS.size() - 1], 600, ActorSeats.table())
-		var first: Node2D = _add_body(side, "first", Vector2(100.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+		mgr.set_walls([Rect2(96.0, 250.0, 16.0, 40.0)] as Array[Rect2])
 		var near: Node2D = _add_body(side, "near", Vector2(500.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
 		var far: Node2D = _add_body(side, "far", Vector2(800.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
-		(_targets[side] as Array).append_array([first, near, far])
-		mgr.events.projectile_hit.connect(_on_grow_hit.bind(side, first, [near, far]))
-		# First in the pass: a shot past `near` (its cell is taken, its box as it is), then one into `first`.
+		(_targets[side] as Array).append_array([near, far])
+		mgr.events.projectile_hit.connect(_on_grow_hit.bind(side))
+		mgr.events.projectile_expired.connect(_on_grow_wall.bind(side, [near, far]))
+		# First in the pass: a shot past `near` (its cell is taken, its box as it is), then one into the wall.
 		mgr.spawn(0, Vector2(440.0, 300.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY)
 		mgr.spawn(0, Vector2(85.0, 270.0), Vector2(900.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY)
 		# Then shots 40 px off `near` and `far`: only a grown one reaches them.
@@ -371,16 +465,60 @@ func test_a_cell_the_pass_took_keeps_its_box_until_the_next_filling() -> void:
 	if not _native_loaded():
 		return
 	var events: Array = _step_targets_grown_mid_pass()
-	var on_near: int = events.filter(func(e: String) -> bool: return " near " in e).size()
-	var on_far: int = events.filter(func(e: String) -> bool: return " far " in e).size()
+	# Each merged hit's count is its event's last word (`x` and the hits it stands for).
+	var on_near: int = 0
+	var on_far: int = 0
+	for e: String in events:
+		var count: int = int(e.get_slice(" x", 1)) if " x" in e else 0
+		if " near " in e:
+			on_near += count
+		elif " far " in e:
+			on_far += count
 	check(on_near == 0 and on_far > 100, "after the hit, the shots miss the grown near (%d hits) and hit the grown far (%d)" % [on_near, on_far])
 
 
-func _on_grow_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int, first: Node2D, grown: Array) -> void:
-	_events[side].append("hit %d %s %s %d %d" % [caster, (target as Node).name, var_to_str(position), tag, shot])
-	if target == first:
-		for node: Node2D in grown:
-			_mgrs[side].add_target(node, 60.0)
+## A merged hit the kernel opens on a barriered body for a spell the barrier spares (hit batch A4):
+## shot 1 (spell 1) hits B, so GDScript asks B's room (a barrier of 5 sparing spell 2); shot 2
+## (spell 2) hits C, so it asks spell 2's damage; shot 3 (spell 2) hits B with both told: the kernel
+## opens that entry itself, and it meets no barrier (its damage counts; the charges stay for spell
+## 1), as the GDScript's does.
+func test_the_kernel_opens_a_spared_spells_hit_as_the_gdscript() -> void:
+	if not _native_loaded():
+		return
+	for side in 2:
+		var mgr: ManagerScript = _manager(side, 1, 64, ActorSeats.table())
+		var b: Node2D = _add_body(side, "b", Vector2(200.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+		_add_body(side, "c", Vector2(200.0, 300.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+		mgr.events.hit_room_asked.connect(func(target: Node, room: HitRoom) -> void:
+			room.known = true
+			room.health = 1000.0
+			if target == b:
+				room.charges = 5
+				room.spares = 2)
+		mgr.events.hit_damage_asked.connect(func(tag: int, _shot: int, answer: HitDamage) -> void: answer.damage = 4.0 if tag == 1 else 7.0)
+		mgr.events.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int, _shot: int) -> void:
+			_events[side].append("hit %d %s %d x%d" % [caster, target.name, tag, mgr.impact_count]))
+		mgr.spawn(0, Vector2(190.0, 100.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 1)
+		mgr.spawn(0, Vector2(190.0, 300.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 2)
+		mgr.spawn(0, Vector2(190.0, 102.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 2)
+	for side in 2:
+		_events[side].clear()
+		_mgrs[side].step(DT)
+	check_equal(_events[1], _events[0], "the same hits")
+	_compare_arrays(0)
+	check_equal(_mgrs[1].merged_opens, 1, "the kernel opened the spared spell's entry on B")
+	var batch: HitBatch = _mgrs[1]._hit_batch
+	check_equal([batch._charges_used[0], batch._spent[0]], [1, 7.0], "spell 1's hit took a charge, spell 2's damage counted")
+
+
+func _on_grow_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int) -> void:
+	_events[side].append("hit %d %s %s %d %d x%d" % [caster, (target as Node).name, var_to_str(position), tag, shot, _mgrs[side].impact_count])
+
+
+func _on_grow_wall(caster: int, position: Vector2, tag: int, shot: int, side: int, grown: Array) -> void:
+	_events[side].append("wall %d %s %d %d" % [caster, var_to_str(position), tag, shot])
+	for node: Node2D in grown:
+		_mgrs[side].add_target(node, 60.0)
 
 
 func _add_body(side: int, body_name: String, at: Vector2, radius: float, layer: int, owner_id: int, half: Vector2 = Vector2.ZERO) -> Node2D:
@@ -453,8 +591,9 @@ func _drive(side: int, step: int) -> void:
 		else:
 			slot = m.spawn(caster, from, velocity, rng.randf_range(0.3, 2.5), rng.randf_range(1.0, 9.0), ManagerScript.ACTOR_LAYERS, rng.randi() % 4, 1 if kind != 9 else 2)
 			if slot >= 0 and kind == 8:
-				# A flying shot of a card body (a bolt's own head): a head body's pair, or plain.
-				m.set_carrier_card(slot, &"", slot % (SCENE_BODIES + 1))
+				# A flying shot of a card body (a bolt's own head): a head body's pair, or plain; some
+				# with a carrier card of their own, the merged hits' look (hit batch A4).
+				m.set_carrier_card(slot, CARDS[slot % CARDS.size()], slot % (SCENE_BODIES + 1))
 		if slot < 0:
 			continue
 		if prop >= 0:
@@ -506,7 +645,10 @@ func _drive(side: int, step: int) -> void:
 
 
 func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int) -> void:
-	_events[side].append("hit %d %s %s %d %d" % [caster, (target as Node).name, var_to_str(position), tag, shot])
+	var m_hit: ManagerScript = _mgrs[side]
+	_events[side].append("hit %d %s %s %d %d x%d" % [caster, (target as Node).name, var_to_str(position), tag, shot, m_hit.impact_count])
+	if side == 1:
+		_hits_sent += m_hit.impact_count
 	if side == 1 and target.has_meta(&"box"):
 		_box_hits.append(String(target.name))
 	var m: ManagerScript = _mgrs[side]
@@ -520,10 +662,10 @@ func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, 
 		# Now and then a hit takes its target away (it died).
 		m.remove_target(target as Node2D)
 	elif shot % 89 == 7 and target.name.begins_with("enemy"):
-		# Or makes it much larger (registered again) for the shots after it.
+		# Or makes it much larger (registered again) for the next pass.
 		m.add_target(target as Node2D, 60.0)
 	if shot % 13 == 5:
-		# Or changes a shot further on in the pass (a ghost now, pulled a little, as a pull would).
+		# Or changes another shot (a ghost now, pulled a little, as a pull would).
 		var later: int = (shot + 31) % m.get_cap()
 		if m.set_ghost(later):
 			m._pos[later] += Vector2(6.0, -4.0)
@@ -531,6 +673,25 @@ func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, 
 
 func _on_expired(caster: int, position: Vector2, tag: int, shot: int, side: int) -> void:
 	_events[side].append("expired %d %s %d %d" % [caster, var_to_str(position), tag, shot])
+	# During the pass, alike on both sides: now and then an end takes an enemy away, makes one much
+	# larger (registered again), or makes a shot later in the pass a ghost and pulls it a little.
+	var m: ManagerScript = _mgrs[side]
+	var enemies: Array = _targets[side]
+	if enemies.is_empty():
+		return
+	var body: Node2D = enemies[(shot * 7) % enemies.size()] as Node2D
+	if shot % 23 == 4 and body.name.begins_with("enemy"):
+		m.remove_target(body)
+	elif shot % 29 == 6 and _added[side] < 24:
+		# Or brings a new body in, a target row of its own (the hit batch's tables grow for it).
+		_added[side] += 1
+		_add_body(side, "new%d" % _added[side], body.global_position + Vector2(14.0, 9.0), 6.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+	elif shot % 19 == 9 and body.name.begins_with("enemy"):
+		m.add_target(body, 60.0)
+	if shot % 11 == 2:
+		var later: int = (shot + 17) % m.get_cap()
+		if m.set_ghost(later):
+			m._pos[later] += Vector2(6.0, -4.0)
 
 
 ## Every packed array (and int and float) member of the two managers, byte for byte.
@@ -546,6 +707,40 @@ func _compare_arrays(step: int) -> void:
 		var b: Variant = _mgrs[1].get(member)
 		if var_to_bytes(a) != var_to_bytes(b):
 			_differ("step %d: %s differs (GDScript %s, native %s)" % [step, member, _first_difference(a, b), _first_difference(b, a)])
+	# The room grid's too (the walls and the solid shots' stones on them; hit batch B1).
+	for prop: Dictionary in _mgrs[0].grid().get_property_list():
+		var member: StringName = prop["name"]
+		if (prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0:
+			continue
+		var a: Variant = _mgrs[0].grid().get(member)
+		var b: Variant = _mgrs[1].grid().get(member)
+		if var_to_bytes(a) != var_to_bytes(b):
+			_differ("step %d: the room grid's %s differs" % [step, member])
+	# The hit batch's (its entries, the bodies' tallies, the spent shots; hit batch A1).
+	_compare_batch(step, _mgrs[0]._hit_batch, _mgrs[1]._hit_batch)
+
+
+## The hit batch's scratch of its last `add` (what it asked, at which count, the damage slot kept):
+## an entry the native hit pass opens does not go through `add` (hit batch A4).
+const BATCH_SCRATCH: Array[StringName] = [&"asks", &"_asked_at", &"_asked_alone", &"_kept"]
+
+
+## Every packed array, int and float member of the two managers' hit batches, byte for byte.
+func _compare_batch(step: int, first: HitBatch, second: HitBatch) -> void:
+	for prop: Dictionary in first.get_property_list():
+		var member: StringName = prop["name"]
+		var type: int = prop["type"]
+		if (prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0 or member in BATCH_SCRATCH:
+			continue
+		if type < TYPE_PACKED_BYTE_ARRAY and type != TYPE_INT and type != TYPE_FLOAT and type != TYPE_VECTOR2:
+			continue
+		var a: Variant = first.get(member)
+		var b: Variant = second.get(member)
+		if var_to_bytes(a) != var_to_bytes(b):
+			_differ("step %d: the hit batch's %s differs (GDScript %s, native %s)" % [step, member, _first_difference(a, b), _first_difference(b, a)])
+	# The entries' carrier cards (an Array, the look the manager fills for the kernel's entries).
+	if var_to_bytes(first.card) != var_to_bytes(second.card):
+		_differ("step %d: the hit batch's card differs (GDScript %s, native %s)" % [step, _first_difference(first.card, second.card), _first_difference(second.card, first.card)])
 
 
 func _first_difference(a: Variant, b: Variant) -> String:
@@ -582,3 +777,4 @@ func _compare_draw(step: int) -> void:
 			continue
 		if var_to_bytes(buffer_a.slice(0, floats)) != var_to_bytes(buffer_b.slice(0, floats)):
 			_differ("step %d batch %d: the instances differ (%s / %s)" % [step, batch, _first_difference(buffer_a.slice(0, floats), buffer_b.slice(0, floats)), _first_difference(buffer_b.slice(0, floats), buffer_a.slice(0, floats))])
+

@@ -532,6 +532,21 @@ func test_fire_on_a_charged_enemy_discharges_and_then_bursts() -> void:
 	check_equal(_combat.health_of(enemy), 100 - BOLT - 4, "the struck enemy takes its hit and the burst, not the discharge")
 
 
+## A merged hit of three shots (the projectile manager's `impact_count`) deals three hits' damage, but
+## a charged body discharges one hit's worth, as one by one only the first hit discharges.
+func test_a_merged_hit_on_a_charged_enemy_discharges_one_hits_worth() -> void:
+	var enemy := _enemy()
+	var near := _foe(Vector2(30.0, 0.0))
+	_combat.apply_status(1, enemy, &"static", 5.0, 60.0)
+	var tag: int = _tag(1, &"fire")
+	_projectiles.step(STEP)
+	_projectiles.impact_count = 3
+	_bus.projectile_hit.emit(1, enemy, enemy.position + Vector2(-8.0, 0.0), tag, -1)
+	_projectiles.impact_count = 1
+	check(is_equal_approx(_combat.health_of(near), 100.0 - 2.4 - 4.0), "the neighbour takes one hit's discharge and the burst (%s)" % _combat.health_of(near))
+	check_equal(_combat.health_of(enemy), 100 - 3 * BOLT - 4, "the struck enemy takes the three hits and the burst")
+
+
 func test_superconduct_freezes_a_chilled_enemy_hit_by_lightning() -> void:
 	var enemy := _enemy()
 	_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)

@@ -262,7 +262,7 @@ func _push_place_again() -> void:
 func _origin() -> Vector2:
 	var tip: Vector2 = actor.muzzle_position()
 	if actor.projectiles != null:
-		return actor.projectiles.clip_to_walls(actor.global_position, tip)
+		return actor.projectiles.grid().clip_to_walls(actor.global_position, tip)
 	return tip
 
 

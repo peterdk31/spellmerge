@@ -36,31 +36,31 @@ const RUN_UP_WALK_COST: float = 0.5
 ## True when no wall (room or spell) lies between `from` and `to`. Without a projectile manager
 ## nothing blocks.
 static func line_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector2) -> bool:
-	return projectiles == null or projectiles.line_clear(from, to)
+	return projectiles == null or projectiles.grid().line_clear(from, to)
 
 
 ## True when no ground of a body that cannot move (a pillar's footprint) lies between `from` and
 ## `to`: a body's feet to another's. Without a projectile manager nothing blocks.
 static func ground_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector2) -> bool:
-	return projectiles == null or projectiles.ground_clear(from, to)
+	return projectiles == null or projectiles.grid().ground_clear(from, to)
 
 
 ## True when a body could walk from `from` to `to` in a line: no wall (room or spell), no ground
 ## of a body that cannot move and no hole (HR-H2) on it.
 static func walk_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector2) -> bool:
-	return projectiles == null or (projectiles.line_clear(from, to) and projectiles.walk_clear(from, to))
+	return projectiles == null or (projectiles.grid().line_clear(from, to) and projectiles.grid().walk_clear(from, to))
 
 
 ## True when a walk's feet from `from` to `to` meet no ground of a body that cannot move and no hole
 ## (HR-H2), walls aside: `ground_clear` for walking.
 static func feet_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector2) -> bool:
-	return projectiles == null or projectiles.walk_clear(from, to)
+	return projectiles == null or projectiles.grid().walk_clear(from, to)
 
 
 ## True when nothing a shot would stop at lies from `from` to `to`: no wall and no blocking body's
 ## ground; a hole is no cover (HR-H2). What `cover` looks for between an end and the threat.
 static func shot_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector2) -> bool:
-	return projectiles == null or (projectiles.line_clear(from, to) and projectiles.ground_clear(from, to))
+	return projectiles == null or (projectiles.grid().line_clear(from, to) and projectiles.grid().ground_clear(from, to))
 
 
 ## How far a body of `radius` at `from` could run along `way` before its rim meets a wall or a
@@ -69,7 +69,7 @@ static func shot_clear(projectiles: ProjectilesScript, from: Vector2, to: Vector
 static func run_along(projectiles: ProjectilesScript, from: Vector2, way: Vector2, most: float, radius: float) -> float:
 	if projectiles == null:
 		return most
-	return clampf(projectiles.clear_run(from, way, most + radius) - radius, 0.0, most)
+	return clampf(projectiles.grid().clear_run(from, way, most + radius) - radius, 0.0, most)
 
 
 ## Where a body of `radius` at `from` should stand to run a move `reach` long at `target` (boss
@@ -86,11 +86,11 @@ static func run_up_spot(projectiles: ProjectilesScript, from: Vector2, target: V
 	var best_score: float = -INF
 	for k in RUN_UP_WAYS:
 		var way: Vector2 = DMath.from_angle(float(k) * TAU / float(RUN_UP_WAYS))
-		var back: float = minf(projectiles.clear_run(target, way, reach) - radius - RUN_UP_MARGIN, reach * RUN_UP_NEAR)
+		var back: float = minf(projectiles.grid().clear_run(target, way, reach) - radius - RUN_UP_MARGIN, reach * RUN_UP_NEAR)
 		if back <= radius:
 			continue
 		var spot: Vector2 = target + way * back
-		if projectiles.circle_blocked(spot, radius, true):
+		if projectiles.grid().circle_blocked(spot, radius, true):
 			continue
 		var run: float = minf(back + run_along(projectiles, target, -way, reach, radius), reach)
 		var walk: float = from.distance_to(spot)

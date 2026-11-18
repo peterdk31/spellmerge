@@ -1163,7 +1163,7 @@ func _ready_mover() -> int:
 ## homing, the target's feet when they are nearer, short of the first wall either way.
 func _lands_on_ground(at: int, way: Vector2) -> bool:
 	var projectiles: ProjectileManagerScript = actor.projectiles
-	if projectiles == null or not projectiles.has_holes() or way == Vector2.ZERO:
+	if projectiles == null or not projectiles.grid().has_holes() or way == Vector2.ZERO:
 		return true
 	var sense: CastSense = _sense_of(at)
 	if sense == null or not sense.moves_caster:
@@ -1172,8 +1172,9 @@ func _lands_on_ground(at: int, way: Vector2) -> bool:
 	var reach: float = sense.move_reach
 	if sense.homing and target != null:
 		reach = minf(reach, from.distance_to(target.global_position))
-	var end: Vector2 = projectiles.clip_to_walls(from, from + way.normalized() * reach)
-	return not projectiles.is_hole(end)
+	var grid: RoomGrid = projectiles.grid()
+	var end: Vector2 = grid.clip_to_walls(from, from + way.normalized() * reach)
+	return not grid.is_hole(end)
 
 
 ## `senses[at]` from the last decision, else asked now.
@@ -1240,7 +1241,7 @@ func _walk_goal() -> Vector2:
 	var feet: Vector2 = target.global_position
 	if _target_actor == null or actor.projectiles == null or _target_actor.id < 0:
 		return feet
-	var box: Rect2 = actor.projectiles.footprint_of(_target_actor.id)
+	var box: Rect2 = actor.projectiles.grid().footprint_of(_target_actor.id)
 	if not box.has_area() or not box.has_point(feet):
 		return feet
 	var back: Vector2 = actor.global_position - feet

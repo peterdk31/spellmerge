@@ -1,0 +1,58 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.4,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 107
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 210,
+				"to": 70
+			},
+			"length": 0.14,
+			"amp": {
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -13,
+			"drive": 1.8
+		},
+		{
+			"patch": "water_wash",
+			"gain": -2,
+			"length": 0.34
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 420,
+				"to": 260,
+				"q": 6.0
+			},
+			"length": 0.12,
+			"amp": {
+				"attack": 0.005,
+				"shape": "perc",
+				"power": 2.4
+			},
+			"gain": -6
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A pool's cast: a wet, low plop (a sine dropping from 210 to 70 Hz and a short ring) and a wash of the spit mire landing, water's own soft wash under it.",
+	"gain": -2
+}

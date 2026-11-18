@@ -38,6 +38,18 @@ func test_a_sound_plays_where_it_happens_and_a_missing_one_is_silent() -> void:
 	check_equal(player.panning_strength, AudioScript.PAN, "panned by PAN")
 
 
+func test_a_sound_may_play_at_another_pitch_and_holds_its_voice_as_long_as_it_plays() -> void:
+	book.know_as(&"boom", book.long)
+	var deep: int = audio.play(&"boom", Vector2.ZERO, 0.0, AudioScript.BUS_SFX, 0.5)
+	check_equal((audio.voices.player(deep) as AudioStreamPlayer2D).pitch_scale, 0.5, "played at half its pitch")
+	audio.step_world(1.5)
+	check_equal(audio.voices.voices_of(&"boom"), 1, "half its pitch plays twice as long: still playing past its own length")
+	var plain: int = audio.play(&"boom")
+	check_equal((audio.voices.player(plain) as AudioStreamPlayer2D).pitch_scale, 1.0, "the next play of a voice is at its own pitch again")
+	var wild: int = audio.play(&"boom", Vector2.ZERO, 0.0, AudioScript.BUS_SFX, 100.0)
+	check_equal((audio.voices.player(wild) as AudioStreamPlayer2D).pitch_scale, VoicesScript.MAX_PITCH, "never past MAX_PITCH")
+
+
 func test_one_sound_has_at_most_its_voices_and_the_oldest_starts_again() -> void:
 	book.know([&"knock", &"bell"])
 	var first: int = audio.play(&"knock")

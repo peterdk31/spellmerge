@@ -50,7 +50,7 @@ func _init(throw: Callable) -> void:
 ## at Feel's clock `now`: its count thrown over its `lasts` seconds. Its first share is thrown at the
 ## next step.
 func start(part: MotesPartScript, cue: CueContextScript, now: float) -> void:
-	var whole: int = maxi(roundi(float(part.count) * cue.power), 1)
+	var whole: int = maxi(roundi(float(part.count) * cue.count_times()), 1)
 	var lasts: float = part.lasts
 	if lasts <= 0.0:
 		return
@@ -72,6 +72,7 @@ func start(part: MotesPartScript, cue: CueContextScript, now: float) -> void:
 		own.reach *= cue.power
 	_cues[slot].copy_from(cue)
 	_cues[slot].power = 1.0
+	_cues[slot].grow = 1.0
 	_from[slot] = now
 	_lasts[slot] = lasts
 	_whole[slot] = whole

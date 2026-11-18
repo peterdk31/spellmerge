@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/carriers/spray/sounds/spray_cast/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/spray/sounds/spray_cast/spray_cast.sound.json",
+			"recipe_hash": "sha256:fec37d0d74172cf0c5a4d432e171ce25f88df426a7ab73ca6cdfd807710df31a",
+			"audio_hash": "sha256:f1aaf3a65ea60595039579d9cb365f885272abc43194d486fd3307e3bdd79f72",
+			"loudness": -26.1,
+			"peak": -6.8
+		},
+		{
+			"path": "content/spells/carriers/spray/sounds/spray_cast/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/spray/sounds/spray_cast/spray_cast.sound.json",
+			"recipe_hash": "sha256:fec37d0d74172cf0c5a4d432e171ce25f88df426a7ab73ca6cdfd807710df31a",
+			"audio_hash": "sha256:0e6b80ed034d7f31766ade625abe7534b81642d31764e2e0f5fdd3f74f89c560",
+			"loudness": -26.5,
+			"peak": -8.2
+		},
+		{
+			"path": "content/spells/carriers/spray/sounds/spray_cast/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/spray/sounds/spray_cast/spray_cast.sound.json",
+			"recipe_hash": "sha256:fec37d0d74172cf0c5a4d432e171ce25f88df426a7ab73ca6cdfd807710df31a",
+			"audio_hash": "sha256:341cd08935093ef053377e4c92043fb782e83c6783b692fe6a2a54c775c96898",
+			"loudness": -25.2,
+			"peak": -6.4
+		},
+		{
+			"path": "content/spells/carriers/spray/sounds/spray_cast/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/carriers/spray/sounds/spray_cast/spray_cast.sound.json",
+			"recipe_hash": "sha256:fec37d0d74172cf0c5a4d432e171ce25f88df426a7ab73ca6cdfd807710df31a",
+			"audio_hash": "sha256:e60e956010694c93586f432f5314eef525ea11484a527e4e1c5588beb1d8a01c",
+			"loudness": -26.2,
+			"peak": -8.0
+		}
+	]
+}

@@ -1,0 +1,77 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.55,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 108
+	},
+	"layers": [
+		{
+			"source": "fm",
+			"pitch": {
+				"from": 110,
+				"to": 55
+			},
+			"ratio": 1.5,
+			"index": {
+				"from": 0.5,
+				"to": 3.0
+			},
+			"filter": {
+				"type": "low",
+				"from": 750,
+				"q": 0.8
+			},
+			"length": 0.5,
+			"amp": {
+				"attack": 0.05,
+				"shape": "arch",
+				"power": 1.3
+			},
+			"gain": -2
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 700,
+				"to": 200,
+				"q": 2.5,
+				"curve": "exp"
+			},
+			"length": 0.45,
+			"amp": {
+				"attack": 0.05,
+				"shape": "arch",
+				"power": 1.3
+			},
+			"gain": -6
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 90,
+				"to": 45
+			},
+			"length": 0.16,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -16
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.25,
+			"size": 1.0
+		},
+		"lowpass": 2800
+	},
+	"notes": "A portal's cast: a low, hollow FM swell sinking as the gate tears open, with a band of rushing air falling from 700 to 200 Hz into it.",
+	"gain": -3
+}

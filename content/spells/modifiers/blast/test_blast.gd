@@ -125,3 +125,18 @@ func test_a_pulling_shot_that_misses_blasts_where_it_ends() -> void:
 	check_equal(_lost_at(["pull", "bolt"], at, 2.0), 0, "the pull bolt passes the imp by")
 	check(_lost_at(["blast", "pull", "bolt"], at, 2.0) > 0, "its blast where it ends reaches the imp")
 
+
+
+func test_a_bigger_blast_is_wider_by_the_bigger_cards_radius() -> void:
+	var arena := ArenaScript.new(root)
+	var bigger: ModifierBase = load("res://content/spells/modifiers/bigger/bigger.tres") as ModifierBase
+	var plain: CompiledSpell = arena.install_cards(0, 0, ["blast", "bolt"]).casts[0].group.spells[0]
+	var big: CompiledSpell = arena.install_cards(0, 1, ["bigger", "blast", "bolt"]).casts[0].group.spells[0]
+	check(is_equal_approx(big.behaviour(ModifierBase.Behaviour.BLAST), plain.behaviour(ModifierBase.Behaviour.BLAST) * bigger.radius_mult), "a bigger card grows the blast as it grows the shot (the owner, 2026-11-18): %s against %s" % [big.behaviour(ModifierBase.Behaviour.BLAST), plain.behaviour(ModifierBase.Behaviour.BLAST)])
+	arena.free_all()
+
+
+func test_its_cue_sounds_as_an_explosion_made_at_its_own_radius() -> void:
+	var cue: CueBase = load("res://content/cues/%s.tres" % _card().cue) as CueBase
+	check(cue != null and cue.sound != &"", "its cue has a sound of its own")
+	check_equal(cue.size_ref, _card().behaviour_strength, "made at one Blast card's radius, so it plays as made there and bigger past it")

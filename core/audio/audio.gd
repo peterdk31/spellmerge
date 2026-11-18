@@ -53,8 +53,10 @@ const BUS_MUSIC_DUCK: StringName = &"MusicDuck"
 const BUS_SFX: StringName = &"SFX"
 const BUS_AMBIENCE: StringName = &"Ambience"
 const BUS_UI: StringName = &"UI"
-## The world's one-shot voices, and how many may play one sound id at once.
-const VOICES: int = 8
+## The world's one-shot voices, and how many may play one sound id at once. Twelve since every
+## actor's cast sounds its carrier and its infusions' hints (2026-11-18: four players and their
+## enemies casting leave voices for the hits, deaths and reactions).
+const VOICES: int = 12
 const PER_SOUND: int = 3
 ## The over lane's voices, and the UI's.
 const OVER_VOICES: int = 4
@@ -220,11 +222,11 @@ func length_of(id: StringName) -> float:
 
 ## Plays the sound `id` at `at` (INF: the middle of the picture), `volume` decibels on top of its
 ## own, on `bus`; the voice used, or -1 for none (no such sound).
-func play(id: StringName, at: Vector2 = Vector2.INF, volume: float = 0.0, bus: StringName = BUS_SFX) -> int:
+func play(id: StringName, at: Vector2 = Vector2.INF, volume: float = 0.0, bus: StringName = BUS_SFX, pitch: float = 1.0) -> int:
 	var stream: AudioStream = sound(id)
 	if stream == null:
 		return -1
-	return voices.play(id, stream, at if at.is_finite() else _middle(), volume, bus)
+	return voices.play(id, stream, at if at.is_finite() else _middle(), volume, bus, pitch)
 
 
 ## Stops the world's one-shot on `voice`.

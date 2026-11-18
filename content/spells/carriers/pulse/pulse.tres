@@ -22,3 +22,4 @@ carrier = &"pulse"
 pierce = 0
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.06, "turn": -70.0, "push": -3.0, "stretch": -0.15, "ease": "out"}, {"phase": "after", "at": 0.16, "turn": -80.0, "push": -3.0, "lift": 2.0, "glow": 0.7, "stretch": 0.1, "mood": "raised"}, {"phase": "after", "at": 0.36}])
 cast_cue = &"cast_self"
+cast_sound = &"pulse_cast"

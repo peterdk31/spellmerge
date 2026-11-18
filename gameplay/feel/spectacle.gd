@@ -705,10 +705,10 @@ func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 		var alone: bool = part.colours == &"surface" or (part.kind_surface and part.colours != &"spell" and not exact)
 		var each: int
 		if part.share >= 0.0:
-			each = maxi(roundi(float(part.kind_count) * part.share * cue.power), 1)
+			each = maxi(roundi(float(part.kind_count) * part.share * cue.count_times()), 1)
 			pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, 0.0, part.spread, part.up, false, true, line, life, 0 if alone else cards_look)
 			return
-		each = -1 if part.count < 0 and cue.power == 1.0 else maxi(roundi(float(part.kind_count if part.count < 0 else part.count) * cue.power), 1)
+		each = -1 if part.count < 0 and cue.count_times() == 1.0 else maxi(roundi(float(part.kind_count if part.count < 0 else part.count) * cue.count_times()), 1)
 		if part.gather > 0.0 and cue.size > 0.0:
 			_gather(part, cue, at, surface if alone else spell, Color.WHITE if alone else core, part.kind_count if each < 0 else each, life, 0 if alone else cards_look)
 			return
@@ -717,7 +717,7 @@ func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 	var kinds: PackedInt32Array = cards.motes_of(cue.tag, cue.look) if named == &"spell" else _surface_kinds
 	var count: int = part.count
 	var shed: bool = part.share >= 0.0
-	var share: float = part.share * cue.power / float(maxi(kinds.size(), 1))
+	var share: float = part.share * cue.count_times() / float(maxi(kinds.size(), 1))
 	# What a surface sheds (the walls', or a room's own kinds) cools through the surface's colours,
 	# as does a part whose `colours` say so; one whose `colours` are the spell's, through its ramp.
 	var of_surface: bool = named == &"surface" or part.colours == &"surface"
@@ -735,7 +735,7 @@ func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 			continue
 		# How many of this kind: its share of the part's count (else its own count), times the power.
 		var each_share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
-		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(each_share * cue.power), 1)
+		var each: int = -1 if count < 0 and cue.count_times() == 1.0 else maxi(roundi(each_share * cue.count_times()), 1)
 		if jet:
 			each = jet_share(count, n_kinds, part.turn, at_kind)
 			at_kind += 1

@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/modifiers/blast/sounds/blast_boom/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/modifiers/blast/sounds/blast_boom/blast_boom.sound.json",
+			"recipe_hash": "sha256:bb2d617afd99c17742e995ec5707213553bef454ff8259f7f24f277bbda73dee",
+			"audio_hash": "sha256:e9e8de3df42664c2b0c8817287493c8281be3b6a965563fa86672425d600e78b",
+			"loudness": -16.7,
+			"peak": -5.2
+		},
+		{
+			"path": "content/spells/modifiers/blast/sounds/blast_boom/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/modifiers/blast/sounds/blast_boom/blast_boom.sound.json",
+			"recipe_hash": "sha256:bb2d617afd99c17742e995ec5707213553bef454ff8259f7f24f277bbda73dee",
+			"audio_hash": "sha256:861bb5ad5963911fb73b51dae71460a748748a91917a467b7e6c1e101d2a2722",
+			"loudness": -17.0,
+			"peak": -5.1
+		},
+		{
+			"path": "content/spells/modifiers/blast/sounds/blast_boom/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/modifiers/blast/sounds/blast_boom/blast_boom.sound.json",
+			"recipe_hash": "sha256:bb2d617afd99c17742e995ec5707213553bef454ff8259f7f24f277bbda73dee",
+			"audio_hash": "sha256:1e89a3eb9665635018cfff3684cfc5e021e894ed337946a2a18137f9807ec524",
+			"loudness": -17.3,
+			"peak": -4.6
+		}
+	]
+}

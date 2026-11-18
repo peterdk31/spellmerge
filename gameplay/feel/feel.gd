@@ -20,7 +20,8 @@ extends Node
 ## - a white-hot ring where an enemy dies, and its body breaks into motes of its own art's
 ##   colours that fall and settle (S3, `Spectacle.break_body`; the enemy itself is freed at once).
 ## - a sound from `core/registry` by id, played on Audio (core/audio: Feel decides what plays and
-##   when, Audio how); nothing plays on `null`. A seat's every cast (`staff_cast`) sounds `cast`.
+##   when, Audio how); nothing plays on `null`. Every actor's cast (`cast_left`) sounds its carriers'
+##   own sounds with its infusions' faint hints over them (`cast_sounds.gd`), an enemy's quieter.
 ##
 ## Every actor's damage numbers (props W5) are drawn by one child, `damage_number_drawer.gd`: each
 ## actor's `DamageNumbers` look tells its hits on the bus (`damage_number_shown`), and the
@@ -106,6 +107,8 @@ const LanesScript := preload("res://gameplay/feel/lanes.gd")
 const RemnantsScript := preload("res://gameplay/feel/remnants.gd")
 const AudioScript := preload("res://core/audio/audio.gd")
 const HeldSoundsScript := preload("res://gameplay/feel/held_sounds.gd")
+const CastSoundsScript := preload("res://gameplay/feel/cast_sounds.gd")
+const CueSizeScript := preload("res://gameplay/feel/cue_size.gd")
 const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
 const BodySoundsScript := preload("res://gameplay/feel/body_sounds.gd")
 const BossIntroSoundScript := preload("res://gameplay/feel/boss_intro_sound.gd")
@@ -188,7 +191,8 @@ const HIT_FLASH_RESERVE: int = 4
 const WALL_SPOT: float = 16.0
 ## The voices a frame's hit sounds may start (`_hit_sounds`): past them each would only cut short
 ## one of the same frame before it was heard, and the rest stay free for kills, casts and cues.
-const HIT_SOUNDS_PER_FRAME: int = SOUND_VOICES / 2
+## Four, a third of the voices (half of the eight there were before the casts' sounds and hints).
+const HIT_SOUNDS_PER_FRAME: int = 4
 ## Room for sprites reacting to a hit made at first; every hit sprite flashes (owner,
 ## 2026-10-31: no limit on interactions), and the room doubles when a crowd needs more, up to the
 ## largest crowd seen, and is kept.
@@ -318,8 +322,11 @@ const POSSESS_END: StringName = &"possess_end"
 ## docs/milestones/boss-intro.md, rule 8), and this cue only when no intro played for it (the run's
 ## rule off, a boss a phase called: `BossIntroWait`).
 const BOSS_INTRO: StringName = &"boss_intro"
-## The sound of a seat's every cast (`staff_cast`).
-const CAST_SOUND: StringName = &"cast"
+## How much quieter an enemy's cast sounds than a wizard's (decibels; the owner, 2026-11-18: an
+## audio telegraph, under the players' own).
+const ENEMY_CAST_VOLUME: float = -6.0
+## The sound of a cast whose carrier card names none of its own (`cast_sounds.gd`).
+const CAST_SOUND: StringName = CastSoundsScript.FALLBACK
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -341,6 +348,8 @@ var registry: RegistryScript = null:
 			_numbers.registry = value
 		if _intro_sound != null:
 			_intro_sound.registry = value
+		if _cast_sounds != null:
+			_cast_sounds.registry = value
 		if _ambience != null:
 			_ambience.registry = value
 		if _spawn_look != null:
@@ -408,6 +417,7 @@ var _hit_slot: int = -1
 var _hit_position: Vector2 = Vector2.INF
 var _hit_voice: int = -1
 ## What each held sound is for and when it ends (`held_sounds.gd`, boss plan OB15); Audio plays them.
+var _cast_sounds: CastSoundsScript = null
 var _held: HeldSoundsScript = null
 ## The room in play's sound under the music (atmosphere D, `room_ambience.gd`): which, and its accents.
 var _ambience: RoomAmbienceScript = null
@@ -763,6 +773,9 @@ func _ready() -> void:
 		audio = get_node_or_null("/root/Audio") as AudioScript
 	_held = HeldSoundsScript.new()
 	_held.audio = audio
+	_cast_sounds = CastSoundsScript.new()
+	_cast_sounds.audio = audio
+	_cast_sounds.registry = registry
 	_ambience = RoomAmbienceScript.new()
 	_ambience.name = "RoomAmbience"
 	_ambience.events = events
@@ -867,7 +880,6 @@ func _ready() -> void:
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
-	events.staff_cast.connect(_on_staff_cast)
 	events.projectile_expired.connect(_on_projectile_expired)
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
@@ -1727,6 +1739,8 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	context.tag = tag if tag != 0 or shot < 0 or projectiles == null else projectiles.get_tag_of(shot)
 	context.color = plan.color
 	context.power = plan.power
+	var grow: float = CueSizeScript.factor(plan.cue.size_ref, size)
+	context.grow = grow
 	_cue_depth += 1
 	# A cue with a `light` part lights by it alone: the flashes it shows light nothing (S6, item 4).
 	var unlit_before: bool = _cue_unlit
@@ -1752,11 +1766,12 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 		return
 	var cue: CueBase = plan.cue
 	var power: float = plan.power
+	# A cue played bigger than it is made shakes, kicks and sounds bigger (`CueBase.size_ref`: `grow`).
 	# Its holds and game-wide stop are the game's (`HitStop`, online-ready N4), not drawn here.
 	var table: ActorsScript = _actor_table() if cue.kick_way == &"away" else null
 	if shake_enabled and (cue.shake > 0.0 or cue.kick > 0.0) and _in_picture(at):
 		_refresh_camera()
-		_shake(cue.shake * power)
+		_shake(cue.shake * power * CueSizeScript.shake(grow))
 		var way: Vector2 = Vector2.DOWN
 		var kick_way: StringName = cue.kick_way
 		# Back or along its way only when it has one (a cast with no aim kicks nowhere).
@@ -1768,11 +1783,13 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 			var body: Node2D = table.node_of(caster) as Node2D if table != null and table.is_open(caster) else null
 			if body != null and body.global_position.distance_to(at) > 1.0:
 				way = body.global_position.direction_to(at)
-		_kick = (_kick + way * cue.kick * power).limit_length(MAX_KICK_PIXELS)
+		_kick = (_kick + way * cue.kick * power * CueSizeScript.shake(grow)).limit_length(MAX_KICK_PIXELS)
 	var sound: StringName = instead if instead != &"" else cue.sound
-	if _play(sound, at) >= 0 and cue.duck < 0.0:
-		# The music gives way for as long as the sound plays (Audio's duck: the deepest wins).
-		audio.duck(cue.duck, audio.length_of(sound))
+	var pitch: float = CueSizeScript.pitch(grow)
+	if _play(sound, at, CueSizeScript.volume(grow), pitch) >= 0 and cue.duck < 0.0:
+		# The music gives way for as long as the sound plays (Audio's duck: the deepest wins), a
+		# deeper one longer.
+		audio.duck(cue.duck, audio.length_of(sound) / pitch)
 
 
 ## Whether `plan`, played as the look of the hit being shown, would show nothing: each of its parts
@@ -1858,7 +1875,8 @@ func _play_flash(flash: CuePlanScript.Flash, cue: CueContextScript) -> void:
 		# Only at some sizes (a zap's short spark into the air against a zap at a body).
 		if cue.size <= flash.size_over or cue.size > flash.size_upto:
 			return
-	var seconds: float = flash.seconds
+	# A cue played bigger than it is made lasts longer (`CueBase.size_ref`, `cue_size.gd`).
+	var seconds: float = flash.seconds * CueSizeScript.seconds(cue.grow)
 	if flash.lasts_size:
 		if cue.size <= 0.0:
 			return
@@ -2364,12 +2382,6 @@ func set_environment_interaction(on: bool) -> bool:
 	return _spectacle.set_environment_interaction(on)
 
 
-## A seat's staff was cast (`staff_cast`, every cast, a carrier card or none): the cast sound from
-## where it left (docs/milestones/sound.md, section 5: it was the player's, in the simulation).
-func _on_staff_cast(_player: int, _staff: int, origin: Vector2, _direction: Vector2) -> void:
-	_play(CAST_SOUND, origin)
-
-
 func _on_screen_shake_changed(enabled: bool) -> void:
 	shake_enabled = enabled
 
@@ -2869,12 +2881,15 @@ func _staff_of_tag(tag: int) -> StaffBase:
 	return spells.call(&"staff_of", SpellTag.caster_of(tag), SpellTag.staff_of(tag)) as StaffBase
 
 
-## A cast left its staff (`cast_left`): the staff's own `cast_cue` (boss plan OB15: a swat), from
-## where its caster holds it, along its aim.
+## A cast left its staff (`cast_left`): the staff's own `cast_cue` when it names one (boss plan OB15:
+## a swat), else the cast's own sounds (`_sound_cast`), from where its caster holds it, along its aim.
 func _on_cast_left(caster: int, staff: int) -> void:
 	if spells == null or not spells.has_method(&"staff_of"):
 		return
 	var own: StaffBase = spells.call(&"staff_of", caster, staff) as StaffBase
+	if own == null or not _cue_sounds(own.cast_cue):
+		# A staff's cue with no sound of its own (a spitter's acid jet) is a look on the cast's sound.
+		_sound_cast(caster, staff)
 	if own == null or own.cast_cue == &"":
 		return
 	var origin: Vector2 = spells.call(&"aim_origin_of", caster)
@@ -2886,6 +2901,41 @@ func _on_cast_left(caster: int, staff: int) -> void:
 			return
 		origin = body.global_position
 	play_cue(own.cast_cue, caster, origin, way if way.is_finite() else Vector2.ZERO)
+
+
+## The sounds of the cast leaving now (`Spells.leaving_cast`) of `caster`, from its staff tip: its
+## carriers' own and its infusions' hints (`cast_sounds.gd`), an enemy's ENEMY_CAST_VOLUME quieter;
+## nothing for a prop's (the world's: its moments are its states' cues).
+func _sound_cast(caster: int, staff: int) -> void:
+	if _cast_sounds == null or not spells.has_method(&"leaving_cast"):
+		return
+	var cast: CompiledCast = spells.call(&"leaving_cast") as CompiledCast
+	if cast == null:
+		return
+	var table: ActorsScript = _actor_table()
+	var team: int = table.team_of(caster) if table != null else ActorsScript.TEAM_WIZARDS
+	if team == ActorsScript.TEAM_WORLD:
+		return
+	var origin: Vector2 = spells.call(&"aim_origin_of", caster) if spells.has_method(&"aim_origin_of") else Vector2.INF
+	if not origin.is_finite() and table != null and table.is_open(caster):
+		var body: Node2D = table.node_of(caster) as Node2D
+		origin = body.global_position if body != null else Vector2.INF
+	_cast_sounds.play(cast, origin, ENEMY_CAST_VOLUME if team == ActorsScript.TEAM_ENEMIES else 0.0, caster * SpellLimits.STAFFS + staff, _clock)
+
+
+## Whether the cue `id` has a sound of its own (an unknown cue, or none, has not).
+func _cue_sounds(id: StringName) -> bool:
+	if id == &"":
+		return false
+	var plan: CuePlanScript = _cue_plans.get(id) as CuePlanScript
+	if plan == null:
+		plan = _plan_of(id)
+	return plan != null and plan.cue.sound != &""
+
+
+## The cast sounds (for tests).
+func cast_sounds() -> CastSoundsScript:
+	return _cast_sounds
 
 
 ## A move ended (`caster_move_finished`): one a wall stopped (`walled`, boss plan OB12) plays its
@@ -3314,12 +3364,12 @@ func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = V
 		_hit_sounds += 1
 
 
-## Plays a sound where it happens (`at`; INF: the middle of the picture); returns the voice used, or
-## -1 for none.
-func _play(id: StringName, at: Vector2 = Vector2.INF) -> int:
+## Plays a sound where it happens (`at`; INF: the middle of the picture), `volume` decibels on top of
+## its own, at `pitch` times its own; returns the voice used, or -1 for none.
+func _play(id: StringName, at: Vector2 = Vector2.INF, volume: float = 0.0, pitch: float = 1.0) -> int:
 	if audio == null:
 		return -1
-	return audio.play(id, at)
+	return audio.play(id, at, volume, AudioScript.BUS_SFX, pitch)
 
 
 ## True for the death of a boss: an enemy whose data says `boss`.

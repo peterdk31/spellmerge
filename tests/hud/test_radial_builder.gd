@@ -795,3 +795,19 @@ func test_its_sounds_point_place_remove_page_deny_and_back() -> void:
 	check_equal(sounds, [UiSounds.BACK], "B closes it: a back")
 	_bus.build_refused.emit(0, "late")
 	check_equal(sounds, [UiSounds.BACK], "a refusal after it closed says nothing")
+
+
+func test_a_held_lt_clear_is_a_cards_removal() -> void:
+	var sounds: Array[StringName] = []
+	_bus.ui_sound_requested.connect(func(id: StringName) -> void: sounds.append(id))
+	_start(1)
+	var radial: RadialScript = _open(0)
+	radial.mark_slot(0)
+	_input.send_virtual(0, &"staff_4", 1.0)
+	_frame()
+	check_equal(sounds, [UiSounds.CARD_REMOVE], "the press takes one out")
+	for _i in ceili(RadialScript.CLEAR_HOLD / STEP) + 1:
+		_frame()
+	check_equal(sounds, [UiSounds.CARD_REMOVE, UiSounds.CARD_REMOVE], "and the clear is a removal too")
+	_input.send_virtual(0, &"staff_4", 0.0)
+	_frame()

@@ -262,10 +262,14 @@ func _chose(id: StringName) -> void:
 	UiSounds.send(events, id)
 
 
-## The focus moved to `control`: the move's sound, unless a press this frame moved it.
+## The focus moved to `control`: the move's sound, unless a press this frame moved it or a mouse
+## button is down (a click focuses a button before it presses it: its choice is the sound).
 func _on_gui_focus_changed(_control: Control) -> void:
-	if _chose_frame != Engine.get_process_frames():
-		UiSounds.send(events, UiSounds.MOVE)
+	if _chose_frame == Engine.get_process_frames():
+		return
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		return
+	UiSounds.send(events, UiSounds.MOVE)
 
 
 func _on_play_pressed() -> void:

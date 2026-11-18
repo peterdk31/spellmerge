@@ -514,6 +514,7 @@ func tree_view() -> TreeViewScript:
 ## Y: swap the ring for the tree, or back. Pointing ends: the tree has no card to put in.
 func toggle_tree() -> void:
 	_tree_open = not _tree_open
+	_sound(UiSounds.CHOOSE)
 	_tree.visible = _tree_open
 	_menu.pointed = NONE
 	if ring_picker != null:
@@ -703,6 +704,7 @@ func _poll_buttons() -> void:
 	var flips: int = _presses(&"kind_next") - _presses(&"kind_prev")
 	if flips != 0 and layout == Layout.KIND and not _kinds.is_empty():
 		_kind_page = posmod(_kind_page + flips, _kinds.size())
+		_sound(UiSounds.MOVE)
 		_menu.pointed = NONE
 		_build_ring()
 		_refresh_preview()

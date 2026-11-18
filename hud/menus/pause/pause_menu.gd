@@ -608,11 +608,12 @@ func _add_slider(row: Button, low: int, high: int, step: int, value: int, longes
 
 
 ## The menu's navigator for UIFocus: left and right on the slider move it and keep the focus
-## there, with the move's sound (UIFocus sends none: the focus stays); any other move goes on as
-## usual (null).
+## there, with the move's sound when it moved (UIFocus sends none: the focus stays; at an end
+## nothing moves and nothing is heard); any other move goes on as usual (null).
 func _navigate(control: Control, direction: Vector2i) -> Control:
+	var words: String = str(control.get_meta(BASE_TEXT_META, "")) if control != null else ""
 	var slider: Control = _step_slider(control, direction)
-	if slider != null:
+	if slider != null and str(slider.get_meta(BASE_TEXT_META, "")) != words:
 		UiSounds.send(_events, UiSounds.MOVE)
 	return slider
 
@@ -805,8 +806,8 @@ func _on_focus_changed(player: int, control: Control) -> void:
 func _on_activated(player: int, control: Control) -> void:
 	if player != owner_player:
 		return
-	# Every row does something on `accept` (sound plan AU8; `UiSounds`).
-	UiSounds.send(_events, UiSounds.CHOOSE)
+	# Every row does something on `accept` (sound plan AU8; `UiSounds`); the Map page's Back goes back.
+	UiSounds.send(_events, UiSounds.BACK if control == _map_back else UiSounds.CHOOSE)
 	if control == _resume:
 		close_menu()
 	elif control == _map_row:

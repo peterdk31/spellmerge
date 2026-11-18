@@ -420,3 +420,17 @@ func test_its_sounds_point_choose_go_back_and_deny() -> void:
 	_tap(&"staff_1")
 	_frame()
 	check_equal(sounds, [UiSounds.CHOOSE, UiSounds.DENY], "a hand's button asks (a choice), and the full bag's refusal is a deny")
+
+
+func test_x_dropping_a_staff_is_a_choice() -> void:
+	var sounds: Array[StringName] = []
+	_bus.ui_sound_requested.connect(func(id: StringName) -> void: sounds.append(id))
+	_start()
+	_open()
+	_enter(STAFFS)
+	_point("staff", 4)
+	sounds.clear()
+	_tap(&"alternate")
+	_frame()
+	check_equal(_drop_asks.size(), 1, "the staff asked dropped")
+	check(sounds.has(UiSounds.CHOOSE), "with a choice's sound, got %s" % [sounds])

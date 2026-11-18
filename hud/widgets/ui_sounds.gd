@@ -11,12 +11,15 @@ extends Node
 ##   moved by the player's own move is MOVE, and `back` (`cancelled`) is BACK (every menu goes back
 ##   or closes on it). A focus moved by the menu itself in answer to a press (the first row of
 ##   a menu opened, a page shown after a choice or a back) is no move: that press's own sound says
-##   it, so one press is one sound. It knows nothing of any menu.
+##   it, so one press is one sound. (Presses of one poll share the mark, so a move pressed in the
+##   frame of a choice is not heard; and a focus a menu moves on its own in a later frame, as when
+##   the run's map goes from under its page or a row is hidden from outside, is heard as a move.)
+##   It knows nothing of any menu.
 ## - **Each menu** sends what only it knows, with `send`: CHOOSE when a press did something (a row
 ##   of the pause menu, a bag entered in the inventory, a depth at the lectern, a main menu
 ##   button), MOVE when its paging showed another tab or staff (LB and RB do nothing in some
 ##   menus, so `paged` alone says nothing), DENY when it was refused (the builder's or the
-##   inventory's refusal, an item not taken), and the builder CARD_PLACE and CARD_REMOVE as a
+##   inventory's refusal), and the builder CARD_PLACE and CARD_REMOVE as a
 ##   card goes in or comes out (a clear too).
 ##   Pointing at another card or bag on a ring is MOVE, as a focus move is.
 ##

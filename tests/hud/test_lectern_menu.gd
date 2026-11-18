@@ -175,3 +175,17 @@ func test_the_depths_in_words() -> void:
 	check_equal(DepthWords.of(4, 6), "Room 5", "a room of its row")
 	check_equal(DepthWords.of(5, 6), "The boss", "the last of them")
 	check_equal(DepthWords.of(0, 1), "Room 1", "a map of one row starts in its room")
+
+
+func test_a_depth_picked_is_a_choice() -> void:
+	var sounds: Array[StringName] = []
+	_bus.ui_sound_requested.connect(func(id: StringName) -> void: sounds.append(id))
+	_bus.lectern_changed.emit(0b0001)
+	_tap(0, &"accept")
+	_frame()
+	check(_hud.get_lectern(0).is_open(), "A at the lectern opened it")
+	sounds.clear()
+	_tap(0, &"accept")
+	_frame()
+	check_equal(_picked.size(), 1, "a depth picked")
+	check_equal(sounds, [UiSounds.CHOOSE], "with a choice's sound")

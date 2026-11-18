@@ -1,0 +1,6 @@
+{
+	"version": 1,
+	"layer": {"source": "saw", "filter": {"type": "low", "from": 3000, "to": 700, "q": 2.5}, "drive": 1.2,
+		"amp": {"attack": 0.003, "decay": 0.12, "sustain": 0.3, "release": 0.03}},
+	"notes": "A hot plucked saw: its low pass closing from 3 kHz to 700 Hz on every note, a little driven, for fast arpeggios."
+}

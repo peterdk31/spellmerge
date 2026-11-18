@@ -60,6 +60,8 @@ A sound made by `tools/sound.py` (tools/README.md) has a folder of its own: `sfx
 
 A rebake keeps a file's `tier` while its audio (`audio_hash`) stays the same; one that changes it sets `final` back to `good`, because the owner promoted the sound they heard. Hear a sound before a PR with `tools/sound.py sheet <id> --out <a folder outside the repository>`, and attach or link the sheet's `.mp4`.
 
+Music is made the same way from a score: `music/<track>/<track>.score.json` (sound plan, section 4; tools/README.md) names its instruments (patches from `patches/`), its one-bar patterns and its layers, and `tools/sound.py bake <track>` writes `<layer id>.ogg` a layer beside it, every one a loop of the same length (its `.import` with `loop=true`), and the folder's `assets.json`. A layer's id is the sound id a `MusicTrack` names; the layers of one track are placed together on the music target in docs/STYLE.md.
+
 ## Steps
 
 1. Add the `.ogg` in `sfx/`, `music/` or `ambience/`.
@@ -69,6 +71,8 @@ A rebake keeps a file's `tier` while its audio (`audio_hash`) stays the same; on
 ## Example to copy
 
 The first audio is the rooms' ambience (atmosphere D), all in `audio/ambience/` and each with its entry in `audio/manifest.json`: the crypt's `amb_crypt_air.ogg` (a 12 s stereo loop, imported to loop), `amb_crypt_drip.ogg`, `amb_crypt_drip_double.ogg` and `amb_crypt_rumble.ogg` (one-shot accents), named by `content/rooms/crypt/crypt_ambience.tres`; the hub's `amb_hub_wind.ogg` and `amb_hub_void.ogg` (loops) and `amb_hub_gust.ogg` (an accent), named by `content/rooms/hub/hub_ambience.tres`. Ambience ids start `amb_`. They are made by procedural synthesis and listed as `placeholder` until someone has listened to them in play. The first generated sounds are the menus' (sound plan AU8): `sfx/ui_move/` and its five siblings (`ui_choose`, `ui_back`, `ui_deny`, `ui_card_place`, `ui_card_remove`), each its recipe, its `variants/`, its `.tres` and its `assets.json`; copy one of those folders for a new generated sound.
+
+The first music is generated (sound plan AU7): `music/boss_broom/boss_broom.score.json` makes the Old Broom's two stacked layers, `boss_broom` and `boss_broom_fire` (named by its `MusicTrack` in `content/bosses/old_broom/old_broom.tres`), and `music/crypt_halls/` the crypt fight rooms' one layer (named by `content/rooms/crypt/crypt_music.tres`). Copy a score's folder, rename it and its layers, and bake.
 
 ## Validate
 

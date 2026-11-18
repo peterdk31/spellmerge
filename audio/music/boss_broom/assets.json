@@ -1,0 +1,30 @@
+{
+	"assets": [
+		{
+			"path": "audio/music/boss_broom/boss_broom.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/music/boss_broom/boss_broom.score.json",
+			"recipe_hash": "sha256:841869a811a9d3265ed183c36fcbe3842ebd9f6f1e62701f52f8dc77f87b7498",
+			"audio_hash": "sha256:1545fc27c34172af25fc65a766b9849197750038641ddc9b5fede266e4e16239",
+			"loudness": -25.0,
+			"peak": -7.0
+		},
+		{
+			"path": "audio/music/boss_broom/boss_broom_fire.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/music/boss_broom/boss_broom.score.json",
+			"recipe_hash": "sha256:841869a811a9d3265ed183c36fcbe3842ebd9f6f1e62701f52f8dc77f87b7498",
+			"audio_hash": "sha256:47f1f0c9507ed6792f6bb99a9fc477f154a2cc42e24576ef3cb023ae417886f8",
+			"loudness": -27.3,
+			"peak": -9.2
+		}
+	]
+}

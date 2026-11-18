@@ -101,7 +101,7 @@ class CheckTest(unittest.TestCase):
         (self.folder / "blip.sound.json").unlink()
         problems = sound.check(self.root)
         self.assertEqual(len(problems), 2, problems)
-        self.assertIn("audio/sfx/blip/variants/1.ogg: no recipe makes it", problems[0])
+        self.assertIn("audio/sfx/blip/variants/1.ogg: no recipe or score makes it", problems[0])
 
     def test_a_kind_change_names_the_files_of_the_old_kind(self) -> None:
         self.bake()
@@ -149,7 +149,7 @@ class CheckTest(unittest.TestCase):
         stray.write_bytes(b"x")
         problems = sound.check(self.root)
         self.assertEqual(len(problems), 1)
-        self.assertIn("audio/sfx/stray.ogg: no recipe makes it", problems[0])
+        self.assertIn("audio/sfx/stray.ogg: no recipe or score makes it", problems[0])
         (self.root / sound.MANIFEST).write_text(json.dumps({"assets": [
             {"path": "audio/sfx/stray.ogg", "origin": "human", "author": "Someone", "license": "CC0-1.0"}]}),
             encoding="utf-8")

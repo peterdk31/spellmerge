@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "audio/music/crypt_halls/crypt_halls.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/music/crypt_halls/crypt_halls.score.json",
+			"recipe_hash": "sha256:aa4eb497cdd6c8277a20ed4a95428b36f575bbca8cd93b8da194b3360c1be0e0",
+			"audio_hash": "sha256:83fa4ab4b91a35f558eaf43b57dbb9642799881b093c2eef78a015d7af28db92",
+			"loudness": -23.0,
+			"peak": -6.1
+		}
+	]
+}

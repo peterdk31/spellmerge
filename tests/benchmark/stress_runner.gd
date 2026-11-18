@@ -129,6 +129,12 @@ var measure: float = MEASURE
 ## The scenarios to run, in order (indexes into SCENARIOS); `_ready` keeps the ones for this
 ## build (`scenarios_for`).
 var scenarios: Array[int] = [0, 2, 3, 1]
+## The scenario rows `scenarios` indexes (SCENARIOS here). A runner built on this one (the split
+## views, split_views_runner.gd) sets its own rows and order in `_init`, and takes the hooks
+## `_scenario_started`, `_measuring_started`, `_report_more` and `_scenario_ending`.
+var rows: Array[Dictionary] = SCENARIOS
+## The word the result line starts with (`STRESS OK`, `STRESS FAILED`).
+var result_word: String = "STRESS"
 
 var _log: Logger = ErrorLogScript.new()
 var _logging: bool = false
@@ -210,13 +216,13 @@ func _ready() -> void:
 		_finish(["the Events, PlayerInput, Flow and Projectiles autoloads must exist"])
 		return
 	_default_cap = int(_projectiles.call("get_cap"))
-	scenarios = scenarios_for(scenarios, OS.has_feature("web"))
+	scenarios = scenarios_for(scenarios, OS.has_feature("web"), rows)
 	var args: PackedStringArray = OS.get_cmdline_user_args() + OS.get_cmdline_args()
 	profile = profile or args.has("--profile")
 	# `--only=desktop` (a scenario's label, or several, comma separated): those scenarios alone.
 	for arg in args:
 		if arg.begins_with("--only="):
-			scenarios = scenarios_named(scenarios, arg.trim_prefix("--only=").split(","))
+			scenarios = scenarios_named(scenarios, arg.trim_prefix("--only=").split(","), rows)
 	# `--no-native` runs the projectile manager's and WallSlide's GDScript in place of the module
 	# (native/README.md).
 	if args.has("--no-native"):
@@ -234,20 +240,20 @@ func _ready() -> void:
 
 
 ## `wanted` without the desktop-only scenarios when `web` (a web build measures the web budget
-## only).
-static func scenarios_for(wanted: Array[int], web: bool) -> Array[int]:
+## only); `table` is the rows `wanted` indexes.
+static func scenarios_for(wanted: Array[int], web: bool, table: Array[Dictionary] = SCENARIOS) -> Array[int]:
 	var out: Array[int] = []
 	for index in wanted:
-		if not (web and bool(SCENARIOS[index].get("desktop_only", false))):
+		if not (web and bool(table[index].get("desktop_only", false))):
 			out.append(index)
 	return out
 
 
-## `wanted` with only the scenarios whose label is in `labels`.
-static func scenarios_named(wanted: Array[int], labels: PackedStringArray) -> Array[int]:
+## `wanted` with only the scenarios whose label is in `labels` (of the rows `table`).
+static func scenarios_named(wanted: Array[int], labels: PackedStringArray, table: Array[Dictionary] = SCENARIOS) -> Array[int]:
 	var out: Array[int] = []
 	for index in wanted:
-		if labels.has(String(SCENARIOS[index]["label"])):
+		if labels.has(String(table[index]["label"])):
 			out.append(index)
 	return out
 
@@ -268,7 +274,7 @@ func _next_scenario() -> void:
 	if _current >= scenarios.size():
 		_finish(_check_log())
 		return
-	var scenario: Dictionary = SCENARIOS[scenarios[_current]]
+	var scenario: Dictionary = rows[scenarios[_current]]
 	_target_enemies = scenario["enemies"]
 	_target_shots = scenario["shots"]
 	_rng.seed = SEED
@@ -318,7 +324,7 @@ func _next_scenario() -> void:
 
 
 func _on_loaded(_room_id: StringName) -> void:
-	_start_measuring(SCENARIOS[scenarios[_current]])
+	_start_measuring(rows[scenarios[_current]])
 
 
 ## The room is up (or should be): give the wizards their stress staffs and start the scenario.
@@ -352,7 +358,27 @@ func _start_measuring(scenario: Dictionary) -> void:
 				return
 	print("BENCH: stress scenario %s: %d players, %d enemies, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], PLAYERS, _target_enemies, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])
 	_start_tick_profile()
+	_scenario_started(scenario)
 	_active = true
+
+
+## Hooks for a runner built on this one (they do nothing here): the scenario's wizards hold their
+## staffs and it is about to run; its measured window starts; its report is printed (`label`); it
+## ends, before the run is stopped.
+func _scenario_started(_scenario: Dictionary) -> void:
+	pass
+
+
+func _measuring_started() -> void:
+	pass
+
+
+func _report_more(_label: String) -> void:
+	pass
+
+
+func _scenario_ending() -> void:
+	pass
 
 
 ## The hands of a stress wizard: Play's two staffs and the moon staff on LB (empty when one is
@@ -403,6 +429,7 @@ func _process(delta: float) -> void:
 		add_child(_probe)
 		if profile:
 			_start_tree_profile()
+		_measuring_started()
 	if _elapsed >= warm_up + measure:
 		_end_scenario()
 
@@ -554,13 +581,14 @@ func _on_build_refused(_player: int, _reason: String) -> void:
 ## Report the scenario, check it and go on to the next.
 func _end_scenario() -> void:
 	_active = false
-	var scenario: Dictionary = SCENARIOS[scenarios[_current]]
+	var scenario: Dictionary = rows[scenarios[_current]]
 	var label: String = scenario["label"]
 	if _probe != null:
 		print("BENCH: stress %s results" % label)
 		_probe.call("report")
 		_warn_when_slow(label)
 		_report_parts()
+		_report_more(label)
 		_report_damage(label)
 		_report_tick_parts(label)
 		_report_state_hash(label)
@@ -585,6 +613,7 @@ func _end_scenario() -> void:
 			_failures.append("%s: bot %d never cast a spell while measured" % [label, index + 1])
 	if _probe == null or int(_probe.call("frame_count")) == 0:
 		_failures.append("%s: no frames were measured" % label)
+	_scenario_ending()
 	_teardown_scenario()
 	_next_scenario()
 
@@ -782,9 +811,9 @@ func _finish(failed: Array[String]) -> void:
 		SessionRules.machine().shot_cap = _default_cap
 		_projectiles.call("set_cap", _default_cap)
 	if failed.is_empty():
-		print("STRESS OK: %d scenarios, 4 players with built spells, enemies and shots at the targets, no errors logged" % scenarios.size())
+		print("%s OK: %d scenarios, 4 players with built spells, enemies and shots at the targets, no errors logged" % [result_word, scenarios.size()])
 		get_tree().quit(0)
 	else:
 		for reason in failed:
-			printerr("STRESS FAILED: " + reason)
+			printerr("%s FAILED: %s" % [result_word, reason])
 		get_tree().quit(1)

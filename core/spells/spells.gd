@@ -203,7 +203,7 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit", &"_leaving"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
@@ -220,6 +220,8 @@ const RUN_KEEPS: Array[StringName] = [&"fire_shots_per_step"]
 ## unless a benchmark sets another); a fire past it waits for the next step. A run's comes from its
 ## rules (`take_rules`, online-ready N11).
 var fire_shots_per_step: int = SpellLimits.FIRE_SHOTS_PER_STEP
+## The cast `cast_left` is sent for, while it is sent (`leaving_cast`; scratch, DERIVED).
+var _leaving: CompiledCast = null
 ## Payloads fired, and fires that had to wait for a later step, since the last `clear`.
 var fires_made: int = 0
 var fires_waited: int = 0
@@ -1257,6 +1259,13 @@ func staff_of(actor: int, staff: int) -> StaffBase:
 	return compiled.staff if compiled != null else null
 
 
+## The cast leaving now, while `cast_left` is sent for it (null at any other time): what Feel's
+## cast sounds read of it (its carriers' cards and infusions, `gameplay/feel/cast_sounds.gd`). Read
+## only.
+func leaving_cast() -> CompiledCast:
+	return _leaving
+
+
 ## The carrier card (its id) of the last cast this actor's staff made, `&""` before any. The
 ## wizard's player sends it with `spell_cast`.
 func last_carrier_card(actor: int, staff: int) -> StringName:
@@ -1362,7 +1371,9 @@ func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vec
 		# Before its shots start (props W6): a caster that becomes something else as its cast leaves
 		# (a barrel's fuse burns out into rubble) is that when they meet it. Before the scatter is
 		# seeded, so a cast a listener makes now does not take this one's.
+		_leaving = cast
 		events.cast_left.emit(actor, staff)
+		_leaving = null
 	_scatter_from(hash(Vector3i(actor, staff, _cast_count[index])))
 	_cast_turn[index] = fposmod(float(_cast_count[index]) * SpellLimits.RING_STEP, 1.0)
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:

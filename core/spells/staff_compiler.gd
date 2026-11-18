@@ -505,6 +505,10 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 	spell.speed = speed
 	spell.radius = radius
 	spell.card_scale = spell.radius_scale
+	var blast: int = ModifierBase.Behaviour.BLAST
+	if spell.behaviours[blast] > 0.0:
+		# A blast grows with its shot (the owner, 2026-11-18): a bigger card's radius is its blast's.
+		spell.behaviours[blast] *= spell.radius_scale
 	if _spell_scale != 1.0:
 		# The body's own size, after the cards' (boss plan OB7): as `bigger`'s radius, no damage or speed.
 		carrier.scale_size(spell, _spell_scale)

@@ -1,0 +1,84 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 1.1,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.08,
+		"seed": 301
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 80,
+				"to": 26
+			},
+			"length": 0.6,
+			"amp": {
+				"attack": 0.004,
+				"shape": "perc",
+				"power": 1.8
+			},
+			"gain": -2,
+			"drive": 2.8
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 1100,
+				"to": 140,
+				"q": 0.9,
+				"curve": "exp"
+			},
+			"length": 0.95,
+			"amp": {
+				"attack": 0.004,
+				"shape": "perc",
+				"power": 1.6
+			},
+			"gain": 0
+		},
+		{
+			"patch": "fire_roar",
+			"gain": -3,
+			"length": 0.7,
+			"filter": {
+				"from": 900,
+				"to": 180
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 620,
+				"to": 300,
+				"q": 1.4
+			},
+			"length": 0.08,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 2.4
+			},
+			"gain": -5
+		},
+		{
+			"patch": "fire_crackle",
+			"gain": -6,
+			"start": 0.12,
+			"length": 0.8
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.32,
+			"size": 1.5
+		},
+		"lowpass": 2400
+	},
+	"notes": "A blast going off: an explosion made at a Blast card's own radius (40 px), a driven sine boom falling from 80 to 26 Hz, a low rumble of noise closing from 1.1 kHz to 140 Hz, a burst of flame, a short dull crack at its start and debris crackling out. Feel plays it deeper and louder for a bigger blast and higher and softer for a smaller one (`CueBase.size_ref`)."
+}

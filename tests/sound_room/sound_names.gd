@@ -1,6 +1,7 @@
 extends RefCounted
 ## The sound room's list (docs/milestones/sound.md, section 7): every sound id the game names, read
-## from its data, never from a list kept here: the cues' `sound` and their `held` parts', an enemy's
+## from its data, never from a list kept here: the cues' `sound` and their `held` parts', a carrier
+## card's `cast_sound` and an infusion's `cast_hint` (Feel's cast sounds), an enemy's
 ## `death_sound`, its phases' held `look.sound` and its music, a room's music and its ambience's
 ## layers and accents, and the ids Feel names itself (`feel_names`: its preset's `hit_sound` and each
 ## hit kind's `kind_looks` sound, and the cast sound) and the HUD's menu sounds (`UiSounds.IDS`, played
@@ -30,7 +31,7 @@ var bed_owners: PackedStringArray = PackedStringArray()
 
 
 ## The ids Feel names itself, as [id, where] pairs for `read`: `preset`'s `hit_sound`, each hit kind's
-## sound (`kind_looks`, in kind order), and `cast` (Feel's `CAST_SOUND`).
+## sound (`kind_looks`, in kind order), and `cast` (Feel's `CAST_SOUND`, a carrier's with none).
 static func feel_names(preset: FeelPresetScript, cast: StringName) -> Array:
 	var found: Array = [[preset.hit_sound, "Feel's hit sound (its preset)"]]
 	var kinds_named: Array = preset.kind_looks.keys()
@@ -38,7 +39,7 @@ static func feel_names(preset: FeelPresetScript, cast: StringName) -> Array:
 	for kind: Variant in kinds_named:
 		var look: Dictionary = preset.kind_looks[kind]
 		found.append([StringName(look.get("sound", "")), "Feel's %s hit (its preset's kind_looks)" % kind])
-	found.append([cast, "Feel's cast sound (staff_cast)"])
+	found.append([cast, "Feel's cast sound (a carrier card with none of its own)"])
 	return found
 
 
@@ -61,6 +62,10 @@ func read(registry: Node, feel: Array, ui: Array[StringName] = []) -> void:
 		for resource: Resource in all:
 			if resource is CueBase:
 				_read_cue(resource as CueBase)
+			elif resource is CarrierCard:
+				note((resource as CarrierCard).cast_sound, Kind.ONE_SHOT, "carrier %s's cast" % (resource as CarrierCard).id)
+			elif resource is ElementBase:
+				note((resource as ElementBase).cast_hint, Kind.ONE_SHOT, "infusion %s's cast hint" % (resource as ElementBase).id)
 			elif resource is EnemyBase:
 				_read_enemy(resource as EnemyBase)
 			elif resource is RoomBase:

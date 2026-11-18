@@ -1,0 +1,80 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.4,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 105
+	},
+	"layers": [
+		{
+			"source": "partials",
+			"pitch": {
+				"from": 300,
+				"to": 200
+			},
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.3
+				},
+				{
+					"ratio": 1.5,
+					"gain": -8,
+					"decay": 0.22
+				},
+				{
+					"ratio": 3.0,
+					"gain": -20,
+					"decay": 0.1
+				}
+			],
+			"amp": {
+				"attack": 0.002
+			},
+			"gain": -2
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 260,
+				"to": 180,
+				"q": 6.0
+			},
+			"length": 0.25,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.6
+			},
+			"gain": -6
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 140,
+				"to": 80
+			},
+			"length": 0.12,
+			"amp": {
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -16
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A decoy's cast: a hollow, falling double tone, a second of the caster stepping out (partials at 1 and 1.5 falling from 300 to 200 Hz over a soft tube puff).",
+	"gain": -3
+}

@@ -6,3 +6,4 @@
 script = ExtResource("1_base")
 id = &"zap"
 parts = Array[Dictionary]([{"flash": &"arc", "seconds": 0.25, "if_size_over": 22.0}, {"flash": &"arc", "seconds": 0.15, "if_size_upto": 22.0}])
+sound = &"zap_crack"

@@ -43,3 +43,4 @@ impact_cue = &"rune_burst"
 look_shader = ExtResource("3_shader")
 look_motes = Array[ExtResource("9_source")]([SubResource("Mote_1"), SubResource("Mote_2")])
 look_shape = Vector2(1, 0.625)
+cast_sound = &"rune_cast"

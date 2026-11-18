@@ -36,3 +36,4 @@ impact_cue = &"impact_ring"
 look_shader = ExtResource("3_shader")
 look_motes = Array[ExtResource("9_source")]([SubResource("Mote_1")])
 look_shape = Vector2(1.25, 0.6)
+cast_sound = &"wall_cast"

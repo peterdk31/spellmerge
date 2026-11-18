@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Boss plan OB15 and docs/milestones/sound.md, section 5: what Feel decides of its sounds (what
 ## each held sound is for and when it ends, `held_sounds.gd`; a staff's moments, a death's sound, a
-## boss's entrance, a phase's held sound and the music it picks, the cast sound on `staff_cast`, a
+## boss's entrance, a phase's held sound and the music it picks, a cast's carrier sound and infusion hints, a
 ## cue's duck), heard only. How they play is core/audio's (tests/core/audio). Sound files do not
 ## exist yet, so a registry of the test's own answers every sound id it knows with a silent stream,
 ## and knows the test's own cues and rooms; nothing here names a boss of the game.
@@ -12,6 +12,9 @@ const AudioScript := preload("res://core/audio/audio.gd")
 const MusicScript := preload("res://core/audio/music.gd")
 const VoicesScript := preload("res://core/audio/voices.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
+const CastSoundsScript := preload("res://gameplay/feel/cast_sounds.gd")
+const CueSizeScript := preload("res://gameplay/feel/cue_size.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 
 ## The game's registry, with a silent sound for every id in `known` and the test's own cues and
@@ -434,17 +437,110 @@ func test_more_held_sounds_than_slots_stay_within_them() -> void:
 
 # --- The cast sound and a cue's duck --------------------------------------------------------------
 
-func test_every_cast_sounds_from_feel_a_carrier_card_or_none() -> void:
+## The voice that last started `id` (-1: none).
+func _voice_of(id: StringName) -> int:
+	var ids: Array = fx.audio.voices.get(&"_voice_id")
+	var from: PackedFloat64Array = fx.audio.voices.get(&"_from")
+	var found: int = -1
+	for i in fx.audio.voices.count:
+		if ids[i] == id and (found < 0 or from[i] >= from[found]):
+			found = i
+	return found
+
+
+## An enemy whose one staff casts `cards` at once (no wind-up), so a cast leaves as it is pressed.
+func _quick_enemy(cards: Array) -> Actor:
+	var data: EnemyBase = Fixture.staffed([cards])
+	data.staffs[0].staff.wind_up = 0.0
+	return fx.imp(Vector2(40, 0), data)
+
+
+func test_a_cast_sounds_its_carrier_with_its_infusions_hints_over_it() -> void:
 	_world()
-	_know([&"cast"])
+	_know([&"bolt_cast", &"fire_hint", &"frost_hint", &"cast"])
+	var wizard: Actor = fx.wizard(1, Vector2.ZERO, null, null, [[&"fire", &"frost", &"bolt"], [], [], []])
 	var before: int = _voices().started
-	fx.bus.staff_cast.emit(0, 1, Vector2(30, 10), Vector2.RIGHT)
-	check_equal(_voices().started, before + 1, "a staff's cast with no carrier card (no `spell_cast`) still sounds")
-	check_equal(_voices().last, &"cast", "the cast sound")
-	var voice: AudioStreamPlayer2D = _voices().player(0) as AudioStreamPlayer2D
-	check(voice != null and voice.global_position.is_equal_approx(Vector2(30, 10)), "from where it left")
-	fx.bus.spell_cast.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT)
-	check_equal(_voices().started, before + 1, "`spell_cast` alone sounds no second cast")
+	fx.bus.staff_cast.emit(1, 0, Vector2(30, 10), Vector2.RIGHT)
+	check_equal(_voices().started, before, "`staff_cast` alone sounds nothing: the cast leaving does")
+	fx.spells.call(&"cast_staff", wizard.id, 0, Vector2(30, 10), Vector2.RIGHT, 1000.0)
+	check_equal(_voices().started, before + 3, "the bolt's own sound and its two infusions' hints")
+	check_equal(_voices().voices_of(&"bolt_cast"), 1, "the bolt's own cast sound")
+	check_equal(_voices().voices_of(&"fire_hint"), 1, "fire's hint over it")
+	check_equal(_voices().voices_of(&"frost_hint"), 1, "and frost's")
+	check_equal(_voices().voices_of(&"cast"), 0, "not the shared cast")
+	var bolt: AudioStreamPlayer2D = _voices().player(_voice_of(&"bolt_cast")) as AudioStreamPlayer2D
+	var hint: AudioStreamPlayer2D = _voices().player(_voice_of(&"fire_hint")) as AudioStreamPlayer2D
+	check_equal(bolt.volume_db, 0.0, "a wizard's cast at its own level")
+	check_equal(hint.volume_db, CastSoundsScript.HINT_VOLUME, "a hint under it")
+
+
+func test_an_enemys_cast_sounds_quieter_and_a_props_not_at_all() -> void:
+	_world()
+	_know([&"bolt_cast"])
+	var body: Actor = _quick_enemy([&"bolt"])
+	fx.spells.call(&"cast_staff", body.id, 0, body.global_position, Vector2.RIGHT, 1000.0)
+	check_equal(_voices().voices_of(&"bolt_cast"), 1, "an enemy's cast sounds its carrier")
+	var voice: AudioStreamPlayer2D = _voices().player(_voice_of(&"bolt_cast")) as AudioStreamPlayer2D
+	check_equal(voice.volume_db, FeelScript.ENEMY_CAST_VOLUME, "quieter than a wizard's")
+	# A prop (the world's: an actor with no controller) casting a bolt plays no carrier sound.
+	var prop: int = fx.actors.open(ActorsScript.TEAM_WORLD, 0)
+	var staff := StaffBase.new()
+	staff.slots = 1
+	fx.spells.call(&"open_caster", prop)
+	fx.spells.call(&"install_staff", prop, 0, fx.spells.call(&"compile_staff", [&"bolt"] as Array[StringName], staff))
+	var before: int = _voices().started
+	var paid: float = fx.spells.call(&"cast_staff", prop, 0, Vector2(80, 0), Vector2.RIGHT, 1000.0)
+	check(paid >= 0.0, "the prop's bolt left (%s)" % paid)
+	check_equal(_voices().started, before, "a prop's cast is its states' moments: no carrier sound")
+
+
+func test_a_carrier_card_with_no_sound_of_its_own_sounds_the_shared_cast() -> void:
+	_world()
+	var sounds: CastSoundsScript = CastSoundsScript.new()
+	sounds.registry = reg
+	check_equal(sounds.carrier_sound(&"bolt"), &"bolt_cast", "a carrier's own")
+	var plain := CarrierCard.new()
+	plain.id = &"test_plain"
+	reg.extra[&"spells"] = {&"test_plain": plain}
+	sounds.registry = reg
+	check_equal(sounds.carrier_sound(&"test_plain"), CastSoundsScript.FALLBACK, "one that names none: the shared cast")
+	check_equal(sounds.carrier_sound(&""), CastSoundsScript.FALLBACK, "a cast of no carrier card: the shared cast")
+	check_equal(sounds.hint_sound(&"fire"), &"fire_hint", "an infusion's hint")
+	check_equal(sounds.hint_sound(&"bigger"), &"", "a modifier has none")
+
+
+func test_a_cast_of_three_alike_sounds_once() -> void:
+	_world()
+	_know([&"bolt_cast", &"fire_hint"])
+	var wizard: Actor = fx.wizard(1, Vector2.ZERO, null, null, [[&"triple", &"fire", &"bolt"], [], [], []])
+	var before: int = _voices().started
+	fx.spells.call(&"cast_staff", wizard.id, 0, Vector2.ZERO, Vector2.RIGHT, 1000.0)
+	check_equal(_voices().started, before + 2, "three fire bolts are one bolt's sound and one hint")
+
+
+func test_a_cue_played_bigger_than_it_is_made_sounds_deeper_and_louder() -> void:
+	var feel: FeelScript = _world()
+	_know([&"boom"])
+	var boom: CueBase = _cue(&"test_boom", [] as Array[Dictionary], &"boom")
+	boom.size_ref = 40.0
+	feel.play_cue(&"test_boom", -1, Vector2.ZERO, Vector2.ZERO, 40.0)
+	var voice: AudioStreamPlayer2D = _voices().player(_voice_of(&"boom")) as AudioStreamPlayer2D
+	check_equal(voice.pitch_scale, 1.0, "at its own size, as made")
+	check_equal(voice.volume_db, 0.0, "at its own level")
+	fx.audio.clear_world()
+	feel.play_cue(&"test_boom", -1, Vector2.ZERO, Vector2.ZERO, 80.0)
+	voice = _voices().player(_voice_of(&"boom")) as AudioStreamPlayer2D
+	check(voice.pitch_scale < 0.9, "twice as big: deeper (%s)" % voice.pitch_scale)
+	check(is_equal_approx(voice.volume_db, CueSizeScript.DB_PER_DOUBLING), "and a doubling louder (%s dB)" % voice.volume_db)
+	fx.audio.clear_world()
+	feel.play_cue(&"test_boom", -1, Vector2.ZERO, Vector2.ZERO, 20.0)
+	voice = _voices().player(_voice_of(&"boom")) as AudioStreamPlayer2D
+	check(voice.pitch_scale > 1.1 and voice.volume_db < 0.0, "half as big: higher and softer")
+	fx.audio.clear_world()
+	boom.size_ref = 0.0
+	feel.play_cue(&"test_boom", -1, Vector2.ZERO, Vector2.ZERO, 80.0)
+	voice = _voices().player(_voice_of(&"boom")) as AudioStreamPlayer2D
+	check(voice.pitch_scale == 1.0 and voice.volume_db == 0.0, "a cue with no size of its own plays as made at any size")
 
 
 func test_a_cue_with_a_duck_lowers_the_music_while_its_sound_plays() -> void:

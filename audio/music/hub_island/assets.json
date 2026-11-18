@@ -8,8 +8,8 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/music/hub_island/hub_island.score.json",
-			"recipe_hash": "sha256:98ce8258b0bafc214afcb758378dd942c54305e8444cf69f12a78d54522c6f1b",
-			"audio_hash": "sha256:060fc128c450cfb1905397bca7b18f87f18253d80bc58dec3517021be1555cac",
+			"recipe_hash": "sha256:827e673aebe43640d349d1d2df9d63dc8b4e38959ef5b8be2055d5f8841d5586",
+			"audio_hash": "sha256:31cc23394cef8f04e7798edd4a9b00a4c7768b470c794f3254927bb4e9194b3e",
 			"loudness": -25.0,
 			"peak": -9.0
 		}

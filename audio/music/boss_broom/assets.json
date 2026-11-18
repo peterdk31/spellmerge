@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/music/boss_broom/boss_broom.score.json",
-			"recipe_hash": "sha256:a4cacd11777232a0ca3c9046de789e37642f7a123c151116715831c7a936481b",
-			"audio_hash": "sha256:96f5a4f897eafeb5830bcb261b84cc0d30e7fdda1828c81b74f6d1400df98b3a",
-			"loudness": -25.0,
-			"peak": -7.8
+			"recipe_hash": "sha256:1ce3afb5c54a0178263d38a65de269aee0f0b4b7056b650e85e1f449bfcdda84",
+			"audio_hash": "sha256:aac7815d81c8308a35d2cef63fa6777150d0ab48068c8599ddc86f6fae77370a",
+			"loudness": -25.5,
+			"peak": -7.7
 		},
 		{
 			"path": "audio/music/boss_broom/boss_broom_fire.ogg",
@@ -21,10 +21,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/music/boss_broom/boss_broom.score.json",
-			"recipe_hash": "sha256:a4cacd11777232a0ca3c9046de789e37642f7a123c151116715831c7a936481b",
-			"audio_hash": "sha256:a3f247df687fe814c77f95cafbb9bbca7a8a0c0b2707c9590bf40269b1936b04",
-			"loudness": -27.1,
-			"peak": -8.7
+			"recipe_hash": "sha256:1ce3afb5c54a0178263d38a65de269aee0f0b4b7056b650e85e1f449bfcdda84",
+			"audio_hash": "sha256:f4a7ab9b0735008a8d4adccddb80c2e52107fe2e769b6e0af3ae45170db6708e",
+			"loudness": -26.6,
+			"peak": -8.1
 		}
 	]
 }

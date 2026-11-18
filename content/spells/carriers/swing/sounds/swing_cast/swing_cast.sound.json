@@ -1,0 +1,55 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.26,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 114
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 280,
+				"to": 760,
+				"q": 2.4,
+				"curve": "arch"
+			},
+			"length": 0.24,
+			"amp": {
+				"attack": 0.02,
+				"shape": "arch",
+				"power": 1.6
+			},
+			"gain": 0
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 180,
+				"to": 140,
+				"q": 4.0
+			},
+			"length": 0.12,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -8
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A swing's cast: the staff cutting the air, a low swish swept up from 280 Hz and back, short and dry. 3 dB under the family's level (gain -3), which keeps its peak under the limit.",
+	"gain": -3
+}

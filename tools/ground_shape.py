@@ -36,6 +36,12 @@ style's `full_width` (the whole edge) to nothing at a hairline. A crack narrower
 (`CELL`) is drawn into the floor (dark, opaque) rather than cut out of it, so it is never a wall
 or a hole of less than a cell; only its wide part is clear.
 
+**The game draws it too** (connected biomes CB4, docs/milestones/connected-biomes.md): as a room is
+laid out, `gameplay/feel/ground/` draws its ground again from its shape, mirrored or not, the twin of
+this file's drawing line by line (and `native/src/ground_kernel.cpp` the native twin of that), so
+the two never part: change the drawing here and there in the same PR, and
+tests/gameplay/feel/test_ground_drawing.gd holds the game's drawing of each room to the art baked here.
+
 The scene's root carries the hash of everything it was made from (`metadata/ground_inputs`):
 `--check` fails when a shape file, its edge style, its ground materials or this generator changed
 since its scene was written. Python 3.10 and the standard library only (tools/README.md); the same
@@ -135,6 +141,16 @@ def hash32(*values: int) -> int:
 def unit(*values: int) -> float:
     """A number in [0, 1) from whole numbers."""
     return hash32(*values) / 4294967296.0
+
+
+def length_of(dx: float, dy: float) -> float:
+    """How long (dx, dy) is: the square root of its squares' sum, as the game's drawing works it out
+    (gameplay/feel/ground: `math.hypot` and `math.dist` round otherwise, now and then)."""
+    return math.sqrt(dx * dx + dy * dy)
+
+
+def length_between(a: tuple[float, float], b: tuple[float, float]) -> float:
+    return length_of(b[0] - a[0], b[1] - a[1])
 
 
 def _smooth(t: float) -> float:
@@ -254,6 +270,12 @@ def read_png(data: bytes) -> tuple[int, int, bytearray]:
 # The shape
 
 
+def single(text: str) -> float:
+    """A number of a scene's text as the game reads it: a node's position and a zone's sides are single
+    precision there (`Vector2`, a Control's offsets), so the game's drawing and this one agree."""
+    return struct.unpack("<f", struct.pack("<f", float(text)))[0]
+
+
 def placements(shape_path: Path) -> list[tuple[float, float, float]]:
     """Where the room's things stand, as circles a crack keeps clear of: every node of the room's
     scene (`<room>.tscn` beside its shape) placed under another node (its spawns, props, dummies,
@@ -275,7 +297,7 @@ def placements(shape_path: Path) -> list[tuple[float, float, float]]:
         if head.group(1) == "ReferenceRect":
             if head.group(2) != "Zones":
                 continue
-            sides = {k: float(v) for k, v in re.findall(r"offset_(left|top|right|bottom) = ([-\d.]+)", block)}
+            sides = {k: single(v) for k, v in re.findall(r"^offset_(left|top|right|bottom) = ([-\d.]+)", block, re.M)}
             if len(sides) == 4:
                 # A row (or column) of circles along a long zone, each round a square-ish piece of it.
                 w, h = sides["right"] - sides["left"], sides["bottom"] - sides["top"]
@@ -285,11 +307,11 @@ def placements(shape_path: Path) -> list[tuple[float, float, float]]:
                     cx = sides["left"] + (w * t if w >= h else w / 2)
                     cy = sides["top"] + (h * t if h > w else h / 2)
                     piece = (w / count, h) if w >= h else (w, h / count)
-                    found.append((cx, cy, math.hypot(*piece) / 2 + radius))
+                    found.append((cx, cy, length_of(*piece) / 2 + radius))
             continue
-        at = re.search(r"position = Vector2\(([-\d.]+), ([-\d.]+)\)", block)
+        at = re.search(r"^position = Vector2\(([-\d.]+), ([-\d.]+)\)", block, re.M)
         if at:
-            found.append((float(at.group(1)), float(at.group(2)), radius))
+            found.append((single(at.group(1)), single(at.group(2)), radius))
     return found
 
 
@@ -311,9 +333,9 @@ def clear_points(shape_path: Path) -> list[tuple[float, float, float]]:
         # plain group node, stands at the room's origin); a grandchild's is not.
         if head is None or head.group(2) not in parents:
             continue
-        at = re.search(r"position = Vector2\(([-\d.]+), ([-\d.]+)\)", block)
+        at = re.search(r"^position = Vector2\(([-\d.]+), ([-\d.]+)\)", block, re.M)
         if at:
-            found.append((float(at.group(1)), float(at.group(2)), radius))
+            found.append((single(at.group(1)), single(at.group(2)), radius))
     return found
 
 
@@ -435,23 +457,23 @@ class Ground:
                     continue
                 px, py = x + 0.5, y + 0.5
                 qx, qy = abs(px - cx) - hw, abs(py - cy) - hh
-                inward = -(math.hypot(max(qx, 0.0), max(qy, 0.0)) + min(max(qx, qy), 0.0) - corner)
+                inward = -(length_of(max(qx, 0.0), max(qy, 0.0)) + min(max(qx, qy), 0.0) - corner)
                 pinned = 1.0
                 for x0, y0, x1, y1 in pins:
                     dx = max(x0 - px, 0.0, px - x1)
                     dy = max(y0 - py, 0.0, py - y1)
-                    pinned = min(pinned, math.hypot(dx, dy) / PIN_EASE)
+                    pinned = min(pinned, length_of(dx, dy) / PIN_EASE)
                 inside = inward > 0.0
                 if abs(inward) < reach and pinned > 0.0:
                     n = max(-1.0, min(1.0, (fbm2(px, py, scales, seed) - 0.5) * 2.6))
                     inside = inward + (n * wander_out if n > 0.0 else n * wander_in) * min(1.0, pinned) > 0.0
                 if not inside and pinned >= 1.0:
                     for bx, by, br in bays:
-                        if math.hypot(px - bx, py - by) + (fbm2(px, py, [12.0, 5.0], seed + 7) - 0.5) * br * 0.6 < br:
+                        if length_of(px - bx, py - by) + (fbm2(px, py, [12.0, 5.0], seed + 7) - 0.5) * br * 0.6 < br:
                             inside = True
                             break
                 if not inside and pinned >= 1.0:
-                    inside = any(math.hypot(px - kx, py - ky) < kr for kx, ky, kr in clear)
+                    inside = any(length_of(px - kx, py - ky) < kr for kx, ky, kr in clear)
                 if inside:
                     self.land[p] = 1
 
@@ -473,7 +495,7 @@ class Ground:
         self._side = 0
 
     def _near_keep_clear(self, x: float, y: float) -> bool:
-        return any(math.hypot(x - cx, y - cy) < r for cx, cy, r in self.keep_clear)
+        return any(length_of(x - cx, y - cy) < r for cx, cy, r in self.keep_clear)
 
     def _crack(self, spec: dict) -> None:
         """Carve a crack in from the edge of outline `outline` (default 0): it starts where a line
@@ -515,7 +537,7 @@ class Ground:
         seed = int(self.shape.get("seed", 0))
         for py in range(max(0, int(y) - reach), min(self.height, int(y) + reach + 1)):
             for px in range(max(0, int(x) - reach), min(self.width, int(x) + reach + 1)):
-                d = math.hypot(px + 0.5 - x, py + 0.5 - y)
+                d = length_of(px + 0.5 - x, py + 0.5 - y)
                 if d > r + 5.0:
                     continue
                 edge = r
@@ -845,7 +867,7 @@ class Drawing:
                 q = path[i]
                 here = (q % self.w + 0.5, q // self.w + 0.5)
                 if last is not None:
-                    run += math.dist(last, here)
+                    run += length_of(here[0] - last[0], here[1] - last[1])
                 marks.append(run)
                 last = here
             for i, q in enumerate(path):
@@ -1284,7 +1306,7 @@ def scene_text(drawing: Drawing, outs: dict[str, Path], digest: str) -> str:
     for i, (points, side) in enumerate(zip(drawing.rims, drawing.rim_sides)):
         style = drawing.styles[side]
         rim = style["rim"]
-        length = sum(math.dist(points[k], points[(k + 1) % len(points)]) for k in range(len(points)))
+        length = sum(length_between(points[k], points[(k + 1) % len(points)]) for k in range(len(points)))
         lines += [f'[sub_resource type="Resource" id="MoteSource_rim{i + 1}"]', 'script = ExtResource("4_motes")',
                   f'kind = &"{rim["kind"]}"', f"rate = {length / 100.0 * float(rim['per_100px']):.1f}", "from = 1"]
         if "colours" in rim:
@@ -1297,7 +1319,7 @@ def scene_text(drawing: Drawing, outs: dict[str, Path], digest: str) -> str:
         lines.append("")
     for i, ((material, points), side) in enumerate(zip(drawing.drips, drawing.drip_sides)):
         drip = drawing.styles[side]["drip"]
-        length = sum(math.dist(points[k], points[k + 1]) for k in range(len(points) - 1))
+        length = sum(length_between(points[k], points[k + 1]) for k in range(len(points) - 1))
         lines += [f'[sub_resource type="Resource" id="MoteSource_drip{i + 1}"]', 'script = ExtResource("4_motes")',
                   f'kind = &"{drip["kind"]}"', f"rate = {max(0.1, length / 100.0 * float(drip['per_100px'])):.1f}", "from = 1",
                   f'colours = Array[StringName]([&"{material}"])', ""]
@@ -1391,11 +1413,43 @@ def stale(shape_path: Path) -> str | None:
     return None
 
 
+# The test shapes the game's drawing is held to this one by (tests/gameplay/feel/test_ground_drawing.gd):
+# shapes that reach what no room uses yet, and the hashes of what is drawn from each.
+FIXTURES = ROOT / "tests/gameplay/feel/fixtures"
+FIXTURE_HASHES = FIXTURES / "ground_fixtures.json"
+
+
+def fixture_hashes() -> dict[str, dict[str, str]]:
+    """Each fixture shape's drawing (no room's things placed), as the SHA-256 of each image's RGBA
+    bytes and of its rims' and drips' points (`x,y` to a tenth, `;` between points, `|` between lines)."""
+    found: dict[str, dict[str, str]] = {}
+    for path in sorted(FIXTURES.glob("*.shape.json")):
+        drawing = Drawing(json.loads(path.read_text(encoding="utf-8")))
+        lines = "|".join(";".join(f"{x:.1f},{y:.1f}" for x, y in points) for points in drawing.rims + [p for _, p in drawing.drips])
+        found[path.name.removesuffix(".shape.json")] = {
+            "floor": hashlib.sha256(bytes(drawing.floor)).hexdigest(),
+            "under": hashlib.sha256(bytes(drawing.under)).hexdigest(),
+            "glow": hashlib.sha256(bytes(drawing.glow)).hexdigest(),
+            "wall": hashlib.sha256(bytes(drawing.wall_art or b"")).hexdigest(),
+            "lines": hashlib.sha256(lines.encode()).hexdigest(),
+        }
+    return found
+
+
+def fixture_text() -> str:
+    return json.dumps(fixture_hashes(), indent="\t", sort_keys=True) + "\n"
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("shapes", nargs="*", type=Path, help="shape files to draw (default with --check: every one)")
     parser.add_argument("--check", action="store_true", help="write nothing; fail when a room's ground is out of date")
+    parser.add_argument("--fixtures", action="store_true", help=f"write {FIXTURE_HASHES.relative_to(ROOT)}, the test shapes' hashes")
     args = parser.parse_args(argv)
+    if args.fixtures:
+        FIXTURE_HASHES.write_text(fixture_text(), encoding="utf-8")
+        print(f"wrote {FIXTURE_HASHES.relative_to(ROOT)}")
+        return 0
     if args.check:
         problems = [f"{path.relative_to(ROOT)}: {why}" for path in (args.shapes or shape_files()) if (why := stale(path.resolve()))]
         for problem in problems:

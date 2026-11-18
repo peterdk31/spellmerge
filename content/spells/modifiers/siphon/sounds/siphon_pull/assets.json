@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/modifiers/siphon/sounds/siphon_pull/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/modifiers/siphon/sounds/siphon_pull/siphon_pull.sound.json",
+			"recipe_hash": "sha256:178ca945e67e3401794c77b90703867c9d71a8ae8ea69616d7b8c192a97792fa",
+			"audio_hash": "sha256:fd056b5d34c13725a8e9cad7ca6aa1f2657d217e8cc13ae06cbdce102f2e81b7",
+			"loudness": -23.2,
+			"peak": -12.7
+		},
+		{
+			"path": "content/spells/modifiers/siphon/sounds/siphon_pull/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/modifiers/siphon/sounds/siphon_pull/siphon_pull.sound.json",
+			"recipe_hash": "sha256:178ca945e67e3401794c77b90703867c9d71a8ae8ea69616d7b8c192a97792fa",
+			"audio_hash": "sha256:a4ee848c15928a7ce8acd3c794c1a8e3401b774c448de43b1eb0822f1479f9a8",
+			"loudness": -23.3,
+			"peak": -12.4
+		},
+		{
+			"path": "content/spells/modifiers/siphon/sounds/siphon_pull/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/modifiers/siphon/sounds/siphon_pull/siphon_pull.sound.json",
+			"recipe_hash": "sha256:178ca945e67e3401794c77b90703867c9d71a8ae8ea69616d7b8c192a97792fa",
+			"audio_hash": "sha256:54210648fc69c24450ef4f65e5cd5c0748c1e0bc3ccb5bc0c607d1792b1c5db5",
+			"loudness": -22.8,
+			"peak": -12.5
+		},
+		{
+			"path": "content/spells/modifiers/siphon/sounds/siphon_pull/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "content/spells/modifiers/siphon/sounds/siphon_pull/siphon_pull.sound.json",
+			"recipe_hash": "sha256:178ca945e67e3401794c77b90703867c9d71a8ae8ea69616d7b8c192a97792fa",
+			"audio_hash": "sha256:cf8e5c98cabbb7b412a4fe7c4400be253004f4b9c08de51ae2614d6d28cee451",
+			"loudness": -22.7,
+			"peak": -11.7
+		}
+	]
+}

@@ -7,6 +7,7 @@ extends RefCounted
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
+const CueSizeScript := preload("res://gameplay/feel/cue_size.gd")
 
 ## The actor that set it off (`ActorsScript.NONE` for none), and its ramp (`Feel._ramp_of`).
 var caster: int = ActorsScript.NONE
@@ -37,6 +38,9 @@ var follow: Node2D = null
 ## exactly; alpha 0 for none) and its `power` (what its sizes, counts, holds and shake are times).
 var color: Color = Color(0.0, 0.0, 0.0, 0.0)
 var power: float = 1.0
+## How many times its reference size it plays at (`CueBase.size_ref`, `cue_size.gd`; 1 for a cue with
+## none): its motes' counts are times its `counts`, besides its power.
+var grow: float = 1.0
 
 
 ## Takes every field of `other` (a cue kept to play on after the one it was played with is
@@ -61,6 +65,12 @@ func copy_from(other: RefCounted) -> void:
 	follow = from.follow
 	color = from.color
 	power = from.power
+	grow = from.grow
+
+
+## What its motes' counts are times: its power, and its growth by size (`cue_size.gd`).
+func count_times() -> float:
+	return power * CueSizeScript.counts(grow)
 
 
 ## Where a part not prepared into fields plays (a light; `CueBase`'s `along`): its fraction of the cue's line from its point (0, the

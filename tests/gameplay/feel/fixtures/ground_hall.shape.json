@@ -1,0 +1,21 @@
+{
+	"about": "A small hall inside walls for tests/gameplay/feel/test_ground_drawing.gd: the crypt's masonry edge (a wall's top, face and foot), a pit in the crypt's pit edge with a crack from it, a pinned stretch, a bay and a drift of dust.",
+	"size": [192, 144],
+	"seed": 5,
+	"edge": "crypt_wall",
+	"pit_edge": "crypt_pit",
+	"ground": "flagstone",
+	"void": "wall",
+	"frame": {
+		"inset": 24,
+		"corner": 16,
+		"wander": [6, 8],
+		"rough": [30, 9, 4],
+		"seed": 3,
+		"pins": [[80, 0, 112, 30]],
+		"bays": [[24, 72, 12]]
+	},
+	"pits": [{"centre": [124, 92], "radii": [18, 12], "rough": [[20, 0.1], [7, 0.04]], "seed": 2}],
+	"cracks": [{"pit": 0, "angle": 0.6, "width": 7, "length": 30, "seed": 3}],
+	"areas": [{"ground": "dust", "centre": [64, 70], "radii": [34, 22], "seed": 1}]
+}

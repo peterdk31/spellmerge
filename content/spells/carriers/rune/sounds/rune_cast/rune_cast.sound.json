@@ -1,0 +1,79 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.5,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 110
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 100,
+				"to": 50
+			},
+			"length": 0.12,
+			"amp": {
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -15,
+			"drive": 2.0
+		},
+		{
+			"source": "partials",
+			"pitch": 330,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.45
+				},
+				{
+					"ratio": 2.76,
+					"gain": -12,
+					"decay": 0.25
+				},
+				{
+					"ratio": 5.4,
+					"gain": -26,
+					"decay": 0.1
+				}
+			],
+			"amp": {
+				"attack": 0.002
+			},
+			"gain": -4,
+			"start": 0.01
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 320,
+				"to": 220,
+				"q": 5.0
+			},
+			"length": 0.14,
+			"amp": {
+				"attack": 0.005,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -7
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A rune's cast: a crystal set down on the floor, a low struck stone bell at 330 Hz with a dull knock under it.",
+	"gain": -3
+}

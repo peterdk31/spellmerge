@@ -149,7 +149,7 @@ class Material:
         `stroke_share` are drawn (each ring its own)."""
         cx, cy = self.centre
         dx, dy = x + 0.5 - cx, y + 0.5 - cy
-        r = math.hypot(dx, dy)
+        r = math.sqrt(dx * dx + dy * dy)
         if r < self.stroke_inner:
             return rgb
         turn = (math.atan2(dy, dx) / math.tau) % 1.0

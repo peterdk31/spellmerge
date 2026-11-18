@@ -9,3 +9,5 @@ parts = Array[Dictionary]([{"flash": &"fireball", "reach": 1.0}, {"part": &"mote
 shake = 0.75
 kick = 3.0
 kick_way = &"away"
+sound = &"blast_boom"
+size_ref = 40.0

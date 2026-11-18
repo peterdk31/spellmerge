@@ -1,0 +1,69 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.4,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 111
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 220,
+				"to": 520,
+				"q": 2.0,
+				"curve": "arch"
+			},
+			"length": 0.34,
+			"amp": {
+				"attack": 0.04,
+				"shape": "arch",
+				"power": 1.5
+			},
+			"gain": 0
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 80,
+				"to": 140
+			},
+			"length": 0.3,
+			"amp": {
+				"attack": 0.08,
+				"shape": "perc",
+				"power": 1.2
+			},
+			"gain": -16
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 160,
+				"to": 120,
+				"q": 4.0
+			},
+			"length": 0.2,
+			"amp": {
+				"attack": 0.02,
+				"shape": "perc",
+				"power": 1.5
+			},
+			"gain": -8
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A slam's cast: the heave before the blow, a heavy low swish rising and falling as the staff comes up and over (the strike itself is the slam's own moment).",
+	"gain": -2
+}

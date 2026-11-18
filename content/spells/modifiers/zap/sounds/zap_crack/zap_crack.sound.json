@@ -1,0 +1,57 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.24,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 302
+	},
+	"layers": [
+		{
+			"patch": "lightning_zap",
+			"gain": 0,
+			"length": 0.14,
+			"amp": {
+				"attack": 0.004
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 900,
+				"to": 500,
+				"q": 1.2
+			},
+			"length": 0.05,
+			"amp": {
+				"attack": 0.004,
+				"shape": "perc",
+				"power": 3.0
+			},
+			"gain": -8,
+			"color": "stepped",
+			"pitch": {
+				"from": 1200,
+				"to": 400
+			}
+		},
+		{
+			"patch": "lightning_crackle",
+			"gain": -6,
+			"start": 0.02,
+			"length": 0.18
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A zap jumping to a body: a short electric crack, lightning's zap with a spit of stepped noise at its start and sparks after it; low and dry, never a snap. 4 dB under the family's level (gain -4), which keeps its crack's peak under the limit.",
+	"gain": -4
+}

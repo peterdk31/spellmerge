@@ -15,12 +15,21 @@ extends Resource
 @export var display_name: String = ""
 ## The layout scene: its art and walls, and what is where (`RoomPlaces`). No scripts.
 @export var scene: PackedScene
+## The shape its ground is drawn from when it is laid out (connected biomes CB4: its `<room>.shape.json`,
+## content/rooms/README.md, "A room's ground from a shape"): Feel draws its floor, rock face, glow,
+## wall art and edge motes again from it as placed, mirrored or not, over its `Floor`'s baked art
+## (gameplay/feel/ground/). Null (the hub): the baked art stays. Drawn only.
+@export var ground_shape: JSON = null
 ## The biome it is a room of (run generation RG1): a run's map of that biome may use it
 ## (`MapRules.biome`). Empty: no biome's.
 @export var biome: StringName = &""
 ## The room kinds it can host (`RoomKind` ids: `fight`, `boss`), as a template a run's map picks for
 ## a room of that kind. Empty: it is offered for no run (the hub).
 @export var kinds: Array[StringName] = []
+## True for a walkway (connected biomes CB2, docs/milestones/connected-biomes.md, decision 2): a
+## template that spans the dark between two rooms' sockets in a biome (a bridge), its own sockets
+## (`RoomSocket`) on its edge at its ends. It hosts no room kind and is no room of a run's map.
+@export var walkway: bool = false
 ## Seconds after which a downed wizard stands up by itself at full health (the hub: hits hurt there,
 ## but a fall costs nothing; owner, 2026-11-13). Below 0 (the default): never by itself, only by a
 ## teammate's revive or the restart. In such a room everyone down starts no restart.

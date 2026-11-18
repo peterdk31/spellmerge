@@ -1,0 +1,86 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.36,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 102
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 150,
+				"to": 52
+			},
+			"length": 0.22,
+			"amp": {
+				"attack": 0.012,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -15,
+			"drive": 2.2
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 300,
+				"to": 200,
+				"q": 5.0
+			},
+			"length": 0.32,
+			"amp": {
+				"attack": 0.012,
+				"shape": "perc",
+				"power": 1.3
+			},
+			"gain": 0
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 560,
+				"to": 380,
+				"q": 3.0
+			},
+			"length": 0.16,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.8
+			},
+			"gain": -3
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 380,
+				"to": 820,
+				"q": 1.5
+			},
+			"length": 0.2,
+			"amp": {
+				"attack": 0.04,
+				"shape": "perc",
+				"power": 1.4
+			},
+			"gain": -12,
+			"start": 0.05
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A bolt's cast: the Roman candle's deep, hollow thoomp (a tube's ring falling from 300 and 560 Hz over a sine dropping from 150 to 52 Hz) and a breath of the shot leaving, a little deeper and longer than the shared cast.",
+	"gain": -3
+}

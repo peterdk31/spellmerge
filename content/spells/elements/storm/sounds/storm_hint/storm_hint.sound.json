@@ -1,0 +1,27 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.35,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 204
+	},
+	"layers": [
+		{
+			"patch": "storm_gust",
+			"gain": 0,
+			"length": 0.32
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 1800
+	},
+	"notes": "Storm's hint on a cast: a short low gust, storm's own wind. 4 dB under the family's level (gain -4): a hint, never a cast of its own (Feel plays it 6 dB under the cast besides), which also keeps its peak under the limit.",
+	"gain": -4
+}

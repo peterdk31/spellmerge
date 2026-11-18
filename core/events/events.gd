@@ -239,7 +239,7 @@ signal owned_staff_changed(player: int, staff: int, plan: Dictionary)
 signal hands_changed(player: int, hands: PackedInt32Array)
 ## Sender: player. The staff on hand `staff` (0-3: RB, RT, LB, LT) of `player`'s own wizard was built or changed (never another actor's the seat drives). `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them; empty for an empty hand. Heard by hud (the corner panel).
 signal staff_changed(player: int, staff: int, plan: Dictionary)
-## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by feel.
+## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by nobody now: Feel sounds every actor's cast on `cast_left` instead.
 signal staff_cast(player: int, staff: int, origin: Vector2, direction: Vector2)
 ## Sender: core/spells. A card of the actor `caster` moves it: `mode` is `&"dash"`, `&"teleport"`, `&"pull"`, `&"swap"` or `&"recoil"`; `move` is the way and the distance (the body stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player (a wizard's actor) and ai (an enemy's), each for its own actor id, which answer each with `caster_move_finished`. Every move adds up (rules R4 F1): several requests in one step (a scatter, a burst, `mirror`) or while one runs all move the body, each over its own time.
 signal caster_move_requested(caster: int, mode: StringName, move: Vector2, seconds: float, tag: int)
@@ -263,7 +263,7 @@ signal cast_fizzled(caster: int, staff: int)
 signal cast_winding(caster: int, staff: int, carrier_card: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int, cue: StringName)
 ## Sender: ai (boss plan OB14, decision 26). The AI driving the actor `caster` stopped following its target with the cast of staff `staff` it winds up (its profile's `aim_lock`): the cast leaves along the aim it has now. Only for a caster that warns (not on the players' team). Heard by gameplay/feel, which gives the cast's lane a beat (a flash).
 signal aim_locked(caster: int, staff: int)
-## Sender: core/spells. A cast of the actor `caster`'s staff `staff` leaves now: at once for a cast that does not wind up, else as its wind-up ends; sent just before its shots start, so what the caster becomes as its cast leaves is what they meet (props W6: a barrel's fuse burns out, it is rubble, its blast goes off); a cast that then finds no room for any shot (every one inside a wall) was told all the same. Heard by the actor kit (a prop's `PropStateTriggers`, for its `cast` triggers).
+## Sender: core/spells. A cast of the actor `caster`'s staff `staff` leaves now: at once for a cast that does not wind up, else as its wind-up ends; sent just before its shots start, so what the caster becomes as its cast leaves is what they meet (props W6: a barrel's fuse burns out, it is rubble, its blast goes off); a cast that then finds no room for any shot (every one inside a wall) was told all the same. While it is sent, `Spells.leaving_cast()` is the cast. Heard by the actor kit (a prop's `PropStateTriggers`, for its `cast` triggers) and Feel (the staff's own `cast_cue`, else the cast's carrier sounds and infusion hints, `gameplay/feel/cast_sounds.gd`).
 signal cast_left(caster: int, staff: int)
 ## Sender: core/spells. `amount` of the mana of staff `staff` of the seat `player`'s actor is now held by sustained cards (`hold`); 0 when none is on. Sent only for an actor a seat drives (every actor's Caster reads `Spells.reserved_mana`). Heard by nobody yet.
 signal mana_reserved(player: int, staff: int, amount: float)
@@ -443,7 +443,10 @@ signal room_entered(room_id: StringName)
 ## snapshot restored into another room (`Flow.rebuild_derived`); a restore into the room shown sends
 ## nothing. Heard at once, before the placements and zones are taken out: a listener works out what it
 ## needs from it then (`CoverLayout.of`) and keeps neither the node nor anything in it. It changes no
-## state. Heard by the cover area and feel (GC3, GC5).
+## state. Heard by the cover area and feel (GC3, GC5). One listener draws onto it: Feel's ground
+## (connected biomes CB4, gameplay/feel/ground/ground_layout.gd) puts the ground drawn from the room's
+## shape on its `Floor` (textures) and makes its rims' and drips' mote lines again; so no listener reads
+## the `Floor`'s art or its mote lines here (they read the walls, holes and places, which it leaves).
 signal room_built(room_id: StringName, layout_root: Node)
 ## Sender: core/spells (ground cover GC5, rule 5). An element of a spell touched the floor: `element`
 ## (a card id, &"fire") within `radius` of `at`, by the actor `caster` (NO_PLAYER for none). Sent

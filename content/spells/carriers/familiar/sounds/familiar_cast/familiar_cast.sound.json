@@ -1,0 +1,92 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.42,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 106
+	},
+	"layers": [
+		{
+			"source": "partials",
+			"pitch": {
+				"from": 220,
+				"to": 330,
+				"curve": "linear"
+			},
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.3
+				},
+				{
+					"ratio": 2,
+					"gain": -10,
+					"decay": 0.18
+				},
+				{
+					"ratio": 3,
+					"gain": -20,
+					"decay": 0.08
+				}
+			],
+			"amp": {
+				"attack": 0.002
+			},
+			"gain": -2
+		},
+		{
+			"source": "partials",
+			"pitch": {
+				"from": 330,
+				"to": 440,
+				"curve": "linear"
+			},
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.22
+				},
+				{
+					"ratio": 2,
+					"gain": -12,
+					"decay": 0.12
+				}
+			],
+			"amp": {
+				"attack": 0.002
+			},
+			"gain": -7,
+			"start": 0.08
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 300,
+				"to": 220,
+				"q": 5.0
+			},
+			"length": 0.16,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.8
+			},
+			"gain": -8
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A familiar's cast: two soft, low rising notes, a small thing woken (warm partials gliding up from 220 to 330 and 330 to 440 Hz) over a breath of the tube.",
+	"gain": -3
+}

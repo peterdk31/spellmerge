@@ -1,0 +1,86 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.4,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 113
+	},
+	"layers": [
+		{
+			"source": "partials",
+			"pitch": {
+				"from": 180,
+				"to": 270,
+				"curve": "linear"
+			},
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.3
+				},
+				{
+					"ratio": 2,
+					"gain": -12,
+					"decay": 0.15
+				}
+			],
+			"amp": {
+				"attack": 0.002
+			},
+			"gain": -3
+		},
+		{
+			"source": "partials",
+			"pitch": {
+				"from": 270,
+				"to": 180,
+				"curve": "linear"
+			},
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.3
+				},
+				{
+					"ratio": 2,
+					"gain": -12,
+					"decay": 0.15
+				}
+			],
+			"amp": {
+				"attack": 0.002
+			},
+			"gain": -3
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 300,
+				"to": 220,
+				"q": 4.0
+			},
+			"length": 0.14,
+			"amp": {
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 1.8
+			},
+			"gain": -8
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A swap's cast: two low tones crossing, one gliding up from 180 to 270 Hz as the other glides down, two places trading. 4 dB under the family's level (gain -4), which keeps its two strikes' peak under the limit.",
+	"gain": -4
+}

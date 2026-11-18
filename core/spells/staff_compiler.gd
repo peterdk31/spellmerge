@@ -100,6 +100,7 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 		_cast.delay += staff.cooldown
 	_cast.description = "%s. %s mana, %s%s s%s." % [_group_text(_cast.group), _number(_cast.mana), ("%s s wind-up, " % _number(_cast.wind_up)) if _cast.wind_up > 0.0 else "", _number(_cast.wind_down), (", then %s s cooldown" % _number(staff.cooldown)) if _cast.ends_cycle and staff != null and staff.cooldown > 0.0 else ""]
 	_cast.sense = CastSense.of(_cast)
+	_cast.list_cards()
 	return _cast
 
 
@@ -505,6 +506,10 @@ func _build(carrier_card: CarrierCard, on: Carrier, elements: Array[ElementBase]
 	spell.speed = speed
 	spell.radius = radius
 	spell.card_scale = spell.radius_scale
+	var blast: int = ModifierBase.Behaviour.BLAST
+	if spell.behaviours[blast] > 0.0:
+		# A blast grows with its shot (the owner, 2026-11-18): a bigger card's radius is its blast's.
+		spell.behaviours[blast] *= spell.radius_scale
 	if _spell_scale != 1.0:
 		# The body's own size, after the cards' (boss plan OB7): as `bigger`'s radius, no damage or speed.
 		carrier.scale_size(spell, _spell_scale)

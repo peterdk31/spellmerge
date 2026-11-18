@@ -26,3 +26,4 @@ knockback = 60.0
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.04, "push": 2, "stretch": 0.1, "glow": 0.4, "shake": 0.4, "ease": "out"}, {"phase": "after", "at": 0.14}])
 cast_cue = &"cast_atom"
 shown_cue = &"spray_jet"
+cast_sound = &"spray_cast"

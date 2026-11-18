@@ -1,0 +1,54 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.16,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 112
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 500,
+				"to": 340,
+				"q": 2.0
+			},
+			"length": 0.14,
+			"amp": {
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 1.6
+			},
+			"gain": 0
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 260,
+				"to": 200,
+				"q": 4.0
+			},
+			"length": 0.12,
+			"amp": {
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 1.8
+			},
+			"gain": -4
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.18,
+			"size": 0.7
+		},
+		"lowpass": 2800
+	},
+	"notes": "A spray's cast: a short, soft low spurt of a hose, poured every 0.15 s while held, so it is dull, short and 6 dB under the family: a steady pulse under the fight, never a hiss.",
+	"gain": -6
+}

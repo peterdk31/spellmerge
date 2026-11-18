@@ -35,6 +35,10 @@ const MIRROR_Y: int = 2
 ## The four mirrorings.
 const MIRRORINGS: PackedInt32Array = [0, MIRROR_X, MIRROR_Y, MIRROR_X | MIRROR_Y]
 
+## The meta a laid piece's layout carries for the view, how it is placed (`Vector2i`, x or y 1 where
+## mirrored): Feel's `GroundShape.MIRROR_META` (connected biomes CB4), which draws its ground so.
+const GROUND_MIRROR_META: StringName = &"ground_mirror"
+
 ## The template's id (`RoomBase.id`), whether it is a walkway, and its mirroring.
 var id: StringName = &""
 var walkway: bool = false

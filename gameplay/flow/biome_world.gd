@@ -22,8 +22,10 @@ extends RefCounted
 ## keeps whatever was laid before.
 ##
 ## **Mirroring** (decision 6) is the map's and the collision's: a mirrored piece's walls, holes and
-## sockets are mirrored in whole cells. Its art is shown flipped as a stand-in until the ground is
-## drawn at layout from the mirrored shape (CB4); the art never reaches the simulation.
+## sockets are mirrored in whole cells. Its layout says how it is placed (`PieceShape.GROUND_MIRROR_META`)
+## for Feel, which draws a room's ground from its mirrored shape as it hears the room built (CB4);
+## the pieces are announced to the view with CB3's room events, so until then a mirrored piece shows
+## its template's baked art. The art never reaches the simulation.
 ##
 ## Rooms' contents (props, enemies, items), room state and room events are room life's (CB3).
 
@@ -167,14 +169,12 @@ func _place(named: String, template: StringName, place: Vector2, mirror: int, in
 		return null
 	RoomPlaces.strip(layout)
 	layout.name = named
-	var shape: PieceShape = _shapes.get(template) as PieceShape
+	# How it is placed, for the view: Feel draws a room's ground mirrored from its shape as it hears
+	# the room built (connected biomes CB4, `GroundShape.MIRROR_META`). The node is never flipped.
+	layout.set_meta(PieceShape.GROUND_MIRROR_META, Vector2i(1 if (mirror & PieceShape.MIRROR_X) != 0 else 0, 1 if (mirror & PieceShape.MIRROR_Y) != 0 else 0))
 	var piece := layout as Node2D
 	if piece != null:
-		# The art's stand-in for a mirrored piece (view only; the ground is drawn mirrored at layout
-		# from CB4): flipped about its own middle.
-		var flip := Vector2(-1.0 if (mirror & PieceShape.MIRROR_X) != 0 else 1.0, -1.0 if (mirror & PieceShape.MIRROR_Y) != 0 else 1.0)
-		piece.scale = flip
-		piece.position = place + Vector2(shape.size.x if flip.x < 0.0 else 0.0, shape.size.y if flip.y < 0.0 else 0.0)
+		piece.position = place
 	if _into != null:
 		_into.add_child(layout)
 		_into.move_child(layout, mini(index, _into.get_child_count() - 1))

@@ -9,6 +9,7 @@ extends "res://tests/support/suite.gd"
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
+const GroundShapeScript := preload("res://gameplay/feel/ground/ground_shape.gd")
 
 ## Where the walkers start: in the antechamber, on a line over the bridges and clear of the rooms' walls
 ## (the nave's sarcophagus stands on its sockets' line).
@@ -67,6 +68,8 @@ func test_the_biome_is_laid_at_its_places_under_one_grid() -> void:
 	check_equal(_into.get_child_count(), 5, "three rooms and two bridges")
 	check_equal((_biome.room_layout(1) as Node2D).position, _biome.map.room_places[1], "the nave at its place")
 	check(_biome.room_layout(1).find_children("*", "RoomSocket", true, false).is_empty(), "its sockets taken out")
+	check_equal(_biome.room_layout(1).get_meta(PieceShape.GROUND_MIRROR_META), Vector2i.ZERO, "it says it is not mirrored, for the ground's drawing")
+	check_equal(PieceShape.GROUND_MIRROR_META, GroundShapeScript.MIRROR_META, "the meta the ground's drawing reads (CB4)")
 	var bounds: Rect2 = _world.projectiles.bounds()
 	check(bounds.encloses(_biome.room_rect(2)) and bounds.encloses(_biome.room_rect(0)), "the grid covers the whole biome")
 	var grid: RoomGrid = _world.projectiles.grid()

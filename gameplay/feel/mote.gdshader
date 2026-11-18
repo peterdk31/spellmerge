@@ -17,8 +17,7 @@ render_mode blend_premul_alpha, world_vertex_coords;
 //   bounce, glow), its sway (sway, its rate, first shade, how far its shape reaches from its pixel
 //   in any frame and any way it turns: `Motes.reach_of`), its shape (frames, how they play: 0
 //   life, 1 loop, 2 pick; frames a second; 1 when it turns with its flight) and its light (x: 1
-//   for a kind drawn only where light falls, `MoteKind.lit_only`; y: its darkest shade drawn,
-//   `lit_darkest`), and their shapes as
+//   for a kind drawn only where light falls, `MoteKind.lit_only`), and their shapes as
 //   `shape_atlas`: SHAPE_SIZE squares, a kind's frames along its row, each pixel 0 none, 0.5 its
 //   shade, 1 the shade hotter;
 // - a spell's ramp is the shot's own, picked by the shot shaders' `look_of` from its core colour
@@ -45,9 +44,11 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // under each of its pixels: below the first of `lit_steps` it is not drawn (the dark), above each
 // step it is a shade brighter (shadow, base, light, white-hot), in the light's hue. Its life does
 // not cool it: it comes in through its shades and goes out through them (its brightest at the
-// middle of its life, `shade_from`), the dimmer of the two winning, so it never pops; a shade
-// darker than its `lit_darkest` is not drawn. With no light buffer (`light_on` off: the "Spell
-// light" setting off) it is not drawn.
+// middle of its life, `shade_from`), the dimmer of the two winning, so it changes a shade at a time
+// and is only ever gone from its shadow shade: it never pops. Its highlights are drawn as its body
+// (a hotter pixel would skip a shade). `Motes.lit_shade` and `Motes.lit_life_shade` are the same
+// lines on the CPU. With no light buffer (`light_on` off: the "Spell light" setting off) it is not
+// drawn.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 // A mote is in one infusion's colours (`Motes.set_infusions` picks it): its look is never woven.
@@ -61,8 +62,9 @@ uniform sampler2D shape_atlas : filter_nearest;
 uniform sampler2D light_buffer : filter_linear, repeat_disable;
 uniform bool light_on = false;
 // The light's brightest channel from which a lit-only mote shows in its shadow, base, light and
-// white-hot shade; and how much it takes the light's hue (0 none, 1 all of it).
-uniform vec4 lit_steps = vec4(0.015, 0.04, 0.09, 0.2);
+// white-hot shade (`SpellLight.lit_steps`, from the apply rect's own steps; Motes.DEFAULT_LIT_STEPS
+// until handed them); and how much it takes the light's hue (0 none, 1 all of it).
+uniform vec4 lit_steps = vec4(0.12, 0.16, 0.305, 0.45);
 uniform float lit_hue = 0.6;
 
 // Motes.LIFE_MAX, SOURCE_CODE, KIND_CODE, HEIGHT_MAX, MAX_KINDS, EXACT_SOURCE, TABLE_SOURCE;
@@ -80,7 +82,7 @@ const float GLOW_REACH = 2.0;
 // How far before now its way is read, to turn its shape (s).
 const float TURN_LOOK = 0.03;
 // How much quicker than its half life a lit-only mote comes into its first shade (and goes out of
-// it): 2 is in its brightest from a quarter of its life to three quarters.
+// it): 2 is in its brightest from a quarter of its life to three quarters (Motes.RISE_SPEED).
 const float RISE_SPEED = 2.0;
 
 // The mote's pixel (its shape's middle), its shade and the shade hotter, its glow, its shape (the
@@ -93,12 +95,10 @@ varying flat float m_glow;
 varying flat vec2 m_cell;
 varying flat vec2 m_turn;
 varying vec2 m_px;
-// A lit-only mote: 1 (else 0), the shade its life allows now (0 white-hot ... 3 shadow), its
-// darkest shade drawn, and its base and shadow shades (m_hot and m_rgb are then its white-hot and
-// light ones).
+// A lit-only mote: 1 (else 0), the shade its life allows now (0 white-hot ... 3 shadow), and its
+// base and shadow shades (m_hot and m_rgb are then its white-hot and light ones).
 varying flat float m_lit;
 varying flat float m_life_shade;
-varying flat float m_darkest;
 varying flat vec3 m_mid;
 varying flat vec3 m_lo;
 
@@ -165,7 +165,6 @@ void vertex() {
 	m_turn = vec2(1.0, 0.0);
 	m_lit = 0.0;
 	m_life_shade = 3.0;
-	m_darkest = 3.0;
 	m_mid = vec3(0.0);
 	m_lo = vec3(0.0);
 	vec4 light_of = alive ? texelFetch(kind_table, ivec2(3, k), 0) : vec4(0.0);
@@ -210,16 +209,16 @@ void vertex() {
 		VERTEX = p;
 		m_px = p;
 		m_at = pixel;
-		m_rgb = mote_shade(source, INSTANCE_CUSTOM.rgb, s, shade);
-		m_hot = mote_shade(source, INSTANCE_CUSTOM.rgb, s, max(shade - 1, 0));
 		m_glow = lit;
 		m_cell = vec2(frame, float(k)) * float(SHAPE_SIZE);
 		m_turn = turn;
-		if (lit_only) {
+		if (!lit_only) {
+			m_rgb = mote_shade(source, INSTANCE_CUSTOM.rgb, s, shade);
+			m_hot = mote_shade(source, INSTANCE_CUSTOM.rgb, s, max(shade - 1, 0));
+		} else {
 			// In through its shades and out again: its first shade at the middle of its life.
 			float rise = min((1.0 - abs(2.0 * t / life - 1.0)) * RISE_SPEED, 1.0);
 			m_lit = 1.0;
-			m_darkest = light_of.y;
 			m_life_shade = clamp(3.0 - floor(rise * (4.0 - shade_from)), shade_from, 3.0);
 			m_hot = mote_shade(source, INSTANCE_CUSTOM.rgb, s, 0);
 			m_rgb = mote_shade(source, INSTANCE_CUSTOM.rgb, s, 1);
@@ -243,19 +242,14 @@ void fragment() {
 		if (mark <= 0.25) {
 			discard;
 		}
-		vec3 shine = texture(light_buffer, SCREEN_UV).rgb;
+		vec3 shine = textureLod(light_buffer, SCREEN_UV, 0.0).rgb;
 		float most = max(shine.r, max(shine.g, shine.b));
-		// In the dark (below the first step) it is not drawn, a highlight neither.
+		// In the dark (below the first step) it is not drawn; a highlight is drawn as its body.
 		if (most < lit_steps.x) {
 			discard;
 		}
 		float step_of = most >= lit_steps.w ? 0.0 : (most >= lit_steps.z ? 1.0 : (most >= lit_steps.y ? 2.0 : 3.0));
-		// A highlight ("o") is a shade hotter than its light.
-		step_of -= mark > 0.75 ? 1.0 : 0.0;
-		float shade = max(max(step_of, m_life_shade), 0.0);
-		if (shade > m_darkest + 0.5) {
-			discard;
-		}
+		float shade = max(step_of, m_life_shade);
 		vec3 rgb = shade < 0.5 ? m_hot : (shade < 1.5 ? m_rgb : (shade < 2.5 ? m_mid : m_lo));
 		COLOR = vec4(rgb * mix(vec3(1.0), shine / max(most, 0.0001), lit_hue), 1.0);
 	} else if (mark > 0.75) {

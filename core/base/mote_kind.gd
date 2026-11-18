@@ -54,15 +54,13 @@ var look_layers: PackedInt32Array:
 @export var settles: StringName = &""
 ## Drawn only where light falls (docs/milestones/atmosphere.md, B: a room's dust in the air): its
 ## motes read the spell light's light buffer under them, unseen in the dark and a shade brighter
-## each step brighter the light is, in the light's hue; it comes and goes through its shades over
-## its life (dim, its brightest at the middle, dim) instead of cooling, so it never pops. With the
-## "Spell light" setting off it is not drawn at all. It does not glow (the light is its glow).
+## each step brighter the light is (the steps are the spell light's own, `SpellLight.lit_steps`), in
+## the light's hue; it comes and goes through its shades over its life (dim, its brightest at the
+## middle, dim) instead of cooling, and is only ever gone from its shadow shade, so it never pops
+## (`Motes.lit_shade`). Its highlights ("o") are drawn as its body: a hotter pixel would skip a
+## shade. With the "Spell light" setting off it is not drawn at all. It neither glows (the light is
+## its glow) nor settles.
 @export var lit_only: bool = false
-## A lit-only kind's darkest shade drawn (0 white-hot ... 3 shadow): in dimmer light, or dimmer in
-## its life, it is not drawn. 3 (the default) shows it in every shade; 1 never darker than its
-## light shade, for a room whose floor is brighter than the kind's dark shades (the hub's grass,
-## where a shadow-shade speck reads as dirt).
-@export_range(0, 3) var lit_darkest: int = 3
 
 @export_group("Flight")
 ## Down the fake height, in px/s/s; below 0 it rises (an ember), 0 it keeps its height.
@@ -194,10 +192,10 @@ func problems() -> PackedStringArray:
 	for look in look_ids:
 		if not LookNames.known(look):
 			found.append("%s: %s is not a look (%s)" % [id, look, ", ".join(LookNames.NAMES)])
-	if lit_only and lit_darkest < shade_from:
-		found.append("%s: its darkest lit shade (%d) is hotter than its first (%d), so it is never drawn" % [id, lit_darkest, shade_from])
 	if lit_only and glow > 0.0:
 		found.append("%s: a lit-only kind does not glow (glow 0): the light under it is its glow" % id)
+	if lit_only and settles != &"":
+		found.append("%s: a lit-only kind leaves no mark: it is seen only in the light, a mark everywhere" % id)
 	if settles != &"" and gravity <= 0.0:
 		found.append("%s: only a kind that falls comes to rest, so one that rises leaves no mark" % id)
 	if speed.x > speed.y or up.x > up.y or life.x > life.y:

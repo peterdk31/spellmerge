@@ -23,7 +23,8 @@ uniform sampler2D screen : hint_screen_texture, filter_nearest, repeat_disable;
 // (`RoomBase.shade`; white: an even dark), multiplied together.
 uniform float ambient = 1.0;
 uniform vec3 shade = vec3(1.0);
-// From how bright a light the world is lit, and bright; and how much each step adds.
+// From how bright a light the world is lit, and bright (set from SpellLight.LIT_FROM and
+// BRIGHT_FROM, which the lit-only motes' steps come from too); and how much each step adds.
 uniform float lit_from = 0.16;
 uniform float bright_from = 0.45;
 uniform float lit_gain = 0.22;

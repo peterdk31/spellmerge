@@ -53,9 +53,10 @@ extends Resource
 ## the whole room by Feel (gameplay/feel/air_motes.gd), its `rate` the motes a second for every
 ## AIR_AREA square pixels of the room in view, from anywhere in it, each shown `height` px over a
 ## point of the floor, thrown its `way` within its `spread`, in its `colours`; its `from`, `at`,
-## `size` and the rest of where a source leaves from are not read. Its kind is usually lit only
-## (`MoteKind.lit_only`: the crypt's dust, seen only in a candle's pool, a wizard's light or a
-## passing spell's). Null (the default): nothing drifts, the room is as it was. Drawn only.
+## `size` and the rest of where a source leaves from are neither read nor checked
+## (`problems_of_air`). Its kind is usually lit only (`MoteKind.lit_only`: the crypt's dust, seen
+## only in a candle's pool, a wizard's light or a passing spell's). Null (the default): nothing
+## drifts, the room is as it was. Drawn only.
 @export var air: MoteSource = null
 ## Whether its biome's cover kinds fill its open floor by themselves (ground cover GC2,
 ## `CoverLayout.of`: each `CoverKind` whose `biomes` names its `biome`). Off: only its fields
@@ -121,16 +122,24 @@ func template_problems(known: Array[StringName]) -> PackedStringArray:
 	return found
 
 
-## What is wrong with its `air`, one line each (empty when it is fine or there is none): a source's
-## own problems, with no art to take colours from.
+## What is wrong with its `air`, one line each (empty when it is fine or there is none).
 func air_problems() -> PackedStringArray:
 	var found := PackedStringArray()
-	if air == null:
-		return found
-	for problem in air.problems(false):
+	for problem in problems_of_air(air):
 		found.append("%s's air: %s" % [id, problem])
-	if air.stand:
-		found.append("%s's air: the air's motes are given off, never standing" % id)
+	return found
+
+
+## What is wrong with `source` as a room's air (empty when it is fine or null): what it gives off
+## (`MoteSource.stream_problems`, with no art to take colours from), never where a source leaves
+## from, which the air does not read; and its motes are given off, never standing.
+static func problems_of_air(source: MoteSource) -> PackedStringArray:
+	var found := PackedStringArray()
+	if source == null:
+		return found
+	found.append_array(source.stream_problems(false))
+	if source.stand:
+		found.append("the air's motes are given off, never standing")
 	return found
 
 

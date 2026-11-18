@@ -791,7 +791,7 @@ func use_motes(motes: MotesScript) -> void:
 		# A spell's motes in each of its infusions' colours (`Motes.set_infusions`).
 		pool.set_infusions(InfusionTable.of_registry(registry))
 		# Its lit-only kinds read the spell light's buffer (atmosphere B).
-		pool.set_light(light.buffer() if light != null else null)
+		pool.set_light(light.buffer() if light != null else null, SpellLightScript.lit_steps())
 	cards.use_motes(pool)
 	if pool != null:
 		pool.use_cards(cards if pool.has_card_kinds() else null)
@@ -886,7 +886,7 @@ func _make_light(on: bool) -> void:
 		add_child(light)
 	# The motes' lit-only kinds read the light buffer, or with none are not drawn (atmosphere B).
 	if pool != null:
-		pool.set_light(light.buffer() if light != null else null)
+		pool.set_light(light.buffer() if light != null else null, SpellLightScript.lit_steps())
 
 
 ## Feel's flash rows, just uploaded (the flares', the explosions' and the arcs'; `slots` rows

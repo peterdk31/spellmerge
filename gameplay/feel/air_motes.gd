@@ -5,8 +5,10 @@ extends RefCounted
 ## `RoomBase.AIR_AREA` of that floor, so a big room and a small one look as thick and nothing is
 ## given off where nobody looks. Each mote leaves from a point anywhere in that part at random,
 ## shown its source's `height` over the floor, thrown its `way` within its `spread`, in one of its
-## colours at random, never more than RING_SHARE of the motes' ring at once, as motes of many a frame (`often`: in a crowded frame they give way to the
-## moments and the hits first). Its kind is usually lit only (`MoteKind.lit_only`), so the dust is
+## colours at random, never more than RING_SHARE of the motes' ring at once, as motes of many a
+## frame (`often`: in a crowded frame they give way to the moments and the hits first). Its colours
+## are rows of the ramp table, asked for again whenever the table writes a row (`RampTable.writes`),
+## so a long fight's new colours taking the oldest rows never recolour the air. Its kind is usually lit only (`MoteKind.lit_only`), so the dust is
 ## seen only where a light falls; that is the motes' drawing, not this.
 ##
 ## It knows the room only by what the spectacle hands it (`use`: the air, `give_off`: the room's
@@ -30,6 +32,9 @@ const RING_SHARE: float = 0.125
 var look: MoteSource = null
 var sources: PackedInt32Array = PackedInt32Array()
 var _owed: float = 0.0
+## Its ramps (read once), and the table's writes when its sources were last asked for.
+var _ramps: Array[PackedColorArray] = []
+var _written: int = -1
 var _table: RampTableScript = null
 var _rng := RandomNumberGenerator.new()
 var _last: float = -1.0
@@ -49,16 +54,18 @@ func _init(table: RampTableScript) -> void:
 func use(air: MoteSource) -> void:
 	look = null
 	sources = PackedInt32Array()
+	_ramps = []
 	_owed = 0.0
 	_warned = false
 	if air == null:
 		return
-	var problems: PackedStringArray = air.problems(false)
+	var problems: PackedStringArray = RoomBase.problems_of_air(air)
 	if not problems.is_empty():
 		push_warning("The room's air gives off nothing: %s." % "; ".join(problems))
 		return
-	for ramp: PackedColorArray in air.ramps():
-		sources.append(_table.source(ramp))
+	_ramps = air.ramps()
+	sources.resize(_ramps.size())
+	_resolve()
 	if sources.is_empty():
 		push_warning("The room's air gives off nothing: it has no colours.")
 		return
@@ -95,6 +102,8 @@ func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2) -> void
 	var life: Vector2 = pool.kinds()[k].life
 	var most: float = float(pool.cap()) * RING_SHARE / maxf((life.x + life.y) * 0.5, 0.05)
 	_owed += minf(look.rate * area.get_area() / RoomBase.AIR_AREA, most) * dt
+	if _table.writes != _written:
+		_resolve()
 	var height: float = look.height if look.height > 0.0 else -1.0
 	while _owed >= 1.0:
 		_owed -= 1.0
@@ -102,3 +111,11 @@ func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2) -> void
 		var ramp: int = sources[_rng.randi() % sources.size()]
 		pool.throw_part(k, at, look.way, ramp, Color.WHITE, 1, look.reach, look.spread, 1.0, false, true, Vector2.ZERO, 1.0, 0, height)
 		given += 1
+
+
+## Its ramps' rows in the table, asked for again (each kept, or written again where its row went to
+## other colours), into `sources` (no new array).
+func _resolve() -> void:
+	for i in _ramps.size():
+		sources[i] = _table.source(_ramps[i])
+	_written = _table.writes

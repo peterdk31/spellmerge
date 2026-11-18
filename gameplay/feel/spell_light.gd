@@ -64,6 +64,14 @@ const CUE_LIGHTS: int = 64
 ## The steps the light comes in by default (`light_apply.gdshader`'s `bands`): 3 (dim, lit,
 ## bright); 0 is smooth. The owner's choice between them is open (2026-11-04).
 const DEFAULT_BANDS: int = 3
+## From how bright a light (its brightest channel in the buffer) the floor is lit, and bright: the
+## apply rect's steps (`light_apply.gdshader`'s `lit_from`, `bright_from`), set from here. What
+## else draws by the light takes its steps from the same numbers (`lit_steps`), so they stay in
+## step when these are tuned.
+const LIT_FROM: float = 0.16
+const BRIGHT_FROM: float = 0.45
+## A lit-only mote's faint first step, a share of LIT_FROM (`lit_steps`): just inside a pool's edge.
+const FAINT_SHARE: float = 0.75
 ## A flash's light reaches this many times its square's half size, plus FLASH_PAD (px); an
 ## explosion's square is already BLAST_SPAN radii, so it reaches about that far.
 const FLASH_REACH: float = 1.6
@@ -172,6 +180,8 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 	material.shader = APPLY_SHADER
 	material.set_shader_parameter(&"light_buffer", viewport.get_texture())
 	material.set_shader_parameter(&"bands", bands)
+	material.set_shader_parameter(&"lit_from", LIT_FROM)
+	material.set_shader_parameter(&"bright_from", BRIGHT_FROM)
 	apply.material = material
 	add_child(apply)
 
@@ -281,6 +291,13 @@ func follow() -> void:
 ## B): handed over, nothing asked of them.
 func buffer() -> Texture2D:
 	return viewport.get_texture()
+
+
+## The light's brightest channel from which a lit-only mote (`MoteKind.lit_only`) shows in its
+## shadow, base, light and white-hot shade: faint just inside where the floor is lit (FAINT_SHARE of
+## LIT_FROM), then at LIT_FROM, halfway to BRIGHT_FROM and at BRIGHT_FROM, the apply rect's steps.
+static func lit_steps() -> Vector4:
+	return Vector4(LIT_FROM * FAINT_SHARE, LIT_FROM, (LIT_FROM + BRIGHT_FROM) * 0.5, BRIGHT_FROM)
 
 
 ## The room's light where nothing lights it (`RoomBase.ambient`; 1.0 the room as it is), and the

@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_base")
 kind = &"air_glimmer"
-rate = 3.0
+rate = 8.0
 way = Vector2(0, -1)
 spread = 360.0
 reach = 0.0
 height = 16.0
-colours = Array[StringName]([&"ice", &"bone"])
+colours = Array[StringName]([&"bone", &"spark"])

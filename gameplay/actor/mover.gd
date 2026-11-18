@@ -311,11 +311,12 @@ func _teleport(move: Vector2, tag: int) -> void:
 	var start: Vector2 = actor.global_position
 	var goal: Vector2 = start + move
 	if actor.projectiles != null:
-		var reached: Vector2 = actor.projectiles.clip_to_walls(start, goal)
+		var grid: RoomGrid = actor.projectiles.grid()
+		var reached: Vector2 = grid.clip_to_walls(start, goal)
 		if reached != goal:
 			reached = reached.move_toward(start, TELEPORT_CLEARANCE)
 		goal = reached
-		while goal != start and actor.projectiles.circle_blocked(goal, actor.wall_radius()):
+		while goal != start and grid.circle_blocked(goal, actor.wall_radius()):
 			goal = goal.move_toward(start, TELEPORT_BACKOFF)
 	actor.global_position = goal
 	if actor.events != null:

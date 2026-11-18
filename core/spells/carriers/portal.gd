@@ -167,7 +167,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 
 ## Where a gate meant for `to` opens: there, or short of the first wall from `from`, by `radius`.
 func _clear_of_walls(from: Vector2, to: Vector2, radius: float) -> Vector2:
-	var clipped: Vector2 = kit.projectiles.clip_to_walls(from, to)
+	var clipped: Vector2 = kit.projectiles.grid().clip_to_walls(from, to)
 	if clipped.is_equal_approx(to):
 		return to
 	var back: float = minf(radius, from.distance_to(clipped))
@@ -290,7 +290,7 @@ func _out_point(to: int, way: Vector2, radius: float) -> Vector2:
 	var centre: Vector2 = kit.projectiles.gate_position(to)
 	var out_way: Vector2 = way.normalized() if not way.is_zero_approx() else kit.projectiles.gate_face(to)
 	var out: Vector2 = centre + out_way * (kit.projectiles.gate_radius(to) + radius + 1.0)
-	return kit.projectiles.clip_to_walls(centre, out)
+	return kit.projectiles.grid().clip_to_walls(centre, out)
 
 
 ## The bodies whose middle went into a gate come out of where it leads (P6): from a mouth, its

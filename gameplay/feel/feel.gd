@@ -181,6 +181,8 @@ const MUSIC_POLL: float = BodySoundsScript.POLL
 ## The share of the effect slots a frame's hit flashes leave to the rest (casts, kills,
 ## statuses): `effect_slots` / this (`_flashes_shown`).
 const HIT_FLASH_RESERVE: int = 4
+## How big a spot of wall one staff's impact look shows on in a frame (`_wall_impact`), in pixels.
+const WALL_SPOT: float = 16.0
 ## The voices a frame's hit sounds may start (`_hit_sounds`): past them each would only cut short
 ## one of the same frame before it was heard, and the rest stay free for kills, casts and cues.
 const HIT_SOUNDS_PER_FRAME: int = SOUND_VOICES / 2
@@ -1542,13 +1544,26 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 
 
 ## A shot of `caster`'s (tagged `tag`) ended on a wall or pillar at `position`, flying `direction`:
-## knocked back off the surface, the shot's own motes and the wall's, and its impact.
+## knocked back off the surface, the shot's own motes and the wall's, and its impact. As on a body,
+## only a staff's first shot to end on a spot of the wall (WALL_SPOT pixels a side) shows its look
+## in a frame (`_body_looks`, by the spot): a volley into one wall reads as one burst a spot, not
+## dozens stacked (performance, 2026-11-17: wall impacts were Feel's costliest, uncapped).
 func _wall_impact(caster: int, tag: int, position: Vector2, direction: Vector2) -> void:
+	if not _body_looks.take(_wall_spot(position), SpectacleScript.hit_group(caster, tag)):
+		return
 	var ramp: int = _ramp_of(caster)
 	_spectacle.begin_hit(caster, tag)
 	_spectacle.shed_on_wall(ramp, position, -direction)
 	_show_impact(caster, ramp, position, direction)
 	_spectacle.end_hit()
+
+
+## The key of the wall spot `at` is on for `_body_looks`: below zero, so it is never a body's
+## instance id (those are positive).
+static func _wall_spot(at: Vector2) -> int:
+	var x: int = floori(at.x / WALL_SPOT) & 0xFFFF
+	var y: int = floori(at.y / WALL_SPOT) & 0xFFFF
+	return -1 - (y * 65536 + x)
 
 
 ## A bolt or orbit shot whose life ran out goes off: the cue `expire` (a small pop of its own

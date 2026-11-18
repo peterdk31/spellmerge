@@ -302,6 +302,16 @@ var _hit_spell: int = 0
 ## The shot that hit (the projectile manager's slot from `projectile_hit`), -1 for none: what the
 ## hit sets off names it as its `shot`, as `_tag` its tag.
 var _slot: int = -1
+## How many of a step's shot hits the spell hit being dealt stands for (the projectile manager's
+## `impact_count`, merged hits; 1 for any other): its damage and its heal are that many times one's;
+## its push, statuses, reactions and everything else the hit sets off (payloads, chains, siphon) one
+## hit's.
+var _hit_count: int = 1
+## The share of one hit in the amount the next `_hit` deals (1 / its merged hits, set by `_strike`
+## right before it; 1 for any other): its static discharge is one hit's, as one by one only the
+## first hit discharges. Read and put back to 1 at the top of `_hit`, so a hit its events set off
+## counts whole.
+var _merged_one: float = 1.0
 
 # Burn damage due this step, sent after the status loop (hits can free rows): body, who, points.
 var _due_node: Array[Node2D] = []
@@ -443,6 +453,53 @@ func setup() -> void:
 		events.cue_shown.connect(_on_cue_shown)
 	if not events.projectile_impact.is_connected(_on_projectile_impact):
 		events.projectile_impact.connect(_on_projectile_impact)
+	if not events.hit_room_asked.is_connected(_on_hit_room_asked):
+		events.hit_room_asked.connect(_on_hit_room_asked)
+	if not events.hit_damage_asked.is_connected(_on_hit_damage_asked):
+		events.hit_damage_asked.connect(_on_hit_damage_asked)
+
+
+## What `target` can still take from hits, for the projectile manager's merged hits
+## (`hit_room_asked`, hit batch A2): its health, its hex and its barrier (charges and the spell it
+## spares), whatever spell hits it; a spell's damage a hit is `_on_hit_damage_asked`'s. A reaction's
+## extra damage is not foreseen, so a body may still take a shot or two after it dies. A body it
+## cannot hurt, or whose health no hit takes (invincible), leaves the room unknown: every shot hits
+## as it comes.
+func _on_hit_room_asked(target: Node, room: HitRoom) -> void:
+	if room == null or target == null or not is_instance_valid(target) or spells == null:
+		return
+	var row: int = _row_of_node(target)
+	if row == ActorsScript.NONE or not _can_hurt(row):
+		return
+	# A body whose health no hit takes (an invincible prop: the fountain, the hub's stones) is never
+	# killed by the pass, whatever its health says.
+	if _body[row] == BODY_ACTOR and (_nodes[row] as Actor).health != null and (_nodes[row] as Actor).health.invincible:
+		return
+	var health: float = health_of(target)
+	if health < 0.0:
+		return
+	room.known = true
+	room.health = health
+	var at: int = row * STATUS_COUNT
+	if _status_left[at + ST_HEX] > 0.0:
+		room.hexed = true
+		room.hex = _status_power[at + ST_HEX]
+	# Its barrier's charges, each a hit it takes whole, and the spell they let through (`_blocks`).
+	if _shield[row] > 0 and _shield_left[row] > 0.0:
+		room.charges = _shield[row]
+		room.spares = _shield_spares[row]
+
+
+## One hit's damage of the spell `tag` (shot `shot`, for a shot with a hit profile of its own) before
+## the body's hex, as `_strike` deals it before reactions, for the manager's merged hits
+## (`hit_damage_asked`, hit batch A2): 0 for a heal or a spell with no profile.
+func _on_hit_damage_asked(tag: int, shot: int, answer: HitDamage) -> void:
+	if answer == null or spells == null:
+		return
+	var profile: HitProfile = spells.hit_profile(tag, shot)
+	if profile == null or profile.heal > 0:
+		return
+	answer.damage = profile.damage * _power_of(tag)
 
 
 ## A swing's block (the projectile manager's `impact_carrier` while it is sent, no shot of its own)
@@ -848,6 +905,8 @@ func hit(caster: int, target: Variant, amount: float, direction: Vector2 = Vecto
 ## speck takes 0.3 health). `team` is the row's team when the caller read it already (a spell's
 ## hit, `_apply_spell`), else TEAM_UNREAD. Sets `_discharged`.
 func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float, kind: StringName, profile: HitProfile, quiet: bool, team: int = TEAM_UNREAD) -> bool:
+	var one_share: float = _merged_one
+	_merged_one = 1.0
 	_discharged = false
 	if amount <= 0.0 or not _can_hurt(row):
 		return false
@@ -903,7 +962,7 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 		_die(row, by, where, team)
 	if discharge_share > 0.0:
 		# A charged actor is a lightning rod: the charge leaves in one step to the other teams near.
-		_discharge(actor, team, node, centre, amount * discharge_share / 100.0)
+		_discharge(actor, team, node, centre, amount * one_share * discharge_share / 100.0)
 	_discharged = discharge_share > 0.0
 	return true
 
@@ -1107,13 +1166,16 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 	var saved_tag: int = _tag
 	var saved_slot: int = _slot
 	var saved_spell: int = _hit_spell
+	var saved_count: int = _hit_count
 	_tag = tag
 	_slot = shot
 	_hit_spell = tag
+	_hit_count = maxi(projectiles.impact_count, 1) if projectiles != null else 1
 	_apply_spell(caster, row, position, profile, profile.kind)
 	_tag = saved_tag
 	_slot = saved_slot
 	_hit_spell = saved_spell
+	_hit_count = saved_count
 
 
 ## A spell's hit on the row `row`, struck at `position`: a mend heals whatever it hits, of any
@@ -1123,7 +1185,7 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kind: StringName) -> void:
 	var node: Node2D = _nodes[row]
 	if profile.heal > 0:
-		_heal(by, row, profile.heal)
+		_heal(by, row, profile.heal * _hit_count)
 	else:
 		_strike(by, row, position, profile, kind)
 	if profile.barrier > 0 and _same(row, node):
@@ -1165,6 +1227,15 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 	var push: float = strength
 	if carried:
 		strength = 0.0
+	# A merged hit (`_hit_count`): a barrier takes each of its hits whole, one charge each, as it
+	# would have one by one; the rest land as one hit of their damage together.
+	var landing: int = _hit_count
+	while landing > 1 and _blocks(row):
+		_hit(by, row, damage, direction, strength, kind, profile, false, team)
+		landing -= 1
+	var one_hit: float = damage
+	damage *= float(landing)
+	_merged_one = 1.0 / float(landing)
 	if not _hit(by, row, damage, direction, strength, kind, profile, false, team):
 		if carried and _same(row, node):
 			# A barrier took the hit whole: nothing of it carries the body either.
@@ -1180,7 +1251,8 @@ func _strike(by: int, row: int, position: Vector2, profile: HitProfile, kind: St
 			_carried_by[row] = spells.plow().carrier_body_of(row)
 		elif strength > 0.0:
 			# A push replaces the knockback, so it replaces the slam too.
-			_slam[row] = _slam_of(profile, damage, gust, power)
+			# One hit's slam, whatever its count (each of its hits would set it anew).
+			_slam[row] = _slam_of(profile, one_hit, gust, power)
 			_slam_by[row] = by
 			_slam_tag[row] = _hit_spell
 	# What the reactions kill is not the spell's own kill: no `kill_landed`.
@@ -1698,7 +1770,7 @@ func _check_slam(row: int) -> void:
 	var from: Vector2 = _position_of(_nodes[row]) + _hurt_offset[row]
 	var way: Vector2 = _knock[row] / speed
 	var to: Vector2 = from + way * (HitShape.reach_toward(_hurt_half[row], _hurt_radius[row], way) + SLAM_REACH)
-	if projectiles.clip_to_walls(from, to) != to:
+	if projectiles.grid().clip_to_walls(from, to) != to:
 		_slam_due_node.append(_nodes[row])
 		_slam_due_by.append(_slam_by[row])
 		_slam_due_amount.append(_slam[row])

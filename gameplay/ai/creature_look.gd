@@ -166,13 +166,15 @@ func step(delta: float) -> void:
 	elif _pose != Pose.IDLE or _showing:
 		# Idle with nothing showing changes nothing either.
 		_update_sprite()
+	# The staff animation's aim, read once for the step (each read walks its table).
+	var dir: Vector2 = pose_dir()
 	if not _parts.is_empty():
 		# Only a layered body draws its pose (a body of one sprite has its strips above).
 		var transition: bool = ai != null and ai.brain.state == AIBrain.State.TRANSITION
-		_body.step(actor, delta, full_speed, telegraphing, transition, is_hurt(), pose_dir())
+		_body.step(actor, delta, full_speed, telegraphing, transition, is_hurt(), dir)
 		for part in _parts:
 			part.show_pose(_body)
-	_hop(delta)
+	_hop(delta, dir)
 
 
 ## The pose a layered body shows now (`BodyPose.Pose`; IDLE for a body of one sprite, which reads
@@ -218,8 +220,8 @@ func lift() -> float:
 
 
 ## The hop while walking, the bob while standing, and its cast's staff animation, on the sprite and
-## the face.
-func _hop(delta: float) -> void:
+## the face; `dir` is the staff animation's aim this step (`pose_dir`).
+func _hop(delta: float, dir: Vector2) -> void:
 	_hop_time += delta
 	var walking: bool = hops and actor.velocity.length_squared() > HOP_SPEED * HOP_SPEED
 	var up: float = 0.0
@@ -228,8 +230,7 @@ func _hop(delta: float) -> void:
 	else:
 		up = roundf((sin(_hop_time * HOP_RATE) * 0.5 + 0.5) * HOP_IDLE)
 	# The staff animation of its cast (ActorLook's pose: lift, push, shake) on top.
-	var at: Vector2 = Vector2(0.0, -up) + pose_offset(_hop_time)
-	apply_pose(sprite, _face, false)
+	var at: Vector2 = Vector2(0.0, -up) + show_pose(sprite, _face, false, _hop_time, dir)
 	if at != _lift:
 		# Whole pixels: most steps the body is where it was.
 		_lift = at

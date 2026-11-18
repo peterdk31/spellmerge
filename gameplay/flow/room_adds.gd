@@ -99,7 +99,7 @@ func clear() -> void:
 ## Where the `n`-th of `of` adds stands on a ring round `centre`, a caller whose hurt shape reaches
 ## `caller_reach`, for an add of `radius`: evenly spaced, the first turned by `turn` from straight
 ## down (the adds stood before, so a wave does not stand on the burst), slid out from the
-## middle against the walls (`slide`, the projectile manager's `slide_body`), so none stands in a
+## middle against the walls (`slide`, the room grid's `slide_body`), so none stands in a
 ## wall or a blocking prop.
 static func ring(centre: Vector2, caller_reach: float, radius: float, n: int, of: int, slide: Callable, turn: int = 0) -> Vector2:
 	var angle: float = TAU * float(n) / float(maxi(of, 1)) + RING_TURN * float(turn)

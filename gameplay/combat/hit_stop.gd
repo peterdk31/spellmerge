@@ -46,7 +46,7 @@ const KIND_STOP: Dictionary[StringName, float] = {
 }
 
 ## Not state: the services it holds and stops through, and caches of content (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"actors", &"projectiles", &"registry", &"sim", &"_cues", &"_reaction_cues", &"_carrier_card_cues"]
+const DERIVED: Array[StringName] = [&"actors", &"projectiles", &"registry", &"sim", &"_cues", &"_reaction_cues", &"_carrier_card_cues", &"_impact_cues"]
 
 ## What it holds and stops through, handed over by its owner (Combat's `bind`): the bodies' holds
 ## (the actor table), the shots' (the projectile manager), the cues (the registry) and the
@@ -64,6 +64,9 @@ var _reaction_next: Dictionary[StringName, int] = {}
 var _cues: Dictionary = {}
 var _reaction_cues: Dictionary = {}
 var _carrier_card_cues: Dictionary = {}
+## A carrier card's impact cue when it holds or stops anything, else null (`impact`: every shot that
+## strikes asks, and most cards' impact cues are looks alone).
+var _impact_cues: Dictionary[StringName, CueBase] = {}
 
 
 ## Hand over the services (Combat's, each time they may have changed: its setup and its step).
@@ -95,7 +98,11 @@ func hit(by: int, target: int, kind: StringName, shot: int) -> void:
 
 ## The moment of the cue `id` (content/cues): its holds and its game-wide stop.
 func cue(id: StringName, caster: int, target: int = ActorsScript.NONE, shot: int = -1) -> void:
-	var of: CueBase = _cue(id)
+	_play(_cue(id), caster, target, shot)
+
+
+## The holds and the game-wide stop of the cue `of` (null: none), as `cue` says.
+func _play(of: CueBase, caster: int, target: int, shot: int) -> void:
 	if of == null:
 		return
 	if of.stop_game > 0.0:
@@ -143,9 +150,17 @@ func carrier_ended(caster: int, carrier_card: StringName) -> void:
 
 ## A shot of `caster`'s, of the card `carrier_card`, struck a body or a wall: its card's `impact_cue`.
 func impact(caster: int, carrier_card: StringName) -> void:
-	var id: StringName = _carrier_card_cue(carrier_card, 0)
-	if id != &"":
-		cue(id, caster)
+	if not _impact_cues.has(carrier_card):
+		var of: CueBase = _cue(_carrier_card_cue(carrier_card, 0))
+		_impact_cues[carrier_card] = of if of != null and _holds(of) else null
+	var acting: CueBase = _impact_cues[carrier_card]
+	if acting != null:
+		_play(acting, caster, ActorsScript.NONE, -1)
+
+
+## True when the cue `of` holds a body or stops the game (`_play` does something with it).
+static func _holds(of: CueBase) -> bool:
+	return of.stop_game > 0.0 or of.hold > 0.0 or of.hold_target > 0.0
 
 
 func _freeze(shot: int, seconds: float) -> void:

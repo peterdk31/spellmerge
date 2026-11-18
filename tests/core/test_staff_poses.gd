@@ -109,3 +109,28 @@ func test_every_carrier_moves_the_staff() -> void:
 		var card: Resource = arena.registry.call("get_resource", &"spells", id)
 		if card is CarrierCard:
 			check(not (card as CarrierCard).staff_pose.is_empty(), "%s has a staff animation" % id)
+
+
+## A finished animation is known to be over (`StaffPoses._pose_ended`, so its looks stop walking its
+## keys each step): a new cast plays again, and a snapshot that gives back an earlier clock plays it
+## where that clock has it.
+func test_an_animation_known_over_plays_again_when_cast_again_and_after_a_restore() -> void:
+	_card(&"posed_again", &"atom", [{"phase": "after", "at": 0.1, "lift": 4}, {"phase": "after", "at": 0.3}] as Array[Dictionary])
+	_cast(&"posed_again")
+	arena.run(0.1)
+	var during: float = float(arena.spells.get("_clock"))
+	var lift: float = arena.spells.poses().staff_pose(0).y
+	check(lift > 1.0, "it lifts while it plays: %s" % lift)
+	arena.run(0.4)
+	check_equal(arena.spells.poses().staff_pose_dir(0), Vector2.ZERO, "then it is over")
+	check_equal(arena.spells.poses().staff_pose_dir(0), Vector2.ZERO, "and stays over when asked again")
+	# As a snapshot restore does: the state's clock back to while it played, then rebuild_derived.
+	var after: float = float(arena.spells.get("_clock"))
+	arena.spells.set("_clock", during)
+	arena.spells.poses().rebuild_derived()
+	check_equal(arena.spells.poses().staff_pose(0).y, lift, "a restore to an earlier clock shows it where it was")
+	arena.spells.set("_clock", after)
+	check_equal(arena.spells.poses().staff_pose_dir(0), Vector2.ZERO, "over again at the later clock")
+	_cast(&"posed_again")
+	arena.run(0.1)
+	check(arena.spells.poses().staff_pose(0).y > 1.0, "cast again, it plays again")

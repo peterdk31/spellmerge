@@ -333,7 +333,7 @@ func _set_segments(at: int, spell: CompiledSpell, origin: Vector2) -> void:
 		var stop: float = INF
 		if not ghost:
 			var to: Vector2 = origin + _segment_way(k) * far
-			var wall: Vector2 = kit.projectiles.clip_to_walls(origin, to)
+			var wall: Vector2 = kit.projectiles.grid().clip_to_walls(origin, to)
 			if not wall.is_equal_approx(to):
 				stop = origin.distance_to(wall)
 		_pu_stop[base + k] = stop

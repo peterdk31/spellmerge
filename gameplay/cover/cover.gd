@@ -56,7 +56,7 @@ const NEIGHBOURS: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0
 const DERIVED: Array[StringName] = [
 	&"events", &"actors", &"registry", &"sim", &"layout", &"_moves", &"_given", &"_use_given", &"_said",
 	&"_changed_cells", &"_changed_states", &"_ids", &"_spread_cells", &"_spread_by",
-	&"_next_ids", &"_next_keys", &"_next_left", &"_rest_harms", &"_harming",
+	&"_next_ids", &"_next_keys", &"_next_left", &"_rest_harms", &"_harming", &"_harming_rows",
 ]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads (and the
@@ -77,6 +77,9 @@ var _rest_harms: bool = false
 ## laid, entered or restored, and kept with each cell's change, so a look with none returns at once
 ## (ash and grass at rest harm nobody).
 var _harming: int = 0
+## The same count for each row of the room's cells, so a look passes over the rows of its window with
+## none (a fire is a few rows of the room).
+var _harming_rows: PackedInt32Array = PackedInt32Array()
 ## Kinds given instead of the registry's (`use_kinds`: tests, before the game has cover of its own).
 var _given: Array[CoverKind] = []
 var _use_given: bool = false
@@ -216,6 +219,8 @@ func look(at: Vector2, reach: float, sight: CoverSight) -> void:
 	var harms_table: PackedByteArray = _moves.harms_table
 	var width: int = _moves.width
 	for y in range(sight.origin.y, sight.origin.y + sight.rows):
+		if _harming_rows[y] == 0:
+			continue
 		for x in range(sight.origin.x, sight.origin.x + sight.columns):
 			var cell: int = y * layout.columns + x
 			var kind: int = cells[cell] - 1
@@ -413,7 +418,9 @@ func _moved_to(cell: int, element: int) -> int:
 func _enter(cell: int, to: int) -> void:
 	var was: int = _state[cell]
 	var row: int = (layout.cells[cell] - 1) * _moves.width
-	_harming += int(_moves.harms_table[row + to]) - int(_moves.harms_table[row + was])
+	var harms: int = int(_moves.harms_table[row + to]) - int(_moves.harms_table[row + was])
+	_harming += harms
+	_harming_rows[cell / layout.columns] += harms
 	_state[cell] = to
 	_age[cell] = 0.0
 	if was == 0 and to != 0:
@@ -482,14 +489,18 @@ func _size_at_rest() -> void:
 ## How many cells are in a state that gives a status (`_harming`), from the state.
 func _count_harming() -> void:
 	_harming = 0
+	_harming_rows.resize(0)
 	if layout == null or _moves == null or _state.size() != layout.cells.size():
 		return
+	_harming_rows.resize(layout.rows)
+	_harming_rows.fill(0)
 	var cells: PackedByteArray = layout.cells
 	var harms_table: PackedByteArray = _moves.harms_table
 	var width: int = _moves.width
 	for cell in _state.size():
 		if cells[cell] > 0 and harms_table[(cells[cell] - 1) * width + _state[cell]] != 0:
 			_harming += 1
+			_harming_rows[cell / layout.columns] += 1
 
 
 func _clear_touches() -> void:

@@ -65,7 +65,7 @@ extends Node2D
 ##
 ## The move (online-ready N6): `move(delta)` slides the body, its footprint's circle (`wall_radius`),
 ## along the walls (the room's, the solid shots' and the footprints', the projectile manager's
-## wall grid, `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
+## wall grid, `RoomGrid.slide_body`), the same to the bit on every machine; `velocity` is then what it
 ## moved by over the step, so a body against a wall keeps only its slide. Actors walk through each
 ## other (Combat's push parts them); spells find them by their hurt circles. No physics engine.
 ## Where the move left it, its circle tells every actor whose touch area it overlaps (`touched`,
@@ -147,11 +147,16 @@ signal touched(by: int)
 ## The touch areas it overlapped after its last move (`_touch`), scratch.
 const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim", &"_components", &"_touching"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"_looks", &"damage_numbers"]
+const VIEW: Array[StringName] = [&"_looks", &"damage_numbers", &"_look_time", &"_looks_later", &"step_looks_due", &"_on_screen"]
 ## State as who it points at: the controller driving it now, which may be another body's (a
 ## possessor's, `possession.gd`). Its own controller's state is walked through `home_controller`,
 ## and who drives what is the controller's `driving`.
 const REFS: Array[StringName] = [&"controller"]
+## The most seconds of ticks its looks catch up at once (`step_looks_due`): a body back on screen
+## after a long while off it plays a moment, not all of it.
+const LOOK_TIME_MOST: float = 0.25
+## How far off screen (pixels) a body's looks are still stepped: a body walking in is drawn as it is.
+const ON_SCREEN_MARGIN: float = 96.0
 
 ## The colour ramp of its spells: 0-3 the hat colours, 4 the enemy ramp.
 @export var ramp: int = ActorsScript.RAMP_ENEMY
@@ -239,6 +244,10 @@ var size: float = 1.0
 var _looks: Array[ActorLook] = []
 ## True once the looks have shown the start of the local stop the body is in (see `step`).
 var _hold_shown: bool = false
+## While the Tick steps it, its looks are stepped once a drawn frame (`step_looks_due`), not every
+## tick (performance, 2026-11-17): the seconds of the ticks since, and whether this step leaves them.
+var _look_time: float = 0.0
+var _looks_later: bool = false
 ## Scratch of `_touch`: the actors whose touch area it overlaps.
 var _touching: PackedInt32Array = PackedInt32Array()
 ## Whether the Tick steps this body (core/sim/tick.gd, by actor id): off for a body another
@@ -309,11 +318,37 @@ func _exit_tree() -> void:
 
 
 ## One tick of the body (core/sim/tick.gd steps every actor's body by id): its step, then its move
-## (none while it spawns in: it stands where it rises).
-func tick_step(delta: float) -> void:
+## (none while it spawns in: it stands where it rises). With `looks_later` (the Tick's), its looks are
+## left for `step_looks_due`, once a drawn frame.
+func tick_step(delta: float, looks_later: bool = false) -> void:
+	_looks_later = looks_later
 	step(delta)
+	_looks_later = false
 	if spawn_left <= 0.0:
 		move(delta)
+
+
+## The looks' share of the drawn frame (the Tick's `_process`, after the frame's ticks): its looks
+## stepped once for every tick since they last were, unless the body is off screen, where they
+## wait (at most LOOK_TIME_MOST seconds of them) until it is back. View: nothing the game plays by.
+func step_looks_due() -> void:
+	if _look_time <= 0.0:
+		return
+	_look_time = minf(_look_time, LOOK_TIME_MOST)
+	if not _on_screen():
+		return
+	var seconds: float = _look_time
+	_look_time = 0.0
+	for look in _looks:
+		look.step(seconds)
+
+
+## True when the body's feet are on screen or within ON_SCREEN_MARGIN pixels of it.
+func _on_screen() -> bool:
+	var viewport: Viewport = get_viewport()
+	if viewport == null:
+		return true
+	return viewport.get_visible_rect().grow(ON_SCREEN_MARGIN).has_point(get_global_transform_with_canvas().origin)
 
 
 ## True while no controller drives it, it has no Mover and it keeps no time (props W2; see the
@@ -354,12 +389,12 @@ func move(delta: float) -> void:
 	var from: Vector2 = global_position
 	var unhindered: Vector2 = from + velocity * delta
 	var to: Vector2 = unhindered
-	var holes: bool = projectiles != null and projectiles.has_holes()
+	var holes: bool = projectiles != null and projectiles.grid().has_holes()
 	var crossed: bool = mover.crossing != Vector2.ZERO
 	if holes:
 		to = _move_over_holes(from, delta)
 	elif projectiles != null:
-		to = projectiles.slide_body(from, velocity * delta, wall_radius())
+		to = projectiles.grid().slide_body(from, velocity * delta, wall_radius())
 	mover.crossing = Vector2.ZERO
 	global_position = to
 	if to != unhindered:
@@ -380,14 +415,15 @@ func _check_ground(crossed: bool) -> void:
 	if fall_left > 0.0 or _dying or _leaving:
 		return
 	var at: Vector2 = global_position
-	if projectiles.is_hole(at):
+	var grid: RoomGrid = projectiles.grid()
+	if grid.is_hole(at):
 		if crossed or _hold_shown or mover.is_moving():
 			return
 		if never_falls():
-			global_position = projectiles.nearest_ground(at, wall_radius())
+			global_position = grid.nearest_ground(at, wall_radius())
 			return
 		_fall()
-	elif not projectiles.touches_hole(at, wall_radius() + HoleRules.GROUND_MARGIN):
+	elif not grid.touches_hole(at, wall_radius() + HoleRules.GROUND_MARGIN):
 		ground = at
 		has_ground = true
 
@@ -425,7 +461,7 @@ func _land() -> void:
 		return
 	var at: Vector2 = ground
 	if not has_ground:
-		at = projectiles.nearest_ground(global_position, wall_radius()) if projectiles != null else global_position
+		at = projectiles.grid().nearest_ground(global_position, wall_radius()) if projectiles != null else global_position
 	global_position = at
 	fell_by = ActorsScript.NONE
 	if combat != null:
@@ -519,18 +555,19 @@ func _move_over_holes(from: Vector2, delta: float) -> Vector2:
 	var radius: float = wall_radius()
 	var motion: Vector2 = velocity * delta
 	var crossed: Vector2 = mover.crossing * delta
+	var grid: RoomGrid = projectiles.grid()
 	var at: Vector2 = from
 	if crossed != Vector2.ZERO:
-		at = projectiles.slide_body(from, crossed, radius, true)
+		at = grid.slide_body(from, crossed, radius, true)
 	var walk: Vector2 = motion - crossed
 	if walk == Vector2.ZERO and crossed != Vector2.ZERO:
 		return at
-	if projectiles.is_hole(at):
-		return projectiles.slide_body(at, walk, radius, true)
-	if crossed != Vector2.ZERO and projectiles.touches_hole(at, radius):
-		var walked: Vector2 = projectiles.slide_body(at, walk, radius, true)
-		return at if projectiles.is_hole(walked) else walked
-	return projectiles.slide_body(at, walk, radius)
+	if grid.is_hole(at):
+		return grid.slide_body(at, walk, radius, true)
+	if crossed != Vector2.ZERO and grid.touches_hole(at, radius):
+		var walked: Vector2 = grid.slide_body(at, walk, radius, true)
+		return at if grid.is_hole(walked) else walked
+	return grid.slide_body(at, walk, radius)
 
 
 ## Tell every actor whose touch area this body overlaps where its move left it (its circle against
@@ -571,6 +608,11 @@ func step(delta: float) -> void:
 				# What stopped it (a hit, a slam's impact) came after its own step, so its looks
 				# catch up once: the stop shows that moment, not the step before.
 				_hold_shown = true
+				# Looks left for the frame play the ticks before the stop first.
+				if _look_time > 0.0:
+					for look in _looks:
+						look.step(_look_time)
+					_look_time = 0.0
 				for look in _looks:
 					look.step(0.0)
 			return
@@ -621,8 +663,11 @@ func step(delta: float) -> void:
 		velocity = Vector2.ZERO
 	if hurtbox != null and hurtbox.registered == (is_down() or not hurtbox.enabled):
 		hurtbox.step()
-	for look in _looks:
-		look.step(delta)
+	if _looks_later:
+		_look_time += delta
+	else:
+		for look in _looks:
+			look.step(delta)
 	if home_controller != null and home_controller != controller:
 		# Its own controller is away (it drives another actor, or another drives this one): it
 		# still watches its body (a seat set aside shows its own wizard on its panel).

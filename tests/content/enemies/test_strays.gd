@@ -6,6 +6,7 @@ extends "res://tests/support/suite.gd"
 ## each staff compiles from player cards and its first cast is affordable on full mana; and they
 ## hop on their tips while they walk (the face goes with the body) and bob while they stand.
 const AiFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
+const FakeSpells := preload("res://tests/gameplay/player/fixtures/fake_spells.gd")
 const STRAYS: Array[EnemyBase] = [
 	preload("res://content/enemies/ember_imp/ember_imp.tres"),
 	preload("res://content/enemies/splinter/splinter.tres"),
@@ -168,11 +169,44 @@ func test_a_stray_plays_its_carriers_staff_animation() -> void:
 	var look := body.get_node(^"CreatureLook") as CreatureLook
 	var sprite := body.get_node(^"Sprite") as Sprite2D
 	var glowed: bool = false
+	var stretched: bool = false
 	var highest: float = 0.0
+	# Steps after it played with its glow or stretch still on the sprite (the look passes over the
+	# animation's work while none plays and nothing is left to put back: `ActorLook.show_pose`).
+	var lingered: int = 0
 	for step in 480:
 		world.run_all(1)
 		glowed = glowed or look.is_glowing(sprite)
+		stretched = stretched or sprite.scale != Vector2.ONE
 		highest = maxf(highest, look.lift())
+		if look.pose_dir().is_zero_approx() and (look.is_glowing(sprite) or sprite.scale != Vector2.ONE):
+			lingered += 1
 	check(glowed, "its staff glowed while it cast")
+	check(stretched, "and stretched the body")
 	check(highest > CreatureLook.HOP_HEIGHT + 1.0, "and rose higher than a hop: %f" % highest)
+	check_equal(lingered, 0, "nothing of it stays on the sprite once it is over")
 	world.free_all()
+
+
+## An animation that ends while it still stretches and lights the body (its strike cut short, a new
+## cast) gives the sprite back the step after: the look passes over the animation's work only while
+## nothing of it is left on the sprite (`ActorLook.show_pose`).
+func test_a_stray_gives_its_sprite_back_when_its_animation_ends_stretched_and_glowing() -> void:
+	var body: Actor = _world.enemy(STRAYS[0].scene, STRAYS[0], Vector2.ZERO)
+	var look := body.get_node(^"CreatureLook") as CreatureLook
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	var fake := FakeSpells.new()
+	body.spells = fake
+	look.step(AiFixture.STEP)
+	check(not look.is_glowing(sprite) and sprite.scale == Vector2.ONE, "at rest: no glow, no stretch")
+	# [aim, pose (turn, lift, push), glow, stretch], as the fake's poses read them.
+	fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3(0.0, 3.0, 0.0), 0.8, 0.5]
+	look.step(AiFixture.STEP)
+	check(look.is_glowing(sprite), "glowing while it plays")
+	check(sprite.scale.x > 1.0, "stretched along its aim (%s)" % sprite.scale)
+	fake.staff_poses.erase(body.id)
+	look.step(AiFixture.STEP)
+	check(not look.is_glowing(sprite) and sprite.material == null, "the glow given back the step it ends")
+	check_equal(sprite.scale, Vector2.ONE, "and the stretch")
+	body.spells = null
+	fake.free()

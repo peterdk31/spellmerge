@@ -52,6 +52,8 @@ const EVENTS: Dictionary = {
 	&"item_drop_requested": [["actor", TYPE_INT], ["stack", TYPE_OBJECT]],
 	&"ground_looked": [["actor", TYPE_INT], ["feet", TYPE_VECTOR2], ["reach", TYPE_FLOAT], ["sight", TYPE_OBJECT]],
 	&"cover_danger_looked": [["actor", TYPE_INT], ["at", TYPE_VECTOR2], ["reach", TYPE_FLOAT], ["sight", TYPE_OBJECT]],
+	&"hit_room_asked": [["target", TYPE_OBJECT], ["room", TYPE_OBJECT]],
+	&"hit_damage_asked": [["tag", TYPE_INT], ["shot", TYPE_INT], ["answer", TYPE_OBJECT]],
 	&"actor_take_requested": [["actor", TYPE_INT], ["item", TYPE_INT]],
 	&"ground_item_changed": [["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
 	&"item_near_changed": [["player", TYPE_INT], ["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
@@ -176,6 +178,7 @@ const EVENTS: Dictionary = {
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"run_begun", &"run_room_scaled", &"run_room_paced", &"run_room_chosen", &"run_way_taken", &"run_map_changed", &"room_left", &"room_exits_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"lectern_changed", &"start_depth_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
+	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",
 	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]

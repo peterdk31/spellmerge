@@ -8,10 +8,10 @@
 			"tier": "good",
 			"tool": "tools/sound.py (procedural synthesis, generator 1)",
 			"prompt": "audio/music/crypt_halls/crypt_halls.score.json",
-			"recipe_hash": "sha256:0c8999863f6dfacf62b255c2054cb2c89c9c82cc88a73890bc3084cdc8692f95",
-			"audio_hash": "sha256:4bf20dec177d804fa373274d2c41ae709b81f76f7fa9ba49cc9607728d025879",
+			"recipe_hash": "sha256:dbf49caaba338ef2f2de4360f8cbb8c031b54b92df376fd0408b4488561c2b22",
+			"audio_hash": "sha256:d985526ea1842999b16c2f4909a5a2a88c3f30e8a44ace4764d8dc3abc6037d1",
 			"loudness": -23.0,
-			"peak": -5.4
+			"peak": -7.7
 		}
 	]
 }

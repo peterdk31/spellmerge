@@ -210,15 +210,16 @@ func test_a_content_items_sounds_are_found_and_loaded_only_when_asked() -> void:
 
 
 func test_an_ogg_and_a_tres_of_one_id_clash() -> void:
-	DirAccess.make_dir_recursive_absolute(CLASH_ROOT + "/audio/sfx/bang")
-	for file_name: String in ["audio/sfx/bang.ogg", "audio/sfx/bang/bang.tres"]:
+	DirAccess.make_dir_recursive_absolute(CLASH_ROOT + "/audio/sfx/bang/variants")
+	for file_name: String in ["audio/sfx/bang.ogg", "audio/sfx/bang/bang.tres", "audio/sfx/bang/variants/1.ogg"]:
 		FileAccess.open(CLASH_ROOT + "/" + file_name, FileAccess.WRITE).close()
 	var fresh: Node = own(RegistryScript.new()) as Node
 	fresh.scan(CLASH_ROOT + "/no_content", CLASH_ROOT + "/audio")
 	var clashes: PackedStringArray = fresh.sound_clashes()
 	check_equal(clashes.size(), 1, "one clash")
 	check(clashes.size() == 1 and clashes[0].contains("bang.ogg") and clashes[0].contains("bang.tres"), "naming both files: %s" % [clashes])
-	for file_name: String in ["audio/sfx/bang.ogg", "audio/sfx/bang/bang.tres"]:
+	check(not fresh._sound_paths.has(&"1"), "a baked variant (variants/1.ogg) is no sound id `1`")
+	for file_name: String in ["audio/sfx/bang/variants/1.ogg", "audio/sfx/bang.ogg", "audio/sfx/bang/bang.tres"]:
 		DirAccess.remove_absolute(CLASH_ROOT + "/" + file_name)
 
 

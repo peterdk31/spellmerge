@@ -23,8 +23,8 @@ extends PanelContainer
 ##   through UIFocus `paged`; Z and C on the keyboard) go to the previous and the next tab, wrapping
 ##   round from the last to the first and back, as most games' tabs do; their glyphs are drawn at the
 ##   tab row's ends for the device of the player working the menu. A switch focuses the tab's first
-##   row that is not greyed, and the selected tab's box slides there while the rows step in from the
-##   side it came from, by whole pixels (Smooth). Settings opens on Graphics. There is no Back row:
+##   row that is not greyed, and the selected tab's box slides there while the rows step in 6 px from
+##   the side it goes toward (a wrap too), by whole pixels, never cut (Smooth). Settings opens on Graphics. There is no Back row:
 ##   `back` (B; E) goes up to the main page on its Settings row (the Map page's on its Map row), as
 ##   the hint under the rows says with the `back` glyph; the menu takes no mouse anywhere. Every row
 ##   of every tab is as wide as the widest words of any tab focused, either way (`_fit_widths`), and
@@ -114,9 +114,10 @@ enum Page { MAIN, SETTINGS, MAP }
 enum Tab { GRAPHICS, PERFORMANCE, AUDIO, INTERFACE }
 ## The name each tab shows.
 const TAB_NAMES: Array[String] = ["Graphics", "Performance", "Audio", "Interface"]
-## How far the rows of a tab switched to start to the side (toward the tab left), in pixels; they
-## step in with the tabs' box (`MenuTabs.remaining`).
-const ROW_SHIFT: float = 12.0
+## How far the rows of a tab switched to start to the side the tabs' box goes toward, in pixels; they
+## step in with it (`MenuTabs.remaining`). The rows' box is this much wider on each side than the rows,
+## so a row stepping in is never cut.
+const ROW_SHIFT: float = 6.0
 ## The words beside the `back` glyph under the Settings rows.
 const BACK_HINT: String = "Back"
 ## The radial builder's ring (see the top): the plain one with every card or one kind at a time,
@@ -202,7 +203,8 @@ var _pages: Dictionary = {}
 var _tab_rows: Dictionary = {}
 ## Button name -> the button, every page's.
 var _by_name: Dictionary = {}
-## Which way the rows of the tab switched to step in from: +1 from the right, -1 from the left.
+## Which side the rows of the tab switched to step in from: +1 the right, -1 the left (the way the
+## tabs' box goes, `MenuTabs.travel_side`).
 var _shift_side: float = 0.0
 ## The hint under the Settings rows: the `back` glyph and its words.
 var _hint_row: HBoxContainer = null
@@ -319,7 +321,7 @@ func _fit_widths() -> void:
 	for on_page: int in _pages:
 		var widest: float = 0.0
 		if on_page == Page.SETTINGS:
-			widest = _tabs.get_combined_minimum_size().x
+			widest = _tabs.get_combined_minimum_size().x - 2.0 * ROW_SHIFT
 		for row: Button in _pages[on_page]:
 			widest = maxf(widest, needs[row])
 		if on_page == Page.SETTINGS:
@@ -343,8 +345,9 @@ func _fit_body() -> void:
 			tall += least.y + (gap if tall > 0.0 else 0.0)
 			wide = maxf(wide, least.x)
 		tallest = maxf(tallest, tall)
-	_body.custom_minimum_size = Vector2(wide, tallest)
-	_tab_box.size = _body.custom_minimum_size
+	_body.custom_minimum_size = Vector2(wide + 2.0 * ROW_SHIFT, tallest)
+	_tab_box.size = Vector2(wide, tallest)
+	_on_slide_stepped(0.0)
 
 
 ## `format` with each of `words`.
@@ -519,7 +522,7 @@ func _add_tabs() -> MenuTabsScript:
 	return made
 
 
-## The box the Settings rows stand in: clipped, so rows stepping in from the side show only inside.
+## The box the Settings rows stand in, ROW_SHIFT wider than them on each side (clipped to it).
 func _add_body() -> Control:
 	var made := Control.new()
 	made.name = "TabBody"
@@ -654,11 +657,12 @@ func _show_page(next: Page) -> void:
 
 ## Show the Settings page on tab `next`, its first row that is not greyed focused. `side` is the way
 ## the player paged (+1 to the next tab, -1 to the previous): the tabs' box slides and the rows step
-## in from that side; 0 shows it at once (Settings opening).
+## in from the side it goes toward (on a wrap, the far end); 0 shows it at once (Settings opening).
 func _show_tab(next: Tab, side: int = 0) -> void:
 	tab = next
 	_tabs.select(next)
-	_shift_side = float(signi(side))
+	# The way the box goes (on a wrap, the other way from the paging), so rows and box agree.
+	_shift_side = float(_tabs.travel_side())
 	if side == 0:
 		_tabs.snap()
 	else:
@@ -671,7 +675,7 @@ func _show_tab(next: Tab, side: int = 0) -> void:
 
 ## The rows follow the tabs' box: `left` of the slide to go (eased, 1 to 0), by whole pixels.
 func _on_slide_stepped(left: float) -> void:
-	_tab_box.position = Vector2(roundf(_shift_side * ROW_SHIFT * left), 0.0)
+	_tab_box.position = Vector2(ROW_SHIFT + roundf(_shift_side * ROW_SHIFT * left), 0.0)
 
 
 ## LB or RB on the Settings page: the previous or the next tab, round from the ends.

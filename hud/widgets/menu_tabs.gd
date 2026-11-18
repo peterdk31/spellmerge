@@ -13,11 +13,12 @@ extends Control
 ##     tabs.select(1)                         # the box slides there (`snap` puts it there at once)
 ##
 ## Smooth (docs/STYLE.md): a switch slides the box from where it is to the new tab over
-## SLIDE_SECONDS, eased out, by whole pixels (6 frames at 60), and each tab's words step through
-## three shades (dim, plain, bright) as it is left or reached, never in one jump; a switch during
-## a slide starts from where the box is. `remaining()` tells the holder how much of the slide is
-## left (1 to 0, eased) so its own content can follow. It allocates only when its tabs are set or
-## the device changes, never a frame.
+## SLIDE_SECONDS, eased out, by whole pixels (6 frames at 60, and never fewer than 3 however slow
+## the frames), and each tab's name steps one shade at a time (dim, plain, bright) from where it was
+## toward its own, never in one jump, a switch during a slide too, which starts from where the box
+## is. `remaining()` tells the holder how much of the slide is left (1 to 0, eased) and
+## `travel_side()` which way the box goes, so its own content can follow. It allocates only when its
+## tabs are set, the theme or the device changes, never a frame.
 
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -32,8 +33,11 @@ const GLYPH_GAP: float = 4.0
 const FONT_SIZE: int = 12
 ## How long the box takes to slide to a new tab.
 const SLIDE_SECONDS: float = 0.1
-## The palette (hud/theme): the box like a button, its outline, the gold of the focus, and the
-## three shades a tab's name steps through (a disabled button's, a label's, a button's).
+## The colours, read from the theme (hud/theme/spellmerge_theme.tres, `_read_colors`) when it is
+## known: the box a button's face (Button `normal`), its outline that style's border, the gold the
+## focus style's border (Button `focus`), and the three shades a tab's name steps through (Button
+## `font_disabled_color`, Label `font_color`, Button `font_color`). These are the theme's own values,
+## used only where the theme has none.
 const BOX: Color = Color(0.290196, 0.27451, 0.388235)
 const OUTLINE: Color = Color(0.0784314, 0.0705882, 0.121569)
 const GOLD: Color = Color(0.94902, 0.760784, 0.188235)
@@ -42,8 +46,8 @@ const SHADES: Array[Color] = [
 ]
 ## The names' outline (as the theme's labels have).
 const TEXT_OUTLINE: int = 2
-## The thin line under the whole row.
-const RULE: Color = Color(0.290196, 0.27451, 0.388235)
+## The most a slide moves on in one step: a slow frame still shows at least 3 frames of it.
+const MAX_STEP: float = SLIDE_SECONDS / 3.0
 
 var _names: Array[String] = []
 ## Each tab's width (its name and padding), measured when the tabs are set.
@@ -51,8 +55,15 @@ var _widths: PackedFloat32Array = PackedFloat32Array()
 var _selected: int = 0
 ## The box drawn when the slide began, and how far the slide is (0 to 1; 1 when still).
 var _from_box: Rect2 = Rect2()
-var _from_tab: int = 0
 var _t: float = 1.0
+## Each tab's name shade when the slide began, which it steps from toward its own (bright for the
+## selected tab, dim for the rest).
+var _from_shades: PackedInt32Array = PackedInt32Array()
+## The colours drawn with (see BOX).
+var _box_color: Color = BOX
+var _outline_color: Color = OUTLINE
+var _gold_color: Color = GOLD
+var _shade_colors: Array[Color] = SHADES.duplicate()
 ## Sent each step of a slide with what is left of it (`remaining`), so the holder's content can
 ## follow the box (the pause menu's rows step in with it).
 signal slide_stepped(left: float)
@@ -99,6 +110,7 @@ func set_tabs(names: Array[String]) -> void:
 	_names = names.duplicate()
 	_selected = 0
 	_t = 1.0
+	_from_shades.resize(_names.size())
 	_measure()
 
 
@@ -121,7 +133,8 @@ func select(index: int) -> void:
 	if next == _selected:
 		return
 	_from_box = box()
-	_from_tab = _selected
+	for at in _names.size():
+		_from_shades[at] = shade_of(at)
 	_selected = next
 	_t = 0.0
 	set_process(true)
@@ -133,6 +146,14 @@ func snap() -> void:
 	_t = 1.0
 	queue_redraw()
 	slide_stepped.emit(0.0)
+
+
+## Which way the box goes on its slide: +1 right, -1 left, 0 still (a page's content steps in from
+## the side it goes toward, so the two agree when paging wraps round).
+func travel_side() -> int:
+	if _t >= 1.0:
+		return 0
+	return signi(int(tab_rect(_selected).position.x - _from_box.position.x))
 
 
 ## Whether the box is still sliding.
@@ -163,7 +184,7 @@ func step(delta: float) -> void:
 	if _t >= 1.0:
 		set_process(false)
 		return
-	_t = minf(1.0, _t + delta / SLIDE_SECONDS)
+	_t = minf(1.0, _t + minf(delta, MAX_STEP) / SLIDE_SECONDS)
 	queue_redraw()
 	slide_stepped.emit(remaining())
 
@@ -189,15 +210,17 @@ func box() -> Rect2:
 	return Rect2(left, 0.0, right - left, TAB_HEIGHT)
 
 
-## The shade (0 dim, 1 plain, 2 bright) tab `index`'s name is drawn in now: the selected one steps
-## up as the box arrives, the one left steps down as it goes.
+## The shade (0 dim, 1 plain, 2 bright) tab `index`'s name is drawn in now: each steps one shade at
+## a time from where it was when the slide began toward its own, the selected one up as the box
+## arrives, the others down, so paging again mid-slide never skips a shade.
 func shade_of(index: int) -> int:
+	var target: int = 2 if index == _selected else 0
+	if _t >= 1.0:
+		return target
+	var from: int = _from_shades[index]
 	var e: float = _eased(_t)
-	if index == _selected:
-		return 2 if e >= 0.66 else (1 if e >= 0.33 else 0)
-	if index == _from_tab and _t < 1.0:
-		return 0 if e >= 0.66 else (1 if e >= 0.33 else 2)
-	return 0
+	var moved: int = 2 if e >= 0.66 else (1 if e >= 0.33 else 0)
+	return from + signi(target - from) * mini(moved, absi(target - from))
 
 
 ## Ease out (cubic): quick away, settling in.
@@ -220,6 +243,7 @@ func _tabs_width() -> float:
 
 
 func _measure() -> void:
+	_read_colors()
 	_widths.clear()
 	var font: Font = get_theme_default_font()
 	for tab_name in _names:
@@ -227,6 +251,23 @@ func _measure() -> void:
 	custom_minimum_size = Vector2(_tabs_width() + 2.0 * (GLYPH_ROOM + GLYPH_GAP), TAB_HEIGHT)
 	_lay_out_glyphs()
 	queue_redraw()
+
+
+## The colours from the theme (see BOX), each kept at its fallback where the theme has none.
+func _read_colors() -> void:
+	var face: StyleBoxFlat = get_theme_stylebox(&"normal", &"Button") as StyleBoxFlat
+	if face != null:
+		_box_color = face.bg_color
+		_outline_color = face.border_color
+	var focus: StyleBoxFlat = get_theme_stylebox(&"focus", &"Button") as StyleBoxFlat
+	if focus != null:
+		_gold_color = focus.border_color
+	if has_theme_color(&"font_disabled_color", &"Button"):
+		_shade_colors[0] = get_theme_color(&"font_disabled_color", &"Button")
+	if has_theme_color(&"font_color", &"Label"):
+		_shade_colors[1] = get_theme_color(&"font_color", &"Label")
+	if has_theme_color(&"font_color", &"Button"):
+		_shade_colors[2] = get_theme_color(&"font_color", &"Button")
 
 
 ## Each glyph in the middle of its end's room, at the row's middle.
@@ -251,15 +292,16 @@ func _notification(what: int) -> void:
 func _draw() -> void:
 	if _names.is_empty():
 		return
-	draw_rect(Rect2(0.0, TAB_HEIGHT - 1.0, size.x, 1.0), RULE)
+	# The thin line under the whole row, in the box's face colour.
+	draw_rect(Rect2(0.0, TAB_HEIGHT - 1.0, size.x, 1.0), _box_color)
 	var at: Rect2 = box()
-	draw_rect(at, OUTLINE)
-	draw_rect(at.grow(-1.0), BOX)
-	draw_rect(Rect2(at.position.x + 1.0, TAB_HEIGHT - 3.0, at.size.x - 2.0, 2.0), GOLD)
+	draw_rect(at, _outline_color)
+	draw_rect(at.grow(-1.0), _box_color)
+	draw_rect(Rect2(at.position.x + 1.0, TAB_HEIGHT - 3.0, at.size.x - 2.0, 2.0), _gold_color)
 	var font: Font = get_theme_default_font()
 	var baseline: float = roundf((TAB_HEIGHT - 3.0 - font.get_height(FONT_SIZE)) / 2.0 + font.get_ascent(FONT_SIZE))
 	for index in _names.size():
 		var tab: Rect2 = tab_rect(index)
 		var at_text := Vector2(tab.position.x + TAB_PAD, baseline)
-		draw_string_outline(font, at_text, _names[index], HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, TEXT_OUTLINE, OUTLINE)
-		draw_string(font, at_text, _names[index], HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, SHADES[shade_of(index)])
+		draw_string_outline(font, at_text, _names[index], HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, TEXT_OUTLINE, _outline_color)
+		draw_string(font, at_text, _names[index], HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, _shade_colors[shade_of(index)])

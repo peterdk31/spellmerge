@@ -35,6 +35,7 @@ const HudScript := preload("res://hud/panels/panels.gd")
 const PauseMenuScript := preload("res://hud/menus/pause/pause_menu.gd")
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
 const MenuTabsScript := preload("res://hud/widgets/menu_tabs.gd")
+const GlyphsScript := preload("res://core/input/input_glyphs.gd")
 const RingZoomScript := preload("res://hud/builder/rings/ring_zoom.gd")
 const RingKindsScript := preload("res://hud/builder/rings/ring_kinds.gd")
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
@@ -736,10 +737,50 @@ func test_the_glyphs_sit_at_the_tab_rows_ends() -> void:
 
 
 func test_the_tab_row_follows_the_device_of_the_player_working_it() -> void:
-	_setup(2)
-	_open(1)
-	_open_settings(1)
-	check_equal(_menu().tabs().next_glyph().current_glyph()["label"], "RB", "P2's pad")
+	# P1 on a plain pad (LB, RB), P2 on a PlayStation pad (L1, R1): P2 opens Settings.
+	await _pad_seats("PS5 Controller")
+	_seat_one_settings()
+	check(_menu().owner_player == 1 and _menu().page == PauseMenuScript.Page.SETTINGS, "P2 has Settings open")
+	check_equal(_menu().tabs().prev_glyph().current_glyph()["label"], "L1", "P2's L1 at the left end")
+	check_equal(_menu().tabs().next_glyph().current_glyph()["label"], "R1", "P2's R1 at the right end")
+	check_equal(_menu().hint_glyph().current_glyph()["label"], "circle", "P2's circle beside Back")
+
+
+## Seat 1 (on its real pad, device 3) opens the pause menu with Start, then Settings.
+func _seat_one_settings() -> void:
+	var start := InputEventJoypadButton.new()
+	start.device = 3
+	start.button_index = JOY_BUTTON_START
+	start.pressed = true
+	_input.handle_event(start)
+	_frame()
+	_focus.focus(1, _menu().button("Settings"))
+	_focus.activate(1)
+	_frame()
+
+
+func test_the_glyphs_follow_a_device_change_while_settings_is_open() -> void:
+	_settings()
+	var least: Vector2 = _menu().get_combined_minimum_size()
+	_input._pad_kind[0] = GlyphsScript.Kind.PLAYSTATION
+	_input.glyph_kind_changed.emit(0)
+	check(_menu().tabs().prev_glyph().current_glyph()["label"] == "L1" and _menu().tabs().next_glyph().current_glyph()["label"] == "R1", "the tab row's glyphs follow")
+	check_equal(_menu().hint_glyph().current_glyph()["label"], "circle", "and the hint's")
+	check_equal(_menu().get_combined_minimum_size(), least, "the panel keeps its size")
+
+
+func test_the_owners_pad_gone_on_another_tab_then_another_player_opens_settings_on_graphics() -> void:
+	await _pad_seats()
+	_seat_one_settings()
+	_focus.paged.emit(1, 1)
+	check_equal(_tab_name(), "Performance", "P2 on Performance")
+	_input._on_joy_connection_changed(3, false)
+	_bus.pad_wait_changed.emit(1 << 1)
+	check(not _menu().is_open(), "P2's menu closed with its pad gone")
+	_open(0)
+	_open_settings(0)
+	check(_tab_name() == "Graphics" and _focused("Fullscreen"), "P1's Settings opens on Graphics, on its first row")
+	check(not _menu().tabs().is_sliding() and _rows_x() == PauseMenuScript.ROW_SHIFT, "still, the rows in place")
 
 
 ## One seat on this machine's keyboard, the pause menu open by Escape, on Settings.
@@ -828,13 +869,19 @@ func test_every_setting_row_is_reached_by_paging_and_moving() -> void:
 		_do(0, &"page_next")
 
 
+## Where the Settings rows stand in their box (ROW_SHIFT when in place).
+func _rows_x() -> float:
+	return (_menu().tab_body().get_node("TabRows") as Control).position.x
+
+
 func test_a_switch_slides_the_box_and_steps_the_rows_in_by_whole_pixels() -> void:
 	_settings()
 	var tabs: MenuTabsScript = _menu().tabs()
 	var from: float = tabs.box().position.x
 	_do(0, &"page_next")
 	var rows: Control = _menu().tab_body().get_node("TabRows") as Control
-	check_equal(rows.position.x, PauseMenuScript.ROW_SHIFT, "the rows start to the right, toward the tab paged to")
+	var body: Control = _menu().tab_body()
+	check_equal(rows.position.x, 2.0 * PauseMenuScript.ROW_SHIFT, "the rows start to the right, toward the tab paged to")
 	var boxes: Array[float] = [from]
 	var shifts: Array[float] = [rows.position.x]
 	for _frame_at in 12:
@@ -843,22 +890,59 @@ func test_a_switch_slides_the_box_and_steps_the_rows_in_by_whole_pixels() -> voi
 			boxes.append(tabs.box().position.x)
 		if rows.position.x != shifts.back():
 			shifts.append(rows.position.x)
+		check(rows.position.x >= 0.0 and rows.position.x + rows.size.x <= body.custom_minimum_size.x, "the rows inside their box, never cut: at %s" % rows.position.x)
 	check(boxes.size() >= 5, "the box passes at least 3 places between the tabs: %s" % [boxes])
 	check(shifts.size() >= 4, "the rows at least 3 steps in: %s" % [shifts])
 	for x: float in boxes + shifts:
 		check_equal(x, roundf(x), "whole pixels")
-	check(boxes.back() == tabs.tab_rect(1).position.x and rows.position.x == 0.0, "both end in place")
+	check(boxes.back() == tabs.tab_rect(1).position.x and rows.position.x == PauseMenuScript.ROW_SHIFT, "both end in place")
 
 
 func test_lb_steps_the_rows_in_from_the_left() -> void:
 	_settings()
+	_do(0, &"page_next")
+	_menu().tabs().step(1.0)
 	_do(0, &"page_prev")
-	check_equal((_menu().tab_body().get_node("TabRows") as Control).position.x, -PauseMenuScript.ROW_SHIFT, "from the left")
+	check_equal(_rows_x(), 0.0, "from the left, as the box goes left")
+
+
+func test_on_a_wrap_the_rows_step_in_from_the_side_the_box_goes() -> void:
+	_settings()
+	_do(0, &"page_prev")
+	check_equal(_menu().tabs().travel_side(), 1, "LB on Graphics: the box goes right, round to Interface")
+	check_equal(_rows_x(), 2.0 * PauseMenuScript.ROW_SHIFT, "the rows from the right too")
+	_menu().tabs().step(1.0)
+	_do(0, &"page_next")
+	check(_menu().tabs().travel_side() == -1 and _rows_x() == 0.0, "RB on Interface: both from the left")
+
+
+func test_paging_twice_within_a_slide_ends_on_the_last_tab_in_place() -> void:
+	_settings()
+	_do(0, &"page_next")
+	_menu().tabs().step(1.0 / 60.0)
+	_do(0, &"page_next")
+	for _frame_at in 12:
+		_menu().tabs().step(1.0 / 60.0)
+	check(_tab_name() == "Audio" and _focused("AmbienceVolume"), "on Audio, its first row focused")
+	check(not _menu().tabs().is_sliding() and _rows_x() == PauseMenuScript.ROW_SHIFT, "the rows in place")
+	check(_menu().tabs().box() == _menu().tabs().tab_rect(PauseMenuScript.Tab.AUDIO), "the box on Audio")
+
+
+func test_closed_mid_slide_settings_opens_still_again() -> void:
+	_settings()
+	_do(0, &"page_next")
+	_menu().tabs().step(1.0 / 60.0)
+	_do(0, &"pause")
+	check(not _menu().is_open(), "closed mid-slide")
+	_open()
+	_open_settings()
+	check(_tab_name() == "Graphics" and not _menu().tabs().is_sliding() and _rows_x() == PauseMenuScript.ROW_SHIFT, "Settings opens still, on Graphics")
+	check(_menu().tabs().box() == _menu().tabs().tab_rect(0), "the box on Graphics")
 
 
 func test_settings_opens_still() -> void:
 	_settings()
-	check(not _menu().tabs().is_sliding() and (_menu().tab_body().get_node("TabRows") as Control).position.x == 0.0, "nothing slides as Settings opens")
+	check(not _menu().tabs().is_sliding() and _rows_x() == PauseMenuScript.ROW_SHIFT, "nothing slides as Settings opens")
 
 
 
@@ -1734,9 +1818,12 @@ func test_leave_game_leaves_the_other_seat_playing() -> void:
 # menu closes, and the menu another player opens lets the waiting seat leave.
 
 
-## Seat 0 on a virtual device, seat 1 on a real gamepad (device 3), the input layer in the tree.
-func _pad_seats() -> void:
+## Seat 0 on a virtual device, seat 1 on a real gamepad (device 3, named `pad_name` by the system),
+## the input layer in the tree.
+func _pad_seats(pad_name: String = "") -> void:
 	_setup(1)
+	if pad_name != "":
+		_input.joy_name_provider = func(_device: int) -> String: return pad_name
 	root.add_child(_input)
 	await process_frame
 	var join := InputEventJoypadButton.new()

@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the row of tabs (hud/widgets/menu_tabs.gd): the tabs left to right without overlap
 ## between the paging glyphs, the box on the selected tab, a switch sliding it there over at least
-## 3 frames by whole pixels and easing in, the names stepping through their three shades, a switch
-## during a slide starting from where the box is, `snap` putting it in place at once, and the glyphs
+## 3 frames by whole pixels and easing in (even at a slow frame rate), the names stepping through
+## their three shades one at a time (paging again mid-slide too), a switch during a slide starting
+## from where the box is, which way the box goes, the colours read from the theme, `snap` putting it in place at once, and the glyphs
 ## following the player's device.
 
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -104,6 +105,55 @@ func test_a_switch_during_a_slide_starts_from_where_the_box_is() -> void:
 	check(tabs.box() == there, "no jump: it goes on from %s" % [there])
 	_slide(tabs)
 	check(tabs.box() == tabs.tab_rect(3), "and ends on the new tab")
+
+
+func test_paging_again_mid_slide_steps_every_name_one_shade_at_a_time() -> void:
+	var tabs: MenuTabsScript = _tabs()
+	tabs.select(1)
+	tabs.step(FRAME)
+	var before: Array[int] = []
+	for at in NAMES.size():
+		before.append(tabs.shade_of(at))
+	tabs.select(2)
+	for at in NAMES.size():
+		check(absi(tabs.shade_of(at) - before[at]) <= 1, "%s: no jump as the second switch starts (%d to %d)" % [NAMES[at], before[at], tabs.shade_of(at)])
+	var last: Array[int] = []
+	for at in NAMES.size():
+		last.append(tabs.shade_of(at))
+	while tabs.is_sliding():
+		tabs.step(FRAME)
+		for at in NAMES.size():
+			check(absi(tabs.shade_of(at) - last[at]) <= 1, "%s: one shade a frame at most" % NAMES[at])
+			last[at] = tabs.shade_of(at)
+	check(tabs.shade_of(2) == 2 and tabs.shade_of(1) == 0 and tabs.shade_of(0) == 0, "ends bright on the last tab only")
+
+
+func test_a_slow_frame_still_shows_three_frames_of_slide() -> void:
+	var tabs: MenuTabsScript = _tabs()
+	tabs.select(3)
+	var lefts: Array[float] = [tabs.box().position.x]
+	while tabs.is_sliding():
+		tabs.step(0.5)
+		lefts.append(tabs.box().position.x)
+	check(lefts.size() >= 4, "at 2 frames a second, still 3 frames to get there: %s" % [lefts])
+
+
+func test_the_box_says_which_way_it_goes() -> void:
+	var tabs: MenuTabsScript = _tabs()
+	check_equal(tabs.travel_side(), 0, "still")
+	tabs.select(3)
+	check_equal(tabs.travel_side(), 1, "right to the last tab")
+	tabs.snap()
+	tabs.select(0)
+	check_equal(tabs.travel_side(), -1, "left back to the first")
+
+
+func test_the_colours_come_from_the_theme() -> void:
+	var tabs: MenuTabsScript = _tabs()
+	var theme := Theme.new()
+	theme.set_color(&"font_color", &"Button", Color(1.0, 0.0, 0.0))
+	tabs.theme = theme
+	check_equal(tabs._shade_colors[2], Color(1.0, 0.0, 0.0), "the selected name in the theme's button text colour")
 
 
 func test_snap_puts_the_box_in_place_at_once() -> void:

@@ -35,7 +35,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `inventory_refused` | `player` | `hud` (the inventory's note) |
 | `inventory_announced` | `player` (before a wizard's whole inventory is said anew) | `hud` (the builder, the inventory forget the earlier wizard's staffs) |
 | `staff_changed` | `player` | `hud` (the builders) |
-| `staff_cast` | `player` | `hud` (the corner panel) |
+| `staff_cast` | `player` | `hud` (the corner panel), `feel` (the cast sound) |
 | `caster_move_requested` | `core/spells` | `actor` (the Mover), each for its own actor id |
 | `mana_reserved` | `core/spells` (to the seat that drives the caster) | none (the Caster reads `Spells.reserved_mana`, actors G7) |
 | `mana_refund_requested` | `core/spells` (for every actor) | `actor` (the Caster), each for its own actor id |

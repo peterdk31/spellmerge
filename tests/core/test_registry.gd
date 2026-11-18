@@ -179,3 +179,50 @@ func test_the_default_scan_indexes_ogg_names() -> void:
 	var fresh: Node = own(RegistryScript.new()) as Node
 	fresh.scan(EXPORT_ROOT + "/no_content", EXPORT_ROOT + "/audio")
 	check(fresh._sound_paths.has(&"pop") and fresh._sound_paths.has(&"boom"), "the default scan indexes .ogg names")
+
+
+# Sounds with variants (docs/milestones/sound.md, section 3): `<id>.tres`, a content item's
+# `sounds/`, and an `.ogg` and a `.tres` of one id.
+
+const SOUNDS_FIXTURE: String = "res://tests/core/fixtures/registry_sounds"
+const THUD: String = SOUNDS_FIXTURE + "/content/props/heap/sounds/thud/thud.tres"
+const CLASH_ROOT: String = "user://registry_clash_test"
+
+
+func test_a_tres_sound_is_its_variants_and_they_are_no_ids_of_their_own() -> void:
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(SOUNDS_FIXTURE + "/content", SOUNDS_FIXTURE + "/audio")
+	var whoosh := fresh.get_sound(&"whoosh") as AudioStreamRandomizer
+	check(whoosh != null, "the .tres is the sound `whoosh`, a randomizer")
+	check(whoosh != null and whoosh.streams_count == 2, "of its two variants")
+	check(fresh.get_sound(&"1") == null and fresh.get_sound(&"2") == null, "a file under variants/ is never an id")
+	check(is_equal_approx(AudioLength.of(whoosh), 0.2), "as long as its longest variant (0.2 s), got %s" % AudioLength.of(whoosh))
+	check(fresh.sound_clashes().is_empty(), "no clash")
+
+
+func test_a_content_items_sounds_are_found_and_loaded_only_when_asked() -> void:
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(SOUNDS_FIXTURE + "/content", SOUNDS_FIXTURE + "/audio")
+	check(fresh.get_resource(&"props", &"heap") != null, "the item itself is content")
+	check(not ResourceLoader.has_cached(THUD), "its sounds/ folder is not loaded by the content scan")
+	check(fresh.get_sound(&"thud") is AudioStreamRandomizer, "its sound `thud` is found under its sounds/ folder")
+	check(fresh.get_ids(&"props") == ([&"heap"] as Array[StringName]), "and is no content id")
+
+
+func test_an_ogg_and_a_tres_of_one_id_clash() -> void:
+	DirAccess.make_dir_recursive_absolute(CLASH_ROOT + "/audio/sfx/bang/variants")
+	for file_name: String in ["audio/sfx/bang.ogg", "audio/sfx/bang/bang.tres", "audio/sfx/bang/variants/1.ogg"]:
+		FileAccess.open(CLASH_ROOT + "/" + file_name, FileAccess.WRITE).close()
+	var fresh: Node = own(RegistryScript.new()) as Node
+	fresh.scan(CLASH_ROOT + "/no_content", CLASH_ROOT + "/audio")
+	var clashes: PackedStringArray = fresh.sound_clashes()
+	check_equal(clashes.size(), 1, "one clash")
+	check(clashes.size() == 1 and clashes[0].contains("bang.ogg") and clashes[0].contains("bang.tres"), "naming both files: %s" % [clashes])
+	check(not fresh._sound_paths.has(&"1"), "a baked variant (variants/1.ogg) is no sound id `1`")
+	for file_name: String in ["audio/sfx/bang/variants/1.ogg", "audio/sfx/bang.ogg", "audio/sfx/bang/bang.tres"]:
+		DirAccess.remove_absolute(CLASH_ROOT + "/" + file_name)
+
+
+func test_the_games_sounds_have_no_clash() -> void:
+	var game: Node = root.get_node("Registry")
+	check_equal(game.sound_clashes(), PackedStringArray(), "no sound id is two files in audio/ and content/")

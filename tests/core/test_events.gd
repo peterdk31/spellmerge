@@ -35,6 +35,10 @@ const EVENTS: Dictionary = {
 	&"fog_changed": [["on", TYPE_BOOL]],
 	&"environment_interaction_changed": [["on", TYPE_BOOL]],
 	&"ambience_volume_changed": [["percent", TYPE_INT]],
+	&"music_volume_changed": [["percent", TYPE_INT]],
+	&"sound_volume_changed": [["percent", TYPE_INT]],
+	&"ui_volume_changed": [["percent", TYPE_INT]],
+	&"ui_sound_requested": [["id", TYPE_STRING_NAME]],
 	&"tailless_motes_changed": [["pool", TYPE_INT]],
 	# Playing online.
 	&"online_host_requested": [["player", TYPE_INT]],
@@ -185,7 +189,7 @@ const NOT_PER_PLAYER: Array[StringName] = [
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",
-	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"shadows_changed", &"ambient_particles_changed", &"fog_changed", &"environment_interaction_changed", &"ambience_volume_changed", &"tailless_motes_changed", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"shadows_changed", &"ambient_particles_changed", &"fog_changed", &"environment_interaction_changed", &"ambience_volume_changed", &"music_volume_changed", &"sound_volume_changed", &"ui_volume_changed", &"ui_sound_requested", &"tailless_motes_changed", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).

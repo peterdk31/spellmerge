@@ -13,7 +13,7 @@ extends "res://tests/support/suite.gd"
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
-const SoundsScript := preload("res://gameplay/feel/sounds.gd")
+const AudioScript := preload("res://core/audio/audio.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
@@ -44,6 +44,7 @@ class FixtureRegistry:
 
 var bus: EventsScript
 var feel: FeelScript
+var audio: AudioScript
 var camera: Camera2D
 var registry: FixtureRegistry
 ## Wizards at actor ids 0-3 (seats 0-3): the `player` of `_hit` is the attacker's actor id.
@@ -55,9 +56,14 @@ func before_each() -> void:
 	registry = FixtureRegistry.new()
 	registry.cues = root.get_node_or_null("Registry") as RegistryScript
 	registry.scan(FIXTURE + "/content", FIXTURE + "/audio", PackedStringArray(["tres"]))
+	audio = AudioScript.new()
+	audio.events = bus
+	audio.registry = registry
+	root.add_child(audio)
 	feel = FeelScript.new()
 	feel.events = bus
 	feel.registry = registry
+	feel.audio = audio
 	actors = ActorSeats.table()
 	feel.actors = actors
 	feel.drive_engine = false
@@ -69,12 +75,13 @@ func before_each() -> void:
 
 func after_each() -> void:
 	# A voice that is still playing keeps its stream (a resource) alive at exit.
-	if feel != null and is_instance_valid(feel) and feel.sounds() != null:
-		feel.sounds().clear()
-	for node: Node in [feel, camera, registry, bus, actors]:
+	if audio != null and is_instance_valid(audio):
+		audio.clear_world()
+	for node: Node in [feel, audio, camera, registry, bus, actors]:
 		if node != null and is_instance_valid(node):
 			node.free()
 	feel = null
+	audio = null
 	camera = null
 	registry = null
 	bus = null
@@ -91,7 +98,7 @@ func _hit(player: int, at: Vector2 = Vector2.ZERO) -> void:
 
 
 func _voices_with_stream() -> int:
-	return feel.sounds().voices_with_stream()
+	return audio.voices.voices_with_stream()
 
 
 ## A plain body with a Sprite child, in the tree, freed after the test.
@@ -389,9 +396,9 @@ func test_an_unknown_hit_sound_plays_nothing() -> void:
 
 func test_no_registry_plays_nothing() -> void:
 	_sound(&"zap")
-	feel.registry = null
+	audio.registry = null
 	_hit(0)
-	check_equal(_voices_with_stream(), 0, "no registry plays nothing")
+	check_equal(_voices_with_stream(), 0, "no registry (Audio's) plays nothing")
 
 
 func test_a_known_hit_sound_plays_on_a_hit() -> void:
@@ -414,14 +421,14 @@ func test_a_frames_hits_start_at_most_hit_sounds_per_frame() -> void:
 	_sound(&"zap")
 	for i in 20:
 		_hit(i % 4, Vector2(float(i), 0.0))
-	check_equal(feel.sounds().started, FeelScript.HIT_SOUNDS_PER_FRAME, "a frame's hits start HIT_SOUNDS_PER_FRAME sounds")
+	check_equal(audio.voices.started, FeelScript.HIT_SOUNDS_PER_FRAME, "a frame's hits start HIT_SOUNDS_PER_FRAME sounds")
 
 
 func test_a_frames_hit_sounds_of_one_sound_take_at_most_per_sound_voices() -> void:
 	_sound(&"zap")
 	for i in 20:
 		_hit(i % 4, Vector2(float(i), 0.0))
-	check_equal(_voices_with_stream(), SoundsScript.PER_SOUND, "on at most PER_SOUND voices of the one sound")
+	check_equal(_voices_with_stream(), AudioScript.PER_SOUND, "on at most PER_SOUND voices of the one sound")
 
 
 func test_the_next_frames_hit_sounds_start_again() -> void:
@@ -430,7 +437,7 @@ func test_the_next_frames_hit_sounds_start_again() -> void:
 		_hit(i % 4, Vector2(float(i), 0.0))
 	feel.step(FRAME)
 	_hit(0, Vector2(-30.0, 0.0))
-	check_equal(feel.sounds().started, FeelScript.HIT_SOUNDS_PER_FRAME + 1, "the next frame's hit sounds")
+	check_equal(audio.voices.started, FeelScript.HIT_SOUNDS_PER_FRAME + 1, "the next frame's hit sounds")
 
 
 # --- Damage is combat's ----------------------------------------------------------------------
@@ -447,6 +454,7 @@ func _combat_outcome(with_feel: bool) -> Array:
 		listener = own(FeelScript.new()) as FeelScript
 		listener.events = own_bus
 		listener.registry = registry
+		listener.audio = audio
 		listener.actors = actors
 		listener.drive_engine = false
 		listener.preset = FeelPresetScript.new()
@@ -464,7 +472,7 @@ func _combat_outcome(with_feel: bool) -> Array:
 	var health: float = combat.health_of(enemy)
 	if listener != null:
 		listener.step(STEP)
-		listener.sounds().clear()
+		audio.clear_world()
 	return [damage, deaths, health]
 
 

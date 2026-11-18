@@ -1,17 +1,18 @@
 extends Node
-## Feel's music (boss plan OB15, docs/milestones/boss-old-broom.md, "Sound"): plays one
-## `MusicTrack` at an intensity, drawn only (nothing in the game reads it). Feel says which track
-## and intensity (`play`: the room's, or a living enemy's with its phase's intensity) and steps it
-## once a frame.
+## Audio's music (core/audio, docs/milestones/sound.md, section 5; moved from Feel, boss plan OB15,
+## unchanged in behaviour): plays one `MusicTrack` at an intensity, heard only (nothing in the game
+## reads it). Its caller says which track and intensity (`Audio.play_track`: Feel's, the room's or a
+## living enemy's with its phase's intensity); Audio steps it once a frame.
 ##
 ## Every layer of the track starts together and keeps playing, silent until its intensity comes, so
 ## the layers never drift apart; each fades to where its intensity puts it over the track's `fade`.
 ## A new track starts at once while the last one fades out on a second set of players. A layer whose
-## sound does not exist is silent (the game has no music files yet). When the track's first layer
-## has run out (a file not imported to loop), every layer starts again together. **A change inside a
-## fade:** back to the track still fading out, the two sets swap and each goes on from where it was;
-## a third track needs a set, so the quieter of the two is let go and the louder goes on (never the
-## loudest cut). Only `audible` starts a player (Feel's: none on the audio driver with no device).
+## sound does not exist is silent. When the track's first layer has run out (a file not imported to
+## loop), every layer starts again together. **A change inside a fade:** back to the track still
+## fading out, the two sets swap and each goes on from where it was; a third track needs a set, so
+## the quieter of the two is let go and the louder goes on (never the loudest cut). Every player is
+## on `bus` (Audio's `MusicDuck`, under `Music`: the duck's own and the setting's). Only `audible`
+## starts a player (Audio's: none on the audio driver with no device).
 
 ## The players of the track playing and of the one fading out, a layer each.
 var _now: Array[AudioStreamPlayer] = []
@@ -29,8 +30,10 @@ var _then_track: MusicTrack = null
 
 ## The registry the layers' sounds are asked of (`get_sound`).
 var registry: Node = null
-## Whether its players are started (Feel's `audible`).
+## Whether its players are started (Audio's `audible`).
 var audible: bool = true
+## The bus its players are on, set before `_ready`.
+var bus: StringName = &"Master"
 
 var _track: MusicTrack = null
 var _intensity: int = 0
@@ -48,6 +51,7 @@ func _ready() -> void:
 func _player() -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
 	player.volume_db = linear_to_db(0.0)
+	player.bus = bus
 	add_child(player)
 	return player
 
@@ -116,6 +120,11 @@ func step(delta: float) -> void:
 	var first: AudioStreamPlayer = _now[0]
 	if first.stream != null and not first.playing:
 		_start_all()
+
+
+## Leaving the tree (the game quitting): every player lets go of its stream.
+func _exit_tree() -> void:
+	stop()
 
 
 ## Silence at once (tests; in play a room with no music fades to silence).

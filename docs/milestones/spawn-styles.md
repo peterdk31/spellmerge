@@ -1,6 +1,6 @@
 # Spawn styles: each biome (or enemy) names how its enemies spawn in
 
-**Status (2026-11-18): approved; the owner answered its questions (the end of this document) and asked for it to be built now. AS1 done (the data, with no change on screen; "As built (AS1)" below); AS2 done (a style picked per body; "As built (AS2)"); AS3 and AS4 to come.** The owner asked whether it is easy to change the spawn animation or add new ones in other biomes, then asked for this plan.
+**Status (2026-11-18): approved; the owner answered its questions (the end of this document) and asked for it to be built now. AS1 done (the data, with no change on screen; "As built (AS1)" below); AS2 done (a style picked per body; "As built (AS2)"); AS3 done (`materialize`, the storm fork's; "As built (AS3)"); AS4 to come.** The owner asked whether it is easy to change the spawn animation or add new ones in other biomes, then asked for this plan.
 
 Today (enemy spawning EA1–EA5, docs/milestones/enemy-spawning.md) the spawn has one look. A mark grows on the floor, then the body rises out of it. The look is written in `gameplay/feel/spawn_look.gd`:
 - its timing is constants there (`MARK_END`, `CLOSE_FROM`, the frame counts);
@@ -55,12 +55,12 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
   - the mark's colours (`_fill`, `_rim`, one pair today) become per style before AS4.
   - **`rise`** is today's code moved, unchanged: the clip parent and the shifted parts.
   - **`materialize`** (the owner, 2026-11-18: "materialize in from nothing, a cool sci-fi look"): the body is built up out of light, row by row, inside the game's palette and the Smooth rule (whole pixels, no fade, no blur, no glow gradients). It uses the same one clip per body as `rise`, but its mask is rows instead of one rect:
-    - **The pad (the mark stage):** a ring in the style's colour (its `colours` source, as a mark's: the room's `floor` or a fixed colour of the game palette, docs/STYLE.md) draws in, with a 1-pixel rim that runs round it in 4 or more frames.
-    - **The scan:** a bright 1-pixel line sweeps up from the feet to the top of the art. Behind it, the body's rows show **interlaced**: every 4th row first, then every 2nd, then all, each set over at least 3 frames. So the body is a striped ghost that fills in, never a fade.
-    - **The glitch:** while the rows fill, the body's parts are shifted sideways by whole pixels, 1 or 2 now and then, settling to 0 in the last frames. The shift is rolled from Feel's own dice, view only.
+    - **The pad (the mark stage):** a ring in the style's colour (its `colours` source, as a mark's: the room's `floor` or a fixed colour of the game palette, docs/STYLE.md) draws in, with a 1-pixel rim that runs round it in 4 or more frames. As built, the ring is the rim, in the light shade; the inside stays a hole in the floor, as `rise`'s (a pad filled in a material's shadow read as a puddle).
+    - **The scan:** a bright 1-pixel line sweeps up from the feet to the top of the art. Behind it, the body's rows show **interlaced**: every 4th row first, then every 2nd, then all, each set over at least 3 frames. So the body is a striped ghost that fills in, never a fade. As built, a row's sets follow how long ago the line passed it (4 frames each), and the rows are lit: every 4th in the light shade, flat, every 2nd in the base shade, then the body's own colours. Without that the body read as uncovered by a scanner rather than built out of light.
+    - **The glitch:** while the rows fill, the body's parts are shifted sideways by whole pixels, 1 or 2 now and then, settling to 0 in the last frames. The shift is rolled from Feel's own dice, view only. As built, the dice are a hash of the body's actor id and the moment, not Feel's random generator, so the glitch is drawn from state alone: the same on every machine and after a snapshot.
     - **The landing:** the line reaches the top and goes out over 3 frames, the pad closes, and a few square `spark` motes come off the body's outline, through the cue.
 
-    Its mask is up to the body's height in rows, one rect a row band, so it adds no render pass beyond `rise`'s.
+    Its mask is up to the body's height in rows, one rect a row band, so it adds no render pass beyond `rise`'s. (As built, the line and the lit rows are two canvas items of its own under the body's, drawn flat by one small shader and clipped by the same mask.)
 - **The mark** is the ring drawn from the floor's colours by default. A style may instead give an art strip, played frame by frame over the mark stage and closed in its last frames, so a forest biome can have roots or a frost biome rime, as art.
 - **Tests:**
   - every style file (`problems()`);
@@ -124,6 +124,38 @@ Across all styles, no two may name the same biome (`SpawnStyle.all_problems`, as
   - test_spawn_look.gd: each body is drawn by its own style, with an unknown id as the lookup's rise, and `cut()` hands a body from one motion to another when its style's motion changes mid-spawn (a recording fixture motion; AS1 left that path untested).
   - test_flow.gd and test_flow_adds.gd: room enemies and adds spawn in the style Flow picks, for its seconds.
   - tests/core/test_snapshot_spawn_styles.gd: the arena with two fixture styles (the biome's, and the bone husk's own, of other lengths; `ReplayRun.spawn_styles` adds them to every fresh game's registry), played with a snapshot mid-spawn and resumed in a fresh game, agrees tick for tick.
+
+**As built (AS3):**
+- **The motion** is `gameplay/feel/spawn_motions/materialize.gd`, in `SpawnStyle.MOTIONS` and `SpawnLook.MOTIONS`. Its stages are in frames at 60 fps from the mark's end (`timings`), so each keeps its frames whatever the style's length:
+  - the scan, at least 6 frames;
+  - a row's every-4th set, then its every-2nd set, 4 frames each;
+  - the line going out, 4.5 frames in 3 looks (two thirds, a third, a dot);
+  - the body whole for its last 3 frames, when its cue plays.
+
+  The glitch is at most 2 px, at most 1 from 6 frames before the body is whole, and none from 3. The line is as wide as the mark.
+- **A motion's stage has a least length.** `SpawnStyle.MOTION_FRAMES` (rise 3, materialize 17) is each motion's `least_frames()`, and a test holds the two together. `problems()` names a style whose motion's stage is shorter. AS1 needed no such check: rise's close holds it.
+- **The motion says when the cue plays** (`cue_share`). `rise` plays it as it starts, as before; `materialize` plays it as the body is whole, so its sparks come off a whole body. The motion also says how far round the mark's rim is drawn (`rim_share`).
+- **The look reads `colours`** (`shades_for`): the floor's shades for `floor`, else the palette material's, kept per material. Only the mark's rim and `materialize`'s light take them. The mark's inside stays the floor's darkened shadow, so `rise` draws as before.
+- **The light** is two canvas items per body under the body's own: the line, and the lit rows (the body sprite's frame, those rows only). `spawn_motions/flat.gdshader` draws them flat in their colour; it is warmed before play (`ShaderWarmup.want`). The motion makes them as the body is first drawn and frees them in `put_back`. The material is one for the game: a material freed in the headless test renderer logs errors.
+- **The content.**
+  - `content/spawn_styles/materialize/`: 1.0 s, the mark to 0.3 in 6 frames, the close from 0.92, `colours` `arc` (the storm fork is a lightning enemy).
+  - The cue `enemy_materialize`: square sparks and the sound id `enemy_materialize`, silent until its .ogg exists.
+  - The sparks are a new mote kind, `bit` (content/motes): a 2x2 square, then a pixel, never glowing. The plan's `spark` is a glowing streak, and a cue played with no way throws its motes nowhere, so the part throws `up`, all round.
+  - The storm fork names `materialize` (content/enemies/storm_fork/storm_fork.tres), so it shows in the crypt.
+- **The screenshot:** `tests/screenshots/shot_spawning.gd` saves `spawning_materialize` too: a storm fork stood by the wizard, every 3rd frame from the pad to standing.
+- **The `rise` strip is no longer equal to the pixel.** With the global seed pinned and particles off, it differs from main's only in a few floor pixels, by one shade step. Removing the new shader from the warm-up makes it identical: the warm-up takes one frame more, and Feel's real clock (a torch's flicker) moves with it.
+- **Tests.**
+  - `tests/gameplay/feel/test_spawn_materialize.gd` covers each stage in 3 looks at least, the row sets and their shades, the line, the glitch, the rim and the colours, the cue as the body is whole, a fresh look drawing alike, the put-back (landed, gone, or changed to `rise`) and no allocation.
+  - `tests/gameplay/feel/test_spawn_styles_everywhere.gd` plays every style on every enemy that spawns in and every boss's add, as `test_card_rules.gd` plays its cards. Each cell must land on time, draw its motion's `stages` in 3 looks at least, be drawn alike by a fresh look, and be put back.
+  - `tests/core/test_snapshot_spawn_styles.gd` runs the bone husk in `materialize` through a snapshot: tick for tick, and its bodies drawn alike before the snapshot and once it is restored (`ReplayRun.at_restore`, new).
+  - `tests/core/test_spawn_style.gd` names a motion's stage too short.
+- **What it leaves out, for now:**
+  - Only the body sprite (`Sprite`) is lit. Its other drawn parts (a face's eyes) show in their own colours in the rows as they are shown. Lighting them would need each part drawn into the light.
+  - The sparks play at the body's feet, as every spawn cue does, thrown up all round it, not from its outline.
+  - Their colour is the cue's own (Arc's light shade), not the style's `colours`. A style in another colour gives itself a cue of its own (content/spawn_styles/README.md).
+  - At a size that is not whole, or a turned sprite, a row of the world is not a row of the art, so its lit rows cut the art's rows a little.
+- **Kept clean.** The look puts back every body it draws as it leaves the tree or goes (`put_back_all`), so a motion's canvas items never outlive it. Each motion sets the clip every frame, so another look putting a body back never leaves it uncut. The line's row is in the mask only as wide as the line.
+- A motion's `look_of(body)` (what it drew, in whole numbers) and `stages(style)` serve the tests; `rise.gd`'s mask and the parts' shift moved to the base class (`mask_rect`, `shift_parts`), as `materialize` uses them too.
 
 Each step updates the README of the areas it touches, and `content/spawn_styles/README.md` (new) is the guide: copy `rise/`, change the numbers, name your biome.
 

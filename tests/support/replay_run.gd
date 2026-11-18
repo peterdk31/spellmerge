@@ -85,6 +85,9 @@ var spawning: SpawnRules = null
 ## Called right after the snapshot is taken (with nothing), so a test can check what the snapshot
 ## caught (a body mid-spawn, groups still to come).
 var at_snapshot: Callable = Callable()
+## Called right after `resume` restores the snapshot (with nothing), before it plays on, so a test can
+## check the restored game against what `at_snapshot` saw (spawn styles AS3: the spawns drawn alike).
+var at_restore: Callable = Callable()
 ## True: each run starts from a fresh game (every autoload made again). False: in the same game,
 ## after whatever ran before, as a player starts one run after another (N3b: the run starts from
 ## a fresh game's state all the same).
@@ -390,6 +393,8 @@ func resume(replay: Replay, from: Snapshot, tick: int, bots: int, into: Desync) 
 		problems.append("%s: the replay did not play" % replay.start)
 	for problem in from.restore(areas(), _root):
 		problems.append("%s restored: %s" % [replay.start, problem])
+	if at_restore.is_valid():
+		at_restore.call()
 	if not bool(_frames.call("seek", tick + 1)):
 		problems.append("%s: the replay cannot go on from tick %d" % [replay.start, tick + 1])
 	for i in range(tick + 1, replay.tick_count()):

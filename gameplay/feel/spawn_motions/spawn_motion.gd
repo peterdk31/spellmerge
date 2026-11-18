@@ -9,13 +9,20 @@ extends RefCounted
 ## A motion answers `apply(body, share, style)`: draw `body` at `share` of its spawn as `style` says
 ## (the look calls it every frame the body spawns in); and `put_back(key, body)`: the body spawns in no
 ## more, give it its own look back and forget it. It is drawn from the share alone, never from a
-## moment it was told of, so a machine that joins mid-spawn draws it where it is. View only.
+## moment it was told of, so a machine that joins mid-spawn draws it where it is. View only. It also
+## says when its style's cue plays (`cue_share`: `rise`'s as it starts to move, `materialize`'s as it
+## is whole), how far round the mark's rim is drawn (`rim_share`: all of it, but for a rim that runs
+## round), and its stages (`stages`, for the tests: each is drawn in `SpawnStyle.MIN_FRAMES` frames at
+## least). The look hands it the shades of a style's `colours` (`shades`).
 ##
 ## The measures of a body every motion needs (how tall it is drawn, how far its art reaches under its
 ## feet) are here, with each body's `size_top` kept while it spawns in.
 
 const VIEW_ONLY: bool = true
 
+## The mask's reach each way from the feet and up (a body's own pixels, at its size 1).
+const MASK_HALF_WIDTH: float = 96.0
+const MASK_TALL: float = 192.0
 ## The least height a body rises by, in pixels (so a rise is never fewer than this many frames).
 const MIN_HEIGHT: float = 8.0
 ## Pixels added over a body's measured height, so nothing of it shows above the floor before it rises.
@@ -28,6 +35,9 @@ const HEIGHT_MARGIN: float = 2.0
 ## bob moves its art while it spawns in (`CreatureLook`, the sprite's offset).
 var _size_top: Dictionary[int, float] = {}
 var _size_top_measured_at: Dictionary[int, float] = {}
+## The shades of a style's `colours`: (style: SpawnStyle) -> PackedColorArray of light, base, shadow
+## (the room's floor's for `floor`, a palette material's otherwise). Set by the look.
+var shades: Callable = Callable()
 
 
 ## Draw `body` at `share` (0 to 1) of its spawn as `style` says. Called every frame it spawns in.
@@ -39,6 +49,52 @@ func apply(_body: Actor, _share: float, _style: SpawnStyle) -> void:
 ## forgotten).
 func put_back(key: int, _body: Actor) -> void:
 	forget(key)
+
+
+## The least frames its stage (`mark_end` to the end) must last at `SpawnStyle.CHECK_FPS` to draw its
+## stages (`SpawnStyle.MOTION_FRAMES` holds the same number for the style's check; a test holds them).
+func least_frames() -> int:
+	return SpawnStyle.MIN_FRAMES
+
+
+## The share of its spawn at which `style`'s cue plays: as the motion starts (the mark's end).
+func cue_share(style: SpawnStyle) -> float:
+	return style.mark_end
+
+
+## How much of the mark's rim is drawn at `share` of the spawn as `style` times it, 0 to 1 (going
+## round from the top, clockwise): all of it.
+func rim_share(_share: float, _style: SpawnStyle) -> float:
+	return 1.0
+
+
+## Where its stages start, as shares of the spawn, and the end (1): each is drawn in at least
+## `SpawnStyle.MIN_FRAMES` frames (tests). The mark's, then the motion's.
+func stages(style: SpawnStyle) -> PackedFloat32Array:
+	return PackedFloat32Array([0.0, style.mark_end, 1.0])
+
+
+## What it drew `body` as at its last cut, as whole numbers (empty: not drawn; tests): two cuts that
+## look the same give the same numbers.
+func look_of(_body: Actor) -> PackedInt32Array:
+	return PackedInt32Array()
+
+
+## The mask of a body whose art reaches `bottom` pixels below its feet, at its `size`: everything
+## above that line, in the body's own pixels.
+static func mask_rect(bottom: float, size: float) -> Rect2:
+	return Rect2(-MASK_HALF_WIDTH, -MASK_TALL, 2.0 * MASK_HALF_WIDTH, MASK_TALL + bottom / size)
+
+
+## Each direct drawn child of `body` (a Node2D that is not top level) drawn `by` of the body's own
+## pixels from where it is (0: where it is). Its node is untouched; only its canvas item is moved.
+static func shift_parts(body: Actor, by: Vector2) -> void:
+	for i in body.get_child_count():
+		var part := body.get_child(i) as Node2D
+		if part == null or part.top_level:
+			continue
+		var place: Transform2D = part.get_transform()
+		RenderingServer.canvas_item_set_transform(part.get_canvas_item(), place.translated(by) if by != Vector2.ZERO else place)
 
 
 ## Forget what is kept of the body of instance id `key`.

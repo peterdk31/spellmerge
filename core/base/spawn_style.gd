@@ -26,8 +26,13 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 ## The registry's folder of the styles (content/spawn_styles), which Flow and Feel find them in.
 const FOLDER: StringName = &"spawn_styles"
 ## The motions a style may name: the kinds of motion Feel draws (`SpawnLook.MOTIONS` has code for
-## each). `rise`: out of the floor, through the mark (enemy spawning EA2's look).
-const MOTIONS: Array[StringName] = [&"rise"]
+## each). `rise`: out of the floor, through the mark (enemy spawning EA2's look); `materialize`: built
+## up out of light, row by row behind a scan line (spawn styles AS3).
+const MOTIONS: Array[StringName] = [&"rise", &"materialize"]
+## The least frames each motion's stage (`mark_end` to the end) must last at `CHECK_FPS` to draw all
+## its stages in `MIN_FRAMES` frames each (`problems`): the motion's own (`least_frames()` of its code in
+## gameplay/feel/spawn_motions/; a test holds the two together).
+const MOTION_FRAMES: Dictionary[StringName, int] = {&"rise": 3, &"materialize": 17}
 ## `rise`'s numbers: every field's default, and the style drawn when none is found.
 const DEFAULT: Dictionary[String, Variant] = {
 	"id": &"rise",
@@ -70,8 +75,8 @@ const FLOOR: StringName = &"floor"
 ## never names art it does not show).
 @export var mark_strip: Texture2D = null
 ## Where the mark's colours come from: `floor` (the room's floor's, today's ring) or a material of
-## the game's palette by name (`Palette`; never a player's nor Blight, docs/STYLE.md). Read by the
-## look from AS3 on; every style today is `floor`'s.
+## the game's palette by name (`Palette`; never a player's nor Blight, docs/STYLE.md): the mark's
+## shades (its rim the light one) and `materialize`'s scan line (its light shade).
 @export var colours: StringName = DEFAULT["colours"]
 ## The cue played as the body starts to move (content/cues): its dust and sound. Empty: none.
 @export var cue: StringName = DEFAULT["cue"]
@@ -120,10 +125,16 @@ func close_stage_frames() -> float:
 	return (1.0 - close_from) * seconds * CHECK_FPS
 
 
+## The time the motion is drawn in (from `mark_end` to the end), at `CHECK_FPS`, in frames.
+func motion_stage_frames() -> float:
+	return (1.0 - mark_end) * seconds * CHECK_FPS
+
+
 ## What is wrong with it, one line each (empty when it is fine): an id that is not its folder's name
 ## (a style read from a file), a motion `MOTIONS` does not have, `seconds` outside `MIN_SECONDS` to
 ## `MAX_SECONDS`, shares out of order (0 < `mark_end` < `close_from` < 1), a stage shorter than its
-## frames at `CHECK_FPS` or drawn in fewer than `MIN_FRAMES`, colours that are neither the floor's
+## frames at `CHECK_FPS` or drawn in fewer than `MIN_FRAMES`, a motion's stage shorter than its
+## motion needs (`MOTION_FRAMES`), colours that are neither the floor's
 ## nor a world material of the palette, a mark strip (not drawn before AS4), a biome named twice, and
 ## given `known_cue` (a cue id to whether the game has it: the registry's), a cue it does not know.
 func problems(known_cue: Callable = Callable()) -> PackedStringArray:
@@ -140,9 +151,11 @@ func problems(known_cue: Callable = Callable()) -> PackedStringArray:
 	if not (mark_end > 0.0 and mark_end < close_from and close_from < 1.0):
 		found.append("%s: the shares are out of order (mark_end %s, close_from %s); 0 < mark_end < close_from < 1." % [name, mark_end, close_from])
 	else:
-		# The motion's stage holds the close's, so a close long enough is a motion long enough.
 		_check_stage(found, name, "the mark's", mark_frames, mark_stage_frames(), "mark_frames")
 		_check_stage(found, name, "the close's", close_frames, close_stage_frames(), "close_frames")
+		var least: int = MOTION_FRAMES.get(motion, 0)
+		if MOTIONS.has(motion) and motion_stage_frames() < float(least):
+			found.append("%s: the motion's stage lasts %.1f frames at %d fps; %s needs %d to draw its stages; make the spawn longer or mark_end earlier." % [name, motion_stage_frames(), roundi(CHECK_FPS), motion, least])
 	if colours != FLOOR:
 		for line: String in Palette.world_problems([colours] as Array[StringName], "%s: colours" % name):
 			found.append(line + "; or 'floor'.")

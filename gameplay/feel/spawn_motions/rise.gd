@@ -22,10 +22,6 @@ extends "res://gameplay/feel/spawn_motions/spawn_motion.gd"
 ## Nothing here allocates while bodies spawn in: the dictionaries of the bodies it cut grow only when a
 ## body first spawns in.
 
-## The mask's reach each way from the feet and up (a body's own pixels, at its size 1).
-const MASK_HALF_WIDTH: float = 96.0
-const MASK_TALL: float = 192.0
-
 ## The bodies cut (by instance id): how far below their place each was drawn at its last cut, and how
 ## far below its feet its mask reached (`body_bottom`), in pixels.
 var _drawn: Dictionary[int, Vector2] = {}
@@ -43,13 +39,13 @@ static func shift(height: float, share: float, style: SpawnStyle) -> float:
 ## One spawning body cut at its feet's line (the lowest row of its art) and its parts shifted by its rise.
 func apply(body: Actor, share: float, style: SpawnStyle) -> void:
 	var key: int = body.get_instance_id()
-	if not _drawn.has(key):
-		body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	# Every frame: another look putting the body back (a fresh look's) must not leave it uncut.
+	body.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
 	var size: float = maxf(absf(body.size), 0.01)
 	var bottom: float = body_bottom(body)
 	var by: float = shift(height_of(body, key) + bottom, share, style)
 	_drawn[key] = Vector2(by, bottom)
-	_shift_parts(body, by / size)
+	shift_parts(body, Vector2(0.0, by / size))
 	var item: RID = body.get_canvas_item()
 	RenderingServer.canvas_item_clear(item)
 	# The mask: everything above the line (in the body's own pixels). Always drawn, every frame: a
@@ -63,26 +59,18 @@ func put_back(key: int, body: Actor) -> void:
 	if body != null:
 		body.clip_children = CanvasItem.CLIP_CHILDREN_DISABLED
 		RenderingServer.canvas_item_clear(body.get_canvas_item())
-		_shift_parts(body, 0.0)
+		shift_parts(body, Vector2.ZERO)
 	_drawn.erase(key)
 	forget(key)
 
 
-## The mask of a body whose art reaches `bottom` pixels below its feet, at its `size`: everything
-## above that line, in the body's own pixels.
-static func mask_rect(bottom: float, size: float) -> Rect2:
-	return Rect2(-MASK_HALF_WIDTH, -MASK_TALL, 2.0 * MASK_HALF_WIDTH, MASK_TALL + bottom / size)
-
-
-## Each direct drawn child of `body` (a Node2D that is not top level) drawn `by` of the body's own
-## pixels below where it is (0: where it is). Its node is untouched; only its canvas item is moved.
-static func _shift_parts(body: Actor, by: float) -> void:
-	for i in body.get_child_count():
-		var part := body.get_child(i) as Node2D
-		if part == null or part.top_level:
-			continue
-		var place: Transform2D = part.get_transform()
-		RenderingServer.canvas_item_set_transform(part.get_canvas_item(), place.translated(Vector2(0.0, by)) if by != 0.0 else place)
+## What it drew `body` as at its last cut: how far below its place, and how far below its feet its
+## mask reached (empty: not cut; tests).
+func look_of(body: Actor) -> PackedInt32Array:
+	var key: int = body.get_instance_id()
+	if not _drawn.has(key):
+		return PackedInt32Array()
+	return PackedInt32Array([int(_drawn[key].x), int(_drawn[key].y)])
 
 
 ## How far below its feet `body`'s mask reached at its last cut, in pixels (-1: not cut; tests).

@@ -36,3 +36,4 @@ profile = ExtResource("5_profile")
 biomes = Array[StringName]([&"crypt"])
 cost = 3
 min_depth = 1
+spawn_style = &"materialize"

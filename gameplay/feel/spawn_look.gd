@@ -20,28 +20,36 @@ extends Node2D
 ## have is drawn as `rise`, so a body is never drawn whole mid-spawn. What every style shares is here:
 ##
 ## - **0 to `mark_end`, the mark:** a disc on the floor at the body's feet, as wide as its footprint,
-##   in the room's floor colours (`RoomBase.floor_colors`: its shadow, darkened, with its light shade
-##   as a rim; `use_room`), growing from a dot in `mark_frames` frames. The body is not drawn yet.
+##   a hole in the room's floor (`RoomBase.floor_colors`: its shadow, darkened; `use_room`) ringed by
+##   a rim in the light shade of the style's `colours` (`shades_for`: the floor's own for `floor`,
+##   else a palette material's, docs/STYLE.md), growing from a dot in `mark_frames` frames; the motion
+##   says how far round its rim is drawn (`rim_share`: `materialize`'s runs round as it grows). The
+##   body is not drawn yet.
 ## - **`mark_end` to 1, the motion** (`rise`: the body comes up out of the mark, cut at its feet's
-##   line; spawn_motions/rise.gd). As it starts the style's cue plays at the body's feet (`rise`'s
-##   `enemy_spawn`: dust off the mark, a soft sound): its sound at most every SOUND_EVERY seconds,
-##   so a group does not stack it (the cue is played unweighted in between: its dust only). From
-##   `close_from` the mark closes in `close_frames` frames as the feet land, down to a dot, so the
-##   motion ends where standing begins (docs/STYLE.md, "Smooth").
+##   line, spawn_motions/rise.gd; `materialize`: built up out of light behind a scan line,
+##   spawn_motions/materialize.gd). When the motion says (`cue_share`: `rise`'s as it starts,
+##   `materialize`'s as it is whole) the style's cue plays at the body's feet (`rise`'s `enemy_spawn`:
+##   dust off the mark, a soft sound): its sound at most every SOUND_EVERY seconds, so a group does
+##   not stack it (the cue is played unweighted in between: its dust only). From `close_from` the mark
+##   closes in `close_frames` frames as the feet land, down to a dot, so the motion ends where
+##   standing begins (docs/STYLE.md, "Smooth").
 ##
 ## View only. Nothing here allocates while bodies spawn in: its scratch of ids and marks is made once,
-## and the dictionaries of the bodies it drew, whose cue it played and the styles it looked up grow
-## only when a body or a style is first seen (and are walked only as one is done).
+## and the dictionaries of the bodies it drew, whose cue it played, the styles it looked up and the
+## materials' shades grow only when a body, a style or a material is first seen (and are walked only
+## as one is done).
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 const SpawnMotionScript := preload("res://gameplay/feel/spawn_motions/spawn_motion.gd")
 const RiseScript := preload("res://gameplay/feel/spawn_motions/rise.gd")
+const MaterializeScript := preload("res://gameplay/feel/spawn_motions/materialize.gd")
 
 const VIEW_ONLY: bool = true
 
 ## The motions it draws, by the names of `SpawnStyle.MOTIONS` (the same names: a test checks).
 const MOTIONS: Dictionary[StringName, Script] = {
 	&"rise": RiseScript,
+	&"materialize": MaterializeScript,
 }
 ## The motion a style whose motion it does not have is drawn by.
 const FALLBACK_MOTION: StringName = &"rise"
@@ -75,15 +83,19 @@ var _risen: Dictionary[int, bool] = {}
 ## The styles looked up, by id (a style not found is kept as `rise`'s or the default), and the default.
 var _styles: Dictionary[StringName, SpawnStyle] = {}
 var _default_style: SpawnStyle = SpawnStyle.from_default()
-## This frame's marks: where (whole pixels) and how wide; `_marks` of them are in use.
+## This frame's marks: where (whole pixels), how wide, their fill and rim, and how much of the rim is
+## drawn (0 to 1, round from the top); `_marks` of them are in use.
 var _mark_at: PackedVector2Array = PackedVector2Array()
 var _mark_radius: PackedInt32Array = PackedInt32Array()
+var _mark_fill: PackedColorArray = PackedColorArray()
+var _mark_rim: PackedColorArray = PackedColorArray()
+var _mark_rim_share: PackedFloat32Array = PackedFloat32Array()
 var _marks: int = 0
 ## How many marks the last draw drew (to clear them once when there are none).
 var _drawn_marks: int = 0
-## The mark's fill and rim.
-var _fill: Color = NO_FLOOR[2].darkened(MARK_DARKEN)
-var _rim: Color = NO_FLOOR[0]
+## The room's floor's shades (light, base, shadow), and each palette material's a style named, by name.
+var _floor_shades: PackedColorArray = NO_FLOOR
+var _material_shades: Dictionary[StringName, PackedColorArray] = {}
 ## Real seconds since it started, and when a cue last sounded.
 var _clock: float = 0.0
 var _sounded_at: float = -INF
@@ -93,8 +105,13 @@ func _init() -> void:
 	_ids.resize(ActorsScript.ACTORS)
 	_mark_at.resize(ActorsScript.ACTORS)
 	_mark_radius.resize(ActorsScript.ACTORS)
+	_mark_fill.resize(ActorsScript.ACTORS)
+	_mark_rim.resize(ActorsScript.ACTORS)
+	_mark_rim_share.resize(ActorsScript.ACTORS)
+	var shades: Callable = shades_for
 	for motion: StringName in MOTIONS:
 		_motions[motion] = MOTIONS[motion].new() as SpawnMotionScript
+		_motions[motion].shades = shades
 
 
 func _ready() -> void:
@@ -109,15 +126,41 @@ func _enter_tree() -> void:
 func _exit_tree() -> void:
 	if RenderingServer.frame_pre_draw.is_connected(cut):
 		RenderingServer.frame_pre_draw.disconnect(cut)
+	put_back_all()
 
 
-## The room played in now (null for none): the mark takes its floor's colours.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		put_back_all()
+
+
+## Every body it draws is put back by its motion now (the look leaves the tree or goes, mid-spawn):
+## its own drawing back, and a motion's own canvas items freed.
+func put_back_all() -> void:
+	for key: int in _cut.keys():
+		_cut[key].put_back(key, instance_from_id(key) as Actor)
+	_cut.clear()
+
+
+## The room played in now (null for none): a style of `floor` colours takes its floor's.
 func use_room(room: RoomBase) -> void:
 	var colours: PackedColorArray = room.floor_colors() if room != null else PackedColorArray()
 	if colours.is_empty():
 		colours = NO_FLOOR
-	_rim = colours[0]
-	_fill = colours[mini(2, colours.size() - 1)].darkened(MARK_DARKEN)
+	_floor_shades = PackedColorArray([colours[0], colours[mini(1, colours.size() - 1)], colours[mini(2, colours.size() - 1)]])
+
+
+## The shades of `style`'s `colours` (light, base, shadow): the room's floor's for `floor` (and for a
+## name the palette does not have), else the palette material's (docs/STYLE.md, "Palette").
+func shades_for(style: SpawnStyle) -> PackedColorArray:
+	if style.colours == SpawnStyle.FLOOR:
+		return _floor_shades
+	var shades: PackedColorArray = _material_shades.get(style.colours, PackedColorArray())
+	if shades.is_empty():
+		var palette: PackedColorArray = Palette.shades_of(style.colours)
+		shades = PackedColorArray([palette[2], palette[1], palette[0]]) if palette.size() == 3 else _floor_shades
+		_material_shades[style.colours] = shades
+	return shades
 
 
 ## Forget the styles looked up, so each is looked up again: Feel calls it when its registry is set
@@ -184,8 +227,9 @@ func step(table: ActorsScript, real_delta: float) -> void:
 			if body == null or not body.is_spawning() or not body.is_inside_tree():
 				continue
 			var style: SpawnStyle = style_for(body)
+			var motion: SpawnMotionScript = _motion_of(style)
 			var share: float = body.spawn_share()
-			if share >= style.mark_end:
+			if share >= motion.cue_share(style):
 				rising += 1
 				var key: int = body.get_instance_id()
 				if not _risen.has(key):
@@ -195,6 +239,10 @@ func step(table: ActorsScript, real_delta: float) -> void:
 			if radius > 0 and _marks < _mark_at.size():
 				_mark_at[_marks] = body.global_position.round()
 				_mark_radius[_marks] = radius
+				# A hole in the floor (its shadow darkened), ringed in the light shade of the style's colours.
+				_mark_rim[_marks] = shades_for(style)[0]
+				_mark_fill[_marks] = _floor_shades[2].darkened(MARK_DARKEN)
+				_mark_rim_share[_marks] = motion.rim_share(share, style)
 				_marks += 1
 	if _risen.size() > rising:
 		_forget_risen()
@@ -258,24 +306,40 @@ func _put_back() -> void:
 func _draw() -> void:
 	_drawn_marks = _marks
 	for m in _marks:
-		_draw_mark(_mark_at[m], _mark_radius[m])
+		_draw_mark(_mark_at[m], _mark_radius[m], _mark_fill[m], _mark_rim[m], _mark_rim_share[m])
 
 
 ## A mark `radius` pixels wide each way at `at` (radius 1: a dot), half as high (it lies on the floor),
-## row by row in whole pixels: its inside in the fill, its edge in the rim.
-func _draw_mark(at: Vector2, radius: int) -> void:
+## row by row in whole pixels: its inside in `fill`, its edge in `rim`, of which `rim_share` is drawn
+## (round from the top, clockwise; the rest of the edge in the fill).
+func _draw_mark(at: Vector2, radius: int, fill: Color, rim: Color, rim_share: float) -> void:
 	var high: int = maxi(radius / 2, 0)
 	for row in range(-high, high + 1):
 		var across: float = 1.0 - (float(row) / float(high + 1)) ** 2 if high > 0 else 1.0
 		var half: int = maxi(floori((float(radius) - 0.5) * sqrt(across)), 0)
 		var y: float = at.y + float(row)
 		var width: float = float(2 * half + 1)
-		if row == -high or row == high or half <= 1:
-			draw_rect(Rect2(at.x - float(half), y, width, 1.0), _rim)
+		if rim_share < 1.0 and radius > 1:
+			_draw_mark_row(at, row, half, fill, rim, rim_share, row == -high or row == high or half <= 1)
 			continue
-		draw_rect(Rect2(at.x - float(half), y, 1.0, 1.0), _rim)
-		draw_rect(Rect2(at.x - float(half) + 1.0, y, width - 2.0, 1.0), _fill)
-		draw_rect(Rect2(at.x + float(half), y, 1.0, 1.0), _rim)
+		if row == -high or row == high or half <= 1:
+			draw_rect(Rect2(at.x - float(half), y, width, 1.0), rim)
+			continue
+		draw_rect(Rect2(at.x - float(half), y, 1.0, 1.0), rim)
+		draw_rect(Rect2(at.x - float(half) + 1.0, y, width - 2.0, 1.0), fill)
+		draw_rect(Rect2(at.x + float(half), y, 1.0, 1.0), rim)
+
+
+## One row of a mark whose rim is drawn only `rim_share` round, pixel by pixel on its edge (`edge`: the
+## whole row is edge, its top or bottom).
+func _draw_mark_row(at: Vector2, row: int, half: int, fill: Color, rim: Color, rim_share: float, edge: bool) -> void:
+	var y: float = at.y + float(row)
+	for dx in range(-half, half + 1):
+		var on_edge: bool = edge or dx == -half or dx == half
+		var colour: Color = fill
+		if on_edge and fposmod(atan2(float(dx), -2.0 * float(row)), TAU) <= rim_share * TAU + 0.001:
+			colour = rim
+		draw_rect(Rect2(at.x + float(dx), y, 1.0, 1.0), colour)
 
 
 ## How many bodies it draws now (tests).
@@ -314,3 +378,16 @@ func marks() -> int:
 ## The mark `n` of this frame: where and how wide (tests).
 func mark(n: int) -> Vector3:
 	return Vector3(_mark_at[n].x, _mark_at[n].y, float(_mark_radius[n]))
+
+
+## The mark `n` of this frame's fill and rim colours, and how much of its rim is drawn (tests).
+func mark_fill(n: int) -> Color:
+	return _mark_fill[n]
+
+
+func mark_rim(n: int) -> Color:
+	return _mark_rim[n]
+
+
+func mark_rim_share(n: int) -> float:
+	return _mark_rim_share[n]

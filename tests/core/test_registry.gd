@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## Tests for core/registry, one rule per test, each on a registry of its own scanning a fixture
 ## folder (tests/core/fixtures/registry): lookup by folder and id, nested folders, skipped files
-## and duplicate ids, every resource seen (no demo filter), unknown folders and ids, `add` for a
+## and duplicate ids, every resource seen (no demo filter), unknown folders and ids, a content item's
+## JSON (`get_data`), `add` for a
 ## test's own fixture, sounds by id (`null` for an unknown one), a rescan and missing roots, and an
 ## export's `.remap` and `.import` names (on empty files the test writes under user:// and takes
 ## out after).
@@ -87,6 +88,15 @@ func test_an_unknown_folder_gives_nothing() -> void:
 
 func test_an_unknown_id_gives_null() -> void:
 	check(registry.get_resource(&"spells", &"nope") == null, "an unknown id gives null")
+
+
+func test_a_content_items_json_is_read_by_folder_id_and_file() -> void:
+	var data: Dictionary = registry.get_data(&"edges", &"rough", "edge.json")
+	check(float(data.get("full_width", 0)) == 9.0, "a content item's JSON is read, parsed")
+	check(registry.get_data(&"edges", &"rough", "edge.json") == data, "and kept")
+	check(registry.get_data(&"edges", &"smooth", "edge.json").is_empty(), "an item with no such file gives nothing")
+	check(registry.get_data(&"edges", &"../rough", "edge.json").is_empty(), "an id that is not one plain name gives nothing")
+	check(registry.get_data(&"edges", &"rough", "edge.tres").is_empty(), "nor a file that is not JSON")
 
 
 # Add (a test's fixture beside the content).

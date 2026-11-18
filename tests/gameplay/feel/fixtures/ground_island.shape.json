@@ -1,0 +1,12 @@
+{
+	"about": "A small island in the void for tests/gameplay/feel/test_ground_drawing.gd: an outline of waves and rough noise in the hub's magic edge (its seam in bands, glow, rock face, rims and drips), its void a hole, two cracks from its edge round a kept-clear circle, a clearing of trodden earth and a swept ring.",
+	"size": [256, 192],
+	"seed": 7,
+	"edge": "magic",
+	"ground": "turf",
+	"void": "hole",
+	"keep_clear": [[128, 96, 14]],
+	"outlines": [{"centre": [128, 90], "radii": [104, 66], "waves": [[3, 0.05, 0.4], [5, 0.03, 1.2]], "rough": [[40, 0.08], [12, 0.04]], "seed": 4}],
+	"cracks": [{"angle": 0.1, "width": 10, "length": 32, "seed": 2}, {"angle": 0.62, "width": 5, "length": 26, "seed": 6}],
+	"areas": [{"ground": "earth", "centre": [100, 80], "radii": [34, 22], "seed": 2}, {"ground": "swept", "centre": [160, 100], "radii": [30, 20], "seed": 3}]
+}

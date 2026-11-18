@@ -126,6 +126,7 @@ const ExitSignsScript := preload("res://gameplay/feel/exit_signs.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
+const GroundLayoutScript := preload("res://gameplay/feel/ground/ground_layout.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const SHOWN_BEAMS_PER_PLAYER: int = 24
@@ -474,6 +475,9 @@ var _spectacle: SpectacleScript = null
 ## The room's ground cover (`cover.gd`, ground cover GC3): at the floor marks' z, before the
 ## spectacle in the tree, so the marks lie over it.
 var _cover: CoverScript = null
+## The room's ground, drawn again from its shape as it is laid out (`ground/ground_layout.gd`,
+## connected biomes CB4).
+var _ground_layout: GroundLayoutScript = null
 ## The look of a fall into a hole (hub rework HR-H2), drawn from the bodies' state, and its motes'
 ## thrower (made once).
 var _fall_look: FallLook = FallLook.new()
@@ -734,6 +738,11 @@ func _ready() -> void:
 	add_child(_swing_trails)
 	_portal_look = PortalLookScript.new()
 	add_child(_portal_look)
+	_ground_layout = GroundLayoutScript.new()
+	_ground_layout.name = "Ground"
+	_ground_layout.events = events
+	_ground_layout.registry = registry
+	add_child(_ground_layout)
 	# Before the spectacle: at the marks' z the later node draws on top, so the marks lie over the cover.
 	_cover = CoverScript.new(MARK_Z)
 	_cover.name = "Cover"

@@ -24,7 +24,7 @@ var enemies: Array[StringName] = []
 ## `RunScaling.room_scale`: its depth and the run's players): its enemy budget was scaled by it, and
 ## every enemy's and boss's health is (gameplay/difficulty).
 var scale: float = 1.0
-## How its enemies come in (enemy arrivals EA4, its biome's `MapRules.arrivals` at its scaled budget):
+## How its enemies come in (enemy spawning EA4, its biome's `MapRules.spawning` at its scaled budget):
 ## the cost of one group (0: the whole list at once), the cost standing at or below which the next
 ## comes, and the seconds between two bodies of a group. Told to Flow as the party enters it
 ## (`run_room_paced`).

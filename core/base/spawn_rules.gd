@@ -1,9 +1,9 @@
-class_name ArrivalRules
+class_name SpawnRules
 extends Resource
-## How a room's enemies come in (enemy arrivals EA4, docs/milestones/enemy-arrivals.md, "The data and
+## How a room's enemies come in (enemy spawning EA4, docs/milestones/enemy-spawning.md, "The data and
 ## how it reaches Flow"): in groups, the next only when the room gets quiet (the owner, 2026-11-17: no
 ## timer), each group a share of the room's enemy budget by cost (the measure the budget already uses).
-## One biome's pace: `MapRules.arrivals` (null: a room's whole list arrives at once).
+## One biome's pace: `MapRules.spawning` (null: a room's whole list spawns in at once).
 ##
 ## The shares are of the room's **scaled** budget (`RunScaling.scaled_budget`), so a bigger party or a
 ## deeper room gets bigger groups in the same proportion as its bigger room. The run works the costs
@@ -13,10 +13,10 @@ extends Resource
 ## The cost of one group, as a share of the room's scaled budget: a group takes enemies from the
 ## front of the room's list until its cost reaches it (always one at least).
 @export_range(0.0, 1.0, 0.01) var group_share: float = 0.35
-## The cost still standing (or arriving) that calls the next group, as a share of the room's scaled
+## The cost still standing (or spawning) that calls the next group, as a share of the room's scaled
 ## budget: at it or below, the next group comes. Below `group_share`.
 @export_range(0.0, 1.0, 0.01) var refill_share: float = 0.15
-## Seconds between two bodies of one group starting to arrive, so a group ripples in.
+## Seconds between two bodies of one group starting to spawn in, so a group ripples in.
 @export_range(0.0, 2.0, 0.01, "or_greater") var stagger: float = 0.15
 
 

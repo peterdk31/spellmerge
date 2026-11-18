@@ -87,16 +87,16 @@ extends Node2D
 ## the nearest ground instead. A body downed over a hole falls too, and comes back still down. All of
 ## it is state, so Feel draws the fall from it (`fall_share`) on a machine that joins mid-fall.
 ##
-## Arriving (enemy arrivals EA1, docs/milestones/enemy-arrivals.md, "The simulation"): a body Flow
-## stands with `arrive(seconds)` (set before it is added to the tree) is not there yet for
-## `arrive_left` seconds: it is down to everything that asks (`is_down`: its hurt shape is never
+## Spawning (enemy spawning EA1, docs/milestones/enemy-spawning.md, "The simulation"): a body Flow
+## stands with `spawn(seconds)` (set before it is added to the tree) is not there yet for
+## `spawn_left` seconds: it is down to everything that asks (`is_down`: its hurt shape is never
 ## registered, so it can't be hurt, targeted or possessed, and its contact damage starts only once it
 ## has landed), it neither touches nor is touched (`_touch`, both ways), and its step holds it: the
 ## timer counts down and the hurt shape follows, then it returns before its phases, possession,
 ## controller, caster and mover (its intent cleared, `velocity` zero), and the tick does not `move` it
-## (no slide, no ground check, so an arrival never turns into a fall). The tick its timer runs out it
-## steps as a standing body. All of it is state (`arrive_left`, `arrive_seconds`), so Feel draws the
-## arrival from it (`arrive_share`, `ArriveLook`) on a machine that joins mid-arrival.
+## (no slide, no ground check, so a spawn never turns into a fall). The tick its timer runs out it
+## steps as a standing body. All of it is state (`spawn_left`, `spawn_seconds`), so Feel draws the
+## spawn from it (`spawn_share`, `SpawnLook`) on a machine that joins mid-spawn.
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
 ## health (times `stat_scale`, the room's scale, and by the players in play, `players`), walking speed, contact damage, staff, cards and
@@ -107,7 +107,7 @@ extends Node2D
 ## start (no time passing), so the stop shows the moment of the hit.
 ##
 ## Down and out: `is_down()` is true while a Downed component (gameplay/player, G7) holds the actor
-## down (`set_down`, `is_downed`), while it falls (`is_falling`) or while it arrives (`is_arriving`); `die(killer)` sends the local `died` and frees the actor. When its Health is
+## down (`set_down`, `is_downed`), while it falls (`is_falling`) or while it spawns in (`is_spawning`); `die(killer)` sends the local `died` and frees the actor. When its Health is
 ## used up the actor dies, unless something downs it instead (`downable`).
 ##
 ## Services are the autoloads (`Events`, `Combat`, `Projectiles`, `Spells`, `Actors`), found by
@@ -118,9 +118,6 @@ const EventsScript := preload("res://core/events/events.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-## How long an enemy's arrival takes (enemy arrivals EA1: a mark on the floor, then the body rising
-## out of it; `ArriveLook`): what Flow hands `arrive`.
-const ARRIVE_SECONDS: float = 0.8
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 
 ## The actor died (`die`); `killer` is who landed the last hit (an event's player, or -1).
@@ -269,10 +266,10 @@ var fell_by: int = ActorsScript.NONE
 ## and whether it has stood on any since it was placed.
 var ground: Vector2 = Vector2.ZERO
 var has_ground: bool = false
-## Its arrival (enemy arrivals EA1, see the class doc): seconds of it left (0: standing), and how long
-## the whole arrival was (what `arrive_share` is counted against).
-var arrive_left: float = 0.0
-var arrive_seconds: float = 0.0
+## Its spawn (enemy spawning EA1, see the class doc): seconds of it left (0: standing), and how long
+## the whole spawn was (what `spawn_share` is counted against).
+var spawn_left: float = 0.0
+var spawn_seconds: float = 0.0
 
 
 func _enter_tree() -> void:
@@ -321,13 +318,13 @@ func _exit_tree() -> void:
 
 
 ## One tick of the body (core/sim/tick.gd steps every actor's body by id): its step, then its move
-## (none while it arrives: it stands where it rises). With `looks_later` (the Tick's), its looks are
+## (none while it spawns in: it stands where it rises). With `looks_later` (the Tick's), its looks are
 ## left for `step_looks_due`, once a drawn frame.
 func tick_step(delta: float, looks_later: bool = false) -> void:
 	_looks_later = looks_later
 	step(delta)
 	_looks_later = false
-	if arrive_left <= 0.0:
+	if spawn_left <= 0.0:
 		move(delta)
 
 
@@ -357,9 +354,9 @@ func _on_screen() -> bool:
 ## True while no controller drives it, it has no Mover and it keeps no time (props W2; see the
 ## class doc): the Tick does not step it. A prop with a `timer` row keeps time
 ## (`PropStateTriggers.keeps_time`): it is stepped, so its clock runs and its pools refill; so does a
-## body that arrives (its timer runs, or it would never land).
+## body that spawns in (its timer runs, or it would never land).
 func is_still() -> bool:
-	return controller == null and mover == null and arrive_left <= 0.0 and (state_triggers == null or not state_triggers.keeps_time())
+	return controller == null and mover == null and spawn_left <= 0.0 and (state_triggers == null or not state_triggers.keeps_time())
 
 
 ## The body as a few values for the state hash while it rests (props W2; see the class doc): still,
@@ -368,7 +365,7 @@ func is_still() -> bool:
 ## are what may differ between two bodies made alike: where it stands and aims, its size, the staff
 ## on show, its health and whether hits take any.
 func rest_leaf() -> Variant:
-	if _down or _dying or _leaving or fall_left > 0.0 or arrive_left > 0.0 or not is_still() or possessed_by != null or phases != null:
+	if _down or _dying or _leaving or fall_left > 0.0 or spawn_left > 0.0 or not is_still() or possessed_by != null or phases != null:
 		return null
 	# What a step it took while driven may have left (a possession that ended).
 	if _hold_shown or velocity != Vector2.ZERO or intent.pressed_bits != 0 or intent.held_bits != 0:
@@ -475,9 +472,9 @@ func _land() -> void:
 		events.body_returned.emit(id, at)
 
 
-## The rest of a step while it arrives (see the class doc): it stands, thinks nothing and casts
+## The rest of a step while it spawns in (see the class doc): it stands, thinks nothing and casts
 ## nothing; its hurt shape stays off (it follows `is_down` as in every step) and its looks step.
-func _hold_arriving(delta: float) -> void:
+func _hold_spawning(delta: float) -> void:
 	intent.clear()
 	velocity = Vector2.ZERO
 	if hurtbox != null and hurtbox.registered == (is_down() or not hurtbox.enabled):
@@ -486,16 +483,16 @@ func _hold_arriving(delta: float) -> void:
 		look.step(delta)
 
 
-## It arrives for `seconds` from now (enemy arrivals EA1, see the class doc): Flow calls it before
-## the body is added to the tree, so its hurt shape is never registered while it arrives. 0 or less
+## It spawns in for `seconds` from now (enemy spawning EA1, see the class doc): Flow calls it before
+## the body is added to the tree, so its hurt shape is never registered while it spawns in. 0 or less
 ## (or not finite) stands it at once.
-func arrive(seconds: float) -> void:
+func spawn(seconds: float) -> void:
 	if not is_finite(seconds) or seconds <= 0.0:
-		arrive_left = 0.0
-		arrive_seconds = 0.0
+		spawn_left = 0.0
+		spawn_seconds = 0.0
 		return
-	arrive_left = seconds
-	arrive_seconds = seconds
+	spawn_left = seconds
+	spawn_seconds = seconds
 	velocity = Vector2.ZERO
 	intent.clear()
 	if actors != null and id != ActorsScript.NONE:
@@ -503,17 +500,17 @@ func arrive(seconds: float) -> void:
 		actors.set_still(id, is_still())
 
 
-## True while it arrives (see the class doc).
-func is_arriving() -> bool:
-	return arrive_left > 0.0
+## True while it spawns in (see the class doc).
+func is_spawning() -> bool:
+	return spawn_left > 0.0
 
 
-## How far through its arrival it is, 0 as it starts to 1 as it lands (1 while not arriving: it
-## stands): what Feel draws the arrival by.
-func arrive_share() -> float:
-	if arrive_left <= 0.0 or arrive_seconds <= 0.0:
+## How far through its spawn it is, 0 as it starts to 1 as it lands (1 while not spawning: it
+## stands): what Feel draws the spawn by.
+func spawn_share() -> float:
+	if spawn_left <= 0.0 or spawn_seconds <= 0.0:
 		return 1.0
-	return clampf(1.0 - arrive_left / arrive_seconds, 0.0, 1.0)
+	return clampf(1.0 - spawn_left / spawn_seconds, 0.0, 1.0)
 
 
 ## True while it falls (see the class doc).
@@ -574,8 +571,8 @@ func _move_over_holes(from: Vector2, delta: float) -> Vector2:
 
 
 ## Tell every actor whose touch area this body overlaps where its move left it (its circle against
-## the walls at its feet; `Actors.touching`), lowest id first: their `touched`. A body down (arriving
-## too), dying or leaving touches nothing, and a body arriving is touched by nothing. Each tick it overlaps, so a prop that should hear it once leaves its
+## the walls at its feet; `Actors.touching`), lowest id first: their `touched`. A body down (spawning
+## too), dying or leaving touches nothing, and a body spawning is touched by nothing. Each tick it overlaps, so a prop that should hear it once leaves its
 ## `touched` state (content/props/README.md).
 func _touch() -> void:
 	if id == ActorsScript.NONE or is_down() or _dying or _leaving:
@@ -586,7 +583,7 @@ func _touch() -> void:
 			# What a touched prop did ended this body (its blast): it touches no more.
 			return
 		var other := actors.node_of(_touching[i]) as Actor
-		if other != null and other != self and not other.is_dying() and not other.is_leaving() and not other.is_arriving():
+		if other != null and other != self and not other.is_dying() and not other.is_leaving() and not other.is_spawning():
 			other.touched.emit(id)
 
 
@@ -623,14 +620,14 @@ func step(delta: float) -> void:
 	intent.pressed_bits = 0
 	if health != null and health.protecting:
 		health.step(delta)
-	if arrive_left > 0.0:
-		arrive_left -= delta
-		if arrive_left > 0.0:
-			_hold_arriving(delta)
+	if spawn_left > 0.0:
+		spawn_left -= delta
+		if spawn_left > 0.0:
+			_hold_spawning(delta)
 			return
 		# Landed: it steps as a standing body from this tick on (its hurt shape registers below), and
-		# the actor table hears whether it is still now (it was not while it arrived).
-		arrive_left = 0.0
+		# the actor table hears whether it is still now (it was not while it spawned in).
+		spawn_left = 0.0
 		if actors != null and id != ActorsScript.NONE:
 			actors.set_still(id, is_still())
 	if fall_left > 0.0:
@@ -778,9 +775,9 @@ func close_caster_number() -> void:
 
 
 ## True while the actor is down (a Downed component holds it; G7), falls (hub rework HR-H2) or
-## arrives (enemy arrivals EA1): out of play to everything that asks.
+## spawns in (enemy spawning EA1): out of play to everything that asks.
 func is_down() -> bool:
-	return _down or fall_left > 0.0 or arrive_left > 0.0
+	return _down or fall_left > 0.0 or spawn_left > 0.0
 
 
 ## Down (`on`) or standing again. Called by the Downed component.

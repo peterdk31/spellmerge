@@ -389,12 +389,12 @@ signal run_begun(run_id: StringName, players: int, start_depth: int)
 ## definition's `scaling`), sent before `run_room_chosen`. Heard by difficulty, which scales every
 ## enemy and boss that stands in it (`enemy_standing`).
 signal run_room_scaled(scale: float)
-## Sender: run. How the enemies of the room the party enters come in (enemy arrivals EA4,
-## docs/milestones/enemy-arrivals.md): in groups of `group` cost (0: the whole list at once), the
-## next when the cost still standing or arriving drops to `refill_at` or below, the bodies of a group
-## `stagger` seconds apart. Plain costs: the run works them out from its biome's `ArrivalRules`
+## Sender: run. How the enemies of the room the party enters come in (enemy spawning EA4,
+## docs/milestones/enemy-spawning.md): in groups of `group` cost (0: the whole list at once), the
+## next when the cost still standing or spawning drops to `refill_at` or below, the bodies of a group
+## `stagger` seconds apart. Plain costs: the run works them out from its biome's `SpawnRules`
 ## shares and the room's scaled budget. Sent after `run_room_scaled`, before `run_room_chosen`.
-## Heard by flow (`RoomArrivals`).
+## Heard by flow (`RoomSpawning`).
 signal run_room_paced(group: int, refill_at: int, stagger: float)
 ## Sender: run. The room of the run's map the party enters: the room template `room_id`
 ## (content/rooms), what stands in it (`enemies`: enemy and boss ids, one per body) and the kinds of

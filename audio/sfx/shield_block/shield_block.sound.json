@@ -1,0 +1,65 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.34,
+	"vary": {
+		"pitch": 0.04,
+		"time": 0.06,
+		"seed": 87
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 190,
+				"to": 120
+			},
+			"length": 0.16,
+			"drive": 1.8,
+			"amp": {
+				"attack": 0.004,
+				"shape": "perc",
+				"power": 2.0
+			}
+		},
+		{
+			"source": "fm",
+			"pitch": 520,
+			"ratio": 1.41,
+			"index": {
+				"from": 2.2,
+				"to": 0.0
+			},
+			"length": 0.3,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 1.6
+			},
+			"gain": -6
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1200,
+				"q": 1.0
+			},
+			"length": 0.06,
+			"amp": {
+				"attack": 0.003,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -11
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.15,
+			"size": 0.7
+		}
+	},
+	"notes": "A shield taking a hit: a dull, hollow knock with a short metallic shimmer ringing off it."
+}

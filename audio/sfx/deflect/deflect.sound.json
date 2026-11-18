@@ -1,0 +1,61 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.32,
+	"vary": {
+		"pitch": 0.04,
+		"time": 0.06,
+		"seed": 86
+	},
+	"layers": [
+		{
+			"source": "partials",
+			"pitch": 2100,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.28
+				},
+				{
+					"ratio": 2.4,
+					"gain": -6,
+					"decay": 0.18
+				},
+				{
+					"ratio": 3.9,
+					"gain": -12,
+					"decay": 0.1
+				}
+			],
+			"amp": {
+				"attack": 0.003
+			},
+			"gain": -6
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1500,
+				"to": 4200,
+				"q": 2.0
+			},
+			"length": 0.16,
+			"amp": {
+				"shape": "arch",
+				"power": 1.2,
+				"attack": 0.004
+			},
+			"gain": -4
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.2,
+			"size": 0.8
+		}
+	},
+	"notes": "A shot turned back: a short glancing ting and a quick swish as it flies off the other way."
+}

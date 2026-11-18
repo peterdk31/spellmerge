@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/broom_swish/broom_swish.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_swish/broom_swish.sound.json",
+			"recipe_hash": "sha256:8cd31c44284d73440e8e32698c854ceb4255cb3796184932c05c72f5b4c95b99",
+			"audio_hash": "sha256:6b7bbe4fca709f0c9830aa9a2e3dc35f618c9da461a6763a530119cb8735d1d2",
+			"loudness": -24.0,
+			"peak": -10.9
+		}
+	]
+}

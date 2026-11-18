@@ -1,7 +1,7 @@
 class_name AmbienceLayer
 extends Resource
 ## One loop of a room's sound bed (docs/milestones/atmosphere.md, D; `Ambience.layers`): a sound id
-## (`audio/ambience/<id>.ogg`, found by the registry as any sound; silent until the file exists),
+## (`audio/ambience/<id>/<id>.ogg`, found by the registry as any sound; silent until the file exists),
 ## imported to loop, and how loud it is against the others. Drawn only: Feel plays it.
 
 ## The loop's sound id.

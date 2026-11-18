@@ -1,0 +1,87 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "boss",
+	"seconds": 0.42,
+	"vary": {
+		"pitch": 0.02,
+		"time": 0.05,
+		"seed": 62
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 700,
+				"to": 3200,
+				"curve": "exp",
+				"q": 2.2
+			},
+			"length": 0.14,
+			"amp": {
+				"shape": "swell",
+				"power": 1.4,
+				"attack": 0.01
+			},
+			"gain": -3
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 150,
+				"to": 52
+			},
+			"start": 0.128,
+			"length": 0.28,
+			"drive": 2.6,
+			"amp": {
+				"attack": 0.012,
+				"shape": "perc",
+				"power": 1.5
+			},
+			"gain": 0
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1300,
+				"to": 420,
+				"q": 1.0
+			},
+			"start": 0.12,
+			"length": 0.3,
+			"drive": 2.6,
+			"amp": {
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 1.1
+			},
+			"gain": -8
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "high",
+				"from": 4200,
+				"q": 0.8
+			},
+			"start": 0.124,
+			"length": 0.1,
+			"amp": {
+				"attack": 0.003,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -16
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.2,
+			"size": 1.0
+		}
+	},
+	"notes": "The broom's swat: a short rising swish of bristles through the air, then a broad, heavy whack."
+}

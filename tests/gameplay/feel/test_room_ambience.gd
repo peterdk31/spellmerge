@@ -199,8 +199,13 @@ func test_the_crypt_and_the_hub_name_their_ambience_and_its_files_exist() -> voi
 				check(bed.get_length() >= 8.0 and bed.get_length() <= 16.5, "%s is a modest loop" % layer.sound)
 		for accent in ambience.accents:
 			for id in accent.sounds:
-				var sound := reg.base.get_sound(id) as AudioStreamOggVorbis
-				check(sound != null and not sound.loop, "the accent %s has its file, played once" % id)
+				# Its baked variants (sound plan AU6), each a Vorbis file played once.
+				var variants := reg.base.get_sound(id) as AudioStreamRandomizer
+				check(variants != null and variants.streams_count >= 2, "the accent %s has its variants" % id)
+				if variants != null:
+					for i in variants.streams_count:
+						var sound := variants.get_stream(i) as AudioStreamOggVorbis
+						check(sound != null and not sound.loop, "the accent %s's variant %d is played once" % [id, i + 1])
 
 
 # --- Playing --------------------------------------------------------------------------------------

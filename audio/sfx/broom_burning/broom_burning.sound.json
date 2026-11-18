@@ -1,0 +1,54 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 3.0,
+	"layers": [
+		{
+			"patch": "fire_roar",
+			"filter": {
+				"from": 520,
+				"to": 820,
+				"curve": "arch",
+				"q": 0.9
+			},
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 180,
+				"q": 0.7
+			},
+			"gain": -4
+		},
+		{
+			"patch": "ember_crackle",
+			"amp": {
+				"attack": 0.0,
+				"release": 0.0
+			},
+			"gain": -6
+		},
+		{
+			"patch": "fire_crackle",
+			"pitch": 20,
+			"amp": {
+				"shape": "flat",
+				"attack": 0.0
+			},
+			"gain": -6
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.15,
+			"size": 0.9
+		}
+	},
+	"notes": "The broom's head burning all through its second phase: a steady roar of flame breathing slowly, a low rumble under it and crackles of embers on top."
+}

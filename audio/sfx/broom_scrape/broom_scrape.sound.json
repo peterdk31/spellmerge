@@ -1,0 +1,46 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 1.0,
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1700,
+				"to": 2700,
+				"curve": "arch",
+				"q": 1.4
+			}
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": 190,
+			"filter": {
+				"type": "band",
+				"from": 3600,
+				"q": 1.2
+			},
+			"gain": -9
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 260,
+				"q": 0.7
+			},
+			"gain": -6
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.15,
+			"size": 0.8
+		}
+	},
+	"gain": 2,
+	"notes": "The broom's Sweep winding up: stiff bristles dragged over stone, a scratchy hiss pushed back and forth with a low rasp under it. 2 dB over the family's level (gain 2): it is a telegraph, heard off screen."
+}

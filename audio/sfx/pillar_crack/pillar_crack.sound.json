@@ -1,0 +1,74 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.32,
+	"vary": {
+		"pitch": 0.04,
+		"time": 0.06,
+		"seed": 81
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "high",
+				"from": 2400,
+				"q": 0.8
+			},
+			"length": 0.07,
+			"drive": 2.4,
+			"amp": {
+				"attack": 0.003,
+				"shape": "perc",
+				"power": 1.6
+			},
+			"gain": -8
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 320,
+				"to": 50
+			},
+			"filter": {
+				"type": "band",
+				"from": 1800,
+				"q": 1.2
+			},
+			"start": 0.006,
+			"length": 0.3,
+			"drive": 1.8,
+			"amp": {
+				"attack": 0.005,
+				"shape": "perc",
+				"power": 1.0
+			},
+			"gain": -8
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 120,
+				"to": 60
+			},
+			"start": 0.01,
+			"length": 0.16,
+			"drive": 2.0,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.6
+			},
+			"gain": -2
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.2,
+			"size": 0.8
+		}
+	},
+	"notes": "A stone pillar cracking under a hit: a sharp snap, a short thump in the stone and grit trickling off it."
+}

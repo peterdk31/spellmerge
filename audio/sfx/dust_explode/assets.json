@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/dust_explode/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/dust_explode/dust_explode.sound.json",
+			"recipe_hash": "sha256:27afac3fc6eac7d390fd9eb29ade6a069fb3bd5267d95048c118bd5b89afb715",
+			"audio_hash": "sha256:1f4f4b7d28c6fb9a47c851904f6a8f5eee4ead9d564ba69b028b1feb65249efb",
+			"loudness": -17.1,
+			"peak": -4.3
+		},
+		{
+			"path": "audio/sfx/dust_explode/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/dust_explode/dust_explode.sound.json",
+			"recipe_hash": "sha256:27afac3fc6eac7d390fd9eb29ade6a069fb3bd5267d95048c118bd5b89afb715",
+			"audio_hash": "sha256:c96f39f0a2171f680dd3fa9ff288f8243e5a94a8f9ca0ed2148cc89ebc6fcd48",
+			"loudness": -16.7,
+			"peak": -4.0
+		},
+		{
+			"path": "audio/sfx/dust_explode/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/dust_explode/dust_explode.sound.json",
+			"recipe_hash": "sha256:27afac3fc6eac7d390fd9eb29ade6a069fb3bd5267d95048c118bd5b89afb715",
+			"audio_hash": "sha256:858f20dee65a95dd6c2b0c3d4d2d57b69703dbf44095d8c9820ca8f82101da50",
+			"loudness": -17.2,
+			"peak": -4.7
+		}
+	]
+}

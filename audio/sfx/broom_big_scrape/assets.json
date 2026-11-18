@@ -1,0 +1,17 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/broom_big_scrape/broom_big_scrape.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_big_scrape/broom_big_scrape.sound.json",
+			"recipe_hash": "sha256:8db682bcd453c44ee1051c4bf23c03fbb32f27a07d86dbcf7a715af6c62644c0",
+			"audio_hash": "sha256:6ce733140504efbc07e420fc8651946db347a354abe58a5664bc64962dd839ef",
+			"loudness": -22.0,
+			"peak": -12.3
+		}
+	]
+}

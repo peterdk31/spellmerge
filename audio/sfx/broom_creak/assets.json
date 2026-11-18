@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/broom_creak/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_creak/broom_creak.sound.json",
+			"recipe_hash": "sha256:e6551266af64c8834e9d51faa8bfc12476e658af4c329359eaecb27147caabc8",
+			"audio_hash": "sha256:bd7d61608990667839b2808ae5166abf3f5235c0b45214fc251686f1bbc04839",
+			"loudness": -20.3,
+			"peak": -5.3
+		},
+		{
+			"path": "audio/sfx/broom_creak/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_creak/broom_creak.sound.json",
+			"recipe_hash": "sha256:e6551266af64c8834e9d51faa8bfc12476e658af4c329359eaecb27147caabc8",
+			"audio_hash": "sha256:e02e2db5ad8fe3c16366dc9ce39e82ef0e10f28eb19678846f3181a76c65f5c4",
+			"loudness": -19.7,
+			"peak": -3.8
+		},
+		{
+			"path": "audio/sfx/broom_creak/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_creak/broom_creak.sound.json",
+			"recipe_hash": "sha256:e6551266af64c8834e9d51faa8bfc12476e658af4c329359eaecb27147caabc8",
+			"audio_hash": "sha256:d4c88ab8c7990c3ad301cf8831a071edccb9f85a4a61f4bcbfaccc6b84b13bab",
+			"loudness": -20.1,
+			"peak": -5.0
+		}
+	]
+}

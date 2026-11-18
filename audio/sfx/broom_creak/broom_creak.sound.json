@@ -1,0 +1,76 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "boss",
+	"seconds": 0.75,
+	"vary": {
+		"pitch": 0.02,
+		"time": 0.05,
+		"seed": 65
+	},
+	"layers": [
+		{
+			"source": "square",
+			"duty": 0.12,
+			"pitch": {
+				"from": 34,
+				"to": 58,
+				"curve": "arch"
+			},
+			"filter": {
+				"type": "band",
+				"from": 850,
+				"q": 4.0
+			},
+			"length": 0.5,
+			"amp": {
+				"shape": "arch",
+				"power": 1.2,
+				"attack": 0.03
+			}
+		},
+		{
+			"source": "square",
+			"duty": 0.1,
+			"pitch": {
+				"from": 62,
+				"to": 44
+			},
+			"filter": {
+				"type": "band",
+				"from": 1300,
+				"q": 5.0
+			},
+			"start": 0.38,
+			"length": 0.32,
+			"amp": {
+				"shape": "arch",
+				"power": 1.2,
+				"attack": 0.02
+			},
+			"gain": -5
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 600,
+				"q": 1.0
+			},
+			"length": 0.7,
+			"amp": {
+				"shape": "arch",
+				"power": 2.0
+			},
+			"gain": -22
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.45,
+			"size": 1.7
+		}
+	},
+	"gain": -5,
+	"notes": "Old wood creaking in the dark before the broom is seen: a slow, groaning creak and a shorter one after, in a deep room. It sits 5 dB under the family's level (gain -5): it is a hint heard in silence, not a slam."
+}

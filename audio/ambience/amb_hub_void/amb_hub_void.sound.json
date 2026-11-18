@@ -1,0 +1,105 @@
+{
+	"version": 1,
+	"kind": "held",
+	"family": "held",
+	"seconds": 12.0,
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": 110,
+			"gain": -6
+		},
+		{
+			"source": "sine",
+			"pitch": 110.25,
+			"gain": -6
+		},
+		{
+			"source": "sine",
+			"pitch": 165,
+			"gain": -16
+		},
+		{
+			"source": "sine",
+			"pitch": 220.5,
+			"gain": -18
+		},
+		{
+			"source": "sine",
+			"pitch": 330,
+			"gain": -24
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 140,
+				"to": 620,
+				"curve": "arch",
+				"q": 1.0
+			},
+			"start": 0.4,
+			"length": 5.6,
+			"amp": {
+				"shape": "arch",
+				"power": 1.8
+			},
+			"gain": -4
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 120,
+				"to": 560,
+				"curve": "arch",
+				"q": 1.0
+			},
+			"start": 6.4,
+			"length": 5.6,
+			"amp": {
+				"shape": "arch",
+				"power": 1.8
+			},
+			"gain": -5
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "high",
+				"from": 2600,
+				"q": 0.8
+			},
+			"start": 2.4,
+			"length": 1.8,
+			"amp": {
+				"shape": "arch",
+				"power": 2.0
+			},
+			"gain": -24
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "high",
+				"from": 2600,
+				"q": 0.8
+			},
+			"start": 8.4,
+			"length": 1.8,
+			"amp": {
+				"shape": "arch",
+				"power": 2.0
+			},
+			"gain": -25
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 2.0
+		}
+	},
+	"gain": -5.6,
+	"notes": "The void under the floating island: a low hum beating slowly with soft overtones, under two far swells a loop like surf on a distant shore, each with a hiss on its crest. Remade from the first ambience file of the same id (atmosphere D), at its level: 5.6 dB under the family's (gain -5.6)."
+}

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-18: Sound AU6: the rest of the effects, the held loops and the ambience
+
+The sound plan's last sounds (docs/milestones/sound.md, AU6): 30 recipes, baked with `tools/sound.py`, tier `good`. The Old Broom's sheet (its creak, reveal, swat, crunch, ignition, splinter, two scrapes, swish and burning loop) and `boss_intro`; the props (`pillar_crack`, `pillar_break`, `dust_scatter`, `dust_explode`); `parry`, `deflect`, `shield_block`, `possess`, `enemy_spawn`, `enemy_materialize`, `self_hit` and `room_start`. The seven ambience files made before the tool are remade as recipes under the same ids at their old levels (mono now; the accents a new `ambience` family in docs/STYLE.md), and `UNRECIPED` is empty. The boss's slams, its ignition and death, `boss_intro` and the two biggest reactions duck the music a little. The sound room shows no id red. The owner listens (AU9).
+
 ## 2026-11-18: Sound AU5: the core combat set
 
 The sound plan's first sounds (docs/milestones/sound.md, AU5): 24 recipes in `audio/sfx/<id>/`, baked with `tools/sound.py`, tier `good`: the cast (the owner's whoosh, shorter and darker), `hit` and the four hit kinds' sounds (ray, swing, burst, reaction), `enemy_death`, `player_downed`, `revive`, `heal` and the fourteen reactions, each mixing its elements' voices (two each; the discharge lightning's alone) from eight element patches in `audio/patches/` (`fire_roar`, `fire_crackle`, `frost_glass`, `storm_gust`, `void_swell`, `water_wash`, `lightning_zap`, `lightning_crackle`). The most heard sit under their family's level by a noted `gain`. The sound room's test plays every one. Audio now starts its players in a run recorded with Godot's movie maker, so a four-bot fight was recorded with sound. Plan fixes: the four hit kinds are AU5's, lightning (not storm) is the crackle and the zap, and the owner's listen moves to AU9.

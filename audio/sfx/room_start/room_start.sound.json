@@ -1,0 +1,57 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 1.0,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.05,
+		"seed": 92
+	},
+	"layers": [
+		{
+			"patch": "soft_kick",
+			"pitch": {
+				"from": 110,
+				"to": 40
+			},
+			"length": 0.35,
+			"gain": -3
+		},
+		{
+			"patch": "glass_pluck",
+			"pitch": 440,
+			"length": 0.95
+		},
+		{
+			"patch": "glass_pluck",
+			"pitch": 659.26,
+			"start": 0.09,
+			"length": 0.86,
+			"gain": -4
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1500,
+				"to": 4500,
+				"q": 2.0
+			},
+			"length": 0.35,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.2
+			},
+			"gain": -14
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.35,
+			"size": 1.6
+		}
+	},
+	"notes": "A fight starting in a room: a soft, deep beat and two glass notes a fifth apart (A and E, the crypt's key) ringing out over a breath of air."
+}

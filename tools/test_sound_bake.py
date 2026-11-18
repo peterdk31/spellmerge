@@ -212,7 +212,7 @@ class BakeTest(unittest.TestCase):
 class FamiliesTest(unittest.TestCase):
     def test_the_families_are_read_from_the_style_guide(self) -> None:
         fams = sound.families()
-        self.assertEqual(set(fams), {"combat", "big", "boss", "held", "ui", "music"})
+        self.assertEqual(set(fams), {"combat", "big", "boss", "held", "ambience", "ui", "music"})
         self.assertEqual(fams["combat"], sound.Family("combat", -20.0, "momentary", -3.0, 4, 0.04, 1.5))
         self.assertEqual(fams["held"], sound.Family("held", -24.0, "integrated", -6.0, 1, 0.0, 0.0))
         self.assertEqual(fams["ui"].pitch, 0.02)

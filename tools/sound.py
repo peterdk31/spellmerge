@@ -70,17 +70,10 @@ WINDOW = 1.0  # LU either side of a family's target
 PEAK_MARGIN = 1.0  # dB under the family's true peak limit, for Vorbis's overshoot
 EDGE = 1e-3  # how near zero a one-shot's first and last samples must be
 LOOP_MEASURE = 3.0  # seconds of a loop, played round, that its loudness is measured over
-# Sounds with no recipe yet, made before the tool by a generator kept out of the repository
-# (atmosphere D). AU6 remakes them as recipes, and then this list is empty and stays so.
-UNRECIPED = (
-    "audio/ambience/amb_crypt_air.ogg",
-    "audio/ambience/amb_crypt_drip.ogg",
-    "audio/ambience/amb_crypt_drip_double.ogg",
-    "audio/ambience/amb_crypt_rumble.ogg",
-    "audio/ambience/amb_hub_gust.ogg",
-    "audio/ambience/amb_hub_void.ogg",
-    "audio/ambience/amb_hub_wind.ogg",
-)
+# Sounds with no recipe, made before the tool by a generator kept out of the repository. The
+# seven ambience files of atmosphere D were the last; AU6 remade them as recipes, so this is empty
+# and stays so (a test holds it): every generated sound comes from a recipe.
+UNRECIPED: tuple[str, ...] = ()
 
 
 class BakeError(ValueError):

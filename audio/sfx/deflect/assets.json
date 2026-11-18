@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/deflect/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/deflect/deflect.sound.json",
+			"recipe_hash": "sha256:ac298f6d87e093d7632f060fa34da08d86be1076908d78cb1e664375f3f1b458",
+			"audio_hash": "sha256:ee3e02068823802153fd5c9e8a26c944583c3ffcb86ba13499beb07ea757d7a9",
+			"loudness": -19.7,
+			"peak": -4.9
+		},
+		{
+			"path": "audio/sfx/deflect/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/deflect/deflect.sound.json",
+			"recipe_hash": "sha256:ac298f6d87e093d7632f060fa34da08d86be1076908d78cb1e664375f3f1b458",
+			"audio_hash": "sha256:5384a70587dacbf4d1103714504a69d67f922aafe0e5aa90efae0f5afc3217a1",
+			"loudness": -20.5,
+			"peak": -4.9
+		},
+		{
+			"path": "audio/sfx/deflect/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/deflect/deflect.sound.json",
+			"recipe_hash": "sha256:ac298f6d87e093d7632f060fa34da08d86be1076908d78cb1e664375f3f1b458",
+			"audio_hash": "sha256:fac82e8135619f936c8d021ac76ed1e22a767c6d8e14ad38269a04909fc3583c",
+			"loudness": -20.0,
+			"peak": -5.0
+		},
+		{
+			"path": "audio/sfx/deflect/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/deflect/deflect.sound.json",
+			"recipe_hash": "sha256:ac298f6d87e093d7632f060fa34da08d86be1076908d78cb1e664375f3f1b458",
+			"audio_hash": "sha256:c909a624e2b1c8e09eb70d5e3a9fca60f9badb42439fe7a25b4daacf6a341c36",
+			"loudness": -19.8,
+			"peak": -4.8
+		}
+	]
+}

@@ -11,3 +11,4 @@ hold = 0.09
 hold_shot = true
 stop_game = 0.09
 sound = &"enemy_death"
+duck = -6.0

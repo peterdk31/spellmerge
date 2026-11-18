@@ -145,6 +145,7 @@ The game's sound is synthesised from code in a modern style (the owner, 2026-11-
 | `big` (reactions, deaths, downed, revive) | -17 momentary | -2 dBTP | 3 | ±3% | ±1 dB |
 | `boss` (the boss's moves, intro, slams) | -15 momentary | -1 dBTP | 3 | ±2% | ±1 dB |
 | `held` (loops) | -24 integrated | -6 dBTP | 1 | none | none |
+| `ambience` (a room's accents: drips, gusts, rumbles) | -21 momentary | -6 dBTP | 3 | none | none |
 | `ui` | -24 momentary | -6 dBTP | 2 | ±2% | none |
 | `music` (all layers together) | -23 integrated | -1 dBTP | 1 | none | none |
 

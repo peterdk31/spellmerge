@@ -1,0 +1,99 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "boss",
+	"seconds": 2.0,
+	"vary": {
+		"pitch": 0.02,
+		"time": 0.04,
+		"seed": 63
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 22,
+				"to": 50
+			},
+			"filter": {
+				"type": "band",
+				"from": 1500,
+				"q": 2.0
+			},
+			"length": 0.85,
+			"drive": 1.5,
+			"amp": {
+				"shape": "swell",
+				"power": 1.2,
+				"attack": 0.05
+			},
+			"gain": -4
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 20,
+				"to": 34
+			},
+			"filter": {
+				"type": "band",
+				"from": 700,
+				"q": 2.5
+			},
+			"length": 0.85,
+			"amp": {
+				"shape": "swell",
+				"power": 1.0,
+				"attack": 0.05
+			},
+			"gain": -8
+		},
+		{
+			"patch": "fire_roar",
+			"filter": {
+				"from": 280,
+				"to": 1500,
+				"curve": "arch",
+				"q": 1.0
+			},
+			"start": 0.72,
+			"length": 1.28,
+			"amp": {
+				"attack": 0.12,
+				"shape": "perc",
+				"power": 1.1
+			}
+		},
+		{
+			"patch": "fire_crackle",
+			"start": 0.8,
+			"length": 1.2,
+			"gain": -4
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 75,
+				"to": 38
+			},
+			"start": 0.72,
+			"length": 0.6,
+			"drive": 2.0,
+			"amp": {
+				"attack": 0.03,
+				"shape": "perc",
+				"power": 1.8
+			},
+			"gain": -5
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.4
+		}
+	},
+	"notes": "The broom catching fire as its second phase starts: its straw rattles faster and faster, then bursts into a roaring whoosh of flame with crackles running on."
+}

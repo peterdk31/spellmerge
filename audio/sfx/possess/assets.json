@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/possess/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/possess/possess.sound.json",
+			"recipe_hash": "sha256:bdffc489b831f8236a36bf3b3e4305c72ed47108caeb717ee70eb271206079be",
+			"audio_hash": "sha256:d8015dfac0fd4b7f4b82f7ac556d540c17eaef034c82bc738e334397879dd147",
+			"loudness": -17.2,
+			"peak": -7.1
+		},
+		{
+			"path": "audio/sfx/possess/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/possess/possess.sound.json",
+			"recipe_hash": "sha256:bdffc489b831f8236a36bf3b3e4305c72ed47108caeb717ee70eb271206079be",
+			"audio_hash": "sha256:9ca7940452c126e20e0ebe114d6206b91816224b4e4884ac1111c3e901bbb2a9",
+			"loudness": -16.8,
+			"peak": -5.2
+		},
+		{
+			"path": "audio/sfx/possess/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/possess/possess.sound.json",
+			"recipe_hash": "sha256:bdffc489b831f8236a36bf3b3e4305c72ed47108caeb717ee70eb271206079be",
+			"audio_hash": "sha256:4ff0994fcfebab9e009b77c4bb062361672ad97944762469433fa90188744012",
+			"loudness": -17.0,
+			"peak": -5.7
+		}
+	]
+}

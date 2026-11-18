@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/broom_swat/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_swat/broom_swat.sound.json",
+			"recipe_hash": "sha256:134474b232e52e90eb8302e516d3bb2b0970514165cece3e8604346ff81d7d50",
+			"audio_hash": "sha256:833bd045e89a48c80bd9d74e0374139355582c3247bd230bc55ec0ea12c8e1a4",
+			"loudness": -14.9,
+			"peak": -3.0
+		},
+		{
+			"path": "audio/sfx/broom_swat/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_swat/broom_swat.sound.json",
+			"recipe_hash": "sha256:134474b232e52e90eb8302e516d3bb2b0970514165cece3e8604346ff81d7d50",
+			"audio_hash": "sha256:6ec517bb7cb6b270478b2ae2ff44410fdb36217e2da64f56a9524dbe7dbbd7d5",
+			"loudness": -14.9,
+			"peak": -2.6
+		},
+		{
+			"path": "audio/sfx/broom_swat/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_swat/broom_swat.sound.json",
+			"recipe_hash": "sha256:134474b232e52e90eb8302e516d3bb2b0970514165cece3e8604346ff81d7d50",
+			"audio_hash": "sha256:526696fbdedef99dfbfa921df9d9401e33d3bd748781a0f62f44b102ea0a32e5",
+			"loudness": -15.2,
+			"peak": -2.6
+		}
+	]
+}

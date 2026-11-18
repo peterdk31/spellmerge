@@ -23,6 +23,11 @@ RECIPE = {"version": 1, "kind": "sfx", "family": "combat", "seconds": 0.05, "var
           "layers": [{"source": "sine", "pitch": 600, "amp": {"shape": "arch"}}], "notes": "a blip"}
 
 
+# Where the ambience made before the tool lay (atmosphere D), for the checks of UNRECIPED, which is
+# empty now that AU6 remade it.
+OLD_AMBIENCE = "audio/ambience/amb_crypt_air.ogg"
+
+
 def fake_encode(samples: list[float]) -> bytes:
     return sound.wav_bytes(samples)
 
@@ -125,7 +130,7 @@ class CheckTest(unittest.TestCase):
         self.assertTrue(any("content item's sounds/atom/" in p for p in problems), problems)
 
     def test_an_ambience_file_with_a_recipe_must_leave_unreciped(self) -> None:
-        ambience = Path(sound.UNRECIPED[0])
+        ambience = Path(OLD_AMBIENCE)
         sound_id = ambience.stem
         recipe = dict(RECIPE, kind="held", family="held", variants=1)
         folder = self.root / ambience.parent / sound_id
@@ -156,11 +161,17 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(sound.check(self.root), [], "a hand-made sound has no recipe")
 
     def test_the_unreciped_ambience_is_allowed_until_it_has_a_recipe(self) -> None:
-        ambience = self.root / sound.UNRECIPED[0]
+        ambience = self.root / OLD_AMBIENCE
         ambience.parent.mkdir(parents=True)
         ambience.write_bytes(b"x")
         self.bake()
-        self.assertEqual(sound.check(self.root), [])
+        self.assertIn("no recipe or score makes it", "\n".join(sound.check(self.root)))
+        with mock.patch.object(sound, "UNRECIPED", (OLD_AMBIENCE,)):
+            self.assertEqual(sound.check(self.root), [])
+
+    def test_no_sound_is_left_unreciped(self) -> None:
+        # AU6 remade the last files made before the tool; a new sound comes with its recipe.
+        self.assertEqual(sound.UNRECIPED, ())
 
     def test_a_recipe_that_does_not_validate_is_named(self) -> None:
         self.write(dict(RECIPE, wobble=1))

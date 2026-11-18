@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/broom_intro_reveal/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_intro_reveal/broom_intro_reveal.sound.json",
+			"recipe_hash": "sha256:cbad1421328600879140f62b64d4a2a665d5649cb51ef89ea41f5d070caba64f",
+			"audio_hash": "sha256:28fbed9f3e5768bda1519a209670913171c2608967f0fc3d0d8c835682a279d6",
+			"loudness": -14.8,
+			"peak": -3.7
+		},
+		{
+			"path": "audio/sfx/broom_intro_reveal/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_intro_reveal/broom_intro_reveal.sound.json",
+			"recipe_hash": "sha256:cbad1421328600879140f62b64d4a2a665d5649cb51ef89ea41f5d070caba64f",
+			"audio_hash": "sha256:9f489d54ef9682d2e17e80c5e581e35ee83d2e4bdfb1cd53f6a409ae4ef04eeb",
+			"loudness": -15.2,
+			"peak": -3.9
+		},
+		{
+			"path": "audio/sfx/broom_intro_reveal/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/broom_intro_reveal/broom_intro_reveal.sound.json",
+			"recipe_hash": "sha256:cbad1421328600879140f62b64d4a2a665d5649cb51ef89ea41f5d070caba64f",
+			"audio_hash": "sha256:6dc2b2aba31e773e86c262caafff99cd5d9d851ba23cafb7165912a158f77377",
+			"loudness": -15.0,
+			"peak": -3.4
+		}
+	]
+}

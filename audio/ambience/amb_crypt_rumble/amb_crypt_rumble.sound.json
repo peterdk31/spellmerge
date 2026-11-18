@@ -1,0 +1,157 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "ambience",
+	"seconds": 4.7,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.04,
+		"seed": 73
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 95,
+				"q": 0.8
+			},
+			"length": 4.6,
+			"amp": {
+				"attack": 1.1,
+				"release": 3.4
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 140,
+				"q": 3.0
+			},
+			"length": 4.6,
+			"drive": 1.2,
+			"amp": {
+				"attack": 1.1,
+				"release": 3.4
+			},
+			"gain": -6
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 46,
+				"to": 38
+			},
+			"length": 4.6,
+			"amp": {
+				"attack": 1.2,
+				"release": 3.0
+			},
+			"gain": -12
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 600,
+				"q": 2.0
+			},
+			"start": 0.5,
+			"length": 0.03,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 1.5
+			},
+			"gain": -12
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 600,
+				"q": 2.0
+			},
+			"start": 0.9,
+			"length": 0.03,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 1.5
+			},
+			"gain": -14
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 600,
+				"q": 2.0
+			},
+			"start": 1.3,
+			"length": 0.03,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 1.5
+			},
+			"gain": -11
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 600,
+				"q": 2.0
+			},
+			"start": 1.8,
+			"length": 0.03,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 1.5
+			},
+			"gain": -15
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 600,
+				"q": 2.0
+			},
+			"start": 2.4,
+			"length": 0.03,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 1.5
+			},
+			"gain": -13
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 600,
+				"q": 2.0
+			},
+			"start": 3.1,
+			"length": 0.03,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 1.5
+			},
+			"gain": -16
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.6
+		}
+	},
+	"notes": "A far rumble through the stone: a deep growl swelling in and settling slowly, with a few small grains of grit falling. Remade from the first ambience file of the same id (atmosphere D); the room's accent adds its own pitch and volume spread."
+}

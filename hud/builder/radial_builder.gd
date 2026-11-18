@@ -514,6 +514,7 @@ func tree_view() -> TreeViewScript:
 ## Y: swap the ring for the tree, or back. Pointing ends: the tree has no card to put in.
 func toggle_tree() -> void:
 	_tree_open = not _tree_open
+	_sound(UiSounds.CHOOSE)
 	_tree.visible = _tree_open
 	_menu.pointed = NONE
 	if ring_picker != null:
@@ -703,6 +704,7 @@ func _poll_buttons() -> void:
 	var flips: int = _presses(&"kind_next") - _presses(&"kind_prev")
 	if flips != 0 and layout == Layout.KIND and not _kinds.is_empty():
 		_kind_page = posmod(_kind_page + flips, _kinds.size())
+		_sound(UiSounds.MOVE)
 		_menu.pointed = NONE
 		_build_ring()
 		_refresh_preview()
@@ -734,7 +736,10 @@ func _move_marker(dir: Vector2i) -> void:
 	var next: int = _slot + dir.x + dir.y * SLOT_COLUMNS
 	if dir.y != 0 and (next < 0 or next >= count):
 		return
+	var was: int = _slot
 	mark_slot(clampi(next, 0, count - 1))
+	if _slot != was:
+		_sound(UiSounds.MOVE)
 
 
 ## The right stick (P1's mouse) picks the card it points at; letting go (the mouse leaving the
@@ -755,6 +760,7 @@ func _poll_pointer(delta: float) -> void:
 		return
 	if picked != NONE:
 		_rumble(RUMBLE_POINT)
+		_sound(UiSounds.MOVE)
 	_refresh_preview()
 	_changed()
 
@@ -847,6 +853,7 @@ func _put_in() -> void:
 		_ask_one(_slot, id)
 	_fly(_spells.component_icon(id) if _spells != null else null, _menu.tile_center(_menu.angle_of_entry(pointed), RING_RADIUS), _slot_rect(_slot).get_center(), false)
 	_rumble(RUMBLE_PUT)
+	_sound(UiSounds.CARD_PLACE)
 	if _slot + 1 < cards.size():
 		_slot += 1
 		_marker_at = _clock
@@ -894,6 +901,7 @@ func _take_out() -> void:
 	if id != NO_CARD:
 		_fly(_spells.component_icon(id) if _spells != null else null, _slot_rect(at).get_center(), _menu.center, true)
 	_rumble(RUMBLE_TAKE)
+	_sound(UiSounds.CARD_REMOVE)
 	if at != _slot:
 		_slot = at
 		_marker_at = _clock
@@ -911,6 +919,7 @@ func _clear() -> void:
 	_fade_start = _clock
 	_ask_all([] as Array[StringName])
 	_rumble(RUMBLE_CLEAR)
+	_sound(UiSounds.CARD_REMOVE)
 	_slot = 0
 	_first_row = 0
 	_marker_at = _clock
@@ -930,10 +939,21 @@ func _ask_all(cards: Array[StringName]) -> void:
 		_events.staff_cards_requested.emit(index, _viewed, cards, _mirror.body)
 
 
+## A refusal's note shown over the card info panel for a moment, with the refusal's sound while
+## the builder is open (every note is a refusal: nothing to point at, a full or empty staff, or
+## `build_refused`).
 func _say(text: String) -> void:
 	_note = text
 	_note_left = NOTE_TIME
+	_sound(UiSounds.DENY)
 	_changed()
+
+
+## The menu sound `id` (`UiSounds`), only while the builder is open: a refusal that comes back
+## after it closed says nothing.
+func _sound(id: StringName) -> void:
+	if _open:
+		UiSounds.send(_events, id)
 
 
 func _rumble(motors: Vector3) -> void:
@@ -1169,7 +1189,10 @@ func _on_cancelled(player: int) -> void:
 
 func _on_paged(player: int, step_by: int) -> void:
 	if player == index and _open:
-		_show_staff(_along_strip(_viewed, signi(step_by)))
+		var next: int = _along_strip(_viewed, signi(step_by))
+		if next != _viewed:
+			_sound(UiSounds.MOVE)
+		_show_staff(next)
 
 
 # --- The ring ---------------------------------------------------------------------------

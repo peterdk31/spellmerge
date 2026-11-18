@@ -8,7 +8,7 @@ extends Control
 ##
 ## **Rows.** An id named with no file is red (missing), and so is a file that nothing names (unnamed).
 ## A row plays its sound as the game would, on its bus: a one-shot through `Audio.play` (each press a
-## new variant: a randomizer picks one), a held sound through `Audio.hold` until pressed again, a
+## new variant: a randomizer picks one), a menu's sound through `Audio.play_ui` (the UI bus), a held sound through `Audio.hold` until pressed again, a
 ## room's bed layer by playing its whole bed (`Audio.play_bed`, its layers at their levels) until
 ## pressed again, an accent through `Audio.play_accent` at its bed's and its own level, and a music
 ## layer by playing its track up to that layer. The fixtures (`fixtures/`, baked by `tools/sound_fixtures.py`: AU2's three
@@ -94,7 +94,7 @@ func _ready() -> void:
 		audio.registry = sounds
 		add_child(audio)
 	_names = SoundNames.new()
-	_names.read(registry, SoundNames.feel_names(PRESET, FeelScript.CAST_SOUND))
+	_names.read(registry, SoundNames.feel_names(PRESET, FeelScript.CAST_SOUND), UiSounds.IDS)
 	_list()
 	_build()
 	print("SOUND ROOM: %d named, %d missing, %d unnamed, %d fixtures" % [_names.kinds.size(), count_of(State.MISSING), count_of(State.UNNAMED), count_of(State.FIXTURE)])
@@ -125,6 +125,8 @@ func press(id: StringName) -> void:
 	match row.kind:
 		SoundNames.Kind.ONE_SHOT:
 			audio.play(id)
+		SoundNames.Kind.UI:
+			audio.play_ui(id)
 		SoundNames.Kind.ACCENT:
 			audio.play_accent(id, Vector2.ZERO, SoundNames.accent_volume(_names.bed_of(id), id), 1.0)
 		SoundNames.Kind.BED:
@@ -229,7 +231,7 @@ static func _kind_of(source: Node, id: StringName) -> SoundNames.Kind:
 
 # --- The view -------------------------------------------------------------------------------------
 
-const KIND_NAMES: PackedStringArray = ["one-shot", "held", "music", "bed", "accent"]
+const KIND_NAMES: PackedStringArray = ["one-shot", "held", "music", "bed", "accent", "ui"]
 const FONT_SIZE: int = 8
 
 

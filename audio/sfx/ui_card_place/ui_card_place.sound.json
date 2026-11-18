@@ -1,0 +1,50 @@
+{
+	"version": 1,
+	"kind": "ui",
+	"family": "ui",
+	"seconds": 0.12,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.04,
+		"seed": 805
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 420,
+				"to": 170
+			},
+			"length": 0.05,
+			"drive": 1.2,
+			"amp": {
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 1.8
+			},
+			"gain": -4
+		},
+		{
+			"source": "partials",
+			"pitch": 1760,
+			"start": 0.02,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.4
+				},
+				{
+					"ratio": 2.76,
+					"gain": -9,
+					"decay": 0.08
+				}
+			],
+			"amp": {
+				"attack": 0.005
+			},
+			"gain": -3
+		}
+	],
+	"notes": "A card set into a staff's slot: a soft low tap with a small glassy ring on top, the card seating."
+}

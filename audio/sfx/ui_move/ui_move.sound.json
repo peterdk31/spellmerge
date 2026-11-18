@@ -1,0 +1,42 @@
+{
+	"version": 1,
+	"kind": "ui",
+	"family": "ui",
+	"seconds": 0.065,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.05,
+		"seed": 801
+	},
+	"layers": [
+		{
+			"source": "fm",
+			"pitch": 1560,
+			"ratio": 2.0,
+			"index": {
+				"from": 1.2,
+				"to": 0.0
+			},
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 2.2
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 5200,
+				"q": 2.0
+			},
+			"length": 0.012,
+			"amp": {
+				"shape": "perc",
+				"power": 2.0
+			},
+			"gain": -14
+		}
+	],
+	"notes": "The focus moving to another row: a tiny soft FM tick with a breath of high noise, heard many times a second as a player scrolls."
+}

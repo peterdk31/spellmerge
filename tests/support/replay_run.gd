@@ -95,6 +95,9 @@ var rack_item: StringName = STORM_ITEM
 ## Cover kinds the game's cover area and Feel lay instead of the registry's (ground cover GC5; empty:
 ## the registry's), given again in every fresh game. The snapshot test puts cover in its rooms so.
 var cover: Array[CoverKind] = []
+## Spawn styles added to the registry of every fresh game (spawn styles AS2: a room of two styles,
+## tests/core/test_snapshot_spawn_styles.gd); empty: the registry's own.
+var spawn_styles: Array[SpawnStyle] = []
 
 var _tree: SceneTree
 var _root: Window
@@ -488,6 +491,8 @@ func _find() -> void:
 	# under a test script.
 	_flow.set(&"loading_enabled", false)
 	_flow.set(&"intro_enabled", false)
+	for style in spawn_styles:
+		_root.get_node("Registry").call("add", SpawnStyle.FOLDER, style)
 	if room != null:
 		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room, &"", RoomKind.FILL_ENEMIES, 16, 1, 1, spawning))
 	var kinds: Variant = cover if not cover.is_empty() else null

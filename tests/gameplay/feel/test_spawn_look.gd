@@ -36,11 +36,12 @@ func after_each() -> void:
 	_world.free_all()
 
 
-## An enemy at `at` (a hurt circle 12 high), spawning `share` of the way through (set by hand).
-func _spawning(at: Vector2, share: float) -> Actor:
+## An enemy at `at` (a hurt circle 12 high), spawning `share` of the way through (set by hand), in
+## the style of id `style`.
+func _spawning(at: Vector2, share: float, style: StringName = SpawnStyle.DEFAULT["id"]) -> Actor:
 	var body := Actor.new()
 	body.add_child(Hurtbox.new())
-	body.spawn(_style.seconds)
+	body.spawn(_style.seconds, style)
 	_world.add(body, at)
 	_set_share(body, share)
 	return body
@@ -207,7 +208,7 @@ func test_art_under_its_feet_rises_with_it() -> void:
 	sprite.texture = art
 	sprite.position = Vector2(0.0, -14.0)
 	body.add_child(sprite)
-	body.spawn(_style.seconds)
+	body.spawn(_style.seconds, _style.id)
 	_world.add(body, Vector2(100.0, 100.0))
 	check_equal(Motion.body_bottom(body), 2.0, "its frame reaches 2 px under its feet")
 	_set_share(body, 0.1)
@@ -245,7 +246,7 @@ func _spawning_with_art(at: Vector2, share: float, hurt_radius: float = -1.0) ->
 	sprite.texture = art
 	sprite.position = Vector2(0.0, -14.0)
 	body.add_child(sprite)
-	body.spawn(_style.seconds)
+	body.spawn(_style.seconds, _style.id)
 	_world.add(body, at)
 	_set_share(body, share)
 	return body
@@ -332,7 +333,7 @@ func test_it_draws_by_the_style_it_looks_up() -> void:
 		return slow
 	var body: Actor = _spawning(Vector2(100.0, 100.0), 0.5)
 	_frame(0.016)
-	check_equal(asked, [&"rise"] as Array[StringName], "it asked for rise, the style of every body today, once")
+	check_equal(asked, [&"rise"] as Array[StringName], "it asked for rise, the body's style, once")
 	check_equal(int(_look.mark(0).z), SpawnLook.mark_radius(body.wall_radius(), 0.5, slow), "its mark by the style's frames")
 	check_equal(_look.shift_of(body), Motion.body_height(body), "at 0.5 still under the floor: its mark ends at 0.6")
 	check(_cues.is_empty(), "no cue before its motion starts")
@@ -361,3 +362,86 @@ func test_a_motion_it_does_not_have_is_drawn_as_rise() -> void:
 	check_equal(body.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "cut")
 	check_equal(_look.shift_of(body), Motion.body_height(body), "under the floor through the mark, as rise draws it")
 	check_equal(_look.drawn(), 1, "one body drawn")
+
+
+## A style of `rise`'s numbers but these, named `id`.
+func _fixture_style(id: StringName, mark_end: float, cue: StringName, motion: StringName = &"rise") -> SpawnStyle:
+	var style: SpawnStyle = SpawnStyle.from_default()
+	style.id = id
+	style.mark_end = mark_end
+	style.cue = cue
+	style.motion = motion
+	return style
+
+
+## Each body is drawn by its own style (`Actor.spawn_style`, spawn styles AS2): its mark, its motion's
+## numbers and its cue; an id the lookup does not find is drawn as the lookup's `rise`, not as the
+## default (the two are held together by test_spawn_style.gd, but the registry's is the game's).
+func test_each_body_is_drawn_by_its_own_style() -> void:
+	var slow: SpawnStyle = _fixture_style(&"slow", 0.7, &"slow_cue")
+	var rise: SpawnStyle = _fixture_style(&"rise", 0.3, &"rise_cue")
+	var asked: Array[StringName] = []
+	_look.style_of = func(id: StringName) -> SpawnStyle:
+		asked.append(id)
+		return {&"slow": slow, &"rise": rise}.get(id) as SpawnStyle
+	var slow_body: Actor = _spawning(Vector2(100.0, 100.0), 0.5, &"slow")
+	var rise_body: Actor = _spawning(Vector2(200.0, 100.0), 0.5, &"rise")
+	var lost_body: Actor = _spawning(Vector2(300.0, 100.0), 0.5, &"no_such_style")
+	_frame(0.016)
+	check_equal(_look.style_for(slow_body), slow, "the slow body's style is slow")
+	check_equal(_look.style_for(rise_body), rise, "the rise body's rise")
+	check_equal(_look.style_for(lost_body), rise, "an id not found: the lookup's rise")
+	check_equal(_look.shift_of(slow_body), Motion.body_height(slow_body), "slow: at 0.5 still under the floor (its mark ends at 0.7)")
+	check_equal(_look.shift_of(rise_body), Rise.shift(Motion.body_height(rise_body), 0.5, rise), "rise: rising by its own numbers")
+	check_equal(_look.shift_of(lost_body), Rise.shift(Motion.body_height(lost_body), 0.5, rise), "the lost one as rise")
+	check_equal(_cue_ids, [&"rise_cue", &"rise_cue"] as Array[StringName], "the cue of each body whose motion started")
+	_set_share(slow_body, 0.75)
+	_frame(0.016)
+	check_equal(_cue_ids.slice(2), [&"slow_cue"] as Array[StringName], "the slow one's own cue as its motion starts")
+	asked.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
+	check_equal(asked, [&"no_such_style", &"rise", &"slow"] as Array[StringName], "each id looked up once")
+
+
+## A body whose style's motion changes mid-spawn (a snapshot restored over it, or another machine's
+## state) is put back by the motion that drew it before the new one draws it, and the new one puts it
+## back as it lands (`cut`).
+func test_a_body_whose_motion_changes_is_handed_from_one_motion_to_the_other() -> void:
+	var other := Recording.new()
+	_look._motions[&"fixture_motion"] = other
+	var odd: SpawnStyle = _fixture_style(&"odd", 0.4, &"", &"fixture_motion")
+	_look.style_of = func(id: StringName) -> SpawnStyle: return odd if id == &"odd" else null
+	var body: Actor = _spawning(Vector2(100.0, 100.0), 0.6)
+	_frame(0.016)
+	check_equal(body.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "drawn by rise: cut")
+	check(_look.shift_of(body) > 0.0, "and shifted")
+	body.spawn_style = &"odd"
+	_frame(0.016)
+	check_equal(body.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED, "rise put it back: no cut")
+	check_equal(_look.shift_of(body), -1.0, "and no shift")
+	check_equal(other.applied, 1, "the other motion drew it")
+	check_equal(other.put_back_count, 0, "and has not put it back")
+	check_equal(_look.drawn(), 1, "one body drawn")
+	body.spawn_style = &"rise"
+	_frame(0.016)
+	check_equal(other.put_back_count, 1, "back to rise: the other put it back")
+	check_equal(body.clip_children, CanvasItem.CLIP_CHILDREN_ONLY, "and rise cuts it again")
+	body.spawn_style = &"odd"
+	_frame(0.016)
+	body.spawn_left = 0.0
+	_frame(0.016)
+	check_equal(other.put_back_count, 2, "landed: the motion drawing it puts it back")
+	check_equal(_look.drawn(), 0, "none drawn")
+	check_equal(body.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED, "and rise never cut it again")
+
+
+## A motion that counts what it is asked (the motion-change test).
+class Recording extends Motion:
+	var applied: int = 0
+	var put_back_count: int = 0
+
+	func apply(_body: Actor, _share: float, _style: SpawnStyle) -> void:
+		applied += 1
+
+	func put_back(key: int, _body: Actor) -> void:
+		put_back_count += 1
+		forget(key)

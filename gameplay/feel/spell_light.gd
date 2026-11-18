@@ -30,10 +30,13 @@ extends Node
 ##   into the art (the group `LightSpot.PAINTED`: a torch's glow sprites) is hidden while this node
 ##   is in the tree, and shown again when it leaves (the setting turned off), so a torch lights
 ##   once (S6, item 12).
+## - **Carried lights** (docs/milestones/atmosphere.md, A): the lights that move with a body (a
+##   wizard's staff tip), spot rows its owner writes each frame (gameplay/feel/carried_lights.gd)
+##   and hands over (`light_carried`); this node knows nothing of who carries them.
 ## - **Applying it:** one rect over the whole world at `z` (Feel's LIGHT_Z: above the room and the
 ##   bodies, under the motes, beams, flashes, telegraphs and shots), drawn by
 ##   `light_apply.gdshader`: what is under it, times the room's `ambient` (`RoomBase.ambient`,
-##   `set_ambient`) plus the light, cut into the steps `bands` sets (`set_bands`: 3 steps by
+##   `set_ambient`, times its `shade`, the colour of its dark) plus the light, cut into the steps `bands` sets (`set_bands`: 3 steps by
 ##   default, 0 smooth).
 
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -83,11 +86,14 @@ var batches: Array[MultiMeshInstance2D] = []
 var flashes: Array[MultiMeshInstance2D] = []
 var beams: Array[MeshInstance2D] = []
 var spots: MultiMeshInstance2D = null
+## The carried lights' batch (ROWS_SPOT rows, `light_carried`). Read only.
+var carried: MultiMeshInstance2D = null
 ## The cues' lights' batch (ROWS_CUE). Read only.
 var cue_lights: MultiMeshInstance2D = null
 var apply: ColorRect = null
-## The room's light (`set_ambient`) and the steps (`set_bands`). Read only.
+## The room's light and the colour of its dark (`set_ambient`) and the steps (`set_bands`). Read only.
 var ambient: float = 1.0
+var shade: Color = Color.WHITE
 var bands: int = DEFAULT_BANDS
 var _projectiles: ProjectileManagerScript = null
 var _quad: QuadMesh = null
@@ -139,6 +145,8 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 		flashes.append(node)
 	spots = _light_batch(ROWS_SPOT)
 	spots.name = "Spots"
+	carried = _light_batch(ROWS_SPOT)
+	carried.name = "Carried"
 	cue_lights = _light_batch(ROWS_CUE)
 	cue_lights.name = "CueLights"
 	cue_lights.multimesh.instance_count = CUE_LIGHTS
@@ -265,10 +273,25 @@ func follow() -> void:
 	viewport.canvas_transform = Transform2D(0.0, scale, 0.0, Vector2.ZERO) * view.global_canvas_transform * view.canvas_transform
 
 
-## The room's light where nothing lights it (`RoomBase.ambient`; 1.0 the room as it is).
-func set_ambient(to: float) -> void:
+## The room's light where nothing lights it (`RoomBase.ambient`; 1.0 the room as it is), and the
+## colour of its dark (`RoomBase.shade`; white an even dark).
+func set_ambient(to: float, dark: Color = Color.WHITE) -> void:
 	ambient = clampf(to, 0.0, 1.0)
-	(apply.material as ShaderMaterial).set_shader_parameter(&"ambient", ambient)
+	shade = Color(clampf(dark.r, 0.0, 1.0), clampf(dark.g, 0.0, 1.0), clampf(dark.b, 0.0, 1.0))
+	var material := apply.material as ShaderMaterial
+	material.set_shader_parameter(&"ambient", ambient)
+	material.set_shader_parameter(&"shade", Vector3(shade.r, shade.g, shade.b))
+
+
+## The carried lights this frame: `count` spot rows (ROWS_SPOT, STRIDE floats each) of `rows`,
+## whose length is the batch's room for them (its instances never shrink, so nothing is allocated).
+func light_carried(rows: PackedFloat32Array, count: int) -> void:
+	_hand(carried.multimesh, rows, count, rows.size() / STRIDE)
+
+
+## How many carried lights are lit (for tests).
+func carried_count() -> int:
+	return carried.multimesh.visible_instance_count
 
 
 ## The steps the light comes in: 0 smooth, 2 or more that many (dim counted); DEFAULT_BANDS 3.
@@ -437,24 +460,9 @@ func draw_spots() -> void:
 		var reach: float = LightSpot.reach_of(spot)
 		var colour: Color = _colour_of(spot)
 		var where: Vector2 = spot.global_position
-		var i: int = at * STRIDE
-		_spot_buffer[i] = reach
-		_spot_buffer[i + 1] = 0.0
-		_spot_buffer[i + 2] = 0.0
-		_spot_buffer[i + 3] = where.x
-		_spot_buffer[i + 4] = 0.0
-		_spot_buffer[i + 5] = reach
-		_spot_buffer[i + 6] = 0.0
-		_spot_buffer[i + 7] = where.y
-		_spot_buffer[i + 8] = colour.r
-		_spot_buffer[i + 9] = colour.g
-		_spot_buffer[i + 10] = colour.b
-		_spot_buffer[i + 11] = clampf(LightSpot.strength_of(spot), 0.0, 1.0)
-		_spot_buffer[i + 12] = clampf(LightSpot.flicker_of(spot), 0.0, 1.0)
 		# A seed from where it is, so two torches flicker out of step and a run is the same.
-		_spot_buffer[i + 13] = fposmod(where.x * 0.137 + where.y * 0.311, 1.0)
-		_spot_buffer[i + 14] = 0.0
-		_spot_buffer[i + 15] = 0.0
+		var seed: float = fposmod(where.x * 0.137 + where.y * 0.311, 1.0)
+		write_spot_row(_spot_buffer, at, where, reach, colour, LightSpot.strength_of(spot), LightSpot.flicker_of(spot), seed)
 		at += 1
 	_spot_buffer.resize(at * STRIDE)
 	var multimesh: MultiMesh = spots.multimesh
@@ -462,6 +470,30 @@ func draw_spots() -> void:
 	multimesh.visible_instance_count = at
 	if at > 0:
 		multimesh.buffer = _spot_buffer
+
+
+## Write row `at` of `buffer` (STRIDE floats a row) as a spot row (ROWS_SPOT, light.gdshader): a
+## light at `where` reaching `reach` px, in `colour`, `strength` bright at its middle, its strength
+## dropping by up to `flicker` a step a few times a second from `seed` (0 to 1). The rows' one
+## writer: the room's spots and the carried lights.
+static func write_spot_row(buffer: PackedFloat32Array, at: int, where: Vector2, reach: float, colour: Color, strength: float, flicker: float, seed: float) -> void:
+	var i: int = at * STRIDE
+	buffer[i] = reach
+	buffer[i + 1] = 0.0
+	buffer[i + 2] = 0.0
+	buffer[i + 3] = where.x
+	buffer[i + 4] = 0.0
+	buffer[i + 5] = reach
+	buffer[i + 6] = 0.0
+	buffer[i + 7] = where.y
+	buffer[i + 8] = colour.r
+	buffer[i + 9] = colour.g
+	buffer[i + 10] = colour.b
+	buffer[i + 11] = clampf(strength, 0.0, 1.0)
+	buffer[i + 12] = clampf(flicker, 0.0, 1.0)
+	buffer[i + 13] = seed
+	buffer[i + 14] = 0.0
+	buffer[i + 15] = 0.0
 
 
 ## How many spots are lit (for tests).

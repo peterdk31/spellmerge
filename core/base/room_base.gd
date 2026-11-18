@@ -45,6 +45,10 @@ extends Resource
 ## so spells and torches read as the light in it. Only drawn while the "Spell light" setting is
 ## on; at most 1.0 (light only brightens past it).
 @export_range(0.3, 1.0, 0.05) var ambient: float = 1.0
+## The colour of the room's dark (docs/milestones/atmosphere.md, A): where no spell or torch lights
+## it, a pixel is its art times `ambient` times this, channel by channel, so warm light falls on a
+## cool dark. White (the default) is an even dark, as `ambient` alone. Drawn only with spell light.
+@export var shade: Color = Color.WHITE
 ## Whether its biome's cover kinds fill its open floor by themselves (ground cover GC2,
 ## `CoverLayout.of`: each `CoverKind` whose `biomes` names its `biome`). Off: only its fields
 ## (`CoverField`) put cover in it.

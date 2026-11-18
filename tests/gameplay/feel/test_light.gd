@@ -19,6 +19,7 @@ const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 const TORCH := preload("res://content/rooms/crypt/decals/torch.tscn")
 const ARENA := preload("res://content/rooms/crypt/arena_01.tres")
 
@@ -485,13 +486,16 @@ func test_every_light_spot_in_the_content_is_whole() -> void:
 ## the content's own ambients may change freely.
 func test_a_room_sets_the_ambient() -> void:
 	check(is_equal_approx(RoomBase.new().ambient, 1.0), "a room is as drawn by default")
+	check(RoomBase.new().shade.is_equal_approx(Color.WHITE), "and its dark is even by default")
 	var dark := ARENA.duplicate() as RoomBase
 	dark.id = &"test_dark_room"
 	dark.ambient = 0.85
+	dark.shade = Color(0.8, 0.9, 1.0)
 	registry.add(&"rooms", dark)
 	var plain := ARENA.duplicate() as RoomBase
 	plain.id = &"test_plain_room"
 	plain.ambient = 1.0
+	plain.shade = Color.WHITE
 	registry.add(&"rooms", plain)
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
@@ -499,11 +503,32 @@ func test_a_room_sets_the_ambient() -> void:
 	bus.room_entered.emit(dark.id)
 	check(is_equal_approx(feel.light().ambient, 0.85), "the darker room's ambient")
 	check(is_equal_approx(float((feel.light().apply.material as ShaderMaterial).get_shader_parameter(&"ambient")), 0.85), "to the rect")
+	check(feel.light().shade.is_equal_approx(Color(0.8, 0.9, 1.0)), "the darker room's dark's colour (atmosphere A)")
+	check((feel.light().apply.material as ShaderMaterial).get_shader_parameter(&"shade").is_equal_approx(Vector3(0.8, 0.9, 1.0)), "to the rect too")
 	bus.spell_light_changed.emit(false)
 	bus.spell_light_changed.emit(true)
 	check(is_equal_approx(feel.light().ambient, 0.85), "kept through the setting")
+	check(feel.light().shade.is_equal_approx(Color(0.8, 0.9, 1.0)), "its colour too")
 	bus.room_entered.emit(plain.id)
 	check(is_equal_approx(feel.light().ambient, 1.0), "the plain room's")
+	check(feel.light().shade.is_equal_approx(Color.WHITE), "an even dark again")
+
+
+## Atmosphere A: Feel's frame hands the spell light the lights its seats' wizards carry (one at a
+## seat's own body's staff tip; gameplay/feel/carried_lights.gd has the rest).
+func test_feels_frame_lights_the_wizards_staffs() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	feel._process(1.0 / 60.0)
+	check_equal(feel.light().carried_count(), 0, "no wizard in the tree, no carried light")
+	var wizard := own(Actor.new()) as Actor
+	wizard.actors = feel.actors
+	wizard.ticking = false
+	root.add_child(wizard)
+	var table: ActorsScript = feel.actors as ActorsScript
+	table.set_node(table.home_of_seat(0), wizard)
+	feel._process(1.0 / 60.0)
+	check_equal(feel.light().carried_count(), 1, "seat 0's wizard carries its light")
 
 
 ## The steps are a switch: 3 by default (dim, lit, bright), 0 smooth; the shader's default too.

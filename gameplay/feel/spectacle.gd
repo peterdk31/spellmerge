@@ -38,6 +38,7 @@ const BarriersScript := preload("res://gameplay/feel/barriers.gd")
 const StillMotesScript := preload("res://gameplay/feel/still_motes.gd")
 const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")
 const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
+const CarriedLightsScript := preload("res://gameplay/feel/carried_lights.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's SHOWN_BEAM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -125,6 +126,11 @@ var spell_light: bool = SpellLightSetting.default_on()
 ## The room's light where nothing lights it (`RoomBase.ambient`, from `room_entered`; P3b), kept
 ## for a light made later. Read only.
 var ambient: float = 1.0
+## The colour of the room's dark (`RoomBase.shade`; atmosphere A), kept with the ambient. Read only.
+var shade: Color = Color.WHITE
+## The lights the wizards carry at their staff tips (atmosphere A), written each frame while the
+## light is on. Read only.
+var carried_lights: CarriedLightsScript = CarriedLightsScript.new()
 
 ## The ramp table the motes and the floor marks share: a surface's colours and a body's art, one
 ## row each, so a mote and the mark it leaves read the same colours.
@@ -240,6 +246,8 @@ func step(now: float, table: ActorsScript = null) -> void:
 		marks.step(now)
 	if light != null:
 		light.step_cues(now)
+		carried_lights.step(table)
+		light.light_carried(carried_lights.rows, carried_lights.count)
 
 
 ## The barrier on `actor` changed (combat's `barrier_changed`; `ramp` the actor's): its shell, in
@@ -866,7 +874,7 @@ func _make_light(on: bool) -> void:
 	if on and projectiles != null:
 		light = SpellLightScript.new(projectiles, LIGHT_Z)
 		light.name = "SpellLight"
-		light.set_ambient(ambient)
+		light.set_ambient(ambient, shade)
 		add_child(light)
 
 
@@ -902,7 +910,7 @@ func view_rect() -> Rect2:
 # --- The room ------------------------------------------------------------------------------------
 
 ## A new room: its colours for its walls' motes (`RoomBase.surface_colors`) and its ambient light
-## (`RoomBase.ambient`, P3b).
+## (`RoomBase.ambient`, P3b; and its dark's colour, `RoomBase.shade`).
 func _on_room_entered(room_id: StringName) -> void:
 	use_room(registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null)
 	# The room's world is in the tree by now: its mote sources are read again (each from now).
@@ -918,8 +926,9 @@ func use_room(room: RoomBase) -> void:
 	_surface_ids = room.surface_kinds if room != null else ([] as Array[StringName])
 	_take_surface_kinds()
 	ambient = room.ambient if room != null else 1.0
+	shade = room.shade if room != null else Color.WHITE
 	if light != null:
-		light.set_ambient(ambient)
+		light.set_ambient(ambient, shade)
 	_surface_source = _ramp_table.source(_surface_colors)
 
 

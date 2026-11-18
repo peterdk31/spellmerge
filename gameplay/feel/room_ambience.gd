@@ -23,7 +23,7 @@ extends Node
 ## **No device, no playback:** on the audio driver with no device (`DUMMY_DRIVER`: every headless
 ## run, the tests among them) it does all of the above (streams, levels, accents picked and placed)
 ## but starts no player (`audible`), since nothing is there to hear it, and a loop still playing as a
-## headless run quits is left behind by the engine's audio thread under load (a leak the test
+## headless run quits is left behind by the engine's audio thread when busy (a leak the test
 ## runner fails on).
 ##
 ## Nothing is allocated while playing: the players are made once.

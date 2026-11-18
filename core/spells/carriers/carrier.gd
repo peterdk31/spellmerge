@@ -408,6 +408,22 @@ func lane_radius(spell: CompiledSpell) -> float:
 	return spell.radius
 
 
+## How wide a cast of `spell` by the body `body` strikes either side of its way, all along it and
+## past its end, when that is its body's width and not its spell's (a dash's pass); 0 for a carrier
+## whose width is its spell's (`lane_radius`). What a telegraph lane is drawn as wide as
+## (`Spells.carrier_pass`).
+func pass_radius(_spell: CompiledSpell, _body: int) -> float:
+	return 0.0
+
+
+## How far a cast of `spell` moves its caster along its way, for a carrier with a `pass_radius` (a
+## dash's distance); 0 for the others. A telegraph lane of a pass is this long and its width more
+## (`Spells.carrier_pass_length`); not `reach_of`, which is how far a cast reaches from where its
+## caster stands (the AI's range), and a move goes nowhere but with its caster.
+func pass_length(_spell: CompiledSpell) -> float:
+	return 0.0
+
+
 ## How far a cast of `spell` reaches along its aim, for an enemy's telegraph (`Spells.next_cast_reach`);
 ## 0 for one that is not aimed.
 func reach_of(_spell: CompiledSpell) -> float:

@@ -3,7 +3,9 @@ extends Node2D
 ## T6b). While a cast winds up, a lane runs from its caster's staff tip along its live aim (the aim
 ## follows the caster until the cast leaves, owner 2026-11-06), as long as its carrier reaches and
 ## as wide as it hits (widening to its cone's width at its far end for a cone, a spray's:
-## `Spells.carrier_lane`), in the cast's tint: its dashes march toward the tip, its arrowhead grows and
+## `Spells.carrier_lane`; as wide as its caster's body strikes and that much longer for a move
+## that strikes what its body meets, a dash's pass: `Spells.carrier_pass`, the owner 2026-11-18),
+## in the cast's tint: its arrowhead grows and
 ## the lane brightens as the wind-up runs out (`telegraph.gdshader`). It ends the step the cast
 ## leaves or is cancelled (`Spells.is_winding`), so it always shows a cast that comes. A carrier
 ## that is not aimed (a nova, an orbit) shows none. When its caster's AI locks its aim (`beat`,
@@ -25,8 +27,9 @@ const START: float = 4.0
 ## `NEAR_MOST` is taller, up to twice `LANE_MOST` and its glow.
 const HEIGHT: float = 32.0
 ## The widest a lane is drawn either side of its middle (pixels; the shader's `LANE_MOST`).
-const LANE_MOST: float = 40.0
-## The widest a lane is at its caster's end (pixels either side; as ever, before cones).
+const LANE_MOST: float = 72.0
+## The widest a lane is at its caster's end (pixels either side; as ever, before cones), but a
+## body's pass, which is as wide all along (up to `LANE_MOST`).
 const NEAR_MOST: float = 14.0
 ## Pixels of glow drawn past a lane's edge.
 const GLOW: float = 4.0
@@ -39,6 +42,10 @@ const BEAT_TIME: float = 0.2
 
 ## The spell runtime (`Spells`), read only.
 var spells: Node = null
+## The z a lane of a body's pass (a dash's) is drawn at: on the floor, under every body, as if
+## painted on the ground its caster will cross (the owner, 2026-11-18). Feel sets it (its marks'
+## z). Any other lane, a shot's, is drawn at this node's own z, over the bodies.
+var floor_z: int = 0
 
 ## The lanes under way: the first `count` of each list.
 var count: int = 0
@@ -77,7 +84,11 @@ func _ready() -> void:
 func play(caster: int, tag: int, seconds: float, tint: Color, reach: float) -> void:
 	if spells == null or seconds <= 0.0 or _sprites.is_empty():
 		return
+	# A body's pass (a dash's) strikes as wide as the body all along its way, and as far past its end.
+	var wide: float = float(spells.call("carrier_pass", tag, caster))
 	var length: float = float(spells.call("carrier_reach", tag)) * maxf(reach, 0.0)
+	if wide > 0.0:
+		length = (float(spells.call("carrier_pass_length", tag)) + wide) * maxf(reach, 0.0)
 	if length <= START:
 		return
 	var staff: int = SpellTag.staff_of(tag)
@@ -104,6 +115,13 @@ func play(caster: int, tag: int, seconds: float, tint: Color, reach: float) -> v
 	var near: float = minf(radius + LANE_MARGIN * 0.5, NEAR_MOST)
 	# Only a cone widens (its lane wider than its hit radius); any other lane is as wide all along.
 	var far: float = maxf(lane + LANE_MARGIN * 0.5, near) if lane > radius else near
+	if wide > 0.0:
+		# Exactly its pass, no margin: its dotted edge is where it strikes.
+		near = minf(wide, LANE_MOST)
+		far = near
+	# The sprites change places as lanes go (`_remove`), so each lane sets its own.
+	sprite.z_as_relative = wide <= 0.0
+	sprite.z_index = floor_z if wide > 0.0 else 0
 	# Tall enough for its widest end and its glow, its middle kept on the texture's middle row.
 	var high: float = HEIGHT if far <= NEAR_MOST else maxf(HEIGHT, 2.0 * ceilf(minf(far, LANE_MOST) + GLOW))
 	sprite.offset = Vector2(START, -high * 0.5)

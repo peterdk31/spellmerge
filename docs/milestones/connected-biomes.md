@@ -1,6 +1,6 @@
 # Connected biomes: one walkable map a biome, free split and a Voronoi camera
 
-**Status (2026-11-18): proposed, for the owner's approval.** Designed with the owner in one session ("Let's design a new room system"); every rule below is the owner's answer to a question of that session ("Owner decisions"). Reviewed against the code by a fresh-context agent the same day; its findings are written into the model and the steps, and the four that needed the owner were answered (decisions 2, 6, 25 and 1's count). No code yet. It replaces run generation's branching row map ([run-generation.md](run-generation.md)) with a map of floating rooms joined by bridges, and keeps the rest of that plan (the run as data, kind rules, scaling, rule changes). It keeps the crypt rework's floating rooms ([crypt-rework.md](crypt-rework.md)). It builds a large part of M3's run structure ([docs/PLAN.md](../PLAN.md)).
+**Status (2026-11-18): approved by the owner** ("Approve, open a PR"; the CB1 scene stays as a stress test); this document is the plan. Designed with the owner in one session ("Let's design a new room system"); every rule below is the owner's answer to a question of that session ("Owner decisions"). Reviewed against the code by a fresh-context agent the same day; its findings are written into the model and the steps, and the four that needed the owner were answered (decisions 2, 6, 25 and 1's count). No code yet. It replaces run generation's branching row map ([run-generation.md](run-generation.md)) with a map of floating rooms joined by bridges, and keeps the rest of that plan (the run as data, kind rules, scaling, rule changes). It keeps the crypt rework's floating rooms ([crypt-rework.md](crypt-rework.md)). It builds a large part of M3's run structure ([docs/PLAN.md](../PLAN.md)).
 
 The steps are **CB1 to CB13** (CB for connected biomes). Each is one PR with its tests, in order.
 
@@ -90,7 +90,7 @@ And on how the party moves: "Free split would really make the game awesome! Coul
 
 ## Steps
 
-1. **CB1 the camera spike.** Draw 2, 3 and 4 Voronoi views (a viewport a cell, each masked to its cell) over the busiest stress fight, on Linux and the web build; measure frame time with shots, motes, light and cover. Report numbers and the fallbacks they need (fewer motes or lights a view). The owner sets the targets from it (decision 31).
+1. **CB1 the camera spike.** Draw 2, 3 and 4 Voronoi views (a viewport a cell, each masked to its cell) over the busiest stress fight, on Linux and the web build; measure frame time with shots, motes, light and cover. Report numbers and the fallbacks they need (fewer motes or lights a view). The owner sets the targets from it (decision 31). The measuring scene stays as a lasting stress test (owner, 2026-11-18), run again whenever the camera, motes or light change.
 2. **CB2 the biome world.** Sockets on templates (a class in `core/`, its editor preview in `tools/`), the 32 px placement rule, the mouth cell (GDScript and native kernels together), one bridge template, the biome map as hashed state, the grid's room layers DERIVED. Two or three crypt rooms joined in a hand-made test map, walked through. The row run stays the default. Tests: shots stop at a mouth, a wizard crosses, a free enemy does not, the kernels match, the hash and snapshot cost of a 12-room biome.
 3. **CB3 room life.** Room state and room events (each listener named above moved to them), body membership, waking and sleeping, fights that start past a mouth and seal one way, movement spells across mouths (never out of a seal), portals and possession across rooms, crawling while downed. Tests: determinism and snapshots with a split party and two sealed fights at once (the content-determinism test gains them), a room woken by a shot, sleep-and-wake against never slept, a swap across a seal fizzling.
 4. **CB4 ground at layout.** The ground drawing of `tools/ground_shape.py` (and the wall art of `ground_walls.py`) run in the game when a room is laid out, from the mirrored shape: view only, no load stall (measured), its output for an unmirrored room the same as the baked art's (a test compares them). The baked ground scenes stay for the hub until it moves over too.
@@ -106,10 +106,10 @@ And on how the party moves: "Free split would really make the game awesome! Coul
 
 Every template is read by tests in all four mirrorings (sockets on the lip, every socket reaching every other, spawns clear, the 32 px rule) and played once in a generated biome; a screenshot of each template and each map style.
 
-## Questions for the owner
+## Answered by the owner (2026-11-18)
 
-1. Approve this plan as written?
-2. CB1 is a spike: keep its measuring scene as a lasting stress test, or throw it away once the numbers are in?
+1. The plan: approved as written.
+2. CB1's measuring scene: kept as a stress test.
 
 ## Not in this plan
 

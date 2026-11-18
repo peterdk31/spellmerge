@@ -1,6 +1,6 @@
 # Arrival styles: each biome (or enemy) names how its enemies arrive
 
-**Status (2026-11-17): a plan, waiting for the owner's answers to the questions at the end.** The owner asked whether it is easy to change the arrival animation or add new ones in other biomes, then asked for this plan.
+**Status (2026-11-18): approved; the owner answered its questions (the end of this document) and asked for it to be built now.** The owner asked whether it is easy to change the arrival animation or add new ones in other biomes, then asked for this plan.
 
 Today (enemy arrivals EA1–EA5, docs/milestones/enemy-arrivals.md) the arrival has one look. A mark grows on the floor, then the body rises out of it. The look is written in `gameplay/feel/arrive_look.gd`:
 - its timing is constants there (`MARK_END`, `CLOSE_FROM`, the frame counts);
@@ -18,11 +18,12 @@ This plan makes the look **data a biome or an enemy names**, as cards name their
 | Field | Meaning |
 | --- | --- |
 | `id` | the style's id, which the registry keys it by; it must match the folder's name (the validator checks) |
-| `motion` | the kind of motion: `rise` (out of the floor, today's look) or `drop` (from above, AS3); one of `ArrivalStyle.MOTIONS`, a list of names in core (Feel maps each name to its code, and a test checks the two match, as `ModifierBase.RULES` is split) |
+| `motion` | the kind of motion: `rise` (out of the floor, today's look) or `materialize` (out of nothing, AS3); one of `ArrivalStyle.MOTIONS`, a list of names in core (Feel maps each name to its code, and a test checks the two match, as `ModifierBase.RULES` is split) |
 | `seconds` | how long the arrival lasts (simulation: the body can't be hurt and can't act for this long), 0.3 to 2 s |
 | `mark_end`, `close_from` | where the mark stage ends and where the mark starts to close, as shares of the arrival (today's 0.4 and 0.92) |
 | `mark_frames`, `close_frames` | the frames the mark grows in and closes in (today's 4 and 3) |
 | `mark_strip` | the mark's look: empty for the ring drawn from the floor's colours (today's look), or an art strip played over the mark stage (AS4) |
+| `colours` | where the mark's (and `materialize`'s scan line's) colours come from, as a floor mark's: `floor` (the room's floor, today's ring) or a fixed colour of the game palette |
 | `cue` | the cue played as the body starts to move (today's `enemy_arrive`); a biome's own dust and sound |
 | `biomes` | the biomes it is the arrival of (as an enemy names its `biomes`) |
 
@@ -37,7 +38,7 @@ This plan makes the look **data a biome or an enemy names**, as cards name their
 Across all styles, no two may name the same biome (`ArrivalStyle.all_problems`, as `run_problems` does across runs), so no style wins silently by sort order. A test checks every style file and the set. No registration is needed: the registry's scan finds `content/arrivals/`.
 
 **Which style an enemy gets** (`ArrivalStyle.pick(registry, enemy, biome)`, a pure static function):
-1. the enemy's own (`EnemyBase.arrival`, a style id, empty by default: an imp that always drops in);
+1. the enemy's own (`EnemyBase.arrival`, a style id, empty by default: the storm fork that always materializes, AS3);
 2. else the first style by id that names the room's biome (`RoomBase.biome`);
 3. else `rise`, the default.
 
@@ -53,10 +54,13 @@ Across all styles, no two may name the same biome (`ArrivalStyle.all_problems`, 
   - Feel hands `ArriveLook` a style lookup (the registry, or a Callable), and `play_cue` takes the cue's id: `play_cue(cue, at, weighted)`. Today feel.gd plays the fixed `ArriveLook.CUE`;
   - the mark's colours (`_fill`, `_rim`, one pair today) become per style before AS4.
   - **`rise`** is today's code moved, unchanged: the clip parent and the shifted parts.
-  - **`drop`** needs no clip at all, so it is also the cheaper look: no extra render pass per body (see the arrival cost benchmark, branch bench/arrive-cost).
-    - The mark is the body's shadow growing.
-    - The body falls in **from above the top of the view**, which Feel knows (the simulation never does), so it slides in through the screen's edge instead of appearing out of nothing (Smooth: no pop). It falls by whole pixels and lands with dust.
-    - While in the air it is drawn above the walls and the other bodies, as a thing in the air is. It takes its place in the y-sort as it lands, the same frame its feet touch the mark.
+  - **`materialize`** (the owner, 2026-11-18: "materialize in from nothing, a cool sci-fi look"): the body is built up out of light, row by row, inside the game's palette and the Smooth rule (whole pixels, no fade, no blur, no glow gradients). It uses the same one clip per body as `rise`, but its mask is rows instead of one rect:
+    - **The pad (the mark stage):** a ring in the style's colour (its `colours` source, as a mark's: the room's `floor` or a fixed colour of the game palette, docs/STYLE.md) draws in, with a 1-pixel rim that runs round it in 4 or more frames.
+    - **The scan:** a bright 1-pixel line sweeps up from the feet to the top of the art. Behind it, the body's rows show **interlaced**: every 4th row first, then every 2nd, then all, each set over at least 3 frames. So the body is a striped ghost that fills in, never a fade.
+    - **The glitch:** while the rows fill, the body's parts are shifted sideways by whole pixels, 1 or 2 now and then, settling to 0 in the last frames. The shift is rolled from Feel's own dice, view only.
+    - **The landing:** the line reaches the top and goes out over 3 frames, the pad closes, and a few square `spark` motes come off the body's outline, through the cue.
+
+    Its mask is up to the body's height in rows, one rect a row band, so it adds no render pass beyond `rise`'s.
 - **The mark** is the ring drawn from the floor's colours by default. A style may instead give an art strip, played frame by frame over the mark stage and closed in its last frames, so a forest biome can have roots or a frost biome rime, as art.
 - **Tests:**
   - every style file (`problems()`);
@@ -70,13 +74,13 @@ Across all styles, no two may name the same biome (`ArrivalStyle.all_problems`, 
 | --- | --- | --- |
 | AS1 | **The data, with no change on screen:** `ArrivalStyle`, `MOTIONS`, `DEFAULT`, `content/arrivals/rise/` with today's numbers, `ArriveLook` reading the style's timings and cue instead of its constants, the `rise` motion moved into `arrive_motions/`, the validator and its test. The look's static helpers (`rise_shift`, `mark_radius`) take the style's numbers, so the 21 references in test_arrive_look.gd, test_arrive.gd, test_flow.gd and test_bot.gd are updated | core/base, content/arrivals, gameplay/feel, tests |
 | AS2 | **Picked per body:** `ArrivalStyle.pick`, `EnemyBase.arrival`, `Actor.arrive(seconds, style)` and `arrive_style` as state, Flow picking as it stands a body; tests for the picker, snapshots and determinism | core/base, gameplay/actor, gameplay/flow, tests |
-| AS3 | **A second motion, to prove it:** `drop` (question 1), with its own cue; the every-style-on-every-enemy test | gameplay/feel, content/arrivals, content/cues, tests |
+| AS3 | **A second motion, to prove it:** `materialize`, with its own style `content/arrivals/materialize/`, its cue (sparks and a sound id) and `EnemyBase.arrival = &"materialize"` on the storm fork, so it shows in the crypt today (one line to move it to another enemy or a biome); the every-style-on-every-enemy test | gameplay/feel, content/arrivals, content/cues, tests |
 | AS4 | **Art strips for the mark** (question 2) | gameplay/feel, content/arrivals, tests |
 
 Each step updates the README of the areas it touches, and `content/arrivals/README.md` (new) is the guide: copy `rise/`, change the numbers, name your biome.
 
-## Questions for the owner
+## The owner's answers (2026-11-18)
 
-1. **The second motion, built to prove the system:** `drop` (from above, with a shadow growing first; recommended, as it is also the cheaper look), or none yet (only the system, with `rise` as its one style)?
-2. **The mark:** allow art strips (AS4; recommended, so a biome's mark can be its own art), or only the drawn ring with numbers?
-3. **Build it now** in sessions, merged automatically as before (recommended), or keep the plan until a second biome is planned?
+1. **The second motion:** "Materialize in from nothing. A cool sci-fi look": `materialize`, above (AS3), instead of the `drop` first proposed.
+2. **The mark:** art strips are allowed (AS4); the drawn ring stays the default.
+3. **When:** build it now, step by step in new sessions, each merged automatically.

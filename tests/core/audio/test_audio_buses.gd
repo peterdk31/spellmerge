@@ -180,3 +180,9 @@ func test_the_ui_plays_one_of_an_id_a_frame_on_its_bus() -> void:
 	check(audio.ui.get_parent().process_mode == Node.PROCESS_MODE_ALWAYS, "on the over lane: heard over the pause menu")
 	bus.ui_sound_requested.emit(&"no_such")
 	check(audio.play_ui(&"no_such") < 0, "an id with no file plays nothing")
+
+
+func test_a_recorded_run_is_heard_on_the_driver_with_no_device() -> void:
+	check(not AudioScript.hears_on(AudioScript.DUMMY_AUDIO_DRIVER, false), "a headless run starts no player")
+	check(AudioScript.hears_on(AudioScript.DUMMY_AUDIO_DRIVER, true), "a run recorded with --write-movie does, so the movie has its sound")
+	check(AudioScript.hears_on("PulseAudio", false), "a machine with a device does")

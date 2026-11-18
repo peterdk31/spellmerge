@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/reaction_stillness/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/reaction_stillness/reaction_stillness.sound.json",
+			"recipe_hash": "sha256:e9028041cbd7c22125ff5f2254a811e6dd8f33e5326a3b9a1d558ed912df8f84",
+			"audio_hash": "sha256:4f3763e307bbafc0e12f4403c8c58e8763e70cad8fc58d29d3cc503c8328e0eb",
+			"loudness": -17.3,
+			"peak": -6.3
+		},
+		{
+			"path": "audio/sfx/reaction_stillness/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/reaction_stillness/reaction_stillness.sound.json",
+			"recipe_hash": "sha256:e9028041cbd7c22125ff5f2254a811e6dd8f33e5326a3b9a1d558ed912df8f84",
+			"audio_hash": "sha256:bda124267ca75b1d6e08255313d0c3c99310206abf3a3a68103322da88d5f58d",
+			"loudness": -16.3,
+			"peak": -5.8
+		},
+		{
+			"path": "audio/sfx/reaction_stillness/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/reaction_stillness/reaction_stillness.sound.json",
+			"recipe_hash": "sha256:e9028041cbd7c22125ff5f2254a811e6dd8f33e5326a3b9a1d558ed912df8f84",
+			"audio_hash": "sha256:20bfdfab10760cd384e5bb17b5c82c7bc99682e700aa8cbd0459a65033ffee3d",
+			"loudness": -17.4,
+			"peak": -6.4
+		}
+	]
+}

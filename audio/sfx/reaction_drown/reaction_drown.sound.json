@@ -1,0 +1,52 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.75,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 42
+	},
+	"layers": [
+		{
+			"patch": "water_wash",
+			"filter": {
+				"from": 300,
+				"to": 900
+			}
+		},
+		{
+			"patch": "void_swell",
+			"gain": -3
+		},
+		{
+			"source": "noise",
+			"color": "stepped",
+			"pitch": {
+				"from": 26,
+				"to": 20
+			},
+			"filter": {
+				"type": "band",
+				"from": 420,
+				"to": 260,
+				"q": 4.0
+			},
+			"amp": {
+				"attack": 0.05,
+				"shape": "perc",
+				"power": 1.0
+			},
+			"gain": -6
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		},
+		"lowpass": 3000
+	},
+	"notes": "Drown (water and void): a deep, muffled wash pulled down into a hollow swell, a few slow bubbles in it."
+}

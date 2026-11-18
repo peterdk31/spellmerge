@@ -1,0 +1,29 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.7,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 38
+	},
+	"layers": [
+		{
+			"patch": "frost_glass",
+			"pitch": 1320
+		},
+		{
+			"patch": "lightning_crackle",
+			"length": 0.25,
+			"gain": -8
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		}
+	},
+	"notes": "Superconduct (frost and lightning): a clear glass ping with a quick spit of sparks."
+}

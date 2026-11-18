@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/reaction_kindle/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/reaction_kindle/reaction_kindle.sound.json",
+			"recipe_hash": "sha256:79d900c55f87ff82e0ecc034b00e7be1754998346c62b6519e72da274d33b318",
+			"audio_hash": "sha256:477cfc2d9f62b6e7280ac04894bc4ae91928e643f012b5df4901feec1486e2b6",
+			"loudness": -16.9,
+			"peak": -5.4
+		},
+		{
+			"path": "audio/sfx/reaction_kindle/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/reaction_kindle/reaction_kindle.sound.json",
+			"recipe_hash": "sha256:79d900c55f87ff82e0ecc034b00e7be1754998346c62b6519e72da274d33b318",
+			"audio_hash": "sha256:423881cc069d6feb45d6d434f7e9659b6e5956604fcea359e53d5030eb5484a2",
+			"loudness": -17.0,
+			"peak": -5.7
+		},
+		{
+			"path": "audio/sfx/reaction_kindle/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/reaction_kindle/reaction_kindle.sound.json",
+			"recipe_hash": "sha256:79d900c55f87ff82e0ecc034b00e7be1754998346c62b6519e72da274d33b318",
+			"audio_hash": "sha256:a67283218322c0b12001b673e521c73adc0e457b0dd4fe339390595dd006f819",
+			"loudness": -17.1,
+			"peak": -5.9
+		}
+	]
+}

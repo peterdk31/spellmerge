@@ -1,0 +1,23 @@
+{
+	"version": 1,
+	"layer": {
+		"source": "noise",
+		"color": "stepped",
+		"pitch": {
+			"from": 900,
+			"to": 160
+		},
+		"filter": {
+			"type": "band",
+			"from": 3400,
+			"q": 0.9
+		},
+		"drive": 2.5,
+		"amp": {
+			"attack": 0.004,
+			"shape": "perc",
+			"power": 1.3
+		}
+	},
+	"notes": "Lightning's crackle: fast stepped noise through a driven band at 3.4 kHz, sparks spitting and thinning."
+}

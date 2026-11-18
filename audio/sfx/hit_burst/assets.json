@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/hit_burst/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/hit_burst/hit_burst.sound.json",
+			"recipe_hash": "sha256:e9d812b4ab57a1c2be4ac7f558f27722f0a368c1135b63db78606122ca74ea7b",
+			"audio_hash": "sha256:d8b1164e71e4fcefcd5b281e73bba2994eda697be8f6371883160907518cd502",
+			"loudness": -20.5,
+			"peak": -4.8
+		},
+		{
+			"path": "audio/sfx/hit_burst/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/hit_burst/hit_burst.sound.json",
+			"recipe_hash": "sha256:e9d812b4ab57a1c2be4ac7f558f27722f0a368c1135b63db78606122ca74ea7b",
+			"audio_hash": "sha256:5e073b2ef15619c88b182426cc81678fd6d5f4c5e579ed2762db0f070a8a6720",
+			"loudness": -21.2,
+			"peak": -5.2
+		},
+		{
+			"path": "audio/sfx/hit_burst/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/hit_burst/hit_burst.sound.json",
+			"recipe_hash": "sha256:e9d812b4ab57a1c2be4ac7f558f27722f0a368c1135b63db78606122ca74ea7b",
+			"audio_hash": "sha256:44c103aff83f1d6bc1995d7d053149e86c2cf0ea1dbbafc83aa5597315c7caed",
+			"loudness": -21.3,
+			"peak": -4.2
+		},
+		{
+			"path": "audio/sfx/hit_burst/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/hit_burst/hit_burst.sound.json",
+			"recipe_hash": "sha256:e9d812b4ab57a1c2be4ac7f558f27722f0a368c1135b63db78606122ca74ea7b",
+			"audio_hash": "sha256:581fd36ffd3a8200f6c94b7b9e87189e0c2aa169076ea360a171f3ee6ad3390a",
+			"loudness": -21.0,
+			"peak": -5.1
+		}
+	]
+}

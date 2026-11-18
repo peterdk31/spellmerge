@@ -1,0 +1,63 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.5,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 17
+	},
+	"layers": [
+		{
+			"source": "partials",
+			"pitch": {
+				"from": 620,
+				"to": 700,
+				"curve": "linear"
+			},
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.5
+				},
+				{
+					"ratio": 2,
+					"gain": -9,
+					"decay": 0.35
+				},
+				{
+					"ratio": 3,
+					"gain": -16,
+					"decay": 0.2
+				}
+			],
+			"amp": {
+				"attack": 0.02
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 930,
+				"to": 1050
+			},
+			"start": 0.06,
+			"gain": -10,
+			"amp": {
+				"attack": 0.03,
+				"shape": "arch",
+				"power": 2.0
+			}
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.0
+		},
+		"lowpass": 6000
+	},
+	"notes": "A wizard healed: a soft, warm chime of harmonic partials rising a little, with a gentle fifth above it. Calm, never a ping that cuts through a fight."
+}

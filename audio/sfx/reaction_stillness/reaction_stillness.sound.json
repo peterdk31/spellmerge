@@ -1,0 +1,49 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.9,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 35
+	},
+	"layers": [
+		{
+			"patch": "frost_glass",
+			"pitch": 740,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 1.2
+				},
+				{
+					"ratio": 2.76,
+					"gain": -9,
+					"decay": 0.7
+				},
+				{
+					"ratio": 5.4,
+					"gain": -18,
+					"decay": 0.3
+				}
+			]
+		},
+		{
+			"patch": "void_swell",
+			"pitch": {
+				"from": 70,
+				"to": 55
+			},
+			"gain": -2
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.4,
+			"size": 1.6
+		}
+	},
+	"notes": "Stillness (frost and void): one low glass note held over a hollow swell, a hush rather than a strike."
+}

@@ -1,0 +1,44 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.55,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 37
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 90,
+				"to": 38
+			},
+			"length": 0.3,
+			"drive": 2.4,
+			"gain": -4,
+			"amp": {
+				"attack": 0.012,
+				"shape": "perc",
+				"power": 1.8
+			}
+		},
+		{
+			"patch": "fire_roar",
+			"gain": -3
+		},
+		{
+			"patch": "lightning_zap",
+			"start": 0.03,
+			"gain": -10
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		}
+	},
+	"notes": "Overload (fire and lightning): a dull, heavy thump of fire with a short electric snap on top."
+}

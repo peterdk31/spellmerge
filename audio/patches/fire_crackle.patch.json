@@ -1,0 +1,23 @@
+{
+	"version": 1,
+	"layer": {
+		"source": "noise",
+		"color": "stepped",
+		"pitch": {
+			"from": 90,
+			"to": 25
+		},
+		"filter": {
+			"type": "band",
+			"from": 3200,
+			"q": 0.9
+		},
+		"amp": {
+			"attack": 0.02,
+			"shape": "perc",
+			"power": 1.2
+		},
+		"gain": -6
+	},
+	"notes": "Fire's crackle: stepped noise through a band at 3.2 kHz, thinning from 90 to 25 pops a second."
+}

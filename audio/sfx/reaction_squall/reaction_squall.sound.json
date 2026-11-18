@@ -1,0 +1,31 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.6,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 44
+	},
+	"layers": [
+		{
+			"patch": "storm_gust"
+		},
+		{
+			"patch": "water_wash",
+			"filter": {
+				"from": 700,
+				"to": 2400
+			},
+			"gain": -3
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		}
+	},
+	"notes": "Squall (water and storm): a gust driving rain, wind over a bright wash."
+}

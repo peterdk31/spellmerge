@@ -1,0 +1,51 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.28,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 15
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 95,
+				"to": 40
+			},
+			"length": 0.2,
+			"drive": 1.5,
+			"gain": -4,
+			"amp": {
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 2.0
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "low",
+				"from": 1600,
+				"to": 300,
+				"q": 0.9
+			},
+			"amp": {
+				"attack": 0.004,
+				"shape": "perc",
+				"power": 1.8
+			},
+			"gain": -2
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.15,
+			"size": 0.7
+		}
+	},
+	"gain": -1,
+	"notes": "A burst catching a body: a dull, rounded pop, low-passed so several bodies caught at once thicken it rather than sharpen it; several play together, so it sits 1 dB under the family's level (gain -1)."
+}

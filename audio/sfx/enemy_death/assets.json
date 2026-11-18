@@ -1,0 +1,43 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/enemy_death/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/enemy_death/enemy_death.sound.json",
+			"recipe_hash": "sha256:fc02c17fa689c4a77f20d368485a1c38a6d8a7529be05493b65d28759f250b4d",
+			"audio_hash": "sha256:eafffe7564dc69d43cbe20ee586163d3c56d328556ad4ce6113cb2704a4016cb",
+			"loudness": -17.0,
+			"peak": -3.6
+		},
+		{
+			"path": "audio/sfx/enemy_death/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/enemy_death/enemy_death.sound.json",
+			"recipe_hash": "sha256:fc02c17fa689c4a77f20d368485a1c38a6d8a7529be05493b65d28759f250b4d",
+			"audio_hash": "sha256:a1bd209b899426792605dec0893001d977b33acdf8d6d91b71d25acd0b197774",
+			"loudness": -16.9,
+			"peak": -4.0
+		},
+		{
+			"path": "audio/sfx/enemy_death/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/enemy_death/enemy_death.sound.json",
+			"recipe_hash": "sha256:fc02c17fa689c4a77f20d368485a1c38a6d8a7529be05493b65d28759f250b4d",
+			"audio_hash": "sha256:46583d5cda464e5e88abb7c4204a1a89aa0a6915bdd9967675b7504b5d576222",
+			"loudness": -17.1,
+			"peak": -3.1
+		}
+	]
+}

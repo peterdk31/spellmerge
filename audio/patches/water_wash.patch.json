@@ -1,0 +1,19 @@
+{
+	"version": 1,
+	"layer": {
+		"source": "noise",
+		"filter": {
+			"type": "low",
+			"from": 450,
+			"to": 1700,
+			"curve": "arch",
+			"q": 1.1
+		},
+		"amp": {
+			"attack": 0.03,
+			"shape": "arch",
+			"power": 1.3
+		}
+	},
+	"notes": "Water's wash: soft low-passed noise that opens and closes, a wave sliding in and out."
+}

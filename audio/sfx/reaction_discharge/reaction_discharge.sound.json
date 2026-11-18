@@ -1,0 +1,56 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.45,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 39
+	},
+	"layers": [
+		{
+			"patch": "lightning_crackle",
+			"start": 0.015,
+			"length": 0.35,
+			"gain": -10
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 4200,
+				"to": 2400,
+				"q": 1.0
+			},
+			"length": 0.3,
+			"amp": {
+				"attack": 0.025,
+				"shape": "perc",
+				"power": 1.0
+			}
+		},
+		{
+			"patch": "lightning_zap",
+			"start": 0.04,
+			"gain": -11
+		},
+		{
+			"patch": "lightning_zap",
+			"start": 0.13,
+			"pitch": {
+				"from": 1100,
+				"to": 150
+			},
+			"gain": -14
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.2,
+			"size": 0.9
+		},
+		"lowpass": 8000
+	},
+	"notes": "Discharge (lightning): a crackle of sparks and two quick zaps, the charge jumping on. Heard in every fight with lightning, so it is short and kept below a hiss."
+}

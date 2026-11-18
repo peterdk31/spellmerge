@@ -123,12 +123,6 @@ Not kept here any more: each question is an issue labelled `owner-question` (doc
 
 Sounds the game asks for by id and does not have yet. A missing sound is silent (`Registry.get_sound` returns `null`), never an error. Claude makes each one itself (synthesised from code) or the owner commissions it; a player's suggestion for one comes in through the intake. Files are `.ogg` in `audio/`, listed in `audio/manifest.json`; the id is the file name without the extension.
 
-- **`cast`** (M1 part 10). The sound of a wizard releasing a spell: a short, soft whoosh, under 0.5 s. Heard every cast, from up to four players, so it must not tire the ear.
-- **`hit`** (M1 part 16). A projectile or spell landing on an enemy: a short, dry impact, under 0.3 s. Heard many times a second in a fight.
-- **`enemy_death`** (M1 part 16). An enemy dying: a small burst or fizz, under 0.6 s, clearly different from `hit`.
-- **`player_downed`** (M1 part 16). A wizard going down: a low, soft thud or sigh, under 0.8 s, calm rather than alarming.
-
-- **`reaction_discharge`, `reaction_overload`, `reaction_superconduct`** (#243 part 2). Feel asks for each by id when the reaction fires and nothing plays until the `.ogg` is in `audio/sfx/`. Same family as the six older `reaction_<id>` sounds (none exists yet): short (under 0.4 s), a crackle for the discharge, a dull thump for overload, a glassy ping for superconduct. Heard in every fight with lightning, so they must not tire.
 - **`possess`** (actors G9). A possession starting: Feel plays it on `possess_started` (the `possess_start` cue's sound), and the `possess` card names it; silent until the `.ogg` exists. A short, eerie swell or reversed whoosh, under 0.5 s, that says "someone else drives this body now", clearly apart from `cast` and `hit`. Rare (a dear card, one possession per cast), so it may stand out more than the cast sound.
 
 ## Foundation

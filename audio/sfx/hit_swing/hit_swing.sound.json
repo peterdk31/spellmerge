@@ -1,0 +1,53 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.26,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 14
+	},
+	"layers": [
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 130,
+				"to": 42
+			},
+			"length": 0.2,
+			"drive": 3.0,
+			"gain": -3,
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.8
+			}
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1300,
+				"to": 400,
+				"q": 1.0
+			},
+			"length": 0.14,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 2.0
+			},
+			"drive": 2.0,
+			"gain": -4
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.12,
+			"size": 0.6
+		},
+		"lowpass": 5000
+	},
+	"notes": "A staff's swing striking: a heavier, lower whack than a shot's hit, with a wide, dull body of noise. Rarer than a shot's hit, so it may weigh more."
+}

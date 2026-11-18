@@ -1,0 +1,56 @@
+{
+	"assets": [
+		{
+			"path": "audio/sfx/hit_reaction/variants/1.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/hit_reaction/hit_reaction.sound.json",
+			"recipe_hash": "sha256:5d24de8345080f81e858310873d4379d472ccead71acb58d7f1930864f0198ce",
+			"audio_hash": "sha256:a4c928676967b4c9929161369bbc932d08589e17f240255b98e4abadc22d3002",
+			"loudness": -24.3,
+			"peak": -4.6
+		},
+		{
+			"path": "audio/sfx/hit_reaction/variants/2.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/hit_reaction/hit_reaction.sound.json",
+			"recipe_hash": "sha256:5d24de8345080f81e858310873d4379d472ccead71acb58d7f1930864f0198ce",
+			"audio_hash": "sha256:b82456acdad346c11a6d3390b0f1ba0d9e1f7df27c6f603aa358b581d777668f",
+			"loudness": -24.0,
+			"peak": -5.2
+		},
+		{
+			"path": "audio/sfx/hit_reaction/variants/3.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/hit_reaction/hit_reaction.sound.json",
+			"recipe_hash": "sha256:5d24de8345080f81e858310873d4379d472ccead71acb58d7f1930864f0198ce",
+			"audio_hash": "sha256:e2bd9e277f925b332d344a2bda1ad05a7ea3ff65f7a3ae4ff69d885006846bdd",
+			"loudness": -23.7,
+			"peak": -5.0
+		},
+		{
+			"path": "audio/sfx/hit_reaction/variants/4.ogg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "tools/sound.py (procedural synthesis, generator 1)",
+			"prompt": "audio/sfx/hit_reaction/hit_reaction.sound.json",
+			"recipe_hash": "sha256:5d24de8345080f81e858310873d4379d472ccead71acb58d7f1930864f0198ce",
+			"audio_hash": "sha256:cc5370ac9c0dddc9ed450516cf74c97f7468fdb4eaaa9487295337138ea7d204",
+			"loudness": -24.0,
+			"peak": -4.6
+		}
+	]
+}

@@ -1,0 +1,34 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.7,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 34
+	},
+	"layers": [
+		{
+			"patch": "void_swell",
+			"length": 0.5
+		},
+		{
+			"patch": "fire_roar",
+			"start": 0.12,
+			"gain": -4
+		},
+		{
+			"patch": "fire_crackle",
+			"start": 0.14,
+			"gain": -3
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		}
+	},
+	"notes": "Kindle (fire and void): a low, hollow swell that catches into fire, its roar and crackles rising out of it."
+}

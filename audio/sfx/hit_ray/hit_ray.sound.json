@@ -1,0 +1,46 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.12,
+	"vary": {
+		"pitch": 0.05,
+		"time": 0.08,
+		"seed": 13
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 3600,
+				"to": 1800,
+				"q": 1.6
+			},
+			"amp": {
+				"attack": 0.008,
+				"shape": "perc",
+				"power": 1.8
+			}
+		},
+		{
+			"source": "sine",
+			"pitch": {
+				"from": 700,
+				"to": 420
+			},
+			"length": 0.06,
+			"gain": -10,
+			"amp": {
+				"attack": 0.002,
+				"shape": "perc",
+				"power": 2.0
+			}
+		}
+	],
+	"fx": {
+		"lowpass": 7000
+	},
+	"gain": -5,
+	"notes": "A ray touching a body: a light sizzle with a tiny falling tick. A ray hits many times a second, so it sits 5 dB under the family's level (gain -5) and is the softest of the hits."
+}

@@ -1,0 +1,23 @@
+{
+	"version": 1,
+	"layer": {
+		"source": "saw",
+		"pitch": {
+			"from": 1400,
+			"to": 180
+		},
+		"crush": 6,
+		"filter": {
+			"type": "band",
+			"from": 2600,
+			"to": 900,
+			"q": 1.2
+		},
+		"amp": {
+			"attack": 0.001,
+			"shape": "perc",
+			"power": 3.0
+		}
+	},
+	"notes": "Lightning's zap: a crushed saw falling fast through a band, a short electric snap."
+}

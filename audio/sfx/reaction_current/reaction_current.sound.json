@@ -1,0 +1,47 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.6,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 40
+	},
+	"layers": [
+		{
+			"patch": "water_wash",
+			"gain": -2
+		},
+		{
+			"source": "square",
+			"duty": 0.3,
+			"pitch": {
+				"from": 120,
+				"to": 90
+			},
+			"filter": {
+				"type": "band",
+				"from": 900,
+				"q": 1.5
+			},
+			"amp": {
+				"attack": 0.01,
+				"shape": "perc",
+				"power": 1.4
+			},
+			"gain": -12
+		},
+		{
+			"patch": "lightning_zap",
+			"gain": -10
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		}
+	},
+	"notes": "Current (water and lightning): a wash of water buzzing with a low electric hum and a zap."
+}

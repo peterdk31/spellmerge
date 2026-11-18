@@ -1,0 +1,30 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.7,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 43
+	},
+	"layers": [
+		{
+			"patch": "water_wash",
+			"length": 0.35,
+			"gain": -4
+		},
+		{
+			"patch": "frost_glass",
+			"pitch": 1040,
+			"start": 0.1
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		}
+	},
+	"notes": "Rime (water and frost): a wash of water caught short by a glass ping as it freezes."
+}

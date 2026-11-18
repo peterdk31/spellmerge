@@ -1,0 +1,50 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "big",
+	"seconds": 0.6,
+	"vary": {
+		"pitch": 0.03,
+		"time": 0.06,
+		"seed": 32
+	},
+	"layers": [
+		{
+			"patch": "frost_glass",
+			"pitch": {
+				"from": 980,
+				"to": 760
+			},
+			"gain": -4
+		},
+		{
+			"patch": "fire_roar",
+			"filter": {
+				"from": 1400,
+				"to": 500
+			},
+			"gain": -4
+		},
+		{
+			"source": "noise",
+			"filter": {
+				"type": "high",
+				"from": 3000,
+				"q": 0.7
+			},
+			"start": 0.08,
+			"amp": {
+				"shape": "arch",
+				"power": 2.0
+			},
+			"gain": -16
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.3,
+			"size": 1.2
+		}
+	},
+	"notes": "Thaw (fire and frost): a glass ping sagging in pitch as a soft roar takes it, and a hiss of steam after."
+}

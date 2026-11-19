@@ -507,7 +507,7 @@ func test_a_room_sets_the_ambient() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
-	bus.room_entered.emit(dark.id)
+	bus.room_entered.emit(dark.id, 0)
 	check(is_equal_approx(feel.light().ambient, 0.85), "the darker room's ambient")
 	check(is_equal_approx(float((feel.light().apply.material as ShaderMaterial).get_shader_parameter(&"ambient")), 0.85), "to the rect")
 	check(feel.light().shade.is_equal_approx(Color(0.8, 0.9, 1.0)), "the darker room's dark's colour (atmosphere A)")
@@ -516,7 +516,7 @@ func test_a_room_sets_the_ambient() -> void:
 	bus.spell_light_changed.emit(true)
 	check(is_equal_approx(feel.light().ambient, 0.85), "kept through the setting")
 	check(feel.light().shade.is_equal_approx(Color(0.8, 0.9, 1.0)), "its colour too")
-	bus.room_entered.emit(plain.id)
+	bus.room_entered.emit(plain.id, 0)
 	check(is_equal_approx(feel.light().ambient, 1.0), "the plain room's")
 	check(feel.light().shade.is_equal_approx(Color.WHITE), "an even dark again")
 

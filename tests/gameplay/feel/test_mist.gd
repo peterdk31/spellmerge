@@ -303,8 +303,8 @@ func test_a_room_names_feel_its_mist_drawn_only_with_spell_light() -> void:
 	var spectacle: SpectacleScript = feel.spectacle()
 	var room := registry.get_resource(&"rooms", &"arena_04") as RoomBase
 	bus.spell_light_changed.emit(true)
-	bus.room_built.emit(room.id, own(room.build(null)) as Node)
-	bus.room_entered.emit(room.id)
+	bus.room_built.emit(room.id, 0, own(room.build(null)) as Node)
+	bus.room_entered.emit(room.id, 0)
 	var mist: MistScript = spectacle.mist
 	check(mist != null, "spell light on: the mist is made")
 	check(mist.mist == room.mist and mist.visible, "the room's mist is drawn")

@@ -65,7 +65,7 @@ func after_each() -> void:
 	await commands_applied()
 
 
-func _on_room_cleared(_room_id: StringName) -> void:
+func _on_room_cleared(_room_id: StringName, _number: int) -> void:
 	cleared += 1
 
 

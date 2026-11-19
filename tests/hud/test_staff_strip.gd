@@ -60,7 +60,7 @@ func before_each() -> void:
 	own(_hud)
 	for player in 4:
 		_bus.player_joined.emit(player)
-	_bus.room_entered.emit(&"arena_01")
+	_bus.room_entered.emit(&"arena_01", 0)
 
 
 ## The actor id of `player`'s own wizard: what Spells keeps its staffs by.

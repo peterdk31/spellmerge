@@ -369,7 +369,7 @@ func test_feel_blocks_light_by_the_room_and_draws_shadows_only_with_spell_light(
 	check(spectacle.get("shadows") != null, "spell light on: the bodies' shadows are drawn")
 	var room := registry.get_resource(&"rooms", &"arena_03") as RoomBase
 	var layout: Node = room.build()
-	bus.room_built.emit(room.id, layout)
+	bus.room_built.emit(room.id, 0, layout)
 	layout.free()
 	feel._process(FRAME)
 	var light: SpellLightScript = spectacle.get("light")

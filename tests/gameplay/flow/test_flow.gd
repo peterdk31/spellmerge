@@ -54,8 +54,8 @@ func before_each() -> void:
 	entered.clear()
 	cleared.clear()
 	room_cues.clear()
-	_listen("room_entered", func(id: StringName) -> void: entered.append(id))
-	_listen("room_cleared", func(id: StringName) -> void: cleared.append(id))
+	_listen("room_entered", func(id: StringName, _number: int) -> void: entered.append(id))
+	_listen("room_cleared", func(id: StringName, _number: int) -> void: cleared.append(id))
 	_listen("cue_shown", func(caster: int, cue: StringName, _at: Vector2, _d: Vector2, _s: float, _t: Color, _l: int) -> void:
 		if cue == FlowScript.ROOM_START_CUE:
 			room_cues.append(caster))

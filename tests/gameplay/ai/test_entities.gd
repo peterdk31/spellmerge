@@ -515,7 +515,7 @@ func test_a_new_room_clears_every_entity_quietly() -> void:
 	_setup(1)
 	_spawn(0, EntitiesScript.FAMILIAR, Vector2.ZERO)
 	_spawn(0, EntitiesScript.DECOY, Vector2(5.0, 0.0))
-	world.bus.room_entered.emit(&"next")
+	world.bus.room_entered.emit(&"next", 0)
 	check(entities.count() == 0 and ended.is_empty(), "a new room clears every entity without entity_ended")
 	check(entities.decoy_of(0) == null, "its decoys are gone")
 

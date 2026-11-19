@@ -66,8 +66,8 @@ func _feel() -> Array:
 ## The room `id` built and entered.
 func _enter(bus: EventsScript, id: StringName) -> void:
 	var room := registry.get_resource(&"rooms", id) as RoomBase
-	bus.room_built.emit(room.id, own(room.build(null)) as Node)
-	bus.room_entered.emit(room.id)
+	bus.room_built.emit(room.id, 0, own(room.build(null)) as Node)
+	bus.room_entered.emit(room.id, 0)
 
 
 func _frames(feel: FeelScript, count: int) -> void:
@@ -239,7 +239,7 @@ func test_ambient_particles_off_gives_off_no_air_mid_room() -> void:
 	var feel: FeelScript = made[1]
 	var air: AirMotesScript = feel.spectacle().air
 	bus.spell_light_changed.emit(true)
-	bus.room_entered.emit(&"arena_01")
+	bus.room_entered.emit(&"arena_01", 0)
 	_frames(feel, 60)
 	check(air.given > 0, "on: the room's dust is given off")
 	bus.ambient_particles_changed.emit(false)

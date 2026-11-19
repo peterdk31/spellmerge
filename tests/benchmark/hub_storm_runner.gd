@@ -185,7 +185,7 @@ func _exit_tree() -> void:
 		OS.remove_logger(_log)
 
 
-func _on_loaded(_room_id: StringName) -> void:
+func _on_loaded(_room_id: StringName, _room: int) -> void:
 	_start()
 
 

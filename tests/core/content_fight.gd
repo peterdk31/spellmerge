@@ -239,8 +239,8 @@ func _lay_cover() -> void:
 	field.offset_right = COVER_FIELD.end.x
 	field.offset_bottom = COVER_FIELD.end.y
 	layout.add_child(field)
-	fight.bus.room_built.emit(COVER_ROOM, layout)
-	fight.bus.room_entered.emit(COVER_ROOM)
+	fight.bus.room_built.emit(COVER_ROOM, 0, layout)
+	fight.bus.room_entered.emit(COVER_ROOM, 0)
 	layout.free()
 
 

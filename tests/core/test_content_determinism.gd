@@ -17,6 +17,7 @@ extends "res://tests/support/suite.gd"
 
 const ContentFight := preload("res://tests/core/content_fight.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const BiomeFight := preload("res://tests/support/biome_fight.gd")
 
 ## Ticks a fight runs (five seconds of game).
 const TICKS: int = 300
@@ -55,6 +56,47 @@ func test_a_room_with_holes_plays_the_same_twice_and_through_a_snapshot() -> voi
 				# The fight really falls: its movers dash and jump into the pit.
 				var falls: int = int(_play(ContentFight.CARD, card, holes, TICKS)[3])
 				check(falls > 0, "the %s fight has bodies fall into a hole (%d)" % [id, falls])
+
+
+## Connected biomes CB3: a party split into two sealed fights at once in a biome (the split test map,
+## tests/support/biome_fight.gd) plays the same twice and through a snapshot: the rooms' life (who is
+## where, entered, sealed, cleared, asleep), both fights' queues and the bodies crossing mouths.
+func test_a_split_party_in_two_sealed_fights_plays_the_same_twice_and_through_a_snapshot() -> void:
+	var at: int = 150
+	var fight := BiomeFight.new(root)
+	var first := Desync.new()
+	var snapshot: Snapshot = fight.play(TICKS, at, first)
+	check(fight.both_sealed, "the party split into two sealed fights at once")
+	check(snapshot != null, "the snapshot was taken")
+	if snapshot == null:
+		return
+	for problem in snapshot.problems:
+		check(false, "the biome's snapshot: %s" % problem)
+	var second := Desync.new()
+	fight.play(TICKS, -1, second)
+	var tick: int = Desync.first_parting(first, second)
+	if tick >= 0:
+		var a := Desync.new(tick)
+		var b := Desync.new(tick)
+		fight.play(TICKS, -1, a)
+		fight.play(TICKS, -1, b)
+		check(false, "the biome played twice: %s" % Desync.compare(a, b))
+	var resumed := Desync.new()
+	fight.resume(snapshot, at, TICKS, resumed)
+	for problem in fight.problems:
+		check(false, problem)
+	check_equal(resumed.hashes.size(), TICKS - at - 1, "the restored biome played every tick after the snapshot")
+	var after := Desync.new()
+	after.hashes = first.hashes.slice(at + 1)
+	tick = Desync.first_parting(after, resumed)
+	if tick >= 0:
+		var kept := Desync.new(at + 1 + tick)
+		fight.play(TICKS, -1, kept)
+		kept.hashes = kept.hashes.slice(at + 1)
+		kept.keep_tick = tick
+		var again := Desync.new(tick)
+		fight.resume(snapshot, at, TICKS, again)
+		check(false, "the biome restored from tick %d parts %d ticks after: %s" % [at, tick + 1, Desync.compare(kept, again)])
 
 
 func _card(id: StringName) -> Resource:

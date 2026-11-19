@@ -142,7 +142,7 @@ func _enter(id: StringName, ambience: Ambience) -> void:
 	var rooms: Dictionary = reg.extra.get(&"rooms", {})
 	rooms[id] = room
 	reg.extra[&"rooms"] = rooms
-	fx.bus.room_entered.emit(id)
+	fx.bus.room_entered.emit(id, 0)
 
 
 # --- The data -------------------------------------------------------------------------------------
@@ -449,7 +449,7 @@ func test_back_to_the_menu_the_ambience_and_the_music_fade_out() -> void:
 	room.ambience = crypt
 	room.music = track
 	reg.extra[&"rooms"] = {room.id: room}
-	fx.bus.room_entered.emit(room.id)
+	fx.bus.room_entered.emit(room.id, 0)
 	for i in int(3.0 / FRAME):
 		_fstep(feel, FRAME)
 	var player: RoomAmbienceScript = feel.ambience()

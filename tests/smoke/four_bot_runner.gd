@@ -169,7 +169,7 @@ func _watch_builder() -> void:
 		_idler_downed_at_close = _downed[IDLER]
 
 
-func _on_room_entered(_room_id: StringName) -> void:
+func _on_room_entered(_room_id: StringName, _room: int) -> void:
 	_entered += 1
 	print("SMOKE: room_entered (%.1f game seconds)" % _elapsed)
 	_bots[IDLER].open_builder()
@@ -178,7 +178,7 @@ func _on_room_entered(_room_id: StringName) -> void:
 			_builds_failed.append("bot %d could not build a spell" % (index + 1))
 
 
-func _on_room_cleared(_room_id: StringName) -> void:
+func _on_room_cleared(_room_id: StringName, _room: int) -> void:
 	_cleared += 1
 	if _settle < 0:
 		_settle = SETTLE_FRAMES

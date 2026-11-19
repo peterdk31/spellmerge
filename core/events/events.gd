@@ -26,6 +26,14 @@ extends Node
 ##
 ## "No actor" (`Actors.NONE`): the world, where no actor did it. Also "no seat".
 const NO_PLAYER: int = -1
+## The rooms of a world (connected biomes CB3, "Room events"): `room_entered`, `room_left`,
+## `room_cleared`, `room_built` and `room_items_placed` name the room by number, a biome's by its
+## place in the map (`BiomeMap`: 0 its start room; a bridge numbered after the rooms), a row run's
+## FIRST_ROOM (every room of it stands alone in a world laid anew). FIRST_ROOM entered is a new world:
+## what a listener keeps of the world (decoys, revives, the camera, the ground's items) starts over
+## then, and only then. ALL_ROOMS: every room of the world at once (`room_left` as the world goes).
+const FIRST_ROOM: int = 0
+const ALL_ROOMS: int = -1
 ## The kinds of number `damage_number_shown` tells (props W5): a hit, a heal, and a hit that took
 ## nothing (an invincible actor). Its sender and its listener both name them from here.
 const NUMBER_HIT: StringName = &"hit"
@@ -429,15 +437,22 @@ signal run_room_chosen(room_id: StringName, enemies: Array[StringName], ways: Ar
 signal run_map_changed(rows: PackedInt32Array, kinds: Array[StringName], links: Array[PackedInt32Array], at: int)
 ## Sender: flow. The party leaves the run's room it is in for the next (run generation RG4), before
 ## anything of it goes: what was cast in it ends quietly with it. Heard by core/spells (`leave_room`:
-## carriers, holds, waiting launches and moves end; builds stay).
-signal room_left()
+## carriers, holds, waiting launches and moves end; builds stay). `room`: the room left (FIRST_ROOM
+## in a row run); a biome's party never leaves a room as a whole, so a biome sends it only as its
+## world goes, for ALL_ROOMS (connected biomes CB3).
+signal room_left(room: int)
 ## Sender: flow. Every standing wizard stands in the lit exit of way `way` (0 = the leftmost of the
 ## room's ways; run generation RG4): the party goes on. Heard by run, which moves on through the map
 ## to that room and answers with `run_room_chosen`. Not a command: stepping in is position only.
 signal run_way_taken(way: int)
-## Sender: flow. The players entered the room `room_id`.
-signal room_entered(room_id: StringName)
-## Sender: flow (`_lay_out`, ground cover GC2). The room `room_id` was laid out: `layout_root` is the
+## Sender: flow. The players entered the room `room_id` (its template), the world's room `room`
+## (`FIRST_ROOM`, ...): a row run's each room, a biome's each room the first time a wizard steps into
+## it (its start room as the biome starts). Entering FIRST_ROOM is entering a new world (see
+## FIRST_ROOM); never sent by a restore.
+signal room_entered(room_id: StringName, room: int)
+## Sender: flow (`_lay_out`, ground cover GC2; a biome's pieces as `BiomeWorld` lays them, connected
+## biomes CB3: every room and bridge, `room` its number, FIRST_ROOM first). The room `room_id` was
+## laid out: `layout_root` is the
 ## layout the game shows, built and read but not yet in the tree, its placements and zones still in it
 ## (the cover's fields). Sent whenever a room is laid out: a run's start, each room entered, and a
 ## snapshot restored into another room (`Flow.rebuild_derived`); a restore into the room shown sends
@@ -447,7 +462,9 @@ signal room_entered(room_id: StringName)
 ## (connected biomes CB4, gameplay/feel/ground/ground_layout.gd) puts the ground drawn from the room's
 ## shape on its `Floor` (textures) and makes its rims' and drips' mote lines again; so no listener reads
 ## the `Floor`'s art or its mote lines here (they read the walls, holes and places, which it leaves).
-signal room_built(room_id: StringName, layout_root: Node)
+## In a biome the layout is placed where the piece stands (its `position`, and its mirroring's meta,
+## `PieceShape.GROUND_MIRROR_META`), and one room's cover is played (Cover's, FIRST_ROOM's; CB3).
+signal room_built(room_id: StringName, room: int, layout_root: Node)
 ## Sender: core/spells (ground cover GC5, rule 5). An element of a spell touched the floor: `element`
 ## (a card id, &"fire") within `radius` of `at`, by the actor `caster` (NO_PLAYER for none). Sent
 ## where a blast or a pulse's ring goes off, as a pool lies and on each of its ticks
@@ -476,8 +493,8 @@ signal loading_started()
 signal loading_progressed(done: int, total: int)
 ## Sender: core/loading. The load is over (done, or cancelled). Heard by hud.
 signal loading_finished()
-## Sender: flow. The room `room_id` was cleared: every enemy the run stood in it is down (boss OB2a: no waves). Its exits light (run generation RG4); the run's last room cleared wins the run.
-signal room_cleared(room_id: StringName)
+## Sender: flow. The room `room_id` (the world's room `room`) was cleared: every enemy the run stood in it is down (boss OB2a: no waves). Its exits light (run generation RG4); the run's last room cleared wins the run. In a biome each fight room's own (connected biomes CB3), sent once.
+signal room_cleared(room_id: StringName, room: int)
 ## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
 ## teleporter stone (a prop of the role `run_start`, where its area is; `HubRules`); `lit` while all of them do (and at least one is there),
 ## when any seat's A starts the run (`run_requested`). Sent as the hub starts and whenever it
@@ -511,8 +528,10 @@ signal room_exits_shown(at: PackedVector2Array, kinds: Array[StringName])
 ## where each lies, in the scene's order. Sent once each room is made: after the run's start, and as
 ## the party goes on into the next room of the run (run generation RG4: what lay in the room left goes).
 ## Heard by items, which lays them on the ground (or, the run taking along what lay on that room's
-## ground, `Frames.next_run_ground`, that instead).
-signal room_items_placed(room_id: StringName, items: Array[Resource], at: PackedVector2Array)
+## ground, `Frames.next_run_ground`, that instead). `room`: the world's room (Events.FIRST_ROOM...);
+## only FIRST_ROOM's clears what lay on the ground before (a new world): a biome's later rooms add
+## theirs, at their places in the world (connected biomes CB3: what was left on a floor stays).
+signal room_items_placed(room_id: StringName, room: int, items: Array[Resource], at: PackedVector2Array)
 ## Sender: an actor's Inventory (gameplay/actor). Lay `stack` (gone from the inventory already) on
 ## the ground beside the actor `actor` (items I6: a card given back to a full bag). Heard by items,
 ## which finds the spot; heard by nobody, the stack is lost.

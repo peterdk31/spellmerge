@@ -307,7 +307,7 @@ func _room(music: MusicTrack) -> void:
 	var rooms: Dictionary = reg.extra.get(&"rooms", {})
 	rooms[room.id] = room
 	reg.extra[&"rooms"] = rooms
-	fx.bus.room_entered.emit(room.id)
+	fx.bus.room_entered.emit(room.id, 0)
 
 
 func _poll(feel: FeelScript) -> void:

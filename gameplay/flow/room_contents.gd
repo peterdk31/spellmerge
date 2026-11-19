@@ -72,6 +72,12 @@ static func items_of(places: RoomPlaces) -> Array:
 ## is), in order, then the props of `registry` its role zones place (`stand_in_role_zones`).
 func stand(world: Node2D, places: RoomPlaces, registry: RegistryScript) -> void:
 	clear()
+	stand_more(world, places, registry)
+
+
+## As `stand`, keeping what stands already (a biome's every room, one after another: connected
+## biomes CB3).
+func stand_more(world: Node2D, places: RoomPlaces, registry: RegistryScript) -> void:
 	for i in places.placed.size():
 		bodies.append(_stand(world, places, i))
 	stand_in_role_zones(world, places, registry)

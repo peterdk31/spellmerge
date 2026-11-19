@@ -511,8 +511,10 @@ signal room_cleared(room_id: StringName, room: int)
 ## Sender: flow (connected biomes CB11). The biome's room `room` was cleared and its kind rewards a
 ## clear: each player rolls a reward from the table `table` (`RoomKind.rewards`, content/rewards),
 ## however its foes left it (the owner, 2026-11-19: a possessed foe killed elsewhere too). Sent right
-## after `room_cleared`, once a room. Heard by rewards.
-signal room_rewards_due(room: int, table: StringName)
+## after `room_cleared`, once a room. `type`: the room's reward type (`RewardType.to_row`: item kind,
+## card kind, element; empty names for any), a reward room's decided as its biome was made (the
+## owner's ask of 2026-11-19), every other room's any. Heard by rewards.
+signal room_rewards_due(room: int, table: StringName, type: PackedStringArray)
 ## Sender: flow (connected biomes CB11, decisions 19 and 20). The biome's room `room` of a special
 ## fill (`RoomKind.FILL_SHOP`, `FILL_FOUNTAIN`) was entered for the first time: `table` the shop's
 ## shelf table (`RoomKind.shelf`; empty for a fountain), `area` the fountain's pool in world pixels

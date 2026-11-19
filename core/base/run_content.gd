@@ -14,14 +14,24 @@ var kinds: Dictionary = {}
 var rooms: Array[RoomBase] = []
 ## Every enemy and boss, in id order (`EnemyBase.boss` tells them apart).
 var enemies: Array[EnemyBase] = []
+## The reward tables by id (`RewardTable`, content/rewards) and the cards a reward may give
+## (`RewardCards`): what a reward room's type is decided from as the biome is made (the owner's ask
+## of 2026-11-19). Empty: no room is typed.
+var reward_tables: Dictionary = {}
+var cards: RewardCards = RewardCards.new()
 
 
-## The content in `of_kinds`, `of_rooms` and `of_enemies` (each what the registry's `get_all` gives
+## The content in `of_kinds`, `of_rooms`, `of_enemies`, `of_tables` and `of_cards` (each what the registry's `get_all` gives
 ## for its folder, so in id order; for the enemies the folders of `EnemyBase.FOLDERS` one after the
 ## other). What is not of the folder's class is left out, and so is an id met before (an enemy and a
 ## boss of one id: the first folder's, as the game finds it).
-static func gather(of_kinds: Array[Resource], of_rooms: Array[Resource], of_enemies: Array[Resource]) -> RunContent:
+static func gather(of_kinds: Array[Resource], of_rooms: Array[Resource], of_enemies: Array[Resource], of_tables: Array[Resource] = [], of_cards: Array[Resource] = []) -> RunContent:
 	var made := RunContent.new()
+	for item: Resource in of_tables:
+		var table := item as RewardTable
+		if table != null and table.id != &"" and not made.reward_tables.has(table.id):
+			made.reward_tables[table.id] = table
+	made.cards = RewardCards.gather(of_cards)
 	for item: Resource in of_kinds:
 		var kind := item as RoomKind
 		if kind != null and kind.id != &"" and not made.kinds.has(kind.id):
@@ -47,6 +57,11 @@ func kind_ids() -> Array[StringName]:
 		ids.append(id)
 	ids.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
 	return ids
+
+
+## The reward table `id`, or null when there is none.
+func reward_table(id: StringName) -> RewardTable:
+	return reward_tables.get(id) as RewardTable
 
 
 ## The room kind `id`, or null when there is none.

@@ -12,6 +12,7 @@ const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const MouthSymbolsScript := preload("res://gameplay/feel/mouth_symbols.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
 const PartyMapViewScript := preload("res://gameplay/feel/party_map_view.gd")
+const RewardGlyphsScript := preload("res://gameplay/feel/reward_glyphs.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -377,3 +378,74 @@ func test_a_restore_into_the_world_shown_draws_the_dark_as_it_stands() -> void:
 	check_equal(dark.stage_of(WEST), 0, "the antechamber lit at once")
 	check_equal(dark.stage_of(EAST), 0, "the court too")
 	check(not dark.is_moving(), "nothing played in")
+
+
+## A reward room's type (the owner's ask of 2026-11-19, `RewardType`): its mouth's sign tells it
+## beside the kind symbol (its item kind, card kind and element, a glyph each), rising with it by
+## rows in whole pixels; the held map shows it under the room's symbol; a room of no type tells only
+## its kind.
+func test_a_reward_rooms_mouth_and_the_map_tell_its_type() -> void:
+	var map: BiomeMap = BiomeMaps.split(registry, [0, 0, 0] as Array[int], [BiomeMaps.FIRST, BiomeMaps.MIDDLE, BiomeMaps.LAST] as Array[StringName], [&"reward", &"start", &"fight"] as Array[StringName])
+	map.type_room(WEST, RewardType.make(ItemKinds.CARD, &"element", &"fire"))
+	input.add_virtual_device(0)
+	var fights: Array[RoomFight] = [RoomFight.new(), RoomFight.new(), RoomFight.new()]
+	check(flow.start_biome(0, map, fights), "the biome starts")
+	tick.run(DT)
+	var mouths: MouthLooksScript = feel.call(&"mouth_looks") as MouthLooksScript
+	var symbols: MouthSymbolsScript = feel.call(&"mouth_symbols") as MouthSymbolsScript
+	mouths.step(0.0, _grid())
+	symbols.step(0.0, actors, 1, _grid())
+	check(_hearing().type_of(WEST) != null and _hearing().type_of(WEST).same_as(map.reward_type_of(WEST)), "the view hears the reward room's type from its layout")
+	check(_hearing().type_of(EAST) == null, "a fight room has none")
+	var into_west: int = -1
+	for mouth in mouths.mouths():
+		if mouths.room_of(mouth) == WEST:
+			into_west = mouth
+			check_equal(symbols.glyphs_of(mouth), 3, "the reward room's mouth tells its item kind, card kind and element")
+			var corner: Vector2 = symbols.glyph_corner_of(mouth)
+			check_equal(corner, corner.floor(), "in whole pixels")
+			var glyphs := Rect2(corner, Vector2(RewardGlyphsScript.row_width(3), RewardGlyphsScript.SIDE)) if Rect2(mouths.area_of(mouth)).size.x > Rect2(mouths.area_of(mouth)).size.y else Rect2(corner, Vector2(RewardGlyphsScript.SIDE, RewardGlyphsScript.row_width(3)))
+			check(not glyphs.intersects(Rect2(mouths.area_of(mouth))), "beside the symbol, outside the mouth")
+			check(not glyphs.intersects(Rect2(symbols.corner_of(mouth), Vector2.ONE * RoomKind.SYMBOL_SIDE)), "and clear of the symbol")
+		else:
+			check_equal(symbols.glyphs_of(mouth), 0, "a mouth into a room of no type tells only its kind")
+	check(into_west >= 0, "a mouth leads into the reward room")
+	_wizard(0).global_position = Rect2(mouths.area_of(into_west)).get_center() + Vector2(40.0, 0.0)
+	symbols.step(0.0, actors, 1, _grid())
+	var frames: int = 0
+	while symbols.is_moving():
+		symbols.advance()
+		frames += 1
+	check(frames >= 3, "the sign rises over at least 3 frames (Smooth): %d" % frames)
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check(view.draws_symbol(WEST), "the map shows the reward room led to")
+	check_equal(view.glyphs_of(WEST), 3, "with its type")
+	check_equal(view.glyphs_of(EAST), 0, "a fight room with none")
+	var corner: Vector2 = PartyMapViewScript.glyphs_corner(Vector2(41, 30), 3, 2)
+	check_equal(corner, corner.floor(), "the map's glyphs in whole pixels")
+	check(corner.y >= 30.0 + RoomKind.SYMBOL_SIDE, "under the room's symbol")
+
+
+## The glyphs a type makes: one a level it names, each a whole SIDE-square picture; an element in the
+## palette light nearest its tint, never a player's.
+func test_a_reward_types_glyphs() -> void:
+	var pixels: Array[PackedByteArray] = []
+	var shades: Array[PackedColorArray] = []
+	RewardGlyphsScript.glyphs_of(RewardType.make(ItemKinds.POTION), null, pixels, shades)
+	check_equal(pixels.size(), 1, "a potion room: its item kind alone")
+	RewardGlyphsScript.glyphs_of(RewardType.make(ItemKinds.CARD, &"modifier"), null, pixels, shades)
+	check_equal(pixels.size(), 2, "a modifier room: a card and its kind")
+	RewardGlyphsScript.glyphs_of(RewardType.new(), null, pixels, shades)
+	check_equal(pixels.size(), 0, "no type: nothing")
+	for picture: String in RewardGlyphsScript.ITEM_PICTURES.values() + RewardGlyphsScript.KIND_PICTURES.values() + [RewardGlyphsScript.ELEMENT_PICTURE, RewardGlyphsScript.UNKNOWN]:
+		var lines: PackedStringArray = picture.split("\n")
+		check(lines.size() == RewardGlyphsScript.SIDE and Array(lines).all(func(line: String) -> bool: return line.length() == RewardGlyphsScript.SIDE), "a glyph is %d rows of %d: %s" % [RewardGlyphsScript.SIDE, RewardGlyphsScript.SIDE, picture])
+	var fire := registry.call(&"get_resource", &"spells", &"fire") as ElementBase
+	check_equal(RewardGlyphsScript.element_shades(fire), Palette.shades_of(&"fire"), "fire in the fire's light")
+	for id: StringName in [&"fire", &"frost", &"lightning", &"mend", &"storm", &"void", &"water"]:
+		var element := registry.call(&"get_resource", &"spells", id) as ElementBase
+		var light: PackedColorArray = RewardGlyphsScript.element_shades(element)
+		check(light.size() == 3, "%s has a light" % id)
+		for owned: StringName in Palette.OWNED:
+			check(light != Palette.shades_of(owned), "%s is in no owned colour" % id)

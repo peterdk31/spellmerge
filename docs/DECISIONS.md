@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-19: a loading screen when a run starts from the stone (owner)
+
+- **The owner:** "Add a loading screen when starting a run."
+- **Why:** A on the lit stone built the run's whole biome (its map, every room's and bridge's layout, the grid, the bodies) in one tick: the game froze on the hub for 1.0 s with one player and 1.2 s with four (headless, measured the same day), with nothing to say so.
+- **How:** the build stays one tick of the simulation, so the run still starts on the same tick on every machine and in a replay; only its start moves. A on the lit stone starts the party's **departure** (`HubRules.depart`: its seat and ticks left are state), and the run starts `HubRules.DEPART_TICKS` (12, a fifth of a second) ticks later. Flow tells the HUD as it begins and ends (`run_departure_changed`), and the loading screen comes down over the hub before the build, with "Loading" and no bar (the build has no steps to count), then goes up over the run's start room. Nothing on a real clock: the core `Loading` service's frames (LoadTasks) would start the run on a different tick on each machine (2026-11-10, "Host and Join", "A run two machines start together loads before it starts").
+- **Committed once pressed:** a second A, a wizard stepping off the stone and a joiner change nothing during the departure (the joiner goes along); only leaving the hub (the main menu) ends it.
+- **Smooth** (docs/STYLE.md): the screen now comes down from above over 6 frames and goes up the same way, by whole pixels, for the shaders' load too; that load waits 8 frames before its first unit (was 2), so the screen is down before a compile freezes the game. The screen is now over every line of the HUD (the stone line was drawn over it), only the frame rate readout above it.
+- **Not done:** the way back to the hub after a run (0.2 s, a run's start of its own through the frames service) has no screen.
+
 ## 2026-11-19: the hub hands out Play's bag; every card is a cheat code (owner)
 
 - **The owner:** "Can you make it such that a player no longer has all cards, but only dash and bolt in the bag? We then need some way for me personally to activate all cards. Maybe if I type something while standing in the hub like a cheatcode."

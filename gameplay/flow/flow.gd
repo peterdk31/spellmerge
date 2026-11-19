@@ -94,9 +94,11 @@ extends Node
 ## counted each tick and whenever a wizard joins or leaves (`hub`, `HubRules`), told by
 ## `start_stone_changed`, the stone asked to enter `lit` or `unlit` to match, so its look and cue
 ## are the prop's (props W8).
-## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts a run at
-## the tick's start, every wizard going in as the player it is: every bag, its staffs with their
-## cards and its hands (owner, 2026-11-13: what a run's start takes along is the whole player; items
+## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts the party's
+## departure at the tick's start, and a run HubRules.DEPART_TICKS later (the loading screen comes
+## down over the hub first, `run_departure_changed`, as the biome takes a second or more to
+## build), every wizard going in as the player it is: every bag, its staffs with their cards and
+## its hands (owner, 2026-11-13: what a run's start takes along is the whole player; items
 ## I4, `start_run`'s `party`, a `PartyLoadout` of each wizard's `PlayerLoadout`); that run's end
 ## (everyone down) brings everyone back to the hub with nothing of the run, its staffs neither
 ## (owner, 2026-11-10: the hub is the arsenal a run's tools are picked from). A run started by
@@ -399,6 +401,10 @@ func step(delta: float) -> void:
 		return
 	_count_stand_ups(delta)
 	if mode == MODE_HUB and state == State.RUNNING:
+		var departing: int = hub.departure_due()
+		if departing >= 0:
+			_start_run_from_stone(departing)
+			return
 		_count_stone()
 		return
 	if _restart_left < 0.0:
@@ -878,12 +884,14 @@ func _start_hub(player: int, party: PartyLoadout = null) -> void:
 
 
 ## The command `run_requested` (a seat pressed A on the lit stone; the HUD sends it, heard at the
-## tick's start): the run starts, for that seat, while the stone is lit. The stone's count
-## is the last tick's, made again when a wizard joined or left since, so it is exact here.
+## tick's start): the party departs, for that seat, while the stone is lit, and the run starts
+## HubRules.DEPART_TICKS later (`step`), behind the loading screen (`run_departure_changed`). The
+## stone's count is the last tick's, made again when a wizard joined or left since, so it is exact here.
 func _on_run_requested(player: int) -> void:
 	if not is_stone_lit() or state != State.RUNNING or get_wizard(player) == null:
 		return
-	_start_run_from_stone(player)
+	if hub.depart(player):
+		_count_stone()
 
 
 ## The command `all_cards_requested` (the HUD's cheat code; owner, 2026-11-19): while the hub

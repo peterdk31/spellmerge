@@ -533,6 +533,11 @@ signal rooms_seen(seen: PackedByteArray, again: bool)
 ## The stone's look is the prop standing on it, which flow puts in its state `lit` or `unlit`
 ## (props W8, `prop_state_requested`), so feel needs no word of it.
 signal start_stone_changed(standing: int, wizards: int, lit: bool)
+## Sender: flow (its hub rules). The party is departing from the hub's stone (`departing` true: A was
+## pressed on the lit stone, and the run starts HubRules.DEPART_TICKS later), or no longer is (the
+## run started, or did not, or the hub was left). Sent when it changes. Heard by hud (the loading
+## screen covers the hub while the run's biome is built); the simulation never reads it back.
+signal run_departure_changed(departing: bool)
 ## Sender: flow. The party entered the hub (`in_hub` true: a run in the hub room began) or left it (a run from the stone, the game stopped). Sent when it changes. Heard by net (a machine may join a party only while it is in the hub); the simulation never reads it back.
 signal hub_changed(in_hub: bool)
 ## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (a prop of the role `party_altar`, where its area is), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).

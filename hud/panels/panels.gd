@@ -28,8 +28,9 @@ extends CanvasLayer
 ## (`inventory_announced`: the body shown changed, or its wizard was made again) its builder and
 ## inventory close, so neither sends a request about a staff of the body shown before.
 ##
-## The loading screen (`loading/`, node Root/Loading, over everything) shows from
-## `loading_started` to `loading_finished`, while flow compiles the shaders before the first room.
+## The loading screen (`loading/`, node Root/Loading, over everything but the frame rate readout)
+## shows from `loading_started` to `loading_finished`, while flow compiles the shaders before the
+## first room, and while the party departs from the hub's stone (`run_departure_changed`).
 ##
 ## The boss bar (`boss/boss_bar.gd`, node Root/BossBar, at the top middle) and the entrance banner
 ## (`boss/boss_banner.gd`, node Root/BossBanner, over the world, under the panels) show what
@@ -268,7 +269,7 @@ func _ready() -> void:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
 	if spells == null:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
-	# Over everything: the loading screen before the first room.
+	# The loading screen (put over everything below, once the rest is made).
 	_loading = LoadingScript.new()
 	_loading.events = events
 	root_control.add_child(_loading)
@@ -360,6 +361,10 @@ func _ready() -> void:
 	root_control.add_child(_item_hints)
 	root_control.move_child(_item_hints, 1)
 	_item_hints.bind(events, input, spells)
+	# The loading screen over every line, overlay and menu made above; only the frame rate readout
+	# over it (the freeze it covers is what that counts).
+	root_control.move_child(_loading, -1)
+	root_control.move_child(_fps, -1)
 	if events != null:
 		events.pad_wait_changed.connect(_on_pad_wait_changed)
 		events.player_joined.connect(_on_player_joined)

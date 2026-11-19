@@ -7,7 +7,10 @@ extends RefCounted
 ## every wizard of the hub stands on one, asked of each stone by the bus (`prop_state_requested`:
 ## LIT, UNLIT, the states a `run_start` prop has). It tells the party where it is (`hub_changed`),
 ## the HUD who stands on the altar (`altar_changed`), the view where the altar is (`altar_placed`)
-## and the stone's count (`start_stone_changed`). (The lectern of run generation RG7 and its start
+## and the stone's count (`start_stone_changed`). A on the lit stone starts the party's departure
+## (`depart`): the run starts DEPART_TICKS later (`departure_due`), so the loading screen is up
+## before the biome is built, which takes the game a second or more in one tick; the departure is
+## told as it begins and ends (`run_departure_changed`). (The lectern of run generation RG7 and its start
 ## depth went with the row map, connected biomes CB8: a biome's run starts in its start room.)
 ## Flow's state (it holds one), counted by Flow each tick and as a wizard joins or leaves.
 
@@ -20,10 +23,14 @@ const ROLE_PARTY_ALTAR: StringName = &"party_altar"
 const LIT: StringName = &"lit"
 const UNLIT: StringName = &"unlit"
 const SEATS: int = 4
+## Ticks from A on the lit stone to the run's start (a fifth of a second): longer than the loading
+## screen takes to come down (hud/panels/loading/, COVER_FRAMES), so it covers the hub before the
+## tick that builds the biome. Ticks, not real time: the run starts on the same tick everywhere.
+const DEPART_TICKS: int = 12
 
 ## Not state: what was last told, only drawn or heard outside the simulation, so a game whose state
 ## a snapshot replaced tells it again (DERIVED).
-const DERIVED: Array[StringName] = [&"_stone_sent", &"_altar_sent", &"_hub_sent", &"_place_sent", &"_place_stands"]
+const DERIVED: Array[StringName] = [&"_stone_sent", &"_altar_sent", &"_hub_sent", &"_place_sent", &"_place_stands", &"_departure_sent"]
 
 ## The wizards on a stone and in the hub at the last count (none out of the hub).
 var standing: int = 0
@@ -33,11 +40,45 @@ var _altar_sent: int = -1
 var _hub_sent: bool = false
 var _place_stands: bool = false
 var _place_sent: Vector2 = Vector2.ZERO
+## The seat whose A started the departure (-1: none), and the ticks left until the run starts.
+var departing_seat: int = -1
+var _depart_left: int = 0
+var _departure_sent: bool = false
 
 
 ## True while every wizard of the hub stands on a stone, and there is one.
 func is_lit() -> bool:
 	return wizards > 0 and standing == wizards
+
+
+## True while the party is departing: A was pressed on the lit stone and the run has not started.
+func is_departing() -> bool:
+	return departing_seat >= 0
+
+
+## Seat `seat` pressed A on the lit stone: the run starts DEPART_TICKS from now, whoever steps
+## off the stone or joins meanwhile (the press is the party's choice). False, and nothing changes,
+## while a departure is already under way.
+func depart(seat: int) -> bool:
+	if is_departing():
+		return false
+	departing_seat = seat
+	_depart_left = DEPART_TICKS
+	return true
+
+
+## One tick of the departure: the seat that started it on the tick the run is due (the departure
+## is over then), else -1.
+func departure_due() -> int:
+	if not is_departing():
+		return -1
+	_depart_left -= 1
+	if _depart_left > 0:
+		return -1
+	var seat: int = departing_seat
+	departing_seat = -1
+	_depart_left = 0
+	return seat
 
 
 ## Where standing on a prop of `data` whose feet are at `at` counts, in room pixels (empty: none).
@@ -61,6 +102,10 @@ func count(in_hub: bool, party: Array[Node2D], contents: RoomContents, events: E
 	standing = 0
 	wizards = 0
 	var at_altar: int = 0
+	if not in_hub:
+		# Out of the hub (the run started, the main menu, the hub gone) nothing departs.
+		departing_seat = -1
+		_depart_left = 0
 	var stones: Array[Actor] = []
 	var altars: Array[Actor] = []
 	if in_hub:
@@ -78,6 +123,10 @@ func count(in_hub: bool, party: Array[Node2D], contents: RoomContents, events: E
 				at_altar |= 1 << seat
 	if events == null:
 		return
+	# The loading screen covers the hub while the party departs (the HUD's).
+	if is_departing() != _departure_sent:
+		_departure_sent = is_departing()
+		events.run_departure_changed.emit(_departure_sent)
 	# Where the party is, for whoever lets other machines join it (net/): told as it changes.
 	if in_hub != _hub_sent:
 		_hub_sent = in_hub

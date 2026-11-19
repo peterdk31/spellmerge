@@ -103,8 +103,16 @@ func _tick() -> void:
 	flow.step(DT)
 
 
-## Seat `seat` presses A on the stone: the command as a tick's start applies it.
+## Seat `seat` presses A on the stone: the command as a tick's start applies it, and the ticks of
+## the party's departure pass (on a lit stone the run starts on the last; HubRules.DEPART_TICKS).
 func _press_a(seat: int) -> void:
+	_press_a_only(seat)
+	for i in HubRules.DEPART_TICKS:
+		_tick()
+
+
+## Seat `seat` presses A on the stone, and no tick passes.
+func _press_a_only(seat: int) -> void:
 	events.call("apply_command", &"run_requested", [seat])
 
 
@@ -291,7 +299,62 @@ func test_a_sent_by_the_hud_starts_the_run_at_the_next_tick() -> void:
 	events.emit_signal("run_requested", 0)
 	check_equal(flow.mode, FlowScript.MODE_HUB, "a command waits for the tick's start")
 	await commands_applied()
-	check_equal(flow.mode, FlowScript.MODE_RUN, "and starts the run there")
+	check(flow.hub.is_departing(), "the party departs there")
+	for i in HubRules.DEPART_TICKS:
+		_tick()
+	check_equal(flow.mode, FlowScript.MODE_RUN, "and the run starts when it is done")
+
+
+## A on the lit stone starts the party's departure (the loading screen comes down over the hub), and
+## the run starts HubRules.DEPART_TICKS ticks later, on that tick and no other: a second A, a
+## wizard stepping off the stone and a joiner change nothing. `run_departure_changed` is told as it
+## begins and as it ends.
+func test_a_on_the_lit_stone_departs_and_the_run_starts_ticks_later() -> void:
+	var told: Array[bool] = []
+	var hear := func(departing: bool) -> void: told.append(departing)
+	events.connect("run_departure_changed", hear)
+	_start([0, 1])
+	_place(0, true)
+	_place(1, true)
+	_tick()
+	_press_a_only(1)
+	check(flow.hub.is_departing(), "A on the lit stone: the party departs")
+	check_equal(flow.hub.departing_seat, 1, "for the seat that pressed")
+	check_equal(told, [true] as Array[bool], "and the HUD is told at once")
+	_press_a_only(0)
+	check_equal(flow.hub.departing_seat, 1, "a second A changes nothing")
+	_place(0, false)
+	input.add_virtual_device(2)
+	for i in HubRules.DEPART_TICKS - 1:
+		_tick()
+		check_equal(flow.mode, FlowScript.MODE_HUB, "tick %d: still the hub" % (i + 1))
+	check(not flow.is_stone_lit(), "the stone went out under the departure")
+	check_equal(told, [true] as Array[bool], "the departure goes on")
+	_tick()
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run starts on the last tick")
+	check_equal(flow.get_wizard(2) != null, true, "the joiner goes along")
+	check(not flow.hub.is_departing(), "nothing departs in the run")
+	check_equal(told, [true, false] as Array[bool], "and the HUD is told the departure is over")
+	events.disconnect("run_departure_changed", hear)
+
+
+## The main menu under a departure (the pause menu's): no run starts, and the HUD is told it ended.
+func test_the_main_menu_under_a_departure_starts_no_run() -> void:
+	var told: Array[bool] = []
+	var hear := func(departing: bool) -> void: told.append(departing)
+	events.connect("run_departure_changed", hear)
+	_start([0])
+	_place(0, true)
+	_tick()
+	_press_a_only(0)
+	_tick()
+	events.emit_signal("main_menu_requested", 0)
+	check(not flow.hub.is_departing(), "the departure ends")
+	check_equal(told, [true, false] as Array[bool], "and the HUD is told")
+	for i in HubRules.DEPART_TICKS:
+		_tick()
+	check_equal(flow.state, FlowScript.State.IDLE, "and no run starts")
+	events.disconnect("run_departure_changed", hear)
 
 
 func test_the_stone_is_told_again_after_a_restore() -> void:

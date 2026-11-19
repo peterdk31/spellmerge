@@ -50,7 +50,7 @@ func _tick() -> void:
 
 func _clear(room: int, table: StringName = &"clear") -> void:
 	_world.bus.room_cleared.emit(&"test_room", room)
-	_world.bus.room_rewards_due.emit(room, table)
+	_world.bus.room_rewards_due.emit(room, table, PackedStringArray())
 	_rewards.step(Fixture.STEP)
 
 

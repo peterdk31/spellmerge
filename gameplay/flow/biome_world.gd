@@ -237,6 +237,9 @@ func _place(named: String, template: StringName, place: Vector2, mirror: int, in
 	# A room's kind, for the view (connected biomes CB12: its music, air and light by kind).
 	if number < map.rooms() and map.room_kinds[number] != &"":
 		layout.set_meta(RoomKind.LAYOUT_META, map.room_kinds[number])
+	# A reward room's type, for the view (its mouths' signs and the held map; the owner, 2026-11-19).
+	if number < map.rooms() and not map.reward_type_of(number).is_any():
+		layout.set_meta(RewardType.LAYOUT_META, map.reward_type_of(number).to_row())
 	var piece := layout as Node2D
 	if piece != null:
 		piece.position = place

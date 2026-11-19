@@ -513,7 +513,7 @@ func test_fighters_in_a_run_take_their_rewards() -> void:
 	var taken: Array = []
 	var hear := func(player: int, _offer: int, _choice: int, _reward: Dictionary) -> void: taken.append(player)
 	_events.connect("reward_taken", hear)
-	_events.emit_signal("room_rewards_due", wizard.room, &"clear")
+	_events.emit_signal("room_rewards_due", wizard.room, &"clear", PackedStringArray())
 	for i in 6:
 		await physics_frame
 	_events.disconnect("reward_taken", hear)

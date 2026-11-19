@@ -55,6 +55,30 @@ var room_enemies: Array[StringName] = []
 ## Each enemy's elite card (connected biomes CB11, decision 24), by the same index as `room_enemies`:
 ## the card an elite gets in its staff, empty for an enemy that is no elite (`elites_of`).
 var room_elites: Array[StringName] = []
+## Each room's reward type (the owner's ask of 2026-11-19, `RewardType`): a reward room's item kind,
+## card kind and element, decided as the biome is made (`BiomeGenerator`), empty names for a room of
+## no type; by room, empty rows for a map not typed (made by hand).
+var room_reward_items: Array[StringName] = []
+var room_reward_card_kinds: Array[StringName] = []
+var room_reward_elements: Array[StringName] = []
+
+
+## Room `room`'s reward type (any: a room of no type, or a map not typed).
+func reward_type_of(room: int) -> RewardType:
+	if room < 0 or room >= room_reward_items.size():
+		return RewardType.new()
+	return RewardType.make(room_reward_items[room], room_reward_card_kinds[room], room_reward_elements[room])
+
+
+## Room `room`'s reward type made `type` (the rows grown to every room, any for the others).
+func type_room(room: int, type: RewardType) -> void:
+	while room_reward_items.size() < rooms():
+		room_reward_items.append(&"")
+		room_reward_card_kinds.append(&"")
+		room_reward_elements.append(&"")
+	room_reward_items[room] = type.item
+	room_reward_card_kinds[room] = type.card_kind
+	room_reward_elements[room] = type.element
 
 
 ## A room of template `template` at `place`, mirrored by `mirror`, of kind `kind`: its number.
@@ -185,7 +209,7 @@ func work_out_depths() -> void:
 
 ## True when `other` is the same map, row for row.
 func same_as(other: BiomeMap) -> bool:
-	return other != null and biome == other.biome and style == other.style and not_made == other.not_made and room_scales == other.room_scales and room_enemy_ends == other.room_enemy_ends and room_enemies == other.room_enemies and room_elites == other.room_elites and room_templates == other.room_templates and room_places == other.room_places and room_mirrors == other.room_mirrors and room_kinds == other.room_kinds and bridge_templates == other.bridge_templates and bridge_places == other.bridge_places and bridge_mirrors == other.bridge_mirrors and bridge_ends == other.bridge_ends and depths == other.depths
+	return other != null and biome == other.biome and style == other.style and not_made == other.not_made and room_scales == other.room_scales and room_enemy_ends == other.room_enemy_ends and room_enemies == other.room_enemies and room_elites == other.room_elites and room_reward_items == other.room_reward_items and room_reward_card_kinds == other.room_reward_card_kinds and room_reward_elements == other.room_reward_elements and room_templates == other.room_templates and room_places == other.room_places and room_mirrors == other.room_mirrors and room_kinds == other.room_kinds and bridge_templates == other.bridge_templates and bridge_places == other.bridge_places and bridge_mirrors == other.bridge_mirrors and bridge_ends == other.bridge_ends and depths == other.depths
 
 
 ## A copy, row for row.
@@ -198,6 +222,9 @@ func copy() -> BiomeMap:
 	out.room_enemy_ends = room_enemy_ends.duplicate()
 	out.room_enemies = room_enemies.duplicate()
 	out.room_elites = room_elites.duplicate()
+	out.room_reward_items = room_reward_items.duplicate()
+	out.room_reward_card_kinds = room_reward_card_kinds.duplicate()
+	out.room_reward_elements = room_reward_elements.duplicate()
 	out.room_templates = room_templates.duplicate()
 	out.room_places = room_places.duplicate()
 	out.room_mirrors = room_mirrors.duplicate()

@@ -2,7 +2,10 @@ extends Node2D
 ## What a bridge's mouth tells of what lies behind it (connected biomes CB9, "What the players see":
 ## "A bridge mouth tells what lies behind it (a kind symbol)"): the symbol of the kind of the room the
 ## mouth leads into (`RoomKind.symbol`, drawn by `kind_symbol.gd`), on the bridge just outside the
-## mouth, centred along it. A kind with no symbol tells nothing. View only: it reads Feel's mouths
+## mouth, centred along it. A kind with no symbol tells nothing. A reward room's mouth also tells its
+## type (`RewardType`, the owner's ask of 2026-11-19; `reward_glyphs.gd`): its glyphs beside the
+## symbol, in a row on its right for a mouth across the bridge's way, else in a column under it, rising
+## with it by rows (each glyph's SIDE rows). View only: it reads Feel's mouths
 ## (`mouth_looks.gd`: each mouth's area and room), the rooms' kinds (Feel's room hearing) and where
 ## this machine's wizards stand; nothing in the game reads it.
 ##
@@ -22,6 +25,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const KindSymbolScript := preload("res://gameplay/feel/kind_symbol.gd")
+const RewardGlyphsScript := preload("res://gameplay/feel/reward_glyphs.gd")
 
 ## Over the mouths' looks (1), under the bodies.
 const Z: int = 2
@@ -45,6 +49,12 @@ var _middle: PackedVector2Array = PackedVector2Array()
 ## By mouth: the walkway (place) it lies on.
 var _walkway: PackedInt32Array = PackedInt32Array()
 var _rows: PackedInt32Array = PackedInt32Array()
+## By mouth: its reward type's glyphs (each an Array[PackedByteArray] and an
+## Array[PackedColorArray]; empty: none), their first's corner and whether they run in a row.
+var _glyph_pixels: Array = []
+var _glyph_shades: Array = []
+var _glyph_at: PackedVector2Array = PackedVector2Array()
+var _glyph_across: PackedByteArray = PackedByteArray()
 ## What each mouth wants this frame (1: shown).
 var _near: PackedByteArray = PackedByteArray()
 ## The mouths read last: how many and the world they were found in (`RoomHearing.world`).
@@ -58,6 +68,8 @@ var _turn_rooms: Dictionary = {}
 var _turning: PackedByteArray = PackedByteArray()
 var _next_pixels: Array[PackedByteArray] = []
 var _next_shades: Array[PackedColorArray] = []
+var _next_glyphs: Array = []
+var _next_glyph_shades: Array = []
 
 
 func _ready() -> void:
@@ -77,6 +89,15 @@ func rows_of(mouth: int) -> int:
 
 func corner_of(mouth: int) -> Vector2:
 	return _at[mouth] if mouth >= 0 and mouth < _at.size() else Vector2.INF
+
+
+## How many glyphs of its room's reward type mouth `mouth` tells (0: none), and their first's corner.
+func glyphs_of(mouth: int) -> int:
+	return (_glyph_pixels[mouth] as Array).size() if mouth >= 0 and mouth < _glyph_pixels.size() else 0
+
+
+func glyph_corner_of(mouth: int) -> Vector2:
+	return _glyph_at[mouth] if mouth >= 0 and mouth < _glyph_at.size() else Vector2.INF
 
 
 ## True when mouth `mouth` has a symbol to tell.
@@ -133,6 +154,8 @@ func advance() -> void:
 			_turning[mouth] = 0
 			_pixels[mouth] = _next_pixels[mouth]
 			_shades[mouth] = _next_shades[mouth]
+			_glyph_pixels[mouth] = _next_glyphs[mouth]
+			_glyph_shades[mouth] = _next_glyph_shades[mouth]
 		_rows[mouth] += signi(_wanted(mouth) - _rows[mouth])
 	queue_redraw()
 
@@ -172,16 +195,26 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 	# A rerolled room's mouths keep their old sign and rows to sink out (the same mouths, read again).
 	var old_pixels: Array[PackedByteArray] = []
 	var old_shades: Array[PackedColorArray] = []
+	var old_glyphs: Array = []
+	var old_glyph_shades: Array = []
 	if _pixels.size() == found:
 		old_pixels = _pixels.duplicate()
 		old_shades = _shades.duplicate()
+		old_glyphs = _glyph_pixels.duplicate()
+		old_glyph_shades = _glyph_shades.duplicate()
 	var old_rows: PackedInt32Array = _rows.duplicate()
 	_turning.resize(found)
 	_turning.fill(0)
 	_next_pixels.resize(found)
 	_next_shades.resize(found)
+	_next_glyphs.resize(found)
+	_next_glyph_shades.resize(found)
 	_pixels.clear()
 	_shades.clear()
+	_glyph_pixels.clear()
+	_glyph_shades.clear()
+	_glyph_at.resize(found)
+	_glyph_across.resize(found)
 	_at.resize(found)
 	_middle.resize(found)
 	_walkway.resize(found)
@@ -197,18 +230,33 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 		_middle[mouth] = middle
 		_walkway[mouth] = grid.place_at(middle) if grid != null else RoomGrid.NO_PLACE
 		_at[mouth] = corner_beside(area, grid.place_rect(room) if grid != null else Rect2())
+		var type: RewardType = pieces.type_of(room) if pieces != null and kind != null else null
+		var glyphs: Array[PackedByteArray] = []
+		var glyph_shades: Array[PackedColorArray] = []
+		var element: Resource = pieces.content(RewardGlyphsScript.card_folder(), type.element) if type != null else null
+		RewardGlyphsScript.glyphs_of(type, element, glyphs, glyph_shades)
+		_glyph_pixels.append(glyphs)
+		_glyph_shades.append(glyph_shades)
+		var across: bool = area.size.x > area.size.y
+		_glyph_across[mouth] = 1 if across else 0
+		_glyph_at[mouth] = glyphs_beside(_at[mouth], across)
 	_see(table, seats_here, grid)
 	for mouth in found:
-		if not old_pixels.is_empty() and _turn_rooms.has(mouths.room_of(mouth)) and mouth < old_rows.size() and old_rows[mouth] > 0 and old_pixels[mouth] != _pixels[mouth]:
+		if not old_pixels.is_empty() and _turn_rooms.has(mouths.room_of(mouth)) and mouth < old_rows.size() and old_rows[mouth] > 0:
+			# A rerolled room's sign turns over (its kind and its reward type's glyphs alike).
 			_next_pixels[mouth] = _pixels[mouth]
 			_next_shades[mouth] = _shades[mouth]
+			_next_glyphs[mouth] = _glyph_pixels[mouth]
+			_next_glyph_shades[mouth] = _glyph_shades[mouth]
 			_pixels[mouth] = old_pixels[mouth]
 			_shades[mouth] = old_shades[mouth]
+			_glyph_pixels[mouth] = old_glyphs[mouth]
+			_glyph_shades[mouth] = old_glyph_shades[mouth]
 			_rows[mouth] = old_rows[mouth]
 			_turning[mouth] = 1
 			continue
 		# The same mouths read again (a reroll's lay): a sign mid-play keeps its rows and plays on.
-		_rows[mouth] = old_rows[mouth] if not old_pixels.is_empty() and mouth < old_rows.size() and old_pixels[mouth] == _pixels[mouth] else _wanted(mouth)
+		_rows[mouth] = old_rows[mouth] if not old_pixels.is_empty() and mouth < old_rows.size() and old_pixels[mouth] == _pixels[mouth] and old_glyphs[mouth] == _glyph_pixels[mouth] else _wanted(mouth)
 	_turn_rooms.clear()
 	queue_redraw()
 
@@ -227,7 +275,20 @@ static func corner_beside(area: Rect2i, room: Rect2) -> Vector2:
 	return Vector2(area.position.x - GAP - side, y) if towards.x > 0.0 else Vector2(area.end.x + GAP, y)
 
 
+## The corner of a reward type's first glyph beside a symbol whose box's corner is `symbol`: on its
+## right, feet level with its foot, for a mouth across the bridge's way (`across`); else under it,
+## centred.
+static func glyphs_beside(symbol: Vector2, across: bool) -> Vector2:
+	var side: int = RoomKind.SYMBOL_SIDE
+	var glyph: int = RewardGlyphsScript.SIDE
+	if across:
+		return symbol + Vector2(side + RewardGlyphsScript.GAP, side - glyph)
+	return symbol + Vector2((side - glyph) / 2, side + RewardGlyphsScript.GAP)
+
+
 func _draw() -> void:
 	for mouth in _rows.size():
 		if _rows[mouth] > 0:
 			KindSymbolScript.draw(self, _pixels[mouth], _shades[mouth], _at[mouth], _rows[mouth])
+			# Each a typed array as made in `_read` (nothing allocated here).
+			RewardGlyphsScript.draw(self, _glyph_pixels[mouth], _glyph_shades[mouth], _glyph_at[mouth], _glyph_across[mouth] != 0, _rows[mouth])

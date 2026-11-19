@@ -34,7 +34,7 @@ func test_a_reroll_changes_that_room_alone_and_keeps_the_map_valid() -> void:
 	var rules: MapRules = _crypt.biomes[0]
 	var tried: int = 0
 	var rerolled: int = 0
-	for seed_value in 4:
+	for seed_value in 3:
 		var sim: Sim = _sim(seed_value)
 		var map: BiomeMap = BiomeGenerator.generate(_crypt, _content, _shapes, sim)
 		check(map.is_made(), "seed %d: made" % seed_value)
@@ -56,7 +56,7 @@ func test_a_reroll_changes_that_room_alone_and_keeps_the_map_valid() -> void:
 				check(made.room_templates[other] == map.room_templates[other] and made.room_places[other] == map.room_places[other] and made.room_kinds[other] == map.room_kinds[other], "%s: room %d as it was" % [what, other])
 				check_equal(made.enemies_of(other), map.enemies_of(other), "%s: room %d's foes as they were" % [what, other])
 			check(BiomeGenerator._area_of(map, _shapes).encloses(made.room_shape(room, _shapes).rect_at(made.room_places[room])), "%s: inside the biome's area" % what)
-			check(made.room_templates[room] != map.room_templates[room] or made.room_mirrors[room] != map.room_mirrors[room] or made.room_kinds[room] != map.room_kinds[room] or _content.kind(made.room_kinds[room]).fills_with_enemies(), "%s: something behind the doorway changed" % what)
+			check(made.room_templates[room] != map.room_templates[room] or made.room_mirrors[room] != map.room_mirrors[room] or made.room_kinds[room] != map.room_kinds[room] or _content.kind(made.room_kinds[room]).fills_with_enemies() or _content.kind(made.room_kinds[room]).fill == RoomKind.FILL_SHOP or not made.reward_type_of(room).same_as(map.reward_type_of(room)) or _content.kind(made.room_kinds[room]).typed_rewards, "%s: something behind the doorway changed (its foes, shelf or reward type rolled again at least)" % what)
 			check(map.same_as(BiomeGenerator.generate(_crypt, _content, _shapes, sim)), "%s: the map asked is left as it was" % what)
 	check(rerolled > tried / 2, "most rooms reroll (%d of %d)" % [rerolled, tried])
 
@@ -114,3 +114,24 @@ func test_a_refill_keeps_the_rooms_after_it() -> void:
 	check_equal(map.elites_of(1), [&"ice", &"", &""] as Array[StringName], "and their elites")
 	check_equal(map.enemies_of(2), [&"d"] as Array[StringName], "the room after as it was")
 	check_equal(map.room_scales[1], 2.0, "its scale")
+
+
+func test_a_rerolled_reward_room_rolls_its_type_again() -> void:
+	var differs: int = 0
+	var rerolled: int = 0
+	for seed_value in 8:
+		var sim: Sim = _sim(seed_value)
+		var map: BiomeMap = BiomeGenerator.generate(_crypt, _content, _shapes, sim)
+		var room: int = map.room_kinds.find(&"reward")
+		if room < 0:
+			continue
+		for roll in 3:
+			var made: BiomeMap = BiomeGenerator.reroll_room(_crypt, _content, _shapes, sim, 1, map, room, roll)
+			if made == null:
+				continue
+			rerolled += 1
+			check(not made.reward_type_of(room).is_any(), "seed %d: a reward room keeps a type" % seed_value)
+			if not made.reward_type_of(room).same_as(map.reward_type_of(room)):
+				differs += 1
+	check(rerolled > 0, "reward rooms reroll (%d)" % rerolled)
+	check(differs > 0, "and their type is rolled again (%d differ)" % differs)

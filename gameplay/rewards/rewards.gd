@@ -10,7 +10,10 @@ extends Node
 ##   owner, 2026-11-19: a possessed foe killed elsewhere too), every seat with a wizard gets an offer
 ##   of its own (`RewardOffer`), its choices rolled from that table (content/rewards, `RewardRoll`),
 ##   as many as that player's `reward_choices` (`RunStats`: "pick 1 of 2", decision 17), said by
-##   `reward_rolled`. A seat whose wizard was in the room (`here`) has its menu opened by the HUD;
+##   `reward_rolled`. A reward room's rolls are of its type (`RewardType`, the owner's ask of
+##   2026-11-19: decided as its biome is made, told with `room_rewards_due`): each choice among the
+##   items of the type, widened a level while it has none left (`RewardRoll`).
+##   A seat whose wizard was in the room (`here`) has its menu opened by the HUD;
 ##   one who was not there finds it waiting, an unspent icon on its corner panel (rule 4). Nobody
 ##   waits: each player picks when they like, oldest first, and an offer stays until it is picked
 ##   (`rewards_waiting_changed`), all run long.
@@ -20,7 +23,7 @@ extends Node
 ## - **A reward reroll** (the owner, 2026-11-19: X in the reward picker; `reward_reroll_requested`,
 ##   a command at the tick's start): the offer it names, if it is the seat's and its wizard holds a
 ##   reward reroll (`RerollBase.REWARD`, its currency bag), spends one and rolls every choice again
-##   from the table the offer came from (`RewardOffer.table`), as many as it offered, under its own
+##   from the table and the reward room's type the offer came from (`RewardOffer.table`, `type_row`), as many as it offered, under its own
 ##   purpose (REROLL_PURPOSE, keyed by the seat and counted by `_rerolls`, so a reroll never shifts
 ##   the seat's later offers); only that offer changes (`reward_rerolled`). With none held, or a
 ##   roll that finds nothing, nothing is spent and nothing changes (`reward_reroll_refused`).
@@ -133,9 +136,11 @@ var _run_changes: Array[StatChange] = []
 var _offers: Array[RewardOffer] = []
 ## The number the next offer gets.
 var _next_offer: int = 0
-## The rooms due a roll since the last step (`room_rewards_due`), and the table each rolls from.
+## The rooms due a roll since the last step (`room_rewards_due`), the table each rolls from and
+## its type (`RewardType.to_row`, three names a room, one after the other).
 var _due_rooms: PackedInt32Array = PackedInt32Array()
 var _due_tables: Array[StringName] = []
+var _due_types: PackedStringArray = PackedStringArray()
 ## The shops' shelves: each item's number, room, place, what it is (an item: kind, id, count) and
 ## price (before a buyer's `price_scale`), by the same index, in the order stocked.
 var _item_numbers: PackedInt32Array = PackedInt32Array()
@@ -226,10 +231,12 @@ func step(delta: float) -> void:
 	if not _due_rooms.is_empty():
 		var rooms: PackedInt32Array = _due_rooms.duplicate()
 		var tables: Array[StringName] = _due_tables.duplicate()
+		var types: PackedStringArray = _due_types.duplicate()
 		_due_rooms.clear()
 		_due_tables.clear()
+		_due_types.clear()
 		for at in rooms.size():
-			_roll_clear(rooms[at], tables[at])
+			_roll_clear(rooms[at], tables[at], RewardType.from_row(types.slice(at * 3, at * 3 + 3)))
 	for seat in SEATS:
 		if _funded & (1 << seat) == 0 and actors.home_of_seat(seat) != ActorsScript.NONE:
 			_funded |= 1 << seat
@@ -359,24 +366,25 @@ func rebuild_derived() -> void:
 
 # --- Heard ------------------------------------------------------------------------------
 
-## The room `room` was cleared and its kind rewards it from `table`: rolled for at the next step.
-func _on_room_rewards_due(room: int, table: StringName) -> void:
+## The room `room` was cleared and its kind rewards it from `table`, of the type `type` (a
+## `RewardType` row; any for every room but a reward room): rolled for at the next step.
+func _on_room_rewards_due(room: int, table: StringName, type: PackedStringArray) -> void:
 	if not _due_rooms.has(room):
 		_due_rooms.append(room)
 		_due_tables.append(table)
+		_due_types.append_array(RewardType.from_row(type).to_row())
 
 
-## Room `room`'s clear: every seat with a wizard rolls its own offer from the table `table_id`.
-func _roll_clear(room: int, table_id: StringName) -> void:
+## Room `room`'s clear: every seat with a wizard rolls its own offer from the table `table_id`,
+## among items of the room's type `type`.
+func _roll_clear(room: int, table_id: StringName, type: RewardType) -> void:
 	if actors == null:
 		return
 	var table: RewardTable = registry.get_resource(TABLES, table_id) as RewardTable if registry != null else null
 	if table == null:
 		push_warning("Rewards: no reward table '%s' (content/rewards), so a clear rewards nobody." % table_id)
 		return
-	var cards: Array[StringName] = []
-	var complexities := PackedInt32Array()
-	_cards_of(cards, complexities)
+	var cards: RewardCards = _cards()
 	for seat in SEATS:
 		var body: Actor = _wizard_of(seat)
 		if body == null:
@@ -387,7 +395,8 @@ func _roll_clear(room: int, table_id: StringName) -> void:
 		offer.room = room
 		offer.here = body.room == room or body.room == RoomGrid.NO_PLACE
 		offer.table = table_id
-		RewardRoll.fill(offer, table, int(stat_of(seat, &"reward_choices")), _sim(), seat, _rolls[seat], cards, complexities)
+		offer.type_row = type.to_row() if type != null else PackedStringArray()
+		RewardRoll.fill(offer, table, int(stat_of(seat, &"reward_choices")), _sim(), seat, _rolls[seat], cards, RewardRoll.PURPOSE, RewardRoll.CARD_PURPOSE, [], type)
 		_rolls[seat] += 1
 		if offer.size() == 0:
 			continue
@@ -444,10 +453,8 @@ func _on_reward_reroll_requested(player: int, offer: int) -> void:
 		_refuse_reroll(player, offer)
 		return
 	var fresh := RewardOffer.new()
-	var cards: Array[StringName] = []
-	var complexities := PackedInt32Array()
-	_cards_of(cards, complexities)
-	RewardRoll.fill(fresh, table, row.size(), _sim(), player, _rerolls[player], cards, complexities, REROLL_PURPOSE, REROLL_CARD_PURPOSE)
+	var type: RewardType = RewardType.from_row(row.type_row) if not row.type_row.is_empty() else null
+	RewardRoll.fill(fresh, table, row.size(), _sim(), player, _rerolls[player], _cards(), REROLL_PURPOSE, REROLL_CARD_PURPOSE, [], type)
 	_rerolls[player] += 1
 	if fresh.size() == 0 or not body.inventory.take(COIN_BAG, RerollBase.REWARD):
 		_refuse_reroll(player, offer)
@@ -633,15 +640,12 @@ func _relics_of(seat: int) -> Array[Resource]:
 	return out
 
 
-## The card ids a reward may give (every card the registry has, in id order), with each one's
-## complexity by the same index.
-func _cards_of(cards: Array[StringName], complexities: PackedInt32Array) -> void:
+## The cards a reward may give (every card the registry has, in id order), with each one's kind
+## and complexity.
+func _cards() -> RewardCards:
 	if registry == null:
-		return
-	for found: Resource in registry.get_all(ItemKinds.content_of(ItemKinds.CARD)[0]):
-		if ItemKinds.is_content(ItemKinds.CARD, found):
-			cards.append(StringName(str(found.get(&"id"))))
-			complexities.append(int(found.get(&"complexity")))
+		return RewardCards.new()
+	return RewardCards.gather(registry.get_all(ItemKinds.content_of(ItemKinds.CARD)[0]))
 
 
 ## The first seat (in order) whose driven wizard, standing, reaches `at` with its feet; NONE for none.
@@ -683,14 +687,12 @@ func _stock_shelf(room: int, table_id: StringName, spots: PackedVector2Array) ->
 	if table == null:
 		push_warning("Rewards: no shelf table '%s' (content/rewards), so the shop stands empty." % table_id)
 		return
-	var cards: Array[StringName] = []
-	var complexities := PackedInt32Array()
-	_cards_of(cards, complexities)
+	var cards: RewardCards = _cards()
 	var stock := RewardOffer.new()
 	var lines: Array[RewardEntry] = []
 	# A room rerolled before it opened (`room_rerolled`) rolls its shelf anew: its rerolls are the roll.
 	var roll: int = _room_rerolls[room] if room >= 0 and room < _room_rerolls.size() else 0
-	RewardRoll.fill(stock, table, spots.size(), _sim(), room, roll, cards, complexities, SHOP_PURPOSE, SHOP_CARD_PURPOSE, lines)
+	RewardRoll.fill(stock, table, spots.size(), _sim(), room, roll, cards, SHOP_PURPOSE, SHOP_CARD_PURPOSE, lines)
 	for at in stock.size():
 		_item_numbers.append(_next_item)
 		_next_item += 1

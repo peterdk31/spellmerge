@@ -16,6 +16,9 @@ var room: int = -1
 var here: bool = false
 ## The reward table it was rolled from (content/rewards; a reward reroll rolls from it again).
 var table: StringName = &""
+## The reward room's type it was rolled among (`RewardType.to_row`; empty: none), rolled among again
+## by a reward reroll.
+var type_row: PackedStringArray = PackedStringArray()
 ## Its choices: what each gives, the card's id (empty for coins) and how many.
 var kinds: Array[StringName] = []
 var ids: Array[StringName] = []

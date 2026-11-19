@@ -29,6 +29,12 @@ extends RefCounted
 ##    its elites (connected biomes CB11, decision 24): a fight room from `MapRules.elite_depth` on is
 ##    an elite room by `elite_chance` (its first enemy an elite), a challenge room's
 ##    (`RoomKind.FILL_ELITES`) every enemy, each elite one card of `elite_cards` by chance.
+## 7. **The reward rooms' types** (the owner's ask of 2026-11-19, `RewardType`): each room of a kind
+##    with `typed_rewards` (the reward room) one type from its `rewards` table (`RunContent`): a line
+##    by weight (its item kind); for a card line one of the card kinds its cards are, evenly (in
+##    name order); for the element kind one of its element cards, evenly. Rolled under REWARD_PURPOSE
+##    with a key of its own, so the rooms and their fill roll as they did. With no table or no card
+##    there, the room is of no type.
 ##
 ## A line with no limit (the fights) fills the rooms past the fixed and chance ones only while a
 ## template is left to host it (a template stands once a biome), so the count rolled is the most
@@ -52,6 +58,8 @@ extends RefCounted
 
 ## What the generator's rolls are named by.
 const PURPOSE: StringName = &"biome_map"
+## What the reward rooms' types are rolled by (step 7).
+const REWARD_PURPOSE: StringName = &"biome_rewards"
 ## How many times a map is tried before it is given up.
 const ATTEMPTS: int = 24
 ## How much dark a room keeps round its slab from every other room's, in pixels.
@@ -85,6 +93,7 @@ static func generate(definition: RunDefinition, content: RunContent, shapes: Dic
 		if why == "":
 			var made: BiomeMap = growth.to_map()
 			_fill(made, definition, rules, content, players, dice)
+			_type_rewards(made, content, sim)
 			return made
 	map.not_made = PackedStringArray(["%s: %s: no map after %d tries (the templates' shapes and sockets leave no room for it; the last try: %s)." % [definition.id, rules.biome, ATTEMPTS, why]])
 	return map
@@ -296,7 +305,8 @@ const REROLL_KEYS: int = 256
 ## is laid (its bounds never move), and every rule of `problems` and `rule_problems` still kept (the
 ## fixed kinds present, the boss deepest, rooms apart, sockets that meet). A candidate the same as
 ## the room (template, mirroring and kind) is one only when its kind fights (its foes are rolled
-## again) or is a shop (its shelf is rolled again as it opens, gameplay/rewards). The most change
+## again), is a shop (its shelf is rolled again as it opens, gameplay/rewards) or a reward room (its
+## reward type is rolled again, `roll_type`; a kind with no `typed_rewards` has none). The most change
 ## wins: a candidate of another kind if there is one, else of another template, else the rest; one
 ## of those by chance. Null when there is none: the reroll is refused. A pure function, as
 ## `generate`.
@@ -329,7 +339,7 @@ static func reroll_room(definition: RunDefinition, content: RunContent, shapes: 
 			if host.id != map.room_templates[room] and map.room_templates.has(host.id):
 				continue
 			for mirror: int in PieceShape.MIRRORINGS:
-				if host.id == map.room_templates[room] and mirror == map.room_mirrors[room] and rule.kind == map.room_kinds[room] and not kind.fills_with_enemies() and kind.fill != RoomKind.FILL_SHOP:
+				if host.id == map.room_templates[room] and mirror == map.room_mirrors[room] and rule.kind == map.room_kinds[room] and not kind.fills_with_enemies() and kind.fill != RoomKind.FILL_SHOP and not kind.typed_rewards:
 					continue
 				var made: BiomeMap = _refit(map, room, host.id, mirror, rule.kind, (shapes[host.id] as PieceShape).mirrored(mirror), joined, facings)
 				if made == null or not area.encloses(made.room_shape(room, shapes).rect_at(made.room_places[room])):
@@ -350,6 +360,13 @@ static func reroll_room(definition: RunDefinition, content: RunContent, shapes: 
 	var picked: BiomeMap = found[dice.below(Step.PLACE, found.size())] as BiomeMap
 	var filled: Array = _fill_one(picked, room, definition, rules, content, players, dice)
 	picked.refill_room(room, filled[0], filled[1], filled[2])
+	# A reward room's type is rolled again (the owner, 2026-11-19), any other kind's is none.
+	var picked_kind: RoomKind = content.kind(picked.room_kinds[room])
+	var type: RewardType = RewardType.new()
+	if picked_kind != null and picked_kind.typed_rewards:
+		type = roll_type(content.reward_table(picked_kind.rewards), content.cards, dice)
+	if not type.is_any() or room < picked.room_reward_items.size():
+		picked.type_room(room, type)
 	return picked
 
 
@@ -403,6 +420,54 @@ static func _area_of(map: BiomeMap, shapes: Dictionary) -> Rect2:
 		if shape != null:
 			whole = whole.merge(shape.rect_at(map.bridge_places[bridge]))
 	return whole
+
+
+## Step 7: each room of a kind with `typed_rewards` its reward type, rolled from its kind's table.
+static func _type_rewards(map: BiomeMap, content: RunContent, sim: Sim) -> void:
+	var dice := MapDice.new(sim, REWARD_PURPOSE, 0, 1)
+	for room in map.rooms():
+		var kind: RoomKind = content.kind(map.room_kinds[room])
+		if kind != null and kind.typed_rewards:
+			var type: RewardType = roll_type(content.reward_table(kind.rewards), content.cards, dice)
+			if not type.is_any():
+				map.type_room(room, type)
+
+
+## A reward type rolled from `table` (a line by weight; a card line's card kind, then an element
+## card, evenly) with `dice`'s step 0; any when the table gives nothing.
+static func roll_type(table: RewardTable, cards: RewardCards, dice: MapDice) -> RewardType:
+	if table == null:
+		return RewardType.new()
+	var weights := PackedFloat32Array()
+	for entry: RewardEntry in table.entries:
+		var weight: float = entry.weight if entry != null and entry.weight > 0.0 else 0.0
+		if weight > 0.0 and entry.kind == ItemKinds.CARD and _kinds_given(entry, cards).is_empty():
+			weight = 0.0
+		weights.append(weight)
+	if weights.is_empty() or Array(weights).max() <= 0.0:
+		return RewardType.new()
+	var line: RewardEntry = table.entries[dice.pick(0, weights)]
+	if line.kind != ItemKinds.CARD:
+		return RewardType.make(line.kind)
+	var kinds: Array[StringName] = _kinds_given(line, cards)
+	var kind: StringName = kinds[dice.below(0, kinds.size())]
+	if kind != RewardType.ELEMENT_KIND:
+		return RewardType.make(line.kind, kind)
+	var elements: Array[StringName] = []
+	for at in cards.size():
+		if cards.kinds[at] == kind and cards.line_gives(line, at):
+			elements.append(cards.ids[at])
+	return RewardType.make(line.kind, kind, elements[dice.below(0, elements.size())])
+
+
+## The card kinds the card line `line` gives among `cards`, in name order.
+static func _kinds_given(line: RewardEntry, cards: RewardCards) -> Array[StringName]:
+	var found: Array[StringName] = []
+	for at in cards.size():
+		if cards.kinds[at] != &"" and not found.has(cards.kinds[at]) and cards.line_gives(line, at):
+			found.append(cards.kinds[at])
+	found.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
+	return found
 
 
 ## One attempt's map as it grows (steps 1 to 5): a generator's scratch, never state.

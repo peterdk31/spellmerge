@@ -8,7 +8,8 @@ extends RefCounted
 ## and plays on from the next tick, as a player joining the run would.
 ## Connected biomes CB11 (`special`): the rooms west and east are a shop and a fountain (the crypt's
 ## own, with the start room between them); seat 0, its wallet full, walks west over the shop's shelf
-## and buys, seat 1, hurt, walks east into the fountain and draws on it.
+## pressing A (`shelf_buy_requested` for every shelf item, each tick: one in reach is bought), seat 1,
+## hurt, walks east into the fountain and draws on it.
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
@@ -53,12 +54,16 @@ class Walker:
 	extends FrameSource
 	var way: Vector2 = Vector2.ZERO
 	var tick: int = 0
+	## Shelf items asked for each tick (their numbers 0 to buys - 1; 0: none).
+	var buys: int = 0
 
 	func fill_frame(frame: InputFrame, _delta: float) -> void:
 		frame.set_move(way)
 		frame.aim = 0 if way.x > 0.0 else InputFrame.AIM_STEPS / 2
 		if tick % 24 == 5:
 			frame.press(1)
+		for item in buys:
+			frame.add_command(&"shelf_buy_requested", [item])
 		tick += 1
 
 
@@ -129,6 +134,7 @@ func _start() -> BiomeMap:
 		_input.call("add_virtual_device", seat)
 		var walker := Walker.new()
 		walker.way = Vector2.LEFT if seat == 0 and not gate else Vector2.RIGHT
+		walker.buys = SHELF if special and seat == 0 else 0
 		_walkers.append(walker)
 		_frames.call("set_source", seat, walker)
 	var map: BiomeMap = BiomeMaps.split(_root.get_node("Registry"))

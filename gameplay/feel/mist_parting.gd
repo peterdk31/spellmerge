@@ -30,6 +30,8 @@ const CLOSED: float = 0.004
 ## is. Read only.
 var texture: ImageTexture = null
 var cell: float = CELL
+## Where the grid's first cell begins (world px): the room's place. Read only.
+var origin: Vector2 = Vector2.ZERO
 var width: int = 0
 var height: int = 0
 
@@ -44,8 +46,9 @@ var _live_count: int = 0
 var _dirty: bool = false
 
 
-## The grid for a room of `size` px (from the origin): every cell closed.
-func lay(size: Vector2) -> void:
+## The grid for a room of `size` px from `at` (world px, its place): every cell closed.
+func lay(size: Vector2, at: Vector2 = Vector2.ZERO) -> void:
+	origin = at
 	cell = maxf(CELL, ceilf(maxf(size.x, size.y) / float(MOST_CELLS)))
 	width = maxi(ceili(size.x / cell), 1)
 	height = maxi(ceili(size.y / cell), 1)
@@ -80,7 +83,7 @@ func step(delta: float, feet: PackedVector2Array, count: int) -> void:
 	for n in _live_count:
 		_wanted[_live[n]] = 0.0
 	for k in mini(count, feet.size()):
-		_part(feet[k] + Vector2(0.0, FEET_DROP))
+		_part(feet[k] + Vector2(0.0, FEET_DROP) - origin)
 	var opens: float = OPEN_RATE * delta
 	var closes: float = CLOSE_RATE * delta
 	var kept: int = 0
@@ -105,7 +108,7 @@ func step(delta: float, feet: PackedVector2Array, count: int) -> void:
 		texture.update(_image)
 
 
-## Every cell within REACH of `foot` wants to be parted as much as it is near.
+## Every cell within REACH of `foot` (the grid's px) wants to be parted as much as it is near.
 func _part(foot: Vector2) -> void:
 	if not foot.is_finite():
 		return
@@ -129,10 +132,10 @@ func _part(foot: Vector2) -> void:
 				_live_count += 1
 
 
-## How far the cell holding `point` is parted (0 outside the grid).
+## How far the cell holding `point` (world px) is parted (0 outside the grid).
 func parted_at(point: Vector2) -> float:
-	var x: int = floori(point.x / cell)
-	var y: int = floori(point.y / cell)
+	var x: int = floori((point.x - origin.x) / cell)
+	var y: int = floori((point.y - origin.y) / cell)
 	if x < 0 or y < 0 or x >= width or y >= height:
 		return 0.0
 	return _shown[y * width + x]

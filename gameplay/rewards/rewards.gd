@@ -23,10 +23,13 @@ extends Node
 ##   waits for card levels.
 ## - **A shop** (CB11, decision 19): as a shop room opens (`special_room_opened`, its shelf table and
 ##   its spots), its shelf is rolled once (purpose SHOP_PURPOSE, keyed by its room): one item a spot,
-##   each a different line's, at its line's `price`. The first standing wizard (seat order) whose own
-##   feet come within SHELF_REACH of an item, with its price (times that player's `price_scale`) in
-##   their own wallet and room for it, buys it: it is theirs (as a reward's choice is given) and gone
-##   from the shelf for everyone. The shelf keeps what is left all run (`shelf_changed`).
+##   each a different line's, at its line's `price`. The item nearest a standing wizard's own feet,
+##   within SHELF_REACH, is in their reach (`shelf_near_changed`), and A buys it (the owner,
+##   2026-11-19: `shelf_buy_requested`, a command at the tick's start, so the first seat to ask
+##   takes it; nobody waits): with its price (times that player's `price_scale`) in their own wallet
+##   and room for it (a heal only while hurt), it is theirs (as a reward's choice is given) and gone
+##   from the shelf for everyone; else `shelf_refused`. Walking over an item buys nothing, so a
+##   shelf may sell heals. The shelf keeps what is left all run (`shelf_changed`).
 ## - **A fountain** (CB11, decision 20): as a fountain room opens, its pool fills with POOL_HEALTH
 ##   times the highest `fountain_pool` of the players then, shared: every hurt standing wizard whose
 ##   own feet are in it draws DRAW_RATE health a second from it until they are whole or it runs dry
@@ -34,7 +37,9 @@ extends Node
 ##   heals it as asked.
 ## - **Run stats** (`RunStats`): the run's own changes come with `run_stats_ruled` (the Run area's,
 ##   as a run of rooms begins); a player's are those, then their relics' (the relics bag of its
-##   wizard, `RelicBase`). Read by name: `stat_of`.
+##   wizard, `RelicBase`). Read by name: `stat_of`. Each seat's are told to the view
+##   (`run_stats_told`) as they may change and after a restore (a relic taken will tell them
+##   when relics come, M3).
 ## - **Coins** (decision 18: shared income, own wallet): a foe that dies (`enemy_died`) drops its
 ##   `EnemyBase.coins` where it fell (an add another body called, `Actor.is_add`, drops none; a boss's go to every wallet at once,
 ##   decision 25), each one coin anyone may take: the first wizard (seat order)
@@ -125,6 +130,9 @@ var _pool_left: PackedFloat32Array = PackedFloat32Array()
 var _pool_most: PackedFloat32Array = PackedFloat32Array()
 ## By seat: the rolls it has had this run (its counter of the run's chance, `RewardRoll`).
 var _rolls: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## By seat: the shelf item (its number) in reach of its standing wizard, last said
+## (`shelf_near_changed`), -1 for none.
+var _shelf_near: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 ## By seat: the coins in its wallet.
 var _wallets: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## The seats whose starting coins came this run, a bit each.
@@ -164,6 +172,7 @@ func _ready() -> void:
 	events.run_stats_ruled.connect(_on_run_stats_ruled)
 	# A command, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"reward_pick_requested", _on_reward_pick_requested)
+	events.listen(&"shelf_buy_requested", _on_shelf_buy_requested)
 
 
 ## A run's start: every offer, coin, shelf, pool and wallet goes (each said), and the area is a fresh
@@ -175,11 +184,13 @@ func begin_run() -> void:
 	for seat in SEATS:
 		_say_waiting(seat)
 		_say_wallet(seat)
+		_say_shelf_near(seat)
+		_say_stats(seat)
 
 
 ## The tick's step: the clears since the last step are rolled for; a seat whose wizard came gets
 ## its starting coins (once a run); each coin a wizard's feet reach is taken (seats in order, the
-## first takes it); each shelf item a wizard can buy is bought; each fountain is drawn on.
+## first takes it); each seat's shelf item in reach is found; each fountain is drawn on.
 func step(delta: float) -> void:
 	if actors == null:
 		return
@@ -194,6 +205,8 @@ func step(delta: float) -> void:
 		if _funded & (1 << seat) == 0 and actors.home_of_seat(seat) != ActorsScript.NONE:
 			_funded |= 1 << seat
 			_add_coins(seat, int(stat_of(seat, &"start_coins")))
+			_say_stats(seat)
+			_say_shelf_near(seat)
 	var at: int = 0
 	while at < _coin_numbers.size():
 		if _taker_of(_coin_at[at]) != ActorsScript.NONE:
@@ -207,7 +220,7 @@ func step(delta: float) -> void:
 					_add_coins(seat, 1)
 		else:
 			at += 1
-	_buy_from_shelves()
+	_look_at_shelves()
 	_draw_on_pools(delta)
 
 
@@ -307,6 +320,8 @@ func rebuild_derived() -> void:
 	for seat in SEATS:
 		_say_wallet(seat)
 		_say_waiting(seat)
+		_say_shelf_near(seat)
+		_say_stats(seat)
 
 
 # --- Heard ------------------------------------------------------------------------------
@@ -383,6 +398,34 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 		_clear_rooms()
 
 
+## Seat `player` asked to buy shelf item `item` (a command): sold if it still lies on its shelf, in
+## reach of the seat's standing wizard, who can pay for it and take it; else `shelf_refused` (an item
+## gone or out of reach says nothing).
+func _on_shelf_buy_requested(player: int, item: int) -> void:
+	if player < 0 or player >= SEATS:
+		return
+	var at: int = _item_numbers.find(item)
+	var body: Actor = _wizard_of(player)
+	if at < 0 or body == null or body.is_down() or body.position.distance_squared_to(_item_at[at]) > SHELF_REACH * SHELF_REACH:
+		return
+	var price: int = _price_of(at, stat_of(player, &"price_scale"))
+	var whole: bool = body.health == null or body.health.health >= body.health.max_health
+	if _wallets[player] < price or (_item_kinds[at] == RewardEntry.HEAL and whole) or not _give(player, _item_kinds[at], _item_ids[at], _item_counts[at]):
+		if events != null:
+			events.shelf_refused.emit(player, item)
+		return
+	_add_coins(player, -price)
+	_say_item(at, false)
+	_item_numbers.remove_at(at)
+	_item_rooms.remove_at(at)
+	_item_at.remove_at(at)
+	_item_kinds.remove_at(at)
+	_item_ids.remove_at(at)
+	_item_counts.remove_at(at)
+	_item_prices.remove_at(at)
+	_look_at_shelves()
+
+
 ## A special room opened (Flow's, CB11): a shop's shelf is stocked from `table` at `spots`, a
 ## fountain's pool filled at `area`. Once a room.
 func _on_special_room_opened(room: int, fill: StringName, table: StringName, area: Rect2, spots: PackedVector2Array) -> void:
@@ -425,6 +468,10 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 ## The run's own changes of the run stats (the Run area's, as a run of rooms begins).
 func _on_run_stats_ruled(changes: Array[StatChange]) -> void:
 	_run_changes = changes.duplicate()
+	for seat in SEATS:
+		_say_stats(seat)
+		# A price in reach follows the player's `price_scale`.
+		_say_shelf_near(seat)
 
 
 # --- Inside -----------------------------------------------------------------------------
@@ -541,32 +588,22 @@ func _stock_shelf(room: int, table_id: StringName, spots: PackedVector2Array) ->
 		_say_item(_item_numbers.size() - 1, true)
 
 
-## Each shelf item the first standing wizard (seat order) at it can pay for and take is bought: given
-## to them, paid from their own wallet, and gone from the shelf.
-func _buy_from_shelves() -> void:
-	var at: int = 0
-	while at < _item_numbers.size():
-		var bought: bool = false
-		for seat in SEATS:
-			var body: Actor = _wizard_of(seat)
-			if body == null or body.is_down() or body.position.distance_squared_to(_item_at[at]) > SHELF_REACH * SHELF_REACH:
-				continue
-			var price: int = _price_of(at, stat_of(seat, &"price_scale"))
-			if _wallets[seat] < price or not _give(seat, _item_kinds[at], _item_ids[at], _item_counts[at]):
-				continue
-			_add_coins(seat, -price)
-			_say_item(at, false)
-			_item_numbers.remove_at(at)
-			_item_rooms.remove_at(at)
-			_item_at.remove_at(at)
-			_item_kinds.remove_at(at)
-			_item_ids.remove_at(at)
-			_item_counts.remove_at(at)
-			_item_prices.remove_at(at)
-			bought = true
-			break
-		if not bought:
-			at += 1
+## Each seat's shelf item in reach: the one nearest its standing wizard's own feet within
+## SHELF_REACH (the first stocked of two as near), said as it changes.
+func _look_at_shelves() -> void:
+	for seat in SEATS:
+		var near: int = -1
+		var body: Actor = _wizard_of(seat)
+		if body != null and not body.is_down():
+			var best: float = SHELF_REACH * SHELF_REACH
+			for at in _item_numbers.size():
+				var gap: float = body.position.distance_squared_to(_item_at[at])
+				if gap <= best and (near < 0 or gap < best):
+					best = gap
+					near = _item_numbers[at]
+		if near != _shelf_near[seat]:
+			_shelf_near[seat] = near
+			_say_shelf_near(seat)
 
 
 ## Each fountain `delta` seconds on: every hurt standing wizard whose own feet are in its pool draws
@@ -608,6 +645,10 @@ func _shown_price(at: int) -> int:
 func _clear_rooms() -> void:
 	for at in _item_numbers.size():
 		_say_item(at, false)
+	for seat in SEATS:
+		if _shelf_near[seat] >= 0:
+			_shelf_near[seat] = -1
+			_say_shelf_near(seat)
 	_item_numbers.clear()
 	_item_rooms.clear()
 	_item_at.clear()
@@ -686,6 +727,23 @@ func _say_item(at: int, lying: bool) -> void:
 		_said_items.erase(number)
 	if events != null:
 		events.shelf_changed.emit(number, _item_at[at], _item_view(at) if lying else {}, _shown_price(at), lying)
+
+
+func _say_stats(seat: int) -> void:
+	if events != null:
+		events.run_stats_told.emit(seat, RunStats.all_of(_run_changes, _relics_of(seat)))
+
+
+func _say_shelf_near(seat: int) -> void:
+	if events == null:
+		return
+	var at: int = _item_numbers.find(_shelf_near[seat])
+	if at < 0:
+		events.shelf_near_changed.emit(seat, -1, Vector2.ZERO, {})
+		return
+	var view: Dictionary = _item_view(at)
+	view["price"] = _price_of(at, stat_of(seat, &"price_scale"))
+	events.shelf_near_changed.emit(seat, _shelf_near[seat], _item_at[at], view)
 
 
 func _say_pool(at: int) -> void:

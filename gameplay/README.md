@@ -98,6 +98,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `reward_rerolled` | `rewards` (an offer rerolled: one reward reroll spent, its new choices; the owner's of 2026-11-19) | `hud` (the menu turns its cards over) |
 | `reward_reroll_refused` | `rewards` (none held: nothing spent) | `hud` (the menu's title says so) |
 | `coin_changed` | `rewards` (a coin on the floor laid or gone) | `feel` (the coins' look) |
+| `item_picked_up` | `rewards`, `items`, `flow` (an actor picked up an item: a coin, a key, a bought or ground item, a reward) | `feel` (each kind's pickup sound) |
 | `run_stats_ruled` | `run` (the run's own changes of the run stats, as a run of rooms begins) | `rewards` |
 | `health_gift_requested` | `rewards` (a fountain's draw), `player` (a potion drunk) | `combat` (it keeps an actor's health) |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |

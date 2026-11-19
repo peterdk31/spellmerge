@@ -33,6 +33,9 @@ const NO_PLAYER: int = -1
 ## what a listener keeps of the world (decoys, revives, the camera, the ground's items) starts over
 ## then, and only then. ALL_ROOMS: every room of the world at once (`room_left` as the world goes).
 const FIRST_ROOM: int = 0
+## `item_picked_up`'s kind for a reward item's offer taken (not an `ItemKinds` kind: the reward item
+## on the floor, gameplay/rewards).
+const PICKUP_REWARD: StringName = &"reward"
 const ALL_ROOMS: int = -1
 ## The kinds of number `damage_number_shown` tells (props W5): a hit, a heal, and a hit that took
 ## nothing (an invincible actor). Its sender and its listener both name them from here.
@@ -688,6 +691,12 @@ signal rewards_waiting_changed(player: int, offers: Array[Dictionary])
 ## (`lying`), or is gone from there (taken, or the world went). After a snapshot is restored, said
 ## again for every coin (and gone for those no longer lying). Heard by feel (the coins' look).
 signal coin_changed(coin: int, at: Vector2, lying: bool)
+## Sender: rewards (a coin walked over, a shelf item bought, a reward taken), items (a ground item
+## taken) and flow (a key taken; the owner's ask of 2026-11-19). The actor `actor` picked up an item
+## of kind `kind` (an `ItemKinds` kind, or `PICKUP_REWARD` for a reward item's offer taken) and id
+## `id` at `at` (world pixels). For the view only: heard by feel (each kind's pickup sound, from the
+## rooms this machine's wizards are in, CB12's Ears).
+signal item_picked_up(actor: int, kind: StringName, id: StringName, at: Vector2)
 ## Sender: rewards (connected biomes CB11, decision 19). Shop item `item` (numbered once a run) lies on
 ## its shelf at `at` (`lying`), `choice` what it is (an item, as a reward choice's view: `kind`, `id`,
 ## `count`, `name`, `icon`, `description`) and `price` its price in coins (the run's own `price_scale`; a buyer's relics may

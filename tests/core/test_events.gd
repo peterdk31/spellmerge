@@ -197,6 +197,7 @@ const EVENTS: Dictionary = {
 	&"reward_reroll_refused": [["player", TYPE_INT], ["offer", TYPE_INT]],
 	&"rewards_waiting_changed": [["player", TYPE_INT], ["offers", TYPE_ARRAY]],
 	&"coin_changed": [["coin", TYPE_INT], ["at", TYPE_VECTOR2], ["lying", TYPE_BOOL]],
+	&"item_picked_up": [["actor", TYPE_INT], ["kind", TYPE_STRING_NAME], ["id", TYPE_STRING_NAME], ["at", TYPE_VECTOR2]],
 	&"shelf_changed": [["item", TYPE_INT], ["at", TYPE_VECTOR2], ["choice", TYPE_DICTIONARY], ["price", TYPE_INT], ["lying", TYPE_BOOL]],
 	&"shelf_near_changed": [["player", TYPE_INT], ["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
 	&"shelf_refused": [["player", TYPE_INT], ["item", TYPE_INT]],

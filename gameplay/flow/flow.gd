@@ -53,10 +53,15 @@ extends Node
 ##
 ## Each mode's setup (owner, 2026-11-05): a new wizard gets the mode's staffs, start cards and
 ## card bag (the cards it may build with, counted: `bag_for_mode`, card id to copies, handed over
-## with `seat_wizard`; items I3): Play one `dash` and one `bolt` (PLAY_BAG, `play_bag`: each entry
-## a copy); the hub Inventory.DEV_COPIES of every card (the hub's for now, owner
-## 2026-11-11: to try combos online until a better way to come by cards comes; owner 2026-11-13:
-## 20 of each). The start cards come with their staffs, beside the bag.
+## with `seat_wizard`; items I3): Play and the hub alike one `dash` and one `bolt` (PLAY_BAG,
+## `play_bag`: each entry a copy; owner, 2026-11-19: the hub no longer hands out every card). The
+## start cards come with their staffs, beside the bag.
+## The command `all_cards_requested` (the HUD's cheat code, typed on the keyboard or pressed on a
+## gamepad; owner, 2026-11-19) fills the card bag of the wizard of the seat that sent it, and no
+## other, with Inventory.DEV_COPIES of every card, at the tick's start (`_on_all_cards_requested`);
+## outside the hub it does nothing. It lasts
+## as long as that hub: a run from the stone takes the cards along (the whole player), and the hub
+## begun again after a run hands out its own bag again.
 ##
 ## The intro (living staffs H6, `intro.gd`): on a new save (`save`, a `SaveFile`, has no
 ## INTRO_SEEN flag) Play shows the intro first (state INTRO): one staff dropped per joined player,
@@ -84,7 +89,7 @@ extends Node
 ## without consequences), and everyone down restarts nothing. Its wizards
 ## have Play's staffs (two, RB and RT: START_HANDS; items I2 took the `dev` staff off RT, the
 ## rack of items I6 replaces it: its premade staffs are built on the `dev` staff, content/items),
-## Play's start cards, and every card in the bag (above). Its teleporter stone (a
+## Play's start cards, and Play's bag (above). Its teleporter stone (a
 ## prop of the role `run_start`, stood on where its area is) is lit while every wizard stands on it:
 ## counted each tick and whenever a wizard joins or leaves (`hub`, `HubRules`), told by
 ## `start_stone_changed`, the stone asked to enter `lit` or `unlit` to match, so its look and cue
@@ -358,6 +363,7 @@ func _ready() -> void:
 	# Commands, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"run_requested", _on_run_requested)
 	events.listen(&"boss_intro_next_requested", _on_boss_intro_next_requested)
+	events.listen(&"all_cards_requested", _on_all_cards_requested)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
@@ -870,6 +876,19 @@ func _on_run_requested(player: int) -> void:
 	_start_run_from_stone(player)
 
 
+## The command `all_cards_requested` (the HUD's cheat code; owner, 2026-11-19): while the hub
+## runs, the own card bag of seat `player`'s wizard, and only that one (owner: only the typer's
+## wizard), holds Inventory.DEV_COPIES of every card of the registry from now on (what it held is
+## replaced; its staffs keep their cards). Anywhere else, or for a seat with no wizard, it does
+## nothing.
+func _on_all_cards_requested(player: int) -> void:
+	if mode != MODE_HUB or state != State.RUNNING:
+		return
+	var wizard := get_wizard(player) as Actor
+	if wizard != null and wizard.inventory != null:
+		wizard.inventory.give_cards(Inventory.dev_cards(registry))
+
+
 ## The run, from the hub's stone, for seat `seat`: every wizard goes in as the player it
 ## is, with every bag, its staffs and its hands (owner, 2026-11-13: what a run's start takes along
 ## is the whole player), and the run's end brings everyone back to the hub.
@@ -1184,17 +1203,13 @@ func start_cards_for_mode() -> Array:
 	return start_cards
 
 
-## The card bag a new wizard gets in this run's `mode`, card id to copies (items I3):
-## Inventory.DEV_COPIES of every spell card of the registry in the hub, `play_bag` in Play (an entry
-## a copy).
+## The card bag a new wizard gets in this run's `mode`, card id to copies (items I3): `play_bag`
+## in Play and the hub alike (an entry a copy; owner, 2026-11-19). Every card is the cheat code's
+## (`all_cards_requested`).
 func bag_for_mode() -> Dictionary:
 	var out: Dictionary = {}
-	match mode:
-		MODE_HUB:
-			out = Inventory.dev_cards(registry)
-		_:
-			for id: StringName in play_bag:
-				out[id] = int(out.get(id, 0)) + 1
+	for id: StringName in play_bag:
+		out[id] = int(out.get(id, 0)) + 1
 	return out
 
 

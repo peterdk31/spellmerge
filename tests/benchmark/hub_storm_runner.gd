@@ -21,7 +21,8 @@ extends Node
 ## Run in a window it is the showcase: a line at the top shows the live numbers, and with `--stay`
 ## it keeps casting after the report. User arguments: `--seconds=N` (SECONDS), `--cap=N` (the projectile cap; the platform's by default), `--no-native` (the
 ## projectile manager's GDScript), `--cards=a,b,c` (another build on the storm's staff, card ids, as
-## the builder sends it, `staff_cards_requested`, from the hub's bag of every card: a beam build, say,
+## the builder sends it, `staff_cards_requested`, from every card the hub's cheat code gives
+## (`all_cards_requested`, owner 2026-11-19): a beam build, say,
 ## whose hits are not shots, so it passes with none; spell spectacle 2, S6 items 10 and 11),
 ## `--stay`, `--profile` (the tree profile, tree_profile.gd: each
 ## script's time a physics step and a frame) and `--profile-signals` (with it, the time of each
@@ -209,6 +210,8 @@ func _start() -> void:
 	if _own_cards:
 		# By the staff's number (the inventory's), as the builder names it: the one on LB.
 		var number: int = PlayerController.loadout_of(_wizard).hands()[STORM_STAFF]
+		# The hub's bag is Play's: every card is the cheat code's, applied first.
+		_events.emit_signal("all_cards_requested", PLAYER)
 		_events.emit_signal("staff_cards_requested", PLAYER, number, _cards, _wizard.key())
 		await _ticks(2)
 	if _wizard.caster.staffs.size() <= STORM_STAFF or _wizard.caster.staffs[STORM_STAFF] == null:

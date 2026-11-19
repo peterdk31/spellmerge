@@ -578,6 +578,63 @@ func test_the_hub_and_its_command_are_ignored_elsewhere() -> void:
 	check(flow.world == world, "run_requested out of the hub changes nothing")
 
 
+## The hub hands out Play's bag (owner, 2026-11-19), and the cheat code's command
+## `all_cards_requested` fills the card bag of the sending seat's wizard, and no other's (owner:
+## only the typer's wizard), with Inventory.DEV_COPIES of every card, at the tick's start; the run
+## from the stone takes them along, and the hub begun again after the run hands out Play's bag again.
+func test_the_cheat_code_gives_the_typers_wizard_every_card() -> void:
+	_start([0, 1])
+	var plain: Array = [[&"dash", 1], [&"bolt", 1]]
+	check_equal(_card_bag(0), plain, "the hub's bag is Play's: one dash, one bolt")
+	check_equal(_card_bag(1), plain, "seat 1's too")
+	events.emit_signal("all_cards_requested", 1)
+	check_equal(_card_bag(1), plain, "a command waits for the tick's start")
+	await commands_applied()
+	var every: Array = []
+	var dev: Dictionary = Inventory.dev_cards(root.get_node("Registry"))
+	for id: Variant in dev:
+		every.append([id, dev[id]])
+	check(every.size() > 2, "the registry holds more cards than Play's two")
+	check_equal(_card_bag(1), every, "seat 1, who typed it, holds every card, DEV_COPIES of each")
+	check_equal(_card_bag(0), plain, "seat 0 keeps Play's bag")
+	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(0).slice(0, 1), [&"dash"] as Array[StringName], "the staffs keep their cards")
+	_place(0, true)
+	_place(1, true)
+	_tick()
+	_press_a(0)
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run started")
+	check_equal(_card_bag(1), every, "the run takes every card along with the whole player")
+	check_equal(_card_bag(0), plain, "and seat 0's bag as it was")
+	for wizard in _wizards():
+		wizard.health.take(wizard.health.max_health)
+	flow.step(FlowScript.RESTART_DELAY)
+	from_frames()
+	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
+	check_equal(_card_bag(1), plain, "the hub begun again hands out Play's bag again")
+
+
+## The cheat code gives only the typer's wizard: a seat joining after it gets Play's bag, and a seat
+## with no wizard changes nothing.
+func test_a_seat_joining_after_the_cheat_code_gets_plays_bag() -> void:
+	_start([0])
+	events.call("apply_command", &"all_cards_requested", [0])
+	check(_card_bag(0).size() > 2, "seat 0 holds every card")
+	input.add_virtual_device(1)
+	check_equal(_card_bag(1), [[&"dash", 1], [&"bolt", 1]], "the joiner holds Play's bag")
+	events.call("apply_command", &"all_cards_requested", [3])
+	check_equal(_card_bag(1), [[&"dash", 1], [&"bolt", 1]], "a seat with no wizard gives nobody anything")
+
+
+## The cheat code's command does nothing outside the hub: a run's bag stays as it is.
+func test_the_cheat_code_does_nothing_in_a_run() -> void:
+	input.add_virtual_device(0)
+	events.emit_signal("play_requested", 0)
+	check_equal(flow.mode, FlowScript.MODE_RUN, "a run")
+	var before: Array = _card_bag(0)
+	events.call("apply_command", &"all_cards_requested", [0])
+	check_equal(_card_bag(0), before, "the run's bag is as it was")
+
+
 ## Where the altar stands is told for the view (online-lobby L5c: the room's code over it): the top
 ## middle of its area once in the hub, and none once the hub is left.
 func test_the_altars_place_is_told_in_the_hub_and_gone_out_of_it() -> void:

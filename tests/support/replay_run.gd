@@ -239,6 +239,10 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 			var standing: Actor = _flow.call("get_wizard", bots) as Actor
 			if standing != null and standing.is_down():
 				problems.append("%s: the scripted wizard is down at the rebuild (tick %d): move REBUILD_AT" % [start, REBUILD_AT])
+			if start == &"hub_requested":
+				# The hub's bag is Play's: the cheat code gives every card first (owner, 2026-11-19),
+				# a command of its own on the same tick, applied before the rebuild.
+				events.emit_signal("all_cards_requested", bots)
 			events.emit_signal("staff_cards_requested", bots, 0, REBUILT, standing.key() if standing != null else 0)
 		if walker != null and i == walker.take_at:
 			# As the HUD's panels send A by an item in reach: applied at the next tick's start.
@@ -255,7 +259,7 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		if scripted > 0:
 			_check_stopped(start + " recorded", i)
 	replay = _frames.call("stop_recording")
-	# The hub's bag holds every card; Play's only its own.
+	# The hub's bag holds every card once the cheat code is typed; Play's only its own.
 	if scripted > 0 and ticks > REBUILD_AT + 1 and _takes_from_rack(start):
 		var wizard: Actor = _flow.call("get_wizard", bots) as Actor
 		if wizard == null or wizard.caster.cards_of(0).slice(0, REBUILT.size()) != REBUILT:

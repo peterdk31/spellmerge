@@ -385,7 +385,7 @@ Every daily release ships two builds from the same code:
 | Web demo | Everything, as the full build (owner, 2026-11-05) | GitHub Pages and itch.io, playable in the browser |
 | Full build | Everything | Windows and Linux downloads on GitHub Releases and itch.io; later Steam |
 
-There is no demo flag on content (owner, 2026-11-05: every build shows every card; the hub's bag holds them all). If the full game ever outgrows the web budgets, the Web preset's `exclude_filter` (export_presets.cfg) can leave content out, by the owner's decision. Windows builds are unsigned at first, so Windows shows a SmartScreen warning until signing is added for Steam.
+There is no demo flag on content (owner, 2026-11-05: every build shows every card; the hub's cheat code gives them all, owner 2026-11-19). If the full game ever outgrows the web budgets, the Web preset's `exclude_filter` (export_presets.cfg) can leave content out, by the owner's decision. Windows builds are unsigned at first, so Windows shows a SmartScreen warning until signing is added for Steam.
 
 ## Planning system
 

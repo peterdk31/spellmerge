@@ -11,3 +11,4 @@ ends = &"enemies_down"
 door = &"gate"
 portal_home = true
 light = &"fire"
+symbol = ".#####.\n#######\n#..#..#\n#######\n.##.##.\n.#.#.#.\n......."

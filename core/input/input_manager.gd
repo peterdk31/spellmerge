@@ -111,11 +111,13 @@ const MOUSE_AIM_TRAVEL: float = 8.0
 ## the stick; Page Up, Page Down) flip the radial builder's kind of card. `take` (A; F or Enter, never
 ## Space, which casts) takes the item in reach in play (items I6, `hud/panels`). `inventory` (Select,
 ## the pad's Back or View; Tab) opens and closes the inventory (items I7, `hud/panels`); the builder's
-## `back` keeps B and E.
+## `back` keeps B and E. `map` (Y; M), held, shows the party's map over the player's own view
+## (connected biomes CB9, Feel's `party_map_view.gd`: view only, it never reaches the simulation);
+## inside a menu Y is the menu's `extra`, and the map waits while the menu holds the player.
 const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down", &"staff_1", &"staff_2", &"staff_3", &"staff_4",
 	&"accept", &"back", &"alternate", &"pause", &"page_prev", &"page_next", &"extra", &"kind_prev", &"kind_next",
-	&"take", &"inventory",
+	&"take", &"inventory", &"map",
 ]
 ## The staff cast actions, by staff index (0 to 3: RB, RT, LB, LT).
 const CAST_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]

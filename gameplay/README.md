@@ -79,6 +79,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `cover_changed` | `cover` (each tick's changes of one room, by its number; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look of that room) |
 | `status_requested` | `core/spells` (a portal's infusion) and `cover` (a status of the cover a body stands in, ground cover GC5 rule 4: asked as any status is) | `combat` |
 | `room_cleared` | `flow` | `rewards` (a roll per player), `run` |
+| `rooms_seen` | `flow` (the party's map: each room unseen, shown or entered; again after a restore; connected biomes CB9) | `feel` (the dark over the unvisited rooms, the held Y map) |
 | `door_voted` | `flow` | none yet |
 | `difficulty_changed` | `difficulty` (a difficulty setting's level, M3; never the room's scale, `run_room_scaled`) | none yet (enemy AI AI10: `ai`, the TeamBoard's skill) |
 | `reward_rolled`, `rewards_waiting_changed` | `rewards` (a player's own offer on a clear; the offers a seat has waiting, connected biomes CB10) | `hud` (the reward menu, the corner panel's unspent count) |

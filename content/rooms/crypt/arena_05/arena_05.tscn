@@ -1,15 +1,11 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/void.svg" id="1_void"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/arena_05/arena_05_ground.tscn" id="2_ground"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/candles.tscn" id="3_candles"]
 [ext_resource type="PackedScene" path="res://content/rooms/decor/beam.tscn" id="4_beam"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/sarcophagus.svg" id="5_sarcophagus"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/ossuary_wall.svg" id="6_ossuary"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="7_rubble"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="8_skull"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/bone_pile.svg" id="9_bones"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/fallen_column.svg" id="9_fallen"]
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="10_prop_stand_in"]
 [ext_resource type="Resource" path="res://content/props/crypt_pillar/crypt_pillar.tres" id="12_pillar"]
 [ext_resource type="Resource" path="res://content/props/cracked_pillar/cracked_pillar.tres" id="13_cracked"]
@@ -17,12 +13,6 @@
 [ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
 [ext_resource type="Script" path="res://core/base/room_socket.gd" id="cb_socket"]
 [ext_resource type="Script" path="res://tools/socket_preview.gd" id="cb_socket_preview"]
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_64x32"]
-size = Vector2(64, 32)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_128x32"]
-size = Vector2(128, 32)
 
 [node name="Arena05" type="Node2D"]
 

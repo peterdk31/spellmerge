@@ -275,6 +275,23 @@ class GroundShapeTest(unittest.TestCase):
         self.assertEqual(shades[1], gs.colour(turf["patches"]["colour"], mats), "base: the turf's patches")
         self.assertEqual(shades[2], gs.colour(turf["base"], mats), "shadow: the turf's own colour")
 
+    def test_a_polygon_outline_is_land_inside_its_corners_only(self) -> None:
+        # A corner walkway's L (connected biomes CB13): `points`, taken as they are.
+        corner = [[0, 32], [64, 32], [64, 0], [96, 0], [96, 96], [0, 96]]
+        ground = gs.Ground({"size": [128, 128], "outlines": [{"points": corner}]})
+        self.assertEqual(gs.outline_points({"points": corner}), [tuple(map(float, p)) for p in corner])
+        self.assertTrue(ground.land[40 * 128 + 10] and ground.land[10 * 128 + 80])
+        self.assertFalse(ground.land[10 * 128 + 10] or ground.land[40 * 128 + 110] or ground.land[100 * 128 + 50])
+        self.assertEqual(sum(ground.land), 96 * 96 - 64 * 32)
+
+    def test_a_polygon_names_what_an_oval_gives_for_free(self) -> None:
+        # A crack starts from an oval's middle, and an area's strokes go round its centre.
+        corner = {"points": [[0, 32], [96, 32], [96, 96], [0, 96]]}
+        with self.assertRaisesRegex(ValueError, "polygon outline"):
+            gs.Ground({"size": [128, 128], "outlines": [corner], "cracks": [{"angle": 0.0, "width": 6, "length": 20, "seed": 1}]})
+        with self.assertRaisesRegex(ValueError, "centre"):
+            gs.Ground({"size": [128, 128], "outlines": [corner], "areas": [dict(corner, ground="earth")]})
+
     def test_every_rooms_ground_is_up_to_date(self) -> None:
         shapes = gs.shape_files()
         self.assertTrue(shapes, "the hub has a shape file")

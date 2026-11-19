@@ -526,7 +526,8 @@ func test_the_start_room_alone_is_one_room_at_the_origin() -> void:
 ## The crypt's walkways (connected biomes CB13: straight ones every 32 px both ways and corner ones)
 ## and its fight rooms with three or four sockets (a way uses two of a room's sockets, so a loop needs
 ## a third) let its loop style close loops: before them none of 60 loop maps closed one; now at least
-## a fifth do, and every kind of walkway (west-east, north-south, a corner) carries a way somewhere.
+## two in five do (34 when measured), and every kind of walkway (west-east, north-south, a corner)
+## carries a way somewhere.
 func test_the_crypt_s_loop_style_closes_loops() -> void:
 	var registry := own(RegistryScript.new()) as RegistryScript
 	registry.scan()
@@ -547,15 +548,37 @@ func test_the_crypt_s_loop_style_closes_loops() -> void:
 	var looped: int = 0
 	var made: int = 0
 	var used: Dictionary = {}
-	for seed_value in 60:
+	for seed_value: int in 60:
 		var map: BiomeMap = BiomeGenerator.generate(definition, content, shapes, _sim(seed_value))
 		if not map.is_made():
 			continue
 		made += 1
 		looped += 1 if map.bridges() >= map.rooms() else 0
-		for bridge in map.bridges():
+		for bridge: int in map.bridges():
 			var id := String(map.bridge_templates[bridge])
 			used["corner" if id.begins_with("crypt_corner") else ("north-south" if id.begins_with("crypt_bridge_v") else "west-east")] = true
 	check_equal(made, 60, "every loop map is made")
-	check(looped >= 12, "the loop style closes a loop in a fifth of the crypt's maps at least: %d of 60" % looped)
+	check(looped >= 24, "the loop style closes a loop in two maps of five at least: %d of 60" % looped)
 	check_equal(used.size(), 3, "every kind of walkway carries a way: %s" % [used.keys()])
+
+
+## Every crypt template is played (connected biomes, "Steps": each template "played once in a
+## generated biome"): over 60 crypt maps in the styles its rules roll, every fight room and every
+## walkway stands somewhere, so a template no placement can ever fit is named.
+func test_every_crypt_fight_room_and_walkway_is_played() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	var placed: Dictionary = {}
+	for seed_value: int in 60:
+		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		for template: StringName in map.room_templates + map.bridge_templates:
+			placed[template] = int(placed.get(template, 0)) + 1
+	var unplayed := PackedStringArray()
+	for item: Resource in registry.get_all(&"rooms"):
+		var room := item as RoomBase
+		if room != null and room.biome == &"crypt" and (room.walkway or room.kinds.has(&"fight")) and not placed.has(room.id):
+			unplayed.append(String(room.id))
+	check_equal(unplayed, PackedStringArray(), "every crypt fight room and walkway is played in some map")

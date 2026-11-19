@@ -415,6 +415,8 @@ class Ground:
         if "frame" in shape:
             self._frame(shape["frame"], clear or [])
         for i, area in enumerate(shape.get("areas", [])):
+            if "centre" not in area:
+                raise ValueError(f"area {i} names no `centre` (a polygon area names one too: its strokes go round it)")
             area_mask = bytearray(n)
             fill_polygon(area_mask, self.width, self.height, outline_points(area, 3.0), 1)
             for p in range(n):
@@ -507,6 +509,8 @@ class Ground:
         land, and wanders back in `width` pixels wide at its mouth, tapering over `length` steps of
         3 px and forking, never into a `keep_clear` circle."""
         outline = self.shape["outlines"][int(spec.get("outline", 0))]
+        if "points" in outline:
+            raise ValueError("a crack runs from an oval outline's edge: a polygon outline (`points`) has none to start it")
         cx, cy = outline["centre"]
         rx, ry = outline["radii"]
         a = float(spec["angle"]) * math.tau

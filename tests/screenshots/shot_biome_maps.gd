@@ -68,7 +68,7 @@ func _map_of_style(registry: RegistryScript, crypt: RunDefinition, style: MapSty
 	var content: RunContent = registry.run_content()
 	var shapes: Dictionary = registry.piece_shapes(&"crypt")
 	var map: BiomeMap = null
-	for seed_value in SEEDS:
+	for seed_value: int in SEEDS:
 		var made: BiomeMap = BiomeGenerator.generate(definition, content, shapes, Sim.seeded(seed_value))
 		if not made.is_made():
 			continue
@@ -81,9 +81,9 @@ func _map_of_style(registry: RegistryScript, crypt: RunDefinition, style: MapSty
 		fail("no %s map of the crypt was made" % style.id)
 		return
 	var pieces: Array = []  # [template, place, mirror]
-	for room in map.rooms():
+	for room: int in map.rooms():
 		pieces.append([map.room_templates[room], map.room_places[room], map.room_mirrors[room]])
-	for bridge in map.bridges():
+	for bridge: int in map.bridges():
 		pieces.append([map.bridge_templates[bridge], map.bridge_places[bridge], map.bridge_mirrors[bridge]])
 	var size := Vector2i.ZERO
 	var drawn: Array[Image] = []
@@ -93,10 +93,10 @@ func _map_of_style(registry: RegistryScript, crypt: RunDefinition, style: MapSty
 		size = size.max(Vector2i(piece[1]) + image.get_size())
 	var whole := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
 	whole.fill(VOID)
-	for i in pieces.size():
+	for i: int in pieces.size():
 		var image: Image = drawn[i]
 		whole.blend_rect(image, Rect2i(Vector2i.ZERO, image.get_size()), Vector2i(pieces[i][1]))
-	whole.resize(maxi(1, size.x / 4), maxi(1, size.y / 4), Image.INTERPOLATE_BILINEAR)
+	whole.resize(maxi(1, size.x / 4), maxi(1, size.y / 4), Image.INTERPOLATE_NEAREST)
 	save(whole, "biome_map_%s" % style.id)
 
 

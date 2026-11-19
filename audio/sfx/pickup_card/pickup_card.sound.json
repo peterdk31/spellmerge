@@ -1,0 +1,62 @@
+{
+	"version": 1,
+	"kind": "sfx",
+	"family": "combat",
+	"seconds": 0.38,
+	"vary": {
+		"pitch": 0.04,
+		"time": 0.06,
+		"seed": 905
+	},
+	"layers": [
+		{
+			"source": "noise",
+			"filter": {
+				"type": "band",
+				"from": 1600,
+				"to": 700,
+				"q": 1.0
+			},
+			"length": 0.07,
+			"amp": {
+				"attack": 0.006,
+				"shape": "perc",
+				"power": 1.5
+			},
+			"gain": -7
+		},
+		{
+			"source": "partials",
+			"pitch": 659,
+			"start": 0.03,
+			"partials": [
+				{
+					"ratio": 1,
+					"gain": 0,
+					"decay": 0.32
+				},
+				{
+					"ratio": 2,
+					"gain": -12,
+					"decay": 0.12
+				},
+				{
+					"ratio": 3,
+					"gain": -20,
+					"decay": 0.05
+				}
+			],
+			"amp": {
+				"attack": 0.012
+			}
+		}
+	],
+	"fx": {
+		"reverb": {
+			"mix": 0.22,
+			"size": 0.6
+		},
+		"lowpass": 4000
+	},
+	"notes": "A card, staff or relic picked up: a soft papery flick and a gentle tone after it, so an item taken from the ground reads as a thing put in the hand."
+}

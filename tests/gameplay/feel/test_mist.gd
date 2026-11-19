@@ -172,6 +172,43 @@ func test_a_big_room_is_masked_by_bigger_cells() -> void:
 	check(image.get_width() <= MistMaskScript.MOST_CELLS, "never more than MOST_CELLS a side")
 
 
+## A biome's room stands at its place, often mirrored (connected biomes; the mirrored art's fix, #851):
+## the mist lies over it there, its mask of the walls and holes as mirrored where they stand, and the
+## bodies part it where they walk.
+func test_a_room_laid_away_from_the_origin_and_mirrored_has_its_mist_where_it_stands() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var spectacle: SpectacleScript = feel.spectacle()
+	var room := registry.get_resource(&"rooms", &"arena_04") as RoomBase
+	var place := Vector2(640.0, 352.0)
+	var layout := own(room.build(null)) as Node2D
+	layout.position = place
+	layout.set_meta(PieceShape.GROUND_MIRROR_META, Vector2i(1, 1))
+	bus.spell_light_changed.emit(true)
+	bus.room_built.emit(room.id, 0, layout)
+	bus.room_entered.emit(room.id, 0)
+	var mist: MistScript = spectacle.mist
+	check(mist != null, "spell light on: the mist is made")
+	if mist == null:
+		return
+	check_equal(mist.position, place, "the mist lies at the room's place")
+	check_equal(mist.room_origin, place, "its origin the room's")
+	check_equal((mist.material as ShaderMaterial).get_shader_parameter(&"origin"), place, "and the shader reads its mask from there")
+	var size: Vector2 = room.places().size
+	var shape: PieceShape = PieceShape.of_room(room, PieceShape.MIRROR_X | PieceShape.MIRROR_Y)
+	var mirrored: Image = MistMaskScript.build(size, shape.walls, shape.holes, true)
+	check(mist.mask.get_image().get_data() == mirrored.get_data(), "its mask is of the walls and holes mirrored as the room stands (in its own px)")
+	var unmirrored: PieceShape = PieceShape.of_room(room)
+	check(MistMaskScript.build(size, unmirrored.walls, unmirrored.holes, true).get_data() != mirrored.get_data(), "(the template's own mask differs: the room is not symmetric)")
+	var foot: Vector2 = place + size * 0.5
+	for frame in 12:
+		spectacle.hand_bodies(PackedVector2Array([foot]), 1)
+		spectacle.step(10.0 + float(frame) * FRAME)
+	check(mist.parting.parted_at(foot + Vector2(0.0, MistPartingScript.FEET_DROP)) > 0.5, "a body parts it where it stands in the world")
+	check_equal(mist.parting.parted_at(size * 0.5 + Vector2(0.0, MistPartingScript.FEET_DROP)), 0.0, "not at the world's origin")
+
+
 # --- Parted by bodies -----------------------------------------------------------------------------
 
 func test_a_body_parts_the_mist_over_frames_and_it_closes_behind() -> void:

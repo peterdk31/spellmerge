@@ -4,7 +4,10 @@ extends Control
 ## (`item_near_changed`) and a refused take (`item_refused`), and each frame puts each hint over its
 ## item as the camera shows it now, those of players sharing an item stacked. A player's hint hides
 ## while that player has a menu open (`step`'s `menus`). `item_of(player)` is the item A would take
-## (the panels send `item_take_requested`). Display only: it reads no input.
+## (the panels send `item_take_requested`). A shop's item in reach (`shelf_near_changed`, connected
+## biomes CB11's follow-up) is shown the same way, "Buy" and its price, when no ground item is in
+## reach; `shelf_of(player)` is the one A would buy (`shelf_buy_requested`), and a refused buy
+## (`shelf_refused`) shakes it. Display only: it reads no input.
 
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -14,8 +17,15 @@ const ItemHintScript := preload("res://hud/widgets/item_hint.gd")
 const PLAYER_COUNT: int = 4
 
 var _hints: Array[ItemHintScript] = []
-## By player: where its item lies (room pixels).
+## By player: where its shown item lies (room pixels).
 var _at: PackedVector2Array = PackedVector2Array()
+## By player: the ground item in reach and the shop item in reach (-1: none), each with its place and view.
+var _ground: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+var _ground_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
+var _ground_view: Array[Dictionary] = [{}, {}, {}, {}]
+var _shelf: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+var _shelf_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
+var _shelf_view: Array[Dictionary] = [{}, {}, {}, {}]
 
 
 func _init() -> void:
@@ -34,11 +44,20 @@ func bind(events: EventsScript, input: InputManagerScript, spells: SpellsScript)
 	if events != null:
 		events.item_near_changed.connect(_on_item_near_changed)
 		events.item_refused.connect(_on_item_refused)
+		events.shelf_near_changed.connect(_on_shelf_near_changed)
+		events.shelf_refused.connect(_on_shelf_refused)
 
 
 ## The item `player`'s A takes now (shown, and no menu of theirs open), -1 for none.
 func item_of(player: int) -> int:
-	if player < 0 or player >= PLAYER_COUNT or not _hints[player].visible:
+	if player < 0 or player >= PLAYER_COUNT or not _hints[player].visible or _ground[player] < 0:
+		return -1
+	return _hints[player].item()
+
+
+## The shop item `player`'s A buys now (shown, no ground item in reach and no menu open), -1 for none.
+func shelf_of(player: int) -> int:
+	if player < 0 or player >= PLAYER_COUNT or not _hints[player].visible or _ground[player] >= 0:
 		return -1
 	return _hints[player].item()
 
@@ -51,6 +70,8 @@ func hint_of(player: int) -> ItemHintScript:
 ## Every hint hidden (a run ended).
 func clear() -> void:
 	for player in PLAYER_COUNT:
+		_ground[player] = -1
+		_shelf[player] = -1
 		_hints[player].show_item(player, -1, {})
 
 
@@ -80,7 +101,7 @@ func step(delta: float, menus: Array[bool], to_screen: Transform2D, views: Scree
 			place = layer * on_screen
 		var below: int = 0
 		for other in player:
-			if _hints[other].visible and _hints[other].item() == hint.item():
+			if _hints[other].visible and _hints[other].item() == hint.item() and _at[other] == _at[player]:
 				below += 1
 		hint.place_over(place, below)
 		hint.step(delta)
@@ -89,10 +110,40 @@ func step(delta: float, menus: Array[bool], to_screen: Transform2D, views: Scree
 func _on_item_near_changed(player: int, item: int, at: Vector2, view: Dictionary) -> void:
 	if player < 0 or player >= PLAYER_COUNT:
 		return
-	_at[player] = at
-	_hints[player].show_item(player, item, view)
+	_ground[player] = item if not view.is_empty() else -1
+	_ground_at[player] = at
+	_ground_view[player] = view
+	_show(player)
+
+
+func _on_shelf_near_changed(player: int, item: int, at: Vector2, view: Dictionary) -> void:
+	if player < 0 or player >= PLAYER_COUNT:
+		return
+	_shelf[player] = item if not view.is_empty() else -1
+	_shelf_at[player] = at
+	_shelf_view[player] = view
+	if _ground[player] < 0:
+		# A ground item shown stays as it is (its refused shake too).
+		_show(player)
+
+
+## Player `player`'s hint shows its ground item in reach, else its shop item, else nothing.
+func _show(player: int) -> void:
+	if _ground[player] >= 0:
+		_at[player] = _ground_at[player]
+		_hints[player].show_item(player, _ground[player], _ground_view[player])
+	elif _shelf[player] >= 0:
+		_at[player] = _shelf_at[player]
+		_hints[player].show_item(player, _shelf[player], _shelf_view[player], ItemHintScript.BUY)
+	else:
+		_hints[player].show_item(player, -1, {})
 
 
 func _on_item_refused(player: int, item: int) -> void:
-	if player >= 0 and player < PLAYER_COUNT:
+	if player >= 0 and player < PLAYER_COUNT and _ground[player] >= 0:
+		_hints[player].refuse(item)
+
+
+func _on_shelf_refused(player: int, item: int) -> void:
+	if player >= 0 and player < PLAYER_COUNT and _ground[player] < 0:
 		_hints[player].refuse(item)

@@ -99,7 +99,10 @@ extends CanvasLayer
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
 ##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
 ##   Enter, never Space, which casts) with no menu open and no lit stone takes it
-##   (`item_take_requested`); the altar's A comes after.
+##   (`item_take_requested`). With no ground item in reach, a shop's item where the wizard stands
+##   (`shelf_near_changed`) is shown the same way, "Buy" and its price, and `take` buys it
+##   (`shelf_buy_requested`; connected biomes CB11's follow-up): what the wizard stands at decides
+##   what A does. The altar's A and a waiting reward's come after.
 ## - The cheat code (`hud/widgets/cheat_code.gd`, node CheatCode, made here; owner, 2026-11-19):
 ##   the word `CheatCode.CODE` typed on the keyboard, or `CheatCode.PAD_CODE` on a gamepad, sends `all_cards_requested` (every card, in
 ##   the hub).
@@ -392,6 +395,8 @@ func _process(delta: float) -> void:
 		# The entrance waits while the game is paused.
 		_boss_banner.step(delta)
 	step_staffs()
+	for reward in _rewards:
+		reward.step()
 
 
 ## Put every player's item hint over its item as the camera shows it now (none outside a room,
@@ -453,6 +458,9 @@ func poll() -> void:
 						events.run_requested.emit(player)
 				elif take_now and _item_hints.item_of(player) >= 0:
 					events.item_take_requested.emit(player, _item_hints.item_of(player))
+				elif take_now and _item_hints.shelf_of(player) >= 0:
+					# A shop's item where the wizard stands: A buys it (connected biomes CB11's follow-up).
+					events.shelf_buy_requested.emit(player, _item_hints.shelf_of(player))
 				elif start_now and _altar_seats & (1 << player) != 0:
 					events.online_open_requested.emit(player)
 				elif start_now and _rewards[player].waiting() > 0 and _in_room and not _panels[player].is_downed():
@@ -499,16 +507,27 @@ func _has_menu(player: int) -> bool:
 
 
 
-## Open seat `player`'s reward menu, in the middle of their quarter of the view, so four open at once
-## never cover each other.
+## Open seat `player`'s reward menu, its cards laid out in their quarter of the view while several
+## play, so four open at once never cover each other (a quarter is inside the seat's own cell of a
+## split screen, CB6), or in the whole view for one player.
 func _open_reward(player: int) -> void:
 	var reward: RewardMenuScript = _rewards[player]
-	if not reward.open_menu():
-		return
-	reward.reset_size()
+	reward.room = reward_room(player)
+	reward.open_menu()
+
+
+## The room seat `player`'s reward menu lays its cards out in (view pixels).
+func reward_room(player: int) -> Rect2:
 	var view: Vector2 = (get_node("Root") as Control).size
-	var quarter: Vector2 = Vector2(0.25 + 0.5 * (player % 2), 0.75 if player >= 2 else 0.25) * view
-	reward.position = (quarter - reward.size * 0.5).round()
+	if _joined.count(true) <= 1:
+		return Rect2(Vector2(0.0, REWARD_CORNER_BAND), view - Vector2(0.0, REWARD_CORNER_BAND * 2.0))
+	var quarter: Vector2 = (view * 0.5).floor()
+	var top: float = REWARD_CORNER_BAND if player < 2 else 0.0
+	return Rect2(Vector2(float(player % 2), 1.0 if player >= 2 else 0.0) * quarter + Vector2(0.0, top), quarter - Vector2(0.0, REWARD_CORNER_BAND))
+
+
+## The reward menus keep off the band of the screen's top and bottom edges the corner panels sit in.
+const REWARD_CORNER_BAND: float = 32.0
 
 
 ## The reward menu of seat `player` (for tests and screenshots).

@@ -16,6 +16,14 @@ const HEAL: StringName = &"heal"
 const MAX_HEALTH: StringName = &"max_health"
 ## The kinds a line may be.
 const KINDS: Array[StringName] = [CARD, COINS, HEAL, MAX_HEALTH]
+## What a choice of each kind does, one short line for the reward menu's card (`describe`;
+## `{count}` is its count). A card says its own (`SpellComponent.description`), so it has none here;
+## a new kind brings its line with its row of `KINDS`.
+const DESCRIPTIONS: Dictionary = {
+	COINS: "{count} coins into your own purse, to spend in a shop.",
+	HEAL: "Heals your wizard {count} health at once. Not while down.",
+	MAX_HEALTH: "Your wizard's most health grows by {count}, healed too.",
+}
 
 ## What it gives (one of `KINDS`).
 @export var kind: StringName = CARD
@@ -41,6 +49,12 @@ static func make(of_kind: StringName, of_id: StringName = &"", of_count: int = 1
 	made.count = of_count
 	made.weight = of_weight
 	return made
+
+
+## What a choice of `of_kind`, `of_count` of it, does (`DESCRIPTIONS`); empty for a card (its own
+## description is the card's) or a kind with no line.
+static func describe(of_kind: StringName, of_count: int) -> String:
+	return String(DESCRIPTIONS.get(of_kind, "")).format({"count": of_count})
 
 
 ## What is wrong with it, one line each, named by `what`: a kind not of `KINDS`, a weight not above

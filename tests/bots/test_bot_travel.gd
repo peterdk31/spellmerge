@@ -11,13 +11,16 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const BotScript := preload("res://tests/bots/bot.gd")
 const BiomeMaps := preload("res://tests/support/biome_maps.gd")
 
-## The rooms the walkways join (the first two that fit, any mirroring).
-const ROOMS: Array[StringName] = [&"arena_07", &"arena_01", &"arena_03", &"arena_05", &"arena_06", &"arena_08"]
+## The rooms the walkways join (the first two that fit, any mirroring; the start room first, where
+## the bots were stuck).
+const ROOMS: Array[StringName] = [&"crypt_start", &"arena_07", &"arena_01", &"arena_03", &"arena_05", &"arena_06", &"arena_08"]
 ## One walkway of each kind.
 const WALKWAYS: Array[StringName] = [&"crypt_bridge_192", &"crypt_bridge_v192", &"crypt_corner_320", &"crypt_corner_384x256", &"crypt_corner_256x384"]
 ## How long a crossing may take, and how near the fight room's middle counts as there.
 const TICKS: int = 1200
 const THERE: float = 48.0
+## How near a shut door's mouth counts as waiting at it.
+const BY_THE_DOOR: float = 56.0
 
 
 ## What the bot reads of Flow (`biome`, `life`, `gates`).
@@ -97,9 +100,9 @@ func _joined(walkway: StringName, mirror: int, way: PieceShape, rooms: Array) ->
 	return map
 
 
-## Lay `map`, stand the bot's wizard in room `from` and walk it toward the fight in the other room;
-## true when it got to that room's middle.
-func _crossed(map: BiomeMap, from: int) -> bool:
+## Lay `map`, stand the bot's wizard in room `from` and walk it toward the fight in the other room
+## (behind a shut gather door when `shut`) for up to TICKS ticks; true once `there(wizard, biome)`.
+func _walked(map: BiomeMap, from: int, shut: bool, there: Callable) -> bool:
 	var biome := BiomeWorld.new()
 	biome.registry = _world.registry
 	biome.projectiles = _world.projectiles
@@ -114,6 +117,14 @@ func _crossed(map: BiomeMap, from: int) -> bool:
 	life.begin(map.rooms(), biome.places(), fights)
 	_flow.biome = biome
 	_flow.life = life
+	_flow.gates = null
+	if shut:
+		var rules := PackedByteArray([GatherDoors.RULE_NONE, GatherDoors.RULE_NONE])
+		rules[to] = GatherDoors.RULE_GATHER
+		var gates := GatherDoors.new()
+		gates.begin(map, rules, PackedByteArray([0, 0]))
+		gates.lay(biome, _world.projectiles.grid())
+		_flow.gates = gates
 	var mind := Fixture.Scripted.new()
 	mind.team = ActorsScript.TEAM_WIZARDS
 	mind.seat = 0
@@ -122,16 +133,34 @@ func _crossed(map: BiomeMap, from: int) -> bool:
 	var bot := BotScript.new()
 	bot.use_flow(_flow)
 	var intent := ActorIntent.new()
-	var goal: Vector2 = biome.room_rect(to).get_center()
 	for _i in TICKS:
 		intent.clear()
 		intent.move = bot.travel(wizard)
 		bot.send(intent)
 		mind.move = bot.wanted_frame().move
 		wizard.tick_step(Fixture.STEP)
-		if wizard.room == to and wizard.global_position.distance_to(goal) <= THERE:
+		if there.call(wizard, biome):
 			return true
 	return false
+
+
+## True when `wizard` stands in room 1 - `from`, near its middle.
+func _in_the_fight(from: int) -> Callable:
+	return func(wizard: Actor, biome: BiomeWorld) -> bool:
+		return wizard.room == 1 - from and wizard.global_position.distance_to(biome.room_rect(1 - from).get_center()) <= THERE
+
+
+## True when `wizard` waits on the walkway (bridge 0) within BY_THE_DOOR of the shut door of room 1 - `from`.
+func _at_the_door(from: int) -> Callable:
+	return func(wizard: Actor, biome: BiomeWorld) -> bool:
+		return wizard.room == biome.map.rooms() and wizard.global_position.distance_to(biome.mouth_rect(0, 1 - from).get_center()) <= BY_THE_DOOR
+
+
+func _fresh_world() -> void:
+	_world.free_all()
+	_world = Fixture.new(root)
+	for piece: Node in _into.get_children():
+		piece.free()
 
 
 func _check_walkway(walkway: StringName) -> void:
@@ -140,11 +169,8 @@ func _check_walkway(walkway: StringName) -> void:
 		if map == null:
 			return
 		for from in 2:
-			check(_crossed(map, from), "%s mirrored %d crosses from room %d" % [walkway, mirror, from])
-			_world.free_all()
-			_world = Fixture.new(root)
-			for piece: Node in _into.get_children():
-				piece.free()
+			check(_walked(map, from, false, _in_the_fight(from)), "%s mirrored %d crosses from room %d" % [walkway, mirror, from])
+			_fresh_world()
 
 
 func test_a_bot_crosses_a_straight_east_west_walkway() -> void:
@@ -165,3 +191,15 @@ func test_a_bot_crosses_a_wide_corner_walkway() -> void:
 
 func test_a_bot_crosses_a_tall_corner_walkway() -> void:
 	_check_walkway(WALKWAYS[4])
+
+
+func test_a_bot_waits_on_a_corner_walkway_by_a_shut_door() -> void:
+	# Review of the route (2026-11-19): with the fight behind a shut door (a gather door, the boss's
+	# gate) the bot walks along the walkway to the door and waits there, where the door counts it.
+	for walkway: StringName in [WALKWAYS[0], WALKWAYS[2]]:
+		for mirror: int in PieceShape.MIRRORINGS:
+			var map: BiomeMap = _map(walkway, mirror)
+			if map == null:
+				return
+			check(_walked(map, 0, true, _at_the_door(0)), "%s mirrored %d: the bot waits by the shut door" % [walkway, mirror])
+			_fresh_world()

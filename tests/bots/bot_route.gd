@@ -11,8 +11,9 @@ extends RefCounted
 ## `goal_point` (INF: anywhere in the place). The answer is a flow field: every cell of `area` a body
 ## of `radius` can stand in gets its walk (in cells, eight ways, no corner cut) to the nearest goal
 ## cell, worked out once for each `key` (the caller's name for that goal and area) and again every
-## STALE steps while the feet have no way (a gather door opened, a Wall card's stone gone); the
-## feet walk down the field, aiming AHEAD cells on. Nothing is allocated once its arrays have grown
+## STALE steps while the feet have no way or come no nearer (a gather door opened, a Wall card's
+## stone laid across the way or gone); the feet walk down the field, aiming AHEAD cells on. The area
+## is kept inside the grid's bounds (outside them `cell_at` reads open). Nothing is allocated once its arrays have grown
 ## to the largest area asked.
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -22,7 +23,8 @@ const AHEAD: int = 3
 ## How far round the feet (in cells) a way is looked for when the feet's own cell has none (a body
 ## brushing a wall stands where its centre's cell is too near one).
 const NEAR_RING: int = 2
-## While the feet have no way, the field is worked out again after this many steps.
+## While the feet have no way, or come no nearer the goal, the field is worked out again after this
+## many steps.
 const STALE: int = 60
 ## The eight steps, the four straight first (cells: x, y).
 const STEPS: Array[Vector2i] = [
@@ -40,24 +42,38 @@ var _stand: PackedByteArray = PackedByteArray()
 var _dist: PackedInt32Array = PackedInt32Array()
 var _queue: PackedInt32Array = PackedInt32Array()
 var _key: int = -1
+## Steps since the feet last came nearer the goal (or, with no way, since it was worked out), and
+## the nearest they came.
 var _stale: int = 0
+var _best: int = -1
 
 
 ## The way to walk from `feet` to the goal (see the class doc), or ZERO.
 func aim(projectiles: ProjectilesScript, feet: Vector2, area: Rect2, goal_place: int, goal_point: Vector2, goal_reach: float, radius: float, key: int) -> Vector2:
-	if projectiles == null or area.size.x <= 0.0 or area.size.y <= 0.0:
+	var within: Rect2 = area.intersection(projectiles.bounds()) if projectiles != null else Rect2()
+	if within.size.x <= 0.0 or within.size.y <= 0.0:
+		_w = 0
+		_key = -1
 		return Vector2.ZERO
 	if key != _key or _stale >= STALE:
-		_work_out(projectiles.grid(), projectiles.bounds().position, area, goal_place, goal_point, goal_reach, radius)
+		_work_out(projectiles.grid(), projectiles.bounds().position, within, goal_place, goal_point, goal_reach, radius)
 		_key = key
 		_stale = 0
+		_best = -1
 	var at: int = _nearest_way(feet)
 	if at < 0:
 		_stale += 1
 		return Vector2.ZERO
 	if _dist[at] == 0 and _cell_of(feet) == at:
 		# In the goal: nothing more to walk.
+		_stale = 0
 		return Vector2.ZERO
+	# No nearer for STALE steps (a Wall card's stone across the way, or gone since): work it out again.
+	if _best < 0 or _dist[at] < _best:
+		_best = _dist[at]
+		_stale = 0
+	else:
+		_stale += 1
 	for _n in AHEAD:
 		var next: int = _downhill(at)
 		if next < 0:

@@ -26,8 +26,8 @@ extends FrameSource
 ## walks the biome's bridges to the nearest room whose fight is still to come (the fewest bridges from
 ## where it stands; one behind a shut door, the boss's gate, it waits at: `Flow.gates`), along the
 ## shortest walk over the wall grid (`bot_route.gd`: round a room's walls, along a walkway of any
-## shape and mirroring, through its mouths; round the walls toward the landing where no walk is
-## open), then steps in, and its fight seals it in; in a fight the brain plays as
+## shape and mirroring, through its mouths; on to a shut door's bridge to wait there; round the walls
+## toward the landing where no walk is open), then steps in, and its fight seals it in; in a fight the brain plays as
 ## above, and a revive goes first (its brain's `revive` behaviour running: it stays by the one downed,
 ## cleared room or not). It reads Flow's map and rooms (`biome`, `life`, `gates`), as a player reads the screen.
 ## Idler: stands still; it only opens its builder.
@@ -68,6 +68,9 @@ const ROUTE_INTO: float = 64.0
 const ROUTE_ON_BRIDGE: int = 0
 const ROUTE_OFF_BRIDGE: int = 1
 const ROUTE_IN_ROOM: int = 2
+const ROUTE_TO_DOOR: int = 3
+## How near a shut door's mouth a traveller waits, on its bridge (`GatherDoors` counts it there).
+const DOOR_REACH: float = 48.0
 ## How far a detour round a wall looks (`AISight.detour`).
 const DETOUR_PROBE: float = 32.0
 ## A downed bot's crawl: how near a teammate it stops, and how far an enemy pushes it aside.
@@ -85,6 +88,9 @@ var _flow: Node = null
 var _frames: Node = null
 ## The frame it wants for the next tick (`send`), handed over in `fill_frame`.
 var _wanted: InputFrame = InputFrame.new()
+## The rooms' bridges from the nearest fight, and the walk out that works them out (sized once a map).
+var _hops: PackedInt32Array = PackedInt32Array()
+var _hops_queue: PackedInt32Array = PackedInt32Array()
 ## The traveller's way over the walls, and the map it was worked out on.
 var _route: RouteScript = RouteScript.new()
 var _route_map: BiomeMap = null
@@ -246,25 +252,31 @@ func travel(wizard: Actor) -> Vector2:
 	if here >= 0 and here < map.rooms() and life.has(here, RoomLife.STARTED) and not life.has(here, RoomLife.CLEARED):
 		return Vector2.ZERO
 	# The bridges from each room, and how far each room is from the nearest fight still to come.
-	var hops: PackedInt32Array = PackedInt32Array()
-	hops.resize(map.rooms())
-	hops.fill(-1)
-	var queue: Array[int] = []
+	# The members themselves (a packed array copied to a local and resized would be a new one each step).
+	if _hops.size() != map.rooms():
+		_hops.resize(map.rooms())
+		_hops_queue.resize(map.rooms())
+	_hops.fill(-1)
+	var head: int = 0
+	var tail: int = 0
 	for room in map.rooms():
 		# A room behind a shut door (the boss's gate) is a goal too: the bot walks to its door and
 		# waits there with the party; no way leads through it.
 		if not life.has(room, RoomLife.ENTERED) and life.fights[room].has_enemies():
-			hops[room] = 0
-			queue.append(room)
-	while not queue.is_empty():
-		var room: int = queue.pop_front()
+			_hops[room] = 0
+			_hops_queue[tail] = room
+			tail += 1
+	while head < tail:
+		var room: int = _hops_queue[head]
+		head += 1
 		for bridge in map.bridges():
 			for end in 2:
 				if map.end_room(bridge, end) == room:
 					var other: int = map.end_room(bridge, 1 - end)
-					if hops[other] < 0 and (gates == null or gates.is_open(other)):
-						hops[other] = hops[room] + 1
-						queue.append(other)
+					if _hops[other] < 0 and (gates == null or gates.is_open(other)):
+						_hops[other] = _hops[room] + 1
+						_hops_queue[tail] = other
+						tail += 1
 	var feet: Vector2 = wizard.global_position
 	if biome.map != _route_map:
 		# A new biome: its places are numbered afresh.
@@ -275,13 +287,16 @@ func travel(wizard: Actor) -> Vector2:
 		var bridge: int = here - map.rooms()
 		if bridge >= map.bridges():
 			return Vector2.ZERO
-		var end: int = 0 if _hops_of(hops, map.end_room(bridge, 0)) <= _hops_of(hops, map.end_room(bridge, 1)) else 1
+		var end: int = 0 if _hops_of(_hops, map.end_room(bridge, 0)) <= _hops_of(_hops, map.end_room(bridge, 1)) else 1
 		var room: int = map.end_room(bridge, end)
 		var over: Rect2 = biome.bridge_rect(bridge)
+		if gates != null and not gates.is_open(room):
+			# Its door is shut: it waits on the bridge, by the door.
+			return _walk_to(wizard, over, here, biome.mouth_rect(bridge, end).get_center(), DOOR_REACH, _route_key(ROUTE_TO_DOOR, here, room), _landing(biome, bridge, end))
 		return _walk_to(wizard, over.merge(_inside(biome.room_rect(room), over)), room, Vector2.ZERO, INF, _route_key(ROUTE_OFF_BRIDGE, here, room), _landing(biome, bridge, end))
-	if here < 0 or hops[here] < 0:
+	if here < 0 or _hops[here] < 0:
 		return Vector2.ZERO
-	if hops[here] == 0:
+	if _hops[here] == 0:
 		var middle: Vector2 = biome.room_rect(here).get_center()
 		return _walk_to(wizard, biome.room_rect(here), here, middle, GOAL_REACH, _route_key(ROUTE_IN_ROOM, here, here), middle)
 	# The bridge out of this room toward the goal: along its walkway into the room at its far end.
@@ -290,9 +305,12 @@ func travel(wizard: Actor) -> Vector2:
 			if map.end_room(bridge, end) != here:
 				continue
 			var other: int = map.end_room(bridge, 1 - end)
-			if hops[other] < 0 or hops[other] >= hops[here]:
+			if _hops[other] < 0 or _hops[other] >= _hops[here]:
 				continue
 			var over: Rect2 = biome.bridge_rect(bridge)
+			if gates != null and not gates.is_open(other):
+				# A shut door (a gather door, the boss's gate): along the walkway to it, and wait there.
+				return _walk_to(wizard, biome.room_rect(here).merge(over), map.rooms() + bridge, biome.mouth_rect(bridge, 1 - end).get_center(), DOOR_REACH, _route_key(ROUTE_TO_DOOR, here, bridge), _landing(biome, bridge, 1 - end))
 			var area: Rect2 = biome.room_rect(here).merge(over).merge(_inside(biome.room_rect(other), over))
 			return _walk_to(wizard, area, other, Vector2.ZERO, INF, _route_key(ROUTE_ON_BRIDGE, here, bridge), _landing(biome, bridge, 1 - end))
 	return Vector2.ZERO

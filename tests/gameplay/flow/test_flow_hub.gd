@@ -98,16 +98,25 @@ func from_frames() -> void:
 	frames.call(&"begin_step", DT)
 
 
+## The run is over: the ticks of the party's departure for the hub pass (Departure.TICKS), and the
+## frames service sends the hub's start as the next step starts.
+func _home() -> void:
+	check(flow.departure.is_under_way(), "the party departs for the hub first")
+	for i in Departure.TICKS:
+		_tick()
+	from_frames()
+
+
 ## One tick of Flow.
 func _tick() -> void:
 	flow.step(DT)
 
 
 ## Seat `seat` presses A on the stone: the command as a tick's start applies it, and the ticks of
-## the party's departure pass (on a lit stone the run starts on the last; HubRules.DEPART_TICKS).
+## the party's departure pass (on a lit stone the run starts on the last; Departure.TICKS).
 func _press_a(seat: int) -> void:
 	_press_a_only(seat)
-	for i in HubRules.DEPART_TICKS:
+	for i in Departure.TICKS:
 		_tick()
 
 
@@ -299,14 +308,14 @@ func test_a_sent_by_the_hud_starts_the_run_at_the_next_tick() -> void:
 	events.emit_signal("run_requested", 0)
 	check_equal(flow.mode, FlowScript.MODE_HUB, "a command waits for the tick's start")
 	await commands_applied()
-	check(flow.hub.is_departing(), "the party departs there")
-	for i in HubRules.DEPART_TICKS:
+	check(flow.departure.is_under_way(), "the party departs there")
+	for i in Departure.TICKS:
 		_tick()
 	check_equal(flow.mode, FlowScript.MODE_RUN, "and the run starts when it is done")
 
 
 ## A on the lit stone starts the party's departure (the loading screen comes down over the hub), and
-## the run starts HubRules.DEPART_TICKS ticks later, on that tick and no other: a second A, a
+## the run starts Departure.TICKS ticks later, on that tick and no other: a second A, a
 ## wizard stepping off the stone and a joiner change nothing. `run_departure_changed` is told as it
 ## begins and as it ends.
 func test_a_on_the_lit_stone_departs_and_the_run_starts_ticks_later() -> void:
@@ -318,14 +327,14 @@ func test_a_on_the_lit_stone_departs_and_the_run_starts_ticks_later() -> void:
 	_place(1, true)
 	_tick()
 	_press_a_only(1)
-	check(flow.hub.is_departing(), "A on the lit stone: the party departs")
-	check_equal(flow.hub.departing_seat, 1, "for the seat that pressed")
+	check(flow.departure.is_under_way(), "A on the lit stone: the party departs")
+	check_equal(flow.departure.seat, 1, "for the seat that pressed")
 	check_equal(told, [true] as Array[bool], "and the HUD is told at once")
 	_press_a_only(0)
-	check_equal(flow.hub.departing_seat, 1, "a second A changes nothing")
+	check_equal(flow.departure.seat, 1, "a second A changes nothing")
 	_place(0, false)
 	input.add_virtual_device(2)
-	for i in HubRules.DEPART_TICKS - 1:
+	for i in Departure.TICKS - 1:
 		_tick()
 		check_equal(flow.mode, FlowScript.MODE_HUB, "tick %d: still the hub" % (i + 1))
 	check(not flow.is_stone_lit(), "the stone went out under the departure")
@@ -333,7 +342,7 @@ func test_a_on_the_lit_stone_departs_and_the_run_starts_ticks_later() -> void:
 	_tick()
 	check_equal(flow.mode, FlowScript.MODE_RUN, "the run starts on the last tick")
 	check_equal(flow.get_wizard(2) != null, true, "the joiner goes along")
-	check(not flow.hub.is_departing(), "nothing departs in the run")
+	check(not flow.departure.is_under_way(), "nothing departs in the run")
 	check_equal(told, [true, false] as Array[bool], "and the HUD is told the departure is over")
 	events.disconnect("run_departure_changed", hear)
 
@@ -347,11 +356,61 @@ func test_the_presser_leaving_hands_the_run_to_a_seat_still_there() -> void:
 	_press_a_only(0)
 	input.leave(0)
 	await commands_applied()
-	for i in HubRules.DEPART_TICKS:
+	for i in Departure.TICKS:
 		_tick()
 	check_equal(flow.mode, FlowScript.MODE_RUN, "the run starts")
 	check(flow.get_wizard(1) != null and flow.get_wizard(0) == null, "with the seat left")
 	check_equal(flow.get("_starter"), 1, "and for it")
+
+
+## The run's end (everyone down) departs for the hub: the run steps on for Departure.TICKS, the
+## loading screen is wanted from its first tick, and still while the hub is asked of the frames
+## service, until the hub stands.
+func test_the_runs_end_departs_for_the_hub_behind_the_loading_screen() -> void:
+	var told: Array[bool] = []
+	var hear := func(departing: bool) -> void: told.append(departing)
+	_start([0])
+	_place(0, true)
+	_tick()
+	_press_a(0)
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run started")
+	events.connect("run_departure_changed", hear)
+	(flow.get_wizard(0) as Actor).health.take(100000.0)
+	flow.step(FlowScript.RESTART_DELAY)
+	check(flow.departure.is_under_way() and flow.departure.to == Departure.To.HUB, "everyone down: the party departs for the hub")
+	check_equal(told, [true] as Array[bool], "the screen is asked for at once")
+	for i in Departure.TICKS - 1:
+		_tick()
+		check_equal(flow.mode, FlowScript.MODE_RUN, "tick %d: still the run" % (i + 1))
+	_tick()
+	check_equal(flow.state, FlowScript.State.IDLE, "the run went on the last tick")
+	check_equal(told, [true] as Array[bool], "the screen stays while the hub is asked for")
+	from_frames()
+	check_equal(flow.mode, FlowScript.MODE_HUB, "the hub stands")
+	check_equal(told, [true, false] as Array[bool], "and the screen goes")
+	events.disconnect("run_departure_changed", hear)
+
+
+## The portal home departs for the hub too, and the main menu under that departure ends it: no hub,
+## and the screen goes.
+func test_the_main_menu_under_a_return_starts_no_hub() -> void:
+	var told: Array[bool] = []
+	var hear := func(departing: bool) -> void: told.append(departing)
+	_start([0])
+	_place(0, true)
+	_tick()
+	_press_a(0)
+	events.connect("run_departure_changed", hear)
+	flow.call("_take_portal_home")
+	check(flow.departure.is_under_way() and flow.departure.to == Departure.To.HUB, "the portal home: the party departs for the hub")
+	_tick()
+	events.emit_signal("main_menu_requested", 0)
+	check_equal(told, [true, false] as Array[bool], "the main menu: the screen goes")
+	for i in Departure.TICKS:
+		_tick()
+	from_frames()
+	check_equal(flow.state, FlowScript.State.IDLE, "and no hub starts")
+	events.disconnect("run_departure_changed", hear)
 
 
 ## The main menu under a departure (the pause menu's): no run starts, and the HUD is told it ended.
@@ -365,9 +424,9 @@ func test_the_main_menu_under_a_departure_starts_no_run() -> void:
 	_press_a_only(0)
 	_tick()
 	events.emit_signal("main_menu_requested", 0)
-	check(not flow.hub.is_departing(), "the departure ends")
+	check(not flow.departure.is_under_way(), "the departure ends")
 	check_equal(told, [true, false] as Array[bool], "and the HUD is told")
-	for i in HubRules.DEPART_TICKS:
+	for i in Departure.TICKS:
 		_tick()
 	check_equal(flow.state, FlowScript.State.IDLE, "and no run starts")
 	events.disconnect("run_departure_changed", hear)
@@ -525,7 +584,7 @@ func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
 	check(flow.is_restarting(), "everyone down ends the run")
 	flow.step(FlowScript.RESTART_DELAY)
 	# The hub is a run's start of its own: the frames service sends it as the next step starts.
-	from_frames()
+	_home()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
 	check_equal(flow.room_id, FlowScript.HUB_ROOM_ID, "the hub's room")
 	check_equal(_wizards().size(), 2, "both are there")
@@ -556,7 +615,7 @@ func test_a_won_run_from_the_stone_goes_back_to_the_hub() -> void:
 	for seat in 2:
 		flow.get_wizard(seat).global_position = flow.gates.portal_area.get_center()
 	_tick()
-	from_frames()
+	_home()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
 	check_equal(_wizards().size(), 2, "everyone with it")
 	(registry.call("get_resource", &"room_kinds", PinnedRun.room_id(ARENA)) as RoomKind).portal_home = false
@@ -591,7 +650,7 @@ func test_staffs_built_in_the_hub_follow_into_the_run_and_nothing_comes_back() -
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
 	# The hub is a run's start of its own: the frames service sends it as the next step starts.
-	from_frames()
+	_home()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
 	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(1), fresh_rt, "seat 1's staff did not come back: the hub's own again")
 	check_equal((flow.get_wizard(0) as Actor).caster.cards_of(1), fresh_rt, "seat 0's neither")
@@ -617,7 +676,7 @@ func test_the_hands_held_in_the_hub_go_into_the_run_as_they_are() -> void:
 	for wizard in _wizards():
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
-	from_frames()
+	_home()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
 	_check_two_hands(1, "back in the hub")
 
@@ -643,7 +702,7 @@ func test_a_run_of_play_requested_ends_in_the_hub_too() -> void:
 	for wizard in _wizards():
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
-	from_frames()
+	_home()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "everyone down: back in the hub")
 
 
@@ -687,7 +746,7 @@ func test_the_cheat_code_gives_the_typers_wizard_every_card() -> void:
 	for wizard in _wizards():
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
-	from_frames()
+	_home()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
 	check_equal(_card_bag(1), plain, "the hub begun again hands out Play's bag again")
 
@@ -804,7 +863,7 @@ func test_the_bus_is_told_when_the_party_enters_and_leaves_the_hub() -> void:
 	for wizard in _wizards():
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
-	from_frames()
+	_home()
 	_tick()
 	check_equal(told, [true, false, true] as Array[bool], "back in the hub after the run")
 	_stop()
@@ -895,7 +954,7 @@ func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> vo
 	for wizard in _wizards():
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
-	from_frames()
+	_home()
 	check_equal(anew.size(), 1, "back in the hub, recorded anew")
 	if anew.size() == 1:
 		check(anew[0].party.is_empty(), "its header takes nothing along")
@@ -973,7 +1032,7 @@ func test_the_hub_begun_anew_keeps_its_ground_and_a_runs_end_lays_the_rack_again
 	for each in _wizards():
 		each.health.take(each.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
-	from_frames()
+	_home()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
 	check_equal((items.call("lying") as Array).size(), HUB_RACK, "the whole rack lies there again")
 	_stop()

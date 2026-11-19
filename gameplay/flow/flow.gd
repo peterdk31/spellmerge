@@ -41,7 +41,10 @@ extends Node
 ##
 ## The run's end: when every wizard is down, a timer of RESTART_DELAY seconds runs, then the party
 ## goes back to the hub (connected biomes CB7, decision 14), nothing of the run coming along; the
-## portal home of the boss's room ends it there too, won.
+## portal home of the boss's room ends it there too, won. Either way the party departs first
+## (`departure`, a `Departure`: Departure.TICKS while the run steps on), so the loading screen is
+## down before the hub is made, and it stays down until the hub stands (`_cover_held`,
+## `_hub_stands`; owner, 2026-11-19).
 ##
 ## Staffs (staffs A6a, docs/milestones/M2-staffs.md; living staffs H3; owner 2026-11-01: one
 ## staff file per setup, used as it is): every wizard gets the hands of its run's mode
@@ -95,7 +98,7 @@ extends Node
 ## `start_stone_changed`, the stone asked to enter `lit` or `unlit` to match, so its look and cue
 ## are the prop's (props W8).
 ## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts the party's
-## departure at the tick's start, and a run HubRules.DEPART_TICKS later (the loading screen comes
+## departure at the tick's start, and a run Departure.TICKS later (the loading screen comes
 ## down over the hub first, `run_departure_changed`, as the biome takes a second or more to
 ## build), every wizard going in as the player it is: every bag, its staffs with their cards and
 ## its hands (owner, 2026-11-13: what a run's start takes along is the whole player; items
@@ -223,7 +226,7 @@ const INTRO_SEEN: StringName = &"intro_seen"
 enum State { IDLE, RUNNING, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"actors", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_map", &"_chosen_fights", &"_chosen_reveal"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"actors", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_map", &"_chosen_fights", &"_chosen_reveal", &"_cover_held", &"_departure_told"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -293,6 +296,13 @@ var _places: RoomPlaces = RoomPlaces.new()
 var contents: RoomContents = RoomContents.new()
 var yard: PropYard = PropYard.new()
 var hub: HubRules = HubRules.new()
+## The party's departure (`departure.gd`): to a run from the hub's stone, to the hub at the run's end.
+var departure: Departure = Departure.new()
+## Not state (DERIVED): the loading screen is held down over a return to the hub after its
+## departure is over, until the hub stands (a run's start of its own, sent by the frames service:
+## a step later, or later still on a machine playing another's run live); and what was last told.
+var _cover_held: bool = false
+var _departure_told: bool = false
 ## The adds standing, each with the body that called it (boss plan OB13).
 var adds: RoomAdds = RoomAdds.new()
 ## The boss's intro of the room (docs/milestones/boss-intro.md, `BossIntroHold`).
@@ -393,6 +403,9 @@ func step(delta: float) -> void:
 	if intro != null:
 		intro.step(delta)
 	contents.forget_gone()
+	if departure.due():
+		_depart()
+		return
 	if world != null and state != State.IDLE:
 		yard.tend(delta, world, registry)
 		_crumble_orphans()
@@ -401,11 +414,8 @@ func step(delta: float) -> void:
 		return
 	_count_stand_ups(delta)
 	if mode == MODE_HUB and state == State.RUNNING:
-		var departing: int = hub.departure_due()
-		if departing >= 0:
-			_start_run_from_stone(_seat_still_here(departing))
-			return
 		_count_stone()
+		_tell_departure()
 		return
 	if _restart_left < 0.0:
 		return
@@ -415,7 +425,44 @@ func step(delta: float) -> void:
 		# A run lost goes back to the hub (connected biomes CB7, decision 14). Back in the hub the
 		# party is ready for a new run: nothing of the run comes back with it, its staffs neither
 		# (owner, 2026-11-10). The hub is the arsenal the next run's tools are picked from.
-		_return_to_hub(_starter)
+		_depart_for_hub()
+
+
+## The run is over (lost, or won through the portal home): the party departs for the hub, which
+## stands Departure.TICKS later behind the loading screen (`_depart`). The run steps on meanwhile.
+func _depart_for_hub() -> void:
+	if departure.begin(_starter, Departure.To.HUB):
+		_tell_departure()
+
+
+## A departure is due: the run starts from the stone (for the seat that pressed, or one still here),
+## or the party goes back to the hub, the loading screen held down until it stands.
+func _depart() -> void:
+	var to: Departure.To = departure.to
+	var seat: int = departure.take()
+	if to == Departure.To.RUN:
+		_start_run_from_stone(_seat_still_here(seat))
+	else:
+		_cover_held = true
+		_return_to_hub(seat)
+	_tell_departure()
+
+
+## The hub a return waited for stands, or will not (it failed, or the game left for the main menu):
+## the loading screen held over the return goes.
+func _hub_stands() -> void:
+	_cover_held = false
+	_tell_departure()
+
+
+## Tells the HUD whether the loading screen is wanted (`run_departure_changed`): while a departure
+## is under way, and over a return until the hub stands (`_hub_stands`). Sent when it changes.
+func _tell_departure() -> void:
+	var want: bool = departure.is_under_way() or _cover_held
+	if want == _departure_told or events == null:
+		return
+	_departure_told = want
+	events.run_departure_changed.emit(want)
 
 
 ## The party goes back to the hub, for seat `starter`, with nothing of the run (the run's end); with
@@ -439,6 +486,7 @@ func _return_to_hub(starter: int, party: PartyLoadout = null) -> void:
 	if not start_run(starter, party):
 		push_warning("Flow: the hub did not start again after the run, so the run is over.")
 		stop_run()
+	_hub_stands()
 
 
 ## True while the run's end (the way back to the hub) is counting down.
@@ -621,6 +669,8 @@ func _lay_out(into: Node2D, room: RoomBase, sim: Sim) -> void:
 ## bodies are the snapshot's own. The layout is built again by the run's chance as it is now: the
 ## same as the host's while rooms are fixed scenes (`RoomBase.build` ignores it).
 func rebuild_derived() -> void:
+	# A departure the snapshot holds (or none) is told to this machine's HUD.
+	_tell_departure()
 	if mode == MODE_RUN:
 		_rebuild_biome()
 		return
@@ -728,6 +778,8 @@ func _announce_room(room: RoomBase) -> void:
 func stop_run() -> void:
 	if state == State.LOADING and loading != null:
 		loading.cancel()
+	departure.cancel()
+	_tell_departure()
 	if intro != null:
 		var shown: IntroScript = intro
 		intro = null
@@ -751,6 +803,7 @@ func stop_run() -> void:
 ## intro or the loading stops and its world goes; the HUD shows the menu.
 func _on_main_menu_requested(_player: int) -> void:
 	stop_run()
+	_hub_stands()
 	# Every service as a fresh game's (as a run's start makes them, after its bodies left with the
 	# world above): no shot, decoy or stop of the run goes on under the menu.
 	var tick: TickScript = TickScript.of(self) as TickScript
@@ -871,6 +924,7 @@ func _on_hub_requested(player: int) -> void:
 		return
 	if not _load_then(_start_hub.bind(player, party)):
 		_start_hub(player, party)
+	_hub_stands()
 
 
 ## The hub, once the work before a room is loaded: after the intro on a new save, as Play's run;
@@ -885,13 +939,13 @@ func _start_hub(player: int, party: PartyLoadout = null) -> void:
 
 ## The command `run_requested` (a seat pressed A on the lit stone; the HUD sends it, heard at the
 ## tick's start): the party departs, for that seat, while the stone is lit, and the run starts
-## HubRules.DEPART_TICKS later (`step`), behind the loading screen (`run_departure_changed`). The
+## Departure.TICKS later (`step`), behind the loading screen (`run_departure_changed`). The
 ## stone's count is the last tick's, made again when a wizard joined or left since, so it is exact here.
 func _on_run_requested(player: int) -> void:
 	if not is_stone_lit() or state != State.RUNNING or get_wizard(player) == null:
 		return
-	if hub.depart(player):
-		_count_stone()
+	if departure.begin(player, Departure.To.RUN):
+		_tell_departure()
 
 
 ## The command `all_cards_requested` (the HUD's cheat code; owner, 2026-11-19): while the hub
@@ -917,8 +971,9 @@ func _start_run_from_stone(seat: int) -> void:
 	if not start_run(seat, party):
 		if state == State.IDLE:
 			# The hub went before the run's map was found cornered: the party goes back there, each
-			# wizard as it went.
+			# wizard as it went, the loading screen held down until it stands.
 			push_warning("Flow: the run from the stone did not start, so the party goes back to the hub.")
+			_cover_held = true
 			_return_to_hub(seat, party)
 			return
 		# It refused before freeing anything (content missing): the hub stands as it was.
@@ -1775,7 +1830,7 @@ func _open_gate(room: int) -> void:
 ## Every standing wizard stands in the portal home (connected biomes CB7, decision 7): the run is won
 ## and ends back in the hub, nothing of it coming along (as a row run's end from the stone).
 func _take_portal_home() -> void:
-	_return_to_hub(_starter)
+	_depart_for_hub()
 
 
 ## Room `room` is entered for the first time: `room_entered`, and its fight starts (its bosses stand,

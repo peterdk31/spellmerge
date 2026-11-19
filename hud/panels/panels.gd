@@ -31,7 +31,7 @@ extends CanvasLayer
 ## The loading screen (`loading/`, node Root/Loading, over everything but the pause menu, the pad
 ## line and the frame rate readout)
 ## shows from `loading_started` to `loading_finished`, while flow compiles the shaders before the
-## first room, and while the party departs from the hub's stone (`run_departure_changed`).
+## first room, and while the party departs for a run or back to the hub (`run_departure_changed`).
 ##
 ## The boss bar (`boss/boss_bar.gd`, node Root/BossBar, at the top middle) and the entrance banner
 ## (`boss/boss_banner.gd`, node Root/BossBanner, over the world, under the panels) show what

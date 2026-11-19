@@ -67,7 +67,7 @@ func test_on_a_slow_machine_it_is_down_before_the_run_is_built() -> void:
 		frames += 1
 		check_equal(_screen.position.y, roundf(_screen.position.y), "by whole pixels")
 	check(_screen.is_down(), "down")
-	check(frames * 3 < HubRules.DEPART_TICKS, "in %d frames of three ticks, before the %d ticks of the departure" % [frames, HubRules.DEPART_TICKS])
+	check(frames * 3 < Departure.TICKS, "in %d frames of three ticks, before the %d ticks of the departure" % [frames, Departure.TICKS])
 
 
 func test_it_turns_round_where_it_is() -> void:
@@ -85,7 +85,7 @@ func test_a_load_shows_its_bar_and_is_down_before_its_first_unit() -> void:
 	check(_screen.is_up(), "a load shows it")
 	check((_screen.get_child(0).get_child(1) as Control).visible, "with its bar")
 	check(ScreenScript.COVER_FRAMES < LoadingScript.WAIT_FRAMES, "down before the load's first unit freezes the game")
-	check(ScreenScript.COVER_FRAMES < HubRules.DEPART_TICKS, "and before a departure's run is built")
+	check(ScreenScript.COVER_FRAMES < Departure.TICKS, "and before a departure's run is built")
 	_bus.loading_progressed.emit(1, 4)
 	check_equal(_screen.progress(), 0.25, "the bar follows the load")
 	_bus.run_departure_changed.emit(true)

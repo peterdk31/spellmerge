@@ -3,11 +3,13 @@ extends ColorRect
 ## "Loading". It is up for two kinds of wait, told by events alone:
 ## - core/loading's work (`loading_started` to `loading_finished`: the shaders before the first
 ##   room), with a bar that fills from `loading_progressed`;
-## - the party's departure from the hub's stone (`run_departure_changed`, flow: the run's biome is
-##   built in one tick, a second or more), with no bar, since that work has no steps to show.
+## - the party's departure (`run_departure_changed`, flow): to a run from the hub's stone (its biome
+##   built in one tick, a second or more) or back to the hub at the run's end, with no bar, since
+##   that work has no steps to show.
 ## Smooth (docs/STYLE.md): it comes down from above in COVER_FRAMES steps of STEP_SECONDS (0.1 s,
-## by real time: drawing may use it) and goes back up the same way, by whole pixels, and turns round where it is if it is wanted again on the way. It takes
-## no input and holds nobody up: the run starts the moment its work is done.
+## by real time: drawing may use it) and goes back up the same way, by whole pixels, and turns
+## round where it is if it is wanted again on the way. It takes no input and holds nobody up: the
+## next world starts the moment its work is done.
 
 const EventsScript := preload("res://core/events/events.gd")
 ## The boot screen's colour (`application/boot_splash/bg_color`), so the screen does not flash.
@@ -17,7 +19,7 @@ const BAR_BACK: Color = Color(1.0, 1.0, 1.0, 0.15)
 const BAR_FILL: Color = Color(1.0, 0.953, 0.651, 1.0)
 ## Steps the screen takes to come down (and to go up), one each STEP_SECONDS of real time. A slow
 ## frame takes as many steps as its time holds (at least one), so the screen is down in 0.1 s at any
-## frame rate: before a departure's run is built (`HubRules.DEPART_TICKS`, 0.2 s of ticks, which a
+## frame rate: before a departure's run is built (`Departure.TICKS`, 0.2 s of ticks, which a
 ## slow machine runs up to three a frame) and before a load's first unit (`Loading.WAIT_FRAMES`).
 const COVER_FRAMES: int = 6
 const STEP_SECONDS: float = 1.0 / 60.0

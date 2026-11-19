@@ -138,6 +138,12 @@ static func cell_at(at: Vector2) -> Vector2i:
 	return Vector2i(floori(at.x / float(CELL)), floori(at.y / float(CELL)))
 
 
+## The middle of the room cell `cell` (column and row) in world pixels: its room's grid corner
+## (`offset`) on (connected biomes CB3b; room pixels for a room laid as its scene).
+func world_middle(cell: Vector2i) -> Vector2:
+	return middle(cell) + offset
+
+
 ## The middle of the room cell `cell` (column and row), in room pixels.
 static func middle(cell: Vector2i) -> Vector2:
 	return Vector2((float(cell.x) + 0.5) * float(CELL), (float(cell.y) + 0.5) * float(CELL))

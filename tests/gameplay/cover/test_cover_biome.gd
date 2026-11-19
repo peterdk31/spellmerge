@@ -144,6 +144,12 @@ func test_every_rooms_cover_plays_at_its_place() -> void:
 	for asked: Array in _statuses:
 		burnt = burnt or asked[0] == wizard
 	check(burnt, "a wizard standing in the court's fire is asked its status")
+	# An enemy's look there finds its way out in the court, not at the world's corner (the AI's exit).
+	var sight := CoverSight.new()
+	cover.look(wizard.global_position, 32.0, sight)
+	check(sight.harms(wizard.global_position), "the look sees the fire it stands in")
+	check(flow.biome.room_rect(2).has_point(sight.world_middle(sight.origin)), "its cells' middles are the court's, in the world")
+	_check_within_pieces("unmirrored")
 
 
 func test_a_mirrored_rooms_cover_is_its_templates_mirrored() -> void:
@@ -159,6 +165,9 @@ func test_a_mirrored_rooms_cover_is_its_templates_mirrored() -> void:
 		built.free()
 		var laid: CoverLayout = cover.layout_of(room)
 		var place: Vector2 = map.room_places[room]
+		# Mirrored within the piece's shape, as its walls and spawns are (BiomeWorld), not its
+		# screen-padded room size.
+		var extent: Vector2 = PieceShape.of_room(template).size
 		var flip_x: bool = (by_room[room] & PieceShape.MIRROR_X) != 0
 		var flip_y: bool = (by_room[room] & PieceShape.MIRROR_Y) != 0
 		var same: bool = laid.columns == plain.columns and laid.rows == plain.rows
@@ -169,12 +178,13 @@ func test_a_mirrored_rooms_cover_is_its_templates_mirrored() -> void:
 					break
 				var from: int = y * plain.columns + x
 				var to: int = (plain.rows - 1 - y if flip_y else y) * plain.columns + (plain.columns - 1 - x if flip_x else x)
-				same = same and laid.cells[to] == plain.cells[from]
-				# The cell's pixels are its template cell's, mirrored within the room and moved to its place.
 				var own: Rect2 = plain.cell_rect(from)
-				var mirrored := Rect2(Vector2(plain.size.x - own.end.x if flip_x else own.position.x, plain.size.y - own.end.y if flip_y else own.position.y) + place, own.size)
+				var inside: bool = own.end.x <= extent.x and own.end.y <= extent.y
+				same = same and laid.cells[to] == (plain.cells[from] if inside else 0)
+				# The cell's pixels are its template cell's, mirrored within the shape and moved to its place.
+				var mirrored := Rect2(Vector2(extent.x - own.end.x if flip_x else own.position.x, extent.y - own.end.y if flip_y else own.position.y) + place, own.size)
 				placed = placed and laid.cell_rect(to) == mirrored
-		check(same, "room %d's cells are its template's, mirrored (%d)" % [room, by_room[room]])
+		check(same, "room %d's cells are its template's within its shape, mirrored (%d)" % [room, by_room[room]])
 		check(placed, "each at its template cell's pixels, mirrored and moved to its place")
 		if by_room[room] != 0:
 			check(laid.cells != plain.cells, "room %d's grass lies otherwise than its template's" % room)
@@ -187,6 +197,32 @@ func test_a_mirrored_rooms_cover_is_its_templates_mirrored() -> void:
 			inside = inside and rect.has_point(Vector2(rows[at + 3], rows[at + 7]))
 		check(inside, "room %d's tufts all stand in it" % room)
 		check_equal(view.layout.cells, laid.cells, "Feel draws room %d's as the area plays it" % room)
+	_check_within_pieces("mirrored")
+
+
+## Every covered cell of every piece (rooms and bridges) lies wholly on its piece, none on a wall.
+func _check_within_pieces(label: String) -> void:
+	var map: BiomeMap = flow.biome.map
+	for number in cover.rooms():
+		var laid: CoverLayout = cover.layout_of(number)
+		var is_room: bool = number < map.rooms()
+		var bridge: int = number - map.rooms()
+		var rect: Rect2 = flow.biome.room_rect(number) if is_room else flow.biome.bridge_rect(bridge)
+		var template: StringName = map.room_templates[number] if is_room else map.bridge_templates[bridge]
+		var shape: PieceShape = PieceShape.of_room(registry.call(&"get_resource", &"rooms", template) as RoomBase, map.room_mirrors[number] if is_room else map.bridge_mirrors[bridge])
+		var outside: int = 0
+		var on_wall: int = 0
+		for cell in laid.cells.size():
+			if laid.cells[cell] == 0:
+				continue
+			if not rect.encloses(laid.cell_rect(cell)):
+				outside += 1
+			else:
+				for wall: Rect2 in shape.walls:
+					if Rect2(wall.position + rect.position, wall.size).has_point(laid.cell_rect(cell).get_center()):
+						on_wall += 1
+						break
+		check_equal([outside, on_wall], [0, 0], "%s: piece %d's cover lies on its floor, off its walls" % [label, number])
 
 
 ## Fires in the antechamber and the court, a wizard in each keeping it awake: `TICKS` ticks, each

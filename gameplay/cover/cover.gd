@@ -249,7 +249,10 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 	if number < 0:
 		return
 	if number == EventsScript.FIRST_ROOM:
+		# A new world's pieces: the last world's rooms play nothing until theirs come.
 		_layouts.clear()
+		for other in range(1, _rooms.size()):
+			_rooms[other].unbind()
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	var laid: CoverLayout = CoverLayout.of_piece(layout_root, room, kinds())
 	while _layouts.size() <= number:
@@ -270,7 +273,7 @@ func _on_room_entered(_room_id: StringName, number: int) -> void:
 		return
 	_rooms.resize(_layouts.size())
 	for at in _rooms.size():
-		if _rooms[at] == null:
+		if _rooms[at] == null or _layouts[at] == null:
 			_rooms[at] = CoverRoom.new()
 		if _layouts[at] != null:
 			if _rooms[at].layout != _layouts[at]:
@@ -305,6 +308,8 @@ func rebuild_derived() -> void:
 		var room: CoverRoom = _rooms[number]
 		var laid: CoverLayout = layout_of(number)
 		if laid == null:
+			# A piece this world does not lay (a restore into another world): it plays nothing.
+			room.unbind()
 			continue
 		if room.layout != laid:
 			room.bind(laid)

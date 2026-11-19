@@ -97,28 +97,35 @@ static func of(layout_root: Node, room: RoomBase, all_kinds: Array[CoverKind]) -
 ## layout, then `placed` where the layout node stands, mirrored as its `PieceShape.GROUND_MIRROR_META`
 ## says (a `Vector2i`, 1 on an axis mirrored). A layout at (0, 0) with no mirroring (the row run's
 ## room, the editor's) is `of`'s own.
+##
+## A piece a biome laid (it carries the mirror meta, even unmirrored) keeps its cover within its
+## shape (`PieceShape.of`'s size: its floor and walls, the extent its walls and spawns are mirrored
+## within, which `RoomPlaces.size` pads to a screen and past its spawns), so a bridge's or a room's
+## cover never lies past its own floor over the dark or a neighbour.
 static func of_piece(layout_root: Node, room: RoomBase, all_kinds: Array[CoverKind]) -> CoverLayout:
 	var made: CoverLayout = of(layout_root, room, all_kinds)
 	var piece := layout_root as Node2D
-	if piece == null:
+	if piece == null or not piece.has_meta(PieceShape.GROUND_MIRROR_META):
 		return made
 	var flip: Vector2i = piece.get_meta(PieceShape.GROUND_MIRROR_META, Vector2i.ZERO) as Vector2i
 	var mirror: int = (PieceShape.MIRROR_X if flip.x != 0 else 0) | (PieceShape.MIRROR_Y if flip.y != 0 else 0)
-	if mirror == 0 and piece.position == Vector2.ZERO:
-		return made
-	return made.placed(piece.position, mirror)
+	var extent: Vector2 = PieceShape.of(layout_root).size
+	return made.placed(piece.position, mirror, extent if extent.x > 0.0 and extent.y > 0.0 else made.size)
 
 
 ## This cover laid at `at` (world pixels, the room's corner) and mirrored by `mirror`
-## (`PieceShape.MIRROR_X`, `MIRROR_Y`, both or 0) within its `size`: a new layout. A cell's kind and
+## (`PieceShape.MIRROR_X`, `MIRROR_Y`, both or 0) within `extent` (the piece's shape's size; its
+## `size` when none is given): a new layout, its `size` the extent. A cell not wholly within the
+## extent is left bare and blocked as a wall. A cell's kind and
 ## its blocking move to the mirrored cell (whole cells; the art is drawn again from them, never
 ## flipped, decision 6), and on a mirrored axis the grid's corner moves by what its last cell reaches
 ## past the room's size, so each cell covers the pixels its mirror image does. The rolls stay keyed
 ## by the template (`room_key`).
-func placed(at: Vector2, mirror: int) -> CoverLayout:
+func placed(at: Vector2, mirror: int, extent: Vector2 = Vector2.ZERO) -> CoverLayout:
+	var within: Vector2 = extent if extent.x > 0.0 and extent.y > 0.0 else size
 	var out := CoverLayout.new()
 	out.room_key = room_key
-	out.size = size
+	out.size = within
 	out.columns = columns
 	out.rows = rows
 	out.kinds = kinds
@@ -130,10 +137,11 @@ func placed(at: Vector2, mirror: int) -> CoverLayout:
 	for y in rows:
 		for x in columns:
 			var to: int = (rows - 1 - y if flip_y else y) * columns + (columns - 1 - x if flip_x else x)
-			out.cells[to] = cells[y * columns + x]
-			out.blocked[to] = blocked[y * columns + x]
+			var inside: bool = float((x + 1) * CELL) <= within.x and float((y + 1) * CELL) <= within.y
+			out.cells[to] = cells[y * columns + x] if inside else 0
+			out.blocked[to] = blocked[y * columns + x] if inside else BLOCKED_WALL
 	var reach: Vector2 = Vector2(float(columns * CELL), float(rows * CELL))
-	out.origin = at + Vector2(size.x - reach.x if flip_x else 0.0, size.y - reach.y if flip_y else 0.0)
+	out.origin = at + Vector2(within.x - reach.x if flip_x else 0.0, within.y - reach.y if flip_y else 0.0)
 	return out
 
 

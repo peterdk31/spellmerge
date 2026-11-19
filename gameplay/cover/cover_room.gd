@@ -75,6 +75,13 @@ func bind(laid: CoverLayout) -> void:
 	tell_all()
 
 
+## No layout any more (a piece the world laid now lacks): it plays nothing until bound again.
+func unbind() -> void:
+	layout = null
+	_moves = null
+	_said.resize(0)
+
+
 ## The room starts in play: every cell at rest.
 func rest() -> void:
 	_size_at_rest()

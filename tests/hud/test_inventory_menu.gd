@@ -1,11 +1,12 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the inventory menu (items I7, hud/menus/inventory/): Select (Tab) opens it on the ring
-## of the four bags with how full each is, and closes it again (so do B on the first ring and
+## of the bags with how full each is, and closes it again (so do B on the first ring and
 ## Start); A enters a bag, B goes back out; on the staffs ring a hand's button puts the staff
 ## pointed at on that hand or, on its own hand, takes it off, and X drops it; on the cards ring the
 ## kinds, then a kind's cards with their counts, and X drops one; the hands column's arrows compare
 ## every hand's staff with the one pointed at; a refusal shows its words; the left stick steps
-## round the ring; nothing is asked for with nothing pointed at; and what an earlier wizard held is
+## round the ring; nothing is asked for with nothing pointed at; A drinks the potion pointed at
+## (the owner, 2026-11-19: a heal only while hurt, more most health whenever); what an earlier wizard held is
 ## forgotten when the seat's wizard is said anew (the builder's too). The wizard is real (the real
 ## registry and spell runtime), so every request is answered as in the game.
 const EventsScript := preload("res://core/events/events.gd")
@@ -140,7 +141,7 @@ func test_select_opens_the_bags_and_closes_them_again() -> void:
 	var bags: Array = []
 	for entry: Dictionary in inventory.entries():
 		bags.append(entry["bag"])
-	check_equal(bags, ItemKinds.BAGS, "the four bags, in order")
+	check_equal(bags, ItemKinds.BAGS, "the bags, in order")
 	check_equal(inventory.mirror().fill_text(STAFFS), "1/∞", "the staff bag: one staff off a hand, no limit")
 	check_equal(inventory.mirror().fill_text(&"relics"), "0/∞", "an empty bag")
 	_tap(&"inventory")
@@ -187,9 +188,62 @@ func test_a_enters_a_bag_and_b_goes_back_out() -> void:
 	check(inventory.is_open(), "and does not close it")
 	check_equal(inventory.pointed().get("bag"), STAFFS, "pointing at the bag it came out of")
 	_enter(&"relics")
-	check_equal(inventory.layer(), InventoryScript.Layer.EMPTY, "relics: nothing there yet")
+	check_equal(inventory.layer(), InventoryScript.Layer.ITEMS, "relics: nothing there yet")
 	check(inventory.entries().is_empty(), "an empty ring")
 	check(inventory.hub_lines().has("Empty"), "which says so")
+
+
+func test_a_drinks_the_potion_pointed_at() -> void:
+	_start()
+	check(_wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 2)), "two healing potions")
+	_world.hurt(_wizard, 50)
+	var inventory: InventoryScript = _open()
+	_enter(&"potions")
+	check_equal(inventory.layer(), InventoryScript.Layer.ITEMS, "the potions, each its own item")
+	_point("item", &"healing")
+	check_equal(inventory.hub_lines()[0], "Healing Potion", "its own name")
+	check_equal(inventory.hint_verbs()[0], "Use", "A uses it")
+	_tap(&"accept")
+	_frame()
+	_frame()
+	check_equal(_wizard.health.health, 80.0, "drunk: healed 30, through Combat")
+	check_equal(_wizard.inventory.count_of(&"potions", &"healing"), 1, "one gone from the bag")
+	_tap(&"accept")
+	_frame()
+	_frame()
+	check_equal([_wizard.health.health, _wizard.inventory.count_of(&"potions", &"healing")], [100.0, 0], "the second, healing what was missing")
+	check(_wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"healing", 1)), "another")
+	_frame()
+	_point("item", &"healing")
+	_tap(&"accept")
+	_frame()
+	_frame()
+	check_equal(_wizard.inventory.count_of(&"potions", &"healing"), 1, "whole: a heal is refused, never wasted")
+	check_equal(inventory.note_text(), "You are already whole.", "and the note says why")
+	check(_wizard.inventory.add(ItemStack.of(ItemKinds.POTION, &"max_health", 1)), "a max health potion")
+	check_equal(_wizard.health.max_health, 100.0, "which does nothing in the bag")
+	_frame()
+	_point("item", &"max_health")
+	_tap(&"accept")
+	_frame()
+	_frame()
+	check_equal([_wizard.health.max_health, _wizard.health.health], [110.0, 110.0], "drunk while whole: 10 more most health, healed too")
+	check_equal(_wizard.inventory.count_of(&"potions", &"max_health"), 0, "gone from the bag")
+
+
+func test_the_coins_bag_shows_the_stack_and_does_nothing_with_it() -> void:
+	_start()
+	check(_wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 12)), "twelve coins")
+	var inventory: InventoryScript = _open()
+	_enter(&"coins")
+	_point("item", CoinBase.ID)
+	check_equal(inventory.hub_lines(), PackedStringArray(["Coins", "x12"]), "one stack, counted")
+	_tap(&"accept")
+	_tap(&"alternate")
+	_frame()
+	_frame()
+	check_equal(_wizard.inventory.count_of(&"coins", CoinBase.ID), 12, "coins are neither used nor dropped")
+	check(_drop_asks.is_empty(), "nothing asked")
 
 
 func test_a_hands_button_puts_the_staff_on_that_hand_and_off_again() -> void:

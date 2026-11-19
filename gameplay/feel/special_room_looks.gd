@@ -260,7 +260,7 @@ func _draw_item(item: int, row: Array) -> void:
 		draw_texture_rect(icon, rect, false)
 	else:
 		var kind: StringName = StringName(str(choice.get("kind", "")))
-		var colour: Color = RED if kind == RewardEntry.HEAL or kind == RewardEntry.MAX_HEALTH else GOLD[1]
+		var colour: Color = RED if kind == ItemKinds.POTION else GOLD[1]
 		var arm: float = maxf(roundf(size / 3.0), 1.0)
 		draw_rect(Rect2(rect.position + Vector2(arm, 0.0), Vector2(arm, size)), colour)
 		draw_rect(Rect2(rect.position + Vector2(0.0, arm), Vector2(size, arm)), colour)

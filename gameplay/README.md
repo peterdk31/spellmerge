@@ -32,6 +32,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `bag_changed` | `player` | `hud` (the builders) |
 | `staff_cards_requested` | `hud` (the radial builder) | `player` |
 | `staff_hand_requested`, `bag_drop_requested` | `hud` (the inventory; commands, items I7) | `player` |
+| `bag_use_requested` | `hud` (the inventory: a potion drunk; a command, the owner's of 2026-11-19) | `player` |
 | `inventory_refused` | `player` | `hud` (the inventory's note) |
 | `inventory_announced` | `player` (before a wizard's whole inventory is said anew) | `hud` (the builder, the inventory forget the earlier wizard's staffs) |
 | `staff_changed` | `player` | `hud` (the builders) |
@@ -90,9 +91,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `reward_taken` | `rewards` | none yet (tests) |
 | `reward_refused` | `rewards` (a pick that could not be given: the offer stays) | `hud` (the reward menu opens again, saying why) |
 | `coin_changed` | `rewards` (a coin on the floor laid or gone) | `feel` (the coins' look) |
-| `wallet_changed` | `rewards` (a seat's coins) | `hud` (the corner panel) |
 | `run_stats_ruled` | `run` (the run's own changes of the run stats, as a run of rooms begins) | `rewards` |
-| `health_gift_requested` | `rewards` (a reward of healing or more most health) | `combat` (it keeps an actor's health) |
+| `health_gift_requested` | `rewards` (a fountain's draw), `player` (a potion drunk) | `combat` (it keeps an actor's health) |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |
 | `play_requested` | HUD | `flow` |
 | `hub_requested` | HUD | `flow`, `core/input` |

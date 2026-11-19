@@ -5,7 +5,7 @@ extends Control
 ## the shared radial menu (`hud/widgets/radial_menu.gd`): a ring of places, pointed at with the
 ## right stick or P1's mouse (or stepped round with the left stick and the move keys), with layers.
 ##
-## - **The first ring:** the four bags (`ItemKinds.BAGS`), each with how full it is ("2/4", "2/∞").
+## - **The first ring:** the bags (`ItemKinds.BAGS`), each with how full it is ("2/4", "2/∞").
 ##   A (P1: a left click) enters the bag pointed at; B goes back out a layer, and closes it on the
 ##   first ring; Select (Tab), Start and going down close it.
 ## - **Staffs:** every staff owned, the hands' first (each marked with its button), then the bag's.
@@ -14,7 +14,9 @@ extends Control
 ##   another hand the two change places); the button of the hand it is on takes it off into the bag.
 ##   X drops it on the ground.
 ## - **Cards:** the kinds the bag holds, then (A) a kind's cards with their counts; X drops one.
-## - **Relics, Potions:** empty for now.
+## - **Relics, Potions, Coins:** the items the bag holds, each its own icon and count (`ItemLooks`);
+##   A uses the one pointed at where its kind can be used (a potion is drunk: `bag_use_requested`,
+##   the owner's of 2026-11-19) and X drops one where its kind can be dropped (`ItemKinds.can`).
 ## - **The column:** the HP bar, then the four hands, each its button's glyph, its staff's head and
 ##   numbers (`NUMBERS`), and while a staff is pointed at an arrow beside each number of every other
 ##   hand's staff: up or down as the pointed staff's number is higher or lower, green where that is
@@ -23,7 +25,7 @@ extends Control
 ##
 ## It shows only what the seat's events say (`inventory_announced`, `bag_changed`,
 ## `owned_staff_changed`, `hands_changed`, kept in an `InventoryMirror`; `inventory_refused`; `player_stats_changed` for the HP bar) and asks
-## for every change as a command (`staff_hand_requested`, `bag_drop_requested`), so it holds no
+## for every change as a command (`staff_hand_requested`, `bag_drop_requested`, `bag_use_requested`), so it holds no
 ## rules: the simulation checks each request, applies or refuses it, and says what happened. It
 ## opens through `core/ui_focus` with itself as its one control (capture, the "MENU" word, A as
 ## `activated`, B as `cancelled`, X as `alternate`), and reads the hand buttons, the sticks and
@@ -32,6 +34,7 @@ extends Control
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 const MeterLineScript := preload("res://hud/widgets/meter_line.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
@@ -52,9 +55,9 @@ const HINT_ACTIONS: Array[StringName] = [&"accept", &"alternate", &"back", &"inv
 ## The buttons read here (the rest come as UIFocus signals).
 const READ_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4", &"inventory"]
 ## Which layer the ring shows.
-enum Layer { BAGS, STAFFS, KINDS, CARDS, EMPTY }
+enum Layer { BAGS, STAFFS, KINDS, CARDS, ITEMS }
 ## Each bag's word.
-const BAG_WORDS: Dictionary = {&"staffs": "Staffs", &"cards": "Cards", &"relics": "Relics", &"potions": "Potions"}
+const BAG_WORDS: Dictionary = {&"staffs": "Staffs", &"cards": "Cards", &"relics": "Relics", &"potions": "Potions", &"coins": "Coins"}
 ## The staff numbers the column shows, in order, with their headers and how each is written.
 const NUMBERS: Array[String] = ["slots", "cooldown", "max_mana"]
 const NUMBER_WORDS: Array[String] = ["Slots", "Delay", "Mana"]
@@ -100,6 +103,7 @@ const POP_TIME: float = 0.07
 const NOTE_TIME: float = 1.4
 
 const OPEN_VERB: String = "Open"
+const USE_VERB: String = "Use"
 const DROP_VERB: String = "Drop"
 const BACK_VERB: String = "Back"
 const CLOSE_VERB: String = "Close"
@@ -113,6 +117,8 @@ const IN_BAG_TEXT: String = "In the bag"
 var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
 var _spells: SpellsScript = null
+## The registry (an item's look, `ItemLooks`), found as it is first needed.
+var _registry: RegistryScript = null
 var _input: InputManagerScript = null
 
 ## What the seat's events said of its inventory.
@@ -124,7 +130,7 @@ var _layer: Layer = Layer.BAGS
 var _bag: StringName = &""
 var _kind: StringName = &""
 ## The ring's entries, by entry number: {"bag"}, {"staff"}, {"kind", "count"}, {"card", "count"} or
-## (a bag of a kind with nothing to do yet) {"item", "count"}; the first key names it (`ENTRY_KEYS`).
+## (a relic, a potion, the coins) {"item", "count"}; the first key names it (`ENTRY_KEYS`).
 var _entries: Array[Dictionary] = []
 
 var _open: bool = false
@@ -312,8 +318,11 @@ func hub_lines() -> PackedStringArray:
 				lines.append_array([String(CardKindsScript.WORDS.get(_kind, _kind)), POINT_TEXT])
 			else:
 				lines.append_array([_card_name(entry["card"]), "x%d" % int(entry["count"])])
-		Layer.EMPTY:
-			lines.append_array([_bag_word(_bag), _mirror.fill_text(_bag), EMPTY_TEXT])
+		Layer.ITEMS:
+			if entry.is_empty():
+				lines.append_array([_bag_word(_bag), _mirror.fill_text(_bag), EMPTY_TEXT if _entries.is_empty() else POINT_TEXT])
+			else:
+				lines.append_array([String(_look(entry["item"])["name"]), "x%d" % int(entry["count"])])
 	return lines
 
 
@@ -456,9 +465,14 @@ func _sound(id: StringName) -> void:
 
 # --- What the buttons do ----------------------------------------------------------------
 
-## A: enter the bag or the kind pointed at. Nothing on a ring with nothing to enter.
+## A: enter the bag or the kind pointed at; on an item that can be used, use one
+## (`bag_use_requested`: a potion drunk). Nothing on a ring with nothing to enter.
 func enter_pointed() -> void:
 	var entry: Dictionary = pointed()
+	if _layer == Layer.ITEMS and _item_can(entry, ItemKinds.USE):
+		_sound(UiSounds.CHOOSE)
+		_events.bag_use_requested.emit(index, _bag, entry["item"], _mirror.body)
+		return
 	if entry.is_empty() or not (_layer == Layer.BAGS or _layer == Layer.KINDS):
 		return
 	if _layer == Layer.BAGS:
@@ -500,10 +514,15 @@ func put_on_hand(hand: int) -> void:
 	_events.staff_hand_requested.emit(index, number, NONE if _mirror.hand_of(number) == hand else hand, _mirror.body)
 
 
-## X: drop the staff pointed at, or one copy of the card (`bag_drop_requested`).
+## X: drop the staff pointed at, or one copy of the card or item (`bag_drop_requested`).
 func drop_pointed() -> void:
 	var entry: Dictionary = pointed()
 	if entry.is_empty() or _events == null:
+		return
+	if _layer == Layer.ITEMS:
+		if _item_can(entry, ItemKinds.DROP) or _item_can(entry, ItemKinds.DROP_ONE):
+			_sound(UiSounds.CHOOSE)
+			_events.bag_drop_requested.emit(index, _bag, entry["item"], NONE, _mirror.body)
 		return
 	if _layer == Layer.STAFFS or _layer == Layer.CARDS:
 		_sound(UiSounds.CHOOSE)
@@ -622,7 +641,7 @@ func _show_layer() -> void:
 			for id: StringName in _cards_of_kind(_kind):
 				_entries.append({"card": id, "count": _mirror.count_of(_bag, id)})
 		else:
-			_layer = Layer.EMPTY
+			_layer = Layer.ITEMS
 			for id: StringName in _mirror.ids_in(_bag):
 				_entries.append({"item": id, "count": _mirror.count_of(_bag, id)})
 	var places := PackedInt32Array()
@@ -651,7 +670,12 @@ func _refresh_hints() -> void:
 	var entry: Dictionary = pointed()
 	var can_enter: bool = not entry.is_empty() and (_layer == Layer.BAGS or _layer == Layer.KINDS)
 	var can_drop: bool = not entry.is_empty() and (_layer == Layer.STAFFS or _layer == Layer.CARDS)
-	var verbs: Array[String] = [OPEN_VERB, DROP_VERB, CLOSE_VERB if _menu.depth() == 0 else BACK_VERB, CLOSE_VERB]
+	var first: String = OPEN_VERB
+	if _layer == Layer.ITEMS:
+		first = USE_VERB
+		can_enter = _item_can(entry, ItemKinds.USE)
+		can_drop = _item_can(entry, ItemKinds.DROP) or _item_can(entry, ItemKinds.DROP_ONE)
+	var verbs: Array[String] = [first, DROP_VERB, CLOSE_VERB if _menu.depth() == 0 else BACK_VERB, CLOSE_VERB]
 	var live: Array[bool] = [can_enter, can_drop, true, true]
 	_menu.set_hints(verbs, live)
 
@@ -811,6 +835,14 @@ func _draw_info() -> void:
 		var room: int = maxi(floori((box.end.y - 2.0 - (at.y + LINE_STEP * 2.0)) / LINE_STEP), 0)
 		for line in mini(lines.size(), room):
 			_text(lines[line], at + Vector2(0.0, LINE_STEP * (2 + line)), MUTED)
+	elif entry.has("item"):
+		var look: Dictionary = _look(entry["item"])
+		_text(_fit(String(look["name"]), box.size.x - 6.0), at, TEXT)
+		_text("x%d" % int(entry["count"]), at + Vector2(0.0, LINE_STEP), MUTED)
+		var said: PackedStringArray = _wrap(String(look["description"]), box.size.x - 6.0)
+		var rows: int = maxi(floori((box.end.y - 2.0 - (at.y + LINE_STEP * 2.0)) / LINE_STEP), 0)
+		for line in mini(said.size(), rows):
+			_text(said[line], at + Vector2(0.0, LINE_STEP * (2 + line)), MUTED)
 	elif entry.has("bag"):
 		_text(_bag_word(entry["bag"]), at, TEXT)
 		_text(_mirror.fill_text(entry["bag"]), at + Vector2(0.0, LINE_STEP), MUTED)
@@ -873,6 +905,11 @@ func _draw_entry(entry: int, middle: Vector2, size: float, picked: bool) -> void
 			draw_texture_rect(icon, Rect2((rect.get_center() - Vector2(side, side) * 0.5).round(), Vector2(side, side)), false)
 		var kind: StringName = _spells.component_kind(id) if _spells != null else &""
 		draw_rect(Rect2(rect.position.x, rect.end.y - 2.0, rect.size.x, 2.0), CardKindsScript.COLORS.get(kind, DIM))
+	elif data.has("item"):
+		var item_icon: Texture2D = _look(data["item"])["icon"] as Texture2D
+		if item_icon != null and size >= SMALL_ICON:
+			var side: float = minf(ICON_SIZE, rect.size.x - 2.0)
+			draw_texture_rect(item_icon, Rect2((rect.get_center() - Vector2(side, side) * 0.5).round(), Vector2(side, side)), false)
 	if data.has("count") and int(data["count"]) > 1 and not data.has("kind"):
 		var number: String = str(int(data["count"]))
 		var badge := Rect2(rect.end - Vector2(_text_width(number) + 2.0, 8.0), Vector2(_text_width(number) + 2.0, 8.0))
@@ -896,6 +933,18 @@ func _draw_hub() -> void:
 
 func _bag_word(bag: StringName) -> String:
 	return String(BAG_WORDS.get(bag, String(bag).capitalize()))
+
+
+## How item `id` of the bag entered looks (`ItemLooks`: its name, icon and description).
+func _look(id: StringName) -> Dictionary:
+	if _registry == null and is_inside_tree():
+		_registry = get_node_or_null("/root/Registry") as RegistryScript
+	return ItemLooks.of(ItemKinds.kind_in(_bag), id, _registry, _spells)
+
+
+## True when the item entry `entry` of the bag entered is of a kind that can be `action`ed.
+func _item_can(entry: Dictionary, action: StringName) -> bool:
+	return entry.has("item") and _events != null and ItemKinds.can(ItemKinds.kind_in(_bag), action)
 
 
 func _staff_name(number: int) -> String:

@@ -225,11 +225,12 @@ func view_of(row: GroundItem) -> Dictionary:
 		view["mana_regen"] = base.mana_regen
 		view["cards"] = stack.cards.duplicate()
 		return view
-	if stack.kind == ItemKinds.CARD and spells != null:
-		# A card's name and icon are Spells' to say (no script outside core/spells reads a card).
-		if row.title == "":
-			view["name"] = spells.component_name(stack.id)
-		view["icon"] = spells.component_icon(stack.id)
+	# Any other kind looks as it does everywhere (`ItemLooks`: a card's name and icon are Spells', a
+	# potion's or the coin's its content's).
+	var look: Dictionary = ItemLooks.of(stack.kind, stack.id, registry, spells)
+	if row.title == "":
+		view["name"] = look["name"]
+	view["icon"] = look["icon"]
 	if String(view["name"]) == "":
 		view["name"] = String(stack.id)
 	return view

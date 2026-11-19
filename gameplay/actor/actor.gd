@@ -239,7 +239,7 @@ var possessed_by: Possession = null
 var belongs_to: int = ActorsScript.NONE
 ## True for an add another body called (boss plan OB13: its phase's burst or waves), set by Flow as
 ## it stands it. An add drops no coins (connected biomes CB10: waves without end would fill every
-## wallet). State.
+## player's coins). State.
 var is_add: bool = false
 
 ## The number it casts under in Spells and the projectile manager: its `id` while its caster is

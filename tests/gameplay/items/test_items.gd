@@ -181,6 +181,15 @@ func test_a_downed_body_takes_nothing_and_has_nothing_in_reach() -> void:
 	check_equal(_items.take(body.id, item), ItemsScript.Take.NO_HOLDER, "nor taken")
 
 
+func test_a_dropped_potion_is_shown_by_its_own_name_and_icon() -> void:
+	var body := _wizard(0, Vector2(100, 100))
+	_world.bus.item_drop_requested.emit(body.id, ItemStack.of(ItemKinds.POTION, &"healing", 1))
+	var potion: PotionBase = _world.registry.get_resource(&"potions", &"healing") as PotionBase
+	var view: Dictionary = _items.view_of(_items.lying().back())
+	check_equal(view["name"], "Healing Potion", "the potion's own name (ItemLooks)")
+	check(view["icon"] == potion.icon and potion.icon != null, "and its own icon")
+
+
 func test_a_drop_lands_a_step_away_from_the_next_item_and_never_in_a_wall() -> void:
 	var body := _wizard(0, Vector2(100, 100))
 	_items.lay(ItemStack.card(&"bolt"), Vector2(100, 90))

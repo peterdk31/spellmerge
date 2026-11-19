@@ -29,6 +29,16 @@ var cards: Array[StringName] = []
 var mana: float = 0.0
 
 
+## `copies` of the item `of_kind` `of_id` (a kind that stacks: one stack of them; a staff: use
+## `of_staff`).
+static func of(of_kind: StringName, of_id: StringName, copies: int = 1) -> ItemStack:
+	var made := ItemStack.new()
+	made.kind = of_kind
+	made.id = of_id
+	made.count = copies
+	return made
+
+
 ## `count` copies of the card `card_id`.
 static func card(card_id: StringName, copies: int = 1) -> ItemStack:
 	var made := ItemStack.new()

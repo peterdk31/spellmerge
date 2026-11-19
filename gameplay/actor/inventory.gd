@@ -58,7 +58,7 @@ extends ActorComponent
 ## `bag_changed(bag)`, `staff_changed(number)` (its cards, or it came or went) and `hands_changed`.
 
 ## Why a change was refused (NONE: it was made).
-enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM }
+enum Refusal { NONE, NO_STAFF, NO_SLOT, NO_CARD, NO_HAND, NO_ROOM, NO_ITEM, NO_DROP }
 
 ## A bag with no limit.
 const UNLIMITED: int = -1
@@ -619,6 +619,9 @@ func drop(bag: StringName, id: StringName) -> Refusal:
 	var kind: StringName = ItemKinds.kind_in(bag)
 	if kind == &"" or kind == ItemKinds.STAFF or count_of(bag, id) < 1:
 		return Refusal.NO_ITEM
+	if not ItemKinds.can(kind, ItemKinds.DROP) and not ItemKinds.can(kind, ItemKinds.DROP_ONE):
+		# A kind that is never dropped (the coins: shared income, decision 18): the simulation checks.
+		return Refusal.NO_DROP
 	var lying: ItemStack = null
 	if ItemKinds.stacks(kind):
 		_change_count(bag, id, -1)

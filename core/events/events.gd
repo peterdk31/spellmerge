@@ -54,6 +54,11 @@ signal staff_cards_requested(player: int, staff: int, cards: Array[StringName], 
 signal staff_hand_requested(player: int, staff: int, hand: int, body: int)
 ## Sender: hud. `player` asked, in the inventory (items I7), to drop one thing on the ground: their staff number `staff` (as `staff_change_requested`'s; `bag` and `id` are then the staff bag's and its id), or with `staff` -1 one copy of `id` from the bag `bag` (one of `ItemKinds.BAGS`). A command: heard by player at the next tick's start; the inventory lets it go (`item_drop_requested`, which the Items area lays beside the body) or player says `inventory_refused`. `body` as `staff_change_requested`'s.
 signal bag_drop_requested(player: int, bag: StringName, id: StringName, staff: int, body: int)
+## Sender: hud (the inventory, the owner's of 2026-11-19). A command: `player` drinks (uses) one `id`
+## of `bag` (a potion), from the body its menu showed (`body`, `Actor.key`). Heard by player, which
+## takes one and does what it does (`PotionBase`: through Combat, `health_gift_requested`), or
+## refuses it (`inventory_refused`).
+signal bag_use_requested(player: int, bag: StringName, id: StringName, body: int)
 ## Sender: hud (the reward menu, connected biomes CB10). `player` picked choice number `choice` of
 ## their reward offer number `offer` (`reward_rolled`'s; naming the offer, so a pick sent as another
 ## offer arrives never takes that one's). A command: heard by rewards at the next tick's start,
@@ -316,7 +321,8 @@ signal adds_requested(actor: int, adds: EnemyAdds, key: int, wave: bool)
 ## caller died crumbles. Heard by combat, which takes its health and tells its death as any other
 ## (`enemy_died` with NO_PLAYER for a foe of the wizards).
 signal crumble_requested(actor: int)
-## Sender: rewards (connected biomes CB10: a reward of healing or of more health). The actor `actor`
+## Sender: rewards (connected biomes CB11: a fountain's draw) and player (a potion drunk from the
+## inventory, `bag_use_requested`; the owner, 2026-11-19). The actor `actor`
 ## gains `more_most` most health (and as much health, unless it is down) and is then healed `heal`.
 ## Heard by combat, which keeps an actor's health: it changes the body's Health and tells a heal as
 ## any other (`heal_dealt`, by nobody).
@@ -606,7 +612,8 @@ signal difficulty_changed(level: float)
 
 ## Sender: rewards (connected biomes CB10). Seat `player`'s own roll on a room's clear: the offer
 ## numbered `offer` (handed out once a run), its `choices` (the views of what each gives:
-## `kind` (`RewardEntry.KINDS`), `id`, `count`, `name`, `icon`; as many as the player's
+## `kind` (an item kind, `ItemKinds.RULES`: every reward is an inventory item), `id`, `count`, and the
+## item's own `name`, `icon` and `description` (`ItemLooks`); as many as the player's
 ## `reward_choices`, fewer when the table runs out of different ones), and whether the player's wizard was in the room (`here`: the menu opens at
 ## once; a player who was not there finds it as an unspent reward, DESIGN rule 4). Heard by hud.
 signal reward_rolled(player: int, offer: int, choices: Array[Dictionary], here: bool)
@@ -614,8 +621,8 @@ signal reward_rolled(player: int, offer: int, choices: Array[Dictionary], here: 
 ## of their offer `offer`, which gave what `reward` says (a view, as `reward_rolled`'s). Heard by
 ## nobody yet (tests; later Feel's sound).
 signal reward_taken(player: int, offer: int, choice: int, reward: Dictionary)
-## Sender: rewards. A pick of `player`'s offer `offer` could not be given (no room in the card bag,
-## a heal while the wizard is down, no wizard): the offer stays unspent. Heard by hud (the reward
+## Sender: rewards. A pick of `player`'s offer `offer` could not be given (no room in its item's bag,
+## no wizard): the offer stays unspent. Heard by hud (the reward
 ## menu opens on it again, saying why).
 signal reward_refused(player: int, offer: int)
 ## Sender: rewards. Seat `player`'s offers not yet picked, oldest first (`offers`: each a dictionary
@@ -628,8 +635,8 @@ signal rewards_waiting_changed(player: int, offers: Array[Dictionary])
 ## again for every coin (and gone for those no longer lying). Heard by feel (the coins' look).
 signal coin_changed(coin: int, at: Vector2, lying: bool)
 ## Sender: rewards (connected biomes CB11, decision 19). Shop item `item` (numbered once a run) lies on
-## its shelf at `at` (`lying`), `choice` what it is (a reward choice's view: `kind`, `id`, `count`,
-## `name`, `icon`) and `price` its price in coins (the run's own `price_scale`; a buyer's relics may
+## its shelf at `at` (`lying`), `choice` what it is (an item, as a reward choice's view: `kind`, `id`,
+## `count`, `name`, `icon`, `description`) and `price` its price in coins (the run's own `price_scale`; a buyer's relics may
 ## change theirs), or is gone (bought, or the world went). After a snapshot is restored, said again
 ## for every item (and gone for those no longer there). For the view only. Heard by feel.
 signal shelf_changed(item: int, at: Vector2, choice: Dictionary, price: int, lying: bool)
@@ -639,17 +646,13 @@ signal shelf_changed(item: int, at: Vector2, choice: Dictionary, price: int, lyi
 ## restored. Heard by hud (the hint; A buys it, `shelf_buy_requested`).
 signal shelf_near_changed(player: int, item: int, at: Vector2, view: Dictionary)
 ## Sender: rewards. `player` asked to buy shop item `item` and could not: too few coins in their own
-## wallet, no room for it, or a heal while whole. Nothing changed. Heard by hud (the hint's red shake).
+## coin stack (their wizard's coins bag), or no room for it. Nothing changed. Heard by hud (the hint's red shake).
 signal shelf_refused(player: int, item: int)
 ## Sender: rewards (connected biomes CB11, decision 20). The fountain of room `room`, its pool at
 ## `area` (world pixels), holds `left` of its `most` healing: as it is filled, as a hurt wizard draws
 ## on it, and after a snapshot is restored; room -1 (the rest empty): every fountain forgotten (the
 ## world went; a restore, before each is said again). For the view only. Heard by feel.
 signal fountain_changed(room: int, area: Rect2, left: float, most: float)
-## Sender: rewards. Seat `player`'s wallet holds `coins` now: at a run's start, as a player's
-## starting coins come, as anyone takes a coin from the floor (every wallet gains it), as a reward
-## gives coins and as the player spends. Heard by hud (the corner panel).
-signal wallet_changed(player: int, coins: int)
 ## Sender: rewards (connected biomes CB11's follow-up). Seat `player`'s run stats now (`stats`: every
 ## `RunStats` row by name, its value for this player: the base, the run's changes, its relics): at a
 ## run's start, as the run's changes come (`run_stats_ruled`), as the seat's wizard comes, and after a

@@ -1047,7 +1047,7 @@ func _on_crumble_requested(actor: int) -> void:
 	crumble(actor)
 
 
-## A reward's gift of health to `actor` (connected biomes CB10): `more_most` more most health (and
+## A gift of health to `actor` (a fountain's draw, CB11; a potion drunk, the owner's of 2026-11-19): `more_most` more most health (and
 ## as much health while it stands, `Health.grow`), then a heal of `heal` as any heal is (told by
 ## nobody). A body Combat does not keep, or one with no Health, gains nothing.
 func _on_health_gift_requested(actor: int, heal: float, more_most: float) -> void:

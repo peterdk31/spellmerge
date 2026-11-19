@@ -2,26 +2,29 @@ extends "res://tests/support/suite.gd"
 ## Tests for the Rewards area (connected biomes CB10, gameplay/rewards/rewards.gd): a room's clear
 ## rolls each player's own offer of `reward_choices` (2) distinct choices from the clear's table,
 ## `here` for a wizard in the room and waiting for one who was not; a run rule change or a relic
-## changes a player's number of choices; a pick (a command naming its offer) gives a card to the bag
-## or coins to the picker's wallet, and a pick of another's offer or a bad choice does nothing; no
-## room in the bag keeps it unspent; offers wait across rooms until picked; the same seed rolls the
-## same; a foe's death lays its coins, a wizard's feet take one and every wallet gains it; spending
-## is one's own; a new world clears the coins, a run's start everything; a snapshot's restore says
-## it all again.
+## changes a player's number of choices; every choice wraps an item (the owner, 2026-11-19): a pick
+## (a command naming its offer) puts it into the picker's inventory (a card into the card bag,
+## potions into the potions bag, undrunk; coins onto the picker's own coin stack), and a pick of
+## another's offer or a bad choice does nothing; no room in the bag keeps it unspent; offers wait
+## across rooms until picked; the same seed rolls the same; a foe's death lays its coins, a wizard's
+## feet take one and every player's coin stack gains one; spending is one's own; a new world clears
+## the coins, a run's start everything; a snapshot's restore says it all again.
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const RewardsScript := preload("res://gameplay/rewards/rewards.gd")
 const IMP: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 const EventsScript := preload("res://core/events/events.gd")
 const CARDS: StringName = &"cards"
+const POTIONS: StringName = &"potions"
+const COINS: StringName = &"coins"
 
 var _world: Fixture
 var _rewards: RewardsScript
-## Every reward_rolled [player, offer, choices, here], reward_taken [player, offer, choice],
-## wallet_changed [player, coins] and coin_changed [coin, lying].
+## Every reward_rolled [player, offer, choices, here], reward_taken [player, offer, choice], the
+## coins bag's bag_changed [player, coins] and coin_changed [coin, lying].
 var _rolled: Array = []
 var _taken: Array = []
-var _wallets: Array = []
+var _purses: Array = []
 var _coins: Array = []
 
 
@@ -30,11 +33,13 @@ func before_each() -> void:
 	_rewards = _make(7)
 	_rolled.clear()
 	_taken.clear()
-	_wallets.clear()
+	_purses.clear()
 	_coins.clear()
 	_world.bus.reward_rolled.connect(func(player: int, offer: int, choices: Array[Dictionary], here: bool) -> void: _rolled.append([player, offer, choices, here]))
 	_world.bus.reward_taken.connect(func(player: int, offer: int, choice: int, _reward: Dictionary) -> void: _taken.append([player, offer, choice]))
-	_world.bus.wallet_changed.connect(func(player: int, coins: int) -> void: _wallets.append([player, coins]))
+	_world.bus.bag_changed.connect(func(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, _capacity: int) -> void:
+		if bag == COINS:
+			_purses.append([player, counts[ids.find(CoinBase.ID)] if ids.has(CoinBase.ID) else 0]))
 	_world.bus.coin_changed.connect(func(coin: int, _at: Vector2, lying: bool) -> void: _coins.append([coin, lying]))
 
 
@@ -114,12 +119,11 @@ func test_a_clear_rolls_each_players_own_offer_of_two() -> void:
 		check(choices[0]["kind"] != choices[1]["kind"] or choices[0]["id"] != choices[1]["id"] or choices[0]["count"] != choices[1]["count"], "two different choices")
 		check(row[3], "a wizard in the room is there for it")
 		for choice: Dictionary in choices:
-			check(RewardEntry.KINDS.has(choice["kind"]), "one of the reward kinds")
-			check(String(choice["name"]) != "", "each has a name for the menu")
-			if choice["kind"] != RewardEntry.CARD:
-				check_equal(choice["description"], RewardEntry.describe(choice["kind"], choice["count"]), "and says what it does, its kind's line")
-			else:
-				check(choice.has("description"), "a card says what it does with its builder line")
+			check(ItemKinds.has(choice["kind"]), "an item kind: every reward is an item")
+			var look: Dictionary = ItemLooks.of(choice["kind"], choice["id"], _world.registry, _world.spells)
+			check(String(choice["name"]).begins_with(String(look["name"])) and String(look["name"]) != "", "the item's own name for the menu")
+			check_equal(choice["icon"], look["icon"], "the item's own icon")
+			check_equal(choice["description"], look["description"], "and the item's own description")
 	check_equal(_rewards.waiting_of(0).size(), 1, "it waits until picked")
 	check(_rewards.waiting_of(2).is_empty(), "a seat with no wizard rolls nothing")
 
@@ -174,7 +178,7 @@ func test_a_pick_gives_the_choice_and_the_offer_goes() -> void:
 	_pick(0, offer, 0)
 	check_equal(_taken, [[0, offer, 0]], "a rolled offer is taken, as picked")
 	check(_rewards.waiting_of(0).is_empty(), "and goes")
-	_offer(0, 70, RewardEntry.CARD, 2, &"fire")
+	_offer(0, 70, ItemKinds.CARD, 2, &"fire")
 	var before: int = body.inventory.count_of(CARDS, &"fire")
 	_pick(0, 70, 0)
 	check_equal(body.inventory.count_of(CARDS, &"fire"), before + 2, "a card's copies go into the bag")
@@ -195,12 +199,17 @@ func test_a_pick_of_anothers_offer_or_no_choice_does_nothing() -> void:
 	check_equal(_rewards.waiting_of(0).size(), 1, "the offer still waits")
 
 
-func test_coins_go_to_the_pickers_wallet_only() -> void:
-	_wizard(0)
+func test_coins_go_onto_the_pickers_own_stack_only() -> void:
+	var body := _wizard(0)
 	_wizard(1, Vector2(40, 0))
-	_offer(0, 50, RewardEntry.COINS, 5)
+	_offer(0, 50, ItemKinds.COIN, 5, CoinBase.ID)
 	_pick(0, 50, 0)
-	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [5, 0], "spending and rewards are one's own")
+	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [5, 0], "spending and rewards are one's own")
+	check_equal(body.inventory.stacks_in(COINS).size(), 1, "coins are one stack in the coins bag")
+	_offer(0, 52, ItemKinds.COIN, 3, CoinBase.ID)
+	_pick(0, 52, 0)
+	check_equal([body.inventory.stacks_in(COINS).size(), body.inventory.count_of(COINS, CoinBase.ID)], [1, 8], "more coins join the stack")
+	check(_purses.has([0, 8]), "the stack is said as any bag (the HUD's purse)")
 
 
 ## Seat `seat`'s own offer numbered `number` of the one choice `kind` `count`, waiting.
@@ -212,30 +221,29 @@ func _offer(seat: int, number: int, kind: StringName, count: int, id: StringName
 	_rewards._offers.append(offer)
 
 
-func test_healing_and_more_health_go_through_combat() -> void:
+func test_potions_go_into_the_bag_and_do_nothing_until_drunk() -> void:
 	var body := _wizard(0)
 	_world.hurt(body, 50)
-	check_equal(body.health.health, 50.0, "hurt")
 	var heals: Array = []
 	_world.bus.heal_dealt.connect(func(by: int, _target: Node, amount: float, _at: Vector2) -> void: heals.append([by, amount]))
-	_offer(0, 60, RewardEntry.HEAL, 30)
+	_offer(0, 60, ItemKinds.POTION, 1, &"healing")
 	_pick(0, 60, 0)
-	check_equal(body.health.health, 80.0, "healed 30")
-	check_equal(heals, [[EventsScript.NO_PLAYER, 30.0]], "told as a heal by nobody")
-	_offer(0, 61, RewardEntry.MAX_HEALTH, 10)
+	_offer(0, 61, ItemKinds.POTION, 2, &"max_health")
 	_pick(0, 61, 0)
-	check_equal([body.health.max_health, body.health.health], [110.0, 90.0], "10 more most health, and as much health")
 	check_equal(_taken.size(), 2, "both taken")
+	check_equal([body.inventory.count_of(POTIONS, &"healing"), body.inventory.count_of(POTIONS, &"max_health")], [1, 2], "into the potions bag")
+	check_equal([body.health.health, body.health.max_health], [50.0, 100.0], "nothing happens until a potion is drunk")
+	check(heals.is_empty(), "no heal")
 
 
-func test_a_heal_waits_while_the_wizard_is_down() -> void:
+func test_a_potion_is_taken_while_the_wizard_is_down() -> void:
 	var body := _wizard(0)
 	_world.hurt(body, 100000)
 	check(body.is_down(), "down")
-	_offer(0, 62, RewardEntry.HEAL, 30)
+	_offer(0, 62, ItemKinds.POTION, 1, &"healing")
 	_pick(0, 62, 0)
-	check(_taken.is_empty(), "not taken while down")
-	check_equal(_rewards.waiting_of(0).size(), 1, "it waits")
+	check_equal(_taken.size(), 1, "an item is kept for later, down or not")
+	check_equal(body.inventory.count_of(POTIONS, &"healing"), 1, "in the bag")
 
 
 func test_no_room_in_the_bag_keeps_it_unspent() -> void:
@@ -243,7 +251,7 @@ func test_no_room_in_the_bag_keeps_it_unspent() -> void:
 	body.inventory.set_capacity(CARDS, body.inventory.copies(CARDS))
 	var refused: Array = []
 	_world.bus.reward_refused.connect(func(player: int, offer: int) -> void: refused.append([player, offer]))
-	_offer(0, 51, RewardEntry.CARD, 1, &"fire")
+	_offer(0, 51, ItemKinds.CARD, 1, &"fire")
 	_pick(0, 51, 0)
 	check(_taken.is_empty(), "nothing taken")
 	check_equal(refused, [[0, 51]], "the seat hears it was refused")
@@ -302,14 +310,15 @@ func test_a_foes_coins_are_shared_income() -> void:
 	taker.position = _rewards.coins_lying()[0] + Vector2(3, 0)
 	_tick()
 	check(_rewards.coins_lying().is_empty(), "taken")
-	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [1, 1], "every wallet gained it")
+	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [1, 1], "every player's coin stack gained it (shared income, decision 18)")
+	check(_purses.has([0, 1]) and _purses.has([1, 1]), "each stack said by its bag")
 	check_equal(_coins.back(), [0, false], "said gone")
 	check(_rewards.spend(1, 1), "a player spends their own")
-	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [1, 0], "only theirs")
+	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [1, 0], "only theirs")
 	check(not _rewards.spend(1, 1), "not more than they hold")
 
 
-func test_a_bosss_coins_go_to_every_wallet() -> void:
+func test_a_bosss_coins_go_to_every_player() -> void:
 	_wizard(0)
 	_wizard(1, Vector2(40, 0))
 	var boss := Actor.new()
@@ -320,7 +329,7 @@ func test_a_bosss_coins_go_to_every_wallet() -> void:
 	_world.bus.enemy_died.emit(0, boss, Vector2(300, 0), -1)
 	boss.free()
 	check(_rewards.coins_lying().is_empty(), "none on the floor (the portal home opens as its room clears)")
-	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [10, 10], "every wallet gains them (decision 25)")
+	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [10, 10], "every player gains them (decision 25)")
 
 
 func test_an_add_drops_no_coin() -> void:
@@ -361,7 +370,7 @@ func test_starting_coins_come_once_a_run() -> void:
 	_wizard(0)
 	_tick()
 	_tick()
-	check_equal(_rewards.wallet_of(0), 12, "the run's starting coins, once")
+	check_equal(_rewards.coins_of(0), 12, "the run's starting coins, once")
 
 
 func test_a_new_world_clears_the_coins_and_a_run_start_everything() -> void:
@@ -378,7 +387,7 @@ func test_a_new_world_clears_the_coins_and_a_run_start_everything() -> void:
 	_rewards.lay_coin(Vector2(80, 0))
 	_rewards.begin_run()
 	check(_rewards.waiting_of(0).is_empty() and _rewards.coins_lying().is_empty(), "a run's start ends the offers and the coins")
-	check_equal(_rewards.wallet_of(0), 0, "and empties the wallets")
+	check_equal(_rewards.coins_of(0), 0, "and the wizard holds none")
 
 
 func test_a_restore_says_it_all_again() -> void:
@@ -387,14 +396,12 @@ func test_a_restore_says_it_all_again() -> void:
 	var kept: int = _rewards.lay_coin(Vector2(80, 0))
 	_clear(0)
 	_coins.clear()
-	_wallets.clear()
 	var waiting: Array = []
 	_world.bus.rewards_waiting_changed.connect(func(player: int, offers: Array[Dictionary]) -> void: waiting.append([player, offers.size()]))
 	_rewards._said_coins[kept + 1] = true
 	_rewards.rebuild_derived()
 	check(_coins.has([kept + 1, false]), "a coin this machine drew that lies there no more is said gone")
 	check(_coins.has([kept, true]), "every coin lying is said")
-	check(_wallets.has([0, 0]), "every wallet is said")
 	check(waiting.has([0, 1]), "every seat's waiting offers are said")
 
 
@@ -405,7 +412,7 @@ func _open_shop(room: int, spots: PackedVector2Array) -> void:
 	_world.bus.special_room_opened.emit(room, RoomKind.FILL_SHOP, &"shelf", Rect2(), spots)
 
 
-## Seat `seat`'s wallet given `coins` (a run's starting coins).
+## Every seat's coin stack given `coins` (a run's starting coins).
 func _fund(coins: int) -> void:
 	_world.bus.run_stats_ruled.emit([StatChange.make(&"start_coins", float(coins))] as Array[StatChange])
 	_tick()
@@ -447,7 +454,7 @@ func test_a_shops_shelf_is_one_of_each_and_the_first_buyer_takes_it() -> void:
 	check_equal(_rewards.shelf().size(), 2, "bought: gone from the shelf for everyone")
 	check(refused.is_empty(), "the second ask finds it gone, and says nothing")
 	check(near.back() == [1, -1, -1] and near[near.size() - 2] == [0, -1, -1], "nobody has it in reach any more")
-	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [30 - price, 30], "the buyer pays from their own wallet")
+	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [30 - price, 30], "the buyer pays from their own coin stack")
 	check(shelf.back()[3] == false and shelf.back()[0] == items[0]["number"], "the view is told it went")
 
 
@@ -466,7 +473,7 @@ func test_a_wizard_who_cannot_pay_buys_nothing_and_prices_follow_the_players_sca
 	_world.bus.shelf_buy_requested.emit(0, item["number"])
 	_tick()
 	check_equal(_rewards.shelf().size(), 1, "too few coins: it stays")
-	check_equal(_rewards.wallet_of(0), 1, "nothing spent")
+	check_equal(_rewards.coins_of(0), 1, "nothing spent")
 	check_equal(refused, [[0, item["number"]]], "the buyer is told it was refused")
 	_world.bus.run_stats_ruled.emit([StatChange.make(&"price_scale", 0.5, StatChange.How.TIMES)] as Array[StatChange])
 	check_equal(_rewards.price_for(0, item["number"]), maxi(roundi(float(item["price"]) * 0.5), 1), "a player's price is the price times their price_scale")
@@ -490,35 +497,53 @@ func test_the_item_in_reach_follows_the_price_and_goes_with_the_world() -> void:
 	check_equal(near.back(), [-1, -1], "a new world: nothing in reach at once")
 
 
-func test_a_shelf_sells_heals_only_to_the_hurt() -> void:
+func test_a_shelf_sells_potions_into_the_bag() -> void:
 	var one := _wizard(0, Vector2(-200, 0))
 	_fund(60)
-	var heal: Dictionary = {}
+	var potion: Dictionary = {}
 	for room in range(10, 40):
 		_open_shop(room, PackedVector2Array([Vector2(0, 0), Vector2(48, 0), Vector2(96, 0), Vector2(144, 0)]))
 		for item: Dictionary in _rewards.shelf():
-			if (item["choice"] as Dictionary)["kind"] == RewardEntry.HEAL and heal.is_empty():
-				heal = item
-		if not heal.is_empty():
+			if (item["choice"] as Dictionary)["kind"] == ItemKinds.POTION and potion.is_empty():
+				potion = item
+		if not potion.is_empty():
 			break
-	check(not heal.is_empty(), "the shop's shelf (content/rewards/shelf.tres) sells heals")
-	if heal.is_empty():
+	check(not potion.is_empty(), "the shop's shelf (content/rewards/shelf.tres) sells potions")
+	if potion.is_empty():
 		return
+	var id: StringName = (potion["choice"] as Dictionary)["id"]
+	one.position = potion["at"]
+	_tick()
+	_world.bus.shelf_buy_requested.emit(0, potion["number"])
+	_tick()
+	check_equal(one.inventory.count_of(POTIONS, id), 1, "bought by a whole wizard too: a potion is kept, not drunk")
+	check_equal(_rewards.coins_of(0), 60 - int(potion["price"]), "paid for (price_scale 1), the coins gone from the stack")
+	check(_rewards.price_for(0, potion["number"]) < 0, "and gone from the shelf")
+
+
+func test_a_full_bag_buys_nothing() -> void:
+	var one := _wizard(0, Vector2(-200, 0))
+	_fund(60)
+	_open_shop(4, PackedVector2Array([Vector2(0, 0)]))
+	var item: Dictionary = _rewards.shelf()[0]
+	var bag: StringName = ItemKinds.bag_of((item["choice"] as Dictionary)["kind"])
+	one.inventory.set_capacity(bag, one.inventory.copies(bag))
 	var refused: Array = []
 	_world.bus.shelf_refused.connect(func(seat: int, number: int) -> void: refused.append([seat, number]))
-	one.position = heal["at"]
+	one.position = item["at"]
 	_tick()
-	_world.bus.shelf_buy_requested.emit(0, heal["number"])
+	_world.bus.shelf_buy_requested.emit(0, item["number"])
 	_tick()
-	check_equal(refused, [[0, heal["number"]]], "a whole wizard is refused a heal")
-	check_equal(_rewards.wallet_of(0), 60, "and pays nothing")
-	_world.hurt(one, 50)
-	var before: float = one.health.health
-	_world.bus.shelf_buy_requested.emit(0, heal["number"])
-	_tick()
-	check(one.health.health > before, "a hurt wizard's heal heals them")
-	check_equal(_rewards.wallet_of(0), 60 - int(heal["price"]), "paid for (price_scale 1)")
-	check(_rewards.price_for(0, heal["number"]) < 0, "and gone from the shelf")
+	check_equal(refused, [[0, item["number"]]], "no room: refused")
+	check_equal([_rewards.coins_of(0), _rewards.shelf().size()], [60, 1], "nothing paid, nothing gone")
+
+
+func test_a_coin_stack_is_state_snapshotted_with_the_wizard() -> void:
+	var body := _wizard(0)
+	_fund(7)
+	check_equal(_rewards.coins_of(0), 7, "funded")
+	var saved: ItemStack = body.inventory.stacks_in(COINS)[0]
+	check_equal([saved.kind, saved.id, saved.count], [ItemKinds.COIN, CoinBase.ID, 7], "a stack in the inventory, which is state (hashed and snapshotted with the body)")
 
 
 func test_each_players_run_stats_are_told_to_the_view() -> void:

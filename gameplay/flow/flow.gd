@@ -403,7 +403,7 @@ func step(delta: float) -> void:
 	if mode == MODE_HUB and state == State.RUNNING:
 		var departing: int = hub.departure_due()
 		if departing >= 0:
-			_start_run_from_stone(departing)
+			_start_run_from_stone(_seat_still_here(departing))
 			return
 		_count_stone()
 		return
@@ -924,6 +924,17 @@ func _start_run_from_stone(seat: int) -> void:
 		# It refused before freeing anything (content missing): the hub stands as it was.
 		push_warning("Flow: the run from the stone did not start, so the party stays in the hub.")
 		mode = MODE_HUB
+
+
+## `seat` while its wizard is in the world, else the lowest seat whose wizard is (the one that
+## pressed A on the stone may leave before the run starts; it starts for whoever is left), else `seat`.
+func _seat_still_here(seat: int) -> int:
+	if get_wizard(seat) != null:
+		return seat
+	for other in PLAYER_SLOTS:
+		if get_wizard(other) != null:
+			return other
+	return seat
 
 
 ## Every wizard's player loadout now, by its seat (items I4): what `start_run` makes each seat's

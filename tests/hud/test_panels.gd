@@ -117,13 +117,16 @@ func test_the_hud_is_an_autoload() -> void:
 	check_equal(autoload, "*res://hud/panels/panels.tscn", "autoload Hud is registered")
 
 
-## The loading screen covers every line, overlay and menu of the HUD (the stone line was drawn over
-## it while the party departed from the stone); only the frame rate readout is over it.
-func test_the_loading_screen_is_over_everything_but_the_frame_rate() -> void:
+## The loading screen covers every line and overlay of the HUD (the stone line was drawn over it
+## while the party departed from the stone). The pause menu and the pad line are over it: either stops
+## the game, and a departure with it, so the screen stays down under them until the run starts.
+func test_the_loading_screen_is_under_only_the_pause_menu_the_pad_line_and_the_frame_rate() -> void:
 	var hud_root: Control = _make_hud().get_node("Root") as Control
 	var count: int = hud_root.get_child_count()
-	check_equal(hud_root.get_child(count - 1).name, &"FpsCounter", "the frame rate readout last")
-	check_equal(hud_root.get_child(count - 2).name, &"Loading", "the loading screen under it, over the rest")
+	var top: Array[StringName] = []
+	for i in range(count - 4, count):
+		top.append(hud_root.get_child(i).name)
+	check_equal(top, [&"Loading", &"PauseMenu", &"PadLine", &"FpsCounter"] as Array[StringName], "the loading screen over the rest, those over it")
 
 
 # --- One panel ---------------------------------------------------------------------------------

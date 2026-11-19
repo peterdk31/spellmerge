@@ -338,6 +338,22 @@ func test_a_on_the_lit_stone_departs_and_the_run_starts_ticks_later() -> void:
 	events.disconnect("run_departure_changed", hear)
 
 
+## The seat that pressed A leaves during the departure: the run starts for a seat still there.
+func test_the_presser_leaving_hands_the_run_to_a_seat_still_there() -> void:
+	_start([0, 1])
+	_place(0, true)
+	_place(1, true)
+	_tick()
+	_press_a_only(0)
+	input.leave(0)
+	await commands_applied()
+	for i in HubRules.DEPART_TICKS:
+		_tick()
+	check_equal(flow.mode, FlowScript.MODE_RUN, "the run starts")
+	check(flow.get_wizard(1) != null and flow.get_wizard(0) == null, "with the seat left")
+	check_equal(flow.get("_starter"), 1, "and for it")
+
+
 ## The main menu under a departure (the pause menu's): no run starts, and the HUD is told it ended.
 func test_the_main_menu_under_a_departure_starts_no_run() -> void:
 	var told: Array[bool] = []

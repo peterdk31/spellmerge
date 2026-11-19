@@ -28,7 +28,8 @@ extends CanvasLayer
 ## (`inventory_announced`: the body shown changed, or its wizard was made again) its builder and
 ## inventory close, so neither sends a request about a staff of the body shown before.
 ##
-## The loading screen (`loading/`, node Root/Loading, over everything but the frame rate readout)
+## The loading screen (`loading/`, node Root/Loading, over everything but the pause menu, the pad
+## line and the frame rate readout)
 ## shows from `loading_started` to `loading_finished`, while flow compiles the shaders before the
 ## first room, and while the party departs from the hub's stone (`run_departure_changed`).
 ##
@@ -361,10 +362,12 @@ func _ready() -> void:
 	root_control.add_child(_item_hints)
 	root_control.move_child(_item_hints, 1)
 	_item_hints.bind(events, input, spells)
-	# The loading screen over every line, overlay and menu made above; only the frame rate readout
-	# over it (the freeze it covers is what that counts).
+	# The loading screen over every line and overlay made above. Over it: the pause menu and the pad
+	# line, since either stops the game, and a departure from the stone with it (the screen stays down
+	# until the run starts), and the frame rate readout (the freeze it covers is what that counts).
 	root_control.move_child(_loading, -1)
-	root_control.move_child(_fps, -1)
+	for over: Control in [_pause_menu, _pad_line, _fps]:
+		root_control.move_child(over, -1)
 	if events != null:
 		events.pad_wait_changed.connect(_on_pad_wait_changed)
 		events.player_joined.connect(_on_player_joined)

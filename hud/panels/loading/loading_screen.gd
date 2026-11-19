@@ -5,8 +5,8 @@ extends ColorRect
 ##   room), with a bar that fills from `loading_progressed`;
 ## - the party's departure from the hub's stone (`run_departure_changed`, flow: the run's biome is
 ##   built in one tick, a second or more), with no bar, since that work has no steps to show.
-## Smooth (docs/STYLE.md): it comes down from above over COVER_FRAMES frames and goes back up the
-## same way, by whole pixels, and turns round where it is if it is wanted again on the way. It takes
+## Smooth (docs/STYLE.md): it comes down from above in COVER_FRAMES steps of STEP_SECONDS (0.1 s,
+## by real time: drawing may use it) and goes back up the same way, by whole pixels, and turns round where it is if it is wanted again on the way. It takes
 ## no input and holds nobody up: the run starts the moment its work is done.
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -15,10 +15,12 @@ const BACKING: Color = Color(0.105882, 0.0941176, 0.188235, 1.0)
 const BAR_SIZE: Vector2 = Vector2(160.0, 4.0)
 const BAR_BACK: Color = Color(1.0, 1.0, 1.0, 0.15)
 const BAR_FILL: Color = Color(1.0, 0.953, 0.651, 1.0)
-## Frames the screen takes to come down (and to go up). Fewer than the frames a load waits before
-## its first unit (`Loading.WAIT_FRAMES`) and the ticks a departure waits (`HubRules.DEPART_TICKS`),
-## so it is down before the work freezes the game.
+## Steps the screen takes to come down (and to go up), one each STEP_SECONDS of real time. A slow
+## frame takes as many steps as its time holds (at least one), so the screen is down in 0.1 s at any
+## frame rate: before a departure's run is built (`HubRules.DEPART_TICKS`, 0.2 s of ticks, which a
+## slow machine runs up to three a frame) and before a load's first unit (`Loading.WAIT_FRAMES`).
 const COVER_FRAMES: int = 6
+const STEP_SECONDS: float = 1.0 / 60.0
 
 var events: EventsScript = null
 var _label: Label = null
@@ -72,8 +74,8 @@ func _ready() -> void:
 		events.run_departure_changed.connect(_on_departure_changed)
 
 
-func _process(_delta: float) -> void:
-	advance()
+func _process(delta: float) -> void:
+	advance(delta)
 
 
 func _on_started() -> void:
@@ -102,10 +104,11 @@ func is_up() -> bool:
 	return _loading or _departing
 
 
-## One frame of the screen's way down or up (the screen calls it every frame while moving; tests
-## call it by hand).
-func advance() -> void:
-	_frame = clampi(_frame + (1 if is_up() else -1), 0, COVER_FRAMES)
+## One frame of `delta` seconds of the screen's way down or up: as many steps as it holds, at least
+## one (the screen calls it every frame while moving; tests call it by hand).
+func advance(delta: float = STEP_SECONDS) -> void:
+	var steps: int = maxi(1, roundi(delta / STEP_SECONDS))
+	_frame = clampi(_frame + (steps if is_up() else -steps), 0, COVER_FRAMES)
 	_place()
 	if _frame == 0 and not is_up():
 		visible = false

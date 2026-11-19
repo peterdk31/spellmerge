@@ -57,6 +57,19 @@ func test_a_departure_brings_it_down_and_the_runs_start_takes_it_up() -> void:
 	check(not _screen.visible, "and is hidden there")
 
 
+## A slow machine (a frame of 50 ms, three ticks a frame): it is down in 0.1 s all the same, before
+## the departure's run is built, still by steps of whole pixels.
+func test_on_a_slow_machine_it_is_down_before_the_run_is_built() -> void:
+	_bus.run_departure_changed.emit(true)
+	var frames: int = 0
+	while not _screen.is_down() and frames < 100:
+		_screen.advance(0.05)
+		frames += 1
+		check_equal(_screen.position.y, roundf(_screen.position.y), "by whole pixels")
+	check(_screen.is_down(), "down")
+	check(frames * 3 < HubRules.DEPART_TICKS, "in %d frames of three ticks, before the %d ticks of the departure" % [frames, HubRules.DEPART_TICKS])
+
+
 func test_it_turns_round_where_it_is() -> void:
 	_bus.run_departure_changed.emit(true)
 	var down: Array[float] = _tops(2)

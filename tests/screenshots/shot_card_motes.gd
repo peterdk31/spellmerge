@@ -47,7 +47,7 @@ func take() -> void:
 	var feel: Node = root.get_node("Feel")
 	feel.set("drive_engine", false)
 	var spectacle: Node = feel.call(&"spectacle") as Node
-	spectacle.call(&"_on_room_entered", &"arena_01")
+	spectacle.call(&"_on_room_entered", &"arena_01", 0)
 	_spells = SheetSpells.new()
 	root.add_child(_spells)
 	_heavy_tag = SpellTag.make(0, 0, 1, 0)

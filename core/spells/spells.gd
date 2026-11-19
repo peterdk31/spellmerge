@@ -768,7 +768,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.reaction_landed.disconnect(_on_reaction)
 		events.entity_ended.disconnect(_on_entity_ended)
 		events.caster_move_finished.disconnect(_moves.finished)
-		events.room_left.disconnect(leave_room)
+		events.room_left.disconnect(_on_room_left)
 	projectiles = manager
 	events = bus
 	if projectiles != null:
@@ -785,7 +785,13 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.reaction_landed.connect(_on_reaction)
 		events.entity_ended.connect(_on_entity_ended)
 		events.caster_move_finished.connect(_moves.finished)
-		events.room_left.connect(leave_room)
+		events.room_left.connect(_on_room_left)
+
+
+## The party left room `room` (`room_left`; connected biomes CB3: a row run's each room, a biome's
+## world as a whole, ALL_ROOMS): what was cast ends with it (`leave_room`).
+func _on_room_left(_room: int) -> void:
+	leave_room()
 
 
 ## True when the card `card_id` does something on the carrier `carrier` (`CarrierCard.carrier`) on its

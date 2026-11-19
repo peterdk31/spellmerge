@@ -56,8 +56,8 @@ func _init(root: Node, of_kind: CoverKind, run_seed: int = 7) -> void:
 	cover.sim = Sim.seeded(run_seed)
 	cover.use_kinds([of_kind] as Array[CoverKind])
 	root.add_child(cover)
-	world.bus.room_built.emit(ROOM, _layout)
-	world.bus.room_entered.emit(ROOM)
+	world.bus.room_built.emit(ROOM, 0, _layout)
+	world.bus.room_entered.emit(ROOM, 0)
 
 
 func free_all() -> void:

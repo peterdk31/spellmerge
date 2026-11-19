@@ -288,7 +288,11 @@ func rebuild_derived() -> void:
 ## nothing), that is laid again;
 ## otherwise (a host starting it, a party back from a run, any other room) what its scene places,
 ## one copy each, in its order: the rack is fresh then (owner, 2026-11-14).
-func _on_room_items_placed(room_id: StringName, items: Array[Resource], at: PackedVector2Array) -> void:
+func _on_room_items_placed(room_id: StringName, room: int, items: Array[Resource], at: PackedVector2Array) -> void:
+	if room != EventsScript.FIRST_ROOM:
+		# A biome's later room (connected biomes CB3): its items join what lies on the ground.
+		_lay_placed(items, at)
+		return
 	# A room the party went on into (run generation RG4): what lay in the room left goes with it.
 	clear()
 	var carried: GroundLoadout = frames.next_run_ground() if frames != null else null
@@ -296,6 +300,11 @@ func _on_room_items_placed(room_id: StringName, items: Array[Resource], at: Pack
 	if carried != null and room_id != &"" and carried.room == room_id:
 		lay_ground(carried)
 		return
+	_lay_placed(items, at)
+
+
+## Lay the items a room's scene places (`items`, each at `at`), one of each.
+func _lay_placed(items: Array[Resource], at: PackedVector2Array) -> void:
 	for i in mini(items.size(), at.size()):
 		var stack: ItemStack = ItemKinds.stack_of(items[i])
 		if stack == null:

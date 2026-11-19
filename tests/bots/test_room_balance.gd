@@ -60,7 +60,7 @@ func _run(count: int, events: Node, flow: Node, input: Node) -> void:
 			bot.leave()
 		return
 	var tally: Dictionary = {"cleared": false, "downed": 0, "casts": 0}
-	var on_cleared := func(_room: StringName) -> void: tally["cleared"] = true
+	var on_cleared := func(_room: StringName, _number: int) -> void: tally["cleared"] = true
 	var on_downed := func(_player: int) -> void: tally["downed"] = int(tally["downed"]) + 1
 	var on_cast := func(_player: int, _spell: StringName, _origin: Vector2, _direction: Vector2) -> void:
 		tally["casts"] = int(tally["casts"]) + 1

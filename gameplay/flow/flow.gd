@@ -133,7 +133,20 @@ extends Node
 ## enemies. Presses made while it stood still, and on the tick it closes, are dropped
 ## (`Frames.drop_presses`), so a staff pressed during it casts nothing as the fight starts.
 ##
-## Modes: `mode` says which run this is: MODE_RUN (a run of rooms) or MODE_HUB (above).
+## Modes: `mode` says which run this is: MODE_RUN (a run of rooms), MODE_HUB (above) or MODE_BIOME
+## (below).
+##
+## A biome (connected biomes CB3, docs/milestones/connected-biomes.md, "Room life"): `start_biome`
+## starts a run in one walkable world of rooms joined by bridges (`BiomeMap`, laid by `biome`, a
+## `BiomeWorld`), each room with its fight (`RoomFight`), its state Flow's (`life`, `RoomLife`). The
+## party starts in its start room (room 0, `Events.FIRST_ROOM`) and goes anywhere. A room's fight
+## starts as the first wizard's own body steps onto it (`room_entered` of that room, the first time):
+## its bosses stand, the rest spawn in at its pace, and its mouths seal one way (nothing inside leaves,
+## a wizard outside walks in); with its last enemy down it is cleared (`room_cleared`) and opens. A
+## room's fight is what no seat drives standing in it (`Actor.room`): a possessed enemy leaves its room
+## (cleared without it) and fights for the room it ends in, which never seals again once cleared.
+## Each place sleeps while nothing acts in it (`RoomLife.wake`). The row run stays the default until
+## CB8 moves the crypt over; nothing but the tests starts a biome yet.
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -151,6 +164,7 @@ const IntroScript := preload("res://gameplay/flow/intro.gd")
 const LoadingScript := preload("res://core/loading/loading.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const LoadTask := preload("res://core/loading/load_task.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 const PLAYER_SLOTS: int = 4
 ## The rooms' registry folder.
@@ -173,6 +187,8 @@ const ZONE_PROP_YARD: StringName = &"prop_yard"
 ## The run modes (`mode`): a run of rooms, the hub.
 const MODE_RUN: StringName = &"run"
 const MODE_HUB: StringName = &"hub"
+## A biome (connected biomes CB3): `start_biome`.
+const MODE_BIOME: StringName = &"biome"
 ## The cue played on every standing wizard as a run's room starts (`_show_room_start`).
 const ROOM_START_CUE: StringName = &"room_start"
 ## The four basic staffs of Play by button (RB, RT, LB, LT), by id under `wizard`.
@@ -200,12 +216,12 @@ const INTRO_SEEN: StringName = &"intro_seen"
 enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_room", &"_chosen_enemies", &"_chosen_ways", &"_chosen_group", &"_chosen_refill", &"_chosen_stagger"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"actors", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_room", &"_chosen_enemies", &"_chosen_ways", &"_chosen_group", &"_chosen_refill", &"_chosen_stagger"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
 ## room's camera.
-const VIEW: Array[StringName] = [&"_add_camera"]
+const VIEW: Array[StringName] = [&"_add_camera", &"_add_camera_over"]
 
 ## Why Flow needs no renewing at a run's start (core/sim/sim_area.gd, `fresh_because`).
 const FRESH_BECAUSE: String = "it starts the run: start_run sets the run's members itself"
@@ -218,6 +234,8 @@ var frames: FramesScript = null
 var combat: CombatScript = null
 var projectiles: ProjectileManagerScript = null
 var spells: SpellsScript = null
+## The actor table (a biome's waking: `RoomLife.wake`).
+var actors: ActorsScript = null
 ## Where the world goes. Only tests set this; otherwise the world becomes the
 ## current scene (the main menu is freed).
 var world_parent: Node = null
@@ -277,6 +295,12 @@ var adds: RoomAdds = RoomAdds.new()
 var spawn_queue: RoomSpawning = RoomSpawning.new()
 ## The boss's intro of the room (docs/milestones/boss-intro.md, `BossIntroHold`).
 var boss_intro: BossIntroHold = BossIntroHold.new()
+## A biome's world (connected biomes CB3; its map is the state), its rooms' life, and what the
+## biome run in progress was started with (its map and fights, for a restart).
+var biome: BiomeWorld = BiomeWorld.new()
+var life: RoomLife = RoomLife.new()
+var _biome_start: BiomeMap = null
+var _biome_fights: Array[RoomFight] = []
 ## The room's layout in the world, and the room it is of (a joining machine built the room the run
 ## started in: a snapshot taken in a later room lays that room's out again, `rebuild_derived`).
 var _layout: Node = null
@@ -326,6 +350,8 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if spells == null:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
+	if actors == null:
+		actors = get_node_or_null("/root/Actors") as ActorsScript
 	if frames != null:
 		frames.set_party_source(_party_now)
 	boss_intro.events = events
@@ -361,6 +387,8 @@ func step(delta: float) -> void:
 		_crumble_orphans()
 	if mode == MODE_RUN and state == State.RUNNING and not spawn_queue.is_done():
 		_call_spawning(delta)
+	if mode == MODE_BIOME and state == State.RUNNING:
+		_step_biome(delta)
 	_count_stand_ups(delta)
 	if mode == MODE_HUB and state == State.RUNNING:
 		_count_stone()
@@ -483,6 +511,11 @@ func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0)
 		if not problems.is_empty():
 			push_warning("Flow: the run '%s' cannot be made, so no run starts: %s" % [run_id_to_play, "; ".join(problems)])
 			return false
+	elif mode == MODE_BIOME:
+		room = registry.get_resource(ROOM_FOLDER, _biome_start.room_templates[0]) as RoomBase if registry != null and _biome_start != null and _biome_start.rooms() > 0 else null
+		if room == null:
+			push_warning("Flow: the biome has no start room the registry knows, so no run starts.")
+			return false
 	else:
 		room = registry.get_resource(ROOM_FOLDER, _room_id_for_mode()) as RoomBase if registry != null else null
 		if room == null or room.scene == null:
@@ -530,9 +563,18 @@ func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0)
 	# it, one behind it under it. The room's layout, at the top left, is one piece drawn first, its
 	# floor, walls and tops in their own order and z.
 	new_world.y_sort_enabled = true
-	_lay_out(new_world, room, tick.sim if tick != null else null)
+	if mode == MODE_BIOME:
+		if not _lay_biome(new_world):
+			new_world.free()
+			stop_run()
+			return false
+	else:
+		_lay_out(new_world, room, tick.sim if tick != null else null)
 	_spawn_players(new_world, room, players, party)
 	contents.stand(new_world, _places, registry)
+	if mode == MODE_BIOME:
+		for other in range(1, life.rooms()):
+			contents.stand_more(new_world, biome.room_places(other), registry)
 	for problem in contents.problems:
 		push_warning("Flow: the room's bodies: %s" % problem)
 	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
@@ -542,6 +584,10 @@ func start_run(requester: int, party: PartyLoadout = null, start_depth: int = 0)
 	room_id = room.id
 	state = State.RUNNING
 	_show_world(new_world)
+	if mode == MODE_BIOME:
+		# Laid by the biome (its grid is the whole biome's, `BiomeWorld`): its start room is entered.
+		_start_biome_rooms()
+		return true
 	_set_walls(new_world)
 	# The first group starts in the room's setup, once its walls and holes are known (its spawns
 	# over a hole are left out); the room is checked at the setup's end, after it is announced.
@@ -571,7 +617,7 @@ func _lay_out(into: Node2D, room: RoomBase, sim: Sim) -> void:
 		push_warning("Flow: the room '%s': %s" % [room.id, problem])
 	# Told while its placements and zones are still in it (the cover's fields), before they go.
 	if events != null and layout != null:
-		events.room_built.emit(room.id, layout)
+		events.room_built.emit(room.id, EventsScript.FIRST_ROOM, layout)
 	RoomPlaces.strip(layout)
 	if projectiles != null:
 		projectiles.set_bounds(Rect2(Vector2.ZERO, _places.size).grow(PROJECTILE_MARGIN))
@@ -588,6 +634,9 @@ func _lay_out(into: Node2D, room: RoomBase, sim: Sim) -> void:
 ## the same as the host's while rooms are fixed scenes (`RoomBase.build` ignores it); a room put
 ## together from pieces (M3) must build from what does not move on (its node's own key).
 func rebuild_derived() -> void:
+	if mode == MODE_BIOME:
+		_rebuild_biome()
+		return
 	if world == null or not is_instance_valid(world) or _room == null or _layout_of == _room.id:
 		return
 	var tick: TickScript = TickScript.of(self) as TickScript
@@ -689,7 +738,7 @@ func _take_way(way: int) -> void:
 ## start, and the room is entered.
 func _enter_next_room(room: RoomBase) -> void:
 	if events != null:
-		events.room_left.emit()
+		events.room_left.emit(EventsScript.FIRST_ROOM)
 	if projectiles != null:
 		projectiles.clear()
 	_forget_enemies()
@@ -756,9 +805,9 @@ func _drop_stood_presses() -> void:
 func _announce_room(room: RoomBase) -> void:
 	if events == null:
 		return
-	events.room_entered.emit(room.id)
+	events.room_entered.emit(room.id, EventsScript.FIRST_ROOM)
 	var items: Array = RoomContents.items_of(_places)
-	events.room_items_placed.emit(room.id, items[0], items[1])
+	events.room_items_placed.emit(room.id, EventsScript.FIRST_ROOM, items[0], items[1])
 
 
 ## A wizard of the party comes into the next room: at its seat's spawn, still (its moves, a dash's
@@ -796,6 +845,9 @@ func stop_run() -> void:
 	_back_to_hub = false
 	_party_back = PackedByteArray()
 	_clear_run()
+	# A biome's start is its run's: nothing of it outlives the run (a later run hashes as a fresh one's).
+	_biome_start = null
+	_biome_fights.clear()
 	state = State.IDLE
 	exits.leave()
 	_count_exits()
@@ -1107,7 +1159,7 @@ func _check_room_won() -> void:
 	if last and _restart_left < 0.0:
 		_restart_left = RUN_WON_DELAY
 	if events != null:
-		events.room_cleared.emit(room_id)
+		events.room_cleared.emit(room_id, EventsScript.FIRST_ROOM)
 	if not last:
 		exits.open = true
 		_count_exits()
@@ -1210,17 +1262,22 @@ func _set_walls(new_world: Node2D) -> void:
 
 
 func _add_camera(parent: Node2D, size: Vector2) -> void:
+	_add_camera_over(parent, Rect2(Vector2.ZERO, size))
+
+
+## A camera kept inside `area` (a room's, from the origin; a biome's bounds: connected biomes CB3).
+func _add_camera_over(parent: Node2D, area: Rect2) -> void:
 	for old: Node in parent.get_children():
 		if old is Camera2D:
 			_detach(old)
 	var camera := Camera2D.new()
-	camera.position = size * 0.5
+	camera.position = area.get_center()
 	# Feel's party camera moves and zooms it to hold this machine's wizards; the limits keep it
 	# inside the room.
-	camera.limit_left = 0
-	camera.limit_top = 0
-	camera.limit_right = ceili(size.x)
-	camera.limit_bottom = ceili(size.y)
+	camera.limit_left = floori(area.position.x)
+	camera.limit_top = floori(area.position.y)
+	camera.limit_right = ceili(area.end.x)
+	camera.limit_bottom = ceili(area.end.y)
 	# The picture shows this room from the moment it is in the tree, whatever camera was current.
 	camera.ready.connect(camera.make_current, CONNECT_ONE_SHOT)
 	parent.add_child(camera)
@@ -1381,9 +1438,13 @@ func stand_all_now() -> void:
 ## farthest from every standing wizard first, none over a hole nor within `RoomSpawning.NEAR` of a
 ## wizard), stacked where one is used again and moved to the nearest clear ground. An id with no
 ## enemy, or a room with no spawns, stands nothing: it is dropped (it was taken off the queue).
-func _stand_queued(id: StringName) -> void:
+func _stand_queued(id: StringName, places: RoomPlaces = null, queue: RoomSpawning = null, room: int = RoomGrid.NO_PLACE) -> void:
+	if places == null:
+		places = _places
+	if queue == null:
+		queue = spawn_queue
 	var data: EnemyBase = _enemy_data_of(id)
-	var spawns: PackedVector2Array = _places.enemy_spawns
+	var spawns: PackedVector2Array = places.enemy_spawns
 	if data == null or data.scene == null or spawns.is_empty():
 		push_warning("Flow: the room's enemy '%s' could not stand, so it is dropped." % id)
 		return
@@ -1391,7 +1452,7 @@ func _stand_queued(id: StringName) -> void:
 	var on_hole: Callable = Callable()
 	if projectiles != null and projectiles.grid().has_holes():
 		on_hole = func(at: Vector2) -> bool: return projectiles.grid().touches_hole(world.to_global(at), radius)
-	var at: Vector2 = spawn_queue.spawn_for(spawns, _standing_wizard_places(), on_hole, stacked_position)
+	var at: Vector2 = queue.spawn_for(spawns, _standing_wizard_places(room), on_hole, stacked_position)
 	if projectiles != null:
 		# A body stacked beside its spawn may reach a wall or a hole's edge: the nearest clear ground
 		# (the spot itself when it is clear; hub rework HR-H2).
@@ -1399,25 +1460,31 @@ func _stand_queued(id: StringName) -> void:
 	_stand_enemy(world, data, at, true)
 
 
-## What the room's enemies standing or spawning cost together (`EnemyBase.cost`): how busy the room is.
-func _standing_cost() -> int:
+## What the room's enemies standing or spawning cost together (`EnemyBase.cost`): how busy the room is
+## (a biome's room `room`: those standing in it; NO_PLACE: all of them).
+func _standing_cost(room: int = RoomGrid.NO_PLACE) -> int:
 	var cost: int = 0
 	for enemy: Node in _enemies:
 		if not is_instance_valid(enemy):
 			continue
 		var body := enemy as Actor
+		if body != null and room != RoomGrid.NO_PLACE and body.room != room:
+			continue
 		if body != null and body.data != null:
 			cost += body.data.cost
 	return cost
 
 
-## Where the wizards standing (not down) are, in the world.
-func _standing_wizard_places() -> PackedVector2Array:
+## Where the wizards standing (not down) are, in the world (in a biome's room `room` only; NO_PLACE:
+## everywhere).
+func _standing_wizard_places(room: int = RoomGrid.NO_PLACE) -> PackedVector2Array:
 	var places := PackedVector2Array()
 	for wizard: Node2D in _wizards:
 		if not is_instance_valid(wizard):
 			continue
 		var actor := wizard as Actor
+		if actor != null and room != RoomGrid.NO_PLACE and actor.room != room:
+			continue
 		if actor != null and not actor.is_down():
 			places.append(actor.position)
 	return places
@@ -1466,6 +1533,7 @@ func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, spawn_in: bool =
 	if events != null:
 		events.enemy_standing.emit(enemy)
 	parent.add_child(enemy)
+	enemy.find_room()
 	_enemies.append(enemy)
 	return enemy
 
@@ -1520,7 +1588,9 @@ func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> v
 	var players: int = _players_in_play()
 	var wanted: int = entry.wave_for(players) if wave else entry.burst_for(players)
 	var count: int = entry.allowed(wanted, adds.alive(caller, key), players)
-	var spawns: PackedVector2Array = _places.enemy_spawns
+	var spawns: PackedVector2Array = _places_for(caller.room).enemy_spawns
+	if mode == MODE_BIOME:
+		_scale_for(caller.room)
 	var at_spawns: bool = entry.at == EnemyAdds.At.SPAWNS and not spawns.is_empty()
 	var centre: Vector2 = world.to_local(caller.global_position)
 	var reach: float = caller.hurtbox.outer_radius() if caller.hurtbox != null else caller.wall_radius()
@@ -1605,9 +1675,17 @@ func _clear_run() -> void:
 			if is_instance_valid(wizard):
 				combat.unregister_actor(wizard)
 	_wizards.clear()
+	if mode == MODE_BIOME and biome.map != null and events != null:
+		# A biome's world goes as a whole: what was cast in it ends with it.
+		events.room_left.emit(EventsScript.ALL_ROOMS)
+	if biome.map != null and projectiles != null:
+		# No place is left once the biome goes (a later room lays its own grid).
+		projectiles.grid().clear_places()
 	_forget_enemies()
 	contents.clear()
 	yard.clear()
+	biome.clear()
+	life.clear()
 	if world != null and is_instance_valid(world):
 		_detach(world)
 	world = null
@@ -1637,3 +1715,203 @@ func _detach(node: Node) -> void:
 	if parent != null:
 		parent.remove_child(node)
 	node.queue_free()
+
+
+# --- A biome (connected biomes CB3) -----------------------------------------------------------
+
+## Start a run in the biome `map` (connected biomes CB3; see the class doc): each room's fight
+## `fights[room]` (a room past their end, or null, has none), for seat `requester`, each seat's
+## wizard as `party` says (as `start_run` takes it). Everyone down starts it again as it began.
+## False (nothing started) when its map or content is missing or nobody has joined.
+func start_biome(requester: int, map: BiomeMap, fights: Array[RoomFight], party: PartyLoadout = null) -> bool:
+	if map == null:
+		return false
+	_biome_start = map.copy()
+	_biome_fights.clear()
+	for fight: RoomFight in fights:
+		_biome_fights.append(fight.fresh() if fight != null else RoomFight.new())
+	mode = MODE_BIOME
+	_back_to_hub = false
+	if start_run(requester, party):
+		return true
+	mode = MODE_RUN
+	return false
+
+
+## Lay the biome's map in `into` (the world being built): every piece (each told as it is laid,
+## `room_built`), the whole biome's grid, the rooms' life begun and the camera over the biome. False
+## (a warning) when the map has problems.
+func _lay_biome(into: Node2D) -> bool:
+	biome.attach(into, registry, projectiles, _on_piece_built)
+	var problems: PackedStringArray = biome.lay(into, _biome_start.copy())
+	if not problems.is_empty():
+		push_warning("Flow: the biome cannot be laid, so no run starts: %s" % "; ".join(problems))
+		return false
+	_layout = null
+	_layout_of = &""
+	_places = biome.room_places(EventsScript.FIRST_ROOM)
+	life.begin(biome.map.rooms(), biome.places(), _biome_fights)
+	if projectiles != null:
+		life.tell_seals(projectiles.grid())
+		_add_camera_over(into, projectiles.bounds())
+	return true
+
+
+## A piece of the biome was laid (`BiomeWorld.built`): `room_built` for it.
+func _on_piece_built(template: StringName, number: int, layout: Node) -> void:
+	if events != null:
+		events.room_built.emit(template, number, layout)
+
+
+## The biome's world is up: its start room entered (a new world: `room_entered` of FIRST_ROOM), then
+## the items every room's scene places (`room_items_placed`, the start room's first), and its places
+## woken or put to sleep.
+func _start_biome_rooms() -> void:
+	# Who is where first: the start room's fight (if any) stands away from its wizards.
+	life.wake(actors, projectiles)
+	_enter_biome_room(EventsScript.FIRST_ROOM)
+	if events != null:
+		for room in life.rooms():
+			var items: Array = RoomContents.items_of(biome.room_places(room))
+			events.room_items_placed.emit(biome.map.room_templates[room], room, items[0], items[1])
+	_count_stone()
+	life.wake(actors, projectiles)
+
+
+## A biome's tick (Flow's step): every room a wizard's own body stepped onto entered (its fight
+## starting), every fight under way spawning at its pace and cleared once its last enemy is down,
+## then every place woken or put to sleep (`RoomLife.wake`).
+func _step_biome(delta: float) -> void:
+	for wizard: Node2D in _wizards:
+		if not is_instance_valid(wizard):
+			continue
+		var actor := wizard as Actor
+		if actor == null:
+			continue
+		actor.find_room()
+		# A wizard standing (a downed one crawling in starts nothing).
+		if not actor.is_down() and actor.room >= 0 and actor.room < life.rooms() and not life.has(actor.room, RoomLife.ENTERED):
+			_enter_biome_room(actor.room)
+	for room in life.rooms():
+		if life.has(room, RoomLife.STARTED) and not life.has(room, RoomLife.CLEARED):
+			if life.is_awake(room):
+				_call_room_spawning(room, delta)
+			_check_biome_room(room)
+	life.wake(actors, projectiles)
+
+
+## Room `room` is entered for the first time: `room_entered`, and its fight starts (its bosses stand,
+## the first group spawns in, its mouths seal, `room_start` on the wizards in it); a room with no fight
+## is cleared at once.
+func _enter_biome_room(room: int) -> void:
+	life.set_flag(room, RoomLife.ENTERED, true)
+	if events != null:
+		events.room_entered.emit(biome.map.room_templates[room], room)
+	var fight: RoomFight = life.fights[room]
+	if not fight.has_enemies():
+		_clear_biome_room(room)
+		return
+	life.set_flag(room, RoomLife.STARTED, true)
+	life.set_flag(room, RoomLife.SEALED, true)
+	if projectiles != null:
+		life.tell_seals(projectiles.grid())
+	_scale_for(room)
+	var places: RoomPlaces = biome.room_places(room)
+	var queued: Array[StringName] = []
+	var queued_costs := PackedInt32Array()
+	var bosses: int = 0
+	for id: StringName in fight.enemies:
+		var data: EnemyBase = _enemy_data_of(id)
+		if data == null or data.scene == null or places.enemy_spawns.is_empty():
+			push_warning("Flow: the biome's room %d cannot stand '%s', so it is dropped." % [room, id])
+			continue
+		if data.boss:
+			var spawn: int = bosses % places.enemy_spawns.size()
+			_stand_enemy(world, data, stacked_position(places.enemy_spawns[spawn], bosses / places.enemy_spawns.size()), false)
+			bosses += 1
+		else:
+			queued.append(id)
+			queued_costs.append(data.cost)
+	fight.queue.begin(queued, queued_costs, fight.group, fight.refill_at, fight.stagger)
+	_call_room_spawning(room, 0.0)
+	if events != null:
+		for wizard: Node2D in _wizards:
+			var actor := wizard as Actor if is_instance_valid(wizard) else null
+			if actor != null and actor.room == room and not actor.is_down():
+				events.cue_shown.emit(actor.id, ROOM_START_CUE, actor.global_position, Vector2.ZERO, 0.0, Color.WHITE, 0)
+	_check_biome_room(room)
+
+
+## Room `room`'s queue `delta` seconds on: each enemy it calls spawns in at the room's spawns
+## (`_stand_queued`, against the wizards in that room).
+func _call_room_spawning(room: int, delta: float) -> void:
+	var queue: RoomSpawning = life.fights[room].queue
+	if queue.is_done() or world == null:
+		return
+	var places: RoomPlaces = biome.room_places(room)
+	var id: StringName = queue.next(delta, _standing_cost(room))
+	if id != &"":
+		_scale_for(room)
+	while id != &"":
+		_stand_queued(id, places, queue, room)
+		id = queue.next(0.0, _standing_cost(room))
+
+
+## Difficulty told room `room`'s scale (its `RoomFight.scale`; 0: as it is) before an enemy of its
+## fight stands: two fights at once each stand at their own.
+func _scale_for(room: int) -> void:
+	if events != null and room >= 0 and room < life.rooms() and life.fights[room].scale > 0.0:
+		events.run_room_scaled.emit(life.fights[room].scale)
+
+
+## Room `room`'s fight is over when its queue is empty and nothing it must beat stands in it (an
+## enemy no seat drives, `Actor.room` that room): cleared.
+func _check_biome_room(room: int) -> void:
+	if not life.has(room, RoomLife.STARTED) or life.has(room, RoomLife.CLEARED) or not life.fights[room].queue.is_done():
+		return
+	for enemy: Node in _enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var body := enemy as Actor
+		if body != null and not body.is_dying() and body.room == room and (body.controller == null or body.controller.seat < 0):
+			return
+	_clear_biome_room(room)
+
+
+## Room `room` is cleared: its seal opens and `room_cleared` is sent, once.
+func _clear_biome_room(room: int) -> void:
+	life.set_flag(room, RoomLife.CLEARED, true)
+	life.set_flag(room, RoomLife.SEALED, false)
+	if projectiles != null:
+		life.tell_seals(projectiles.grid())
+	if events != null:
+		events.room_cleared.emit(biome.map.room_templates[room], room)
+
+
+## What is where in the room a body of `room` stands in: a biome's room's (its places in the world),
+## else the room shown's.
+func _places_for(room: int) -> RoomPlaces:
+	if mode == MODE_BIOME and room >= 0 and room < life.rooms():
+		return biome.room_places(room)
+	return _places
+
+
+## After a snapshot was restored into a biome: the biome laid again where it differs (the world's
+## own `rebuild_derived`, or here into a world that laid none), its start room's places, and the
+## seals told to the grid again (they are not state there).
+func _rebuild_biome() -> void:
+	if world == null or not is_instance_valid(world):
+		return
+	if _layout != null and is_instance_valid(_layout):
+		# A row room's layout this world showed before (a restore from another kind of run).
+		_detach(_layout)
+		_layout = null
+		_layout_of = &""
+	biome.attach(world, registry, projectiles, _on_piece_built)
+	biome.rebuild_derived()
+	if biome.map != null:
+		_places = biome.room_places(EventsScript.FIRST_ROOM)
+		if projectiles != null:
+			_add_camera_over(world, projectiles.bounds())
+	if projectiles != null:
+		life.tell_seals(projectiles.grid())

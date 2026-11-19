@@ -43,7 +43,7 @@ func before_each() -> void:
 	own(_hud)
 	for seat in 2:
 		_bus.player_joined.emit(seat)
-	_bus.room_entered.emit(&"hub")
+	_bus.room_entered.emit(&"hub", 0)
 	_bus.start_stone_changed.emit(0, 2, false)
 	_bus.start_depth_changed.emit(0, 6)
 

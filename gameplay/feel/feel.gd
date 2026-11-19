@@ -1137,7 +1137,10 @@ func _grow_reactions(size: int) -> void:
 
 ## A run starts (`room_entered`): no reaction was heard and no hit was juiced, so the first ones
 ## shake and sound (view only since N4: the holds are the game's, `HitStop`).
-func _on_room_entered(room_id: StringName) -> void:
+func _on_room_entered(room_id: StringName, number: int) -> void:
+	# A world laid anew (FIRST_ROOM): a biome's later rooms are the same world (connected biomes CB3).
+	if number != EventsScript.FIRST_ROOM:
+		return
 	party_camera.room_entered()
 	if split_screen != null:
 		split_screen.camera.reset()

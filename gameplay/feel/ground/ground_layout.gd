@@ -35,7 +35,8 @@ func _ready() -> void:
 		events.room_built.connect(_on_room_built)
 
 
-func _on_room_built(room_id: StringName, layout_root: Node) -> void:
+## Every piece of a biome too (connected biomes CB3), each drawn on its own layout.
+func _on_room_built(room_id: StringName, _room: int, layout_root: Node) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if room != null:
 		lay(room, layout_root)

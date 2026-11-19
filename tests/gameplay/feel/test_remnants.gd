@@ -169,7 +169,7 @@ func test_feel_leaves_a_layered_body_s_remnant_when_it_dies() -> void:
 	check_equal(feel.remnants().count(), 2, "a body of one sprite leaves no remnant")
 	check(feel.spectacle().broken_from() == (plain.get_node("Sprite") as Sprite2D).texture, "it breaks as before")
 	plain.free()
-	bus.room_entered.emit(&"arena_01")
+	bus.room_entered.emit(&"arena_01", 0)
 	check_equal(feel.remnants().count(), 0, "a new room clears the remnant")
 	# Killed mid-squash, its Sprite showing a strip of its own (a hurt pose): still layered, and its
 	# pieces fly at its rest scale.

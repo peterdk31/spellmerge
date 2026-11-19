@@ -75,7 +75,7 @@ func _feel() -> Array:
 	feel.drive_engine = false
 	feel.preset = preset
 	root.add_child(feel)
-	bus.room_entered.emit(ARENA)
+	bus.room_entered.emit(ARENA, 0)
 	return [bus, feel]
 
 
@@ -462,7 +462,7 @@ func test_a_new_room_and_the_setting() -> void:
 	feel.play_cue(&"slam", 0, Vector2(300.0, 150.0), Vector2.RIGHT, 30.0)
 	feel.step(0.016)
 	feel.play_cue(&"slam", 0, Vector2(300.0, 150.0), Vector2.RIGHT, 30.0)
-	bus.room_entered.emit(ARENA)
+	bus.room_entered.emit(ARENA, 0)
 	check_equal(feel.marks().pending(), 0, "a new room: the marks so far go")
 	check_equal(feel.marks().viewport().render_target_clear_mode, SubViewport.CLEAR_MODE_ONCE, "the layer is wiped")
 	bus.floor_marks_changed.emit(false)

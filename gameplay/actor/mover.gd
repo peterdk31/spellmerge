@@ -35,7 +35,8 @@ extends ActorComponent
 ## pinned ends its dash with that card there (`carry_ended`), as if it met the wall itself. A swap
 ## card that names the actor as its
 ## target (`target_move_requested`) puts it there at once. While the actor is down it stands: its
-## moves end unanswered and new requests are ignored.
+## moves end unanswered and new requests are ignored; in a biome it crawls (`can_crawl`, connected
+## biomes CB3). A move never takes it out of a sealed fight (`RoomGrid.may_cross`).
 ##
 ## Holes (hub rework HR-H1, docs/milestones/hub-rework.md, "Holes" 2 and 3): its own walk stops at a
 ## hole's lip; its dashes and everything done to it (its other moves, a carry, Combat's push) cross
@@ -53,6 +54,8 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 ## steps of TELEPORT_BACKOFF until the body is clear.
 const TELEPORT_CLEARANCE: float = 8.0
 const TELEPORT_BACKOFF: float = 4.0
+## A downed wizard crawls at this share of its walking speed (connected biomes CB3, decision 13).
+const CRAWL_SHARE: float = 0.25
 ## Room for this many running moves at first; the list doubles when it is full.
 const MOVE_ROOM: int = 8
 ## The shortest time a move takes.
@@ -126,6 +129,11 @@ func step(delta: float) -> void:
 		_moved = Vector2.ZERO
 		crossing = Vector2.ZERO
 		actor.velocity = Vector2.ZERO
+		if can_crawl():
+			# Downed in a biome (connected biomes CB3, decision 13): it crawls where its intent says,
+			# slowly, and nothing else moves it (its controller casts nothing while down).
+			var pace: float = actor.combat.own_pace(actor, actor.id) if actor.combat != null else 1.0
+			actor.velocity = actor.intent.move.limit_length(1.0) * speed * CRAWL_SHARE * pace
 		return
 	# The moves whose last step has been walked (the body moved after it) say where they ended.
 	_answer()
@@ -166,6 +174,13 @@ func step(delta: float) -> void:
 	if not legs:
 		velocity += walk
 	actor.velocity = velocity + carry + knockback
+
+
+## True while the body crawls if its intent says so: downed (not falling or spawning) in a world of
+## places (a biome, connected biomes CB3, decision 13; a row run's downed wizard stands where it fell
+## until CB8 moves every run over).
+func can_crawl() -> bool:
+	return actor.is_downed() and not actor.is_falling() and not actor.is_spawning() and actor.projectiles != null and actor.projectiles.grid().places() > 0
 
 
 ## True while a move carries the actor.
@@ -312,7 +327,10 @@ func _teleport(move: Vector2, tag: int) -> void:
 	var goal: Vector2 = start + move
 	if actor.projectiles != null:
 		var grid: RoomGrid = actor.projectiles.grid()
-		var reached: Vector2 = grid.clip_to_walls(start, goal)
+		# Across a doorway for a body a wizard drives, never out of a sealed fight (connected biomes
+		# CB3, decision 11: `Actor.passes_mouths`); else a mouth stops it as a wall does.
+		var through: bool = grid.has_mouths() and actor.passes_mouths()
+		var reached: Vector2 = grid.clip_past_mouths(start, goal) if through else grid.clip_to_walls(start, goal)
 		if reached != goal:
 			reached = reached.move_toward(start, TELEPORT_CLEARANCE)
 		goal = reached
@@ -352,4 +370,8 @@ func _answer() -> void:
 ## A swap card moved this actor (it was the target): it is there at once, its move and aim kept.
 func _on_target_move_requested(_player: int, moved: Node, to: Vector2) -> void:
 	if moved == actor and to.is_finite():
+		# Never out of a sealed fight (connected biomes CB3, decisions 11 and 12): a swap or a
+		# portal that would take it out does nothing to it.
+		if actor.projectiles != null and not actor.projectiles.grid().may_cross(actor.global_position, to):
+			return
 		actor.global_position = to

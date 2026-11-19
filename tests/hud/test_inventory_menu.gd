@@ -88,7 +88,7 @@ func _start() -> void:
 	_wizard = own(_world.wizard(0, Vector2.ZERO, [[&"bolt"], [], [], []], null, true, [_short, _long, null, null] as Array[StaffBase])) as Actor
 	check(_wizard.inventory.add(ItemStack.of_staff(_bagged)), "a staff in the bag")
 	_bus.player_joined.emit(0)
-	_bus.room_entered.emit(&"test_room")
+	_bus.room_entered.emit(&"test_room", 0)
 
 
 func _tap(action: StringName) -> void:

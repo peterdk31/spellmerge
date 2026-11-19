@@ -338,7 +338,7 @@ func test_a_room_names_feel_its_air_given_off_only_with_spell_light() -> void:
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
 	var air: AirMotesScript = feel.spectacle().air
-	bus.room_entered.emit(&"arena_01")
+	bus.room_entered.emit(&"arena_01", 0)
 	check(air.look == ARENA.air, "the crypt's air is the spectacle's")
 	for frame in 60:
 		feel._process(FRAME)
@@ -356,5 +356,5 @@ func test_a_room_names_feel_its_air_given_off_only_with_spell_light() -> void:
 	check_equal(air.given, given, "particles off: none given off either")
 	feel.spectacle().particles_enabled = true
 	bus.spell_light_changed.emit(true)
-	bus.room_entered.emit(still.id)
+	bus.room_entered.emit(still.id, 0)
 	check(air.look == null, "a room with no air: nothing drifts")

@@ -83,8 +83,8 @@ func _make_cover(run_seed: int, kinds: Array[CoverKind], layout: Node2D = _layou
 	made.sim = Sim.seeded(run_seed)
 	made.use_kinds(kinds)
 	root.add_child(made)
-	_world.bus.room_built.emit(ROOM, layout)
-	_world.bus.room_entered.emit(ROOM)
+	_world.bus.room_built.emit(ROOM, 0, layout)
+	_world.bus.room_entered.emit(ROOM, 0)
 	return made
 
 
@@ -219,7 +219,7 @@ func _fire_from(cover: CoverScript) -> Array[PackedByteArray]:
 		seen.append(states)
 	# Each area hears the bus: the others are taken off it.
 	cover.queue_free()
-	_world.bus.room_entered.emit(ROOM)
+	_world.bus.room_entered.emit(ROOM, 0)
 	return seen
 
 
@@ -311,11 +311,11 @@ func test_a_room_built_keeps_the_state_and_only_a_room_entered_resets_it() -> vo
 	_touch(&"fire", _middle(cell))
 	_steps(1)
 	_changes.clear()
-	_world.bus.room_built.emit(ROOM, _layout)
+	_world.bus.room_built.emit(ROOM, 0, _layout)
 	check_equal(_cover.state_at(cell), BURNING, "a room built (a restore's) keeps the fire")
 	check_equal(_changes, [[PackedInt32Array([cell]), PackedInt32Array([BURNING])]], "and tells the view every cell not at rest")
 	_changes.clear()
-	_world.bus.room_entered.emit(ROOM)
+	_world.bus.room_entered.emit(ROOM, 0)
 	check_equal(_cover.state_at(cell), 0, "a room entered starts at rest")
 	check(_cover.active_cells().is_empty(), "nothing active")
 	check_equal(_changes, [[PackedInt32Array([cell]), PackedInt32Array([0])]], "told back to rest")

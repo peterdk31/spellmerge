@@ -276,6 +276,11 @@ var has_ground: bool = false
 var spawn_left: float = 0.0
 var spawn_seconds: float = 0.0
 var spawn_style: StringName = &""
+## The place of the biome it is in (connected biomes CB3, "Room life": a room's number, or a bridge's
+## after them, `RoomGrid.place_at`; NO_PLACE in a world with none): kept after every move and by
+## Flow's room life each tick (for a body that never moves, and one stood or put somewhere), so it changes only as it crosses a mouth (a body crosses nowhere else) or is put
+## somewhere (a teleport, a swap, a portal). State: what Flow's room life reads (waking, fights).
+var room: int = RoomGrid.NO_PLACE
 
 
 func _enter_tree() -> void:
@@ -414,8 +419,17 @@ func move(delta: float) -> void:
 		velocity = (to - from) / delta
 	if holes:
 		_check_ground(crossed)
+	find_room()
 	if actors != null and not actors.touch_ids.is_empty():
 		_touch()
+
+
+## Which place it stands in now (`room`, see its doc): read from the grid's places.
+func find_room() -> void:
+	if projectiles != null and projectiles.grid().places() > 0:
+		room = projectiles.grid().place_at(global_position)
+	else:
+		room = RoomGrid.NO_PLACE
 
 
 ## After a move in a room with holes (hub rework HR-H2, see the class doc): a body whose centre ends
@@ -448,9 +462,11 @@ func never_falls() -> bool:
 ## True while a wizard drives it (connected biomes CB2, docs/milestones/connected-biomes.md, "Who
 ## passes a mouth"): its controller now is a seat's, its own body's or a body it possesses. Its move
 ## then walks through a bridge's mouth (`RoomGrid.MOUTH_CELL`); any other body's stops there as at a
-## wall. By who drives it, never by its team.
+## wall. By who drives it, never by its team. Never out of a sealed fight (connected biomes CB3,
+## decision 10): a body in a sealed room is stopped at its mouths as at walls, downed or standing; a
+## wizard outside walks in (the seal is one way).
 func passes_mouths() -> bool:
-	return controller != null and controller.seat >= 0
+	return controller != null and controller.seat >= 0 and (projectiles == null or not projectiles.grid().sealed_at(global_position))
 
 
 ## True for a body that comes back from a fall (a wizard: a seat's own body); anything else dies of it.

@@ -9,7 +9,13 @@ extends Control
 ## POSE_TIME each, moved by whole pixels and cut by the control's own edge (`clip_contents`), never
 ## faded. The number changes as a play starts (the last one's as its sinking ends). A change told
 ## while a play runs waits for it to end, then plays from where it stands. `set_count(count, true)`
-## (after a snapshot is restored) draws the count as it stands at once.
+## (after a snapshot is restored) draws the count as it stands at once; told again the count it was
+## told already, it lets the play run (a biome laid as the last one's keys sink out).
+##
+## **Its place:** it is the first thing on the purse's row, so its left edge never moves. The room it
+## takes (`custom_minimum_size`) grows with its slide in and shrinks with its sinking, by whole
+## pixels (`reserved`), so the row and the coins beside it move in steps, never in one jump; at rest
+## with no key it takes none.
 ##
 ## Display only: no input, no simulation state. It processes only while a play runs, draws in whole
 ## pixels and allocates nothing a frame.
@@ -35,6 +41,8 @@ const WIDEST: String = "99"
 ## Gold and pickups are Spark (docs/STYLE.md, "UI"): the key's shades and its number's colour.
 const SHADES: StringName = &"spark"
 
+## Its whole size at rest with a key (from its font, `_ready`; a test may set it).
+var full_size: Vector2 = Vector2(ICON_SIZE.x + ICON_GAP + 10, 9)
 ## The count drawn, and the count it was told last.
 var _shown: int = 0
 var _target: int = 0
@@ -60,12 +68,15 @@ func _ready() -> void:
 	var font: Font = get_theme_default_font()
 	var wide: float = font.get_string_size(WIDEST, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x if font != null else 10.0
 	var tall: float = font.get_height(FONT_SIZE) if font != null else 9.0
-	custom_minimum_size = Vector2(ICON_SIZE.x + ICON_GAP + ceilf(wide), maxf(ceilf(tall), ICON_SIZE.y))
+	full_size = Vector2(ICON_SIZE.x + ICON_GAP + ceilf(wide), maxf(ceilf(tall), ICON_SIZE.y))
+	_refresh()
 
 
 ## The party holds `count` keys. `at_once`: drawn as it stands (a restore), no play.
 func set_count(count: int, at_once: bool) -> void:
 	count = maxi(count, 0)
+	if at_once and count == _target:
+		return
 	_target = count
 	if at_once:
 		_play = Play.NONE
@@ -103,9 +114,20 @@ func offset() -> int:
 	return 0
 
 
-## The height its plays slide by: its own (its least before it is laid out).
+## The height its plays slide by: its whole height.
 func size_tall() -> float:
-	return maxf(size.y, custom_minimum_size.y)
+	return full_size.y
+
+
+## The room it takes on the row now, in whole pixels: none with no key at rest, all of it with one,
+## and between them as much as shows of the key sliding in or sinking out.
+func reserved() -> Vector2:
+	if _shown <= 0 and _play == Play.NONE:
+		return Vector2.ZERO
+	var share: float = 1.0
+	if _play == Play.APPEAR or _play == Play.LEAVE:
+		share = 1.0 - float(offset()) / maxf(size_tall(), 1.0)
+	return Vector2(roundf(full_size.x * share), roundf(full_size.y * share))
 
 
 ## Step the play `delta` seconds on (each frame by `_process`; a test calls it itself).
@@ -157,6 +179,9 @@ func _show(count: int) -> void:
 
 func _refresh() -> void:
 	visible = _shown > 0 or _play != Play.NONE
+	var room: Vector2 = reserved()
+	if custom_minimum_size != room:
+		custom_minimum_size = room
 	set_process(_play != Play.NONE)
 	queue_redraw()
 
@@ -164,6 +189,7 @@ func _refresh() -> void:
 func _draw() -> void:
 	if _shown <= 0:
 		return
+	# Drawn from its whole size's top: the part below its room is cut by its edge.
 	var tall: int = int(size_tall())
 	var top: int = (tall - ICON_SIZE.y) / 2 + offset()
 	var dark: Color = _brass[0]

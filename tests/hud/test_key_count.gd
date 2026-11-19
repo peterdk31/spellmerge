@@ -13,7 +13,7 @@ const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 
 func _count() -> KeyCountScript:
 	var keys := own(KeyCountScript.new()) as KeyCountScript
-	keys.custom_minimum_size = Vector2(20, 9)
+	keys.full_size = Vector2(20, 9)
 	return keys
 
 
@@ -87,6 +87,42 @@ func test_a_change_during_a_play_waits_and_a_restore_is_drawn_at_once() -> void:
 	check(not keys.visible, "none at once: hidden at once")
 
 
+## The review's: its room on the row grows and shrinks by whole pixels, never in one jump, so the
+## row's height and the coins beside it move in steps.
+func test_its_room_on_the_row_grows_and_shrinks_in_steps() -> void:
+	var keys: KeyCountScript = _count()
+	check_equal(keys.custom_minimum_size, Vector2.ZERO, "no key: no room taken")
+	keys.set_count(1, false)
+	var rooms: Array[Vector2] = [keys.custom_minimum_size]
+	while keys.playing() != KeyCountScript.Play.NONE:
+		keys.advance(KeyCountScript.POSE_TIME)
+		rooms.append(keys.custom_minimum_size)
+	check_equal(rooms.back(), Vector2(20, 9), "all of it at rest")
+	for at in rooms.size():
+		check(rooms[at] == rooms[at].round(), "whole pixels (%s)" % [rooms])
+		if at > 0:
+			check(rooms[at].y - rooms[at - 1].y <= 3.0 and rooms[at].y >= rooms[at - 1].y, "grows by steps of a few pixels (%s)" % [rooms])
+	check(rooms[0].y > 0.0 and rooms[0].y < 9.0, "starting part way (%s)" % [rooms])
+	keys.set_count(0, false)
+	var last: float = keys.custom_minimum_size.y
+	while keys.playing() != KeyCountScript.Play.NONE:
+		keys.advance(KeyCountScript.POSE_TIME)
+		check(keys.custom_minimum_size.y <= last and last - keys.custom_minimum_size.y <= 3.0, "shrinks by steps")
+		last = keys.custom_minimum_size.y
+	check_equal(keys.custom_minimum_size, Vector2.ZERO, "none once it is out of view")
+
+
+## The review's: a biome laid as the last biome's keys sink out says 0 at once after 0 played: the
+## sinking plays on.
+func test_the_same_count_at_once_lets_a_play_run() -> void:
+	var keys: KeyCountScript = _count()
+	keys.set_count(2, true)
+	keys.set_count(0, false)
+	keys.set_count(0, true)
+	check_equal(keys.playing(), KeyCountScript.Play.LEAVE, "still sinking")
+	check(keys.visible, "and drawn")
+
+
 func test_every_panel_shows_the_partys_keys() -> void:
 	var bus := own(EventsScript.new()) as EventsScript
 	var input := own(InputManagerScript.new()) as InputManagerScript
@@ -109,3 +145,5 @@ func test_every_panel_shows_the_partys_keys() -> void:
 	check_equal(hud.get_panel(0).key_count().playing(), KeyCountScript.Play.SPEND, "a key spent plays its dip")
 	await process_frame
 	check(hud.get_panel(0).key_count().is_processing(), "and steps itself each frame while it plays")
+	var keys: KeyCountScript = hud.get_panel(0).key_count()
+	check_equal(keys.get_index(), 0, "first on the purse row: its left edge never moves")

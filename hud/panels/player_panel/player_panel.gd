@@ -14,7 +14,7 @@ extends PanelContainer
 ## It only shows what it is told: `set_stats`, `set_menu_open`, `set_online` (a small "ONLINE" over
 ## the line of a seat played on another machine), `set_purse` (a small line under the health line
 ## with the seat's coins and its unspent rewards, connected biomes CB10; hidden while both are 0),
-## `set_keys` (the party's keys after the coins, on the same row: `key_count.gd`, Smooth; hidden
+## `set_keys` (the party's keys before the coins, on the same row: `key_count.gd`, Smooth; hidden
 ## while there are none),
 ## `set_staff_plan`, `set_staff_mana`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
@@ -86,10 +86,12 @@ func _ready() -> void:
 	_purse_row.name = "PurseRow"
 	_purse_row.add_theme_constant_override(&"separation", 4)
 	_purse_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_purse_row.add_child(_purse)
+	# The keys first: their left edge never moves, and their room grows by whole pixels (key_count.gd).
 	_keys = KeyCountScript.new()
 	_keys.name = "Keys"
+	_keys.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_purse_row.add_child(_keys)
+	_purse_row.add_child(_purse)
 	_staffs.get_parent().add_child(_purse_row)
 	_staffs.get_parent().move_child(_purse_row, _staffs.get_index())
 	_align_rows()
@@ -156,7 +158,7 @@ func set_purse(coins: int, unspent: int) -> void:
 	_purse.visible = not words.is_empty()
 
 
-## Show the keys the party holds after the coins (`key_count.gd`: played in by whole pixels;
+## Show the keys the party holds before the coins (`key_count.gd`: played in by whole pixels;
 ## `at_once` after a restore).
 func set_keys(count: int, at_once: bool) -> void:
 	_keys.set_count(count, at_once)

@@ -18,6 +18,7 @@ const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd
 const AudioScript := preload("res://core/audio/audio.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
+const CloseFoesScript := preload("res://gameplay/feel/close_foes.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const DT: float = 1.0 / 60.0
@@ -293,6 +294,33 @@ func test_the_void_is_black_with_motes_outside_the_rooms() -> void:
 	flow.stop_run()
 	feel.call(&"_step_rooms", 0.0, 1)
 	check_equal(backdrop.rect(), Rect2(), "outside a biome, no void is drawn")
+
+
+## Enemies still spawning in count as close foes from the moment they start (the owner, 2026-11-19):
+## the camera zooms out as they appear.
+func test_spawning_foes_are_close_from_the_moment_they_start() -> void:
+	var map: BiomeMap = _start(1, [IMP, IMP] as Array[StringName])
+	_wizard(0).global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 40.0)
+	var spawning: Actor = null
+	for i in 240:
+		tick.run(DT)
+		var ids := PackedInt32Array()
+		for n in actors.open_ids(ids):
+			var body := actors.node_of(ids[n]) as Actor
+			if body != null and actors.team_of(ids[n]) == ActorsScript.TEAM_ENEMIES and body.is_spawning():
+				spawning = body
+				break
+		if spawning != null:
+			break
+	check(spawning != null, "an imp spawns in the sealed antechamber")
+	if spawning == null:
+		return
+	var foes: CloseFoesScript = feel.get(&"close_foes") as CloseFoesScript
+	foes.find(actors, _grid())
+	var found: bool = false
+	for i in foes.count:
+		found = found or foes.at[i] == spawning.global_position
+	check(found, "the imp still spawning in (share %.2f) is a close foe already" % spawning.spawn_share())
 
 
 func test_a_gather_doors_lamps_are_lit_in_their_wizards_hat_colours() -> void:

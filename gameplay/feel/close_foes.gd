@@ -10,7 +10,9 @@ extends RefCounted
 ## as that wizard (a room or a bridge; in a world with no places, as a single room or the hub, every
 ## point is the same place) and either the place is sealed (a fight under way there, a boss's among
 ## them: every foe of the room is framed) or it is within REACH of the wizard. A foe behind a wall in
-## the next room is not framed, nor one across a big open room.
+## the next room is not framed, nor one across a big open room. An enemy still spawning in is one
+## from its spawn's first frame (an open actor whose body stands where it will rise; the owner,
+## 2026-11-19), so the camera zooms out as a wave appears.
 ##
 ## Each foe found keeps its place in the world and a bit for every seat it is close to (`seats_of`),
 ## so a view frames only its own seats' foes (`box_for`). Nothing is allocated after it is made.

@@ -510,6 +510,58 @@ func hurt_mate(sense: CastSense) -> Actor:
 	return best
 
 
+## Behaviours ask: whether a cast of `sense` would hurt the target from here now: it harms, is not
+## held, reaches the target along a clear line (an aimed one), and is no blast that would catch
+## itself (`blast_on_caster`, a Pulse's; or one going off nearer than `blast_margin` past its rim).
+## Whether the staff is ready is the caller's question (`ready`).
+func can_fire(sense: CastSense, at: int, blast_margin: float) -> bool:
+	if target == null or sense == null or sense.empty or not sense.harms() or holding[at] != 0:
+		return false
+	if not reaches(sense):
+		return false
+	if sense.blast_on_caster or (sense.blast > 0.0 and not sense.moves_caster and distance < sense.blast + blast_margin):
+		return false
+	return sense.reach <= 0.0 or line_clear
+
+
+## Behaviours ask: of its teammates (the actor table's, on its team; itself not), the nearest that
+## is downed (`Actor.is_downed`: a revive's to bring back, not one only falling), or null. The
+## table's ids are walked lowest first, so a tie goes to the lowest id on every machine.
+func downed_mate() -> Actor:
+	var table: ActorsScript = actor.actors
+	if table == null:
+		return null
+	var team: int = actor.team()
+	var count: int = table.open_ids(_open_ids)
+	var best: Actor = null
+	var best_far: float = INF
+	for n in count:
+		var id: int = _open_ids[n]
+		if id == actor.id or table.team_of(id) != team:
+			continue
+		var mate: Actor = table.node_of(id) as Actor
+		if mate == null or not mate.is_inside_tree() or not mate.is_downed() or mate.is_dying():
+			continue
+		var far: float = actor.global_position.distance_squared_to(mate.global_position)
+		if far < best_far:
+			best = mate
+			best_far = far
+	return best
+
+
+## Behaviours ask: whether an actor of another team stands within `radius` of `point` (a body's
+## middle; `Projectiles.nearest_target`, as the target is found). One still spawning in counts (it
+## is a foe a moment later), one dying does not.
+func foe_within(point: Vector2, radius: float) -> bool:
+	if actor.projectiles == null:
+		return false
+	var found: Node2D = actor.projectiles.nearest_target(point, radius, ProjectileManagerScript.ACTOR_LAYERS, actor, null, actor.team())
+	if found == null or not is_instance_valid(found):
+		return false
+	var other: Actor = found as Actor
+	return other == null or not other.is_dying()
+
+
 ## Behaviours ask: the health of `body` now, a share of its most (1 without Health).
 static func health_of(body: Actor) -> float:
 	if body == null or body.health == null or body.health.max_health <= 0.0:

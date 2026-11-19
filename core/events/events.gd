@@ -546,6 +546,18 @@ signal room_exits_shown(at: PackedVector2Array, kinds: Array[StringName])
 ## `open` true: what is told next is drawn as it stands, not played in).
 ## For the view only. Heard by feel (the door's bars, its lamps, the portal).
 signal gather_door_shown(door: int, rule: StringName, area: Rect2, gathered: int, standing: int, held: bool, open: bool)
+## Sender: flow (connected biomes CB11, to come; CB12 made its look ready). In a biome: key door
+## `door` (by number), its `area` in world pixels (its mouth), `open` once a key opened it. Sent as
+## it changes; door -1 (the rest empty): every key door forgotten (the biome left; a restore, with
+## `open` true: what is told next is drawn as it stands, not played in). For the view only. Heard by
+## feel (its padlock turning and falling, its bars sinking: `lock_looks.gd`).
+signal key_door_shown(door: int, area: Rect2, open: bool)
+## Sender: flow (connected biomes CB11, to come; CB12 made its look ready). In a biome: secret rock
+## `rock` (by number), its `area` in world pixels (the cracked rock), the `element` that breaks it (a
+## card id, &"fire"; its crack's tint), `broken` once it broke. Sent as it changes; rock -1 (the rest
+## empty): every secret rock forgotten (as `key_door_shown`'s -1). For the view only. Heard by feel
+## (its crack's tint, brightening as its element touches near it, and its breaking in stages).
+signal secret_rock_shown(rock: int, area: Rect2, element: StringName, broken: bool)
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
 ## where each lies, in the scene's order. Sent once each room is made: after the run's start, and as

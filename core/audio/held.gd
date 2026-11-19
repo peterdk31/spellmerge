@@ -11,19 +11,28 @@ extends Node
 ## without a restart when its stream is the same (a held sound taken over by the same moment again).
 ## One more than SLOTS takes the place of the one with the least time left.
 ##
-## Its voices are `AudioStreamPlayer2D`s, placed as Audio's world voices are. Only `audible` starts
-## a voice (Audio's).
+## Its voices are `AudioStreamPlayer2D`s, placed as Audio's world voices are (`ears`: heard from the
+## view that shows them while the screen is split). One where nobody hears (`ears.hears`, connected
+## biomes CB12: a fire in a room none of this machine's wizards are in) keeps its slot and its loop
+## but is silent, going down or up over FADE as it stops or starts being heard. Only `audible`
+## starts a voice (Audio's).
+
+const EarsScript := preload("res://core/audio/ears.gd")
 
 ## Held sounds at once.
 const SLOTS: int = 16
 ## Seconds a held sound fades out over once it is let go.
 const FADE: float = 0.12
+## The least share of a voice's loudness set (-80 dB: silent, never minus infinity).
+const SILENT: float = 0.0001
 
 var heard: float = 1600.0
 var attenuation: float = 0.7
 var pan: float = 1.0
 ## Whether its voices are started (Audio's `audible`).
 var audible: bool = true
+## Where its sounds are heard from and which are heard (Audio's; its own with none).
+var ears: EarsScript = EarsScript.new()
 
 ## The held sounds under way: the first `held_count` of each list.
 var held_count: int = 0
@@ -35,6 +44,10 @@ var _left: PackedFloat32Array = PackedFloat32Array()
 ## Seconds of its fade left (-1: not fading), and its volume in decibels.
 var _fade: PackedFloat32Array = PackedFloat32Array()
 var _volume: PackedFloat32Array = PackedFloat32Array()
+## How much of it is heard (0 to 1: 0 where nobody hears it).
+var _gain: PackedFloat32Array = PackedFloat32Array()
+## Where each is in the world (before `ears` places it).
+var _at: PackedVector2Array = PackedVector2Array()
 var _last_handle: int = 0
 
 
@@ -44,6 +57,8 @@ func _ready() -> void:
 	_left.resize(SLOTS)
 	_fade.resize(SLOTS)
 	_volume.resize(SLOTS)
+	_gain.resize(SLOTS)
+	_at.resize(SLOTS)
 	for i in SLOTS:
 		var voice := AudioStreamPlayer2D.new()
 		voice.max_distance = heard
@@ -85,9 +100,13 @@ func hold(stream: AudioStream, follow: Node2D, at: Vector2, seconds: float, volu
 	_left[slot] = seconds
 	_fade[slot] = -1.0
 	_volume[slot] = volume
-	voice.volume_db = volume
+	var where: Vector2 = follow.global_position if followed else at
+	_at[slot] = where
+	if again:
+		_gain[slot] = 1.0 if ears.hears(where) else 0.0
+	voice.volume_db = volume + linear_to_db(maxf(_gain[slot], SILENT))
 	voice.bus = bus
-	voice.global_position = follow.global_position if followed else at
+	voice.global_position = ears.place(where)
 	if again:
 		voice.stream = stream
 		if audible:
@@ -120,10 +139,16 @@ func has(handle: int) -> bool:
 	return _slot_of(handle) >= 0
 
 
-## Where the held sound `handle` is now (INF for none).
+## Where the held sound `handle` is now in the world (INF for none).
 func held_at(handle: int) -> Vector2:
 	var slot: int = _slot_of(handle)
-	return _voices[slot].global_position if slot >= 0 else Vector2.INF
+	return _at[slot] if slot >= 0 else Vector2.INF
+
+
+## How much of the held sound `handle` is heard now (0 to 1; 0 for none).
+func gain_of(handle: int) -> float:
+	var slot: int = _slot_of(handle)
+	return _gain[slot] if slot >= 0 else 0.0
 
 
 ## The voice of the held sound `handle` (null for none; for tests).
@@ -143,7 +168,7 @@ func step(delta: float) -> void:
 			if _fade[i] <= 0.0:
 				_remove(i)
 				continue
-			voice.volume_db = _volume[i] + linear_to_db(_fade[i] / FADE)
+			voice.volume_db = _volume[i] + linear_to_db(maxf(_gain[i] * _fade[i] / FADE, SILENT))
 			i += 1
 			continue
 		_left[i] -= delta
@@ -155,7 +180,12 @@ func step(delta: float) -> void:
 			i += 1
 			continue
 		if _followed[i] == 1:
-			voice.global_position = follow.global_position
+			_at[i] = follow.global_position
+		voice.global_position = ears.place(_at[i])
+		var gain: float = move_toward(_gain[i], 1.0 if ears.hears(_at[i]) else 0.0, delta / FADE)
+		if gain != _gain[i]:
+			_gain[i] = gain
+			voice.volume_db = _volume[i] + linear_to_db(maxf(gain, SILENT))
 		if audible and not voice.playing:
 			voice.play()
 		i += 1
@@ -203,6 +233,8 @@ func _remove(i: int) -> void:
 		_left[i] = _left[last]
 		_fade[i] = _fade[last]
 		_volume[i] = _volume[last]
+		_gain[i] = _gain[last]
+		_at[i] = _at[last]
 	_follow[last] = null
 	_handle[last] = 0
 	held_count = last

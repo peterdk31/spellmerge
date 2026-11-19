@@ -99,3 +99,14 @@ func test_after_a_restore_what_is_told_is_drawn_as_it_stands() -> void:
 	check_equal(_looks.lamps_of(0), PackedInt32Array([LooksScript.LAMP_STAGES, 1]), "the gate's lamps as they stand")
 	check_equal(_looks.frame_of(1), LooksScript.OPEN_FRAMES, "the portal open, not opening again")
 	check(not _looks.is_moving(), "nothing plays in")
+
+
+func test_after_a_restore_a_later_change_is_played_in_again() -> void:
+	_bus.gather_door_shown.emit(-1, &"", Rect2(), 0, 0, false, true)
+	_bus.gather_door_shown.emit(0, RoomKind.DOOR_GATE, MOUTH, 0, 1, false, false)
+	check(not _looks.is_moving(), "the restore's door is drawn as it stands")
+	# A drawn frame passes; the door opens later: it sinks over its frames, not at once.
+	_looks._process(0.0)
+	_bus.gather_door_shown.emit(0, RoomKind.DOOR_GATE, MOUTH, 1, 1, false, true)
+	check_equal(_looks.frame_of(0), 0, "still shut the moment it is told open")
+	check(_looks.is_moving(), "and plays its frames")

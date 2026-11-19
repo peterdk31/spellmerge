@@ -261,9 +261,22 @@ func test_a_sensed_secret_room_comes_in_through_its_own_void_light() -> void:
 		view.step(0.0, actors, 1, _grid(), views)
 		stages.append(view.sense_shade_of(0, EAST))
 	check_equal(stages, [0, 1, 2, 3] as Array[int], "on an open map it comes in a stage a frame")
-	var shades: PackedColorArray = view._sensed_shades
-	check(shades[2] == Palette.shades_of(&"void")[1] and shades[1] == Palette.shades_of(&"void")[0], "its last looks are the void's: it reads as secret")
-	check(shades[2] != Palette.shades_of(&"stone")[0], "never the stone's shadow of a room only shown")
+	check_equal(view.drawn_colour(0, EAST), Palette.shades_of(&"void")[1], "it rests in the void's faint light: it reads as secret")
+	check_equal(view.drawn_colour(1, EAST), Color.TRANSPARENT, "not on another player's map")
+	# The party's map takes it over (shown to all, as a seen room's neighbour is): it steps down
+	# through the void's shadow to the stone's, never in one jump (the review's).
+	var seen: PackedByteArray = flow.party_map.seen.duplicate()
+	seen[EAST] = 1
+	events.rooms_seen.emit(seen, false)
+	var looks: Array[Color] = [view.drawn_colour(0, EAST)]
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), views)
+		if view.drawn_colour(0, EAST) != looks.back():
+			looks.append(view.drawn_colour(0, EAST))
+	var stone: PackedColorArray = Palette.shades_of(&"stone")
+	var voids: PackedColorArray = Palette.shades_of(&"void")
+	check_equal(looks, [voids[1], voids[0], stone[0]] as Array[Color], "void light, void shadow, then the stone's shadow of a room shown, a look a frame")
 
 
 func test_on_an_open_map_a_room_comes_in_through_the_shades_and_a_new_size_reopens() -> void:

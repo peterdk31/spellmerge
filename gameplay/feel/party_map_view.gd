@@ -197,10 +197,27 @@ func symbol_rows_of(place: int) -> int:
 	return _symbol_rows[place] if place >= 0 and place < _symbol_rows.size() else 0
 
 
-## Room `place` as sensed on seat `seat`'s map now (0 not drawn, 1 the stone's shadow; for tests).
+## Room `place` as sensed on seat `seat`'s map now (0 not drawn, then its stage: 1 the stone's
+## shadow, 2 the void's shadow, 3 the void's base; for tests).
 func sense_shade_of(seat: int, place: int) -> int:
 	var at: int = seat * _rects.size() + place
 	return _sense_shade[at] if seat >= 0 and place >= 0 and place < _rects.size() and at < _sense_shade.size() else 0
+
+
+## The colour place `place` is drawn in on seat `seat`'s map now (transparent: not drawn). A secret
+## room the seat senses is drawn in its own look while its stage is past the stone's shadow, so as
+## the party's map takes it over (entered, shown) it steps down through the void's shadow, never
+## jumping from the void's light to the stone (the review's).
+func drawn_colour(seat: int, place: int) -> Color:
+	var shade: int = _shade[place] if place >= 0 and place < _shade.size() else 0
+	var sensed: int = sense_shade_of(seat, place)
+	if sensed > 1 or (shade <= 0 and sensed > 0):
+		return _sensed_shades[sensed - 1]
+	return _stone[shade - 1] if shade > 0 else Color.TRANSPARENT
+
+
+func _drawn(seat: int, place: int) -> bool:
+	return (place < _shade.size() and _shade[place] > 0) or sense_shade_of(seat, place) > 0
 
 
 ## True when seat `seat`'s own map draws secret room `place`, which the party's map does not, by the
@@ -450,15 +467,9 @@ func draw_map(canvas: SeatMap, seat: int) -> void:
 	var origin: Vector2 = _origin[seat] + shift
 	var places: int = _rects.size()
 	for place in places:
-		var shade: int = _shade[place]
-		var colour: Color = _stone[maxi(shade - 1, 0)]
-		var sensed: int = _sense_shade[seat * places + place]
-		if shade <= 0 and sensed > 0:
-			# A secret room this player senses (`secret_sense`): on their map only, in a void light.
-			shade = sensed
-			colour = _sensed_shades[sensed - 1]
-		if shade <= 0:
+		if not _drawn(seat, place):
 			continue
+		var colour: Color = drawn_colour(seat, place)
 		var at: Vector2 = origin + ((_rects[place].position - _area.position) / MAP_CELL).floor() * scale
 		var texture: ImageTexture = _floors[place]
 		if texture != null:

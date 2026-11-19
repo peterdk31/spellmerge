@@ -82,7 +82,7 @@ func test_the_first_play_loads_then_starts_the_room() -> void:
 	check(WarmupScript.warmed, "every shader is compiled")
 	check(_progressed >= WarmupScript.shaders().size(), "the bar moved with each one: %d" % _progressed)
 	check_equal(_finished, 1, "the loading is over")
-	check(not screen.visible, "the screen is gone")
+	check(not screen.is_up(), "the screen is gone")
 	check_equal(flow.state, FlowScript.State.RUNNING, "and the run is on")
 	check(flow.get_wizard(0) != null, "with the player's wizard")
 
@@ -129,7 +129,7 @@ func test_a_run_stopped_while_loading_starts_nothing() -> void:
 	check_equal(flow.state, FlowScript.State.IDLE, "idle again")
 	check(not loading.is_loading(), "the load is dropped")
 	check_equal(_finished, 1, "the screen is told to go")
-	check(not screen.visible, "and it went")
+	check(not screen.is_up(), "and it went")
 	check(flow.world == null, "no room")
 
 
@@ -148,7 +148,7 @@ func test_the_rendered_runs_warm_up_like_play() -> void:
 	check(await WarmUp.run(root), "the warm-up finishes")
 	check(WarmupScript.warmed, "the shaders are warmed")
 	check(not loading.is_loading(), "the load is over")
-	check(not screen.visible, "the loading screen is gone")
+	check(not screen.is_up(), "the loading screen is gone")
 	check_equal(_started, 1, "it went through the loading screen")
 	check_equal(_finished, 1, "and the screen was told it is done")
 	check(await WarmUp.run(root), "a second warm-up has nothing to do and says so")

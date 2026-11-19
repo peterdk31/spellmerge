@@ -23,7 +23,8 @@ extends FrameSource
 ## walks the biome's bridges to the nearest room whose fight is still to come (the fewest bridges from
 ## where it stands; one behind a shut door, the boss's gate, it waits at: `Flow.gates`), round the walls in a room (`AISight.detour`) and
 ## straight over a bridge, then steps in, and its fight seals it in; in a fight the brain plays as
-## above. It reads Flow's map and rooms (`biome`, `life`, `gates`), as a player reads the screen.
+## above, and a revive goes first (its brain's `revive` behaviour running: it stays by the one downed,
+## cleared room or not). It reads Flow's map and rooms (`biome`, `life`, `gates`), as a player reads the screen.
 ## Idler: stands still; it only opens its builder.
 ##
 ## Builder: `build_random(seed)` builds a random staff into staff 1 (BUILD_STAFF, RB: `dash` at the
@@ -38,6 +39,7 @@ extends FrameSource
 enum Mode { FIGHTER, IDLER }
 
 const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
+const ReviveScript := preload("res://gameplay/ai/behaviours/revive.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 ## How a bot plays (the brain's numbers).
 const PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
@@ -182,7 +184,8 @@ func step(delta: float) -> void:
 		brain.setup(wizard, PROFILE, SEED + player)
 	intent.begin_step()
 	brain.think(delta, intent)
-	var way: Vector2 = _travel(wizard)
+	# A revive under way (the brain's `revive` behaviour) goes first: it would walk off its teammate.
+	var way: Vector2 = Vector2.ZERO if brain.behaviour is ReviveScript else _travel(wizard)
 	if way != Vector2.ZERO:
 		intent.move = way
 	send(intent)

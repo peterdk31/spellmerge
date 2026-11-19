@@ -221,7 +221,7 @@ func test_the_command_carries_the_page_and_only_this_machines_seats_send_it() ->
 func test_a_is_the_pause_menus_while_it_is_open() -> void:
 	input.add_virtual_device(0)
 	bus.player_joined.emit(0)
-	bus.room_entered.emit(&"test_room")
+	bus.room_entered.emit(&"test_room", 0)
 	_open()
 	_to(BossIntro.LINES_AT + 3.0)
 	hud.get_pause_menu().open_menu(0)
@@ -240,7 +240,7 @@ func test_a_is_the_pause_menus_while_it_is_open() -> void:
 func test_the_builder_and_the_inventory_stay_shut_while_it_is_open() -> void:
 	input.add_virtual_device(0)
 	bus.player_joined.emit(0)
-	bus.room_entered.emit(&"test_room")
+	bus.room_entered.emit(&"test_room", 0)
 	hud.poll()
 	_tap(0, &"back")
 	hud.poll()

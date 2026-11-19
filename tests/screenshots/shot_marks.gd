@@ -42,7 +42,7 @@ func take() -> void:
 	for node: Node in room.find_children("*", "StaticBody2D", true, false):
 		if ((node as StaticBody2D).collision_layer & RoomBase.WALL_LAYER) != 0:
 			projectiles.call("add_wall_body", node)
-	root.get_node("Events").emit_signal(&"room_entered", &"arena_01")
+	root.get_node("Events").emit_signal(&"room_entered", &"arena_01", 0)
 	if feel.call("marks") == null:
 		fail("Feel has no mark layer (the Floor marks setting is off?)")
 		return

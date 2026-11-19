@@ -779,7 +779,7 @@ func _ask_wait(player: int, on: bool) -> void:
 
 
 ## A room was entered: a run's start lets every stop go, so each seat still waiting asks again.
-func _on_room_entered(_room_id: StringName) -> void:
+func _on_room_entered(_room_id: StringName, _room: int) -> void:
 	for player in MAX_PLAYERS:
 		if _waiting[player]:
 			_ask_wait(player, true)

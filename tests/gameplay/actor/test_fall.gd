@@ -135,7 +135,7 @@ func test_a_wizard_comes_back_on_its_last_ground_paying_a_fifth() -> void:
 
 
 func test_a_fall_in_a_room_where_falls_are_free_costs_nothing() -> void:
-	_world.bus.room_entered.emit(&"hub")
+	_world.bus.room_entered.emit(&"hub", 0)
 	check_equal(_world.combat.fall_cost, 0.0, "the hub's falls are free")
 	var body: Actor = _wizard()
 	_run(1)
@@ -143,7 +143,7 @@ func test_a_fall_in_a_room_where_falls_are_free_costs_nothing() -> void:
 	_run(FALL_TICKS + 1)
 	check_equal(body.health.health, 50.0, "no cost")
 	check_equal(body.global_position, START, "back")
-	_world.bus.room_entered.emit(&"arena_01")
+	_world.bus.room_entered.emit(&"arena_01", 0)
 	check_equal(_world.combat.fall_cost, HoleRules.FALL_COST, "a run's room costs a fifth")
 
 

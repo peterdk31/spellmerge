@@ -294,6 +294,8 @@ func _clear_revives() -> void:
 
 
 ## A new world is up: its wizards and revives are new.
-func _on_room_entered(_room_id: StringName) -> void:
+func _on_room_entered(_room_id: StringName, room: int) -> void:
 	refresh_wizards()
-	_clear_revives()
+	# Revives under way go with the world (a biome's later rooms keep them; connected biomes CB3).
+	if room == EventsScript.FIRST_ROOM:
+		_clear_revives()

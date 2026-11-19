@@ -391,9 +391,11 @@ func _step_bodies(delta: float) -> void:
 		return
 	var n: int = actors.open_ids(_ids)
 	var still: PackedByteArray = actors.still
+	var asleep: PackedByteArray = actors.asleep
 	for i in n:
-		if still[_ids[i]] != 0:
-			# No controller and no Mover: nothing it does changes from tick to tick (props W2).
+		if still[_ids[i]] != 0 or asleep[_ids[i]] != 0:
+			# No controller and no Mover: nothing it does changes from tick to tick (props W2); or
+			# its place sleeps (connected biomes CB3).
 			continue
 		var body: Actor = actors.node_of(_ids[i]) as Actor
 		if body != null and body.ticking and body.is_inside_tree() and body.can_process():

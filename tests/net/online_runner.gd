@@ -230,7 +230,7 @@ func _ready_room() -> void:
 
 
 ## The host is in its hub: a wizard of its opens the room at the altar (once).
-func _on_room_entered(_room_id: StringName) -> void:
+func _on_room_entered(_room_id: StringName, _room: int) -> void:
 	if not _opened:
 		_opened = true
 		_events.online_open_requested.emit.call_deferred(0)

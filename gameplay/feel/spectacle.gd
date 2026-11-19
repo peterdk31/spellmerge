@@ -214,6 +214,9 @@ var _broken_from: Texture2D = null
 var _broken_at: Vector2 = Vector2.INF
 ## The room the marks were last fitted to (`room_entered`), to fit a layer made later.
 var _mark_room: StringName = &""
+## The walls of every piece of the world built so far (a biome's pieces, each at its place; a row
+## run's one room): what the light is blocked by (`_on_room_built`).
+var _world_walls: Array[Rect2] = []
 ## Feel's clock at the last step.
 var _clock: float = 0.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -1153,8 +1156,20 @@ func view_rect() -> Rect2:
 # --- The room ------------------------------------------------------------------------------------
 
 ## A room was laid out (`room_built`; atmosphere C): its standing walls block the light from now on.
-func _on_room_built(room_id: StringName, layout_root: Node) -> void:
+func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void:
 	var walls: Array[Rect2] = RoomPlaces.wall_rects(layout_root)
+	var piece := layout_root as Node2D
+	# A biome's pieces stand at their places (connected biomes CB3): their walls at them.
+	var at: Vector2 = piece.position if piece != null else Vector2.ZERO
+	for i in walls.size():
+		walls[i].position += at
+	if number != EventsScript.FIRST_ROOM:
+		# A biome's later piece: its walls join the world's; the mist and the room's look are the
+		# first room's.
+		_world_walls.append_array(walls)
+		blockers.use_walls(_world_walls)
+		return
+	_world_walls = walls.duplicate()
 	blockers.use_walls(walls)
 	# The mist's room (atmosphere F), read only when the room names a mist.
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
@@ -1183,7 +1198,9 @@ func _keep_mist_last() -> void:
 
 ## A new room: its colours for its walls' motes (`RoomBase.surface_colors`), its ambient light
 ## (`RoomBase.ambient`, P3b; and its dark's colour, `RoomBase.shade`) and its air (`RoomBase.air`).
-func _on_room_entered(room_id: StringName) -> void:
+func _on_room_entered(room_id: StringName, number: int) -> void:
+	if number != EventsScript.FIRST_ROOM:
+		return
 	use_room(registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null)
 	# The room's world is in the tree by now: its mote sources are read again (each from now).
 	source_motes.take(get_tree() if is_inside_tree() else null)
@@ -1227,7 +1244,9 @@ func _take_surface_kinds() -> void:
 
 ## A new room: the mark layer wiped and fitted to its bounds and walls (the projectile manager's,
 ## set before `room_entered`) in its floor's colours.
-func _fit_marks(room_id: StringName) -> void:
+func _fit_marks(room_id: StringName, number: int = EventsScript.FIRST_ROOM) -> void:
+	if number != EventsScript.FIRST_ROOM:
+		return
 	_mark_room = room_id
 	if marks == null:
 		return

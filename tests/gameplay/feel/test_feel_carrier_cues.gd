@@ -71,7 +71,7 @@ func test_a_dash_kicks_up_dust_and_lands_in_a_ring() -> void:
 	check_equal(_card(&"dash").shown_cue, &"dash_start", "dash.tres names the cue `dash_start`")
 	check_equal(_card(&"dash").end_cue, &"dash_land", "and `dash_land`")
 	# The dust is in the room's colours: a room is entered.
-	bus.room_entered.emit(&"arena_01")
+	bus.room_entered.emit(&"arena_01", 0)
 	var motes: Node = feel.motes()
 	var written: int = int(motes.get(&"written"))
 	bus.carrier_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, sparks)

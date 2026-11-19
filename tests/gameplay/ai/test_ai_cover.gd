@@ -47,8 +47,8 @@ func before_each() -> void:
 	_cover.sim = Sim.seeded(5)
 	_cover.use_kinds([_grass] as Array[CoverKind])
 	root.add_child(_cover)
-	_world.bus.room_built.emit(ROOM, _layout())
-	_world.bus.room_entered.emit(ROOM)
+	_world.bus.room_built.emit(ROOM, 0, _layout())
+	_world.bus.room_entered.emit(ROOM, 0)
 	# The wizard far off unless a test puts it near.
 	_world.players[0].position = Vector2(4000.0, 4000.0)
 
@@ -149,8 +149,8 @@ func test_ash_and_a_room_with_no_cover_mark_nothing() -> void:
 	_cover.sim = Sim.seeded(5)
 	_cover.use_kinds([ash] as Array[CoverKind])
 	root.add_child(_cover)
-	_world.bus.room_built.emit(ROOM, _layout())
-	_world.bus.room_entered.emit(ROOM)
+	_world.bus.room_built.emit(ROOM, 0, _layout())
+	_world.bus.room_entered.emit(ROOM, 0)
 	_world.bus.floor_touched.emit(0, &"fire", Vector2(200.0, 100.0), 0.0)
 	for i in 30:
 		_cover.step(Fixture.STEP)
@@ -159,8 +159,8 @@ func test_ash_and_a_room_with_no_cover_mark_nothing() -> void:
 	check(_cover.state_at(_cover.layout.cell_of(Vector2(200.0, 100.0))) == 2, "burnt to ash")
 	check_equal(sight.count, 0, "ash harms nobody")
 	_cover.use_kinds([] as Array[CoverKind])
-	_world.bus.room_built.emit(ROOM, _layout())
-	_world.bus.room_entered.emit(ROOM)
+	_world.bus.room_built.emit(ROOM, 0, _layout())
+	_world.bus.room_entered.emit(ROOM, 0)
 	_cover.look(Vector2(200.0, 100.0), 64.0, sight)
 	check_equal(sight.count, 0, "a room with no cover: every cell safe")
 

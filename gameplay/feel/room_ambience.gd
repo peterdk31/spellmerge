@@ -50,7 +50,11 @@ func _ready() -> void:
 		events.main_menu_requested.connect(_on_main_menu_requested)
 
 
-func _on_room_entered(room_id: StringName) -> void:
+## The world's room in play: a biome's first room's for now (connected biomes CB3; each room's own
+## sound is CB12's).
+func _on_room_entered(room_id: StringName, number: int) -> void:
+	if number != EventsScript.FIRST_ROOM:
+		return
 	var room: RoomBase = registry.call(&"get_resource", ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	use(room.ambience if room != null else null)
 

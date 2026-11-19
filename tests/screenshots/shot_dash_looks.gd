@@ -37,7 +37,7 @@ func take() -> void:
 	lay_floor()
 	shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
 	# A room, so the dust is in its colours (the dash's `dash_start` cue, S5).
-	events.emit_signal(&"room_entered", &"arena_01")
+	events.emit_signal(&"room_entered", &"arena_01", 0)
 	await settle()
 	var length: float = float(DASH.get("ray_length"))
 	var casters: Array[int] = []

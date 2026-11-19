@@ -74,7 +74,7 @@ func _ask(seat: int, item: int) -> void:
 
 func test_a_room_lays_what_it_places_one_copy_each() -> void:
 	var bolt: SpellComponent = _world.registry.get_resource(&"spells", &"bolt") as SpellComponent
-	_world.bus.room_items_placed.emit(&"test_room", [WILD_STAR, bolt, StaffCards.new()] as Array[Resource], PackedVector2Array([Vector2(10, 0), Vector2(40, 0), Vector2(70, 0)]))
+	_world.bus.room_items_placed.emit(&"test_room", 0, [WILD_STAR, bolt, StaffCards.new()] as Array[Resource], PackedVector2Array([Vector2(10, 0), Vector2(40, 0), Vector2(70, 0)]))
 	var lying: Array[GroundItem] = _items.lying()
 	check_equal(lying.size(), 2, "the staff and the card lie there; what is no item does not")
 	check_equal([lying[0].number, lying[0].at, lying[0].stack.kind, lying[0].stack.id], [0, Vector2(10, 0), ItemKinds.STAFF, &"star"], "the premade staff is its staff")
@@ -317,7 +317,7 @@ func test_a_restore_says_gone_what_the_snapshot_does_not_hold() -> void:
 func test_only_a_recording_of_the_same_room_keeps_its_ground() -> void:
 	var placed: Array[Resource] = [WILD_STAR]
 	var at := PackedVector2Array([Vector2(10, 0)])
-	_world.bus.room_items_placed.emit(&"hub", placed, at)
+	_world.bus.room_items_placed.emit(&"hub", 0, placed, at)
 	var rack: int = _items.lying()[0].number
 	_wizard(0, Vector2.ZERO)
 	check_equal(_items.take(_world.wizards[0].id, rack), ItemsScript.Take.TAKEN, "the rack taken")
@@ -327,11 +327,11 @@ func test_only_a_recording_of_the_same_room_keeps_its_ground() -> void:
 	# The frames service's ground with no recording is the game's now: bare after a run's start.
 	_items.begin_run()
 	check_equal(_world.frames.next_run_ground().room, &"", "nothing is carried with no recording")
-	_world.bus.room_items_placed.emit(&"hub", placed, at)
+	_world.bus.room_items_placed.emit(&"hub", 0, placed, at)
 	check_equal(_items.lying().size(), 1, "so the hub lays its rack: a host's start, a party back from a run")
 	check_equal(_items.lying()[0].title, "Wild star", "fresh")
 	_items.begin_run()
-	_world.bus.room_items_placed.emit(&"crypt", [] as Array[Resource], PackedVector2Array())
+	_world.bus.room_items_placed.emit(&"crypt", 0, [] as Array[Resource], PackedVector2Array())
 	check(_items.lying().is_empty(), "another room lays its own")
 
 

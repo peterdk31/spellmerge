@@ -75,4 +75,4 @@ func _enter_room() -> void:
 	var projectiles: Node = root.get_node_or_null("Projectiles")
 	if projectiles != null:
 		projectiles.call("set_bounds", Rect2(Vector2.ZERO, Vector2(640.0, 384.0)))
-	root.get_node("Events").emit_signal(&"room_entered", &"arena_01")
+	root.get_node("Events").emit_signal(&"room_entered", &"arena_01", 0)

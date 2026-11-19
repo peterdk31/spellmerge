@@ -84,7 +84,7 @@ func _start(count: int) -> void:
 		var player := own(_world.wizard(index, Vector2.ZERO, START, _registry.get_resource(&"wizard", &"dev") as StaffBase)) as Actor
 		_players.append(player)
 		_bus.player_joined.emit(index)
-	_bus.room_entered.emit(&"test_room")
+	_bus.room_entered.emit(&"test_room", 0)
 
 
 func _tap(player: int, action: StringName) -> void:
@@ -395,7 +395,7 @@ func test_lb_rb_pass_an_empty_hand() -> void:
 	var player := own(_world.wizard(0, Vector2.ZERO, START, null, true, hands)) as Actor
 	_players.append(player)
 	_bus.player_joined.emit(0)
-	_bus.room_entered.emit(&"test_room")
+	_bus.room_entered.emit(&"test_room", 0)
 	var radial: RadialScript = _open(0)
 	check(not radial.holds_staff(1) and not radial.holds_staff(3), "RT and LT hold no staff")
 	check(radial.holds_staff(0) and radial.holds_staff(2), "RB and LB do")

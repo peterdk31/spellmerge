@@ -330,9 +330,41 @@ func add_mouth(rect: Rect2) -> void:
 	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
 	for y in range(y0, y1):
 		for x in range(x0, x1):
+			# A cell that is a wall already stays one (no mouth): a gather door opened
+			# (`shut_mouth`) never opens a wall.
+			if (_wall_cells[y * _wall_w + x] & ROOM_CELL) != 0:
+				continue
 			_wall_cells[y * _wall_w + x] |= MOUTH_CELL
 			_has_walls = true
 			_has_mouths = true
+
+
+## Shut the mouth cells in the world rectangle `rect`, or open them again (connected biomes CB7: a
+## gather door, Flow's state, told here again after a restore). A shut mouth is a room wall as well
+## (ROOM_CELL over its MOUTH_CELL): nothing walks, flies or is moved through it, a wizard neither.
+## Only cells that are mouths change; parts outside the grid are ignored. The bodies' move and the
+## shots read the same bytes, so the native kernels need nothing of it.
+func shut_mouth(rect: Rect2, shut: bool) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / WALL_CELL), 0)
+	var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / WALL_CELL), 0)
+	var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / WALL_CELL), _wall_w)
+	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
+	for y in range(y0, y1):
+		for x in range(x0, x1):
+			var cell: int = y * _wall_w + x
+			if (_wall_cells[cell] & MOUTH_CELL) == 0:
+				continue
+			if shut:
+				_wall_cells[cell] |= ROOM_CELL
+			else:
+				_wall_cells[cell] &= ~ROOM_CELL
+
+
+## True when the cell at `point` is a shut mouth (`shut_mouth`).
+func is_shut_mouth(point: Vector2) -> bool:
+	return (cell_at(point) & (MOUTH_CELL | ROOM_CELL)) == (MOUTH_CELL | ROOM_CELL)
 
 
 ## True while a mouth lies in the grid (`add_mouth`).

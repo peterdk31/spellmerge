@@ -56,6 +56,11 @@ func reset() -> void:
 	queue_redraw()
 
 
+## The share of the width the value is, 0 to 1 (-1 before any value; for tests).
+func share() -> float:
+	return _share
+
+
 ## The fill drawn now and the fill it goes to, in pixels (for tests and screenshots).
 func shown_pixels() -> int:
 	return _shown

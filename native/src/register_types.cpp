@@ -11,6 +11,7 @@
 
 #include "body_kernel.h"
 #include "dmath_kernel.h"
+#include "ground_kernel.h"
 #include "jobs.h"
 #include "mote_kernel.h"
 #include "shot_kernel.h"
@@ -25,6 +26,7 @@ static void initialize_spellmerge(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(MoteKernel);
 	GDREGISTER_CLASS(DMathKernel);
 	GDREGISTER_CLASS(BodyKernel);
+	GDREGISTER_CLASS(GroundKernel);
 }
 
 static void uninitialize_spellmerge(ModuleInitializationLevel p_level) {

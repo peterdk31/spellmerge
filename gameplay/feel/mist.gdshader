@@ -21,7 +21,7 @@ shader_type canvas_item;
 
 #include "res://gameplay/feel/stir.gdshaderinc"
 
-uniform sampler2D light_buffer : hint_default_black, filter_linear, repeat_disable;
+#include "res://gameplay/feel/light_views.gdshaderinc"
 uniform sampler2D mask : hint_default_black, filter_linear, repeat_disable;
 uniform vec2 mask_size = vec2(1.0);
 uniform sampler2D parted : hint_default_black, filter_linear, repeat_disable;
@@ -54,6 +54,7 @@ const float PART_THIN = 0.92;
 varying vec2 world;
 
 void vertex() {
+	LIGHT_VIEW_FIND;
 	world = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
 
@@ -114,7 +115,7 @@ void fragment() {
 	if (density < 0.004) {
 		discard;
 	}
-	vec3 shine = textureLod(light_buffer, SCREEN_UV, 0.0).rgb;
+	vec3 shine = view_light(SCREEN_UV);
 	float most = max(shine.r, max(shine.g, shine.b));
 	float bright = clamp(most / bright_from, 0.0, 1.0) * lit;
 	vec3 hue = most > 0.001 ? shine / most : vec3(1.0);

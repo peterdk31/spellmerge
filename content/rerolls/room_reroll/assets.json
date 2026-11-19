@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/rerolls/room_reroll/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (hand-written SVG rects)",
+			"prompt": "A 16x16 icon of an arched stone doorway with a turning arrow beside it, ice shades from docs/STYLE.md with a 1 px outline. Only non-overlapping rect elements, whole-number coordinates."
+		}
+	]
+}

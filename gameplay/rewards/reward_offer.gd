@@ -14,6 +14,8 @@ var seat: int = -1
 var room: int = -1
 ## Whether the seat's wizard was in that room as it was cleared.
 var here: bool = false
+## The reward table it was rolled from (content/rewards; a reward reroll rolls from it again).
+var table: StringName = &""
 ## Its choices: what each gives, the card's id (empty for coins) and how many.
 var kinds: Array[StringName] = []
 var ids: Array[StringName] = []

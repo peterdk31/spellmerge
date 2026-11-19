@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="RerollBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/reroll_base.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://content/rerolls/room_reroll/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"room_reroll"
+display_name = "Room reroll"
+description = "Press X at an unvisited room's doorway, where its sign shows, to reroll what lies behind it. Your own."
+icon = ExtResource("2_icon")

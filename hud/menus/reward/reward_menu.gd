@@ -15,12 +15,18 @@ extends Control
 ## alone and pauses nothing (pillar 2). It closes by itself when the offer it shows is gone. A pick
 ## the Rewards area refuses (`reward_refused`: no room in the bag, a heal while down) opens it again
 ## on that offer, its title saying so. Display and intent only: what a pick gives is the Rewards
-## area's, told back by `rewards_waiting_changed`.
+## area's, told back by `rewards_waiting_changed`. **X** (`alternate`) on it sends the command
+## `reward_reroll_requested(seat, offer)` (a reward reroll spent, the owner's of 2026-11-19); the
+## new choices (`reward_rerolled`) are turned over onto its cards, and a refusal
+## (`reward_reroll_refused`: none held) shows in its title (NO_REROLL_TEXT), nothing else changing.
 ##
 ## Smooth (docs/STYLE.md): it unrolls from its top over OPEN_FRAMES frames as it opens and rolls up
 ## as it closes; the focused card stands up LIFT pixels, one a frame (the one left sinks back alike),
 ## the gold rim slides from card to card over MOVE_FRAMES frames and a scrolled row slides along;
 ## everything by whole pixels, one step a drawn frame (`step`, called by `panels.gd` each frame).
+## A reroll rolls it up over OPEN_FRAMES frames, turns the cards over to the new
+## choices there and unrolls it again, never in one jump (a reroll of another count of choices closes
+## it and opens it again on the new ones).
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -30,6 +36,8 @@ const CardScript := preload("res://hud/menus/reward/reward_card.gd")
 const TITLE_TEXT: String = "Pick 1 of %d"
 ## Its title after a pick was refused (`reward_refused`: a full bag, a heal while down).
 const REFUSED_TEXT: String = "Can't take that now"
+## Its title after X with no reward reroll held (`reward_reroll_refused`).
+const NO_REROLL_TEXT: String = "No reward rerolls"
 const FONT_SIZE: int = CardScript.FONT_SIZE
 ## The title's line, under the menu's top edge.
 const TITLE_HEIGHT: float = 12.0
@@ -69,6 +77,10 @@ var _shown: int = -1
 var _wants_open: bool = false
 ## The offer whose pick was refused, shown with REFUSED_TEXT the next time it opens (-1: none).
 var _refused: int = -1
+## The new choices of the offer shown, rerolled and not yet turned over onto the cards (empty: none).
+var _rerolled: Array[Dictionary] = []
+## Rolled up for a reroll: it unrolls again once the cards are turned over.
+var _rerolling: bool = false
 ## Its whole height, and how far it has unrolled: 0 (rolled up) to OPEN_FRAMES.
 var _full_height: float = 0.0
 var _unrolled: int = 0
@@ -111,11 +123,14 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 		_events.rewards_waiting_changed.connect(_on_rewards_waiting_changed)
 		_events.reward_rolled.connect(_on_reward_rolled)
 		_events.reward_refused.connect(_on_reward_refused)
+		_events.reward_rerolled.connect(_on_reward_rerolled)
+		_events.reward_reroll_refused.connect(_on_reward_reroll_refused)
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
 		_ui_focus.activated.connect(_on_activated)
 		_ui_focus.cancelled.connect(_on_cancelled)
 		_ui_focus.focus_changed.connect(_on_focus_changed)
+		_ui_focus.alternate.connect(_on_alternate)
 
 
 func is_open() -> bool:
@@ -153,6 +168,8 @@ func open_menu() -> bool:
 		_shown = -1
 		return false
 	_refused = -1
+	_rerolled = []
+	_rerolling = false
 	_open = true
 	_unrolled = 0
 	_lay_out()
@@ -175,10 +192,16 @@ func close_menu() -> bool:
 func step() -> void:
 	if not visible:
 		return
-	var target: int = OPEN_FRAMES if _open else 0
+	if _open and not _rerolled.is_empty():
+		_rerolling = true
+	var target: int = OPEN_FRAMES if _open and not _rerolling else 0
 	if _unrolled != target:
 		_unrolled += signi(target - _unrolled)
 		_apply_height()
+	if _open and _rerolling and _unrolled == 0:
+		# Rolled up for a reroll: the cards turn over to the new choices, and it unrolls again.
+		_turn_over()
+		return
 	if not _open and _unrolled == 0:
 		# Rolled up (or closed before it unrolled at all): it hides.
 		visible = false
@@ -201,7 +224,7 @@ func step() -> void:
 func is_moving() -> bool:
 	if not visible:
 		return false
-	if not _open or _unrolled != OPEN_FRAMES or _rim_frame < MOVE_FRAMES or _row_frame < SCROLL_FRAMES:
+	if not _open or _rerolling or not _rerolled.is_empty() or _unrolled != OPEN_FRAMES or _rim_frame < MOVE_FRAMES or _row_frame < SCROLL_FRAMES:
 		return true
 	for at in _cards.size():
 		if _cards[at].lift != (CardScript.LIFT if at == _focused else 0):
@@ -266,6 +289,24 @@ func _fill(offer: Dictionary) -> void:
 	_row.move_child(_cursor, -1)
 	_focused = -1
 	_first = 0
+
+
+## The cards turned over to the rerolled choices (`_rerolled`), laid out again, the focus kept on
+## the card it was on.
+func _turn_over() -> void:
+	var choices: Array[Dictionary] = _rerolled
+	_rerolled = []
+	_rerolling = false
+	if choices.size() != _cards.size():
+		# Another count of choices: closed and opened again on the new ones (from the waiting list).
+		close_menu()
+		_wants_open = true
+		return
+	for at in choices.size():
+		_cards[at].show_choice(choices[at])
+	_title = TITLE_TEXT % choices.size()
+	_lay_out()
+	_settle()
 
 
 ## Lay its cards out in its room and centre it there.
@@ -412,6 +453,25 @@ func _on_reward_refused(player: int, offer: int) -> void:
 	if player == index:
 		_refused = offer
 		_wants_open = true
+
+
+func _on_reward_rerolled(player: int, offer: int, choices: Array[Dictionary]) -> void:
+	if player == index and _open and offer == _shown:
+		_rerolled = choices.duplicate()
+
+
+func _on_reward_reroll_refused(player: int, offer: int) -> void:
+	if player == index and _open and offer == _shown:
+		_title = NO_REROLL_TEXT
+		queue_redraw()
+
+
+## X: spend a reward reroll on the offer shown (the class doc).
+func _on_alternate(player: int, _control: Control) -> void:
+	if player != index or not _open or _rerolling or not _rerolled.is_empty() or _events == null:
+		return
+	UiSounds.send(_events, UiSounds.CHOOSE)
+	_events.reward_reroll_requested.emit(index, _shown)
 
 
 func _on_closed(player: int) -> void:

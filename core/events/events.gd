@@ -64,6 +64,16 @@ signal bag_use_requested(player: int, bag: StringName, id: StringName, body: int
 ## offer arrives never takes that one's). A command: heard by rewards at the next tick's start,
 ## which gives it (`reward_taken`) or keeps the offer unspent (no room in the bag, an offer gone).
 signal reward_pick_requested(player: int, offer: int, choice: int)
+## Sender: hud (the reward menu's X; the owner, 2026-11-19). `player` asked to spend a reward reroll
+## (`RerollBase.REWARD`) on their reward offer number `offer`: every choice rolled again. A command:
+## heard by rewards at the next tick's start, which rerolls it (`reward_rerolled`) or refuses it
+## (`reward_reroll_refused`: none held).
+signal reward_reroll_requested(player: int, offer: int)
+## Sender: hud (X in play, no menu open; the owner, 2026-11-19). `player` asked to spend a room
+## reroll (`RerollBase.ROOM`) on the unvisited room whose bridge mouth (its kind sign) the body
+## they drive stands at. A command: heard by flow at the next tick's start, which rerolls what lies
+## behind that doorway (`room_rerolled`) or refuses it (`room_reroll_refused`).
+signal room_reroll_requested(player: int)
 ## A player voted for door number `door`. Heard by flow.
 signal door_vote_requested(player: int, door: int)
 ## Sender: hud. The "Effect slots" slider in the pause menu (Settings) moved: how many effects
@@ -637,6 +647,13 @@ signal reward_taken(player: int, offer: int, choice: int, reward: Dictionary)
 ## no wizard): the offer stays unspent. Heard by hud (the reward
 ## menu opens on it again, saying why).
 signal reward_refused(player: int, offer: int)
+## Sender: rewards. `player`'s offer `offer` was rerolled (`reward_reroll_requested`): one reward
+## reroll spent, its new `choices` (views, as `reward_rolled`'s). Heard by hud (the reward menu turns
+## its cards over to the new ones).
+signal reward_rerolled(player: int, offer: int, choices: Array[Dictionary])
+## Sender: rewards. A reward reroll of `player`'s offer `offer` was refused (no reward reroll held, or
+## nothing to roll): nothing spent, the offer as it was. Heard by hud (the menu's title says why).
+signal reward_reroll_refused(player: int, offer: int)
 ## Sender: rewards. Seat `player`'s offers not yet picked, oldest first (`offers`: each a dictionary
 ## of `offer`, `here` and `choices`, as `reward_rolled` says), whenever they change, at a run's
 ## start (none) and after a snapshot is restored. Heard by hud (the unspent count on the corner

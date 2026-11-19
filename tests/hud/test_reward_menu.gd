@@ -374,3 +374,63 @@ func test_the_panel_says_the_coins() -> void:
 	_bus.bag_changed.emit(1, &"currency", [CoinBase.ID] as Array[StringName], PackedInt32Array([12]), -1)
 	_roll(1, 3, false)
 	check_equal(_hud.get_panel(1).purse_text(), "12 coins  1 to pick", "and its rewards waiting")
+
+
+# --- The reward reroll (the owner, 2026-11-19: X in the picker) ---------------------------------
+
+func test_x_asks_for_a_reroll_and_the_new_cards_turn_over_smoothly() -> void:
+	var asked: Array = []
+	_bus.reward_reroll_requested.connect(func(seat: int, offer: int) -> void: asked.append([seat, offer]))
+	_roll(0, 4, true)
+	_frame()
+	var menu: RewardMenuScript = _hud.get_reward(0)
+	check(menu.is_open(), "open")
+	_settle(menu)
+	var tall: float = menu.size.y
+	_tap(0, &"alternate")
+	_frame()
+	check_equal(asked, [[0, 4]], "X sends reward_reroll_requested for the offer shown")
+	check(_picked.is_empty(), "and picks nothing")
+	var fresh: Array[Dictionary] = _choices(3).slice(1, 3)
+	_bus.reward_rerolled.emit(0, 4, fresh)
+	var heights: Array[float] = []
+	var turned: int = -1
+	for frame in 12:
+		menu.step()
+		heights.append(menu.size.y)
+		if turned < 0 and _words(0) == [String(fresh[0]["name"]), String(fresh[1]["name"])]:
+			turned = frame
+	check(turned >= 3, "the cards turn over only once it rolled up, frames on (%d)" % turned)
+	check(heights.min() == 0.0 and heights.back() == tall, "it rolls up and unrolls again (%s)" % [heights])
+	for at in range(1, heights.size()):
+		check(absf(heights[at] - heights[at - 1]) < tall, "never one jump (%s)" % [heights])
+	check(menu.is_open() and not menu.is_moving(), "open on the new choices, at rest")
+	check_equal(menu.title_text(), RewardMenuScript.TITLE_TEXT % 2, "the title as before")
+
+
+func test_x_with_no_reward_reroll_says_why_and_changes_nothing() -> void:
+	_roll(0, 4, true)
+	_frame()
+	var menu: RewardMenuScript = _hud.get_reward(0)
+	_settle(menu)
+	var before: Array[String] = _words(0)
+	_bus.reward_reroll_refused.emit(0, 4)
+	check_equal(menu.title_text(), RewardMenuScript.NO_REROLL_TEXT, "the title says there is none")
+	check(not menu.is_moving(), "nothing else moves")
+	check_equal(_words(0), before, "the same cards")
+	_bus.reward_reroll_refused.emit(1, 4)
+	check_equal(_hud.get_reward(1).title_text(), "", "another seat's refusal is not this one's")
+
+
+func test_the_panel_counts_each_reroll() -> void:
+	var ids: Array[StringName] = [CoinBase.ID, RerollBase.ROOM, RerollBase.REWARD]
+	_bus.bag_changed.emit(0, &"currency", ids, PackedInt32Array([2, 1, 3]), -1)
+	var panel: Node = _hud.get_panel(0)
+	check_equal(panel.room_reroll_count().shown_count(), 1, "its room rerolls")
+	check_equal(panel.reward_reroll_count().shown_count(), 3, "its reward rerolls")
+	check_equal(_hud.get_panel(1).reward_reroll_count().shown_count(), 0, "each panel its own body's")
+	check(panel.room_reroll_count().playing() != 0, "played in, never one jump (Smooth)")
+	check(panel.key_count().get_index() < panel.room_reroll_count().get_index() and panel.room_reroll_count().get_index() < panel.reward_reroll_count().get_index(), "after the keys, on the purse row")
+	panel.reward_reroll_count().advance(1.0)
+	_bus.bag_changed.emit(0, &"currency", [CoinBase.ID] as Array[StringName], PackedInt32Array([2]), -1)
+	check_equal(panel.reward_reroll_count().playing(), 4, "the last one spent sinks out (Play.LEAVE)")

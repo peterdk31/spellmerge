@@ -1,8 +1,11 @@
 extends Control
-## A seat's key count (the owner, 2026-11-19): a small brass key and the number of keys in the
-## currency bag of the body the seat drives, beside a corner panel's coins (`player_panel.gd`'s purse
-## row). Keys are each body's own (picked up and spent by it), so each panel shows its own count;
-## `panels.gd` tells it from the bag (`bag_changed`), a possessed foe's while possessing.
+## A seat's count of one currency (the owner, 2026-11-19): a small picture and the number of that
+## item in the currency bag of the body the seat drives, beside a corner panel's coins
+## (`player_panel.gd`'s purse row). First the keys (a brass key, `KEY`); the room rerolls and the
+## reward rerolls are two more of it (`picture` and `material` set as it is made: `ROOM_REROLL` in
+## Ice, `REWARD_REROLL` in Void). Each is each body's own (picked up and spent by it), so each panel
+## shows its own count; `panels.gd` tells it from the bag (`bag_changed`), a possessed foe's while
+## possessing.
 ##
 ## Smooth (docs/STYLE.md): the count never changes in one jump. The key and its number slide up into
 ## view from under the row's edge as the first key is taken, nod up as one more is taken and dip as
@@ -32,7 +35,13 @@ const GAIN: PackedFloat32Array = [-1.0, -2.0, -1.0, 0.0]
 const SPEND: PackedFloat32Array = [1.0, 2.0, 1.0, 0.0]
 ## The plays by number (`playing`).
 enum Play { NONE, APPEAR, GAIN, SPEND, LEAVE }
-## The key's pixels, drawn from the control's left: a ring bow, a shaft and two teeth (7 × 5).
+## The pictures, drawn from the control's left, a row a string: `d` the material's shadow, `m` its
+## base, `l` its light, `.` nothing (7 × 5). The key: a ring bow, a shaft and two teeth.
+const KEY: PackedStringArray = [".......", "mlm....", "mdmmmmm", "mmm..dd", "......d"]
+## A room reroll: a doorway and a turning arrow beside it.
+const ROOM_REROLL: PackedStringArray = [".lll.l.", "lmmml.l", "lmdml.l", "lmdml.l", "lmdml.."]
+## A reward reroll: a card with a mark and a turning arrow beside it.
+const REWARD_REROLL: PackedStringArray = ["lllll.l", "lmdmm.l", "ldddm.l", "lmdmm..", "lmmmm.."]
 const ICON_SIZE: Vector2i = Vector2i(7, 5)
 const ICON_GAP: int = 2
 ## The number's font size (the panel's small font, as the coins).
@@ -41,6 +50,11 @@ const FONT_SIZE: int = 8
 const WIDEST: String = "99"
 ## Gold and pickups are Spark (docs/STYLE.md, "UI"): the key's shades and its number's colour.
 const SHADES: StringName = &"spark"
+
+## What it counts: its picture (one of the pictures above) and the palette material it is drawn in
+## (its shades and its number's colour). Set before it enters the tree.
+var picture: PackedStringArray = KEY
+var material_name: StringName = SHADES
 
 ## Its whole size at rest with a key (from its font, `_ready`; a test may set it).
 var full_size: Vector2 = Vector2(ICON_SIZE.x + ICON_GAP + 10, 9)
@@ -60,12 +74,12 @@ var _text: String = ""
 func _init() -> void:
 	clip_contents = true
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_brass = Palette.shades_of(SHADES)
 	set_process(false)
 	visible = false
 
 
 func _ready() -> void:
+	_brass = Palette.shades_of(material_name)
 	var font: Font = get_theme_default_font()
 	var wide: float = font.get_string_size(WIDEST, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x if font != null else 10.0
 	var tall: float = font.get_height(FONT_SIZE) if font != null else 9.0
@@ -193,16 +207,15 @@ func _draw() -> void:
 	# Drawn from its whole size's top: the part below its room is cut by its edge.
 	var tall: int = int(size_tall())
 	var top: int = (tall - ICON_SIZE.y) / 2 + offset()
-	var dark: Color = _brass[0]
-	var mid: Color = _brass[1]
+	if _brass.size() < 3:
+		_brass = Palette.shades_of(material_name)
 	var light: Color = _brass[2]
-	# The bow: a 3 × 3 ring with its hole, then the shaft and two teeth hanging from its end.
-	draw_rect(Rect2(0, top + 1, 3, 3), mid)
-	draw_rect(Rect2(1, top + 2, 1, 1), dark)
-	draw_rect(Rect2(1, top + 1, 1, 1), light)
-	draw_rect(Rect2(3, top + 2, 4, 1), mid)
-	draw_rect(Rect2(5, top + 3, 1, 1), dark)
-	draw_rect(Rect2(6, top + 3, 1, 2), dark)
+	for y in picture.size():
+		var row: String = picture[y]
+		for x in row.length():
+			var shade: int = "dml".find(row[x])
+			if shade >= 0:
+				draw_rect(Rect2(x, top + y, 1, 1), _brass[shade])
 	var font: Font = get_theme_default_font()
 	if font == null:
 		return

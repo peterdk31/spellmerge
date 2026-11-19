@@ -548,15 +548,22 @@ func get_reward(player: int) -> RewardMenuScript:
 	return _rewards[player]
 
 
-## A bag of the seat's shown body changed: its currency bag is the purse's coins and its keys.
+## A bag of the seat's shown body changed: its currency bag is the purse's coins, its keys and its
+## rerolls.
 func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, _capacity: int) -> void:
 	if player < 0 or player >= PLAYER_COUNT or bag != ItemKinds.bag_of(ItemKinds.COIN):
 		return
 	var at: int = ids.find(CoinBase.ID)
 	_coins[player] = counts[at] if at >= 0 and at < counts.size() else 0
 	_panels[player].set_purse(_coins[player], _unspent[player])
-	var key_at: int = ids.find(KeyBase.ID)
-	_panels[player].set_keys(counts[key_at] if key_at >= 0 and key_at < counts.size() else 0, false)
+	_panels[player].set_keys(_count_in(ids, counts, KeyBase.ID), false)
+	_panels[player].set_rerolls(_count_in(ids, counts, RerollBase.ROOM), _count_in(ids, counts, RerollBase.REWARD), false)
+
+
+## The count of `id` in a bag's `ids` and `counts` (0 when it holds none).
+static func _count_in(ids: Array[StringName], counts: PackedInt32Array, id: StringName) -> int:
+	var at: int = ids.find(id)
+	return counts[at] if at >= 0 and at < counts.size() else 0
 
 
 func _on_rewards_waiting_changed(player: int, offers: Array[Dictionary]) -> void:

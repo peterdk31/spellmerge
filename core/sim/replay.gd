@@ -46,9 +46,11 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## commands without `start_depth_picked`, connected biomes CB8, `InputFrame.VERSION` 7, and every
 ## run a biome's; 14: the frames' commands with `shelf_buy_requested`, `InputFrame.VERSION` 8; 15:
 ## the frames' commands with `bag_use_requested`, `InputFrame.VERSION` 9, every reward an item; 16: the coins
-## bag renamed the currency bag (its loadouts' stacks, its rule `bag_currency`) and the keys in it).
+## bag renamed the currency bag (its loadouts' stacks, its rule `bag_currency`) and the keys in it;
+## 17: the frames' commands with `reward_reroll_requested` and `room_reroll_requested`,
+## `InputFrame.VERSION` 10, the rerolls).
 ## A replay of another format is refused.
-const FORMAT: int = 16
+const FORMAT: int = 17
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): a run of rooms, the hub (online-lobby L1; the main

@@ -234,11 +234,19 @@ func test_coins_go_onto_the_pickers_own_stack_only() -> void:
 	_offer(0, 50, ItemKinds.COIN, 5, CoinBase.ID)
 	_pick(0, 50, 0)
 	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [5, 0], "spending and rewards are one's own")
-	check_equal(body.inventory.stacks_in(COINS).size(), 1, "coins are one stack in the currency bag")
+	check_equal(_kinds_in(body).count(ItemKinds.COIN), 1, "coins are one stack in the currency bag")
 	_offer(0, 52, ItemKinds.COIN, 3, CoinBase.ID)
 	_pick(0, 52, 0)
-	check_equal([body.inventory.stacks_in(COINS).size(), body.inventory.count_of(COINS, CoinBase.ID)], [1, 8], "more coins join the stack")
+	check_equal([_kinds_in(body).count(ItemKinds.COIN), body.inventory.count_of(COINS, CoinBase.ID)], [1, 8], "more coins join the stack")
 	check(_purses.has([0, 8]), "the stack is said as any bag (the HUD's purse)")
+
+
+## The kinds of the stacks in `body`'s currency bag (its rerolls beside its coins).
+func _kinds_in(body: Actor) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for stack: ItemStack in body.inventory.stacks_in(COINS):
+		out.append(stack.kind)
+	return out
 
 
 ## Seat `seat`'s own offer numbered `number` of the one choice `kind` `count`, waiting.

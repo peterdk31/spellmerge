@@ -15,7 +15,8 @@ extends PanelContainer
 ## the line of a seat played on another machine), `set_purse` (a small line under the health line
 ## with the seat's coins and its unspent rewards, connected biomes CB10; hidden while both are 0),
 ## `set_keys` (the shown body's keys before the coins, on the same row: `key_count.gd`, Smooth; hidden
-## while there are none),
+## while there are none), `set_rerolls` (its room rerolls and reward rerolls after the keys, each a
+## `key_count.gd` of its own picture, the same way; the owner, 2026-11-19),
 ## `set_staff_plan`, `set_staff_mana`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
 ## which hears the events and reads the staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
@@ -54,6 +55,8 @@ var _purse: Label = null
 ## The purse's row (the purse line, then the shown body's keys) and its key count (`set_keys`).
 var _purse_row: HBoxContainer = null
 var _keys: KeyCountScript = null
+var _room_rerolls: KeyCountScript = null
+var _reward_rerolls: KeyCountScript = null
 var _coins: int = 0
 var _unspent: int = 0
 
@@ -91,6 +94,8 @@ func _ready() -> void:
 	_keys.name = "Keys"
 	_keys.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_purse_row.add_child(_keys)
+	_room_rerolls = _count_of("RoomRerolls", KeyCountScript.ROOM_REROLL, &"ice")
+	_reward_rerolls = _count_of("RewardRerolls", KeyCountScript.REWARD_REROLL, &"void")
 	_purse_row.add_child(_purse)
 	_staffs.get_parent().add_child(_purse_row)
 	_staffs.get_parent().move_child(_purse_row, _staffs.get_index())
@@ -162,6 +167,33 @@ func set_purse(coins: int, unspent: int) -> void:
 ## pixels; `at_once`: drawn as it stands).
 func set_keys(count: int, at_once: bool) -> void:
 	_keys.set_count(count, at_once)
+
+
+## Show the room rerolls and the reward rerolls the seat's shown body holds, after its keys (each
+## played in by whole pixels as the keys are; `at_once`: drawn as they stand).
+func set_rerolls(room: int, reward: int, at_once: bool) -> void:
+	_room_rerolls.set_count(room, at_once)
+	_reward_rerolls.set_count(reward, at_once)
+
+
+## The room reroll count and the reward reroll count it shows (their widgets, for tests).
+func room_reroll_count() -> KeyCountScript:
+	return _room_rerolls
+
+
+func reward_reroll_count() -> KeyCountScript:
+	return _reward_rerolls
+
+
+## A count of one currency on the purse row, after those before it.
+func _count_of(named: String, picture: PackedStringArray, shades: StringName) -> KeyCountScript:
+	var made: KeyCountScript = KeyCountScript.new()
+	made.name = named
+	made.picture = picture
+	made.material_name = shades
+	made.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_purse_row.add_child(made)
+	return made
 
 
 ## The key count it shows (its widget, for tests).

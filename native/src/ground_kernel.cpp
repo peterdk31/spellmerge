@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <vector>
 
+#include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
@@ -1721,7 +1722,11 @@ PackedByteArray bytes(const std::vector<uint8_t> &from) {
 
 } // namespace
 
-Dictionary godot::ground::draw(const Dictionary &spec) {
+void GroundKernel::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("draw", "spec"), &GroundKernel::draw);
+}
+
+Dictionary GroundKernel::draw(const Dictionary &spec) const {
 	Drawing drawing;
 	drawing.run(spec);
 	Dictionary out;

@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## (split_views_runner.gd) are the ones its report and the web build expect. How a split looks and
 ## what it costs are the runner's (split_views.gd, in a window): headless runs draw nothing.
 
-const CellsScript := preload("res://tests/benchmark/voronoi_cells.gd")
+const CellsScript := preload("res://gameplay/feel/voronoi_cells.gd")
 const ViewsScript := preload("res://tests/benchmark/voronoi_views.gd")
 const RunnerScript := preload("res://tests/benchmark/split_views_runner.gd")
 

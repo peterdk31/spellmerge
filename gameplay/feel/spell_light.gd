@@ -50,6 +50,13 @@ extends Node
 ##   `light_apply.gdshader`: what is under it, times the room's `ambient` (`RoomBase.ambient`,
 ##   `set_ambient`, times its `shade`, the colour of its dark) plus the light, cut into the steps `bands` sets (`set_bands`: 3 steps by
 ##   default, 0 smooth).
+## - **A light buffer a view** (connected biomes CB6, docs/milestones/connected-biomes.md): while the
+##   screen is split each view draws the world through its own transform, so each has a buffer that
+##   follows it (`use_views`: the light buffer the first view's, then one more a view, sharing its
+##   world, so the lights are drawn once a view). What reads the light by the screen (the apply rect,
+##   and what `read_by` names: the lit-only motes, the mist) reads its own view's buffer:
+##   `light_views.gdshaderinc` finds the view a pixel is drawn in by its canvas matrix, from the
+##   views' transforms written each frame (`follow`). One material serves every view.
 
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
@@ -96,6 +103,11 @@ const BEAM_POINTS: int = 80
 ## How far a beam's light reaches each side of it (px), and how bright it is.
 const BEAM_REACH: float = 24.0
 const BEAM_STRENGTH: float = 0.8
+## The most views a buffer each (`use_views`; ScreenViews.VIEWS_MOST), and the uniforms of
+## `light_views.gdshaderinc` that name each view's transform and the buffers past the first.
+const VIEWS_MOST: int = 4
+const VIEW_UNIFORMS: Array[StringName] = [&"light_view_0", &"light_view_1", &"light_view_2", &"light_view_3"]
+const EXTRA_UNIFORMS: Array[StringName] = [&"light_buffer_1", &"light_buffer_2", &"light_buffer_3"]
 ## Floats a 2D MultiMesh row holds with colours and custom data.
 const STRIDE: int = 16
 ## Where a spot row (`write_spot_row`) holds its light's reach, its middle's x and y, and its strength.
@@ -138,6 +150,14 @@ var _spots_dirty: bool = true
 var _spot_buffer: PackedFloat32Array = PackedFloat32Array()
 ## How many times the spots' rows were written anew (`draw_spots`), for what moves them.
 var spots_written: int = 0
+## The views the buffers follow while the screen is split (`use_views`; empty: the one picture,
+## this node's viewport), the buffers of the views past the first (made as needed, kept), how
+## much smaller they are, and the materials that read the light by the screen besides the apply
+## rect (`read_by`, by name).
+var _views: Array[Viewport] = []
+var _extra: Array[SubViewport] = []
+var _extra_downscale: int = DOWNSCALE
+var _readers: Dictionary = {}
 ## A spot's colour by the texture it is read from (read once per texture).
 var _art_colours: Dictionary = {}
 ## The cue lights, by slot (CUE_LIGHTS of them, the next one `_next_cue`): where, how far they reach,
@@ -332,19 +352,113 @@ func release() -> void:
 
 ## Fit the light buffer to the view: its size a DOWNSCALE-th of the view's, its canvas transform
 ## the view's scaled down, so a light lands under its shot; and redraw the spots if one came or
-## went. Run just before every draw, after the camera has moved.
+## went. While the screen is split (`use_views`) the buffer follows the first view and each other
+## view's buffer its own, and the views' transforms are written for what reads the light. Run just
+## before every draw, after the camera has moved.
 func follow() -> void:
 	if _spots_dirty and is_inside_tree():
 		draw_spots()
-	var view: Viewport = get_viewport()
-	if view == null:
-		return
+	var count: int = 0
+	if _views.is_empty():
+		var view: Viewport = get_viewport()
+		if view == null:
+			return
+		_fit(viewport, view, DOWNSCALE)
+	else:
+		for k in _views.size():
+			var shown: Viewport = _views[k]
+			if shown == null or not is_instance_valid(shown):
+				break
+			_fit(viewport if k == 0 else _extra[k - 1], shown, DOWNSCALE if k == 0 else _extra_downscale)
+			var drawn: Transform2D = shown.global_canvas_transform * shown.canvas_transform
+			_set_on_readers(VIEW_UNIFORMS[k], Vector4(drawn.x.x, drawn.origin.x, drawn.origin.y, 0.0))
+			count += 1
+	_set_on_readers(&"light_view_count", count)
+
+
+## `buffer` sized a `downscale`-th of `view` each way, its canvas transform `view`'s scaled down.
+static func _fit(buffer: SubViewport, view: Viewport, downscale: int) -> void:
 	var size: Vector2 = view.get_visible_rect().size
-	var wanted := Vector2i(maxi(ceili(size.x / DOWNSCALE), 1), maxi(ceili(size.y / DOWNSCALE), 1))
-	if viewport.size != wanted:
-		viewport.size = wanted
+	var wanted := Vector2i(maxi(ceili(size.x / downscale), 1), maxi(ceili(size.y / downscale), 1))
+	if buffer.size != wanted:
+		buffer.size = wanted
 	var scale := Vector2(float(wanted.x) / maxf(size.x, 1.0), float(wanted.y) / maxf(size.y, 1.0))
-	viewport.canvas_transform = Transform2D(0.0, scale, 0.0, Vector2.ZERO) * view.global_canvas_transform * view.canvas_transform
+	buffer.canvas_transform = Transform2D(0.0, scale, 0.0, Vector2.ZERO) * view.global_canvas_transform * view.canvas_transform
+
+
+## The views the light follows from now on, one buffer each (`views`, in the order the split screen
+## lays them out, at most VIEWS_MOST; empty: the one picture, this node's viewport); the buffers past
+## the first `extra_downscale` times smaller than their view each way (the fallback of a cheaper
+## light a view; DOWNSCALE: as the first). Nothing is made while they are the same.
+func use_views(views: Array[Viewport], extra_downscale: int = DOWNSCALE) -> void:
+	var downscale: int = maxi(extra_downscale, 1)
+	if downscale == _extra_downscale and views.size() == _views.size():
+		var same: bool = true
+		for k in views.size():
+			same = same and views[k] == _views[k]
+		if same:
+			return
+	_views = views.slice(0, VIEWS_MOST)
+	_extra_downscale = downscale
+	while _extra.size() < _views.size() - 1:
+		var buffer := SubViewport.new()
+		buffer.name = "LightBuffer%d" % (_extra.size() + 1)
+		buffer.world_2d = viewport.world_2d
+		buffer.transparent_bg = true
+		buffer.disable_3d = true
+		buffer.gui_disable_input = true
+		buffer.size = Vector2i(1, 1)
+		buffer.render_target_clear_mode = SubViewport.CLEAR_MODE_ALWAYS
+		add_child(buffer)
+		_extra.append(buffer)
+	for k in _extra.size():
+		_extra[k].render_target_update_mode = SubViewport.UPDATE_ALWAYS if k + 1 < _views.size() else SubViewport.UPDATE_DISABLED
+	# Each buffer is drawn before the view that reads it (Godot draws a viewport's children first):
+	# made after the views, it would be read a frame late, slipping behind them as they move.
+	for k in VIEWS_MOST:
+		var buffer: SubViewport = viewport if k == 0 else (_extra[k - 1] if k - 1 < _extra.size() else null)
+		if buffer == null:
+			break
+		var reader: Viewport = _views[k] if k < _views.size() and is_instance_valid(_views[k]) else buffer.get_parent().get_viewport()
+		RenderingServer.viewport_set_parent_viewport(buffer.get_viewport_rid(), reader.get_viewport_rid())
+	_bind(apply.material as ShaderMaterial)
+	for key: StringName in _readers:
+		_bind(_readers[key] as ShaderMaterial)
+	follow()
+
+
+## How many views the light follows (0: the one picture), and the buffer of view `k` (for tests).
+func view_count() -> int:
+	return _views.size()
+
+
+func view_buffer(k: int) -> SubViewport:
+	return viewport if k == 0 else _extra[k - 1]
+
+
+## `material` reads the light by the screen as the apply rect does (`light_views.gdshaderinc`):
+## it is given each view's buffer and transform from now on, under `key` (one a reader: the motes',
+## the mist's; a new one under a key takes the old one's place; null: none).
+func read_by(key: StringName, material: ShaderMaterial) -> void:
+	if material == null:
+		_readers.erase(key)
+		return
+	_readers[key] = material
+	_bind(material)
+
+
+## The light buffers' textures on `material`, the first the light buffer's.
+func _bind(material: ShaderMaterial) -> void:
+	material.set_shader_parameter(&"light_buffer", viewport.get_texture())
+	for k in EXTRA_UNIFORMS.size():
+		material.set_shader_parameter(EXTRA_UNIFORMS[k], _extra[k].get_texture() if k < _extra.size() else null)
+
+
+## `value` for the uniform `name` on the apply rect and every reader.
+func _set_on_readers(name: StringName, value: Variant) -> void:
+	(apply.material as ShaderMaterial).set_shader_parameter(name, value)
+	for key: StringName in _readers:
+		(_readers[key] as ShaderMaterial).set_shader_parameter(name, value)
 
 
 ## The light buffer's texture (the light round everything this frame, the view a DOWNSCALE-th

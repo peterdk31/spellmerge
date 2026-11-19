@@ -1,17 +1,19 @@
 extends RefCounted
-## The geometry of a Voronoi split screen (connected biomes CB1, docs/milestones/connected-biomes.md):
-## pure functions, nothing drawn. The camera spike (`voronoi_views.gd`) draws one view a cell with
-## them; CB6 builds the game's camera, and may take these into Feel.
+## The geometry of a Voronoi split screen (connected biomes CB1 and CB6,
+## docs/milestones/connected-biomes.md): pure functions, nothing drawn. The game's split screen
+## (`split_camera.gd`) fills its cells with `fill` (nothing allocated); the camera spike
+## (tests/benchmark/voronoi_views.gd) uses the static helpers.
 ##
 ## - **Sites** (`sites`): each wizard's place on the screen, the party's middle at the screen's
 ##   middle and the wizards spread as they stand (one scale both ways, so the line between two
 ##   cells is square to the line between their wizards: the bisector), scaled until the farthest
 ##   is `margin` from the edge. Sites closer than MIN_GAP are pushed apart, so every cell has room.
-## - **Cells** (`cells`): the screen cut by the bisectors: a site's cell is every point of the
-##   screen nearer it than any other site, a convex polygon (the screen clipped by one half-plane a
-##   neighbour). Together they cover the screen, without overlap.
-## - **Each view's camera** (`camera_centre`): its wizard is drawn at its cell's middle, so the view
-##   leans toward the others (the wizard is off the screen's middle toward the edge its cell owns).
+## - **Cells** (`cells`, `fill`): the screen cut by the bisectors: a site's cell is every point of
+##   the screen nearer it than any other site, a convex polygon (the screen clipped by one
+##   half-plane a neighbour), clockwise on screen. Together they cover the screen, without overlap.
+## - **Each view's camera** (`camera_centre`): where a view looks so a wizard is drawn at a point.
+
+const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 
 ## Sites closer than this (screen pixels) are pushed apart.
 const MIN_GAP: float = 1.0
@@ -137,3 +139,59 @@ static func _twice_signed_area(polygon: PackedVector2Array) -> float:
 ## is drawn at `cell_middle` (screen pixels) on a screen of `screen` pixels at `zoom`.
 static func camera_centre(wizard: Vector2, cell_middle: Vector2, screen: Vector2, zoom: float) -> Vector2:
 	return wizard - (cell_middle - screen * 0.5) / maxf(zoom, EPSILON)
+
+
+## Scratch corners for `fill` (two, clipped from one into the other).
+var _from: PackedVector2Array = PackedVector2Array()
+var _into: PackedVector2Array = PackedVector2Array()
+
+
+func _init() -> void:
+	_from.resize(ScreenViewsScript.CORNERS_MOST)
+	_into.resize(ScreenViewsScript.CORNERS_MOST)
+
+
+## Fill `views`' cells for its `count` views from their anchors (`views.anchor`, screen pixels,
+## at least MIN_GAP apart) on its screen: each the screen cut by the bisector to every other anchor.
+## Nothing is allocated.
+func fill(views: ScreenViewsScript) -> void:
+	var screen: Vector2 = views.screen
+	for i in views.count:
+		_from[0] = Vector2.ZERO
+		_from[1] = Vector2(screen.x, 0.0)
+		_from[2] = screen
+		_from[3] = Vector2(0.0, screen.y)
+		var n: int = 4
+		var own: Vector2 = views.anchor[i]
+		for j in views.count:
+			if j == i or n == 0:
+				continue
+			var normal: Vector2 = views.anchor[j] - own
+			if normal.length_squared() < EPSILON:
+				continue
+			n = _clip_into((own + views.anchor[j]) * 0.5, normal, n)
+		for k in n:
+			views.set_corner(i, k, _from[k])
+		views.set_corners(i, n)
+
+
+## `clip` on the scratch corners: the first `n` of `_from` cut to the near side of the line through
+## `point` square to `normal`, written back into `_from`; the corners kept (at most CORNERS_MOST).
+func _clip_into(point: Vector2, normal: Vector2, n: int) -> int:
+	var out: int = 0
+	for i in n:
+		var a: Vector2 = _from[i]
+		var b: Vector2 = _from[(i + 1) % n]
+		var side_a: float = (a - point).dot(normal)
+		var side_b: float = (b - point).dot(normal)
+		var a_in: bool = side_a <= EPSILON
+		var b_in: bool = side_b <= EPSILON
+		if a_in and out < ScreenViewsScript.CORNERS_MOST:
+			_into[out] = a
+			out += 1
+		if a_in != b_in and out < ScreenViewsScript.CORNERS_MOST:
+			_into[out] = a.lerp(b, side_a / (side_a - side_b))
+			out += 1
+	for k in out:
+		_from[k] = _into[k]
+	return out

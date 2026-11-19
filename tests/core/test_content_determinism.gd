@@ -89,6 +89,15 @@ func test_a_shop_bought_from_and_a_fountain_drawn_on_play_the_same_twice_and_thr
 	check(fight.drunk, "a max health potion was drunk from the inventory")
 
 
+## Keys are each body's own items (the owner, 2026-11-19): a key taken into seat 0's currency bag
+## and spent at a treasure room's door plays the same twice and through a snapshot taken before.
+func test_a_key_taken_and_spent_at_its_door_plays_the_same_twice_and_through_a_snapshot() -> void:
+	var fight := BiomeFight.new(root, false, false, true)
+	_check_biome(fight, 4)
+	check(fight.key_taken, "seat 0 took the key into its own bag")
+	check(fight.door_opened, "and opened the treasure room's door with it")
+
+
 ## `fight` played twice the same and through a snapshot taken after tick `at`.
 func _check_biome(fight: BiomeFight, at: int) -> void:
 	var first := Desync.new()

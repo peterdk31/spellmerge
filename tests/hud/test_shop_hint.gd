@@ -57,7 +57,7 @@ func _frame() -> void:
 func _roll(seat: int, offer: int, here: bool, waiting: Array[Dictionary] = []) -> Array[Dictionary]:
 	var choices: Array[Dictionary] = [
 		{"kind": &"card", "id": &"fire", "count": 1, "name": "Fire", "icon": null},
-		{"kind": &"coins", "id": &"", "count": 5, "name": "5 coins", "icon": null},
+		{"kind": &"coin", "id": &"coin", "count": 5, "name": "5 coins", "icon": null},
 	]
 	var offers: Array[Dictionary] = waiting.duplicate()
 	offers.append({"offer": offer, "here": here, "choices": choices})
@@ -101,3 +101,28 @@ func test_a_at_a_shop_item_buys_it_and_elsewhere_opens_the_waiting_reward() -> v
 	check(_hud.get_reward(0).is_open(), "away from the shelf, A opens the waiting reward")
 	check_equal(bought.size(), 1, "and buys nothing")
 	check_equal(waiting.size(), 1, "")
+
+
+## A body at a shut key door with no key of its own (the owner, 2026-11-19; `key_needed_shown`):
+## "Needs a key" over the door, words alone, under any item in reach; A takes and buys nothing for it.
+func test_a_shut_key_door_with_no_key_says_a_key_is_needed() -> void:
+	var bought: Array = []
+	_bus.shelf_buy_requested.connect(func(seat: int, item: int) -> void: bought.append([seat, item]))
+	_bus.key_needed_shown.emit(1, Vector2(80, 40), true)
+	_hud.step_hints(0.016)
+	var hint: Control = _hud.get_item_hints().call("hint_of", 1) as Control
+	check(hint.visible and bool(hint.call("is_note")), "seat 1's hint is a note")
+	check_equal(String(hint.call("title")), "Needs a key", "saying a key is needed")
+	check(not (_hud.get_item_hints().call("hint_of", 0) as Control).visible, "nothing for seat 0")
+	check_equal(int(_hud.get_item_hints().call("item_of", 1)), -1, "A takes nothing for it")
+	check_equal(int(_hud.get_item_hints().call("shelf_of", 1)), -1, "and buys nothing")
+	_bus.item_near_changed.emit(1, 9, Vector2(60, 40), {"kind": &"card", "id": &"fire", "name": "Fire"})
+	_hud.step_hints(0.016)
+	check_equal(String(hint.call("title")), "Take Fire", "an item in reach comes first")
+	_bus.item_near_changed.emit(1, -1, Vector2.ZERO, {})
+	_hud.step_hints(0.016)
+	check_equal(String(hint.call("title")), "Needs a key", "and the note again once it is gone")
+	_bus.key_needed_shown.emit(1, Vector2.ZERO, false)
+	_hud.step_hints(0.016)
+	check(not hint.visible, "away from the door (or holding a key): no hint")
+	check(bought.is_empty(), "nothing bought")

@@ -12,6 +12,7 @@ extends Control
 ##
 ##     hint.bind(input, spells)
 ##     hint.show_item(player, item, view)    # item -1, or an empty view: hidden
+##     hint.show_note(player, NEEDS_KEY)     # words alone, no button (a shut key door, no key)
 
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
@@ -20,6 +21,11 @@ const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 ## What A is called on the hint: a ground item's, and a shop item's (`BUY`, with its price).
 const VERB: String = "Take"
 const BUY: String = "Buy"
+## A note's words (`show_note`): at a shut key door with no key of one's own (the owner, 2026-11-19).
+const NEEDS_KEY: String = "Needs a key"
+## The item number a note is shown as (it names no item: A does nothing for it; never a real
+## item's, so no other hint stacks with it).
+const NOTE: int = -2
 ## The button that takes it (A; F or Enter on the keyboard, never Space, which casts).
 const ACTION: StringName = &"take"
 const FONT_SIZE: int = 8
@@ -51,6 +57,8 @@ var _view: Dictionary = {}
 var _title: String = ""
 var _line: String = ""
 var _icons: Array[Texture2D] = []
+## True while it shows a note (`show_note`): words alone, no button.
+var _note: bool = false
 ## Seconds of the refused shake left.
 var _shake_left: float = 0.0
 ## Where its owner put it, before the shake.
@@ -80,10 +88,12 @@ func show_item(player: int, item: int, view: Dictionary, verb: String = VERB) ->
 	_item = item if not view.is_empty() else -1
 	_view = view if _item >= 0 else {}
 	_shake_left = 0.0
+	_note = false
 	visible = _item >= 0
 	if not visible:
 		return
 	if _glyph != null:
+		_glyph.visible = true
 		_glyph.show_action(player, ACTION)
 	_title = "%s %s" % [verb, String(view.get("name", ""))]
 	if view.has("price"):
@@ -95,6 +105,28 @@ func show_item(player: int, item: int, view: Dictionary, verb: String = VERB) ->
 			_icons.append(_spells.component_icon(StringName(id)))
 	_lay_out()
 	queue_redraw()
+
+
+## Show `words` alone for `player` (no button: A does nothing for it), as item NOTE.
+func show_note(player: int, words: String) -> void:
+	_player = player
+	_item = NOTE
+	_view = {}
+	_shake_left = 0.0
+	_note = true
+	visible = true
+	if _glyph != null:
+		_glyph.visible = false
+	_title = words
+	_line = ""
+	_icons.clear()
+	_lay_out()
+	queue_redraw()
+
+
+## True while it shows a note (`show_note`).
+func is_note() -> bool:
+	return _note
 
 
 ## The item shown, -1 for none.
@@ -153,13 +185,20 @@ func _shake_offset() -> Vector2:
 	return Vector2(roundf(sin(_shake_left * SHAKE_RATE) * SHAKE_PIXELS * _shake_left / SHAKE_TIME), 0.0)
 
 
+## The room the button's glyph takes before the words (with its gap); none for a note.
+func _glyph_width() -> float:
+	if _note:
+		return -GAP
+	return _glyph.custom_minimum_size.x if _glyph != null else 10.0
+
+
 func _font() -> Font:
 	return get_theme_default_font()
 
 
 func _lay_out() -> void:
 	var font: Font = _font()
-	var glyph_width: float = _glyph.custom_minimum_size.x if _glyph != null else 10.0
+	var glyph_width: float = _glyph_width()
 	var top_width: float = glyph_width + GAP + font.get_string_size(_title, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
 	var width: float = top_width
 	var height: float = float(ActionGlyphScript.GLYPH_HEIGHT)
@@ -175,13 +214,13 @@ func _lay_out() -> void:
 
 
 func _draw() -> void:
-	if _item < 0:
+	if _item < 0 and not _note:
 		return
 	var refused: bool = _shake_left > 0.0
 	draw_rect(Rect2(Vector2.ZERO, size), BACK)
 	draw_rect(Rect2(Vector2.ZERO, size), REFUSED if refused else EDGE, false, 1.0)
 	var font: Font = _font()
-	var glyph_width: float = _glyph.custom_minimum_size.x if _glyph != null else 10.0
+	var glyph_width: float = _glyph_width()
 	var y: float = PAD + float(ActionGlyphScript.GLYPH_HEIGHT) - 2.0
 	draw_string(font, Vector2(PAD + glyph_width + GAP, y), _title, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, REFUSED if refused else TEXT)
 	y += 2.0

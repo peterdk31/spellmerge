@@ -4,8 +4,8 @@ extends "res://tests/support/suite.gd"
 ## on the real autoloads, in CB3's split test map (tests/support/biome_maps.gd: the nave the start
 ## room 0, the antechamber west, room 1, and the ossuary court east, room 2), its rooms' kinds set
 ## here: each kind's fill as the party enters (a reward room's rewards, a shop's shelf, a fountain's
-## pool), a fight's rewards however its foes left it, the treasure rooms' keys (any key any door) dropped in an open room and
-## its door opening for all, a secret rock opening to its own element only, a challenge room's
+## pool), a fight's rewards however its foes left it, the treasure rooms' keys (any key any door) dropped in an open room,
+## each taken into its taker's own bag (a possessed foe's too) and spent by it, its door opening for all, a secret rock opening to its own element only, a challenge room's
 ## elites, and an elite's numbers.
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
@@ -34,7 +34,7 @@ var east_type: RewardType = RewardType.new()
 var keys: Array = []
 var key_doors: Array = []
 var rocks: Array = []
-var held: Array = []
+var needed: Array = []
 var _sources: Array[Walk] = []
 
 
@@ -67,8 +67,8 @@ func before_each() -> void:
 	events.connect("key_shown", _on_key)
 	events.connect("key_door_shown", _on_key_door)
 	events.connect("secret_rock_shown", _on_rock)
-	held.clear()
-	events.connect("party_keys_shown", _on_held)
+	needed.clear()
+	events.connect("key_needed_shown", _on_needed)
 	flow.world_parent = own(Node.new()) as Node
 	root.add_child(flow.world_parent)
 
@@ -78,7 +78,7 @@ func after_each() -> void:
 	events.disconnect("key_shown", _on_key)
 	events.disconnect("key_door_shown", _on_key_door)
 	events.disconnect("secret_rock_shown", _on_rock)
-	events.disconnect("party_keys_shown", _on_held)
+	events.disconnect("key_needed_shown", _on_needed)
 	flow.stop_run()
 	flow.world_parent = null
 	flow.mode = FlowScript.MODE_RUN
@@ -100,8 +100,8 @@ func _on_key(key: int, at: Vector2, lying: bool) -> void:
 	keys.append([key, at, lying])
 
 
-func _on_held(count: int, at_once: bool) -> void:
-	held.append([count, at_once])
+func _on_needed(player: int, at: Vector2, is_needed: bool) -> void:
+	needed.append([player, at, is_needed])
 
 
 func _on_key_door(door: int, area: Rect2, open: bool) -> void:
@@ -137,6 +137,11 @@ func _ticks(count: int) -> void:
 
 func _wizard(seat: int) -> Actor:
 	return flow.get_wizard(seat) as Actor
+
+
+## The keys in seat `seat`'s wizard's own currency bag.
+func _keys_of(seat: int) -> int:
+	return LockDoors.keys_of(_wizard(seat))
 
 
 func _grid() -> RoomGrid:
@@ -216,7 +221,10 @@ func test_a_shop_is_stocked_once_as_it_is_entered_and_a_fountain_filled() -> voi
 	check_equal((rewards.call(&"shelf") as Array).size(), shelf.size(), "entered again: the same shelf")
 
 
-func test_the_treasure_rooms_key_drops_on_the_way_and_its_door_opens_for_all() -> void:
+## The owner, 2026-11-19: "each player picks up keys individually and uses them individually." The
+## key goes into the bag of the wizard that reaches it, and only a body holding one opens a door with
+## it; the door then opens for everyone (decision 21).
+func test_a_key_is_its_takers_own_and_its_door_opens_for_all() -> void:
 	# The court the boss's (never a key's room: its clear sends the party home), so the start room is
 	# the one room the key may drop in.
 	var map: BiomeMap = _start(2, &"treasure", &"boss", [], [IMP])
@@ -230,19 +238,58 @@ func test_the_treasure_rooms_key_drops_on_the_way_and_its_door_opens_for_all() -
 	check(not keys.is_empty() and keys.back()[2], "its key lies on the floor")
 	var key_at: Vector2 = keys.back()[1]
 	check(flow.biome.room_rect(0).has_point(key_at), "in the start room, on the way to it")
-	# A wizard at the door without the key: it stays shut.
+	# A wizard at the door without a key: it stays shut, and its seat is told a key is needed.
 	_put(0, _on_bridge(map, RoomSocket.Facing.WEST, 48.0))
 	_ticks(30)
 	check(not flow.locks.is_open(WEST), "no key: shut")
-	# The other takes the key; the first, still at the door, opens it for all.
+	check_equal(needed, [[0, mouth.get_center(), true]], "seat 0 told once: a key is needed, over the door")
+	# The other takes the key: it is that wizard's own, so the first, still at the door, opens nothing.
 	_put(1, key_at)
 	check(not keys.back()[2], "the key is taken off the floor")
-	check_equal(flow.locks.key_states[0], LockDoors.KEY_SPENT, "the party held it, and at the door it is spent")
+	check_equal(flow.locks.key_states[0], LockDoors.KEY_TAKEN, "taken")
+	check_equal([_keys_of(0), _keys_of(1)], [0, 1], "into the taker's own currency bag, nobody else's")
+	_ticks(10)
+	check(not flow.locks.is_open(WEST), "the key is not the party's: the first wizard still opens nothing")
+	# The taker walks into the door: its key is spent, and the door opens for all.
+	_put(1, _on_bridge(map, RoomSocket.Facing.WEST, 40.0))
 	check(flow.locks.is_open(WEST), "the door opens")
+	check_equal(_keys_of(1), 0, "its one key spent")
 	check(not _grid().is_shut_mouth(mouth.get_center()), "its mouth with it")
 	check(key_doors.back()[2], "the view is told it opened")
-	_put(1, _by_socket(map, WEST, RoomSocket.Facing.EAST, 24.0))
-	check_equal(due.back(), [WEST, &"treasure"], "the treasure's rewards as it is entered")
+	check_equal(needed.back(), [0, Vector2.ZERO, false], "seat 0 told no key is needed any more")
+	_put(0, _by_socket(map, WEST, RoomSocket.Facing.EAST, 24.0))
+	check_equal(due.back(), [WEST, &"treasure"], "the treasure's rewards as the keyless wizard enters: it opened for all")
+
+
+## A seat possessing a foe drives that body: a key it reaches goes into the foe's own bag, and the
+## foe's key opens a door (the owner, 2026-11-19: "the driven body's bag").
+func test_a_possessed_foe_takes_and_spends_a_key_of_its_own() -> void:
+	var map: BiomeMap = _start(1, &"treasure", &"fight", [], [IMP])
+	_ticks(1)
+	_put(0, _by_socket(map, EAST, RoomSocket.Facing.WEST, 24.0))
+	flow.stand_all_now()
+	_ticks(2)
+	var foe: Actor = null
+	for enemy: Node in flow.get(&"_enemies"):
+		if enemy is Actor and (enemy as Actor).inventory != null:
+			foe = enemy as Actor
+	check(foe != null, "a foe in the court")
+	for _wait in 300:
+		if Possession.can_start(foe):
+			break
+		_ticks(1)
+	check(Possession.begin(_wizard(0), foe, 60.0) != null, "seat 0 possesses it")
+	var at: Vector2 = foe.position
+	flow.locks.key_drops = PackedInt32Array([EAST])
+	flow.locks.key_states = PackedByteArray([LockDoors.KEY_LYING])
+	flow.locks.key_at = PackedVector2Array([at])
+	_ticks(2)
+	check_equal(LockDoors.keys_of(foe), 1, "the driven foe took it into its own bag")
+	check_equal(_keys_of(0), 0, "the wizard left behind did not")
+	foe.global_position = _on_bridge(map, RoomSocket.Facing.WEST, 40.0)
+	_ticks(3)
+	check(flow.locks.is_open(WEST), "the foe's key opens the door")
+	check_equal(LockDoors.keys_of(foe), 0, "and is spent")
 
 
 ## The owner, 2026-11-19: "It should just drop in some random room." The key's room is picked by
@@ -300,22 +347,22 @@ func test_keys_are_any_doors_and_may_be_fewer_than_the_treasure_rooms() -> void:
 	flow.locks.key_at = PackedVector2Array([first, second])
 	# The first key taken opens the court's door (any key, any door), and only one is spent.
 	_put(1, first)
-	_put(0, _on_bridge(map, RoomSocket.Facing.EAST, 48.0))
+	_put(1, _on_bridge(map, RoomSocket.Facing.EAST, 48.0))
 	check(flow.locks.is_open(EAST), "a key opens the court")
-	check(flow.locks.key_states[0] == LockDoors.KEY_SPENT and flow.locks.key_states[1] == LockDoors.KEY_LYING, "one key spent, the other still lying")
+	check(_keys_of(1) == 0 and flow.locks.key_states[1] == LockDoors.KEY_LYING, "one key spent, the other still lying")
 	_put(0, _on_bridge(map, RoomSocket.Facing.WEST, 48.0))
 	_ticks(10)
 	check(not flow.locks.is_open(WEST), "no key held: the antechamber stays shut (the party chose the court)")
-	_put(1, second)
+	_put(0, second)
+	_put(0, _on_bridge(map, RoomSocket.Facing.WEST, 48.0))
 	_ticks(2)
 	check(flow.locks.is_open(WEST), "the second key opens the antechamber")
-	check_equal(flow.locks.key_states[1], LockDoors.KEY_SPENT, "and is spent")
+	check_equal(_keys_of(0), 0, "and is spent")
 
 
-## A key with no zone lies round the room's middle clear of a fountain's pool or a shop's items.
-## The HUD's key count (the owner, 2026-11-19): the party's keys held are told as one is taken and
-## spent, as they stand after a restore, and 0 as the biome goes.
-func test_the_keys_the_party_holds_are_told_as_they_are_taken_spent_and_restored() -> void:
+## A key in a body's bag is state with its inventory: a snapshot saves and restores it, and the
+## hints are told again (none needed) after a restore and as the biome goes.
+func test_keys_held_are_saved_by_a_snapshot_and_the_hints_forgotten() -> void:
 	var map: BiomeMap = _start(2, &"treasure", &"treasure")
 	_ticks(1)
 	var first: Vector2 = flow.locks.key_at[0]
@@ -323,22 +370,22 @@ func test_the_keys_the_party_holds_are_told_as_they_are_taken_spent_and_restored
 	flow.locks.key_drops = PackedInt32Array([0, 0])
 	flow.locks.key_states = PackedByteArray([LockDoors.KEY_LYING, LockDoors.KEY_LYING])
 	flow.locks.key_at = PackedVector2Array([first, second])
-	held.clear()
 	_put(1, first)
-	check_equal(held, [[1, false]], "one taken: the party holds one")
 	_put(1, second)
-	check_equal(held.back(), [2, false], "two")
-	check_equal(flow.locks.held_keys(), 2, "Flow's count")
+	check_equal([_keys_of(0), _keys_of(1)], [0, 2], "both in seat 1's bag")
 	var snapshot := Snapshot.take(tick.state_areas(), root)
-	_put(0, _on_bridge(map, RoomSocket.Facing.EAST, 48.0))
-	check(flow.locks.is_open(EAST), "a key opens the court")
-	check_equal(held.back(), [1, false], "one spent: one left")
-	held.clear()
-	check(snapshot.restore(tick.state_areas(), root).is_empty(), "restored to two held")
-	check(held.size() >= 2 and held[0] == [0, true] and held.back() == [2, true], "told again at once, as it stands: %s" % [held])
-	held.clear()
+	_put(1, _on_bridge(map, RoomSocket.Facing.EAST, 48.0))
+	check(flow.locks.is_open(EAST) and _keys_of(1) == 1, "one spent on the court")
+	_put(0, _on_bridge(map, RoomSocket.Facing.WEST, 48.0))
+	check(not needed.is_empty() and needed.back()[0] == 0 and needed.back()[2], "seat 0 at the other door with none: told a key is needed")
+	needed.clear()
+	check(snapshot.restore(tick.state_areas(), root).is_empty(), "restored")
+	check_equal(_keys_of(1), 2, "the two keys back in seat 1's bag")
+	check(not flow.locks.is_open(EAST), "and the court shut again")
+	check(needed.size() >= 4 and needed.slice(0, 4).all(func(told: Array) -> bool: return not told[2]), "every seat's hint forgotten: %s" % [needed])
+	needed.clear()
 	flow.stop_run()
-	check_equal(held.back(), [0, false], "the biome gone: none")
+	check(not needed.is_empty() and not needed.back()[2], "the biome gone: no hint")
 
 
 func test_a_key_keeps_off_a_fountains_pool_and_a_shops_items() -> void:

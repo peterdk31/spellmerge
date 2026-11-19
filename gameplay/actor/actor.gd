@@ -1077,7 +1077,7 @@ func _apply_data() -> void:
 	caster.hold_staffs(data.staffs, elite_card)
 
 
-## An enemy's coins into its own coins bag as it first comes (the owner, 2026-11-19: its data's
+## An enemy's coins into its own currency bag as it first comes (the owner, 2026-11-19: its data's
 ## `coins`, or a roll up to `coins_most`, keyed by its actor key, so after its id is open). None for
 ## an add, and nothing again for a body made from a snapshot (its inventory holds what was saved).
 func _carry_coins() -> void:

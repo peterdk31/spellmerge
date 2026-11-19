@@ -16,12 +16,12 @@ const IMP: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
 const EventsScript := preload("res://core/events/events.gd")
 const CARDS: StringName = &"cards"
 const POTIONS: StringName = &"potions"
-const COINS: StringName = &"coins"
+const COINS: StringName = &"currency"
 
 var _world: Fixture
 var _rewards: RewardsScript
 ## Every reward_rolled [player, offer, choices, here], reward_taken [player, offer, choice], the
-## coins bag's bag_changed [player, coins] and coin_changed [coin, lying].
+## currency bag's bag_changed [player, coins] and coin_changed [coin, lying].
 var _rolled: Array = []
 var _taken: Array = []
 var _purses: Array = []
@@ -234,7 +234,7 @@ func test_coins_go_onto_the_pickers_own_stack_only() -> void:
 	_offer(0, 50, ItemKinds.COIN, 5, CoinBase.ID)
 	_pick(0, 50, 0)
 	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [5, 0], "spending and rewards are one's own")
-	check_equal(body.inventory.stacks_in(COINS).size(), 1, "coins are one stack in the coins bag")
+	check_equal(body.inventory.stacks_in(COINS).size(), 1, "coins are one stack in the currency bag")
 	_offer(0, 52, ItemKinds.COIN, 3, CoinBase.ID)
 	_pick(0, 52, 0)
 	check_equal([body.inventory.stacks_in(COINS).size(), body.inventory.count_of(COINS, CoinBase.ID)], [1, 8], "more coins join the stack")

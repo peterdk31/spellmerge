@@ -17,19 +17,38 @@ func test_every_row_answers_every_question() -> void:
 			check(ACTIONS.has(StringName(action)), "%s: %s is an action" % [kind, action])
 
 
-func test_every_bag_holds_one_kind() -> void:
+func test_every_bag_holds_its_kinds() -> void:
 	var bags: Array[StringName] = []
 	for kind: StringName in ItemKinds.kinds():
 		var bag: StringName = ItemKinds.bag_of(kind)
 		check(ItemKinds.BAGS.has(bag), "%s's bag %s is a bag" % [kind, bag])
-		check(not bags.has(bag), "%s is one kind's bag" % bag)
-		bags.append(bag)
-		check_equal(ItemKinds.kind_in(bag), kind, "%s holds %s" % [bag, kind])
+		check(ItemKinds.kinds_in(bag).has(kind), "%s holds %s" % [bag, kind])
+		if not bags.has(bag):
+			bags.append(bag)
+		if ItemKinds.kinds_in(bag).size() == 1:
+			check_equal(ItemKinds.kind_in(bag), kind, "%s holds only %s" % [bag, kind])
 	check_equal(bags.size(), ItemKinds.BAGS.size(), "every bag is a kind's")
 
 
+func test_the_currency_bag_holds_the_coins_and_the_keys() -> void:
+	check_equal(ItemKinds.kinds_in(&"currency"), [ItemKinds.COIN, ItemKinds.KEY] as Array[StringName], "the coins and the keys share the currency bag")
+	check_equal(ItemKinds.kind_in(&"currency", CoinBase.ID), ItemKinds.COIN, "the coin's id is a coin")
+	check_equal(ItemKinds.kind_in(&"currency", KeyBase.ID), ItemKinds.KEY, "the key's id is a key")
+	check(ItemKinds.stacks(ItemKinds.KEY) and not ItemKinds.can(ItemKinds.KEY, ItemKinds.DROP) and not ItemKinds.can(ItemKinds.KEY, ItemKinds.DROP_ONE), "a key is one stack, never dropped")
+	var loadout := PlayerLoadout.new()
+	check(loadout.add_stack(&"currency", CoinBase.ID, 4) and loadout.add_stack(&"currency", KeyBase.ID, 2), "a loadout carries both")
+	var inventory := Inventory.new()
+	inventory.take_loadout(loadout, root.get_node("Registry"))
+	var kinds: Array[StringName] = []
+	for stack: ItemStack in inventory.stacks_in(&"currency"):
+		kinds.append(stack.kind)
+	check_equal(kinds, [ItemKinds.COIN, ItemKinds.KEY] as Array[StringName], "each stack taken from a loadout knows its kind by its id")
+	check(inventory.take(&"currency", KeyBase.ID) and inventory.count_of(&"currency", KeyBase.ID) == 1 and inventory.count_of(&"currency", CoinBase.ID) == 4, "a key taken leaves the coins")
+	inventory.free()
+
+
 func test_the_owners_kinds() -> void:
-	check_equal(ItemKinds.BAGS, [&"staffs", &"cards", &"relics", &"potions", &"coins"] as Array[StringName], "Staffs, Cards, Relics, Potions, in order, then the coins")
+	check_equal(ItemKinds.BAGS, [&"staffs", &"cards", &"relics", &"potions", &"currency"] as Array[StringName], "Staffs, Cards, Relics, Potions, in order, then the currency")
 	check(ItemKinds.stacks(ItemKinds.CARD) and ItemKinds.stacks(ItemKinds.POTION), "cards and potions stack")
 	check(ItemKinds.stacks(ItemKinds.COIN) and not ItemKinds.can(ItemKinds.COIN, ItemKinds.DROP), "coins are one stack, never dropped")
 	check(ItemKinds.can(ItemKinds.POTION, ItemKinds.USE), "a potion is used (drunk)")
@@ -53,7 +72,7 @@ func test_every_content_folder_named_is_there_and_holds_its_kind() -> void:
 
 func test_potions_and_the_coin_are_sound_content() -> void:
 	var registry: Node = root.get_node("Registry")
-	for folder: StringName in [&"potions", &"coins"]:
+	for folder: StringName in [&"potions", &"coins", &"keys"]:
 		for id: StringName in registry.call("get_ids", folder):
 			var item := registry.call("get_resource", folder, id) as ItemContent
 			check(item != null and item.problems().is_empty(), "%s/%s: %s" % [folder, id, item.problems() if item != null else "not an item"])

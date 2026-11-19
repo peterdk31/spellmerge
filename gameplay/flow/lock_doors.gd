@@ -16,18 +16,24 @@ extends RefCounted
 ##   the run's chance among those reached from the start without passing a locked door,
 ##   `open_rooms`); with none said, one a key room, in the room its bridge hangs off (the shallowest
 ##   beside it). A key drops as its room is cleared (`drop_keys`; a room with no fight is cleared as
-##   it is entered, so its key lies on its floor), two in one room each on a spot of its own (Flow's). It lies there until the first standing wizard (in the
-##   party's order) whose feet come within KEY_REACH takes it: the party holds it (shared). With one
-##   held, the first standing wizard at a shut key door (on its bridge, or on the room's lip outside
-##   the shut mouth, as at a gather door) opens that room, and one key is spent.
+##   it is entered, so its key lies on its floor), two in one room each on a spot of its own (Flow's).
+## - **A key is an item** (the owner, 2026-11-19: "each player picks up keys individually and uses
+##   them individually"): it lies there until the first standing body a seat drives (in seat order:
+##   its wizard, or a foe it possesses) whose feet come within KEY_REACH; it goes into that body's
+##   own currency bag (`ItemKinds.KEY`, `KeyBase`; nobody else's), and the floor no longer knows it.
+##   A shut key door opens by walking into it, as before (no button): the first standing driven body
+##   at it (on its bridge, or on the room's lip outside the shut mouth, as at a gather door) with a
+##   key in its own bag spends one and the room opens for everyone (decision 21). A body there with
+##   none opens nothing, and its seat's hint says a key is needed (`key_needed_shown`).
 ## - **A secret rock** (decision 22) opens to one element, rolled for its room as the biome begins
 ##   (Flow's `_begin_locks`): that element touching the floor (`floor_touched`, queued by
 ##   `queue_touch` and applied at the next `step`, never in the middle of the shots' step) with its
 ##   circle within TOUCH_REACH of a door's mouth breaks the rock (`touched`), and the room opens.
 ## - **The view** is told each key door (`key_door_shown`), each rock (`secret_rock_shown`, with its
-##   element) and each key (`key_shown`) as it changes; -1 when every one is forgotten (the biome left,
-##   a restore: told again by `tell_all`). The HUD is told how many keys the party holds
-##   (`party_keys_shown`) as one is taken or spent. Never read back by the simulation.
+##   element) and each key lying (`key_shown`) as it changes; -1 when every one is forgotten (the biome
+##   left, a restore: told again by `tell_all`). The HUD is told, by seat, the shut key door its body
+##   stands at with no key (`key_needed_shown`), and reads a body's keys from its bag (`bag_changed`).
+##   Never read back by the simulation.
 
 const EventsScript := preload("res://core/events/events.gd")
 
@@ -37,11 +43,14 @@ const RULE_KEY: int = 1
 const RULE_SECRET: int = 2
 ## No room, no door, every one (the view's -1).
 const NONE: int = -1
-## A key's states (`key_states`): not dropped yet, lying on the floor, held by the party, spent.
+## A key's states (`key_states`): not dropped yet, lying on the floor, taken into a body's bag.
 const KEY_WAITING: int = 0
 const KEY_LYING: int = 1
-const KEY_HELD: int = 2
-const KEY_SPENT: int = 3
+const KEY_TAKEN: int = 2
+## The bag a key goes into (`ItemKinds.KEY`'s: the currency, beside the coins).
+const KEY_BAG: StringName = &"currency"
+## The most seats told a hint (`key_needed_shown`).
+const SEATS: int = 4
 ## How near a wizard's feet must come to a key to take it, in pixels (a coin's reach).
 const KEY_REACH: float = 10.0
 ## `begin`'s `drops` for "no key at all" (nowhere to drop one), as against none said (the old rule).
@@ -51,8 +60,9 @@ const LIP_REACH: float = 24.0
 ## How near a floor touch's circle must come to a secret door's mouth to break its rock, in pixels.
 const TOUCH_REACH: float = 8.0
 
-## Not state: the bus (set by Flow) and each door's mouth in the world (laid from the map, `lay`).
-const DERIVED: Array[StringName] = [&"events", &"_mouths"]
+## Not state: the bus (set by Flow), each door's mouth in the world (laid from the map, `lay`) and,
+## by seat, the door its hint was last told (`key_needed_shown`: view only, told again after a restore).
+const DERIVED: Array[StringName] = [&"events", &"_mouths", &"_needed"]
 
 var events: EventsScript = null
 ## Each room's rule (RULE_*), by its number; 1 in `opened` once it opened; a secret room's element.
@@ -73,6 +83,7 @@ var touch_elements: Array[StringName] = []
 var touch_at: PackedVector2Array = PackedVector2Array()
 var touch_radii: PackedFloat32Array = PackedFloat32Array()
 var _mouths: Array[Rect2] = []
+var _needed: PackedInt32Array = PackedInt32Array([NONE, NONE, NONE, NONE])
 
 
 ## A biome's locks begin (every door shut, no key dropped): `map`'s rooms, each with its rule of
@@ -196,14 +207,9 @@ func mouth_of(door: int) -> Rect2:
 	return _mouths[door] if door >= 0 and door < _mouths.size() else Rect2()
 
 
-## The first key the party holds (NONE for none): any key opens any key door.
-func held_key() -> int:
-	return key_states.find(KEY_HELD)
-
-
-## How many keys the party holds (taken, not spent).
-func held_keys() -> int:
-	return key_states.count(KEY_HELD)
+## How many keys `body` holds in its own currency bag (0 for none, or no inventory).
+static func keys_of(body: Actor) -> int:
+	return body.inventory.count_of(KEY_BAG, KeyBase.ID) if body != null and body.inventory != null else 0
 
 
 ## Lay the doors into `grid` from the biome laid in `world` (as the biome starts, and after a restore:
@@ -230,12 +236,13 @@ func drop_keys(room: int, spots: PackedVector2Array) -> void:
 			_tell_key(key)
 
 
-## One tick of the locks with `party` (the wizards, in seat order) and `life` the rooms' state
-## (`rooms()` of them, whose bridges' places follow): each lying key the first standing wizard's feet
-## reach is taken, then each shut key room opens, while the party holds any key, once a standing wizard is at one
-## of its doors (the key spent); the floor touches queued since the last step break their rocks
-## first. Returns the key room opened (NONE for none; one a tick).
-func step(party: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:
+## One tick of the locks with `bodies` (by seat, the body each drives now: its wizard or a foe it
+## possesses; null for none) and `life` the rooms' state (`rooms()` of them, whose bridges' places
+## follow): the floor touches queued since the last step break their rocks first; then each lying key
+## the first standing body's feet reach goes into that body's own bag; then each standing body at a
+## shut key door spends one of its own keys and opens that room (one a tick, seat order), or, with
+## none, its seat's hint says a key is needed. Returns the key room opened (NONE for none).
+func step(bodies: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:
 	for at in touch_elements.size():
 		touched(touch_elements[at], touch_at[at], touch_radii[at], grid)
 	touch_elements.clear()
@@ -244,26 +251,47 @@ func step(party: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:
 	for key in key_drops.size():
 		if key_states[key] != KEY_LYING:
 			continue
-		for wizard: Node2D in party:
-			var actor := wizard as Actor if is_instance_valid(wizard) else null
-			if actor != null and not actor.is_downed() and actor.position.distance_squared_to(key_at[key]) <= KEY_REACH * KEY_REACH:
-				key_states[key] = KEY_HELD
+		for body: Node2D in bodies:
+			var actor: Actor = _standing(body)
+			if actor == null or actor.inventory == null or actor.position.distance_squared_to(key_at[key]) > KEY_REACH * KEY_REACH:
+				continue
+			if actor.inventory.add(ItemStack.of(ItemKinds.KEY, KeyBase.ID, 1)):
+				key_states[key] = KEY_TAKEN
 				_tell_key(key)
-				_tell_held(false)
 				break
+	var opened_room: int = NONE
+	for seat in bodies.size():
+		var actor: Actor = _standing(bodies[seat])
+		var door: int = _key_door_at(actor, life)
+		var needed: int = NONE
+		if door != NONE:
+			if keys_of(actor) <= 0:
+				needed = door
+			elif opened_room == NONE and actor.inventory.take(KEY_BAG, KeyBase.ID):
+				opened_room = door_rooms[door]
+				open(opened_room, grid)
+		_tell_needed(seat, needed)
+	return opened_room
+
+
+## `body` as an Actor while it stands (not downed), else null.
+static func _standing(body: Node2D) -> Actor:
+	var actor := body as Actor if is_instance_valid(body) else null
+	return actor if actor != null and not actor.is_downed() else null
+
+
+## The first shut key door `actor` stands at (on its bridge, or on its room's lip outside the shut
+## mouth); NONE for none, or no actor.
+func _key_door_at(actor: Actor, life: RoomLife) -> int:
+	if actor == null:
+		return NONE
 	for door in doors():
 		var room: int = door_rooms[door]
-		var key: int = held_key()
-		if rules[room] != RULE_KEY or is_open(room) or key < 0:
+		if rules[room] != RULE_KEY or is_open(room):
 			continue
 		var at_door: int = life.rooms() + door_bridges[door] if life != null else NONE
-		for wizard: Node2D in party:
-			var actor := wizard as Actor if is_instance_valid(wizard) else null
-			if actor != null and not actor.is_downed() and (actor.room == at_door or (actor.room == room and mouth_of(door).grow(LIP_REACH).has_point(actor.position))):
-				key_states[key] = KEY_SPENT
-				_tell_held(false)
-				open(room, grid)
-				return room
+		if actor.room == at_door or (actor.room == room and mouth_of(door).grow(LIP_REACH).has_point(actor.position)):
+			return door
 	return NONE
 
 
@@ -323,7 +351,6 @@ func tell_all() -> void:
 		_tell_door(door)
 	for key in key_drops.size():
 		_tell_key(key)
-	_tell_held(true)
 
 
 ## The view's number of door `door`: key doors and secret rocks are each counted on their own.
@@ -345,9 +372,14 @@ func _tell_door(door: int) -> void:
 		events.secret_rock_shown.emit(_view_number(door), mouth_of(door), elements[room], is_open(room))
 
 
-func _tell_held(at_once: bool) -> void:
+## Seat `seat`'s body stands at shut key door `door` with no key (NONE: at none), told on a change.
+func _tell_needed(seat: int, door: int) -> void:
+	if seat < 0 or seat >= SEATS or _needed[seat] == door:
+		return
+	_needed[seat] = door
 	if events != null:
-		events.party_keys_shown.emit(held_keys(), at_once)
+		var at: Vector2 = mouth_of(door).get_center() if door != NONE else Vector2.ZERO
+		events.key_needed_shown.emit(seat, at, door != NONE)
 
 
 func _tell_key(key: int) -> void:
@@ -357,9 +389,11 @@ func _tell_key(key: int) -> void:
 
 ## Every door, rock and key forgotten (NONE); `restored`: what is told next is drawn as it stands.
 func _forget(restored: bool) -> void:
+	_needed.fill(NONE)
 	if events == null:
 		return
+	for seat in SEATS:
+		events.key_needed_shown.emit(seat, Vector2.ZERO, false)
 	events.key_door_shown.emit(NONE, Rect2(), restored)
 	events.secret_rock_shown.emit(NONE, Rect2(), &"", restored)
 	events.key_shown.emit(NONE, Vector2.ZERO, false)
-	events.party_keys_shown.emit(0, restored)

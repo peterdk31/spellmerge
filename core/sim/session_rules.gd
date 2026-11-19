@@ -15,11 +15,12 @@ extends RefCounted
 ##   past it the rest of the shots are tested in the next step). Only benchmarks change it.
 ## - `fire_shots`: the shots one budget's trigger fires may make in one step
 ##   (`Spells.fire_shots_per_step`; past it a fire waits for the next step). Only benchmarks change it.
-## - `bag_staffs`, `bag_cards`, `bag_relics`, `bag_potions`, `bag_coins`: the capacity of each bag of an
+## - `bag_staffs`, `bag_cards`, `bag_relics`, `bag_potions`, `bag_currency`: the capacity of each bag of an
 ##   inventory, in copies (items I4, docs/milestones/items.md; one rule per `ItemKinds.BAGS`
 ##   entry, named `bag_` and the bag's name). 0, the default: no limit. An inventory takes its
 ##   bags' at its start (`bag_capacity`); meta progression raises them later. Nothing limits the
-##   coins bag (`bag_coins` stays 0): a coin given must never be lost (the owner, 2026-11-19).
+##   currency bag (`bag_currency` stays 0): a coin or a key given must never be lost (the owner,
+##   2026-11-19).
 ## - `boss_intros`: 1, the default: a boss with an intro stops the game for it as its fight starts
 ##   (docs/milestones/boss-intro.md, rule 4; `BossIntroHold`); 0: none, the entrance banner. A rule,
 ##   not a setting of the machine, because it changes when the game stops: a replay recorded with
@@ -53,7 +54,7 @@ const FIELDS: Array = [
 	[&"bag_cards", "card bag", 0, MAX_BAG],
 	[&"bag_relics", "relic bag", 0, MAX_BAG],
 	[&"bag_potions", "potion bag", 0, MAX_BAG],
-	[&"bag_coins", "coin bag", 0, MAX_BAG],
+	[&"bag_currency", "currency bag", 0, MAX_BAG],
 	[&"boss_intros", "boss intros", 0, 1],
 ]
 ## The header's bytes: a 32-bit number for each of FIELDS.
@@ -66,7 +67,7 @@ var bag_staffs: int = 0
 var bag_cards: int = 0
 var bag_relics: int = 0
 var bag_potions: int = 0
-var bag_coins: int = 0
+var bag_currency: int = 0
 var boss_intros: int = 1
 
 ## Not state: this machine's rules.

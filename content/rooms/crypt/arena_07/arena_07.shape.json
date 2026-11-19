@@ -1,0 +1,139 @@
+{
+	"about": "The crypt's Twin wells (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark two round wells where the floor fell in, west and east of the middle, a pillar between them north and south. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, east, north, south) by pins. tools/ground_shape.py draws arena_07_ground.tscn and its art from this.",
+	"size": [
+		768,
+		512
+	],
+	"seed": 73,
+	"edge": "crypt_edge",
+	"pit_edge": "crypt_pit",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [
+			10,
+			14
+		],
+		"rough": [
+			46,
+			17,
+			6
+		],
+		"seed": 7,
+		"pins": [
+			[
+				0,
+				224,
+				40,
+				288
+			],
+			[
+				728,
+				224,
+				768,
+				288
+			],
+			[
+				352,
+				0,
+				416,
+				40
+			],
+			[
+				352,
+				472,
+				416,
+				512
+			]
+		],
+		"bays": [
+			[
+				168,
+				36,
+				21
+			],
+			[
+				600,
+				476,
+				18
+			],
+			[
+				732,
+				384,
+				20
+			]
+		],
+		"clear": {
+			"round": 28,
+			"of": [
+				"PlayerSpawns",
+				"EnemySpawns",
+				"Props",
+				"Decor"
+			]
+		}
+	},
+	"pits": [
+		{
+			"centre": [
+				224,
+				256
+			],
+			"radii": [
+				30,
+				24
+			],
+			"rough": [
+				[
+					30,
+					0.12
+				],
+				[
+					10,
+					0.05
+				]
+			],
+			"seed": 17
+		},
+		{
+			"centre": [
+				544,
+				256
+			],
+			"radii": [
+				30,
+				24
+			],
+			"rough": [
+				[
+					30,
+					0.12
+				],
+				[
+					10,
+					0.05
+				]
+			],
+			"seed": 19
+		}
+	],
+	"cracks": [
+		{
+			"pit": 0,
+			"angle": 0.25,
+			"width": 6,
+			"length": 60,
+			"seed": 3
+		},
+		{
+			"pit": 1,
+			"angle": 0.75,
+			"width": 6,
+			"length": 60,
+			"seed": 7
+		}
+	]
+}

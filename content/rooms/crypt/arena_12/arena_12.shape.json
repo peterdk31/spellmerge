@@ -1,0 +1,73 @@
+{
+	"about": "The crypt's Fallen vault (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark the vault's middle column fallen across the floor under the shaft of light, four pillars standing round it. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, east, north, south) by pins. tools/ground_shape.py draws arena_12_ground.tscn and its art from this.",
+	"size": [
+		576,
+		448
+	],
+	"seed": 128,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [
+			10,
+			14
+		],
+		"rough": [
+			46,
+			17,
+			6
+		],
+		"seed": 16,
+		"pins": [
+			[
+				0,
+				192,
+				40,
+				256
+			],
+			[
+				536,
+				192,
+				576,
+				256
+			],
+			[
+				256,
+				0,
+				320,
+				40
+			],
+			[
+				256,
+				408,
+				320,
+				448
+			]
+		],
+		"bays": [
+			[
+				128,
+				36,
+				21
+			],
+			[
+				448,
+				412,
+				18
+			]
+		],
+		"clear": {
+			"round": 28,
+			"of": [
+				"PlayerSpawns",
+				"EnemySpawns",
+				"Props",
+				"Decor"
+			]
+		}
+	}
+}

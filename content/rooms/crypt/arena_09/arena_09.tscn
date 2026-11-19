@@ -1,0 +1,250 @@
+[gd_scene load_steps=20 format=3]
+
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/void.svg" id="1_void"]
+[ext_resource type="PackedScene" path="res://content/rooms/crypt/arena_09/arena_09_ground.tscn" id="2_ground"]
+[ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/candles.tscn" id="3_candles"]
+[ext_resource type="PackedScene" path="res://content/rooms/decor/beam.tscn" id="4_beam"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/sarcophagus.svg" id="5_sarcophagus"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/ossuary_wall.svg" id="6_ossuary"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="7_rubble"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="8_skull"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/bone_pile.svg" id="9_bones"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/fallen_column.svg" id="9_fallen"]
+[ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="10_prop_stand_in"]
+[ext_resource type="Resource" path="res://content/props/crypt_pillar/crypt_pillar.tres" id="12_pillar"]
+[ext_resource type="Resource" path="res://content/props/cracked_pillar/cracked_pillar.tres" id="13_cracked"]
+[ext_resource type="Script" path="res://core/base/cover_field.gd" id="gc_field"]
+[ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
+[ext_resource type="Script" path="res://core/base/room_socket.gd" id="cb_socket"]
+[ext_resource type="Script" path="res://tools/socket_preview.gd" id="cb_socket_preview"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_64x32"]
+size = Vector2(64, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_128x32"]
+size = Vector2(128, 32)
+
+[node name="Arena09" type="Node2D"]
+
+[node name="Void" type="Sprite2D" parent="."]
+z_index = -3
+texture_filter = 1
+texture_repeat = 2
+texture = ExtResource("1_void")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 768, 576)
+
+[node name="Floor" parent="." instance=ExtResource("2_ground")]
+
+[node name="Props" type="Node2D" parent="."]
+
+[node name="Pillar1" type="Node2D" parent="Props"]
+position = Vector2(224, 160)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("12_pillar")
+
+[node name="Pillar2" type="Node2D" parent="Props"]
+position = Vector2(384, 160)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("13_cracked")
+
+[node name="Pillar3" type="Node2D" parent="Props"]
+position = Vector2(544, 160)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("12_pillar")
+
+[node name="Pillar4" type="Node2D" parent="Props"]
+position = Vector2(224, 288)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("13_cracked")
+
+[node name="Pillar5" type="Node2D" parent="Props"]
+position = Vector2(384, 288)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("12_pillar")
+
+[node name="Pillar6" type="Node2D" parent="Props"]
+position = Vector2(544, 288)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("13_cracked")
+
+[node name="Pillar7" type="Node2D" parent="Props"]
+position = Vector2(224, 416)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("12_pillar")
+
+[node name="Pillar8" type="Node2D" parent="Props"]
+position = Vector2(384, 416)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("13_cracked")
+
+[node name="Pillar9" type="Node2D" parent="Props"]
+position = Vector2(544, 416)
+script = ExtResource("10_prop_stand_in")
+prop = ExtResource("12_pillar")
+
+[node name="Decor" type="Node2D" parent="."]
+
+[node name="Beam" parent="Decor" instance=ExtResource("4_beam")]
+position = Vector2(384, 352)
+
+[node name="Rubble1" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(296, 248)
+texture = ExtResource("7_rubble")
+centered = false
+
+[node name="Rubble2" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(440, 376)
+texture = ExtResource("7_rubble")
+centered = false
+
+[node name="Skull1" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(464, 232)
+texture = ExtResource("8_skull")
+centered = false
+
+[node name="Skull2" type="Sprite2D" parent="Decor"]
+texture_filter = 1
+position = Vector2(296, 360)
+texture = ExtResource("8_skull")
+centered = false
+
+[node name="Candles1" parent="Decor" instance=ExtResource("3_candles")]
+position = Vector2(144, 224)
+
+[node name="Core" parent="Decor/Candles1" index="1"]
+speed_scale = 1.1
+frame = 5
+
+[node name="Flame" parent="Decor/Candles1" index="3"]
+speed_scale = 1.1
+frame = 2
+
+[node name="Candles2" parent="Decor" instance=ExtResource("3_candles")]
+position = Vector2(608, 224)
+
+[node name="Core" parent="Decor/Candles2" index="1"]
+speed_scale = 0.9
+frame = 2
+
+[node name="Flame" parent="Decor/Candles2" index="3"]
+speed_scale = 0.9
+frame = 5
+
+[node name="Candles3" parent="Decor" instance=ExtResource("3_candles")]
+position = Vector2(144, 352)
+
+[node name="Core" parent="Decor/Candles3" index="1"]
+speed_scale = 1.2
+frame = 4
+
+[node name="Flame" parent="Decor/Candles3" index="3"]
+speed_scale = 1.2
+frame = 1
+
+[node name="Candles4" parent="Decor" instance=ExtResource("3_candles")]
+position = Vector2(608, 352)
+
+[node name="Core" parent="Decor/Candles4" index="1"]
+speed_scale = 1.0
+frame = 1
+
+[node name="Flame" parent="Decor/Candles4" index="3"]
+speed_scale = 1.0
+frame = 4
+
+[node name="PlayerSpawns" type="Node2D" parent="."]
+
+[node name="Player1" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(288, 496)
+
+[node name="Player2" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(352, 496)
+
+[node name="Player3" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(416, 496)
+
+[node name="Player4" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(480, 496)
+
+[node name="EnemySpawns" type="Node2D" parent="."]
+
+[node name="Enemy1" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(96, 96)
+
+[node name="Enemy2" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(672, 96)
+
+[node name="Enemy3" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(304, 96)
+
+[node name="Enemy4" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(464, 96)
+
+[node name="Enemy5" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(96, 448)
+
+[node name="Enemy6" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(672, 448)
+
+[node name="Enemy7" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(304, 224)
+
+[node name="Enemy8" type="Marker2D" parent="EnemySpawns"]
+position = Vector2(464, 352)
+
+[node name="Cover" type="Node2D" parent="."]
+
+[node name="WebsTopLeft" type="ReferenceRect" parent="Cover"]
+script = ExtResource("gc_field")
+offset_left = 40.0
+offset_top = 40.0
+offset_right = 104.0
+offset_bottom = 88.0
+mouse_filter = 2
+border_color = Color(0.56, 0.68, 0.33, 1)
+border_width = 2.0
+kind = &"cobweb"
+density = 0.5
+
+[node name="WebsTopRight" type="ReferenceRect" parent="Cover"]
+script = ExtResource("gc_field")
+offset_left = 664.0
+offset_top = 40.0
+offset_right = 728.0
+offset_bottom = 88.0
+mouse_filter = 2
+border_color = Color(0.56, 0.68, 0.33, 1)
+border_width = 2.0
+kind = &"cobweb"
+density = 0.5
+
+[node name="CoverPreview" type="Node2D" parent="."]
+script = ExtResource("gc_preview")
+
+[node name="SocketWest" type="Node2D" parent="."]
+position = Vector2(32, 288)
+script = ExtResource("cb_socket")
+facing = 3
+
+[node name="SocketNorth" type="Node2D" parent="."]
+position = Vector2(384, 32)
+script = ExtResource("cb_socket")
+facing = 0
+
+[node name="SocketEast" type="Node2D" parent="."]
+position = Vector2(736, 288)
+script = ExtResource("cb_socket")
+facing = 1
+
+[node name="SocketSouth" type="Node2D" parent="."]
+position = Vector2(384, 544)
+script = ExtResource("cb_socket")
+facing = 2
+
+[node name="SocketPreview" type="Node2D" parent="."]
+script = ExtResource("cb_socket_preview")

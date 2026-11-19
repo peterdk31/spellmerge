@@ -1,0 +1,380 @@
+[gd_scene load_steps=39 format=3]
+
+[ext_resource type="Texture2D" path="res://art/grounds/arena_05/arena_05_ground_floor.png" id="1_floor"]
+[ext_resource type="Texture2D" path="res://art/grounds/arena_05/arena_05_ground_under.png" id="2_under"]
+[ext_resource type="Texture2D" path="res://art/grounds/arena_05/arena_05_ground_glow.png" id="3_glow"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="4_motes"]
+
+[sub_resource type="CanvasItemMaterial" id="GlowAdd"]
+blend_mode = 1
+
+[sub_resource type="Resource" id="MoteSource_rim1"]
+script = ExtResource("4_motes")
+kind = &"pit_dust"
+rate = 72.1
+from = 1
+colours = Array[StringName]([&"stone", &"bone"])
+
+[sub_resource type="Resource" id="MoteSource_rim2"]
+script = ExtResource("4_motes")
+kind = &"pit_dust"
+rate = 8.1
+from = 1
+colours = Array[StringName]([&"stone", &"bone"])
+
+[sub_resource type="Resource" id="MoteSource_rim3"]
+script = ExtResource("4_motes")
+kind = &"pit_dust"
+rate = 7.9
+from = 1
+colours = Array[StringName]([&"stone", &"bone"])
+
+[sub_resource type="RectangleShape2D" id="Box_8x8"]
+size = Vector2(8, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_16x8"]
+size = Vector2(16, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_24x8"]
+size = Vector2(24, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_24x24"]
+size = Vector2(24, 24)
+
+[sub_resource type="RectangleShape2D" id="Box_24x32"]
+size = Vector2(24, 32)
+
+[sub_resource type="RectangleShape2D" id="Box_32x8"]
+size = Vector2(32, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_32x16"]
+size = Vector2(32, 16)
+
+[sub_resource type="RectangleShape2D" id="Box_32x32"]
+size = Vector2(32, 32)
+
+[sub_resource type="RectangleShape2D" id="Box_32x56"]
+size = Vector2(32, 56)
+
+[sub_resource type="RectangleShape2D" id="Box_32x160"]
+size = Vector2(32, 160)
+
+[sub_resource type="RectangleShape2D" id="Box_32x208"]
+size = Vector2(32, 208)
+
+[sub_resource type="RectangleShape2D" id="Box_40x8"]
+size = Vector2(40, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_40x16"]
+size = Vector2(40, 16)
+
+[sub_resource type="RectangleShape2D" id="Box_40x64"]
+size = Vector2(40, 64)
+
+[sub_resource type="RectangleShape2D" id="Box_40x72"]
+size = Vector2(40, 72)
+
+[sub_resource type="RectangleShape2D" id="Box_48x8"]
+size = Vector2(48, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_48x16"]
+size = Vector2(48, 16)
+
+[sub_resource type="RectangleShape2D" id="Box_56x8"]
+size = Vector2(56, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_56x16"]
+size = Vector2(56, 16)
+
+[sub_resource type="RectangleShape2D" id="Box_64x8"]
+size = Vector2(64, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_72x8"]
+size = Vector2(72, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_136x8"]
+size = Vector2(136, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_160x8"]
+size = Vector2(160, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_168x16"]
+size = Vector2(168, 16)
+
+[sub_resource type="RectangleShape2D" id="Box_176x8"]
+size = Vector2(176, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_208x8"]
+size = Vector2(208, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_280x8"]
+size = Vector2(280, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_328x8"]
+size = Vector2(328, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_360x8"]
+size = Vector2(360, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_640x8"]
+size = Vector2(640, 8)
+
+[sub_resource type="RectangleShape2D" id="Box_832x16"]
+size = Vector2(832, 16)
+
+[node name="Floor" type="Sprite2D"]
+z_index = -2
+texture_filter = 1
+texture = ExtResource("1_floor")
+centered = false
+metadata/ground_inputs = "8a820dc36a1bc4d2"
+
+[node name="Glow" type="Sprite2D" parent="."]
+material = SubResource("GlowAdd")
+z_as_relative = false
+z_index = -1
+texture_filter = 2
+scale = Vector2(2, 2)
+texture = ExtResource("3_glow")
+centered = false
+
+[node name="Walls" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Underside" type="Sprite2D" parent="."]
+z_as_relative = false
+z_index = -2
+texture_filter = 1
+texture = ExtResource("2_under")
+centered = false
+
+[node name="W1" type="CollisionShape2D" parent="Walls"]
+position = Vector2(416, 8)
+shape = SubResource("Box_832x16")
+
+[node name="W2" type="CollisionShape2D" parent="Walls"]
+position = Vector2(84, 24)
+shape = SubResource("Box_168x16")
+
+[node name="W3" type="CollisionShape2D" parent="Walls"]
+position = Vector2(512, 20)
+shape = SubResource("Box_640x8")
+
+[node name="W4" type="CollisionShape2D" parent="Walls"]
+position = Vector2(232, 28)
+shape = SubResource("Box_64x8")
+
+[node name="W5" type="CollisionShape2D" parent="Walls"]
+position = Vector2(476, 28)
+shape = SubResource("Box_360x8")
+
+[node name="W6" type="CollisionShape2D" parent="Walls"]
+position = Vector2(764, 28)
+shape = SubResource("Box_136x8")
+
+[node name="W7" type="CollisionShape2D" parent="Walls"]
+position = Vector2(28, 36)
+shape = SubResource("Box_56x8")
+
+[node name="W8" type="CollisionShape2D" parent="Walls"]
+position = Vector2(232, 36)
+shape = SubResource("Box_32x8")
+
+[node name="W9" type="CollisionShape2D" parent="Walls"]
+position = Vector2(644, 36)
+shape = SubResource("Box_8x8")
+
+[node name="W10" type="CollisionShape2D" parent="Walls"]
+position = Vector2(732, 36)
+shape = SubResource("Box_8x8")
+
+[node name="W11" type="CollisionShape2D" parent="Walls"]
+position = Vector2(808, 36)
+shape = SubResource("Box_48x8")
+
+[node name="W12" type="CollisionShape2D" parent="Walls"]
+position = Vector2(20, 44)
+shape = SubResource("Box_40x8")
+
+[node name="W13" type="CollisionShape2D" parent="Walls"]
+position = Vector2(812, 76)
+shape = SubResource("Box_40x72")
+
+[node name="W14" type="CollisionShape2D" parent="Walls"]
+position = Vector2(16, 64)
+shape = SubResource("Box_32x32")
+
+[node name="W15" type="CollisionShape2D" parent="Walls"]
+position = Vector2(12, 92)
+shape = SubResource("Box_24x24")
+
+[node name="W16" type="CollisionShape2D" parent="Walls"]
+position = Vector2(16, 208)
+shape = SubResource("Box_32x208")
+
+[node name="W17" type="CollisionShape2D" parent="Walls"]
+position = Vector2(816, 192)
+shape = SubResource("Box_32x160")
+
+[node name="W18" type="CollisionShape2D" parent="Walls"]
+position = Vector2(812, 304)
+shape = SubResource("Box_40x64")
+
+[node name="W19" type="CollisionShape2D" parent="Walls"]
+position = Vector2(12, 324)
+shape = SubResource("Box_24x24")
+
+[node name="W20" type="CollisionShape2D" parent="Walls"]
+position = Vector2(16, 340)
+shape = SubResource("Box_32x8")
+
+[node name="W21" type="CollisionShape2D" parent="Walls"]
+position = Vector2(816, 364)
+shape = SubResource("Box_32x56")
+
+[node name="W22" type="CollisionShape2D" parent="Walls"]
+position = Vector2(12, 360)
+shape = SubResource("Box_24x32")
+
+[node name="W23" type="CollisionShape2D" parent="Walls"]
+position = Vector2(16, 384)
+shape = SubResource("Box_32x16")
+
+[node name="W24" type="CollisionShape2D" parent="Walls"]
+position = Vector2(20, 400)
+shape = SubResource("Box_40x16")
+
+[node name="W25" type="CollisionShape2D" parent="Walls"]
+position = Vector2(812, 400)
+shape = SubResource("Box_40x16")
+
+[node name="W26" type="CollisionShape2D" parent="Walls"]
+position = Vector2(24, 412)
+shape = SubResource("Box_48x8")
+
+[node name="W27" type="CollisionShape2D" parent="Walls"]
+position = Vector2(92, 412)
+shape = SubResource("Box_24x8")
+
+[node name="W28" type="CollisionShape2D" parent="Walls"]
+position = Vector2(324, 412)
+shape = SubResource("Box_24x8")
+
+[node name="W29" type="CollisionShape2D" parent="Walls"]
+position = Vector2(464, 412)
+shape = SubResource("Box_64x8")
+
+[node name="W30" type="CollisionShape2D" parent="Walls"]
+position = Vector2(548, 412)
+shape = SubResource("Box_40x8")
+
+[node name="W31" type="CollisionShape2D" parent="Walls"]
+position = Vector2(804, 412)
+shape = SubResource("Box_56x8")
+
+[node name="W32" type="CollisionShape2D" parent="Walls"]
+position = Vector2(80, 420)
+shape = SubResource("Box_160x8")
+
+[node name="W33" type="CollisionShape2D" parent="Walls"]
+position = Vector2(224, 420)
+shape = SubResource("Box_64x8")
+
+[node name="W34" type="CollisionShape2D" parent="Walls"]
+position = Vector2(340, 420)
+shape = SubResource("Box_56x8")
+
+[node name="W35" type="CollisionShape2D" parent="Walls"]
+position = Vector2(496, 420)
+shape = SubResource("Box_208x8")
+
+[node name="W36" type="CollisionShape2D" parent="Walls"]
+position = Vector2(628, 420)
+shape = SubResource("Box_8x8")
+
+[node name="W37" type="CollisionShape2D" parent="Walls"]
+position = Vector2(688, 420)
+shape = SubResource("Box_32x8")
+
+[node name="W38" type="CollisionShape2D" parent="Walls"]
+position = Vector2(796, 420)
+shape = SubResource("Box_72x8")
+
+[node name="W39" type="CollisionShape2D" parent="Walls"]
+position = Vector2(140, 428)
+shape = SubResource("Box_280x8")
+
+[node name="W40" type="CollisionShape2D" parent="Walls"]
+position = Vector2(468, 428)
+shape = SubResource("Box_328x8")
+
+[node name="W41" type="CollisionShape2D" parent="Walls"]
+position = Vector2(744, 428)
+shape = SubResource("Box_176x8")
+
+[node name="W42" type="CollisionShape2D" parent="Walls"]
+position = Vector2(416, 440)
+shape = SubResource("Box_832x16")
+
+[node name="Holes" type="StaticBody2D" parent="."]
+collision_layer = 2
+collision_mask = 0
+
+[node name="H1" type="CollisionShape2D" parent="Holes"]
+position = Vector2(288, 284)
+shape = SubResource("Box_32x8")
+
+[node name="H2" type="CollisionShape2D" parent="Holes"]
+position = Vector2(548, 284)
+shape = SubResource("Box_24x8")
+
+[node name="H3" type="CollisionShape2D" parent="Holes"]
+position = Vector2(288, 292)
+shape = SubResource("Box_48x8")
+
+[node name="H4" type="CollisionShape2D" parent="Holes"]
+position = Vector2(544, 292)
+shape = SubResource("Box_48x8")
+
+[node name="H5" type="CollisionShape2D" parent="Holes"]
+position = Vector2(284, 300)
+shape = SubResource("Box_56x8")
+
+[node name="H6" type="CollisionShape2D" parent="Holes"]
+position = Vector2(540, 304)
+shape = SubResource("Box_56x16")
+
+[node name="H7" type="CollisionShape2D" parent="Holes"]
+position = Vector2(288, 312)
+shape = SubResource("Box_48x16")
+
+[node name="H8" type="CollisionShape2D" parent="Holes"]
+position = Vector2(544, 316)
+shape = SubResource("Box_48x8")
+
+[node name="H9" type="CollisionShape2D" parent="Holes"]
+position = Vector2(288, 324)
+shape = SubResource("Box_16x8")
+
+[node name="H10" type="CollisionShape2D" parent="Holes"]
+position = Vector2(544, 324)
+shape = SubResource("Box_16x8")
+
+[node name="Rim" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+closed = true
+points = PackedVector2Array(188.5, 15.5, 193.5, 19.5, 198.5, 24.5, 200.5, 30.5, 205.5, 33.5, 211.5, 34.5, 216.5, 40.5, 222.5, 41.5, 228.5, 41.5, 234.5, 39.5, 240.5, 39.5, 246.5, 36.5, 252.5, 31.5, 258.5, 32.5, 264.5, 27.5, 270.5, 25.5, 276.5, 26.5, 282.5, 28.5, 288.5, 27.5, 294.5, 28.5, 300.5, 31.5, 306.5, 32.5, 312.5, 33.5, 318.5, 34.5, 324.5, 35.5, 330.5, 33.5, 336.5, 33.5, 342.5, 30.5, 348.5, 31.5, 354.5, 32.5, 360.5, 31.5, 366.5, 30.5, 372.5, 32.5, 378.5, 31.5, 384.5, 32.5, 390.5, 32.5, 396.5, 32.5, 402.5, 32.5, 408.5, 32.5, 414.5, 32.5, 420.5, 32.5, 426.5, 32.5, 432.5, 32.5, 438.5, 32.5, 444.5, 32.5, 450.5, 33.5, 456.5, 33.5, 462.5, 34.5, 468.5, 35.5, 474.5, 35.5, 480.5, 35.5, 486.5, 32.5, 492.5, 34.5, 497.5, 30.5, 503.5, 31.5, 509.5, 31.5, 515.5, 31.5, 521.5, 29.5, 527.5, 30.5, 533.5, 32.5, 539.5, 33.5, 545.5, 33.5, 551.5, 30.5, 557.5, 31.5, 563.5, 29.5, 567.5, 31.5, 573.5, 33.5, 579.5, 33.5, 585.5, 31.5, 589.5, 32.5, 595.5, 33.5, 601.5, 33.5, 607.5, 33.5, 613.5, 33.5, 618.5, 30.5, 624.5, 33.5, 630.5, 33.5, 636.5, 36.5, 642.5, 36.5, 648.5, 37.5, 654.5, 33.5, 659.5, 28.5, 664.5, 27.5, 670.5, 29.5, 676.5, 26.5, 682.5, 24.5, 688.5, 28.5, 694.5, 27.5, 700.5, 31.5, 706.5, 32.5, 712.5, 33.5, 718.5, 33.5, 724.5, 36.5, 730.5, 37.5, 736.5, 35.5, 742.5, 34.5, 748.5, 33.5, 754.5, 31.5, 759.5, 30.5, 765.5, 29.5, 771.5, 29.5, 776.5, 33.5, 782.5, 35.5, 787.5, 41.5, 789.5, 47.5, 794.5, 53.5, 791.5, 58.5, 792.5, 64.5, 795.5, 68.5, 792.5, 72.5, 791.5, 78.5, 795.5, 82.5, 795.5, 88.5, 795.5, 94.5, 794.5, 100.5, 795.5, 106.5, 798.5, 112.5, 797.5, 118.5, 798.5, 124.5, 799.5, 130.5, 799.5, 136.5, 799.5, 142.5, 799.5, 148.5, 799.5, 154.5, 799.5, 160.5, 799.5, 166.5, 799.5, 172.5, 799.5, 178.5, 799.5, 184.5, 799.5, 190.5, 800.5, 196.5, 799.5, 202.5, 800.5, 208.5, 803.5, 212.5, 803.5, 218.5, 802.5, 224.5, 801.5, 230.5, 800.5, 236.5, 800.5, 242.5, 801.5, 248.5, 802.5, 254.5, 799.5, 260.5, 796.5, 266.5, 795.5, 272.5, 795.5, 278.5, 795.5, 284.5, 794.5, 290.5, 794.5, 295.5, 790.5, 300.5, 791.5, 306.5, 792.5, 312.5, 794.5, 316.5, 793.5, 322.5, 794.5, 328.5, 796.5, 334.5, 797.5, 340.5, 796.5, 346.5, 799.5, 352.5, 799.5, 358.5, 799.5, 364.5, 797.5, 370.5, 798.5, 376.5, 798.5, 382.5, 799.5, 388.5, 796.5, 394.5, 794.5, 400.5, 791.5, 406.5, 785.5, 411.5, 779.5, 410.5, 774.5, 416.5, 768.5, 418.5, 762.5, 415.5, 756.5, 420.5, 750.5, 423.5, 744.5, 423.5, 738.5, 424.5, 732.5, 423.5, 727.5, 421.5, 721.5, 422.5, 716.5, 419.5, 710.5, 419.5, 704.5, 420.5, 698.5, 417.5, 692.5, 416.5, 686.5, 415.5, 680.5, 416.5, 676.5, 418.5, 670.5, 417.5, 667.5, 422.5, 661.5, 426.5, 655.5, 428.5, 649.5, 428.5, 643.5, 432.5, 637.5, 435.5, 632.5, 431.5, 631.5, 425.5, 629.5, 419.5, 623.5, 420.5, 617.5, 423.5, 611.5, 421.5, 605.5, 422.5, 600.5, 418.5, 594.5, 419.5, 588.5, 418.5, 582.5, 418.5, 576.5, 416.5, 570.5, 413.5, 564.5, 410.5, 558.5, 410.5, 552.5, 409.5, 546.5, 410.5, 540.5, 411.5, 534.5, 411.5, 528.5, 411.5, 522.5, 414.5, 516.5, 414.5, 510.5, 415.5, 504.5, 413.5, 498.5, 412.5, 492.5, 411.5, 486.5, 410.5, 480.5, 411.5, 474.5, 409.5, 468.5, 410.5, 464.5, 408.5, 458.5, 407.5, 454.5, 412.5, 448.5, 411.5, 442.5, 410.5, 436.5, 411.5, 430.5, 413.5, 424.5, 414.5, 418.5, 415.5, 412.5, 417.5, 406.5, 420.5, 400.5, 419.5, 394.5, 419.5, 388.5, 421.5, 382.5, 422.5, 376.5, 421.5, 370.5, 421.5, 364.5, 419.5, 358.5, 419.5, 352.5, 418.5, 346.5, 415.5, 340.5, 415.5, 334.5, 413.5, 328.5, 410.5, 322.5, 411.5, 316.5, 411.5, 310.5, 411.5, 309.5, 417.5, 307.5, 422.5, 303.5, 427.5, 299.5, 431.5, 293.5, 432.5, 287.5, 432.5, 282.5, 427.5, 277.5, 426.5, 271.5, 426.5, 265.5, 425.5, 259.5, 421.5, 253.5, 417.5, 247.5, 414.5, 241.5, 414.5, 235.5, 413.5, 229.5, 412.5, 223.5, 412.5, 217.5, 414.5, 211.5, 415.5, 205.5, 415.5, 199.5, 415.5, 194.5, 419.5, 188.5, 421.5, 182.5, 422.5, 176.5, 423.5, 170.5, 424.5, 164.5, 422.5, 158.5, 417.5, 152.5, 414.5, 146.5, 416.5, 140.5, 419.5, 136.5, 416.5, 130.5, 415.5, 126.5, 420.5, 120.5, 416.5, 114.5, 414.5, 108.5, 412.5, 102.5, 410.5, 96.5, 410.5, 90.5, 408.5, 84.5, 410.5, 78.5, 411.5, 72.5, 414.5, 66.5, 414.5, 60.5, 415.5, 54.5, 413.5, 49.5, 408.5, 43.5, 407.5, 41.5, 402.5, 38.5, 397.5, 34.5, 391.5, 32.5, 386.5, 30.5, 380.5, 27.5, 374.5, 25.5, 368.5, 26.5, 362.5, 27.5, 356.5, 27.5, 350.5, 29.5, 344.5, 30.5, 338.5, 24.5, 333.5, 21.5, 329.5, 25.5, 325.5, 23.5, 319.5, 18.5, 318.5, 24.5, 314.5, 29.5, 308.5, 33.5, 304.5, 31.5, 298.5, 31.5, 292.5, 30.5, 286.5, 32.5, 280.5, 33.5, 274.5, 35.5, 268.5, 34.5, 262.5, 34.5, 256.5, 34.5, 250.5, 31.5, 244.5, 30.5, 238.5, 32.5, 232.5, 31.5, 226.5, 29.5, 220.5, 30.5, 214.5, 29.5, 208.5, 29.5, 202.5, 31.5, 196.5, 32.5, 190.5, 32.5, 184.5, 32.5, 178.5, 32.5, 172.5, 32.5, 166.5, 32.5, 160.5, 32.5, 154.5, 32.5, 148.5, 32.5, 142.5, 32.5, 136.5, 32.5, 130.5, 30.5, 124.5, 32.5, 120.5, 33.5, 114.5, 29.5, 110.5, 28.5, 104.5, 28.5, 98.5, 28.5, 92.5, 27.5, 86.5, 28.5, 80.5, 30.5, 74.5, 31.5, 68.5, 33.5, 62.5, 32.5, 56.5, 29.5, 52.5, 34.5, 47.5, 40.5, 44.5, 46.5, 42.5, 52.5, 38.5, 58.5, 35.5, 64.5, 34.5, 70.5, 34.5, 76.5, 33.5, 82.5, 34.5, 88.5, 35.5, 94.5, 33.5, 100.5, 32.5, 106.5, 32.5, 112.5, 34.5, 118.5, 34.5, 124.5, 32.5, 130.5, 32.5, 136.5, 31.5, 142.5, 31.5, 148.5, 29.5, 154.5, 31.5, 160.5, 31.5, 166.5, 27.5, 171.5, 23.5, 175.5, 19.5, 181.5, 18.5, 187.5, 16.5)
+metadata/mote_source = SubResource("MoteSource_rim1")
+
+[node name="Rim2" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+closed = true
+points = PackedVector2Array(260.5, 306.5, 262.5, 310.5, 265.5, 314.5, 268.5, 318.5, 272.5, 322.5, 276.5, 324.5, 280.5, 325.5, 284.5, 326.5, 288.5, 326.5, 292.5, 326.5, 296.5, 325.5, 300.5, 324.5, 304.5, 321.5, 308.5, 318.5, 312.5, 315.5, 315.5, 311.5, 315.5, 307.5, 315.5, 303.5, 315.5, 299.5, 314.5, 295.5, 312.5, 291.5, 308.5, 287.5, 304.5, 284.5, 300.5, 282.5, 296.5, 281.5, 292.5, 281.5, 288.5, 281.5, 284.5, 281.5, 280.5, 282.5, 276.5, 283.5, 272.5, 285.5, 268.5, 287.5, 264.5, 289.5, 260.5, 293.5, 259.5, 297.5, 259.5, 301.5, 259.5, 305.5)
+metadata/mote_source = SubResource("MoteSource_rim2")
+
+[node name="Rim3" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+closed = true
+points = PackedVector2Array(515.5, 308.5, 517.5, 312.5, 520.5, 316.5, 524.5, 320.5, 528.5, 322.5, 532.5, 324.5, 536.5, 324.5, 540.5, 325.5, 544.5, 325.5, 548.5, 326.5, 552.5, 325.5, 556.5, 324.5, 560.5, 322.5, 564.5, 318.5, 567.5, 314.5, 568.5, 310.5, 569.5, 306.5, 569.5, 302.5, 568.5, 298.5, 567.5, 294.5, 564.5, 290.5, 560.5, 287.5, 556.5, 283.5, 552.5, 282.5, 548.5, 281.5, 544.5, 281.5, 540.5, 281.5, 536.5, 282.5, 532.5, 284.5, 528.5, 285.5, 524.5, 287.5, 520.5, 289.5, 517.5, 292.5, 515.5, 296.5, 515.5, 300.5, 514.5, 304.5)
+metadata/mote_source = SubResource("MoteSource_rim3")

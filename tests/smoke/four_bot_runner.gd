@@ -92,6 +92,7 @@ var _settle: int = -1
 var _started: bool = false
 var _logging: bool = false
 var _stopped: bool = false
+var _bots_left: bool = false
 var _builder_was_open: bool = false
 var _builder_seen_open: bool = false
 var _refusals: Array[String] = []
@@ -164,8 +165,10 @@ func _seeds_text() -> String:
 
 
 ## Puts the global state back if the node is freed before it finished.
+## Its run is not stopped here: the tree is busy removing the node (a test that frees it calls
+## `stop` first, or stops the run itself).
 func _exit_tree() -> void:
-	stop()
+	_let_go()
 	if _run != null:
 		_run.scaling = _run_scaling
 		_run = null
@@ -313,12 +316,18 @@ func stop() -> void:
 		return
 	_stopped = true
 	set_process(false)
-	_stop_logging()
-	if is_instance_valid(_input) and _input.is_inside_tree():
-		for bot in _bots:
-			bot.leave()
+	_let_go()
 	if is_instance_valid(_flow) and _flow.is_inside_tree():
 		_flow.call("stop_run")
+
+
+## What the node holds goes back: its logger, the bots' seats and devices, the recording.
+func _let_go() -> void:
+	_stop_logging()
+	if not _bots_left and is_instance_valid(_input) and _input.is_inside_tree():
+		_bots_left = true
+		for bot in _bots:
+			bot.leave()
 	_stop_recording()
 
 

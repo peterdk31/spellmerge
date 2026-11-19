@@ -46,10 +46,13 @@ func test_the_recording_ends_with_the_run() -> void:
 	check(frames != null and not bool(frames.call("is_recording")), "the runner left the frames service recording")
 
 
-func test_freeing_the_runner_stops_its_bots_and_recording() -> void:
+func test_freeing_the_runner_gives_back_its_seats_and_recording() -> void:
 	var runner: Node = RunnerScript.new()
 	root.add_child(runner)
 	runner.free()
+	var flow: Node = root.get_node_or_null(^"Flow")
+	if flow != null:
+		flow.call("stop_run")
 	var frames: Node = root.get_node_or_null(^"Frames")
 	check(frames != null and not bool(frames.call("is_recording")), "a freed runner left the frames service recording")
 	check(frames != null and frames.call("source_of", 0) == null, "a freed runner left a bot filling seat 1's frames")

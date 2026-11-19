@@ -799,3 +799,20 @@ func test_the_area_rolls_each_player_within_the_rooms_type() -> void:
 	for row: Array in _rolled:
 		for choice: Dictionary in row[2]:
 			check_equal(cards.kind_of(choice["id"]), &"trigger", "a trigger room offers triggers: %s" % [choice["id"]])
+
+
+## A regression (the review of 2026-11-19): a typed level widened after its tries landed on a line
+## with nothing of the type left (the multicasts: one under the first line's complexity, three over
+## it), so a multicast room now and then offered another kind while multicasts remained.
+func test_a_typed_room_widens_only_when_its_type_has_nothing_left() -> void:
+	var cards: RewardCards = RewardCards.gather(_world.registry.get_all(&"spells"))
+	var table := registry_table(&"reward")
+	var type := RewardType.make(ItemKinds.CARD, &"multicast")
+	var wrong: int = 0
+	for seed in 200:
+		var offer := RewardOffer.new()
+		RewardRoll.fill(offer, table, 2, Sim.seeded(seed), 0, 0, cards, RewardRoll.PURPOSE, RewardRoll.CARD_PURPOSE, [], type)
+		for at in offer.size():
+			if cards.kind_of(offer.ids[at]) != &"multicast":
+				wrong += 1
+	check_equal(wrong, 0, "every choice of a multicast room is a multicast while there are more than two")

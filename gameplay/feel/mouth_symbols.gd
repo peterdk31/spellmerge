@@ -187,7 +187,7 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 		var type: RewardType = pieces.type_of(room) if pieces != null and kind != null else null
 		var glyphs: Array[PackedByteArray] = []
 		var glyph_shades: Array[PackedColorArray] = []
-		var element: Resource = pieces.content(RewardGlyphsScript.CARD_FOLDER, type.element) if type != null else null
+		var element: Resource = pieces.content(RewardGlyphsScript.card_folder(), type.element) if type != null else null
 		RewardGlyphsScript.glyphs_of(type, element, glyphs, glyph_shades)
 		_glyph_pixels.append(glyphs)
 		_glyph_shades.append(glyph_shades)

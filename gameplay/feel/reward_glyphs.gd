@@ -13,8 +13,6 @@ const KindSymbolScript := preload("res://gameplay/feel/kind_symbol.gd")
 ## A glyph's side and the gap between two glyphs, in pixels (a symbol pixel each).
 const SIDE: int = 5
 const GAP: int = 2
-## The registry folder the element cards are in.
-const CARD_FOLDER: StringName = &"spells"
 
 ## Each item kind's glyph, in bone; an item kind with none shows UNKNOWN.
 const ITEM_LIGHT: StringName = &"bone"
@@ -37,6 +35,11 @@ const KIND_LIGHTS: Dictionary = {
 }
 ## An element's glyph, in its element's light.
 const ELEMENT_PICTURE: String = "..#..\n.#+#.\n#+#+#\n.#+#.\n..#.."
+
+
+## The registry folder the cards (the element cards among them) are in.
+static func card_folder() -> StringName:
+	return ItemKinds.content_of(ItemKinds.CARD)[0]
 
 
 ## The glyphs of `type` (null: none) into `pixels` and `shades` (cleared first), in order: its item

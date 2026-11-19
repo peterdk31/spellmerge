@@ -535,7 +535,7 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 		var type: RewardType = pieces.type_of(place) if kind != null else null
 		var glyphs: Array[PackedByteArray] = []
 		var glyph_shades: Array[PackedColorArray] = []
-		RewardGlyphsScript.glyphs_of(type, pieces.content(RewardGlyphsScript.CARD_FOLDER, type.element) if type != null else null, glyphs, glyph_shades)
+		RewardGlyphsScript.glyphs_of(type, pieces.content(RewardGlyphsScript.card_folder(), type.element) if type != null else null, glyphs, glyph_shades)
 		_glyphs.append(glyphs)
 		_glyph_shades.append(glyph_shades)
 	for place in places:

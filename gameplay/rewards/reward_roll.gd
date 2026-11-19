@@ -42,7 +42,7 @@ static func fill(offer: RewardOffer, table: RewardTable, count: int, sim: Sim, s
 		cards = RewardCards.new()
 	var narrowest: int = type.narrowest() if type != null else RewardType.ANY
 	var allowed: Array[StringName] = []
-	var weights := PackedFloat32Array()
+	var weights := PackedFloat64Array()
 	for choice in mini(count, MOST):
 		var base: int = roll * TRIES_A_ROLL + choice * TRIES
 		for level in range(narrowest, RewardType.ANY - 1, -1):
@@ -53,14 +53,16 @@ static func fill(offer: RewardOffer, table: RewardTable, count: int, sim: Sim, s
 
 
 ## One choice at level `level` of `type`: up to TRIES lines rolled among the lines of that level
-## (counters from `base`), the first giving what the offer has not added. False when none does.
-static func _choose(offer: RewardOffer, table: RewardTable, sim: Sim, seat: int, base: int, cards: RewardCards, type: RewardType, level: int, line_purpose: StringName, pick_purpose: StringName, allowed: Array[StringName], weights: PackedFloat32Array, lines: Array[RewardEntry]) -> bool:
+## (counters from `base`), the first giving what the offer has not added. False when none does. At
+## a typed level only a line with something of the type the offer lacks weighs anything, and a card
+## line's card is picked among those, so a typed level widens only once it has nothing left.
+static func _choose(offer: RewardOffer, table: RewardTable, sim: Sim, seat: int, base: int, cards: RewardCards, type: RewardType, level: int, line_purpose: StringName, pick_purpose: StringName, allowed: Array[StringName], weights: PackedFloat64Array, lines: Array[RewardEntry]) -> bool:
 	var total: float = 0.0
 	weights.resize(table.entries.size())
 	for at in table.entries.size():
 		var entry: RewardEntry = table.entries[at]
 		var weight: float = 0.0
-		if entry != null and entry.weight > 0.0 and (level == RewardType.ANY or type.line_fits(entry, level)):
+		if entry != null and entry.weight > 0.0 and (level == RewardType.ANY or (type.line_fits(entry, level) and _left(offer, entry, cards, type, level, allowed))):
 			weight = entry.weight
 		weights[at] = weight
 		total += weight
@@ -76,7 +78,9 @@ static func _choose(offer: RewardOffer, table: RewardTable, sim: Sim, seat: int,
 			if id == &"":
 				allowed.clear()
 				for at in cards.size():
-					if cards.line_gives(entry, at) and (level == RewardType.ANY or type.card_fits(cards.ids[at], cards.kinds[at], level)):
+					if not cards.line_gives(entry, at):
+						continue
+					if level == RewardType.ANY or (type.card_fits(cards.ids[at], cards.kinds[at], level) and not offer.offers(entry.kind, cards.ids[at], entry.count)):
 						allowed.append(cards.ids[at])
 				if allowed.is_empty():
 					continue
@@ -90,9 +94,22 @@ static func _choose(offer: RewardOffer, table: RewardTable, sim: Sim, seat: int,
 	return false
 
 
+## True when the line `entry` can still give, at level `level` of `type`, an item the offer has not
+## (`allowed`: scratch).
+static func _left(offer: RewardOffer, entry: RewardEntry, cards: RewardCards, type: RewardType, level: int, allowed: Array[StringName]) -> bool:
+	if entry.kind != ItemKinds.CARD:
+		return not offer.offers(entry.kind, entry.id, entry.count)
+	if entry.id != &"":
+		return type.card_fits(entry.id, cards.kind_of(entry.id), level) and not offer.offers(entry.kind, entry.id, entry.count)
+	for at in cards.size():
+		if cards.line_gives(entry, at) and type.card_fits(cards.ids[at], cards.kinds[at], level) and not offer.offers(entry.kind, cards.ids[at], entry.count):
+			return true
+	return false
+
+
 ## The line of `table` a roll of `at` (0 to 1) lands on, by `weights` (by the same index; `total`
 ## their sum).
-static func _line(table: RewardTable, weights: PackedFloat32Array, total: float, at: float) -> RewardEntry:
+static func _line(table: RewardTable, weights: PackedFloat64Array, total: float, at: float) -> RewardEntry:
 	var point: float = at * total
 	var last: RewardEntry = null
 	for index in table.entries.size():

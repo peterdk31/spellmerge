@@ -14,6 +14,8 @@ extends PanelContainer
 ## It only shows what it is told: `set_stats`, `set_menu_open`, `set_online` (a small "ONLINE" over
 ## the line of a seat played on another machine), `set_purse` (a small line under the health line
 ## with the seat's coins and its unspent rewards, connected biomes CB10; hidden while both are 0),
+## `set_keys` (the party's keys before the coins, on the same row: `key_count.gd`, Smooth; hidden
+## while there are none),
 ## `set_staff_plan`, `set_staff_mana`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
 ## which hears the events and reads the staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
@@ -26,6 +28,7 @@ extends PanelContainer
 
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const MeterScript := preload("res://hud/widgets/meter_line.gd")
+const KeyCountScript := preload("res://hud/widgets/key_count.gd")
 
 const PLAYER_COUNT: int = 4
 const STAFF_COUNT: int = 4
@@ -48,6 +51,9 @@ var _rows: Array[StaffRowScript] = []
 var _has_cards: Array[bool] = [false, false, false, false]
 ## The purse line (`set_purse`), made in `_ready` under the health line, and what it shows.
 var _purse: Label = null
+## The purse's row (the purse line, then the party's keys) and its key count (`set_keys`).
+var _purse_row: HBoxContainer = null
+var _keys: KeyCountScript = null
 var _coins: int = 0
 var _unspent: int = 0
 
@@ -76,8 +82,18 @@ func _ready() -> void:
 	_purse.theme_type_variation = StringName("PlayerLabel%d" % (player + 1))
 	# In the panel's small font, as the health number (owner, 2026-11-19: a smaller HUD).
 	_purse.add_theme_font_size_override(&"font_size", 8)
-	_staffs.get_parent().add_child(_purse)
-	_staffs.get_parent().move_child(_purse, _staffs.get_index())
+	_purse_row = HBoxContainer.new()
+	_purse_row.name = "PurseRow"
+	_purse_row.add_theme_constant_override(&"separation", 4)
+	_purse_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# The keys first: their left edge never moves, and their room grows by whole pixels (key_count.gd).
+	_keys = KeyCountScript.new()
+	_keys.name = "Keys"
+	_keys.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_purse_row.add_child(_keys)
+	_purse_row.add_child(_purse)
+	_staffs.get_parent().add_child(_purse_row)
+	_staffs.get_parent().move_child(_purse_row, _staffs.get_index())
 	_align_rows()
 	_refresh_status()
 
@@ -140,6 +156,17 @@ func set_purse(coins: int, unspent: int) -> void:
 		words.append(UNSPENT_TEXT % unspent)
 	_purse.text = "  ".join(words)
 	_purse.visible = not words.is_empty()
+
+
+## Show the keys the party holds before the coins (`key_count.gd`: played in by whole pixels;
+## `at_once` after a restore).
+func set_keys(count: int, at_once: bool) -> void:
+	_keys.set_count(count, at_once)
+
+
+## The party's key count it shows (its widget, for tests).
+func key_count() -> KeyCountScript:
+	return _keys
 
 
 ## The purse line's words ("" while it hides).

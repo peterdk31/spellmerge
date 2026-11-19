@@ -30,6 +30,7 @@ var due: Array = []
 var keys: Array = []
 var key_doors: Array = []
 var rocks: Array = []
+var held: Array = []
 var _sources: Array[Walk] = []
 
 
@@ -60,6 +61,8 @@ func before_each() -> void:
 	events.connect("key_shown", _on_key)
 	events.connect("key_door_shown", _on_key_door)
 	events.connect("secret_rock_shown", _on_rock)
+	held.clear()
+	events.connect("party_keys_shown", _on_held)
 	flow.world_parent = own(Node.new()) as Node
 	root.add_child(flow.world_parent)
 
@@ -69,6 +72,7 @@ func after_each() -> void:
 	events.disconnect("key_shown", _on_key)
 	events.disconnect("key_door_shown", _on_key_door)
 	events.disconnect("secret_rock_shown", _on_rock)
+	events.disconnect("party_keys_shown", _on_held)
 	flow.stop_run()
 	flow.world_parent = null
 	flow.mode = FlowScript.MODE_RUN
@@ -87,6 +91,10 @@ func _on_due(room: int, table: StringName) -> void:
 
 func _on_key(key: int, at: Vector2, lying: bool) -> void:
 	keys.append([key, at, lying])
+
+
+func _on_held(count: int, at_once: bool) -> void:
+	held.append([count, at_once])
 
 
 func _on_key_door(door: int, area: Rect2, open: bool) -> void:
@@ -295,6 +303,34 @@ func test_keys_are_any_doors_and_may_be_fewer_than_the_treasure_rooms() -> void:
 
 
 ## A key with no zone lies round the room's middle clear of a fountain's pool or a shop's items.
+## The HUD's key count (the owner, 2026-11-19): the party's keys held are told as one is taken and
+## spent, as they stand after a restore, and 0 as the biome goes.
+func test_the_keys_the_party_holds_are_told_as_they_are_taken_spent_and_restored() -> void:
+	var map: BiomeMap = _start(2, &"treasure", &"treasure")
+	_ticks(1)
+	var first: Vector2 = flow.locks.key_at[0]
+	var second: Vector2 = _grid().nearest_ground(first + Vector2(64.0, 0.0), 6.0)
+	flow.locks.key_drops = PackedInt32Array([0, 0])
+	flow.locks.key_states = PackedByteArray([LockDoors.KEY_LYING, LockDoors.KEY_LYING])
+	flow.locks.key_at = PackedVector2Array([first, second])
+	held.clear()
+	_put(1, first)
+	check_equal(held, [[1, false]], "one taken: the party holds one")
+	_put(1, second)
+	check_equal(held.back(), [2, false], "two")
+	check_equal(flow.locks.held_keys(), 2, "Flow's count")
+	var snapshot := Snapshot.take(tick.state_areas(), root)
+	_put(0, _on_bridge(map, RoomSocket.Facing.EAST, 48.0))
+	check(flow.locks.is_open(EAST), "a key opens the court")
+	check_equal(held.back(), [1, false], "one spent: one left")
+	held.clear()
+	check(snapshot.restore(tick.state_areas(), root).is_empty(), "restored to two held")
+	check(held.size() >= 2 and held[0] == [0, true] and held.back() == [2, true], "told again at once, as it stands: %s" % [held])
+	held.clear()
+	flow.stop_run()
+	check_equal(held.back(), [0, false], "the biome gone: none")
+
+
 func test_a_key_keeps_off_a_fountains_pool_and_a_shops_items() -> void:
 	var middle := Vector2(200.0, 160.0)
 	var fountain := RoomKind.new()

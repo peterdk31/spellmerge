@@ -82,8 +82,8 @@ const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 @export_range(0, 100) var coins_most: int = 0
 ## The chance that its coins drop as it dies (the Rewards area rolls it, `Rewards.DROP_PURPOSE`):
 ## each one a coin on the floor that anyone may take, adding one to every player's coins (connected
-## biomes decision 18). A boss's go straight to every player instead (decision 25), by the same
-## chance; an add's never drop. 1: always; 0: never.
+## biomes decision 18). A boss's go straight to every player instead (decision 25), always:
+## a boss ignores this chance (the owner, 2026-11-19); an add's never drop. 1: always; 0: never.
 @export_range(0.0, 1.0) var coin_drop_chance: float = 1.0
 
 ## The most staffs an enemy may hold (the staff buttons).

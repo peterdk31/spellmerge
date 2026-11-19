@@ -571,6 +571,11 @@ signal secret_rock_shown(rock: int, area: Rect2, element: StringName, broken: bo
 ## left). After a snapshot is restored, said again for every key (key -1 first: every key
 ## forgotten). For the view only. Heard by feel (`special_room_looks.gd`).
 signal key_shown(key: int, at: Vector2, lying: bool)
+## Sender: flow (the owner, 2026-11-19). How many keys the party holds (taken, not spent yet: keys
+## are the party's, shared). Sent as a key is taken or spent, 0 as the biome is left; `at_once` after a
+## snapshot is restored (and as a biome is laid): drawn as it stands, not played in. For the view
+## only. Heard by hud (the key count beside every panel's coins: `hud/widgets/key_count.gd`).
+signal party_keys_shown(count: int, at_once: bool)
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
 ## where each lies, in the scene's order. Sent for every room as a world is made, at the run's start.

@@ -10,7 +10,8 @@ extends RefCounted
 ## 1. **The count and the style:** the rooms (`rooms_min` to `rooms_max`, the start room and the
 ##    bridges not counted) and one of the rules' `styles` by weight (`MapStyle`).
 ## 2. **The kinds** (decision 1): each line's `least` (the fixed kinds), each room past it up to
-##    `max_per_run` by its `chance` (the chance kinds, within `rooms_max`), and the rest the lines
+##    `max_per_run` by its `chance` (the chance kinds, within `rooms_max`: the lines with the fewest
+##    chance rooms take the slots first, so a challenge room before the treasure rooms), and the rest the lines
 ##    with no limit, by weight; one room of the line that stands deepest (the boss).
 ## 3. **The way** (decision 4): the style's `way_share` of the rooms, at least `fights_on_way` + 1,
 ##    from the start room to the boss, one bridge a room deeper: its rooms by chance from the kinds
@@ -401,12 +402,29 @@ class Growth:
 			if rule != end_line:
 				for k in rule.least:
 					pool.append(rule)
-		for rule: KindRule in lines:
+		# The chance rooms: every line's rolls made in line order, then the rooms won take the slots
+		# left within `rooms_max` line by line, the lines with the fewest chance rooms first (line
+		# order between two alike), so a one-off (a challenge room) is never crowded out by a line of
+		# many (the treasure rooms fill what is left: the owner, 2026-11-19). Added in line order.
+		var won := PackedInt32Array()
+		won.resize(lines.size())
+		for at in lines.size():
+			var rule: KindRule = lines[at]
 			if rule == end_line or rule.chance <= 0.0:
 				continue
 			for k in rule.max_per_run - rule.least:
-				if dice.roll(Step.KINDS) < rule.chance and pool.size() + 1 < rules.rooms_max:
-					pool.append(rule)
+				if dice.roll(Step.KINDS) < rule.chance:
+					won[at] += 1
+		var granted := PackedInt32Array()
+		granted.resize(lines.size())
+		var slots: int = maxi(rules.rooms_max - 1 - pool.size(), 0)
+		for at: int in _chance_order(lines):
+			var take: int = mini(won[at], slots)
+			granted[at] = take
+			slots -= take
+		for at in lines.size():
+			for k in granted[at]:
+				pool.append(lines[at])
 		var fillers: Array[KindRule] = []
 		var weights := PackedFloat32Array()
 		# A filler takes no more rooms than templates host it (a template stands once a biome).
@@ -426,6 +444,18 @@ class Growth:
 				weights.remove_at(at)
 				room_left.remove_at(at)
 		return pool
+
+	## The lines' indices in the order their chance rooms take slots: the fewest chance rooms
+	## (`max_per_run` - `least`) first, line order between two alike.
+	static func _chance_order(lines: Array[KindRule]) -> PackedInt32Array:
+		var order := PackedInt32Array()
+		for at in lines.size():
+			var rooms: int = lines[at].max_per_run - lines[at].least
+			var put: int = order.size()
+			while put > 0 and lines[order[put - 1]].max_per_run - lines[order[put - 1]].least > rooms:
+				put -= 1
+			order.insert(put, at)
+		return order
 
 	# --- Step 3: the way -----------------------------------------------------------------------
 

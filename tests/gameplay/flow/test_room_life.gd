@@ -299,6 +299,60 @@ func test_a_downed_wizard_crawls_in_a_biome() -> void:
 	check(crawled < one.mover.speed * 0.5 * Mover.CRAWL_SHARE * 1.5, "slowly: %.1f px in half a second" % crawled)
 
 
+func test_a_fight_in_the_start_room_stands_away_from_its_wizards() -> void:
+	input.add_virtual_device(0)
+	var map: BiomeMap = BiomeMaps.split(registry)
+	var fights: Array[RoomFight] = [RoomFight.of([IMP] as Array[StringName])]
+	check(flow.start_biome(0, map, fights), "the biome starts")
+	check_equal(_wizard(0).room, 0, "its wizard is known to be in the start room as its fight starts")
+	check(flow.life.has(0, RoomLife.SEALED), "the start room's fight seals it")
+	var imp := flow.get(&"_enemies")[0] as Actor
+	check(imp.global_position.distance_to(_wizard(0).global_position) >= RoomSpawning.NEAR, "its imp stands away from the wizard: %s and %s" % [imp.global_position, _wizard(0).global_position])
+
+
+func test_a_downed_wizard_crawling_in_starts_no_fight() -> void:
+	var map: BiomeMap = _start(1, [IMP], [])
+	_ticks(1)
+	var one: Actor = _wizard(0)
+	one.health.take(one.health.health + 100.0)
+	_ticks(1)
+	one.global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 24.0)
+	_ticks(2)
+	check(not entered.has(1) and not flow.life.has(1, RoomLife.SEALED), "a downed wizard in the antechamber starts nothing")
+
+
+func test_each_fight_stands_at_its_own_scale() -> void:
+	var map: BiomeMap = BiomeMaps.split(registry)
+	input.add_virtual_device(0)
+	input.add_virtual_device(1)
+	var west: RoomFight = RoomFight.of([IMP, IMP] as Array[StringName], 1, 0, 0.0, 1.5)
+	var east: RoomFight = RoomFight.of([IMP] as Array[StringName], 0, 0, 0.0, 2.0)
+	check(flow.start_biome(0, map, [RoomFight.new(), west, east] as Array[RoomFight]), "the biome starts")
+	_wizard(0).global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 24.0)
+	_ticks(1)
+	_wizard(1).global_position = _by_socket(map, 2, RoomSocket.Facing.WEST, 24.0)
+	_ticks(1)
+	var first: Actor = null
+	for enemy: Node in flow.get(&"_enemies"):
+		if (enemy as Actor).room == 1:
+			first = enemy as Actor
+	check(first != null and is_equal_approx(first.stat_scale, 1.5), "the antechamber's first imp at its scale")
+	_beat(1)
+	_ticks(2)
+	var second: Actor = null
+	for enemy: Node in flow.get(&"_enemies"):
+		if (enemy as Actor).room == 1:
+			second = enemy as Actor
+	check(second != null and is_equal_approx(second.stat_scale, 1.5), "its second, standing after the court's fight began, still at its own: %s" % [second.stat_scale if second != null else -1.0])
+
+
+func test_nothing_of_a_biome_outlives_its_run() -> void:
+	_start(1, [], [])
+	flow.stop_run()
+	check(flow.get(&"_biome_start") == null and (flow.get(&"_biome_fights") as Array).is_empty(), "its map and fights go with it")
+	check_equal(_grid().places(), 0, "and the grid's places")
+
+
 ## The first pillar standing in room `room`.
 func _pillar_in(room: int) -> Actor:
 	for body: Node in flow.room_props():

@@ -185,6 +185,11 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 	# The cover the cover area plays: the world's first room's (connected biomes CB3).
 	if number != EventsScript.FIRST_ROOM:
 		return
+	# Only where it is laid as its scene is: at the world's origin, unmirrored (a biome's start room
+	# elsewhere, or mirrored, plays no cover until Cover keeps a cover a room: connected biomes CB3).
+	var piece := layout_root as Node2D
+	if piece != null and (piece.position != Vector2.ZERO or (piece.has_meta(PieceShape.GROUND_MIRROR_META) and piece.get_meta(PieceShape.GROUND_MIRROR_META) != Vector2i.ZERO)):
+		layout_root = null
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	lay(CoverLayout.of(layout_root, room, kinds()))
 

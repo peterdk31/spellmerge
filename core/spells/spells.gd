@@ -788,6 +788,12 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.room_left.connect(_on_room_left)
 
 
+## The party left room `room` (`room_left`; connected biomes CB3: a row run's each room, a biome's
+## world as a whole, ALL_ROOMS): what was cast ends with it (`leave_room`).
+func _on_room_left(_room: int) -> void:
+	leave_room()
+
+
 ## True when the card `card_id` does something on the carrier `carrier` (`CarrierCard.carrier`) on its
 ## own: for the builder, a reward screen or a bot, before the card is placed
 ## (`StaffCompiler.card_works`). False for an unknown card.
@@ -3980,12 +3986,6 @@ func _budget(actor: int) -> int:
 ## (beams, portals, rings, swings, slams, decoys and familiars) and its moves. The shots in the air are the projectile
 ## manager's to end (each `shot_ended`). Every caster keeps its builds, delays and mana: the party
 ## goes on as it is.
-## The party left room `room` (`room_left`; connected biomes CB3: a row run's each room, a biome's
-## world as a whole, ALL_ROOMS): what was cast ends with it (`leave_room`).
-func _on_room_left(_room: int) -> void:
-	leave_room()
-
-
 func leave_room() -> void:
 	for actor in _caster_rows:
 		for carrier: Carrier in _carriers.values():

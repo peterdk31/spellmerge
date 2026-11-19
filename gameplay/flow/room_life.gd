@@ -119,6 +119,12 @@ func wake(table: ActorsScript, projectiles: ProjectileManagerScript) -> void:
 		table.set_asleep(_ids[n], place >= 0 and place < awake.size() and awake[place] == 0)
 
 
-## True when `body` keeps the place it is in awake: it acts (no world prop, not still, not dying).
+## True when `body` keeps the place it is in awake: it acts (a seat drives it, or it is no world prop
+## and not still), and it is not dying.
 static func keeps_awake(body: Actor, table: ActorsScript) -> bool:
-	return not body.is_dying() and not table.is_still(body.id) and body.own_team() != ActorsScript.TEAM_WORLD
+	if body.is_dying():
+		return false
+	# A body a seat drives acts, a prop a wizard possesses too.
+	if body.controller != null and body.controller.seat >= 0:
+		return true
+	return not table.is_still(body.id) and body.own_team() != ActorsScript.TEAM_WORLD

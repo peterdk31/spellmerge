@@ -1159,12 +1159,13 @@ func view_rect() -> Rect2:
 func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void:
 	var walls: Array[Rect2] = RoomPlaces.wall_rects(layout_root)
 	var piece := layout_root as Node2D
+	# A biome's pieces stand at their places (connected biomes CB3): their walls at them.
+	var at: Vector2 = piece.position if piece != null else Vector2.ZERO
+	for i in walls.size():
+		walls[i].position += at
 	if number != EventsScript.FIRST_ROOM:
-		# A biome's later piece (connected biomes CB3): its walls join the world's, at its place; the
-		# mist and the room's look are the first room's.
-		var at: Vector2 = piece.position if piece != null else Vector2.ZERO
-		for i in walls.size():
-			walls[i].position += at
+		# A biome's later piece: its walls join the world's; the mist and the room's look are the
+		# first room's.
 		_world_walls.append_array(walls)
 		blockers.use_walls(_world_walls)
 		return

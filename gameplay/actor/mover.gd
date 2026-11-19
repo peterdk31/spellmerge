@@ -132,7 +132,8 @@ func step(delta: float) -> void:
 		if can_crawl():
 			# Downed in a biome (connected biomes CB3, decision 13): it crawls where its intent says,
 			# slowly, and nothing else moves it (its controller casts nothing while down).
-			actor.velocity = actor.intent.move.limit_length(1.0) * speed * CRAWL_SHARE
+			var pace: float = actor.combat.own_pace(actor, actor.id) if actor.combat != null else 1.0
+			actor.velocity = actor.intent.move.limit_length(1.0) * speed * CRAWL_SHARE * pace
 		return
 	# The moves whose last step has been walked (the body moved after it) say where they ended.
 	_answer()

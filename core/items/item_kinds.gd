@@ -42,14 +42,17 @@ const USE: StringName = &"use"
 ## `bag_use_requested`); coins are a `CoinBase` (content/coins), one stack the player spends in a
 ## shop (the owner, 2026-11-19: every reward is an item, and coins are a stacked one); a key is a
 ## `KeyBase` (content/keys), one stack beside the coins in the currency bag, spent at a treasure
-## room's door (the owner, 2026-11-19: "Keys are also just inventory items"). Neither is dropped.
+## room's door (the owner, 2026-11-19: "Keys are also just inventory items"). Everything is dropped
+## (the owner, 2026-11-19: "Everything is droppable"): a coin or a key one copy at a time, as a potion,
+## lying as any item, taken by A into the taker's own bag (a dropped coin is not shared: only the
+## coins a foe dies with are, gameplay/rewards).
 const RULES: Dictionary = {
 	&"staff": {"bag": &"staffs", "stacks": false, "content": [&"wizard"], "type": &"StaffBase", "actions": [&"drop", &"hand"], "premade": [&"items"]},
 	&"card": {"bag": &"cards", "stacks": true, "content": [&"spells"], "type": &"SpellComponent", "actions": [&"drop_one"], "premade": []},
 	&"relic": {"bag": &"relics", "stacks": false, "content": [&"relics"], "type": &"RelicBase", "actions": [&"drop"], "premade": []},
 	&"potion": {"bag": &"potions", "stacks": true, "content": [&"potions"], "type": &"PotionBase", "actions": [&"drop", &"use"], "premade": []},
-	&"coin": {"bag": &"currency", "stacks": true, "content": [&"coins"], "type": &"CoinBase", "actions": [], "premade": [], "ids": [&"coin"]},
-	&"key": {"bag": &"currency", "stacks": true, "content": [&"keys"], "type": &"KeyBase", "actions": [], "premade": [], "ids": [&"key"]},
+	&"coin": {"bag": &"currency", "stacks": true, "content": [&"coins"], "type": &"CoinBase", "actions": [&"drop"], "premade": [], "ids": [&"coin"]},
+	&"key": {"bag": &"currency", "stacks": true, "content": [&"keys"], "type": &"KeyBase", "actions": [&"drop"], "premade": [], "ids": [&"key"]},
 }
 ## The class of a kind with none of its own yet.
 const NO_CLASS: StringName = &"Resource"

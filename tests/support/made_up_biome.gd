@@ -5,7 +5,8 @@ extends RefCounted
 ## on the wall's inner face, on the 32 px grid), with no scenes (`MadeUpRoom`), so nothing is drawn or
 ## laid: the generator reads only the shapes. Bridges across (west to east) and down (north to
 ## south), 96 to 384 px long in 32 px steps and 64 px across (a loop closes where two free sockets line up a bridge's
-## length apart: at a corner, one bridge's length lines a room up, another's spans to the next).
+## length apart: at a corner, one bridge's length lines a room up, another's spans to the next), and
+## corner walkways (a way that turns).
 ##
 ##     var biome := MadeUpBiome.new()
 ##     var map: BiomeMap = BiomeGenerator.generate(biome.run(), biome.content, biome.shapes, sim)
@@ -62,6 +63,9 @@ const ROOMS: Array = [
 const BRIDGE_LENGTHS: Array[int] = [96, 128, 160, 192, 224, 256, 288, 320, 352, 384]
 const BRIDGE_ACROSS: StringName = &"plank_across_128"
 const BRIDGE_DOWN: StringName = &"plank_down_128"
+## The corner walkways' sizes (square; a socket on its west edge and one on its north edge, mirrored
+## to every corner): a walkway whose sockets do not face each other (the owner, 2026-11-19).
+const CORNER_SIZES: Array[int] = [160, 224]
 
 var content: RunContent = null
 ## Template id to its unmirrored shape.
@@ -84,6 +88,10 @@ func _init(rooms: Array = ROOMS) -> void:
 			var id := StringName("plank_%s_%d" % ["down" if down else "across", length])
 			templates.append(_template(id, [], true))
 			shapes[id] = bridge_shape(id, down, float(length))
+	for size: int in CORNER_SIZES:
+		var corner := StringName("plank_corner_%d" % size)
+		templates.append(_template(corner, [], true))
+		shapes[corner] = corner_shape(corner, float(size))
 	var enemies: Array[Resource] = [_enemy(&"rat", 1, 0), _enemy(&"wolf", 3, 1), _enemy(&"ogre", 7, 3), _enemy(&"king", 10, 0, true)]
 	content = RunContent.gather(kinds, templates, enemies)
 
@@ -144,6 +152,18 @@ static func bridge_shape(id: StringName, down: bool, length: float = 128.0) -> P
 		shape.size = Vector2(length, 64)
 		shape.socket_at = PackedVector2Array([Vector2(0, 32), Vector2(length, 32)])
 		shape.socket_facing = PackedInt32Array([RoomSocket.Facing.WEST, RoomSocket.Facing.EAST])
+	return shape
+
+
+## A corner walkway `size` px square: its sockets on its west edge (32 px down) and its north edge
+## (32 px in from its east side), so a way through it turns.
+static func corner_shape(id: StringName, size: float) -> PieceShape:
+	var shape := PieceShape.new()
+	shape.id = id
+	shape.walkway = true
+	shape.size = Vector2(size, size)
+	shape.socket_at = PackedVector2Array([Vector2(0, size - 32), Vector2(size - 32, 0)])
+	shape.socket_facing = PackedInt32Array([RoomSocket.Facing.WEST, RoomSocket.Facing.NORTH])
 	return shape
 
 

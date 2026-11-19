@@ -435,3 +435,25 @@ func _breaks(made: BiomeMap, rules: MapRules, change: Callable, says: String) ->
 	change.call(map)
 	var problems: String = "\n".join(BiomeGenerator.rule_problems(map, rules, _biome.content, _biome.shapes))
 	check(says in problems, "named: %s (got: %s)" % [says, problems])
+
+
+## A walkway whose sockets do not face each other (a corner, the owner's answer of 2026-11-19) bridges
+## rooms as a straight one does: with corners and only the shortest straight bridges, every seed
+## makes a sound map, and the corners are placed in every mirroring.
+func test_corner_walkways_bridge_rooms_too() -> void:
+	var shapes: Dictionary = {}
+	for id: StringName in _biome.shapes:
+		var shape: PieceShape = _biome.shapes[id]
+		if not shape.walkway or String(id).begins_with("plank_corner") or id == MadeUpBiome.BRIDGE_ACROSS or id == MadeUpBiome.BRIDGE_DOWN:
+			shapes[id] = shape
+	var rules: MapRules = MadeUpBiome.rules()
+	var definition: RunDefinition = MadeUpBiome.run(rules)
+	var corners: Dictionary = {}
+	for seed_value in 60:
+		var map: BiomeMap = BiomeGenerator.generate(definition, _biome.content, shapes, _sim(seed_value))
+		check(map.is_made(), "seed %d: made (%s)" % [seed_value, "\n".join(map.not_made)])
+		check_equal(map.problems(shapes) + BiomeGenerator.rule_problems(map, rules, _biome.content, shapes), PackedStringArray(), "seed %d: sound" % seed_value)
+		for bridge in map.bridges():
+			if String(map.bridge_templates[bridge]).begins_with("plank_corner"):
+				corners[map.bridge_mirrors[bridge]] = true
+	check_equal(corners.size(), 4, "corners placed turning every way: %s" % corners.keys())

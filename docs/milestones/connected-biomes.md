@@ -190,7 +190,7 @@ What CB5 built (`BiomeGenerator`, gameplay/run; gameplay/run/README.md, "The bio
 - **The kinds by depth** (decision 1): the run's kind table (`KindRule`) is read by depth, the fewest bridges from the start room, -1 the deepest. A line holds `least` rooms in every biome (the fixed kinds), each room past it up to `max_per_run` by `chance` (the chance kinds, within `rooms_max`), and the rest of the rooms are the lines with no `max_per_run`, by weight (the fights). The line whose `first_row` and `last_row` are -1 is the way's end, the boss, and stands alone deepest; a `dead_end` line's rooms have one bridge (the boss, a secret room, a treasure room). The start room is a kind of its own (`content/room_kinds/start.tres`, `RoomKind.FILL_NONE`) and not counted. `max_per_row` means nothing on a biome's map. One line a kind.
 - **"At least 4 fights on the way"** (decision 4) is read strictly: the fewest fights (rooms of a kind filled with enemies) on any way from the start room to the boss, so a loop never lets a party round a fight of the way (`BiomeGenerator.fights_on_way`). The way is built first, a style's `way_share` of the rooms and at least `fights_on_way` + 1, and the boss hangs at its end.
 - **Styles** (decision 5) are `MapStyle` sub-resources of `MapRules.styles`, rolled by `weight`: `way_share`, `branch_chain` (branches grown long), `hub_pull` (rooms drawn to the busiest room) and `loops` with `loop_pull`. The crypt's: long 0.75, branching 0.4 (chain 0.6), loop 0.45 (3 loops), hub 0.35 (pull 6). A branching and a hub map's way are both near its least (5 rooms with 4 fights), so they differ by their branches.
-- **Loops need walkways of several lengths.** A loop is an extra bridge between two free sockets a bridge's ends meet, kept only where the rules still hold. With rooms of free shapes, two sockets line up a bridge apart on both axes almost never with one length; with lengths every 32 px (the stand-in content: 96 to 384 px), a loop closes at a corner (one bridge's length lines a room up, another's spans to the next) in about half the loop style's maps. The crypt has one 128 px bridge, so its loop style closes few until CB12 and CB13 add walkways (an open question for the owner, in CB5's PR).
+- **Loops need walkways of several lengths.** A loop is an extra bridge between two free sockets a bridge's ends meet, kept only where the rules still hold. With rooms of free shapes, two sockets line up a bridge apart on both axes almost never with one length; with lengths every 32 px (the stand-in content: 96 to 384 px), a loop closes at a corner (one bridge's length lines a room up, another's spans to the next) in about half the loop style's maps. The crypt has one 128 px bridge, so its loop style closes few until CB12 and CB13 add walkways: straight ones every 32 px and corner ones (the owner, 2026-11-19, below). A corner walkway (sockets not facing each other) bridges as a straight one does: a crossing is any walkway end met to a room socket, its far end facing any way.
 - **Placing** (decisions 2 and 6): a room over a free socket of the room it hangs off, by any walkway of the biome in any mirroring, a template hosting its kind in any of its four mirrorings (the map's `room_mirrors`, which BiomeWorld lays and CB4's ground draws), never a template the biome holds already (the start room excepted; bridges repeat), its slab 32 px clear of every other room (`BiomeGenerator.GAP`), its bridge over its two rooms only; the map moved last so its corner is (0, 0), every place on the 32 px grid. A seed whose shapes leave a room no placement is tried again (24 attempts), then the map says why.
 - **The fill** is the map's: each room's scale (`RunDefinition.biome_room_scale`: the per-depth curve reaches its end at `MapRules.scale_depth`, 8, deeper rooms keep it) and a fight's enemies by its scaled budget, the boss's boss (`BiomeMap.room_scales`, `enemies_of`). A room's pace (`SpawnRules`) is worked out from its scale as the party enters it (CB8), not kept.
 - **Rule changes** (`RunRuleChange`) target the new numbers: `ROOMS_MIN`, `ROOMS_MAX`, `FIGHTS_ON_WAY`, `SCALE_DEPTH`, `KIND_LEAST`, `KIND_CHANCE`, `STYLE_WEIGHT` (a style by its id); the row map's depth and width targets stay until CB8 takes the row map out.
@@ -228,6 +228,24 @@ What CB3 built, and where it settled what the plan left open:
 
 1. The plan: approved as written.
 2. CB1's measuring scene: kept as a stress test.
+
+## Answered by the owner (2026-11-19)
+
+1. **Loops:** build both straight walkways of several lengths (every 32 px, about 96 to 384 px) and corner (L-shaped) walkways; that content comes in CB13 and its art in CB12. The generator stays general and bridges with a corner walkway as with a straight one (CB5: a walkway's sockets need not face each other; `test_biome_generator.gd` plays corners).
+2. **"At least 4 fights on the way"** is read strictly, on any route from the start room to the boss: kept.
+3. **The boss's room** is a dead end and stands strictly deepest: kept.
+4. **Casting from inside a doorway** keeps today's rule: the shot stops at the mouth, with its impact.
+5. **Props never keep a room awake:** kept.
+6. **Only a standing wizard's own body starts a fight:** kept.
+7. **A downed wizard crawls** at a quarter of walking speed: kept.
+8. **Cover per room** is a new step, CB3b.
+9. **The ground's C++** moves to its own `GroundKernel` class (the owner allowed the `ci/smbot/rules.py` edit).
+10. **CB1's stress test** stays on demand, not in `tests/build.json`.
+11. **Frame-time targets** (decision 31): 16.7 ms on desktop and 33 ms on the web for 4 views, tuned later.
+12. **DESIGN.md's reward line** is changed to decision 17 by CB10.
+13. **Before relics, a reward** may be a spell card, a card upgrade, healing or a little max health, or coins.
+14. **CB13** keeps growing the crypt's templates toward 12 to 16 fights after the first full set.
+15. **CB4** keeps drawing unmirrored rooms at layout too.
 
 ## Not in this plan
 

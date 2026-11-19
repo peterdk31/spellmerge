@@ -27,7 +27,7 @@ extends RefCounted
 ##    players) and a fight's enemies bought by its scaled budget, the boss's one boss (`RoomFill`).
 ##
 ## **Placing a room** (decisions 2 and 6): over a free socket of the room it hangs off, a bridge
-## (a walkway of the biome, any mirroring whose end faces the socket), and at the bridge's far end
+## (a walkway of the biome, straight or a corner, any mirroring whose end faces the socket), and at the bridge's far end
 ## a template that hosts the room's kind with a socket facing it, in any of its four mirrorings
 ## (`BiomeMap.room_mirrors`: BiomeWorld lays its collision mirrored and Feel draws its ground so,
 ## CB4), never a template the biome holds already (the start room excepted; bridges repeat), with

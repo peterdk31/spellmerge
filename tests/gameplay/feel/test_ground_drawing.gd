@@ -52,7 +52,10 @@ func _spec(shape: Dictionary, scene: PackedScene, mirror: Vector2i = Vector2i.ZE
 
 func _native_or_say() -> bool:
 	if NativeScript.loaded():
-		return true
+		# A module built before GroundKernel would draw by the GDScript and compare it with itself.
+		var has_kernel: bool = NativeScript.ground_kernel() != null
+		check(has_kernel, "the native module is loaded but has no GroundKernel (build it again: ci/build/native.sh)")
+		return has_kernel
 	check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "SPELLMERGE_NATIVE=required, but the native module is not loaded")
 	return false
 

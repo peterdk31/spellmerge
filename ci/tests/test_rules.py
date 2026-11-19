@@ -82,6 +82,8 @@ class BannedApiTest(unittest.TestCase):
         self.assertTrue(banned(good.replace("ShotKernel", "HTTPRequest"), rules.NATIVE_FILE))
         self.assertTrue(banned('ClassDB.instantiate(name)', rules.NATIVE_FILE))
         self.assertTrue(banned(good + 'var x := Expression.new()\n', rules.NATIVE_FILE))
+        for name in ("ShotKernel", "MoteKernel", "DMathKernel", "BodyKernel", "GroundKernel"):
+            self.assertEqual(banned(good.replace("ShotKernel", name), rules.NATIVE_FILE), [], name)
 
     def test_tool_scripts_only_in_claudes_folders(self) -> None:
         # The owner's decision of 2026-11-11: @tool is allowed where contributors cannot write.

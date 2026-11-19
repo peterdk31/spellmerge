@@ -4,7 +4,7 @@ A kind of room is what a room of a run's map is for the game (run generation, do
 
 ## Contract
 
-- `fill`: how a room of the kind is filled, one of `RoomKind.FILLS`: `enemies` (an enemy budget spent on the biome's enemies whose `min_depth` the room has reached) or `boss` (one of the biome's bosses).
+- `fill`: how a room of the kind is filled, one of `RoomKind.FILLS`: `enemies` (an enemy budget spent on the biome's enemies whose `min_depth` the room has reached), `boss` (one of the biome's bosses) or `none` (nothing: a safe room).
 - `ends`: what ends it, one of `RoomKind.ENDS`: `enemies_down`.
 - `door` (connected biomes CB7): how a room of the kind is entered in a biome, one of `RoomKind.DOORS`: none (free), `gather` (a gather door: shut until every standing wizard is on its bridge, then the standing ones come in together; a challenge room, CB11) or `gate` (the boss's: a gather door that also waits while any sealed fight holds a wizard, and then brings everyone, downed or far away). A row run reads none of it.
 - `portal_home` (CB7): true when a room of the kind, cleared, opens the portal home on its floor (at its template's zone `portal`, else its middle): every standing wizard in it ends the run, won, back in the hub.
@@ -15,6 +15,7 @@ A kind of room is what a room of a run's map is for the game (run generation, do
 | --- | --- | --- |
 | `fight` | `enemies` | a fight: its enemies stand as it starts, and it is cleared when they are down |
 | `boss` | `boss` | the boss's room: in a biome its gate (`door = gate`) and, cleared, the portal home |
+| `start` | `none` | a biome's start room (connected biomes CB5, `MapRules.start_kind`): a small safe slab where the party arrives; hosted by no crypt template yet (CB13) |
 
 ## Allowed files
 

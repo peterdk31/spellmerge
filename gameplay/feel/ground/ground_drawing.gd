@@ -16,7 +16,7 @@ extends RefCounted
 ## comer wins, so it may differ from the mirror at a tie. A look only.)
 ##
 ## `draw(spec)` is the whole of it, a pure function of `spec` (`GroundShape.spec`): the native twin,
-## `MoteKernel.draw_ground` (native/src/ground_kernel.cpp), gives the same bytes, and is what the game
+## `GroundKernel.draw` (native/src/ground_kernel.cpp), gives the same bytes, and is what the game
 ## calls when the module is loaded (`GroundShape.draw`); this is the reference and the fallback.
 ##
 ## A crack's width and an edge's share of it (`crack`, `t`) and the glow's sums are single precision,

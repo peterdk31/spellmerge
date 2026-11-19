@@ -121,6 +121,8 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
 const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
+const SplitScreenScript := preload("res://gameplay/feel/split_screen.gd")
+const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
 const ExitSignsScript := preload("res://gameplay/feel/exit_signs.gd")
 const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
@@ -494,8 +496,14 @@ var _lanes: LanesScript = null
 var _remnants: RemnantsScript = null
 ## Every actor's damage numbers (`damage_number_drawer.gd`, props W5).
 var _numbers: DamageNumberDrawerScript = null
-## The markers at the picture's edge for teammates out of it (`teammate_markers.gd`).
+## The markers at the screen's edge for teammates in none of this machine's views
+## (`teammate_markers.gd`).
 var _markers: TeammateMarkersScript = null
+## The Voronoi split screen (connected biomes CB6, `split_screen.gd`): this machine's wizards in a
+## view each group once they no longer fit in one picture. Stepped after the party camera.
+var split_screen: SplitScreenScript = null
+## The one picture as views (`ScreenViews.set_single`), for the markers while the screen is not split.
+var _one_view: ScreenViewsScript = ScreenViewsScript.new()
 ## The open room's code over the hub's altar (`altar_code.gd`).
 var _altar_code: AltarCodeScript = null
 ## The kind of room behind each lit exit of a run's room (`exit_signs.gd`).
@@ -809,12 +817,13 @@ func _ready() -> void:
 	_numbers.events = events
 	_numbers.registry = registry
 	add_child(_numbers)
-	# On a layer of its own over the HUD's, following the camera (world space).
+	# On a layer of its own over the HUD's, in screen pixels.
 	var marker_layer := CanvasLayer.new()
 	marker_layer.name = "TeammateMarkerLayer"
 	marker_layer.layer = TeammateMarkersScript.LAYER
-	marker_layer.follow_viewport_enabled = true
 	add_child(marker_layer)
+	split_screen = SplitScreenScript.new()
+	add_child(split_screen)
 	_markers = TeammateMarkersScript.new()
 	_markers.name = "TeammateMarkers"
 	marker_layer.add_child(_markers)
@@ -950,9 +959,12 @@ func step(real_delta: float) -> void:
 	var seats_here: int = _seats_here()
 	party_camera.look(_actor_table(), seats_here)
 	party_camera.step(real_delta)
+	if split_screen != null:
+		var world_camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
+		split_screen.step(real_delta, _actor_table(), seats_here, world_camera)
+		_spectacle.set_split(split_screen.views(), split_screen.mote_share(), split_screen.light_downscale())
 	if _markers != null:
-		var shown: Camera2D = party_camera.camera
-		_markers.step(_actor_table(), seats_here, party_camera.visible_rect(), shown.zoom.x if is_instance_valid(shown) else 0.0, _clock)
+		_markers.step(_actor_table(), seats_here, _views_shown(), _clock)
 	if _away_bars != null:
 		_away_bars.step(_actor_table())
 	_intro_wait.settle()
@@ -979,10 +991,11 @@ func step(real_delta: float) -> void:
 	_fall_look.step(_actor_table(), real_delta, _fall_motes if _spectacle.motes_on() else Callable())
 	if _spawn_look != null:
 		_spawn_look.step(_actor_table(), real_delta)
-	var picture: Rect2 = party_camera.visible_rect()
+	var picture: Rect2 = _picture()
+	var focus: Vector2 = _focus(picture)
 	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
 	_spectacle.step_stirs(_clock, picture)
-	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
+	_cover.step(_clock, _actor_table(), focus, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
 	# The bodies the cover found part the mist (atmosphere F): one gathering, read by both.
 	_spectacle.hand_bodies(_cover.bodies(), _cover.body_count())
 	_spectacle.step(_clock, _actor_table())
@@ -995,7 +1008,7 @@ func step(real_delta: float) -> void:
 	if _body_sounds != null:
 		_body_sounds.step(real_delta, _actor_table())
 	if _ambience != null:
-		_ambience.step(real_delta, picture.get_center() if picture.has_area() else Vector2.INF)
+		_ambience.step(real_delta, focus)
 	_step_labels(real_delta)
 	if _remnants != null:
 		_remnants.step(real_delta)
@@ -1137,6 +1150,8 @@ func _on_room_entered(room_id: StringName, number: int) -> void:
 	if number != EventsScript.FIRST_ROOM:
 		return
 	party_camera.room_entered()
+	if split_screen != null:
+		split_screen.camera.reset()
 	# What held a sound is gone with the last room; the music is the new room's (`body_sounds.gd`).
 	if audio != null:
 		audio.clear_world()
@@ -1173,6 +1188,38 @@ func _seats_here() -> int:
 		if tree != null and tree.root != null:
 			frames = tree.root.get_node_or_null(^"Frames") as FramesScript
 	return frames.seats_here() if frames != null else 0
+
+
+## The part of the world this machine shows now: the party camera's picture, or while the screen is
+## split the box round every view's (`ScreenViews.world_box`).
+func _picture() -> Rect2:
+	if split_screen != null and split_screen.is_drawing():
+		return split_screen.camera.views.world_box()
+	return party_camera.visible_rect()
+
+
+## Where this machine looks from (the cover's nearest bodies, the room's ambience): the picture's
+## middle; while split, the middle of the first view's (the box round the views may be the void
+## between them). INF with no picture.
+func _focus(picture: Rect2) -> Vector2:
+	if split_screen != null and split_screen.is_drawing():
+		var views: ScreenViewsScript = split_screen.camera.views
+		return views.to_screen[0].affine_inverse() * (views.screen * 0.5)
+	return picture.get_center() if picture.has_area() else Vector2.INF
+
+
+## This machine's views now: the split screen's, or the party camera's one picture as one view.
+func _views_shown() -> ScreenViewsScript:
+	if split_screen != null and split_screen.is_drawing():
+		return split_screen.camera.views
+	var camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
+	var picture: Rect2 = party_camera.visible_rect()
+	if camera == null or not picture.has_area():
+		_one_view.count = 0
+		return _one_view
+	var zoom: float = camera.zoom.x
+	_one_view.set_single(picture.size * zoom, Transform2D(0.0, Vector2(zoom, zoom), 0.0, -picture.position * zoom), _seats_here())
+	return _one_view
 
 
 ## The camera followed now, or null when it is gone (a freed world's).
@@ -3350,7 +3397,10 @@ func _on_player_downed(player: int) -> void:
 func _in_picture(at: Vector2) -> bool:
 	if at == Vector2.INF:
 		return true
-	var picture: Rect2 = party_camera.visible_rect()
+	# While split: in a view's cell, or within SHAKE_REACH of it (not the void between views).
+	if split_screen != null and split_screen.is_drawing():
+		return split_screen.camera.views.view_showing(at, SHAKE_REACH) >= 0
+	var picture: Rect2 = _picture()
 	return not picture.has_area() or picture.grow(SHAKE_REACH).has_point(at)
 
 

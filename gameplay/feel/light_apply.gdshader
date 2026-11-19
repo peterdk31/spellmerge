@@ -15,9 +15,10 @@ shader_type canvas_item;
 // factor is clamped to 1 in an 8-bit target, the web's included), and light added on top would
 // wash a dark floor out instead of lighting its colours.
 
-// The light buffer (the light viewport's texture: the same view, smaller). Linear, so a band's
-// edge is cut at the world's pixels, not the buffer's.
-uniform sampler2D light_buffer : filter_linear, repeat_disable;
+// The light buffer (the light viewport's texture: the same view, smaller; a view's own while the
+// screen is split, light_views.gdshaderinc). Linear, so a band's edge is cut at the world's pixels,
+// not the buffer's.
+#include "res://gameplay/feel/light_views.gdshaderinc"
 uniform sampler2D screen : hint_screen_texture, filter_nearest, repeat_disable;
 // The room's light where no spell lights it (1.0: as it is), and the colour of its dark
 // (`RoomBase.shade`; white: an even dark), multiplied together.
@@ -54,8 +55,12 @@ float gain_of(float most) {
 	return gain;
 }
 
+void vertex() {
+	LIGHT_VIEW_FIND;
+}
+
 void fragment() {
-	vec3 shine = texture(light_buffer, SCREEN_UV).rgb;
+	vec3 shine = view_light(SCREEN_UV);
 	float most = max(shine.r, max(shine.g, shine.b));
 	float gain = gain_of(most);
 	vec3 dark = vec3(ambient) * shade;

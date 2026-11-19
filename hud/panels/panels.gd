@@ -386,7 +386,8 @@ func step_hints(delta: float) -> void:
 		menus[player] = not _in_room or _has_menu(player) or (_pause_menu != null and _pause_menu.is_open())
 	var viewport: Viewport = get_viewport()
 	var to_screen: Transform2D = viewport.get_canvas_transform() if viewport != null else Transform2D.IDENTITY
-	_item_hints.step(delta, menus, transform.affine_inverse() * to_screen)
+	# While the screen is split (connected biomes CB6) each hint follows its player's own view.
+	_item_hints.step(delta, menus, transform.affine_inverse() * to_screen, ScreenViews.on(viewport), transform.affine_inverse())
 
 
 ## The item hints (for tests and screenshots).

@@ -23,7 +23,7 @@ extends FrameSource
 ## near), round the walls, leaning aside from every enemy ahead within CRAWL_SHY of it so it never
 ## crawls into one, and stops once within CRAWL_BESIDE of that teammate; with none standing it lies still.
 ## Travel (connected biomes CB8): out of a fight (its room under way or not, `RoomLife`), a fighter
-## walks the biome's bridges to the nearest room whose fight is still to come (the fewest bridges from
+## walks the biome's bridges to the nearest room whose fight is still to come or under way (the fewest bridges from
 ## where it stands; one behind a shut door, the boss's gate, it waits at: `Flow.gates`), along the
 ## shortest walk over the wall grid (`bot_route.gd`: round a room's walls, along a walkway of any
 ## shape and mirroring, through its mouths; on to a shut door's bridge to wait there; round the walls
@@ -262,7 +262,9 @@ func travel(wizard: Actor) -> Vector2:
 	for room in map.rooms():
 		# A room behind a shut door (the boss's gate) is a goal too: the bot walks to its door and
 		# waits there with the party; no way leads through it.
-		if not life.has(room, RoomLife.ENTERED) and life.fights[room].has_enemies():
+		# A fight under way is one too: a teammate who walked in first is fighting there (2026-11-19:
+		# the others stood still once it was entered).
+		if not life.has(room, RoomLife.CLEARED) and life.fights[room].has_enemies():
 			_hops[room] = 0
 			_hops_queue[tail] = room
 			tail += 1

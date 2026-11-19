@@ -101,8 +101,9 @@ func _joined(walkway: StringName, mirror: int, way: PieceShape, rooms: Array) ->
 
 
 ## Lay `map`, stand the bot's wizard in room `from` and walk it toward the fight in the other room
-## (behind a shut gather door when `shut`) for up to TICKS ticks; true once `there(wizard, biome)`.
-func _walked(map: BiomeMap, from: int, shut: bool, there: Callable) -> bool:
+## (behind a shut gather door when `shut`; already under way, a teammate in it, when `under_way`) for
+## up to TICKS ticks; true once `there(wizard, biome)`.
+func _walked(map: BiomeMap, from: int, shut: bool, there: Callable, under_way: bool = false) -> bool:
 	var biome := BiomeWorld.new()
 	biome.registry = _world.registry
 	biome.projectiles = _world.projectiles
@@ -115,6 +116,9 @@ func _walked(map: BiomeMap, from: int, shut: bool, there: Callable) -> bool:
 	fights[to].enemies = [&"skeleton"] as Array[StringName]
 	var life := RoomLife.new()
 	life.begin(map.rooms(), biome.places(), fights)
+	if under_way:
+		life.set_flag(to, RoomLife.ENTERED, true)
+		life.set_flag(to, RoomLife.STARTED, true)
 	_flow.biome = biome
 	_flow.life = life
 	_flow.gates = null
@@ -203,3 +207,13 @@ func test_a_bot_waits_on_a_corner_walkway_by_a_shut_door() -> void:
 				return
 			check(_walked(map, 0, true, _at_the_door(0)), "%s mirrored %d: the bot waits by the shut door" % [walkway, mirror])
 			_fresh_world()
+
+
+func test_a_bot_joins_a_fight_a_teammate_started() -> void:
+	# Regression (replay seed 57, 2026-11-19): once one bot stepped into the fight room it was
+	# entered, no longer a fight to come, and the others stood still in the room before it.
+	var map: BiomeMap = _map(WALKWAYS[2], 0)
+	if map != null:
+		# In a fight under way the brain plays (travel stops): it only has to get in.
+		var in_room: Callable = func(wizard: Actor, _biome: BiomeWorld) -> bool: return wizard.room == 1
+		check(_walked(map, 0, false, in_room, true), "it walks into the fight under way")

@@ -24,7 +24,8 @@ var _sprite: Sprite2D = null
 var _stage: int = 0
 var _stage_time: float = 0.0
 ## What it drew last: the ring's key, the sprite's corner and its flip (to redraw only on a change).
-var _drawn_key: String = ""
+var _drawn_texture: int = 0
+var _drawn_frame: Rect2 = Rect2()
 var _drawn_corner: Vector2 = Vector2.INF
 var _drawn_flip: bool = false
 var _drawn_stage: int = -1
@@ -42,7 +43,7 @@ func setup(owner_actor: Actor) -> void:
 ## After a snapshot: drawn as it stands (whole once the body is in), never played in again.
 func sync() -> void:
 	_stage = STAGES if actor != null and actor.spawn_left <= 0.0 else 0
-	_drawn_key = ""
+	_drawn_texture = 0
 
 
 ## The stage it is drawn at (0 none ... STAGES whole; for tests).
@@ -69,16 +70,19 @@ func step(delta: float) -> void:
 		if _stage == 0:
 			_stage = 1
 	var frame: Rect2 = _frame_rect()
-	var key: String = "%d|%s" % [_sprite.texture.get_rid().get_id(), frame]
-	if key != _drawn_key:
-		var found: Array = _ring_of(key, frame)
+	var texture: int = _sprite.texture.get_instance_id()
+	var changed: bool = texture != _drawn_texture or frame != _drawn_frame
+	if changed:
+		# Only as the frame changes (a key made then, never each step).
+		var found: Array = _ring_of("%d|%s" % [texture, frame], frame)
 		_ring = found[0]
 		_ring_stages = found[1]
 		_size = frame.size
 	var corner: Vector2 = _sprite.position + _sprite.offset - (frame.size * 0.5 if _sprite.centered else Vector2.ZERO)
 	corner = corner.round()
-	if key != _drawn_key or corner != _drawn_corner or _sprite.flip_h != _drawn_flip or _stage != _drawn_stage:
-		_drawn_key = key
+	if changed or corner != _drawn_corner or _sprite.flip_h != _drawn_flip or _stage != _drawn_stage:
+		_drawn_texture = texture
+		_drawn_frame = frame
 		_drawn_corner = corner
 		_drawn_flip = _sprite.flip_h
 		_drawn_stage = _stage

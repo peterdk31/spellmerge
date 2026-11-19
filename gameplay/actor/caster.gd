@@ -529,6 +529,8 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 	staffs = new_staffs.duplicate()
 	staff = staffs[0]
 	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)
+	# An elite's slot more was its own first staff's (connected biomes CB11): new staffs have none.
+	extra_slots = 0
 	empty_hands = 0
 	for at in MAX_STAFFS:
 		_mana[at] = max_mana_of(at)
@@ -628,7 +630,9 @@ func _compiled(cards: Array[StringName], base: StaffBase, slots: int) -> Compile
 ## The compiled staff of `cards` on `base` for a trial: the staffs' own cache's when it is there (a
 ## build held), else the trials' (made there, never in the staffs' own).
 func _tried(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
-	var key: String = _key(cards, base, base.slots)
+	# The first staff of an elite reads its slot more (connected biomes CB11).
+	var slots: int = base.slots + (extra_slots if base == staff_of(0) else 0)
+	var key: String = _key(cards, base, slots)
 	var found: CompiledStaff = _cache.get(key) as CompiledStaff
 	if found == null:
 		found = _trials.get(key) as CompiledStaff
@@ -636,15 +640,15 @@ func _tried(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
 		return found
 	if _trials.size() >= CACHE_SIZE:
 		_trials.clear()
-	found = actor.spells.compile_staff(cards, base, _spell_scale())
+	found = actor.spells.compile_staff(cards, base, _spell_scale(), slots)
 	_trials[key] = found
 	return found
 
 
-## The caches' key of `cards` on `base` with `slots` slots at the body's spell scale:
-## "spells id|staff id|slots|scale|cards".
-func _key(cards: Array[StringName], base: StaffBase, slots: int) -> String:
-	return "%d|%d|%d|%s|%s" % [actor.spells.get_instance_id(), base.get_instance_id(), slots, _spell_scale(), ",".join(PackedStringArray(cards))]
+## The caches' key of `cards` on `base` with `slots` slots (-1: the staff's own) at the body's spell
+## scale: "spells id|staff id|slots|scale|cards".
+func _key(cards: Array[StringName], base: StaffBase, slots: int = -1) -> String:
+	return "%d|%d|%d|%s|%s" % [actor.spells.get_instance_id(), base.get_instance_id(), slots if slots >= 0 else base.slots, _spell_scale(), ",".join(PackedStringArray(cards))]
 
 
 ## The size its spells are built at (boss plan OB7): its body's `Stats.spell_scale`, 1 without.

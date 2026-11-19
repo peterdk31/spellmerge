@@ -30,7 +30,8 @@ extends Node
 ## - **A fountain** (CB11, decision 20): as a fountain room opens, its pool fills with POOL_HEALTH
 ##   times the highest `fountain_pool` of the players then, shared: every hurt standing wizard whose
 ##   own feet are in it draws DRAW_RATE health a second from it until they are whole or it runs dry
-##   (`fountain_changed`).
+##   (`fountain_changed`). The pool counts what was asked of Combat (`health_gift_requested`), which
+##   heals it as asked.
 ## - **Run stats** (`RunStats`): the run's own changes come with `run_stats_ruled` (the Run area's,
 ##   as a run of rooms begins); a player's are those, then their relics' (the relics bag of its
 ##   wizard, `RelicBase`). Read by name: `stat_of`.

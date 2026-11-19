@@ -10,14 +10,15 @@ extends RefCounted
 ##   (`RoomGrid.shut_mouth`: a wall to everything) until the room opens; then all its doors open, for
 ##   everyone (decision 21: a key door opens for all).
 ## - **A key** (one a key room, decision 21) is dropped on the way to its room: in the room its
-##   bridge hangs off (a key room is a dead end), as that room is cleared (`drop_keys`; a room with no
+##   bridge hangs off (a key room is a dead end; else the shallowest room beside it), as that room is cleared (`drop_keys`; a room with no
 ##   fight is cleared as it is entered). It lies there until the first standing wizard (in the
 ##   party's order) whose feet come within KEY_REACH takes it: the party holds it. With it held, the
 ##   first standing wizard at one of its room's doors (on its bridge, or on the room's lip outside the
 ##   shut mouth, as at a gather door) opens it, and the key is spent.
 ## - **A secret rock** (decision 22) opens to one element, rolled for its room as the biome begins
-##   (Flow's `_begin_locks`): that element touching the floor (`floor_touched`) with its circle
-##   within TOUCH_REACH of a door's mouth breaks the rock (`touched`), and the room opens.
+##   (Flow's `_begin_locks`): that element touching the floor (`floor_touched`, queued by
+##   `queue_touch` and applied at the next `step`, never in the middle of the shots' step) with its
+##   circle within TOUCH_REACH of a door's mouth breaks the rock (`touched`), and the room opens.
 ## - **The view** is told each key door (`key_door_shown`), each rock (`secret_rock_shown`, with its
 ##   element) and each key (`key_shown`) as it changes; -1 when every one is forgotten (the biome left,
 ##   a restore: told again by `tell_all`). Never read back by the simulation.
@@ -59,6 +60,11 @@ var key_rooms: PackedInt32Array = PackedInt32Array()
 var key_drops: PackedInt32Array = PackedInt32Array()
 var key_states: PackedByteArray = PackedByteArray()
 var key_at: PackedVector2Array = PackedVector2Array()
+## The floor touches heard since the last step (`queue_touch`), applied at the next (`step`), so a
+## rock never opens in the middle of the shots' step: each one's element, place and radius.
+var touch_elements: Array[StringName] = []
+var touch_at: PackedVector2Array = PackedVector2Array()
+var touch_radii: PackedFloat32Array = PackedFloat32Array()
 var _mouths: Array[Rect2] = []
 
 
@@ -85,11 +91,17 @@ func begin(map: BiomeMap, room_rules: PackedByteArray, room_elements: Array[Stri
 			door_rooms.append(room)
 			door_bridges.append(bridge)
 			door_ends.append(end)
-			if rules[room] == RULE_KEY and not key_rooms.has(room):
+			var other: int = map.end_room(bridge, 1 - end)
+			var at_key: int = key_rooms.find(room)
+			if rules[room] == RULE_KEY and at_key < 0:
 				key_rooms.append(room)
-				key_drops.append(map.end_room(bridge, 1 - end))
+				key_drops.append(other)
 				key_states.append(KEY_WAITING)
 				key_at.append(Vector2.ZERO)
+			elif at_key >= 0 and other < map.depths.size() and key_drops[at_key] < map.depths.size() and map.depths[other] < map.depths[key_drops[at_key]]:
+				# A key room with more than one bridge: its key drops in the shallowest room beside it,
+				# the one on the way to it.
+				key_drops[at_key] = other
 
 
 ## No biome: no door, no key (the view told every one is forgotten, when there was one).
@@ -105,6 +117,9 @@ func clear() -> void:
 	key_drops.resize(0)
 	key_states.resize(0)
 	key_at.resize(0)
+	touch_elements.clear()
+	touch_at.resize(0)
+	touch_radii.resize(0)
 	_mouths.clear()
 	if had:
 		_forget(false)
@@ -164,8 +179,14 @@ func drop_keys(room: int, at: Vector2) -> void:
 ## One tick of the locks with `party` (the wizards, in seat order) and `life` the rooms' state
 ## (`rooms()` of them, whose bridges' places follow): each lying key the first standing wizard's feet
 ## reach is taken, then each shut key room whose key is held opens once a standing wizard is at one
-## of its doors (the key spent). Returns the room opened (NONE for none; one a tick).
+## of its doors (the key spent); the floor touches queued since the last step break their rocks
+## first. Returns the key room opened (NONE for none; one a tick).
 func step(party: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:
+	for at in touch_elements.size():
+		touched(touch_elements[at], touch_at[at], touch_radii[at], grid)
+	touch_elements.clear()
+	touch_at.resize(0)
+	touch_radii.resize(0)
 	for key in key_rooms.size():
 		if key_states[key] != KEY_LYING:
 			continue
@@ -190,7 +211,19 @@ func step(party: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:
 	return NONE
 
 
-## An element touched the floor (`floor_touched`): `element` within `radius` of `at`. Every shut
+## An element touched the floor (`floor_touched`): kept for the next `step` (as the cover area keeps
+## its touches), only when a shut secret rock of that element is there to break.
+func queue_touch(element: StringName, at: Vector2, radius: float) -> void:
+	for door in doors():
+		var room: int = door_rooms[door]
+		if rules[room] == RULE_SECRET and not is_open(room) and elements[room] == element:
+			touch_elements.append(element)
+			touch_at.append(at)
+			touch_radii.append(radius)
+			return
+
+
+## An element touched the floor: `element` within `radius` of `at`. Every shut
 ## secret room of that element with a door's mouth within the circle's reach (TOUCH_REACH more)
 ## opens. Returns the first room opened (NONE for none).
 func touched(element: StringName, at: Vector2, radius: float, grid: RoomGrid) -> int:

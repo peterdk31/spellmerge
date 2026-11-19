@@ -1609,11 +1609,11 @@ func _kind_of(room: int) -> RoomKind:
 
 
 ## An element touched the floor (`floor_touched`, connected biomes CB11): a secret rock of that
-## element near it breaks open.
+## element near it breaks open at Flow's next step (`LockDoors.queue_touch`).
 func _on_floor_touched(_caster: int, element: StringName, at: Vector2, radius: float) -> void:
 	if mode != MODE_RUN or state != State.RUNNING or locks.doors() == 0 or world == null:
 		return
-	locks.touched(element, world.to_local(at), radius, projectiles.grid() if projectiles != null else null)
+	locks.queue_touch(element, world.to_local(at), radius)
 
 
 ## A piece of the biome was laid (`BiomeWorld.built`): `room_built` for it.

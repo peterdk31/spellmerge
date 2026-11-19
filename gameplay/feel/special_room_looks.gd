@@ -11,8 +11,8 @@ extends Node2D
 ##
 ## **Smooth** (docs/STYLE.md): each comes in and goes by STAGES (a sliver, half, whole), STAGE_FRAMES
 ## frames each, never popping; a pool's water moves a pixel a frame to its new height. Whole pixels,
-## never a fade. After a restore (-1 told for keys and fountains; a shelf item said again) what is
-## said again keeps how far it had come in. A child of Feel, top level (world space); view only, on
+## never a fade. After a restore (-1 told for keys and fountains, then each said again; a shelf item
+## said again) what is said again in the same frame keeps how far it had come in. A child of Feel, top level (world space); view only, on
 ## real time.
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -45,9 +45,9 @@ const OUTLINE: Color = Color("14121f")
 
 ## Shelf items by number: [at, choice view, price, frames come in, going].
 var _items: Dictionary = {}
-## Fountains by room: [area, left share drawn (pixels of water), wanted pixels, frames come in].
+## Fountains by room: [area, pixels of water drawn, wanted pixels, frames come in, forgotten].
 var _pools: Dictionary = {}
-## Keys by number: [at, frames come in, going].
+## Keys by number: [at, frames come in, going, forgotten].
 var _keys: Dictionary = {}
 var _clock: float = 0.0
 ## Scratch: the things gone this frame (reused, no allocation a frame).
@@ -102,7 +102,10 @@ func _on_shelf_changed(item: int, at: Vector2, choice: Dictionary, price: int, l
 
 func _on_fountain_changed(room: int, area: Rect2, left: float, most: float) -> void:
 	if room < 0:
-		_pools.clear()
+		# Forgotten (the world went, or a restore says each again): those not said again by the
+		# next frame go; one said again keeps how far it had come in.
+		for kept: int in _pools:
+			(_pools[kept] as Array)[4] = true
 		queue_redraw()
 		return
 	var wanted: int = _water_pixels(area, left, most)
@@ -110,21 +113,27 @@ func _on_fountain_changed(room: int, area: Rect2, left: float, most: float) -> v
 		var row: Array = _pools[room]
 		row[0] = area
 		row[2] = wanted
+		row[4] = false
 	else:
-		_pools[room] = [area, wanted, wanted, 0.0]
+		_pools[room] = [area, wanted, wanted, 0.0, false]
 	queue_redraw()
 
 
 func _on_key_shown(key: int, at: Vector2, lying: bool) -> void:
 	if key < 0:
-		_keys.clear()
+		# Forgotten: each key goes unless said again (a restore), keeping how far it had come in.
+		for kept: int in _keys:
+			(_keys[kept] as Array)[3] = true
 		queue_redraw()
 		return
 	if lying:
-		if _keys.has(key) and not bool((_keys[key] as Array)[2]):
-			(_keys[key] as Array)[0] = at
+		if _keys.has(key):
+			var row: Array = _keys[key]
+			row[0] = at
+			row[2] = false
+			row[3] = false
 		else:
-			_keys[key] = [at, 0.0, false]
+			_keys[key] = [at, 0.0, false, false]
 	elif _keys.has(key):
 		(_keys[key] as Array)[2] = true
 	queue_redraw()
@@ -147,6 +156,17 @@ func _process(delta: float) -> void:
 		return
 	_clock += delta
 	var frames: float = delta * 60.0
+	# What a -1 forgot and was not said again by now goes (keys back down their stages; pools at once).
+	_gone.clear()
+	for room: int in _pools:
+		if bool((_pools[room] as Array)[4]):
+			_gone.append(room)
+	for room: int in _gone:
+		_pools.erase(room)
+	for key: int in _keys:
+		if bool((_keys[key] as Array)[3]):
+			(_keys[key] as Array)[2] = true
+			(_keys[key] as Array)[3] = false
 	_step_rows(_items, 3, 4, frames)
 	_step_rows(_keys, 1, 2, frames)
 	for room: int in _pools:

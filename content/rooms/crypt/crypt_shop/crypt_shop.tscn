@@ -26,14 +26,46 @@ region_rect = Rect2(0, 0, 448, 320)
 [node name="Candles1" parent="Decor" instance=ExtResource("3_candles")]
 position = Vector2(96, 96)
 
+[node name="Core" parent="Decor/Candles1" index="1"]
+speed_scale = 1.1
+frame = 5
+
+[node name="Flame" parent="Decor/Candles1" index="3"]
+speed_scale = 1.1
+frame = 2
+
 [node name="Candles2" parent="Decor" instance=ExtResource("3_candles")]
 position = Vector2(352, 96)
+
+[node name="Core" parent="Decor/Candles2" index="1"]
+speed_scale = 0.9
+frame = 2
+
+[node name="Flame" parent="Decor/Candles2" index="3"]
+speed_scale = 0.9
+frame = 6
 
 [node name="Candles3" parent="Decor" instance=ExtResource("3_candles")]
 position = Vector2(96, 232)
 
+[node name="Core" parent="Decor/Candles3" index="1"]
+speed_scale = 1.25
+frame = 7
+
+[node name="Flame" parent="Decor/Candles3" index="3"]
+speed_scale = 1.25
+frame = 4
+
 [node name="Candles4" parent="Decor" instance=ExtResource("3_candles")]
 position = Vector2(352, 232)
+
+[node name="Core" parent="Decor/Candles4" index="1"]
+speed_scale = 0.95
+frame = 3
+
+[node name="Flame" parent="Decor/Candles4" index="3"]
+speed_scale = 0.95
+frame = 0
 
 [node name="PlayerSpawns" type="Node2D" parent="."]
 

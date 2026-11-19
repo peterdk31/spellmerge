@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
-## The map as this machine draws it (connected biomes CB9): each bridge mouth's kind symbol, big, lit
-## and always shown (the owner, 2026-11-19), turning over by rows on a reroll; the held Y map, opening over frames inside its own player's view's
+## The map as this machine draws it (connected biomes CB9): each bridge mouth's kind symbol, big and
+## lit, rising in by rows as a wizard comes near (the owner, 2026-11-19), turning over on a reroll; the held Y map, opening over frames inside its own player's view's
 ## cell only; and the party's map and the dark over the unvisited rooms right on a machine that joins
 ## mid-run (it hears only the restore). On the real autoloads with the split test map
 ## (tests/support/biome_maps.gd: the nave the start room, the antechamber west, the ossuary court
@@ -116,9 +116,10 @@ func test_a_kind_symbol_is_a_whole_picture() -> void:
 	check(none.problems().is_empty() and none.symbol_pixels().is_empty(), "no symbol: nothing is told, and nothing is wrong")
 
 
-## Every mouth's sign is big (SCALE px a symbol pixel), lit by a light spot in its kind's light, on
-## its bridge outside the mouth, and shown wherever the wizards are (the owner, 2026-11-19).
-func test_a_mouth_tells_the_kind_behind_it_big_and_lit_from_afar() -> void:
+## Every mouth's sign is big (SCALE px a symbol pixel), on its bridge outside the mouth and clear of
+## its room; it rises in by rows, lit, as a wizard comes near and sinks back once none is (the owner,
+## 2026-11-19).
+func test_a_mouth_tells_the_kind_behind_it_big_and_lit_rising_as_a_wizard_comes_near() -> void:
 	var map: BiomeMap = _start(1)
 	var mouths: MouthLooksScript = feel.call(&"mouth_looks") as MouthLooksScript
 	var symbols: MouthSymbolsScript = feel.call(&"mouth_symbols") as MouthSymbolsScript
@@ -137,23 +138,46 @@ func test_a_mouth_tells_the_kind_behind_it_big_and_lit_from_afar() -> void:
 		check(not box.intersects(_grid().place_rect(mouths.room_of(mouth))), "clear of its room, which its dark covers until entered")
 		check(box.get_center().distance_to(_grid().place_rect(mouths.room_of(mouth)).get_center()) > area.get_center().distance_to(_grid().place_rect(mouths.room_of(mouth)).get_center()), "on the side away from its room")
 		check_equal(box.position, box.position.floor(), "in whole pixels")
-		check_equal(symbols.rows_of(mouth), RoomKind.SYMBOL_SIDE, "mouth %d's sign shows wherever the wizard is" % mouth)
-		var light: Marker2D = symbols.light_of(mouth)
-		check(light != null and light.is_in_group(LightSpot.GROUP), "mouth %d's sign is lit" % mouth)
-		if light != null:
-			check(box.has_point(light.global_position), "its light stands on it")
-			var kind: RoomKind = _hearing().kind_of(mouths.room_of(mouth))
-			check_equal(light.get_meta(LightSpot.TINT), KindSymbolScript.shades_of(kind)[1], "in its kind's light")
 		if mouths.room_of(mouth) == WEST:
 			into_west = mouth
 	check(into_west >= 0, "a mouth leads into the antechamber")
-	# Far away, from inside the room it leads to, and for a machine with no seat here: still told.
-	for at: Vector2 in [_grid().place_rect(EAST).get_center(), _grid().place_rect(WEST).get_center()]:
-		_wizard(0).global_position = at
-		symbols.step(0.0, actors, 1, _grid())
-		check(not symbols.is_moving() and symbols.rows_of(into_west) == RoomKind.SYMBOL_SIDE, "told from %s" % at)
+	# Far from it: nothing told yet, no light.
+	_wizard(0).global_position = _grid().place_rect(EAST).get_center()
+	symbols.step(0.0, actors, 1, _grid())
+	while symbols.is_moving():
+		symbols.advance()
+	check_equal(symbols.rows_of(into_west), 0, "far from it, the antechamber's mouth tells nothing")
+	check(symbols.light_of(into_west) == null, "and casts no light")
+	# Near it: it rises a row a frame, its light brightening with it.
+	_wizard(0).global_position = Rect2(mouths.area_of(into_west)).get_center() + Vector2(40.0, 0.0)
+	symbols.step(0.0, actors, 1, _grid())
+	var rows: Array[int] = []
+	var strengths: Array[float] = []
+	while symbols.is_moving():
+		symbols.advance()
+		rows.append(symbols.rows_of(into_west))
+		var light: Marker2D = symbols.light_of(into_west)
+		strengths.append(LightSpot.strength_of(light) if light != null else 0.0)
+	check_equal(rows, [1, 2, 3, 4, 5, 6, 7] as Array[int], "near it, the symbol rises in a row a frame")
+	for i in strengths.size():
+		check(is_equal_approx(strengths[i], MouthSymbolsScript.LIGHT_STRENGTH * rows[i] / RoomKind.SYMBOL_SIDE), "its light brightens with its rows (%s)" % [strengths])
+	var shown: Marker2D = symbols.light_of(into_west)
+	check(shown != null and Rect2(symbols.corner_of(into_west), Vector2.ONE * side).has_point(shown.global_position), "lit, its light on it")
+	if shown != null:
+		check_equal(shown.get_meta(LightSpot.TINT), KindSymbolScript.shades_of(_hearing().kind_of(WEST))[1], "in its kind's light")
 	symbols.step(0.0, actors, 0, _grid())
-	check_equal(symbols.rows_of(into_west), RoomKind.SYMBOL_SIDE, "told whoever plays here")
+	check(not symbols.is_moving(), "with no seat played here (a recording), anyone's wizard near tells, as the camera holds everyone")
+	symbols.step(0.0, actors, 0b0010, _grid())
+	check(not symbols.is_moving(), "and with a seat here that has no wizard yet")
+	# From inside the room it leads to: it tells nothing new and sinks a row a frame.
+	_wizard(0).global_position = _grid().place_rect(WEST).get_center()
+	symbols.step(0.0, actors, 1, _grid())
+	rows.clear()
+	while symbols.is_moving():
+		symbols.advance()
+		rows.append(symbols.rows_of(into_west))
+	check_equal(rows, [6, 5, 4, 3, 2, 1, 0] as Array[int], "no wizard near: it sinks back the same way")
+	check(symbols.light_of(into_west) == null, "its light out")
 	check(map != null, "the map")
 
 
@@ -412,7 +436,13 @@ func test_a_reward_rooms_mouth_and_the_map_tell_its_type() -> void:
 		else:
 			check_equal(symbols.glyphs_of(mouth), 0, "a mouth into a room of no type tells only its kind")
 	check(into_west >= 0, "a mouth leads into the reward room")
-	check_equal(symbols.rows_of(into_west), RoomKind.SYMBOL_SIDE, "a biome laid: its sign drawn as it stands")
+	_wizard(0).global_position = Rect2(mouths.area_of(into_west)).get_center() + Vector2(40.0, 0.0)
+	symbols.step(0.0, actors, 1, _grid())
+	var frames: int = 0
+	while symbols.is_moving():
+		symbols.advance()
+		frames += 1
+	check(frames >= 3, "the sign rises over at least 3 frames (Smooth): %d" % frames)
 	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
 	view.step(0.0, actors, 1, _grid(), _two_views())
 	check(view.draws_symbol(WEST), "the map shows the reward room led to")
@@ -466,6 +496,10 @@ func test_a_rerolled_rooms_sign_sinks_out_and_its_new_one_rises() -> void:
 	for mouth in mouths.mouths():
 		if mouths.room_of(mouth) == WEST:
 			into_west = mouth
+	_wizard(0).global_position = Rect2(mouths.area_of(into_west)).get_center() + Vector2(40.0, 0.0)
+	symbols.step(0.0, actors, 1, _grid())
+	while symbols.is_moving():
+		symbols.advance()
 	check_equal(symbols.rows_of(into_west), RoomKind.SYMBOL_SIDE, "the fight's sign shown")
 	var old_light: Marker2D = symbols.light_of(into_west)
 	flow.call(&"_reroll_room", WEST, _rerolled_west(), RoomFight.new())

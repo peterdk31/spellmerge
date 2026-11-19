@@ -8,7 +8,9 @@ extends RefCounted
 ## wizard of this machine's seats (`Frames.seats_here`; 0: every seat) stands in, and the places
 ## touching it (a room's bridges, a bridge's rooms), so a shot stopping at a room's mouth (on its
 ## bridge) is heard from inside and a wizard on a bridge hears both ends. A point in no place (the
-## void, a world with no places: a row run, the hub) is heard. Audio asks `hears` for every world
+## void, a world with no places: a row run, the hub) is heard. While none of this machine's wizards
+## stands in a place (one falling, freed, not stood yet) the places heard last stay heard, so the
+## biome never goes silent for a frame. Audio asks `hears` for every world
 ## sound (`Ears.heard`, core/audio).
 ##
 ## **The music** follows the room (not a bridge) of this machine's wizards that is the most intense:
@@ -100,13 +102,15 @@ func step(table: ActorsScript, seats_here: int, grid: RoomGrid) -> void:
 		return
 	if places != _touch_places:
 		_work_out_touches(grid, places)
-	_heard.resize(places)
-	_heard.fill(0)
+	if _heard.size() != places:
+		_heard.resize(places)
+		_heard.fill(1)
+	if table == null:
+		return
 	var best: int = NONE
 	var best_intensity: int = 0
 	var keep: bool = false
-	if table == null:
-		return
+	var found: bool = false
 	for seat in ActorsScript.SEATS:
 		if seats_here != 0 and seats_here & (1 << seat) == 0:
 			continue
@@ -116,6 +120,9 @@ func step(table: ActorsScript, seats_here: int, grid: RoomGrid) -> void:
 		var place: int = grid.place_at(body.global_position)
 		if place < 0 or place >= places:
 			continue
+		if not found:
+			found = true
+			_heard.fill(0)
 		_heard[place] = 1
 		for k in _touch_count[place]:
 			_heard[_touch[_touch_from[place] + k]] = 1

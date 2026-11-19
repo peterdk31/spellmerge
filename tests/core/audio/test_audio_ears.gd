@@ -81,3 +81,24 @@ func test_while_split_a_sound_is_heard_where_its_view_shows_it() -> void:
 	check_equal(ears.place(Vector2(2010, 0)), Vector2(1000 + 160 + 10, 0), "one by the second's, right of the middle")
 	ears.clear_views()
 	check_equal(ears.place(Vector2(2010, 0)), Vector2(2010, 0), "one picture again: where it is")
+
+
+func test_an_accent_where_nobody_hears_is_not_played() -> void:
+	audio.ears.heard = _west
+	check_equal(audio.play_accent(&"knock", Vector2(400, 0), 0.0, 1.0), -1, "not heard: no accent")
+	check(audio.play_accent(&"knock", Vector2(40, 0), 0.0, 1.0) >= 0, "heard: it plays")
+
+
+func test_refresh_hears_from_the_views_published_on_a_viewport() -> void:
+	var views := ScreenViewsScript.new()
+	views.count = 2
+	views.to_screen[0] = Transform2D.IDENTITY
+	views.to_screen[1] = Transform2D(0.0, Vector2(-1000, 0))
+	var viewport: Viewport = root.get_viewport()
+	ScreenViewsScript.publish(viewport, views)
+	var ears := EarsScript.new()
+	ears.refresh(viewport)
+	check_equal(ears.views(), 2, "published views are heard from")
+	ScreenViewsScript.withdraw(viewport)
+	ears.refresh(viewport)
+	check_equal(ears.views(), 0, "withdrawn: one picture")

@@ -121,9 +121,12 @@ func seal_of(mouth: int) -> int:
 
 
 ## The mouth whose area holds `at` grown by `reach` pixels (-1: none).
+## Grown across the mouth's depth only, so a hit on the bridge's side beside it is not on it.
 func mouth_at(at: Vector2, reach: float = 0.0) -> int:
 	for mouth in _areas.size():
-		if Rect2(_areas[mouth]).grow(reach).has_point(at):
+		var area := Rect2(_areas[mouth])
+		area = area.grow_individual(0.0, reach, 0.0, reach) if _wide[mouth] != 0 else area.grow_individual(reach, 0.0, reach, 0.0)
+		if area.has_point(at):
 			return mouth
 	return -1
 
@@ -245,6 +248,11 @@ func _find(grid: RoomGrid, places: int) -> void:
 			continue
 		_find_in(grid, place, places)
 	_size_lists()
+	# A world laid (a new biome, a restore's) is drawn as it stands, never played in.
+	read(grid)
+	for mouth in _areas.size():
+		_glow[mouth] = _glow_wanted(mouth)
+		_seal[mouth] = _seal_wanted(mouth)
 	queue_redraw()
 
 

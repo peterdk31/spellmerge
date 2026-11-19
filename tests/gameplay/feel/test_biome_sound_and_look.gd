@@ -161,11 +161,8 @@ func test_each_mouth_shimmers_and_flares_where_a_shot_stops() -> void:
 		check_equal(mouths.area_of(mouth).size, Vector2i(8, 64), "mouth %d is a cell deep and a mouth wide" % mouth)
 	rooms.sort()
 	check_equal(rooms, [0, 0, 1, 2] as Array[int], "each leads into the room it meets")
-	var glows: Array[int] = []
-	while mouths.is_moving():
-		mouths.advance()
-		glows.append(mouths.glow_of(0))
-	check_equal(glows, [1, 2, 3] as Array[int], "the shimmer comes in a shade a frame")
+	check_equal(mouths.glow_of(0), MouthLooksScript.GLOW_STAGES, "a world laid is drawn as it stands: the open mouths shimmer")
+	check(not mouths.is_moving(), "nothing plays in")
 	var middle: Vector2 = Rect2(mouths.area_of(0)).get_center()
 	events.emit_signal(&"projectile_impact", 0, null, middle + Vector2(-3.0, 0.0), Vector2.RIGHT)
 	var stages: Array[int] = [mouths.flare_of(0)]
@@ -174,6 +171,9 @@ func test_each_mouth_shimmers_and_flares_where_a_shot_stops() -> void:
 		stages.append(mouths.flare_of(0))
 	check_equal(stages, [1, 2, 3, 2, 1, 0] as Array[int], "a shot stopping there flares it, a stage a frame")
 	check(not mouths.flare(_middle_of(1)), "nowhere near a mouth, nothing flares")
+	var area := Rect2(mouths.area_of(0))
+	var beside: Vector2 = Vector2(area.get_center().x, area.position.y - 4.0) if area.size.y > area.size.x else Vector2(area.position.x - 4.0, area.get_center().y)
+	check(not mouths.flare(beside), "a hit on the bridge's side beside the mouth does not flare it")
 
 
 func test_a_seals_bars_drop_in_over_frames_then_its_rune_lights() -> void:
@@ -261,3 +261,16 @@ func test_a_gather_doors_lamps_are_lit_in_their_wizards_hat_colours() -> void:
 	while looks.is_moving():
 		looks.advance()
 	check_equal(looks.lamps_of(0), PackedInt32Array([3, 1]), "the lit lamp follows who is at the door")
+
+
+func test_with_no_wizard_of_this_machine_in_a_place_the_last_places_stay_heard() -> void:
+	_start(1)
+	var hearing: RoomHearingScript = _hearing()
+	hearing.step(actors, 0, _grid())
+	check(hearing.is_heard(0) and not hearing.is_heard(1), "the start room heard")
+	_wizard(0).global_position = Vector2(-5000.0, -5000.0)
+	hearing.step(actors, 0, _grid())
+	check(hearing.is_heard(0), "the wizard in no place (falling, not stood): the start room still heard, the biome never silent")
+	check(not hearing.is_heard(1), "and the rest still not")
+	hearing.step(null, 0, _grid())
+	check(hearing.is_heard(0), "no actor table: the same")

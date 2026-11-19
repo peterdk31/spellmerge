@@ -361,6 +361,9 @@ var registry: RegistryScript = null:
 			_cast_sounds.registry = value
 		if _ambience != null:
 			_ambience.registry = value
+		_hearing.registry = value
+		if _locks != null:
+			_locks.registry = value
 		if _spawn_look != null:
 			_spawn_look.forget_styles()
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
@@ -1060,6 +1063,9 @@ func step(real_delta: float) -> void:
 func _step_rooms(real_delta: float, seats_here: int) -> void:
 	var grid: RoomGrid = projectiles.grid() if projectiles != null and is_instance_valid(projectiles) else null
 	var table: ActorsScript = _actor_table()
+	if audio != null and not audio.ears.heard.is_valid():
+		# Feel back in the tree after it let go of Audio's ears (`_exit_tree`).
+		audio.ears.heard = _hearing.hears
 	_hearing.step(table, seats_here, grid)
 	if _hearing.in_biome() and _hearing.followed() >= 0:
 		if _body_sounds != null:

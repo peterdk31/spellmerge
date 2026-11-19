@@ -57,7 +57,7 @@ func test_a_rocks_crack_brightens_near_its_element_and_dims_again() -> void:
 	check_equal(_looks.rock_glow_of(0), LooksScript.GLOW_REST, "its crack dim at rest")
 	var fire: PackedColorArray = _looks.rock_tint_of(0)
 	var card: ElementBase = root.get_node("Registry").call(&"get_resource", &"spells", &"fire") as ElementBase
-	check(card != null and fire[1] == card.tint, "in its element's tint")
+	check(card != null and fire == Palette.shades_of(LooksScript.nearest_material(card.tint)), "in the palette material nearest its element's tint")
 	_bus.floor_touched.emit(0, &"frost", ROCK.get_center(), 16.0)
 	check(not _looks.is_moving(), "another element on it: nothing")
 	_bus.floor_touched.emit(0, &"fire", ROCK.get_center() + Vector2(400.0, 0.0), 16.0)
@@ -83,7 +83,16 @@ func test_a_broken_rock_breaks_in_stages() -> void:
 	while _looks.is_moving():
 		_looks.advance()
 		frames.append(_looks.rock_frame_of(0))
-	check_equal(frames, [1, 2, 3, 4, 5, 6] as Array[int], "its cracks spread, then it is thrown apart, a frame at a time")
+	var expected: Array[int] = []
+	for frame in LooksScript.BREAK_FRAMES:
+		expected.append(frame + 1)
+	check_equal(frames, expected, "its cracks spread, then it is thrown apart, a frame at a time")
+	check(LooksScript.SPREAD_FRAMES >= 3 and LooksScript.BREAK_FRAMES - LooksScript.SPREAD_FRAMES >= 3, "each stage at least 3 frames")
+
+
+func test_a_rocks_tint_is_the_palette_material_nearest_its_element() -> void:
+	check_equal(LooksScript.nearest_material(Palette.shades_of(&"ice")[1]), &"ice", "a palette colour is its own material")
+	check(not Palette.OWNED.has(LooksScript.nearest_material(Palette.shades_of(&"player_1")[1])), "never a player's colour")
 
 
 func test_minus_one_forgets_and_after_a_restore_what_is_told_stands() -> void:

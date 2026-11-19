@@ -9,11 +9,13 @@ extends Node2D
 ## smaller as it goes), then the bars sink into the floor (BAR_FRAMES): one chain of stages, each
 ## ending where the next begins.
 ##
-## **A secret rock:** cracks across it in its element's tint (`ElementBase.tint`, the card's), dim
+## **A secret rock:** cracks across it in its element's tint (the palette material nearest the card's
+## `ElementBase.tint`, never a player's or Blight, so the rock keeps to the palette), dim
 ## until its element touches the floor within NEAR pixels of it (a blast, a pool, a shot ending:
 ## `floor_touched`), when they brighten a shade a frame up to the brightest, held NEAR_SECONDS after
-## the last touch and then dimming again. Broken, it breaks in stages: its cracks spread and flash
-## (frames 1 and 2), then its chunks are thrown apart, shrinking (BREAK_FRAMES in all).
+## the last touch and then dimming again. Broken, it breaks in stages: its cracks spread at their
+## brightest a shade a frame and flash white (frames 1 to 3), then go dark as its chunks are thrown apart from them,
+## shrinking (BREAK_FRAMES in all).
 ##
 ## **Smooth** (docs/STYLE.md): every change steps by whole pixels at FPS. After a restore (-1 told
 ## with `open` or `broken` true) what is told next is drawn as it stands, never played in again.
@@ -48,8 +50,8 @@ const GLOW_REST: int = 1
 const NEAR: float = 96.0
 const NEAR_SECONDS: float = 1.0
 ## A rock's breaking: its frames, the cracks spreading until SPREAD_FRAMES, then the chunks.
-const BREAK_FRAMES: int = 6
-const SPREAD_FRAMES: int = 2
+const BREAK_FRAMES: int = 7
+const SPREAD_FRAMES: int = 3
 ## How many cracks a rock has, how many more as it breaks, and its chunks.
 const CRACKS: int = 3
 const CRACKS_SPREAD: int = 3
@@ -245,17 +247,32 @@ func _rock_frame_wanted(rock: int) -> int:
 
 func _glow_wanted(rock: int) -> int:
 	if _rock_broken[rock] != 0:
-		return 0
+		return GLOW_MOST
 	return GLOW_MOST if _time < _rock_near_until[rock] else GLOW_REST
 
 
-## The shades of the element `element`'s tint (shadow, base, light), the spark's for none.
+## The shades (shadow, base, light) of the palette material nearest the element `element`'s tint
+## (by its base shade; the world's materials only), the spark's for none.
 func _tint_of(element: StringName) -> PackedColorArray:
 	var card: ElementBase = registry.call(&"get_resource", SPELLS_FOLDER, element) as ElementBase if registry != null and element != &"" else null
 	if card == null:
 		return Palette.shades_of(&"spark")
-	var tint: Color = card.tint
-	return PackedColorArray([tint.darkened(0.5), tint, tint.lightened(0.45)])
+	return Palette.shades_of(nearest_material(card.tint))
+
+
+## The world's palette material (not a player's, not Blight) whose base shade is nearest `colour`.
+static func nearest_material(colour: Color) -> StringName:
+	var best: StringName = &"spark"
+	var nearest: float = INF
+	for material: StringName in Palette.MATERIALS:
+		if Palette.OWNED.has(material):
+			continue
+		var base: Color = Palette.shades_of(material)[1]
+		var gap: float = Vector3(base.r - colour.r, base.g - colour.g, base.b - colour.b).length_squared()
+		if gap < nearest:
+			nearest = gap
+			best = material
+	return best
 
 
 ## Rock `rock`'s cracks: CRACKS at rest and CRACKS_SPREAD more as it breaks, each a walk of whole
@@ -308,7 +325,7 @@ func _draw_key_door(door: int) -> void:
 	# The bars: up until the padlock is gone, then sinking.
 	var sunk: int = maxi(frame - TURN_FRAMES - FALL_FRAMES, 0)
 	_draw_bars(area, sunk)
-	if frame >= TURN_FRAMES + FALL_FRAMES:
+	if frame > TURN_FRAMES + FALL_FRAMES:
 		return
 	var middle := Vector2i(Rect2(area).get_center())
 	var lift: int = mini(frame, 2)
@@ -367,13 +384,25 @@ func _draw_rock(rock: int) -> void:
 		return
 	var tints: PackedColorArray = _rock_tints[rock]
 	var pixels: PackedVector2Array = _cracks[rock]
-	if frame <= SPREAD_FRAMES:
-		# At rest its first cracks in its glow's shade; breaking, the rest spread out and flash.
-		var shown: int = _crack_rest[rock] + ((pixels.size() - _crack_rest[rock]) * frame) / SPREAD_FRAMES
+	var shown: int = _crack_rest[rock] + ((pixels.size() - _crack_rest[rock]) * mini(frame, SPREAD_FRAMES)) / SPREAD_FRAMES
+	var colour: Color
+	if frame == 0:
+		# At rest: its first cracks in its glow's shade.
 		var glow: int = _rock_glow[rock]
-		var colour: Color = Palette.WHITE_HOT if frame == SPREAD_FRAMES else (tints[glow - 1] if glow > 0 else Palette.OUTLINE)
-		for i in shown:
-			draw_rect(Rect2(pixels[i], Vector2.ONE), colour if frame > 0 or glow > 0 else Palette.OUTLINE)
+		colour = tints[glow - 1] if glow > 0 else Palette.OUTLINE
+	elif frame < SPREAD_FRAMES:
+		# Up through the tint's shades a frame at a time.
+		colour = tints[clampi(frame, 1, 2)]
+	elif frame == SPREAD_FRAMES:
+		colour = Palette.WHITE_HOT
+	else:
+		# The chunks' first frame: the cracks they broke along, gone dark; then gone.
+		colour = tints[0]
+		if frame > SPREAD_FRAMES + 1:
+			shown = 0
+	for i in shown:
+		draw_rect(Rect2(pixels[i], Vector2.ONE), colour)
+	if frame <= SPREAD_FRAMES:
 		return
 	# Thrown apart: chunks of its stone flying out from its middle, shrinking each frame.
 	var area: Rect2i = _rock_areas[rock]

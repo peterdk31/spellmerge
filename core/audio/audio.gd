@@ -293,6 +293,8 @@ func play_bed(bed: Ambience) -> void:
 ## Plays the sound `id` as an accent of the bed, at `at`, `volume` decibels, at `pitch` its pitch
 ## scale; the voice used, or -1 for none.
 func play_accent(id: StringName, at: Vector2, volume: float, pitch: float) -> int:
+	if not ears.hears(at):
+		return -1
 	return ambience.play_accent(sound(id), ears.place(at), volume, pitch)
 
 

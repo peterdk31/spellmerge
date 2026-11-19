@@ -489,6 +489,12 @@ signal loading_progressed(done: int, total: int)
 signal loading_finished()
 ## Sender: flow. The room `room_id` (the world's room `room`) was cleared: every enemy the run stood in it is down (boss OB2a: no waves). In a biome each fight room's own (connected biomes CB3), sent once; the boss's room cleared opens the portal home (CB7).
 signal room_cleared(room_id: StringName, room: int)
+## Sender: flow (connected biomes CB9). The party's map of the biome: `seen[room]` for each room by
+## its number (0 unseen, 1 shown on the map but never entered, 2 entered; `PartyMap`), a copy. Sent as
+## a biome starts and whenever a room is seen; empty as the biome goes; `again` after a restore (what
+## it says is drawn as it stands, not played in: a machine that joined mid-run learns the map so).
+## For the view only. Heard by feel (the dark over the unvisited rooms, the held Y map).
+signal rooms_seen(seen: PackedByteArray, again: bool)
 ## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
 ## teleporter stone (a prop of the role `run_start`, where its area is; `HubRules`); `lit` while all of them do (and at least one is there),
 ## when any seat's A starts the run (`run_requested`). Sent as the hub starts and whenever it

@@ -210,7 +210,7 @@ const INTRO_SEEN: StringName = &"intro_seen"
 enum State { IDLE, RUNNING, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"actors", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_map", &"_chosen_fights"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"actors", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_map", &"_chosen_fights", &"_chosen_reveal"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -292,6 +292,10 @@ var life: RoomLife = RoomLife.new()
 ## A biome's gather doors: its gated rooms' doors (a challenge room's, the boss's gate) and the portal
 ## home (connected biomes CB7, `GatherDoors`).
 var gates: GatherDoors = GatherDoors.new()
+## The party's map: the rooms seen (connected biomes CB9, `PartyMap`), and how far past a room entered
+## the run's map shows (the run stat `map_reveal`, as the run began; a test's own biome: 0).
+var party_map: PartyMap = PartyMap.new()
+var _biome_reveal: int = 0
 var _biome_start: BiomeMap = null
 var _biome_fights: Array[RoomFight] = []
 var _biome_given: bool = false
@@ -305,6 +309,7 @@ var _layout_of: StringName = &""
 var _asking: bool = false
 var _chosen_map: BiomeMap = null
 var _chosen_fights: Array[RoomFight] = []
+var _chosen_reveal: int = 0
 ## The party a run from the stone takes back to the hub when its map could not be made after the hub
 ## went (`PartyLoadout` bytes; empty: none): what a run starting now takes along (`_party_now`) until
 ## the hub starts again, so every wizard comes back as it went.
@@ -359,6 +364,7 @@ func _ready() -> void:
 	events.player_joined.connect(_on_player_joined)
 	events.player_left.connect(_on_player_left)
 	events.run_room_filled.connect(_on_run_room_filled)
+	events.run_stats_ruled.connect(_on_run_stats_ruled)
 	events.run_biome_chosen.connect(_on_run_biome_chosen)
 	events.adds_requested.connect(_on_adds_requested)
 
@@ -406,6 +412,7 @@ func _return_to_hub(starter: int, party: PartyLoadout = null) -> void:
 	_biome_start = null
 	_biome_fights.clear()
 	_biome_given = false
+	_biome_reveal = 0
 	mode = MODE_HUB
 	if not start_run(starter, party):
 		push_warning("Flow: the hub did not start again after the run, so the run is over.")
@@ -615,6 +622,7 @@ func _room_id_for_mode() -> StringName:
 func _begin_run_of_rooms(players: int) -> RoomBase:
 	_chosen_map = null
 	_chosen_fights.clear()
+	_chosen_reveal = 0
 	if events != null:
 		_asking = true
 		events.run_begun.emit(run_id_to_play, players)
@@ -627,6 +635,7 @@ func _begin_run_of_rooms(players: int) -> RoomBase:
 		_chosen_fights.clear()
 		return null
 	_biome_start = map
+	_biome_reveal = _chosen_reveal
 	_biome_fights.clear()
 	for at in map.rooms():
 		var fight: RoomFight = _chosen_fights[at] if at < _chosen_fights.size() else null
@@ -643,6 +652,14 @@ func _on_run_room_filled(room: int, enemies: Array[StringName], scale: float, gr
 	while _chosen_fights.size() <= room:
 		_chosen_fights.append(null)
 	_chosen_fights[room] = RoomFight.of(enemies, group, refill_at, stagger, scale)
+
+
+## The run's own changes of the run stats (`run_stats_ruled`): how far past a room entered the party's
+## map shows (`map_reveal`, connected biomes CB9; the map is the party's, and no player has relics yet).
+## Heard only while Flow asks (`_begin_run_of_rooms`).
+func _on_run_stats_ruled(changes: Array[StatChange]) -> void:
+	if _asking:
+		_chosen_reveal = RunStats.whole_of(&"map_reveal", changes)
 
 
 ## The run area's biome map (`run_biome_chosen`; a `BiomeMap`), a copy kept. Heard only while Flow
@@ -702,6 +719,7 @@ func stop_run() -> void:
 	_biome_start = null
 	_biome_fights.clear()
 	_biome_given = false
+	_biome_reveal = 0
 	state = State.IDLE
 	mode = MODE_RUN
 	_count_stone()
@@ -1444,6 +1462,9 @@ func _clear_run() -> void:
 	biome.clear()
 	life.clear()
 	gates.clear()
+	if party_map.rooms() > 0:
+		party_map.clear()
+		_tell_seen(false)
 	if world != null and is_instance_valid(world):
 		_detach(world)
 	world = null
@@ -1486,8 +1507,9 @@ func start_biome(requester: int, map: BiomeMap, fights: Array[RoomFight], party:
 	if map == null:
 		return false
 	# Kept, so a start refused before anything went leaves the run in progress as it was.
-	var kept: Array = [mode, _biome_start, _biome_fights.duplicate(), _biome_given]
+	var kept: Array = [mode, _biome_start, _biome_fights.duplicate(), _biome_given, _biome_reveal]
 	_biome_start = map.copy()
+	_biome_reveal = 0
 	_biome_fights.clear()
 	for fight: RoomFight in fights:
 		_biome_fights.append(fight.fresh() if fight != null else RoomFight.new())
@@ -1500,7 +1522,9 @@ func start_biome(requester: int, map: BiomeMap, fights: Array[RoomFight], party:
 		_biome_start = kept[1]
 		_biome_fights.assign(kept[2])
 		_biome_given = kept[3]
+		_biome_reveal = kept[4]
 	else:
+		_biome_reveal = 0
 		_biome_start = null
 		_biome_fights.clear()
 		_biome_given = false
@@ -1520,6 +1544,7 @@ func _lay_biome(into: Node2D) -> bool:
 	_layout_of = &""
 	_places = biome.room_places(EventsScript.FIRST_ROOM)
 	life.begin(biome.map.rooms(), biome.places(), _biome_fights)
+	party_map.begin(biome.map.rooms(), _biome_reveal)
 	_begin_gates(biome.map)
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
@@ -1637,6 +1662,8 @@ func _take_portal_home() -> void:
 ## is cleared at once.
 func _enter_biome_room(room: int) -> void:
 	life.set_flag(room, RoomLife.ENTERED, true)
+	if party_map.enter(room, biome.map):
+		_tell_seen(false)
 	if room != EventsScript.FIRST_ROOM and world != null:
 		# Its placed enemies (a dummy, a stand-in) stand now, as the party first comes (connected
 		# biomes CB8); the start room's stood with the world.
@@ -1786,3 +1813,11 @@ func _rebuild_biome() -> void:
 		life.tell_awake(projectiles.grid())
 		gates.lay(biome, projectiles.grid())
 	gates.tell_all(_wizards, life)
+	_tell_seen(true)
+
+
+## The party's map told to the view (`rooms_seen`; connected biomes CB9): as a room is seen, and
+## `again` after a restore (drawn as it stands; a machine that joined learns the map so).
+func _tell_seen(again: bool) -> void:
+	if events != null:
+		events.rooms_seen.emit(party_map.seen.duplicate(), again)

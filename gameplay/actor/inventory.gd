@@ -98,6 +98,11 @@ var _started: bool = false
 var _edited: bool = false
 ## True once it was given what its body carries from the start (`carry`: an enemy's coins).
 var carried: bool = false
+## Of what it carried from the start (`carry`), the bag and id, and how many it has held all along
+## (`carried_kept`): lowered whenever it holds fewer, never raised by what it takes later.
+var _carried_bag: StringName = &""
+var _carried_id: StringName = &""
+var _carried_kept: int = 0
 
 
 func _init() -> void:
@@ -355,7 +360,19 @@ func carry(stack: ItemStack, rolled: bool) -> bool:
 	var was_edited: bool = _edited
 	var added: bool = add(stack)
 	_edited = was_edited or (added and rolled)
+	if added:
+		_carried_bag = ItemKinds.bag_of(stack.kind)
+		_carried_id = stack.id
+		_carried_kept = stack.count
 	return added
+
+
+## How many of what it carried from the start (`carry`) it has held all along: what it dropped or
+## gave away since is not counted again when it takes more of the same (a dying foe shares only these
+## coins, gameplay/rewards, so a player's dropped coin taken by a possessed foe is never shared). 0
+## for nothing carried.
+func carried_kept() -> int:
+	return mini(_carried_kept, count_of(_carried_bag, _carried_id)) if _carried_bag != &"" else 0
 
 
 ## Take `count` copies of `id` out of `bag` (a stack left empty goes; of a kind that does not
@@ -667,7 +684,7 @@ func drop(bag: StringName, id: StringName) -> Refusal:
 	if kind == &"" or kind == ItemKinds.STAFF or count_of(bag, id) < 1:
 		return Refusal.NO_ITEM
 	if not ItemKinds.can(kind, ItemKinds.DROP) and not ItemKinds.can(kind, ItemKinds.DROP_ONE):
-		# A kind that is never dropped (the coins: shared income, decision 18; the keys): the simulation checks.
+		# A kind that is never dropped (none today: everything is, the owner, 2026-11-19): the simulation checks.
 		return Refusal.NO_DROP
 	var lying: ItemStack = null
 	if ItemKinds.stacks(kind):
@@ -810,6 +827,8 @@ func _change_count(bag: StringName, id: StringName, by: int) -> void:
 	for at in stacks.size():
 		if stacks[at].id == id:
 			stacks[at].count += by
+			if bag == _carried_bag and id == _carried_id:
+				_carried_kept = mini(_carried_kept, maxi(stacks[at].count, 0))
 			if stacks[at].count <= 0:
 				stacks.remove_at(at)
 			return

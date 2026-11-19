@@ -759,3 +759,53 @@ func test_a_player_who_leaves_and_joins_again_gets_no_second_start() -> void:
 	_tick()
 	_tick()
 	check_equal(_rewards.coins_of(0), 3, "back with what its inventory holds, no second start_coins")
+
+
+# --- Everything is droppable (the owner, 2026-11-19) -------------------------------------------
+
+## No coin is made by a drop: a coin a player dropped, taken by a foe it possesses, goes with the
+## foe as it dies, unshared; only the coins it came carrying and held all along are shared. What it
+## dropped of those itself and took back is not shared again.
+func test_a_possessed_foe_never_shares_a_coin_it_took_later() -> void:
+	var wizard := _wizard(0)
+	_wizard(1, Vector2(200, 0))
+	_tick()
+	var foe: Actor = _foe(_carrying(3))
+	check(Possession.begin(wizard, foe, 30.0) != null, "seat 0 possesses the foe")
+	check_equal(foe.inventory.carried_kept(), 3, "it came with three")
+	check(foe.inventory.take(COINS, CoinBase.ID, 2), "it drops two of its own (lying as items, one's own)")
+	check(foe.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 4)), "and takes four a player dropped")
+	check_equal(foe.inventory.count_of(COINS, CoinBase.ID), 5, "five held")
+	check_equal(foe.inventory.carried_kept(), 1, "one of them held all along")
+	_kill(foe, Vector2(60, 0))
+	check_equal(_rewards.coins_lying().size(), 1, "only that one is laid for everyone")
+
+
+func test_a_boss_shares_only_the_coins_it_came_with() -> void:
+	_wizard(0)
+	_wizard(1, Vector2(200, 0))
+	_tick()
+	var data: EnemyBase = _carrying(2)
+	data.boss = true
+	var boss: Actor = _foe(data)
+	check(boss.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 5)), "it takes five dropped coins")
+	_kill(boss, Vector2(60, 0))
+	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [2, 2], "each player gains its own two, not seven")
+
+
+## The count held all along is the body's state: it comes back through a snapshot and is hashed.
+func test_the_coins_held_all_along_are_state() -> void:
+	var foe: Actor = _foe(_carrying(4))
+	var areas: Dictionary = {"Actors": _world.table, "foe": foe}
+	var snapshot: Snapshot = Snapshot.take(areas, root)
+	check_equal(snapshot.problems, PackedStringArray(), "taken")
+	var before: int = SimHash.of(foe.inventory)
+	check(foe.inventory.take(COINS, CoinBase.ID, 3), "three dropped")
+	check(foe.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 3)), "three taken back")
+	check_equal(foe.inventory.count_of(COINS, CoinBase.ID), 4, "four held again")
+	check_equal(foe.inventory.carried_kept(), 1, "but one held all along")
+	check(SimHash.of(foe.inventory) != before, "a change the hash sees")
+	var problems: PackedStringArray = snapshot.restore(areas, root)
+	check(problems.is_empty(), "restored: %s" % [problems])
+	check_equal(foe.inventory.carried_kept(), 4, "the four held all along again")
+	check_equal(SimHash.of(foe.inventory), before, "the same state")

@@ -80,7 +80,8 @@ func test_a_stale_body_or_a_downed_one_keeps_its_potion() -> void:
 	check_equal(wizard.inventory.count_of(POTIONS, &"max_health"), 1, "kept both times")
 
 
-func test_coins_are_never_dropped() -> void:
+## Everything is droppable (the owner, 2026-11-19): the simulation lays one coin of the stack.
+func test_a_coin_is_dropped_one_at_a_time() -> void:
 	var wizard: Actor = _world.wizard(0, Vector2.ZERO)
 	check(wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 5)), "five coins")
 	var dropped: Array = []
@@ -88,9 +89,11 @@ func test_coins_are_never_dropped() -> void:
 	_world.run(1)
 	_world.bus.bag_drop_requested.emit(0, COINS, CoinBase.ID, Inventory.NO_STAFF, wizard.key())
 	_world.run(1)
-	check_equal(_refused, ["That cannot be dropped."] as Array[String], "the simulation refuses it, not only the HUD")
-	check(dropped.is_empty() and wizard.inventory.count_of(COINS, CoinBase.ID) == 5, "nothing laid, nothing lost")
-	check_equal(wizard.inventory.drop(COINS, CoinBase.ID), Inventory.Refusal.NO_DROP, "the inventory says why")
+	check(_refused.is_empty(), "nothing refused: %s" % [_refused])
+	check_equal(dropped.size(), 1, "one stack laid")
+	if dropped.size() == 1:
+		check_equal([dropped[0].kind, dropped[0].id, dropped[0].count], [ItemKinds.COIN, CoinBase.ID, 1], "one coin")
+	check_equal(wizard.inventory.count_of(COINS, CoinBase.ID), 4, "one fewer held")
 
 
 func test_while_possessing_the_purse_and_the_drink_are_the_possessed_bodys() -> void:

@@ -23,7 +23,8 @@ extends Node
 ##   as a run of rooms begins); a player's are those, then their relics' (the relics bag of its
 ##   wizard, `RelicBase`). Read by name: `stat_of`.
 ## - **Coins** (decision 18: shared income, own wallet): a foe that dies (`enemy_died`) drops its
-##   `EnemyBase.coins` where it fell (an add another body called, `Actor.is_add`, drops none), each one coin anyone may take: the first wizard (seat order)
+##   `EnemyBase.coins` where it fell (an add another body called, `Actor.is_add`, drops none; a boss's go to every wallet at once,
+##   decision 25), each one coin anyone may take: the first wizard (seat order)
 ##   whose feet come within `COIN_REACH` takes it, and every player's wallet gains one. Each wallet
 ##   starts a run with its player's `start_coins`, and spending is one's own (`spend`, for CB11's
 ##   shop). The coins on the floor are the world's: a new world (`room_entered` FIRST_ROOM) and a
@@ -318,6 +319,13 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 		_fought.append(body.room)
 	if body.data == null or body.is_add:
 		# An add (a boss's waves, boss plan OB13) drops no coins: waves without end would fill wallets.
+		return
+	if body.data.boss:
+		# A boss's coins go to every wallet at once (decision 25): its room's portal home opens as it
+		# is cleared, and nobody should lose them to it.
+		for seat in SEATS:
+			if actors != null and actors.home_of_seat(seat) != ActorsScript.NONE:
+				_add_coins(seat, body.data.coins)
 		return
 	for i in body.data.coins:
 		var spot: Vector2 = position + COIN_SPREAD[i % COIN_SPREAD.size()]

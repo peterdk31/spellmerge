@@ -293,6 +293,20 @@ func test_a_foes_coins_are_shared_income() -> void:
 	check(not _rewards.spend(1, 1), "not more than they hold")
 
 
+func test_a_bosss_coins_go_to_every_wallet() -> void:
+	_wizard(0)
+	_wizard(1, Vector2(40, 0))
+	var boss := Actor.new()
+	var data: EnemyBase = IMP.duplicate()
+	data.boss = true
+	data.coins = 10
+	boss.data = data
+	_world.bus.enemy_died.emit(0, boss, Vector2(300, 0), -1)
+	boss.free()
+	check(_rewards.coins_lying().is_empty(), "none on the floor (the portal home opens as its room clears)")
+	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [10, 10], "every wallet gains them (decision 25)")
+
+
 func test_an_add_drops_no_coin() -> void:
 	var add := Actor.new()
 	add.data = IMP

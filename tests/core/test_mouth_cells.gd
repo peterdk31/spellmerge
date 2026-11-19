@@ -124,3 +124,21 @@ func test_a_wizard_crosses_a_mouth_and_a_free_enemy_does_not() -> void:
 	check(wizard.global_position.x > MOUTH.end.x + 20.0, "the wizard walked through the mouth: %s" % wizard.global_position)
 	check(absf(free.global_position.x - (MOUTH.position.x - free.wall_radius())) < 0.01, "the free body stopped at it, its team a wizard's: %s" % free.global_position)
 	world.free_all()
+
+
+func test_a_shut_mouth_is_a_wall_to_everything_and_opens_again() -> void:
+	# A gather door (connected biomes CB7): shut, a wall to a wizard's walk, a teleport and sight;
+	# open, a mouth again. Only mouth cells change.
+	for native: bool in [false, true]:
+		WallSlide.use_native(native)
+		var grid: RoomGrid = _manager().grid()
+		grid.shut_mouth(Rect2(0.0, 0.0, 320.0, 200.0), true)
+		check(grid.is_shut_mouth(Vector2(164.0, 100.0)), "native %s: shut" % native)
+		check_equal(grid.cell_at(Vector2(150.0, 100.0)), 0, "native %s: a cell that is no mouth is left open" % native)
+		check_equal(grid.slide_body(Vector2(100.0, 100.0), Vector2(100.0, 0.0), 6.0, false, true), Vector2(154.0, 100.0), "native %s: a wizard's walk stops at a shut mouth" % native)
+		check_equal(grid.clip_past_mouths(Vector2(100.0, 100.0), Vector2(250.0, 100.0)).x, 160.0, "native %s: a teleport stops at it" % native)
+		check(not grid.sight_clear(Vector2(100.0, 100.0), Vector2(250.0, 100.0)), "native %s: sight too" % native)
+		grid.shut_mouth(Rect2(0.0, 0.0, 320.0, 200.0), false)
+		check_equal(grid.cell_at(Vector2(164.0, 100.0)), RoomGrid.MOUTH_CELL, "native %s: open, a mouth again" % native)
+		check_equal(grid.slide_body(Vector2(100.0, 100.0), Vector2(100.0, 0.0), 6.0, false, true), Vector2(200.0, 100.0), "native %s: a wizard walks through again" % native)
+	WallSlide.use_native(true)

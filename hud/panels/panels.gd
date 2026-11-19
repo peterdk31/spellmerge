@@ -13,10 +13,11 @@ extends CanvasLayer
 ## ever left open over the main menu. The pause menu's "Main menu" (`main_menu_requested`) clears
 ## them all and makes the main menu the current scene again (`main_menu`).
 ##
-## Under each panel's mana bar, one row per staff with cards (owner, 2026-10-27): its cast
+## Under each panel's health line, one row per staff with cards (owner, 2026-10-27): its cast
 ## sequence comes from `staff_changed` (the plain `Spells.staff_view`, icons asked of `Spells`
 ## once per plan), and its next cast and delay are read each frame from `Spells.cast_index` and
-## `Spells.cooldown_left`, plain numbers that allocate nothing (`step_staffs`).
+## `Spells.cooldown_left`, plain numbers that allocate nothing (`step_staffs`), and its mana line
+## from `staff_mana_changed`.
 ##
 ## A panel is the body its seat drives (items I8; owner, 2026-11-13, which replaces "always the
 ## player's own wizard" of 2026-10-28): its numbers and staff rows (`player_stats_changed`,
@@ -268,7 +269,7 @@ func _ready() -> void:
 	_ui_sounds = UiSounds.new()
 	_ui_sounds.name = "UiSounds"
 	add_child(_ui_sounds)
-	_ui_sounds.bind(events, ui_focus)
+	_ui_sounds.bind(events, ui_focus, input)
 	_pause_menu.save = save
 	_pause_menu.bind(events, ui_focus, input)
 	for radial in _radials:
@@ -767,6 +768,7 @@ func _on_inventory_announced(player: int, _body: int) -> void:
 		for staff in PlayerPanelScript.STAFF_COUNT:
 			_staff_mana[player * PlayerPanelScript.STAFF_COUNT + staff] = INF
 			_staff_reserved[player * PlayerPanelScript.STAFF_COUNT + staff] = 0.0
+			_panels[player].set_staff_mana(staff, INF, 0.0)
 
 
 func _on_menu_opened(player: int) -> void:
@@ -781,10 +783,12 @@ func _on_menu_closed(player: int) -> void:
 		_refresh(player)
 
 
-## A seat's staff's mana changed (the player sends whole numbers).
-func _on_staff_mana_changed(player: int, staff: int, mana: float, _max_mana: float) -> void:
+## A seat's staff's mana changed (the player sends whole numbers): its row's mana line, and what a
+## press could pay.
+func _on_staff_mana_changed(player: int, staff: int, mana: float, max_mana: float) -> void:
 	if player >= 0 and player < PLAYER_COUNT and staff >= 0 and staff < PlayerPanelScript.STAFF_COUNT:
 		_staff_mana[player * PlayerPanelScript.STAFF_COUNT + staff] = mana
+		_panels[player].set_staff_mana(staff, mana, max_mana)
 
 
 ## What a seat's staff's sustained cards hold of its mana.

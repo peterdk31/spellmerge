@@ -395,18 +395,18 @@ func test_a_possession_closes_the_menus_and_they_show_the_body_the_seat_drives()
 	check_equal(inventory.mirror().staffs(), PackedInt32Array([0, 1, 4]), "and it shows the wizard's staffs again")
 
 
-func test_its_sounds_point_choose_go_back_and_deny() -> void:
+func test_its_sounds_choose_go_back_and_deny() -> void:
 	var sounds: Array[StringName] = []
 	_bus.ui_sound_requested.connect(func(id: StringName) -> void: sounds.append(id))
 	_start()
 	_open()
 	check_equal(sounds, [] as Array[StringName], "opening says nothing")
 	_point("bag", STAFFS)
-	check_equal(sounds, [UiSounds.MOVE], "pointing at a bag is a move")
+	check_equal(sounds, [] as Array[StringName], "pointing at a bag makes no sound (it rumbles)")
 	sounds.clear()
 	_tap(&"accept")
 	_frame()
-	check(not sounds.is_empty() and sounds[0] == UiSounds.CHOOSE, "entering it is a choice (then the held stick points into the bag: a move), got %s" % [sounds])
+	check_equal(sounds, [UiSounds.CHOOSE], "entering it is a choice (the held stick pointing into the bag is silent)")
 	_input.send_virtual_aim(0, Vector2.ZERO)
 	_frame()
 	sounds.clear()

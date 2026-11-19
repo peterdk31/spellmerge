@@ -1,24 +1,28 @@
 extends PanelContainer
-## One player's corner panel, in the player's border colour: a health bar and a mana bar with
-## their numbers, a word over the health bar when the player is down ("DOWN") or has their
-## overlay open ("MENU"), and under the mana bar one row per staff that has cards
-## (`staff_row.gd`: the staff's button glyph, its cast sequence and its delay). The word means
-## the state is never shown by colour alone. There is no "P1" or "Staff 2" line (owner,
+## One player's corner panel, in the player's border colour, kept small (owner, 2026-11-19): a
+## thin red health line with a small number beside it, a word after them when the player is down
+## ("DOWN") or has their overlay open ("MENU"), and under it one row per staff that has cards
+## (`staff_row.gd`: the staff's button glyph, its cast sequence, its delay and a thin blue line of
+## its own mana, `set_staff_mana`). There is no panel-wide mana bar: every staff has its own pool,
+## and its row shows it. The word means the state is never shown by colour alone. The lines ease
+## by whole pixels (`hud/widgets/meter_line.gd`). The room the bars took is kept free for the
+## run's coins and relics, which come with M3. There is no "P1" or "Staff 2" line (owner,
 ## 2026-10-27): the corner and the border say whose panel it is, and the rows say more than the
 ## staff cast last did.
 ##
 ## It only shows what it is told: `set_stats`, `set_menu_open`, `set_online` (a small "ONLINE" over
-## the bars of a seat played on another machine), `set_staff_plan`,
+## the line of a seat played on another machine), `set_staff_plan`, `set_staff_mana`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
 ## which hears the events and reads the staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
 ## the same for any player index 0-3. Colours come from the shared theme (type variations
-## PlayerPanel1-4, HealthBar and ManaBar). Updating only changes text when a number changed, and
+## PlayerPanel1-4) and the lines' own. Updating only changes text when a number changed, and
 ## a row only redraws when its timing changed, so a frame with no change allocates nothing.
 ##
 ## While the player has a menu open the staff rows hide: the builder shows the staffs, and the
 ## radial builder's column takes the space under the panel.
 
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
+const MeterScript := preload("res://hud/widgets/meter_line.gd")
 
 const PLAYER_COUNT: int = 4
 const STAFF_COUNT: int = 4
@@ -31,8 +35,6 @@ const ONLINE_TEXT: String = "ONLINE"
 @export var index: int = 0
 
 var _health: float = -1.0
-var _mana: int = -1
-var _max_mana: float = -1.0
 var _downed: bool = false
 var _menu_open: bool = false
 var _rows: Array[StaffRowScript] = []
@@ -42,10 +44,8 @@ var _has_cards: Array[bool] = [false, false, false, false]
 @onready var _seat_row: Control = %SeatRow
 @onready var _seat: Label = %Seat
 @onready var _status: Label = %Status
-@onready var _health_bar: ProgressBar = %HealthBar
+@onready var _health_line: MeterScript = %HealthLine
 @onready var _health_value: Label = %HealthValue
-@onready var _mana_bar: ProgressBar = %ManaBar
-@onready var _mana_value: Label = %ManaValue
 @onready var _staffs: VBoxContainer = %Staffs
 
 
@@ -64,26 +64,30 @@ func _ready() -> void:
 	_refresh_status()
 
 
-## Show these numbers. A player with no health left is shown as down.
-func set_stats(health: float, max_health: float, mana: float, max_mana: float) -> void:
-	var whole_mana: int = floori(mana)
+## Show these numbers. A player with no health left is shown as down. The mana of the staff on
+## show is not shown here: each staff row shows its own (`set_staff_mana`).
+func set_stats(health: float, max_health: float, _mana: float, _max_mana: float) -> void:
 	if health != _health:
 		_health = health
-		_health_bar.max_value = maxf(max_health, 1.0)
-		_health_bar.value = health
+		_health_line.set_value(health, maxf(max_health, 1.0))
 		# Rounded up: a wizard with part of a point left reads 1, never 0 (which is down).
 		_health_value.text = str(ceili(health))
 		var downed: bool = health <= 0.0
 		if downed != _downed:
 			_downed = downed
 			_refresh_status()
-	# The size counts too: the bar is the staff on show's pool, and another staff's may differ.
-	if whole_mana != _mana or max_mana != _max_mana:
-		_mana = whole_mana
-		_max_mana = max_mana
-		_mana_bar.max_value = maxf(max_mana, 1.0)
-		_mana_bar.value = mana
-		_mana_value.text = str(whole_mana)
+
+
+## Show staff `staff`'s whole mana `mana` of its pool `most` on its row's line (a mana not finite:
+## not told yet, the line hides).
+func set_staff_mana(staff: int, mana: float, most: float) -> void:
+	if staff >= 0 and staff < STAFF_COUNT:
+		_rows[staff].set_mana(mana, most)
+
+
+## The health line (for tests and screenshots).
+func health_line() -> MeterScript:
+	return _health_line
 
 
 ## Show or hide the "MENU" word: this player's overlay is open. The staff rows hide meanwhile.
@@ -176,18 +180,17 @@ func clear_staffs() -> void:
 	_refresh_rows()
 
 
-## Back to the empty state (no numbers, not down, no menu word), for a player who left or a run
-## that ended. The next `player_stats_changed` fills it again. The staffs stay until
+## Back to the empty state (no numbers, not down, no menu word, no mana lines), for a player who
+## left or a run that ended. The next `player_stats_changed` fills it again. The staffs stay until
 ## `clear_staffs`, since a wizard announces them once, when it appears.
 func reset() -> void:
 	_health = -1
-	_mana = -1
 	_downed = false
 	_menu_open = false
-	_health_bar.value = 0
-	_mana_bar.value = 0
+	_health_line.reset()
 	_health_value.text = ""
-	_mana_value.text = ""
+	for row in _rows:
+		row.set_mana(INF, 0.0)
 	_refresh_status()
 	_refresh_rows()
 
@@ -207,7 +210,7 @@ func is_downed() -> bool:
 	return _downed
 
 
-## The word over the health bar; empty when nothing special.
+## The word after the health line; empty when nothing special.
 func status_text() -> String:
 	return _status.text
 
@@ -235,3 +238,6 @@ func _refresh_status() -> void:
 		_status.text = MENU_TEXT
 	else:
 		_status.text = ""
+	_status.visible = _status.text != ""
+	# Down, the word says it: no "0" beside it.
+	_health_value.visible = not _downed

@@ -78,6 +78,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
+const MeterLineScript := preload("res://hud/widgets/meter_line.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
 const RingPickerScript := preload("res://hud/builder/rings/ring_picker.gd")
@@ -129,10 +130,10 @@ const COLUMN_WIDTH: float = 112.0
 const BARS_HEIGHT: float = 7.0
 const TABS_FROM_TOP: float = 11.0
 const SLOTS_FROM_TOP: float = 26.0
-## The bars' colours, the corner panel's (the theme's HealthBar and ManaBar fills), and each
-## player's colour (the theme's PlayerPanel1-4 borders).
-const HEALTH_COLOR: Color = Color("#e0592f")
-const MANA_COLOR: Color = Color("#f2c230")
+## The bars' colours, the corner panel's lines' (`meter_line.gd`), and each player's colour (the
+## theme's PlayerPanel1-4 borders).
+const HEALTH_COLOR: Color = MeterLineScript.HEALTH_COLOR
+const MANA_COLOR: Color = MeterLineScript.MANA_COLOR
 const PLAYER_COLORS: Array[Color] = [Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4")]
 const SLOT_SIZE: float = 16.0
 const SLOT_STEP: float = 18.0
@@ -167,12 +168,6 @@ const FADE_TIME: float = 0.25
 const FLY_TIME: float = 0.15
 const POP_TIME: float = 0.07
 const NOTE_TIME: float = 1.4
-## Rumbles: (weak, strong, seconds).
-const RUMBLE_POINT: Vector3 = Vector3(0.25, 0.0, 0.03)
-const RUMBLE_PUT: Vector3 = Vector3(0.2, 0.45, 0.06)
-const RUMBLE_TAKE: Vector3 = Vector3(0.35, 0.0, 0.04)
-const RUMBLE_CLEAR: Vector3 = Vector3(0.3, 0.7, 0.14)
-const RUMBLE_REFUSED: Vector3 = Vector3(0.0, 0.6, 0.09)
 
 const PUT_VERB: String = "Put in"
 const TAKE_VERB: String = "Take out"
@@ -313,6 +308,8 @@ var _kind_glyphs: Array[ActionGlyphScript] = []
 
 
 func _ready() -> void:
+	# No menu sound for its back either (UiSounds): the builder is felt, not heard.
+	add_to_group(UiSounds.SILENT_GROUP)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	visible = false
@@ -514,7 +511,7 @@ func tree_view() -> TreeViewScript:
 ## Y: swap the ring for the tree, or back. Pointing ends: the tree has no card to put in.
 func toggle_tree() -> void:
 	_tree_open = not _tree_open
-	_sound(UiSounds.CHOOSE)
+	_rumble(UiHaptics.CHOOSE)
 	_tree.visible = _tree_open
 	_menu.pointed = NONE
 	if ring_picker != null:
@@ -704,7 +701,7 @@ func _poll_buttons() -> void:
 	var flips: int = _presses(&"kind_next") - _presses(&"kind_prev")
 	if flips != 0 and layout == Layout.KIND and not _kinds.is_empty():
 		_kind_page = posmod(_kind_page + flips, _kinds.size())
-		_sound(UiSounds.MOVE)
+		_rumble(UiHaptics.POINT)
 		_menu.pointed = NONE
 		_build_ring()
 		_refresh_preview()
@@ -739,7 +736,7 @@ func _move_marker(dir: Vector2i) -> void:
 	var was: int = _slot
 	mark_slot(clampi(next, 0, count - 1))
 	if _slot != was:
-		_sound(UiSounds.MOVE)
+		_rumble(UiHaptics.POINT)
 
 
 ## The right stick (P1's mouse) picks the card it points at; letting go (the mouse leaving the
@@ -759,8 +756,7 @@ func _poll_pointer(delta: float) -> void:
 	if not _menu.point_at(picked, _clock):
 		return
 	if picked != NONE:
-		_rumble(RUMBLE_POINT)
-		_sound(UiSounds.MOVE)
+		_rumble(UiHaptics.POINT)
 	_refresh_preview()
 	_changed()
 
@@ -844,7 +840,6 @@ func _put_in() -> void:
 	if put == Put.PUSH and cards[_slot] != NO_CARD:
 		if cards[cards.size() - 1] != NO_CARD:
 			_say(FULL_NOTE)
-			_rumble(RUMBLE_REFUSED)
 			return
 		cards.insert(_slot, id)
 		cards.resize(cards.size() - 1)
@@ -852,8 +847,7 @@ func _put_in() -> void:
 	else:
 		_ask_one(_slot, id)
 	_fly(_spells.component_icon(id) if _spells != null else null, _menu.tile_center(_menu.angle_of_entry(pointed), RING_RADIUS), _slot_rect(_slot).get_center(), false)
-	_rumble(RUMBLE_PUT)
-	_sound(UiSounds.CARD_PLACE)
+	_rumble(UiHaptics.PUT)
 	if _slot + 1 < cards.size():
 		_slot += 1
 		_marker_at = _clock
@@ -900,8 +894,7 @@ func _take_out() -> void:
 		_ask_one(at, NO_CARD)
 	if id != NO_CARD:
 		_fly(_spells.component_icon(id) if _spells != null else null, _slot_rect(at).get_center(), _menu.center, true)
-	_rumble(RUMBLE_TAKE)
-	_sound(UiSounds.CARD_REMOVE)
+	_rumble(UiHaptics.TAKE)
 	if at != _slot:
 		_slot = at
 		_marker_at = _clock
@@ -918,8 +911,7 @@ func _clear() -> void:
 	_fading = cards
 	_fade_start = _clock
 	_ask_all([] as Array[StringName])
-	_rumble(RUMBLE_CLEAR)
-	_sound(UiSounds.CARD_REMOVE)
+	_rumble(UiHaptics.CLEAR)
 	_slot = 0
 	_first_row = 0
 	_marker_at = _clock
@@ -939,26 +931,21 @@ func _ask_all(cards: Array[StringName]) -> void:
 		_events.staff_cards_requested.emit(index, _viewed, cards, _mirror.body)
 
 
-## A refusal's note shown over the card info panel for a moment, with the refusal's sound while
+## A refusal's note shown over the card info panel for a moment, with the refusal's rumble while
 ## the builder is open (every note is a refusal: nothing to point at, a full or empty staff, or
 ## `build_refused`).
 func _say(text: String) -> void:
 	_note = text
 	_note_left = NOTE_TIME
-	_sound(UiSounds.DENY)
+	_rumble(UiHaptics.REFUSED)
 	_changed()
 
 
-## The menu sound `id` (`UiSounds`), only while the builder is open: a refusal that comes back
-## after it closed says nothing.
-func _sound(id: StringName) -> void:
-	if _open:
-		UiSounds.send(_events, id)
-
-
+## Rumble the player's pad (`UiHaptics`), only while the builder is open: a refusal that comes
+## back after it closed is not felt. The builder makes no sound (owner, 2026-11-19).
 func _rumble(motors: Vector3) -> void:
-	if _input != null:
-		_input.rumble(index, motors.x, motors.y, motors.z)
+	if _open:
+		UiHaptics.pulse(_input, index, motors)
 
 
 ## The slot after the last card (the last slot when the staff is full; 0 when it is empty).
@@ -1191,7 +1178,7 @@ func _on_paged(player: int, step_by: int) -> void:
 	if player == index and _open:
 		var next: int = _along_strip(_viewed, signi(step_by))
 		if next != _viewed:
-			_sound(UiSounds.MOVE)
+			_rumble(UiHaptics.POINT)
 		_show_staff(next)
 
 

@@ -96,8 +96,6 @@ const MOVE_DELAY: float = 0.3
 const MOVE_REPEAT: float = 0.14
 const POP_TIME: float = 0.07
 const NOTE_TIME: float = 1.4
-## The pad's rumble (weak, strong, seconds): landing on an entry.
-const RUMBLE_POINT: Vector3 = Vector3(0.25, 0.0, 0.03)
 
 const OPEN_VERB: String = "Open"
 const DROP_VERB: String = "Drop"
@@ -419,8 +417,7 @@ func _step_round(way: int) -> void:
 	var next: int = 0 if at < 0 else posmod(at + way, places.size())
 	_aimed = false
 	if _menu.point_at(places[next], _clock):
-		_rumble(RUMBLE_POINT)
-		_sound(UiSounds.MOVE)
+		_rumble(UiHaptics.POINT)
 		_changed()
 
 
@@ -439,14 +436,13 @@ func _poll_pointer() -> void:
 	_aimed = true
 	if _menu.point_at(picked, _clock):
 		if picked != NONE:
-			_rumble(RUMBLE_POINT)
-			_sound(UiSounds.MOVE)
+			_rumble(UiHaptics.POINT)
 		_changed()
 
 
+## Rumble the player's pad (`UiHaptics`): pointing is felt, not heard (owner, 2026-11-19).
 func _rumble(motors: Vector3) -> void:
-	if _input != null:
-		_input.rumble(index, motors.x, motors.y, motors.z)
+	UiHaptics.pulse(_input, index, motors)
 
 
 ## The menu sound `id` (`UiSounds`, sound plan AU8), only while the inventory is open: a refusal

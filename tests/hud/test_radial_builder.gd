@@ -759,55 +759,57 @@ func test_the_replay_steps_through_the_rows_and_loops() -> void:
 	check_equal(seen, [0, 1, 0, 1], "a row a beat, round and round")
 
 
-func test_its_sounds_point_place_remove_page_deny_and_back() -> void:
+func test_it_makes_no_sound_and_rumbles_each_action_instead() -> void:
 	var sounds: Array[StringName] = []
 	_bus.ui_sound_requested.connect(func(id: StringName) -> void: sounds.append(id))
 	_start(1)
 	var radial: RadialScript = _open(0)
-	check_equal(sounds, [] as Array[StringName], "opening says nothing")
+	_rumbles.clear()
 	_point(0, &"atom")
-	check_equal(sounds, [UiSounds.MOVE], "pointing at a card is a move")
-	sounds.clear()
+	check_equal(_motors(), [UiHaptics.POINT], "pointing at a card rumbles POINT")
 	_tap(0, &"staff_2")
 	_frame()
-	check_equal(sounds, [UiSounds.CARD_PLACE], "RT puts it in: the card's place")
-	sounds.clear()
+	check_equal(_motors(), [UiHaptics.PUT], "RT puts it in: PUT")
 	_tap(0, &"staff_4")
 	_frame()
-	check_equal(sounds, [UiSounds.CARD_REMOVE], "LT takes it out again: the card's removal")
+	check_equal(_motors(), [UiHaptics.TAKE], "LT takes it out again: TAKE")
 	_let_go(0)
-	sounds.clear()
+	_rumbles.clear()
 	_tap(0, &"staff_2")
 	_frame()
-	check_equal(sounds, [UiSounds.DENY], "RT with nothing pointed at is refused")
-	sounds.clear()
+	check_equal(_motors(), [UiHaptics.REFUSED], "RT with nothing pointed at is refused: REFUSED, once")
 	var shown: int = radial.viewed_staff()
 	_tap(0, &"page_next")
 	_frame()
 	check(radial.viewed_staff() != shown, "RB showed another staff")
-	check_equal(sounds, [UiSounds.MOVE], "which is a move")
-	sounds.clear()
-	_tap(0, &"accept")
-	_frame()
-	check_equal(sounds, [] as Array[StringName], "A does nothing in the builder, so says nothing")
+	check_equal(_motors(), [UiHaptics.POINT], "which rumbles POINT")
 	_tap(0, &"back")
 	_frame()
-	check_equal(sounds, [UiSounds.BACK], "B closes it: a back")
+	check(not radial.is_open(), "B closed it")
 	_bus.build_refused.emit(0, "late")
-	check_equal(sounds, [UiSounds.BACK], "a refusal after it closed says nothing")
+	check_equal(_motors(), [] as Array[Vector3], "a refusal after it closed is not felt")
+	check_equal(sounds, [] as Array[StringName], "and the builder made no sound at all, B included")
 
 
-func test_a_held_lt_clear_is_a_cards_removal() -> void:
-	var sounds: Array[StringName] = []
-	_bus.ui_sound_requested.connect(func(id: StringName) -> void: sounds.append(id))
+func test_a_held_lt_clear_rumbles_take_then_clear() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
 	radial.mark_slot(0)
+	_rumbles.clear()
 	_input.send_virtual(0, &"staff_4", 1.0)
 	_frame()
-	check_equal(sounds, [UiSounds.CARD_REMOVE], "the press takes one out")
+	check_equal(_motors(), [UiHaptics.TAKE], "the press takes one out")
 	for _i in ceili(RadialScript.CLEAR_HOLD / STEP) + 1:
 		_frame()
-	check_equal(sounds, [UiSounds.CARD_REMOVE, UiSounds.CARD_REMOVE], "and the clear is a removal too")
+	check_equal(_motors(), [UiHaptics.CLEAR], "and the clear rumbles CLEAR")
 	_input.send_virtual(0, &"staff_4", 0.0)
 	_frame()
+
+
+## The rumbles asked since the last call, as (weak, strong, seconds), and forget them.
+func _motors() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for rumble: Array in _rumbles:
+		out.append(Vector3(rumble[1], rumble[2], rumble[3]))
+	_rumbles.clear()
+	return out

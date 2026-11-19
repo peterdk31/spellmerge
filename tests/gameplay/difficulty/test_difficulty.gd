@@ -126,6 +126,8 @@ func test_an_enemy_standing_takes_the_level_on_its_health() -> void:
 	events.emit_signal("run_room_scaled", 1.5)
 	var harder: Actor = _stand(IMP)
 	check_equal(harder.stat_scale, 1.5, "in a room 1.5 times harder: scaled so")
+	check_equal(harder.room_level, 1.5, "and its room's level kept, which its aim sharpens by")
+	check_equal(plain.room_level, 1.0, "out of a run's room, level 1")
 	check(is_equal_approx(harder.health.max_health, IMP.max_health * 1.5), "its health 1.5 times its data's: %s" % harder.health.max_health)
 	check_equal(harder.health.health, harder.health.max_health, "and full")
 	check_equal(plain.health.max_health, IMP.max_health, "a body already standing keeps what it stood with")

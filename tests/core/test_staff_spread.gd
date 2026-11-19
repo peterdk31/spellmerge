@@ -128,8 +128,9 @@ func test_four_players_spread_on_their_own_staffs() -> void:
 	check_equal(true_aim, 2, "player 0 has two")
 
 
-func test_the_dev_and_starter_staffs_aim_true() -> void:
-	for id: StringName in [&"dev", &"curl", &"star", &"moon", &"crystal"]:
+## The starter staffs spread a little since 2026-11-19 (`test_the_starter_staffs_spread_a_little_and_the_same_each_time`).
+func test_the_dev_staff_aims_true() -> void:
+	for id: StringName in [&"dev"]:
 		var staff: StaffBase = _registry.call("get_resource", &"wizard", id) as StaffBase
 		check(staff != null, "the %s staff is found" % id)
 		if staff != null:
@@ -167,3 +168,38 @@ func test_spread_factors_multiply_in_the_compiler() -> void:
 	check(not wild.range_problems().is_empty(), "5 is out of range")
 	var spell: CompiledSpell = _spells.compile_staff([&"bolt"] as Array[StringName], _staff(10.0)).casts[0].group.spells[0]
 	check_equal(spell.spread_mult, 1.0, "a carrier with no such card keeps the staff's spread")
+
+
+## The four starter staffs (enemy aim, the owner 2026-11-19): `STARTER_SPREAD` degrees of spread,
+## so a wizard's shots leave a little off their line, the same way again in the same casts.
+const STARTER_SPREAD: float = 3.0
+const STARTERS: Array[String] = ["curl", "star", "moon", "crystal"]
+
+
+## The angles of a triple bolt cast by each of the four seats from the starter staff `id`.
+func _starter_angles(id: String) -> Array[float]:
+	var staff: StaffBase = load("res://content/wizard/staffs/%s/%s.tres" % [id, id]) as StaffBase
+	var angles: Array[float] = []
+	for player in 4:
+		_spells.install_staff(player, 0, _spells.compile_staff([&"triple", &"bolt", &"bolt", &"bolt"] as Array[StringName], staff))
+		_spells.cast_staff(player, 0, Vector2.ZERO, AIM, 100.0)
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot):
+			angles.append(rad_to_deg(AIM.angle_to(_mgr.get_velocity_of(slot))))
+	return angles
+
+
+func test_the_starter_staffs_spread_a_little_and_the_same_each_time() -> void:
+	for id in STARTERS:
+		_build_runtime()
+		var staff: StaffBase = load("res://content/wizard/staffs/%s/%s.tres" % [id, id]) as StaffBase
+		check_equal(staff.spread, STARTER_SPREAD, "the %s spreads %s degrees" % [id, STARTER_SPREAD])
+		var angles: Array[float] = _starter_angles(id)
+		check_equal(angles.size(), 12, "%s: twelve bolts" % id)
+		var off: float = 0.0
+		for angle in angles:
+			check(absf(angle) <= STARTER_SPREAD + 0.001, "%s: a bolt at most %s degrees off its line (%s)" % [id, STARTER_SPREAD, angle])
+			off = maxf(off, absf(angle))
+		check(off > 0.01, "%s: some bolt leaves off its line: %s" % [id, angles])
+		_build_runtime()
+		check_equal(_starter_angles(id), angles, "%s: the same casts spread the same way" % id)

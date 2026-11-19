@@ -6,10 +6,11 @@ extends Node
 ## level (`level`) and, as Flow stands an enemy or a boss
 ## (`enemy_standing`, the body not yet in the tree), sets the body's `Actor.stat_scale` to it (an
 ## elite's, connected biomes CB11, ELITE_HEALTH times it), so its data's health is multiplied by it
-## when the body applies its data. Power, spell size and a boss's
+## when the body applies its data, and its `Actor.room_level` to the level, which its AI's aim
+## sharpens by (`AimTuning`, enemy aim 2026-11-19). Power, spell size and a boss's
 ## adds join the same scale as the boss plan's OB7 and OB13 land; a difficulty setting later is one
 ## more factor of the level. The room's scale is not `difficulty_changed`: that event is kept for the
-## setting's level, which the enemies' skill follows (enemy AI AI10), never the room's depth. Areas never call each other: this area knows the run and Flow by these
+## setting's level, which the enemies' skill follows (enemy AI AI10). Areas never call each other: this area knows the run and Flow by these
 ## events only.
 ##
 ## The level is the run's state (hashed, saved in snapshots): a run's start renews it to 1
@@ -58,9 +59,10 @@ func _on_run_room_scaled(scale: float) -> void:
 	level = scale
 
 
-## An enemy or a boss is about to stand in the room: it takes the room's level (an elite's times
-## ELITE_HEALTH).
+## An enemy or a boss is about to stand in the room: it takes the room's level (its `room_level`,
+## which its AI's aim sharpens by) and its health by it (`stat_scale`, an elite's times ELITE_HEALTH).
 func _on_enemy_standing(enemy: Node) -> void:
 	var actor := enemy as Actor
 	if actor != null:
+		actor.room_level = level
 		actor.stat_scale = level * (ELITE_HEALTH if actor.is_elite() else 1.0)

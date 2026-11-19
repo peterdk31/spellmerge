@@ -116,6 +116,33 @@ func fill_room(room: int, scale: float, enemies: Array[StringName], elite_cards:
 	room_enemy_ends[room] = room_enemies.size()
 
 
+## Room `room`'s fill replaced (a room reroll's, `BiomeGenerator.reroll_room`): its scale, its
+## enemies and their elite cards, the rooms after it kept as they were.
+func refill_room(room: int, scale: float, enemies: Array[StringName], elite_cards: Array[StringName] = []) -> void:
+	if room < 0 or room >= room_enemy_ends.size():
+		return
+	var from: int = room_enemy_ends[room - 1] if room > 0 else 0
+	var to: int = room_enemy_ends[room]
+	room_scales[room] = scale
+	var kept_enemies: Array[StringName] = room_enemies.slice(to)
+	var kept_elites: Array[StringName] = []
+	if to < room_elites.size():
+		kept_elites = room_elites.slice(to)
+	room_enemies.resize(from)
+	if room_elites.size() > from:
+		room_elites.resize(from)
+	while room_elites.size() < from:
+		room_elites.append(&"")
+	for at in enemies.size():
+		room_enemies.append(enemies[at])
+		room_elites.append(elite_cards[at] if at < elite_cards.size() else &"")
+	room_enemies.append_array(kept_enemies)
+	room_elites.append_array(kept_elites)
+	var by: int = enemies.size() - (to - from)
+	for later in range(room, room_enemy_ends.size()):
+		room_enemy_ends[later] += by
+
+
 ## How many rooms and bridges it has.
 func rooms() -> int:
 	return room_templates.size()

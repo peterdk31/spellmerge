@@ -110,6 +110,8 @@ var _wizard_colour: PackedColorArray = PackedColorArray([Color.WHITE, Color.WHIT
 var _laid_places: int = -1
 var _laid_world: int = -1
 var _clock: float = 0.0
+## The rooms rerolled since the last lay (`_on_room_rerolled`): the next lay keeps the maps open.
+var _turn_rooms: Dictionary = {}
 ## The stone's shades (shadow, base, light).
 var _stone: PackedColorArray = Palette.shades_of(&"stone")
 ## A sensed secret room's stages, coming in: as a room only shown (the stone's shadow), then the
@@ -147,6 +149,14 @@ func bind(events: Node) -> void:
 	if events != null:
 		events.rooms_seen.connect(_on_rooms_seen)
 		events.run_stats_told.connect(_on_run_stats_told)
+		events.room_rerolled.connect(_on_room_rerolled)
+
+
+## A room was rerolled (`room_rerolled`, the owner's of 2026-11-19): the world is laid again next,
+## and an open map stays open, that room alone coming in again through the stone's shades (its floor
+## and its symbol new), never a jump.
+func _on_room_rerolled(room: int, _kind: StringName) -> void:
+	_turn_rooms[room] = true
 
 
 func _on_rooms_seen(seen: PackedByteArray, _again: bool) -> void:
@@ -491,6 +501,15 @@ func draw_map(canvas: SeatMap, seat: int) -> void:
 ## A new biome's pieces as the map draws them: each place's floor read from `grid` at MAP_CELL (once a
 ## biome), its walkway's rooms and its room's symbol.
 func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
+	# A room rerolled lays the same pieces again: what is open stays open (see `_on_room_rerolled`).
+	var keep: bool = not _turn_rooms.is_empty() and places == _shade.size()
+	var old_stage: PackedInt32Array = _stage.duplicate()
+	var old_reopen: PackedByteArray = _reopen.duplicate()
+	var old_shade: PackedInt32Array = _shade.duplicate()
+	var old_rows: PackedInt32Array = _symbol_rows.duplicate()
+	var old_shown: Array[bool] = []
+	for map in _maps:
+		old_shown.append(map.visible)
 	_laid_places = places
 	_laid_world = world_now
 	_rects.clear()
@@ -526,6 +545,20 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 			if end < 2 and _room[room] != 0 and grown.intersects(_rects[room]):
 				_ends[place * 2 + end] = room
 				end += 1
+	if keep:
+		_settle()
+		_stage = old_stage
+		_reopen = old_reopen
+		for at in _maps.size():
+			_maps[at].visible = old_shown[at]
+		for place in places:
+			_shade[place] = 0 if _turn_rooms.has(place) else old_shade[place]
+			_symbol_rows[place] = 0 if _turn_rooms.has(place) else old_rows[place]
+		_turn_rooms.clear()
+		for map in _maps:
+			map.queue_redraw()
+		return
+	_turn_rooms.clear()
 	# A biome laid is drawn as it stands, every map shut (a new world opens nothing already open).
 	_stage.fill(0)
 	_reopen.fill(0)

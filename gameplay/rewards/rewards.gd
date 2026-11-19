@@ -156,6 +156,8 @@ var _pool_most: PackedFloat32Array = PackedFloat32Array()
 var _rolls: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## By seat: the reward rerolls it has spent this run (REROLL_PURPOSE's counter, `RewardRoll`).
 var _rerolls: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## By room of the biome: how many times it was rerolled (a shop's shelf rolls from that count).
+var _room_rerolls: PackedInt32Array = PackedInt32Array()
 ## By seat: the shelf item (its number) in reach of its standing wizard, last said
 ## (`shelf_near_changed`), -1 for none.
 var _shelf_near: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
@@ -196,6 +198,7 @@ func _ready() -> void:
 	events.room_entered.connect(_on_room_entered)
 	events.enemy_died.connect(_on_enemy_died)
 	events.run_stats_ruled.connect(_on_run_stats_ruled)
+	events.room_rerolled.connect(_on_room_rerolled)
 	# A command, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"reward_pick_requested", _on_reward_pick_requested)
 	events.listen(&"shelf_buy_requested", _on_shelf_buy_requested)
@@ -685,7 +688,9 @@ func _stock_shelf(room: int, table_id: StringName, spots: PackedVector2Array) ->
 	_cards_of(cards, complexities)
 	var stock := RewardOffer.new()
 	var lines: Array[RewardEntry] = []
-	RewardRoll.fill(stock, table, spots.size(), _sim(), room, 0, cards, complexities, SHOP_PURPOSE, SHOP_CARD_PURPOSE, lines)
+	# A room rerolled before it opened (`room_rerolled`) rolls its shelf anew: its rerolls are the roll.
+	var roll: int = _room_rerolls[room] if room >= 0 and room < _room_rerolls.size() else 0
+	RewardRoll.fill(stock, table, spots.size(), _sim(), room, roll, cards, complexities, SHOP_PURPOSE, SHOP_CARD_PURPOSE, lines)
 	for at in stock.size():
 		_item_numbers.append(_next_item)
 		_next_item += 1
@@ -772,6 +777,17 @@ func _clear_rooms() -> void:
 	_pool_areas.clear()
 	_pool_left.clear()
 	_pool_most.clear()
+	_room_rerolls.clear()
+
+
+## A room of the biome was rerolled (`room_rerolled`, Flow's; the owner, 2026-11-19): its shelf, if it
+## is a shop, is rolled anew as it opens (`_room_rerolls`).
+func _on_room_rerolled(room: int, _kind: StringName) -> void:
+	if room < 0:
+		return
+	if _room_rerolls.size() <= room:
+		_room_rerolls.resize(room + 1)
+	_room_rerolls[room] += 1
 
 
 func _sim() -> Sim:

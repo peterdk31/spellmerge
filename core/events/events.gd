@@ -452,6 +452,16 @@ signal run_room_filled(room: int, enemies: Array[StringName], scale: float, grou
 ## core names no area's class), a copy of the run's own. Heard by flow, which keeps a copy as its
 ## world's state and lays it. None comes when the map could not be made.
 signal run_biome_chosen(map: RefCounted)
+## Sender: flow (a room reroll, the owner's of 2026-11-19). The biome's map as it is now, `map` (a
+## `BiomeMap`, a copy), wants its room `room` rerolled, the run's `roll`th room reroll. Heard by run,
+## which answers at once with `run_room_rerolled` (Flow asks and listens in one call, as with
+## `run_begun`).
+signal run_room_reroll_asked(map: RefCounted, room: int, roll: int)
+## Sender: run, in answer to `run_room_reroll_asked`. `map`: the biome's map with room `room`
+## rerolled (`BiomeGenerator.reroll_room`: its kind, template and fill new, every rule of the map
+## kept; a copy), its fight's pace `group`, `refill_at` and `stagger` as `run_room_filled`'s; null
+## when no valid replacement was found (the reroll is refused). Heard by flow.
+signal run_room_rerolled(room: int, map: RefCounted, group: int, refill_at: int, stagger: float)
 ## Sender: flow. The room a fight of the biome stands in is `scale` times harder than the run's first
 ## room with one player (`run_room_filled`'s scale), sent before each enemy of the room's fight
 ## stands (two fights at once each stand at their own). Heard by difficulty, which scales every enemy
@@ -587,6 +597,19 @@ signal key_shown(key: int, at: Vector2, lying: bool)
 ## every seat as the biome is left and after a snapshot is restored. For the view only. Heard by hud
 ## (the hint over the door: "Needs a key").
 signal key_needed_shown(player: int, at: Vector2, needed: bool)
+## Sender: flow (the owner, 2026-11-19). Seat `player`'s standing body is at the bridge mouth (its
+## middle `at`, world pixels) into an unvisited room it may reroll with X (`shown`; a room reroll,
+## `RerollBase.ROOM`), or no more. Sent as it changes; false for every seat as the biome is left and
+## after a snapshot is restored. For the view only. Heard by hud (the hint at the mouth).
+signal room_reroll_shown(player: int, at: Vector2, shown: bool)
+## Sender: flow. Room `room` of the biome was rerolled (`room_reroll_requested`): it is now of kind
+## `kind`, laid anew (its pieces told again, `room_built`) right after this. Heard by cover (the
+## room's cover begins at rest) and feel (its mouths' kind signs and the Y map turn over, Smooth).
+signal room_rerolled(room: int, kind: StringName)
+## Sender: flow. Seat `player`'s room reroll was refused: it holds none (`reason` &"none_held") or
+## nothing valid could stand there (&"no_room"); nothing was spent. For the view only. Heard by hud
+## (a note at the mouth).
+signal room_reroll_refused(player: int, reason: StringName)
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
 ## where each lies, in the scene's order. Sent for every room as a world is made, at the run's start.

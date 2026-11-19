@@ -237,6 +237,22 @@ func run_content() -> RunContent:
 	return RunContent.gather(get_all(&"room_kinds"), get_all(&"rooms"), enemies)
 
 
+## The shapes of biome `biome`'s templates as a biome's map lays them (connected biomes CB5:
+## `PieceShape.of_room`, unmirrored), by id, in id order: what `BiomeGenerator` and
+## `MapRules.biome_problems` read with `run_content()`. Each template with a scene is built once
+## here, so ask once a run, never a frame.
+func piece_shapes(biome: StringName) -> Dictionary:
+	var found: Dictionary = {}
+	for item: Resource in get_all(&"rooms"):
+		var room := item as RoomBase
+		if room == null or room.biome != biome or room.scene == null:
+			continue
+		var shape: PieceShape = PieceShape.of_room(room)
+		if shape != null:
+			found[room.id] = shape
+	return found
+
+
 ## What keeps a map of the run `run_id` from being made from the content there is, one line each
 ## (empty when nothing does): no run of that id under `runs`, or its definition's problems
 ## (`RunDefinition.problems` on `run_content()`, as the generator checks them). Asked before a run's

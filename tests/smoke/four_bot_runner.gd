@@ -53,9 +53,9 @@ extends Node
 ## downed and never revived, as the bots did not revive then, or a stalemate past TIME_LIMIT), which
 ## made this test fail by chance until the seed was pinned (tests/smoke/test_four_bot_seed.gd). The
 ## bots revive since 2026-11-19 (gameplay/ai/behaviours/revive.gd): the sweep of replay seeds 1-100
-## lost 11 before and 7 after; in each of those a fighter was downed in the last 1.5 s before the
-## room was cleared, a revive (2 s) not done by the checks SETTLE_FRAMES later (all 7 win with a 5 s
-## settle; in seed 95 another fighter, downed 2.4 s before, was not revived in time either). A
+## on the biome run (CB8) lost 9 before and 7 after (1, 2, 65, 66, 75, 92, 99); each of those 7 is a
+## fighter downed shortly before the room was cleared, a revive (2 s) not done by the checks
+## SETTLE_FRAMES later: all 7 win with a 5 s settle. A
 ## recorded run also skips the first-time intro (Flow), which the automated runs skip anyway. The
 ## argument `--replay-seed=N` plays the run of replay seed N instead (0: a random one); the result
 ## line prints both seeds, so any run can be played again:

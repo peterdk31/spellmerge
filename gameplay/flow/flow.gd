@@ -1864,9 +1864,11 @@ func _room_occupied(room: int, made: BiomeMap) -> bool:
 ## Room `room` rerolled to the map `made` (only that room differs: its kind, template, mirroring,
 ## place and fill), its fight `fight`: the props it stood go, the map is the world's from now on, the
 ## room is told rerolled (`room_rerolled`: its cover begins at rest, the view turns its signs over),
-## the world is laid again from the map as after a restore that brought another map (every piece told
-## again, the grid's layers, the doors' and the seals laid again; no other state touched), and the new
-## room's props stand. Its placed enemies stand as it is entered, as any room's.
+## and that room alone is laid again (`BiomeWorld.relay_room`, the owner's of 2026-11-19: no hitch,
+## no other room's mist, cover or look touched): its layout (`room_built` under its number), its grid
+## layers and its place, the shut doors' mouths shut again over it; no other state touched. A world
+## laid fresh from the same map, or a restore of it, is the same world (`test_room_reroll.gd`). Then
+## the new room's props stand. Its placed enemies stand as it is entered, as any room's.
 func _reroll_room(room: int, made: BiomeMap, fight: RoomFight) -> void:
 	var old: Rect2 = biome.room_rect(room)
 	for body: Node in contents.of_kind(PropBase):
@@ -1879,7 +1881,12 @@ func _reroll_room(room: int, made: BiomeMap, fight: RoomFight) -> void:
 		life.fights[room] = fight
 	events.room_rerolled.emit(room, made.room_kinds[room])
 	# The biome's area never moves (`BiomeGenerator.reroll_room`): the camera is kept, not snapped.
-	_rebuild_biome(false)
+	if world == null or not is_instance_valid(world) or not biome.relay_room(room):
+		_rebuild_biome(false)
+	elif projectiles != null:
+		gates.lay(biome, projectiles.grid())
+		locks.lay(biome, projectiles.grid())
+		rerolls.forget()
 	if projectiles != null:
 		projectiles.set_room_size(biome.biggest_room())
 	if world != null and is_instance_valid(world):

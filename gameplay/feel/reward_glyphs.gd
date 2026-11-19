@@ -59,23 +59,12 @@ static func glyphs_of(type: RewardType, element: Resource, pixels: Array[PackedB
 		shades.append(element_shades(element as ElementBase))
 
 
-## The shades of the palette material nearest `element`'s tint (the spark's with none).
+## The shades of the palette material nearest `element`'s tint (`ElementBase.light`; the spark's
+## with none).
 static func element_shades(element: ElementBase) -> PackedColorArray:
 	if element == null:
 		return Palette.shades_of(KindSymbolScript.DEFAULT_LIGHT)
-	var best: StringName = KindSymbolScript.DEFAULT_LIGHT
-	var nearest: float = INF
-	for material: StringName in Palette.MATERIALS:
-		var ramp: PackedColorArray = Palette.shades_of(material)
-		# A player's own colours, and the owned ones, are never a room's (docs/STYLE.md).
-		if ramp.size() != 3 or Palette.OWNED.has(material):
-			continue
-		for shade: Color in ramp:
-			var away: float = Vector3(shade.r - element.tint.r, shade.g - element.tint.g, shade.b - element.tint.b).length_squared()
-			if away < nearest:
-				nearest = away
-				best = material
-	return Palette.shades_of(best)
+	return Palette.shades_of(element.light(KindSymbolScript.DEFAULT_LIGHT))
 
 
 ## A picture's pixels, row by row (KindSymbol's values: RoomKind.SYMBOL_NONE, _BASE, _LIT).

@@ -49,6 +49,11 @@ const TIMING_NODE: String = "ProjectileTimingRunner"
 const STORM_ARGUMENT: String = "--storm"
 const STORM_RUNNER: String = "res://tests/benchmark/hub_storm_runner.gd"
 const STORM_NODE: String = "HubStormRunner"
+## The camera spike's split screen (`--split-views`, tests/benchmark/split_views_runner.gd; connected
+## biomes CB1): the stress fight in 0 to 4 Voronoi views; in the Web Test export, the web's numbers.
+const SPLIT_VIEWS_ARGUMENT: String = "--split-views"
+const SPLIT_VIEWS_RUNNER: String = "res://tests/benchmark/split_views_runner.gd"
+const SPLIT_VIEWS_NODE: String = "SplitViewsRunner"
 ## The replay hashes (`--replay-hashes`, tests/platforms/replay_hashes_runner.gd): the same recorded
 ## runs on Linux, Windows and the web, every tick's state hash printed (online-ready N2b).
 const REPLAY_HASHES_ARGUMENT: String = "--replay-hashes"
@@ -161,6 +166,7 @@ func _ready() -> void:
 	_start_stress_test(args)
 	_start_timing_test(args)
 	_start_storm(args)
+	_start_runner(args, SPLIT_VIEWS_ARGUMENT, SPLIT_VIEWS_NODE)
 	_start_replay_hashes(args)
 	_start_runner(args, ONLINE_ARGUMENT, ONLINE_NODE)
 
@@ -238,6 +244,9 @@ func _runner_script(node_name: String) -> GDScript:
 		STORM_NODE:
 			if ResourceLoader.exists(STORM_RUNNER):
 				return load("res://tests/benchmark/hub_storm_runner.gd") as GDScript
+		SPLIT_VIEWS_NODE:
+			if ResourceLoader.exists(SPLIT_VIEWS_RUNNER):
+				return load("res://tests/benchmark/split_views_runner.gd") as GDScript
 		REPLAY_HASHES_NODE:
 			if ResourceLoader.exists(REPLAY_HASHES_RUNNER):
 				return load("res://tests/platforms/replay_hashes_runner.gd") as GDScript

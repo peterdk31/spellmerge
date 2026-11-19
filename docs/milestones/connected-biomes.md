@@ -1,6 +1,6 @@
 # Connected biomes: one walkable map a biome, free split and a Voronoi camera
 
-**Status (2026-11-18): approved by the owner** ("Approve, open a PR"; the CB1 scene stays as a stress test); this document is the plan. CB2 built (the biome world: "CB2 done", below). CB4 done (the ground drawn at layout; "Built (CB4)" below). CB5 built (the generator, on stand-in content until the crypt has the templates: "CB5 done", below). Designed with the owner in one session ("Let's design a new room system"); every rule below is the owner's answer to a question of that session ("Owner decisions"). Reviewed against the code by a fresh-context agent the same day; its findings are written into the model and the steps, and the four that needed the owner were answered (decisions 2, 6, 25 and 1's count). It replaces run generation's branching row map ([run-generation.md](run-generation.md)) with a map of floating rooms joined by bridges, and keeps the rest of that plan (the run as data, kind rules, scaling, rule changes). It keeps the crypt rework's floating rooms ([crypt-rework.md](crypt-rework.md)). It builds a large part of M3's run structure ([docs/PLAN.md](../PLAN.md)).
+**Status (2026-11-18): approved by the owner** ("Approve, open a PR"; the CB1 scene stays as a stress test); this document is the plan. **CB1 done** (2026-11-18): the camera spike's numbers are below ("CB1's numbers"); the owner sets the targets from them (decision 31). CB2 built (the biome world: "CB2 done", below). CB4 done (the ground drawn at layout; "Built (CB4)" below). CB5 built (the generator, on stand-in content until the crypt has the templates: "CB5 done", below). Designed with the owner in one session ("Let's design a new room system"); every rule below is the owner's answer to a question of that session ("Owner decisions"). Reviewed against the code by a fresh-context agent the same day; its findings are written into the model and the steps, and the four that needed the owner were answered (decisions 2, 6, 25 and 1's count). It replaces run generation's branching row map ([run-generation.md](run-generation.md)) with a map of floating rooms joined by bridges, and keeps the rest of that plan (the run as data, kind rules, scaling, rule changes). It keeps the crypt rework's floating rooms ([crypt-rework.md](crypt-rework.md)). It builds a large part of M3's run structure ([docs/PLAN.md](../PLAN.md)).
 
 The steps are **CB1 to CB13** (CB for connected biomes). Each is one PR with its tests, in order.
 
@@ -90,7 +90,7 @@ And on how the party moves: "Free split would really make the game awesome! Coul
 
 ## Steps
 
-1. **CB1 the camera spike.** Draw 2, 3 and 4 Voronoi views (a viewport a cell, each masked to its cell) over the busiest stress fight, on Linux and the web build; measure frame time with shots, motes, light and cover. Report numbers and the fallbacks they need (fewer motes or lights a view). The owner sets the targets from it (decision 31). The measuring scene stays as a lasting stress test (owner, 2026-11-18), run again whenever the camera, motes or light change.
+1. **CB1 the camera spike** (done 2026-11-18; "CB1's numbers" below; `tests/benchmark/split_views.gd`). Draw 2, 3 and 4 Voronoi views (a viewport a cell, each masked to its cell) over the busiest stress fight, on Linux and the web build; measure frame time with shots, motes, light and cover. Report numbers and the fallbacks they need (fewer motes or lights a view). The owner sets the targets from it (decision 31). The measuring scene stays as a lasting stress test (owner, 2026-11-18), run again whenever the camera, motes or light change.
 2. **CB2 the biome world.** Sockets on templates (a class in `core/`, its editor preview in `tools/`), the 32 px placement rule, the mouth cell (GDScript and native kernels together), one bridge template, the biome map as hashed state, the grid's room layers DERIVED. Two or three crypt rooms joined in a hand-made test map, walked through. The row run stays the default. Tests: shots stop at a mouth, a wizard crosses, a free enemy does not, the kernels match, the hash and snapshot cost of a 12-room biome.
 3. **CB3 room life.** Room state and room events (each listener named above moved to them), body membership, waking and sleeping, fights that start past a mouth and seal one way, movement spells across mouths (never out of a seal), portals and possession across rooms, crawling while downed. Tests: determinism and snapshots with a split party and two sealed fights at once (the content-determinism test gains them), a room woken by a shot, sleep-and-wake against never slept, a swap across a seal fizzling.
 4. **CB4 ground at layout.** The ground drawing of `tools/ground_shape.py` (and the wall art of `ground_walls.py`) run in the game when a room is laid out, from the mirrored shape: view only, no load stall (measured), its output for an unmirrored room the same as the baked art's (a test compares them). The baked ground scenes stay for the hub until it moves over too.
@@ -105,6 +105,73 @@ And on how the party moves: "Free split would really make the game awesome! Coul
 13. **CB13 templates:** the crypt's set grown from the first small one (about 6 fights, 3 bridges, the start room, the boss and one of each special) toward 12–16 fights, in later PRs.
 
 Every template is read by tests in all four mirrorings (sockets on the lip, every socket reaching every other, spawns clear, the 32 px rule) and played once in a generated biome; a screenshot of each template and each map style.
+
+## CB1's numbers (2026-11-18)
+
+The measuring scene is `tests/benchmark/split_views.gd` (tests/README.md, `benchmark/`): the stress fight (four bots with built spells, the crowd and the shots held at the cap, every hit's particles, light, motes and the crypt room's cover; `stress_runner.gd`) drawn as a Voronoi split. A view is a SubViewport the screen's size sharing the root's World2D, its own Camera2D at zoom 1 on its wizard, shown through a polygon the shape of its cell; the root then draws only the cells and the HUD (its canvas cull mask leaves the world's layer out). Each view past the first draws a light buffer of its own. Run it again whenever the camera, the motes or the light change.
+
+**Where:** this session's container, 4 cores, no GPU: Linux under `xvfb-run` on Mesa's llvmpipe (software GL, on the same 4 cores as the game), and the Web Test export in headless Chrome on SwiftShader (software WebGL). Neither is a GPU: the times are far over any budget and only their **ratios** are worth reading. Each row is one scenario of the run, 10 s measured after 3 s of warm-up (`SPLIT VIEWS OK`, no errors).
+
+Linux, the desktop's 200 enemies and 6,000 shots (frame time is the whole frame; GPU the views', the light buffers' and the root's, a frame):
+
+| Views | Frame avg | Frame p95 | GPU total | GPU a view | Light buffers |
+|---|---|---|---|---|---|
+| no split | 138 ms | 165 ms | 64 ms | (root 51) | 13 ms (1) |
+| 1 | 135 ms | 160 ms | 57 ms | 43 ms | 10 ms (1) |
+| 2 | 207 ms | 240 ms | 124 ms | 51 ms | 19 ms (2) |
+| 3 | 263 ms | 296 ms | 187 ms | 48 ms | 38 ms (3) |
+| 4 | 297 ms | 347 ms | 214 ms | 41 ms | 44 ms (4) |
+| 4, light off | 219 ms | 255 ms | 147 ms | 36 ms | none |
+| 4, fewest motes (2,048) | 280 ms | 311 ms | 199 ms | 40 ms | 36 ms (4) |
+
+Linux, the web's 100 enemies and 1,000 shots (the desktop's mote ring, 32,768):
+
+| Views | Frame avg | Frame p95 | GPU total | GPU a view | Light buffers |
+|---|---|---|---|---|---|
+| no split | 80 ms | 90 ms | 42 ms | (root 31) | 11 ms (1) |
+| 2 | 109 ms | 122 ms | 71 ms | 27 ms | 14 ms (2) |
+| 3 | 139 ms | 161 ms | 99 ms | 25 ms | 19 ms (3) |
+| 4 | 156 ms | 177 ms | 112 ms | 24 ms | 14 ms (4) |
+| 4, light off | 118 ms | 138 ms | 78 ms | 19 ms | none |
+| 4, fewest motes (2,048) | 145 ms | 163 ms | 101 ms | 21 ms | 12 ms (4) |
+
+Web, the Web Test export (`--split-views`) in headless Chrome on SwiftShader, the web's load and mote ring (8,192). WebGL has no GPU timer queries, so only the frame time is a measure there (the run warns when it reads no GPU time):
+
+| Views | Frame avg | Frame p95 | Against no split |
+|---|---|---|---|
+| no split | 273 ms | 330 ms | 1.0 |
+| 2 | 452 ms | 597 ms | 1.66 |
+| 3 | 666 ms | 828 ms | 2.44 |
+| 4 | 788 ms | 974 ms | 2.89 |
+| 4, light off | 614 ms | 807 ms | 2.25 (22% under 4 views) |
+| 4, fewest motes (2,048) | 629 ms | 747 ms | 2.30 (20% under 4 views) |
+
+The web's tick stays at 10.9 to 12.0 ms in every row.
+
+**What they say:**
+
+- **The split is drawing only.** A physics step's scripts take the same time in every row (about 20 ms desktop, 9 ms web on this machine), and the tick stays within its noise (17.0 to 18.5 ms desktop, 7.4 to 8.9 ms web): nothing in the simulation knows about the views, as the plan wants.
+- **A view through a SubViewport costs nothing extra:** one view costs what the root drawing the world does (135 against 138 ms). The way CB6 draws views is settled: a SubViewport a view sharing the world, masked to its cell.
+- **Each view draws the whole frame again,** about 40 to 50 ms of llvmpipe a view at the desktop's load and 20 to 27 ms at the web's: four views cost about 3.3 times one view's GPU time, close to linear. On a GPU the ratio is what to expect: four views of a busy fight cost about four frames' drawing.
+- **Light is the largest share a fallback can take:** with it off, four views draw 26% faster (desktop on llvmpipe), 24% (the web's load on llvmpipe) and 22% (the browser); the light buffers are only part of it, most is the apply pass in each view (its screen copy and shader). **Motes depend on the renderer:** the fewest motes save 6 to 7% on llvmpipe but 20% in the browser, nearly what the light does; on the web they are the second fallback, not the last.
+- **Every view draws every shot:** the projectile batches are never culled (`Batches.multimesh`, the world's box), so a view of an empty room still draws the fight in another. On one slab it does not matter (each view sees the fight); across the biome it will.
+
+**The fallbacks, in the order to try them** (for the owner's targets, decision 31):
+
+1. **Light a view at a lower price:** the light off past two views, or a light buffer at half its size a view past the first; light was a quarter of the frame at four views.
+2. **Draw a view's own room's shots only:** cull the batches by the rooms a view shows (per-room batches, or a view's cull mask over room layers), so a split across rooms does not draw each fight in every view.
+3. **Smaller views:** a SubViewport the size of its cell's box, not the screen's, so four views fill about one screen of pixels instead of four (the cell's camera offset moves with it).
+4. **Fewer motes a view:** a step down the mote ring when split; little on the desktop, about a fifth of the frame in the browser, so on the web it comes second.
+
+**For CB6, the light's look:** every view's apply rect is the world's one canvas item with one material, which reads the game's one light buffer at the screen's coordinates, so in a view the light is drawn where the root's camera would put it (the spike's extra buffers are drawn for their cost, not read). The fix that fits Godot: a light buffer and an apply rect a view, each apply rect on a visibility layer of its own (`CanvasItem.visibility_layer`) with its own material reading its own buffer, and each view's cull mask taking only its own layer; the lit-only motes and the mist read the buffer too and need the same (a MultiMeshInstance2D a view sharing the one MultiMesh, each with its view's material).
+
+**What the spike does not measure:**
+
+- **What each view frames:** every view's camera keeps to the room's limits, as the game's camera does today, so in the stress room (larger than a screen) the views show overlapping parts of the one fight (their screens are saved with `--shots`). That is the worst case, every view full of the fight; views onto void and quiet rooms cost less.
+- **Cover:** the stress room's cover is the crypt's own (its cobwebs; the Cover step about 0.33 ms a tick), drawn in every view; a room thick with grass, and a "cover off" row, are left for when a biome has one.
+- **What sits on the root's canvas layers but follows the world** (the teammate markers' layer, the HUD panels placed by the root camera) is drawn once by the root, over the cells, where the root's camera puts it; the mote sources and the bodies' on-screen checks still read the root's view. Cheap, and right in no split; CB6 moves each to its view.
+
+**Targets:** not set here. These are software-rendered numbers; the owner's real measure is a GPU in a browser (the hub storm's harness, tests/README.md, `benchmark/`): the Web Test export with `--split-views` in Chrome without vsync, or `split_views.gd` on a desktop with a GPU.
 
 ## Built (CB4)
 

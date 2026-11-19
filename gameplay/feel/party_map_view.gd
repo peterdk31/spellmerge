@@ -115,6 +115,10 @@ var _wizard_at: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.IN
 var _wizard_colour: PackedColorArray = PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE])
 var _laid_places: int = -1
 var _laid_world: int = -1
+## The pieces' versions read last (`RoomHearing.versions`, `relaid`): a room laid again alone (a room
+## reroll's) is read again alone (`_relay`), every other room's entry as it stands.
+var _laid_versions: PackedInt32Array = PackedInt32Array()
+var _laid_relaid: int = -1
 var _clock: float = 0.0
 ## The rooms rerolled since the last lay (`_on_room_rerolled`): the next lay keeps the maps open.
 var _turn_rooms: Dictionary = {}
@@ -296,6 +300,8 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid, vi
 	var world_now: int = pieces.world() if pieces != null else 0
 	if places != _laid_places or world_now != _laid_world:
 		_lay(grid, places, world_now)
+	elif pieces != null and pieces.relaid() != _laid_relaid:
+		_relay(grid, pieces.changed_since(_laid_versions, places))
 	for seat in ActorsScript.SEATS:
 		_held[seat] = 1 if not _rects.is_empty() and seats_here & (1 << seat) != 0 and _holds(seat) else 0
 	if not _any_open():
@@ -525,12 +531,20 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 		old_shown.append(map.visible)
 	_laid_places = places
 	_laid_world = world_now
+	_laid_relaid = pieces.relaid() if pieces != null else 0
+	_laid_versions = pieces.versions() if pieces != null else PackedInt32Array()
 	_rects.clear()
+	_rects.resize(places)
 	_floors.clear()
+	_floors.resize(places)
 	_symbols.clear()
+	_symbols.resize(places)
 	_symbol_shades.clear()
+	_symbol_shades.resize(places)
 	_glyphs.clear()
+	_glyphs.resize(places)
 	_glyph_shades.clear()
+	_glyph_shades.resize(places)
 	_room.resize(places)
 	_secret.resize(places)
 	_sense_shade.resize(places * ActorsScript.SEATS)
@@ -542,30 +556,9 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	_ends.fill(-1)
 	_area = Rect2()
 	for place in places:
-		var rect: Rect2 = grid.place_rect(place)
-		_rects.append(rect)
-		_area = rect if place == 0 else _area.merge(rect)
-		_room[place] = 0 if pieces != null and pieces.is_walkway(place) else 1
-		_floors.append(floor_of(grid, place))
-		var kind: RoomKind = pieces.kind_of(place) if pieces != null and _room[place] != 0 else null
-		_secret[place] = 1 if kind != null and kind.door == RoomKind.DOOR_SECRET else 0
-		_symbols.append(kind.symbol_pixels() if kind != null else PackedByteArray())
-		_symbol_shades.append(KindSymbolScript.shades_of(kind))
-		var type: RewardType = pieces.type_of(place) if kind != null else null
-		var glyphs: Array[PackedByteArray] = []
-		var glyph_shades: Array[PackedColorArray] = []
-		RewardGlyphsScript.glyphs_of(type, pieces.content(RewardGlyphsScript.card_folder(), type.element) if type != null else null, glyphs, glyph_shades)
-		_glyphs.append(glyphs)
-		_glyph_shades.append(glyph_shades)
-	for place in places:
-		if _room[place] != 0:
-			continue
-		var grown: Rect2 = _rects[place].grow(RoomHearingScript.TOUCH)
-		var end: int = 0
-		for room in places:
-			if end < 2 and _room[room] != 0 and grown.intersects(_rects[room]):
-				_ends[place * 2 + end] = room
-				end += 1
+		_read_place(grid, place)
+		_area = _rects[place] if place == 0 else _area.merge(_rects[place])
+	_find_ends(places)
 	if keep:
 		_settle()
 		_stage = old_stage
@@ -586,6 +579,60 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	for map in _maps:
 		map.visible = false
 	_settle()
+	for map in _maps:
+		map.queue_redraw()
+
+
+## Each walkway's two rooms (`_ends`), from the places' rectangles.
+func _find_ends(places: int) -> void:
+	_ends.fill(-1)
+	for place in places:
+		if _room[place] != 0:
+			continue
+		var grown: Rect2 = _rects[place].grow(RoomHearingScript.TOUCH)
+		var end: int = 0
+		for room in places:
+			if end < 2 and _room[room] != 0 and grown.intersects(_rects[room]):
+				_ends[place * 2 + end] = room
+				end += 1
+
+
+## Place `place` as the map draws it, read from `grid` and the pieces: its rectangle, floor, symbol and
+## reward glyphs.
+func _read_place(grid: RoomGrid, place: int) -> void:
+	_rects[place] = grid.place_rect(place)
+	_room[place] = 0 if pieces != null and pieces.is_walkway(place) else 1
+	_floors[place] = floor_of(grid, place)
+	var kind: RoomKind = pieces.kind_of(place) if pieces != null and _room[place] != 0 else null
+	_secret[place] = 1 if kind != null and kind.door == RoomKind.DOOR_SECRET else 0
+	_symbols[place] = kind.symbol_pixels() if kind != null else PackedByteArray()
+	_symbol_shades[place] = KindSymbolScript.shades_of(kind)
+	var type: RewardType = pieces.type_of(place) if kind != null else null
+	var glyphs: Array[PackedByteArray] = []
+	var glyph_shades: Array[PackedColorArray] = []
+	RewardGlyphsScript.glyphs_of(type, pieces.content(RewardGlyphsScript.card_folder(), type.element) if type != null else null, glyphs, glyph_shades)
+	_glyphs[place] = glyphs
+	_glyph_shades[place] = glyph_shades
+
+
+## The rooms of `changed` (laid again alone: a room reroll's) read again alone: an open map stays
+## open, each of them coming in again through the stone's shades (its floor and its symbol new),
+## never a jump; every other room's entry stays as it stands.
+func _relay(grid: RoomGrid, changed: PackedInt32Array) -> void:
+	_laid_relaid = pieces.relaid()
+	_laid_versions = pieces.versions()
+	var shown: bool = _any_open()
+	for place in changed:
+		_read_place(grid, place)
+		# Shut, it is drawn as it stands when opened; open, it comes in again.
+		_shade[place] = 0 if shown else _shade_wanted(place)
+		_symbol_rows[place] = 0 if shown else _rows_wanted(place)
+	_area = Rect2()
+	for place in _rects.size():
+		_area = _rects[place] if place == 0 else _area.merge(_rects[place])
+	_find_ends(_rects.size())
+	_sensed_stale = true
+	_turn_rooms.clear()
 	for map in _maps:
 		map.queue_redraw()
 

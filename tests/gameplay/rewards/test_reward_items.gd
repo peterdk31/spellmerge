@@ -160,3 +160,23 @@ func test_a_coin_walked_over_says_its_pickup() -> void:
 	_rewards.lay_coin(Vector2(200, 0))
 	_tick()
 	check(_picked.has([one.id, ItemKinds.COIN]), "a coin's pickup said, for its sound")
+
+
+## The review of 2026-11-19: a clear due as the world changes is rolled waiting, never lying at the
+## old world's spots in the new one.
+func test_a_clear_due_across_a_new_world_waits() -> void:
+	_world.wizard(0, Vector2(200, 0))
+	_world.bus.room_rewards_due.emit(4, &"clear", PackedStringArray(), SPOTS)
+	_world.bus.room_entered.emit(&"next_biome", EventsScript.FIRST_ROOM)
+	_rewards.step(Fixture.STEP)
+	var offer: Dictionary = _offer_of(0)
+	check(not offer.is_empty() and not bool(offer["lying"]), "rolled, waiting, lying nowhere")
+	check(_items.is_empty(), "no item said in the new world")
+
+
+## The review of 2026-11-19: no reward item is opened from inside the portal home (48 px square on
+## the room's middle).
+func test_the_reward_spots_keep_clear_of_the_portal_home() -> void:
+	for spot: Vector2 in SpecialPlaces.reward_spots(null, Vector2.ZERO):
+		var reach := Rect2(spot, Vector2.ZERO).grow(RewardsScript.REWARD_REACH)
+		check(not reach.intersects(Rect2(Vector2(-24, -24), Vector2(48, 48))), "%s out of reach from the portal" % spot)

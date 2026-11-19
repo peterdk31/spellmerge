@@ -29,9 +29,10 @@ const SIGN_ZONE: StringName = &"shelf_sign"
 const SIGN_SPOT: Vector2 = Vector2(0.0, 40.0)
 ## The zone the players' reward items lie in (the owner's ask of 2026-11-19: a reward lies as an item
 ## in the room's middle), and where each seat's lies from it (or from the room's middle), by seat: a
-## row under the middle, apart from a key's first spot and the portal home on the middle itself.
+## row under the middle, its middle column left free, so none is opened from inside the portal home
+## (48 px square on the middle) nor lies on a key's first spots.
 const REWARD_ZONE: StringName = &"reward"
-const REWARD_SPOTS: Array[Vector2] = [Vector2(-36.0, 32.0), Vector2(-12.0, 32.0), Vector2(12.0, 32.0), Vector2(36.0, 32.0)]
+const REWARD_SPOTS: Array[Vector2] = [Vector2(-60.0, 48.0), Vector2(-36.0, 48.0), Vector2(36.0, 48.0), Vector2(60.0, 48.0)]
 
 
 ## The shelf's spots of a room whose places are `places` and whose middle is `middle` (world pixels).

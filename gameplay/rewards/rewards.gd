@@ -371,7 +371,7 @@ static func sign_price(uses: int) -> int:
 		return SIGN_PRICES[maxi(uses, 0)]
 	var before: int = SIGN_PRICES[SIGN_PRICES.size() - 2]
 	var last: int = SIGN_PRICES[SIGN_PRICES.size() - 1]
-	for step in uses - SIGN_PRICES.size() + 1:
+	for _i in uses - SIGN_PRICES.size() + 1:
 		var next: int = before + last
 		before = last
 		last = next
@@ -576,6 +576,9 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 		_clear_coins()
 		_clear_rooms()
 		_unlay_rewards()
+		# A clear of the world before not yet rolled: rolled now, waiting, never at the old spots.
+		for at in _due_spots.size():
+			_due_spots[at] = Vector2.INF
 
 
 ## Seat `player` asked to buy shelf item `item` (a command): sold if it still lies on its shelf, in

@@ -79,6 +79,9 @@ var _shown: int = -1
 ## `_wanted`: the panels open it when they may.
 var _wants_open: bool = false
 var _wanted: int = -1
+## The offer whose pick was last sent, until the Rewards area answers (it goes, or is refused): A at
+## its item meanwhile opens nothing (online the answer comes a few frames later).
+var _sent: int = -1
 ## The offer whose pick was refused, shown with REFUSED_TEXT the next time it opens (-1: none).
 var _refused: int = -1
 ## The new choices of the offer shown, rerolled and not yet turned over onto the cards (empty: none).
@@ -172,7 +175,7 @@ func wants_open() -> bool:
 ## `offer` (its reward item's), or with -1 on its oldest offer lying nowhere. False with no such
 ## offer, already open, or the seat has no device.
 func open_menu(offer: int = -1) -> bool:
-	var at: int = _offer_of(offer) if offer >= 0 else _first_away()
+	var at: int = _offer_of(offer) if offer >= 0 and offer != _sent else (_first_away() if offer < 0 else -1)
 	if visible and not _open and at >= 0:
 		# Still rolling up: it opens again once rolled up (the panels ask each frame), never by a jump.
 		_wants_open = true
@@ -463,6 +466,8 @@ func _on_rewards_waiting_changed(player: int, offers: Array[Dictionary]) -> void
 	if player != index:
 		return
 	_offers = offers.duplicate()
+	if _offer_of(_sent) < 0:
+		_sent = -1
 	if _offers.is_empty():
 		_wants_open = false
 	if _open and _offer_of(_shown) < 0:
@@ -491,6 +496,7 @@ func _on_reward_refused(player: int, offer: int) -> void:
 		_refused = offer
 		_wants_open = true
 		_wanted = offer
+		_sent = -1
 
 
 func _on_reward_rerolled(player: int, offer: int, choices: Array[Dictionary]) -> void:
@@ -541,6 +547,7 @@ func _on_activated(player: int, control: Control) -> void:
 		return
 	UiSounds.send(_events, UiSounds.CHOOSE)
 	if _events != null:
+		_sent = _shown
 		_events.reward_pick_requested.emit(index, _shown, choice)
 	close_menu()
 

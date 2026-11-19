@@ -8,8 +8,9 @@ extends Node2D
 ##
 ## **Smooth** (docs/STYLE.md): it comes in by STAGES (a sliver, half, whole), STAGE_FRAMES frames
 ## each, and goes the same way back; the glint runs through its 3 frames and rests. Whole pixels,
-## never a fade. After a restore (-1 told, then each lying one said again) one said again keeps how
-## far it had come in.
+## never a fade. After a restore the Rewards area says gone each it no longer holds and each lying one
+## again; one said again keeps how far it had come in (-1 forgets them all, kept for a sender that
+## says each again after it).
 ##
 ## A child of Feel, in world space. View only, on real time: never state, nothing in the game reads
 ## it. It allocates only as items come and go.
@@ -131,7 +132,6 @@ func _draw() -> void:
 func _draw_item(offer: int, row: Array) -> void:
 	var at: Vector2 = (row[0] as Vector2).round()
 	var first: int = clampi(int(row[1]), 0, 3) * 3
-	var ramp: PackedColorArray = PLAYER_RAMPS.slice(first, first + 3)
 	var share: float = STAGES[clampi(floori(float(row[2]) / STAGE_FRAMES), 0, STAGES.size() - 1)]
 	var bob: float = roundf(sin((_clock * BOB_RATE + float(offer) * 0.37) * PI) * BOB)
 	draw_rect(Rect2(at + Vector2(-5.0, 0.0), Vector2(11.0, 2.0)), SHADOW)
@@ -140,9 +140,9 @@ func _draw_item(offer: int, row: Array) -> void:
 	var bottom: Vector2 = at + Vector2(-CHEST.x * 0.5, -LIFT + bob)
 	var box := Rect2(bottom - Vector2(0.0, height), Vector2(CHEST.x, height))
 	draw_rect(box.grow(1.0), OUTLINE)
-	draw_rect(box, ramp[1])
-	draw_rect(Rect2(box.position, Vector2(box.size.x, 1.0)), ramp[2])
-	draw_rect(Rect2(box.position + Vector2(0.0, box.size.y - 1.0), Vector2(box.size.x, 1.0)), ramp[0])
+	draw_rect(box, PLAYER_RAMPS[first + 1])
+	draw_rect(Rect2(box.position, Vector2(box.size.x, 1.0)), PLAYER_RAMPS[first + 2])
+	draw_rect(Rect2(box.position + Vector2(0.0, box.size.y - 1.0), Vector2(box.size.x, 1.0)), PLAYER_RAMPS[first])
 	if share < 1.0:
 		return
 	# Its lid's line, the gold band down its middle and its clasp.

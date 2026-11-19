@@ -546,10 +546,10 @@ signal room_rewards_due(room: int, table: StringName, type: PackedStringArray, s
 ## fill (`RoomKind.FILL_SHOP`, `FILL_FOUNTAIN`) was entered for the first time: `table` the shop's
 ## shelf table (`RoomKind.shelf`; empty for a fountain), `area` the fountain's pool in world pixels
 ## (its template's zone `fountain`, else round the room's middle), `spots` where a shop's items lie
-## (its zones `shelf`, in order, else spots round its middle), `sign` where a shop's reroll sign
+## (its zones `shelf`, in order, else spots round its middle), `board` where a shop's reroll sign
 ## stands (its zone `shelf_sign`, else under its shelf; the owner's ask of 2026-11-19). Sent once a
 ## room, never by a restore. Heard by rewards, which stocks the shelf and fills the pool.
-signal special_room_opened(room: int, fill: StringName, table: StringName, area: Rect2, spots: PackedVector2Array, sign: Vector2)
+signal special_room_opened(room: int, fill: StringName, table: StringName, area: Rect2, spots: PackedVector2Array, board: Vector2)
 ## Sender: flow (connected biomes CB9). The party's map of the biome: `seen[room]` for each room by
 ## its number (0 unseen, 1 shown on the map but never entered, 2 entered; `PartyMap`), a copy. Sent as
 ## a biome starts and whenever a room is seen; empty as the biome goes; `again` after a restore (what

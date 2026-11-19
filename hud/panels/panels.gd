@@ -485,7 +485,7 @@ func poll() -> void:
 					# A shop's item (or reroll sign) where the wizard stands: A buys it (connected biomes
 					# CB11's follow-up; the sign, a reroll of the shelf, the owner's of 2026-11-19).
 					events.shelf_buy_requested.emit(player, _item_hints.shelf_of(player))
-				elif _item_hints.reward_of(player) >= 0 and not _panels[player].is_downed():
+				elif take_now and _item_hints.reward_of(player) >= 0 and not _panels[player].is_downed():
 					# The seat's own reward item where its body stands: A opens its pick (the owner,
 					# 2026-11-19: rewards never pop up by themselves).
 					_open_reward(player, _item_hints.reward_of(player))
@@ -587,8 +587,13 @@ static func _count_in(ids: Array[StringName], counts: PackedInt32Array, id: Stri
 
 func _on_rewards_waiting_changed(player: int, offers: Array[Dictionary]) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
-		_unspent[player] = offers.size()
-		_panels[player].set_purse(_coins[player], offers.size())
+		# What A anywhere opens: an offer lying as an item waits in its room, its chest says so.
+		var away: int = 0
+		for offer: Dictionary in offers:
+			if not bool(offer.get("lying", false)):
+				away += 1
+		_unspent[player] = away
+		_panels[player].set_purse(_coins[player], away)
 
 
 ## `pause`: close the player's open menu, or open the pause menu for them.

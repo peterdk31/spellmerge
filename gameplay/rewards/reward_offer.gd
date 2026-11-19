@@ -37,8 +37,8 @@ func size() -> int:
 
 ## True when it already offers a choice of `kind` `id` `count`.
 func offers(kind: StringName, id: StringName, count: int) -> bool:
-	for at in kinds.size():
-		if kinds[at] == kind and ids[at] == id and counts[at] == count:
+	for choice in kinds.size():
+		if kinds[choice] == kind and ids[choice] == id and counts[choice] == count:
 			return true
 	return false
 

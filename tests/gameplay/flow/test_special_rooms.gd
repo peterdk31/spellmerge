@@ -191,7 +191,7 @@ func test_a_reward_room_rewards_each_wizard_as_the_party_steps_in() -> void:
 	check_equal(spots.size(), 4, "a spot a seat")
 	var middle: Vector2 = flow.biome.room_rect(EAST).get_center()
 	for seat in spots.size():
-		check(spots[seat].distance_to(middle) < 64.0, "round the room's middle")
+		check(spots[seat].distance_to(middle) < 96.0, "round the room's middle")
 		check(not projectiles.call(&"grid").circle_blocked(spots[seat], 4.0, true), "on clear ground")
 		for other in range(seat + 1, spots.size()):
 			check(spots[seat].distance_to(spots[other]) >= 12.0, "apart from the others")

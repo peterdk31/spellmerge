@@ -311,19 +311,19 @@ func test_opening_closing_and_moving_play_their_frames() -> void:
 	check(closing - 1 >= 3, "after at least 3 frames between (%d)" % closing)
 
 
-func test_back_leaves_it_unspent_and_a_opens_it_again() -> void:
+func test_back_leaves_it_unspent_and_a_at_its_item_opens_it_again() -> void:
 	var waiting: Array[Dictionary] = _roll(0, 2, true)
 	_frame()
 	_tap(0, &"back")
 	_frame()
 	check(not _hud.get_reward(0).is_open(), "B closes it")
 	check(_picked.is_empty(), "with nothing sent")
-	check_equal(_hud.get_panel(0).purse_text(), "1 to pick", "the corner panel says it waits")
+	check_equal(_hud.get_panel(0).purse_text(), "", "it waits as its item in the room, not on the corner panel")
 	_settle(_hud.get_reward(0))
 	_frame()
-	_tap(0, &"accept")
+	_tap(0, &"take")
 	_frame()
-	check(_hud.get_reward(0).is_open(), "A with nothing else for it opens it again")
+	check(_hud.get_reward(0).is_open(), "A at its item opens it again")
 	_bus.rewards_waiting_changed.emit(0, [] as Array[Dictionary])
 	check(not _hud.get_reward(0).is_open(), "it closes when its offer goes")
 	check_equal(_hud.get_panel(0).purse_text(), "", "the panel's line hides")
@@ -472,3 +472,27 @@ func test_the_panel_counts_each_reroll() -> void:
 	panel.reward_reroll_count().advance(1.0)
 	_bus.bag_changed.emit(0, &"currency", [CoinBase.ID] as Array[StringName], PackedInt32Array([2]), -1)
 	check_equal(panel.reward_reroll_count().playing(), 4, "the last one spent sinks out (Play.LEAVE)")
+
+
+## The review of 2026-11-19: Space is `accept` and casts on the keyboard, so only `take` (pad A,
+## F, Enter) at a reward item opens it; the corner panel counts only the offers A anywhere opens;
+## and A at the item again before the pick is answered opens nothing.
+func test_only_take_opens_a_reward_item_and_a_sent_pick_is_not_opened_again() -> void:
+	_rolled(0, 6, true)
+	_bus.reward_near_changed.emit(0, 6, Vector2.ZERO)
+	_tap(0, &"accept")
+	_frame()
+	var menu: RewardMenuScript = _hud.get_reward(0)
+	check(not menu.is_open(), "accept alone (Space, which casts) opens nothing at the item")
+	_tap(0, &"take")
+	_frame()
+	check(menu.is_open(), "take opens it")
+	_tap(0, &"accept")
+	_frame()
+	check_equal(_picked, [[0, 6, 0]], "picked")
+	for frame in 8:
+		menu.step()
+	_tap(0, &"take")
+	_frame()
+	check(not menu.is_open(), "the pick not yet answered: the item opens nothing again")
+	check(not menu.open_menu(6), "nor asked directly")

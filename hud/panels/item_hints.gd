@@ -233,8 +233,8 @@ func _show(player: int) -> void:
 		_hints[player].show_item(player, _ground[player], _ground_view[player])
 	elif _shelf[player] >= 0:
 		_at[player] = _shelf_at[player]
-		var sign: bool = _shelf_view[player].get("kind", &"") == EventsScript.SHELF_SIGN
-		_hints[player].show_item(player, _shelf[player], _shelf_view[player], "" if sign else ItemHintScript.BUY)
+		var is_sign: bool = _shelf_view[player].get("kind", &"") == EventsScript.SHELF_SIGN
+		_hints[player].show_item(player, _shelf[player], _shelf_view[player], "" if is_sign else ItemHintScript.BUY)
 	elif _reward[player] >= 0:
 		_at[player] = _reward_at[player]
 		_hints[player].show_item(player, _reward[player], {"name": ItemHintScript.REWARD_NAME}, ItemHintScript.OPEN)

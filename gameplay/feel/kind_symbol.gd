@@ -20,9 +20,9 @@ static func shades_of(kind: RoomKind) -> PackedColorArray:
 
 ## Draw `pixels` (`RoomKind.symbol_pixels`) on `canvas` with its box's corner at `at` (whole pixels),
 ## `size` screen pixels a symbol pixel, `rows` of its rows shown (0 none ... SYMBOL_SIDE all), in
-## `shades` (shadow, base, light), with an edge of Palette.OUTLINE round the pixels drawn.
-static func draw(canvas: CanvasItem, pixels: PackedByteArray, shades: PackedColorArray, at: Vector2, rows: int, size: int = 1) -> void:
-	var side: int = RoomKind.SYMBOL_SIDE
+## `shades` (shadow, base, light), with an edge of Palette.OUTLINE round the pixels drawn. `side`: the
+## picture's (a reward glyph's is smaller, `reward_glyphs.gd`).
+static func draw(canvas: CanvasItem, pixels: PackedByteArray, shades: PackedColorArray, at: Vector2, rows: int, size: int = 1, side: int = RoomKind.SYMBOL_SIDE) -> void:
 	if pixels.size() != side * side or rows <= 0 or shades.size() < 3:
 		return
 	rows = mini(rows, side)

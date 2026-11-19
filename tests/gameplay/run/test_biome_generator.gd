@@ -617,3 +617,43 @@ func test_every_crypt_fight_room_and_walkway_is_played() -> void:
 		if room != null and room.biome == &"crypt" and (room.walkway or room.kinds.has(&"fight")) and not placed.has(room.id):
 			unplayed.append(String(room.id))
 	check_equal(unplayed, PackedStringArray(), "every crypt fight room and walkway is played in some map")
+
+
+## The reward rooms' types (the owner's ask of 2026-11-19, step 7): every crypt reward room gets one,
+## a line of its table's item kind, a card's kind among its cards' kinds and an infusion's element
+## among the element cards; every other room none; the same seed the same types (and the same rooms
+## as a map made without them); the seeds vary them.
+func test_each_reward_room_is_given_its_type_from_the_seed() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	var untyped: RunContent = RunContent.gather(registry.get_all(&"room_kinds"), registry.get_all(&"rooms"), registry.get_all(&"enemies") + registry.get_all(&"bosses"))
+	var seen: Dictionary = {}
+	var table := registry.get_resource(&"rewards", &"reward") as RewardTable
+	var items: Array[StringName] = []
+	for entry: RewardEntry in table.entries:
+		items.append(entry.kind)
+	for seed_value in 32:
+		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		if not map.is_made():
+			continue
+		var again: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		check(map.same_as(again), "seed %d: the same seed, the same types" % seed_value)
+		var plain: BiomeMap = BiomeGenerator.generate(crypt, untyped, shapes, _sim(seed_value))
+		check(plain.room_reward_items.is_empty(), "seed %d: with no tables nor cards, no room is typed" % seed_value)
+		check(plain.room_kinds == map.room_kinds and plain.room_places == map.room_places and plain.room_enemies == map.room_enemies, "seed %d: the types shift no other roll" % seed_value)
+		for room in map.rooms():
+			var type: RewardType = map.reward_type_of(room)
+			if map.room_kinds[room] != &"reward":
+				check(type.is_any(), "seed %d: a %s room has no type" % [seed_value, map.room_kinds[room]])
+				continue
+			check(items.has(type.item), "seed %d: the reward room's item kind is a line of its table's: %s" % [seed_value, type.to_row()])
+			if type.item == ItemKinds.CARD:
+				check(type.card_kind != &"", "seed %d: a card room names its card kind" % seed_value)
+				check_equal(type.element != &"", type.card_kind == RewardType.ELEMENT_KIND, "seed %d: an infusion room, and only one, names its element" % seed_value)
+				if type.element != &"":
+					check_equal(content.cards.kind_of(type.element), RewardType.ELEMENT_KIND, "its element is an element card")
+			seen[",".join(type.to_row())] = true
+	check(seen.size() >= 3, "the seeds give the reward room different types: %s" % [seen.keys()])

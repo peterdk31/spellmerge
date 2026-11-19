@@ -27,6 +27,10 @@ var registry: Node
 var projectiles: Node
 var rewards: Node
 var due: Array = []
+## Each `room_rewards_due`'s type, by the same index.
+var due_types: Array[PackedStringArray] = []
+## The type the next `_start` gives its east room (any: none).
+var east_type: RewardType = RewardType.new()
 var keys: Array = []
 var key_doors: Array = []
 var rocks: Array = []
@@ -53,6 +57,8 @@ func before_each() -> void:
 	projectiles = root.get_node("Projectiles")
 	rewards = root.get_node("Rewards")
 	due.clear()
+	due_types.clear()
+	east_type = RewardType.new()
 	keys.clear()
 	key_doors.clear()
 	rocks.clear()
@@ -85,8 +91,9 @@ func after_each() -> void:
 	tick.begin_run()
 
 
-func _on_due(room: int, table: StringName) -> void:
+func _on_due(room: int, table: StringName, type: PackedStringArray) -> void:
 	due.append([room, table])
+	due_types.append(type)
 
 
 func _on_key(key: int, at: Vector2, lying: bool) -> void:
@@ -111,6 +118,8 @@ func _start(players: int, west_kind: StringName, east_kind: StringName, west: Ar
 	var map: BiomeMap = BiomeMaps.split(registry)
 	map.room_kinds[WEST] = west_kind
 	map.room_kinds[EAST] = east_kind
+	if not east_type.is_any():
+		map.type_room(EAST, east_type)
 	for seat in players:
 		input.add_virtual_device(seat)
 		var walk := Walk.new()
@@ -172,6 +181,7 @@ func test_a_reward_room_rewards_each_wizard_as_the_party_steps_in() -> void:
 	_put(0, _by_socket(map, EAST, RoomSocket.Facing.WEST, 24.0))
 	check(flow.life.has(EAST, RoomLife.CLEARED), "a reward room is cleared as it is entered")
 	check_equal(due, [[EAST, &"reward"]], "its rewards are due, from its kind's table")
+	check(RewardType.from_row(due_types[0]).is_any(), "a map not typed: of any type")
 	_ticks(1)
 	check_equal((rewards.call(&"waiting_of", 0) as Array).size(), 1, "the wizard there has its offer")
 	check_equal((rewards.call(&"waiting_of", 1) as Array).size(), 1, "the one elsewhere finds its own waiting (rule 4)")
@@ -451,3 +461,18 @@ func test_a_challenge_rooms_elites_stand_with_more_health_a_card_more_and_an_out
 	_beat(EAST)
 	_ticks(2)
 	check_equal(due.back(), [EAST, &"challenge"], "the bigger reward of the challenge's own table")
+
+
+## A reward room's type (the owner's ask of 2026-11-19) comes with its rewards due, from the map.
+func test_a_reward_rooms_type_comes_with_its_rewards() -> void:
+	east_type = RewardType.make(ItemKinds.CARD, &"modifier")
+	var map: BiomeMap = _start(1, &"fight", &"reward")
+	_ticks(1)
+	_put(0, _by_socket(map, EAST, RoomSocket.Facing.WEST, 24.0))
+	check_equal(due, [[EAST, &"reward"]], "its rewards are due")
+	check(RewardType.from_row(due_types[0]).same_as(east_type), "of the room's own type: %s" % [due_types[0]])
+	_ticks(1)
+	var waiting: Array = rewards.call(&"waiting_of", 0) as Array
+	check_equal(waiting.size(), 1, "the wizard's offer")
+	for choice: Dictionary in waiting[0]["choices"]:
+		check_equal((registry.call(&"get_resource", &"spells", choice["id"]) as SpellComponent).kind(), &"modifier", "a modifier room offers modifiers")

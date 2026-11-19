@@ -49,6 +49,24 @@ func kind() -> StringName:
 	return &"element"
 
 
+## The palette material nearest its tint (a player's own colours and the owned ones never: docs/
+## STYLE.md), or `fallback` when the palette has none: the light a view draws the element in (a
+## reward room's element glyph, gameplay/feel/reward_glyphs.gd).
+func light(fallback: StringName = &"spark") -> StringName:
+	var best: StringName = fallback
+	var nearest: float = INF
+	for material: StringName in Palette.MATERIALS:
+		var ramp: PackedColorArray = Palette.shades_of(material)
+		if ramp.size() != 3 or Palette.OWNED.has(material):
+			continue
+		for shade: Color in ramp:
+			var away: float = Vector3(shade.r - tint.r, shade.g - tint.g, shade.b - tint.b).length_squared()
+			if away < nearest:
+				nearest = away
+				best = material
+	return best
+
+
 ## How a status it puts on is shown, for looks (`gameplay/feel`, which reads no spell field; spell
 ## spectacle 2, S6 item 11): [status_id, tint, look_layer, id] (`STATUS_LOOK_*`). A new Array each
 ## call.

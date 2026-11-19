@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/potions/large_healing/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (hand-written SVG rects)",
+			"prompt": "A 16x16 icon of a large round glass flask with a wide brown cork, filled with red healing liquid and a white glint, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

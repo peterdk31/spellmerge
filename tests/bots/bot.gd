@@ -19,7 +19,7 @@ extends FrameSource
 ## (a teammate's blast never makes it fight a teammate).
 ## Travel (connected biomes CB8): out of a fight (its room under way or not, `RoomLife`), a fighter
 ## walks the biome's bridges to the nearest room whose fight is still to come (the fewest bridges from
-## where it stands, its door open: `Flow.gates`), round the walls in a room (`AISight.detour`) and
+## where it stands; one behind a shut door, the boss's gate, it waits at: `Flow.gates`), round the walls in a room (`AISight.detour`) and
 ## straight over a bridge, then steps in, and its fight seals it in; in a fight the brain plays as
 ## above. It reads Flow's map and rooms (`biome`, `life`, `gates`), as a player reads the screen.
 ## Idler: stands still; it only opens its builder.
@@ -215,7 +215,9 @@ func _travel(wizard: Actor) -> Vector2:
 	hops.fill(-1)
 	var queue: Array[int] = []
 	for room in map.rooms():
-		if not life.has(room, RoomLife.ENTERED) and life.fights[room].has_enemies() and (gates == null or gates.is_open(room)):
+		# A room behind a shut door (the boss's gate) is a goal too: the bot walks to its door and
+		# waits there with the party; no way leads through it.
+		if not life.has(room, RoomLife.ENTERED) and life.fights[room].has_enemies():
 			hops[room] = 0
 			queue.append(room)
 	while not queue.is_empty():
@@ -253,7 +255,8 @@ func _travel(wizard: Actor) -> Vector2:
 			var mouth: Vector2 = biome.mouth_rect(bridge, end).get_center()
 			# At the landing, or past it toward the mouth (a room's place reaches over its lip past the
 			# mouth): across.
-			if feet.distance_to(near) > NEAR and (feet - near).dot(mouth - near) <= 0.0:
+			var past: bool = (feet - near).dot(mouth - near) > 0.0 and feet.distance_to(mouth) <= LANDING + NEAR
+			if feet.distance_to(near) > NEAR and not past:
 				return _toward(feet, near, true)
 			return _toward(feet, _landing(biome, bridge, 1 - end))
 	return Vector2.ZERO

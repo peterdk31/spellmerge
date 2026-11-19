@@ -299,8 +299,6 @@ var _biome_given: bool = false
 ## started in: a snapshot taken in a later room lays that room's out again, `rebuild_derived`).
 var _layout: Node = null
 var _layout_of: StringName = &""
-## True while the run in progress was started from the hub's stone: its end goes back there.
-var _back_to_hub: bool = false
 ## Scratch: the run area's answer to `run_begun` (`run_room_filled` for each room, then
 ## `run_biome_chosen`), taken only while Flow asks for it (`_asking`, `_begin_run_of_rooms`) and read
 ## by the same call.
@@ -395,7 +393,6 @@ func step(delta: float) -> void:
 ## The party goes back to the hub, for seat `starter`, with nothing of the run (the run's end); with
 ## `party`, each seat as it says (a run from the stone that never started).
 func _return_to_hub(starter: int, party: PartyLoadout = null) -> void:
-	_back_to_hub = false
 	if frames != null:
 		# The hub is a run's start of its own: asked of the frames service, which sends it
 		# between ticks, the same on every machine, and begins a new recording there
@@ -405,6 +402,10 @@ func _return_to_hub(starter: int, party: PartyLoadout = null) -> void:
 			party.encode_into(_party_back)
 		frames.restart(&"hub_requested", starter)
 		return
+	# Nothing of the biome outlives its run (a later run hashes as a fresh one's), as `stop_run` says.
+	_biome_start = null
+	_biome_fights.clear()
+	_biome_given = false
 	mode = MODE_HUB
 	if not start_run(starter, party):
 		push_warning("Flow: the hub did not start again after the run, so the run is over.")
@@ -695,7 +696,6 @@ func stop_run() -> void:
 			_detach(shown)
 	_restart_left = -1.0
 	_stand_up_left.fill(-1.0)
-	_back_to_hub = false
 	_party_back = PackedByteArray()
 	_clear_run()
 	# A biome's start is its run's: nothing of it outlives the run (a later run hashes as a fresh one's).
@@ -729,7 +729,6 @@ func _on_play_requested(player: int) -> void:
 func _start_play(player: int) -> void:
 	mode = MODE_RUN
 	_biome_given = false
-	_back_to_hub = false
 	_intro_then_run(player)
 
 
@@ -838,7 +837,6 @@ func _on_hub_requested(player: int) -> void:
 ## each seat's wizard as `party` says (a seat with no loadout: the hub's staffs, start cards and bag).
 func _start_hub(player: int, party: PartyLoadout = null) -> void:
 	mode = MODE_HUB
-	_back_to_hub = false
 	_intro_then_run(player, party)
 	if state == State.IDLE:
 		# Nothing started (content missing): idle is MODE_RUN.
@@ -861,7 +859,6 @@ func _start_run_from_stone(seat: int) -> void:
 	var party: PartyLoadout = _party_of()
 	mode = MODE_RUN
 	_biome_given = false
-	_back_to_hub = true
 	if not start_run(seat, party):
 		if state == State.IDLE:
 			# The hub went before the run's map was found cornered: the party goes back there, each
@@ -871,7 +868,6 @@ func _start_run_from_stone(seat: int) -> void:
 			return
 		# It refused before freeing anything (content missing): the hub stands as it was.
 		push_warning("Flow: the run from the stone did not start, so the party stays in the hub.")
-		_back_to_hub = false
 		mode = MODE_HUB
 
 
@@ -1489,16 +1485,25 @@ func _detach(node: Node) -> void:
 func start_biome(requester: int, map: BiomeMap, fights: Array[RoomFight], party: PartyLoadout = null) -> bool:
 	if map == null:
 		return false
+	# Kept, so a start refused before anything went leaves the run in progress as it was.
+	var kept: Array = [mode, _biome_start, _biome_fights.duplicate(), _biome_given]
 	_biome_start = map.copy()
 	_biome_fights.clear()
 	for fight: RoomFight in fights:
 		_biome_fights.append(fight.fresh() if fight != null else RoomFight.new())
 	mode = MODE_RUN
 	_biome_given = true
-	_back_to_hub = false
 	if start_run(requester, party):
 		return true
-	_biome_given = false
+	if state != State.IDLE:
+		mode = kept[0]
+		_biome_start = kept[1]
+		_biome_fights.assign(kept[2])
+		_biome_given = kept[3]
+	else:
+		_biome_start = null
+		_biome_fights.clear()
+		_biome_given = false
 	return false
 
 
@@ -1635,7 +1640,10 @@ func _enter_biome_room(room: int) -> void:
 	if room != EventsScript.FIRST_ROOM and world != null:
 		# Its placed enemies (a dummy, a stand-in) stand now, as the party first comes (connected
 		# biomes CB8); the start room's stood with the world.
+		contents.problems.clear()
 		contents.stand_enemies(world, biome.room_places(room))
+		for problem in contents.problems:
+			push_warning("Flow: the room's bodies: %s" % problem)
 	if events != null:
 		events.room_entered.emit(biome.map.room_templates[room], room)
 	var fight: RoomFight = life.fights[room]

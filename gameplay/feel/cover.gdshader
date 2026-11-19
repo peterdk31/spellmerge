@@ -58,6 +58,9 @@ uniform float flatten = 0.5;
 // Feel's view grid, a texel a cell (CoverLayout.CELL pixels): when it was last walked through (red)
 // and when it began to show its state (green).
 uniform sampler2D cell_times : filter_nearest;
+// Where the view grid's first texel's cell lies in the world (`CoverLayout.origin`, connected biomes
+// CB3b: a room laid elsewhere in a biome; (0, 0) for one laid as its scene).
+uniform vec2 cell_origin = vec2(0.0, 0.0);
 
 // Cover.SWAY_CODE: the most a tuft sways, in pixels.
 const float SWAY_CODE = 8.0;
@@ -107,7 +110,7 @@ void vertex() {
 		float pushed = min(length(push), 1.0) * bend;
 		vec2 lean = pushed > 0.0 ? normalize(push) * pushed * bend_pixels : vec2(0.0);
 		lean += (stir_wake(foot) * STIR_SHOT_PIXELS + stir_blasts_at(foot, view_time) * STIR_BLAST_PIXELS) * bend;
-		vec2 times = texelFetch(cell_times, ivec2(floor(foot / CELL - vec2(0.0, 0.001))), 0).rg;
+		vec2 times = texelFetch(cell_times, ivec2(floor((foot - cell_origin) / CELL - vec2(0.0, 0.001))), 0).rg;
 		// Animated: its frame now, from when its cell began to show its state.
 		float count = floor(COLOR.g * 255.0 + 0.5);
 		if (count > 1.0) {

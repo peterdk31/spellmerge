@@ -4,7 +4,7 @@
 // A room's ground drawn when it is laid out (connected biomes CB4, docs/milestones/connected-biomes.md):
 // the floor, the rock face, the glow, the walls' art and the edges' mote lines from the room's shape,
 // mirrored or not. It stands for `GroundDrawing.draw` (gameplay/feel/ground/ground_drawing.gd, the
-// twin of tools/ground_shape.py), line by line, to the bit: GroundKernel's `draw`. A pure function
+// twin of tools/ground_shape.py), line by line, to the bit (`GroundKernel.draw`). A pure function
 // of the dictionary it is handed (`GroundShape.spec`): it keeps nothing between calls. View only, so
 // it keeps `std::` maths, as MoteKernel does; tests/gameplay/feel/test_ground_drawing.gd compares it
 // with the GDScript byte for byte.

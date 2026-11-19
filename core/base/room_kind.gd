@@ -91,14 +91,26 @@ const LAYOUT_META: StringName = &"room_kind"
 ## (`RoomBase.music`; a living boss's still comes first).
 @export var music: MusicTrack = null
 ## Its light: the palette material (docs/STYLE.md) the mouths into a room of the kind shimmer in, and
-## its seals' runes glow in (empty: the spark's).
+## its seals' runes glow in (empty: the spark's), and that its room's own light is tinted toward
+## (`light_tint`; CB12b).
 @export var light: StringName = &""
+## How far a room of the kind's own light takes on its light's colour (connected biomes CB12b): 0 not
+## at all, 1 wholly. Its dark and every light falling in it lean toward the light's base shade by this
+## share (the spell light's apply pass, `gameplay/feel/room_tints.gd`); read only while dynamic
+## lighting is on.
+@export_range(0.0, LIGHT_TINT_MOST, 0.01) var light_tint: float = 0.0
+## Its air motes (connected biomes CB12b): what drifts in a room of the kind's air besides its
+## template's (`RoomBase.air`), given off over that room alone (`gameplay/feel/kind_air.gd`), as a
+## room's air is (its `rate` for every `RoomBase.AIR_AREA` of the room in view). Null: none.
+@export var air_motes: MoteSource = null
 ## Its symbol (connected biomes CB9): what a bridge's mouth into a room of the kind tells of what lies
 ## behind it, and what the held map shows on the room. A picture of SYMBOL_SIDE rows of SYMBOL_SIDE
 ## pixels as text, a row a line: `#` its light's lit shade, `+` its base shade, `.` none (drawn with a
 ## dark edge round its pixels). Empty: nothing is told (a room meant to be found, a secret one).
 @export_multiline var symbol: String = ""
 
+## The most `light_tint` may be: a room keeps its own colours under its kind's light.
+const LIGHT_TINT_MOST: float = 0.5
 ## A symbol's side, in pixels.
 const SYMBOL_SIDE: int = 7
 ## A symbol pixel's values (`symbol_pixels`).
@@ -165,6 +177,10 @@ func problems() -> PackedStringArray:
 		found.append("%s: a shop names no shelf table (shelf)." % id)
 	if light != &"" and (not Palette.has(light) or Palette.OWNED.has(light)):
 		found.append("%s: light '%s' is not a palette material the world may use." % [id, light])
+	if light_tint < 0.0 or light_tint > LIGHT_TINT_MOST:
+		found.append("%s: light_tint %.2f is outside 0 to %.2f." % [id, light_tint, LIGHT_TINT_MOST])
+	for problem in RoomBase.problems_of_air(air_motes):
+		found.append("%s's air motes: %s" % [id, problem])
 	if music != null:
 		found.append_array(music.problems(String(id)))
 	if symbol_problem() != "":

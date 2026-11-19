@@ -41,6 +41,7 @@ const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")
 const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 const CarriedLightsScript := preload("res://gameplay/feel/carried_lights.gd")
 const AirMotesScript := preload("res://gameplay/feel/air_motes.gd")
+const KindAirScript := preload("res://gameplay/feel/kind_air.gd")
 const LightBlockersScript := preload("res://gameplay/feel/light_blockers.gd")
 const BodyShadowsScript := preload("res://gameplay/feel/body_shadows.gd")
 const StirsScript := preload("res://gameplay/feel/stirs.gd")
@@ -203,6 +204,10 @@ var source_motes: SourceMotesScript = SourceMotesScript.new(_ramp_table)
 ## motes are thrown, spell light is on (its dust is lit only: with no light it would be unseen) and
 ## "Ambient particles" is on.
 var air: AirMotesScript = AirMotesScript.new(_ramp_table)
+## What drifts in each room kind's air, over its own rooms alone (`kind_air.gd`, `RoomKind.air_motes`;
+## connected biomes CB12b), given off as the room's air is, laid from the grid first each frame (Feel
+## hands it its room hearing, `kind_air.pieces`).
+var kind_air: KindAirScript = KindAirScript.new(_ramp_table)
 var _standing: PlacedMotesScript = null
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
 ## and their source in the ramp table (-1 for none).
@@ -331,7 +336,10 @@ func step(now: float, table: ActorsScript = null) -> void:
 	_drawn_motes()
 	var view: Rect2 = view_rect()
 	source_motes.give_off(now, pool if motes_on() else null, view, _standing)
-	air.give_off(now, pool if motes_on() and light != null and ambient_particles else null, view, projectiles.bounds() if projectiles != null else Rect2())
+	var air_pool: MotesScript = pool if motes_on() and light != null and ambient_particles else null
+	air.give_off(now, air_pool, view, projectiles.bounds() if projectiles != null else Rect2())
+	kind_air.lay(projectiles.grid() if projectiles != null else null)
+	kind_air.give_off(now, air_pool, view)
 	if barriers != null:
 		barriers.step(now, pool if motes_on() else null, table, projectiles)
 	if pool != null:

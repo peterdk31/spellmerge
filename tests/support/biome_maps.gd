@@ -21,14 +21,17 @@ static func walk_through(registry: Object) -> BiomeMap:
 ## ossuary court east of it (room 2), each joined to the nave by a bridge, so a party can split to two
 ## fights at once. `mirrors`: the antechamber's, the nave's and the court's mirrorings. `templates`:
 ## other rooms in their places, west, middle (the start room) and east (connected biomes CB11).
-static func split(registry: Object, mirrors: Array[int] = [0, 0, 0], templates: Array[StringName] = [FIRST, MIDDLE, LAST]) -> BiomeMap:
+## `kinds`: the rooms' kinds, west, middle and east (empty: a fight, the start room and a fight;
+## connected biomes CB12b, where a room's kind is its look).
+static func split(registry: Object, mirrors: Array[int] = [0, 0, 0], templates: Array[StringName] = [FIRST, MIDDLE, LAST], kinds: Array[StringName] = []) -> BiomeMap:
 	var row: BiomeMap = _row(registry, templates, mirrors)
 	var map := BiomeMap.new()
 	map.biome = row.biome
 	# The row's room 1 (the nave) first, then its rooms 0 and 2.
 	var order: Array[int] = [1, 0, 2]
 	for room: int in order:
-		map.add_room(row.room_templates[room], row.room_places[room], row.room_mirrors[room], &"start" if room == 1 else &"fight")
+		var kind: StringName = kinds[room] if room < kinds.size() else (&"start" if room == 1 else &"fight")
+		map.add_room(row.room_templates[room], row.room_places[room], row.room_mirrors[room], kind)
 	for bridge in row.bridges():
 		map.add_bridge(row.bridge_templates[bridge], row.bridge_places[bridge], row.bridge_mirrors[bridge], order.find(row.end_room(bridge, 0)), row.end_socket(bridge, 0), order.find(row.end_room(bridge, 1)), row.end_socket(bridge, 1))
 	map.work_out_depths()

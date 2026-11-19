@@ -53,6 +53,39 @@ var socket_at: PackedVector2Array = PackedVector2Array()
 var socket_facing: PackedInt32Array = PackedInt32Array()
 
 
+## How the piece whose layout is `layout_root` is placed (MIRROR_X, MIRROR_Y, both or 0), from its
+## GROUND_MIRROR_META (none: 0, as the template is).
+static func mirror_of(layout_root: Node) -> int:
+	if layout_root == null or not layout_root.has_meta(GROUND_MIRROR_META):
+		return 0
+	var flip: Vector2i = layout_root.get_meta(GROUND_MIRROR_META, Vector2i.ZERO) as Vector2i
+	return (MIRROR_X if flip.x != 0 else 0) | (MIRROR_Y if flip.y != 0 else 0)
+
+
+## The walls of a laid piece (`layout_root`, as `room_built` hands it) where the world has them:
+## its layout's own (`RoomPlaces.wall_rects`, template pixels) mirrored as it is placed (`mirror_of`)
+## and moved to where its node stands. The layout's wall bodies are never moved: they are the
+## template's, read so by everyone who mirrors them.
+static func laid_walls(layout_root: Node) -> Array[Rect2]:
+	return _laid(layout_root, RoomPlaces.wall_rects(layout_root))
+
+
+## Its holes (`RoomPlaces.hole_rects`) where the world has them, as `laid_walls`.
+static func laid_holes(layout_root: Node) -> Array[Rect2]:
+	return _laid(layout_root, RoomPlaces.hole_rects(layout_root))
+
+
+static func _laid(layout_root: Node, rects: Array[Rect2]) -> Array[Rect2]:
+	var mirror: int = mirror_of(layout_root)
+	var shape: PieceShape = of(layout_root) if mirror != 0 else null
+	var piece := layout_root as Node2D
+	var at: Vector2 = piece.position if piece != null else Vector2.ZERO
+	for i in rects.size():
+		var rect: Rect2 = shape.flip_rect(rects[i], mirror) if shape != null else rects[i]
+		rects[i] = Rect2(rect.position + at, rect.size)
+	return rects
+
+
 ## The shape of `room`'s default layout, mirrored by `mirror`; null for a room with no scene.
 static func of_room(room: RoomBase, mirror: int = 0) -> PieceShape:
 	if room == null:
@@ -101,16 +134,18 @@ func mirrored(by: int) -> PieceShape:
 	out.mirror = mirror ^ by
 	out.size = size
 	for rect: Rect2 in walls:
-		out.walls.append(_flip_rect(rect, by))
+		out.walls.append(flip_rect(rect, by))
 	for rect: Rect2 in holes:
-		out.holes.append(_flip_rect(rect, by))
+		out.holes.append(flip_rect(rect, by))
 	for i in socket_at.size():
-		out.socket_at.append(_flip_point(socket_at[i], by))
+		out.socket_at.append(flip_point(socket_at[i], by))
 		out.socket_facing.append(RoomSocket.mirrored(socket_facing[i], by))
 	return out
 
 
-func _flip_rect(rect: Rect2, by: int) -> Rect2:
+## `rect` (in this shape's pixels) mirrored by `by` within its size: where the mirror image of what
+## covers it lies (a wall's box, a sprite's drawn box; a point's rectangle of no size is the point).
+func flip_rect(rect: Rect2, by: int) -> Rect2:
 	var at: Vector2 = rect.position
 	if (by & MIRROR_X) != 0:
 		at.x = size.x - rect.end.x
@@ -119,7 +154,8 @@ func _flip_rect(rect: Rect2, by: int) -> Rect2:
 	return Rect2(at, rect.size)
 
 
-func _flip_point(point: Vector2, by: int) -> Vector2:
+## `point` (in this shape's pixels) mirrored by `by` within its size.
+func flip_point(point: Vector2, by: int) -> Vector2:
 	return Vector2(size.x - point.x if (by & MIRROR_X) != 0 else point.x, size.y - point.y if (by & MIRROR_Y) != 0 else point.y)
 
 

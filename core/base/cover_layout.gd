@@ -107,8 +107,7 @@ static func of_piece(layout_root: Node, room: RoomBase, all_kinds: Array[CoverKi
 	var piece := layout_root as Node2D
 	if piece == null or not piece.has_meta(PieceShape.GROUND_MIRROR_META):
 		return made
-	var flip: Vector2i = piece.get_meta(PieceShape.GROUND_MIRROR_META, Vector2i.ZERO) as Vector2i
-	var mirror: int = (PieceShape.MIRROR_X if flip.x != 0 else 0) | (PieceShape.MIRROR_Y if flip.y != 0 else 0)
+	var mirror: int = PieceShape.mirror_of(piece)
 	var extent: Vector2 = PieceShape.of(layout_root).size
 	return made.placed(piece.position, mirror, extent if extent.x > 0.0 and extent.y > 0.0 else made.size)
 

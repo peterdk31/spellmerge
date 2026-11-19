@@ -16,6 +16,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ShapeScript := preload("res://gameplay/feel/ground/ground_shape.gd")
 const NativeScript := preload("res://core/native/native.gd")
+const MirroredArtScript := preload("res://gameplay/feel/ground/mirrored_art.gd")
 
 const ROOM_FOLDER: StringName = &"rooms"
 const FLOOR: StringName = &"Floor"
@@ -35,8 +36,11 @@ func _ready() -> void:
 		events.room_built.connect(_on_room_built)
 
 
-## Every piece of a biome too (connected biomes CB3), each drawn on its own layout.
+## Every piece of a biome too (connected biomes CB3), each drawn on its own layout; a mirrored
+## piece's other art is put where its mirror image stands first (`mirrored_art.gd`), so it lies
+## over its mirrored walls and floor.
 func _on_room_built(room_id: StringName, _room: int, layout_root: Node) -> void:
+	MirroredArtScript.place(layout_root)
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if room != null:
 		lay(room, layout_root)

@@ -1198,12 +1198,9 @@ func view_rect() -> Rect2:
 
 ## A room was laid out (`room_built`; atmosphere C): its standing walls block the light from now on.
 func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void:
-	var walls: Array[Rect2] = RoomPlaces.wall_rects(layout_root)
-	var piece := layout_root as Node2D
-	# A biome's pieces stand at their places (connected biomes CB3): their walls at them.
-	var at: Vector2 = piece.position if piece != null else Vector2.ZERO
-	for i in walls.size():
-		walls[i].position += at
+	# A biome's pieces stand at their places (connected biomes CB3), mirrored as they are placed (the
+	# grid's walls, decision 6): their walls there, as the world has them.
+	var walls: Array[Rect2] = PieceShape.laid_walls(layout_root)
 	if number != EventsScript.FIRST_ROOM:
 		# A biome's later piece: its walls join the world's; the mist and the room's look are the
 		# first room's.
@@ -1215,8 +1212,10 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 	# The mist's room (atmosphere F), read only when the room names a mist.
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if room != null and room.mist != null:
+		# Its walls and holes in the world's pixels, as the grid has them (the mist itself still lies
+		# from the world's origin over the template's size, not yet at a biome room's place).
 		var places: RoomPlaces = RoomPlaces.read(layout_root)
-		lay_mist(places.size, walls, places.holes)
+		lay_mist(places.size, walls, PieceShape.laid_holes(layout_root))
 	else:
 		lay_mist(Vector2.ZERO, [] as Array[Rect2], [] as Array[Rect2])
 

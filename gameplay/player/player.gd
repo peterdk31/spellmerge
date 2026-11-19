@@ -542,7 +542,7 @@ func _announce_body() -> void:
 	_on_hands_changed()
 
 
-## `bag_changed` for this seat: what the shown body's bag `bag` holds now (its coins bag too: the
+## `bag_changed` for this seat: what the shown body's bag `bag` holds now (its currency bag too: the
 ## HUD's purse is the shown body's, as the rest of the HUD; the owner, 2026-11-19).
 func _on_bag_changed(bag: StringName) -> void:
 	var body: Actor = shown()
@@ -672,7 +672,7 @@ func _on_bag_use_requested(player: int, bag: StringName, id: StringName, body: i
 		return
 	var shown_body: Actor = shown()
 	var inventory: Inventory = shown_body.inventory
-	var kind: StringName = ItemKinds.kind_in(bag)
+	var kind: StringName = ItemKinds.kind_in(bag, id)
 	if inventory == null or inventory.count_of(bag, id) < 1:
 		_refuse_inventory(NO_ITEM)
 		return

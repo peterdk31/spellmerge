@@ -30,7 +30,9 @@ extends ActorComponent
 ##   holds as a run's start takes it along (its counted bags, every staff with its number and cards,
 ##   its hands), and `take_loadout(loadout, registry)`, before the actor is ready, makes it hold
 ##   exactly that in place of the start above (then `hand_staffs` and `hand_cards` are what its
-##   Caster is made with). A staff's mana is not in a loadout: every pool starts full.
+##   Caster is made with). A staff's mana is not in a loadout: every pool starts full. What a
+##   rejoining wizard left with is set again after it is made (`staff_mana`, `set_staff_mana`: the
+##   owner, 2026-11-19, Flow's `LeftPlayers`).
 ## - **Counted cards** (owner, 2026-11-13): `set_cards(number, cards)` (and `set_card`, one slot)
 ##   is the builder's change to a staff's cards. A card put in takes one copy from the card bag, a
 ##   card taken out gives it back; the change is refused, and nothing changes, when a card has no
@@ -170,15 +172,15 @@ func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
 	for bag: StringName in loadout.bags():
 		if not _bags.has(bag):
 			continue
-		var kind: StringName = ItemKinds.kind_in(bag)
-		if kind == ItemKinds.STAFF:
+		if ItemKinds.kind_in(bag) == ItemKinds.STAFF:
 			# A staff is never counted: the loadout's staffs are below.
 			continue
 		var ids: Array[StringName] = loadout.stack_ids(bag)
 		var counts: PackedInt32Array = loadout.stack_counts(bag)
 		for at in ids.size():
 			var stack := ItemStack.new()
-			stack.kind = kind
+			# A bag of several kinds (the currency) knows each stack's by its id.
+			stack.kind = ItemKinds.kind_in(bag, ids[at])
 			stack.id = ids[at]
 			stack.count = counts[at]
 			_put(stack)
@@ -194,6 +196,35 @@ func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
 			_hands[hand] = stack
 		else:
 			_stacks(ItemKinds.bag_of(ItemKinds.STAFF)).append(stack)
+
+
+## The mana of every staff it owns, by its number: a staff on a hand its Caster's pool, one in the
+## bag what it kept (a rejoin keeps it, Flow's `LeftPlayers`).
+func staff_mana() -> Dictionary:
+	var out: Dictionary = {}
+	var caster: Caster = actor.caster if actor != null else null
+	for hand in HANDS:
+		if _hands[hand] != null:
+			out[_hands[hand].number] = caster.mana_of(hand) if caster != null and caster.holds(hand) else _hands[hand].mana
+	for stack: ItemStack in _stacks(ItemKinds.bag_of(ItemKinds.STAFF)):
+		out[stack.number] = stack.mana
+	return out
+
+
+## Staff `number` holds `mana` (kept within its pool): on a hand its Caster's pool, in the bag what it
+## keeps. Nothing for a staff it does not own.
+func set_staff_mana(number: int, mana: float) -> void:
+	var caster: Caster = actor.caster if actor != null else null
+	for hand in HANDS:
+		if _hands[hand] != null and _hands[hand].number == number:
+			if caster != null and caster.holds(hand):
+				caster.set_mana(hand, mana)
+			else:
+				_hands[hand].mana = clampf(mana, 0.0, _hands[hand].staff.max_mana if _hands[hand].staff != null else mana)
+			return
+	var stack: ItemStack = _staff(number)
+	if stack != null:
+		stack.mana = clampf(mana, 0.0, stack.staff.max_mana if stack.staff != null else mana)
 
 
 ## The staff `registry` has of the id `id` in the staff kind's content folders, or null.
@@ -334,7 +365,7 @@ func take(bag: StringName, id: StringName, count: int = 1) -> bool:
 	if count <= 0 or count_of(bag, id) < count:
 		return false
 	var gone: PackedInt32Array = PackedInt32Array()
-	if ItemKinds.stacks(ItemKinds.kind_in(bag)):
+	if ItemKinds.stacks(ItemKinds.kind_in(bag, id)):
 		_change_count(bag, id, -count)
 	else:
 		var stacks: Array[ItemStack] = _bags[bag]
@@ -632,11 +663,11 @@ func drop_staff(number: int) -> Refusal:
 ## Lay one copy of `id` from `bag` on the ground, as the class doc says. A staff is dropped by its
 ## number (`drop_staff`): asked here, it is NO_ITEM.
 func drop(bag: StringName, id: StringName) -> Refusal:
-	var kind: StringName = ItemKinds.kind_in(bag)
+	var kind: StringName = ItemKinds.kind_in(bag, id)
 	if kind == &"" or kind == ItemKinds.STAFF or count_of(bag, id) < 1:
 		return Refusal.NO_ITEM
 	if not ItemKinds.can(kind, ItemKinds.DROP) and not ItemKinds.can(kind, ItemKinds.DROP_ONE):
-		# A kind that is never dropped (the coins: shared income, decision 18): the simulation checks.
+		# A kind that is never dropped (the coins: shared income, decision 18; the keys): the simulation checks.
 		return Refusal.NO_DROP
 	var lying: ItemStack = null
 	if ItemKinds.stacks(kind):
@@ -784,7 +815,7 @@ func _change_count(bag: StringName, id: StringName, by: int) -> void:
 			return
 	if by > 0:
 		var made := ItemStack.new()
-		made.kind = ItemKinds.kind_in(bag)
+		made.kind = ItemKinds.kind_in(bag, id)
 		made.id = id
 		made.count = by
 		stacks.append(made)

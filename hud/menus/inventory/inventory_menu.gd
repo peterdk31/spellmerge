@@ -57,7 +57,7 @@ const READ_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"s
 ## Which layer the ring shows.
 enum Layer { BAGS, STAFFS, KINDS, CARDS, ITEMS }
 ## Each bag's word.
-const BAG_WORDS: Dictionary = {&"staffs": "Staffs", &"cards": "Cards", &"relics": "Relics", &"potions": "Potions", &"coins": "Coins"}
+const BAG_WORDS: Dictionary = {&"staffs": "Staffs", &"cards": "Cards", &"relics": "Relics", &"potions": "Potions", &"currency": "Currency"}
 ## The staff numbers the column shows, in order, with their headers and how each is written.
 const NUMBERS: Array[String] = ["slots", "cooldown", "max_mana"]
 const NUMBER_WORDS: Array[String] = ["Slots", "Delay", "Mana"]
@@ -130,7 +130,7 @@ var _layer: Layer = Layer.BAGS
 var _bag: StringName = &""
 var _kind: StringName = &""
 ## The ring's entries, by entry number: {"bag"}, {"staff"}, {"kind", "count"}, {"card", "count"} or
-## (a relic, a potion, the coins) {"item", "count"}; the first key names it (`ENTRY_KEYS`).
+## (a relic, a potion, the coins or the keys) {"item", "count"}; the first key names it (`ENTRY_KEYS`).
 var _entries: Array[Dictionary] = []
 
 var _open: bool = false
@@ -939,12 +939,12 @@ func _bag_word(bag: StringName) -> String:
 func _look(id: StringName) -> Dictionary:
 	if _registry == null and is_inside_tree():
 		_registry = get_node_or_null("/root/Registry") as RegistryScript
-	return ItemLooks.of(ItemKinds.kind_in(_bag), id, _registry, _spells)
+	return ItemLooks.of(ItemKinds.kind_in(_bag, id), id, _registry, _spells)
 
 
 ## True when the item entry `entry` of the bag entered is of a kind that can be `action`ed.
 func _item_can(entry: Dictionary, action: StringName) -> bool:
-	return entry.has("item") and _events != null and ItemKinds.can(ItemKinds.kind_in(_bag), action)
+	return entry.has("item") and _events != null and ItemKinds.can(ItemKinds.kind_in(_bag, StringName(entry["item"])), action)
 
 
 func _staff_name(number: int) -> String:

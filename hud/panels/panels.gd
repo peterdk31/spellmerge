@@ -98,9 +98,10 @@ extends CanvasLayer
 ##   Each corner panel says the seat's coins and its unspent rewards (the coin stack in the coins
 ##   bag of the body the seat drives, as the rest of the HUD: a possessed foe's while possessing,
 ##   0 for a body with no coins; `bag_changed`: coins are an inventory item, the owner's of
-##   2026-11-19; `rewards_waiting_changed`; `PlayerPanel.set_purse`). Beside the coins, every panel
-##   shows the keys the party holds (keys are the party's, shared, so each panel the same count:
-##   `party_keys_shown`, `PlayerPanel.set_keys`, `hud/widgets/key_count.gd`, Smooth).
+##   2026-11-19; `rewards_waiting_changed`; `PlayerPanel.set_purse`). Beside the coins, each panel
+##   shows the keys in that same currency bag (keys are each body's own, the owner's of 2026-11-19:
+##   a possessed foe's while possessing; `PlayerPanel.set_keys`, `hud/widgets/key_count.gd`, Smooth:
+##   a change of body plays from the count shown to the new body's).
 ## - The item hints (`item_hints.gd`, node Root/ItemHints, made here; items I6): over the item in
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
 ##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
@@ -177,7 +178,7 @@ var _panels: Array[PlayerPanelScript] = []
 var _radials: Array[RadialScript] = []
 var _inventories: Array[InventoryScript] = []
 var _rewards: Array[RewardMenuScript] = []
-## By seat: the coins in its coins bag and its offers waiting (`bag_changed`,
+## By seat: the coins in its currency bag and its offers waiting (`bag_changed`,
 ## `rewards_waiting_changed`), for its corner panel.
 var _coins: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _unspent: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
@@ -390,7 +391,6 @@ func _ready() -> void:
 		events.boss_intro_opened.connect(_on_boss_intro_opened)
 		events.bag_changed.connect(_on_bag_changed)
 		events.rewards_waiting_changed.connect(_on_rewards_waiting_changed)
-		events.party_keys_shown.connect(_on_party_keys_shown)
 	if ui_focus != null:
 		ui_focus.opened.connect(_on_menu_opened)
 		ui_focus.closed.connect(_on_menu_closed)
@@ -548,13 +548,15 @@ func get_reward(player: int) -> RewardMenuScript:
 	return _rewards[player]
 
 
-## A bag of the seat's shown body changed: its coins bag is the purse's count.
+## A bag of the seat's shown body changed: its currency bag is the purse's coins and its keys.
 func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, _capacity: int) -> void:
 	if player < 0 or player >= PLAYER_COUNT or bag != ItemKinds.bag_of(ItemKinds.COIN):
 		return
 	var at: int = ids.find(CoinBase.ID)
 	_coins[player] = counts[at] if at >= 0 and at < counts.size() else 0
 	_panels[player].set_purse(_coins[player], _unspent[player])
+	var key_at: int = ids.find(KeyBase.ID)
+	_panels[player].set_keys(counts[key_at] if key_at >= 0 and key_at < counts.size() else 0, false)
 
 
 func _on_rewards_waiting_changed(player: int, offers: Array[Dictionary]) -> void:
@@ -833,7 +835,7 @@ func _on_inventory_announced(player: int, _body: int) -> void:
 		# Another body's numbers follow: no hit flash for the change, and none of the last body's
 		# mana held or told is read for this one's staff rows (review, items I8).
 		_panels[player].forget_health()
-		# The purse is the new body's: 0 until its coins bag is said (a body with none says nothing).
+		# The purse is the new body's: 0 until its currency bag is said (a body with none says nothing).
 		_coins[player] = 0
 		_panels[player].set_purse(0, _unspent[player])
 		for staff in PlayerPanelScript.STAFF_COUNT:
@@ -842,10 +844,6 @@ func _on_inventory_announced(player: int, _body: int) -> void:
 			_panels[player].set_staff_mana(staff, INF, 0.0)
 
 
-## The party holds `count` keys (Flow's): every panel shows them beside its coins.
-func _on_party_keys_shown(count: int, at_once: bool) -> void:
-	for panel in _panels:
-		panel.set_keys(count, at_once)
 
 
 func _on_menu_opened(player: int) -> void:

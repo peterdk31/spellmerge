@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
-## The party's key count beside every corner panel's coins (the owner, 2026-11-19;
+## A seat's key count beside its corner panel's coins (the owner, 2026-11-19;
 ## `hud/widgets/key_count.gd`): Smooth (docs/STYLE.md), each change a play of at least 3 poses moved
 ## by whole pixels, the first key sliding in, one more nodding up, one spent dipping and the last
-## sinking out; at once after a restore. `panels.gd` tells every panel the same count.
+## sinking out. `panels.gd` tells each panel the keys in its seat's shown body's currency bag.
 const KeyCountScript := preload("res://hud/widgets/key_count.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -123,7 +123,7 @@ func test_the_same_count_at_once_lets_a_play_run() -> void:
 	check(keys.visible, "and drawn")
 
 
-func test_every_panel_shows_the_partys_keys() -> void:
+func test_each_panel_shows_its_own_bodys_keys() -> void:
 	var bus := own(EventsScript.new()) as EventsScript
 	var input := own(InputManagerScript.new()) as InputManagerScript
 	input.events = bus
@@ -138,11 +138,23 @@ func test_every_panel_shows_the_partys_keys() -> void:
 	hud.save = SaveFile.new("user://test_key_count_save.cfg")
 	root.add_child(hud)
 	own(hud)
-	bus.party_keys_shown.emit(2, true)
-	for seat in 4:
-		check_equal(hud.get_panel(seat).key_count().shown_count(), 2, "panel %d shows the party's 2 keys" % seat)
-	bus.party_keys_shown.emit(1, false)
-	check_equal(hud.get_panel(0).key_count().playing(), KeyCountScript.Play.SPEND, "a key spent plays its dip")
+	var ids: Array[StringName] = [CoinBase.ID, KeyBase.ID]
+	bus.bag_changed.emit(0, &"currency", ids, PackedInt32Array([5, 2]), -1)
+	check_equal(hud.get_panel(0).key_count().shown_count(), 2, "panel 0 shows its body's 2 keys")
+	check_equal(hud.get_panel(0).purse_text(), "5 coins", "beside its coins, from the same bag")
+	for seat in [1, 2, 3]:
+		check_equal(hud.get_panel(seat).key_count().shown_count(), 0, "panel %d shows its own body's: none" % seat)
+	bus.bag_changed.emit(1, &"currency", [KeyBase.ID] as Array[StringName], PackedInt32Array([1]), -1)
+	check_equal(hud.get_panel(1).key_count().shown_count(), 1, "seat 1's one key, on its own panel")
+	check_equal(hud.get_panel(0).key_count().shown_count(), 2, "seat 0's unchanged")
+	bus.bag_changed.emit(0, &"potions", [] as Array[StringName], PackedInt32Array(), -1)
+	check_equal(hud.get_panel(0).key_count().shown_count(), 2, "another bag says nothing of keys")
+	# A body shown anew (a possession): the count plays from the last body's to the new one's.
+	hud.get_panel(0).key_count().advance(1.0)
+	bus.inventory_announced.emit(0, 99)
+	check_equal(hud.get_panel(0).key_count().playing(), KeyCountScript.Play.NONE, "the announcement alone changes nothing: the new body's bag follows")
+	bus.bag_changed.emit(0, &"currency", [CoinBase.ID] as Array[StringName], PackedInt32Array([3]), -1)
+	check_equal(hud.get_panel(0).key_count().playing(), KeyCountScript.Play.LEAVE, "a body with none: the keys sink out, never one jump")
 	await process_frame
 	check(hud.get_panel(0).key_count().is_processing(), "and steps itself each frame while it plays")
 	var keys: KeyCountScript = hud.get_panel(0).key_count()

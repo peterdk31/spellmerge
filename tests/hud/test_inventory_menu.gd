@@ -235,15 +235,34 @@ func test_the_coins_bag_shows_the_stack_and_does_nothing_with_it() -> void:
 	_start()
 	check(_wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 12)), "twelve coins")
 	var inventory: InventoryScript = _open()
-	_enter(&"coins")
+	_enter(&"currency")
 	_point("item", CoinBase.ID)
 	check_equal(inventory.hub_lines(), PackedStringArray(["Coins", "x12"]), "one stack, counted")
 	_tap(&"accept")
 	_tap(&"alternate")
 	_frame()
 	_frame()
-	check_equal(_wizard.inventory.count_of(&"coins", CoinBase.ID), 12, "coins are neither used nor dropped")
+	check_equal(_wizard.inventory.count_of(&"currency", CoinBase.ID), 12, "coins are neither used nor dropped")
 	check(_drop_asks.is_empty(), "nothing asked")
+
+
+## The keys share the currency bag (the owner, 2026-11-19): a key is shown by its own look, and A
+## and X do nothing with it.
+func test_a_key_in_the_currency_bag_shows_its_own_look_and_does_nothing() -> void:
+	_start()
+	check(_wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 3)), "three coins")
+	check(_wizard.inventory.add(ItemStack.of(ItemKinds.KEY, KeyBase.ID, 2)), "two keys")
+	var inventory: InventoryScript = _open()
+	_enter(&"currency")
+	_point("item", KeyBase.ID)
+	check_equal(inventory.hub_lines(), PackedStringArray(["Key", "x2"]), "the key's own look, counted")
+	_tap(&"accept")
+	_tap(&"alternate")
+	_frame()
+	_frame()
+	check_equal(_wizard.inventory.count_of(&"currency", KeyBase.ID), 2, "keys are neither used nor dropped from the menu")
+	check(_drop_asks.is_empty(), "nothing asked")
+	check_equal(_wizard.inventory.drop(&"currency", KeyBase.ID), Inventory.Refusal.NO_DROP, "and the simulation refuses a key's drop")
 
 
 func test_a_hands_button_puts_the_staff_on_that_hand_and_off_again() -> void:

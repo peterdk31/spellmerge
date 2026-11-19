@@ -73,7 +73,7 @@ const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 @export_range(1, 100) var cost: int = 1
 ## The first row of a run's map it may stand in (0: the first room on).
 @export_range(0, 32) var min_depth: int = 0
-## The coins it carries (the owner, 2026-11-19): they are in its own coins bag from the start (a seat
+## The coins it carries (the owner, 2026-11-19): they are in its own currency bag from the start (a seat
 ## possessing it sees them and may spend them in a shop), `coins` of them, or with `coins_most` above
 ## `coins` a whole number from `coins` to `coins_most` rolled by the run's chance as it comes
 ## (`Actor.COINS_PURPOSE`, keyed by its actor key). An add another body called carries none.

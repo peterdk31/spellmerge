@@ -1,7 +1,8 @@
 extends Control
-## The party's key count (the owner, 2026-11-19): a small brass key and the number of keys the party
-## holds, beside a corner panel's coins (`player_panel.gd`'s purse row). Keys are the party's, so
-## every panel shows the same count; `panels.gd` tells each one (`party_keys_shown`).
+## A seat's key count (the owner, 2026-11-19): a small brass key and the number of keys in the
+## currency bag of the body the seat drives, beside a corner panel's coins (`player_panel.gd`'s purse
+## row). Keys are each body's own (picked up and spent by it), so each panel shows its own count;
+## `panels.gd` tells it from the bag (`bag_changed`), a possessed foe's while possessing.
 ##
 ## Smooth (docs/STYLE.md): the count never changes in one jump. The key and its number slide up into
 ## view from under the row's edge as the first key is taken, nod up as one more is taken and dip as
@@ -72,7 +73,7 @@ func _ready() -> void:
 	_refresh()
 
 
-## The party holds `count` keys. `at_once`: drawn as it stands (a restore), no play.
+## The body shown holds `count` keys. `at_once`: drawn as it stands, no play.
 func set_count(count: int, at_once: bool) -> void:
 	count = maxi(count, 0)
 	if at_once and count == _target:

@@ -14,7 +14,7 @@ extends PanelContainer
 ## It only shows what it is told: `set_stats`, `set_menu_open`, `set_online` (a small "ONLINE" over
 ## the line of a seat played on another machine), `set_purse` (a small line under the health line
 ## with the seat's coins and its unspent rewards, connected biomes CB10; hidden while both are 0),
-## `set_keys` (the party's keys before the coins, on the same row: `key_count.gd`, Smooth; hidden
+## `set_keys` (the shown body's keys before the coins, on the same row: `key_count.gd`, Smooth; hidden
 ## while there are none),
 ## `set_staff_plan`, `set_staff_mana`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
@@ -51,7 +51,7 @@ var _rows: Array[StaffRowScript] = []
 var _has_cards: Array[bool] = [false, false, false, false]
 ## The purse line (`set_purse`), made in `_ready` under the health line, and what it shows.
 var _purse: Label = null
-## The purse's row (the purse line, then the party's keys) and its key count (`set_keys`).
+## The purse's row (the purse line, then the shown body's keys) and its key count (`set_keys`).
 var _purse_row: HBoxContainer = null
 var _keys: KeyCountScript = null
 var _coins: int = 0
@@ -158,13 +158,13 @@ func set_purse(coins: int, unspent: int) -> void:
 	_purse.visible = not words.is_empty()
 
 
-## Show the keys the party holds before the coins (`key_count.gd`: played in by whole pixels;
-## `at_once` after a restore).
+## Show the keys the seat's shown body holds before the coins (`key_count.gd`: played in by whole
+## pixels; `at_once`: drawn as it stands).
 func set_keys(count: int, at_once: bool) -> void:
 	_keys.set_count(count, at_once)
 
 
-## The party's key count it shows (its widget, for tests).
+## The key count it shows (its widget, for tests).
 func key_count() -> KeyCountScript:
 	return _keys
 

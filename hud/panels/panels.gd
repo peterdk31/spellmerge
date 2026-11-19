@@ -86,6 +86,14 @@ extends CanvasLayer
 ##   in the hub, how many wizards stand on the teleporter stone, or that A starts the run, at the
 ##   top middle under the online line (`start_stone_changed`). While the stone is lit, a player's
 ##   `accept` (A, Enter) with no menu open sends the command `run_requested` (`poll`).
+## - The reward menus (`hud/menus/reward/`, nodes Root/Reward1 to Root/Reward4, made here;
+##   connected biomes CB10): a seat's oldest offer not yet picked, "pick 1 of 2". It opens by itself
+##   as an offer is rolled for a seat whose wizard was in the cleared room, once that seat may open a
+##   menu (`RewardMenu.wants_open`), and on the seat's `accept` with no menu open and nothing else for
+##   A (no lit stone, no item in reach, no altar) while one waits. Its pick is the command
+##   `reward_pick_requested`; `back`, `pause` and a boss's intro close it, the offer left unspent.
+##   Each corner panel says the seat's coins and its unspent rewards (`wallet_changed`,
+##   `rewards_waiting_changed`; `PlayerPanel.set_purse`).
 ## - The item hints (`item_hints.gd`, node Root/ItemHints, made here; items I6): over the item in
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
 ##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
@@ -113,6 +121,7 @@ const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 const StoneLineScript := preload("res://hud/widgets/stone_line.gd")
 const PadLineScript := preload("res://hud/widgets/pad_line.gd")
 const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
+const RewardMenuScript := preload("res://hud/menus/reward/reward_menu.gd")
 const BossBarScript := preload("res://hud/panels/boss/boss_bar.gd")
 const BossBannerScript := preload("res://hud/panels/boss/boss_banner.gd")
 const BossIntroScript := preload("res://hud/panels/boss/boss_intro.gd")
@@ -154,6 +163,11 @@ var main_menu: PackedScene = null
 var _panels: Array[PlayerPanelScript] = []
 var _radials: Array[RadialScript] = []
 var _inventories: Array[InventoryScript] = []
+var _rewards: Array[RewardMenuScript] = []
+## By seat: the coins in its wallet and its offers waiting (`wallet_changed`,
+## `rewards_waiting_changed`), for its corner panel.
+var _coins: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var _unspent: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _pause_menu: PauseMenuScript = null
 ## Per player: the `pause` and `back` press counts at the last poll, and whether a menu of
 ## theirs was open then.
@@ -229,6 +243,12 @@ func _ready() -> void:
 		# Under the corner panels, as the builders.
 		root_control.move_child(inventory, _panels[0].get_index())
 		_inventories.append(inventory)
+	for player in PLAYER_COUNT:
+		var reward := RewardMenuScript.new()
+		reward.name = "Reward%d" % (player + 1)
+		reward.index = player
+		root_control.add_child(reward)
+		_rewards.append(reward)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if ui_focus == null:
@@ -260,6 +280,8 @@ func _ready() -> void:
 		radial.bind(events, ui_focus, spells, input)
 	for inventory in _inventories:
 		inventory.bind(events, ui_focus, spells, input)
+	for reward in _rewards:
+		reward.bind(events, ui_focus)
 	_pause_menu.builder_options_changed.connect(_on_builder_options_changed)
 	_pause_menu.reload_style_changed.connect(_on_reload_style_changed)
 	# The frame rate readout: over everything, at the bottom middle.
@@ -341,6 +363,8 @@ func _ready() -> void:
 		events.run_ended.connect(_on_run_ended)
 		events.main_menu_requested.connect(_on_main_menu_requested)
 		events.boss_intro_opened.connect(_on_boss_intro_opened)
+		events.wallet_changed.connect(_on_wallet_changed)
+		events.rewards_waiting_changed.connect(_on_rewards_waiting_changed)
 	if ui_focus != null:
 		ui_focus.opened.connect(_on_menu_opened)
 		ui_focus.closed.connect(_on_menu_closed)
@@ -421,12 +445,17 @@ func poll() -> void:
 					events.item_take_requested.emit(player, _item_hints.item_of(player))
 				elif start_now and _altar_seats & (1 << player) != 0:
 					events.online_open_requested.emit(player)
+				elif start_now and _rewards[player].waiting() > 0 and _in_room and not _panels[player].is_downed():
+					_open_reward(player)
 			if paused_now:
 				_on_pause_pressed(player)
 			elif back_now and _may_open_menu(player, had_menu):
 				_radials[player].open_builder()
 			elif inventory_now and _may_open_menu(player, had_menu):
 				_inventories[player].open_inventory()
+			elif _rewards[player].wants_open() and _may_open_menu(player, had_menu):
+				# An offer rolled with the seat's wizard there opens once the seat is free for it.
+				_open_reward(player)
 		_had_menu[player] = _has_menu(player)
 		# A seat in the game with no device of this machine on it is played on another one. Asked
 		# of the input layer each frame: a device handed over or mirrored sends no event.
@@ -455,7 +484,38 @@ func _may_open_menu(player: int, had_menu: bool) -> bool:
 
 ## Whether `player` has a menu open: their builder, their inventory, or the pause menu they work.
 func _has_menu(player: int) -> bool:
-	return _radials[player].is_open() or _inventories[player].is_open() or _pause_menu.owner_player == player
+	return _radials[player].is_open() or _inventories[player].is_open() or _rewards[player].is_open() or _pause_menu.owner_player == player
+
+
+
+
+## Open seat `player`'s reward menu, in the middle of their quarter of the view, so four open at once
+## never cover each other.
+func _open_reward(player: int) -> void:
+	var reward: RewardMenuScript = _rewards[player]
+	if not reward.open_menu():
+		return
+	reward.reset_size()
+	var view: Vector2 = (get_node("Root") as Control).size
+	var quarter: Vector2 = Vector2(0.25 + 0.5 * (player % 2), 0.75 if player >= 2 else 0.25) * view
+	reward.position = (quarter - reward.size * 0.5).round()
+
+
+## The reward menu of seat `player` (for tests and screenshots).
+func get_reward(player: int) -> RewardMenuScript:
+	return _rewards[player]
+
+
+func _on_wallet_changed(player: int, coins: int) -> void:
+	if player >= 0 and player < PLAYER_COUNT:
+		_coins[player] = coins
+		_panels[player].set_purse(coins, _unspent[player])
+
+
+func _on_rewards_waiting_changed(player: int, offers: Array[Dictionary]) -> void:
+	if player >= 0 and player < PLAYER_COUNT:
+		_unspent[player] = offers.size()
+		_panels[player].set_purse(_coins[player], offers.size())
 
 
 ## `pause`: close the player's open menu, or open the pause menu for them.
@@ -464,6 +524,8 @@ func _on_pause_pressed(player: int) -> void:
 		_radials[player].close_builder()
 	elif _inventories[player].is_open():
 		_inventories[player].close_inventory()
+	elif _rewards[player].is_open():
+		_rewards[player].close_menu()
 	elif _pause_menu.is_open():
 		if _pause_menu.owner_player == player:
 			_pause_menu.close_menu()
@@ -567,6 +629,7 @@ func _on_boss_intro_opened(_actor: int, _boss_name: String, _lore: String, _intr
 	for player in PLAYER_COUNT:
 		_radials[player].close_builder()
 		_inventories[player].close_inventory()
+		_rewards[player].close_menu()
 
 
 ## The red vignette (for tests).

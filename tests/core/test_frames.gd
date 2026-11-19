@@ -106,9 +106,9 @@ func test_commands_keep_their_order_and_types() -> void:
 func test_without_a_sink_a_command_applies_as_sent() -> void:
 	var bus := own(EventsScript.new()) as EventsScript
 	var heard: Array = []
-	bus.listen(&"reward_pick_requested", func(seat: int, choice: int) -> void: heard.append([seat, choice]))
-	bus.reward_pick_requested.emit(3, 1)
-	check_equal(heard, [[3, 1]], "a test's own bus applies at once")
+	bus.listen(&"reward_pick_requested", func(seat: int, offer: int, choice: int) -> void: heard.append([seat, offer, choice]))
+	bus.reward_pick_requested.emit(3, 2, 1)
+	check_equal(heard, [[3, 2, 1]], "a test's own bus applies at once")
 
 
 func test_a_bad_command_never_reaches_the_game() -> void:

@@ -30,9 +30,10 @@ extends RefCounted
 ## them renumbered; 3: `card_move_requested` gone with the list builder, the same; 4: the four menu
 ## requests carry the key of the body the menu showed, items I8; 5: `sandbox_action_requested`
 ## and `sandbox_spawn_requested` gone with the sandbox, crypt rework CR-S, docs/DECISIONS.md
-## 2026-11-16, the kinds after them renumbered; 6: `start_depth_picked` gone with the lectern,
+## 2026-11-16, the kinds after them renumbered; 6: `reward_pick_requested` names its offer,
+## connected biomes CB10; 7: `start_depth_picked` gone with the lectern,
 ## connected biomes CB8, the kind after it renumbered).
-const VERSION: int = 6
+const VERSION: int = 7
 const SEATS: int = 4
 const STAFFS: int = 4
 ## A move axis of 1.0 is this byte.
@@ -76,7 +77,7 @@ const COMMAND_NAMES: Array[StringName] = [
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
 	"iisi", "iSi",
-	"i", "i",
+	"ii", "i",
 	"i",
 	"i",
 	"",

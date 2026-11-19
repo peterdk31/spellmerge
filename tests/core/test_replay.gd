@@ -45,7 +45,7 @@ func _made() -> Replay:
 		frames[2].clear()
 		frames[2].set_aim(Vector2.UP)
 		if tick == 1:
-			frames[2].add_command(&"reward_pick_requested", [1])
+			frames[2].add_command(&"reward_pick_requested", [4, 1])
 		replay.add_tick(frames, 0b0101)
 		frames[0].pressed_bits = 0
 	return replay
@@ -76,7 +76,7 @@ func test_a_replay_comes_back_from_its_bytes() -> void:
 		for seat in 4:
 			check_equal(b[seat].to_bytes(), a[seat].to_bytes(), "tick %d seat %d: the same frame" % [tick, seat])
 	back.read_tick(1, b)
-	check_equal(b[2].commands, [[&"reward_pick_requested", 1]], "a command at its tick")
+	check_equal(b[2].commands, [[&"reward_pick_requested", 4, 1]], "a command at its tick")
 	check(b[1].move == Vector2i.ZERO and b[1].commands.is_empty(), "a seat with no frame reads cleared")
 	check_equal(back.read_tick(3, b), -1, "no tick past the end")
 	check_equal(back.to_bytes(), replay.to_bytes(), "the same bytes again")

@@ -232,6 +232,10 @@ var possessed_by: Possession = null
 ## shots pass it as they pass its own body (its hurt circle is a projectile target owned by that
 ## actor: `Caster.own_hurtbox`, Combat). Set before adding the actor.
 var belongs_to: int = ActorsScript.NONE
+## True for an add another body called (boss plan OB13: its phase's burst or waves), set by Flow as
+## it stands it. An add drops no coins (connected biomes CB10: waves without end would fill every
+## wallet). State.
+var is_add: bool = false
 
 ## The number it casts under in Spells and the projectile manager: its `id` while its caster is
 ## open (see `open_caster_number`), else -1.

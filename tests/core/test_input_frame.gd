@@ -80,11 +80,11 @@ func test_add_command_refuses_what_the_decoder_would() -> void:
 	check(not frame.add_command(&"staff_change_requested", [1, 2]), "too few arguments")
 	check(not frame.add_command(&"staff_change_requested", [1, 2.0, &"fire", 9]), "a float for an int")
 	check(not frame.add_command(&"staff_change_requested", [1, 2, &"../x", 9]), "a path for an id")
-	check(not frame.add_command(&"reward_pick_requested", [1 << 40]), "an int past 32 bits")
+	check(not frame.add_command(&"reward_pick_requested", [0, 1 << 40]), "an int past 32 bits")
 	check(frame.commands.is_empty(), "nothing was added")
 	for i in InputFrame.MAX_COMMANDS:
-		frame.add_command(&"reward_pick_requested", [0])
-	check(not frame.add_command(&"reward_pick_requested", [0]), "a full frame takes no more")
+		frame.add_command(&"reward_pick_requested", [0, 0])
+	check(not frame.add_command(&"reward_pick_requested", [0, 0]), "a full frame takes no more")
 
 
 func test_the_decoder_rejects_bad_frames() -> void:

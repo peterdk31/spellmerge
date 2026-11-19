@@ -9,6 +9,9 @@ extends Node
 ## its biome's `MapRules.spawning` at its scaled budget), then the map itself (`run_biome_chosen`),
 ## which Flow lays and plays. Areas never call each other: Flow knows the run by these events only,
 ## and this area knows nothing of a world, a body or a scene.
+## As a run begins it also says the run's own changes of the run stats (`run_stats_ruled`, connected
+## biomes CB10: its rule changes of a run stat whose flags the run's unlocks hold), which the Rewards
+## area works each player's stats out from.
 ##
 ## The map is the run's state (`map`: hashed, saved in snapshots), the same on every machine; a
 ## joining machine gets it from the snapshot. A run's start renews it (`begin_run`): out of a run
@@ -103,6 +106,8 @@ func _on_run_begun(run_id: StringName, players: int) -> void:
 		push_warning("Run: no map for the run '%s': %s" % [run_id, "; ".join(made.not_made)])
 		return
 	map = made
+	# The run's own changes of the run stats (connected biomes CB10, `RunStats`), before its rooms.
+	events.run_stats_ruled.emit(definition.stat_changes_by(sim.unlocks))
 	var rules: MapRules = played.biomes[0]
 	for room in made.rooms():
 		var enemies: Array[StringName] = made.enemies_of(room)

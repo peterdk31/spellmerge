@@ -98,7 +98,14 @@ func test_every_target_changes_its_number() -> void:
 		[RunRuleChange.Target.KIND_CHANCE, &"fight", func(d: RunDefinition) -> float: return d.biomes[0].kinds[0].chance],
 		[RunRuleChange.Target.STYLE_WEIGHT, &"", func(d: RunDefinition) -> float: return d.biomes[0].styles[0].weight, &"long"],
 	]
-	check_equal(cases.size(), RunRuleChange.Target.size(), "every target has a case")
+	# The run stats' target is the one more (connected biomes CB10): it changes a stat, not the map.
+	check_equal(cases.size() + 1, RunRuleChange.Target.size(), "every target has a case")
+	var stat_run: RunDefinition = _run()
+	var stat_change := RunRuleChange.make(&"unlocked", RunRuleChange.Target.RUN_STAT, 4.0)
+	stat_change.stat = &"start_coins"
+	stat_run.changes = [stat_change] as Array[RunRuleChange]
+	check_equal(RunStats.value_of(&"start_coins", stat_run.stat_changes_by(_unlocks([&"unlocked"] as Array[StringName]))), 4.0, "RUN_STAT set to 4")
+	check_equal(_problems(stat_run), PackedStringArray(), "a run stat's change is sound")
 	for case: Array in cases:
 		var run: RunDefinition = _run()
 		run.changes = [RunRuleChange.make(&"unlocked", case[0], 4.0, RunRuleChange.How.SET, &"", case[1], case[3] if case.size() > 3 else &"")] as Array[RunRuleChange]

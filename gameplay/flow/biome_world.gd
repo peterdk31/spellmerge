@@ -220,6 +220,9 @@ func _place(named: String, template: StringName, place: Vector2, mirror: int, in
 	# How it is placed, for the view: Feel draws a room's ground mirrored from its shape as it hears
 	# the room built (connected biomes CB4, `GroundShape.MIRROR_META`). The node is never flipped.
 	layout.set_meta(PieceShape.GROUND_MIRROR_META, Vector2i(1 if (mirror & PieceShape.MIRROR_X) != 0 else 0, 1 if (mirror & PieceShape.MIRROR_Y) != 0 else 0))
+	# A room's kind, for the view (connected biomes CB12: its music, air and light by kind).
+	if number < map.rooms() and map.room_kinds[number] != &"":
+		layout.set_meta(RoomKind.LAYOUT_META, map.room_kinds[number])
 	var piece := layout as Node2D
 	if piece != null:
 		piece.position = place

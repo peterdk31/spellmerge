@@ -4,17 +4,26 @@
 
 Per-player rolls from loot tables, unspent rewards and shops.
 
-Built in M3 (see "Gameplay sub-areas" in docs/PLAN.md).
+Built by connected biomes CB10 ([docs/milestones/connected-biomes.md](../../docs/milestones/connected-biomes.md), decisions 16 to 18 and 26); its shops come with CB11.
 
-Loot tables are content data read through the registry, so new ones are added without touching this code. Each player rolls their own rewards.
+Reward tables are content data read through the registry (`content/rewards/`, `RewardTable`), so new ones are added without touching this code. Each player rolls their own rewards.
+
+## What it does
+
+- **A roll per player** (DESIGN rule 3): on `room_cleared` every seat with a wizard gets its own offer (`RewardOffer`), its choices rolled from the `clear` table by `RewardRoll` (by weight, never one twice in an offer; the run's chance, purpose `reward`, keyed by the seat and counted by its rolls, so one seat's roll never shifts another's), as many as the player's `reward_choices` run stat (2: "pick 1 of 2", decision 17).
+- **Here or not** (rule 4): `here` when the seat's wizard is in the cleared room (`Actor.room`; a row run's rooms have no places, so everyone is); the HUD opens a present player's menu at once, and a player who was not there finds the offer waiting, an unspent count on their corner panel. Offers wait all run until picked, oldest first; nobody waits for anyone.
+- **A pick** (`reward_pick_requested(player, offer, choice)`, a command): the seat's own offer of that number gives the choice to the seat's wizard (`RewardEntry.CARD`: copies into its card bag; `COINS`: its own wallet; `HEAL` and `MAX_HEALTH`: through Combat, `health_gift_requested`) and goes (`reward_taken`). A full bag, or a heal while down, keeps it unspent. What a reward may be before relics exist (the owner, 2026-11-19): a card, coins, healing or a little more most health; a card upgrade waits for card levels.
+- **Run stats** (`RunStats`, core/base): the run's own changes arrive with `run_stats_ruled` (from `run`); `stat_of(seat, stat)` is those, then the relics in the seat's wizard's relics bag (`RelicBase.stat_changes`). Another area that reads a run stat hears `run_stats_ruled` itself and works the stat out with `RunStats` (areas never call each other); `spend` is for this area's own shop (CB11).
+- **Coins** (decision 18): a foe's death (`enemy_died`) lays its `EnemyBase.coins` round where it fell; the first standing wizard (seat order) whose feet come within `COIN_REACH` takes one, and every player's wallet gains one. Each wallet starts a run with the player's `start_coins`; `spend(seat, amount)` takes from one's own only (CB11's shop). A new world (`room_entered` FIRST_ROOM) and a run's start clear the floor.
+- **State:** the offers, the rolls counted, the wallets, the coins and the run's changes are state (hashed, snapshotted); `rebuild_derived` says every coin, wallet and waiting list again after a restore.
 
 ## Contract
 
 - **Public entry script:** `gameplay/rewards/rewards.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. The script arrives when the area is built.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
-  - Sends: `reward_rolled`, `reward_taken`.
-  - Listens to: `room_cleared` and `reward_pick_requested` (from the HUD; `reward_taken` is the announced result).
+  - Sends: `reward_rolled`, `reward_taken`, `rewards_waiting_changed`, `coin_changed`, `wallet_changed`, `health_gift_requested` (to combat), `reward_refused`.
+  - Listens to: `room_cleared`, `room_entered`, `enemy_died`, `run_stats_ruled` and `reward_pick_requested` (from the HUD, a command; `reward_taken` is the announced result).
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
 ## Allowed files
@@ -27,7 +36,7 @@ Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
-Arrives with Claude's first code for this area. Do not guess its layout before then.
+`rewards.gd` (the area: its state, its events, its step in `Tick.STEPS` "Rewards"), `reward_offer.gd` (a row of state), `reward_roll.gd` (the policy, apart, so it changes alone). A new kind of reward is a row of `RewardEntry.KINDS` and its branch in `_give`; a new table is a file in `content/rewards/`. Tests: `tests/gameplay/rewards/test_rewards.gd`.
 
 ## Validate
 

@@ -55,7 +55,7 @@ Chosen by the owner on 2026-11-04, so online co-op can be added ([docs/milestone
 ## What makes it fun
 
 - **Game feel from day 1:** every hit has hit-stop, screen shake, knockback, particles and sound. A step's hits of one spell on one body are one hit, with one of each (the owner, 2026-11-17).
-- **Meaningful choices:** every reward offers 3 options with trade-offs.
+- **Meaningful choices:** every reward is "pick 1 of 2" with trade-offs; relics and meta progression may add choices (the owner, 2026-11-18; connected biomes decision 17).
 - **Surprising combos:** components interact across systems; every new component needs at least 2 interesting interactions.
 - **Growing power fantasy:** weak at the start, overpowered by the end.
 - **Short loops:** runs of 20–30 minutes, under 3 seconds from death to a new run.

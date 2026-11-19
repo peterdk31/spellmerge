@@ -34,6 +34,10 @@ const DOOR_GATE: StringName = &"gate"
 const DOOR_PORTAL_HOME: StringName = &"portal"
 ## Every way in the game knows.
 const DOORS: Array[StringName] = [DOOR_NONE, DOOR_GATHER, DOOR_GATE]
+## The layout metadata a biome's laid room may carry its kind's id under (`room_built`'s layout;
+## connected biomes CB12): what the view reads a room's kind by. Without it the view takes the first
+## kind its template hosts (`RoomBase.kinds`).
+const LAYOUT_META: StringName = &"room_kind"
 
 ## Unique name of the kind, also its file name; room templates and kind rules name it by this.
 @export var id: StringName = &""
@@ -49,6 +53,19 @@ const DOORS: Array[StringName] = [DOOR_NONE, DOOR_GATHER, DOOR_GATE]
 ## True when a room of the kind, cleared, opens the portal home (connected biomes CB7, decision 7):
 ## a gather door in it that ends the run, back to the hub, once every standing wizard is in it.
 @export var portal_home: bool = false
+
+@export_group("Look and sound")
+## What a room of the kind brings to how it looks and sounds (connected biomes CB12, decision 30;
+## drawn and heard only, nothing in the game reads it). Each is optional: unset, the room's own.
+## Its air: the bed and accents heard while the music follows a room of the kind, in place of the
+## room's own (`RoomBase.ambience`).
+@export var air: Ambience = null
+## Its music: played while the music follows a room of the kind, in place of the room's own
+## (`RoomBase.music`; a living boss's still comes first).
+@export var music: MusicTrack = null
+## Its light: the palette material (docs/STYLE.md) the mouths into a room of the kind shimmer in, and
+## its seals' runes glow in (empty: the spark's).
+@export var light: StringName = &""
 
 
 ## Its name for people: `display_name`, else its id in words.
@@ -68,4 +85,8 @@ func problems() -> PackedStringArray:
 		found.append("%s: ends '%s' is none of %s." % [id, ends, ENDS])
 	if not DOORS.has(door):
 		found.append("%s: door '%s' is none of %s." % [id, door, DOORS])
+	if light != &"" and (not Palette.has(light) or Palette.OWNED.has(light)):
+		found.append("%s: light '%s' is not a palette material the world may use." % [id, light])
+	if music != null:
+		found.append_array(music.problems(String(id)))
 	return found

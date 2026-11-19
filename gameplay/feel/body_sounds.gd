@@ -20,8 +20,14 @@ const POLL: float = 0.1
 var held: HeldSoundsScript = null
 var audio: AudioScript = null
 var play_cue: Callable = Callable()
-## The room in play's music (`RoomBase.music`; null: none).
+## The room in play's music (`RoomBase.music`; in a biome the room the music follows, Feel's room
+## hearing: connected biomes CB12; null: none).
 var room_music: MusicTrack = null
+## Whether a body at a world point is heard (`func(at: Vector2) -> bool`, Feel's room hearing): a
+## boss's music is played only from a place this machine hears. Unset: every body is.
+var heard: Callable = Callable()
+## The room music's intensity (1; in a biome 2 while the room followed is a sealed fight).
+var room_intensity: int = 1
 
 var _wait: float = 0.0
 ## The phase each actor id's body was last seen in (`Phases.current`), and that body (its instance
@@ -42,6 +48,7 @@ func _init() -> void:
 ## sound was stopped with the last room).
 func room_entered(track: MusicTrack) -> void:
 	room_music = track
+	room_intensity = 1
 	_wait = 0.0
 	_body.fill(0)
 
@@ -54,7 +61,7 @@ func step(delta: float, table: ActorsScript) -> void:
 	if _wait <= 0.0:
 		_wait = POLL
 		var track: MusicTrack = room_music
-		var intensity: int = 1
+		var intensity: int = room_intensity
 		var found: bool = false
 		var open: int = table.open_ids(_open) if table != null else 0
 		for n in open:
@@ -64,7 +71,7 @@ func step(delta: float, table: ActorsScript) -> void:
 				continue
 			if body.phases != null:
 				_look_at_phase(id, body)
-			if not found and body.data.music != null and not body.is_dying():
+			if not found and body.data.music != null and not body.is_dying() and (not heard.is_valid() or bool(heard.call(body.global_position))):
 				found = true
 				track = body.data.music
 				intensity = intensity_of(body)

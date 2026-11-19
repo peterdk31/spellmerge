@@ -54,8 +54,11 @@ signal staff_cards_requested(player: int, staff: int, cards: Array[StringName], 
 signal staff_hand_requested(player: int, staff: int, hand: int, body: int)
 ## Sender: hud. `player` asked, in the inventory (items I7), to drop one thing on the ground: their staff number `staff` (as `staff_change_requested`'s; `bag` and `id` are then the staff bag's and its id), or with `staff` -1 one copy of `id` from the bag `bag` (one of `ItemKinds.BAGS`). A command: heard by player at the next tick's start; the inventory lets it go (`item_drop_requested`, which the Items area lays beside the body) or player says `inventory_refused`. `body` as `staff_change_requested`'s.
 signal bag_drop_requested(player: int, bag: StringName, id: StringName, staff: int, body: int)
-## A player picked reward choice number `choice`. Heard by rewards.
-signal reward_pick_requested(player: int, choice: int)
+## Sender: hud (the reward menu, connected biomes CB10). `player` picked choice number `choice` of
+## their reward offer number `offer` (`reward_rolled`'s; naming the offer, so a pick sent as another
+## offer arrives never takes that one's). A command: heard by rewards at the next tick's start,
+## which gives it (`reward_taken`) or keeps the offer unspent (no room in the bag, an offer gone).
+signal reward_pick_requested(player: int, offer: int, choice: int)
 ## A player voted for door number `door`. Heard by flow.
 signal door_vote_requested(player: int, door: int)
 ## Sender: hud. The "Effect slots" slider in the pause menu (Settings) moved: how many effects
@@ -302,6 +305,11 @@ signal adds_requested(actor: int, adds: EnemyAdds, key: int, wave: bool)
 ## caller died crumbles. Heard by combat, which takes its health and tells its death as any other
 ## (`enemy_died` with NO_PLAYER for a foe of the wizards).
 signal crumble_requested(actor: int)
+## Sender: rewards (connected biomes CB10: a reward of healing or of more health). The actor `actor`
+## gains `more_most` most health (and as much health, unless it is down) and is then healed `heal`.
+## Heard by combat, which keeps an actor's health: it changes the body's Health and tells a heal as
+## any other (`heal_dealt`, by nobody).
+signal health_gift_requested(actor: int, heal: float, more_most: float)
 ## Sender: actor (a boss body's `BossPresence` look, boss plan OB16). The boss `actor` entered play:
 ## `boss_name` its name for people (`EnemyBase.shown_name`: its `display_name`, else its id in words), `lore` its one line, `marks`
 ## each phase's health share (`EnemyPhase.health_below`, largest first; none for a phase by time).
@@ -420,6 +428,11 @@ signal run_biome_chosen(map: RefCounted)
 ## stands (two fights at once each stand at their own). Heard by difficulty, which scales every enemy
 ## and boss that stands then (`enemy_standing`).
 signal run_room_scaled(scale: float)
+## Sender: run (connected biomes CB10, "Run stats"). The run's own changes of the run stats
+## (`RunStats`: its definition's rule changes of the `RUN_STAT` target whose flags the run's
+## unlocks hold, in order; empty for none), as a run begins (`run_begun`), before its rooms' fights
+## (`run_room_filled`). Every player's stats are these, then their relics'. Heard by rewards.
+signal run_stats_ruled(changes: Array[StatChange])
 ## Sender: flow. The world's room `room` goes, before anything of it goes: what was cast in it ends
 ## quietly with it. Heard by core/spells (`leave_room`: carriers, holds, waiting launches and moves
 ## end; builds stay). A biome's party never leaves a room as a whole, so it is sent only as a
@@ -498,6 +511,18 @@ signal altar_placed(standing: bool, at: Vector2)
 ## `open` true: what is told next is drawn as it stands, not played in).
 ## For the view only. Heard by feel (the door's bars, its lamps, the portal).
 signal gather_door_shown(door: int, rule: StringName, area: Rect2, gathered: int, standing: int, held: bool, open: bool)
+## Sender: flow (connected biomes CB11, to come; CB12 made its look ready). In a biome: key door
+## `door` (by number), its `area` in world pixels (its mouth), `open` once a key opened it. Sent as
+## it changes; door -1 (the rest empty): every key door forgotten (the biome left; a restore, with
+## `open` true: what is told next is drawn as it stands, not played in). For the view only. Heard by
+## feel (its padlock turning and falling, its bars sinking: `lock_looks.gd`).
+signal key_door_shown(door: int, area: Rect2, open: bool)
+## Sender: flow (connected biomes CB11, to come; CB12 made its look ready). In a biome: secret rock
+## `rock` (by number), its `area` in world pixels (the cracked rock), the `element` that breaks it (a
+## card id, &"fire"; its crack's tint), `broken` once it broke. Sent as it changes; rock -1 (the rest
+## empty): every secret rock forgotten (as `key_door_shown`'s -1). For the view only. Heard by feel
+## (its crack's tint, brightening as its element touches near it, and its breaking in stages).
+signal secret_rock_shown(rock: int, area: Rect2, element: StringName, broken: bool)
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
 ## where each lies, in the scene's order. Sent for every room as a world is made, at the run's start.
@@ -543,10 +568,33 @@ signal difficulty_changed(level: float)
 
 # --- Rewards and progression ------------------------------------------------
 
-## Sender: rewards. These rewards were offered to the players.
-signal reward_rolled(reward_ids: Array[StringName])
-## Sender: rewards. The result of a pick: `player` took `reward_id`.
-signal reward_taken(player: int, reward_id: StringName)
+## Sender: rewards (connected biomes CB10). Seat `player`'s own roll on a room's clear: the offer
+## numbered `offer` (handed out once a run), its `choices` (the views of what each gives:
+## `kind` (`RewardEntry.KINDS`), `id`, `count`, `name`, `icon`; as many as the player's
+## `reward_choices`, fewer when the table runs out of different ones), and whether the player's wizard was in the room (`here`: the menu opens at
+## once; a player who was not there finds it as an unspent reward, DESIGN rule 4). Heard by hud.
+signal reward_rolled(player: int, offer: int, choices: Array[Dictionary], here: bool)
+## Sender: rewards. The result of a pick (`reward_pick_requested`): `player` took choice `choice`
+## of their offer `offer`, which gave what `reward` says (a view, as `reward_rolled`'s). Heard by
+## nobody yet (tests; later Feel's sound).
+signal reward_taken(player: int, offer: int, choice: int, reward: Dictionary)
+## Sender: rewards. A pick of `player`'s offer `offer` could not be given (no room in the card bag,
+## a heal while the wizard is down, no wizard): the offer stays unspent. Heard by hud (the reward
+## menu opens on it again, saying why).
+signal reward_refused(player: int, offer: int)
+## Sender: rewards. Seat `player`'s offers not yet picked, oldest first (`offers`: each a dictionary
+## of `offer`, `here` and `choices`, as `reward_rolled` says), whenever they change, at a run's
+## start (none) and after a snapshot is restored. Heard by hud (the unspent count on the corner
+## panel; the reward menu shows the oldest).
+signal rewards_waiting_changed(player: int, offers: Array[Dictionary])
+## Sender: rewards (connected biomes CB10, decision 18). The coin numbered `coin` lies at `at`
+## (`lying`), or is gone from there (taken, or the world went). After a snapshot is restored, said
+## again for every coin (and gone for those no longer lying). Heard by feel (the coins' look).
+signal coin_changed(coin: int, at: Vector2, lying: bool)
+## Sender: rewards. Seat `player`'s wallet holds `coins` now: at a run's start, as a player's
+## starting coins come, as anyone takes a coin from the floor (every wallet gains it), as a reward
+## gives coins and as the player spends. Heard by hud (the corner panel).
+signal wallet_changed(player: int, coins: int)
 ## Sender: progression. `unlock_id` was unlocked.
 signal unlock_gained(unlock_id: StringName)
 ## Sender: progression. The balance of `currency_id` is now `amount`.

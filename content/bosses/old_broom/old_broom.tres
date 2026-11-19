@@ -227,6 +227,7 @@ move_speed = 40.0
 contact_damage = 8
 scene = ExtResource("2_scene")
 boss = true
+coins = 10
 stats = SubResource("Resource_stats")
 hit_color = Color(0.949, 0.761, 0.188, 1)
 staffs = Array[ExtResource("4_entry")]([SubResource("Resource_sweep"), SubResource("Resource_flick"), SubResource("Resource_swat"), SubResource("Resource_big_sweep")])

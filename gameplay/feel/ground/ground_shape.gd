@@ -57,9 +57,9 @@ static func spec(shape: Dictionary, scene: PackedScene, registry: RegistryScript
 ## The ground `spec` describes, drawn (`GroundDrawing.draw`'s dictionary): by the native module when
 ## it is loaded and `native`, else by the GDScript.
 static func draw(ground_spec: Dictionary, native: bool = true) -> Dictionary:
-	var kernel: Object = NativeScript.mote_kernel() if native else null
+	var kernel: Object = NativeScript.ground_kernel() if native else null
 	if kernel != null:
-		return kernel.call(&"draw_ground", ground_spec)
+		return kernel.call(&"draw", ground_spec)
 	return DrawingScript.draw(ground_spec)
 
 

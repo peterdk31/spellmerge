@@ -5,7 +5,6 @@
 // `float` is a double; Vector2, Color and PackedFloat32Array single precision).
 
 #include "mote_kernel.h"
-#include "ground_kernel.h"
 #include "packed.h"
 
 #include <godot_cpp/classes/random_number_generator.hpp>
@@ -450,9 +449,4 @@ void MoteKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("check_fields", "motes"), &MoteKernel::check_fields);
 	ClassDB::bind_method(D_METHOD("key_births", "motes", "given", "count"), &MoteKernel::key_births);
 	ClassDB::bind_method(D_METHOD("give_off", "motes", "given", "count", "has_marks"), &MoteKernel::give_off);
-	ClassDB::bind_method(D_METHOD("draw_ground", "spec"), &MoteKernel::draw_ground);
-}
-
-Dictionary MoteKernel::draw_ground(const Dictionary &spec) const {
-	return ground::draw(spec);
 }

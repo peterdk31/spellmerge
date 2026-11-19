@@ -50,6 +50,9 @@ const DIVIDER_WIDTH: int = 3
 const SETTLED: float = 0.05
 ## A merging view's divider shrinks once its picture is this close to the one it merges into.
 const SHRINK_FROM: float = 1.0
+## A new view eases in over this many real seconds (its pull rising from none), so it sets off from
+## the picture it split from gently rather than at the party camera's full pull.
+const EASE_IN: float = 0.4
 
 ## A slot: free, a live view (its group's), or a view merging into another.
 const FREE: int = 0
@@ -72,6 +75,8 @@ var _stage: PackedInt32Array = PackedInt32Array()
 ## camera's picture, or none). Only the line between a view and its kin grows or shrinks; its other
 ## lines were its kin's, drawn already.
 var _kin: PackedInt32Array = PackedInt32Array()
+## By slot: real seconds since it was made (its ease-in, EASE_IN).
+var _age: PackedFloat32Array = PackedFloat32Array()
 ## By view (as laid out in `views`): its slot.
 var _slot_of: PackedInt32Array = PackedInt32Array()
 ## By seat: its box's middle and its box (each seat's own body and the actor it drives).
@@ -98,6 +103,7 @@ func _init() -> void:
 	_stage.resize(VIEWS_MOST)
 	_kin.resize(VIEWS_MOST)
 	_kin.fill(-1)
+	_age.resize(VIEWS_MOST)
 	_slot_of.resize(VIEWS_MOST)
 	_point.resize(ActorsScript.SEATS)
 	_box.resize(ActorsScript.SEATS)
@@ -354,6 +360,7 @@ func _open_slot(held: int, root_centre: Vector2, root_zoom: float) -> int:
 	_zoom[free] = _zoom[from] if from >= 0 else root_zoom
 	_stage[free] = 0
 	_kin[free] = from
+	_age[free] = 0.0
 	_members[free] = held
 	_state[free] = LIVE
 	return free
@@ -367,13 +374,20 @@ func _ease(delta: float, root_centre: Vector2, root_zoom: float, limits: Rect2, 
 	for slot in VIEWS_MOST:
 		if _state[slot] != LIVE:
 			continue
+		if _stage[slot] == 0:
+			# Born this frame: drawn first as the picture it splits from, eased from the next.
+			_stage[slot] = 1
+			continue
+		_age[slot] += maxf(delta, 0.0)
+		var rise: float = clampf(_age[slot] / EASE_IN, 0.0, 1.0)
+		var pull: float = weight * rise * rise * (3.0 - 2.0 * rise)
 		var group: int = _group_holding(slot)
-		var aim_zoom: float = lerpf(_zoom[slot], SPLIT_ZOOM, weight)
+		var aim_zoom: float = lerpf(_zoom[slot], SPLIT_ZOOM, pull)
 		var aim: Vector2 = _centre[slot]
 		if group >= 0:
 			aim = _group_middle[group] - (_group_site[group] - screen * 0.5) / aim_zoom
 		_zoom[slot] = aim_zoom
-		_centre[slot] = _clamp(_centre[slot].lerp(aim, weight), aim_zoom, limits, screen)
+		_centre[slot] = _clamp(_centre[slot].lerp(aim, pull), aim_zoom, limits, screen)
 		_stage[slot] = mini(_stage[slot] + 1, DIVIDER_WIDTH)
 		if _stage[slot] == DIVIDER_WIDTH:
 			_kin[slot] = -1

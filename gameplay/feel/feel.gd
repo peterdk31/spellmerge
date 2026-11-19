@@ -953,7 +953,8 @@ func step(real_delta: float) -> void:
 	party_camera.look(_actor_table(), seats_here)
 	party_camera.step(real_delta)
 	if split_screen != null:
-		split_screen.step(real_delta, _actor_table(), seats_here, party_camera.camera)
+		var world_camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
+		split_screen.step(real_delta, _actor_table(), seats_here, world_camera)
 		_spectacle.set_split(split_screen.views(), split_screen.mote_share, split_screen.light_downscale)
 	if _markers != null:
 		_markers.step(_actor_table(), seats_here, _views_shown(), _clock)
@@ -1190,9 +1191,9 @@ func _picture() -> Rect2:
 func _views_shown() -> ScreenViewsScript:
 	if split_screen != null and split_screen.is_drawing():
 		return split_screen.camera.views
-	var camera: Camera2D = party_camera.camera
+	var camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
 	var picture: Rect2 = party_camera.visible_rect()
-	if camera == null or not is_instance_valid(camera) or not picture.has_area():
+	if camera == null or not picture.has_area():
 		_one_view.count = 0
 		return _one_view
 	var zoom: float = camera.zoom.x

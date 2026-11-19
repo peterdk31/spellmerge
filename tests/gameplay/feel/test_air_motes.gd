@@ -154,7 +154,8 @@ func test_a_lit_only_kind_tells_the_shader_and_reads_the_light_it_is_handed() ->
 	motes.set_light(null)
 	check(motes.shader_parameter(&"light_on") != true, "none again: not drawn")
 	var code: String = FileAccess.get_file_as_string("res://gameplay/feel/mote.gdshader")
-	check(code.contains("uniform sampler2D light_buffer") and code.contains("textureLod(light_buffer, SCREEN_UV, 0.0)"), "the shader reads the light under each lit-only pixel")
+	var views: String = FileAccess.get_file_as_string("res://gameplay/feel/light_views.gdshaderinc")
+	check(code.contains("#include \"res://gameplay/feel/light_views.gdshaderinc\"") and code.contains("view_light(SCREEN_UV)") and views.contains("uniform sampler2D light_buffer") and views.contains("textureLod(light_buffer, uv, 0.0)"), "the shader reads the light under each lit-only pixel (its view's buffer, light_views.gdshaderinc)")
 	check(code.contains("texelFetch(kind_table, ivec2(3, k), 0)"), "and knows a lit-only kind by its row's light texel")
 
 

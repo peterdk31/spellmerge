@@ -213,12 +213,17 @@ func test_a_split_starts_as_the_picture_it_splits_from() -> void:
 		check_equal(_split.stage_of(view), 1, "its divider starts a pixel wide")
 	# Then the divider grows a pixel a frame, and the views ease apart without a jump.
 	var before: Array[Transform2D] = [_split.views.to_screen[0], _split.views.to_screen[1]]
-	for step in SplitCameraScript.DIVIDER_WIDTH + 30:
+	var most: float = 0.0
+	for step in 60:
 		_frame()
 		for view in _split.views.count:
 			var moved: float = _gap(_split.views.to_screen[view], before[view])
-			check(moved < 40.0, "view %d moves on smoothly (%.2f px in a frame)" % [view, moved])
+			if step < 2:
+				check(moved < 1.0, "view %d sets off gently (%.2f px in frame %d)" % [view, moved, step])
+			most = maxf(most, moved)
 			before[view] = _split.views.to_screen[view]
+	check(most < 32.0, "the views ease apart without a jump (at most %.2f px a frame)" % most)
+	print("SPLIT: the views moved at most %.2f px a frame easing apart" % most)
 	check(a != null, "the wizards stand")
 
 

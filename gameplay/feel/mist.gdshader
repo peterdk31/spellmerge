@@ -24,6 +24,9 @@ shader_type canvas_item;
 #include "res://gameplay/feel/light_views.gdshaderinc"
 uniform sampler2D mask : hint_default_black, filter_linear, repeat_disable;
 uniform vec2 mask_size = vec2(1.0);
+// Where the room's mask and parting begin (world px): the room's place (connected biomes, a room laid
+// away from the world's origin; its mask is of its walls as mirrored where it stands).
+uniform vec2 origin = vec2(0.0);
 uniform sampler2D parted : hint_default_black, filter_linear, repeat_disable;
 uniform vec2 parted_size = vec2(1.0);
 uniform float view_time = 0.0;
@@ -79,7 +82,7 @@ float mist_noise(vec2 q) {
 
 // How far the mist is parted at `p` (world px).
 float mist_parted(vec2 p) {
-	return textureLod(parted, p / parted_size, 0.0).r;
+	return textureLod(parted, (p - origin) / parted_size, 0.0).r;
 }
 
 void fragment() {
@@ -87,7 +90,7 @@ void fragment() {
 	vec2 p = floor(world) + 0.5;
 	// Where it lies first: past a wall's spill, or where even its thickest billow would not show, the
 	// rest is not worked out.
-	vec4 m = textureLod(mask, p / mask_size, 0.0);
+	vec4 m = textureLod(mask, (p - origin) / mask_size, 0.0);
 	float edge = 1.0 - smoothstep(0.0, max(edge_reach, 0.001), m.r);
 	float pit = (1.0 - smoothstep(0.0, max(pit_reach, 0.001), m.g)) * pit_share;
 	float over_wall = 1.0 - smoothstep(0.0, max(spill, 0.001), m.b);

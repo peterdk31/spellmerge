@@ -105,6 +105,9 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `pad_wait_requested` | `core/input` (a command) | `coop` (the game stops while a seat waits for its unplugged gamepad) |
 | `pad_wait_changed` | `coop` | `hud` (the pad line, the pause menu) |
 | `item_take_requested` | HUD (a command) | `items` (A by an item in reach) |
+| `shelf_buy_requested` | HUD (a command) | `rewards` (A at a shop's item; connected biomes CB11's follow-up) |
+| `shelf_near_changed`, `shelf_refused` | `rewards` (the shop item in a seat's reach, a refused buy) | HUD (the item hint) |
+| `run_stats_told` | `rewards` (a seat's run stats, by name) | `feel` (the held Y map: `secret_sense`) |
 | `room_items_placed` | `flow` | `items` (what the room's scene places lies there) |
 | `item_drop_requested` | `actor` (an Inventory) | `items` (a card given back to a full bag, or what the inventory menu drops, lands beside the body) |
 | `cover_danger_looked` | `ai` (every brain, as it walks and at each decision, ground cover GC7) | `cover` (fills the look at once: where the floor would harm) |

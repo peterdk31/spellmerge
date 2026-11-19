@@ -132,3 +132,40 @@ func test_the_panel_says_the_coins() -> void:
 	check_equal(_hud.get_panel(1).purse_text(), "12 coins", "the seat's wallet")
 	_roll(1, 3, false)
 	check_equal(_hud.get_panel(1).purse_text(), "12 coins  1 to pick", "and its rewards waiting")
+
+
+## Connected biomes CB11's follow-up (the owner, 2026-11-19): what the wizard stands at decides what
+## A does. A shop's item in reach (`shelf_near_changed`) is hinted "Buy" with its price, and A buys it
+## (`shelf_buy_requested`), even with a reward waiting; away from it, A opens the waiting reward.
+func test_a_at_a_shop_item_buys_it_and_elsewhere_opens_the_waiting_reward() -> void:
+	var bought: Array = []
+	_bus.shelf_buy_requested.connect(func(seat: int, item: int) -> void: bought.append([seat, item]))
+	var waiting: Array[Dictionary] = _roll(0, 3, false)
+	_bus.shelf_near_changed.emit(0, 5, Vector2(40, 40), {"kind": &"heal", "id": &"", "count": 30, "name": "Heal 30", "icon": null, "price": 6})
+	_hud.step_hints(0.016)
+	var hint: Control = _hud.get_item_hints().call("hint_of", 0) as Control
+	check(hint.visible, "the shop item in reach is hinted")
+	check_equal(String(hint.call("title")), "Buy Heal 30 (6)", "with what A does and its price")
+	_frame()
+	_tap(0, &"accept")
+	_tap(0, &"take")
+	_frame()
+	check_equal(bought, [[0, 5]], "A buys the item the wizard stands at")
+	check(not _hud.get_reward(0).is_open(), "and opens no reward")
+	_bus.shelf_refused.emit(0, 5)
+	check(bool(hint.call("is_refused")), "a refused buy shakes the hint red")
+	_bus.item_near_changed.emit(0, 9, Vector2(60, 40), {"kind": &"card", "id": &"fire", "name": "Fire"})
+	_hud.step_hints(0.016)
+	check_equal(String(hint.call("title")), "Take Fire", "a ground item in reach comes first")
+	check_equal(int(_hud.get_item_hints().call("shelf_of", 0)), -1, "and A buys nothing then")
+	_bus.item_near_changed.emit(0, -1, Vector2.ZERO, {})
+	_bus.shelf_near_changed.emit(0, -1, Vector2.ZERO, {})
+	_hud.step_hints(0.016)
+	check(not hint.visible, "nothing in reach: no hint")
+	_frame()
+	_tap(0, &"accept")
+	_tap(0, &"take")
+	_frame()
+	check(_hud.get_reward(0).is_open(), "away from the shelf, A opens the waiting reward")
+	check_equal(bought.size(), 1, "and buys nothing")
+	check_equal(waiting.size(), 1, "")

@@ -425,12 +425,24 @@ func test_a_shops_shelf_is_one_of_each_and_the_first_buyer_takes_it() -> void:
 	check_equal(shelf.size(), 3, "each told to the view")
 	_open_shop(3, PackedVector2Array([Vector2(0, 0)]))
 	check_equal(_rewards.shelf().size(), 3, "a shop is stocked once: it keeps its shelf")
-	# Both step onto the first item at once: the first seat buys it, and only it pays.
+	# Both step onto the first item at once: walking on buys nothing, and each is told it is in reach.
+	var near: Array = []
+	_world.bus.shelf_near_changed.connect(func(seat: int, item: int, _at: Vector2, view: Dictionary) -> void: near.append([seat, item, view.get("price", -1)]))
 	var price: int = int(items[0]["price"])
 	one.position = items[0]["at"]
 	two.position = items[0]["at"]
 	_tick()
+	check_equal(_rewards.shelf().size(), 3, "standing on an item buys nothing")
+	check(near.has([0, items[0]["number"], price]) and near.has([1, items[0]["number"], price]), "each seat is told the item in its reach, with its price")
+	# Both press A in the same tick: the first seat buys it, and only it pays; the second finds it gone.
+	var refused: Array = []
+	_world.bus.shelf_refused.connect(func(seat: int, item: int) -> void: refused.append([seat, item]))
+	_world.bus.shelf_buy_requested.emit(0, items[0]["number"])
+	_world.bus.shelf_buy_requested.emit(1, items[0]["number"])
+	_tick()
 	check_equal(_rewards.shelf().size(), 2, "bought: gone from the shelf for everyone")
+	check(refused.is_empty(), "the second ask finds it gone, and says nothing")
+	check(near.back() == [1, -1, -1] and near[near.size() - 2] == [0, -1, -1], "nobody has it in reach any more")
 	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [30 - price, 30], "the buyer pays from their own wallet")
 	check(shelf.back()[3] == false and shelf.back()[0] == items[0]["number"], "the view is told it went")
 
@@ -440,12 +452,66 @@ func test_a_wizard_who_cannot_pay_buys_nothing_and_prices_follow_the_players_sca
 	_fund(1)
 	_open_shop(4, PackedVector2Array([Vector2(0, 0)]))
 	var item: Dictionary = _rewards.shelf()[0]
+	var refused: Array = []
+	_world.bus.shelf_refused.connect(func(seat: int, number: int) -> void: refused.append([seat, number]))
+	_world.bus.shelf_buy_requested.emit(0, item["number"])
+	_tick()
+	check(refused.is_empty() and _rewards.shelf().size() == 1, "out of reach: nothing, and nothing said")
 	one.position = item["at"]
+	_tick()
+	_world.bus.shelf_buy_requested.emit(0, item["number"])
 	_tick()
 	check_equal(_rewards.shelf().size(), 1, "too few coins: it stays")
 	check_equal(_rewards.wallet_of(0), 1, "nothing spent")
+	check_equal(refused, [[0, item["number"]]], "the buyer is told it was refused")
 	_world.bus.run_stats_ruled.emit([StatChange.make(&"price_scale", 0.5, StatChange.How.TIMES)] as Array[StatChange])
 	check_equal(_rewards.price_for(0, item["number"]), maxi(roundi(float(item["price"]) * 0.5), 1), "a player's price is the price times their price_scale")
+
+
+func test_a_shelf_sells_heals_only_to_the_hurt() -> void:
+	var one := _wizard(0, Vector2(-200, 0))
+	_fund(60)
+	var heal: Dictionary = {}
+	for room in range(10, 40):
+		_open_shop(room, PackedVector2Array([Vector2(0, 0), Vector2(48, 0), Vector2(96, 0), Vector2(144, 0)]))
+		for item: Dictionary in _rewards.shelf():
+			if (item["choice"] as Dictionary)["kind"] == RewardEntry.HEAL and heal.is_empty():
+				heal = item
+		if not heal.is_empty():
+			break
+	check(not heal.is_empty(), "the shop's shelf (content/rewards/shelf.tres) sells heals")
+	if heal.is_empty():
+		return
+	var refused: Array = []
+	_world.bus.shelf_refused.connect(func(seat: int, number: int) -> void: refused.append([seat, number]))
+	one.position = heal["at"]
+	_tick()
+	_world.bus.shelf_buy_requested.emit(0, heal["number"])
+	_tick()
+	check_equal(refused, [[0, heal["number"]]], "a whole wizard is refused a heal")
+	check_equal(_rewards.wallet_of(0), 60, "and pays nothing")
+	_world.hurt(one, 50)
+	var before: float = one.health.health
+	_world.bus.shelf_buy_requested.emit(0, heal["number"])
+	_tick()
+	check(one.health.health > before, "a hurt wizard's heal heals them")
+	check_equal(_rewards.wallet_of(0), 60 - int(heal["price"]), "paid for (price_scale 1)")
+	check(_rewards.price_for(0, heal["number"]) < 0, "and gone from the shelf")
+
+
+func test_each_players_run_stats_are_told_to_the_view() -> void:
+	var told: Dictionary = {}
+	_world.bus.run_stats_told.connect(func(seat: int, stats: Dictionary) -> void: told[seat] = stats)
+	_wizard(0)
+	_tick()
+	check(told.has(0) and float((told[0] as Dictionary)[&"secret_sense"]) == 0.0, "as a seat's wizard comes: its stats, the base")
+	_world.bus.run_stats_ruled.emit([StatChange.make(&"secret_sense", 200.0)] as Array[StatChange])
+	for seat in 4:
+		check(told.has(seat) and float((told[seat] as Dictionary)[&"secret_sense"]) == 200.0, "seat %d told the run's change" % seat)
+	check_equal((told[0] as Dictionary).size(), RunStats.names().size(), "every stat by name")
+	told.clear()
+	_rewards.rebuild_derived()
+	check_equal(told.size(), 4, "a restore tells every seat's again")
 
 
 func test_a_fountain_is_a_shared_pool_every_hurt_wizard_draws_on() -> void:

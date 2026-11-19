@@ -212,6 +212,31 @@ func test_the_map_shows_the_rooms_seen_the_bridges_from_them_and_the_kinds_they_
 	check_equal(view.shade_of(WEST), 3, "with every map shut, as it stands: the stone's light")
 
 
+## The run stat `secret_sense` (the owner's answer of 2026-11-19): a secret room within that many
+## pixels of a room the party entered shows on that player's own map only, worked out from the party's
+## map and the seat's stat as told (`run_stats_told`).
+func test_a_players_secret_sense_shows_a_secret_room_near_on_their_own_map_only() -> void:
+	var map: BiomeMap = BiomeMaps.split(registry, [0, 0, 0] as Array[int], [BiomeMaps.FIRST, BiomeMaps.MIDDLE, BiomeMaps.LAST] as Array[StringName], [&"fight", &"start", &"secret"] as Array[StringName])
+	for seat in 2:
+		input.add_virtual_device(seat)
+	check(flow.start_biome(0, map, [RoomFight.new(), RoomFight.new(), RoomFight.new()] as Array[RoomFight]), "the biome starts")
+	tick.run(DT)
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	view.step(0.0, actors, 3, _grid(), _two_views())
+	check(not view.draws(EAST), "the secret room is not on the party's map")
+	check(not view.senses(0, EAST) and view.sense_shade_of(0, EAST) == 0, "no sense (the base, 0): nobody's map shows it")
+	var gap: float = PartyMapViewScript.gap_between(_grid().place_rect(EAST), _grid().place_rect(0))
+	check(gap > 0.0, "the secret room lies a bridge away from the start room")
+	events.run_stats_told.emit(0, {&"secret_sense": gap - 1.0})
+	check(not view.senses(0, EAST), "a sense short of it shows nothing")
+	events.run_stats_told.emit(0, {&"secret_sense": gap + 1.0})
+	check(view.senses(0, EAST), "within the seat's sense of a room entered: sensed")
+	check_equal(view.sense_shade_of(0, EAST), 1, "drawn on that player's map in the stone's shadow (every map shut: as it stands)")
+	check(not view.senses(1, EAST) and view.sense_shade_of(1, EAST) == 0, "never on another player's map")
+	check(not view.senses(0, WEST), "a room that is no secret one is never sensed")
+	check(not view.draws(EAST), "the party's map is as it was")
+
+
 func test_on_an_open_map_a_room_comes_in_through_the_shades_and_a_new_size_reopens() -> void:
 	var map: BiomeMap = _start(1)
 	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript

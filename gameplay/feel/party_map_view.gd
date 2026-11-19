@@ -85,6 +85,10 @@ var _sense: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 ## By seat and place (seat * places + place): a secret room sensed by that seat drawn (0 none, 1 the
 ## stone's shadow).
 var _sense_shade: PackedInt32Array = PackedInt32Array()
+## By seat and place: sensed now (1), worked out again only when the party's map, a seat's stat or
+## the biome changes (`_sensed_stale`).
+var _sensed: PackedByteArray = PackedByteArray()
+var _sensed_stale: bool = true
 ## By seat: held now, the opening's stage, its frame (screen pixels) and scale, and where the map's
 ## corner sits in its frame (screen pixels).
 var _held: PackedByteArray = PackedByteArray([0, 0, 0, 0])
@@ -141,6 +145,7 @@ func bind(events: Node) -> void:
 
 func _on_rooms_seen(seen: PackedByteArray, _again: bool) -> void:
 	_seen = seen
+	_sensed_stale = true
 	if not _any_open():
 		_settle()
 
@@ -149,6 +154,7 @@ func _on_run_stats_told(player: int, stats: Dictionary) -> void:
 	if player < 0 or player >= _sense.size():
 		return
 	_sense[player] = float(stats.get(&"secret_sense", 0.0))
+	_sensed_stale = true
 	if not _any_open():
 		_settle()
 
@@ -292,8 +298,13 @@ func advance() -> void:
 
 ## The sensed shade wanted at `at` (seat * places + place).
 func _sense_wanted(at: int) -> int:
-	var places: int = _rects.size()
-	return 1 if places > 0 and senses(at / places, at % places) else 0
+	if _sensed_stale:
+		_sensed_stale = false
+		var places: int = _rects.size()
+		_sensed.resize(places * ActorsScript.SEATS)
+		for each in _sensed.size():
+			_sensed[each] = 1 if senses(each / places, each % places) else 0
+	return _sensed[at] if at < _sensed.size() else 0
 
 
 func _stage_wanted(seat: int) -> int:
@@ -471,6 +482,7 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	_secret.resize(places)
 	_sense_shade.resize(places * ActorsScript.SEATS)
 	_sense_shade.fill(0)
+	_sensed_stale = true
 	_shade.resize(places)
 	_symbol_rows.resize(places)
 	_ends.resize(places * 2)

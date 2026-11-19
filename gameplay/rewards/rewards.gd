@@ -206,6 +206,7 @@ func step(delta: float) -> void:
 			_funded |= 1 << seat
 			_add_coins(seat, int(stat_of(seat, &"start_coins")))
 			_say_stats(seat)
+			_say_shelf_near(seat)
 	var at: int = 0
 	while at < _coin_numbers.size():
 		if _taker_of(_coin_at[at]) != ActorsScript.NONE:
@@ -469,6 +470,8 @@ func _on_run_stats_ruled(changes: Array[StatChange]) -> void:
 	_run_changes = changes.duplicate()
 	for seat in SEATS:
 		_say_stats(seat)
+		# A price in reach follows the player's `price_scale`.
+		_say_shelf_near(seat)
 
 
 # --- Inside -----------------------------------------------------------------------------
@@ -642,6 +645,10 @@ func _shown_price(at: int) -> int:
 func _clear_rooms() -> void:
 	for at in _item_numbers.size():
 		_say_item(at, false)
+	for seat in SEATS:
+		if _shelf_near[seat] >= 0:
+			_shelf_near[seat] = -1
+			_say_shelf_near(seat)
 	_item_numbers.clear()
 	_item_rooms.clear()
 	_item_at.clear()

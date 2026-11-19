@@ -122,7 +122,9 @@ func _on_shelf_near_changed(player: int, item: int, at: Vector2, view: Dictionar
 	_shelf[player] = item if not view.is_empty() else -1
 	_shelf_at[player] = at
 	_shelf_view[player] = view
-	_show(player)
+	if _ground[player] < 0:
+		# A ground item shown stays as it is (its refused shake too).
+		_show(player)
 
 
 ## Player `player`'s hint shows its ground item in reach, else its shop item, else nothing.

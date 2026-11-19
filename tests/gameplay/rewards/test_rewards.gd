@@ -468,6 +468,24 @@ func test_a_wizard_who_cannot_pay_buys_nothing_and_prices_follow_the_players_sca
 	check_equal(_rewards.price_for(0, item["number"]), maxi(roundi(float(item["price"]) * 0.5), 1), "a player's price is the price times their price_scale")
 
 
+func test_the_item_in_reach_follows_the_price_and_goes_with_the_world() -> void:
+	var one := _wizard(0, Vector2(-200, 0))
+	_fund(30)
+	_open_shop(4, PackedVector2Array([Vector2(0, 0)]))
+	var item: Dictionary = _rewards.shelf()[0]
+	var near: Array = []
+	_world.bus.shelf_near_changed.connect(func(seat: int, number: int, _at: Vector2, view: Dictionary) -> void:
+		if seat == 0:
+			near.append([number, view.get("price", -1)]))
+	one.position = item["at"]
+	_tick()
+	check_equal(near.back(), [item["number"], item["price"]], "in reach, with its price")
+	_world.bus.run_stats_ruled.emit([StatChange.make(&"price_scale", 2.0, StatChange.How.TIMES)] as Array[StatChange])
+	check_equal(near.back(), [item["number"], _rewards.price_for(0, item["number"])], "told again at the player's new price")
+	_world.bus.room_entered.emit(&"next", EventsScript.FIRST_ROOM)
+	check_equal(near.back(), [-1, -1], "a new world: nothing in reach at once")
+
+
 func test_a_shelf_sells_heals_only_to_the_hurt() -> void:
 	var one := _wizard(0, Vector2(-200, 0))
 	_fund(60)

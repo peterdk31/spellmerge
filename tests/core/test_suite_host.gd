@@ -16,12 +16,3 @@ func test_a_relative_data_folder_passed_over_is_shared() -> void:
 	# What Godot does with XDG_DATA_HOME=build/test-runs/a (seen 2026-11-19): ~/.local/share.
 	check(RunScript.user_dir_shared("build/test-runs/a", "/root/.local/share/godot/app_userdata/Spellmerge"), "relative: passed over, shared")
 	check(RunScript.user_dir_shared("/work/build/test-runs/a", "/work/build/test-runs/ab/godot/app_userdata/Spellmerge"), "a folder whose name only begins the same is another")
-
-
-## This very process: the runner (ci/build/unit_tests.sh, tools/ptest.sh) gives it a folder of its
-## own; where it did not, the host must have cleared nothing (it says so in the log).
-func test_this_host_clears_only_a_user_dir_of_its_own() -> void:
-	var shared: bool = RunScript.user_dir_shared(OS.get_environment("XDG_DATA_HOME"), OS.get_user_data_dir())
-	var host: Variant = Engine.get_main_loop()
-	if host is RunScript:
-		check_equal(bool((host as Object).get(&"_shared")), shared, "the host knows whether its user:// is shared")

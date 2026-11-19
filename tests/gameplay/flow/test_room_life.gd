@@ -130,7 +130,7 @@ func _beat(room: int) -> void:
 
 func test_the_start_room_is_entered_and_every_piece_built_and_placed() -> void:
 	var map: BiomeMap = _start(1, [IMP], [IMP])
-	check_equal(flow.mode, FlowScript.MODE_BIOME, "a biome's run")
+	check_equal(flow.mode, FlowScript.MODE_RUN, "a biome's run")
 	check_equal(built, [0, 1, 2, 3, 4] as Array[int], "every room and then every bridge is built, in order")
 	check_equal(entered, [0] as Array[int], "the start room is entered as the biome starts")
 	check_equal(cleared, [0] as Array[int], "and, with no fight, cleared")
@@ -138,7 +138,8 @@ func test_the_start_room_is_entered_and_every_piece_built_and_placed() -> void:
 	check(map.room_places[0] == flow.biome.map.room_places[0], "the start room is the map's room 0")
 	check_equal(_wizard(0).room, 0, "the wizard stands in the start room")
 	var camera: Camera2D = flow.world.find_children("*", "Camera2D", true, false)[0] as Camera2D
-	check_equal(camera.limit_right, ceili(projectiles.call(&"bounds").end.x), "the camera's limits are the biome's")
+	check_equal(camera.limit_right, ceili(flow.biome.area().end.x), "the camera's limits are the biome's pieces'")
+	check(flow.biome.area().end.x < (projectiles.call(&"bounds") as Rect2).end.x, "the shots' bounds reach past them")
 	check(float(projectiles.call(&"room_size")) < (projectiles.call(&"bounds") as Rect2).size.x, "a growing shot grows to a room's side, not the biome's")
 
 
@@ -360,3 +361,23 @@ func _pillar_in(room: int) -> Actor:
 		if actor != null and actor.room == room and actor.prop != null and String(actor.prop.id).contains("pillar"):
 			return actor
 	return null
+
+
+## Regression (connected biomes CB8, the four-bot run on the crypt's biome): a room's place reaches
+## over its lip past its mouth, and a wizard standing there, on the bridge outside the mouth, was in
+## the room: its fight started and sealed with the wizard outside it, who could then pass no mouth.
+## The bridge's place holds its rooms' lips past their mouths, so a room is entered only through its
+## mouth, and the wizard is sealed in, never out.
+func test_a_wizard_outside_a_mouth_is_on_the_bridge_and_enters_only_through_it() -> void:
+	var map: BiomeMap = _start(1, [IMP], [] as Array[StringName])
+	var socket: Vector2 = BiomeMaps.socket_point(registry, map, 1, RoomSocket.Facing.EAST)
+	var outside: Vector2 = socket + RoomSocket.way(RoomSocket.Facing.EAST) * 12.0
+	check(flow.biome.room_rect(1).has_point(outside), "the point is on the antechamber's lip, past its mouth")
+	_wizard(0).global_position = outside
+	_ticks(1)
+	check(_wizard(0).room >= map.rooms(), "there the wizard is on the bridge (%d)" % _wizard(0).room)
+	check(not flow.life.has(1, RoomLife.ENTERED), "and the antechamber is not entered")
+	_wizard(0).global_position = socket - RoomSocket.way(RoomSocket.Facing.EAST) * 24.0
+	_ticks(1)
+	check_equal(_wizard(0).room, 1, "past its mouth the wizard is in the antechamber")
+	check(flow.life.has(1, RoomLife.SEALED), "whose fight starts and seals")

@@ -64,17 +64,15 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `player_stats_changed` | `player` (the seat's own body, also while it is away) | `hud` |
 | `player_joined`, `player_left` | `coop` | `difficulty`, `flow`, `hud` |
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
-| `run_begun` | `flow` (a run of rooms begins, on its fresh state, with the seats joined at its start) | `run` (makes the run's map for them) |
-| `run_room_scaled` | `run` (how much harder the room the party enters is: its depth and the run's players; before `run_room_chosen`) | `difficulty` (the level) |
-| `run_room_paced` | `run` (how the enemies of the room the party enters come in: a group's cost, the cost standing that calls the next, the seconds between a group's bodies; enemy spawning EA4; after `run_room_scaled`, before `run_room_chosen`) | `flow` (`RoomSpawning`) |
-| `run_room_chosen` | `run` (the map's room the party enters, what stands in it and the kinds of the rooms it leads to) | `flow` (builds it) |
+| `run_begun` | `flow` (a run begins, on its fresh state, with the seats joined at its start) | `run` (makes the run's biome map for them) |
+| `run_room_filled` | `run` (each room's fight of the run's biome map: its enemies, its scale, its pace; connected biomes CB8; before `run_biome_chosen`) | `flow` (the room's `RoomFight`) |
+| `run_biome_chosen` | `run` (the run's biome map, a copy; connected biomes CB8) | `flow` (lays it and plays it) |
+| `run_room_scaled` | `flow` (how much harder the room a fight stands in is: its depth and the run's players, `run_room_filled`'s scale; before each of its enemies stands) | `difficulty` (the level) |
 | `enemy_standing` | `flow` (an enemy or boss body about to stand, not yet in the tree) | `difficulty` (scales it to the room: `Actor.stat_scale`) |
 | `adds_requested` | `actor` (a body's `Phases`: its phase's burst or a wave of adds; boss plan OB13) | `flow` (stands them, for a body it stood) |
 | `crumble_requested` | `flow` (an add whose caller died; boss plan OB13) | `combat` (it dies with no hit, nobody's kill) |
-| `run_way_taken` | `flow` (every standing wizard in a lit exit) | `run` (moves on through the map) |
-| `room_exits_shown` | `flow` (the lit exits of a cleared room, and the kind behind each) | `feel` (the kind's name over each) |
 | `gather_door_shown` | `flow` (a biome's gather door, gate or portal home: who is gathered at it, held, open; connected biomes CB7) | `feel` (its bars, lamps and portal) |
-| `room_left` | `flow` (the party goes on to the next room of the run; a biome's world goes, `Events.ALL_ROOMS`) | `core/spells` (what was cast in the room ends quietly) |
+| `room_left` | `flow` (a world goes: a biome's, `Events.ALL_ROOMS`; the hub's, `FIRST_ROOM`) | `core/spells` (what was cast in the room ends quietly) |
 | `room_entered` | `flow` (by room number: a biome's each room the first time; `Events.FIRST_ROOM` is a new world, connected biomes CB3) | `ai`, `coop`, `difficulty`, `hud`, `rewards` (a new world clears the coins), `feel` (its walls' colours for motes; the party camera jumps to the new room) |
 | `room_built` | `flow` | `feel` (ground cover GC3: the cover's look, `cover_rooms.gd`, a `cover.gd` a piece) and `cover` (GC5): each piece's cover worked out from its layout at its place, mirrored with it, `CoverLayout.of_piece` (connected biomes CB3b) |
 | `floor_touched` | `core/spells` (a blast, a pulse's ring, a pool lying and on its ticks, a shot's end; ground cover GC5) | `cover` (the `element` triggers of the cells inside its circle, at its next step) |

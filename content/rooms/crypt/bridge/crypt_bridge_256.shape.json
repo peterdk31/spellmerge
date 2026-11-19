@@ -1,0 +1,25 @@
+{
+	"about": "The crypt's 256 px bridge (docs/milestones/connected-biomes.md, CB8): the crypt bridge (crypt_bridge.shape.json) at another length, so the generator lines rooms up at more spans and closes loops. A stand-in until the bridges' own art (CB12). tools/ground_shape.py draws crypt_bridge_256_ground.tscn and its art from this.",
+	"size": [
+		256,
+		128
+	],
+	"seed": 277,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 16,
+	"outlines": [
+		{
+			"centre": [
+				128,
+				64
+			],
+			"radii": [
+				4000,
+				32
+			],
+			"seed": 261
+		}
+	]
+}

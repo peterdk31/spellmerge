@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The ossuary court's data (content/rooms/crypt/arena_03, crypt rework CR5, docs/milestones/
 ## crypt-rework.md): a floating room drawn from its shape, its four pillars `crypt_pillar` props and its
-## exits gates; its landmark the four low walls built of bones (each a wall of the room's own `Walls`,
+## two sockets; its landmark the four low walls built of bones (each a wall of the room's own `Walls`,
 ## drawn by a sprite of its box's size), bones piled at their feet and candles low beside them; the
 ## court in the middle lit by a shaft; no pit; and its side ways beside `Pillar1` and `Pillar2` still
 ## the crypt's narrowest, the slab's edge pinned to the 32 px line there (rule 2).

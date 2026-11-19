@@ -19,18 +19,18 @@ func test_every_run_can_be_made_from_the_content() -> void:
 	check_equal(_registry.validate_runs(), PackedStringArray(), "every run, room kind and template is sound")
 
 
-func test_the_crypt_run_has_fights_in_every_row_it_keeps() -> void:
+func test_the_crypt_run_has_its_biome_s_rooms() -> void:
 	var crypt := _registry.get_resource(&"runs", &"crypt") as RunDefinition
 	check(crypt != null and crypt.biomes.size() == 1, "the crypt run, one biome")
 	if crypt == null or crypt.biomes.is_empty():
 		return
 	var rules: MapRules = crypt.biomes[0]
 	var content: RunContent = _registry.run_content()
-	check(not content.templates_for(rules.biome, &"fight").is_empty(), "the crypt has fight rooms")
-	for depth in range(rules.depth_min, rules.depth_max + 1):
-		var rows: Array[int] = rules.kept_rows(content, depth)
-		check(rows.size() >= depth - 1, "%d rows deep: every row but at most the boss's is kept (%s)" % [depth, rows])
-		check(rows.has(0), "%d rows deep: the first room is kept" % depth)
+	var shapes: Dictionary = _registry.run_shapes(crypt)
+	check(rules.biome_templates(content, shapes, &"fight", 2).size() >= rules.fights_on_way, "the crypt has a two-socket fight room for every fight on the way")
+	check_equal(rules.biome_templates(content, shapes, rules.start_kind, 1).size(), 1, "its start room")
+	check_equal(rules.biome_templates(content, shapes, &"boss", 1).size(), 1, "its boss's room, with a socket")
+	check(rules.biome_walkways(content, shapes).size() >= 2, "walkways of more than one length")
 
 
 func test_rooms_for_no_run_host_no_kind() -> void:

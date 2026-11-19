@@ -47,7 +47,7 @@ func test_the_map_rules_report_them_and_copy_them() -> void:
 	rules.biome = &"cellar"
 	rules.kinds = [KindRule.make(&"fight", 0, -1)] as Array[KindRule]
 	rules.spawning = _rules(0.35, 0.5)
-	var found: PackedStringArray = rules.problems(RunContent.new())
+	var found: PackedStringArray = rules.biome_problems(RunContent.new(), {})
 	var named: bool = false
 	for line: String in found:
 		named = named or line.begins_with("cellar: spawning: refill_share")

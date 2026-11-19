@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## A boss's intro as the game's (docs/milestones/boss-intro.md, rule 2, step BI2), on the real
-## autoloads: a test boss made here (the imp's body, with an intro), the boss of a run of copies of the
-## crypt arena pinned to a biome of its own (tests/support/pinned_run.gd). The game stops on the
-## room's tick with the boss's id open, by both ways into a room, only for a boss with an intro and the
+## autoloads: a test boss made here (the imp's body, with an intro), the boss of a copy of the crypt
+## arena pinned as a one-room biome (tests/support/pinned_run.gd). The game stops on the room's tick
+## with the boss's id open (a biome room entered through its gate: test_gather_doors.gd), only for a
+## boss with an intro and the
 ## run's rule on; any seat turns a page, a stale page is ignored, the last page lets the game go; it
 ## stacks with the pause menu and a waited-for pad; none for adds; it closes when the
 ## last seat leaves and when the run ends; a staff pressed during it casts nothing as the fight starts;
@@ -139,9 +140,9 @@ func _register() -> void:
 	registry.call("add", &"bosses", _make_boss(ADD_ID, &"test_intro_nowhere", true))
 
 
-## A run of `depth` boss rooms of `lair`'s, with `players` seats.
-func _play(players: int = 1, depth: int = 1, lair: StringName = LAIR) -> void:
-	flow.run_id_to_play = PinnedRun.pin(registry, PLAIN_ARENA if lair == PLAIN_LAIR else ARENA, lair, RoomKind.FILL_BOSS, 16, depth)
+## A run of one boss room of `lair`'s (a pinned one-room biome), with `players` seats.
+func _play(players: int = 1, lair: StringName = LAIR) -> void:
+	flow.run_id_to_play = PinnedRun.pin(registry, PLAIN_ARENA if lair == PLAIN_LAIR else ARENA, lair, RoomKind.FILL_BOSS)
 	for seat in players:
 		input.add_virtual_device(seat)
 	events.emit_signal("play_requested", 0)
@@ -191,31 +192,6 @@ func test_the_game_stops_on_the_rooms_tick_with_the_boss_open() -> void:
 	check(boss.position == at and boss.health.health == health, "the world stands still under it")
 
 
-func test_the_next_room_opens_its_own() -> void:
-	_play(1, 2)
-	check(_stopped(), "the first room's intro")
-	await _next(0, 0)
-	await _next(0, 1)
-	check(not _stopped(), "closed")
-	var first: Actor = _boss()
-	for enemy: Node in flow.get(&"_enemies").duplicate():
-		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
-	heard.clear()
-	# Into the lit exit (one of the arena's two leads on).
-	var entered: int = flow.get(&"_enemies").size()
-	for exit: Actor in ExitRules.exits_in(flow.contents):
-		if flow.get(&"_enemies").size() != entered:
-			break
-		flow.get_wizard(0).position = HubRules.area_at(exit.prop, exit.position).get_center()
-		flow.step(DT)
-	var boss: Actor = _boss()
-	check(boss != null and boss != first, "the next room's boss stands")
-	check(_stopped(), "the next room stops for its own intro")
-	check_equal(_of(&"opened").size(), 1, "opened once more")
-	if boss != null and not _of(&"opened").is_empty():
-		check_equal(_of(&"opened")[0][1], boss.id, "for the next room's boss, its id open")
-
-
 func test_none_with_the_rule_off_or_for_a_boss_with_no_intro() -> void:
 	SessionRules.machine().boss_intros = 0
 	_play()
@@ -223,7 +199,7 @@ func test_none_with_the_rule_off_or_for_a_boss_with_no_intro() -> void:
 	check(not _stopped() and heard.is_empty(), "the rule off: no intro")
 	flow.stop_run()
 	SessionRules.machine().boss_intros = 1
-	_play(1, 1, PLAIN_LAIR)
+	_play(1, PLAIN_LAIR)
 	check(_boss() != null, "the plain boss stands")
 	check(not _stopped() and heard.is_empty(), "a boss with no intro: none")
 
@@ -280,7 +256,7 @@ func test_it_stacks_with_the_pause_menu_and_a_waited_for_pad() -> void:
 
 
 func test_none_for_adds() -> void:
-	_play(1, 1, PLAIN_LAIR)
+	_play(1, PLAIN_LAIR)
 	var plain: Actor = _boss()
 	plain.phases.begin(0)
 	var added: bool = false

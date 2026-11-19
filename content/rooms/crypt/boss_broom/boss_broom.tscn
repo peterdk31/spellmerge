@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/void.svg" id="1_void"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/boss_broom/boss_broom_ground.tscn" id="2_ground"]
@@ -10,6 +10,8 @@
 [ext_resource type="Resource" path="res://content/props/dust_heap/dust_heap.tres" id="10_heap"]
 [ext_resource type="Script" path="res://core/base/cover_field.gd" id="gc_field"]
 [ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
+[ext_resource type="Script" path="res://core/base/room_socket.gd" id="cb_socket"]
+[ext_resource type="Script" path="res://tools/socket_preview.gd" id="cb_socket_preview"]
 
 [node name="BossBroom" type="Node2D"]
 
@@ -370,3 +372,11 @@ border_width = 2.0
 
 [node name="CoverPreview" type="Node2D" parent="."]
 script = ExtResource("gc_preview")
+
+[node name="SocketEast" type="Node2D" parent="."]
+position = Vector2(800, 288)
+script = ExtResource("cb_socket")
+facing = 1
+
+[node name="SocketPreview" type="Node2D" parent="."]
+script = ExtResource("cb_socket_preview")

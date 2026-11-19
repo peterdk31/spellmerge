@@ -146,10 +146,12 @@ func test_a_room_without_a_yard_stands_none() -> void:
 	check(flow.yard_props().is_empty(), "no yard there")
 	# The room's own props are its placements (a crypt room's pillars have no role since crypt rework
 	# CR3/CR4), so each one standing is one of its own, never a yard's extra.
-	var room: RoomBase = _registry.get_resource(&"rooms", flow.room_id) as RoomBase
+	# A biome's world stands every room's props (connected biomes CB8).
 	var own_ids: Array[StringName] = []
-	for prop: Resource in room.places().placed_of(PropBase):
-		own_ids.append((prop as PropBase).id)
-	check_equal(flow.room_props().size(), own_ids.size(), "%s stands its own props and no more" % flow.room_id)
+	for room_id: StringName in flow.biome.map.room_templates:
+		var room: RoomBase = _registry.get_resource(&"rooms", room_id) as RoomBase
+		for prop: Resource in room.places().placed_of(PropBase):
+			own_ids.append((prop as PropBase).id)
+	check_equal(flow.room_props().size(), own_ids.size(), "the biome's rooms stand their own props and no more")
 	for body: Node in flow.room_props():
 		check(own_ids.has((body as Actor).prop.id), "only the room's own props (%s), none of the yard's" % (body as Actor).prop.id)

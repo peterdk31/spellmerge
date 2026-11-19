@@ -40,8 +40,8 @@ extends CanvasLayer
 ## panels and the boss bar, under the menus and the pause shade; docs/milestones/boss-intro.md, rule
 ## 5) plays a boss's intro from `boss_intro_opened`, `boss_intro_paged` and `boss_intro_closed`, stepped
 ## every frame (the tree is paused for the whole intro). While it is open a seat's `accept` is its
-## (`BossIntro.press`: the next page's command for a seat of this machine), the builder, the inventory
-## and the lectern menu do not open, and the ones open as it opens close, so A is never two menus' at
+## (`BossIntro.press`: the next page's command for a seat of this machine), the builder and the
+## inventory do not open, and the ones open as it opens close, so A is never two menus' at
 ## once; the pause menu still opens, and while it is open its A is the menu's. A boss with an intro
 ## (`boss_shown`'s `has_intro`) keeps the bar and the banner back until its intro is over (a
 ## `BossIntroWait`, `core/base/`): the bar then fades in; the banner shows only when no intro played.
@@ -87,16 +87,11 @@ extends CanvasLayer
 ##   in the hub, how many wizards stand on the teleporter stone, or that A starts the run, at the
 ##   top middle under the online line (`start_stone_changed`). While the stone is lit, a player's
 ##   `accept` (A, Enter) with no menu open sends the command `run_requested` (`poll`).
-## - The lectern menus (`hud/menus/lectern/`, nodes Root/Lectern1 to Root/Lectern4, made here; run
-##   generation RG7): `accept` (A, Enter) with no menu open, no lit stone and no item in reach, while
-##   the seat's wizard stands at the hub's lectern (`lectern_changed`), opens that seat's menu of the
-##   stone's run's depths, whose pick is the command `start_depth_picked`; the altar comes first. It
-##   closes on `back`, on `pause` and by itself (its seat left the lectern, the hub was left).
 ## - The reward menus (`hud/menus/reward/`, nodes Root/Reward1 to Root/Reward4, made here;
 ##   connected biomes CB10): a seat's oldest offer not yet picked, "pick 1 of 2". It opens by itself
 ##   as an offer is rolled for a seat whose wizard was in the cleared room, once that seat may open a
 ##   menu (`RewardMenu.wants_open`), and on the seat's `accept` with no menu open and nothing else for
-##   A (no lit stone, no item in reach, no altar, no lectern) while one waits. Its pick is the command
+##   A (no lit stone, no item in reach, no altar) while one waits. Its pick is the command
 ##   `reward_pick_requested`; `back`, `pause` and a boss's intro close it, the offer left unspent.
 ##   Each corner panel says the seat's coins and its unspent rewards (`wallet_changed`,
 ##   `rewards_waiting_changed`; `PlayerPanel.set_purse`).
@@ -127,7 +122,6 @@ const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 const StoneLineScript := preload("res://hud/widgets/stone_line.gd")
 const PadLineScript := preload("res://hud/widgets/pad_line.gd")
 const ItemHintsScript := preload("res://hud/panels/item_hints.gd")
-const LecternMenuScript := preload("res://hud/menus/lectern/lectern_menu.gd")
 const RewardMenuScript := preload("res://hud/menus/reward/reward_menu.gd")
 const BossBarScript := preload("res://hud/panels/boss/boss_bar.gd")
 const BossBannerScript := preload("res://hud/panels/boss/boss_banner.gd")
@@ -170,7 +164,6 @@ var main_menu: PackedScene = null
 var _panels: Array[PlayerPanelScript] = []
 var _radials: Array[RadialScript] = []
 var _inventories: Array[InventoryScript] = []
-var _lecterns: Array[LecternMenuScript] = []
 var _rewards: Array[RewardMenuScript] = []
 ## By seat: the coins in its wallet and its offers waiting (`wallet_changed`,
 ## `rewards_waiting_changed`), for its corner panel.
@@ -188,8 +181,6 @@ var _seen_take: Array[int] = [0, 0, 0, 0]
 var _stone_lit: bool = false
 ## The seats whose wizards stand on the hub's multiplayer altar (`altar_changed`), a bit each.
 var _altar_seats: int = 0
-## The seats whose wizards stand at the hub's lectern (`lectern_changed`), a bit each.
-var _lectern_seats: int = 0
 ## Whether this machine plays with others now (`online_changed`): only then is a seat marked.
 var _online: bool = false
 var _had_menu: Array[bool] = [false, false, false, false]
@@ -254,12 +245,6 @@ func _ready() -> void:
 		root_control.move_child(inventory, _panels[0].get_index())
 		_inventories.append(inventory)
 	for player in PLAYER_COUNT:
-		var lectern := LecternMenuScript.new()
-		lectern.name = "Lectern%d" % (player + 1)
-		lectern.index = player
-		root_control.add_child(lectern)
-		_lecterns.append(lectern)
-	for player in PLAYER_COUNT:
 		var reward := RewardMenuScript.new()
 		reward.name = "Reward%d" % (player + 1)
 		reward.index = player
@@ -296,8 +281,6 @@ func _ready() -> void:
 		radial.bind(events, ui_focus, spells, input)
 	for inventory in _inventories:
 		inventory.bind(events, ui_focus, spells, input)
-	for lectern in _lecterns:
-		lectern.bind(events, ui_focus)
 	for reward in _rewards:
 		reward.bind(events, ui_focus)
 	_pause_menu.builder_options_changed.connect(_on_builder_options_changed)
@@ -371,7 +354,6 @@ func _ready() -> void:
 		events.room_entered.connect(_on_room_entered)
 		events.start_stone_changed.connect(_on_start_stone_changed)
 		events.altar_changed.connect(func(seats: int) -> void: _altar_seats = seats)
-		events.lectern_changed.connect(func(seats: int) -> void: _lectern_seats = seats)
 		events.online_changed.connect(_on_online_changed)
 		events.staff_changed.connect(_on_staff_changed)
 		events.inventory_announced.connect(_on_inventory_announced)
@@ -428,8 +410,7 @@ func get_ui_sounds() -> UiSounds:
 ## Read every joined player's `pause`, `back` and `accept` presses since the last poll (several
 ## presses in one frame count once) and open or close menus as the top of this file says; `accept`
 ## with no menu open while the hub's stone is lit sends `run_requested`, else with an item in reach
-## `item_take_requested`, else on the altar `online_open_requested`, else at the lectern opens the
-## seat's lectern menu. Presses outside a room are
+## `item_take_requested`, else on the altar `online_open_requested`. Presses outside a room are
 ## dropped. Called every frame by _process; tests call it directly. One player's press never
 ## touches another player's menus.
 func poll() -> void:
@@ -465,8 +446,6 @@ func poll() -> void:
 					events.item_take_requested.emit(player, _item_hints.item_of(player))
 				elif start_now and _altar_seats & (1 << player) != 0:
 					events.online_open_requested.emit(player)
-				elif start_now and _lectern_seats & (1 << player) != 0 and _in_room and not _panels[player].is_downed():
-					_open_lectern(player)
 				elif start_now and _rewards[player].waiting() > 0 and _in_room and not _panels[player].is_downed():
 					_open_reward(player)
 			if paused_now:
@@ -504,30 +483,15 @@ func _may_open_menu(player: int, had_menu: bool) -> bool:
 	return not had_menu and not _has_menu(player) and _in_room and not _pause_menu.is_open() and not _panels[player].is_downed() and not _boss_intro.is_open()
 
 
-## Whether `player` has a menu open: their builder, their inventory, their lectern menu, or the pause
-## menu they work.
+## Whether `player` has a menu open: their builder, their inventory, or the pause menu they work.
 func _has_menu(player: int) -> bool:
-	return _radials[player].is_open() or _inventories[player].is_open() or _lecterns[player].is_open() or _rewards[player].is_open() or _pause_menu.owner_player == player
+	return _radials[player].is_open() or _inventories[player].is_open() or _rewards[player].is_open() or _pause_menu.owner_player == player
 
 
-## Open seat `player`'s lectern menu: placed in the middle of their quarter of the view, so four
-## open at once never cover each other.
-func _open_lectern(player: int) -> void:
-	var lectern: LecternMenuScript = _lecterns[player]
-	if not lectern.open_menu():
-		return
-	lectern.reset_size()
-	var view: Vector2 = (get_node("Root") as Control).size
-	var quarter: Vector2 = Vector2(0.25 + 0.5 * (player % 2), 0.75 if player >= 2 else 0.25) * view
-	lectern.position = (quarter - lectern.size * 0.5).round()
 
 
-## The lectern menu of seat `player` (for tests and screenshots).
-func get_lectern(player: int) -> LecternMenuScript:
-	return _lecterns[player]
-
-
-## Open seat `player`'s reward menu, in the middle of their quarter of the view, as the lectern's.
+## Open seat `player`'s reward menu, in the middle of their quarter of the view, so four open at once
+## never cover each other.
 func _open_reward(player: int) -> void:
 	var reward: RewardMenuScript = _rewards[player]
 	if not reward.open_menu():
@@ -561,8 +525,6 @@ func _on_pause_pressed(player: int) -> void:
 		_radials[player].close_builder()
 	elif _inventories[player].is_open():
 		_inventories[player].close_inventory()
-	elif _lecterns[player].is_open():
-		_lecterns[player].close_menu()
 	elif _rewards[player].is_open():
 		_rewards[player].close_menu()
 	elif _pause_menu.is_open():
@@ -662,13 +624,12 @@ func get_boss_intro() -> BossIntroScript:
 	return _boss_intro
 
 
-## A boss's intro opened: every builder, inventory and lectern menu closes, so A is only the
+## A boss's intro opened: every builder and inventory closes, so A is only the
 ## intro's (the pause menu stays as it is).
 func _on_boss_intro_opened(_actor: int, _boss_name: String, _lore: String, _intro: BossIntro, _page: int, _fresh: bool) -> void:
 	for player in PLAYER_COUNT:
 		_radials[player].close_builder()
 		_inventories[player].close_inventory()
-		_lecterns[player].close_menu()
 		_rewards[player].close_menu()
 
 

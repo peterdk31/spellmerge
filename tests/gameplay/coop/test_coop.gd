@@ -748,12 +748,15 @@ func test_with_no_seat_played_here_feels_camera_holds_whoever_is_left() -> void:
 
 
 ## The room restart builds a new world and camera; the party camera follows the new one.
+## Everyone down: the party goes back to the hub (connected biomes CB7, decision 14), a new world.
 func test_the_party_camera_follows_the_new_worlds_camera_after_a_restart() -> void:
 	_start_with(0)
 	var old_camera: Camera2D = party.camera
 	_down(0)
 	flow.step(FlowScript.RESTART_DELAY)
-	check_equal(flow.state, FlowScript.State.RUNNING, "the room restarted")
+	root.get_node("Frames").call("begin_step", 1.0 / 60.0)
+	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
+	check_equal(flow.state, FlowScript.State.RUNNING, "the hub runs")
 	_fit_and_snap()
 	check(party.camera != null and party.camera != old_camera and party.camera.is_inside_tree(), "the party camera picked up the new world's camera")
 	check(_everyone_in_view(), "the player is in view after the restart")

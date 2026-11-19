@@ -7,7 +7,7 @@ extends RefCounted
 ## and the two room sockets its own sockets 0 and 1 meet; and each room's depth, the fewest bridges
 ## from room 0 (the start room); and, once filled (the generator, `BiomeGenerator`, CB5), each room's
 ## scale and its enemies. Made once (by hand in the tests, by the seeded generator) and
-## then **kept as small hashed state**, as `RunMap` is: a joining machine and a restored snapshot
+## then **kept as small hashed state** (the run area's and Flow's): a joining machine and a restored snapshot
 ## never make their own. Only the nodes and the grid's layers are laid again from it
 ## (`BiomeWorld`, `rebuild_derived`).
 ##

@@ -192,7 +192,7 @@ func test_the_stone_prop_follows_the_stone() -> void:
 		ids.append(prop.prop.id)
 		if prop.prop.id == &"hub_stone":
 			stone_prop = prop
-	check_equal(ids, [&"hub_stone", &"hub_altar", &"start_lectern"] as Array[StringName], "the stone and the altar stand, and the lectern in its zone after them")
+	check_equal(ids, [&"hub_stone", &"hub_altar"] as Array[StringName], "the stone and the altar stand")
 	check(stone_prop != null and HubRules.area_of(_room().places(), HubRules.ROLE_RUN_START).has_point(stone_prop.position), "the stone prop on the stone")
 	if stone_prop == null:
 		events.disconnect("cue_shown", hear)
@@ -259,10 +259,10 @@ func test_a_by_any_seat_on_the_lit_stone_starts_the_run() -> void:
 		var hub_world: Node = flow.world
 		_press_a(presser)
 		check_equal(flow.mode, FlowScript.MODE_RUN, "seat %d: A starts the run" % presser)
-		var first: RunNode = (root.get_node("Run").call("room_now") as RunNode)
-		check(first != null and flow.room_id == first.room, "seat %d: in the first room of the run's map" % presser)
+		var map: BiomeMap = root.get_node("Run").get(&"map") as BiomeMap
+		check(map != null and flow.room_id == map.room_templates[0], "seat %d: in the start room of the run's biome" % presser)
 		check(flow.world != hub_world, "seat %d: a new world" % presser)
-		check(flow.enemies_left() > 0, "seat %d: the room's enemies stand" % presser)
+		check(flow.life.rooms() > 1 and flow.enemies_left() == 0, "seat %d: a biome of rooms, no fight in the start room" % presser)
 		check_equal(_wizards().size(), 4, "seat %d: everyone plays" % presser)
 		check_equal(_last(), Vector3i(0, 0, 0), "seat %d: the stone's line goes" % presser)
 		for wizard in _wizards():
@@ -381,9 +381,9 @@ func test_a_run_from_the_hub_still_downs_for_good() -> void:
 func test_a_run_that_cannot_be_made_leaves_the_hub_as_it_was() -> void:
 	var rules := MapRules.new()
 	rules.biome = &"test_hub_nowhere"
-	rules.depth_min = 1
-	rules.depth_max = 1
-	rules.kinds = [KindRule.make(&"fight", 0, -1)] as Array[KindRule]
+	rules.rooms_min = 0
+	rules.rooms_max = 0
+	rules.start_kind = &"fight"
 	var nowhere := RunDefinition.new()
 	nowhere.id = &"test_hub_nowhere"
 	nowhere.biomes = [rules] as Array[MapRules]
@@ -398,7 +398,7 @@ func test_a_run_that_cannot_be_made_leaves_the_hub_as_it_was() -> void:
 	check(flow.world == hub_world and flow.state == FlowScript.State.RUNNING, "the same hub, going on")
 
 
-## A map its rolls cornered (only `KindRule.not_after` can, after the hub went: the map is made
+## A map its rolls cornered (the templates' shapes leaving a room no place, after the hub went: the map is made
 ## from the run's seed, at its start; here the run's area does not answer at all) sends the party
 ## back to the hub, each wizard with everything it took to the stone, and the stone works again.
 func test_a_run_with_no_map_from_the_stone_goes_back_to_the_hub_as_it_went() -> void:
@@ -456,10 +456,13 @@ func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
 		check_equal(wizard.health.health, wizard.health.max_health, "at full health")
 
 
-## A run from the stone won (its last room cleared: a run of one room, pinned) brings the party
-## back to the hub RUN_WON_DELAY later, as a lost one does.
+## A run from the stone won (its pinned room, of a kind that opens the portal home, cleared and every
+## standing wizard in the portal: connected biomes CB7) brings the party back to the hub, as a lost
+## one does.
 func test_a_won_run_from_the_stone_goes_back_to_the_hub() -> void:
-	flow.run_id_to_play = PinnedRun.pin(root.get_node("Registry"), ARENA)
+	var registry: Node = root.get_node("Registry")
+	flow.run_id_to_play = PinnedRun.pin(registry, ARENA)
+	(registry.call("get_resource", &"room_kinds", flow.run_id_to_play) as RoomKind).portal_home = true
 	_start([0, 1])
 	_place(0, true)
 	_place(1, true)
@@ -468,11 +471,16 @@ func test_a_won_run_from_the_stone_goes_back_to_the_hub() -> void:
 	check_equal(flow.mode, FlowScript.MODE_RUN, "the run started")
 	for enemy: Node in flow.get("_enemies").duplicate():
 		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
-	check_equal(flow.state, FlowScript.State.CLEARED, "won")
-	flow.step(FlowScript.RUN_WON_DELAY + 0.1)
+	_tick()
+	check(flow.life.has(0, RoomLife.CLEARED), "cleared")
+	check(flow.gates.portal_room == 0, "the portal home opens")
+	for seat in 2:
+		flow.get_wizard(seat).global_position = flow.gates.portal_area.get_center()
+	_tick()
 	from_frames()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
 	check_equal(_wizards().size(), 2, "everyone with it")
+	(registry.call("get_resource", &"room_kinds", PinnedRun.room_id(ARENA)) as RoomKind).portal_home = false
 
 
 ## Owner, 2026-11-10: the hub is the arsenal a run's tools are picked from. What a seat built in
@@ -548,15 +556,16 @@ func _check_two_hands(seat: int, where: String) -> void:
 			check_equal(wizard.caster.staff_of(at).id, FlowScript.STARTER_HEADS[at], "seat %d's hand %d holds Play's staff %s" % [seat, at, where])
 
 
-func test_a_run_of_play_requested_still_restarts() -> void:
+## Every run ends back in the hub (connected biomes CB7, decision 14), one started without it too.
+func test_a_run_of_play_requested_ends_in_the_hub_too() -> void:
 	input.add_virtual_device(0)
 	events.emit_signal("play_requested", 0)
-	var first: Node = flow.world
+	check_equal(flow.mode, FlowScript.MODE_RUN, "a run")
 	for wizard in _wizards():
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
-	check_equal(flow.mode, FlowScript.MODE_RUN, "a run started without the hub restarts")
-	check(flow.world != first, "a fresh world")
+	from_frames()
+	check_equal(flow.mode, FlowScript.MODE_HUB, "everyone down: back in the hub")
 
 
 func test_the_hub_and_its_command_are_ignored_elsewhere() -> void:

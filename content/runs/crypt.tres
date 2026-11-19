@@ -20,9 +20,7 @@ script = ExtResource("3_kind")
 kind = &"boss"
 first_row = -1
 last_row = -1
-max_per_row = 1
 max_per_run = 1
-required = false
 least = 1
 dead_end = true
 
@@ -62,20 +60,14 @@ hub_pull = 6.0
 [sub_resource type="Resource" id="crypt"]
 script = ExtResource("2_rules")
 biome = &"crypt"
-depth_min = 4
-depth_max = 6
-width_min = 1
-width_max = 3
-branches_min = 1
-branches_max = 2
 room_budget = 16
 spawning = SubResource("spawning")
 kinds = Array[ExtResource("3_kind")]([SubResource("fights"), SubResource("boss")])
-rooms_min = 8
-rooms_max = 12
+rooms_min = 5
+rooms_max = 5
 start_kind = &"start"
 fights_on_way = 4
-scale_depth = 8
+scale_depth = 5
 styles = Array[ExtResource("7_style")]([SubResource("style_long"), SubResource("style_branching"), SubResource("style_loop"), SubResource("style_hub")])
 
 [sub_resource type="Resource" id="per_depth"]

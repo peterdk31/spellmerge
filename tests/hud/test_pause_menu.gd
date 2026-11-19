@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## Tests for the pause menu (hud/menus/pause) and the buttons that open menus (owner,
 ## 2026-10-26), one behaviour per test: `pause` (Start) opens it for the player who pressed it and
 ## stops the game for everyone; only that player works it; Resume, `back` on the main page and
-## `pause` again close it and the game goes on; the Map page shows the run's map; Settings is one
+## `pause` again close it and the game goes on; Settings is one
 ## page of tabs (owner, 2026-11-18): Graphics (Fullscreen, Dynamic lighting, Shadows, Fog, Ambient
 ## particles, Environment interaction, Floor marks), Performance (Effect slots, Particles, Particle
 ## amount, Tailless motes, Max shots), Audio (Music, Sound, Ambience and UI volume) and Interface (Screen shake, Damage
@@ -471,121 +471,6 @@ func test_the_radial_gets_each_ring_style() -> void:
 func test_the_ring_styles_come_round_to_every_card() -> void:
 	_ring_styles()
 	check_equal(_hud.get_radial(0).layout, RadialScript.Layout.ALL, "every card again")
-
-
-# --- The Map page (run generation RG8) ---------------------------------------------------------
-# In a run of rooms (a map told, `run_map_changed`) the main page has Map, whose page shows the
-# run's map, its kinds named by the registry, and Back; the map gone, the row goes and a Map page
-# shown goes back to the main page.
-
-
-const MAP_PAGE: Array[String] = ["Resume", "Map", "Settings", "LeaveGame", "MainMenu"]
-
-
-## Tell the HUD a map of two rooms (a fight, then the boss), the party at `at`.
-func _tell_map(at: int = 0) -> void:
-	var links: Array[PackedInt32Array] = [PackedInt32Array([1]), PackedInt32Array()]
-	_bus.run_map_changed.emit(PackedInt32Array([0, 1]), [&"fight", &"boss"] as Array[StringName], links, at)
-
-
-func _tell_no_map() -> void:
-	_bus.run_map_changed.emit(PackedInt32Array(), [] as Array[StringName], [] as Array[PackedInt32Array], -1)
-
-
-## One seat in a run of rooms with the menu open; on the Map page when `on_map`.
-func _map_menu(on_map: bool = true) -> void:
-	_setup(1)
-	_tell_map()
-	_open()
-	if on_map:
-		_press(0, "Map")
-
-
-func test_in_a_run_of_rooms_the_main_page_has_map() -> void:
-	_map_menu(false)
-	check_equal(_names(), MAP_PAGE, "in a run of rooms the main page has Map")
-
-
-func test_the_map_shows_on_its_page_only() -> void:
-	_map_menu(false)
-	check(not _menu().map_view().visible, "the map shows on its page only")
-
-
-func test_the_map_page_holds_the_map_and_back() -> void:
-	_map_menu()
-	check(_menu().page == PauseMenuScript.Page.MAP and _names() == ["MapBack"], "the Map page: the map and Back, got %s" % [_names()])
-	check(_menu().map_view().visible and _menu().map_view().call("has_map"), "the map shows")
-
-
-func test_the_map_names_its_kinds_by_the_registry() -> void:
-	_map_menu()
-	check_equal(String(_menu().map_view().call("kinds_line")), "F Fight  B Boss", "the kinds by the registry's names")
-
-
-func test_back_is_focused_on_the_map_page() -> void:
-	_map_menu()
-	check(_focused("MapBack"), "Back is focused")
-
-
-func test_back_goes_from_the_map_to_the_main_page() -> void:
-	_map_menu()
-	_press(0, "MapBack")
-	check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "Back goes to the main page")
-
-
-func test_b_goes_from_the_map_to_the_main_page() -> void:
-	_map_menu()
-	_do(0, &"back")
-	check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
-
-
-func test_a_new_map_keeps_the_map_page_with_back_focused() -> void:
-	# A room entered while the page shows (the pause not yet in effect online): it stays, on Back.
-	_map_menu()
-	_tell_map(1)
-	check(_menu().page == PauseMenuScript.Page.MAP and _focused("MapBack"), "a new map keeps the page, Back focused")
-
-
-func test_a_new_map_shows_where_the_party_is_now() -> void:
-	_map_menu()
-	_tell_map(1)
-	check_equal(int(_menu().map_view().get("at")), 1, "the map shows where the party is now")
-
-
-func test_the_map_gone_its_page_goes_back_to_the_main_page_without_map() -> void:
-	_map_menu()
-	_tell_no_map()
-	check(_menu().page == PauseMenuScript.Page.MAIN and _names() == MAIN_PAGE, "the map gone: back to the main page, with no Map, got %s" % [_names()])
-
-
-func test_the_map_gone_from_its_page_the_first_row_is_focused() -> void:
-	_map_menu()
-	_tell_no_map()
-	check(_focused("Resume"), "the main page's first row is focused")
-
-
-func test_a_map_arriving_on_the_main_page_adds_its_row() -> void:
-	_setup(1)
-	_open()
-	_tell_map()
-	check_equal(_names(), MAP_PAGE, "the Map row comes")
-
-
-func test_a_map_arriving_keeps_the_focus_where_it_was() -> void:
-	_setup(1)
-	_open()
-	_focus.focus(0, _menu().button("Settings"))
-	_frame()
-	_tell_map()
-	check(_focused("Settings"), "the focus stays on Settings")
-
-
-func test_the_map_row_focused_when_the_map_goes_focuses_resume() -> void:
-	_map_menu(false)
-	_focus.focus(0, _menu().button("Map"))
-	_frame()
-	_tell_no_map()
-	check(_menu().is_open() and _focused("Resume"), "the Map row gone: Resume is focused")
 
 
 # --- The Settings page: its tabs -----------------------------------------------------------------

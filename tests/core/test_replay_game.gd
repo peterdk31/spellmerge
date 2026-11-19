@@ -45,8 +45,8 @@ func test_a_run_started_from_the_hub_replays_tick_for_tick() -> void:
 	await _check_replay(&"hub_requested", 0, 1)
 	var flow: Node = root.get_node("Flow")
 	check_equal(flow.get(&"mode"), &"run", "the replay started the run from the stone")
-	var first: RunNode = root.get_node("Run").call("room_now") as RunNode
-	check(first != null and flow.get(&"room_id") == first.room, "in the first room of the run's map")
+	var map: BiomeMap = root.get_node("Run").get(&"map") as BiomeMap
+	check(map != null and flow.get(&"room_id") == map.room_templates[0], "in the start room of the run's biome")
 
 
 ## A run starts from a fresh game's state (online-ready N3b): a replay recorded in a fresh game

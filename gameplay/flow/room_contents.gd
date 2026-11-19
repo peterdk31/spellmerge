@@ -6,7 +6,7 @@ extends RefCounted
 ## of placed thing is a branch here and nothing in Flow. It keeps them standing (a slot a
 ## placement, null once its body went, forgotten in the tick it goes) and answers by kind and role.
 ##
-## A room's zone named for a prop role (run generation RG7: the hub's `start_lectern`) is a place for
+## A room's zone named for a prop role is a place for
 ## the registry's prop of that role (`stand`): the first by id stands with its feet at the zone's
 ## middle, after the placements. So such a prop is found by folder, never named by the
 ## room's scene: deleting its folder leaves the zone empty and the room whole.
@@ -76,11 +76,25 @@ func stand(world: Node2D, places: RoomPlaces, registry: RegistryScript) -> void:
 
 
 ## As `stand`, keeping what stands already (a biome's every room, one after another: connected
-## biomes CB3).
-func stand_more(world: Node2D, places: RoomPlaces, registry: RegistryScript) -> void:
+## biomes CB3). With `enemies` false the placed enemies are left for later (a biome's later room:
+## they stand as the room is entered, `stand_enemies`; connected biomes CB8), each its slot empty.
+func stand_more(world: Node2D, places: RoomPlaces, registry: RegistryScript, enemies: bool = true) -> void:
 	for i in places.placed.size():
-		bodies.append(_stand(world, places, i))
+		bodies.append(_stand(world, places, i) if enemies or not places.placed[i] is EnemyBase else null)
 	stand_in_role_zones(world, places, registry)
+
+
+## Stand the placed enemies of `places` in `world` now (a biome's room entered, its other placements
+## stood with the world: `stand_more`), each in a slot of its own; the bodies stood.
+func stand_enemies(world: Node2D, places: RoomPlaces) -> Array[Node]:
+	var stood: Array[Node] = []
+	for i in places.placed.size():
+		if places.placed[i] is EnemyBase:
+			var body: Node = _stand(world, places, i)
+			bodies.append(body)
+			if body != null:
+				stood.append(body)
+	return stood
 
 
 ## For each zone of `places` named for the role of a prop of `registry` (`PropBase.role`), stand

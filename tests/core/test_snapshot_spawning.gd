@@ -48,11 +48,17 @@ func after_each() -> void:
 
 func _caught() -> void:
 	var flow: Node = root.get_node("Flow")
-	_left = int((flow.get(&"spawn_queue") as RoomSpawning).left())
+	_left = _queue_left()
 	_spawning = 0
 	for enemy: Node in flow.get(&"_enemies") as Array[Node]:
 		if is_instance_valid(enemy) and (enemy as Actor).is_spawning():
 			_spawning += 1
+
+
+## The pinned room's fight's enemies still to come (its queue; the pinned room is the start room).
+func _queue_left() -> int:
+	var life: RoomLife = root.get_node("Flow").get(&"life") as RoomLife
+	return life.fights[0].queue.left() if life != null and life.rooms() > 0 else -1
 
 
 func test_a_snapshot_mid_spawn_with_groups_to_come_plays_on_the_same() -> void:
@@ -75,7 +81,7 @@ func _check_resumed(at: int) -> void:
 	var recorded := Desync.new()
 	_run.snapshot_at = at
 	var replay: Replay = await _run.record(&"play_requested", 0, 1, recorded)
-	_left_after = int((root.get_node("Flow").get(&"spawn_queue") as RoomSpawning).left())
+	_left_after = _queue_left()
 	check(replay != null and _run.snapshot != null, "recorded with its snapshot")
 	if replay == null or _run.snapshot == null:
 		return
@@ -84,7 +90,7 @@ func _check_resumed(at: int) -> void:
 	recorded.hashes = recorded.hashes.slice(at + 1)
 	var resumed := Desync.new()
 	await _run.resume(replay, _run.snapshot, at, 0, resumed)
-	_left_restored = int((root.get_node("Flow").get(&"spawn_queue") as RoomSpawning).left())
+	_left_restored = _queue_left()
 	for problem in _run.problems:
 		check(false, problem)
 	_run.problems.clear()

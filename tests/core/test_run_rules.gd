@@ -1,8 +1,10 @@
 extends "res://tests/support/suite.gd"
-## A run's rules as data (run generation RG1, docs/milestones/run-generation.md, "The model"):
-## `RunDefinition`, `MapRules`, `KindRule` and `RoomKind`, and `RunContent`'s questions, on made-up
-## content. Every problem the validator names is named, and a sound definition has none.
+## A run's rules as data (run generation RG1, docs/milestones/run-generation.md, "The model";
+## connected biomes CB8: the biome map's rules alone, the row map's gone): `RunDefinition`,
+## `MapRules`, `KindRule` and `RoomKind`, and `RunContent`'s questions, on made-up content. The
+## biome map's own rules are named by tests/gameplay/run/test_biome_generator.gd; here the run's.
 const MadeUpRoom := preload("res://tests/support/made_up_room.gd")
+const MadeUpBiome := preload("res://tests/support/made_up_biome.gd")
 
 const BIOME: StringName = &"cellar"
 
@@ -42,19 +44,6 @@ func _content(with_boss: bool = true) -> RunContent:
 	return RunContent.gather(kinds, rooms, enemies)
 
 
-## Fights then a boss, 3 to 5 rows deep.
-func _rules() -> MapRules:
-	var rules := MapRules.new()
-	rules.biome = BIOME
-	rules.depth_min = 3
-	rules.depth_max = 5
-	var boss := KindRule.make(&"boss", -1, -1)
-	boss.max_per_row = 1
-	boss.max_per_run = 1
-	rules.kinds = [KindRule.make(&"fight", 0, -2), boss] as Array[KindRule]
-	return rules
-
-
 func _run(rules: MapRules) -> RunDefinition:
 	var run := RunDefinition.new()
 	run.id = &"cellar_run"
@@ -69,16 +58,57 @@ func _names(problems: PackedStringArray, part: String) -> bool:
 	return false
 
 
+## The made-up cellar's run and the problems of it (`RunDefinition.biome_problems`).
+func _problems(run: RunDefinition) -> PackedStringArray:
+	var biome := MadeUpBiome.new()
+	return run.biome_problems(biome.content, biome.shapes)
+
+
 func test_a_sound_definition_has_no_problems() -> void:
-	check_equal(_run(_rules()).problems(_content()), PackedStringArray(), "fights then a boss, with content for both")
+	check_equal(_problems(MadeUpBiome.run()), PackedStringArray(), "the made-up cellar, every kind with its content")
 
 
-func test_negative_rows_count_from_the_end() -> void:
+func test_negative_rows_count_from_the_deepest() -> void:
 	var boss := KindRule.make(&"boss", -1, -1)
-	check(boss.takes_row(4, 5) and not boss.takes_row(3, 5), "-1 is the last row of five")
-	check(boss.takes_row(2, 3) and not boss.takes_row(1, 3), "-1 is the last row of three")
+	check(boss.takes_row(4, 5) and not boss.takes_row(3, 5), "-1 is the deepest of five depths")
+	check(boss.stands_deepest(), "and the line that takes only it stands deepest")
 	var fight := KindRule.make(&"fight", 0, -2)
-	check(fight.takes_row(0, 5) and fight.takes_row(3, 5) and not fight.takes_row(4, 5), "0 to -2 is all but the last")
+	check(fight.takes_row(0, 5) and fight.takes_row(3, 5) and not fight.takes_row(4, 5), "0 to -2 is all but the deepest")
+	check(not fight.stands_deepest(), "a fight does not")
+
+
+func test_an_unknown_kind_is_named() -> void:
+	var run: RunDefinition = MadeUpBiome.run()
+	run.biomes[0].kinds.append(KindRule.make(&"feast"))
+	check(_names(_problems(run), "'feast': no room kind"), "a rule for a kind there is not")
+
+
+func test_a_biome_twice_and_an_empty_one_are_named() -> void:
+	var run: RunDefinition = MadeUpBiome.run()
+	run.biomes.append(MadeUpBiome.rules())
+	run.biomes.append(null)
+	var problems: PackedStringArray = _problems(run)
+	check(_names(problems, "biome 'cellar' twice"), "twice: %s" % problems)
+	check(_names(problems, "biome 2 is empty"), "empty: %s" % problems)
+
+
+## The start room alone (`MapRules.start_only`, a test's pinned room): only a template hosting its
+## kind and what fills it are asked of it.
+func test_the_start_room_alone_needs_only_its_room() -> void:
+	var rules := MapRules.new()
+	rules.biome = BIOME
+	rules.rooms_min = 0
+	rules.rooms_max = 0
+	rules.start_kind = &"fight"
+	var run: RunDefinition = _run(rules)
+	var content: RunContent = _content()
+	check(rules.start_only(), "rooms 0 to 0 is the start room alone")
+	check_equal(run.biome_problems(content, {&"hall": MadeUpBiome.room_shape(&"hall", Vector2(640, 384), 0)}), PackedStringArray(), "a fight room with no socket stands alone")
+	rules.start_kind = &"shop"
+	check(_names(run.biome_problems(content, {}), "'shop' is no room kind"), "a kind there is not is named")
+	rules.start_kind = &"fight"
+	rules.rooms_min = 1
+	check(_names(run.biome_problems(content, {}), "the start room alone is 0 to 0"), "rooms 1 to 0 is named")
 
 
 func test_the_pools_follow_biome_and_depth() -> void:
@@ -87,82 +117,6 @@ func test_the_pools_follow_biome_and_depth() -> void:
 	check_equal(content.enemy_pool(BIOME, 2).size(), 2, "the ghoul joins at row 2")
 	check_equal(content.enemy_pool(&"attic", 4).size(), 0, "nobody fights in another biome")
 	check_equal(content.boss_pool(BIOME, 0).size(), 1, "the king is the boss pool, not the enemy pool")
-
-
-func test_an_optional_kind_with_no_content_leaves_its_row_out() -> void:
-	var rules: MapRules = _rules()
-	rules.kinds[1].required = false
-	var content: RunContent = _content(false)
-	check_equal(_run(rules).problems(content), PackedStringArray(), "no boss: the run ends at its deepest fight")
-	check_equal(rules.kept_rows(content, 4), [0, 1, 2] as Array[int], "the boss's row is left out")
-
-
-func test_a_required_kind_with_no_content_is_a_problem() -> void:
-	var problems: PackedStringArray = _run(_rules()).problems(_content(false))
-	check(_names(problems, "'boss' is required"), "a required boss with none: %s" % problems)
-
-
-func test_no_template_for_a_kind_is_named() -> void:
-	var content: RunContent = RunContent.gather([_kind(&"fight", RoomKind.FILL_ENEMIES)], [_room(&"hall", [&"fight"] as Array[StringName], &"attic")], [_enemy(&"rat")])
-	check(content.cannot_fill(BIOME, &"fight", 0).contains("no cellar room"), "a fight room of another biome is not the cellar's")
-
-
-func test_an_enemy_too_deep_for_the_first_room_is_named() -> void:
-	var content: RunContent = RunContent.gather([_kind(&"fight", RoomKind.FILL_ENEMIES)], [_room(&"hall", [&"fight"] as Array[StringName])], [_enemy(&"ghoul", 1)])
-	check(content.cannot_fill(BIOME, &"fight", 0).contains("no enemy"), "nobody fights in the first room")
-	check_equal(content.cannot_fill(BIOME, &"fight", 1), "", "the ghoul fights from row 1")
-
-
-func test_an_unknown_kind_is_named() -> void:
-	var rules: MapRules = _rules()
-	rules.kinds.append(KindRule.make(&"shop"))
-	check(_names(_run(rules).problems(_content()), "'shop': no room kind"), "a rule for a kind there is not")
-
-
-func test_a_row_no_rule_takes_is_named() -> void:
-	var rules: MapRules = _rules()
-	rules.kinds[0].last_row = 0
-	check(_names(_run(rules).problems(_content()), "no kind rule takes row 1"), "fights in the first row only leave row 1 empty")
-
-
-func test_ranges_out_of_order_are_named() -> void:
-	var rules: MapRules = _rules()
-	rules.depth_min = 6
-	rules.width_min = 0
-	rules.branches_max = 0
-	var problems: PackedStringArray = _run(rules).problems(_content())
-	check(_names(problems, "depth 6 to 5"), "depth: %s" % problems)
-	check(_names(problems, "width 0 to 3"), "width: %s" % problems)
-	check(_names(problems, "branches 1 to 0"), "branches: %s" % problems)
-
-
-func test_too_few_rooms_allowed_in_the_run_is_named() -> void:
-	var rules: MapRules = _rules()
-	rules.kinds[0].max_per_run = 1
-	check(_names(_run(rules).problems(_content()), "max_per_run"), "one fight cannot fill two fight rows")
-
-
-func test_a_kind_that_may_follow_nothing_before_it_is_named() -> void:
-	var rules: MapRules = _rules()
-	rules.kinds[1].not_after = [&"fight"] as Array[StringName]
-	check(_names(_run(rules).problems(_content()), "not_after"), "a boss that may not follow a fight, after fights only")
-
-
-func test_a_row_too_wide_to_reach_is_named() -> void:
-	var rules: MapRules = _rules()
-	rules.width_min = 3
-	rules.width_max = 3
-	rules.branches_max = 2
-	check(_names(_run(rules).problems(_content()), "more than the 1 of row 0"), "one first room leading to 2 at most cannot reach a row of 3")
-
-
-func test_a_biome_twice_and_an_empty_one_are_named() -> void:
-	var run: RunDefinition = _run(_rules())
-	run.biomes.append(_rules())
-	run.biomes.append(null)
-	var problems: PackedStringArray = run.problems(_content())
-	check(_names(problems, "biome 'cellar' twice"), "twice: %s" % problems)
-	check(_names(problems, "biome 2 is empty"), "empty: %s" % problems)
 
 
 func test_a_room_kind_with_an_unknown_fill_is_named() -> void:
@@ -187,99 +141,10 @@ func test_an_enemy_with_a_bad_cost_is_named() -> void:
 	check(_names(problems, "twice"), "the biome twice: %s" % problems)
 
 
-func test_rows_out_of_order_are_named() -> void:
-	var rules: MapRules = _rules()
-	rules.kinds[1].first_row = -1
-	rules.kinds[1].last_row = -2
-	var problems: PackedStringArray = _run(rules).problems(_content())
-	check(_names(problems, "the first after the last"), "rows -1 to -2: %s" % problems)
-
-
-func test_a_required_kind_that_takes_no_row_is_named() -> void:
-	var rules: MapRules = _rules()
-	var shop := KindRule.make(&"fight", 8, 9)
-	rules.kinds.append(shop)
-	check(_names(_run(rules).problems(_content()), "takes no row"), "rows 8 and 9 of a map at most 5 deep")
-
-
-func test_a_row_whose_only_kind_cannot_lead_on_is_named() -> void:
-	# The fights may not lead to the boss and nothing else stands in the last row, so the row
-	# before it has no line left; one more kind there that may lead on makes it sound again.
-	var rules: MapRules = _rules()
-	rules.kinds[1].not_after = [&"fight"] as Array[StringName]
-	check(_names(_run(rules).problems(_content()), "not_after"), "no fight may lead to the boss")
-	var hall := KindRule.make(&"boss", -2, -2)
-	hall.max_per_run = 0
-	var content: RunContent = _content()
-	rules.kinds.append(hall)
-	check(not _names(_run(rules).problems(content), "not_after"), "a boss line in the row before leads on: %s" % _run(rules).problems(content))
-
-
-func test_a_line_capped_in_the_run_limits_its_row() -> void:
-	var rules: MapRules = _rules()
-	rules.width_min = 3
-	rules.width_max = 3
-	rules.branches_max = 2
-	var only := KindRule.make(&"fight", 1, 1)
-	only.max_per_run = 1
-	rules.kinds[0].first_row = 0
-	rules.kinds[0].last_row = 0
-	rules.kinds.insert(1, only)
-	rules.kinds.insert(2, KindRule.make(&"fight", 2, -2))
-	rules.depth_min = 4
-	rules.depth_max = 4
-	# Row 1 holds one room at most (its only line, once a run), so it is no wider than the one
-	# room before it can reach, and row 2's three are more than that one room leads to.
-	var problems: PackedStringArray = _run(rules).problems(_content())
-	check(not _names(problems, "row 1 holds"), "row 1 is one room: %s" % problems)
-	check(_names(problems, "row 2 holds at least 3 rooms, more than the 1 of row 1"), "the run's cap is the row's: %s" % problems)
-
-
-func test_a_boss_keeps_to_its_depth() -> void:
-	var content: RunContent = RunContent.gather([_kind(&"boss", RoomKind.FILL_BOSS)], [_room(&"throne", [&"boss"] as Array[StringName])], [_enemy(&"king", 5, true)])
-	check(content.cannot_fill(BIOME, &"boss", 3).contains("no boss"), "a boss from row 5 is not offered in row 3")
-	check_equal(content.cannot_fill(BIOME, &"boss", 5), "", "it is in row 5")
-
-
 func test_an_enemy_and_a_boss_of_one_id_count_once() -> void:
 	var content: RunContent = RunContent.gather([], [], [_enemy(&"broom"), _enemy(&"broom", 0, true)])
 	check_equal(content.enemies.size(), 1, "the first folder's, as the game finds it")
 	check_equal(content.boss_pool(BIOME, 0).size(), 0, "so no boss of that id")
-
-
-func test_with_no_room_kinds_every_kind_is_unknown() -> void:
-	var content: RunContent = RunContent.gather([], [_room(&"hall", [&"fight"] as Array[StringName])], [_enemy(&"rat")])
-	var rules: MapRules = _rules()
-	rules.kinds[1].required = false
-	check(_names(_run(rules).problems(content), "'boss': no room kind"), "an optional kind no file defines is still named")
-
-
-## Run generation RG4: a room leads to as many rooms as it has exits, so a kind that leads on needs a
-## template with an exit for every way a room may lead (`MapRules.most_ways`); the last row's needs none.
-func test_a_kind_that_leads_on_with_too_few_exits_is_named() -> void:
-	var kinds: Array[Resource] = [_kind(&"fight", RoomKind.FILL_ENEMIES), _kind(&"boss", RoomKind.FILL_BOSS)]
-	var hall := _room(&"hall", [&"fight"] as Array[StringName]) as MadeUpRoom
-	var throne := _room(&"throne", [&"boss"] as Array[StringName]) as MadeUpRoom
-	var rooms: Array[Resource] = [hall, throne]
-	var enemies: Array[Resource] = [_enemy(&"rat"), _enemy(&"king", 0, true)]
-	hall.exits = 1
-	var content: RunContent = RunContent.gather(kinds, rooms, enemies)
-	check_equal(content.exits_of(&"hall"), 1, "the hall's exits are gathered")
-	var rules: MapRules = _rules()
-	check_equal(rules.most_ways(), 2, "a room may lead to two")
-	check(_names(_run(rules).problems(content), "'fight' leads on, but no cellar room"), "one exit for two ways: %s" % _run(rules).problems(content))
-	rules.branches_max = 1
-	check_equal(_run(rules).problems(content), PackedStringArray(), "one way, one exit")
-	rules.branches_max = 2
-	rules.width_max = 1
-	check_equal(rules.most_ways(), 1, "a row of one room: one way at most")
-	check_equal(_run(rules).problems(content), PackedStringArray(), "so one exit is enough")
-	hall.exits = 0
-	throne.exits = 0
-	content = RunContent.gather(kinds, rooms, enemies)
-	check(_names(_run(rules).problems(content), "'fight' leads on"), "a fight room with no exit leads nowhere")
-	check(not _names(_run(rules).problems(content), "'boss' leads on"), "the boss's room, the last, needs none")
-	check(content.templates_for(BIOME, &"fight").size() == 1 and content.templates_for(BIOME, &"fight", 1).is_empty(), "templates_for counts exits")
 
 
 # --- Scaling (run generation RG5) ------------------------------------------------------------
@@ -316,11 +181,13 @@ func test_a_room_s_scale_is_its_depth_s_factor_times_its_players() -> void:
 	_near(scaling.room_scale(0, 0, 1), 1.0, "a map of one row is its start")
 	scaling.per_player = null
 	_near(scaling.room_scale(4, 4, 4), 2.0, "no curve for players: players change nothing")
-	var rules: MapRules = _rules()
+	var rules := MapRules.new()
+	rules.scale_depth = 4
 	var run: RunDefinition = _run(rules)
-	_near(run.room_scale(rules, 4, 4), 1.0, "a run with no scaling is the same everywhere")
+	_near(run.biome_room_scale(rules, 4, 4), 1.0, "a run with no scaling is the same everywhere")
 	run.scaling = scaling
-	_near(run.room_scale(rules, rules.depth_max - 1, 1), 2.0, "the deepest row the rules allow is the depth's end")
+	_near(run.biome_room_scale(rules, 4, 1), 2.0, "the rules' scale_depth is the depth's end")
+	_near(run.biome_room_scale(rules, 9, 1), 2.0, "and a deeper room keeps it")
 
 
 func test_a_budget_is_scaled_and_rounded_and_one_at_least() -> void:
@@ -331,14 +198,14 @@ func test_a_budget_is_scaled_and_rounded_and_one_at_least() -> void:
 
 
 func test_a_bad_scaling_curve_is_named() -> void:
-	var run: RunDefinition = _run(_rules())
+	var run: RunDefinition = MadeUpBiome.run()
 	run.scaling = RunScaling.new()
-	check_equal(run.problems(_content()), PackedStringArray(), "a scaling with no curves is sound")
+	check_equal(_problems(run), PackedStringArray(), "a scaling with no curves is sound")
 	run.scaling.per_depth = ScaleCurve.make(1.0, 2.0, 1.5)
 	run.scaling.per_player = ScaleCurve.make(1.0, 1.75)
-	check_equal(run.problems(_content()), PackedStringArray(), "sound curves")
+	check_equal(_problems(run), PackedStringArray(), "sound curves")
 	run.scaling.per_depth.end = 0.0
 	run.scaling.per_player.easing = NAN
-	var problems: PackedStringArray = run.problems(_content())
+	var problems: PackedStringArray = _problems(run)
 	check(_names(problems, "scaling per depth: end 0"), "an end of 0 is named: %s" % problems)
 	check(_names(problems, "scaling per player: easing"), "an easing that is no number is named: %s" % problems)

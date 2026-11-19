@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The game's ground cover in its rooms (ground cover GC8, docs/milestones/ground-cover.md): the hub
 ## is grassy (its biome `hub`, its grass's fill and a meadow) with its ways kept clear, the stone,
-## the altar, the lectern and the paths from the spawns to them; every crypt room holds a few
+## the altar and the paths from the spawns to them; every crypt room holds a few
 ## cobwebs, few enough not to crowd its fights, and no moss (crypt rework, docs/milestones/
 ## crypt-rework.md: the owner, 2026-11-16, "Not even sure it is needed at all"); every room with cover holds a `CoverPreview`, so
 ## the editor shows it; and every kind's fill reaches a room. Rooms and kinds are found by folder.
@@ -90,7 +90,6 @@ func test_the_hub_is_grassy_and_its_ways_are_clear() -> void:
 			stone = places.placed_at[i]
 		check_equal(_covered_in(layout, Rect2(places.placed_at[i] - HUB_PROP_ART * 0.5, HUB_PROP_ART)), PackedStringArray(), "nothing grows on the %s" % prop.id)
 	check(stone.is_finite(), "the stone stands in the hub")
-	check_equal(_covered_in(layout, places.zone(&"start_lectern").grow(8.0)), PackedStringArray(), "nor round the lectern")
 	for spawn in places.player_spawns:
 		check_equal(_covered_along(layout, spawn, stone), PackedStringArray(), "the way from %s to the stone is clear" % spawn)
 	for spawn in places.joiner_spawns:

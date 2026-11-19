@@ -1,11 +1,12 @@
 extends "res://tests/support/suite.gd"
 ## gameplay/flow on the real autoloads (the real wiring is the point): Play starts the room in the
 ## same call with 1, 2 and 4 players, the enemies the run's map puts in it stand (no waves: boss
-## OB2a; run generation RG3; the arena pinned as the run's one room, tests/support/pinned_run.gd, so
-## its spawns are known), `room_entered` and `room_cleared` are sent once, a won room ends the run
-## after RUN_WON_DELAY, every wizard holds the two start spells, the cooldowns are reset on a new
-## run, the room restarts in under 3 seconds when every player is down (and not while one still
-## stands), the walls reach the projectile manager, and the main menu only asks for the hub. Each
+## OB2a; run generation RG3; the arena pinned as a one-room biome, tests/support/pinned_run.gd, so
+## its spawns are known), `room_entered` and `room_cleared` are sent once, a cleared room stays
+## cleared and the run goes on, every wizard holds the two start spells, the cooldowns are reset on
+## a new run, the run ends back in the hub in under 3 seconds when every player is down (connected
+## biomes CB7, decision 14; not while one still stands), the walls reach the projectile manager, and
+## the main menu only asks for the hub. Each
 ## test joins the players it needs by virtual devices and starts its own run; `after_each` stops it,
 ## frees the devices, puts the run to play back and drops the test's listeners. Time moves by fixed
 ## steps through Flow.step(); nothing waits.
@@ -19,6 +20,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 ## The arena's floor, wall border included.
 const INNER := Rect2(Vector2.ZERO, Vector2(640.0, 384.0))
+const DT: float = 1.0 / 60.0
 
 var events: Node
 var flow: FlowScript
@@ -146,17 +148,22 @@ func _down_everyone() -> void:
 		_down(wizard)
 
 
-## How many enemies the run's map puts in the room the party is in (each restart is a new run, and
-## a new map).
+## How many enemies the run's map puts in the room the party is in (the pinned start room).
 func _room_count() -> int:
-	var node: RunNode = run.call("room_now") as RunNode
-	return node.enemies.size() if node != null else 0
+	var map: BiomeMap = run.get(&"map") as BiomeMap
+	return map.enemies_of(0).size() if map != null else 0
 
 
-## Kill every enemy of the room (as if shot down).
+## Kill every enemy of the room (as if shot down); Flow's next step clears it.
 func _kill_room() -> void:
 	for enemy: Node in flow._enemies.duplicate():
 		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
+	flow.step(DT)
+
+
+## True once the pinned room is cleared.
+func _cleared() -> bool:
+	return flow.life.has(0, RoomLife.CLEARED)
 
 
 ## The arena's walls, as rectangles, as the game reads them (a floating room's are its ground's: crypt
@@ -467,14 +474,17 @@ func test_room_cleared_waits_for_the_last_enemy() -> void:
 func test_room_cleared_is_sent_once_as_the_last_enemy_dies() -> void:
 	var enemies: Array[Node] = _all_but_one_dead()
 	events.emit_signal("enemy_died", 3, enemies[enemies.size() - 1], Vector2.ZERO, -1)
+	flow.step(DT)
 	check_equal(cleared, [arena] as Array[StringName], "room_cleared(arena_01) was sent once")
-	check_equal(flow.state, FlowScript.State.CLEARED, "flow is in the cleared state")
+	check(_cleared(), "the room is cleared")
 
 
 func test_a_repeated_death_does_not_send_room_cleared_again() -> void:
 	var enemies: Array[Node] = _all_but_one_dead()
 	events.emit_signal("enemy_died", 3, enemies[enemies.size() - 1], Vector2.ZERO, -1)
+	flow.step(DT)
 	events.emit_signal("enemy_died", 0, enemies[0], Vector2.ZERO, -1)
+	flow.step(DT)
 	check_equal(cleared.size(), 1, "a repeated death does not send room_cleared again")
 
 
@@ -493,6 +503,7 @@ func _clear_with_a_possessed_enemy(possessed_first: bool) -> void:
 		order.reverse()
 	for enemy: Node in order:
 		combat.call("hit", 0, enemy, 100000)
+	flow.step(DT)
 	check_equal(flow.enemies_left(), 0, "no enemy is left")
 	check_equal(cleared, [arena] as Array[StringName], "the room clears")
 
@@ -505,47 +516,22 @@ func test_a_room_clears_with_its_possessed_enemy_killed_last() -> void:
 	_clear_with_a_possessed_enemy(false)
 
 
-func test_killing_every_enemy_wins_the_room() -> void:
+func test_killing_every_enemy_clears_the_room() -> void:
 	_playing(1)
 	_kill_room()
 	check_equal(cleared, [arena] as Array[StringName], "the room is cleared")
-	check_equal(flow.state, FlowScript.State.CLEARED, "won")
+	check(_cleared(), "and stays so")
 
 
-## A won room (every enemy down) with no room after it ends the run RUN_WON_DELAY later; a run from
-## `play_requested` starts the room again (a run from the hub's stone goes back there:
-## test_flow_hub.gd).
-func test_a_won_run_ends_run_won_delay_later_and_begins_again() -> void:
-	for count: int in [1, 4]:
-		_playing(count)
-		var world: Node = flow.world
-		_kill_room()
-		flow.step(FlowScript.RUN_WON_DELAY - 0.1)
-		check(flow.world == world, "%d players: the kill is seen out first" % count)
-		flow.step(0.2)
-		check(flow.world != world and flow.state == FlowScript.State.RUNNING, "%d players: the run ended and began again" % count)
-		check_equal(flow.enemies_left(), _room_count(), "%d players: with the room's enemies" % count)
-		_stop()
-
-
-## Won, the run ends RUN_WON_DELAY later whatever the players do.
-func _won() -> void:
+## A cleared room that is no boss's ends nothing (connected biomes: the run goes on until the portal
+## home or everyone down; tests/gameplay/flow/test_gather_doors.gd).
+func test_a_cleared_room_ends_nothing() -> void:
 	_playing(1)
+	var world: Node = flow.world
 	_kill_room()
-	check(is_equal_approx(float(flow.get("_restart_left")), FlowScript.RUN_WON_DELAY), "won: the run's end counts")
-
-
-func test_going_down_after_the_win_starts_no_restart_of_its_own() -> void:
-	_won()
-	_down(_wizard(0))
-	check(is_equal_approx(float(flow.get("_restart_left")), FlowScript.RUN_WON_DELAY), "going down after the win changes nothing")
-
-
-func test_a_revive_after_the_win_stops_nothing() -> void:
-	_won()
-	_down(_wizard(0))
-	Downed.of(_wizard(0)).revive(0)
-	check(flow.is_restarting(), "a revive does not stop the won run's end")
+	flow.step(5.0)
+	check(flow.world == world and flow.state == FlowScript.State.RUNNING, "the run goes on")
+	check(not flow.is_restarting(), "no end counts")
 
 
 ## A run whose map cannot be made (no room of its biome hosts its kind) starts nothing: Flow says so
@@ -553,9 +539,9 @@ func test_a_revive_after_the_win_stops_nothing() -> void:
 func _try_a_run_with_no_map() -> bool:
 	var rules := MapRules.new()
 	rules.biome = &"test_flow_nowhere"
-	rules.depth_min = 1
-	rules.depth_max = 1
-	rules.kinds = [KindRule.make(&"fight", 0, -1)] as Array[KindRule]
+	rules.rooms_min = 0
+	rules.rooms_max = 0
+	rules.start_kind = &"fight"
 	var nowhere := RunDefinition.new()
 	nowhere.id = &"test_flow_nowhere"
 	nowhere.biomes = [rules] as Array[MapRules]
@@ -581,12 +567,12 @@ func test_play_starts_again_after_a_run_with_no_map() -> void:
 ## What the run names that the registry lacks (an enemy deleted after a map was made) stands nothing,
 ## with a warning, and a room the run puts nothing in is won as it starts. The run's area never names
 ## either: the answer is stood in for here, heard after the area's (Flow takes the last answer to its
-## `run_begun`).
+## `run_begun`: its start room's fight).
 func _play_a_room_of(named: Array) -> void:
 	var enemies: Array[StringName] = []
 	enemies.assign(named)
-	var answer := func(_run_id: StringName, _players: int, _start_depth: int) -> void:
-		events.emit_signal("run_room_chosen", arena, enemies, [] as Array[StringName])
+	var answer := func(_run_id: StringName, _players: int) -> void:
+		events.emit_signal("run_room_filled", 0, enemies, 1.0, 0, 0, 0.0)
 	_listen("run_begun", answer)
 	_playing(1)
 
@@ -616,8 +602,8 @@ func test_a_boss_room_stands_the_boss_its_map_names() -> void:
 	flow.run_id_to_play = PinnedRun.pin(registry, room, &"test_flow_lair", RoomKind.FILL_BOSS)
 	_playing(1)
 	check_equal(flow.enemies_left(), 1, "the boss stands")
-	var node: RunNode = run.call("room_now") as RunNode
-	var named: Array[StringName] = node.enemies if node != null else [] as Array[StringName]
+	var map: BiomeMap = run.get(&"map") as BiomeMap
+	var named: Array[StringName] = map.enemies_of(0) if map != null else [] as Array[StringName]
 	check_equal(named, [boss.id] as Array[StringName], "the map names it")
 
 
@@ -639,51 +625,34 @@ func test_no_restart_before_the_delay() -> void:
 	check(flow.world == old_world, "no restart before the delay")
 
 
-func test_the_room_restarts_after_the_delay() -> void:
+## Everyone down: RESTART_DELAY later the run ends and the party goes back to the hub (connected
+## biomes CB7, decision 14), as the frames service starts it between ticks.
+func test_everyone_down_goes_back_to_the_hub_after_the_delay() -> void:
 	for count: int in [1, 2, 4]:
 		_playing(count)
 		var old_world: Node = flow.world
 		_down_everyone()
 		flow.step(FlowScript.RESTART_DELAY - 0.5)
+		check(flow.world == old_world, "%d players: not yet" % count)
 		flow.step(0.5)
-		check(flow.world != old_world and flow.world != null, "%d players: the room restarted after %f s" % [count, FlowScript.RESTART_DELAY])
-		check_equal(entered.size(), 2, "%d players: room_entered was sent again for the new room" % count)
-		check(not flow.is_restarting(), "%d players: the timer is off after the restart" % count)
+		check(flow.state == FlowScript.State.IDLE and flow.world == null and not flow.is_restarting(), "%d players: the run ended after %f s" % [count, FlowScript.RESTART_DELAY])
+		root.get_node("Frames").call("begin_step", DT)
+		check_equal(flow.mode, FlowScript.MODE_HUB, "%d players: back in the hub" % count)
+		check_equal(_wizards().size(), count, "%d players: every wizard there" % count)
+		for wizard in _wizards():
+			check(wizard.health.health == wizard.health.max_health and not wizard.is_down(), "%d players: wizard %d stands at full health" % [count, _seat(wizard)])
 		_stop()
 
 
-func test_after_a_restart_every_wizard_stands_at_full_health() -> void:
-	_playing(4)
-	_down_everyone()
-	flow.step(FlowScript.RESTART_DELAY)
-	check_equal(_wizards().size(), 4, "the wizards are back")
-	for wizard in _wizards():
-		check(wizard.health.health == wizard.health.max_health and not wizard.is_down(), "wizard %d is standing at full health" % _seat(wizard))
-
-
-func test_after_a_restart_the_rooms_enemies_stand_again() -> void:
-	_playing(2)
-	_down_everyone()
-	flow.step(FlowScript.RESTART_DELAY)
-	check_equal(flow.enemies_left(), _room_count(), "the room's enemies stand again")
-
-
-func test_a_restart_leaves_no_old_shot() -> void:
+func test_the_way_back_leaves_no_old_shot() -> void:
 	_playing(1)
 	var projectiles: Node = root.get_node("Projectiles")
 	projectiles.call("spawn", 0, Vector2(100.0, 100.0), Vector2(10.0, 0.0), 5.0)
 	check_equal(projectiles.call("get_count"), 1, "a shot is in the air")
 	_down(_wizard(0))
 	flow.step(FlowScript.RESTART_DELAY)
-	check_equal(projectiles.call("get_count"), 0, "the restart cleared the shots")
-
-
-func test_a_restart_leaves_no_old_enemy_in_combat() -> void:
-	_playing(1)
-	_down(_wizard(0))
-	flow.step(FlowScript.RESTART_DELAY)
-	Spawning.land(flow)
-	check_equal(combat.call("actor_count"), _room_count() + 1 + _props_in_combat(), "combat knows only the room's new enemies, props and the wizard")
+	root.get_node("Frames").call("begin_step", DT)
+	check_equal(projectiles.call("get_count"), 0, "the run's end cleared the shots")
 
 
 func test_no_restart_while_one_of_four_stands() -> void:
@@ -705,44 +674,13 @@ func test_a_revive_cancels_the_restart() -> void:
 
 
 ## The last enemy dies (a bolt still in flight) after every wizard is down: the room is cleared, but
-## the restart timer keeps running and gives a new world.
+## the run's end keeps counting.
 func test_a_room_cleared_with_everyone_down_still_restarts() -> void:
 	_playing(2)
 	_down_everyone()
 	_kill_room()
 	check_equal(cleared, [arena] as Array[StringName], "the room still counts as cleared")
 	check(flow.is_restarting(), "the last enemy dying does not cancel the restart")
-
-
-func test_a_room_cleared_with_everyone_down_restarts_into_a_new_run() -> void:
-	_playing(2)
-	var old_world: Node = flow.world
-	_down_everyone()
-	_kill_room()
-	flow.step(FlowScript.RESTART_DELAY)
-	check(flow.world != old_world and flow.world != null, "the run restarted after the last enemy died with everyone down")
-	check(flow.state == FlowScript.State.RUNNING and flow.enemies_left() == _room_count(), "the new run is running with the room's enemies")
-
-
-## A failed restart (content gone) ends the run instead of leaving it stuck.
-func _failed_restart() -> void:
-	_playing(1)
-	var kept: Node = flow.registry
-	flow.registry = null
-	_down(_wizard(0))
-	flow.step(FlowScript.RESTART_DELAY)
-	flow.registry = kept
-
-
-func test_a_failed_restart_returns_flow_to_idle() -> void:
-	_failed_restart()
-	check(flow.state == FlowScript.State.IDLE and flow.world == null, "a failed restart returns flow to idle")
-
-
-func test_play_starts_again_after_a_failed_restart() -> void:
-	_failed_restart()
-	_play()
-	check_equal(flow.state, FlowScript.State.RUNNING, "Play starts again after a failed restart")
 
 
 # --- Walls -----------------------------------------------------------------------------------
@@ -762,14 +700,6 @@ func _check_arena_walls(when: String) -> void:
 func test_the_walls_reach_the_projectile_manager_at_the_start() -> void:
 	_playing(2)
 	_check_arena_walls("after start_run")
-
-
-func test_the_walls_reach_the_projectile_manager_again_after_a_restart() -> void:
-	_playing(2)
-	_down_everyone()
-	flow.step(FlowScript.RESTART_DELAY)
-	check_equal(flow.state, FlowScript.State.RUNNING, "the run restarted")
-	_check_arena_walls("after a restart")
 
 
 func test_each_players_shot_stops_on_the_border() -> void:

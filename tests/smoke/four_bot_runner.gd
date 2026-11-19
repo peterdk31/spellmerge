@@ -1,13 +1,14 @@
 extends Node
 ## The 4-bot smoke test as a node: four bots join on virtual devices and play the
-## first room through the real input path. Bots 1-3 fight; bot 4 opens its builder with B
-## (`back`) when the room starts and idles in it the whole run (the full builder, fights
-## included). Bots 1-3 also build: when the room starts each builds a seeded random staff into
+## run's first fight through the real input path: the crypt's biome (connected biomes CB8), from its
+## start room over a bridge to the nearest fight (the bots travel, tests/bots/bot.gd). Bots 1-3
+## fight; bot 4 opens its builder with B (`back`) as the run starts and idles in it the whole run
+## (the full builder, fights included). Bots 1-3 also build: as the run starts each builds a seeded random staff into
 ## staff 1 (RB, `BotScript.BUILD_STAFF`) with `staff_change_requested`, and their brains (the enemies' AI, tests/bots/bot.gd)
 ## play it with their other staffs, so the run is played with built staffs.
 ##
 ## It passes only if
-##  - `room_cleared` is received,
+##  - `room_cleared` is received for a fight room (the start room's, which holds none, counts not),
 ##  - players 1-3 (indices 0-2) are alive or revived at the end,
 ##  - at least one `spell_cast` happened (the bots really fired),
 ##  - bot 4's builder opened and was not seen closed afterwards (polled every frame). Bot 4
@@ -72,6 +73,7 @@ extends Node
 signal finished(failures: Array[String], replay_seed: int, run_seed: int)
 
 const BotScript := preload("res://tests/bots/bot.gd")
+const EventsScript := preload("res://core/events/events.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
 
@@ -249,8 +251,9 @@ func _watch_builder() -> void:
 		_idler_downed_at_close = _downed[IDLER]
 
 
-func _on_room_entered(_room_id: StringName, _room: int) -> void:
-	if _stopped:
+func _on_room_entered(_room_id: StringName, room: int) -> void:
+	# The run's start: its start room (a biome's later rooms are entered as the bots walk on).
+	if _stopped or room != EventsScript.FIRST_ROOM:
 		return
 	_entered += 1
 	print("SMOKE: room_entered (%.1f game seconds)" % _elapsed)
@@ -260,7 +263,10 @@ func _on_room_entered(_room_id: StringName, _room: int) -> void:
 			_builds_failed.append("bot %d could not build a spell" % (index + 1))
 
 
-func _on_room_cleared(_room_id: StringName, _room: int) -> void:
+func _on_room_cleared(_room_id: StringName, room: int) -> void:
+	# The start room holds no fight (connected biomes CB8): cleared as it is entered, it counts not.
+	if room == EventsScript.FIRST_ROOM:
+		return
 	_cleared += 1
 	if _settle < 0:
 		_settle = SETTLE_FRAMES

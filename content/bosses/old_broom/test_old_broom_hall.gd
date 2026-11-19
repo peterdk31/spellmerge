@@ -51,7 +51,7 @@ func test_it_is_a_crypt_boss_room_drawn_from_its_shape() -> void:
 func test_a_hall_is_a_floating_room_with_no_gate_and_no_pit() -> void:
 	for room in halls:
 		var root: Node = own(room.scene.instantiate()) as Node
-		check_equal(RoomScan.floating_room_problems(room, root, 4, 0), PackedStringArray(), "%s: a floating room with its four pillars, leading nowhere" % room.id)
+		check_equal(RoomScan.floating_room_problems(room, root, 4, 1), PackedStringArray(), "%s: a floating room with its four pillars and one socket, a dead end" % room.id)
 		check(RoomPlaces.hole_rects(root).is_empty(), "%s: no pit, a boss never falls" % room.id)
 
 

@@ -8,7 +8,8 @@ extends Node2D
 ##
 ## **Smooth** (docs/STYLE.md): a mouth's symbol rises in by rows, a row a frame at FPS, while one of
 ## this machine's wizards (`Frames.seats_here`, a seat's own body) is within SHOW_REACH of the mouth
-## or on its bridge (so the far end of a long bridge tells as the wizard sets out on it), and sinks out
+## or on its bridge (so the far end of a long bridge tells as the wizard sets out on it), but not from
+## inside the room it leads into (that tells nothing new), and sinks out
 ## the same way once none is; a biome laid (a new one, a restore's) is drawn as it
 ## stands. Whole pixels; nothing fades.
 ##
@@ -131,6 +132,9 @@ func _see(table: ActorsScript, seats_here: int, grid: RoomGrid) -> void:
 		var at: Vector2 = body.global_position
 		var on: int = grid.place_at(at) if grid != null else RoomGrid.NO_PLACE
 		for mouth in _middle.size():
+			if on != RoomGrid.NO_PLACE and on == mouths.room_of(mouth):
+				# Inside the room the mouth leads into: it tells nothing new.
+				continue
 			if at.distance_to(_middle[mouth]) <= SHOW_REACH or (on != RoomGrid.NO_PLACE and on == _walkway[mouth]):
 				_near[mouth] = 1
 

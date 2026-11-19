@@ -1,7 +1,7 @@
 extends RefCounted
 ## A room kind's symbol as the view draws it (connected biomes CB9: `RoomKind.symbol`), on a bridge's
 ## mouth (`mouth_symbols.gd`) and on the held map (`party_map_view.gd`). Whole pixels, a dark edge
-## round the lit ones; `rows` of its SYMBOL_SIDE shown, rising out of its foot (the bottom row of its
+## round every pixel drawn; `rows` of its SYMBOL_SIDE shown, rising out of its foot (the bottom row of its
 ## box): at `rows` 1 only its top row shows, at its foot, so a symbol comes in and goes by rows, never
 ## at once (docs/STYLE.md, "Smooth"). Nothing is allocated.
 
@@ -20,7 +20,7 @@ static func shades_of(kind: RoomKind) -> PackedColorArray:
 
 ## Draw `pixels` (`RoomKind.symbol_pixels`) on `canvas` with its box's corner at `at` (whole pixels),
 ## `size` screen pixels a symbol pixel, `rows` of its rows shown (0 none ... SYMBOL_SIDE all), in
-## `shades` (shadow, base, light), each lit pixel with an edge of Palette.OUTLINE round it.
+## `shades` (shadow, base, light), with an edge of Palette.OUTLINE round the pixels drawn.
 static func draw(canvas: CanvasItem, pixels: PackedByteArray, shades: PackedColorArray, at: Vector2, rows: int, size: int = 1) -> void:
 	var side: int = RoomKind.SYMBOL_SIDE
 	if pixels.size() != side * side or rows <= 0 or shades.size() < 3:

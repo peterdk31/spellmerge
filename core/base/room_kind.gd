@@ -69,7 +69,7 @@ const LAYOUT_META: StringName = &"room_kind"
 ## Its symbol (connected biomes CB9): what a bridge's mouth into a room of the kind tells of what lies
 ## behind it, and what the held map shows on the room. A picture of SYMBOL_SIDE rows of SYMBOL_SIDE
 ## pixels as text, a row a line: `#` its light's lit shade, `+` its base shade, `.` none (drawn with a
-## dark edge round it). Empty: nothing is told (a room meant to be found, a secret one).
+## dark edge round its pixels). Empty: nothing is told (a room meant to be found, a secret one).
 @export_multiline var symbol: String = ""
 
 ## A symbol's side, in pixels.

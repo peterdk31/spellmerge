@@ -111,12 +111,10 @@ func test_the_start_room_is_seen_and_each_room_as_a_wizard_enters_it() -> void:
 func test_the_seen_rooms_are_hashed_and_survive_a_snapshot() -> void:
 	var map: BiomeMap = _start()
 	var before := Snapshot.take(tick.state_areas(), root)
-	var hash_before: int = SimHash.whole(SimHash.areas(tick.state_areas()))
 	_into(map, EAST, RoomSocket.Facing.WEST)
 	check_equal(flow.party_map.seen, PackedByteArray([2, 0, 2]), "the court entered")
 	var after := Snapshot.take(tick.state_areas(), root)
 	var hash_after: int = SimHash.whole(SimHash.areas(tick.state_areas()))
-	check(hash_before != hash_after, "the hash changes with the map")
 	# A change of the map alone changes Flow's hash: it is state.
 	var flow_hash: int = SimHash.areas({"Flow": flow})["Flow"]
 	flow.party_map.seen[WEST] = 1

@@ -20,7 +20,12 @@ extends CanvasLayer
 ## cell is the screen.
 ##
 ## **Smooth** (docs/STYLE.md): it opens from its middle row out through OPEN_STAGES heights at FPS and
-## closes the same way back; whole pixels, nothing fades.
+## closes the same way back. While it is open, a piece newly drawn comes in through the stone's shades
+## (none, shadow, base, light; a room only shown stops at its shadow, a bridge at its base), a room
+## entered climbs from its shadow to its light, and a symbol rises in by rows, each a step a frame at
+## FPS; with every map shut they are drawn as they stand. A frame whose size or scale must change (the
+## screen split or merged under it) closes and opens again at its new size; it never jumps. Whole
+## pixels; nothing fades.
 ##
 ## Feel's: a canvas layer under the HUD's (`LAYER`), a frame (a Control that clips) a seat; stepped once
 ## a frame (`step`). Nothing is allocated while it is drawn.
@@ -77,6 +82,11 @@ var _frame: Array[Rect2i] = [Rect2i(), Rect2i(), Rect2i(), Rect2i()]
 var _scale: PackedInt32Array = PackedInt32Array([1, 1, 1, 1])
 var _origin: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
 var _maps: Array[SeatMap] = []
+## By seat: its frame closing to open again at a new size or scale (1).
+var _reopen: PackedByteArray = PackedByteArray([0, 0, 0, 0])
+## By place: the stone's shade drawn (0 none, 1 shadow, 2 base, 3 light) and its symbol's rows shown.
+var _shade: PackedInt32Array = PackedInt32Array()
+var _symbol_rows: PackedInt32Array = PackedInt32Array()
 ## The wizards' places and colours this frame (world pixels; INF: none), by seat.
 var _wizard_at: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
 var _wizard_colour: PackedColorArray = PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE])
@@ -119,9 +129,8 @@ func bind(events: Node) -> void:
 
 func _on_rooms_seen(seen: PackedByteArray, _again: bool) -> void:
 	_seen = seen
-	for map in _maps:
-		if map.visible:
-			map.queue_redraw()
+	if not _any_open():
+		_settle()
 
 
 ## Seat `seat`'s opening (0 shut ... OPEN_STAGES), its frame (screen pixels) and its map's scale (for
@@ -144,6 +153,16 @@ func shown_rect(seat: int) -> Rect2i:
 	if map == null or not map.visible:
 		return Rect2i()
 	return Rect2i(Vector2i(map.position), Vector2i(map.size))
+
+
+## Place `place`'s shade drawn now (0 none, 1 the stone's shadow, 2 its base, 3 its light) and its
+## symbol's rows shown (for tests).
+func shade_of(place: int) -> int:
+	return _shade[place] if place >= 0 and place < _shade.size() else 0
+
+
+func symbol_rows_of(place: int) -> int:
+	return _symbol_rows[place] if place >= 0 and place < _symbol_rows.size() else 0
 
 
 ## How many places the map knows.
@@ -182,6 +201,8 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid, vi
 		_lay(grid, places, world_now)
 	for seat in ActorsScript.SEATS:
 		_held[seat] = 1 if not _rects.is_empty() and seats_here & (1 << seat) != 0 and _holds(seat) else 0
+	if not _any_open():
+		_settle()
 	_clock += delta
 	var change: float = 1.0 / FPS
 	if not is_moving():
@@ -194,18 +215,57 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid, vi
 		_place(seat, views)
 
 
-## True while an opening still opens or closes.
+## True while an opening still opens or closes, or a piece's look still changes on an open map.
 func is_moving() -> bool:
 	for seat in ActorsScript.SEATS:
-		if _stage[seat] != (OPEN_STAGES if _held[seat] != 0 else 0):
+		if _stage[seat] != _stage_wanted(seat):
+			return true
+	if _any_open():
+		for place in _shade.size():
+			if _shade[place] != _shade_wanted(place) or _symbol_rows[place] != _rows_wanted(place):
+				return true
+	return false
+
+
+## One stage of every opening and every piece's look (a frame at FPS).
+func advance() -> void:
+	for seat in ActorsScript.SEATS:
+		_stage[seat] += signi(_stage_wanted(seat) - _stage[seat])
+		if _stage[seat] == 0:
+			_reopen[seat] = 0
+	for place in _shade.size():
+		_shade[place] += signi(_shade_wanted(place) - _shade[place])
+		_symbol_rows[place] += signi(_rows_wanted(place) - _symbol_rows[place])
+
+
+func _stage_wanted(seat: int) -> int:
+	return OPEN_STAGES if _held[seat] != 0 and _reopen[seat] == 0 else 0
+
+
+func _shade_wanted(place: int) -> int:
+	if not draws(place):
+		return 0
+	if _room[place] == 0:
+		return 2
+	return 3 if _level(place) >= ENTERED else 1
+
+
+func _rows_wanted(place: int) -> int:
+	return RoomKind.SYMBOL_SIDE if draws_symbol(place) else 0
+
+
+func _any_open() -> bool:
+	for seat in ActorsScript.SEATS:
+		if _stage[seat] > 0:
 			return true
 	return false
 
 
-## One stage of every opening (a frame at FPS).
-func advance() -> void:
-	for seat in ActorsScript.SEATS:
-		_stage[seat] += signi((OPEN_STAGES if _held[seat] != 0 else 0) - _stage[seat])
+## Every piece's look as it stands (with every map shut, nothing is seen changing).
+func _settle() -> void:
+	for place in _shade.size():
+		_shade[place] = _shade_wanted(place)
+		_symbol_rows[place] = _rows_wanted(place)
 
 
 ## Seat `seat` holds the map's button, and no menu of its holds its input (its builder's Y is its own).
@@ -238,15 +298,27 @@ func _place(seat: int, views: ScreenViewsScript) -> void:
 		map.visible = false
 		return
 	var view: int = views.view_of_seat(seat)
-	if view < 0:
+	if view < 0 and views.count == 1:
 		view = 0
+	if view < 0:
+		# No view holds the seat (its wizard is not in the world): never over another player's view.
+		map.visible = false
+		_stage[seat] = 0
+		return
 	var content: Vector2 = (_area.size / MAP_CELL).ceil()
 	var want: Vector2 = content + Vector2(PAD, PAD) * 2.0
 	var fit: float = fit_scale(views, view, views.anchor[view], want, float(MAX_SCALE))
 	var scale: int = maxi(floori(fit), 1)
 	var size: Vector2i = Vector2i(want * scale) if fit >= 1.0 else Vector2i((want * fit).floor())
+	var was: Rect2i = _frame[seat]
+	if map.visible and (size != was.size or scale != _scale[seat]):
+		# Its cell changed under it: it closes at the size it has and opens again at the new one.
+		_reopen[seat] = 1
+		size = was.size
+		scale = _scale[seat]
 	if size.x <= PAD * 2 or size.y <= PAD * 2:
 		map.visible = false
+		_stage[seat] = 0
 		return
 	var corner: Vector2i = Vector2i((views.anchor[view] - Vector2(size) * 0.5).round())
 	_frame[seat] = Rect2i(corner, size)
@@ -300,20 +372,18 @@ func draw_map(canvas: SeatMap, seat: int) -> void:
 	var scale: int = _scale[seat]
 	var origin: Vector2 = _origin[seat] + shift
 	for place in _rects.size():
-		if not draws(place):
+		if _shade[place] <= 0:
 			continue
-		var colour: Color = _stone[1]
-		if _room[place] != 0:
-			colour = _stone[2] if _level(place) >= ENTERED else _stone[0]
+		var colour: Color = _stone[_shade[place] - 1]
 		var at: Vector2 = origin + ((_rects[place].position - _area.position) / MAP_CELL).floor() * scale
 		var texture: ImageTexture = _floors[place]
 		if texture != null:
 			canvas.draw_texture_rect(texture, Rect2(at, texture.get_size() * scale), false, colour)
 	for place in _rects.size():
-		if draws_symbol(place):
+		if _symbol_rows[place] > 0:
 			var middle: Vector2 = origin + ((_rects[place].get_center() - _area.position) / MAP_CELL).floor() * scale
 			var half: float = float(RoomKind.SYMBOL_SIDE * scale / 2)
-			KindSymbolScript.draw(canvas, _symbols[place], _symbol_shades[place], middle - Vector2(half, half), RoomKind.SYMBOL_SIDE, scale)
+			KindSymbolScript.draw(canvas, _symbols[place], _symbol_shades[place], middle - Vector2(half, half), _symbol_rows[place], scale)
 	for wizard in ActorsScript.SEATS:
 		if _wizard_at[wizard] == Vector2.INF:
 			continue
@@ -333,6 +403,8 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	_symbols.clear()
 	_symbol_shades.clear()
 	_room.resize(places)
+	_shade.resize(places)
+	_symbol_rows.resize(places)
 	_ends.resize(places * 2)
 	_ends.fill(-1)
 	_area = Rect2()
@@ -354,6 +426,12 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 			if end < 2 and _room[room] != 0 and grown.intersects(_rects[room]):
 				_ends[place * 2 + end] = room
 				end += 1
+	# A biome laid is drawn as it stands, every map shut (a new world opens nothing already open).
+	_stage.fill(0)
+	_reopen.fill(0)
+	for map in _maps:
+		map.visible = false
+	_settle()
 	for map in _maps:
 		map.queue_redraw()
 

@@ -209,6 +209,60 @@ func test_the_map_shows_the_rooms_seen_the_bridges_from_them_and_the_kinds_they_
 	_into(map, WEST, RoomSocket.Facing.EAST)
 	view.step(0.0, actors, 1, _grid(), _two_views())
 	check(view.draws(WEST), "entered, the antechamber is drawn")
+	check_equal(view.shade_of(WEST), 3, "with every map shut, as it stands: the stone's light")
+
+
+func test_on_an_open_map_a_room_comes_in_through_the_shades_and_a_new_size_reopens() -> void:
+	var map: BiomeMap = _start(1)
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	var views: ScreenViewsScript = _two_views()
+	view.input = input as InputManagerScript
+	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 1.0)
+	view.step(0.0, actors, 1, _grid(), views)
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), views)
+	check_equal(view.stage_of(0), PartyMapViewScript.OPEN_STAGES, "open")
+	check_equal(view.shade_of(WEST), 0, "the antechamber not drawn")
+	check_equal(view.symbol_rows_of(WEST), RoomKind.SYMBOL_SIDE, "but its symbol, as its bridge leads there")
+	_into(map, WEST, RoomSocket.Facing.EAST)
+	view.step(0.0, actors, 1, _grid(), views)
+	var shades: Array[int] = []
+	while view.is_moving():
+		view.advance()
+		shades.append(view.shade_of(WEST))
+	check_equal(shades, [1, 2, 3] as Array[int], "entered while the map is open: it comes in a shade a frame")
+	# The screen merges under it: one view of the whole screen, a bigger frame. It closes, then opens again.
+	var frame: Rect2i = view.frame_of(0)
+	var one := ScreenViewsScript.new()
+	one.set_single(SCREEN, Transform2D.IDENTITY, 1)
+	view.step(0.0, actors, 1, _grid(), one)
+	check_equal(view.frame_of(0).size, frame.size, "no jump: the frame keeps its size this frame")
+	var stages: Array[int] = []
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), one)
+		stages.append(view.stage_of(0))
+	check_equal(stages, [3, 2, 1, 0, 1, 2, 3, 4] as Array[int], "it closes and opens again")
+	check(view.frame_of(0).size != frame.size, "at its new size")
+
+
+func test_the_map_stays_shut_while_a_menu_holds_the_player_or_no_view_holds_it() -> void:
+	_start(2)
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	view.input = input as InputManagerScript
+	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 1.0)
+	input.call(&"set_captured", 0, true)
+	view.step(0.0, actors, 1, _grid(), _two_views())
+	check(not view.is_moving() and view.stage_of(0) == 0, "its builder open (Y is the builder's): no map")
+	input.call(&"set_captured", 0, false)
+	# Split, but no view holds seat 2: never over another player's view.
+	input.call(&"add_virtual_device", 2)
+	input.call(&"send_virtual", 2, PartyMapViewScript.ACTION, 1.0)
+	view.step(0.0, actors, 4, _grid(), _two_views())
+	view.advance()
+	view.step(0.0, actors, 4, _grid(), _two_views())
+	check(view.shown_rect(2).size == Vector2i.ZERO, "no map drawn for a seat no view holds")
 
 
 func test_a_machine_that_joins_mid_run_has_the_map_and_the_dark_right() -> void:
@@ -235,3 +289,24 @@ func test_a_machine_that_joins_mid_run_has_the_map_and_the_dark_right() -> void:
 	check_equal(dark.stage_of(EAST), darkest, "the court dark")
 	check(not dark.is_moving(), "drawn as it stands, nothing played in")
 	check(view.draws(0) and view.draws(WEST) and not view.draws(EAST), "the joiner's map: the rooms entered before it came")
+
+
+func test_a_restore_into_the_world_shown_draws_the_dark_as_it_stands() -> void:
+	var map: BiomeMap = _start(1)
+	var dark: UnseenDarkScript = feel.call(&"unseen_dark") as UnseenDarkScript
+	dark.step(0.0, _grid())
+	var later_entered := Snapshot.take(tick.state_areas(), root)
+	var darkest: int = UnseenDarkScript.DARK_STAGES.size() - 1
+	_into(map, WEST, RoomSocket.Facing.EAST)
+	_into(map, EAST, RoomSocket.Facing.WEST)
+	var both := Snapshot.take(tick.state_areas(), root)
+	check(later_entered.restore(tick.state_areas(), root).is_empty(), "back to the start")
+	dark.step(0.0, _grid())
+	while dark.is_moving():
+		dark.advance()
+	check_equal(dark.stage_of(EAST), darkest, "the court dark")
+	check(both.restore(tick.state_areas(), root).is_empty(), "a restore into the same world, both rooms entered")
+	dark.step(0.0, _grid())
+	check_equal(dark.stage_of(WEST), 0, "the antechamber lit at once")
+	check_equal(dark.stage_of(EAST), 0, "the court too")
+	check(not dark.is_moving(), "nothing played in")

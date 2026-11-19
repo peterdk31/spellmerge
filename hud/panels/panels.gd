@@ -465,7 +465,7 @@ func poll() -> void:
 					events.online_open_requested.emit(player)
 				elif start_now and _lectern_seats & (1 << player) != 0 and _in_room and not _panels[player].is_downed():
 					_open_lectern(player)
-				elif start_now and _rewards[player].waiting() > 0 and _in_room:
+				elif start_now and _rewards[player].waiting() > 0 and _in_room and not _panels[player].is_downed():
 					_open_reward(player)
 			if paused_now:
 				_on_pause_pressed(player)

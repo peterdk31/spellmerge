@@ -15,7 +15,6 @@ extends RefCounted
 ## One row a stat: its base, the range it is held to and whether it is a whole number.
 ## - `reward_choices`: how many choices a reward offers ("pick 1 of 2", decision 17).
 ## - `start_coins`: the coins in a player's wallet at a run's start (decision 18).
-## - `coin_drops`: how many coins each coin an enemy drops becomes (1: as the enemy says).
 ## - `price_scale`: what a shop's prices are multiplied by (CB11's shop).
 ## - `map_reveal`: how many rooms past the seen ones the map shows (CB9's map).
 ## - `secret_sense`: how far a secret room's crack is sensed, in pixels (CB11).
@@ -23,7 +22,6 @@ extends RefCounted
 const ROWS: Dictionary = {
 	&"reward_choices": {"base": 2.0, "low": 1.0, "high": 4.0, "whole": true},
 	&"start_coins": {"base": 0.0, "low": 0.0, "high": 999.0, "whole": true},
-	&"coin_drops": {"base": 1.0, "low": 0.0, "high": 10.0, "whole": true},
 	&"price_scale": {"base": 1.0, "low": 0.1, "high": 10.0, "whole": false},
 	&"map_reveal": {"base": 0.0, "low": 0.0, "high": 99.0, "whole": true},
 	&"secret_sense": {"base": 0.0, "low": 0.0, "high": 1024.0, "whole": false},

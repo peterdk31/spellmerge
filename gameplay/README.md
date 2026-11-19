@@ -84,6 +84,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `difficulty_changed` | `difficulty` (a difficulty setting's level, M3; never the room's scale, `run_room_scaled`) | none yet (enemy AI AI10: `ai`, the TeamBoard's skill) |
 | `reward_rolled`, `rewards_waiting_changed` | `rewards` (a player's own offer on a clear; the offers a seat has waiting, connected biomes CB10) | `hud` (the reward menu, the corner panel's unspent count) |
 | `reward_taken` | `rewards` | none yet (tests) |
+| `reward_refused` | `rewards` (a pick that could not be given: the offer stays) | `hud` (the reward menu opens again, saying why) |
 | `coin_changed` | `rewards` (a coin on the floor laid or gone) | `feel` (the coins' look) |
 | `wallet_changed` | `rewards` (a seat's coins) | `hud` (the corner panel) |
 | `run_stats_ruled` | `run` (the run's own changes of the run stats, as a run of rooms begins) | `rewards` |

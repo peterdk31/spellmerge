@@ -116,7 +116,7 @@ func test_a_clear_rolls_each_players_own_offer_of_two() -> void:
 		check(choices[0]["kind"] != choices[1]["kind"] or choices[0]["id"] != choices[1]["id"] or choices[0]["count"] != choices[1]["count"], "two different choices")
 		check(row[3], "a wizard in the room is there for it")
 		for choice: Dictionary in choices:
-			check(RewardEntry.KINDS.has(choice["kind"]), "a card or coins")
+			check(RewardEntry.KINDS.has(choice["kind"]), "one of the reward kinds")
 			check(String(choice["name"]) != "", "each has a name for the menu")
 	check_equal(_rewards.waiting_of(0).size(), 1, "it waits until picked")
 	check(_rewards.waiting_of(2).is_empty(), "a seat with no wizard rolls nothing")
@@ -154,18 +154,16 @@ func test_a_pick_gives_the_choice_and_the_offer_goes() -> void:
 	var body := _wizard(0)
 	_clear(0)
 	var offer: int = _rolled[0][1]
-	var choices: Array = _rolled[0][2]
-	var choice: int = 0
-	var before: int = body.inventory.count_of(CARDS, choices[0]["id"])
-	_pick(0, offer, choice)
-	check_equal(_taken, [[0, offer, choice]], "taken, as picked")
-	check(_rewards.waiting_of(0).is_empty(), "the offer went")
-	if choices[0]["kind"] == RewardEntry.CARD:
-		check_equal(body.inventory.count_of(CARDS, choices[0]["id"]), before + int(choices[0]["count"]), "the card is in the bag")
-	else:
-		check_equal(_rewards.wallet_of(0), int(choices[0]["count"]), "the coins are in the wallet")
-	_pick(0, offer, choice)
-	check_equal(_taken.size(), 1, "an offer is picked once")
+	check_equal(_rewards.waiting_of(0).size(), 1, "the rolled offer waits")
+	_pick(0, offer, 0)
+	check_equal(_taken, [[0, offer, 0]], "a rolled offer is taken, as picked")
+	check(_rewards.waiting_of(0).is_empty(), "and goes")
+	_offer(0, 70, RewardEntry.CARD, 2, &"fire")
+	var before: int = body.inventory.count_of(CARDS, &"fire")
+	_pick(0, 70, 0)
+	check_equal(body.inventory.count_of(CARDS, &"fire"), before + 2, "a card's copies go into the bag")
+	_pick(0, 70, 0)
+	check_equal(_taken.size(), 2, "an offer is picked once")
 
 
 func test_a_pick_of_anothers_offer_or_no_choice_does_nothing() -> void:
@@ -184,11 +182,7 @@ func test_a_pick_of_anothers_offer_or_no_choice_does_nothing() -> void:
 func test_coins_go_to_the_pickers_wallet_only() -> void:
 	_wizard(0)
 	_wizard(1, Vector2(40, 0))
-	var offer := RewardOffer.new()
-	offer.number = 50
-	offer.seat = 0
-	offer.add(RewardEntry.COINS, &"", 5)
-	_rewards._offers.append(offer)
+	_offer(0, 50, RewardEntry.COINS, 5)
 	_pick(0, 50, 0)
 	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [5, 0], "spending and rewards are one's own")
 
@@ -231,13 +225,12 @@ func test_a_heal_waits_while_the_wizard_is_down() -> void:
 func test_no_room_in_the_bag_keeps_it_unspent() -> void:
 	var body := _wizard(0)
 	body.inventory.set_capacity(CARDS, body.inventory.copies(CARDS))
-	var offer := RewardOffer.new()
-	offer.number = 51
-	offer.seat = 0
-	offer.add(RewardEntry.CARD, &"fire", 1)
-	_rewards._offers.append(offer)
+	var refused: Array = []
+	_world.bus.reward_refused.connect(func(player: int, offer: int) -> void: refused.append([player, offer]))
+	_offer(0, 51, RewardEntry.CARD, 1, &"fire")
 	_pick(0, 51, 0)
 	check(_taken.is_empty(), "nothing taken")
+	check_equal(refused, [[0, 51]], "the seat hears it was refused")
 	check_equal(_rewards.waiting_of(0).size(), 1, "it stays, to pick later")
 
 
@@ -298,6 +291,29 @@ func test_a_foes_coins_are_shared_income() -> void:
 	check(_rewards.spend(1, 1), "a player spends their own")
 	check_equal([_rewards.wallet_of(0), _rewards.wallet_of(1)], [1, 0], "only theirs")
 	check(not _rewards.spend(1, 1), "not more than they hold")
+
+
+func test_an_add_drops_no_coin() -> void:
+	var add := Actor.new()
+	add.data = IMP
+	add.is_add = true
+	_world.bus.enemy_died.emit(0, add, Vector2(50, 0), -1)
+	add.free()
+	check(_rewards.coins_lying().is_empty(), "a boss's add drops nothing (its waves never end)")
+
+
+func test_a_coin_never_lands_in_a_wall() -> void:
+	_world.projectiles.grid().add_wall(Rect2(104.0, -16.0, 32.0, 32.0))
+	var foe := Actor.new()
+	var data: EnemyBase = IMP.duplicate()
+	data.coins = 3
+	foe.data = data
+	_world.bus.enemy_died.emit(0, foe, Vector2(100, 0), -1)
+	foe.free()
+	var lying: PackedVector2Array = _rewards.coins_lying()
+	check_equal(lying.size(), 3, "three coins")
+	check_equal(lying[1], Vector2(100, 0), "the one that would land in the wall lands on the foe's spot")
+	check_equal(lying[2], Vector2(94, 0), "the one on the open side lands there")
 
 
 func test_a_downed_wizard_takes_no_coin() -> void:

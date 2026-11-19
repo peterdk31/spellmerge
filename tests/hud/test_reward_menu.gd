@@ -113,6 +113,20 @@ func test_an_offer_for_a_seat_that_was_not_there_waits() -> void:
 	check_equal(_hud.get_panel(0).purse_text(), "1 to pick", "the unspent icon (rule 4)")
 
 
+func test_a_refused_pick_opens_the_menu_again_saying_so() -> void:
+	_roll(0, 6, true)
+	_frame()
+	_tap(0, &"accept")
+	_frame()
+	check(not _hud.get_reward(0).is_open(), "picked and closed")
+	_bus.reward_refused.emit(0, 6)
+	# The poll after the one that closed it (the press that closed a menu never opens another).
+	_frame()
+	_frame()
+	check(_hud.get_reward(0).is_open(), "a refused pick opens it again")
+	check_equal((_hud.get_reward(0).get_node("Rows/Title") as Label).text, "Can't take that now", "saying so")
+
+
 func test_the_panel_says_the_coins() -> void:
 	_bus.wallet_changed.emit(1, 12)
 	check_equal(_hud.get_panel(1).purse_text(), "12 coins", "the seat's wallet")

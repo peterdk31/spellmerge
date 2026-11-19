@@ -28,6 +28,8 @@ const SHADOW: Color = Color(0.05, 0.04, 0.08, 0.35)
 ## By coin number: [where, how far it has come in (0 to `_whole_frames`, in frames), whether it goes].
 var _coins: Dictionary = {}
 var _clock: float = 0.0
+## The coins gone this frame (reused: no allocation a frame).
+var _gone: Array[int] = []
 
 
 func _ready() -> void:
@@ -56,7 +58,11 @@ func lying() -> int:
 
 func _on_coin_changed(coin: int, at: Vector2, there: bool) -> void:
 	if there:
-		_coins[coin] = [at, 0.0, false]
+		if _coins.has(coin) and not bool((_coins[coin] as Array)[2]):
+			# Said again (a restore): it keeps how far it has come in, never popping in anew.
+			(_coins[coin] as Array)[0] = at
+		else:
+			_coins[coin] = [at, 0.0, false]
 	elif _coins.has(coin):
 		# Going: back down the stages from where it is now.
 		(_coins[coin] as Array)[2] = true
@@ -73,16 +79,16 @@ func _process(delta: float) -> void:
 		return
 	_clock += delta
 	var frames: float = delta * 60.0
-	var gone: Array[int] = []
+	_gone.clear()
 	for coin: int in _coins:
 		var row: Array = _coins[coin]
 		if bool(row[2]):
 			row[1] = float(row[1]) - frames
 			if float(row[1]) < 0.0:
-				gone.append(coin)
+				_gone.append(coin)
 		else:
 			row[1] = minf(float(row[1]) + frames, _whole_frames())
-	for coin: int in gone:
+	for coin: int in _gone:
 		_coins.erase(coin)
 	queue_redraw()
 

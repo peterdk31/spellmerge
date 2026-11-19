@@ -585,13 +585,17 @@ signal difficulty_changed(level: float)
 ## Sender: rewards (connected biomes CB10). Seat `player`'s own roll on a room's clear: the offer
 ## numbered `offer` (handed out once a run), its `choices` (the views of what each gives:
 ## `kind` (`RewardEntry.KINDS`), `id`, `count`, `name`, `icon`; as many as the player's
-## `reward_choices`), and whether the player's wizard was in the room (`here`: the menu opens at
+## `reward_choices`, fewer when the table runs out of different ones), and whether the player's wizard was in the room (`here`: the menu opens at
 ## once; a player who was not there finds it as an unspent reward, DESIGN rule 4). Heard by hud.
 signal reward_rolled(player: int, offer: int, choices: Array[Dictionary], here: bool)
 ## Sender: rewards. The result of a pick (`reward_pick_requested`): `player` took choice `choice`
 ## of their offer `offer`, which gave what `reward` says (a view, as `reward_rolled`'s). Heard by
 ## nobody yet (tests; later Feel's sound).
 signal reward_taken(player: int, offer: int, choice: int, reward: Dictionary)
+## Sender: rewards. A pick of `player`'s offer `offer` could not be given (no room in the card bag,
+## a heal while the wizard is down, no wizard): the offer stays unspent. Heard by hud (the reward
+## menu opens on it again, saying why).
+signal reward_refused(player: int, offer: int)
 ## Sender: rewards. Seat `player`'s offers not yet picked, oldest first (`offers`: each a dictionary
 ## of `offer`, `here` and `choices`, as `reward_rolled` says), whenever they change, at a run's
 ## start (none) and after a snapshot is restored. Heard by hud (the unspent count on the corner

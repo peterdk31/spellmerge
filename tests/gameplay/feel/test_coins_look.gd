@@ -17,6 +17,8 @@ func test_a_coin_comes_and_goes_by_stages() -> void:
 	check_equal([look.count(), look.lying()], [1, 1], "drawn once laid")
 	for frame in 20:
 		look._process(1.0 / 60.0)
+	bus.coin_changed.emit(3, Vector2(10, 10), true)
+	check_equal(look._stage_of(float((look._coins[3] as Array)[1])), 2, "said again (a restore), it stays whole: no pop")
 	bus.coin_changed.emit(3, Vector2(10, 10), false)
 	check_equal([look.count(), look.lying()], [1, 0], "still drawn as it goes")
 	for frame in 3:

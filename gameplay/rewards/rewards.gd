@@ -23,7 +23,7 @@ extends Node
 ##   as a run of rooms begins); a player's are those, then their relics' (the relics bag of its
 ##   wizard, `RelicBase`). Read by name: `stat_of`.
 ## - **Coins** (decision 18: shared income, own wallet): a foe that dies (`enemy_died`) drops its
-##   `EnemyBase.coins` where it fell, each one coin anyone may take: the first wizard (seat order)
+##   `EnemyBase.coins` where it fell (an add another body called, `Actor.is_add`, drops none), each one coin anyone may take: the first wizard (seat order)
 ##   whose feet come within `COIN_REACH` takes it, and every player's wallet gains one. Each wallet
 ##   starts a run with its player's `start_coins`, and spending is one's own (`spend`, for CB11's
 ##   shop). The coins on the floor are the world's: a new world (`room_entered` FIRST_ROOM) and a
@@ -134,8 +134,9 @@ func begin_run() -> void:
 		_say_wallet(seat)
 
 
-## The tick's step: a seat whose wizard came gets its starting coins (once a run); each coin a
-## wizard's feet reach is taken (seats in order, the first takes it).
+## The tick's step: the clears since the last step are rolled for; a seat whose wizard came gets
+## its starting coins (once a run); each coin a wizard's feet reach is taken (seats in order, the
+## first takes it).
 func step(_delta: float) -> void:
 	if actors == null:
 		return
@@ -166,7 +167,9 @@ func step(_delta: float) -> void:
 # --- Asked ------------------------------------------------------------------------------
 
 ## Seat `seat`'s run stat `stat` (`RunStats.value_of`): its base, the run's changes, then the
-## relics its wizard holds.
+## relics its wizard holds. For this area's own rules and tests: another area that reads a run stat
+## (CB9's map, CB11's fountain) hears `run_stats_ruled` itself and works it out with `RunStats`, as
+## areas never call each other.
 func stat_of(seat: int, stat: StringName) -> float:
 	return RunStats.value_of(stat, _run_changes, _relics_of(seat))
 
@@ -176,8 +179,8 @@ func wallet_of(seat: int) -> int:
 	return _wallets[seat] if seat >= 0 and seat < SEATS else 0
 
 
-## Spend `amount` coins of seat `seat`'s own wallet (a shop's buy, CB11): false, and nothing changes,
-## when it holds fewer.
+## Spend `amount` coins of seat `seat`'s own wallet (a shop's buy: the shop is this area's, CB11):
+## false, and nothing changes, when it holds fewer. Not for other areas (they never call this one).
 func spend(seat: int, amount: int) -> bool:
 	if seat < 0 or seat >= SEATS or amount < 0 or _wallets[seat] < amount:
 		return false
@@ -275,7 +278,8 @@ func _roll_clear(room: int) -> void:
 
 
 ## Seat `player` picked choice `choice` of its offer `offer` (a command): given to its wizard and
-## gone, or kept (not its offer, no such choice, no wizard, no room in the bag).
+## gone, or kept (not its offer, no such choice; `reward_refused` for no wizard, no room in the bag,
+## a heal while down).
 func _on_reward_pick_requested(player: int, offer: int, choice: int) -> void:
 	var at: int = -1
 	for i in _offers.size():
@@ -288,6 +292,8 @@ func _on_reward_pick_requested(player: int, offer: int, choice: int) -> void:
 	if choice < 0 or choice >= row.size():
 		return
 	if not _give(player, row.kinds[choice], row.ids[choice], row.counts[choice]):
+		if events != null:
+			events.reward_refused.emit(player, offer)
 		return
 	_offers.remove_at(at)
 	if events != null:
@@ -310,7 +316,8 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 		return
 	if not _fought.has(body.room):
 		_fought.append(body.room)
-	if body.data == null:
+	if body.data == null or body.is_add:
+		# An add (a boss's waves, boss plan OB13) drops no coins: waves without end would fill wallets.
 		return
 	for i in body.data.coins:
 		var spot: Vector2 = position + COIN_SPREAD[i % COIN_SPREAD.size()]

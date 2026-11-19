@@ -7,13 +7,17 @@ extends PanelContainer
 ## nothing else for A while it has one waiting (the unspent icon on its corner panel says so). It is
 ## that seat's alone and pauses nothing (pillar 2). `accept` on a choice sends the command
 ## `reward_pick_requested(seat, offer, choice)` and closes it; `back` closes it with nothing sent, the
-## offer left unspent. It closes by itself when the offer it shows is gone. Display and intent
+## offer left unspent. It closes by itself when the offer it shows is gone. A pick the Rewards area
+## refuses (`reward_refused`: no room in the bag, a heal while down) opens it again on that offer,
+## its title saying so. Display and intent
 ## only: what a pick gives is the Rewards area's, told back by `rewards_waiting_changed`.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 
 const TITLE_TEXT: String = "Pick 1 of %d"
+## Its title after a pick was refused (`reward_refused`: a full bag, a heal while down).
+const REFUSED_TEXT: String = "Can't take that now"
 ## Marks the focused choice.
 const FOCUS_MARK: String = "> "
 const MIN_WIDTH: float = 96.0
@@ -33,6 +37,8 @@ var _offers: Array[Dictionary] = []
 var _shown: int = -1
 ## An offer was rolled while the seat's wizard was there: the panels open it when they may.
 var _wants_open: bool = false
+## The offer whose pick was refused, shown with REFUSED_TEXT the next time it opens (-1: none).
+var _refused: int = -1
 
 
 func _ready() -> void:
@@ -58,6 +64,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	if _events != null:
 		_events.rewards_waiting_changed.connect(_on_rewards_waiting_changed)
 		_events.reward_rolled.connect(_on_reward_rolled)
+		_events.reward_refused.connect(_on_reward_refused)
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
 		_ui_focus.activated.connect(_on_activated)
@@ -125,7 +132,8 @@ func _fill(offer: Dictionary) -> void:
 	_buttons.clear()
 	_shown = int(offer.get("offer", -1))
 	var choices: Array = offer.get("choices", [])
-	_title.text = TITLE_TEXT % choices.size()
+	_title.text = REFUSED_TEXT if _shown == _refused else TITLE_TEXT % choices.size()
+	_refused = -1
 	for choice in choices.size():
 		var made := Button.new()
 		made.name = "Choice%d" % choice
@@ -158,6 +166,12 @@ func _on_rewards_waiting_changed(player: int, offers: Array[Dictionary]) -> void
 
 func _on_reward_rolled(player: int, _offer: int, _choices: Array[Dictionary], here: bool) -> void:
 	if player == index and here:
+		_wants_open = true
+
+
+func _on_reward_refused(player: int, offer: int) -> void:
+	if player == index:
+		_refused = offer
 		_wants_open = true
 
 

@@ -179,6 +179,7 @@ const EVENTS: Dictionary = {
 	# Rewards and progression.
 	&"reward_rolled": [["player", TYPE_INT], ["offer", TYPE_INT], ["choices", TYPE_ARRAY], ["here", TYPE_BOOL]],
 	&"reward_taken": [["player", TYPE_INT], ["offer", TYPE_INT], ["choice", TYPE_INT], ["reward", TYPE_DICTIONARY]],
+	&"reward_refused": [["player", TYPE_INT], ["offer", TYPE_INT]],
 	&"rewards_waiting_changed": [["player", TYPE_INT], ["offers", TYPE_ARRAY]],
 	&"coin_changed": [["coin", TYPE_INT], ["at", TYPE_VECTOR2], ["lying", TYPE_BOOL]],
 	&"wallet_changed": [["player", TYPE_INT], ["coins", TYPE_INT]],

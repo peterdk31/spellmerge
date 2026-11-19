@@ -76,9 +76,9 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `gather_door_shown` | `flow` (a biome's gather door, gate or portal home: who is gathered at it, held, open; connected biomes CB7) | `feel` (its bars, lamps and portal) |
 | `room_left` | `flow` (the party goes on to the next room of the run; a biome's world goes, `Events.ALL_ROOMS`) | `core/spells` (what was cast in the room ends quietly) |
 | `room_entered` | `flow` (by room number: a biome's each room the first time; `Events.FIRST_ROOM` is a new world, connected biomes CB3) | `ai`, `coop`, `difficulty`, `hud`, `feel` (its walls' colours for motes; the party camera jumps to the new room) |
-| `room_built` | `flow` | `feel` (ground cover GC3: the cover's look, `cover.gd`) and `cover` (GC5): the room's cover worked out from its layout, `CoverLayout.of` |
+| `room_built` | `flow` | `feel` (ground cover GC3: the cover's look, `cover_rooms.gd`, a `cover.gd` a piece) and `cover` (GC5): each piece's cover worked out from its layout at its place, mirrored with it, `CoverLayout.of_piece` (connected biomes CB3b) |
 | `floor_touched` | `core/spells` (a blast, a pulse's ring, a pool lying and on its ticks, a shot's end; ground cover GC5) | `cover` (the `element` triggers of the cells inside its circle, at its next step) |
-| `cover_changed` | `cover` (each tick's changes; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look) |
+| `cover_changed` | `cover` (each tick's changes of one room, by its number; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look of that room) |
 | `status_requested` | `core/spells` (a portal's infusion) and `cover` (a status of the cover a body stands in, ground cover GC5 rule 4: asked as any status is) | `combat` |
 | `room_cleared` | `flow` | `rewards`, `run` |
 | `door_voted` | `flow` | none yet |

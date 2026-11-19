@@ -37,7 +37,7 @@ func before_each() -> void:
 	_world.projectiles.set_cap(512)
 	_changes.clear()
 	_asked.clear()
-	_world.bus.cover_changed.connect(func(cells: PackedInt32Array, states: PackedInt32Array) -> void: _changes.append([cells.duplicate(), states.duplicate()]))
+	_world.bus.cover_changed.connect(func(_room: int, cells: PackedInt32Array, states: PackedInt32Array) -> void: _changes.append([cells.duplicate(), states.duplicate()]))
 	_world.bus.status_requested.connect(func(_caster: int, target: Node, status: StringName, _duration: float, _strength: float) -> void: _asked.append([target, status]))
 	_layout = _make_layout(FIELD)
 	_cover = _make_cover(7, [GRASS])
@@ -356,7 +356,7 @@ func test_a_room_with_no_cover_keeps_no_state_and_hears_no_touch() -> void:
 	check_equal(_cover.layout.count(), 0, "no cover")
 	_touch(&"fire", Vector2(40.0, 40.0), 40.0)
 	_steps(1)
-	check_equal(_cover.get(&"_state"), PackedByteArray(), "no state")
+	check_equal(_cover.cell_count(), 0, "no state")
 	check_equal(_cover.get(&"_touch_at"), PackedVector2Array(), "nothing queued")
 
 
@@ -366,7 +366,7 @@ func test_a_run_start_renews_it() -> void:
 	_cover.begin_run()
 	check_equal(_cover.rolls(), 0, "the counter from 0")
 	check(_cover.active_cells().is_empty(), "nothing active")
-	check_equal(_cover.get(&"_state"), PackedByteArray(), "empty until the next room sizes it")
+	check_equal(_cover.cell_count(), 0, "empty until the next room sizes it")
 
 
 func test_a_cell_rolls_only_for_neighbours_its_element_moves_on() -> void:
@@ -490,12 +490,12 @@ func test_only_cover_in_the_room_counts_as_harmful_at_rest() -> void:
 	_cover.free()
 	_cover = _make_cover(7, [GRASS, webs])
 	check_equal(_cover.layout.count(webs.id), 0, "the webs have no cell here")
-	check(not _cover.get(&"_rest_harms"), "so nothing here harms at rest")
+	check(not _cover.room().get(&"_rest_harms"), "so nothing here harms at rest")
 	var here := GRASS.duplicate(true) as CoverKind
 	here.states[0].status = &"chill"
 	_cover.free()
 	_cover = _make_cover(7, [here])
-	check(_cover.get(&"_rest_harms"), "cover in the room harmful at rest counts")
+	check(_cover.room().get(&"_rest_harms"), "cover in the room harmful at rest counts")
 
 
 ## A look passes over the rows of its window with no harming cell (`_harming_rows`, kept with each
@@ -510,14 +510,14 @@ func test_the_harming_rows_kept_are_a_recounts_and_looks_see_every_fire() -> voi
 	var saw_fire: bool = false
 	for i in 240:
 		_steps(1)
-		var kept: PackedInt32Array = (_cover.get("_harming_rows") as PackedInt32Array).duplicate()
-		var total: int = int(_cover.get("_harming"))
+		var kept: PackedInt32Array = (_cover.room().get("_harming_rows") as PackedInt32Array).duplicate()
+		var total: int = int(_cover.room().get("_harming"))
 		for at: Vector2 in [_middle(_cell(3, 2)), _middle(_cell(9, 7)), _middle(_cell(6, 5))]:
 			_cover.look(at, 64.0, sight)
-			_cover.call("_count_harming")
+			_cover.room().call("_count_harming")
 			_cover.look(at, 64.0, fresh)
 			check_equal(sight.count, fresh.count, "step %d: the look at %s marks what a recount's does" % [i, at])
 			saw_fire = saw_fire or sight.count > 0
-		check_equal(_cover.get("_harming_rows"), kept, "step %d: the rows kept are a recount's" % i)
-		check_equal(int(_cover.get("_harming")), total, "step %d: and so is the total" % i)
+		check_equal(_cover.room().get("_harming_rows"), kept, "step %d: the rows kept are a recount's" % i)
+		check_equal(int(_cover.room().get("_harming")), total, "step %d: and so is the total" % i)
 	check(saw_fire, "the looks saw the fires")

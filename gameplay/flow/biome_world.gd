@@ -170,8 +170,13 @@ func mouth_rect(bridge: int, end: int) -> Rect2:
 	return _moved(shape.mouth_rect(map.end_socket(bridge, end)), map.room_places[room]) if shape != null else Rect2()
 
 
-## The world's bounds for the biome: every piece, and MARGIN round them.
+## The world's bounds for the biome: every piece (`area`), and MARGIN round them.
 func bounds() -> Rect2:
+	return area().grow(MARGIN)
+
+
+## What the biome's pieces cover together, from the first room's corner: what the camera keeps to.
+func area() -> Rect2:
 	var whole := Rect2()
 	var first: bool = true
 	for room in map.rooms():
@@ -179,7 +184,7 @@ func bounds() -> Rect2:
 		first = false
 	for bridge in map.bridges():
 		whole = whole.merge(bridge_rect(bridge))
-	return whole.grow(MARGIN)
+	return whole
 
 
 ## Lay the map's pieces and the grid (the class doc); `restored`: after a snapshot, over the bounds
@@ -220,6 +225,9 @@ func _place(named: String, template: StringName, place: Vector2, mirror: int, in
 	# How it is placed, for the view: Feel draws a room's ground mirrored from its shape as it hears
 	# the room built (connected biomes CB4, `GroundShape.MIRROR_META`). The node is never flipped.
 	layout.set_meta(PieceShape.GROUND_MIRROR_META, Vector2i(1 if (mirror & PieceShape.MIRROR_X) != 0 else 0, 1 if (mirror & PieceShape.MIRROR_Y) != 0 else 0))
+	# A room's kind, for the view (connected biomes CB12: its music, air and light by kind).
+	if number < map.rooms() and map.room_kinds[number] != &"":
+		layout.set_meta(RoomKind.LAYOUT_META, map.room_kinds[number])
 	var piece := layout as Node2D
 	if piece != null:
 		piece.position = place
@@ -269,7 +277,8 @@ func _lay_grid(restored: bool) -> void:
 		grid.add_place(room_rect(room))
 		biggest = maxf(biggest, maxf(room_rect(room).size.x, room_rect(room).size.y))
 	for bridge in map.bridges():
-		grid.add_place(bridge_rect(bridge))
+		# Over the lips of its rooms past their mouths: a body there is on the bridge (CB8).
+		grid.add_place(bridge_rect(bridge), true)
 	if not restored:
 		projectiles.set_room_size(biggest)
 	if restored:

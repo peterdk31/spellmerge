@@ -65,7 +65,7 @@ const PAST_MOUTHS: int = 255 & ~MOUTH_CELL
 ## walking grid), set up again in `rebuild_derived` (see the class doc).
 ## The places, their seals and their sleep too (`add_place`, `set_sealed`, `set_awake`): laid from
 ## the biome map and Flow's room state by whoever lays them.
-const DERIVED: Array[StringName] = [&"_bounds", &"_wall_w", &"_wall_h", &"_wall_cells", &"_has_walls", &"_has_mouths", &"_ground_cells", &"_footprint_missed", &"_hole_cells", &"_has_holes", &"_walk_cells", &"_place_rects", &"_sealed", &"_asleep", &"_place_w", &"_place_h", &"_place_cells"]
+const DERIVED: Array[StringName] = [&"_bounds", &"_wall_w", &"_wall_h", &"_wall_cells", &"_has_walls", &"_has_mouths", &"_ground_cells", &"_footprint_missed", &"_hole_cells", &"_has_holes", &"_walk_cells", &"_place_rects", &"_sealed", &"_asleep", &"_place_w", &"_place_h", &"_place_cells", &"_place_over", &"_place_mixed"]
 ## What `place_at` answers outside every place (and everywhere in a world with none).
 const NO_PLACE: int = -1
 ## The side of a cell of the places' lookup (`place_at`), in pixels: a biome's pieces stand on the
@@ -112,6 +112,11 @@ var _asleep: PackedByteArray = PackedByteArray()
 var _place_w: int = 0
 var _place_h: int = 0
 var _place_cells: PackedByteArray = PackedByteArray()
+## 1 for a place that wins where it overlaps another (`add_place`'s `over`: a bridge over a room's
+## lip, connected biomes CB8), and 1 for a PLACE_CELL square such a place reaches into at all (there
+## `place_at` asks those places first).
+var _place_over: PackedByteArray = PackedByteArray()
+var _place_mixed: PackedByteArray = PackedByteArray()
 
 func _init() -> void:
 	_footprint_at.resize(ACTORS)
@@ -430,17 +435,31 @@ func wall_image(holes: bool = false) -> Image:
 
 
 ## Place number `place` (the next one: places are added in order) is the world rectangle `rect`
-## (connected biomes CB3; see the class doc), unsealed. Returns its number.
-func add_place(rect: Rect2) -> int:
+## (connected biomes CB3; see the class doc), unsealed. Returns its number. Where places overlap the
+## first added holds the point, but one added `over` holds it over every other (a bridge over the lip
+## of the room its end meets, past the room's mouth: a body crosses from a bridge into a room only by
+## its mouth, connected biomes CB8).
+func add_place(rect: Rect2, over: bool = false) -> int:
 	_place_rects.append(rect)
 	_sealed.append(0)
 	_asleep.append(0)
+	_place_over.append(1 if over else 0)
 	var number: int = _place_rects.size() - 1
 	if _place_cells.is_empty():
 		_place_w = maxi(ceili(_bounds.size.x / PLACE_CELL), 1)
 		_place_h = maxi(ceili(_bounds.size.y / PLACE_CELL), 1)
 		_place_cells.resize(_place_w * _place_h)
 		_place_cells.fill(0)
+		_place_mixed.resize(_place_w * _place_h)
+		_place_mixed.fill(0)
+	if over:
+		var ox0: int = maxi(floori((rect.position.x - _bounds.position.x) / PLACE_CELL), 0)
+		var oy0: int = maxi(floori((rect.position.y - _bounds.position.y) / PLACE_CELL), 0)
+		var ox1: int = mini(ceili((rect.end.x - _bounds.position.x) / PLACE_CELL), _place_w)
+		var oy1: int = mini(ceili((rect.end.y - _bounds.position.y) / PLACE_CELL), _place_h)
+		for y in range(oy0, oy1):
+			for x in range(ox0, ox1):
+				_place_mixed[y * _place_w + x] = 1
 	if number < 255:
 		var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / PLACE_CELL), 0)
 		var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / PLACE_CELL), 0)
@@ -459,7 +478,9 @@ func clear_places() -> void:
 	_place_rects.clear()
 	_sealed.resize(0)
 	_asleep.resize(0)
+	_place_over.resize(0)
 	_place_cells.resize(0)
+	_place_mixed.resize(0)
 	_place_w = 0
 	_place_h = 0
 
@@ -481,9 +502,16 @@ func place_at(point: Vector2) -> int:
 	var x: int = floori((point.x - _bounds.position.x) / PLACE_CELL)
 	var y: int = floori((point.y - _bounds.position.y) / PLACE_CELL)
 	if x >= 0 and x < _place_w and y >= 0 and y < _place_h:
+		if _place_mixed[y * _place_w + x] != 0:
+			for place in _place_rects.size():
+				if _place_over[place] != 0 and _place_rects[place].has_point(point):
+					return place
 		var guess: int = _place_cells[y * _place_w + x] - 1
 		if guess >= 0 and _place_rects[guess].has_point(point):
 			return guess
+	for place in _place_rects.size():
+		if _place_over[place] != 0 and _place_rects[place].has_point(point):
+			return place
 	for place in _place_rects.size():
 		if _place_rects[place].has_point(point):
 			return place

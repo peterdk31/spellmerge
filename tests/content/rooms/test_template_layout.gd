@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Every room template's layout (content/rooms: arena_01 and every room a run's map can pick, found
 ## by folder), about where things are and what can be reached, never about how a room looks: spawns
-## lie inside the room and clear of walls, the doors sit in the border, and every spawn can be
+## lie inside the room and clear of walls, the doors (where a room has them) sit in the border, and every spawn can be
 ## reached from the first player spawn.
 
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
@@ -9,8 +9,6 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 ## Clearance a spawn needs around it (a wizard is about 12 px wide).
 const SPAWN_RADIUS: float = 12.0
 const TILE: float = 32.0
-## The part of an exit's area a wizard walks into, from its bottom: a wizard's height and a half.
-const EXIT_FOOT: float = 24.0
 ## The walls' grid (the projectile manager's `WALL_CELL`), on which the reach is flooded.
 const CELL: float = 8.0
 const STEPS: Array[Vector2i] = [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
@@ -63,6 +61,9 @@ func test_scenes_have_no_scripts() -> void:
 func test_spawn_groups_hold_only_markers() -> void:
 	for room in templates:
 		for group: String in ["PlayerSpawns", "EnemySpawns", "Doors"]:
+			# A start room stands no enemy, and no room needs doors since the row run went (CB8).
+			if group != "PlayerSpawns" and layouts[room.id].get_node_or_null(group) == null:
+				continue
 			check(RoomScan.only_markers(layouts[room.id], group), "%s: %s holds only Marker2D nodes" % [room.id, group])
 
 
@@ -98,38 +99,9 @@ func test_spawns_do_not_overlap() -> void:
 func test_doors_lie_on_the_border() -> void:
 	for room in templates:
 		var size: Vector2 = _bounds(room).end
-		check(room.places().doors.size() >= 1, "%s has a door" % room.id)
 		for door in room.places().doors:
 			var on_border: bool = door.x < TILE or door.y < TILE or door.x > size.x - TILE or door.y > size.y - TILE
 			check(on_border, "%s: door %s lies on the border" % [room.id, door])
-
-
-## Where each exit is stood on (a prop of the role `room_exit`, run generation RG4): its foot (the
-## lowest `EXIT_FOOT` pixels of its area, where a wizard walks in) open floor clear of every wall,
-## its whole area inside the room and clear of every spawn, so a wizard can step in and nobody
-## starts in a way on. Above its foot an exit may rise over the edge: a crypt gate stands against a
-## floating room's north edge, its arch over the dark (crypt rework CR-G).
-func test_exits_are_open_floor_clear_of_spawns() -> void:
-	for room in templates:
-		var places: RoomPlaces = room.places()
-		var props: Array[Resource] = places.placed_of(PropBase)
-		var at: PackedVector2Array = places.placed_at_of(PropBase)
-		for i in props.size():
-			var prop: PropBase = props[i] as PropBase
-			if prop.role != RoomBase.EXIT_ROLE:
-				continue
-			var area: Rect2 = prop.area_rect()
-			area.position += at[i]
-			check(_bounds(room).encloses(area), "%s: the exit at %s is inside the room" % [room.id, at[i]])
-			# A tiled room's exit stands whole on its floor; only a ground's (a floating room's) may
-			# rise over its edge.
-			var foot: Rect2 = area
-			if _has_ground(room):
-				foot = Rect2(area.position.x, area.end.y - EXIT_FOOT, area.size.x, minf(EXIT_FOOT, area.size.y))
-			for wall in _walls(room):
-				check(not wall.intersects(foot), "%s: the exit at %s is walked into from open floor, clear of the wall %s" % [room.id, at[i], wall])
-			for point in _spawns(room):
-				check(not area.grow(SPAWN_RADIUS).has_point(point), "%s: the spawn %s is clear of the exit at %s" % [room.id, point, at[i]])
 
 
 ## True when the room's floor is a ground drawn from a shape (tools/ground_shape.py).
@@ -138,8 +110,7 @@ func _has_ground(room: RoomBase) -> bool:
 	return ground != null and ground.has_meta(&"ground_inputs")
 
 
-## Every prop the room stands (a pillar, a heap; not an exit, whose arch may rise over a floating
-## room's edge) has its ground, where it blocks and is stood, on open floor: clear of every wall and
+## Every prop the room stands (a pillar, a heap) has its ground, where it blocks and is stood, on open floor: clear of every wall and
 ## hole, so a floating room's pillar never hangs over its edge (crypt rework CR3).
 func test_props_stand_on_open_floor() -> void:
 	for room in templates:
@@ -149,8 +120,6 @@ func test_props_stand_on_open_floor() -> void:
 		var blocked: Array[Rect2] = _walls(room) + RoomPlaces.hole_rects(layouts[room.id])
 		for i in props.size():
 			var prop: PropBase = props[i] as PropBase
-			if prop.role == RoomBase.EXIT_ROLE:
-				continue
 			# Its own ground, or (none set: the kit fits one under its hurt box) its whole extent.
 			var ground: Rect2 = prop.ground_rect() if prop.has_footprint() else prop.extent()
 			ground.position += at[i]
@@ -246,32 +215,6 @@ func _body_box(data: EnemyBase) -> Rect2:
 func _shape_box(size: Vector2, radius: float, offset: Vector2) -> Rect2:
 	var half: Vector2 = size * 0.5 if size.x > 0.0 and size.y > 0.0 else Vector2(radius, radius)
 	return Rect2(offset - half, half * 2.0)
-
-
-## A template a run may pick for a room that leads on has an exit for each way a room may lead
-## (`MapRules.most_ways`): with fewer the generator never picks it there (RG4), so it would stand
-## only for a last room.
-func test_templates_have_exits_for_every_way_on() -> void:
-	var checked: int = 0
-	for res: Resource in registry.get_all(&"runs"):
-		for rules: MapRules in (res as RunDefinition).biomes:
-			for rule: KindRule in rules.kinds:
-				if not _leads_on(rules, rule):
-					continue
-				for room in templates:
-					if room.biome == rules.biome and room.kinds.has(rule.kind):
-						checked += 1
-						check(room.exit_count() >= rules.most_ways(), "%s hosts %s in %s, which leads on to %d rooms: it has %d exits" % [room.id, rule.kind, rules.biome, rules.most_ways(), room.exit_count()])
-	check(checked >= 4, "the crypt's fight rooms are checked (%d)" % checked)
-
-
-## True if a room of `rule`'s kind may stand in a row before the last at some depth of `rules`.
-func _leads_on(rules: MapRules, rule: KindRule) -> bool:
-	for depth in range(rules.depth_min, rules.depth_max + 1):
-		for row in depth - 1:
-			if rule.takes_row(row, depth):
-				return true
-	return false
 
 
 ## Flood fill on the 8 px wall grid from the first player spawn, through the cells a wizard fits

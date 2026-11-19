@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/void.svg" id="1_void"]
 [ext_resource type="PackedScene" path="res://content/rooms/crypt/arena_03_ground.tscn" id="2_ground"]
@@ -9,7 +9,6 @@
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="7_rubble"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="8_skull"]
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="10_prop_stand_in"]
-[ext_resource type="Resource" path="res://content/props/crypt_gate/crypt_gate.tres" id="11_gate"]
 [ext_resource type="Resource" path="res://content/props/crypt_pillar/crypt_pillar.tres" id="12_pillar"]
 [ext_resource type="Script" path="res://core/base/cover_field.gd" id="gc_field"]
 [ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
@@ -313,18 +312,6 @@ position = Vector2(320, 16)
 [node name="Entry" type="Marker2D" parent="Doors"]
 position = Vector2(320, 432)
 
-[node name="Exits" type="Node2D" parent="."]
-
-[node name="ExitLeft" type="Node2D" parent="Exits"]
-position = Vector2(272, 64)
-script = ExtResource("10_prop_stand_in")
-prop = ExtResource("11_gate")
-
-[node name="ExitRight" type="Node2D" parent="Exits"]
-position = Vector2(368, 64)
-script = ExtResource("10_prop_stand_in")
-prop = ExtResource("11_gate")
-
 [node name="Cover" type="Node2D" parent="."]
 
 [node name="WebsTopLeft" type="ReferenceRect" parent="Cover"]
@@ -358,6 +345,11 @@ script = ExtResource("gc_preview")
 position = Vector2(32, 192)
 script = ExtResource("cb_socket")
 facing = 3
+
+[node name="SocketEast" type="Node2D" parent="."]
+position = Vector2(608, 256)
+script = ExtResource("cb_socket")
+facing = 1
 
 [node name="SocketPreview" type="Node2D" parent="."]
 script = ExtResource("cb_socket_preview")

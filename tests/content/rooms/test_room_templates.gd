@@ -15,11 +15,18 @@ func test_every_template_has_enemy_and_player_spawns() -> void:
 	var registry := own(RegistryScript.new()) as RegistryScript
 	registry.scan()
 	var templates: int = 0
-	for room: RoomBase in registry.run_content().rooms:
+	var content: RunContent = registry.run_content()
+	for room: RoomBase in content.rooms:
 		if room.kinds.is_empty():
 			continue
 		templates += 1
 		var places: RoomPlaces = room.places()
-		check(places.enemy_spawns.size() >= 1, "%s hosts %s: it has enemy spawns" % [room.id, room.kinds])
+		# A room no fight stands in (a biome's start room, connected biomes CB8) needs no enemy spawn.
+		var fought: bool = false
+		for kind_id: StringName in room.kinds:
+			var kind: RoomKind = content.kind(kind_id)
+			fought = fought or (kind != null and kind.fill != RoomKind.FILL_NONE)
+		if fought:
+			check(places.enemy_spawns.size() >= 1, "%s hosts %s: it has enemy spawns" % [room.id, room.kinds])
 		check(places.player_spawns.size() >= SEATS, "%s hosts %s: a player spawn for each of %d seats (%d)" % [room.id, room.kinds, SEATS, places.player_spawns.size()])
 	check(templates >= 1, "it finds the templates (%d)" % templates)

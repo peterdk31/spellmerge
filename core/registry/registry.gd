@@ -54,6 +54,8 @@ var _sound_clashes: PackedStringArray = PackedStringArray()
 var _data: Dictionary = {}
 ## A plain name: what an id or a data file's name may be (`get_data`).
 var _plain: RegEx = RegEx.create_from_string("^[a-z0-9_]+$")
+## The templates' shapes by biome (`piece_shapes`), kept until the content changes.
+var _piece_shapes: Dictionary = {}
 
 ## The folder a content item keeps its sounds in, and a sound's folder of baked variants: never ids.
 const SOUNDS_FOLDER: String = "sounds"
@@ -76,6 +78,7 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 	_content_root = content_root
 	_duplicates.clear()
 	_resources.clear()
+	_piece_shapes.clear()
 	_ids.clear()
 	_sound_paths.clear()
 	_sounds.clear()
@@ -242,6 +245,8 @@ func run_content() -> RunContent:
 ## `MapRules.biome_problems` read with `run_content()`. Each template with a scene is built once
 ## here, so ask once a run, never a frame.
 func piece_shapes(biome: StringName) -> Dictionary:
+	if _piece_shapes.has(biome):
+		return _piece_shapes[biome]
 	var found: Dictionary = {}
 	for item: Resource in get_all(&"rooms"):
 		var room := item as RoomBase
@@ -250,22 +255,33 @@ func piece_shapes(biome: StringName) -> Dictionary:
 		var shape: PieceShape = PieceShape.of_room(room)
 		if shape != null:
 			found[room.id] = shape
+	_piece_shapes[biome] = found
 	return found
 
 
 ## What keeps a map of the run `run_id` from being made from the content there is, one line each
 ## (empty when nothing does): no run of that id under `runs`, or its definition's problems
-## (`RunDefinition.problems` on `run_content()`, as the generator checks them). Asked before a run's
-## start frees anything (Flow). The rolls of a map can still corner it (only `KindRule.not_after`
-## can; gameplay/run/run_generator.gd), which only the run's seed tells.
+## (`RunDefinition.biome_problems` on `run_content()` and its first biome's `piece_shapes`, as the
+## generator checks them). Asked before a run's start frees anything (Flow). The templates' shapes
+## can still leave a seed's map no room (gameplay/run/biome_generator.gd), which only the run's seed
+## tells.
 func run_problems(run_id: StringName) -> PackedStringArray:
 	var definition := get_resource(&"runs", run_id) as RunDefinition
 	if definition == null:
 		return PackedStringArray(["No run '%s' in the registry." % run_id])
-	return definition.problems(run_content())
+	return definition.biome_problems(run_content(), run_shapes(definition))
 
 
-## The problems with the runs (`runs`: each `RunDefinition.problems` on `run_content()`), each room
+## The shapes of the templates of `definition`'s first biome (`piece_shapes`; empty with no biome):
+## what its map is made of.
+func run_shapes(definition: RunDefinition) -> Dictionary:
+	if definition == null or definition.biomes.is_empty() or definition.biomes[0] == null:
+		return {}
+	return piece_shapes(definition.biomes[0].biome)
+
+
+## The problems with the runs (`runs`: each `RunDefinition.biome_problems` on `run_content()` and
+## its biome's shapes), each room
 ## kind's (`RoomKind.problems`), each room's as a run's template (`RoomBase.template_problems`) and
 ## more save flags named by the runs' rule changes than a run's start carries, one line each; empty when every run can be made from the content there is.
 func validate_runs() -> PackedStringArray:
@@ -279,7 +295,7 @@ func validate_runs() -> PackedStringArray:
 	var flags: Array[StringName] = []
 	for res: Resource in get_all(&"runs"):
 		if res is RunDefinition:
-			found.append_array((res as RunDefinition).problems(content))
+			found.append_array((res as RunDefinition).biome_problems(content, run_shapes(res as RunDefinition)))
 			for flag: StringName in (res as RunDefinition).flags():
 				if not flags.has(flag):
 					flags.append(flag)
@@ -331,6 +347,7 @@ func add(folder: StringName, resource: Resource) -> bool:
 		return false
 	found[id] = resource
 	_resources[folder] = found
+	_piece_shapes.clear()
 	var ids: Array[StringName] = get_ids(folder)
 	ids.append(id)
 	ids.sort_custom(_name_less)
@@ -345,6 +362,7 @@ func remove(folder: StringName, id: StringName) -> bool:
 	if not found.has(id):
 		return false
 	found.erase(id)
+	_piece_shapes.clear()
 	var ids: Array[StringName] = get_ids(folder)
 	ids.erase(id)
 	_ids[folder] = ids

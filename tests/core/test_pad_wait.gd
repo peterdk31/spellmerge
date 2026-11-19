@@ -124,3 +124,24 @@ func _axis(device: int, axis: JoyAxis, value: float) -> InputEventJoypadMotion:
 	event.axis = axis
 	event.axis_value = value
 	return event
+
+
+## Regression (connected biomes CB3, made reachable by CB8): only a new world (FIRST_ROOM entered: a
+## run's start lets every stop go) has a waiting seat ask again; a biome's later room entered changes
+## no stop, so a waiting seat never asks twice.
+func test_a_waiting_seat_asks_again_only_in_a_new_world() -> void:
+	var input: InputManagerScript = root.get_node("PlayerInput") as InputManagerScript
+	var events: Node = root.get_node("Events")
+	var asked: Array[int] = []
+	var hear := func(player: int, on: int) -> void:
+		if on == 1:
+			asked.append(player)
+	events.connect("pad_wait_requested", hear)
+	var kept: bool = input._waiting[2]
+	input._waiting[2] = true
+	events.emit_signal("room_entered", &"arena_01", 1)
+	check(asked.is_empty(), "a biome's later room: nobody asks again")
+	events.emit_signal("room_entered", &"arena_01", 0)
+	check_equal(asked, [2] as Array[int], "a new world: the waiting seat asks again")
+	input._waiting[2] = kept
+	events.disconnect("pad_wait_requested", hear)

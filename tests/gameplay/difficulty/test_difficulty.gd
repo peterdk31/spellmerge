@@ -5,8 +5,9 @@ extends "res://tests/support/suite.gd"
 ## skill follows: enemy AI AI10); an enemy or a boss about to stand
 ## (`enemy_standing`) takes it (`Actor.stat_scale`), so its data's health is multiplied by it; the level
 ## is the run's state, 1 again at every run's start, so the hub scales nothing; and in
-## play, a pinned run of copies of the crypt arena (tests/support/pinned_run.gd) scaled by depth and
-## players stands each room's enemies at the room's scale, deeper rooms harder.
+## play, a pinned room of the crypt arena (tests/support/pinned_run.gd) scaled by its players stands
+## its enemies at the room's scale, also through a snapshot. (Deeper rooms of a biome, each fight at its
+## own scale: tests/gameplay/flow/test_room_life.gd.)
 const Spawning := preload("res://tests/support/spawning.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
@@ -79,10 +80,10 @@ func _stand(data: EnemyBase) -> Actor:
 	return body
 
 
-## A pinned run of copies of the arena, `depth` rows of one room, grown twice as hard to its
-## deepest row and 1.6 times with four players (each extra player a fifth more), played by `players`.
-func _play_scaled(depth: int, players: int) -> void:
-	var id: StringName = PinnedRun.pin(registry, ARENA, &"", RoomKind.FILL_ENEMIES, 16, depth, 1)
+## A pinned run of a copy of the arena (a one-room biome), grown twice as hard to its rules'
+## `scale_depth` and 1.6 times with four players (each extra player a fifth more), played by `players`.
+func _play_scaled(players: int) -> void:
+	var id: StringName = PinnedRun.pin(registry, ARENA)
 	scaled = registry.call("get_resource", &"runs", id) as RunDefinition
 	scaled.scaling = RunScaling.new()
 	scaled.scaling.per_depth = ScaleCurve.make(1.0, 2.0)
@@ -154,24 +155,12 @@ func test_the_hub_scales_nothing() -> void:
 	check_equal(_level(), 1.0, "the hub's start too")
 
 
-## Walk every standing wizard into the room's lit exit (the arena's right one, one way on).
-func _go_on(players: int) -> void:
-	for enemy: Node in flow.get(&"_enemies").duplicate():
-		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
-	flow.step(DT)
-	var exit: Actor = ExitRules.exits_in(flow.contents)[1]
-	for seat in players:
-		flow.get_wizard(seat).position = HubRules.area_at(exit.prop, exit.position).get_center()
-	flow.step(DT)
-
-
 ## A snapshot taken in a scaled room restores its enemies with their scaled health and the level
-## into a machine whose run is unscaled, and the next room is scaled on from there: by the snapshot's
-## map (its rooms' scales are state), though the definition there has no scaling.
+## into a machine whose run is unscaled: by the snapshot's map (its rooms' scales are state), though
+## the definition there has no scaling.
 func test_a_snapshot_of_a_scaled_room_restores_its_scale() -> void:
-	_play_scaled(3, 2)
-	_go_on(2)
-	_check_enemies_at(1.8, "the second room")
+	_play_scaled(2)
+	_check_enemies_at(1.2, "the room")
 	var snapshot: Snapshot = Snapshot.take(tick.state_areas(), root)
 	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
 	var taken_hash: Dictionary = SimHash.areas(tick.state_areas(), StateWalk.new())
@@ -179,28 +168,20 @@ func test_a_snapshot_of_a_scaled_room_restores_its_scale() -> void:
 	scaled.scaling = null
 	events.emit_signal("play_requested", 0)
 	_check_enemies_at(1.0, "a joining machine's unscaled run")
-	# The definition stays unscaled from here on: every scale after the restore is the snapshot's map's.
 	check_equal(snapshot.restore(tick.state_areas(), root), PackedStringArray(), "restored without problems")
 	check_equal(SimHash.areas(tick.state_areas(), StateWalk.new()), taken_hash, "the game is the snapshot's")
-	check(is_equal_approx(_level(), 1.8), "the level is the snapshot's: %s" % _level())
-	_check_enemies_at(1.8, "the restored room")
-	_go_on(2)
-	check(is_equal_approx(_level(), 2.4), "the deepest room after it: %s" % _level())
-	_check_enemies_at(2.4, "the deepest room")
+	check(is_equal_approx(_level(), 1.2), "the level is the snapshot's: %s" % _level())
+	_check_enemies_at(1.2, "the restored room")
 
 
-## Play: two players in a run three rows deep. The first room is scaled by the players alone (1.2),
-## the next by its depth too (half way down: 1.5 x 1.2).
+## Play: two players in a pinned room, the start room of its biome: scaled by the players alone (1.2),
+## told to difficulty before its enemies stand (the room's fight's scale, `run_room_filled`).
 func test_each_room_s_enemies_stand_at_its_scale() -> void:
-	_play_scaled(3, 2)
+	_play_scaled(2)
 	check_equal(flow.state, FlowScript.State.RUNNING, "the run is under way")
-	var first: RunNode = run.call("room_now") as RunNode
-	check(first != null and is_equal_approx(first.scale, 1.2), "the first room's scale: %s" % (first.scale if first != null else -1.0))
+	var map: BiomeMap = run.get(&"map") as BiomeMap
+	check(map != null and is_equal_approx(map.room_scales[0], 1.2), "the room's scale: %s" % (map.room_scales[0] if map != null else -1.0))
+	check(is_equal_approx(flow.life.fights[0].scale, 1.2), "its fight's scale")
 	check(is_equal_approx(_level(), 1.2), "the level is the room's")
-	_check_enemies_at(1.2, "the first room")
-	_go_on(2)
-	var next: RunNode = run.call("room_now") as RunNode
-	check(next != null and next.depth == 1, "on into the second row")
-	check(is_equal_approx(_level(), 1.8), "the level is the deeper room's: %s" % _level())
-	_check_enemies_at(1.8, "the second room")
+	_check_enemies_at(1.2, "the room")
 	check(told.is_empty(), "the room's scale is never the setting's level")

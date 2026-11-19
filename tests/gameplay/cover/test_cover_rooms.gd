@@ -1,11 +1,11 @@
 extends "res://tests/support/suite.gd"
 ## The cover area on the real autoloads (ground cover GC5, gameplay/cover/cover.gd): a room's cover is
-## worked out as Flow lays it out and starts at rest as the party enters it; a snapshot taken mid-fire
-## in a room other than the run's first, restored into a game that is in the run's first room (a
-## joining machine), keeps its fire (the restore's `room_built` never resets it, only `room_entered`
-## does) and Feel draws it; a restore into the room shown keeps it too. The rooms are copies of the
+## worked out as Flow lays it out and starts at rest as the party enters it, a fire lit there burns
+## and Feel draws it, and a snapshot restored into the room shown keeps it. The room is a copy of the
 ## crypt arena under a stand-in grass that fills its biome (tests/support/stand_in_grass.gd), pinned
-## as a run of known shape (tests/support/pinned_run.gd).
+## as a one-room biome (tests/support/pinned_run.gd). Every room of a biome's own cover, mirrored and
+## through a snapshot into a joining game, is tests/gameplay/cover/test_cover_biome.gd's (CB3b; the
+## row run's next room went with CB8).
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const CoverScript := preload("res://gameplay/cover/cover.gd")
@@ -58,15 +58,6 @@ func _play(run_id: StringName) -> void:
 	events.emit_signal("play_requested", 0)
 
 
-## The room's enemies down, and the wizard in its lit exit (a run one room wide lights the second): the party goes on.
-func _go_on() -> void:
-	for enemy: Node in flow.get(&"_enemies").duplicate():
-		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
-	var exit: Actor = ExitRules.exits_in(flow.contents)[1]
-	flow.get_wizard(0).position = HubRules.area_at(exit.prop, exit.position).get_center()
-	flow.step(DT)
-
-
 ## The first covered cell from the room's middle, and a fire touched there; `steps` of the area.
 func _light(steps: int) -> int:
 	var middle: int = cover.layout.cell_of(Vector2(cover.layout.columns, cover.layout.rows) * float(CoverLayout.CELL) * 0.5)
@@ -93,30 +84,17 @@ func _fire() -> Array:
 
 
 func test_a_room_entered_starts_at_rest() -> void:
-	_play(PinnedRun.pin(registry, ARENA, &"", RoomKind.FILL_ENEMIES, 16, 2, 1))
+	_play(PinnedRun.pin(registry, ARENA))
 	check(cover.layout != null and cover.layout.count() > 0, "the room's cover is worked out")
 	check_equal(cover.cell_count(), cover.layout.cells.size(), "its state sized to it")
 	check(cover.active_cells().is_empty(), "at rest")
 	var cell: int = _light(1)
 	check_equal(cover.state_at(cell), BURNING, "fire lights it")
 	check_equal(feel.cover().shown_state(cell), BURNING, "and Feel draws it")
-	_go_on()
-	check(cover.active_cells().is_empty(), "the next room starts at rest")
-	check_equal(feel.cover().shown_state(cell), 0, "and is drawn so")
 
 
-func test_a_snapshot_mid_fire_in_a_later_room_keeps_its_fire_in_a_joining_game() -> void:
-	var run_id: StringName = PinnedRun.pin(registry, ARENA, &"", RoomKind.FILL_ENEMIES, 16, 4, 1)
-	var other := ARENA.duplicate() as RoomBase
-	other.id = StringName(String(run_id) + "_other")
-	other.biome = ARENA.biome
-	other.kinds = [run_id] as Array[StringName]
-	registry.call("add", &"rooms", other)
-	_play(run_id)
-	var first: StringName = flow.room_id
-	_go_on()
-	var later: StringName = flow.room_id
-	check(later != first, "the second room is the other template")
+func test_a_snapshot_mid_fire_restored_into_the_room_shown_keeps_its_fire() -> void:
+	_play(PinnedRun.pin(registry, ARENA))
 	_light(40)
 	var fire: Array = _fire()
 	check(not (fire[0] as Dictionary).is_empty(), "a fire burns")
@@ -124,17 +102,8 @@ func test_a_snapshot_mid_fire_in_a_later_room_keeps_its_fire_in_a_joining_game()
 	var snapshot: Snapshot = Snapshot.take(tick.state_areas(), root)
 	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
 	var taken: Dictionary = SimHash.areas(tick.state_areas(), StateWalk.new())
-	# A joining machine: the run starts again (another seed) until its first room is not the later one.
-	for attempt in 32:
-		flow.stop_run()
-		events.emit_signal("play_requested", 0)
-		if flow.room_id != later:
-			break
-	check(flow.room_id != later, "the joining machine is in the other room")
-	check(cover.active_cells().is_empty(), "its cover at rest")
+	for i in 30:
+		cover.step(DT)
 	check_equal(snapshot.restore(tick.state_areas(), root), PackedStringArray(), "restored without problems")
-	check_equal(flow.room_id, later, "in the later room")
 	check_equal(SimHash.areas(tick.state_areas(), StateWalk.new()), taken, "the game is the snapshot's")
 	check_equal(_fire(), fire, "its fire kept, and Feel draws it")
-	check_equal(snapshot.restore(tick.state_areas(), root), PackedStringArray(), "restored again, into the room shown")
-	check_equal(_fire(), fire, "the fire kept again")

@@ -2,8 +2,8 @@ class_name RoomFight
 extends RefCounted
 ## One room's fight in a biome (connected biomes CB3, docs/milestones/connected-biomes.md, "Room
 ## state"): what the run puts in it (enemy and boss ids, one a body), the pace they come in at (as
-## `run_room_paced` tells a row run's room: a group's cost, the cost standing that calls the next, the
-## seconds between a group's bodies; all 0: the whole list at once), its scale (`run_room_scaled`, 0:
+## `run_room_filled` tells it: a group's cost, the cost standing that calls the next, the
+## seconds between a group's bodies; all 0: the whole list at once), its scale (told as `run_room_scaled` before its enemies stand, 0:
 ## the level as it is) and the queue of those still to come once it has started (`RoomSpawning`). State,
 ## Flow's room life's (`RoomLife.fights`), one a room; a room with no enemies has no fight and is
 ## cleared as it is entered.

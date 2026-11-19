@@ -28,8 +28,8 @@ extends Node
 const NO_PLAYER: int = -1
 ## The rooms of a world (connected biomes CB3, "Room events"): `room_entered`, `room_left`,
 ## `room_cleared`, `room_built` and `room_items_placed` name the room by number, a biome's by its
-## place in the map (`BiomeMap`: 0 its start room; a bridge numbered after the rooms), a row run's
-## FIRST_ROOM (every room of it stands alone in a world laid anew). FIRST_ROOM entered is a new world:
+## place in the map (`BiomeMap`: 0 its start room; a bridge numbered after the rooms), the hub's
+## FIRST_ROOM (its one room). FIRST_ROOM entered is a new world:
 ## what a listener keeps of the world (decoys, revives, the camera, the ground's items) starts over
 ## then, and only then. ALL_ROOMS: every room of the world at once (`room_left` as the world goes).
 const FIRST_ROOM: int = 0
@@ -128,13 +128,6 @@ signal run_requested(player: int)
 ## it if it still lies in reach and its bag has room; no room says `item_refused`, an item gone
 ## meanwhile (taken by a seat before it in that tick) or out of reach by then says nothing.
 signal item_take_requested(player: int, item: int)
-## Sender: hud. `player` picked `depth` on the hub's lectern menu (run generation RG7; the menu a
-## seat's A opens at the lectern, `lectern_changed`): the stone's run begins in a room of that depth
-## of its map (0: the first room, as with no lectern; the last of `start_depth_changed`'s `depths`:
-## the map's last row, the boss's). A command: heard by flow at the next tick's start, which keeps it
-## as the party's one start (hub state, `start_depth_changed`) while that seat's wizard still stands
-## at the lectern in the hub.
-signal start_depth_picked(player: int, depth: int)
 ## Sender: hud. `player` pressed A on page `page` of the boss's intro, written out on their screen
 ## (docs/milestones/boss-intro.md, rule 2): the next page for everyone, or past the last the fight.
 ## Any seat on any machine moves it on (decision 1). A command: heard by flow at the next tick's
@@ -411,55 +404,42 @@ signal player_left(player: int)
 signal run_started(player_count: int)
 ## Sender: run. The run is over; `victory` is true if the players won.
 signal run_ended(victory: bool)
-## Sender: flow. A run of rooms of the run definition `run_id` (content/runs) begins, on the run's
-## fresh state (its seed dealt; run generation RG3), for `players` players (the seats joined at its
-## start, the same on every machine and in every replay; RG5), starting at `start_depth` (the hub's
-## lectern, run generation RG7: 0 for the map's first room; the run definition's `start_depths()`
-## less one for its last row; `RunMap.start_at`). Heard by run, which makes the run's map and answers
-## with `run_room_scaled`, `run_room_paced` and `run_room_chosen` for the room the party enters.
-signal run_begun(run_id: StringName, players: int, start_depth: int)
-## Sender: run. The room of the run's map the party enters is `scale` times harder than the run's
-## first room with one player (run generation RG5: its depth and the run's players, the run
-## definition's `scaling`), sent before `run_room_chosen`. Heard by difficulty, which scales every
-## enemy and boss that stands in it (`enemy_standing`).
+## Sender: flow. A run of the run definition `run_id` (content/runs) begins, on the run's fresh
+## state (its seed dealt; run generation RG3), for `players` players (the seats joined at its start,
+## the same on every machine and in every replay; RG5). Heard by run, which makes the run's biome map
+## (connected biomes CB8) and answers with `run_room_filled` for every room, then `run_biome_chosen`.
+signal run_begun(run_id: StringName, players: int)
+## Sender: run, in answer to `run_begun` (connected biomes CB8). Room `room` of the run's biome map
+## (by number, 0 the start room) holds the fight `enemies` (enemy and boss ids, one per body; none: no
+## fight), `scale` times harder than the run's first room with one player (run generation RG5: its
+## depth and the run's players, the run definition's `scaling`), its enemies coming in groups of
+## `group` cost (0: the whole list at once), the next when the cost still standing or spawning in the
+## room drops to `refill_at` or below, the bodies of a group `stagger` seconds apart (enemy spawning
+## EA4: plain costs, the run works them out from its biome's `SpawnRules` shares at the room's scaled
+## budget). Sent for every room before `run_biome_chosen`. Heard by flow (the room's `RoomFight`).
+signal run_room_filled(room: int, enemies: Array[StringName], scale: float, group: int, refill_at: int, stagger: float)
+## Sender: run, in answer to `run_begun`, after every room's `run_room_filled` (connected biomes
+## CB8). The run's biome map, `map`: a `BiomeMap` (gameplay/run; typed here as what it extends, since
+## core names no area's class), a copy of the run's own. Heard by flow, which keeps a copy as its
+## world's state and lays it. None comes when the map could not be made.
+signal run_biome_chosen(map: RefCounted)
+## Sender: flow. The room a fight of the biome stands in is `scale` times harder than the run's first
+## room with one player (`run_room_filled`'s scale), sent before each enemy of the room's fight
+## stands (two fights at once each stand at their own). Heard by difficulty, which scales every enemy
+## and boss that stands then (`enemy_standing`).
 signal run_room_scaled(scale: float)
-## Sender: run. How the enemies of the room the party enters come in (enemy spawning EA4,
-## docs/milestones/enemy-spawning.md): in groups of `group` cost (0: the whole list at once), the
-## next when the cost still standing or spawning drops to `refill_at` or below, the bodies of a group
-## `stagger` seconds apart. Plain costs: the run works them out from its biome's `SpawnRules`
-## shares and the room's scaled budget. Sent after `run_room_scaled`, before `run_room_chosen`.
-## Heard by flow (`RoomSpawning`).
-signal run_room_paced(group: int, refill_at: int, stagger: float)
-## Sender: run. The room of the run's map the party enters: the room template `room_id`
-## (content/rooms), what stands in it (`enemies`: enemy and boss ids, one per body) and the kinds of
-## the rooms it leads to (`ways`: `RoomKind` ids, left to right as the map's links; none for the
-## run's last room). Heard by flow, which builds it and, once it is cleared, lights an exit a way.
-signal run_room_chosen(room_id: StringName, enemies: Array[StringName], ways: Array[StringName])
 ## Sender: run (connected biomes CB10, "Run stats"). The run's own changes of the run stats
 ## (`RunStats`: its definition's rule changes of the `RUN_STAT` target whose flags the run's
-## unlocks hold, in order; empty for none), as a run of rooms begins (`run_begun`), before its
-## first room is chosen. Every player's stats are these, then their relics'. Heard by rewards.
+## unlocks hold, in order; empty for none), as a run begins (`run_begun`), before its rooms' fights
+## (`run_room_filled`). Every player's stats are these, then their relics'. Heard by rewards.
 signal run_stats_ruled(changes: Array[StatChange])
-## Sender: run. The run's map as the party sees it (run generation RG8): one entry a room, in the
-## map's order (`RunMap.nodes`: row by row, each row left to right): its row (`rows`), its kind
-## (`kinds`: `RoomKind` ids) and the rooms of the next row it leads to (`links`: their places in these
-## lists, left to right), and the room the party is in (`at`). Sent as the party enters a room, and
-## empty (no rooms, `at` -1) as a run starts (the hub: no map) and when a run's map could
-## not be made; told again after a snapshot is restored. For the view only. Heard by hud (the pause
-## menu's map).
-signal run_map_changed(rows: PackedInt32Array, kinds: Array[StringName], links: Array[PackedInt32Array], at: int)
-## Sender: flow. The party leaves the run's room it is in for the next (run generation RG4), before
-## anything of it goes: what was cast in it ends quietly with it. Heard by core/spells (`leave_room`:
-## carriers, holds, waiting launches and moves end; builds stay). `room`: the room left (FIRST_ROOM
-## in a row run); a biome's party never leaves a room as a whole, so a biome sends it only as its
-## world goes, for ALL_ROOMS (connected biomes CB3).
+## Sender: flow. The world's room `room` goes, before anything of it goes: what was cast in it ends
+## quietly with it. Heard by core/spells (`leave_room`: carriers, holds, waiting launches and moves
+## end; builds stay). A biome's party never leaves a room as a whole, so it is sent only as a
+## world goes, for ALL_ROOMS (connected biomes CB3); the hub's is FIRST_ROOM.
 signal room_left(room: int)
-## Sender: flow. Every standing wizard stands in the lit exit of way `way` (0 = the leftmost of the
-## room's ways; run generation RG4): the party goes on. Heard by run, which moves on through the map
-## to that room and answers with `run_room_chosen`. Not a command: stepping in is position only.
-signal run_way_taken(way: int)
 ## Sender: flow. The players entered the room `room_id` (its template), the world's room `room`
-## (`FIRST_ROOM`, ...): a row run's each room, a biome's each room the first time a wizard steps into
+## (`FIRST_ROOM`, ...): the hub's room, a biome's each room the first time a wizard steps into
 ## it (its start room as the biome starts). Entering FIRST_ROOM is entering a new world (see
 ## FIRST_ROOM); never sent by a restore.
 signal room_entered(room_id: StringName, room: int)
@@ -507,7 +487,7 @@ signal loading_started()
 signal loading_progressed(done: int, total: int)
 ## Sender: core/loading. The load is over (done, or cancelled). Heard by hud.
 signal loading_finished()
-## Sender: flow. The room `room_id` (the world's room `room`) was cleared: every enemy the run stood in it is down (boss OB2a: no waves). Its exits light (run generation RG4); the run's last room cleared wins the run. In a biome each fight room's own (connected biomes CB3), sent once.
+## Sender: flow. The room `room_id` (the world's room `room`) was cleared: every enemy the run stood in it is down (boss OB2a: no waves). In a biome each fight room's own (connected biomes CB3), sent once; the boss's room cleared opens the portal home (CB7).
 signal room_cleared(room_id: StringName, room: int)
 ## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
 ## teleporter stone (a prop of the role `run_start`, where its area is; `HubRules`); `lit` while all of them do (and at least one is there),
@@ -520,23 +500,8 @@ signal start_stone_changed(standing: int, wizards: int, lit: bool)
 signal hub_changed(in_hub: bool)
 ## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (a prop of the role `party_altar`, where its area is), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).
 signal altar_changed(seats: int)
-## Sender: flow. In the hub (run generation RG7): the seats whose wizards stand at the lectern (a
-## prop of the role `start_lectern`, where its area is), a bit each; 0 when the hub is left or no
-## lectern stands. Sent whenever it changes. Heard by hud (A at the lectern opens that seat's depth
-## menu, whose pick is `start_depth_picked`).
-signal lectern_changed(seats: int)
-## Sender: flow. In the hub (run generation RG7): the stone's run begins at `depth` of its map (0: the
-## first room) of the `depths` the lectern offers (the run definition's `start_depths()`: "Room 1"
-## up to the last, the boss's). Sent as the hub starts and whenever it changes; (0, 0) when the hub
-## is left. Heard by hud (the stone line says where the run starts; the lectern menu lists `depths`).
-signal start_depth_changed(depth: int, depths: int)
 ## Sender: flow. In the hub: whether a multiplayer altar stands (`standing`), and `at`, the top middle of the first one's area in room pixels (where something drawn over it sits). Sent as it changes; (false, zero) when the hub is left. For the view only. Heard by feel (the room's code drawn over the altar, online-lobby L5c).
 signal altar_placed(standing: bool, at: Vector2)
-## Sender: flow. In a run's cleared room (run generation RG4): the lit exits, each the top middle of
-## its area in room pixels (`at`) and the kind of room it leads to (`kinds`, `RoomKind` ids, as
-## many). Sent as it changes; empty when none is lit (a room under way, the room left). For the view
-## only. Heard by feel (the kind's name over each lit exit).
-signal room_exits_shown(at: PackedVector2Array, kinds: Array[StringName])
 ## Sender: flow. In a biome (connected biomes CB7): gather door `door` (the doors of the biome's gated
 ## rooms, by number, then the portal home after them), its `rule` (`RoomKind.DOOR_GATHER`,
 ## `DOOR_GATE`, or `portal` for the portal home), its `area` in world pixels (a door's mouth, the
@@ -560,8 +525,7 @@ signal key_door_shown(door: int, area: Rect2, open: bool)
 signal secret_rock_shown(rock: int, area: Rect2, element: StringName, broken: bool)
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places
 ## (`ItemStandIn`'s data, each a `StaffItem` or anything `ItemKinds.stack_of` makes a stack of) and
-## where each lies, in the scene's order. Sent once each room is made: after the run's start, and as
-## the party goes on into the next room of the run (run generation RG4: what lay in the room left goes).
+## where each lies, in the scene's order. Sent for every room as a world is made, at the run's start.
 ## Heard by items, which lays them on the ground (or, the run taking along what lay on that room's
 ## ground, `Frames.next_run_ground`, that instead). `room`: the world's room (Events.FIRST_ROOM...);
 ## only FIRST_ROOM's clears what lay on the ground before (a new world): a biome's later rooms add

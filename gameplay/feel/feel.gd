@@ -124,7 +124,6 @@ const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd"
 const SplitScreenScript := preload("res://gameplay/feel/split_screen.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
-const ExitSignsScript := preload("res://gameplay/feel/exit_signs.gd")
 const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
@@ -516,8 +515,6 @@ var split_screen: SplitScreenScript = null
 var _one_view: ScreenViewsScript = ScreenViewsScript.new()
 ## The open room's code over the hub's altar (`altar_code.gd`).
 var _altar_code: AltarCodeScript = null
-## The kind of room behind each lit exit of a run's room (`exit_signs.gd`).
-var _exit_signs: ExitSignsScript = null
 ## A biome's gather doors, its gate and the portal home (connected biomes CB7, `gather_door_looks.gd`).
 var _gather_doors: GatherDoorLooksScript = null
 ## A biome's pieces as this machine hears them (connected biomes CB12, `room_hearing.gd`): which
@@ -854,10 +851,6 @@ func _ready() -> void:
 	_altar_code.name = "AltarCode"
 	add_child(_altar_code)
 	_altar_code.bind(events)
-	_exit_signs = ExitSignsScript.new()
-	_exit_signs.name = "ExitSigns"
-	add_child(_exit_signs)
-	_exit_signs.bind(events, _room_kind_name)
 	_gather_doors = GatherDoorLooksScript.new()
 	_gather_doors.name = "GatherDoors"
 	add_child(_gather_doors)
@@ -2425,18 +2418,6 @@ func ground_items() -> GroundItemsScript:
 ## The coins on the floor's look (for tests).
 func coins() -> CoinsScript:
 	return _coins
-
-
-## The name for people of the room kind `kind` (`RoomKind.shown_name`), from the registry; its id in
-## words when the registry has none.
-func _room_kind_name(kind: StringName) -> String:
-	var data := registry.get_resource(&"room_kinds", kind) as RoomKind if registry != null else null
-	return data.shown_name() if data != null else String(kind).capitalize()
-
-
-## The names over a run's lit exits (for tests).
-func exit_signs() -> ExitSignsScript:
-	return _exit_signs
 
 
 ## The gather doors' look (connected biomes CB7).

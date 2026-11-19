@@ -48,6 +48,10 @@ const ProbeScript := preload("res://tests/benchmark/probe.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const TreeProfileScript := preload("res://tests/benchmark/tree_profile.gd")
 const TickScript := preload("res://core/sim/tick.gd")
+const PinnedRun := preload("res://tests/support/pinned_run.gd")
+## The room the fight is played in: the antechamber, pinned as a one-room biome at the world's origin
+## (tests/support/pinned_run.gd; since connected biomes CB8 a crypt run starts on its start room).
+const STRESS_ROOM: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 const PLAYERS: int = 4
 ## The scenarios: label, enemies, shots, and (variants only) whether the scene is drawn and
@@ -313,6 +317,9 @@ func _next_scenario() -> void:
 			_finish(["bot %d could not take its virtual device" % (index + 1)])
 			return
 		_bots.append(bot)
+	var registry: Node = get_tree().root.get_node_or_null("Registry")
+	if registry != null:
+		_flow.set(&"run_id_to_play", PinnedRun.pin(registry, STRESS_ROOM))
 	# As a player starts: the first Play loads behind the loading screen (the shaders compile
 	# there, not while this run is measured); the scenario goes on when the room is up.
 	_events.emit_signal("play_requested", 0)

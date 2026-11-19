@@ -18,10 +18,10 @@ extends Node
 ##   opened, a page shown after a choice or a back) is no move: that press says it, so one press
 ##   is one sound or one rumble. (Presses of one poll share the mark, so a move pressed in the
 ##   frame of a choice is not felt; and a focus a menu moves on its own in a later frame, as when
-##   the run's map goes from under its page or a row is hidden from outside, is felt as a move.)
+##   a row is hidden from outside, is felt as a move.)
 ##   It knows nothing of any menu.
 ## - **Each menu** sends what only it knows, with `send`: CHOOSE when a press did something (a row
-##   of the pause menu, a bag entered in the inventory, a depth at the lectern, a main menu
+##   of the pause menu, a bag entered in the inventory, a main menu
 ##   button) and DENY when it was refused (the inventory's refusal), and rumbles (`UiHaptics`)
 ##   when its paging showed another tab or staff or a ring pointed at another entry.
 ##

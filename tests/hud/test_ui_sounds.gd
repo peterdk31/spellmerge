@@ -145,21 +145,6 @@ func test_a_slider_at_its_end_says_nothing() -> void:
 	check_equal(_felt(), 0, "nor felt")
 
 
-func test_the_map_pages_back_row_is_a_back() -> void:
-	var links: Array[PackedInt32Array] = [PackedInt32Array([1]), PackedInt32Array()]
-	_bus.run_map_changed.emit(PackedInt32Array([0, 1]), [&"fight", &"boss"] as Array[StringName], links, 0)
-	_do(&"pause")
-	_focus.focus(0, _menu().button("Map"))
-	_do(&"accept")
-	check(_menu().page == PauseMenuScript.Page.MAP, "on the Map page")
-	_heard()
-	_focus.focus(0, _menu().button("MapBack"))
-	_heard()
-	_do(&"accept")
-	check(_menu().page == PauseMenuScript.Page.MAIN, "Back went to the main page")
-	check_equal(_heard(), [UiSounds.BACK], "a back, not a choice")
-
-
 func test_rb_on_the_main_page_says_nothing() -> void:
 	_do(&"pause")
 	_heard()

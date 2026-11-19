@@ -15,6 +15,8 @@ extends "res://tests/support/suite.gd"
 ## Regression (the owner's playtest of 2026-11-12, "I can kinda walk in behind their bottom"): the
 ## props were drawn over the wizards wherever they stood.
 const FlowScript := preload("res://gameplay/flow/flow.gd")
+const PinnedRun := preload("res://tests/support/pinned_run.gd")
+const ARENA: RoomBase = preload("res://content/rooms/crypt/arena_01.tres")
 
 var flow: FlowScript
 var input: Node
@@ -64,8 +66,12 @@ func test_the_hub_sorts_its_wizards_and_props_together() -> void:
 	check_equal(flow.get_wizard(0).get_parent(), flow.world, "a wizard among them")
 
 
+## A run's room: the arena pinned as a one-room biome (tests/support/pinned_run.gd), laid at the
+## world's origin, its fight standing as the run starts.
 func test_a_run_room_sorts_its_wizards_and_enemies_together() -> void:
 	flow.mode = FlowScript.MODE_RUN
+	flow.run_id_to_play = PinnedRun.pin(root.get_node("Registry"), ARENA)
 	flow.start_run(0)
+	flow.run_id_to_play = FlowScript.DEFAULT_RUN_ID
 	_check_world("a run's room", func(body: Node) -> bool: return (body as Actor).data != null)
 	check(flow.enemies_left() > 0, "its enemies stood")

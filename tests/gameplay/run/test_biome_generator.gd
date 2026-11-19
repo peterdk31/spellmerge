@@ -316,18 +316,30 @@ func test_the_validator_names_a_run_whose_content_makes_no_map() -> void:
 	check(not map.is_made() and "No run definition" in "\n".join(map.not_made), "no definition")
 
 
-## The crypt today has one room with a socket each way and no boss template with one: its biome's map
-## is named not makeable (CB11 and CB13 add the templates; the row run stays the crypt's until CB8).
-func test_the_crypt_s_content_of_today_is_named() -> void:
+## The crypt's own run is makeable since CB8 (its rooms given sockets, a start room and walkways of
+## several lengths): the validator names nothing, and every seed makes a sound map by its rules, of
+## the crypt's own templates, each once, the boss's deepest at the way's end.
+func test_the_crypt_is_made() -> void:
 	var registry := own(RegistryScript.new()) as RegistryScript
 	registry.scan()
 	var crypt := registry.get_resource(&"runs", &"crypt") as RunDefinition
-	var problems: PackedStringArray = crypt.biome_problems(registry.run_content(), registry.piece_shapes(&"crypt"))
-	check(not problems.is_empty(), "named")
-	check("kinds stand deepest" in "\n".join(problems), "no boss room with a socket: %s" % "\n".join(problems))
-	check_equal(crypt.problems(registry.run_content()), PackedStringArray(), "the row run is untouched")
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	check_equal(crypt.biome_problems(content, shapes), PackedStringArray(), "the validator names the crypt makeable")
 	var rules: MapRules = crypt.biomes[0]
-	check(rules.rooms_min == 8 and rules.rooms_max == 12 and rules.fights_on_way == 4 and rules.styles.size() == 4, "the crypt's biome numbers are decision 1's and 5's")
+	check(rules.fights_on_way == 4 and rules.styles.size() == 4, "the crypt's fights on the way and styles are decisions 4's and 5's")
+	var styles: Dictionary = {}
+	for seed_value in 24:
+		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		check(map.is_made(), "seed %d: made (%s)" % [seed_value, "\n".join(map.not_made)])
+		if not map.is_made():
+			continue
+		check_equal(map.problems(shapes) + BiomeGenerator.rule_problems(map, rules, content, shapes), PackedStringArray(), "seed %d: sound" % seed_value)
+		check_equal(map.room_kinds[0], &"start", "seed %d: the start room first" % seed_value)
+		check(map.room_kinds.has(&"boss"), "seed %d: the boss stands" % seed_value)
+		check(map.rooms() >= rules.rooms_min + 1 and map.rooms() <= rules.rooms_max + 1, "seed %d: %d rooms and the start room" % [seed_value, map.rooms() - 1])
+		styles[map.style] = true
+	check(styles.size() > 1, "more than one style rolled: %s" % [styles.keys()])
 
 
 ## A map generated from the crypt's own rooms (the antechamber as the start, the nave a fight, the
@@ -387,8 +399,10 @@ func test_a_map_of_the_crypt_s_rooms_is_laid() -> void:
 	check_equal(into.get_child_count(), 5, "three rooms and two bridges")
 	var grid: RoomGrid = world.projectiles.grid()
 	var start_shape: PieceShape = laid.room_shape(0, shapes)
-	var joint: Vector2 = laid.room_places[0] + start_shape.socket_at[0]
-	check(grid.is_mouth(joint + start_shape.way_of(0) * 4.0), "a mouth just out from the start room's socket")
+	# The start room's socket the first bridge meets (the antechamber has two since CB8).
+	var socket: int = laid.bridge_ends[1] if laid.bridge_ends[0] == 0 else laid.bridge_ends[3]
+	var joint: Vector2 = laid.room_places[0] + start_shape.socket_at[socket]
+	check(grid.is_mouth(joint + start_shape.way_of(socket) * 4.0), "a mouth just out from the start room's socket")
 	check_equal(biome.room_layout(0).get_meta(PieceShape.GROUND_MIRROR_META), Vector2i(laid.room_mirrors[0] & 1, (laid.room_mirrors[0] >> 1) & 1), "the start room's layout says its mirroring, for the ground")
 	world.free_all()
 	into.free()
@@ -457,3 +471,27 @@ func test_corner_walkways_bridge_rooms_too() -> void:
 			if String(map.bridge_templates[bridge]).begins_with("plank_corner"):
 				corners[map.bridge_mirrors[bridge]] = true
 	check_equal(corners.size(), 4, "corners placed turning every way: %s" % [corners.keys()])
+
+
+## The start room alone (`MapRules.start_only`, rooms 0 to 0: a test's pinned room,
+## tests/support/pinned_run.gd; connected biomes CB8): one room, the first template hosting the start
+## room's kind, unmirrored at the origin, filled as its kind fills; the same for every seed.
+func test_the_start_room_alone_is_one_room_at_the_origin() -> void:
+	var rules := MapRules.new()
+	rules.biome = MadeUpBiome.BIOME
+	rules.rooms_min = 0
+	rules.rooms_max = 0
+	rules.start_kind = &"fight"
+	var definition := RunDefinition.new()
+	definition.id = &"cellar_alone"
+	definition.biomes = [rules] as Array[MapRules]
+	check_equal(definition.biome_problems(_biome.content, _biome.shapes), PackedStringArray(), "sound")
+	var first: BiomeMap = BiomeGenerator.generate(definition, _biome.content, _biome.shapes, _sim(1))
+	check(first.is_made() and first.rooms() == 1 and first.bridges() == 0, "one room, no bridge")
+	if not first.is_made():
+		return
+	check_equal(first.room_templates[0], rules.biome_templates(_biome.content, _biome.shapes, &"fight", 0)[0].id, "the first template hosting its kind")
+	check(first.room_places[0] == Vector2.ZERO and first.room_mirrors[0] == 0, "unmirrored at the origin")
+	check(not first.enemies_of(0).is_empty(), "filled with its fight")
+	check_equal(first.problems(_biome.shapes), PackedStringArray(), "a sound map")
+	check_equal(BiomeGenerator.generate(definition, _biome.content, _biome.shapes, _sim(2)).room_templates, first.room_templates, "the same room for any seed")

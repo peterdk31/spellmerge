@@ -84,11 +84,11 @@ func test_every_cast_a_prop_reacts_with_is_paid_from_a_full_pool() -> void:
 
 
 ## What a prop is to the game's rules (props W8c, `PropBase.role`): a role is one the rules read
-## (`HubRules`, `ExitRules`), and a prop of a role has what those rules need: a `run_start` stone the
-## states `lit` and `unlit` and an area to stand on, a `party_altar` and a `start_lectern` an area,
-## a `room_exit` the states `dark` and `lit` and an area. A prop with no role stands in the hub's yard.
+## (`HubRules`), and a prop of a role has what those rules need: a `run_start` stone the states `lit`
+## and `unlit` and an area to stand on, a `party_altar` an area. A prop with no role stands in the
+## hub's yard. (The row run's `room_exit` and the lectern's `start_lectern` went with CB8.)
 func test_every_props_role_is_kept() -> void:
-	var roles: Array[StringName] = [HubRules.ROLE_RUN_START, HubRules.ROLE_PARTY_ALTAR, HubRules.ROLE_START_LECTERN, RoomBase.EXIT_ROLE]
+	var roles: Array[StringName] = [HubRules.ROLE_RUN_START, HubRules.ROLE_PARTY_ALTAR]
 	for data in _props():
 		if data.role == &"":
 			continue
@@ -97,8 +97,4 @@ func test_every_props_role_is_kept() -> void:
 		if data.role == HubRules.ROLE_RUN_START:
 			for state: StringName in [HubRules.LIT, HubRules.UNLIT]:
 				check(data.states.state_at(state) >= 0, "%s: a run_start has the state %s" % [data.id, state])
-		if data.role == RoomBase.EXIT_ROLE:
-			for state: StringName in [ExitRules.DARK, ExitRules.LIT]:
-				check(data.states.state_at(state) >= 0, "%s: a room_exit has the state %s" % [data.id, state])
-			check_equal(data.states.list[0].state_id, ExitRules.DARK, "%s: an exit starts dark" % data.id)
 

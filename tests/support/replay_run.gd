@@ -265,8 +265,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		var item := _root.get_node("Registry").call("get_resource", &"items", rack_item) as StaffItem
 		if taker == null or item == null or taker.caster.cards_of(2).slice(0, item.cards.size()) != item.cards:
 			problems.append("%s: the scripted player did not take %s onto LB" % [start, rack_item])
-	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room, 1, 1, spawning):
-		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room, 1, 1, spawning)])
+	if room != null and start == &"play_requested" and StringName(_flow.get(&"room_id")) != PinnedRun.room_id(room, spawning):
+		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), PinnedRun.room_id(room, spawning)])
 	_check_settings(start)
 	for bot in players:
 		bot.leave()
@@ -499,7 +499,7 @@ func _find() -> void:
 	for style in spawn_styles:
 		_root.get_node("Registry").call("add", SpawnStyle.FOLDER, style)
 	if room != null:
-		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room, &"", RoomKind.FILL_ENEMIES, 16, 1, 1, spawning))
+		_flow.set(&"run_id_to_play", PinnedRun.pin(_root.get_node("Registry"), room, &"", RoomKind.FILL_ENEMIES, 16, spawning))
 	var kinds: Variant = cover if not cover.is_empty() else null
 	_root.get_node("Cover").call(&"use_kinds", kinds)
 	_feel.cover().use_kinds(kinds)

@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The crypt room's data (content/rooms/crypt/arena_01): the resource is a RoomBase, the scene
 ## has no scripts, and its spawns and doors are its scene's markers (props W8a: `RoomPlaces`). The
 ## antechamber (crypt rework CR3, docs/milestones/crypt-rework.md): a floating room drawn from its
-## shape, its pillars and gates props, its landmark the fallen column under a shaft of light.
+## shape, its pillars props and two sockets, its landmark the fallen column under a shaft of light.
 
 const RoomData := preload("res://content/rooms/crypt/arena_01.tres")
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
@@ -33,7 +33,7 @@ func test_spawn_groups_hold_only_markers() -> void:
 
 
 ## A floating room drawn from its shape, its own Void behind the slab, its five pillars props and its
-## exits gates (`RoomScan.floating_room_problems`).
+## two sockets (`RoomScan.floating_room_problems`).
 func test_it_is_a_floating_room_drawn_from_its_shape() -> void:
 	check_equal(RoomScan.floating_room_problems(RoomData as RoomBase, room_root, 4), PackedStringArray(), "a floating room")
 

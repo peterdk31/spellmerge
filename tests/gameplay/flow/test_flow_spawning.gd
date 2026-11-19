@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## A room's enemies come in groups as the room gets quiet (enemy spawning EA5,
-## docs/milestones/enemy-spawning.md, "Pacing"), on the real autoloads: the arena pinned as a run's one
-## room with a pace of its own (tests/support/pinned_run.gd). The first group starts in the room's
+## docs/milestones/enemy-spawning.md, "Pacing"), on the real autoloads: the arena pinned as a one-room
+## biome with a pace of its own (its start room's fight) (tests/support/pinned_run.gd). The first group starts in the room's
 ## setup and ripples in; the next comes only once the room is quiet, never while it is busy; a group
 ## stands at the spawns farthest from the wizards; the room is cleared only when the queue is empty and
 ## nothing stands or spawns in; an id that cannot stand is dropped, so the room is never stuck; the
@@ -35,7 +35,7 @@ func before_each() -> void:
 	pace.group_share = 0.25
 	pace.refill_share = 0.0
 	pace.stagger = 0.1
-	flow.run_id_to_play = PinnedRun.pin(registry, ARENA, &"", RoomKind.FILL_ENEMIES, 16, 1, 1, pace)
+	flow.run_id_to_play = PinnedRun.pin(registry, ARENA, &"", RoomKind.FILL_ENEMIES, 16, pace)
 	cleared = 0
 	events.connect("room_cleared", _on_cleared)
 
@@ -58,8 +58,13 @@ func _start() -> void:
 	events.emit_signal("play_requested", 0)
 
 
-func _node() -> RunNode:
-	return run.call("room_now") as RunNode
+## The pinned room's fight (its enemies, its pace and its queue).
+func _node() -> RoomFight:
+	return flow.life.fights[0] if flow.life.rooms() > 0 else null
+
+
+func _queue() -> RoomSpawning:
+	return _node().queue
 
 
 func _steps(count: int) -> void:
@@ -67,7 +72,7 @@ func _steps(count: int) -> void:
 		flow.step(STEP)
 
 
-## Every enemy standing or spawning killed (as if shot down).
+## Every enemy standing or spawning killed (as if shot down); its room is checked at Flow's next step.
 func _kill_standing() -> void:
 	for enemy: Node in flow._enemies.duplicate():
 		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
@@ -82,7 +87,7 @@ func _cost_of(bodies: Array[Node]) -> int:
 
 func test_the_first_group_starts_in_the_room_s_setup_and_ripples_in() -> void:
 	_start()
-	var node: RunNode = _node()
+	var node: RoomFight = _node()
 	check(node != null and node.enemies.size() > 2, "a room of several enemies")
 	if node == null:
 		return
@@ -90,7 +95,7 @@ func test_the_first_group_starts_in_the_room_s_setup_and_ripples_in() -> void:
 	check_equal(flow._enemies.size(), 1, "the first body starts with the room")
 	check((flow._enemies[0] as Actor).is_spawning(), "and spawns")
 	check_equal(flow.enemies_left(), node.enemies.size(), "the queue counts as enemies left")
-	check(not flow.spawn_queue.is_done(), "the rest are still to come")
+	check(not _queue().is_done(), "the rest are still to come")
 	_steps(60)
 	var first: Array[Node] = flow._enemies.duplicate()
 	var cost: int = _cost_of(first)
@@ -116,18 +121,19 @@ func test_the_next_group_comes_only_when_the_room_is_quiet() -> void:
 
 func test_the_room_is_cleared_only_when_every_group_is_down() -> void:
 	_start()
-	var node: RunNode = _node()
+	var node: RoomFight = _node()
 	var total: int = node.enemies.size() if node != null else 0
 	var killed: int = 0
 	var groups: int = 0
 	for round in 60:
-		if flow.spawn_queue.is_done() and flow._enemies.is_empty():
+		if _queue().is_done() and flow._enemies.is_empty():
 			break
 		_steps(60)
 		check_equal(cleared, 0, "group %d: not cleared yet" % groups)
 		killed += flow._enemies.size()
 		groups += 1
 		_kill_standing()
+	_steps(1)
 	check_equal(killed, total, "every enemy of the list came")
 	check(groups >= 2, "in groups: %d" % groups)
 	check_equal(cleared, 1, "cleared once, after the last")
@@ -137,12 +143,12 @@ func test_the_room_is_cleared_only_when_every_group_is_down() -> void:
 ## An id the registry has no enemy for is dropped from the queue, so the room is cleared all the same.
 func test_an_id_that_cannot_stand_is_dropped() -> void:
 	_start()
-	flow.spawn_queue.take_all()
-	flow.spawn_queue.begin([&"no_such_enemy", &"no_such_enemy"] as Array[StringName], PackedInt32Array([1, 1]), 1, 0, 0.1)
+	_queue().take_all()
+	_queue().begin([&"no_such_enemy", &"no_such_enemy"] as Array[StringName], PackedInt32Array([1, 1]), 1, 0, 0.1)
 	_kill_standing()
 	check_equal(cleared, 0, "two still to come")
 	_steps(30)
-	check(flow.spawn_queue.is_done(), "both dropped")
+	check(_queue().is_done(), "both dropped")
 	check_equal(cleared, 1, "the room is cleared, not stuck")
 
 
@@ -216,8 +222,8 @@ func test_a_stacked_body_stands_clear_of_a_hole() -> void:
 	for at in ranked.size() + 1:
 		ids.append(&"crypt_mite")
 		costs.append(1)
-	flow.spawn_queue.take_all()
-	flow.spawn_queue.begin(ids, costs, 0, 0, 0.0)
+	_queue().take_all()
+	_queue().begin(ids, costs, 0, 0, 0.0)
 	_steps(1)
 	check_equal(flow._enemies.size(), ids.size(), "the whole group at once")
 	if flow._enemies.size() == ids.size():
@@ -228,11 +234,12 @@ func test_a_stacked_body_stands_clear_of_a_hole() -> void:
 ## Tests call the rest of the queue at once (`stand_all_now`, the shared helper's).
 func test_stand_all_now_calls_every_group() -> void:
 	_start()
-	var node: RunNode = _node()
+	var node: RoomFight = _node()
 	Spawning.land(flow)
-	check(flow.spawn_queue.is_done(), "nothing still to come")
+	check(_queue().is_done(), "nothing still to come")
 	check_equal(flow._enemies.size(), node.enemies.size() if node != null else -1, "every enemy stands")
 	for enemy: Node in flow._enemies:
 		check(not (enemy as Actor).is_spawning(), "landed")
 	_kill_standing()
+	_steps(1)
 	check_equal(cleared, 1, "cleared")

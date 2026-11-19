@@ -54,17 +54,17 @@ func test_a_run_rule_change_of_a_stat_is_a_stat_change_and_no_map_change() -> vo
 	check(change.is_stat_target(), "its target is a run stat")
 	var made: StatChange = change.as_stat_change()
 	check_equal([made.stat, made.how, made.amount], [&"start_coins", StatChange.How.ADD, 7.0], "the same change, as a stat change")
-	check(RunRuleChange.make(&"x", RunRuleChange.Target.DEPTH_MAX, 1.0).as_stat_change() == null, "another target makes none")
+	check(RunRuleChange.make(&"x", RunRuleChange.Target.ROOMS_MAX, 1.0).as_stat_change() == null, "another target makes none")
 	var rules := MapRules.new()
 	rules.biome = &"crypt"
-	rules.depth_max = 5
+	rules.rooms_max = 5
 	var biomes: Array[MapRules] = [rules]
 	check(change.apply_to(biomes, null) == null, "it changes no scaling")
-	check_equal(rules.depth_max, 5, "nor the map")
+	check_equal(rules.rooms_max, 5, "nor the map")
 	check(change.problems(biomes, "A run").is_empty(), "a known stat is fine: %s" % [change.problems(biomes, "A run")])
 	change.stat = &"no_such_stat"
 	check(not change.problems(biomes, "A run").is_empty(), "an unknown stat is a problem")
-	var map_change := RunRuleChange.make(&"y", RunRuleChange.Target.DEPTH_MAX, 1.0, RunRuleChange.How.ADD, &"crypt")
+	var map_change := RunRuleChange.make(&"y", RunRuleChange.Target.ROOMS_MAX, 1.0, RunRuleChange.How.ADD, &"crypt")
 	map_change.stat = &"start_coins"
 	check(not map_change.problems(biomes, "A run").is_empty(), "another target naming a stat is a problem")
 
@@ -76,7 +76,7 @@ func test_a_run_definition_gives_the_stat_changes_its_unlocks_hold() -> void:
 	held.stat = &"start_coins"
 	var other := RunRuleChange.make(&"choosier", RunRuleChange.Target.RUN_STAT, 1.0, RunRuleChange.How.ADD)
 	other.stat = &"reward_choices"
-	var map_change := RunRuleChange.make(&"richer", RunRuleChange.Target.DEPTH_MAX, 1.0, RunRuleChange.How.ADD)
+	var map_change := RunRuleChange.make(&"richer", RunRuleChange.Target.ROOMS_MAX, 1.0, RunRuleChange.How.ADD)
 	definition.changes = [held, other, map_change] as Array[RunRuleChange]
 	var made: Array[StatChange] = definition.stat_changes_by(RunUnlocks.of([&"richer"] as Array[StringName]))
 	check_equal(made.size(), 1, "only the stat change whose flag is held")

@@ -13,6 +13,7 @@
 		"wander": [10, 14],
 		"rough": [46, 17, 6],
 		"seed": 7,
+		"pins": [[0, 256, 40, 320], [664, 160, 704, 224]],
 		"bays": [[36, 176, 20], [668, 336, 20], [560, 414, 18]],
 		"clear": {"round": 28, "of": ["PlayerSpawns", "EnemySpawns", "Exits", "Props", "Decor"]}
 	},

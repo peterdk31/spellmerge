@@ -72,9 +72,9 @@ func test_a_split_party_in_two_sealed_fights_plays_the_same_twice_and_through_a_
 ## twice and through a snapshot taken before the gate opened.
 func test_a_party_through_the_gate_plays_the_same_twice_and_through_a_snapshot() -> void:
 	var fight := BiomeFight.new(root, true)
-	_check_biome(fight, 20)
+	_check_biome(fight, 8)
 	check(fight.gate_opened, "the gate opened and the party came in")
-	check(fight.gate_opened_at > 20, "after the snapshot (at tick %d)" % fight.gate_opened_at)
+	check(fight.gate_opened_at > 8, "after the snapshot (at tick %d)" % fight.gate_opened_at)
 
 
 ## `fight` played twice the same and through a snapshot taken after tick `at`.

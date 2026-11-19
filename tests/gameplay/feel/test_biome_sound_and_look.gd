@@ -204,7 +204,7 @@ func test_a_seals_bars_drop_in_over_frames_then_its_rune_lights() -> void:
 func test_unvisited_rooms_are_dark_and_lighten_in_stages() -> void:
 	var map: BiomeMap = _start(1)
 	var dark: UnseenDarkScript = feel.call(&"unseen_dark") as UnseenDarkScript
-	dark.step(0.0, actors, _grid())
+	dark.step(0.0, _grid())
 	var darkest: int = UnseenDarkScript.DARK_STAGES.size() - 1
 	check_equal(dark.places(), 5, "every piece")
 	check_equal(dark.stage_of(0), 0, "the start room, entered, is lit")
@@ -213,7 +213,10 @@ func test_unvisited_rooms_are_dark_and_lighten_in_stages() -> void:
 	check_equal(dark.stage_of(3), 0, "a bridge is never dark")
 	check(dark.dark_of(1) > 8 and dark.dark_of(1) < 16, "dark by a dither, not wholly: %d of 16" % dark.dark_of(1))
 	_wizard(0).global_position = _by_socket(map, 1, RoomSocket.Facing.EAST, 24.0)
-	dark.step(0.0, actors, _grid())
+	dark.step(0.0, _grid())
+	check_equal(dark.stage_of(1), darkest, "a wizard standing there is not yet the party's map")
+	tick.run(DT)
+	dark.step(0.0, _grid())
 	var stages: Array[int] = []
 	while dark.is_moving():
 		dark.advance()

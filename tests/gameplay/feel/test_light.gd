@@ -81,7 +81,9 @@ func _items(node: Node, into: Array[CanvasItem]) -> void:
 	if node is CanvasItem and node.get_class() != "Node2D":
 		into.append(node as CanvasItem)
 	for child: Node in node.get_children():
-		if not child is SubViewport:
+		# A canvas layer's items are drawn on the screen over the world (the held map, connected
+		# biomes CB9), never with the light.
+		if not child is SubViewport and not child is CanvasLayer:
 			_items(child, into)
 
 

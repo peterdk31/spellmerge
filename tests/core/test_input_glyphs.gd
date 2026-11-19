@@ -100,7 +100,7 @@ func test_the_glyphs_follow_the_bindings_in_the_input_map() -> void:
 	var place_of: Dictionary = {
 		&"join": JOY_BUTTON_A, &"accept": JOY_BUTTON_A, &"back": JOY_BUTTON_B, &"alternate": JOY_BUTTON_X,
 		&"staff_1": JOY_BUTTON_RIGHT_SHOULDER, &"staff_3": JOY_BUTTON_LEFT_SHOULDER, &"pause": JOY_BUTTON_START,
-		&"inventory": JOY_BUTTON_BACK,
+		&"inventory": JOY_BUTTON_BACK, &"map": JOY_BUTTON_Y,
 	}
 	for action: StringName in place_of:
 		var bound: bool = false
@@ -110,7 +110,7 @@ func test_the_glyphs_follow_the_bindings_in_the_input_map() -> void:
 		check(bound, "%s is bound to joypad button %d, which the pad glyphs show" % [action, place_of[action]])
 	var keys: Dictionary = {
 		&"staff_2": KEY_J, &"staff_3": KEY_K, &"staff_1": KEY_SPACE, &"staff_4": KEY_Q, &"accept": KEY_ENTER,
-		&"back": KEY_E, &"alternate": KEY_X, &"pause": KEY_ESCAPE, &"inventory": KEY_TAB,
+		&"back": KEY_E, &"alternate": KEY_X, &"pause": KEY_ESCAPE, &"inventory": KEY_TAB, &"map": KEY_M,
 	}
 	for action: StringName in keys:
 		var key_bound: bool = false

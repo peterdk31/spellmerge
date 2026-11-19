@@ -129,6 +129,9 @@ const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
+const MouthSymbolsScript := preload("res://gameplay/feel/mouth_symbols.gd")
+const PartyMapViewScript := preload("res://gameplay/feel/party_map_view.gd")
+const InputManagerScript := preload("res://core/input/input_manager.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const CoinsScript := preload("res://gameplay/feel/coins.gd")
 const SpecialRoomLooksScript := preload("res://gameplay/feel/special_room_looks.gd")
@@ -384,6 +387,9 @@ var actors: ActorsScript = null
 ## The frames service (core/sim/frames.gd), asked only which seats are played on this machine
 ## (the party camera); null looks for the "Frames" autoload.
 var frames: FramesScript = null
+## The input manager, asked only whether a seat of this machine holds the map (`party_map_view.gd`);
+## null looks for the "PlayerInput" autoload.
+var input: InputManagerScript = null
 ## The "Actors" autoload once found (`_actor_table`), while it is still there.
 var _auto_actors: ActorsScript = null
 ## Tests turn this off: Feel steps only when the test calls `step` (no real clock in `_process`).
@@ -526,6 +532,9 @@ var _hearing: RoomHearingScript = RoomHearingScript.new()
 var _mouths: MouthLooksScript = null
 var _locks: LockLooksScript = null
 var _unseen: UnseenDarkScript = null
+## What each mouth tells of the room behind it, and the held Y map (connected biomes CB9).
+var _mouth_symbols: MouthSymbolsScript = null
+var _party_map: PartyMapViewScript = null
 ## The items on the ground (`ground_items.gd`, items I6).
 var _ground_items: GroundItemsScript = null
 ## The coins on the floor (`coins.gd`, connected biomes CB10).
@@ -878,6 +887,16 @@ func _ready() -> void:
 	_unseen.pieces = _hearing
 	add_child(_unseen)
 	_unseen.bind(events)
+	_mouth_symbols = MouthSymbolsScript.new()
+	_mouth_symbols.name = "MouthSymbols"
+	_mouth_symbols.pieces = _hearing
+	_mouth_symbols.mouths = _mouths
+	add_child(_mouth_symbols)
+	_party_map = PartyMapViewScript.new()
+	_party_map.name = "PartyMap"
+	_party_map.pieces = _hearing
+	add_child(_party_map)
+	_party_map.bind(events)
 	_ground_items = GroundItemsScript.new()
 	_ground_items.name = "GroundItems"
 	add_child(_ground_items)
@@ -1085,8 +1104,13 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		_gather_doors.see(table)
 	if _mouths != null:
 		_mouths.step(real_delta, grid)
+	if _mouth_symbols != null:
+		_mouth_symbols.step(real_delta, table, seats_here, grid)
 	if _unseen != null:
-		_unseen.step(real_delta, table, grid)
+		_unseen.step(real_delta, grid)
+	if _party_map != null:
+		_party_map.input = _input_manager()
+		_party_map.step(real_delta, table, seats_here, grid, _views_shown())
 
 
 ## The open portals, read once (`CarrierPortal.read_view`), drawn by the portal look; their motes
@@ -1260,6 +1284,16 @@ func _seats_here() -> int:
 		if tree != null and tree.root != null:
 			frames = tree.root.get_node_or_null(^"Frames") as FramesScript
 	return frames.seats_here() if frames != null else 0
+
+
+## The input manager (the "PlayerInput" autoload unless a test set its own), or null.
+func _input_manager() -> InputManagerScript:
+	if input == null or not is_instance_valid(input):
+		input = null
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		if tree != null and tree.root != null:
+			input = tree.root.get_node_or_null(^"PlayerInput") as InputManagerScript
+	return input
 
 
 ## The part of the world this machine shows now: the party camera's picture, or while the screen is
@@ -2454,6 +2488,15 @@ func lock_looks() -> LockLooksScript:
 
 func unseen_dark() -> UnseenDarkScript:
 	return _unseen
+
+
+## What each mouth tells of the room behind it and the held Y map (for tests; connected biomes CB9).
+func mouth_symbols() -> MouthSymbolsScript:
+	return _mouth_symbols
+
+
+func party_map() -> PartyMapViewScript:
+	return _party_map
 
 
 ## The room's code over the altar (for tests).

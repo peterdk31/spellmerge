@@ -112,6 +112,7 @@ const CueSizeScript := preload("res://gameplay/feel/cue_size.gd")
 const RoomAmbienceScript := preload("res://gameplay/feel/room_ambience.gd")
 const BodySoundsScript := preload("res://gameplay/feel/body_sounds.gd")
 const BossIntroSoundScript := preload("res://gameplay/feel/boss_intro_sound.gd")
+const PickupSoundsScript := preload("res://gameplay/feel/pickup_sounds.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
@@ -447,6 +448,8 @@ var _body_sounds: BodySoundsScript = null
 ## The boss intro's two cues, played while the tree is paused for it, and what holds a boss with an
 ## intro's entrance cue back until it is known whether its intro played.
 var _intro_sound: BossIntroSoundScript = null
+## Each kind of pickup's sound (`pickup_sounds.gd`).
+var _pickup_sounds: PickupSoundsScript = PickupSoundsScript.new()
 var _intro_wait: BossIntroWait = BossIntroWait.new()
 ## The sound the death cue being played sounds in place of its own (an enemy's `death_sound`), read
 ## once by the next `play_cue` (so a cue its parts play does not take it).
@@ -847,6 +850,7 @@ func _ready() -> void:
 	_intro_sound.registry = registry
 	_intro_sound.audio = audio
 	add_child(_intro_sound)
+	_pickup_sounds.audio = audio
 	add_cue_part(&"held", _play_held)
 	_numbers = DamageNumberDrawerScript.new()
 	_numbers.name = "DamageNumbers"
@@ -964,6 +968,7 @@ func _ready() -> void:
 	events.possess_ended.connect(_on_possess_ended)
 	events.boss_shown.connect(_on_boss_shown)
 	_intro_sound.bind(events)
+	_pickup_sounds.bind(events)
 	_intro_wait.bind(events)
 	_intro_wait.released.connect(_on_boss_released)
 	events.projectile_impact.connect(_on_projectile_impact)

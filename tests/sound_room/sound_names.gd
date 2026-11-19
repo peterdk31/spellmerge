@@ -4,7 +4,7 @@ extends RefCounted
 ## card's `cast_sound` and an infusion's `cast_hint` (Feel's cast sounds), an enemy's
 ## `death_sound`, its phases' held `look.sound` and its music, a room's music and its ambience's
 ## layers and accents, and the ids Feel names itself (`feel_names`: its preset's `hit_sound` and each
-## hit kind's `kind_looks` sound, and the cast sound) and the HUD's menu sounds (`UiSounds.IDS`, played
+## hit kind's `kind_looks` sound, the cast sound and the pickups') and the HUD's menu sounds (`UiSounds.IDS`, played
 ## on the UI bus; sound plan AU8), which the room hands to `read`. Each id has the
 ## kind it is played as (the first that names it wins) and every place it is named; every music track
 ## and ambience is kept too, with its owner.
@@ -14,6 +14,7 @@ extends RefCounted
 ##     for id: StringName in names.ids(): ...
 
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
+const PickupSoundsScript := preload("res://gameplay/feel/pickup_sounds.gd")
 
 ## How a sound is played: a one-shot (SFX), held while its moment lasts (SFX), a layer of a music
 ## track (MusicDuck), a room's bed loop or one of its accents (Ambience), or a menu's sound (UI).
@@ -31,7 +32,8 @@ var bed_owners: PackedStringArray = PackedStringArray()
 
 
 ## The ids Feel names itself, as [id, where] pairs for `read`: `preset`'s `hit_sound`, each hit kind's
-## sound (`kind_looks`, in kind order), and `cast` (Feel's `CAST_SOUND`, a carrier's with none).
+## sound (`kind_looks`, in kind order), `cast` (Feel's `CAST_SOUND`, a carrier's with none) and each
+## kind of pickup's (`PickupSounds.ids`).
 static func feel_names(preset: FeelPresetScript, cast: StringName) -> Array:
 	var found: Array = [[preset.hit_sound, "Feel's hit sound (its preset)"]]
 	var kinds_named: Array = preset.kind_looks.keys()
@@ -40,6 +42,8 @@ static func feel_names(preset: FeelPresetScript, cast: StringName) -> Array:
 		var look: Dictionary = preset.kind_looks[kind]
 		found.append([StringName(look.get("sound", "")), "Feel's %s hit (its preset's kind_looks)" % kind])
 	found.append([cast, "Feel's cast sound (a carrier card with none of its own)"])
+	for id: StringName in PickupSoundsScript.ids():
+		found.append([id, "Feel's pickup sound (pickup_sounds.gd)"])
 	return found
 
 

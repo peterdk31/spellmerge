@@ -199,13 +199,16 @@ func test_a_shop_is_stocked_once_as_it_is_entered_and_a_fountain_filled() -> voi
 
 
 func test_the_treasure_rooms_key_drops_on_the_way_and_its_door_opens_for_all() -> void:
-	var map: BiomeMap = _start(2, &"treasure", &"fight", [], [IMP])
+	# The court the boss's (never a key's room: its clear sends the party home), so the start room is
+	# the one room the key may drop in.
+	var map: BiomeMap = _start(2, &"treasure", &"boss", [], [IMP])
 	_ticks(1)
 	check_equal(flow.locks.doors(), 1, "the treasure room has a door: where the west bridge meets it")
 	var mouth: Rect2 = flow.locks.mouth_of(0)
 	check(_grid().is_shut_mouth(mouth.get_center()), "its mouth is shut")
 	check(not key_doors.is_empty() and key_doors.back()[0] == 0 and not key_doors.back()[2], "the view is told the key door, shut")
-	# The key drops in the room its bridge hangs off: the start room, cleared as the biome starts.
+	# The key drops in a room picked among those reached without passing a locked door: here the
+	# start room alone, cleared as the biome starts (a room with no fight: on its floor at once).
 	check(not keys.is_empty() and keys.back()[2], "its key lies on the floor")
 	var key_at: Vector2 = keys.back()[1]
 	check(flow.biome.room_rect(0).has_point(key_at), "in the start room, on the way to it")
@@ -222,6 +225,25 @@ func test_the_treasure_rooms_key_drops_on_the_way_and_its_door_opens_for_all() -
 	check(key_doors.back()[2], "the view is told it opened")
 	_put(1, _by_socket(map, WEST, RoomSocket.Facing.EAST, 24.0))
 	check_equal(due.back(), [WEST, &"treasure"], "the treasure's rewards as it is entered")
+
+
+## The owner, 2026-11-19: "It should just drop in some random room." The key's room is picked by
+## the run's chance (keyed by the treasure room) among the rooms reached without passing a locked
+## door, never the treasure room itself; a fight room's key drops on its clear.
+func test_the_keys_room_is_picked_by_chance_among_the_open_rooms() -> void:
+	var map: BiomeMap = _start(1, &"treasure", &"fight", [], [IMP])
+	_ticks(1)
+	var drop: int = flow.locks.key_drops[0]
+	check(drop == 0 or drop == EAST, "the start room or the court, never the treasure room: %d" % drop)
+	var open: PackedInt32Array = LockDoors.open_rooms(map, PackedByteArray([LockDoors.RULE_NONE, LockDoors.RULE_KEY, LockDoors.RULE_NONE]))
+	check_equal(open, PackedInt32Array([0, EAST]), "the open rooms: all but the locked one")
+	check_equal(drop, open[tick.sim.chance_int(FlowScript.KEY_PURPOSE, WEST, 0, open.size())], "the run's chance, keyed by the treasure room, picks it")
+	if drop == EAST:
+		check(keys.is_empty() or not keys.back()[2], "in the court: nothing lies before its fight is cleared")
+	var picked: Dictionary = {}
+	for seed in 24:
+		picked[open[Sim.seeded(seed).chance_int(FlowScript.KEY_PURPOSE, WEST, 0, open.size())]] = true
+	check_equal(picked.size(), 2, "over seeds, either room")
 
 
 func test_a_secret_rock_opens_to_its_own_element_only() -> void:

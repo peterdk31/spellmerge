@@ -5,8 +5,10 @@ extends RefCounted
 ## material; the spark's when it names none) by that share. Drawn by the spell light's apply pass
 ## (`SpellLight.set_room_tints`, `light_apply.gdshader`), which finds the room a world pixel is in by
 ## its place's rectangle, so it is the room's wherever a view stands: two rooms side by side in one
-## view are each their own, and two views of a split screen each tint the rooms they show. Bridges are
-## never tinted. Only while dynamic lighting is on (with it off there is no apply pass to tint).
+## view are each their own, and two views of a split screen each tint the rooms they show. **Its edge**
+## (the owner, 2026-11-19): past a room's rectangle its tint steps down onto its bridges in EDGE_BANDS
+## whole-pixel bands EDGE_BAND px wide (two thirds of its tint, a third, then none), never one hard
+## edge; the rest of a bridge is untinted. Only while dynamic lighting is on (with it off there is no apply pass to tint).
 ##
 ## **Smooth:** a room's tint comes in once the party's map says it was entered (`rooms_seen`, as the
 ## dark over it lifts, `unseen_dark.gd`), a stage a frame at FPS through STAGES (a third, two thirds,
@@ -26,6 +28,10 @@ const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 ## Frames a second a tint comes in at, and its stages (from none to all of its share).
 const FPS: float = 12.0
 const STAGES: int = 3
+## The edge's bands past a room's rectangle (world px each, and how many): light_apply.gdshader's
+## EDGE_BAND and EDGE_BANDS.
+const EDGE_BAND: float = 6.0
+const EDGE_BANDS: int = 2
 ## A room's level in `rooms_seen` once it was entered (0 unseen, 1 only shown on the map).
 const ENTERED: int = 2
 ## The light a kind's tint leans toward when it names none (the mouths' own).
@@ -126,11 +132,20 @@ func stage_of(place: int) -> int:
 ## The tint at world point `at` as the apply pass reads it: the hue of the room it is in, and how
 ## far its light leans toward it now (alpha; 0 on a bridge, in the void or an untinted room).
 func tint_at(at: Vector2) -> Color:
+	var p := Vector2(floorf(at.x) + 0.5, floorf(at.y) + 0.5)
+	var edge := Color(1.0, 1.0, 1.0, 0.0)
 	for i in _places.size():
 		var r: Vector4 = _rects[i]
 		if at.x >= r.x and at.y >= r.y and at.x < r.z and at.y < r.w:
 			return Color(_hues[i].r, _hues[i].g, _hues[i].b, _tint_now(i))
-	return Color(1.0, 1.0, 1.0, 0.0)
+		var out_x: float = maxf(maxf(r.x - p.x, p.x - r.z), 0.0)
+		var out_y: float = maxf(maxf(r.y - p.y, p.y - r.w), 0.0)
+		var band: int = floori(maxf(out_x, out_y) / EDGE_BAND)
+		if band < EDGE_BANDS:
+			var a: float = _tint_now(i) * float(EDGE_BANDS - band) / float(EDGE_BANDS + 1)
+			if a > edge.a:
+				edge = Color(_hues[i].r, _hues[i].g, _hues[i].b, a)
+	return edge
 
 
 ## The hue a kind's tint leans toward: its light's base shade, scaled so its brightest channel is 1

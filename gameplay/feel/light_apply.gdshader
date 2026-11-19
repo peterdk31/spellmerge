@@ -34,9 +34,12 @@ uniform float bright_gain = 0.45;
 uniform int bands = 3;
 // Each room's own light tinted by its kind (connected biomes CB12b, gameplay/feel/room_tints.gd):
 // `tint_count` world rectangles (x0, y0, x1, y1) and, for each, the hue its dark and its light lean
-// toward (rgb) and how far (a). A pixel in none (a bridge, the void) is untinted. MAX_TINTS is
-// SpellLight.MAX_TINTS.
+// toward (rgb) and how far (a). Past a room's edge its tint steps down in EDGE_BANDS whole-pixel
+// bands EDGE_BAND px wide onto its bridges (two thirds, a third, then none: RoomTints.EDGE_BAND and
+// EDGE_BANDS); a pixel farther from every tinted room is untinted. MAX_TINTS is SpellLight.MAX_TINTS.
 #define MAX_TINTS 40
+#define EDGE_BAND 6.0
+#define EDGE_BANDS 2.0
 uniform vec4 tint_rects[MAX_TINTS];
 uniform vec4 tint_hues[MAX_TINTS];
 uniform int tint_count = 0;
@@ -44,8 +47,11 @@ uniform int tint_count = 0;
 // Where the pixel is in the world (the rect's own place through its transform: the world's).
 varying vec2 world_at;
 
-// The tint of the room world point `at` is in (a: 0 for none).
+// The tint at world point `at`: the room's it is in, else the strongest edge band of a room it is
+// near (a: 0 for none). Worked out a world pixel at a time (whole-pixel bands).
 vec4 room_tint(vec2 at) {
+	vec2 p = floor(at) + 0.5;
+	vec4 edge = vec4(1.0, 1.0, 1.0, 0.0);
 	for (int k = 0; k < MAX_TINTS; k++) {
 		if (k >= tint_count) {
 			break;
@@ -54,8 +60,16 @@ vec4 room_tint(vec2 at) {
 		if (at.x >= r.x && at.y >= r.y && at.x < r.z && at.y < r.w) {
 			return tint_hues[k];
 		}
+		vec2 out_by = max(max(r.xy - p, p - r.zw), vec2(0.0));
+		float band = floor(max(out_by.x, out_by.y) / EDGE_BAND);
+		if (band < EDGE_BANDS) {
+			float a = tint_hues[k].a * (EDGE_BANDS - band) / (EDGE_BANDS + 1.0);
+			if (a > edge.a) {
+				edge = vec4(tint_hues[k].rgb, a);
+			}
+		}
 	}
-	return vec4(1.0, 1.0, 1.0, 0.0);
+	return edge;
 }
 
 // The light a pixel adds for a light of brightest channel `most`.

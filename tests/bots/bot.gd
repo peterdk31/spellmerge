@@ -18,7 +18,10 @@ extends FrameSource
 ## taps whichever staff's next cast moves the caster (no button is "the dash"). It goes to a downed
 ## teammate and stands beside it till the coop rule revives it, when no foe is near that one
 ## (gameplay/ai/behaviours/revive.gd; its profile's `revives`). It holds no grudge
-## (a teammate's blast never makes it fight a teammate).
+## (a teammate's blast never makes it fight a teammate). **Downed** (connected biomes CB3's crawl;
+## the owner, 2026-11-19) it crawls toward the nearest standing teammate (seat order between two as
+## near), round the walls, leaning aside from every enemy ahead within CRAWL_SHY of it so it never
+## crawls into one, and stops once within CRAWL_BESIDE of that teammate; with none standing it lies still.
 ## Travel (connected biomes CB8): out of a fight (its room under way or not, `RoomLife`), a fighter
 ## walks the biome's bridges to the nearest room whose fight is still to come (the fewest bridges from
 ## where it stands; one behind a shut door, the boss's gate, it waits at: `Flow.gates`), round the walls in a room (`AISight.detour`) and
@@ -41,6 +44,7 @@ enum Mode { FIGHTER, IDLER }
 const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
 const ReviveScript := preload("res://gameplay/ai/behaviours/revive.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 ## How a bot plays (the brain's numbers).
 const PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
 
@@ -57,6 +61,9 @@ const LANDING: float = 20.0
 const NEAR: float = 8.0
 ## How far a detour round a wall looks (`AISight.detour`).
 const DETOUR_PROBE: float = 32.0
+## A downed bot's crawl: how near a teammate it stops, and how far an enemy pushes it aside.
+const CRAWL_BESIDE: float = 14.0
+const CRAWL_SHY: float = 64.0
 
 var player: int = 0
 var mode: Mode = Mode.FIGHTER
@@ -69,6 +76,8 @@ var _flow: Node = null
 var _frames: Node = null
 ## The frame it wants for the next tick (`send`), handed over in `fill_frame`.
 var _wanted: InputFrame = InputFrame.new()
+## The open actors, read for a crawl (sized once).
+var _ids: PackedInt32Array = PackedInt32Array()
 
 ## The cards of the last `build_random`, one per slot of the staff (empty before the first).
 var built_cards: Array[StringName] = []
@@ -175,7 +184,11 @@ func step(delta: float) -> void:
 	if mode == Mode.IDLER:
 		return
 	var wizard := _flow.call("get_wizard", player) as Actor
-	if wizard == null or _flow.get("world") == null or wizard.is_down() or wizard.caster == null:
+	if wizard != null and _flow.get("world") != null and wizard.is_down():
+		_release()
+		_wanted.set_move(crawl_way(wizard))
+		return
+	if wizard == null or _flow.get("world") == null or wizard.caster == null:
 		_release()
 		return
 	if brain.actor != wizard:
@@ -285,6 +298,52 @@ func _toward(feet: Vector2, goal: Vector2, around: bool = false) -> Vector2:
 	if around:
 		return AISight.detour(_flow.get_node_or_null(^"/root/Projectiles") as ProjectilesScript, feet, goal, DETOUR_PROBE)
 	return (goal - feet).normalized()
+
+
+## The way a downed `wizard` crawls (unit length, or ZERO): toward the nearest standing teammate,
+## round the walls, leaning aside from the enemies near it ahead (see the top of this file).
+func crawl_way(wizard: Actor) -> Vector2:
+	var feet: Vector2 = wizard.global_position
+	var mate: Vector2 = Vector2.INF
+	var best: float = INF
+	for seat in 4:
+		var other := _flow.call("get_wizard", seat) as Actor
+		if seat == player or other == null or not other.is_inside_tree() or other.is_down():
+			continue
+		var gap: float = feet.distance_squared_to(other.global_position)
+		if gap < best:
+			best = gap
+			mate = other.global_position
+	if mate == Vector2.INF or best <= CRAWL_BESIDE * CRAWL_BESIDE:
+		return Vector2.ZERO
+	var way: Vector2 = _toward(feet, mate, true)
+	var table := _flow.get_node_or_null(^"/root/Actors") as ActorsScript
+	if table == null:
+		return way
+	if _ids.size() < ActorsScript.ACTORS:
+		_ids.resize(ActorsScript.ACTORS)
+	var count: int = table.open_ids(_ids)
+	var away: Vector2 = Vector2.ZERO
+	for at in count:
+		var id: int = _ids[at]
+		if table.team_of(id) != ActorsScript.TEAM_ENEMIES:
+			continue
+		var foe := table.node_of(id) as Node2D
+		if foe == null or not foe.is_inside_tree():
+			continue
+		var rel: Vector2 = foe.global_position - feet
+		var near: float = rel.length()
+		var ahead: float = rel.dot(way)
+		if near >= CRAWL_SHY or ahead < 0.0:
+			# Far, or behind it (crawling on is crawling away).
+			continue
+		# Aside from the foe ahead, never back: across the way, to the side away from it (the way's
+		# left when it lies straight ahead).
+		var side: Vector2 = rel - way * ahead
+		var push: Vector2 = -side.normalized() if side.length() > 0.5 else way.orthogonal()
+		away += push * (1.0 - near / CRAWL_SHY) * 2.0
+	way += away
+	return way.normalized() if way.length() > 0.001 else Vector2.ZERO
 
 
 ## The frame it wants next (read only; tests).

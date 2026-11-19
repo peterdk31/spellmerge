@@ -397,3 +397,37 @@ func test_a_fighter_revives_a_downed_teammate_before_it_travels() -> void:
 		await physics_frame
 	check(_bots[0].brain.behaviour is ReviveScript, "bot 1 is reviving")
 	check(wizard.global_position.distance_to(mate.global_position) <= ReviveScript.NEAR + 4.0, "bot 1 stands by its downed teammate (%.0f px off)" % wizard.global_position.distance_to(mate.global_position))
+
+
+## Connected biomes CB3's crawl (the owner, 2026-11-19): a downed bot crawls toward the nearest
+## standing teammate, never into an enemy, and stops beside it; with nobody standing it lies still.
+func test_a_downed_bot_crawls_toward_its_nearest_standing_teammate() -> void:
+	var wizard := await _fighters_in_a_run() as Actor
+	var mate := _flow.call("get_wizard", 1) as Actor
+	if wizard == null or mate == null:
+		return
+	mate.global_position = wizard.global_position + Vector2(96.0, 0.0)
+	wizard.set_down(true)
+	var way: Vector2 = _bots[0].crawl_way(wizard)
+	check(way.x > 0.9, "toward the standing teammate: %s" % way)
+	# An enemy just above the way: it leans away from it, down.
+	var table: Node = _flow.get_node(^"/root/Actors")
+	var foe := own(Node2D.new()) as Node2D
+	_flow.get_parent().add_child(foe)
+	foe.global_position = wizard.global_position + Vector2(20.0, -12.0)
+	var id: int = table.call("open", 1, 4)
+	table.call("set_node", id, foe)
+	var shy: Vector2 = _bots[0].crawl_way(wizard)
+	check(shy.y > 0.2 and shy.x > 0.0, "leaning away from the enemy near it, still on its way: %s" % shy)
+	table.call("close", id)
+	mate.global_position = wizard.global_position + Vector2(BotScript.CRAWL_BESIDE - 2.0, 0.0)
+	check_equal(_bots[0].crawl_way(wizard), Vector2.ZERO, "beside the teammate it stops")
+	mate.global_position = wizard.global_position + Vector2(96.0, 0.0)
+	mate.set_down(true)
+	check_equal(_bots[0].crawl_way(wizard), Vector2.ZERO, "nobody standing: it lies still")
+	mate.set_down(false)
+	wizard.global_position = mate.global_position - Vector2(160.0, 0.0)
+	var from: float = wizard.global_position.distance_to(mate.global_position)
+	for i in 60:
+		await physics_frame
+	check(wizard.global_position.distance_to(mate.global_position) < from - 4.0, "in play its seat's frames crawl it nearer (%.0f px to %.0f)" % [from, wizard.global_position.distance_to(mate.global_position)])

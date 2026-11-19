@@ -17,6 +17,13 @@ extends RefCounted
 ##    deciding the cells whose middles lie in its rectangle: its kind with the chance of its
 ##    `density`, else none (a field of no kind clears them).
 ##
+## **At its place** (connected biomes CB3b): a biome lays a room's piece somewhere in the world and maybe
+## mirrored (decision 6). `of_piece` reads that from the laid layout (its position and
+## `PieceShape.GROUND_MIRROR_META`) and `placed` does it: the template's cells mirrored in whole
+## cells, so its clumps are the template's own mirrored, and the grid's corner (`origin`) moved to
+## the piece's place. Cells, rectangles and lookups are then world pixels; a room laid as its scene
+## (the row run, the editor) has its origin at (0, 0), so world and room pixels are one.
+##
 ## No source ever covers a cell under a wall or a hole (one a wall's or a hole's rectangle overlaps;
 ## a hole is blocked as a wall, `BLOCKED_WALL`, hub rework HR-H2) or
 ## the cell of a door, a spawn or a placement. The chances come from `hash4`, keyed by the room's id,
@@ -36,6 +43,11 @@ const ROLL_RANGE: int = 65536
 ## The room's key in every roll of its cover (`name_hash` of its id; 0 with no room), Feel's tufts'
 ## and the editor's included (`CoverTufts`).
 var room_key: int = 0
+## Where the grid's top left corner lies, in world pixels (`placed`; (0, 0) for a room laid as its
+## scene): every cell and rectangle is read from here.
+var origin: Vector2 = Vector2.ZERO
+## The room's size in pixels (`RoomPlaces.size`, from its corner), which a mirroring flips within.
+var size: Vector2 = Vector2.ZERO
 ## Its size in cells.
 var columns: int = 0
 var rows: int = 0
@@ -64,6 +76,7 @@ static func of(layout_root: Node, room: RoomBase, all_kinds: Array[CoverKind]) -
 			made.kinds.append(kind)
 	made.kinds.sort_custom(func(a: CoverKind, b: CoverKind) -> bool: return String(a.id) < String(b.id))
 	var places: RoomPlaces = RoomPlaces.read(layout_root)
+	made.size = places.size
 	made.columns = ceili(places.size.x / float(CELL))
 	made.rows = ceili(places.size.y / float(CELL))
 	made.cells.resize(made.columns * made.rows)
@@ -78,6 +91,58 @@ static func of(layout_root: Node, room: RoomBase, all_kinds: Array[CoverKind]) -
 		made._fill(made.room_key, room.biome)
 	made._lay_fields(made.room_key, places)
 	return made
+
+
+## The cover of a piece as a biome laid it (connected biomes CB3b; `room_built`'s layout): `of` its
+## layout, then `placed` where the layout node stands, mirrored as its `PieceShape.GROUND_MIRROR_META`
+## says (a `Vector2i`, 1 on an axis mirrored). A layout at (0, 0) with no mirroring (the row run's
+## room, the editor's) is `of`'s own.
+##
+## A piece a biome laid (it carries the mirror meta, even unmirrored) keeps its cover within its
+## shape (`PieceShape.of`'s size: its floor and walls, the extent its walls and spawns are mirrored
+## within, which `RoomPlaces.size` pads to a screen and past its spawns), so a bridge's or a room's
+## cover never lies past its own floor over the dark or a neighbour.
+static func of_piece(layout_root: Node, room: RoomBase, all_kinds: Array[CoverKind]) -> CoverLayout:
+	var made: CoverLayout = of(layout_root, room, all_kinds)
+	var piece := layout_root as Node2D
+	if piece == null or not piece.has_meta(PieceShape.GROUND_MIRROR_META):
+		return made
+	var flip: Vector2i = piece.get_meta(PieceShape.GROUND_MIRROR_META, Vector2i.ZERO) as Vector2i
+	var mirror: int = (PieceShape.MIRROR_X if flip.x != 0 else 0) | (PieceShape.MIRROR_Y if flip.y != 0 else 0)
+	var extent: Vector2 = PieceShape.of(layout_root).size
+	return made.placed(piece.position, mirror, extent if extent.x > 0.0 and extent.y > 0.0 else made.size)
+
+
+## This cover laid at `at` (world pixels, the room's corner) and mirrored by `mirror`
+## (`PieceShape.MIRROR_X`, `MIRROR_Y`, both or 0) within `extent` (the piece's shape's size; its
+## `size` when none is given): a new layout, its `size` the extent. A cell not wholly within the
+## extent is left bare and blocked as a wall. A cell's kind and
+## its blocking move to the mirrored cell (whole cells; the art is drawn again from them, never
+## flipped, decision 6), and on a mirrored axis the grid's corner moves by what its last cell reaches
+## past the room's size, so each cell covers the pixels its mirror image does. The rolls stay keyed
+## by the template (`room_key`).
+func placed(at: Vector2, mirror: int, extent: Vector2 = Vector2.ZERO) -> CoverLayout:
+	var within: Vector2 = extent if extent.x > 0.0 and extent.y > 0.0 else size
+	var out := CoverLayout.new()
+	out.room_key = room_key
+	out.size = within
+	out.columns = columns
+	out.rows = rows
+	out.kinds = kinds
+	out._problems = _problems
+	out.cells.resize(cells.size())
+	out.blocked.resize(blocked.size())
+	var flip_x: bool = (mirror & PieceShape.MIRROR_X) != 0
+	var flip_y: bool = (mirror & PieceShape.MIRROR_Y) != 0
+	for y in rows:
+		for x in columns:
+			var to: int = (rows - 1 - y if flip_y else y) * columns + (columns - 1 - x if flip_x else x)
+			var inside: bool = float((x + 1) * CELL) <= within.x and float((y + 1) * CELL) <= within.y
+			out.cells[to] = cells[y * columns + x] if inside else 0
+			out.blocked[to] = blocked[y * columns + x] if inside else BLOCKED_WALL
+	var reach: Vector2 = Vector2(float(columns * CELL), float(rows * CELL))
+	out.origin = at + Vector2(within.x - reach.x if flip_x else 0.0, within.y - reach.y if flip_y else 0.0)
+	return out
 
 
 ## The engine's hash of the four keys (integer code, the same on every machine and in the editor).
@@ -102,18 +167,23 @@ func kind_at(cell: int) -> CoverKind:
 	return kinds[cells[cell] - 1]
 
 
-## The cell at room pixel `at`, -1 outside the grid.
+## The cell at world pixel `at` (a room pixel for a room at (0, 0)), -1 outside the grid.
 func cell_of(at: Vector2) -> int:
-	var x: int = floori(at.x / float(CELL))
-	var y: int = floori(at.y / float(CELL))
+	var x: int = floori((at.x - origin.x) / float(CELL))
+	var y: int = floori((at.y - origin.y) / float(CELL))
 	if x < 0 or y < 0 or x >= columns or y >= rows:
 		return -1
 	return y * columns + x
 
 
-## The rectangle of cell `cell`, in room pixels.
+## The rectangle of cell `cell`, in world pixels (room pixels for a room at (0, 0)).
 func cell_rect(cell: int) -> Rect2:
-	return Rect2(Vector2(float((cell % columns) * CELL), float((cell / columns) * CELL)), Vector2(CELL, CELL))
+	return Rect2(origin + Vector2(float((cell % columns) * CELL), float((cell / columns) * CELL)), Vector2(CELL, CELL))
+
+
+## The rectangle the grid covers, in world pixels.
+func rect() -> Rect2:
+	return Rect2(origin, Vector2(float(columns * CELL), float(rows * CELL)))
 
 
 ## How many cells hold the kind `kind_id` (any kind: &"").

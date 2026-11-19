@@ -121,11 +121,20 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
 const TeammateMarkersScript := preload("res://gameplay/feel/teammate_markers.gd")
+const SplitScreenScript := preload("res://gameplay/feel/split_screen.gd")
+const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
 const ExitSignsScript := preload("res://gameplay/feel/exit_signs.gd")
+const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
+const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
+const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
+const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
+const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
+const CoinsScript := preload("res://gameplay/feel/coins.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
+const CoverRoomsScript := preload("res://gameplay/feel/cover_rooms.gd")
 const GroundLayoutScript := preload("res://gameplay/feel/ground/ground_layout.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
@@ -353,6 +362,9 @@ var registry: RegistryScript = null:
 			_cast_sounds.registry = value
 		if _ambience != null:
 			_ambience.registry = value
+		_hearing.registry = value
+		if _locks != null:
+			_locks.registry = value
 		if _spawn_look != null:
 			_spawn_look.forget_styles()
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
@@ -472,9 +484,10 @@ var _portal_look: PortalLookScript = null
 var _portal_view: PortalView = PortalView.new()
 ## The spectacle (`spectacle.gd`): motes, floor marks, spell light and their settings.
 var _spectacle: SpectacleScript = null
-## The room's ground cover (`cover.gd`, ground cover GC3): at the floor marks' z, before the
-## spectacle in the tree, so the marks lie over it.
-var _cover: CoverScript = null
+## The ground cover (ground cover GC3): one view a room (`cover_rooms.gd`, each a `cover.gd`;
+## connected biomes CB3b), at the floor marks' z, before the spectacle in the tree, so the marks lie
+## over it.
+var _cover_rooms: CoverRoomsScript = null
 ## The room's ground, drawn again from its shape as it is laid out (`ground/ground_layout.gd`,
 ## connected biomes CB4).
 var _ground_layout: GroundLayoutScript = null
@@ -493,14 +506,32 @@ var _lanes: LanesScript = null
 var _remnants: RemnantsScript = null
 ## Every actor's damage numbers (`damage_number_drawer.gd`, props W5).
 var _numbers: DamageNumberDrawerScript = null
-## The markers at the picture's edge for teammates out of it (`teammate_markers.gd`).
+## The markers at the screen's edge for teammates in none of this machine's views
+## (`teammate_markers.gd`).
 var _markers: TeammateMarkersScript = null
+## The Voronoi split screen (connected biomes CB6, `split_screen.gd`): this machine's wizards in a
+## view each group once they no longer fit in one picture. Stepped after the party camera.
+var split_screen: SplitScreenScript = null
+## The one picture as views (`ScreenViews.set_single`), for the markers while the screen is not split.
+var _one_view: ScreenViewsScript = ScreenViewsScript.new()
 ## The open room's code over the hub's altar (`altar_code.gd`).
 var _altar_code: AltarCodeScript = null
 ## The kind of room behind each lit exit of a run's room (`exit_signs.gd`).
 var _exit_signs: ExitSignsScript = null
+## A biome's gather doors, its gate and the portal home (connected biomes CB7, `gather_door_looks.gd`).
+var _gather_doors: GatherDoorLooksScript = null
+## A biome's pieces as this machine hears them (connected biomes CB12, `room_hearing.gd`): which
+## places Audio plays from, and the room the music and the bed follow.
+var _hearing: RoomHearingScript = RoomHearingScript.new()
+## A biome's bridge mouths (shimmer, flare, seal: `mouth_looks.gd`), its key doors and secret rocks
+## (`lock_looks.gd`) and the dark over its unvisited rooms (`unseen_dark.gd`; CB12).
+var _mouths: MouthLooksScript = null
+var _locks: LockLooksScript = null
+var _unseen: UnseenDarkScript = null
 ## The items on the ground (`ground_items.gd`, items I6).
 var _ground_items: GroundItemsScript = null
+## The coins on the floor (`coins.gd`, connected biomes CB10).
+var _coins: CoinsScript = null
 ## The health bars over wizards whose seat drives another body (`away_bars.gd`, items I8).
 var _away_bars: AwayBarsScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
@@ -705,6 +736,8 @@ var _cue_next_at: PackedFloat32Array = PackedFloat32Array()
 func _exit_tree() -> void:
 	if audio != null and is_instance_valid(audio):
 		audio.silence()
+		if audio.ears.heard == Callable(_hearing, &"hears"):
+			audio.ears.heard = Callable()
 	if _held != null:
 		_held.clear()
 
@@ -744,11 +777,11 @@ func _ready() -> void:
 	_ground_layout.registry = registry
 	add_child(_ground_layout)
 	# Before the spectacle: at the marks' z the later node draws on top, so the marks lie over the cover.
-	_cover = CoverScript.new(MARK_Z)
-	_cover.name = "Cover"
-	_cover.events = events
-	_cover.registry = registry
-	add_child(_cover)
+	_cover_rooms = CoverRoomsScript.new(MARK_Z)
+	_cover_rooms.name = "CoverRooms"
+	_cover_rooms.events = events
+	_cover_rooms.registry = registry
+	add_child(_cover_rooms)
 	_spectacle = SpectacleScript.new()
 	_spectacle.name = "Spectacle"
 	_spectacle.events = events
@@ -756,7 +789,7 @@ func _ready() -> void:
 	_spectacle.particles_enabled = particles_enabled
 	add_child(_spectacle)
 	# Burning cover's embers and smoke cool through the spectacle's ramps (GC8).
-	_cover.motes.ramp_table = _spectacle.ramp_table()
+	_cover_rooms.set_ramp_table(_spectacle.ramp_table())
 	# The floor flashes (a slam's burst and star) share the floor marks' z; at one z the later node
 	# draws on top, so they come after the spectacle, whose mark layer (made whenever the setting
 	# turns on) is inside it: a new strike shows over the marks earlier ones left.
@@ -793,6 +826,7 @@ func _ready() -> void:
 	add_child(_ambience)
 	_body_sounds = BodySoundsScript.new()
 	_body_sounds.held = _held
+	_body_sounds.heard = _hearing.hears
 	_body_sounds.audio = audio
 	_body_sounds.play_cue = _play_body_cue
 	_intro_sound = BossIntroSoundScript.new()
@@ -806,12 +840,13 @@ func _ready() -> void:
 	_numbers.events = events
 	_numbers.registry = registry
 	add_child(_numbers)
-	# On a layer of its own over the HUD's, following the camera (world space).
+	# On a layer of its own over the HUD's, in screen pixels.
 	var marker_layer := CanvasLayer.new()
 	marker_layer.name = "TeammateMarkerLayer"
 	marker_layer.layer = TeammateMarkersScript.LAYER
-	marker_layer.follow_viewport_enabled = true
 	add_child(marker_layer)
+	split_screen = SplitScreenScript.new()
+	add_child(split_screen)
 	_markers = TeammateMarkersScript.new()
 	_markers.name = "TeammateMarkers"
 	marker_layer.add_child(_markers)
@@ -823,10 +858,37 @@ func _ready() -> void:
 	_exit_signs.name = "ExitSigns"
 	add_child(_exit_signs)
 	_exit_signs.bind(events, _room_kind_name)
+	_gather_doors = GatherDoorLooksScript.new()
+	_gather_doors.name = "GatherDoors"
+	add_child(_gather_doors)
+	_gather_doors.bind(events)
+	_hearing.registry = registry
+	_hearing.bind(events)
+	if audio != null:
+		audio.ears.heard = _hearing.hears
+	_mouths = MouthLooksScript.new()
+	_mouths.name = "MouthLooks"
+	_mouths.pieces = _hearing
+	add_child(_mouths)
+	_mouths.bind(events)
+	_locks = LockLooksScript.new()
+	_locks.name = "LockLooks"
+	_locks.registry = registry
+	add_child(_locks)
+	_locks.bind(events)
+	_unseen = UnseenDarkScript.new()
+	_unseen.name = "UnseenDark"
+	_unseen.pieces = _hearing
+	add_child(_unseen)
+	_unseen.bind(events)
 	_ground_items = GroundItemsScript.new()
 	_ground_items.name = "GroundItems"
 	add_child(_ground_items)
 	_ground_items.bind(events)
+	_coins = CoinsScript.new()
+	_coins.name = "Coins"
+	add_child(_coins)
+	_coins.bind(events)
 	_away_bars = AwayBarsScript.new()
 	_away_bars.name = "AwayBars"
 	add_child(_away_bars)
@@ -943,9 +1005,12 @@ func step(real_delta: float) -> void:
 	var seats_here: int = _seats_here()
 	party_camera.look(_actor_table(), seats_here)
 	party_camera.step(real_delta)
+	if split_screen != null:
+		var world_camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
+		split_screen.step(real_delta, _actor_table(), seats_here, world_camera)
+		_spectacle.set_split(split_screen.views(), split_screen.mote_share(), split_screen.light_downscale())
 	if _markers != null:
-		var shown: Camera2D = party_camera.camera
-		_markers.step(_actor_table(), seats_here, party_camera.visible_rect(), shown.zoom.x if is_instance_valid(shown) else 0.0, _clock)
+		_markers.step(_actor_table(), seats_here, _views_shown(), _clock)
 	if _away_bars != null:
 		_away_bars.step(_actor_table())
 	_intro_wait.settle()
@@ -972,12 +1037,13 @@ func step(real_delta: float) -> void:
 	_fall_look.step(_actor_table(), real_delta, _fall_motes if _spectacle.motes_on() else Callable())
 	if _spawn_look != null:
 		_spawn_look.step(_actor_table(), real_delta)
-	var picture: Rect2 = party_camera.visible_rect()
+	var picture: Rect2 = _picture()
+	var focus: Vector2 = _focus(picture)
 	# The world's stirs first (atmosphere E): the cover, the lights and the motes read them.
 	_spectacle.step_stirs(_clock, picture)
-	_cover.step(_clock, _actor_table(), picture.get_center() if picture.has_area() else Vector2.INF, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
+	_cover_rooms.step(_clock, _actor_table(), focus, _spectacle.pool if _spectacle.motes_on() else null, picture, _spectacle.stirs.version, _spectacle.stirs.hand_to)
 	# The bodies the cover found part the mist (atmosphere F): one gathering, read by both.
-	_spectacle.hand_bodies(_cover.bodies(), _cover.body_count())
+	_spectacle.hand_bodies(cover().bodies(), cover().body_count())
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells
@@ -985,16 +1051,41 @@ func step(real_delta: float) -> void:
 	if _held != null:
 		_held.spells = spells
 		_held.step()
+	_step_rooms(real_delta, seats_here)
 	if _body_sounds != null:
 		_body_sounds.step(real_delta, _actor_table())
 	if _ambience != null:
-		_ambience.step(real_delta, picture.get_center() if picture.has_area() else Vector2.INF)
+		_ambience.step(real_delta, focus)
 	_step_labels(real_delta)
 	if _remnants != null:
 		_remnants.step(real_delta)
 	if _numbers != null:
 		_numbers.step(real_delta)
 	_step_statuses(real_delta)
+
+
+## A biome's rooms as this machine sees and hears them (connected biomes CB12): the places heard
+## (Audio's ears ask), the music and the bed of the room followed, the mouths, the gather doors'
+## wizards and the dark of the unvisited rooms.
+func _step_rooms(real_delta: float, seats_here: int) -> void:
+	var grid: RoomGrid = projectiles.grid() if projectiles != null and is_instance_valid(projectiles) else null
+	var table: ActorsScript = _actor_table()
+	if audio != null and not audio.ears.heard.is_valid():
+		# Feel back in the tree after it let go of Audio's ears (`_exit_tree`).
+		audio.ears.heard = _hearing.hears
+	_hearing.step(table, seats_here, grid)
+	if _hearing.in_biome() and _hearing.followed() >= 0:
+		if _body_sounds != null:
+			_body_sounds.room_music = _hearing.music()
+			_body_sounds.room_intensity = _hearing.intensity_of(_hearing.followed())
+		if _ambience != null:
+			_ambience.use(_hearing.air())
+	if _gather_doors != null:
+		_gather_doors.see(table)
+	if _mouths != null:
+		_mouths.step(real_delta, grid)
+	if _unseen != null:
+		_unseen.step(real_delta, table, grid)
 
 
 ## The open portals, read once (`CarrierPortal.read_view`), drawn by the portal look; their motes
@@ -1130,6 +1221,8 @@ func _on_room_entered(room_id: StringName, number: int) -> void:
 	if number != EventsScript.FIRST_ROOM:
 		return
 	party_camera.room_entered()
+	if split_screen != null:
+		split_screen.camera.reset()
 	# What held a sound is gone with the last room; the music is the new room's (`body_sounds.gd`).
 	if audio != null:
 		audio.clear_world()
@@ -1166,6 +1259,38 @@ func _seats_here() -> int:
 		if tree != null and tree.root != null:
 			frames = tree.root.get_node_or_null(^"Frames") as FramesScript
 	return frames.seats_here() if frames != null else 0
+
+
+## The part of the world this machine shows now: the party camera's picture, or while the screen is
+## split the box round every view's (`ScreenViews.world_box`).
+func _picture() -> Rect2:
+	if split_screen != null and split_screen.is_drawing():
+		return split_screen.camera.views.world_box()
+	return party_camera.visible_rect()
+
+
+## Where this machine looks from (the cover's nearest bodies, the room's ambience): the picture's
+## middle; while split, the middle of the first view's (the box round the views may be the void
+## between them). INF with no picture.
+func _focus(picture: Rect2) -> Vector2:
+	if split_screen != null and split_screen.is_drawing():
+		var views: ScreenViewsScript = split_screen.camera.views
+		return views.to_screen[0].affine_inverse() * (views.screen * 0.5)
+	return picture.get_center() if picture.has_area() else Vector2.INF
+
+
+## This machine's views now: the split screen's, or the party camera's one picture as one view.
+func _views_shown() -> ScreenViewsScript:
+	if split_screen != null and split_screen.is_drawing():
+		return split_screen.camera.views
+	var camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
+	var picture: Rect2 = party_camera.visible_rect()
+	if camera == null or not picture.has_area():
+		_one_view.count = 0
+		return _one_view
+	var zoom: float = camera.zoom.x
+	_one_view.set_single(picture.size * zoom, Transform2D(0.0, Vector2(zoom, zoom), 0.0, -picture.position * zoom), _seats_here())
+	return _one_view
 
 
 ## The camera followed now, or null when it is gone (a freed world's).
@@ -2297,6 +2422,11 @@ func ground_items() -> GroundItemsScript:
 	return _ground_items
 
 
+## The coins on the floor's look (for tests).
+func coins() -> CoinsScript:
+	return _coins
+
+
 ## The name for people of the room kind `kind` (`RoomKind.shown_name`), from the registry; its id in
 ## words when the registry has none.
 func _room_kind_name(kind: StringName) -> String:
@@ -2307,6 +2437,29 @@ func _room_kind_name(kind: StringName) -> String:
 ## The names over a run's lit exits (for tests).
 func exit_signs() -> ExitSignsScript:
 	return _exit_signs
+
+
+## The gather doors' look (connected biomes CB7).
+func gather_doors() -> GatherDoorLooksScript:
+	return _gather_doors
+
+
+## A biome's pieces as heard, its mouths, key doors and secret rocks, the unvisited rooms' dark (for
+## tests; connected biomes CB12).
+func room_hearing() -> RoomHearingScript:
+	return _hearing
+
+
+func mouth_looks() -> MouthLooksScript:
+	return _mouths
+
+
+func lock_looks() -> LockLooksScript:
+	return _locks
+
+
+func unseen_dark() -> UnseenDarkScript:
+	return _unseen
 
 
 ## The room's code over the altar (for tests).
@@ -2329,9 +2482,15 @@ func motes() -> MotesScript:
 	return _spectacle.pool if _spectacle != null else null
 
 
-## The room's ground cover's look (for tests and the screenshots).
+## The first room's ground cover's look (a row run's room, a biome's start room; for tests and the
+## screenshots).
 func cover() -> CoverScript:
-	return _cover
+	return _cover_rooms.first() if _cover_rooms != null else null
+
+
+## Every room's ground cover's look (`cover_rooms.gd`: `view_of(number)`), for tests.
+func cover_rooms() -> CoverRoomsScript:
+	return _cover_rooms
 
 
 ## The floor marks (null with the setting off; for tests and the benchmarks).
@@ -3338,7 +3497,10 @@ func _on_player_downed(player: int) -> void:
 func _in_picture(at: Vector2) -> bool:
 	if at == Vector2.INF:
 		return true
-	var picture: Rect2 = party_camera.visible_rect()
+	# While split: in a view's cell, or within SHAKE_REACH of it (not the void between views).
+	if split_screen != null and split_screen.is_drawing():
+		return split_screen.camera.views.view_showing(at, SHAKE_REACH) >= 0
+	var picture: Rect2 = _picture()
 	return not picture.has_area() or picture.grow(SHAKE_REACH).has_point(at)
 
 

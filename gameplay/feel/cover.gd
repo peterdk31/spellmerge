@@ -1,12 +1,16 @@
 extends Node2D
-## Ground cover's look (ground cover GC3, docs/milestones/ground-cover.md, rule 6): the tufts of the
-## room's cover, swaying in a slow wind. Feel's own script (`Feel.cover()`), never more of feel.gd.
+## Ground cover's look (ground cover GC3, docs/milestones/ground-cover.md, rule 6): the tufts of one
+## room's cover, swaying in a slow wind. Feel's own script (`Feel.cover()`, the first room's; one a
+## piece of the world, `cover_rooms.gd`, connected biomes CB3b), never more of feel.gd.
 ##
-## **The layout** is heard, never asked: each `room_built` (Flow, whenever it lays a room out: a run's
+## **The layout** is heard, never asked: `room_built` (Flow, whenever it lays a room out: a run's
 ## start, each room entered, a restore into another room) works out the room's cover
-## (`CoverLayout.of`, from the layout, its `RoomBase` and the registry's cover kinds) and lays its
-## tufts; the layout's node is not kept. A restore into the room shown sends nothing and needs
-## nothing: the tufts are still the room's.
+## (`CoverLayout.of_piece`, from the layout at its place and mirrored with it, its `RoomBase` and the
+## registry's cover kinds) and lays its tufts, at the room's place, scattered again over the mirrored
+## cells (the art is drawn, never flipped: decision 6); the layout's node is not kept. In the game
+## Feel's `cover_rooms.gd` hears it and hands each room's view its layout (`lay`) and its changes
+## (`show_state`); a view made with the bus (a test's) hears the first room's itself. A restore into
+## the room shown sends nothing and needs nothing: the tufts are still the room's.
 ##
 ## **One batch a kind** (made by `Batches.multimesh()`, so never culled), its rows the tufts of every
 ## cell of that kind, scattered by `CoverTufts` (the editor's preview draws the same ones), drawn by
@@ -82,7 +86,8 @@ const STIR_BLAST_PIXELS: float = 10.0
 ## When a cell never walked through was walked (long before any clock).
 const NEVER: float = -1.0e6
 
-## The bus and the registry (Feel's; null in a test that lays a layout itself).
+## The bus and the registry (a test's own view's; null for Feel's views, which `cover_rooms.gd` hands
+## their rooms, and in a test that lays a layout itself).
 var events: EventsScript = null
 var registry: RegistryScript = null
 
@@ -180,22 +185,27 @@ func kinds() -> Array[CoverKind]:
 	return found
 
 
-## A room was laid out (`room_built`): its cover, from its layout as built.
+## A room was laid out (`room_built`): the first room's cover, from its layout as built.
 func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void:
-	# The cover the cover area plays: the world's first room's (connected biomes CB3).
-	if number != EventsScript.FIRST_ROOM:
-		return
-	# Only where it is laid as its scene is: at the world's origin, unmirrored (a biome's start room
-	# elsewhere, or mirrored, plays no cover until Cover keeps a cover a room: connected biomes CB3).
-	var piece := layout_root as Node2D
-	if piece != null and (piece.position != Vector2.ZERO or (piece.has_meta(PieceShape.GROUND_MIRROR_META) and piece.get_meta(PieceShape.GROUND_MIRROR_META) != Vector2i.ZERO)):
-		layout_root = null
+	if number == EventsScript.FIRST_ROOM:
+		lay(laid_from(room_id, layout_root))
+
+
+## The cover of the piece `room_id` laid as `layout_root` (at its place, mirrored with it), with this
+## view's kinds.
+func laid_from(room_id: StringName, layout_root: Node) -> CoverLayout:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
-	lay(CoverLayout.of(layout_root, room, kinds()))
+	return CoverLayout.of_piece(layout_root, room, kinds())
 
 
-## The cover area's changes (`cover_changed`, GC5): each cell shows its new state.
-func _on_cover_changed(cells: PackedInt32Array, states: PackedInt32Array) -> void:
+## The cover area's changes (`cover_changed`, GC5): the first room's cells show their new states.
+func _on_cover_changed(room: int, cells: PackedInt32Array, states: PackedInt32Array) -> void:
+	if room == EventsScript.FIRST_ROOM:
+		show_states(cells, states)
+
+
+## Each of `cells` shows its state of `states` (a `cover_changed`'s).
+func show_states(cells: PackedInt32Array, states: PackedInt32Array) -> void:
 	for at in mini(cells.size(), states.size()):
 		show_state(cells[at], states[at])
 
@@ -270,11 +280,12 @@ func shown_state(cell: int) -> int:
 	return _shown[cell] if cell >= 0 and cell < _shown.size() else 0
 
 
-## The cell of the layout's grid the shader reads a tuft's walk from, for its foot `foot` (room
-## pixels): the cell it stands in, a foot on a cell's bottom edge its own (`CoverTufts.foot` puts
-## a foot 1 to `CELL` pixels below its cell's top). The shader's expression, mirrored.
-static func foot_cell(foot: Vector2) -> Vector2i:
-	var at: Vector2 = foot / float(CoverLayout.CELL) - Vector2(0.0, 0.001)
+## The cell of the layout's grid the shader reads a tuft's walk from, for its foot `foot` (world
+## pixels) on a grid whose corner is `origin` (`CoverLayout.origin`): the cell it stands in, a foot on
+## a cell's bottom edge its own (`CoverTufts.foot` puts a foot 1 to `CELL` pixels below its cell's
+## top). The shader's expression, mirrored.
+static func foot_cell(foot: Vector2, origin: Vector2 = Vector2.ZERO) -> Vector2i:
+	var at: Vector2 = (foot - origin) / float(CoverLayout.CELL) - Vector2(0.0, 0.001)
 	return Vector2i(floori(at.x), floori(at.y))
 
 
@@ -338,9 +349,23 @@ func body_count() -> int:
 ## ShaderMaterial; the spectacle's `Stirs.hand_to`; none: not handed) whenever their `stirs_version`
 ## is not the one handed last.
 func step(now: float, table: ActorsScript = null, focus: Vector2 = Vector2.INF, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
+	_find_bodies(table, focus)
+	_draw_frame(now, pool, view, stirs_version, hand_stirs)
+
+
+## `step` with the bodies another view found this frame (`found`, `count` of them: Feel's first
+## room's `bodies()`, so a frame gathers them once for every room), the rest as `step`.
+func step_with(found: PackedVector2Array, count: int, now: float, pool: MotesScript = null, view: Rect2 = Rect2(), stirs_version: int = -1, hand_stirs: Callable = Callable()) -> void:
+	_near_count = mini(count, mini(found.size(), BODIES))
+	for at in _near_count:
+		_near_at[at] = found[at]
+	_draw_frame(now, pool, view, stirs_version, hand_stirs)
+
+
+## The frame's look once the bodies are found (`step`).
+func _draw_frame(now: float, pool: MotesScript, view: Rect2, stirs_version: int, hand_stirs: Callable) -> void:
 	_now = now
 	if layout != null:
-		_find_bodies(table, focus)
 		_walk(now)
 	if _times_dirty:
 		_times_dirty = false
@@ -493,7 +518,8 @@ func _lay_kind(index: int) -> MultiMeshInstance2D:
 		for tuft in per_cell:
 			rolls[slot] = CoverTufts.roll(layout, kind_key, cell, tuft)
 			feet[slot] = CoverTufts.foot(layout, cell, tuft, per_cell, rolls[slot])
-			keys[slot] = CoverTufts.draw_key(feet[slot], slot)
+			# Keyed by its foot in the room (a biome's room may lie anywhere in the world).
+			keys[slot] = CoverTufts.draw_key(feet[slot] - layout.origin, slot)
 			slot += 1
 	keys.sort()
 	var slot_row := PackedInt32Array()
@@ -525,6 +551,8 @@ func _lay_kind(index: int) -> MultiMeshInstance2D:
 	material.set_shader_parameter(&"frame_size", Vector2(kind.frame_size))
 	material.set_shader_parameter(&"sheet_size", Vector2(kind.sheet.get_size()))
 	material.set_shader_parameter(&"cell_times", _times_texture)
+	# Its view grid's texels are cells from the grid's corner in the world (connected biomes CB3b).
+	material.set_shader_parameter(&"cell_origin", layout.origin)
 	material.set_shader_parameter(&"body_count", 0)
 	material.set_shader_parameter(&"trample_hold", kind.trample_hold)
 	material.set_shader_parameter(&"trample_spring", kind.trample_spring)

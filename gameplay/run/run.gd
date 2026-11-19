@@ -13,7 +13,9 @@ extends Node
 ## hears the map as the party sees it (`run_map_changed`, run generation RG8: every room's row, kind
 ## and links, and where the party is) as it enters each room, empty as a run starts. Areas never
 ## call each other: Flow knows the run by these events only, and this area knows nothing of a world,
-## a body or a scene.
+## a body or a scene. As a run of rooms begins it also says the run's own changes of the run stats
+## (`run_stats_ruled`, connected biomes CB10: its rule changes of a run stat whose flags the run's
+## unlocks hold), which the Rewards area works each player's stats out from.
 ##
 ## The map is the run's state (`map`, `at`: hashed, saved in snapshots), the same on every machine;
 ## a joining machine gets it from the snapshot. A run's start renews it (`begin_run`): out of a run
@@ -128,6 +130,8 @@ func _on_run_begun(run_id: StringName, players: int, start_depth: int) -> void:
 		_tell_map()
 		return
 	map = made
+	# The run's own changes of the run stats (connected biomes CB10, `RunStats`), before its first room.
+	events.run_stats_ruled.emit(definition.stat_changes_by(sim.unlocks))
 	_enter(made.start_at(start_depth, definition.start_depths()))
 
 

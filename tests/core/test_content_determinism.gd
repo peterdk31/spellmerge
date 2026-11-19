@@ -62,11 +62,25 @@ func test_a_room_with_holes_plays_the_same_twice_and_through_a_snapshot() -> voi
 ## tests/support/biome_fight.gd) plays the same twice and through a snapshot: the rooms' life (who is
 ## where, entered, sealed, cleared, asleep), both fights' queues and the bodies crossing mouths.
 func test_a_split_party_in_two_sealed_fights_plays_the_same_twice_and_through_a_snapshot() -> void:
-	var at: int = 150
 	var fight := BiomeFight.new(root)
+	_check_biome(fight, 150)
+	check(fight.both_sealed, "the party split into two sealed fights at once")
+
+
+## Connected biomes CB7: the party at the boss's gate (the court a boss's room, tests/support/
+## biome_fight.gd): it opens, everyone comes in onto the arena's spawns and the fight starts, the same
+## twice and through a snapshot taken before the gate opened.
+func test_a_party_through_the_gate_plays_the_same_twice_and_through_a_snapshot() -> void:
+	var fight := BiomeFight.new(root, true)
+	_check_biome(fight, 20)
+	check(fight.gate_opened, "the gate opened and the party came in")
+	check(fight.gate_opened_at > 20, "after the snapshot (at tick %d)" % fight.gate_opened_at)
+
+
+## `fight` played twice the same and through a snapshot taken after tick `at`.
+func _check_biome(fight: BiomeFight, at: int) -> void:
 	var first := Desync.new()
 	var snapshot: Snapshot = fight.play(TICKS, at, first)
-	check(fight.both_sealed, "the party split into two sealed fights at once")
 	check(snapshot != null, "the snapshot was taken")
 	if snapshot == null:
 		return

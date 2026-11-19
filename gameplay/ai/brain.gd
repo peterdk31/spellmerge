@@ -720,7 +720,7 @@ func _perceive_harm() -> void:
 			var cell := Vector2i(x, y)
 			if sight.harms_cell(cell):
 				continue
-			var middle: Vector2 = CoverSight.middle(cell)
+			var middle: Vector2 = sight.world_middle(cell)
 			var far: float = middle.distance_squared_to(at)
 			if far < best and AISight.line_clear(actor.projectiles, at, middle):
 				best = far

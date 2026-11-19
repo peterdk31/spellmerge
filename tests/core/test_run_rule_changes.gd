@@ -51,6 +51,7 @@ func _run() -> RunDefinition:
 	boss.max_per_row = 1
 	boss.max_per_run = 1
 	rules.kinds = [KindRule.make(&"fight", 0, -2), boss] as Array[KindRule]
+	rules.styles = [MapStyle.make(&"long", 0.75)] as Array[MapStyle]
 	var run := RunDefinition.new()
 	run.id = &"cellar_run"
 	run.biomes = [rules] as Array[MapRules]
@@ -126,11 +127,26 @@ func test_every_target_changes_its_number() -> void:
 		[RunRuleChange.Target.SCALE_DEPTH_END, &"", func(d: RunDefinition) -> float: return d.scaling.per_depth.end],
 		[RunRuleChange.Target.SCALE_PLAYER_START, &"", func(d: RunDefinition) -> float: return d.scaling.per_player.start],
 		[RunRuleChange.Target.SCALE_PLAYER_END, &"", func(d: RunDefinition) -> float: return d.scaling.per_player.end],
+		# A biome's map (connected biomes CB5).
+		[RunRuleChange.Target.ROOMS_MIN, &"", func(d: RunDefinition) -> float: return float(d.biomes[0].rooms_min)],
+		[RunRuleChange.Target.ROOMS_MAX, &"", func(d: RunDefinition) -> float: return float(d.biomes[0].rooms_max)],
+		[RunRuleChange.Target.FIGHTS_ON_WAY, &"", func(d: RunDefinition) -> float: return float(d.biomes[0].fights_on_way)],
+		[RunRuleChange.Target.SCALE_DEPTH, &"", func(d: RunDefinition) -> float: return float(d.biomes[0].scale_depth)],
+		[RunRuleChange.Target.KIND_LEAST, &"fight", func(d: RunDefinition) -> float: return float(d.biomes[0].kinds[0].least)],
+		[RunRuleChange.Target.KIND_CHANCE, &"fight", func(d: RunDefinition) -> float: return d.biomes[0].kinds[0].chance],
+		[RunRuleChange.Target.STYLE_WEIGHT, &"", func(d: RunDefinition) -> float: return d.biomes[0].styles[0].weight, &"long"],
 	]
-	check_equal(cases.size(), RunRuleChange.Target.size(), "every target has a case")
+	# The run stats' target is the one more (connected biomes CB10): it changes a stat, not the map.
+	check_equal(cases.size() + 1, RunRuleChange.Target.size(), "every target has a case")
+	var stat_run: RunDefinition = _run()
+	var stat_change := RunRuleChange.make(&"unlocked", RunRuleChange.Target.RUN_STAT, 4.0)
+	stat_change.stat = &"start_coins"
+	stat_run.changes = [stat_change] as Array[RunRuleChange]
+	check_equal(RunStats.value_of(&"start_coins", stat_run.stat_changes_by(_unlocks([&"unlocked"] as Array[StringName]))), 4.0, "RUN_STAT set to 4")
+	check_equal(stat_run.problems(_content()), PackedStringArray(), "a run stat's change is sound")
 	for case: Array in cases:
 		var run: RunDefinition = _run()
-		run.changes = [RunRuleChange.make(&"unlocked", case[0], 4.0, RunRuleChange.How.SET, &"", case[1])] as Array[RunRuleChange]
+		run.changes = [RunRuleChange.make(&"unlocked", case[0], 4.0, RunRuleChange.How.SET, &"", case[1], case[3] if case.size() > 3 else &"")] as Array[RunRuleChange]
 		var getter: Callable = case[2]
 		var played: RunDefinition = run.changed_by(_unlocks([&"unlocked"] as Array[StringName]))
 		check(is_equal_approx(getter.call(played) as float, 4.0), "%s set to 4" % RunRuleChange.Target.find_key(case[0]))

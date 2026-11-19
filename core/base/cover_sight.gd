@@ -19,6 +19,9 @@ extends RefCounted
 const SIDE: int = 9
 const CELL: int = CoverLayout.CELL
 
+## Where the room's cover grid starts, in world pixels (`CoverLayout.origin`; (0, 0) for a room laid
+## as its scene, connected biomes CB3b): the points asked about are world pixels, its cells the room's.
+var offset: Vector2 = Vector2.ZERO
 ## The window's first cell (its column and row in the room's cover) and its size in cells.
 var origin: Vector2i = Vector2i.ZERO
 var columns: int = 0
@@ -41,13 +44,16 @@ func clear() -> void:
 	columns = 0
 	rows = 0
 	origin = Vector2i.ZERO
+	offset = Vector2.ZERO
 
 
 ## The window of the cells within `reach` of `at` (at most SIDE a side, centred on `at`'s cell),
-## clipped to a room of `room_columns` by `room_rows` cells; every cell safe. Returns whether any of
-## the room is in it.
-func open(at: Vector2, reach: float, room_columns: int, room_rows: int) -> bool:
+## clipped to a room of `room_columns` by `room_rows` cells whose grid starts at world pixel
+## `grid_origin`; every cell safe. Returns whether any of the room is in it.
+func open(world_at: Vector2, reach: float, room_columns: int, room_rows: int, grid_origin: Vector2 = Vector2.ZERO) -> bool:
 	clear()
+	offset = grid_origin
+	var at: Vector2 = world_at - grid_origin
 	var half: int = SIDE / 2
 	var centre: Vector2i = cell_at(at)
 	var x0: int = maxi(floori((at.x - reach) / float(CELL)), centre.x - half)
@@ -74,9 +80,9 @@ func mark(x: int, y: int) -> void:
 		count += 1
 
 
-## True when a body standing at room pixel `at` would be harmed (false outside the window).
+## True when a body standing at world pixel `at` would be harmed (false outside the window).
 func harms(at: Vector2) -> bool:
-	return count > 0 and harms_cell(cell_at(at))
+	return count > 0 and harms_cell(cell_at(at - offset))
 
 
 ## True when the room cell `cell` (its column and row) would harm a body (false outside the window).
@@ -91,9 +97,11 @@ func harms_cell(cell: Vector2i) -> bool:
 ## True when a cell the segment from `from` to `to` passes through, but the one `from` is in, would
 ## harm a body: every cell it crosses, walked in order along it (a corner clipped counts), so a body
 ## walking it steps in no harmful cell. Cells outside the window read as safe.
-func harms_along(from: Vector2, to: Vector2) -> bool:
+func harms_along(world_from: Vector2, world_to: Vector2) -> bool:
 	if count == 0:
 		return false
+	var from: Vector2 = world_from - offset
+	var to: Vector2 = world_to - offset
 	var cell: Vector2i = cell_at(from)
 	var last: Vector2i = cell_at(to)
 	var way: Vector2 = to - from
@@ -125,9 +133,15 @@ func harms_along(from: Vector2, to: Vector2) -> bool:
 	return false
 
 
-## The room cell (column and row) room pixel `at` is in.
+## The room cell (column and row) room pixel `at` is in (a world pixel less `offset`).
 static func cell_at(at: Vector2) -> Vector2i:
 	return Vector2i(floori(at.x / float(CELL)), floori(at.y / float(CELL)))
+
+
+## The middle of the room cell `cell` (column and row) in world pixels: its room's grid corner
+## (`offset`) on (connected biomes CB3b; room pixels for a room laid as its scene).
+func world_middle(cell: Vector2i) -> Vector2:
+	return middle(cell) + offset
 
 
 ## The middle of the room cell `cell` (column and row), in room pixels.

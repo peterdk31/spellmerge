@@ -442,6 +442,8 @@ func setup() -> void:
 		events.carry_ended.connect(_on_carry_ended)
 	if not events.crumble_requested.is_connected(_on_crumble_requested):
 		events.crumble_requested.connect(_on_crumble_requested)
+	if not events.health_gift_requested.is_connected(_on_health_gift_requested):
+		events.health_gift_requested.connect(_on_health_gift_requested)
 	if not events.room_entered.is_connected(_on_room_entered):
 		events.room_entered.connect(_on_room_entered)
 	# The moments of other areas that hold bodies (online-ready N4, `hit_stop.gd`).
@@ -1043,6 +1045,22 @@ func crumble(target: Variant) -> bool:
 
 func _on_crumble_requested(actor: int) -> void:
 	crumble(actor)
+
+
+## A reward's gift of health to `actor` (connected biomes CB10): `more_most` more most health (and
+## as much health while it stands, `Health.grow`), then a heal of `heal` as any heal is (told by
+## nobody). A body Combat does not keep, or one with no Health, gains nothing.
+func _on_health_gift_requested(actor: int, heal: float, more_most: float) -> void:
+	var row: int = _row_of(actor)
+	if row == ActorsScript.NONE or _body[row] != BODY_ACTOR:
+		return
+	var kit: Actor = _nodes[row] as Actor
+	if kit == null or kit.health == null:
+		return
+	if more_most > 0.0:
+		kit.health.grow(more_most)
+	if heal > 0.0:
+		_heal(EventsScript.NO_PLAYER, row, heal)
 
 
 # --- Falls (hub rework HR-H2, docs/milestones/hub-rework.md, "Holes" 4, question 10) -----------

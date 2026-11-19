@@ -232,6 +232,10 @@ var possessed_by: Possession = null
 ## shots pass it as they pass its own body (its hurt circle is a projectile target owned by that
 ## actor: `Caster.own_hurtbox`, Combat). Set before adding the actor.
 var belongs_to: int = ActorsScript.NONE
+## True for an add another body called (boss plan OB13: its phase's burst or waves), set by Flow as
+## it stands it. An add drops no coins (connected biomes CB10: waves without end would fill every
+## wallet). State.
+var is_add: bool = false
 
 ## The number it casts under in Spells and the projectile manager: its `id` while its caster is
 ## open (see `open_caster_number`), else -1.
@@ -354,11 +358,16 @@ func step_looks_due() -> void:
 		look.step(seconds)
 
 
-## True when the body's feet are on screen or within ON_SCREEN_MARGIN pixels of it.
+## True when the body's feet are on screen or within ON_SCREEN_MARGIN pixels of it (in a view's cell
+## while the screen is split).
 func _on_screen() -> bool:
 	var viewport: Viewport = get_viewport()
 	if viewport == null:
 		return true
+	# While the screen is split (connected biomes CB6): in any view's cell.
+	var views: ScreenViews = ScreenViews.on(viewport)
+	if views != null and views.is_split():
+		return views.view_showing(global_position, ON_SCREEN_MARGIN) >= 0
 	return viewport.get_visible_rect().grow(ON_SCREEN_MARGIN).has_point(get_global_transform_with_canvas().origin)
 
 

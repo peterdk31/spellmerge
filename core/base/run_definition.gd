@@ -35,6 +35,15 @@ func room_scale(rules: MapRules, depth: int, players: int) -> float:
 	return scaling.room_scale(depth, rules.depth_max - 1, players)
 
 
+## The scale of a room `depth` bridges from the start room of a biome's map of `rules` (connected
+## biomes CB5), in a run of `players` players: the scaling per depth reaches its end at the rules'
+## `scale_depth`, and a deeper room keeps it (1 with no `scaling`).
+func biome_room_scale(rules: MapRules, depth: int, players: int) -> float:
+	if scaling == null:
+		return 1.0
+	return scaling.room_scale(mini(depth, rules.scale_depth), rules.scale_depth, players)
+
+
 ## How many depths the hub's lectern offers a run of it to start at (run generation RG7): one a row
 ## of its first biome's deepest map (`MapRules.depth_max`), "Room 1" to the last, the boss's (none
 ## with no biome). A map made shallower starts a pick past its rows in its deepest row before the
@@ -69,6 +78,17 @@ func changed_by(unlocks: RunUnlocks) -> RunDefinition:
 	# The rules played are final: a copy has no changes left to apply (its `problems` checks it as
 	# it is, never applying them twice).
 	made.changes = [] as Array[RunRuleChange]
+	return made
+
+
+## The changes of the run stats a run of it plays with `unlocks` (connected biomes CB10,
+## `RunStats`): each rule change of the `RUN_STAT` target whose flag they hold, in order. Empty
+## with none.
+func stat_changes_by(unlocks: RunUnlocks) -> Array[StatChange]:
+	var made: Array[StatChange] = []
+	for change: RunRuleChange in changes:
+		if change != null and change.is_stat_target() and unlocks != null and unlocks.has(change.flag):
+			made.append(change.as_stat_change())
 	return made
 
 
@@ -113,11 +133,41 @@ func problems(content: RunContent) -> PackedStringArray:
 	return found
 
 
+## What keeps a biome's map (connected biomes CB5, `BiomeGenerator`) from being made of the
+## definition, one line each, as `problems` for the row map: no id, no biome, an empty entry, a
+## biome twice, each biome's `MapRules.biome_problems` from `content` and `shapes` (template id to its
+## `PieceShape`), the scaling's, and its rule changes' with the rules they leave (`change_problems`).
+func biome_problems(content: RunContent, shapes: Dictionary) -> PackedStringArray:
+	var found := PackedStringArray()
+	var name: String = String(id) if id != &"" else "A run"
+	if id == &"":
+		found.append("A run definition has no id.")
+	if biomes.is_empty():
+		found.append("%s: no biomes." % name)
+	var seen: Array[StringName] = []
+	for at in biomes.size():
+		var rules: MapRules = biomes[at]
+		if rules == null:
+			found.append("%s: biome %d is empty." % [name, at])
+			continue
+		if rules.biome != &"" and seen.has(rules.biome):
+			found.append("%s: biome '%s' twice." % [name, rules.biome])
+		seen.append(rules.biome)
+		for line: String in rules.biome_problems(content, shapes):
+			found.append("%s: %s" % [name, line])
+	if scaling != null:
+		found.append_array(scaling.problems(name))
+	if found.is_empty():
+		found.append_array(change_problems(content, func(changed: RunDefinition) -> PackedStringArray: return changed.biome_problems(content, shapes)))
+	return found
+
+
 ## What is wrong with its rule changes, one line each: an empty entry, each change's own
-## (`RunRuleChange.problems`), and the rules a flag leaves that can make no map: with each flag
-## alone, and with every flag at once (each set of flags between is not tried), and more flags than
-## a run's start carries (`RunUnlocks.MAX_FLAGS`; the registry checks all runs together too).
-func change_problems(content: RunContent) -> PackedStringArray:
+## (`RunRuleChange.problems`), and the rules a flag leaves that can make no map (`check`: the
+## problems of a changed definition; the row map's `problems` when not given): with each flag alone,
+## and with every flag at once (each set of flags between is not tried), and more flags than a run's
+## start carries (`RunUnlocks.MAX_FLAGS`; the registry checks all runs together too).
+func change_problems(content: RunContent, check: Callable = Callable()) -> PackedStringArray:
 	var found := PackedStringArray()
 	var name: String = String(id) if id != &"" else "A run"
 	for change: RunRuleChange in changes:
@@ -140,6 +190,7 @@ func change_problems(content: RunContent) -> PackedStringArray:
 		var changed: RunDefinition = changed_by(RunUnlocks.of(with))
 		if changed == self:
 			continue
-		for line: String in changed.problems(content):
+		var lines: PackedStringArray = check.call(changed) if check.is_valid() else changed.problems(content)
+		for line: String in lines:
 			found.append("With %s unlocked: %s" % [", ".join(PackedStringArray(with)), line])
 	return found

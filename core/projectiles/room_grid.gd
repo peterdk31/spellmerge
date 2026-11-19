@@ -26,7 +26,9 @@ extends RefCounted
 ## everywhere in a world with none: a row run's room). A place may be sealed (`set_sealed`: a fight
 ## under way in a room, Flow's state, told here again after a restore): nothing leaves a sealed place,
 ## a wizard's walk neither (`Actor.passes_mouths`), nor a movement spell, a swap or a portal
-## (`may_cross`); from outside, a wizard still walks in (the seal is one way). A move across a mouth
+## (`may_cross`); from outside, a wizard still walks in (the seal is one way). A place is awake or
+## asleep as Flow's room life says (`set_awake`, told each tick and again after a restore), for the
+## areas that step a place's own things only while it is awake (the cover, connected biomes CB3b). A move across a mouth
 ## goes along a way a body could walk (`walk_way_clear`: no wall but mouths on its segment).
 ##
 ## **The room's layers are not state** (connected biomes CB2, "The wall grid"): a biome-wide grid
@@ -61,9 +63,9 @@ const PAST_MOUTHS: int = 255 & ~MOUTH_CELL
 ## Not state: the room's layers (its bounds, walls, mouths and holes), laid from the room or the biome
 ## map by whoever lays them, and the grids worked out from the state (the footprints' counts, the
 ## walking grid), set up again in `rebuild_derived` (see the class doc).
-## The places and their seals too (`add_place`, `set_sealed`): laid from the biome map and Flow's
-## room state by whoever lays them.
-const DERIVED: Array[StringName] = [&"_bounds", &"_wall_w", &"_wall_h", &"_wall_cells", &"_has_walls", &"_has_mouths", &"_ground_cells", &"_footprint_missed", &"_hole_cells", &"_has_holes", &"_walk_cells", &"_place_rects", &"_sealed", &"_place_w", &"_place_h", &"_place_cells"]
+## The places, their seals and their sleep too (`add_place`, `set_sealed`, `set_awake`): laid from
+## the biome map and Flow's room state by whoever lays them.
+const DERIVED: Array[StringName] = [&"_bounds", &"_wall_w", &"_wall_h", &"_wall_cells", &"_has_walls", &"_has_mouths", &"_ground_cells", &"_footprint_missed", &"_hole_cells", &"_has_holes", &"_walk_cells", &"_place_rects", &"_sealed", &"_asleep", &"_place_w", &"_place_h", &"_place_cells"]
 ## What `place_at` answers outside every place (and everywhere in a world with none).
 const NO_PLACE: int = -1
 ## The side of a cell of the places' lookup (`place_at`), in pixels: a biome's pieces stand on the
@@ -103,6 +105,8 @@ var _walk_cells: PackedByteArray = PackedByteArray()
 ## The places (`add_place`): each one's world rectangle, by number, and 1 where it is sealed.
 var _place_rects: Array[Rect2] = []
 var _sealed: PackedByteArray = PackedByteArray()
+## 1 where a place sleeps (Flow's room life, `set_awake`).
+var _asleep: PackedByteArray = PackedByteArray()
 ## The places by PLACE_CELL square over the bounds (its middle's place, plus one; 0 for none), so
 ## `place_at` asks one cell (a body's move, every shot of a tick) and only checks that place.
 var _place_w: int = 0
@@ -330,9 +334,41 @@ func add_mouth(rect: Rect2) -> void:
 	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
 	for y in range(y0, y1):
 		for x in range(x0, x1):
+			# A cell that is a wall already stays one (no mouth): a gather door opened
+			# (`shut_mouth`) never opens a wall.
+			if (_wall_cells[y * _wall_w + x] & ROOM_CELL) != 0:
+				continue
 			_wall_cells[y * _wall_w + x] |= MOUTH_CELL
 			_has_walls = true
 			_has_mouths = true
+
+
+## Shut the mouth cells in the world rectangle `rect`, or open them again (connected biomes CB7: a
+## gather door, Flow's state, told here again after a restore). A shut mouth is a room wall as well
+## (ROOM_CELL over its MOUTH_CELL): nothing walks, flies or is moved through it, a wizard neither.
+## Only cells that are mouths change; parts outside the grid are ignored. The bodies' move and the
+## shots read the same bytes, so the native kernels need nothing of it.
+func shut_mouth(rect: Rect2, shut: bool) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / WALL_CELL), 0)
+	var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / WALL_CELL), 0)
+	var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / WALL_CELL), _wall_w)
+	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
+	for y in range(y0, y1):
+		for x in range(x0, x1):
+			var cell: int = y * _wall_w + x
+			if (_wall_cells[cell] & MOUTH_CELL) == 0:
+				continue
+			if shut:
+				_wall_cells[cell] |= ROOM_CELL
+			else:
+				_wall_cells[cell] &= ~ROOM_CELL
+
+
+## True when the cell at `point` is a shut mouth (`shut_mouth`).
+func is_shut_mouth(point: Vector2) -> bool:
+	return (cell_at(point) & (MOUTH_CELL | ROOM_CELL)) == (MOUTH_CELL | ROOM_CELL)
 
 
 ## True while a mouth lies in the grid (`add_mouth`).
@@ -398,6 +434,7 @@ func wall_image(holes: bool = false) -> Image:
 func add_place(rect: Rect2) -> int:
 	_place_rects.append(rect)
 	_sealed.append(0)
+	_asleep.append(0)
 	var number: int = _place_rects.size() - 1
 	if _place_cells.is_empty():
 		_place_w = maxi(ceili(_bounds.size.x / PLACE_CELL), 1)
@@ -421,6 +458,7 @@ func add_place(rect: Rect2) -> int:
 func clear_places() -> void:
 	_place_rects.clear()
 	_sealed.resize(0)
+	_asleep.resize(0)
 	_place_cells.resize(0)
 	_place_w = 0
 	_place_h = 0
@@ -461,6 +499,17 @@ func set_sealed(place: int, on: bool) -> void:
 ## True while place `place` is sealed.
 func is_sealed(place: int) -> bool:
 	return place >= 0 and place < _sealed.size() and _sealed[place] != 0
+
+
+## Wake place `place` or put it to sleep (Flow's room life; see the class doc).
+func set_awake(place: int, on: bool) -> void:
+	if place >= 0 and place < _asleep.size():
+		_asleep[place] = 0 if on else 1
+
+
+## True while place `place` is awake (always for a place out of them all, and in a world with none).
+func is_awake(place: int) -> bool:
+	return place < 0 or place >= _asleep.size() or _asleep[place] == 0
 
 
 ## True when `point` is in a sealed place: nothing there leaves it.

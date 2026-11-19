@@ -1,5 +1,5 @@
 extends "res://tests/support/screenshot.gd"
-## The markers at the picture's edge for teammates out of it (gameplay/feel/teammate_markers.gd;
+## The markers at the screen's edge for teammates out of it (gameplay/feel/teammate_markers.gd;
 ## owner, 2026-11-13): seat 0 is played here on the keyboard, seats 1-3 are virtual devices, as
 ## another machine's players are. The three are put far outside the picture (to the right, up and
 ## left, and down and left), the last one downed; the shot shows an arrow in each one's hat colour
@@ -36,4 +36,4 @@ func take() -> void:
 	await shot("teammate_markers")
 	var image: Image = await grab()
 	for at in 3:
-		save_crop(image, on_screen(markers.call("position_of", at) as Vector2), "teammate_marker_seat_%d" % int(markers.call("seat_of", at)), Vector2i(24, 24))
+		save_crop(image, markers.call("position_of", at) as Vector2, "teammate_marker_seat_%d" % int(markers.call("seat_of", at)), Vector2i(24, 24))

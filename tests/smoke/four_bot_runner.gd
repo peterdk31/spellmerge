@@ -39,10 +39,20 @@ extends Node
 ##
 ## Either way the node prints `SMOKE OK` or `SMOKE FAILED` lines and quits with 0 or 1.
 ##
-## Reproducibility: the game logic draws no random numbers (only cosmetic feel code
-## does) and each bot's brain is seeded by its slot, so a run varies only with frame
-## timing. There is no seed to set. The pass rate over repeated runs is in
-## docs/LOG.md and, for the bots on the brain, docs/milestones/M2-enemy-ai.md (L5).
+## Reproducibility: the fight is the same, tick by tick, on every start. Each bot's brain is
+## seeded by its slot, each build by BUILD_SEED, and the run's seed (`Sim.run_seed`), which makes
+## the map and every roll of the fight (`Sim.chance`), is dealt from REPLAY_SEED: the node starts
+## the run by recording it (`Frames.record`, Play recorded), and the replay's seed deals its runs'
+## seeds (`ReplayTape.next_run_seed`). Frame pacing changes only how many ticks fit in TIME_LIMIT's
+## game seconds (the unit runs are `--fixed-fps 60`). Started with Play alone, a run takes a random
+## seed (`SimSeed.fresh`), and about one seed in eleven makes a fight the bots lose (a fighter
+## downed and never revived, since the bots do not revive, or a stalemate past TIME_LIMIT), which
+## made this test fail by chance until the seed was pinned (tests/smoke/test_four_bot_seed.gd). A
+## recorded run also skips the first-time intro (Flow), which the automated runs skip anyway. The
+## argument `--replay-seed=N` plays the run of replay seed N instead (0: a random one); the result
+## line prints both seeds, so any run can be played again:
+##
+## godot --headless --fixed-fps 60 --path . --script res://tests/smoke/four_bot_smoke.gd -- --replay-seed=N
 
 const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
@@ -53,6 +63,12 @@ const PLAYERS: int = 4
 const IDLER: int = 3
 ## Bot `i` builds with the seed BUILD_SEED + i, so a failing run can be replayed.
 const BUILD_SEED: int = 2026
+## The seed of the replay the run is recorded into, which deals the run's seed (see the class doc;
+## 11: no fighter is downed). Changing it, or content that changes how this run's fight goes, can
+## make the run end otherwise: a failure then is the same on every start.
+const REPLAY_SEED: int = 11
+## The argument that plays another replay seed (`--replay-seed=N`; 0: a random one).
+const REPLAY_SEED_ARGUMENT: String = "--replay-seed="
 ## Game seconds allowed for the room to be cleared.
 const TIME_LIMIT: float = 120.0
 ## Frames to let the world settle after the room is cleared, then the checks run.
@@ -63,6 +79,7 @@ var _failures: Array[String] = []
 var _events: Node
 var _flow: Node
 var _input: Node
+var _frames: Node
 var _hud: Node
 var _bots: Array[BotScript] = []
 var _probe: Node
@@ -74,12 +91,18 @@ var _elapsed: float = 0.0
 var _settle: int = -1
 var _started: bool = false
 var _logging: bool = false
+var _stopped: bool = false
+var _bots_left: bool = false
 var _builder_was_open: bool = false
 var _builder_seen_open: bool = false
 var _refusals: Array[String] = []
 var _builds_failed: Array[String] = []
 var _builder_closed_at: float = -1.0
 var _idler_downed_at_close: bool = false
+## The seed of the replay the run is recorded into (REPLAY_SEED unless `--replay-seed` says), and
+## the run seed it dealt.
+var _replay_seed: int = REPLAY_SEED
+var _run_seed: int = 0
 ## The run played and its scaling, put back when the node goes.
 var _run: RunDefinition = null
 var _run_scaling: RunScaling = null
@@ -94,9 +117,10 @@ func _ready() -> void:
 	_events = root.get_node_or_null("Events")
 	_flow = root.get_node_or_null("Flow")
 	_input = root.get_node_or_null("PlayerInput")
+	_frames = root.get_node_or_null("Frames")
 	_hud = root.get_node_or_null("Hud")
-	if _events == null or _flow == null or _input == null or _hud == null:
-		_finish(["the Events, PlayerInput, Flow and Hud autoloads must exist"])
+	if _events == null or _flow == null or _input == null or _frames == null or _hud == null:
+		_finish(["the Events, PlayerInput, Frames, Flow and Hud autoloads must exist"])
 		return
 	_play_unscaled(root)
 	_events.connect("room_entered", _on_room_entered)
@@ -113,13 +137,38 @@ func _ready() -> void:
 			return
 		_bots.append(bot)
 	# Game time runs at real speed: the game never scales the engine's time (online-ready N4).
-	_events.emit_signal("play_requested", 0)
+	# Play, recorded: the replay's seed deals the run's (the class doc, "Reproducibility").
+	# Both argument lists, as the main menu reads them (a web page's come without `--`).
+	var replay: Replay = _frames.call("record", &"play_requested", 0, replay_seed_of(OS.get_cmdline_user_args() + OS.get_cmdline_args())) as Replay
+	_replay_seed = replay.run_seed
+	var tick: Node = root.get_node_or_null("Tick")
+	_run_seed = int(tick.get("sim").get("run_seed")) if tick != null else 0
+	print("SMOKE: %s" % _seeds_text())
 	_started = true
 
 
+## The replay seed `args` ask for with `--replay-seed=N`, else REPLAY_SEED. A value that is not a
+## whole number is REPLAY_SEED too.
+static func replay_seed_of(args: PackedStringArray) -> int:
+	for arg in args:
+		if arg.begins_with(REPLAY_SEED_ARGUMENT):
+			var value: String = arg.trim_prefix(REPLAY_SEED_ARGUMENT)
+			if value.is_valid_int():
+				return value.to_int()
+			push_warning("FourBotRunner: '%s' is not a seed; the run plays REPLAY_SEED (%d)." % [arg, REPLAY_SEED])
+	return REPLAY_SEED
+
+
+## The seeds, for the result lines.
+func _seeds_text() -> String:
+	return "replay seed %d (run seed %d; played again with %s%d)" % [_replay_seed, _run_seed, REPLAY_SEED_ARGUMENT, _replay_seed]
+
+
 ## Puts the global state back if the node is freed before it finished.
+## Its run is not stopped here: the tree is busy removing the node (a test that frees it calls
+## `stop` first, or stops the run itself).
 func _exit_tree() -> void:
-	_stop_logging()
+	_let_go()
 	if _run != null:
 		_run.scaling = _run_scaling
 		_run = null
@@ -134,6 +183,12 @@ func _play_unscaled(root: Node) -> void:
 	if _run != null:
 		_run_scaling = _run.scaling
 		_run.scaling = null
+
+
+## The recording ends with the run (nothing reads it: it is how the run's seed is set).
+func _stop_recording() -> void:
+	if is_instance_valid(_frames) and bool(_frames.call("is_recording")):
+		_frames.call("stop_recording")
 
 
 func _stop_logging() -> void:
@@ -170,6 +225,8 @@ func _watch_builder() -> void:
 
 
 func _on_room_entered(_room_id: StringName, _room: int) -> void:
+	if _stopped:
+		return
 	_entered += 1
 	print("SMOKE: room_entered (%.1f game seconds)" % _elapsed)
 	_bots[IDLER].open_builder()
@@ -252,30 +309,48 @@ func _plain(value: Variant) -> Variant:
 	return value
 
 
-func _finish(failed: Array[String]) -> void:
+## End the run without a verdict: the bots leave, the run stops and the recording ends
+## (`_finish` does this first; a test that only starts the node calls it, tests/smoke/test_four_bot_seed.gd).
+func stop() -> void:
+	if _stopped:
+		return
+	_stopped = true
 	set_process(false)
-	_stop_logging()
-	for bot in _bots:
-		bot.leave()
-	if _flow != null:
+	_let_go()
+	if is_instance_valid(_flow) and _flow.is_inside_tree():
 		_flow.call("stop_run")
+
+
+## What the node holds goes back: its logger, the bots' seats and devices, the recording.
+func _let_go() -> void:
+	_stop_logging()
+	if not _bots_left and is_instance_valid(_input) and _input.is_inside_tree():
+		_bots_left = true
+		for bot in _bots:
+			bot.leave()
+	_stop_recording()
+
+
+func _finish(failed: Array[String]) -> void:
+	stop()
 	if _probe != null:
 		_probe.call("report")
 	failed.append_array(_errors())
 	if failed.is_empty():
-		print("SMOKE OK: 4 bots cleared the room in %.1f game seconds (%d casts), bot 4 idled in its builder, bots 1-3 built spells (%s), no errors logged" % [_elapsed, _casts, _built_text()])
+		print("SMOKE OK: 4 bots cleared the room in %.1f game seconds (%d casts), bot 4 idled in its builder, bots 1-3 built spells (%s), no errors logged, %s" % [_elapsed, _casts, _built_text(), _seeds_text()])
 		get_tree().quit(0)
 	else:
 		for reason in failed:
 			printerr("SMOKE FAILED: " + reason)
 		print("SMOKE builds: " + _built_text())
+		print("SMOKE seeds: " + _seeds_text())
 		get_tree().quit(1)
 
 
 ## The staffs the fighters built, for the OK line.
 func _built_text() -> String:
 	var parts: Array[String] = []
-	for index in IDLER:
+	for index in mini(IDLER, _bots.size()):
 		parts.append(str((_bots[index] as BotScript).built_cards))
 	return "; ".join(parts)
 

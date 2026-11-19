@@ -165,12 +165,12 @@ func test_play_has_the_focus_and_takes_everyone_to_the_hub() -> void:
 	check_equal(asked, [0] as Array[int], "Play sends hub_requested(0)")
 
 
-func test_its_sounds_a_move_a_choice_and_cancel_a_back() -> void:
+func test_its_sounds_a_silent_move_a_choice_and_cancel_a_back() -> void:
 	var sounds: Array[StringName] = []
 	(_menu.get("events") as EventsScript).ui_sound_requested.connect(func(id: StringName) -> void: sounds.append(id))
 	await process_frame
 	(_menu.get_node("%Join") as Button).grab_focus()
-	check_equal(sounds, [UiSounds.MOVE], "the focus moving to Join is a move")
+	check_equal(sounds, [] as Array[StringName], "the focus moving to Join makes no sound")
 	sounds.clear()
 	await process_frame
 	(_menu.get_node("%Join") as Button).pressed.emit()

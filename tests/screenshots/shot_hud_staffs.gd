@@ -1,8 +1,9 @@
 extends "res://tests/support/screenshot.gd"
-## Screenshots of the staff rows under the corner panels' mana bars (owner, 2026-10-27): each
-## staff's glyph, its cast sequence by cast, the next cast in gold, wasted cards struck through,
-## the delay as a shade on the button glyph (a dashed next cast during a recharge), and "+N"
-## for a long staff.
+## Screenshots of the staff rows of the corner panels (owner, 2026-10-27): the thin red health
+## line with its small number, each staff's glyph, its cast sequence by cast, the next cast in
+## gold, wasted cards struck through, the delay as a shade on the button glyph (a dashed next cast
+## during a recharge), each staff's blue mana line, and a long staff scrolled with its arrows
+## (owner, 2026-11-19).
 ##
 ## The hub with the dev staffs and four built staffs per wizard (tests/support/dev_hub.gd): the dash, a three-cast
 ## staff, one with a wasted card and a long one. Shots: one player just after casting (with a 3x

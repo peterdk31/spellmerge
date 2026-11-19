@@ -32,6 +32,7 @@ extends Control
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const MeterLineScript := preload("res://hud/widgets/meter_line.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
@@ -72,7 +73,8 @@ const WARN: Color = Color("#e0592f")
 ## The arrows: a better number, a worse one (and their shape says up or down).
 const BETTER: Color = Color("#6fd46a")
 const WORSE: Color = Color("#e0592f")
-const HEALTH_COLOR: Color = Color("#e0592f")
+## The HUD's health colour (`meter_line.gd`), as on the corner panel and the builder.
+const HEALTH_COLOR: Color = MeterLineScript.HEALTH_COLOR
 const PLAYER_COLORS: Array[Color] = [Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4")]
 
 ## The layout, in the view's pixels from the quarter's top left, the same in every quarter.
@@ -96,8 +98,6 @@ const MOVE_DELAY: float = 0.3
 const MOVE_REPEAT: float = 0.14
 const POP_TIME: float = 0.07
 const NOTE_TIME: float = 1.4
-## The pad's rumble (weak, strong, seconds): landing on an entry.
-const RUMBLE_POINT: Vector3 = Vector3(0.25, 0.0, 0.03)
 
 const OPEN_VERB: String = "Open"
 const DROP_VERB: String = "Drop"
@@ -419,8 +419,7 @@ func _step_round(way: int) -> void:
 	var next: int = 0 if at < 0 else posmod(at + way, places.size())
 	_aimed = false
 	if _menu.point_at(places[next], _clock):
-		_rumble(RUMBLE_POINT)
-		_sound(UiSounds.MOVE)
+		_rumble(UiHaptics.POINT)
 		_changed()
 
 
@@ -439,14 +438,13 @@ func _poll_pointer() -> void:
 	_aimed = true
 	if _menu.point_at(picked, _clock):
 		if picked != NONE:
-			_rumble(RUMBLE_POINT)
-			_sound(UiSounds.MOVE)
+			_rumble(UiHaptics.POINT)
 		_changed()
 
 
+## Rumble the player's pad (`UiHaptics`): pointing is felt, not heard (owner, 2026-11-19).
 func _rumble(motors: Vector3) -> void:
-	if _input != null:
-		_input.rumble(index, motors.x, motors.y, motors.z)
+	UiHaptics.pulse(_input, index, motors)
 
 
 ## The menu sound `id` (`UiSounds`, sound plan AU8), only while the inventory is open: a refusal

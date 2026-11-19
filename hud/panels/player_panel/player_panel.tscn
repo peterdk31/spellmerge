@@ -1,14 +1,16 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://hud/panels/player_panel/player_panel.gd" id="1_panel"]
+[ext_resource type="Script" path="res://hud/widgets/meter_line.gd" id="2_meter"]
 
 [node name="PlayerPanel" type="PanelContainer"]
-custom_minimum_size = Vector2(112, 0)
+custom_minimum_size = Vector2(96, 0)
 mouse_filter = 2
 script = ExtResource("1_panel")
 
 [node name="Rows" type="VBoxContainer" parent="."]
 layout_mode = 2
+mouse_filter = 2
 theme_override_constants/separation = 1
 
 [node name="SeatRow" type="Control" parent="Rows"]
@@ -34,25 +36,42 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="Health" type="HBoxContainer" parent="Rows"]
+custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
 
-[node name="Tag" type="Label" parent="Rows/Health"]
-custom_minimum_size = Vector2(18, 0)
-layout_mode = 2
-text = "HP"
-
-[node name="HealthBar" type="ProgressBar" parent="Rows/Health"]
+[node name="HealthLine" type="Control" parent="Rows/Health"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(40, 8)
+custom_minimum_size = Vector2(64, 3)
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("2_meter")
+
+[node name="Word" type="Control" parent="Rows/Health"]
+custom_minimum_size = Vector2(24, 8)
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 4
-theme_type_variation = &"HealthBar"
-value = 100.0
-show_percentage = false
+mouse_filter = 2
 
-[node name="Status" type="Label" parent="Rows/Health/HealthBar"]
+[node name="HealthValue" type="Label" parent="Rows/Health/Word"]
 unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 8
+text = "100"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="Status" type="Label" parent="Rows/Health/Word"]
+unique_name_in_owner = true
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -61,42 +80,12 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 3
-horizontal_alignment = 1
+theme_override_font_sizes/font_size = 8
+horizontal_alignment = 2
 vertical_alignment = 1
-
-[node name="HealthValue" type="Label" parent="Rows/Health"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(24, 0)
-layout_mode = 2
-text = "100"
-horizontal_alignment = 2
-
-[node name="Mana" type="HBoxContainer" parent="Rows"]
-layout_mode = 2
-
-[node name="Tag" type="Label" parent="Rows/Mana"]
-custom_minimum_size = Vector2(18, 0)
-layout_mode = 2
-text = "MP"
-
-[node name="ManaBar" type="ProgressBar" parent="Rows/Mana"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(40, 8)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-theme_type_variation = &"ManaBar"
-value = 100.0
-show_percentage = false
-
-[node name="ManaValue" type="Label" parent="Rows/Mana"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(24, 0)
-layout_mode = 2
-text = "100"
-horizontal_alignment = 2
 
 [node name="Staffs" type="VBoxContainer" parent="Rows"]
 unique_name_in_owner = true
 layout_mode = 2
+mouse_filter = 2
 theme_override_constants/separation = 1

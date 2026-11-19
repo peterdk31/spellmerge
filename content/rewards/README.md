@@ -16,7 +16,7 @@ A reward table is what a reward offers its choices from (connected biomes CB10, 
 | `treasure` | a treasure room (behind its key door) |
 | `secret` | a secret room (behind its cracked rock) |
 | `challenge` | a challenge room's clear: the bigger reward of an elite fight |
-| `shelf` | a shop's shelf (`RoomKind.shelf`): one item a spot, never one twice, each at its line's `price` |
+| `shelf` | a shop's shelf (`RoomKind.shelf`): one item a spot, never one twice, each at its line's `price`; since the owner's answer of 2026-11-19 it also sells a room reroll (10 coins) and a reward reroll (8 coins), one copy each, weight 1.5 each |
 
 ## Allowed files
 

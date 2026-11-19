@@ -207,3 +207,25 @@ func test_the_rerolled_map_and_count_are_state_through_a_snapshot() -> void:
 	check_equal(later.restore(tick.state_areas(), root), PackedStringArray(), "the later one restored")
 	check_equal(flow.biome.map.room_kinds[WEST], &"fountain", "the rerolled map, laid")
 	check_equal([flow.rerolls.rolls, _rerolls()], [1, 0], "counted and spent")
+
+
+func test_nobody_inside_and_never_the_boss_room() -> void:
+	var map: BiomeMap = _start()
+	_put(_at_mouth(map, WEST, RoomSocket.Facing.EAST))
+	# A foe walked into the unvisited room: refused, nothing spent.
+	var foe := Node2D.new()
+	foe.position = flow.biome.room_rect(WEST).get_center()
+	flow.world.add_child(foe)
+	flow.get(&"_enemies").append(foe)
+	answer = _fountain_west(flow.biome.map)
+	_press_x()
+	check_equal(refused.back() if not refused.is_empty() else [], [0, &"occupied"], "someone inside: refused")
+	check_equal(_rerolls(), 1, "nothing spent")
+	flow.get(&"_enemies").erase(foe)
+	foe.free()
+	# The boss's room: no doorway to reroll.
+	flow.biome.map.room_kinds[WEST] = &"boss"
+	shown.clear()
+	_put(_at_mouth(map, WEST, RoomSocket.Facing.EAST) + Vector2(1, 0))
+	check(RoomRerolls.doorway_of(_wizard(), flow.biome, flow.life, flow._kind_of).x == RoomRerolls.NONE, "the boss's doorway refuses a room reroll")
+	flow.biome.map.room_kinds[WEST] = &"fight"

@@ -28,6 +28,7 @@ const NEEDS_KEY: String = "Needs a key"
 const REROLL_ROOM: String = "Reroll room"
 const NO_ROOM_REROLLS: String = "No room rerolls"
 const NOTHING_FITS: String = "Nothing else fits"
+const SOMEONE_INSIDE: String = "Someone is inside"
 ## The button a room reroll's note shows (X).
 const REROLL_ACTION: StringName = &"alternate"
 ## The item number a note is shown as (it names no item: A does nothing for it; never a real

@@ -1814,8 +1814,14 @@ func _on_room_reroll_requested(player: int) -> void:
 	var answer: Array = _reroll_answer
 	_reroll_answer = []
 	var made: BiomeMap = answer[0] as BiomeMap if not answer.is_empty() else null
-	if made == null or made.rooms() != biome.map.rooms() or made.bridges() != biome.map.bridges():
+	if made == null:
 		events.room_reroll_refused.emit(player, &"no_room")
+		return
+	if _room_occupied(room, made):
+		# Nobody may stand where the room's walls could move (a downed wizard who crawled in, a foe
+		# that walked in): refused, nothing spent. The Run area's map stays as Flow's (`rerolls.rolls`
+		# only counts the rolls asked, so asking again rolls afresh).
+		events.room_reroll_refused.emit(player, &"occupied")
 		return
 	var scale: float = made.room_scales[room] if room < made.room_scales.size() else 0.0
 	var fight: RoomFight = RoomFight.of(made.enemies_of(room), int(answer[1]), int(answer[2]), float(answer[3]), scale, made.elites_of(room))
@@ -1826,6 +1832,33 @@ func _on_room_reroll_requested(player: int) -> void:
 ## The Run area's answer to a room reroll asked (`run_room_rerolled`), kept for the asker.
 func _on_run_room_rerolled(_room: int, map: RefCounted, group: int, refill_at: int, stagger: float) -> void:
 	_reroll_answer = [map, group, refill_at, stagger]
+
+
+## True when a wizard, a foe or a body that is not the room's own prop stands in room `room` as it
+## is or as `made` would lay it, off the bridges (a room reroll is refused then: nobody is left
+## inside a wall).
+func _room_occupied(room: int, made: BiomeMap) -> bool:
+	var old: Rect2 = biome.room_rect(room)
+	var shape: PieceShape = made.room_shape(room, biome.shapes_of(made))
+	var new: Rect2 = shape.rect_at(made.room_places[room]) if shape != null else old
+	var bodies: Array[Node] = []
+	bodies.append_array(_wizards)
+	bodies.append_array(_enemies)
+	for body: Node in contents.bodies:
+		if body != null and not contents.of_kind(PropBase).has(body):
+			bodies.append(body)
+	var grid: RoomGrid = projectiles.grid() if projectiles != null else null
+	for body: Node in bodies:
+		var at := body as Node2D
+		if at == null or not is_instance_valid(at):
+			continue
+		# A body on a bridge (its lip past the room's mouth too) stays on it: the bridges never move.
+		var place: int = grid.place_at(at.position) if grid != null else RoomGrid.NO_PLACE
+		if place >= biome.map.rooms():
+			continue
+		if place == room or old.has_point(at.position) or new.has_point(at.position):
+			return true
+	return false
 
 
 ## Room `room` rerolled to the map `made` (only that room differs: its kind, template, mirroring,
@@ -1845,7 +1878,10 @@ func _reroll_room(room: int, made: BiomeMap, fight: RoomFight) -> void:
 	if room < life.fights.size():
 		life.fights[room] = fight
 	events.room_rerolled.emit(room, made.room_kinds[room])
-	_rebuild_biome()
+	# The biome's area never moves (`BiomeGenerator.reroll_room`): the camera is kept, not snapped.
+	_rebuild_biome(false)
+	if projectiles != null:
+		projectiles.set_room_size(biome.biggest_room())
 	if world != null and is_instance_valid(world):
 		contents.stand_more(world, biome.room_places(room), registry, false)
 
@@ -2135,7 +2171,7 @@ func _places_for(room: int) -> RoomPlaces:
 ## After a snapshot was restored into a biome: the biome laid again where it differs (the world's
 ## own `rebuild_derived`, or here into a world that laid none), its start room's places, and the
 ## seals and the places' sleep told to the grid again (they are not state there).
-func _rebuild_biome() -> void:
+func _rebuild_biome(camera: bool = true) -> void:
 	if world == null or not is_instance_valid(world):
 		return
 	if _layout != null and is_instance_valid(_layout):
@@ -2147,7 +2183,7 @@ func _rebuild_biome() -> void:
 	biome.rebuild_derived()
 	if biome.map != null:
 		_places = biome.room_places(EventsScript.FIRST_ROOM)
-		if projectiles != null:
+		if projectiles != null and camera:
 			_add_camera_over(world, biome.area())
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())

@@ -166,3 +166,39 @@ func test_the_same_seed_rerolls_the_same_and_through_a_snapshot() -> void:
 		again.append(_choices_of(0))
 	check_equal(again, seen, "the rerolls after the restore are the same")
 	check_equal(_rewards._rerolls[0], 3, "the rerolls counted are state")
+
+
+func test_a_shop_sells_both_rerolls_and_its_shelf_rolls_anew_when_rerolled() -> void:
+	var table := _world.registry.get_resource(&"rewards", &"shelf") as RewardTable
+	var sold: Dictionary = {}
+	for entry: RewardEntry in table.entries:
+		if entry.kind == ItemKinds.REROLL:
+			sold[entry.id] = entry.price
+	check_equal(sold, {RerollBase.ROOM: 10, RerollBase.REWARD: 8}, "the shelf's table sells a room reroll and a reward reroll (the owner, 2026-11-19)")
+	var seen: bool = false
+	var spots := PackedVector2Array([Vector2(300, 0), Vector2(320, 0), Vector2(340, 0)])
+	for room in 12:
+		_world.bus.special_room_opened.emit(room, RoomKind.FILL_SHOP, &"shelf", Rect2(), spots)
+	for item: Dictionary in _rewards.shelf():
+		if (item["choice"] as Dictionary)["kind"] == ItemKinds.REROLL:
+			seen = true
+	check(seen, "some shelf stocks a reroll")
+	# A shop rerolled before it opens rolls its shelf anew (the same seed, the same rooms).
+	var plain: Array = []
+	var rerolled: Array = []
+	for pass_rerolled in [false, true]:
+		_rewards.free()
+		_rewards = _make(7)
+		for room in range(30, 36):
+			if pass_rerolled:
+				_world.bus.room_rerolled.emit(room, &"shop")
+			_world.bus.special_room_opened.emit(room, RoomKind.FILL_SHOP, &"shelf", Rect2(), spots)
+		var ids: Array = []
+		for item: Dictionary in _rewards.shelf():
+			ids.append([(item["choice"] as Dictionary)["kind"], (item["choice"] as Dictionary)["id"]])
+		if pass_rerolled:
+			rerolled = ids
+		else:
+			plain = ids
+	check(plain != rerolled, "a rerolled shop's shelf is rolled anew")
+	check_equal(_rewards._room_rerolls[30], 1, "a room's rerolls counted, state")

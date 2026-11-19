@@ -580,6 +580,7 @@ func _panel_source() -> String:
 	source = source.replace("events.online_open_requested.emit(player)", "")
 	source = source.replace("events.item_take_requested.emit(player, _item_hints.item_of(player))", "")
 	source = source.replace("events.shelf_buy_requested.emit(player, _item_hints.shelf_of(player))", "")
+	source = source.replace("events.room_reroll_requested.emit(player)", "")
 	source += FileAccess.get_file_as_string("res://hud/panels/item_hints.gd")
 	source += FileAccess.get_file_as_string("res://hud/widgets/item_hint.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/player_panel.gd")
@@ -589,7 +590,7 @@ func _panel_source() -> String:
 
 ## The panels send no event but the player intents `spell_swap_requested` (a `swap` press) and
 ## `run_requested` (A on the hub's lit stone), `item_take_requested` (A by an item),
-## `shelf_buy_requested` (A at a shop's item) and
+## `shelf_buy_requested` (A at a shop's item), `room_reroll_requested` (X at a doorway) and
 ## `online_open_requested` (A on the altar; all tested in test_pause_menu.gd); the corner panel
 ## itself sends nothing. (Tested in test_quick.gd.)
 func test_the_panel_scripts_send_only_the_player_intents() -> void:

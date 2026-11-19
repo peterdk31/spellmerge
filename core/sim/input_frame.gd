@@ -96,7 +96,7 @@ const COMMAND_SHAPES: PackedStringArray = [
 	"",
 	"i",
 	"ssi",
-	"ii",
+	"i",
 	"",
 ]
 

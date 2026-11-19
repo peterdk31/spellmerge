@@ -170,6 +170,15 @@ func mouth_rect(bridge: int, end: int) -> Rect2:
 	return _moved(shape.mouth_rect(map.end_socket(bridge, end)), map.room_places[room]) if shape != null else Rect2()
 
 
+## The biggest room's longest side (the projectile manager's room size, `set_room_size`).
+func biggest_room() -> float:
+	var biggest: float = 0.0
+	if map != null:
+		for room in map.rooms():
+			biggest = maxf(biggest, maxf(room_rect(room).size.x, room_rect(room).size.y))
+	return biggest
+
+
 ## The world's bounds for the biome: every piece (`area`), and MARGIN round them.
 func bounds() -> Rect2:
 	return area().grow(MARGIN)

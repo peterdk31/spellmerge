@@ -81,6 +81,9 @@ var _refused: int = -1
 var _rerolled: Array[Dictionary] = []
 ## Rolled up for a reroll: it unrolls again once the cards are turned over.
 var _rerolling: bool = false
+## X sent and not yet answered (`reward_rerolled` or `reward_reroll_refused`): A and X wait, so a
+## pick never takes a choice not yet shown and a double press never spends two.
+var _reroll_pending: bool = false
 ## Its whole height, and how far it has unrolled: 0 (rolled up) to OPEN_FRAMES.
 var _full_height: float = 0.0
 var _unrolled: int = 0
@@ -170,6 +173,7 @@ func open_menu() -> bool:
 	_refused = -1
 	_rerolled = []
 	_rerolling = false
+	_reroll_pending = false
 	_open = true
 	_unrolled = 0
 	_lay_out()
@@ -458,20 +462,28 @@ func _on_reward_refused(player: int, offer: int) -> void:
 func _on_reward_rerolled(player: int, offer: int, choices: Array[Dictionary]) -> void:
 	if player == index and _open and offer == _shown:
 		_rerolled = choices.duplicate()
+		_reroll_pending = false
 
 
 func _on_reward_reroll_refused(player: int, offer: int) -> void:
 	if player == index and _open and offer == _shown:
+		_reroll_pending = false
 		_title = NO_REROLL_TEXT
 		queue_redraw()
 
 
 ## X: spend a reward reroll on the offer shown (the class doc).
 func _on_alternate(player: int, _control: Control) -> void:
-	if player != index or not _open or _rerolling or not _rerolled.is_empty() or _events == null:
+	if player != index or not _open or _busy() or _events == null:
 		return
+	_reroll_pending = true
 	UiSounds.send(_events, UiSounds.CHOOSE)
 	_events.reward_reroll_requested.emit(index, _shown)
+
+
+## True while a reroll is asked, or its cards still turn over: A and X wait.
+func _busy() -> bool:
+	return _reroll_pending or _rerolling or not _rerolled.is_empty()
 
 
 func _on_closed(player: int) -> void:
@@ -491,7 +503,7 @@ func _on_activated(player: int, control: Control) -> void:
 	if player != index or not _open:
 		return
 	var choice: int = _cards.find(control as CardScript)
-	if choice < 0:
+	if choice < 0 or _busy():
 		return
 	UiSounds.send(_events, UiSounds.CHOOSE)
 	if _events != null:

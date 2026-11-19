@@ -207,7 +207,8 @@ func _read(grid: RoomGrid, found: int, world_now: int, table: ActorsScript, seat
 			_rows[mouth] = old_rows[mouth]
 			_turning[mouth] = 1
 			continue
-		_rows[mouth] = _wanted(mouth)
+		# The same mouths read again (a reroll's lay): a sign mid-play keeps its rows and plays on.
+		_rows[mouth] = old_rows[mouth] if not old_pixels.is_empty() and mouth < old_rows.size() and old_pixels[mouth] == _pixels[mouth] else _wanted(mouth)
 	_turn_rooms.clear()
 	queue_redraw()
 

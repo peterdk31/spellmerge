@@ -487,6 +487,7 @@ func poll() -> void:
 				elif start_now and _rewards[player].waiting() > 0 and _in_room and not _panels[player].is_downed():
 					_open_reward(player)
 			if reroll_now and _in_room and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and not _boss_intro.is_open() and events != null and _item_hints.reroll_of(player):
+				_item_hints.reroll_asked(player)
 				events.room_reroll_requested.emit(player)
 			if paused_now:
 				_on_pause_pressed(player)

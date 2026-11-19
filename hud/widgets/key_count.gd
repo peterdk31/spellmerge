@@ -209,7 +209,9 @@ func _draw() -> void:
 	var top: int = (tall - ICON_SIZE.y) / 2 + offset()
 	if _brass.size() < 3:
 		_brass = Palette.shades_of(material_name)
-	var light: Color = _brass[2]
+	# Its number is Spark light whatever its picture's material (docs/STYLE.md, "UI": gold and
+	# pickups Spark light, no other text colours).
+	var light: Color = Palette.shades_of(SHADES)[2]
 	for y in picture.size():
 		var row: String = picture[y]
 		for x in row.length():

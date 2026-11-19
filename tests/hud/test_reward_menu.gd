@@ -391,6 +391,11 @@ func test_x_asks_for_a_reroll_and_the_new_cards_turn_over_smoothly() -> void:
 	_frame()
 	check_equal(asked, [[0, 4]], "X sends reward_reroll_requested for the offer shown")
 	check(_picked.is_empty(), "and picks nothing")
+	_tap(0, &"alternate")
+	_tap(0, &"accept")
+	_frame()
+	check_equal(asked, [[0, 4]], "a second X waits for the answer: one reroll spent")
+	check(_picked.is_empty(), "and A waits: never a choice not yet shown")
 	var fresh: Array[Dictionary] = _choices(3).slice(1, 3)
 	_bus.reward_rerolled.emit(0, 4, fresh)
 	var heights: Array[float] = []

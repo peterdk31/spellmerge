@@ -39,6 +39,8 @@ var _door_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZER
 ## shown there (REROLL_ROOM, or why a reroll was refused).
 var _reroll: Array[bool] = [false, false, false, false]
 var _reroll_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
+## By player: X sent and not yet answered (no second request: a double press spends one).
+var _reroll_pending: Array[bool] = [false, false, false, false]
 var _reroll_words: Array[String] = [ItemHintScript.REROLL_ROOM, ItemHintScript.REROLL_ROOM, ItemHintScript.REROLL_ROOM, ItemHintScript.REROLL_ROOM]
 
 
@@ -84,7 +86,13 @@ func shelf_of(player: int) -> int:
 func reroll_of(player: int) -> bool:
 	if player < 0 or player >= PLAYER_COUNT or not _hints[player].visible:
 		return false
-	return _reroll[player] and _ground[player] < 0 and _shelf[player] < 0 and not _needs_key[player]
+	return _reroll[player] and not _reroll_pending[player] and _ground[player] < 0 and _shelf[player] < 0 and not _needs_key[player]
+
+
+## `player`'s X asked for a reroll: no other until it is answered (`room_reroll_shown`, refused).
+func reroll_asked(player: int) -> void:
+	if player >= 0 and player < PLAYER_COUNT:
+		_reroll_pending[player] = true
 
 
 ## Player `player`'s hint (for tests).
@@ -168,6 +176,7 @@ func _on_room_reroll_shown(player: int, at: Vector2, shown: bool) -> void:
 		return
 	_reroll[player] = shown
 	_reroll_at[player] = at
+	_reroll_pending[player] = false
 	_reroll_words[player] = ItemHintScript.REROLL_ROOM
 	if _ground[player] < 0 and _shelf[player] < 0 and not _needs_key[player]:
 		_show(player)
@@ -176,7 +185,14 @@ func _on_room_reroll_shown(player: int, at: Vector2, shown: bool) -> void:
 func _on_room_reroll_refused(player: int, reason: StringName) -> void:
 	if player < 0 or player >= PLAYER_COUNT or not _reroll[player]:
 		return
-	_reroll_words[player] = ItemHintScript.NO_ROOM_REROLLS if reason == &"none_held" else ItemHintScript.NOTHING_FITS
+	_reroll_pending[player] = false
+	match reason:
+		&"none_held":
+			_reroll_words[player] = ItemHintScript.NO_ROOM_REROLLS
+		&"occupied":
+			_reroll_words[player] = ItemHintScript.SOMEONE_INSIDE
+		_:
+			_reroll_words[player] = ItemHintScript.NOTHING_FITS
 	if _ground[player] < 0 and _shelf[player] < 0 and not _needs_key[player]:
 		_show(player)
 		_hints[player].refuse(ItemHintScript.NOTE)

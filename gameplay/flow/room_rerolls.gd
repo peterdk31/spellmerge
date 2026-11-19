@@ -8,8 +8,9 @@ extends RefCounted
 ## - **A doorway to reroll** (`doorway_of`): the standing body is on a bridge (its place, a bridge's),
 ##   within REACH of a mouth of it (its middle) into a room that is not the start room, that no wizard
 ##   has entered (`RoomLife.ENTERED`) and that is neither started nor sealed, whose kind shows a sign
-##   (`RoomKind.symbol`: the secret rooms tell nothing, so none of them is rerolled). The first such
-##   mouth, bridge by bridge.
+##   (`RoomKind.symbol`: the secret rooms tell nothing, so none of them is rerolled), and that is not
+##   the boss's (the owner, 2026-11-19: "any unvisited room except the boss room"; its doorway
+##   refuses: no hint, and X does nothing there). The first such mouth, bridge by bridge.
 ## - **The hint** (`tell`): each seat whose body stands at one is told so as it changes
 ##   (`room_reroll_shown`, view only), and told none as the biome goes and after a restore.
 ## - **State:** `rolls` (hashed and snapshotted with Flow); the hints are this machine's (DERIVED).
@@ -62,7 +63,7 @@ static func doorway_of(body: Node2D, biome: BiomeWorld, life: RoomLife, kind_of:
 		if life.has(room, RoomLife.ENTERED) or life.has(room, RoomLife.STARTED) or life.has(room, RoomLife.SEALED):
 			continue
 		var kind: RoomKind = kind_of.call(room) as RoomKind
-		if kind == null or kind.symbol_pixels().is_empty():
+		if kind == null or kind.symbol_pixels().is_empty() or kind.fill == RoomKind.FILL_BOSS:
 			continue
 		if actor.position.distance_to(biome.mouth_rect(bridge, end).get_center()) <= REACH:
 			return Vector2i(bridge, end)

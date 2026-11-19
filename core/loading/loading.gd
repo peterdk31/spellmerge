@@ -12,8 +12,9 @@ extends Node
 
 const EventsScript := preload("res://core/events/events.gd")
 const LoadTask := preload("res://core/loading/load_task.gd")
-## Frames to wait before the first unit, so the screen is up first.
-const WAIT_FRAMES: int = 2
+## Frames to wait before the first unit, so the screen is up first (the HUD's comes down over
+## a few frames: hud/panels/loading/, COVER_FRAMES).
+const WAIT_FRAMES: int = 8
 
 var events: EventsScript = null
 var _tasks: Array[LoadTask] = []

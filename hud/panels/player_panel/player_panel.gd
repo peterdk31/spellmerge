@@ -158,13 +158,13 @@ func set_purse(coins: int, unspent: int) -> void:
 	_purse.visible = not words.is_empty()
 
 
-## Show the keys the party holds before the coins (`key_count.gd`: played in by whole pixels;
-## `at_once` after a restore).
+## Show the keys the seat's shown body holds before the coins (`key_count.gd`: played in by whole
+## pixels; `at_once`: drawn as it stands).
 func set_keys(count: int, at_once: bool) -> void:
 	_keys.set_count(count, at_once)
 
 
-## The party's key count it shows (its widget, for tests).
+## The key count it shows (its widget, for tests).
 func key_count() -> KeyCountScript:
 	return _keys
 

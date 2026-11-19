@@ -12,6 +12,9 @@ extends RefCounted
 ## from its coin stack) and, after the snapshot, drinking its potions from the inventory
 ## (`bag_use_requested`: it holds a max health potion from the start; the owner, 2026-11-19), seat 1,
 ## hurt, walks east into the fountain and draws on it.
+## Keys (`treasure`; the owner, 2026-11-19: a key is the taker's own item): the room west is a
+## treasure room; a key lies on seat 0's way west, which it takes into its own currency bag and
+## spends at the treasure room's door as it walks into it.
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TickScript := preload("res://core/sim/tick.gd")
@@ -45,6 +48,10 @@ var special: bool = false
 var bought: bool = false
 var drawn: bool = false
 var drunk: bool = false
+## Keys (`treasure`), whether seat 0 took the key and whether its door opened.
+var treasure: bool = false
+var key_taken: bool = false
+var door_opened: bool = false
 var problems: PackedStringArray = PackedStringArray()
 
 var _root: Window
@@ -80,10 +87,11 @@ class Walker:
 		tick += 1
 
 
-func _init(root: Window, at_the_gate: bool = false, shop_and_fountain: bool = false) -> void:
+func _init(root: Window, at_the_gate: bool = false, shop_and_fountain: bool = false, with_treasure: bool = false) -> void:
 	_root = root
 	gate = at_the_gate
 	special = shop_and_fountain
+	treasure = with_treasure
 	_flow = root.get_node("Flow") as FlowScript
 	_tick = root.get_node("Tick") as TickScript
 	_frames = root.get_node("Frames")
@@ -119,6 +127,9 @@ func play(ticks: int, snapshot_at: int, into: Desync) -> Snapshot:
 			drawn = drawn or (left >= 0.0 and left < RewardsScript.POOL_HEALTH)
 			var buyer: Actor = _flow.get_wizard(0) as Actor
 			drunk = drunk or (buyer != null and buyer.inventory.count_of(&"potions", &"max_health") == 0)
+		if treasure:
+			key_taken = key_taken or LockDoors.keys_of(_flow.get_wizard(0) as Actor) > 0
+			door_opened = door_opened or _flow.locks.is_open(1)
 		if i == snapshot_at:
 			snapshot = Snapshot.take(_tick.state_areas(), _root)
 	_stop()
@@ -161,6 +172,10 @@ func _start() -> BiomeMap:
 		map.room_kinds[1] = &"shop"
 		map.room_kinds[2] = &"fountain"
 		fights = [RoomFight.new(), RoomFight.new(), RoomFight.new()] as Array[RoomFight]
+	if treasure:
+		map.room_kinds[1] = &"treasure"
+		map.room_kinds[2] = &"fight"
+		fights = [RoomFight.new(), RoomFight.new(), RoomFight.new()] as Array[RoomFight]
 	_flow.world_parent = _root
 	if not _flow.start_biome(0, map, fights):
 		problems.append("the biome did not start")
@@ -174,6 +189,12 @@ func _start() -> BiomeMap:
 		var buyer: Actor = _flow.get_wizard(0) as Actor
 		buyer.inventory.add(ItemStack.of(ItemKinds.POTION, &"max_health", 1))
 		_walkers[0].drinker = buyer.key()
+	if treasure:
+		# One key, lying on seat 0's way west (wherever the run's chance put the biome's own).
+		var on_way: Vector2 = BiomeMaps.socket_point(_root.get_node("Registry"), map, 0, RoomSocket.Facing.WEST) + Vector2(4.0, 0.0)
+		_flow.locks.key_drops = PackedInt32Array([0])
+		_flow.locks.key_states = PackedByteArray([LockDoors.KEY_LYING])
+		_flow.locks.key_at = PackedVector2Array([on_way])
 	return map
 
 

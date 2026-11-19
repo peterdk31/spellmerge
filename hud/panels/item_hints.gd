@@ -7,7 +7,9 @@ extends Control
 ## (the panels send `item_take_requested`). A shop's item in reach (`shelf_near_changed`, connected
 ## biomes CB11's follow-up) is shown the same way, "Buy" and its price, when no ground item is in
 ## reach; `shelf_of(player)` is the one A would buy (`shelf_buy_requested`), and a refused buy
-## (`shelf_refused`) shakes it. Display only: it reads no input.
+## (`shelf_refused`) shakes it. A seat whose body stands at a shut key door with no key of its own
+## (`key_needed_shown`, the owner's of 2026-11-19) is shown "Needs a key" over the door, words alone,
+## when neither is in reach. Display only: it reads no input.
 
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -26,6 +28,9 @@ var _ground_view: Array[Dictionary] = [{}, {}, {}, {}]
 var _shelf: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 var _shelf_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
 var _shelf_view: Array[Dictionary] = [{}, {}, {}, {}]
+## By player: true while its body is at a shut key door with no key, and the door's mouth.
+var _needs_key: Array[bool] = [false, false, false, false]
+var _door_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
 
 
 func _init() -> void:
@@ -46,6 +51,7 @@ func bind(events: EventsScript, input: InputManagerScript, spells: SpellsScript)
 		events.item_refused.connect(_on_item_refused)
 		events.shelf_near_changed.connect(_on_shelf_near_changed)
 		events.shelf_refused.connect(_on_shelf_refused)
+		events.key_needed_shown.connect(_on_key_needed_shown)
 
 
 ## The item `player`'s A takes now (shown, and no menu of theirs open), -1 for none.
@@ -57,7 +63,7 @@ func item_of(player: int) -> int:
 
 ## The shop item `player`'s A buys now (shown, no ground item in reach and no menu open), -1 for none.
 func shelf_of(player: int) -> int:
-	if player < 0 or player >= PLAYER_COUNT or not _hints[player].visible or _ground[player] >= 0:
+	if player < 0 or player >= PLAYER_COUNT or not _hints[player].visible or _ground[player] >= 0 or _shelf[player] < 0:
 		return -1
 	return _hints[player].item()
 
@@ -72,6 +78,7 @@ func clear() -> void:
 	for player in PLAYER_COUNT:
 		_ground[player] = -1
 		_shelf[player] = -1
+		_needs_key[player] = false
 		_hints[player].show_item(player, -1, {})
 
 
@@ -127,7 +134,17 @@ func _on_shelf_near_changed(player: int, item: int, at: Vector2, view: Dictionar
 		_show(player)
 
 
-## Player `player`'s hint shows its ground item in reach, else its shop item, else nothing.
+func _on_key_needed_shown(player: int, at: Vector2, needed: bool) -> void:
+	if player < 0 or player >= PLAYER_COUNT:
+		return
+	_needs_key[player] = needed
+	_door_at[player] = at
+	if _ground[player] < 0 and _shelf[player] < 0:
+		_show(player)
+
+
+## Player `player`'s hint shows its ground item in reach, else its shop item, else a shut key door's
+## "Needs a key", else nothing.
 func _show(player: int) -> void:
 	if _ground[player] >= 0:
 		_at[player] = _ground_at[player]
@@ -135,6 +152,9 @@ func _show(player: int) -> void:
 	elif _shelf[player] >= 0:
 		_at[player] = _shelf_at[player]
 		_hints[player].show_item(player, _shelf[player], _shelf_view[player], ItemHintScript.BUY)
+	elif _needs_key[player]:
+		_at[player] = _door_at[player]
+		_hints[player].show_note(player, ItemHintScript.NEEDS_KEY)
 	else:
 		_hints[player].show_item(player, -1, {})
 

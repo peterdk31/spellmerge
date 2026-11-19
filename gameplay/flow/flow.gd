@@ -228,7 +228,7 @@ const INTRO_SEEN: StringName = &"intro_seen"
 enum State { IDLE, RUNNING, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"actors", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_map", &"_chosen_fights", &"_chosen_reveal", &"_cover_held", &"_departure_told"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"actors", &"world_parent", &"intro", &"loading", &"world", &"save", &"_places", &"_layout", &"_layout_of", &"_asking", &"_chosen_map", &"_chosen_fights", &"_chosen_reveal", &"_cover_held", &"_departure_told", &"_driven"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -285,6 +285,8 @@ var _room: RoomBase = null
 var _wizard_scene: PackedScene = null
 var _enemies: Array[Node] = []
 var _wizards: Array[Node2D] = []
+## Scratch: by seat, the body it drives now (`_driven_bodies`, for the locks' step).
+var _driven: Array[Node2D] = []
 var _downed: Array[bool] = [false, false, false, false]
 var _restart_left: float = -1.0
 ## By seat: seconds until that seat's downed wizard stands up by itself (`RoomBase.stand_up_after`,
@@ -1051,6 +1053,17 @@ func _count_stone() -> void:
 	hub.count(in_hub, _wizards, contents, events)
 
 
+## By seat, the body it drives now (its wizard, or a foe it possesses; null for none): who takes a
+## key and opens a key door with its own (`LockDoors.step`). Without the actors service (a test's
+## world), each seat's wizard.
+func _driven_bodies() -> Array[Node2D]:
+	_driven.resize(PLAYER_SLOTS)
+	for seat in PLAYER_SLOTS:
+		var id: int = actors.actor_of_seat(seat) if actors != null else ActorsScript.NONE
+		_driven[seat] = actors.node_of(id) as Node2D if id != ActorsScript.NONE else get_wizard(seat)
+	return _driven
+
+
 ## Add the wizard of a player who joined mid-run: at the room's spawn for joiners when it has them
 ## (the hub: beside the altar, where a joining machine's wizards arrive), else at the player spawn
 ## farthest from danger, holding what its last wizard of this run left with (`left_players`), or as
@@ -1062,8 +1075,14 @@ func _on_player_joined(player: int) -> void:
 		return
 	var joiners: PackedVector2Array = _places.joiner_spawns
 	var at: Vector2 = joiners[player] if player < joiners.size() else _joiner_spawn(_room, player)
-	# A player back after leaving this run comes back holding what it left with (`LeftPlayers`).
+	# A player back after leaving this run comes back holding what it left with (`LeftPlayers`), its
+	# staffs' mana too (set once it is made: its Caster's pools start full).
+	var mana: Dictionary = left_players.mana_of(player)
 	_add_wizard(world, _room, player, at, left_players.take(player))
+	var back := get_wizard(player) as Actor
+	if back != null and back.inventory != null:
+		for number: int in mana:
+			back.inventory.set_staff_mana(number, float(mana[number]))
 	_count_players()
 	var joiner: DownedScript = DownedScript.of(get_wizard(player))
 	# In a room where a fall costs nothing (the hub), a joiner needs no moment of protection.
@@ -1088,7 +1107,8 @@ func _on_player_left(player: int) -> void:
 	_wizards.erase(wizard)
 	# What it holds is kept for its return in this run (the owner, 2026-11-19: the whole inventory).
 	if state != State.IDLE:
-		left_players.keep(player, PlayerScript.loadout_of(wizard as Actor))
+		var body := wizard as Actor
+		left_players.keep(player, PlayerScript.loadout_of(body), body.inventory.staff_mana() if body != null and body.inventory != null else {})
 	_downed[player] = false
 	_stand_up_left[player] = -1.0
 	var parent: Node = wizard.get_parent()
@@ -1822,7 +1842,7 @@ func _step_biome(delta: float) -> bool:
 	var gated: int = gates.count_doors(_wizards, life)
 	if gated != GatherDoors.NONE:
 		_open_gate(gated)
-	locks.step(_wizards, life, projectiles.grid() if projectiles != null else null)
+	locks.step(_driven_bodies(), life, projectiles.grid() if projectiles != null else null)
 	if gates.count_portal(_wizards):
 		_take_portal_home()
 		return true

@@ -235,14 +235,14 @@ func test_the_coins_bag_shows_the_stack_and_does_nothing_with_it() -> void:
 	_start()
 	check(_wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 12)), "twelve coins")
 	var inventory: InventoryScript = _open()
-	_enter(&"coins")
+	_enter(&"currency")
 	_point("item", CoinBase.ID)
 	check_equal(inventory.hub_lines(), PackedStringArray(["Coins", "x12"]), "one stack, counted")
 	_tap(&"accept")
 	_tap(&"alternate")
 	_frame()
 	_frame()
-	check_equal(_wizard.inventory.count_of(&"coins", CoinBase.ID), 12, "coins are neither used nor dropped")
+	check_equal(_wizard.inventory.count_of(&"currency", CoinBase.ID), 12, "coins are neither used nor dropped")
 	check(_drop_asks.is_empty(), "nothing asked")
 
 

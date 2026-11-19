@@ -3,17 +3,17 @@ extends "res://tests/support/suite.gd"
 ## gameplay/player/player.gd, `bag_use_requested`): a potion drunk from the shown body's bag does
 ## what its content says through Combat (the max health potion nothing until then); refused, keeping
 ## the potion, for a stale body key, while down, for what is not drunk (coins, cards) and for a heal
-## while whole; while possessing, the possessed body drinks its own; the coins bag is never dropped,
+## while whole; while possessing, the possessed body drinks its own; the currency bag is never dropped,
 ## and the seat's coins are always its home wizard's, a possession or not (the HUD's purse).
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const RewardsScript := preload("res://gameplay/rewards/rewards.gd")
 
 const POTIONS: StringName = &"potions"
-const COINS: StringName = &"coins"
+const COINS: StringName = &"currency"
 
 var _world: Fixture
-## Every inventory_refused reason, and every coins bag_changed [player, coins].
+## Every inventory_refused reason, and every currency bag_changed [player, coins].
 var _refused: Array[String] = []
 var _purses: Array = []
 

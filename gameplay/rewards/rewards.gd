@@ -29,7 +29,7 @@ extends Node
 ##   2026-11-19: `shelf_buy_requested`, a command at the tick's start, so the first seat to ask
 ##   takes it; nobody waits): the standing body the seat drives (its wizard, or a foe it possesses:
 ##   the buyer, the owner's of 2026-11-19), with the price (times that player's `price_scale`) in
-##   its own coins bag and room for it, takes it into its inventory, the coins come out of its
+##   its own currency bag and room for it, takes it into its inventory, the coins come out of its
 ##   stack, and it is gone from the shelf for everyone; else `shelf_refused`. Walking
 ##   over an item buys nothing. The shelf keeps what is left all run (`shelf_changed`).
 ## - **A fountain** (CB11, decision 20): as a fountain room opens, its pool fills with POOL_HEALTH
@@ -43,8 +43,8 @@ extends Node
 ##   (`run_stats_told`) as they may change and after a restore (a relic taken will tell them
 ##   when relics come, M3).
 ## - **Coins** (decision 18: shared income, own coins; the owner, 2026-11-19: "Coins are stacked
-##   inventory items"): a player's coins are one stack in its wizard's coins bag (`CoinBase`,
-##   content/coins). A foe carries its coins in its own coins bag (its data's, `Actor._carry_coins`);
+##   inventory items"): a player's coins are one stack in its wizard's currency bag (`CoinBase`,
+##   content/coins). A foe carries its coins in its own currency bag (its data's, `Actor._carry_coins`);
 ##   as it dies (`enemy_died`, possessed or not), by its `EnemyBase.coin_drop_chance` (DROP_PURPOSE),
 ##   what it still carries drops where it fell (an add another body called, `Actor.is_add`, drops
 ##   none; a boss's go to every player at once, decision 25), each one coin anyone may take: the
@@ -84,9 +84,9 @@ const SHELF_REACH: float = 12.0
 ## wizard in it draws on it, health a second.
 const POOL_HEALTH: float = 120.0
 const DRAW_RATE: float = 40.0
-## The relics bag and the coins bag of an Inventory (`ItemKinds.BAGS`).
+## The relics bag and the currency bag (the coins', beside the keys) of an Inventory (`ItemKinds.BAGS`).
 const RELIC_BAG: StringName = &"relics"
-const COIN_BAG: StringName = &"coins"
+const COIN_BAG: StringName = &"currency"
 ## How near a wizard's feet must come to a coin to take it, in pixels.
 const COIN_REACH: float = 10.0
 ## Where an enemy's coins land round where it fell, in order (more than these: on its spot again).
@@ -244,7 +244,7 @@ func stat_of(seat: int, stat: StringName) -> float:
 	return RunStats.value_of(stat, _run_changes, _relics_of(seat))
 
 
-## The coins seat `seat`'s own wizard holds: the coin stack in its coins bag (0 with no wizard).
+## The coins seat `seat`'s own wizard holds: the coin stack in its currency bag (0 with no wizard).
 ## A foe the seat possesses holds its own (a shop's buy spends the driven body's).
 func coins_of(seat: int) -> int:
 	return _coins_in(_wizard_of(seat)) if seat >= 0 and seat < SEATS else 0
@@ -454,7 +454,7 @@ func _on_special_room_opened(room: int, fill: StringName, table: StringName, are
 
 
 ## A foe died at `position` (possessed or not): by its `EnemyBase.coin_drop_chance` (the run's
-## chance, `DROP_PURPOSE`, keyed by its actor key and counted), the coins in its own coins bag land
+## chance, `DROP_PURPOSE`, keyed by its actor key and counted), the coins in its own currency bag land
 ## there, spread round it (the owner, 2026-11-19: what it carries, less what a seat possessing it
 ## spent).
 func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) -> void:
@@ -544,7 +544,7 @@ func _driven_of(seat: int) -> Actor:
 	return actors.node_of(id) as Actor if id != ActorsScript.NONE else null
 
 
-## The coins in `body`'s coins bag (0 for none, or no inventory).
+## The coins in `body`'s currency bag (0 for none, or no inventory).
 static func _coins_in(body: Actor) -> int:
 	return body.inventory.count_of(COIN_BAG, CoinBase.ID) if body != null and body.inventory != null else 0
 
@@ -588,7 +588,7 @@ func _taker_of(at: Vector2) -> int:
 
 
 ## Seat `seat`'s coin stack changed by `amount` (a fall takes no more than it holds): its wizard's
-## coins bag, said by its Inventory (`bag_changed`). Nothing for a seat with no wizard.
+## currency bag, said by its Inventory (`bag_changed`). Nothing for a seat with no wizard.
 func _add_coins(seat: int, amount: int) -> void:
 	var body: Actor = _wizard_of(seat)
 	if amount == 0 or body == null or body.inventory == null:

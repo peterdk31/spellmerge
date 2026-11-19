@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
-## Tests for the staff rows under each corner panel's mana bar (owner, 2026-10-27): a row only
+## Tests for the staff rows of each corner panel (owner, 2026-10-27): a row only
 ## for a staff with cards (0, 1 and 4 rows), the cast sequence in read order with one group per
 ## cast and wasted cards greyed, the next-cast mark moving after a cast, the delay emptying and
-## the recharge read apart from a plain delay, a long staff capped with "+N", four rows still a
+## the recharge read apart from a plain delay, a long staff scrolled to its next cast (owner,
+## 2026-11-19), each row's mana line, four rows still a
 ## small corner panel, and the rows hiding while their player has a menu open. The two ways to
 ## show the delay (owner, 2026-10-27): a shade on the button glyph (the default, its next cast
 ## dashed during a recharge) and a shade on the next cast (the whole cycle during a recharge),
@@ -127,13 +128,68 @@ func test_emptying_a_staff_hides_its_row() -> void:
 	check_equal(_hud.get_panel(0).shown_rows(), 0, "the emptied staff's row is gone")
 
 
-func test_a_long_staff_is_capped_with_a_count() -> void:
+func test_a_long_staff_scrolls_to_keep_the_next_cast_in_view() -> void:
 	_build(0, 0, CARDS)
 	# The row learns its width when the panel lays out, on the next frame.
 	await process_frame
 	var row: RowScript = _hud.get_panel(0).staff_row(0)
-	check(row.shown_count() > 0 and row.shown_count() < CARDS, "only the cards that fit show, got %d" % row.shown_count())
-	check_equal(row.plus_text(), "+%d" % (CARDS - row.shown_count()), "the rest are counted")
+	check_equal(row.card_count(), CARDS, "every card is in the strip: none is dropped for a count")
+	check_equal(row.scroll(), 0, "it starts at the first cast")
+	check(row.is_cast_in_view(0), "which is in view")
+	check(row.hides_right() and not row.hides_left(), "an arrow says more cards are to the right")
+	var last: int = CARDS - 1
+	check(not row.is_cast_in_view(last), "the last cast is out of view")
+	row.set_timing(last, 0.0)
+	var first_step: int = row.scroll()
+	var target: int = row.scroll_target()
+	check(target > 0, "the strip is to slide right, to %d" % target)
+	check(first_step > 0 and first_step < target, "it moves on the first frame but does not jump there: %d of %d" % [first_step, target])
+	var frames: int = 1
+	var before: int = first_step
+	while row.scroll() != target and frames < 60:
+		row.set_timing(last, 0.0)
+		check(row.scroll() > before, "every frame on its way it moves on, by whole pixels")
+		before = row.scroll()
+		frames += 1
+	check(frames >= 3, "the slide takes at least 3 frames, took %d" % frames)
+	check(row.is_cast_in_view(last), "the next cast is in view at the end")
+	check(row.hides_left() and not row.hides_right(), "and the arrow is on the left now")
+
+
+func test_the_strip_slides_back_when_the_cycle_starts_over() -> void:
+	_build(0, 0, CARDS)
+	await process_frame
+	var row: RowScript = _hud.get_panel(0).staff_row(0)
+	for _frame in 60:
+		row.set_timing(CARDS - 1, 0.0)
+	check(row.scroll() > 0, "on the last cast")
+	var far: int = row.scroll()
+	row.set_timing(0, 0.4)
+	check(row.scroll() > 0 and row.scroll() < far, "back to the first cast: it slides, no jump")
+	for _frame in 60:
+		row.set_timing(0, 0.4)
+	check_equal(row.scroll(), 0, "and ends at the start")
+
+
+func test_a_short_staff_never_scrolls() -> void:
+	_build(0, 0, 3)
+	await process_frame
+	var row: RowScript = _hud.get_panel(0).staff_row(0)
+	row.set_timing(2, 0.0)
+	check_equal(row.scroll_target(), 0, "everything fits: nothing to slide")
+	check(not row.hides_left() and not row.hides_right(), "and no arrows")
+
+
+func test_each_row_has_a_mana_line_under_its_cards() -> void:
+	_build(0, 0, 2)
+	_bus.staff_mana_changed.emit(0, 0, 50.0, 100.0)
+	await process_frame
+	var row: RowScript = _hud.get_panel(0).staff_row(0)
+	var line: Control = row.mana_line()
+	check(line.visible, "the staff's mana is told: its line shows")
+	check_equal(line.position.x, row.cards_start(), "starting where the cards start")
+	check(line.position.y >= RowScript.BOX_HEIGHT and line.position.y + line.size.y <= RowScript.ROW_HEIGHT, "under the frames, inside the row")
+	check(line.size.y <= 2.0, "a thin line")
 
 
 func test_wasted_cards_are_marked() -> void:
@@ -385,3 +441,23 @@ func test_a_fizzle_flashes_the_glyph() -> void:
 	for frame in RowScript.RIM_FRAMES + 1:
 		_tick(1)
 	check(not row.is_fizzling(), "for a few frames")
+
+
+func test_a_scrolled_strip_still_marks_its_next_cast_and_slides_its_arrows_in() -> void:
+	_build(0, 0, CARDS)
+	await process_frame
+	# The row is stepped by hand here, not by the HUD's frame (which reads the real cursor).
+	_hud.set_process(false)
+	var row: RowScript = _hud.get_panel(0).staff_row(0)
+	check_equal(row.arrow_in(1), RowScript.ARROW_FRAMES, "a long staff starts with its right arrow in")
+	check_equal(row.arrow_in(-1), 0, "and no left arrow")
+	var next: int = CARDS / 2
+	row.set_timing(next, 0.0)
+	check_equal(row.arrow_in(-1), 1, "the left arrow starts to slide in, not all at once")
+	for _frame in 60:
+		row.set_timing(next, 0.0)
+	check_equal(row.arrow_in(-1), RowScript.ARROW_FRAMES, "and is in after a few frames")
+	await process_frame
+	await process_frame
+	check(row.scroll() > 0, "scrolled")
+	check_equal(row.drawn_outline(), next, "the cast in the middle has the gold frame while scrolled")

@@ -193,6 +193,8 @@ var tab: Tab = Tab.GRAPHICS
 
 var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
+## The pads its moves rumble (`UiHaptics`); none in a test that gives none.
+var _input: InputManagerScript = null
 ## The seats of this machine that wait for their unplugged gamepad, a bit each (`set_waiting_seats`).
 var _waiting_seats: int = 0
 ## The player whose menu is closing, for the command that lets the game go.
@@ -371,6 +373,7 @@ func _width_of(row: Button, texts: Array[String]) -> float:
 func bind(events: EventsScript, ui_focus: UIFocusScript, input: InputManagerScript = null) -> void:
 	_events = events
 	_ui_focus = ui_focus
+	_input = input
 	_tabs.bind(input)
 	_hint_glyph.bind(input)
 	if save == null:
@@ -580,13 +583,13 @@ func _add_slider(row: Button, low: int, high: int, step: int, value: int, longes
 
 
 ## The menu's navigator for UIFocus: left and right on the slider move it and keep the focus
-## there, with the move's sound when it moved (UIFocus sends none: the focus stays; at an end
-## nothing moves and nothing is heard); any other move goes on as usual (null).
+## there, with the move's rumble when it moved (UIFocus sends none: the focus stays; at an end
+## nothing moves and nothing is felt); any other move goes on as usual (null).
 func _navigate(control: Control, direction: Vector2i) -> Control:
 	var words: String = str(control.get_meta(BASE_TEXT_META, "")) if control != null else ""
 	var slider: Control = _step_slider(control, direction)
 	if slider != null and str(slider.get_meta(BASE_TEXT_META, "")) != words:
-		UiSounds.send(_events, UiSounds.MOVE)
+		UiHaptics.pulse(_input, owner_player, UiHaptics.POINT)
 	return slider
 
 
@@ -672,7 +675,7 @@ func _on_slide_stepped(left: float) -> void:
 func _on_paged(player: int, step: int) -> void:
 	if player != owner_player or page != Page.SETTINGS or step == 0:
 		return
-	UiSounds.send(_events, UiSounds.MOVE)
+	UiHaptics.pulse(_input, owner_player, UiHaptics.POINT)
 	_show_tab(posmod(tab + signi(step), Tab.size()) as Tab, signi(step))
 
 

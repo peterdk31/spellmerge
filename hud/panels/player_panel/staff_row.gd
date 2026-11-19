@@ -1,7 +1,8 @@
 extends Control
-## One staff's row under the corner panel's mana bar (owner, 2026-10-27): the staff's button
-## glyph, then its cast sequence as small card icons in read order, one framed group per cast of
-## the cycle, so a player sees which cards fire together and finds a card that does nothing.
+## One staff's row of the corner panel (owner, 2026-10-27): the staff's button glyph, then its
+## cast sequence as small card icons in read order, one framed group per cast of the cycle, so a
+## player sees which cards fire together and finds a card that does nothing, and under the cards
+## a thin blue line of the staff's own mana (owner, 2026-11-19; `set_mana`, `meter_line.gd`).
 ##
 ## - The cast the staff fires next has a gold frame and full-bright icons; the other casts are
 ##   dimmer, so the highlight is told by brightness too, not by colour alone.
@@ -24,29 +25,43 @@ extends Control
 ##   the mana does not pay are skipped (cast-timing T3) and have a red frame, as has every cast
 ##   left in the cycle when the mana pays none. A press that found none (a fizzle) gives the
 ##   glyph a red rim for a few frames.
-## - A staff longer than the row shows "+N" for the cards that do not fit (gold when the next
-##   cast is among them).
+## - A staff longer than the row scrolls (owner, 2026-11-19): the cards are drawn in a strip
+##   clipped to the row, which slides by whole pixels to keep the cast the staff fires next in
+##   view, with a card of the one before it showing. It slides a third of the way each frame
+##   (`set_timing`'s), so a move never jumps (docs/STYLE.md, "Smooth"), and a small arrow at
+##   either end says cards are hidden that way (gold when the next cast is among them, which only
+##   happens while it slides, or when the next cast is wider than the strip); an arrow slides in
+##   from past its end over ARROW_FRAMES frames, and out again. A new plan or a new width starts the strip where it should be.
+## - The mana line is the staff's whole mana of its pool (`staff_mana_changed`); it hides until
+##   the staff's mana is told, and eases by whole pixels as the line does.
 ##
 ## Display only: no input, no focus. `set_plan` takes the plain `Spells.staff_view` and an icon
 ## per card (it allocates, once per plan); `set_timing` takes the cursor and the seconds left each
-## frame and only redraws when they changed (or the ready rim is counting down), allocating
-## nothing.
+## frame and only redraws when they changed (or the ready rim is counting down, or the strip
+## slides), allocating nothing.
 
 const GlyphScript := preload("res://hud/widgets/action_glyph.gd")
+const MeterScript := preload("res://hud/widgets/meter_line.gd")
 
 const ICON: float = 8.0
 ## One icon plus the 1 px between two icons.
 const ICON_STEP: float = 9.0
 const BOX_HEIGHT: float = 10.0
-## The frames plus 2 px of air, so a row's frames never touch the next row's.
-const ROW_HEIGHT: float = 12.0
+## The mana line under the frames: 1 px of air above it, 2 px of line.
+const MANA_GAP: float = 1.0
+const MANA_HEIGHT: float = 2.0
+## The frames, the mana line and 1 px of air, so a row never touches the next row.
+const ROW_HEIGHT: float = BOX_HEIGHT + MANA_GAP + MANA_HEIGHT + 1.0
 ## Between two casts' frames.
 const CAST_GAP: float = 2.0
 ## The glyph cell (the shoulder glyphs are 12 px; a wider key pushes the cards right).
 const GLYPH_CELL: float = 14.0
-const PLUS_FONT_SIZE: int = 8
-## Room kept for "+N" when cards are left over.
-const PLUS_WIDTH: float = 13.0
+## The arrow at an end of a strip with cards hidden that way: its width with its dark backing.
+const ARROW_WIDTH: float = 4.0
+## Frames an arrow takes to slide in from its end of the strip, or back out (docs/STYLE.md, "Smooth").
+const ARROW_FRAMES: int = 3
+## How much of the cards before the next cast stays in view: one card, and the arrow over it.
+const LEAD: float = ICON_STEP
 ## How many frames (`set_timing` calls) the white rim stays on a glyph whose staff became ready.
 const RIM_FRAMES: int = 7
 
@@ -97,6 +112,15 @@ var _wasted: PackedByteArray = PackedByteArray()
 ## Per cast: the index in `_icons` of its first card, and how many cards it read.
 var _cast_first: PackedInt32Array = PackedInt32Array()
 var _cast_size: PackedInt32Array = PackedInt32Array()
+## Per cast: where its frame starts in the strip, before the scroll; and the strip's whole width.
+var _cast_x: PackedFloat32Array = PackedFloat32Array()
+var _content_width: float = 0.0
+## How far the strip is scrolled, in whole pixels, and where it slides to.
+var _scroll: int = 0
+var _scroll_target: int = 0
+## How far each end's arrow has slid in, 0 (out) to ARROW_FRAMES (in).
+var _left_in: int = 0
+var _right_in: int = 0
 ## The cast fired next (`Spells.cast_index`), the delay left and the delay it started from.
 var _cursor: int = 0
 var _left: float = 0.0
@@ -109,10 +133,10 @@ var _winding: bool = false
 var _firing: int = FIRING_UNKNOWN
 ## Frames left of the red rim of a fizzle.
 var _fizzle_frames: int = 0
-## "+N", made when the plan or the width changes, never per frame.
-var _plus_text: String = ""
-var _shown: int = 0
 var _glyph: GlyphScript = null
+## The cards, clipped to the row right of the glyph, and the mana line under them.
+var _strip: Control = null
+var _mana: MeterScript = null
 ## Drawn over the glyph (its shade and its rim), since a child draws over its parent's `_draw`.
 var _cover: Control = null
 ## Frames left of the white rim.
@@ -136,6 +160,17 @@ func _ready() -> void:
 	_glyph.position = Vector2(0.0, 0.0)
 	add_child(_glyph)
 	_glyph.show_action(player, StringName("staff_%d" % (staff + 1)))
+	_strip = Control.new()
+	_strip.name = "Strip"
+	_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_strip.clip_contents = true
+	_strip.draw.connect(_draw_cards)
+	add_child(_strip)
+	_mana = MeterScript.new()
+	_mana.name = "Mana"
+	_mana.fill_color = MeterScript.MANA_COLOR
+	_mana.visible = false
+	add_child(_mana)
 	_cover = Control.new()
 	_cover.name = "Cover"
 	_cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -171,6 +206,12 @@ func set_plan(plan: Dictionary, icons: Array[Texture2D]) -> void:
 		if not _icons.is_empty():
 			_cast_first.append(0)
 			_cast_size.append(_icons.size())
+	_cast_x.clear()
+	var x: float = 0.0
+	for c in _cast_size.size():
+		_cast_x.append(x)
+		x += _cast_size[c] * ICON_STEP + 1.0 + CAST_GAP
+	_content_width = maxf(x - CAST_GAP, 0.0)
 	_cursor = 0
 	_left = 0.0
 	_total = 0.0
@@ -214,8 +255,32 @@ func set_timing(cursor: int, left: float, winding: bool = false, firing: int = F
 		changed = changed or _fizzle_frames == 0
 	if was_waiting and left <= 0.0:
 		_rim_frames = RIM_FRAMES
+	_scroll_target = _wanted_scroll()
+	if _step_scroll():
+		changed = true
+	if _step_arrows():
+		changed = true
 	if changed or is_recharging() != was_recharging:
 		_redraw_all()
+
+
+## Show the staff's whole mana `mana` of its pool `most` on the line under the cards; a mana not
+## told (not finite) hides the line until it is.
+func set_mana(mana: float, most: float) -> void:
+	if _mana == null:
+		return
+	var known: bool = is_finite(mana) and most > 0.0
+	if not known:
+		_mana.reset()
+		_mana.visible = false
+		return
+	_mana.visible = true
+	_mana.set_value(mana, most)
+
+
+## The mana line (for tests and screenshots).
+func mana_line() -> MeterScript:
+	return _mana
 
 
 ## The cards shown in read order (for tests): how many, and how many are greyed.
@@ -295,13 +360,36 @@ func cards_start() -> float:
 	return _cards_left()
 
 
-## How many cards fit, and the "+N" text for the rest ("" when all fit).
-func shown_count() -> int:
-	return _shown
+## How far the strip is scrolled and where it slides to, in pixels (0: the first cast at the
+## start).
+func scroll() -> int:
+	return _scroll
 
 
-func plus_text() -> String:
-	return _plus_text
+func scroll_target() -> int:
+	return _scroll_target
+
+
+## The strip's width: the room right of the glyph the cards show in.
+func view_width() -> float:
+	return _strip.size.x if _strip != null else 0.0
+
+
+## Whether cards are hidden left of the strip, or right of it.
+func hides_left() -> bool:
+	return _scroll > 0
+
+
+func hides_right() -> bool:
+	return _content_width - float(_scroll) > view_width() + 0.5
+
+
+## Whether cast `c`'s whole frame is in the strip now.
+func is_cast_in_view(c: int) -> bool:
+	if c < 0 or c >= _cast_x.size():
+		return false
+	var start: float = _cast_x[c] - float(_scroll)
+	return start >= 0.0 and start + _cast_size[c] * ICON_STEP + 1.0 <= view_width() + 0.5
 
 
 ## The room this row's own glyph needs before the cards.
@@ -313,54 +401,94 @@ func _cards_left() -> float:
 	return maxf(glyph_room(), cards_left)
 
 
-## How many cards fit in the row's width (frames and gaps counted), leaving room for "+N".
+## Lay the strip and the mana line out right of the glyph, and start the strip where it should be
+## for this width (a new width is a new layout, not a move).
 func _measure() -> void:
-	var limit: float = size.x
-	var x: float = _cards_left()
-	var shown: int = 0
-	var total: int = _icons.size()
-	for c in _cast_size.size():
-		x += 1.0
-		for i in _cast_size[c]:
-			var room: float = limit - (PLUS_WIDTH if shown + 1 < total else 0.0)
-			if x + ICON_STEP + 1.0 > room:
-				_set_shown(shown, total)
-				return
-			x += ICON_STEP
-			shown += 1
-		x += CAST_GAP
-	_set_shown(shown, total)
+	if _strip == null:
+		return
+	var left: float = _cards_left()
+	var width: float = maxf(size.x - left, 0.0)
+	_strip.position = Vector2(left, 0.0)
+	_strip.size = Vector2(width, BOX_HEIGHT)
+	_mana.position = Vector2(left, BOX_HEIGHT + MANA_GAP)
+	_mana.size = Vector2(width, MANA_HEIGHT)
+	_scroll_target = _wanted_scroll()
+	_scroll = _scroll_target
+	_left_in = ARROW_FRAMES if hides_left() else 0
+	_right_in = ARROW_FRAMES if hides_right() else 0
+	_redraw_all()
 
 
-func _set_shown(shown: int, total: int) -> void:
-	_shown = shown
-	_plus_text = "" if shown >= total else "+%d" % (total - shown)
-	queue_redraw()
+## One frame of each arrow's slide toward in (cards hidden that way) or out; true when one moved.
+func _step_arrows() -> bool:
+	var left: int = clampi(_left_in + (1 if hides_left() else -1), 0, ARROW_FRAMES)
+	var right: int = clampi(_right_in + (1 if hides_right() else -1), 0, ARROW_FRAMES)
+	var moved: bool = left != _left_in or right != _right_in
+	_left_in = left
+	_right_in = right
+	return moved
 
 
-func _draw() -> void:
+## How far an arrow has slid in, 0 to ARROW_FRAMES: the left one (`way` -1) or the right (for
+## tests).
+func arrow_in(way: int) -> int:
+	return _left_in if way < 0 else _right_in
+
+
+## Where the strip should be: the next cast's frame in view with LEAD of the cards before it and
+## clear of the arrows, never past either end; 0 when everything fits.
+func _wanted_scroll() -> int:
+	var view: float = view_width()
+	if _content_width <= view or _cast_x.is_empty():
+		return 0
+	var c: int = next_cast()
+	var start: float = _cast_x[c]
+	var end: float = start + _cast_size[c] * ICON_STEP + 1.0
+	var at: float = start - LEAD
+	if end - at > view - ARROW_WIDTH:
+		at = end - view + ARROW_WIDTH
+	if at > start - ARROW_WIDTH:
+		# A cast wider than the strip: its start shows.
+		at = start - ARROW_WIDTH
+	return clampi(floori(at), 0, ceili(_content_width - view))
+
+
+## One frame of the strip's slide to its target, a third of the way (at least a pixel); true when
+## it moved.
+func _step_scroll() -> bool:
+	var gap: int = _scroll_target - _scroll
+	if gap == 0:
+		return false
+	_scroll += mini(maxi(1, ceili(absi(gap) / 3.0)), absi(gap)) * signi(gap)
+	return true
+
+
+## The cards, in the strip (its own coordinates; the strip clips what is past its ends): each
+## cast's frame from its place less the scroll, the arrows over the ends that hide cards, and the
+## `NEXT_CAST` shade. What the tests read (`drawn_shade`) is kept in the row's coordinates.
+func _draw_cards() -> void:
 	var next: int = next_cast()
 	var recharging: bool = is_recharging()
 	var on_button: bool = style == Style.BUTTON
+	var view: float = _strip.size.x
 	_drawn_outline = -1
 	_drawn_dashed = -1
-	var x: float = _cards_left()
-	var next_hidden: bool = next < _cast_first.size() and _cast_first[next] >= _shown
 	# The insides of the next cast's frame and of every frame, for the `NEXT_CAST` shade.
 	var next_inside := Rect2()
 	var all_inside := Rect2()
 	for c in _cast_size.size():
 		var first: int = _cast_first[c]
-		var count: int = mini(_cast_size[c], _shown - first)
-		if count <= 0:
+		var count: int = _cast_size[c]
+		var x: float = _cast_x[c] - float(_scroll)
+		var box := Rect2(x, 0.0, count * ICON_STEP + 1.0, BOX_HEIGHT)
+		if box.end.x <= 0.0 or box.position.x >= view:
 			continue
 		var is_next: bool = c == next and _firing != -1
 		var short: bool = is_short(c)
 		# A recharge keeps the next cast marked on the button style (dashed), and drops the mark
 		# on the next-cast style (the shade covers the whole cycle).
 		var marked: bool = is_next and (on_button or not recharging)
-		var box := Rect2(x, 0.0, count * ICON_STEP + 1.0, BOX_HEIGHT)
-		draw_rect(box, NEXT_FILL if marked else FILL)
+		_strip.draw_rect(box, NEXT_FILL if marked else FILL)
 		for i in count:
 			var at := Rect2(x + 1.0 + i * ICON_STEP, 1.0, ICON, ICON)
 			var wasted: bool = _wasted[first + i] == 1
@@ -373,43 +501,64 @@ func _draw() -> void:
 				tint = OTHER_TINT
 			var icon: Texture2D = _icons[first + i]
 			if icon != null:
-				draw_texture_rect(icon, at, false, tint)
+				_strip.draw_texture_rect(icon, at, false, tint)
 			else:
-				draw_rect(at.grow(-1.0), PLACEHOLDER * tint)
+				_strip.draw_rect(at.grow(-1.0), PLACEHOLDER * tint)
 			if wasted:
-				draw_line(at.position + Vector2(0.0, ICON), at.position + Vector2(ICON, 0.0), STRIKE, 1.0)
+				_strip.draw_line(at.position + Vector2(0.0, ICON), at.position + Vector2(ICON, 0.0), STRIKE, 1.0)
 		if marked and recharging:
 			_draw_dashed(box, GOLD)
 			_drawn_dashed = c
 		else:
-			draw_rect(box, GOLD if marked else (SHORT if short else FRAME), false, 1.0)
+			_strip.draw_rect(box, GOLD if marked else (SHORT if short else FRAME), false, 1.0)
 			if marked:
 				_drawn_outline = c
 		var inside := box.grow(-1.0)
 		if is_next:
 			next_inside = inside
 		all_inside = inside if all_inside.size.x <= 0.0 else all_inside.merge(inside)
-		x += box.size.x + CAST_GAP
-	if _plus_text != "":
-		var font: Font = get_theme_default_font()
-		var color: Color = GOLD if next_hidden else MUTED
-		draw_string(font, Vector2(x, BOX_HEIGHT - 2.0), _plus_text, HORIZONTAL_ALIGNMENT_LEFT, -1, PLUS_FONT_SIZE, color)
 	if not on_button:
 		_drawn_shade = Rect2()
 		var fill: float = cooldown_fill()
 		var under: Rect2 = all_inside if recharging else next_inside
+		var shade := Rect2()
 		if is_winding() and under.size.x > 0.0:
 			# A wind-up charges from the left: what has wound up is shaded, its edge gold.
 			var charged: float = maxf(1.0, floorf(under.size.x * (1.0 - fill)))
-			_drawn_shade = Rect2(under.position, Vector2(charged, under.size.y))
-			draw_rect(_drawn_shade, SHADE)
-			draw_rect(Rect2(_drawn_shade.end.x - 1.0, under.position.y, 1.0, under.size.y), EDGE_WIND)
+			shade = Rect2(under.position, Vector2(charged, under.size.y))
+			_strip.draw_rect(shade, SHADE)
+			_strip.draw_rect(Rect2(shade.end.x - 1.0, under.position.y, 1.0, under.size.y), EDGE_WIND)
 		elif fill > 0.0 and under.size.x > 0.0:
 			# Pulls back left to right: what is still to wait is on the right.
 			var width: float = maxf(1.0, floorf(under.size.x * fill))
-			_drawn_shade = Rect2(under.end.x - width, under.position.y, width, under.size.y)
-			draw_rect(_drawn_shade, SHADE)
-			draw_rect(Rect2(_drawn_shade.position, Vector2(1.0, _drawn_shade.size.y)), EDGE_RECHARGE if recharging else EDGE_DELAY)
+			shade = Rect2(under.end.x - width, under.position.y, width, under.size.y)
+			_strip.draw_rect(shade, SHADE)
+			_strip.draw_rect(Rect2(shade.position, Vector2(1.0, shade.size.y)), EDGE_RECHARGE if recharging else EDGE_DELAY)
+		if shade.size.x > 0.0:
+			_drawn_shade = Rect2(shade.position + _strip.position, shade.size)
+	var next_left: bool = next < _cast_x.size() and _cast_x[next] - float(_scroll) < 0.0
+	var next_right: bool = next < _cast_x.size() and not next_left and not is_cast_in_view(next)
+	# An arrow slides in from past its end, a pixel or two a frame, never popping in whole.
+	if _left_in > 0:
+		_draw_arrow(-_arrow_out(_left_in), -1, GOLD if next_left else MUTED)
+	if _right_in > 0:
+		_draw_arrow(view - ARROW_WIDTH + _arrow_out(_right_in), 1, GOLD if next_right else MUTED)
+
+
+## How far past its end an arrow `slid` frames in is still, in whole pixels.
+func _arrow_out(slid: int) -> float:
+	return floorf(ARROW_WIDTH * float(ARROW_FRAMES - slid) / float(ARROW_FRAMES))
+
+
+## A small arrow at `x` of the strip pointing `way` (-1 left, 1 right), on a dark backing over the
+## cards it hides: 3 px wide, its columns 2, 4 and 6 px tall from the tip.
+func _draw_arrow(x: float, way: int, color: Color) -> void:
+	_strip.draw_rect(Rect2(x, 0.0, ARROW_WIDTH, BOX_HEIGHT), FILL)
+	for step in 3:
+		# The tip is the column furthest out; each column inward is 2 px taller.
+		var column: float = x + (float(step) if way < 0 else ARROW_WIDTH - 1.0 - float(step))
+		var half: float = float(step)
+		_strip.draw_rect(Rect2(column, BOX_HEIGHT * 0.5 - 1.0 - half, 1.0, 2.0 + half * 2.0), color)
 
 
 ## Over the glyph: the `BUTTON` shade, which pulls back up as the delay runs (what is still to
@@ -442,19 +591,20 @@ func _draw_cover() -> void:
 func _draw_dashed(box: Rect2, color: Color) -> void:
 	var x: float = box.position.x
 	while x < box.end.x:
-		draw_rect(Rect2(x, box.position.y, 1.0, 1.0), color)
-		draw_rect(Rect2(x, box.end.y - 1.0, 1.0, 1.0), color)
+		_strip.draw_rect(Rect2(x, box.position.y, 1.0, 1.0), color)
+		_strip.draw_rect(Rect2(x, box.end.y - 1.0, 1.0, 1.0), color)
 		x += 2.0
 	var y: float = box.position.y
 	while y < box.end.y:
-		draw_rect(Rect2(box.position.x, y, 1.0, 1.0), color)
-		draw_rect(Rect2(box.end.x - 1.0, y, 1.0, 1.0), color)
+		_strip.draw_rect(Rect2(box.position.x, y, 1.0, 1.0), color)
+		_strip.draw_rect(Rect2(box.end.x - 1.0, y, 1.0, 1.0), color)
 		y += 2.0
 
 
 ## Redraw the cards and the cover, and grey the glyph while a `NEXT_CAST` staff is not ready.
 func _redraw_all() -> void:
-	queue_redraw()
+	if _strip != null:
+		_strip.queue_redraw()
 	if _cover != null:
 		_cover.queue_redraw()
 	if _glyph != null:

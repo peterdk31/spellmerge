@@ -558,17 +558,17 @@ func test_the_panel_keeps_the_players_live_stats_while_an_ai_drives_the_wizard()
 	check(wizard.controller == brain, "the imp's controller drives the wizard")
 	_world.hurt(wizard, 25, imp.id)
 	check_equal(panel.health(), 75, "the wizard's hit shows on its player's panel while the AI drives it")
-	# The AI casts the wizard's staff: its mana drops, and the panel's mana follows.
+	# The AI casts the wizard's staff: its mana drops, and the staff row's mana line follows.
 	_stats.clear()
 	brain.presses = [0]
 	_world.run(1)
 	check(wizard.caster.mana_of(0) < wizard.caster.max_mana_of(0), "the AI cast the wizard's staff")
-	var mana_label := panel.find_child("ManaValue", true, false) as Label
-	check_equal(mana_label.text, str(floori(wizard.caster.mana_of(0))), "the panel's mana is the wizard's, live")
-	var before: int = floori(wizard.caster.mana_of(0))
+	var line := panel.staff_row(0).mana_line()
+	check(is_equal_approx(line.share(), floorf(wizard.caster.mana_of(0)) / wizard.caster.max_mana_of(0)), "the staff's mana line is the wizard's, live: %s" % line.share())
+	var before: float = line.share()
 	_world.run(16)
-	check(floori(wizard.caster.mana_of(0)) > before and mana_label.text == str(floori(wizard.caster.mana_of(0))),
-		"and its regen too, with no seat driving it: %s" % mana_label.text)
+	check(line.share() > before and is_equal_approx(line.share(), floorf(wizard.caster.mana_of(0)) / wizard.caster.max_mana_of(0)),
+		"and its regen too, with no seat driving it: %s" % line.share())
 	check_equal(panel.status_text(), "", "no possessed word on the panel")
 	check(not _stats.is_empty() and _stats.back()[0] == 0, "sent for seat 0")
 

@@ -1,10 +1,11 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the menus' sounds (sound plan AU8, docs/milestones/sound.md; `hud/widgets/ui_sounds.gd`):
-## the HUD opens its menus and the `ui_sound_requested` it sends are counted. One press is one
-## sound: a move of the focus is `ui_move`, a row chosen `ui_choose`, `back` `ui_back`; opening a
-## menu and the focus a menu moves in answer to a choice or a back say nothing more. Every id the
-## HUD sends has its baked sound, a UI sound, and no HUD script plays a sound itself.
-## The builder's and the inventory's sounds are tested beside their other behaviour
+## the HUD opens its menus and the `ui_sound_requested` it sends and the rumbles it asks for are
+## counted. One press is one sound or one rumble: a move of the focus rumbles the pad
+## (`UiHaptics.POINT`) and makes no sound (owner, 2026-11-19), a row chosen is `ui_choose`, `back`
+## `ui_back`; opening a menu and the focus a menu moves in answer to a choice or a back say nothing
+## more. Every id the HUD sends has its baked sound, a UI sound, and no HUD script plays a sound
+## itself. The builder's and the inventory's are tested beside their other behaviour
 ## (test_radial_builder.gd, test_inventory_menu.gd).
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -22,14 +23,18 @@ var _focus: UIFocusScript
 var _hud: HudScript
 ## Every sound the HUD asked for, in order.
 var _sounds: Array[StringName] = []
+## Every rumble asked of the pads, as (weak, strong, seconds).
+var _rumbles: Array[Vector3] = []
 
 
 func before_each() -> void:
 	DirAccess.remove_absolute(SAVE_PATH)
 	_sounds.clear()
+	_rumbles.clear()
 	_bus = own(EventsScript.new()) as EventsScript
 	_input = own(InputManagerScript.new()) as InputManagerScript
 	_input.events = _bus
+	_input.vibrator = func(_device: int, weak: float, strong: float, seconds: float) -> void: _rumbles.append(Vector3(weak, strong, seconds))
 	_focus = own(UIFocusScript.new()) as UIFocusScript
 	_focus.input = _input
 	_focus.events = _bus
@@ -69,6 +74,13 @@ func _heard() -> Array[StringName]:
 	return out
 
 
+## How many rumbles were asked since the last call, and forget them.
+func _felt() -> int:
+	var count: int = _rumbles.size()
+	_rumbles.clear()
+	return count
+
+
 func _menu() -> PauseMenuScript:
 	return _hud.get_pause_menu()
 
@@ -77,17 +89,23 @@ func test_the_pause_menu_sounds_one_press_at_a_time() -> void:
 	_do(&"pause")
 	check(_menu().is_open(), "Start opened the pause menu")
 	check_equal(_heard(), [] as Array[StringName], "opening says nothing (its first row's focus is no move)")
+	check_equal(_felt(), 0, "and rumbles nothing")
 	_do(&"move_down")
-	check_equal(_heard(), [UiSounds.MOVE], "down: a move")
+	check_equal(_heard(), [] as Array[StringName], "down: a move makes no sound")
+	check_equal(_felt(), 1, "it rumbles once")
 	_do(&"move_up")
-	check_equal(_heard(), [UiSounds.MOVE], "up: a move")
+	check_equal(_heard(), [] as Array[StringName], "up: no sound")
+	check_equal(_felt(), 1, "one rumble")
 	_focus.focus(0, _menu().button("Settings"))
 	_heard()
+	_felt()
 	_do(&"accept")
 	check(_menu().page == PauseMenuScript.Page.SETTINGS, "on Settings")
 	check_equal(_heard(), [UiSounds.CHOOSE], "Settings chosen: one choice, its first row's focus no move")
+	check_equal(_felt(), 0, "and no rumble for the focus it moved")
 	_do(&"page_next")
-	check_equal(_heard(), [UiSounds.MOVE], "RB: the next tab, one move")
+	check_equal(_heard(), [] as Array[StringName], "RB: the next tab, no sound")
+	check_equal(_felt(), 1, "one rumble")
 	_do(&"back")
 	check(_menu().page == PauseMenuScript.Page.MAIN, "back on the main page")
 	check_equal(_heard(), [UiSounds.BACK], "back: one back, its Settings row's focus no move")
@@ -96,7 +114,7 @@ func test_the_pause_menu_sounds_one_press_at_a_time() -> void:
 	check_equal(_heard(), [UiSounds.BACK], "and was a back")
 
 
-func test_a_slider_step_is_a_move_and_accept_a_choice() -> void:
+func test_a_slider_step_rumbles_and_accept_is_a_choice() -> void:
 	_do(&"pause")
 	_focus.focus(0, _menu().button("Settings"))
 	_do(&"accept")
@@ -104,9 +122,11 @@ func test_a_slider_step_is_a_move_and_accept_a_choice() -> void:
 	_do(&"page_next")
 	check_equal(PauseMenuScript.TAB_NAMES[_menu().tab], "Audio", "on Audio")
 	_heard()
+	_felt()
 	_do(&"move_left")
 	check_equal(_menu().volume(PauseMenuScript.Volume.MUSIC), 90, "left stepped the music down")
-	check_equal(_heard(), [UiSounds.MOVE], "a slider's step is a move")
+	check_equal(_heard(), [] as Array[StringName], "a slider's step makes no sound")
+	check_equal(_felt(), 1, "it rumbles once")
 	_do(&"accept")
 	check_equal(_heard(), [UiSounds.CHOOSE], "accept on a slider is a choice")
 
@@ -118,23 +138,44 @@ func test_a_slider_at_its_end_says_nothing() -> void:
 	_do(&"page_next")
 	_do(&"page_next")
 	_heard()
+	_felt()
 	_do(&"move_right")
 	check_equal(_menu().volume(PauseMenuScript.Volume.MUSIC), 100, "the music stays at the top")
 	check_equal(_heard(), [] as Array[StringName], "nothing moved, so nothing is heard")
+	check_equal(_felt(), 0, "nor felt")
 
 
 func test_rb_on_the_main_page_says_nothing() -> void:
 	_do(&"pause")
 	_heard()
+	_felt()
 	_do(&"page_next")
 	check_equal(_heard(), [] as Array[StringName], "LB and RB page nothing on the main page, so nothing is heard")
+	check_equal(_felt(), 0, "nor felt")
 
 
 func test_a_focus_moved_by_the_menu_alone_in_a_later_frame_is_a_move() -> void:
 	_do(&"pause")
 	_heard()
+	_felt()
 	_focus.focus(0, _menu().button("Settings"))
-	check_equal(_heard(), [UiSounds.MOVE], "a focus moved after the press's frame is a move")
+	check_equal(_heard(), [] as Array[StringName], "a focus moved after the press's frame makes no sound")
+	check_equal(_felt(), 1, "but rumbles, as a move")
+
+
+func test_the_builder_is_silent_even_for_back() -> void:
+	_do(&"back")
+	check(_hud.get_radial(0).is_open(), "B opened the builder")
+	_heard()
+	_do(&"back")
+	check(not _hud.get_radial(0).is_open(), "B closed it")
+	check_equal(_heard(), [] as Array[StringName], "its back makes no sound")
+
+
+func test_the_moves_sound_is_gone() -> void:
+	check(not UiSounds.IDS.has(&"ui_move"), "no move sound id")
+	for id: String in ["ui_move", "ui_card_place", "ui_card_remove"]:
+		check(not ResourceLoader.exists("res://audio/sfx/%s/%s.tres" % [id, id]), "%s is gone" % id)
 
 
 func test_every_id_has_its_baked_ui_sound() -> void:

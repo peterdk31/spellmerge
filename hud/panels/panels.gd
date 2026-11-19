@@ -100,6 +100,9 @@ extends CanvasLayer
 ##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
 ##   Enter, never Space, which casts) with no menu open and no lit stone takes it
 ##   (`item_take_requested`); the altar's A comes after.
+## - The cheat code (`hud/widgets/cheat_code.gd`, node CheatCode, made here; owner, 2026-11-19):
+##   the word `CheatCode.CODE` typed on the keyboard sends `all_cards_requested` (every card, in
+##   the hub).
 ## - The frame rate readout (`hud/widgets/fps_counter.gd`, node Root/FpsCounter, made here; owner,
 ##   2026-11-02): "60 FPS" at the bottom middle, over everything, shown while the pause menu's
 ##   "Show FPS" switch is on (read after the menu is bound, then `show_fps_changed`).
@@ -209,6 +212,8 @@ var _boss_intro: BossIntroScript = null
 var _intro_wait: BossIntroWait = BossIntroWait.new()
 ## The menus' focus sounds (sound plan AU8; `widgets/ui_sounds.gd`).
 var _ui_sounds: UiSounds = null
+## The cheat code's listener (`widgets/cheat_code.gd`).
+var _cheat_code: CheatCode = null
 
 
 func _ready() -> void:
@@ -275,6 +280,10 @@ func _ready() -> void:
 	_ui_sounds.name = "UiSounds"
 	add_child(_ui_sounds)
 	_ui_sounds.bind(events, ui_focus, input)
+	_cheat_code = CheatCode.new()
+	_cheat_code.name = "CheatCode"
+	add_child(_cheat_code)
+	_cheat_code.bind(events, input)
 	_pause_menu.save = save
 	_pause_menu.bind(events, ui_focus, input)
 	for radial in _radials:

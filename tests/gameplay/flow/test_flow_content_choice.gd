@@ -63,17 +63,12 @@ func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 
 
 ## Each mode's setup (owner, 2026-11-05): a new wizard's card bag is the mode's, counted (items
-## I3). Play: one dash and one bolt; the hub (owner, 2026-11-11 and 2026-11-13):
-## Inventory.DEV_COPIES of every card, a joiner's too.
+## I3). Play and the hub alike (owner, 2026-11-19: the hub no longer hands out every card): one
+## dash and one bolt, a joiner's too.
 func test_each_mode_gives_its_own_bag() -> void:
-	var registry: Node = root.get_node("Registry")
-	var every: Dictionary = {}
-	for id: StringName in registry.call("get_ids", &"spells"):
-		if registry.call("get_resource", &"spells", id) is SpellComponent:
-			every[id] = Inventory.DEV_COPIES
 	var wanted: Dictionary = {
 		FlowScript.MODE_RUN: {&"dash": 1, &"bolt": 1},
-		FlowScript.MODE_HUB: every,
+		FlowScript.MODE_HUB: {&"dash": 1, &"bolt": 1},
 	}
 	for mode: StringName in wanted:
 		flow.mode = mode

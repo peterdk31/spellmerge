@@ -8,7 +8,8 @@ extends PanelContainer
 ## staff cast last did.
 ##
 ## It only shows what it is told: `set_stats`, `set_menu_open`, `set_online` (a small "ONLINE" over
-## the bars of a seat played on another machine), `set_staff_plan`,
+## the bars of a seat played on another machine), `set_purse` (a line under the bars with the
+## seat's coins and its unspent rewards, connected biomes CB10; hidden while both are 0), `set_staff_plan`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
 ## which hears the events and reads the staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
 ## the same for any player index 0-3. Colours come from the shared theme (type variations
@@ -26,6 +27,9 @@ const DOWN_TEXT: String = "DOWN"
 const MENU_TEXT: String = "MENU"
 ## The word of a seat played on another machine (`set_online`).
 const ONLINE_TEXT: String = "ONLINE"
+## The purse line's words (`set_purse`): the coins, and the rewards waiting (A opens the oldest).
+const COINS_TEXT: String = "%d coins"
+const UNSPENT_TEXT: String = "%d to pick"
 
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
@@ -38,6 +42,10 @@ var _menu_open: bool = false
 var _rows: Array[StaffRowScript] = []
 ## Per staff: whether its plan has a card (an empty staff shows no row).
 var _has_cards: Array[bool] = [false, false, false, false]
+## The purse line (`set_purse`), made in `_ready` under the mana bar, and what it shows.
+var _purse: Label = null
+var _coins: int = 0
+var _unspent: int = 0
 
 @onready var _seat_row: Control = %SeatRow
 @onready var _seat: Label = %Seat
@@ -60,6 +68,12 @@ func _ready() -> void:
 		row.visible = false
 		_staffs.add_child(row)
 		_rows.append(row)
+	_purse = Label.new()
+	_purse.name = "Purse"
+	_purse.visible = false
+	_purse.theme_type_variation = StringName("PlayerLabel%d" % (player + 1))
+	_staffs.get_parent().add_child(_purse)
+	_staffs.get_parent().move_child(_purse, _staffs.get_index())
 	_align_rows()
 	_refresh_status()
 
@@ -101,6 +115,28 @@ func set_online(on: bool) -> void:
 	if _seat_row.visible != on:
 		_seat.text = ONLINE_TEXT
 		_seat_row.visible = on
+
+
+## Show the seat's coins and how many rewards wait to be picked (the unspent icon, DESIGN rule 4):
+## one line under the bars, "12 coins  1 to pick", hidden while both are 0. Text changes only when
+## a number did.
+func set_purse(coins: int, unspent: int) -> void:
+	if coins == _coins and unspent == _unspent:
+		return
+	_coins = coins
+	_unspent = unspent
+	var words := PackedStringArray()
+	if coins != 0:
+		words.append(COINS_TEXT % coins)
+	if unspent > 0:
+		words.append(UNSPENT_TEXT % unspent)
+	_purse.text = "  ".join(words)
+	_purse.visible = not words.is_empty()
+
+
+## The purse line's words ("" while it hides).
+func purse_text() -> String:
+	return _purse.text if _purse.visible else ""
 
 
 ## The seat's word shown ("" for a seat played here).

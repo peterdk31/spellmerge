@@ -42,8 +42,9 @@ const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## run plays by after the ground, run generation RG6; 10: the boss intros among the rules,
 ## docs/milestones/boss-intro.md; 11: `sandbox_requested` gone from
 ## STARTS with the sandbox, crypt rework CR-S, docs/DECISIONS.md 2026-11-16, `hub_requested`
-## renumbered). A replay of another format is refused.
-const FORMAT: int = 11
+## renumbered; 12: `reward_pick_requested` names its offer, connected biomes CB10). A replay of
+## another format is refused.
+const FORMAT: int = 12
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): a run of rooms, the hub (online-lobby L1; the main

@@ -73,6 +73,9 @@ const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 @export_range(1, 100) var cost: int = 1
 ## The first row of a run's map it may stand in (0: the first room on).
 @export_range(0, 32) var min_depth: int = 0
+## The coins it drops where it dies (connected biomes CB10, decision 18: each one coin on the
+## floor that anyone may take, adding one to every wallet; the Rewards area lays them).
+@export_range(0, 100) var coins: int = 1
 
 ## The most staffs an enemy may hold (the staff buttons).
 const MAX_STAFFS: int = 4

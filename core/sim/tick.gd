@@ -58,16 +58,17 @@ const PRIORITY: int = -1000
 ## The step of the actors' bodies, the Tick's own.
 const BODIES: StringName = &"bodies"
 ## The written order of the steps (`SimArea.steps`' keys): the services, the bodies, the ground
-## cover (it reads where the bodies stood after their move, ground cover GC5), then the
+## cover (it reads where the bodies stood after their move, ground cover GC5), the items and the
+## coins on the floor (taken where the bodies stand now; connected biomes CB10), then the
 ## run's rules and timers (Flow's: the intro, the run's end; Coop's: the view the
 ## camera is fitted to, the revives).
-const STEPS: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities", BODIES, &"Cover", &"Items", &"Flow", &"Coop"]
+const STEPS: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities", BODIES, &"Cover", &"Items", &"Rewards", &"Flow", &"Coop"]
 ## The order areas are renewed in at a run's start (`SimArea.renewed_by`): Entities first, whose
 ## `begin_run` frees the last run's decoys (bodies outside Flow's world, still registered in the
 ## manager and Combat), so no area is renewed under a body that leaves after; then the services in
 ## the tick's order. The actor table goes last, once every area has let its bodies go: its births
 ## count from 0 again (the keys, N5).
-const RUN_ORDER: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat", &"Cover", &"Items", &"Run", &"Difficulty"]
+const RUN_ORDER: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat", &"Cover", &"Items", &"Rewards", &"Run", &"Difficulty"]
 ## The name the actor table is part of the state under.
 const ACTORS: StringName = &"Actors"
 

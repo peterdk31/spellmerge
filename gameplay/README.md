@@ -57,7 +57,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `status_applied` | `combat` | `feel` (an actor's own components hear its `Actor.status_gained`, and a reaction on it its `Actor.reacted`, which Combat sends with them) |
 | `cast_left` | `core/spells` (a cast leaving, before its shots) | `actor` (a prop's `PropStateTriggers`, for its `cast` triggers), `feel` (the staff's cast cue, the cast's carrier sounds and infusion hints) |
 | `prop_state_changed` | `actor` (a prop's `PropStateTriggers`, props W6) | none yet (tests; a prop's own look hears its component directly) |
-| `enemy_died` | `combat` (every foe of the players, never a prop: `Actors.is_foe`) | `feel`, `flow` |
+| `enemy_died` | `combat` (every foe of the players, never a prop: `Actors.is_foe`) | `feel`, `flow`, `rewards` (its coins) |
 | `player_downed` | `player` (Downed) | `combat`, `feel`, `flow`, `run` |
 | `player_revived` | `player` (Downed) | `combat`, `flow` |
 | `revive_progress` | `coop` | `player` (Downed) |
@@ -74,15 +74,19 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `run_way_taken` | `flow` (every standing wizard in a lit exit) | `run` (moves on through the map) |
 | `room_exits_shown` | `flow` (the lit exits of a cleared room, and the kind behind each) | `feel` (the kind's name over each) |
 | `room_left` | `flow` (the party goes on to the next room of the run; a biome's world goes, `Events.ALL_ROOMS`) | `core/spells` (what was cast in the room ends quietly) |
-| `room_entered` | `flow` (by room number: a biome's each room the first time; `Events.FIRST_ROOM` is a new world, connected biomes CB3) | `ai`, `coop`, `difficulty`, `hud`, `feel` (its walls' colours for motes; the party camera jumps to the new room) |
+| `room_entered` | `flow` (by room number: a biome's each room the first time; `Events.FIRST_ROOM` is a new world, connected biomes CB3) | `ai`, `coop`, `difficulty`, `hud`, `rewards` (a new world clears the coins), `feel` (its walls' colours for motes; the party camera jumps to the new room) |
 | `room_built` | `flow` | `feel` (ground cover GC3: the cover's look, `cover.gd`) and `cover` (GC5): the room's cover worked out from its layout, `CoverLayout.of` |
 | `floor_touched` | `core/spells` (a blast, a pulse's ring, a pool lying and on its ticks, a shot's end; ground cover GC5) | `cover` (the `element` triggers of the cells inside its circle, at its next step) |
 | `cover_changed` | `cover` (each tick's changes; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look) |
 | `status_requested` | `core/spells` (a portal's infusion) and `cover` (a status of the cover a body stands in, ground cover GC5 rule 4: asked as any status is) | `combat` |
-| `room_cleared` | `flow` | `rewards`, `run` |
+| `room_cleared` | `flow` | `rewards` (a roll per player), `run` |
 | `door_voted` | `flow` | none yet |
 | `difficulty_changed` | `difficulty` (a difficulty setting's level, M3; never the room's scale, `run_room_scaled`) | none yet (enemy AI AI10: `ai`, the TeamBoard's skill) |
-| `reward_rolled`, `reward_taken` | `rewards` | none yet |
+| `reward_rolled`, `rewards_waiting_changed` | `rewards` (a player's own offer on a clear; the offers a seat has waiting, connected biomes CB10) | `hud` (the reward menu, the corner panel's unspent count) |
+| `reward_taken` | `rewards` | none yet (tests) |
+| `coin_changed` | `rewards` (a coin on the floor laid or gone) | `feel` (the coins' look) |
+| `wallet_changed` | `rewards` (a seat's coins) | `hud` (the corner panel) |
+| `run_stats_ruled` | `run` (the run's own changes of the run stats, as a run of rooms begins) | `rewards` |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |
 | `play_requested` | HUD | `flow` |
 | `hub_requested` | HUD | `flow`, `core/input` |

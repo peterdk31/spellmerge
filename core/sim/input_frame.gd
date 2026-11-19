@@ -76,7 +76,7 @@ const COMMAND_NAMES: Array[StringName] = [
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
 	"iisi", "iSi",
-	"i", "i",
+	"ii", "i",
 	"i",
 	"i",
 	"",

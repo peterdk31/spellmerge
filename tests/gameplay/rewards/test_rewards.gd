@@ -780,7 +780,7 @@ func test_a_reward_rooms_rolls_stay_within_its_type() -> void:
 				if type.card_kind != &"":
 					check_equal(cards.kind_of(offer.ids[at]), type.card_kind, "every choice of a %s room is a %s" % [type.card_kind, type.card_kind])
 			if type.item == ItemKinds.POTION:
-				check(offer.kinds[1] != ItemKinds.POTION or offer.ids[1] != offer.ids[0], "the potion room's one potion, then the table widened")
+				check(offer.kinds[1] == ItemKinds.POTION and offer.ids[1] != offer.ids[0], "a potion room offers two potions (the owner, 2026-11-19: more potions)")
 		var plain := RewardOffer.new()
 		var any := RewardOffer.new()
 		RewardRoll.fill(plain, table, 2, Sim.seeded(seed), 0, 0, cards)

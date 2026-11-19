@@ -11,7 +11,10 @@ A potion is an inventory item (the owner, 2026-11-19): a reward or a shop's shel
 | Potion | A drink |
 | --- | --- |
 | `healing` | heals 30 |
+| `small_healing` | heals 15 |
+| `large_healing` | heals 60 |
 | `max_health` | 10 more most health, healed too |
+| `vigor` | 5 more most health and heals 20 (the owner, 2026-11-19: more potions, so a potion reward room has real choices) |
 
 ## Allowed files
 

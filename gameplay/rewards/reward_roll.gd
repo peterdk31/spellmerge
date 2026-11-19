@@ -13,7 +13,7 @@ extends RefCounted
 ## element's card, its card kind's cards, its item kind's lines) and, while that level has nothing
 ## left the offer has not (its tries all land on what it has), at the next wider level, down to the
 ## whole table. So a fire room offers Fire and then another infusion; a modifier room two modifiers;
-## a coin room its coins and then anything of the table. Each level rolls under purposes of its own
+## a coin room its coins and then anything of the table (it has one coin line). Each level rolls under purposes of its own
 ## (`LEVEL_PURPOSES`), so a roll of no type (every other room, a shop) rolls as it always did.
 
 ## The chance's purposes: which line, and which card of a line of any card.

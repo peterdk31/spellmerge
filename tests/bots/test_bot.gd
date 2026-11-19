@@ -77,7 +77,7 @@ func test_flow_has_what_the_bot_calls() -> void:
 
 
 func test_events_has_the_signals_a_bot_run_uses() -> void:
-	for signal_name: String in ["play_requested", "room_entered", "room_cleared", "player_downed", "player_revived", "spell_cast"]:
+	for signal_name: String in ["play_requested", "room_entered", "room_cleared", "player_downed", "player_revived", "spell_cast", "rewards_waiting_changed", "reward_pick_requested"]:
 		check(_events.has_signal(signal_name), "Events has %s" % signal_name)
 
 
@@ -439,3 +439,83 @@ func test_a_downed_bot_crawls_toward_its_nearest_standing_teammate() -> void:
 	for i in 60:
 		await physics_frame
 	check(wizard.global_position.x > from.x + 2.0 and wizard.global_position.distance_to(mate.global_position) < gap - 2.0, "in play its seat's frames crawl it nearer (%.0f px to %.0f)" % [gap, wizard.global_position.distance_to(mate.global_position)])
+
+
+# --- Rewards (a bot never stands waiting in a reward room) -------------------------------------
+
+## The offers `rewards_waiting_changed` would tell seat 1: one offer of number `number` with
+## `choices` choices.
+func _offer(number: int, choices: int) -> Array[Dictionary]:
+	var list: Array[Dictionary] = []
+	var row: Array[Dictionary] = []
+	for i in choices:
+		row.append({"kind": ItemKinds.CARD, "id": &"bolt", "count": 1})
+	list.append({"offer": number, "here": true, "choices": row})
+	return list
+
+
+## A fighter answers an offer waiting for its seat with the reward menu's command, on the bus (the
+## frames service puts it in its seat's frame): the first choice; the next one while the same offer
+## still waits (refused: a full bag); past its last choice the next offer waiting; nothing for another
+## seat's offer, nor with none waiting.
+func test_a_fighter_picks_the_first_choice_of_an_offer_waiting_for_it() -> void:
+	var bot: BotScript = _bot(1)
+	var asked: Array = []
+	var hear := func(player: int, offer: int, choice: int) -> void: asked.append([player, offer, choice])
+	_events.connect("reward_pick_requested", hear)
+	bot.pick_reward()
+	check(asked.is_empty(), "nothing waiting: nothing asked")
+	_events.emit_signal("rewards_waiting_changed", 0, _offer(3, 2))
+	bot.pick_reward()
+	check(asked.is_empty(), "another seat's offer is not its own")
+	var two: Array[Dictionary] = _offer(7, 2)
+	two.append_array(_offer(8, 1))
+	_events.emit_signal("rewards_waiting_changed", 1, two)
+	bot.pick_reward()
+	check_equal(asked, [[1, 7, 0]], "its oldest offer's first choice, as the menu's A")
+	bot.pick_reward()
+	check_equal(asked.back(), [1, 7, 1], "still waiting (refused): the next choice")
+	bot.pick_reward()
+	check_equal(asked.back(), [1, 8, 0], "every choice refused: the next offer waiting")
+	asked.clear()
+	bot.pick_reward()
+	check(asked.is_empty(), "every choice of every offer asked: it asks no more")
+	_events.emit_signal("rewards_waiting_changed", 1, _offer(7, 2))
+	bot.pick_reward()
+	check_equal(asked, [[1, 7, 0]], "the offers changed (one taken): it asks again from the first")
+	asked.clear()
+	_events.emit_signal("rewards_waiting_changed", 1, [] as Array[Dictionary])
+	bot.pick_reward()
+	check(asked.is_empty(), "taken: nothing waits")
+	_events.disconnect("reward_pick_requested", hear)
+
+
+func test_an_idler_picks_nothing() -> void:
+	var bot: BotScript = _bot(1, BotScript.Mode.IDLER)
+	var asked: Array = []
+	var hear := func(player: int, _offer: int, _choice: int) -> void: asked.append(player)
+	_events.connect("reward_pick_requested", hear)
+	_events.emit_signal("rewards_waiting_changed", 1, _offer(7, 2))
+	var frame := InputFrame.new()
+	frame.seat = 1
+	bot.fill_frame(frame, 1.0 / 60.0)
+	check(asked.is_empty(), "an idler stands, as it does in a fight")
+	_events.disconnect("reward_pick_requested", hear)
+
+
+## In a run, through the real Rewards area and the frames service: an offer rolled for the fighters'
+## room is picked within a few ticks, and its choice goes into the wizard's inventory.
+func test_fighters_in_a_run_take_their_rewards() -> void:
+	var wizard := await _fighters_in_a_run() as Actor
+	if wizard == null:
+		return
+	var rewards: Node = root.get_node("Rewards")
+	var taken: Array = []
+	var hear := func(player: int, _offer: int, _choice: int, _reward: Dictionary) -> void: taken.append(player)
+	_events.connect("reward_taken", hear)
+	_events.emit_signal("room_rewards_due", wizard.room, &"clear")
+	for i in 6:
+		await physics_frame
+	_events.disconnect("reward_taken", hear)
+	check(taken.has(0) and taken.has(1), "each fighter took its own reward: %s" % [taken])
+	check((rewards.call("waiting_of", 0) as Array).is_empty() and (rewards.call("waiting_of", 1) as Array).is_empty(), "nothing waits")

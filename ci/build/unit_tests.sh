@@ -43,6 +43,9 @@ TIMED_TESTS='test_projectiles_kit|test_spell_fuzz'
 HOST=tests/support/run.gd
 RESULTS="$LOGS/unit-results.txt"
 mkdir -p "$LOGS" "$DATA" build
+# Godot ignores a relative XDG_DATA_HOME and falls back to ~/.local/share, so every test process
+# would share one user:// and clear each other's saves: hand it an absolute path.
+DATA="$(cd "$DATA" && pwd)"
 touch "$TIMES"
 
 # Whether the test file $1 is a suite: its `extends` reaches tests/support/suite.gd.

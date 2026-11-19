@@ -30,12 +30,12 @@ const BOB_RATE: float = 1.2
 ## between twinkles (seconds).
 const GLINT_FRAME: float = 0.08
 const GLINT_REST: float = 1.2
-## The players' ramps (docs/STYLE.md: shadow, base, light), the spark's gold, the outline, a shadow.
-const PLAYER_RAMPS: Array[PackedColorArray] = [
-	[Color("1d3a6b"), Color("3b73c9"), Color("7fc0f0")],
-	[Color("7a2347"), Color("d9477a"), Color("f59ab8")],
-	[Color("1f4a3a"), Color("3f8f4f"), Color("8fd46a")],
-	[Color("4a2a6b"), Color("8a4fc4"), Color("c99af0")],
+## The players' ramps (docs/STYLE.md: shadow, base, light; three a seat), the spark's gold, the outline, a shadow.
+const PLAYER_RAMPS: PackedColorArray = [
+	Color("1d3a6b"), Color("3b73c9"), Color("7fc0f0"),
+	Color("7a2347"), Color("d9477a"), Color("f59ab8"),
+	Color("1f4a3a"), Color("3f8f4f"), Color("8fd46a"),
+	Color("4a2a6b"), Color("8a4fc4"), Color("c99af0"),
 ]
 const GOLD: PackedColorArray = [Color("b8801f"), Color("f2c230"), Color("fff3a6")]
 const OUTLINE: Color = Color("14121f")
@@ -130,7 +130,8 @@ func _draw() -> void:
 
 func _draw_item(offer: int, row: Array) -> void:
 	var at: Vector2 = (row[0] as Vector2).round()
-	var ramp: PackedColorArray = PLAYER_RAMPS[clampi(int(row[1]), 0, PLAYER_RAMPS.size() - 1)]
+	var first: int = clampi(int(row[1]), 0, 3) * 3
+	var ramp: PackedColorArray = PLAYER_RAMPS.slice(first, first + 3)
 	var share: float = STAGES[clampi(floori(float(row[2]) / STAGE_FRAMES), 0, STAGES.size() - 1)]
 	var bob: float = roundf(sin((_clock * BOB_RATE + float(offer) * 0.37) * PI) * BOB)
 	draw_rect(Rect2(at + Vector2(-5.0, 0.0), Vector2(11.0, 2.0)), SHADOW)

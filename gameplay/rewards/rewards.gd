@@ -13,8 +13,11 @@ extends Node
 ##   `reward_rolled`. A reward room's rolls are of its type (`RewardType`, the owner's ask of
 ##   2026-11-19: decided as its biome is made, told with `room_rewards_due`): each choice among the
 ##   items of the type, widened a level while it has none left (`RewardRoll`).
-##   A seat whose wizard was in the room (`here`) has its menu opened by the HUD;
-##   one who was not there finds it waiting, an unspent icon on its corner panel (rule 4). Nobody
+##   A seat whose wizard was in the room (`here`) has it lie as an item at its spot of the room
+##   (`room_rewards_due`'s spots; the owner, 2026-11-19: nothing pops up; `reward_item_changed`), and
+##   its own driven body in reach (REWARD_REACH; `reward_near_changed`) opens it with A (the HUD's);
+##   one who was not there finds it waiting, an unspent icon on its corner panel (rule 4), as does
+##   every offer whose item's world was left (`_unlay_rewards`). Nobody
 ##   waits: each player picks when they like, oldest first, and an offer stays until it is picked
 ##   (`rewards_waiting_changed`), all run long.
 ## - **A pick** (`reward_pick_requested`, a command at the tick's start): the offer it names, if it
@@ -42,6 +45,9 @@ extends Node
 ##   its own currency bag and room for it, takes it into its inventory, the coins come out of its
 ##   stack, and it is gone from the shelf for everyone; else `shelf_refused`. Walking
 ##   over an item buys nothing. The shelf keeps what is left all run (`shelf_changed`).
+##   Its reroll sign (the owner, 2026-11-19; one a shop, numbered with its items, so A at it is a
+##   `shelf_buy_requested` too): for `sign_price` of its uses (3, 5, 8, ...) times the player's
+##   `price_scale`, every spot is stocked anew with items the shelf did not hold (`_reroll_shelf`).
 ## - **A fountain** (CB11, decision 20): as a fountain room opens, its pool fills with POOL_HEALTH
 ##   times the highest `fountain_pool` of the players then, shared: every hurt standing wizard whose
 ##   own feet are in it draws DRAW_RATE health a second from it until they are whole or it runs dry

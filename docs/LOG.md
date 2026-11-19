@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-19: Reward items, pick 1 of 3, a shop's reroll sign, pickup sounds, RT opens a bag
+
+Five asks of the owner (docs/milestones/connected-biomes.md, "Reward items, pick 1 of 3, a shop's reroll sign"). A cleared room's reward no longer pops up: each present player's offer lies as a small chest in their colours in the room, and their A at it opens the pick; an absent player's still waits (rule 4). Rewards offer 3 choices. Each shop has a reroll sign: A at it rolls a new shelf for 3, 5, 8, ... coins. Every pickup kind has its own generated sound, heard only from this machine's rooms. RT enters a bag in the inventory.
+
 ## 2026-11-19: Room rerolls and reward rerolls
 
 The owner asked for two new currencies, a room reroll and a reward reroll (docs/milestones/connected-biomes.md, "Rerolls"). Both are stacked items in each player's currency bag (content/rerolls), personal and droppable, and every player starts a run with one of each (the run stats `start_room_rerolls` and `start_reward_rerolls`). X in the reward picker spends a reward reroll and rolls that player's offer again from its own table; X at an unvisited room's doorway, where its sign shows, spends a room reroll and the Run area rerolls the room (`BiomeGenerator.reroll_room`: a new kind, template or mirroring that fits the room's bridges and keeps every rule of the map, filled again), which Flow lays in place. The signs, the open Y map, the reward menu's cards and the corner panel's two new counts all change Smooth. Two new commands (`InputFrame.VERSION` 10, replay format 17).

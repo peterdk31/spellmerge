@@ -2,7 +2,7 @@
 
 ## Purpose
 
-What lies on the ground, and picking it up (items I6, [docs/milestones/items.md](../../docs/milestones/items.md), "The ground" and "Picking up"). Staffs first, cards too; relics and potions later. What an item is (the kinds table, the stack) is `core/items/`; who holds stacks is the actor kit's `Inventory` (`gameplay/actor/`).
+What lies on the ground, and picking it up (items I6, [docs/milestones/items.md](../../docs/milestones/items.md), "The ground" and "Picking up"). Staffs first, cards and potions too (a potion or the coin dropped lies as any item); relics later. What an item is (the kinds table, the stack) is `core/items/`; who holds stacks is the actor kit's `Inventory` (`gameplay/actor/`).
 
 ## Contract
 
@@ -14,7 +14,7 @@ What lies on the ground, and picking it up (items I6, [docs/milestones/items.md]
   - **Taken:** `take(actor, item)` by actor id (a seat's request is one caller; the AI, I9, another): the item must still lie there in reach of the actor's feet, and the pickup rule must find room (`Take`: TAKEN, GONE, NO_HOLDER, OUT_OF_REACH, NO_ROOM). A seat's A is the command `item_take_requested`, applied at the tick's start seat by seat, so of two seats asking for one item in one tick the first takes it; no room is `item_refused` for that seat, anything else is silent.
 - **Looked at by an actor** (items I9): `ground_looked(actor, feet, reach, sight)` asks what lies within `reach` of `feet`; `look` fills the asker's `GroundSight` (core/items) at once, the nearest first, each marked in reach as the pickup rule says. `actor_take_requested(actor, item)` is an actor's take during the tick (the AI's), as `take` says, silently. So the AI sees and takes without calling this area.
 - **The pickup rule** (`pickup_rule.gd`, `PickupRule`): reach (`REACH`, 24 px from the feet), which item is the one in reach (the nearest; the lower number on a tie) and what a take does (a staff onto a free hand, `Inventory.free_hand`/`put_on_hand`, else into its bag; anything else into its bag; no room, nothing). One small policy apart from the bags and the ground (owner, 2026-11-13: "the way to pickup items could be tweaked"): walking over an item or another button is a change there only.
-- **Views** (`view_of`): plain values for the looks (`ground_item_changed` lists them): Feel draws the items (`gameplay/feel/ground_items.gd`), the HUD the hint (`hud/panels/item_hints.gd`).
+- **Views** (`view_of`): an item's name and icon as `ItemLooks` says them (core/items), a staff's numbers; plain values for the looks (`ground_item_changed` lists them): Feel draws the items (`gameplay/feel/ground_items.gd`), the HUD the hint (`hud/panels/item_hints.gd`).
 - **Dependency direction:** `core` ← `gameplay` ← `content`. It uses `core/` (the bus, the actor table, the projectile manager's walls, Spells for cards' names and icons) and the actor kit's Inventory; it knows nothing of the HUD, the AI or `net/`.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `ground_item_changed`, `item_near_changed`, `item_refused`.

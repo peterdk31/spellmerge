@@ -8,7 +8,7 @@ The steps are **I1 to I9** (I for items). Each is one PR with its tests, in orde
 
 - **Things lie on the ground:** staffs first, then cards, later relics and potions. Near one, a button hint shows with a small tooltip: its name, and for a staff its numbers and its row of cards.
 - **A takes it.** A staff goes onto a free hand if there is one, else into the staff bag. If the bag for that kind of item is full, the hint shakes red and nothing is taken; the player opens the inventory and makes room.
-- **Select (Tab) opens the inventory:** a ring of four bags, Staffs, Cards, Relics and Potions, each with how full it is (`2/4`, or `2/∞` for a bag with no limit). Enter a bag to see what is in it and drop things. Cards drop one at a time.
+- **Select (Tab) opens the inventory:** a ring of four bags, Staffs, Cards, Relics and Potions (and Coins since 2026-11-19, docs/milestones/connected-biomes.md, "Rewards are items"), each with how full it is (`2/4`, or `2/∞` for a bag with no limit). Enter a bag to see what is in it and drop things. Cards drop one at a time.
 - **A staff is put on a hand in the inventory:** point at a staff, press the hand's own button (RB, RT, LB, LT). A column beside the ring lists the four hands with their staffs, each number with a green or red arrow against the staff pointed at.
 - **B is still the builder,** and it builds every staff the player owns: the four hands first, then the staffs in the bag.
 - **Cards are counted.** A card put in a staff is out of the bag; taken out, it is back. A card with none left is not in the bag.
@@ -213,7 +213,7 @@ Each of these PRs runs `tools/online_pair.sh` and the determinism tests before i
 
 ## Not in this plan
 
-- What relics and potions do; their bags stay empty.
+- What relics do; their bag stays empty. (Potions: a healing and a max health potion since the owner's decision of 2026-11-19, drunk from the inventory, docs/milestones/connected-biomes.md, "Rewards are items".)
 - Items as a run's rewards, and cards placed in rooms (M3). A dropped card is taken again by the same path.
 - A limit on disarming enemies by possessing them.
 - A quicker way to swap a staff on the ground for one held, should playtests ask for it: it would be the pickup rule's.

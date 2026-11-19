@@ -100,6 +100,10 @@ const NO_ITEM: String = "You do not have that."
 ## Why the inventory's use of a thing is refused (`bag_use_requested`): it is no potion, or a potion
 ## that only heals while the body is whole.
 const NO_USE: String = "That cannot be used."
+## Why a drop of a kind that is never dropped (the coins) is refused.
+const NO_DROP: String = "That cannot be dropped."
+## The coins bag (`ItemKinds.COIN`'s), told from the home wizard whatever body is shown.
+const COIN_BAG: StringName = &"coins"
 const NO_NEED: String = "You are already whole."
 ## Why every request of the builder's and the inventory's is refused while the home body is down
 ## (items I7b): the HUD closes both menus then, but a command can still arrive (a late frame online).
@@ -111,6 +115,7 @@ const REFUSALS: Dictionary = {
 	Inventory.Refusal.NO_STAFF: NO_STAFF, Inventory.Refusal.NO_SLOT: NO_SLOT,
 	Inventory.Refusal.NO_CARD: NO_CARD, Inventory.Refusal.NO_HAND: NO_HAND,
 	Inventory.Refusal.NO_ROOM: NO_ROOM, Inventory.Refusal.NO_ITEM: NO_ITEM,
+	Inventory.Refusal.NO_DROP: NO_DROP,
 }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
@@ -304,6 +309,10 @@ func _watch(body: Actor) -> void:
 		inventory.bag_changed.connect(_on_bag_changed)
 		inventory.staff_changed.connect(_on_owned_staff_changed)
 		inventory.hands_changed.connect(_on_hands_changed)
+	# The coins are the player's, on its home wizard, whatever body is shown (`_on_bag_changed`).
+	var own: Actor = home()
+	if own != null and own.inventory != null and not own.inventory.bag_changed.is_connected(_on_home_bag_changed):
+		own.inventory.bag_changed.connect(_on_home_bag_changed)
 
 
 func _unwatch(body: Actor) -> void:
@@ -539,9 +548,13 @@ func _announce_body() -> void:
 	_on_hands_changed()
 
 
-## `bag_changed` for this seat: what the shown body's bag `bag` holds now.
+## `bag_changed` for this seat: what the shown body's bag `bag` holds now; the coins bag always the
+## home wizard's (coins are the player's, spent by its wizard: the HUD's purse reads it; the owner,
+## 2026-11-19), so a possession never hides them.
 func _on_bag_changed(bag: StringName) -> void:
 	var body: Actor = shown()
+	if bag == COIN_BAG and home() != null:
+		body = home()
 	if body == null or body.events == null or body.inventory == null:
 		return
 	var ids: Array[StringName] = []
@@ -550,6 +563,12 @@ func _on_bag_changed(bag: StringName) -> void:
 		ids.append(stack.id)
 		counts.append(stack.count)
 	body.events.bag_changed.emit(seat, bag, ids, counts, body.inventory.capacity_of(bag))
+
+
+## The home wizard's bag `bag` changed while it may not be the body shown: its coins are said.
+func _on_home_bag_changed(bag: StringName) -> void:
+	if bag == COIN_BAG and shown() != home():
+		_on_bag_changed(bag)
 
 
 ## `owned_staff_changed` for this seat: staff `number` of the shown body as it is now.

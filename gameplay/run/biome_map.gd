@@ -5,7 +5,8 @@ extends RefCounted
 ## place in the biome's world, its mirroring (`PieceShape.MIRROR_X`, `MIRROR_Y`) and its kind
 ## (`RoomKind` id); bridges, each a walkway template (`RoomBase.walkway`), its place and mirroring,
 ## and the two room sockets its own sockets 0 and 1 meet; and each room's depth, the fewest bridges
-## from room 0 (the start room). Made once (by hand for now, by the seeded generator from CB5) and
+## from room 0 (the start room); and, once filled (the generator, `BiomeGenerator`, CB5), each room's
+## scale and its enemies. Made once (by hand in the tests, by the seeded generator) and
 ## then **kept as small hashed state**, as `RunMap` is: a joining machine and a restored snapshot
 ## never make their own. Only the nodes and the grid's layers are laid again from it
 ## (`BiomeWorld`, `rebuild_derived`).
@@ -25,6 +26,10 @@ const END_FIELDS: int = 4
 
 ## The biome it is a map of (`MapRules.biome`).
 var biome: StringName = &""
+## The map style it was made in (`MapStyle.id`; empty for a hand-made map).
+var style: StringName = &""
+## Why the generator made no map (empty for a map made, or made by hand): `is_made`.
+var not_made: PackedStringArray = PackedStringArray()
 ## Its rooms, by number (0: the start room): template ids, places (world pixels, whole and on the
 ## grid), mirrorings and kinds.
 var room_templates: Array[StringName] = []
@@ -40,6 +45,13 @@ var bridge_ends: PackedInt32Array = PackedInt32Array()
 ## Each room's depth: the fewest bridges from room 0 (-1: not reached). Worked out by `work_out_depths`
 ## once the map is made, and kept with it.
 var depths: PackedInt32Array = PackedInt32Array()
+## Each room's fill, once filled (empty rows for a map not filled): its scale (`RunScaling`, by its
+## depth and the run's players) and its enemies (ids, one per body: a fight's bought by its scaled
+## budget, the boss's one boss), room by room in `room_enemies`, room `r`'s ending at
+## `room_enemy_ends[r]` (`enemies_of`).
+var room_scales: PackedFloat32Array = PackedFloat32Array()
+var room_enemy_ends: PackedInt32Array = PackedInt32Array()
+var room_enemies: Array[StringName] = []
 
 
 ## A room of template `template` at `place`, mirrored by `mirror`, of kind `kind`: its number.
@@ -59,6 +71,31 @@ func add_bridge(template: StringName, place: Vector2, mirror: int, room_a: int, 
 	bridge_mirrors.append(mirror)
 	bridge_ends.append_array(PackedInt32Array([room_a, socket_a, room_b, socket_b]))
 	return bridge_templates.size() - 1
+
+
+## True when it has rooms: a map made (else `not_made` says why).
+func is_made() -> bool:
+	return rooms() > 0
+
+
+## Room `room`'s enemies (ids), once filled (none for a map not filled).
+func enemies_of(room: int) -> Array[StringName]:
+	var out: Array[StringName] = []
+	if room < 0 or room >= room_enemy_ends.size():
+		return out
+	var from: int = room_enemy_ends[room - 1] if room > 0 else 0
+	for i in range(from, room_enemy_ends[room]):
+		out.append(room_enemies[i])
+	return out
+
+
+## Room `room`'s fill: its scale and its enemies (rooms filled in order, from room 0).
+func fill_room(room: int, scale: float, enemies: Array[StringName]) -> void:
+	room_scales.resize(room + 1)
+	room_scales[room] = scale
+	room_enemies.append_array(enemies)
+	room_enemy_ends.resize(room + 1)
+	room_enemy_ends[room] = room_enemies.size()
 
 
 ## How many rooms and bridges it has.
@@ -103,13 +140,18 @@ func work_out_depths() -> void:
 
 ## True when `other` is the same map, row for row.
 func same_as(other: BiomeMap) -> bool:
-	return other != null and biome == other.biome and room_templates == other.room_templates and room_places == other.room_places and room_mirrors == other.room_mirrors and room_kinds == other.room_kinds and bridge_templates == other.bridge_templates and bridge_places == other.bridge_places and bridge_mirrors == other.bridge_mirrors and bridge_ends == other.bridge_ends and depths == other.depths
+	return other != null and biome == other.biome and style == other.style and not_made == other.not_made and room_scales == other.room_scales and room_enemy_ends == other.room_enemy_ends and room_enemies == other.room_enemies and room_templates == other.room_templates and room_places == other.room_places and room_mirrors == other.room_mirrors and room_kinds == other.room_kinds and bridge_templates == other.bridge_templates and bridge_places == other.bridge_places and bridge_mirrors == other.bridge_mirrors and bridge_ends == other.bridge_ends and depths == other.depths
 
 
 ## A copy, row for row.
 func copy() -> BiomeMap:
 	var out := BiomeMap.new()
 	out.biome = biome
+	out.style = style
+	out.not_made = not_made.duplicate()
+	out.room_scales = room_scales.duplicate()
+	out.room_enemy_ends = room_enemy_ends.duplicate()
+	out.room_enemies = room_enemies.duplicate()
 	out.room_templates = room_templates.duplicate()
 	out.room_places = room_places.duplicate()
 	out.room_mirrors = room_mirrors.duplicate()
@@ -144,6 +186,9 @@ func problems(shapes: Dictionary) -> PackedStringArray:
 		return found
 	if room_places.size() != rooms() or room_mirrors.size() != rooms() or room_kinds.size() != rooms() or bridge_places.size() != bridges() or bridge_mirrors.size() != bridges() or bridge_ends.size() != bridges() * END_FIELDS:
 		found.append("the map's rows are not of one length: make it with add_room and add_bridge.")
+		return found
+	if (room_scales.size() != 0 or room_enemy_ends.size() != 0) and (room_scales.size() != rooms() or room_enemy_ends.size() != rooms() or room_enemy_ends[rooms() - 1] != room_enemies.size()):
+		found.append("the map's fill is not one a room: fill every room with fill_room, in order.")
 		return found
 	for room in rooms():
 		if room_mirrors[room] > (PieceShape.MIRROR_X | PieceShape.MIRROR_Y):

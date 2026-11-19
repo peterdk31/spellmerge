@@ -59,7 +59,7 @@ static func generate(definition: RunDefinition, content: RunContent, sim: Sim, p
 	var rules: MapRules = definition.biomes[0]
 	map.biome = rules.biome
 	for attempt in ATTEMPTS:
-		var dice := Dice.new(sim, attempt)
+		var dice := MapDice.new(sim, PURPOSE, attempt, Step.size())
 		var nodes: Array[RunNode] = _shape_and_kinds(rules, content, dice)
 		if nodes.is_empty():
 			continue
@@ -79,7 +79,7 @@ static func generate(definition: RunDefinition, content: RunContent, sim: Sim, p
 
 ## Steps 1 and 2, row by row: the rooms with their rows, links and kinds, or none when the kinds'
 ## limits leave a room no line.
-static func _shape_and_kinds(rules: MapRules, content: RunContent, dice: Dice) -> Array[RunNode]:
+static func _shape_and_kinds(rules: MapRules, content: RunContent, dice: MapDice) -> Array[RunNode]:
 	var nodes: Array[RunNode] = []
 	var depth: int = rules.depth_min + dice.below(Step.DEPTH, rules.depth_max - rules.depth_min + 1)
 	var rows: Array[int] = rules.kept_rows(content, depth)
@@ -165,7 +165,7 @@ static func _place_slots(slots: Array, from: int, in_row: Dictionary, in_run: Di
 ## most `here` + `before` - 1: where that is too few for every room of `before` to have
 ## `branches_min`, the fewest rooms fall short, by as little as can be (the longest runs shortened
 ## first, by chance among equals).
-static func _link(before: Array[RunNode], here: Array[RunNode], rules: MapRules, dice: Dice) -> void:
+static func _link(before: Array[RunNode], here: Array[RunNode], rules: MapRules, dice: MapDice) -> void:
 	var parents: int = before.size()
 	var width: int = here.size()
 	var most: int = mini(rules.branches_max, width)
@@ -213,7 +213,7 @@ static func _link(before: Array[RunNode], here: Array[RunNode], rules: MapRules,
 ## `max_per_row` and `max_per_run` (counted in `in_run`), one every room leading to it may be
 ## followed by, and one that leaves the rest of the row and every later row a line
 ## (`_fillable`). False when a room is left no line (only `not_after` can do that).
-static func _pick_kinds(before: Array[RunNode], here: Array[RunNode], table: Array, at: int, in_run: Dictionary, dice: Dice) -> bool:
+static func _pick_kinds(before: Array[RunNode], here: Array[RunNode], table: Array, at: int, in_run: Dictionary, dice: MapDice) -> bool:
 	var lines: Array[KindRule] = table[at]
 	var in_row: Dictionary = {}  # KindRule -> rooms of it in this row
 	for k in here.size():
@@ -262,7 +262,7 @@ static func _pick_kinds(before: Array[RunNode], here: Array[RunNode], table: Arr
 ## Step 3: each room a template of the map's biome that hosts its kind with an exit for each of its
 ## links, by chance; one no room leading to it has, while one is left. What is missing, or "" when
 ## every room has its template.
-static func _pick_templates(map: RunMap, content: RunContent, dice: Dice) -> String:
+static func _pick_templates(map: RunMap, content: RunContent, dice: MapDice) -> String:
 	for node: RunNode in map.nodes:
 		var hosts: Array[RoomBase] = content.templates_for(map.biome, node.kind, node.links.size())
 		if hosts.is_empty():
@@ -281,14 +281,14 @@ static func _pick_templates(map: RunMap, content: RunContent, dice: Dice) -> Str
 
 ## Step 4: each room its scale (its depth, the run's players), its pace (`_pace`), and filled as
 ## its kind's `fill` says: a fight by its budget at that scale.
-static func _fill(map: RunMap, definition: RunDefinition, rules: MapRules, content: RunContent, dice: Dice) -> void:
+static func _fill(map: RunMap, definition: RunDefinition, rules: MapRules, content: RunContent, dice: MapDice) -> void:
 	for node: RunNode in map.nodes:
 		node.scale = definition.room_scale(rules, node.depth, map.players)
 		var budget: int = RunScaling.scaled_budget(rules.room_budget, node.scale)
 		_pace(node, rules.spawning, budget)
 		match content.kind(node.kind).fill:
 			RoomKind.FILL_ENEMIES:
-				node.enemies = _spend(content.enemy_pool(map.biome, node.depth), budget, dice)
+				node.enemies = RoomFill.spend(content.enemy_pool(map.biome, node.depth), budget, dice, Step.FILL)
 			RoomKind.FILL_BOSS:
 				var bosses: Array[EnemyBase] = content.boss_pool(map.biome, node.depth)
 				node.enemies = [bosses[dice.below(Step.FILL, bosses.size())].id] as Array[StringName]
@@ -297,58 +297,7 @@ static func _fill(map: RunMap, definition: RunDefinition, rules: MapRules, conte
 ## How `node`'s enemies come in (enemy spawning EA4): `spawning`'s shares of its scaled budget
 ## `budget`, as costs; with no `SpawnRules`, the whole list at once (a group of 0).
 static func _pace(node: RunNode, spawning: SpawnRules, budget: int) -> void:
-	if spawning == null:
-		node.group = 0
-		node.refill_at = 0
-		node.stagger = 0.0
-		return
-	node.group = spawning.group_cost(budget)
-	node.refill_at = spawning.refill_cost(budget)
-	node.stagger = spawning.stagger
-
-
-## Enemies of `pool` by chance until `budget` is spent: one of the whole pool first (a room always
-## has a fight), then any the rest of the budget affords, until none does.
-static func _spend(pool: Array[EnemyBase], budget: int, dice: Dice) -> Array[StringName]:
-	var picked: Array[StringName] = []
-	var left: int = budget
-	var from: Array[EnemyBase] = pool
-	while not from.is_empty():
-		var enemy: EnemyBase = from[dice.below(Step.FILL, from.size())]
-		picked.append(enemy.id)
-		left -= enemy.cost
-		var affordable: Array[EnemyBase] = []
-		for other: EnemyBase in pool:
-			if other.cost <= left:
-				affordable.append(other)
-		from = affordable
-	return picked
-
-
-## The generator's rolls in one attempt: each step's own count under a key of its own.
-class Dice:
-	extends RefCounted
-	const DERIVED: Array[StringName] = [&"sim"]
-	var sim: Sim = null
-	var attempt: int = 0
-	var counts: Array[int] = []
-
-	func _init(of_sim: Sim, of_attempt: int) -> void:
-		sim = of_sim
-		attempt = of_attempt
-		counts.resize(Step.size())
-		counts.fill(0)
-
-	## A roll in [0, 1) of step `step`.
-	func roll(step: int) -> float:
-		var value: float = sim.chance(PURPOSE, attempt * Step.size() + step, counts[step])
-		counts[step] += 1
-		return value
-
-	## A whole number from 0 to `count` - 1 of step `step` (no roll when `count` is 1 or less).
-	func below(step: int, count: int) -> int:
-		if count <= 1:
-			return 0
-		var value: int = sim.chance_int(PURPOSE, attempt * Step.size() + step, counts[step], count)
-		counts[step] += 1
-		return value
+	var pace: Array = RoomFill.pace(spawning, budget)
+	node.group = pace[0]
+	node.refill_at = pace[1]
+	node.stagger = pace[2]

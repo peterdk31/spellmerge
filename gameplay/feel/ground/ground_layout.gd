@@ -8,7 +8,7 @@ extends Node
 ## bodies stay the layout's).
 ##
 ## No load stall: the native module draws a crypt room in a few tens of milliseconds on the module's
-## threads (`MoteKernel.draw_ground`); `last_usec` holds how long the last room took, drawing and
+## threads (`GroundKernel.draw`); `last_usec` holds how long the last room took, drawing and
 ## textures together (tests/gameplay/feel/test_ground_layout.gd reports it). Without the module an
 ## unmirrored room keeps its baked art, which is what would be drawn, rather than stall for seconds.
 

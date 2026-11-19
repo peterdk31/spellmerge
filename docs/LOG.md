@@ -2,9 +2,15 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+<<<<<<< HEAD
 ## 2026-11-19: Connected biomes CB3b: cover per room
 
 A step the owner added to the connected biomes plan (docs/milestones/connected-biomes.md, "CB3b done"): every room of a biome now plays its ground cover, where CB3 played only the start room's and only unmirrored at the world's origin. The cover area keeps one cover a piece (`CoverRoom`: its cells' states, its active cells and its own roll counter, state, hashed and snapshotted; its layout DERIVED, bound again after a restore), laid at the room's place and mirrored with it (`CoverLayout.of_piece`: the template's cells mirrored in whole cells, the grid's corner moved to the room; Feel scatters the tufts again over them, one view a piece in `gameplay/feel/cover_rooms.gd`, never flipping the art). A room's cover steps only while its place is awake (Flow's room life tells the grid, `RoomGrid.set_awake`), so a fire in a room nobody is in waits as if no time had passed; a touch lights it all the same. `cover_changed` carries the room's number and a look reads the room the asker stands in. Laying a twelve-room biome's cover costs about 95 ms (worked out and drawn) of its 1.3 s start, so it is laid as the world is. The row run plays as before. Tests: `tests/gameplay/cover/test_cover_biome.gd` (at its place, mirrored, two rooms' fires twice and through a snapshot, slept against never slept, the cost).
+=======
+## 2026-11-18: Connected biomes CB5: the biome generator
+
+The connected biomes plan's fifth step (docs/milestones/connected-biomes.md, "CB5 done"): `BiomeGenerator` (gameplay/run) makes a biome's map as one pure function of the run's definition, the content, the templates' shapes and the seed. It rolls the room count and a map style (`MapStyle`, data: long, branching, loop, hub and spokes as a few weights), the kinds (each line's fixed `least`, its `chance` rooms, the rest fights by weight), the way to the boss (fights enough on it, the boss a dead end at its end, so deepest), the rooms off it, and loops where two free sockets line up a bridge's length apart and the rules still hold; every room in any of its four mirrorings, a template once a biome, on the 32 px grid; then each room's scale (by depth to `scale_depth`, and players) and enemies. `MapRules` has the biome numbers, `KindRule` `least`, `chance` and `dead_end`, `RunRuleChange` targets for them, and `biome_problems` names a run whose content makes no map. On made-up content of every kind (until the crypt has the templates) every style makes sound maps over hundreds of seeds; a map of the crypt's own three socketed rooms is generated and laid. The crypt's run carries its biome numbers but is named not makeable today (no boss room with a socket); the row run stays the default until CB8.
+>>>>>>> origin/main
 
 ## 2026-11-18: Connected biomes CB3: room life
 

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RunDefinition" load_steps=12 format=3]
+[gd_resource type="Resource" script_class="RunDefinition" load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://core/base/run_definition.gd" id="1_run"]
 [ext_resource type="Script" path="res://core/base/map_rules.gd" id="2_rules"]
@@ -6,12 +6,14 @@
 [ext_resource type="Script" path="res://core/base/run_scaling.gd" id="4_scaling"]
 [ext_resource type="Script" path="res://core/base/scale_curve.gd" id="5_curve"]
 [ext_resource type="Script" path="res://core/base/spawn_rules.gd" id="6_spawning"]
+[ext_resource type="Script" path="res://core/base/map_style.gd" id="7_style"]
 
 [sub_resource type="Resource" id="fights"]
 script = ExtResource("3_kind")
 kind = &"fight"
 first_row = 0
 last_row = -2
+least = 4
 
 [sub_resource type="Resource" id="boss"]
 script = ExtResource("3_kind")
@@ -21,12 +23,41 @@ last_row = -1
 max_per_row = 1
 max_per_run = 1
 required = false
+least = 1
+dead_end = true
 
 [sub_resource type="Resource" id="spawning"]
 script = ExtResource("6_spawning")
 group_share = 0.35
 refill_share = 0.15
 stagger = 0.15
+
+[sub_resource type="Resource" id="style_long"]
+script = ExtResource("7_style")
+id = &"long"
+way_share = 0.75
+branch_chain = 0.2
+
+[sub_resource type="Resource" id="style_branching"]
+script = ExtResource("7_style")
+id = &"branching"
+way_share = 0.4
+branch_chain = 0.6
+
+[sub_resource type="Resource" id="style_loop"]
+script = ExtResource("7_style")
+id = &"loop"
+way_share = 0.45
+branch_chain = 0.5
+loops = 3
+loop_pull = 5000.0
+
+[sub_resource type="Resource" id="style_hub"]
+script = ExtResource("7_style")
+id = &"hub"
+way_share = 0.35
+branch_chain = 0.05
+hub_pull = 6.0
 
 [sub_resource type="Resource" id="crypt"]
 script = ExtResource("2_rules")
@@ -40,6 +71,12 @@ branches_max = 2
 room_budget = 16
 spawning = SubResource("spawning")
 kinds = Array[ExtResource("3_kind")]([SubResource("fights"), SubResource("boss")])
+rooms_min = 8
+rooms_max = 12
+start_kind = &"start"
+fights_on_way = 4
+scale_depth = 8
+styles = Array[ExtResource("7_style")]([SubResource("style_long"), SubResource("style_branching"), SubResource("style_loop"), SubResource("style_hub")])
 
 [sub_resource type="Resource" id="per_depth"]
 script = ExtResource("5_curve")

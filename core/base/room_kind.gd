@@ -22,8 +22,8 @@ const FILL_NONE: StringName = &"none"
 ## `MapRules.elite_cards`, an outline).
 const FILL_ELITES: StringName = &"elites"
 ## How a room of the kind is filled: a shop's shelf (decision 19), one of each item rolled from the
-## kind's `shelf` table, each bought by the first wizard who steps onto it with its price in their
-## own wallet (the Rewards area's).
+## kind's `shelf` table, each bought (A) by the first wizard at it with its price in their own coins
+## (the Rewards area's; coins are an inventory item).
 const FILL_SHOP: StringName = &"shop"
 ## How a room of the kind is filled: a fountain (decision 20), a shared pool of healing that every
 ## hurt wizard standing in it draws on until it runs dry (the Rewards area's).

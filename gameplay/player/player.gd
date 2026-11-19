@@ -50,10 +50,14 @@ extends ActorController
 ## - **The inventory menu** (items I7: `staff_hand_requested` and `bag_drop_requested`, commands for
 ##   this seat only, a staff named by its number) puts the shown body's staffs on hands, in the bag
 ##   and on the ground, and drops its things (`Inventory.set_hand`, `drop_staff`, `drop`); a
-##   refusal is `inventory_refused` with its words.
+##   refusal is `inventory_refused` with its words. `bag_use_requested` (the owner, 2026-11-19)
+##   drinks one potion of the shown body's potions bag (`PotionBase`, found in the registry): one is
+##   taken and the body is given what it does through Combat (`health_gift_requested`); refused for
+##   none held (NO_ITEM), a thing that is not drunk (NO_USE) and a potion that only heals while the
+##   body is whole (NO_NEED: never wasted).
 ## - **Down** (items I7b): while the shown body is down every request of the builder's and the
 ##   inventory's is refused (NO_DOWN, as `build_refused` or `inventory_refused`) and changes nothing.
-## - **The body named** (items I8): each of those four requests carries the key of the body the menu
+## - **The body named** (items I8): each of those requests carries the key of the body the menu
 ##   showed (`Actor.key`, sent with `inventory_announced`); one for a body the seat no longer shows
 ##   (sent just before a possession began or ended, a late frame online) is refused (NO_BODY), so
 ##   it never changes another body's staff of the same number.
@@ -93,6 +97,10 @@ const NO_CARD: String = "You do not have that card."
 const NO_HAND: String = "You have no such hand."
 const NO_ROOM: String = "That bag is full."
 const NO_ITEM: String = "You do not have that."
+## Why the inventory's use of a thing is refused (`bag_use_requested`): it is no potion, or a potion
+## that only heals while the body is whole.
+const NO_USE: String = "That cannot be used."
+const NO_NEED: String = "You are already whole."
 ## Why every request of the builder's and the inventory's is refused while the home body is down
 ## (items I7b): the HUD closes both menus then, but a command can still arrive (a late frame online).
 const NO_DOWN: String = "You cannot do that while down."
@@ -349,6 +357,7 @@ func _bind_home(actor: Actor) -> void:
 		bus.listen(&"staff_cards_requested", _on_staff_cards_requested)
 		bus.listen(&"staff_hand_requested", _on_staff_hand_requested)
 		bus.listen(&"bag_drop_requested", _on_bag_drop_requested)
+		bus.listen(&"bag_use_requested", _on_bag_use_requested)
 
 
 ## Where the seat's mouse aims from: the hand of the body it drives (`Actor.aim_pivot`; items I8),
@@ -645,6 +654,35 @@ func _on_bag_drop_requested(player: int, bag: StringName, id: StringName, number
 	if inventory != null:
 		refusal = inventory.drop_staff(number) if number != Inventory.NO_STAFF else inventory.drop(bag, id)
 	_answer_inventory(refusal)
+
+
+## The inventory menu asked to drink one `id` of `bag` (the owner, 2026-11-19): a potion the shown
+## body holds is taken and does what it does (`PotionBase`: more most health, then a heal, through
+## Combat), refused as the class doc says.
+func _on_bag_use_requested(player: int, bag: StringName, id: StringName, body: int) -> void:
+	if player != seat:
+		return
+	var why: String = _menu_refusal(body)
+	if why != "":
+		_refuse_inventory(why)
+		return
+	var shown_body: Actor = shown()
+	var inventory: Inventory = shown_body.inventory
+	var kind: StringName = ItemKinds.kind_in(bag)
+	if inventory == null or inventory.count_of(bag, id) < 1:
+		_refuse_inventory(NO_ITEM)
+		return
+	var potion := ItemLooks.content_of(kind, id, registry) as PotionBase
+	if not ItemKinds.can(kind, ItemKinds.USE) or potion == null:
+		_refuse_inventory(NO_USE)
+		return
+	if shown_body.health == null or potion.wasted_on(shown_body.health.health, shown_body.health.max_health):
+		_refuse_inventory(NO_NEED)
+		return
+	var bus: EventsScript = _bus()
+	if bus == null or not inventory.take(bag, id, 1):
+		return
+	bus.health_gift_requested.emit(shown_body.id, potion.heal, potion.more_most)
 
 
 ## A refusal of the inventory menu's to the seat (`inventory_refused`); nothing for a change made.

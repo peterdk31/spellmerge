@@ -1,17 +1,17 @@
 # content/rewards: reward tables
 
-A reward table is what a reward offers its choices from (connected biomes CB10, docs/milestones/connected-biomes.md, decisions 16 and 17): one weighted line a kind of reward. One file per table, `<id>.tres`, a `RewardTable` (`core/base/reward_table.gd`) of `RewardEntry` lines (`core/base/reward_entry.gd`); the registry finds it by its `id` under `rewards`. The Rewards area (`gameplay/rewards/`) rolls each player's own choices from it, as many as that player's `reward_choices` run stat (`core/base/run_stats.gd`), never one twice in an offer.
+A reward table is what a reward offers its choices from (connected biomes CB10, docs/milestones/connected-biomes.md, decisions 16 and 17): one weighted line an item (every reward is an inventory item, the owner's decision of 2026-11-19). One file per table, `<id>.tres`, a `RewardTable` (`core/base/reward_table.gd`) of `RewardEntry` lines (`core/base/reward_entry.gd`); the registry finds it by its `id` under `rewards`. The Rewards area (`gameplay/rewards/`) rolls each player's own choices from it, as many as that player's `reward_choices` run stat (`core/base/run_stats.gd`), never one twice in an offer.
 
 ## Contract
 
-- A line's `kind` is one of `RewardEntry.KINDS`: `card` (`count` copies of the card `id`, or with no id any card of `content/spells` of at most `max_complexity`, 0 for any) `coins` (`count` coins into the player's own wallet), `heal` (`count` health) or `max_health` (`count` more most health, and as much health). A card upgrade waits for card levels; relics join with M3's relic work: a new kind is a row of `KINDS` and its code in the Rewards area.
+- A line names an item: its `kind` is an item kind (a row of `ItemKinds.RULES`) and its `id` the content's: `card` (`count` copies of the card `id`, or with no id any card of `content/spells` of at most `max_complexity`, 0 for any), `potion` (`count` potions of `content/potions`: `healing`, `max_health`; kept in the inventory and drunk when the player likes), `coin` (`id = &"coin"`, `count` coins onto the player's own coin stack, content/coins). A relic joins with M3's relic work as an item of its own; a card upgrade waits for card levels. The reward's card shows the item's own icon, name and description.
 - `weight` is how likely the line is against the table's others (above 0). `price` (connected biomes CB11): what the line costs on a shop's shelf, in coins, before the buyer's `price_scale` run stat (read only by a shelf's table).
-- `RewardTable.problems()` must be empty, and every card a line names must be a card (`tests/content/rewards/test_reward_tables.gd`).
+- `RewardTable.problems()` must be empty, and every item a line names must be there (`tests/content/rewards/test_reward_tables.gd`).
 
 | Table | What rolls from it |
 | --- | --- |
 | `clear` | a fight room's clear (a room kind names its table: `RoomKind.rewards`, connected biomes CB11) |
-| `boss` | the boss's room's clear: better cards, more health |
+| `boss` | the boss's room's clear: better cards, max health potions |
 | `reward` | a reward room, as the party steps in |
 | `treasure` | a treasure room (behind its key door) |
 | `secret` | a secret room (behind its cracked rock) |

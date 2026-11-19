@@ -7,8 +7,10 @@ extends RefCounted
 ## each tick's hashes (and a snapshot after one); `resume` starts the same biome, restores the snapshot
 ## and plays on from the next tick, as a player joining the run would.
 ## Connected biomes CB11 (`special`): the rooms west and east are a shop and a fountain (the crypt's
-## own, with the start room between them); seat 0, its wallet full, walks west over the shop's shelf
-## pressing A (`shelf_buy_requested` for every shelf item, each tick: one in reach is bought), seat 1,
+## own, with the start room between them); seat 0, its coin stack full, walks west over the shop's shelf
+## pressing A (`shelf_buy_requested` for every shelf item, each tick: one in reach is bought, paid
+## from its coin stack) and, after the snapshot, drinking its potions from the inventory
+## (`bag_use_requested`: it holds a max health potion from the start; the owner, 2026-11-19), seat 1,
 ## hurt, walks east into the fountain and draws on it.
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
@@ -19,9 +21,13 @@ const RewardsScript := preload("res://gameplay/rewards/rewards.gd")
 const DT: float = 1.0 / 60.0
 ## The run's seed (a biome's run takes no replay's: the same in every play).
 const RUN_SEED: int = 0x5eed_b10e
-## CB11: the coins each wallet starts with, and the shelf's items (the shop's three zones).
+## CB11: the coins each player starts with, and the shelf's items (the shop's three zones).
 const FUNDS: int = 60
 const SHELF: int = 3
+## CB11: the potions seat 0 drinks, when, and the max health potion it holds from the start.
+const POTIONS: Array[StringName] = [&"healing", &"max_health"]
+const DRINK_FROM: int = 12
+const DRINK_EVERY: int = 10
 ## The fights: the antechamber's and the court's.
 const WEST: Array[StringName] = [&"ember_imp", &"ember_imp"]
 const EAST: Array[StringName] = [&"spitter", &"ember_imp"]
@@ -38,6 +44,7 @@ var gate_opened_at: int = -1
 var special: bool = false
 var bought: bool = false
 var drawn: bool = false
+var drunk: bool = false
 var problems: PackedStringArray = PackedStringArray()
 
 var _root: Window
@@ -56,6 +63,9 @@ class Walker:
 	var tick: int = 0
 	## Shelf items asked for each tick (their numbers 0 to buys - 1; 0: none).
 	var buys: int = 0
+	## The key of its wizard (`Actor.key`), whose potions it drinks every DRINK_EVERY ticks from
+	## DRINK_FROM on; -1: it drinks none.
+	var drinker: int = -1
 
 	func fill_frame(frame: InputFrame, _delta: float) -> void:
 		frame.set_move(way)
@@ -64,6 +74,9 @@ class Walker:
 			frame.press(1)
 		for item in buys:
 			frame.add_command(&"shelf_buy_requested", [item])
+		if drinker >= 0 and tick >= DRINK_FROM and tick % DRINK_EVERY == 0:
+			for potion: StringName in POTIONS:
+				frame.add_command(&"bag_use_requested", [&"potions", potion, drinker])
 		tick += 1
 
 
@@ -101,9 +114,11 @@ func play(ticks: int, snapshot_at: int, into: Desync) -> Snapshot:
 			gate_opened_at = i
 		if special:
 			var rewards: Object = _root.get_node("Rewards")
-			bought = bought or (rewards.call(&"shelf") as Array).size() < SHELF and int(rewards.call(&"wallet_of", 0)) < FUNDS
+			bought = bought or (rewards.call(&"shelf") as Array).size() < SHELF and int(rewards.call(&"coins_of", 0)) < FUNDS
 			var left: float = float(rewards.call(&"pool_left", 2))
 			drawn = drawn or (left >= 0.0 and left < RewardsScript.POOL_HEALTH)
+			var buyer: Actor = _flow.get_wizard(0) as Actor
+			drunk = drunk or (buyer != null and buyer.inventory.count_of(&"potions", &"max_health") == 0)
 		if i == snapshot_at:
 			snapshot = Snapshot.take(_tick.state_areas(), _root)
 	_stop()
@@ -156,6 +171,9 @@ func _start() -> BiomeMap:
 		events.emit_signal(&"run_stats_ruled", [StatChange.make(&"start_coins", float(FUNDS))] as Array[StatChange])
 		var hurt: Actor = _flow.get_wizard(1) as Actor
 		hurt.health.take(60.0)
+		var buyer: Actor = _flow.get_wizard(0) as Actor
+		buyer.inventory.add(ItemStack.of(ItemKinds.POTION, &"max_health", 1))
+		_walkers[0].drinker = buyer.key()
 	return map
 
 

@@ -1,7 +1,7 @@
 extends Node
 ## The Rewards area (autoload `Rewards`; connected biomes CB10 and CB11, docs/milestones/connected-
-## biomes.md, decisions 16 to 20 and 26): each player's rewards, their wallets, the coins on the floor,
-## the shops' shelves and the fountains' pools. State like any area's, the same on every machine,
+## biomes.md, decisions 16 to 20 and 26): each player's rewards, the coins on the floor, the shops'
+## shelves and the fountains' pools. State like any area's, the same on every machine,
 ## saved and restored with everything else.
 ##
 ## - **A roll per player** (DESIGN rule 3): as a room whose kind rewards a clear is cleared
@@ -15,21 +15,22 @@ extends Node
 ##   waits: each player picks when they like, oldest first, and an offer stays until it is picked
 ##   (`rewards_waiting_changed`), all run long.
 ## - **A pick** (`reward_pick_requested`, a command at the tick's start): the offer it names, if it
-##   is the seat's, gives the choice to the seat's own wizard (a card's copies into its card bag;
-##   coins into its wallet) and goes (`reward_taken`). With no room in the bag it stays unspent.
-## - **What a reward may be** before relics exist (`RewardEntry.KINDS`; the owner, 2026-11-19): a
-##   card, coins, a heal (not while down: it stays unspent) or a little more most health, the last
-##   two through Combat, which keeps an actor's health (`health_gift_requested`). A card upgrade
-##   waits for card levels.
+##   is the seat's, puts the choice into the seat's own wizard's inventory and goes
+##   (`reward_taken`). With no room in its bag it stays unspent.
+## - **A reward is an item** (the owner, 2026-11-19: "Every reward is something that can be placed
+##   in a player's inventory"): a choice is an item kind, its id and a count (`RewardEntry`, a row
+##   of `ItemKinds.RULES`): a card's copies, potions (a heal, more most health: drunk from the
+##   inventory when the player likes, gameplay/player), coins. Its look is the item's own
+##   (`ItemLooks`). A card upgrade waits for card levels.
 ## - **A shop** (CB11, decision 19): as a shop room opens (`special_room_opened`, its shelf table and
 ##   its spots), its shelf is rolled once (purpose SHOP_PURPOSE, keyed by its room): one item a spot,
 ##   each a different line's, at its line's `price`. The item nearest a standing wizard's own feet,
 ##   within SHELF_REACH, is in their reach (`shelf_near_changed`), and A buys it (the owner,
 ##   2026-11-19: `shelf_buy_requested`, a command at the tick's start, so the first seat to ask
-##   takes it; nobody waits): with its price (times that player's `price_scale`) in their own wallet
-##   and room for it (a heal only while hurt), it is theirs (as a reward's choice is given) and gone
-##   from the shelf for everyone; else `shelf_refused`. Walking over an item buys nothing, so a
-##   shelf may sell heals. The shelf keeps what is left all run (`shelf_changed`).
+##   takes it; nobody waits): with its price (times that player's `price_scale`) in their own coins
+##   and room for it, it goes into their inventory (as a reward's choice does), the coins come out
+##   of their coin stack, and it is gone from the shelf for everyone; else `shelf_refused`. Walking
+##   over an item buys nothing. The shelf keeps what is left all run (`shelf_changed`).
 ## - **A fountain** (CB11, decision 20): as a fountain room opens, its pool fills with POOL_HEALTH
 ##   times the highest `fountain_pool` of the players then, shared: every hurt standing wizard whose
 ##   own feet are in it draws DRAW_RATE health a second from it until they are whole or it runs dry
@@ -40,15 +41,18 @@ extends Node
 ##   wizard, `RelicBase`). Read by name: `stat_of`. Each seat's are told to the view
 ##   (`run_stats_told`) as they may change and after a restore (a relic taken will tell them
 ##   when relics come, M3).
-## - **Coins** (decision 18: shared income, own wallet): a foe that dies (`enemy_died`) drops its
-##   `EnemyBase.coins` where it fell (an add another body called, `Actor.is_add`, drops none; a boss's go to every wallet at once,
-##   decision 25), each one coin anyone may take: the first wizard (seat order)
-##   whose feet come within `COIN_REACH` takes it, and every player's wallet gains one. Each wallet
-##   starts a run with its player's `start_coins`, and spending is one's own (a shop's buy, `spend`).
+## - **Coins** (decision 18: shared income, own coins; the owner, 2026-11-19: "Coins are stacked
+##   inventory items"): a player's coins are one stack in its wizard's coins bag (`CoinBase`,
+##   content/coins). A foe that dies (`enemy_died`) drops its `EnemyBase.coins` where it fell (an
+##   add another body called, `Actor.is_add`, drops none; a boss's go to every player at once,
+##   decision 25), each one coin anyone may take: the first wizard (seat order) whose feet come
+##   within `COIN_REACH` takes it, and every player's coin stack gains one. As a seat's wizard
+##   first comes in a run its stack gains its player's `start_coins` (nothing comes back from a
+##   run, and the hub has no coins to take along), and spending is one's own (a shop's buy, `spend`).
 ##   The coins, shelves and pools are the world's: a new world (`room_entered` FIRST_ROOM) and a
 ##   run's start clear them; a cleared room's coins stay where they lie.
-## - **Said:** `coin_changed` as a coin is laid and goes, `wallet_changed` as a wallet changes,
-##   `shelf_changed` and `fountain_changed` as a shelf and a pool change. After a snapshot is
+## - **Said:** `coin_changed` as a coin is laid and goes (a player's coin stack is said by its
+##   Inventory, `bag_changed`, as any bag), `shelf_changed` and `fountain_changed` as a shelf and a pool change. After a snapshot is
 ##   restored it says everything again (`rebuild_derived`).
 ##
 ## It knows nothing of the HUD, Flow or `net/`, and calls no other area: it hears events, reads the
@@ -76,9 +80,9 @@ const SHELF_REACH: float = 12.0
 ## wizard in it draws on it, health a second.
 const POOL_HEALTH: float = 120.0
 const DRAW_RATE: float = 40.0
-## The card bag and the relics bag of an Inventory (`ItemKinds.BAGS`).
-const CARD_BAG: StringName = &"cards"
+## The relics bag and the coins bag of an Inventory (`ItemKinds.BAGS`).
 const RELIC_BAG: StringName = &"relics"
+const COIN_BAG: StringName = &"coins"
 ## How near a wizard's feet must come to a coin to take it, in pixels.
 const COIN_REACH: float = 10.0
 ## Where an enemy's coins land round where it fell, in order (more than these: on its spot again).
@@ -112,7 +116,7 @@ var _next_offer: int = 0
 ## The rooms due a roll since the last step (`room_rewards_due`), and the table each rolls from.
 var _due_rooms: PackedInt32Array = PackedInt32Array()
 var _due_tables: Array[StringName] = []
-## The shops' shelves: each item's number, room, place, what it is (a choice: kind, id, count) and
+## The shops' shelves: each item's number, room, place, what it is (an item: kind, id, count) and
 ## price (before a buyer's `price_scale`), by the same index, in the order stocked.
 var _item_numbers: PackedInt32Array = PackedInt32Array()
 var _item_rooms: PackedInt32Array = PackedInt32Array()
@@ -133,8 +137,6 @@ var _rolls: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## By seat: the shelf item (its number) in reach of its standing wizard, last said
 ## (`shelf_near_changed`), -1 for none.
 var _shelf_near: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
-## By seat: the coins in its wallet.
-var _wallets: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## The seats whose starting coins came this run, a bit each.
 var _funded: int = 0
 ## The coins on the floor: each one's number and where it lies, by the same index, in the order laid.
@@ -175,21 +177,19 @@ func _ready() -> void:
 	events.listen(&"shelf_buy_requested", _on_shelf_buy_requested)
 
 
-## A run's start: every offer, coin, shelf, pool and wallet goes (each said), and the area is a fresh
-## one's.
+## A run's start: every offer, coin, shelf and pool goes (each said), and the area is a fresh one's.
 func begin_run() -> void:
 	_clear_coins()
 	_clear_rooms()
 	SimFresh.renew(self)
 	for seat in SEATS:
 		_say_waiting(seat)
-		_say_wallet(seat)
 		_say_shelf_near(seat)
 		_say_stats(seat)
 
 
 ## The tick's step: the clears since the last step are rolled for; a seat whose wizard came gets
-## its starting coins (once a run); each coin a wizard's feet reach is taken (seats in order, the
+## its starting coins into its coin stack (once a run); each coin a wizard's feet reach is taken (seats in order, the
 ## first takes it); each seat's shelf item in reach is found; each fountain is drawn on.
 func step(delta: float) -> void:
 	if actors == null:
@@ -234,15 +234,16 @@ func stat_of(seat: int, stat: StringName) -> float:
 	return RunStats.value_of(stat, _run_changes, _relics_of(seat))
 
 
-## The coins in seat `seat`'s wallet.
-func wallet_of(seat: int) -> int:
-	return _wallets[seat] if seat >= 0 and seat < SEATS else 0
+## The coins seat `seat` holds: the coin stack in its wizard's coins bag (0 with no wizard).
+func coins_of(seat: int) -> int:
+	var body: Actor = _wizard_of(seat) if seat >= 0 and seat < SEATS else null
+	return body.inventory.count_of(COIN_BAG, CoinBase.ID) if body != null and body.inventory != null else 0
 
 
-## Spend `amount` coins of seat `seat`'s own wallet (a shop's buy: the shop is this area's, CB11):
-## false, and nothing changes, when it holds fewer. Not for other areas (they never call this one).
+## Spend `amount` of seat `seat`'s own coins (a shop's buy: the shop is this area's, CB11): false,
+## and nothing changes, when it holds fewer. Not for other areas (they never call this one).
 func spend(seat: int, amount: int) -> bool:
-	if seat < 0 or seat >= SEATS or amount < 0 or _wallets[seat] < amount:
+	if seat < 0 or seat >= SEATS or amount < 0 or coins_of(seat) < amount:
 		return false
 	_add_coins(seat, -amount)
 	return true
@@ -297,8 +298,8 @@ func lay_coin(at: Vector2) -> int:
 
 
 ## Say everything again (a snapshot restored: this machine's looks and HUD showed what was here
-## before): gone for each coin it told of that no longer lies there, then every coin, every
-## wallet and every seat's waiting offers.
+## before): gone for each coin it told of that no longer lies there, then every coin, shelf item and
+## pool, and every seat's waiting offers (a coin stack is its Inventory's to say again).
 func rebuild_derived() -> void:
 	if events == null:
 		return
@@ -318,7 +319,6 @@ func rebuild_derived() -> void:
 	for at in _pool_rooms.size():
 		_say_pool(at)
 	for seat in SEATS:
-		_say_wallet(seat)
 		_say_waiting(seat)
 		_say_shelf_near(seat)
 		_say_stats(seat)
@@ -367,9 +367,9 @@ func _roll_clear(room: int, table_id: StringName) -> void:
 		_say_waiting(seat)
 
 
-## Seat `player` picked choice `choice` of its offer `offer` (a command): given to its wizard and
-## gone, or kept (not its offer, no such choice; `reward_refused` for no wizard, no room in the bag,
-## a heal while down).
+## Seat `player` picked choice `choice` of its offer `offer` (a command): into its wizard's
+## inventory and gone, or kept (not its offer, no such choice; `reward_refused` for no wizard or no
+## room in the bag).
 func _on_reward_pick_requested(player: int, offer: int, choice: int) -> void:
 	var at: int = -1
 	for i in _offers.size():
@@ -399,8 +399,8 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 
 
 ## Seat `player` asked to buy shelf item `item` (a command): sold if it still lies on its shelf, in
-## reach of the seat's standing wizard, who can pay for it and take it; else `shelf_refused` (an item
-## gone or out of reach says nothing).
+## reach of the seat's standing wizard, who can pay for it and has room for it; else `shelf_refused`
+## (an item gone or out of reach says nothing).
 func _on_shelf_buy_requested(player: int, item: int) -> void:
 	if player < 0 or player >= SEATS:
 		return
@@ -409,8 +409,7 @@ func _on_shelf_buy_requested(player: int, item: int) -> void:
 	if at < 0 or body == null or body.is_down() or body.position.distance_squared_to(_item_at[at]) > SHELF_REACH * SHELF_REACH:
 		return
 	var price: int = _price_of(at, stat_of(player, &"price_scale"))
-	var whole: bool = body.health == null or body.health.health >= body.health.max_health
-	if _wallets[player] < price or (_item_kinds[at] == RewardEntry.HEAL and whole) or not _give(player, _item_kinds[at], _item_ids[at], _item_counts[at]):
+	if coins_of(player) < price or not _give(player, _item_kinds[at], _item_ids[at], _item_counts[at]):
 		if events != null:
 			events.shelf_refused.emit(player, item)
 		return
@@ -449,10 +448,10 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 	if body == null:
 		return
 	if body.data == null or body.is_add:
-		# An add (a boss's waves, boss plan OB13) drops no coins: waves without end would fill wallets.
+		# An add (a boss's waves, boss plan OB13) drops no coins: waves without end would fill coin stacks.
 		return
 	if body.data.boss:
-		# A boss's coins go to every wallet at once (decision 25): its room's portal home opens as it
+		# A boss's coins go to every player at once (decision 25): its room's portal home opens as it
 		# is cleared, and nobody should lose them to it.
 		for seat in SEATS:
 			if actors != null and actors.home_of_seat(seat) != ActorsScript.NONE:
@@ -476,30 +475,30 @@ func _on_run_stats_ruled(changes: Array[StatChange]) -> void:
 
 # --- Inside -----------------------------------------------------------------------------
 
-## Give seat `seat`'s wizard `count` of `kind` `id`. False, and nothing changes, when it cannot.
+## Put `count` of the item `kind` `id` into seat `seat`'s wizard's inventory (a staff with no
+## cards, as its content is). False, and nothing changes, when it has no wizard, the item no content
+## of its kind, or its bag no room.
 func _give(seat: int, kind: StringName, id: StringName, count: int) -> bool:
-	match kind:
-		RewardEntry.COINS:
-			_add_coins(seat, count)
-			return true
-		RewardEntry.HEAL, RewardEntry.MAX_HEALTH:
-			# Combat keeps an actor's health: the gift goes through it. A heal waits while down.
-			var wizard: Actor = _wizard_of(seat)
-			if wizard == null or events == null or (kind == RewardEntry.HEAL and wizard.is_down()):
-				return false
-			var heal: float = float(count) if kind == RewardEntry.HEAL else 0.0
-			var more: float = float(count) if kind == RewardEntry.MAX_HEALTH else 0.0
-			events.health_gift_requested.emit(actors.home_of_seat(seat), heal, more)
-			return true
-		RewardEntry.CARD:
-			var body: Actor = _wizard_of(seat)
-			if body == null or body.inventory == null:
-				return false
-			var stack: ItemStack = ItemStack.card(id, count)
-			if not body.inventory.has_room(stack):
-				return false
-			return body.inventory.add(stack)
-	return false
+	var body: Actor = _wizard_of(seat)
+	if body == null or body.inventory == null:
+		return false
+	var stack: ItemStack = _stack_of(kind, id, count)
+	if stack == null or not body.inventory.has_room(stack):
+		return false
+	return body.inventory.add(stack)
+
+
+## `count` of the item `kind` `id` as a stack: a staff its content empty (copies, one a stack), any
+## other kind just its kind, id and count; null for a staff the registry has none of.
+func _stack_of(kind: StringName, id: StringName, count: int) -> ItemStack:
+	if kind == ItemKinds.STAFF:
+		var base := ItemLooks.content_of(kind, id, registry) as StaffBase
+		if base == null:
+			return null
+		var staff: ItemStack = ItemStack.of_staff(base)
+		staff.count = count
+		return staff
+	return ItemStack.of(kind, id, count)
 
 
 ## The wizard of seat `seat` (its own body, also while it drives another), or null.
@@ -548,11 +547,16 @@ func _taker_of(at: Vector2) -> int:
 	return ActorsScript.NONE
 
 
+## Seat `seat`'s coin stack changed by `amount` (a fall takes no more than it holds): its wizard's
+## coins bag, said by its Inventory (`bag_changed`). Nothing for a seat with no wizard.
 func _add_coins(seat: int, amount: int) -> void:
-	if amount == 0:
+	var body: Actor = _wizard_of(seat)
+	if amount == 0 or body == null or body.inventory == null:
 		return
-	_wallets[seat] = maxi(_wallets[seat] + amount, 0)
-	_say_wallet(seat)
+	if amount > 0:
+		body.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, amount))
+	else:
+		body.inventory.take(COIN_BAG, CoinBase.ID, mini(-amount, coins_of(seat)))
 
 
 func _clear_coins() -> void:
@@ -686,25 +690,13 @@ func _item_view(at: int) -> Dictionary:
 	return _view_of(_item_kinds[at], _item_ids[at], _item_counts[at])
 
 
-## The plain view of a choice of `kind` `id`, `count` of it: its kind, id, count, name, icon and
-## description (what it does, for the reward menu's card: a card's own builder line, Spells', or
-## the kind's line, `RewardEntry.describe`).
+## The plain view of a choice of `kind` `id`, `count` of it: its kind, id and count, and the item's
+## own name, icon and description (`ItemLooks`; the reward menu's card shows only these), its name
+## with the count when there are more than one.
 func _view_of(kind: StringName, id: StringName, count: int) -> Dictionary:
-	var view: Dictionary = {"kind": kind, "id": id, "count": count, "name": "", "icon": null, "description": RewardEntry.describe(kind, count)}
-	if kind == RewardEntry.COINS:
-		view["name"] = "%d coin%s" % [count, "" if count == 1 else "s"]
-	elif kind == RewardEntry.HEAL:
-		view["name"] = "Heal %d" % count
-	elif kind == RewardEntry.MAX_HEALTH:
-		view["name"] = "+%d max health" % count
-	elif spells != null:
-		# A card's name and icon are Spells' to say (no script outside core/spells reads a card).
-		view["name"] = spells.component_name(id)
-		view["icon"] = spells.component_icon(id)
-		view["description"] = spells.component_description(id)
-	if String(view["name"]) == "":
-		view["name"] = String(id)
-	if kind == RewardEntry.CARD and count > 1:
+	var look: Dictionary = ItemLooks.of(kind, id, registry, spells)
+	var view: Dictionary = {"kind": kind, "id": id, "count": count, "name": look["name"], "icon": look["icon"], "description": look["description"]}
+	if count > 1:
 		view["name"] = "%s x%d" % [view["name"], count]
 	return view
 
@@ -712,11 +704,6 @@ func _view_of(kind: StringName, id: StringName, count: int) -> Dictionary:
 func _say_waiting(seat: int) -> void:
 	if events != null:
 		events.rewards_waiting_changed.emit(seat, waiting_of(seat))
-
-
-func _say_wallet(seat: int) -> void:
-	if events != null:
-		events.wallet_changed.emit(seat, _wallets[seat])
 
 
 func _say_item(at: int, lying: bool) -> void:

@@ -3,7 +3,7 @@ extends RefCounted
 ## One player's reward not yet picked (connected biomes CB10): a row of the Rewards area
 ## (gameplay/rewards/rewards.gd). Its number (handed out once a run), whose it is, the room whose
 ## clear rolled it and whether the player's wizard was there (`here`), and its choices, one entry of
-## each list a choice (`RewardEntry.KINDS`, an id, a count). State, walked and snapshotted member
+## each list a choice (an item: its kind, `ItemKinds.RULES`, its id and a count). State, walked and snapshotted member
 ## by member (core/sim/README.md); `new()` with no arguments makes a blank one.
 
 ## Its number (`reward_rolled`, `reward_pick_requested` name it).

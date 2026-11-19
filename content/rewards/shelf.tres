@@ -21,15 +21,17 @@ price = 14
 
 [sub_resource type="Resource" id="Resource_3"]
 script = ExtResource("2_entry")
-kind = &"max_health"
-count = 10
+kind = &"potion"
+id = &"max_health"
+count = 1
 weight = 1.0
 price = 12
 
 [sub_resource type="Resource" id="Resource_heal"]
 script = ExtResource("2_entry")
-kind = &"heal"
-count = 30
+kind = &"potion"
+id = &"healing"
+count = 1
 weight = 2.0
 price = 6
 

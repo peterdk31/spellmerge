@@ -1,8 +1,8 @@
 extends Control
 ## One choice of a reward offer as a card (hud/menus/reward, the owner's redesign of 2026-11-19):
-## its icon (a card's own, or its kind's glyph for coins, a heal or more health), its name and what
-## it does (the view's `description`: a card's builder line, or the reward kind's,
-## `RewardEntry.DESCRIPTIONS`), each wrapped to the card's width at spaces (a word too long for a
+## the item it wraps, as the view says it (every reward is an inventory item, the owner's of
+## 2026-11-19): the item's own icon, name and description (`ItemLooks`: a card's builder line, a
+## potion's or the coin's own words), with nothing of a reward's own; each wrapped to the card's width at spaces (a word too long for a
 ## line is cut across lines, never clipped), centred. `reward_menu.gd` makes one a choice, sets its
 ## width (`fit_width`, which says the height its words need) and how far it is raised (`lift`, by
 ## whole pixels, the focused one LIFT up); it is drawn by itself, in the palette, by whole pixels.
@@ -24,71 +24,8 @@ const RIM: Color = Color("#4a4663")
 const TEXT: Color = Color("#f4f1ea")
 const MUTED: Color = Color("#a39fb8")
 
-## A glyph of 16 by 16 cells drawn 2 px a cell, by a choice's kind when it has no icon of its own;
-## a letter a colour, "." for none.
-const GLYPH_CELL: float = 2.0
-const GLYPH_COLORS: Dictionary = {
-	"o": Color("#14121f"), "d": Color("#b8801f"), "g": Color("#f2c230"), "y": Color("#fff3a6"),
-	"r": Color("#8f2d2a"), "h": Color("#e0592f"), "w": Color("#f4f1ea"),
-}
-const GLYPHS: Dictionary = {
-	&"coins": [
-		"................",
-		".....oooooo.....",
-		"...oodddddddo...",
-		"..odggggggggdo..",
-		"..odgyyyyyygdo..",
-		".odgygggggggydo.",
-		".odgyggddgggydo.",
-		".odgygdggdggydo.",
-		".odgygdggdggydo.",
-		".odgyggddgggydo.",
-		".odgygggggggydo.",
-		"..odgyyyyyygdo..",
-		"..odggggggggdo..",
-		"...oodddddddo...",
-		".....oooooo.....",
-		"................",
-	],
-	&"heal": [
-		"................",
-		"................",
-		"...ooo....ooo...",
-		"..ohhho..ohhho..",
-		".ohwwhhoohhhhro.",
-		".ohwhhhhhhhhhro.",
-		".ohhhhhhhhhhhro.",
-		".ohhhhhhhhhhhro.",
-		"..ohhhhhhhhhro..",
-		"...ohhhhhhhro...",
-		"....ohhhhhro....",
-		".....ohhhro.....",
-		"......ohro......",
-		".......oo.......",
-		"................",
-		"................",
-	],
-	&"max_health": [
-		"................",
-		"................",
-		"...ooo....ooo...",
-		"..ohhho..ohhho..",
-		".ohwwhhoohhhhro.",
-		".ohwhhhoohhhhro.",
-		".ohhhhowwohhhro.",
-		".ohhhoowwoohhro.",
-		"..ohowwwwwwohro.",
-		"...oowwwwwwoo...",
-		"....ohoowwoo....",
-		".....ohowwo.....",
-		"......ohoo......",
-		".......oo.......",
-		"................",
-		"................",
-	],
-}
-
-## The choice shown (the Rewards area's view: kind, id, count, name, icon, description).
+## The choice shown (the Rewards area's view: kind, id, count, and the item's name, icon and
+## description).
 var choice: Dictionary = {}
 ## How far it is raised now, 0 to LIFT (the menu's).
 var lift: int = 0
@@ -176,8 +113,6 @@ func _draw() -> void:
 	var icon: Texture2D = choice.get("icon") as Texture2D
 	if icon != null:
 		draw_texture_rect(icon, Rect2(icon_at, Vector2(ICON, ICON)), false)
-	else:
-		_draw_glyph(GLYPHS.get(StringName(choice.get("kind", &"")), []) as Array, icon_at)
 	y += ICON + SPACE
 	for line: String in _name_lines:
 		_text(line, y, TEXT)
@@ -186,15 +121,6 @@ func _draw() -> void:
 	for line: String in _text_lines:
 		_text(line, y, MUTED)
 		y += LINE_STEP
-
-
-func _draw_glyph(rows: Array, at: Vector2) -> void:
-	for row in rows.size():
-		var cells: String = rows[row]
-		for column in cells.length():
-			var color: Variant = GLYPH_COLORS.get(cells[column])
-			if color is Color:
-				draw_rect(Rect2(at + Vector2(column, row) * GLYPH_CELL, Vector2(GLYPH_CELL, GLYPH_CELL)), color as Color)
 
 
 func _text(line: String, y: float, color: Color) -> void:

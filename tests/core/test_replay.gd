@@ -174,7 +174,7 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	frame_seat[first + 3 + 1] = 1
 	cases["a frame under another seat"] = frame_seat
 	var frame_bad: PackedByteArray = good.duplicate()
-	frame_bad[first + 3] = 9
+	frame_bad[first + 3] = InputFrame.VERSION + 1
 	cases["a frame of another version"] = frame_bad
 	var mask: PackedByteArray = good.duplicate()
 	mask[first] = 0x20
@@ -235,7 +235,7 @@ func test_a_tick_from_bytes_is_checked_as_a_files() -> void:
 	seat[4] = 1
 	cases["a frame under another seat"] = seat
 	var version: PackedByteArray = good.duplicate()
-	version[3] = 9
+	version[3] = InputFrame.VERSION + 1
 	cases["a frame of another version"] = version
 	var length: PackedByteArray = good.duplicate()
 	length.encode_u16(1, 0xffff)

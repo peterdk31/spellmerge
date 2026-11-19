@@ -67,17 +67,28 @@ func _frame() -> void:
 	_focus.poll()
 
 
-## The views of `count` choices, each kind in turn: a card (with a builder line as long as one may
-## be), coins, a heal, more most health.
+## The items the choices wrap after a card, in turn (every reward is an inventory item, the owner's
+## of 2026-11-19): the coin, the healing potion, the max health potion.
+const ITEMS: Array[ItemContent] = [
+	preload("res://content/coins/coin/coin.tres"),
+	preload("res://content/potions/healing/healing.tres"),
+	preload("res://content/potions/max_health/max_health.tres"),
+]
+
+
+## The views of `count` choices, each in turn: a card (with a builder line as long as one may be),
+## then each of ITEMS, as the Rewards area makes a view (the item's own name, icon, description).
 func _choices(count: int) -> Array[Dictionary]:
 	var made: Array[Dictionary] = []
-	var kinds: Array[StringName] = [RewardEntry.CARD, RewardEntry.COINS, RewardEntry.HEAL, RewardEntry.MAX_HEALTH]
 	for at in count:
-		var kind: StringName = kinds[at % kinds.size()]
 		var amount: int = 5 + at
-		var words: String = "Frostfire Cascade" if kind == RewardEntry.CARD else "%d %s" % [amount, kind]
-		var says: String = LONG_LINE if kind == RewardEntry.CARD else RewardEntry.describe(kind, amount)
-		made.append({"kind": kind, "id": &"fire" if kind == RewardEntry.CARD else &"", "count": amount, "name": words, "icon": null, "description": says})
+		var turn: int = at % (ITEMS.size() + 1)
+		if turn == 0:
+			made.append({"kind": ItemKinds.CARD, "id": &"fire", "count": amount, "name": "Frostfire Cascade", "icon": null, "description": LONG_LINE})
+			continue
+		var item: ItemContent = ITEMS[turn - 1]
+		var kind: StringName = ItemKinds.COIN if item is CoinBase else ItemKinds.POTION
+		made.append({"kind": kind, "id": item.id, "count": amount, "name": "%s x%d" % [item.shown_name(), amount], "icon": item.icon, "description": item.description})
 	return made
 
 
@@ -123,7 +134,7 @@ func test_an_offer_for_a_seat_that_was_there_opens_its_menu() -> void:
 	var menu: RewardMenuScript = _hud.get_reward(1)
 	check(menu.is_open() and menu.visible, "the seat's menu opens by itself")
 	check(not _hud.get_reward(0).is_open(), "nobody else's")
-	check_equal(_words(1), ["Frostfire Cascade", "6 coins"] as Array[String], "a card a choice")
+	check_equal(_words(1), ["Frostfire Cascade", "Coins x6"] as Array[String], "a card a choice")
 	check_equal(menu.title_text(), "Pick 1 of 2", "pick 1 of 2")
 	check(_hud.reward_room(1).encloses(Rect2(menu.position, Vector2(menu.size.x, menu.full_height()))), "inside its seat's quarter")
 	_tap(1, &"accept")
@@ -211,19 +222,16 @@ func test_a_scrolled_row_keeps_the_focused_card_in_view() -> void:
 		check(strip.get_global_rect().encloses(card.get_global_rect()), "card %d drawn inside the strip" % focused)
 
 
-func test_each_kind_of_reward_says_what_it_does() -> void:
+func test_each_card_shows_its_items_own_look() -> void:
 	var menu: RewardMenuScript = _open_in(FULL, 4)
 	var cards: Array[RewardCardScript] = menu.cards()
 	check_equal(cards[0].description(), LONG_LINE, "a card says its own builder line")
 	for at in range(1, 4):
-		var kind: StringName = cards[at].choice["kind"]
-		check(cards[at].description() != "", "%s says what it does" % kind)
-		check_equal(cards[at].description(), RewardEntry.describe(kind, 5 + at), "%s: its kind's line, with its count" % kind)
-		check(cards[at].description().contains(str(5 + at)), "%s: naming how much" % kind)
-	for kind: StringName in RewardEntry.KINDS:
-		if kind != RewardEntry.CARD:
-			check(RewardEntry.DESCRIPTIONS.has(kind), "every kind but a card has its line (%s)" % kind)
-			check(RewardCardScript.GLYPHS.has(kind), "and its glyph (%s)" % kind)
+		var item: ItemContent = ITEMS[at - 1]
+		check_equal(cards[at].description(), item.description, "%s: the item's own description" % item.id)
+		check(cards[at].words().begins_with(item.shown_name()), "%s: the item's own name" % item.id)
+		check(cards[at].words().ends_with("x%d" % (5 + at)), "%s: and how many" % item.id)
+		check(cards[at].choice["icon"] == item.icon and item.icon != null, "%s: the item's own icon, nothing of a reward's own" % item.id)
 
 
 func test_opening_closing_and_moving_play_their_frames() -> void:
@@ -357,7 +365,9 @@ func test_it_stays_inside_a_low_room() -> void:
 
 
 func test_the_panel_says_the_coins() -> void:
-	_bus.wallet_changed.emit(1, 12)
-	check_equal(_hud.get_panel(1).purse_text(), "12 coins", "the seat's wallet")
+	_bus.bag_changed.emit(1, &"potions", [&"healing"] as Array[StringName], PackedInt32Array([3]), -1)
+	check_equal(_hud.get_panel(1).purse_text(), "", "another bag is not the purse")
+	_bus.bag_changed.emit(1, &"coins", [CoinBase.ID] as Array[StringName], PackedInt32Array([12]), -1)
+	check_equal(_hud.get_panel(1).purse_text(), "12 coins", "the coin stack in the seat's coins bag")
 	_roll(1, 3, false)
 	check_equal(_hud.get_panel(1).purse_text(), "12 coins  1 to pick", "and its rewards waiting")

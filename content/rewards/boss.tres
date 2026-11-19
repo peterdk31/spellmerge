@@ -19,14 +19,16 @@ max_complexity = 0
 
 [sub_resource type="Resource" id="Resource_2"]
 script = ExtResource("2_entry")
-kind = &"coins"
+kind = &"coin"
+id = &"coin"
 count = 25
 weight = 1.0
 
 [sub_resource type="Resource" id="Resource_3"]
 script = ExtResource("2_entry")
-kind = &"max_health"
-count = 25
+kind = &"potion"
+id = &"max_health"
+count = 2
 weight = 2.0
 
 [resource]

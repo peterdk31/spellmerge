@@ -1190,12 +1190,9 @@ func view_rect() -> Rect2:
 
 ## A room was laid out (`room_built`; atmosphere C): its standing walls block the light from now on.
 func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void:
-	var walls: Array[Rect2] = RoomPlaces.wall_rects(layout_root)
-	var piece := layout_root as Node2D
-	# A biome's pieces stand at their places (connected biomes CB3): their walls at them.
-	var at: Vector2 = piece.position if piece != null else Vector2.ZERO
-	for i in walls.size():
-		walls[i].position += at
+	# A biome's pieces stand at their places (connected biomes CB3), mirrored as they are placed (the
+	# grid's walls, decision 6): their walls there, as the world has them.
+	var walls: Array[Rect2] = PieceShape.laid_walls(layout_root)
 	if number != EventsScript.FIRST_ROOM:
 		# A biome's later piece: its walls join the world's; the mist and the room's look are the
 		# first room's.

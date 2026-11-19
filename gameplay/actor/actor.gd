@@ -156,6 +156,9 @@ const REFS: Array[StringName] = [&"controller"]
 ## The most seconds of ticks its looks catch up at once (`step_looks_due`): a body back on screen
 ## after a long while off it plays a moment, not all of it.
 const LOOK_TIME_MOST: float = 0.25
+## The run's chance's purpose for how many coins an enemy carries when its data gives a range
+## (`EnemyBase.coins_most`), keyed by its actor key: one roll a body.
+const COINS_PURPOSE: StringName = &"coins_carried"
 ## How far off screen (pixels) a body's looks are still stepped: a body walking in is drawn as it is.
 const ON_SCREEN_MARGIN: float = 96.0
 
@@ -237,9 +240,10 @@ var possessed_by: Possession = null
 ## shots pass it as they pass its own body (its hurt circle is a projectile target owned by that
 ## actor: `Caster.own_hurtbox`, Combat). Set before adding the actor.
 var belongs_to: int = ActorsScript.NONE
-## True for an add another body called (boss plan OB13: its phase's burst or waves), set by Flow as
-## it stands it. An add drops no coins (connected biomes CB10: waves without end would fill every
-## player's coins). State.
+## True for an add another body called (boss plan OB13: its phase's burst or waves), set by Flow
+## before it stands it (`Flow._stand_enemy`). An add carries no coins (decided as it comes) and drops
+## none (decided as it dies, so one marked later carries its coins but never drops them; connected
+## biomes CB10: waves without end would fill every player's coins). State.
 var is_add: bool = false
 
 ## The number it casts under in Spells and the projectile manager: its `id` while its caster is
@@ -320,6 +324,7 @@ func _ready() -> void:
 		home_controller.home_actor = self
 	_is_ready = true
 	_open_id()
+	_carry_coins()
 	if controller != null:
 		controller.driving = self
 		controller.started(self)
@@ -1070,6 +1075,25 @@ func _apply_data() -> void:
 		caster = null
 		return
 	caster.hold_staffs(data.staffs, elite_card)
+
+
+## An enemy's coins into its own coins bag as it first comes (the owner, 2026-11-19: its data's
+## `coins`, or a roll up to `coins_most`, keyed by its actor key, so after its id is open). None for
+## an add, and nothing again for a body made from a snapshot (its inventory holds what was saved).
+func _carry_coins() -> void:
+	if data == null or inventory == null or inventory.carried or is_add:
+		return
+	var span: Vector2i = data.coin_range()
+	var amount: int = span.x
+	var rolled: bool = span.y > span.x
+	var game: Sim = sim if sim != null else Sim.found(self)
+	if rolled and game != null:
+		var key: int = actors.key_of(id) if actors != null and id != ActorsScript.NONE else 0
+		amount += game.chance_int(COINS_PURPOSE, key, 0, span.y - span.x + 1)
+	if amount > 0:
+		inventory.carry(ItemStack.of(ItemKinds.COIN, CoinBase.ID, amount), rolled)
+	else:
+		inventory.carried = true
 
 
 ## True for an elite (connected biomes CB11: it has an `elite_card`).

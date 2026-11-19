@@ -1326,12 +1326,15 @@ func _enemy_data_of(enemy_id: StringName) -> EnemyBase:
 ## play (`Actor.players`, boss plan OB13) and told to difficulty (`enemy_standing`: scaled to the
 ## room, run generation RG5), both before its data is applied. With `spawn_in` it spawns in (enemy
 ## spawning EA3: `Actor.spawn`, set before it enters the tree, so its hurt shape is never registered
-## while it spawns in), in the style `spawn_style_for` picks. Null when no body could be made.
-func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, spawn_in: bool = false, elite_card: StringName = &"") -> Actor:
+## while it spawns in), in the style `spawn_style_for` picks; `is_add` for an add (`Actor.is_add`).
+## Null when no body could be made.
+func _stand_enemy(parent: Node2D, data: EnemyBase, at: Vector2, spawn_in: bool = false, elite_card: StringName = &"", is_add: bool = false) -> Actor:
 	var enemy := RoomContents.make_body(data) as Actor
 	if enemy == null:
 		return null
 	enemy.position = at
+	# An add (boss plan OB13) is one before it comes: it carries no coins (`Actor.is_add`).
+	enemy.is_add = is_add
 	# An elite (connected biomes CB11, decision 24): its card and its look are the body's, its health
 	# Difficulty's (it hears `enemy_standing`).
 	enemy.elite_card = elite_card
@@ -1415,9 +1418,8 @@ func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> v
 				# A spot on the ring over a hole takes the nearest ground (hub rework HR-H2).
 				at = world.to_local(projectiles.grid().nearest_ground(world.to_global(at), radius))
 		# An add spawns in as the room's enemies do (enemy spawning, the owner's question 3).
-		var add: Actor = _stand_enemy(world, data, at, not data.boss)
+		var add: Actor = _stand_enemy(world, data, at, not data.boss, &"", true)
 		if add != null:
-			add.is_add = true
 			adds.track(add, caller, key)
 
 

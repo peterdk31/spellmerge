@@ -94,6 +94,8 @@ var _staffs_given: bool = false
 var _started: bool = false
 ## True once anything it holds changed after its start (`at_rest`).
 var _edited: bool = false
+## True once it was given what its body carries from the start (`carry`: an enemy's coins).
+var carried: bool = false
 
 
 func _init() -> void:
@@ -309,6 +311,20 @@ func add(stack: ItemStack) -> bool:
 	for number in numbered:
 		_say_staff(number)
 	return true
+
+
+## What its body carries from the start (an enemy's coins, its data's: `Actor`): `stack` added as
+## `add` does, once (`carried`; a body made again from a snapshot holds what was saved). As its data
+## made it, so it stays at rest (`at_rest`), unless the count was `rolled` by the run's chance (two
+## bodies made alike may then differ, so the hash walks it).
+func carry(stack: ItemStack, rolled: bool) -> bool:
+	if carried:
+		return false
+	carried = true
+	var was_edited: bool = _edited
+	var added: bool = add(stack)
+	_edited = was_edited or (added and rolled)
+	return added
 
 
 ## Take `count` copies of `id` out of `bag` (a stack left empty goes; of a kind that does not

@@ -91,11 +91,40 @@ func _choices(seat: int) -> Array:
 
 ## A foe of `IMP`'s data dying at `at`, in the place `room`.
 func _foe_dies(at: Vector2, room: int = RoomGrid.NO_PLACE) -> void:
+	_kill(_foe(IMP, room), at)
+
+
+## A foe of `data` in the tree on the world's services (so it carries its coins, `Actor._carry_coins`),
+## in the place `room`; an add with `is_add`; its chance the run's seeded `seed`.
+func _foe(data: EnemyBase, room: int = RoomGrid.NO_PLACE, is_add: bool = false, seed: int = 7) -> Actor:
 	var foe := Actor.new()
-	foe.data = IMP
+	foe.data = data
 	foe.room = room
+	foe.is_add = is_add
+	foe.events = _world.bus
+	foe.combat = _world.combat
+	foe.projectiles = _world.projectiles
+	foe.spells = _world.spells
+	foe.actors = _world.table
+	foe.sim = Sim.seeded(seed)
+	root.add_child(foe)
+	foe.ticking = false
+	return foe
+
+
+## `foe` dies at `at` (Combat's `enemy_died`) and goes.
+func _kill(foe: Actor, at: Vector2) -> void:
 	_world.bus.enemy_died.emit(0, foe, at, -1)
 	foe.free()
+
+
+## A copy of the imp's data carrying `coins` (up to `most`), dropped by `chance`.
+func _carrying(coins: int, chance: float = 1.0, most: int = 0) -> EnemyBase:
+	var data: EnemyBase = IMP.duplicate()
+	data.coins = coins
+	data.coins_most = most
+	data.coin_drop_chance = chance
+	return data
 
 
 ## Room `room` cleared, its kind rewarding it from `table` (Flow's `room_rewards_due`), then a step
@@ -321,34 +350,27 @@ func test_a_foes_coins_are_shared_income() -> void:
 func test_a_bosss_coins_go_to_every_player() -> void:
 	_wizard(0)
 	_wizard(1, Vector2(40, 0))
-	var boss := Actor.new()
-	var data: EnemyBase = IMP.duplicate()
+	var data: EnemyBase = _carrying(10)
 	data.boss = true
-	data.coins = 10
-	boss.data = data
-	_world.bus.enemy_died.emit(0, boss, Vector2(300, 0), -1)
-	boss.free()
+	_kill(_foe(data), Vector2(300, 0))
 	check(_rewards.coins_lying().is_empty(), "none on the floor (the portal home opens as its room clears)")
 	check_equal([_rewards.coins_of(0), _rewards.coins_of(1)], [10, 10], "every player gains them (decision 25)")
 
 
 func test_an_add_drops_no_coin() -> void:
-	var add := Actor.new()
-	add.data = IMP
-	add.is_add = true
-	_world.bus.enemy_died.emit(0, add, Vector2(50, 0), -1)
-	add.free()
+	var add: Actor = _foe(IMP, RoomGrid.NO_PLACE, true)
+	check_equal(add.inventory.count_of(COINS, CoinBase.ID), 0, "an add carries none")
+	_kill(add, Vector2(50, 0))
 	check(_rewards.coins_lying().is_empty(), "a boss's add drops nothing (its waves never end)")
+	var late: Actor = _foe(IMP)
+	late.is_add = true
+	_kill(late, Vector2(50, 0))
+	check(_rewards.coins_lying().is_empty(), "nor one marked an add after it came")
 
 
 func test_a_coin_never_lands_in_a_wall() -> void:
 	_world.projectiles.grid().add_wall(Rect2(104.0, -16.0, 32.0, 32.0))
-	var foe := Actor.new()
-	var data: EnemyBase = IMP.duplicate()
-	data.coins = 3
-	foe.data = data
-	_world.bus.enemy_died.emit(0, foe, Vector2(100, 0), -1)
-	foe.free()
+	_kill(_foe(_carrying(3)), Vector2(100, 0))
 	var lying: PackedVector2Array = _rewards.coins_lying()
 	check_equal(lying.size(), 3, "three coins")
 	check_equal(lying[1], Vector2(100, 0), "the one that would land in the wall lands on the foe's spot")
@@ -608,3 +630,127 @@ func test_a_restore_says_the_shelves_and_pools_again() -> void:
 	check(items.has([99, false]), "an item this machine drew that lies there no more is said gone")
 	check(items.has([0, true]) and items.has([1, true]), "every item lying is said")
 	check_equal(pools, [-1, 6], "every pool forgotten, then each said")
+
+
+# --- Enemies carry coins and drop them by chance (the owner, 2026-11-19) --------------------------
+
+func test_a_foe_carries_its_coins_in_its_own_coins_bag() -> void:
+	var foe: Actor = _foe(_carrying(3))
+	check_equal(foe.inventory.count_of(COINS, CoinBase.ID), 3, "its data's coins, in its own bag")
+	check(foe.inventory.at_rest(), "as its data made it: still at rest")
+	var none: Actor = _foe(_carrying(0))
+	check_equal(none.inventory.stacks_in(COINS).size(), 0, "none for a foe whose data gives none")
+	check_equal(IMP.coin_range(), Vector2i(1, 1), "an ordinary foe: 1 coin, as CB10's 1 a foe")
+	check_equal(IMP.coin_drop_chance, 1.0, "always dropped, so today's economy stays")
+	foe.free()
+	none.free()
+
+
+func test_a_range_of_coins_is_rolled_once_by_the_runs_chance() -> void:
+	var seen: Dictionary = {}
+	var again: Array = []
+	for seed in 40:
+		var foe: Actor = _foe(_carrying(1, 1.0, 4), RoomGrid.NO_PLACE, false, seed)
+		var count: int = foe.inventory.count_of(COINS, CoinBase.ID)
+		check(count >= 1 and count <= 4, "from coins to coins_most (%d)" % count)
+		seen[count] = true
+		check(not foe.inventory.at_rest(), "a rolled count is walked by the hash")
+		var key: int = _world.table.key_of(foe.id)
+		again.append([seed, key, count])
+		foe.free()
+	check(seen.size() >= 3, "the counts differ between seeds (%s)" % [seen.keys()])
+	for row: Array in again:
+		var expected: int = 1 + Sim.seeded(int(row[0])).chance_int(Actor.COINS_PURPOSE, int(row[1]), 0, 4)
+		check_equal(int(row[2]), expected, "the same seed and key roll the same")
+
+
+func test_the_drop_chance_over_many_seeds() -> void:
+	var dropped: int = 0
+	var seeds: int = 120
+	for seed in seeds:
+		var rewards: RewardsScript = _make(seed)
+		var foe: Actor = _foe(_carrying(2, 0.5))
+		_world.bus.enemy_died.emit(0, foe, Vector2(40, 0), -1)
+		foe.free()
+		var lying: int = rewards.coins_lying().size()
+		check(lying == 0 or lying == 2, "all its coins or none (%d)" % lying)
+		if lying > 0:
+			dropped += 1
+		rewards.free()
+	_rewards.begin_run()
+	check(dropped > seeds * 3 / 10 and dropped < seeds * 7 / 10, "about half drop at 0.5 (%d of %d)" % [dropped, seeds])
+	for i in 20:
+		_kill(_foe(_carrying(1, 0.0)), Vector2(40, 0))
+	check(_rewards.coins_lying().is_empty(), "never at 0")
+	for i in 20:
+		_kill(_foe(_carrying(1, 1.0)), Vector2(40, 0))
+	check_equal(_rewards.coins_lying().size(), 20, "always at 1")
+
+
+## The drops of `count` foes at chance 0.5, by the Rewards area `rewards`: 1 a drop, 0 none.
+func _drops_of(rewards: RewardsScript, count: int) -> Array:
+	var out: Array = []
+	for i in count:
+		var before: int = rewards.coins_lying().size()
+		_kill(_foe(_carrying(1, 0.5)), Vector2(40, 0))
+		out.append(rewards.coins_lying().size() - before)
+	return out
+
+
+func test_the_drops_are_the_same_for_the_same_seed_and_through_a_snapshot() -> void:
+	_rewards.free()
+	_rewards = _make(11)
+	var first: Array = _drops_of(_rewards, 30)
+	_rewards.free()
+	_rewards = _make(11)
+	_world.table.begin_run()
+	check_equal(_drops_of(_rewards, 30), first, "the same seed drops the same")
+	var areas: Dictionary = {"Rewards": _rewards, "Actors": _world.table}
+	var snapshot: Snapshot = Snapshot.take(areas)
+	var on: Array = _drops_of(_rewards, 30)
+	check(on.has(0) and on.has(1), "some drop and some do not (%s)" % [on])
+	var problems: PackedStringArray = snapshot.restore(areas)
+	check(problems.is_empty(), "restored: %s" % [problems])
+	_rewards.rebuild_derived()
+	check_equal(_rewards._drops, 30, "the drops counted are state")
+	check_equal(_drops_of(_rewards, 30), on, "and the drops after the restore are the same")
+
+
+func test_a_possessed_foe_drops_what_it_still_carries() -> void:
+	var wizard := _wizard(0)
+	_tick()
+	var foe: Actor = _foe(_carrying(5))
+	check(Possession.begin(wizard, foe, 30.0) != null, "seat 0 possesses the foe")
+	check(foe.inventory.take(COINS, CoinBase.ID, 2), "it spends two (a shop's buy is the driven body's)")
+	_kill(foe, Vector2(60, 0))
+	check_equal(_rewards.coins_lying().size(), 3, "its coins drop the same way: what it still carries")
+	check_equal(_rewards.coins_of(0), 0, "none straight into a wizard's stack")
+
+
+# --- A rejoin keeps the coins (the owner, 2026-11-19) -------------------------------------------
+
+func test_a_player_who_leaves_and_joins_again_keeps_their_coins() -> void:
+	_world.bus.run_stats_ruled.emit([StatChange.make(&"start_coins", 4.0)] as Array[StatChange])
+	var body := _wizard(0)
+	_wizard(1, Vector2(200, 0))
+	_tick()
+	_rewards.lay_coin(Vector2(0, 0))
+	_tick()
+	check_equal(_rewards.coins_of(0), 5, "its starting coins and a coin from the floor")
+	check(_rewards.spend(0, 2), "spent two")
+	_world.wizards.erase(body)
+	body.free()
+	_world.bus.player_left.emit(0)
+	_tick()
+	_tick()
+	check_equal(_rewards.coins_of(0), 0, "away: no wizard, no coins")
+	_rewards.lay_coin(Vector2(200, 0))
+	_tick()
+	check_equal(_rewards.coins_of(1), 6, "the other gains while it is away")
+	_wizard(0)
+	_tick()
+	check_equal(_rewards.coins_of(0), 3, "back with the coins it left with, no second start_coins")
+	_tick()
+	check_equal(_rewards.coins_of(0), 3, "once")
+	_rewards.begin_run()
+	check_equal(_rewards._kept, PackedInt32Array([0, 0, 0, 0]), "a run's start forgets what was kept")

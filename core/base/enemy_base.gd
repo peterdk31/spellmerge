@@ -73,16 +73,29 @@ const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 @export_range(1, 100) var cost: int = 1
 ## The first row of a run's map it may stand in (0: the first room on).
 @export_range(0, 32) var min_depth: int = 0
-## The coins it drops where it dies (connected biomes CB10, decision 18: each one coin on the
-## floor that anyone may take, adding one to every player's coins; the Rewards area lays them). A boss's go
-## straight to every player as it dies (decision 25).
+## The coins it carries (the owner, 2026-11-19): they are in its own coins bag from the start (a seat
+## possessing it sees them and may spend them in a shop), `coins` of them, or with `coins_most` above
+## `coins` a whole number from `coins` to `coins_most` rolled by the run's chance as it comes
+## (`Actor.COINS_PURPOSE`, keyed by its actor key). An add another body called carries none.
 @export_range(0, 100) var coins: int = 1
+## The most coins it may carry (0, or not above `coins`: exactly `coins`).
+@export_range(0, 100) var coins_most: int = 0
+## The chance that its coins drop as it dies (the Rewards area rolls it, `Rewards.DROP_PURPOSE`):
+## each one a coin on the floor that anyone may take, adding one to every player's coins (connected
+## biomes decision 18). A boss's go straight to every player instead (decision 25), by the same
+## chance; an add's never drop. 1: always; 0: never.
+@export_range(0.0, 1.0) var coin_drop_chance: float = 1.0
 
 ## The most staffs an enemy may hold (the staff buttons).
 const MAX_STAFFS: int = 4
 ## The registry folders an enemy's data is found in: the enemies, then the bosses (content/bosses;
 ## boss OB2: a run's map stands both).
 const FOLDERS: Array[StringName] = [&"enemies", &"bosses"]
+
+
+## The fewest and the most coins it carries (`coins`, `coins_most`): [fewest, most].
+func coin_range() -> Vector2i:
+	return Vector2i(coins, maxi(coins, coins_most))
 
 
 ## Its name for people: `display_name`, else its id in words.

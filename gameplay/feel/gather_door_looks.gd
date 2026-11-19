@@ -7,7 +7,10 @@ extends Node2D
 ##
 ## **Smooth** (docs/STYLE.md): every change plays its frames, by whole pixels, at FPS: the bars sink
 ## over OPEN_FRAMES frames, the portal opens over the same, and a lamp steps through LAMP_STAGES shades
-## each way (a lamp past the count shrinks out the same). Nothing fades.
+## each way (a lamp past the count shrinks out the same). A gate held or let go turns its lamps from
+## the spark's shades to the fire's (or back) through their shared out shade (the outline): down, the
+## palette changes there, up again. Nothing fades. After a restore (door -1 told with `open`), what
+## is told next is drawn as it stands, never played in again.
 ##
 ## A child of Feel, top level (world space). View only: never state, nothing in the game reads it;
 ## it draws only while something moves (`_process` redraws then).
@@ -50,6 +53,10 @@ var _held: PackedByteArray = PackedByteArray()
 var _open: PackedByteArray = PackedByteArray()
 var _frame: PackedInt32Array = PackedInt32Array()
 var _lamps: Array[PackedInt32Array] = []
+## Each door's lamps' palette as drawn now (1 the held one's): it follows `_held` once they are out.
+var _drawn_held: PackedByteArray = PackedByteArray()
+## True after a restore's forgetting, until the next step: a door told meanwhile is drawn as it stands.
+var _as_it_stands: bool = false
 var _clock: float = 0.0
 
 
@@ -83,7 +90,7 @@ func is_moving() -> bool:
 		if _frame[door] != _frame_wanted(door):
 			return true
 		var lamps: PackedInt32Array = _lamps[door]
-		if lamps.size() != _lamp_count(door):
+		if lamps.size() != _lamp_count(door) or _drawn_held[door] != _held[door]:
 			return true
 		for lamp in lamps.size():
 			if lamps[lamp] != _lamp_wanted(door, lamp):
@@ -105,7 +112,17 @@ func advance() -> void:
 		while lamps.size() > wanted and lamps[lamps.size() - 1] == 0:
 			lamps.resize(lamps.size() - 1)
 		_lamps[door] = lamps
+		if _drawn_held[door] != _held[door] and _all_out(lamps):
+			_drawn_held[door] = _held[door]
+	_as_it_stands = false
 	queue_redraw()
+
+
+static func _all_out(lamps: PackedInt32Array) -> bool:
+	for shade in lamps:
+		if shade != 0:
+			return false
+	return true
 
 
 func _process(delta: float) -> void:
@@ -122,6 +139,7 @@ func _process(delta: float) -> void:
 func _on_door_shown(door: int, rule: StringName, area: Rect2, gathered: int, standing: int, held: bool, open: bool) -> void:
 	if door < 0:
 		_forget()
+		_as_it_stands = open
 		return
 	var fresh: bool = door >= _rules.size()
 	while _rules.size() <= door:
@@ -134,6 +152,7 @@ func _on_door_shown(door: int, rule: StringName, area: Rect2, gathered: int, sta
 		# A door is first drawn as it stands: a shut door's bars already up, a portal not yet open.
 		_frame.append(0)
 		_lamps.append(PackedInt32Array())
+		_drawn_held.append(1 if held else 0)
 	_rules[door] = rule
 	_areas[door] = area
 	_gathered[door] = gathered
@@ -143,6 +162,14 @@ func _on_door_shown(door: int, rule: StringName, area: Rect2, gathered: int, sta
 	if fresh and open and rule != RoomKind.DOOR_PORTAL_HOME:
 		# Told open before it was ever drawn shut (a restore): drawn open.
 		_frame[door] = OPEN_FRAMES
+	if _as_it_stands:
+		# After a restore: as it stands, its frame and lamps where they are wanted.
+		_frame[door] = _frame_wanted(door)
+		_drawn_held[door] = _held[door]
+		var lamps := PackedInt32Array()
+		for lamp in _lamp_count(door):
+			lamps.append(_lamp_wanted(door, lamp))
+		_lamps[door] = lamps
 	queue_redraw()
 
 
@@ -156,6 +183,7 @@ func _forget() -> void:
 	_open.resize(0)
 	_frame.resize(0)
 	_lamps.clear()
+	_drawn_held.resize(0)
 	_clock = 0.0
 	queue_redraw()
 
@@ -172,7 +200,7 @@ func _lamp_count(door: int) -> int:
 
 
 func _lamp_wanted(door: int, lamp: int) -> int:
-	if lamp >= _lamp_count(door):
+	if lamp >= _lamp_count(door) or _drawn_held[door] != _held[door]:
 		return 0
 	return LAMP_STAGES if lamp < _gathered[door] else 1
 
@@ -238,7 +266,7 @@ func _draw_lamps(door: int) -> void:
 	var row: int = lamps.size() * LAMP + (lamps.size() - 1) * LAMP_GAP
 	var x: int = roundi(area.get_center().x) - row / 2
 	var y: int = roundi(area.position.y) - LAMP_OUT - LAMP if _rules[door] == RoomKind.DOOR_PORTAL_HOME else roundi(area.end.y) + LAMP_OUT
-	var colours: PackedColorArray = held_colours if _held[door] != 0 else lamp_colours
+	var colours: PackedColorArray = held_colours if _drawn_held[door] != 0 else lamp_colours
 	for lamp in lamps.size():
 		var shade: int = lamps[lamp]
 		var side: int = LAMP if shade > 0 else LAMP - 2

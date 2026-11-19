@@ -330,6 +330,10 @@ func add_mouth(rect: Rect2) -> void:
 	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
 	for y in range(y0, y1):
 		for x in range(x0, x1):
+			# A cell that is a wall already stays one (no mouth): a gather door opened
+			# (`shut_mouth`) never opens a wall.
+			if (_wall_cells[y * _wall_w + x] & ROOM_CELL) != 0:
+				continue
 			_wall_cells[y * _wall_w + x] |= MOUTH_CELL
 			_has_walls = true
 			_has_mouths = true

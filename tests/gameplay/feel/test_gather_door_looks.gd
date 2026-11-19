@@ -78,3 +78,24 @@ func test_door_minus_one_forgets_every_door() -> void:
 func test_feel_has_the_gather_doors() -> void:
 	var feel: Node = root.get_node("Feel")
 	check(feel.call("gather_doors") is LooksScript, "Feel draws the gather doors")
+
+
+func test_a_held_gate_turns_its_lamps_through_their_shared_out_shade() -> void:
+	_bus.gather_door_shown.emit(0, RoomKind.DOOR_GATE, MOUTH, 1, 1, true, false)
+	_advance_until_still()
+	check_equal(_looks.lamps_of(0), PackedInt32Array([LooksScript.LAMP_STAGES]), "lit, in the held palette")
+	_bus.gather_door_shown.emit(0, RoomKind.DOOR_GATE, MOUTH, 1, 1, false, false)
+	var shades: Array[int] = [_looks.lamps_of(0)[0]]
+	while _looks.is_moving():
+		_looks.advance()
+		shades.append(_looks.lamps_of(0)[0])
+	check_equal(shades, [3, 2, 1, 0, 1, 2, 3] as Array[int], "down to the out shade, where the palettes meet, and up again")
+
+
+func test_after_a_restore_what_is_told_is_drawn_as_it_stands() -> void:
+	_bus.gather_door_shown.emit(-1, &"", Rect2(), 0, 0, false, true)
+	_bus.gather_door_shown.emit(0, RoomKind.DOOR_GATE, MOUTH, 1, 2, false, false)
+	_bus.gather_door_shown.emit(1, RoomKind.DOOR_PORTAL_HOME, Rect2(200.0, 200.0, 48.0, 48.0), 1, 2, false, true)
+	check_equal(_looks.lamps_of(0), PackedInt32Array([LooksScript.LAMP_STAGES, 1]), "the gate's lamps as they stand")
+	check_equal(_looks.frame_of(1), LooksScript.OPEN_FRAMES, "the portal open, not opening again")
+	check(not _looks.is_moving(), "nothing plays in")

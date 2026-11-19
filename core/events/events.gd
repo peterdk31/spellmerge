@@ -528,7 +528,8 @@ signal room_exits_shown(at: PackedVector2Array, kinds: Array[StringName])
 ## `DOOR_GATE`, or `portal` for the portal home), its `area` in world pixels (a door's mouth, the
 ## portal's floor), how many standing wizards are `gathered` at it of the `standing` there are,
 ## `held` while a gate stays shut for a sealed fight that holds a wizard, and `open` once it opened.
-## Sent as it changes; door -1 (the rest empty): every door forgotten (the biome left, a restore).
+## Sent as it changes; door -1 (the rest empty): every door forgotten (the biome left; a restore, with
+## `open` true: what is told next is drawn as it stands, not played in).
 ## For the view only. Heard by feel (the door's bars, its lamps, the portal).
 signal gather_door_shown(door: int, rule: StringName, area: Rect2, gathered: int, standing: int, held: bool, open: bool)
 ## Sender: flow. The room `room_id` a run is in was stood (items I6): the items its scene places

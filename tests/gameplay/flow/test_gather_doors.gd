@@ -301,6 +301,7 @@ func test_a_boss_in_a_biome_room_opens_its_intro() -> void:
 	_ticks(1)
 	check_equal(opened.size(), 1, "the boss's room entered through the gate: its intro opens")
 	check(flow.boss_intro.opened, "and stands")
+	check(tick.sim.stops.has(BossIntroHold.STOP), "the game stops for it")
 	# Any seat's A moves it on, past the last page.
 	# (The command's handler, as the tick's start applies it; tests/gameplay/flow/test_boss_intro_hold.gd
 	# plays the command itself.)
@@ -326,3 +327,58 @@ func test_a_restore_lays_the_doors_again() -> void:
 	check(not flow.gates.is_open(EAST), "the snapshot's gate is shut")
 	check(_grid().is_shut_mouth(mouth.get_center()), "and its mouth is shut in the grid again")
 	check(not told.is_empty() and told[0][0] == -1, "the view forgets its doors to be told them again")
+	check(not _last_told(0).is_empty() and not _last_told(0)[6], "and is told the gate again at once, shut")
+
+
+func test_a_room_with_two_doors_counts_each_door_on_its_own() -> void:
+	# The nave as a gated room (its two bridges two doors), laid alone: a wizard on the lip of one door
+	# is at that door, never at the other.
+	var map: BiomeMap = BiomeMaps.split(registry)
+	var into: Node2D = own(Node2D.new()) as Node2D
+	var world: BiomeWorld = BiomeMaps.laid(registry, projectiles, into, map)
+	var doors := GatherDoors.new()
+	doors.begin(map, PackedByteArray([GatherDoors.RULE_GATHER, 0, 0]), PackedByteArray([0, 0, 0]))
+	doors.lay(world, _grid())
+	check_equal(doors.doors(), 2, "two doors to the nave")
+	var life := RoomLife.new()
+	life.begin(map.rooms(), world.places(), [] as Array[RoomFight])
+	var a: Actor = own(Actor.new()) as Actor
+	var b: Actor = own(Actor.new()) as Actor
+	var lip: Rect2 = doors.mouth_of(0)
+	var lip_way: Vector2 = Vector2.LEFT if lip.get_center().x < world.room_rect(0).get_center().x else Vector2.RIGHT
+	a.position = lip.get_center() + lip_way * 10.0
+	a.room = _grid().place_at(a.position)
+	check_equal(a.room, 0, "the lip outside door 0's mouth is the nave's place")
+	b.room = map.rooms() + doors.door_bridges[1]
+	b.position = world.bridge_rect(doors.door_bridges[1]).get_center()
+	var party: Array[Node2D] = [a, b]
+	check_equal(doors.count_doors(party, life), GatherDoors.NONE, "one at each door: neither opens")
+	b.room = a.room
+	b.position = a.position + Vector2(0.0, 6.0)
+	check_equal(doors.count_doors(party, life), 0, "both by door 0: the nave opens")
+	_grid().clear_places()
+
+
+func test_a_snapshot_with_the_gate_and_the_portal_open_restores_them() -> void:
+	var map: BiomeMap = _start(2, &"boss", [], [IMP])
+	_ticks(1)
+	var shut := Snapshot.take(tick.state_areas(), root)
+	var mouth: Rect2 = flow.gates.mouth_of(0)
+	_wizard(0).global_position = _on_east_bridge(map)
+	_wizard(1).global_position = _on_east_bridge(map, 40.0)
+	_ticks(1)
+	_beat(EAST)
+	_ticks(2)
+	check_equal(flow.gates.portal_room, EAST, "the portal stands")
+	var area: Rect2 = flow.gates.portal_area
+	var open := Snapshot.take(tick.state_areas(), root)
+	check(shut.restore(tick.state_areas(), root).is_empty(), "restored the shut gate")
+	check(_grid().is_shut_mouth(mouth.get_center()) and flow.gates.portal_room == GatherDoors.NONE, "shut, no portal")
+	told.clear()
+	check(open.restore(tick.state_areas(), root).is_empty(), "restored the open gate")
+	check(flow.gates.is_open(EAST) and not _grid().is_shut_mouth(mouth.get_center()), "the gate open again, its mouth too")
+	check(flow.gates.portal_room == EAST and flow.gates.portal_area == area, "the portal again, where it was")
+	check(told.size() >= 3 and told[0][0] == -1 and told[0][6], "the view forgets its doors, to draw what follows as it stands")
+	var portal: Array = _last_told(flow.gates.doors())
+	check(not portal.is_empty() and portal[2] == area, "and is told the portal at once, before any step: %s" % [portal])
+	check(not _last_told(0).is_empty() and _last_told(0)[6], "and the gate, open")

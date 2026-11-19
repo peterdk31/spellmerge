@@ -8,7 +8,8 @@ extends RefCounted
 ##   or DOOR_GATE (the boss's). Each mouth where a bridge meets it is one of its doors, shut
 ##   (`RoomGrid.shut_mouth`: a wall to everything, a wizard too) until the room opens.
 ## - **At a door** is on its bridge (a wizard's own body whose place, `Actor.room`, is that bridge's,
-##   or the gated room's own while it is shut: its lip outside the shut mouth, where its place reaches),
+##   or the gated room's own while it is shut, beside that door's mouth: its lip outside the shut
+##   mouth, where its place reaches),
 ##   counted where the wizard's own body stands, as the row run's exits are (a seat driving another
 ##   body holds the party until it comes back). **Standing** is not downed (one falling into a hole
 ##   stands: the party waits for its return).
@@ -32,6 +33,9 @@ const RULE_GATHER: int = 1
 const RULE_GATE: int = 2
 ## No room (`count_doors`), no portal (`portal_room`), every door (`gather_door_shown`'s door -1).
 const NONE: int = -1
+## How far round a door's mouth its room's lip counts as at that door (a room's place reaches up to
+## 16 px past its socket, CB2; and a wizard's half).
+const LIP_REACH: float = 24.0
 ## The portal home's floor: a square this wide round its middle (as a room exit's area).
 const PORTAL_SIZE: Vector2 = Vector2(48.0, 48.0)
 
@@ -158,7 +162,7 @@ func count_doors(party: Array[Node2D], life: RoomLife) -> int:
 			var actor := wizard as Actor if is_instance_valid(wizard) else null
 			# On its bridge, or on the lip of its room outside the shut mouth (the room's place
 			# reaches past its socket; nobody is further in before it opens).
-			if actor != null and not actor.is_downed() and (actor.room == at_door or (actor.room == room and not is_open(room))):
+			if actor != null and not actor.is_downed() and (actor.room == at_door or (actor.room == room and not is_open(room) and mouth_of(door).grow(LIP_REACH).has_point(actor.position))):
 				gathered += 1
 		var gate_held: bool = rules[room] == RULE_GATE and held
 		if not is_open(room):
@@ -208,11 +212,18 @@ func count_portal(party: Array[Node2D]) -> bool:
 	return standing > 0 and gathered == standing
 
 
-## After a snapshot was restored: the view forgets every door and is told each again at the next
-## count (the mouths are laid again by Flow, `lay`).
+## After a snapshot was restored: the view forgets every door, to draw each as it stands when told it
+## again (`tell_all`, by Flow once the mouths are laid again, `lay`).
 func rebuild_derived() -> void:
 	_shown.resize(0)
-	_forget()
+	_forget(true)
+
+
+## Tell the view every door and the portal as they stand now, opening nothing (after a restore, which
+## may stand still for a while: a boss's intro, a pause).
+func tell_all(party: Array[Node2D], life: RoomLife) -> void:
+	count_doors(party, life)
+	count_portal(party)
 
 
 static func _rule_name(rule: int) -> StringName:
@@ -239,6 +250,7 @@ func _tell(door: int, rule: StringName, area: Rect2, gathered: int, standing: in
 		events.gather_door_shown.emit(door, rule, area, gathered, standing, held, is_opened)
 
 
-func _forget() -> void:
+## Every door forgotten (door NONE); `restored`: what is told next is drawn as it stands (`open` true).
+func _forget(restored: bool = false) -> void:
 	if events != null:
-		events.gather_door_shown.emit(NONE, &"", Rect2(), 0, 0, false, false)
+		events.gather_door_shown.emit(NONE, &"", Rect2(), 0, 0, false, restored)

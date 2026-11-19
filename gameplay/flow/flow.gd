@@ -402,8 +402,9 @@ func step(delta: float) -> void:
 		_crumble_orphans()
 	if mode == MODE_RUN and state == State.RUNNING and not spawn_queue.is_done():
 		_call_spawning(delta)
-	if mode == MODE_BIOME and state == State.RUNNING:
-		_step_biome(delta)
+	if mode == MODE_BIOME and state == State.RUNNING and _step_biome(delta):
+		# The run ended in its step (the portal home): nothing more of it steps.
+		return
 	_count_stand_ups(delta)
 	if mode == MODE_HUB and state == State.RUNNING:
 		_count_stone()
@@ -1817,8 +1818,9 @@ func _start_biome_rooms() -> void:
 
 ## A biome's tick (Flow's step): every room a wizard's own body stepped onto entered (its fight
 ## starting), every fight under way spawning at its pace and cleared once its last enemy is down,
-## then every place woken or put to sleep (`RoomLife.wake`).
-func _step_biome(delta: float) -> void:
+## then the gather doors counted (CB7), then every place woken or put to sleep (`RoomLife.wake`).
+## True when the run ended here (the portal home taken).
+func _step_biome(delta: float) -> bool:
 	for wizard: Node2D in _wizards:
 		if not is_instance_valid(wizard):
 			continue
@@ -1840,8 +1842,9 @@ func _step_biome(delta: float) -> void:
 		_open_gate(gated)
 	if gates.count_portal(_wizards):
 		_take_portal_home()
-		return
+		return true
 	life.wake(actors, projectiles)
+	return false
 
 
 ## Every standing wizard is at a door of gated room `room` (and a gate is not held): it opens and the
@@ -2023,3 +2026,4 @@ func _rebuild_biome() -> void:
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
 		gates.lay(biome, projectiles.grid())
+	gates.tell_all(_wizards, life)

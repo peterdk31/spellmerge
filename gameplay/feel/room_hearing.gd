@@ -22,7 +22,8 @@ extends RefCounted
 ##
 ## It learns the pieces from `room_built` (their templates, rooms first and then bridges, a new world
 ## from FIRST_ROOM) and a room's kind from the layout's `RoomKind.LAYOUT_META`, else the first kind its
-## template hosts.
+## template hosts; a reward room's type (`RewardType`, the owner's ask of 2026-11-19) from the layout's
+## `RewardType.LAYOUT_META` (none: any), for the mouths' signs and the held map.
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -45,6 +46,7 @@ var registry: Node = null
 var _templates: Array[StringName] = []
 var _walkway: PackedByteArray = PackedByteArray()
 var _kinds: Array[RoomKind] = []
+var _types: Array[RewardType] = []
 ## By place: heard this frame (1) or not; the places touching it (from `_touch_from`, `_touch_count`).
 var _heard: PackedByteArray = PackedByteArray()
 var _touch: PackedInt32Array = PackedInt32Array()
@@ -71,6 +73,7 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 		_templates.clear()
 		_walkway.resize(0)
 		_kinds.clear()
+		_types.clear()
 		_followed = NONE
 		_touch_places = -1
 		_world += 1
@@ -80,6 +83,7 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 		_templates.append(&"")
 		_walkway.append(0)
 		_kinds.append(null)
+		_types.append(null)
 	_templates[number] = room_id
 	var room: RoomBase = _room(room_id)
 	_walkway[number] = 1 if room != null and room.walkway else 0
@@ -88,6 +92,10 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 		kind_id = StringName(layout_root.get_meta(RoomKind.LAYOUT_META))
 	elif room != null and not room.kinds.is_empty():
 		kind_id = room.kinds[0]
+	var type: RewardType = null
+	if layout_root != null and layout_root.has_meta(RewardType.LAYOUT_META):
+		type = RewardType.from_row(PackedStringArray(layout_root.get_meta(RewardType.LAYOUT_META)))
+	_types[number] = type
 	_kinds[number] = registry.call(&"get_resource", KIND_FOLDER, kind_id) as RoomKind if registry != null and kind_id != &"" else null
 
 
@@ -195,6 +203,17 @@ func followed() -> int:
 ## The kind of piece `place` (null: none known).
 func kind_of(place: int) -> RoomKind:
 	return _kinds[place] if place >= 0 and place < _kinds.size() else null
+
+
+## The reward type of piece `place` (null: none, or any).
+func type_of(place: int) -> RewardType:
+	var type: RewardType = _types[place] if place >= 0 and place < _types.size() else null
+	return type if type != null and not type.is_any() else null
+
+
+## The registry's resource `id` in `folder` (null: none; for the views that read a piece's content).
+func content(folder: StringName, id: StringName) -> Resource:
+	return registry.call(&"get_resource", folder, id) as Resource if registry != null and id != &"" else null
 
 
 ## The track the music plays for the room it follows (its kind's, else its template's; null: none).

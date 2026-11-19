@@ -80,7 +80,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `cover_changed` | `cover` (each tick's changes of one room, by its number; after a `room_built` or a restore, the cells the view was told otherwise) | `feel` (the tufts' look of that room) |
 | `status_requested` | `core/spells` (a portal's infusion) and `cover` (a status of the cover a body stands in, ground cover GC5 rule 4: asked as any status is) | `combat` |
 | `room_cleared` | `flow` | `run` |
-| `room_rewards_due` | `flow` (a cleared room whose kind names a reward table, however its foes left it; connected biomes CB11) | `rewards` (a roll per player from that table) |
+| `room_rewards_due` | `flow` (a cleared room whose kind names a reward table, however its foes left it; connected biomes CB11) | `rewards` (a roll per player from that table, among items of the room's reward type) |
 | `special_room_opened` | `flow` (a shop or a fountain entered the first time: its shelf's spots or its pool; CB11) | `rewards` (stocks the shelf, fills the pool) |
 | `key_door_shown`, `secret_rock_shown`, `key_shown` | `flow` (a biome's key doors, secret rocks and keys; CB11) | `feel` (`lock_looks.gd`, `special_room_looks.gd`) |
 | `shelf_changed`, `fountain_changed` | `rewards` (a shop's items, a fountain's pool; CB11) | `feel` (`special_room_looks.gd`) |

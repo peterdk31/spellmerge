@@ -237,7 +237,7 @@ func run_content() -> RunContent:
 	var enemies: Array[Resource] = []
 	for folder: StringName in EnemyBase.FOLDERS:
 		enemies.append_array(get_all(folder))
-	return RunContent.gather(get_all(&"room_kinds"), get_all(&"rooms"), enemies)
+	return RunContent.gather(get_all(&"room_kinds"), get_all(&"rooms"), enemies, get_all(&"rewards"), get_all(ItemKinds.content_of(ItemKinds.CARD)[0]))
 
 
 ## The shapes of biome `biome`'s templates as a biome's map lays them (connected biomes CB5:

@@ -129,9 +129,9 @@ func _carrying(coins: int, chance: float = 1.0, most: int = 0) -> EnemyBase:
 
 ## Room `room` cleared, its kind rewarding it from `table` (Flow's `room_rewards_due`), then a step
 ## rolls for it.
-func _clear(room: int, table: StringName = &"clear") -> void:
+func _clear(room: int, table: StringName = &"clear", type: RewardType = null) -> void:
 	_world.bus.room_cleared.emit(&"test_room", room)
-	_world.bus.room_rewards_due.emit(room, table)
+	_world.bus.room_rewards_due.emit(room, table, type.to_row() if type != null else PackedStringArray())
 	_rewards.step(Fixture.STEP)
 
 
@@ -165,13 +165,13 @@ func test_only_a_clear_its_kind_rewards_rolls_and_from_its_own_table() -> void:
 	# Connected biomes CB11 (the owner, 2026-11-19): however its foes left it (one killed elsewhere,
 	# none dying in it at all), a fight's clear rolls.
 	_foe_dies(Vector2(500, 500), 2)
-	_world.bus.room_rewards_due.emit(1, &"clear")
+	_world.bus.room_rewards_due.emit(1, &"clear", PackedStringArray())
 	check(_rolled.is_empty(), "not before the area's step")
 	_rewards.step(Fixture.STEP)
 	check_equal(_rolled.size(), 1, "a fight's clear rolls whoever its foes died by and wherever")
 	# Each kind rolls from its own table: the treasure's never offers what only the clear's has.
 	var treasure := registry_table(&"treasure")
-	_world.bus.room_rewards_due.emit(4, &"treasure")
+	_world.bus.room_rewards_due.emit(4, &"treasure", PackedStringArray())
 	_rewards.step(Fixture.STEP)
 	check_equal(_rolled.size(), 2, "a treasure room's clear rolls too")
 	for choice: Dictionary in _rolled[1][2]:
@@ -759,6 +759,63 @@ func test_a_player_who_leaves_and_joins_again_gets_no_second_start() -> void:
 	_tick()
 	_tick()
 	check_equal(_rewards.coins_of(0), 3, "back with what its inventory holds, no second start_coins")
+
+
+## A reward room's type (the owner's ask of 2026-11-19, `RewardType`): every player's roll there is
+## among items of the type, widened a level only where it has nothing more (an element's one card,
+## then other infusions; a potion room's one potion, then the whole table); a room of no type rolls as
+## it always did.
+func test_a_reward_rooms_rolls_stay_within_its_type() -> void:
+	var cards: RewardCards = RewardCards.gather(_world.registry.get_all(&"spells"))
+	var table := registry_table(&"reward")
+	for seed in 12:
+		for type: RewardType in [RewardType.make(ItemKinds.CARD, &"modifier"), RewardType.make(ItemKinds.CARD, &"carrier"), RewardType.make(ItemKinds.CARD, &"element", &"fire"), RewardType.make(ItemKinds.POTION)]:
+			var offer := RewardOffer.new()
+			RewardRoll.fill(offer, table, 2, Sim.seeded(seed), 0, 0, cards, RewardRoll.PURPOSE, RewardRoll.CARD_PURPOSE, [], type)
+			check_equal(offer.size(), 2, "two choices in a %s room" % [type.to_row()])
+			check_equal(offer.kinds[0], type.item, "the first is of the room's item kind")
+			if type.element != &"":
+				check_equal(offer.ids[0], type.element, "a fire room's first choice is Fire, its one card")
+			for at in offer.size():
+				if type.card_kind != &"":
+					check_equal(cards.kind_of(offer.ids[at]), type.card_kind, "every choice of a %s room is a %s" % [type.card_kind, type.card_kind])
+			if type.item == ItemKinds.POTION:
+				check(offer.kinds[1] == ItemKinds.POTION and offer.ids[1] != offer.ids[0], "a potion room offers two potions (the owner, 2026-11-19: more potions)")
+		var plain := RewardOffer.new()
+		var any := RewardOffer.new()
+		RewardRoll.fill(plain, table, 2, Sim.seeded(seed), 0, 0, cards)
+		RewardRoll.fill(any, table, 2, Sim.seeded(seed), 0, 0, cards, RewardRoll.PURPOSE, RewardRoll.CARD_PURPOSE, [], RewardType.new())
+		check_equal([any.kinds, any.ids], [plain.kinds, plain.ids], "a room of no type rolls as before")
+
+
+## Through the area: the type comes with `room_rewards_due` (Flow's, from the map) and each seat's
+## own roll keeps to it; the same seed the same.
+func test_the_area_rolls_each_player_within_the_rooms_type() -> void:
+	_wizard(0)
+	_wizard(1, Vector2(40, 0))
+	_clear(2, &"reward", RewardType.make(ItemKinds.CARD, &"trigger"))
+	check_equal(_rolled.size(), 2, "each player rolls their own")
+	var cards: RewardCards = RewardCards.gather(_world.registry.get_all(&"spells"))
+	for row: Array in _rolled:
+		for choice: Dictionary in row[2]:
+			check_equal(cards.kind_of(choice["id"]), &"trigger", "a trigger room offers triggers: %s" % [choice["id"]])
+
+
+## A regression (the review of 2026-11-19): a typed level widened after its tries landed on a line
+## with nothing of the type left (the multicasts: one under the first line's complexity, three over
+## it), so a multicast room now and then offered another kind while multicasts remained.
+func test_a_typed_room_widens_only_when_its_type_has_nothing_left() -> void:
+	var cards: RewardCards = RewardCards.gather(_world.registry.get_all(&"spells"))
+	var table := registry_table(&"reward")
+	var type := RewardType.make(ItemKinds.CARD, &"multicast")
+	var wrong: int = 0
+	for seed in 200:
+		var offer := RewardOffer.new()
+		RewardRoll.fill(offer, table, 2, Sim.seeded(seed), 0, 0, cards, RewardRoll.PURPOSE, RewardRoll.CARD_PURPOSE, [], type)
+		for at in offer.size():
+			if cards.kind_of(offer.ids[at]) != &"multicast":
+				wrong += 1
+	check_equal(wrong, 0, "every choice of a multicast room is a multicast while there are more than two")
 
 
 # --- Everything is droppable (the owner, 2026-11-19) -------------------------------------------

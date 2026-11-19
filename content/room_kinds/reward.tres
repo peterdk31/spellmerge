@@ -19,6 +19,7 @@ display_name = "Reward"
 fill = &"none"
 ends = &"enemies_down"
 rewards = &"reward"
+typed_rewards = true
 light = &"spark"
 light_tint = 0.2
 air_motes = SubResource("Resource_air")

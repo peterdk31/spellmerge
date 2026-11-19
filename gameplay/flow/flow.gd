@@ -2002,7 +2002,8 @@ func _clear_biome_room(room: int) -> void:
 		events.room_cleared.emit(biome.map.room_templates[room], room)
 		if kind != null and kind.rewards != &"":
 			# Each player's reward (connected biomes CB11): however its foes left it.
-			events.room_rewards_due.emit(room, kind.rewards)
+			# A reward room's of its type, decided as the biome was made (the owner, 2026-11-19).
+			events.room_rewards_due.emit(room, kind.rewards, biome.map.reward_type_of(room).to_row())
 	_drop_keys(room)
 	if gates.opens_home(room):
 		_open_portal_home(room)

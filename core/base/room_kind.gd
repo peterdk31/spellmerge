@@ -80,6 +80,10 @@ const LAYOUT_META: StringName = &"room_kind"
 ## A shop's shelf (`FILL_SHOP`): the reward table its items are rolled from, each line's `price` what
 ## it costs. Read for no other fill.
 @export var shelf: StringName = &""
+## Its rewards are of one type (the owner's ask of 2026-11-19, `RewardType`): decided from its
+## `rewards` table as the biome is made, told at its mouths and on the held map, and every wizard's
+## roll there made among items of it. A reward room's; every other kind's rewards are of any type.
+@export var typed_rewards: bool = false
 
 @export_group("Look and sound")
 ## What a room of the kind brings to how it looks and sounds (connected biomes CB12, decision 30;

@@ -10,7 +10,8 @@ extends CanvasLayer
 ## shown (the run stat `map_reveal`: the stone's shadow), each in its own shape (its floor at
 ## MAP_CELL world pixels a map pixel, read once from the grid as the biome is laid); each bridge with a
 ## seen room at an end; each room's kind symbol (`RoomKind.symbol`) on the rooms seen and on those a
-## drawn bridge leads to (their mouth tells it already, `mouth_symbols.gd`); and every wizard, a dot in
+## drawn bridge leads to (their mouth tells it already, `mouth_symbols.gd`), with a reward room's
+## type under it (`reward_glyphs.gd`, the owner's ask of 2026-11-19), rising with it; and every wizard, a dot in
 ## its hat colour. **A player's own sense** (the run stat `secret_sense`, told for each seat by
 ## `run_stats_told`; the owner's answer of 2026-11-19): on that player's map only, each secret
 ## room (a kind whose door is `RoomKind.DOOR_SECRET`) not otherwise drawn whose rectangle lies within
@@ -40,6 +41,7 @@ extends CanvasLayer
 const ActorsScript := preload("res://core/actors/actors.gd")
 const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const KindSymbolScript := preload("res://gameplay/feel/kind_symbol.gd")
+const RewardGlyphsScript := preload("res://gameplay/feel/reward_glyphs.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -77,6 +79,10 @@ var _room: PackedByteArray = PackedByteArray()
 var _ends: PackedInt32Array = PackedInt32Array()
 var _symbols: Array[PackedByteArray] = []
 var _symbol_shades: Array[PackedColorArray] = []
+## By place: its reward type's glyphs (an Array[PackedByteArray] and an Array[PackedColorArray] each;
+## empty: none).
+var _glyphs: Array = []
+var _glyph_shades: Array = []
 ## The pieces' box (world pixels).
 var _area: Rect2 = Rect2()
 ## The party's map as told last (`rooms_seen`).
@@ -195,6 +201,11 @@ func shade_of(place: int) -> int:
 
 func symbol_rows_of(place: int) -> int:
 	return _symbol_rows[place] if place >= 0 and place < _symbol_rows.size() else 0
+
+
+## How many glyphs of its reward type room `place` shows with its symbol (for tests).
+func glyphs_of(place: int) -> int:
+	return (_glyphs[place] as Array).size() if place >= 0 and place < _glyphs.size() else 0
 
 
 ## Room `place` as sensed on seat `seat`'s map now (0 not drawn, then its stage: 1 the stone's
@@ -479,6 +490,8 @@ func draw_map(canvas: SeatMap, seat: int) -> void:
 			var middle: Vector2 = origin + ((_rects[place].get_center() - _area.position) / MAP_CELL).floor() * scale
 			var half: float = float(RoomKind.SYMBOL_SIDE * scale / 2)
 			KindSymbolScript.draw(canvas, _symbols[place], _symbol_shades[place], middle - Vector2(half, half), _symbol_rows[place], scale)
+			if (_glyphs[place] as Array).size() > 0:
+				RewardGlyphsScript.draw(canvas, _glyphs[place], _glyph_shades[place], glyphs_corner(middle, (_glyphs[place] as Array).size(), scale), true, _symbol_rows[place], scale)
 	for wizard in ActorsScript.SEATS:
 		if _wizard_at[wizard] == Vector2.INF:
 			continue
@@ -497,6 +510,8 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	_floors.clear()
 	_symbols.clear()
 	_symbol_shades.clear()
+	_glyphs.clear()
+	_glyph_shades.clear()
 	_room.resize(places)
 	_secret.resize(places)
 	_sense_shade.resize(places * ActorsScript.SEATS)
@@ -517,6 +532,12 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 		_secret[place] = 1 if kind != null and kind.door == RoomKind.DOOR_SECRET else 0
 		_symbols.append(kind.symbol_pixels() if kind != null else PackedByteArray())
 		_symbol_shades.append(KindSymbolScript.shades_of(kind))
+		var type: RewardType = pieces.type_of(place) if kind != null else null
+		var glyphs: Array[PackedByteArray] = []
+		var glyph_shades: Array[PackedColorArray] = []
+		RewardGlyphsScript.glyphs_of(type, pieces.content(RewardGlyphsScript.card_folder(), type.element) if type != null else null, glyphs, glyph_shades)
+		_glyphs.append(glyphs)
+		_glyph_shades.append(glyph_shades)
 	for place in places:
 		if _room[place] != 0:
 			continue
@@ -534,6 +555,14 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	_settle()
 	for map in _maps:
 		map.queue_redraw()
+
+
+## The corner of a row of `count` reward glyphs under a room's symbol centred on `middle` (screen
+## pixels), `scale` screen pixels a map pixel: centred, a glyph's gap under the symbol, whole pixels.
+static func glyphs_corner(middle: Vector2, count: int, scale: int) -> Vector2:
+	var half_symbol: int = RoomKind.SYMBOL_SIDE * scale / 2
+	var width: int = RewardGlyphsScript.row_width(count) * scale
+	return middle + Vector2(-(width / 2), RoomKind.SYMBOL_SIDE * scale - half_symbol + RewardGlyphsScript.GAP * scale)
 
 
 ## Place `place`'s floor on `grid` as a white mask, a pixel a MAP_CELL square (open ground of the

@@ -1,0 +1,17 @@
+{
+	"about": "The crypt's bridges (connected biomes CB12): a causeway of narrow dressed stones laid across the walkway in courses, smaller and more even than the rooms' flagstones and a shade cooler, each stone's upper joint lit (the light from the upper left), grit gathering along its broken sides.",
+	"base": "stone.base",
+	"slabs": {
+		"size": 13,
+		"jitter": 0.75,
+		"squash": 1.8,
+		"tone": "#4f4b6c",
+		"vary": 0.7,
+		"joint": "#24213a",
+		"joint_width": 1.0,
+		"light": "#5d5980",
+		"light_width": 1.0
+	},
+	"toward_edge": {"colour": "#5a5468", "reach": 14, "most": 0.5, "scales": [9, 3]},
+	"speckle": [["stone.shadow", 0.005], ["#5d5980", 0.003]]
+}

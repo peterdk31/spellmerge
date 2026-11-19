@@ -15,6 +15,11 @@ extends Node
 ## is a plain `AudioStreamPlayer`. `clear_world` stops the world's one-shots and held sounds at once
 ## (a new room: what held them is gone).
 ##
+## **Ears** (`ears`, `ears.gd`; connected biomes CB12, decision 29): while the screen is split a world
+## sound is heard from the view that shows it (it pans and falls off as it looks in that view), and
+## only where `ears.heard` says (Feel's: the rooms this machine's wizards are in). A one-shot or an
+## accent asked for where nobody hears is not played; a held sound there is silent until it is heard.
+##
 ## **Buses** (`default_bus_layout.tres`, named in project.godot): Master > `Music` > `MusicDuck`,
 ## `SFX`, `Ambience` and `UI`; BUS_* are their names, so no other script writes one. The music is on
 ## `MusicDuck`, whose volume is the duck's alone (`duck`), under `Music`, whose volume is the
@@ -45,6 +50,7 @@ const MusicScript := preload("res://core/audio/music.gd")
 const AmbienceScript := preload("res://core/audio/ambience.gd")
 const BusesScript := preload("res://core/audio/buses.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const EarsScript := preload("res://core/audio/ears.gd")
 
 ## The buses (default_bus_layout.tres).
 const BUS_MASTER: StringName = &"Master"
@@ -91,6 +97,8 @@ var ambience: AmbienceScript = null
 var over: VoicesScript = null
 var ui: VoicesScript = null
 var buses: BusesScript = null
+## Where the world's sounds are heard from and which are heard (`ears.gd`; Feel sets its `heard`).
+var ears: EarsScript = EarsScript.new()
 
 var _world: Node = null
 ## The ids the UI played this frame (at most one play an id a frame), the first `_ui_count`.
@@ -117,6 +125,7 @@ func _ready() -> void:
 	held.heard = HEARD
 	held.attenuation = ATTENUATION
 	held.pan = PAN
+	held.ears = ears
 	_world.add_child(held)
 	music = MusicScript.new()
 	music.name = "Music"
@@ -188,6 +197,8 @@ func step(delta: float) -> void:
 
 ## The world's players `delta` real seconds on: voices, held sounds, the music and the room's bed.
 func step_world(delta: float) -> void:
+	if is_inside_tree():
+		ears.refresh(get_viewport())
 	voices.step(delta)
 	held.step(delta)
 	music.step(delta)
@@ -221,12 +232,14 @@ func length_of(id: StringName) -> float:
 # --- The world ------------------------------------------------------------------------------------
 
 ## Plays the sound `id` at `at` (INF: the middle of the picture), `volume` decibels on top of its
-## own, on `bus`; the voice used, or -1 for none (no such sound).
+## own, on `bus`; the voice used, or -1 for none (no such sound, or `at` where nobody hears: `ears`).
 func play(id: StringName, at: Vector2 = Vector2.INF, volume: float = 0.0, bus: StringName = BUS_SFX, pitch: float = 1.0) -> int:
+	if not ears.hears(at):
+		return -1
 	var stream: AudioStream = sound(id)
 	if stream == null:
 		return -1
-	return voices.play(id, stream, at if at.is_finite() else _middle(), volume, bus, pitch)
+	return voices.play(id, stream, ears.place(at) if at.is_finite() else _middle(), volume, bus, pitch)
 
 
 ## Stops the world's one-shot on `voice`.
@@ -280,7 +293,7 @@ func play_bed(bed: Ambience) -> void:
 ## Plays the sound `id` as an accent of the bed, at `at`, `volume` decibels, at `pitch` its pitch
 ## scale; the voice used, or -1 for none.
 func play_accent(id: StringName, at: Vector2, volume: float, pitch: float) -> int:
-	return ambience.play_accent(sound(id), at, volume, pitch)
+	return ambience.play_accent(sound(id), ears.place(at), volume, pitch)
 
 
 ## The world's one-shots and held sounds stop at once (a new room, a run's end).

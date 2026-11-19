@@ -126,6 +126,10 @@ const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
 const ExitSignsScript := preload("res://gameplay/feel/exit_signs.gd")
 const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
+const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
+const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
+const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
+const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
@@ -512,6 +516,14 @@ var _altar_code: AltarCodeScript = null
 var _exit_signs: ExitSignsScript = null
 ## A biome's gather doors, its gate and the portal home (connected biomes CB7, `gather_door_looks.gd`).
 var _gather_doors: GatherDoorLooksScript = null
+## A biome's pieces as this machine hears them (connected biomes CB12, `room_hearing.gd`): which
+## places Audio plays from, and the room the music and the bed follow.
+var _hearing: RoomHearingScript = RoomHearingScript.new()
+## A biome's bridge mouths (shimmer, flare, seal: `mouth_looks.gd`), its key doors and secret rocks
+## (`lock_looks.gd`) and the dark over its unvisited rooms (`unseen_dark.gd`; CB12).
+var _mouths: MouthLooksScript = null
+var _locks: LockLooksScript = null
+var _unseen: UnseenDarkScript = null
 ## The items on the ground (`ground_items.gd`, items I6).
 var _ground_items: GroundItemsScript = null
 ## The health bars over wizards whose seat drives another body (`away_bars.gd`, items I8).
@@ -718,6 +730,8 @@ var _cue_next_at: PackedFloat32Array = PackedFloat32Array()
 func _exit_tree() -> void:
 	if audio != null and is_instance_valid(audio):
 		audio.silence()
+		if audio.ears.heard == Callable(_hearing, &"hears"):
+			audio.ears.heard = Callable()
 	if _held != null:
 		_held.clear()
 
@@ -806,6 +820,7 @@ func _ready() -> void:
 	add_child(_ambience)
 	_body_sounds = BodySoundsScript.new()
 	_body_sounds.held = _held
+	_body_sounds.heard = _hearing.hears
 	_body_sounds.audio = audio
 	_body_sounds.play_cue = _play_body_cue
 	_intro_sound = BossIntroSoundScript.new()
@@ -841,6 +856,25 @@ func _ready() -> void:
 	_gather_doors.name = "GatherDoors"
 	add_child(_gather_doors)
 	_gather_doors.bind(events)
+	_hearing.registry = registry
+	_hearing.bind(events)
+	if audio != null:
+		audio.ears.heard = _hearing.hears
+	_mouths = MouthLooksScript.new()
+	_mouths.name = "MouthLooks"
+	_mouths.pieces = _hearing
+	add_child(_mouths)
+	_mouths.bind(events)
+	_locks = LockLooksScript.new()
+	_locks.name = "LockLooks"
+	_locks.registry = registry
+	add_child(_locks)
+	_locks.bind(events)
+	_unseen = UnseenDarkScript.new()
+	_unseen.name = "UnseenDark"
+	_unseen.pieces = _hearing
+	add_child(_unseen)
+	_unseen.bind(events)
 	_ground_items = GroundItemsScript.new()
 	_ground_items.name = "GroundItems"
 	add_child(_ground_items)
@@ -1007,6 +1041,7 @@ func step(real_delta: float) -> void:
 	if _held != null:
 		_held.spells = spells
 		_held.step()
+	_step_rooms(real_delta, seats_here)
 	if _body_sounds != null:
 		_body_sounds.step(real_delta, _actor_table())
 	if _ambience != null:
@@ -1017,6 +1052,27 @@ func step(real_delta: float) -> void:
 	if _numbers != null:
 		_numbers.step(real_delta)
 	_step_statuses(real_delta)
+
+
+## A biome's rooms as this machine sees and hears them (connected biomes CB12): the places heard
+## (Audio's ears ask), the music and the bed of the room followed, the mouths, the gather doors'
+## wizards and the dark of the unvisited rooms.
+func _step_rooms(real_delta: float, seats_here: int) -> void:
+	var grid: RoomGrid = projectiles.grid() if projectiles != null and is_instance_valid(projectiles) else null
+	var table: ActorsScript = _actor_table()
+	_hearing.step(table, seats_here, grid)
+	if _hearing.in_biome() and _hearing.followed() >= 0:
+		if _body_sounds != null:
+			_body_sounds.room_music = _hearing.music()
+			_body_sounds.room_intensity = _hearing.intensity_of(_hearing.followed())
+		if _ambience != null:
+			_ambience.use(_hearing.air())
+	if _gather_doors != null:
+		_gather_doors.see(table)
+	if _mouths != null:
+		_mouths.step(real_delta, grid)
+	if _unseen != null:
+		_unseen.step(real_delta, table, grid)
 
 
 ## The open portals, read once (`CarrierPortal.read_view`), drawn by the portal look; their motes
@@ -2368,6 +2424,24 @@ func exit_signs() -> ExitSignsScript:
 ## The gather doors' look (connected biomes CB7).
 func gather_doors() -> GatherDoorLooksScript:
 	return _gather_doors
+
+
+## A biome's pieces as heard, its mouths, key doors and secret rocks, the unvisited rooms' dark (for
+## tests; connected biomes CB12).
+func room_hearing() -> RoomHearingScript:
+	return _hearing
+
+
+func mouth_looks() -> MouthLooksScript:
+	return _mouths
+
+
+func lock_looks() -> LockLooksScript:
+	return _locks
+
+
+func unseen_dark() -> UnseenDarkScript:
+	return _unseen
 
 
 ## The room's code over the altar (for tests).

@@ -67,6 +67,10 @@ var _lights: Array[Marker2D] = []
 var _read_mouths: int = -1
 var _read_world: int = -1
 var _read_places: int = -1
+## The pieces' versions read last (`RoomHearing.versions`, `relaid`): a room laid again alone (a room
+## reroll's) has its mouths' signs read again alone (`_reread`), every other sign as it stands.
+var _read_versions: PackedInt32Array = PackedInt32Array()
+var _read_relaid: int = -1
 var _clock: float = 0.0
 ## The rooms rerolled whose mouths' signs turn over at the next read, and by mouth the new symbol
 ## waiting while the old one sinks out (`_turning` 1; its pixels and shades).
@@ -121,6 +125,8 @@ func step(delta: float, table: ActorsScript, seats_here: int, grid: RoomGrid) ->
 	if found != _read_mouths or world_now != _read_world or places != _read_places:
 		_read_places = places
 		_read(grid, found, world_now)
+	elif pieces != null and pieces.relaid() != _read_relaid:
+		_reread(pieces.changed_since(_read_versions, places))
 	if _rows.is_empty():
 		return
 	if not is_moving():
@@ -166,6 +172,41 @@ func advance() -> void:
 	queue_redraw()
 
 
+## The mouths into the rooms of `changed` (laid again alone: a room reroll's) read again: a sign
+## showing sinks out and its room's new one rises (Smooth), one not showing is the new one at once.
+## Every other mouth is left as it stands.
+func _reread(changed: PackedInt32Array) -> void:
+	_read_relaid = pieces.relaid()
+	_read_versions = pieces.versions()
+	for mouth in _rows.size():
+		var room: int = mouths.room_of(mouth)
+		if not changed.has(room):
+			continue
+		var kind: RoomKind = pieces.kind_of(room)
+		var pixels: PackedByteArray = kind.symbol_pixels() if kind != null else PackedByteArray()
+		var shades: PackedColorArray = KindSymbolScript.shades_of(kind)
+		var type: RewardType = pieces.type_of(room) if kind != null else null
+		var glyphs: Array[PackedByteArray] = []
+		var glyph_shades: Array[PackedColorArray] = []
+		var element: Resource = pieces.content(RewardGlyphsScript.card_folder(), type.element) if type != null else null
+		RewardGlyphsScript.glyphs_of(type, element, glyphs, glyph_shades)
+		if _rows[mouth] > 0:
+			# Showing: the old sign sinks out first (its kind and its reward type's glyphs alike).
+			_next_pixels[mouth] = pixels
+			_next_shades[mouth] = shades
+			_next_glyphs[mouth] = glyphs
+			_next_glyph_shades[mouth] = glyph_shades
+			_turning[mouth] = 1
+			continue
+		_pixels[mouth] = pixels
+		_shades[mouth] = shades
+		_glyph_pixels[mouth] = glyphs
+		_glyph_shades[mouth] = glyph_shades
+		_light(mouth)
+	_turn_rooms.clear()
+	queue_redraw()
+
+
 func _wanted(mouth: int) -> int:
 	if _turning[mouth] != 0:
 		return 0
@@ -177,6 +218,8 @@ func _wanted(mouth: int) -> int:
 func _read(grid: RoomGrid, found: int, world_now: int) -> void:
 	_read_mouths = found
 	_read_world = world_now
+	_read_relaid = pieces.relaid() if pieces != null else 0
+	_read_versions = pieces.versions() if pieces != null else PackedInt32Array()
 	# A rerolled room's mouths keep their old sign and rows to sink out (the same mouths, read again).
 	var old_pixels: Array[PackedByteArray] = []
 	var old_shades: Array[PackedColorArray] = []

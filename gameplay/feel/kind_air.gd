@@ -32,6 +32,10 @@ var _places: PackedInt32Array = PackedInt32Array()
 var _rects: Array[Rect2] = []
 var _laid_places: int = -1
 var _laid_world: int = -1
+## The pieces' versions read last (`RoomHearing.versions`, `relaid`): a room laid again alone (a
+## room reroll's) gets its kind's air anew, every other room's air kept.
+var _laid_versions: PackedInt32Array = PackedInt32Array()
+var _laid_relaid: int = -1
 
 
 ## Air whose colours are rows of `table` (the spectacle's, shared with the motes).
@@ -45,6 +49,8 @@ func lay(grid: RoomGrid) -> void:
 	var places: int = grid.places() if grid != null else 0
 	var world: int = pieces.world() if pieces != null else 0
 	if places == _laid_places and world == _laid_world:
+		if pieces != null and pieces.relaid() != _laid_relaid:
+			_relay(grid, pieces.changed_since(_laid_versions, places))
 		return
 	_laid_places = places
 	_laid_world = world
@@ -53,19 +59,39 @@ func lay(grid: RoomGrid) -> void:
 	_rects.clear()
 	if pieces == null:
 		return
+	_laid_relaid = pieces.relaid()
+	_laid_versions = pieces.versions()
 	for place in places:
-		if pieces.is_walkway(place):
-			continue
-		var kind: RoomKind = pieces.kind_of(place)
-		if kind == null or kind.air_motes == null:
-			continue
-		var air := AirMotesScript.new(_table)
-		air.use(kind.air_motes)
-		if air.look == null:
-			continue
-		_airs.append(air)
-		_places.append(place)
-		_rects.append(grid.place_rect(place))
+		_add_air(grid, place)
+
+
+## Place `place`'s air, when its kind names air motes (a room, not a walkway).
+func _add_air(grid: RoomGrid, place: int) -> void:
+	if pieces.is_walkway(place):
+		return
+	var kind: RoomKind = pieces.kind_of(place)
+	if kind == null or kind.air_motes == null:
+		return
+	var air := AirMotesScript.new(_table)
+	air.use(kind.air_motes)
+	if air.look == null:
+		return
+	_airs.append(air)
+	_places.append(place)
+	_rects.append(grid.place_rect(place))
+
+
+## The places of `changed` given their air again alone (their kind's now); every other air kept.
+func _relay(grid: RoomGrid, changed: PackedInt32Array) -> void:
+	_laid_relaid = pieces.relaid()
+	_laid_versions = pieces.versions()
+	for place in changed:
+		var at: int = _places.find(place)
+		if at >= 0:
+			_airs.remove_at(at)
+			_places.remove_at(at)
+			_rects.remove_at(at)
+		_add_air(grid, place)
 
 
 ## Give off every room's motes owed since the last call, at Feel's clock `now`, into `pool` (null:

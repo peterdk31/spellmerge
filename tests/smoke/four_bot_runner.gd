@@ -83,9 +83,12 @@ const IDLER: int = 3
 ## Bot `i` builds with the seed BUILD_SEED + i, so a failing run can be replayed.
 const BUILD_SEED: int = 2026
 ## The seed of the replay the run is recorded into, which deals the run's seed (see the class doc;
-## 11: no fighter is downed). Changing it, or content that changes how this run's fight goes, can
-## make the run end otherwise: a failure then is the same on every start.
-const REPLAY_SEED: int = 11
+## 8: no fighter is downed; it was 11 until the crypt's treasure line grew to up to 3 rooms, the
+## owner's follow-up of 2026-11-19, which laid seed 11's map with a bridge out of the start room the
+## bots' travel does not cross (seeds 5 to 7 lose so on main too; tests/README.md, "The seed
+## sweep"). Changing it, or content that changes how this run's fight goes, can make the run end
+## otherwise: a failure then is the same on every start.
+const REPLAY_SEED: int = 8
 ## The argument that plays another replay seed (`--replay-seed=N`; 0: a random one).
 const REPLAY_SEED_ARGUMENT: String = "--replay-seed="
 ## Game seconds allowed for the room to be cleared.

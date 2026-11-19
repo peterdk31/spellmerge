@@ -49,17 +49,28 @@ static func pool(places: RoomPlaces, middle: Vector2) -> Rect2:
 ## `keep_off` (a fountain's pool, a shop's items grown by KEY_OFF_ITEM; a key may drop in any room
 ## since the owner's follow-up of 2026-11-19), else its middle.
 static func key_spot(places: RoomPlaces, middle: Vector2, keep_off: Array[Rect2] = []) -> Vector2:
+	return key_spots(places, middle, keep_off, 1)[0]
+
+
+## Where `count` keys dropped in one room lie, apart: the first as `key_spot`, each next the next of
+## KEY_SPOTS (round the `key` zone's middle when there is one, else the room's) clear of `keep_off`;
+## with too few clear, the rest on the first.
+static func key_spots(places: RoomPlaces, middle: Vector2, keep_off: Array[Rect2], count: int) -> PackedVector2Array:
+	var out := PackedVector2Array()
 	var zone: Rect2 = places.zone(KEY_ZONE) if places != null else Rect2()
-	if zone.has_area():
-		return zone.get_center().floor()
+	var from: Vector2 = zone.get_center() if zone.has_area() else middle
 	for offset: Vector2 in KEY_SPOTS:
-		var spot: Vector2 = middle + offset
+		if out.size() >= count:
+			break
+		var spot: Vector2 = from + offset
 		var clear: bool = true
 		for rect: Rect2 in keep_off:
 			clear = clear and not rect.has_point(spot)
-		if clear:
-			return spot.floor()
-	return middle.floor()
+		if clear or (zone.has_area() and offset == Vector2.ZERO):
+			out.append(spot.floor())
+	while out.size() < maxi(count, 1):
+		out.append(out[0] if not out.is_empty() else from.floor())
+	return out
 
 
 ## What a key keeps off in a room of `kind` (its fill's things: a fountain's pool, a shop's items,

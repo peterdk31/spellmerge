@@ -209,6 +209,51 @@ func test_a_room_laid_away_from_the_origin_and_mirrored_has_its_mist_where_it_st
 	check_equal(mist.parting.parted_at(size * 0.5 + Vector2(0.0, MistPartingScript.FEET_DROP)), 0.0, "not at the world's origin")
 
 
+## The owner, 2026-11-19: every room of a biome draws its own mist, where it stands and mirrored as it
+## is; made and freed with the first room's (spell light and "Fog"), gone with a new world.
+func test_every_room_of_a_biome_draws_its_own_mist_where_it_stands() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var spectacle: SpectacleScript = feel.spectacle()
+	var first := registry.get_resource(&"rooms", &"arena_04") as RoomBase
+	var later := registry.get_resource(&"rooms", &"arena_01") as RoomBase
+	bus.spell_light_changed.emit(true)
+	bus.room_built.emit(first.id, 0, own(first.build(null)) as Node)
+	bus.room_entered.emit(first.id, 0)
+	var place := Vector2(960.0, 320.0)
+	var layout := own(later.build(null)) as Node2D
+	layout.position = place
+	layout.set_meta(PieceShape.GROUND_MIRROR_META, Vector2i(1, 0))
+	bus.room_built.emit(later.id, 3, layout)
+	check_equal(spectacle.room_mists.size(), 1, "the later room's own mist")
+	if spectacle.room_mists.is_empty():
+		return
+	var own_mist: MistScript = spectacle.room_mists[0]
+	check(own_mist.visible and own_mist.mist == later.mist, "drawn, with its room's mist")
+	check_equal(own_mist.position, place, "where the room stands")
+	var shape: PieceShape = PieceShape.of_room(later, PieceShape.MIRROR_X)
+	check(own_mist.mask.get_image().get_data() == MistMaskScript.build(later.places().size, shape.walls, shape.holes, true).get_data(), "its mask the room's as mirrored")
+	var children: Array[Node] = spectacle.get_children()
+	check(children.find(own_mist) > children.find(spectacle.shadows), "over the shadows, as the first room's")
+	var walkway: RoomBase = null
+	for item: Resource in registry.get_all(&"rooms"):
+		var room := item as RoomBase
+		if room != null and room.walkway and room.scene != null:
+			walkway = room
+			break
+	if walkway != null:
+		bus.room_built.emit(walkway.id, 4, own(walkway.build(null)) as Node)
+		check_equal(spectacle.room_mists.size(), 1, "a bridge draws none")
+	bus.spell_light_changed.emit(false)
+	check(spectacle.room_mists.is_empty(), "spell light off: freed with the first room's")
+	bus.spell_light_changed.emit(true)
+	check_equal(spectacle.room_mists.size(), 1, "on again: made again as laid")
+	check_equal(spectacle.room_mists[0].position if not spectacle.room_mists.is_empty() else Vector2.ZERO, place, "at its place")
+	bus.room_built.emit(first.id, 0, own(first.build(null)) as Node)
+	check(spectacle.room_mists.is_empty(), "a new world: the later rooms' mists go")
+
+
 # --- Parted by bodies -----------------------------------------------------------------------------
 
 func test_a_body_parts_the_mist_over_frames_and_it_closes_behind() -> void:

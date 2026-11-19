@@ -4,7 +4,7 @@ extends "res://tests/support/suite.gd"
 ## on the real autoloads, in CB3's split test map (tests/support/biome_maps.gd: the nave the start
 ## room 0, the antechamber west, room 1, and the ossuary court east, room 2), its rooms' kinds set
 ## here: each kind's fill as the party enters (a reward room's rewards, a shop's shelf, a fountain's
-## pool), a fight's rewards however its foes left it, the treasure room's key dropped on the way and
+## pool), a fight's rewards however its foes left it, the treasure rooms' keys (any key any door) dropped in an open room and
 ## its door opening for all, a secret rock opening to its own element only, a challenge room's
 ## elites, and an elite's numbers.
 const FlowScript := preload("res://gameplay/flow/flow.gd")
@@ -228,7 +228,7 @@ func test_the_treasure_rooms_key_drops_on_the_way_and_its_door_opens_for_all() -
 
 
 ## The owner, 2026-11-19: "It should just drop in some random room." The key's room is picked by
-## the run's chance (keyed by the treasure room) among the rooms reached without passing a locked
+## the run's chance (keyed by the key) among the rooms reached without passing a locked
 ## door, never the treasure room itself; a fight room's key drops on its clear.
 func test_the_keys_room_is_picked_by_chance_among_the_open_rooms() -> void:
 	var map: BiomeMap = _start(1, &"treasure", &"fight", [], [IMP])
@@ -237,7 +237,8 @@ func test_the_keys_room_is_picked_by_chance_among_the_open_rooms() -> void:
 	check(drop == 0 or drop == EAST, "the start room or the court, never the treasure room: %d" % drop)
 	var open: PackedInt32Array = LockDoors.open_rooms(map, PackedByteArray([LockDoors.RULE_NONE, LockDoors.RULE_KEY, LockDoors.RULE_NONE]))
 	check_equal(open, PackedInt32Array([0, EAST]), "the open rooms: all but the locked one")
-	check_equal(drop, open[tick.sim.chance_int(FlowScript.KEY_PURPOSE, WEST, 0, open.size())], "the run's chance, keyed by the treasure room, picks it")
+	check_equal(flow.locks.key_drops.size(), 1, "one treasure room: one key")
+	check_equal(drop, open[tick.sim.chance_int(FlowScript.KEY_PURPOSE, 0, 0, open.size())], "the run's chance, keyed by the key, picks it")
 	# Whatever the seed picked, a fight room's key drops as its fight is cleared: the court's here.
 	flow.locks.key_drops[0] = EAST
 	flow.locks.key_states[0] = LockDoors.KEY_WAITING
@@ -251,8 +252,46 @@ func test_the_keys_room_is_picked_by_chance_among_the_open_rooms() -> void:
 	check(not keys.is_empty() and keys.back()[2] and flow.biome.room_rect(EAST).has_point(keys.back()[1]), "its key lies in the court once cleared")
 	var picked: Dictionary = {}
 	for seed in 24:
-		picked[open[Sim.seeded(seed).chance_int(FlowScript.KEY_PURPOSE, WEST, 0, open.size())]] = true
+		picked[open[Sim.seeded(seed).chance_int(FlowScript.KEY_PURPOSE, 0, 0, open.size())]] = true
 	check_equal(picked.size(), 2, "over seeds, either room")
+
+
+## The owner, 2026-11-19: "Multiple treasures can be in each biome. But there should not necessarily
+## be a key for each treasure room available." Two treasure rooms: 1 or 2 keys (never more), any key
+## opens either door and is spent by it, so with one the party chooses.
+func test_keys_are_any_doors_and_may_be_fewer_than_the_treasure_rooms() -> void:
+	var map: BiomeMap = _start(2, &"treasure", &"treasure")
+	_ticks(1)
+	check_equal(flow.locks.doors(), 2, "a door each")
+	var keys: int = flow.locks.key_drops.size()
+	check(keys >= 1 and keys <= 2, "1 or 2 keys for 2 treasure rooms: %d" % keys)
+	check_equal(keys, 1 + tick.sim.chance_int(FlowScript.KEY_COUNT_PURPOSE, 0, 0, 2), "the run's chance counts them")
+	var counts: Dictionary = {}
+	for seed in 16:
+		counts[1 + Sim.seeded(seed).chance_int(FlowScript.KEY_COUNT_PURPOSE, 0, 0, 2)] = true
+	check_equal(counts.size(), 2, "over seeds, a key short now and then")
+	for key in keys:
+		check_equal(flow.locks.key_drops[key], 0, "each in the one room open to it: the start room")
+		check_equal(flow.locks.key_states[key], LockDoors.KEY_LYING, "lying there")
+	check(keys < 2 or flow.locks.key_at[0].distance_to(flow.locks.key_at[1]) > LockDoors.KEY_REACH * 2.0, "two in one room each on a spot of its own")
+	# Whatever the seed dealt: two keys lying in the start room, apart, on clear ground.
+	var first: Vector2 = flow.locks.key_at[0]
+	var second: Vector2 = _grid().nearest_ground(first + Vector2(64.0, 0.0), 6.0)
+	flow.locks.key_drops = PackedInt32Array([0, 0])
+	flow.locks.key_states = PackedByteArray([LockDoors.KEY_LYING, LockDoors.KEY_LYING])
+	flow.locks.key_at = PackedVector2Array([first, second])
+	# The first key taken opens the court's door (any key, any door), and only one is spent.
+	_put(1, first)
+	_put(0, _on_bridge(map, RoomSocket.Facing.EAST, 48.0))
+	check(flow.locks.is_open(EAST), "a key opens the court")
+	check(flow.locks.key_states[0] == LockDoors.KEY_SPENT and flow.locks.key_states[1] == LockDoors.KEY_LYING, "one key spent, the other still lying")
+	_put(0, _on_bridge(map, RoomSocket.Facing.WEST, 48.0))
+	_ticks(10)
+	check(not flow.locks.is_open(WEST), "no key held: the antechamber stays shut (the party chose the court)")
+	_put(1, second)
+	_ticks(2)
+	check(flow.locks.is_open(WEST), "the second key opens the antechamber")
+	check_equal(flow.locks.key_states[1], LockDoors.KEY_SPENT, "and is spent")
 
 
 ## A key with no zone lies round the room's middle clear of a fountain's pool or a shop's items.
@@ -268,6 +307,12 @@ func test_a_key_keeps_off_a_fountains_pool_and_a_shops_items() -> void:
 	for item: Vector2 in SpecialPlaces.shelf(null, middle):
 		check(item.distance_to(spot) > SpecialPlaces.KEY_OFF_ITEM, "off each item: %s" % spot)
 	check_equal(SpecialPlaces.key_spot(null, middle, SpecialPlaces.taken_by(RoomKind.new(), null, middle)), middle, "any other room: its middle")
+	# Several keys in one room: each its own spot, every one off the pool.
+	var spots: PackedVector2Array = SpecialPlaces.key_spots(null, middle, SpecialPlaces.taken_by(fountain, null, middle), 3)
+	check_equal(spots.size(), 3, "a spot a key")
+	check(spots[0] != spots[1] and spots[1] != spots[2] and spots[0] != spots[2], "each apart: %s" % spots)
+	for at: Vector2 in spots:
+		check(not SpecialPlaces.pool(null, middle).grow(SpecialPlaces.KEY_OFF_ITEM).has_point(at), "each off the pool: %s" % at)
 
 
 func test_a_secret_rock_opens_to_its_own_element_only() -> void:

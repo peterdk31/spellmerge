@@ -345,6 +345,17 @@ func test_a_frame_of_kind_air_allocates_nothing() -> void:
 
 func test_the_spectacle_lays_each_kinds_air_from_the_biome() -> void:
 	_start(1)
-	feel.call(&"_step_rooms", 0.0, 0)
+	_spectacle().call(&"step", 0.0)
 	var air: KindAirScript = _spectacle().get(&"kind_air") as KindAirScript
-	check_equal(air.rooms(), 3, "Feel lays the spectacle's kind air from the grid")
+	check_equal(air.rooms(), 3, "the spectacle lays its kind air from the grid before giving off")
+	flow.stop_run()
+	_spectacle().call(&"step", 0.1)
+	check_equal(air.rooms(), 0, "and lets it go with the biome")
+
+
+func test_the_apply_pass_holds_as_many_tints_as_the_light_hands_it_by_world_place() -> void:
+	var source: String = (load("res://gameplay/feel/light_apply.gdshader") as Shader).code
+	check(source.contains("#define MAX_TINTS %d" % SpellLightScript.MAX_TINTS), "the shader's MAX_TINTS is SpellLight's")
+	check(source.contains("world_at = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy"), "a pixel's room found by its world place, the same in every view")
+	# MapRules.rooms_max is at most 32 (its export range), and the start room besides.
+	check(SpellLightScript.MAX_TINTS >= 33, "every room of the biggest biome can be tinted")

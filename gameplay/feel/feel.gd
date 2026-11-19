@@ -1118,8 +1118,6 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		_unseen.step(real_delta, grid)
 	if _tints != null:
 		_tints.step(real_delta, grid, _spectacle.light if _spectacle != null else null)
-	if _spectacle != null:
-		_spectacle.kind_air.lay(grid)
 	if _party_map != null:
 		_party_map.input = _input_manager()
 		_party_map.step(real_delta, table, seats_here, grid, _views_shown())

@@ -205,7 +205,8 @@ var source_motes: SourceMotesScript = SourceMotesScript.new(_ramp_table)
 ## "Ambient particles" is on.
 var air: AirMotesScript = AirMotesScript.new(_ramp_table)
 ## What drifts in each room kind's air, over its own rooms alone (`kind_air.gd`, `RoomKind.air_motes`;
-## connected biomes CB12b), given off as the room's air is (Feel lays it from the grid, `kind_air.lay`).
+## connected biomes CB12b), given off as the room's air is, laid from the grid first each frame (Feel
+## hands it its room hearing, `kind_air.pieces`).
 var kind_air: KindAirScript = KindAirScript.new(_ramp_table)
 var _standing: PlacedMotesScript = null
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
@@ -337,6 +338,7 @@ func step(now: float, table: ActorsScript = null) -> void:
 	source_motes.give_off(now, pool if motes_on() else null, view, _standing)
 	var air_pool: MotesScript = pool if motes_on() and light != null and ambient_particles else null
 	air.give_off(now, air_pool, view, projectiles.bounds() if projectiles != null else Rect2())
+	kind_air.lay(projectiles.grid() if projectiles != null else null)
 	kind_air.give_off(now, air_pool, view)
 	if barriers != null:
 		barriers.step(now, pool if motes_on() else null, table, projectiles)

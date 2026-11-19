@@ -2,9 +2,10 @@ extends RefCounted
 ## Each room kind's air motes (connected biomes CB12b, docs/milestones/connected-biomes.md): what a
 ## kind names to drift in its rooms' air (`RoomKind.air_motes`, a `MoteSource`), besides the room's
 ## own (`RoomBase.air`, gameplay/feel/air_motes.gd). Every room of a biome whose kind names air motes
-## gives them off over its own place alone (the grid's place rectangle: a room's slab, 32 px clear
-## of every other), within the part of the world in view (`AirMotes.area_of`), so a fountain's
-## glimmer never drifts out over its bridge or the fight beside it. Each room is an `AirMotes` of its
+## gives them off from inside its own place alone (the grid's place rectangle: a room's slab, 32 px
+## clear of every other), within the part of the world in view (`AirMotes.area_of`), so a fountain's
+## glimmer is born only in the fountain's room (a mote born at its edge may sway a few pixels past it
+## over its short life, as the room's own dust does). Each room is an `AirMotes` of its
 ## own (its colours rows of the ramp table, its owed motes), made as the biome is laid, never in a
 ## frame.
 ##

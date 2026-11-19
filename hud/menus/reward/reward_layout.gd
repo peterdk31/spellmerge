@@ -24,13 +24,18 @@ var card_width: float = 0.0
 var scrolls: bool = false
 
 
-## Lay out `of_count` cards in a room `room_width` pixels wide.
-func fit(of_count: int, room_width: float) -> void:
+## Lay out `of_count` cards in a room `room_width` pixels wide, at most `most_shown` in view (the
+## menu asks for fewer, wider ones when the room is too low for their words; -1: as many as fit).
+func fit(of_count: int, room_width: float, most_shown: int = -1) -> void:
 	count = maxi(of_count, 0)
 	shown = count
 	scrolls = false
 	var inner: float = floorf(room_width - 2.0 * (MARGIN + EDGE))
-	if count > 0 and _width_for(count, inner) < CARD_MIN:
+	if most_shown >= 1 and most_shown < count:
+		scrolls = true
+		inner -= 2.0 * ARROW_ROOM
+		shown = mini(most_shown, maxi(floori((inner + GAP) / (CARD_MIN + GAP)), 1))
+	elif count > 0 and _width_for(count, inner) < CARD_MIN:
 		scrolls = true
 		inner -= 2.0 * ARROW_ROOM
 		shown = clampi(floori((inner + GAP) / (CARD_MIN + GAP)), 1, count)

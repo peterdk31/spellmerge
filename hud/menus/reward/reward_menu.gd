@@ -135,6 +135,10 @@ func wants_open() -> bool:
 ## Open it for its seat on its oldest offer (closing any other panel of theirs), laid out in `room`.
 ## False with none waiting, already open, or the seat has no device.
 func open_menu() -> bool:
+	if visible and not _open and not _offers.is_empty():
+		# Still rolling up: it opens again once rolled up (the panels ask each frame), never by a jump.
+		_wants_open = true
+		return false
 	_wants_open = false
 	if _open or _ui_focus == null or _offers.is_empty():
 		return false
@@ -148,6 +152,7 @@ func open_menu() -> bool:
 		visible = false
 		_shown = -1
 		return false
+	_refused = -1
 	_open = true
 	_unrolled = 0
 	_lay_out()
@@ -165,7 +170,8 @@ func close_menu() -> bool:
 
 
 ## One frame of its looks: unrolling or rolling up, the cards standing up or sinking, the rim and
-## the row sliding (`panels.gd` calls it every frame; tests call it directly).
+## the row sliding (`panels.gd` calls it every frame; tests call it directly). It is laid out as it
+## opens: a seat joining or leaving while it is open moves it the next time it opens.
 func step() -> void:
 	if not visible:
 		return
@@ -173,9 +179,10 @@ func step() -> void:
 	if _unrolled != target:
 		_unrolled += signi(target - _unrolled)
 		_apply_height()
-		if _unrolled == 0:
-			visible = false
-			return
+	if not _open and _unrolled == 0:
+		# Rolled up (or closed before it unrolled at all): it hides.
+		visible = false
+		return
 	for at in _cards.size():
 		var card: CardScript = _cards[at]
 		var lift: int = clampi(card.lift + (1 if at == _focused else -1), 0, CardScript.LIFT)
@@ -194,7 +201,7 @@ func step() -> void:
 func is_moving() -> bool:
 	if not visible:
 		return false
-	if _unrolled != (OPEN_FRAMES if _open else 0) or _rim_frame < MOVE_FRAMES or _row_frame < SCROLL_FRAMES:
+	if not _open or _unrolled != OPEN_FRAMES or _rim_frame < MOVE_FRAMES or _row_frame < SCROLL_FRAMES:
 		return true
 	for at in _cards.size():
 		if _cards[at].lift != (CardScript.LIFT if at == _focused else 0):
@@ -250,7 +257,6 @@ func _fill(offer: Dictionary) -> void:
 	_shown = int(offer.get("offer", -1))
 	var choices: Array = offer.get("choices", [])
 	_title = REFUSED_TEXT if _shown == _refused else TITLE_TEXT % choices.size()
-	_refused = -1
 	for choice in choices.size():
 		var made: CardScript = CardScript.new()
 		made.name = "Choice%d" % choice
@@ -267,10 +273,17 @@ func _lay_out() -> void:
 	var space: Rect2 = room
 	if not space.has_area():
 		space = get_viewport_rect() if is_inside_tree() else Rect2(Vector2.ZERO, Vector2(640.0, 360.0))
-	_layout.fit(_cards.size(), space.size.x)
+	# Too tall for the room: fewer cards in view, each wider, so their words take fewer lines.
+	var most: int = _cards.size()
 	var card_height: float = 0.0
-	for card: CardScript in _cards:
-		card_height = maxf(card_height, card.fit_width(_layout.card_width))
+	while true:
+		_layout.fit(_cards.size(), space.size.x, most)
+		card_height = 0.0
+		for card: CardScript in _cards:
+			card_height = maxf(card_height, card.fit_width(_layout.card_width))
+		if LayoutScript.EDGE * 2.0 + TITLE_HEIGHT + card_height <= space.size.y - 2.0 * LayoutScript.MARGIN or _layout.shown <= 1 or _layout.card_width >= LayoutScript.CARD_MAX:
+			break
+		most = _layout.shown - 1
 	for at in _cards.size():
 		var card: CardScript = _cards[at]
 		card.position = Vector2(float(at) * _layout.pitch(), 0.0)
@@ -284,7 +297,10 @@ func _lay_out() -> void:
 	_row.size = _cursor.size
 	_full_height = top + card_height + LayoutScript.EDGE
 	var width: float = _layout.menu_width()
-	position = (space.get_center() - Vector2(width, _full_height) * 0.5).round()
+	var at: Vector2 = (space.get_center() - Vector2(width, _full_height) * 0.5).round()
+	# Kept inside its room (its top left first, should it be bigger than the room).
+	at = at.min(space.end - Vector2(width, _full_height)).max(space.position)
+	position = at
 	size = Vector2(width, 0.0)
 	_apply_height()
 

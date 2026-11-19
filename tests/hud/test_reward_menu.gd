@@ -278,6 +278,7 @@ func test_back_leaves_it_unspent_and_a_opens_it_again() -> void:
 	check(not _hud.get_reward(0).is_open(), "B closes it")
 	check(_picked.is_empty(), "with nothing sent")
 	check_equal(_hud.get_panel(0).purse_text(), "1 to pick", "the corner panel says it waits")
+	_settle(_hud.get_reward(0))
 	_frame()
 	_tap(0, &"accept")
 	_frame()
@@ -301,6 +302,7 @@ func test_a_refused_pick_opens_the_menu_again_saying_so() -> void:
 	_tap(0, &"accept")
 	_frame()
 	check(not _hud.get_reward(0).is_open(), "picked and closed")
+	_settle(_hud.get_reward(0))
 	_bus.reward_refused.emit(0, 6)
 	# The poll after the one that closed it (the press that closed a menu never opens another).
 	_frame()
@@ -312,9 +314,46 @@ func test_a_refused_pick_opens_the_menu_again_saying_so() -> void:
 func test_one_player_lays_it_out_in_the_whole_view() -> void:
 	_bus.player_left.emit(1)
 	var view: Vector2 = (_hud.get_node("Root") as Control).size
-	check_equal(_hud.reward_room(0), Rect2(Vector2.ZERO, view), "the whole view for one player")
+	var band: float = HudScript.REWARD_CORNER_BAND
+	check_equal(_hud.reward_room(0), Rect2(0.0, band, view.x, view.y - band * 2.0), "the whole view for one player, off the corner panels' bands")
 	_bus.player_joined.emit(1)
-	check_equal(_hud.reward_room(1).size, (view * 0.5).floor(), "a quarter while several play")
+	check_equal(_hud.reward_room(1).size, (view * 0.5).floor() - Vector2(0.0, band), "a quarter while several play, off its corner panel's band")
+	check_equal(_hud.reward_room(0).position.y, band, "a top quarter starts under the band")
+
+
+## Regression (review): a refused pick opened it again while it was still rolling up, and its
+## height jumped to 0 in one frame; it now rolls up, then unrolls, a step a frame.
+func test_a_refused_pick_rolls_up_before_it_opens_again() -> void:
+	_roll(0, 6, true)
+	_frame()
+	var menu: RewardMenuScript = _hud.get_reward(0)
+	_settle(menu)
+	var whole: float = menu.full_height()
+	var step_most: float = ceilf(whole / float(RewardMenuScript.OPEN_FRAMES))
+	_tap(0, &"accept")
+	_frame()
+	_bus.reward_refused.emit(0, 6)
+	var last: float = menu.size.y
+	var heights: Array[float] = [last]
+	for frame in 20:
+		menu.step()
+		_frame()
+		check(absf(menu.size.y - last) <= step_most, "never jumps (%s)" % [heights])
+		last = menu.size.y
+		heights.append(last)
+	check(menu.is_open(), "it opens again")
+	check_equal(menu.title_text(), "Can't take that now", "saying so")
+	check(heights.has(0.0), "after rolling up")
+
+
+## Regression (review): its height was not fitted, so a low room left it off its room.
+func test_it_stays_inside_a_low_room() -> void:
+	for space: Rect2 in [Rect2(320.0, 180.0, 320.0, 110.0), Rect2(10.0, 10.0, 90.0, 60.0)]:
+		var menu: RewardMenuScript = _open_in(space, 3)
+		check(space.encloses(Rect2(menu.position, Vector2(menu.size.x, menu.full_height()))) or menu.full_height() > space.size.y, "inside %s, or at its top left when bigger" % space)
+		check(menu.position.x >= space.position.x and menu.position.y >= space.position.y, "never above or left of %s" % space)
+		menu.close_menu()
+		_settle(menu)
 
 
 func test_the_panel_says_the_coins() -> void:

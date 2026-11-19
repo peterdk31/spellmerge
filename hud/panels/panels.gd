@@ -514,9 +514,14 @@ func _open_reward(player: int) -> void:
 func reward_room(player: int) -> Rect2:
 	var view: Vector2 = (get_node("Root") as Control).size
 	if _joined.count(true) <= 1:
-		return Rect2(Vector2.ZERO, view)
+		return Rect2(Vector2(0.0, REWARD_CORNER_BAND), view - Vector2(0.0, REWARD_CORNER_BAND * 2.0))
 	var quarter: Vector2 = (view * 0.5).floor()
-	return Rect2(Vector2(float(player % 2), 1.0 if player >= 2 else 0.0) * quarter, quarter)
+	var top: float = REWARD_CORNER_BAND if player < 2 else 0.0
+	return Rect2(Vector2(float(player % 2), 1.0 if player >= 2 else 0.0) * quarter + Vector2(0.0, top), quarter - Vector2(0.0, REWARD_CORNER_BAND))
+
+
+## The reward menus keep off the band of the screen's top and bottom edges the corner panels sit in.
+const REWARD_CORNER_BAND: float = 32.0
 
 
 ## The reward menu of seat `player` (for tests and screenshots).

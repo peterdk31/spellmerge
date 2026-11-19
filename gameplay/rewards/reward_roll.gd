@@ -37,7 +37,7 @@ static func fill(offer: RewardOffer, table: RewardTable, count: int, sim: Sim, s
 			if entry == null:
 				continue
 			var id: StringName = entry.id
-			if entry.kind == RewardEntry.CARD and id == &"":
+			if entry.kind == ItemKinds.CARD and id == &"":
 				allowed.clear()
 				for at in cards.size():
 					if entry.max_complexity <= 0 or complexities[at] <= entry.max_complexity:

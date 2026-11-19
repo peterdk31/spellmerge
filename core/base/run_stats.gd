@@ -14,7 +14,7 @@ extends RefCounted
 
 ## One row a stat: its base, the range it is held to and whether it is a whole number.
 ## - `reward_choices`: how many choices a reward offers ("pick 1 of 2", decision 17).
-## - `start_coins`: the coins in a player's wallet at a run's start (decision 18).
+## - `start_coins`: the coins put into a player's coin stack as a run starts (decision 18).
 ## - `price_scale`: what a shop's prices are multiplied by (CB11's shop).
 ## - `map_reveal`: how many rooms past the seen ones the map shows (CB9's map).
 ## - `secret_sense`: how far from a room the party entered a secret room shows on this player's own

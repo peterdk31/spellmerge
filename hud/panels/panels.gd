@@ -93,8 +93,10 @@ extends CanvasLayer
 ##   menu (`RewardMenu.wants_open`), and on the seat's `accept` with no menu open and nothing else for
 ##   A (no lit stone, no item in reach, no altar) while one waits. Its pick is the command
 ##   `reward_pick_requested`; `back`, `pause` and a boss's intro close it, the offer left unspent.
-##   Each corner panel says the seat's coins and its unspent rewards (`wallet_changed`,
-##   `rewards_waiting_changed`; `PlayerPanel.set_purse`).
+##   Each corner panel says the seat's coins and its unspent rewards (the coin stack in the coins
+##   bag of the body the seat drives, as the rest of the HUD: a possessed foe's while possessing,
+##   0 for a body with no coins; `bag_changed`: coins are an inventory item, the owner's of
+##   2026-11-19; `rewards_waiting_changed`; `PlayerPanel.set_purse`).
 ## - The item hints (`item_hints.gd`, node Root/ItemHints, made here; items I6): over the item in
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
 ##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
@@ -171,7 +173,7 @@ var _panels: Array[PlayerPanelScript] = []
 var _radials: Array[RadialScript] = []
 var _inventories: Array[InventoryScript] = []
 var _rewards: Array[RewardMenuScript] = []
-## By seat: the coins in its wallet and its offers waiting (`wallet_changed`,
+## By seat: the coins in its coins bag and its offers waiting (`bag_changed`,
 ## `rewards_waiting_changed`), for its corner panel.
 var _coins: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _unspent: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
@@ -376,7 +378,7 @@ func _ready() -> void:
 		events.run_ended.connect(_on_run_ended)
 		events.main_menu_requested.connect(_on_main_menu_requested)
 		events.boss_intro_opened.connect(_on_boss_intro_opened)
-		events.wallet_changed.connect(_on_wallet_changed)
+		events.bag_changed.connect(_on_bag_changed)
 		events.rewards_waiting_changed.connect(_on_rewards_waiting_changed)
 	if ui_focus != null:
 		ui_focus.opened.connect(_on_menu_opened)
@@ -535,10 +537,13 @@ func get_reward(player: int) -> RewardMenuScript:
 	return _rewards[player]
 
 
-func _on_wallet_changed(player: int, coins: int) -> void:
-	if player >= 0 and player < PLAYER_COUNT:
-		_coins[player] = coins
-		_panels[player].set_purse(coins, _unspent[player])
+## A bag of the seat's shown body changed: its coins bag is the purse's count.
+func _on_bag_changed(player: int, bag: StringName, ids: Array[StringName], counts: PackedInt32Array, _capacity: int) -> void:
+	if player < 0 or player >= PLAYER_COUNT or bag != ItemKinds.bag_of(ItemKinds.COIN):
+		return
+	var at: int = ids.find(CoinBase.ID)
+	_coins[player] = counts[at] if at >= 0 and at < counts.size() else 0
+	_panels[player].set_purse(_coins[player], _unspent[player])
 
 
 func _on_rewards_waiting_changed(player: int, offers: Array[Dictionary]) -> void:
@@ -817,6 +822,9 @@ func _on_inventory_announced(player: int, _body: int) -> void:
 		# Another body's numbers follow: no hit flash for the change, and none of the last body's
 		# mana held or told is read for this one's staff rows (review, items I8).
 		_panels[player].forget_health()
+		# The purse is the new body's: 0 until its coins bag is said (a body with none says nothing).
+		_coins[player] = 0
+		_panels[player].set_purse(0, _unspent[player])
 		for staff in PlayerPanelScript.STAFF_COUNT:
 			_staff_mana[player * PlayerPanelScript.STAFF_COUNT + staff] = INF
 			_staff_reserved[player * PlayerPanelScript.STAFF_COUNT + staff] = 0.0

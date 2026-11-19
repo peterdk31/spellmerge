@@ -1,6 +1,6 @@
 extends "res://tests/support/screenshot.gd"
 ## Screenshots of the inventory (items I7, hud/menus/inventory/): in the hub (the dev staffs, tests/support/dev_hub.gd), P1 with a staff in
-## the bag opens it on the ring of the four bags (inventory_bags), enters the staffs and points at
+## the bag opens it on the ring of the bags (inventory_bags), enters the staffs and points at
 ## the bag's staff, the hands column showing its arrows against every hand (inventory_staffs),
 ## enters the cards' kinds (inventory_kinds) and the carriers with their counts (inventory_cards);
 ## then all four players with their inventories open at once (inventory_four_players).

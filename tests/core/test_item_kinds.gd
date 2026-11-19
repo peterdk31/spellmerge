@@ -28,9 +28,11 @@ func test_every_bag_holds_one_kind() -> void:
 	check_equal(bags.size(), ItemKinds.BAGS.size(), "every bag is a kind's")
 
 
-func test_the_owners_four_kinds() -> void:
-	check_equal(ItemKinds.BAGS, [&"staffs", &"cards", &"relics", &"potions"] as Array[StringName], "Staffs, Cards, Relics, Potions, in order")
+func test_the_owners_kinds() -> void:
+	check_equal(ItemKinds.BAGS, [&"staffs", &"cards", &"relics", &"potions", &"coins"] as Array[StringName], "Staffs, Cards, Relics, Potions, in order, then the coins")
 	check(ItemKinds.stacks(ItemKinds.CARD) and ItemKinds.stacks(ItemKinds.POTION), "cards and potions stack")
+	check(ItemKinds.stacks(ItemKinds.COIN) and not ItemKinds.can(ItemKinds.COIN, ItemKinds.DROP), "coins are one stack, never dropped")
+	check(ItemKinds.can(ItemKinds.POTION, ItemKinds.USE), "a potion is used (drunk)")
 	check(not ItemKinds.stacks(ItemKinds.STAFF) and not ItemKinds.stacks(ItemKinds.RELIC), "staffs and relics do not")
 	check(ItemKinds.can(ItemKinds.STAFF, ItemKinds.HAND) and not ItemKinds.can(ItemKinds.CARD, ItemKinds.HAND), "only a staff goes on a hand")
 	check(ItemKinds.can(ItemKinds.CARD, ItemKinds.DROP_ONE), "a card drops one at a time")
@@ -45,8 +47,21 @@ func test_every_content_folder_named_is_there_and_holds_its_kind() -> void:
 			for id: StringName in registry.call("get_ids", folder):
 				if ItemKinds.is_content(kind, registry.call("get_resource", folder, id) as Resource):
 					found += 1
-			if kind == ItemKinds.CARD or kind == ItemKinds.STAFF:
+			if kind != ItemKinds.RELIC:
 				check(found > 0, "%s: the registry finds some under %s (%d)" % [kind, folder, found])
+
+
+func test_potions_and_the_coin_are_sound_content() -> void:
+	var registry: Node = root.get_node("Registry")
+	for folder: StringName in [&"potions", &"coins"]:
+		for id: StringName in registry.call("get_ids", folder):
+			var item := registry.call("get_resource", folder, id) as ItemContent
+			check(item != null and item.problems().is_empty(), "%s/%s: %s" % [folder, id, item.problems() if item != null else "not an item"])
+			check(ItemKinds.stack_of(item) != null, "%s/%s can lie on the ground as a stack" % [folder, id])
+	var healing := registry.call("get_resource", &"potions", &"healing") as PotionBase
+	check(healing.wasted_on(100.0, 100.0) and not healing.wasted_on(50.0, 100.0), "a heal is wasted only on the whole")
+	var more := registry.call("get_resource", &"potions", &"max_health") as PotionBase
+	check(not more.wasted_on(100.0, 100.0), "more most health never is")
 
 
 func test_is_content_goes_by_the_rows_class() -> void:

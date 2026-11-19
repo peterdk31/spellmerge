@@ -19,9 +19,11 @@ const STAFF: StringName = &"staff"
 const CARD: StringName = &"card"
 const RELIC: StringName = &"relic"
 const POTION: StringName = &"potion"
+const COIN: StringName = &"coin"
 
-## The bags, in the order the inventory shows them (owner, 2026-11-13: Staffs, Cards, Relics, Potions).
-const BAGS: Array[StringName] = [&"staffs", &"cards", &"relics", &"potions"]
+## The bags, in the order the inventory shows them (owner, 2026-11-13: Staffs, Cards, Relics, Potions;
+## the coins after them, connected biomes CB10's follow-up, the owner's of 2026-11-19).
+const BAGS: Array[StringName] = [&"staffs", &"cards", &"relics", &"potions", &"coins"]
 
 ## What can be done with one held.
 const DROP: StringName = &"drop"
@@ -32,13 +34,15 @@ const USE: StringName = &"use"
 ## One row a kind (see the class doc). A premade staff (`StaffItem`, `items`) is a staff of the
 ## `wizard` folder with its cards, so a stack's id is always its content's. A relic is a
 ## `RelicBase` (connected biomes CB10: its run stat changes, `RunStats`; no relic file exists yet).
-## Potions do nothing yet, and their bag stays empty: with no class of its own (`type` a plain
-## Resource) nothing is one of them on the ground (`stack_of`).
+## A potion is a `PotionBase` (content/potions), drunk from the bag (USE: the player controller's
+## `bag_use_requested`); coins are a `CoinBase` (content/coins), one stack the player spends in a
+## shop (the owner, 2026-11-19: every reward is an item, and coins are a stacked one).
 const RULES: Dictionary = {
 	&"staff": {"bag": &"staffs", "stacks": false, "content": [&"wizard"], "type": &"StaffBase", "actions": [&"drop", &"hand"], "premade": [&"items"]},
 	&"card": {"bag": &"cards", "stacks": true, "content": [&"spells"], "type": &"SpellComponent", "actions": [&"drop_one"], "premade": []},
 	&"relic": {"bag": &"relics", "stacks": false, "content": [&"relics"], "type": &"RelicBase", "actions": [&"drop"], "premade": []},
-	&"potion": {"bag": &"potions", "stacks": true, "content": [], "type": &"Resource", "actions": [&"drop", &"use"], "premade": []},
+	&"potion": {"bag": &"potions", "stacks": true, "content": [&"potions"], "type": &"PotionBase", "actions": [&"drop", &"use"], "premade": []},
+	&"coin": {"bag": &"coins", "stacks": true, "content": [&"coins"], "type": &"CoinBase", "actions": [], "premade": []},
 }
 ## The class of a kind with none of its own yet.
 const NO_CLASS: StringName = &"Resource"

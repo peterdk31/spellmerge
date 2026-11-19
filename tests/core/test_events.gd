@@ -71,6 +71,7 @@ const EVENTS: Dictionary = {
 	# The inventory menu (items I7).
 	&"staff_hand_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["hand", TYPE_INT], ["body", TYPE_INT]],
 	&"bag_drop_requested": [["player", TYPE_INT], ["bag", TYPE_STRING_NAME], ["id", TYPE_STRING_NAME], ["staff", TYPE_INT], ["body", TYPE_INT]],
+	&"bag_use_requested": [["player", TYPE_INT], ["bag", TYPE_STRING_NAME], ["id", TYPE_STRING_NAME], ["body", TYPE_INT]],
 	&"inventory_refused": [["player", TYPE_INT], ["reason", TYPE_STRING]],
 	&"inventory_announced": [["player", TYPE_INT], ["body", TYPE_INT]],
 	&"pad_wait_changed": [["seats", TYPE_INT]],
@@ -189,7 +190,6 @@ const EVENTS: Dictionary = {
 	&"shelf_near_changed": [["player", TYPE_INT], ["item", TYPE_INT], ["at", TYPE_VECTOR2], ["view", TYPE_DICTIONARY]],
 	&"shelf_refused": [["player", TYPE_INT], ["item", TYPE_INT]],
 	&"fountain_changed": [["room", TYPE_INT], ["area", TYPE_RECT2], ["left", TYPE_FLOAT], ["most", TYPE_FLOAT]],
-	&"wallet_changed": [["player", TYPE_INT], ["coins", TYPE_INT]],
 	&"run_stats_told": [["player", TYPE_INT], ["stats", TYPE_DICTIONARY]],
 	&"run_stats_ruled": [["changes", TYPE_ARRAY]],
 	&"health_gift_requested": [["actor", TYPE_INT], ["heal", TYPE_FLOAT], ["more_most", TYPE_FLOAT]],

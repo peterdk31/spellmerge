@@ -64,23 +64,25 @@ func take() -> void:
 ## menu to open.
 func _offer(seat: int, offer: int, count: int) -> bool:
 	var choices: Array[Dictionary] = []
-	var kinds: Array[StringName] = [RewardEntry.CARD, RewardEntry.COINS, RewardEntry.CARD, RewardEntry.HEAL, RewardEntry.MAX_HEALTH]
+	# Every reward is an inventory item (the owner, 2026-11-19): a card, the coin, a potion; each
+	# card shows its item's own name, icon and description.
+	var items: Array[ItemContent] = [null, preload("res://content/coins/coin/coin.tres"), null, preload("res://content/potions/healing/healing.tres"), preload("res://content/potions/max_health/max_health.tres")]
 	for at in count:
-		var kind: StringName = kinds[at % kinds.size()]
-		var amount: int = [1, 12, 1, 6, 4][at % 5]
-		var view: Dictionary = {"kind": kind, "id": &"", "count": amount, "name": "", "icon": null, "description": RewardEntry.describe(kind, amount)}
-		if kind == RewardEntry.CARD and not _cards.is_empty():
+		var item: ItemContent = items[at % items.size()]
+		var amount: int = [1, 12, 1, 2, 1][at % 5]
+		var view: Dictionary = {"kind": ItemKinds.CARD, "id": &"", "count": amount, "name": "", "icon": null, "description": ""}
+		if item == null and not _cards.is_empty():
 			var id: StringName = _cards[(seat * 5 + at * 7) % _cards.size()]
 			view["id"] = id
 			view["name"] = _spells.call("component_name", id)
 			view["icon"] = _spells.call("component_icon", id)
 			view["description"] = _spells.call("component_description", id)
-		elif kind == RewardEntry.COINS:
-			view["name"] = "%d coins" % amount
-		elif kind == RewardEntry.HEAL:
-			view["name"] = "Heal %d" % amount
-		else:
-			view["name"] = "+%d max health" % amount
+		elif item != null:
+			view["kind"] = ItemKinds.COIN if item is CoinBase else ItemKinds.POTION
+			view["id"] = item.id
+			view["name"] = item.shown_name() if amount == 1 else "%s x%d" % [item.shown_name(), amount]
+			view["icon"] = item.icon
+			view["description"] = item.description
 		choices.append(view)
 	var offers: Array[Dictionary] = [{"offer": offer, "here": true, "choices": choices}]
 	_events.reward_rolled.emit(seat, offer, choices, true)

@@ -33,8 +33,9 @@ extends RefCounted
 ## 2026-11-16, the kinds after them renumbered; 6: `reward_pick_requested` names its offer,
 ## connected biomes CB10; 7: `start_depth_picked` gone with the lectern,
 ## connected biomes CB8, the kind after it renumbered; 8: `shelf_buy_requested` added, a shop's
-## buy by A, connected biomes CB11's follow-up).
-const VERSION: int = 8
+## buy by A, connected biomes CB11's follow-up; 9: `bag_use_requested` added, a potion drunk from the
+## inventory, every reward an item, the owner's of 2026-11-19).
+const VERSION: int = 9
 const SEATS: int = 4
 const STAFFS: int = 4
 ## A move axis of 1.0 is this byte.
@@ -76,6 +77,7 @@ const COMMAND_NAMES: Array[StringName] = [
 	&"boss_intro_next_requested",
 	&"all_cards_requested",
 	&"shelf_buy_requested",
+	&"bag_use_requested",
 ]
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
@@ -90,6 +92,7 @@ const COMMAND_SHAPES: PackedStringArray = [
 	"i",
 	"",
 	"i",
+	"ssi",
 ]
 
 var seat: int = 0

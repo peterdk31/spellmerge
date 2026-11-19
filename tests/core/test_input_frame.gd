@@ -96,7 +96,7 @@ func test_the_decoder_rejects_bad_frames() -> void:
 	longer.append(0)
 	cases["a byte left over"] = longer
 	var version: PackedByteArray = good.duplicate()
-	version[0] = 9
+	version[0] = InputFrame.VERSION + 1
 	cases["another version"] = version
 	var seat: PackedByteArray = good.duplicate()
 	seat[1] = 4

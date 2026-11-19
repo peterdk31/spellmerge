@@ -1,5 +1,5 @@
 {
-	"about": "The crypt's Bone market (docs/milestones/connected-biomes.md, CB11): The shop: a floating slab with three spots of its shelf in a row across its middle; a wizard who steps onto an item with its price in their wallet buys it. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), sockets on its east and north and south and west sides for the bridges. tools/ground_shape.py draws crypt_shop_ground.tscn and its art from this.",
+	"about": "The crypt's Bone market (docs/milestones/connected-biomes.md, CB11): The shop: a floating slab with three spots of its shelf in a row across its middle; a wizard at an item presses A to buy it, with its price in their own coins (an inventory item). Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), sockets on its east and north and south and west sides for the bridges. tools/ground_shape.py draws crypt_shop_ground.tscn and its art from this.",
 	"size": [
 		448,
 		320

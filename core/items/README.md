@@ -8,12 +8,14 @@ What an item is (items I3, [docs/milestones/items.md](../../docs/milestones/item
 
 - **`item_kinds.gd` (`ItemKinds`):** one row a kind in `RULES` (staff, card, relic, potion): its bag (`bag_of`, `kind_in`; the bags in order are `BAGS`), whether it stacks (`stacks`), the registry folders its ids are in and the class a resource there must be (`content_of`, `is_content`), what can be done with one held (`can`: DROP, DROP_ONE, HAND, USE) and the folders its premade items are in (`premade_of`: the staff's `items`, content/items/). `stack_of(resource)` is one of what a resource is as a stack (a premade staff `StaffItem.stack()`, a staff empty, a card one copy; null for what is no kind's, a kind with no class of its own included): what a room's item placement lays. Nothing else names a kind to decide something: a new kind is a row and its own code.
 - **`item_stack.gd` (`ItemStack`):** a kind, an id and a count; a staff stack also has its `number` in its inventory, the `StaffBase` it is (content, never changed), its cards by slot (exactly its slots long: `fit`) and the mana it keeps while on no hand. `card(id, count)`, `of_staff(base, cards)` (pool full), `copy()`.
+- **`item_looks.gd` (`ItemLooks`):** how an item looks to people, one answer for every kind (`of(kind, id, registry, spells)`: `name`, `icon`, `description`): a card's are Spells', a staff's its `StaffBase`'s, any other kind's its content's (an `ItemContent`: a potion, the coin; or a `RelicBase`), found by `content_of(kind, id, registry)` in its row's folders. What a reward's card, a shop's shelf and the inventory show of an item (the owner, 2026-11-19: every reward is an item).
+- **Potions and coins** (the owner, 2026-11-19): a potion is a `PotionBase` (content/potions; USE: drunk from the inventory, the player controller's `bag_use_requested`), coins one stack of the `CoinBase` in their own bag (`coins`, after the owner's four; no action: neither used nor dropped). Both are `ItemContent` (core/base: id, name, description, icon). `ItemStack.of(kind, id, count)` makes a stack of any kind but a staff.
 - **`ground_sight.gd` (`GroundSight`, items I9):** what a body sees lying round it, the answer to `ground_looked` (the Items area fills it at once): up to `MOST` items, nearest first, each its number, where it lies, whether it is in reach and its stack (the ground's own: read only). Made once per asker and filled again at each look; scratch (DERIVED) to whoever holds it.
 - **Simulation:** a simulation folder (`StateWalk.FOLDERS`): a stack held by an inventory is state, walked and snapshotted member by member; nothing here has a clock or dice.
 
 ## Allowed files
 
-Claude only, like all of `core/`. Typed GDScript. Tests: `tests/core/test_item_kinds.gd` (the table against every content folder it names), and the inventory's in `tests/gameplay/actor/test_inventory.gd`.
+Claude only, like all of `core/`. Typed GDScript. Tests: `tests/core/test_item_kinds.gd` (the table against every content folder it names, the potions and the coin sound), and the inventory's in `tests/gameplay/actor/test_inventory.gd`.
 
 ## Steps
 

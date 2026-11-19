@@ -373,6 +373,36 @@ func test_the_crypt_is_made() -> void:
 	check(treasures >= 18, "a treasure room in most of the crypt's maps (chance 0.9): %d of 24" % treasures)
 
 
+## The owner, 2026-11-19: a challenge room rolled always gets its slot within `rooms_max`, the
+## treasure rooms filling what is left. With every chance room won and too few slots for all, every
+## seed's crypt map holds its challenge room (rolled after the treasure rooms, it was crowded out).
+func test_a_challenge_room_takes_its_slot_before_the_treasure_rooms() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var crypt := (registry.get_resource(&"runs", &"crypt") as RunDefinition).duplicate(true) as RunDefinition
+	var content: RunContent = registry.run_content()
+	var shapes: Dictionary = registry.piece_shapes(&"crypt")
+	var rules: MapRules = crypt.biomes[0]
+	var chance_rooms: int = 0
+	var fixed: int = 0
+	for rule: KindRule in rules.kinds:
+		fixed += rule.least
+		if rule.chance > 0.0:
+			rule.chance = 1.0
+			chance_rooms += rule.max_per_run - rule.least
+	check(fixed + chance_rooms > rules.rooms_max, "too few slots for every chance room (%d fixed, %d by chance, %d at most)" % [fixed, chance_rooms, rules.rooms_max])
+	var treasures: int = 0
+	for seed_value in 12:
+		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
+		check(map.is_made(), "seed %d: made (%s)" % [seed_value, "\n".join(map.not_made)])
+		if not map.is_made():
+			continue
+		check(map.room_kinds.has(&"challenge"), "seed %d: the challenge room stands" % seed_value)
+		check(map.rooms() - 1 <= rules.rooms_max, "seed %d: within rooms_max" % seed_value)
+		treasures += map.room_kinds.count(&"treasure")
+	check(treasures > 0, "the treasure rooms fill what is left")
+
+
 ## A map generated from the crypt's own rooms (the antechamber as the start, the nave a fight, the
 ## ossuary court the way's end), laid by the biome world: every seed's shapes keep the rules mirrored,
 ## and a wizard can cross from the start room's socket onto the first bridge.

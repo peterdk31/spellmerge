@@ -26,7 +26,8 @@ extends RefCounted
 ##   circle within TOUCH_REACH of a door's mouth breaks the rock (`touched`), and the room opens.
 ## - **The view** is told each key door (`key_door_shown`), each rock (`secret_rock_shown`, with its
 ##   element) and each key (`key_shown`) as it changes; -1 when every one is forgotten (the biome left,
-##   a restore: told again by `tell_all`). Never read back by the simulation.
+##   a restore: told again by `tell_all`). The HUD is told how many keys the party holds
+##   (`party_keys_shown`) as one is taken or spent. Never read back by the simulation.
 
 const EventsScript := preload("res://core/events/events.gd")
 
@@ -200,6 +201,11 @@ func held_key() -> int:
 	return key_states.find(KEY_HELD)
 
 
+## How many keys the party holds (taken, not spent).
+func held_keys() -> int:
+	return key_states.count(KEY_HELD)
+
+
 ## Lay the doors into `grid` from the biome laid in `world` (as the biome starts, and after a restore:
 ## the grid's layers are not state): each door's mouth found, shut while its room is not open.
 func lay(world: BiomeWorld, grid: RoomGrid) -> void:
@@ -243,6 +249,7 @@ func step(party: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:
 			if actor != null and not actor.is_downed() and actor.position.distance_squared_to(key_at[key]) <= KEY_REACH * KEY_REACH:
 				key_states[key] = KEY_HELD
 				_tell_key(key)
+				_tell_held(false)
 				break
 	for door in doors():
 		var room: int = door_rooms[door]
@@ -254,6 +261,7 @@ func step(party: Array[Node2D], life: RoomLife, grid: RoomGrid) -> int:
 			var actor := wizard as Actor if is_instance_valid(wizard) else null
 			if actor != null and not actor.is_downed() and (actor.room == at_door or (actor.room == room and mouth_of(door).grow(LIP_REACH).has_point(actor.position))):
 				key_states[key] = KEY_SPENT
+				_tell_held(false)
 				open(room, grid)
 				return room
 	return NONE
@@ -315,6 +323,7 @@ func tell_all() -> void:
 		_tell_door(door)
 	for key in key_drops.size():
 		_tell_key(key)
+	_tell_held(true)
 
 
 ## The view's number of door `door`: key doors and secret rocks are each counted on their own.
@@ -336,6 +345,11 @@ func _tell_door(door: int) -> void:
 		events.secret_rock_shown.emit(_view_number(door), mouth_of(door), elements[room], is_open(room))
 
 
+func _tell_held(at_once: bool) -> void:
+	if events != null:
+		events.party_keys_shown.emit(held_keys(), at_once)
+
+
 func _tell_key(key: int) -> void:
 	if events != null and key_states[key] != KEY_WAITING:
 		events.key_shown.emit(key, key_at[key], key_states[key] == KEY_LYING)
@@ -348,3 +362,4 @@ func _forget(restored: bool) -> void:
 	events.key_door_shown.emit(NONE, Rect2(), restored)
 	events.secret_rock_shown.emit(NONE, Rect2(), &"", restored)
 	events.key_shown.emit(NONE, Vector2.ZERO, false)
+	events.party_keys_shown.emit(0, restored)

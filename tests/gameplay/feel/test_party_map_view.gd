@@ -231,10 +231,52 @@ func test_a_players_secret_sense_shows_a_secret_room_near_on_their_own_map_only(
 	check(not view.senses(0, EAST), "a sense short of it shows nothing")
 	events.run_stats_told.emit(0, {&"secret_sense": gap + 1.0})
 	check(view.senses(0, EAST), "within the seat's sense of a room entered: sensed")
-	check_equal(view.sense_shade_of(0, EAST), 1, "drawn on that player's map in the stone's shadow (every map shut: as it stands)")
+	check_equal(view.sense_shade_of(0, EAST), PartyMapViewScript.SENSED_STAGES, "drawn on that player's map in its own look, the void's faint light (every map shut: as it stands)")
 	check(not view.senses(1, EAST) and view.sense_shade_of(1, EAST) == 0, "never on another player's map")
 	check(not view.senses(0, WEST), "a room that is no secret one is never sensed")
 	check(not view.draws(EAST), "the party's map is as it was")
+
+
+## The owner, 2026-11-19: a sensed secret room reads as secret, in a faint void light of its own,
+## not the stone's shadow of a room only shown; on an open map it comes in through its stages.
+func test_a_sensed_secret_room_comes_in_through_its_own_void_light() -> void:
+	var map: BiomeMap = BiomeMaps.split(registry, [0, 0, 0] as Array[int], [BiomeMaps.FIRST, BiomeMaps.MIDDLE, BiomeMaps.LAST] as Array[StringName], [&"fight", &"start", &"secret"] as Array[StringName])
+	input.add_virtual_device(0)
+	check(flow.start_biome(0, map, [RoomFight.new(), RoomFight.new(), RoomFight.new()] as Array[RoomFight]), "the biome starts")
+	tick.run(DT)
+	var view: PartyMapViewScript = feel.call(&"party_map") as PartyMapViewScript
+	var views: ScreenViewsScript = _two_views()
+	view.input = input as InputManagerScript
+	input.call(&"send_virtual", 0, PartyMapViewScript.ACTION, 1.0)
+	view.step(0.0, actors, 1, _grid(), views)
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), views)
+	check_equal(view.stage_of(0), PartyMapViewScript.OPEN_STAGES, "open")
+	var gap: float = PartyMapViewScript.gap_between(_grid().place_rect(EAST), _grid().place_rect(0))
+	events.run_stats_told.emit(0, {&"secret_sense": gap + 1.0})
+	var stages: Array[int] = [view.sense_shade_of(0, EAST)]
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), views)
+		stages.append(view.sense_shade_of(0, EAST))
+	check_equal(stages, [0, 1, 2, 3] as Array[int], "on an open map it comes in a stage a frame")
+	check_equal(view.drawn_colour(0, EAST), Palette.shades_of(&"void")[1], "it rests in the void's faint light: it reads as secret")
+	check_equal(view.drawn_colour(1, EAST), Color.TRANSPARENT, "not on another player's map")
+	# The party's map takes it over (shown to all, as a seen room's neighbour is): it steps down
+	# through the void's shadow to the stone's, never in one jump (the review's).
+	var seen: PackedByteArray = flow.party_map.seen.duplicate()
+	seen[EAST] = 1
+	events.rooms_seen.emit(seen, false)
+	var looks: Array[Color] = [view.drawn_colour(0, EAST)]
+	while view.is_moving():
+		view.advance()
+		view.step(0.0, actors, 1, _grid(), views)
+		if view.drawn_colour(0, EAST) != looks.back():
+			looks.append(view.drawn_colour(0, EAST))
+	var stone: PackedColorArray = Palette.shades_of(&"stone")
+	var voids: PackedColorArray = Palette.shades_of(&"void")
+	check_equal(looks, [voids[1], voids[0], stone[0]] as Array[Color], "void light, void shadow, then the stone's shadow of a room shown, a look a frame")
 
 
 func test_on_an_open_map_a_room_comes_in_through_the_shades_and_a_new_size_reopens() -> void:

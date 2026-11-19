@@ -955,7 +955,7 @@ func step(real_delta: float) -> void:
 	if split_screen != null:
 		var world_camera: Camera2D = party_camera.camera if is_instance_valid(party_camera.camera) else null
 		split_screen.step(real_delta, _actor_table(), seats_here, world_camera)
-		_spectacle.set_split(split_screen.views(), split_screen.mote_share, split_screen.light_downscale)
+		_spectacle.set_split(split_screen.views(), split_screen.mote_share(), split_screen.light_downscale())
 	if _markers != null:
 		_markers.step(_actor_table(), seats_here, _views_shown(), _clock)
 	if _away_bars != null:

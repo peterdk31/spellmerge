@@ -18,10 +18,10 @@ extends Node
 ## - **Published** (`ScreenViews.publish` on the root) while there are two views or more, for what
 ##   reads the picture by the screen (the mouse, the item hints, a body's looks on screen).
 ## - **The light, a buffer a view**, and the fallbacks: Feel hands `views()` to the spectacle every
-##   frame (`Spectacle.set_split`), with this node's switches for the fallbacks CB1 measured, both
-##   off by default (the owner sets the targets from a GPU run, decision 31): `mote_share` (the share
-##   of motes thrown while split) and `light_downscale` (how much smaller the light buffers past the
-##   first view's are).
+##   frame (`Spectacle.set_split`), with the fallbacks CB1 measured as the frame-time budget asks
+##   for them (`budget`, `split_budget.gd`: the owner's targets, decision 31): `mote_share()` (the
+##   share of motes thrown while split) and `light_downscale()` (how much smaller the light buffers
+##   past the first view's are).
 ##
 ## Every view and cell is made the first time it is needed and kept; nothing is allocated a frame.
 
@@ -29,7 +29,7 @@ const SplitCameraScript := preload("res://gameplay/feel/split_camera.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
-const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
+const SplitBudgetScript := preload("res://gameplay/feel/split_budget.gd")
 const CELL_SHADER: Shader = preload("res://gameplay/feel/split_cell.gdshader")
 
 ## The visibility layer of the world's canvas items (the default), and the one the root keeps.
@@ -43,10 +43,8 @@ const DIVIDER_COLOUR := Color(0.05, 0.04, 0.09)
 const OTHER_UNIFORMS: Array[StringName] = [&"other_0", &"other_1", &"other_2"]
 const DIVIDER_UNIFORMS: Array[StringName] = [&"divider_0", &"divider_1", &"divider_2"]
 
-## The fallbacks (CB1's; off by default): the share of motes thrown while split, and how many times
-## smaller than its view a light buffer past the first view's is (SpellLight.DOWNSCALE: as the first).
-var mote_share: float = 1.0
-var light_downscale: int = SpellLightScript.DOWNSCALE
+## The frame-time budget: which of CB1's fallbacks the split's frames need now.
+var budget: SplitBudgetScript = SplitBudgetScript.new()
 
 ## The views worked out (read only; `camera.views` is what is drawn).
 var camera: SplitCameraScript = SplitCameraScript.new()
@@ -87,6 +85,16 @@ func views() -> Array[Viewport]:
 	return _shown
 
 
+## The share of motes thrown now (1: all; the budget's fallback while split).
+func mote_share() -> float:
+	return budget.mote_share()
+
+
+## How many times smaller than its view a light buffer past the first view's is now (the budget's).
+func light_downscale() -> int:
+	return budget.light_downscale()
+
+
 ## True while the views draw the world instead of the root.
 func is_drawing() -> bool:
 	return _drawing
@@ -105,6 +113,7 @@ func step(delta: float, table: ActorsScript, seats: int, world_camera: Camera2D)
 	var screen: Vector2 = _root.get_visible_rect().size
 	camera.step(delta, table, seats, world_camera, screen)
 	var laid: ScreenViewsScript = camera.views
+	budget.step(delta, laid.count)
 	if laid.count == 0:
 		_stop()
 		return

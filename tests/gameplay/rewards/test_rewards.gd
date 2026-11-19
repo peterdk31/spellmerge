@@ -820,8 +820,8 @@ func test_a_typed_room_widens_only_when_its_type_has_nothing_left() -> void:
 
 # --- Everything is droppable (the owner, 2026-11-19) -------------------------------------------
 
-## No coin is made by a drop: a coin a player dropped, taken by a foe it possesses, goes with the
-## foe as it dies, unshared; only the coins it came carrying and held all along are shared. What it
+## No coin is made by a drop: a coin a player dropped, taken by a foe it possesses, is never shared
+## as it dies (it drops as a plain coin, `Inventory.drop_taken`, the owner's of 2026-11-19); only the coins it came carrying and held all along are shared. What it
 ## dropped of those itself and took back is not shared again.
 func test_a_possessed_foe_never_shares_a_coin_it_took_later() -> void:
 	var wizard := _wizard(0)
@@ -834,8 +834,11 @@ func test_a_possessed_foe_never_shares_a_coin_it_took_later() -> void:
 	check(foe.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 4)), "and takes four a player dropped")
 	check_equal(foe.inventory.count_of(COINS, CoinBase.ID), 5, "five held")
 	check_equal(foe.inventory.carried_kept(), 1, "one of them held all along")
+	var dropped: Array = []
+	_world.bus.item_drop_requested.connect(func(_actor: int, stack: ItemStack) -> void: dropped.append([stack.kind, stack.count]))
 	_kill(foe, Vector2(60, 0))
 	check_equal(_rewards.coins_lying().size(), 1, "only that one is laid for everyone")
+	check_equal(dropped, [[ItemKinds.COIN, 1], [ItemKinds.COIN, 1], [ItemKinds.COIN, 1], [ItemKinds.COIN, 1]], "the four it took drop as plain coins, one at a time")
 
 
 func test_a_boss_shares_only_the_coins_it_came_with() -> void:

@@ -7,6 +7,10 @@ extends RefCounted
 ##
 ## - **Reach** (`in_reach`): an item lies within REACH of the body's feet.
 ## - **The one in reach** (`nearest`): the nearest of those, the lower number on a tie.
+## - **Walked over** (`walks_over`, `walked_over`; the owner, 2026-11-19): a coin is taken by
+##   walking over it, its feet within WALK_REACH, never shown for A (`nearest` leaves it out; an AI's
+##   `actor_take_requested` may still take one, as its `look` sees it); by the body
+##   it dropped from only once that body's feet have left it (`GroundItem.waits_for`).
 ## - **What a take does** (`take`, `has_room`): a staff goes onto a free hand if there is one, else
 ##   into its bag; anything else into its bag; with no room nothing is taken.
 ##
@@ -14,6 +18,10 @@ extends RefCounted
 
 ## How far from the feet an item can be taken, in pixels: about a body and a half.
 const REACH: float = 24.0
+## How near the feet a coin must come to be taken by walking over it, in pixels: as near as a
+## floor coin's (gameplay/rewards, `COIN_REACH`). A drop's first ring (Items' DROP_STEPS, 18 px) lies
+## past it; its second (9 px) and one at the feet inside, so its dropper waits (`GroundItem.waits_for`).
+const WALK_REACH: float = 10.0
 
 
 ## True when an item at `at` is in reach of feet at `feet`.
@@ -21,13 +29,15 @@ static func in_reach(feet: Vector2, at: Vector2) -> bool:
 	return feet.distance_squared_to(at) <= REACH * REACH
 
 
-## The index in `rows` of the item in reach of `feet`: the nearest, the lower number on a tie; -1
-## for none.
+## The index in `rows` of the item in reach of `feet` to take with A: the nearest, the lower number
+## on a tie, never one taken by walking over it (`walks_over`); -1 for none.
 static func nearest(rows: Array[GroundItem], feet: Vector2) -> int:
 	var best: int = -1
 	var best_distance: float = INF
 	for at in rows.size():
 		var row: GroundItem = rows[at]
+		if walks_over(row.stack.kind):
+			continue
 		var distance: float = feet.distance_squared_to(row.at)
 		if distance > REACH * REACH:
 			continue
@@ -35,6 +45,22 @@ static func nearest(rows: Array[GroundItem], feet: Vector2) -> int:
 			best = at
 			best_distance = distance
 	return best
+
+
+## True when an item of `kind` is taken by walking over it (a coin), not with A.
+static func walks_over(kind: StringName) -> bool:
+	return kind == ItemKinds.COIN
+
+
+## The index in `rows` of the first item (in the order laid, from index `from` on) that actor
+## `actor`, its feet at `feet`, walks over: one `walks_over` takes, within WALK_REACH, not waiting
+## for that actor to step off it (`GroundItem.waits_for`); -1 for none.
+static func walked_over(rows: Array[GroundItem], feet: Vector2, actor: int, from: int = 0) -> int:
+	for at in range(from, rows.size()):
+		var row: GroundItem = rows[at]
+		if walks_over(row.stack.kind) and row.waits_for != actor and feet.distance_squared_to(row.at) <= WALK_REACH * WALK_REACH:
+			return at
+	return -1
 
 
 ## True when `inventory` has room for `stack`: a free hand for a staff, else room in its bag.

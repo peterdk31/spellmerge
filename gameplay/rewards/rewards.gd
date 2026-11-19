@@ -50,7 +50,7 @@ extends Node
 ##   content/coins). A foe carries its coins in its own currency bag (its data's, `Actor._carry_coins`);
 ##   as it dies (`enemy_died`, possessed or not), by its `EnemyBase.coin_drop_chance` (DROP_PURPOSE),
 ##   what it still carries of those (`Inventory.carried_kept`: a coin it took later, a player's
-##   dropped one, goes with it unshared, so a drop never makes coins) drops where it fell (an add another body called, `Actor.is_add`, drops
+##   dropped one, drops as a plain coin for whoever walks over it, `Inventory.drop_taken`, so a drop never makes or loses coins) drops where it fell (an add another body called, `Actor.is_add`, drops
 ##   none; a boss's go to every player at once, decision 25), each one coin anyone may take: the
 ##   first wizard (seat order) whose feet come within `COIN_REACH` takes it, and every player's coin
 ##   stack gains one. As a seat's wizard first comes in a run its stack gains its player's
@@ -470,12 +470,17 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 	var body := enemy as Actor
 	if body == null:
 		return
+	if body.inventory != null:
+		# The coins it took later (a player's dropped one, taken while possessed) drop where it fell as
+		# plain coins, one's own to whoever walks over them (the owner, 2026-11-19), never shared and
+		# never lost; only what it came carrying follows the shared rule below. Its keys go with it.
+		body.inventory.drop_taken(ItemKinds.COIN)
 	if body.data == null or body.is_add:
 		# An add (a boss's waves, boss plan OB13) drops no coins: waves without end would fill coin stacks.
 		return
 	# Only the coins it came carrying and held all along are shared (the owner, 2026-11-19: everything
 	# is droppable): a coin a player dropped, taken by a possessed foe, is not made into one a player
-	# then, so dropping never makes coins. Those go with the body, as its keys.
+	# then, so dropping never makes coins. Those dropped above, as plain coins.
 	var carried: int = body.inventory.carried_kept() if body.inventory != null else 0
 	if carried <= 0:
 		return

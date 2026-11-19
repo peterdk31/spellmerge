@@ -407,8 +407,8 @@ const CURRENCY: StringName = &"currency"
 
 
 ## A coin and a key are dropped one copy at a time from one wizard's currency bag (X, the command
-## `bag_drop_requested`), lie as items, and another wizard takes them with A into its own bag: the
-## coins are one's own then (no shared income: the third player gains nothing), and none is made.
+## `bag_drop_requested`), lie as items, and another wizard takes them into its own bag (the key with
+## A, the coins by walking over them, the owner's of 2026-11-19): the coins are one's own then (no shared income: the third player gains nothing), and none is made.
 func test_coins_and_a_key_dropped_by_one_wizard_are_taken_by_another_and_none_is_made() -> void:
 	var giver := _wizard(0, Vector2(100, 100))
 	var taker := _wizard(1, Vector2(100, 200))
@@ -461,3 +461,90 @@ func test_a_dropped_coin_is_the_same_state_twice_and_through_a_snapshot() -> voi
 	check_equal(snapshot.restore(areas, root), PackedStringArray(), "restored")
 	check_equal(SimHash.of(_items), before, "the coin lies there again")
 	check_equal([_items.lying().back().stack.kind, _items.lying().back().stack.id], [ItemKinds.COIN, CoinBase.ID], "the coin")
+
+
+# --- Coins are walked over (the owner, 2026-11-19) ----------------------------------------------
+
+## A coin a player dropped is taken by walking over it, no A: by the one body whose feet come over
+## it (its own, never shared), not by its dropper till that one's feet have left it; a key still
+## waits for A, and no coin is made.
+func test_a_dropped_coin_is_walked_over_by_one_player_only() -> void:
+	var giver := _wizard(0, Vector2(100, 100))
+	var taker := _wizard(1, Vector2(100, 200))
+	var third := _wizard(2, Vector2(300, 300))
+	check(giver.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 2)), "two coins")
+	check(giver.inventory.add(ItemStack.of(ItemKinds.KEY, KeyBase.ID, 1)), "a key")
+	_tick()
+	_world.bus.bag_drop_requested.emit(0, CURRENCY, CoinBase.ID, Inventory.NO_STAFF, _world.body_key(0))
+	_world.bus.bag_drop_requested.emit(0, CURRENCY, KeyBase.ID, Inventory.NO_STAFF, _world.body_key(0))
+	_tick()
+	var lying: Array[GroundItem] = _items.lying()
+	check_equal(lying.size(), 2, "the coin and the key lie there")
+	var coin: GroundItem = lying[0]
+	var key: GroundItem = lying[1]
+	check_equal(coin.stack.kind, ItemKinds.COIN, "the coin first")
+	check(_items.near_of(0) != coin.number, "a coin is never the item to take with A")
+	taker.position = key.at
+	_tick()
+	check_equal(taker.inventory.count_of(CURRENCY, KeyBase.ID), 0, "a key is not walked over")
+	check_equal(_items.near_of(1), key.number, "it waits for A")
+	taker.position = coin.at
+	third.position = coin.at + Vector2(3, 0)
+	_tick()
+	check_equal(taker.inventory.count_of(CURRENCY, CoinBase.ID), 1, "the first seat over it walks it into its own bag")
+	check_equal(third.inventory.count_of(CURRENCY, CoinBase.ID), 0, "nobody else gains one")
+	check_equal(_items.lying().size(), 1, "only the key is left")
+	check_equal(giver.inventory.count_of(CURRENCY, CoinBase.ID) + taker.inventory.count_of(CURRENCY, CoinBase.ID) + third.inventory.count_of(CURRENCY, CoinBase.ID), 2, "as many coins as there were")
+	# A drop at the feet (as when every way is blocked) waits for its dropper to step off it.
+	_items.lay(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 1), giver.position)
+	_items._rows.back().waits_for = giver.id
+	_tick()
+	check_equal(giver.inventory.count_of(CURRENCY, CoinBase.ID), 1, "not taken back at once by its dropper")
+	giver.position += Vector2(40, 0)
+	_tick()
+	giver.position -= Vector2(40, 0)
+	_tick()
+	check_equal(giver.inventory.count_of(CURRENCY, CoinBase.ID), 2, "but once it stepped off and back")
+
+
+## A dying foe drops every coin it holds: those it came with by the shared rule (Rewards' floor
+## coins), and those it took later (here a player's, while possessed) as plain coins one walks
+## over into its own bag; its keys go with it. No coin is lost or made.
+func test_a_possessed_foe_that_took_coins_dies_and_drops_them_as_plain_coins() -> void:
+	var rewards := preload("res://gameplay/rewards/rewards.gd").new()
+	rewards.events = _world.bus
+	rewards.actors = _world.table
+	rewards.projectiles = _world.projectiles
+	rewards.spells = _world.spells
+	rewards.registry = _world.registry
+	rewards.sim = Sim.seeded(7)
+	root.add_child(rewards)
+	var body := _wizard(0, Vector2(100, 100))
+	var data: EnemyBase = IMP.duplicate()
+	data.coins = 2
+	data.coins_most = 0
+	data.coin_drop_chance = 1.0
+	var imp := IMP.scene.instantiate() as Actor
+	imp.data = data
+	imp.position = Vector2(200, 100)
+	_world.add(imp)
+	_tick()
+	check_equal(imp.inventory.carried_kept(), 2, "it came with two")
+	check(Possession.begin(body, imp, 5.0) != null, "the seat possesses the imp")
+	check(imp.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 3)), "it takes three a player dropped")
+	check(imp.inventory.add(ItemStack.of(ItemKinds.KEY, KeyBase.ID, 1)), "and a key")
+	_world.bus.enemy_died.emit(0, imp, imp.global_position, -1)
+	var plain: int = 0
+	for row: GroundItem in _items.lying():
+		check_equal([row.stack.kind, row.stack.count], [ItemKinds.COIN, 1], "only coins lie there, one each")
+		plain += 1
+	check_equal(plain, 3, "the three it took drop as plain coins")
+	check_equal(rewards.coins_lying().size(), 2, "its own two as shared coins, as before")
+	check_equal(imp.inventory.count_of(CURRENCY, KeyBase.ID), 1, "its key is not laid: it goes with the body")
+	check_equal(imp.inventory.count_of(CURRENCY, CoinBase.ID), 2, "nothing more left the body")
+	imp.free()
+	body.position = _items.lying()[0].at
+	_tick()
+	check_equal(body.inventory.count_of(CURRENCY, CoinBase.ID), 1, "a plain coin is walked over into one's own bag")
+	check_equal([rewards.coins_lying().size(), rewards.coins_of(0)], [2, 1], "the shared coins untouched (the stack is the same one)")
+	rewards.free()

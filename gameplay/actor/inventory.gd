@@ -377,6 +377,28 @@ func carried_kept() -> int:
 	return mini(_carried_kept, count_of(_carried_bag, _carried_id)) if _carried_bag != &"" else 0
 
 
+## Lay on the ground, one copy at a time (`drop`), every copy of `kind` it holds but what it carried
+## from the start and held all along (`carried_kept`): what it took later (a dying foe's coins it
+## picked up while possessed, gameplay/rewards; the owner, 2026-11-19), so no copy is lost or made.
+## Returns how many were laid.
+func drop_taken(kind: StringName) -> int:
+	var bag: StringName = ItemKinds.bag_of(kind)
+	if not _bags.has(bag):
+		return 0
+	var kept: int = carried_kept()
+	var ids: Array[StringName] = []
+	for stack: ItemStack in _stacks(bag):
+		if stack.kind == kind and not ids.has(stack.id):
+			ids.append(stack.id)
+	var laid: int = 0
+	for id: StringName in ids:
+		var more: int = count_of(bag, id) - (kept if bag == _carried_bag and id == _carried_id else 0)
+		for i in more:
+			if drop(bag, id) == Refusal.NONE:
+				laid += 1
+	return laid
+
+
 ## Take `count` copies of `id` out of `bag` (a stack left empty goes; of a kind that does not
 ## stack, the first `count` stacks of that id: a staff taken is said gone, `staff_changed`).
 ## Returns false, and nothing changes, when it holds fewer.

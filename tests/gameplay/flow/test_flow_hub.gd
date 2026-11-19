@@ -413,6 +413,27 @@ func test_the_main_menu_under_a_return_starts_no_hub() -> void:
 	events.disconnect("run_departure_changed", hear)
 
 
+## The main menu once the run went, while the hub is still to come: no hub, and the screen goes.
+func test_the_main_menu_while_the_hub_is_asked_for_drops_the_screen() -> void:
+	var told: Array[bool] = []
+	var hear := func(departing: bool) -> void: told.append(departing)
+	_start([0])
+	_place(0, true)
+	_tick()
+	_press_a(0)
+	events.connect("run_departure_changed", hear)
+	(flow.get_wizard(0) as Actor).health.take(100000.0)
+	flow.step(FlowScript.RESTART_DELAY)
+	for i in Departure.TICKS:
+		_tick()
+	check_equal(flow.state, FlowScript.State.IDLE, "the run went, the hub to come")
+	events.emit_signal("main_menu_requested", 0)
+	check_equal(told, [true, false] as Array[bool], "the main menu: the screen goes")
+	from_frames()
+	check_equal(flow.state, FlowScript.State.IDLE, "and no hub starts")
+	events.disconnect("run_departure_changed", hear)
+
+
 ## The main menu under a departure (the pause menu's): no run starts, and the HUD is told it ended.
 func test_the_main_menu_under_a_departure_starts_no_run() -> void:
 	var told: Array[bool] = []

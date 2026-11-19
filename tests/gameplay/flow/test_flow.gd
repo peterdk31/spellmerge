@@ -635,7 +635,10 @@ func test_everyone_down_goes_back_to_the_hub_after_the_delay() -> void:
 		flow.step(FlowScript.RESTART_DELAY - 0.5)
 		check(flow.world == old_world, "%d players: not yet" % count)
 		flow.step(0.5)
-		check(flow.state == FlowScript.State.IDLE and flow.world == null and not flow.is_restarting(), "%d players: the run ended after %f s" % [count, FlowScript.RESTART_DELAY])
+		check(flow.departure.is_under_way() and flow.world == old_world, "%d players: after %f s the party departs for the hub" % [count, FlowScript.RESTART_DELAY])
+		for i in Departure.TICKS:
+			flow.step(DT)
+		check(flow.state == FlowScript.State.IDLE and flow.world == null and not flow.is_restarting(), "%d players: the run ended %d ticks later" % [count, Departure.TICKS])
 		root.get_node("Frames").call("begin_step", DT)
 		check_equal(flow.mode, FlowScript.MODE_HUB, "%d players: back in the hub" % count)
 		check_equal(_wizards().size(), count, "%d players: every wizard there" % count)
@@ -651,6 +654,8 @@ func test_the_way_back_leaves_no_old_shot() -> void:
 	check_equal(projectiles.call("get_count"), 1, "a shot is in the air")
 	_down(_wizard(0))
 	flow.step(FlowScript.RESTART_DELAY)
+	for i in Departure.TICKS:
+		flow.step(DT)
 	root.get_node("Frames").call("begin_step", DT)
 	check_equal(projectiles.call("get_count"), 0, "the run's end cleared the shots")
 

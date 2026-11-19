@@ -754,6 +754,8 @@ func test_the_party_camera_follows_the_new_worlds_camera_after_a_restart() -> vo
 	var old_camera: Camera2D = party.camera
 	_down(0)
 	flow.step(FlowScript.RESTART_DELAY)
+	for i in Departure.TICKS:
+		flow.step(1.0 / 60.0)
 	root.get_node("Frames").call("begin_step", 1.0 / 60.0)
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
 	check_equal(flow.state, FlowScript.State.RUNNING, "the hub runs")

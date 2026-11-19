@@ -431,7 +431,7 @@ func step(delta: float) -> void:
 ## The run is over (lost, or won through the portal home): the party departs for the hub, which
 ## stands Departure.TICKS later behind the loading screen (`_depart`). The run steps on meanwhile.
 func _depart_for_hub() -> void:
-	if departure.begin(_starter, Departure.To.HUB):
+	if departure.begin(maxi(_starter, 0), Departure.To.HUB):
 		_tell_departure()
 
 
@@ -586,6 +586,8 @@ func start_run(requester: int, party: PartyLoadout = null) -> bool:
 	_starter = requester
 	_party_back = PackedByteArray()
 	_restart_left = -1.0
+	# A run starts with no departure under way (every way here has ended it): a recording's start too.
+	departure.cancel()
 	_stand_up_left.fill(-1.0)
 	_clear_run()
 	_wizard_scene = wizard_scene
@@ -921,6 +923,7 @@ func _on_hub_requested(player: int) -> void:
 	if state == State.RUNNING and mode == MODE_HUB:
 		stop_run()
 	if state != State.IDLE:
+		_hub_stands()
 		return
 	if not _load_then(_start_hub.bind(player, party)):
 		_start_hub(player, party)

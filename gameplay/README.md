@@ -73,6 +73,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `crumble_requested` | `flow` (an add whose caller died; boss plan OB13) | `combat` (it dies with no hit, nobody's kill) |
 | `run_way_taken` | `flow` (every standing wizard in a lit exit) | `run` (moves on through the map) |
 | `room_exits_shown` | `flow` (the lit exits of a cleared room, and the kind behind each) | `feel` (the kind's name over each) |
+| `gather_door_shown` | `flow` (a biome's gather door, gate or portal home: who is gathered at it, held, open; connected biomes CB7) | `feel` (its bars, lamps and portal) |
 | `room_left` | `flow` (the party goes on to the next room of the run; a biome's world goes, `Events.ALL_ROOMS`) | `core/spells` (what was cast in the room ends quietly) |
 | `room_entered` | `flow` (by room number: a biome's each room the first time; `Events.FIRST_ROOM` is a new world, connected biomes CB3) | `ai`, `coop`, `difficulty`, `hud`, `feel` (its walls' colours for motes; the party camera jumps to the new room) |
 | `room_built` | `flow` | `feel` (ground cover GC3: the cover's look, `cover_rooms.gd`, a `cover.gd` a piece) and `cover` (GC5): each piece's cover worked out from its layout at its place, mirrored with it, `CoverLayout.of_piece` (connected biomes CB3b) |

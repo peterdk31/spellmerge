@@ -145,8 +145,13 @@ extends Node
 ## a wizard outside walks in); with its last enemy down it is cleared (`room_cleared`) and opens. A
 ## room's fight is what no seat drives standing in it (`Actor.room`): a possessed enemy leaves its room
 ## (cleared without it) and fights for the room it ends in, which never seals again once cleared.
-## Each place sleeps while nothing acts in it (`RoomLife.wake`). The row run stays the default until
-## CB8 moves the crypt over; nothing but the tests starts a biome yet.
+## Each place sleeps while nothing acts in it (`RoomLife.wake`). A gated room (connected biomes CB7,
+## `gates`, `GatherDoors`: a challenge room's gather door, the boss's gate) is shut until every standing
+## wizard is at its door (the gate also while a sealed fight holds a wizard), and then the party comes
+## in together (the gate: everyone, downed or far away); its boss's intro opens as it is entered. The
+## boss's room cleared opens the portal home: every standing wizard in it wins the run, back to the hub;
+## everyone down loses it, back to the hub too. The row run stays the default until CB8 moves the
+## crypt over; nothing but the tests starts a biome yet.
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -169,6 +174,8 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const PLAYER_SLOTS: int = 4
 ## The rooms' registry folder.
 const ROOM_FOLDER: StringName = &"rooms"
+## The room kinds' registry folder (a biome's rooms' kinds: their doors, connected biomes CB7).
+const ROOM_KIND_FOLDER: StringName = &"room_kinds"
 ## The registry folder of the run definitions (content/runs).
 const RUN_FOLDER: StringName = &"runs"
 ## The run a run of rooms is unless `run_id_to_play` says otherwise (a run definition's id,
@@ -184,6 +191,10 @@ const HUB_ROOM_ID: StringName = &"hub"
 ## The zone of a room's scene Flow gives a meaning (`RoomPlaces.zone`; a place that is no thing):
 ## the prop yard (props W8).
 const ZONE_PROP_YARD: StringName = &"prop_yard"
+## The zone of a biome room's template where its portal home opens (connected biomes CB7; none: the
+## room's middle), and how much clear ground round its middle it wants.
+const ZONE_PORTAL: StringName = &"portal"
+const PORTAL_GROUND: float = 16.0
 ## The run modes (`mode`): a run of rooms, the hub.
 const MODE_RUN: StringName = &"run"
 const MODE_HUB: StringName = &"hub"
@@ -299,6 +310,9 @@ var boss_intro: BossIntroHold = BossIntroHold.new()
 ## biome run in progress was started with (its map and fights, for a restart).
 var biome: BiomeWorld = BiomeWorld.new()
 var life: RoomLife = RoomLife.new()
+## A biome's gather doors: its gated rooms' doors (a challenge room's, the boss's gate) and the portal
+## home (connected biomes CB7, `GatherDoors`).
+var gates: GatherDoors = GatherDoors.new()
 var _biome_start: BiomeMap = null
 var _biome_fights: Array[RoomFight] = []
 ## The room's layout in the world, and the room it is of (a joining machine built the room the run
@@ -355,6 +369,7 @@ func _ready() -> void:
 	if frames != null:
 		frames.set_party_source(_party_now)
 	boss_intro.events = events
+	gates.events = events
 	if events == null:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
 		return
@@ -387,8 +402,9 @@ func step(delta: float) -> void:
 		_crumble_orphans()
 	if mode == MODE_RUN and state == State.RUNNING and not spawn_queue.is_done():
 		_call_spawning(delta)
-	if mode == MODE_BIOME and state == State.RUNNING:
-		_step_biome(delta)
+	if mode == MODE_BIOME and state == State.RUNNING and _step_biome(delta):
+		# The run ended in its step (the portal home): nothing more of it steps.
+		return
 	_count_stand_ups(delta)
 	if mode == MODE_HUB and state == State.RUNNING:
 		_count_stone()
@@ -403,7 +419,8 @@ func step(delta: float) -> void:
 	_restart_left -= delta
 	if _restart_left <= 0.0:
 		_restart_left = -1.0
-		if _back_to_hub:
+		if _back_to_hub or mode == MODE_BIOME:
+			# A biome's run lost goes back to the hub (connected biomes CB7, decision 14).
 			# Back in the hub the party is ready for a new run: nothing of the run comes back
 			# with it, its staffs neither (owner, 2026-11-10). The hub is the arsenal the next
 			# run's tools are picked from.
@@ -1686,6 +1703,7 @@ func _clear_run() -> void:
 	yard.clear()
 	biome.clear()
 	life.clear()
+	gates.clear()
 	if world != null and is_instance_valid(world):
 		_detach(world)
 	world = null
@@ -1721,7 +1739,7 @@ func _detach(node: Node) -> void:
 
 ## Start a run in the biome `map` (connected biomes CB3; see the class doc): each room's fight
 ## `fights[room]` (a room past their end, or null, has none), for seat `requester`, each seat's
-## wizard as `party` says (as `start_run` takes it). Everyone down starts it again as it began.
+## wizard as `party` says (as `start_run` takes it). Everyone down ends it back in the hub (CB7).
 ## False (nothing started) when its map or content is missing or nobody has joined.
 func start_biome(requester: int, map: BiomeMap, fights: Array[RoomFight], party: PartyLoadout = null) -> bool:
 	if map == null:
@@ -1751,10 +1769,30 @@ func _lay_biome(into: Node2D) -> bool:
 	_layout_of = &""
 	_places = biome.room_places(EventsScript.FIRST_ROOM)
 	life.begin(biome.map.rooms(), biome.places(), _biome_fights)
+	_begin_gates(biome.map)
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
 		_add_camera_over(into, projectiles.bounds())
 	return true
+
+
+## The biome's gather doors begin from its rooms' kinds (`RoomKind.door`, `portal_home`; a kind the
+## registry lacks has none) and are laid into the grid, every door shut.
+func _begin_gates(map: BiomeMap) -> void:
+	var rules := PackedByteArray()
+	var homes := PackedByteArray()
+	rules.resize(map.rooms())
+	homes.resize(map.rooms())
+	for room in map.rooms():
+		var kind: RoomKind = registry.get_resource(ROOM_KIND_FOLDER, map.room_kinds[room]) as RoomKind if registry != null and map.room_kinds[room] != &"" else null
+		rules[room] = GatherDoors.RULE_NONE
+		if kind != null and kind.door == RoomKind.DOOR_GATHER:
+			rules[room] = GatherDoors.RULE_GATHER
+		elif kind != null and kind.door == RoomKind.DOOR_GATE:
+			rules[room] = GatherDoors.RULE_GATE
+		homes[room] = 1 if kind != null and kind.portal_home else 0
+	gates.begin(map, rules, homes)
+	gates.lay(biome, projectiles.grid() if projectiles != null else null)
 
 
 ## A piece of the biome was laid (`BiomeWorld.built`): `room_built` for it.
@@ -1780,8 +1818,9 @@ func _start_biome_rooms() -> void:
 
 ## A biome's tick (Flow's step): every room a wizard's own body stepped onto entered (its fight
 ## starting), every fight under way spawning at its pace and cleared once its last enemy is down,
-## then every place woken or put to sleep (`RoomLife.wake`).
-func _step_biome(delta: float) -> void:
+## then the gather doors counted (CB7), then every place woken or put to sleep (`RoomLife.wake`).
+## True when the run ended here (the portal home taken).
+func _step_biome(delta: float) -> bool:
 	for wizard: Node2D in _wizards:
 		if not is_instance_valid(wizard):
 			continue
@@ -1790,14 +1829,56 @@ func _step_biome(delta: float) -> void:
 			continue
 		actor.find_room()
 		# A wizard standing (a downed one crawling in starts nothing).
-		if not actor.is_down() and actor.room >= 0 and actor.room < life.rooms() and not life.has(actor.room, RoomLife.ENTERED):
+		# A gated room is entered only once it opened (its lip outside the shut door is its place).
+		if not actor.is_down() and actor.room >= 0 and actor.room < life.rooms() and not life.has(actor.room, RoomLife.ENTERED) and gates.is_open(actor.room):
 			_enter_biome_room(actor.room)
 	for room in life.rooms():
 		if life.has(room, RoomLife.STARTED) and not life.has(room, RoomLife.CLEARED):
 			if life.is_awake(room):
 				_call_room_spawning(room, delta)
 			_check_biome_room(room)
+	var gated: int = gates.count_doors(_wizards, life)
+	if gated != GatherDoors.NONE:
+		_open_gate(gated)
+	if gates.count_portal(_wizards):
+		_take_portal_home()
+		return true
 	life.wake(actors, projectiles)
+	return false
+
+
+## Every standing wizard is at a door of gated room `room` (and a gate is not held): it opens and the
+## party comes in onto its player spawns, each at its seat's (connected biomes CB7): a gather door's
+## standing wizards, the gate's everyone, downed or far away (decision 25). A standing one is
+## protected for a moment, as a wizard coming into a row run's room is; a downed one stays down for a
+## teammate's revive. The room is entered at once (its fight starts and seals, its boss's intro opens).
+func _open_gate(room: int) -> void:
+	var everyone: bool = gates.rule_of(room) == GatherDoors.RULE_GATE
+	gates.open(room, projectiles.grid() if projectiles != null else null)
+	var places: RoomPlaces = biome.room_places(room)
+	var middle: Vector2 = biome.room_rect(room).get_center()
+	for wizard: Node2D in _wizards:
+		var actor := wizard as Actor if is_instance_valid(wizard) else null
+		if actor == null or (actor.is_downed() and not everyone):
+			continue
+		var seat: int = _seat_of(actor)
+		var at: Vector2 = places.player_spawns[seat] if places != null and seat >= 0 and seat < places.player_spawns.size() else middle
+		if projectiles != null:
+			at = world.to_local(projectiles.grid().nearest_ground(world.to_global(at), actor.wall_radius()))
+		actor.position = at
+		actor.placed()
+		actor.find_room()
+		var hero: DownedScript = DownedScript.of(actor)
+		if hero != null and not actor.is_downed():
+			hero.protect(DownedScript.JOIN_PROTECTION)
+	if not life.has(room, RoomLife.ENTERED):
+		_enter_biome_room(room)
+
+
+## Every standing wizard stands in the portal home (connected biomes CB7, decision 7): the run is won
+## and ends back in the hub, nothing of it coming along (as a row run's end from the stone).
+func _take_portal_home() -> void:
+	_return_to_hub(_starter)
 
 
 ## Room `room` is entered for the first time: `room_entered`, and its fight starts (its bosses stand,
@@ -1820,6 +1901,7 @@ func _enter_biome_room(room: int) -> void:
 	var queued: Array[StringName] = []
 	var queued_costs := PackedInt32Array()
 	var bosses: int = 0
+	var stood: Array[Node] = []
 	for id: StringName in fight.enemies:
 		var data: EnemyBase = _enemy_data_of(id)
 		if data == null or data.scene == null or places.enemy_spawns.is_empty():
@@ -1827,7 +1909,9 @@ func _enter_biome_room(room: int) -> void:
 			continue
 		if data.boss:
 			var spawn: int = bosses % places.enemy_spawns.size()
-			_stand_enemy(world, data, stacked_position(places.enemy_spawns[spawn], bosses / places.enemy_spawns.size()), false)
+			var boss: Actor = _stand_enemy(world, data, stacked_position(places.enemy_spawns[spawn], bosses / places.enemy_spawns.size()), false)
+			if boss != null:
+				stood.append(boss)
 			bosses += 1
 		else:
 			queued.append(id)
@@ -1840,6 +1924,19 @@ func _enter_biome_room(room: int) -> void:
 			if actor != null and actor.room == room and not actor.is_down():
 				events.cue_shown.emit(actor.id, ROOM_START_CUE, actor.global_position, Vector2.ZERO, 0.0, Color.WHITE, 0)
 	_check_biome_room(room)
+	_open_biome_boss_intro(stood)
+
+
+## A biome's room's fight began with `bosses` standing (connected biomes CB7; docs/milestones/
+## boss-intro.md): the first with an intro opens it, as a row run's room's does, and the game stops on
+## this tick for everyone (any seat's A moves it on). A room is entered once, so its intro opens once.
+func _open_biome_boss_intro(bosses: Array[Node]) -> void:
+	if bosses.is_empty() or state != State.RUNNING:
+		return
+	var game: Sim = Sim.found(self)
+	# The last room's intro is done with (it closed before anyone could walk on): this room's may open.
+	boss_intro.clear(game)
+	boss_intro.open_in(bosses, game)
 
 
 ## Room `room`'s queue `delta` seconds on: each enemy it calls spawns in at the room's spawns
@@ -1886,6 +1983,19 @@ func _clear_biome_room(room: int) -> void:
 		life.tell_seals(projectiles.grid())
 	if events != null:
 		events.room_cleared.emit(biome.map.room_templates[room], room)
+	if gates.opens_home(room):
+		_open_portal_home(room)
+
+
+## Room `room`, cleared, opens the portal home on its floor (connected biomes CB7): at its zone
+## `ZONE_PORTAL` when its template has one, else at its middle, on the nearest clear ground.
+func _open_portal_home(room: int) -> void:
+	var places: RoomPlaces = biome.room_places(room)
+	var zone: Rect2 = places.zone(ZONE_PORTAL) if places != null else Rect2()
+	var middle: Vector2 = zone.get_center() if zone.has_area() else biome.room_rect(room).get_center()
+	if projectiles != null and world != null:
+		middle = world.to_local(projectiles.grid().nearest_ground(world.to_global(middle), PORTAL_GROUND))
+	gates.open_portal(room, middle)
 
 
 ## What is where in the room a body of `room` stands in: a biome's room's (its places in the world),
@@ -1916,3 +2026,5 @@ func _rebuild_biome() -> void:
 	if projectiles != null:
 		life.tell_seals(projectiles.grid())
 		life.tell_awake(projectiles.grid())
+		gates.lay(biome, projectiles.grid())
+	gates.tell_all(_wizards, life)

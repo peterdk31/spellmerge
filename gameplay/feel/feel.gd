@@ -125,6 +125,7 @@ const SplitScreenScript := preload("res://gameplay/feel/split_screen.gd")
 const ScreenViewsScript := preload("res://core/display/screen_views.gd")
 const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
 const ExitSignsScript := preload("res://gameplay/feel/exit_signs.gd")
+const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
@@ -509,6 +510,8 @@ var _one_view: ScreenViewsScript = ScreenViewsScript.new()
 var _altar_code: AltarCodeScript = null
 ## The kind of room behind each lit exit of a run's room (`exit_signs.gd`).
 var _exit_signs: ExitSignsScript = null
+## A biome's gather doors, its gate and the portal home (connected biomes CB7, `gather_door_looks.gd`).
+var _gather_doors: GatherDoorLooksScript = null
 ## The items on the ground (`ground_items.gd`, items I6).
 var _ground_items: GroundItemsScript = null
 ## The health bars over wizards whose seat drives another body (`away_bars.gd`, items I8).
@@ -834,6 +837,10 @@ func _ready() -> void:
 	_exit_signs.name = "ExitSigns"
 	add_child(_exit_signs)
 	_exit_signs.bind(events, _room_kind_name)
+	_gather_doors = GatherDoorLooksScript.new()
+	_gather_doors.name = "GatherDoors"
+	add_child(_gather_doors)
+	_gather_doors.bind(events)
 	_ground_items = GroundItemsScript.new()
 	_ground_items.name = "GroundItems"
 	add_child(_ground_items)
@@ -2356,6 +2363,11 @@ func _room_kind_name(kind: StringName) -> String:
 ## The names over a run's lit exits (for tests).
 func exit_signs() -> ExitSignsScript:
 	return _exit_signs
+
+
+## The gather doors' look (connected biomes CB7).
+func gather_doors() -> GatherDoorLooksScript:
+	return _gather_doors
 
 
 ## The room's code over the altar (for tests).

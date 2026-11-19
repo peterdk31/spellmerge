@@ -129,6 +129,7 @@ const RoomHearingScript := preload("res://gameplay/feel/room_hearing.gd")
 const MouthLooksScript := preload("res://gameplay/feel/mouth_looks.gd")
 const LockLooksScript := preload("res://gameplay/feel/lock_looks.gd")
 const UnseenDarkScript := preload("res://gameplay/feel/unseen_dark.gd")
+const RoomTintsScript := preload("res://gameplay/feel/room_tints.gd")
 const MouthSymbolsScript := preload("res://gameplay/feel/mouth_symbols.gd")
 const PartyMapViewScript := preload("res://gameplay/feel/party_map_view.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -532,6 +533,8 @@ var _hearing: RoomHearingScript = RoomHearingScript.new()
 var _mouths: MouthLooksScript = null
 var _locks: LockLooksScript = null
 var _unseen: UnseenDarkScript = null
+## Each room's own light tinted by its kind (`room_tints.gd`; CB12b), onto the spell light.
+var _tints: RoomTintsScript = null
 ## What each mouth tells of the room behind it, and the held Y map (connected biomes CB9).
 var _mouth_symbols: MouthSymbolsScript = null
 var _party_map: PartyMapViewScript = null
@@ -887,6 +890,11 @@ func _ready() -> void:
 	_unseen.pieces = _hearing
 	add_child(_unseen)
 	_unseen.bind(events)
+	_tints = RoomTintsScript.new()
+	_tints.pieces = _hearing
+	_tints.bind(events)
+	if _spectacle != null:
+		_spectacle.kind_air.pieces = _hearing
 	_mouth_symbols = MouthSymbolsScript.new()
 	_mouth_symbols.name = "MouthSymbols"
 	_mouth_symbols.pieces = _hearing
@@ -1108,6 +1116,10 @@ func _step_rooms(real_delta: float, seats_here: int) -> void:
 		_mouth_symbols.step(real_delta, table, seats_here, grid)
 	if _unseen != null:
 		_unseen.step(real_delta, grid)
+	if _tints != null:
+		_tints.step(real_delta, grid, _spectacle.light if _spectacle != null else null)
+	if _spectacle != null:
+		_spectacle.kind_air.lay(grid)
 	if _party_map != null:
 		_party_map.input = _input_manager()
 		_party_map.step(real_delta, table, seats_here, grid, _views_shown())
@@ -2488,6 +2500,11 @@ func lock_looks() -> LockLooksScript:
 
 func unseen_dark() -> UnseenDarkScript:
 	return _unseen
+
+
+## Each room's tint by its kind (CB12b; for tests and the screenshots).
+func room_tints() -> RoomTintsScript:
+	return _tints
 
 
 ## What each mouth tells of the room behind it and the held Y map (for tests; connected biomes CB9).

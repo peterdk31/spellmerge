@@ -135,7 +135,7 @@ signal item_take_requested(player: int, item: int)
 ## seats pressing on one tick turn one page.
 signal boss_intro_next_requested(player: int, page: int)
 ## Sender: hud (the cheat code, `hud/widgets/cheat_code.gd`; owner, 2026-11-19). `player` typed the
-## cheat code on the keyboard or pressed it on their gamepad: every wizard in the hub gets every card. A command: heard by flow at
+## cheat code on the keyboard or pressed it on their gamepad: that seat's wizard in the hub, and no other, gets every card. A command: heard by flow at
 ## the next tick's start, which fills their card bags only while the hub runs.
 signal all_cards_requested(player: int)
 ## `player` opened (`on` 1) or closed (`on` 0) the pause menu: offline the game stops while it is

@@ -56,9 +56,10 @@ extends Node
 ## with `seat_wizard`; items I3): Play and the hub alike one `dash` and one `bolt` (PLAY_BAG,
 ## `play_bag`: each entry a copy; owner, 2026-11-19: the hub no longer hands out every card). The
 ## start cards come with their staffs, beside the bag.
-## The command `all_cards_requested` (the HUD's cheat code, typed on the keyboard; owner,
-## 2026-11-19) fills the card bag of every wizard in the hub with Inventory.DEV_COPIES of every
-## card, at the tick's start (`_on_all_cards_requested`); outside the hub it does nothing. It lasts
+## The command `all_cards_requested` (the HUD's cheat code, typed on the keyboard or pressed on a
+## gamepad; owner, 2026-11-19) fills the card bag of the wizard of the seat that sent it, and no
+## other, with Inventory.DEV_COPIES of every card, at the tick's start (`_on_all_cards_requested`);
+## outside the hub it does nothing. It lasts
 ## as long as that hub: a run from the stone takes the cards along (the whole player), and the hub
 ## begun again after a run hands out its own bag again.
 ##
@@ -858,16 +859,16 @@ func _on_run_requested(player: int) -> void:
 
 
 ## The command `all_cards_requested` (the HUD's cheat code; owner, 2026-11-19): while the hub
-## runs, every wizard's own card bag holds Inventory.DEV_COPIES of every card of the registry from
-## now on (what it held is replaced; its staffs keep their cards). Anywhere else it does nothing.
-func _on_all_cards_requested(_player: int) -> void:
+## runs, the own card bag of seat `player`'s wizard, and only that one (owner: only the typer's
+## wizard), holds Inventory.DEV_COPIES of every card of the registry from now on (what it held is
+## replaced; its staffs keep their cards). Anywhere else, or for a seat with no wizard, it does
+## nothing.
+func _on_all_cards_requested(player: int) -> void:
 	if mode != MODE_HUB or state != State.RUNNING:
 		return
-	var every: Dictionary = Inventory.dev_cards(registry)
-	for wizard: Node2D in _wizards:
-		var actor := wizard as Actor
-		if is_instance_valid(actor) and actor.inventory != null:
-			actor.inventory.give_cards(every)
+	var wizard := get_wizard(player) as Actor
+	if wizard != null and wizard.inventory != null:
+		wizard.inventory.give_cards(Inventory.dev_cards(registry))
 
 
 ## The run, from the hub's stone, for seat `seat`: every wizard goes in as the player it

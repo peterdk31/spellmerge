@@ -3,7 +3,8 @@ extends Node
 ## The cheat code (owner, 2026-11-19): a way for the owner to try every card. Typing CODE on the
 ## keyboard, or pressing PAD_CODE on a gamepad (up, down, left, right on the d-pad, then A, B, X,
 ## Y), sends the command `all_cards_requested` (core/events). Flow hears it at the next tick's
-## start and, only while the party is in the hub, fills every wizard's card bag with every card
+## start and, only while the party is in the hub, fills the card bag of that seat's wizard (and no
+## other's) with every card
 ## (gameplay/flow, `_on_all_cards_requested`). Anywhere else the command does nothing, so this node
 ## does not need to know where the party is. Being a command, the request reaches every machine of
 ## an online party and a replay, on the same tick.

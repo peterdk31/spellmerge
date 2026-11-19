@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The reward menu on screen (connected biomes CB10, hud/menus/reward, hud/panels; its cards by the
-## owner's redesign of 2026-11-19): an offer rolled for a seat whose wizard was there opens that
-## seat's menu by itself, "Pick 1 of 2" over a row of cards, one a choice, each with its name and
+## owner's redesign of 2026-11-19): an offer rolled for a seat whose wizard was there lies as its
+## reward item and never opens by itself (the owner, 2026-11-19); the seat's A at its item opens that
+## offer's menu, "Pick 1 of 3" (here of 2) over a row of cards, one a choice, each with its name and
 ## what it does; right and left move along the row (wrapping), A on one sends the command
 ## `reward_pick_requested` with its offer and closes it; B closes it with nothing sent, and the
 ## corner panel says the reward waits; the seat's A with nothing else for it opens it again. An offer
@@ -93,10 +94,21 @@ func _choices(count: int) -> Array[Dictionary]:
 
 
 ## Seat `seat`'s offer `offer` rolled (`here` or not), waiting with any earlier ones in `waiting`.
+## One `here` lies as the seat's reward item, and the seat walks to it and presses A (`take`), so the
+## next frame opens it.
 func _roll(seat: int, offer: int, here: bool, waiting: Array[Dictionary] = [], count: int = 2) -> Array[Dictionary]:
+	var offers: Array[Dictionary] = _rolled(seat, offer, here, waiting, count)
+	if here:
+		_bus.reward_near_changed.emit(seat, offer, Vector2.ZERO)
+		_tap(seat, &"take")
+	return offers
+
+
+## Seat `seat`'s offer `offer` rolled, as `_roll`, but nobody walks to it.
+func _rolled(seat: int, offer: int, here: bool, waiting: Array[Dictionary] = [], count: int = 2) -> Array[Dictionary]:
 	var choices: Array[Dictionary] = _choices(count)
 	var offers: Array[Dictionary] = waiting.duplicate()
-	offers.append({"offer": offer, "here": here, "choices": choices})
+	offers.append({"offer": offer, "here": here, "lying": here, "choices": choices})
 	_bus.reward_rolled.emit(seat, offer, choices, here)
 	_bus.rewards_waiting_changed.emit(seat, offers)
 	return offers
@@ -128,11 +140,32 @@ func _open_in(space: Rect2, count: int) -> RewardMenuScript:
 	return menu
 
 
+func test_a_reward_never_opens_by_itself_and_a_at_its_item_opens_it() -> void:
+	_rolled(1, 4, true)
+	for frame in 5:
+		_frame()
+	var menu: RewardMenuScript = _hud.get_reward(1)
+	check(not menu.is_open() and not menu.visible, "a present seat's reward never pops up: it lies as an item")
+	_tap(1, &"accept")
+	_frame()
+	check(not menu.is_open(), "A away from its item opens nothing (the offer lies in the room)")
+	_bus.reward_near_changed.emit(0, 4, Vector2.ZERO)
+	_tap(0, &"take")
+	_frame()
+	check(not _hud.get_reward(0).is_open(), "another seat at it opens nothing: only its owner's")
+	_bus.reward_near_changed.emit(1, 4, Vector2(10, 20))
+	check_equal(_hud.get_item_hints().hint_of(1).title(), "Open reward", "its owner at it is shown A: Open reward")
+	_tap(1, &"take")
+	_frame()
+	check(menu.is_open() and menu.visible, "A at its own reward item opens its pick")
+	check_equal(menu.shown_offer(), 4, "on that offer")
+
+
 func test_an_offer_for_a_seat_that_was_there_opens_its_menu() -> void:
 	_roll(1, 4, true)
 	_frame()
 	var menu: RewardMenuScript = _hud.get_reward(1)
-	check(menu.is_open() and menu.visible, "the seat's menu opens by itself")
+	check(menu.is_open() and menu.visible, "A at its item opens the seat's menu")
 	check(not _hud.get_reward(0).is_open(), "nobody else's")
 	check_equal(_words(1), ["Frostfire Cascade", "Coins x6"] as Array[String], "a card a choice")
 	check_equal(menu.title_text(), "Pick 1 of 2", "pick 1 of 2")

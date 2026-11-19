@@ -13,7 +13,7 @@ extends RefCounted
 ##     var choices: int = RunStats.whole_of(&"reward_choices", run_changes, relics)
 
 ## One row a stat: its base, the range it is held to and whether it is a whole number.
-## - `reward_choices`: how many choices a reward offers ("pick 1 of 2", decision 17).
+## - `reward_choices`: how many choices a reward offers ("pick 1 of 3": decision 17, raised from 2 by the owner, 2026-11-19).
 ## - `start_coins`: the coins put into a player's coin stack as a run starts (decision 18).
 ## - `price_scale`: what a shop's prices are multiplied by (CB11's shop).
 ## - `map_reveal`: how many rooms past the seen ones the map shows (CB9's map).
@@ -23,7 +23,7 @@ extends RefCounted
 ## - `start_room_rerolls`, `start_reward_rerolls`: the room rerolls and reward rerolls put into a
 ##   player's currency bag as a run starts (`RerollBase`; the owner, 2026-11-19: 1 of each for now).
 const ROWS: Dictionary = {
-	&"reward_choices": {"base": 2.0, "low": 1.0, "high": 4.0, "whole": true},
+	&"reward_choices": {"base": 3.0, "low": 1.0, "high": 4.0, "whole": true},
 	&"start_coins": {"base": 0.0, "low": 0.0, "high": 999.0, "whole": true},
 	&"price_scale": {"base": 1.0, "low": 0.1, "high": 10.0, "whole": false},
 	&"map_reveal": {"base": 0.0, "low": 0.0, "high": 99.0, "whole": true},

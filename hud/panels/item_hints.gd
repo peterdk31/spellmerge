@@ -13,6 +13,10 @@ extends Control
 ## (`room_reroll_shown`, the owner's of 2026-11-19) is shown X "Reroll room" there, when nothing
 ## above is shown; `reroll_of(player)` is true while it shows (the panels send
 ## `room_reroll_requested` on X), and a refused reroll (`room_reroll_refused`) shakes it with why.
+## A shop's reroll sign in reach comes as a shop item (its view's kind `SHELF_SIGN`): "Reroll shelf"
+## and its price, A buying the reroll. A seat's own reward item in reach (`reward_near_changed`, the
+## owner's of 2026-11-19) is shown "Open reward" when no ground or shop item is; `reward_of(player)`
+## is the offer A opens (the panels open its reward menu).
 ## Display only: it reads no input.
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -32,6 +36,9 @@ var _ground_view: Array[Dictionary] = [{}, {}, {}, {}]
 var _shelf: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 var _shelf_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
 var _shelf_view: Array[Dictionary] = [{}, {}, {}, {}]
+## By player: its own reward item in reach (its offer, -1: none) and where it lies.
+var _reward: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+var _reward_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
 ## By player: true while its body is at a shut key door with no key, and the door's mouth.
 var _needs_key: Array[bool] = [false, false, false, false]
 var _door_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
@@ -62,6 +69,7 @@ func bind(events: EventsScript, input: InputManagerScript, spells: SpellsScript)
 		events.item_refused.connect(_on_item_refused)
 		events.shelf_near_changed.connect(_on_shelf_near_changed)
 		events.shelf_refused.connect(_on_shelf_refused)
+		events.reward_near_changed.connect(_on_reward_near_changed)
 		events.key_needed_shown.connect(_on_key_needed_shown)
 		events.room_reroll_shown.connect(_on_room_reroll_shown)
 		events.room_reroll_refused.connect(_on_room_reroll_refused)
@@ -81,12 +89,20 @@ func shelf_of(player: int) -> int:
 	return _hints[player].item()
 
 
+## The reward offer whose item `player`'s A opens now (shown, no ground or shop item in reach and no
+## menu open), -1 for none.
+func reward_of(player: int) -> int:
+	if player < 0 or player >= PLAYER_COUNT or not _hints[player].visible or _ground[player] >= 0 or _shelf[player] >= 0 or _reward[player] < 0:
+		return -1
+	return _reward[player]
+
+
 ## True while `player`'s hint shows X "Reroll room" at a doorway (shown, nothing else shown there
 ## and no menu open): X sends `room_reroll_requested`.
 func reroll_of(player: int) -> bool:
 	if player < 0 or player >= PLAYER_COUNT or not _hints[player].visible:
 		return false
-	return _reroll[player] and not _reroll_pending[player] and _ground[player] < 0 and _shelf[player] < 0 and not _needs_key[player]
+	return _reroll[player] and not _reroll_pending[player] and _ground[player] < 0 and _shelf[player] < 0 and _reward[player] < 0 and not _needs_key[player]
 
 
 ## `player`'s X asked for a reroll: no other until it is answered (`room_reroll_shown`, refused).
@@ -105,6 +121,7 @@ func clear() -> void:
 	for player in PLAYER_COUNT:
 		_ground[player] = -1
 		_shelf[player] = -1
+		_reward[player] = -1
 		_needs_key[player] = false
 		_reroll[player] = false
 		_hints[player].show_item(player, -1, {})
@@ -162,12 +179,21 @@ func _on_shelf_near_changed(player: int, item: int, at: Vector2, view: Dictionar
 		_show(player)
 
 
+func _on_reward_near_changed(player: int, offer: int, at: Vector2) -> void:
+	if player < 0 or player >= PLAYER_COUNT:
+		return
+	_reward[player] = offer
+	_reward_at[player] = at
+	if _ground[player] < 0 and _shelf[player] < 0:
+		_show(player)
+
+
 func _on_key_needed_shown(player: int, at: Vector2, needed: bool) -> void:
 	if player < 0 or player >= PLAYER_COUNT:
 		return
 	_needs_key[player] = needed
 	_door_at[player] = at
-	if _ground[player] < 0 and _shelf[player] < 0:
+	if _ground[player] < 0 and _shelf[player] < 0 and _reward[player] < 0:
 		_show(player)
 
 
@@ -178,7 +204,7 @@ func _on_room_reroll_shown(player: int, at: Vector2, shown: bool) -> void:
 	_reroll_at[player] = at
 	_reroll_pending[player] = false
 	_reroll_words[player] = ItemHintScript.REROLL_ROOM
-	if _ground[player] < 0 and _shelf[player] < 0 and not _needs_key[player]:
+	if _ground[player] < 0 and _shelf[player] < 0 and _reward[player] < 0 and not _needs_key[player]:
 		_show(player)
 
 
@@ -193,20 +219,25 @@ func _on_room_reroll_refused(player: int, reason: StringName) -> void:
 			_reroll_words[player] = ItemHintScript.SOMEONE_INSIDE
 		_:
 			_reroll_words[player] = ItemHintScript.NOTHING_FITS
-	if _ground[player] < 0 and _shelf[player] < 0 and not _needs_key[player]:
+	if _ground[player] < 0 and _shelf[player] < 0 and _reward[player] < 0 and not _needs_key[player]:
 		_show(player)
 		_hints[player].refuse(ItemHintScript.NOTE)
 
 
-## Player `player`'s hint shows its ground item in reach, else its shop item, else a shut key door's
-## "Needs a key", else X "Reroll room" at a doorway it may reroll, else nothing.
+## Player `player`'s hint shows its ground item in reach, else its shop item (or reroll sign), else
+## its own reward item, else a shut key door's "Needs a key", else X "Reroll room" at a doorway it
+## may reroll, else nothing.
 func _show(player: int) -> void:
 	if _ground[player] >= 0:
 		_at[player] = _ground_at[player]
 		_hints[player].show_item(player, _ground[player], _ground_view[player])
 	elif _shelf[player] >= 0:
 		_at[player] = _shelf_at[player]
-		_hints[player].show_item(player, _shelf[player], _shelf_view[player], ItemHintScript.BUY)
+		var sign: bool = _shelf_view[player].get("kind", &"") == EventsScript.SHELF_SIGN
+		_hints[player].show_item(player, _shelf[player], _shelf_view[player], "" if sign else ItemHintScript.BUY)
+	elif _reward[player] >= 0:
+		_at[player] = _reward_at[player]
+		_hints[player].show_item(player, _reward[player], {"name": ItemHintScript.REWARD_NAME}, ItemHintScript.OPEN)
 	elif _needs_key[player]:
 		_at[player] = _door_at[player]
 		_hints[player].show_note(player, ItemHintScript.NEEDS_KEY)

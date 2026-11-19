@@ -27,8 +27,9 @@ var registry: Node
 var projectiles: Node
 var rewards: Node
 var due: Array = []
-## Each `room_rewards_due`'s type, by the same index.
+## Each `room_rewards_due`'s type and reward items' spots, by the same index.
 var due_types: Array[PackedStringArray] = []
+var due_spots: Array[PackedVector2Array] = []
 ## The type the next `_start` gives its east room (any: none).
 var east_type: RewardType = RewardType.new()
 var keys: Array = []
@@ -58,6 +59,7 @@ func before_each() -> void:
 	rewards = root.get_node("Rewards")
 	due.clear()
 	due_types.clear()
+	due_spots.clear()
 	east_type = RewardType.new()
 	keys.clear()
 	key_doors.clear()
@@ -91,9 +93,10 @@ func after_each() -> void:
 	tick.begin_run()
 
 
-func _on_due(room: int, table: StringName, type: PackedStringArray) -> void:
+func _on_due(room: int, table: StringName, type: PackedStringArray, spots: PackedVector2Array) -> void:
 	due.append([room, table])
 	due_types.append(type)
+	due_spots.append(spots)
 
 
 func _on_key(key: int, at: Vector2, lying: bool) -> void:
@@ -182,9 +185,23 @@ func test_a_reward_room_rewards_each_wizard_as_the_party_steps_in() -> void:
 	check(flow.life.has(EAST, RoomLife.CLEARED), "a reward room is cleared as it is entered")
 	check_equal(due, [[EAST, &"reward"]], "its rewards are due, from its kind's table")
 	check(RewardType.from_row(due_types[0]).is_any(), "a map not typed: of any type")
+	# Each seat's reward item lies at its own spot round the room's middle (the owner's ask of
+	# 2026-11-19), on clear ground, apart from the others.
+	var spots: PackedVector2Array = due_spots[0]
+	check_equal(spots.size(), 4, "a spot a seat")
+	var middle: Vector2 = flow.biome.room_rect(EAST).get_center()
+	for seat in spots.size():
+		check(spots[seat].distance_to(middle) < 64.0, "round the room's middle")
+		check(not projectiles.call(&"grid").circle_blocked(spots[seat], 4.0, true), "on clear ground")
+		for other in range(seat + 1, spots.size()):
+			check(spots[seat].distance_to(spots[other]) >= 12.0, "apart from the others")
 	_ticks(1)
-	check_equal((rewards.call(&"waiting_of", 0) as Array).size(), 1, "the wizard there has its offer")
-	check_equal((rewards.call(&"waiting_of", 1) as Array).size(), 1, "the one elsewhere finds its own waiting (rule 4)")
+	var mine: Array = rewards.call(&"waiting_of", 0)
+	check_equal(mine.size(), 1, "the wizard there has its offer")
+	check(bool((mine[0] as Dictionary)["lying"]), "lying as its item in the room, never popping up")
+	var theirs: Array = rewards.call(&"waiting_of", 1)
+	check_equal(theirs.size(), 1, "the one elsewhere finds its own waiting (rule 4)")
+	check(not bool((theirs[0] as Dictionary)["lying"]), "lying nowhere")
 
 
 func test_a_fight_rewards_its_clear_however_its_foes_left_it() -> void:
@@ -214,6 +231,9 @@ func test_a_shop_is_stocked_once_as_it_is_entered_and_a_fountain_filled() -> voi
 	check_equal(shelf.size(), SpecialPlaces.SHELF_SPOTS.size(), "the shop's shelf, an item a spot (no zones: round its middle)")
 	var middle: Vector2 = flow.biome.room_rect(WEST).get_center()
 	check(((shelf[1] as Dictionary)["at"] as Vector2).distance_to(middle) < 2.0, "the middle spot at the room's middle")
+	var signs: Array = rewards.call(&"signs")
+	check_equal(signs.size(), 1, "and its reroll sign (the owner's ask of 2026-11-19)")
+	check(((signs[0] as Dictionary)["at"] as Vector2).distance_to(middle + SpecialPlaces.SIGN_SPOT) < 16.0, "under the shelf")
 	check(due.is_empty(), "a shop's clear rewards nobody")
 	_put(0, _by_socket(map, EAST, RoomSocket.Facing.WEST, 24.0))
 	check_equal(float(rewards.call(&"pool_left", EAST)), RewardsScript.POOL_HEALTH, "the fountain's pool filled as it is entered")
@@ -244,8 +264,13 @@ func test_a_key_is_its_takers_own_and_its_door_opens_for_all() -> void:
 	check(not flow.locks.is_open(WEST), "no key: shut")
 	check_equal(needed, [[0, mouth.get_center(), true]], "seat 0 told once: a key is needed, over the door")
 	# The other takes the key: it is that wizard's own, so the first, still at the door, opens nothing.
+	var picked: Array = []
+	var on_picked := func(_actor: int, kind: StringName, _id: StringName, _at: Vector2) -> void: picked.append(kind)
+	events.connect("item_picked_up", on_picked)
 	_put(1, key_at)
+	events.disconnect("item_picked_up", on_picked)
 	check(not keys.back()[2], "the key is taken off the floor")
+	check(picked.has(ItemKinds.KEY), "its pickup said, for its sound")
 	check_equal(flow.locks.key_states[0], LockDoors.KEY_TAKEN, "taken")
 	check_equal([_keys_of(0), _keys_of(1)], [0, 1], "into the taker's own currency bag, nobody else's")
 	_ticks(10)

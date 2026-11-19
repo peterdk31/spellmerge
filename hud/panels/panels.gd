@@ -90,10 +90,12 @@ extends CanvasLayer
 ##   top middle under the online line (`start_stone_changed`). While the stone is lit, a player's
 ##   `accept` (A, Enter) with no menu open sends the command `run_requested` (`poll`).
 ## - The reward menus (`hud/menus/reward/`, nodes Root/Reward1 to Root/Reward4, made here;
-##   connected biomes CB10): a seat's oldest offer not yet picked, "pick 1 of 2". It opens by itself
-##   as an offer is rolled for a seat whose wizard was in the cleared room, once that seat may open a
-##   menu (`RewardMenu.wants_open`), and on the seat's `accept` with no menu open and nothing else for
-##   A (no lit stone, no item in reach, no altar) while one waits. Its pick is the command
+##   connected biomes CB10): a seat's offer not yet picked, "pick 1 of 3". It never opens by itself
+##   (the owner, 2026-11-19): a present seat's reward lies as an item in the cleared room, and A at
+##   it (the item hints' `reward_of`) opens that offer; a seat with an offer lying nowhere (rolled
+##   while away, or its world left) opens its oldest such on `accept` with no menu open and nothing
+##   else for A (no lit stone, no item in reach, no altar). A refused pick opens it again on that
+##   offer once the seat may open a menu (`RewardMenu.wants_open`). Its pick is the command
 ##   `reward_pick_requested`; `back`, `pause` and a boss's intro close it, the offer left unspent.
 ##   Each corner panel says the seat's coins and its unspent rewards (the coin stack in the coins
 ##   bag of the body the seat drives, as the rest of the HUD: a possessed foe's while possessing,
@@ -480,11 +482,17 @@ func poll() -> void:
 				elif take_now and _item_hints.item_of(player) >= 0:
 					events.item_take_requested.emit(player, _item_hints.item_of(player))
 				elif take_now and _item_hints.shelf_of(player) >= 0:
-					# A shop's item where the wizard stands: A buys it (connected biomes CB11's follow-up).
+					# A shop's item (or reroll sign) where the wizard stands: A buys it (connected biomes
+					# CB11's follow-up; the sign, a reroll of the shelf, the owner's of 2026-11-19).
 					events.shelf_buy_requested.emit(player, _item_hints.shelf_of(player))
+				elif _item_hints.reward_of(player) >= 0 and not _panels[player].is_downed():
+					# The seat's own reward item where its body stands: A opens its pick (the owner,
+					# 2026-11-19: rewards never pop up by themselves).
+					_open_reward(player, _item_hints.reward_of(player))
 				elif start_now and _altar_seats & (1 << player) != 0:
 					events.online_open_requested.emit(player)
-				elif start_now and _rewards[player].waiting() > 0 and _in_room and not _panels[player].is_downed():
+				elif start_now and _rewards[player].waiting_away() > 0 and _in_room and not _panels[player].is_downed():
+					# An offer lying nowhere (rolled while away, or its world left): A anywhere opens it.
 					_open_reward(player)
 			if reroll_now and _in_room and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and not _boss_intro.is_open() and events != null and _item_hints.reroll_of(player):
 				_item_hints.reroll_asked(player)
@@ -496,8 +504,8 @@ func poll() -> void:
 			elif inventory_now and _may_open_menu(player, had_menu):
 				_inventories[player].open_inventory()
 			elif _rewards[player].wants_open() and _may_open_menu(player, had_menu):
-				# An offer rolled with the seat's wizard there opens once the seat is free for it.
-				_open_reward(player)
+				# A refused pick (or a reroll of another count) opens again once the seat is free for it.
+				_open_reward(player, _rewards[player].wanted())
 		_had_menu[player] = _has_menu(player)
 		# A seat in the game with no device of this machine on it is played on another one. Asked
 		# of the input layer each frame: a device handed over or mirrored sends no event.
@@ -531,13 +539,13 @@ func _has_menu(player: int) -> bool:
 
 
 
-## Open seat `player`'s reward menu, its cards laid out in their quarter of the view while several
+## Open seat `player`'s reward menu on its offer `offer` (-1: its oldest lying nowhere), its cards laid out in their quarter of the view while several
 ## play, so four open at once never cover each other (a quarter is inside the seat's own cell of a
 ## split screen, CB6), or in the whole view for one player.
-func _open_reward(player: int) -> void:
+func _open_reward(player: int, offer: int = -1) -> void:
 	var reward: RewardMenuScript = _rewards[player]
 	reward.room = reward_room(player)
-	reward.open_menu()
+	reward.open_menu(offer)
 
 
 ## The room seat `player`'s reward menu lays its cards out in (view pixels).

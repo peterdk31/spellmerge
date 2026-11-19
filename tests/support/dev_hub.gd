@@ -1,6 +1,6 @@
 extends RefCounted
 ## The hub with every seat's wizard holding the `dev` staff (content/wizard/staffs/dev: 20 slots, no
-## delay, a million mana) on all four hands, each built as asked, and the hub's bag of every card,
+## delay, a million mana) on all four hands, each built as asked, and a bag of every card,
 ## for the screenshots that show built staffs (crypt rework CR-S, docs/DECISIONS.md 2026-11-16:
 ## before, a room of its own gave its wizards these). Started the way a party comes back to the hub
 ## with what it holds (`Flow.start_run` with a `PartyLoadout`, items I4), so nothing in the game

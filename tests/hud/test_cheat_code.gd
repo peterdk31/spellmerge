@@ -1,7 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the cheat code (`hud/widgets/cheat_code.gd`; owner, 2026-11-19): typing its word on the
 ## keyboard, in any case and with other keys between its letters, sends `all_cards_requested` once
-## for the keyboard's seat (or this machine's first seat), and nothing while no seat is joined.
+## for the keyboard's seat (or this machine's first seat), and nothing while no seat is joined; its
+## buttons in a row on a gamepad (up, down, left, right, A, B, X, Y) send it for that pad's seat,
+## each pad on its own, any other button starting it over.
 
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -82,3 +84,62 @@ func test_key_presses_reach_it() -> void:
 		echo.unicode = &"x".unicode_at(0)
 		_code._input(echo)
 	check_equal(_sent, [0] as Array[int], "pressed keys are typed; held keys' echoes are not")
+
+
+## Gamepad `device` presses `buttons` in order.
+func _press(device: int, buttons: Array) -> void:
+	for button: int in buttons:
+		_code.press_button(device, button)
+
+
+func test_the_pads_buttons_send_the_command_for_its_seat() -> void:
+	_input.add_virtual_device(0)
+	_input.join_as(1, 3)
+	_press(1, CheatCode.PAD_CODE)
+	check_equal(_sent, [3] as Array[int], "sent once, for the seat of the pad that pressed it")
+	_press(1, CheatCode.PAD_CODE)
+	check_equal(_sent, [3, 3] as Array[int], "and again each time")
+
+
+func test_another_button_starts_the_pads_code_over() -> void:
+	_input.join_as(0, 0)
+	var code: Array = CheatCode.PAD_CODE.duplicate()
+	_press(0, code.slice(0, 5))
+	_press(0, [JOY_BUTTON_LEFT_SHOULDER])
+	_press(0, code.slice(5))
+	check(_sent.is_empty(), "a button out of the row breaks it")
+	# Up, up, down, ...: the second up starts it anew, so the code still counts from there.
+	_press(0, [JOY_BUTTON_DPAD_UP])
+	_press(0, code)
+	check_equal(_sent, [0] as Array[int], "a first button pressed again starts it anew")
+
+
+func test_each_pad_counts_on_its_own() -> void:
+	_input.join_as(0, 0)
+	_input.join_as(1, 1)
+	var code: Array = CheatCode.PAD_CODE.duplicate()
+	for at in code.size():
+		_press(0, [code[at]])
+		_press(1, [JOY_BUTTON_START])
+	check_equal(_sent, [0] as Array[int], "pad 1's presses never break pad 0's code")
+
+
+func test_a_pad_with_no_seat_sends_nothing() -> void:
+	_input.join(InputManagerScript.KEYBOARD)
+	_press(4, CheatCode.PAD_CODE)
+	check(_sent.is_empty(), "a pad that never joined has no seat to speak for")
+
+
+func test_button_presses_reach_it() -> void:
+	_input.join_as(2, 1)
+	for button: JoyButton in CheatCode.PAD_CODE:
+		var down := InputEventJoypadButton.new()
+		down.device = 2
+		down.button_index = button
+		down.pressed = true
+		_code._input(down)
+		var up := InputEventJoypadButton.new()
+		up.device = 2
+		up.button_index = button
+		_code._input(up)
+	check_equal(_sent, [1] as Array[int], "pressed buttons count; their releases do not")

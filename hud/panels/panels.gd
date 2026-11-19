@@ -101,7 +101,7 @@ extends CanvasLayer
 ##   Enter, never Space, which casts) with no menu open and no lit stone takes it
 ##   (`item_take_requested`); the altar's A comes after.
 ## - The cheat code (`hud/widgets/cheat_code.gd`, node CheatCode, made here; owner, 2026-11-19):
-##   the word `CheatCode.CODE` typed on the keyboard sends `all_cards_requested` (every card, in
+##   the word `CheatCode.CODE` typed on the keyboard, or `CheatCode.PAD_CODE` on a gamepad, sends `all_cards_requested` (every card, in
 ##   the hub).
 ## - The frame rate readout (`hud/widgets/fps_counter.gd`, node Root/FpsCounter, made here; owner,
 ##   2026-11-02): "60 FPS" at the bottom middle, over everything, shown while the pause menu's

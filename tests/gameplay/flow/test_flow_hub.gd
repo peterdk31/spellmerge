@@ -612,6 +612,15 @@ func test_the_cheat_code_gives_every_wizard_in_the_hub_every_card() -> void:
 	check_equal(_card_bag(0), plain, "the hub begun again hands out Play's bag again")
 
 
+## The cheat code gives the wizards in the hub then: a seat joining after it gets Play's bag.
+func test_a_seat_joining_after_the_cheat_code_gets_plays_bag() -> void:
+	_start([0])
+	events.call("apply_command", &"all_cards_requested", [0])
+	check(_card_bag(0).size() > 2, "seat 0 holds every card")
+	input.add_virtual_device(1)
+	check_equal(_card_bag(1), [[&"dash", 1], [&"bolt", 1]], "the joiner holds Play's bag")
+
+
 ## The cheat code's command does nothing outside the hub: a run's bag stays as it is.
 func test_the_cheat_code_does_nothing_in_a_run() -> void:
 	input.add_virtual_device(0)

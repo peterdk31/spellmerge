@@ -96,7 +96,9 @@ extends CanvasLayer
 ##   Each corner panel says the seat's coins and its unspent rewards (the coin stack in the coins
 ##   bag of the body the seat drives, as the rest of the HUD: a possessed foe's while possessing,
 ##   0 for a body with no coins; `bag_changed`: coins are an inventory item, the owner's of
-##   2026-11-19; `rewards_waiting_changed`; `PlayerPanel.set_purse`).
+##   2026-11-19; `rewards_waiting_changed`; `PlayerPanel.set_purse`). Beside the coins, every panel
+##   shows the keys the party holds (keys are the party's, shared, so each panel the same count:
+##   `party_keys_shown`, `PlayerPanel.set_keys`, `hud/widgets/key_count.gd`, Smooth).
 ## - The item hints (`item_hints.gd`, node Root/ItemHints, made here; items I6): over the item in
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
 ##   numbers and cards under it, shaking red when a take is refused (`item_refused`). `take` (A; F or
@@ -380,6 +382,7 @@ func _ready() -> void:
 		events.boss_intro_opened.connect(_on_boss_intro_opened)
 		events.bag_changed.connect(_on_bag_changed)
 		events.rewards_waiting_changed.connect(_on_rewards_waiting_changed)
+		events.party_keys_shown.connect(_on_party_keys_shown)
 	if ui_focus != null:
 		ui_focus.opened.connect(_on_menu_opened)
 		ui_focus.closed.connect(_on_menu_closed)
@@ -829,6 +832,12 @@ func _on_inventory_announced(player: int, _body: int) -> void:
 			_staff_mana[player * PlayerPanelScript.STAFF_COUNT + staff] = INF
 			_staff_reserved[player * PlayerPanelScript.STAFF_COUNT + staff] = 0.0
 			_panels[player].set_staff_mana(staff, INF, 0.0)
+
+
+## The party holds `count` keys (Flow's): every panel shows them beside its coins.
+func _on_party_keys_shown(count: int, at_once: bool) -> void:
+	for panel in _panels:
+		panel.set_keys(count, at_once)
 
 
 func _on_menu_opened(player: int) -> void:

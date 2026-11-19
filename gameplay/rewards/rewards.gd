@@ -51,8 +51,8 @@ extends Node
 ##   first wizard (seat order) whose feet come within `COIN_REACH` takes it, and every player's coin
 ##   stack gains one. As a seat's wizard first comes in a run its stack gains its player's
 ##   `start_coins` (nothing comes back from a run, and the hub has no coins to take along); a seat
-##   that left and comes back gets the coins its wizard left with (`_kept`; the owner, 2026-11-19).
-##   Spending is one's own (a shop's buy, `spend`).
+##   that left and comes back has its coins in the inventory its wizard comes back with (Flow's
+##   `LeftPlayers`; the owner, 2026-11-19), and no second `start_coins`. Spending is one's own (a shop's buy, `spend`).
 ##   The coins, shelves and pools are the world's: a new world (`room_entered` FIRST_ROOM) and a
 ##   run's start clear them; a cleared room's coins stay where they lie.
 ## - **Said:** `coin_changed` as a coin is laid and goes (a player's coin stack is said by its
@@ -148,11 +148,6 @@ var _shelf_near: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 var _funded: int = 0
 ## The drop rolls made this run (`DROP_PURPOSE`'s counter).
 var _drops: int = 0
-## By seat: the coins its wizard held when last seen (kept for a rejoin: the owner, 2026-11-19).
-var _kept: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
-## The seats that left (`player_left`) and are owed their kept coins as their wizard comes again,
-## a bit each.
-var _away: int = 0
 ## The coins on the floor: each one's number and where it lies, by the same index, in the order laid.
 var _coin_numbers: PackedInt32Array = PackedInt32Array()
 var _coin_at: PackedVector2Array = PackedVector2Array()
@@ -186,7 +181,6 @@ func _ready() -> void:
 	events.room_entered.connect(_on_room_entered)
 	events.enemy_died.connect(_on_enemy_died)
 	events.run_stats_ruled.connect(_on_run_stats_ruled)
-	events.player_left.connect(_on_player_left)
 	# A command, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"reward_pick_requested", _on_reward_pick_requested)
 	events.listen(&"shelf_buy_requested", _on_shelf_buy_requested)
@@ -204,9 +198,9 @@ func begin_run() -> void:
 
 
 ## The tick's step: the clears since the last step are rolled for; a seat whose wizard came gets
-## its starting coins into its coin stack (once a run), or, coming back after it left, the coins it
-## left with; each coin a wizard's feet reach is taken (seats in order, the first takes it); each
-## seat's shelf item in reach is found; each fountain is drawn on; each wizard's coins are kept.
+## its starting coins into its coin stack (once a run: one coming back after it left brings its
+## coins in its inventory, Flow's `LeftPlayers`); each coin a wizard's feet reach is taken (seats in
+## order, the first takes it); each seat's shelf item in reach is found; each fountain is drawn on.
 func step(delta: float) -> void:
 	if actors == null:
 		return
@@ -218,19 +212,11 @@ func step(delta: float) -> void:
 		for at in rooms.size():
 			_roll_clear(rooms[at], tables[at])
 	for seat in SEATS:
-		if actors.home_of_seat(seat) == ActorsScript.NONE:
-			continue
-		if _funded & (1 << seat) == 0:
+		if _funded & (1 << seat) == 0 and actors.home_of_seat(seat) != ActorsScript.NONE:
 			_funded |= 1 << seat
-			_away &= ~(1 << seat)
 			_add_coins(seat, int(stat_of(seat, &"start_coins")))
 			_say_stats(seat)
 			_say_shelf_near(seat)
-		elif _away & (1 << seat) != 0:
-			# Back after leaving mid-run (the owner, 2026-11-19): the coins it left with, not a second
-			# `start_coins`. Its cards and potions went with its old body.
-			_away &= ~(1 << seat)
-			_add_coins(seat, _kept[seat])
 	var at: int = 0
 	while at < _coin_numbers.size():
 		if _taker_of(_coin_at[at]) != ActorsScript.NONE:
@@ -246,8 +232,6 @@ func step(delta: float) -> void:
 			at += 1
 	_look_at_shelves()
 	_draw_on_pools(delta)
-	for seat in SEATS:
-		_keep_coins(seat)
 
 
 # --- Asked ------------------------------------------------------------------------------
@@ -412,7 +396,6 @@ func _on_reward_pick_requested(player: int, offer: int, choice: int) -> void:
 			events.reward_refused.emit(player, offer)
 		return
 	_offers.remove_at(at)
-	_keep_coins(player)
 	if events != null:
 		events.reward_taken.emit(player, offer, choice, _choice_view(row, choice))
 	_say_waiting(player)
@@ -442,7 +425,6 @@ func _on_shelf_buy_requested(player: int, item: int) -> void:
 			events.shelf_refused.emit(player, item)
 		return
 	body.inventory.take(COIN_BAG, CoinBase.ID, price)
-	_keep_coins(player)
 	_say_item(at, false)
 	_item_numbers.remove_at(at)
 	_item_rooms.remove_at(at)
@@ -502,13 +484,6 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 		if projectiles != null and (projectiles.grid().circle_blocked(spot, COIN_RADIUS) or not projectiles.grid().line_clear(position, spot)):
 			spot = position
 		lay_coin(spot)
-
-
-## Seat `player` left (Coop's): its wizard went with what it held, and its coins (kept, `_kept`)
-## come back as it joins again in this run.
-func _on_player_left(player: int) -> void:
-	if player >= 0 and player < SEATS and _funded & (1 << player) != 0:
-		_away |= 1 << player
 
 
 ## The run's own changes of the run stats (the Run area's, as a run of rooms begins).
@@ -621,15 +596,6 @@ func _add_coins(seat: int, amount: int) -> void:
 		body.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, amount))
 	else:
 		body.inventory.take(COIN_BAG, CoinBase.ID, mini(-amount, coins_of(seat)))
-	_keep_coins(seat)
-
-
-## Seat `seat`'s wizard's coins, kept for a rejoin (nothing for a seat with no wizard: it keeps what
-## its last one held).
-func _keep_coins(seat: int) -> void:
-	var body: Actor = _wizard_of(seat)
-	if body != null:
-		_kept[seat] = _coins_in(body)
 
 
 func _clear_coins() -> void:

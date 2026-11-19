@@ -329,6 +329,9 @@ var _chosen_reveal: int = 0
 ## went (`PartyLoadout` bytes; empty: none): what a run starting now takes along (`_party_now`) until
 ## the hub starts again, so every wizard comes back as it went.
 var _party_back: PackedByteArray = PackedByteArray()
+## What each seat's wizard held as its player left mid-run, given back as it joins again (the
+## owner, 2026-11-19: `LeftPlayers`).
+var left_players: LeftPlayers = LeftPlayers.new()
 
 
 func _ready() -> void:
@@ -973,7 +976,8 @@ func _count_stone() -> void:
 
 ## Add the wizard of a player who joined mid-run: at the room's spawn for joiners when it has them
 ## (the hub: beside the altar, where a joining machine's wizards arrive), else at the player spawn
-## farthest from danger. Ignored while no run is up, and for a slot that already has a wizard.
+## farthest from danger, holding what its last wizard of this run left with (`left_players`), or as
+## a fresh one. Ignored while no run is up, and for a slot that already has a wizard.
 func _on_player_joined(player: int) -> void:
 	if state == State.IDLE or world == null or _room == null or player < 0 or player >= PLAYER_SLOTS:
 		return
@@ -981,7 +985,8 @@ func _on_player_joined(player: int) -> void:
 		return
 	var joiners: PackedVector2Array = _places.joiner_spawns
 	var at: Vector2 = joiners[player] if player < joiners.size() else _joiner_spawn(_room, player)
-	_add_wizard(world, _room, player, at)
+	# A player back after leaving this run comes back holding what it left with (`LeftPlayers`).
+	_add_wizard(world, _room, player, at, left_players.take(player))
 	_count_players()
 	var joiner: DownedScript = DownedScript.of(get_wizard(player))
 	# In a room where a fall costs nothing (the hub), a joiner needs no moment of protection.
@@ -995,8 +1000,8 @@ func _on_player_joined(player: int) -> void:
 	_count_stone()
 
 
-## Remove the wizard of a player who left. If everyone still here is down, the
-## restart timer starts, as when the last standing wizard goes down.
+## Remove the wizard of a player who left, what it holds kept for its return (`left_players`). If
+## everyone still here is down, the restart timer starts, as when the last standing wizard goes down.
 func _on_player_left(player: int) -> void:
 	if player < 0 or player >= PLAYER_SLOTS:
 		return
@@ -1004,6 +1009,9 @@ func _on_player_left(player: int) -> void:
 	if wizard == null:
 		return
 	_wizards.erase(wizard)
+	# What it holds is kept for its return in this run (the owner, 2026-11-19: the whole inventory).
+	if state != State.IDLE:
+		left_players.keep(player, PlayerScript.loadout_of(wizard as Actor))
 	_downed[player] = false
 	_stand_up_left[player] = -1.0
 	var parent: Node = wizard.get_parent()
@@ -1484,6 +1492,7 @@ func _clear_run() -> void:
 			if is_instance_valid(wizard):
 				combat.unregister_actor(wizard)
 	_wizards.clear()
+	left_players.clear()
 	if biome.map != null and events != null:
 		# A biome's world goes as a whole: what was cast in it ends with it.
 		events.room_left.emit(EventsScript.ALL_ROOMS)

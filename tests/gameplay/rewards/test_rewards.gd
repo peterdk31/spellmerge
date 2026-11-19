@@ -727,30 +727,23 @@ func test_a_possessed_foe_drops_what_it_still_carries() -> void:
 	check_equal(_rewards.coins_of(0), 0, "none straight into a wizard's stack")
 
 
-# --- A rejoin keeps the coins (the owner, 2026-11-19) -------------------------------------------
+# --- A rejoin gets no second start (the owner, 2026-11-19) --------------------------------------
 
-func test_a_player_who_leaves_and_joins_again_keeps_their_coins() -> void:
+## A seat that leaves and joins again in a run brings its coins back in its inventory (Flow's
+## `LeftPlayers`, tests/gameplay/flow/test_rejoin.gd); the Rewards area gives it no second
+## `start_coins`.
+func test_a_player_who_leaves_and_joins_again_gets_no_second_start() -> void:
 	_world.bus.run_stats_ruled.emit([StatChange.make(&"start_coins", 4.0)] as Array[StatChange])
 	var body := _wizard(0)
-	_wizard(1, Vector2(200, 0))
 	_tick()
-	_rewards.lay_coin(Vector2(0, 0))
-	_tick()
-	check_equal(_rewards.coins_of(0), 5, "its starting coins and a coin from the floor")
-	check(_rewards.spend(0, 2), "spent two")
+	check_equal(_rewards.coins_of(0), 4, "its starting coins")
 	_world.wizards.erase(body)
 	body.free()
 	_world.bus.player_left.emit(0)
 	_tick()
-	_tick()
 	check_equal(_rewards.coins_of(0), 0, "away: no wizard, no coins")
-	_rewards.lay_coin(Vector2(200, 0))
+	var back := _wizard(0)
+	back.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 3))
 	_tick()
-	check_equal(_rewards.coins_of(1), 6, "the other gains while it is away")
-	_wizard(0)
 	_tick()
-	check_equal(_rewards.coins_of(0), 3, "back with the coins it left with, no second start_coins")
-	_tick()
-	check_equal(_rewards.coins_of(0), 3, "once")
-	_rewards.begin_run()
-	check_equal(_rewards._kept, PackedInt32Array([0, 0, 0, 0]), "a run's start forgets what was kept")
+	check_equal(_rewards.coins_of(0), 3, "back with what its inventory holds, no second start_coins")

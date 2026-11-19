@@ -394,10 +394,23 @@ Two changes the owner decided on 2026-11-19:
 
 ### Open questions for the owner
 
-1. **A rejoin keeps only its coins:** cards, staffs and potions still go with the old body. Should a rejoin keep the whole inventory too?
+1. **A rejoin keeps only its coins:** cards, staffs and potions still go with the old body. Should a rejoin keep the whole inventory too? *Answered by the owner on 2026-11-19: yes, the whole inventory (below, "The keys on the HUD and a rejoin's inventory").*
 2. **A boss's coins by chance:** the boss's coins follow its `coin_drop_chance` too (1.0 for the old broom). Should a boss always pay, whatever its data says?
 3. **Shared income while away:** a seat that left gets back exactly what it left with; the coins the others picked up (and a boss's) while it was away are not added. Should a rejoin also get the shared income it missed?
 4. **No enemy has a range or a chance below 1 yet:** the defaults keep CB10's economy. Should tougher enemies carry more (a range) and the swarmers drop by chance?
+
+## The keys on the HUD and a rejoin's inventory (2026-11-19)
+
+Two changes the owner decided on 2026-11-19.
+
+- **The party's keys on the HUD:** every corner panel shows the keys the party holds after its coins (a small brass key and the count; `hud/widgets/key_count.gd`). One count on every panel, not one shared counter: keys are the party's, and each player reads it where they read their coins. LockDoors tells it (`party_keys_shown(count, at_once)`) as a key is taken or spent, 0 as the biome goes, and as it stands after a restore (`tell_all`). Smooth: the first key slides in, one more nods up, one spent dips, the last sinks out (4 poses of whole pixels each). View only.
+- **A rejoin keeps its whole inventory:** replacing the coins-only keep above (Rewards' `_kept`, gone), Flow keeps a leaving wizard's player loadout (`LeftPlayers`: cards, staffs and hands, potions, coins) and makes the rejoining wizard from it, once; a run's start and end forget it. State (the party's bytes), the same on every machine and saved by a snapshot. Mana is not in a loadout, so a rejoining wizard's pools are full.
+- **Tests:** `tests/gameplay/flow/test_rejoin.gd` (exactly what it left with, once, no second `start_coins`; a run forgetting it; hashed and through a snapshot), `tests/hud/test_key_count.gd` (each play at least 3 poses in whole pixels, a change waiting for a play, a restore at once, every panel told), `tests/gameplay/flow/test_special_rooms.gd` (the count told on a key taken and spent, after a restore and as the biome goes), `tests/gameplay/rewards/test_rewards.gd` (a rejoin gets no second start).
+
+### Open questions for the owner
+
+1. **Mana on a rejoin:** a player loadout carries no mana, so a wizard that rejoins comes back with every staff's pool full. Should it come back with the mana it left with?
+2. **One counter or four:** the key count is on every panel (the same number up to four times). Would one shared counter (top middle) read better?
 
 ## Follow-ups done, second part (2026-11-19)
 

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-19: The keys on the HUD and a rejoin's inventory
+
+Two changes the owner decided on 2026-11-19 (docs/milestones/connected-biomes.md, "The keys on the HUD and a rejoin's inventory"). Every corner panel now shows the keys the party holds beside its coins, a small brass key and the count, played in and out by whole pixels (`hud/widgets/key_count.gd`, told by `party_keys_shown` from Flow's LockDoors). A player who leaves and joins again mid-run now gets back its whole inventory (cards, staffs, potions, coins), not only its coins: Flow keeps the leaving wizard's player loadout (`LeftPlayers`) and makes the new wizard from it, once. Tests: test_rejoin.gd, test_key_count.gd, and additions to test_special_rooms.gd and test_rewards.gd.
+
 ## 2026-11-19: Enemy coins and a rejoin's coins
 
 Two changes the owner decided on 2026-11-19 (docs/milestones/connected-biomes.md, "Enemy coins and a rejoin's coins"). An enemy now carries its coins in its own inventory from the start (`EnemyBase.coins`, with `coins_most` for a range rolled by the run's chance) and drops them as it dies by its `coin_drop_chance` (rolled by the Rewards area, seeded and counted), possessed or not; the defaults (1 coin, chance 1.0; the dummies 0) keep CB10's economy, adds carry none, and the boss's still go to every player. A player who leaves and joins again in the same run comes back with the coins they left with (only the coins: the rest of the inventory still goes with the old body). Tests in `tests/gameplay/rewards/test_rewards.gd`.

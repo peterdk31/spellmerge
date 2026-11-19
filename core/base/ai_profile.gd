@@ -53,6 +53,10 @@ extends Resource
 ## when every hand is full and the staff is stronger; a card into a free slot where it does something
 ## (gameplay/ai/behaviours/pick_up.gd).
 @export var takes: Array[StringName] = []
+## 0-1: how keen it is to revive a downed teammate (gameplay/ai/behaviours/revive.gd): it walks to
+## one and stands beside it while no foe is near it, firing what it can from there. 0: never, and it
+## never looks (every enemy; the test bots' profile has 1).
+@export_range(0.0, 1.0) var revives: float = 0.0
 
 ## The profile an actor with no profile of its own plays by.
 static var _fallback: AIProfile = null

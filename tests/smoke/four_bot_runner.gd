@@ -38,7 +38,10 @@ extends Node
 ## The performance probe (tests/benchmark/probe.gd) rides along and prints `BENCH:`
 ## lines at the end; it gates nothing.
 ##
-## Either way the node prints `SMOKE OK` or `SMOKE FAILED` lines and quits with 0 or 1.
+## Either way the node prints `SMOKE OK` or `SMOKE FAILED` lines and quits with 0 or 1. The seed
+## sweep (tests/smoke/four_bot_sweep.gd) plays many runs in one process instead: it sets
+## `replay_seed_wanted` and `standalone` false before adding the node, which then sends `finished`
+## with its failures instead of quitting, and rides no performance probe.
 ##
 ## Reproducibility: the fight is the same, tick by tick, on every start. Each bot's brain is
 ## seeded by its slot, each build by BUILD_SEED, and the run's seed (`Sim.run_seed`), which makes
@@ -46,14 +49,28 @@ extends Node
 ## the run by recording it (`Frames.record`, Play recorded), and the replay's seed deals its runs'
 ## seeds (`ReplayTape.next_run_seed`). Frame pacing changes only how many ticks fit in TIME_LIMIT's
 ## game seconds (the unit runs are `--fixed-fps 60`). Started with Play alone, a run takes a random
-## seed (`SimSeed.fresh`), and about one seed in eleven makes a fight the bots lose (a fighter
-## downed and never revived, since the bots do not revive, or a stalemate past TIME_LIMIT), which
-## made this test fail by chance until the seed was pinned (tests/smoke/test_four_bot_seed.gd). A
+## seed (`SimSeed.fresh`), and about one seed in eleven made a fight the bots lose (a fighter
+## downed and never revived, as the bots did not revive then, or a stalemate past TIME_LIMIT), which
+## made this test fail by chance until the seed was pinned (tests/smoke/test_four_bot_seed.gd). The
+## bots revive since 2026-11-19 (gameplay/ai/behaviours/revive.gd): the sweep of replay seeds 1-100
+## on the biome run (CB8) lost 9 before and 7 after (1, 2, 65, 66, 75, 92, 99); each of those 7 is a
+## fighter downed shortly before the room was cleared, a revive (2 s) not done by the checks
+## SETTLE_FRAMES later: all 7 win with a 5 s settle. A
 ## recorded run also skips the first-time intro (Flow), which the automated runs skip anyway. The
 ## argument `--replay-seed=N` plays the run of replay seed N instead (0: a random one); the result
 ## line prints both seeds, so any run can be played again:
 ##
 ## godot --headless --fixed-fps 60 --path . --script res://tests/smoke/four_bot_smoke.gd -- --replay-seed=N
+##
+## **The pinned seed** (the owner's rule, 2026-11-19): REPLAY_SEED must be a seed the bots win. If a
+## content change (a card, an enemy, a room, a number) makes the bots lose it, the PR making that
+## change moves REPLAY_SEED to a seed they win (the sweep lists them) and says why in its
+## description; it never loosens the checks. The sweep's loss rate, not this one seed, is the
+## balance signal (tests/README.md, "The seed sweep").
+
+## Sent once the run is over, when not `standalone`: its failures (empty: the bots won), and the
+## replay seed and run seed it played.
+signal finished(failures: Array[String], replay_seed: int, run_seed: int)
 
 const BotScript := preload("res://tests/bots/bot.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -75,6 +92,12 @@ const REPLAY_SEED_ARGUMENT: String = "--replay-seed="
 const TIME_LIMIT: float = 120.0
 ## Frames to let the world settle after the room is cleared, then the checks run.
 const SETTLE_FRAMES: int = 30
+
+## The replay seed to play, set before the node is added (-1: as the arguments say, `--replay-seed`).
+var replay_seed_wanted: int = -1
+## True: the node rides the performance probe and quits the game with its result (the smoke test).
+## False: it sends `finished` and leaves the game running (the sweep).
+var standalone: bool = true
 
 var _log: Logger = ErrorLogScript.new()
 var _failures: Array[String] = []
@@ -113,8 +136,9 @@ var _run_scaling: RunScaling = null
 func _ready() -> void:
 	OS.add_logger(_log)
 	_logging = true
-	_probe = ProbeScript.new()
-	add_child(_probe)
+	if standalone:
+		_probe = ProbeScript.new()
+		add_child(_probe)
 	var root: Node = get_tree().root
 	_events = root.get_node_or_null("Events")
 	_flow = root.get_node_or_null("Flow")
@@ -141,7 +165,8 @@ func _ready() -> void:
 	# Game time runs at real speed: the game never scales the engine's time (online-ready N4).
 	# Play, recorded: the replay's seed deals the run's (the class doc, "Reproducibility").
 	# Both argument lists, as the main menu reads them (a web page's come without `--`).
-	var replay: Replay = _frames.call("record", &"play_requested", 0, replay_seed_of(OS.get_cmdline_user_args() + OS.get_cmdline_args())) as Replay
+	var wanted: int = replay_seed_wanted if replay_seed_wanted >= 0 else replay_seed_of(OS.get_cmdline_user_args() + OS.get_cmdline_args())
+	var replay: Replay = _frames.call("record", &"play_requested", 0, wanted) as Replay
 	_replay_seed = replay.run_seed
 	var tick: Node = root.get_node_or_null("Tick")
 	_run_seed = int(tick.get("sim").get("run_seed")) if tick != null else 0
@@ -342,6 +367,9 @@ func _finish(failed: Array[String]) -> void:
 	if _probe != null:
 		_probe.call("report")
 	failed.append_array(_errors())
+	if not standalone:
+		finished.emit(failed, _replay_seed, _run_seed)
+		return
 	if failed.is_empty():
 		print("SMOKE OK: 4 bots cleared the room in %.1f game seconds (%d casts), bot 4 idled in its builder, bots 1-3 built spells (%s), no errors logged, %s" % [_elapsed, _casts, _built_text(), _seeds_text()])
 		get_tree().quit(0)

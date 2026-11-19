@@ -13,6 +13,7 @@ extends "res://tests/support/suite.gd"
 ## stopped and the seats' leaves are applied.
 
 const BotScript := preload("res://tests/bots/bot.gd")
+const ReviveScript := preload("res://gameplay/ai/behaviours/revive.gd")
 
 ## Physics frames a fighter is given to walk (the bots think at each tick's start).
 const WALK_FRAMES: int = 20
@@ -381,3 +382,18 @@ func test_the_built_staff_holds_what_the_bot_built() -> void:
 func test_the_built_staff_can_cast() -> void:
 	var built: Array = await _built()
 	check(not built.is_empty() and (built[0] as Caster).has_staff(BotScript.BUILD_STAFF), "the built staff can cast")
+
+
+func test_a_fighter_revives_a_downed_teammate_before_it_travels() -> void:
+	# Regression (bots revive, 2026-11-19): out of a fight a fighter travels to the next one
+	# (CB8), which walked it off a teammate it was reviving. In the start room, no fight on: bot 2's
+	# wizard is downed (as its Downed component downs it), and bot 1 goes to it and stays.
+	var wizard: Node2D = await _fighters_in_a_run()
+	var mate := _flow.call("get_wizard", 1) as Actor
+	if wizard == null or mate == null:
+		return
+	mate.set_down(true)
+	for i in 60:
+		await physics_frame
+	check(_bots[0].brain.behaviour is ReviveScript, "bot 1 is reviving")
+	check(wizard.global_position.distance_to(mate.global_position) <= ReviveScript.NEAR + 4.0, "bot 1 stands by its downed teammate (%.0f px off)" % wizard.global_position.distance_to(mate.global_position))

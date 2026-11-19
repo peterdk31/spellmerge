@@ -27,9 +27,10 @@ extends Node
 ##   each a different line's, at its line's `price`. The item nearest a standing wizard's own feet,
 ##   within SHELF_REACH, is in their reach (`shelf_near_changed`), and A buys it (the owner,
 ##   2026-11-19: `shelf_buy_requested`, a command at the tick's start, so the first seat to ask
-##   takes it; nobody waits): with its price (times that player's `price_scale`) in their own coins
-##   and room for it, it goes into their inventory (as a reward's choice does), the coins come out
-##   of their coin stack, and it is gone from the shelf for everyone; else `shelf_refused`. Walking
+##   takes it; nobody waits): the standing body the seat drives (its wizard, or a foe it possesses:
+##   the buyer, the owner's of 2026-11-19), with the price (times that player's `price_scale`) in
+##   its own coins bag and room for it, takes it into its inventory, the coins come out of its
+##   stack, and it is gone from the shelf for everyone; else `shelf_refused`. Walking
 ##   over an item buys nothing. The shelf keeps what is left all run (`shelf_changed`).
 ## - **A fountain** (CB11, decision 20): as a fountain room opens, its pool fills with POOL_HEALTH
 ##   times the highest `fountain_pool` of the players then, shared: every hurt standing wizard whose
@@ -234,10 +235,10 @@ func stat_of(seat: int, stat: StringName) -> float:
 	return RunStats.value_of(stat, _run_changes, _relics_of(seat))
 
 
-## The coins seat `seat` holds: the coin stack in its wizard's coins bag (0 with no wizard).
+## The coins seat `seat`'s own wizard holds: the coin stack in its coins bag (0 with no wizard).
+## A foe the seat possesses holds its own (a shop's buy spends the driven body's).
 func coins_of(seat: int) -> int:
-	var body: Actor = _wizard_of(seat) if seat >= 0 and seat < SEATS else null
-	return body.inventory.count_of(COIN_BAG, CoinBase.ID) if body != null and body.inventory != null else 0
+	return _coins_in(_wizard_of(seat)) if seat >= 0 and seat < SEATS else 0
 
 
 ## Spend `amount` of seat `seat`'s own coins (a shop's buy: the shop is this area's, CB11): false,
@@ -399,21 +400,22 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 
 
 ## Seat `player` asked to buy shelf item `item` (a command): sold if it still lies on its shelf, in
-## reach of the seat's standing wizard, who can pay for it and has room for it; else `shelf_refused`
-## (an item gone or out of reach says nothing).
+## reach of the standing body the seat drives (its wizard, or a foe it possesses: the actor doing the
+## buying, the owner's of 2026-11-19), which pays from its own coins and has room for it; else
+## `shelf_refused` (an item gone or out of reach says nothing).
 func _on_shelf_buy_requested(player: int, item: int) -> void:
 	if player < 0 or player >= SEATS:
 		return
 	var at: int = _item_numbers.find(item)
-	var body: Actor = _wizard_of(player)
+	var body: Actor = _driven_of(player)
 	if at < 0 or body == null or body.is_down() or body.position.distance_squared_to(_item_at[at]) > SHELF_REACH * SHELF_REACH:
 		return
 	var price: int = _price_of(at, stat_of(player, &"price_scale"))
-	if coins_of(player) < price or not _give(player, _item_kinds[at], _item_ids[at], _item_counts[at]):
+	if _coins_in(body) < price or not _give_to(body, _item_kinds[at], _item_ids[at], _item_counts[at]):
 		if events != null:
 			events.shelf_refused.emit(player, item)
 		return
-	_add_coins(player, -price)
+	body.inventory.take(COIN_BAG, CoinBase.ID, price)
 	_say_item(at, false)
 	_item_numbers.remove_at(at)
 	_item_rooms.remove_at(at)
@@ -479,7 +481,11 @@ func _on_run_stats_ruled(changes: Array[StatChange]) -> void:
 ## cards, as its content is). False, and nothing changes, when it has no wizard, the item no content
 ## of its kind, or its bag no room.
 func _give(seat: int, kind: StringName, id: StringName, count: int) -> bool:
-	var body: Actor = _wizard_of(seat)
+	return _give_to(_wizard_of(seat), kind, id, count)
+
+
+## Put `count` of the item `kind` `id` into `body`'s inventory, as `_give` says.
+func _give_to(body: Actor, kind: StringName, id: StringName, count: int) -> bool:
 	if body == null or body.inventory == null:
 		return false
 	var stack: ItemStack = _stack_of(kind, id, count)
@@ -507,6 +513,19 @@ func _wizard_of(seat: int) -> Actor:
 		return null
 	var id: int = actors.home_of_seat(seat)
 	return actors.node_of(id) as Actor if id != ActorsScript.NONE else null
+
+
+## The body seat `seat` drives now (its wizard, or a foe it possesses), or null.
+func _driven_of(seat: int) -> Actor:
+	if actors == null:
+		return null
+	var id: int = actors.actor_of_seat(seat)
+	return actors.node_of(id) as Actor if id != ActorsScript.NONE else null
+
+
+## The coins in `body`'s coins bag (0 for none, or no inventory).
+static func _coins_in(body: Actor) -> int:
+	return body.inventory.count_of(COIN_BAG, CoinBase.ID) if body != null and body.inventory != null else 0
 
 
 ## The relics seat `seat`'s wizard holds, one entry a copy, in the bag's order (each a `RelicBase`
@@ -592,12 +611,12 @@ func _stock_shelf(room: int, table_id: StringName, spots: PackedVector2Array) ->
 		_say_item(_item_numbers.size() - 1, true)
 
 
-## Each seat's shelf item in reach: the one nearest its standing wizard's own feet within
-## SHELF_REACH (the first stocked of two as near), said as it changes.
+## Each seat's shelf item in reach: the one nearest the own feet of the standing body it drives
+## within SHELF_REACH (the first stocked of two as near), said as it changes.
 func _look_at_shelves() -> void:
 	for seat in SEATS:
 		var near: int = -1
-		var body: Actor = _wizard_of(seat)
+		var body: Actor = _driven_of(seat)
 		if body != null and not body.is_down():
 			var best: float = SHELF_REACH * SHELF_REACH
 			for at in _item_numbers.size():

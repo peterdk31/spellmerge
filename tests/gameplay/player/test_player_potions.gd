@@ -7,6 +7,7 @@ extends "res://tests/support/suite.gd"
 ## and the seat's coins are always its home wizard's, a possession or not (the HUD's purse).
 const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
+const RewardsScript := preload("res://gameplay/rewards/rewards.gd")
 
 const POTIONS: StringName = &"potions"
 const COINS: StringName = &"coins"
@@ -92,22 +93,63 @@ func test_coins_are_never_dropped() -> void:
 	check_equal(wizard.inventory.drop(COINS, CoinBase.ID), Inventory.Refusal.NO_DROP, "the inventory says why")
 
 
-func test_while_possessing_the_body_shown_drinks_and_the_purse_stays_the_wizards() -> void:
+func test_while_possessing_the_purse_and_the_drink_are_the_possessed_bodys() -> void:
 	var wizard: Actor = _world.wizard(0, Vector2.ZERO, [[&"possess", &"bolt"], [], [], []])
 	check(wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 12)), "twelve coins")
-	var imp := _imp(Vector2(0.0, 60.0))
-	_world.hold(0, &"staff_1")
-	_world.release(0, &"staff_1")
-	_world.run(8)
-	check(imp.controller == Fixture.controller(wizard), "the seat drives the imp")
-	check_equal(_purses.back(), [0, 12], "the purse is the home wizard's coins while the imp is shown")
-	check(wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 1)), "a coin shared meanwhile")
-	check_equal(_purses.back(), [0, 13], "told at once")
+	var imp := _possess(wizard)
+	check_equal(_purses.back(), [0, 0], "the purse is the imp's coins while it is driven (none yet: 0)")
+	check(imp.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 3)), "an enemy's inventory has room for coins")
+	check_equal(_purses.back(), [0, 3], "told at once")
+	check(wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 1)), "a coin the wizard gains meanwhile")
+	check_equal(_purses.back(), [0, 3], "is not the shown body's")
 	check(imp.inventory.add(ItemStack.of(ItemKinds.POTION, &"max_health", 1)), "the imp holds a potion")
 	_world.run(1)
 	_drink(imp, &"max_health")
 	check_equal(imp.health.max_health, 60.0, "the body shown drinks its own")
 	check_equal(wizard.health.max_health, 100.0, "not the wizard")
+	_world.run(80)
+	check(wizard.controller == Fixture.controller(wizard), "the possession ended")
+	check_equal(_purses.back(), [0, 13], "the purse is the wizard's again")
+
+
+func test_a_possessing_seat_buys_with_the_possessed_bodys_coins() -> void:
+	var rewards := RewardsScript.new()
+	rewards.events = _world.bus
+	rewards.actors = _world.table
+	rewards.projectiles = _world.projectiles
+	rewards.spells = _world.spells
+	rewards.registry = _world.registry
+	rewards.sim = Sim.seeded(3)
+	root.add_child(rewards)
+	var wizard: Actor = _world.wizard(0, Vector2.ZERO, [[&"possess", &"bolt"], [], [], []])
+	check(wizard.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 99)), "a rich wizard")
+	var imp := _possess(wizard)
+	_world.bus.special_room_opened.emit(4, RoomKind.FILL_SHOP, &"shelf", Rect2(), PackedVector2Array([imp.position]))
+	var item: Dictionary = rewards.shelf()[0]
+	var refused: Array = []
+	_world.bus.shelf_refused.connect(func(seat: int, number: int) -> void: refused.append([seat, number]))
+	_world.bus.shelf_buy_requested.emit(0, item["number"])
+	_world.run(1)
+	rewards.step(Fixture.STEP)
+	check_equal(refused, [[0, item["number"]]], "the imp has no coins: refused, whatever its wizard holds")
+	check(imp.inventory.add(ItemStack.of(ItemKinds.COIN, CoinBase.ID, 99)), "the imp's own coins")
+	_world.bus.shelf_buy_requested.emit(0, item["number"])
+	_world.run(1)
+	rewards.step(Fixture.STEP)
+	check(rewards.shelf().is_empty(), "bought by the body doing the buying")
+	check_equal(imp.inventory.count_of(COINS, CoinBase.ID), 99 - int(item["price"]), "paid from the imp's coins")
+	check_equal(wizard.inventory.count_of(COINS, CoinBase.ID), 99, "not the wizard's")
+	rewards.free()
+
+
+## Seat 0's wizard (holding `possess · bolt`) possesses an imp 60 px below it; the imp.
+func _possess(wizard: Actor) -> Actor:
+	var imp := _imp(Vector2(0.0, 60.0))
+	_world.hold(0, &"staff_1")
+	_world.release(0, &"staff_1")
+	_world.run(8)
+	check(imp.controller == Fixture.controller(wizard), "the seat drives the imp")
+	return imp
 
 
 ## A creature of the kit standing in for an enemy: Health 50, a hurtbox, a Mover, a Caster with a

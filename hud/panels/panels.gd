@@ -94,7 +94,8 @@ extends CanvasLayer
 ##   A (no lit stone, no item in reach, no altar) while one waits. Its pick is the command
 ##   `reward_pick_requested`; `back`, `pause` and a boss's intro close it, the offer left unspent.
 ##   Each corner panel says the seat's coins and its unspent rewards (the coin stack in the coins
-##   bag of the body it shows, `bag_changed`: coins are an inventory item, the owner's of
+##   bag of the body the seat drives, as the rest of the HUD: a possessed foe's while possessing,
+##   0 for a body with no coins; `bag_changed`: coins are an inventory item, the owner's of
 ##   2026-11-19; `rewards_waiting_changed`; `PlayerPanel.set_purse`).
 ## - The item hints (`item_hints.gd`, node Root/ItemHints, made here; items I6): over the item in
 ##   reach of each player's driven body (`item_near_changed`), its name and the A glyph, a staff's
@@ -821,6 +822,9 @@ func _on_inventory_announced(player: int, _body: int) -> void:
 		# Another body's numbers follow: no hit flash for the change, and none of the last body's
 		# mana held or told is read for this one's staff rows (review, items I8).
 		_panels[player].forget_health()
+		# The purse is the new body's: 0 until its coins bag is said (a body with none says nothing).
+		_coins[player] = 0
+		_panels[player].set_purse(0, _unspent[player])
 		for staff in PlayerPanelScript.STAFF_COUNT:
 			_staff_mana[player * PlayerPanelScript.STAFF_COUNT + staff] = INF
 			_staff_reserved[player * PlayerPanelScript.STAFF_COUNT + staff] = 0.0

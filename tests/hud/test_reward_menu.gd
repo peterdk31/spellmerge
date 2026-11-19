@@ -369,5 +369,8 @@ func test_the_panel_says_the_coins() -> void:
 	check_equal(_hud.get_panel(1).purse_text(), "", "another bag is not the purse")
 	_bus.bag_changed.emit(1, &"coins", [CoinBase.ID] as Array[StringName], PackedInt32Array([12]), -1)
 	check_equal(_hud.get_panel(1).purse_text(), "12 coins", "the coin stack in the seat's coins bag")
+	_bus.inventory_announced.emit(1, 77)
+	check_equal(_hud.get_panel(1).purse_text(), "", "another body shown (a possession): 0 until its coins bag is said, and a body with none says nothing")
+	_bus.bag_changed.emit(1, &"coins", [CoinBase.ID] as Array[StringName], PackedInt32Array([12]), -1)
 	_roll(1, 3, false)
 	check_equal(_hud.get_panel(1).purse_text(), "12 coins  1 to pick", "and its rewards waiting")

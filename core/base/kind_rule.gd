@@ -113,6 +113,8 @@ func problems(known: Array[StringName]) -> PackedStringArray:
 		found.append("Kind rule '%s': least %d; 0 to %d, and max_per_run (%d) at most where that is set." % [kind, least, MOST_PER_RUN, max_per_run])
 	if not (chance >= 0.0 and chance <= 1.0):
 		found.append("Kind rule '%s': its chance is %s; 0 to 1." % [kind, chance])
+	elif chance > 0.0 and max_per_run == 0:
+		found.append("Kind rule '%s': a chance of %s but no max_per_run: a line with no limit fills by weight, so its chance does nothing; set max_per_run." % [kind, chance])
 	for before: StringName in not_after:
 		if not known.has(before):
 			found.append("Kind rule '%s': not_after names '%s', no room kind of that id." % [kind, before])

@@ -337,7 +337,7 @@ func biome_problems(content: RunContent, shapes: Dictionary) -> PackedStringArra
 	var unlimited: int = 0
 	var fixed: int = 0
 	var fixed_fights: int = 0
-	var spine_template: bool = false
+	var spine_templates: Dictionary = {}
 	var used: Dictionary = {}
 	for rule: KindRule in lines:
 		var hosts: Array[RoomBase] = biome_templates(content, shapes, rule.kind, 1)
@@ -355,7 +355,8 @@ func biome_problems(content: RunContent, shapes: Dictionary) -> PackedStringArra
 		var fights: bool = of_kind.fill == RoomKind.FILL_ENEMIES
 		if fights and not rule.dead_end:
 			fixed_fights += rule.least
-			spine_template = spine_template or not biome_templates(content, shapes, rule.kind, 2).is_empty()
+			for room: RoomBase in biome_templates(content, shapes, rule.kind, 2):
+				spine_templates[room.id] = true
 		if hosts.size() < rule.least:
 			found.append("%s: kind '%s' has %d rooms in every biome, but %d %s rooms with a socket host it (a template stands once a biome)." % [biome, rule.kind, rule.least, hosts.size(), biome])
 	for rule: KindRule in kinds:
@@ -369,8 +370,8 @@ func biome_problems(content: RunContent, shapes: Dictionary) -> PackedStringArra
 		found.append("%s: %d fixed rooms (each kind's least, the boss's too), more than rooms_max %d." % [biome, fixed + 1, rooms_max])
 	if fixed_fights < fights_on_way:
 		found.append("%s: %d fights fixed (the least of kinds filled with enemies, not dead ends), fewer than the %d on the way to the boss (fights_on_way)." % [biome, fixed_fights, fights_on_way])
-	if not spine_template and fights_on_way > 0:
-		found.append("%s: no %s room hosting a fight has two sockets: a room on the way to the boss has a way in and a way on." % [biome, biome])
+	if spine_templates.size() < fights_on_way:
+		found.append("%s: %d %s rooms hosting a fight have two sockets, fewer than the %d fights on the way to the boss (a room on the way has a way in and a way on, and a template stands once a biome)." % [biome, spine_templates.size(), biome, fights_on_way])
 	if biome_walkways(content, shapes).is_empty():
 		found.append("%s: no %s walkway (RoomBase.walkway) with two sockets: nothing bridges its rooms." % [biome, biome])
 	if used.size() < rooms_min:
@@ -429,9 +430,9 @@ func _biome_cannot_fill(content: RunContent, shapes: Dictionary, rule: KindRule)
 			if content.enemy_pool(biome, from).is_empty():
 				return "no enemy fights in %s by depth %d" % [biome, from]
 		RoomKind.FILL_BOSS:
-			# The boss stands deepest: any boss of the biome, by the deepest depth the map may reach.
-			if content.boss_pool(biome, rooms_max).is_empty():
-				return "no boss fights in %s" % biome
+			# The boss stands deepest, at the way's end: a way is fights_on_way + 1 rooms at least.
+			if content.boss_pool(biome, fights_on_way + 1).is_empty():
+				return "no boss fights in %s by depth %d (the shallowest the way's end may be)" % [biome, fights_on_way + 1]
 	return ""
 
 

@@ -86,7 +86,7 @@ static func generate(definition: RunDefinition, content: RunContent, shapes: Dic
 ## depth its line takes, and filled there; each line's `least` and `max_per_run`; a dead end's one
 ## bridge; at least `fights_on_way` fights on every way from the start room to the boss; no bridge
 ## from a kind a room may not follow (`not_after`); each template hosting its room's kind, and none
-## twice (the start room's excepted). With `whole` false (a map still growing), the counts (of rooms
+## twice (the start room's excepted); every room's slab GAP clear of every other's. With `whole` false (a map still growing), the counts (of rooms
 ## and of each line) are not checked.
 static func rule_problems(map: BiomeMap, rules: MapRules, content: RunContent, shapes: Dictionary, whole: bool = true) -> PackedStringArray:
 	var found := PackedStringArray()
@@ -118,6 +118,14 @@ static func rule_problems(map: BiomeMap, rules: MapRules, content: RunContent, s
 		if seen.has(template):
 			found.append("rooms %d and %d are both %s: a template stands once a biome." % [seen[template], room, template])
 		seen[template] = room
+	var rects: Array[Rect2] = []
+	for room in map.rooms():
+		var shape: PieceShape = map.room_shape(room, shapes)
+		rects.append(shape.rect_at(map.room_places[room]).grow(GAP * 0.5) if shape != null else Rect2())
+	for a in rects.size():
+		for b in range(a + 1, rects.size()):
+			if rects[a].intersects(rects[b]):
+				found.append("rooms %d and %d are less than %d px apart." % [a, b, int(GAP)])
 	for room in map.rooms():
 		var host: RoomBase = _template(content, map.room_templates[room])
 		if host == null or not host.hosts(map.room_kinds[room]):
@@ -258,7 +266,7 @@ class Growth:
 	var room_kinds: Array[StringName] = []
 	var room_shapes: Array[PieceShape] = []
 	var room_rects: Array[Rect2] = []
-	## Each room's depth as it hangs off the room before (loops can only shorten it: they are checked).
+	## Each room's depth, the fewest bridges from the start room (worked out again after a loop).
 	var room_depths: Array[int] = []
 	## Each room's sockets, 1 where free.
 	var room_free: Array[PackedByteArray] = []
@@ -710,6 +718,10 @@ class Growth:
 			var crossing: Crossing = pick[0]
 			loops_left -= 1
 			_add_bridge(crossing, dice.below(Step.LOOPS, crossing.mirrors.size()), pick[1], pick[2], pick[3], pick[4], pick[5])
+			# A loop can shorten a way: the depths the next rooms hang off are the map's.
+			var depths: PackedInt32Array = to_map().depths
+			for room in room_depths.size():
+				room_depths[room] = depths[room]
 
 	func _joined(a: int, b: int) -> bool:
 		for bridge in bridge_templates.size():
@@ -733,14 +745,15 @@ class Growth:
 				return false
 		return true
 
-	## True when the map with the loop's bridge `loop_bridge` still keeps the rules.
+	## True when the map with the loop's bridge `loop_bridge` still keeps the rules so far (a loop
+	## changes no count; the whole map is checked once grown).
 	func _keeps_rules(loop_bridge: Array) -> bool:
 		var map: BiomeMap = to_map()
 		var crossing: Crossing = loop_bridge[0]
 		# Only the joins and kinds are checked: its place is the generator's (checked clear already).
 		map.add_bridge(crossing.template, Vector2.ZERO, crossing.mirrors[0], loop_bridge[2], loop_bridge[3], loop_bridge[4], loop_bridge[5])
 		map.work_out_depths()
-		return BiomeGenerator.rule_problems(map, rules, content, shapes).is_empty()
+		return BiomeGenerator.rule_problems(map, rules, content, shapes, false).is_empty()
 
 
 ## A way a walkway crosses from a room's socket: placed with its end at the socket (`from_at`, in its

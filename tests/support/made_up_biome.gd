@@ -4,7 +4,7 @@ extends RefCounted
 ## names, its templates' shapes made in code (`PieceShape`: a slab ringed by a 32 px wall, its sockets
 ## on the wall's inner face, on the 32 px grid), with no scenes (`MadeUpRoom`), so nothing is drawn or
 ## laid: the generator reads only the shapes. Bridges across (west to east) and down (north to
-## south), 128 to 320 px long by 32 px (a loop closes where two free sockets line up a bridge's
+## south), 96 to 384 px long in 32 px steps and 64 px across (a loop closes where two free sockets line up a bridge's
 ## length apart: at a corner, one bridge's length lines a room up, another's spans to the next).
 ##
 ##     var biome := MadeUpBiome.new()
@@ -149,7 +149,7 @@ static func bridge_shape(id: StringName, down: bool, length: float = 128.0) -> P
 
 ## The cellar's rules (decision 1): 8 to 12 rooms; the boss deepest; a reward room, a shop, a secret
 ## room and 4 fights in every biome; by chance a fountain, a treasure room, a second secret and a
-## challenge room (from 2 bridges deep); the rest fights. In `styles` (default: the four).
+## challenge room (from 2 bridges deep); the rest fights; a reward room never led to from the shop. In `styles` (default: the four).
 static func rules(styles: Array[MapStyle] = []) -> MapRules:
 	var made := MapRules.new()
 	made.biome = BIOME
@@ -166,7 +166,10 @@ static func rules(styles: Array[MapStyle] = []) -> MapRules:
 	secret.dead_end = true
 	var treasure := _line(&"treasure", 1, -2, 0, 1, 0.5)
 	treasure.dead_end = true
-	made.kinds = [fight, boss, _line(&"reward", 0, -2, 1, 1, 0.0), _line(&"shop", 0, -2, 1, 1, 0.0), secret, _line(&"fountain", 0, -2, 0, 1, 0.5), treasure, _line(&"challenge", 2, -2, 0, 1, 0.4)] as Array[KindRule]
+	# A reward room never right past the shop (a `not_after`, so the generator's checks of it run).
+	var reward := _line(&"reward", 0, -2, 1, 1, 0.0)
+	reward.not_after = [&"shop"] as Array[StringName]
+	made.kinds = [fight, boss, reward, _line(&"shop", 0, -2, 1, 1, 0.0), secret, _line(&"fountain", 0, -2, 0, 1, 0.5), treasure, _line(&"challenge", 2, -2, 0, 1, 0.4)] as Array[KindRule]
 	return made
 
 

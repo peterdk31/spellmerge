@@ -294,6 +294,24 @@ func test_the_validator_names_a_run_whose_content_makes_no_map() -> void:
 			across[id] = up.shapes[id]
 	check_equal(MadeUpBiome.run().biome_problems(up.content, across), PackedStringArray(), "nothing the rules can tell")
 	_named(MadeUpBiome.run(), up.content, across, "no map after %d tries" % BiomeGenerator.ATTEMPTS)
+	# One fight template with two sockets: the way's 4 fights need 4 (a template stands once).
+	var one_hall: Array = []
+	for row: Array in MadeUpBiome.ROOMS:
+		var sockets: int = row[3]
+		if &"fight" in row[1] and row[0] != &"hall_a":
+			sockets = MadeUpBiome.N
+		one_hall.append([row[0], row[1], row[2], sockets])
+	var single := MadeUpBiome.new(one_hall)
+	_named(MadeUpBiome.run(), single.content, single.shapes, "fewer than the 4 fights on the way")
+	# A boss that fights only deeper than the way's shallowest end.
+	var deep := MadeUpBiome.new()
+	for enemy: EnemyBase in deep.content.enemies:
+		if enemy.boss:
+			enemy.min_depth = 11
+	_named(MadeUpBiome.run(), deep.content, deep.shapes, "no boss fights in cellar by depth 5")
+	var chance_line: MapRules = MadeUpBiome.rules()
+	chance_line.kinds[0].chance = 0.5
+	_named(MadeUpBiome.run(chance_line), _biome.content, _biome.shapes, "its chance does nothing")
 	var map: BiomeMap = BiomeGenerator.generate(null, _biome.content, _biome.shapes, _sim(1))
 	check(not map.is_made() and "No run definition" in "\n".join(map.not_made), "no definition")
 
@@ -374,3 +392,46 @@ func test_a_map_of_the_crypt_s_rooms_is_laid() -> void:
 	check_equal(biome.room_layout(0).get_meta(PieceShape.GROUND_MIRROR_META), Vector2i(laid.room_mirrors[0] & 1, (laid.room_mirrors[0] >> 1) & 1), "the start room's layout says its mirroring, for the ground")
 	world.free_all()
 	into.free()
+
+
+## The rules' check names each rule a made map breaks.
+func test_the_rule_check_names_what_a_map_breaks() -> void:
+	var rules: MapRules = MadeUpBiome.rules()
+	var definition: RunDefinition = MadeUpBiome.run(rules)
+	var made: BiomeMap = _map(definition, 5)
+	check_equal(BiomeGenerator.rule_problems(made, rules, _biome.content, _biome.shapes), PackedStringArray(), "the map as made is sound")
+	var fight: int = made.room_kinds.find(&"fight")
+	var boss: int = _deepest(made)
+	_breaks(made, rules, func(map: BiomeMap) -> void: map.room_kinds[fight] = &"shop", "does not host its kind")
+	_breaks(made, rules, func(map: BiomeMap) -> void: map.room_kinds[0] = &"fight", "not the start room")
+	_breaks(made, rules, func(map: BiomeMap) -> void: map.room_templates[boss] = map.room_templates[fight], "a template stands once")
+	_breaks(made, rules, func(map: BiomeMap) -> void: map.room_places[fight] = map.room_places[boss] + Vector2(16, 0), "px apart")
+	# The boss joined straight to the start room: no longer deepest, and no fights on that way.
+	_breaks(made, rules, func(map: BiomeMap) -> void:
+		map.add_bridge(MadeUpBiome.BRIDGE_ACROSS, Vector2.ZERO, 0, 0, 0, boss, 0)
+		map.work_out_depths(), "the boss stands deepest")
+	_breaks(made, rules, func(map: BiomeMap) -> void:
+		map.add_bridge(MadeUpBiome.BRIDGE_ACROSS, Vector2.ZERO, 0, 0, 0, boss, 0)
+		map.work_out_depths(), "a way to the boss passes 0 fights")
+	_breaks(made, rules, func(map: BiomeMap) -> void:
+		map.add_bridge(MadeUpBiome.BRIDGE_ACROSS, Vector2.ZERO, 0, boss - 1, 0, boss, 0)
+		map.work_out_depths(), "is a dead end, but 2 bridges reach it")
+	var secret: int = made.room_kinds.find(&"secret")
+	_breaks(made, rules, func(map: BiomeMap) -> void: map.room_kinds[secret] = &"boss", "rooms of 'boss'")
+	_breaks(made, rules, func(map: BiomeMap) -> void: map.room_kinds[fight] = &"reward", "rooms of 'reward'")
+	# A reward room led to from the shop (`not_after`): the first bridge from the way's first room on.
+	_breaks(made, rules, func(map: BiomeMap) -> void:
+		map.room_kinds[map.room_kinds.find(&"shop")] = &"fight"
+		map.room_kinds[map.room_kinds.find(&"reward")] = &"fight"
+		map.room_kinds[1] = &"shop"
+		map.room_kinds[2] = &"reward", "leads from a 'shop' to a 'reward'")
+	var shallow: RunDefinition = MadeUpBiome.run(MadeUpBiome.rules())
+	shallow.biomes[0].kinds[4].first_row = 20
+	check("a depth its line does not take" in "\n".join(BiomeGenerator.rule_problems(made, shallow.biomes[0], _biome.content, _biome.shapes)), "a room at a depth its line does not take is named")
+
+
+func _breaks(made: BiomeMap, rules: MapRules, change: Callable, says: String) -> void:
+	var map: BiomeMap = made.copy()
+	change.call(map)
+	var problems: String = "\n".join(BiomeGenerator.rule_problems(map, rules, _biome.content, _biome.shapes))
+	check(says in problems, "named: %s (got: %s)" % [says, problems])

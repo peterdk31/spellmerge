@@ -160,6 +160,16 @@ func bridge_rect(bridge: int) -> Rect2:
 	return shape.rect_at(map.bridge_places[bridge]) if shape != null else Rect2()
 
 
+## The world rectangle of the mouth where bridge `bridge`'s end `end` (0 or 1) meets its room (as
+## `_lay_grid` lays it; empty when none is laid): the doorway a gather door shuts (CB7).
+func mouth_rect(bridge: int, end: int) -> Rect2:
+	if map == null or bridge < 0 or bridge >= map.bridges():
+		return Rect2()
+	var room: int = map.end_room(bridge, end)
+	var shape: PieceShape = map.room_shape(room, _shapes)
+	return _moved(shape.mouth_rect(map.end_socket(bridge, end)), map.room_places[room]) if shape != null else Rect2()
+
+
 ## The world's bounds for the biome: every piece, and MARGIN round them.
 func bounds() -> Rect2:
 	var whole := Rect2()
@@ -252,9 +262,7 @@ func _lay_grid(restored: bool) -> void:
 		_lay_piece(grid, map.bridge_shape(bridge, _shapes), map.bridge_places[bridge])
 	for bridge in map.bridges():
 		for end in 2:
-			var room: int = map.end_room(bridge, end)
-			var shape: PieceShape = map.room_shape(room, _shapes)
-			grid.add_mouth(_moved(shape.mouth_rect(map.end_socket(bridge, end)), map.room_places[room]))
+			grid.add_mouth(mouth_rect(bridge, end))
 	# Every piece a place, rooms first (connected biomes CB3); the seals are Flow's to set again.
 	var biggest: float = 0.0
 	for room in map.rooms():

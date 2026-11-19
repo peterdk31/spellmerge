@@ -20,6 +20,12 @@ const EAST: Array[StringName] = [&"spitter", &"ember_imp"]
 
 ## True once a tick had both fights sealed at once (the split the test is about).
 var both_sealed: bool = false
+## Connected biomes CB7: the court is the boss's room (`gate`), both seats stood at the nave's east
+## mouth walk east onto its bridge, and the gate opens (`gate_opened`): the party comes in together.
+var gate: bool = false
+var gate_opened: bool = false
+## The tick the gate opened at (-1: it did not).
+var gate_opened_at: int = -1
 var problems: PackedStringArray = PackedStringArray()
 
 var _root: Window
@@ -45,8 +51,9 @@ class Walker:
 		tick += 1
 
 
-func _init(root: Window) -> void:
+func _init(root: Window, at_the_gate: bool = false) -> void:
 	_root = root
+	gate = at_the_gate
 	_flow = root.get_node("Flow") as FlowScript
 	_tick = root.get_node("Tick") as TickScript
 	_frames = root.get_node("Frames")
@@ -62,6 +69,9 @@ func play(ticks: int, snapshot_at: int, into: Desync) -> Snapshot:
 	var registry: Object = _root.get_node("Registry")
 	# Stood at the nave's two mouths, each looking out at its fight.
 	(_flow.get_wizard(0) as Actor).global_position = BiomeMaps.socket_point(registry, map, 0, RoomSocket.Facing.WEST) + Vector2(24.0, 0.0)
+	if gate:
+		# Both at the east mouth, a little apart, walking out onto the gate's bridge.
+		(_flow.get_wizard(0) as Actor).global_position = BiomeMaps.socket_point(registry, map, 0, RoomSocket.Facing.EAST) - Vector2(24.0, 12.0)
 	(_flow.get_wizard(1) as Actor).global_position = BiomeMaps.socket_point(registry, map, 0, RoomSocket.Facing.EAST) - Vector2(24.0, 0.0)
 	var snapshot: Snapshot = null
 	for i in ticks:
@@ -69,6 +79,9 @@ func play(ticks: int, snapshot_at: int, into: Desync) -> Snapshot:
 		into.capture(_tick.state_areas())
 		if _flow.life.has(1, RoomLife.SEALED) and _flow.life.has(2, RoomLife.SEALED):
 			both_sealed = true
+		if _flow.gates.is_open(2) and _flow.life.has(2, RoomLife.SEALED) and not gate_opened:
+			gate_opened = true
+			gate_opened_at = i
 		if i == snapshot_at:
 			snapshot = Snapshot.take(_tick.state_areas(), _root)
 	_stop()
@@ -98,10 +111,12 @@ func _start() -> BiomeMap:
 	for seat in 2:
 		_input.call("add_virtual_device", seat)
 		var walker := Walker.new()
-		walker.way = Vector2.LEFT if seat == 0 else Vector2.RIGHT
+		walker.way = Vector2.LEFT if seat == 0 and not gate else Vector2.RIGHT
 		_walkers.append(walker)
 		_frames.call("set_source", seat, walker)
 	var map: BiomeMap = BiomeMaps.split(_root.get_node("Registry"))
+	if gate:
+		map.room_kinds[2] = &"boss"
 	var fights: Array[RoomFight] = [RoomFight.new(), RoomFight.of(WEST), RoomFight.of(EAST, 2, 0, 0.25)]
 	_flow.world_parent = _root
 	if not _flow.start_biome(0, map, fights):

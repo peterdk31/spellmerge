@@ -1908,7 +1908,9 @@ func _drop_keys(room: int) -> void:
 		drops = drops or locks.key_drops[key] == room
 	if not drops:
 		return
-	var at: Vector2 = SpecialPlaces.key_spot(biome.room_places(room), biome.room_rect(room).get_center())
+	var places: RoomPlaces = biome.room_places(room)
+	var middle: Vector2 = biome.room_rect(room).get_center()
+	var at: Vector2 = SpecialPlaces.key_spot(places, middle, SpecialPlaces.taken_by(_kind_of(room), places, middle))
 	if projectiles != null and world != null:
 		at = world.to_local(projectiles.grid().nearest_ground(world.to_global(at), PORTAL_GROUND * 0.5))
 	locks.drop_keys(room, at)

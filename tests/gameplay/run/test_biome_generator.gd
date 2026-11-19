@@ -338,6 +338,7 @@ func test_the_crypt_is_made() -> void:
 	var styles: Dictionary = {}
 	var chance_kinds: Dictionary = {}
 	var elites: int = 0
+	var treasures: int = 0
 	for seed_value in 24:
 		var map: BiomeMap = BiomeGenerator.generate(crypt, content, shapes, _sim(seed_value))
 		check(map.is_made(), "seed %d: made (%s)" % [seed_value, "\n".join(map.not_made)])
@@ -355,6 +356,8 @@ func test_the_crypt_is_made() -> void:
 				chance_kinds[kind] = true
 		if map.room_kinds.count(&"secret") == 2:
 			chance_kinds[&"second secret"] = true
+		if map.room_kinds.has(&"treasure"):
+			treasures += 1
 		for room in map.rooms():
 			for card: StringName in map.elites_of(room):
 				if card != &"":
@@ -366,6 +369,8 @@ func test_the_crypt_is_made() -> void:
 	check(styles.size() > 1, "more than one style rolled: %s" % [styles.keys()])
 	check(chance_kinds.size() == 4, "every chance kind stands now and then (a fountain, a treasure room, a challenge room, a second secret): %s" % [chance_kinds.keys()])
 	check(elites > 0, "fight rooms past the elites' depth hold elites now and then")
+	# The owner, 2026-11-19: a treasure room (and its key) in about 9 biomes in 10.
+	check(treasures >= 18, "a treasure room in most of the crypt's maps (chance 0.9): %d of 24" % treasures)
 
 
 ## A map generated from the crypt's own rooms (the antechamber as the start, the nave a fight, the

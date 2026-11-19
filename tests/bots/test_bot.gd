@@ -426,8 +426,16 @@ func test_a_downed_bot_crawls_toward_its_nearest_standing_teammate() -> void:
 	mate.set_down(true)
 	check_equal(_bots[0].crawl_way(wizard), Vector2.ZERO, "nobody standing: it lies still")
 	mate.set_down(false)
-	wizard.global_position = mate.global_position - Vector2(160.0, 0.0)
-	var from: float = wizard.global_position.distance_to(mate.global_position)
+	# In play: the teammate stands still (an idler, so it does not come to revive), and the downed bot's
+	# own frames crawl it nearer.
+	_bots[1].mode = BotScript.Mode.IDLER
+	_bots[1].wanted_frame().clear()
+	var grid: RoomGrid = _flow.get_node(^"/root/Projectiles").call(&"grid") as RoomGrid
+	var room: Rect2 = (_flow.get(&"biome") as BiomeWorld).room_rect(0)
+	mate.global_position = grid.nearest_ground(room.get_center() + Vector2(48.0, 0.0), 6.0)
+	wizard.global_position = grid.nearest_ground(room.get_center() - Vector2(48.0, 0.0), 6.0)
+	var from: Vector2 = wizard.global_position
+	var gap: float = from.distance_to(mate.global_position)
 	for i in 60:
 		await physics_frame
-	check(wizard.global_position.distance_to(mate.global_position) < from - 4.0, "in play its seat's frames crawl it nearer (%.0f px to %.0f)" % [from, wizard.global_position.distance_to(mate.global_position)])
+	check(wizard.global_position.x > from.x + 2.0 and wizard.global_position.distance_to(mate.global_position) < gap - 2.0, "in play its seat's frames crawl it nearer (%.0f px to %.0f)" % [gap, wizard.global_position.distance_to(mate.global_position)])

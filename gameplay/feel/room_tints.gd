@@ -8,7 +8,9 @@ extends RefCounted
 ## view are each their own, and two views of a split screen each tint the rooms they show. **Its edge**
 ## (the owner, 2026-11-19): past a room's rectangle its tint steps down onto its bridges in EDGE_BANDS
 ## whole-pixel bands EDGE_BAND px wide (two thirds of its tint, a third, then none), never one hard
-## edge; the rest of a bridge is untinted. Only while dynamic lighting is on (with it off there is no apply pass to tint).
+## edge; the rest of a bridge is untinted. The bands ring the whole rectangle (a room's rectangle
+## holds its void frame, so past it is a bridge or the void, where a band shows on nothing lit), and
+## rooms stand at least a bridge apart, so a band never reaches another room. Only while dynamic lighting is on (with it off there is no apply pass to tint).
 ##
 ## **Smooth:** a room's tint comes in once the party's map says it was entered (`rooms_seen`, as the
 ## dark over it lifts, `unseen_dark.gd`), a stage a frame at FPS through STAGES (a third, two thirds,
@@ -130,12 +132,15 @@ func stage_of(place: int) -> int:
 
 
 ## The tint at world point `at` as the apply pass reads it: the hue of the room it is in, and how
-## far its light leans toward it now (alpha; 0 on a bridge, in the void or an untinted room).
+## far its light leans toward it now (alpha; past a room's edge its bands, then 0 on a bridge, in the
+## void or an untinted room). A room at no tint yet is passed over, as the shader is never handed it.
 func tint_at(at: Vector2) -> Color:
 	var p := Vector2(floorf(at.x) + 0.5, floorf(at.y) + 0.5)
 	var edge := Color(1.0, 1.0, 1.0, 0.0)
 	for i in _places.size():
 		var r: Vector4 = _rects[i]
+		if _tint_now(i) <= 0.0:
+			continue
 		if at.x >= r.x and at.y >= r.y and at.x < r.z and at.y < r.w:
 			return Color(_hues[i].r, _hues[i].g, _hues[i].b, _tint_now(i))
 		var out_x: float = maxf(maxf(r.x - p.x, p.x - r.z), 0.0)

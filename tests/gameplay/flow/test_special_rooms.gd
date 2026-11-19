@@ -238,12 +238,36 @@ func test_the_keys_room_is_picked_by_chance_among_the_open_rooms() -> void:
 	var open: PackedInt32Array = LockDoors.open_rooms(map, PackedByteArray([LockDoors.RULE_NONE, LockDoors.RULE_KEY, LockDoors.RULE_NONE]))
 	check_equal(open, PackedInt32Array([0, EAST]), "the open rooms: all but the locked one")
 	check_equal(drop, open[tick.sim.chance_int(FlowScript.KEY_PURPOSE, WEST, 0, open.size())], "the run's chance, keyed by the treasure room, picks it")
-	if drop == EAST:
-		check(keys.is_empty() or not keys.back()[2], "in the court: nothing lies before its fight is cleared")
+	# Whatever the seed picked, a fight room's key drops as its fight is cleared: the court's here.
+	flow.locks.key_drops[0] = EAST
+	flow.locks.key_states[0] = LockDoors.KEY_WAITING
+	keys.clear()
+	_put(0, _by_socket(map, EAST, RoomSocket.Facing.WEST, 24.0))
+	check(keys.is_empty(), "in the court: nothing lies while its fight is on")
+	flow.stand_all_now()
+	_beat(EAST)
+	_ticks(2)
+	check(flow.life.has(EAST, RoomLife.CLEARED), "the court cleared")
+	check(not keys.is_empty() and keys.back()[2] and flow.biome.room_rect(EAST).has_point(keys.back()[1]), "its key lies in the court once cleared")
 	var picked: Dictionary = {}
 	for seed in 24:
 		picked[open[Sim.seeded(seed).chance_int(FlowScript.KEY_PURPOSE, WEST, 0, open.size())]] = true
 	check_equal(picked.size(), 2, "over seeds, either room")
+
+
+## A key with no zone lies round the room's middle clear of a fountain's pool or a shop's items.
+func test_a_key_keeps_off_a_fountains_pool_and_a_shops_items() -> void:
+	var middle := Vector2(200.0, 160.0)
+	var fountain := RoomKind.new()
+	fountain.fill = RoomKind.FILL_FOUNTAIN
+	var spot: Vector2 = SpecialPlaces.key_spot(null, middle, SpecialPlaces.taken_by(fountain, null, middle))
+	check(not SpecialPlaces.pool(null, middle).grow(SpecialPlaces.KEY_OFF_ITEM).has_point(spot), "off the pool: %s" % spot)
+	var shop := RoomKind.new()
+	shop.fill = RoomKind.FILL_SHOP
+	spot = SpecialPlaces.key_spot(null, middle, SpecialPlaces.taken_by(shop, null, middle))
+	for item: Vector2 in SpecialPlaces.shelf(null, middle):
+		check(item.distance_to(spot) > SpecialPlaces.KEY_OFF_ITEM, "off each item: %s" % spot)
+	check_equal(SpecialPlaces.key_spot(null, middle, SpecialPlaces.taken_by(RoomKind.new(), null, middle)), middle, "any other room: its middle")
 
 
 func test_a_secret_rock_opens_to_its_own_element_only() -> void:

@@ -184,11 +184,12 @@ func step(delta: float) -> void:
 	if mode == Mode.IDLER:
 		return
 	var wizard := _flow.call("get_wizard", player) as Actor
-	if wizard != null and _flow.get("world") != null and wizard.is_down():
+	if wizard != null and _flow.get("world") != null and wizard.is_downed():
+		# Downed (not falling or spawning in): it crawls.
 		_release()
 		_wanted.set_move(crawl_way(wizard))
 		return
-	if wizard == null or _flow.get("world") == null or wizard.caster == null:
+	if wizard == null or _flow.get("world") == null or wizard.is_down() or wizard.caster == null:
 		_release()
 		return
 	if brain.actor != wizard:

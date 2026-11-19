@@ -14,6 +14,10 @@ var stack: ItemStack = null
 ## The name it is shown by while it lies there: a premade staff's own (`StaffItem.shown_name`);
 ## empty: its content's.
 var title: String = ""
+## The actor it was dropped from, while that actor's feet have not yet left it (`PickupRule`'s
+## WALK_REACH): it is not walked over by that actor till then, so a drop at the feet stays down.
+## NO_ACTOR (-1) for none.
+var waits_for: int = -1
 
 
 ## A row numbered `of_number` holding `of_stack` at `where`, shown as `shown` (empty: its content's).

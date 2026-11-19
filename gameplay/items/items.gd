@@ -14,6 +14,10 @@ extends Node
 ## - **In reach:** each tick (its step, `Tick.STEPS` "Items", after the bodies moved) it finds, for
 ##   the body each seat drives, the item in reach (`PickupRule.nearest`; none for a body with no
 ##   Inventory or down) and says so when it changes (`item_near_changed`).
+## - **Walked over** (the owner, 2026-11-19): a coin lying there is taken by the first body (seats
+##   in order, each seat's driven body, standing, with room) whose feet come over it
+##   (`PickupRule.walked_over`), into its own bag: one's own, never shared (a floor coin of the
+##   Rewards area is the shared kind). A coin dropped waits for its dropper's feet to leave it first.
 ## - **Taken:** `take(actor, item)` gives the item to the actor's Inventory as the pickup rule says,
 ##   if it still lies in reach and there is room (`PickupRule.take`); keyed by actor, so a seat's
 ##   request (`item_take_requested`, a command at the tick's start: seats in order, so the first of
@@ -126,12 +130,14 @@ func clear() -> void:
 		_set_near(seat, NONE)
 
 
-## The tick's step: the item in reach of each seat's driven body, said when it changed.
+## The tick's step: each seat's driven body takes the coins it walks over (seats in order), then
+## the item in reach of it, said when it changed.
 func step(_delta: float) -> void:
 	for seat in SEATS:
 		var found: int = NONE
 		var body: Actor = _holder(actors.actor_of_seat(seat)) if actors != null else null
 		if body != null and not body.is_down():
+			_walk_over(body)
 			var at: int = PickupRule.nearest(_rows, body.global_position)
 			if at >= 0:
 				found = _rows[at].number
@@ -324,6 +330,10 @@ func _on_item_drop_requested(actor: int, stack: ItemStack) -> void:
 	var feet: Vector2 = body.global_position
 	var next: int = PickupRule.nearest(_rows, feet)
 	lay(stack, drop_spot(feet, _rows[next].at if next >= 0 else Vector2.INF))
+	# Not walked over by its dropper till its feet leave it (a drop at the feet when all is blocked);
+	# a dying body's drop waits for nobody (its id may be given again).
+	if not (body is Actor and (body as Actor).is_dying()):
+		_rows.back().waits_for = actor
 
 
 ## Seat `player` asked for `item` (a command): taken as `take` says for the body it drives; no
@@ -366,6 +376,27 @@ func _holder(actor: int) -> Actor:
 		return null
 	var body := actors.node_of(actor) as Actor
 	return body if body != null and body.inventory != null else null
+
+
+## `body` takes every coin its feet are over (`PickupRule.walked_over`) it has room for; a coin
+## waiting for it to step off is free of that once its feet are away.
+func _walk_over(body: Actor) -> void:
+	var feet: Vector2 = body.global_position
+	for row: GroundItem in _rows:
+		if row.waits_for == body.id and feet.distance_squared_to(row.at) > PickupRule.WALK_REACH * PickupRule.WALK_REACH:
+			row.waits_for = ActorsScript.NONE
+	var skipped: int = 0
+	while true:
+		var at: int = PickupRule.walked_over(_rows, feet, body.id, skipped)
+		if at < 0:
+			return
+		var row: GroundItem = _rows[at]
+		if PickupRule.take(body.inventory, row.stack):
+			_rows.remove_at(at)
+			_say_gone(row)
+			skipped = at
+		else:
+			skipped = at + 1
 
 
 func _index_of(item: int) -> int:

@@ -14,6 +14,15 @@ const KEY_ZONE: StringName = &"key"
 const SHELF_SPOTS: Array[Vector2] = [Vector2(-48.0, 0.0), Vector2(0.0, 0.0), Vector2(48.0, 0.0)]
 ## A pool with no zone: this big round the room's middle.
 const POOL_SIZE: Vector2 = Vector2(64.0, 48.0)
+## A key with no zone tries these spots round the room's middle, in order, for the first clear of
+## what the room holds (a shop's items, a fountain's pool: `key_spot`'s `keep_off`).
+const KEY_SPOTS: Array[Vector2] = [
+	Vector2(0.0, 0.0), Vector2(0.0, 64.0), Vector2(0.0, -64.0), Vector2(64.0, 0.0), Vector2(-64.0, 0.0),
+	Vector2(64.0, 64.0), Vector2(-64.0, 64.0), Vector2(64.0, -64.0), Vector2(-64.0, -64.0),
+	Vector2(0.0, 128.0), Vector2(0.0, -128.0),
+]
+## How far a key keeps off a shop's item (pixels).
+const KEY_OFF_ITEM: float = 24.0
 
 
 ## The shelf's spots of a room whose places are `places` and whose middle is `middle` (world pixels).
@@ -35,7 +44,33 @@ static func pool(places: RoomPlaces, middle: Vector2) -> Rect2:
 	return zone if zone.has_area() else Rect2((middle - POOL_SIZE * 0.5).floor(), POOL_SIZE)
 
 
-## Where a key dropped in a room lies (world pixels, before it is put on clear ground).
-static func key_spot(places: RoomPlaces, middle: Vector2) -> Vector2:
+## Where a key dropped in a room lies (world pixels, before it is put on clear ground): its `key`
+## zone, else the first of KEY_SPOTS round its middle that lies outside every rectangle of
+## `keep_off` (a fountain's pool, a shop's items grown by KEY_OFF_ITEM; a key may drop in any room
+## since the owner's follow-up of 2026-11-19), else its middle.
+static func key_spot(places: RoomPlaces, middle: Vector2, keep_off: Array[Rect2] = []) -> Vector2:
 	var zone: Rect2 = places.zone(KEY_ZONE) if places != null else Rect2()
-	return (zone.get_center() if zone.has_area() else middle).floor()
+	if zone.has_area():
+		return zone.get_center().floor()
+	for offset: Vector2 in KEY_SPOTS:
+		var spot: Vector2 = middle + offset
+		var clear: bool = true
+		for rect: Rect2 in keep_off:
+			clear = clear and not rect.has_point(spot)
+		if clear:
+			return spot.floor()
+	return middle.floor()
+
+
+## What a key keeps off in a room of `kind` (its fill's things: a fountain's pool, a shop's items,
+## each grown by KEY_OFF_ITEM), `places` and `middle` as `shelf` and `pool` take them.
+static func taken_by(kind: RoomKind, places: RoomPlaces, middle: Vector2) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	if kind == null:
+		return out
+	if kind.fill == RoomKind.FILL_FOUNTAIN:
+		out.append(pool(places, middle).grow(KEY_OFF_ITEM))
+	elif kind.fill == RoomKind.FILL_SHOP:
+		for spot: Vector2 in shelf(places, middle):
+			out.append(Rect2(spot, Vector2.ZERO).grow(KEY_OFF_ITEM))
+	return out

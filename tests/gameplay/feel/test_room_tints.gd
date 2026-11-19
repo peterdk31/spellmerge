@@ -155,7 +155,7 @@ func test_a_rooms_tint_follows_its_kind() -> void:
 	check_equal(tints.tint_at(_middle_of(2)).a, 0.0, "the court, not yet entered, is not tinted yet")
 	var bridge: Rect2 = _grid().place_rect(4)
 	check(_hearing().is_walkway(4), "place 4 is a bridge")
-	check_equal(tints.tint_at(bridge.get_center()).a, 0.0, "a bridge is never tinted")
+	check_equal(tints.tint_at(bridge.get_center()).a, 0.0, "a bridge's middle is never tinted")
 	check_equal(tints.tint_at(Vector2(-4096.0, -4096.0)).a, 0.0, "nor the void")
 	var light: SpellLightScript = _light()
 	check(light != null, "dynamic lighting on")
@@ -203,6 +203,14 @@ func test_two_rooms_of_different_kinds_side_by_side_are_each_their_own() -> void
 	check(tints.tint_at(near_nave).is_equal_approx(nave), "the nave's edge is the nave's")
 	check(tints.tint_at(near_court).is_equal_approx(court), "the court's edge is the court's")
 	check_equal(tints.tint_at((near_nave + near_court) * 0.5).a, 0.0, "between them the bridge, untinted")
+	# Its edge (the owner, 2026-11-19): stepped down onto the bridge in whole-pixel bands.
+	var out_x: float = east.end.x
+	var y: float = east.get_center().y
+	check(is_equal_approx(tints.tint_at(Vector2(out_x + 0.5, y)).a, nave.a * 2.0 / 3.0), "the first band past the nave's edge: two thirds of its tint")
+	check(is_equal_approx(tints.tint_at(Vector2(out_x + RoomTintsScript.EDGE_BAND - 0.5, y)).a, nave.a * 2.0 / 3.0), "the whole band alike (whole pixels)")
+	check(is_equal_approx(tints.tint_at(Vector2(out_x + RoomTintsScript.EDGE_BAND + 0.5, y)).a, nave.a / 3.0), "the second band: a third")
+	check_equal(tints.tint_at(Vector2(out_x + RoomTintsScript.EDGE_BAND * 2.0 + 0.5, y)).a, 0.0, "then none")
+	check(Color(tints.tint_at(Vector2(out_x + 0.5, y)).r, tints.tint_at(Vector2(out_x + 0.5, y)).g, tints.tint_at(Vector2(out_x + 0.5, y)).b).is_equal_approx(Color(nave.r, nave.g, nave.b)), "in the nave's hue")
 	check_equal(_light().tint_count, 2, "the light holds both")
 
 

@@ -64,7 +64,7 @@ kind = &"treasure"
 first_row = 2
 last_row = -2
 max_per_run = 1
-chance = 0.5
+chance = 0.9
 dead_end = true
 
 [sub_resource type="Resource" id="challenge"]

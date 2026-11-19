@@ -9,9 +9,11 @@ extends RefCounted
 ##   `DOOR_SECRET` (a secret room). Each mouth where a bridge meets it is one of its doors, shut
 ##   (`RoomGrid.shut_mouth`: a wall to everything) until the room opens; then all its doors open, for
 ##   everyone (decision 21: a key door opens for all).
-## - **A key** (one a key room, decision 21) is dropped on the way to its room: in the room its
-##   bridge hangs off (a key room is a dead end; else the shallowest room beside it), as that room is cleared (`drop_keys`; a room with no
-##   fight is cleared as it is entered). It lies there until the first standing wizard (in the
+## - **A key** (one a key room, decision 21) drops in a room Flow picks by the run's chance among the
+##   rooms reached from the start without passing a locked door (`open_rooms`; the owner,
+##   2026-11-19: "it should just drop in some random room"), else, with none picked, in the room its
+##   bridge hangs off (the shallowest room beside it), as that room is cleared (`drop_keys`; a room
+##   with no fight is cleared as it is entered, so its key lies on its floor). It lies there until the first standing wizard (in the
 ##   party's order) whose feet come within KEY_REACH takes it: the party holds it. With it held, the
 ##   first standing wizard at one of its room's doors (on its bridge, or on the room's lip outside the
 ##   shut mouth, as at a gather door) opens it, and the key is spent.
@@ -70,9 +72,10 @@ var _mouths: Array[Rect2] = []
 
 ## A biome's locks begin (every door shut, no key dropped): `map`'s rooms, each with its rule of
 ## `room_rules` (RULE_*, by room) and a secret room's element of `room_elements`; a door at each mouth
-## of a locked room, and a key for each key room, dropped in the room at the other end of its bridge.
-## Laid into the grid by `lay`.
-func begin(map: BiomeMap, room_rules: PackedByteArray, room_elements: Array[StringName]) -> void:
+## of a locked room, and a key for each key room, dropped in the room `drops` names for it (by room;
+## -1 or none: the room at the other end of its bridge, the shallowest of them). Laid into the grid
+## by `lay`.
+func begin(map: BiomeMap, room_rules: PackedByteArray, room_elements: Array[StringName], drops: PackedInt32Array = PackedInt32Array()) -> void:
 	clear()
 	var count: int = map.rooms() if map != null else 0
 	rules = room_rules.duplicate()
@@ -102,6 +105,40 @@ func begin(map: BiomeMap, room_rules: PackedByteArray, room_elements: Array[Stri
 				# A key room with more than one bridge: its key drops in the shallowest room beside it,
 				# the one on the way to it.
 				key_drops[at_key] = other
+	for key in key_rooms.size():
+		var room: int = key_rooms[key]
+		if room < drops.size() and drops[room] >= 0 and drops[room] < count:
+			key_drops[key] = drops[room]
+
+
+## The rooms of `map` the party reaches from its start room (0) without passing a locked door (a
+## room whose rule of `room_rules` is not RULE_NONE), in room order, the start room among them: where
+## a key may drop.
+static func open_rooms(map: BiomeMap, room_rules: PackedByteArray) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	if map == null or map.rooms() == 0:
+		return out
+	var reached := PackedByteArray()
+	reached.resize(map.rooms())
+	reached[0] = 1
+	var queue: Array[int] = [0]
+	while not queue.is_empty():
+		var room: int = queue.pop_front()
+		for bridge in map.bridges():
+			for end in 2:
+				if map.end_room(bridge, end) != room:
+					continue
+				var other: int = map.end_room(bridge, 1 - end)
+				if other < 0 or other >= reached.size() or reached[other] != 0:
+					continue
+				if other < room_rules.size() and room_rules[other] != RULE_NONE:
+					continue
+				reached[other] = 1
+				queue.append(other)
+	for room in reached.size():
+		if reached[room] != 0:
+			out.append(room)
+	return out
 
 
 ## No biome: no door, no key (the view told every one is forgotten, when there was one).

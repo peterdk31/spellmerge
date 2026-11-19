@@ -23,17 +23,15 @@ extends SceneTree
 ## `~/.local/share`, so every process at once shares one user:// and one process's clearing deletes
 ## another's files mid-test (a save written, then gone: test_intro's "the save remembers it", and
 ## test_net_play's replays, failing only among the others; found 2026-11-19). A host whose user://
-## is not under its `XDG_DATA_HOME` (`user_dir_shared`) says so once and clears nothing, so it never
-## deletes what another process is using.
+## is not under its `XDG_DATA_HOME` (`user_dir_shared`) fails the run at once, before any file and
+## before clearing anything, so it never deletes what another process is using and the runner's
+## mistake is seen (the owner, 2026-11-19: "a shared user:// should be an error, not a warning").
 
 const FreshGame := preload("res://tests/support/fresh_game.gd")
 const SuiteScript := preload("res://tests/support/suite.gd")
 
 const START: String = "SUITE START: "
 const END: String = "SUITE END: "
-
-## True when this process's user:// is shared with others (see the class doc): nothing is cleared.
-var _shared: bool = false
 
 
 func _initialize() -> void:
@@ -48,9 +46,10 @@ func _initialize() -> void:
 		quit(2)
 		return
 	var autoloads: Array[String] = _autoload_names()
-	_shared = user_dir_shared(OS.get_environment("XDG_DATA_HOME"), OS.get_user_data_dir())
-	if _shared:
-		print("WARNING: run.gd: user:// (%s) is not under XDG_DATA_HOME (%s, which Godot takes only when absolute): it is shared with every other process, so nothing in it is cleared between files." % [OS.get_user_data_dir(), OS.get_environment("XDG_DATA_HOME")])
+	if user_dir_shared(OS.get_environment("XDG_DATA_HOME"), OS.get_user_data_dir()):
+		printerr("ERROR: run.gd: user:// (%s) is not under XDG_DATA_HOME (%s; Godot takes it only when absolute): it is shared with every other process, which delete each other's files. Give each process an absolute data folder of its own; no suite runs." % [OS.get_user_data_dir(), OS.get_environment("XDG_DATA_HOME")])
+		quit(2)
+		return
 	var failed: int = 0
 	for at in files.size():
 		if at > 0:
@@ -99,8 +98,7 @@ func _fresh_game(autoloads: Array[String]) -> void:
 			child.free()
 	Engine.time_scale = 1.0
 	InputMap.load_from_project_settings()
-	if not _shared:
-		_clear_user_data("user://")
+	_clear_user_data("user://")
 	FreshGame.restart(root)
 	# As at a start: the autoloads' deferred calls run before the first test.
 	await process_frame

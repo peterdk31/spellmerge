@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the unit tests' host (tests/support/run.gd): a user:// that Godot did not put under the
 ## data folder asked for (a relative `XDG_DATA_HOME`, passed over for ~/.local/share) is known to be
-## shared, so the host clears nothing in it (regression, 2026-11-19: test_intro's save and
+## shared, so the host fails the run before any suite (the owner, 2026-11-19: an error, not a warning) (regression, 2026-11-19: test_intro's save and
 ## test_net_play's replays were deleted mid-test by other processes' clearing, only among the others).
 const RunScript := preload("res://tests/support/run.gd")
 

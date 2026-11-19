@@ -7,6 +7,6 @@
 script = ExtResource("1_script")
 id = &"coin"
 display_name = "Coins"
-description = "Shared by everyone who picks one up. Spend them in a shop."
+description = "A fallen foe's are shared by everyone. Spend them in a shop."
 icon = ExtResource("2_icon")
 

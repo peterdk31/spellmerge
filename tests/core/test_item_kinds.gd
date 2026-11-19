@@ -34,7 +34,7 @@ func test_the_currency_bag_holds_the_coins_and_the_keys() -> void:
 	check_equal(ItemKinds.kinds_in(&"currency"), [ItemKinds.COIN, ItemKinds.KEY] as Array[StringName], "the coins and the keys share the currency bag")
 	check_equal(ItemKinds.kind_in(&"currency", CoinBase.ID), ItemKinds.COIN, "the coin's id is a coin")
 	check_equal(ItemKinds.kind_in(&"currency", KeyBase.ID), ItemKinds.KEY, "the key's id is a key")
-	check(ItemKinds.stacks(ItemKinds.KEY) and not ItemKinds.can(ItemKinds.KEY, ItemKinds.DROP) and not ItemKinds.can(ItemKinds.KEY, ItemKinds.DROP_ONE), "a key is one stack, never dropped")
+	check(ItemKinds.stacks(ItemKinds.KEY) and ItemKinds.can(ItemKinds.KEY, ItemKinds.DROP), "a key is one stack, dropped (everything is droppable, the owner, 2026-11-19)")
 	var loadout := PlayerLoadout.new()
 	check(loadout.add_stack(&"currency", CoinBase.ID, 4) and loadout.add_stack(&"currency", KeyBase.ID, 2), "a loadout carries both")
 	var inventory := Inventory.new()
@@ -50,7 +50,9 @@ func test_the_currency_bag_holds_the_coins_and_the_keys() -> void:
 func test_the_owners_kinds() -> void:
 	check_equal(ItemKinds.BAGS, [&"staffs", &"cards", &"relics", &"potions", &"currency"] as Array[StringName], "Staffs, Cards, Relics, Potions, in order, then the currency")
 	check(ItemKinds.stacks(ItemKinds.CARD) and ItemKinds.stacks(ItemKinds.POTION), "cards and potions stack")
-	check(ItemKinds.stacks(ItemKinds.COIN) and not ItemKinds.can(ItemKinds.COIN, ItemKinds.DROP), "coins are one stack, never dropped")
+	check(ItemKinds.stacks(ItemKinds.COIN) and ItemKinds.can(ItemKinds.COIN, ItemKinds.DROP), "coins are one stack, dropped")
+	for kind: StringName in ItemKinds.kinds():
+		check(ItemKinds.can(kind, ItemKinds.DROP) or ItemKinds.can(kind, ItemKinds.DROP_ONE), "everything is droppable: %s" % kind)
 	check(ItemKinds.can(ItemKinds.POTION, ItemKinds.USE), "a potion is used (drunk)")
 	check(not ItemKinds.stacks(ItemKinds.STAFF) and not ItemKinds.stacks(ItemKinds.RELIC), "staffs and relics do not")
 	check(ItemKinds.can(ItemKinds.STAFF, ItemKinds.HAND) and not ItemKinds.can(ItemKinds.CARD, ItemKinds.HAND), "only a staff goes on a hand")

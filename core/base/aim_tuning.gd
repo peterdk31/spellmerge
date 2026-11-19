@@ -13,8 +13,10 @@ extends Resource
 ## - for an **elite** (connected biomes CB11): `elite_sharpness` more of the way to sharp.
 ## - by the **global knobs** `lead_scale` and `error_scale`, on top of everything (1: as above).
 ##
-## Only an enemy's aim is tuned (a brain that `warns()`): a test bot and an AI possessing a wizard
-## aim as their profile says. Pure numbers, the same on every machine.
+## Only an enemy's aim is tuned (a brain that `warns()`): a test bot aims as its profile says. An
+## enemy's AI possessing a wizard reads the wizard's body (level 1, no elite): its sloppiest. The
+## level is the room's scale, depth times the players (`RunScaling`), so more players sharpen it too.
+## Pure numbers, the same on every machine.
 
 ## The lead at level 1, a share of the profile's (1: no change with depth).
 @export_range(0.0, 1.0, 0.01) var start_lead: float = 0.3
@@ -42,6 +44,18 @@ func sharpness(level: float, elite: bool) -> float:
 ## The lead of a profile leading by `lead`, `sharp` sharp (`sharpness`), 0-1.
 func lead_for(lead: float, sharp: float) -> float:
 	return clampf(lead * lerpf(start_lead, 1.0, sharp) * lead_scale, 0.0, 1.0)
+
+
+## What is wrong with the numbers, one line each (`tests/gameplay/ai/test_ai_aim.gd` checks the file).
+func problems(what: String) -> PackedStringArray:
+	var found := PackedStringArray()
+	for row: Array in [[&"start_lead", 0.0, 1.0], [&"start_error", 1.0, 8.0], [&"elite_sharpness", 0.0, 1.0], [&"lead_scale", 0.0, 4.0], [&"error_scale", 0.0, 8.0]]:
+		var value: float = float(get(row[0]))
+		if not (value >= float(row[1]) and value <= float(row[2])):
+			found.append("%s: %s %s; %s to %s." % [what, row[0], value, row[1], row[2]])
+	if not (sharp_level > 1.0 and sharp_level <= 8.0):
+		found.append("%s: sharp_level %s; above 1, at most 8." % [what, sharp_level])
+	return found
 
 
 ## The factor on a profile's aim error, `sharp` sharp (`sharpness`).

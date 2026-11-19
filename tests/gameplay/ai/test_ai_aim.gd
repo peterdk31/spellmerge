@@ -37,7 +37,7 @@ func _enemy(profile: AIProfile, tuning: AimTuning) -> Actor:
 	fx.players[0].position = Vector2(200.0, 0.0)
 	fx.players[0].velocity = Vector2(0.0, 100.0)
 	var body: Actor = fx.staffed_enemy([["fire", "bolt"]], Vector2.ZERO, profile)
-	Fixture.ai(body).brain.aim = tuning
+	Fixture.ai(body).brain.aim_tuning = tuning
 	return body
 
 
@@ -76,6 +76,10 @@ func test_the_tuning_numbers() -> void:
 
 func test_the_shipped_tuning_starts_sloppier() -> void:
 	var tuning: AimTuning = AIBrain.AIM_TUNING
+	check_equal(tuning.problems("aim_tuning.tres"), PackedStringArray(), "the shipped numbers are in range")
+	var bad := AimTuning.new()
+	bad.sharp_level = 1.0
+	check_equal(bad.problems("bad").size(), 1, "a sharp level of 1 is named")
 	check(tuning.start_lead < 1.0 and tuning.start_error > 1.0, "early enemies lead less and err more: %s, %s" % [tuning.start_lead, tuning.start_error])
 	check_equal(tuning.lead_scale, 1.0, "the global knobs ship at 1")
 	check_equal(tuning.error_scale, 1.0, "the global knobs ship at 1")

@@ -129,7 +129,7 @@ const GROUND_MARGIN: float = 12.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the team board is
 ## Entities' (hashed there), handed over by the controller.
-const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground", &"_open_ids", &"_cover", &"aim"]
+const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_ground", &"_open_ids", &"_cover", &"aim_tuning"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"actor", &"target", &"grudge", &"plan_target", &"_target_actor", &"_turn_to"]
 
@@ -137,7 +137,7 @@ const REFS: Array[StringName] = [&"actor", &"target", &"grudge", &"plan_target",
 var actor: Actor = null
 var profile: AIProfile = null
 ## How an enemy's aim is tuned (`AimTuning`; tests set their own, otherwise `AIM_TUNING`).
-var aim: AimTuning = AIM_TUNING
+var aim_tuning: AimTuning = AIM_TUNING
 var entities: EntitiesScript = null
 ## The team board (gameplay/ai/team_board.gd), or null: staggered fire, calls, and where its
 ## teammates stand and how hurt they are (it reports itself at each decision).
@@ -1216,28 +1216,28 @@ func _aim_for(sense: CastSense, now: Vector2, error: float) -> Vector2:
 ## How sharp its aim is, 0-1 (`AimTuning.sharpness`: its room's level, an elite nearer 1); 1 for a
 ## brain that does not `warns()` (a test bot, an AI possessing a wizard), whose aim is not tuned.
 func aim_sharpness() -> float:
-	if not warns() or aim == null:
+	if not warns() or aim_tuning == null:
 		return 1.0
 	if actor == null:
-		return aim.sharpness(1.0, false)
-	return aim.sharpness(actor.room_level, actor.is_elite())
+		return aim_tuning.sharpness(1.0, false)
+	return aim_tuning.sharpness(actor.room_level, actor.is_elite())
 
 
 ## How far it aims ahead of a moving target, 0-1: its profile's `lead`, tuned (`AimTuning.lead_for`)
 ## for an enemy.
 func aim_lead() -> float:
-	if not warns() or aim == null:
+	if not warns() or aim_tuning == null:
 		return profile.lead
-	return aim.lead_for(profile.lead, aim_sharpness())
+	return aim_tuning.lead_for(profile.lead, aim_sharpness())
 
 
 ## Its widest aim error (radians, either side): `AIM_ERROR` × (1 − its profile's `accuracy`), tuned
 ## (`AimTuning.error_for`) for an enemy.
 func aim_error_most() -> float:
 	var most: float = (1.0 - profile.accuracy) * AIM_ERROR
-	if not warns() or aim == null:
+	if not warns() or aim_tuning == null:
 		return most
-	return minf(most * aim.error_for(aim_sharpness()), PI)
+	return minf(most * aim_tuning.error_for(aim_sharpness()), PI)
 
 
 ## A staff whose next cast moves the caster and can leave now, or -1.

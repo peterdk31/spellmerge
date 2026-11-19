@@ -456,4 +456,4 @@ func test_corner_walkways_bridge_rooms_too() -> void:
 		for bridge in map.bridges():
 			if String(map.bridge_templates[bridge]).begins_with("plank_corner"):
 				corners[map.bridge_mirrors[bridge]] = true
-	check_equal(corners.size(), 4, "corners placed turning every way: %s" % corners.keys())
+	check_equal(corners.size(), 4, "corners placed turning every way: %s" % [corners.keys()])

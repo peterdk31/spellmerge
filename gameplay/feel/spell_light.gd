@@ -49,7 +49,8 @@ extends Node
 ##   bodies, under the motes, beams, flashes, telegraphs and shots), drawn by
 ##   `light_apply.gdshader`: what is under it, times the room's `ambient` (`RoomBase.ambient`,
 ##   `set_ambient`, times its `shade`, the colour of its dark) plus the light, cut into the steps `bands` sets (`set_bands`: 3 steps by
-##   default, 0 smooth).
+##   default, 0 smooth). Each room's own light may lean toward its kind's light (`set_room_tints`,
+##   connected biomes CB12b: its dark and every light in it, by the room's world rectangle).
 ## - **A light buffer a view** (connected biomes CB6, docs/milestones/connected-biomes.md): while the
 ##   screen is split each view draws the world through its own transform, so each has a buffer that
 ##   follows it (`use_views`: the light buffer the first view's, then one more a view, sharing its
@@ -119,6 +120,9 @@ const SPOT_ROW_STRENGTH: int = 11
 const SPOT_ROW_GROUND: int = 14
 ## The most boxes that block light (light.gdshader's MAX_BLOCKERS).
 const MAX_BLOCKERS: int = 32
+## The most rooms whose own light the apply rect tints at once (`set_room_tints`; light_apply.gdshader's
+## MAX_TINTS): a biome's rooms at most (`MapRules.rooms_max` 32, and its start room).
+const MAX_TINTS: int = 40
 ## Whether the shots' and runes' lights are blocked too. Not: there are thousands of them, and
 ## blocking tripled the light buffer's time for 3,000 shots among a crypt room's boxes on llvmpipe
 ## (`tests/benchmark/shot_gpu.gd -- --light --blockers`); a shot's light is small and moves on, its
@@ -142,6 +146,8 @@ var apply: ColorRect = null
 var ambient: float = 1.0
 var shade: Color = Color.WHITE
 var bands: int = DEFAULT_BANDS
+## How many rooms' tints the apply rect reads (`set_room_tints`). Read only.
+var tint_count: int = 0
 var _projectiles: ProjectileManagerScript = null
 var _quad: QuadMesh = null
 static var _beam_mesh: ArrayMesh = null
@@ -483,6 +489,19 @@ func set_ambient(to: float, dark: Color = Color.WHITE) -> void:
 	var material := apply.material as ShaderMaterial
 	material.set_shader_parameter(&"ambient", ambient)
 	material.set_shader_parameter(&"shade", Vector3(shade.r, shade.g, shade.b))
+
+
+## Each room's own light tinted by its kind (connected biomes CB12b, gameplay/feel/room_tints.gd):
+## `count` rooms of `rects` (each a world rectangle: x0, y0, x1, y1) and `tints` (each the hue its
+## light leans toward, and how far), MAX_TINTS long each; a world pixel in a room's rectangle has its
+## dark and the light on it lean toward its hue (`light_apply.gdshader`). This node knows nothing of
+## rooms. Set only when a tint changes.
+func set_room_tints(rects: PackedVector4Array, tints: PackedVector4Array, count: int) -> void:
+	tint_count = clampi(count, 0, mini(MAX_TINTS, mini(rects.size(), tints.size())))
+	var material := apply.material as ShaderMaterial
+	material.set_shader_parameter(&"tint_rects", rects)
+	material.set_shader_parameter(&"tint_hues", tints)
+	material.set_shader_parameter(&"tint_count", tint_count)
 
 
 ## The carried lights this frame: `count` spot rows (ROWS_SPOT, STRIDE floats each) of `rows`,

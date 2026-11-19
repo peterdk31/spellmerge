@@ -425,7 +425,7 @@ Two changes the owner decided on 2026-11-19.
 
 ### Open questions for the owner
 
-1. **Keys are never dropped** (like coins): a wizard cannot hand a key to another. Should a key be droppable from the inventory (X), so a player can give one to a teammate?
+1. *Answered by the owner, 2026-11-19: "Everything is droppable" ("Everything is droppable", below).* ~~Keys are never dropped (like coins): should a key be droppable from the inventory (X)?~~
 2. **A downed wizard's keys** stay in its bag; a key taken by a possessed foe stays in the foe's bag when the possession ends (and is lost when it dies). Should a foe drop the keys it carries as it dies, as it drops its coins by chance?
 
 ## Follow-ups done, second part (2026-11-19)
@@ -444,7 +444,7 @@ The owner, 2026-11-19: "Everything is droppable."
 
 - **Coins and keys drop** from the inventory as any item (`ItemKinds.RULES`: both DROP): X in the currency bag lays **one copy** of the coin or the key pointed at (as a potion; a stack is never dropped whole), through the Items area (`item_drop_requested`), as a ground item another body takes with A into its own currency bag (`PickupRule`). A key so dropped opens a treasure door for whoever holds it, as any key.
 - **No coin is made by a drop:** a coin a player drops is taken by the one body that takes it (an Items ground item, not a Rewards floor coin: no shared income). The coins a foe dies with keep the shared rule (each laid as a Rewards coin, every player gaining one when one is taken), and a boss's go to everyone, but only the coins the foe came carrying and held all along (`Inventory.carried_kept`: the carried count, lowered whenever it held fewer, never raised by what it takes later). A possessed foe that took a player's dropped coin dies with it unshared, so the coin goes with the body, as its keys do (as built). *Open question for the owner:* whether such a coin should rather drop as an item where it fell.
-- **Tests:** `tests/gameplay/items/test_drop_currency.gd` (a key and coins dropped by one wizard and taken by another, one copy a drop; a dropped coin never shared; a possessed foe's taken coin never shared on its death; the carried count kept through a snapshot; the same state hash twice), `tests/hud/test_inventory_menu.gd` (X drops one coin and one key from the currency bag).
+- **Tests:** `tests/gameplay/items/test_items.gd` (a key and coins dropped by one wizard and taken by another, one copy a drop, none made; a dropped coin lying through a snapshot), `tests/gameplay/rewards/test_rewards.gd` (a possessed foe's taken coin never shared on its death, a boss's only its own, the count held all along hashed and snapshotted), `tests/gameplay/player/test_player_potions.gd` and `tests/core/test_item_kinds.gd` (one coin a drop; every kind droppable), `tests/hud/test_inventory_menu.gd` (X drops one coin and one key from the currency bag).
 
 ## Answered by the owner (2026-11-18)
 

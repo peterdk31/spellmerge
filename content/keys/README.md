@@ -1,6 +1,6 @@
 # content/keys: the key
 
-Keys are a stacked inventory item beside the coins, in the currency bag (the owner, 2026-11-19: "Keys are also just inventory items, right? I think they should go in a currency bag (along with coins). They should not be 'global', but each player picks up keys individually and uses them individually"). There is one key, `key/key.tres` (a `KeyBase`, `core/base/key_base.gd`; its id `KeyBase.ID`), found by the registry under `keys` (`ItemKinds.KEY`'s row). Flow's `LockDoors` (gameplay/flow) puts a key lying on the floor into the bag of the body that reaches it, and a treasure room's door spends one from the bag of the body at it. A key is never dropped.
+Keys are a stacked inventory item beside the coins, in the currency bag (the owner, 2026-11-19: "Keys are also just inventory items, right? I think they should go in a currency bag (along with coins). They should not be 'global', but each player picks up keys individually and uses them individually"). There is one key, `key/key.tres` (a `KeyBase`, `core/base/key_base.gd`; its id `KeyBase.ID`), found by the registry under `keys` (`ItemKinds.KEY`'s row). Flow's `LockDoors` (gameplay/flow) puts a key lying on the floor into the bag of the body that reaches it, and a treasure room's door spends one from the bag of the body at it. A key is dropped from the inventory one at a time (X) as any item, and taken with A into the taker's own bag (the owner, 2026-11-19: "Everything is droppable").
 
 ## Contract
 

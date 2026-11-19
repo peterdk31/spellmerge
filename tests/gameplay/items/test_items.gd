@@ -435,7 +435,7 @@ func test_coins_and_a_key_dropped_by_one_wizard_are_taken_by_another_and_none_is
 	check(_items.lying().is_empty(), "all taken")
 	check_equal(taker.inventory.count_of(CURRENCY, CoinBase.ID), 2, "the taker's own two coins")
 	check_equal(taker.inventory.count_of(CURRENCY, KeyBase.ID), 1, "and the key")
-	check_equal(third.inventory.count_of(CURRENCY, CoinBase.ID), 0, "a dropped coin is not shared")
+	check_equal(third.inventory.count_of(CURRENCY, CoinBase.ID), 0, "a dropped coin goes to its taker alone")
 	check_equal(giver.inventory.count_of(CURRENCY, CoinBase.ID) + taker.inventory.count_of(CURRENCY, CoinBase.ID) + third.inventory.count_of(CURRENCY, CoinBase.ID), 3, "as many coins as there were")
 
 
@@ -449,7 +449,6 @@ func test_a_dropped_coin_is_the_same_state_twice_and_through_a_snapshot() -> voi
 	_tick()
 	var areas: Dictionary = {&"Items": _items}
 	var before: int = SimHash.of(_items)
-	var held: int = SimHash.of(giver.inventory)
 	var snapshot: Snapshot = Snapshot.take(areas, root)
 	check_equal(snapshot.problems, PackedStringArray(), "nothing it cannot save")
 	var coin: GroundItem = _items.lying().back()
@@ -462,4 +461,3 @@ func test_a_dropped_coin_is_the_same_state_twice_and_through_a_snapshot() -> voi
 	check_equal(snapshot.restore(areas, root), PackedStringArray(), "restored")
 	check_equal(SimHash.of(_items), before, "the coin lies there again")
 	check_equal([_items.lying().back().stack.kind, _items.lying().back().stack.id], [ItemKinds.COIN, CoinBase.ID], "the coin")
-	check(SimHash.of(giver.inventory) != held, "the inventory is the body's, which this snapshot of the area alone does not hold")

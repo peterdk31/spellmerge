@@ -100,7 +100,7 @@ const NO_ITEM: String = "You do not have that."
 ## Why the inventory's use of a thing is refused (`bag_use_requested`): it is no potion, or a potion
 ## that only heals while the body is whole.
 const NO_USE: String = "That cannot be used."
-## Why a drop of a kind that is never dropped (the coins) is refused.
+## Why a drop of a kind that is never dropped (none today: everything is, the owner, 2026-11-19) is refused.
 const NO_DROP: String = "That cannot be dropped."
 const NO_NEED: String = "You are already whole."
 ## Why every request of the builder's and the inventory's is refused while the home body is down

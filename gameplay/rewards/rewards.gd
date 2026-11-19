@@ -468,7 +468,7 @@ func _on_enemy_died(_killer: int, enemy: Node, position: Vector2, _shot: int) ->
 	# Only the coins it came carrying and held all along are shared (the owner, 2026-11-19: everything
 	# is droppable): a coin a player dropped, taken by a possessed foe, is not made into one a player
 	# then, so dropping never makes coins. Those go with the body, as its keys.
-	var carried: int = mini(_coins_in(body), body.inventory.carried_kept()) if body.inventory != null else 0
+	var carried: int = body.inventory.carried_kept() if body.inventory != null else 0
 	if carried <= 0:
 		return
 	if body.data.boss:

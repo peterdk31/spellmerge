@@ -172,6 +172,8 @@ func take_loadout(loadout: PlayerLoadout, registry: Node) -> void:
 	_staffs_given = true
 	_hands.fill(null)
 	_next_number = HANDS
+	# What it carried from the start is gone with the bags (`carried_kept`: 0 from now on).
+	_carried_kept = 0
 	for bag: StringName in _bags:
 		_stacks(bag).clear()
 	for bag: StringName in loadout.bags():

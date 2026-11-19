@@ -1,0 +1,78 @@
+{
+	"about": "The crypt's Long gallery (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark a long gallery of four sarcophagi in two rows, two pillars down its middle, candles burning along it. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, east, north, south) by pins. tools/ground_shape.py draws arena_11_ground.tscn and its art from this.",
+	"size": [
+		896,
+		384
+	],
+	"seed": 117,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [
+			10,
+			14
+		],
+		"rough": [
+			46,
+			17,
+			6
+		],
+		"seed": 5,
+		"pins": [
+			[
+				0,
+				160,
+				40,
+				224
+			],
+			[
+				856,
+				160,
+				896,
+				224
+			],
+			[
+				416,
+				0,
+				480,
+				40
+			],
+			[
+				416,
+				344,
+				480,
+				384
+			]
+		],
+		"bays": [
+			[
+				196,
+				36,
+				20
+			],
+			[
+				700,
+				348,
+				22
+			],
+			[
+				312,
+				348,
+				20
+			]
+		],
+		"clear": {
+			"round": 28,
+			"of": [
+				"PlayerSpawns",
+				"EnemySpawns",
+				"Props",
+				"Decor"
+			]
+		}
+	}
+}

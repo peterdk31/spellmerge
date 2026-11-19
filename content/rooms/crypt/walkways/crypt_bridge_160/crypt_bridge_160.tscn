@@ -1,0 +1,38 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/void.svg" id="1_void"]
+[ext_resource type="PackedScene" path="res://content/rooms/crypt/walkways/crypt_bridge_160/crypt_bridge_160_ground.tscn" id="2_ground"]
+[ext_resource type="Script" path="res://core/base/room_socket.gd" id="3_socket"]
+[ext_resource type="Script" path="res://tools/socket_preview.gd" id="cb_socket_preview"]
+[ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
+
+[node name="CryptBridge160" type="Node2D"]
+
+[node name="Void" type="Sprite2D" parent="."]
+z_index = -3
+texture_filter = 1
+texture_repeat = 2
+texture = ExtResource("1_void")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 160, 128)
+
+[node name="Floor" parent="." instance=ExtResource("2_ground")]
+
+[node name="Sockets" type="Node2D" parent="."]
+
+[node name="West" type="Node2D" parent="Sockets"]
+position = Vector2(0, 64)
+script = ExtResource("3_socket")
+facing = 3
+
+[node name="East" type="Node2D" parent="Sockets"]
+position = Vector2(160, 64)
+script = ExtResource("3_socket")
+facing = 1
+
+[node name="SocketPreview" type="Node2D" parent="."]
+script = ExtResource("cb_socket_preview")
+
+[node name="CoverPreview" type="Node2D" parent="."]
+script = ExtResource("gc_preview")

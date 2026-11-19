@@ -1,0 +1,70 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Texture2D" path="res://art/grounds/crypt_corner_384x256/crypt_corner_384x256_ground_floor.png" id="1_floor"]
+[ext_resource type="Texture2D" path="res://art/grounds/crypt_corner_384x256/crypt_corner_384x256_ground_under.png" id="2_under"]
+[ext_resource type="Texture2D" path="res://art/grounds/crypt_corner_384x256/crypt_corner_384x256_ground_glow.png" id="3_glow"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="4_motes"]
+
+[sub_resource type="CanvasItemMaterial" id="GlowAdd"]
+blend_mode = 1
+
+[sub_resource type="Resource" id="MoteSource_rim1"]
+script = ExtResource("4_motes")
+kind = &"pit_dust"
+rate = 34.2
+from = 1
+colours = Array[StringName]([&"stone", &"bone"])
+
+[sub_resource type="RectangleShape2D" id="Box_32x224"]
+size = Vector2(32, 224)
+
+[sub_resource type="RectangleShape2D" id="Box_288x160"]
+size = Vector2(288, 160)
+
+[sub_resource type="RectangleShape2D" id="Box_384x32"]
+size = Vector2(384, 32)
+
+[node name="Floor" type="Sprite2D"]
+z_index = -2
+texture_filter = 1
+texture = ExtResource("1_floor")
+centered = false
+metadata/ground_inputs = "a11159bae04da0f2"
+
+[node name="Glow" type="Sprite2D" parent="."]
+material = SubResource("GlowAdd")
+z_as_relative = false
+z_index = -1
+texture_filter = 2
+scale = Vector2(2, 2)
+texture = ExtResource("3_glow")
+centered = false
+
+[node name="Walls" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Underside" type="Sprite2D" parent="Walls"]
+z_as_relative = false
+z_index = -2
+texture_filter = 1
+texture = ExtResource("2_under")
+centered = false
+
+[node name="W1" type="CollisionShape2D" parent="Walls"]
+position = Vector2(144, 80)
+shape = SubResource("Box_288x160")
+
+[node name="W2" type="CollisionShape2D" parent="Walls"]
+position = Vector2(368, 112)
+shape = SubResource("Box_32x224")
+
+[node name="W3" type="CollisionShape2D" parent="Walls"]
+position = Vector2(192, 240)
+shape = SubResource("Box_384x32")
+
+[node name="Rim" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+closed = true
+points = PackedVector2Array(288.5, 0.5, 294.5, 0.5, 300.5, 0.5, 306.5, 0.5, 312.5, 0.5, 318.5, 0.5, 324.5, 0.5, 330.5, 0.5, 336.5, 0.5, 342.5, 0.5, 348.5, 0.5, 351.5, 3.5, 351.5, 9.5, 351.5, 15.5, 351.5, 21.5, 351.5, 27.5, 351.5, 33.5, 351.5, 39.5, 351.5, 45.5, 351.5, 51.5, 351.5, 57.5, 351.5, 63.5, 351.5, 69.5, 351.5, 75.5, 351.5, 81.5, 351.5, 87.5, 351.5, 93.5, 351.5, 99.5, 351.5, 105.5, 351.5, 111.5, 351.5, 117.5, 351.5, 123.5, 351.5, 129.5, 351.5, 135.5, 351.5, 141.5, 351.5, 147.5, 351.5, 153.5, 351.5, 159.5, 351.5, 165.5, 351.5, 171.5, 351.5, 177.5, 351.5, 183.5, 351.5, 189.5, 351.5, 195.5, 351.5, 201.5, 351.5, 207.5, 351.5, 213.5, 351.5, 219.5, 349.5, 223.5, 343.5, 223.5, 337.5, 223.5, 331.5, 223.5, 325.5, 223.5, 319.5, 223.5, 313.5, 223.5, 307.5, 223.5, 301.5, 223.5, 295.5, 223.5, 289.5, 223.5, 283.5, 223.5, 277.5, 223.5, 271.5, 223.5, 265.5, 223.5, 259.5, 223.5, 253.5, 223.5, 247.5, 223.5, 241.5, 223.5, 235.5, 223.5, 229.5, 223.5, 223.5, 223.5, 217.5, 223.5, 211.5, 223.5, 205.5, 223.5, 199.5, 223.5, 193.5, 223.5, 187.5, 223.5, 181.5, 223.5, 175.5, 223.5, 169.5, 223.5, 163.5, 223.5, 157.5, 223.5, 151.5, 223.5, 145.5, 223.5, 139.5, 223.5, 133.5, 223.5, 127.5, 223.5, 121.5, 223.5, 115.5, 223.5, 109.5, 223.5, 103.5, 223.5, 97.5, 223.5, 91.5, 223.5, 85.5, 223.5, 79.5, 223.5, 73.5, 223.5, 67.5, 223.5, 61.5, 223.5, 55.5, 223.5, 49.5, 223.5, 43.5, 223.5, 37.5, 223.5, 31.5, 223.5, 25.5, 223.5, 19.5, 223.5, 13.5, 223.5, 7.5, 223.5, 1.5, 223.5, 0.5, 218.5, 0.5, 212.5, 0.5, 206.5, 0.5, 200.5, 0.5, 194.5, 0.5, 188.5, 0.5, 182.5, 0.5, 176.5, 0.5, 170.5, 0.5, 164.5, 2.5, 160.5, 8.5, 160.5, 14.5, 160.5, 20.5, 160.5, 26.5, 160.5, 32.5, 160.5, 38.5, 160.5, 44.5, 160.5, 50.5, 160.5, 56.5, 160.5, 62.5, 160.5, 68.5, 160.5, 74.5, 160.5, 80.5, 160.5, 86.5, 160.5, 92.5, 160.5, 98.5, 160.5, 104.5, 160.5, 110.5, 160.5, 116.5, 160.5, 122.5, 160.5, 128.5, 160.5, 134.5, 160.5, 140.5, 160.5, 146.5, 160.5, 152.5, 160.5, 158.5, 160.5, 164.5, 160.5, 170.5, 160.5, 176.5, 160.5, 182.5, 160.5, 188.5, 160.5, 194.5, 160.5, 200.5, 160.5, 206.5, 160.5, 212.5, 160.5, 218.5, 160.5, 224.5, 160.5, 230.5, 160.5, 236.5, 160.5, 242.5, 160.5, 248.5, 160.5, 254.5, 160.5, 260.5, 160.5, 266.5, 160.5, 272.5, 160.5, 278.5, 160.5, 284.5, 160.5, 288.5, 157.5, 288.5, 151.5, 288.5, 145.5, 288.5, 139.5, 288.5, 133.5, 288.5, 127.5, 288.5, 121.5, 288.5, 115.5, 288.5, 109.5, 288.5, 103.5, 288.5, 97.5, 288.5, 91.5, 288.5, 85.5, 288.5, 79.5, 288.5, 73.5, 288.5, 67.5, 288.5, 61.5, 288.5, 55.5, 288.5, 49.5, 288.5, 43.5, 288.5, 37.5, 288.5, 31.5, 288.5, 25.5, 288.5, 19.5, 288.5, 13.5, 288.5, 7.5, 288.5, 1.5)
+metadata/mote_source = SubResource("MoteSource_rim1")

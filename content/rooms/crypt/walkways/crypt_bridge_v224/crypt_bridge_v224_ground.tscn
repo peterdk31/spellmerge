@@ -1,0 +1,60 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Texture2D" path="res://art/grounds/crypt_bridge_v224/crypt_bridge_v224_ground_floor.png" id="1_floor"]
+[ext_resource type="Texture2D" path="res://art/grounds/crypt_bridge_v224/crypt_bridge_v224_ground_under.png" id="2_under"]
+[ext_resource type="Texture2D" path="res://art/grounds/crypt_bridge_v224/crypt_bridge_v224_ground_glow.png" id="3_glow"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="4_motes"]
+
+[sub_resource type="CanvasItemMaterial" id="GlowAdd"]
+blend_mode = 1
+
+[sub_resource type="Resource" id="MoteSource_rim1"]
+script = ExtResource("4_motes")
+kind = &"pit_dust"
+rate = 17.0
+from = 1
+colours = Array[StringName]([&"stone", &"bone"])
+
+[sub_resource type="RectangleShape2D" id="Box_32x224"]
+size = Vector2(32, 224)
+
+[node name="Floor" type="Sprite2D"]
+z_index = -2
+texture_filter = 1
+texture = ExtResource("1_floor")
+centered = false
+metadata/ground_inputs = "09db519f53bf5cf3"
+
+[node name="Glow" type="Sprite2D" parent="."]
+material = SubResource("GlowAdd")
+z_as_relative = false
+z_index = -1
+texture_filter = 2
+scale = Vector2(2, 2)
+texture = ExtResource("3_glow")
+centered = false
+
+[node name="Walls" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Underside" type="Sprite2D" parent="Walls"]
+z_as_relative = false
+z_index = -2
+texture_filter = 1
+texture = ExtResource("2_under")
+centered = false
+
+[node name="W1" type="CollisionShape2D" parent="Walls"]
+position = Vector2(16, 112)
+shape = SubResource("Box_32x224")
+
+[node name="W2" type="CollisionShape2D" parent="Walls"]
+position = Vector2(112, 112)
+shape = SubResource("Box_32x224")
+
+[node name="Rim" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+closed = true
+points = PackedVector2Array(32.5, 0.5, 38.5, 0.5, 44.5, 0.5, 50.5, 0.5, 56.5, 0.5, 62.5, 0.5, 68.5, 0.5, 74.5, 0.5, 80.5, 0.5, 86.5, 0.5, 92.5, 0.5, 95.5, 3.5, 95.5, 9.5, 95.5, 15.5, 95.5, 21.5, 95.5, 27.5, 95.5, 33.5, 95.5, 39.5, 95.5, 45.5, 95.5, 51.5, 95.5, 57.5, 95.5, 63.5, 95.5, 69.5, 95.5, 75.5, 95.5, 81.5, 95.5, 87.5, 95.5, 93.5, 95.5, 99.5, 95.5, 105.5, 95.5, 111.5, 95.5, 117.5, 95.5, 123.5, 95.5, 129.5, 95.5, 135.5, 95.5, 141.5, 95.5, 147.5, 95.5, 153.5, 95.5, 159.5, 95.5, 165.5, 95.5, 171.5, 95.5, 177.5, 95.5, 183.5, 95.5, 189.5, 95.5, 195.5, 95.5, 201.5, 95.5, 207.5, 95.5, 213.5, 95.5, 219.5, 93.5, 223.5, 87.5, 223.5, 81.5, 223.5, 75.5, 223.5, 69.5, 223.5, 63.5, 223.5, 57.5, 223.5, 51.5, 223.5, 45.5, 223.5, 39.5, 223.5, 33.5, 223.5, 32.5, 218.5, 32.5, 212.5, 32.5, 206.5, 32.5, 200.5, 32.5, 194.5, 32.5, 188.5, 32.5, 182.5, 32.5, 176.5, 32.5, 170.5, 32.5, 164.5, 32.5, 158.5, 32.5, 152.5, 32.5, 146.5, 32.5, 140.5, 32.5, 134.5, 32.5, 128.5, 32.5, 122.5, 32.5, 116.5, 32.5, 110.5, 32.5, 104.5, 32.5, 98.5, 32.5, 92.5, 32.5, 86.5, 32.5, 80.5, 32.5, 74.5, 32.5, 68.5, 32.5, 62.5, 32.5, 56.5, 32.5, 50.5, 32.5, 44.5, 32.5, 38.5, 32.5, 32.5, 32.5, 26.5, 32.5, 20.5, 32.5, 14.5, 32.5, 8.5, 32.5, 2.5)
+metadata/mote_source = SubResource("MoteSource_rim1")

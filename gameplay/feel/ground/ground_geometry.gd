@@ -77,8 +77,15 @@ func _init(shape_data: Dictionary, placed: PackedFloat64Array = PackedFloat64Arr
 			_crack(spec)
 
 
-## An outline's points, clockwise on screen: a wavy, rough oval (`outline_points`), x then y.
+## An outline's points, clockwise on screen: a wavy, rough oval (`outline_points`), x then y; or a
+## polygon, its corners in `points`, taken as they are (a walkway's turn, connected biomes CB13).
 static func outline_points(spec: Dictionary, step: float = 2.0) -> PackedFloat64Array:
+	if spec.has("points"):
+		var corners := PackedFloat64Array()
+		for corner: Array in spec["points"]:
+			corners.append(float(corner[0]))
+			corners.append(float(corner[1]))
+		return corners
 	var centre: Array = spec["centre"]
 	var radii: Array = spec["radii"]
 	var cx: float = float(centre[0])

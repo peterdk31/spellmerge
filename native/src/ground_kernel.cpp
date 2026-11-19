@@ -188,6 +188,17 @@ constexpr int64_t WAY_Y[4] = { 0, 0, 1, -1 };
 // -- GroundGeometry --
 
 std::vector<double> outline_points(const Dictionary &spec, double step = 2.0) {
+	// A polygon, its corners in `points`, taken as they are (a walkway's turn, connected biomes CB13).
+	if (spec.has("points")) {
+		const Array corners = arr(spec, "points");
+		std::vector<double> points;
+		for (int64_t i = 0; i < corners.size(); i++) {
+			const Array corner = corners[i];
+			points.push_back(at(corner, 0));
+			points.push_back(at(corner, 1));
+		}
+		return points;
+	}
 	const Array centre = arr(spec, "centre");
 	const Array radii = arr(spec, "radii");
 	const double cx = at(centre, 0), cy = at(centre, 1), rx = at(radii, 0), ry = at(radii, 1);

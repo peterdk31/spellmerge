@@ -1,0 +1,83 @@
+{
+	"about": "The crypt's Pillar forest (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark a forest of nine pillars in three rows, some cracked, where a shot finds cover and a dash finds a way. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, north, east, south) by pins. tools/ground_shape.py draws arena_09_ground.tscn and its art from this.",
+	"size": [
+		768,
+		576
+	],
+	"seed": 95,
+	"edge": "crypt_edge",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [
+			10,
+			14
+		],
+		"rough": [
+			46,
+			17,
+			6
+		],
+		"seed": 6,
+		"pins": [
+			[
+				0,
+				256,
+				40,
+				320
+			],
+			[
+				352,
+				0,
+				416,
+				40
+			],
+			[
+				728,
+				256,
+				768,
+				320
+			],
+			[
+				352,
+				536,
+				416,
+				576
+			]
+		],
+		"bays": [
+			[
+				168,
+				36,
+				18
+			],
+			[
+				600,
+				540,
+				20
+			],
+			[
+				36,
+				416,
+				22
+			],
+			[
+				732,
+				160,
+				19
+			]
+		],
+		"clear": {
+			"round": 28,
+			"of": [
+				"PlayerSpawns",
+				"EnemySpawns",
+				"Props",
+				"Decor"
+			]
+		}
+	}
+}

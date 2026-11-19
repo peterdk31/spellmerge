@@ -91,6 +91,11 @@ func test_the_gdscript_drawing_is_the_baked_art() -> void:
 	var room: Dictionary = {"id": antechamber.id, "shape": antechamber.ground_shape.data, "scene": antechamber.scene}
 	var spec: Dictionary = _spec(room["shape"], room["scene"])
 	_check_baked(room, spec, ShapeScript.draw(spec, false))
+	# A corner walkway (connected biomes CB13): its outline a polygon (`points`) and an area of one.
+	var corner: RoomBase = _registry().get_resource(ROOMS, &"crypt_corner_256x384")
+	var turn: Dictionary = {"id": corner.id, "shape": corner.ground_shape.data, "scene": corner.scene}
+	var turn_spec: Dictionary = _spec(turn["shape"], turn["scene"])
+	_check_baked(turn, turn_spec, ShapeScript.draw(turn_spec, false))
 
 
 ## `art` against the baked art of `room`: each image, and the rims' and drips' lines.
@@ -178,6 +183,10 @@ func test_the_native_drawing_is_the_gdscript_in_every_mirroring() -> void:
 	# A room with pits, cracks from them and two edge styles, mirrored both ways.
 	var room: RoomBase = _registry().get_resource(ROOMS, &"arena_02")
 	_check_twins("arena_02 (1, 1)", _spec(room.ground_shape.data, room.scene, Vector2i(1, 1)))
+	# A corner walkway's polygon outline and area (connected biomes CB13), in every mirroring.
+	var corner: RoomBase = _registry().get_resource(ROOMS, &"crypt_corner_256x384")
+	for mirror: Vector2i in [Vector2i.ZERO] + MIRRORINGS:
+		_check_twins("crypt_corner_256x384 %s" % mirror, _spec(corner.ground_shape.data, corner.scene, mirror))
 
 
 func _check_twins(what: String, spec: Dictionary) -> void:
@@ -193,7 +202,7 @@ func _check_twins(what: String, spec: Dictionary) -> void:
 			check(same, "%s: the native %s are the GDScript's" % [what, key])
 		else:
 			check(native[key] == plain[key], "%s: the native %s is the GDScript's" % [what, key])
-	check(not (plain["wall"] as PackedByteArray).is_empty() or what.begins_with("island") or what.begins_with("arena"), "%s: a hall's walls are drawn" % what)
+	check(not (plain["wall"] as PackedByteArray).is_empty() or what.begins_with("island") or what.begins_with("arena") or what.begins_with("crypt"), "%s: a hall's walls are drawn" % what)
 	check(not (plain["drips"] as Array).is_empty() or not what.begins_with("island"), "%s: an island's rock face drips" % what)
 
 

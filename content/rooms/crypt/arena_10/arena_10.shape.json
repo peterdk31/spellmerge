@@ -1,0 +1,117 @@
+{
+	"about": "The crypt's Sunken chapel (docs/milestones/connected-biomes.md, CB13): a fight room, a floating slab of the crypt's flagstones; its landmark the chapel's apse sunk into the dark, a pit at its north end, two sarcophagi standing before it as pews. Its edge a broken lip (crypt_edge) and an invisible wall (its void a wall), held straight under its sockets (west, east, north) by pins. tools/ground_shape.py draws arena_10_ground.tscn and its art from this.",
+	"size": [
+		640,
+		512
+	],
+	"seed": 106,
+	"edge": "crypt_edge",
+	"pit_edge": "crypt_pit",
+	"ground": "flagstone",
+	"void": "wall",
+	"keep_clear_round": 28,
+	"frame": {
+		"inset": 32,
+		"corner": 40,
+		"wander": [
+			10,
+			14
+		],
+		"rough": [
+			46,
+			17,
+			6
+		],
+		"seed": 17,
+		"pins": [
+			[
+				0,
+				288,
+				40,
+				352
+			],
+			[
+				600,
+				288,
+				640,
+				352
+			],
+			[
+				288,
+				0,
+				352,
+				40
+			]
+		],
+		"bays": [
+			[
+				140,
+				36,
+				19
+			],
+			[
+				500,
+				476,
+				21
+			],
+			[
+				604,
+				144,
+				20
+			],
+			[
+				224,
+				476,
+				19
+			]
+		],
+		"clear": {
+			"round": 28,
+			"of": [
+				"PlayerSpawns",
+				"EnemySpawns",
+				"Props",
+				"Decor"
+			]
+		}
+	},
+	"pits": [
+		{
+			"centre": [
+				320,
+				176
+			],
+			"radii": [
+				52,
+				24
+			],
+			"rough": [
+				[
+					30,
+					0.12
+				],
+				[
+					10,
+					0.05
+				]
+			],
+			"seed": 23
+		}
+	],
+	"cracks": [
+		{
+			"pit": 0,
+			"angle": 0.0,
+			"width": 6,
+			"length": 60,
+			"seed": 2
+		},
+		{
+			"pit": 0,
+			"angle": 0.5,
+			"width": 5,
+			"length": 60,
+			"seed": 6
+		}
+	]
+}

@@ -1626,6 +1626,7 @@ func _on_adds_requested(actor: int, entry: EnemyAdds, key: int, wave: bool) -> v
 		# An add spawns in as the room's enemies do (enemy spawning, the owner's question 3).
 		var add: Actor = _stand_enemy(world, data, at, not data.boss)
 		if add != null:
+			add.is_add = true
 			adds.track(add, caller, key)
 
 

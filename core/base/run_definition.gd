@@ -81,6 +81,17 @@ func changed_by(unlocks: RunUnlocks) -> RunDefinition:
 	return made
 
 
+## The changes of the run stats a run of it plays with `unlocks` (connected biomes CB10,
+## `RunStats`): each rule change of the `RUN_STAT` target whose flag they hold, in order. Empty
+## with none.
+func stat_changes_by(unlocks: RunUnlocks) -> Array[StatChange]:
+	var made: Array[StatChange] = []
+	for change: RunRuleChange in changes:
+		if change != null and change.is_stat_target() and unlocks != null and unlocks.has(change.flag):
+			made.append(change.as_stat_change())
+	return made
+
+
 ## A copy of its own, down to every biome's rules, their kind rules and the scaling's curves (the
 ## changes are shared: read-only), so changing it changes nothing else.
 func copied() -> RunDefinition:

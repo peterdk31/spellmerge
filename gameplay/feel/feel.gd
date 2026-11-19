@@ -127,6 +127,7 @@ const AltarCodeScript := preload("res://gameplay/feel/altar_code.gd")
 const ExitSignsScript := preload("res://gameplay/feel/exit_signs.gd")
 const GatherDoorLooksScript := preload("res://gameplay/feel/gather_door_looks.gd")
 const GroundItemsScript := preload("res://gameplay/feel/ground_items.gd")
+const CoinsScript := preload("res://gameplay/feel/coins.gd")
 const AwayBarsScript := preload("res://gameplay/feel/away_bars.gd")
 const CoverScript := preload("res://gameplay/feel/cover.gd")
 const CoverRoomsScript := preload("res://gameplay/feel/cover_rooms.gd")
@@ -514,6 +515,8 @@ var _exit_signs: ExitSignsScript = null
 var _gather_doors: GatherDoorLooksScript = null
 ## The items on the ground (`ground_items.gd`, items I6).
 var _ground_items: GroundItemsScript = null
+## The coins on the floor (`coins.gd`, connected biomes CB10).
+var _coins: CoinsScript = null
 ## The health bars over wizards whose seat drives another body (`away_bars.gd`, items I8).
 var _away_bars: AwayBarsScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
@@ -845,6 +848,10 @@ func _ready() -> void:
 	_ground_items.name = "GroundItems"
 	add_child(_ground_items)
 	_ground_items.bind(events)
+	_coins = CoinsScript.new()
+	_coins.name = "Coins"
+	add_child(_coins)
+	_coins.bind(events)
 	_away_bars = AwayBarsScript.new()
 	_away_bars.name = "AwayBars"
 	add_child(_away_bars)
@@ -2351,6 +2358,11 @@ func damage_numbers() -> DamageNumberDrawerScript:
 ## The items on the ground's look (for tests).
 func ground_items() -> GroundItemsScript:
 	return _ground_items
+
+
+## The coins on the floor's look (for tests).
+func coins() -> CoinsScript:
+	return _coins
 
 
 ## The name for people of the room kind `kind` (`RoomKind.shown_name`), from the registry; its id in

@@ -30,13 +30,14 @@ const HAND: StringName = &"hand"
 const USE: StringName = &"use"
 
 ## One row a kind (see the class doc). A premade staff (`StaffItem`, `items`) is a staff of the
-## `wizard` folder with its cards, so a stack's id is always its content's. Relics and potions do
-## nothing yet, and their bags stay empty: with no class of their own (`type` a plain Resource)
-## nothing is one of them on the ground (`stack_of`).
+## `wizard` folder with its cards, so a stack's id is always its content's. A relic is a
+## `RelicBase` (connected biomes CB10: its run stat changes, `RunStats`; no relic file exists yet).
+## Potions do nothing yet, and their bag stays empty: with no class of its own (`type` a plain
+## Resource) nothing is one of them on the ground (`stack_of`).
 const RULES: Dictionary = {
 	&"staff": {"bag": &"staffs", "stacks": false, "content": [&"wizard"], "type": &"StaffBase", "actions": [&"drop", &"hand"], "premade": [&"items"]},
 	&"card": {"bag": &"cards", "stacks": true, "content": [&"spells"], "type": &"SpellComponent", "actions": [&"drop_one"], "premade": []},
-	&"relic": {"bag": &"relics", "stacks": false, "content": [&"relics"], "type": &"Resource", "actions": [&"drop"], "premade": []},
+	&"relic": {"bag": &"relics", "stacks": false, "content": [&"relics"], "type": &"RelicBase", "actions": [&"drop"], "premade": []},
 	&"potion": {"bag": &"potions", "stacks": true, "content": [], "type": &"Resource", "actions": [&"drop", &"use"], "premade": []},
 }
 ## The class of a kind with none of its own yet.

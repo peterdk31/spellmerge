@@ -27,13 +27,7 @@ func want(brain: AIBrain) -> float:
 	var near: float = brain.band_min * (1.0 - press_on)
 	for at in brain.staff_count:
 		var sense: CastSense = brain.senses[at]
-		if sense == null or sense.empty or not sense.harms() or brain.holding[at] != 0:
-			continue
-		if not brain.reaches(sense):
-			continue
-		if sense.blast_on_caster or (sense.blast > 0.0 and not sense.moves_caster and brain.distance < sense.blast + BLAST_MARGIN):
-			continue
-		if sense.reach > 0.0 and not brain.line_clear:
+		if not brain.can_fire(sense, at, BLAST_MARGIN):
 			continue
 		if brain.ready[at] == 0:
 			if waiting < 0:

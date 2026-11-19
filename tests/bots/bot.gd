@@ -15,7 +15,9 @@ extends FrameSource
 ## 2026-11-01) and casts the step a staff is ready. It reads what each staff casts next
 ## (`CastSense`), never a card: it fires the staff that hurts and reaches, walks round walls
 ## (`AISight`), dodges shots and the telegraphs aimed at it, and when getting away is urgent it
-## taps whichever staff's next cast moves the caster (no button is "the dash"). It holds no grudge
+## taps whichever staff's next cast moves the caster (no button is "the dash"). It goes to a downed
+## teammate and stands beside it till the coop rule revives it, when no foe is near that one
+## (gameplay/ai/behaviours/revive.gd; its profile's `revives`). It holds no grudge
 ## (a teammate's blast never makes it fight a teammate).
 ## Idler: stands still; it only opens its builder.
 ##

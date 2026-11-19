@@ -66,11 +66,55 @@ const LAYOUT_META: StringName = &"room_kind"
 ## Its light: the palette material (docs/STYLE.md) the mouths into a room of the kind shimmer in, and
 ## its seals' runes glow in (empty: the spark's).
 @export var light: StringName = &""
+## Its symbol (connected biomes CB9): what a bridge's mouth into a room of the kind tells of what lies
+## behind it, and what the held map shows on the room. A picture of SYMBOL_SIDE rows of SYMBOL_SIDE
+## pixels as text, a row a line: `#` its light's lit shade, `+` its base shade, `.` none (drawn with a
+## dark edge round its pixels). Empty: nothing is told (a room meant to be found, a secret one).
+@export_multiline var symbol: String = ""
+
+## A symbol's side, in pixels.
+const SYMBOL_SIDE: int = 7
+## A symbol pixel's values (`symbol_pixels`).
+const SYMBOL_NONE: int = 0
+const SYMBOL_BASE: int = 1
+const SYMBOL_LIT: int = 2
 
 
 ## Its name for people: `display_name`, else its id in words.
 func shown_name() -> String:
 	return display_name if display_name != "" else String(id).capitalize()
+
+
+## The symbol's pixels, row by row (SYMBOL_SIDE × SYMBOL_SIDE of SYMBOL_NONE, SYMBOL_BASE, SYMBOL_LIT),
+## or empty when it has none or it is not a whole picture (`problems` says why).
+func symbol_pixels() -> PackedByteArray:
+	var out := PackedByteArray()
+	if symbol_problem() != "" or symbol.strip_edges() == "":
+		return out
+	for line in symbol.strip_edges().split("\n"):
+		for at in SYMBOL_SIDE:
+			var pixel: String = line.strip_edges()[at]
+			out.append(SYMBOL_LIT if pixel == "#" else (SYMBOL_BASE if pixel == "+" else SYMBOL_NONE))
+	return out
+
+
+## What is wrong with the symbol (empty: nothing, or no symbol): not SYMBOL_SIDE rows of SYMBOL_SIDE
+## pixels, or a pixel none of `#`, `+` and `.`.
+func symbol_problem() -> String:
+	var text: String = symbol.strip_edges()
+	if text == "":
+		return ""
+	var lines: PackedStringArray = text.split("\n")
+	if lines.size() != SYMBOL_SIDE:
+		return "%s: its symbol has %d rows, not %d." % [id, lines.size(), SYMBOL_SIDE]
+	for line in lines:
+		var row: String = line.strip_edges()
+		if row.length() != SYMBOL_SIDE:
+			return "%s: a row of its symbol is %d pixels, not %d." % [id, row.length(), SYMBOL_SIDE]
+		for pixel in row:
+			if pixel != "#" and pixel != "+" and pixel != ".":
+				return "%s: its symbol has '%s', none of #, + and ." % [id, pixel]
+	return ""
 
 
 ## What is wrong with the kind, one line each (empty when it is fine): no id, a fill or an end the
@@ -89,4 +133,6 @@ func problems() -> PackedStringArray:
 		found.append("%s: light '%s' is not a palette material the world may use." % [id, light])
 	if music != null:
 		found.append_array(music.problems(String(id)))
+	if symbol_problem() != "":
+		found.append(symbol_problem())
 	return found

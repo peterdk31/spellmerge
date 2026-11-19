@@ -162,6 +162,7 @@ const EVENTS: Dictionary = {
 	&"floor_touched": [["caster", TYPE_INT], ["element", TYPE_STRING_NAME], ["at", TYPE_VECTOR2], ["radius", TYPE_FLOAT]],
 	&"cover_changed": [["room", TYPE_INT], ["cells", TYPE_PACKED_INT32_ARRAY], ["states", TYPE_PACKED_INT32_ARRAY]],
 	&"room_cleared": [["room_id", TYPE_STRING_NAME], ["room", TYPE_INT]],
+	&"rooms_seen": [["seen", TYPE_PACKED_BYTE_ARRAY], ["again", TYPE_BOOL]],
 	&"loading_started": [],
 	&"loading_progressed": [["done", TYPE_INT], ["total", TYPE_INT]],
 	&"loading_finished": [],
@@ -189,7 +190,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_stats_ruled", &"coin_changed", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
+	&"run_started", &"run_ended", &"run_begun", &"run_room_filled", &"run_biome_chosen", &"run_room_scaled", &"run_stats_ruled", &"coin_changed", &"room_left", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"rooms_seen", &"start_stone_changed", &"altar_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",

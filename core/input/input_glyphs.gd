@@ -37,7 +37,7 @@ const _KEYS: Dictionary = {
 	&"staff_1": "Space", &"staff_2": "J", &"staff_3": "K", &"staff_4": "Q", &"accept": "Enter", &"back": "E",
 	&"alternate": "X", &"pause": "Esc", &"join": "Enter",
 	&"move_up": "W", &"move_down": "S", &"move_left": "A", &"move_right": "D", &"page_prev": "Z", &"page_next": "C",
-	&"extra": "R", &"kind_prev": "PgUp", &"kind_next": "PgDn", &"take": "F", &"inventory": "Tab",
+	&"extra": "R", &"kind_prev": "PgUp", &"kind_next": "PgDn", &"take": "F", &"inventory": "Tab", &"map": "M",
 }
 
 ## Name fragments (lower case) of a gamepad's name, per family.
@@ -84,7 +84,7 @@ static func glyph(kind: int, action: StringName) -> Dictionary:
 			return _face(kind, 1)
 		&"alternate":
 			return _face(kind, 2)
-		&"extra":
+		&"extra", &"map":
 			return _face(kind, 3)
 		&"kind_prev":
 			return {"shape": Shape.DPAD, "label": "left", "color": PLAIN}

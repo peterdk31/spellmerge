@@ -344,7 +344,11 @@ def outline_points(spec: dict, step: float = 2.0) -> list[tuple[float, float]]:
 
     `centre` and `radii` place the oval; `waves` ([[k, amount, phase], ...]) bend it k times round;
     `rough` ([[scale, amount], ...]) roughens it along its length with noise of that many pixels
-    (the large bays and points first, the small notches last), seeded by `seed`."""
+    (the large bays and points first, the small notches last), seeded by `seed`. An outline may
+    instead be a polygon, its corners in `points` (`[[x, y], ...]`, clockwise on screen: a walkway's
+    straight sides and its turn, connected biomes CB13), taken as they are."""
+    if "points" in spec:
+        return [(float(x), float(y)) for x, y in spec["points"]]
     cx, cy = spec["centre"]
     rx, ry = spec["radii"]
     seed = int(spec.get("seed", 0))

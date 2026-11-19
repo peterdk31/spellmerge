@@ -1,0 +1,17 @@
+{
+	"about": "The crypt's north-south walkways (connected biomes CB13): the causeway (content/grounds/causeway) laid the other way, so its courses still run across the walkway: the same narrow dressed stones, each now wider than tall, the joints between them as wide as the causeway's, each stone's upper joint lit (the light from the upper left, never turned), grit gathering along its broken sides.",
+	"base": "stone.base",
+	"slabs": {
+		"size": 23.4,
+		"jitter": 0.75,
+		"squash": 0.5556,
+		"tone": "#4f4b6c",
+		"vary": 0.7,
+		"joint": "#24213a",
+		"joint_width": 1.8,
+		"light": "#5d5980",
+		"light_width": 1.8
+	},
+	"toward_edge": {"colour": "#5a5468", "reach": 14, "most": 0.5, "scales": [9, 3]},
+	"speckle": [["stone.shadow", 0.005], ["#5d5980", 0.003]]
+}

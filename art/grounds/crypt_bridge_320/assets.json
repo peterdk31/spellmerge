@@ -1,0 +1,31 @@
+{
+  "assets": [
+    {
+      "path": "art/grounds/crypt_bridge_320/crypt_bridge_320_ground_floor.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "Crypt bridge (320 px)'s floor (connected biomes CB13), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/walkways/crypt_bridge_320/crypt_bridge_320.shape.json: a 64 px band of the crypt's causeway running west to east across the dark, 320 px long: narrow dressed stones laid across it in courses, each lit along its upper joint, the light from the upper left (content/grounds/causeway), its sides a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand."
+    },
+    {
+      "path": "art/grounds/crypt_bridge_320/crypt_bridge_320_ground_under.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "Crypt bridge (320 px)'s underside (connected biomes CB13), drawn by tools/ground_shape.py from content/rooms/crypt/walkways/crypt_bridge_320/crypt_bridge_320.shape.json: the rock of the walkway hanging into the dark under its south edges, in the crypt edge's shades (content/edges/crypt_edge)."
+    },
+    {
+      "path": "art/grounds/crypt_bridge_320/crypt_bridge_320_ground_glow.png",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
+      "prompt": "Crypt bridge (320 px)'s edge glow (connected biomes CB13), drawn at half size by tools/ground_shape.py from content/rooms/crypt/walkways/crypt_bridge_320/crypt_bridge_320.shape.json: the crypt edge's faint glow along the walkway's sides, added over what lies below it."
+    }
+  ]
+}

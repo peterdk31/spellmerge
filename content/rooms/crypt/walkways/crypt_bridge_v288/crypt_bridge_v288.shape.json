@@ -1,0 +1,25 @@
+{
+	"about": "The crypt's north-south bridge, 288 px long (docs/milestones/connected-biomes.md, CB13). Its floor a 64 px band of the causeway's stones laid across it, its sides a broken lip (crypt_edge) and an invisible wall (its void a wall). Its ends run to the template's edge, where its two sockets are. tools/ground_shape.py draws crypt_bridge_v288_ground.tscn and its art from this.",
+	"size": [
+		128,
+		288
+	],
+	"seed": 761,
+	"edge": "crypt_edge",
+	"ground": "causeway_ns",
+	"void": "wall",
+	"keep_clear_round": 16,
+	"outlines": [
+		{
+			"centre": [
+				64,
+				144
+			],
+			"radii": [
+				32,
+				4000
+			],
+			"seed": 55
+		}
+	]
+}

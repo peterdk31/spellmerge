@@ -1,0 +1,70 @@
+{
+	"about": "A corner walkway of the crypt, 192\u00d7256 px: an L that leaves its west edge and turns north, so two rooms whose sockets do not face each other join (mirrored, it turns every way) (docs/milestones/connected-biomes.md, CB13). Its floor a 64 px band of the causeway's stones laid across it, its sides a broken lip (crypt_edge) and an invisible wall (its void a wall). Its ends run to the template's edge, where its two sockets are. tools/ground_shape.py draws crypt_corner_192x256_ground.tscn and its art from this.",
+	"size": [
+		192,
+		256
+	],
+	"seed": 577,
+	"edge": "crypt_edge",
+	"ground": "causeway",
+	"void": "wall",
+	"keep_clear_round": 16,
+	"outlines": [
+		{
+			"points": [
+				[
+					-8,
+					160
+				],
+				[
+					96,
+					160
+				],
+				[
+					96,
+					-8
+				],
+				[
+					160,
+					-8
+				],
+				[
+					160,
+					224
+				],
+				[
+					-8,
+					224
+				]
+			],
+			"seed": 89
+		}
+	],
+	"areas": [
+		{
+			"ground": "causeway_ns",
+			"centre": [
+				128,
+				96
+			],
+			"points": [
+				[
+					96,
+					-8
+				],
+				[
+					200,
+					-8
+				],
+				[
+					200,
+					264
+				],
+				[
+					96,
+					160
+				]
+			]
+		}
+	]
+}

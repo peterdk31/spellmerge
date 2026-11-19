@@ -7,7 +7,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
-      "prompt": "The crypt's north-south bridge's floor (128 px, connected biomes CB11), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/bridge/crypt_bridge_v128.shape.json: a 64 px band of the causeway's narrow dressed stones (content/grounds/causeway) running north to south across the dark, its sides a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand."
+      "prompt": "Crypt bridge (north-south, 128 px)'s floor (connected biomes CB13), drawn per pixel by tools/ground_shape.py from content/rooms/crypt/walkways/crypt_bridge_v128/crypt_bridge_v128.shape.json: a 64 px band of the crypt's causeway running north to south across the dark, 128 px long: its narrow dressed stones laid across it in courses, each wider than tall, each lit along its upper joint, the light from the upper left (content/grounds/causeway_ns), its sides a broken lip with stones and grit fallen along it (content/edges/crypt_edge); clear wherever a body may not stand."
     },
     {
       "path": "art/grounds/crypt_bridge_v128/crypt_bridge_v128_ground_under.png",
@@ -16,7 +16,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
-      "prompt": "The crypt's north-south bridge's underside (128 px, connected biomes CB11), drawn by tools/ground_shape.py from content/rooms/crypt/bridge/crypt_bridge_v128.shape.json: the rock of the walkway hanging into the dark under its south end, in the crypt edge's shades (content/edges/crypt_edge)."
+      "prompt": "Crypt bridge (north-south, 128 px)'s underside (connected biomes CB13), drawn by tools/ground_shape.py from content/rooms/crypt/walkways/crypt_bridge_v128/crypt_bridge_v128.shape.json: the rock of the walkway hanging into the dark under its south edges, in the crypt edge's shades (content/edges/crypt_edge)."
     },
     {
       "path": "art/grounds/crypt_bridge_v128/crypt_bridge_v128_ground_glow.png",
@@ -25,7 +25,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (tools/ground_shape.py, a procedural generator written for the hub rework, 2026-11-16)",
-      "prompt": "The crypt's north-south bridge's edge glow (128 px, connected biomes CB11), drawn at half size by tools/ground_shape.py from content/rooms/crypt/bridge/crypt_bridge_v128.shape.json: the crypt edge's faint glow along the walkway's sides, added over what lies below it."
+      "prompt": "Crypt bridge (north-south, 128 px)'s edge glow (connected biomes CB13), drawn at half size by tools/ground_shape.py from content/rooms/crypt/walkways/crypt_bridge_v128/crypt_bridge_v128.shape.json: the crypt edge's faint glow along the walkway's sides, added over what lies below it."
     }
   ]
 }

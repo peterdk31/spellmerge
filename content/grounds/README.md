@@ -25,7 +25,8 @@ A colour is a palette material's shade (`leaf.shadow`) or `#rrggbb`; the hub's g
 | `flagstone` | the crypt's floor | large irregular flagstones of one cool, quiet Stone, softly jointed, grit toward the floor's edges |
 | `dust` | areas (drifts) | dust and grit lying thick enough to hide the stone, a shade darker than the swept stone, in soft patches, heaped a little paler toward the floor's edge (`toward_edge`) |
 | `swept` | areas (the broom's ring) | flagstones swept clean, the strokes of a broom round the area's middle |
-| `causeway` | the crypt's bridges (connected biomes CB12) | narrow dressed stones laid across the walkway in courses, smaller and more even than the flagstones, each lit along its upper joint, grit toward its sides |
+| `causeway` | the crypt's west-east walkways (connected biomes CB12) | narrow dressed stones laid across the walkway in courses, smaller and more even than the flagstones, each lit along its upper joint, grit toward its sides |
+| `causeway_ns` | the crypt's north-south walkways and a corner walkway's north arm (connected biomes CB13) | the causeway laid the other way: the same stones, each wider than tall, so the courses still run across the walkway; the light still from the upper left |
 
 How a material is drawn is `tools/ground_materials.py`. Areas are drawn in order, a later one over an earlier one (the broom's ring: `dust` over the hall, then `swept` inside it).
 

@@ -40,8 +40,9 @@ var _rng := RandomNumberGenerator.new()
 var _last: float = -1.0
 ## Whether the kind the pool lacks was warned of (once a room).
 var _warned: bool = false
-## Motes given off, all told (for tests).
+## Motes given off, all told, and the box round where they left from (for tests).
 var given: int = 0
+var given_box: Rect2 = Rect2()
 
 
 ## Air whose colours are rows of `table` (the spectacle's, shared with the motes).
@@ -82,8 +83,10 @@ static func area_of(view: Rect2, bounds: Rect2) -> Rect2:
 
 
 ## Give off the motes owed since the last call, at Feel's clock `now`, into `pool` (null: none, the
-## particles or the light are off), over `area_of(view, bounds)`.
-func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2) -> void:
+## particles or the light are off), over `area_of(view, bounds)`, holding at most `share` of the
+## motes' ring at once (RING_SHARE for the room's air; a kind's air in each of its rooms takes a part
+## of its own, gameplay/feel/kind_air.gd).
+func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2, share: float = RING_SHARE) -> void:
 	var dt: float = clampf(now - _last, 0.0, LONGEST_FRAME) if _last >= 0.0 else 0.0
 	_last = now
 	if look == null or pool == null:
@@ -100,7 +103,7 @@ func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2) -> void
 			push_warning("The room's air gives off nothing: '%s' is no mote kind (content/motes)." % look.kind)
 		return
 	var life: Vector2 = pool.kinds()[k].life
-	var most: float = float(pool.cap()) * RING_SHARE / maxf((life.x + life.y) * 0.5, 0.05)
+	var most: float = float(pool.cap()) * share / maxf((life.x + life.y) * 0.5, 0.05)
 	_owed += minf(look.rate * area.get_area() / RoomBase.AIR_AREA, most) * dt
 	if _table.writes != _written:
 		_resolve()
@@ -110,6 +113,7 @@ func give_off(now: float, pool: MotesScript, view: Rect2, bounds: Rect2) -> void
 		var at := Vector2(area.position.x + _rng.randf() * area.size.x, area.position.y + _rng.randf() * area.size.y)
 		var ramp: int = sources[_rng.randi() % sources.size()]
 		pool.throw_part(k, at, look.way, ramp, Color.WHITE, 1, look.reach, look.spread, 1.0, false, true, Vector2.ZERO, 1.0, 0, height)
+		given_box = given_box.expand(at) if given > 0 else Rect2(at, Vector2.ZERO)
 		given += 1
 
 

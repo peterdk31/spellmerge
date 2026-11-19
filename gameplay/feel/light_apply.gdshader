@@ -32,6 +32,31 @@ uniform float lit_gain = 0.22;
 uniform float bright_gain = 0.45;
 // The steps the light comes in (see above): 0 smooth, else that many (dim counted), at least 2.
 uniform int bands = 3;
+// Each room's own light tinted by its kind (connected biomes CB12b, gameplay/feel/room_tints.gd):
+// `tint_count` world rectangles (x0, y0, x1, y1) and, for each, the hue its dark and its light lean
+// toward (rgb) and how far (a). A pixel in none (a bridge, the void) is untinted. MAX_TINTS is
+// SpellLight.MAX_TINTS.
+#define MAX_TINTS 40
+uniform vec4 tint_rects[MAX_TINTS];
+uniform vec4 tint_hues[MAX_TINTS];
+uniform int tint_count = 0;
+
+// Where the pixel is in the world (the rect's own place through its transform: the world's).
+varying vec2 world_at;
+
+// The tint of the room world point `at` is in (a: 0 for none).
+vec4 room_tint(vec2 at) {
+	for (int k = 0; k < MAX_TINTS; k++) {
+		if (k >= tint_count) {
+			break;
+		}
+		vec4 r = tint_rects[k];
+		if (at.x >= r.x && at.y >= r.y && at.x < r.z && at.y < r.w) {
+			return tint_hues[k];
+		}
+	}
+	return vec4(1.0, 1.0, 1.0, 0.0);
+}
 
 // The light a pixel adds for a light of brightest channel `most`.
 float gain_of(float most) {
@@ -57,17 +82,19 @@ float gain_of(float most) {
 
 void vertex() {
 	LIGHT_VIEW_FIND;
+	world_at = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
 
 void fragment() {
 	vec3 shine = view_light(SCREEN_UV);
 	float most = max(shine.r, max(shine.g, shine.b));
 	float gain = gain_of(most);
-	vec3 dark = vec3(ambient) * shade;
+	vec4 tint = tint_count > 0 ? room_tint(world_at) : vec4(1.0, 1.0, 1.0, 0.0);
+	vec3 dark = vec3(ambient) * shade * mix(vec3(1.0), tint.rgb, tint.a);
 	if (gain < 0.004 && min(dark.r, min(dark.g, dark.b)) >= 1.0) {
 		discard;
 	}
-	vec3 hue = gain > 0.0 && most > 0.0 ? shine / most : vec3(0.0);
+	vec3 hue = gain > 0.0 && most > 0.0 ? mix(shine / most, tint.rgb, tint.a) : vec3(0.0);
 	vec3 under = texture(screen, SCREEN_UV).rgb;
 	COLOR = vec4(under * (dark + hue * gain), 1.0);
 }

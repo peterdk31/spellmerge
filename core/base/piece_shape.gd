@@ -67,15 +67,23 @@ static func mirror_of(layout_root: Node) -> int:
 ## and moved to where its node stands. The layout's wall bodies are never moved: they are the
 ## template's, read so by everyone who mirrors them.
 static func laid_walls(layout_root: Node) -> Array[Rect2]:
-	var walls: Array[Rect2] = RoomPlaces.wall_rects(layout_root)
+	return _laid(layout_root, RoomPlaces.wall_rects(layout_root))
+
+
+## Its holes (`RoomPlaces.hole_rects`) where the world has them, as `laid_walls`.
+static func laid_holes(layout_root: Node) -> Array[Rect2]:
+	return _laid(layout_root, RoomPlaces.hole_rects(layout_root))
+
+
+static func _laid(layout_root: Node, rects: Array[Rect2]) -> Array[Rect2]:
 	var mirror: int = mirror_of(layout_root)
 	var shape: PieceShape = of(layout_root) if mirror != 0 else null
 	var piece := layout_root as Node2D
 	var at: Vector2 = piece.position if piece != null else Vector2.ZERO
-	for i in walls.size():
-		var rect: Rect2 = shape.flip_rect(walls[i], mirror) if shape != null else walls[i]
-		walls[i] = Rect2(rect.position + at, rect.size)
-	return walls
+	for i in rects.size():
+		var rect: Rect2 = shape.flip_rect(rects[i], mirror) if shape != null else rects[i]
+		rects[i] = Rect2(rect.position + at, rect.size)
+	return rects
 
 
 ## The shape of `room`'s default layout, mirrored by `mirror`; null for a room with no scene.

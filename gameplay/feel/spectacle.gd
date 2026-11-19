@@ -1204,8 +1204,10 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 	# The mist's room (atmosphere F), read only when the room names a mist.
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	if room != null and room.mist != null:
+		# Its walls and holes in the world's pixels, as the grid has them (the mist itself still lies
+		# from the world's origin over the template's size, not yet at a biome room's place).
 		var places: RoomPlaces = RoomPlaces.read(layout_root)
-		lay_mist(places.size, walls, places.holes)
+		lay_mist(places.size, walls, PieceShape.laid_holes(layout_root))
 	else:
 		lay_mist(Vector2.ZERO, [] as Array[Rect2], [] as Array[Rect2])
 

@@ -225,3 +225,29 @@ func test_a_layout_is_put_once() -> void:
 	check(not MirroredArtScript.place(layout), "heard again, it is not put twice")
 	check_equal(sprite.position, put, "and stays where it was put")
 	layout.free()
+
+
+## Only the art moves: the collision, places and zones its readers mirror stay the template's, and so
+## does every node of an unmirrored room.
+func test_only_a_mirrored_rooms_art_moves() -> void:
+	for room: RoomBase in _templates():
+		var template: Node = room.build()
+		var walls: Array[Rect2] = RoomPlaces.wall_rects(template)
+		var holes: Array[Rect2] = RoomPlaces.hole_rects(template)
+		var places: RoomPlaces = RoomPlaces.read(template)
+		for mirror: int in PieceShape.MIRRORINGS:
+			var layout := room.build() as Node2D
+			layout.set_meta(PieceShape.GROUND_MIRROR_META, Vector2i(mirror & 1, (mirror >> 1) & 1))
+			check_equal(MirroredArtScript.place(layout), mirror != 0, "%s mirrored %d: put only when mirrored" % [room.id, mirror])
+			check_equal(RoomPlaces.wall_rects(layout), walls, "%s mirrored %d: its walls stay the template's" % [room.id, mirror])
+			check_equal(RoomPlaces.hole_rects(layout), holes, "%s mirrored %d: its holes stay the template's" % [room.id, mirror])
+			var after: RoomPlaces = RoomPlaces.read(layout)
+			check(after.placed_at == places.placed_at and after.player_spawns == places.player_spawns and after.enemy_spawns == places.enemy_spawns \
+				and after.doors == places.doors and after.socket_at == places.socket_at and after.zone_rects == places.zone_rects,
+				"%s mirrored %d: its places, sockets and zones stay the template's" % [room.id, mirror])
+			if mirror == 0:
+				for node: Node in layout.find_children("*", "Node2D", true, false):
+					var twin := template.get_node_or_null(layout.get_path_to(node)) as Node2D
+					check(twin != null and twin.position == (node as Node2D).position, "%s unmirrored: %s stays where the template has it" % [room.id, layout.get_path_to(node)])
+			layout.free()
+		template.free()

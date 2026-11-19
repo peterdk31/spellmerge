@@ -14,7 +14,7 @@ const EVENTS: Dictionary = {
 	&"play_requested": [["player", TYPE_INT]],
 	&"staff_change_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["slot", TYPE_INT], ["card_id", TYPE_STRING_NAME], ["body", TYPE_INT]],
 	&"staff_cards_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["cards", TYPE_ARRAY], ["body", TYPE_INT]],
-	&"reward_pick_requested": [["player", TYPE_INT], ["choice", TYPE_INT]],
+	&"reward_pick_requested": [["player", TYPE_INT], ["offer", TYPE_INT], ["choice", TYPE_INT]],
 	&"door_vote_requested": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"pause_requested": [["player", TYPE_INT], ["on", TYPE_INT]],
 	&"hub_requested": [["player", TYPE_INT]],
@@ -180,19 +180,25 @@ const EVENTS: Dictionary = {
 	&"door_voted": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"difficulty_changed": [["level", TYPE_FLOAT]],
 	# Rewards and progression.
-	&"reward_rolled": [["reward_ids", TYPE_ARRAY]],
-	&"reward_taken": [["player", TYPE_INT], ["reward_id", TYPE_STRING_NAME]],
+	&"reward_rolled": [["player", TYPE_INT], ["offer", TYPE_INT], ["choices", TYPE_ARRAY], ["here", TYPE_BOOL]],
+	&"reward_taken": [["player", TYPE_INT], ["offer", TYPE_INT], ["choice", TYPE_INT], ["reward", TYPE_DICTIONARY]],
+	&"reward_refused": [["player", TYPE_INT], ["offer", TYPE_INT]],
+	&"rewards_waiting_changed": [["player", TYPE_INT], ["offers", TYPE_ARRAY]],
+	&"coin_changed": [["coin", TYPE_INT], ["at", TYPE_VECTOR2], ["lying", TYPE_BOOL]],
+	&"wallet_changed": [["player", TYPE_INT], ["coins", TYPE_INT]],
+	&"run_stats_ruled": [["changes", TYPE_ARRAY]],
+	&"health_gift_requested": [["actor", TYPE_INT], ["heal", TYPE_FLOAT], ["more_most", TYPE_FLOAT]],
 	&"unlock_gained": [["unlock_id", TYPE_STRING_NAME]],
 	&"currency_changed": [["currency_id", TYPE_STRING_NAME], ["amount", TYPE_INT]],
 }
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"run_begun", &"run_room_scaled", &"run_room_paced", &"run_room_chosen", &"run_way_taken", &"run_map_changed", &"room_left", &"room_exits_shown", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"lectern_changed", &"start_depth_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
+	&"run_started", &"run_ended", &"run_begun", &"run_room_scaled", &"run_room_paced", &"run_room_chosen", &"run_way_taken", &"run_map_changed", &"run_stats_ruled", &"coin_changed", &"room_left", &"room_exits_shown", &"gather_door_shown", &"key_door_shown", &"secret_rock_shown", &"room_entered", &"room_built", &"cover_changed", &"room_cleared", &"start_stone_changed", &"altar_changed", &"lectern_changed", &"start_depth_changed", &"altar_placed", &"hub_changed", &"pad_wait_changed",
 	&"room_items_placed", &"ground_item_changed", &"enemy_standing", &"boss_intro_paged",
 	&"hit_room_asked", &"hit_damage_asked",
 	&"loading_started", &"loading_progressed", &"loading_finished",
-	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"shadows_changed", &"ambient_particles_changed", &"fog_changed", &"environment_interaction_changed", &"ambience_volume_changed", &"music_volume_changed", &"sound_volume_changed", &"ui_volume_changed", &"ui_sound_requested", &"tailless_motes_changed", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"play_load_requested", &"online_changed", &"online_line_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"shadows_changed", &"ambient_particles_changed", &"fog_changed", &"environment_interaction_changed", &"ambience_volume_changed", &"music_volume_changed", &"sound_volume_changed", &"ui_volume_changed", &"ui_sound_requested", &"tailless_motes_changed", &"difficulty_changed", &"unlock_gained", &"currency_changed",
 ]
 
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).

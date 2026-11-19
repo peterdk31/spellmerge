@@ -4,8 +4,9 @@ extends Resource
 ## docs/milestones/run-generation.md, "Meta progression (RG6)"): what meta progression unlocks. It
 ## names the flag (`flag`, a `SaveFile` flag) and one number of the run definition it changes
 ## (`target`): a kind rule's weight, limit, least or chance, the map's depth or width, a biome map's
-## room counts, fights on the way or scaling depth, a map style's weight (connected biomes CB5), or a
-## scaling factor (a curve's start or end), set to, raised by or multiplied by `amount` (`how`). A sub-resource of
+## room counts, fights on the way or scaling depth, a map style's weight (connected biomes CB5), a
+## scaling factor (a curve's start or end), or a run stat (`RunStats`, connected biomes CB10), set
+## to, raised by or multiplied by `amount` (`how`). A sub-resource of
 ## `RunDefinition.changes`, applied in their order (`RunDefinition.changed_by`).
 ##
 ## The flags in effect are the host's (core/sim/run_unlocks.gd: worked out from the save of the
@@ -51,6 +52,9 @@ enum Target {
 	KIND_CHANCE,
 	## A map style's `weight` (`biome`'s style `style`).
 	STYLE_WEIGHT,
+	## A run stat (`stat`, a row of `RunStats.ROWS`; connected biomes CB10): every player's, before
+	## their relics.
+	RUN_STAT,
 }
 
 ## How `amount` changes the number.
@@ -105,6 +109,8 @@ const SCALE_MEMBERS: Dictionary = {
 @export var kind: StringName = &""
 ## The map style it changes (`MapStyle.id`), for a style target.
 @export var style: StringName = &""
+## The run stat it changes (a row of `RunStats.ROWS`), for the `RUN_STAT` target.
+@export var stat: StringName = &""
 ## How `amount` changes the number.
 @export var how: How = How.SET
 ## The amount (a whole number's result is rounded). A kind rule's limit of 0 is no limit: ADD makes
@@ -140,6 +146,19 @@ func is_scale_target() -> bool:
 	return SCALE_MEMBERS.has(target)
 
 
+## True for a target of a run stat (`stat`).
+func is_stat_target() -> bool:
+	return target == Target.RUN_STAT
+
+
+## The change of a run stat it makes (`RunStats`), or null for any other target.
+func as_stat_change() -> StatChange:
+	if not is_stat_target():
+		return null
+	var ways: Array[StatChange.How] = [StatChange.How.SET, StatChange.How.ADD, StatChange.How.TIMES]
+	return StatChange.make(stat, amount, ways[how])
+
+
 ## The number `value` changed by it.
 func changed(value: float) -> float:
 	match how:
@@ -153,9 +172,12 @@ func changed(value: float) -> float:
 ## Change a run's `biomes` and `scaling` (a copy's, `RunDefinition.copied`: never the registry's)
 ## as it says, and return the scaling (a scaling target on a run with none, or no such curve, makes
 ## one at 1 first). A kind target changes every line of its kind in the biomes it names; a target
-## that names nothing there changes nothing (`problems` says so). It takes the definition's parts,
-## never the definition, so the two scripts never name each other.
+## that names nothing there changes nothing (`problems` says so). A run stat's target changes
+## neither (`as_stat_change`). It takes the definition's parts, never the definition, so the two
+## scripts never name each other.
 func apply_to(biomes: Array[MapRules], scaling: RunScaling) -> RunScaling:
+	if is_stat_target():
+		return scaling
 	if is_scale_target():
 		var names: Array = SCALE_MEMBERS[target]
 		var made: RunScaling = scaling if scaling != null else RunScaling.new()
@@ -193,7 +215,8 @@ func _change_member(of: Object, member: StringName) -> void:
 
 ## What is wrong with it in a run of `biomes`, one line each, named by `what` (the run): no flag or one
 ## that is not a plain id, an amount that is not finite, a biome the run has not, a kind target with
-## no kind or one no line of its biomes has, a scaling target naming a biome.
+## no kind or one no line of its biomes has, a scaling target naming a biome, a run stat's target
+## naming a stat no row has (or a biome or kind), another target naming a stat.
 func problems(biomes: Array[MapRules], what: String) -> PackedStringArray:
 	var found := PackedStringArray()
 	var named: String = "%s: the rule change of '%s'" % [what, flag]
@@ -203,6 +226,14 @@ func problems(biomes: Array[MapRules], what: String) -> PackedStringArray:
 		found.append("%s: its flag is not a plain id (letters, digits, `_`, %d at most)." % [named, RunUnlocks.MAX_FLAG])
 	if not is_finite(amount):
 		found.append("%s: its amount %s is not a number." % [named, amount])
+	if is_stat_target():
+		if not RunStats.has(stat):
+			found.append("%s: no run stat '%s' (RunStats.ROWS)." % [named, stat])
+		if biome != &"" or kind != &"" or style != &"":
+			found.append("%s: it changes a run stat, so it names no biome, kind or style." % named)
+		return found
+	if stat != &"":
+		found.append("%s: it changes no run stat, so it names none." % named)
 	if is_scale_target():
 		if biome != &"" or kind != &"" or style != &"":
 			found.append("%s: it changes the run's scaling, so it names no biome, kind or style." % named)

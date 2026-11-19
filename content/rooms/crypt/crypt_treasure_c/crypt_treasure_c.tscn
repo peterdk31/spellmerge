@@ -1,0 +1,96 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/void.svg" id="1_void"]
+[ext_resource type="PackedScene" path="res://content/rooms/crypt/crypt_treasure_c/crypt_treasure_c_ground.tscn" id="2_ground"]
+[ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/candles.tscn" id="3_candles"]
+[ext_resource type="Script" path="res://core/base/room_socket.gd" id="cb_socket"]
+[ext_resource type="Script" path="res://tools/socket_preview.gd" id="cb_socket_preview"]
+[ext_resource type="Script" path="res://tools/cover_preview.gd" id="gc_preview"]
+
+[node name="CryptTreasureC" type="Node2D"]
+
+[node name="Void" type="Sprite2D" parent="."]
+z_index = -3
+texture_filter = 1
+texture_repeat = 2
+texture = ExtResource("1_void")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 384, 320)
+
+[node name="Floor" parent="." instance=ExtResource("2_ground")]
+
+[node name="Decor" type="Node2D" parent="."]
+
+[node name="Candles1" parent="Decor" instance=ExtResource("3_candles")]
+position = Vector2(96, 96)
+
+[node name="Core" parent="Decor/Candles1" index="1"]
+speed_scale = 1.1
+frame = 5
+
+[node name="Flame" parent="Decor/Candles1" index="3"]
+speed_scale = 1.1
+frame = 2
+
+[node name="Candles2" parent="Decor" instance=ExtResource("3_candles")]
+position = Vector2(288, 96)
+
+[node name="Core" parent="Decor/Candles2" index="1"]
+speed_scale = 0.9
+frame = 2
+
+[node name="Flame" parent="Decor/Candles2" index="3"]
+speed_scale = 0.9
+frame = 6
+
+[node name="Candles3" parent="Decor" instance=ExtResource("3_candles")]
+position = Vector2(192, 184)
+
+[node name="Core" parent="Decor/Candles3" index="1"]
+speed_scale = 1.25
+frame = 7
+
+[node name="Flame" parent="Decor/Candles3" index="3"]
+speed_scale = 1.25
+frame = 4
+
+[node name="PlayerSpawns" type="Node2D" parent="."]
+
+[node name="Player1" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(160, 128)
+
+[node name="Player2" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(224, 128)
+
+[node name="Player3" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(160, 192)
+
+[node name="Player4" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(224, 192)
+
+[node name="SocketWest1" type="Node2D" parent="."]
+position = Vector2(32, 160)
+script = ExtResource("cb_socket")
+facing = 3
+
+[node name="SocketEast2" type="Node2D" parent="."]
+position = Vector2(352, 160)
+script = ExtResource("cb_socket")
+facing = 1
+
+[node name="SocketNorth3" type="Node2D" parent="."]
+position = Vector2(192, 32)
+script = ExtResource("cb_socket")
+facing = 0
+
+[node name="SocketSouth4" type="Node2D" parent="."]
+position = Vector2(192, 288)
+script = ExtResource("cb_socket")
+facing = 2
+
+[node name="CoverPreview" type="Node2D" parent="."]
+script = ExtResource("gc_preview")
+
+[node name="SocketPreview" type="Node2D" parent="."]
+script = ExtResource("cb_socket_preview")

@@ -66,7 +66,7 @@ uniform sampler2D kind_table : filter_nearest;
 uniform sampler2D ramp_table : filter_nearest;
 uniform sampler2D shape_atlas : filter_nearest;
 // The spell light's buffer (Motes.set_light), for the lit-only kinds; `light_on` false: none.
-uniform sampler2D light_buffer : filter_linear, repeat_disable;
+#include "res://gameplay/feel/light_views.gdshaderinc"
 uniform bool light_on = false;
 // The light's brightest channel from which a lit-only mote shows in its shadow, base, light and
 // white-hot shade (`SpellLight.lit_steps`, from the apply rect's own steps; Motes.DEFAULT_LIT_STEPS
@@ -151,6 +151,7 @@ vec3 mote_shade(float source, vec3 c, float s, int shade) {
 }
 
 void vertex() {
+	LIGHT_VIEW_FIND;
 	vec2 vel = MODEL_MATRIX[0].xy;
 	float born = MODEL_MATRIX[1].x;
 	float vz = MODEL_MATRIX[1].y;
@@ -252,7 +253,7 @@ void fragment() {
 		if (mark <= 0.25) {
 			discard;
 		}
-		vec3 shine = textureLod(light_buffer, SCREEN_UV, 0.0).rgb;
+		vec3 shine = view_light(SCREEN_UV);
 		float most = max(shine.r, max(shine.g, shine.b));
 		// In the dark (below the first step) it is not drawn; a highlight is drawn as its body.
 		if (most < lit_steps.x) {

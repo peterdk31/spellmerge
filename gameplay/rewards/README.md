@@ -38,7 +38,7 @@ Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
-`rewards.gd` (the area: its state, its events, its step in `Tick.STEPS` "Rewards"), `reward_offer.gd` (a row of state), `reward_roll.gd` (the policy, apart, so it changes alone). A new kind of reward is a row of `RewardEntry.KINDS` and its branch in `_give`; a new table is a file in `content/rewards/`. Tests: `tests/gameplay/rewards/test_rewards.gd`.
+`rewards.gd` (the area: its state, its events, its step in `Tick.STEPS` "Rewards"), `reward_offer.gd` (a row of state), `reward_roll.gd` (the policy, apart, so it changes alone). A new kind of reward is a row of `RewardEntry.KINDS`, its line of `RewardEntry.DESCRIPTIONS` (what it does, for the reward menu's card: a choice's view carries it as `description`, a card's being its builder line), its glyph in the HUD's `hud/menus/reward/reward_card.gd` (`GLYPHS`, a test asks for it) and its branch in `_give`; a new table is a file in `content/rewards/`. Tests: `tests/gameplay/rewards/test_rewards.gd`.
 
 ## Validate
 

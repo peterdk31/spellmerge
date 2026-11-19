@@ -116,6 +116,10 @@ func test_a_clear_rolls_each_players_own_offer_of_two() -> void:
 		for choice: Dictionary in choices:
 			check(RewardEntry.KINDS.has(choice["kind"]), "one of the reward kinds")
 			check(String(choice["name"]) != "", "each has a name for the menu")
+			if choice["kind"] != RewardEntry.CARD:
+				check_equal(choice["description"], RewardEntry.describe(choice["kind"], choice["count"]), "and says what it does, its kind's line")
+			else:
+				check(choice.has("description"), "a card says what it does with its builder line")
 	check_equal(_rewards.waiting_of(0).size(), 1, "it waits until picked")
 	check(_rewards.waiting_of(2).is_empty(), "a seat with no wizard rolls nothing")
 

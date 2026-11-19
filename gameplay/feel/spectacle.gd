@@ -188,6 +188,15 @@ var _room_size: Vector2 = Vector2.ZERO
 var _room_walls: Array[Rect2] = []
 var _room_holes: Array[Rect2] = []
 var _room_at: Vector2 = Vector2.ZERO
+## A biome's later rooms' mists (the owner, 2026-11-19: every room draws its own, at its place and
+## mirroring): each one's node (made and freed with the first room's `mist`, by the same settings),
+## and what it was laid with, by the same index. View only.
+var room_mists: Array[MistScript] = []
+var _later_data: Array[RoomMist] = []
+var _later_size: PackedVector2Array = PackedVector2Array()
+var _later_walls: Array[Array] = []
+var _later_holes: Array[Array] = []
+var _later_at: PackedVector2Array = PackedVector2Array()
 var _feet: PackedVector2Array = PackedVector2Array()
 var _feet_count: int = 0
 ## The pool's material the stirs were last handed to, and their `version` then.
@@ -367,6 +376,8 @@ func step(now: float, table: ActorsScript = null) -> void:
 		shadows.step(table, now, view, blockers)
 	if mist != null:
 		mist.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
+	for later: MistScript in room_mists:
+		later.step(now, _feet, _feet_count, stirs.version, stirs.hand_to)
 	_free_faded()
 
 
@@ -1109,14 +1120,60 @@ func _fit_mist(at_once: bool) -> void:
 		add_child(mist)
 		mist.lay(_room_size, _room_walls, _room_holes, _room_at)
 		mist.use(_mist_data)
+		for at in _later_data.size():
+			_make_later_mist(at)
 		_keep_mist_last()
 	if mist != null:
 		# The light's buffer, again when the light was made anew under it.
 		mist.use_light(light.buffer())
 		light.read_by(&"mist", mist.material as ShaderMaterial)
+		for at in room_mists.size():
+			room_mists[at].use_light(light.buffer())
+			light.read_by(_later_key(at), room_mists[at].material as ShaderMaterial)
+
+
+## Later room `at`'s mist made (while the first room's is), as laid.
+func _make_later_mist(at: int) -> void:
+	var made := MistScript.new(MARK_Z)
+	made.name = "Mist%d" % (at + 1)
+	made.set_share(_mist_share)
+	add_child(made)
+	var walls: Array[Rect2] = []
+	walls.assign(_later_walls[at])
+	var holes: Array[Rect2] = []
+	holes.assign(_later_holes[at])
+	made.lay(_later_size[at], walls, holes, _later_at[at])
+	made.use(_later_data[at])
+	room_mists.append(made)
+	if light != null:
+		made.use_light(light.buffer())
+		light.read_by(_later_key(at), made.material as ShaderMaterial)
+
+
+func _later_key(at: int) -> StringName:
+	return StringName("mist_%d" % (at + 1))
+
+
+## Every later room's mist node freed (the laid rooms kept unless `forget`).
+func _free_later_mists(forget: bool) -> void:
+	for at in room_mists.size():
+		if light != null:
+			light.read_by(_later_key(at), null)
+		remove_child(room_mists[at])
+		room_mists[at].queue_free()
+	room_mists.clear()
+	if forget:
+		_later_data.clear()
+		_later_size.resize(0)
+		_later_walls.clear()
+		_later_holes.clear()
+		_later_at.resize(0)
 
 
 func _free_mist() -> void:
+	_free_later_mists(false)
+	if light != null:
+		light.read_by(&"mist", null)
 	remove_child(mist)
 	mist.queue_free()
 	mist = null
@@ -1135,6 +1192,8 @@ func _fade_layers(delta: float) -> void:
 	if mist != null:
 		_mist_share = move_toward(_mist_share, 1.0 if fog else 0.0, most)
 		mist.set_share(_mist_share)
+		for later: MistScript in room_mists:
+			later.set_share(_mist_share)
 
 
 ## The layers faded out all the way are freed (after the frame's step: the light was handed no
@@ -1203,11 +1262,23 @@ func _on_room_built(room_id: StringName, number: int, layout_root: Node) -> void
 	# grid's walls, decision 6): their walls there, as the world has them.
 	var walls: Array[Rect2] = PieceShape.laid_walls(layout_root)
 	if number != EventsScript.FIRST_ROOM:
-		# A biome's later piece: its walls join the world's; the mist and the room's look are the
-		# first room's.
+		# A biome's later piece: its walls join the world's; the room's look is the first room's, and
+		# a room naming a mist draws its own where it stands (the owner, 2026-11-19).
 		_world_walls.append_array(walls)
 		blockers.use_walls(_world_walls)
+		var later: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
+		if later != null and later.mist != null and not later.walkway:
+			var piece := layout_root as Node2D
+			_later_data.append(later.mist)
+			_later_size.append(RoomPlaces.read(layout_root).size)
+			_later_walls.append(walls.duplicate())
+			_later_holes.append(PieceShape.laid_holes(layout_root))
+			_later_at.append(piece.position if piece != null else Vector2.ZERO)
+			if mist != null:
+				_make_later_mist(_later_data.size() - 1)
+				_keep_mist_last()
 		return
+	_free_later_mists(true)
 	_world_walls = walls.duplicate()
 	blockers.use_walls(walls)
 	# The mist's room (atmosphere F), read only when the room names a mist.
@@ -1238,6 +1309,9 @@ func lay_mist(size: Vector2, walls: Array[Rect2], holes: Array[Rect2], at: Vecto
 func _keep_mist_last() -> void:
 	if mist != null and mist.get_parent() == self:
 		move_child(mist, -1)
+	for later: MistScript in room_mists:
+		if later.get_parent() == self:
+			move_child(later, -1)
 
 
 ## A new room: its colours for its walls' motes (`RoomBase.surface_colors`), its ambient light

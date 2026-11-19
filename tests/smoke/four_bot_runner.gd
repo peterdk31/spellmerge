@@ -8,7 +8,8 @@ extends Node
 ## play it with their other staffs, so the run is played with built staffs.
 ##
 ## It passes only if
-##  - `room_cleared` is received for a fight room (the start room's, which holds none, counts not),
+##  - `room_cleared` is received for a fight room (the start room's, a shop's or a reward room's,
+##    which hold none, count not: `counts_as_a_fight`),
 ##  - players 1-3 (indices 0-2) are alive or revived at the end,
 ##  - at least one `spell_cast` happened (the bots really fired),
 ##  - bot 4's builder opened and was not seen closed afterwards (polled every frame). Bot 4
@@ -267,8 +268,7 @@ func _on_room_entered(_room_id: StringName, room: int) -> void:
 
 
 func _on_room_cleared(_room_id: StringName, room: int) -> void:
-	# The start room holds no fight (connected biomes CB8): cleared as it is entered, it counts not.
-	if room == EventsScript.FIRST_ROOM:
+	if not counts_as_a_fight(_flow.get(&"life") as RoomLife, room):
 		return
 	_cleared += 1
 	if _settle < 0:
@@ -291,6 +291,16 @@ func _on_player_downed(player: int) -> void:
 func _on_player_revived(player: int, _reviver: int) -> void:
 	if player >= 0 and player < PLAYERS:
 		_downed[player] = false
+
+
+## True when room `room`'s clear is the fight's the test waits for: a room that holds a fight
+## (`life`'s, `RoomFight.has_enemies`). The start room holds none (connected biomes CB8), nor does a
+## shop or a reward room the bots walk through on their way to one: each is cleared as it is
+## entered, and counts not (it ended the run before any fight, 2026-11-19).
+static func counts_as_a_fight(life: RoomLife, room: int) -> bool:
+	if room == EventsScript.FIRST_ROOM:
+		return false
+	return life != null and room >= 0 and room < life.fights.size() and life.fights[room].has_enemies()
 
 
 ## The failures of the finished run.

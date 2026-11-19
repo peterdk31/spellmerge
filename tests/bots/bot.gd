@@ -24,8 +24,10 @@ extends FrameSource
 ## crawls into one, and stops once within CRAWL_BESIDE of that teammate; with none standing it lies still.
 ## Travel (connected biomes CB8): out of a fight (its room under way or not, `RoomLife`), a fighter
 ## walks the biome's bridges to the nearest room whose fight is still to come (the fewest bridges from
-## where it stands; one behind a shut door, the boss's gate, it waits at: `Flow.gates`), round the walls in a room (`AISight.detour`) and
-## straight over a bridge, then steps in, and its fight seals it in; in a fight the brain plays as
+## where it stands; one behind a shut door, the boss's gate, it waits at: `Flow.gates`), along the
+## shortest walk over the wall grid (`bot_route.gd`: round a room's walls, along a walkway of any
+## shape and mirroring, through its mouths; round the walls toward the landing where no walk is
+## open), then steps in, and its fight seals it in; in a fight the brain plays as
 ## above, and a revive goes first (its brain's `revive` behaviour running: it stays by the one downed,
 ## cleared room or not). It reads Flow's map and rooms (`biome`, `life`, `gates`), as a player reads the screen.
 ## Idler: stands still; it only opens its builder.
@@ -45,6 +47,7 @@ const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
 const ReviveScript := preload("res://gameplay/ai/behaviours/revive.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const RouteScript := preload("res://tests/bots/bot_route.gd")
 ## How a bot plays (the brain's numbers).
 const PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
 
@@ -56,9 +59,15 @@ const STAFF_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"
 const BUILD_CARDS: int = 6
 ## The brain of bot `i` is seeded SEED + i, so a run repeats.
 const SEED: int = 4111
-## How far into a room from a mouth a traveller aims for (pixels), and how near counts as there.
+## How far into a room from a mouth a traveller aims for where no route is open (pixels).
 const LANDING: float = 20.0
-const NEAR: float = 8.0
+## A route (`bot_route.gd`): how near a fight room's middle a traveller walks to, how far into the
+## room at a bridge's end its area reaches, and what each route is for.
+const GOAL_REACH: float = 24.0
+const ROUTE_INTO: float = 64.0
+const ROUTE_ON_BRIDGE: int = 0
+const ROUTE_OFF_BRIDGE: int = 1
+const ROUTE_IN_ROOM: int = 2
 ## How far a detour round a wall looks (`AISight.detour`).
 const DETOUR_PROBE: float = 32.0
 ## A downed bot's crawl: how near a teammate it stops, and how far an enemy pushes it aside.
@@ -76,6 +85,9 @@ var _flow: Node = null
 var _frames: Node = null
 ## The frame it wants for the next tick (`send`), handed over in `fill_frame`.
 var _wanted: InputFrame = InputFrame.new()
+## The traveller's way over the walls, and the map it was worked out on.
+var _route: RouteScript = RouteScript.new()
+var _route_map: BiomeMap = null
 ## The open actors, read for a crawl (sized once).
 var _ids: PackedInt32Array = PackedInt32Array()
 
@@ -92,7 +104,7 @@ func join(index: int, bot_mode: Mode, input: Node, flow: Node) -> bool:
 	player = index
 	mode = bot_mode
 	_input = input
-	_flow = flow
+	use_flow(flow)
 	_wanted.seat = index
 	_wanted.clear()
 	if int(_input.call("add_virtual_device", player)) == int(_input.get("NO_DEVICE")):
@@ -101,6 +113,12 @@ func join(index: int, bot_mode: Mode, input: Node, flow: Node) -> bool:
 	if _frames != null:
 		_frames.call("set_source", player, self)
 	return true
+
+
+## Read the biome, its rooms and its doors from `flow` (the `Flow` autoload, as `join` does; a
+## stand-in with `biome`, `life` and `gates` in the travel tests).
+func use_flow(flow: Node) -> void:
+	_flow = flow
 
 
 ## Press and release `back` (B) once: in play it opens the builder.
@@ -199,7 +217,7 @@ func step(delta: float) -> void:
 	intent.begin_step()
 	brain.think(delta, intent)
 	# A revive under way (the brain's `revive` behaviour) goes first: it would walk off its teammate.
-	var way: Vector2 = Vector2.ZERO if brain.behaviour is ReviveScript else _travel(wizard)
+	var way: Vector2 = Vector2.ZERO if brain.behaviour is ReviveScript else travel(wizard)
 	if way != Vector2.ZERO:
 		intent.move = way
 	send(intent)
@@ -216,8 +234,8 @@ func send(wanted: ActorIntent) -> void:
 
 
 ## The way to walk to the nearest fight still to come (unit length), or ZERO: in a fight under way,
-## with no biome, or nothing left to go to.
-func _travel(wizard: Actor) -> Vector2:
+## with no biome, or nothing left to go to (`step`'s, and the travel tests').
+func travel(wizard: Actor) -> Vector2:
 	var biome: BiomeWorld = _flow.get(&"biome") as BiomeWorld
 	var life: RoomLife = _flow.get(&"life") as RoomLife
 	var gates: GatherDoors = _flow.get(&"gates") as GatherDoors
@@ -228,7 +246,6 @@ func _travel(wizard: Actor) -> Vector2:
 	if here >= 0 and here < map.rooms() and life.has(here, RoomLife.STARTED) and not life.has(here, RoomLife.CLEARED):
 		return Vector2.ZERO
 	# The bridges from each room, and how far each room is from the nearest fight still to come.
-	var goal: int = -1
 	var hops: PackedInt32Array = PackedInt32Array()
 	hops.resize(map.rooms())
 	hops.fill(-1)
@@ -249,20 +266,25 @@ func _travel(wizard: Actor) -> Vector2:
 						hops[other] = hops[room] + 1
 						queue.append(other)
 	var feet: Vector2 = wizard.global_position
+	if biome.map != _route_map:
+		# A new biome: its places are numbered afresh.
+		_route_map = biome.map
+		_route.reset()
 	if here >= map.rooms():
 		# On a bridge: on to the end nearer the goal.
 		var bridge: int = here - map.rooms()
 		if bridge >= map.bridges():
 			return Vector2.ZERO
 		var end: int = 0 if _hops_of(hops, map.end_room(bridge, 0)) <= _hops_of(hops, map.end_room(bridge, 1)) else 1
-		return _toward(feet, _landing(biome, bridge, end))
+		var room: int = map.end_room(bridge, end)
+		var over: Rect2 = biome.bridge_rect(bridge)
+		return _walk_to(wizard, over.merge(_inside(biome.room_rect(room), over)), room, Vector2.ZERO, INF, _route_key(ROUTE_OFF_BRIDGE, here, room), _landing(biome, bridge, end))
 	if here < 0 or hops[here] < 0:
 		return Vector2.ZERO
 	if hops[here] == 0:
-		goal = here
-	if goal >= 0:
-		return _toward(feet, biome.room_rect(goal).get_center(), true)
-	# The bridge out of this room toward the goal: to its near landing, then across.
+		var middle: Vector2 = biome.room_rect(here).get_center()
+		return _walk_to(wizard, biome.room_rect(here), here, middle, GOAL_REACH, _route_key(ROUTE_IN_ROOM, here, here), middle)
+	# The bridge out of this room toward the goal: along its walkway into the room at its far end.
 	for bridge in map.bridges():
 		for end in 2:
 			if map.end_room(bridge, end) != here:
@@ -270,15 +292,32 @@ func _travel(wizard: Actor) -> Vector2:
 			var other: int = map.end_room(bridge, 1 - end)
 			if hops[other] < 0 or hops[other] >= hops[here]:
 				continue
-			var near: Vector2 = _landing(biome, bridge, end)
-			var mouth: Vector2 = biome.mouth_rect(bridge, end).get_center()
-			# At the landing, or past it toward the mouth (a room's place reaches over its lip past the
-			# mouth): across.
-			var past: bool = (feet - near).dot(mouth - near) > 0.0 and feet.distance_to(mouth) <= LANDING + NEAR
-			if feet.distance_to(near) > NEAR and not past:
-				return _toward(feet, near, true)
-			return _toward(feet, _landing(biome, bridge, 1 - end))
+			var over: Rect2 = biome.bridge_rect(bridge)
+			var area: Rect2 = biome.room_rect(here).merge(over).merge(_inside(biome.room_rect(other), over))
+			return _walk_to(wizard, area, other, Vector2.ZERO, INF, _route_key(ROUTE_ON_BRIDGE, here, bridge), _landing(biome, bridge, 1 - end))
 	return Vector2.ZERO
+
+
+## The way for `wizard` to walk inside `area` to place `place` (within `reach` of `point`; INF:
+## anywhere in it), down the route's field (`bot_route.gd`); where the field has no way (a shut
+## door, the boss's gate: it waits there), toward `fallback` round the walls, as before routes.
+func _walk_to(wizard: Actor, area: Rect2, place: int, point: Vector2, reach: float, key: int, fallback: Vector2) -> Vector2:
+	var feet: Vector2 = wizard.global_position
+	var way: Vector2 = _route.aim(wizard.projectiles, feet, area, place, point, reach, wizard.wall_radius(), key)
+	if way != Vector2.ZERO or _route.has_way(feet):
+		return way
+	return _toward(wizard.projectiles, feet, fallback)
+
+
+## The part of room rectangle `room` within ROUTE_INTO of `bridge`'s rectangle: where a walk off
+## the bridge into that room ends.
+static func _inside(room: Rect2, bridge: Rect2) -> Rect2:
+	return room.intersection(bridge.grow(ROUTE_INTO))
+
+
+## A route's name: what it is for (ROUTE_*), the place it starts in and where it goes.
+static func _route_key(kind: int, from: int, to: int) -> int:
+	return kind + 4 * (from + 4096 * to)
 
 
 static func _hops_of(hops: PackedInt32Array, room: int) -> int:
@@ -292,13 +331,11 @@ static func _landing(biome: BiomeWorld, bridge: int, end: int) -> Vector2:
 	return mouth + (mouth - far).normalized() * LANDING
 
 
-## The way from `feet` to `goal`, round a wall in a room (`around`), straight over a bridge.
-func _toward(feet: Vector2, goal: Vector2, around: bool = false) -> Vector2:
+## The way from `feet` to `goal` over `projectiles`' grid, round a wall (a short look: `AISight.detour`).
+static func _toward(projectiles: ProjectilesScript, feet: Vector2, goal: Vector2) -> Vector2:
 	if feet.distance_to(goal) <= 1.0:
 		return Vector2.ZERO
-	if around:
-		return AISight.detour(_flow.get_node_or_null(^"/root/Projectiles") as ProjectilesScript, feet, goal, DETOUR_PROBE)
-	return (goal - feet).normalized()
+	return AISight.detour(projectiles, feet, goal, DETOUR_PROBE)
 
 
 ## The way a downed `wizard` crawls (unit length, or ZERO): toward the nearest standing teammate,
@@ -317,7 +354,7 @@ func crawl_way(wizard: Actor) -> Vector2:
 			mate = other.global_position
 	if mate == Vector2.INF or best <= CRAWL_BESIDE * CRAWL_BESIDE:
 		return Vector2.ZERO
-	var way: Vector2 = _toward(feet, mate, true)
+	var way: Vector2 = _toward(wizard.projectiles, feet, mate)
 	var table := _flow.get_node_or_null(^"/root/Actors") as ActorsScript
 	if table == null:
 		return way

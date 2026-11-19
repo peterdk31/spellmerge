@@ -4,8 +4,8 @@ extends "res://tests/support/suite.gd"
 ## mirroring, place and fill), keeps every bridge where it was, its sockets meeting them, inside the
 ## biome's area, and keeps every rule of the map (`problems`, `rule_problems`: the fixed kinds there,
 ## the boss deepest, a template once a biome; a kind's `max_per_run` may be broken, never its
-## `least`); a door's kind stays its door's; in the crypt a room changes kind, to more than one kind,
-## weighed by `kind_weight`; the same roll the same map, another roll another; the start room is
+## `least`); a door's kind stays its door's; in the made-up biome a room changes kind, to more than
+## one kind and past a count (the crypt has one template of each kind but the fight); `kind_weight`; the same roll the same map, another roll another; the start room is
 ## never rerolled; refills keep the other rooms' foes.
 const RegistryScript := preload("res://core/registry/registry.gd")
 const MadeUpBiome := preload("res://tests/support/made_up_biome.gd")

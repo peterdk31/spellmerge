@@ -558,15 +558,7 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	for place in places:
 		_read_place(grid, place)
 		_area = _rects[place] if place == 0 else _area.merge(_rects[place])
-	for place in places:
-		if _room[place] != 0:
-			continue
-		var grown: Rect2 = _rects[place].grow(RoomHearingScript.TOUCH)
-		var end: int = 0
-		for room in places:
-			if end < 2 and _room[room] != 0 and grown.intersects(_rects[room]):
-				_ends[place * 2 + end] = room
-				end += 1
+	_find_ends(places)
 	if keep:
 		_settle()
 		_stage = old_stage
@@ -589,6 +581,20 @@ func _lay(grid: RoomGrid, places: int, world_now: int) -> void:
 	_settle()
 	for map in _maps:
 		map.queue_redraw()
+
+
+## Each walkway's two rooms (`_ends`), from the places' rectangles.
+func _find_ends(places: int) -> void:
+	_ends.fill(-1)
+	for place in places:
+		if _room[place] != 0:
+			continue
+		var grown: Rect2 = _rects[place].grow(RoomHearingScript.TOUCH)
+		var end: int = 0
+		for room in places:
+			if end < 2 and _room[room] != 0 and grown.intersects(_rects[room]):
+				_ends[place * 2 + end] = room
+				end += 1
 
 
 ## Place `place` as the map draws it, read from `grid` and the pieces: its rectangle, floor, symbol and
@@ -621,6 +627,10 @@ func _relay(grid: RoomGrid, changed: PackedInt32Array) -> void:
 		# Shut, it is drawn as it stands when opened; open, it comes in again.
 		_shade[place] = 0 if shown else _shade_wanted(place)
 		_symbol_rows[place] = 0 if shown else _rows_wanted(place)
+	_area = Rect2()
+	for place in _rects.size():
+		_area = _rects[place] if place == 0 else _area.merge(_rects[place])
+	_find_ends(_rects.size())
 	_sensed_stale = true
 	_turn_rooms.clear()
 	for map in _maps:

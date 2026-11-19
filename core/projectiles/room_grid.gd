@@ -437,6 +437,16 @@ func wall_outside(pieces: Array[Rect2], within: Rect2 = Rect2()) -> void:
 				_has_walls = true
 
 
+## Whether any hole is laid worked out again from the cells (after part of the grid was laid again
+## alone, `BiomeWorld.relay_room`: a `cut` may have taken the last hole out), as a whole lay leaves it.
+func recount_holes() -> void:
+	_has_holes = false
+	for cell in _hole_cells.size():
+		if _hole_cells[cell] != 0:
+			_has_holes = true
+			return
+
+
 ## `rect` grown out to the wall cells it touches (whole cells of the grid, for a part laid again).
 func cells_round(rect: Rect2) -> Rect2:
 	var low: Vector2 = ((rect.position - _bounds.position) / WALL_CELL).floor()

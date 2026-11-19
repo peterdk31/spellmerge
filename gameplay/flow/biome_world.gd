@@ -341,6 +341,8 @@ func _lay_cells(grid: RoomGrid, within: Rect2) -> void:
 	for bridge in map.bridges():
 		for end in 2:
 			grid.add_mouth(_clipped(mouth_rect(bridge, end), within))
+	if within.has_area():
+		grid.recount_holes()
 
 
 func _lay_piece(grid: RoomGrid, shape: PieceShape, place: Vector2, within: Rect2 = Rect2()) -> void:

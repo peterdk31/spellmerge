@@ -60,7 +60,7 @@ func _start(map: BiomeMap) -> void:
 	tick.run(DT)
 
 
-## A reroll of `map` whose room moves or changes template (so its walls and place change): [room,
+## A reroll of `map` whose room changes template and moves (so its walls and place change): [room,
 ## the map rerolled], or [] for none.
 func _moving_reroll(map: BiomeMap, seed_value: int) -> Array:
 	var shapes: Dictionary = registry.call(&"piece_shapes", &"crypt")
@@ -87,7 +87,7 @@ func _layers() -> Array:
 	var rects: Array[Rect2] = []
 	for place in grid.places():
 		rects.append(grid.place_rect(place))
-	return [walls, grid.get(&"_hole_cells"), rects, grid.get(&"_place_cells"), grid.get(&"_place_mixed"), grid.bounds() if grid.has_method(&"bounds") else Rect2()]
+	return [walls, grid.get(&"_hole_cells"), grid.has_holes(), grid.has_mouths(), rects, grid.get(&"_place_cells"), grid.get(&"_place_mixed"), grid.get(&"_place_over"), grid.get(&"_sealed"), grid.get(&"_asleep")]
 
 
 func _hash() -> int:
@@ -151,6 +151,8 @@ func test_only_the_rerolled_room_is_laid_again() -> void:
 
 
 func test_the_relaid_grid_is_the_rerolled_map_laid_fresh_and_a_restore_the_same_world() -> void:
+	# A room that moves and changes template; the holes' flag is checked with the layers (and alone,
+	# `test_a_part_laid_again_with_no_hole_left_has_none`: no crypt reroll takes a room's holes away).
 	var seed_value: int = 2
 	var map: BiomeMap = _map(seed_value)
 	var found: Array = _moving_reroll(map, seed_value)
@@ -166,24 +168,45 @@ func test_the_relaid_grid_is_the_rerolled_map_laid_fresh_and_a_restore_the_same_
 	flow.call(&"_reroll_room", room, made, RoomFight.new())
 	var room_usec: int = Time.get_ticks_usec() - began
 	var relaid: Array = _layers()
+	var after: Snapshot = Snapshot.take(tick.state_areas(), root)
+	check_equal(after.problems, PackedStringArray(), "taken without problems")
+	for _i in 20:
+		tick.run(DT)
+	var hash_played: int = _hash()
+	check_equal(before.restore(tick.state_areas(), root), PackedStringArray(), "the world before restored")
+	check(flow.biome.map.same_as(map), "the map before")
+	check_equal(after.restore(tick.state_areas(), root), PackedStringArray(), "the rerolled world restored")
+	check(flow.biome.map.same_as(made), "the rerolled map")
+	check(_layers() == relaid, "the restored grid's layers are the relaid one's")
+	check_equal((flow.biome.room_layout(room) as Node2D).position, made.room_places[room], "the room laid at its new place")
+	for _i in 20:
+		tick.run(DT)
+	check_equal(_hash(), hash_played, "played on from the restore: the same state hash as played on from the relay")
 	# As a reroll laid it before (the whole biome again, as a restore into another map): timed only.
 	flow.biome.set(&"_laid", null)
 	began = Time.get_ticks_usec()
 	flow.call(&"_rebuild_biome", false)
 	var whole_usec: int = Time.get_ticks_usec() - began
 	print("Room reroll's lay: the whole biome laid again %.1f ms, the rerolled room alone %.1f ms" % [whole_usec / 1000.0, room_usec / 1000.0])
-	check(_layers() == relaid, "the whole biome laid again from the rerolled map: the same layers")
-	var hash_relaid: int = _hash()
-	var after: Snapshot = Snapshot.take(tick.state_areas(), root)
-	check_equal(after.problems, PackedStringArray(), "taken without problems")
-	check_equal(before.restore(tick.state_areas(), root), PackedStringArray(), "the world before restored")
-	check(flow.biome.map.same_as(map), "the map before")
-	check_equal(after.restore(tick.state_areas(), root), PackedStringArray(), "the rerolled world restored")
-	check(flow.biome.map.same_as(made), "the rerolled map")
-	check_equal(_hash(), hash_relaid, "the same state hash as the world relaid")
-	check(_layers() == relaid, "the restored grid's layers are the relaid one's")
-	check_equal((flow.biome.room_layout(room) as Node2D).position, made.room_places[room], "the room laid at its new place")
 	# The rerolled map laid fresh: the same grid.
 	flow.stop_run()
 	_start(made.copy())
-	check(_layers() == relaid, "a fresh lay of the rerolled map gives the relaid grid's layers")
+	var fresh: Array = _layers()
+	fresh[8] = relaid[8]
+	fresh[9] = relaid[9]
+	check(fresh == relaid, "a fresh lay of the rerolled map gives the relaid grid's layers (the seals and sleep aside)")
+
+
+func test_a_part_laid_again_with_no_hole_left_has_none() -> void:
+	# As a whole lay leaves it: `has_holes` steers the bodies' moves (state), so a relay that takes
+	# the last hole out must say so (`RoomGrid.recount_holes`).
+	var grid := RoomGrid.new()
+	grid.size_to(Rect2(0, 0, 256, 256))
+	grid.add_hole(Rect2(64, 64, 32, 32))
+	check(grid.has_holes(), "a hole")
+	grid.cut(grid.cells_round(Rect2(60, 60, 40, 40)))
+	grid.recount_holes()
+	check(not grid.has_holes(), "the last hole cut out: none")
+	grid.add_hole(Rect2(0, 0, 8, 8))
+	grid.recount_holes()
+	check(grid.has_holes(), "one left: some")

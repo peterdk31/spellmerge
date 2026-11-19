@@ -10,10 +10,13 @@ extends Control
 ##
 ## Display only: no input. It processes only while the fill is on its way, and allocates nothing.
 
-## The HUD's health and mana colours, everywhere a health or a mana is drawn: a strong red and a
-## clear blue (owner, 2026-11-19), and the dark track behind a line.
+## The HUD's health and mana colours, everywhere a bar or line of health or mana is drawn (the
+## corner panel, the builder's and the inventory's bars), and the dark track behind a line. Health
+## is a strong red, the one colour outside the palette, by the owner's word ("a very red line",
+## 2026-11-19; docs/STYLE.md, "UI"); mana is the palette's Mana light, an ultramarine built to read
+## apart from Player 1's blue.
 const HEALTH_COLOR: Color = Color("#e01a2b")
-const MANA_COLOR: Color = Color("#3d8bff")
+const MANA_COLOR: Color = Color("#6f86f0")
 const TRACK_COLOR: Color = Color(0.07, 0.06, 0.1, 0.9)
 
 ## The fill's colour, and the track's behind it.
@@ -105,7 +108,12 @@ func _pixels(share: float) -> int:
 
 func _on_resized() -> void:
 	if _share >= 0.0:
+		var had_width: bool = _target > 0 or _shown > 0
 		_target = _pixels(_share)
+		if not had_width:
+			# Told its value before it had a width (a row shown after its mana came): it starts
+			# where it is, as a line that appears does.
+			_shown = _target
 		_go()
 
 

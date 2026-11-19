@@ -81,9 +81,9 @@ func test_the_theme_has_a_panel_and_a_label_variation_per_player() -> void:
 		check(SpellmergeTheme.has_color("font_color", "PlayerLabel%d" % n), "theme has PlayerLabel%d" % n)
 
 
-func test_the_theme_has_the_bar_fills() -> void:
-	for type_name: String in ["HealthBar", "ManaBar"]:
-		check(SpellmergeTheme.has_stylebox("fill", type_name), "theme has %s" % type_name)
+func test_the_theme_has_the_health_bar_fill() -> void:
+	# The boss bar's; the corner panel draws thin lines of its own (`meter_line.gd`).
+	check(SpellmergeTheme.has_stylebox("fill", "HealthBar"), "theme has HealthBar")
 
 
 func test_every_player_panel_has_its_own_border_colour() -> void:
@@ -129,7 +129,7 @@ func test_each_panel_uses_its_players_theme_variation() -> void:
 func test_the_health_line_shows_the_health() -> void:
 	var panel: PlayerPanelScript = _panel(1)
 	await process_frame
-	panel.set_stats(64, 100, 37.8, 100.0)
+	panel.set_stats(64, 100)
 	var line: MeterLineScript = panel.health_line()
 	var width: int = floori(line.size.x)
 	check(width >= 40, "the line has its width, got %d" % width)
@@ -141,7 +141,7 @@ func test_the_health_line_shows_the_health() -> void:
 
 func test_the_panel_is_small() -> void:
 	var panel: PlayerPanelScript = _panel(1)
-	panel.set_stats(64, 100, 37.8, 100.0)
+	panel.set_stats(64, 100)
 	await process_frame
 	var wanted: Vector2 = panel.get_combined_minimum_size()
 	check(wanted.y <= 20.0, "with no staffs the panel is one thin line and its small number, got %s" % wanted)
@@ -151,7 +151,7 @@ func test_the_panel_is_small() -> void:
 
 func test_the_health_number_is_shown_small() -> void:
 	var panel: PlayerPanelScript = _panel(1)
-	panel.set_stats(64, 100, 37.8, 100.0)
+	panel.set_stats(64, 100)
 	check_equal(_label(panel, "HealthValue"), "64", "health number")
 	var label := panel.find_child("HealthValue", true, false) as Label
 	check(label.get_theme_font_size(&"font_size") <= 8, "in the small font")
@@ -159,7 +159,7 @@ func test_the_health_number_is_shown_small() -> void:
 
 func test_a_healthy_player_has_no_status_word() -> void:
 	var panel: PlayerPanelScript = _panel(1)
-	panel.set_stats(64, 100, 37.8, 100.0)
+	panel.set_stats(64, 100)
 	check(not panel.is_downed(), "not shown down")
 	check_equal(panel.status_text(), "", "no status word")
 
@@ -184,7 +184,7 @@ func test_a_staffs_mana_shows_on_its_own_row() -> void:
 
 func test_an_open_overlay_shows_menu() -> void:
 	var panel: PlayerPanelScript = _panel()
-	panel.set_stats(100, 100, 100.0, 100.0)
+	panel.set_stats(100, 100)
 	panel.set_menu_open(true)
 	check_equal(panel.status_text(), "MENU", "an open overlay shows MENU")
 
@@ -192,7 +192,7 @@ func test_an_open_overlay_shows_menu() -> void:
 func test_no_health_shows_down_over_menu() -> void:
 	var panel: PlayerPanelScript = _panel()
 	panel.set_menu_open(true)
-	panel.set_stats(0, 100, 50.0, 100.0)
+	panel.set_stats(0, 100)
 	check(panel.is_downed(), "no health is down")
 	check_equal(panel.status_text(), "DOWN", "DOWN wins over MENU")
 
@@ -200,14 +200,14 @@ func test_no_health_shows_down_over_menu() -> void:
 func test_a_revive_with_the_overlay_open_shows_menu_again() -> void:
 	var panel: PlayerPanelScript = _panel()
 	panel.set_menu_open(true)
-	panel.set_stats(0, 100, 50.0, 100.0)
-	panel.set_stats(50, 100, 50.0, 100.0)
+	panel.set_stats(0, 100)
+	panel.set_stats(50, 100)
 	check_equal(panel.status_text(), "MENU", "a revive shows MENU again while the overlay is open")
 
 
 func test_closing_the_overlay_clears_the_word() -> void:
 	var panel: PlayerPanelScript = _panel()
-	panel.set_stats(100, 100, 100.0, 100.0)
+	panel.set_stats(100, 100)
 	panel.set_menu_open(true)
 	panel.set_menu_open(false)
 	check_equal(panel.status_text(), "", "closing the overlay clears the word")
@@ -584,3 +584,30 @@ func test_the_panel_scripts_send_only_the_player_intents() -> void:
 
 func test_the_panel_scripts_read_no_input() -> void:
 	check(not _panel_source().contains("Input."), "the panel scripts read no input")
+
+
+func test_the_health_line_keeps_its_length_when_a_word_shows() -> void:
+	var panel: PlayerPanelScript = _panel()
+	panel.set_stats(100, 100)
+	await process_frame
+	var width: float = panel.health_line().size.x
+	panel.set_menu_open(true)
+	await process_frame
+	check_equal(panel.status_text(), "MENU", "the word shows")
+	check_equal(panel.health_line().size.x, width, "and the line keeps its length (Smooth: no jump)")
+	check(not (panel.find_child("HealthValue", true, false) as Label).visible, "the word is in the number's place")
+	panel.set_stats(0, 100)
+	await process_frame
+	check_equal(panel.status_text(), "DOWN", "down")
+	check_equal(panel.health_line().size.x, width, "the line keeps its length down too")
+
+
+func test_a_new_body_hides_the_mana_lines_until_its_mana_comes() -> void:
+	var hud: HudScript = _make_hud([0], true)
+	var line: MeterLineScript = hud.get_panel(0).staff_row(1).mana_line()
+	_bus.staff_mana_changed.emit(0, 1, 40.0, 80.0)
+	check(line.visible and is_equal_approx(line.share(), 0.5), "the staff's mana shows")
+	_bus.inventory_announced.emit(0, 7)
+	check(not line.visible, "another body shown: the last body's mana is not shown for it")
+	_bus.staff_mana_changed.emit(0, 1, 20.0, 80.0)
+	check(line.visible and is_equal_approx(line.share(), 0.25), "the new body's mana shows when it comes")

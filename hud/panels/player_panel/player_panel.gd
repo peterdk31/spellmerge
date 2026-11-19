@@ -1,11 +1,12 @@
 extends PanelContainer
 ## One player's corner panel, in the player's border colour, kept small (owner, 2026-11-19): a
-## thin red health line with a small number beside it, a word after them when the player is down
-## ("DOWN") or has their overlay open ("MENU"), and under it one row per staff that has cards
+## thin red health line with a small number beside it, a word in the number's place when the
+## player is down ("DOWN") or has their overlay open ("MENU"), and under it one row per staff that has cards
 ## (`staff_row.gd`: the staff's button glyph, its cast sequence, its delay and a thin blue line of
 ## its own mana, `set_staff_mana`). There is no panel-wide mana bar: every staff has its own pool,
 ## and its row shows it. The word means the state is never shown by colour alone. The lines ease
-## by whole pixels (`hud/widgets/meter_line.gd`). The room the bars took is kept free for the
+## by whole pixels (`hud/widgets/meter_line.gd`), and the line keeps one length: the number and the
+## word share one fixed cell beside it, so neither reflows it. The room the bars took is kept free for the
 ## run's coins and relics, which come with M3. There is no "P1" or "Staff 2" line (owner,
 ## 2026-10-27): the corner and the border say whose panel it is, and the rows say more than the
 ## staff cast last did.
@@ -64,9 +65,9 @@ func _ready() -> void:
 	_refresh_status()
 
 
-## Show these numbers. A player with no health left is shown as down. The mana of the staff on
-## show is not shown here: each staff row shows its own (`set_staff_mana`).
-func set_stats(health: float, max_health: float, _mana: float, _max_mana: float) -> void:
+## Show the health. A player with no health left is shown as down. Mana is not shown here: each
+## staff row shows its own (`set_staff_mana`).
+func set_stats(health: float, max_health: float) -> void:
 	if health != _health:
 		_health = health
 		_health_line.set_value(health, maxf(max_health, 1.0))
@@ -210,7 +211,7 @@ func is_downed() -> bool:
 	return _downed
 
 
-## The word after the health line; empty when nothing special.
+## The word in the number's place; empty when nothing special.
 func status_text() -> String:
 	return _status.text
 
@@ -238,6 +239,6 @@ func _refresh_status() -> void:
 		_status.text = MENU_TEXT
 	else:
 		_status.text = ""
+	# The word takes the number's place in the same cell, so the line never changes length.
 	_status.visible = _status.text != ""
-	# Down, the word says it: no "0" beside it.
-	_health_value.visible = not _downed
+	_health_value.visible = not _status.visible

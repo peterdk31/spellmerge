@@ -40,12 +40,14 @@ const IDS: Array[StringName] = [CHOOSE, BACK, DENY]
 const SILENT_GROUP: StringName = &"ui_silent"
 
 var _events: EventsScript = null
-var _ui_focus: UIFocusScript = null
 ## The pads to rumble a move on (none in a test that gives none).
 var _input: InputManagerScript = null
 ## The players (a bit each) whose menu acted on a press this frame (opened, chose, went back,
 ## paged): a focus change that follows it in the same frame is the menu's answer, not a move.
 var _acted: int = 0
+## The players (a bit each) whose focused control is in a silent menu (SILENT_GROUP), kept as the
+## focus moves, so a back is judged by the menu it was pressed in whatever closes it first.
+var _silent: int = 0
 
 
 ## Send the sound `id` (one of IDS) on `events` (none with no bus).
@@ -63,7 +65,6 @@ func _ready() -> void:
 ## `panels.gd`).
 func bind(events: EventsScript, ui_focus: UIFocusScript, input: InputManagerScript = null) -> void:
 	_events = events
-	_ui_focus = ui_focus
 	_input = input
 	if ui_focus == null:
 		return
@@ -91,7 +92,7 @@ func _mark(player: int) -> void:
 
 func _on_cancelled(player: int) -> void:
 	_mark(player)
-	if not _is_silent(player):
+	if _silent & (1 << player) == 0:
 		send(_events, BACK)
 
 
@@ -99,12 +100,11 @@ func _on_paged(player: int, _step: int) -> void:
 	_mark(player)
 
 
-func _on_focus_changed(player: int, _control: Control) -> void:
-	if _acted & (1 << player) == 0 and not _is_silent(player):
+func _on_focus_changed(player: int, control: Control) -> void:
+	# UIFocus focuses a menu's first control as it opens, so every menu passes here first.
+	if control != null and control.is_in_group(SILENT_GROUP):
+		_silent |= 1 << player
+		return
+	_silent &= ~(1 << player)
+	if _acted & (1 << player) == 0:
 		UiHaptics.pulse(_input, player, UiHaptics.POINT)
-
-
-## True while `player`'s focused control belongs to a silent menu (SILENT_GROUP).
-func _is_silent(player: int) -> bool:
-	var control: Control = _ui_focus.focused(player) if _ui_focus != null else null
-	return control != null and control.is_in_group(SILENT_GROUP)

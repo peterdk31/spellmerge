@@ -32,6 +32,7 @@ extends Control
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const MeterLineScript := preload("res://hud/widgets/meter_line.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const RadialMenuScript := preload("res://hud/widgets/radial_menu.gd")
@@ -72,7 +73,8 @@ const WARN: Color = Color("#e0592f")
 ## The arrows: a better number, a worse one (and their shape says up or down).
 const BETTER: Color = Color("#6fd46a")
 const WORSE: Color = Color("#e0592f")
-const HEALTH_COLOR: Color = Color("#e0592f")
+## The HUD's health colour (`meter_line.gd`), as on the corner panel and the builder.
+const HEALTH_COLOR: Color = MeterLineScript.HEALTH_COLOR
 const PLAYER_COLORS: Array[Color] = [Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4")]
 
 ## The layout, in the view's pixels from the quarter's top left, the same in every quarter.

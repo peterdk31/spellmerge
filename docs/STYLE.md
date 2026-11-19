@@ -188,7 +188,7 @@ The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
 
 - **Font:** one pixel font, set in `hud/theme`, at whole-number sizes only, and one title type beside it for the names of bosses (and later biomes) only: a bitmap face drawn for the game on the pixel grid, `TitleLabel` in `hud/theme/title_theme.tres`, the game's first font file (docs/milestones/boss-intro.md, rule 7). Body text is Bone light on Stone shadow; headings Bone base; warnings Fire light; gold and pickups Spark light. No other text colours.
 - **Panels:** a 1 px Outline border, Stone shadow fill, a Stone light top and left inner edge (3 shades at most). Corners are cut by one pixel, not rounded.
-- **Player panels:** the border and name tab use that player's ramp (base fill, light top-left edge, shadow bottom-right edge). Next to the colour sit the player's number (1–4) and a shape, so colour is never the only signal. Health bars are Fire and mana bars Bone on a Stone shadow trough; neither uses a player colour.
+- **Player panels:** the border and name tab use that player's ramp (base fill, light top-left edge, shadow bottom-right edge). Next to the colour sit the player's number (1–4) and a shape, so colour is never the only signal. Health is a thin line of a strong red, `#e01a2b`, the one UI colour outside the palette, by the owner's word ("a very red line", 2026-11-19); mana is a thin line of Mana light under each staff's row; both on a dark trough, and neither uses a player colour (`hud/widgets/meter_line.gd`).
 - **Icons:** 16×16 for spells and relics in the overlay, 8×8 for status marks, with the 1 px outline and at most 3 shades per material.
 - Everything snaps to whole pixels at the 640×360 base size, and four panels stay readable there.
 

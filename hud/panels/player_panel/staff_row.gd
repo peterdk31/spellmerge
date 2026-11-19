@@ -30,7 +30,8 @@ extends Control
 ##   view, with a card of the one before it showing. It slides a third of the way each frame
 ##   (`set_timing`'s), so a move never jumps (docs/STYLE.md, "Smooth"), and a small arrow at
 ##   either end says cards are hidden that way (gold when the next cast is among them, which only
-##   happens while it slides). A new plan or a new width starts the strip where it should be.
+##   happens while it slides, or when the next cast is wider than the strip); an arrow slides in
+##   from past its end over ARROW_FRAMES frames, and out again. A new plan or a new width starts the strip where it should be.
 ## - The mana line is the staff's whole mana of its pool (`staff_mana_changed`); it hides until
 ##   the staff's mana is told, and eases by whole pixels as the line does.
 ##
@@ -57,6 +58,8 @@ const CAST_GAP: float = 2.0
 const GLYPH_CELL: float = 14.0
 ## The arrow at an end of a strip with cards hidden that way: its width with its dark backing.
 const ARROW_WIDTH: float = 4.0
+## Frames an arrow takes to slide in from its end of the strip, or back out (docs/STYLE.md, "Smooth").
+const ARROW_FRAMES: int = 3
 ## How much of the cards before the next cast stays in view: one card, and the arrow over it.
 const LEAD: float = ICON_STEP
 ## How many frames (`set_timing` calls) the white rim stays on a glyph whose staff became ready.
@@ -115,6 +118,9 @@ var _content_width: float = 0.0
 ## How far the strip is scrolled, in whole pixels, and where it slides to.
 var _scroll: int = 0
 var _scroll_target: int = 0
+## How far each end's arrow has slid in, 0 (out) to ARROW_FRAMES (in).
+var _left_in: int = 0
+var _right_in: int = 0
 ## The cast fired next (`Spells.cast_index`), the delay left and the delay it started from.
 var _cursor: int = 0
 var _left: float = 0.0
@@ -251,6 +257,8 @@ func set_timing(cursor: int, left: float, winding: bool = false, firing: int = F
 		_rim_frames = RIM_FRAMES
 	_scroll_target = _wanted_scroll()
 	if _step_scroll():
+		changed = true
+	if _step_arrows():
 		changed = true
 	if changed or is_recharging() != was_recharging:
 		_redraw_all()
@@ -406,7 +414,25 @@ func _measure() -> void:
 	_mana.size = Vector2(width, MANA_HEIGHT)
 	_scroll_target = _wanted_scroll()
 	_scroll = _scroll_target
+	_left_in = ARROW_FRAMES if hides_left() else 0
+	_right_in = ARROW_FRAMES if hides_right() else 0
 	_redraw_all()
+
+
+## One frame of each arrow's slide toward in (cards hidden that way) or out; true when one moved.
+func _step_arrows() -> bool:
+	var left: int = clampi(_left_in + (1 if hides_left() else -1), 0, ARROW_FRAMES)
+	var right: int = clampi(_right_in + (1 if hides_right() else -1), 0, ARROW_FRAMES)
+	var moved: bool = left != _left_in or right != _right_in
+	_left_in = left
+	_right_in = right
+	return moved
+
+
+## How far an arrow has slid in, 0 to ARROW_FRAMES: the left one (`way` -1) or the right (for
+## tests).
+func arrow_in(way: int) -> int:
+	return _left_in if way < 0 else _right_in
 
 
 ## Where the strip should be: the next cast's frame in view with LEAD of the cards before it and
@@ -512,14 +538,20 @@ func _draw_cards() -> void:
 			_drawn_shade = Rect2(shade.position + _strip.position, shade.size)
 	var next_left: bool = next < _cast_x.size() and _cast_x[next] - float(_scroll) < 0.0
 	var next_right: bool = next < _cast_x.size() and not next_left and not is_cast_in_view(next)
-	if hides_left():
-		_draw_arrow(0.0, -1, GOLD if next_left else MUTED)
-	if hides_right():
-		_draw_arrow(view - ARROW_WIDTH, 1, GOLD if next_right else MUTED)
+	# An arrow slides in from past its end, a pixel or two a frame, never popping in whole.
+	if _left_in > 0:
+		_draw_arrow(-_arrow_out(_left_in), -1, GOLD if next_left else MUTED)
+	if _right_in > 0:
+		_draw_arrow(view - ARROW_WIDTH + _arrow_out(_right_in), 1, GOLD if next_right else MUTED)
+
+
+## How far past its end an arrow `slid` frames in is still, in whole pixels.
+func _arrow_out(slid: int) -> float:
+	return floorf(ARROW_WIDTH * float(ARROW_FRAMES - slid) / float(ARROW_FRAMES))
 
 
 ## A small arrow at `x` of the strip pointing `way` (-1 left, 1 right), on a dark backing over the
-## cards it hides: 3 px wide, 5 px tall at its base.
+## cards it hides: 3 px wide, its columns 2, 4 and 6 px tall from the tip.
 func _draw_arrow(x: float, way: int, color: Color) -> void:
 	_strip.draw_rect(Rect2(x, 0.0, ARROW_WIDTH, BOX_HEIGHT), FILL)
 	for step in 3:

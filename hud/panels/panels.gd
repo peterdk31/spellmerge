@@ -744,10 +744,12 @@ func _reset_all() -> void:
 		_refresh(player)
 
 
-func _on_stats_changed(player: int, health: float, max_health: float, mana: float, max_mana: float) -> void:
+## A seat's numbers: the panel shows the health (each staff row its own mana, from
+## `staff_mana_changed`).
+func _on_stats_changed(player: int, health: float, max_health: float, _mana: float, _max_mana: float) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		var before: float = _panels[player].health()
-		_panels[player].set_stats(health, max_health, mana, max_mana)
+		_panels[player].set_stats(health, max_health)
 		if _in_room and before >= 0.0 and health < before:
 			_vignette.flash_hit(player, (before - health) / maxf(max_health, 1.0), _joined.count(true))
 		if health <= 0.0:

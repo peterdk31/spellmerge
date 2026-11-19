@@ -441,3 +441,23 @@ func test_a_fizzle_flashes_the_glyph() -> void:
 	for frame in RowScript.RIM_FRAMES + 1:
 		_tick(1)
 	check(not row.is_fizzling(), "for a few frames")
+
+
+func test_a_scrolled_strip_still_marks_its_next_cast_and_slides_its_arrows_in() -> void:
+	_build(0, 0, CARDS)
+	await process_frame
+	# The row is stepped by hand here, not by the HUD's frame (which reads the real cursor).
+	_hud.set_process(false)
+	var row: RowScript = _hud.get_panel(0).staff_row(0)
+	check_equal(row.arrow_in(1), RowScript.ARROW_FRAMES, "a long staff starts with its right arrow in")
+	check_equal(row.arrow_in(-1), 0, "and no left arrow")
+	var next: int = CARDS / 2
+	row.set_timing(next, 0.0)
+	check_equal(row.arrow_in(-1), 1, "the left arrow starts to slide in, not all at once")
+	for _frame in 60:
+		row.set_timing(next, 0.0)
+	check_equal(row.arrow_in(-1), RowScript.ARROW_FRAMES, "and is in after a few frames")
+	await process_frame
+	await process_frame
+	check(row.scroll() > 0, "scrolled")
+	check_equal(row.drawn_outline(), next, "the cast in the middle has the gold frame while scrolled")
